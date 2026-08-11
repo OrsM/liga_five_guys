@@ -1,4 +1,4 @@
-# Fantasy report — 2026-08-11T2251Z
+# Fantasy report — 2026-08-11T2314Z
 
 _614 players, 509 with a probable-XI reading._
 
@@ -23,6 +23,35 @@ _614 players, 509 with a probable-XI reading._
 | ruben garcia | Osasuna | 13.26M | 180K | 60% |  |
 
 **Squad value: 138.15M** — compare with the app's team value; a mismatch means a name matched the wrong player.
+
+## Lineup
+
+**4-5-1** — projected 32.0 pts
+
+| | Player | Start% | Score | Last season |
+|---|---|--:|--:|---|
+| POR | alvaro fernandez | 20% | 1.2 | no history |
+| DEF | carl starfelt | 70% | 3.6 | 106p / 19j |
+| DEF | igor zubeldia | 80% | 3.0 | 90p / 25j |
+| DEF | omar el hilali | 80% | 2.4 | 101p / 36j |
+| DEF | robin le normand | 50% | 2.2 | 125p / 28j |
+| MED | jon moncayola | 90% | 3.9 | 159p / 36j |
+| MED | dani lorenzo | 90% | 3.7 | no history |
+| MED | ruben garcia | 60% | 2.9 | 174p / 35j |
+| MED | iñigo ruiz de galarreta | 60% | 2.7 | 156p / 34j |
+| MED | beñat turrientes | 70% | 2.5 | 93p / 27j |
+| DEL | iñigo vicente | 90% | 3.9 | no history |
+
+**Bench**
+
+| Player | Pos | Score | Why |
+|---|---|--:|---|
+| pepelu | med | 2.1 | outscored |
+| dani martinez | def | 2.1 | no XI reading |
+| hugo duro | del | 1.9 | outscored |
+| orri steinn oskarsson | del | 1.7 | outscored |
+
+_Score = shrunk pts/match (K=8, from 2025-26) × P(start). A proxy until real jornadas exist — sanity-check it against your own read._
 
 ## Rising fastest (24h)
 
@@ -62,6 +91,4 @@ _614 players, 509 with a probable-XI reading._
 
 Recruitment targets live in `reports/watchlist.md` — it filters out players your rivals already own.
 
-**No expected points yet** — no jornada has been played. Once results exist this gains a points model and a best-XI recommendation.
-
-_Generated 2026-08-11 22:52 UTC._
+_Generated 2026-08-11 23:15 UTC._
