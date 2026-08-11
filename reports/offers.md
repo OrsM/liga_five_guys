@@ -33,4 +33,4 @@ Ranked by start probability, then price edge. **Edge** is value minus asking pri
 
 No expected-points model yet, so this ranks on start probability and price only. A 90% starter at a weak club still scores less than a 70% starter at a strong one — use judgement.
 
-_Generated 2026-08-11 20:40 UTC._
+_Generated 2026-08-11 22:43 UTC._
