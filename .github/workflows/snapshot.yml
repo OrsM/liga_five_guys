@@ -47,12 +47,17 @@ jobs:
           FF_ROOT: ./data
         run: python report.py
 
+      - name: Bid log
+        env:
+          FF_ROOT: ./data
+        run: python bids.py
+
       - name: Commit
         run: |
           git config user.name  "snapshot-bot"
           git config user.email "snapshot-bot@users.noreply.github.com"
           mkdir -p reports
-          git add -A data reports
+          git add -A data reports bids.csv
           git diff --staged --quiet || git commit -m "snapshot $(date -u +%Y-%m-%dT%H%MZ)"
           git pull --rebase && git push
 
