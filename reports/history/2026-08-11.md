@@ -1,4 +1,4 @@
-# Fantasy report — 2026-08-11T2314Z
+# Fantasy report — 2026-08-11T2322Z
 
 _614 players, 509 with a probable-XI reading._
 
@@ -91,4 +91,4 @@ _Score = shrunk pts/match (K=8, from 2025-26) × P(start). A proxy until real jo
 
 Recruitment targets live in `reports/watchlist.md` — it filters out players your rivals already own.
 
-_Generated 2026-08-11 23:15 UTC._
+_Generated 2026-08-11 23:23 UTC._
