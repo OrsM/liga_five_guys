@@ -1,0 +1,31 @@
+name: offers
+
+# Run from the Actions tab after editing offers.txt.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  offers:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Rank
+        env:
+          FF_ROOT: ./data
+        run: |
+          python offers.py
+          cat reports/offers.md
+      - name: Commit
+        run: |
+          git config user.name  "snapshot-bot"
+          git config user.email "snapshot-bot@users.noreply.github.com"
+          mkdir -p reports
+          git add -A reports offers.txt
+          git diff --staged --quiet || git commit -m "offers"
+          git pull --rebase && git push
