@@ -150,31 +150,37 @@ def _num(v):
         return None
 
 
-# futbolfantasy player links look like /jugadores/ficha/<id>/<name>, so the
-# first path segment is the literal word "ficha" and useless as an id. Capture
-# the whole path and derive an id from it.
-PATH_RE = re.compile(r'/jugadores/([^"\'\s>]+)')
+# Player photos live at /jugadores/ficha/<id>.png and appear BEFORE the player
+# link in the markup, so a naive /jugadores/ match grabs the image. Worse,
+# players with no photo all share 00.png. Match the anchor href specifically.
+HREF_RE = re.compile(r'href="[^"]*?/jugadores/([^"?#]+)"')
+PHOTO_RE = re.compile(r'/jugadores/ficha/(\d+)\.(?:png|jpg|jpeg|webp)')
+ASSET_RE = re.compile(r'\.(png|jpg|jpeg|webp|svg)$', re.I)
 
 
 def _player_path(chunk: str) -> str | None:
-    m = PATH_RE.search(chunk)
-    return m.group(1).rstrip("/") if m else None
+    for cand in HREF_RE.findall(chunk):
+        cand = cand.rstrip("/")
+        if cand and not ASSET_RE.search(cand):
+            return cand
+    return None
 
 
 def _slug(chunk: str) -> str | None:
-    """A stable per-player id. Prefer the numeric id in the URL — names get
-    re-spelled and accented differently between pages, ids don't."""
+    """Stable per-player id. Prefers the player-page path; falls back to the
+    numeric photo id, but never to the shared 00 placeholder."""
     path = _player_path(chunk)
-    if not path:
-        return None
-    parts = [p for p in path.split("/") if p and p != "ficha"]
-    if not parts:
-        return None
-    # Prefer the numeric segment if there is one, else the last segment.
-    for p in parts:
-        if p.isdigit():
-            return p
-    return parts[-1]
+    if path:
+        parts = [p for p in path.split("/") if p and p != "ficha"]
+        for p in parts:
+            if p.isdigit() and p != "00":
+                return p
+        if parts:
+            return parts[-1]
+    m = PHOTO_RE.search(chunk)
+    if m and m.group(1) != "00":
+        return m.group(1)
+    return None
 
 
 # ---------------------------------------------------------------------------
