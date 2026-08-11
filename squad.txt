@@ -1,0 +1,15 @@
+# Your squad — one player slug per line.
+#
+# The slug is what appears in a futbolfantasy player URL:
+#   https://www.futbolfantasy.com/jugadores/lamine-yamal  ->  lamine-yamal
+#
+# Easiest way to find them: open data/tidy/market.csv, search the player's
+# name, copy the value in the `slug` column. Names get re-spelled between
+# pages; slugs don't, which is why we key on them.
+#
+# Edit this straight from the GitHub web UI (pencil icon) whenever you buy or
+# sell. Lines starting with # are ignored, blank lines too.
+#
+# Rivals' squads are deliberately NOT tracked yet — with 3 managers and ~600
+# players the free pool is huge, so what they own rarely changes a decision.
+# Worth adding later for clause exposure, not now.
