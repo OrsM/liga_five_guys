@@ -1,4 +1,4 @@
-# Fantasy report — 2026-08-11T1806Z
+# Fantasy report — 2026-08-11T1919Z
 
 _613 players, 509 with a probable-XI reading._
 
@@ -107,4 +107,4 @@ _613 players, 509 with a probable-XI reading._
 
 **No expected points yet** — no jornada has been played. Once results exist this gains a points model and a best-XI recommendation.
 
-_Generated 2026-08-11 18:07 UTC._
+_Generated 2026-08-11 19:20 UTC._
