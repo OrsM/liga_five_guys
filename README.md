@@ -1,72 +1,78 @@
 # liga_five_guys
-Data-driven deci# fantasy — LaLiga Fantasy decision system
 
-Private. Personal use only. Do not redistribute the scraped data.
+Data-driven decision system for LaLiga Fantasy Oficial. Private league
+"Some Guys", 3 managers. Runs entirely on GitHub Actions — no local machine.
 
-## What's here
+Personal use only. Don't redistribute the scraped data.
 
-| File | Does |
-|---|---|
-| `ff_ingest.py` | Fetches + parses public futbolfantasy data. **No login.** |
-| `optimise.py` | MILP: best XI, squad plan, bid reservation price |
-| `llf_client.py` | Official API client. Parked — needs a token we can't get yet. |
-| `.github/workflows/snapshot.yml` | Runs the snapshot twice daily on GitHub's machines |
-| `data/raw/dt=…/` | Gzipped HTML, immutable. Never edit or delete these. |
-| `data/tidy/*.csv` | Parsed output. Disposable — regenerated from raw. |
-| `docs/design.md` | Full architecture, data sources, modelling plan |
+## Layout
 
-## Setup (5 minutes, all from a phone)
+```
+src/                 ff_ingest.py  report.py  offers.py  bids.py
+                     find_slug.py  optimise.py (unused — Phase 3)
+inputs/              squad.txt  offers.txt  lookup.txt  bids.csv   ← you edit these
+data/raw/dt=…/       gzipped HTML — immutable, never edit or delete
+data/tidy/*.csv      parsed output — disposable, rebuilt from raw
+reports/*.md         generated; read these on your phone
+docs/design.md       architecture, data sources, modelling plan
+HANDOFF.md           current state + prompt for a fresh session
+```
 
-1. **Create the repo** — GitHub app → New → Private.
-2. **Upload** the four files. `snapshot.yml` goes in `.github/workflows/`.
-3. **Actions tab → daily snapshot → Run workflow.**
-4. Green tick + a new `data/raw/dt=…` folder = you're collecting.
+## Workflows
 
-That's it. No secrets, no token, nothing to rotate.
+| Workflow | When | Does |
+|---|---|---|
+| **daily snapshot** | 22:40 + 09:40 UTC, or manual | Fetch → parse → report → bid log → commit |
+| **lookup players** | manual | Resolve app names to CSV names |
+| **offers** | manual | Rank what's currently purchasable |
 
-## What it collects
+## Routine
 
-- **Market values** for every player, daily: value, 1-day delta, 1-day %,
-  position, team. This is the price series the whole value model needs, and
-  it can't be backfilled — every day missed is gone.
-- **Probable XIs** for all 20 teams: starter/sub, start %, injury and doubt
-  flags. This is the single highest-value input for "who do I field".
+- **Most days:** glance at `reports/latest.md`. Usually nothing to do.
+- **Thursday/Friday:** probable XIs firm up. This is when the report earns its
+  keep and when to spend.
+- **Before bidding:** type what's on offer into `inputs/offers.txt`, run
+  *offers*, read `reports/offers.md`.
+- **After bidding:** add a row to `inputs/bids.csv`; set `outcome` when it
+  resolves. Record losses too — they're what reveal rivals' premiums.
+- **After buying/selling:** update `inputs/squad.txt`.
 
 ## Design notes
 
 **Raw HTML is kept forever; parsed CSV is disposable.** Scrapers rot. When the
-markup changes, or you want a field you didn't think to extract, fix `parse`
-and re-run over the whole history. If you'd only kept the CSV, that's gone.
+markup changes, fix the parser and re-run over all history. Keeping only the
+CSV would lose that option.
 
-**Key on `player_slug`, not name.** Names get re-spelled and accented
-differently between pages; the URL slug is stable.
+**Names are the only join key.** Neither futbolfantasy page exposes player
+links — just photo URLs, and photo-less players all share `00.png`. Don't
+attempt a slug-based join.
 
-**An empty parse is an error, not an empty result.** A silently-empty probable
-XI would set every start probability to zero and quietly bench your best
-players. `parse` exits non-zero instead.
+**Empty results say why.** A silently-blank probable XI would set every start
+probability to zero and quietly bench your best players, so each section
+explains itself when it has nothing.
 
-**Be a good citizen.** One sweep per run, sequential, 1.5–3s between requests,
-and it aborts immediately on 403/429. Someone maintains that site for free.
+**Scripts prefer `inputs/<file>` but fall back to the repo root**, so a
+partial move doesn't break a run.
+
+**Be a good citizen.** One sweep per run, 1.5–3s between requests, aborts on
+403/429.
 
 ## Roadmap
 
-- [x] **Phase 0 — collect.** Twice-daily snapshots. The only irreversible bit.
-- [ ] **Phase 1 — decide.** "Start these 11" from probable XI + shrunk
-      5-jornada mean points. Beats manual play on its own.
+- [x] **Phase 0 — collect.** Twice-daily snapshots. The only irreversible part.
+- [x] **Phase 0.5 — report.** Squad, momentum, cheap likely starters, bid log.
+- [ ] **Phase 1 — decide.** Expected points from probable XI + shrunk points
+      mean; best-XI recommendation. Needs a few jornadas played.
 - [ ] **Phase 2 — value.** Odds → team λ, points decomposition, price model.
 - [ ] **Phase 3 — optimise.** Multi-week planning, reservation-price bidding.
+      `src/optimise.py` is the skeleton; it needs a coach (`entrenador`) slot.
 
-Phases 2+ can't be validated until there are ~8 jornadas to backtest against,
-so building them now would be guessing.
+Phases 2+ can't be validated until ~8 jornadas exist to backtest against.
 
-## The parked auth path
+## The official API
 
-There is no web version of LaLiga Fantasy any more — `fantasy.laliga.com` is a
-download splash, and `miliga.laliga.com` is a different product (MILIGA fan
-rewards, `fz-` prefixed keys, no refresh token). So the browser token capture
-in `docs/design.md` §3 can't be done at all, on phone or desktop.
-
-Options when there's a desktop to hand: run Externoak/LaLigaApp and read the
-session it stores, or put mitmproxy in front of the native app and see whether
-it pins certificates. Until then the API only adds your own squad, your cash,
-and rival bid history — none of which the model needs.
+Unreachable. There is no web version of LaLiga Fantasy — `fantasy.laliga.com`
+is a download splash and `miliga.laliga.com` is a different product. No
+browser session means no token, on any device. `docs/design.md` §3 documents
+the endpoints for if that ever changes; futbolfantasy's values match the app
+to the euro, so the API isn't needed for pricing anyway.
