@@ -37,6 +37,18 @@ jobs:
         id: watch
         run: python src/watch.py
 
+      # Housekeeping. Self-healing, so it can stay here forever: it drops
+      # the old committed alerts.md (the issue is the artifact now) and
+      # sweeps any dated archive left at the top level into history/.
+      - name: Tidy reports/
+        run: |
+          mkdir -p reports/history
+          rm -f reports/alerts.md
+          for f in reports/[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9].md; do
+            [ -e "$f" ] || continue
+            mv -f "$f" reports/history/
+          done
+
       - name: Commit
         run: |
           git config user.name "github-actions[bot]"
@@ -55,7 +67,8 @@ jobs:
         if: steps.watch.outputs.fired == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BODY: ${{ steps.watch.outputs.path }}
         run: |
           gh issue create \
             --title "Market alert $(date -u +%F\ %R)" \
-            --body-file reports/alerts.md
+            --body-file "$BODY"
