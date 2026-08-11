@@ -40,13 +40,23 @@ jobs:
       # Housekeeping. Self-healing, so it can stay here forever: it drops
       # the old committed alerts.md (the issue is the artifact now) and
       # sweeps any dated archive left at the top level into history/.
+      #
+      # It never overwrites an existing history/ file. report.py is the only
+      # thing that should author those; if one is already there, the stray
+      # top-level copy is stale and just gets deleted. That's what stops the
+      # add/add rebase conflict against the snapshot workflow.
       - name: Tidy reports/
         run: |
           mkdir -p reports/history
           rm -f reports/alerts.md
           for f in reports/[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9].md; do
             [ -e "$f" ] || continue
-            mv -f "$f" reports/history/
+            dest="reports/history/$(basename "$f")"
+            if [ -e "$dest" ]; then
+              rm -f "$f"
+            else
+              mv "$f" "$dest"
+            fi
           done
 
       - name: Commit
@@ -56,12 +66,25 @@ jobs:
           git add -A data/state reports inputs/squad.txt
           if git diff --staged --quiet; then
             echo "nothing to commit"
-          else
-            git commit -m "market: $(date -u +%FT%RZ)"
-            # the ingest workflow commits too — rebase before pushing
-            git pull --rebase --autostash
-            git push
+            exit 0
           fi
+          git commit -m "market: $(date -u +%FT%RZ)"
+          # The snapshot workflow pushes to the same branch — rebase, and
+          # retry rather than dying on a race.
+          for attempt in 1 2 3; do
+            if git pull --rebase --autostash -X theirs; then
+              if git push; then
+                echo "pushed on attempt $attempt"
+                exit 0
+              fi
+            else
+              git rebase --abort || true
+            fi
+            echo "attempt $attempt failed; retrying"
+            sleep 7
+          done
+          echo "::error::could not push after 3 attempts"
+          exit 1
 
       - name: Open an issue if something fired
         if: steps.watch.outputs.fired == 'true'
