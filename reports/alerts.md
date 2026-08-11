@@ -1,4 +1,4 @@
-# Alerts — 2026-08-11 22:32 UTC
+# Alerts — 2026-08-11 22:33 UTC
 
 - **abel bretones** (Osasuna) +4.0% in 24h (132K, value 3.28M)
 - **aitor paredes** (Athletic) +2.6% in 24h (118K, value 4.62M)
@@ -24,17 +24,3 @@
 - **santi comesaña** (Villarreal) +2.8% in 24h (885K, value 31.57M)
 - **sergio canales** (Racing) +3.9% in 24h (794K, value 20.19M)
 - **stole dimitrievski** (Valencia) +3.2% in 24h (395K, value 12.45M)
-- KEEPER: **alex remiro** (Real Sociedad) at 90%, value 45.01M
-- KEEPER: **alvaro valles** (Betis) at 95%, value 30.42M
-- KEEPER: **antonio sivera** (Alavés) at 95%, value 30.46M
-- KEEPER: **augusto batalla** (Rayo) at 95%, value 41.92M
-- KEEPER: **david soria** (Getafe) at 95%, value 19.30M
-- KEEPER: **ionut radu** (Celta) at 90%, value 40.23M
-- KEEPER: **jan oblak** (Atlético) at 90%, value 54.36M
-- KEEPER: **joan garcia** (Barcelona) at 80%, value 62.72M
-- KEEPER: **leo roman** (Deportivo) at 80%, value 34.10M
-- KEEPER: **marko dmitrovic** (Espanyol) at 95%, value 36.35M
-- KEEPER: **mathew ryan** (Levante) at 90%, value 13.55M
-- KEEPER: **odysseas vlachodimos** (Sevilla) at 90%, value 16.30M
-- KEEPER: **stole dimitrievski** (Valencia) at 90%, value 12.45M
-- KEEPER: **unai simon** (Athletic) at 90%, value 57.62M
