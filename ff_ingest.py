@@ -187,50 +187,57 @@ def _slug(chunk: str) -> str | None:
 # parse — probable XI
 # ---------------------------------------------------------------------------
 
+# "Carles Aleñá 50% 28 años Izquierdo 1.80m 0 0 ..." -> name is the text
+# before the start percentage. Everything after it is biography and stat junk.
+NAME_RE = re.compile(r"^(.*?)\s*(\d{1,3})\s*%")
+
+
+def _name_from_blob(text: str) -> tuple[str | None, int | None]:
+    m = NAME_RE.match(text)
+    if m:
+        return m.group(1).strip() or None, int(m.group(2))
+    # No percentage: fall back to the text before the first digit.
+    head = re.split(r"\d", text, 1)[0].strip()
+    return (head or None), None
+
+
 def parse_team(html: str, slug: str, observed_at: str) -> list[dict]:
     from lxml import html as lh
 
     doc = lh.fromstring(html)
     rows = []
+    seen = set()
 
     def add(el, role):
+        text = " ".join(el.text_content().split())
+        name, pct = _name_from_blob(text)
+        if not name or name.lower() in seen:
+            return
+        seen.add(name.lower())
+        # Injury/doubt markers must come from the player element itself. Reading
+        # the parent's classes tagged every starter in a section as injured.
+        own = " ".join(el.classes).lower()
+        status = ("injured" if "lesionad" in own
+                  else "doubt" if "duda" in own or "sancion" in own
+                  else "ok")
         href = el.get("href") or ""
         if not href:
             a = el.find(".//a[@href]")
             href = a.get("href") if a is not None else ""
-        text = " ".join(el.text_content().split())
-        pct = re.search(r"(\d+)\s*%", text)
-        cls = " ".join(el.classes).lower() + " " + (el.getparent().get("class") or "").lower()
         rows.append({
             "observed_at": observed_at,
             "team_slug": slug,
-            "player_slug": _slug(href),
-            "display": text[:60],
+            "player_name": name,
+            "player_slug": _slug(href) if href else None,
             "role": role,
-            "start_pct": int(pct.group(1)) if pct else None,
-            "status": "injured" if "lesionad" in cls else "doubt" if "duda" in cls else "ok",
+            "start_pct": pct,
+            "status": status,
         })
 
     for el in doc.cssselect('[class*="jugadores-titulares"] .jugador.tipo_lista'):
         add(el, "starter")
     for el in doc.cssselect('[class*="jugadores-suplentes"] .jugador.tipo_lista'):
         add(el, "sub")
-
-    # Pitch view is an independent rendering of the same information; useful
-    # as a cross-check when the list view changes shape.
-    for w in doc.cssselect(".camiseta-wrapper[data-onceff]"):
-        a = w.cssselect("a[href*='/jugadores/']")
-        if not a:
-            continue
-        rows.append({
-            "observed_at": observed_at,
-            "team_slug": slug,
-            "player_slug": _slug(a[0].get("href") or ""),
-            "display": " ".join(a[0].text_content().split())[:60],
-            "role": "pitch_gk" if "portero" in " ".join(w.classes) else "pitch",
-            "start_pct": None,
-            "status": "ok",
-        })
 
     return rows
 
