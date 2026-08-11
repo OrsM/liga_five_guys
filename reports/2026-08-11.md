@@ -1,4 +1,4 @@
-# Fantasy report — 2026-08-11T1750Z
+# Fantasy report — 2026-08-11T1806Z
 
 _613 players, 509 with a probable-XI reading._
 
@@ -6,22 +6,22 @@ _613 players, 509 with a probable-XI reading._
 
 | Player | Team | Value | 24h | Start% | |
 |---|---|--:|--:|--:|---|
-| alvaro fernandez | Deportivo | 5.05M | -83K | — |  |
-| robin le normand | Atlético | 10.03M | -104K | — |  |
-| igor zubeldia | Real Sociedad | 9.72M | -30K | — |  |
-| omar el hilali | Espanyol | 8.47M | 161K | — |  |
-| carl starfelt | Celta | 13.23M | 294K | — |  |
+| alvaro fernandez | Deportivo | 5.05M | -83K | 20% |  |
+| robin le normand | Atlético | 10.03M | -104K | 50% |  |
+| igor zubeldia | Real Sociedad | 9.72M | -30K | 80% |  |
+| omar el hilali | Espanyol | 8.47M | 161K | 80% |  |
+| carl starfelt | Celta | 13.23M | 294K | 70% |  |
 | dani martinez | Atlético | 418K | -3K | — |  |
-| `moncayola` | ? | — | — | — | **not found** |
-| ruben garcia | Osasuna | 13.09M | 73K | — |  |
-| iñigo ruiz de galarreta | Athletic | 11.72M | 205K | — |  |
-| pepelu | Valencia | 7.48M | -55K | — |  |
-| dani lorenzo | Málaga | 9.43M | 75K | — |  |
-| hugo duro | Valencia | 8.59M | -80K | — |  |
-| orri steinn oskarsson | Real Sociedad | 8.27M | -131K | — |  |
-| iñigo vicente | Racing | 18.76M | 10K | — |  |
+| jon moncayola | Osasuna | 6.45M | 103K | 90% |  |
+| ruben garcia | Osasuna | 13.09M | 73K | 60% |  |
+| iñigo ruiz de galarreta | Athletic | 11.72M | 205K | 60% |  |
+| pepelu | Valencia | 7.48M | -55K | 50% |  |
+| dani lorenzo | Málaga | 9.43M | 75K | 90% |  |
+| hugo duro | Valencia | 8.59M | -80K | 50% |  |
+| orri steinn oskarsson | Real Sociedad | 8.27M | -131K | 40% |  |
+| iñigo vicente | Racing | 18.76M | 10K | 90% |  |
 
-**Squad value: 124.26M** — compare with the app's team value; a mismatch means a name matched the wrong player.
+**Squad value: 130.71M** — compare with the app's team value; a mismatch means a name matched the wrong player.
 
 ## Rising fastest (24h)
 
@@ -59,10 +59,52 @@ _613 players, 509 with a probable-XI reading._
 
 ## Cheap likely starters (start% >= 70)
 
-_Readings exist but none cleared the threshold, or they didn't join to a market entry._
+**Portero**
+
+| Player | Team | Value | Start% |
+|---|---|--:|--:|
+| matias dituro | Elche | 6.86M | 90% |
+| alfonso herrero | Málaga | 7.64M | 80% |
+| stole dimitrievski | Valencia | 12.45M | 90% |
+| mathew ryan | Levante | 13.55M | 90% |
+| odysseas vlachodimos | Sevilla | 16.30M | 90% |
+| david soria | Getafe | 19.30M | 95% |
+
+**Defensa**
+
+| Player | Team | Value | Start% |
+|---|---|--:|--:|
+| aissa mandi | Levante | 1.88M | 80% |
+| alvaro mantilla | Racing | 2.58M | 80% |
+| davinchi | Getafe | 3.01M | 80% |
+| facundo gonzalez | Racing | 3.09M | 70% |
+| abel bretones | Osasuna | 3.28M | 90% |
+| kiko femenia | Getafe | 3.62M | 70% |
+
+**Mediocampista**
+
+| Player | Team | Value | Start% |
+|---|---|--:|--:|
+| ramon enriquez | Málaga | 864K | 70% |
+| ramon terrats | Getafe | 2.81M | 80% |
+| pablo ibañez | Alavés | 3.23M | 70% |
+| marc aguado | Elche | 3.50M | 70% |
+| rodrigo riquelme | Betis | 3.52M | 70% |
+| jon ander olasagasti | Levante | 4.00M | 90% |
+
+**Delantero**
+
+| Player | Team | Value | Start% |
+|---|---|--:|--:|
+| miguel sierra | Sevilla | 602K | 70% |
+| alex calatrava | Espanyol | 3.72M | 70% |
+| martin satriano | Getafe | 4.34M | 90% |
+| luismi cruz | Deportivo | 5.91M | 70% |
+| roberto fernandez | Espanyol | 6.31M | 70% |
+| ivan romero | Levante | 6.86M | 80% |
 
 ---
 
 **No expected points yet** — no jornada has been played. Once results exist this gains a points model and a best-XI recommendation.
 
-_Generated 2026-08-11 17:51 UTC._
+_Generated 2026-08-11 18:07 UTC._
