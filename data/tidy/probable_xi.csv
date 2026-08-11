@@ -4951,3 +4951,1241 @@ observed_at,team_slug,player_slug,display,role,start_pct,status
 2026-08-11T1735Z,villarreal,,,pitch,,ok
 2026-08-11T1735Z,villarreal,,,pitch,,ok
 2026-08-11T1735Z,villarreal,,,pitch,,ok
+2026-08-11T1750Z,alaves,,Carles Aleñá 50% 28 años Izquierdo 1.80m 0 0 0 0 -- -- -- --,starter,50,injured
+2026-08-11T1750Z,alaves,,Ángel Pérez 80% 24 años Derecho 1.83m 0 0 0 0 -- -- -- -- 0 ,starter,80,injured
+2026-08-11T1750Z,alaves,,Ville Koski 60% 24 años Derecho 1.85m 0 0 0 0 -- -- -- -- 0 ,starter,60,injured
+2026-08-11T1750Z,alaves,,Nahuel Tenaglia 90% 30 años Derecho 1.81m 0 0 0 0 -- -- -- -,starter,90,injured
+2026-08-11T1750Z,alaves,,Youssef Enríquez 50% 20 años Izquierdo 1.70m 0 0 0 0 -- -- -,starter,50,injured
+2026-08-11T1750Z,alaves,,Antonio Blanco 90% 26 años Derecho 1.76m 0 0 0 0 -- -- -- --,starter,90,injured
+2026-08-11T1750Z,alaves,,Pablo Ibáñez 70% 27 años Derecho 1.79m 0 0 0 0 -- -- -- -- 0,starter,70,injured
+2026-08-11T1750Z,alaves,,Antonio Sivera 95% 30 años Derecho 1.85m 0 0 0 0 -- -- -- --,starter,95,injured
+2026-08-11T1750Z,alaves,,Toni Martinez 80% 29 años Derecho 1.87m 0 0 0 0 -- -- -- -- ,starter,80,injured
+2026-08-11T1750Z,alaves,,Lucas Boyé 50% 30 años Derecho 1.83m 0 0 0 0 -- -- -- -- 0 0,starter,50,injured
+2026-08-11T1750Z,alaves,,Jonny Castro 70% 32 años Ambidiestro 1.75m 0 0 0 0 -- -- -- ,starter,70,injured
+2026-08-11T1750Z,alaves,,Denis Suárez 50% 32 años Derecho 1.76m 0 0 0 0 -- -- -- -- 0,sub,50,ok
+2026-08-11T1750Z,alaves,,Abde Rebbach 50% 28 años Derecho 1.76m 0 0 0 0 -- -- -- -- 0,sub,50,ok
+2026-08-11T1750Z,alaves,,Nicolás Valentini 30% 25 años Izquierdo 1.87m 0 0 0 0 -- -- ,sub,30,ok
+2026-08-11T1750Z,alaves,,Mikel Rodriguez 30% 24 años Derecho 1.75m 0 0 0 0 -- -- -- -,sub,30,ok
+2026-08-11T1750Z,alaves,,Aitor Mañas 30% 23 años Izquierdo 1.85m 0 0 0 0 -- -- -- -- ,sub,30,ok
+2026-08-11T1750Z,alaves,,Xanet Oláiz 30% - - - - 0 0 0 0 -- -- -- -- 0 0 ALA vs GET 🏠,sub,30,ok
+2026-08-11T1750Z,alaves,,Miguel Rodríguez 20% 23 años Izquierdo 1.79m 0 0 0 0 -- -- -,sub,20,ok
+2026-08-11T1750Z,alaves,,Ander Guevara 20% 29 años Derecho 1.80m 0 0 0 0 -- -- -- -- ,sub,20,ok
+2026-08-11T1750Z,alaves,,Hugo Novoa 20% 23 años Derecho 1.82m 0 0 0 0 -- -- -- -- 0 0,sub,20,ok
+2026-08-11T1750Z,alaves,,Mariano Díaz 20% 33 años Derecho 1.80m 0 0 0 0 -- -- -- -- 0,sub,20,ok
+2026-08-11T1750Z,alaves,,Carlos Benavidez 10% 28 años Derecho 1.85m 0 0 0 0 -- -- -- ,sub,10,ok
+2026-08-11T1750Z,alaves,,Jesús Owono 5% 25 años Ambidiestro 1.86m 0 0 0 0 -- -- -- --,sub,5,ok
+2026-08-11T1750Z,alaves,,Selu Diallo 0% 22 años Derecho 1.87m 0 0 0 0 -- -- -- -- 0 0,sub,0,ok
+2026-08-11T1750Z,alaves,,Moussa Diarra 0% 25 años Izquierdo 1.85m 0 0 0 0 -- -- -- --,sub,0,ok
+2026-08-11T1750Z,alaves,,Nikola Maras 0% 30 años Derecho 1.89m 0 0 0 0 -- -- -- -- 0 ,sub,0,ok
+2026-08-11T1750Z,alaves,,Adrián Rodríguez 0% 25 años Derecho 1.95m 0 0 0 0 -- -- -- -,sub,0,ok
+2026-08-11T1750Z,alaves,,Facundo Garcés 0% 26 años Derecho 1.91m 0 0 0 0 -- -- -- -- ,sub,0,ok
+2026-08-11T1750Z,alaves,,"Aleñá 3,96M (-33k) 860k (+0) 830k (+40k) 19,00M (+0) 1,37M (",pitch,,ok
+2026-08-11T1750Z,alaves,,1.8380%,pitch,,ok
+2026-08-11T1750Z,alaves,,"Koski 803k (+0) 1,29M (+0) 1,81M (+10k) 17,00M (+0) 1,62M (+",pitch,,ok
+2026-08-11T1750Z,alaves,,1.8190%,pitch,,ok
+2026-08-11T1750Z,alaves,,"Youssef 496k (-3k) 420k (+50k) 220k (+10k) 17,00M (+0) 1,00M",pitch,,ok
+2026-08-11T1750Z,alaves,,1.7690%,pitch,,ok
+2026-08-11T1750Z,alaves,,1.7970%,pitch,,ok
+2026-08-11T1750Z,alaves,,1.8595%,pitch_gk,,ok
+2026-08-11T1750Z,alaves,,1.8780%,pitch,,ok
+2026-08-11T1750Z,alaves,,1.8350%,pitch,,ok
+2026-08-11T1750Z,alaves,,1.7570%,pitch,,ok
+2026-08-11T1750Z,alaves,,"Denis Suárez 2,65M (-39k) 440k (+10k) 1,08M (+10k) 19,00M (+",pitch,,ok
+2026-08-11T1750Z,alaves,,1.7650%,pitch,,ok
+2026-08-11T1750Z,alaves,,"Valentini - 810k (+210k) 680k (+10k) 19,00M (+0) 2,25M (-67k",pitch,,ok
+2026-08-11T1750Z,alaves,,"Mikel Rodriguez - 250k (+20k) 230k (+0) 16,00M (+0) 1,00M (+",pitch,,ok
+2026-08-11T1750Z,alaves,,1.8530%,pitch,,ok
+2026-08-11T1750Z,alaves,,Oláiz 602k (+0) - - - - - - - 0 partidos0 min.Sin definir,pitch,,ok
+2026-08-11T1750Z,alaves,,"Miguel 680k (+0) 1,05M (-40k) 1,01M (-20k) 28,00M (+0) 2,09M",pitch,,ok
+2026-08-11T1750Z,alaves,,1.8020%,pitch,,ok
+2026-08-11T1750Z,alaves,,1.8220%,pitch,,ok
+2026-08-11T1750Z,alaves,,1.8020%TRN,pitch,,ok
+2026-08-11T1750Z,alaves,,1.8510%,pitch,,ok
+2026-08-11T1750Z,alaves,,1.865%,pitch,,ok
+2026-08-11T1750Z,alaves,,1.870%,pitch,,ok
+2026-08-11T1750Z,alaves,,1.850%TRN,pitch,,ok
+2026-08-11T1750Z,alaves,,1.890%TRN,pitch,,ok
+2026-08-11T1750Z,alaves,,1.950%,pitch,,ok
+2026-08-11T1750Z,alaves,,1.910%,pitch,,ok
+2026-08-11T1750Z,alaves,,,pitch,,ok
+2026-08-11T1750Z,alaves,,,pitch,,ok
+2026-08-11T1750Z,alaves,,,pitch,,ok
+2026-08-11T1750Z,alaves,,,pitch,,ok
+2026-08-11T1750Z,alaves,,,pitch,,ok
+2026-08-11T1750Z,alaves,,,pitch,,ok
+2026-08-11T1750Z,alaves,,,pitch,,ok
+2026-08-11T1750Z,alaves,,,pitch,,ok
+2026-08-11T1750Z,alaves,,,pitch,,ok
+2026-08-11T1750Z,alaves,,,pitch_gk,,ok
+2026-08-11T1750Z,alaves,,,pitch,,ok
+2026-08-11T1750Z,athletic,,Yeray Álvarez 70% 31 años Derecho 1.82m 0 0 0 0 -- -- -- -- ,starter,70,injured
+2026-08-11T1750Z,athletic,,Jesús Areso 50% 27 años Derecho 1.82m 0 0 0 0 -- -- -- -- 0 ,starter,50,injured
+2026-08-11T1750Z,athletic,,Unai Simón 90% 29 años Derecho 1.90m 0 0 0 0 -- -- -- -- 0 0,starter,90,injured
+2026-08-11T1750Z,athletic,,Aitor Paredes 70% 26 años Derecho 1.85m 0 0 0 0 -- -- -- -- ,starter,70,injured
+2026-08-11T1750Z,athletic,,Gorka Guruzeta 80% 29 años Derecho 1.88m 0 0 0 0 -- -- -- --,starter,80,injured
+2026-08-11T1750Z,athletic,,Iñaki Williams 60% 32 años Derecho 1.86m 0 0 0 0 -- -- -- --,starter,60,injured
+2026-08-11T1750Z,athletic,,Íñigo Ruiz de Galarreta 60% 33 años Derecho 1.75m 0 0 0 0 --,starter,60,injured
+2026-08-11T1750Z,athletic,,Nico Williams 50% 24 años Derecho 1.81m 0 0 0 0 -- -- -- -- ,starter,50,injured
+2026-08-11T1750Z,athletic,,Yuri Berchiche 70% 36 años Izquierdo 1.81m 0 0 0 0 -- -- -- ,starter,70,injured
+2026-08-11T1750Z,athletic,,Oihan Sancet 70% 26 años Derecho 1.88m 0 0 0 0 -- -- -- -- 0,starter,70,injured
+2026-08-11T1750Z,athletic,,Mikel Jauregizar 70% 22 años Derecho 1.77m 0 0 0 0 -- -- -- ,starter,70,injured
+2026-08-11T1750Z,athletic,,Robert Navarro 50% 24 años Derecho 1.78m 0 0 0 0 -- -- -- --,sub,50,ok
+2026-08-11T1750Z,athletic,,Peio Canales 40% 21 años Derecho 1.75m 0 0 0 0 -- -- -- -- 0,sub,40,ok
+2026-08-11T1750Z,athletic,,Hugo Rincón 40% 23 años Derecho 1.83m 0 0 0 0 -- -- -- -- 0 ,sub,40,ok
+2026-08-11T1750Z,athletic,,Beñat Prados 30% 25 años Derecho 1.80m 0 0 0 0 -- -- -- -- 0,sub,30,ok
+2026-08-11T1750Z,athletic,,Álex Berenguer 30% 31 años Derecho 1.75m 0 0 0 0 -- -- -- --,sub,30,ok
+2026-08-11T1750Z,athletic,,Adama Boiro 30% 24 años Izquierdo 1.83m 0 0 0 0 -- -- -- -- ,sub,30,ok
+2026-08-11T1750Z,athletic,,Dani Vivian 30% 27 años Derecho 1.84m 0 0 0 0 -- -- -- -- 0 ,sub,30,ok
+2026-08-11T1750Z,athletic,,Aymeric Laporte 30% 32 años Izquierdo 1.91m 0 0 0 0 -- -- --,sub,30,ok
+2026-08-11T1750Z,athletic,,Alejandro Rego 20% 23 años Derecho 1.92m 0 0 0 0 -- -- -- --,sub,20,ok
+2026-08-11T1750Z,athletic,,Beñat Gerenabarrena 10% 23 años Derecho 1.73m 0 0 0 0 -- -- ,sub,10,ok
+2026-08-11T1750Z,athletic,,Selton Sánchez 10% 19 años Derecho 1.85m 0 0 0 0 -- -- -- --,sub,10,ok
+2026-08-11T1750Z,athletic,,Nico Serrano 10% 23 años Izquierdo 1.76m 0 0 0 0 -- -- -- --,sub,10,ok
+2026-08-11T1750Z,athletic,,Andoni Gorosabel 10% 30 años Derecho 1.74m 0 0 0 0 -- -- -- ,sub,10,ok
+2026-08-11T1750Z,athletic,,Álvaro Djaló 10% 26 años Derecho 1.75m 0 0 0 0 -- -- -- -- 0,sub,10,ok
+2026-08-11T1750Z,athletic,,Alex Padilla 10% 22 años Derecho 1.90m 0 0 0 0 -- -- -- -- 0,sub,10,ok
+2026-08-11T1750Z,athletic,,Unai Vencedor 0% 25 años Derecho 1.76m 0 0 0 0 -- -- -- -- 0,sub,0,ok
+2026-08-11T1750Z,athletic,,Maroan Sannadi 0% 25 años Derecho 1.92m 0 0 0 0 -- -- -- -- ,sub,0,ok
+2026-08-11T1750Z,athletic,,Unai Egiluz 0% 24 años Derecho 1.86m 0 0 0 0 -- -- -- -- 0 0,sub,0,ok
+2026-08-11T1750Z,athletic,,"Yeray 4,36M (+77k) 1,51M (+50k) 1,82M (+70k) 24,00M (+0) 3,2",pitch,,ok
+2026-08-11T1750Z,athletic,,"Areso 2,69M (+56k) 1,52M (+0) 1,21M (+40k) 23,00M (+0) 2,29M",pitch,,ok
+2026-08-11T1750Z,athletic,,1.9090%,pitch_gk,,ok
+2026-08-11T1750Z,athletic,,"Paredes 4,62M (+118k) 1,45M (+230k) 610k (+40k) 26,00M (+0) ",pitch,,ok
+2026-08-11T1750Z,athletic,,1.8880%,pitch,,ok
+2026-08-11T1750Z,athletic,,1.8660%,pitch,,ok
+2026-08-11T1750Z,athletic,,1.7560%,pitch,,ok
+2026-08-11T1750Z,athletic,,1.8150%,pitch,,ok
+2026-08-11T1750Z,athletic,,1.8170%,pitch,,ok
+2026-08-11T1750Z,athletic,,1.8870%,pitch,,ok
+2026-08-11T1750Z,athletic,,1.7770%,pitch,,ok
+2026-08-11T1750Z,athletic,,"Navarro 2,07M (+2k) 960k (+10k) 2,35M (+20k) 29,00M (+0) 3,0",pitch,,ok
+2026-08-11T1750Z,athletic,,"Canales 1,62M (+0) 2,51M (+190k) 1,78M (+40k) 22,00M (+0) 2,",pitch,,ok
+2026-08-11T1750Z,athletic,,1.8340%,pitch,,ok
+2026-08-11T1750Z,athletic,,1.8030%,pitch,,ok
+2026-08-11T1750Z,athletic,,1.7530%,pitch,,ok
+2026-08-11T1750Z,athletic,,1.8330%,pitch,,ok
+2026-08-11T1750Z,athletic,,1.8430%,pitch,,ok
+2026-08-11T1750Z,athletic,,1.9130%,pitch,,ok
+2026-08-11T1750Z,athletic,,1.9220%,pitch,,ok
+2026-08-11T1750Z,athletic,,1.7310%,pitch,,ok
+2026-08-11T1750Z,athletic,,1.8510%,pitch,,ok
+2026-08-11T1750Z,athletic,,1.7610%,pitch,,ok
+2026-08-11T1750Z,athletic,,1.7410%CEDTRN,pitch,,ok
+2026-08-11T1750Z,athletic,,1.7510%,pitch,,ok
+2026-08-11T1750Z,athletic,,1.9010%,pitch,,ok
+2026-08-11T1750Z,athletic,,1.760%TRN,pitch,,ok
+2026-08-11T1750Z,athletic,,1.920%,pitch,,ok
+2026-08-11T1750Z,athletic,,1.860%,pitch,,ok
+2026-08-11T1750Z,athletic,,,pitch,,ok
+2026-08-11T1750Z,athletic,,,pitch_gk,,ok
+2026-08-11T1750Z,athletic,,,pitch,,ok
+2026-08-11T1750Z,athletic,,,pitch,,ok
+2026-08-11T1750Z,athletic,,,pitch,,ok
+2026-08-11T1750Z,athletic,,,pitch,,ok
+2026-08-11T1750Z,athletic,,,pitch,,ok
+2026-08-11T1750Z,athletic,,,pitch,,ok
+2026-08-11T1750Z,athletic,,,pitch,,ok
+2026-08-11T1750Z,athletic,,,pitch,,ok
+2026-08-11T1750Z,athletic,,,pitch,,ok
+2026-08-11T1750Z,atletico,,Álex Baena 50% 25 años Derecho 1.72m 0 0 0 0 -- -- -- -- 0 0,starter,50,injured
+2026-08-11T1750Z,atletico,,Jan Oblak 90% 33 años Derecho 1.88m 0 0 0 0 -- -- -- -- 0 0 ,starter,90,injured
+2026-08-11T1750Z,atletico,,Álex Grimaldo 70% 30 años Izquierdo 1.71m 0 0 0 0 -- -- -- -,starter,70,injured
+2026-08-11T1750Z,atletico,,Alexander Sorloth 70% 30 años Izquierdo 1.95m 0 0 0 0 -- -- ,starter,70,injured
+2026-08-11T1750Z,atletico,,Ademola Lookman 80% 28 años Derecho 1.74m 0 0 0 0 -- -- -- -,starter,80,injured
+2026-08-11T1750Z,atletico,,Giuliano Simeone 70% 23 años Derecho 1.74m 0 0 0 0 -- -- -- ,starter,70,injured
+2026-08-11T1750Z,atletico,,Morten Hjulmand 70% 27 años Derecho 1.85m 0 0 0 0 -- -- -- -,starter,70,injured
+2026-08-11T1750Z,atletico,,Pablo Barrios 60% 23 años Derecho 1.81m 0 0 0 0 -- -- -- -- ,starter,60,injured
+2026-08-11T1750Z,atletico,,David Hancko 80% 28 años Izquierdo 1.88m 0 0 0 0 -- -- -- --,starter,80,injured
+2026-08-11T1750Z,atletico,,Marc Pubill 50% 23 años Derecho 1.91m 0 0 0 0 -- -- -- -- 0 ,starter,50,injured
+2026-08-11T1750Z,atletico,,Marcos Llorente 50% 31 años Derecho 1.83m 0 0 0 0 -- -- -- -,starter,50,injured
+2026-08-11T1750Z,atletico,,Julián Álvarez 50% 26 años Derecho 1.70m 0 0 0 0 -- -- -- --,sub,50,ok
+2026-08-11T1750Z,atletico,,Rodrigo Mendoza 50% 21 años Derecho 1.82m 0 0 0 0 -- -- -- -,sub,50,ok
+2026-08-11T1750Z,atletico,,Robin Le Normand 50% 29 años Derecho 1.87m 0 0 0 0 -- -- -- ,sub,50,ok
+2026-08-11T1750Z,atletico,,Koke Resurrección 40% 34 años Derecho 1.76m 0 0 0 0 -- -- --,sub,40,ok
+2026-08-11T1750Z,atletico,,Johnny Cardoso 30% 24 años Derecho 1.86m 0 0 0 0 -- -- -- --,sub,30,ok
+2026-08-11T1750Z,atletico,,Jorge Domínguez 30% - - - - 0 0 0 0 -- -- -- -- 0 0 ATM vs M,sub,30,ok
+2026-08-11T1750Z,atletico,,Arnau Ortiz 30% 24 años Ambidiestro 1.75m 0 0 0 0 -- -- -- -,sub,30,ok
+2026-08-11T1750Z,atletico,,Javier Boñar 20% 21 años Derecho 1.80m 0 0 0 0 -- -- -- -- 0,sub,20,ok
+2026-08-11T1750Z,atletico,,Obed Vargas 20% 21 años Derecho 1.75m 0 0 0 0 -- -- -- -- 0 ,sub,20,ok
+2026-08-11T1750Z,atletico,,José María Giménez 10% 31 años Derecho 1.86m 0 0 0 0 -- -- -,sub,10,ok
+2026-08-11T1750Z,atletico,,Kang-In Lee 10% 25 años Izquierdo 1.74m 0 0 0 0 -- -- -- -- ,sub,10,ok
+2026-08-11T1750Z,atletico,,Carlos Martín 10% 24 años Derecho 1.84m 0 0 0 0 -- -- -- -- ,sub,10,ok
+2026-08-11T1750Z,atletico,,Juan Musso 10% 32 años Derecho 1.93m 0 0 0 0 -- -- -- -- 0 0,sub,10,ok
+2026-08-11T1750Z,atletico,,Matteo Ruggeri 0% 24 años Izquierdo 1.87m 0 0 0 0 -- -- -- -,sub,0,ok
+2026-08-11T1750Z,atletico,,Nahuel Molina 0% 28 años Derecho 1.79m 0 0 0 0 -- -- -- -- 0,sub,0,ok
+2026-08-11T1750Z,atletico,,Thomas Lemar 0% 30 años Izquierdo 1.71m 0 0 0 0 -- -- -- -- ,sub,0,ok
+2026-08-11T1750Z,atletico,,1.7250%,pitch,,ok
+2026-08-11T1750Z,atletico,,1.8890%,pitch_gk,,ok
+2026-08-11T1750Z,atletico,,"Grimaldo - 10,91M (+0) 6,75M (+40k) 52,00M (+0) 27,58M (+275",pitch,,ok
+2026-08-11T1750Z,atletico,,1.9570%,pitch,,ok
+2026-08-11T1750Z,atletico,,1.7480%,pitch,,ok
+2026-08-11T1750Z,atletico,,1.7470%,pitch,,ok
+2026-08-11T1750Z,atletico,,"Hjulmand 33,94M (+508k) 6,82M (+140k) 5,65M (-30k) 85,00M (+",pitch,,ok
+2026-08-11T1750Z,atletico,,1.8160%,pitch,,ok
+2026-08-11T1750Z,atletico,,1.8880%,pitch,,ok
+2026-08-11T1750Z,atletico,,1.9150%,pitch,,ok
+2026-08-11T1750Z,atletico,,1.8350%,pitch,,ok
+2026-08-11T1750Z,atletico,,1.7050%,pitch,,ok
+2026-08-11T1750Z,atletico,,"Mendoza 871k (-6k) 560k (-10k) 680k (+0) 22,00M (+0) 1,85M (",pitch,,ok
+2026-08-11T1750Z,atletico,,1.8750%,pitch,,ok
+2026-08-11T1750Z,atletico,,1.7640%,pitch,,ok
+2026-08-11T1750Z,atletico,,1.8630%,pitch,,ok
+2026-08-11T1750Z,atletico,,Jorge Domínguez - - - - - - - - 0 partidos0 min.Sin definir,pitch,,ok
+2026-08-11T1750Z,atletico,,1.7530%,pitch,,ok
+2026-08-11T1750Z,atletico,,1.8020%,pitch,,ok
+2026-08-11T1750Z,atletico,,1.7520%CED,pitch,,ok
+2026-08-11T1750Z,atletico,,1.8610%,pitch,,ok
+2026-08-11T1750Z,atletico,,"Kang-In Lee - 7,95M (+160k) 5,84M (+120k) 45,00M (+0) 27,15M",pitch,,ok
+2026-08-11T1750Z,atletico,,1.8410%CEDTRN,pitch,,ok
+2026-08-11T1750Z,atletico,,1.9310%,pitch,,ok
+2026-08-11T1750Z,atletico,,1.870%,pitch,,ok
+2026-08-11T1750Z,atletico,,1.790%,pitch,,ok
+2026-08-11T1750Z,atletico,,1.710%CEDTRN,pitch,,ok
+2026-08-11T1750Z,atletico,,,pitch,,ok
+2026-08-11T1750Z,atletico,,,pitch,,ok
+2026-08-11T1750Z,atletico,,,pitch,,ok
+2026-08-11T1750Z,atletico,,,pitch,,ok
+2026-08-11T1750Z,atletico,,,pitch,,ok
+2026-08-11T1750Z,atletico,,,pitch_gk,,ok
+2026-08-11T1750Z,atletico,,,pitch,,ok
+2026-08-11T1750Z,atletico,,,pitch,,ok
+2026-08-11T1750Z,atletico,,,pitch,,ok
+2026-08-11T1750Z,atletico,,,pitch,,ok
+2026-08-11T1750Z,atletico,,,pitch,,ok
+2026-08-11T1750Z,barcelona,,Marc Bernal 50% 19 años Izquierdo 1.93m 0 0 0 0 -- -- -- -- ,starter,50,injured
+2026-08-11T1750Z,barcelona,,Joan Garcia 80% 25 años Derecho 1.94m 0 0 0 0 -- -- -- -- 0 ,starter,80,injured
+2026-08-11T1750Z,barcelona,,Lamine Yamal 60% 19 años Izquierdo 1.83m 0 0 0 0 -- -- -- --,starter,60,injured
+2026-08-11T1750Z,barcelona,,Fermín López 70% 23 años Derecho 1.76m 0 0 0 0 -- -- -- -- 0,starter,70,injured
+2026-08-11T1750Z,barcelona,,Pau Cubarsí 70% 19 años Derecho 1.84m 0 0 0 0 -- -- -- -- 0 ,starter,70,injured
+2026-08-11T1750Z,barcelona,,Karim Adeyemi 50% 24 años Izquierdo 1.80m 0 0 0 0 -- -- -- -,starter,50,injured
+2026-08-11T1750Z,barcelona,,Gerard Martín 80% 24 años Izquierdo 1.86m 0 0 0 0 -- -- -- -,starter,80,injured
+2026-08-11T1750Z,barcelona,,Alejandro Balde 70% 22 años Izquierdo 1.77m 0 0 0 0 -- -- --,starter,70,injured
+2026-08-11T1750Z,barcelona,,Pedri González 70% 23 años Derecho 1.74m 0 0 0 0 -- -- -- --,starter,70,injured
+2026-08-11T1750Z,barcelona,,Eric Garcia 50% 25 años Derecho 1.83m 0 0 0 0 -- -- -- -- 0 ,starter,50,injured
+2026-08-11T1750Z,barcelona,,Raphinha 70% 29 años Izquierdo 1.76m 0 0 0 0 -- -- -- -- 0 0,starter,70,injured
+2026-08-11T1750Z,barcelona,,Jules Koundé 50% 27 años Derecho 1.81m 0 0 0 0 -- -- -- -- 0,sub,50,ok
+2026-08-11T1750Z,barcelona,,Pablo Gavi 50% 22 años Derecho 1.73m 0 0 0 0 -- -- -- -- 0 0,sub,50,ok
+2026-08-11T1750Z,barcelona,,Anthony Gordon 50% 25 años Derecho 1.83m 0 0 0 0 -- -- -- --,sub,50,ok
+2026-08-11T1750Z,barcelona,,Dani Olmo 40% 28 años Derecho 1.79m 0 0 0 0 -- -- -- -- 0 0 ,sub,40,ok
+2026-08-11T1750Z,barcelona,,Xavi Espart 40% 19 años Derecho 1.75m 0 0 0 0 -- -- -- -- 0 ,sub,40,ok
+2026-08-11T1750Z,barcelona,,Andreas Christensen 40% 30 años Derecho 1.89m 0 0 0 0 -- -- ,sub,40,ok
+2026-08-11T1750Z,barcelona,,Ferrán Torres 40% 26 años Derecho 1.83m 0 0 0 0 -- -- -- -- ,sub,40,ok
+2026-08-11T1750Z,barcelona,,Hamza Abdelkarim 30% 18 años Ambidiestro 1.82m 0 0 0 0 -- --,sub,30,ok
+2026-08-11T1750Z,barcelona,,Wojciech Szczesny 20% 36 años Derecho 1.95m 0 0 0 0 -- -- --,sub,20,ok
+2026-08-11T1750Z,barcelona,,Marc Casadó 0% 22 años Derecho 1.72m 0 0 0 0 -- -- -- -- 0 0,sub,0,ok
+2026-08-11T1750Z,barcelona,,Héctor Fort 0% 20 años Derecho 1.85m 0 0 0 0 -- -- -- -- 0 0,sub,0,ok
+2026-08-11T1750Z,barcelona,,Frenkie de Jong 0% 29 años Derecho 1.81m 0 0 0 0 -- -- -- --,sub,0,ok
+2026-08-11T1750Z,barcelona,,Roony Bardghji 0% 20 años Izquierdo 1.73m 0 0 0 0 -- -- -- -,sub,0,ok
+2026-08-11T1750Z,barcelona,,1.9350%,pitch,,ok
+2026-08-11T1750Z,barcelona,,1.9480%,pitch_gk,,ok
+2026-08-11T1750Z,barcelona,,1.8360%,pitch,,ok
+2026-08-11T1750Z,barcelona,,1.7670%,pitch,,ok
+2026-08-11T1750Z,barcelona,,1.8470%,pitch,,ok
+2026-08-11T1750Z,barcelona,,"Adeyemi - 11,23M (+1,37M) 8,14M (-200k) 75,00M (+0) 28,12M (",pitch,,ok
+2026-08-11T1750Z,barcelona,,1.8680%,pitch,,ok
+2026-08-11T1750Z,barcelona,,"Balde 23,11M (-195k) 2,95M (+210k) 3,23M (+0) 44,00M (+0) 15",pitch,,ok
+2026-08-11T1750Z,barcelona,,1.7470%,pitch,,ok
+2026-08-11T1750Z,barcelona,,1.8350%,pitch,,ok
+2026-08-11T1750Z,barcelona,,1.7670%,pitch,,ok
+2026-08-11T1750Z,barcelona,,1.8150%,pitch,,ok
+2026-08-11T1750Z,barcelona,,1.7350%,pitch,,ok
+2026-08-11T1750Z,barcelona,,"Gordon - 17,30M (+0) 9,73M (-160k) 110,00M (+0) 47,72M (+117",pitch,,ok
+2026-08-11T1750Z,barcelona,,1.7940%,pitch,,ok
+2026-08-11T1750Z,barcelona,,"Espart 703k (+0) 320k (-30k) 290k (+10k) 17,00M (+0) 1,00M (",pitch,,ok
+2026-08-11T1750Z,barcelona,,1.8940%,pitch,,ok
+2026-08-11T1750Z,barcelona,,1.8340%,pitch,,ok
+2026-08-11T1750Z,barcelona,,1.8230%,pitch,,ok
+2026-08-11T1750Z,barcelona,,1.9520%,pitch,,ok
+2026-08-11T1750Z,barcelona,,1.720%CEDTRN,pitch,,ok
+2026-08-11T1750Z,barcelona,,1.850%CEDTRN,pitch,,ok
+2026-08-11T1750Z,barcelona,,1.810%,pitch,,ok
+2026-08-11T1750Z,barcelona,,1.730%,pitch,,ok
+2026-08-11T1750Z,barcelona,,,pitch,,ok
+2026-08-11T1750Z,barcelona,,,pitch,,ok
+2026-08-11T1750Z,barcelona,,,pitch_gk,,ok
+2026-08-11T1750Z,barcelona,,,pitch,,ok
+2026-08-11T1750Z,barcelona,,,pitch,,ok
+2026-08-11T1750Z,barcelona,,,pitch,,ok
+2026-08-11T1750Z,barcelona,,,pitch,,ok
+2026-08-11T1750Z,barcelona,,,pitch,,ok
+2026-08-11T1750Z,barcelona,,,pitch,,ok
+2026-08-11T1750Z,barcelona,,,pitch,,ok
+2026-08-11T1750Z,barcelona,,,pitch,,ok
+2026-08-11T1750Z,betis,,Cucho Hernández 60% 27 años Derecho 1.76m 0 0 0 0 -- -- -- -,starter,60,injured
+2026-08-11T1750Z,betis,,Pablo Fornals 80% 30 años Derecho 1.78m 0 0 0 0 -- -- -- -- ,starter,80,injured
+2026-08-11T1750Z,betis,,Héctor Bellerín 70% 31 años Derecho 1.78m 0 0 0 0 -- -- -- -,starter,70,injured
+2026-08-11T1750Z,betis,,Diego Javier Llorente 60% 32 años Derecho 1.86m 0 0 0 0 -- -,starter,60,injured
+2026-08-11T1750Z,betis,,Natan 80% 25 años Izquierdo 1.88m 0 0 0 0 -- -- -- -- 0 0 BE,starter,80,injured
+2026-08-11T1750Z,betis,,Álvaro Valles 95% 29 años Derecho 1.91m 0 0 0 0 -- -- -- -- ,starter,95,injured
+2026-08-11T1750Z,betis,,Marc Roca 60% 29 años Izquierdo 1.84m 0 0 0 0 -- -- -- -- 0 ,starter,60,injured
+2026-08-11T1750Z,betis,,Isco Alarcón 50% 34 años Derecho 1.76m 0 0 0 0 -- -- -- -- 0,starter,50,injured
+2026-08-11T1750Z,betis,,Antony 60% 26 años Izquierdo 1.72m 0 0 0 0 -- -- -- -- 0 0 B,starter,60,injured
+2026-08-11T1750Z,betis,,Fran García 80% 26 años Izquierdo 1.69m 0 0 0 0 -- -- -- -- ,starter,80,injured
+2026-08-11T1750Z,betis,,Rodrigo Riquelme 70% 26 años Derecho 1.74m 0 0 0 0 -- -- -- ,starter,70,injured
+2026-08-11T1750Z,betis,,Facundo Bernal 50% 22 años Derecho 1.87m 0 0 0 0 -- -- -- --,sub,50,ok
+2026-08-11T1750Z,betis,,Nelson Deossa 40% 26 años Izquierdo 1.85m 0 0 0 0 -- -- -- -,sub,40,ok
+2026-08-11T1750Z,betis,,Pablo García 40% 20 años Izquierdo 1.75m 0 0 0 0 -- -- -- --,sub,40,ok
+2026-08-11T1750Z,betis,,Marc Bartra 40% 35 años Derecho 1.84m 0 0 0 0 -- -- -- -- 0 ,sub,40,ok
+2026-08-11T1750Z,betis,,Abde Ezzalzouli 30% 24 años Derecho 1.77m 0 0 0 0 -- -- -- -,sub,30,ok
+2026-08-11T1750Z,betis,,Álvaro Fidalgo 30% 29 años Derecho 1.75m 0 0 0 0 -- -- -- --,sub,30,ok
+2026-08-11T1750Z,betis,,Ángel Ortiz 30% 22 años Derecho 1.67m 0 0 0 0 -- -- -- -- 0 ,sub,30,ok
+2026-08-11T1750Z,betis,,Giovani Lo Celso 20% 30 años Izquierdo 1.77m 0 0 0 0 -- -- -,sub,20,ok
+2026-08-11T1750Z,betis,,Junior Firpo 20% 29 años Izquierdo 1.84m 0 0 0 0 -- -- -- --,sub,20,ok
+2026-08-11T1750Z,betis,,Valentín Gómez 20% 23 años Izquierdo 1.81m 0 0 0 0 -- -- -- ,sub,20,ok
+2026-08-11T1750Z,betis,,José Antonio Morante 10% - - - - 0 0 0 0 -- -- -- -- 0 0 BET,sub,10,ok
+2026-08-11T1750Z,betis,,Manu González 5% - - - - 0 0 0 0 -- -- -- -- 0 0 BET vs RSO ,sub,5,ok
+2026-08-11T1750Z,betis,,Iker Losada 0% 25 años Derecho 1.75m 0 0 0 0 -- -- -- -- 0 0,sub,0,ok
+2026-08-11T1750Z,betis,,Gonzalo Petit 0% 19 años Derecho 1.91m 0 0 0 0 -- -- -- -- 0,sub,0,ok
+2026-08-11T1750Z,betis,,Aitor Ruibal 0% 30 años Derecho 1.76m 0 0 0 0 -- -- -- -- 0 ,sub,0,ok
+2026-08-11T1750Z,betis,,Diego Conde 0% 27 años Derecho 1.88m 0 0 0 0 -- -- -- -- 0 0,sub,0,ok
+2026-08-11T1750Z,betis,,1.7660%,pitch,,ok
+2026-08-11T1750Z,betis,,1.7880%,pitch,,ok
+2026-08-11T1750Z,betis,,1.7870%,pitch,,ok
+2026-08-11T1750Z,betis,,1.8660%,pitch,,ok
+2026-08-11T1750Z,betis,,1.8880%,pitch,,ok
+2026-08-11T1750Z,betis,,1.9195%,pitch_gk,,ok
+2026-08-11T1750Z,betis,,1.8460%,pitch,,ok
+2026-08-11T1750Z,betis,,"Isco 57,07M (-464k) 12,86M (+880k) 10,71M (+70k) 64,00M (+0)",pitch,,ok
+2026-08-11T1750Z,betis,,1.7260%,pitch,,ok
+2026-08-11T1750Z,betis,,"Fran García 9,59M (+0) 4,89M (+630k) 5,48M (+40k) 29,00M (+0",pitch,,ok
+2026-08-11T1750Z,betis,,"Riquelme 3,52M (+62k) 820k (+0) 1,39M (+60k) 21,00M (+0) 2,3",pitch,,ok
+2026-08-11T1750Z,betis,,"Bernal - 2,14M (+260k) 1,98M (+50k) 20,00M (+0) 4,01M (-51k)",pitch,,ok
+2026-08-11T1750Z,betis,,"Deossa 1,95M (+38k) 980k (+20k) 690k (+140k) 24,00M (+0) 1,0",pitch,,ok
+2026-08-11T1750Z,betis,,1.7540%,pitch,,ok
+2026-08-11T1750Z,betis,,1.8440%,pitch,,ok
+2026-08-11T1750Z,betis,,1.7730%,pitch,,ok
+2026-08-11T1750Z,betis,,1.7530%,pitch,,ok
+2026-08-11T1750Z,betis,,1.6730%,pitch,,ok
+2026-08-11T1750Z,betis,,1.7720%,pitch,,ok
+2026-08-11T1750Z,betis,,1.8420%,pitch,,ok
+2026-08-11T1750Z,betis,,1.8120%,pitch,,ok
+2026-08-11T1750Z,betis,,Morante - - - - - - - - 0 partidos0 min.Revulsivo,pitch,,ok
+2026-08-11T1750Z,betis,,-5%,pitch,,ok
+2026-08-11T1750Z,betis,,1.750%CEDTRN,pitch,,ok
+2026-08-11T1750Z,betis,,1.910%CED,pitch,,ok
+2026-08-11T1750Z,betis,,1.760%,pitch,,ok
+2026-08-11T1750Z,betis,,"Conde 3,04M (+0) 560k (+170k) 250k (+0) 18,00M (+0) 1,00M (+",pitch,,ok
+2026-08-11T1750Z,betis,,,pitch,,ok
+2026-08-11T1750Z,betis,,,pitch,,ok
+2026-08-11T1750Z,betis,,,pitch_gk,,ok
+2026-08-11T1750Z,betis,,,pitch,,ok
+2026-08-11T1750Z,betis,,,pitch,,ok
+2026-08-11T1750Z,betis,,,pitch,,ok
+2026-08-11T1750Z,betis,,,pitch,,ok
+2026-08-11T1750Z,betis,,,pitch,,ok
+2026-08-11T1750Z,betis,,,pitch,,ok
+2026-08-11T1750Z,betis,,,pitch,,ok
+2026-08-11T1750Z,betis,,,pitch,,ok
+2026-08-11T1750Z,celta,,Carl Starfelt 70% 31 años Derecho 1.85m 0 0 0 0 -- -- -- -- ,starter,70,injured
+2026-08-11T1750Z,celta,,Sergio Carreira 70% 25 años Derecho 1.70m 0 0 0 0 -- -- -- -,starter,70,injured
+2026-08-11T1750Z,celta,,Ionut Radu 90% 29 años Derecho 1.88m 0 0 0 0 -- -- -- -- 0 0,starter,90,injured
+2026-08-11T1750Z,celta,,Marcos Alonso 90% 35 años Izquierdo 1.88m 0 0 0 0 -- -- -- -,starter,90,injured
+2026-08-11T1750Z,celta,,Aleix Febas 50% 30 años Derecho 1.72m 0 0 0 0 -- -- -- -- 0 ,starter,50,injured
+2026-08-11T1750Z,celta,,Javi Rodríguez 80% 23 años Derecho 1.83m 0 0 0 0 -- -- -- --,starter,80,injured
+2026-08-11T1750Z,celta,,Javi Rueda 70% 24 años Derecho 1.77m 0 0 0 0 -- -- -- -- 0 0,starter,70,injured
+2026-08-11T1750Z,celta,,Miguel Román 70% 23 años Derecho 1.78m 0 0 0 0 -- -- -- -- 0,starter,70,injured
+2026-08-11T1750Z,celta,,Williot Swedberg 50% 22 años Derecho 1.87m 0 0 0 0 -- -- -- ,starter,50,injured
+2026-08-11T1750Z,celta,,Hugo González 50% 23 años Derecho 1.77m 0 0 0 0 -- -- -- -- ,starter,50,injured
+2026-08-11T1750Z,celta,,Ferran Jutglà 80% 27 años Derecho 1.75m 0 0 0 0 -- -- -- -- ,starter,80,injured
+2026-08-11T1750Z,celta,,Hugo Álvarez 50% 23 años Derecho 1.76m 0 0 0 0 -- -- -- -- 0,sub,50,ok
+2026-08-11T1750Z,celta,,Ilaix Moriba 50% 23 años Derecho 1.85m 0 0 0 0 -- -- -- -- 0,sub,50,ok
+2026-08-11T1750Z,celta,,Iago Aspas 40% 39 años Izquierdo 1.76m 0 0 0 0 -- -- -- -- 0,sub,40,ok
+2026-08-11T1750Z,celta,,Javi Galán 30% 31 años Izquierdo 1.72m 0 0 0 0 -- -- -- -- 0,sub,30,ok
+2026-08-11T1750Z,celta,,Yoel Lago 30% 22 años Derecho 1.85m 0 0 0 0 -- -- -- -- 0 0 ,sub,30,ok
+2026-08-11T1750Z,celta,,Álvaro Núñez 30% 26 años Derecho 1.77m 0 0 0 0 -- -- -- -- 0,sub,30,ok
+2026-08-11T1750Z,celta,,Abdoulaye Faye 20% 21 años Izquierdo 1.91m 0 0 0 0 -- -- -- ,sub,20,ok
+2026-08-11T1750Z,celta,,Matías Vecino 20% 34 años Derecho 1.87m 0 0 0 0 -- -- -- -- ,sub,20,ok
+2026-08-11T1750Z,celta,,Manu Fernández 20% 25 años Derecho 1.85m 0 0 0 0 -- -- -- --,sub,20,ok
+2026-08-11T1750Z,celta,,Jones El-Abdellaoui 10% 20 años Derecho 1.84m 0 0 0 0 -- -- ,sub,10,ok
+2026-08-11T1750Z,celta,,Altay Bayindir 10% 28 años Derecho 1.98m 0 0 0 0 -- -- -- --,sub,10,ok
+2026-08-11T1750Z,celta,,Borja Iglesias 10% 33 años Derecho 1.87m 0 0 0 0 -- -- -- --,sub,10,ok
+2026-08-11T1750Z,celta,,Pablo Durán 10% 25 años Derecho 1.76m 0 0 0 0 -- -- -- -- 0 ,sub,10,ok
+2026-08-11T1750Z,celta,,Carles Pérez 0% 28 años Izquierdo 1.73m 0 0 0 0 -- -- -- -- ,sub,0,ok
+2026-08-11T1750Z,celta,,Iván Villar 0% 29 años Derecho 1.83m 0 0 0 0 -- -- -- -- 0 0,sub,0,ok
+2026-08-11T1750Z,celta,,1.8570%,pitch,,ok
+2026-08-11T1750Z,celta,,1.7070%,pitch,,ok
+2026-08-11T1750Z,celta,,1.8890%,pitch_gk,,ok
+2026-08-11T1750Z,celta,,1.8890%,pitch,,ok
+2026-08-11T1750Z,celta,,1.7250%,pitch,,ok
+2026-08-11T1750Z,celta,,1.8380%,pitch,,ok
+2026-08-11T1750Z,celta,,1.7770%,pitch,,ok
+2026-08-11T1750Z,celta,,1.7870%,pitch,,ok
+2026-08-11T1750Z,celta,,1.8750%,pitch,,ok
+2026-08-11T1750Z,celta,,"Hugo González 1,51M (+0) 1,02M (+110k) 880k (+230k) 16,00M (",pitch,,ok
+2026-08-11T1750Z,celta,,1.7580%,pitch,,ok
+2026-08-11T1750Z,celta,,1.7650%,pitch,,ok
+2026-08-11T1750Z,celta,,1.8550%TRN,pitch,,ok
+2026-08-11T1750Z,celta,,1.7640%,pitch,,ok
+2026-08-11T1750Z,celta,,"Galán 14,48M (+0) 2,42M (+30k) 2,67M (-50k) 29,00M (+0) 12,4",pitch,,ok
+2026-08-11T1750Z,celta,,1.8530%,pitch,,ok
+2026-08-11T1750Z,celta,,1.7730%,pitch,,ok
+2026-08-11T1750Z,celta,,"Faye - - 580k (+10k) 18,00M (+0) 3,41M (-89k) 3,41M (-89k) 4",pitch,,ok
+2026-08-11T1750Z,celta,,1.8720%TRN,pitch,,ok
+2026-08-11T1750Z,celta,,1.8520%TRN,pitch,,ok
+2026-08-11T1750Z,celta,,1.8410%,pitch,,ok
+2026-08-11T1750Z,celta,,"Bayindir - 640k (+60k) 740k (-20k) 20,00M (+0) 3,69M (-81k) ",pitch,,ok
+2026-08-11T1750Z,celta,,1.8710%,pitch,,ok
+2026-08-11T1750Z,celta,,1.7610%,pitch,,ok
+2026-08-11T1750Z,celta,,1.730%TRN,pitch,,ok
+2026-08-11T1750Z,celta,,1.830%TRN,pitch,,ok
+2026-08-11T1750Z,celta,,,pitch_gk,,ok
+2026-08-11T1750Z,celta,,,pitch,,ok
+2026-08-11T1750Z,celta,,,pitch,,ok
+2026-08-11T1750Z,celta,,,pitch,,ok
+2026-08-11T1750Z,celta,,,pitch,,ok
+2026-08-11T1750Z,celta,,,pitch,,ok
+2026-08-11T1750Z,celta,,,pitch,,ok
+2026-08-11T1750Z,celta,,,pitch,,ok
+2026-08-11T1750Z,celta,,,pitch,,ok
+2026-08-11T1750Z,celta,,,pitch,,ok
+2026-08-11T1750Z,celta,,,pitch,,ok
+2026-08-11T1750Z,deportivo,,Lorenzo Amatucci 70% 22 años Derecho 1.73m 0 0 0 0 -- -- -- ,starter,70,injured
+2026-08-11T1750Z,deportivo,,Leo Román 80% 26 años Derecho 1.89m 0 0 0 0 -- -- -- -- 0 0 ,starter,80,injured
+2026-08-11T1750Z,deportivo,,Pierre-Emerick Aubameyang 70% 37 años Derecho 1.87m 0 0 0 0 ,starter,70,injured
+2026-08-11T1750Z,deportivo,,Ximo Navarro 70% 36 años Derecho 1.76m 0 0 0 0 -- -- -- -- 0,starter,70,injured
+2026-08-11T1750Z,deportivo,,Bright Ede 50% 19 años Izquierdo 1.93m 0 0 0 0 -- -- -- -- 0,starter,50,injured
+2026-08-11T1750Z,deportivo,,Mario Soriano 80% 24 años Derecho 1.63m 0 0 0 0 -- -- -- -- ,starter,80,injured
+2026-08-11T1750Z,deportivo,,Lucas Noubi 80% 21 años Derecho 1.84m 0 0 0 0 -- -- -- -- 0 ,starter,80,injured
+2026-08-11T1750Z,deportivo,,Giacomo Quagliata 50% 26 años Izquierdo 1.80m 0 0 0 0 -- -- ,starter,50,injured
+2026-08-11T1750Z,deportivo,,Luismi Cruz 70% 25 años Izquierdo 1.66m 0 0 0 0 -- -- -- -- ,starter,70,injured
+2026-08-11T1750Z,deportivo,,Bil Nsongo 50% 21 años - 1.82m 0 0 0 0 -- -- -- -- 0 0 DEP v,starter,50,injured
+2026-08-11T1750Z,deportivo,,Adrià Altimira 50% 25 años Derecho 1.70m 0 0 0 0 -- -- -- --,starter,50,injured
+2026-08-11T1750Z,deportivo,,Angeliño 50% 29 años Izquierdo 1.71m 0 0 0 0 -- -- -- -- 0 0,sub,50,ok
+2026-08-11T1750Z,deportivo,,Miguel Loureiro 50% 29 años Derecho 1.82m 0 0 0 0 -- -- -- -,sub,50,ok
+2026-08-11T1750Z,deportivo,,Jonathan Asp Jensen 40% 20 años Derecho 1.82m 0 0 0 0 -- -- ,sub,40,ok
+2026-08-11T1750Z,deportivo,,Diego Villares 40% 30 años Derecho 1.80m 0 0 0 0 -- -- -- --,sub,40,ok
+2026-08-11T1750Z,deportivo,,Yeremay Hernández 40% 23 años Derecho 1.70m 0 0 0 0 -- -- --,sub,40,ok
+2026-08-11T1750Z,deportivo,,David Mella 30% 21 años Izquierdo 1.69m 0 0 0 0 -- -- -- -- ,sub,30,ok
+2026-08-11T1750Z,deportivo,,Zakaria Eddahchouri 30% 26 años Derecho 1.87m 0 0 0 0 -- -- ,sub,30,ok
+2026-08-11T1750Z,deportivo,,Teun Gijselhart 30% 21 años Derecho 1.76m 0 0 0 0 -- -- -- -,sub,30,ok
+2026-08-11T1750Z,deportivo,,Dani Barcia 20% 23 años Izquierdo 1.86m 0 0 0 0 -- -- -- -- ,sub,20,ok
+2026-08-11T1750Z,deportivo,,Arnau Comas 20% 26 años Derecho 1.91m 0 0 0 0 -- -- -- -- 0 ,sub,20,ok
+2026-08-11T1750Z,deportivo,,Álvaro Fernández 20% 28 años Derecho 1.85m 0 0 0 0 -- -- -- ,sub,20,ok
+2026-08-11T1750Z,deportivo,,Kevin Sánchez 10% 21 años Derecho 1.69m 0 0 0 0 -- -- -- -- ,sub,10,ok
+2026-08-11T1750Z,deportivo,,Noé Carrillo 0% 19 años - - 0 0 0 0 -- -- -- -- 0 0 DEP vs E,sub,0,ok
+2026-08-11T1750Z,deportivo,,José Ángel Jurado 0% 34 años Izquierdo 1.83m 0 0 0 0 -- -- -,sub,0,ok
+2026-08-11T1750Z,deportivo,,Riki Rodríguez 0% 28 años Derecho 1.75m 0 0 0 0 -- -- -- -- ,sub,0,ok
+2026-08-11T1750Z,deportivo,,Charlie Patino 0% 22 años Izquierdo 1.82m 0 0 0 0 -- -- -- -,sub,0,ok
+2026-08-11T1750Z,deportivo,,Eric Puerto 0% 23 años Derecho 1.85m 0 0 0 0 -- -- -- -- 0 0,sub,0,ok
+2026-08-11T1750Z,deportivo,,Germán Parreño 0% 33 años Derecho 1.91m 0 0 0 0 -- -- -- -- ,sub,0,ok
+2026-08-11T1750Z,deportivo,,"Amatucci 12,05M (+61k) 2,32M (+0) 3,27M (-20k) 20,00M (+0) 4",pitch,,ok
+2026-08-11T1750Z,deportivo,,"Leo Román 34,10M (+695k) 3,48M (+420k) 4,80M (+50k) 40,00M (",pitch_gk,,ok
+2026-08-11T1750Z,deportivo,,"Aubameyang 27,19M (+1,36M) 11,01M (-10k) 6,92M (+140k) 33,00",pitch,,ok
+2026-08-11T1750Z,deportivo,,1.7670%,pitch,,ok
+2026-08-11T1750Z,deportivo,,"Ede - 990k (-20k) 680k (+10k) 15,00M (+0) 1,00M (-13k) 1,00M",pitch,,ok
+2026-08-11T1750Z,deportivo,,1.6380%,pitch,,ok
+2026-08-11T1750Z,deportivo,,1.8480%,pitch,,ok
+2026-08-11T1750Z,deportivo,,1.8050%,pitch,,ok
+2026-08-11T1750Z,deportivo,,1.6670%,pitch,,ok
+2026-08-11T1750Z,deportivo,,1.8250%,pitch,,ok
+2026-08-11T1750Z,deportivo,,1.7050%,pitch,,ok
+2026-08-11T1750Z,deportivo,,"Angeliño - 2,37M (+170k) 2,86M (+160k) 31,00M (+0) 11,49M (-",pitch,,ok
+2026-08-11T1750Z,deportivo,,1.8250%,pitch,,ok
+2026-08-11T1750Z,deportivo,,"Asp Jensen - 2,25M (+70k) 1,82M (-60k) 20,00M (+0) 4,60M (+2",pitch,,ok
+2026-08-11T1750Z,deportivo,,1.8040%,pitch,,ok
+2026-08-11T1750Z,deportivo,,"Yeremay 56,69M (-1,23M) 11,01M (+0) 9,16M (+20k) 50,00M (+0)",pitch,,ok
+2026-08-11T1750Z,deportivo,,1.6930%,pitch,,ok
+2026-08-11T1750Z,deportivo,,1.8730%,pitch,,ok
+2026-08-11T1750Z,deportivo,,1.7630%,pitch,,ok
+2026-08-11T1750Z,deportivo,,1.8620%,pitch,,ok
+2026-08-11T1750Z,deportivo,,1.9120%,pitch,,ok
+2026-08-11T1750Z,deportivo,,1.8520%,pitch,,ok
+2026-08-11T1750Z,deportivo,,1.6910%,pitch,,ok
+2026-08-11T1750Z,deportivo,,-0%,pitch,,ok
+2026-08-11T1750Z,deportivo,,1.830%CEDTRN,pitch,,ok
+2026-08-11T1750Z,deportivo,,1.750%,pitch,,ok
+2026-08-11T1750Z,deportivo,,1.820%CED,pitch,,ok
+2026-08-11T1750Z,deportivo,,1.850%,pitch,,ok
+2026-08-11T1750Z,deportivo,,1.910%,pitch,,ok
+2026-08-11T1750Z,deportivo,,,pitch,,ok
+2026-08-11T1750Z,deportivo,,,pitch,,ok
+2026-08-11T1750Z,deportivo,,,pitch,,ok
+2026-08-11T1750Z,deportivo,,,pitch_gk,,ok
+2026-08-11T1750Z,deportivo,,,pitch,,ok
+2026-08-11T1750Z,deportivo,,,pitch,,ok
+2026-08-11T1750Z,deportivo,,,pitch,,ok
+2026-08-11T1750Z,deportivo,,,pitch,,ok
+2026-08-11T1750Z,deportivo,,,pitch,,ok
+2026-08-11T1750Z,deportivo,,,pitch,,ok
+2026-08-11T1750Z,deportivo,,,pitch,,ok
+2026-08-11T1750Z,elche,,Gonzalo Villar 80% 28 años Derecho 1.81m 0 0 0 0 -- -- -- --,starter,80,injured
+2026-08-11T1750Z,elche,,David Affengruber 90% 25 años Derecho 1.85m 0 0 0 0 -- -- --,starter,90,injured
+2026-08-11T1750Z,elche,,Buba Sangaré 70% 19 años Derecho 1.83m 0 0 0 0 -- -- -- -- 0,starter,70,injured
+2026-08-11T1750Z,elche,,Lucas Cepeda 60% 23 años Izquierdo 1.77m 0 0 0 0 -- -- -- --,starter,60,injured
+2026-08-11T1750Z,elche,,Germán Valera 90% 24 años Izquierdo 1.70m 0 0 0 0 -- -- -- -,starter,90,injured
+2026-08-11T1750Z,elche,,Pedro Bigas 50% 36 años Izquierdo 1.81m 0 0 0 0 -- -- -- -- ,starter,50,injured
+2026-08-11T1750Z,elche,,Marc Aguado 70% 26 años Izquierdo 1.82m 0 0 0 0 -- -- -- -- ,starter,70,injured
+2026-08-11T1750Z,elche,,Grady Diangana 50% 28 años Izquierdo 1.80m 0 0 0 0 -- -- -- ,starter,50,injured
+2026-08-11T1750Z,elche,,Matías Dituro 90% 39 años Derecho 1.91m 0 0 0 0 -- -- -- -- ,starter,90,injured
+2026-08-11T1750Z,elche,,Fernando Niño 60% 25 años Derecho 1.91m 0 0 0 0 -- -- -- -- ,starter,60,injured
+2026-08-11T1750Z,elche,,Víctor Chust 80% 26 años Ambidiestro 1.84m 0 0 0 0 -- -- -- ,starter,80,injured
+2026-08-11T1750Z,elche,,Federico Redondo 50% 23 años Derecho 1.88m 0 0 0 0 -- -- -- ,sub,50,ok
+2026-08-11T1750Z,elche,,Martim Neto 50% 23 años Derecho 1.85m 0 0 0 0 -- -- -- -- 0 ,sub,50,ok
+2026-08-11T1750Z,elche,,Ali Houary 40% 21 años Derecho 1.78m 0 0 0 0 -- -- -- -- 0 0,sub,40,ok
+2026-08-11T1750Z,elche,,Tete Morente 40% 29 años Derecho 1.84m 0 0 0 0 -- -- -- -- 0,sub,40,ok
+2026-08-11T1750Z,elche,,Adam Boayar 30% 20 años Derecho 1.80m 0 0 0 0 -- -- -- -- 0 ,sub,30,ok
+2026-08-11T1750Z,elche,,Facundo Buonanotte 30% 21 años Izquierdo 1.74m 0 0 0 0 -- --,sub,30,ok
+2026-08-11T1750Z,elche,,Umaru Konaré 30% - - - - 0 0 0 0 -- -- -- -- 0 0 ELC vs DEP ,sub,30,ok
+2026-08-11T1750Z,elche,,John Chetauya 20% 25 años Derecho 1.82m 0 0 0 0 -- -- -- -- ,sub,20,ok
+2026-08-11T1750Z,elche,,Javi Morcillo 10% 20 años Derecho 1.83m 0 0 0 0 -- -- -- -- ,sub,10,ok
+2026-08-11T1750Z,elche,,Alejandro Iturbe 10% 22 años Derecho 1.86m 0 0 0 0 -- -- -- ,sub,10,ok
+2026-08-11T1750Z,elche,,Rafa Núñez 0% 24 años Derecho 1.78m 0 0 0 0 -- -- -- -- 0 0 ,sub,0,ok
+2026-08-11T1750Z,elche,,Abiel Osorio 0% 24 años Derecho 1.82m 0 0 0 0 -- -- -- -- 0 ,sub,0,ok
+2026-08-11T1750Z,elche,,Yago Santiago 0% 23 años Derecho 1.80m 0 0 0 0 -- -- -- -- 0,sub,0,ok
+2026-08-11T1750Z,elche,,Bambo Diaby 0% 28 años Derecho 1.88m 0 0 0 0 -- -- -- -- 0 0,sub,0,ok
+2026-08-11T1750Z,elche,,Matia Barzic 0% 22 años Derecho 1.90m 0 0 0 0 -- -- -- -- 0 ,sub,0,ok
+2026-08-11T1750Z,elche,,1.8180%,pitch,,ok
+2026-08-11T1750Z,elche,,1.8590%,pitch,,ok
+2026-08-11T1750Z,elche,,1.8370%,pitch,,ok
+2026-08-11T1750Z,elche,,1.7760%,pitch,,ok
+2026-08-11T1750Z,elche,,1.7090%,pitch,,ok
+2026-08-11T1750Z,elche,,1.8150%,pitch,,ok
+2026-08-11T1750Z,elche,,1.8270%,pitch,,ok
+2026-08-11T1750Z,elche,,1.8050%,pitch,,ok
+2026-08-11T1750Z,elche,,1.9190%,pitch_gk,,ok
+2026-08-11T1750Z,elche,,"Fer Niño - 3,24M (+0) 3,13M (+210k) 18,00M (+0) 1,74M (+83k)",pitch,,ok
+2026-08-11T1750Z,elche,,1.8480%,pitch,,ok
+2026-08-11T1750Z,elche,,"Redondo 940k (-19k) 200k (+10k) 150k (+0) 17,00M (+0) 1,00M ",pitch,,ok
+2026-08-11T1750Z,elche,,1.8550%,pitch,,ok
+2026-08-11T1750Z,elche,,1.7840%,pitch,,ok
+2026-08-11T1750Z,elche,,1.8440%,pitch,,ok
+2026-08-11T1750Z,elche,,1.8030%,pitch,,ok
+2026-08-11T1750Z,elche,,"Buonanotte - 1,37M (+70k) 1,32M (+50k) 23,00M (+0) 1,01M (+7",pitch,,ok
+2026-08-11T1750Z,elche,,"Umaru - - 150k (+0) 15,00M (+0) - - 1,37M (+138k) 276k (+16k",pitch,,ok
+2026-08-11T1750Z,elche,,1.8220%,pitch,,ok
+2026-08-11T1750Z,elche,,"Morcillo 703k (+0) 550k (+120k) 160k (+0) 15,00M (+0) 1,12M ",pitch,,ok
+2026-08-11T1750Z,elche,,1.8610%CED,pitch,,ok
+2026-08-11T1750Z,elche,,1.780%CED,pitch,,ok
+2026-08-11T1750Z,elche,,"Osorio 1,41M (+0) 190k (-20k) 410k (-10k) 23,00M (+0) 1,00M ",pitch,,ok
+2026-08-11T1750Z,elche,,1.800%,pitch,,ok
+2026-08-11T1750Z,elche,,1.880%TRN,pitch,,ok
+2026-08-11T1750Z,elche,,1.900%TRN,pitch,,ok
+2026-08-11T1750Z,elche,,,pitch,,ok
+2026-08-11T1750Z,elche,,,pitch,,ok
+2026-08-11T1750Z,elche,,,pitch,,ok
+2026-08-11T1750Z,elche,,,pitch,,ok
+2026-08-11T1750Z,elche,,,pitch_gk,,ok
+2026-08-11T1750Z,elche,,,pitch,,ok
+2026-08-11T1750Z,elche,,,pitch,,ok
+2026-08-11T1750Z,elche,,,pitch,,ok
+2026-08-11T1750Z,elche,,,pitch,,ok
+2026-08-11T1750Z,elche,,,pitch,,ok
+2026-08-11T1750Z,elche,,,pitch,,ok
+2026-08-11T1750Z,espanyol,,Álex Calatrava 70% 26 años Izquierdo 1.75m 0 0 0 0 -- -- -- ,starter,70,injured
+2026-08-11T1750Z,espanyol,,Omar El Hilali 80% 22 años Derecho 1.83m 0 0 0 0 -- -- -- --,starter,80,injured
+2026-08-11T1750Z,espanyol,,Roger Hinojo 50% 21 años Izquierdo 1.80m 0 0 0 0 -- -- -- --,starter,50,injured
+2026-08-11T1750Z,espanyol,,Leandro Cabrera 95% 35 años Izquierdo 1.90m 0 0 0 0 -- -- --,starter,95,injured
+2026-08-11T1750Z,espanyol,,Unai Núñez 50% 29 años Derecho 1.86m 0 0 0 0 -- -- -- -- 0 0,starter,50,injured
+2026-08-11T1750Z,espanyol,,Urko González de Zarate 80% 25 años Derecho 1.89m 0 0 0 0 --,starter,80,injured
+2026-08-11T1750Z,espanyol,,Edu Expósito 80% 30 años Derecho 1.78m 0 0 0 0 -- -- -- -- 0,starter,80,injured
+2026-08-11T1750Z,espanyol,,Tyrhys Dolan 50% 24 años Derecho 1.70m 0 0 0 0 -- -- -- -- 0,starter,50,injured
+2026-08-11T1750Z,espanyol,,Marko Dmitrovic 95% 34 años Izquierdo 1.89m 0 0 0 0 -- -- --,starter,95,injured
+2026-08-11T1750Z,espanyol,,Javier Hernández 50% 22 años Izquierdo 1.75m 0 0 0 0 -- -- -,starter,50,injured
+2026-08-11T1750Z,espanyol,,Roberto Fernández 70% 24 años Derecho 1.86m 0 0 0 0 -- -- --,starter,70,injured
+2026-08-11T1750Z,espanyol,,Pere Milla 50% 33 años Izquierdo 1.80m 0 0 0 0 -- -- -- -- 0,sub,50,ok
+2026-08-11T1750Z,espanyol,,Jofre Carreras 50% 25 años Derecho 1.75m 0 0 0 0 -- -- -- --,sub,50,ok
+2026-08-11T1750Z,espanyol,,Pol Lozano 50% 26 años Derecho 1.76m 0 0 0 0 -- -- -- -- 0 0,sub,50,ok
+2026-08-11T1750Z,espanyol,,Quilindschy Hartman 50% 24 años Izquierdo 1.83m 0 0 0 0 -- -,sub,50,ok
+2026-08-11T1750Z,espanyol,,Clemens Riedel 50% 23 años Derecho 1.86m 0 0 0 0 -- -- -- --,sub,50,ok
+2026-08-11T1750Z,espanyol,,Marcos Fernández 30% 23 años Derecho 1.76m 0 0 0 0 -- -- -- ,sub,30,ok
+2026-08-11T1750Z,espanyol,,Gabriel Moscardo 30% 20 años Derecho 1.85m 0 0 0 0 -- -- -- ,sub,30,ok
+2026-08-11T1750Z,espanyol,,Rafel Bauzà 10% 21 años Derecho 1.83m 0 0 0 0 -- -- -- -- 0 ,sub,10,ok
+2026-08-11T1750Z,espanyol,,Miguel Ángel Rubio 5% 28 años Derecho 1.91m 0 0 0 0 -- -- --,sub,5,ok
+2026-08-11T1750Z,espanyol,,Ángel Fortuño 5% 24 años Derecho 1.83m 0 0 0 0 -- -- -- -- 0,sub,5,ok
+2026-08-11T1750Z,espanyol,,Rubén Sánchez 0% 25 años Derecho 1.85m 0 0 0 0 -- -- -- -- 0,sub,0,ok
+2026-08-11T1750Z,espanyol,,Kike García 0% 36 años Derecho 1.86m 0 0 0 0 -- -- -- -- 0 0,sub,0,ok
+2026-08-11T1750Z,espanyol,,Javi Puado 0% 28 años Derecho 1.77m 0 0 0 0 -- -- -- -- 0 0 ,sub,0,ok
+2026-08-11T1750Z,espanyol,,"Calatrava 3,72M (+87k) 5,11M (-40k) 4,15M (+70k) 19,00M (+0)",pitch,,ok
+2026-08-11T1750Z,espanyol,,1.8380%,pitch,,ok
+2026-08-11T1750Z,espanyol,,"Hinojo 317k (+0) 280k (+10k) 150k (+0) 17,00M (+0) 1,00M (+0",pitch,,ok
+2026-08-11T1750Z,espanyol,,1.9095%,pitch,,ok
+2026-08-11T1750Z,espanyol,,"U. Núñez 3,61M (-24k) 980k (+40k) 1,26M (+120k) 19,00M (+0) ",pitch,,ok
+2026-08-11T1750Z,espanyol,,1.8980%,pitch,,ok
+2026-08-11T1750Z,espanyol,,1.7880%,pitch,,ok
+2026-08-11T1750Z,espanyol,,1.7050%,pitch,,ok
+2026-08-11T1750Z,espanyol,,1.8995%,pitch_gk,,ok
+2026-08-11T1750Z,espanyol,,1.7550%,pitch,,ok
+2026-08-11T1750Z,espanyol,,1.8670%,pitch,,ok
+2026-08-11T1750Z,espanyol,,1.8050%,pitch,,ok
+2026-08-11T1750Z,espanyol,,1.7550%,pitch,,ok
+2026-08-11T1750Z,espanyol,,1.7650%,pitch,,ok
+2026-08-11T1750Z,espanyol,,"Hartman 9,59M (-181k) 2,52M (-10k) 2,46M (-20k) 28,00M (+0) ",pitch,,ok
+2026-08-11T1750Z,espanyol,,1.8650%,pitch,,ok
+2026-08-11T1750Z,espanyol,,1.7630%,pitch,,ok
+2026-08-11T1750Z,espanyol,,"Moscardo 10,37M (-243k) 1,52M (-20k) 970k (-20k) 19,00M (+0)",pitch,,ok
+2026-08-11T1750Z,espanyol,,1.8310%CED,pitch,,ok
+2026-08-11T1750Z,espanyol,,1.915%CEDTRN,pitch,,ok
+2026-08-11T1750Z,espanyol,,1.835%,pitch,,ok
+2026-08-11T1750Z,espanyol,,1.850%TRN,pitch,,ok
+2026-08-11T1750Z,espanyol,,1.860%,pitch,,ok
+2026-08-11T1750Z,espanyol,,1.770%,pitch,,ok
+2026-08-11T1750Z,espanyol,,,pitch,,ok
+2026-08-11T1750Z,espanyol,,,pitch,,ok
+2026-08-11T1750Z,espanyol,,,pitch,,ok
+2026-08-11T1750Z,espanyol,,,pitch_gk,,ok
+2026-08-11T1750Z,espanyol,,,pitch,,ok
+2026-08-11T1750Z,espanyol,,,pitch,,ok
+2026-08-11T1750Z,espanyol,,,pitch,,ok
+2026-08-11T1750Z,espanyol,,,pitch,,ok
+2026-08-11T1750Z,espanyol,,,pitch,,ok
+2026-08-11T1750Z,espanyol,,,pitch,,ok
+2026-08-11T1750Z,espanyol,,,pitch,,ok
+2026-08-11T1750Z,getafe,,Martín Satriano 90% 25 años Derecho 1.87m 0 0 0 0 -- -- -- -,starter,90,injured
+2026-08-11T1750Z,getafe,,Mario Martín 80% 22 años Derecho 1.77m 0 0 0 0 -- -- -- -- 0,starter,80,injured
+2026-08-11T1750Z,getafe,,David Soria 95% 33 años Derecho 1.92m 0 0 0 0 -- -- -- -- 0 ,starter,95,injured
+2026-08-11T1750Z,getafe,,Ramón Terrats 80% 25 años Izquierdo 1.81m 0 0 0 0 -- -- -- -,starter,80,injured
+2026-08-11T1750Z,getafe,,Orel Mangala 50% 28 años Derecho 1.78m 0 0 0 0 -- -- -- -- 0,starter,50,injured
+2026-08-11T1750Z,getafe,,Davinchi 80% 18 años Izquierdo 1.82m 0 0 0 0 -- -- -- -- 0 0,starter,80,injured
+2026-08-11T1750Z,getafe,,Zaid Romero 90% 26 años Izquierdo 1.92m 0 0 0 0 -- -- -- -- ,starter,90,injured
+2026-08-11T1750Z,getafe,,Dakonam Djené 90% 34 años Derecho 1.78m 0 0 0 0 -- -- -- -- ,starter,90,injured
+2026-08-11T1750Z,getafe,,Kiko Femenia 70% 35 años Derecho 1.74m 0 0 0 0 -- -- -- -- 0,starter,70,injured
+2026-08-11T1750Z,getafe,,Andrés García 70% 23 años Derecho 1.85m 0 0 0 0 -- -- -- -- ,starter,70,injured
+2026-08-11T1750Z,getafe,,Abdel Abqar 70% 27 años Derecho 1.88m 0 0 0 0 -- -- -- -- 0 ,starter,70,injured
+2026-08-11T1750Z,getafe,,Sebastián Boselli 50% 22 años Derecho 1.83m 0 0 0 0 -- -- --,sub,50,ok
+2026-08-11T1750Z,getafe,,Borja Mayoral 40% 29 años Derecho 1.82m 0 0 0 0 -- -- -- -- ,sub,40,ok
+2026-08-11T1750Z,getafe,,Saba Sazonov 30% 24 años Derecho 1.94m 0 0 0 0 -- -- -- -- 0,sub,30,ok
+2026-08-11T1750Z,getafe,,Juan Berrocal 30% 27 años Ambidiestro 1.87m 0 0 0 0 -- -- --,sub,30,ok
+2026-08-11T1750Z,getafe,,Jean Ives Valou 30% 20 años Izquierdo 1.88m 0 0 0 0 -- -- --,sub,30,ok
+2026-08-11T1750Z,getafe,,Álex Sancris 20% 29 años Ambidiestro 1.81m 0 0 0 0 -- -- -- ,sub,20,ok
+2026-08-11T1750Z,getafe,,Ismael Bekhoucha 20% 21 años Derecho 1.76m 0 0 0 0 -- -- -- ,sub,20,ok
+2026-08-11T1750Z,getafe,,Javi Muñoz 10% 31 años Derecho 1.77m 0 0 0 0 -- -- -- -- 0 0,sub,10,ok
+2026-08-11T1750Z,getafe,,Jiri Letácek 5% 27 años Derecho 1.96m 0 0 0 0 -- -- -- -- 0 ,sub,5,ok
+2026-08-11T1750Z,getafe,,Yvan Neyou 0% 29 años Derecho 1.80m 0 0 0 0 -- -- -- -- 0 0 ,sub,0,ok
+2026-08-11T1750Z,getafe,,Christantus Uche 0% 23 años Ambidiestro 1.90m 0 0 0 0 -- -- ,sub,0,ok
+2026-08-11T1750Z,getafe,,Juanmi Jiménez 0% 33 años Derecho 1.72m 0 0 0 0 -- -- -- -- ,sub,0,ok
+2026-08-11T1750Z,getafe,,1.8790%,pitch,,ok
+2026-08-11T1750Z,getafe,,1.7780%,pitch,,ok
+2026-08-11T1750Z,getafe,,1.9295%,pitch_gk,,ok
+2026-08-11T1750Z,getafe,,"Terrats 2,81M (+0) 1,58M (+250k) 2,98M (+120k) 29,00M (+0) 1",pitch,,ok
+2026-08-11T1750Z,getafe,,"Mangala - 1,13M (+70k) 2,89M (+0) 36,00M (+0) 8,55M (-67k) 8",pitch,,ok
+2026-08-11T1750Z,getafe,,1.8280%,pitch,,ok
+2026-08-11T1750Z,getafe,,1.9290%,pitch,,ok
+2026-08-11T1750Z,getafe,,1.7890%,pitch,,ok
+2026-08-11T1750Z,getafe,,1.7470%,pitch,,ok
+2026-08-11T1750Z,getafe,,"Andrés García - 1,11M (+0) 1,19M (+50k) 17,00M (+0) 1,00M (+",pitch,,ok
+2026-08-11T1750Z,getafe,,1.8870%,pitch,,ok
+2026-08-11T1750Z,getafe,,1.8350%,pitch,,ok
+2026-08-11T1750Z,getafe,,1.8240%,pitch,,ok
+2026-08-11T1750Z,getafe,,"Sazonov - 440k (+60k) 270k (+0) 16,00M (+0) 1,22M (-39k) 1,2",pitch,,ok
+2026-08-11T1750Z,getafe,,1.8730%TRN,pitch,,ok
+2026-08-11T1750Z,getafe,,"Valou 602k (+0) 730k (+10k) 160k (+0) 15,00M (+0) 1,00M (+0)",pitch,,ok
+2026-08-11T1750Z,getafe,,1.8120%TRN,pitch,,ok
+2026-08-11T1750Z,getafe,,1.7620%,pitch,,ok
+2026-08-11T1750Z,getafe,,1.7710%TRN,pitch,,ok
+2026-08-11T1750Z,getafe,,1.965%,pitch,,ok
+2026-08-11T1750Z,getafe,,1.800%TRN,pitch,,ok
+2026-08-11T1750Z,getafe,,1.900%,pitch,,ok
+2026-08-11T1750Z,getafe,,1.720%TRN,pitch,,ok
+2026-08-11T1750Z,getafe,,,pitch,,ok
+2026-08-11T1750Z,getafe,,,pitch,,ok
+2026-08-11T1750Z,getafe,,,pitch,,ok
+2026-08-11T1750Z,getafe,,,pitch,,ok
+2026-08-11T1750Z,getafe,,,pitch,,ok
+2026-08-11T1750Z,getafe,,,pitch,,ok
+2026-08-11T1750Z,getafe,,,pitch_gk,,ok
+2026-08-11T1750Z,getafe,,,pitch,,ok
+2026-08-11T1750Z,getafe,,,pitch,,ok
+2026-08-11T1750Z,getafe,,,pitch,,ok
+2026-08-11T1750Z,getafe,,,pitch,,ok
+2026-08-11T1750Z,levante,,Iván Romero 80% 25 años Derecho 1.73m 0 0 0 0 -- -- -- -- 0 ,starter,80,injured
+2026-08-11T1750Z,levante,,Enzo Bardelli 50% 25 años Derecho 1.73m 0 0 0 0 -- -- -- -- ,starter,50,injured
+2026-08-11T1750Z,levante,,Kareem Tunde 60% 20 años Izquierdo 1.77m 0 0 0 0 -- -- -- --,starter,60,injured
+2026-08-11T1750Z,levante,,Mathew Ryan 90% 34 años Derecho 1.84m 0 0 0 0 -- -- -- -- 0 ,starter,90,injured
+2026-08-11T1750Z,levante,,Hugo Sotelo 50% 22 años Derecho 1.80m 0 0 0 0 -- -- -- -- 0 ,starter,50,injured
+2026-08-11T1750Z,levante,,Nacho Pérez 50% 17 años Derecho 1.76m 0 0 0 0 -- -- -- -- 0 ,starter,50,injured
+2026-08-11T1750Z,levante,,Carlos Álvarez 60% 23 años Izquierdo 1.68m 0 0 0 0 -- -- -- ,starter,60,injured
+2026-08-11T1750Z,levante,,Aissa Mandi 80% 34 años Derecho 1.84m 0 0 0 0 -- -- -- -- 0 ,starter,80,injured
+2026-08-11T1750Z,levante,,Jon Ander Olasagasti 90% 25 años Izquierdo 1.76m 0 0 0 0 -- ,starter,90,injured
+2026-08-11T1750Z,levante,,Manu Sánchez 80% 25 años Izquierdo 1.71m 0 0 0 0 -- -- -- --,starter,80,injured
+2026-08-11T1750Z,levante,,Adrián de la Fuente 90% 27 años Derecho 1.79m 0 0 0 0 -- -- ,starter,90,injured
+2026-08-11T1750Z,levante,,Paco Cortés 50% 19 años Derecho 1.78m 0 0 0 0 -- -- -- -- 0 ,sub,50,ok
+2026-08-11T1750Z,levante,,Karl Etta Eyong 50% 22 años Derecho 1.81m 0 0 0 0 -- -- -- -,sub,50,ok
+2026-08-11T1750Z,levante,,Jeremy Toljan 50% 32 años Derecho 1.82m 0 0 0 0 -- -- -- -- ,sub,50,ok
+2026-08-11T1750Z,levante,,Víctor García 40% 28 años Derecho 1.80m 0 0 0 0 -- -- -- -- ,sub,40,ok
+2026-08-11T1750Z,levante,,Oriol Rey 40% 28 años Izquierdo 1.77m 0 0 0 0 -- -- -- -- 0 ,sub,40,ok
+2026-08-11T1750Z,levante,,Thiago Fernández 30% 22 años Derecho 1.75m 0 0 0 0 -- -- -- ,sub,30,ok
+2026-08-11T1750Z,levante,,Kervin Arriaga 30% 28 años Derecho 1.91m 0 0 0 0 -- -- -- --,sub,30,ok
+2026-08-11T1750Z,levante,,Yanis Musuayi 20% 19 años Derecho 1.90m 0 0 0 0 -- -- -- -- ,sub,20,ok
+2026-08-11T1750Z,levante,,Dani Requena 10% 22 años Derecho 1.86m 0 0 0 0 -- -- -- -- 0,sub,10,ok
+2026-08-11T1750Z,levante,,Tai Abed 10% 22 años Izquierdo 1.78m 0 0 0 0 -- -- -- -- 0 0,sub,10,ok
+2026-08-11T1750Z,levante,,Jorge Cabello 10% 22 años Izquierdo 1.83m 0 0 0 0 -- -- -- -,sub,10,ok
+2026-08-11T1750Z,levante,,Pablo Campos 10% 24 años Derecho 1.88m 0 0 0 0 -- -- -- -- 0,sub,10,ok
+2026-08-11T1750Z,levante,,Alejandro Primo 0% 22 años Derecho 1.87m 0 0 0 0 -- -- -- --,sub,0,ok
+2026-08-11T1750Z,levante,,Dani Martín 0% 20 años Derecho 1.88m 0 0 0 0 -- -- -- -- 0 0,sub,0,ok
+2026-08-11T1750Z,levante,,Roger Brugué 0% 29 años Izquierdo 1.74m 0 0 0 0 -- -- -- -- ,sub,0,ok
+2026-08-11T1750Z,levante,,"Iván Romero 6,86M (+34k) 3,70M (+470k) 3,60M (+50k) 34,00M (",pitch,,ok
+2026-08-11T1750Z,levante,,1.7350%,pitch,,ok
+2026-08-11T1750Z,levante,,1.7760%,pitch,,ok
+2026-08-11T1750Z,levante,,1.8490%,pitch_gk,,ok
+2026-08-11T1750Z,levante,,"Sotelo 1,38M (+0) 1,37M (+230k) 2,96M (+60k) 20,00M (+0) 1,3",pitch,,ok
+2026-08-11T1750Z,levante,,"Nacho Pérez 582k (+0) 200k (+10k) 150k (+0) 15,00M (+0) 1,00",pitch,,ok
+2026-08-11T1750Z,levante,,1.6860%,pitch,,ok
+2026-08-11T1750Z,levante,,"Mandi 1,88M (+0) 1,93M (-320k) 2,05M (+50k) 22,00M (+0) 3,81",pitch,,ok
+2026-08-11T1750Z,levante,,"Olasagasti 4,00M (+85k) 3,08M (+0) 2,58M (+50k) 26,00M (+0) ",pitch,,ok
+2026-08-11T1750Z,levante,,1.7180%,pitch,,ok
+2026-08-11T1750Z,levante,,1.7990%,pitch,,ok
+2026-08-11T1750Z,levante,,1.7850%,pitch,,ok
+2026-08-11T1750Z,levante,,"Etta Eyong 24,51M (+577k) 5,17M (+70k) 3,93M (+50k) 36,00M (",pitch,,ok
+2026-08-11T1750Z,levante,,1.8250%,pitch,,ok
+2026-08-11T1750Z,levante,,1.8040%,pitch,,ok
+2026-08-11T1750Z,levante,,1.7740%,pitch,,ok
+2026-08-11T1750Z,levante,,1.7530%,pitch,,ok
+2026-08-11T1750Z,levante,,1.9130%,pitch,,ok
+2026-08-11T1750Z,levante,,"Musuayi - 1,22M (+140k) 1,44M (+170k) 15,00M (+0) 1,00M (+0)",pitch,,ok
+2026-08-11T1750Z,levante,,"Requena 1,62M (+0) 770k (+10k) 370k (-10k) 17,00M (+0) 1,00M",pitch,,ok
+2026-08-11T1750Z,levante,,1.7810%,pitch,,ok
+2026-08-11T1750Z,levante,,1.8310%CEDTRN,pitch,,ok
+2026-08-11T1750Z,levante,,1.8810%,pitch,,ok
+2026-08-11T1750Z,levante,,1.870%CED,pitch,,ok
+2026-08-11T1750Z,levante,,1.880%CED,pitch,,ok
+2026-08-11T1750Z,levante,,1.740%,pitch,,ok
+2026-08-11T1750Z,levante,,,pitch,,ok
+2026-08-11T1750Z,levante,,,pitch,,ok
+2026-08-11T1750Z,levante,,,pitch,,ok
+2026-08-11T1750Z,levante,,,pitch,,ok
+2026-08-11T1750Z,levante,,,pitch,,ok
+2026-08-11T1750Z,levante,,,pitch,,ok
+2026-08-11T1750Z,levante,,,pitch,,ok
+2026-08-11T1750Z,levante,,,pitch,,ok
+2026-08-11T1750Z,levante,,,pitch,,ok
+2026-08-11T1750Z,levante,,,pitch_gk,,ok
+2026-08-11T1750Z,levante,,,pitch,,ok
+2026-08-11T1750Z,malaga,,Chupete 70% 21 años Derecho 1.85m 0 0 0 0 -- -- -- -- 0 0 ML,starter,70,injured
+2026-08-11T1750Z,malaga,,José Salinas 50% 25 años Izquierdo 1.78m 0 0 0 0 -- -- -- --,starter,50,injured
+2026-08-11T1750Z,malaga,,Rafa Rodríguez 50% 23 años Derecho 1.80m 0 0 0 0 -- -- -- --,starter,50,injured
+2026-08-11T1750Z,malaga,,Einar Galilea 80% 32 años Izquierdo 1.85m 0 0 0 0 -- -- -- -,starter,80,injured
+2026-08-11T1750Z,malaga,,Carlos Puga 70% 25 años Derecho 1.75m 0 0 0 0 -- -- -- -- 0 ,starter,70,injured
+2026-08-11T1750Z,malaga,,Izan Merino 70% 20 años Derecho 1.83m 0 0 0 0 -- -- -- -- 0 ,starter,70,injured
+2026-08-11T1750Z,malaga,,Dani Lorenzo 90% 23 años Derecho 1.76m 0 0 0 0 -- -- -- -- 0,starter,90,injured
+2026-08-11T1750Z,malaga,,Ramón Enríquez 70% 25 años Derecho 1.73m 0 0 0 0 -- -- -- --,starter,70,injured
+2026-08-11T1750Z,malaga,,David Larrubia 90% 24 años Izquierdo 1.72m 0 0 0 0 -- -- -- ,starter,90,injured
+2026-08-11T1750Z,malaga,,Joaquín Muñoz 60% 27 años Ambidiestro 1.73m 0 0 0 0 -- -- --,starter,60,injured
+2026-08-11T1750Z,malaga,,Alfonso Herrero 80% 32 años Derecho 1.83m 0 0 0 0 -- -- -- -,starter,80,injured
+2026-08-11T1750Z,malaga,,Rafa Garrido 50% 21 años Derecho 1.70m 0 0 0 0 -- -- -- -- 0,sub,50,ok
+2026-08-11T1750Z,malaga,,Angel Recio 40% 23 años Derecho 1.85m 0 0 0 0 -- -- -- -- 0 ,sub,40,ok
+2026-08-11T1750Z,malaga,,Álex Pastor 40% 26 años Derecho 1.85m 0 0 0 0 -- -- -- -- 0 ,sub,40,ok
+2026-08-11T1750Z,malaga,,Juan Cruz 40% 26 años Izquierdo 1.80m 0 0 0 0 -- -- -- -- 0 ,sub,40,ok
+2026-08-11T1750Z,malaga,,Adrián Niño 30% 22 años Derecho 1.85m 0 0 0 0 -- -- -- -- 0 ,sub,30,ok
+2026-08-11T1750Z,malaga,,Dani Sánchez 30% 26 años Izquierdo 1.71m 0 0 0 0 -- -- -- --,sub,30,ok
+2026-08-11T1750Z,malaga,,Julen Lobete 20% 25 años Derecho 1.78m 0 0 0 0 -- -- -- -- 0,sub,20,ok
+2026-08-11T1750Z,malaga,,Eneko Jauregi 20% 30 años Derecho 1.84m 0 0 0 0 -- -- -- -- ,sub,20,ok
+2026-08-11T1750Z,malaga,,Haitam Abaida 20% 24 años Izquierdo 1.72m 0 0 0 0 -- -- -- -,sub,20,ok
+2026-08-11T1750Z,malaga,,Juanpe Jiménez 20% 30 años Derecho 1.84m 0 0 0 0 -- -- -- --,sub,20,ok
+2026-08-11T1750Z,malaga,,Carlos López 20% 21 años Derecho 1.84m 0 0 0 0 -- -- -- -- 0,sub,20,ok
+2026-08-11T1750Z,malaga,,Pablo Arriaza 10% 22 años Derecho 1.77m 0 0 0 0 -- -- -- -- ,sub,10,ok
+2026-08-11T1750Z,malaga,,Aarón Ochoa 0% 19 años Derecho 1.67m 0 0 0 0 -- -- -- -- 0 0,sub,0,ok
+2026-08-11T1750Z,malaga,,Diego Murillo 0% 25 años Derecho 1.79m 0 0 0 0 -- -- -- -- 0,sub,0,ok
+2026-08-11T1750Z,malaga,,Carlos Dotor 0% 25 años Derecho 1.80m 0 0 0 0 -- -- -- -- 0 ,sub,0,ok
+2026-08-11T1750Z,malaga,,Fernando Calero 0% 30 años Derecho 1.84m 0 0 0 0 -- -- -- --,sub,0,ok
+2026-08-11T1750Z,malaga,,1.8570%,pitch,,ok
+2026-08-11T1750Z,malaga,,"Salinas 1,07M (+0) 1,40M (+20k) 1,03M (+30k) 16,00M (+0) 1,0",pitch,,ok
+2026-08-11T1750Z,malaga,,1.8050%,pitch,,ok
+2026-08-11T1750Z,malaga,,1.8580%,pitch,,ok
+2026-08-11T1750Z,malaga,,1.7570%,pitch,,ok
+2026-08-11T1750Z,malaga,,"Merino 6,62M (-51k) 3,12M (+140k) 2,41M (+50k) 19,00M (+0) 9",pitch,,ok
+2026-08-11T1750Z,malaga,,1.7690%,pitch,,ok
+2026-08-11T1750Z,malaga,,1.7370%,pitch,,ok
+2026-08-11T1750Z,malaga,,"Larrubia 55,95M (+551k) 6,76M (+180k) 6,10M (+70k) 30,00M (+",pitch,,ok
+2026-08-11T1750Z,malaga,,1.7360%,pitch,,ok
+2026-08-11T1750Z,malaga,,1.8380%,pitch_gk,,ok
+2026-08-11T1750Z,malaga,,1.7050%,pitch,,ok
+2026-08-11T1750Z,malaga,,1.8540%,pitch,,ok
+2026-08-11T1750Z,malaga,,1.8540%,pitch,,ok
+2026-08-11T1750Z,malaga,,"Juan Cruz 19,97M (+0) 2,57M (+90k) 3,08M (-150k) 17,00M (+0)",pitch,,ok
+2026-08-11T1750Z,malaga,,1.8530%,pitch,,ok
+2026-08-11T1750Z,malaga,,1.7130%,pitch,,ok
+2026-08-11T1750Z,malaga,,1.7820%CED,pitch,,ok
+2026-08-11T1750Z,malaga,,1.8420%,pitch,,ok
+2026-08-11T1750Z,malaga,,1.7220%,pitch,,ok
+2026-08-11T1750Z,malaga,,1.8420%,pitch,,ok
+2026-08-11T1750Z,malaga,,1.8420%,pitch,,ok
+2026-08-11T1750Z,malaga,,1.7710%,pitch,,ok
+2026-08-11T1750Z,malaga,,1.670%,pitch,,ok
+2026-08-11T1750Z,malaga,,1.790%,pitch,,ok
+2026-08-11T1750Z,malaga,,1.800%,pitch,,ok
+2026-08-11T1750Z,malaga,,"Calero 3,28M (-112k) 2,34M (-140k) 2,00M (-40k) 20,00M (+0) ",pitch,,ok
+2026-08-11T1750Z,malaga,,,pitch_gk,,ok
+2026-08-11T1750Z,malaga,,,pitch,,ok
+2026-08-11T1750Z,malaga,,,pitch,,ok
+2026-08-11T1750Z,malaga,,,pitch,,ok
+2026-08-11T1750Z,malaga,,,pitch,,ok
+2026-08-11T1750Z,malaga,,,pitch,,ok
+2026-08-11T1750Z,malaga,,,pitch,,ok
+2026-08-11T1750Z,malaga,,,pitch,,ok
+2026-08-11T1750Z,malaga,,,pitch,,ok
+2026-08-11T1750Z,malaga,,,pitch,,ok
+2026-08-11T1750Z,malaga,,,pitch,,ok
+2026-08-11T1750Z,osasuna,,Sergio Herrera 70% 33 años Derecho 1.92m 0 0 0 0 -- -- -- --,starter,70,injured
+2026-08-11T1750Z,osasuna,,Abel Bretones 90% 25 años Izquierdo 1.88m 0 0 0 0 -- -- -- -,starter,90,injured
+2026-08-11T1750Z,osasuna,,Boyomo 70% 24 años Derecho 1.84m 0 0 0 0 -- -- -- -- 0 0 OSA,starter,70,injured
+2026-08-11T1750Z,osasuna,,Iker Muñoz 50% 23 años Derecho 1.80m 0 0 0 0 -- -- -- -- 0 0,starter,50,injured
+2026-08-11T1750Z,osasuna,,Jon Moncayola 90% 28 años Derecho 1.82m 0 0 0 0 -- -- -- -- ,starter,90,injured
+2026-08-11T1750Z,osasuna,,Aimar Oroz 70% 24 años Derecho 1.77m 0 0 0 0 -- -- -- -- 0 0,starter,70,injured
+2026-08-11T1750Z,osasuna,,Rubén García 60% 33 años Izquierdo 1.72m 0 0 0 0 -- -- -- --,starter,60,injured
+2026-08-11T1750Z,osasuna,,Alejandro Catena 80% 31 años Derecho 1.94m 0 0 0 0 -- -- -- ,starter,80,injured
+2026-08-11T1750Z,osasuna,,Ante Budimir 90% 35 años Izquierdo 1.90m 0 0 0 0 -- -- -- --,starter,90,injured
+2026-08-11T1750Z,osasuna,,Iñigo Arguibide 60% 21 años Derecho 1.78m 0 0 0 0 -- -- -- -,starter,60,injured
+2026-08-11T1750Z,osasuna,,Raul Moro 60% 23 años Derecho 1.69m 0 0 0 0 -- -- -- -- 0 0 ,starter,60,injured
+2026-08-11T1750Z,osasuna,,Lucas Torró 50% 32 años Derecho 1.90m 0 0 0 0 -- -- -- -- 0 ,sub,50,ok
+2026-08-11T1750Z,osasuna,,Jorge Herrando 50% 25 años Izquierdo 1.92m 0 0 0 0 -- -- -- ,sub,50,ok
+2026-08-11T1750Z,osasuna,,Jonathan Dubasin 40% 26 años Derecho 1.80m 0 0 0 0 -- -- -- ,sub,40,ok
+2026-08-11T1750Z,osasuna,,Valentin Rosier 40% 29 años Derecho 1.75m 0 0 0 0 -- -- -- -,sub,40,ok
+2026-08-11T1750Z,osasuna,,Moi Gómez 30% 32 años Derecho 1.76m 0 0 0 0 -- -- -- -- 0 0 ,sub,30,ok
+2026-08-11T1750Z,osasuna,,Kike Barja 30% 29 años Derecho 1.79m 0 0 0 0 -- -- -- -- 0 0,sub,30,ok
+2026-08-11T1750Z,osasuna,,Raúl García 30% 25 años Derecho 1.92m 0 0 0 0 -- -- -- -- 0 ,sub,30,ok
+2026-08-11T1750Z,osasuna,,Aitor Fernández 30% 35 años Derecho 1.82m 0 0 0 0 -- -- -- -,sub,30,ok
+2026-08-11T1750Z,osasuna,,Asier Osambela 10% 21 años Derecho 1.86m 0 0 0 0 -- -- -- --,sub,10,ok
+2026-08-11T1750Z,osasuna,,Iker Benito 0% 24 años Derecho 1.76m 0 0 0 0 -- -- -- -- 0 0,sub,0,ok
+2026-08-11T1750Z,osasuna,,1.9270%,pitch_gk,,ok
+2026-08-11T1750Z,osasuna,,1.8890%,pitch,,ok
+2026-08-11T1750Z,osasuna,,1.8470%,pitch,,ok
+2026-08-11T1750Z,osasuna,,"Iker Muñoz 1,39M (-14k) 530k (+140k) 240k (+30k) 17,00M (+0)",pitch,,ok
+2026-08-11T1750Z,osasuna,,1.8290%,pitch,,ok
+2026-08-11T1750Z,osasuna,,1.7770%,pitch,,ok
+2026-08-11T1750Z,osasuna,,1.7260%,pitch,,ok
+2026-08-11T1750Z,osasuna,,1.9480%,pitch,,ok
+2026-08-11T1750Z,osasuna,,1.9090%,pitch,,ok
+2026-08-11T1750Z,osasuna,,"Arguibide 582k (+0) 310k (+0) 160k (+10k) 15,00M (+0) 1,00M ",pitch,,ok
+2026-08-11T1750Z,osasuna,,1.6960%,pitch,,ok
+2026-08-11T1750Z,osasuna,,"Torró 2,56M (-18k) 1,39M (+10k) 1,81M (+10k) 26,00M (+0) 3,8",pitch,,ok
+2026-08-11T1750Z,osasuna,,1.9250%,pitch,,ok
+2026-08-11T1750Z,osasuna,,"Dubasin - 4,77M (+0) 3,15M (-110k) 33,00M (+0) 5,13M (+92k) ",pitch,,ok
+2026-08-11T1750Z,osasuna,,1.7540%,pitch,,ok
+2026-08-11T1750Z,osasuna,,1.7630%,pitch,,ok
+2026-08-11T1750Z,osasuna,,1.7930%,pitch,,ok
+2026-08-11T1750Z,osasuna,,1.9230%,pitch,,ok
+2026-08-11T1750Z,osasuna,,1.8230%,pitch,,ok
+2026-08-11T1750Z,osasuna,,1.8610%,pitch,,ok
+2026-08-11T1750Z,osasuna,,1.760%,pitch,,ok
+2026-08-11T1750Z,osasuna,,,pitch,,ok
+2026-08-11T1750Z,osasuna,,,pitch,,ok
+2026-08-11T1750Z,osasuna,,,pitch,,ok
+2026-08-11T1750Z,osasuna,,,pitch,,ok
+2026-08-11T1750Z,osasuna,,,pitch_gk,,ok
+2026-08-11T1750Z,osasuna,,,pitch,,ok
+2026-08-11T1750Z,osasuna,,,pitch,,ok
+2026-08-11T1750Z,osasuna,,,pitch,,ok
+2026-08-11T1750Z,osasuna,,,pitch,,ok
+2026-08-11T1750Z,osasuna,,,pitch,,ok
+2026-08-11T1750Z,osasuna,,,pitch,,ok
+2026-08-11T1750Z,racing,,Sergio Canales 80% 35 años Izquierdo 1.75m 0 0 0 0 -- -- -- ,starter,80,injured
+2026-08-11T1750Z,racing,,Simon Eriksson 60% 20 años Derecho 1.95m 0 0 0 0 -- -- -- --,starter,60,injured
+2026-08-11T1750Z,racing,,Asier Villalibre 70% 28 años Izquierdo 1.82m 0 0 0 0 -- -- -,starter,70,injured
+2026-08-11T1750Z,racing,,Andrés Martín 80% 27 años Izquierdo 1.78m 0 0 0 0 -- -- -- -,starter,80,injured
+2026-08-11T1750Z,racing,,Maguette Gueye 80% 23 años Izquierdo 1.88m 0 0 0 0 -- -- -- ,starter,80,injured
+2026-08-11T1750Z,racing,,Iñigo Vicente 90% 28 años Derecho 1.78m 0 0 0 0 -- -- -- -- ,starter,90,injured
+2026-08-11T1750Z,racing,,Gustavo Puerta 80% 23 años Derecho 1.73m 0 0 0 0 -- -- -- --,starter,80,injured
+2026-08-11T1750Z,racing,,Jorge Salinas 90% 19 años Izquierdo 1.83m 0 0 0 0 -- -- -- -,starter,90,injured
+2026-08-11T1750Z,racing,,Pedro Felipe 50% 22 años Derecho 1.90m 0 0 0 0 -- -- -- -- 0,starter,50,injured
+2026-08-11T1750Z,racing,,Facundo González 70% 23 años Izquierdo 1.93m 0 0 0 0 -- -- -,starter,70,injured
+2026-08-11T1750Z,racing,,Álvaro Mantilla 80% 26 años Derecho 1.84m 0 0 0 0 -- -- -- -,starter,80,injured
+2026-08-11T1750Z,racing,,Manu Hernando 50% 28 años Derecho 1.83m 0 0 0 0 -- -- -- -- ,sub,50,ok
+2026-08-11T1750Z,racing,,Julen Agirrezabala 40% 25 años Izquierdo 1.87m 0 0 0 0 -- --,sub,40,ok
+2026-08-11T1750Z,racing,,Íñigo Sainz-Maza 40% 28 años Derecho 1.84m 0 0 0 0 -- -- -- ,sub,40,ok
+2026-08-11T1750Z,racing,,Pablo Ramón 30% 25 años Derecho 1.84m 0 0 0 0 -- -- -- -- 0 ,sub,30,ok
+2026-08-11T1750Z,racing,,Juan Carlos Arana 30% 26 años Derecho 1.82m 0 0 0 0 -- -- --,sub,30,ok
+2026-08-11T1750Z,racing,,Yassir Zabiri 30% 21 años Izquierdo 1.82m 0 0 0 0 -- -- -- -,sub,30,ok
+2026-08-11T1750Z,racing,,Sergio Martínez 30% 19 años - 1.85m 0 0 0 0 -- -- -- -- 0 0 ,sub,30,ok
+2026-08-11T1750Z,racing,,Giorgi Guliashvili 20% 24 años Derecho 1.75m 0 0 0 0 -- -- -,sub,20,ok
+2026-08-11T1750Z,racing,,Laro Gómez 0% - - - - 0 0 0 0 -- -- -- -- 0 0 RAC vs VIL 🏠 R,sub,0,ok
+2026-08-11T1750Z,racing,,"Canales 20,19M (+794k) 7,95M (+740k) 7,38M (+70k) 44,00M (+0",pitch,,ok
+2026-08-11T1750Z,racing,,1.9560%,pitch_gk,,ok
+2026-08-11T1750Z,racing,,1.8270%,pitch,,ok
+2026-08-11T1750Z,racing,,1.7880%,pitch,,ok
+2026-08-11T1750Z,racing,,1.8880%,pitch,,ok
+2026-08-11T1750Z,racing,,"Iñigo Vicente 18,76M (+10k) 6,65M (+270k) 5,41M (+80k) 32,00",pitch,,ok
+2026-08-11T1750Z,racing,,1.7380%,pitch,,ok
+2026-08-11T1750Z,racing,,1.8390%,pitch,,ok
+2026-08-11T1750Z,racing,,"Pedro Felipe - 860k (-10k) 370k (+30k) 16,00M (+0) 1,01M (+9",pitch,,ok
+2026-08-11T1750Z,racing,,1.9370%,pitch,,ok
+2026-08-11T1750Z,racing,,1.8480%,pitch,,ok
+2026-08-11T1750Z,racing,,"Hernando 1,88M (-32k) 1,21M (+10k) 1,40M (-20k) 17,00M (+0) ",pitch,,ok
+2026-08-11T1750Z,racing,,"Agirrezabala 2,91M (+0) 830k (+180k) 1,14M (+250k) 29,00M (+",pitch,,ok
+2026-08-11T1750Z,racing,,1.8440%,pitch,,ok
+2026-08-11T1750Z,racing,,"Pablo Ramón 540k (+0) 490k (+50k) 460k (+30k) 18,00M (+0) 1,",pitch,,ok
+2026-08-11T1750Z,racing,,1.8230%,pitch,,ok
+2026-08-11T1750Z,racing,,"Zabiri - 1,64M (-20k) 1,24M (+100k) 17,00M (+0) 6,47M (-130k",pitch,,ok
+2026-08-11T1750Z,racing,,1.8530%,pitch,,ok
+2026-08-11T1750Z,racing,,1.7520%,pitch,,ok
+2026-08-11T1750Z,racing,,-0%,pitch,,ok
+2026-08-11T1750Z,racing,,,pitch,,ok
+2026-08-11T1750Z,racing,,,pitch,,ok
+2026-08-11T1750Z,racing,,,pitch,,ok
+2026-08-11T1750Z,racing,,,pitch,,ok
+2026-08-11T1750Z,racing,,,pitch,,ok
+2026-08-11T1750Z,racing,,,pitch,,ok
+2026-08-11T1750Z,racing,,,pitch_gk,,ok
+2026-08-11T1750Z,racing,,,pitch,,ok
+2026-08-11T1750Z,racing,,,pitch,,ok
+2026-08-11T1750Z,racing,,,pitch,,ok
+2026-08-11T1750Z,racing,,,pitch,,ok
+2026-08-11T1750Z,rayo-vallecano,,Óscar Valentín 60% 31 años Derecho 1.77m 0 0 0 0 -- -- -- --,starter,60,injured
+2026-08-11T1750Z,rayo-vallecano,,Sergio Camello 50% 25 años Derecho 1.82m 0 0 0 0 -- -- -- --,starter,50,injured
+2026-08-11T1750Z,rayo-vallecano,,Augusto Batalla 95% 30 años Derecho 1.85m 0 0 0 0 -- -- -- -,starter,95,injured
+2026-08-11T1750Z,rayo-vallecano,,Jorge de Frutos 90% 29 años Derecho 1.73m 0 0 0 0 -- -- -- -,starter,90,injured
+2026-08-11T1750Z,rayo-vallecano,,Isi Palazón 80% 31 años Izquierdo 1.69m 0 0 0 0 -- -- -- -- ,starter,80,injured
+2026-08-11T1750Z,rayo-vallecano,,Unai López 70% 30 años Derecho 1.70m 0 0 0 0 -- -- -- -- 0 0,starter,70,injured
+2026-08-11T1750Z,rayo-vallecano,,Pelayo Fernández 50% 23 años Derecho 1.93m 0 0 0 0 -- -- -- ,starter,50,injured
+2026-08-11T1750Z,rayo-vallecano,,Florian Lejeune 90% 35 años Derecho 1.90m 0 0 0 0 -- -- -- -,starter,90,injured
+2026-08-11T1750Z,rayo-vallecano,,Iván Balliu 60% 34 años Derecho 1.72m 0 0 0 0 -- -- -- -- 0 ,starter,60,injured
+2026-08-11T1750Z,rayo-vallecano,,Andrei Ratiu 90% 28 años Derecho 1.83m 0 0 0 0 -- -- -- -- 0,starter,90,injured
+2026-08-11T1750Z,rayo-vallecano,,Álvaro García 80% 33 años Ambidiestro 1.67m 0 0 0 0 -- -- --,starter,80,injured
+2026-08-11T1750Z,rayo-vallecano,,Pedro Díaz 50% 28 años Derecho 1.80m 0 0 0 0 -- -- -- -- 0 0,sub,50,ok
+2026-08-11T1750Z,rayo-vallecano,,Alemão 50% 28 años Derecho 1.82m 0 0 0 0 -- -- -- -- 0 0 RAY,sub,50,ok
+2026-08-11T1750Z,rayo-vallecano,,Pathé Ciss 40% 32 años Derecho 1.86m 0 0 0 0 -- -- -- -- 0 0,sub,40,ok
+2026-08-11T1750Z,rayo-vallecano,,Jozhua Vertrouwd 40% 21 años Izquierdo 1.87m 0 0 0 0 -- -- -,sub,40,ok
+2026-08-11T1750Z,rayo-vallecano,,Fran Pérez 30% 23 años Derecho 1.76m 0 0 0 0 -- -- -- -- 0 0,sub,30,ok
+2026-08-11T1750Z,rayo-vallecano,,Randy Nteka 30% 28 años Izquierdo 1.89m 0 0 0 0 -- -- -- -- ,sub,30,ok
+2026-08-11T1750Z,rayo-vallecano,,Marash Kumbulla 30% 26 años Derecho 1.91m 0 0 0 0 -- -- -- -,sub,30,ok
+2026-08-11T1750Z,rayo-vallecano,,Nobel Mendy 10% 21 años Izquierdo 1.87m 0 0 0 0 -- -- -- -- ,sub,10,ok
+2026-08-11T1750Z,rayo-vallecano,,Dani Cárdenas 5% 29 años Derecho 1.86m 0 0 0 0 -- -- -- -- 0,sub,5,ok
+2026-08-11T1750Z,rayo-vallecano,,Raúl De Tomás 0% 31 años Derecho 1.80m 0 0 0 0 -- -- -- -- 0,sub,0,ok
+2026-08-11T1750Z,rayo-vallecano,,Pep Chavarría 0% 28 años Izquierdo 1.74m 0 0 0 0 -- -- -- --,sub,0,ok
+2026-08-11T1750Z,rayo-vallecano,,Luiz Felipe 0% 29 años Derecho 1.87m 0 0 0 0 -- -- -- -- 0 0,sub,0,ok
+2026-08-11T1750Z,rayo-vallecano,,1.7760%,pitch,,ok
+2026-08-11T1750Z,rayo-vallecano,,1.8250%,pitch,,ok
+2026-08-11T1750Z,rayo-vallecano,,1.8595%,pitch_gk,,ok
+2026-08-11T1750Z,rayo-vallecano,,1.7390%,pitch,,ok
+2026-08-11T1750Z,rayo-vallecano,,1.6980%,pitch,,ok
+2026-08-11T1750Z,rayo-vallecano,,1.7070%,pitch,,ok
+2026-08-11T1750Z,rayo-vallecano,,1.9350%CED,pitch,,ok
+2026-08-11T1750Z,rayo-vallecano,,1.9090%,pitch,,ok
+2026-08-11T1750Z,rayo-vallecano,,1.7260%,pitch,,ok
+2026-08-11T1750Z,rayo-vallecano,,1.8390%,pitch,,ok
+2026-08-11T1750Z,rayo-vallecano,,1.6780%,pitch,,ok
+2026-08-11T1750Z,rayo-vallecano,,1.8050%,pitch,,ok
+2026-08-11T1750Z,rayo-vallecano,,1.8250%,pitch,,ok
+2026-08-11T1750Z,rayo-vallecano,,"Pathé Ciss 11,48M (+97k) 2,70M (+80k) 3,77M (+20k) 36,00M (+",pitch,,ok
+2026-08-11T1750Z,rayo-vallecano,,1.8740%,pitch,,ok
+2026-08-11T1750Z,rayo-vallecano,,1.7630%,pitch,,ok
+2026-08-11T1750Z,rayo-vallecano,,1.8930%,pitch,,ok
+2026-08-11T1750Z,rayo-vallecano,,"Kumbulla 897k (+0) 990k (+140k) 900k (+40k) 20,00M (+0) 2,06",pitch,,ok
+2026-08-11T1750Z,rayo-vallecano,,1.8710%,pitch,,ok
+2026-08-11T1750Z,rayo-vallecano,,1.865%,pitch,,ok
+2026-08-11T1750Z,rayo-vallecano,,1.800%TRN,pitch,,ok
+2026-08-11T1750Z,rayo-vallecano,,1.740%,pitch,,ok
+2026-08-11T1750Z,rayo-vallecano,,1.870%,pitch,,ok
+2026-08-11T1750Z,rayo-vallecano,,,pitch,,ok
+2026-08-11T1750Z,rayo-vallecano,,,pitch,,ok
+2026-08-11T1750Z,rayo-vallecano,,,pitch,,ok
+2026-08-11T1750Z,rayo-vallecano,,,pitch,,ok
+2026-08-11T1750Z,rayo-vallecano,,,pitch_gk,,ok
+2026-08-11T1750Z,rayo-vallecano,,,pitch,,ok
+2026-08-11T1750Z,rayo-vallecano,,,pitch,,ok
+2026-08-11T1750Z,rayo-vallecano,,,pitch,,ok
+2026-08-11T1750Z,rayo-vallecano,,,pitch,,ok
+2026-08-11T1750Z,rayo-vallecano,,,pitch,,ok
+2026-08-11T1750Z,rayo-vallecano,,,pitch,,ok
+2026-08-11T1750Z,real-madrid,,Kylian Mbappé 70% 27 años Derecho 1.80m 0 0 0 0 -- -- -- -- ,starter,70,injured
+2026-08-11T1750Z,real-madrid,,Arda Güler 60% 21 años Izquierdo 1.75m 0 0 0 0 -- -- -- -- 0,starter,60,injured
+2026-08-11T1750Z,real-madrid,,Dean Huijsen 70% 21 años Ambidiestro 1.97m 0 0 0 0 -- -- -- ,starter,70,injured
+2026-08-11T1750Z,real-madrid,,Ibrahima Konaté 50% 27 años Derecho 1.94m 0 0 0 0 -- -- -- -,starter,50,injured
+2026-08-11T1750Z,real-madrid,,Denzel Dumfries 50% 30 años Derecho 1.88m 0 0 0 0 -- -- -- -,starter,50,injured
+2026-08-11T1750Z,real-madrid,,Bernardo Silva 60% 32 años Izquierdo 1.73m 0 0 0 0 -- -- -- ,starter,60,injured
+2026-08-11T1750Z,real-madrid,,Federico Valverde 90% 28 años Derecho 1.82m 0 0 0 0 -- -- --,starter,90,injured
+2026-08-11T1750Z,real-madrid,,Jude Bellingham 60% 23 años Derecho 1.86m 0 0 0 0 -- -- -- -,starter,60,injured
+2026-08-11T1750Z,real-madrid,,Vinicius Junior 90% 26 años Derecho 1.76m 0 0 0 0 -- -- -- -,starter,90,injured
+2026-08-11T1750Z,real-madrid,,Thibaut Courtois 70% 34 años Izquierdo 1.99m 0 0 0 0 -- -- -,starter,70,injured
+2026-08-11T1750Z,real-madrid,,Marc Cucurella 70% 28 años Izquierdo 1.73m 0 0 0 0 -- -- -- ,starter,70,injured
+2026-08-11T1750Z,real-madrid,,Antonio Rüdiger 50% 33 años Derecho 1.90m 0 0 0 0 -- -- -- -,sub,50,ok
+2026-08-11T1750Z,real-madrid,,Trent Alexander-Arnold 50% 27 años Derecho 1.80m 0 0 0 0 -- ,sub,50,ok
+2026-08-11T1750Z,real-madrid,,Yan Diomande 50% 19 años Derecho 1.80m 0 0 0 0 -- -- -- -- 0,sub,50,ok
+2026-08-11T1750Z,real-madrid,,Aurélien Tchouaméni 50% 26 años Derecho 1.88m 0 0 0 0 -- -- ,sub,50,ok
+2026-08-11T1750Z,real-madrid,,Eduardo Camavinga 30% 23 años Izquierdo 1.82m 0 0 0 0 -- -- ,sub,30,ok
+2026-08-11T1750Z,real-madrid,,Brahim Díaz 30% 27 años Ambidiestro 1.70m 0 0 0 0 -- -- -- -,sub,30,ok
+2026-08-11T1750Z,real-madrid,,Carlos Espí 30% 21 años Derecho 1.94m 0 0 0 0 -- -- -- -- 0 ,sub,30,ok
+2026-08-11T1750Z,real-madrid,,Álvaro F. Carreras 30% 23 años Izquierdo 1.86m 0 0 0 0 -- --,sub,30,ok
+2026-08-11T1750Z,real-madrid,,Andriy Lunin 30% 27 años Derecho 1.91m 0 0 0 0 -- -- -- -- 0,sub,30,ok
+2026-08-11T1750Z,real-madrid,,Endrick 10% 20 años Izquierdo 1.72m 0 0 0 0 -- -- -- -- 0 0 ,sub,10,ok
+2026-08-11T1750Z,real-madrid,,Ferland Mendy 0% 31 años Izquierdo 1.80m 0 0 0 0 -- -- -- --,sub,0,ok
+2026-08-11T1750Z,real-madrid,,Raúl Asencio 0% 23 años Derecho 1.84m 0 0 0 0 -- -- -- -- 0 ,sub,0,ok
+2026-08-11T1750Z,real-madrid,,Éder Militão 0% 28 años Derecho 1.86m 0 0 0 0 -- -- -- -- 0 ,sub,0,ok
+2026-08-11T1750Z,real-madrid,,Thiago Pitarch 0% 19 años Derecho 1.79m 0 0 0 0 -- -- -- -- ,sub,0,ok
+2026-08-11T1750Z,real-madrid,,Rodrygo Goes 0% 25 años Derecho 1.74m 0 0 0 0 -- -- -- -- 0 ,sub,0,ok
+2026-08-11T1750Z,real-madrid,,1.8070%,pitch,,ok
+2026-08-11T1750Z,real-madrid,,1.7560%,pitch,,ok
+2026-08-11T1750Z,real-madrid,,1.9770%,pitch,,ok
+2026-08-11T1750Z,real-madrid,,"Konaté 46,91M (+1,30M) 10,68M (-20k) 5,67M (-50k) 67,00M (+0",pitch,,ok
+2026-08-11T1750Z,real-madrid,,"Dumfries 63,49M (-1,42M) 9,75M (+100k) 6,51M (-90k) 51,00M (",pitch,,ok
+2026-08-11T1750Z,real-madrid,,"Bernardo Silva 47,99M (+1,88M) 18,45M (+750k) 9,79M (+40k) 7",pitch,,ok
+2026-08-11T1750Z,real-madrid,,1.8290%,pitch,,ok
+2026-08-11T1750Z,real-madrid,,1.8660%,pitch,,ok
+2026-08-11T1750Z,real-madrid,,1.7690%,pitch,,ok
+2026-08-11T1750Z,real-madrid,,1.9970%,pitch_gk,,ok
+2026-08-11T1750Z,real-madrid,,"Cucurella 83,34M (+1,19M) 20,00M (-150k) 12,09M (-200k) 86,0",pitch,,ok
+2026-08-11T1750Z,real-madrid,,1.9050%,pitch,,ok
+2026-08-11T1750Z,real-madrid,,1.8050%,pitch,,ok
+2026-08-11T1750Z,real-madrid,,"Y. Diomande - 12,04M (+650k) 14,12M (+180k) 112,00M (+0) 37,",pitch,,ok
+2026-08-11T1750Z,real-madrid,,1.8850%,pitch,,ok
+2026-08-11T1750Z,real-madrid,,1.8230%,pitch,,ok
+2026-08-11T1750Z,real-madrid,,1.7030%,pitch,,ok
+2026-08-11T1750Z,real-madrid,,"Carlos Espí 8,06M (-275k) 6,95M (+290k) 3,78M (-50k) 50,00M ",pitch,,ok
+2026-08-11T1750Z,real-madrid,,1.8630%,pitch,,ok
+2026-08-11T1750Z,real-madrid,,1.9130%,pitch,,ok
+2026-08-11T1750Z,real-madrid,,1.7210%,pitch,,ok
+2026-08-11T1750Z,real-madrid,,1.800%,pitch,,ok
+2026-08-11T1750Z,real-madrid,,1.840%CEDTRN,pitch,,ok
+2026-08-11T1750Z,real-madrid,,1.860%,pitch,,ok
+2026-08-11T1750Z,real-madrid,,1.790%,pitch,,ok
+2026-08-11T1750Z,real-madrid,,1.740%,pitch,,ok
+2026-08-11T1750Z,real-madrid,,,pitch,,ok
+2026-08-11T1750Z,real-madrid,,,pitch,,ok
+2026-08-11T1750Z,real-madrid,,,pitch,,ok
+2026-08-11T1750Z,real-madrid,,,pitch,,ok
+2026-08-11T1750Z,real-madrid,,,pitch,,ok
+2026-08-11T1750Z,real-madrid,,,pitch,,ok
+2026-08-11T1750Z,real-madrid,,,pitch,,ok
+2026-08-11T1750Z,real-madrid,,,pitch,,ok
+2026-08-11T1750Z,real-madrid,,,pitch,,ok
+2026-08-11T1750Z,real-madrid,,,pitch,,ok
+2026-08-11T1750Z,real-madrid,,,pitch_gk,,ok
+2026-08-11T1750Z,real-sociedad,,Sergio Gómez 80% 25 años Izquierdo 1.73m 0 0 0 0 -- -- -- --,starter,80,injured
+2026-08-11T1750Z,real-sociedad,,Jon Aramburu 80% 24 años Derecho 1.76m 0 0 0 0 -- -- -- -- 0,starter,80,injured
+2026-08-11T1750Z,real-sociedad,,Igor Zubeldia 80% 29 años Derecho 1.81m 0 0 0 0 -- -- -- -- ,starter,80,injured
+2026-08-11T1750Z,real-sociedad,,Jon Martín 90% 20 años Derecho 1.87m 0 0 0 0 -- -- -- -- 0 0,starter,90,injured
+2026-08-11T1750Z,real-sociedad,,Beñat Turrientes 70% 24 años Derecho 1.81m 0 0 0 0 -- -- -- ,starter,70,injured
+2026-08-11T1750Z,real-sociedad,,Carlos Soler 80% 29 años Derecho 1.80m 0 0 0 0 -- -- -- -- 0,starter,80,injured
+2026-08-11T1750Z,real-sociedad,,Yangel Herrera 50% 28 años Derecho 1.84m 0 0 0 0 -- -- -- --,starter,50,injured
+2026-08-11T1750Z,real-sociedad,,Ander Barrenetxea 70% 24 años Derecho 1.75m 0 0 0 0 -- -- --,starter,70,injured
+2026-08-11T1750Z,real-sociedad,,Takefusa Kubo 50% 25 años Izquierdo 1.73m 0 0 0 0 -- -- -- -,starter,50,injured
+2026-08-11T1750Z,real-sociedad,,Mikel Oyarzabal 60% 29 años Izquierdo 1.81m 0 0 0 0 -- -- --,starter,60,injured
+2026-08-11T1750Z,real-sociedad,,Álex Remiro 90% 31 años Derecho 1.92m 0 0 0 0 -- -- -- -- 0 ,starter,90,injured
+2026-08-11T1750Z,real-sociedad,,Gonçalo Guedes 50% 29 años Derecho 1.79m 0 0 0 0 -- -- -- --,sub,50,ok
+2026-08-11T1750Z,real-sociedad,,Luka Sucic 50% 23 años Izquierdo 1.85m 0 0 0 0 -- -- -- -- 0,sub,50,ok
+2026-08-11T1750Z,real-sociedad,,Orri Steinn Óskarsson 40% 21 años Derecho 1.86m 0 0 0 0 -- -,sub,40,ok
+2026-08-11T1750Z,real-sociedad,,Pablo Marín 30% 23 años Derecho 1.78m 0 0 0 0 -- -- -- -- 0 ,sub,30,ok
+2026-08-11T1750Z,real-sociedad,,Jon Gorrotxategi 30% 24 años Derecho 1.77m 0 0 0 0 -- -- -- ,sub,30,ok
+2026-08-11T1750Z,real-sociedad,,Arsen Zakharyan 20% 23 años Derecho 1.83m 0 0 0 0 -- -- -- -,sub,20,ok
+2026-08-11T1750Z,real-sociedad,,Luken Beitia 20% 22 años Derecho 1.91m 0 0 0 0 -- -- -- -- 0,sub,20,ok
+2026-08-11T1750Z,real-sociedad,,Aihen Muñoz 20% 28 años Izquierdo 1.75m 0 0 0 0 -- -- -- -- ,sub,20,ok
+2026-08-11T1750Z,real-sociedad,,Job Ochieng 10% 23 años Derecho 1.85m 0 0 0 0 -- -- -- -- 0 ,sub,10,ok
+2026-08-11T1750Z,real-sociedad,,Kazunari Kita 10% 20 años Izquierdo 1.89m 0 0 0 0 -- -- -- -,sub,10,ok
+2026-08-11T1750Z,real-sociedad,,Jon Pacheco 10% 25 años Izquierdo 1.84m 0 0 0 0 -- -- -- -- ,sub,10,ok
+2026-08-11T1750Z,real-sociedad,,Unai Marrero 10% 24 años Derecho 1.89m 0 0 0 0 -- -- -- -- 0,sub,10,ok
+2026-08-11T1750Z,real-sociedad,,Jon Balda 0% 24 años Izquierdo 1.74m 0 0 0 0 -- -- -- -- 0 0,sub,0,ok
+2026-08-11T1750Z,real-sociedad,,Mikel Goti 0% 24 años Izquierdo 1.85m 0 0 0 0 -- -- -- -- 0 ,sub,0,ok
+2026-08-11T1750Z,real-sociedad,,Javi López 0% 24 años Izquierdo 1.83m 0 0 0 0 -- -- -- -- 0 ,sub,0,ok
+2026-08-11T1750Z,real-sociedad,,Iñaki Rupérez 0% 23 años Derecho 1.77m 0 0 0 0 -- -- -- -- 0,sub,0,ok
+2026-08-11T1750Z,real-sociedad,,Jon Karrikaburu 0% 23 años Derecho 1.83m 0 0 0 0 -- -- -- --,sub,0,ok
+2026-08-11T1750Z,real-sociedad,,Álvaro Odriozola 0% 30 años Derecho 1.75m 0 0 0 0 -- -- -- -,sub,0,ok
+2026-08-11T1750Z,real-sociedad,,1.7380%,pitch,,ok
+2026-08-11T1750Z,real-sociedad,,1.7680%,pitch,,ok
+2026-08-11T1750Z,real-sociedad,,1.8180%,pitch,,ok
+2026-08-11T1750Z,real-sociedad,,1.8790%,pitch,,ok
+2026-08-11T1750Z,real-sociedad,,1.8170%,pitch,,ok
+2026-08-11T1750Z,real-sociedad,,1.8080%,pitch,,ok
+2026-08-11T1750Z,real-sociedad,,1.8450%,pitch,,ok
+2026-08-11T1750Z,real-sociedad,,1.7570%,pitch,,ok
+2026-08-11T1750Z,real-sociedad,,1.7350%,pitch,,ok
+2026-08-11T1750Z,real-sociedad,,1.8160%,pitch,,ok
+2026-08-11T1750Z,real-sociedad,,1.9290%,pitch_gk,,ok
+2026-08-11T1750Z,real-sociedad,,1.7950%,pitch,,ok
+2026-08-11T1750Z,real-sociedad,,1.8550%,pitch,,ok
+2026-08-11T1750Z,real-sociedad,,1.8640%,pitch,,ok
+2026-08-11T1750Z,real-sociedad,,1.7830%,pitch,,ok
+2026-08-11T1750Z,real-sociedad,,1.7730%,pitch,,ok
+2026-08-11T1750Z,real-sociedad,,1.8320%TRN,pitch,,ok
+2026-08-11T1750Z,real-sociedad,,1.9120%,pitch,,ok
+2026-08-11T1750Z,real-sociedad,,1.7520%,pitch,,ok
+2026-08-11T1750Z,real-sociedad,,1.8510%,pitch,,ok
+2026-08-11T1750Z,real-sociedad,,1.8910%,pitch,,ok
+2026-08-11T1750Z,real-sociedad,,"Pacheco 4,02M (+0) 220k (-20k) 220k (+0) 22,00M (+0) 1,00M (",pitch,,ok
+2026-08-11T1750Z,real-sociedad,,1.8910%,pitch,,ok
+2026-08-11T1750Z,real-sociedad,,1.740%,pitch,,ok
+2026-08-11T1750Z,real-sociedad,,1.850%CED,pitch,,ok
+2026-08-11T1750Z,real-sociedad,,1.830%CED,pitch,,ok
+2026-08-11T1750Z,real-sociedad,,1.770%,pitch,,ok
+2026-08-11T1750Z,real-sociedad,,1.830%CED,pitch,,ok
+2026-08-11T1750Z,real-sociedad,,1.750%,pitch,,ok
+2026-08-11T1750Z,real-sociedad,,,pitch,,ok
+2026-08-11T1750Z,real-sociedad,,,pitch,,ok
+2026-08-11T1750Z,real-sociedad,,,pitch,,ok
+2026-08-11T1750Z,real-sociedad,,,pitch,,ok
+2026-08-11T1750Z,real-sociedad,,,pitch,,ok
+2026-08-11T1750Z,real-sociedad,,,pitch,,ok
+2026-08-11T1750Z,real-sociedad,,,pitch_gk,,ok
+2026-08-11T1750Z,real-sociedad,,,pitch,,ok
+2026-08-11T1750Z,real-sociedad,,,pitch,,ok
+2026-08-11T1750Z,real-sociedad,,,pitch,,ok
+2026-08-11T1750Z,real-sociedad,,,pitch,,ok
+2026-08-11T1750Z,sevilla,,Gabriel Suazo 70% 29 años Izquierdo 1.78m 0 0 0 0 -- -- -- -,starter,70,injured
+2026-08-11T1750Z,sevilla,,Arouna Sangante 50% 24 años Derecho 1.89m 0 0 0 0 -- -- -- -,starter,50,injured
+2026-08-11T1750Z,sevilla,,Lucien Agoume 80% 24 años Derecho 1.85m 0 0 0 0 -- -- -- -- ,starter,80,injured
+2026-08-11T1750Z,sevilla,,Joaquín Oso 50% 23 años Izquierdo 1.83m 0 0 0 0 -- -- -- -- ,starter,50,injured
+2026-08-11T1750Z,sevilla,,Odysseas Vlachodimos 90% 32 años Derecho 1.91m 0 0 0 0 -- --,starter,90,injured
+2026-08-11T1750Z,sevilla,,Kike Salas 90% 24 años Izquierdo 1.88m 0 0 0 0 -- -- -- -- 0,starter,90,injured
+2026-08-11T1750Z,sevilla,,Jon Guridi 70% 31 años Izquierdo 1.79m 0 0 0 0 -- -- -- -- 0,starter,70,injured
+2026-08-11T1750Z,sevilla,,Juan Iglesias 70% 28 años Derecho 1.87m 0 0 0 0 -- -- -- -- ,starter,70,injured
+2026-08-11T1750Z,sevilla,,Nico Guillén 60% - - - - 0 0 0 0 -- -- -- -- 0 0 SEV vs RAY ,starter,60,injured
+2026-08-11T1750Z,sevilla,,Isaac Romero 60% 26 años Izquierdo 1.83m 0 0 0 0 -- -- -- --,starter,60,injured
+2026-08-11T1750Z,sevilla,,Miguel Sierra 70% - - - - 0 0 0 0 -- -- -- -- 0 0 SEV vs RAY,starter,70,injured
+2026-08-11T1750Z,sevilla,,Peque 50% 23 años Derecho 1.72m 0 0 0 0 -- -- -- -- 0 0 SEV ,sub,50,ok
+2026-08-11T1750Z,sevilla,,Andrés Castrín 50% 23 años Derecho 1.88m 0 0 0 0 -- -- -- --,sub,50,ok
+2026-08-11T1750Z,sevilla,,Rubén Vargas 50% 28 años Derecho 1.79m 0 0 0 0 -- -- -- -- 0,sub,50,ok
+2026-08-11T1750Z,sevilla,,José Ángel Carmona 50% 24 años Derecho 1.84m 0 0 0 0 -- -- -,sub,50,ok
+2026-08-11T1750Z,sevilla,,Julio Díaz 40% 21 años Izquierdo 1.74m 0 0 0 0 -- -- -- -- 0,sub,40,ok
+2026-08-11T1750Z,sevilla,,Manu Bueno 30% 22 años Izquierdo 1.78m 0 0 0 0 -- -- -- -- 0,sub,30,ok
+2026-08-11T1750Z,sevilla,,Robbie Ure 30% 22 años Derecho 1.89m 0 0 0 0 -- -- -- -- 0 0,sub,30,ok
+2026-08-11T1750Z,sevilla,,Marcão 20% 30 años Izquierdo 1.85m 0 0 0 0 -- -- -- -- 0 0 S,sub,20,ok
+2026-08-11T1750Z,sevilla,,Fran González 10% 21 años Derecho 2.00m 0 0 0 0 -- -- -- -- ,sub,10,ok
+2026-08-11T1750Z,sevilla,,Chidera Ejuke 10% 28 años Derecho 1.76m 0 0 0 0 -- -- -- -- ,sub,10,ok
+2026-08-11T1750Z,sevilla,,Alfonso González 0% 27 años - 1.72m 0 0 0 0 -- -- -- -- 0 0 ,sub,0,ok
+2026-08-11T1750Z,sevilla,,Adrià Pedrosa 0% 28 años Izquierdo 1.72m 0 0 0 0 -- -- -- --,sub,0,ok
+2026-08-11T1750Z,sevilla,,Federico Gattoni 0% 27 años Derecho 1.83m 0 0 0 0 -- -- -- -,sub,0,ok
+2026-08-11T1750Z,sevilla,,Fábio Cardoso 0% 32 años Derecho 1.87m 0 0 0 0 -- -- -- -- 0,sub,0,ok
+2026-08-11T1750Z,sevilla,,1.7870%,pitch,,ok
+2026-08-11T1750Z,sevilla,,1.8950%,pitch,,ok
+2026-08-11T1750Z,sevilla,,1.8580%,pitch,,ok
+2026-08-11T1750Z,sevilla,,1.8350%,pitch,,ok
+2026-08-11T1750Z,sevilla,,1.9190%,pitch_gk,,ok
+2026-08-11T1750Z,sevilla,,1.8890%,pitch,,ok
+2026-08-11T1750Z,sevilla,,"Guridi 5,02M (+0) 1,94M (+250k) 2,13M (+40k) 20,00M (+0) 3,9",pitch,,ok
+2026-08-11T1750Z,sevilla,,"Iglesias 12,55M (+0) 2,29M (+160k) 2,80M (+60k) 34,00M (+0) ",pitch,,ok
+2026-08-11T1750Z,sevilla,,"Guillén - 430k (+220k) 320k (+60k) 15,00M (+0) 1,10M (+0,00M",pitch,,ok
+2026-08-11T1750Z,sevilla,,1.8360%,pitch,,ok
+2026-08-11T1750Z,sevilla,,"Sierra 602k (+0) 500k (+80k) 310k (+50k) 16,00M (+0) 1,03M (",pitch,,ok
+2026-08-11T1750Z,sevilla,,1.7250%,pitch,,ok
+2026-08-11T1750Z,sevilla,,"Castrín 4,82M (+0) 1,52M (+100k) 1,10M (-20k) 21,00M (+0) 1,",pitch,,ok
+2026-08-11T1750Z,sevilla,,1.7950%,pitch,,ok
+2026-08-11T1750Z,sevilla,,1.8450%,pitch,,ok
+2026-08-11T1750Z,sevilla,,1.7440%,pitch,,ok
+2026-08-11T1750Z,sevilla,,1.7830%CED,pitch,,ok
+2026-08-11T1750Z,sevilla,,Ure - - - - - - - - 22 añosDerecho0 partidos0 min.Importante,pitch,,ok
+2026-08-11T1750Z,sevilla,,1.8520%TRN,pitch,,ok
+2026-08-11T1750Z,sevilla,,"Fran González 675k (-13k) 510k (-20k) 300k (+10k) 15,00M (+0",pitch,,ok
+2026-08-11T1750Z,sevilla,,1.7610%TRN,pitch,,ok
+2026-08-11T1750Z,sevilla,,1.720%TRN,pitch,,ok
+2026-08-11T1750Z,sevilla,,1.720%CEDTRN,pitch,,ok
+2026-08-11T1750Z,sevilla,,1.830%,pitch,,ok
+2026-08-11T1750Z,sevilla,,1.870%TRN,pitch,,ok
+2026-08-11T1750Z,sevilla,,,pitch,,ok
+2026-08-11T1750Z,sevilla,,,pitch,,ok
+2026-08-11T1750Z,sevilla,,,pitch,,ok
+2026-08-11T1750Z,sevilla,,,pitch_gk,,ok
+2026-08-11T1750Z,sevilla,,,pitch,,ok
+2026-08-11T1750Z,sevilla,,,pitch,,ok
+2026-08-11T1750Z,sevilla,,,pitch,,ok
+2026-08-11T1750Z,sevilla,,,pitch,,ok
+2026-08-11T1750Z,sevilla,,,pitch,,ok
+2026-08-11T1750Z,sevilla,,,pitch,,ok
+2026-08-11T1750Z,sevilla,,,pitch,,ok
+2026-08-11T1750Z,valencia,,Stole Dimitrievski 90% 32 años Derecho 1.88m 0 0 0 0 -- -- -,starter,90,injured
+2026-08-11T1750Z,valencia,,Guido Rodríguez 90% 32 años Derecho 1.85m 0 0 0 0 -- -- -- -,starter,90,injured
+2026-08-11T1750Z,valencia,,Jesús Vázquez 50% 23 años Izquierdo 1.82m 0 0 0 0 -- -- -- -,starter,50,injured
+2026-08-11T1750Z,valencia,,José Gayà 90% 31 años Izquierdo 1.72m 0 0 0 0 -- -- -- -- 0 ,starter,90,injured
+2026-08-11T1750Z,valencia,,Justin de Haas 70% 26 años Izquierdo 1.94m 0 0 0 0 -- -- -- ,starter,70,injured
+2026-08-11T1750Z,valencia,,Hugo Duro 50% 26 años Izquierdo 1.77m 0 0 0 0 -- -- -- -- 0 ,starter,50,injured
+2026-08-11T1750Z,valencia,,Pepelu 50% 28 años Derecho 1.86m 0 0 0 0 -- -- -- -- 0 0 VAL,starter,50,injured
+2026-08-11T1750Z,valencia,,Filip Ugrinic 50% 27 años Derecho 1.84m 0 0 0 0 -- -- -- -- ,starter,50,injured
+2026-08-11T1750Z,valencia,,Ryunosuke Sato 70% 19 años Derecho 1.71m 0 0 0 0 -- -- -- --,starter,70,injured
+2026-08-11T1750Z,valencia,,Javi Guerra 90% 23 años Derecho 1.87m 0 0 0 0 -- -- -- -- 0 ,starter,90,injured
+2026-08-11T1750Z,valencia,,César Tárrega 80% 24 años Derecho 1.94m 0 0 0 0 -- -- -- -- ,starter,80,injured
+2026-08-11T1750Z,valencia,,Aliou Dieng 50% 28 años Derecho 1.84m 0 0 0 0 -- -- -- -- 0 ,sub,50,ok
+2026-08-11T1750Z,valencia,,Dimitri Foulquier 50% 33 años Derecho 1.83m 0 0 0 0 -- -- --,sub,50,ok
+2026-08-11T1750Z,valencia,,Umar Sadiq 50% 29 años Derecho 1.91m 0 0 0 0 -- -- -- -- 0 0,sub,50,ok
+2026-08-11T1750Z,valencia,,Arnaut Danjuma 40% 29 años Derecho 1.78m 0 0 0 0 -- -- -- --,sub,40,ok
+2026-08-11T1750Z,valencia,,Mouctar Diakhaby 40% 29 años Derecho 1.92m 0 0 0 0 -- -- -- ,sub,40,ok
+2026-08-11T1750Z,valencia,,André Almeida 30% 26 años Derecho 1.76m 0 0 0 0 -- -- -- -- ,sub,30,ok
+2026-08-11T1750Z,valencia,,Luis Rioja 20% 32 años Izquierdo 1.76m 0 0 0 0 -- -- -- -- 0,sub,20,ok
+2026-08-11T1750Z,valencia,,Rubén Iranzo 10% - - - - 0 0 0 0 -- -- -- -- 0 0 VAL vs CEL ,sub,10,ok
+2026-08-11T1750Z,valencia,,Iker Córdoba 10% 20 años Izquierdo 1.90m 0 0 0 0 -- -- -- --,sub,10,ok
+2026-08-11T1750Z,valencia,,Daniel Raba 10% 30 años Izquierdo 1.85m 0 0 0 0 -- -- -- -- ,sub,10,ok
+2026-08-11T1750Z,valencia,,Cristian Rivero 10% 28 años Derecho 1.88m 0 0 0 0 -- -- -- -,sub,10,ok
+2026-08-11T1750Z,valencia,,Alberto Mari 0% 25 años Derecho 1.83m 0 0 0 0 -- -- -- -- 0 ,sub,0,ok
+2026-08-11T1750Z,valencia,,Sergi Canós 0% 29 años Derecho 1.77m 0 0 0 0 -- -- -- -- 0 0,sub,0,ok
+2026-08-11T1750Z,valencia,,José Manuel Copete 0% 26 años Izquierdo 1.90m 0 0 0 0 -- -- ,sub,0,ok
+2026-08-11T1750Z,valencia,,Diego López 0% 24 años Derecho 1.72m 0 0 0 0 -- -- -- -- 0 0,sub,0,ok
+2026-08-11T1750Z,valencia,,1.8890%,pitch_gk,,ok
+2026-08-11T1750Z,valencia,,1.8590%,pitch,,ok
+2026-08-11T1750Z,valencia,,"Jesús Vázquez 1,73M (-19k) 310k (-10k) 270k (+20k) 17,00M (+",pitch,,ok
+2026-08-11T1750Z,valencia,,1.7290%,pitch,,ok
+2026-08-11T1750Z,valencia,,"De Haas 8,66M (+129k) 2,22M (+250k) 3,13M (-60k) 29,00M (+0)",pitch,,ok
+2026-08-11T1750Z,valencia,,1.7750%,pitch,,ok
+2026-08-11T1750Z,valencia,,1.8650%,pitch,,ok
+2026-08-11T1750Z,valencia,,1.8450%,pitch,,ok
+2026-08-11T1750Z,valencia,,"Sato - 4,47M (+230k) 3,64M (+20k) 18,00M (+0) 4,98M (+303k) ",pitch,,ok
+2026-08-11T1750Z,valencia,,1.8790%,pitch,,ok
+2026-08-11T1750Z,valencia,,1.9480%,pitch,,ok
+2026-08-11T1750Z,valencia,,"Dieng 5,11M (-112k) 1,66M (+40k) 1,14M (-20k) 29,00M (+0) 4,",pitch,,ok
+2026-08-11T1750Z,valencia,,1.8350%,pitch,,ok
+2026-08-11T1750Z,valencia,,1.9150%,pitch,,ok
+2026-08-11T1750Z,valencia,,1.7840%,pitch,,ok
+2026-08-11T1750Z,valencia,,1.9240%,pitch,,ok
+2026-08-11T1750Z,valencia,,1.7630%TRN,pitch,,ok
+2026-08-11T1750Z,valencia,,1.7620%,pitch,,ok
+2026-08-11T1750Z,valencia,,-10%,pitch,,ok
+2026-08-11T1750Z,valencia,,1.9010%CED,pitch,,ok
+2026-08-11T1750Z,valencia,,1.8510%TRN,pitch,,ok
+2026-08-11T1750Z,valencia,,1.8810%TRN,pitch,,ok
+2026-08-11T1750Z,valencia,,1.830%CED,pitch,,ok
+2026-08-11T1750Z,valencia,,1.770%TRN,pitch,,ok
+2026-08-11T1750Z,valencia,,1.900%,pitch,,ok
+2026-08-11T1750Z,valencia,,1.720%,pitch,,ok
+2026-08-11T1750Z,valencia,,,pitch,,ok
+2026-08-11T1750Z,valencia,,,pitch,,ok
+2026-08-11T1750Z,valencia,,,pitch,,ok
+2026-08-11T1750Z,valencia,,,pitch,,ok
+2026-08-11T1750Z,valencia,,,pitch,,ok
+2026-08-11T1750Z,valencia,,,pitch_gk,,ok
+2026-08-11T1750Z,valencia,,,pitch,,ok
+2026-08-11T1750Z,valencia,,,pitch,,ok
+2026-08-11T1750Z,valencia,,,pitch,,ok
+2026-08-11T1750Z,valencia,,,pitch,,ok
+2026-08-11T1750Z,valencia,,,pitch,,ok
+2026-08-11T1750Z,villarreal,,Pape Gueye 70% 27 años Izquierdo 1.89m 0 0 0 0 -- -- -- -- 0,starter,70,injured
+2026-08-11T1750Z,villarreal,,Carlos Romero 80% 24 años Izquierdo 1.74m 0 0 0 0 -- -- -- -,starter,80,injured
+2026-08-11T1750Z,villarreal,,Renato Veiga 70% 23 años Izquierdo 1.88m 0 0 0 0 -- -- -- --,starter,70,injured
+2026-08-11T1750Z,villarreal,,Juan Foyth 50% 28 años Derecho 1.87m 0 0 0 0 -- -- -- -- 0 0,starter,50,injured
+2026-08-11T1750Z,villarreal,,Santi Comesaña 90% 29 años Ambidiestro 1.88m 0 0 0 0 -- -- -,starter,90,injured
+2026-08-11T1750Z,villarreal,,Gerard Moreno 60% 34 años Izquierdo 1.80m 0 0 0 0 -- -- -- -,starter,60,injured
+2026-08-11T1750Z,villarreal,,Nicolas Pépé 70% 31 años Izquierdo 1.83m 0 0 0 0 -- -- -- --,starter,70,injured
+2026-08-11T1750Z,villarreal,,Alberto Moleiro 80% 22 años Derecho 1.71m 0 0 0 0 -- -- -- -,starter,80,injured
+2026-08-11T1750Z,villarreal,,Luiz Junior 50% 25 años Izquierdo 1.92m 0 0 0 0 -- -- -- -- ,starter,50,injured
+2026-08-11T1750Z,villarreal,,Santiago Mouriño 70% 24 años Derecho 1.86m 0 0 0 0 -- -- -- ,starter,70,injured
+2026-08-11T1750Z,villarreal,,Georges Mikautadze 80% 25 años Derecho 1.76m 0 0 0 0 -- -- -,starter,80,injured
+2026-08-11T1750Z,villarreal,,Pau Navarro 50% 21 años Derecho 1.85m 0 0 0 0 -- -- -- -- 0 ,sub,50,ok
+2026-08-11T1750Z,villarreal,,Ayoze Pérez 50% 33 años Derecho 1.78m 0 0 0 0 -- -- -- -- 0 ,sub,50,ok
+2026-08-11T1750Z,villarreal,,Péter Gulácsi 40% 36 años Derecho 1.93m 0 0 0 0 -- -- -- -- ,sub,40,ok
+2026-08-11T1750Z,villarreal,,Carlos Macià 30% 17 años Derecho 1.94m 0 0 0 0 -- -- -- -- 0,sub,30,ok
+2026-08-11T1750Z,villarreal,,Tajon Buchanan 30% 27 años Derecho 1.83m 0 0 0 0 -- -- -- --,sub,30,ok
+2026-08-11T1750Z,villarreal,,Alex Freeman 30% 22 años Derecho 1.88m 0 0 0 0 -- -- -- -- 0,sub,30,ok
+2026-08-11T1750Z,villarreal,,Tani Oluwaseyi 30% 26 años Izquierdo 1.87m 0 0 0 0 -- -- -- ,sub,30,ok
+2026-08-11T1750Z,villarreal,,Sergi Cardona 20% 27 años Ambidiestro 1.86m 0 0 0 0 -- -- --,sub,20,ok
+2026-08-11T1750Z,villarreal,,Logan Costa 20% 25 años Derecho 1.90m 0 0 0 0 -- -- -- -- 0 ,sub,20,ok
+2026-08-11T1750Z,villarreal,,Alassane Diatta 10% - - - - 0 0 0 0 -- -- -- -- 0 0 VIL vs R,sub,10,ok
+2026-08-11T1750Z,villarreal,,Ilias Akhomach 10% 22 años Izquierdo 1.75m 0 0 0 0 -- -- -- ,sub,10,ok
+2026-08-11T1750Z,villarreal,,Willy Kambwala 10% 21 años Derecho 1.92m 0 0 0 0 -- -- -- --,sub,10,ok
+2026-08-11T1750Z,villarreal,,1.8970%,pitch,,ok
+2026-08-11T1750Z,villarreal,,"Romero 40,59M (+1,14M) 6,03M (+200k) 7,16M (+10k) 63,00M (+0",pitch,,ok
+2026-08-11T1750Z,villarreal,,1.8870%,pitch,,ok
+2026-08-11T1750Z,villarreal,,1.8750%,pitch,,ok
+2026-08-11T1750Z,villarreal,,1.8890%,pitch,,ok
+2026-08-11T1750Z,villarreal,,"Gerard 28,65M (-263k) 9,00M (+470k) 7,26M (+50k) 61,00M (+0)",pitch,,ok
+2026-08-11T1750Z,villarreal,,1.8370%,pitch,,ok
+2026-08-11T1750Z,villarreal,,1.7180%,pitch,,ok
+2026-08-11T1750Z,villarreal,,"Luiz Junior 40,40M (-474k) 1,99M (-160k) 3,40M (-80k) 33,00M",pitch_gk,,ok
+2026-08-11T1750Z,villarreal,,1.8670%,pitch,,ok
+2026-08-11T1750Z,villarreal,,1.7680%,pitch,,ok
+2026-08-11T1750Z,villarreal,,1.8550%,pitch,,ok
+2026-08-11T1750Z,villarreal,,"Ayoze 15,97M (+123k) 5,80M (+750k) 4,54M (+100k) 42,00M (+0)",pitch,,ok
+2026-08-11T1750Z,villarreal,,1.9340%,pitch,,ok
+2026-08-11T1750Z,villarreal,,"Carlos Macià 803k (+0) 360k (-50k) 460k (+80k) 16,00M (+0) 2",pitch,,ok
+2026-08-11T1750Z,villarreal,,1.8330%,pitch,,ok
+2026-08-11T1750Z,villarreal,,1.8830%,pitch,,ok
+2026-08-11T1750Z,villarreal,,1.8730%,pitch,,ok
+2026-08-11T1750Z,villarreal,,1.8620%,pitch,,ok
+2026-08-11T1750Z,villarreal,,1.9020%,pitch,,ok
+2026-08-11T1750Z,villarreal,,"Diatta 582k (+0) 1,16M (+240k) 240k (+0) 16,00M (+0) - - 482",pitch,,ok
+2026-08-11T1750Z,villarreal,,1.7510%CED,pitch,,ok
+2026-08-11T1750Z,villarreal,,1.9210%CED,pitch,,ok
+2026-08-11T1750Z,villarreal,,,pitch_gk,,ok
+2026-08-11T1750Z,villarreal,,,pitch,,ok
+2026-08-11T1750Z,villarreal,,,pitch,,ok
+2026-08-11T1750Z,villarreal,,,pitch,,ok
+2026-08-11T1750Z,villarreal,,,pitch,,ok
+2026-08-11T1750Z,villarreal,,,pitch,,ok
+2026-08-11T1750Z,villarreal,,,pitch,,ok
+2026-08-11T1750Z,villarreal,,,pitch,,ok
+2026-08-11T1750Z,villarreal,,,pitch,,ok
+2026-08-11T1750Z,villarreal,,,pitch,,ok
+2026-08-11T1750Z,villarreal,,,pitch,,ok
