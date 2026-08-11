@@ -72,6 +72,25 @@ def main() -> None:
         return
 
     index = {fold(r["name"]): r for r in market}
+
+    def resolve(q: str):
+        """Exact, then substring, then token match. Returns (row, candidates)."""
+        qf = fold(q)
+        if qf in index:
+            return index[qf], []
+        subs = [r for r in market if qf in fold(r["name"])]
+        if len(subs) == 1:
+            return subs[0], []
+        if not subs:
+            # "C. Dominguez" -> drop initials and punctuation, match remaining
+            # words. The app abbreviates first names; the CSV spells them out.
+            toks = [t for t in fold(q).replace(".", " ").split() if len(t) > 1]
+            if toks:
+                subs = [r for r in market
+                        if all(t in fold(r["name"]) for t in toks)]
+                if len(subs) == 1:
+                    return subs[0], []
+        return None, subs
     start, status = {}, {}
     for r in xi:
         k = fold(r.get("player_name"))
@@ -96,9 +115,9 @@ def main() -> None:
         if not line or line.startswith("#"):
             continue
         name, _, price = line.partition(",")
-        r = index.get(fold(name.strip()))
+        r, candidates = resolve(name.strip())
         if not r:
-            rows.append({"missing": name.strip()})
+            rows.append({"missing": name.strip(), "candidates": candidates})
             continue
         k = fold(r["name"])
         value = num(r["value"])
@@ -135,10 +154,16 @@ def main() -> None:
             f"{eur(r['delta'])} | {pct} | {flag} |"
         )
 
-    missing = [r["missing"] for r in rows if "missing" in r]
+    missing = [r for r in rows if "missing" in r]
     if missing:
-        out += ["", "**Not found** (check spelling against market.csv):", ""]
-        out += [f"- {m}" for m in missing]
+        out += ["", "**Unresolved:**", ""]
+        for m in missing:
+            if m["candidates"]:
+                names = ", ".join(f"`{c['name']}` ({c['team']})"
+                                  for c in m["candidates"][:5])
+                out.append(f"- **{m['missing']}** — ambiguous: {names}")
+            else:
+                out.append(f"- **{m['missing']}** — no match")
 
     out += ["", "---", "",
             "No expected-points model yet, so this ranks on start probability "
