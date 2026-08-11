@@ -1,89 +1,86 @@
 # Baseline rosters. One [section] per manager, one player per line.
-# Names as they appear in data/tidy — accents optional, case ignored.
-# You only touch this to fix a mistake; day-to-day changes go in
-# inputs/transactions.csv and are applied on top of this.
+# Day-to-day changes go in inputs/transactions.csv, not here.
 #
-# The section named "me" is you. Rename the other two to their real names.
+# Lines marked TODO need a decision from you — see the notes.
+# Any name still listed under "Unmatched names" in reports/rivals.md
+# after this is a spelling problem, not a missing player.
 
 [me]
 alvaro fernandez
+carl starfelt
 robin le normand
 igor zubeldia
 omar el hilali
-carl starfelt
 dani martinez
-jon moncayola
 ruben garcia
 iñigo ruiz de galarreta
-pepelu
 dani lorenzo
+pepelu
+beñat turrientes
+jon moncayola
+iñigo vicente
 hugo duro
 orri steinn oskarsson
-iñigo vicente
-beñat turrientes
-
-[rob]
-J. Musso
-E. Militão
-C. Romero
-Quagliata
-C. Puga
-Q. Hartman
-De Haas
-Unai Lopez
-Buchanan
-Gorrotxa
-Blanco
-Dieng
-Iago Aspas
-Etta Eyong
-Joaquín
-
-[albert]
-M. Dituro
-R.P. Bigas
-Vivian
-Llorente
-Foyth
-Manuel Fernández
-Camavinga
-Pathé I. Ciss
-Marc Roca
-Puado
-Ilaix Moriba
-Ayoze
-Ferran Jutglà
-Raúl Moro
-
-[susi]
-Szczesny
-Yuri
-Tárrega
-Jonny Otto
-A. Abqar
-Purić
-Álvaro García
-Aimar
-Johnny
-Izan M.
-Amatucci
-Berenguer
-Andrés Martín
-Carlos Espí
 
 [Marquez]
-A. Herrero
-Gayá
-Asencio
-Kike Salas
-Cardoso
-Noubi
-Pastor
-Williot
-Brahim
-Marc Bernal
-G. Puerta
-Moscardo
-Guruzeta
-Pere Milla
-Lucas Boyé
+kike salas
+marc bernal
+lucas boye
+pere milla
+jose gaya
+raul asencio
+lucas noubi
+alex pastor
+williot swedberg
+gabriel moscardo
+gorka guruzeta
+fabio cardoso
+brahim diaz
+alfonso herrero
+gustavo puerta
+
+[albert]
+ilaix moriba
+marc roca
+raul moro
+ferran jutgla
+juan foyth
+eduardo camavinga
+ayoze perez
+diego javier llorente
+matias dituro
+pedro bigas
+fernandez #
+
+[rob]
+unai lopez
+iago aspas
+giacomo quagliata
+justin de haas
+tajon buchanan
+jon gorrotxategi
+antonio blanco
+aliou dieng
+karl etta eyong
+joaquin muñoz
+juan musso
+eder militao
+carlos puga
+quilindschy hartman
+carlos romero
+
+[susi]
+alvaro garcia
+andres martin
+carlos espi
+wojciech szczesny
+yuri berchiche
+cesar tarrega
+aleksa puric
+johnny cardoso
+izan merino
+lorenzo amatucci
+alex berenguer
+aimar oroz
+jonny castro
+abdel abqar
