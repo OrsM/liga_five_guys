@@ -6,11 +6,10 @@ Run after ff_ingest.py parse.
 
     python report.py
 
-Sections: your squad, the recommended XI and bench, and market momentum.
-Recruitment lives in reports/watchlist.md, which knows who owns whom.
-
-reports/latest.md is the file to scroll; the dated copy goes in
-reports/history/ so the folder stays short.
+Structure, top to bottom: what needs a decision today, your team as one table
+(XI then bench, with the cost of each swap), and your own squad's price moves.
+League-wide movers and recruitment live in reports/watchlist.md, which knows
+who owns whom; repeating them here was noise.
 
 SCORING, while no jornada of this season has been played:
 
@@ -22,35 +21,40 @@ toward the median for that position:
 
     shrunk = (total_points + K * prior) / (matches + K)
 
-with K = 8 matches. A player with one 10-point cameo lands near the prior; a
-36-match regular keeps almost all of his own average. P(start) is the
-probable-XI reading, so a 7-a-match player at 20% ranks below a 4-a-match
-nailed starter — which is the whole point of the bench question.
+with K = 8 matches. P(start) is the probable-XI reading.
 
-This is a proxy, not a points model. Last season's average says nothing about
-a new signing, a promoted side or a changed role, and nothing at all about
-anyone who didn't play. Replace it with real expected points once a few
-jornadas exist.
+The score is a RANKING INDEX, not a points forecast. Three things it cannot
+know, all of them flagged in the report rather than hidden:
+
+  * Promoted-side players have no LaLiga record at all, so they fall back to
+    the positional prior — the median top-flight starter, which flatters them.
+    Their rows say "assumed", and the prior is discounted.
+  * A player absent from the probable-XI page is not the same as one listed
+    with no percentage. The first gets a low default; the second, a neutral one.
+  * Nothing here has been checked against reality yet. Every recommended XI is
+    appended to data/decisions/xi_log.csv so that once jornadas exist you can
+    compare what this told you to do against what actually scored.
 """
 
 from __future__ import annotations
 
 import csv
 import os
+import re
 import statistics
 import unicodedata
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 ROOT = Path(os.environ.get("FF_ROOT", "./data"))
 TIDY = ROOT / "tidy"
 SEASON = ROOT / "season"
+DECISIONS = ROOT / "decisions"
 REPORTS = Path("reports")
 HISTORY = REPORTS / "history"
-SQUAD_FILE = None  # resolved at runtime by input_path()
 
-# Spanish positions -> XI slots. entrenador is deliberately excluded: it is a
-# separate slot in the app and does not compete for one of the eleven.
+# Spanish positions -> XI slots. entrenador is excluded: separate slot in the
+# app, and premium anyway.
 SLOT = {
     "portero": "POR",
     "defensa": "DEF",
@@ -58,32 +62,40 @@ SLOT = {
     "centrocampista": "MED",
     "delantero": "DEL",
 }
-SLOT_LABEL = {"POR": "Portero", "DEF": "Defensa", "MED": "Mediocampista",
-              "DEL": "Delantero"}
+SLOT_LABEL = {"POR": "portero", "DEF": "defensa", "MED": "mediocampista",
+              "DEL": "delantero"}
 SLOT_MIN = {"POR": 1, "DEF": 3, "MED": 3, "DEL": 1}
-# Most that can ever be on the pitch at once — anyone deeper than this in his
-# position can never start under any legal formation.
+# Most that can ever be on the pitch — anyone deeper than this in his position
+# can never start under any legal formation.
 MAX_SLOT = {"POR": 1, "DEF": 5, "MED": 5, "DEL": 3}
+# Below this you cannot absorb a single injury without a scramble.
+THIN = {"POR": 2, "DEF": 4, "MED": 4, "DEL": 2}
 
-# Legal shapes, confirmed against the app's formation picker. The free ones
-# are exactly: 3-5 defenders, 3-5 midfielders, 1-3 forwards, ten outfielders.
+# Confirmed against the app's formation picker.
 FREE_FORMATIONS = [(5, 4, 1), (5, 3, 2), (4, 5, 1), (4, 4, 2), (4, 3, 3),
                    (3, 5, 2), (3, 4, 3)]
-# Behind the premium subscription — every one breaks the bounds above. The
-# captain boost and the coach slot are premium as well, so PREMIUM gates all
-# three. Flip it to True if you ever subscribe.
+# Premium subscription: these shapes, the captain boost and the coach slot.
 PREMIUM_FORMATIONS = [(5, 2, 3), (4, 6, 0), (4, 2, 4), (3, 6, 1), (3, 3, 4)]
 PREMIUM = False
 FORMATIONS = FREE_FORMATIONS + (PREMIUM_FORMATIONS if PREMIUM else [])
 
-SHRINK_K = 8.0          # matches of prior weight
-DEFAULT_START = 60.0    # assumed start% when no probable-XI reading exists
-DOUBT_FACTOR = 0.5      # a flagged doubt is half a player
+SHRINK_K = 8.0            # matches of prior weight
+NEUTRAL_START = 60.0      # listed on the XI page but no percentage given
+ABSENT_START = 15.0       # not on the XI page at all — not in the picture
+DOUBT_FACTOR = 0.5
+PROMOTED_DISCOUNT = 0.70  # the LaLiga median overstates a promoted squad
+STALE_HOURS = 14.0
+MOVER_PCT = 1.0           # squad price moves worth printing
+
+# Name particles that stay lowercase when title-casing a folded name.
+# "le"/"el"/"la" are deliberately absent: Le Normand and El Hilali are far
+# more common in this league than "de la Fuente" losing its lowercase.
+PARTICLES = {"de", "del", "van", "von", "der", "den", "di", "da", "dos",
+             "do", "y", "bin", "ibn", "ter"}
 
 
 def input_path(name: str) -> Path:
-    """Locate an editable input file. Prefers inputs/<name>; falls back to the
-    repo root so a half-finished move doesn't break the run."""
+    """Prefers inputs/<name>; falls back to the repo root."""
     p = Path("inputs") / name
     return p if p.exists() else Path(name)
 
@@ -94,6 +106,24 @@ def fold(s) -> str:
         c for c in unicodedata.normalize("NFD", (s or "").lower())
         if unicodedata.category(c) != "Mn"
     )
+
+
+def title_name(s: str) -> str:
+    """market.csv hands us folded names; make them readable again.
+
+    Accents survive (they're in the source string), particles stay lowercase,
+    hyphenated parts are capitalised on both sides.
+    """
+    s = (s or "").strip()
+    if not s or s != s.lower():
+        return s  # already cased — leave it alone
+    words = []
+    for i, w in enumerate(s.split()):
+        if i and w in PARTICLES:
+            words.append(w)
+        else:
+            words.append("-".join(p[:1].upper() + p[1:] for p in w.split("-")))
+    return " ".join(words)
 
 
 def read_csv(path: Path) -> list[dict]:
@@ -126,14 +156,34 @@ def eur(v) -> str:
     return f"{v:.0f}"
 
 
+def parse_stamp(s: str):
+    """Tolerant: 2026-08-11T2325Z, 2026-08-11T23:25Z, 2026-08-11 both parse."""
+    digits = re.sub(r"\D", "", s or "")
+    if len(digits) < 8:
+        return None
+    try:
+        y, mo, d = int(digits[:4]), int(digits[4:6]), int(digits[6:8])
+        h = int(digits[8:10]) if len(digits) >= 10 else 0
+        mi = int(digits[10:12]) if len(digits) >= 12 else 0
+        return datetime(y, mo, d, h, mi, tzinfo=timezone.utc)
+    except ValueError:
+        return None
+
+
+def madrid_tz():
+    try:
+        from zoneinfo import ZoneInfo
+        return ZoneInfo("Europe/Madrid")
+    except Exception:
+        return timezone(timedelta(hours=2))  # CEST, good enough Mar-Oct
+
+
 def load_squad() -> list[str]:
     path = input_path("squad.txt")
     if not path.exists():
         return []
-    return [
-        ln.strip() for ln in path.read_text(encoding="utf-8").splitlines()
-        if ln.strip() and not ln.strip().startswith("#")
-    ]
+    return [ln.strip() for ln in path.read_text(encoding="utf-8").splitlines()
+            if ln.strip() and not ln.strip().startswith("#")]
 
 
 def load_history() -> tuple[dict, str]:
@@ -151,16 +201,114 @@ def load_history() -> tuple[dict, str]:
     return out, path.stem.replace("points_", "")
 
 
+def load_cash() -> tuple[float | None, datetime | None]:
+    """inputs/cash.txt: a balance, optionally with the date you checked it.
+
+        12500000  2026-08-11
+    """
+    path = input_path("cash.txt")
+    if not path.exists():
+        return None, None
+    text = path.read_text(encoding="utf-8")
+    body = "\n".join(ln.split("#")[0] for ln in text.splitlines())
+    money = re.search(r"-?\d[\d.,]*\d|-?\d", body)
+    when = re.search(r"\d{4}-\d{2}-\d{2}", body)
+    amount = None
+    if money:
+        raw = money.group(0).strip().replace(" ", "")
+        # 12.500.000 and 12,500,000 both mean the same thing here.
+        raw = raw.replace(".", "").replace(",", "") if raw.count(".") > 1 \
+            or raw.count(",") > 1 else raw.replace(",", "")
+        amount = num(raw, None) if raw else None
+    return amount, (parse_stamp(when.group(0)) if when else None)
+
+
+def last_transaction() -> datetime | None:
+    """Newest date found anywhere in inputs/transactions.csv."""
+    rows = read_csv(input_path("transactions.csv"))
+    best = None
+    for r in rows:
+        for v in r.values():
+            m = re.search(r"\d{4}-\d{2}-\d{2}", str(v or ""))
+            if m:
+                d = parse_stamp(m.group(0))
+                if d and (best is None or d > best):
+                    best = d
+    return best
+
+
+def load_deadline() -> datetime | None:
+    """inputs/deadline.txt: next lock, e.g. 2026-08-15T18:30 (Madrid time)."""
+    path = input_path("deadline.txt")
+    if not path.exists():
+        return None
+    body = "\n".join(ln.split("#")[0] for ln in
+                     path.read_text(encoding="utf-8").splitlines())
+    m = re.search(r"\d{4}-\d{2}-\d{2}[T ]?\d{0,2}:?\d{0,2}", body)
+    if not m:
+        return None
+    d = parse_stamp(m.group(0))
+    return d.replace(tzinfo=madrid_tz()).astimezone(timezone.utc) if d else None
+
+
+def pick_xi(pool: dict, force: dict | None = None):
+    """Best legal XI by total score. force pins one player into his slot.
+
+    Exact, not heuristic: the only coupling between players is the per-slot
+    count, so top-N per slot within each legal shape is optimal.
+    """
+    best = None
+    for d, m, f in FORMATIONS:
+        need = {"POR": 1, "DEF": d, "MED": m, "DEL": f}
+        if force is not None:
+            slot = force["slot"]
+            if not slot or need.get(slot, 0) < 1:
+                continue
+        picked, ok = [], True
+        for k, n in need.items():
+            avail = pool.get(k, [])
+            if force is not None and force["slot"] == k:
+                rest = [p for p in avail if p is not force][:n - 1]
+                take = [force] + rest
+            else:
+                take = avail[:n]
+            if len(take) < n:
+                ok = False
+                break
+            picked += take
+        if not ok:
+            continue
+        tot = sum(p["score"] for p in picked)
+        if best is None or tot > best[0]:
+            best = (tot, (d, m, f), picked)
+    return best
+
+
+def log_xi(observed: str, formation, picked, total) -> None:
+    """Append-only record so the proxy can be scored against reality later."""
+    DECISIONS.mkdir(parents=True, exist_ok=True)
+    path = DECISIONS / "xi_log.csv"
+    seen = {r.get("observed_at") for r in read_csv(path)}
+    if observed in seen:
+        return
+    new = not path.exists()
+    with path.open("a", newline="", encoding="utf-8") as fh:
+        w = csv.writer(fh)
+        if new:
+            w.writerow(["observed_at", "formation", "index_total", "players"])
+        w.writerow([observed, "-".join(str(x) for x in formation),
+                    f"{total:.2f}",
+                    "|".join(f"{p['name']}:{p['score']:.2f}" for p in picked)])
+
+
 def main() -> None:
     market = latest_only(read_csv(TIDY / "market.csv"))
-    xi = latest_only(read_csv(TIDY / "probable_xi.csv"))
+    xi_rows = latest_only(read_csv(TIDY / "probable_xi.csv"))
 
     REPORTS.mkdir(exist_ok=True)
     HISTORY.mkdir(parents=True, exist_ok=True)
 
     if not market:
-        # Write a report saying so rather than crashing — a missing file is
-        # indistinguishable from a broken workflow otherwise.
         (REPORTS / "latest.md").write_text(
             "# Fantasy report\n\nNo market data found in "
             f"`{TIDY/'market.csv'}`. Did `ff_ingest.py parse` run?\n",
@@ -176,13 +324,15 @@ def main() -> None:
             lookup[fold(r["name"])] = r
 
     start_pct: dict[str, float] = {}
+    listed: set[str] = set()
     status: dict[str, str] = {}
-    for r in xi:
+    for r in xi_rows:
         # Names are the only key both files share — neither page exposes
         # player links, so slugs are unavailable on the team pages.
         key = fold(r.get("player_name")) or r.get("player_slug")
         if not key:
             continue
+        listed.add(key)
         p = num(r.get("start_pct"), -1)
         if p >= 0:
             start_pct[key] = max(start_pct.get(key, 0), p)
@@ -191,8 +341,18 @@ def main() -> None:
 
     hist, hist_label = load_history()
 
-    # Positional priors: median of last season's per-match average among
-    # players with a real sample, bucketed by the position market.csv gives.
+    # Promoted sides have no top-flight record at all, so a team with players
+    # but essentially no history is promoted. Detected, not hardcoded, so it
+    # keeps working next season.
+    per_team: dict[str, list[int]] = {}
+    for r in market:
+        team = r.get("team") or "?"
+        h = hist.get(fold(r.get("name", "")))
+        tally = per_team.setdefault(team, [0, 0])
+        tally[0] += 1
+        tally[1] += 1 if h and h["pj"] > 0 else 0
+    promoted = {t for t, (n, k) in per_team.items() if n >= 10 and k / n < 0.15}
+
     samples: dict[str, list[float]] = {}
     for r in market:
         h = hist.get(fold(r.get("name", "")))
@@ -204,234 +364,222 @@ def main() -> None:
     global_prior = statistics.median(flat) if flat else 0.0
 
     def rate(rec) -> tuple[float, str]:
-        """Shrunk points-per-match, plus a note about where it came from."""
         slot = SLOT.get((rec.get("position") or "").lower(), "")
         prior = priors.get(slot, global_prior)
         h = hist.get(fold(rec.get("name", "")))
-        if not h or h["pj"] <= 0:
-            return prior, "no history"
-        shrunk = (h["pts"] + SHRINK_K * prior) / (h["pj"] + SHRINK_K)
-        return shrunk, f"{h['pts']:.0f}p / {h['pj']:.0f}j"
+        if h and h["pj"] > 0:
+            return (h["pts"] + SHRINK_K * prior) / (h["pj"] + SHRINK_K), \
+                f"{h['pts']:.0f}p/{h['pj']:.0f}j"
+        if (rec.get("team") or "") in promoted:
+            return prior * PROMOTED_DISCOUNT, "**assumed**"
+        return prior, "**assumed**"
 
     observed = market[0]["observed_at"]
-    out: list[str] = [
-        f"# Fantasy report — {observed}",
-        "",
-        f"_{len(market)} players, {len(start_pct)} with a probable-XI reading._",
-        "",
-    ]
+    obs_dt = parse_stamp(observed)
+    now = datetime.now(timezone.utc)
+    age_h = (now - obs_dt).total_seconds() / 3600 if obs_dt else None
 
-    # --- squad ------------------------------------------------------------
+    # --- build squad records ---------------------------------------------
     squad = load_squad()
     players: list[dict] = []
-    out += ["## Your squad", ""]
-    if not squad:
-        out += ["_Empty — add names to `squad.txt`, one per line._", ""]
-    else:
-        total = 0.0
-        out.append("| Player | Team | Value | 24h | Start% | |")
-        out.append("|---|---|--:|--:|--:|---|")
-        for s in squad:
-            r = lookup.get(s) or lookup.get(fold(s))
-            if not r:
-                out.append(f"| `{s}` | ? | — | — | — | **not found** |")
-                continue
-            total += num(r["value"])
-            key = fold(r["name"])
-            st = status.get(key, "")
-            flag = {"injured": "INJ", "doubt": "?"}.get(st, "")
-            pct = start_pct.get(key)
-            pct_s = f"{pct:.0f}%" if pct is not None else "—"
-            out.append(
-                f"| {r['name']} | {r['team']} | {eur(r['value'])} | "
-                f"{eur(r['delta_1d'])} | {pct_s} | {flag} |"
-            )
+    missing: list[str] = []
+    squad_value = 0.0
+    for s in squad:
+        r = lookup.get(s) or lookup.get(fold(s))
+        if not r:
+            missing.append(s)
+            continue
+        key = fold(r["name"])
+        st = status.get(key, "")
+        pct = start_pct.get(key)
+        on_page = key in listed
+        base, why = rate(r)
+        if pct is None:
+            pct_used = NEUTRAL_START if on_page else ABSENT_START
+        else:
+            pct_used = pct
+        score = base * pct_used / 100.0
+        if st == "injured":
+            score = 0.0
+        elif st == "doubt":
+            score *= DOUBT_FACTOR
+        squad_value += num(r.get("value"))
+        players.append({
+            "name": title_name(r["name"]), "team": r.get("team", "?"),
+            "slot": SLOT.get((r.get("position") or "").lower(), ""),
+            "pos": (r.get("position") or "").lower(),
+            "pct": pct, "on_page": on_page, "status": st,
+            "assumed": why.startswith("**"), "why": why, "score": score,
+            "value": num(r.get("value")), "delta_1d": num(r.get("delta_1d")),
+            "delta_pct": num(r.get("delta_pct_1d")),
+        })
 
-            base, why = rate(r)
-            p_start = (pct if pct is not None else DEFAULT_START) / 100.0
-            score = base * p_start
-            if st == "injured":
-                score = 0.0
-            elif st == "doubt":
-                score *= DOUBT_FACTOR
-            players.append({
-                "name": r["name"], "team": r["team"],
-                "slot": SLOT.get((r.get("position") or "").lower(), ""),
-                "pos": (r.get("position") or "").lower(),
-                "pct": pct, "assumed": pct is None, "status": st,
-                "base": base, "why": why, "score": score,
-                "value": num(r.get("value")),
-                "delta_1d": num(r.get("delta_1d")),
-                "delta_pct": num(r.get("delta_pct_1d")),
-            })
-        out += ["", f"**Squad value: {eur(total)}** — compare with the app's "
-                    "team value; a mismatch means a name matched the wrong "
-                    "player.", ""]
-
-    # --- lineup -----------------------------------------------------------
-    chosen: set[int] = set()
     pool: dict[str, list[dict]] = {}
-    out += ["## Lineup", ""]
-    if not players:
-        out += ["_Nothing to pick from._", ""]
-    else:
-        if not hist:
-            out += ["_No `data/season/points_*.csv` yet — run the **history** "
-                    "workflow. Until then every player carries the same "
-                    "baseline and only start% separates them._", ""]
-        pool = {}
-        for p in players:
-            if p["slot"]:
-                pool.setdefault(p["slot"], []).append(p)
-        for v in pool.values():
-            v.sort(key=lambda p: p["score"], reverse=True)
+    for p in players:
+        if p["slot"]:
+            pool.setdefault(p["slot"], []).append(p)
+    for v in pool.values():
+        v.sort(key=lambda p: p["score"], reverse=True)
 
-        best = None
-        for d, m, f in FORMATIONS:
-            need = {"POR": 1, "DEF": d, "MED": m, "DEL": f}
-            if any(len(pool.get(k, [])) < n for k, n in need.items()):
-                continue
-            picked = [p for k, n in need.items() for p in pool[k][:n]]
-            tot = sum(p["score"] for p in picked)
-            if best is None or tot > best[0]:
-                best = (tot, (d, m, f), picked)
-        if best is None:
-            short = [SLOT_LABEL[k] for k, n in SLOT_MIN.items()
-                     if len(pool.get(k, [])) < n]
-            out += ["_No legal XI from this squad — short of: "
-                    + (", ".join(short) or "?") + "._", ""]
+    best = pick_xi(pool) if players else None
+    chosen = {id(p) for p in best[2]} if best else set()
+
+    # --- header -----------------------------------------------------------
+    out: list[str] = [f"# Fantasy report — {observed}", ""]
+
+    alerts: list[str] = []
+    if age_h is not None and age_h > STALE_HOURS:
+        alerts.append(f"**Data is {age_h:.0f}h old** — the ingest workflow may "
+                      "have failed. Everything below is that snapshot.")
+    deadline = load_deadline()
+    if deadline:
+        left = (deadline - now).total_seconds() / 3600
+        if left < 0:
+            alerts.append("**Deadline passed** — update `inputs/deadline.txt`.")
+        elif left < 48:
+            alerts.append(f"**Locks in {left:.0f}h.** Probable XIs are at their "
+                          "most reliable now.")
         else:
-            tot, (d, m, f), picked = best
-            chosen = {id(p) for p in picked}
-            out += [f"**{d}-{m}-{f}** — projected {tot:.1f} pts", "",
-                    "| | Player | Start% | Score | Last season |",
-                    "|---|---|--:|--:|---|"]
-            for slot in ("POR", "DEF", "MED", "DEL"):
-                for p in [x for x in picked if x["slot"] == slot]:
-                    pct_s = (f"~{DEFAULT_START:.0f}%" if p["assumed"]
-                             else f"{p['pct']:.0f}%")
-                    # A thin squad can force a flagged player in — say so.
-                    mark = {"injured": " **INJ**",
-                            "doubt": " **?**"}.get(p["status"], "")
-                    out.append(f"| {slot} | {p['name']}{mark} | {pct_s} | "
-                               f"{p['score']:.1f} | {p['why']} |")
-            out.append("")
+            alerts.append(f"Locks in {left/24:.0f} days — readings will still "
+                          "move, so this is provisional.")
 
-            # Captain and the coach slot are premium too (crowned in the app),
-            # so they stay quiet unless PREMIUM is on. The captain boost is
-            # multiplicative, which makes the best captain simply the
-            # highest-scoring man in the XI — true whatever the multiplier is.
-            if PREMIUM:
-                cap = max(picked, key=lambda x: x["score"])
-                out += [f"**Captain: {cap['name']}** ({cap['score']:.1f}) — "
-                        "highest projected score in the XI.", ""]
-                coaches = [p for p in players if p["pos"] == "entrenador"]
-                if coaches:
-                    out += ["**Coach slot:** "
-                            + ", ".join(c["name"] for c in coaches)
-                            + " — separate slot, not one of the eleven.", ""]
+    if best:
+        for k, n in THIN.items():
+            have = len(pool.get(k, []))
+            if have < n:
+                alerts.append(f"**Only {have} {SLOT_LABEL[k]}"
+                              f"{'s' if have != 1 else ''}** — one knock and "
+                              "you can't field a legal XI.")
+        hurt = [p["name"] for p in best[2] if p["status"]]
+        if hurt:
+            alerts.append("**Flagged in the XI:** " + ", ".join(hurt) + ".")
+        guessed = [p["name"] for p in best[2] if p["assumed"]]
+        if guessed:
+            alerts.append(f"**{len(guessed)} of the XI are unmodelled** "
+                          f"({', '.join(guessed)}) — no LaLiga record, so "
+                          "they're carrying an assumed baseline, not an "
+                          "earned one.")
+    if missing:
+        alerts.append("**Not found in the market:** "
+                      + ", ".join(f"`{m}`" for m in missing) + ".")
 
-            bench = [p for p in players if id(p) not in chosen]
-            out += ["**Bench**", ""]
-            if not bench:
-                out += ["_Nobody spare._", ""]
-            else:
-                out += ["| Player | Pos | Score | Why |", "|---|---|--:|---|"]
-                for p in sorted(bench, key=lambda x: x["score"], reverse=True):
-                    if p["status"] == "injured":
-                        reason = "injured"
-                    elif p["status"] == "doubt":
-                        reason = "doubt — halved"
-                    elif not p["slot"]:
-                        reason = p["pos"] or "no position"
-                    elif p["assumed"]:
-                        reason = "no XI reading"
-                    else:
-                        reason = "outscored"
-                    out.append(f"| {p['name']} | {p['pos'][:3]} | "
-                               f"{p['score']:.1f} | {reason} |")
-                out.append("")
-            out += [f"_Score = shrunk pts/match (K={SHRINK_K:.0f}"
-                    + (f", from {hist_label}" if hist_label else "")
-                    + ") × P(start). A proxy until real jornadas exist — "
-                      "sanity-check it against your own read._", ""]
+    if alerts:
+        out += ["## Needs a decision", ""] + [f"- {a}" for a in alerts] + [""]
 
-    # --- sell candidates --------------------------------------------------
-    # Ranked by euros per projected point: the man tying up the most money
-    # for the least production. Anyone the formation rules can never start is
-    # dead capital regardless of how good he is.
-    out += ["## Sell candidates", ""]
-    if not players:
-        out += ["_Nothing to sell._", ""]
+    cash, cash_at = load_cash()
+    last_tx = last_transaction()
+    money = f"**Squad {eur(squad_value)}**"
+    if cash is not None:
+        money += f" · cash {eur(cash)} · total {eur(squad_value + cash)}"
+        if cash_at and last_tx and last_tx > cash_at:
+            money += (f" — cash last checked {cash_at:%d %b}, but the ledger "
+                      f"has a move on {last_tx:%d %b}. Re-check it.")
+        elif not cash_at:
+            money += " — undated; add the date to `inputs/cash.txt`."
     else:
-        rank = {id(p): i for v in pool.values() for i, p in enumerate(v)}
-        cands = []
-        for p in players:
-            if id(p) in chosen:
-                continue
-            score = p["score"]
-            cpp = p["value"] / score if score > 0.05 else float("inf")
-            if p["status"] == "injured":
-                note = "injured"
-            elif p["slot"] and rank.get(id(p), 0) >= MAX_SLOT[p["slot"]]:
-                nth = rank[id(p)] + 1
-                suffix = ("th" if nth % 100 in (11, 12, 13)
-                          else {1: "st", 2: "nd", 3: "rd"}.get(nth % 10, "th"))
-                note = f"can never start ({nth}{suffix} {p['slot']})"
-            elif p["delta_pct"] >= 1.5:
-                note = "rising — sell into strength"
-            elif p["pos"] == "entrenador":
-                note = "coach slot"
-            else:
-                note = "outside the XI"
-            cands.append((cpp, p, note))
-        cands.sort(key=lambda t: t[0], reverse=True)
+        money += " — add `inputs/cash.txt` to see cash alongside it."
+    out += [money, "", "Compare squad value with the app; a mismatch means a "
+                       "name matched the wrong player.", ""]
 
-        if not cands:
-            out += ["_Whole squad is in the XI._", ""]
-        else:
-            out += ["| Player | Value | 24h | Score | €/pt | Why |",
-                    "|---|--:|--:|--:|--:|---|"]
-            for cpp, p, note in cands[:6]:
-                cpp_s = "—" if cpp == float("inf") else eur(cpp)
-                out.append(f"| {p['name']} | {eur(p['value'])} | "
-                           f"{eur(p['delta_1d'])} | {p['score']:.1f} | "
-                           f"{cpp_s} | {note} |")
-            out += ["", "_Ranked by value per projected point. Two things "
-                        "this can't know: what a rival will actually pay "
-                        "(sales land above and below value on the same day), "
-                        "and whether anyone can bid at all — that's per-league "
-                        "state, visible only in the app._", ""]
-
-    # --- momentum ---------------------------------------------------------
-    movers = [r for r in market if num(r.get("delta_1d")) != 0]
-    movers.sort(key=lambda r: num(r["delta_1d"]), reverse=True)
-
-    def mover_table(rows, title):
-        out.append(f"## {title}")
-        out.append("")
-        if not rows:
-            out.extend(["_No movement recorded._", ""])
-            return
-        out.append("| Player | Team | Value | 24h | % |")
-        out.append("|---|---|--:|--:|--:|")
-        for r in rows:
-            out.append(
-                f"| {r['name']} | {r['team']} | {eur(r['value'])} | "
-                f"{eur(r['delta_1d'])} | {num(r['delta_pct_1d']):+.2f}% |"
-            )
+    # --- team -------------------------------------------------------------
+    out += ["## Team", ""]
+    if not players:
+        out += ["_Empty — add names to `squad.txt`, one per line._", ""]
+    elif best is None:
+        short = [SLOT_LABEL[k] for k, n in SLOT_MIN.items()
+                 if len(pool.get(k, [])) < n]
+        out += ["_No legal XI from this squad — short of: "
+                + (", ".join(short) or "?") + "._", ""]
+    else:
+        tot, (d, m, f), picked = best
+        out += [f"**{d}-{m}-{f}** · index {tot:.1f} "
+                "(a ranking number, not a points forecast)", "",
+                "| | Player | Start% | Value | 24h | Score | Last season |",
+                "|---|---|--:|--:|--:|--:|---|"]
+        for slot in ("POR", "DEF", "MED", "DEL"):
+            for p in [x for x in picked if x["slot"] == slot]:
+                mark = {"injured": " **INJ**",
+                        "doubt": " **?**"}.get(p["status"], "")
+                pct_s = (f"{p['pct']:.0f}%" if p["pct"] is not None
+                         else ("~" if p["on_page"] else "!") +
+                         f"{NEUTRAL_START if p['on_page'] else ABSENT_START:.0f}%")
+                out.append(f"| {slot} | {p['name']}{mark} | {pct_s} | "
+                           f"{eur(p['value'])} | {eur(p['delta_1d'])} | "
+                           f"{p['score']:.1f} | {p['why']} |")
         out.append("")
 
-    mover_table(movers[:12], "Rising fastest (24h)")
-    mover_table(list(reversed(movers[-12:])), "Falling fastest (24h)")
+        bench = [p for p in players if id(p) not in chosen]
+        out += ["**Bench** — gap is what the XI index loses by playing him "
+                "instead, after re-picking the formation. €/pt is his value "
+                "per point of score: the sell shortlist, worst first.", ""]
+        if not bench:
+            out += ["_Nobody spare._", ""]
+        else:
+            rank = {id(p): i for v in pool.values() for i, p in enumerate(v)}
+            rows = []
+            for p in bench:
+                forced = pick_xi(pool, force=p) if p["slot"] else None
+                gap = (forced[0] - tot) if forced else None
+                cpp = p["value"] / p["score"] if p["score"] > 0.05 \
+                    else float("inf")
+                if p["status"] == "injured":
+                    why = "injured"
+                elif p["slot"] and rank.get(id(p), 0) >= MAX_SLOT[p["slot"]]:
+                    nth = rank[id(p)] + 1
+                    sfx = ("th" if nth % 100 in (11, 12, 13)
+                           else {1: "st", 2: "nd", 3: "rd"}.get(nth % 10, "th"))
+                    why = (f"{nth}{sfx} {p['slot']} — only "
+                           f"{MAX_SLOT[p['slot']]} can ever play")
+                elif p["delta_pct"] >= MOVER_PCT:
+                    why = "rising — sell into strength"
+                elif p["pos"] == "entrenador":
+                    why = "coach slot"
+                elif gap is not None and gap > -0.15:
+                    why = "as good as the man ahead"
+                else:
+                    why = "outscored"
+                rows.append((cpp, p, gap, why))
+            rows.sort(key=lambda t: t[0], reverse=True)
+            out += ["| Player | Pos | Value | Score | Gap | €/pt | Why |",
+                    "|---|---|--:|--:|--:|--:|---|"]
+            for cpp, p, gap, why in rows:
+                out.append(
+                    f"| {p['name']} | {p['pos'][:3]} | {eur(p['value'])} | "
+                    f"{p['score']:.1f} | "
+                    f"{'—' if gap is None else format(gap, '+.1f')} | "
+                    f"{'—' if cpp == float('inf') else eur(cpp)} | {why} |")
+            out += ["", "_A sale lands above or below value depending on who "
+                        "bids, and whether anyone can bid at all is per-league "
+                        "state you can only see in the app._", ""]
+
+        log_xi(observed, (d, m, f), picked, tot)
+
+    # --- your movers ------------------------------------------------------
+    movers = sorted((p for p in players if abs(p["delta_pct"]) >= MOVER_PCT),
+                    key=lambda p: p["delta_pct"], reverse=True)
+    out += [f"## Your movers (24h, over {MOVER_PCT:.0f}%)", ""]
+    if not movers:
+        out += ["_Nothing in your squad moved much._", ""]
+    else:
+        out += ["| Player | Value | 24h | % |", "|---|--:|--:|--:|"]
+        for p in movers:
+            out.append(f"| {p['name']} | {eur(p['value'])} | "
+                       f"{eur(p['delta_1d'])} | {p['delta_pct']:+.2f}% |")
+        out.append("")
 
     out += [
         "---",
         "",
-        "Recruitment targets live in `reports/watchlist.md` — it filters out "
-        "players your rivals already own.",
+        f"_{len(market)} players tracked, {len(start_pct)} with a probable-XI "
+        "reading. Who to buy is in `reports/watchlist.md`, which filters out "
+        "players your rivals already own._",
         "",
-        f"_Generated {datetime.now(timezone.utc):%Y-%m-%d %H:%M} UTC._",
+        f"_Score = shrunk pts/match (K={SHRINK_K:.0f}"
+        + (f", {hist_label}" if hist_label else "")
+        + ") × P(start). Recommended XIs are logged to "
+          "`data/decisions/xi_log.csv` for scoring against reality later._",
+        "",
+        f"_Generated {now:%Y-%m-%d %H:%M} UTC._",
     ]
 
     text = "\n".join(out) + "\n"
