@@ -103,7 +103,9 @@ def main() -> None:
     start_pct: dict[str, float] = {}
     status: dict[str, str] = {}
     for r in xi:
-        key = r.get("player_slug") or fold(r.get("display"))
+        # Names are the only key both files share — neither page exposes
+        # player links, so slugs are unavailable on the team pages.
+        key = fold(r.get("player_name")) or r.get("player_slug")
         if not key:
             continue
         p = num(r.get("start_pct"), -1)
@@ -135,7 +137,7 @@ def main() -> None:
                 out.append(f"| `{s}` | ? | — | — | — | **not found** |")
                 continue
             total += num(r["value"])
-            key = r.get("slug") or fold(r["name"])
+            key = fold(r["name"])
             flag = {"injured": "INJ", "doubt": "?"}.get(status.get(key, ""), "")
             pct = start_pct.get(key)
             pct_s = f"{pct:.0f}%" if pct is not None else "—"
