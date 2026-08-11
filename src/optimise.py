@@ -1,6 +1,15 @@
 """
 optimise.py — decision layer for LaLiga Fantasy Oficial.
 
+STATUS: not wired into any workflow. Nothing imports it, so it cannot break
+a run. It becomes useful once expected points exist (Phase 1+).
+
+BEFORE USING, two known gaps:
+  * No coach slot. `entrenador` is a real, buyable position in this game and
+    the quotas below ignore it.
+  * SQUAD_QUOTA and formation bounds are assumed, not verified against the
+    app's actual rules. Check them first.
+
 Three problems, one objective:
   1. best_xi()          — which 11 to field this jornada
   2. plan()             — multi-week buy/sell plan under a budget that compounds
