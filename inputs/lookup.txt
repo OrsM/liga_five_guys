@@ -1,17 +1,49 @@
 # One search term per line. Surnames work best — short fragments match more.
 # Edit this file, then run the "lookup players" workflow from the Actions tab.
 # Results land in reports/lookup.md.
-alvaro fernandez
-robin le normand
-igor zubeldia
-omar el hilali
-carl starfelt
-dani martinez
-moncayola
-ruben garcia
-iñigo ruiz de galarreta
-pepelu
-dani lorenzo
-hugo duro
-orri steinn oskarsson
-iñigo vicente
+- a abqar
+- a herrero
+- aimar
+- amatucci
+- asencio
+- ayoze
+- berenguer
+- blanco
+- brahim
+- buchanan
+- c puga
+- c romero
+- camavinga
+- cardoso
+- de haas
+- delete this example row
+- dieng
+- e militao
+- etta eyong
+- foyth
+- g puerta
+- gaya
+- gorrotxa
+- guruzeta
+- izan m
+- j musso
+- joaquin
+- johnny
+- jonny otto
+- llorente
+- m dituro
+- manuel fernandez
+- moscardo
+- noubi
+- pastor
+- pathe i ciss
+- puado
+- puric
+- q hartman
+- quagliata
+- r p bigas
+- szczesny
+- tarrega
+- vivian
+- williot
+- yuri
