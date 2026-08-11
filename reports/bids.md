@@ -13,4 +13,4 @@ _Nothing settled yet. Set `outcome` to won/lost/outbid as auctions resolve._
 
 Record every auction, including losses — a loss at a known premium is what tells you where rivals actually sit.
 
-_Generated 2026-08-11 20:06 UTC._
+_Generated 2026-08-11 22:52 UTC._
