@@ -1,0 +1,15 @@
+# Your squad — one player per line, name as it appears in market.csv.
+alvaro fernandez
+robin le normand
+igor zubeldia
+omar el hilali
+carl starfelt
+dani martinez
+jon moncayola
+ruben garcia
+iñigo ruiz de galarreta
+pepelu
+dani lorenzo
+hugo duro
+orri steinn oskarsson
+iñigo vicente
