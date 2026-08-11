@@ -1,4 +1,4 @@
-# Offers — 2026-08-11T1806Z
+# Offers — 2026-08-11T1919Z
 
 Ranked by start probability, then price edge. **Edge** is value minus asking price (or the 24h move if you didn't give a price): positive means you pay less than today's value.
 
@@ -26,4 +26,4 @@ Ranked by start probability, then price edge. **Edge** is value minus asking pri
 
 No expected-points model yet, so this ranks on start probability and price only. A 90% starter at a weak club still scores less than a 70% starter at a strong one — use judgement.
 
-_Generated 2026-08-11 18:40 UTC._
+_Generated 2026-08-11 20:05 UTC._
