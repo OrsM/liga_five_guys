@@ -91,6 +91,24 @@ def main() -> None:
     if not args:
         sys.exit(__doc__)
 
+    if args[0] == "--many":
+        # Resolve several surnames at once and print ready-to-paste squad lines.
+        market = latest_market()
+        print("# paste the lines below into squad.txt")
+        for q in args[1:]:
+            qf = fold(q)
+            hits = [r for r in market if qf in fold(r["name"])]
+            if len(hits) == 1:
+                print(hits[0]["name"])
+            elif not hits:
+                print(f"# NO MATCH for '{q}' — try a shorter fragment")
+            else:
+                print(f"# AMBIGUOUS '{q}' — pick one:")
+                for r in sorted(hits, key=lambda r: -float(r.get("value") or 0))[:6]:
+                    print(f"#   {r['name']}  ({r['team']}, {r['position']}, "
+                          f"{float(r['value'])/1e6:.2f}M)")
+        return
+
     if args[0] == "--check":
         check(Path(args[1] if len(args) > 1 else "squad.txt"))
         return
