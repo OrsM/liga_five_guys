@@ -1,13 +1,16 @@
 """
-find_slug.py — look up a player's slug from the collected market data.
+find_slug.py — resolve player names against the collected market data.
 
-    python find_slug.py starfelt
-    python find_slug.py "le norm"        # truncated app names work fine
-    python find_slug.py --team celta     # everyone at one club
-    python find_slug.py --check squad.txt
+    python find_slug.py starfelt              # search
+    python find_slug.py --team celta          # a club's whole squad
+    python find_slug.py --many starfelt duro  # several at once
+    python find_slug.py --file lookup.txt     # one query per LINE
+    python find_slug.py --check squad.txt     # validate a squad file
 
-Accent-insensitive, substring-based. The app truncates names ("Le Norm...",
-"Dani Lor..."), so partial matches are the normal case, not the exception.
+Use --file for multi-word names: the shell splits on spaces, which turns
+"alvaro fernandez" into two useless one-word searches.
+
+Accent-insensitive and substring-based, because the app truncates names.
 """
 
 from __future__ import annotations
@@ -21,8 +24,7 @@ from pathlib import Path
 TIDY = Path(os.environ.get("FF_ROOT", "./data")) / "tidy"
 
 
-def fold(s: str) -> str:
-    """Lowercase and strip accents, so 'Iñigo' matches 'inigo'."""
+def fold(s) -> str:
     return "".join(
         c for c in unicodedata.normalize("NFD", (s or "").lower())
         if unicodedata.category(c) != "Mn"
@@ -32,103 +34,100 @@ def fold(s: str) -> str:
 def latest_market() -> list[dict]:
     path = TIDY / "market.csv"
     if not path.exists():
-        sys.exit(f"{path} not found — run ff_ingest.py fetch && parse first.")
+        sys.exit(f"ERROR: {path} not found — run ff_ingest.py fetch && parse.")
     with path.open(encoding="utf-8") as fh:
         rows = list(csv.DictReader(fh))
     if not rows:
-        sys.exit("market.csv is empty.")
+        sys.exit("ERROR: market.csv is empty.")
     newest = max(r["observed_at"] for r in rows)
-    return [r for r in rows if r["observed_at"] == newest]
+    rows = [r for r in rows if r["observed_at"] == newest]
+    print(f"# {len(rows)} players in snapshot {newest}")
+    return rows
+
+
+def val(r) -> float:
+    try:
+        return float(r.get("value") or 0)
+    except ValueError:
+        return 0.0
 
 
 def show(rows: list[dict]) -> None:
     if not rows:
         print("  no match")
         return
-    for r in sorted(rows, key=lambda r: -float(r.get("value") or 0)):
-        val = float(r.get("value") or 0) / 1_000_000
-        print(f"  {r['slug']:<32} {r['name'][:24]:<24} "
-              f"{r['team'][:14]:<14} {r['position'][:12]:<12} {val:>7.2f}M")
+    for r in sorted(rows, key=lambda r: -val(r)):
+        print(f"  {r['name'][:28]:<28} {r['team'][:14]:<14} "
+              f"{r['position'][:12]:<12} {val(r)/1e6:>7.2f}M")
 
 
-def check(path: Path) -> None:
-    """Validate a squad file: report which slugs don't resolve."""
-    rows = latest_market()
-    market = {r["slug"]: r for r in rows if r.get("slug")}
-    # Names are the practical key until slugs are re-collected, so accept either.
-    market.update({fold(r["name"]): r for r in rows if r.get("name")})
-    slugs = [
-        ln.strip() for ln in path.read_text(encoding="utf-8").splitlines()
-        if ln.strip() and not ln.strip().startswith("#")
-    ]
-    ok, bad = [], []
-    resolved = {}
-    for s in slugs:
-        hit = market.get(s) or market.get(fold(s))
-        if hit:
-            resolved[s] = hit
-            ok.append(s)
+def read_lines(path: Path) -> list[str]:
+    if not path.exists():
+        sys.exit(f"ERROR: {path} not found.")
+    return [ln.strip() for ln in path.read_text(encoding="utf-8").splitlines()
+            if ln.strip() and not ln.strip().startswith("#")]
+
+
+def resolve_many(market: list[dict], queries: list[str]) -> None:
+    print("# paste the plain lines below into squad.txt")
+    if not queries:
+        print("# nothing to look up — lookup.txt has no non-comment lines")
+        return
+    for q in queries:
+        qf = fold(q)
+        hits = [r for r in market if qf in fold(r["name"])]
+        if len(hits) == 1:
+            print(hits[0]["name"])
+        elif not hits:
+            print(f"# NO MATCH for '{q}' — try a shorter fragment")
         else:
-            bad.append(s)
-    print(f"{len(ok)}/{len(slugs)} resolved")
+            print(f"# AMBIGUOUS '{q}' — pick one:")
+            for r in sorted(hits, key=lambda r: -val(r))[:6]:
+                print(f"#   {r['name']}  ({r['team']}, {r['position']}, "
+                      f"{val(r)/1e6:.2f}M)")
+
+
+def check(market: list[dict], path: Path) -> None:
+    index = {fold(r["name"]): r for r in market}
+    entries = read_lines(path)
+    ok, bad = [], []
+    for e in entries:
+        hit = index.get(fold(e))
+        (ok if hit else bad).append(e)
+    print(f"{len(ok)}/{len(entries)} resolved")
     if ok:
         print("\nresolved:")
-        show([resolved[s] for s in ok])
+        show([index[fold(e)] for e in ok])
     if bad:
-        print("\nNOT FOUND — fix these:")
-        for s in bad:
-            print(f"  {s}")
-            # Offer near misses so the fix is obvious.
-            stem = fold(s).replace("-", " ").split()[-1]
-            near = [r for r in market.values()
-                    if stem in fold(r["slug"] or "") or stem in fold(r["name"])]
-            for r in near[:3]:
-                print(f"      did you mean: {r['slug']}  ({r['name']}, {r['team']})")
+        print("\nNOT FOUND:")
+        for e in bad:
+            print(f"  {e}")
+            stem = fold(e).split()[-1] if fold(e).split() else fold(e)
+            for r in [r for r in market if stem in fold(r["name"])][:3]:
+                print(f"      did you mean: {r['name']}  ({r['team']})")
 
 
 def main() -> None:
     args = sys.argv[1:]
     if not args:
-        sys.exit(__doc__)
-
-    if args[0] == "--many":
-        # Resolve several surnames at once and print ready-to-paste squad lines.
-        market = latest_market()
-        print("# paste the lines below into squad.txt")
-        for q in args[1:]:
-            qf = fold(q)
-            hits = [r for r in market if qf in fold(r["name"])]
-            if len(hits) == 1:
-                print(hits[0]["name"])
-            elif not hits:
-                print(f"# NO MATCH for '{q}' — try a shorter fragment")
-            else:
-                print(f"# AMBIGUOUS '{q}' — pick one:")
-                for r in sorted(hits, key=lambda r: -float(r.get("value") or 0))[:6]:
-                    print(f"#   {r['name']}  ({r['team']}, {r['position']}, "
-                          f"{float(r['value'])/1e6:.2f}M)")
-        return
-
-    if args[0] == "--check":
-        check(Path(args[1] if len(args) > 1 else "squad.txt"))
+        print(__doc__)
         return
 
     market = latest_market()
 
     if args[0] == "--team":
-        want = fold(args[1])
-        show([r for r in market if want in fold(r["team"])])
-        return
-
-    q = fold(" ".join(args))
-    hits = [r for r in market if q in fold(r["name"]) or q in fold(r["slug"])]
-    if not hits:
-        # Fall back to matching any single word — handles "ruiz de galarreta"
-        # when the app showed "De Galar...".
-        words = q.split()
-        hits = [r for r in market
-                if any(w in fold(r["name"]) or w in fold(r["slug"]) for w in words)]
-    show(hits)
+        want = fold(args[1]) if len(args) > 1 else ""
+        show([r for r in market if want and want in fold(r["team"])])
+    elif args[0] == "--file":
+        resolve_many(market, read_lines(Path(args[1] if len(args) > 1
+                                             else "lookup.txt")))
+    elif args[0] == "--many":
+        resolve_many(market, args[1:])
+    elif args[0] == "--check":
+        check(market, Path(args[1] if len(args) > 1 else "squad.txt"))
+    else:
+        q = fold(" ".join(args))
+        show([r for r in market if q in fold(r["name"])])
 
 
 if __name__ == "__main__":
