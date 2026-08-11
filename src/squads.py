@@ -1,8 +1,8 @@
 """Partition the player universe into owned vs buyable.
 
 Reads:
-  inputs/owned.txt        baseline rosters, one section per manager
-  inputs/transactions.csv the ledger — applied on top of the baseline
+  inputs/rosters_initial.txt  starting rosters — write once, never edit
+  inputs/transactions.csv     append-only ledger of every market operation
   data/tidy/*.csv         values, 24h moves, start probabilities
 
 Writes:
@@ -32,21 +32,13 @@ TOP_N_PER_POS = 8         # rows per position
 CASH = None               # set an int (euros) to hide unaffordable players
 
 
-def read_owned(path="inputs/owned.txt"):
-    """[manager] sections, one player name per line, # for comments.
-
-    A '# baseline: <ISO timestamp>' line declares the moment the rosters
-    describe. Transactions at or before it are already reflected and are
-    not re-applied — they still feed the price table.
-    """
-    rosters, current, baseline = {}, None, ""
+def read_initial(path="inputs/rosters_initial.txt"):
+    """[manager] sections, one player name per line, # for comments."""
+    rosters, current = {}, None
     if not os.path.exists(path):
         raise SystemExit("missing %s" % path)
     with open(path, encoding="utf-8") as fh:
         for raw in fh:
-            stripped = raw.strip()
-            if stripped.lower().startswith("# baseline:"):
-                baseline = stripped.split(":", 1)[1].strip()
             line = raw.split("#", 1)[0].strip()
             if not line:
                 continue
@@ -55,7 +47,7 @@ def read_owned(path="inputs/owned.txt"):
                 rosters.setdefault(current, [])
             elif current:
                 rosters[current].append(line)
-    return rosters, baseline
+    return rosters
 
 
 def read_transactions(path="inputs/transactions.csv"):
@@ -69,21 +61,19 @@ def read_transactions(path="inputs/transactions.csv"):
     return rows
 
 
-def apply_transactions(rosters, txns, baseline=""):
-    """Baseline + ledger = current ownership.
+def apply_transactions(rosters, txns):
+    """initial rosters + full ledger = current ownership.
 
-    Only transactions after the baseline timestamp move players. Earlier
-    ones are already baked into the rosters you typed.
+    Every transaction is replayed, oldest first. If a row contradicts the
+    state it lands on, that is a gap in the ledger and gets warned about
+    rather than silently absorbed.
     """
     owner = {}
     for mgr, names in rosters.items():
         for n in names:
             owner[norm(n)] = mgr
-    warnings, skipped = [], 0
+    warnings = []
     for t in txns:
-        if baseline and (t.get("date") or "") <= baseline:
-            skipped += 1
-            continue
         key = norm(t["player"])
         src = (t.get("from") or "").strip() or MARKET
         dst = (t.get("to") or "").strip() or MARKET
@@ -93,10 +83,13 @@ def apply_transactions(rosters, txns, baseline=""):
         if dst == MARKET:
             owner.pop(key, None)
         else:
+            if src == MARKET and owner.get(key) is not None:
+                warnings.append("%s: %s bought from market but already "
+                                "owned by %s — missing a sale?"
+                                % (t.get("date", "?"), t["player"],
+                                   owner[key]))
             owner[key] = dst
-    if skipped:
-        print("%d transaction(s) at or before the baseline — logged for "
-              "prices, not re-applied" % skipped)
+    print("replayed %d transaction(s)" % len(txns))
     return owner, warnings
 
 
@@ -152,8 +145,8 @@ def write_rivals(players, owner, txns, warnings, stamp):
     unmatched = [k for k in owner if k not in players]
     if unmatched:
         out += ["## Unmatched names", "",
-                "These are in owned.txt but not in the tidy data — "
-                "check spelling with find_slug.py.", ""]
+                "These are in the ledger or the initial rosters but not "
+                "in the tidy data — check spelling with find_slug.py.", ""]
         out += ["- " + u for u in sorted(unmatched)] + [""]
 
     _write("reports/rivals.md", out)
@@ -210,9 +203,9 @@ def _write(path, lines):
 def main():
     stamp = dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
     players = load_players()
-    rosters, baseline = read_owned()
+    rosters = read_initial()
     txns = read_transactions()
-    owner, warnings = apply_transactions(rosters, txns, baseline)
+    owner, warnings = apply_transactions(rosters, txns)
     write_rivals(players, owner, txns, warnings, stamp)
     write_watchlist(players, owner, stamp)
     write_squad_file(players, owner)
