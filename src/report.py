@@ -7,8 +7,11 @@ Run after ff_ingest.py parse.
     python report.py
 
 Before the season starts there are no points, so there are no expected points.
-This covers what the data supports today: market momentum and, once probable
-XIs appear, cheap likely starters.
+This covers what the data supports today: your squad and market momentum.
+Recruitment lives in reports/watchlist.md, which knows who owns whom.
+
+reports/latest.md is the file to scroll; the dated copy goes in
+reports/history/ so the folder stays short.
 """
 
 from __future__ import annotations
@@ -16,18 +19,14 @@ from __future__ import annotations
 import csv
 import os
 import unicodedata
-from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
 
 ROOT = Path(os.environ.get("FF_ROOT", "./data"))
 TIDY = ROOT / "tidy"
 REPORTS = Path("reports")
+HISTORY = REPORTS / "history"
 SQUAD_FILE = None  # resolved at runtime by input_path()
-
-POS_ORDER = ["portero", "defensa", "mediocampista", "centrocampista",
-             "delantero", "entrenador"]
-STARTER_THRESHOLD = 70
 
 
 def input_path(name: str) -> Path:
@@ -90,6 +89,7 @@ def main() -> None:
     xi = latest_only(read_csv(TIDY / "probable_xi.csv"))
 
     REPORTS.mkdir(exist_ok=True)
+    HISTORY.mkdir(parents=True, exist_ok=True)
 
     if not market:
         # Write a report saying so rather than crashing — a missing file is
@@ -179,36 +179,11 @@ def main() -> None:
     mover_table(movers[:12], "Rising fastest (24h)")
     mover_table(list(reversed(movers[-12:])), "Falling fastest (24h)")
 
-    # --- cheap likely starters -------------------------------------------
-    out += [f"## Cheap likely starters (start% >= {STARTER_THRESHOLD})", ""]
-    if not start_pct:
-        out += ["_No probable-XI data yet. futbolfantasy publishes these 24-48h "
-                "before kickoff._", ""]
-    else:
-        owned = {fold(s) for s in squad}
-        buckets: dict[str, list[dict]] = defaultdict(list)
-        for key, pct in start_pct.items():
-            r = lookup.get(key)
-            if r and pct >= STARTER_THRESHOLD and fold(r["name"]) not in owned:
-                buckets[r["position"]].append({**r, "pct": pct})
-        printed = False
-        for pos in POS_ORDER:
-            rows = sorted(buckets.get(pos, []), key=lambda r: num(r["value"]))[:6]
-            if not rows:
-                continue
-            printed = True
-            out += [f"**{pos.title()}**", "",
-                    "| Player | Team | Value | Start% |", "|---|---|--:|--:|"]
-            for r in rows:
-                out.append(f"| {r['name']} | {r['team']} | "
-                           f"{eur(r['value'])} | {r['pct']:.0f}% |")
-            out.append("")
-        if not printed:
-            out += ["_Readings exist but none cleared the threshold, or they "
-                    "didn't join to a market entry._", ""]
-
     out += [
         "---",
+        "",
+        "Recruitment targets live in `reports/watchlist.md` — it filters out "
+        "players your rivals already own.",
         "",
         "**No expected points yet** — no jornada has been played. Once results "
         "exist this gains a points model and a best-XI recommendation.",
@@ -218,7 +193,7 @@ def main() -> None:
 
     text = "\n".join(out) + "\n"
     (REPORTS / "latest.md").write_text(text, encoding="utf-8")
-    (REPORTS / f"{observed[:10]}.md").write_text(text, encoding="utf-8")
+    (HISTORY / f"{observed[:10]}.md").write_text(text, encoding="utf-8")
     print(f"wrote reports/latest.md ({len(text)} chars)")
 
 
