@@ -40,14 +40,14 @@ jobs:
             echo
             echo '```'
             if [ -n "$TEAM" ]; then
-              python find_slug.py --team "$TEAM"
+              python src/find_slug.py --team "$TEAM"
             elif [ -n "$NAMES" ]; then
-              python find_slug.py --many $NAMES
-            elif [ -f lookup.txt ]; then
+              python src/find_slug.py --many $NAMES
+            elif [ -f inputs/lookup.txt ]; then
               # One query per line; blank lines and # comments ignored.
-              python find_slug.py --file lookup.txt
+              python src/find_slug.py --file
             else
-              echo "Nothing to look up: pass names/team, or create lookup.txt"
+              echo "Nothing to look up: pass names/team, or create inputs/lookup.txt"
             fi
             echo '```'
           } > reports/lookup.md
