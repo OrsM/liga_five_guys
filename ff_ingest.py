@@ -138,6 +138,7 @@ def parse_market(html: str, observed_at: str) -> list[dict]:
             "delta_1d": _num(_attr(chunk, "diferencia1")),
             "delta_pct_1d": _num(_attr(chunk, "diferencia-pct1")),
             "slug": _slug(chunk),
+            "player_path": _player_path(chunk),
         })
     return rows
 
@@ -149,14 +150,31 @@ def _num(v):
         return None
 
 
-SLUG_RE = re.compile(r'/jugadores/([^/"?#]+)')
+# futbolfantasy player links look like /jugadores/ficha/<id>/<name>, so the
+# first path segment is the literal word "ficha" and useless as an id. Capture
+# the whole path and derive an id from it.
+PATH_RE = re.compile(r'/jugadores/([^"\'\s>]+)')
+
+
+def _player_path(chunk: str) -> str | None:
+    m = PATH_RE.search(chunk)
+    return m.group(1).rstrip("/") if m else None
 
 
 def _slug(chunk: str) -> str | None:
-    """The player's URL slug is the only stable id across snapshots — names
-    get re-spelled, accents change, teams move. Key on this, not on name."""
-    m = SLUG_RE.search(chunk)
-    return m.group(1) if m else None
+    """A stable per-player id. Prefer the numeric id in the URL — names get
+    re-spelled and accented differently between pages, ids don't."""
+    path = _player_path(chunk)
+    if not path:
+        return None
+    parts = [p for p in path.split("/") if p and p != "ficha"]
+    if not parts:
+        return None
+    # Prefer the numeric segment if there is one, else the last segment.
+    for p in parts:
+        if p.isdigit():
+            return p
+    return parts[-1]
 
 
 # ---------------------------------------------------------------------------
@@ -174,14 +192,13 @@ def parse_team(html: str, slug: str, observed_at: str) -> list[dict]:
         if not href:
             a = el.find(".//a[@href]")
             href = a.get("href") if a is not None else ""
-        m = SLUG_RE.search(href)
         text = " ".join(el.text_content().split())
         pct = re.search(r"(\d+)\s*%", text)
         cls = " ".join(el.classes).lower() + " " + (el.getparent().get("class") or "").lower()
         rows.append({
             "observed_at": observed_at,
             "team_slug": slug,
-            "player_slug": m.group(1) if m else None,
+            "player_slug": _slug(href),
             "display": text[:60],
             "role": role,
             "start_pct": int(pct.group(1)) if pct else None,
@@ -199,11 +216,10 @@ def parse_team(html: str, slug: str, observed_at: str) -> list[dict]:
         a = w.cssselect("a[href*='/jugadores/']")
         if not a:
             continue
-        m = SLUG_RE.search(a[0].get("href") or "")
         rows.append({
             "observed_at": observed_at,
             "team_slug": slug,
-            "player_slug": m.group(1) if m else None,
+            "player_slug": _slug(a[0].get("href") or ""),
             "display": " ".join(a[0].text_content().split())[:60],
             "role": "pitch_gk" if "portero" in " ".join(w.classes) else "pitch",
             "start_pct": None,
