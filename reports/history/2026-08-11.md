@@ -1,4 +1,4 @@
-# Fantasy report — 2026-08-11T2322Z
+# Fantasy report — 2026-08-11T2325Z
 
 _614 players, 509 with a probable-XI reading._
 
@@ -53,6 +53,17 @@ _614 players, 509 with a probable-XI reading._
 
 _Score = shrunk pts/match (K=8, from 2025-26) × P(start). A proxy until real jornadas exist — sanity-check it against your own read._
 
+## Sell candidates
+
+| Player | Value | 24h | Score | €/pt | Why |
+|---|--:|--:|--:|--:|---|
+| orri steinn oskarsson | 8.13M | -138K | 1.7 | 4.76M | outside the XI |
+| hugo duro | 8.54M | -51K | 1.9 | 4.46M | outside the XI |
+| pepelu | 7.46M | -21K | 2.1 | 3.47M | can never start (6th MED) |
+| dani martinez | 415K | -3K | 2.1 | 196K | outside the XI |
+
+_Ranked by value per projected point. Two things this can't know: what a rival will actually pay (sales land above and below value on the same day), and whether anyone can bid at all — that's per-league state, visible only in the app._
+
 ## Rising fastest (24h)
 
 | Player | Team | Value | 24h | % |
@@ -91,4 +102,4 @@ _Score = shrunk pts/match (K=8, from 2025-26) × P(start). A proxy until real jo
 
 Recruitment targets live in `reports/watchlist.md` — it filters out players your rivals already own.
 
-_Generated 2026-08-11 23:23 UTC._
+_Generated 2026-08-11 23:26 UTC._
