@@ -155,7 +155,7 @@ def main() -> None:
         out.append(f"## {title}")
         out.append("")
         if not rows:
-            out += ["_No movement recorded._", ""]
+            out.extend(["_No movement recorded._", ""])
             return
         out.append("| Player | Team | Value | 24h | % |")
         out.append("|---|---|--:|--:|--:|")
