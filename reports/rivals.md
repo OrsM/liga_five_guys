@@ -1,4 +1,4 @@
-# Squads — 2026-08-11 21:27 UTC
+# Squads — 2026-08-11 21:30 UTC
 
 ## You
 15 players · 137.50M total · 0 at 70%+
