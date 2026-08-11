@@ -1,8 +1,10 @@
 # One search term per line. Surnames work best — short fragments match more.
 # Edit this file, then run the "lookup players" workflow from the Actions tab.
 # Results land in reports/lookup.md.
-romero
-musso
-militao
-puga
-hartman
+jonny
+abqar
+herrero
+puerta
+dituro
+bigas
+fernandez
