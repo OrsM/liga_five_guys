@@ -3,19 +3,24 @@
 Keeps its own state in data/state/watch_prev.json, because data/tidy is
 disposable and only ever holds the current view.
 
-Writes reports/alerts.md. Exits 0 always; the workflow checks whether the
-file has any triggers in it before it bothers you.
+Writes the alert body to a scratch file outside the repo (default
+$TMPDIR/ff_alerts.md, override with ALERTS_FILE). The GitHub issue is the
+real artifact, so nothing here needs committing. Exits 0 always; the
+workflow reads the `fired` and `path` outputs to decide whether to notify.
 """
 
 import datetime as dt
 import json
 import os
 import sys
+import tempfile
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from common import norm, load_players, fmt_money, fmt_pct  # noqa: E402
 
 STATE = os.path.join("data", "state", "watch_prev.json")
+ALERTS = (os.environ.get("ALERTS_FILE")
+          or os.path.join(tempfile.gettempdir(), "ff_alerts.md"))
 
 START_CROSS = 70.0      # alert when someone crosses this, either way
 RISER_PCT = 2.0         # 24h move as % of value
@@ -106,16 +111,23 @@ def main():
     else:
         lines += ["Nothing crossed a threshold.", ""]
 
-    os.makedirs("reports", exist_ok=True)
-    with open("reports/alerts.md", "w", encoding="utf-8") as fh:
+    parent = os.path.dirname(ALERTS)
+    if parent:
+        os.makedirs(parent, exist_ok=True)
+    with open(ALERTS, "w", encoding="utf-8") as fh:
         fh.write("\n".join(lines))
 
     save_state(players)
     print("\n".join(lines))
-    # Signal to the workflow whether to notify.
-    if os.environ.get("GITHUB_OUTPUT") and prev and alerts:
-        with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as fh:
-            fh.write("fired=true\n")
+    print("wrote %s (not committed — the issue is the artifact)" % ALERTS)
+
+    # Signal to the workflow whether to notify, and where the body lives.
+    gh_out = os.environ.get("GITHUB_OUTPUT")
+    if gh_out:
+        with open(gh_out, "a", encoding="utf-8") as fh:
+            fh.write("path=%s\n" % ALERTS)
+            if prev and alerts:
+                fh.write("fired=true\n")
 
 
 if __name__ == "__main__":
