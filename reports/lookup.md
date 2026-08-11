@@ -1,7 +1,7 @@
 # Player lookup
 
 ```
-# 613 players in snapshot 2026-08-11T1806Z
+# 613 players in snapshot 2026-08-11T1919Z
 # paste the plain lines below into squad.txt
 alvaro fernandez
 robin le normand
