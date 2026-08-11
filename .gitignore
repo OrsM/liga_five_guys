@@ -1,0 +1,7 @@
+token.json
+.runtime/
+*.duckdb
+__pycache__/
+*.pyc
+.venv/
+.env
