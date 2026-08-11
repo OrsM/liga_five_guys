@@ -61,6 +61,9 @@ SLOT = {
 SLOT_LABEL = {"POR": "Portero", "DEF": "Defensa", "MED": "Mediocampista",
               "DEL": "Delantero"}
 SLOT_MIN = {"POR": 1, "DEF": 3, "MED": 3, "DEL": 1}
+# Most that can ever be on the pitch at once — anyone deeper than this in his
+# position can never start under any legal formation.
+MAX_SLOT = {"POR": 1, "DEF": 5, "MED": 5, "DEL": 3}
 
 # Legal shapes, confirmed against the app's formation picker. The free ones
 # are exactly: 3-5 defenders, 3-5 midfielders, 1-3 forwards, ten outfielders.
@@ -257,12 +260,17 @@ def main() -> None:
                 "pos": (r.get("position") or "").lower(),
                 "pct": pct, "assumed": pct is None, "status": st,
                 "base": base, "why": why, "score": score,
+                "value": num(r.get("value")),
+                "delta_1d": num(r.get("delta_1d")),
+                "delta_pct": num(r.get("delta_pct_1d")),
             })
         out += ["", f"**Squad value: {eur(total)}** — compare with the app's "
                     "team value; a mismatch means a name matched the wrong "
                     "player.", ""]
 
     # --- lineup -----------------------------------------------------------
+    chosen: set[int] = set()
+    pool: dict[str, list[dict]] = {}
     out += ["## Lineup", ""]
     if not players:
         out += ["_Nothing to pick from._", ""]
@@ -271,7 +279,7 @@ def main() -> None:
             out += ["_No `data/season/points_*.csv` yet — run the **history** "
                     "workflow. Until then every player carries the same "
                     "baseline and only start% separates them._", ""]
-        pool: dict[str, list[dict]] = {}
+        pool = {}
         for p in players:
             if p["slot"]:
                 pool.setdefault(p["slot"], []).append(p)
@@ -347,6 +355,53 @@ def main() -> None:
                     + (f", from {hist_label}" if hist_label else "")
                     + ") × P(start). A proxy until real jornadas exist — "
                       "sanity-check it against your own read._", ""]
+
+    # --- sell candidates --------------------------------------------------
+    # Ranked by euros per projected point: the man tying up the most money
+    # for the least production. Anyone the formation rules can never start is
+    # dead capital regardless of how good he is.
+    out += ["## Sell candidates", ""]
+    if not players:
+        out += ["_Nothing to sell._", ""]
+    else:
+        rank = {id(p): i for v in pool.values() for i, p in enumerate(v)}
+        cands = []
+        for p in players:
+            if id(p) in chosen:
+                continue
+            score = p["score"]
+            cpp = p["value"] / score if score > 0.05 else float("inf")
+            if p["status"] == "injured":
+                note = "injured"
+            elif p["slot"] and rank.get(id(p), 0) >= MAX_SLOT[p["slot"]]:
+                nth = rank[id(p)] + 1
+                suffix = ("th" if nth % 100 in (11, 12, 13)
+                          else {1: "st", 2: "nd", 3: "rd"}.get(nth % 10, "th"))
+                note = f"can never start ({nth}{suffix} {p['slot']})"
+            elif p["delta_pct"] >= 1.5:
+                note = "rising — sell into strength"
+            elif p["pos"] == "entrenador":
+                note = "coach slot"
+            else:
+                note = "outside the XI"
+            cands.append((cpp, p, note))
+        cands.sort(key=lambda t: t[0], reverse=True)
+
+        if not cands:
+            out += ["_Whole squad is in the XI._", ""]
+        else:
+            out += ["| Player | Value | 24h | Score | €/pt | Why |",
+                    "|---|--:|--:|--:|--:|---|"]
+            for cpp, p, note in cands[:6]:
+                cpp_s = "—" if cpp == float("inf") else eur(cpp)
+                out.append(f"| {p['name']} | {eur(p['value'])} | "
+                           f"{eur(p['delta_1d'])} | {p['score']:.1f} | "
+                           f"{cpp_s} | {note} |")
+            out += ["", "_Ranked by value per projected point. Two things "
+                        "this can't know: what a rival will actually pay "
+                        "(sales land above and below value on the same day), "
+                        "and whether anyone can bid at all — that's per-league "
+                        "state, visible only in the app._", ""]
 
     # --- momentum ---------------------------------------------------------
     movers = [r for r in market if num(r.get("delta_1d")) != 0]
