@@ -7,17 +7,24 @@
 #
 # Dots are fine: 4.340.000 parses the same.
 
-oyarzabal
-mbappe
-turrientes
-c. dominguez
-letacek
-quagliata
-carlos romero
-rioja
-diego lopez
-cardoso
-ugrinic
-foyth
-ayoze
-ferran jutgla
+Foyth
+Ayoze
+Ferran Jutglà
+Egiluz
+Manuel Ferná...
+Pathé I. Ciss
+Puado
+Almeida
+Comesaña
+Ez Abde
+Vivian
+Pedro Díaz
+Guliashvili
+Lookman
+Karrikaburu
+Pablo Durán
+Dmitrovic
+Djalo
+Raphinha
+Martín Anselmi
+Matarazzo
