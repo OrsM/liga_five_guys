@@ -1,5 +1,28 @@
 date,player,from,to,price,note
-# One row per completed transfer, from the app's league activity feed.
-# from/to are a manager section name from owned.txt, or "market".
-# price in euros, no separators. Leave blank if you didn't catch it.
-2026-08-10,delete this example row,market,rival-one,8300000,
+# From the app's Activity feed. One row per Market operation; ignore
+# "New member" entries.
+#
+# date   full timestamp, YYYY-MM-DDTHH:MM, in whatever clock the app shows
+#        you. Consistency matters, not the timezone. Sorted as text, so
+#        ISO order = real order.
+# player the name as it appears in data/tidy, NOT as the app writes it.
+#        The app abbreviates ("C. Romero", "Pathé I. Ciss"); resolve with
+#        find_slug.py before pasting, or the row silently does nothing.
+# from   manager section name from owned.txt, or "market"
+# to     same, or "market" for a sale
+# price  euros, digits only
+# note   free text. The app handle is worth keeping here.
+#
+# "X has purchased P from LALIGA"  -> from=market, to=X
+# "X has sold player P to LALIGA"  -> from=X,      to=market
+# A manager-to-manager deal is one row: from=X, to=Y.
+2026-08-11T21:24,giacomo quagliata,market,rob,4000000,BurtonGM89
+2026-08-11T21:24,fabio cardoso,market,Marquez,949269,Magic Mike 333 — price confirms Fabio not Johnny
+2026-08-11T21:24,beñat turrientes,market,me,6892898,bid resolved, won
+2026-08-11T21:42,unai egiluz,rob,market,468693,BurtonGM89
+2026-08-11T22:24,dani vivian,albert,market,11664367,
+2026-08-11T22:25,pathe ciss,albert,market,10393147,app wrote "Pathé I. Ciss"
+2026-08-11T22:26,javi puado,albert,market,8041411,
+# TODO resolve before uncommenting — the name must match data/tidy:
+# 2026-08-11T21:24,<romero>,market,rob,45739000,app wrote "C. Romero" — find the Romero valued near 45.7M
+# 2026-08-11T22:25,<fernandez>,albert,market,373500,app wrote "Manuel Fernández" — find the one valued near 373K
