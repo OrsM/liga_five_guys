@@ -1,21 +1,21 @@
 """
 report.py — daily decision report, written as markdown into the repo.
 
-Renders in the GitHub mobile app, so it's readable wherever you are without
-any hosting. Run after ff_ingest.py parse.
+Renders in the GitHub mobile app, so it's readable anywhere with no hosting.
+Run after ff_ingest.py parse.
 
     python report.py
 
-Scope note: before the season starts there are no points, so there are no
-expected points. This report covers what the data actually supports today —
-market momentum and, once probable XIs firm up, cheap likely starters.
-Anything claiming to project points before a ball is kicked is decoration.
+Before the season starts there are no points, so there are no expected points.
+This covers what the data supports today: market momentum and, once probable
+XIs appear, cheap likely starters.
 """
 
 from __future__ import annotations
 
 import csv
 import os
+import unicodedata
 from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
@@ -25,8 +25,17 @@ TIDY = ROOT / "tidy"
 REPORTS = Path("reports")
 SQUAD_FILE = Path("squad.txt")
 
-POS_ORDER = ["portero", "defensa", "mediocampista", "centrocampista", "delantero"]
-STARTER_THRESHOLD = 70  # start% at or above which we call someone "likely to start"
+POS_ORDER = ["portero", "defensa", "mediocampista", "centrocampista",
+             "delantero", "entrenador"]
+STARTER_THRESHOLD = 70
+
+
+def fold(s) -> str:
+    """Lowercase, strip accents — so 'Iñigo' matches 'inigo'."""
+    return "".join(
+        c for c in unicodedata.normalize("NFD", (s or "").lower())
+        if unicodedata.category(c) != "Mn"
+    )
 
 
 def read_csv(path: Path) -> list[dict]:
@@ -37,8 +46,6 @@ def read_csv(path: Path) -> list[dict]:
 
 
 def latest_only(rows: list[dict]) -> list[dict]:
-    """Keep just the most recent observation. Everything is snapshot-stamped,
-    so this is a point-in-time filter, not a dedupe."""
     if not rows:
         return []
     newest = max(r["observed_at"] for r in rows)
@@ -74,32 +81,36 @@ def main() -> None:
     market = latest_only(read_csv(TIDY / "market.csv"))
     xi = latest_only(read_csv(TIDY / "probable_xi.csv"))
 
+    REPORTS.mkdir(exist_ok=True)
+
     if not market:
-        raise SystemExit("No market data — run ff_ingest.py fetch && parse first.")
+        # Write a report saying so rather than crashing — a missing file is
+        # indistinguishable from a broken workflow otherwise.
+        (REPORTS / "latest.md").write_text(
+            "# Fantasy report\n\nNo market data found in "
+            f"`{TIDY/'market.csv'}`. Did `ff_ingest.py parse` run?\n",
+            encoding="utf-8")
+        print("no market data; wrote placeholder report")
+        return
 
-    import unicodedata
+    lookup = {}
+    for r in market:
+        if r.get("slug"):
+            lookup[r["slug"]] = r
+        if r.get("name"):
+            lookup[fold(r["name"])] = r
 
-    def fold(x):
-        return "".join(c for c in unicodedata.normalize("NFD", (x or "").lower())
-                       if unicodedata.category(c) != "Mn")
-
-    # Accept either a slug or the player's name in squad.txt — names are what
-    # you can actually read off the app.
-    by_slug = {r["slug"]: r for r in market if r.get("slug")}
-    by_slug.update({fold(r["name"]): r for r in market if r.get("name")})
-
-    # Best available start% per player across list and pitch renderings.
     start_pct: dict[str, float] = {}
     status: dict[str, str] = {}
     for r in xi:
-        s = r.get("player_slug")
-        if not s:
+        key = r.get("player_slug") or fold(r.get("display"))
+        if not key:
             continue
         p = num(r.get("start_pct"), -1)
         if p >= 0:
-            start_pct[s] = max(start_pct.get(s, 0), p)
+            start_pct[key] = max(start_pct.get(key, 0), p)
         if r.get("status") and r["status"] != "ok":
-            status[s] = r["status"]
+            status[key] = r["status"]
 
     observed = market[0]["observed_at"]
     out: list[str] = [
@@ -109,39 +120,43 @@ def main() -> None:
         "",
     ]
 
-    # --- your squad -------------------------------------------------------
+    # --- squad ------------------------------------------------------------
     squad = load_squad()
-    out.append("## Your squad")
-    out.append("")
+    out += ["## Your squad", ""]
     if not squad:
-        out += ["_Empty. Add player slugs to `squad.txt` (one per line) and this "
-                "section fills in._", ""]
+        out += ["_Empty — add names to `squad.txt`, one per line._", ""]
     else:
+        total = 0.0
         out.append("| Player | Team | Value | 24h | Start% | |")
         out.append("|---|---|--:|--:|--:|---|")
         for s in squad:
-            r = by_slug.get(s) or by_slug.get(fold(s))
+            r = lookup.get(s) or lookup.get(fold(s))
             if not r:
-                out.append(f"| `{s}` | ? | — | — | — | **not found — check the slug** |")
+                out.append(f"| `{s}` | ? | — | — | — | **not found** |")
                 continue
-            flag = {"injured": "🚑", "doubt": "❓"}.get(status.get(s, ""), "")
-            pct = start_pct.get(s)
+            total += num(r["value"])
+            key = r.get("slug") or fold(r["name"])
+            flag = {"injured": "INJ", "doubt": "?"}.get(status.get(key, ""), "")
+            pct = start_pct.get(key)
+            pct_s = f"{pct:.0f}%" if pct is not None else "—"
             out.append(
                 f"| {r['name']} | {r['team']} | {eur(r['value'])} | "
-                f"{eur(r['delta_1d'])} | {pct:.0f}% | {flag} |"
-                if pct is not None else
-                f"| {r['name']} | {r['team']} | {eur(r['value'])} | "
-                f"{eur(r['delta_1d'])} | — | {flag} |"
+                f"{eur(r['delta_1d'])} | {pct_s} | {flag} |"
             )
-        out.append("")
+        out += ["", f"**Squad value: {eur(total)}** — compare with the app's "
+                    "team value; a mismatch means a name matched the wrong "
+                    "player.", ""]
 
     # --- momentum ---------------------------------------------------------
-    movers = [r for r in market if r.get("delta_1d")]
+    movers = [r for r in market if num(r.get("delta_1d")) != 0]
     movers.sort(key=lambda r: num(r["delta_1d"]), reverse=True)
 
     def mover_table(rows, title):
         out.append(f"## {title}")
         out.append("")
+        if not rows:
+            out += ["_No movement recorded._", ""]
+            return
         out.append("| Player | Team | Value | 24h | % |")
         out.append("|---|---|--:|--:|--:|")
         for r in rows:
@@ -155,17 +170,16 @@ def main() -> None:
     mover_table(list(reversed(movers[-12:])), "Falling fastest (24h)")
 
     # --- cheap likely starters -------------------------------------------
-    out.append(f"## Cheap likely starters (start% ≥ {STARTER_THRESHOLD})")
-    out.append("")
+    out += [f"## Cheap likely starters (start% >= {STARTER_THRESHOLD})", ""]
     if not start_pct:
-        out += ["_No probable-XI data yet. futbolfantasy publishes these in the "
-                "24–48h before kickoff, so expect this to fill in on Thursday "
-                "or Friday._", ""]
+        out += ["_No probable-XI data yet. futbolfantasy publishes these 24-48h "
+                "before kickoff._", ""]
     else:
+        owned = {fold(s) for s in squad}
         buckets: dict[str, list[dict]] = defaultdict(list)
-        for slug, pct in start_pct.items():
-            r = by_slug.get(slug)
-            if r and pct >= STARTER_THRESHOLD and slug not in squad:
+        for key, pct in start_pct.items():
+            r = lookup.get(key)
+            if r and pct >= STARTER_THRESHOLD and fold(r["name"]) not in owned:
                 buckets[r["position"]].append({**r, "pct": pct})
         printed = False
         for pos in POS_ORDER:
@@ -173,31 +187,25 @@ def main() -> None:
             if not rows:
                 continue
             printed = True
-            out.append(f"**{pos.title()}**")
-            out.append("")
-            out.append("| Player | Team | Value | Start% |")
-            out.append("|---|---|--:|--:|")
+            out += [f"**{pos.title()}**", "",
+                    "| Player | Team | Value | Start% |", "|---|---|--:|--:|"]
             for r in rows:
-                out.append(
-                    f"| {r['name']} | {r['team']} | {eur(r['value'])} | {r['pct']:.0f}% |"
-                )
+                out.append(f"| {r['name']} | {r['team']} | "
+                           f"{eur(r['value'])} | {r['pct']:.0f}% |")
             out.append("")
         if not printed:
-            out += ["_Probable-XI readings exist but none cleared the threshold, or "
-                    "they didn't match a market entry. If this persists close to "
-                    "kickoff, the name/slug join is probably broken._", ""]
+            out += ["_Readings exist but none cleared the threshold, or they "
+                    "didn't join to a market entry._", ""]
 
     out += [
         "---",
         "",
-        "**No expected points yet** — no jornada has been played, so there is "
-        "nothing to project from. Once results exist this report gains a points "
-        "model and a best-XI recommendation (Phase 1 in the README).",
+        "**No expected points yet** — no jornada has been played. Once results "
+        "exist this gains a points model and a best-XI recommendation.",
         "",
         f"_Generated {datetime.now(timezone.utc):%Y-%m-%d %H:%M} UTC._",
     ]
 
-    REPORTS.mkdir(exist_ok=True)
     text = "\n".join(out) + "\n"
     (REPORTS / "latest.md").write_text(text, encoding="utf-8")
     (REPORTS / f"{observed[:10]}.md").write_text(text, encoding="utf-8")
