@@ -1,0 +1,13 @@
+# One search term per line. Surnames work best — short fragments match more.
+# Edit this file, then run the "lookup players" workflow from the Actions tab.
+# Results land in reports/lookup.md.
+starfelt
+normand
+zubeldia
+hilali
+pepelu
+galarreta
+oskarsson
+vicente
+lorenzo
+garcia
