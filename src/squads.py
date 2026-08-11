@@ -21,7 +21,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from common import (norm, load_players, fmt_money, fmt_pct, pos_key,
-                    POS_ORDER)  # noqa: E402
+                    flag, POS_ORDER)  # noqa: E402
 
 ME = "miguel_autentico"   # section name in owned.txt for your own squad
 MARKET = "market"         # reserved counterparty: the free-agent pool
@@ -95,7 +95,7 @@ def apply_transactions(rosters, txns):
 
 def row(rec):
     return "| %s | %s | %s | %s | %s | %s |" % (
-        rec.get("name", "?"),
+        rec.get("name", "?") + flag(rec),
         rec.get("team", "—"),
         (rec.get("pos") or "—")[:3],
         fmt_money(rec.get("value")),
