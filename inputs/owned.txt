@@ -1,0 +1,15 @@
+# Baseline rosters. One [section] per manager, one player per line.
+# Names as they appear in data/tidy — accents optional, case ignored.
+# You only touch this to fix a mistake; day-to-day changes go in
+# inputs/transactions.csv and are applied on top of this.
+#
+# The section named "me" is you. Rename the other two to their real names.
+
+[me]
+# your 14 here
+
+[rival-one]
+# ~14 names
+
+[rival-two]
+# ~14 names
