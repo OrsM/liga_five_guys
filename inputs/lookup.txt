@@ -1,48 +1,8 @@
 # One search term per line. Surnames work best — short fragments match more.
 # Edit this file, then run the "lookup players" workflow from the Actions tab.
 # Results land in reports/lookup.md.
-a abqar
-a herrero
-aimar
-amatucci
-asencio
-ayoze
-berenguer
-blanco
-brahim
-buchanan
-c puga
-c romero
-camavinga
-cardoso
-de haas
-dieng
-e militao
-etta eyong
-foyth
-g puerta
-gaya
-gorrotxa
-Guruzeta
-Izan M
-J Musso
-Joaquín
-Johnny
-Jonny Otto
-Llorente
-M Dituro
-Manuel Fernández
-Moscardo
-Noubi
-Pastor
-Pathé I Ciss
-Puado
-Purić
-Q Hartman
-Quagliata
-R P Bigas
-Szczesny
-Tárrega
-Vivian
-Williot
-Yuri
+romero
+musso
+militao
+puga
+hartman
