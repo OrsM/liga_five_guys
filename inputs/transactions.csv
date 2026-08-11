@@ -1,0 +1,5 @@
+date,player,from,to,price,note
+# One row per completed transfer, from the app's league activity feed.
+# from/to are a manager section name from owned.txt, or "market".
+# price in euros, no separators. Leave blank if you didn't catch it.
+2026-08-10,delete this example row,market,rival-one,8300000,
