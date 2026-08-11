@@ -33,31 +33,31 @@ jobs:
       - name: Fetch
         env:
           FF_ROOT: ./data
-        run: python ff_ingest.py fetch
+        run: python src/ff_ingest.py fetch
 
       # Re-parsing all history each run takes seconds and means a parser fix
       # retroactively repairs every past snapshot.
       - name: Parse
         env:
           FF_ROOT: ./data
-        run: python ff_ingest.py parse
+        run: python src/ff_ingest.py parse
 
       - name: Report
         env:
           FF_ROOT: ./data
-        run: python report.py
+        run: python src/report.py
 
       - name: Bid log
         env:
           FF_ROOT: ./data
-        run: python bids.py
+        run: python src/bids.py
 
       - name: Commit
         run: |
           git config user.name  "snapshot-bot"
           git config user.email "snapshot-bot@users.noreply.github.com"
           mkdir -p reports
-          git add -A data reports bids.csv
+          git add -A data reports inputs
           git diff --staged --quiet || git commit -m "snapshot $(date -u +%Y-%m-%dT%H%MZ)"
           git pull --rebase && git push
 
