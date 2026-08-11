@@ -77,7 +77,16 @@ def main() -> None:
     if not market:
         raise SystemExit("No market data — run ff_ingest.py fetch && parse first.")
 
+    import unicodedata
+
+    def fold(x):
+        return "".join(c for c in unicodedata.normalize("NFD", (x or "").lower())
+                       if unicodedata.category(c) != "Mn")
+
+    # Accept either a slug or the player's name in squad.txt — names are what
+    # you can actually read off the app.
     by_slug = {r["slug"]: r for r in market if r.get("slug")}
+    by_slug.update({fold(r["name"]): r for r in market if r.get("name")})
 
     # Best available start% per player across list and pitch renderings.
     start_pct: dict[str, float] = {}
@@ -111,7 +120,7 @@ def main() -> None:
         out.append("| Player | Team | Value | 24h | Start% | |")
         out.append("|---|---|--:|--:|--:|---|")
         for s in squad:
-            r = by_slug.get(s)
+            r = by_slug.get(s) or by_slug.get(fold(s))
             if not r:
                 out.append(f"| `{s}` | ? | — | — | — | **not found — check the slug** |")
                 continue
