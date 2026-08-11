@@ -8,8 +8,68 @@
 [me]
 # your 14 here
 
-[rival-one]
-# ~14 names
+[rob]
+J. Musso
+E. Militão
+C. Romero
+Quagliata
+C. Puga
+Q. Hartman
+De Haas
+Unai Lopez
+Buchanan
+Gorrotxa
+Blanco
+Dieng
+Iago Aspas
+Etta Eyong
+Joaquín
 
-[rival-two]
-# ~14 names
+[albert]
+M. Dituro
+R.P. Bigas
+Vivian
+Llorente
+Foyth
+Manuel Fernández
+Camavinga
+Pathé I. Ciss
+Marc Roca
+Puado
+Ilaix Moriba
+Ayoze
+Ferran Jutglà
+Raúl Moro
+
+[susi]
+Szczesny
+Yuri
+Tárrega
+Jonny Otto
+A. Abqar
+Purić
+Álvaro García
+Aimar
+Johnny
+Izan M.
+Amatucci
+Berenguer
+Andrés Martín
+Carlos Espí
+
+[Marquez]
+A. Herrero
+Gayá
+Asencio
+Kike Salas
+Cardoso
+Noubi
+Pastor
+Williot
+Brahim
+Marc Bernal
+G. Puerta
+Moscardo
+Guruzeta
+Pere Milla
+Lucas Boyé
