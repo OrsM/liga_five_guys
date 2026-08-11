@@ -45,7 +45,7 @@ jobs:
               python find_slug.py --many $NAMES
             elif [ -f lookup.txt ]; then
               # One query per line; blank lines and # comments ignored.
-              python find_slug.py --many $(grep -v '^\s*#' lookup.txt | tr '\n' ' ')
+              python find_slug.py --file lookup.txt
             else
               echo "Nothing to look up: pass names/team, or create lookup.txt"
             fi
