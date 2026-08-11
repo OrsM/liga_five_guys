@@ -1,0 +1,59 @@
+name: daily snapshot
+
+# futbolfantasy reflects LaLiga's ~00:15 Europe/Madrid value recompute.
+# Cron is UTC: 22:40 UTC = 00:40 CEST. Switch to '40 23 * * *' when Spain
+# goes back to CET at the end of October.
+#
+# Also runs at 09:40 UTC — probable XIs firm up through the day, so the
+# morning pass is a different, useful observation rather than a duplicate.
+on:
+  schedule:
+    - cron: '40 22 * * *'
+    - cron: '40 9 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: snapshot
+  cancel-in-progress: false
+
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - run: pip install httpx lxml cssselect
+
+      - name: Fetch
+        env:
+          FF_ROOT: ./data
+        run: python ff_ingest.py fetch
+
+      # Re-parsing all history each run is wasteful but takes seconds, and it
+      # means a parser fix retroactively repairs every past snapshot with no
+      # extra machinery.
+      - name: Parse
+        env:
+          FF_ROOT: ./data
+        run: python ff_ingest.py parse
+
+      - name: Commit
+        run: |
+          git config user.name  "snapshot-bot"
+          git config user.email "snapshot-bot@users.noreply.github.com"
+          git add data/
+          git diff --staged --quiet || git commit -m "snapshot $(date -u +%Y-%m-%dT%H%MZ)"
+          git pull --rebase && git push
+
+      - name: Fail loudly
+        if: failure()
+        run: |
+          echo "::error::Snapshot failed — markup may have changed, or we're being rate limited."
+          exit 1
