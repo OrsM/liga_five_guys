@@ -1,0 +1,92 @@
+# Starting rosters — the 14 each manager began the season with.
+#
+# WRITE ONCE. Never edit this to reflect a transfer; that is what
+# inputs/transactions.csv is for. Current ownership is derived by
+# replaying the whole ledger on top of this, every run.
+#
+# Section names are the app handles exactly as the Activity feed writes
+# them, so a line pasted from the feed needs no translation.
+#
+# Reconstructed by rolling the ledger backwards from the rosters typed
+# 2026-08-11T23:06. All five came out at 14, which is the check that
+# nothing is missing.
+
+[miguel_autentico]
+alvaro fernandez
+carl starfelt
+robin le normand
+igor zubeldia
+omar el hilali
+dani martinez
+ruben garcia
+iñigo ruiz de galarreta
+dani lorenzo
+pepelu
+jon moncayola
+iñigo vicente
+hugo duro
+orri steinn oskarsson
+
+[Magic Mike 333]
+kike salas
+marc bernal
+lucas boye
+pere milla
+jose gaya
+raul asencio
+lucas noubi
+alex pastor
+williot swedberg
+gabriel moscardo
+gorka guruzeta
+brahim diaz
+alfonso herrero
+gustavo puerta
+
+[Albert Laporta]
+ilaix moriba
+marc roca
+raul moro
+ferran jutgla
+juan foyth
+eduardo camavinga
+ayoze perez
+diego javier llorente
+matias dituro
+pedro bigas
+javi puado
+pathe ciss
+manuel fernandez
+dani vivian
+
+[BurtonGM89]
+unai lopez
+iago aspas
+justin de haas
+tajon buchanan
+jon gorrotxategi
+antonio blanco
+aliou dieng
+karl etta eyong
+joaquin muñoz
+juan musso
+eder militao
+carlos puga
+quilindschy hartman
+unai egiluz
+
+[SusoGattuso]
+alvaro garcia
+andres martin
+carlos espi
+wojciech szczesny
+yuri berchiche
+cesar tarrega
+aleksa puric
+johnny cardoso
+izan merino
+lorenzo amatucci
+alex berenguer
+aimar oroz
+jonny castro
+abdel abqar
