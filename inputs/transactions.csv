@@ -1,28 +1,27 @@
 date,player,from,to,price,note
-# From the app's Activity feed. One row per Market operation; ignore
-# "New member" entries.
+# Append-only ledger. From the app's Activity feed, one row per Market
+# operation; ignore "New member" entries. Never delete rows — current
+# ownership is derived by replaying all of them over
+# inputs/rosters_initial.txt.
 #
-# date   full timestamp, YYYY-MM-DDTHH:MM, in whatever clock the app shows
-#        you. Consistency matters, not the timezone. Sorted as text, so
-#        ISO order = real order.
-# player the name as it appears in data/tidy, NOT as the app writes it.
-#        The app abbreviates ("C. Romero", "Pathé I. Ciss"); resolve with
-#        find_slug.py before pasting, or the row silently does nothing.
-# from   manager section name from owned.txt, or "market"
+# date   full timestamp, YYYY-MM-DDTHH:MM, same clock as the app shows.
+#        Sorted as text, so ISO order = real order. Get this right: two
+#        rows for the same player on the same day depend on it.
+# player the name as it appears in data/tidy, not as the app abbreviates
+#        it. Resolve with find_slug.py first.
+# from   app handle from rosters_initial.txt, or "market"
 # to     same, or "market" for a sale
 # price  euros, digits only
-# note   free text. The app handle is worth keeping here.
 #
 # "X has purchased P from LALIGA"  -> from=market, to=X
 # "X has sold player P to LALIGA"  -> from=X,      to=market
 # A manager-to-manager deal is one row: from=X, to=Y.
-2026-08-11T21:24,giacomo quagliata,market,rob,4000000,BurtonGM89
-2026-08-11T21:24,fabio cardoso,market,Marquez,949269,Magic Mike 333 — price confirms Fabio not Johnny
-2026-08-11T21:24,beñat turrientes,market,me,6892898,bid resolved, won
-2026-08-11T21:42,unai egiluz,rob,market,468693,BurtonGM89
-2026-08-11T22:24,dani vivian,albert,market,11664367,
-2026-08-11T22:25,pathe ciss,albert,market,10393147,app wrote "Pathé I. Ciss"
-2026-08-11T22:26,javi puado,albert,market,8041411,
-# TODO resolve before uncommenting — the name must match data/tidy:
-# 2026-08-11T21:24,<romero>,market,rob,45739000,app wrote "C. Romero" — find the Romero valued near 45.7M
-# 2026-08-11T22:25,<fernandez>,albert,market,373500,app wrote "Manuel Fernández" — find the one valued near 373K
+2026-08-11T21:24,giacomo quagliata,market,BurtonGM89,4000000,
+2026-08-11T21:24,carlos romero,market,BurtonGM89,45739000,
+2026-08-11T21:24,fabio cardoso,market,Magic Mike 333,949269,price confirms Fabio not Johnny
+2026-08-11T21:24,beñat turrientes,market,miguel_autentico,6892898,bid resolved
+2026-08-11T21:42,unai egiluz,BurtonGM89,market,468693,
+2026-08-11T22:24,dani vivian,Albert Laporta,market,11664367,
+2026-08-11T22:25,manuel fernandez,Albert Laporta,market,373500,
+2026-08-11T22:25,pathe ciss,Albert Laporta,market,10393147,
+2026-08-11T22:26,javi puado,Albert Laporta,market,8041411,
