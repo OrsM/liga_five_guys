@@ -43,17 +43,17 @@ def save_state(players):
 
 
 def owned_keys():
-    """So we don't alert on players we already have."""
-    path = "inputs/owned.txt"
-    keys = set()
-    if not os.path.exists(path):
-        return keys
-    with open(path, encoding="utf-8") as fh:
-        for line in fh:
-            line = line.split("#", 1)[0].strip()
-            if line and not (line.startswith("[") and line.endswith("]")):
-                keys.add(norm(line))
-    return keys
+    """Everyone owned by any manager right now.
+
+    Reuses squads.py rather than re-parsing, so the two can never drift.
+    """
+    try:
+        from squads import (read_initial, read_transactions,
+                            apply_transactions)
+        owner, _ = apply_transactions(read_initial(), read_transactions())
+        return set(owner)
+    except SystemExit:
+        return set()
 
 
 def main():
