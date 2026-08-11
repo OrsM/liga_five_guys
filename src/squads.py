@@ -23,7 +23,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from common import (norm, load_players, fmt_money, fmt_pct, pos_key,
                     POS_ORDER)  # noqa: E402
 
-ME = "me"                 # section name in owned.txt for your own squad
+ME = "miguel_autentico"   # section name in owned.txt for your own squad
 MARKET = "market"         # reserved counterparty: the free-agent pool
 
 # Watchlist cuts — the whole point is that it fits on a phone screen.
@@ -33,13 +33,21 @@ CASH = None               # set an int (euros) to hide unaffordable players
 
 
 def read_owned(path="inputs/owned.txt"):
-    """[manager] sections, one player name per line, # for comments."""
-    rosters, current = {}, None
+    """[manager] sections, one player name per line, # for comments.
+
+    A '# baseline: <ISO timestamp>' line declares the moment the rosters
+    describe. Transactions at or before it are already reflected and are
+    not re-applied — they still feed the price table.
+    """
+    rosters, current, baseline = {}, None, ""
     if not os.path.exists(path):
         raise SystemExit("missing %s" % path)
     with open(path, encoding="utf-8") as fh:
-        for line in fh:
-            line = line.split("#", 1)[0].strip()
+        for raw in fh:
+            stripped = raw.strip()
+            if stripped.lower().startswith("# baseline:"):
+                baseline = stripped.split(":", 1)[1].strip()
+            line = raw.split("#", 1)[0].strip()
             if not line:
                 continue
             if line.startswith("[") and line.endswith("]"):
@@ -47,7 +55,7 @@ def read_owned(path="inputs/owned.txt"):
                 rosters.setdefault(current, [])
             elif current:
                 rosters[current].append(line)
-    return rosters
+    return rosters, baseline
 
 
 def read_transactions(path="inputs/transactions.csv"):
@@ -61,14 +69,21 @@ def read_transactions(path="inputs/transactions.csv"):
     return rows
 
 
-def apply_transactions(rosters, txns):
-    """Baseline + ledger = current ownership. Ledger wins."""
+def apply_transactions(rosters, txns, baseline=""):
+    """Baseline + ledger = current ownership.
+
+    Only transactions after the baseline timestamp move players. Earlier
+    ones are already baked into the rosters you typed.
+    """
     owner = {}
     for mgr, names in rosters.items():
         for n in names:
             owner[norm(n)] = mgr
-    warnings = []
+    warnings, skipped = [], 0
     for t in txns:
+        if baseline and (t.get("date") or "") <= baseline:
+            skipped += 1
+            continue
         key = norm(t["player"])
         src = (t.get("from") or "").strip() or MARKET
         dst = (t.get("to") or "").strip() or MARKET
@@ -79,6 +94,9 @@ def apply_transactions(rosters, txns):
             owner.pop(key, None)
         else:
             owner[key] = dst
+    if skipped:
+        print("%d transaction(s) at or before the baseline — logged for "
+              "prices, not re-applied" % skipped)
     return owner, warnings
 
 
@@ -107,7 +125,7 @@ def write_rivals(players, owner, txns, warnings, stamp):
         recs = [players.get(k, {"name": k}) for k in keys]
         total = sum(r.get("value") or 0 for r in recs)
         starters = sum(1 for r in recs if (r.get("start") or 0) >= 70)
-        out += ["## %s" % ("You" if mgr == ME else mgr),
+        out += ["## %s" % ("You (%s)" % mgr if mgr == ME else mgr),
                 "%d players · %s total · %d at 70%%+" % (
                     len(recs), fmt_money(total), starters),
                 "", HEAD]
@@ -192,9 +210,9 @@ def _write(path, lines):
 def main():
     stamp = dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
     players = load_players()
-    rosters = read_owned()
+    rosters, baseline = read_owned()
     txns = read_transactions()
-    owner, warnings = apply_transactions(rosters, txns)
+    owner, warnings = apply_transactions(rosters, txns, baseline)
     write_rivals(players, owner, txns, warnings, stamp)
     write_watchlist(players, owner, stamp)
     write_squad_file(players, owner)
