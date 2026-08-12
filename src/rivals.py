@@ -1,0 +1,439 @@
+"""
+rivals.py — how the other four behave, where it costs them, and how to use it.
+
+    python src/rivals.py            # writes reports/behaviour.md
+
+Five sections, in descending order of how much they are worth to you today:
+
+  1. Cash and ceilings   what each rival can still spend. A hard bound on
+                         tomorrow's bidding, and the app never shows it.
+  2. Premium curve       what they pay over market value, and whether their
+                         bids are round numbers (a deliberate auction bid) or
+                         exact ones (nobody competed and you missed a free
+                         player).
+  3. Post-buy drift      what their purchases did next. Tests two specific
+                         errors: momentum chasing and selling into a dip.
+  4. Squad diagnostics   trapped capital, injured holds, positional holes,
+                         and whether they can field a legal XI at all.
+  5. Demand forecast     which unowned players each rival structurally needs
+                         — so you know where not to start a bidding war, and
+                         what to list to whom.
+
+Every run appends its estimates to data/decisions/rival_log.csv. Premiums and
+cash estimates are not reconstructable after the fact, and the point of
+writing them down as they are made is that they can be scored later.
+
+READ IT SCEPTICALLY FOR NOW. Sections 1 and 5 work off today's data.
+Section 2 needs roughly 30-40 settled purchases before the medians mean
+anything, and section 3 needs jornadas to have been played. With a fortnight
+of ledger and five managers, most of this is a hypothesis with a number
+attached, not a finding.
+"""
+
+from __future__ import annotations
+
+import datetime as dt
+import os
+import sys
+from collections import Counter
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+from ffcore.league import MARKET, League  # noqa: E402
+from ffcore.parse import money  # noqa: E402
+from ffcore.score import (MAX_SLOT, SLOT_LABEL, SLOT_MIN, THIN,  # noqa: E402
+                          Scorer, pick_xi, squad_pool)
+from ffcore.tidy import (DECISIONS, REPORTS, append_csv, latest_only,  # noqa: E402
+                         ledger_stamp, load_market, load_xi, read_csv,
+                         write_lines, SEASON)
+
+# A premium computed against a snapshot further than this from the deal is
+# reported but not averaged in.
+MAX_LAG_H = 36.0
+# Drift horizons, in days after a purchase.
+HORIZONS = (3, 7, 14)
+# Below this start probability, money is parked rather than working.
+TRAPPED_START = 50.0
+# Round-number detection: a bid divisible by this was chosen, not computed.
+ROUND_TO = 10_000
+
+
+def eur(v) -> str:
+    if v is None:
+        return "—"
+    if abs(v) >= 1e6:
+        return "%.2fM" % (v / 1e6)
+    return "%.0fK" % (v / 1e3)
+
+
+def pct(v) -> str:
+    return "—" if v is None else "%+.1f%%" % v
+
+
+def is_round(price) -> bool:
+    v = money(price)
+    return v is not None and v > 0 and v % ROUND_TO == 0
+
+
+def load_history() -> tuple[dict, str]:
+    """{normalised name: {'pts','pj'}} from the newest points_*.csv."""
+    files = sorted(SEASON.glob("points_*.csv")) if SEASON.exists() else []
+    if not files:
+        return {}, ""
+    from ffcore.parse import ratio
+    from ffcore.text import norm
+    out: dict[str, dict] = {}
+    for r in read_csv(files[-1]):
+        rec = {"pts": ratio(r.get("points")) or 0.0,
+               "pj": ratio(r.get("games")) or 0.0}
+        for key in (r.get("player_name"), r.get("player_name_full")):
+            if key:
+                out.setdefault(norm(key), rec)
+    return out, files[-1].stem.replace("points_", "")
+
+
+# ---------------------------------------------------------------------------
+# 1. cash
+# ---------------------------------------------------------------------------
+
+def sec_cash(lg) -> list[str]:
+    out = ["## 1. Cash and ceilings", "",
+           "| Manager | Players | Spent | Raised | Net | Cash | Max bid |",
+           "|---|--:|--:|--:|--:|--:|--:|"]
+    for m in lg:
+        out.append("| %s | %d | %s | %s | %s | %s | %s |" % (
+            ("**%s**" % m.handle) if m.handle == lg.cfg.me else m.handle,
+            len(m.players), eur(m.spend), eur(m.proceeds), eur(m.net),
+            m.cash.label(), eur(m.max_bid)))
+    out += ["",
+            "`~` is an estimate anchored on budget minus starting-squad "
+            "value, not an observed balance. Treat it as a ceiling. Any time "
+            "a rival mentions a balance, put it in `inputs/cash.txt` — one "
+            "observed number turns their whole estimate into arithmetic.", ""]
+
+    poor = [m for m in lg
+            if m.handle != lg.cfg.me and m.max_bid is not None
+            and m.max_bid < 5e6]
+    if poor:
+        out += ["**Cash-constrained right now:** %s. Against these, open at "
+                "the minimum increment — they cannot escalate."
+                % ", ".join("%s (%s)" % (m.handle, eur(m.max_bid))
+                            for m in poor), ""]
+    return out
+
+
+# ---------------------------------------------------------------------------
+# 2. premium curve
+# ---------------------------------------------------------------------------
+
+def deals(lg, market):
+    """Every ledger row, priced against the value at the time it happened."""
+    rows = []
+    for t in lg.txns:
+        price = money(t.get("price"))
+        when = ledger_stamp(t.get("date", ""))
+        if price is None or when is None:
+            continue
+        v = market.at(t["player"], when)
+        src = (t.get("from") or "").strip() or MARKET
+        dst = (t.get("to") or "").strip() or MARKET
+        rows.append({
+            "date": t.get("date", ""), "player": t["player"],
+            "actor": dst if dst != MARKET else src,
+            "side": "buy" if dst != MARKET else "sell",
+            "price": price, "when": when,
+            "value": v.value if v else None,
+            "lag_h": v.lag_h if v else None,
+            "premium": ((price / v.value - 1) * 100.0
+                        if v and v.value else None),
+            "round": is_round(t.get("price")),
+        })
+    return rows
+
+
+def usable(d) -> bool:
+    return (d["premium"] is not None and d["lag_h"] is not None
+            and abs(d["lag_h"]) <= MAX_LAG_H)
+
+
+def sec_premium(lg, dl) -> list[str]:
+    out = ["## 2. What they pay over value", ""]
+    buys = [d for d in dl if d["side"] == "buy"]
+    good = [d for d in buys if usable(d)]
+    if not good:
+        return out + ["_No purchase yet lines up with a market snapshot "
+                      "close enough in time to price. This fills in as the "
+                      "ingest history grows._", ""]
+
+    out += ["| Manager | Buys | Median premium | Range | Round bids |",
+            "|---|--:|--:|---|--:|"]
+    for m in lg:
+        mine = [d for d in good if d["actor"] == m.handle]
+        if not mine:
+            continue
+        prem = sorted(d["premium"] for d in mine)
+        rnd = sum(1 for d in buys if d["actor"] == m.handle and d["round"])
+        out.append("| %s | %d | %s | %s to %s | %d/%d |" % (
+            m.handle, len(mine), pct(prem[len(prem) // 2]),
+            pct(prem[0]), pct(prem[-1]), rnd,
+            len([d for d in buys if d["actor"] == m.handle])))
+
+    out += ["",
+            "A round bid was chosen by a human bidding against someone. An "
+            "exact one is the app's own valuation, which means nobody "
+            "competed — every exact purchase in the table below was a player "
+            "you could have had for the same money.", "",
+            "| Date | Player | Buyer | Paid | Value then | Premium | Bid |",
+            "|---|---|---|--:|--:|--:|---|"]
+    for d in sorted(buys, key=lambda d: d["date"], reverse=True)[:25]:
+        mark = "" if usable(d) else " ~"
+        out.append("| %s | %s | %s | %s | %s%s | %s | %s |" % (
+            d["date"][5:], d["player"], d["actor"], eur(d["price"]),
+            eur(d["value"]), mark, pct(d["premium"]),
+            "round" if d["round"] else "exact"))
+    out += ["", "`~` priced against a snapshot more than %dh away and left "
+            "out of the medians." % MAX_LAG_H, ""]
+    return out
+
+
+# ---------------------------------------------------------------------------
+# 3. post-buy drift
+# ---------------------------------------------------------------------------
+
+def sec_drift(lg, dl, market) -> list[str]:
+    out = ["## 3. What happened next", ""]
+    rows = []
+    for d in dl:
+        drifts = [market.drift(d["player"], d["when"], h) for h in HORIZONS]
+        if any(x is not None for x in drifts):
+            rows.append((d, drifts))
+    if not rows:
+        return out + ["_No horizon has elapsed inside the snapshot history "
+                      "yet. Needs %d days of daily ingest past a "
+                      "transaction._" % min(HORIZONS), ""]
+
+    out += ["| Date | Player | Actor | Side | " +
+            " | ".join("+%dd" % h for h in HORIZONS) + " |",
+            "|---|---|---|---|" + "--:|" * len(HORIZONS)]
+    for d, drifts in sorted(rows, key=lambda r: r[0]["date"], reverse=True)[:25]:
+        cells = [pct(x[1]) if x else "—" for x in drifts]
+        out.append("| %s | %s | %s | %s | %s |" % (
+            d["date"][5:], d["player"], d["actor"], d["side"],
+            " | ".join(cells)))
+
+    chasing = [d for d, _ in rows
+               if d["side"] == "buy" and (d.get("value") or 0) > 0]
+    if chasing:
+        out += ["", "Two errors this table is built to catch: buying a "
+                "player who has already risen (paying the top of the move), "
+                "and selling one who has just dipped (realising the bottom). "
+                "Both show as the drift column reversing sign against the "
+                "actor.", ""]
+    return out
+
+
+# ---------------------------------------------------------------------------
+# 4. squad diagnostics
+# ---------------------------------------------------------------------------
+
+def sec_squads(lg, sc, players_by_key) -> list[str]:
+    out = ["## 4. Squad diagnostics", "",
+           "| Manager | XI score | Shape | Trapped | Injured | Thin at | "
+           "Unmatched |", "|---|--:|---|--:|--:|---|--:|"]
+    detail = []
+    for m in lg:
+        names = [players_by_key.get(k, {}).get("name", k) for k in m.players]
+        scored, missing = sc.score_squad(names)
+        best = pick_xi(squad_pool(scored)) if scored else None
+        trapped = sum(p.value for p in scored
+                      if p.pct_used < TRAPPED_START)
+        injured = sum(1 for p in scored if p.status == "injured")
+
+        counts = Counter(p.slot for p in scored if p.slot)
+        thin = [SLOT_LABEL[s][:3] for s, need in THIN.items()
+                if counts.get(s, 0) < need]
+
+        out.append("| %s | %s | %s | %s | %d | %s | %d |" % (
+            ("**%s**" % m.handle) if m.handle == lg.cfg.me else m.handle,
+            "%.1f" % best[0] if best else "**illegal**",
+            "-".join(str(x) for x in best[1]) if best else "—",
+            eur(trapped), injured, ",".join(thin) or "—", len(missing)))
+
+        if not best:
+            short = ["%s %d/%d" % (SLOT_LABEL[s], counts.get(s, 0), need)
+                     for s, need in SLOT_MIN.items() if counts.get(s, 0) < need]
+            detail.append(
+                "- **%s cannot field a legal XI** — short at %s. They have to "
+                "buy there before the next lock, whatever it costs, which is "
+                "the one situation where their premium goes out of the window."
+                % (m.handle, ", ".join(short) or "no legal shape"))
+        over = [s for s, n in counts.items() if n > MAX_SLOT.get(s, 99)]
+        if over:
+            detail.append("- %s is carrying more %s than can ever start."
+                          % (m.handle,
+                             "/".join(SLOT_LABEL[s] for s in over)))
+
+    out.append("")
+    if detail:
+        out += detail + [""]
+    out += ["Trapped is value held in players below %d%% start probability — "
+            "money that cannot score. Unmatched is names in their squad "
+            "missing from data/tidy, which are absent from the XI score, so "
+            "a large number there means the comparison flatters you."
+            % int(TRAPPED_START), ""]
+    return out
+
+
+# ---------------------------------------------------------------------------
+# 5. demand forecast
+# ---------------------------------------------------------------------------
+
+def sec_demand(lg, sc, market_latest) -> list[str]:
+    out = ["## 5. Who wants what", ""]
+
+    need: dict[str, list[str]] = {}
+    for m in lg:
+        scored, _ = sc.score_squad(
+            [market_latest.get(k, {}).get("name", k) for k in m.players])
+        counts = Counter(p.slot for p in scored if p.slot)
+        for slot, floor in THIN.items():
+            if counts.get(slot, 0) < floor:
+                need.setdefault(slot, []).append(m.handle)
+
+    rivals_need = {s: [h for h in hs if h != lg.cfg.me]
+                   for s, hs in need.items()}
+
+    free = [r for k, r in market_latest.items() if k not in lg.owner]
+    scored_free = [sc.score(r) for r in free]
+    scored_free = [p for p in scored_free if p.slot]
+    scored_free.sort(key=lambda p: -p.score)
+
+    contested = [p for p in scored_free if rivals_need.get(p.slot)][:12]
+    if contested:
+        out += ["**Expect competition for these** — the position is one a "
+                "rival is short in, so assume a bidding war and price "
+                "accordingly.", "",
+                "| Player | Pos | Value | Start% | Short here |",
+                "|---|---|--:|--:|---|"]
+        for p in contested:
+            out.append("| %s | %s | %s | %s | %s |" % (
+                p.name, p.slot, eur(p.value),
+                "—" if p.pct is None else "%.0f%%" % p.pct,
+                ", ".join(rivals_need[p.slot])))
+        out.append("")
+
+    uncontested = [p for p in scored_free if not rivals_need.get(p.slot)][:8]
+    if uncontested:
+        out += ["**Nobody else needs these.** Same quality, no auction — "
+                "take the equivalent player here instead of paying a premium "
+                "above.", "",
+                "| Player | Pos | Value | Start% |", "|---|---|--:|--:|"]
+        for p in uncontested:
+            out.append("| %s | %s | %s | %s |" % (
+                p.name, p.slot, eur(p.value),
+                "—" if p.pct is None else "%.0f%%" % p.pct))
+        out.append("")
+
+    mine = lg.managers.get(lg.cfg.me)
+    if mine and rivals_need:
+        sellable = []
+        for k in mine.players:
+            r = market_latest.get(k)
+            if not r:
+                continue
+            p = sc.score(r)
+            buyers = rivals_need.get(p.slot) or []
+            if buyers and p.pct_used < TRAPPED_START:
+                sellable.append((p, buyers))
+        if sellable:
+            out += ["**List these to them.** Players of yours who aren't "
+                    "starting, in a position a rival is short in. You stop "
+                    "competing with them and start selling to them; price "
+                    "just under the premium they showed in section 2.", "",
+                    "| Player | Pos | Value | Start% | Short |",
+                    "|---|---|--:|--:|---|"]
+            for p, buyers in sellable:
+                out.append("| %s | %s | %s | %s | %s |" % (
+                    p.name, p.slot, eur(p.value),
+                    "—" if p.pct is None else "%.0f%%" % p.pct,
+                    ", ".join(buyers)))
+            out.append("")
+
+    if not contested and not uncontested:
+        out += ["_Nothing to forecast: no rival is currently short anywhere, "
+                "or the market data hasn't loaded._", ""]
+    return out
+
+
+# ---------------------------------------------------------------------------
+
+def log(lg, dl) -> None:
+    stamp = dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H:%MZ")
+    rows = [{"observed_at": stamp, "manager": m.handle,
+             "players": len(m.players), "spend": "%.0f" % m.spend,
+             "proceeds": "%.0f" % m.proceeds,
+             "cash": "" if m.cash.value is None else "%.0f" % m.cash.value,
+             "cash_confidence": m.cash.confidence} for m in lg]
+    append_csv(DECISIONS / "rival_log.csv", rows,
+               ["observed_at", "manager", "players", "spend", "proceeds",
+                "cash", "cash_confidence"])
+    prem = [{"observed_at": stamp, "date": d["date"], "player": d["player"],
+             "actor": d["actor"], "side": d["side"],
+             "price": "%.0f" % d["price"],
+             "value_then": "" if d["value"] is None else "%.0f" % d["value"],
+             "lag_h": "" if d["lag_h"] is None else "%.1f" % d["lag_h"],
+             "premium_pct": ("" if d["premium"] is None
+                             else "%.2f" % d["premium"]),
+             "round_bid": "1" if d["round"] else "0"} for d in dl]
+    if prem:
+        append_csv(DECISIONS / "premium_log.csv", prem, list(prem[0]))
+
+
+def main() -> None:
+    lg = League.load()
+    market_rows = load_market()
+    if not market_rows:
+        REPORTS.mkdir(exist_ok=True)
+        write_lines(REPORTS / "behaviour.md",
+                    ["# League behaviour", "",
+                     "No market data. Run `ff_ingest.py parse` first."])
+        return
+
+    latest = latest_only(market_rows)
+    hist, hist_label = load_history()
+    sc = Scorer(latest, latest_only(load_xi()), hist)
+    by_key = lg.market.latest() if lg.market else {}
+
+    dl = deals(lg, lg.market)
+    stamp = dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+
+    out = ["# League behaviour — %s" % stamp, "",
+           "%d managers, %d ledger rows, %d market snapshots%s."
+           % (len(lg.managers), len(lg.txns),
+              len({r.get("observed_at") for r in market_rows}),
+              ", points baseline %s" % hist_label if hist_label else
+              ", **no points baseline** (run history.py)"), ""]
+    out += sec_cash(lg)
+    out += sec_premium(lg, dl)
+    out += sec_drift(lg, dl, lg.market)
+    out += sec_squads(lg, sc, by_key)
+    out += sec_demand(lg, sc, by_key)
+
+    if lg.warnings:
+        out += ["## Ledger warnings", ""] + ["- " + w for w in lg.warnings]
+        out.append("")
+
+    out += ["---", "",
+            "Sections 2 and 3 are hypotheses until the sample grows: with "
+            "%d ledger rows across %d managers, a median is one or two deals. "
+            "Section 1 and section 5 are usable today."
+            % (len(lg.txns), len(lg.managers)), ""]
+
+    REPORTS.mkdir(exist_ok=True)
+    write_lines(REPORTS / "behaviour.md", out)
+    log(lg, dl)
+    print("%d deals priced, %d managers" % (len(dl), len(lg.managers)))
+
+
+if __name__ == "__main__":
+    main()
