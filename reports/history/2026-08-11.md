@@ -1,105 +1,59 @@
-# Fantasy report — 2026-08-11T2325Z
+# Fantasy report — 2026-08-11T2359Z
 
-_614 players, 509 with a probable-XI reading._
+## Needs a decision
 
-## Your squad
+- **Only 1 portero** — one knock and you can't field a legal XI.
+- **3 of the XI are unmodelled** (Alvaro Fernandez, Dani Lorenzo, Iñigo Vicente) — no LaLiga record, so they're carrying an assumed baseline, not an earned one.
 
-| Player | Team | Value | 24h | Start% | |
-|---|---|--:|--:|--:|---|
-| alvaro fernandez | Deportivo | 4.97M | -80K | 20% |  |
-| beñat turrientes | Real Sociedad | 6.86M | 67K | 70% |  |
-| carl starfelt | Celta | 13.51M | 284K | 70% |  |
-| dani lorenzo | Málaga | 9.51M | 84K | 90% |  |
-| dani martinez | Atlético | 415K | -3K | — |  |
-| hugo duro | Valencia | 8.54M | -51K | 50% |  |
-| igor zubeldia | Real Sociedad | 9.73M | 13K | 80% |  |
-| iñigo ruiz de galarreta | Athletic | 11.89M | 174K | 60% |  |
-| iñigo vicente | Racing | 18.85M | 94K | 90% |  |
-| jon moncayola | Osasuna | 6.52M | 81K | 90% |  |
-| omar el hilali | Espanyol | 8.56M | 86K | 80% |  |
-| orri steinn oskarsson | Real Sociedad | 8.13M | -138K | 40% |  |
-| pepelu | Valencia | 7.46M | -21K | 50% |  |
-| robin le normand | Atlético | 9.94M | -97K | 50% |  |
-| ruben garcia | Osasuna | 13.26M | 180K | 60% |  |
+**Squad 138.15M** — add `inputs/cash.txt` to see cash alongside it.
 
-**Squad value: 138.15M** — compare with the app's team value; a mismatch means a name matched the wrong player.
+Compare squad value with the app; a mismatch means a name matched the wrong player.
 
-## Lineup
+## Team
 
-**4-5-1** — projected 32.0 pts
+**4-5-1** · index 29.4 (a ranking number, not a points forecast)
 
-| | Player | Start% | Score | Last season |
-|---|---|--:|--:|---|
-| POR | alvaro fernandez | 20% | 1.2 | no history |
-| DEF | carl starfelt | 70% | 3.6 | 106p / 19j |
-| DEF | igor zubeldia | 80% | 3.0 | 90p / 25j |
-| DEF | omar el hilali | 80% | 2.4 | 101p / 36j |
-| DEF | robin le normand | 50% | 2.2 | 125p / 28j |
-| MED | jon moncayola | 90% | 3.9 | 159p / 36j |
-| MED | dani lorenzo | 90% | 3.7 | no history |
-| MED | ruben garcia | 60% | 2.9 | 174p / 35j |
-| MED | iñigo ruiz de galarreta | 60% | 2.7 | 156p / 34j |
-| MED | beñat turrientes | 70% | 2.5 | 93p / 27j |
-| DEL | iñigo vicente | 90% | 3.9 | no history |
+| | Player | Start% | Value | 24h | Score | Last season |
+|---|---|--:|--:|--:|--:|---|
+| POR | Alvaro Fernandez | 20% | 4.97M | -80K | 0.9 | **assumed** |
+| DEF | Carl Starfelt | 70% | 13.51M | 284K | 3.6 | 106p/19j |
+| DEF | Igor Zubeldia | 80% | 9.73M | 13K | 3.0 | 90p/25j |
+| DEF | Omar El Hilali | 80% | 8.56M | 86K | 2.4 | 101p/36j |
+| DEF | Robin Le Normand | 50% | 9.94M | -97K | 2.2 | 125p/28j |
+| MED | Jon Moncayola | 90% | 6.52M | 81K | 3.9 | 159p/36j |
+| MED | Ruben Garcia | 60% | 13.26M | 180K | 2.9 | 174p/35j |
+| MED | Iñigo Ruiz de Galarreta | 60% | 11.89M | 174K | 2.7 | 156p/34j |
+| MED | Dani Lorenzo | 90% | 9.51M | 84K | 2.6 | **assumed** |
+| MED | Beñat Turrientes | 70% | 6.86M | 67K | 2.5 | 93p/27j |
+| DEL | Iñigo Vicente | 90% | 18.85M | 94K | 2.7 | **assumed** |
 
-**Bench**
+**Bench** — gap is what the XI index loses by playing him instead, after re-picking the formation. €/pt is his value per point of score: the sell shortlist, worst first.
 
-| Player | Pos | Score | Why |
-|---|---|--:|---|
-| pepelu | med | 2.1 | outscored |
-| dani martinez | def | 2.1 | no XI reading |
-| hugo duro | del | 1.9 | outscored |
-| orri steinn oskarsson | del | 1.7 | outscored |
+| Player | Pos | Value | Score | Gap | €/pt | Why |
+|---|---|--:|--:|--:|--:|---|
+| Orri Steinn Oskarsson | del | 8.13M | 1.7 | -0.5 | 4.76M | outscored |
+| Hugo Duro | del | 8.54M | 1.9 | -0.3 | 4.46M | outscored |
+| Pepelu | med | 7.46M | 2.1 | -0.4 | 3.47M | 6th MED — only 5 can ever play |
+| Dani Martinez | def | 415K | 0.5 | -1.7 | 786K | outscored |
 
-_Score = shrunk pts/match (K=8, from 2025-26) × P(start). A proxy until real jornadas exist — sanity-check it against your own read._
+_A sale lands above or below value depending on who bids, and whether anyone can bid at all is per-league state you can only see in the app._
 
-## Sell candidates
+## Your movers (24h, over 1%)
 
-| Player | Value | 24h | Score | €/pt | Why |
-|---|--:|--:|--:|--:|---|
-| orri steinn oskarsson | 8.13M | -138K | 1.7 | 4.76M | outside the XI |
-| hugo duro | 8.54M | -51K | 1.9 | 4.46M | outside the XI |
-| pepelu | 7.46M | -21K | 2.1 | 3.47M | can never start (6th MED) |
-| dani martinez | 415K | -3K | 2.1 | 196K | outside the XI |
-
-_Ranked by value per projected point. Two things this can't know: what a rival will actually pay (sales land above and below value on the same day), and whether anyone can bid at all — that's per-league state, visible only in the app._
-
-## Rising fastest (24h)
-
-| Player | Team | Value | 24h | % |
-|---|---|--:|--:|--:|
-| raphinha | Barcelona | 76.79M | 2.49M | +3.35% |
-| joan garcia | Barcelona | 64.64M | 1.94M | +3.10% |
-| vinicius junior | Real Madrid | 105.54M | 1.84M | +1.78% |
-| bernardo silva | Real Madrid | 49.61M | 1.63M | +3.41% |
-| pierre-emerick aubameyang | Deportivo | 28.50M | 1.32M | +4.86% |
-| alberto moleiro | Villarreal | 65.06M | 1.22M | +1.91% |
-| georges mikautadze | Villarreal | 60.36M | 1.09M | +1.83% |
-| carlos romero | Villarreal | 41.60M | 1.03M | +2.53% |
-| ibrahima konate | Real Madrid | 47.91M | 1.02M | +2.17% |
-| fermin lopez | Barcelona | 60.12M | 1.01M | +1.70% |
-| gerard martin | Barcelona | 33.16M | 919K | +2.85% |
-| sergio canales | Racing | 21.07M | 880K | +4.36% |
-
-## Falling fastest (24h)
-
-| Player | Team | Value | 24h | % |
-|---|---|--:|--:|--:|
-| pepe bordalas | Getafe | 49.89M | -2.06M | -3.97% |
-| ferran torres | Barcelona | 62.50M | -1.92M | -2.97% |
-| denzel dumfries | Real Madrid | 62.04M | -1.44M | -2.27% |
-| aymeric laporte | Athletic | 57.84M | -1.43M | -2.41% |
-| nico williams | Athletic | 67.52M | -1.38M | -2.00% |
-| marc pubill | Atlético | 63.07M | -1.33M | -2.07% |
-| abde ezzalzouli | Betis | 48.70M | -1.29M | -2.57% |
-| yeremay hernandez | Deportivo | 55.42M | -1.26M | -2.23% |
-| gonçalo guedes | Real Sociedad | 37.50M | -1.17M | -3.03% |
-| pau cubarsi | Barcelona | 81.20M | -1.17M | -1.42% |
-| alex baena | Atlético | 56.39M | -996K | -1.74% |
-| oihan sancet | Athletic | 50.46M | -993K | -1.93% |
+| Player | Value | 24h | % |
+|---|--:|--:|--:|
+| Carl Starfelt | 13.51M | 284K | +2.15% |
+| Iñigo Ruiz de Galarreta | 11.89M | 174K | +1.48% |
+| Ruben Garcia | 13.26M | 180K | +1.37% |
+| Jon Moncayola | 6.52M | 81K | +1.26% |
+| Omar El Hilali | 8.56M | 86K | +1.02% |
+| Alvaro Fernandez | 4.97M | -80K | -1.58% |
+| Orri Steinn Oskarsson | 8.13M | -138K | -1.67% |
 
 ---
 
-Recruitment targets live in `reports/watchlist.md` — it filters out players your rivals already own.
+_614 players tracked, 509 with a probable-XI reading. Who to buy is in `reports/watchlist.md`, which filters out players your rivals already own._
 
-_Generated 2026-08-11 23:26 UTC._
+_Score = shrunk pts/match (K=8, 2025-26) × P(start). Recommended XIs are logged to `data/decisions/xi_log.csv` for scoring against reality later._
+
+_Generated 2026-08-12 00:00 UTC._
