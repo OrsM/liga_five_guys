@@ -9,12 +9,25 @@ content, since no jornada of the new season has been played.
     python src/history.py                 # default URL, current selection
     python src/history.py --url "<url>"   # a specific season from the selector
 
-Writes:
-    data/raw/season=<label>/puntos.html.gz     immutable, like ff_ingest
-    data/season/points_<label>.csv             tidy, joined on name
+Two modes:
 
-NOT part of the daily run. Run it from the history workflow once a season, or
-again if the parse looks wrong. Nothing else imports it.
+  baseline (default) — last completed season, the number report.py scores
+      players with. Run once a season.
+          data/raw/season=<label>/puntos.html.gz
+          data/season/points_<label>.csv
+
+  --live — this season's running totals, dated so they accumulate. These are
+      for scoring the recommendations later, NOT for the report: a two-jornada
+      sample must not start driving your XI, which is why they land in a
+      subfolder report.py does not read.
+          data/raw/season=<label>/puntos_<date>.html.gz
+          data/season/live/points_<label>_<date>.csv
+
+The page publishes running totals, so a weekly --live run gives per-jornada
+points by diffing consecutive files. Missing a week coarsens the granularity;
+it loses nothing permanently.
+
+Nothing else imports this.
 
 Two things to know:
   * The table has no position column. Positions come from market.csv at report
@@ -152,6 +165,9 @@ def main() -> None:
     ap.add_argument("--url", default=URL)
     ap.add_argument("--label", default="",
                     help="season label for filenames, e.g. 2025-26")
+    ap.add_argument("--live", action="store_true",
+                    help="this season's running totals, dated, into "
+                         "data/season/live/ instead of the baseline file")
     args = ap.parse_args()
 
     with httpx.Client(follow_redirects=True, timeout=45,
@@ -164,11 +180,13 @@ def main() -> None:
     label = args.label or season_label(text)
     label = re.sub(r"[^0-9A-Za-z._-]", "", label) or "unknown"
 
+    day = dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%d")
     raw_dir = ROOT / "raw" / f"season={label}"
     raw_dir.mkdir(parents=True, exist_ok=True)
-    with gzip.open(raw_dir / "puntos.html.gz", "wt", encoding="utf-8") as fh:
+    raw_name = f"puntos_{day}.html.gz" if args.live else "puntos.html.gz"
+    with gzip.open(raw_dir / raw_name, "wt", encoding="utf-8") as fh:
         fh.write(text)
-    print(f"saved raw -> {raw_dir/'puntos.html.gz'} ({len(text)} chars)")
+    print(f"saved raw -> {raw_dir/raw_name} ({len(text)} chars)")
 
     rows = parse(text)
     if not rows:
@@ -177,9 +195,10 @@ def main() -> None:
               "data/season, so the last good file is untouched.")
         sys.exit(1)
 
-    out_dir = ROOT / "season"
+    out_dir = ROOT / "season" / "live" if args.live else ROOT / "season"
     out_dir.mkdir(parents=True, exist_ok=True)
-    out = out_dir / f"points_{label}.csv"
+    out = out_dir / (f"points_{label}_{day}.csv" if args.live
+                     else f"points_{label}.csv")
     stamp = dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H:%MZ")
     with out.open("w", newline="", encoding="utf-8") as fh:
         w = csv.DictWriter(fh, fieldnames=[
@@ -192,7 +211,8 @@ def main() -> None:
 
     played = sum(1 for r in rows if num(r["games"]))
     print(f"wrote {out} — {len(rows)} players, {played} with minutes, "
-          f"season label '{label}'")
+          f"season label '{label}'"
+          + (" (live: not read by report.py)" if args.live else ""))
     print("Spot-check a few names against the app before trusting the report.")
 
 
