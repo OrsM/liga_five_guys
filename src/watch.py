@@ -7,6 +7,12 @@ Writes the alert body to a scratch file outside the repo (default
 $TMPDIR/ff_alerts.md, override with ALERTS_FILE). The GitHub issue is the
 real artifact, so nothing here needs committing. Exits 0 always; the
 workflow reads the `fired` and `path` outputs to decide whether to notify.
+
+MIGRATED: ownership now comes from ffcore.league. This file used to import
+read_initial/apply_transactions out of squads.py, which broke the moment
+those moved — a report script importing another report script was the wrong
+dependency direction, and this is why. Thresholds come from
+inputs/league.ini rather than constants at the top of the file.
 """
 
 import datetime as dt
@@ -16,16 +22,17 @@ import sys
 import tempfile
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from common import norm, load_players, fmt_money, fmt_pct  # noqa: E402
+
+from common import load_players, fmt_money, fmt_pct  # noqa: E402
+from ffcore.league import League, load_config  # noqa: E402
 
 STATE = os.path.join("data", "state", "watch_prev.json")
 ALERTS = (os.environ.get("ALERTS_FILE")
           or os.path.join(tempfile.gettempdir(), "ff_alerts.md"))
 
-START_CROSS = 70.0      # alert when someone crosses this, either way
-RISER_PCT = 2.0         # 24h move as % of value
-KEEPER_START = 80.0     # a nailed-on keeper appearing is the standing need
-MAX_KEEPER_VALUE = None # set to an int to ignore keepers you can't afford
+# Set to an int (euros) to ignore keepers you can't afford. Everything else
+# lives in inputs/league.ini: start_cross, riser_pct, keeper_start.
+MAX_KEEPER_VALUE = None
 
 
 def load_state():
@@ -48,20 +55,20 @@ def save_state(players):
 
 
 def owned_keys():
-    """Everyone owned by any manager right now.
+    """Everyone owned by any manager right now, via the shared replay.
 
-    Reuses squads.py rather than re-parsing, so the two can never drift.
+    A missing rosters_initial.txt means we cannot tell owned from free, so
+    every player is treated as free rather than as owned — noisier, but it
+    never hides an alert about someone you could actually sign.
     """
     try:
-        from squads import (read_initial, read_transactions,
-                            apply_transactions)
-        owner, _ = apply_transactions(read_initial(), read_transactions())
-        return set(owner)
+        return set(League.load(with_market=False).owner)
     except SystemExit:
         return set()
 
 
 def main():
+    cfg = load_config()
     players = load_players()
     prev = load_state()
     owned = owned_keys()
@@ -79,33 +86,35 @@ def main():
         old_start = old.get("start")
 
         if start is not None and old_start is not None:
-            if old_start < START_CROSS <= start:
+            if old_start < cfg.start_cross <= start:
                 alerts.append("**%s** (%s) start%% %s → %s — crossed %d%%"
                               % (name, team, fmt_pct(old_start),
-                                 fmt_pct(start), int(START_CROSS)))
-            elif old_start >= START_CROSS > start:
+                                 fmt_pct(start), int(cfg.start_cross)))
+            elif old_start >= cfg.start_cross > start:
                 alerts.append("%s (%s) dropped below %d%% (%s)"
-                              % (name, team, int(START_CROSS), fmt_pct(start)))
+                              % (name, team, int(cfg.start_cross),
+                                 fmt_pct(start)))
 
         if value and delta and value > 0:
             pct = 100.0 * delta / value
-            if pct >= RISER_PCT:
+            if pct >= cfg.riser_pct:
                 alerts.append("**%s** (%s) +%.1f%% in 24h (%s, value %s)"
                               % (name, team, pct, fmt_money(delta),
                                  fmt_money(value)))
 
         if ((rec.get("pos") or "").lower() == "portero"
-                and start is not None and start >= KEEPER_START
+                and start is not None and start >= cfg.keeper_start
                 and (MAX_KEEPER_VALUE is None
                      or (value or 0) <= MAX_KEEPER_VALUE)
-                and (old_start is None or old_start < KEEPER_START)):
+                and (old_start is None or old_start < cfg.keeper_start)):
             alerts.append("KEEPER: **%s** (%s) at %s, value %s"
                           % (name, team, fmt_pct(start), fmt_money(value)))
 
     stamp = dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
     lines = ["# Alerts — %s" % stamp, ""]
     if not prev:
-        lines += ["First run — baseline stored, no comparison possible yet.", ""]
+        lines += ["First run — baseline stored, no comparison possible yet.",
+                  ""]
     elif alerts:
         lines += ["- " + a for a in sorted(set(alerts))] + [""]
     else:
