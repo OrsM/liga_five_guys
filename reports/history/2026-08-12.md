@@ -1,4 +1,4 @@
-# Fantasy report — 2026-08-12T0008Z
+# Fantasy report — 2026-08-12T1039Z
 
 ## Needs a decision
 
@@ -11,7 +11,7 @@ Compare squad value with the app; a mismatch means a name matched the wrong play
 
 ## Team
 
-**4-5-1** · index 29.4 (a ranking number, not a points forecast)
+**4-5-1** · index 29.3 (a ranking number, not a points forecast)
 
 | | Player | Start% | Value | 24h | Score | Last season |
 |---|---|--:|--:|--:|--:|---|
@@ -34,7 +34,7 @@ Compare squad value with the app; a mismatch means a name matched the wrong play
 | Orri Steinn Oskarsson | del | 8.13M | 1.7 | -0.5 | 4.76M | outscored |
 | Hugo Duro | del | 8.54M | 1.9 | -0.3 | 4.46M | outscored |
 | Pepelu | med | 7.46M | 2.1 | -0.4 | 3.47M | 6th MED — only 5 can ever play |
-| Dani Martinez | def | 415K | 0.5 | -1.7 | 786K | outscored |
+| Dani Martinez | def | 415K | 0.5 | -1.7 | 797K | outscored |
 
 _A sale lands above or below value depending on who bids, and whether anyone can bid at all is per-league state you can only see in the app._
 
@@ -52,8 +52,8 @@ _A sale lands above or below value depending on who bids, and whether anyone can
 
 ---
 
-_614 players tracked, 509 with a probable-XI reading. Who to buy is in `reports/watchlist.md`, which filters out players your rivals already own._
+_612 players tracked, 507 with a probable-XI reading. Who to buy is in `reports/watchlist.md`, which filters out players your rivals already own._
 
 _Score = shrunk pts/match (K=8, 2025-26) × P(start). Recommended XIs are logged to `data/decisions/xi_log.csv` for scoring against reality later._
 
-_Generated 2026-08-12 00:09 UTC._
+_Generated 2026-08-12 10:40 UTC._
