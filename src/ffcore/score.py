@@ -100,6 +100,7 @@ class Scored(NamedTuple):
     why: str
     value: float
     delta_1d: float
+    delta_pct: float
 
     def as_row(self) -> dict:
         """pick_xi and the report renderers work in plain dicts."""
@@ -215,6 +216,7 @@ class Scorer:
             why=rating.why,
             value=money(rec.get("value")) or 0.0,
             delta_1d=ratio(rec.get("delta_1d")) or 0.0,
+            delta_pct=ratio(rec.get("delta_pct_1d")) or 0.0,
         )
 
     def score_squad(self, names) -> tuple[list[Scored], list[str]]:
