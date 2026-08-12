@@ -1,4 +1,4 @@
-# Watchlist — 2026-08-12 19:27 UTC
+# Watchlist — 2026-08-12 21:02 UTC
 
 Everyone not owned by the three of us, 60% start or better.
 
@@ -7,13 +7,13 @@ Everyone not owned by the three of us, 60% start or better.
 | Player | Team | Pos | Value | 24h | Start% |
 |---|---|---|--:|--:|--:|
 | alvaro valles | Betis | por | 31.28M | 870K | 95% |
-| marko dmitrovic | Espanyol | por | 36.84M | 494K | 95% |
 | antonio sivera | Alavés | por | 30.92M | 461K | 95% |
 | augusto batalla | Rayo | por | 41.54M | -369K | 95% |
 | david soria | Getafe | por | 18.02M | -617K | 95% |
 | odysseas vlachodimos | Sevilla | por | 16.84M | 543K | 90% |
 | stole dimitrievski | Valencia | por | 12.91M | 465K | 90% |
 | ionut radu | Celta | por | 40.32M | 100K | 90% |
+| mathew ryan | Levante | por | 13.55M | 0K | 90% |
 
 ## defensa
 
@@ -32,7 +32,6 @@ Everyone not owned by the three of us, 60% start or better.
 
 | Player | Team | Pos | Value | 24h | Start% |
 |---|---|---|--:|--:|--:|
-| santi comesaña | Villarreal | med | 32.31M | 744K | 90% |
 | david larrubia | Málaga | med | 56.33M | 390K | 90% |
 | jon ander olasagasti | Levante | med | 4.08M | 88K | 90% |
 | javi guerra | Valencia | med | 23.91M | -26K | 90% |
@@ -40,6 +39,7 @@ Everyone not owned by the three of us, 60% start or better.
 | guido rodriguez | Valencia | med | 26.30M | -232K | 90% |
 | federico valverde | Real Madrid | med | 70.03M | -414K | 90% |
 | alberto moleiro | Villarreal | med | 65.06M | 1.22M | 80% |
+| sergio canales | Racing | med | 21.07M | 880K | 80% |
 
 ## delantero
 

@@ -1,4 +1,4 @@
-# Squads — 2026-08-12 19:27 UTC
+# Squads — 2026-08-12 21:02 UTC
 
 ## You (miguel_autentico)
 15 players · 138.15M total · 7 at 70%+
@@ -22,7 +22,7 @@
 | orri steinn oskarsson | Real Sociedad | del | 8.13M | -138K | 40% |
 
 ## Albert Laporta
-10 players · 101.68M total · 2 at 70%+
+11 players · 101.68M total · 2 at 70%+
 
 | Player | Team | Pos | Value | 24h | Start% |
 |---|---|---|--:|--:|--:|
@@ -36,12 +36,14 @@
 | ayoze perez | Villarreal | del | 16.20M | 236K | 50% |
 | raul moro | Osasuna | del | 12.98M | 125K | 60% |
 | ferran jutgla | Celta | del | 9.25M | 132K | 80% |
+| ez abde | — | — | — | — | — |
 
 ## BurtonGM89
-15 players · 177.54M total · 5 at 70%+
+17 players · 246.68M total · 7 at 70%+
 
 | Player | Team | Pos | Value | 24h | Start% |
 |---|---|---|--:|--:|--:|
+| marko dmitrovic | Espanyol | por | 36.84M | 494K | 95% |
 | juan musso | Atlético | por | 4.78M | -108K | 10% |
 | carlos romero | Villarreal | def | 41.60M | 1.03M | 80% |
 | eder militao | Real Madrid | def | 13.16M | -387K | 0% |
@@ -49,6 +51,7 @@
 | justin de haas | Valencia | def | 8.77M | 111K | 70% |
 | carlos puga | Málaga | def | 5.40M | -48K | 70% |
 | giacomo quagliata | Deportivo | def | 3.30M | 10K | 50% |
+| santi comesaña | Villarreal | med | 32.31M | 744K | 90% |
 | tajon buchanan | Villarreal | med | 18.92M | -219K | 30% |
 | antonio blanco | Alavés | med | 15.05M | -30K | 90% |
 | jon gorrotxategi | Real Sociedad | med | 6.91M | -190K | 30% |
@@ -59,7 +62,7 @@
 | joaquin muñoz | Málaga | del | 7.09M | -134K | 60% |
 
 ## Magic Mike 333
-15 players · 132.19M total · 6 at 70%+
+18 players · 211.44M total · 7 at 70%+
 
 | Player | Team | Pos | Value | 24h | Start% |
 |---|---|---|--:|--:|--:|
@@ -75,9 +78,12 @@
 | gabriel moscardo | Espanyol | med | 10.13M | -239K | 30% |
 | williot swedberg | Celta | med | 8.17M | -86K | 50% |
 | marc bernal | Barcelona | med | 6.10M | 256K | 50% |
+| pedro diaz | Rayo | med | 1.86M | -30K | 50% |
+| raphinha | Barcelona | del | 76.79M | 2.49M | 70% |
 | gorka guruzeta | Athletic | del | 13.24M | 237K | 80% |
 | lucas boye | Alavés | del | 13.14M | -343K | 50% |
 | pere milla | Espanyol | del | 9.76M | -17K | 50% |
+| jon karrikaburu | Real Sociedad | del | 604K | -11K | 0% |
 
 ## SusoGattuso
 14 players · 114.47M total · 9 at 70%+
@@ -112,3 +118,15 @@
 | 2026-08-11T22:25 | manuel fernandez | Albert Laporta → market | 373500 |
 | 2026-08-11T22:25 | pathe ciss | Albert Laporta → market | 10393147 |
 | 2026-08-11T22:26 | javi puado | Albert Laporta → market | 8041411 |
+| 2026-08-12T21:24 | ez abde | market → Albert Laporta | 49991863 |
+| 2026-08-12T21:24 | santi comesaña | market → BurtonGM89 | 35276000 |
+| 2026-08-12T21:24 | jon karrikaburu | market → Magic Mike 333 | 700000 |
+| 2026-08-12T21:24 | pedro diaz | market → Magic Mike 333 | 2050000 |
+| 2026-08-12T21:24 | raphinha | market → Magic Mike 333 | 80000000 |
+| 2026-08-12T21:24 | marko dmitrovic | market → BurtonGM89 | 40010000 |
+
+## Unmatched names
+
+These are in the ledger or the initial rosters but not in the tidy data — check spelling with find_slug.py.
+
+- ez abde
