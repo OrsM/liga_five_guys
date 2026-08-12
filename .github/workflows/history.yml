@@ -1,20 +1,33 @@
 name: history
 
-# Once a season, by hand. Fetches last season's per-player points from
-# futbolfantasy analytics so report.py has a baseline to score players with
-# before any jornada of the new season has been played.
+# Two jobs in one workflow, chosen by the mode input:
 #
-# Run it again if the parse looks wrong — the raw HTML is saved either way,
-# and a failed parse leaves the previous CSV untouched.
+#   baseline — last completed season's points, the number report.py scores
+#              players with. Run once a season, by hand.
+#   live     — this season's running totals, dated so they accumulate. Runs
+#              weekly on its own; report.py does not read these. They exist so
+#              the recommendations in data/decisions/squad_log.csv can be
+#              scored against what actually happened, later.
+#
+# The scheduled run is always live. A manual run defaults to baseline.
 on:
+  schedule:
+    # Tuesday 06:20 UTC — after the weekend's jornada has settled.
+    - cron: "20 6 * * 2"
   workflow_dispatch:
     inputs:
+      mode:
+        description: "baseline (last season) or live (this season, dated)"
+        required: true
+        default: "baseline"
+        type: choice
+        options: [baseline, live]
       url:
-        description: "Page URL (leave blank for the default points table)"
+        description: "Page URL (blank = default points table)"
         required: false
         default: ""
       label:
-        description: "Season label for filenames, e.g. 2025-26 (blank = auto)"
+        description: "Season label, e.g. 2025-26 (blank = auto)"
         required: false
         default: ""
 
@@ -40,12 +53,15 @@ jobs:
       - name: Scrape season points
         env:
           FF_ROOT: ./data
+          MODE: ${{ inputs.mode || 'live' }}
           IN_URL: ${{ inputs.url }}
           IN_LABEL: ${{ inputs.label }}
         run: |
           args=""
-          [ -n "$IN_URL" ]   && args="$args --url $IN_URL"
-          [ -n "$IN_LABEL" ] && args="$args --label $IN_LABEL"
+          [ "$MODE" = "live" ] && args="$args --live"
+          [ -n "$IN_URL" ]     && args="$args --url $IN_URL"
+          [ -n "$IN_LABEL" ]   && args="$args --label $IN_LABEL"
+          echo "mode=$MODE"
           python src/history.py $args
 
       - name: Commit
@@ -57,7 +73,7 @@ jobs:
             echo "nothing to commit"
             exit 0
           fi
-          git commit -m "history: season points $(date -u +%FT%RZ)"
+          git commit -m "history: ${{ inputs.mode || 'live' }} points $(date -u +%FT%RZ)"
           for attempt in 1 2 3; do
             if git pull --rebase --autostash -X theirs; then
               if git push; then
