@@ -21,6 +21,9 @@ import sys
 import unicodedata
 from pathlib import Path
 
+import os, sys
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
 TIDY = Path(os.environ.get("FF_ROOT", "./data")) / "tidy"
 
 
