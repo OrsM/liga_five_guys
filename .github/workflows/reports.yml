@@ -1,0 +1,156 @@
+name: reports
+
+# Two triggers, deliberately different:
+#   push               -> tests only. Fast, and it catches a broken refactor
+#                         before you ever look at a report built from it.
+#   workflow_dispatch  -> the whole chain, from the Actions tab on your phone.
+#
+# Nothing here needs a console. Every result you would have read from stdout
+# is written to the run summary instead, which is the readable pane in the
+# GitHub mobile app.
+
+on:
+  push:
+    paths:
+      - 'src/**'
+      - '.github/workflows/reports.yml'
+  workflow_dispatch:
+    inputs:
+      fetch:
+        description: 'Fetch a fresh market snapshot'
+        type: boolean
+        default: true
+      history:
+        description: 'Refresh the season points baseline (once a season)'
+        type: boolean
+        default: false
+      lookup:
+        description: 'Names to resolve, comma-separated (leave blank to skip)'
+        type: string
+        default: ''
+
+permissions:
+  contents: write
+
+# A second run while one is committing would race the push.
+concurrency:
+  group: reports
+  cancel-in-progress: false
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: ffcore self-test
+        run: python src/ffcore/parse.py
+      - name: Import every module
+        # Catches the class of break that only shows at import time —
+        # a helper that moved, a name that no longer exists.
+        run: |
+          cd src
+          for m in common squads report bids offers watch rivals find_slug; do
+            python -c "import $m" || { echo "::error::$m failed to import"; exit 1; }
+          done
+          echo "all modules import cleanly" >> "$GITHUB_STEP_SUMMARY"
+
+  run:
+    if: github.event_name == 'workflow_dispatch'
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install deps
+        # cssselect is required by ff_ingest.parse_team via lxml.
+        run: pip install httpx lxml cssselect
+
+      - name: Fetch snapshot
+        if: inputs.fetch
+        run: python src/ff_ingest.py fetch
+
+      - name: Parse snapshots
+        run: python src/ff_ingest.py parse
+
+      - name: Season points baseline
+        if: inputs.history
+        run: python src/history.py
+
+      # --- name resolution --------------------------------------------------
+      # find_slug prints to stdout, which is unreadable on a phone. Tee it
+      # into the run summary so the answer is one tap away.
+      - name: Resolve names
+        if: inputs.lookup != ''
+        run: |
+          {
+            echo '## Name lookup'
+            echo '```'
+            echo "${{ inputs.lookup }}" | tr ',' '\n' | sed 's/^ *//' \
+              > inputs/lookup.txt
+            python src/find_slug.py --file inputs/lookup.txt 2>&1 || true
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # --- the chain, in dependency order -----------------------------------
+      # squads.py replays ownership and must run before the two that read it.
+      - name: Ownership and watchlist
+        run: |
+          {
+            echo '## squads'
+            echo '```'
+            python src/squads.py 2>&1 | grep -v '^market.csv\|^probable_xi'
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Daily report
+        run: python src/report.py
+
+      - name: League behaviour
+        run: python src/rivals.py
+
+      - name: Bid log
+        run: python src/bids.py
+
+      - name: Offers
+        run: python src/offers.py
+
+      - name: Alerts
+        env:
+          ALERTS_FILE: ${{ runner.temp }}/ff_alerts.md
+        run: |
+          python src/watch.py > /dev/null 2>&1 || true
+          {
+            echo '## Alerts'
+            cat "$ALERTS_FILE" 2>/dev/null || echo '_none_'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # --- what to look at first --------------------------------------------
+      - name: Headline numbers
+        run: |
+          {
+            echo '## Check these first'
+            echo '### Cash'
+            sed -n '/^## 1\./,/^## 2\./p' reports/behaviour.md \
+              | grep '^|' || echo '_no cash table_'
+            echo '### Warnings'
+            grep -A20 '^## Ledger warnings' reports/behaviour.md \
+              | grep '^- ' || echo '_none_'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Commit
+        run: |
+          git config user.name  'github-actions[bot]'
+          git config user.email 'github-actions[bot]@users.noreply.github.com'
+          git add -A data reports inputs
+          if git diff --cached --quiet; then
+            echo 'nothing changed' >> "$GITHUB_STEP_SUMMARY"
+          else
+            git commit -m "reports: $(date -u +%Y-%m-%dT%H:%MZ)"
+            git push
+          fi
