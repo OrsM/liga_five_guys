@@ -1,4 +1,4 @@
-# Squads — 2026-08-12 21:02 UTC
+# Squads — 2026-08-12 21:09 UTC
 
 ## You (miguel_autentico)
 15 players · 138.15M total · 7 at 70%+
@@ -22,7 +22,7 @@
 | orri steinn oskarsson | Real Sociedad | del | 8.13M | -138K | 40% |
 
 ## Albert Laporta
-11 players · 101.68M total · 2 at 70%+
+11 players · 150.38M total · 2 at 70%+
 
 | Player | Team | Pos | Value | 24h | Start% |
 |---|---|---|--:|--:|--:|
@@ -33,10 +33,10 @@
 | eduardo camavinga | Real Madrid | med | 10.90M | -240K | 30% |
 | ilaix moriba | Celta | med | 10.46M | -79K | 50% |
 | marc roca | Betis | med | 5.23M | 69K | 60% |
+| abde ezzalzouli | Betis | del | 48.70M | -1.29M | 30% |
 | ayoze perez | Villarreal | del | 16.20M | 236K | 50% |
 | raul moro | Osasuna | del | 12.98M | 125K | 60% |
 | ferran jutgla | Celta | del | 9.25M | 132K | 80% |
-| ez abde | — | — | — | — | — |
 
 ## BurtonGM89
 17 players · 246.68M total · 7 at 70%+
@@ -118,15 +118,9 @@
 | 2026-08-11T22:25 | manuel fernandez | Albert Laporta → market | 373500 |
 | 2026-08-11T22:25 | pathe ciss | Albert Laporta → market | 10393147 |
 | 2026-08-11T22:26 | javi puado | Albert Laporta → market | 8041411 |
-| 2026-08-12T21:24 | ez abde | market → Albert Laporta | 49991863 |
+| 2026-08-12T21:24 | abde ezzalzouli | market → Albert Laporta | 49991863 |
 | 2026-08-12T21:24 | santi comesaña | market → BurtonGM89 | 35276000 |
 | 2026-08-12T21:24 | jon karrikaburu | market → Magic Mike 333 | 700000 |
 | 2026-08-12T21:24 | pedro diaz | market → Magic Mike 333 | 2050000 |
 | 2026-08-12T21:24 | raphinha | market → Magic Mike 333 | 80000000 |
 | 2026-08-12T21:24 | marko dmitrovic | market → BurtonGM89 | 40010000 |
-
-## Unmatched names
-
-These are in the ledger or the initial rosters but not in the tidy data — check spelling with find_slug.py.
-
-- ez abde
