@@ -6,13 +6,32 @@ ff_ingest.py renames or splits its outputs.
 
 Where a file carries a timestamp column, the newest row per player wins,
 so an append-only snapshot history parses correctly.
+
+CHANGED: norm() and the number parsing now live in ffcore/ and are shared
+with every other script. The private _num() that used to be here returned
+None for any dot-grouped amount — "2.050.000" and every other price in
+inputs/transactions.csv — so nothing must call it again; it is gone. Each
+field now declares which parser it wants, in PARSERS below, because a dot
+means thousands in one source and a decimal point in another.
+
+norm() is re-exported so `from common import norm` keeps working.
 """
 
 import csv
 import glob
 import os
-import re
-import unicodedata
+import sys
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+try:
+    from ffcore.parse import money, pct100  # noqa: E402
+    from ffcore.text import norm  # noqa: E402  (re-exported)
+except ImportError as exc:  # pragma: no cover
+    raise SystemExit(
+        "cannot import ffcore (%s).\n"
+        "src/ffcore/ must sit next to src/common.py and contain "
+        "__init__.py, text.py and parse.py." % exc)
 
 TIDY_DIR = os.path.join("data", "tidy")
 
@@ -30,42 +49,21 @@ FIELDS = {
     "status": ["status", "estado", "injury", "lesion"],
 }
 
+# Which parser each numeric field wants. money() reads dot groups as
+# thousands; pct100() reads dots as decimal points and rescales 0-1 to 0-100.
+# Anything absent here is kept as a stripped string.
+PARSERS = {
+    "value": money,
+    "delta_1d": money,
+    "start": pct100,
+}
+
 # Columns that mark when a row was taken. Newest row per player wins.
 OBS_COLS = ["observed_at", "observed", "snapshot", "timestamp", "dt", "date"]
-
-NUMERIC = ("value", "delta_1d", "start")
 
 POS_ORDER = ["portero", "defensa", "mediocampista", "delantero", "entrenador"]
 
 OK_STATUS = ("ok", "", "none", "disponible", "available")
-
-
-def norm(s):
-    """Accent-insensitive, case-insensitive key. The only join we have."""
-    if s is None:
-        return ""
-    s = unicodedata.normalize("NFKD", str(s))
-    s = "".join(c for c in s if not unicodedata.combining(c))
-    s = s.lower().replace(".", " ").replace("-", " ").replace("'", "")
-    return re.sub(r"\s+", " ", s).strip()
-
-
-def _num(v):
-    if v is None or v == "":
-        return None
-    t = str(v).strip().replace("€", "").replace(",", ".").replace("%", "")
-    t = t.replace(" ", "")
-    if not t:
-        return None
-    mult = 1.0
-    if t[-1:].upper() == "M":
-        mult, t = 1e6, t[:-1]
-    elif t[-1:].upper() == "K":
-        mult, t = 1e3, t[:-1]
-    try:
-        return float(t) * mult
-    except ValueError:
-        return None
 
 
 def _pick(header):
@@ -130,8 +128,14 @@ def load_players():
                         continue
                     if field in rec and obs <= seen.get(field, ""):
                         continue
-                    rec[field] = _num(val) if field in NUMERIC \
-                        else str(val).strip()
+                    parser = PARSERS.get(field)
+                    parsed = parser(val) if parser else str(val).strip()
+                    # A field that fails to parse is left as it was rather
+                    # than overwritten with None — a bad row in one snapshot
+                    # must not erase a good reading from another.
+                    if parsed is None:
+                        continue
+                    rec[field] = parsed
                     seen[field] = obs
 
     for field in FIELDS:
@@ -139,11 +143,6 @@ def load_players():
             print("WARN no column found for '%s' — add your header to "
                   "FIELDS in src/common.py" % field)
 
-    # start probabilities may arrive as 0-1 or 0-100; normalise to 0-100
-    for rec in players.values():
-        s = rec.get("start")
-        if s is not None and s <= 1.0:
-            rec["start"] = s * 100.0
     return players
 
 
