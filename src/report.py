@@ -31,9 +31,11 @@ know, all of them flagged in the report rather than hidden:
     Their rows say "assumed", and the prior is discounted.
   * A player absent from the probable-XI page is not the same as one listed
     with no percentage. The first gets a low default; the second, a neutral one.
-  * Nothing here has been checked against reality yet. Every recommended XI is
-    appended to data/decisions/xi_log.csv so that once jornadas exist you can
-    compare what this told you to do against what actually scored.
+  * Nothing here has been checked against reality yet. Every snapshot appends
+    the whole squad — XI and bench, with the inputs that produced each score —
+    to data/decisions/squad_log.csv, so that once jornadas exist you can ask
+    what the ranking cost you. None of it is reconstructable afterwards, which
+    is why it is logged now and scored later.
 """
 
 from __future__ import annotations
@@ -284,21 +286,53 @@ def pick_xi(pool: dict, force: dict | None = None):
     return best
 
 
-def log_xi(observed: str, formation, picked, total) -> None:
-    """Append-only record so the proxy can be scored against reality later."""
+def log_squad(observed, players, chosen, formation, total, deadline,
+              obs_dt) -> None:
+    """Append-only record of every recommendation, for scoring later.
+
+    One row per player per snapshot — long format, so a scorer can group by
+    snapshot without parsing packed strings. hours_to_lock is stored rather
+    than an at-lock flag, because a run cannot know whether a later snapshot
+    will still beat the deadline: the scorer picks, per jornada, the row with
+    the smallest non-negative value.
+
+    The bench is logged too. Without it "what did the ranking cost me" is
+    unanswerable after the fact, and that is the whole point of keeping this.
+    """
     DECISIONS.mkdir(parents=True, exist_ok=True)
-    path = DECISIONS / "xi_log.csv"
+    path = DECISIONS / "squad_log.csv"
     seen = {r.get("observed_at") for r in read_csv(path)}
     if observed in seen:
         return
+    htl = ""
+    if deadline and obs_dt:
+        htl = f"{(deadline - obs_dt).total_seconds() / 3600:.1f}"
+    cols = ["observed_at", "hours_to_lock", "formation", "index_total",
+            "player", "pos", "slot", "start_pct", "start_source", "status",
+            "assumed", "value", "score", "picked"]
     new = not path.exists()
     with path.open("a", newline="", encoding="utf-8") as fh:
-        w = csv.writer(fh)
+        w = csv.DictWriter(fh, fieldnames=cols)
         if new:
-            w.writerow(["observed_at", "formation", "index_total", "players"])
-        w.writerow([observed, "-".join(str(x) for x in formation),
-                    f"{total:.2f}",
-                    "|".join(f"{p['name']}:{p['score']:.2f}" for p in picked)])
+            w.writeheader()
+        for p_ in players:
+            if p_["pct"] is not None:
+                src = "read"
+            elif p_["on_page"]:
+                src = "listed_blank"
+            else:
+                src = "absent"
+            w.writerow({
+                "observed_at": observed, "hours_to_lock": htl,
+                "formation": "-".join(str(x) for x in formation),
+                "index_total": f"{total:.2f}",
+                "player": p_["name"], "pos": p_["pos"], "slot": p_["slot"],
+                "start_pct": "" if p_["pct"] is None else f"{p_['pct']:.0f}",
+                "start_source": src, "status": p_["status"] or "ok",
+                "assumed": int(bool(p_["assumed"])),
+                "value": f"{p_['value']:.0f}", "score": f"{p_['score']:.3f}",
+                "picked": int(id(p_) in chosen),
+            })
 
 
 def main() -> None:
@@ -552,7 +586,8 @@ def main() -> None:
                         "bids, and whether anyone can bid at all is per-league "
                         "state you can only see in the app._", ""]
 
-        log_xi(observed, (d, m, f), picked, tot)
+        log_squad(observed, players, chosen, (d, m, f), tot, deadline,
+                  obs_dt)
 
     # --- your movers ------------------------------------------------------
     movers = sorted((p for p in players if abs(p["delta_pct"]) >= MOVER_PCT),
