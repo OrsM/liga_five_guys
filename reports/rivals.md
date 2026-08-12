@@ -1,4 +1,4 @@
-# Squads — 2026-08-12 21:09 UTC
+# Squads — 2026-08-12 22:03 UTC
 
 ## You (miguel_autentico)
 15 players · 138.15M total · 7 at 70%+
