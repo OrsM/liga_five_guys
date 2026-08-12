@@ -3,94 +3,40 @@
 Reads:
   inputs/rosters_initial.txt  starting rosters — write once, never edit
   inputs/transactions.csv     append-only ledger of every market operation
-  data/tidy/*.csv         values, 24h moves, start probabilities
+  inputs/league.ini           managers, budgets, thresholds (all optional)
+  inputs/cash.txt             any balance you have actually seen
+  data/tidy/*.csv             values, 24h moves, start probabilities
 
 Writes:
-  reports/rivals.md       every rival squad, plus what they pay over value
+  reports/rivals.md       every rival squad, what they pay, what they can
+                          still spend
   reports/watchlist.md    everyone unowned, cut to something phone-readable
   inputs/squad.txt        GENERATED — your roster, so report.py keeps working
                           unchanged. Stop hand-editing this file.
 
 Run via workflow_dispatch. No arguments.
+
+MIGRATED: read_initial() and apply_transactions() now live in
+ffcore.league, so rivals.py replays the ledger the same way rather than
+forking a second copy. The tuning constants that used to sit at the top of
+this file moved to inputs/league.ini — several were stale after the league
+grew from three managers to five, which is the argument for having them in
+one place.
 """
 
-import csv
 import datetime as dt
 import os
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from common import (norm, load_players, fmt_money, fmt_pct, pos_key,
-                    flag, POS_ORDER)  # noqa: E402
 
-ME = "miguel_autentico"   # section name in owned.txt for your own squad
-MARKET = "market"         # reserved counterparty: the free-agent pool
+from common import (load_players, fmt_money, fmt_pct, pos_key,  # noqa: E402
+                    flag, POS_ORDER)
+from ffcore.league import League  # noqa: E402
+from ffcore.tidy import REPORTS, write_lines  # noqa: E402
 
-# Watchlist cuts — the whole point is that it fits on a phone screen.
-MIN_START = 60.0          # ignore anyone below this start probability
-TOP_N_PER_POS = 8         # rows per position
-CASH = None               # set an int (euros) to hide unaffordable players
-
-
-def read_initial(path="inputs/rosters_initial.txt"):
-    """[manager] sections, one player name per line, # for comments."""
-    rosters, current = {}, None
-    if not os.path.exists(path):
-        raise SystemExit("missing %s" % path)
-    with open(path, encoding="utf-8") as fh:
-        for raw in fh:
-            line = raw.split("#", 1)[0].strip()
-            if not line:
-                continue
-            if line.startswith("[") and line.endswith("]"):
-                current = line[1:-1].strip()
-                rosters.setdefault(current, [])
-            elif current:
-                rosters[current].append(line)
-    return rosters
-
-
-def read_transactions(path="inputs/transactions.csv"):
-    if not os.path.exists(path):
-        return []
-    with open(path, newline="", encoding="utf-8") as fh:
-        lines = [ln for ln in fh if not ln.lstrip().startswith("#")]
-    rows = [r for r in csv.DictReader(lines)
-            if r.get("player") and not r["player"].lstrip().startswith("#")]
-    rows.sort(key=lambda r: (r.get("date") or ""))
-    return rows
-
-
-def apply_transactions(rosters, txns):
-    """initial rosters + full ledger = current ownership.
-
-    Every transaction is replayed, oldest first. If a row contradicts the
-    state it lands on, that is a gap in the ledger and gets warned about
-    rather than silently absorbed.
-    """
-    owner = {}
-    for mgr, names in rosters.items():
-        for n in names:
-            owner[norm(n)] = mgr
-    warnings = []
-    for t in txns:
-        key = norm(t["player"])
-        src = (t.get("from") or "").strip() or MARKET
-        dst = (t.get("to") or "").strip() or MARKET
-        if src != MARKET and owner.get(key) not in (src, None):
-            warnings.append("%s: %s was not owned by %s" % (
-                t.get("date", "?"), t["player"], src))
-        if dst == MARKET:
-            owner.pop(key, None)
-        else:
-            if src == MARKET and owner.get(key) is not None:
-                warnings.append("%s: %s bought from market but already "
-                                "owned by %s — missing a sale?"
-                                % (t.get("date", "?"), t["player"],
-                                   owner[key]))
-            owner[key] = dst
-    print("replayed %d transaction(s)" % len(txns))
-    return owner, warnings
+HEAD = ("| Player | Team | Pos | Value | 24h | Start% |\n"
+        "|---|---|--:|--:|--:|--:|")
 
 
 def row(rec):
@@ -104,30 +50,40 @@ def row(rec):
     )
 
 
-HEAD = "| Player | Team | Pos | Value | 24h | Start% |\n|---|---|---|--:|--:|--:|"
-
-
-def write_rivals(players, owner, txns, warnings, stamp):
-    by_mgr = {}
-    for key, mgr in owner.items():
-        by_mgr.setdefault(mgr, []).append(key)
-
+def write_rivals(lg, players, stamp):
     out = ["# Squads — %s" % stamp, ""]
-    for mgr in sorted(by_mgr, key=lambda m: (m != ME, m)):
-        keys = by_mgr[mgr]
-        recs = [players.get(k, {"name": k}) for k in keys]
+
+    out += ["| Manager | Players | Squad value | Spent | Raised | Cash |",
+            "|---|--:|--:|--:|--:|--:|"]
+    for m in lg:
+        recs = [players.get(k, {}) for k in m.players]
         total = sum(r.get("value") or 0 for r in recs)
-        starters = sum(1 for r in recs if (r.get("start") or 0) >= 70)
-        out += ["## %s" % ("You (%s)" % mgr if mgr == ME else mgr),
-                "%d players · %s total · %d at 70%%+" % (
-                    len(recs), fmt_money(total), starters),
+        out.append("| %s | %d | %s | %s | %s | %s |" % (
+            ("**%s**" % m.handle) if m.handle == lg.cfg.me else m.handle,
+            len(m.players), fmt_money(total), fmt_money(m.spend),
+            fmt_money(m.proceeds), m.cash.label()))
+    out += ["",
+            "`~` is an estimate, not an observed balance — see the basis "
+            "notes at the bottom. Cash is a ceiling on what anyone can bid "
+            "tomorrow, which is the point of tracking it.", ""]
+
+    for m in lg:
+        recs = [players.get(k, {"name": k}) for k in m.players]
+        starters = sum(1 for r in recs
+                       if (r.get("start") or 0) >= lg.cfg.start_cross)
+        out += ["## %s" % ("You (%s)" % m.handle if m.handle == lg.cfg.me
+                           else m.handle),
+                "%d players · %s total · %d at %d%%+ · cash %s" % (
+                    len(recs),
+                    fmt_money(sum(r.get("value") or 0 for r in recs)),
+                    starters, int(lg.cfg.start_cross), m.cash.label()),
                 "", HEAD]
         recs.sort(key=lambda r: (pos_key(r.get("pos")),
                                  -(r.get("value") or 0)))
         out += [row(r) for r in recs]
         out.append("")
 
-    paid = [t for t in txns if (t.get("price") or "").strip()]
+    paid = [t for t in lg.txns if (t.get("price") or "").strip()]
     if paid:
         out += ["## What they pay", "",
                 "| Date | Player | From → To | Price |",
@@ -135,83 +91,93 @@ def write_rivals(players, owner, txns, warnings, stamp):
         for t in paid[-25:]:
             out.append("| %s | %s | %s → %s | %s |" % (
                 t.get("date", "?"), t["player"],
-                t.get("from") or MARKET, t.get("to") or MARKET,
+                t.get("from") or "market", t.get("to") or "market",
                 t.get("price")))
         out.append("")
 
-    if warnings:
-        out += ["## Ledger warnings", ""] + ["- " + w for w in warnings] + [""]
+    out += ["## Cash basis", ""]
+    for m in lg:
+        out.append("- **%s** — %s (%s)" % (m.handle, m.cash.basis or "—",
+                                           m.cash.confidence))
+    out.append("")
 
-    unmatched = [k for k in owner if k not in players]
+    if lg.warnings:
+        out += ["## Ledger warnings", ""] + ["- " + w for w in lg.warnings]
+        out.append("")
+
+    unmatched = lg.unmatched(players)
     if unmatched:
         out += ["## Unmatched names", "",
-                "These are in the ledger or the initial rosters but not "
-                "in the tidy data — check spelling with find_slug.py.", ""]
-        out += ["- " + u for u in sorted(unmatched)] + [""]
+                "In the ledger or the initial rosters but not in the tidy "
+                "data — check spelling with find_slug.py. Until they match, "
+                "they carry no value and are missing from every total above.",
+                ""]
+        out += ["- " + u for u in unmatched] + [""]
 
-    _write("reports/rivals.md", out)
+    write_lines(REPORTS / "rivals.md", out)
 
 
-def write_watchlist(players, owner, stamp):
-    free = [r for k, r in players.items() if k not in owner]
+def write_watchlist(lg, players, stamp):
+    cash = lg[lg.cfg.me].cash if lg.cfg.me in lg.managers else None
+    budget = cash.value if cash and cash.confidence == "known" else None
+
+    free = [r for k, r in players.items() if k not in lg.owner]
     out = ["# Watchlist — %s" % stamp, "",
-           "Everyone not owned by the three of us, %s%% start or better."
-           % int(MIN_START), ""]
-    if CASH:
-        out += ["Filtered to what %s of cash can reach." % fmt_money(CASH), ""]
+           "Everyone not owned by the %d of us, %d%% start or better."
+           % (len(lg.managers), int(lg.cfg.min_start)), ""]
+    if budget:
+        out += ["Filtered to what your %s of cash can reach."
+                % fmt_money(budget), ""]
 
     for pos in POS_ORDER:
         pool = [r for r in free
                 if (r.get("pos") or "").lower() == pos
-                and (r.get("start") or 0) >= MIN_START
-                and (CASH is None or (r.get("value") or 0) <= CASH)]
+                and (r.get("start") or 0) >= lg.cfg.min_start
+                and (budget is None or (r.get("value") or 0) <= budget)]
         pool.sort(key=lambda r: (-(r.get("start") or 0),
                                  -(r.get("delta_1d") or 0)))
         if not pool:
             continue
         out += ["## %s" % pos, "", HEAD]
-        out += [row(r) for r in pool[:TOP_N_PER_POS]]
+        out += [row(r) for r in pool[:lg.cfg.top_n_per_pos]]
         out.append("")
 
     out += ["---", "",
             "Not all of these are purchasable today — the app deals a "
             "limited slate. This is the shortlist to recognise against.", ""]
-    _write("reports/watchlist.md", out)
+    write_lines(REPORTS / "watchlist.md", out)
 
 
-def write_squad_file(players, owner, path="inputs/squad.txt"):
+def write_squad_file(lg, players, path="inputs/squad.txt"):
     """Regenerate squad.txt from the ledger so report.py needs no changes.
 
     Written in the app's own spelling where we have it, one name per line,
     which is exactly the format report.py already reads.
     """
-    mine = [k for k, m in owner.items() if m == ME]
-    names = sorted(players.get(k, {}).get("name", k) for k in mine)
-    lines = ["# GENERATED by src/squads.py — do not edit.",
-             "# Source of truth is inputs/owned.txt + inputs/transactions.csv.",
-             ""] + names
-    _write(path, lines)
-
-
-def _write(path, lines):
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-    with open(path, "w", encoding="utf-8") as fh:
-        fh.write("\n".join(lines).rstrip() + "\n")
-    print("wrote %s" % path)
+    names = sorted(players.get(k, {}).get("name", k)
+                   for k in lg.squad(lg.cfg.me))
+    write_lines(path, [
+        "# GENERATED by src/squads.py — do not edit.",
+        "# Source of truth is inputs/rosters_initial.txt + "
+        "inputs/transactions.csv.",
+        ""] + names)
 
 
 def main():
     stamp = dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
     players = load_players()
-    rosters = read_initial()
-    txns = read_transactions()
-    owner, warnings = apply_transactions(rosters, txns)
-    write_rivals(players, owner, txns, warnings, stamp)
-    write_watchlist(players, owner, stamp)
-    write_squad_file(players, owner)
-    print("%d players known, %d owned, %d free"
-          % (len(players), len(owner), len(players) - len(owner)))
-    for w in warnings:
+    lg = League.load()
+    print("replayed %d transaction(s)" % len(lg.txns))
+
+    write_rivals(lg, players, stamp)
+    write_watchlist(lg, players, stamp)
+    write_squad_file(lg, players)
+
+    unmatched = lg.unmatched(players)
+    free = [k for k in players if k not in lg.owner]
+    print("%d players known, %d owned, %d free, %d owned names unmatched"
+          % (len(players), len(lg.owner), len(free), len(unmatched)))
+    for w in lg.warnings:
         print("WARN " + w)
 
 
