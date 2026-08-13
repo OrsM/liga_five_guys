@@ -38,8 +38,8 @@ Three files under `inputs/`. Everything else is generated.
 | `cash.txt` | Any balance you actually observe. One rival balance turns their whole cash estimate from an estimate into arithmetic. |
 | `rosters_initial.txt` | The starting rosters. Write once, never edit. |
 
-`league.ini` holds thresholds and the starting budget. `offers.txt` and
-`lookup.txt` are scratch inputs for the offers ranking and the name resolver.
+`league.ini` holds thresholds and the starting budget. `lookup.txt` is a
+scratch input for the name resolver.
 `squad.txt` is **generated** — a fallback so `report.py` still works if the
 ledger fails to load; don't hand-edit it.
 
@@ -56,7 +56,7 @@ ledger fails to load; don't hand-edit it.
 
 ```
 src/                 ff_ingest.py (scrape+parse)  squads.py  report.py
-                     rivals.py  offers.py  watch.py
+                     rivals.py  watch.py
                      digest.py (stitches REPORT.md)  find_slug.py
                      history.py  fantasy_api.py  optimise.py (unused — Phase 3)
 src/ffcore/          shared core: parse (numbers)  text (names)  tidy (IO+time)
@@ -96,6 +96,14 @@ attempt a slug-based join.
 squad plus a separate cash balance, so the anchor is the whole budget less every
 ledger row. `~` marks an estimate, `—` means the ledger overdraws the budget and
 the number would be fiction. Never treat a `—` as "they are broke".
+
+**The hand-typed offers list was removed too.** `inputs/offers.txt` asked you
+to copy the app's market slate by hand, and 9 of its 21 names were already
+owned. There is no external feed to replace it with: the slate is 12 free
+agents drawn at random per league, on a clock set by the hour your league was
+created, and every market endpoint is namespaced by private league id.
+`reports/watchlist.md` covers the same ground without typing — it ranks
+everyone the ledger says nobody owns, so it cannot go stale.
 
 **Bid logging was removed, deliberately.** `inputs/bids.csv` asked you to type
 a bid and then come back and type its outcome. Nobody comes back: both rows in

@@ -60,12 +60,13 @@ jobs:
           python src/ffcore/parse.py
           PYTHONPATH=src python src/ffcore/league.py --selftest
           PYTHONPATH=src python src/digest.py --selftest
+          PYTHONPATH=src python src/xi.py --selftest
       - name: Import every module
         # Catches the break that only shows at import time — a helper that
         # moved, a name that no longer exists.
         run: |
           cd src
-          for m in common squads report offers watch rivals digest find_slug; do
+          for m in common squads report watch rivals digest xi find_slug; do
             python -c "import $m" || { echo "::error::$m failed to import"; exit 1; }
           done
           echo 'all modules import cleanly' >> "$GITHUB_STEP_SUMMARY"
@@ -119,8 +120,10 @@ jobs:
       - name: League behaviour
         run: python src/rivals.py
 
-      - name: Offers
-        run: python src/offers.py
+      # Append-only: records the XI standing at this run, so a prediction can
+      # be scored against what you actually fielded.
+      - name: Log the XI
+        run: python src/xi.py
 
       - name: Alerts
         env:

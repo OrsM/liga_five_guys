@@ -1,0 +1,4 @@
+# Who is NOT in your XI. One name per line.
+# Your squad comes from the ledger, so the XI is squad minus this list —
+# 12 owned, 1 benched, 11 fielded. Edit this only when you change the bench.
+pepelu
