@@ -1,4 +1,4 @@
-# Fantasy report — 2026-08-13T1040Z
+# Fantasy report — 2026-08-13T1059Z
 
 ## Needs a decision
 
@@ -55,4 +55,4 @@ _611 players tracked, 508 with a probable-XI reading. Who to buy is in `reports/
 
 _Score = shrunk pts/match (K=8, 2025-26) × P(start), from `ffcore/score.py` — the same scorer rivals.py uses. Recommended XIs are logged to `data/decisions/squad_log.csv` for scoring against reality later._
 
-_Generated 2026-08-13 10:41 UTC._
+_Generated 2026-08-13 11:00 UTC._
