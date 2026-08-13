@@ -1,4 +1,4 @@
-# Fantasy report — 2026-08-13T2214Z
+# Fantasy report — 2026-08-13T2322Z
 
 ## Needs a decision
 
@@ -16,17 +16,17 @@ Compare squad value with the app; a mismatch means a name matched the wrong play
 
 | | Player | Start% | Value | 24h | Score | Last season |
 |---|---|--:|--:|--:|--:|---|
-| POR | Alvaro Fernandez | 20% | 4.87M | -94K | 0.9 | **assumed** |
-| DEF | Carl Starfelt | 60% | 13.57M | 58K | 3.1 | 106p/19j |
-| DEF | Igor Zubeldia | 80% | 9.76M | 30K | 3.0 | 90p/25j |
-| DEF | Robin Le Normand | 60% | 9.83M | -105K | 2.6 | 125p/28j |
-| DEF | Omar El Hilali | 80% | 8.64M | 81K | 2.4 | 101p/36j |
-| MED | Jon Moncayola | 90% | 6.58M | 56K | 3.9 | 159p/36j |
-| MED | Pepelu | 70% | 7.40M | -60K | 3.0 | 135p/31j |
-| MED | Ruben Garcia | 60% | 13.41M | 148K | 2.9 | 174p/35j |
-| MED | Iñigo Ruiz de Galarreta | 60% | 11.95M | 57K | 2.7 | 156p/34j |
-| MED | Dani Lorenzo | 90% | 9.55M | 38K | 2.6 | **assumed** |
-| DEL | Iñigo Vicente | 90% | 18.88M | 22K | 2.7 | **assumed** |
+| POR | Alvaro Fernandez | 20% | 4.87M | 0 | 0.9 | **assumed** |
+| DEF | Carl Starfelt | 60% | 13.57M | 0 | 3.1 | 106p/19j |
+| DEF | Igor Zubeldia | 80% | 9.76M | 0 | 3.0 | 90p/25j |
+| DEF | Robin Le Normand | 60% | 9.83M | 0 | 2.6 | 125p/28j |
+| DEF | Omar El Hilali | 80% | 8.64M | 0 | 2.4 | 101p/36j |
+| MED | Jon Moncayola | 90% | 6.58M | 0 | 3.9 | 159p/36j |
+| MED | Pepelu | 70% | 7.40M | 0 | 3.0 | 135p/31j |
+| MED | Ruben Garcia | 60% | 13.41M | 0 | 2.9 | 174p/35j |
+| MED | Iñigo Ruiz de Galarreta | 60% | 11.95M | 0 | 2.7 | 156p/34j |
+| MED | Dani Lorenzo | 90% | 9.55M | 0 | 2.6 | **assumed** |
+| DEL | Iñigo Vicente | 90% | 18.88M | 0 | 2.7 | **assumed** |
 
 **Bench** — gap is what the XI index loses by playing him instead, after re-picking the formation. €/pt is his value per point of score: the sell shortlist, worst first.
 
@@ -38,11 +38,7 @@ _A sale lands above or below value depending on who bids. Who is short in this p
 
 ## Your movers (24h, over 1%)
 
-| Player | Value | 24h | % |
-|---|--:|--:|--:|
-| Ruben Garcia | 13.41M | 148K | +1.11% |
-| Robin Le Normand | 9.83M | -105K | -1.06% |
-| Alvaro Fernandez | 4.87M | -94K | -1.89% |
+_Nothing in your squad moved much._
 
 ---
 
@@ -50,4 +46,4 @@ _621 players tracked, 510 with a probable-XI reading. Who to buy is in `reports/
 
 _Score = shrunk pts/match (K=8, 2025-26) × P(start), from `ffcore/score.py` — the same scorer rivals.py uses. Recommended XIs are logged to `data/decisions/squad_log.csv` for scoring against reality later._
 
-_Generated 2026-08-13 22:15 UTC._
+_Generated 2026-08-13 23:23 UTC._
