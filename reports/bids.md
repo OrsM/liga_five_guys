@@ -13,4 +13,6 @@ _Nothing settled yet. Set `outcome` to won/lost/outbid as auctions resolve._
 
 Record every auction, including losses — a loss at a known premium is what tells you where rivals actually sit.
 
-_Generated 2026-08-12 10:40 UTC._
+`~` marks a value read from a snapshot more than 36h from the bid.
+
+_Generated 2026-08-13 07:55 UTC._
