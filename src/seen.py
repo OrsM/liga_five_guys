@@ -28,6 +28,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from ffcore.text import norm, resolve  # noqa: E402
+from ffcore.tidy import input_path  # noqa: E402
 
 
 def read_names(text: str) -> list[str]:
@@ -71,6 +72,23 @@ def match(names: list[str], players: dict) -> tuple[set, list, list]:
             unresolved.append(raw)
 
     return keys, unresolved, ambiguous
+
+
+def read_slate(players) -> tuple[set, list, list]:
+    """(keys on offer, unresolved, ambiguous) from inputs/seen.txt.
+
+    Absent file is the normal case — you only paste a slate when deciding, and
+    every consumer treats an empty set as "no slate pasted" rather than as "an
+    empty market". Lived in squads.py; here so report.py and rivals.py read
+    the same slate rather than each growing a copy of the same six lines.
+
+    `players` is any {key: record} whose records carry a "name", so it takes
+    common.load_players() or a market row index equally.
+    """
+    path = input_path("seen.txt")
+    if not path.exists():
+        return set(), [], []
+    return match(read_names(path.read_text(encoding="utf-8")), players)
 
 
 def _selftest() -> None:

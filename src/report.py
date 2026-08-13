@@ -6,10 +6,20 @@ Run after ff_ingest.py parse.
 
     python src/report.py
 
-Structure, top to bottom: what needs a decision today, your team as one table
-(XI then bench, with the cost of each swap), and your own squad's price moves.
-League-wide movers and recruitment live in reports/watchlist.md; how your
-rivals behave lives in reports/behaviour.md.
+Structure, top to bottom: what needs a decision today, today's market slate
+priced player by player, your team as one table (XI then bench, with the cost
+of each swap), and your own squad's price moves. League-wide movers and
+recruitment live in reports/watchlist.md; how your rivals behave lives in
+reports/behaviour.md.
+
+THE SLATE IS THE REPORT when you paste one into inputs/seen.txt. The app deals
+a limited market, so a ranked list of everyone unowned is mostly players you
+cannot buy. sec_slate() answers the only live question — of the players on
+offer right now, which improve my XI, what should I bid, and who else wants
+them — using ffcore.bid: the XI index gained by owning him, and the floor plus
+the premium this league has actually paid over it. Every priced purchase so far
+landed above the floor, so bidding the minimum is bidding the number ten deals
+have already beaten (issue #23).
 
 SCORING lives in ffcore/score.py now, shared with rivals.py so that your
 squad and theirs are ranked by the same arithmetic:
@@ -49,6 +59,7 @@ from datetime import datetime, timezone
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
+from ffcore.bid import deals, gain, premiums, rivals_short, suggest  # noqa: E402
 from ffcore.league import League  # noqa: E402
 from ffcore.parse import money, ratio  # noqa: E402
 from ffcore.score import (ABSENT_START, MAX_SLOT, NEUTRAL_START,  # noqa: E402
@@ -58,6 +69,7 @@ from ffcore.tidy import (DECISIONS, MADRID, REPORTS, SEASON,  # noqa: E402
                          append_csv, input_path, latest_only, ledger_stamp,
                          load_market, load_xi, read_csv, snapshot_stamp,
                          write_lines)
+from seen import read_slate  # noqa: E402
 
 HISTORY = REPORTS / "history"
 
@@ -148,6 +160,117 @@ def squad_names(lg) -> tuple[list[str], str]:
     return load_squad_file(), "squad.txt"
 
 
+def rival_ceiling(lg) -> float | None:
+    """Largest bid any rival could still make, or None if any cash is unknown.
+
+    An unknown balance is not a zero. Returning None where one rival's cash
+    cannot be reconstructed is what stops suggest() telling you to bid the
+    floor against someone who can outspend you.
+    """
+    bids = [m.max_bid for m in lg if m.handle != lg.cfg.me]
+    if not bids or any(b is None for b in bids):
+        return None
+    return max(bids)
+
+
+def sec_slate(lg, sc, by_key, pool, tot, slate, prem, cash_value,
+              rival_max) -> tuple[list[str], int, int]:
+    """Today's slate, priced. The only section that answers 'what do I do now'.
+
+    Everything else in this report describes a position; this one is a list of
+    purchases you can make in the next few minutes, so it leads. XI gain is the
+    change in the ranking index from owning him and re-picking the formation —
+    it is what he is worth to you, and it is frequently negative for a player
+    the watchlist ranks highly, because your own eleven is the benchmark.
+    """
+    on_offer, unresolved, ambiguous = slate
+    out: list[str] = []
+
+    owned = {k: lg.owner[k] for k in on_offer if k in lg.owner}
+    rivals_need = rivals_short(lg, sc, by_key)
+
+    rows = []
+    for k in on_offer:
+        if k in owned:
+            continue
+        rec = by_key.get(k)
+        if not rec:
+            continue
+        cand = sc.score(rec).as_row()
+        cand["name"] = title_name(cand["name"])
+        g = gain(pool, cand, tot) if tot is not None else None
+        adv = suggest(cand["value"], prem, cash_value, rival_max)
+        rows.append((cand, g, adv))
+
+    # Best upgrade first. A player who cannot start sorts last whatever his
+    # score, because the question here is what he adds to YOUR eleven.
+    rows.sort(key=lambda r: (r[1] is None, -(r[1] or 0.0), -r[0]["score"]))
+    better = sum(1 for _, g, _ in rows if g is not None and g > 0)
+
+    out += ["## Today's slate — %d on offer, %d improve your XI"
+            % (len(rows), better), ""]
+    if not rows:
+        out += ["_Every name you pasted is either already owned or missing "
+                "from the market data._", ""]
+    else:
+        out += ["| Player | Pos | Value | Start% | Score | XI gain | Bid | "
+                "Competition | Verdict |",
+                "|---|---|--:|--:|--:|--:|--:|---|---|"]
+        for cand, g, adv in rows:
+            if adv.low is None:
+                verdict = "**No** — %s" % adv.why
+            elif g is None:
+                verdict = "cannot start — depth only"
+            elif g > 0:
+                verdict = "**Bid** — XI %+.1f" % g
+            else:
+                verdict = "pass — XI %+.1f" % g
+            band = ("—" if adv.low is None
+                    else eur(adv.low) if abs(adv.high - adv.low) < 1_000
+                    else "%s–%s" % (eur(adv.low), eur(adv.high)))
+            short = rivals_need.get(cand["slot"]) or []
+            out.append("| %s | %s | %s | %s | %.1f | %s | %s | %s | %s |" % (
+                cand["name"], (cand["pos"] or "—")[:3], eur(cand["value"]),
+                "—" if cand["pct"] is None else "%.0f%%" % cand["pct"],
+                cand["score"],
+                "—" if g is None else "%+.1f" % g,
+                band, ", ".join(short) or "nobody short", verdict))
+        out += ["",
+                "Bid is the floor plus what this league has actually paid over "
+                "it: %s. Every priced purchase so far landed above the floor, "
+                "so the minimum legal bid is the one number known to lose. Ten "
+                "deals is not a distribution — the range is what has happened, "
+                "not a chance of winning."
+                % (prem.label() if prem else
+                   "no priced purchase yet, so these are floors"), ""]
+        if rival_max is None:
+            out += ["_At least one rival's cash is an estimate, so no bid here "
+                    "assumes you are unopposed._", ""]
+        if cash_value is None:
+            out += ["_Your own balance is not a recorded number, so no bid is "
+                    "capped by what you actually have. Put it in "
+                    "`inputs/cash.txt`._", ""]
+
+    if owned:
+        out += ["Already owned, so not a purchase: %s." % ", ".join(
+            "%s (%s)" % (by_key.get(k, {}).get("name", k),
+                         "you" if h == lg.cfg.me else h)
+            for k, h in sorted(owned.items())), ""]
+
+    if unresolved or ambiguous:
+        # A heading, not bold text, so digest.py prints it once instead of
+        # repeating the watchlist's copy of the same list.
+        out += ["## Names I could not place", "",
+                "OCR mangled these past matching, so they are missing from "
+                "the table above — re-read them off the app if one matters.",
+                ""]
+        out += ["- **%s** — no match" % u for u in unresolved]
+        out += ["- **%s** — could be %s" % (raw, ", ".join(c))
+                for raw, c in ambiguous]
+        out.append("")
+    return out, len(rows), better
+
+
 def log_squad(observed, players, chosen, formation, total, deadline,
               obs_dt) -> None:
     """Append-only record of every recommendation, for scoring later.
@@ -234,10 +357,28 @@ def main() -> None:
     best = pick_xi(pool) if players else None
     chosen = {id(p) for p in best[2]} if best else set()
 
+    # --- today's slate ----------------------------------------------------
+    # Built before the header because the count belongs in the alerts: when a
+    # slate has been pasted, it is the decision, and the rest of the report is
+    # the position it is being made from.
+    cash = lg[lg.cfg.me].cash if lg and lg.cfg.me in lg.managers else None
+    cash_value = cash.value if cash and cash.confidence == "known" else None
+    by_key = lg.market.latest() if lg and lg.market else {}
+    slate = read_slate(by_key) if by_key else (set(), [], [])
+    slate_lines, n_slate, n_better = [], 0, 0
+    if any(slate):
+        prem = premiums(deals(lg, lg.market))
+        slate_lines, n_slate, n_better = sec_slate(
+            lg, sc, by_key, pool, best[0] if best else None, slate, prem,
+            cash_value, rival_ceiling(lg))
+
     # --- header -----------------------------------------------------------
     out: list[str] = [f"# Fantasy report — {observed}", ""]
 
     alerts: list[str] = []
+    if n_slate:
+        alerts.append("**%d players on offer, %d improve your XI** — priced in "
+                      "the slate table below." % (n_slate, n_better))
     if age_h is not None and age_h > STALE_HOURS:
         alerts.append(f"**Data is {age_h:.0f}h old** — the ingest workflow may "
                       "have failed. Everything below is that snapshot.")
@@ -278,7 +419,6 @@ def main() -> None:
         out += ["## Needs a decision", ""] + [f"- {a}" for a in alerts] + [""]
 
     # --- money ------------------------------------------------------------
-    cash = lg[lg.cfg.me].cash if lg and lg.cfg.me in lg.managers else None
     line = f"**Squad {eur(squad_value)}**"
     if cash and cash.value is not None:
         line += (f" · cash {cash.label()} · total "
@@ -296,6 +436,8 @@ def main() -> None:
     out += [line, "",
             "Compare squad value with the app; a mismatch means a name "
             f"matched the wrong player. Roster read from the {squad_src}.", ""]
+
+    out += slate_lines
 
     # --- team -------------------------------------------------------------
     out += ["## Team", ""]

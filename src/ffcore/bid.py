@@ -1,0 +1,379 @@
+"""
+ffcore.bid — what a player adds to your XI, and what it takes to win him.
+
+Issue #23: the old reading of the ledger was inverted. rivals.py classified a
+price by whether it was a round number and concluded that an exact one was
+"the app's own valuation, which means nobody competed — every exact purchase
+was a player you could have had for the same money." The repo's own ledger
+says otherwise. All ten priced buys landed ABOVE the market value at the time,
+and the five exact ones went for +1.5%, +2.6%, +2.6%, +9.2% and +12.7%. None
+of them was the app's valuation, so none of them was available at the floor.
+
+Roundness cannot carry that inference, in either direction:
+
+  * A round price is indeed human-chosen — only 0.7% of the 610 current market
+    values are divisible by 10k, so the app almost never hands you one. That
+    half of the old heuristic survives, as an observation about how they type.
+  * A non-round price is NOT the app's valuation. It is a human who typed a
+    non-round number, and the premium column two cells away already says how
+    far above the floor they went. The proxy adds nothing the direct
+    measurement doesn't say better.
+  * Even a purchase at exactly the floor would not prove nobody competed. A
+    sealed bid is paid as bid, so matching it wins only if the tie-break
+    favours you, and the tie-break rule is not documented anywhere we can
+    read. Verify it in-app before treating a floor price as a missed bargain.
+
+So the signal is the premium over the floor, which the ledger measures
+directly:
+
+    floor    = today's market value. The minimum legal bid IS the value.
+    premium  = price / value_at_the_time - 1
+
+and the actionable finding in this league is that the floor has never won:
+median winning premium +8.9% across ten deals. Bidding the minimum loses.
+
+    prem = premiums(deals)                  # what winning has cost so far
+    adv  = suggest(value, prem, cash, ceil)  # what to bid for this one
+    g    = gain(pool, candidate, xi_total)   # what he adds if you play him
+
+`gain` is the marginal-value primitive from docs/design.md §6.3, at the only
+precision the data currently supports: the change in the XI ranking index from
+owning him. It is not euros per point, and it is not a forecast.
+
+TEN DEALS IS NOT A DISTRIBUTION. Everything premiums() returns is a summary of
+a handful of purchases made in the first fortnight of a season, so suggest()
+reports the range alongside the median and the report is expected to print
+both. Treat the band as "what this league has done so far", never as a
+probability of winning.
+"""
+
+from __future__ import annotations
+
+import statistics
+from collections import Counter
+from typing import NamedTuple
+
+from ffcore.league import MARKET
+from ffcore.parse import money
+from ffcore.score import THIN, pick_xi
+from ffcore.tidy import ledger_stamp
+
+__all__ = ["MAX_LAG_H", "ROUND_TO", "Premiums", "Advice", "is_round", "deals",
+           "usable", "premiums", "suggest", "gain", "rivals_short"]
+
+# A premium computed against a snapshot further than this from the deal is
+# reported but never averaged in. Lived in rivals.py; here so report.py sizes
+# bids off the same filtered set rivals.py reports.
+MAX_LAG_H = 36.0
+
+# A bid divisible by this was typed by a human rather than computed by the app.
+# That is all it tells you — see the note on issue #23 above.
+ROUND_TO = 10_000
+
+
+class Premiums(NamedTuple):
+    """What winning has cost, over the floor, in percent."""
+    n: int
+    median: float
+    lo: float
+    hi: float
+
+    def label(self) -> str:
+        return "median %+.1f%%, %+.1f%% to %+.1f%% (n=%d)" % (
+            self.median, self.lo, self.hi, self.n)
+
+
+class Advice(NamedTuple):
+    """A bid band, or (None, None) when you cannot reach the floor."""
+    low: float | None
+    high: float | None
+    why: str
+
+
+def is_round(price) -> bool:
+    """Was this price typed by a human? Says nothing about who competed."""
+    v = money(price)
+    return v is not None and v > 0 and v % ROUND_TO == 0
+
+
+def deals(lg, market) -> list[dict]:
+    """Every priced ledger row, valued against the market at the time.
+
+    Lived in rivals.py. Here because report.py needs the same premiums to size
+    a bid, and two copies of this join would eventually disagree about what a
+    deal cost. Rows the market cannot price are returned with value/premium
+    None rather than dropped — usable() decides what averages in.
+    """
+    rows = []
+    for t in lg.txns:
+        price = money(t.get("price"))
+        when = ledger_stamp(t.get("date", ""))
+        if price is None or when is None:
+            continue
+        v = market.at(t["player"], when)
+        src = (t.get("from") or "").strip() or MARKET
+        dst = (t.get("to") or "").strip() or MARKET
+        rows.append({
+            "date": t.get("date", ""), "player": t["player"],
+            "actor": dst if dst != MARKET else src,
+            "side": "buy" if dst != MARKET else "sell",
+            "price": price, "when": when,
+            "value": v.value if v else None,
+            "lag_h": v.lag_h if v else None,
+            "premium": ((price / v.value - 1) * 100.0
+                        if v and v.value else None),
+            "round": is_round(t.get("price")),
+        })
+    return rows
+
+
+def usable(d) -> bool:
+    """Is this deal's premium priced closely enough in time to average in?"""
+    return (d.get("premium") is not None and d.get("lag_h") is not None
+            and abs(d["lag_h"]) <= MAX_LAG_H)
+
+
+def premiums(deals, side: str = "buy") -> Premiums | None:
+    """Premium over the floor across every usable deal, or None if none are.
+
+    Sells are excluded by default: selling to the app pays the value, so a
+    sell's premium measures nothing about what a rival will pay.
+    """
+    vals = sorted(d["premium"] for d in deals
+                  if d.get("side") == side and usable(d))
+    if not vals:
+        return None
+    return Premiums(len(vals), statistics.median(vals), vals[0], vals[-1])
+
+
+def suggest(value, prem: Premiums | None, cash=None,
+            rival_max=None) -> Advice:
+    """What to bid for a player worth `value`.
+
+    `rival_max` is the largest amount any rival could still spend, and must be
+    None unless every rival's cash is known — an unknown balance is not a
+    zero, and treating it as one is what would tell you to bid the floor
+    against someone who can outspend you.
+    """
+    if not value or value <= 0:
+        return Advice(None, None, "no value on record")
+    if cash is not None and cash < value:
+        return Advice(None, None, "%.2fM short of the floor"
+                      % ((value - cash) / 1e6))
+    if rival_max is not None and rival_max < value:
+        return Advice(value, value, "floor — no rival can afford it")
+    if prem is None:
+        return Advice(value, value, "floor — no premium history yet")
+
+    low = value * (1 + prem.median / 100.0)
+    high = value * (1 + prem.hi / 100.0)
+    why = "floor %+.1f%% median, %+.1f%% worst (n=%d)" % (
+        prem.median, prem.hi, prem.n)
+    if cash is not None and cash < high:
+        high = cash
+        low = min(low, cash)
+        why += ", capped by your cash"
+    return Advice(low, high, why)
+
+
+def gain(pool: dict, candidate: dict, base_total: float,
+         premium: bool = False):
+    """XI index gained by owning `candidate`, or None if he can never start.
+
+    Negative is a real answer: it means the best XI containing him is worse
+    than the one you already field, so he is squad depth, not an upgrade.
+    """
+    slot = candidate.get("slot")
+    if not slot:
+        return None
+    # Copy: the caller's pool feeds the bench table, and a candidate left in
+    # it would be reported as a player you own.
+    trial = {k: list(v) for k, v in pool.items()}
+    trial.setdefault(slot, []).append(candidate)
+    trial[slot].sort(key=lambda p: p["score"], reverse=True)
+    best = pick_xi(trial, force=candidate, premium=premium)
+    return None if best is None else best[0] - base_total
+
+
+def rivals_short(lg, sc, by_key) -> dict[str, list[str]]:
+    """{slot: [rival handles thin there]} — who is likely to bid against you.
+
+    You are excluded: the question this answers is who competes, and your own
+    shortage is already the reason you are looking.
+    """
+    out: dict[str, list[str]] = {}
+    for m in lg:
+        if m.handle == lg.cfg.me:
+            continue
+        scored, _ = sc.score_squad(
+            [by_key.get(k, {}).get("name", k) for k in m.players])
+        counts = Counter(p.slot for p in scored if p.slot)
+        for slot, floor in THIN.items():
+            if counts.get(slot, 0) < floor:
+                out.setdefault(slot, []).append(m.handle)
+    return out
+
+
+# ---------------------------------------------------------------------------
+
+def _selftest() -> None:
+    # -- premiums ---------------------------------------------------------
+    fixed = [
+        {"side": "buy", "premium": 2.0, "lag_h": 0.1},
+        {"side": "buy", "premium": 10.0, "lag_h": 8.8},
+        {"side": "buy", "premium": 20.0, "lag_h": -2.0},   # backwards, still close
+        {"side": "buy", "premium": 99.0, "lag_h": 100.0},  # too far to price
+        {"side": "buy", "premium": None, "lag_h": 1.0},    # never priced
+        {"side": "sell", "premium": 50.0, "lag_h": 1.0},   # sells pay the value
+    ]
+    p = premiums(fixed)
+    assert p.n == 3, p
+    assert p.median == 10.0, p
+    assert (p.lo, p.hi) == (2.0, 20.0), p
+    assert "n=3" in p.label(), p.label()
+    assert premiums([]) is None
+    assert premiums([{"side": "buy", "premium": None, "lag_h": 1.0}]) is None
+    # A lag beyond the cut is excluded, not clamped.
+    assert usable({"premium": 1.0, "lag_h": MAX_LAG_H}) is True
+    assert usable({"premium": 1.0, "lag_h": MAX_LAG_H + 0.1}) is False
+
+    # -- suggest ----------------------------------------------------------
+    prem = Premiums(10, 8.9, 1.45, 21.6)
+
+    # The band is the floor plus what this league has actually paid.
+    a = suggest(1_000_000, prem, cash=10_000_000, rival_max=5_000_000)
+    assert round(a.low) == 1_089_000, a
+    assert round(a.high) == 1_216_000, a
+    assert "8.9" in a.why and "n=10" in a.why, a.why
+
+    # Nobody can reach the floor: the floor wins, and says why.
+    a = suggest(1_000_000, prem, cash=10_000_000, rival_max=900_000)
+    assert (a.low, a.high) == (1_000_000, 1_000_000), a
+    assert "no rival" in a.why, a.why
+
+    # One unknown rival balance means rival_max is None, and the band stands.
+    a = suggest(1_000_000, prem, cash=10_000_000, rival_max=None)
+    assert round(a.high) == 1_216_000, a
+
+    # You cannot afford the floor: no band at all, and the shortfall named.
+    a = suggest(1_000_000, prem, cash=800_000)
+    assert (a.low, a.high) == (None, None), a
+    assert "short" in a.why, a.why
+
+    # No ledger yet -> the floor, labelled as ignorance rather than advice.
+    a = suggest(1_000_000, None, cash=10_000_000)
+    assert (a.low, a.high) == (1_000_000, 1_000_000), a
+    assert "no premium history" in a.why, a.why
+
+    # Cash between the floor and the top of the band clamps the band.
+    a = suggest(1_000_000, prem, cash=1_100_000)
+    assert a.high == 1_100_000, a
+    assert round(a.low) == 1_089_000, a
+    assert "capped by your cash" in a.why, a.why
+
+    # Cash below the median premium clamps both ends, not just the top.
+    a = suggest(1_000_000, prem, cash=1_050_000)
+    assert (a.low, a.high) == (1_050_000, 1_050_000), a
+
+    # A player with no value is not biddable.
+    assert suggest(None, prem).low is None
+    assert suggest(0, prem).low is None
+
+    # -- gain -------------------------------------------------------------
+    def pl(slot, score):
+        return {"slot": slot, "score": score, "name": "%s%.1f" % (slot, score)}
+
+    # Eleven is eleven: a pool that cannot fill one legal shape tests nothing.
+    pool = {
+        "POR": [pl("POR", 5.0)],
+        "DEF": [pl("DEF", 4.0), pl("DEF", 3.5), pl("DEF", 3.0),
+                pl("DEF", 2.5)],
+        "MED": [pl("MED", 4.0), pl("MED", 3.5), pl("MED", 3.0),
+                pl("MED", 2.5), pl("MED", 2.0)],
+        "DEL": [pl("DEL", 6.0), pl("DEL", 1.5), pl("DEL", 1.0)],
+    }
+    base = pick_xi(pool)
+    assert base is not None
+    total = base[0]
+    assert base[1] == (4, 5, 1) and total == 39.0, base[:2]
+
+    # Better than the man he replaces: a positive gain.
+    up = gain(pool, pl("DEL", 9.0), total)
+    assert up is not None and up > 0, up
+
+    # Worse than everyone: forcing him in costs you, and that is the answer.
+    down = gain(pool, pl("DEL", 0.1), total)
+    assert down is not None and down < 0, down
+
+    # No slot -> he can never start, so there is no XI gain to report.
+    assert gain(pool, {"slot": "", "score": 9.0}, total) is None
+
+    # The caller's pool is an input, not scratch: mutating it would corrupt
+    # the bench table report.py builds from the same dict.
+    assert len(pool["DEL"]) == 3, pool["DEL"]
+    assert [p["score"] for p in pool["DEF"]] == [4.0, 3.5, 3.0, 2.5], \
+        pool["DEF"]
+
+    # A slot the pool has never seen is still scoreable.
+    thin = {"POR": [pl("POR", 5.0)], "DEF": [pl("DEF", 4.0)]}
+    assert gain(thin, pl("MED", 9.0), 0.0) is None   # still no legal XI
+
+    # -- is_round ---------------------------------------------------------
+    assert is_round("1.000.000 €") is True
+    assert is_round("1.234.567") is False
+    assert is_round("0") is False           # a free transfer is not a bid
+    assert is_round("") is False
+
+    # -- deals ------------------------------------------------------------
+    class _Val(NamedTuple):
+        value: float
+        lag_h: float
+
+    class _Market:
+        """Every player worth 1M, priced 2h from the deal."""
+        def at(self, name, when):
+            return None if name == "Unpriced" else _Val(1_000_000.0, 2.0)
+
+    class _Lg:
+        txns = [
+            # bought from the market at a 10% premium, round number
+            {"date": "2026-08-10 12:00", "player": "Bought",
+             "from": "", "to": "me", "price": "1.100.000"},
+            # sold to a rival: side is sell, actor is the seller's counterparty
+            {"date": "2026-08-11 12:00", "player": "Sold",
+             "from": "me", "to": "", "price": "900.000"},
+            # rival-to-rival, non-round
+            {"date": "2026-08-12 12:00", "player": "Traded",
+             "from": "a", "to": "b", "price": "1.234.567"},
+            {"date": "2026-08-12 12:00", "player": "Unpriced",
+             "from": "", "to": "me", "price": "5.000.000"},
+            {"date": "2026-08-12 12:00", "player": "Free",
+             "from": "", "to": "me", "price": ""},        # no price: skipped
+            {"date": "nonsense", "player": "Undated",
+             "from": "", "to": "me", "price": "1.000.000"},   # skipped
+        ]
+
+    dl = deals(_Lg(), _Market())
+    assert [d["player"] for d in dl] == ["Bought", "Sold", "Traded",
+                                         "Unpriced"], dl
+    d0 = dl[0]
+    assert d0["side"] == "buy" and d0["actor"] == "me", d0
+    assert round(d0["premium"], 1) == 10.0, d0
+    assert d0["round"] is True and usable(d0)
+    assert dl[1]["side"] == "sell" and dl[1]["actor"] == "me", dl[1]
+    assert dl[2]["actor"] == "b" and dl[2]["round"] is False, dl[2]
+    # No snapshot to price against: reported, but never averaged in.
+    assert dl[3]["value"] is None and dl[3]["premium"] is None
+    assert not usable(dl[3])
+    # And the buy premiums flow straight into the band. Both buys count: a
+    # rival-to-rival deal is still someone outbidding you.
+    pd = premiums(dl)
+    assert pd.n == 2, pd
+    assert (round(pd.lo, 1), round(pd.hi, 1)) == (10.0, 23.5), pd
+    assert round(premiums(dl, "sell").median, 1) == -10.0, premiums(dl, "sell")
+
+    print("ffcore.bid self-test OK (39 cases)")
+
+
+if __name__ == "__main__":                      # pragma: no cover
+    _selftest()

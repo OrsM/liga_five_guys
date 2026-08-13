@@ -23,7 +23,7 @@ Three optional inputs, all off by default:
 | `fetch` | On by default. Turn **off** to rebuild reports from stored HTML without hitting the site. |
 | `history` | Once a season. Refreshes the season points baseline. |
 | `lookup` | Paste comma-separated names to resolve app spellings to CSV names. |
-| `seen` | Paste today's market slate. Marks which of the watchlist you can actually buy — see below. |
+| `seen` | Paste today's market slate. The report then leads with those players, priced — see below. |
 
 `api probe` is the only other workflow. It is a manual spike against the
 official LaLiga API, which is unreachable (see below) — it produces no report
@@ -45,13 +45,33 @@ Four files under `inputs/`. Everything else is generated.
 The watchlist ranks everyone nobody owns, but the app only deals a limited
 slate each cycle, so most of it isn't buyable today. To close that gap:
 long-press the market screenshot, **Copy Text** (iOS Live Text), and paste it
-into the `seen` input when you run the workflow. Those players get a ✅ and
-sort to the top of each position.
+into the `seen` input when you run the workflow.
+
+**Paste a slate and the slate becomes the report.** `reports/REPORT.md` then
+opens with one table covering only the players on offer, sorted by what each
+one is worth to your eleven:
+
+| Column | What it tells you |
+|---|---|
+| XI gain | Change in the XI ranking index from owning him, after re-picking the formation. **Frequently negative** for a player the watchlist ranks highly — your own eleven is the benchmark, not the league. |
+| Bid | The floor (= market value) plus the premium this league has actually paid over it. Capped by your recorded cash. |
+| Competition | Which rivals are structurally short in his position, so who you are bidding against. |
+| Verdict | `Bid` if he improves the XI, `pass` if he doesn't, `No` if you can't reach the floor. |
+
+The watchlist collapses to the same players, unfiltered — no start-probability
+or budget cuts, because a 40%-start player on today's slate is still a choice
+you are making — and `behaviour.md` §5 restricts its demand forecast to them.
 
 OCR output is expected to be bad and that's fine — `Inigo Ruiz Galarreta`
 resolves to `Iñigo Ruiz de Galarreta`. What it will never do is guess: a bare
 `Dani` is reported under "Names I could not place" with the five candidates,
 because a wrong player costs real money.
+
+Every slate you paste is appended to `data/decisions/slate_log.csv`. A player
+who sat on the slate and never appears in `transactions.csv` is one nobody
+would pay the floor for — the closest thing to a losing-bid ceiling that
+doesn't require typing anything. Nothing reads it yet; a fortnight of slates is
+not a base rate.
 
 **Names only, never prices.** Values are already scraped to the euro, and the
 minimum legal bid *is* the market value, so OCR only needs to tell you *who*.
@@ -83,6 +103,7 @@ src/                 ff_ingest.py (scrape+parse)  squads.py  report.py
                      history.py  fantasy_api.py  optimise.py (unused — Phase 3)
 src/ffcore/          shared core: parse (numbers)  text (names)  tidy (IO+time)
                      league (ownership+cash)  score (ratings+XI)
+                     bid (premiums, bid bands, XI gain)
 inputs/              you edit these — see above
 data/raw/dt=…/       gzipped HTML — immutable, never edit or delete
 data/tidy/*.csv      parsed output — disposable, rebuilt from raw
@@ -101,6 +122,7 @@ to `src/`:
 ```
 python src/ffcore/parse.py                      # number parsing
 PYTHONPATH=src python src/ffcore/league.py --selftest   # config + cash
+PYTHONPATH=src python src/ffcore/bid.py                 # premiums, bands, XI gain
 PYTHONPATH=src python src/digest.py --selftest          # report stitching
 PYTHONPATH=src python src/xi.py --selftest              # XI from bench
 PYTHONPATH=src python src/seen.py --selftest            # OCR name matching
@@ -127,15 +149,36 @@ owned. There is no external feed to replace it with: the slate is 12 free
 agents drawn at random per league, on a clock set by the hour your league was
 created, and every market endpoint is namespaced by private league id.
 `reports/watchlist.md` covers the same ground without typing — it ranks
-everyone the ledger says nobody owns, so it cannot go stale.
+everyone the ledger says nobody owns, so it cannot go stale. `inputs/seen.txt`
+is not that mistake returning: it is OCR'd rather than typed, it is names only,
+and it is deleted on every run that doesn't paste one, so it can never be
+mistaken for state.
+
+**The floor has never won, and roundness never proved otherwise.** All ten
+priced purchases in the ledger landed above the market value at the time —
+median +8.9%, range +1.5% to +21.6%. The minimum legal bid *is* the market
+value, so bidding it is bidding the one number this league has already beaten
+ten times. `rivals.py` used to read a non-round price as "the app's own
+valuation, so nobody competed and you could have had him for the same money".
+That was inverted: the five exact-priced buys went for +1.5%, +2.6%, +2.6%,
++9.2% and +12.7%, and only 0.7% of current market values are divisible by 10k,
+so the app almost never hands you a round number in the first place. A round
+bid does mean a human typed it — that half stands, as an observation about how
+they type — but the premium column measures the thing directly, and a sealed
+bid is paid *as bid*, so even a purchase at exactly the floor would only have
+been yours if the undocumented tie-break favoured you. Verify that in-app
+before treating any floor price as a missed bargain.
 
 **Bid logging was removed, deliberately.** `inputs/bids.csv` asked you to type
 a bid and then come back and type its outcome. Nobody comes back: both rows in
 it said `pending` while the ledger already showed one won and one lost. A field
 you have to revisit is a field that drifts. Winning bids are captured
 automatically — a win *is* a transaction — so the only thing lost is losing
-bids, and `rivals.py` infers rival premiums from the ledger instead. Restore it
-from git history if the premium curve ever needs the losses.
+bids, and `ffcore/bid.py` infers premiums from the ledger instead. What losing
+bids would buy is a P(win | bid) curve, and ten deals cannot fit one; the
+ceiling half of the question is answered for free by `slate_log.csv`, which
+records what was on offer and therefore what went unsold. Restore `bids.csv`
+from git history only when the sample is large enough to fit a curve.
 
 **Empty results say why.** A silently-blank probable XI would set every start
 probability to zero and quietly bench your best players, so each section

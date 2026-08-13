@@ -6,16 +6,18 @@ Reads:
   inputs/league.ini           managers, budgets, thresholds (all optional)
   inputs/cash.txt             any balance you have actually seen
   inputs/seen.txt             optional — today's market slate, OCR'd off your
-                              phone. Marks which of the watchlist you can
-                              actually buy right now. Scratch, not state.
+                              phone. When present the watchlist BECOMES the
+                              slate. Scratch, not state.
   data/tidy/*.csv             values, 24h moves, start probabilities
 
 Writes:
   reports/rivals.md       every rival squad, what they pay, what they can
                           still spend
-  reports/watchlist.md    everyone unowned, cut to something phone-readable
+  reports/watchlist.md    the slate when you pasted one, otherwise everyone
+                          unowned cut to something phone-readable
   inputs/squad.txt        GENERATED — your roster, so report.py keeps working
                           unchanged. Stop hand-editing this file.
+  data/decisions/slate_log.csv  append-only: which players were on offer when
 
 Run via workflow_dispatch. No arguments.
 
@@ -37,39 +39,51 @@ from common import (load_players, fmt_money, fmt_pct, pos_key,  # noqa: E402
                     flag, POS_ORDER)
 from ffcore.league import League  # noqa: E402
 from ffcore.text import norm  # noqa: E402
-from ffcore.tidy import REPORTS, input_path, write_lines  # noqa: E402
-from seen import match, read_names  # noqa: E402
+from ffcore.tidy import (DECISIONS, REPORTS, append_csv,  # noqa: E402
+                         write_lines)
+from seen import read_slate  # noqa: E402
 
 HEAD = ("| Player | Team | Pos | Value | 24h | Start% |\n"
         "|---|---|--:|--:|--:|--:|")
 
-HEAD_SEEN = ("| Player | Team | Pos | Value | 24h | Start% | On offer |\n"
-             "|---|---|--:|--:|--:|--:|---|")
+SLATE_LOG = ["observed_at", "player", "value", "start_pct"]
 
 
-def row(rec, on_offer=None):
-    cells = [rec.get("name", "?") + flag(rec),
-             rec.get("team", "—"),
-             (rec.get("pos") or "—")[:3],
-             fmt_money(rec.get("value")),
-             fmt_money(rec.get("delta_1d")),
-             fmt_pct(rec.get("start"))]
-    if on_offer:
-        cells.append("✅" if norm(rec.get("name")) in on_offer else "—")
-    return "| %s |" % " | ".join(cells)
+def row(rec):
+    return "| %s |" % " | ".join([
+        rec.get("name", "?") + flag(rec),
+        rec.get("team", "—"),
+        (rec.get("pos") or "—")[:3],
+        fmt_money(rec.get("value")),
+        fmt_money(rec.get("delta_1d")),
+        fmt_pct(rec.get("start"))])
 
 
-def read_seen(players):
-    """(keys on offer, unresolved, ambiguous) from inputs/seen.txt.
+def log_slate(on_offer, players, stamp):
+    """Append-only record of every slate you paste.
 
-    Absent file is the normal case — you only paste a slate when deciding.
-    The file is scratch, not state: nothing downstream depends on it being
-    current, so it cannot drift the way offers.txt did.
+    A player who sat on the slate and was never bought is one nobody would pay
+    the floor for, which is the ceiling evidence issue #21 asked about — and it
+    arrives for free, as a by-product of the paste you already do, rather than
+    from a field you have to come back and update. Join it to
+    inputs/transactions.csv to ask what went unsold.
+
+    Nothing reads this yet. A fortnight of slates is not a base rate, and
+    saying so is cheaper than a section that pretends otherwise.
     """
-    path = input_path("seen.txt")
-    if not path.exists():
-        return set(), [], []
-    return match(read_names(path.read_text(encoding="utf-8")), players)
+    if not on_offer:
+        return
+    rows = []
+    for k in sorted(on_offer):
+        rec = players.get(k, {})
+        rows.append({
+            "observed_at": stamp,
+            "player": rec.get("name", k),
+            "value": "" if rec.get("value") is None else "%.0f" % rec["value"],
+            "start_pct": ("" if rec.get("start") is None
+                          else "%.0f" % rec["start"]),
+        })
+    append_csv(DECISIONS / "slate_log.csv", rows, SLATE_LOG)
 
 
 def write_rivals(lg, players, stamp):
@@ -139,60 +153,60 @@ def write_rivals(lg, players, stamp):
     write_lines(REPORTS / "rivals.md", out)
 
 
-def write_watchlist(lg, players, stamp):
+def write_watchlist(lg, players, stamp, on_offer, unresolved, ambiguous):
     cash = lg[lg.cfg.me].cash if lg.cfg.me in lg.managers else None
     budget = cash.value if cash and cash.confidence == "known" else None
 
-    on_offer, unresolved, ambiguous = read_seen(players)
-
     free = [r for k, r in players.items() if k not in lg.owner]
-    out = ["# Watchlist — %s" % stamp, "",
-           "Everyone not owned by the %d of us, %d%% start or better."
-           % (len(lg.managers), int(lg.cfg.min_start)), ""]
-    if budget:
-        out += ["Filtered to what your %s of cash can reach."
-                % fmt_money(budget), ""]
+    out = ["# Watchlist — %s" % stamp, ""]
     if on_offer:
-        out += ["**%d of these are on offer right now** (from the slate you "
-                "pasted in) — they sort to the top of each position and carry "
-                "a ✅." % len(on_offer), ""]
+        # Slate pasted: this list IS the decision, so it is not filtered and
+        # not truncated. A 40%-start player on today's slate is a choice you
+        # are making; the 95% starter who isn't on it is not.
+        out += ["The %d players you pasted as today's slate — everyone you can "
+                "actually bid on right now, unfiltered. What each one is worth "
+                "to your XI, and what to bid, is in the slate table at the top "
+                "of this report." % len(on_offer), ""]
+    else:
+        out += ["Everyone not owned by the %d of us, %d%% start or better."
+                % (len(lg.managers), int(lg.cfg.min_start)), ""]
+        if budget:
+            out += ["Filtered to what your %s of cash can reach."
+                    % fmt_money(budget), ""]
 
-    head = HEAD_SEEN if on_offer else HEAD
     for pos in POS_ORDER:
-        pool = [r for r in free
-                if (r.get("pos") or "").lower() == pos
-                and (r.get("start") or 0) >= lg.cfg.min_start
-                and (budget is None or (r.get("value") or 0) <= budget)]
-        # On offer first: a 95% starter you cannot buy today is not a
-        # decision, and the whole point of the slate is to say which are.
-        pool.sort(key=lambda r: (norm(r.get("name")) not in on_offer,
-                                 -(r.get("start") or 0),
+        if on_offer:
+            pool = [r for r in free
+                    if (r.get("pos") or "").lower() == pos
+                    and norm(r.get("name")) in on_offer]
+        else:
+            pool = [r for r in free
+                    if (r.get("pos") or "").lower() == pos
+                    and (r.get("start") or 0) >= lg.cfg.min_start
+                    and (budget is None or (r.get("value") or 0) <= budget)]
+        pool.sort(key=lambda r: (-(r.get("start") or 0),
                                  -(r.get("delta_1d") or 0)))
         if not pool:
             continue
-        out += ["## %s" % pos, "", head]
-        out += [row(r, on_offer) for r in pool[:lg.cfg.top_n_per_pos]]
+        out += ["## %s" % pos, "", HEAD]
+        out += [row(r) for r in (pool if on_offer
+                                 else pool[:lg.cfg.top_n_per_pos])]
         out.append("")
 
     if unresolved or ambiguous:
         out += ["## Names I could not place", "",
-                "OCR mangled these past matching, so they are missing from "
-                "the ✅ marks above — re-read them off the app if one matters.",
-                ""]
+                "OCR mangled these past matching, so they are missing from the "
+                "tables above — re-read them off the app if one matters.", ""]
         out += ["- **%s** — no match" % u for u in unresolved]
         out += ["- **%s** — could be %s" % (raw, ", ".join(cands))
                 for raw, cands in ambiguous]
         out.append("")
 
     out += ["---", ""]
-    if on_offer:
-        out += ["A ✅ means you told me it was on the slate. Everything else "
-                "is the shortlist to recognise against when the slate "
-                "rotates.", ""]
-    else:
+    if not on_offer:
         out += ["Not all of these are purchasable today — the app deals a "
-                "limited slate. Paste today's slate into the `seen` input to "
-                "mark which ones you can actually buy.", ""]
+                "limited slate. Paste today's slate into the `seen` input and "
+                "this list becomes the slate itself.", ""]
     write_lines(REPORTS / "watchlist.md", out)
 
 
@@ -212,13 +226,20 @@ def write_squad_file(lg, players, path="inputs/squad.txt"):
 
 
 def main():
-    stamp = dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+    now = dt.datetime.now(dt.timezone.utc)
+    stamp = now.strftime("%Y-%m-%d %H:%M UTC")
     players = load_players()
     lg = League.load()
     print("replayed %d transaction(s)" % len(lg.txns))
 
+    on_offer, unresolved, ambiguous = read_slate(players)
+    if on_offer or unresolved or ambiguous:
+        print("slate: %d on offer, %d unresolved, %d ambiguous"
+              % (len(on_offer), len(unresolved), len(ambiguous)))
+    log_slate(on_offer, players, now.strftime("%Y-%m-%dT%H:%MZ"))
+
     write_rivals(lg, players, stamp)
-    write_watchlist(lg, players, stamp)
+    write_watchlist(lg, players, stamp, on_offer, unresolved, ambiguous)
     write_squad_file(lg, players)
 
     unmatched = lg.unmatched(players)

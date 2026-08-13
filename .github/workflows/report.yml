@@ -63,6 +63,7 @@ jobs:
         run: |
           python src/ffcore/parse.py
           PYTHONPATH=src python src/ffcore/league.py --selftest
+          PYTHONPATH=src python src/ffcore/bid.py
           PYTHONPATH=src python src/digest.py --selftest
           PYTHONPATH=src python src/xi.py --selftest
           PYTHONPATH=src python src/seen.py --selftest

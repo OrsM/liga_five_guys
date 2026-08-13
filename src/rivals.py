@@ -7,10 +7,9 @@ Five sections, in descending order of how much they are worth to you today:
 
   1. Cash and ceilings   what each rival can still spend. A hard bound on
                          tomorrow's bidding, and the app never shows it.
-  2. Premium curve       what they pay over market value, and whether their
-                         bids are round numbers (a deliberate auction bid) or
-                         exact ones (nobody competed and you missed a free
-                         player).
+  2. Premium curve       what they pay over market value. Every priced buy so
+                         far went above the floor, so the minimum legal bid is
+                         the one number known to lose (issue #23).
   3. Post-buy drift      what their purchases did next. Tests two specific
                          errors: momentum chasing and selling into a dip.
   4. Squad diagnostics   trapped capital, injured holds, positional holes,
@@ -39,23 +38,20 @@ from collections import Counter
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from ffcore.league import MARKET, League  # noqa: E402
-from ffcore.parse import money  # noqa: E402
+from ffcore.bid import (MAX_LAG_H, deals, premiums, rivals_short,  # noqa: E402
+                        usable)
+from ffcore.league import League  # noqa: E402
 from ffcore.score import (MAX_SLOT, SLOT_LABEL, SLOT_MIN, THIN,  # noqa: E402
                           Scorer, pick_xi, squad_pool)
+from ffcore.text import norm  # noqa: E402
 from ffcore.tidy import (DECISIONS, REPORTS, append_csv, latest_only,  # noqa: E402
-                         ledger_stamp, load_market, load_xi, read_csv,
-                         write_lines, SEASON)
+                         load_market, load_xi, read_csv, write_lines, SEASON)
+from seen import read_slate  # noqa: E402
 
-# A premium computed against a snapshot further than this from the deal is
-# reported but not averaged in.
-MAX_LAG_H = 36.0
 # Drift horizons, in days after a purchase.
 HORIZONS = (3, 7, 14)
 # Below this start probability, money is parked rather than working.
 TRAPPED_START = 50.0
-# Round-number detection: a bid divisible by this was chosen, not computed.
-ROUND_TO = 10_000
 
 
 def eur(v) -> str:
@@ -68,11 +64,6 @@ def eur(v) -> str:
 
 def pct(v) -> str:
     return "—" if v is None else "%+.1f%%" % v
-
-
-def is_round(price) -> bool:
-    v = money(price)
-    return v is not None and v > 0 and v % ROUND_TO == 0
 
 
 def load_history() -> tuple[dict, str]:
@@ -129,36 +120,6 @@ def sec_cash(lg) -> list[str]:
 # 2. premium curve
 # ---------------------------------------------------------------------------
 
-def deals(lg, market):
-    """Every ledger row, priced against the value at the time it happened."""
-    rows = []
-    for t in lg.txns:
-        price = money(t.get("price"))
-        when = ledger_stamp(t.get("date", ""))
-        if price is None or when is None:
-            continue
-        v = market.at(t["player"], when)
-        src = (t.get("from") or "").strip() or MARKET
-        dst = (t.get("to") or "").strip() or MARKET
-        rows.append({
-            "date": t.get("date", ""), "player": t["player"],
-            "actor": dst if dst != MARKET else src,
-            "side": "buy" if dst != MARKET else "sell",
-            "price": price, "when": when,
-            "value": v.value if v else None,
-            "lag_h": v.lag_h if v else None,
-            "premium": ((price / v.value - 1) * 100.0
-                        if v and v.value else None),
-            "round": is_round(t.get("price")),
-        })
-    return rows
-
-
-def usable(d) -> bool:
-    return (d["premium"] is not None and d["lag_h"] is not None
-            and abs(d["lag_h"]) <= MAX_LAG_H)
-
-
 def sec_premium(lg, dl) -> list[str]:
     out = ["## 2. What they pay over value", ""]
     buys = [d for d in dl if d["side"] == "buy"]
@@ -181,11 +142,24 @@ def sec_premium(lg, dl) -> list[str]:
             pct(prem[0]), pct(prem[-1]), rnd,
             len([d for d in buys if d["actor"] == m.handle])))
 
+    all_prem = premiums(dl)
+    if all_prem:
+        out += ["",
+                "**The floor has never won.** Every priced purchase in this "
+                "league landed above the market value at the time: %s. The "
+                "minimum legal bid is the market value, so bidding it is "
+                "bidding the number %d deals have already beaten."
+                % (all_prem.label(), all_prem.n)]
+
     out += ["",
-            "A round bid was chosen by a human bidding against someone. An "
-            "exact one is the app's own valuation, which means nobody "
-            "competed — every exact purchase in the table below was a player "
-            "you could have had for the same money.", "",
+            "A round bid was typed by a human. That is the whole of what "
+            "roundness tells you — an exact bid is *not* the app's valuation "
+            "and does not mean nobody competed, because the premium column "
+            "two cells left already measures how far above the floor the "
+            "buyer went, and none of these went to the floor. Sealed bids are "
+            "paid as bid, so even a purchase at exactly the value would only "
+            "have been yours if the tie-break favoured you, and that rule is "
+            "not documented anywhere we can read.", "",
             "| Date | Player | Buyer | Paid | Value then | Premium | Bid |",
             "|---|---|---|--:|--:|--:|---|"]
     for d in sorted(buys, key=lambda d: d["date"], reverse=True)[:25]:
@@ -291,27 +265,26 @@ def sec_squads(lg, sc, players_by_key) -> list[str]:
 # 5. demand forecast
 # ---------------------------------------------------------------------------
 
-def sec_demand(lg, sc, market_latest) -> list[str]:
+def sec_demand(lg, sc, market_latest, on_offer=None) -> list[str]:
     out = ["## 5. Who wants what", ""]
 
-    need: dict[str, list[str]] = {}
-    for m in lg:
-        scored, _ = sc.score_squad(
-            [market_latest.get(k, {}).get("name", k) for k in m.players])
-        counts = Counter(p.slot for p in scored if p.slot)
-        for slot, floor in THIN.items():
-            if counts.get(slot, 0) < floor:
-                need.setdefault(slot, []).append(m.handle)
-
-    rivals_need = {s: [h for h in hs if h != lg.cfg.me]
-                   for s, hs in need.items()}
+    rivals_need = rivals_short(lg, sc, market_latest)
 
     free = [r for k, r in market_latest.items() if k not in lg.owner]
+    if on_offer:
+        # A slate was pasted, so "who wants what" is only worth asking about
+        # players you can actually bid on today. Everyone else is a name to
+        # recognise later, and section 5 was the longest table in the report.
+        free = [r for r in free if norm(r.get("name")) in on_offer]
+        out += ["Restricted to the %d players on today's slate — the rest of "
+                "the market is not a decision you can make today." % len(free),
+                ""]
     scored_free = [sc.score(r) for r in free]
     scored_free = [p for p in scored_free if p.slot]
     scored_free.sort(key=lambda p: -p.score)
 
-    contested = [p for p in scored_free if rivals_need.get(p.slot)][:12]
+    cap = None if on_offer else 12
+    contested = [p for p in scored_free if rivals_need.get(p.slot)][:cap]
     if contested:
         out += ["**Expect competition for these** — the position is one a "
                 "rival is short in, so assume a bidding war and price "
@@ -325,7 +298,8 @@ def sec_demand(lg, sc, market_latest) -> list[str]:
                 ", ".join(rivals_need[p.slot])))
         out.append("")
 
-    uncontested = [p for p in scored_free if not rivals_need.get(p.slot)][:8]
+    uncontested = [p for p in scored_free
+                   if not rivals_need.get(p.slot)][:None if on_offer else 8]
     if uncontested:
         out += ["**Nobody else needs these.** Same quality, no auction — "
                 "take the equivalent player here instead of paying a premium "
@@ -408,6 +382,7 @@ def main() -> None:
     by_key = lg.market.latest() if lg.market else {}
 
     dl = deals(lg, lg.market)
+    on_offer, _, _ = read_slate(by_key)
     stamp = dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
 
     out = ["# League behaviour — %s" % stamp, "",
@@ -420,7 +395,7 @@ def main() -> None:
     out += sec_premium(lg, dl)
     out += sec_drift(lg, dl, lg.market)
     out += sec_squads(lg, sc, by_key)
-    out += sec_demand(lg, sc, by_key)
+    out += sec_demand(lg, sc, by_key, on_offer)
 
     if lg.warnings:
         out += ["## Ledger warnings", ""] + ["- " + w for w in lg.warnings]
