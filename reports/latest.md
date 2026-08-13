@@ -1,4 +1,4 @@
-# Fantasy report — 2026-08-13T0754Z
+# Fantasy report — 2026-08-13T0923Z
 
 ## Needs a decision
 
@@ -11,15 +11,15 @@ Compare squad value with the app; a mismatch means a name matched the wrong play
 
 ## Team
 
-**4-5-1** · index 29.3 (a ranking number, not a points forecast)
+**4-5-1** · index 29.2 (a ranking number, not a points forecast)
 
 | | Player | Start% | Value | 24h | Score | Last season |
 |---|---|--:|--:|--:|--:|---|
 | POR | Alvaro Fernandez | 20% | 4.88M | -86K | 0.9 | **assumed** |
-| DEF | Carl Starfelt | 70% | 13.62M | 105K | 3.6 | 106p/19j |
+| DEF | Carl Starfelt | 60% | 13.62M | 105K | 3.1 | 106p/19j |
 | DEF | Igor Zubeldia | 80% | 9.79M | 61K | 3.0 | 90p/25j |
+| DEF | Robin Le Normand | 60% | 9.85M | -82K | 2.6 | 125p/28j |
 | DEF | Omar El Hilali | 80% | 8.67M | 113K | 2.4 | 101p/36j |
-| DEF | Robin Le Normand | 50% | 9.85M | -82K | 2.2 | 125p/28j |
 | MED | Jon Moncayola | 90% | 6.60M | 80K | 3.9 | 159p/36j |
 | MED | Ruben Garcia | 60% | 13.46M | 200K | 2.9 | 174p/35j |
 | MED | Iñigo Ruiz de Galarreta | 60% | 11.99M | 98K | 2.7 | 156p/34j |
@@ -31,10 +31,10 @@ Compare squad value with the app; a mismatch means a name matched the wrong play
 
 | Player | Pos | Value | Score | Gap | €/pt | Why |
 |---|---|--:|--:|--:|--:|---|
-| Orri Steinn Oskarsson | del | 8.00M | 1.7 | -0.5 | 4.69M | outscored |
-| Hugo Duro | del | 8.49M | 1.9 | -0.3 | 4.44M | outscored |
+| Orri Steinn Oskarsson | del | 8.00M | 1.7 | -0.7 | 4.69M | outscored |
+| Hugo Duro | del | 8.49M | 1.9 | -0.5 | 4.44M | outscored |
 | Pepelu | med | 7.41M | 2.1 | -0.4 | 3.45M | 6th MED — only 5 can ever play |
-| Dani Martinez | def | 412K | 0.5 | -1.7 | 794K | outscored |
+| Dani Martinez | def | 412K | 0.5 | -1.9 | 794K | outscored |
 
 _A sale lands above or below value depending on who bids. Who is short in this position, and who can still afford you, is in `reports/behaviour.md`._
 
@@ -55,4 +55,4 @@ _611 players tracked, 508 with a probable-XI reading. Who to buy is in `reports/
 
 _Score = shrunk pts/match (K=8, 2025-26) × P(start), from `ffcore/score.py` — the same scorer rivals.py uses. Recommended XIs are logged to `data/decisions/squad_log.csv` for scoring against reality later._
 
-_Generated 2026-08-13 07:55 UTC._
+_Generated 2026-08-13 09:24 UTC._
