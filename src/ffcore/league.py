@@ -332,15 +332,16 @@ class League:
                 basis = "balance you recorded%s" % (
                     " on " + since_s if since_s else "")
             else:
-                initial = self._initial_value(handle)
-                if not budget or initial is None:
+                if not budget:
                     mgr.cash = Cash(None, "unknown",
-                                    "no balance recorded and initial squad "
-                                    "not priceable", "")
+                                    "no balance recorded and no budget "
+                                    "configured", "")
                     continue
-                base, since, conf = budget - initial, None, "estimated"
-                basis = ("%.0fM budget less %.1fM of starting squad at the "
-                         "first snapshot" % (budget / 1e6, initial / 1e6))
+                # The starting roster is dealt free, so the whole budget is
+                # the anchor. Charging it against roster value put every
+                # rival tens of millions under water.
+                base, since, conf = budget, None, "estimated"
+                basis = "%.0fM starting budget" % (budget / 1e6)
 
             delta, counted = 0.0, 0
             for t in self.txns:
@@ -358,19 +359,27 @@ class League:
                     counted += 1
 
             value = base + delta
+            if value < 0:
+                # Impossible in the app, so an input is wrong: unrecorded
+                # sales, income the ledger never sees, or a bigger starting
+                # balance than configured. Publishing it as a number is worse
+                # than admitting ignorance, because max_bid used to clamp it
+                # to 0 and the report then called the manager unable to
+                # escalate. Keep the arithmetic in the basis so the size of
+                # the discrepancy stays visible.
+                self.warnings.append(
+                    "%s: net spend exceeds the %.0fM budget by %.2fM — "
+                    "unrecorded sales, or they started with more. Cash "
+                    "reported as unknown; ask before assuming they are "
+                    "broke." % (handle, budget / 1e6, -value / 1e6))
+                mgr.cash = Cash(None, "unknown",
+                                "%s, then %d ledger row(s), which overdraws "
+                                "it by %.2fM" % (basis, counted, -value / 1e6),
+                                _now())
+                continue
             mgr.cash = Cash(value, conf,
                             "%s, then %d ledger row(s)" % (basis, counted),
                             _now())
-            if value < 0:
-                # Not possible in the app, so one of the inputs is wrong.
-                # Most often the anchor: a date with no time is read as
-                # midnight, so a balance you actually checked AFTER the
-                # 21:24 market resolution gets the same day's purchases
-                # subtracted from it a second time.
-                self.warnings.append(
-                    "%s: cash estimate is negative (%.2fM) — %s. Check the "
-                    "anchor time in cash.txt, or a missing sale in the "
-                    "ledger." % (handle, value / 1e6, basis))
 
     # -- views ---------------------------------------------------------
 
@@ -424,7 +433,46 @@ start_cross   = 70
     real = load_config()
     assert real.min_start is not None
 
-    print("ffcore.league self-test OK (7 cases)")
+    _selftest_cash()
+    print("ffcore.league self-test OK (7 cases + cash)")
+
+
+def _selftest_cash() -> None:
+    """Cash from a free starting squad.
+
+    The draft hands out a randomised roster at no cost plus a separate cash
+    balance, so the anchor is the whole budget. Anchoring on
+    budget - roster_value charged everyone for players they were given and
+    put all four rivals tens of millions under water.
+    """
+    cfg = Config(me="nobody", budget=100e6)   # not a handle in cash.txt
+    rosters = {"me": ["a"], "rich": ["b"], "spent": ["c"]}
+    txns = [
+        # rich buys 10M, sells 4M -> 100 - 10 + 4 = 94M
+        {"date": "2026-08-11T21:24", "player": "x", "from": MARKET,
+         "to": "rich", "price": "10000000"},
+        {"date": "2026-08-11T21:42", "player": "b", "from": "rich",
+         "to": MARKET, "price": "4000000"},
+        # spent outruns the budget: a bound, not a balance
+        {"date": "2026-08-12T21:24", "player": "y", "from": MARKET,
+         "to": "spent", "price": "124560000"},
+    ]
+    lg = League(cfg, rosters, txns, None)
+
+    assert lg["rich"].cash.value == 94e6, lg["rich"].cash.value
+    assert lg["me"].cash.value == 100e6, lg["me"].cash.value
+
+    # An untouched manager is at the full budget, not at "unknown" — the old
+    # code needed a priceable market to say anything at all.
+    assert lg["me"].cash.confidence == "estimated", lg["me"].cash.confidence
+
+    # Overspend must not silently clamp to a confident zero: that is what
+    # told the report four rivals "cannot escalate".
+    over = lg["spent"]
+    assert over.cash.value is None, over.cash.value
+    assert over.cash.confidence == "unknown", over.cash.confidence
+    assert over.max_bid is None, over.max_bid
+    assert any("exceeds" in w for w in lg.warnings), lg.warnings
 
 
 if __name__ == "__main__":                      # pragma: no cover

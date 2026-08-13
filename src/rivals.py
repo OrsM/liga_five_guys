@@ -106,10 +106,13 @@ def sec_cash(lg) -> list[str]:
             len(m.players), eur(m.spend), eur(m.proceeds), eur(m.net),
             m.cash.label(), eur(m.max_bid)))
     out += ["",
-            "`~` is an estimate anchored on budget minus starting-squad "
-            "value, not an observed balance. Treat it as a ceiling. Any time "
-            "a rival mentions a balance, put it in `inputs/cash.txt` — one "
-            "observed number turns their whole estimate into arithmetic.", ""]
+            "`~` is an estimate: the starting budget less every ledger row, "
+            "not an observed balance. The starting squad was dealt free, so "
+            "it costs nothing here. A `—` means the ledger overdraws the "
+            "budget, so the number would be fiction — see the warnings. Any "
+            "time a rival mentions a balance, put it in `inputs/cash.txt` — "
+            "one observed number turns their whole estimate into "
+            "arithmetic.", ""]
 
     poor = [m for m in lg
             if m.handle != lg.cfg.me and m.max_bid is not None
