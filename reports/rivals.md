@@ -1,10 +1,20 @@
-# Squads — 2026-08-12 22:03 UTC
+# Squads — 2026-08-13 07:55 UTC
+
+| Manager | Players | Squad value | Spent | Raised | Cash |
+|---|--:|--:|--:|--:|--:|
+| **miguel_autentico** | 15 | 138.15M | 6.89M | 0K | 93.58M |
+| Albert Laporta | 11 | 150.38M | 49.99M | 30.47M | ~-51.58M |
+| BurtonGM89 | 17 | 246.68M | 125.03M | 469K | ~-158.62M |
+| Magic Mike 333 | 18 | 211.44M | 83.70M | 0K | ~-114.87M |
+| SusoGattuso | 14 | 114.47M | 0K | 0K | ~-31.54M |
+
+`~` is an estimate, not an observed balance — see the basis notes at the bottom. Cash is a ceiling on what anyone can bid tomorrow, which is the point of tracking it.
 
 ## You (miguel_autentico)
-15 players · 138.15M total · 7 at 70%+
+15 players · 138.15M total · 7 at 70%+ · cash 93.58M
 
 | Player | Team | Pos | Value | 24h | Start% |
-|---|---|---|--:|--:|--:|
+|---|---|--:|--:|--:|--:|
 | alvaro fernandez | Deportivo | por | 4.97M | -80K | 20% |
 | carl starfelt | Celta | def | 13.51M | 284K | 70% |
 | robin le normand | Atlético | def | 9.94M | -97K | 50% |
@@ -22,10 +32,10 @@
 | orri steinn oskarsson | Real Sociedad | del | 8.13M | -138K | 40% |
 
 ## Albert Laporta
-11 players · 150.38M total · 2 at 70%+
+11 players · 150.38M total · 2 at 70%+ · cash ~-51.58M
 
 | Player | Team | Pos | Value | 24h | Start% |
-|---|---|---|--:|--:|--:|
+|---|---|--:|--:|--:|--:|
 | matias dituro | Elche | por | 7.03M | 166K | 90% |
 | diego javier llorente | Betis | def | 12.84M | 147K | 60% |
 | juan foyth | Villarreal | def | 11.22M | 240K | 50% |
@@ -39,10 +49,10 @@
 | ferran jutgla | Celta | del | 9.25M | 132K | 80% |
 
 ## BurtonGM89
-17 players · 246.68M total · 7 at 70%+
+17 players · 246.68M total · 7 at 70%+ · cash ~-158.62M
 
 | Player | Team | Pos | Value | 24h | Start% |
-|---|---|---|--:|--:|--:|
+|---|---|--:|--:|--:|--:|
 | marko dmitrovic | Espanyol | por | 36.84M | 494K | 95% |
 | juan musso | Atlético | por | 4.78M | -108K | 10% |
 | carlos romero | Villarreal | def | 41.60M | 1.03M | 80% |
@@ -62,10 +72,10 @@
 | joaquin muñoz | Málaga | del | 7.09M | -134K | 60% |
 
 ## Magic Mike 333
-18 players · 211.44M total · 7 at 70%+
+18 players · 211.44M total · 7 at 70%+ · cash ~-114.87M
 
 | Player | Team | Pos | Value | 24h | Start% |
-|---|---|---|--:|--:|--:|
+|---|---|--:|--:|--:|--:|
 | alfonso herrero | Málaga | por | 7.83M | 187K | 80% |
 | kike salas | Sevilla | def | 11.70M | 57K | 90% |
 | lucas noubi | Deportivo | def | 11.55M | 181K | 80% |
@@ -86,10 +96,10 @@
 | jon karrikaburu | Real Sociedad | del | 604K | -11K | 0% |
 
 ## SusoGattuso
-14 players · 114.47M total · 9 at 70%+
+14 players · 114.47M total · 9 at 70%+ · cash ~-31.54M
 
 | Player | Team | Pos | Value | 24h | Start% |
-|---|---|---|--:|--:|--:|
+|---|---|--:|--:|--:|--:|
 | wojciech szczesny | Barcelona | por | 2.50M | -61K | 20% |
 | yuri berchiche | Athletic | def | 12.69M | -33K | 70% |
 | cesar tarrega | Valencia | def | 8.87M | -16K | 80% |
@@ -124,3 +134,18 @@
 | 2026-08-12T21:24 | pedro diaz | market → Magic Mike 333 | 2050000 |
 | 2026-08-12T21:24 | raphinha | market → Magic Mike 333 | 80000000 |
 | 2026-08-12T21:24 | marko dmitrovic | market → BurtonGM89 | 40010000 |
+
+## Cash basis
+
+- **miguel_autentico** — balance you recorded on 2026-08-12, then 0 ledger row(s) (known)
+- **Albert Laporta** — 100M budget less 132.1M of starting squad at the first snapshot, then 5 ledger row(s) (estimated)
+- **BurtonGM89** — 100M budget less 134.1M of starting squad at the first snapshot, then 5 ledger row(s) (estimated)
+- **Magic Mike 333** — 100M budget less 131.2M of starting squad at the first snapshot, then 4 ledger row(s) (estimated)
+- **SusoGattuso** — 100M budget less 131.5M of starting squad at the first snapshot, then 0 ledger row(s) (estimated)
+
+## Ledger warnings
+
+- Magic Mike 333: cash estimate is negative (-114.87M) — 100M budget less 131.2M of starting squad at the first snapshot. Check the anchor time in cash.txt, or a missing sale in the ledger.
+- Albert Laporta: cash estimate is negative (-51.58M) — 100M budget less 132.1M of starting squad at the first snapshot. Check the anchor time in cash.txt, or a missing sale in the ledger.
+- BurtonGM89: cash estimate is negative (-158.62M) — 100M budget less 134.1M of starting squad at the first snapshot. Check the anchor time in cash.txt, or a missing sale in the ledger.
+- SusoGattuso: cash estimate is negative (-31.54M) — 100M budget less 131.5M of starting squad at the first snapshot. Check the anchor time in cash.txt, or a missing sale in the ledger.

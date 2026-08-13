@@ -1,11 +1,13 @@
-# Watchlist — 2026-08-12 22:03 UTC
+# Watchlist — 2026-08-13 07:55 UTC
 
-Everyone not owned by the three of us, 60% start or better.
+Everyone not owned by the 5 of us, 60% start or better.
+
+Filtered to what your 93.58M of cash can reach.
 
 ## portero
 
 | Player | Team | Pos | Value | 24h | Start% |
-|---|---|---|--:|--:|--:|
+|---|---|--:|--:|--:|--:|
 | alvaro valles | Betis | por | 31.28M | 870K | 95% |
 | antonio sivera | Alavés | por | 30.92M | 461K | 95% |
 | augusto batalla | Rayo | por | 41.54M | -369K | 95% |
@@ -18,7 +20,7 @@ Everyone not owned by the three of us, 60% start or better.
 ## defensa
 
 | Player | Team | Pos | Value | 24h | Start% |
-|---|---|---|--:|--:|--:|
+|---|---|--:|--:|--:|--:|
 | leandro cabrera | Espanyol | def | 16.54M | 65K | 95% |
 | david affengruber | Elche | def | 33.43M | 181K | 90% |
 | abel bretones | Osasuna | def | 3.42M | 138K | 90% |
@@ -31,7 +33,7 @@ Everyone not owned by the three of us, 60% start or better.
 ## mediocampista
 
 | Player | Team | Pos | Value | 24h | Start% |
-|---|---|---|--:|--:|--:|
+|---|---|--:|--:|--:|--:|
 | david larrubia | Málaga | med | 56.33M | 390K | 90% |
 | jon ander olasagasti | Levante | med | 4.08M | 88K | 90% |
 | javi guerra | Valencia | med | 23.91M | -26K | 90% |
@@ -44,8 +46,7 @@ Everyone not owned by the three of us, 60% start or better.
 ## delantero
 
 | Player | Team | Pos | Value | 24h | Start% |
-|---|---|---|--:|--:|--:|
-| vinicius junior | Real Madrid | del | 105.54M | 1.84M | 90% |
+|---|---|--:|--:|--:|--:|
 | ante budimir | Osasuna | del | 48.30M | 773K | 90% |
 | martin satriano | Getafe | del | 4.34M | 0K | 90% |
 | jorge de frutos | Rayo | del | 48.59M | -691K | 90% |
@@ -53,6 +54,7 @@ Everyone not owned by the three of us, 60% start or better.
 | isi palazon | Rayo | del | 16.86M | 518K | 80% |
 | ademola lookman | Atlético | del | 79.19M | 112K | 80% |
 | ivan romero | Levante | del | 6.96M | 99K | 80% |
+| angel perez | Alavés | del | 6.91M | -86K | 80% |
 
 ---
 
