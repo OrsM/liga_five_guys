@@ -1,6 +1,6 @@
-# League behaviour — 2026-08-13 19:46 UTC
+# League behaviour — 2026-08-13 21:45 UTC
 
-5 managers, 18 ledger rows, 22 market snapshots, points baseline 2025-26.
+5 managers, 18 ledger rows, 23 market snapshots, points baseline 2025-26.
 
 ## 1. Cash and ceilings
 

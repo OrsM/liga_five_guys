@@ -1,4 +1,4 @@
-# Liga Five Guys — one report — 2026-08-13 19:46 UTC
+# Liga Five Guys — one report — 2026-08-13 21:45 UTC
 
 Everything the generators produced, in reading order. Sections that appeared twice are printed once.
 
@@ -60,12 +60,12 @@ _621 players tracked, 510 with a probable-XI reading. Who to buy is in `reports/
 
 _Score = shrunk pts/match (K=8, 2025-26) × P(start), from `ffcore/score.py` — the same scorer rivals.py uses. Recommended XIs are logged to `data/decisions/squad_log.csv` for scoring against reality later._
 
-_Generated 2026-08-13 19:46 UTC._
+_Generated 2026-08-13 21:45 UTC._
 
 ## Rivals — cash, premiums, squads
 
 
-5 managers, 18 ledger rows, 22 market snapshots, points baseline 2025-26.
+5 managers, 18 ledger rows, 23 market snapshots, points baseline 2025-26.
 
 ### 1. Cash and ceilings
 
