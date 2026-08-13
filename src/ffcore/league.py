@@ -38,8 +38,10 @@ from __future__ import annotations
 
 import configparser
 import os
+import sys
 from dataclasses import dataclass, field
 from datetime import datetime
+from pathlib import Path
 from typing import NamedTuple
 
 from ffcore.parse import money
@@ -86,7 +88,9 @@ class Config:
 
 def load_config(name: str = "league.ini") -> Config:
     path = input_path(name)
-    cp = configparser.ConfigParser()
+    # Trailing comments are stripped: every value here is coerced to a number,
+    # and read_rosters/read_balances already accept '#' on the same line.
+    cp = configparser.ConfigParser(inline_comment_prefixes=(";", "#"))
     cp.optionxform = str          # manager handles are case-sensitive
     if path.exists():
         cp.read(path, encoding="utf-8")
@@ -388,7 +392,45 @@ def _now() -> str:
     return datetime.now().astimezone().strftime("%Y-%m-%d %H:%M")
 
 
+def _selftest() -> None:
+    """Config parsing. Every value in league.ini arrives as a string and gets
+    coerced, so a comment style the parser doesn't strip is a crash, not a
+    bad default."""
+    import tempfile
+
+    ini = """
+[league]
+me = someone
+budget = 100.000.000
+
+[thresholds]
+min_start     = 60    ; watchlist floor
+top_n_per_pos = 8     # rows per position
+start_cross   = 70
+"""
+    with tempfile.TemporaryDirectory() as tmp:
+        p = Path(tmp) / "league.ini"
+        p.write_text(ini, encoding="utf-8")
+        cfg = load_config(str(p))
+
+    assert cfg.me == "someone", cfg.me
+    assert cfg.budget == 100_000_000, cfg.budget
+    assert cfg.min_start == 60.0, cfg.min_start        # ';' inline comment
+    assert cfg.top_n_per_pos == 8, cfg.top_n_per_pos   # '#' inline comment
+    assert cfg.start_cross == 70.0, cfg.start_cross    # no comment
+    assert cfg.keeper_start == 80.0, cfg.keeper_start  # absent -> default
+
+    # The real file must load, whatever is in it today.
+    real = load_config()
+    assert real.min_start is not None
+
+    print("ffcore.league self-test OK (7 cases)")
+
+
 if __name__ == "__main__":                      # pragma: no cover
+    if "--selftest" in sys.argv:
+        _selftest()
+        raise SystemExit(0)
     lg = League.load(with_market=bool(os.environ.get("FF_ROOT", "./data")))
     for m in lg:
         print("%-18s %2d players  spent %7.2fM  took %7.2fM  cash %8s  (%s)"

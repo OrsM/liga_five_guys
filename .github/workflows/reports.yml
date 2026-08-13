@@ -46,7 +46,9 @@ jobs:
         with:
           python-version: '3.12'
       - name: ffcore self-test
-        run: python src/ffcore/parse.py
+        run: |
+          python src/ffcore/parse.py
+          PYTHONPATH=src python src/ffcore/league.py --selftest
       - name: Import every module
         # Catches the class of break that only shows at import time —
         # a helper that moved, a name that no longer exists.
