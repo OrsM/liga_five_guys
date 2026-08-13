@@ -10,6 +10,13 @@ offers.txt format, one per line:
     martin satriano
     matias dituro, 6900000        # optional asking price from the app
 
+Every name is checked against current ownership before it is ranked. A list
+you type by hand goes stale the moment someone signs one of the players on it
+— 9 of the 21 names in the first real offers.txt were already owned, and all
+nine were still being ranked as buys. The ledger already knows, so the file
+corrects itself: owned names are moved to a "no longer on offer" list instead
+of quietly polluting the ranking.
+
 Writes reports/offers.md.
 """
 
@@ -23,6 +30,9 @@ from pathlib import Path
 
 import os, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+from ffcore.league import League  # noqa: E402
+from ffcore.text import norm  # noqa: E402
 
 ROOT = Path(os.environ.get("FF_ROOT", "./data"))
 TIDY = ROOT / "tidy"
@@ -72,10 +82,21 @@ def eur(v) -> str:
     return f"{v:.0f}"
 
 
+def owner_of(canonical_name: str, owner: dict) -> str | None:
+    """Who holds this player, or None if nobody does.
+
+    `owner` is keyed by ffcore.text.norm; this module resolves names with the
+    accent-only fold(), so the canonical market name has to be re-keyed before
+    the lookup. Getting that wrong is silent — every player looks free.
+    """
+    return owner.get(norm(canonical_name))
+
+
 def main() -> None:
     REPORTS.mkdir(exist_ok=True)
     market = latest(read_csv(TIDY / "market.csv"))
     xi = latest(read_csv(TIDY / "probable_xi.csv"))
+    lg = League.load(with_market=False)
 
     if not market:
         (REPORTS / "offers.md").write_text("# Offers\n\nNo market data.\n")
@@ -130,6 +151,10 @@ def main() -> None:
         if not r:
             rows.append({"missing": name.strip(), "candidates": candidates})
             continue
+        held = owner_of(r["name"], lg.owner)
+        if held:
+            rows.append({"taken": r["name"], "by": held})
+            continue
         k = fold(r["name"])
         value = num(r["value"])
         ask = num(price.replace(".", "").replace(" ", "")) if price.strip() else None
@@ -143,7 +168,7 @@ def main() -> None:
             "edge": (value - ask) if ask else num(r["delta_1d"]),
         })
 
-    found = [r for r in rows if "missing" not in r]
+    found = [r for r in rows if "missing" not in r and "taken" not in r]
     # Rank by start probability first — a non-starter scores nothing, so no
     # amount of price edge rescues one. Price edge breaks ties.
     found.sort(key=lambda r: (-(r["pct"] or 0), -r["edge"] / max(r["value"], 1)))
@@ -164,6 +189,13 @@ def main() -> None:
             f"{eur(r['value'])} | {ask} | {eur(r['edge'])} | "
             f"{eur(r['delta'])} | {pct} | {flag} |"
         )
+
+    taken = [r for r in rows if "taken" in r]
+    if taken:
+        out += ["", "**No longer on offer** — owned per the ledger, so they "
+                "are not rankable. Delete them from `inputs/offers.txt`.", ""]
+        for t in sorted(taken, key=lambda t: t["taken"]):
+            out.append(f"- {t['taken']} — {t['by']}")
 
     missing = [r for r in rows if "missing" in r]
     if missing:
@@ -186,5 +218,32 @@ def main() -> None:
     print(f"wrote reports/offers.md ({len(found)} players)")
 
 
+def _selftest() -> None:
+    # owner is keyed by norm(): accents folded, apostrophes dropped.
+    owner = {norm("Ferran Jutglà"): "Albert Laporta",
+             norm("Abde Ezzalzouli"): "Albert Laporta",
+             norm("N'Diaye"): "BurtonGM89"}
+
+    # An owned player is owned however his name is accented or punctuated.
+    assert owner_of("ferran jutgla", owner) == "Albert Laporta"
+    assert owner_of("Ferran Jutglà", owner) == "Albert Laporta"
+    assert owner_of("abde ezzalzouli", owner) == "Albert Laporta"
+    assert owner_of("NDiaye", owner) == "BurtonGM89"
+    # The lookup must survive punctuation the market spelling carries. This is
+    # the case that separates norm() from fold(): fold keeps the apostrophe.
+    assert owner_of("N'Diaye", owner) == "BurtonGM89"
+    # A free player is free.
+    assert owner_of("martin satriano", owner) is None
+    # fold() is NOT the ownership key. It agrees with norm() on accents but
+    # keeps apostrophes and dots, so looking up with it silently reports an
+    # owned player as free — the bug this function exists to prevent.
+    assert fold("N'Diaye") not in owner and norm("N'Diaye") in owner
+
+    print("offers self-test OK (7 cases)")
+
+
 if __name__ == "__main__":
+    if "--selftest" in sys.argv:
+        _selftest()
+        raise SystemExit(0)
     main()
