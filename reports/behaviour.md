@@ -1,6 +1,6 @@
-# League behaviour — 2026-08-13 15:35 UTC
+# League behaviour — 2026-08-13 19:46 UTC
 
-5 managers, 18 ledger rows, 21 market snapshots, points baseline 2025-26.
+5 managers, 18 ledger rows, 22 market snapshots, points baseline 2025-26.
 
 ## 1. Cash and ceilings
 
@@ -48,11 +48,11 @@ _No horizon has elapsed inside the snapshot history yet. Needs 3 days of daily i
 
 | Manager | XI score | Shape | Trapped | Injured | Thin at | Unmatched |
 |---|--:|---|--:|--:|---|--:|
-| **miguel_autentico** | 29.2 | 4-5-1 | 4.88M | 0 | por,del | 0 |
-| Albert Laporta | **illegal** | — | 58.19M | 0 | por,def,med | 0 |
-| BurtonGM89 | 34.2 | 4-4-2 | 50.26M | 0 | — | 0 |
-| Magic Mike 333 | 33.3 | 3-4-3 | 29.44M | 0 | por | 0 |
-| SusoGattuso | 27.1 | 4-4-2 | 26.43M | 0 | por | 0 |
+| **miguel_autentico** | 29.7 | 4-5-1 | 4.87M | 0 | por,del | 0 |
+| Albert Laporta | **illegal** | — | 58.12M | 0 | por,def,med | 0 |
+| BurtonGM89 | 33.9 | 4-3-3 | 55.08M | 0 | — | 0 |
+| Magic Mike 333 | 32.4 | 3-4-3 | 29.41M | 0 | por | 0 |
+| SusoGattuso | 27.1 | 4-4-2 | 26.36M | 0 | por | 0 |
 
 - miguel_autentico is carrying more mediocampista than can ever start.
 - **Albert Laporta cannot field a legal XI** — short at no legal shape. They have to buy there before the next lock, whatever it costs, which is the one situation where their premium goes out of the window.
@@ -68,37 +68,37 @@ Trapped is value held in players below 50% start probability — money that cann
 
 | Player | Pos | Value | Start% | Short here |
 |---|---|--:|--:|---|
-| joan garcia | POR | 66.34M | 80% | Albert Laporta, Magic Mike 333, SusoGattuso |
-| alvaro valles | POR | 31.94M | 95% | Albert Laporta, Magic Mike 333, SusoGattuso |
-| federico valverde | MED | 69.62M | 90% | Albert Laporta |
-| david soria | POR | 18.09M | 95% | Albert Laporta, Magic Mike 333, SusoGattuso |
-| jan oblak | POR | 53.53M | 90% | Albert Laporta, Magic Mike 333, SusoGattuso |
-| augusto batalla | POR | 41.10M | 95% | Albert Laporta, Magic Mike 333, SusoGattuso |
-| ionut radu | POR | 40.17M | 90% | Albert Laporta, Magic Mike 333, SusoGattuso |
-| zaid romero | DEF | 30.12M | 90% | Albert Laporta |
+| joan garcia | POR | 66.03M | 80% | Albert Laporta, Magic Mike 333, SusoGattuso |
+| alvaro valles | POR | 31.80M | 95% | Albert Laporta, Magic Mike 333, SusoGattuso |
+| federico valverde | MED | 69.44M | 90% | Albert Laporta |
+| david soria | POR | 18.03M | 95% | Albert Laporta, Magic Mike 333, SusoGattuso |
+| jan oblak | POR | 53.40M | 90% | Albert Laporta, Magic Mike 333, SusoGattuso |
+| augusto batalla | POR | 41.01M | 95% | Albert Laporta, Magic Mike 333, SusoGattuso |
+| ionut radu | POR | 40.06M | 90% | Albert Laporta, Magic Mike 333, SusoGattuso |
+| zaid romero | DEF | 29.06M | 90% | Albert Laporta |
 | mathew ryan | POR | 13.55M | 90% | Albert Laporta, Magic Mike 333, SusoGattuso |
-| florian lejeune | DEF | 38.27M | 90% | Albert Laporta |
-| pablo fornals | MED | 58.90M | 80% | Albert Laporta |
-| stole dimitrievski | POR | 13.35M | 90% | Albert Laporta, Magic Mike 333, SusoGattuso |
+| florian lejeune | DEF | 38.17M | 90% | Albert Laporta |
+| pablo fornals | MED | 58.77M | 80% | Albert Laporta |
+| stole dimitrievski | POR | 13.28M | 90% | Albert Laporta, Magic Mike 333, SusoGattuso |
 
 **Nobody else needs these.** Same quality, no auction — take the equivalent player here instead of paying a premium above.
 
 | Player | Pos | Value | Start% |
 |---|---|--:|--:|
-| kylian mbappe | DEL | 130.88M | 70% |
-| vinicius junior | DEL | 106.94M | 90% |
-| lamine yamal | DEL | 128.10M | 60% |
-| ante budimir | DEL | 49.05M | 90% |
-| martin satriano | DEL | 4.34M | 90% |
-| georges mikautadze | DEL | 61.39M | 80% |
-| jorge de frutos | DEL | 47.78M | 90% |
-| nicolas pepe | DEL | 49.29M | 70% |
+| kylian mbappe | DEL | 130.53M | 70% |
+| vinicius junior | DEL | 106.55M | 90% |
+| lamine yamal | DEL | 127.78M | 60% |
+| ante budimir | DEL | 48.86M | 90% |
+| martin satriano | DEL | 32.56M | 90% |
+| georges mikautadze | DEL | 61.15M | 80% |
+| jorge de frutos | DEL | 47.70M | 90% |
+| nicolas pepe | DEL | 49.14M | 70% |
 
 **List these to them.** Players of yours who aren't starting, in a position a rival is short in. You stop competing with them and start selling to them; price just under the premium they showed in section 2.
 
 | Player | Pos | Value | Start% | Short |
 |---|---|--:|--:|---|
-| alvaro fernandez | POR | 4.88M | 20% | Albert Laporta, Magic Mike 333, SusoGattuso |
+| alvaro fernandez | POR | 4.87M | 20% | Albert Laporta, Magic Mike 333, SusoGattuso |
 
 ## Ledger warnings
 
