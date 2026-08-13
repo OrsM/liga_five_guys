@@ -5,3 +5,8 @@ __pycache__/
 *.pyc
 .venv/
 .env
+
+# Quarto renders of reports/latest.md. Every workflow does `git add -A reports`,
+# so without this a local render gets committed by the next bot run.
+reports/latest.html
+reports/latest_files/

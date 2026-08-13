@@ -47,10 +47,29 @@ jobs:
           FF_ROOT: ./data
         run: python src/report.py
 
+      # rivals.py is the only writer of reports/behaviour.md, and it used to
+      # run on manual dispatch only — which is why that file, linked three
+      # times from latest.md, had never once been committed.
+      - name: League behaviour
+        env:
+          FF_ROOT: ./data
+        run: python src/rivals.py
+
       - name: Bid log
         env:
           FF_ROOT: ./data
         run: python src/bids.py
+
+      - name: Cash and warnings
+        run: |
+          {
+            echo '## Cash'
+            sed -n '/^## 1\./,/^## 2\./p' reports/behaviour.md \
+              | grep '^|' || echo '_no cash table_'
+            echo '### Warnings'
+            grep -A20 '^## Ledger warnings' reports/behaviour.md \
+              | grep '^- ' || echo '_none_'
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Commit
         run: |
