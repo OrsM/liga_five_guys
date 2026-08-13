@@ -1,41 +1,87 @@
 # liga_five_guys
 
-Data-driven decision system for LaLiga Fantasy Oficial. Private league
-"Some Guys", 3 managers. Runs entirely on GitHub Actions — no local machine.
+Data-driven decision system for LaLiga Fantasy Oficial. Private league of 5
+managers. Runs entirely on GitHub Actions — no local machine, phone only.
 
 Personal use only. Don't redistribute the scraped data.
+
+## The one button
+
+**Actions → report → Run workflow.** That is the whole interface. It fetches a
+snapshot, parses it, runs every generator in dependency order, and stitches the
+output into **`reports/REPORT.md`** — the only file you need to read.
+
+It also runs itself twice a day (22:40 and 09:40 UTC), so most of the time
+there is nothing to press at all. The run summary shows what needs a decision,
+the rival cash table, and any warnings, so you can read the important part in
+the GitHub mobile app without opening a file.
+
+Three optional inputs, all off by default:
+
+| Input | When to use it |
+|---|---|
+| `fetch` | On by default. Turn **off** to rebuild reports from stored HTML without hitting the site. |
+| `history` | Once a season. Refreshes the season points baseline. |
+| `lookup` | Paste comma-separated names to resolve app spellings to CSV names. |
+
+`api probe` is the only other workflow. It is a manual spike against the
+official LaLiga API, which is unreachable (see below) — it produces no report
+and nothing depends on it.
+
+## What you edit
+
+Four files under `inputs/`. Everything else is generated.
+
+| File | What goes in it |
+|---|---|
+| `transactions.csv` | Append a row for every buy and sell, yours and theirs. This is the source of truth for who owns whom. |
+| `cash.txt` | Any balance you actually observe. One rival balance turns their whole cash estimate from an estimate into arithmetic. |
+| `rosters_initial.txt` | The starting rosters. Write once, never edit. |
+| `bids.csv` | What you bid; set `outcome` when it resolves. **Record losses too** — they are what reveal rivals' premiums. |
+
+`league.ini` holds thresholds and the starting budget. `offers.txt` and
+`lookup.txt` are scratch inputs for the offers ranking and the name resolver.
+`squad.txt` is **generated** — a fallback so `report.py` still works if the
+ledger fails to load; don't hand-edit it.
+
+## Routine
+
+- **Most days:** open `reports/REPORT.md`. Usually nothing to do.
+- **Thursday/Friday:** probable XIs firm up. This is when the report earns its
+  keep and when to spend.
+- **After any deal:** add the row to `inputs/transactions.csv`. Everything —
+  ownership, cash, premiums — is replayed from that file.
+- **Whenever a rival mentions a balance:** put it in `inputs/cash.txt`.
 
 ## Layout
 
 ```
-src/                 ff_ingest.py  report.py  offers.py  bids.py
-                     find_slug.py  optimise.py (unused — Phase 3)
-inputs/              squad.txt  offers.txt  lookup.txt  bids.csv   ← you edit these
+src/                 ff_ingest.py (scrape+parse)  squads.py  report.py
+                     rivals.py  bids.py  offers.py  watch.py
+                     digest.py (stitches REPORT.md)  find_slug.py
+                     history.py  fantasy_api.py  optimise.py (unused — Phase 3)
+src/ffcore/          shared core: parse (numbers)  text (names)  tidy (IO+time)
+                     league (ownership+cash)  score (ratings+XI)
+inputs/              you edit these — see above
 data/raw/dt=…/       gzipped HTML — immutable, never edit or delete
 data/tidy/*.csv      parsed output — disposable, rebuilt from raw
-reports/*.md         generated; read these on your phone
+data/decisions/      append-only logs of estimates, for scoring later
+reports/REPORT.md    ← read this
+reports/*.md         the individual sections REPORT.md is built from
 docs/design.md       architecture, data sources, modelling plan
-HANDOFF.md           current state + prompt for a fresh session
 ```
 
-## Workflows
+## Tests
 
-| Workflow | When | Does |
-|---|---|---|
-| **daily snapshot** | 22:40 + 09:40 UTC, or manual | Fetch → parse → report → bid log → commit |
-| **lookup players** | manual | Resolve app names to CSV names |
-| **offers** | manual | Rank what's currently purchasable |
+No test directory and no pytest. Each module self-tests under
+`if __name__ == "__main__"`, and the `report` workflow runs them on every push
+to `src/`:
 
-## Routine
-
-- **Most days:** glance at `reports/latest.md`. Usually nothing to do.
-- **Thursday/Friday:** probable XIs firm up. This is when the report earns its
-  keep and when to spend.
-- **Before bidding:** type what's on offer into `inputs/offers.txt`, run
-  *offers*, read `reports/offers.md`.
-- **After bidding:** add a row to `inputs/bids.csv`; set `outcome` when it
-  resolves. Record losses too — they're what reveal rivals' premiums.
-- **After buying/selling:** update `inputs/squad.txt`.
+```
+python src/ffcore/parse.py                      # number parsing
+PYTHONPATH=src python src/ffcore/league.py --selftest   # config + cash
+PYTHONPATH=src python src/digest.py --selftest          # report stitching
+```
 
 ## Design notes
 
@@ -47,6 +93,11 @@ CSV would lose that option.
 links — just photo URLs, and photo-less players all share `00.png`. Don't
 attempt a slug-based join.
 
+**Cash is an estimate, and says so.** Managers start with a free randomised
+squad plus a separate cash balance, so the anchor is the whole budget less every
+ledger row. `~` marks an estimate, `—` means the ledger overdraws the budget and
+the number would be fiction. Never treat a `—` as "they are broke".
+
 **Empty results say why.** A silently-blank probable XI would set every start
 probability to zero and quietly bench your best players, so each section
 explains itself when it has nothing.
@@ -56,6 +107,18 @@ partial move doesn't break a run.
 
 **Be a good citizen.** One sweep per run, 1.5–3s between requests, aborts on
 403/429.
+
+## Known gaps
+
+- **Injury status is never parsed.** Every row in `data/tidy/probable_xi.csv`
+  says `status=ok` because `parse_team` reads `.jugador.tipo_lista` classes,
+  while injuries live in a separate `elemento lesionado` block it never opens.
+  The markup is in the retained HTML, so this is recoverable retroactively.
+- **No outcome data yet.** Nothing records which XI you actually fielded or
+  what it scored, so no prediction can be scored against reality. Until that
+  exists, every model here is unvalidated.
+- **`start_pct` is an editorial bucket**, not a live probability — it moved for
+  only 22 of 511 players across the snapshots taken so far.
 
 ## Roadmap
 

@@ -1,0 +1,190 @@
+name: report
+
+# THE ONE BUTTON. Actions tab -> report -> "Run workflow".
+#
+# This replaces the six workflows that each ran one script: fetch, parse, and
+# every generator run in dependency order, then digest.py stitches the output
+# into reports/REPORT.md. There is nothing else to press.
+#
+# It also runs on a schedule, twice a day, matching LaLiga's ~00:15
+# Europe/Madrid value recompute (22:40 UTC = 00:40 CEST) and again at 09:40 UTC
+# once probable XIs have firmed up. Cron is UTC: switch to '40 23 * * *' when
+# Spain returns to CET at the end of October.
+#
+# Optional inputs let one button cover the occasional jobs too, so `history`
+# and `lookup` no longer need workflows of their own.
+
+on:
+  schedule:
+    - cron: '40 22 * * *'
+    - cron: '40 9 * * *'
+  push:
+    paths:
+      - 'src/**'
+      - '.github/workflows/report.yml'
+  workflow_dispatch:
+    inputs:
+      fetch:
+        description: 'Fetch a fresh snapshot (off = rebuild from stored HTML)'
+        type: boolean
+        default: true
+      history:
+        description: 'Refresh the season points baseline (once a season)'
+        type: boolean
+        default: false
+      lookup:
+        description: 'Names to resolve, comma-separated (blank to skip)'
+        type: string
+        default: ''
+
+permissions:
+  contents: write
+
+# A second run while one is committing would race the push.
+concurrency:
+  group: report
+  cancel-in-progress: false
+
+jobs:
+  # Runs on every push to src/, so a broken refactor is caught before it can
+  # produce a report you would trust.
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Self-tests
+        run: |
+          python src/ffcore/parse.py
+          PYTHONPATH=src python src/ffcore/league.py --selftest
+          PYTHONPATH=src python src/digest.py --selftest
+      - name: Import every module
+        # Catches the break that only shows at import time — a helper that
+        # moved, a name that no longer exists.
+        run: |
+          cd src
+          for m in common squads report bids offers watch rivals digest find_slug; do
+            python -c "import $m" || { echo "::error::$m failed to import"; exit 1; }
+          done
+          echo 'all modules import cleanly' >> "$GITHUB_STEP_SUMMARY"
+
+  report:
+    # Skip on push: a code change does not need a fresh scrape.
+    if: github.event_name != 'push'
+    needs: test
+    runs-on: ubuntu-latest
+    env:
+      FF_ROOT: ./data
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      # cssselect is required by ff_ingest.parse_team via lxml.
+      - name: Install deps
+        run: pip install httpx lxml cssselect
+
+      # inputs.fetch is empty on a schedule, so default to fetching.
+      - name: Fetch
+        if: github.event_name == 'schedule' || inputs.fetch
+        run: python src/ff_ingest.py fetch
+
+      # Re-parsing all history each run takes seconds and means a parser fix
+      # retroactively repairs every past snapshot.
+      - name: Parse
+        run: python src/ff_ingest.py parse
+
+      - name: Season points baseline
+        if: inputs.history
+        run: python src/history.py
+
+      - name: Resolve names
+        if: inputs.lookup != ''
+        run: |
+          echo "${{ inputs.lookup }}" | tr ',' '\n' | sed 's/^ *//' \
+            > inputs/lookup.txt
+          python src/find_slug.py --file inputs/lookup.txt 2>&1 || true
+
+      # --- the chain, in dependency order ---------------------------------
+      # squads.py replays ownership and must run before anything reading it.
+      - name: Ownership and watchlist
+        run: python src/squads.py
+
+      - name: Daily report
+        run: python src/report.py
+
+      - name: League behaviour
+        run: python src/rivals.py
+
+      - name: Bid log
+        run: python src/bids.py
+
+      - name: Offers
+        run: python src/offers.py
+
+      - name: Alerts
+        env:
+          ALERTS_FILE: ${{ runner.temp }}/ff_alerts.md
+        run: python src/watch.py > /dev/null 2>&1 || true
+
+      - name: Stitch into one report
+        run: python src/digest.py
+
+      # --- read it without opening a file ---------------------------------
+      - name: Summary
+        env:
+          ALERTS_FILE: ${{ runner.temp }}/ff_alerts.md
+        run: |
+          {
+            echo '## Decide today'
+            sed -n '/^### Needs a decision/,/^### /p' reports/REPORT.md \
+              | grep '^[-*]' || echo '_nothing flagged_'
+            echo '## Cash'
+            sed -n '/^### 1\. Cash/,/^### 2\./p' reports/REPORT.md \
+              | grep '^|' || echo '_no cash table_'
+            echo '## Warnings'
+            sed -n '/^### Ledger warnings/,/^## /p' reports/REPORT.md \
+              | grep '^- ' || echo '_none_'
+            echo '## Alerts'
+            cat "$ALERTS_FILE" 2>/dev/null || echo '_none_'
+            echo ''
+            echo 'Full report: `reports/REPORT.md`'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Commit
+        run: |
+          git config user.name  'report-bot'
+          git config user.email 'report-bot@users.noreply.github.com'
+          mkdir -p reports reports/history
+          git add -A data reports inputs
+          if git diff --cached --quiet; then
+            echo 'nothing changed' >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          git commit -m "report: $(date -u +%Y-%m-%dT%H%MZ)"
+          # Everything under reports/ is regenerated from scratch each run, so
+          # on a collision this run's copy is the right one to keep. During a
+          # rebase "theirs" means the commit being replayed — i.e. ours.
+          for attempt in 1 2 3; do
+            if git pull --rebase --autostash -X theirs; then
+              if git push; then
+                echo "pushed on attempt $attempt"
+                exit 0
+              fi
+            else
+              git rebase --abort || true
+            fi
+            echo "attempt $attempt failed; retrying"
+            sleep 7
+          done
+          echo "::error::could not push after 3 attempts — a real conflict outside reports/"
+          exit 1
+
+      - name: Fail loudly
+        if: failure()
+        run: |
+          echo "::error::Report failed — markup may have changed, or we're rate limited."
+          exit 1
