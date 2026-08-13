@@ -15,4 +15,4 @@ Record every auction, including losses — a loss at a known premium is what tel
 
 `~` marks a value read from a snapshot more than 36h from the bid.
 
-_Generated 2026-08-13 09:24 UTC._
+_Generated 2026-08-13 10:41 UTC._
