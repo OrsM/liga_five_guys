@@ -65,7 +65,7 @@ jobs:
         # moved, a name that no longer exists.
         run: |
           cd src
-          for m in common squads report bids offers watch rivals digest find_slug; do
+          for m in common squads report offers watch rivals digest find_slug; do
             python -c "import $m" || { echo "::error::$m failed to import"; exit 1; }
           done
           echo 'all modules import cleanly' >> "$GITHUB_STEP_SUMMARY"
@@ -118,9 +118,6 @@ jobs:
 
       - name: League behaviour
         run: python src/rivals.py
-
-      - name: Bid log
-        run: python src/bids.py
 
       - name: Offers
         run: python src/offers.py

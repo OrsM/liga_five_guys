@@ -51,7 +51,7 @@ def norm(s) -> str:
     return _WS.sub(" ", s).strip()
 
 
-# Deprecated. Present so report.py, offers.py, bids.py and find_slug.py can be
+# Deprecated. Present so report.py, offers.py and find_slug.py can be
 # migrated one file at a time instead of in one risky commit. Delete once no
 # module imports it.
 fold = norm

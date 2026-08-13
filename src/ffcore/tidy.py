@@ -2,7 +2,7 @@
 ffcore.tidy — reading what ff_ingest wrote, and asking it about the past.
 
 Paths, CSV IO and timestamp parsing were copy-pasted across report.py,
-offers.py, bids.py, find_slug.py and history.py. They are here once.
+offers.py, find_slug.py and history.py. They are here once.
 
 The part that matters is Market: an index over EVERY snapshot in
 market.csv, not just the newest one. Three of the five things rivals.py
@@ -148,7 +148,7 @@ def snapshot_stamp(s: str):
 
 
 def ledger_stamp(s: str):
-    """A transactions.csv / bids.csv date -> aware UTC.
+    """A transactions.csv date -> aware UTC.
 
     The string is Madrid wall-clock because that is what the app displayed
     when you copied it. Read as UTC it would be two hours early all summer.

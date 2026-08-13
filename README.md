@@ -30,14 +30,13 @@ and nothing depends on it.
 
 ## What you edit
 
-Four files under `inputs/`. Everything else is generated.
+Three files under `inputs/`. Everything else is generated.
 
 | File | What goes in it |
 |---|---|
 | `transactions.csv` | Append a row for every buy and sell, yours and theirs. This is the source of truth for who owns whom. |
 | `cash.txt` | Any balance you actually observe. One rival balance turns their whole cash estimate from an estimate into arithmetic. |
 | `rosters_initial.txt` | The starting rosters. Write once, never edit. |
-| `bids.csv` | What you bid; set `outcome` when it resolves. **Record losses too** — they are what reveal rivals' premiums. |
 
 `league.ini` holds thresholds and the starting budget. `offers.txt` and
 `lookup.txt` are scratch inputs for the offers ranking and the name resolver.
@@ -57,7 +56,7 @@ ledger fails to load; don't hand-edit it.
 
 ```
 src/                 ff_ingest.py (scrape+parse)  squads.py  report.py
-                     rivals.py  bids.py  offers.py  watch.py
+                     rivals.py  offers.py  watch.py
                      digest.py (stitches REPORT.md)  find_slug.py
                      history.py  fantasy_api.py  optimise.py (unused — Phase 3)
 src/ffcore/          shared core: parse (numbers)  text (names)  tidy (IO+time)
@@ -98,6 +97,14 @@ squad plus a separate cash balance, so the anchor is the whole budget less every
 ledger row. `~` marks an estimate, `—` means the ledger overdraws the budget and
 the number would be fiction. Never treat a `—` as "they are broke".
 
+**Bid logging was removed, deliberately.** `inputs/bids.csv` asked you to type
+a bid and then come back and type its outcome. Nobody comes back: both rows in
+it said `pending` while the ledger already showed one won and one lost. A field
+you have to revisit is a field that drifts. Winning bids are captured
+automatically — a win *is* a transaction — so the only thing lost is losing
+bids, and `rivals.py` infers rival premiums from the ledger instead. Restore it
+from git history if the premium curve ever needs the losses.
+
 **Empty results say why.** A silently-blank probable XI would set every start
 probability to zero and quietly bench your best players, so each section
 explains itself when it has nothing.
@@ -123,7 +130,7 @@ partial move doesn't break a run.
 ## Roadmap
 
 - [x] **Phase 0 — collect.** Twice-daily snapshots. The only irreversible part.
-- [x] **Phase 0.5 — report.** Squad, momentum, cheap likely starters, bid log.
+- [x] **Phase 0.5 — report.** Squad, momentum, cheap likely starters, rivals.
 - [ ] **Phase 1 — decide.** Expected points from probable XI + shrunk points
       mean; best-XI recommendation. Needs a few jornadas played.
 - [ ] **Phase 2 — value.** Odds → team λ, points decomposition, price model.

@@ -3,7 +3,7 @@ ffcore — the shared bottom of the stack.
 
 Everything here is small and reusable: text keys, number parsing, file and
 snapshot access. Modules above it (common.py, report.py, squads.py,
-offers.py, bids.py, watch.py, find_slug.py, rivals.py) may import ffcore;
+offers.py, watch.py, find_slug.py, rivals.py) may import ffcore;
 ffcore imports none of them.
 
     from ffcore import norm, money, ratio, pct100

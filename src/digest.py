@@ -1,12 +1,12 @@
 """
-digest.py — the seven report files, stitched into the one you actually read.
+digest.py — the five report files, stitched into the one you actually read.
 
     python src/digest.py            # writes reports/REPORT.md
 
 Every generator writes its own file, and between them they repeat themselves:
 the ledger warnings appear in both rivals.md and behaviour.md, and the cash
-basis in one is the cash table in the other. Six files also means six taps on a
-phone. This assembles them in the order you need them — what to decide today
+basis in one is the cash table in the other. Five files also means five taps on
+a phone. This assembles them in the order you need them — what to decide today
 first, background last — and drops any section whose heading has already
 appeared, so a repeated block is printed once.
 
@@ -33,7 +33,6 @@ SOURCES = [
     ("Rivals — cash, premiums, squads", "behaviour.md"),
     ("Who to buy", "watchlist.md"),
     ("On offer now", "offers.md"),
-    ("Bid log", "bids.md"),
     ("Squad detail", "rivals.md"),
 ]
 
