@@ -1,8 +1,8 @@
-# Watchlist — 2026-08-13 11:00 UTC
+# Watchlist — 2026-08-13 11:20 UTC
 
 Everyone not owned by the 5 of us, 60% start or better.
 
-Filtered to what your 93.58M of cash can reach.
+Filtered to what your 111.37M of cash can reach.
 
 ## portero
 
@@ -47,6 +47,7 @@ Filtered to what your 93.58M of cash can reach.
 
 | Player | Team | Pos | Value | 24h | Start% |
 |---|---|--:|--:|--:|--:|
+| vinicius junior | Real Madrid | del | 106.94M | 1.40M | 90% |
 | ante budimir | Osasuna | del | 49.05M | 750K | 90% |
 | martin satriano | Getafe | del | 4.34M | 0K | 90% |
 | jorge de frutos | Rayo | del | 47.78M | -804K | 90% |
@@ -54,7 +55,6 @@ Filtered to what your 93.58M of cash can reach.
 | isi palazon | Rayo | del | 17.50M | 638K | 80% |
 | ivan romero | Levante | del | 7.09M | 124K | 80% |
 | toni martinez | Alavés | del | 25.20M | -42K | 80% |
-| angel perez | Alavés | del | 6.82M | -87K | 80% |
 
 ---
 

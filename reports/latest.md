@@ -1,11 +1,12 @@
-# Fantasy report — 2026-08-13T1059Z
+# Fantasy report — 2026-08-13T1119Z
 
 ## Needs a decision
 
 - **Only 1 portero** — one knock and you can't field a legal XI.
+- **Only 1 delantero** — one knock and you can't field a legal XI.
 - **3 of the XI are unmodelled** (Alvaro Fernandez, Dani Lorenzo, Iñigo Vicente) — no LaLiga record, so they're carrying an assumed baseline, not an earned one.
 
-**Squad 138.65M** · cash 93.58M · total 232.23M
+**Squad 121.75M** · cash 111.37M · total 233.12M — balance last checked 2026-08-12, but the ledger moved on 2026-08-13. Re-check it.
 
 Compare squad value with the app; a mismatch means a name matched the wrong player. Roster read from the ledger.
 
@@ -31,10 +32,7 @@ Compare squad value with the app; a mismatch means a name matched the wrong play
 
 | Player | Pos | Value | Score | Gap | €/pt | Why |
 |---|---|--:|--:|--:|--:|---|
-| Orri Steinn Oskarsson | del | 8.00M | 1.7 | -0.7 | 4.69M | outscored |
-| Hugo Duro | del | 8.49M | 1.9 | -0.5 | 4.44M | outscored |
 | Pepelu | med | 7.41M | 2.1 | -0.4 | 3.45M | 6th MED — only 5 can ever play |
-| Dani Martinez | def | 412K | 0.5 | -1.9 | 794K | outscored |
 
 _A sale lands above or below value depending on who bids. Who is short in this position, and who can still afford you, is in `reports/behaviour.md`._
 
@@ -46,7 +44,6 @@ _A sale lands above or below value depending on who bids. Who is short in this p
 | Omar El Hilali | 8.67M | 113K | +1.32% |
 | Jon Moncayola | 6.60M | 80K | +1.23% |
 | Beñat Turrientes | 6.94M | 81K | +1.18% |
-| Orri Steinn Oskarsson | 8.00M | -128K | -1.57% |
 | Alvaro Fernandez | 4.88M | -86K | -1.73% |
 
 ---
@@ -55,4 +52,4 @@ _611 players tracked, 508 with a probable-XI reading. Who to buy is in `reports/
 
 _Score = shrunk pts/match (K=8, 2025-26) × P(start), from `ffcore/score.py` — the same scorer rivals.py uses. Recommended XIs are logged to `data/decisions/squad_log.csv` for scoring against reality later._
 
-_Generated 2026-08-13 11:00 UTC._
+_Generated 2026-08-13 11:20 UTC._

@@ -1,4 +1,4 @@
-# Liga Five Guys — one report — 2026-08-13 11:00 UTC
+# Liga Five Guys — one report — 2026-08-13 11:20 UTC
 
 Everything the generators produced, in reading order. Sections that appeared twice are printed once.
 
@@ -15,9 +15,10 @@ Everything the generators produced, in reading order. Sections that appeared twi
 ### Needs a decision
 
 - **Only 1 portero** — one knock and you can't field a legal XI.
+- **Only 1 delantero** — one knock and you can't field a legal XI.
 - **3 of the XI are unmodelled** (Alvaro Fernandez, Dani Lorenzo, Iñigo Vicente) — no LaLiga record, so they're carrying an assumed baseline, not an earned one.
 
-**Squad 138.65M** · cash 93.58M · total 232.23M
+**Squad 121.75M** · cash 111.37M · total 233.12M — balance last checked 2026-08-12, but the ledger moved on 2026-08-13. Re-check it.
 
 Compare squad value with the app; a mismatch means a name matched the wrong player. Roster read from the ledger.
 
@@ -43,10 +44,7 @@ Compare squad value with the app; a mismatch means a name matched the wrong play
 
 | Player | Pos | Value | Score | Gap | €/pt | Why |
 |---|---|--:|--:|--:|--:|---|
-| Orri Steinn Oskarsson | del | 8.00M | 1.7 | -0.7 | 4.69M | outscored |
-| Hugo Duro | del | 8.49M | 1.9 | -0.5 | 4.44M | outscored |
 | Pepelu | med | 7.41M | 2.1 | -0.4 | 3.45M | 6th MED — only 5 can ever play |
-| Dani Martinez | def | 412K | 0.5 | -1.9 | 794K | outscored |
 
 _A sale lands above or below value depending on who bids. Who is short in this position, and who can still afford you, is in `reports/behaviour.md`._
 
@@ -58,7 +56,6 @@ _A sale lands above or below value depending on who bids. Who is short in this p
 | Omar El Hilali | 8.67M | 113K | +1.32% |
 | Jon Moncayola | 6.60M | 80K | +1.23% |
 | Beñat Turrientes | 6.94M | 81K | +1.18% |
-| Orri Steinn Oskarsson | 8.00M | -128K | -1.57% |
 | Alvaro Fernandez | 4.88M | -86K | -1.73% |
 
 ---
@@ -67,18 +64,18 @@ _611 players tracked, 508 with a probable-XI reading. Who to buy is in `reports/
 
 _Score = shrunk pts/match (K=8, 2025-26) × P(start), from `ffcore/score.py` — the same scorer rivals.py uses. Recommended XIs are logged to `data/decisions/squad_log.csv` for scoring against reality later._
 
-_Generated 2026-08-13 11:00 UTC._
+_Generated 2026-08-13 11:20 UTC._
 
 ## Rivals — cash, premiums, squads
 
 
-5 managers, 15 ledger rows, 19 market snapshots, points baseline 2025-26.
+5 managers, 18 ledger rows, 20 market snapshots, points baseline 2025-26.
 
 ### 1. Cash and ceilings
 
 | Manager | Players | Spent | Raised | Net | Cash | Max bid |
 |---|--:|--:|--:|--:|--:|--:|
-| **miguel_autentico** | 15 | 6.89M | 0K | -6.89M | 93.58M | 93.58M |
+| **miguel_autentico** | 12 | 6.89M | 17.79M | 10.90M | 111.37M | 111.37M |
 | Albert Laporta | 11 | 49.99M | 30.47M | -19.52M | ~80.48M | 80.48M |
 | BurtonGM89 | 17 | 125.03M | 469K | -124.56M | — | — |
 | Magic Mike 333 | 18 | 83.70M | 0K | -83.70M | ~16.30M | 16.30M |
@@ -120,7 +117,7 @@ _No horizon has elapsed inside the snapshot history yet. Needs 3 days of daily i
 
 | Manager | XI score | Shape | Trapped | Injured | Thin at | Unmatched |
 |---|--:|---|--:|--:|---|--:|
-| **miguel_autentico** | 29.2 | 4-5-1 | 13.29M | 0 | por | 0 |
+| **miguel_autentico** | 29.2 | 4-5-1 | 4.88M | 0 | por,del | 0 |
 | Albert Laporta | **illegal** | — | 58.19M | 0 | por,def,med | 0 |
 | BurtonGM89 | 34.2 | 4-4-2 | 50.26M | 0 | — | 0 |
 | Magic Mike 333 | 33.3 | 3-4-3 | 29.44M | 0 | por | 0 |
@@ -171,7 +168,6 @@ Trapped is value held in players below 50% start probability — money that cann
 | Player | Pos | Value | Start% | Short |
 |---|---|--:|--:|---|
 | alvaro fernandez | POR | 4.88M | 20% | Albert Laporta, Magic Mike 333, SusoGattuso |
-| dani martinez | DEF | 412K | — | Albert Laporta |
 
 ### Ledger warnings
 
@@ -179,14 +175,14 @@ Trapped is value held in players below 50% start probability — money that cann
 
 ---
 
-Sections 2 and 3 are hypotheses until the sample grows: with 15 ledger rows across 5 managers, a median is one or two deals. Section 1 and section 5 are usable today.
+Sections 2 and 3 are hypotheses until the sample grows: with 18 ledger rows across 5 managers, a median is one or two deals. Section 1 and section 5 are usable today.
 
 ## Who to buy
 
 
 Everyone not owned by the 5 of us, 60% start or better.
 
-Filtered to what your 93.58M of cash can reach.
+Filtered to what your 111.37M of cash can reach.
 
 ### portero
 
@@ -231,6 +227,7 @@ Filtered to what your 93.58M of cash can reach.
 
 | Player | Team | Pos | Value | 24h | Start% |
 |---|---|--:|--:|--:|--:|
+| vinicius junior | Real Madrid | del | 106.94M | 1.40M | 90% |
 | ante budimir | Osasuna | del | 49.05M | 750K | 90% |
 | martin satriano | Getafe | del | 4.34M | 0K | 90% |
 | jorge de frutos | Rayo | del | 47.78M | -804K | 90% |
@@ -238,7 +235,6 @@ Filtered to what your 93.58M of cash can reach.
 | isi palazon | Rayo | del | 17.50M | 638K | 80% |
 | ivan romero | Levante | del | 7.09M | 124K | 80% |
 | toni martinez | Alavés | del | 25.20M | -42K | 80% |
-| angel perez | Alavés | del | 6.82M | -87K | 80% |
 
 ---
 
@@ -280,7 +276,7 @@ Ranked by start probability, then price edge. **Edge** is value minus asking pri
 
 No expected-points model yet, so this ranks on start probability and price only. A 90% starter at a weak club still scores less than a 70% starter at a strong one — use judgement.
 
-_Generated 2026-08-13 11:00 UTC._
+_Generated 2026-08-13 11:20 UTC._
 
 ## Bid log
 
@@ -300,14 +296,14 @@ Record every auction, including losses — a loss at a known premium is what tel
 
 `~` marks a value read from a snapshot more than 36h from the bid.
 
-_Generated 2026-08-13 11:00 UTC._
+_Generated 2026-08-13 11:20 UTC._
 
 ## Squad detail
 
 
 | Manager | Players | Squad value | Spent | Raised | Cash |
 |---|--:|--:|--:|--:|--:|
-| **miguel_autentico** | 15 | 138.65M | 6.89M | 0K | 93.58M |
+| **miguel_autentico** | 12 | 121.75M | 6.89M | 17.79M | 111.37M |
 | Albert Laporta | 11 | 149.86M | 49.99M | 30.47M | ~80.48M |
 | BurtonGM89 | 17 | 247.86M | 125.03M | 469K | — |
 | Magic Mike 333 | 18 | 214.11M | 83.70M | 0K | ~16.30M |
@@ -316,7 +312,7 @@ _Generated 2026-08-13 11:00 UTC._
 `~` is an estimate, not an observed balance — see the basis notes at the bottom. Cash is a ceiling on what anyone can bid tomorrow, which is the point of tracking it.
 
 ### You (miguel_autentico)
-15 players · 138.65M total · 6 at 70%+ · cash 93.58M
+12 players · 121.75M total · 6 at 70%+ · cash 111.37M
 
 | Player | Team | Pos | Value | 24h | Start% |
 |---|---|--:|--:|--:|--:|
@@ -325,7 +321,6 @@ _Generated 2026-08-13 11:00 UTC._
 | robin le normand | Atlético | def | 9.85M | -82K | 60% |
 | igor zubeldia | Real Sociedad | def | 9.79M | 61K | 80% |
 | omar el hilali | Espanyol | def | 8.67M | 113K | 80% |
-| dani martinez | Atlético | def | 412K | -3K | — |
 | ruben garcia | Osasuna | med | 13.46M | 200K | 60% |
 | iñigo ruiz de galarreta | Athletic | med | 11.99M | 98K | 60% |
 | dani lorenzo | Málaga | med | 9.58M | 70K | 90% |
@@ -333,8 +328,6 @@ _Generated 2026-08-13 11:00 UTC._
 | beñat turrientes | Real Sociedad | med | 6.94M | 81K | 70% |
 | jon moncayola | Osasuna | med | 6.60M | 80K | 90% |
 | iñigo vicente | Racing | del | 18.94M | 82K | 90% |
-| hugo duro | Valencia | del | 8.49M | -45K | 50% |
-| orri steinn oskarsson | Real Sociedad | del | 8.00M | -128K | 40% |
 
 ### Albert Laporta
 11 players · 149.86M total · 2 at 70%+ · cash ~80.48M
@@ -439,10 +432,13 @@ _Generated 2026-08-13 11:00 UTC._
 | 2026-08-12T21:24 | pedro diaz | market → Magic Mike 333 | 2050000 |
 | 2026-08-12T21:24 | raphinha | market → Magic Mike 333 | 80000000 |
 | 2026-08-12T21:24 | marko dmitrovic | market → BurtonGM89 | 40010000 |
+| 2026-08-13T12:12 | orri steinn oskarsson | miguel_autentico → market | 8567036 |
+| 2026-08-13T12:12 | dani martinez | miguel_autentico → market | 425612 |
+| 2026-08-13T12:13 | hugo duro | miguel_autentico → market | 8800811 |
 
 ### Cash basis
 
-- **miguel_autentico** — balance you recorded on 2026-08-12, then 0 ledger row(s) (known)
+- **miguel_autentico** — balance you recorded on 2026-08-12, then 3 ledger row(s) (known)
 - **Albert Laporta** — 100M starting budget, then 5 ledger row(s) (estimated)
 - **BurtonGM89** — 100M starting budget, then 5 ledger row(s), which overdraws it by 24.56M (unknown)
 - **Magic Mike 333** — 100M starting budget, then 4 ledger row(s) (estimated)

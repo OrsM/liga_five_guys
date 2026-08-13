@@ -1,12 +1,12 @@
-# League behaviour — 2026-08-13 11:00 UTC
+# League behaviour — 2026-08-13 11:20 UTC
 
-5 managers, 15 ledger rows, 19 market snapshots, points baseline 2025-26.
+5 managers, 18 ledger rows, 20 market snapshots, points baseline 2025-26.
 
 ## 1. Cash and ceilings
 
 | Manager | Players | Spent | Raised | Net | Cash | Max bid |
 |---|--:|--:|--:|--:|--:|--:|
-| **miguel_autentico** | 15 | 6.89M | 0K | -6.89M | 93.58M | 93.58M |
+| **miguel_autentico** | 12 | 6.89M | 17.79M | 10.90M | 111.37M | 111.37M |
 | Albert Laporta | 11 | 49.99M | 30.47M | -19.52M | ~80.48M | 80.48M |
 | BurtonGM89 | 17 | 125.03M | 469K | -124.56M | — | — |
 | Magic Mike 333 | 18 | 83.70M | 0K | -83.70M | ~16.30M | 16.30M |
@@ -48,7 +48,7 @@ _No horizon has elapsed inside the snapshot history yet. Needs 3 days of daily i
 
 | Manager | XI score | Shape | Trapped | Injured | Thin at | Unmatched |
 |---|--:|---|--:|--:|---|--:|
-| **miguel_autentico** | 29.2 | 4-5-1 | 13.29M | 0 | por | 0 |
+| **miguel_autentico** | 29.2 | 4-5-1 | 4.88M | 0 | por,del | 0 |
 | Albert Laporta | **illegal** | — | 58.19M | 0 | por,def,med | 0 |
 | BurtonGM89 | 34.2 | 4-4-2 | 50.26M | 0 | — | 0 |
 | Magic Mike 333 | 33.3 | 3-4-3 | 29.44M | 0 | por | 0 |
@@ -99,7 +99,6 @@ Trapped is value held in players below 50% start probability — money that cann
 | Player | Pos | Value | Start% | Short |
 |---|---|--:|--:|---|
 | alvaro fernandez | POR | 4.88M | 20% | Albert Laporta, Magic Mike 333, SusoGattuso |
-| dani martinez | DEF | 412K | — | Albert Laporta |
 
 ## Ledger warnings
 
@@ -107,4 +106,4 @@ Trapped is value held in players below 50% start probability — money that cann
 
 ---
 
-Sections 2 and 3 are hypotheses until the sample grows: with 15 ledger rows across 5 managers, a median is one or two deals. Section 1 and section 5 are usable today.
+Sections 2 and 3 are hypotheses until the sample grows: with 18 ledger rows across 5 managers, a median is one or two deals. Section 1 and section 5 are usable today.

@@ -1,8 +1,8 @@
-# Squads — 2026-08-13 11:00 UTC
+# Squads — 2026-08-13 11:20 UTC
 
 | Manager | Players | Squad value | Spent | Raised | Cash |
 |---|--:|--:|--:|--:|--:|
-| **miguel_autentico** | 15 | 138.65M | 6.89M | 0K | 93.58M |
+| **miguel_autentico** | 12 | 121.75M | 6.89M | 17.79M | 111.37M |
 | Albert Laporta | 11 | 149.86M | 49.99M | 30.47M | ~80.48M |
 | BurtonGM89 | 17 | 247.86M | 125.03M | 469K | — |
 | Magic Mike 333 | 18 | 214.11M | 83.70M | 0K | ~16.30M |
@@ -11,7 +11,7 @@
 `~` is an estimate, not an observed balance — see the basis notes at the bottom. Cash is a ceiling on what anyone can bid tomorrow, which is the point of tracking it.
 
 ## You (miguel_autentico)
-15 players · 138.65M total · 6 at 70%+ · cash 93.58M
+12 players · 121.75M total · 6 at 70%+ · cash 111.37M
 
 | Player | Team | Pos | Value | 24h | Start% |
 |---|---|--:|--:|--:|--:|
@@ -20,7 +20,6 @@
 | robin le normand | Atlético | def | 9.85M | -82K | 60% |
 | igor zubeldia | Real Sociedad | def | 9.79M | 61K | 80% |
 | omar el hilali | Espanyol | def | 8.67M | 113K | 80% |
-| dani martinez | Atlético | def | 412K | -3K | — |
 | ruben garcia | Osasuna | med | 13.46M | 200K | 60% |
 | iñigo ruiz de galarreta | Athletic | med | 11.99M | 98K | 60% |
 | dani lorenzo | Málaga | med | 9.58M | 70K | 90% |
@@ -28,8 +27,6 @@
 | beñat turrientes | Real Sociedad | med | 6.94M | 81K | 70% |
 | jon moncayola | Osasuna | med | 6.60M | 80K | 90% |
 | iñigo vicente | Racing | del | 18.94M | 82K | 90% |
-| hugo duro | Valencia | del | 8.49M | -45K | 50% |
-| orri steinn oskarsson | Real Sociedad | del | 8.00M | -128K | 40% |
 
 ## Albert Laporta
 11 players · 149.86M total · 2 at 70%+ · cash ~80.48M
@@ -134,10 +131,13 @@
 | 2026-08-12T21:24 | pedro diaz | market → Magic Mike 333 | 2050000 |
 | 2026-08-12T21:24 | raphinha | market → Magic Mike 333 | 80000000 |
 | 2026-08-12T21:24 | marko dmitrovic | market → BurtonGM89 | 40010000 |
+| 2026-08-13T12:12 | orri steinn oskarsson | miguel_autentico → market | 8567036 |
+| 2026-08-13T12:12 | dani martinez | miguel_autentico → market | 425612 |
+| 2026-08-13T12:13 | hugo duro | miguel_autentico → market | 8800811 |
 
 ## Cash basis
 
-- **miguel_autentico** — balance you recorded on 2026-08-12, then 0 ledger row(s) (known)
+- **miguel_autentico** — balance you recorded on 2026-08-12, then 3 ledger row(s) (known)
 - **Albert Laporta** — 100M starting budget, then 5 ledger row(s) (estimated)
 - **BurtonGM89** — 100M starting budget, then 5 ledger row(s), which overdraws it by 24.56M (unknown)
 - **Magic Mike 333** — 100M starting budget, then 4 ledger row(s) (estimated)
