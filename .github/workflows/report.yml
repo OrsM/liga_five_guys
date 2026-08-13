@@ -36,6 +36,10 @@ on:
         description: 'Names to resolve, comma-separated (blank to skip)'
         type: string
         default: ''
+      seen:
+        description: "Today's market slate — paste the names, comma-separated"
+        type: string
+        default: ''
 
 permissions:
   contents: write
@@ -61,12 +65,13 @@ jobs:
           PYTHONPATH=src python src/ffcore/league.py --selftest
           PYTHONPATH=src python src/digest.py --selftest
           PYTHONPATH=src python src/xi.py --selftest
+          PYTHONPATH=src python src/seen.py --selftest
       - name: Import every module
         # Catches the break that only shows at import time — a helper that
         # moved, a name that no longer exists.
         run: |
           cd src
-          for m in common squads report watch rivals digest xi find_slug; do
+          for m in common squads report watch rivals digest xi seen find_slug; do
             python -c "import $m" || { echo "::error::$m failed to import"; exit 1; }
           done
           echo 'all modules import cleanly' >> "$GITHUB_STEP_SUMMARY"
@@ -108,6 +113,20 @@ jobs:
           echo "${{ inputs.lookup }}" | tr ',' '\n' | sed 's/^ *//' \
             > inputs/lookup.txt
           python src/find_slug.py --file inputs/lookup.txt 2>&1 || true
+
+      # Today's slate, or nothing. Cleared when you don't paste: a slate left
+      # over from yesterday would mark players as buyable that no longer are,
+      # which is exactly how the old offers.txt went wrong.
+      - name: Market slate
+        run: |
+          if [ -n "${{ inputs.seen }}" ]; then
+            echo "${{ inputs.seen }}" | tr ',' '\n' | sed 's/^ *//;s/ *$//' \
+              > inputs/seen.txt
+            echo "slate: $(grep -c . inputs/seen.txt) name(s)" \
+              >> "$GITHUB_STEP_SUMMARY"
+          else
+            rm -f inputs/seen.txt
+          fi
 
       # --- the chain, in dependency order ---------------------------------
       # squads.py replays ownership and must run before anything reading it.

@@ -10,3 +10,8 @@ __pycache__/
 # so without this a local render gets committed by the next bot run.
 reports/latest.html
 reports/latest_files/
+
+# Today's market slate, pasted into the `seen` workflow input. Scratch, not
+# state: every workflow does `git add -A inputs`, and a committed slate would
+# be read by tomorrow's run as if it were still current.
+inputs/seen.txt

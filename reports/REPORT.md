@@ -1,4 +1,4 @@
-# Liga Five Guys — one report — 2026-08-13 15:08 UTC
+# Liga Five Guys — one report — 2026-08-13 15:15 UTC
 
 Everything the generators produced, in reading order. Sections that appeared twice are printed once.
 
@@ -236,7 +236,7 @@ Filtered to what your 111.37M of cash can reach.
 
 ---
 
-Not all of these are purchasable today — the app deals a limited slate. This is the shortlist to recognise against.
+Not all of these are purchasable today — the app deals a limited slate. Paste today's slate into the `seen` input to mark which ones you can actually buy.
 
 ## Squad detail
 

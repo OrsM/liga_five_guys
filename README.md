@@ -23,6 +23,7 @@ Three optional inputs, all off by default:
 | `fetch` | On by default. Turn **off** to rebuild reports from stored HTML without hitting the site. |
 | `history` | Once a season. Refreshes the season points baseline. |
 | `lookup` | Paste comma-separated names to resolve app spellings to CSV names. |
+| `seen` | Paste today's market slate. Marks which of the watchlist you can actually buy — see below. |
 
 `api probe` is the only other workflow. It is a manual spike against the
 official LaLiga API, which is unreachable (see below) — it produces no report
@@ -30,13 +31,34 @@ and nothing depends on it.
 
 ## What you edit
 
-Three files under `inputs/`. Everything else is generated.
+Four files under `inputs/`. Everything else is generated.
 
 | File | What goes in it |
 |---|---|
 | `transactions.csv` | Append a row for every buy and sell, yours and theirs. This is the source of truth for who owns whom. |
 | `cash.txt` | Any balance you actually observe. One rival balance turns their whole cash estimate from an estimate into arithmetic. |
 | `rosters_initial.txt` | The starting rosters. Write once, never edit. |
+| `bench.txt` | Who is **not** in your XI. You own 12 and field 11, so this is one name. The XI is derived. |
+
+## Reading the slate off your phone
+
+The watchlist ranks everyone nobody owns, but the app only deals a limited
+slate each cycle, so most of it isn't buyable today. To close that gap:
+long-press the market screenshot, **Copy Text** (iOS Live Text), and paste it
+into the `seen` input when you run the workflow. Those players get a ✅ and
+sort to the top of each position.
+
+OCR output is expected to be bad and that's fine — `Inigo Ruiz Galarreta`
+resolves to `Iñigo Ruiz de Galarreta`. What it will never do is guess: a bare
+`Dani` is reported under "Names I could not place" with the five candidates,
+because a wrong player costs real money.
+
+**Names only, never prices.** Values are already scraped to the euro, and the
+minimum legal bid *is* the market value, so OCR only needs to tell you *who*.
+An OCR'd price can silently disagree with a correct one we already hold.
+
+`inputs/seen.txt` is git-ignored and cleared on every run that doesn't paste
+one. It is scratch, not state — that is what stops it drifting.
 
 `league.ini` holds thresholds and the starting budget. `lookup.txt` is a
 scratch input for the name resolver.
@@ -80,6 +102,8 @@ to `src/`:
 python src/ffcore/parse.py                      # number parsing
 PYTHONPATH=src python src/ffcore/league.py --selftest   # config + cash
 PYTHONPATH=src python src/digest.py --selftest          # report stitching
+PYTHONPATH=src python src/xi.py --selftest              # XI from bench
+PYTHONPATH=src python src/seen.py --selftest            # OCR name matching
 ```
 
 ## Design notes

@@ -1,4 +1,4 @@
-# Watchlist — 2026-08-13 11:20 UTC
+# Watchlist — 2026-08-13 15:13 UTC
 
 Everyone not owned by the 5 of us, 60% start or better.
 
@@ -58,4 +58,4 @@ Filtered to what your 111.37M of cash can reach.
 
 ---
 
-Not all of these are purchasable today — the app deals a limited slate. This is the shortlist to recognise against.
+Not all of these are purchasable today — the app deals a limited slate. Paste today's slate into the `seen` input to mark which ones you can actually buy.

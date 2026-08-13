@@ -5,6 +5,9 @@ Reads:
   inputs/transactions.csv     append-only ledger of every market operation
   inputs/league.ini           managers, budgets, thresholds (all optional)
   inputs/cash.txt             any balance you have actually seen
+  inputs/seen.txt             optional — today's market slate, OCR'd off your
+                              phone. Marks which of the watchlist you can
+                              actually buy right now. Scratch, not state.
   data/tidy/*.csv             values, 24h moves, start probabilities
 
 Writes:
@@ -33,21 +36,40 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from common import (load_players, fmt_money, fmt_pct, pos_key,  # noqa: E402
                     flag, POS_ORDER)
 from ffcore.league import League  # noqa: E402
-from ffcore.tidy import REPORTS, write_lines  # noqa: E402
+from ffcore.text import norm  # noqa: E402
+from ffcore.tidy import REPORTS, input_path, write_lines  # noqa: E402
+from seen import match, read_names  # noqa: E402
 
 HEAD = ("| Player | Team | Pos | Value | 24h | Start% |\n"
         "|---|---|--:|--:|--:|--:|")
 
+HEAD_SEEN = ("| Player | Team | Pos | Value | 24h | Start% | On offer |\n"
+             "|---|---|--:|--:|--:|--:|---|")
 
-def row(rec):
-    return "| %s | %s | %s | %s | %s | %s |" % (
-        rec.get("name", "?") + flag(rec),
-        rec.get("team", "—"),
-        (rec.get("pos") or "—")[:3],
-        fmt_money(rec.get("value")),
-        fmt_money(rec.get("delta_1d")),
-        fmt_pct(rec.get("start")),
-    )
+
+def row(rec, on_offer=None):
+    cells = [rec.get("name", "?") + flag(rec),
+             rec.get("team", "—"),
+             (rec.get("pos") or "—")[:3],
+             fmt_money(rec.get("value")),
+             fmt_money(rec.get("delta_1d")),
+             fmt_pct(rec.get("start"))]
+    if on_offer:
+        cells.append("✅" if norm(rec.get("name")) in on_offer else "—")
+    return "| %s |" % " | ".join(cells)
+
+
+def read_seen(players):
+    """(keys on offer, unresolved, ambiguous) from inputs/seen.txt.
+
+    Absent file is the normal case — you only paste a slate when deciding.
+    The file is scratch, not state: nothing downstream depends on it being
+    current, so it cannot drift the way offers.txt did.
+    """
+    path = input_path("seen.txt")
+    if not path.exists():
+        return set(), [], []
+    return match(read_names(path.read_text(encoding="utf-8")), players)
 
 
 def write_rivals(lg, players, stamp):
@@ -121,6 +143,8 @@ def write_watchlist(lg, players, stamp):
     cash = lg[lg.cfg.me].cash if lg.cfg.me in lg.managers else None
     budget = cash.value if cash and cash.confidence == "known" else None
 
+    on_offer, unresolved, ambiguous = read_seen(players)
+
     free = [r for k, r in players.items() if k not in lg.owner]
     out = ["# Watchlist — %s" % stamp, "",
            "Everyone not owned by the %d of us, %d%% start or better."
@@ -128,23 +152,47 @@ def write_watchlist(lg, players, stamp):
     if budget:
         out += ["Filtered to what your %s of cash can reach."
                 % fmt_money(budget), ""]
+    if on_offer:
+        out += ["**%d of these are on offer right now** (from the slate you "
+                "pasted in) — they sort to the top of each position and carry "
+                "a ✅." % len(on_offer), ""]
 
+    head = HEAD_SEEN if on_offer else HEAD
     for pos in POS_ORDER:
         pool = [r for r in free
                 if (r.get("pos") or "").lower() == pos
                 and (r.get("start") or 0) >= lg.cfg.min_start
                 and (budget is None or (r.get("value") or 0) <= budget)]
-        pool.sort(key=lambda r: (-(r.get("start") or 0),
+        # On offer first: a 95% starter you cannot buy today is not a
+        # decision, and the whole point of the slate is to say which are.
+        pool.sort(key=lambda r: (norm(r.get("name")) not in on_offer,
+                                 -(r.get("start") or 0),
                                  -(r.get("delta_1d") or 0)))
         if not pool:
             continue
-        out += ["## %s" % pos, "", HEAD]
-        out += [row(r) for r in pool[:lg.cfg.top_n_per_pos]]
+        out += ["## %s" % pos, "", head]
+        out += [row(r, on_offer) for r in pool[:lg.cfg.top_n_per_pos]]
         out.append("")
 
-    out += ["---", "",
-            "Not all of these are purchasable today — the app deals a "
-            "limited slate. This is the shortlist to recognise against.", ""]
+    if unresolved or ambiguous:
+        out += ["## Names I could not place", "",
+                "OCR mangled these past matching, so they are missing from "
+                "the ✅ marks above — re-read them off the app if one matters.",
+                ""]
+        out += ["- **%s** — no match" % u for u in unresolved]
+        out += ["- **%s** — could be %s" % (raw, ", ".join(cands))
+                for raw, cands in ambiguous]
+        out.append("")
+
+    out += ["---", ""]
+    if on_offer:
+        out += ["A ✅ means you told me it was on the slate. Everything else "
+                "is the shortlist to recognise against when the slate "
+                "rotates.", ""]
+    else:
+        out += ["Not all of these are purchasable today — the app deals a "
+                "limited slate. Paste today's slate into the `seen` input to "
+                "mark which ones you can actually buy.", ""]
     write_lines(REPORTS / "watchlist.md", out)
 
 
