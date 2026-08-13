@@ -1,4 +1,4 @@
-# Fantasy report — 2026-08-13T1119Z
+# Fantasy report — 2026-08-13T1534Z
 
 ## Needs a decision
 
@@ -48,8 +48,8 @@ _A sale lands above or below value depending on who bids. Who is short in this p
 
 ---
 
-_611 players tracked, 508 with a probable-XI reading. Who to buy is in `reports/watchlist.md`; how your rivals bid is in `reports/behaviour.md`._
+_610 players tracked, 507 with a probable-XI reading. Who to buy is in `reports/watchlist.md`; how your rivals bid is in `reports/behaviour.md`._
 
 _Score = shrunk pts/match (K=8, 2025-26) × P(start), from `ffcore/score.py` — the same scorer rivals.py uses. Recommended XIs are logged to `data/decisions/squad_log.csv` for scoring against reality later._
 
-_Generated 2026-08-13 11:20 UTC._
+_Generated 2026-08-13 15:35 UTC._

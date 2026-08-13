@@ -1,4 +1,4 @@
-# Squads — 2026-08-13 15:13 UTC
+# Squads — 2026-08-13 15:35 UTC
 
 | Manager | Players | Squad value | Spent | Raised | Cash |
 |---|--:|--:|--:|--:|--:|
@@ -102,7 +102,7 @@
 | cesar tarrega | Valencia | def | 8.90M | 27K | 80% |
 | abdel abqar | Getafe | def | 6.78M | 152K | 70% |
 | jonny castro | Alavés | def | 5.48M | -19K | 70% |
-| alvaro garcia | Alavés | def | 502K | 0K | 80% |
+| alvaro garcia | Villarreal | def | 502K | 0K | 80% |
 | aleksa puric | Atlético | def | 431K | -4K | — |
 | aimar oroz | Osasuna | med | 15.66M | 128K | 70% |
 | lorenzo amatucci | Deportivo | med | 12.35M | 178K | 80% |
