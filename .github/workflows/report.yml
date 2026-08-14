@@ -67,6 +67,7 @@ jobs:
           PYTHONPATH=src python src/digest.py --selftest
           PYTHONPATH=src python src/xi.py --selftest
           PYTHONPATH=src python src/seen.py --selftest
+          PYTHONPATH=src python src/points.py --selftest
       - name: Import every module
         # Catches the break that only shows at import time — a helper that
         # moved, a name that no longer exists.
@@ -103,6 +104,11 @@ jobs:
       # retroactively repairs every past snapshot.
       - name: Parse
         run: python src/ff_ingest.py parse
+
+      # Rebuilds data/season/live/ from every points.html.gz snapshot.
+      # report.py does not read that folder — see points.py's docstring.
+      - name: Season points (running)
+        run: python src/points.py
 
       - name: Season points baseline
         if: inputs.history
