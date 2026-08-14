@@ -1,6 +1,6 @@
-# League behaviour — 2026-08-14 21:57 UTC
+# League behaviour — 2026-08-14 22:57 UTC
 
-5 managers, 35 ledger rows, 28 market snapshots, points baseline 2025-26.
+5 managers, 35 ledger rows, 29 market snapshots, points baseline 2025-26.
 
 ## 1. Cash and ceilings
 
@@ -77,11 +77,11 @@ Two errors this table is built to catch: buying a player who has already risen (
 
 | Manager | XI score | Shape | Trapped | Injured | Thin at | Unmatched |
 |---|--:|---|--:|--:|---|--:|
-| **miguel_autentico** | 35.4 | 4-5-1 | 4.80M | 0 | del | 0 |
-| Albert Laporta | 33.6 | 4-3-3 | 56.84M | 0 | por | 0 |
-| BurtonGM89 | 31.4 | 5-4-1 | 37.43M | 0 | por,del | 0 |
-| Magic Mike 333 | 32.4 | 3-4-3 | 18.17M | 0 | por | 0 |
-| SusoGattuso | 29.4 | 4-4-2 | 26.40M | 0 | por | 0 |
+| **miguel_autentico** | 35.4 | 4-5-1 | 4.73M | 0 | del | 0 |
+| Albert Laporta | 33.6 | 4-3-3 | 55.61M | 0 | por | 0 |
+| BurtonGM89 | 31.4 | 5-4-1 | 36.79M | 0 | por,del | 0 |
+| Magic Mike 333 | 32.4 | 3-4-3 | 17.75M | 0 | por | 0 |
+| SusoGattuso | 29.4 | 4-4-2 | 26.31M | 0 | por | 0 |
 
 - miguel_autentico is carrying more portero/mediocampista than can ever start.
 - Albert Laporta is carrying more delantero than can ever start.
@@ -93,32 +93,41 @@ Trapped is value held in players below 50% start probability — money that cann
 
 ## 5. Who wants what
 
-Restricted to the 9 players on today's slate — the rest of the market is not a decision you can make today.
-
 **Expect competition for these** — the position is one a rival is short in, so assume a bidding war and price accordingly.
 
 | Player | Pos | Value | Start% | Short here |
 |---|---|--:|--:|---|
-| zakaria eddahchouri | DEL | 1.91M | 30% | BurtonGM89 |
+| joan garcia | POR | 68.06M | 80% | Albert Laporta, BurtonGM89, Magic Mike 333, SusoGattuso |
+| kylian mbappe | DEL | 129.58M | 70% | BurtonGM89 |
+| vinicius junior | DEL | 107.53M | 90% | BurtonGM89 |
+| alvaro valles | POR | 32.74M | 95% | Albert Laporta, BurtonGM89, Magic Mike 333, SusoGattuso |
+| david soria | POR | 19.48M | 95% | Albert Laporta, BurtonGM89, Magic Mike 333, SusoGattuso |
+| jan oblak | POR | 52.60M | 90% | Albert Laporta, BurtonGM89, Magic Mike 333, SusoGattuso |
+| lamine yamal | DEL | 126.81M | 60% | BurtonGM89 |
+| augusto batalla | POR | 40.35M | 95% | Albert Laporta, BurtonGM89, Magic Mike 333, SusoGattuso |
+| mathew ryan | POR | 13.55M | 90% | Albert Laporta, BurtonGM89, Magic Mike 333, SusoGattuso |
+| stole dimitrievski | POR | 14.11M | 90% | Albert Laporta, BurtonGM89, Magic Mike 333, SusoGattuso |
+| unai simon | POR | 54.47M | 90% | Albert Laporta, BurtonGM89, Magic Mike 333, SusoGattuso |
+| ante budimir | DEL | 50.42M | 90% | BurtonGM89 |
 
 **Nobody else needs these.** Same quality, no auction — take the equivalent player here instead of paying a premium above.
 
 | Player | Pos | Value | Start% |
 |---|---|--:|--:|
-| pablo fornals | MED | 58.30M | 80% |
-| santiago mouriño | DEF | 40.60M | 70% |
-| mario martin | MED | 3.74M | 80% |
-| pelayo fernandez | DEF | 1.72M | 50% |
-| clemens riedel | DEF | 4.66M | 50% |
-| oriol rey | MED | 742K | 50% |
-| dani vivian | DEF | 11.14M | 30% |
-| alex freeman | DEF | 2.48M | 30% |
+| federico valverde | MED | 68.85M | 90% |
+| zaid romero | DEF | 28.02M | 90% |
+| florian lejeune | DEF | 38.21M | 90% |
+| pablo fornals | MED | 57.93M | 80% |
+| marcos alonso | DEF | 29.33M | 90% |
+| german valera | MED | 23.27M | 90% |
+| andrei ratiu | DEF | 35.45M | 90% |
+| fermin lopez | MED | 64.18M | 70% |
 
 **List these to them.** Players of yours who aren't starting, in a position a rival is short in. You stop competing with them and start selling to them; price just under the premium they showed in section 2.
 
 | Player | Pos | Value | Start% | Short |
 |---|---|--:|--:|---|
-| alvaro fernandez | POR | 4.80M | 20% | Albert Laporta, BurtonGM89, Magic Mike 333, SusoGattuso |
+| alvaro fernandez | POR | 4.73M | 20% | Albert Laporta, BurtonGM89, Magic Mike 333, SusoGattuso |
 
 ## Ledger warnings
 
