@@ -63,9 +63,16 @@ or budget cuts, because a 40%-start player on today's slate is still a choice
 you are making — and `behaviour.md` §5 restricts its demand forecast to them.
 
 OCR output is expected to be bad and that's fine — `Inigo Ruiz Galarreta`
-resolves to `Iñigo Ruiz de Galarreta`. What it will never do is guess: a bare
-`Dani` is reported under "Names I could not place" with the five candidates,
-because a wrong player costs real money.
+resolves to `Iñigo Ruiz de Galarreta`. Where the name alone is ambiguous,
+ownership settles it: the app deals free agents, so a candidate somebody in the
+league already holds is not the one on offer. `Llorente` therefore resolves to
+Marcos, because Diego Javier is owned. Every such placement is printed under
+"Placed by ownership, not by the name" so you can catch it, since it is only as
+good as `transactions.csv` is current.
+
+What it still will never do is guess between candidates the ledger can't
+separate: a bare `Dani` with ten Danis unowned is reported under "Names I could
+not place" with the candidates, because a wrong player costs real money.
 
 Every slate you paste is appended to `data/decisions/slate_log.csv`. A player
 who sat on the slate and never appears in `transactions.csv` is one nobody
@@ -154,20 +161,43 @@ is not that mistake returning: it is OCR'd rather than typed, it is names only,
 and it is deleted on every run that doesn't paste one, so it can never be
 mistaken for state.
 
-**The floor has never won, and roundness never proved otherwise.** All ten
-priced purchases in the ledger landed above the market value at the time —
-median +8.9%, range +1.5% to +21.6%. The minimum legal bid *is* the market
-value, so bidding it is bidding the one number this league has already beaten
-ten times. `rivals.py` used to read a non-round price as "the app's own
-valuation, so nobody competed and you could have had him for the same money".
-That was inverted: the five exact-priced buys went for +1.5%, +2.6%, +2.6%,
-+9.2% and +12.7%, and only 0.7% of current market values are divisible by 10k,
-so the app almost never hands you a round number in the first place. A round
-bid does mean a human typed it — that half stands, as an observation about how
-they type — but the premium column measures the thing directly, and a sealed
-bid is paid *as bid*, so even a purchase at exactly the floor would only have
-been yours if the undocumented tie-break favoured you. Verify that in-app
-before treating any floor price as a missed bargain.
+**Roundness never proved anything, and no count of floor wins is hardcoded.**
+`rivals.py` used to read a non-round price as "the app's own valuation, so
+nobody competed and you could have had him for the same money". That was
+inverted: the five exact-priced buys on the ledger at the time went for +1.5%,
++2.6%, +2.6%, +9.2% and +12.7%, and only 0.7% of current market values are
+divisible by 10k, so the app almost never hands you a round number in the first
+place. A round bid does mean a human typed it — that half stands, as an
+observation about how they type — but the premium over the floor measures the
+thing directly.
+
+The replacement prose then made the same class of mistake in the other
+direction. It asserted that the floor had never won, which was true of the first
+ten buys and false by the fifteenth, and it kept printing as a finding.
+`Premiums.at_floor` now counts floor purchases on every run and both reports
+state the current number. **When the ledger contradicts the prose, the prose is
+the bug.** Note also that every row is a bid that *won*: the share of purchases
+made at the floor is not the probability a floor bid wins, and nothing here can
+measure that.
+
+**The app randomises its own price by about a tenth.** Selling back to the
+market does not pay the market value: the twelve priced sales in the ledger span
+−9.4% to +9.8% of value at the time, five below and seven above. So a sale
+raises the value give or take 10%, and the bench table says so rather than
+printing the value as the money you will get. Whether the same randomiser also
+bids against you for a free agent is *inferred, not measured* — every deal in
+the ledger is a winning bid, so no losing bid has ever been observed.
+
+**Who the counterparty was tells you who the player is.** A player sold by a
+manager was in that manager's squad; a player bought from the market was in
+nobody's; and a price has to be within a factor of two of the right player's
+value. `ffcore/league.py:identify()` applies those three prunes to the
+candidates `resolve()` hands back, which is the step the ledger's own notes
+record by hand — `price confirms Fabio not Johnny`, where Fabio Cardoso at
+925,408 and Johnny Cardoso at 6.31M are told apart by a 949,269 price. It runs
+inside the ledger replay, so ownership is as it stood on the date of the row,
+and a sale of a player nobody was holding is now a warning instead of a
+no-op.
 
 **Bid logging was removed, deliberately.** `inputs/bids.csv` asked you to type
 a bid and then come back and type its outcome. Nobody comes back: both rows in
@@ -175,10 +205,11 @@ it said `pending` while the ledger already showed one won and one lost. A field
 you have to revisit is a field that drifts. Winning bids are captured
 automatically — a win *is* a transaction — so the only thing lost is losing
 bids, and `ffcore/bid.py` infers premiums from the ledger instead. What losing
-bids would buy is a P(win | bid) curve, and ten deals cannot fit one; the
-ceiling half of the question is answered for free by `slate_log.csv`, which
-records what was on offer and therefore what went unsold. Restore `bids.csv`
-from git history only when the sample is large enough to fit a curve.
+bids would buy is a P(win | bid) curve, and a fortnight of deals cannot fit one.
+The ceiling half of the question has two free sources instead: `slate_log.csv`
+records what was on offer and therefore what went unsold, and the sell-side
+spread above measures what the app will pay when nobody else does. Restore
+`bids.csv` from git history only when the sample is large enough to fit a curve.
 
 **Empty results say why.** A silently-blank probable XI would set every start
 probability to zero and quietly bench your best players, so each section

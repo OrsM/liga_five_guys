@@ -7,9 +7,11 @@ Five sections, in descending order of how much they are worth to you today:
 
   1. Cash and ceilings   what each rival can still spend. A hard bound on
                          tomorrow's bidding, and the app never shows it.
-  2. Premium curve       what they pay over market value. Every priced buy so
-                         far went above the floor, so the minimum legal bid is
-                         the one number known to lose (issue #23).
+  2. Premium curve       what they pay over market value, and what the app
+                         pays you — every count in it is computed from the
+                         ledger on each run, because the version of this
+                         section that asserted the floor never wins was still
+                         printing that after the floor had won (issue #23).
   3. Post-buy drift      what their purchases did next. Tests two specific
                          errors: momentum chasing and selling into a dip.
   4. Squad diagnostics   trapped capital, injured holds, positional holes,
@@ -144,22 +146,53 @@ def sec_premium(lg, dl) -> list[str]:
 
     all_prem = premiums(dl)
     if all_prem:
+        # Computed, never asserted. This paragraph used to state that the floor
+        # had never won, which was true of the first ten buys and false by the
+        # fifteenth while still printing as fact (issue #23).
+        won = all_prem.at_floor
+        if won:
+            head = ("**The floor sometimes wins.** %d of the %d priced "
+                    "purchases in this league went at the market value itself "
+                    "and the other %d cleared it, %s across all of them. "
+                    "Bidding the minimum is therefore not the one number known "
+                    "to lose — but %d of %d is a share of the bids that WON, "
+                    "not the odds of winning one. Nothing in this ledger "
+                    "records a bid that lost, so the floor's failure rate is "
+                    "unmeasured and unmeasurable from here."
+                    % (won, all_prem.n, all_prem.n - won, all_prem.label(),
+                       won, all_prem.n))
+        else:
+            head = ("**The floor has not won yet.** All %d priced purchases in "
+                    "this league landed above the market value at the time: "
+                    "%s. On this evidence the minimum legal bid is the one "
+                    "number every deal has beaten — but %d deals is a fortnight "
+                    "of a season, not a rule."
+                    % (all_prem.n, all_prem.label(), all_prem.n))
+        out += ["", head]
+
+    app = premiums(dl, "sell")
+    if app and app.n >= 3:
         out += ["",
-                "**The floor has never won.** Every priced purchase in this "
-                "league landed above the market value at the time: %s. The "
-                "minimum legal bid is the market value, so bidding it is "
-                "bidding the number %d deals have already beaten."
-                % (all_prem.label(), all_prem.n)]
+                "**The app does not pay you the value — it randomises around "
+                "it.** The %d priced sales back to the market went for %s: %d "
+                "below the value and %d above, never further than %.1f%% "
+                "either way. So a sale raises the value give or take a tenth, "
+                "and the value is not the money you will get. Whether the same "
+                "randomiser bids against you for a free agent is inferred, not "
+                "measured: every row in this ledger is a bid that won."
+                % (app.n, app.label(), app.at_floor, app.n - app.at_floor,
+                   app.swing())]
 
     out += ["",
             "A round bid was typed by a human. That is the whole of what "
             "roundness tells you — an exact bid is *not* the app's valuation "
             "and does not mean nobody competed, because the premium column "
             "two cells left already measures how far above the floor the "
-            "buyer went, and none of these went to the floor. Sealed bids are "
-            "paid as bid, so even a purchase at exactly the value would only "
-            "have been yours if the tie-break favoured you, and that rule is "
-            "not documented anywhere we can read.", "",
+            "buyer went. Sealed bids are paid as bid, so a purchase at exactly "
+            "the value was only ever yours to take if the tie-break favoured "
+            "you, and that rule is not documented anywhere we can read. Check "
+            "it in-app before reading a floor purchase as a bargain you "
+            "missed.", "",
             "| Date | Player | Buyer | Paid | Value then | Premium | Bid |",
             "|---|---|---|--:|--:|--:|---|"]
     for d in sorted(buys, key=lambda d: d["date"], reverse=True)[:25]:
@@ -382,7 +415,7 @@ def main() -> None:
     by_key = lg.market.latest() if lg.market else {}
 
     dl = deals(lg, lg.market)
-    on_offer, _, _ = read_slate(by_key)
+    on_offer, _, _, _ = read_slate(by_key, lg.owner)
     stamp = dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
 
     out = ["# League behaviour — %s" % stamp, "",

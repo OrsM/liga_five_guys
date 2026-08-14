@@ -18,6 +18,13 @@ OCR output is expected to be bad. ffcore.text.resolve() does exact, then
 substring, then all-tokens matching, and hands back candidates rather than
 guessing between them — a wrong player costs real money, so ambiguity is
 reported, never resolved silently.
+
+Ownership settles some of it for free (issue #26): the app deals free agents,
+so a candidate somebody in the league already holds is not the player on offer.
+Pass `lg.owner` to match() and a bare "Dani" with one Dani owned has exactly
+one player it can be. Every such substitution is returned separately and
+printed in the report, because this one is a guess and the ledger it leans on
+can be out of date.
 """
 
 from __future__ import annotations
@@ -51,19 +58,40 @@ def read_names(text: str) -> list[str]:
     return out
 
 
-def match(names: list[str], players: dict) -> tuple[set, list, list]:
-    """(keys on offer, unresolved, ambiguous).
+def match(names: list[str], players: dict,
+          owner: dict | None = None) -> tuple[set, list, list, list]:
+    """(keys on offer, unresolved, ambiguous, resolved by ownership).
 
     `players` is common.load_players(): norm(name) -> record. Unresolved and
     ambiguous names are returned so the report can show them — a name OCR
     mangled past recognition is a player you might otherwise think isn't on
     offer, which is the opposite of what the list is for.
+
+    `owner` is ffcore.league's {key: manager}, and it settles ambiguity the
+    string cannot (issue #26): a player the app is dealing is a player nobody
+    in the league holds, so an owned candidate is not the one on offer. With
+    one Dani owned, a bare "Dani" has exactly one player it can be.
+
+    THE PRUNE IS ONLY AS GOOD AS THE LEDGER. Unlike the same trick inside
+    replay(), where ownership is derived from the very rows being read, this
+    leans on transactions.csv being up to date: a rival's unlogged purchase
+    makes an owned player look free, and it can then be chosen over the right
+    one. So every substitution is returned in `resolved` for the report to
+    print, and an exact match is never overridden — being owned is a fact worth
+    reporting, not grounds for picking somebody else.
     """
     rows = list(players.values())
-    keys, unresolved, ambiguous = set(), [], []
+    keys, unresolved, ambiguous, resolved = set(), [], [], []
 
     for raw in names:
         rec, candidates = resolve(raw, rows)
+        if not rec and candidates and owner:
+            free = [c for c in candidates if norm(c.get("name")) not in owner]
+            if len(free) == 1:
+                rec = free[0]
+                resolved.append(
+                    "**%s** → %s — the only one of %d candidates nobody owns"
+                    % (raw, rec.get("name"), len(candidates)))
         if rec:
             keys.add(norm(rec.get("name")))
         elif candidates:
@@ -71,11 +99,11 @@ def match(names: list[str], players: dict) -> tuple[set, list, list]:
         else:
             unresolved.append(raw)
 
-    return keys, unresolved, ambiguous
+    return keys, unresolved, ambiguous, resolved
 
 
-def read_slate(players) -> tuple[set, list, list]:
-    """(keys on offer, unresolved, ambiguous) from inputs/seen.txt.
+def read_slate(players, owner=None) -> tuple[set, list, list, list]:
+    """(keys on offer, unresolved, ambiguous, resolved) from inputs/seen.txt.
 
     Absent file is the normal case — you only paste a slate when deciding, and
     every consumer treats an empty set as "no slate pasted" rather than as "an
@@ -83,12 +111,13 @@ def read_slate(players) -> tuple[set, list, list]:
     the same slate rather than each growing a copy of the same six lines.
 
     `players` is any {key: record} whose records carry a "name", so it takes
-    common.load_players() or a market row index equally.
+    common.load_players() or a market row index equally. Pass `lg.owner` to get
+    the ownership prune described in match().
     """
     path = input_path("seen.txt")
     if not path.exists():
-        return set(), [], []
-    return match(read_names(path.read_text(encoding="utf-8")), players)
+        return set(), [], [], []
+    return match(read_names(path.read_text(encoding="utf-8")), players, owner)
 
 
 def _selftest() -> None:
@@ -103,7 +132,7 @@ def _selftest() -> None:
     }
 
     # OCR drops accents and loses short words. Both must still resolve.
-    keys, unres, amb = match(
+    keys, unres, amb, _ = match(
         ["Alvaro Valles", "Inigo Ruiz Galarreta", "Stole Dimitrievski"],
         players)
     assert keys == {norm("Álvaro Valles"), norm("Iñigo Ruiz de Galarreta"),
@@ -111,19 +140,43 @@ def _selftest() -> None:
     assert not unres and not amb, (unres, amb)
 
     # A first name matching two players is ambiguous, not a coin flip.
-    keys2, unres2, amb2 = match(["Dani"], players)
+    keys2, unres2, amb2, res2 = match(["Dani"], players)
     assert keys2 == set(), keys2
     assert unres2 == []
     assert len(amb2) == 1 and amb2[0][0] == "Dani"
     assert sorted(amb2[0][1]) == ["Dani Lorenzo", "Dani Martínez"], amb2
+    assert res2 == [], res2
+
+    # Issue #26, the slate side: a player on offer is a player nobody owns, so
+    # an owned candidate cannot be the one being dealt. One Dani owned leaves
+    # exactly one it can be.
+    owner = {norm("Dani Lorenzo"): "alice"}
+    keys5, _, amb5, res5 = match(["Dani"], players, owner)
+    assert keys5 == {norm("Dani Martínez")}, keys5
+    assert amb5 == [], amb5
+    assert len(res5) == 1 and "Dani Martínez" in res5[0], res5
+
+    # Both owned: nothing survives the prune, so it stays ambiguous rather
+    # than resolving to whichever happened to be listed first.
+    both = {norm("Dani Lorenzo"): "alice", norm("Dani Martínez"): "bob"}
+    keys6, _, amb6, res6 = match(["Dani"], players, both)
+    assert keys6 == set() and res6 == [], (keys6, res6)
+    assert len(amb6) == 1, amb6
+
+    # An unambiguous name is not touched by ownership: an owned player on the
+    # slate is worth reporting as owned, which the slate table does.
+    keys7, _, _, res7 = match(["Alvaro Valles"], players,
+                              {norm("Álvaro Valles"): "alice"})
+    assert keys7 == {norm("Álvaro Valles")}, keys7
+    assert res7 == [], res7
 
     # Mangled past recognition: reported, never silently absent.
-    keys3, unres3, amb3 = match(["Xyzzy Nobody"], players)
+    keys3, unres3, amb3, _ = match(["Xyzzy Nobody"], players)
     assert keys3 == set() and amb3 == []
     assert unres3 == ["Xyzzy Nobody"]
 
     # Case and stray punctuation from OCR don't matter.
-    keys4, _, _ = match(["ÁLVARO VALLES", "stole dimitrievski."], players)
+    keys4, _, _, _ = match(["ÁLVARO VALLES", "stole dimitrievski."], players)
     assert len(keys4) == 2, keys4
 
     # Both input shapes: newline-separated and comma-separated.
@@ -139,7 +192,7 @@ def _selftest() -> None:
         ["Alvaro Valles"]
     assert read_names("") == []
 
-    print("seen self-test OK (13 cases)")
+    print("seen self-test OK (22 cases)")
 
 
 if __name__ == "__main__":

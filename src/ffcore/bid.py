@@ -5,9 +5,9 @@ Issue #23: the old reading of the ledger was inverted. rivals.py classified a
 price by whether it was a round number and concluded that an exact one was
 "the app's own valuation, which means nobody competed — every exact purchase
 was a player you could have had for the same money." The repo's own ledger
-says otherwise. All ten priced buys landed ABOVE the market value at the time,
-and the five exact ones went for +1.5%, +2.6%, +2.6%, +9.2% and +12.7%. None
-of them was the app's valuation, so none of them was available at the floor.
+says otherwise: of the ten priced buys on it when that was written, the five
+exact-priced ones went for +1.5%, +2.6%, +2.6%, +9.2% and +12.7%. None was the
+app's valuation, so none was available at the floor.
 
 Roundness cannot carry that inference, in either direction:
 
@@ -29,22 +29,37 @@ directly:
     floor    = today's market value. The minimum legal bid IS the value.
     premium  = price / value_at_the_time - 1
 
-and the actionable finding in this league is that the floor has never won:
-median winning premium +8.9% across ten deals. Bidding the minimum loses.
-
     prem = premiums(deals)                  # what winning has cost so far
     adv  = suggest(value, prem, cash, ceil)  # what to bid for this one
     g    = gain(pool, candidate, xi_total)   # what he adds if you play him
 
+NOTHING HERE ASSERTS HOW OFTEN THE FLOOR WINS. An earlier version of this
+module said it never had, on the strength of ten buys that all cleared the
+value. Ten rows later three buys had gone at exactly the value, and the
+sentence was still in the report, printed as fact. `Premiums.at_floor` now
+counts them so the reports state the current number instead. When the ledger
+contradicts the prose, the prose is the bug.
+
+THE APP RANDOMISES ITS OWN PRICE (issue #23, second half). Selling to the
+market does not pay the value: `premiums(deals, "sell")` over the twelve
+priced sells in this ledger spans -9.4% to +9.8%, five below and seven above,
+which is the value plus or minus a tenth and not a valuation. Two consequences:
+
+  * A sale is a coin flip worth about a tenth of the player either way, so
+    never treat the value as the money a sale will raise.
+  * It is the closest thing to a P(win) curve available, and it is not one.
+    Whether the same randomiser also bids against you for a free agent is
+    INFERRED, NOT MEASURED — every deal in the ledger is a winning bid, so
+    nothing here has ever observed a bid that lost.
+
+A HANDFUL OF DEALS IS NOT A DISTRIBUTION. Everything premiums() returns is a
+summary of purchases made in the first fortnight of a season, so suggest()
+reports the range alongside the median and the reports print both. Treat the
+band as "what this league has done so far", never as a probability of winning.
+
 `gain` is the marginal-value primitive from docs/design.md §6.3, at the only
 precision the data currently supports: the change in the XI ranking index from
 owning him. It is not euros per point, and it is not a forecast.
-
-TEN DEALS IS NOT A DISTRIBUTION. Everything premiums() returns is a summary of
-a handful of purchases made in the first fortnight of a season, so suggest()
-reports the range alongside the median and the report is expected to print
-both. Treat the band as "what this league has done so far", never as a
-probability of winning.
 """
 
 from __future__ import annotations
@@ -58,8 +73,9 @@ from ffcore.parse import money
 from ffcore.score import THIN, pick_xi
 from ffcore.tidy import ledger_stamp
 
-__all__ = ["MAX_LAG_H", "ROUND_TO", "Premiums", "Advice", "is_round", "deals",
-           "usable", "premiums", "suggest", "gain", "rivals_short"]
+__all__ = ["MAX_LAG_H", "ROUND_TO", "FLOOR_EPS", "Premiums", "Advice",
+           "is_round", "deals", "usable", "premiums", "suggest", "gain",
+           "rivals_short"]
 
 # A premium computed against a snapshot further than this from the deal is
 # reported but never averaged in. Lived in rivals.py; here so report.py sizes
@@ -70,6 +86,11 @@ MAX_LAG_H = 36.0
 # That is all it tells you — see the note on issue #23 above.
 ROUND_TO = 10_000
 
+# A premium inside this band is a bid at the floor. The residue is float noise
+# plus the euro-rounding in a scraped value, and a buy cannot legally go below
+# the value, so a small negative is snapshot lag rather than a cheaper bid.
+FLOOR_EPS = 0.5
+
 
 class Premiums(NamedTuple):
     """What winning has cost, over the floor, in percent."""
@@ -77,10 +98,19 @@ class Premiums(NamedTuple):
     median: float
     lo: float
     hi: float
+    at_floor: int = 0
 
     def label(self) -> str:
         return "median %+.1f%%, %+.1f%% to %+.1f%% (n=%d)" % (
             self.median, self.lo, self.hi, self.n)
+
+    def swing(self) -> float:
+        """Widest deviation from the floor, either way, in percent.
+
+        The number that describes a price scattered around the value, where a
+        median near zero says nothing about how far a single one can land.
+        """
+        return max(abs(self.lo), abs(self.hi))
 
 
 class Advice(NamedTuple):
@@ -136,14 +166,27 @@ def usable(d) -> bool:
 def premiums(deals, side: str = "buy") -> Premiums | None:
     """Premium over the floor across every usable deal, or None if none are.
 
-    Sells are excluded by default: selling to the app pays the value, so a
-    sell's premium measures nothing about what a rival will pay.
+    Buys by default, because what a rival paid over the floor is what it takes
+    to outbid one. Ask for `side="sell"` to measure something different and
+    just as useful: what the app itself pays, which is NOT the value — see the
+    module note on issue #23.
+
+    `at_floor` counts deals priced at or below the value, which reads as a bid
+    at the floor on the buy side and as the app underpaying you on the sell
+    side. It exists so the reports state how often the floor has won instead of
+    asserting it never has.
+
+    It is a share of PURCHASES, never a probability of winning. Every row in
+    the ledger is a bid that won, so nothing here can say how often a floor bid
+    loses — that is the sampling error issue #23 is about, and dividing
+    at_floor by n would reintroduce it wearing a percent sign.
     """
     vals = sorted(d["premium"] for d in deals
                   if d.get("side") == side and usable(d))
     if not vals:
         return None
-    return Premiums(len(vals), statistics.median(vals), vals[0], vals[-1])
+    return Premiums(len(vals), statistics.median(vals), vals[0], vals[-1],
+                    sum(1 for v in vals if v <= FLOOR_EPS))
 
 
 def suggest(value, prem: Premiums | None, cash=None,
@@ -224,7 +267,7 @@ def _selftest() -> None:
         {"side": "buy", "premium": 20.0, "lag_h": -2.0},   # backwards, still close
         {"side": "buy", "premium": 99.0, "lag_h": 100.0},  # too far to price
         {"side": "buy", "premium": None, "lag_h": 1.0},    # never priced
-        {"side": "sell", "premium": 50.0, "lag_h": 1.0},   # sells pay the value
+        {"side": "sell", "premium": 50.0, "lag_h": 1.0},   # the app's side
     ]
     p = premiums(fixed)
     assert p.n == 3, p
@@ -233,6 +276,23 @@ def _selftest() -> None:
     assert "n=3" in p.label(), p.label()
     assert premiums([]) is None
     assert premiums([{"side": "buy", "premium": None, "lag_h": 1.0}]) is None
+
+    # Issue #23, second half. Three of this league's fifteen priced buys went
+    # at the value itself, so no prose may assert that the floor never wins —
+    # the count has to be computed. A small negative is snapshot lag, not a
+    # bid below the legal minimum, so it counts as the floor too.
+    floors = premiums([{"side": "buy", "premium": x, "lag_h": 1.0}
+                       for x in (0.0, -0.19, 4.18, 21.6)])
+    assert floors.at_floor == 2, floors
+    assert floors.n == 4, floors
+    assert premiums(fixed).at_floor == 0, premiums(fixed)
+
+    # The app's own price swings both ways around the value, so the widest
+    # deviation is the number that describes it, not the median.
+    app = premiums([{"side": "sell", "premium": x, "lag_h": 1.0}
+                    for x in (-9.43, 1.53, 9.75)], "sell")
+    assert round(app.swing(), 2) == 9.75, app.swing()
+    assert round(premiums(fixed).swing(), 1) == 20.0, premiums(fixed)
     # A lag beyond the cut is excluded, not clamped.
     assert usable({"premium": 1.0, "lag_h": MAX_LAG_H}) is True
     assert usable({"premium": 1.0, "lag_h": MAX_LAG_H + 0.1}) is False
@@ -372,7 +432,7 @@ def _selftest() -> None:
     assert (round(pd.lo, 1), round(pd.hi, 1)) == (10.0, 23.5), pd
     assert round(premiums(dl, "sell").median, 1) == -10.0, premiums(dl, "sell")
 
-    print("ffcore.bid self-test OK (39 cases)")
+    print("ffcore.bid self-test OK (44 cases)")
 
 
 if __name__ == "__main__":                      # pragma: no cover

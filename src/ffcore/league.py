@@ -49,11 +49,17 @@ from ffcore.text import norm
 from ffcore.tidy import (Market, input_path, ledger_stamp, load_market,
                          read_ledger, snapshot_stamp)
 
-__all__ = ["MARKET", "Config", "load_config", "read_rosters", "replay",
-           "Cash", "Manager", "League"]
+__all__ = ["MARKET", "Config", "load_config", "read_rosters", "identify",
+           "replay", "Cash", "Manager", "League"]
 
 # Reserved counterparty in the ledger: the free-agent pool.
 MARKET = "market"
+
+# A price further than this factor from a candidate's value is not that player.
+# The widest premium in the ledger is +21.6% and the app's own price swings a
+# tenth either way, so a factor of two is slack rather than a tuned threshold —
+# it is here to separate a 0.9M player from a 6.3M one, not to judge a bid.
+PLAUSIBLE = 2.0
 
 DEFAULTS = {
     "me": "miguel_autentico",
@@ -177,25 +183,109 @@ def read_balances(name: str = "cash.txt") -> dict[str, tuple[float, str]]:
     return out
 
 
-def replay(rosters: dict[str, list[str]], txns: list[dict]):
+def identify(t: dict, owner: dict, market=None) -> tuple[str, str]:
+    """(player key, why) for one ledger row — issue #26.
+
+    The counterparty is evidence about who the player is. A sale names someone
+    that manager was holding; a purchase from the market names someone nobody
+    held. Either one prunes a candidate list that the name alone leaves
+    ambiguous, which is the manual step the ledger's own notes record: "price
+    confirms Fabio not Johnny".
+
+    Three prunes, applied to the candidates ffcore.text.resolve() hands back
+    rather than replacing it — an exact name is returned untouched and is never
+    second-guessed:
+
+      1. Sold by a manager -> he was in that manager's squad at the time.
+      2. Bought from the market -> nobody in the league held him.
+      3. Priced -> the price has to be within a factor of PLAUSIBLE of his
+         value at the time. Two players who share a surname rarely share a
+         price bracket.
+
+    Returns (norm(raw), "") unless exactly one candidate survives, so an
+    unresolved name still lands in unmatched() and a wrong player is never
+    invented. `why` is non-empty only when a substitution was made, and every
+    caller is expected to report it: this guesses, so it has to say so.
+    """
+    key = norm(t["player"])
+    rows = market.latest() if market is not None else {}
+    if not rows or key in rows:
+        return key, ""
+
+    from ffcore.text import resolve
+    rec, cands = resolve(t["player"], list(rows.values()))
+    if rec:
+        return norm(rec.get("name")), "matched %s" % rec.get("name")
+    if not cands:
+        return key, ""
+
+    src = (t.get("from") or "").strip() or MARKET
+    dst = (t.get("to") or "").strip() or MARKET
+    why = ""
+
+    if src != MARKET:
+        kept = [c for c in cands if owner.get(norm(c.get("name"))) == src]
+        if kept:
+            cands, why = kept, "held by %s at the time" % src
+    elif dst != MARKET:
+        kept = [c for c in cands if norm(c.get("name")) not in owner]
+        if kept:
+            cands, why = kept, "the only one nobody owned"
+
+    price = money(t.get("price"))
+    when = ledger_stamp(t.get("date", ""))
+    if len(cands) > 1 and price and when:
+        kept = []
+        for c in cands:
+            v = market.at(c.get("name"), when)
+            if v and v.value and 1 / PLAUSIBLE <= price / v.value <= PLAUSIBLE:
+                kept.append(c)
+        if kept:
+            cands = kept
+            why = ("price fits only his value" if len(kept) == 1
+                   else why)
+
+    if len(cands) != 1:
+        return key, ""
+    return norm(cands[0].get("name")), why
+
+
+def replay(rosters: dict[str, list[str]], txns: list[dict], market=None):
     """initial rosters + full ledger = current ownership.
 
-    Every transaction is replayed, oldest first. If a row contradicts the
-    state it lands on, that is a gap in the ledger and gets warned about
-    rather than silently absorbed.
+    Every transaction is replayed, oldest first, so identify() can use the
+    ownership state as it stood when the row happened rather than as it stands
+    now. If a row contradicts the state it lands on, that is a gap in the
+    ledger and gets warned about rather than silently absorbed.
+
+    Returns (owner, warnings, resolved). `resolved` is every name identify()
+    substituted, so the reports can show what was guessed and on what grounds.
     """
     owner: dict[str, str] = {}
     for mgr, names in rosters.items():
         for n in names:
             owner[norm(n)] = mgr
     warnings: list[str] = []
+    resolved: list[str] = []
     for t in txns:
-        key = norm(t["player"])
+        key, why = identify(t, owner, market)
+        if why:
+            resolved.append("%s: %s → %s (%s)" % (
+                t.get("date", "?"), t["player"], key, why))
         src = (t.get("from") or "").strip() or MARKET
         dst = (t.get("to") or "").strip() or MARKET
         if src != MARKET and owner.get(key) not in (src, None):
             warnings.append("%s: %s was not owned by %s" % (
                 t.get("date", "?"), t["player"], src))
+        elif src != MARKET and owner.get(key) is None:
+            # Used to pass in silence: the key was absent, so the pop below did
+            # nothing and the sale left no trace. Either a purchase is missing
+            # from the ledger or the name is spelled differently from the
+            # roster — both are worth a line, and neither is visible any other
+            # way (issue #26).
+            warnings.append("%s: %s sold %s, but nobody was holding him — "
+                            "missing a purchase, or a different spelling?"
+                            % (t.get("date", "?"), src, t["player"]))
         if dst == MARKET:
             owner.pop(key, None)
         else:
@@ -205,7 +295,7 @@ def replay(rosters: dict[str, list[str]], txns: list[dict]):
                                 % (t.get("date", "?"), t["player"],
                                    owner[key]))
             owner[key] = dst
-    return owner, warnings
+    return owner, warnings, resolved
 
 
 class Cash(NamedTuple):
@@ -258,7 +348,8 @@ class League:
         self.rosters = rosters
         self.txns = txns
         self.market = market
-        self.owner, self.warnings = replay(rosters, txns)
+        self.owner, self.warnings, self.resolved = replay(rosters, txns,
+                                                          market)
 
         self.managers: dict[str, Manager] = {
             h: Manager(h) for h in rosters
@@ -434,7 +525,8 @@ start_cross   = 70
     assert real.min_start is not None
 
     _selftest_cash()
-    print("ffcore.league self-test OK (7 cases + cash)")
+    _selftest_identify()
+    print("ffcore.league self-test OK (7 cases + cash + identify)")
 
 
 def _selftest_cash() -> None:
@@ -473,6 +565,96 @@ def _selftest_cash() -> None:
     assert over.cash.confidence == "unknown", over.cash.confidence
     assert over.max_bid is None, over.max_bid
     assert any("exceeds" in w for w in lg.warnings), lg.warnings
+
+
+def _selftest_identify() -> None:
+    """Issue #26: who the counterparty was narrows who the player can be.
+
+    A sale names a player that manager was holding, and a purchase from the
+    market names one nobody held. Both prune a candidate list that string
+    matching alone leaves ambiguous.
+    """
+    class _Val(NamedTuple):
+        value: float
+        lag_h: float
+
+    class _Market:
+        """Two Cardosos, an order of magnitude apart — the real collision."""
+        vals = {"fabio cardoso": 925_408.0, "johnny cardoso": 6_306_919.0,
+                "dani lorenzo": 4_000_000.0, "dani martinez": 500_000.0}
+
+        def at(self, name, when):
+            v = self.vals.get(norm(name))
+            return None if v is None else _Val(v, 2.0)
+
+        def latest(self):
+            return {k: {"name": k} for k in self.vals}
+
+    mkt = _Market()
+    owner = {"dani lorenzo": "alice", "johnny cardoso": "bob"}
+
+    # A sale by alice can only be a player alice was holding, so the two Danis
+    # collapse to one even though the name matches both.
+    key, why = identify({"player": "Dani", "from": "alice", "to": MARKET},
+                        owner, mkt)
+    assert key == "dani lorenzo", (key, why)
+    assert "alice" in why, why
+
+    # The same string, sold by bob, is not a player bob holds: no guess, and
+    # the row is left alone for the warning to pick up.
+    key, why = identify({"player": "Dani", "from": "bob", "to": MARKET},
+                        owner, mkt)
+    assert key == "dani" and why == "", (key, why)
+
+    # A purchase from the market cannot be a player somebody already owns, so
+    # ownership alone settles the Cardosos: johnny is bob's.
+    key, why = identify({"player": "Cardoso", "from": MARKET, "to": "alice",
+                         "price": "949269", "date": "2026-08-11T21:24"},
+                        owner, mkt)
+    assert key == "fabio cardoso", (key, why)
+
+    # Price settles it too, and on its own: with neither owned, 949,269 is
+    # +2.6% on Fabio and -84.9% on Johnny. This is the hand-written
+    # "price confirms Fabio not Johnny" note in the ledger, automated.
+    key, why = identify({"player": "Cardoso", "from": MARKET, "to": "alice",
+                         "price": "949269", "date": "2026-08-11T21:24"},
+                        {}, mkt)
+    assert key == "fabio cardoso", (key, why)
+    assert "price" in why, why
+
+    # A price that fits both candidates proves nothing, so nothing is chosen.
+    key, why = identify({"player": "Cardoso", "from": MARKET, "to": "alice",
+                         "price": "3000000", "date": "2026-08-11T21:24"},
+                        {}, mkt)
+    assert key == "cardoso" and why == "", (key, why)
+
+    # An exact name is never second-guessed, whoever is holding it.
+    key, why = identify({"player": "Johnny Cardoso", "from": "bob",
+                         "to": MARKET}, owner, mkt)
+    assert key == "johnny cardoso" and why == "", (key, why)
+
+    # No market and no ownership to work with: unchanged, never invented.
+    key, why = identify({"player": "Nobody", "from": MARKET, "to": "alice"},
+                        {}, None)
+    assert key == "nobody" and why == "", (key, why)
+
+    # -- replay uses it, and says so ---------------------------------------
+    # The ledger says alice sold "Dani". Ownership moves off the right key, so
+    # the squad is emptied rather than left holding a player who was sold.
+    own2, warns, notes = replay({"alice": ["Dani Lorenzo"]},
+                                [{"date": "2026-08-13T21:25", "player": "Dani",
+                                  "from": "alice", "to": MARKET,
+                                  "price": "3800000"}], mkt)
+    assert own2 == {}, own2
+    assert notes and "dani lorenzo" in notes[0], notes
+    assert not warns, warns
+
+    # A sale of a player nobody is recorded as holding used to pass in
+    # silence: the key simply wasn't in the map, so the pop did nothing.
+    _, warns2, _ = replay({"alice": ["Dani Lorenzo"]},
+                          [{"date": "2026-08-13T21:25", "player": "Xabi",
+                            "from": "alice", "to": MARKET}], mkt)
+    assert any("nobody was holding" in w for w in warns2), warns2
 
 
 if __name__ == "__main__":                      # pragma: no cover

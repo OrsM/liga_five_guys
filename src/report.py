@@ -17,9 +17,9 @@ a limited market, so a ranked list of everyone unowned is mostly players you
 cannot buy. sec_slate() answers the only live question — of the players on
 offer right now, which improve my XI, what should I bid, and who else wants
 them — using ffcore.bid: the XI index gained by owning him, and the floor plus
-the premium this league has actually paid over it. Every priced purchase so far
-landed above the floor, so bidding the minimum is bidding the number ten deals
-have already beaten (issue #23).
+the premium this league has actually paid over it. How many purchases went at
+the floor is counted from the ledger on every run rather than stated here,
+because the sentence that stated it went stale inside a fortnight (issue #23).
 
 SCORING lives in ffcore/score.py now, shared with rivals.py so that your
 squad and theirs are ranked by the same arithmetic:
@@ -183,7 +183,7 @@ def sec_slate(lg, sc, by_key, pool, tot, slate, prem, cash_value,
     it is what he is worth to you, and it is frequently negative for a player
     the watchlist ranks highly, because your own eleven is the benchmark.
     """
-    on_offer, unresolved, ambiguous = slate
+    on_offer, unresolved, ambiguous, auto = slate
     out: list[str] = []
 
     owned = {k: lg.owner[k] for k in on_offer if k in lg.owner}
@@ -237,12 +237,16 @@ def sec_slate(lg, sc, by_key, pool, tot, slate, prem, cash_value,
                 band, ", ".join(short) or "nobody short", verdict))
         out += ["",
                 "Bid is the floor plus what this league has actually paid over "
-                "it: %s. Every priced purchase so far landed above the floor, "
-                "so the minimum legal bid is the one number known to lose. Ten "
-                "deals is not a distribution — the range is what has happened, "
-                "not a chance of winning."
+                "it: %s.%s A dozen deals is not a distribution — the range is "
+                "what has happened, not a chance of winning, and every one of "
+                "them is a bid that won."
                 % (prem.label() if prem else
-                   "no priced purchase yet, so these are floors"), ""]
+                   "no priced purchase yet, so these are floors",
+                   ("" if not prem else
+                    " %d of those %d went at the floor itself, so the minimum "
+                    "is not a number known to lose." % (prem.at_floor, prem.n)
+                    if prem.at_floor else
+                    " None of those %d went at the floor." % prem.n)), ""]
         if rival_max is None:
             out += ["_At least one rival's cash is an estimate, so no bid here "
                     "assumes you are unopposed._", ""]
@@ -256,6 +260,16 @@ def sec_slate(lg, sc, by_key, pool, tot, slate, prem, cash_value,
             "%s (%s)" % (by_key.get(k, {}).get("name", k),
                          "you" if h == lg.cfg.me else h)
             for k, h in sorted(owned.items())), ""]
+
+    if auto:
+        # Printed, not hidden: this is the one place the repo guesses between
+        # candidates, and it guesses off a ledger you maintain by hand. If a
+        # line here names the wrong player, the fix is a missing row in
+        # transactions.csv (issue #26).
+        out += ["**Placed by ownership, not by the name.** The app deals free "
+                "agents, so a candidate somebody already holds is not the one "
+                "on offer — check these if one looks wrong:", ""]
+        out += ["- " + a for a in auto] + [""]
 
     if unresolved or ambiguous:
         # A heading, not bold text, so digest.py prints it once instead of
@@ -364,13 +378,17 @@ def main() -> None:
     cash = lg[lg.cfg.me].cash if lg and lg.cfg.me in lg.managers else None
     cash_value = cash.value if cash and cash.confidence == "known" else None
     by_key = lg.market.latest() if lg and lg.market else {}
-    slate = read_slate(by_key) if by_key else (set(), [], [])
+    slate = read_slate(by_key, lg.owner) if by_key else (set(), [], [], [])
+    # Priced once: the buy side sizes a bid, and the sell side is what the app
+    # pays you for a player, which the bench table needs whether or not a slate
+    # was pasted.
+    dl = deals(lg, lg.market) if lg and lg.market else []
+    app_prem = premiums(dl, "sell")
     slate_lines, n_slate, n_better = [], 0, 0
     if any(slate):
-        prem = premiums(deals(lg, lg.market))
         slate_lines, n_slate, n_better = sec_slate(
-            lg, sc, by_key, pool, best[0] if best else None, slate, prem,
-            cash_value, rival_ceiling(lg))
+            lg, sc, by_key, pool, best[0] if best else None, slate,
+            premiums(dl), cash_value, rival_ceiling(lg))
 
     # --- header -----------------------------------------------------------
     out: list[str] = [f"# Fantasy report — {observed}", ""]
@@ -508,9 +526,16 @@ def main() -> None:
                     f"{p['score']:.1f} | "
                     f"{'—' if gap is None else format(gap, '+.1f')} | "
                     f"{'—' if cpp == float('inf') else eur(cpp)} | {why} |")
-            out += ["", "_A sale lands above or below value depending on who "
-                        "bids. Who is short in this position, and who can "
-                        "still afford you, is in `reports/behaviour.md`._", ""]
+            out += ["", "_%s Who is short in this position, and who can "
+                        "still afford you, is in `reports/behaviour.md`._" % (
+                            "Selling to the app pays the value give or take "
+                            "%.0f%%: the %d priced sales in the ledger went %s, "
+                            "so read every value above as that band, not as a "
+                            "number." % (app_prem.swing(), app_prem.n,
+                                         app_prem.label())
+                            if app_prem and app_prem.n >= 3 else
+                            "A sale lands above or below value depending on "
+                            "who bids."), ""]
 
         log_squad(observed, players, chosen, (d, m, f), tot, deadline, obs_dt)
 

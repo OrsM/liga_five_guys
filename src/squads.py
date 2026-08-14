@@ -141,6 +141,15 @@ def write_rivals(lg, players, stamp):
         out += ["## Ledger warnings", ""] + ["- " + w for w in lg.warnings]
         out.append("")
 
+    if lg.resolved:
+        out += ["## Names the ledger did not spell exactly", "",
+                "Placed by who the counterparty was, or by what the price "
+                "implies — a player sold by a manager was in that manager's "
+                "squad, and a player bought from the market was in nobody's "
+                "(issue #26). Fix the spelling in `inputs/transactions.csv` if "
+                "one of these is the wrong player.", ""]
+        out += ["- " + r for r in lg.resolved] + [""]
+
     unmatched = lg.unmatched(players)
     if unmatched:
         out += ["## Unmatched names", "",
@@ -232,10 +241,11 @@ def main():
     lg = League.load()
     print("replayed %d transaction(s)" % len(lg.txns))
 
-    on_offer, unresolved, ambiguous = read_slate(players)
+    on_offer, unresolved, ambiguous, auto = read_slate(players, lg.owner)
     if on_offer or unresolved or ambiguous:
-        print("slate: %d on offer, %d unresolved, %d ambiguous"
-              % (len(on_offer), len(unresolved), len(ambiguous)))
+        print("slate: %d on offer, %d unresolved, %d ambiguous, %d placed by "
+              "ownership" % (len(on_offer), len(unresolved), len(ambiguous),
+                             len(auto)))
     log_slate(on_offer, players, now.strftime("%Y-%m-%dT%H:%MZ"))
 
     write_rivals(lg, players, stamp)
