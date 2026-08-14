@@ -1,21 +1,23 @@
-# Squads — 2026-08-14 10:40 UTC
+# Squads — 2026-08-14 20:48 UTC
 
 | Manager | Players | Squad value | Spent | Raised | Cash |
 |---|--:|--:|--:|--:|--:|
-| **miguel_autentico** | 12 | 122.60M | 6.89M | 17.79M | 111.37M |
+| **miguel_autentico** | 15 | 171.04M | 55.37M | 17.79M | 62.89M |
 | Albert Laporta | 14 | 224.32M | 125.28M | 30.47M | ~5.19M |
 | BurtonGM89 | 13 | 221.38M | 127.61M | 30.03M | ~2.42M |
-| Magic Mike 333 | 18 | 216.54M | 83.70M | 0K | ~16.30M |
-| SusoGattuso | 15 | 158.94M | 44.65M | 0K | ~55.35M |
+| Magic Mike 333 | 19 | 239.42M | 121.23M | 14.01M | — |
+| SusoGattuso | 16 | 176.11M | 62.44M | 0K | ~37.56M |
 
 `~` is an estimate, not an observed balance — see the basis notes at the bottom. Cash is a ceiling on what anyone can bid tomorrow, which is the point of tracking it.
 
 ## You (miguel_autentico)
-12 players · 122.60M total · 7 at 70%+ · cash 111.37M
+15 players · 171.04M total · 9 at 70%+ · cash 62.89M
 
 | Player | Team | Pos | Value | 24h | Start% |
 |---|---|--:|--:|--:|--:|
+| ionut radu | Celta | por | 39.71M | -350K | 90% |
 | alvaro fernandez | Deportivo | por | 4.80M | -77K | 20% |
+| simon eriksson | Racing | por | 2.93M | -13K | 50% |
 | carl starfelt | Celta | def | 13.78M | 205K | 60% |
 | igor zubeldia | Real Sociedad | def | 9.86M | 98K | 80% |
 | robin le normand | Atlético | def | 9.84M | 12K | 60% |
@@ -26,6 +28,7 @@
 | pepelu | Valencia | med | 7.37M | -26K | 70% |
 | beñat turrientes | Real Sociedad | med | 6.99M | 70K | 70% |
 | jon moncayola | Osasuna | med | 6.68M | 103K | 90% |
+| lucien agoume | Sevilla | med | 5.79M | 21K | 80% |
 | iñigo vicente | Racing | del | 19.09M | 214K | 90% |
 
 ## Albert Laporta
@@ -68,7 +71,7 @@
 | karl etta eyong | Levante | del | 25.48M | 288K | 50% |
 
 ## Magic Mike 333
-18 players · 216.54M total · 6 at 70%+ · cash ~16.30M
+19 players · 239.42M total · 6 at 70%+ · cash —
 
 | Player | Team | Pos | Value | 24h | Start% |
 |---|---|--:|--:|--:|--:|
@@ -79,6 +82,7 @@
 | raul asencio | Real Madrid | def | 4.71M | -149K | 0% |
 | fabio cardoso | Sevilla | def | 860K | -19K | 0% |
 | alex pastor | Málaga | def | 379K | -3K | 40% |
+| pablo gavi | Barcelona | med | 33.40M | -752K | 50% |
 | gustavo puerta | Racing | med | 12.55M | 230K | 80% |
 | brahim diaz | Real Madrid | med | 10.52M | -54K | 50% |
 | gabriel moscardo | Espanyol | med | 9.65M | -233K | 30% |
@@ -87,20 +91,21 @@
 | pedro diaz | Rayo | med | 1.80M | -25K | 50% |
 | raphinha | Barcelona | del | 81.98M | 2.91M | 70% |
 | gorka guruzeta | Athletic | del | 13.53M | 176K | 80% |
-| lucas boye | Alavés | del | 12.51M | -298K | 40% |
 | pere milla | Espanyol | del | 9.59M | -60K | 50% |
+| tete morente | Elche | del | 1.99M | -48K | 40% |
 | jon karrikaburu | Real Sociedad | del | 581K | -11K | 0% |
 
 ## SusoGattuso
-15 players · 158.94M total · 10 at 70%+ · cash ~55.35M
+16 players · 176.11M total · 10 at 70%+ · cash ~37.56M
 
 | Player | Team | Pos | Value | 24h | Start% |
 |---|---|--:|--:|--:|--:|
 | wojciech szczesny | Barcelona | por | 2.40M | -48K | 20% |
+| jon aramburu | Real Sociedad | def | 17.18M | 268K | 80% |
 | yuri berchiche | Athletic | def | 12.55M | -40K | 70% |
 | cesar tarrega | Valencia | def | 8.94M | 70K | 80% |
 | abdel abqar | Getafe | def | 6.92M | 170K | 70% |
-| jonny castro | Alavés | def | 5.46M | 2K | 70% |
+| jonny castro | Alavés | def | 5.46M | 2K | 50% |
 | alvaro garcia | Villarreal | def | 502K | 0K | 80% |
 | aleksa puric | Atlético | def | 435K | 0K | — |
 | aimar oroz | Osasuna | med | 15.76M | 153K | 70% |
@@ -116,13 +121,6 @@
 
 | Date | Player | From → To | Price |
 |---|---|---|--:|
-| 2026-08-11T21:24 | beñat turrientes | market → miguel_autentico | 6892898 |
-| 2026-08-11T21:42 | unai egiluz | BurtonGM89 → market | 468693 |
-| 2026-08-11T22:24 | dani vivian | Albert Laporta → market | 11664367 |
-| 2026-08-11T22:25 | manuel fernandez | Albert Laporta → market | 373500 |
-| 2026-08-11T22:25 | pathe ciss | Albert Laporta → market | 10393147 |
-| 2026-08-11T22:26 | javi puado | Albert Laporta → market | 8041411 |
-| 2026-08-12T21:24 | abde ezzalzouli | market → Albert Laporta | 49991863 |
 | 2026-08-12T21:24 | santi comesaña | market → BurtonGM89 | 35276000 |
 | 2026-08-12T21:24 | jon karrikaburu | market → Magic Mike 333 | 700000 |
 | 2026-08-12T21:24 | pedro diaz | market → Magic Mike 333 | 2050000 |
@@ -141,11 +139,32 @@
 | 2026-08-13T21:26 | unai lopez | BurtonGM89 → market | 5762182 |
 | 2026-08-13T21:26 | joaquin muñoz | BurtonGM89 → market | 6489738 |
 | 2026-08-13T21:26 | aliou dieng | BurtonGM89 → market | 5284122 |
+| 2026-08-14T12:50 | lucas boye | Magic Mike 333 → market | 14013107 |
+| 2026-08-14T21:24 | ionut radu | market → miguel_autentico | 39655832 |
+| 2026-08-14T21:24 | agoume | market → miguel_autentico | 5891526 |
+| 2026-08-14T21:24 | eriksson | market → miguel_autentico | 2933863 |
+| 2026-08-14T21:24 | gavi | market → Magic Mike 333 | 35500000 |
+| 2026-08-14T21:24 | t. morente | market → Magic Mike 333 | 2033651 |
+| 2026-08-14T21:24 | aramburu | market → SusoGattuso | 17785551 |
 
 ## Cash basis
 
-- **miguel_autentico** — balance you recorded on 2026-08-12, then 3 ledger row(s) (known)
+- **miguel_autentico** — balance you recorded on 2026-08-12, then 6 ledger row(s) (known)
 - **Albert Laporta** — 100M starting budget, then 8 ledger row(s) (estimated)
 - **BurtonGM89** — 100M starting budget, then 11 ledger row(s) (estimated)
-- **Magic Mike 333** — 100M starting budget, then 4 ledger row(s) (estimated)
-- **SusoGattuso** — 100M starting budget, then 1 ledger row(s) (estimated)
+- **Magic Mike 333** — 100M starting budget, then 7 ledger row(s), which overdraws it by 7.22M (unknown)
+- **SusoGattuso** — 100M starting budget, then 2 ledger row(s) (estimated)
+
+## Ledger warnings
+
+- Magic Mike 333: net spend exceeds the 100M budget by 7.22M — unrecorded sales, or they started with more. Cash reported as unknown; ask before assuming they are broke.
+
+## Names the ledger did not spell exactly
+
+Placed by who the counterparty was, or by what the price implies — a player sold by a manager was in that manager's squad, and a player bought from the market was in nobody's (issue #26). Fix the spelling in `inputs/transactions.csv` if one of these is the wrong player.
+
+- 2026-08-14T21:24: agoume → lucien agoume (matched lucien agoume)
+- 2026-08-14T21:24: eriksson → simon eriksson (matched simon eriksson)
+- 2026-08-14T21:24: gavi → pablo gavi (matched pablo gavi)
+- 2026-08-14T21:24: t. morente → tete morente (matched tete morente)
+- 2026-08-14T21:24: aramburu → jon aramburu (matched jon aramburu)

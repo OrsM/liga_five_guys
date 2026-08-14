@@ -36,7 +36,7 @@
 },
 "adam boayar": {
 "name": "adam boayar",
-"start": 30.0,
+"start": 0.0,
 "value": 702711.0
 },
 "adama boiro": {
@@ -641,7 +641,7 @@
 },
 "bright ede": {
 "name": "Bright Ede",
-"start": 50.0,
+"start": 60.0,
 "value": null
 },
 "buba sangare": {
@@ -1061,7 +1061,7 @@
 },
 "facundo buonanotte": {
 "name": "Facundo Buonanotte",
-"start": 30.0,
+"start": 40.0,
 "value": null
 },
 "facundo garces": {
@@ -1071,7 +1071,7 @@
 },
 "facundo gonzalez": {
 "name": "facundo gonzalez",
-"start": 70.0,
+"start": 60.0,
 "value": 3059538.0
 },
 "federico gattoni": {
@@ -1231,7 +1231,7 @@
 },
 "gonzalo villar": {
 "name": "gonzalo villar",
-"start": 80.0,
+"start": 90.0,
 "value": 7027127.0
 },
 "gorka carrera": {
@@ -1526,7 +1526,7 @@
 },
 "javi morcillo": {
 "name": "javi morcillo",
-"start": 10.0,
+"start": 20.0,
 "value": 702702.0
 },
 "javi munoz": {
@@ -1621,7 +1621,7 @@
 },
 "joaquin oso": {
 "name": "joaquin oso",
-"start": 50.0,
+"start": 60.0,
 "value": 13103680.0
 },
 "job ochieng": {
@@ -1681,7 +1681,7 @@
 },
 "jon guridi": {
 "name": "jon guridi",
-"start": 70.0,
+"start": 50.0,
 "value": 4685432.0
 },
 "jon karrikaburu": {
@@ -1721,7 +1721,7 @@
 },
 "jonny castro": {
 "name": "jonny castro",
-"start": 70.0,
+"start": 50.0,
 "value": 5463256.0
 },
 "jorge benito": {
@@ -1836,7 +1836,7 @@
 },
 "juan berrocal": {
 "name": "juan berrocal",
-"start": 30.0,
+"start": 20.0,
 "value": 1679537.0
 },
 "juan carlos arana": {
@@ -1896,7 +1896,7 @@
 },
 "julen agirrezabala": {
 "name": "julen agirrezabala",
-"start": 40.0,
+"start": 50.0,
 "value": 2911085.0
 },
 "julen lobete": {
@@ -1936,7 +1936,7 @@
 },
 "kareem tunde": {
 "name": "kareem tunde",
-"start": 40.0,
+"start": 50.0,
 "value": 8531892.0
 },
 "karim adeyemi": {
@@ -1956,7 +1956,7 @@
 },
 "kervin arriaga": {
 "name": "kervin arriaga",
-"start": 30.0,
+"start": 40.0,
 "value": 2622453.0
 },
 "kevin sanchez": {
@@ -2046,7 +2046,7 @@
 },
 "lucas boye": {
 "name": "lucas boye",
-"start": 40.0,
+"start": 50.0,
 "value": 12511193.0
 },
 "lucas cepeda": {
@@ -2331,7 +2331,7 @@
 },
 "miguel angel rubio": {
 "name": "miguel angel rubio",
-"start": 5.0,
+"start": 0.0,
 "value": 576912.0
 },
 "miguel angel santaella": {
@@ -2441,7 +2441,7 @@
 },
 "nico guillen": {
 "name": "Nico Guillén",
-"start": 60.0,
+"start": 70.0,
 "value": null
 },
 "nico serrano": {
@@ -2461,7 +2461,7 @@
 },
 "nicolas valentini": {
 "name": "Nicolás Valentini",
-"start": 30.0,
+"start": 0.0,
 "value": null
 },
 "nikola maras": {
@@ -2476,7 +2476,7 @@
 },
 "noe carrillo": {
 "name": "noe carrillo",
-"start": 40.0,
+"start": 0.0,
 "value": 702633.0
 },
 "nordin al lal": {
@@ -2591,7 +2591,7 @@
 },
 "pablo ramon": {
 "name": "pablo ramon",
-"start": 30.0,
+"start": 40.0,
 "value": 513342.0
 },
 "pablo roson": {
@@ -2746,7 +2746,7 @@
 },
 "ramon enriquez": {
 "name": "ramon enriquez",
-"start": 70.0,
+"start": 60.0,
 "value": 837253.0
 },
 "ramon terrats": {
@@ -2896,7 +2896,7 @@
 },
 "ruben vargas": {
 "name": "ruben vargas",
-"start": 50.0,
+"start": 40.0,
 "value": 26458284.0
 },
 "ryunosuke sato": {
@@ -3001,7 +3001,7 @@
 },
 "simon eriksson": {
 "name": "simon eriksson",
-"start": 60.0,
+"start": 50.0,
 "value": 2933863.0
 },
 "stole dimitrievski": {
@@ -3106,7 +3106,7 @@
 },
 "umaru konare": {
 "name": "Umaru Konaré",
-"start": 30.0,
+"start": 40.0,
 "value": null
 },
 "unai egiluz": {
@@ -3159,6 +3159,11 @@
 "start": 40.0,
 "value": 5893563.0
 },
+"vanja drkusic": {
+"name": "Vanja Drkusic",
+"start": 5.0,
+"value": null
+},
 "vicent abril": {
 "name": "vicent abril",
 "start": null,
@@ -3176,7 +3181,7 @@
 },
 "ville koski": {
 "name": "ville koski",
-"start": 60.0,
+"start": 70.0,
 "value": 764525.0
 },
 "vinicius junior": {
@@ -3201,7 +3206,7 @@
 },
 "xanet olaiz": {
 "name": "xanet olaiz",
-"start": 30.0,
+"start": 50.0,
 "value": 602316.0
 },
 "xavi espart": {

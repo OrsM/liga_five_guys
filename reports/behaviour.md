@@ -1,16 +1,16 @@
-# League behaviour — 2026-08-14 10:40 UTC
+# League behaviour — 2026-08-14 20:48 UTC
 
-5 managers, 28 ledger rows, 26 market snapshots, points baseline 2025-26.
+5 managers, 35 ledger rows, 27 market snapshots, points baseline 2025-26.
 
 ## 1. Cash and ceilings
 
 | Manager | Players | Spent | Raised | Net | Cash | Max bid |
 |---|--:|--:|--:|--:|--:|--:|
-| **miguel_autentico** | 12 | 6.89M | 17.79M | 10.90M | 111.37M | 111.37M |
+| **miguel_autentico** | 15 | 55.37M | 17.79M | -37.58M | 62.89M | 62.89M |
 | Albert Laporta | 14 | 125.28M | 30.47M | -94.81M | ~5.19M | 5.19M |
 | BurtonGM89 | 13 | 127.61M | 30.03M | -97.58M | ~2.42M | 2.42M |
-| Magic Mike 333 | 18 | 83.70M | 0K | -83.70M | ~16.30M | 16.30M |
-| SusoGattuso | 15 | 44.65M | 0K | -44.65M | ~55.35M | 55.35M |
+| Magic Mike 333 | 19 | 121.23M | 14.01M | -107.22M | — | — |
+| SusoGattuso | 16 | 62.44M | 0K | -62.44M | ~37.56M | 37.56M |
 
 `~` is an estimate: the starting budget less every ledger row, not an observed balance. The starting squad was dealt free, so it costs nothing here. A `—` means the ledger overdraws the budget, so the number would be fiction — see the warnings. Any time a rival mentions a balance, put it in `inputs/cash.txt` — one observed number turns their whole estimate into arithmetic.
 
@@ -20,18 +20,26 @@
 
 | Manager | Buys | Median premium | Range | Round bids |
 |---|--:|--:|---|--:|
-| miguel_autentico | 1 | +1.5% | +1.5% to +1.5% | 0/1 |
+| miguel_autentico | 4 | +1.5% | -0.1% to +1.7% | 0/4 |
 | Albert Laporta | 4 | +2.6% | +0.0% to +5.0% | 0/4 |
 | BurtonGM89 | 5 | +9.2% | +0.0% to +21.6% | 2/5 |
-| Magic Mike 333 | 4 | +9.9% | +2.6% to +15.9% | 3/4 |
-| SusoGattuso | 1 | -0.2% | -0.2% to -0.2% | 0/1 |
+| Magic Mike 333 | 6 | +6.3% | +2.4% to +15.9% | 4/6 |
+| SusoGattuso | 2 | +3.6% | -0.2% to +3.6% | 0/2 |
 
-**The floor has never won.** Every priced purchase in this league landed above the market value at the time: median +4.2%, -0.2% to +21.6% (n=15). The minimum legal bid is the market value, so bidding it is bidding the number 15 deals have already beaten.
+**The floor sometimes wins.** 6 of the 21 priced purchases in this league went at the market value itself and the other 15 cleared it, median +2.6%, -0.2% to +21.6% (n=21) across all of them. Bidding the minimum is therefore not the one number known to lose — but 6 of 21 is a share of the bids that WON, not the odds of winning one. Nothing in this ledger records a bid that lost, so the floor's failure rate is unmeasured and unmeasurable from here.
 
-A round bid was typed by a human. That is the whole of what roundness tells you — an exact bid is *not* the app's valuation and does not mean nobody competed, because the premium column two cells left already measures how far above the floor the buyer went, and none of these went to the floor. Sealed bids are paid as bid, so even a purchase at exactly the value would only have been yours if the tie-break favoured you, and that rule is not documented anywhere we can read.
+**The app does not pay you the value — it randomises around it.** The 13 priced sales back to the market went for median +3.3%, -9.4% to +12.0% (n=13): 5 below the value and 8 above, never further than 12.0% either way. So a sale raises the value give or take a tenth, and the value is not the money you will get. Whether the same randomiser bids against you for a free agent is inferred, not measured: every row in this ledger is a bid that won.
+
+A round bid was typed by a human. That is the whole of what roundness tells you — an exact bid is *not* the app's valuation and does not mean nobody competed, because the premium column two cells left already measures how far above the floor the buyer went. Sealed bids are paid as bid, so a purchase at exactly the value was only ever yours to take if the tie-break favoured you, and that rule is not documented anywhere we can read. Check it in-app before reading a floor purchase as a bargain you missed.
 
 | Date | Player | Buyer | Paid | Value then | Premium | Bid |
 |---|---|---|--:|--:|--:|---|
+| 08-14T21:24 | ionut radu | miguel_autentico | 39.66M | 39.71M | -0.1% | exact |
+| 08-14T21:24 | agoume | miguel_autentico | 5.89M | 5.79M | +1.7% | exact |
+| 08-14T21:24 | eriksson | miguel_autentico | 2.93M | 2.93M | +0.0% | exact |
+| 08-14T21:24 | gavi | Magic Mike 333 | 35.50M | 33.40M | +6.3% | round |
+| 08-14T21:24 | t. morente | Magic Mike 333 | 2.03M | 1.99M | +2.4% | exact |
+| 08-14T21:24 | aramburu | SusoGattuso | 17.79M | 17.18M | +3.6% | exact |
 | 08-13T21:24 | leandro cabrera | Albert Laporta | 17.50M | 16.67M | +5.0% | exact |
 | 08-13T21:24 | arda guler | Albert Laporta | 50.84M | 50.84M | +0.0% | exact |
 | 08-13T21:24 | giuliano simeone | SusoGattuso | 44.65M | 44.74M | -0.2% | exact |
@@ -52,57 +60,59 @@ A round bid was typed by a human. That is the whole of what roundness tells you 
 
 ## 3. What happened next
 
-_No horizon has elapsed inside the snapshot history yet. Needs 3 days of daily ingest past a transaction._
+| Date | Player | Actor | Side | +3d | +7d | +14d |
+|---|---|---|---|--:|--:|--:|
+| 08-11T22:26 | javi puado | Albert Laporta | sell | -9.1% | — | — |
+| 08-11T22:25 | pathe ciss | Albert Laporta | sell | +3.3% | — | — |
+| 08-11T22:24 | dani vivian | Albert Laporta | sell | -8.8% | — | — |
+| 08-11T21:42 | unai egiluz | BurtonGM89 | sell | -3.0% | — | — |
+| 08-11T21:24 | giacomo quagliata | BurtonGM89 | buy | -0.1% | — | — |
+| 08-11T21:24 | carlos romero | BurtonGM89 | buy | +6.5% | — | — |
+| 08-11T21:24 | fabio cardoso | Magic Mike 333 | buy | -7.0% | — | — |
+| 08-11T21:24 | beñat turrientes | miguel_autentico | buy | +2.8% | — | — |
+
+Two errors this table is built to catch: buying a player who has already risen (paying the top of the move), and selling one who has just dipped (realising the bottom). Both show as the drift column reversing sign against the actor.
 
 ## 4. Squad diagnostics
 
 | Manager | XI score | Shape | Trapped | Injured | Thin at | Unmatched |
 |---|--:|---|--:|--:|---|--:|
-| **miguel_autentico** | 29.7 | 4-5-1 | 4.80M | 0 | por,del | 0 |
+| **miguel_autentico** | 35.4 | 4-5-1 | 4.80M | 0 | del | 0 |
 | Albert Laporta | 33.6 | 4-3-3 | 56.84M | 0 | por | 0 |
 | BurtonGM89 | 31.4 | 5-4-1 | 37.43M | 0 | por,del | 0 |
-| Magic Mike 333 | 32.4 | 3-4-3 | 28.69M | 0 | por | 0 |
+| Magic Mike 333 | 32.4 | 3-4-3 | 18.17M | 0 | por | 0 |
 | SusoGattuso | 29.4 | 4-4-2 | 26.40M | 0 | por | 0 |
 
-- miguel_autentico is carrying more mediocampista than can ever start.
+- miguel_autentico is carrying more portero/mediocampista than can ever start.
 - Albert Laporta is carrying more delantero than can ever start.
 - BurtonGM89 is carrying more defensa than can ever start.
 - Magic Mike 333 is carrying more defensa/mediocampista/delantero than can ever start.
-- SusoGattuso is carrying more delantero than can ever start.
+- SusoGattuso is carrying more delantero/defensa than can ever start.
 
 Trapped is value held in players below 50% start probability — money that cannot score. Unmatched is names in their squad missing from data/tidy, which are absent from the XI score, so a large number there means the comparison flatters you.
 
 ## 5. Who wants what
 
+Restricted to the 9 players on today's slate — the rest of the market is not a decision you can make today.
+
 **Expect competition for these** — the position is one a rival is short in, so assume a bidding war and price accordingly.
 
 | Player | Pos | Value | Start% | Short here |
 |---|---|--:|--:|---|
-| joan garcia | POR | 67.47M | 80% | Albert Laporta, BurtonGM89, Magic Mike 333, SusoGattuso |
-| kylian mbappe | DEL | 130.36M | 70% | BurtonGM89 |
-| vinicius junior | DEL | 107.58M | 90% | BurtonGM89 |
-| alvaro valles | POR | 32.48M | 95% | Albert Laporta, BurtonGM89, Magic Mike 333, SusoGattuso |
-| david soria | POR | 18.90M | 95% | Albert Laporta, BurtonGM89, Magic Mike 333, SusoGattuso |
-| jan oblak | POR | 52.96M | 90% | Albert Laporta, BurtonGM89, Magic Mike 333, SusoGattuso |
-| lamine yamal | DEL | 127.31M | 60% | BurtonGM89 |
-| augusto batalla | POR | 40.65M | 95% | Albert Laporta, BurtonGM89, Magic Mike 333, SusoGattuso |
-| ionut radu | POR | 39.71M | 90% | Albert Laporta, BurtonGM89, Magic Mike 333, SusoGattuso |
-| mathew ryan | POR | 13.55M | 90% | Albert Laporta, BurtonGM89, Magic Mike 333, SusoGattuso |
-| stole dimitrievski | POR | 13.76M | 90% | Albert Laporta, BurtonGM89, Magic Mike 333, SusoGattuso |
-| unai simon | POR | 55.11M | 90% | Albert Laporta, BurtonGM89, Magic Mike 333, SusoGattuso |
+| zakaria eddahchouri | DEL | 1.91M | 30% | BurtonGM89 |
 
 **Nobody else needs these.** Same quality, no auction — take the equivalent player here instead of paying a premium above.
 
 | Player | Pos | Value | Start% |
 |---|---|--:|--:|
-| federico valverde | MED | 69.09M | 90% |
-| zaid romero | DEF | 28.08M | 90% |
-| florian lejeune | DEF | 38.21M | 90% |
 | pablo fornals | MED | 58.30M | 80% |
-| marcos alonso | DEF | 29.45M | 90% |
-| german valera | MED | 23.29M | 90% |
-| andrei ratiu | DEF | 35.41M | 90% |
-| fermin lopez | MED | 62.91M | 70% |
+| santiago mouriño | DEF | 40.60M | 70% |
+| mario martin | MED | 3.74M | 80% |
+| pelayo fernandez | DEF | 1.72M | 50% |
+| clemens riedel | DEF | 4.66M | 50% |
+| oriol rey | MED | 742K | 50% |
+| dani vivian | DEF | 11.14M | 30% |
+| alex freeman | DEF | 2.48M | 30% |
 
 **List these to them.** Players of yours who aren't starting, in a position a rival is short in. You stop competing with them and start selling to them; price just under the premium they showed in section 2.
 
@@ -110,6 +120,10 @@ Trapped is value held in players below 50% start probability — money that cann
 |---|---|--:|--:|---|
 | alvaro fernandez | POR | 4.80M | 20% | Albert Laporta, BurtonGM89, Magic Mike 333, SusoGattuso |
 
+## Ledger warnings
+
+- Magic Mike 333: net spend exceeds the 100M budget by 7.22M — unrecorded sales, or they started with more. Cash reported as unknown; ask before assuming they are broke.
+
 ---
 
-Sections 2 and 3 are hypotheses until the sample grows: with 28 ledger rows across 5 managers, a median is one or two deals. Section 1 and section 5 are usable today.
+Sections 2 and 3 are hypotheses until the sample grows: with 35 ledger rows across 5 managers, a median is one or two deals. Section 1 and section 5 are usable today.
