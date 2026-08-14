@@ -1,4 +1,4 @@
-# Fantasy report — 2026-08-14T2047Z
+# Fantasy report — 2026-08-14T2156Z
 
 ## Needs a decision
 
@@ -83,8 +83,8 @@ _Selling to the app pays the value give or take 12%: the 13 priced sales in the 
 
 ---
 
-_621 players tracked, 511 with a probable-XI reading. Who to buy is in `reports/watchlist.md`; how your rivals bid is in `reports/behaviour.md`._
+_621 players tracked, 512 with a probable-XI reading. Who to buy is in `reports/watchlist.md`; how your rivals bid is in `reports/behaviour.md`._
 
 _Score = shrunk pts/match (K=8, 2025-26) × P(start), from `ffcore/score.py` — the same scorer rivals.py uses. Recommended XIs are logged to `data/decisions/squad_log.csv` for scoring against reality later._
 
-_Generated 2026-08-14 20:48 UTC._
+_Generated 2026-08-14 21:57 UTC._
