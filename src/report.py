@@ -59,7 +59,8 @@ from datetime import datetime, timezone
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from ffcore.bid import deals, gain, premiums, rivals_short, suggest  # noqa: E402
+from ffcore.bid import (deals, demand_summary, gain, premiums,  # noqa: E402
+                        suggest, xi_snapshots)
 from ffcore.league import League  # noqa: E402
 from ffcore.parse import money, ratio  # noqa: E402
 from ffcore.score import (ABSENT_START, MAX_SLOT, NEUTRAL_START,  # noqa: E402
@@ -174,7 +175,7 @@ def rival_ceiling(lg) -> float | None:
 
 
 def sec_slate(lg, sc, by_key, pool, tot, slate, prem, cash_value,
-              rival_max) -> tuple[list[str], int, int]:
+              rival_max, snaps) -> tuple[list[str], int, int]:
     """Today's slate, priced. The only section that answers 'what do I do now'.
 
     Everything else in this report describes a position; this one is a list of
@@ -187,7 +188,6 @@ def sec_slate(lg, sc, by_key, pool, tot, slate, prem, cash_value,
     out: list[str] = []
 
     owned = {k: lg.owner[k] for k in on_offer if k in lg.owner}
-    rivals_need = rivals_short(lg, sc, by_key)
 
     rows = []
     for k in on_offer:
@@ -228,14 +228,18 @@ def sec_slate(lg, sc, by_key, pool, tot, slate, prem, cash_value,
             band = ("—" if adv.low is None
                     else eur(adv.low) if abs(adv.high - adv.low) < 1_000
                     else "%s–%s" % (eur(adv.low), eur(adv.high)))
-            short = rivals_need.get(cand["slot"]) or []
             out.append("| %s | %s | %s | %s | %.1f | %s | %s | %s | %s |" % (
                 cand["name"], (cand["pos"] or "—")[:3], eur(cand["value"]),
                 "—" if cand["pct"] is None else "%.0f%%" % cand["pct"],
                 cand["score"],
                 "—" if g is None else "%+.1f" % g,
-                band, ", ".join(short) or "nobody short", verdict))
+                band, demand_summary(cand, lg, snaps), verdict))
         out += ["",
+                "Competition is demand, not roster counts: the rivals whose "
+                "XI actually improves with him, strongest threat first — "
+                "`?` cash unknown (treat as live), `(n broke)` want him but "
+                "cannot pay the floor. The full manager-by-manager matrix is "
+                "in `reports/behaviour.md`.", "",
                 "Bid is the floor plus what this league has actually paid over "
                 "it: %s.%s A dozen deals is not a distribution — the range is "
                 "what has happened, not a chance of winning, and every one of "
@@ -386,9 +390,12 @@ def main() -> None:
     app_prem = premiums(dl, "sell")
     slate_lines, n_slate, n_better = [], 0, 0
     if any(slate):
+        # The same snapshots rivals.py prints in its section 6, so the
+        # Competition column and the matrix can never disagree.
+        snaps = xi_snapshots(lg, sc, by_key)
         slate_lines, n_slate, n_better = sec_slate(
             lg, sc, by_key, pool, best[0] if best else None, slate,
-            premiums(dl), cash_value, rival_ceiling(lg))
+            premiums(dl), cash_value, rival_ceiling(lg), snaps)
 
     # --- header -----------------------------------------------------------
     out: list[str] = [f"# Fantasy report — {observed}", ""]
