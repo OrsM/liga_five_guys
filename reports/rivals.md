@@ -1,4 +1,4 @@
-# League behaviour — 2026-08-15 10:50 UTC
+# League behaviour — 2026-08-15 16:58 UTC
 
 5 managers, 35 ledger rows, 29 market snapshots, points baseline 2025-26.
 
@@ -93,23 +93,35 @@ Trapped is value held in players below 50% start probability — money that cann
 
 ## 5. Who wants what
 
-Restricted to the 9 players on today's slate — the rest of the market is not a decision you can make today.
+**Expect competition for these** — the position is one a rival is short in, so assume a bidding war and price accordingly.
 
-**The slate through every manager's eyes.** XI gain per jornada if that manager owned him, under the one shared scorer. `(…)` = wants him but their estimated cash cannot pay the floor. `?` = wants him, cash unknown — treat as live. **needs** = they cannot field a legal XI without buying in this position — a forced buyer. Your column has no cash cap: you know your own balance.
+| Player | Pos | Value | Start% | Short here |
+|---|---|--:|--:|---|
+| joan garcia | POR | 68.06M | 80% | Albert Laporta, BurtonGM89, Magic Mike 333, SusoGattuso |
+| kylian mbappe | DEL | 129.58M | 70% | BurtonGM89 |
+| vinicius junior | DEL | 107.53M | 90% | BurtonGM89 |
+| alvaro valles | POR | 32.74M | 95% | Albert Laporta, BurtonGM89, Magic Mike 333, SusoGattuso |
+| david soria | POR | 19.48M | 95% | Albert Laporta, BurtonGM89, Magic Mike 333, SusoGattuso |
+| jan oblak | POR | 52.60M | 90% | Albert Laporta, BurtonGM89, Magic Mike 333, SusoGattuso |
+| lamine yamal | DEL | 126.81M | 60% | BurtonGM89 |
+| augusto batalla | POR | 40.35M | 95% | Albert Laporta, BurtonGM89, Magic Mike 333, SusoGattuso |
+| mathew ryan | POR | 13.55M | 90% | Albert Laporta, BurtonGM89, Magic Mike 333, SusoGattuso |
+| stole dimitrievski | POR | 14.11M | 90% | Albert Laporta, BurtonGM89, Magic Mike 333, SusoGattuso |
+| unai simon | POR | 54.47M | 90% | Albert Laporta, BurtonGM89, Magic Mike 333, SusoGattuso |
+| ante budimir | DEL | 50.42M | 90% | BurtonGM89 |
 
-| Player | Pos | Value | You | Albert | BurtonGM | Magic | SusoGatt |
-|---|---|--:|--:|--:|--:|--:|--:|
-| pablo fornals | MED | 57.93M | +2.7 | (+4.2) | (+4.1) | +3.2? | (+3.4) |
-| santiago mouriño | DEF | 40.48M | +0.7 | (+1.8) | (+1.7) | +0.9? | (+1.1) |
-| mario martin | MED | 3.83M | -0.4 | +1.0 | (+1.0) | +0.1? | +0.3 |
-| clemens riedel | DEF | 4.60M | -0.5 | +0.7 | (+0.5) | -0.3? | -0.1 |
-| pelayo fernandez | DEF | 1.72M | -0.5 | +0.7 | +0.5 | -0.3? | -0.0 |
-| oriol rey | MED | 734K | -1.0 | +0.4 | +0.4 | -0.5? | -0.3 |
-| alex freeman | DEF | 2.45M | -1.4 | -0.2 | (-0.4) | -1.2? | -1.0 |
-| zakaria eddahchouri | DEL | 1.88M | -1.5 | -1.2 | -0.4 | -1.3? | -1.1 |
-| dani vivian | DEF | 10.82M | -1.8 | (-0.6) | (-0.8) | -1.6? | -1.4 |
+**Nobody else needs these.** Same quality, no auction — take the equivalent player here instead of paying a premium above.
 
-Read it as an auction map: a player whose gain is big only in YOUR column is a quiet buy at the floor; big in a funded rival's column too means price the bid off their premium in section 2, or walk.
+| Player | Pos | Value | Start% |
+|---|---|--:|--:|
+| federico valverde | MED | 68.85M | 90% |
+| zaid romero | DEF | 28.02M | 90% |
+| florian lejeune | DEF | 38.21M | 90% |
+| pablo fornals | MED | 57.93M | 80% |
+| marcos alonso | DEF | 29.33M | 90% |
+| german valera | MED | 23.27M | 90% |
+| andrei ratiu | DEF | 35.45M | 90% |
+| fermin lopez | MED | 64.18M | 70% |
 
 **List these to them.** Players of yours who aren't starting, in a position a rival is short in. You stop competing with them and start selling to them; price just under the premium they showed in section 2.
 

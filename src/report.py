@@ -2,7 +2,7 @@
 report.py — daily decision report, written as markdown into the repo.
 
 Renders in the GitHub mobile app, so it's readable anywhere with no hosting.
-Run after ff_ingest.py parse.
+Run after ingest.py parse.
 
     python src/report.py
 
@@ -602,7 +602,7 @@ def main() -> None:
         write_lines(REPORTS / "latest.md", [
             "# Fantasy report", "",
             "No market data in `data/tidy/market.csv`. "
-            "Did `ff_ingest.py parse` run?"])
+            "Did `ingest.py parse` run?"])
         print("no market data; wrote placeholder report")
         return
 

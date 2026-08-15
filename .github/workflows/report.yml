@@ -11,7 +11,7 @@ name: report
 # once probable XIs have firmed up. Cron is UTC: switch to '40 23 * * *' when
 # Spain returns to CET at the end of October.
 #
-# Optional inputs let one button cover the occasional jobs too, so `history`
+# Optional inputs let one button cover the occasional jobs too, so `baseline`
 # and `lookup` no longer need workflows of their own.
 
 on:
@@ -28,7 +28,7 @@ on:
         description: 'Fetch a fresh snapshot (off = rebuild from stored HTML)'
         type: boolean
         default: true
-      history:
+      baseline:
         description: 'Refresh the season points baseline (once a season)'
         type: boolean
         default: false
@@ -60,14 +60,15 @@ jobs:
         with:
           python-version: '3.12'
       # The parser self-test drives lxml + cssselect against a fixture, so the
-      # test job needs them. httpx is NOT needed here: ff_ingest imports it
+      # test job needs them. httpx is NOT needed here: ingest imports it
       # inside fetch(), and nothing in this job fetches anything.
       - name: Install test deps
         run: pip install lxml cssselect
       - name: Self-tests
         run: |
           python src/ffcore/parse.py
-          python src/ff_ingest.py --selftest
+          PYTHONPATH=src python src/sources.py
+          PYTHONPATH=src python src/ingest.py --selftest
           PYTHONPATH=src python src/ffcore/league.py --selftest
           PYTHONPATH=src python src/ffcore/bid.py
           PYTHONPATH=src python src/digest.py --selftest
@@ -82,7 +83,7 @@ jobs:
         run: |
           cd src
           for m in common squads report watch rivals digest xi seen \
-                   find_slug ff_ingest points methodology; do
+                   find_slug sources ingest points methodology; do
             python -c "import $m" || { echo "::error::$m failed to import"; exit 1; }
           done
           echo 'all modules import cleanly' >> "$GITHUB_STEP_SUMMARY"
@@ -100,28 +101,28 @@ jobs:
         with:
           python-version: '3.12'
 
-      # cssselect is required by ff_ingest.parse_team via lxml.
+      # cssselect is required by sources.parse_team via lxml.
       - name: Install deps
         run: pip install httpx lxml cssselect
 
       # inputs.fetch is empty on a schedule, so default to fetching.
       - name: Fetch
         if: github.event_name == 'schedule' || inputs.fetch
-        run: python src/ff_ingest.py fetch
+        run: python src/ingest.py fetch
 
       # Re-parsing all history each run takes seconds and means a parser fix
       # retroactively repairs every past snapshot.
       - name: Parse
-        run: python src/ff_ingest.py parse
+        run: python src/ingest.py parse
 
-      # Rebuilds data/season/live/ from every points.html.gz snapshot.
+      # Rebuilds data/season/live/ from the points page in every snapshot.
       # report.py does not read that folder — see points.py's docstring.
       - name: Season points (running)
         run: python src/points.py
 
       - name: Season points baseline
-        if: inputs.history
-        run: python src/history.py
+        if: inputs.baseline
+        run: python src/ingest.py baseline
 
       - name: Resolve names
         if: inputs.lookup != ''

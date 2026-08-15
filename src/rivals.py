@@ -580,7 +580,7 @@ def main() -> None:
         REPORTS.mkdir(exist_ok=True)
         write_lines(REPORTS / "rivals.md",
                     ["# League behaviour", "",
-                     "No market data. Run `ff_ingest.py parse` first."])
+                     "No market data. Run `ingest.py parse` first."])
         return
 
     latest = latest_only(market_rows)
@@ -597,7 +597,7 @@ def main() -> None:
            % (len(lg.managers), len(lg.txns),
               len({r.get("observed_at") for r in market_rows}),
               ", points baseline %s" % hist_label if hist_label else
-              ", **no points baseline** (run history.py)"), ""]
+              ", **no points baseline** (run `ingest.py baseline`)"), ""]
     out += sec_cash(lg)
     out += sec_premium(lg, dl)
     out += sec_drift(lg, dl, lg.market)

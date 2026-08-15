@@ -1,14 +1,14 @@
 """
 points.py — this season's points, from the snapshots you already take.
 
-ff_ingest saves points.html.gz in every twice-daily snapshot, and has since
+ingest saves the points page in every twice-daily snapshot, and has since
 day one. Nothing read them until now. This turns every one of them into two
 files per season label:
 
     data/season/live/running_<label>.csv     running totals, kept snapshots only
     data/season/live/perjornada_<label>.csv  what changed between kept snapshots
 
-Like ff_ingest.parse, it is a full rebuild from raw on every run: fix the
+Like ingest.parse, it is a full rebuild from raw on every run: fix the
 parser and every past snapshot is repaired. Both outputs are disposable.
 
 **Kept** means the totals actually moved. Points only change after matches,
@@ -30,7 +30,7 @@ Two deliberate limits:
     Guessing here would just be a second copy of that logic to keep honest.
   * report.py does NOT read data/season/live/ — deliberately, and this module
     keeps it that way. A two-jornada sample must not start driving your XI
-    (see history.py's docstring). Blending live totals into the Scorer is its
+    (see ingest.baseline). Blending live totals into the Scorer is its
     own change, made on purpose, not a side effect of tidying.
 
 The season label comes from each snapshot's own HTML (the page's season
@@ -39,7 +39,8 @@ season, the new label simply starts its own pair of files. The pre-flip
 snapshots all collapse into one kept row of last season's final totals —
 harmless, and a nice check that dedupe works.
 
-Nothing else imports this. Deps: lxml (via history.parse), stdlib otherwise.
+Nothing else imports this. Deps: lxml (via sources.parse_points), stdlib
+otherwise.
 
     python src/points.py              # rebuild data/season/live/ from raw
     python src/points.py --selftest   # pure-logic checks, no deps, no IO
@@ -47,16 +48,14 @@ Nothing else imports this. Deps: lxml (via history.parse), stdlib otherwise.
 
 from __future__ import annotations
 
-import gzip
 import os
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from ffcore.text import norm  # noqa: E402
-from ffcore.tidy import ROOT, SEASON, write_csv  # noqa: E402
+from ffcore.tidy import SEASON, write_csv  # noqa: E402
 
-RAW = ROOT / "raw"
 LIVE = SEASON / "live"
 
 RUN_FIELDS = ["observed_at", "season", "player_name", "player_name_full",
@@ -129,28 +128,27 @@ def diff(prev_rows: list[dict], cur_rows: list[dict],
 # ---------------------------------------------------------------------------
 
 def load_snapshots() -> dict[str, list[tuple[str, list[dict]]]]:
-    """{season label: [(stamp, rows)]} from every dt=* snapshot, in order.
+    """{season label: [(stamp, rows)]} from every snapshot, in order.
 
-    history.parse and history.season_label are imported lazily so --selftest
-    needs neither lxml nor httpx.
+    ingest.pages and sources.parse_points are imported lazily so --selftest
+    needs neither lxml nor a raw store.
     """
-    from history import parse, season_label
+    from ingest import pages
+    from sources import parse_points, season_label
 
     by_label: dict[str, list[tuple[str, list[dict]]]] = {}
-    for snap in sorted(RAW.glob("dt=*")):
-        f = snap / "points.html.gz"
-        if not f.exists():
+    for stamp, docs in pages():
+        html = docs.get("points")
+        if html is None:
             continue
-        stamp = snap.name.removeprefix("dt=")
         try:
-            html = gzip.open(f, "rt", encoding="utf-8").read()
-            rows = parse(html)
+            rows = parse_points(html)
         except Exception as e:
             # One bad page must not lose the rest of the run.
-            print(f"  warn: {snap.name}/points: {type(e).__name__}: {e}")
+            print(f"  warn: {stamp}/points: {type(e).__name__}: {e}")
             continue
         if not rows:
-            print(f"  warn: {snap.name}/points parsed to 0 rows — "
+            print(f"  warn: {stamp}/points parsed to 0 rows — "
                   f"markup changed? Raw is kept; fix parse and re-run.")
             continue
         by_label.setdefault(season_label(html), []).append((stamp, rows))
@@ -160,8 +158,8 @@ def load_snapshots() -> dict[str, list[tuple[str, list[dict]]]]:
 def main() -> None:
     by_label = load_snapshots()
     if not by_label:
-        sys.exit("no points.html.gz found under data/raw/dt=*/ — "
-                 "run ff_ingest.py fetch first")
+        sys.exit("no points page found in any snapshot under data/raw/ — "
+                 "run ingest.py fetch first")
 
     for label, seq in sorted(by_label.items()):
         kept = keep_changed(seq)

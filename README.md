@@ -32,7 +32,7 @@ Three optional inputs, all off by default:
 | Input | When to use it |
 |---|---|
 | `fetch` | On by default. Turn **off** to rebuild reports from stored HTML without hitting the site. |
-| `history` | Once a season. Refreshes the season points baseline. |
+| `baseline` | Once a season. Refreshes the season points baseline. |
 | `lookup` | Paste comma-separated names to resolve app spellings to CSV names. |
 | `seen` | Paste today's market slate. The report then leads with those players, priced — see below. |
 
@@ -124,15 +124,16 @@ one. It is scratch, not state — that is what stops it drifting.
 ## Layout
 
 ```
-src/                 ff_ingest.py (scrape+parse)  squads.py  report.py
-                     rivals.py  watch.py
+src/                 sources.py (the registry: what we fetch, how to read it)
+                     ingest.py (fetch, parse, prune — the only network code)
+                     squads.py  report.py  rivals.py  watch.py
                      digest.py (stitches REPORT.md)  find_slug.py
-                     history.py  points.py  xi.py  seen.py  methodology.py
+                     points.py  xi.py  seen.py  methodology.py
 src/ffcore/          shared core: parse (numbers)  text (names)  tidy (IO+time)
                      league (ownership+cash)  score (ratings+XI)
                      bid (premiums, bid bands, XI gain)
 inputs/              you edit these — see above
-data/raw/dt=…/       gzipped HTML — immutable, never edit or delete
+data/raw/dt=….tar.xz  raw HTML, deduplicated — append-only, never delete
 data/tidy/*.csv      parsed output — disposable, rebuilt from raw
 data/decisions/      append-only logs of estimates, for scoring later
 reports/REPORT.md    ← read this
@@ -152,7 +153,8 @@ to `src/`:
 
 ```
 python src/ffcore/parse.py                      # number parsing
-python src/ff_ingest.py --selftest              # fitness + market parsing
+PYTHONPATH=src python src/sources.py            # parsers + signatures
+PYTHONPATH=src python src/ingest.py --selftest   # archives + carry-forward
 PYTHONPATH=src python src/ffcore/league.py --selftest   # config + cash
 PYTHONPATH=src python src/ffcore/bid.py                 # premiums, bands, XI gain
 PYTHONPATH=src python src/digest.py --selftest          # report stitching
@@ -185,9 +187,62 @@ different names in each. What you are fielding is a fact; what the model would
 field is advice. Question 1 leads with the fact.
 
 
+**One registry, not one script per source.** `src/sources.py` holds a `Source`
+entry per page we fetch — its URL, its parser, its content signature, its
+cadence — and nothing else knows what a source is. `src/ingest.py` is the only
+code that touches the network or the raw store. Adding a source is one entry,
+one parse function and its self-test cases; it is not a new script, a new
+workflow input, or a new output file to wire into the report.
+
+That replaced three modules that all scraped the same site — and two of them
+fetched the *same* points page the daily sweep already stored, which is how
+`data/season/points_2025-26.csv` and `data/season/live/running_2025-26.csv`
+came to hold the same 757 players with the same totals. They carried four
+different number parsers between them. `history.py` also imported `httpx` at
+module level, so importing it broke the test job, which installs no network
+client on purpose.
+
 **Raw HTML is kept forever; parsed CSV is disposable.** Scrapers rot. When the
 markup changes, fix the parser and re-run over all history. Keeping only the
 CSV would lose that option.
+
+**But "forever" had to be made affordable, and it is stored deduplicated.**
+The first 29 snapshots were 638 pages and 60 MB, projecting to ~4.4 GB across a
+season — past the point GitHub blocks a push, so the original policy did not
+survive the season. Every one of those 638 files was byte-distinct, because the
+pages carry ad ids, cache-busters and forum usernames, so plain deduplication
+saves nothing.
+
+A page is now stored only when its **input-surface signature** changes: a hash
+of every string the parsers can reach — text, `href`, `img alt` — and nothing
+else. That drops 59% of fetches. Hashing whole pages drops only 32%, because a
+news ticker moves constantly. Hashing just the fields we extract today drops
+87%, and is wrong: it silently breaks the promise above, since the page that
+first carried a field we hadn't extracted yet would be thrown away for looking
+unchanged. 59% is the honest middle. When the selectors match *nothing* the
+signature is `None` and the page is stored unconditionally with a warning —
+that is the selector-rot case, and the one time deduplication must not happen.
+
+Each sweep is then one xz-compressed tar rather than a directory of gzips,
+which halves the remainder twice over: xz beats gzip about 2:1, and a solid
+archive sees across twenty team pages that share nearly all their boilerplate.
+`data/raw` went 60 MB → 8.4 MB and the season projection ~4.4 GB → ~0.2 GB.
+Both codecs are stdlib, so the test job still installs only `lxml` and
+`cssselect`. You can no longer open a single page in the GitHub web UI; `parse`
+reads whole snapshots anyway.
+
+**The manifest, not the file listing, says what a snapshot observed.** Every
+archive carries `MANIFEST.csv` naming every page current at that moment, and
+`stored` points at the archive whose bytes hold it. A page listed but not
+written is carried forward by `parse`, so the tidy CSV has exactly the rows it
+always had — verified byte-identical across all 29 snapshots before and after
+pruning. The consequence is that **deleting one archive corrupts every later
+snapshot that carries a page forward from it.** This store was always
+append-only; now it matters.
+
+**`.git` does not shrink.** Git keeps every blob it has ever seen, so pruning
+only slows future growth. The pages dropped from the working tree are still in
+history and nothing is unrecoverable.
 
 **Names are the only join key.** Neither futbolfantasy page exposes player
 links — just photo URLs, and photo-less players all share `00.png`. Don't

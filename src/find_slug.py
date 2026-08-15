@@ -39,7 +39,7 @@ def market() -> list[dict]:
     rows = latest_only(load_market())
     if not rows:
         sys.exit("ERROR: data/tidy/market.csv missing or empty — "
-                 "run ff_ingest.py fetch && parse.")
+                 "run ingest.py fetch && parse.")
     print("# %d players in snapshot %s"
           % (len(rows), rows[0].get("observed_at", "?")))
     return rows
