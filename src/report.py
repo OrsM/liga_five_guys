@@ -55,6 +55,7 @@ from __future__ import annotations
 import os
 import re
 import sys
+from collections import Counter
 from datetime import datetime, timezone
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -64,10 +65,10 @@ from ffcore.bid import (deals, demand_summary, gain, premiums,  # noqa: E402
 from ffcore.league import League  # noqa: E402
 from ffcore.parse import money, ratio  # noqa: E402
 from ffcore.score import (ABSENT_START, MAX_SLOT, NEUTRAL_START,  # noqa: E402
-                          SLOT_LABEL, SLOT_MIN, THIN, Scorer, pick_xi,
-                          squad_pool)
+                          SLOT_LABEL, SLOT_MIN, THIN, Scorer, formations,
+                          pick_xi, squad_pool)
 from ffcore.tidy import (DECISIONS, MADRID, REPORTS, SEASON,  # noqa: E402
-                         append_csv, input_path, latest_only, ledger_stamp,
+                         append_csv, input_path, latest_only, load_deadline,
                          load_market, load_xi, read_csv, snapshot_stamp,
                          write_lines)
 from seen import read_slate  # noqa: E402
@@ -130,6 +131,66 @@ def load_history() -> tuple[dict, str]:
     return out, files[-1].stem.replace("points_", "")
 
 
+def as_fielded(players, squad):
+    """(total, xi, bench, illegal, warnings) for the XI you have MARKED.
+
+    Reads inputs/lineup.txt — the checklist squads.py regenerates — so the
+    report can say what your actual eleven is worth, not only what the best
+    one would be. Returns None when there is no checklist to read: the
+    comparison is skipped, never faked from the recommendation.
+
+    `illegal` is the shape when the marks do not make a legal eleven, which
+    is worth flagging louder than a suboptimal one — the app will fill the
+    gap for you, and not with your choice.
+    """
+    from ffcore.text import norm
+    from xi import bench_from_checklist, read_checklist
+
+    path = input_path("lineup.txt")
+    if not path.exists():
+        return None
+    entries = read_checklist(path.read_text(encoding="utf-8"))
+    if not entries:
+        return None
+
+    names = [p["name"] for p in players]
+    bench_keys, warnings = bench_from_checklist(names, entries)
+    benched = {norm(b) for b in bench_keys}
+    xi = [p for p in players if norm(p["name"]) not in benched]
+    bench = [p for p in players if norm(p["name"]) in benched]
+
+    counts = Counter(p["slot"] for p in xi if p["slot"])
+    shape = (counts.get("DEF", 0), counts.get("MED", 0), counts.get("DEL", 0))
+    illegal = None
+    if len(xi) != 11 or counts.get("POR", 0) != 1 or shape not in set(
+            formations()):
+        illegal = "%d players, %d-%d-%d" % ((len(xi),) + shape)
+    return sum(p["score"] for p in xi), xi, bench, illegal, warnings
+
+
+def swaps(fielded_xi, best_xi):
+    """[(out, in)] — who to bench for whom, paired within a position.
+
+    Only same-slot pairs are offered. A cross-slot difference is a change of
+    formation, not a substitution, and printing it as one would suggest an
+    illegal move.
+    """
+    from ffcore.text import norm
+
+    best_keys = {norm(p["name"]) for p in best_xi}
+    out_ = [p for p in fielded_xi if norm(p["name"]) not in best_keys]
+    have = {norm(p["name"]) for p in fielded_xi}
+    in_ = [p for p in best_xi if norm(p["name"]) not in have]
+    pairs = []
+    for o in sorted(out_, key=lambda p: p["score"]):
+        cand = [i for i in in_ if i["slot"] == o["slot"]]
+        if cand:
+            best_in = max(cand, key=lambda p: p["score"])
+            in_.remove(best_in)
+            pairs.append((o, best_in))
+    return pairs
+
+
 def load_squad_file() -> list[str]:
     """inputs/squad.txt — fallback only. The ledger is the source of truth."""
     path = input_path("squad.txt")
@@ -137,17 +198,6 @@ def load_squad_file() -> list[str]:
         return []
     return [ln.strip() for ln in path.read_text(encoding="utf-8").splitlines()
             if ln.strip() and not ln.strip().startswith("#")]
-
-
-def load_deadline():
-    """inputs/deadline.txt: next lock, e.g. 2026-08-15T18:30 (Madrid time)."""
-    path = input_path("deadline.txt")
-    if not path.exists():
-        return None
-    body = "\n".join(ln.split("#")[0] for ln in
-                     path.read_text(encoding="utf-8").splitlines())
-    m = re.search(r"\d{4}-\d{2}-\d{2}[T ]?\d{0,2}:?\d{0,2}", body)
-    return ledger_stamp(m.group(0)) if m else None
 
 
 def squad_names(lg) -> tuple[list[str], str]:
@@ -435,6 +485,24 @@ def main() -> None:
                           f"({', '.join(guessed)}) — no LaLiga record, so "
                           "they're carrying an assumed baseline, not an "
                           "earned one.")
+    marked = as_fielded(players, squad) if players else None
+    if marked and best:
+        mtot, mxi, _, illegal, mwarn = marked
+        if illegal:
+            alerts.append(f"**Your marked XI is illegal** ({illegal}) — the "
+                          "app will fill the gaps for you, and not with your "
+                          "choice. Fix `inputs/lineup.txt`.")
+        elif best[0] - mtot > 0.05:
+            pairs = swaps(mxi, best[2])
+            how = "; ".join(f"{o['name']} → {i['name']} "
+                            f"({i['score'] - o['score']:+.1f})"
+                            for o, i in pairs[:3])
+            alerts.append(f"**Your bench costs you {best[0] - mtot:.1f} "
+                          f"pts/j** — marked XI ≈{mtot:.0f}, best ≈{best[0]:.0f}"
+                          + (f". Swap {how}." if how else "."))
+        for w in mwarn:
+            alerts.append(f"**Checklist:** {w}")
+
     if missing:
         alerts.append("**Not found in the market:** "
                       + ", ".join(f"`{m}`" for m in missing)
@@ -493,6 +561,20 @@ def main() -> None:
                            f"{eur(p['value'])} | {eur(p['delta_1d'])} | "
                            f"{p['score']:.1f} | {why} |")
         out.append("")
+
+        if marked:
+            mtot, mxi, _, illegal, _ = marked
+            if illegal:
+                out += [f"_As marked in `inputs/lineup.txt`: **{illegal}** — "
+                        "not a legal eleven._", ""]
+            elif best[0] - mtot > 0.05:
+                out += [f"_As marked in `inputs/lineup.txt`: **≈{mtot:.0f} "
+                        f"pts** — {best[0] - mtot:.1f} below this XI. The "
+                        "table above is the recommendation, not what you are "
+                        "fielding._", ""]
+            else:
+                out += ["_Matches what you have marked in "
+                        "`inputs/lineup.txt`._", ""]
 
         bench = [p for p in players if id(p) not in chosen]
         out += ["**Bench** — gap is the expected points the XI loses per "
