@@ -1,6 +1,6 @@
-# League behaviour — 2026-08-15 22:19 UTC
+# League behaviour — 2026-08-15 22:55 UTC
 
-5 managers, 41 ledger rows, 31 market snapshots, points 2025-26.
+5 managers, 41 ledger rows, 32 market snapshots, points 2025-26.
 
 ## 1. Cash and ceilings
 
@@ -71,6 +71,12 @@ A round bid was typed by a human. That is the whole of what roundness tells you 
 
 | Date | Player | Actor | Side | +3d | +7d | +14d |
 |---|---|---|---|--:|--:|--:|
+| 08-12T21:24 | abde ezzalzouli | Albert Laporta | buy | -8.8% | — | — |
+| 08-12T21:24 | santi comesaña | BurtonGM89 | buy | +7.3% | — | — |
+| 08-12T21:24 | jon karrikaburu | Magic Mike 333 | buy | -6.9% | — | — |
+| 08-12T21:24 | pedro diaz | Magic Mike 333 | buy | -5.5% | — | — |
+| 08-12T21:24 | raphinha | Magic Mike 333 | buy | +10.6% | — | — |
+| 08-12T21:24 | marko dmitrovic | BurtonGM89 | buy | +2.0% | — | — |
 | 08-11T22:26 | javi puado | Albert Laporta | sell | -9.1% | — | — |
 | 08-11T22:25 | pathe ciss | Albert Laporta | sell | +3.3% | — | — |
 | 08-11T22:24 | dani vivian | Albert Laporta | sell | -8.8% | — | — |
@@ -86,11 +92,11 @@ Two errors this table is built to catch: buying a player who has already risen (
 
 | Manager | xPts/j | Shape | Trapped | Injured | Thin at | Unmatched |
 |---|--:|---|--:|--:|---|--:|
-| **miguel_autentico** | 39.0 | 4-5-1 | 4.73M | 0 | del | 0 |
-| Albert Laporta | 35.0 | 4-3-3 | 55.61M | 0 | por | 1 |
-| BurtonGM89 | 34.9 | 5-4-1 | 36.79M | 1 | por,del | 0 |
-| Magic Mike 333 | 33.7 | 3-4-3 | 19.54M | 1 | por | 0 |
-| SusoGattuso | 36.1 | 4-4-2 | 26.31M | 0 | por | 0 |
+| **miguel_autentico** | 39.0 | 4-5-1 | 4.65M | 0 | del | 0 |
+| Albert Laporta | 35.0 | 4-3-3 | 54.60M | 0 | por | 1 |
+| BurtonGM89 | 34.9 | 5-4-1 | 36.22M | 1 | por,del | 0 |
+| Magic Mike 333 | 33.7 | 3-4-3 | 19.12M | 1 | por | 0 |
+| SusoGattuso | 36.1 | 4-4-2 | 26.27M | 0 | por | 0 |
 
 - miguel_autentico is carrying more portero/mediocampista than can ever start.
 - Albert Laporta is carrying more delantero than can ever start.
@@ -102,31 +108,41 @@ Trapped is value held in players below 50% start probability — money that cann
 
 ## 5. Who wants what
 
-Restricted to the 11 players on today's slate — the rest of the market is not a decision you can make today.
+**Expect competition for these** — the position is one a rival is short in, so assume a bidding war and price accordingly.
 
-**The slate through every manager's eyes.** XI gain per jornada if that manager owned him, under the one shared scorer. `(…)` = wants him but their estimated cash cannot pay the floor. `?` = wants him, cash unknown — treat as live. **needs** = they cannot field a legal XI without buying in this position — a forced buyer. Your column has no cash cap: you know your own balance.
+| Player | Pos | Value | FF | AF | Short here |
+|---|---|--:|--:|--:|---|
+| david soria | POR | 19.98M | 100% | titular | Albert Laporta, BurtonGM89, Magic Mike 333, SusoGattuso |
+| augusto batalla | POR | 40.07M | 100% | — | Albert Laporta, BurtonGM89, Magic Mike 333, SusoGattuso |
+| joan garcia | POR | 68.69M | 80% | 100% | Albert Laporta, BurtonGM89, Magic Mike 333, SusoGattuso |
+| jan oblak | POR | 52.33M | 90% | 100% | Albert Laporta, BurtonGM89, Magic Mike 333, SusoGattuso |
+| lamine yamal | DEL | 126.12M | 60% | — | BurtonGM89 |
+| kylian mbappe | DEL | 128.76M | 70% | — | BurtonGM89 |
+| vinicius junior | DEL | 107.58M | 90% | — | BurtonGM89 |
+| martin satriano | DEL | 31.07M | 100% | — | BurtonGM89 |
+| alvaro valles | POR | 33.11M | 95% | 100% | Albert Laporta, BurtonGM89, Magic Mike 333, SusoGattuso |
+| jorge de frutos | DEL | 45.88M | 100% | titular | BurtonGM89 |
+| unai simon | POR | 54.03M | 90% | 100% | Albert Laporta, BurtonGM89, Magic Mike 333, SusoGattuso |
+| mathew ryan | POR | 13.55M | 90% | 100% | Albert Laporta, BurtonGM89, Magic Mike 333, SusoGattuso |
 
-| Player | Pos | Value | You | Albert | BurtonGM | Magic | SusoGatt |
-|---|---|--:|--:|--:|--:|--:|--:|
-| dean huijsen | DEF | 31.93M | +2.0 | (+1.8) | (+2.3) | (+1.8) | (+1.7) |
-| aitor paredes | DEF | 5.07M | +1.6 | (+1.4) | (+1.9) | (+1.4) | +1.3 |
-| eric garcia | DEF | 44.75M | +1.0 | (+0.8) | (+1.4) | (+0.8) | (+0.7) |
-| antonio rudiger | DEF | 27.74M | +0.5 | (+0.2) | (+0.8) | (+0.3) | +0.2 |
-| jon ander olasagasti | MED | 4.33M | +0.2 | (+1.4) | (+1.9) | (+1.1) | +1.0 |
-| miguel loureiro | DEF | 3.75M | -0.4 | (-0.6) | (+0.0) | (-0.5) | -0.7 |
-| gonçalo guedes | DEL | 34.13M | -0.8 | (-1.0) | (-0.2) | (-1.3) | (-1.1) |
-| lucas torro | MED | 2.48M | -1.3 | (-0.1) | (+0.4) | (-0.4) | -0.5 |
-| yeremay hernandez | DEL | 51.57M | -1.5 | (-1.7) | (-0.9) | (-2.0) | (-1.8) |
-| ilias akhomach | DEL | 5.20M | -1.6 | (-1.8) | (-1.0) | (-2.1) | -1.9 |
-| jorge cabello | DEF | 837K | -1.7 | (-1.9) | -1.3 | (-1.9) | -2.0 |
+**Nobody else needs these.** Same quality, no auction — take the equivalent player here instead of paying a premium above.
 
-Read it as an auction map: a player whose gain is big only in YOUR column is a quiet buy at the floor; big in a funded rival's column too means price the bid off their premium in section 2, or walk.
+| Player | Pos | Value | FF | AF |
+|---|---|--:|--:|--:|
+| zaid romero | DEF | 28.06M | 100% | titular |
+| florian lejeune | DEF | 38.32M | 100% | — |
+| federico valverde | MED | 69.03M | 90% | — |
+| andrei ratiu | DEF | 35.60M | 100% | titular |
+| unai lopez | MED | 5.91M | 100% | titular |
+| pathe ciss | MED | 12.03M | 100% | titular |
+| marcos alonso | DEF | 29.19M | 90% | 67% |
+| fermin lopez | MED | 65.27M | 70% | — |
 
 **List these to them.** Players of yours who aren't starting, in a position a rival is short in. You stop competing with them and start selling to them; price just under the premium they showed in section 2.
 
 | Player | Pos | Value | FF | AF | Short |
 |---|---|--:|--:|--:|---|
-| alvaro fernandez | POR | 4.73M | 20% | — | Albert Laporta, BurtonGM89, Magic Mike 333, SusoGattuso |
+| alvaro fernandez | POR | 4.65M | 20% | — | Albert Laporta, BurtonGM89, Magic Mike 333, SusoGattuso |
 
 **FF** is futbolfantasy's probable-XI percentage, which is the one the forecast uses. **AF** is analiticafantasy's read of the same eleven, printed beside it and never blended in — `titular` is a named starter (a final call, with no number to it), a percentage is their editors' consensus, `?` means they list him without either, and `—` means they do not have him. Two columns that disagree are the signal; that is the whole point of carrying both.
 
@@ -147,12 +163,12 @@ Unmatched names are absent from that manager's total, so a big number there unde
 **miguel_autentico** — 4-5-1 · ≈39 pts
 - POR: ionut radu 6.0
 - DEF: carl starfelt 3.1 · robin le normand 2.8 · omar el hilali 2.8 · igor zubeldia 2.0
-- MED: pablo fornals 5.4 · jon moncayola 4.5 · lucien agoume 3.6 · ruben garcia 3.3 · pepelu 3.1
+- MED: pablo fornals 5.4 · jon moncayola 4.5 · lucien agoume 3.6 · ruben garcia 3.3 · pepelu 3.2
 - DEL: iñigo vicente 2.6
 
 **SusoGattuso** — 4-4-2 · ≈36 pts
 - POR: wojciech szczesny 1.2~
-- DEF: abdel abqar 4.3 · yuri berchiche 3.8 · cesar tarrega 3.3 · jonny castro 2.8
+- DEF: abdel abqar 4.3 · yuri berchiche 3.8 · cesar tarrega 3.4 · jonny castro 2.8
 - MED: alvaro garcia 5.4 · mario martin 3.3 · aimar oroz 3.1 · lorenzo amatucci 2.6
 - DEL: giuliano simeone 3.9 · andres martin 2.3
 
@@ -164,13 +180,13 @@ Unmatched names are absent from that manager's total, so a big number there unde
 
 **BurtonGM89** — 5-4-1 · ≈35 pts
 - POR: marko dmitrovic 6.5
-- DEF: carlos romero 4.4 · justin de haas 2.9 · quilindschy hartman 2.3 · carlos puga 1.7 · giacomo quagliata 1.6
+- DEF: carlos romero 4.4 · justin de haas 3.0 · quilindschy hartman 2.3 · carlos puga 1.7 · giacomo quagliata 1.6
 - MED: santi comesaña 4.7 · antonio blanco 4.0 · denis suarez 3.2 · tajon buchanan 1.4~
 - DEL: karl etta eyong 2.1
 
 **Magic Mike 333** — 3-4-3 · ≈34 pts
 - POR: alfonso herrero 3.0
-- DEF: kike salas 4.3 · jose gaya 2.6 · lucas noubi 2.6
+- DEF: kike salas 4.3 · jose gaya 2.7 · lucas noubi 2.6
 - MED: marc bernal 2.4 · brahim diaz 2.3 · williot swedberg 2.2 · gustavo puerta 2.2
 - DEL: raphinha 5.3 · gorka guruzeta 4.1 · pere milla 2.5
 
