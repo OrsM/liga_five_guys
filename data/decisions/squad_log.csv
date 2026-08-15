@@ -1,235 +1,235 @@
-observed_at,hours_to_lock,formation,index_total,player,pos,slot,start_pct,start_source,status,assumed,value,score,picked
-2026-08-12T0008Z,,4-5-1,29.35,Alvaro Fernandez,portero,POR,20,read,ok,1,4967837,0.872,1
-2026-08-12T0008Z,,4-5-1,29.35,Beñat Turrientes,mediocampista,MED,70,read,ok,0,6859638,2.512,1
-2026-08-12T0008Z,,4-5-1,29.35,Carl Starfelt,defensa,DEF,70,read,ok,0,13514400,3.596,1
-2026-08-12T0008Z,,4-5-1,29.35,Dani Lorenzo,mediocampista,MED,90,read,ok,1,9511544,2.565,1
-2026-08-12T0008Z,,4-5-1,29.35,Dani Martinez,defensa,DEF,,absent,ok,0,415346,0.529,0
-2026-08-12T0008Z,,4-5-1,29.35,Hugo Duro,delantero,DEL,50,read,ok,0,8535250,1.914,0
-2026-08-12T0008Z,,4-5-1,29.35,Igor Zubeldia,defensa,DEF,80,read,ok,0,9730834,2.975,1
-2026-08-12T0008Z,,4-5-1,29.35,Iñigo Ruiz de Galarreta,mediocampista,MED,60,read,ok,0,11892384,2.694,1
-2026-08-12T0008Z,,4-5-1,29.35,Iñigo Vicente,delantero,DEL,90,read,ok,1,18853588,2.714,1
-2026-08-12T0008Z,,4-5-1,29.35,Jon Moncayola,mediocampista,MED,90,read,ok,0,6524417,3.919,1
-2026-08-12T0008Z,,4-5-1,29.35,Omar El Hilali,defensa,DEF,80,read,ok,0,8557513,2.431,1
-2026-08-12T0008Z,,4-5-1,29.35,Orri Steinn Oskarsson,delantero,DEL,40,read,ok,0,8127914,1.707,0
-2026-08-12T0008Z,,4-5-1,29.35,Pepelu,mediocampista,MED,50,read,ok,0,7455535,2.148,0
-2026-08-12T0008Z,,4-5-1,29.35,Robin Le Normand,defensa,DEF,50,read,ok,0,9936307,2.190,1
-2026-08-12T0008Z,,4-5-1,29.35,Ruben Garcia,mediocampista,MED,60,read,ok,0,13264533,2.882,1
-2026-08-12T1039Z,,4-5-1,29.31,Alvaro Fernandez,portero,POR,20,read,ok,1,4967837,0.872,1
-2026-08-12T1039Z,,4-5-1,29.31,Beñat Turrientes,mediocampista,MED,70,read,ok,0,6859638,2.512,1
-2026-08-12T1039Z,,4-5-1,29.31,Carl Starfelt,defensa,DEF,70,read,ok,0,13514400,3.585,1
-2026-08-12T1039Z,,4-5-1,29.31,Dani Lorenzo,mediocampista,MED,90,read,ok,1,9511544,2.565,1
-2026-08-12T1039Z,,4-5-1,29.31,Dani Martinez,defensa,DEF,,absent,ok,0,415346,0.521,0
-2026-08-12T1039Z,,4-5-1,29.31,Hugo Duro,delantero,DEL,50,read,ok,0,8535250,1.914,0
-2026-08-12T1039Z,,4-5-1,29.31,Igor Zubeldia,defensa,DEF,80,read,ok,0,9730834,2.964,1
-2026-08-12T1039Z,,4-5-1,29.31,Iñigo Ruiz de Galarreta,mediocampista,MED,60,read,ok,0,11892384,2.694,1
-2026-08-12T1039Z,,4-5-1,29.31,Iñigo Vicente,delantero,DEL,90,read,ok,1,18853588,2.714,1
-2026-08-12T1039Z,,4-5-1,29.31,Jon Moncayola,mediocampista,MED,90,read,ok,0,6524417,3.919,1
-2026-08-12T1039Z,,4-5-1,29.31,Omar El Hilali,defensa,DEF,80,read,ok,0,8557513,2.423,1
-2026-08-12T1039Z,,4-5-1,29.31,Orri Steinn Oskarsson,delantero,DEL,40,read,ok,0,8127914,1.707,0
-2026-08-12T1039Z,,4-5-1,29.31,Pepelu,mediocampista,MED,50,read,ok,0,7455535,2.148,0
-2026-08-12T1039Z,,4-5-1,29.31,Robin Le Normand,defensa,DEF,50,read,ok,0,9936307,2.184,1
-2026-08-12T1039Z,,4-5-1,29.31,Ruben Garcia,mediocampista,MED,60,read,ok,0,13264533,2.882,1
-2026-08-13T0754Z,,4-5-1,29.29,Alvaro Fernandez,portero,POR,20,read,ok,1,4881960,0.872,1
-2026-08-13T0754Z,,4-5-1,29.29,Carl Starfelt,defensa,DEF,70,read,ok,0,13619205,3.581,1
-2026-08-13T0754Z,,4-5-1,29.29,Robin Le Normand,defensa,DEF,50,read,ok,0,9853956,2.182,1
-2026-08-13T0754Z,,4-5-1,29.29,Igor Zubeldia,defensa,DEF,80,read,ok,0,9792276,2.961,1
-2026-08-13T0754Z,,4-5-1,29.29,Omar El Hilali,defensa,DEF,80,read,ok,0,8670513,2.421,1
-2026-08-13T0754Z,,4-5-1,29.29,Dani Martinez,defensa,DEF,,absent,ok,0,412199,0.519,0
-2026-08-13T0754Z,,4-5-1,29.29,Ruben Garcia,mediocampista,MED,60,read,ok,0,13464378,2.881,1
-2026-08-13T0754Z,,4-5-1,29.29,Iñigo Ruiz de Galarreta,mediocampista,MED,60,read,ok,0,11990281,2.693,1
-2026-08-13T0754Z,,4-5-1,29.29,Dani Lorenzo,mediocampista,MED,90,read,ok,1,9581112,2.558,1
-2026-08-13T0754Z,,4-5-1,29.29,Pepelu,mediocampista,MED,50,read,ok,0,7414251,2.147,0
-2026-08-13T0754Z,,4-5-1,29.29,Jon Moncayola,mediocampista,MED,90,read,ok,0,6604720,3.917,1
-2026-08-13T0754Z,,4-5-1,29.29,Iñigo Vicente,delantero,DEL,90,read,ok,1,18935091,2.714,1
-2026-08-13T0754Z,,4-5-1,29.29,Hugo Duro,delantero,DEL,50,read,ok,0,8490435,1.914,0
-2026-08-13T0754Z,,4-5-1,29.29,Orri Steinn Oskarsson,delantero,DEL,40,read,ok,0,8000328,1.707,0
-2026-08-13T0754Z,,4-5-1,29.29,Beñat Turrientes,mediocampista,MED,70,read,ok,0,6940602,2.510,1
-2026-08-13T0923Z,,4-5-1,29.21,Alvaro Fernandez,portero,POR,20,read,ok,1,4881960,0.872,1
-2026-08-13T0923Z,,4-5-1,29.21,Carl Starfelt,defensa,DEF,60,read,ok,0,13619205,3.070,1
-2026-08-13T0923Z,,4-5-1,29.21,Robin Le Normand,defensa,DEF,60,read,ok,0,9853956,2.619,1
-2026-08-13T0923Z,,4-5-1,29.21,Igor Zubeldia,defensa,DEF,80,read,ok,0,9792276,2.961,1
-2026-08-13T0923Z,,4-5-1,29.21,Omar El Hilali,defensa,DEF,80,read,ok,0,8670513,2.421,1
-2026-08-13T0923Z,,4-5-1,29.21,Dani Martinez,defensa,DEF,,absent,ok,0,412199,0.519,0
-2026-08-13T0923Z,,4-5-1,29.21,Ruben Garcia,mediocampista,MED,60,read,ok,0,13464378,2.881,1
-2026-08-13T0923Z,,4-5-1,29.21,Iñigo Ruiz de Galarreta,mediocampista,MED,60,read,ok,0,11990281,2.693,1
-2026-08-13T0923Z,,4-5-1,29.21,Dani Lorenzo,mediocampista,MED,90,read,ok,1,9581112,2.558,1
-2026-08-13T0923Z,,4-5-1,29.21,Pepelu,mediocampista,MED,50,read,ok,0,7414251,2.147,0
-2026-08-13T0923Z,,4-5-1,29.21,Jon Moncayola,mediocampista,MED,90,read,ok,0,6604720,3.917,1
-2026-08-13T0923Z,,4-5-1,29.21,Iñigo Vicente,delantero,DEL,90,read,ok,1,18935091,2.714,1
-2026-08-13T0923Z,,4-5-1,29.21,Hugo Duro,delantero,DEL,50,read,ok,0,8490435,1.914,0
-2026-08-13T0923Z,,4-5-1,29.21,Orri Steinn Oskarsson,delantero,DEL,40,read,ok,0,8000328,1.707,0
-2026-08-13T0923Z,,4-5-1,29.21,Beñat Turrientes,mediocampista,MED,70,read,ok,0,6940602,2.510,1
-2026-08-13T1040Z,,4-5-1,29.21,Alvaro Fernandez,portero,POR,20,read,ok,1,4881960,0.872,1
-2026-08-13T1040Z,,4-5-1,29.21,Carl Starfelt,defensa,DEF,60,read,ok,0,13619205,3.070,1
-2026-08-13T1040Z,,4-5-1,29.21,Robin Le Normand,defensa,DEF,60,read,ok,0,9853956,2.619,1
-2026-08-13T1040Z,,4-5-1,29.21,Igor Zubeldia,defensa,DEF,80,read,ok,0,9792276,2.961,1
-2026-08-13T1040Z,,4-5-1,29.21,Omar El Hilali,defensa,DEF,80,read,ok,0,8670513,2.421,1
-2026-08-13T1040Z,,4-5-1,29.21,Dani Martinez,defensa,DEF,,absent,ok,0,412199,0.519,0
-2026-08-13T1040Z,,4-5-1,29.21,Ruben Garcia,mediocampista,MED,60,read,ok,0,13464378,2.881,1
-2026-08-13T1040Z,,4-5-1,29.21,Iñigo Ruiz de Galarreta,mediocampista,MED,60,read,ok,0,11990281,2.693,1
-2026-08-13T1040Z,,4-5-1,29.21,Dani Lorenzo,mediocampista,MED,90,read,ok,1,9581112,2.558,1
-2026-08-13T1040Z,,4-5-1,29.21,Pepelu,mediocampista,MED,50,read,ok,0,7414251,2.147,0
-2026-08-13T1040Z,,4-5-1,29.21,Jon Moncayola,mediocampista,MED,90,read,ok,0,6604720,3.917,1
-2026-08-13T1040Z,,4-5-1,29.21,Iñigo Vicente,delantero,DEL,90,read,ok,1,18935091,2.714,1
-2026-08-13T1040Z,,4-5-1,29.21,Hugo Duro,delantero,DEL,50,read,ok,0,8490435,1.914,0
-2026-08-13T1040Z,,4-5-1,29.21,Orri Steinn Oskarsson,delantero,DEL,40,read,ok,0,8000328,1.707,0
-2026-08-13T1040Z,,4-5-1,29.21,Beñat Turrientes,mediocampista,MED,70,read,ok,0,6940602,2.510,1
-2026-08-13T1059Z,,4-5-1,29.21,Alvaro Fernandez,portero,POR,20,read,ok,1,4881960,0.872,1
-2026-08-13T1059Z,,4-5-1,29.21,Carl Starfelt,defensa,DEF,60,read,ok,0,13619205,3.070,1
-2026-08-13T1059Z,,4-5-1,29.21,Robin Le Normand,defensa,DEF,60,read,ok,0,9853956,2.619,1
-2026-08-13T1059Z,,4-5-1,29.21,Igor Zubeldia,defensa,DEF,80,read,ok,0,9792276,2.961,1
-2026-08-13T1059Z,,4-5-1,29.21,Omar El Hilali,defensa,DEF,80,read,ok,0,8670513,2.421,1
-2026-08-13T1059Z,,4-5-1,29.21,Dani Martinez,defensa,DEF,,absent,ok,0,412199,0.519,0
-2026-08-13T1059Z,,4-5-1,29.21,Ruben Garcia,mediocampista,MED,60,read,ok,0,13464378,2.881,1
-2026-08-13T1059Z,,4-5-1,29.21,Iñigo Ruiz de Galarreta,mediocampista,MED,60,read,ok,0,11990281,2.693,1
-2026-08-13T1059Z,,4-5-1,29.21,Dani Lorenzo,mediocampista,MED,90,read,ok,1,9581112,2.558,1
-2026-08-13T1059Z,,4-5-1,29.21,Pepelu,mediocampista,MED,50,read,ok,0,7414251,2.147,0
-2026-08-13T1059Z,,4-5-1,29.21,Jon Moncayola,mediocampista,MED,90,read,ok,0,6604720,3.917,1
-2026-08-13T1059Z,,4-5-1,29.21,Iñigo Vicente,delantero,DEL,90,read,ok,1,18935091,2.714,1
-2026-08-13T1059Z,,4-5-1,29.21,Hugo Duro,delantero,DEL,50,read,ok,0,8490435,1.914,0
-2026-08-13T1059Z,,4-5-1,29.21,Orri Steinn Oskarsson,delantero,DEL,40,read,ok,0,8000328,1.707,0
-2026-08-13T1059Z,,4-5-1,29.21,Beñat Turrientes,mediocampista,MED,70,read,ok,0,6940602,2.510,1
-2026-08-13T1119Z,,4-5-1,29.21,Alvaro Fernandez,portero,POR,20,read,ok,1,4881960,0.872,1
-2026-08-13T1119Z,,4-5-1,29.21,Carl Starfelt,defensa,DEF,60,read,ok,0,13619205,3.070,1
-2026-08-13T1119Z,,4-5-1,29.21,Robin Le Normand,defensa,DEF,60,read,ok,0,9853956,2.619,1
-2026-08-13T1119Z,,4-5-1,29.21,Igor Zubeldia,defensa,DEF,80,read,ok,0,9792276,2.961,1
-2026-08-13T1119Z,,4-5-1,29.21,Omar El Hilali,defensa,DEF,80,read,ok,0,8670513,2.421,1
-2026-08-13T1119Z,,4-5-1,29.21,Ruben Garcia,mediocampista,MED,60,read,ok,0,13464378,2.881,1
-2026-08-13T1119Z,,4-5-1,29.21,Iñigo Ruiz de Galarreta,mediocampista,MED,60,read,ok,0,11990281,2.693,1
-2026-08-13T1119Z,,4-5-1,29.21,Dani Lorenzo,mediocampista,MED,90,read,ok,1,9581112,2.558,1
-2026-08-13T1119Z,,4-5-1,29.21,Pepelu,mediocampista,MED,50,read,ok,0,7414251,2.147,0
-2026-08-13T1119Z,,4-5-1,29.21,Jon Moncayola,mediocampista,MED,90,read,ok,0,6604720,3.917,1
-2026-08-13T1119Z,,4-5-1,29.21,Iñigo Vicente,delantero,DEL,90,read,ok,1,18935091,2.714,1
-2026-08-13T1119Z,,4-5-1,29.21,Beñat Turrientes,mediocampista,MED,70,read,ok,0,6940602,2.510,1
-2026-08-13T1534Z,,4-5-1,29.21,Alvaro Fernandez,portero,POR,20,read,ok,1,4881960,0.872,1
-2026-08-13T1534Z,,4-5-1,29.21,Carl Starfelt,defensa,DEF,60,read,ok,0,13619205,3.070,1
-2026-08-13T1534Z,,4-5-1,29.21,Robin Le Normand,defensa,DEF,60,read,ok,0,9853956,2.619,1
-2026-08-13T1534Z,,4-5-1,29.21,Igor Zubeldia,defensa,DEF,80,read,ok,0,9792276,2.961,1
-2026-08-13T1534Z,,4-5-1,29.21,Omar El Hilali,defensa,DEF,80,read,ok,0,8670513,2.421,1
-2026-08-13T1534Z,,4-5-1,29.21,Ruben Garcia,mediocampista,MED,60,read,ok,0,13464378,2.881,1
-2026-08-13T1534Z,,4-5-1,29.21,Iñigo Ruiz de Galarreta,mediocampista,MED,60,read,ok,0,11990281,2.693,1
-2026-08-13T1534Z,,4-5-1,29.21,Dani Lorenzo,mediocampista,MED,90,read,ok,1,9581112,2.558,1
-2026-08-13T1534Z,,4-5-1,29.21,Pepelu,mediocampista,MED,50,read,ok,0,7414251,2.147,0
-2026-08-13T1534Z,,4-5-1,29.21,Jon Moncayola,mediocampista,MED,90,read,ok,0,6604720,3.917,1
-2026-08-13T1534Z,,4-5-1,29.21,Iñigo Vicente,delantero,DEL,90,read,ok,1,18935091,2.714,1
-2026-08-13T1534Z,,4-5-1,29.21,Beñat Turrientes,mediocampista,MED,70,read,ok,0,6940602,2.510,1
-2026-08-13T1944Z,,4-5-1,29.70,Alvaro Fernandez,portero,POR,20,read,ok,1,4873912,0.872,1
-2026-08-13T1944Z,,4-5-1,29.70,Carl Starfelt,defensa,DEF,60,read,ok,0,13572748,3.067,1
-2026-08-13T1944Z,,4-5-1,29.70,Robin Le Normand,defensa,DEF,60,read,ok,0,9831352,2.617,1
-2026-08-13T1944Z,,4-5-1,29.70,Igor Zubeldia,defensa,DEF,80,read,ok,0,9760868,2.958,1
-2026-08-13T1944Z,,4-5-1,29.70,Omar El Hilali,defensa,DEF,80,read,ok,0,8638027,2.418,1
-2026-08-13T1944Z,,4-5-1,29.70,Ruben Garcia,mediocampista,MED,60,read,ok,0,13412205,2.881,1
-2026-08-13T1944Z,,4-5-1,29.70,Iñigo Ruiz de Galarreta,mediocampista,MED,60,read,ok,0,11949336,2.693,1
-2026-08-13T1944Z,,4-5-1,29.70,Dani Lorenzo,mediocampista,MED,90,read,ok,1,9549143,2.558,1
-2026-08-13T1944Z,,4-5-1,29.70,Pepelu,mediocampista,MED,70,read,ok,0,7395912,3.006,1
-2026-08-13T1944Z,,4-5-1,29.70,Jon Moncayola,mediocampista,MED,90,read,ok,0,6580213,3.917,1
-2026-08-13T1944Z,,4-5-1,29.70,Iñigo Vicente,delantero,DEL,90,read,ok,1,18875455,2.714,1
-2026-08-13T1944Z,,4-5-1,29.70,Beñat Turrientes,mediocampista,MED,70,read,ok,0,6915246,2.510,0
-2026-08-13T2144Z,,4-5-1,29.70,Alvaro Fernandez,portero,POR,20,read,ok,1,4873912,0.872,1
-2026-08-13T2144Z,,4-5-1,29.70,Carl Starfelt,defensa,DEF,60,read,ok,0,13572748,3.067,1
-2026-08-13T2144Z,,4-5-1,29.70,Robin Le Normand,defensa,DEF,60,read,ok,0,9831352,2.617,1
-2026-08-13T2144Z,,4-5-1,29.70,Igor Zubeldia,defensa,DEF,80,read,ok,0,9760868,2.958,1
-2026-08-13T2144Z,,4-5-1,29.70,Omar El Hilali,defensa,DEF,80,read,ok,0,8638027,2.418,1
-2026-08-13T2144Z,,4-5-1,29.70,Ruben Garcia,mediocampista,MED,60,read,ok,0,13412205,2.881,1
-2026-08-13T2144Z,,4-5-1,29.70,Iñigo Ruiz de Galarreta,mediocampista,MED,60,read,ok,0,11949336,2.693,1
-2026-08-13T2144Z,,4-5-1,29.70,Dani Lorenzo,mediocampista,MED,90,read,ok,1,9549143,2.558,1
-2026-08-13T2144Z,,4-5-1,29.70,Pepelu,mediocampista,MED,70,read,ok,0,7395912,3.006,1
-2026-08-13T2144Z,,4-5-1,29.70,Jon Moncayola,mediocampista,MED,90,read,ok,0,6580213,3.917,1
-2026-08-13T2144Z,,4-5-1,29.70,Iñigo Vicente,delantero,DEL,90,read,ok,1,18875455,2.714,1
-2026-08-13T2144Z,,4-5-1,29.70,Beñat Turrientes,mediocampista,MED,70,read,ok,0,6915246,2.510,0
-2026-08-13T2214Z,,4-5-1,29.70,Alvaro Fernandez,portero,POR,20,read,ok,1,4873912,0.872,1
-2026-08-13T2214Z,,4-5-1,29.70,Carl Starfelt,defensa,DEF,60,read,ok,0,13572748,3.067,1
-2026-08-13T2214Z,,4-5-1,29.70,Robin Le Normand,defensa,DEF,60,read,ok,0,9831352,2.617,1
-2026-08-13T2214Z,,4-5-1,29.70,Igor Zubeldia,defensa,DEF,80,read,ok,0,9760868,2.958,1
-2026-08-13T2214Z,,4-5-1,29.70,Omar El Hilali,defensa,DEF,80,read,ok,0,8638027,2.418,1
-2026-08-13T2214Z,,4-5-1,29.70,Ruben Garcia,mediocampista,MED,60,read,ok,0,13412205,2.881,1
-2026-08-13T2214Z,,4-5-1,29.70,Iñigo Ruiz de Galarreta,mediocampista,MED,60,read,ok,0,11949336,2.693,1
-2026-08-13T2214Z,,4-5-1,29.70,Dani Lorenzo,mediocampista,MED,90,read,ok,1,9549143,2.558,1
-2026-08-13T2214Z,,4-5-1,29.70,Pepelu,mediocampista,MED,70,read,ok,0,7395912,3.006,1
-2026-08-13T2214Z,,4-5-1,29.70,Jon Moncayola,mediocampista,MED,90,read,ok,0,6580213,3.917,1
-2026-08-13T2214Z,,4-5-1,29.70,Iñigo Vicente,delantero,DEL,90,read,ok,1,18875455,2.714,1
-2026-08-13T2214Z,,4-5-1,29.70,Beñat Turrientes,mediocampista,MED,70,read,ok,0,6915246,2.510,0
-2026-08-13T2322Z,,4-5-1,29.70,Alvaro Fernandez,portero,POR,20,read,ok,1,4873912,0.872,1
-2026-08-13T2322Z,,4-5-1,29.70,Carl Starfelt,defensa,DEF,60,read,ok,0,13572748,3.067,1
-2026-08-13T2322Z,,4-5-1,29.70,Robin Le Normand,defensa,DEF,60,read,ok,0,9831352,2.617,1
-2026-08-13T2322Z,,4-5-1,29.70,Igor Zubeldia,defensa,DEF,80,read,ok,0,9760868,2.958,1
-2026-08-13T2322Z,,4-5-1,29.70,Omar El Hilali,defensa,DEF,80,read,ok,0,8638027,2.418,1
-2026-08-13T2322Z,,4-5-1,29.70,Ruben Garcia,mediocampista,MED,60,read,ok,0,13412205,2.881,1
-2026-08-13T2322Z,,4-5-1,29.70,Iñigo Ruiz de Galarreta,mediocampista,MED,60,read,ok,0,11949336,2.693,1
-2026-08-13T2322Z,,4-5-1,29.70,Dani Lorenzo,mediocampista,MED,90,read,ok,1,9549143,2.558,1
-2026-08-13T2322Z,,4-5-1,29.70,Pepelu,mediocampista,MED,70,read,ok,0,7395912,3.006,1
-2026-08-13T2322Z,,4-5-1,29.70,Jon Moncayola,mediocampista,MED,90,read,ok,0,6580213,3.917,1
-2026-08-13T2322Z,,4-5-1,29.70,Iñigo Vicente,delantero,DEL,90,read,ok,1,18875455,2.714,1
-2026-08-13T2322Z,,4-5-1,29.70,Beñat Turrientes,mediocampista,MED,70,read,ok,0,6915246,2.510,0
-2026-08-14T1039Z,,4-5-1,29.70,Alvaro Fernandez,portero,POR,20,read,ok,1,4796907,0.872,1
-2026-08-14T1039Z,,4-5-1,29.70,Carl Starfelt,defensa,DEF,60,read,ok,0,13778051,3.067,1
-2026-08-14T1039Z,,4-5-1,29.70,Robin Le Normand,defensa,DEF,60,read,ok,0,9843374,2.617,1
-2026-08-14T1039Z,,4-5-1,29.70,Igor Zubeldia,defensa,DEF,80,read,ok,0,9859367,2.958,1
-2026-08-14T1039Z,,4-5-1,29.70,Omar El Hilali,defensa,DEF,80,read,ok,0,8778053,2.418,1
-2026-08-14T1039Z,,4-5-1,29.70,Ruben Garcia,mediocampista,MED,60,read,ok,0,13581094,2.881,1
-2026-08-14T1039Z,,4-5-1,29.70,Iñigo Ruiz de Galarreta,mediocampista,MED,60,read,ok,0,12176221,2.693,1
-2026-08-14T1039Z,,4-5-1,29.70,Dani Lorenzo,mediocampista,MED,90,read,ok,1,9657795,2.558,1
-2026-08-14T1039Z,,4-5-1,29.70,Pepelu,mediocampista,MED,70,read,ok,0,7370191,3.006,1
-2026-08-14T1039Z,,4-5-1,29.70,Jon Moncayola,mediocampista,MED,90,read,ok,0,6683208,3.917,1
-2026-08-14T1039Z,,4-5-1,29.70,Iñigo Vicente,delantero,DEL,90,read,ok,1,19089840,2.714,1
-2026-08-14T1039Z,,4-5-1,29.70,Beñat Turrientes,mediocampista,MED,70,read,ok,0,6985377,2.510,0
-2026-08-14T2047Z,,4-5-1,35.37,Alvaro Fernandez,portero,POR,20,read,ok,1,4796907,0.872,0
-2026-08-14T2047Z,,4-5-1,35.37,Carl Starfelt,defensa,DEF,60,read,ok,0,13778051,3.067,1
-2026-08-14T2047Z,,4-5-1,35.37,Robin Le Normand,defensa,DEF,60,read,ok,0,9843374,2.617,1
-2026-08-14T2047Z,,4-5-1,35.37,Igor Zubeldia,defensa,DEF,80,read,ok,0,9859367,2.958,1
-2026-08-14T2047Z,,4-5-1,35.37,Omar El Hilali,defensa,DEF,80,read,ok,0,8778053,2.418,1
-2026-08-14T2047Z,,4-5-1,35.37,Ruben Garcia,mediocampista,MED,60,read,ok,0,13581094,2.881,1
-2026-08-14T2047Z,,4-5-1,35.37,Iñigo Ruiz de Galarreta,mediocampista,MED,60,read,ok,0,12176221,2.693,1
-2026-08-14T2047Z,,4-5-1,35.37,Dani Lorenzo,mediocampista,MED,90,read,ok,1,9657795,2.558,0
-2026-08-14T2047Z,,4-5-1,35.37,Pepelu,mediocampista,MED,70,read,ok,0,7370191,3.006,1
-2026-08-14T2047Z,,4-5-1,35.37,Jon Moncayola,mediocampista,MED,90,read,ok,0,6683208,3.917,1
-2026-08-14T2047Z,,4-5-1,35.37,Iñigo Vicente,delantero,DEL,90,read,ok,1,19089840,2.714,1
-2026-08-14T2047Z,,4-5-1,35.37,Beñat Turrientes,mediocampista,MED,70,read,ok,0,6985377,2.510,0
-2026-08-14T2047Z,,4-5-1,35.37,Ionut Radu,portero,POR,90,read,ok,0,39711707,5.944,1
-2026-08-14T2047Z,,4-5-1,35.37,Lucien Agoume,mediocampista,MED,80,read,ok,0,5791526,3.152,1
-2026-08-14T2047Z,,4-5-1,35.37,Simon Eriksson,portero,POR,50,read,ok,1,2933863,2.180,0
-2026-08-14T2156Z,,4-5-1,35.37,Alvaro Fernandez,portero,POR,20,read,ok,1,4796907,0.872,0
-2026-08-14T2156Z,,4-5-1,35.37,Carl Starfelt,defensa,DEF,60,read,ok,0,13778051,3.067,1
-2026-08-14T2156Z,,4-5-1,35.37,Robin Le Normand,defensa,DEF,60,read,ok,0,9843374,2.617,1
-2026-08-14T2156Z,,4-5-1,35.37,Igor Zubeldia,defensa,DEF,80,read,ok,0,9859367,2.958,1
-2026-08-14T2156Z,,4-5-1,35.37,Omar El Hilali,defensa,DEF,80,read,ok,0,8778053,2.418,1
-2026-08-14T2156Z,,4-5-1,35.37,Ruben Garcia,mediocampista,MED,60,read,ok,0,13581094,2.881,1
-2026-08-14T2156Z,,4-5-1,35.37,Iñigo Ruiz de Galarreta,mediocampista,MED,60,read,ok,0,12176221,2.693,1
-2026-08-14T2156Z,,4-5-1,35.37,Dani Lorenzo,mediocampista,MED,90,read,ok,1,9657795,2.558,0
-2026-08-14T2156Z,,4-5-1,35.37,Pepelu,mediocampista,MED,70,read,ok,0,7370191,3.006,1
-2026-08-14T2156Z,,4-5-1,35.37,Jon Moncayola,mediocampista,MED,90,read,ok,0,6683208,3.917,1
-2026-08-14T2156Z,,4-5-1,35.37,Iñigo Vicente,delantero,DEL,90,read,ok,1,19089840,2.714,1
-2026-08-14T2156Z,,4-5-1,35.37,Beñat Turrientes,mediocampista,MED,70,read,ok,0,6985377,2.510,0
-2026-08-14T2156Z,,4-5-1,35.37,Ionut Radu,portero,POR,90,read,ok,0,39711707,5.944,1
-2026-08-14T2156Z,,4-5-1,35.37,Lucien Agoume,mediocampista,MED,80,read,ok,0,5791526,3.152,1
-2026-08-14T2156Z,,4-5-1,35.37,Simon Eriksson,portero,POR,50,read,ok,1,2933863,2.180,0
-2026-08-14T2256Z,,4-5-1,35.37,Alvaro Fernandez,portero,POR,20,read,ok,1,4728806,0.872,0
-2026-08-14T2256Z,,4-5-1,35.37,Carl Starfelt,defensa,DEF,60,read,ok,0,13847775,3.067,1
-2026-08-14T2256Z,,4-5-1,35.37,Robin Le Normand,defensa,DEF,60,read,ok,0,9983705,2.617,1
-2026-08-14T2256Z,,4-5-1,35.37,Igor Zubeldia,defensa,DEF,80,read,ok,0,9937308,2.958,1
-2026-08-14T2256Z,,4-5-1,35.37,Omar El Hilali,defensa,DEF,80,read,ok,0,8838558,2.418,1
-2026-08-14T2256Z,,4-5-1,35.37,Ruben Garcia,mediocampista,MED,60,read,ok,0,13754249,2.881,1
-2026-08-14T2256Z,,4-5-1,35.37,Iñigo Ruiz de Galarreta,mediocampista,MED,60,read,ok,0,12236355,2.693,1
-2026-08-14T2256Z,,4-5-1,35.37,Dani Lorenzo,mediocampista,MED,90,read,ok,1,9691137,2.558,0
-2026-08-14T2256Z,,4-5-1,35.37,Pepelu,mediocampista,MED,70,read,ok,0,7469048,3.006,1
-2026-08-14T2256Z,,4-5-1,35.37,Jon Moncayola,mediocampista,MED,90,read,ok,0,6790699,3.917,1
-2026-08-14T2256Z,,4-5-1,35.37,Iñigo Vicente,delantero,DEL,90,read,ok,1,19165047,2.714,1
-2026-08-14T2256Z,,4-5-1,35.37,Beñat Turrientes,mediocampista,MED,70,read,ok,0,7063789,2.510,0
-2026-08-14T2256Z,,4-5-1,35.37,Ionut Radu,portero,POR,90,read,ok,0,39248115,5.944,1
-2026-08-14T2256Z,,4-5-1,35.37,Lucien Agoume,mediocampista,MED,80,read,ok,0,5819213,3.152,1
-2026-08-14T2256Z,,4-5-1,35.37,Simon Eriksson,portero,POR,50,read,ok,1,2923053,2.180,0
-2026-08-15T1920Z,19.7,4-5-1,35.40,Alvaro Fernandez,portero,POR,20,read,ok,1,4728806,0.872,0
-2026-08-15T1920Z,19.7,4-5-1,35.40,Carl Starfelt,defensa,DEF,60,read,ok,0,13847775,3.067,1
-2026-08-15T1920Z,19.7,4-5-1,35.40,Robin Le Normand,defensa,DEF,60,read,ok,0,9983705,2.617,1
-2026-08-15T1920Z,19.7,4-5-1,35.40,Igor Zubeldia,defensa,DEF,60,read,ok,0,9937308,2.218,1
-2026-08-15T1920Z,19.7,4-5-1,35.40,Omar El Hilali,defensa,DEF,80,read,ok,0,8838558,2.418,1
-2026-08-15T1920Z,19.7,4-5-1,35.40,Ruben Garcia,mediocampista,MED,60,read,ok,0,13754249,2.881,1
-2026-08-15T1920Z,19.7,4-5-1,35.40,Iñigo Ruiz de Galarreta,mediocampista,MED,60,read,ok,0,12236355,2.693,1
-2026-08-15T1920Z,19.7,4-5-1,35.40,Dani Lorenzo,mediocampista,MED,90,read,ok,1,9691137,2.558,0
-2026-08-15T1920Z,19.7,4-5-1,35.40,Pepelu,mediocampista,MED,70,read,ok,0,7469048,3.006,1
-2026-08-15T1920Z,19.7,4-5-1,35.40,Jon Moncayola,mediocampista,MED,90,read,ok,0,6790699,3.917,1
-2026-08-15T1920Z,19.7,4-5-1,35.40,Iñigo Vicente,delantero,DEL,90,read,ok,1,19165047,2.696,1
-2026-08-15T1920Z,19.7,4-5-1,35.40,Beñat Turrientes,mediocampista,MED,60,read,ok,0,7063789,2.151,0
-2026-08-15T1920Z,19.7,4-5-1,35.40,Ionut Radu,portero,POR,90,read,ok,0,39248115,5.944,1
-2026-08-15T1920Z,19.7,4-5-1,35.40,Lucien Agoume,mediocampista,MED,100,read,ok,0,5819213,3.940,1
-2026-08-15T1920Z,19.7,4-5-1,35.40,Simon Eriksson,portero,POR,50,read,ok,1,2923053,2.180,0
+observed_at,hours_to_lock,formation,index_total,player,pos,slot,start_pct,start_source,status,assumed,value,score,picked,ppm,fix,opp,home,cur_pj,flat
+2026-08-12T0008Z,,4-5-1,29.35,Alvaro Fernandez,portero,POR,20,read,ok,1,4967837,0.872,1,,,,,,
+2026-08-12T0008Z,,4-5-1,29.35,Beñat Turrientes,mediocampista,MED,70,read,ok,0,6859638,2.512,1,,,,,,
+2026-08-12T0008Z,,4-5-1,29.35,Carl Starfelt,defensa,DEF,70,read,ok,0,13514400,3.596,1,,,,,,
+2026-08-12T0008Z,,4-5-1,29.35,Dani Lorenzo,mediocampista,MED,90,read,ok,1,9511544,2.565,1,,,,,,
+2026-08-12T0008Z,,4-5-1,29.35,Dani Martinez,defensa,DEF,,absent,ok,0,415346,0.529,0,,,,,,
+2026-08-12T0008Z,,4-5-1,29.35,Hugo Duro,delantero,DEL,50,read,ok,0,8535250,1.914,0,,,,,,
+2026-08-12T0008Z,,4-5-1,29.35,Igor Zubeldia,defensa,DEF,80,read,ok,0,9730834,2.975,1,,,,,,
+2026-08-12T0008Z,,4-5-1,29.35,Iñigo Ruiz de Galarreta,mediocampista,MED,60,read,ok,0,11892384,2.694,1,,,,,,
+2026-08-12T0008Z,,4-5-1,29.35,Iñigo Vicente,delantero,DEL,90,read,ok,1,18853588,2.714,1,,,,,,
+2026-08-12T0008Z,,4-5-1,29.35,Jon Moncayola,mediocampista,MED,90,read,ok,0,6524417,3.919,1,,,,,,
+2026-08-12T0008Z,,4-5-1,29.35,Omar El Hilali,defensa,DEF,80,read,ok,0,8557513,2.431,1,,,,,,
+2026-08-12T0008Z,,4-5-1,29.35,Orri Steinn Oskarsson,delantero,DEL,40,read,ok,0,8127914,1.707,0,,,,,,
+2026-08-12T0008Z,,4-5-1,29.35,Pepelu,mediocampista,MED,50,read,ok,0,7455535,2.148,0,,,,,,
+2026-08-12T0008Z,,4-5-1,29.35,Robin Le Normand,defensa,DEF,50,read,ok,0,9936307,2.190,1,,,,,,
+2026-08-12T0008Z,,4-5-1,29.35,Ruben Garcia,mediocampista,MED,60,read,ok,0,13264533,2.882,1,,,,,,
+2026-08-12T1039Z,,4-5-1,29.31,Alvaro Fernandez,portero,POR,20,read,ok,1,4967837,0.872,1,,,,,,
+2026-08-12T1039Z,,4-5-1,29.31,Beñat Turrientes,mediocampista,MED,70,read,ok,0,6859638,2.512,1,,,,,,
+2026-08-12T1039Z,,4-5-1,29.31,Carl Starfelt,defensa,DEF,70,read,ok,0,13514400,3.585,1,,,,,,
+2026-08-12T1039Z,,4-5-1,29.31,Dani Lorenzo,mediocampista,MED,90,read,ok,1,9511544,2.565,1,,,,,,
+2026-08-12T1039Z,,4-5-1,29.31,Dani Martinez,defensa,DEF,,absent,ok,0,415346,0.521,0,,,,,,
+2026-08-12T1039Z,,4-5-1,29.31,Hugo Duro,delantero,DEL,50,read,ok,0,8535250,1.914,0,,,,,,
+2026-08-12T1039Z,,4-5-1,29.31,Igor Zubeldia,defensa,DEF,80,read,ok,0,9730834,2.964,1,,,,,,
+2026-08-12T1039Z,,4-5-1,29.31,Iñigo Ruiz de Galarreta,mediocampista,MED,60,read,ok,0,11892384,2.694,1,,,,,,
+2026-08-12T1039Z,,4-5-1,29.31,Iñigo Vicente,delantero,DEL,90,read,ok,1,18853588,2.714,1,,,,,,
+2026-08-12T1039Z,,4-5-1,29.31,Jon Moncayola,mediocampista,MED,90,read,ok,0,6524417,3.919,1,,,,,,
+2026-08-12T1039Z,,4-5-1,29.31,Omar El Hilali,defensa,DEF,80,read,ok,0,8557513,2.423,1,,,,,,
+2026-08-12T1039Z,,4-5-1,29.31,Orri Steinn Oskarsson,delantero,DEL,40,read,ok,0,8127914,1.707,0,,,,,,
+2026-08-12T1039Z,,4-5-1,29.31,Pepelu,mediocampista,MED,50,read,ok,0,7455535,2.148,0,,,,,,
+2026-08-12T1039Z,,4-5-1,29.31,Robin Le Normand,defensa,DEF,50,read,ok,0,9936307,2.184,1,,,,,,
+2026-08-12T1039Z,,4-5-1,29.31,Ruben Garcia,mediocampista,MED,60,read,ok,0,13264533,2.882,1,,,,,,
+2026-08-13T0754Z,,4-5-1,29.29,Alvaro Fernandez,portero,POR,20,read,ok,1,4881960,0.872,1,,,,,,
+2026-08-13T0754Z,,4-5-1,29.29,Carl Starfelt,defensa,DEF,70,read,ok,0,13619205,3.581,1,,,,,,
+2026-08-13T0754Z,,4-5-1,29.29,Robin Le Normand,defensa,DEF,50,read,ok,0,9853956,2.182,1,,,,,,
+2026-08-13T0754Z,,4-5-1,29.29,Igor Zubeldia,defensa,DEF,80,read,ok,0,9792276,2.961,1,,,,,,
+2026-08-13T0754Z,,4-5-1,29.29,Omar El Hilali,defensa,DEF,80,read,ok,0,8670513,2.421,1,,,,,,
+2026-08-13T0754Z,,4-5-1,29.29,Dani Martinez,defensa,DEF,,absent,ok,0,412199,0.519,0,,,,,,
+2026-08-13T0754Z,,4-5-1,29.29,Ruben Garcia,mediocampista,MED,60,read,ok,0,13464378,2.881,1,,,,,,
+2026-08-13T0754Z,,4-5-1,29.29,Iñigo Ruiz de Galarreta,mediocampista,MED,60,read,ok,0,11990281,2.693,1,,,,,,
+2026-08-13T0754Z,,4-5-1,29.29,Dani Lorenzo,mediocampista,MED,90,read,ok,1,9581112,2.558,1,,,,,,
+2026-08-13T0754Z,,4-5-1,29.29,Pepelu,mediocampista,MED,50,read,ok,0,7414251,2.147,0,,,,,,
+2026-08-13T0754Z,,4-5-1,29.29,Jon Moncayola,mediocampista,MED,90,read,ok,0,6604720,3.917,1,,,,,,
+2026-08-13T0754Z,,4-5-1,29.29,Iñigo Vicente,delantero,DEL,90,read,ok,1,18935091,2.714,1,,,,,,
+2026-08-13T0754Z,,4-5-1,29.29,Hugo Duro,delantero,DEL,50,read,ok,0,8490435,1.914,0,,,,,,
+2026-08-13T0754Z,,4-5-1,29.29,Orri Steinn Oskarsson,delantero,DEL,40,read,ok,0,8000328,1.707,0,,,,,,
+2026-08-13T0754Z,,4-5-1,29.29,Beñat Turrientes,mediocampista,MED,70,read,ok,0,6940602,2.510,1,,,,,,
+2026-08-13T0923Z,,4-5-1,29.21,Alvaro Fernandez,portero,POR,20,read,ok,1,4881960,0.872,1,,,,,,
+2026-08-13T0923Z,,4-5-1,29.21,Carl Starfelt,defensa,DEF,60,read,ok,0,13619205,3.070,1,,,,,,
+2026-08-13T0923Z,,4-5-1,29.21,Robin Le Normand,defensa,DEF,60,read,ok,0,9853956,2.619,1,,,,,,
+2026-08-13T0923Z,,4-5-1,29.21,Igor Zubeldia,defensa,DEF,80,read,ok,0,9792276,2.961,1,,,,,,
+2026-08-13T0923Z,,4-5-1,29.21,Omar El Hilali,defensa,DEF,80,read,ok,0,8670513,2.421,1,,,,,,
+2026-08-13T0923Z,,4-5-1,29.21,Dani Martinez,defensa,DEF,,absent,ok,0,412199,0.519,0,,,,,,
+2026-08-13T0923Z,,4-5-1,29.21,Ruben Garcia,mediocampista,MED,60,read,ok,0,13464378,2.881,1,,,,,,
+2026-08-13T0923Z,,4-5-1,29.21,Iñigo Ruiz de Galarreta,mediocampista,MED,60,read,ok,0,11990281,2.693,1,,,,,,
+2026-08-13T0923Z,,4-5-1,29.21,Dani Lorenzo,mediocampista,MED,90,read,ok,1,9581112,2.558,1,,,,,,
+2026-08-13T0923Z,,4-5-1,29.21,Pepelu,mediocampista,MED,50,read,ok,0,7414251,2.147,0,,,,,,
+2026-08-13T0923Z,,4-5-1,29.21,Jon Moncayola,mediocampista,MED,90,read,ok,0,6604720,3.917,1,,,,,,
+2026-08-13T0923Z,,4-5-1,29.21,Iñigo Vicente,delantero,DEL,90,read,ok,1,18935091,2.714,1,,,,,,
+2026-08-13T0923Z,,4-5-1,29.21,Hugo Duro,delantero,DEL,50,read,ok,0,8490435,1.914,0,,,,,,
+2026-08-13T0923Z,,4-5-1,29.21,Orri Steinn Oskarsson,delantero,DEL,40,read,ok,0,8000328,1.707,0,,,,,,
+2026-08-13T0923Z,,4-5-1,29.21,Beñat Turrientes,mediocampista,MED,70,read,ok,0,6940602,2.510,1,,,,,,
+2026-08-13T1040Z,,4-5-1,29.21,Alvaro Fernandez,portero,POR,20,read,ok,1,4881960,0.872,1,,,,,,
+2026-08-13T1040Z,,4-5-1,29.21,Carl Starfelt,defensa,DEF,60,read,ok,0,13619205,3.070,1,,,,,,
+2026-08-13T1040Z,,4-5-1,29.21,Robin Le Normand,defensa,DEF,60,read,ok,0,9853956,2.619,1,,,,,,
+2026-08-13T1040Z,,4-5-1,29.21,Igor Zubeldia,defensa,DEF,80,read,ok,0,9792276,2.961,1,,,,,,
+2026-08-13T1040Z,,4-5-1,29.21,Omar El Hilali,defensa,DEF,80,read,ok,0,8670513,2.421,1,,,,,,
+2026-08-13T1040Z,,4-5-1,29.21,Dani Martinez,defensa,DEF,,absent,ok,0,412199,0.519,0,,,,,,
+2026-08-13T1040Z,,4-5-1,29.21,Ruben Garcia,mediocampista,MED,60,read,ok,0,13464378,2.881,1,,,,,,
+2026-08-13T1040Z,,4-5-1,29.21,Iñigo Ruiz de Galarreta,mediocampista,MED,60,read,ok,0,11990281,2.693,1,,,,,,
+2026-08-13T1040Z,,4-5-1,29.21,Dani Lorenzo,mediocampista,MED,90,read,ok,1,9581112,2.558,1,,,,,,
+2026-08-13T1040Z,,4-5-1,29.21,Pepelu,mediocampista,MED,50,read,ok,0,7414251,2.147,0,,,,,,
+2026-08-13T1040Z,,4-5-1,29.21,Jon Moncayola,mediocampista,MED,90,read,ok,0,6604720,3.917,1,,,,,,
+2026-08-13T1040Z,,4-5-1,29.21,Iñigo Vicente,delantero,DEL,90,read,ok,1,18935091,2.714,1,,,,,,
+2026-08-13T1040Z,,4-5-1,29.21,Hugo Duro,delantero,DEL,50,read,ok,0,8490435,1.914,0,,,,,,
+2026-08-13T1040Z,,4-5-1,29.21,Orri Steinn Oskarsson,delantero,DEL,40,read,ok,0,8000328,1.707,0,,,,,,
+2026-08-13T1040Z,,4-5-1,29.21,Beñat Turrientes,mediocampista,MED,70,read,ok,0,6940602,2.510,1,,,,,,
+2026-08-13T1059Z,,4-5-1,29.21,Alvaro Fernandez,portero,POR,20,read,ok,1,4881960,0.872,1,,,,,,
+2026-08-13T1059Z,,4-5-1,29.21,Carl Starfelt,defensa,DEF,60,read,ok,0,13619205,3.070,1,,,,,,
+2026-08-13T1059Z,,4-5-1,29.21,Robin Le Normand,defensa,DEF,60,read,ok,0,9853956,2.619,1,,,,,,
+2026-08-13T1059Z,,4-5-1,29.21,Igor Zubeldia,defensa,DEF,80,read,ok,0,9792276,2.961,1,,,,,,
+2026-08-13T1059Z,,4-5-1,29.21,Omar El Hilali,defensa,DEF,80,read,ok,0,8670513,2.421,1,,,,,,
+2026-08-13T1059Z,,4-5-1,29.21,Dani Martinez,defensa,DEF,,absent,ok,0,412199,0.519,0,,,,,,
+2026-08-13T1059Z,,4-5-1,29.21,Ruben Garcia,mediocampista,MED,60,read,ok,0,13464378,2.881,1,,,,,,
+2026-08-13T1059Z,,4-5-1,29.21,Iñigo Ruiz de Galarreta,mediocampista,MED,60,read,ok,0,11990281,2.693,1,,,,,,
+2026-08-13T1059Z,,4-5-1,29.21,Dani Lorenzo,mediocampista,MED,90,read,ok,1,9581112,2.558,1,,,,,,
+2026-08-13T1059Z,,4-5-1,29.21,Pepelu,mediocampista,MED,50,read,ok,0,7414251,2.147,0,,,,,,
+2026-08-13T1059Z,,4-5-1,29.21,Jon Moncayola,mediocampista,MED,90,read,ok,0,6604720,3.917,1,,,,,,
+2026-08-13T1059Z,,4-5-1,29.21,Iñigo Vicente,delantero,DEL,90,read,ok,1,18935091,2.714,1,,,,,,
+2026-08-13T1059Z,,4-5-1,29.21,Hugo Duro,delantero,DEL,50,read,ok,0,8490435,1.914,0,,,,,,
+2026-08-13T1059Z,,4-5-1,29.21,Orri Steinn Oskarsson,delantero,DEL,40,read,ok,0,8000328,1.707,0,,,,,,
+2026-08-13T1059Z,,4-5-1,29.21,Beñat Turrientes,mediocampista,MED,70,read,ok,0,6940602,2.510,1,,,,,,
+2026-08-13T1119Z,,4-5-1,29.21,Alvaro Fernandez,portero,POR,20,read,ok,1,4881960,0.872,1,,,,,,
+2026-08-13T1119Z,,4-5-1,29.21,Carl Starfelt,defensa,DEF,60,read,ok,0,13619205,3.070,1,,,,,,
+2026-08-13T1119Z,,4-5-1,29.21,Robin Le Normand,defensa,DEF,60,read,ok,0,9853956,2.619,1,,,,,,
+2026-08-13T1119Z,,4-5-1,29.21,Igor Zubeldia,defensa,DEF,80,read,ok,0,9792276,2.961,1,,,,,,
+2026-08-13T1119Z,,4-5-1,29.21,Omar El Hilali,defensa,DEF,80,read,ok,0,8670513,2.421,1,,,,,,
+2026-08-13T1119Z,,4-5-1,29.21,Ruben Garcia,mediocampista,MED,60,read,ok,0,13464378,2.881,1,,,,,,
+2026-08-13T1119Z,,4-5-1,29.21,Iñigo Ruiz de Galarreta,mediocampista,MED,60,read,ok,0,11990281,2.693,1,,,,,,
+2026-08-13T1119Z,,4-5-1,29.21,Dani Lorenzo,mediocampista,MED,90,read,ok,1,9581112,2.558,1,,,,,,
+2026-08-13T1119Z,,4-5-1,29.21,Pepelu,mediocampista,MED,50,read,ok,0,7414251,2.147,0,,,,,,
+2026-08-13T1119Z,,4-5-1,29.21,Jon Moncayola,mediocampista,MED,90,read,ok,0,6604720,3.917,1,,,,,,
+2026-08-13T1119Z,,4-5-1,29.21,Iñigo Vicente,delantero,DEL,90,read,ok,1,18935091,2.714,1,,,,,,
+2026-08-13T1119Z,,4-5-1,29.21,Beñat Turrientes,mediocampista,MED,70,read,ok,0,6940602,2.510,1,,,,,,
+2026-08-13T1534Z,,4-5-1,29.21,Alvaro Fernandez,portero,POR,20,read,ok,1,4881960,0.872,1,,,,,,
+2026-08-13T1534Z,,4-5-1,29.21,Carl Starfelt,defensa,DEF,60,read,ok,0,13619205,3.070,1,,,,,,
+2026-08-13T1534Z,,4-5-1,29.21,Robin Le Normand,defensa,DEF,60,read,ok,0,9853956,2.619,1,,,,,,
+2026-08-13T1534Z,,4-5-1,29.21,Igor Zubeldia,defensa,DEF,80,read,ok,0,9792276,2.961,1,,,,,,
+2026-08-13T1534Z,,4-5-1,29.21,Omar El Hilali,defensa,DEF,80,read,ok,0,8670513,2.421,1,,,,,,
+2026-08-13T1534Z,,4-5-1,29.21,Ruben Garcia,mediocampista,MED,60,read,ok,0,13464378,2.881,1,,,,,,
+2026-08-13T1534Z,,4-5-1,29.21,Iñigo Ruiz de Galarreta,mediocampista,MED,60,read,ok,0,11990281,2.693,1,,,,,,
+2026-08-13T1534Z,,4-5-1,29.21,Dani Lorenzo,mediocampista,MED,90,read,ok,1,9581112,2.558,1,,,,,,
+2026-08-13T1534Z,,4-5-1,29.21,Pepelu,mediocampista,MED,50,read,ok,0,7414251,2.147,0,,,,,,
+2026-08-13T1534Z,,4-5-1,29.21,Jon Moncayola,mediocampista,MED,90,read,ok,0,6604720,3.917,1,,,,,,
+2026-08-13T1534Z,,4-5-1,29.21,Iñigo Vicente,delantero,DEL,90,read,ok,1,18935091,2.714,1,,,,,,
+2026-08-13T1534Z,,4-5-1,29.21,Beñat Turrientes,mediocampista,MED,70,read,ok,0,6940602,2.510,1,,,,,,
+2026-08-13T1944Z,,4-5-1,29.70,Alvaro Fernandez,portero,POR,20,read,ok,1,4873912,0.872,1,,,,,,
+2026-08-13T1944Z,,4-5-1,29.70,Carl Starfelt,defensa,DEF,60,read,ok,0,13572748,3.067,1,,,,,,
+2026-08-13T1944Z,,4-5-1,29.70,Robin Le Normand,defensa,DEF,60,read,ok,0,9831352,2.617,1,,,,,,
+2026-08-13T1944Z,,4-5-1,29.70,Igor Zubeldia,defensa,DEF,80,read,ok,0,9760868,2.958,1,,,,,,
+2026-08-13T1944Z,,4-5-1,29.70,Omar El Hilali,defensa,DEF,80,read,ok,0,8638027,2.418,1,,,,,,
+2026-08-13T1944Z,,4-5-1,29.70,Ruben Garcia,mediocampista,MED,60,read,ok,0,13412205,2.881,1,,,,,,
+2026-08-13T1944Z,,4-5-1,29.70,Iñigo Ruiz de Galarreta,mediocampista,MED,60,read,ok,0,11949336,2.693,1,,,,,,
+2026-08-13T1944Z,,4-5-1,29.70,Dani Lorenzo,mediocampista,MED,90,read,ok,1,9549143,2.558,1,,,,,,
+2026-08-13T1944Z,,4-5-1,29.70,Pepelu,mediocampista,MED,70,read,ok,0,7395912,3.006,1,,,,,,
+2026-08-13T1944Z,,4-5-1,29.70,Jon Moncayola,mediocampista,MED,90,read,ok,0,6580213,3.917,1,,,,,,
+2026-08-13T1944Z,,4-5-1,29.70,Iñigo Vicente,delantero,DEL,90,read,ok,1,18875455,2.714,1,,,,,,
+2026-08-13T1944Z,,4-5-1,29.70,Beñat Turrientes,mediocampista,MED,70,read,ok,0,6915246,2.510,0,,,,,,
+2026-08-13T2144Z,,4-5-1,29.70,Alvaro Fernandez,portero,POR,20,read,ok,1,4873912,0.872,1,,,,,,
+2026-08-13T2144Z,,4-5-1,29.70,Carl Starfelt,defensa,DEF,60,read,ok,0,13572748,3.067,1,,,,,,
+2026-08-13T2144Z,,4-5-1,29.70,Robin Le Normand,defensa,DEF,60,read,ok,0,9831352,2.617,1,,,,,,
+2026-08-13T2144Z,,4-5-1,29.70,Igor Zubeldia,defensa,DEF,80,read,ok,0,9760868,2.958,1,,,,,,
+2026-08-13T2144Z,,4-5-1,29.70,Omar El Hilali,defensa,DEF,80,read,ok,0,8638027,2.418,1,,,,,,
+2026-08-13T2144Z,,4-5-1,29.70,Ruben Garcia,mediocampista,MED,60,read,ok,0,13412205,2.881,1,,,,,,
+2026-08-13T2144Z,,4-5-1,29.70,Iñigo Ruiz de Galarreta,mediocampista,MED,60,read,ok,0,11949336,2.693,1,,,,,,
+2026-08-13T2144Z,,4-5-1,29.70,Dani Lorenzo,mediocampista,MED,90,read,ok,1,9549143,2.558,1,,,,,,
+2026-08-13T2144Z,,4-5-1,29.70,Pepelu,mediocampista,MED,70,read,ok,0,7395912,3.006,1,,,,,,
+2026-08-13T2144Z,,4-5-1,29.70,Jon Moncayola,mediocampista,MED,90,read,ok,0,6580213,3.917,1,,,,,,
+2026-08-13T2144Z,,4-5-1,29.70,Iñigo Vicente,delantero,DEL,90,read,ok,1,18875455,2.714,1,,,,,,
+2026-08-13T2144Z,,4-5-1,29.70,Beñat Turrientes,mediocampista,MED,70,read,ok,0,6915246,2.510,0,,,,,,
+2026-08-13T2214Z,,4-5-1,29.70,Alvaro Fernandez,portero,POR,20,read,ok,1,4873912,0.872,1,,,,,,
+2026-08-13T2214Z,,4-5-1,29.70,Carl Starfelt,defensa,DEF,60,read,ok,0,13572748,3.067,1,,,,,,
+2026-08-13T2214Z,,4-5-1,29.70,Robin Le Normand,defensa,DEF,60,read,ok,0,9831352,2.617,1,,,,,,
+2026-08-13T2214Z,,4-5-1,29.70,Igor Zubeldia,defensa,DEF,80,read,ok,0,9760868,2.958,1,,,,,,
+2026-08-13T2214Z,,4-5-1,29.70,Omar El Hilali,defensa,DEF,80,read,ok,0,8638027,2.418,1,,,,,,
+2026-08-13T2214Z,,4-5-1,29.70,Ruben Garcia,mediocampista,MED,60,read,ok,0,13412205,2.881,1,,,,,,
+2026-08-13T2214Z,,4-5-1,29.70,Iñigo Ruiz de Galarreta,mediocampista,MED,60,read,ok,0,11949336,2.693,1,,,,,,
+2026-08-13T2214Z,,4-5-1,29.70,Dani Lorenzo,mediocampista,MED,90,read,ok,1,9549143,2.558,1,,,,,,
+2026-08-13T2214Z,,4-5-1,29.70,Pepelu,mediocampista,MED,70,read,ok,0,7395912,3.006,1,,,,,,
+2026-08-13T2214Z,,4-5-1,29.70,Jon Moncayola,mediocampista,MED,90,read,ok,0,6580213,3.917,1,,,,,,
+2026-08-13T2214Z,,4-5-1,29.70,Iñigo Vicente,delantero,DEL,90,read,ok,1,18875455,2.714,1,,,,,,
+2026-08-13T2214Z,,4-5-1,29.70,Beñat Turrientes,mediocampista,MED,70,read,ok,0,6915246,2.510,0,,,,,,
+2026-08-13T2322Z,,4-5-1,29.70,Alvaro Fernandez,portero,POR,20,read,ok,1,4873912,0.872,1,,,,,,
+2026-08-13T2322Z,,4-5-1,29.70,Carl Starfelt,defensa,DEF,60,read,ok,0,13572748,3.067,1,,,,,,
+2026-08-13T2322Z,,4-5-1,29.70,Robin Le Normand,defensa,DEF,60,read,ok,0,9831352,2.617,1,,,,,,
+2026-08-13T2322Z,,4-5-1,29.70,Igor Zubeldia,defensa,DEF,80,read,ok,0,9760868,2.958,1,,,,,,
+2026-08-13T2322Z,,4-5-1,29.70,Omar El Hilali,defensa,DEF,80,read,ok,0,8638027,2.418,1,,,,,,
+2026-08-13T2322Z,,4-5-1,29.70,Ruben Garcia,mediocampista,MED,60,read,ok,0,13412205,2.881,1,,,,,,
+2026-08-13T2322Z,,4-5-1,29.70,Iñigo Ruiz de Galarreta,mediocampista,MED,60,read,ok,0,11949336,2.693,1,,,,,,
+2026-08-13T2322Z,,4-5-1,29.70,Dani Lorenzo,mediocampista,MED,90,read,ok,1,9549143,2.558,1,,,,,,
+2026-08-13T2322Z,,4-5-1,29.70,Pepelu,mediocampista,MED,70,read,ok,0,7395912,3.006,1,,,,,,
+2026-08-13T2322Z,,4-5-1,29.70,Jon Moncayola,mediocampista,MED,90,read,ok,0,6580213,3.917,1,,,,,,
+2026-08-13T2322Z,,4-5-1,29.70,Iñigo Vicente,delantero,DEL,90,read,ok,1,18875455,2.714,1,,,,,,
+2026-08-13T2322Z,,4-5-1,29.70,Beñat Turrientes,mediocampista,MED,70,read,ok,0,6915246,2.510,0,,,,,,
+2026-08-14T1039Z,,4-5-1,29.70,Alvaro Fernandez,portero,POR,20,read,ok,1,4796907,0.872,1,,,,,,
+2026-08-14T1039Z,,4-5-1,29.70,Carl Starfelt,defensa,DEF,60,read,ok,0,13778051,3.067,1,,,,,,
+2026-08-14T1039Z,,4-5-1,29.70,Robin Le Normand,defensa,DEF,60,read,ok,0,9843374,2.617,1,,,,,,
+2026-08-14T1039Z,,4-5-1,29.70,Igor Zubeldia,defensa,DEF,80,read,ok,0,9859367,2.958,1,,,,,,
+2026-08-14T1039Z,,4-5-1,29.70,Omar El Hilali,defensa,DEF,80,read,ok,0,8778053,2.418,1,,,,,,
+2026-08-14T1039Z,,4-5-1,29.70,Ruben Garcia,mediocampista,MED,60,read,ok,0,13581094,2.881,1,,,,,,
+2026-08-14T1039Z,,4-5-1,29.70,Iñigo Ruiz de Galarreta,mediocampista,MED,60,read,ok,0,12176221,2.693,1,,,,,,
+2026-08-14T1039Z,,4-5-1,29.70,Dani Lorenzo,mediocampista,MED,90,read,ok,1,9657795,2.558,1,,,,,,
+2026-08-14T1039Z,,4-5-1,29.70,Pepelu,mediocampista,MED,70,read,ok,0,7370191,3.006,1,,,,,,
+2026-08-14T1039Z,,4-5-1,29.70,Jon Moncayola,mediocampista,MED,90,read,ok,0,6683208,3.917,1,,,,,,
+2026-08-14T1039Z,,4-5-1,29.70,Iñigo Vicente,delantero,DEL,90,read,ok,1,19089840,2.714,1,,,,,,
+2026-08-14T1039Z,,4-5-1,29.70,Beñat Turrientes,mediocampista,MED,70,read,ok,0,6985377,2.510,0,,,,,,
+2026-08-14T2047Z,,4-5-1,35.37,Alvaro Fernandez,portero,POR,20,read,ok,1,4796907,0.872,0,,,,,,
+2026-08-14T2047Z,,4-5-1,35.37,Carl Starfelt,defensa,DEF,60,read,ok,0,13778051,3.067,1,,,,,,
+2026-08-14T2047Z,,4-5-1,35.37,Robin Le Normand,defensa,DEF,60,read,ok,0,9843374,2.617,1,,,,,,
+2026-08-14T2047Z,,4-5-1,35.37,Igor Zubeldia,defensa,DEF,80,read,ok,0,9859367,2.958,1,,,,,,
+2026-08-14T2047Z,,4-5-1,35.37,Omar El Hilali,defensa,DEF,80,read,ok,0,8778053,2.418,1,,,,,,
+2026-08-14T2047Z,,4-5-1,35.37,Ruben Garcia,mediocampista,MED,60,read,ok,0,13581094,2.881,1,,,,,,
+2026-08-14T2047Z,,4-5-1,35.37,Iñigo Ruiz de Galarreta,mediocampista,MED,60,read,ok,0,12176221,2.693,1,,,,,,
+2026-08-14T2047Z,,4-5-1,35.37,Dani Lorenzo,mediocampista,MED,90,read,ok,1,9657795,2.558,0,,,,,,
+2026-08-14T2047Z,,4-5-1,35.37,Pepelu,mediocampista,MED,70,read,ok,0,7370191,3.006,1,,,,,,
+2026-08-14T2047Z,,4-5-1,35.37,Jon Moncayola,mediocampista,MED,90,read,ok,0,6683208,3.917,1,,,,,,
+2026-08-14T2047Z,,4-5-1,35.37,Iñigo Vicente,delantero,DEL,90,read,ok,1,19089840,2.714,1,,,,,,
+2026-08-14T2047Z,,4-5-1,35.37,Beñat Turrientes,mediocampista,MED,70,read,ok,0,6985377,2.510,0,,,,,,
+2026-08-14T2047Z,,4-5-1,35.37,Ionut Radu,portero,POR,90,read,ok,0,39711707,5.944,1,,,,,,
+2026-08-14T2047Z,,4-5-1,35.37,Lucien Agoume,mediocampista,MED,80,read,ok,0,5791526,3.152,1,,,,,,
+2026-08-14T2047Z,,4-5-1,35.37,Simon Eriksson,portero,POR,50,read,ok,1,2933863,2.180,0,,,,,,
+2026-08-14T2156Z,,4-5-1,35.37,Alvaro Fernandez,portero,POR,20,read,ok,1,4796907,0.872,0,,,,,,
+2026-08-14T2156Z,,4-5-1,35.37,Carl Starfelt,defensa,DEF,60,read,ok,0,13778051,3.067,1,,,,,,
+2026-08-14T2156Z,,4-5-1,35.37,Robin Le Normand,defensa,DEF,60,read,ok,0,9843374,2.617,1,,,,,,
+2026-08-14T2156Z,,4-5-1,35.37,Igor Zubeldia,defensa,DEF,80,read,ok,0,9859367,2.958,1,,,,,,
+2026-08-14T2156Z,,4-5-1,35.37,Omar El Hilali,defensa,DEF,80,read,ok,0,8778053,2.418,1,,,,,,
+2026-08-14T2156Z,,4-5-1,35.37,Ruben Garcia,mediocampista,MED,60,read,ok,0,13581094,2.881,1,,,,,,
+2026-08-14T2156Z,,4-5-1,35.37,Iñigo Ruiz de Galarreta,mediocampista,MED,60,read,ok,0,12176221,2.693,1,,,,,,
+2026-08-14T2156Z,,4-5-1,35.37,Dani Lorenzo,mediocampista,MED,90,read,ok,1,9657795,2.558,0,,,,,,
+2026-08-14T2156Z,,4-5-1,35.37,Pepelu,mediocampista,MED,70,read,ok,0,7370191,3.006,1,,,,,,
+2026-08-14T2156Z,,4-5-1,35.37,Jon Moncayola,mediocampista,MED,90,read,ok,0,6683208,3.917,1,,,,,,
+2026-08-14T2156Z,,4-5-1,35.37,Iñigo Vicente,delantero,DEL,90,read,ok,1,19089840,2.714,1,,,,,,
+2026-08-14T2156Z,,4-5-1,35.37,Beñat Turrientes,mediocampista,MED,70,read,ok,0,6985377,2.510,0,,,,,,
+2026-08-14T2156Z,,4-5-1,35.37,Ionut Radu,portero,POR,90,read,ok,0,39711707,5.944,1,,,,,,
+2026-08-14T2156Z,,4-5-1,35.37,Lucien Agoume,mediocampista,MED,80,read,ok,0,5791526,3.152,1,,,,,,
+2026-08-14T2156Z,,4-5-1,35.37,Simon Eriksson,portero,POR,50,read,ok,1,2933863,2.180,0,,,,,,
+2026-08-14T2256Z,,4-5-1,35.37,Alvaro Fernandez,portero,POR,20,read,ok,1,4728806,0.872,0,,,,,,
+2026-08-14T2256Z,,4-5-1,35.37,Carl Starfelt,defensa,DEF,60,read,ok,0,13847775,3.067,1,,,,,,
+2026-08-14T2256Z,,4-5-1,35.37,Robin Le Normand,defensa,DEF,60,read,ok,0,9983705,2.617,1,,,,,,
+2026-08-14T2256Z,,4-5-1,35.37,Igor Zubeldia,defensa,DEF,80,read,ok,0,9937308,2.958,1,,,,,,
+2026-08-14T2256Z,,4-5-1,35.37,Omar El Hilali,defensa,DEF,80,read,ok,0,8838558,2.418,1,,,,,,
+2026-08-14T2256Z,,4-5-1,35.37,Ruben Garcia,mediocampista,MED,60,read,ok,0,13754249,2.881,1,,,,,,
+2026-08-14T2256Z,,4-5-1,35.37,Iñigo Ruiz de Galarreta,mediocampista,MED,60,read,ok,0,12236355,2.693,1,,,,,,
+2026-08-14T2256Z,,4-5-1,35.37,Dani Lorenzo,mediocampista,MED,90,read,ok,1,9691137,2.558,0,,,,,,
+2026-08-14T2256Z,,4-5-1,35.37,Pepelu,mediocampista,MED,70,read,ok,0,7469048,3.006,1,,,,,,
+2026-08-14T2256Z,,4-5-1,35.37,Jon Moncayola,mediocampista,MED,90,read,ok,0,6790699,3.917,1,,,,,,
+2026-08-14T2256Z,,4-5-1,35.37,Iñigo Vicente,delantero,DEL,90,read,ok,1,19165047,2.714,1,,,,,,
+2026-08-14T2256Z,,4-5-1,35.37,Beñat Turrientes,mediocampista,MED,70,read,ok,0,7063789,2.510,0,,,,,,
+2026-08-14T2256Z,,4-5-1,35.37,Ionut Radu,portero,POR,90,read,ok,0,39248115,5.944,1,,,,,,
+2026-08-14T2256Z,,4-5-1,35.37,Lucien Agoume,mediocampista,MED,80,read,ok,0,5819213,3.152,1,,,,,,
+2026-08-14T2256Z,,4-5-1,35.37,Simon Eriksson,portero,POR,50,read,ok,1,2923053,2.180,0,,,,,,
+2026-08-15T1920Z,19.7,4-5-1,35.40,Alvaro Fernandez,portero,POR,20,read,ok,1,4728806,0.872,0,,,,,,
+2026-08-15T1920Z,19.7,4-5-1,35.40,Carl Starfelt,defensa,DEF,60,read,ok,0,13847775,3.067,1,,,,,,
+2026-08-15T1920Z,19.7,4-5-1,35.40,Robin Le Normand,defensa,DEF,60,read,ok,0,9983705,2.617,1,,,,,,
+2026-08-15T1920Z,19.7,4-5-1,35.40,Igor Zubeldia,defensa,DEF,60,read,ok,0,9937308,2.218,1,,,,,,
+2026-08-15T1920Z,19.7,4-5-1,35.40,Omar El Hilali,defensa,DEF,80,read,ok,0,8838558,2.418,1,,,,,,
+2026-08-15T1920Z,19.7,4-5-1,35.40,Ruben Garcia,mediocampista,MED,60,read,ok,0,13754249,2.881,1,,,,,,
+2026-08-15T1920Z,19.7,4-5-1,35.40,Iñigo Ruiz de Galarreta,mediocampista,MED,60,read,ok,0,12236355,2.693,1,,,,,,
+2026-08-15T1920Z,19.7,4-5-1,35.40,Dani Lorenzo,mediocampista,MED,90,read,ok,1,9691137,2.558,0,,,,,,
+2026-08-15T1920Z,19.7,4-5-1,35.40,Pepelu,mediocampista,MED,70,read,ok,0,7469048,3.006,1,,,,,,
+2026-08-15T1920Z,19.7,4-5-1,35.40,Jon Moncayola,mediocampista,MED,90,read,ok,0,6790699,3.917,1,,,,,,
+2026-08-15T1920Z,19.7,4-5-1,35.40,Iñigo Vicente,delantero,DEL,90,read,ok,1,19165047,2.696,1,,,,,,
+2026-08-15T1920Z,19.7,4-5-1,35.40,Beñat Turrientes,mediocampista,MED,60,read,ok,0,7063789,2.151,0,,,,,,
+2026-08-15T1920Z,19.7,4-5-1,35.40,Ionut Radu,portero,POR,90,read,ok,0,39248115,5.944,1,,,,,,
+2026-08-15T1920Z,19.7,4-5-1,35.40,Lucien Agoume,mediocampista,MED,100,read,ok,0,5819213,3.940,1,,,,,,
+2026-08-15T1920Z,19.7,4-5-1,35.40,Simon Eriksson,portero,POR,50,read,ok,1,2923053,2.180,0,,,,,,
