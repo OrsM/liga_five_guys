@@ -1,1 +1,8 @@
+# OBSERVED balances only — never an estimate, never a guess.
+#   <amount>  <YYYY-MM-DD>            your own balance
+#   <handle>  <amount>  <YYYY-MM-DD>  a rival's, if they mention one
+#
+# WRITTEN BY: you.  READ BY: ffcore/league.py.
+# One observed rival balance turns their whole cash estimate from a
+# subtraction off the starting budget into arithmetic.
 63.292.108  2026-08-15
