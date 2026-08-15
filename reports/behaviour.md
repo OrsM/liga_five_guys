@@ -1,4 +1,4 @@
-# League behaviour — 2026-08-14 22:57 UTC
+# League behaviour — 2026-08-15 07:02 UTC
 
 5 managers, 35 ledger rows, 29 market snapshots, points baseline 2025-26.
 
@@ -93,35 +93,26 @@ Trapped is value held in players below 50% start probability — money that cann
 
 ## 5. Who wants what
 
+Restricted to the 9 players on today's slate — the rest of the market is not a decision you can make today.
+
 **Expect competition for these** — the position is one a rival is short in, so assume a bidding war and price accordingly.
 
 | Player | Pos | Value | Start% | Short here |
 |---|---|--:|--:|---|
-| joan garcia | POR | 68.06M | 80% | Albert Laporta, BurtonGM89, Magic Mike 333, SusoGattuso |
-| kylian mbappe | DEL | 129.58M | 70% | BurtonGM89 |
-| vinicius junior | DEL | 107.53M | 90% | BurtonGM89 |
-| alvaro valles | POR | 32.74M | 95% | Albert Laporta, BurtonGM89, Magic Mike 333, SusoGattuso |
-| david soria | POR | 19.48M | 95% | Albert Laporta, BurtonGM89, Magic Mike 333, SusoGattuso |
-| jan oblak | POR | 52.60M | 90% | Albert Laporta, BurtonGM89, Magic Mike 333, SusoGattuso |
-| lamine yamal | DEL | 126.81M | 60% | BurtonGM89 |
-| augusto batalla | POR | 40.35M | 95% | Albert Laporta, BurtonGM89, Magic Mike 333, SusoGattuso |
-| mathew ryan | POR | 13.55M | 90% | Albert Laporta, BurtonGM89, Magic Mike 333, SusoGattuso |
-| stole dimitrievski | POR | 14.11M | 90% | Albert Laporta, BurtonGM89, Magic Mike 333, SusoGattuso |
-| unai simon | POR | 54.47M | 90% | Albert Laporta, BurtonGM89, Magic Mike 333, SusoGattuso |
-| ante budimir | DEL | 50.42M | 90% | BurtonGM89 |
+| zakaria eddahchouri | DEL | 1.88M | 30% | BurtonGM89 |
 
 **Nobody else needs these.** Same quality, no auction — take the equivalent player here instead of paying a premium above.
 
 | Player | Pos | Value | Start% |
 |---|---|--:|--:|
-| federico valverde | MED | 68.85M | 90% |
-| zaid romero | DEF | 28.02M | 90% |
-| florian lejeune | DEF | 38.21M | 90% |
 | pablo fornals | MED | 57.93M | 80% |
-| marcos alonso | DEF | 29.33M | 90% |
-| german valera | MED | 23.27M | 90% |
-| andrei ratiu | DEF | 35.45M | 90% |
-| fermin lopez | MED | 64.18M | 70% |
+| santiago mouriño | DEF | 40.48M | 70% |
+| mario martin | MED | 3.83M | 80% |
+| pelayo fernandez | DEF | 1.72M | 50% |
+| clemens riedel | DEF | 4.60M | 50% |
+| oriol rey | MED | 734K | 50% |
+| dani vivian | DEF | 10.82M | 30% |
+| alex freeman | DEF | 2.45M | 30% |
 
 **List these to them.** Players of yours who aren't starting, in a position a rival is short in. You stop competing with them and start selling to them; price just under the premium they showed in section 2.
 

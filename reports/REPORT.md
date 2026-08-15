@@ -1,4 +1,4 @@
-# Liga Five Guys — one report — 2026-08-14 22:57 UTC
+# Liga Five Guys — one report — 2026-08-15 07:02 UTC
 
 Everything the generators produced, in reading order. Sections that appeared twice are printed once.
 
@@ -6,12 +6,14 @@ Everything the generators produced, in reading order. Sections that appeared twi
 - Rivals — cash, premiums, squads
 - Who to buy
 - Squad detail
+- How the forecast works — and how it's doing
 
 ## Decide today
 
 
 ### Needs a decision
 
+- **9 players on offer, 2 improve your XI** — priced in the slate table below.
 - **Only 1 delantero** — one knock and you can't field a legal XI.
 - **1 of the XI are unmodelled** (Iñigo Vicente) — no LaLiga record, so they're carrying an assumed baseline, not an earned one.
 
@@ -19,11 +21,38 @@ Everything the generators produced, in reading order. Sections that appeared twi
 
 Compare squad value with the app; a mismatch means a name matched the wrong player. Roster read from the ledger.
 
+### Today's slate — 9 on offer, 2 improve your XI
+
+| Player | Pos | Value | Start% | xPts/j | XI gain | Bid | Competition | Verdict |
+|---|---|--:|--:|--:|--:|--:|---|---|
+| Pablo Fornals | med | 57.93M | 80% | 5.4 | +2.7 | 59.46M–62.89M | nobody short | **Bid** — XI +2.7 |
+| Santiago Mouriño | def | 40.48M | 70% | 3.1 | +0.7 | 41.55M–49.22M | nobody short | **Bid** — XI +0.7 |
+| Mario Martin | med | 3.83M | 80% | 2.3 | -0.4 | 3.93M–4.66M | nobody short | pass — XI -0.4 |
+| Pelayo Fernandez | def | 1.72M | 50% | 1.9 | -0.5 | 1.77M–2.09M | nobody short | pass — XI -0.5 |
+| Clemens Riedel | def | 4.60M | 50% | 1.9 | -0.5 | 4.72M–5.59M | nobody short | pass — XI -0.5 |
+| Oriol Rey | med | 734K | 50% | 1.7 | -1.0 | 754K–893K | nobody short | pass — XI -1.0 |
+| Dani Vivian | def | 10.82M | 30% | 1.2 | -1.2 | 11.11M–13.16M | nobody short | pass — XI -1.2 |
+| Alex Freeman | def | 2.45M | 30% | 1.0 | -1.4 | 2.51M–2.97M | nobody short | pass — XI -1.4 |
+| Zakaria Eddahchouri | del | 1.88M | 30% | 0.9 | -1.5 | 1.93M–2.29M | BurtonGM89 | pass — XI -1.5 |
+
+Bid is the floor plus what this league has actually paid over it: median +2.6%, -0.2% to +21.6% (n=21). 6 of those 21 went at the floor itself, so the minimum is not a number known to lose. A dozen deals is not a distribution — the range is what has happened, not a chance of winning, and every one of them is a bid that won.
+
+_At least one rival's cash is an estimate, so no bid here assumes you are unopposed._
+
+Already owned, so not a purchase: arda guler (Albert Laporta), ayoze perez (Albert Laporta), ferran jutgla (Albert Laporta), giacomo quagliata (BurtonGM89), ilaix moriba (Albert Laporta), marc roca (Albert Laporta), matias dituro (Albert Laporta), pedro bigas (Albert Laporta), quilindschy hartman (BurtonGM89), wojciech szczesny (SusoGattuso).
+
+### Names I could not place
+
+OCR mangled these past matching, so they are missing from the table above — re-read them off the app if one matters.
+
+- **Bright Ede** — no match
+- **Buonanotte** — no match
+
 ### Team
 
-**4-5-1** · index 35.4 (a ranking number, not a points forecast)
+**4-5-1** · **≈35 pts expected next jornada** (uncalibrated — see *How the forecast works* at the end)
 
-| | Player | Start% | Value | 24h | Score | Last season |
+| | Player | Start% | Value | 24h | xPts/j | Last season |
 |---|---|--:|--:|--:|--:|---|
 | POR | Ionut Radu | 90% | 39.25M | -464K | 5.9 | 254p/38j |
 | DEF | Carl Starfelt | 60% | 13.85M | 70K | 3.1 | 106p/19j |
@@ -37,9 +66,9 @@ Compare squad value with the app; a mismatch means a name matched the wrong play
 | MED | Iñigo Ruiz de Galarreta | 60% | 12.24M | 60K | 2.7 | 156p/34j |
 | DEL | Iñigo Vicente | 90% | 19.17M | 75K | 2.7 | **assumed** |
 
-**Bench** — gap is what the XI index loses by playing him instead, after re-picking the formation. €/pt is his value per point of score: the sell shortlist, worst first.
+**Bench** — gap is the expected points the XI loses per jornada by playing him instead, after re-picking the formation. €/pt is his value per expected point: the sell shortlist, worst first.
 
-| Player | Pos | Value | Score | Gap | €/pt | Why |
+| Player | Pos | Value | xPts/j | Gap | €/pt | Why |
 |---|---|--:|--:|--:|--:|---|
 | Alvaro Fernandez | por | 4.73M | 0.9 | -5.1 | 5.42M | 3rd POR — only 1 can ever play |
 | Dani Lorenzo | med | 9.69M | 2.6 | -0.1 | 3.79M | 6th MED — only 5 can ever play |
@@ -64,9 +93,9 @@ _Selling to the app pays the value give or take 12%: the 13 priced sales in the 
 
 _621 players tracked, 512 with a probable-XI reading. Who to buy is in `reports/watchlist.md`; how your rivals bid is in `reports/behaviour.md`._
 
-_Score = shrunk pts/match (K=8, 2025-26) × P(start), from `ffcore/score.py` — the same scorer rivals.py uses. Recommended XIs are logged to `data/decisions/squad_log.csv` for scoring against reality later._
+_xPts/j — expected points per jornada = shrunk pts/match (K=8, 2025-26) × P(start), from `ffcore/score.py` — the same scorer rivals.py uses. How it works, what it ignores, and how it is tracking reality: *How the forecast works* at the end of this report._
 
-_Generated 2026-08-14 22:57 UTC._
+_Generated 2026-08-15 07:02 UTC._
 
 ## Rivals — cash, premiums, squads
 
@@ -164,35 +193,26 @@ Trapped is value held in players below 50% start probability — money that cann
 
 ### 5. Who wants what
 
+Restricted to the 9 players on today's slate — the rest of the market is not a decision you can make today.
+
 **Expect competition for these** — the position is one a rival is short in, so assume a bidding war and price accordingly.
 
 | Player | Pos | Value | Start% | Short here |
 |---|---|--:|--:|---|
-| joan garcia | POR | 68.06M | 80% | Albert Laporta, BurtonGM89, Magic Mike 333, SusoGattuso |
-| kylian mbappe | DEL | 129.58M | 70% | BurtonGM89 |
-| vinicius junior | DEL | 107.53M | 90% | BurtonGM89 |
-| alvaro valles | POR | 32.74M | 95% | Albert Laporta, BurtonGM89, Magic Mike 333, SusoGattuso |
-| david soria | POR | 19.48M | 95% | Albert Laporta, BurtonGM89, Magic Mike 333, SusoGattuso |
-| jan oblak | POR | 52.60M | 90% | Albert Laporta, BurtonGM89, Magic Mike 333, SusoGattuso |
-| lamine yamal | DEL | 126.81M | 60% | BurtonGM89 |
-| augusto batalla | POR | 40.35M | 95% | Albert Laporta, BurtonGM89, Magic Mike 333, SusoGattuso |
-| mathew ryan | POR | 13.55M | 90% | Albert Laporta, BurtonGM89, Magic Mike 333, SusoGattuso |
-| stole dimitrievski | POR | 14.11M | 90% | Albert Laporta, BurtonGM89, Magic Mike 333, SusoGattuso |
-| unai simon | POR | 54.47M | 90% | Albert Laporta, BurtonGM89, Magic Mike 333, SusoGattuso |
-| ante budimir | DEL | 50.42M | 90% | BurtonGM89 |
+| zakaria eddahchouri | DEL | 1.88M | 30% | BurtonGM89 |
 
 **Nobody else needs these.** Same quality, no auction — take the equivalent player here instead of paying a premium above.
 
 | Player | Pos | Value | Start% |
 |---|---|--:|--:|
-| federico valverde | MED | 68.85M | 90% |
-| zaid romero | DEF | 28.02M | 90% |
-| florian lejeune | DEF | 38.21M | 90% |
 | pablo fornals | MED | 57.93M | 80% |
-| marcos alonso | DEF | 29.33M | 90% |
-| german valera | MED | 23.27M | 90% |
-| andrei ratiu | DEF | 35.45M | 90% |
-| fermin lopez | MED | 64.18M | 70% |
+| santiago mouriño | DEF | 40.48M | 70% |
+| mario martin | MED | 3.83M | 80% |
+| pelayo fernandez | DEF | 1.72M | 50% |
+| clemens riedel | DEF | 4.60M | 50% |
+| oriol rey | MED | 734K | 50% |
+| dani vivian | DEF | 10.82M | 30% |
+| alex freeman | DEF | 2.45M | 30% |
 
 **List these to them.** Players of yours who aren't starting, in a position a rival is short in. You stop competing with them and start selling to them; price just under the premium they showed in section 2.
 
@@ -211,65 +231,33 @@ Sections 2 and 3 are hypotheses until the sample grows: with 35 ledger rows acro
 ## Who to buy
 
 
-Everyone not owned by the 5 of us, 60% start or better.
-
-Filtered to what your 62.89M of cash can reach.
-
-### portero
-
-| Player | Team | Pos | Value | 24h | Start% |
-|---|---|--:|--:|--:|--:|
-| david soria | Getafe | por | 19.48M | 580K | 95% |
-| alvaro valles | Betis | por | 32.74M | 255K | 95% |
-| antonio sivera | Alavés | por | 31.47M | 88K | 95% |
-| augusto batalla | Rayo | por | 40.35M | -305K | 95% |
-| stole dimitrievski | Valencia | por | 14.11M | 344K | 90% |
-| odysseas vlachodimos | Sevilla | por | 18.02M | 269K | 90% |
-| mathew ryan | Levante | por | 13.55M | 0K | 90% |
-| alex remiro | Real Sociedad | por | 43.26M | -358K | 90% |
+The 21 players you pasted as today's slate — everyone you can actually bid on right now, unfiltered. What each one is worth to your XI, and what to bid, is in the slate table at the top of this report.
 
 ### defensa
 
 | Player | Team | Pos | Value | 24h | Start% |
 |---|---|--:|--:|--:|--:|
-| dakonam djene | Getafe | def | 8.47M | 225K | 90% |
-| andrei ratiu | Rayo | def | 35.45M | 35K | 90% |
-| nahuel tenaglia | Alavés | def | 14.40M | 24K | 90% |
-| florian lejeune | Rayo | def | 38.21M | 4K | 90% |
-| adrian de la fuente | Levante | def | 14.05M | 0K | 90% |
-| jon martin | Real Sociedad | def | 30.11M | 0K | 90% |
-| zaid romero | Getafe | def | 28.02M | -57K | 90% |
-| marcos alonso | Celta | def | 29.33M | -119K | 90% |
+| santiago mouriño | Villarreal | def | 40.48M | -118K | 70% |
+| pelayo fernandez | Rayo | def | 1.72M | 0K | 50% |
+| clemens riedel | Espanyol | def | 4.60M | -58K | 50% |
+| alex freeman | Villarreal | def | 2.45M | -32K | 30% |
+| dani vivian | Athletic | def | 10.82M | -318K | 30% |
 
 ### mediocampista
 
 | Player | Team | Pos | Value | 24h | Start% |
 |---|---|--:|--:|--:|--:|
-| javi guerra | Valencia | med | 24.02M | 95K | 90% |
-| jon ander olasagasti | Levante | med | 4.33M | 80K | 90% |
-| gonzalo villar | Elche | med | 7.03M | 0K | 90% |
-| german valera | Elche | med | 23.27M | -16K | 90% |
-| guido rodriguez | Valencia | med | 25.74M | -170K | 90% |
-| david larrubia | Málaga | med | 54.40M | -1.06M | 90% |
-| sergio canales | Racing | med | 23.16M | 508K | 80% |
-| edu exposito | Espanyol | med | 29.08M | 335K | 80% |
+| mario martin | Getafe | med | 3.83M | 88K | 80% |
+| pablo fornals | Betis | med | 57.93M | -376K | 80% |
+| oriol rey | Levante | med | 734K | -8K | 50% |
 
 ### delantero
 
 | Player | Team | Pos | Value | 24h | Start% |
 |---|---|--:|--:|--:|--:|
-| ante budimir | Osasuna | del | 50.42M | 571K | 90% |
-| martin satriano | Getafe | del | 31.25M | -210K | 90% |
-| jorge de frutos | Rayo | del | 46.38M | -589K | 90% |
-| isi palazon | Rayo | del | 18.82M | 661K | 80% |
-| georges mikautadze | Villarreal | del | 62.44M | 301K | 80% |
-| ivan romero | Levante | del | 7.27M | 97K | 80% |
-| toni martinez | Alavés | del | 25.02M | -31K | 80% |
-| angel perez | Alavés | del | 6.66M | -78K | 80% |
+| zakaria eddahchouri | Deportivo | del | 1.88M | -25K | 30% |
 
 ---
-
-Not all of these are purchasable today — the app deals a limited slate. Paste today's slate into the `seen` input and this list becomes the slate itself.
 
 ## Squad detail
 
@@ -438,3 +426,30 @@ Placed by who the counterparty was, or by what the price implies — a player so
 - 2026-08-14T21:24: gavi → pablo gavi (matched pablo gavi)
 - 2026-08-14T21:24: t. morente → tete morente (matched tete morente)
 - 2026-08-14T21:24: aramburu → jon aramburu (matched jon aramburu)
+
+## How the forecast works — and how it's doing
+
+
+### The formula
+
+Every player's **xPts/j** — expected points per jornada — is:
+
+    xPts/j = shrunk points-per-match × P(start)
+
+**Shrunk points-per-match** pulls a player's last-season average toward the median for his position: `(points + 8×prior) / (matches + 8)`, prior = median pts/match among players in that position with 10+ matches. 8 matches of prior weight means a 3-game wonder is mostly prior and a 34-game regular is mostly himself.
+
+**P(start)** is futbolfantasy's probable-XI percentage, read twice daily. A player listed without a percentage gets a neutral prior; one absent from the page entirely gets a low one. Promoted-side players have no top-flight record, fall back to the positional prior, and are marked **assumed**.
+
+The **team forecast** is the sum over the best legal XI, so ≈35 means: this eleven is expected to score about 35 points in a jornada, before variance — and single-match variance is huge.
+
+### What it deliberately ignores (for now)
+
+- **Fixtures** — no opponent-strength or home/away adjustment.
+- **Sub cameos** — P(start) multiplies the whole average, so a 30% starter is modelled as 0.3 × his points, when in reality he often plays 20 minutes and scores something. Forecasts for rotation players run low.
+- **This season** — the baseline is last season until the live points blend is turned on deliberately; a two-jornada sample should not drive an XI.
+
+Each of these is a candidate fix, but only after the comparison below shows which one actually costs points.
+
+### Forecast vs actual — last 21 days
+
+_No completed jornada in the window yet. points.py has no per-jornada rows to compare against; this section fills itself in after the first matches._
