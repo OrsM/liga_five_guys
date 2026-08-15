@@ -20,11 +20,11 @@
 [x] DEF igor zubeldia
 [x] DEF omar el hilali
 [x] DEF robin le normand
-[x] MED beñat turrientes
+[ ] MED beñat turrientes
 [x] MED dani lorenzo
 [x] MED iñigo ruiz de galarreta
 [x] MED jon moncayola
-[ ] MED lucien agoume
-[ ] MED pepelu
-[x] MED ruben garcia
+[x] MED lucien agoume
+[x] MED pepelu
+[ ] MED ruben garcia
 [x] DEL iñigo vicente
