@@ -62,6 +62,7 @@ jobs:
       - name: Self-tests
         run: |
           python src/ffcore/parse.py
+          python src/ff_ingest.py --selftest
           PYTHONPATH=src python src/ffcore/league.py --selftest
           PYTHONPATH=src python src/ffcore/bid.py
           PYTHONPATH=src python src/digest.py --selftest
@@ -75,7 +76,8 @@ jobs:
         # moved, a name that no longer exists.
         run: |
           cd src
-          for m in common squads report watch rivals digest xi seen find_slug; do
+          for m in common squads report watch rivals digest xi seen \
+                   find_slug ff_ingest points methodology; do
             python -c "import $m" || { echo "::error::$m failed to import"; exit 1; }
           done
           echo 'all modules import cleanly' >> "$GITHUB_STEP_SUMMARY"
@@ -172,13 +174,16 @@ jobs:
         run: |
           {
             echo '## Decide today'
-            sed -n '/^### Needs a decision/,/^### /p' reports/REPORT.md \
-              | grep '^[-*]' || echo '_nothing flagged_'
+            sed -n '/^## 1\. Am I fielding/,/^## 2\./p' reports/REPORT.md \
+              | grep '^|' || echo '_no XI_'
+            echo '## Fitness'
+            sed -n '/^## 2\. Is anyone injured/,/^## 3\./p' reports/REPORT.md \
+              | grep '^\*\*' || echo '_no fitness read_'
             echo '## Cash'
-            sed -n '/^### 1\. Cash/,/^### 2\./p' reports/REPORT.md \
+            sed -n '/^### 1\. Cash/,/^## /p' reports/REPORT.md \
               | grep '^|' || echo '_no cash table_'
             echo '## Warnings'
-            sed -n '/^### Ledger warnings/,/^## /p' reports/REPORT.md \
+            sed -n '/^## Warnings/,/^## /p' reports/REPORT.md \
               | grep '^- ' || echo '_none_'
             echo '## Alerts'
             cat "$ALERTS_FILE" 2>/dev/null || echo '_none_'
