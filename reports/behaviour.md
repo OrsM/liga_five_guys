@@ -1,4 +1,4 @@
-# League behaviour — 2026-08-15 08:26 UTC
+# League behaviour — 2026-08-15 08:33 UTC
 
 5 managers, 35 ledger rows, 29 market snapshots, points baseline 2025-26.
 

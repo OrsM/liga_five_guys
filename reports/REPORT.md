@@ -1,4 +1,4 @@
-# Liga Five Guys — one report — 2026-08-15 08:26 UTC
+# Liga Five Guys — one report — 2026-08-15 08:33 UTC
 
 Everything the generators produced, in reading order. Sections that appeared twice are printed once.
 
@@ -14,10 +14,10 @@ Everything the generators produced, in reading order. Sections that appeared twi
 ### Needs a decision
 
 - **9 players on offer, 2 improve your XI** — priced in the slate table below.
-- **Locks in 9h.** Probable XIs are at their most reliable now.
+- **Locks in 8h.** Probable XIs are at their most reliable now.
 - **Only 1 delantero** — one knock and you can't field a legal XI.
 - **1 of the XI are unmodelled** (Iñigo Vicente) — no LaLiga record, so they're carrying an assumed baseline, not an earned one.
-- **Your marked XI is illegal** (14 players, 4-6-1) — the app will fill the gaps for you, and not with your choice. Fix `inputs/lineup.txt`.
+- **Your bench costs you 1.1 pts/j** — marked XI ≈34, best ≈35. Swap Beñat Turrientes → Lucien Agoume (+0.6); Dani Lorenzo → Pepelu (+0.4).
 
 **Squad 171.50M** · cash 63.29M · total 234.79M
 
@@ -70,7 +70,7 @@ OCR mangled these past matching, so they are missing from the table above — re
 | MED | Iñigo Ruiz de Galarreta | 60% | 12.24M | 60K | 2.7 | 156p/34j |
 | DEL | Iñigo Vicente | 90% | 19.17M | 75K | 2.7 | **assumed** |
 
-_As marked in `inputs/lineup.txt`: **14 players, 4-6-1** — not a legal eleven._
+_As marked in `inputs/lineup.txt`: **≈34 pts** — 1.1 below this XI. The table above is the recommendation, not what you are fielding._
 
 **Bench** — gap is the expected points the XI loses per jornada by playing him instead, after re-picking the formation. €/pt is his value per expected point: the sell shortlist, worst first.
 
@@ -101,7 +101,7 @@ _621 players tracked, 512 with a probable-XI reading. Who to buy is in `reports/
 
 _xPts/j — expected points per jornada = shrunk pts/match (K=8, 2025-26) × P(start), from `ffcore/score.py` — the same scorer rivals.py uses. How it works, what it ignores, and how it is tracking reality: *How the forecast works* at the end of this report._
 
-_Generated 2026-08-15 08:26 UTC._
+_Generated 2026-08-15 08:33 UTC._
 
 ## Rivals — cash, premiums, squads
 

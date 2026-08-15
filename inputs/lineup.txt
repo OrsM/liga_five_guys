@@ -7,9 +7,7 @@
 # xi.py logs them with the hours left, so the last row before kickoff is
 # the XI you actually fielded.
 #
-# 14 marked · NOT a legal XI — fix the marks
-#
-# Seeded from inputs/bench.txt on this first run — check every mark.
+# 11 marked · 4-5-1 legal
 
 [ ] POR alvaro fernandez
 [x] POR ionut radu
