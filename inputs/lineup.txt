@@ -11,9 +11,9 @@
 #
 # Seeded from inputs/bench.txt on this first run — check every mark.
 
-[x] POR alvaro fernandez
+[ ] POR alvaro fernandez
 [x] POR ionut radu
-[x] POR simon eriksson
+[ ] POR simon eriksson
 [x] DEF carl starfelt
 [x] DEF igor zubeldia
 [x] DEF omar el hilali
@@ -22,7 +22,7 @@
 [x] MED dani lorenzo
 [x] MED iñigo ruiz de galarreta
 [x] MED jon moncayola
-[x] MED lucien agoume
+[ ] MED lucien agoume
 [ ] MED pepelu
 [x] MED ruben garcia
 [x] DEL iñigo vicente
