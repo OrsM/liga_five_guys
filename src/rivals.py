@@ -52,10 +52,10 @@ from ffcore.bid import (MAX_LAG_H, deals, gain, premiums,  # noqa: E402
 from ffcore.league import League  # noqa: E402
 from ffcore.parse import fmt_money as eur  # noqa: E402
 from ffcore.score import (MAX_SLOT, SLOT_LABEL, SLOT_MIN, THIN,  # noqa: E402
-                          Scorer, pick_xi, squad_pool)
+                          build, pick_xi, squad_pool)
 from ffcore.text import norm  # noqa: E402
 from ffcore.tidy import (DECISIONS, REPORTS, append_csv, latest_only,  # noqa: E402
-                         load_market, load_lineups, read_csv, write_lines, SEASON)
+                         load_market, load_lineups, write_lines)
 from seen import read_slate  # noqa: E402
 
 # Drift horizons, in days after a purchase.
@@ -68,23 +68,6 @@ def pct(v) -> str:
     """Signed, one decimal — a drift, not a level. Deliberately NOT
     ffcore.parse.fmt_pct, which prints an unsigned whole-number level."""
     return "—" if v is None else "%+.1f%%" % v
-
-
-def load_history() -> tuple[dict, str]:
-    """{normalised name: {'pts','pj'}} from the newest points_*.csv."""
-    files = sorted(SEASON.glob("points_*.csv")) if SEASON.exists() else []
-    if not files:
-        return {}, ""
-    from ffcore.parse import ratio
-    from ffcore.text import norm
-    out: dict[str, dict] = {}
-    for r in read_csv(files[-1]):
-        rec = {"pts": ratio(r.get("points")) or 0.0,
-               "pj": ratio(r.get("games")) or 0.0}
-        for key in (r.get("player_name"), r.get("player_name_full")):
-            if key:
-                out.setdefault(norm(key), rec)
-    return out, files[-1].stem.replace("points_", "")
 
 
 # ---------------------------------------------------------------------------
@@ -579,8 +562,12 @@ def main() -> None:
         return
 
     latest = latest_only(market_rows)
-    hist, hist_label = load_history()
-    sc = Scorer(latest, latest_only(load_lineups()), hist)
+    # The SAME builder report.py uses: same points blend, same fixture
+    # board. A rival's XI and yours are only comparable if the arithmetic
+    # behind them is one function, not two copies of one.
+    sc, (hist_label, cur_label) = build(
+        latest, latest_only(load_lineups()),
+        dt.datetime.now(dt.timezone.utc))
     by_key = lg.market.latest() if lg.market else {}
 
     dl = deals(lg, lg.market)
@@ -591,7 +578,8 @@ def main() -> None:
            "%d managers, %d ledger rows, %d market snapshots%s."
            % (len(lg.managers), len(lg.txns),
               len({r.get("observed_at") for r in market_rows}),
-              ", points baseline %s" % hist_label if hist_label else
+              (", points %s" % "+".join(x for x in (hist_label, cur_label) if x))
+              if hist_label else
               ", **no points baseline** (run `ingest.py baseline`)"), ""]
     out += sec_cash(lg)
     out += sec_premium(lg, dl)

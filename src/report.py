@@ -22,15 +22,16 @@ the floor is counted from the ledger on every run rather than stated here,
 because the sentence that stated it went stale inside a fortnight (issue #23).
 
 SCORING lives in ffcore/score.py now, shared with rivals.py so that your
-squad and theirs are ranked by the same arithmetic:
+squad and theirs are ranked by the same arithmetic — one builder, build(), so
+the two reports cannot drift apart:
 
-    score = shrunk points-per-match  x  P(start)
+    score = shrunk points-per-match  x  fixture  x  P(start)
 
-It is a RANKING INDEX, not a points forecast, and it cannot know three
+It is a RANKING INDEX, not a points forecast, and it cannot know four
 things — all flagged in the report rather than hidden: promoted-side players
 carry an assumed baseline, absence from the probable-XI page is not the same
-as a blank percentage there, and none of it has been checked against reality
-yet. Every snapshot appends the whole squad, XI and bench, with the inputs
+as a blank percentage there, the fixture band is a guess nothing has graded
+yet, and none of it has been checked against reality. Every snapshot appends the whole squad, XI and bench, with the inputs
 that produced each score, to data/decisions/squad_log.csv, so that once
 jornadas exist you can ask what the ranking cost you.
 
@@ -63,15 +64,15 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from ffcore.bid import (HOLD_DAYS, band_of, deals,  # noqa: E402
                         demand_summary, drift_bands, friction, gain,
                         premiums, suggest, verdict, xi_snapshots)
+from ffcore.fixture import FIX_BAND, HOME_EDGE  # noqa: E402
 from ffcore.league import League  # noqa: E402
-from ffcore.parse import ratio  # noqa: E402
 from ffcore.score import (ABSENT_START, MAX_SLOT, NEUTRAL_START,  # noqa: E402
-                          SLOT_LABEL, THIN, Scorer, formations,
+                          SLOT_LABEL, THIN, build, formations,
                           pick_xi, squad_pool)
-from ffcore.tidy import (DECISIONS, REPORTS, SEASON,  # noqa: E402
+from ffcore.tidy import (DECISIONS, REPORTS,  # noqa: E402
                          append_csv, input_path, latest_only, load_deadline,
                          load_market, load_lineups, read_csv, snapshot_stamp,
-                         write_lines)
+                         widen_csv, write_lines)
 from seen import read_slate  # noqa: E402
 
 HISTORY = REPORTS / "history"
@@ -88,6 +89,29 @@ SECOND_SOURCE = "analitica"
 # more common in this league than "de la Fuente" losing its lowercase.
 PARTICLES = {"de", "del", "van", "von", "der", "den", "di", "da", "dos",
              "do", "y", "bin", "ibn", "ter"}
+
+# Words dropped when a club name has to fit in a table cell.
+TEAM_NOISE = {"real", "club", "cf", "fc", "ud", "cd", "rc", "rcd", "sd",
+              "de", "deportivo"}
+
+# A fixture is worth marking on a purchase row from this much swing up. Under
+# it the draw is not the reason to buy or not buy.
+FIX_MARK = 0.05
+
+# data/decisions/squad_log.csv, in order. One list, so the migration and the
+# write cannot disagree about what the file holds.
+#
+# The last six arrived with the fixture term and the current-season blend, and
+# each is a SEPARATE column rather than folded into `score`: grading a forecast
+# means attributing its error to one factor at a time. Was the eleven wrong
+# about who starts, about the opponent, or about the player? A single number
+# cannot answer that, and the two fixture constants are guesses waiting to be
+# graded. Rows written before they existed keep an empty cell, which honestly
+# says "not measured" rather than "average".
+LOG_COLS = ["observed_at", "hours_to_lock", "formation", "index_total",
+            "player", "pos", "slot", "start_pct", "start_source", "status",
+            "assumed", "value", "score", "picked",
+            "ppm", "fix", "opp", "home", "cur_pj", "flat"]
 
 
 def title_name(s: str) -> str:
@@ -120,20 +144,93 @@ def eur(v) -> str:
     return f"{v:.0f}"
 
 
-def load_history() -> tuple[dict, str]:
-    """{normalised name: {'pts','pj'}} from the newest points_*.csv."""
-    from ffcore.text import norm
-    files = sorted(SEASON.glob("points_*.csv")) if SEASON.exists() else []
-    if not files:
-        return {}, ""
-    out: dict[str, dict] = {}
-    for r in read_csv(files[-1]):
-        rec = {"pts": ratio(r.get("points")) or 0.0,
-               "pj": ratio(r.get("games")) or 0.0}
-        for key in (r.get("player_name"), r.get("player_name_full")):
-            if key:
-                out.setdefault(norm(key), rec)
-    return out, files[-1].stem.replace("points_", "")
+def short_team(name: str) -> str:
+    """A team name that fits in a phone-width cell.
+
+    Drops the noise words clubs share — `Real`, `Club`, `CF`, `UD` — and keeps
+    the part that identifies them, so `Real Sociedad` and `Real Madrid` stay
+    distinct while both get shorter. If stripping would leave nothing, the
+    original survives: a cell that says `Real` for two different clubs is
+    worse than a long one.
+    """
+    words = [w for w in (name or "").split()
+             if w.lower() not in TEAM_NOISE]
+    if not words:
+        return (name or "").strip()
+    kept = " ".join(words)
+    # Still too wide for a cell: keep the FIRST word, not the last. Last would
+    # turn Atlético Madrid into Madrid, which is another club.
+    return words[0] if len(kept) > 11 and len(words) > 1 else kept
+
+
+def vs_cell(p, star: bool = False) -> str:
+    """Who he faces next, and whether that is a break. `—` = no fixture known.
+
+    `star` is for the purchase rows: their xPts figure deliberately IGNORES
+    the fixture (you own a player for months, not for one round), so the
+    marker is how this round's draw shows up at all.
+    """
+    if not p.get("opp"):
+        return "—"
+    cell = "%s %s" % (short_team(p["opp"]), "H" if p.get("home") else "A")
+    if star:
+        fix = p.get("fix") or 1.0
+        if fix >= 1.0 + FIX_MARK:
+            cell += " ★"
+        elif fix <= 1.0 - FIX_MARK:
+            cell += " ↓"
+    return cell
+
+
+def fix_cell(p) -> str:
+    """The fixture factor as a percentage swing. `=` is a median opponent,
+    `—` means no fixture is known and the score was left unadjusted."""
+    if not p.get("opp"):
+        return "—"
+    pct = ((p.get("fix") or 1.0) - 1.0) * 100
+    return "=" if abs(pct) < 0.5 else "%+.0f%%" % pct
+
+
+def candidates(sc, by_key, slate, owner) -> list[dict]:
+    """Scored rows for everything on today's slate you do not already own.
+
+    One list, two tables: question 1 asks what a purchase would add to the
+    eleven, question 4 prices the same names. They were scored twice before,
+    which is one refactor away from the two tables disagreeing.
+    """
+    out = []
+    for k in slate[0]:
+        if k in owner:
+            continue
+        rec = by_key.get(k)
+        if not rec:
+            continue
+        cand = sc.score(rec).as_row()
+        cand["name"] = title_name(cand["name"])
+        out.append(cand)
+    return out
+
+
+def flat_gains(players, cands) -> dict[str, float]:
+    """{candidate key: xPts/j the eleven gains by owning him, fixture-neutral}.
+
+    The fielding question is one round, so `score` carries the opponent. The
+    buying question is months, so this re-runs the same arithmetic on `flat`,
+    which does not. A defender who only looks like an upgrade because his club
+    happens to host the bottom side next Saturday is not an upgrade.
+    """
+    from ffcore.bid import gain
+
+    neutral = squad_pool([{**p, "score": p["flat"]} for p in players])
+    base = pick_xi(neutral)
+    if base is None:
+        return {}
+    out = {}
+    for c in cands:
+        g = gain(neutral, {**c, "score": c["flat"]}, base[0])
+        if g is not None:
+            out[c["key"]] = g
+    return out
 
 
 def as_fielded(players):
@@ -229,7 +326,7 @@ def rival_ceiling(lg) -> float | None:
     return max(bids)
 
 
-def sec_slate(lg, sc, by_key, pool, tot, slate, prem, cash_value,
+def sec_slate(lg, by_key, cands, pool, tot, slate, prem, cash_value,
               rival_max, snaps, sell_prem=None,
               bands=None) -> tuple[list[str], int, int]:
     """Today's slate, priced. The only section that answers 'what do I do now'.
@@ -246,14 +343,7 @@ def sec_slate(lg, sc, by_key, pool, tot, slate, prem, cash_value,
     owned = {k: lg.owner[k] for k in on_offer if k in lg.owner}
 
     rows = []
-    for k in on_offer:
-        if k in owned:
-            continue
-        rec = by_key.get(k)
-        if not rec:
-            continue
-        cand = sc.score(rec).as_row()
-        cand["name"] = title_name(cand["name"])
+    for cand in cands:
         g = gain(pool, cand, tot) if tot is not None else None
         adv = suggest(cand["value"], prem, cash_value, rival_max)
         # How far below the thin threshold you are in HIS position. This is
@@ -384,14 +474,15 @@ def log_squad(observed, players, chosen, formation, total, deadline,
     unanswerable after the fact, and that is the whole point of keeping this.
     """
     path = DECISIONS / "squad_log.csv"
+    # Before the dedup check, not after: a run that has nothing new to log
+    # still has to carry the migration, or the columns would only appear on
+    # whichever run happens to see a fresh snapshot first.
+    widen_csv(path, LOG_COLS)
     if observed in {r.get("observed_at") for r in read_csv(path)}:
         return
     htl = ""
     if deadline and obs_dt:
         htl = f"{(deadline - obs_dt).total_seconds() / 3600:.1f}"
-    cols = ["observed_at", "hours_to_lock", "formation", "index_total",
-            "player", "pos", "slot", "start_pct", "start_source", "status",
-            "assumed", "value", "score", "picked"]
     rows = []
     for p in players:
         src = ("read" if p["pct"] is not None
@@ -406,8 +497,11 @@ def log_squad(observed, players, chosen, formation, total, deadline,
             "assumed": int(bool(p["assumed"])),
             "value": f"{p['value']:.0f}", "score": f"{p['score']:.3f}",
             "picked": int(id(p) in chosen),
+            "ppm": f"{p['ppm']:.3f}", "fix": f"{p['fix']:.3f}",
+            "opp": p["opp"], "home": int(bool(p["home"])) if p["opp"] else "",
+            "cur_pj": f"{p['cur_pj']:.0f}", "flat": f"{p['flat']:.3f}",
         })
-    append_csv(path, rows, cols)
+    append_csv(path, rows, LOG_COLS)
 
 
 # ---------------------------------------------------------------------------
@@ -433,7 +527,7 @@ STATE_LABEL = {
 }
 
 
-def sec_eleven(marked, best, players, second=None) -> list[str]:
+def sec_eleven(marked, best, players, second=None, buys=None) -> list[str]:
     """## 1. Am I fielding the right eleven?"""
     out = ["## 1. Am I fielding the right eleven?", ""]
 
@@ -459,32 +553,60 @@ def sec_eleven(marked, best, players, second=None) -> list[str]:
                 "jornada** (uncalibrated — see the methodology link at the "
                 "end)", ""]
 
-    # Three readings side by side, not one blended number: the points a player
-    # scores per match, and each source's view of whether he plays. Only the
-    # first is shared — points per match is a record, and both sites are
-    # looking at the same one — so blending is only ever tempting for the two
-    # start columns, and that is exactly where it would hide a disagreement
-    # worth seeing. State has moved to question 2, which prints every player.
+    # One table for both halves of the same decision: the eleven you are
+    # fielding, then the players on today's slate who would improve it. They
+    # used to be four sections apart, which made "would this signing get into
+    # my team" a question you answered by scrolling.
+    #
+    # Each factor gets its own column instead of one blended number. Only
+    # pts/m is shared between the two sources — points per match is a record,
+    # and both sites read the same one — so blending is only ever tempting for
+    # the two start columns, and that is exactly where it would hide a
+    # disagreement worth seeing. State has moved to question 2.
     cells = second or {}
-    out += ["| | Marked XI | pts/m | FF | AF | xPts/j |",
-            "|---|---|--:|--:|--:|--:|"]
+    out += ["| | Marked XI | vs | pts/m | Fix | FF | AF | xPts/j |",
+            "|---|---|---|--:|--:|--:|--:|--:|"]
     for slot in ("POR", "DEF", "MED", "DEL"):
         for p in [x for x in mxi if x["slot"] == slot]:
             flag = " ⚠" if (p["status"] or "ok") != "ok" else ""
-            out.append(f"| {slot} | {p['name']}{flag} | {ppm_cell(p)} | "
-                       f"{pct_cell(p)} | {af_cell(cells.get(p['key']))} | "
+            out.append(f"| {slot} | {p['name']}{flag} | {vs_cell(p)} | "
+                       f"{ppm_cell(p)} | {fix_cell(p)} | {pct_cell(p)} | "
+                       f"{af_cell(cells.get(p['key']))} | "
                        f"{p['score']:.1f} |")
+
+    # Purchase rows, in the same columns and the same units, so the comparison
+    # is a glance down one column rather than arithmetic between two tables.
+    up = sorted(((c, g) for c, g in (buys or []) if g > 0.05),
+                key=lambda t: -t[1])
+    passed = len(buys or []) - len(up)
+    for cand, g in up:
+        out.append(f"| +{cand['slot']} | _{cand['name']}_ | "
+                   f"{vs_cell(cand, star=True)} | {ppm_cell(cand)} | "
+                   f"{fix_cell(cand)} | {pct_cell(cand)} | "
+                   f"{af_cell(cells.get(cand['key']))} | **{g:+.1f}** |")
+
     out += ["",
-            "_**pts/m** is points per match from last season's totals, shrunk "
-            "toward the average for a short record — a record, not a "
-            "fixture-aware forecast: it does not know who the opponent is. "
-            "`~` means no top-flight record at all, so the baseline is "
-            "assumed. **FF** is futbolfantasy's published start percentage, "
-            "**AF** is analiticafantasy's; they are separate columns because "
-            "neither has been checked against a played jornada yet, so there "
-            "is no weight to blend them by. **xPts/j** = pts/m × FF, and uses "
-            "FF only. `⚠` on a name means question 2 has something on him._",
-            ""]
+            "_**pts/m** is points per match, last season shrunk toward the "
+            "average and blended with this season as it accrues. `~` means no "
+            "record at all, so the baseline is assumed. **Fix** is how much "
+            "the next opponent moves it — `=` a median team, `—` no fixture "
+            "known. **FF** is futbolfantasy's start percentage, **AF** is "
+            "analiticafantasy's; separate columns because neither has been "
+            "checked against a played jornada yet, so there is no weight to "
+            "blend them by. **xPts/j** = pts/m × Fix × FF, and uses FF only. "
+            "`⚠` on a name means question 2 has something on him._", ""]
+    if up:
+        out += ["_The `+SLOT` rows are today's slate: **xPts/j is the change "
+                "to the whole eleven** if you sign him and re-pick the shape, "
+                "not his own score, and it leaves the fixture OUT — you own a "
+                "player for months, not for one round. `★` next to the "
+                "opponent means this round's draw happens to be kind, `↓` that "
+                "it is not; neither is in the number. What he would cost is "
+                "question 4._"
+                + ("" if not passed else
+                   " _%d other%s on the slate would not improve this eleven, "
+                   "so they are priced there and not here._"
+                   % (passed, "" if passed == 1 else "s")), ""]
 
     if best is None:
         return out + ["_No legal XI available from this squad, so there is "
@@ -728,9 +850,12 @@ def main() -> None:
         print("league not loaded (%s); using squad.txt" % exc)
         lg = None
 
-    hist, hist_label = load_history()
+    # One builder, shared with rivals.py: the same points blend and the same
+    # fixture board score your squad and theirs.
     shrink_k = lg.cfg.shrink_k if lg else 8.0
-    sc = Scorer(market, xi_rows, hist, shrink_k=shrink_k)
+    sc, (hist_label, cur_label) = build(market, xi_rows,
+                                        datetime.now(timezone.utc),
+                                        shrink_k=shrink_k)
 
     observed = market[0]["observed_at"]
     obs_dt = snapshot_stamp(observed)
@@ -764,13 +889,18 @@ def main() -> None:
     # was pasted.
     dl = deals(lg, lg.market) if lg and lg.market else []
     app_prem = premiums(dl, "sell")
+    # Scored once, read twice: question 1 asks what they add to the eleven,
+    # question 4 asks what they cost.
+    cands = candidates(sc, by_key, slate, lg.owner) if lg and by_key else []
+    fg = flat_gains(players, cands) if cands and players else {}
+    buys = [(c, fg[c["key"]]) for c in cands if c["key"] in fg]
     slate_lines, n_slate, n_better = [], 0, 0
     if any(slate):
         # The same snapshots rivals.py prints in its section 6, so the
         # Competition column and the matrix can never disagree.
         snaps = xi_snapshots(lg, sc, by_key)
         slate_lines, n_slate, n_better = sec_slate(
-            lg, sc, by_key, pool, best[0] if best else None, slate,
+            lg, by_key, cands, pool, best[0] if best else None, slate,
             premiums(dl), cash_value, rival_ceiling(lg), snaps,
             sell_prem=app_prem, bands=drift_bands(all_market))
 
@@ -780,7 +910,11 @@ def main() -> None:
     # footnote; this inverts it.
     marked = as_fielded(players) if players else None
     min_start = lg.cfg.min_start if lg else 60.0
-    second, unclear = load_second(players)
+    # Candidates are joined too, or their AF cell would always read `—` and
+    # look like a source that has nothing on them.
+    second, unclear = load_second(players + [c for c in cands
+                                             if c["key"] not in
+                                             {p["key"] for p in players}])
 
     out: list[str] = [f"# Fantasy report — {observed}", ""]
 
@@ -804,7 +938,7 @@ def main() -> None:
         ctx.append(f"total {eur(squad_value + cash.value)}")
     out += [" · ".join(ctx), ""]
 
-    out += sec_eleven(marked, best, players, second)
+    out += sec_eleven(marked, best, players, second, buys)
     out += sec_fitness(players)
     out += sec_starting(marked, min_start, second, unclear)
     out += (slate_lines if slate_lines else
@@ -945,9 +1079,14 @@ def main() -> None:
         f"_xPts/j — expected points per jornada = shrunk pts/match "
         f"(K={shrink_k:.0f}"
         + (f", {hist_label}" if hist_label else ", **no points baseline**")
-        + ") × P(start), from `ffcore/score.py` — the same scorer rivals.py "
-          "uses. Injured, suspended and unavailable score zero; a doubt is "
-          "halved._",
+        + (f" + {cur_label}" if cur_label else "")
+        + ") × fixture × P(start), from `ffcore/score.py` — the same scorer "
+          "rivals.py uses. Injured, suspended and unavailable score zero; a "
+          "doubt is halved. The fixture term is a rank-based ±%.0f%% for the "
+          "opponent's squad value and ±%.0f%% for home advantage; both are "
+          "guesses, unfitted because nothing has been played, and small enough "
+          "that a wrong one costs a fraction of a point._"
+          % (FIX_BAND * 100, HOME_EDGE * 100),
         "",
         f"_Generated {now:%Y-%m-%d %H:%M} UTC._",
     ]
@@ -1000,7 +1139,51 @@ def _selftest() -> None:
     assert title_name("de la fuente") == "De La Fuente"
     assert title_name("Vini Jr.") == "Vini Jr."      # already cased
 
-    print("report self-test OK (22 cases)")
+    # --- teams, shortened without merging two clubs into one ---
+    assert short_team("Real Madrid") == "Madrid"
+    assert short_team("Real Sociedad") == "Sociedad"
+    assert short_team("Atletico Madrid") == "Atletico"   # never "Madrid"
+    assert short_team("Deportivo Alavés") == "Alavés"
+    assert short_team("Real") == "Real"          # stripping to nothing: keep it
+    assert short_team("") == ""
+
+    # --- the fixture cells ---
+    def fx(fix=1.0, opp="Elche", home=True):
+        return {"fix": fix, "opp": opp, "home": home}
+
+    assert vs_cell(fx(opp="")) == "—"            # no fixture is not a neutral
+    assert fix_cell(fx(opp="")) == "—"
+    assert vs_cell(fx(opp="Rayo Vallecano", home=False)) == "Rayo A"
+    assert fix_cell(fx(1.0)) == "="              # median opponent
+    assert fix_cell(fx(1.12)) == "+12%"
+    assert fix_cell(fx(0.89)) == "-11%"
+    # The star is a purchase-row marker only, because only those rows exclude
+    # the fixture from their number.
+    assert "★" not in vs_cell(fx(1.12))
+    assert vs_cell(fx(1.12), star=True).endswith("★")
+    assert vs_cell(fx(0.88), star=True).endswith("↓")
+    assert vs_cell(fx(1.02), star=True) == "Elche H"     # too small to mark
+
+    # --- a purchase is judged fixture-NEUTRAL ---
+    def sq(name, flat, score, slot="DEL"):
+        return {"name": name, "key": name, "slot": slot, "flat": flat,
+                "score": score, "pos": slot}
+
+    # Weak on merit, but he happens to face the bottom side: `score` says
+    # upgrade, `flat` says no. flat_gains must follow flat.
+    squad = [sq("mine", 5.0, 5.0, s) for s in ("POR",)] \
+        + [sq("d%d" % i, 5.0, 5.0, "DEF") for i in range(5)] \
+        + [sq("m%d" % i, 5.0, 5.0, "MED") for i in range(5)] \
+        + [sq("f0", 5.0, 5.0, "DEL")]
+    cheat = sq("cheat", 4.0, 9.0)
+    real = sq("real", 6.0, 6.0)
+    g = flat_gains(squad, [cheat, real])
+    assert g["cheat"] < 0, g          # the easy fixture buys him nothing here
+    assert abs(g["real"] - 1.0) < 1e-9, g
+    # A player with no slot can never start, so he has no gain to report.
+    assert flat_gains(squad, [sq("nopos", 9.0, 9.0, "")]) == {}
+
+    print("report self-test OK (43 cases)")
 
 
 if __name__ == "__main__":

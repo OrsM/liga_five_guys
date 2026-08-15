@@ -38,8 +38,8 @@ from ffcore.parse import money, pct100
 from ffcore.text import norm, resolve
 
 __all__ = ["ROOT", "TIDY", "SEASON", "DECISIONS", "REPORTS", "MADRID",
-           "input_path", "read_csv", "write_csv", "append_csv", "write_lines",
-           "snapshot_stamp", "ledger_stamp", "latest_only", "snapshots",
+           "input_path", "read_csv", "write_csv", "append_csv", "widen_csv",
+           "write_lines", "snapshot_stamp", "ledger_stamp", "latest_only", "snapshots",
            "Market", "Valuation", "load_market", "load_lineups",
            "load_players", "read_ledger", "load_deadline", "LINEUP_SOURCE",
            "pick_source", "load_fixtures", "next_kickoff", "kickoff_stamp"]
@@ -96,6 +96,33 @@ def write_csv(path, rows, fieldnames=None) -> None:
         w.writerows(rows)
 
 
+def widen_csv(path, fieldnames) -> bool:
+    """Add columns to an existing log, in place. True if the file was rewritten.
+
+    append_csv writes the header once, so a caller that grows its column list
+    would otherwise append rows WIDER than the header. csv.DictReader silently
+    drops the overflow, which means the new columns would look empty forever
+    instead of failing. This rewrites the old rows with the new header and an
+    empty string for what was never recorded — history keeps its own shape, and
+    a blank cell honestly says "this run did not measure that".
+
+    Only ever widens. A column that disappeared from `fieldnames` is kept, so
+    an old reader still works and no recorded number is ever destroyed.
+    """
+    path = Path(path)
+    if not path.exists():
+        return False
+    with path.open(encoding="utf-8") as fh:
+        r = csv.DictReader(fh)
+        have = list(r.fieldnames or [])
+        if not [c for c in fieldnames if c not in have]:
+            return False
+        rows = list(r)
+    cols = have + [c for c in fieldnames if c not in have]
+    write_csv(path, [{c: row.get(c, "") for c in cols} for row in rows], cols)
+    return True
+
+
 def append_csv(path, rows, fieldnames=None) -> None:
     """Append, writing the header only when creating the file.
 
@@ -108,10 +135,17 @@ def append_csv(path, rows, fieldnames=None) -> None:
         return
     fieldnames = fieldnames or list(rows[0])
     fresh = not path.exists()
+    if not fresh:
+        # The FILE's header wins, not the caller's list. Appending in a
+        # different order than the header would misalign every value in the
+        # row, and nothing downstream would notice. Use widen_csv() first to
+        # add a column; a key not in the header is dropped, not shifted in.
+        with path.open(encoding="utf-8") as fh:
+            fieldnames = list(csv.DictReader(fh).fieldnames or fieldnames)
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("a", newline="", encoding="utf-8") as fh:
         w = csv.DictWriter(fh, fieldnames=fieldnames, extrasaction="ignore",
-                           lineterminator="\n")
+                           restval="", lineterminator="\n")
         if fresh:
             w.writeheader()
         w.writerows(rows)
@@ -510,7 +544,41 @@ def _selftest() -> None:
         2026, 8, 15, 19, 30, tzinfo=timezone.utc)
     assert kickoff_stamp("") is None and kickoff_stamp("soon") is None
 
-    print("ffcore.tidy self-test OK (23 cases)")
+    # -- growing a decision log a column ----------------------------------
+    # The one case here that touches a disk, in a temp directory, because the
+    # thing being tested IS the file: these two functions rewrite and extend
+    # append-only logs that cannot be reconstructed if they go wrong.
+    import tempfile
+    with tempfile.TemporaryDirectory() as tmp:
+        log = Path(tmp) / "log.csv"
+        append_csv(log, [{"a": "1", "b": "2"}], ["a", "b"])
+
+        # A caller that reorders its column list must NOT shift the values.
+        append_csv(log, [{"a": "3", "b": "4"}], ["b", "a"])
+        assert read_csv(log)[1] == {"a": "3", "b": "4"}
+
+        # An unknown column is dropped rather than appended past the header,
+        # which is what used to make a row wider than the file.
+        append_csv(log, [{"a": "5", "b": "6", "c": "7"}], ["a", "b", "c"])
+        assert read_csv(log)[2] == {"a": "5", "b": "6"}
+
+        # Widen: old rows gain an empty cell, and no recorded value moves.
+        assert widen_csv(log, ["a", "b", "c"]) is True
+        rows = read_csv(log)
+        assert [r["c"] for r in rows] == ["", "", ""]
+        assert [r["a"] for r in rows] == ["1", "3", "5"]
+        # Idempotent — every run calls it, only the first one rewrites.
+        assert widen_csv(log, ["a", "b", "c"]) is False
+        # A column the caller stopped sending is KEPT, never dropped.
+        assert widen_csv(log, ["a"]) is False
+        assert "b" in read_csv(log)[0]
+        # And now the new column actually lands.
+        append_csv(log, [{"a": "8", "b": "9", "c": "10"}], ["a", "b", "c"])
+        assert read_csv(log)[3]["c"] == "10"
+        # A file that does not exist yet is not a migration.
+        assert widen_csv(Path(tmp) / "nope.csv", ["a"]) is False
+
+    print("ffcore.tidy self-test OK (33 cases)")
 
 
 if __name__ == "__main__":

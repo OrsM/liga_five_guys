@@ -36,6 +36,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
+from ffcore.fixture import FIX_BAND, HOME_EDGE  # noqa: E402
 from ffcore.score import SHRINK_K  # noqa: E402
 from ffcore.text import norm  # noqa: E402
 from ffcore.tidy import (DECISIONS, REPORTS, SEASON, read_csv,  # noqa: E402
@@ -49,55 +50,90 @@ WINDOW_DAYS = 21
 # pure join logic — selftested below
 # ---------------------------------------------------------------------------
 
-def latest_before(preds: list[tuple[dt.datetime, float]],
-                  cutoff: dt.datetime) -> float | None:
-    """The last predicted score logged strictly before `cutoff`, or None.
+def latest_before(preds: list[tuple[dt.datetime, dict]],
+                  cutoff: dt.datetime) -> dict | None:
+    """The last prediction logged strictly before `cutoff`, or None.
 
-    `preds` must be sorted by timestamp ascending.
+    `preds` must be sorted by timestamp ascending. Returns the whole factor
+    dict — score, and the terms that produced it — so the caller can attribute
+    an error rather than only measure it.
     """
     best = None
-    for when, score in preds:
+    for when, fac in preds:
         if when < cutoff:
-            best = score
+            best = fac
         else:
             break
     return best
 
 
 def pair(actuals: list[dict],
-         preds: dict[str, list[tuple[dt.datetime, float]]]) -> list[dict]:
+         preds: dict[str, list[tuple[dt.datetime, dict]]]) -> list[dict]:
     """Join realised per-jornada rows with the prediction that preceded them.
 
     actuals: parsed perjornada rows with keys `key`, `keys` (all name forms),
-    `from_dt`, `points_delta`, `games_delta`. preds: {norm name: [(dt, score)]
-    sorted ascending}. Returns one dict per matched pair.
+    `from_dt`, `points_delta`, `games_delta`. preds: {norm name: [(dt, factor
+    dict)] sorted ascending}. Returns one dict per matched pair, carrying the
+    factors that need grading alongside the error.
     """
     out = []
     for a in actuals:
         if a["games_delta"] < 1:
             continue
-        score = None
+        fac = None
         for k in a["keys"]:
             hits = preds.get(k)
             if hits:
-                score = latest_before(hits, a["from_dt"])
-            if score is not None:
+                fac = latest_before(hits, a["from_dt"])
+            if fac is not None:
                 break
-        if score is None:
+        if fac is None:
             continue
-        predicted = score * a["games_delta"]
+        predicted = fac["score"] * a["games_delta"]
         out.append({
             "name": a["name"],
             "predicted": predicted,
             "actual": a["points_delta"],
-            "per_match": score,
+            "per_match": fac["score"],
             "matches": a["games_delta"],
             "err": predicted - a["points_delta"],
+            "fix": fac.get("fix"),
         })
     return out
 
 
 BUCKETS = [(-1e9, 2, "under 2"), (2, 3, "2–3"), (3, 4, "3–4"), (4, 1e9, "4+")]
+
+# Where a fixture stops being a median one, for grading purposes only. Wide
+# enough that a home game against an average side lands in "neutral".
+FIX_EDGE = 0.03
+
+FIX_BUCKETS = [(-1e9, 1.0 - FIX_EDGE, "harder"),
+               (1.0 - FIX_EDGE, 1.0 + FIX_EDGE, "neutral"),
+               (1.0 + FIX_EDGE, 1e9, "easier")]
+
+
+def fixture_rows(pairs: list[dict]) -> tuple[list[tuple], int]:
+    """[(label, n, mean forecast/match, mean actual/match, mean err/match)],
+    plus how many pairs carried no fixture factor at all.
+
+    This is what grades FIX_BAND. If the model's fixture term is too WIDE, the
+    easier bucket over-forecasts and the harder one under-forecasts — a
+    positive mean error against an easy draw and a negative one against a hard
+    one. Too NARROW and the signs reverse. Both are only readable once each
+    bucket has a real n; the report prints n so a two-row bucket cannot be
+    mistaken for a verdict.
+    """
+    known = [p for p in pairs if p.get("fix") is not None]
+    out = []
+    for lo, hi, label in FIX_BUCKETS:
+        grp = [p for p in known if lo <= p["fix"] < hi]
+        if not grp:
+            continue
+        n = len(grp)
+        per = lambda f: sum(p[f] / p["matches"] for p in grp) / n  # noqa: E731
+        out.append((label, n, per("predicted"), per("actual"), per("err")))
+    return out, len(pairs) - len(known)
 
 
 def bucket_rows(pairs: list[dict]) -> list[tuple[str, int, float, float]]:
@@ -146,20 +182,31 @@ def load_actuals() -> tuple[list[dict], str]:
     return rows, label
 
 
-def load_predictions() -> dict[str, list[tuple[dt.datetime, float]]]:
-    """{norm name: [(when, score)] ascending} from squad_log.csv."""
-    preds: dict[str, list[tuple[dt.datetime, float]]] = {}
+def load_predictions() -> dict[str, list[tuple[dt.datetime, dict]]]:
+    """{norm name: [(when, factors)] ascending} from squad_log.csv.
+
+    The whole logged row comes through, not just the score, because grading a
+    forecast means asking WHICH factor was wrong. `fix` is empty on every row
+    written before the fixture term existed; those rows still score, they just
+    cannot be attributed, and the section says how many.
+    """
+    preds: dict[str, list[tuple[dt.datetime, dict]]] = {}
     for r in read_csv(DECISIONS / "squad_log.csv"):
         try:
             when = snapshot_stamp(r["observed_at"])
-            score = float(r["score"])
+            fac = {"score": float(r["score"])}
         except (KeyError, ValueError, TypeError):
             continue
+        for col in ("fix", "ppm", "flat", "start_pct"):
+            try:
+                fac[col] = float(r[col])
+            except (KeyError, ValueError, TypeError):
+                fac[col] = None
         key = norm(r.get("player", ""))
         if key and when is not None:
-            preds.setdefault(key, []).append((when, score))
+            preds.setdefault(key, []).append((when, fac))
     for v in preds.values():
-        v.sort()
+        v.sort(key=lambda t: t[0])
     return preds
 
 
@@ -172,30 +219,53 @@ def formula_lines() -> list[str]:
     return [
         "### The formula", "",
         "Every player's **xPts/j** — expected points per jornada — is:", "",
-        "    xPts/j = shrunk points-per-match × P(start)", "",
-        f"**Shrunk points-per-match** pulls a player's last-season average "
-        f"toward the median for his position: `(points + {k}×prior) / "
-        f"(matches + {k})`, prior = median pts/match among players in that "
-        f"position with 10+ matches. {k} matches of prior weight means a "
-        "3-game wonder is mostly prior and a 34-game regular is mostly "
-        "himself.", "",
+        "    xPts/j = shrunk points-per-match × fixture × P(start)", "",
+        f"**Shrunk points-per-match** pulls an average toward the median for "
+        f"the position: `(points + {k}×prior) / (matches + {k})`, prior = "
+        f"median pts/match among players in that position with 10+ matches. "
+        f"{k} matches of prior weight means a 3-game wonder is mostly prior "
+        "and a 34-game regular is mostly himself.", "",
+        f"It runs **twice**. Last season is shrunk toward the positional "
+        f"prior, and the result becomes the prior for THIS season, shrunk the "
+        f"same way with the same K={k}. So a player who has played two "
+        "jornadas is still mostly last season, and one who has played twenty "
+        "is mostly this one, with no switch-over date to pick and no second "
+        "constant to guess. With no matches played yet it collapses exactly "
+        "to last season's number.", "",
+        "**Fixture** is who he plays next: teams are ranked by total squad "
+        f"value and the rank is mapped onto ±{FIX_BAND*100:.0f}%, with "
+        f"±{HOME_EDGE*100:.0f}% for home advantage. It is a RANK, not a "
+        "ratio — Real Madrid's squad is worth 4.6× the median one, and facing "
+        "them does not cost a defender four fifths of his points. **Both "
+        "numbers are guesses**, not fits: nothing has been played, so there "
+        "is nothing to fit them to. They are deliberately small, and the "
+        "table below grades them as soon as jornadas exist.", "",
+        "The fixture applies to **fielding**, which is one round. It is left "
+        "OUT of the buy-side figure in question 1, because you own a player "
+        "for months and next Saturday's draw is not a reason to sign him.", "",
         "**P(start)** is futbolfantasy's probable-XI percentage, read twice "
         "daily. A player listed without a percentage gets a neutral prior; "
         "one absent from the page entirely gets a low one. Promoted-side "
         "players have no top-flight record, fall back to the positional "
-        "prior, and are marked **assumed**.", "",
+        "prior, and are marked **assumed**. analiticafantasy's reading is "
+        "printed beside it and is **not** blended in: neither source has been "
+        "checked against a played jornada, so there is no weight to blend "
+        "them by.", "",
         "The **team forecast** is the sum over the best legal XI, so ≈35 "
         "means: this eleven is expected to score about 35 points in a "
         "jornada, before variance — and single-match variance is huge.", "",
         "### What it deliberately ignores (for now)", "",
-        "- **Fixtures** — no opponent-strength or home/away adjustment.",
         "- **Sub cameos** — P(start) multiplies the whole average, so a 30% "
         "starter is modelled as 0.3 × his points, when in reality he often "
         "plays 20 minutes and scores something. Forecasts for rotation "
         "players run low.",
-        "- **This season** — the baseline is last season until the live "
-        "points blend is turned on deliberately; a two-jornada sample "
-        "should not drive an XI.", "",
+        "- **Position-specific fixture sensitivity** — a clean sheet is far "
+        "more opponent-driven than a striker's goal, and the fixture term "
+        "treats them identically. This is the first thing to add once "
+        f"±{FIX_BAND*100:.0f}% itself has been graded.",
+        "- **Anything but points and minutes** — no goals, assists, cards or "
+        "expected-goals data is scraped, so nothing about HOW a player scores "
+        "reaches the forecast.", "",
         "Each of these is a candidate fix, but only after the comparison "
         "below shows which one actually costs points.", "",
     ]
@@ -237,6 +307,32 @@ def comparison_lines() -> list[str]:
         out.append(f"| {label_} | {cnt} | {mp:.1f} | {ma:.1f} |")
     out.append("")
 
+    # Attribution: not "how wrong", but "wrong about WHAT". One factor at a
+    # time, starting with the newest and least-justified one.
+    fx, no_fix = fixture_rows(pairs)
+    if fx:
+        out += [f"**Is the fixture term earning its place?** It moves a "
+                f"forecast by up to ±{FIX_BAND*100:.0f}% and was never "
+                "fitted, so this is the table that decides whether to keep "
+                "it, widen it, or delete it.", "",
+                "| Next fixture | n | Mean forecast | Mean actual | Error |",
+                "|---|--:|--:|--:|--:|"]
+        for label_, cnt, mp, ma, me in fx:
+            out.append(f"| {label_} | {cnt} | {mp:.1f} | {ma:.1f} | "
+                       f"{me:+.1f} |")
+        out += ["", "_Per player-match. A positive error against an **easier** "
+                "fixture together with a negative one against a **harder** "
+                "fixture means the band is too wide; the reverse means too "
+                "narrow; both near zero means it is roughly right. Judge "
+                "nothing on a bucket with a single-digit n._", ""]
+        if no_fix:
+            out += [f"_{no_fix} of {n} pairs predate the fixture term and "
+                    "carry no factor, so they are in the totals above but not "
+                    "in this table._", ""]
+    elif no_fix:
+        out += [f"_All {no_fix} pairs predate the fixture term, so there is "
+                "nothing to grade it with yet._", ""]
+
     worst = sorted(pairs, key=lambda p: -abs(p["err"]))[:5]
     out += ["Biggest misses (forecast − actual):", ""]
     for p in worst:
@@ -262,8 +358,12 @@ def _selftest() -> None:
     utc = dt.timezone.utc
     t = lambda d, h=0: dt.datetime(2026, 8, d, h, tzinfo=utc)  # noqa: E731
 
-    preds = {"ane": [(t(10), 2.0), (t(14), 3.0), (t(16), 9.9)],
-             "bo": [(t(14), 1.5)]}
+    def f(score, fix=None):
+        return {"score": score, "fix": fix}
+
+    preds = {"ane": [(t(10), f(2.0)), (t(14), f(3.0, 1.10)),
+                     (t(16), f(9.9))],
+             "bo": [(t(14), f(1.5, 0.90))]}
 
     # Ane played once between the 15th and the 17th: the prediction that
     # counts is the one from the 14th (3.0), not the hindsight 9.9.
@@ -285,10 +385,30 @@ def _selftest() -> None:
 
     # No prediction strictly before the cutoff -> excluded.
     assert latest_before(preds["bo"], t(14)) is None
-    assert latest_before(preds["bo"], t(14, 1)) == 1.5
+    assert latest_before(preds["bo"], t(14, 1))["score"] == 1.5
 
     rows = bucket_rows(got)
     assert [r[0] for r in rows] == ["under 2", "3–4"], rows
+
+    # -- grading the fixture term ------------------------------------------
+    # Ane faced an easier fixture (1.10) and beat the forecast; Bo faced a
+    # harder one (0.90) and beat it too. Both land in their own bucket, with
+    # the error signed forecast-minus-actual and stated PER MATCH: Bo's two
+    # matches are one row, not two.
+    fx, no_fix = fixture_rows(got)
+    assert [r[0] for r in fx] == ["harder", "easier"], fx
+    assert no_fix == 0
+    hard, easy = fx
+    assert hard[1] == 1 and abs(hard[4] - (1.5 - 2.0)) < 1e-9, hard
+    assert easy[1] == 1 and abs(easy[4] - (3.0 - 8.0)) < 1e-9, easy
+
+    # A row logged before the fixture term existed is counted as unattributable
+    # rather than dropped or treated as neutral — the difference between "we
+    # did not measure it" and "it was average".
+    old = pair([{"name": "Ane", "keys": ["ane"], "from_dt": t(11),
+                 "points_delta": 4.0, "games_delta": 1.0}], preds)
+    fx2, no_fix2 = fixture_rows(old)
+    assert fx2 == [] and no_fix2 == 1, (fx2, no_fix2)
 
     print("methodology.py selftest OK")
 

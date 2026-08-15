@@ -35,9 +35,12 @@ Two deliberate limits:
     to do later, against a calendar that doesn't exist in this repo yet.
     Guessing here would just be a second copy of that logic to keep honest.
   * report.py does NOT read data/season/live/ — deliberately, and this module
-    keeps it that way. A two-jornada sample must not start driving your XI
-    (see ingest.baseline). Blending live totals into the Scorer is its
-    own change, made on purpose, not a side effect of tidying.
+    keeps it that way. The Scorer does now blend this season into pts/match,
+    but it does so from data/season/points_<label>.csv and through the same
+    shrinkage the prior gets, so a two-jornada sample moves a rating by very
+    little instead of replacing it (ffcore/score.py, load_points). That was a
+    deliberate change with its own self-tests; reading the per-jornada diffs
+    here would be a second, unshrunk path to the same number.
 
 The season label comes from each snapshot's own HTML (the page's season
 selector), so the day futbolfantasy flips the default from 2025/26 to the new
@@ -68,10 +71,26 @@ DIFF_FIELDS = ["from_stamp", "to_stamp", "season", "player_name",
                "player_name_full", "team", "points_delta", "games_delta",
                "points_total", "games_total"]
 
+# What the site puts in the table body when the season it is showing has no
+# played matches. Matched as text on the raw page, because the parser cannot
+# tell "nobody has scored yet" from "the columns moved" — both give it 0 rows.
+EMPTY_MARKS = ("no se encontraron resultados", "sin resultados")
+
 
 # ---------------------------------------------------------------------------
 # pure logic — selftested below, no parsing, no IO
 # ---------------------------------------------------------------------------
+
+def empty_season(html: str) -> bool:
+    """True when the page says it has no results, rather than having lost them.
+
+    August 2026 is exactly this case: futbolfantasy rolled over to 2026-27 and
+    no match has been played, so the points table is served empty. Without
+    this, every run printed a markup-rot warning that was not true.
+    """
+    low = (html or "").lower()
+    return any(m in low for m in EMPTY_MARKS)
+
 
 def totals(rows: list[dict]) -> dict[str, tuple[float, float]]:
     """{key: (points, games)} — the comparable core of one snapshot."""
@@ -152,8 +171,15 @@ def load_snapshots() -> dict[str, list[tuple[str, list[dict]]]]:
             print(f"  warn: {stamp}/points: {type(e).__name__}: {e}")
             continue
         if not rows:
-            print(f"  warn: {stamp}/points parsed to 0 rows — "
-                  f"markup changed? Raw is kept; fix parse and re-run.")
+            # An EMPTY season is not a broken parser. Between the rollover and
+            # the first whistle the site serves the table with "no results"
+            # in it, and calling that markup rot would print a false alarm on
+            # every run for a fortnight — which is how a real one gets
+            # ignored. The two states are told apart by the site's own words.
+            print(f"  note: {stamp}/points has no rows yet — the season has "
+                  "not started." if empty_season(html) else
+                  f"  warn: {stamp}/points parsed to 0 rows — markup "
+                  "changed? Raw is kept; fix parse and re-run.")
             continue
         by_label.setdefault(season_label(html), []).append((stamp, rows))
     return by_label
@@ -214,6 +240,13 @@ def _selftest() -> None:
     # A mid-season first appearance diffs against zero, not an error.
     assert next(r for r in d2 if r["player_name_full"] == "Cai Coro"
                 )["games_delta"] == "1"
+
+    # An empty season and a broken parser both yield 0 rows; only one of them
+    # is a problem, and the page says which.
+    assert empty_season("<tbody><tr><td>No se encontraron resultados</td>")
+    assert empty_season("<TD>NO SE ENCONTRARON RESULTADOS</TD>")   # case-blind
+    assert not empty_season("<tbody><tr><td>Ane Aldea</td>")
+    assert not empty_season("")
 
     print("points.py selftest OK")
 

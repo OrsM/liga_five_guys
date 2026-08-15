@@ -134,6 +134,7 @@ src/                 sources.py (the registry: futbolfantasy + Analítica)
                      points.py  xi.py  seen.py  methodology.py
 src/ffcore/          shared core: parse (numbers)  text (names)  tidy (IO+time)
                      league (ownership+cash)  score (ratings+XI)
+                     fixture (next opponent, difficulty)
                      bid (premiums, bid bands, XI gain)
 inputs/              you edit these — see above
 data/raw/dt=….tar.xz  raw HTML, deduplicated — append-only, never delete
@@ -162,10 +163,16 @@ PYTHONPATH=src python src/ffcore/tidy.py        # the player view over tidy CSV
 PYTHONPATH=src python src/sources.py            # parsers + signatures
 PYTHONPATH=src python src/ingest.py --selftest   # archives + carry-forward
 PYTHONPATH=src python src/ffcore/league.py --selftest   # config + cash
+PYTHONPATH=src python src/ffcore/fixture.py             # difficulty, team join
+PYTHONPATH=src python src/ffcore/score.py               # the blend + fixture
 PYTHONPATH=src python src/ffcore/bid.py                 # premiums, bands, XI gain
 PYTHONPATH=src python src/digest.py --selftest          # report stitching
 PYTHONPATH=src python src/xi.py --selftest              # XI from bench
 PYTHONPATH=src python src/seen.py --selftest            # OCR name matching
+PYTHONPATH=src python src/points.py --selftest          # per-jornada diffs
+PYTHONPATH=src python src/methodology.py --selftest     # forecast-vs-actual join
+PYTHONPATH=src python src/rivals.py --selftest          # rival XI arithmetic
+PYTHONPATH=src python src/report.py --selftest          # the cells that judge
 ```
 
 ## Design notes
@@ -417,6 +424,31 @@ records what was on offer and therefore what went unsold, and the sell-side
 spread above measures what the app will pay when nobody else does. Restore
 `bids.csv` from git history only when the sample is large enough to fit a curve.
 
+**The forecast now has three terms, and one of them is a guess.** `xPts/j =
+shrunk points-per-match x fixture x P(start)`. The shrinkage runs twice: last
+season is pulled toward the positional median with `K=8`, and that result
+becomes the prior for this season, shrunk the same way with the same K. There
+is no switch-over date to pick and no second constant to guess, and with no
+match played it collapses exactly to last season's number — which is the state
+it is in today. The fixture term ranks the twenty squads by total market value
+and maps the rank onto +/-12%, plus 4% for home. It is a RANK, not a ratio,
+because the valuations are convex: Real Madrid's squad is 4.61x the median and
+Elche's 0.46x, so a ratio would swing a forecast threefold and claim that
+facing Real Madrid costs a defender four fifths of his points. The 12% and the
+4% are **not fitted** — nothing has been played, so there is nothing to fit
+them to. They are small enough that a wrong guess costs a fraction of a point,
+`data/decisions/squad_log.csv` records the factor behind every score, and
+`reports/methodology.md` buckets realised points by fixture difficulty so the
+band can be widened, narrowed or deleted on evidence.
+
+**Fielding is one round; buying is months.** So the fixture is inside the
+fielding number and outside the buying one. Question 1's purchase rows show
+what a signing adds to the whole eleven with every fixture set to neutral, and
+mark a kind or unkind next draw with a symbol instead of folding it into the
+figure. The same table carries both, in the same columns, because "would this
+player get into my team" is one question and it used to take two tables to
+answer.
+
 **Empty results say why.** A silently-blank probable XI would set every start
 probability to zero and quietly bench your best players, so each section
 explains itself when it has nothing.
@@ -429,9 +461,12 @@ partial move doesn't break a run.
 
 ## Known gaps
 
-- **No outcome data yet.** Nothing records which XI you actually fielded or
-  what it scored, so no prediction can be scored against reality. Until that
-  exists, every model here is unvalidated.
+- **No outcome data yet.** 2026-27 has not kicked off, so no prediction can be
+  scored against reality and every model here is unvalidated. The machinery to
+  do it is in place and idle: `xi.py` logs the XI you fielded, `points.py`
+  turns each snapshot pair into per-jornada points, and `methodology.py` joins
+  them to the prediction logged *before* the matches. Until the first jornada
+  lands, the fixture band and the two probable-XI sources are all ungraded.
 - **`start_pct` is an editorial bucket**, not a live probability — it moved for
   only 22 of 511 players across the snapshots taken so far. That is true of
   both sources, so two of them agreeing is two editors agreeing, not evidence.

@@ -71,6 +71,8 @@ jobs:
           PYTHONPATH=src python src/sources.py
           PYTHONPATH=src python src/ingest.py --selftest
           PYTHONPATH=src python src/ffcore/league.py --selftest
+          PYTHONPATH=src python src/ffcore/fixture.py
+          PYTHONPATH=src python src/ffcore/score.py
           PYTHONPATH=src python src/ffcore/bid.py
           PYTHONPATH=src python src/digest.py --selftest
           PYTHONPATH=src python src/xi.py --selftest
@@ -78,6 +80,7 @@ jobs:
           PYTHONPATH=src python src/points.py --selftest
           PYTHONPATH=src python src/methodology.py --selftest
           PYTHONPATH=src python src/rivals.py --selftest
+          PYTHONPATH=src python src/report.py --selftest
       - name: Import every module
         # Catches the break that only shows at import time — a helper that
         # moved, a name that no longer exists.
