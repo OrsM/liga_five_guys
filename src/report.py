@@ -60,8 +60,9 @@ from datetime import datetime, timezone
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from ffcore.bid import (deals, demand_summary, gain, premiums,  # noqa: E402
-                        suggest, xi_snapshots)
+from ffcore.bid import (HOLD_DAYS, band_of, deals,  # noqa: E402
+                        demand_summary, drift_bands, friction, gain,
+                        premiums, suggest, verdict, xi_snapshots)
 from ffcore.league import League  # noqa: E402
 from ffcore.parse import money, ratio  # noqa: E402
 from ffcore.score import (ABSENT_START, MAX_SLOT, NEUTRAL_START,  # noqa: E402
@@ -225,7 +226,8 @@ def rival_ceiling(lg) -> float | None:
 
 
 def sec_slate(lg, sc, by_key, pool, tot, slate, prem, cash_value,
-              rival_max, snaps) -> tuple[list[str], int, int]:
+              rival_max, snaps, sell_prem=None,
+              bands=None) -> tuple[list[str], int, int]:
     """Today's slate, priced. The only section that answers 'what do I do now'.
 
     Everything else in this report describes a position; this one is a list of
@@ -250,41 +252,66 @@ def sec_slate(lg, sc, by_key, pool, tot, slate, prem, cash_value,
         cand["name"] = title_name(cand["name"])
         g = gain(pool, cand, tot) if tot is not None else None
         adv = suggest(cand["value"], prem, cash_value, rival_max)
-        rows.append((cand, g, adv))
+        # How far below the thin threshold you are in HIS position. This is
+        # what turns a negative-gain forward into cover rather than a pass.
+        slot = cand.get("slot")
+        short_by = (max(0, THIN[slot] - len(pool.get(slot, [])))
+                    if slot in THIN else 0)
+        daily_pct, n_drift = (bands or {}).get(band_of(cand["value"]),
+                                               (0.0, 0))
+        fr = friction(cand["value"], prem, sell_prem, daily_pct, n_drift)
+        rows.append((cand, g, adv, short_by, fr))
 
     # Best upgrade first. A player who cannot start sorts last whatever his
     # score, because the question here is what he adds to YOUR eleven.
-    rows.sort(key=lambda r: (r[1] is None, -(r[1] or 0.0), -r[0]["score"]))
-    better = sum(1 for _, g, _ in rows if g is not None and g > 0)
+    # Cover first when you cannot field a legal XI without it, then by gain.
+    rows.sort(key=lambda r: (-r[3] if r[1] is not None and r[1] <= 0 else 0,
+                             r[1] is None, -(r[1] or 0.0), -r[0]["score"]))
+    better = sum(1 for _, g, _, _, _ in rows if g is not None and g > 0)
+    covers = sum(1 for _, g, a, sb, _ in rows
+                 if sb > 0 and a.low is not None and g is not None)
 
     out += ["## 4. Anything to do in the market?", "",
-            "**%d on offer, %d improve your XI.**" % (len(rows), better), ""]
+            "**%d on offer, %d improve your XI%s.**"
+            % (len(rows), better,
+               ", %d cover a position you are short in" % covers
+               if covers else ""), ""]
     if not rows:
         out += ["_Every name you pasted is either already owned or missing "
                 "from the market data._", ""]
     else:
-        out += ["| Player | Pos | Value | Start% | xPts/j | XI gain | Bid | "
+        out += ["| Player | Pos | Value | Start% | XI gain | Bid | Cost/pt | "
                 "Competition | Verdict |",
                 "|---|---|--:|--:|--:|--:|--:|---|---|"]
-        for cand, g, adv in rows:
-            if adv.low is None:
-                verdict = "**No** — %s" % adv.why
-            elif g is None:
-                verdict = "cannot start — depth only"
-            elif g > 0:
-                verdict = "**Bid** — XI %+.1f" % g
-            else:
-                verdict = "pass — XI %+.1f" % g
+        for cand, g, adv, short_by, fr in rows:
             band = ("—" if adv.low is None
                     else eur(adv.low) if abs(adv.high - adv.low) < 1_000
                     else "%s–%s" % (eur(adv.low), eur(adv.high)))
-            out.append("| %s | %s | %s | %s | %.1f | %s | %s | %s | %s |" % (
+            cpp = fr.per_point(g) if fr else None
+            out.append("| %s | %s | %s | %s | %s | %s | %s | %s | %s |" % (
                 cand["name"], (cand["pos"] or "—")[:3], eur(cand["value"]),
                 "—" if cand["pct"] is None else "%.0f%%" % cand["pct"],
-                cand["score"],
                 "—" if g is None else "%+.1f" % g,
-                band, demand_summary(cand, lg, snaps), verdict))
+                band, "—" if cpp is None else eur(cpp),
+                demand_summary(cand, lg, snaps),
+                verdict(g, adv, short_by)))
         out += ["",
+                "**Cost/pt** is what the marginal point actually costs, and "
+                "it is not the price: a purchase is closer to a loan than a "
+                "spend, because the value comes back when you sell. It is the "
+                "premium you pay over the floor plus the value expected to "
+                "drain away over %d days — NOT the price, and NOT the exit. "
+                "The app pays value give or take %s on a sale, which on a "
+                "large player is bigger than both other terms together; that "
+                "swing is a coin flip, so it is stated here rather than "
+                "averaged into a number that would look like a price. "
+                "Drift is a flat mean within his price band, over readings "
+                "taken before a ball was kicked — expect it to move harder "
+                "once results land."
+                % (HOLD_DAYS,
+                   ("%.0f%%" % sell_prem.swing() if sell_prem
+                    else "about a tenth")),
+                "",
                 "Competition is demand, not roster counts: the rivals whose "
                 "XI actually improves with him, strongest threat first — "
                 "`?` cash unknown (treat as live), `(n broke)` want him but "
@@ -564,7 +591,8 @@ def sec_starting(marked, players, min_start) -> list[str]:
 
 
 def main() -> None:
-    market = latest_only(load_market())
+    all_market = load_market()
+    market = latest_only(all_market)
     xi_rows = latest_only(load_xi())
 
     REPORTS.mkdir(exist_ok=True)
@@ -629,7 +657,8 @@ def main() -> None:
         snaps = xi_snapshots(lg, sc, by_key)
         slate_lines, n_slate, n_better = sec_slate(
             lg, sc, by_key, pool, best[0] if best else None, slate,
-            premiums(dl), cash_value, rival_ceiling(lg), snaps)
+            premiums(dl), cash_value, rival_ceiling(lg), snaps,
+            sell_prem=app_prem, bands=drift_bands(all_market))
 
     # --- assemble ---------------------------------------------------------
     # Four questions, four tables, then a rule and everything else. The old
