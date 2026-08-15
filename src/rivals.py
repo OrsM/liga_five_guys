@@ -48,7 +48,7 @@ from collections import Counter
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from ffcore.bid import (MAX_LAG_H, deals, gain, premiums,  # noqa: E402
-                        rivals_short, usable)
+                        rivals_short, usable, xi_snapshots)
 from ffcore.league import League  # noqa: E402
 from ffcore.score import (MAX_SLOT, SLOT_LABEL, SLOT_MIN, THIN,  # noqa: E402
                           Scorer, pick_xi, squad_pool)
@@ -255,7 +255,7 @@ def sec_drift(lg, dl, market) -> list[str]:
 
 def sec_squads(lg, sc, players_by_key) -> list[str]:
     out = ["## 4. Squad diagnostics", "",
-           "| Manager | XI score | Shape | Trapped | Injured | Thin at | "
+           "| Manager | xPts/j | Shape | Trapped | Injured | Thin at | "
            "Unmatched |", "|---|--:|---|--:|--:|---|--:|"]
     detail = []
     for m in lg:
@@ -295,37 +295,9 @@ def sec_squads(lg, sc, players_by_key) -> list[str]:
         out += detail + [""]
     out += ["Trapped is value held in players below %d%% start probability — "
             "money that cannot score. Unmatched is names in their squad "
-            "missing from data/tidy, which are absent from the XI score, so "
+            "missing from data/tidy, which are absent from the xPts total, so "
             "a large number there means the comparison flatters you."
             % int(TRAPPED_START), ""]
-    return out
-
-
-# ---------------------------------------------------------------------------
-# shared: every manager's best XI, computed once
-# ---------------------------------------------------------------------------
-
-def xi_snapshots(lg, sc, by_key) -> dict[str, dict]:
-    """{handle: {pool, best, missing, short}} under the one shared scorer.
-
-    `best` is pick_xi's (total, shape, picked) or None — and None is a
-    finding, not an error: that manager cannot field a legal XI today.
-    `short` lists the slots below the legal minimum, which is where their
-    next purchase is forced to go.
-    """
-    out = {}
-    for m in lg:
-        names = [by_key.get(k, {}).get("name", k) for k in m.players]
-        scored, missing = sc.score_squad(names)
-        pool = squad_pool(scored)
-        counts = Counter(p.slot for p in scored if p.slot)
-        out[m.handle] = {
-            "pool": pool,
-            "best": pick_xi(pool) if scored else None,
-            "missing": missing,
-            "short": [sl for sl, need in SLOT_MIN.items()
-                      if counts.get(sl, 0) < need],
-        }
     return out
 
 
@@ -334,20 +306,26 @@ def short_handle(handle: str, me: bool = False) -> str:
     return "You" if me else handle.split()[0][:8]
 
 
-def gain_cell(g, slot: str, snap: dict, max_bid, value) -> str:
+def gain_cell(g, slot: str, snap: dict, max_bid, value,
+              me: bool = False) -> str:
     """One cell of the slate matrix.
 
     `needs`   they cannot field a legal XI and this slot is a hole — they
               are forced buyers here, premium be damned.
     (+x.x)    the gain, but their estimated cash cannot pay even the floor,
               so the demand is real and the threat is not.
+    +x.x?     the gain, cash unknown — unknown is not zero, treat as live.
     """
     if snap["best"] is None:
         return "**needs**" if slot in snap["short"] else "—"
     if g is None:
         return "—"
     cell = "%+.1f" % g
-    if max_bid is not None and value and max_bid < value:
+    if me:
+        return cell
+    if max_bid is None:
+        return cell + "?"
+    if value and max_bid < value:
         return "(%s)" % cell
     return cell
 
@@ -374,9 +352,8 @@ def sec_slate_matrix(lg, sc, by_key, on_offer, snaps) -> list[str]:
             snap = snaps[h]
             g = (gain(snap["pool"], c, snap["best"][0])
                  if snap["best"] is not None else None)
-            cells[h] = gain_cell(g, c["slot"], snap,
-                                 None if h == lg.cfg.me else max_bid[h],
-                                 c["value"])
+            cells[h] = gain_cell(g, c["slot"], snap, max_bid[h],
+                                 c["value"], me=(h == lg.cfg.me))
         my = cells[lg.cfg.me]
         try:
             my_sort = float(my.strip("()"))
@@ -389,9 +366,10 @@ def sec_slate_matrix(lg, sc, by_key, on_offer, snaps) -> list[str]:
     out += ["**The slate through every manager's eyes.** XI gain per "
             "jornada if that manager owned him, under the one shared "
             "scorer. `(…)` = wants him but their estimated cash cannot pay "
-            "the floor. **needs** = they cannot field a legal XI without "
-            "buying in this position — a forced buyer. Your column has no "
-            "cash cap: you know your own balance.", "",
+            "the floor. `?` = wants him, cash unknown — treat as live. "
+            "**needs** = they cannot field a legal XI without buying in "
+            "this position — a forced buyer. Your column has no cash cap: "
+            "you know your own balance.", "",
             "| Player | Pos | Value | "
             + " | ".join(short_handle(h, h == lg.cfg.me) for h in ordered)
             + " |",
@@ -493,9 +471,6 @@ def log_projections(lg, snaps) -> None:
 def sec_demand(lg, sc, market_latest, on_offer=None, snaps=None) -> list[str]:
     out = ["## 5. Who wants what", ""]
 
-    if snaps and on_offer:
-        out += sec_slate_matrix(lg, sc, market_latest, on_offer, snaps)
-
     rivals_need = rivals_short(lg, sc, market_latest)
 
     free = [r for k, r in market_latest.items() if k not in lg.owner]
@@ -507,12 +482,16 @@ def sec_demand(lg, sc, market_latest, on_offer=None, snaps=None) -> list[str]:
         out += ["Restricted to the %d players on today's slate — the rest of "
                 "the market is not a decision you can make today." % len(free),
                 ""]
+    if snaps and on_offer:
+        out += sec_slate_matrix(lg, sc, market_latest, on_offer, snaps)
+
     scored_free = [sc.score(r) for r in free]
     scored_free = [p for p in scored_free if p.slot]
     scored_free.sort(key=lambda p: -p.score)
 
     cap = None if on_offer else 12
-    contested = [p for p in scored_free if rivals_need.get(p.slot)][:cap]
+    contested = [] if on_offer else \
+        [p for p in scored_free if rivals_need.get(p.slot)][:cap]
     if contested:
         out += ["**Expect competition for these** — the position is one a "
                 "rival is short in, so assume a bidding war and price "
@@ -526,8 +505,8 @@ def sec_demand(lg, sc, market_latest, on_offer=None, snaps=None) -> list[str]:
                 ", ".join(rivals_need[p.slot])))
         out.append("")
 
-    uncontested = [p for p in scored_free
-                   if not rivals_need.get(p.slot)][:None if on_offer else 8]
+    uncontested = [] if on_offer else \
+        [p for p in scored_free if not rivals_need.get(p.slot)][:8]
     if uncontested:
         out += ["**Nobody else needs these.** Same quality, no auction — "
                 "take the equivalent player here instead of paying a premium "
@@ -564,7 +543,7 @@ def sec_demand(lg, sc, market_latest, on_offer=None, snaps=None) -> list[str]:
                     ", ".join(buyers)))
             out.append("")
 
-    if not contested and not uncontested:
+    if not on_offer and not contested and not uncontested:
         out += ["_Nothing to forecast: no rival is currently short anywhere, "
                 "or the market data hasn't loaded._", ""]
     return out
@@ -655,8 +634,10 @@ def _selftest() -> None:
     assert gain_cell(2.34, "MED", legal, 50e6, 10e6) == "+2.3"
     # Wants him but cannot pay the floor.
     assert gain_cell(2.34, "MED", legal, 5e6, 10e6) == "(+2.3)"
-    # Your own column carries no cash cap.
-    assert gain_cell(-0.4, "MED", legal, None, 10e6) == "-0.4"
+    # Unknown cash is flagged, not hidden — unknown is not zero.
+    assert gain_cell(2.34, "MED", legal, None, 10e6) == "+2.3?"
+    # Your own column carries no cash cap and no question mark.
+    assert gain_cell(-0.4, "MED", legal, None, 10e6, me=True) == "-0.4"
     # Cannot field an XI: forced buyer in the hole, dash elsewhere.
     assert gain_cell(None, "POR", broke, 1e6, 10e6) == "**needs**"
     assert gain_cell(None, "DEF", broke, 1e6, 10e6) == "—"
