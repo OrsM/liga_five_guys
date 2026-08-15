@@ -287,8 +287,10 @@ def parse() -> None:
     TIDY.mkdir(parents=True, exist_ok=True)
     market_rows = tables.get("market", [])
     xi_rows = tables.get("lineups", [])
+    fixture_rows = tables.get("fixtures", [])
     _write_csv(TIDY / "market.csv", market_rows)
     _write_csv(TIDY / "lineups.csv", xi_rows)
+    _write_csv(TIDY / "fixtures.csv", fixture_rows)
     # probable_xi.csv was this file before it grew a `source` column. Tidy is
     # disposable and rebuilt whole every run, so the old copy is deleted rather
     # than left to be read by mistake.
@@ -307,11 +309,13 @@ def parse() -> None:
     for r in xi_rows:
         tally[r["status"]] = tally.get(r["status"], 0) + 1
         per_source[r["source"]] = per_source.get(r["source"], 0) + 1
-    flags = ", ".join("%s %d" % (k, v) for k, v in sorted(tally.items())
-                      if k != "ok")
+    # "" is a real status meaning "this page said nothing about fitness", and
+    # it needs a printable name or it renders as a blank in the run log.
+    flags = ", ".join("%s %d" % (k or "not stated", v)
+                      for k, v in sorted(tally.items()) if k != "ok")
     by_src = ", ".join("%s %d" % (k, v) for k, v in sorted(per_source.items()))
     print(f"market {len(market_rows)} rows, lineups {len(xi_rows)} rows "
-          f"({by_src})")
+          f"({by_src}), fixtures {len(fixture_rows)} rows")
     print("  status: ok %d%s" % (tally.get("ok", 0),
                                  (", " + flags) if flags else ""))
     if not flags:

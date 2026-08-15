@@ -28,24 +28,48 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
+from typing import NamedTuple  # noqa: E402
+
 from ffcore.tidy import REPORTS, write_lines  # noqa: E402
 
+
+class Part(NamedTuple):
+    title: str
+    name: str
+    sections: list | None      # None = the whole file
+    nest: bool = True          # False = keep own heading levels and preamble
+
+
+# latest.md's decision sections, and only these. It carries more — the sell
+# shortlist, the movers table — and that material is NOT duplicated anywhere
+# else, so it is left in latest.md and linked rather than deleted. This file is
+# what you read on a phone before a lock; latest.md is what you read when you
+# have time.
+DECIDE = [
+    "1. Am I fielding the right eleven?",
+    "2. Is anyone injured, suspended, or doubtful?",
+    "3. Is everyone expected to start?",
+    "4. Anything to do in the market?",
+    "Warnings",
+]
+
 # Order matters: this is the order you read them in, not the order they are
-# generated. Decisions first, reference material last.
-# (title, filename, sections to include or None for the whole file)
+# generated.
 SOURCES = [
-    ("Decide today", "latest.md", None),
-    # Cash is a ceiling on every bid, so it earns its place in the one file
-    # you open. The premium curves, drift table and projected XIs behind it
-    # do not — they are reference, and they are linked below.
-    ("Rival cash", "rivals.md", ["1. Cash and ceilings", "Ledger warnings"]),
+    Part("Decide today", "latest.md", DECIDE, nest=False),
 ]
 
 # Printed as links, not content. Each is a whole file that would otherwise be
 # inlined and duplicate something above.
+#
+# Rival cash used to be stitched in here, on the argument that cash is a
+# ceiling on every bid. It is, and it is one tap away in rivals.md — but it was
+# fourteen lines about four other managers sitting above the eleven names you
+# came to check.
 LINKS = [
+    ("The rest of today's report — sell shortlist, movers", "latest.md"),
     ("Who to buy — everyone unowned, ranked", "watchlist.md"),
-    ("How your rivals bid — premiums, drift, projected XIs", "rivals.md"),
+    ("Rival cash and ceilings, premiums, drift, projected XIs", "rivals.md"),
     ("Every squad in the league, deal history, cash basis", "squads.md"),
     ("How the forecast works, and how it's doing", "methodology.md"),
 ]
@@ -84,16 +108,20 @@ def digest(read, sources=SOURCES, stamp: str = "",
            "reference and is linked, not reprinted.", ""]
     body: list[str] = []
     seen: set[str] = set()
+    lost: list[str] = []
 
-    for title, name, wanted in sources:
+    for part in sources:
+        title, name, wanted, nest = (part if isinstance(part, Part)
+                                     else Part(*part))
         text = read(name)
         if not text:
             body += ["## " + title, "",
                      "_No `%s` yet — the generator has not run._" % name, ""]
             continue
         keep = {_key(w) for w in wanted} if wanted is not None else None
-        if wanted is not None:
+        if wanted is not None and nest:
             body += ["## " + title, ""]
+        found = set()
         for heading, lines in split_sections(text):
             if heading:
                 if keep is not None and _key(heading) not in keep:
@@ -101,16 +129,28 @@ def digest(read, sources=SOURCES, stamp: str = "",
                 if _key(heading) in seen:
                     continue
                 seen.add(_key(heading))
-                # A whole-file source keeps its own heading levels; a
-                # cherry-picked one is nested under the title above it.
-                body.append(("### " if wanted is not None else "## ")
-                            + heading)
-            elif wanted is not None:
+                found.add(_key(heading))
+                # A nested source sits under the title above it; an un-nested
+                # one keeps its own heading levels.
+                body.append(("### " if nest else "## ") + heading)
+            elif wanted is not None and nest:
                 continue      # preamble belongs to the file, not to an excerpt
-            else:
+            elif not heading:
                 # latest.md's H1 becomes this report's H1, so drop it here.
                 lines = [ln for ln in lines if not ln.startswith("# ")]
             body += [ln for ln in lines]
+        # A section named here but absent from the file is a heading that was
+        # renamed upstream. Silently dropping it would quietly shorten the one
+        # report you rely on, so it is named in the output instead.
+        lost += ["%s → %s" % (name, w) for w in (wanted or [])
+                 if _key(w) not in found]
+        body.append("")
+
+    if lost:
+        body += ["## ⚠ Sections missing", "",
+                 "These were asked for and not found — a heading was renamed, "
+                 "and `digest.py`'s list needs the new name:", ""]
+        body += ["- `%s`" % m for m in lost]
         body.append("")
 
     if links:
@@ -145,10 +185,10 @@ def _selftest() -> None:
                      "## 2. What they pay over value\n\n| long | table |\n\n"
                      "## Ledger warnings\n\n- Burton overdraws\n",
     }
-    srcs = [("Decide today", "latest.md", None),
-            ("Rival cash", "rivals.md", ["1. Cash and ceilings",
-                                         "Ledger warnings"]),
-            ("Absent", "gone.md", None)]
+    srcs = [Part("Decide today", "latest.md", None, nest=False),
+            Part("Rival cash", "rivals.md", ["1. Cash and ceilings",
+                                             "Ledger warnings"]),
+            Part("Absent", "gone.md", None)]
     lnks = [("Who to buy", "watchlist.md"), ("Rivals in full", "rivals.md")]
     lines = digest(lambda n: files.get(n), srcs, stamp="now", links=lnks)
     text = "\n".join(lines)
@@ -175,10 +215,31 @@ def _selftest() -> None:
     assert text.count("- Burton overdraws") == 2, text
     # ...and an identical heading really is dropped.
     lines2 = digest(lambda n: files.get(n),
-                    [("A", "rivals.md", ["Ledger warnings"]),
-                     ("B", "rivals.md", ["Ledger warnings"])],
+                    [Part("A", "rivals.md", ["Ledger warnings"]),
+                     Part("B", "rivals.md", ["Ledger warnings"])],
                     links=None)
-    assert "\n".join(lines2).count("Ledger warnings") == 1, lines2
+    text2 = "\n".join(lines2)
+    assert text2.count("### Ledger warnings") == 1, lines2
+    # The second ask found nothing, and says so rather than going quiet.
+    assert "Sections missing" in text2 and "rivals.md → Ledger" in text2
+
+    # THE SILENT-SHORTENING GUARD: a renamed heading is reported, not dropped.
+    renamed = digest(lambda n: files.get(n),
+                     [Part("D", "latest.md", ["Warnings", "5. Gone"],
+                           nest=False)], links=None)
+    assert "## Warnings" in "\n".join(renamed)
+    assert "latest.md → 5. Gone" in "\n".join(renamed), renamed
+
+    # An un-nested cherry-pick keeps '## ' levels and its preamble, because it
+    # is the decision report and not an excerpt from someone else's file.
+    picked = digest(lambda n: files.get(n),
+                    [Part("Decide", "latest.md",
+                          ["1. Am I fielding the right eleven?"], nest=False)],
+                    links=None)
+    ptext = "\n".join(picked)
+    assert "## 1. Am I fielding the right eleven?" in ptext
+    assert "Squad 138M" in ptext           # preamble survives
+    assert "Warnings" not in ptext, ptext  # unasked section stays behind
 
     # A missing generator is a note, not a crash.
     assert "_No `gone.md` yet" in text
@@ -189,7 +250,7 @@ def _selftest() -> None:
     # Numbering is ignored when deciding what is a duplicate.
     assert _key("6. Ledger warnings") == _key("Ledger warnings")
 
-    print("digest self-test OK (16 cases)")
+    print("digest self-test OK (24 cases)")
 
 
 if __name__ == "__main__":

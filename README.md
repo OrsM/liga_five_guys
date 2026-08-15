@@ -52,8 +52,11 @@ Four files under `inputs/`. Everything else is generated.
 | `cash.txt` | Any balance you actually observe. One rival balance turns their whole cash estimate from an estimate into arithmetic. |
 | `rosters_initial.txt` | The starting rosters. Write once, never edit. |
 
-`deadline.txt` (one line, each jornada) and `league.ini` (thresholds and the
-starting budget) are the two you touch occasionally. `lookup.txt` and
+`league.ini` (thresholds and the starting budget) is the one you touch
+occasionally. `deadline.txt` is now a **fallback**: the lock is derived from
+the next kickoff in `data/tidy/fixtures.csv`, and the report says which of the
+two it used. A typed deadline goes stale silently — the one in the file had
+expired and the report was reading it as passed. `lookup.txt` and
 `seen.txt` are scratch. `squad.txt` is **generated** — a fallback so
 `report.py` still works if the ledger fails to load; don't hand-edit it.
 
@@ -136,6 +139,7 @@ inputs/              you edit these — see above
 data/raw/dt=….tar.xz  raw HTML, deduplicated — append-only, never delete
 data/tidy/market.csv  values, disposable — rebuilt from raw every run
 data/tidy/lineups.csv probable XI + fitness, one row per player per source
+data/tidy/fixtures.csv kickoffs, as published — the deadline is derived here
 data/decisions/      append-only logs of estimates, for scoring later
 reports/REPORT.md    ← read this
 reports/latest.md    the four questions (report.py) — carried into REPORT.md
@@ -207,24 +211,47 @@ module level, so importing it broke the test job, which installs no network
 client on purpose.
 
 **Two probable-XI sources, stored side by side.** Analítica Fantasy is the
-second, as twenty registry entries — one per team — that cost one parse
-function and its fixtures, which is what the registry was built for. Their
-team page server-renders exactly the eleven they predict.
+second, as twenty registry entries — one per team — plus their fixtures hub,
+which cost two parse functions and their fixtures, and that is what the
+registry was built for.
 
-What they give is **their predicted eleven, and nothing else**: no start
-percentage (their call is binary) and no fitness panel at all. So `start_pct`
-is empty and `status` is `""`, meaning *not stated*, never `ok` — a page that
-says nothing about fitness must not be stored as a clean bill of health. Their
-position codes are not stored either: the app's own positions are the ones the
-scorer uses. Their per-match pages do carry substitutes, but the URL changes
-every jornada, which the registry's static `url` cannot express without a
-discovery step, and the eleven is the part that matters.
+**Their team page has two shapes, and the second one is the better source.**
+Close to kickoff it server-renders `Titulares <Team>` — the eleven they
+predict, a final call with no number attached. The rest of the week it renders
+`Consenso de alineaciones` instead: their editors' individual picks, published
+as fractions (`2/3 titular`), split into *Unánimes* and *Más divididos*. The
+first live sweep found sixteen of twenty pages in the Consenso shape, so
+parsing only the first shape would have read as site rot four days out of
+five. Both are parsed. A unanimous pick is stored as 100%; a divided one keeps
+its own fraction; a `Titulares` row is stored with `start_pct` empty and
+`role="starter"`, because a yes is not a percentage and turning it into one
+would mean inventing the constant that converts them.
 
-**Nothing reads them yet, deliberately.** `LINEUP_SOURCE` stays
-`futbolfantasy`. Two sources that disagree about a starter is a measurement to
-make once outcomes exist, not an average to take. The one known join hazard is
-already visible: Analítica writes `O. Mangala` where the app writes the full
-name, and names are the only join key we have.
+The same page carries `Candidato a capitán`, a *third* list nested as a
+sibling of the first two. Walking up more than one ancestor to find the block
+heading filed it under *Unánimes* and stored `Nico Williams1/3` as a certain
+starter. `_af_section()` reads the immediate parent only, a fraction in the
+name is a second guard, and the fixture in `sources.py` reproduces that exact
+nesting.
+
+No fitness panel at all, on either shape: `status` is `""`, meaning *not
+stated*, never `ok` — a page that says nothing about fitness must not be
+stored as a clean bill of health. Their position codes are not stored either:
+the app's own positions are the ones the scorer uses.
+
+**The report prints both, beside each other, and blends nothing.**
+`LINEUP_SOURCE` stays `futbolfantasy` — it is what the scorer reads — and
+question 1 gained an `AF` column next to `FF`. Question 3 is now exceptions
+only: who is under the threshold, and the players where the two sources
+contradict each other. Neither source has been checked against a played
+jornada, so there is no weight to blend them by, and a disagreement is a
+prompt to open the app rather than an average to take. Joins go by name —
+exact, then `resolve()` — because neither site publishes the app's slug. Of
+229 names measured, 151 joined exactly, 59 fuzzily and 19 not at all, and the
+19 split three ways worth keeping distinct: a different spelling of the same
+player (`Vini Jr.`), a genuinely ambiguous surname (`Simeone` — Diego and
+Giuliano), and a player absent from the app's market. An unjoined name is
+reported with its candidates and carries no cell. Never guessed.
 
 `robots.txt` allows `/equipo/`; it disallows `/api/`, which is the reason this
 reads the rendered page rather than hunting their endpoint. One request per
@@ -237,7 +264,9 @@ twenty futbolfantasy pages twice; it is now twenty of each, once — the same
 budget answering more. `start_pct` moved for 22 of 511 players across a
 fortnight of twice-daily reads, so the second daily sweep was buying almost
 nothing. Market and points still run every sweep; those move daily and are two
-requests.
+requests. The fixtures hub is the forty-first page, once a day. Verified live:
+the second sweep of the evening made **three** requests, not forty-three —
+forty pages were "not due", which is the cadence doing its job.
 
 **The lineups table names its source, and readers get exactly one.**
 `probable_xi.csv` is now `lineups.csv` with a `source` column, stamped by the
@@ -404,7 +433,8 @@ partial move doesn't break a run.
   what it scored, so no prediction can be scored against reality. Until that
   exists, every model here is unvalidated.
 - **`start_pct` is an editorial bucket**, not a live probability — it moved for
-  only 22 of 511 players across the snapshots taken so far.
+  only 22 of 511 players across the snapshots taken so far. That is true of
+  both sources, so two of them agreeing is two editors agreeing, not evidence.
 
 ## Roadmap
 

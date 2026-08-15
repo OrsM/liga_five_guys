@@ -42,7 +42,7 @@ __all__ = ["ROOT", "TIDY", "SEASON", "DECISIONS", "REPORTS", "MADRID",
            "snapshot_stamp", "ledger_stamp", "latest_only", "snapshots",
            "Market", "Valuation", "load_market", "load_lineups",
            "load_players", "read_ledger", "load_deadline", "LINEUP_SOURCE",
-           "pick_source"]
+           "pick_source", "load_fixtures", "next_kickoff", "kickoff_stamp"]
 
 ROOT = Path(os.environ.get("FF_ROOT", "./data"))
 TIDY = ROOT / "tidy"
@@ -117,21 +117,34 @@ def append_csv(path, rows, fieldnames=None) -> None:
         w.writerows(rows)
 
 
-def load_deadline():
-    """inputs/deadline.txt -> the next lock as aware UTC, or None.
+def load_deadline(with_source: bool = False):
+    """The next lock as aware UTC, or None. Fixtures first, the file second.
 
     Madrid wall-clock in the file, because that is what the app shows. Shared
     rather than copied: report.py stamps hours_to_lock into squad_log.csv and
     xi.py stamps it into xi_fielded.csv, and two readings of the same deadline
     that disagree would silently mis-order the two logs against each other.
+
+    The derived value is the next kickoff in data/tidy/fixtures.csv. That is a
+    conservative floor, not the whole truth: J1 2026-27 runs from 15 to 27
+    August, and if the app locks each player at HIS match then most of your
+    squad stays editable well past the round's first kickoff. It is still
+    strictly better than the typed file, which was wrong the moment it expired
+    and stayed wrong until you noticed. `with_source=True` returns
+    (when, "fixtures"|"file") so the report can say which it used.
     """
+    when = next_kickoff()
+    if when is not None:
+        return (when, "fixtures") if with_source else when
+
     path = input_path("deadline.txt")
     if not path.exists():
-        return None
+        return (None, "none") if with_source else None
     body = "\n".join(ln.split("#")[0] for ln in
                      path.read_text(encoding="utf-8").splitlines())
     m = re.search(r"\d{4}-\d{2}-\d{2}[T ]?\d{0,2}:?\d{0,2}", body)
-    return ledger_stamp(m.group(0)) if m else None
+    when = ledger_stamp(m.group(0)) if m else None
+    return (when, "file" if when else "none") if with_source else when
 
 
 def write_lines(path, lines) -> None:
@@ -220,6 +233,46 @@ def pick_source(rows: list[dict], source: str) -> list[dict]:
     """One source's rows. An empty `source` means all of them."""
     return rows if not source else [r for r in rows
                                     if r.get("source") == source]
+
+
+# ---------------------------------------------------------------------------
+# fixtures — what makes the deadline derivable
+# ---------------------------------------------------------------------------
+
+def kickoff_stamp(s: str):
+    """A published kickoff -> aware UTC, or None.
+
+    fromisoformat, not this module's digit parser: the value comes from
+    someone else's page with an explicit offset on the end, and the digit
+    parser would read a future "+02:00" as if it were UTC — an error of
+    exactly the size that makes a locked squad look editable.
+    """
+    try:
+        when = datetime.fromisoformat((s or "").strip())
+    except ValueError:
+        return None
+    return (when.replace(tzinfo=timezone.utc) if when.tzinfo is None
+            else when.astimezone(timezone.utc))
+
+
+def load_fixtures() -> list[dict]:
+    """The newest fixtures reading, earliest kickoff first."""
+    rows = latest_only(read_csv(TIDY / "fixtures.csv"))
+    return sorted(rows, key=lambda r: r.get("kickoff") or "")
+
+
+def next_kickoff(now=None):
+    """The first kickoff still ahead of us, or None if we cannot tell.
+
+    None covers three cases that must all fall back rather than guess: no
+    fixtures file yet, an unparseable kickoff, and every listed match already
+    started (their page drops a match once it is under way, so a stale file
+    goes quiet rather than stale-and-confident).
+    """
+    now = now or datetime.now(timezone.utc)
+    ahead = [k for k in (kickoff_stamp(r.get("kickoff"))
+                         for r in load_fixtures()) if k and k > now]
+    return min(ahead) if ahead else None
 
 
 # Which tidy column feeds which report field, and how to read it. Named
@@ -444,7 +497,20 @@ def _selftest() -> None:
     assert pick_source(both, "") == both                 # "" means all sources
     assert pick_source(both, "nobody") == []             # a source not stored
 
-    print("ffcore.tidy self-test OK (18 cases)")
+    # -- kickoffs ----------------------------------------------------------
+    # THE TRAP this parser exists to avoid: an offset that is not UTC. The
+    # digit parser used for snapshot stamps would read "21:30+02:00" as 21:30
+    # UTC — two hours late, which turns a locked squad into an editable one.
+    assert kickoff_stamp("2026-08-15T19:30:00+00:00") == datetime(
+        2026, 8, 15, 19, 30, tzinfo=timezone.utc)
+    assert kickoff_stamp("2026-08-15T21:30:00+02:00") == datetime(
+        2026, 8, 15, 19, 30, tzinfo=timezone.utc)
+    # No offset at all is read as UTC, which is what they publish today.
+    assert kickoff_stamp("2026-08-15T19:30:00") == datetime(
+        2026, 8, 15, 19, 30, tzinfo=timezone.utc)
+    assert kickoff_stamp("") is None and kickoff_stamp("soon") is None
+
+    print("ffcore.tidy self-test OK (23 cases)")
 
 
 if __name__ == "__main__":

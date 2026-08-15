@@ -79,6 +79,10 @@ HISTORY = REPORTS / "history"
 STALE_HOURS = 14.0
 MOVER_PCT = 1.0           # squad price moves worth printing
 
+# The second probable-XI source. futbolfantasy is the primary — it is what the
+# scorer reads — and this one is printed BESIDE it, never blended into it.
+SECOND_SOURCE = "analitica"
+
 # Name particles that stay lowercase when title-casing a folded name.
 # "le"/"el"/"la" are deliberately absent: Le Normand and El Hilali are far
 # more common in this league than "de la Fuente" losing its lowercase.
@@ -429,7 +433,7 @@ STATE_LABEL = {
 }
 
 
-def sec_eleven(marked, best, players) -> list[str]:
+def sec_eleven(marked, best, players, second=None) -> list[str]:
     """## 1. Am I fielding the right eleven?"""
     out = ["## 1. Am I fielding the right eleven?", ""]
 
@@ -455,14 +459,32 @@ def sec_eleven(marked, best, players) -> list[str]:
                 "jornada** (uncalibrated — see the methodology link at the "
                 "end)", ""]
 
-    out += ["| | Marked XI | Start% | xPts/j | State |",
-            "|---|---|--:|--:|---|"]
+    # Three readings side by side, not one blended number: the points a player
+    # scores per match, and each source's view of whether he plays. Only the
+    # first is shared — points per match is a record, and both sites are
+    # looking at the same one — so blending is only ever tempting for the two
+    # start columns, and that is exactly where it would hide a disagreement
+    # worth seeing. State has moved to question 2, which prints every player.
+    cells = second or {}
+    out += ["| | Marked XI | pts/m | FF | AF | xPts/j |",
+            "|---|---|--:|--:|--:|--:|"]
     for slot in ("POR", "DEF", "MED", "DEL"):
         for p in [x for x in mxi if x["slot"] == slot]:
-            out.append(f"| {slot} | {p['name']} | {pct_cell(p)} | "
-                       f"{p['score']:.1f} | "
-                       f"{STATE_LABEL.get(p['status'] or 'ok', p['status'])} |")
-    out.append("")
+            flag = " ⚠" if (p["status"] or "ok") != "ok" else ""
+            out.append(f"| {slot} | {p['name']}{flag} | {ppm_cell(p)} | "
+                       f"{pct_cell(p)} | {af_cell(cells.get(p['key']))} | "
+                       f"{p['score']:.1f} |")
+    out += ["",
+            "_**pts/m** is points per match from last season's totals, shrunk "
+            "toward the average for a short record — a record, not a "
+            "fixture-aware forecast: it does not know who the opponent is. "
+            "`~` means no top-flight record at all, so the baseline is "
+            "assumed. **FF** is futbolfantasy's published start percentage, "
+            "**AF** is analiticafantasy's; they are separate columns because "
+            "neither has been checked against a played jornada yet, so there "
+            "is no weight to blend them by. **xPts/j** = pts/m × FF, and uses "
+            "FF only. `⚠` on a name means question 2 has something on him._",
+            ""]
 
     if best is None:
         return out + ["_No legal XI available from this squad, so there is "
@@ -522,19 +544,27 @@ def sec_fitness(players) -> list[str]:
         out += [f"**Nobody in your squad is flagged.** All {len(fit)} players "
                 "with an entry on their team page read as available.", ""]
 
-    out += ["| Player | State | What the page says |", "|---|---|---|"]
-    order = {"injured": 0, "suspended": 1, "unavailable": 2, "doubt": 3}
-    for p in sorted(flagged, key=lambda x: order.get(x["status"], 9)):
-        out.append(f"| {p['name']} | {STATE_LABEL.get(p['status'], p['status'])}"
-                   f" | {p['note'] or '—'} |")
-    for p in sorted(nodata, key=lambda x: x["name"]):
-        out.append(f"| {p['name']} | ⚪ no data | not listed on his team page "
-                   "— unknown, not fit |")
-    for p in sorted(fit, key=lambda x: x["name"]):
-        if not p["on_page"]:
-            continue
-        out.append(f"| {p['name']} | fit | listed, no flag |")
-    out.append("")
+    # Rows for what is wrong or unknown; one line for what is fine. Every
+    # player is still accounted for — the guarantee above is that silence and
+    # fitness must not look the same, and they do not: a no-data player keeps
+    # his own row and the fit ones are named, not merely counted. What is gone
+    # is fifteen table rows reading "fit | listed, no flag" on a phone screen.
+    if flagged or nodata:
+        out += ["| Player | State | What the page says |", "|---|---|---|"]
+        order = {"injured": 0, "suspended": 1, "unavailable": 2, "doubt": 3}
+        for p in sorted(flagged, key=lambda x: order.get(x["status"], 9)):
+            out.append(f"| {p['name']} | "
+                       f"{STATE_LABEL.get(p['status'], p['status'])}"
+                       f" | {p['note'] or '—'} |")
+        for p in sorted(nodata, key=lambda x: x["name"]):
+            out.append(f"| {p['name']} | ⚪ no data | not listed on his team "
+                       "page — unknown, not fit |")
+        out.append("")
+    if fit:
+        out += [f"_Listed with no flag ({len(fit)}): "
+                + ", ".join(p["name"] for p in sorted(fit,
+                                                      key=lambda x: x["name"]))
+                + "._", ""]
 
     if nodata:
         out += [f"_{len(nodata)} player(s) have no entry on their team page. "
@@ -555,38 +585,122 @@ def pct_cell(p) -> str:
         f"{NEUTRAL_START if p['on_page'] else ABSENT_START:.0f}%"
 
 
-def sec_starting(marked, players, min_start) -> list[str]:
-    """## 3. Is everyone expected to start?"""
+def load_second(players, source: str = SECOND_SOURCE):
+    """{player key: the second source's row}, plus the names it could not join.
+
+    Joined by name — exact first, then ffcore.text.resolve — because the two
+    sites number players differently and neither publishes the app's slug.
+    Nothing is guessed: a name with several candidates is handed back to be
+    printed, not picked between, and it carries no cell in the table.
+    """
+    from ffcore.text import resolve
+
+    rows = latest_only(load_lineups(source))
+    cells: dict = {}
+    unclear: list[tuple[str, list[str]]] = []
+    for p in players:
+        row, cands = resolve(p["name"], rows, key="player_name")
+        if row:
+            cells[p["key"]] = row
+        elif cands:
+            unclear.append((p["name"], [c["player_name"] for c in cands]))
+    return cells, unclear
+
+
+def af_cell(row) -> str:
+    """The second source's read, in its own units.
+
+    It publishes two different things on the same page, and they are not
+    interchangeable. Close to kickoff it names a starting eleven — a final
+    call, with no number attached. Before that it publishes its editors'
+    consensus as a fraction ("2/3 titular"), which IS a probability and is
+    printed as one. A final call is printed as `titular`, never dressed up as
+    100%, because turning a yes into a percentage would mean inventing the
+    constant that converts them, and no jornada has been played to fit it.
+    """
+    if not row:
+        return "—"
+    pct = row.get("start_pct")
+    if pct not in (None, ""):
+        return f"{float(pct):.0f}%"
+    return "titular" if row.get("role") == "starter" else "?"
+
+
+def ppm_cell(p) -> str:
+    """Points per match. `~` marks a player with no top-flight record, whose
+    baseline is assumed rather than earned."""
+    return ("~" if p["assumed"] else "") + f"{p['ppm']:.1f}"
+
+
+def disagrees(p, row, min_start: float) -> str:
+    """Why the two sources conflict for this player, or ''.
+
+    Only a conflict that would change the decision counts: one source putting
+    him in the eleven while the other does not.
+    """
+    if not row:
+        return ""
+    likely = p["pct_used"] >= min_start
+    named = (row.get("role") == "starter"
+             or (row.get("start_pct") not in (None, "")
+                 and float(row["start_pct"]) >= min_start))
+    if likely and not named:
+        return f"futbolfantasy {pct_cell(p)}, {SECOND_SOURCE} {af_cell(row)}"
+    if named and not likely:
+        return f"{SECOND_SOURCE} {af_cell(row)}, futbolfantasy {pct_cell(p)}"
+    return ""
+
+
+def sec_starting(marked, players, min_start, second=None,
+                 unclear=None) -> list[str]:
+    """## 3. Is everyone expected to start?
+
+    EXCEPTIONS ONLY. This used to print all fifteen players with a Reading
+    column, and on a normal day fourteen of those rows read "published" — a
+    column of the same word, pushing the one row that mattered off a phone
+    screen. Every start figure is now in question 1's table, so what belongs
+    here is only what question 1 cannot show: who is under the threshold, and
+    where the two sources contradict each other.
+    """
     out = ["## 3. Is everyone expected to start?", ""]
     if marked is None:
         return out + ["_No marks to read — see question 1._", ""]
 
+    cells = second or {}
     _, mxi, mbench, _, _ = marked
     low = [p for p in mxi if p["pct_used"] < min_start]
+    split = [(p, lab, why) for lab, group in (("XI", mxi), ("bench", mbench))
+             for p in group
+             for why in [disagrees(p, cells.get(p["key"]), min_start)] if why]
 
+    if not low and not split and not unclear:
+        out += [f"**Nothing to check.** Every marked player is at "
+                f"{min_start:.0f}% or above on futbolfantasy, and "
+                f"analiticafantasy does not contradict any of them.", ""]
     if low:
         out += [f"**{len(low)} of your marked XI are under {min_start:.0f}%:** "
                 + ", ".join(f"{p['name']} ({pct_cell(p)})" for p in low)
                 + ".", ""]
-    else:
-        out += [f"**Every marked player is at {min_start:.0f}% or above.**", ""]
+    if split:
+        out += ["**The two sources disagree** — one of them has him in the "
+                "eleven and the other does not. Neither has a track record "
+                "here yet, so this is a prompt to open the app, not a verdict:",
+                ""]
+        out += ["| | Player | The split |", "|---|---|---|"]
+        for p, lab, why in split:
+            out.append(f"| {lab} | {p['name']} | {why} |")
+        out.append("")
+    if unclear:
+        out += [f"_{len(unclear)} name(s) could not be matched to "
+                f"analiticafantasy without guessing, so they carry no AF cell: "
+                + "; ".join(f"**{n}** → {', '.join(c)}" for n, c in unclear)
+                + ". A wrong player is worse than a blank one._", ""]
 
-    out += ["| | Player | Start% | Reading |", "|---|---|--:|---|"]
-    for label, group in (("XI", mxi), ("bench", mbench)):
-        for p in sorted(group, key=lambda x: -x["pct_used"]):
-            if p["pct"] is not None:
-                how = "published"
-            elif p["on_page"]:
-                how = f"listed without a figure — assumed {NEUTRAL_START:.0f}%"
-            else:
-                how = f"absent from the page — assumed {ABSENT_START:.0f}%"
-            flag = " ⚠" if label == "XI" and p["pct_used"] < min_start else ""
-            out.append(f"| {label} | {p['name']}{flag} | {pct_cell(p)} | "
-                       f"{how} |")
-    out += ["", "_`start_pct` is futbolfantasy's editorial bucket, read twice "
-                "a day, not a live probability — it moved for only a handful "
-                "of players across the snapshots taken so far. Threshold is "
-                "`min_start` in `inputs/league.ini`._", ""]
+    out += ["_Both figures are editorial reads refreshed a few times a day, "
+            "not live probabilities. `~` means listed with no figure "
+            f"(assumed {NEUTRAL_START:.0f}%), `!` not on the page at all "
+            f"(assumed {ABSENT_START:.0f}%). Threshold is `min_start` in "
+            "`inputs/league.ini`._", ""]
     return out
 
 
@@ -666,17 +780,22 @@ def main() -> None:
     # footnote; this inverts it.
     marked = as_fielded(players, squad) if players else None
     min_start = lg.cfg.min_start if lg else 60.0
+    second, unclear = load_second(players)
 
     out: list[str] = [f"# Fantasy report — {observed}", ""]
 
     ctx = []
-    deadline = load_deadline()
+    # Derived from the next kickoff when fixtures have been scraped, so it
+    # cannot go stale the way a typed date did. The source is printed: a
+    # deadline you cannot trace is one you stop trusting.
+    deadline, dl_src = load_deadline(with_source=True)
     if deadline:
         left = (deadline - now).total_seconds() / 3600
         if left < 0:
             ctx.append("**Deadline passed** — update `inputs/deadline.txt`")
         elif left < 48:
-            ctx.append(f"**Locks in {left:.0f}h**")
+            ctx.append(f"**Locks in {left:.0f}h**"
+                       + (" (next kickoff)" if dl_src == "fixtures" else ""))
         else:
             ctx.append(f"Locks in {left / 24:.0f} days")
     ctx.append(f"squad {eur(squad_value)}")
@@ -685,9 +804,9 @@ def main() -> None:
         ctx.append(f"total {eur(squad_value + cash.value)}")
     out += [" · ".join(ctx), ""]
 
-    out += sec_eleven(marked, best, players)
+    out += sec_eleven(marked, best, players, second)
     out += sec_fitness(players)
-    out += sec_starting(marked, players, min_start)
+    out += sec_starting(marked, players, min_start, second, unclear)
     out += (slate_lines if slate_lines else
             ["## 4. Anything to do in the market?", "",
              "_No slate pasted, so there is nothing you can bid on today that "
@@ -837,5 +956,55 @@ def main() -> None:
     write_lines(HISTORY / f"{observed[:10]}.md", out)
 
 
+def _selftest() -> None:
+    """The cells that carry a judgement. main() needs a repo to run against;
+    these do not, so they are the part CI can hold still."""
+    def pl(pct=None, on_page=True, used=None, ppm=4.0, assumed=False):
+        return {"pct": pct, "on_page": on_page, "ppm": ppm, "assumed": assumed,
+                "pct_used": pct if used is None else used}
+
+    # --- AF's two shapes, kept in their own units ---
+    assert af_cell(None) == "—"                     # not joined at all
+    assert af_cell({"role": "starter", "start_pct": ""}) == "titular"
+    # A named starter is NOT rendered as a percentage: doing so would mean
+    # inventing the yes→probability constant, and nothing exists to fit it.
+    assert "%" not in af_cell({"role": "starter", "start_pct": ""})
+    assert af_cell({"role": "starter", "start_pct": "100.0"}) == "100%"
+    assert af_cell({"role": "doubt", "start_pct": "66.7"}) == "67%"
+    assert af_cell({"role": "doubt", "start_pct": ""}) == "?"
+
+    # --- FF's cell, and the marks that say "assumed", not "read" ---
+    assert pct_cell(pl(pct=80.0)) == "80%"
+    assert pct_cell(pl(on_page=True)).startswith("~")
+    assert pct_cell(pl(on_page=False)).startswith("!")
+    assert ppm_cell(pl(ppm=3.14)) == "3.1"
+    assert ppm_cell(pl(ppm=3.14, assumed=True)) == "~3.1"
+
+    # --- the disagreement that changes a decision, and the ones that don't ---
+    starter = {"role": "starter", "start_pct": ""}
+    out = {"role": "doubt", "start_pct": "33.3"}
+    assert disagrees(pl(pct=90.0), starter, 60.0) == ""    # both say yes
+    assert disagrees(pl(pct=10.0), out, 60.0) == ""        # both say no
+    # FF has him starting, AF has him a third likely: that is the split.
+    assert "33%" in disagrees(pl(pct=90.0), out, 60.0)
+    assert "futbolfantasy 90%" in disagrees(pl(pct=90.0), out, 60.0)
+    # And the reverse reads the other way round, AF first.
+    rev = disagrees(pl(pct=10.0), starter, 60.0)
+    assert rev.startswith(SECOND_SOURCE) and "titular" in rev
+    # No second-source row is not a disagreement — it is silence.
+    assert disagrees(pl(pct=90.0), None, 60.0) == ""
+
+    # --- names ---
+    # A particle stays lowercase inside a name, but not as its first word.
+    assert title_name("nico van gaal") == "Nico van Gaal"
+    assert title_name("de la fuente") == "De La Fuente"
+    assert title_name("Vini Jr.") == "Vini Jr."      # already cased
+
+    print("report self-test OK (22 cases)")
+
+
 if __name__ == "__main__":
+    if "--selftest" in sys.argv:
+        _selftest()
+        raise SystemExit(0)
     main()

@@ -63,11 +63,12 @@ from typing import Callable, NamedTuple
 from lxml import html as lh
 
 __all__ = ["BASE", "SOURCE", "MARKET_URL", "POINTS_URL", "TEAM_URL", "TEAMS",
-           "AF_BASE", "AF_SOURCE", "AF_TEAM_URL", "AF_TEAMS",
+           "AF_BASE", "AF_SOURCE", "AF_TEAM_URL", "AF_TEAMS", "AF_HUB_URL",
            "Source", "sources", "source_for", "SEVERITY",
            "parse_market", "parse_team", "parse_points", "parse_fitness",
-           "parse_af_team", "season_label",
-           "sign_market", "sign_team", "sign_points", "sign_af_team"]
+           "parse_af_team", "parse_af_fixtures", "season_label",
+           "sign_market", "sign_team", "sign_points", "sign_af_team",
+           "sign_af_fixtures"]
 
 BASE = "https://www.futbolfantasy.com"
 # The `source` column on every lineups row from this site. It exists so a
@@ -540,19 +541,39 @@ def sign_team(html: str) -> str | None:
 # Analítica Fantasy — the second probable-XI source
 # ---------------------------------------------------------------------------
 #
-# WHAT IT GIVES, AND WHAT IT DOES NOT. Their team page server-renders exactly
-# the eleven they predict, as <ul aria-label="Titulares <Team>">, with a stable
-# numeric player id in the photo URL. There is NO start percentage — their
-# prediction is binary — and no fitness panel at all. So `start_pct` is empty
-# and `status` is "" rather than "ok": this page says nothing about fitness,
-# and silence must never be stored as a clean bill of health.
+# THEIR TEAM PAGE HAS TWO SHAPES, and which one you get depends on how close
+# the next match is. The first live sweep found only 4 of 20 pages carrying the
+# shape this parser was first written against, which is how the second shape
+# was found — before it could be mistaken for rot.
 #
-# The per-match pages (/partido/<id>-<home>-<away>) carry substitutes too, but
-# their URLs change every jornada, which the registry's static `url` cannot
-# express without a discovery step. Twenty static team pages give the eleven
-# that matters for one entry each. Their position codes are deliberately NOT
-# stored: the app's own positions are the ones the scorer must use, and a
-# column nothing reads is a column that will eventually be read by mistake.
+#   1. Match imminent: <ul aria-label="Titulares <Team>"> holds exactly the
+#      eleven, one <li aria-label="Ver resumen de <Name>"> each. This is their
+#      final call, and it is binary: no percentage anywhere on the page. So
+#      `start_pct` stays empty and `note` says "titular". Do NOT write 100
+#      here — a confident editorial call is not a stated probability, and the
+#      report must be able to tell the difference.
+#
+#   2. Match further out: an aria-label="Consenso de alineaciones" block
+#      instead, and this one is richer than a binary XI. It splits their three
+#      editors into "Unánimes" (in every editor's eleven) and "Más divididos"
+#      (text like "Aitor Paredes2/3 titular"). That fraction is a start
+#      probability THEY published, editor-count based — not a constant this
+#      repo invented — so it lands in `start_pct` as 100·n/d with the raw
+#      fraction preserved in `note`.
+#
+# The two shapes are mutually exclusive on every page seen so far, so the
+# parser tries Titulares and falls back to Consenso. A page with neither
+# returns no rows and ingest reports it as rot, which is the correct outcome:
+# the third shape does not exist yet, and when it does we should hear about it.
+#
+# NO FITNESS, EITHER WAY. Neither shape carries an injury panel, so `status`
+# is "" meaning *not stated*, never "ok" — silence must not be stored as a
+# clean bill of health. Their position codes are deliberately not stored: the
+# app's own positions are the ones the scorer must use.
+#
+# The per-match pages (/partido/<id>) carry substitutes too, but their URLs
+# change every jornada. We now read the ids off the hub page (see
+# parse_af_fixtures) — for kickoff times, not yet for lineups.
 
 AF_BASE = "https://www.analiticafantasy.com"
 AF_SOURCE = "analitica"
@@ -578,46 +599,171 @@ AF_XI_SELECTOR = 'ul[aria-label^="Titulares"] li[aria-label^="Ver resumen de"]'
 AF_NAME_PREFIX = "Ver resumen de "
 AF_PHOTO_RE = re.compile(r"/jugadores/(\d+)\.(?:png|jpg|jpeg|webp)")
 
+AF_CONSENSO_SELECTOR = '[aria-label="Consenso de alineaciones"]'
+AF_UNANIMOUS = "Unánimes"
+AF_DIVIDED = "Más divididos"
+# "Aitor Paredes2/3 titular" — name, then the editor fraction. The trailing
+# word matters: the captain-candidate block repeats a name with a bare "1/3"
+# and no "titular", and counting that as a lineup call would double-count him.
+AF_SPLIT_RE = re.compile(r"^(.+?)(\d+)\s*/\s*(\d+)\s+titular", re.S)
+AF_FRACTION_RE = re.compile(r"\d+\s*/\s*\d+")
+
+
+def _af_section(ul) -> str | None:
+    """Which consensus heading this <ul> sits under, or None for a section we
+    do not read.
+
+    The IMMEDIATE parent only. Walking further up finds the div that wraps all
+    three sections, whose text begins with the first heading — which labelled
+    the captain-candidate list as "Unánimes" and stored a 1/3 player as a
+    certain starter. An unrecognised section returns None and is skipped, so a
+    fourth block appearing on their page is ignored rather than guessed at.
+    """
+    parent = ul.getparent()
+    if parent is None:
+        return None
+    text = _WS.sub(" ", parent.text_content()).strip()
+    for head in (AF_UNANIMOUS, AF_DIVIDED):
+        if text.startswith(head):
+            return head
+    return None
+
+
+def _af_row(observed_at, slug, name, img_src, role, start_pct, note) -> dict:
+    m = AF_PHOTO_RE.search(img_src or "")
+    return {
+        "observed_at": observed_at,
+        "source": AF_SOURCE,
+        "team_slug": slug,
+        "player_name": name,
+        "player_slug": m.group(1) if m else None,
+        "role": role,
+        "start_pct": start_pct,
+        "status": "",               # no fitness panel — "" is "not stated"
+        "note": note,
+    }
+
 
 def parse_af_team(html: str, observed_at: str,
                   key: str = "af_test") -> list[dict]:
-    """Analítica Fantasy's predicted eleven for one team.
+    """Analítica Fantasy's lineup call for one team, in whichever shape the
+    page carries. See the block comment above for the two shapes.
 
-    The name comes from the row's own aria-label, not from its visible text:
-    the text is a truncated shirt-number-plus-name ("1 - Sivera") inside a
-    CSS-truncated element, while the aria-label is the full name the site
-    means. Rows carry `source` so they can share the lineups table with
-    futbolfantasy without either being mistaken for the other.
+    In the Titulares shape the name comes from the row's own aria-label, not
+    from its visible text: the text is a truncated shirt-number-plus-name
+    ("1 - Sivera") inside a CSS-truncated element, while the aria-label is the
+    full name the site means. In the Consenso shape there is no aria-label per
+    player and the visible text IS the name, with the fraction glued to it.
+
+    Rows carry `source` so they can share the lineups table with futbolfantasy
+    without either being mistaken for the other.
     """
     slug = key[3:] if key.startswith("af_") else key
     doc = lh.fromstring(html)
     rows, seen = [], set()
-    for li in doc.cssselect(AF_XI_SELECTOR):
-        name = (li.get("aria-label") or "")
-        name = name[len(AF_NAME_PREFIX):].strip() if \
-            name.startswith(AF_NAME_PREFIX) else ""
+
+    def add(name, img_src, role, start_pct, note):
         if not name or name.lower() in seen:
-            continue
+            return
         seen.add(name.lower())
+        rows.append(_af_row(observed_at, slug, name, img_src,
+                            role, start_pct, note))
+
+    def photo(li):
         img = li.cssselect("img[src]")
-        m = AF_PHOTO_RE.search(img[0].get("src") or "") if img else None
-        rows.append({
-            "observed_at": observed_at,
-            "source": AF_SOURCE,
-            "team_slug": slug,
-            "player_name": name,
-            "player_slug": m.group(1) if m else None,
-            "role": "starter",
-            "start_pct": None,      # they predict a starter, not a probability
-            "status": "",           # no fitness panel — "" is "not stated"
-            "note": "",
-        })
+        return img[0].get("src") if img else ""
+
+    for li in doc.cssselect(AF_XI_SELECTOR):
+        label = li.get("aria-label") or ""
+        name = (label[len(AF_NAME_PREFIX):].strip()
+                if label.startswith(AF_NAME_PREFIX) else "")
+        # start_pct stays None: their final call is binary, not a percentage.
+        add(name, photo(li), "starter", None, "titular")
+    if rows:
+        return rows
+
+    for block in doc.cssselect(AF_CONSENSO_SELECTOR):
+        for ul in block.cssselect("ul"):
+            section = _af_section(ul)
+            if section is None:
+                continue            # captain candidates and anything new
+            for li in ul.cssselect("li"):
+                text = _WS.sub(" ", li.text_content()).strip()
+                if section == AF_UNANIMOUS:
+                    # Second guard: a name with any fraction glued to it is not
+                    # a unanimous pick, whatever section it was found in.
+                    if AF_FRACTION_RE.search(text):
+                        continue
+                    # Unanimous is 100% whatever the editor count is, so this
+                    # needs no denominator and invents no constant.
+                    add(text, photo(li), "starter", 100.0, "consenso unánime")
+                    continue
+                m = AF_SPLIT_RE.match(text)
+                if not m:
+                    continue
+                name, n, d = m.group(1).strip(), int(m.group(2)), int(m.group(3))
+                if not d:
+                    continue
+                add(name, photo(li), "doubt", round(100.0 * n / d, 1),
+                    "consenso %d/%d" % (n, d))
     return rows
 
 
 def sign_af_team(html: str) -> str | None:
+    """Signs both shapes, so a page that switches shape is never called
+    unchanged."""
+    doc = lh.fromstring(html)
+    return _digest(_surface(doc.cssselect('ul[aria-label^="Titulares"]')
+                            + doc.cssselect(AF_CONSENSO_SELECTOR)))
+
+
+# --- fixtures ---------------------------------------------------------------
+#
+# The hub page lists every upcoming match as <a href="/partido/<id>"> holding a
+# <time datetime="...+00:00"> and the two crests as <img alt="<Team>">. That is
+# the whole fixtures table, and it is what makes inputs/deadline.txt derivable
+# instead of typed once a jornada.
+
+AF_HUB_URL = f"{AF_BASE}/la-liga/alineaciones-probables"
+AF_MATCH_RE = re.compile(r"/partido/(\d+)")
+
+
+def parse_af_fixtures(html: str, observed_at: str,
+                      key: str = "af_fixtures") -> list[dict]:
+    """Upcoming matches with their kickoff, newest page wins.
+
+    `kickoff` is stored exactly as they publish it — an ISO 8601 stamp with an
+    explicit +00:00 offset — rather than reformatted into this repo's compact
+    snapshot style. It is the one timestamp here that came from someone else,
+    and rewriting it would hide that.
+
+    A match already under way drops off their page, which is why this cannot
+    be treated as a complete jornada calendar. It answers one question: what
+    is the next kickoff.
+    """
+    doc = lh.fromstring(html)
+    rows, seen = [], set()
+    for a in doc.cssselect('a[href*="/partido/"]'):
+        m = AF_MATCH_RE.search(a.get("href") or "")
+        times = a.cssselect("time[datetime]")
+        teams = [i.get("alt") for i in a.cssselect("img[alt]") if i.get("alt")]
+        if not (m and times and len(teams) >= 2) or m.group(1) in seen:
+            continue
+        seen.add(m.group(1))
+        rows.append({
+            "observed_at": observed_at,
+            "source": AF_SOURCE,
+            "match_id": m.group(1),
+            "kickoff": times[0].get("datetime"),
+            "home": teams[0],
+            "away": teams[1],
+        })
+    return rows
+
+
+def sign_af_fixtures(html: str) -> str | None:
     return _digest(_surface(lh.fromstring(html).cssselect(
-        'ul[aria-label^="Titulares"]')))
+        'a[href*="/partido/"]')))
 
 
 def sign_points(html: str) -> str | None:
@@ -657,6 +803,9 @@ def sources(enabled_only: bool = True) -> list[Source]:
     out += [Source(f"af_{s}", "lineups", AF_TEAM_URL.format(slug=af),
                    parse_af_team, sign_af_team, cadence="daily")
             for s, af in sorted(AF_TEAMS.items())]
+    # One page, and it replaces a file you had to retype every jornada.
+    out += [Source("af_fixtures", "fixtures", AF_HUB_URL,
+                   parse_af_fixtures, sign_af_fixtures, cadence="daily")]
     return [s for s in out if s.enabled or not enabled_only]
 
 
@@ -805,6 +954,52 @@ _AF_FIXTURE = """<html><body>
 </body></html>"""
 
 
+# The other shape, which 16 of 20 pages carried on the first live sweep. Nesting
+# copied from the real page, because the nesting IS the thing under test: all
+# three lists sit in sibling divs inside one wrapper whose text begins with the
+# first heading. Reading the heading off an ancestor instead of the immediate
+# parent stored the captain candidate — "Nico Williams1/3", a 1-of-3 pick — as a
+# unanimous starter at 100%.
+_AF_CONSENSO_FIXTURE = """<html><body>
+<section aria-label="Consenso de alineaciones">
+  <div>
+    <div><h3>Unánimes</h3><p>2 jugadores en el once de todos</p>
+      <ul>
+        <li><img src="https://assets.analiticafantasy.com/jugadores/47270.png?v=13&width=36"/>
+            <span>Unai Simón</span></li>
+        <li><img src="https://assets.analiticafantasy.com/jugadores/47273.png?v=13&width=36"/>
+            <span>Yuri</span></li>
+      </ul></div>
+    <div><h3>Más divididos</h3><p>Titulares en algunos editores</p>
+      <ul>
+        <li><img src="https://assets.analiticafantasy.com/jugadores/183849.png?v=13&width=33"/>
+            <span>Aitor Paredes</span><span>2/3 titular</span></li>
+        <li><img src="https://assets.analiticafantasy.com/jugadores/84086.png?v=13&width=33"/>
+            <span>Robert Navarro</span><span>1/3 titular</span></li>
+      </ul></div>
+    <div><h3>Candidato a capitán</h3><p>Editores que marcan</p>
+      <ul>
+        <li><img src="https://assets.analiticafantasy.com/jugadores/183799.png?v=13&width=33"/>
+            <span>Nico Williams</span><span>1/3</span></li>
+      </ul></div>
+  </div>
+</section>
+</body></html>"""
+
+# The hub page, trimmed to one match link. The bare /partido/ link with no
+# <time> is the "Once posibles" teaser the page repeats without a kickoff.
+_AF_HUB_FIXTURE = """<html><body>
+<a href="/partido/100011934">
+  <time datetime="2026-08-15T19:30:00+00:00">15 ago, 21:30</time>
+  <span>Once posibles →</span>
+  <img alt="Sevilla" src="/escudos/536.png"/><span>Sevilla</span>
+  <img alt="Rayo Vallecano" src="/escudos/728.png"/><span>Rayo Vallecano</span>
+</a>
+<a href="/partido/100011934">duplicate, same id</a>
+<a href="/partido/999">no time, no crests</a>
+</body></html>"""
+
+
 def _selftest() -> None:
     # -- team page: the traps this parser exists to avoid -------------------
     rows = parse_team(_FIXTURE, "2026-01-01T0000Z", "team_test")
@@ -926,35 +1121,82 @@ def _selftest() -> None:
     # The row shape is byte-for-byte the futbolfantasy one, because both feed
     # one CSV whose columns are taken from whichever row is written first.
     assert list(af[0]) == list(rows[0]), (list(af[0]), list(rows[0]))
+    assert af[0]["note"] == "titular"                     # the shape it came in
     assert sign_af_team(_AF_FIXTURE) is not None
     assert sign_af_team("<html><body>no lineup</body></html>") is None
 
+    # -- Analítica, consensus shape ----------------------------------------
+    # 16 of 20 pages carried this on the first live sweep, when the match was
+    # more than a day out. It is the better shape: their three editors give a
+    # published fraction, so start_pct is theirs and not a constant of ours.
+    con = parse_af_team(_AF_CONSENSO_FIXTURE, "2026-01-01T0000Z", "af_test")
+    byc = {r["player_name"]: r for r in con}
+    assert set(byc) == {"Unai Simón", "Yuri", "Aitor Paredes",
+                        "Robert Navarro"}, sorted(byc)
+    # Unanimous is 100% for any editor count, so no denominator is invented.
+    assert byc["Unai Simón"]["start_pct"] == 100.0
+    assert byc["Unai Simón"]["note"] == "consenso unánime"
+    assert byc["Unai Simón"]["role"] == "starter"
+    # A published fraction, carried through as both a number and its source.
+    assert byc["Aitor Paredes"]["start_pct"] == 66.7, byc["Aitor Paredes"]
+    assert byc["Aitor Paredes"]["note"] == "consenso 2/3"
+    assert byc["Robert Navarro"]["start_pct"] == 33.3
+    assert byc["Robert Navarro"]["role"] == "doubt"        # editors disagree
+    # THE BUG THIS FIXTURE EXISTS FOR: the captain candidate must not appear.
+    # He is "Nico Williams1/3" in a third list, and an ancestor-walking heading
+    # lookup filed him under "Unánimes" and stored him at 100%.
+    assert "Nico Williams" not in byc, con
+    assert not any(c.isdigit() for r in con for c in r["player_name"]), con
+    # Same fitness rule as the other shape: silence is not health.
+    assert all(r["status"] == "" for r in con)
+    assert list(con[0]) == list(rows[0])                  # one CSV, one shape
+    # A page with neither shape yields nothing and is reported as rot, rather
+    # than a third shape being guessed at.
+    assert parse_af_team("<html><body>new design</body></html>", "t") == []
+    assert sign_af_team(_AF_CONSENSO_FIXTURE) is not None
+
+    # -- Analítica, fixtures -----------------------------------------------
+    fx = parse_af_fixtures(_AF_HUB_FIXTURE, "2026-01-01T0000Z")
+    assert len(fx) == 1, fx        # duplicate id and the time-less link dropped
+    assert fx[0]["match_id"] == "100011934"
+    assert fx[0]["home"] == "Sevilla" and fx[0]["away"] == "Rayo Vallecano"
+    # Stored exactly as published, offset included — see the docstring.
+    assert fx[0]["kickoff"] == "2026-08-15T19:30:00+00:00", fx[0]
+    assert fx[0]["source"] == AF_SOURCE
+    assert sign_af_fixtures(_AF_HUB_FIXTURE) is not None
+    assert sign_af_fixtures("<html><body>no matches</body></html>") is None
+
     # -- the registry ------------------------------------------------------
     reg = sources()
-    assert len(reg) == 2 + len(TEAMS) + len(AF_TEAMS) == 42, len(reg)
+    assert len(reg) == 3 + len(TEAMS) + len(AF_TEAMS) == 43, len(reg)
     assert set(AF_TEAMS) == set(TEAMS), set(AF_TEAMS) ^ set(TEAMS)
     # Both team sweeps are daily; market and points still run every sweep.
     assert {s.cadence for s in reg if s.key.startswith(("team_", "af_"))} \
         == {"daily"}
     assert {s.cadence for s in reg if s.key in ("market", "points")} \
         == {"every_run"}
-    assert {s.key for s in reg} >= {"market", "points", "team_barcelona"}
+    assert {s.key for s in reg} >= {"market", "points", "team_barcelona",
+                                    "af_fixtures"}
     assert len({s.key for s in reg}) == len(reg)          # keys are unique
-    assert {s.table for s in reg} == {"market", "points", "lineups"}
+    assert {s.table for s in reg} == {"market", "points", "lineups",
+                                      "fixtures"}
     assert source_for("team_celta").parse is parse_team
     assert source_for("gone") is None                     # retired page name
 
     # Every entry can actually parse and sign, with the key it declares —
     # this is what stops a new source being added half-wired.
     assert source_for("af_celta").parse is parse_af_team
-    fixtures = {"market": _MARKET_FIXTURE, "points": _POINTS_FIXTURE}
-    fixtures.update({f"af_{k}": _AF_FIXTURE for k in AF_TEAMS})
+    samples = {"market": _MARKET_FIXTURE, "points": _POINTS_FIXTURE,
+               "af_fixtures": _AF_HUB_FIXTURE}
+    # Half the AF teams get each shape, so neither branch can rot unnoticed.
+    for i, k in enumerate(sorted(AF_TEAMS)):
+        samples[f"af_{k}"] = _AF_FIXTURE if i % 2 else _AF_CONSENSO_FIXTURE
     for s in reg:
-        html = fixtures.get(s.key, _FIXTURE)
+        html = samples.get(s.key, _FIXTURE)
         assert s.sign(html) is not None, s.key
         assert isinstance(s.parse(html, "2026-01-01T0000Z", s.key), list), s.key
 
-    print("sources.py selftest OK (60 cases)")
+    print("sources.py selftest OK (81 cases)")
 
 
 if __name__ == "__main__":
