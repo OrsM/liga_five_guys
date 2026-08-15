@@ -64,11 +64,11 @@ from ffcore.bid import (HOLD_DAYS, band_of, deals,  # noqa: E402
                         demand_summary, drift_bands, friction, gain,
                         premiums, suggest, verdict, xi_snapshots)
 from ffcore.league import League  # noqa: E402
-from ffcore.parse import money, ratio  # noqa: E402
+from ffcore.parse import ratio  # noqa: E402
 from ffcore.score import (ABSENT_START, MAX_SLOT, NEUTRAL_START,  # noqa: E402
-                          SLOT_LABEL, SLOT_MIN, THIN, Scorer, formations,
+                          SLOT_LABEL, THIN, Scorer, formations,
                           pick_xi, squad_pool)
-from ffcore.tidy import (DECISIONS, MADRID, REPORTS, SEASON,  # noqa: E402
+from ffcore.tidy import (DECISIONS, REPORTS, SEASON,  # noqa: E402
                          append_csv, input_path, latest_only, load_deadline,
                          load_market, load_lineups, read_csv, snapshot_stamp,
                          write_lines)
@@ -136,7 +136,7 @@ def load_history() -> tuple[dict, str]:
     return out, files[-1].stem.replace("points_", "")
 
 
-def as_fielded(players, squad):
+def as_fielded(players):
     """(total, xi, bench, illegal, warnings) for the XI you have MARKED.
 
     Reads inputs/lineup.txt — the checklist squads.py regenerates — so the
@@ -651,7 +651,7 @@ def disagrees(p, row, min_start: float) -> str:
     return ""
 
 
-def sec_starting(marked, players, min_start, second=None,
+def sec_starting(marked, min_start, second=None,
                  unclear=None) -> list[str]:
     """## 3. Is everyone expected to start?
 
@@ -778,7 +778,7 @@ def main() -> None:
     # Four questions, four tables, then a rule and everything else. The old
     # layout led with the recommendation and buried the marked XI in a
     # footnote; this inverts it.
-    marked = as_fielded(players, squad) if players else None
+    marked = as_fielded(players) if players else None
     min_start = lg.cfg.min_start if lg else 60.0
     second, unclear = load_second(players)
 
@@ -806,7 +806,7 @@ def main() -> None:
 
     out += sec_eleven(marked, best, players, second)
     out += sec_fitness(players)
-    out += sec_starting(marked, players, min_start, second, unclear)
+    out += sec_starting(marked, min_start, second, unclear)
     out += (slate_lines if slate_lines else
             ["## 4. Anything to do in the market?", "",
              "_No slate pasted, so there is nothing you can bid on today that "

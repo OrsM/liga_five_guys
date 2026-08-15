@@ -1,6 +1,6 @@
-# League behaviour — 2026-08-15 16:58 UTC
+# League behaviour — 2026-08-15 19:42 UTC
 
-5 managers, 35 ledger rows, 29 market snapshots, points baseline 2025-26.
+5 managers, 35 ledger rows, 31 market snapshots, points baseline 2025-26.
 
 ## 1. Cash and ceilings
 
@@ -78,10 +78,10 @@ Two errors this table is built to catch: buying a player who has already risen (
 | Manager | xPts/j | Shape | Trapped | Injured | Thin at | Unmatched |
 |---|--:|---|--:|--:|---|--:|
 | **miguel_autentico** | 35.4 | 4-5-1 | 4.73M | 0 | del | 0 |
-| Albert Laporta | 32.6 | 3-4-3 | 55.61M | 0 | por | 0 |
-| BurtonGM89 | 31.4 | 5-4-1 | 36.79M | 1 | por,del | 0 |
-| Magic Mike 333 | 32.4 | 3-4-3 | 17.75M | 1 | por | 0 |
-| SusoGattuso | 29.4 | 4-4-2 | 26.31M | 0 | por | 0 |
+| Albert Laporta | 32.1 | 3-4-3 | 55.61M | 0 | por | 0 |
+| BurtonGM89 | 33.6 | 5-4-1 | 36.79M | 1 | por,del | 0 |
+| Magic Mike 333 | 32.9 | 3-4-3 | 19.54M | 1 | por | 0 |
+| SusoGattuso | 32.5 | 5-3-2 | 26.31M | 0 | por | 0 |
 
 - miguel_autentico is carrying more portero/mediocampista than can ever start.
 - Albert Laporta is carrying more delantero than can ever start.
@@ -97,31 +97,31 @@ Trapped is value held in players below 50% start probability — money that cann
 
 | Player | Pos | Value | Start% | Short here |
 |---|---|--:|--:|---|
+| david soria | POR | 19.48M | 100% | Albert Laporta, BurtonGM89, Magic Mike 333, SusoGattuso |
 | joan garcia | POR | 68.06M | 80% | Albert Laporta, BurtonGM89, Magic Mike 333, SusoGattuso |
 | kylian mbappe | DEL | 129.58M | 70% | BurtonGM89 |
 | vinicius junior | DEL | 107.53M | 90% | BurtonGM89 |
+| augusto batalla | POR | 40.35M | 100% | Albert Laporta, BurtonGM89, Magic Mike 333, SusoGattuso |
 | alvaro valles | POR | 32.74M | 95% | Albert Laporta, BurtonGM89, Magic Mike 333, SusoGattuso |
-| david soria | POR | 19.48M | 95% | Albert Laporta, BurtonGM89, Magic Mike 333, SusoGattuso |
 | jan oblak | POR | 52.60M | 90% | Albert Laporta, BurtonGM89, Magic Mike 333, SusoGattuso |
 | lamine yamal | DEL | 126.81M | 60% | BurtonGM89 |
-| augusto batalla | POR | 40.35M | 95% | Albert Laporta, BurtonGM89, Magic Mike 333, SusoGattuso |
 | mathew ryan | POR | 13.55M | 90% | Albert Laporta, BurtonGM89, Magic Mike 333, SusoGattuso |
+| toni martinez | DEL | 25.02M | 100% | BurtonGM89 |
+| martin satriano | DEL | 31.25M | 100% | BurtonGM89 |
 | stole dimitrievski | POR | 14.11M | 90% | Albert Laporta, BurtonGM89, Magic Mike 333, SusoGattuso |
-| unai simon | POR | 54.47M | 90% | Albert Laporta, BurtonGM89, Magic Mike 333, SusoGattuso |
-| ante budimir | DEL | 50.42M | 90% | BurtonGM89 |
 
 **Nobody else needs these.** Same quality, no auction — take the equivalent player here instead of paying a premium above.
 
 | Player | Pos | Value | Start% |
 |---|---|--:|--:|
+| zaid romero | DEF | 28.02M | 100% |
+| florian lejeune | DEF | 38.21M | 100% |
 | federico valverde | MED | 68.85M | 90% |
-| zaid romero | DEF | 28.02M | 90% |
-| florian lejeune | DEF | 38.21M | 90% |
+| andrei ratiu | DEF | 35.45M | 100% |
 | pablo fornals | MED | 57.93M | 80% |
 | marcos alonso | DEF | 29.33M | 90% |
 | german valera | MED | 23.27M | 90% |
-| andrei ratiu | DEF | 35.45M | 90% |
-| fermin lopez | MED | 64.18M | 70% |
+| nahuel tenaglia | DEF | 14.40M | 100% |
 
 **List these to them.** Players of yours who aren't starting, in a position a rival is short in. You stop competing with them and start selling to them; price just under the premium they showed in section 2.
 
@@ -136,42 +136,42 @@ Each manager's best legal XI under the same scorer — what a rational version o
 | Manager | ≈pts/j | vs you | Shape | Unmatched |
 |---|--:|--:|---|--:|
 | **miguel_autentico** | 35.4 | — | 4-5-1 | 0 |
-| Albert Laporta | 32.6 | -2.7 | 3-4-3 | 0 |
-| Magic Mike 333 | 32.4 | -2.9 | 3-4-3 | 0 |
-| BurtonGM89 | 31.4 | -3.9 | 5-4-1 | 0 |
-| SusoGattuso | 29.4 | -6.0 | 4-4-2 | 0 |
+| BurtonGM89 | 33.6 | -1.8 | 5-4-1 | 0 |
+| Magic Mike 333 | 32.9 | -2.5 | 3-4-3 | 0 |
+| SusoGattuso | 32.5 | -2.9 | 5-3-2 | 0 |
+| Albert Laporta | 32.1 | -3.3 | 3-4-3 | 0 |
 
 Unmatched names are absent from that manager's total, so a big number there understates them. Variance in one jornada dwarfs these gaps; over ten it does not.
 
 **miguel_autentico** — 4-5-1 · ≈35 pts
 - POR: ionut radu 5.9
-- DEF: carl starfelt 3.1 · igor zubeldia 3.0 · robin le normand 2.6 · omar el hilali 2.4
-- MED: jon moncayola 3.9 · lucien agoume 3.2 · pepelu 3.0 · ruben garcia 2.9 · iñigo ruiz de galarreta 2.7
+- DEF: carl starfelt 3.1 · robin le normand 2.6 · omar el hilali 2.4 · igor zubeldia 2.2
+- MED: lucien agoume 3.9 · jon moncayola 3.9 · pepelu 3.0 · ruben garcia 2.9 · iñigo ruiz de galarreta 2.7
 - DEL: iñigo vicente 2.7
 
-**Albert Laporta** — 3-4-3 · ≈33 pts
-- POR: matias dituro 5.6
-- DEF: leandro cabrera 4.1 · diego javier llorente 2.8 · juan foyth 2.3
-- MED: arda guler 3.9 · marc roca 2.6 · ilaix moriba 1.9 · eduardo camavinga 1.2~
-- DEL: ferran jutgla 3.7 · raul moro 2.4 · asier villalibre 2.1
+**BurtonGM89** — 5-4-1 · ≈34 pts
+- POR: marko dmitrovic 5.7
+- DEF: carlos romero 4.1 · justin de haas 2.8 · quilindschy hartman 2.0 · carlos puga 2.0 · giacomo quagliata 1.4
+- MED: santi comesaña 4.4 · antonio blanco 4.4 · denis suarez 3.4 · tajon buchanan 1.3~
+- DEL: karl etta eyong 2.0
 
-**Magic Mike 333** — 3-4-3 · ≈32 pts
+**Magic Mike 333** — 3-4-3 · ≈33 pts
 - POR: alfonso herrero 3.5
-- DEF: kike salas 4.3 · jose gaya 2.5 · lucas noubi 2.2
+- DEF: kike salas 4.8 · jose gaya 2.5 · lucas noubi 2.2
 - MED: brahim diaz 2.3 · gustavo puerta 2.3 · williot swedberg 2.2 · marc bernal 2.2
 - DEL: raphinha 5.0 · gorka guruzeta 3.7 · pere milla 2.2
 
-**BurtonGM89** — 5-4-1 · ≈31 pts
-- POR: marko dmitrovic 5.7
-- DEF: carlos romero 4.1 · justin de haas 2.8 · quilindschy hartman 2.0 · carlos puga 2.0 · giacomo quagliata 1.4
-- MED: santi comesaña 4.4 · antonio blanco 3.9 · denis suarez 1.7 · tajon buchanan 1.3~
-- DEL: karl etta eyong 2.0
-
-**SusoGattuso** — 4-4-2 · ≈29 pts
+**SusoGattuso** — 5-3-2 · ≈32 pts
 - POR: wojciech szczesny 1.1~
-- DEF: yuri berchiche 3.4 · cesar tarrega 3.2 · abdel abqar 2.6 · jon aramburu 2.1
-- MED: alvaro garcia 3.8 · aimar oroz 2.8 · lorenzo amatucci 2.3 · izan merino 2.0
+- DEF: abdel abqar 3.7 · yuri berchiche 3.4 · cesar tarrega 3.2 · jonny castro 3.0 · jon aramburu 2.1
+- MED: alvaro garcia 4.8 · aimar oroz 2.8 · lorenzo amatucci 2.3
 - DEL: giuliano simeone 3.7 · andres martin 2.4
+
+**Albert Laporta** — 3-4-3 · ≈32 pts
+- POR: matias dituro 5.6
+- DEF: leandro cabrera 4.1 · diego javier llorente 2.4 · juan foyth 2.3
+- MED: arda guler 3.9 · marc roca 2.6 · ilaix moriba 1.9 · eduardo camavinga 1.2~
+- DEL: ferran jutgla 3.7 · raul moro 2.4 · asier villalibre 2.1
 
 `~` start probability under 50% — the model expects rotation there, so that is where their real XI will differ from this one.
 

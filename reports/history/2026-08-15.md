@@ -93,4 +93,4 @@ _620 players tracked, 527 with a probable-XI reading._
 
 _xPts/j — expected points per jornada = shrunk pts/match (K=8, 2025-26) × P(start), from `ffcore/score.py` — the same scorer rivals.py uses. Injured, suspended and unavailable score zero; a doubt is halved._
 
-_Generated 2026-08-15 19:37 UTC._
+_Generated 2026-08-15 19:44 UTC._

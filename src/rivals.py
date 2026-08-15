@@ -212,7 +212,7 @@ def sec_premium(lg, dl) -> list[str]:
 # 3. post-buy drift
 # ---------------------------------------------------------------------------
 
-def sec_drift(lg, dl, market) -> list[str]:
+def sec_drift(dl, market) -> list[str]:
     out = ["## 3. What happened next", ""]
     rows = []
     for d in dl:
@@ -595,7 +595,7 @@ def main() -> None:
               ", **no points baseline** (run `ingest.py baseline`)"), ""]
     out += sec_cash(lg)
     out += sec_premium(lg, dl)
-    out += sec_drift(lg, dl, lg.market)
+    out += sec_drift(dl, lg.market)
     out += sec_squads(lg, sc, by_key)
     snaps = xi_snapshots(lg, sc, by_key)
     out += sec_demand(lg, sc, by_key, on_offer, snaps)

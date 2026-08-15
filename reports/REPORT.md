@@ -1,4 +1,4 @@
-# Liga Five Guys — one report — 2026-08-15 19:37 UTC
+# Liga Five Guys — one report — 2026-08-15 19:44 UTC
 
 The four questions first, from `latest.md`. Everything else is reference and is linked, not reprinted.
 

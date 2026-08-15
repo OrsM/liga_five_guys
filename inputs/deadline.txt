@@ -1,16 +1,21 @@
-# Next lock, Madrid wall-clock (the time the app shows). One line,
-# YYYY-MM-DDTHH:MM. Update it each jornada.
+# FALLBACK ONLY. The lock is derived from the next kickoff in
+# data/tidy/fixtures.csv, scraped from Analítica's fixtures hub. This file is
+# read only when no fixture lies ahead of now, and the report says which of
+# the two it used.
 #
-# WRITTEN BY: you.  READ BY: ffcore/tidy.py, via report.py and xi.py.
-# Stamps hours_to_lock on every logged row, so the scorer can take the
-# last row before kickoff instead of guessing which run was live.
-# Delete the line and the column goes blank; nothing else changes.
+# WRITTEN BY: you, if ever.  READ BY: ffcore/tidy.py load_deadline(), via
+# report.py and xi.py. Stamps hours_to_lock on every logged row, so the scorer
+# can take the last row before kickoff instead of guessing which run was live.
+#
+# One line, YYYY-MM-DDTHH:MM, Madrid wall-clock (the time the app shows).
+# LEFT EMPTY DELIBERATELY: a typed deadline goes stale silently, and this one
+# did — it sat at J1's first kickoff while the report read it as passed. An
+# empty file means the derived kickoff is the only answer, which is the
+# behaviour you want. Type a line here only to override it.
 #
 # J1 2026-27 is NOT one moment. LaLiga opens Sat 15 Aug 19:00 with
 # Alavés-Getafe, but the round runs to Thu 27 Aug: Atlético-Málaga is Wed 19,
 # and Valencia-Betis, Real Madrid-Real Sociedad and Barcelona-Athletic sit
-# between Tue 25 and Thu 27 (World Cup postponements). If the app locks each
-# player at HIS match rather than at the round's first kickoff, then several
-# of your XI stay editable for another week and this single number is only a
-# conservative floor. Check it in-app before trusting it.
-2026-08-15T19:00
+# between Tue 25 and Thu 27 (World Cup postponements). The app locks each
+# player at HIS match, which is exactly why the next kickoff — not a single
+# typed number for the whole round — is the right floor.
