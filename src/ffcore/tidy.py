@@ -40,7 +40,8 @@ from ffcore.text import norm, resolve
 __all__ = ["ROOT", "TIDY", "SEASON", "DECISIONS", "REPORTS", "MADRID",
            "input_path", "read_csv", "write_csv", "append_csv", "write_lines",
            "snapshot_stamp", "ledger_stamp", "latest_only", "snapshots",
-           "Market", "Valuation", "load_market", "load_xi", "read_ledger"]
+           "Market", "Valuation", "load_market", "load_xi", "read_ledger",
+           "load_deadline"]
 
 ROOT = Path(os.environ.get("FF_ROOT", "./data"))
 TIDY = ROOT / "tidy"
@@ -113,6 +114,23 @@ def append_csv(path, rows, fieldnames=None) -> None:
         if fresh:
             w.writeheader()
         w.writerows(rows)
+
+
+def load_deadline():
+    """inputs/deadline.txt -> the next lock as aware UTC, or None.
+
+    Madrid wall-clock in the file, because that is what the app shows. Shared
+    rather than copied: report.py stamps hours_to_lock into squad_log.csv and
+    xi.py stamps it into xi_fielded.csv, and two readings of the same deadline
+    that disagree would silently mis-order the two logs against each other.
+    """
+    path = input_path("deadline.txt")
+    if not path.exists():
+        return None
+    body = "\n".join(ln.split("#")[0] for ln in
+                     path.read_text(encoding="utf-8").splitlines())
+    m = re.search(r"\d{4}-\d{2}-\d{2}[T ]?\d{0,2}:?\d{0,2}", body)
+    return ledger_stamp(m.group(0)) if m else None
 
 
 def write_lines(path, lines) -> None:
