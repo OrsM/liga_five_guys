@@ -59,6 +59,11 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      # The parser self-test drives lxml + cssselect against a fixture, so the
+      # test job needs them. httpx is NOT needed here: ff_ingest imports it
+      # inside fetch(), and nothing in this job fetches anything.
+      - name: Install test deps
+        run: pip install lxml cssselect
       - name: Self-tests
         run: |
           python src/ffcore/parse.py
