@@ -16,9 +16,6 @@ You toggle marks, never names. That matters once the bench is four players
 rather than one: a bench list has to be retyped as the squad churns, while a
 checklist is regenerated from the ledger and only your marks persist.
 
-    inputs/bench.txt        # fallback, still read when lineup.txt is absent
-        pepelu
-
 Everything else is derived. Your squad comes from the ledger, so the XI is
 squad minus bench — you never retype eleven names, and a name that is no
 longer yours is caught instead of silently logged. A squad member the
@@ -61,16 +58,6 @@ FIELDS = ["logged_at", "hours_to_lock", "n_xi", "xi", "bench", "warnings"]
 # 11 on the pitch. Fewer means the app would have auto-filled someone and the
 # log would not match what actually played.
 XI_SIZE = 11
-
-
-def read_bench(text: str) -> list[str]:
-    """One name per line. '#' comments and blank lines ignored."""
-    out = []
-    for line in (text or "").splitlines():
-        line = line.split("#")[0].strip()
-        if line:
-            out.append(line)
-    return out
 
 
 MARK_RE = re.compile(r"^\[(.?)\]\s*(.+)$")
@@ -191,18 +178,23 @@ def migrate(path, fields) -> None:
 
 
 def read_input(squad):
-    """(bench_names, warnings, source) — checklist first, bench.txt after."""
+    """(bench_names, warnings, source) — from the checklist, and only it.
+
+    inputs/bench.txt used to be a fallback here. It was a second hand-typed
+    answer to a question the checklist already answers from the ledger, and
+    once both existed they could disagree — silently, because whichever one
+    was read first won. There is one file now.
+    """
     chk = input_path("lineup.txt")
-    if chk.exists():
-        entries = read_checklist(chk.read_text(encoding="utf-8"))
-        if entries:
-            bench, warns = bench_from_checklist(squad, entries)
-            return bench, warns, "lineup.txt"
+    if not chk.exists():
+        return [], ["no inputs/lineup.txt — run squads.py to generate the "
+                    "checklist, then tick your eleven"], "none"
+    entries = read_checklist(chk.read_text(encoding="utf-8"))
+    if not entries:
         return [], ["lineup.txt has no marked lines — run squads.py"], \
             "lineup.txt"
-    old = input_path("bench.txt")
-    return (read_bench(old.read_text(encoding="utf-8") if old.exists()
-                       else ""), [], "bench.txt")
+    bench, warns = bench_from_checklist(squad, entries)
+    return bench, warns, "lineup.txt"
 
 
 def main() -> None:
@@ -270,11 +262,6 @@ def _selftest() -> None:
     _, _, warns4 = pick_xi(squad, [])
     assert any("12 players for an XI of 11" in w for w in warns4), warns4
 
-    # Comments and blanks are not player names.
-    assert read_bench("pepelu\n\n# injured\n  \n") == ["pepelu"]
-    assert read_bench("pepelu  # sitting\n") == ["pepelu"]
-    assert read_bench("") == []
-
     # --- checklist ---------------------------------------------------------
     text = ("# XI CHECKLIST\n"
             "# 11 marked\n"
@@ -316,6 +303,12 @@ def _selftest() -> None:
          (True, "Carl Starfelt")])
     assert "New Signing" in bench6, bench6
     assert any("not on the checklist" in w for w in warns6), warns6
+
+    # Comments and blanks are not player names — the checklist is the only
+    # reader now, so it has to strip them itself.
+    assert read_checklist("[x] Pepelu  # sitting\n") == [(True, "Pepelu")]
+    assert read_checklist("# [x] Pepelu\n") == []
+    assert read_checklist("") == []
 
     print("xi self-test OK (23 cases)")
 
