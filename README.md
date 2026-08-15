@@ -199,7 +199,9 @@ workflow input, or a new output file to wire into the report.
 That replaced three modules that all scraped the same site — and two of them
 fetched the *same* points page the daily sweep already stored, which is how
 `data/season/points_2025-26.csv` and `data/season/live/running_2025-26.csv`
-came to hold the same 757 players with the same totals. They carried four
+came to hold the same 757 players with the same totals. `running_*.csv` is gone
+— nothing read it, and `points_total` on every per-jornada row carries what it
+held. One copy of a number, or it drifts. They carried four
 different number parsers between them. `history.py` also imported `httpx` at
 module level, so importing it broke the test job, which installs no network
 client on purpose.

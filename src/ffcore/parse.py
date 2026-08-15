@@ -32,7 +32,7 @@ from __future__ import annotations
 
 import re
 
-__all__ = ["money", "euros", "ratio", "pct100", "fmt_money", "fmt_pct"]
+__all__ = ["money", "ratio", "pct100", "fmt_money", "fmt_pct"]
 
 # 1.234 / 1.234.567 — dot-grouped thousands, at least one full group of three.
 _DOT_GROUPED = re.compile(r"\d{1,3}(?:\.\d{3})+$")
@@ -90,12 +90,6 @@ def money(v):
     except ValueError:
         return None
     return -x if neg else x
-
-
-def euros(v):
-    """money() rounded to whole euros — for prices written back to CSV."""
-    x = money(v)
-    return None if x is None else int(round(x))
 
 
 def ratio(v):

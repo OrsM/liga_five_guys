@@ -23,8 +23,8 @@ Still to move here, in this order: league.py (roster replay, cash),
 score.py (shrunk ppm x P(start)), render.py (fmt_money, table helpers).
 """
 
-from ffcore.parse import euros, money, pct100, ratio
+from ffcore.parse import money, pct100, ratio
 from ffcore.text import fold, index_by, norm, resolve, tokens
 
 __all__ = ["norm", "fold", "tokens", "resolve", "index_by",
-           "money", "euros", "ratio", "pct100"]
+           "money", "ratio", "pct100"]

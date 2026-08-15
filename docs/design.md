@@ -134,10 +134,17 @@ The open-source [Externoak/LaLigaApp](https://github.com/Externoak/LaLigaApp) is
 
 ## 4. Pipeline architecture
 
-Designed against your actual constraints: `miguelito-asus` has ~2GB free RAM and swap pressure, everything installs under `~/.local`, and you drive it from your phone.
+> **Not what was built.** This section describes a local box (`miguelito-asus`),
+> DuckDB, Parquet, R/`targets` and systemd timers. None of it exists. What runs
+> is one GitHub Actions workflow, dated `tar.xz` snapshots of raw HTML, and CSV
+> under `data/tidy/`; there is no local machine in the loop and no database. The
+> built layout is in `README.md`, which is the accurate document. Kept here
+> because the *reasoning* below — point-in-time correctness, the language split,
+> the memory argument — is still what would justify moving off CSV if the data
+> ever outgrows it. Read it as a proposal, not a description.
 
 ```
-~/fantasy/
+~/fantasy/                        # proposed, never built
 ├── raw/                          # immutable, never rewritten
 │   └── dt=2026-08-11T00:20Z/
 │       ├── players.json.gz
@@ -149,7 +156,8 @@ Designed against your actual constraints: `miguelito-asus` has ~2GB free RAM and
 ├── silver/                       # parquet, one file per entity per day
 │   ├── player_value_daily/
 │   ├── player_points_jornada/
-│   └── probable_xi/
+│   └── lineups/                  # built as data/tidy/lineups.csv, one row
+│                                 # per source per player, not one dir per source
 ├── models/                       # fitted objects + backtest metrics
 ├── R/                            # targets pipeline + Quarto report
 └── py/                           # ingest, features, optimiser

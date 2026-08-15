@@ -2,14 +2,20 @@
 points.py — this season's points, from the snapshots you already take.
 
 ingest saves the points page in every twice-daily snapshot, and has since
-day one. Nothing read them until now. This turns every one of them into two
-files per season label:
+day one. Nothing read them until now. This turns every one of them into one
+file per season label:
 
-    data/season/live/running_<label>.csv     running totals, kept snapshots only
     data/season/live/perjornada_<label>.csv  what changed between kept snapshots
 
 Like ingest.parse, it is a full rebuild from raw on every run: fix the
-parser and every past snapshot is repaired. Both outputs are disposable.
+parser and every past snapshot is repaired. The output is disposable.
+
+It used to write `running_<label>.csv` beside it — every kept snapshot's
+cumulative totals. Nothing ever read it, and with one kept snapshot it was a
+byte-for-byte second copy of `data/season/points_<label>.csv`. The totals are
+still in raw and `points_total` is on every per-jornada row, so the file was
+storage without a reader. Deleted rather than kept "just in case": a second
+copy of the truth is how the two of them drifted in the first place.
 
 **Kept** means the totals actually moved. Points only change after matches,
 so of ~14 snapshots a week perhaps two carry news; the rest are identical and
@@ -58,8 +64,6 @@ from ffcore.tidy import SEASON, write_csv  # noqa: E402
 
 LIVE = SEASON / "live"
 
-RUN_FIELDS = ["observed_at", "season", "player_name", "player_name_full",
-              "team", "points", "games", "avg"]
 DIFF_FIELDS = ["from_stamp", "to_stamp", "season", "player_name",
                "player_name_full", "team", "points_delta", "games_delta",
                "points_total", "games_total"]
@@ -164,17 +168,11 @@ def main() -> None:
     for label, seq in sorted(by_label.items()):
         kept = keep_changed(seq)
 
-        running = []
-        for stamp, rows in kept:
-            for r in rows:
-                running.append({"observed_at": stamp, "season": label, **r})
-
         deltas = []
         for (s0, r0), (s1, r1) in zip(kept, kept[1:]):
             deltas.append(diff(r0, r1, s0, s1, label))
 
         LIVE.mkdir(parents=True, exist_ok=True)
-        write_csv(LIVE / f"running_{label}.csv", running, RUN_FIELDS)
         flat = [row for d in deltas for row in d]
         write_csv(LIVE / f"perjornada_{label}.csv", flat, DIFF_FIELDS)
 
