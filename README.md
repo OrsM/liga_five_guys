@@ -36,9 +36,10 @@ Three optional inputs, all off by default:
 | `lookup` | Paste comma-separated names to resolve app spellings to CSV names. |
 | `seen` | Paste today's market slate. The report then leads with those players, priced — see below. |
 
-`api probe` is the only other workflow. It is a manual spike against the
-official LaLiga API, which is unreachable (see below) — it produces no report
-and nothing depends on it.
+`report` is now the only workflow. The `api probe` spike and `src/fantasy_api.py`
+were deleted: the official API is unreachable (see below), the probe produced no
+report, and nothing depended on it. `docs/design.md` §3 keeps the token-flow
+recipe for if that ever changes, and git history keeps the code.
 
 ## What you edit
 
@@ -84,7 +85,7 @@ one is worth to your eleven:
 
 The watchlist collapses to the same players, unfiltered — no start-probability
 or budget cuts, because a 40%-start player on today's slate is still a choice
-you are making — and `behaviour.md` §5 restricts its demand forecast to them.
+you are making — and `rivals.md` §5 restricts its demand forecast to them.
 
 OCR output is expected to be bad and that's fine — `Inigo Ruiz Galarreta`
 resolves to `Iñigo Ruiz de Galarreta`. Where the name alone is ambiguous,
@@ -126,7 +127,7 @@ one. It is scratch, not state — that is what stops it drifting.
 src/                 ff_ingest.py (scrape+parse)  squads.py  report.py
                      rivals.py  watch.py
                      digest.py (stitches REPORT.md)  find_slug.py
-                     history.py  fantasy_api.py  optimise.py (unused — Phase 3)
+                     history.py  points.py  xi.py  seen.py  methodology.py
 src/ffcore/          shared core: parse (numbers)  text (names)  tidy (IO+time)
                      league (ownership+cash)  score (ratings+XI)
                      bid (premiums, bid bands, XI gain)
@@ -284,7 +285,11 @@ partial move doesn't break a run.
       mean; best-XI recommendation. Needs a few jornadas played.
 - [ ] **Phase 2 — value.** Odds → team λ, points decomposition, price model.
 - [ ] **Phase 3 — optimise.** Multi-week planning, reservation-price bidding.
-      `src/optimise.py` is the skeleton; it needs a coach (`entrenador`) slot.
+      The design is `docs/design.md` §6. `src/optimise.py` held an unwired
+      skeleton and was deleted — it was never imported, its position quotas
+      were assumed rather than checked, and it had no coach (`entrenador`)
+      slot. Recover it from git history when Phase 1 actually produces
+      expected points for it to consume.
 
 Phases 2+ can't be validated until ~8 jornadas exist to backtest against.
 

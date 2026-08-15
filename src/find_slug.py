@@ -10,111 +10,100 @@ find_slug.py — resolve player names against the collected market data.
 Use --file for multi-word names: the shell splits on spaces, which turns
 "alvaro fernandez" into two useless one-word searches.
 
-Accent-insensitive and substring-based, because the app truncates names.
+This is the tool inputs/transactions.csv tells you to run before adding a row:
+the ledger keys on the name as data/tidy spells it, and the app abbreviates.
+
+WHY THIS FILE IS NOW THIN. It used to carry private copies of input_path(),
+a market loader, and a fold() that stripped accents but not punctuation —
+the exact normaliser ffcore.text was written to replace, which meant this
+tool and the rest of the repo disagreed about "N'Diaye" and "C. Dominguez".
+Matching is now ffcore.text.resolve(), the same three passes (exact,
+substring, all-tokens) that seen.py uses on OCR'd names, so a name that
+resolves here resolves everywhere.
 """
 
 from __future__ import annotations
 
-import csv
 import os
 import sys
-import unicodedata
 from pathlib import Path
 
-import os, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-TIDY = Path(os.environ.get("FF_ROOT", "./data")) / "tidy"
+from ffcore.parse import money                                  # noqa: E402
+from ffcore.text import norm, resolve                           # noqa: E402
+from ffcore.tidy import input_path, latest_only, load_market    # noqa: E402
 
 
-def input_path(name: str) -> Path:
-    """Locate an editable input file. Prefers inputs/<name>; falls back to the
-    repo root so a half-finished move doesn't break the run."""
-    p = Path("inputs") / name
-    return p if p.exists() else Path(name)
-
-
-def fold(s) -> str:
-    return "".join(
-        c for c in unicodedata.normalize("NFD", (s or "").lower())
-        if unicodedata.category(c) != "Mn"
-    )
-
-
-def latest_market() -> list[dict]:
-    path = TIDY / "market.csv"
-    if not path.exists():
-        sys.exit(f"ERROR: {path} not found — run ff_ingest.py fetch && parse.")
-    with path.open(encoding="utf-8") as fh:
-        rows = list(csv.DictReader(fh))
+def market() -> list[dict]:
+    rows = latest_only(load_market())
     if not rows:
-        sys.exit("ERROR: market.csv is empty.")
-    newest = max(r["observed_at"] for r in rows)
-    rows = [r for r in rows if r["observed_at"] == newest]
-    print(f"# {len(rows)} players in snapshot {newest}")
+        sys.exit("ERROR: data/tidy/market.csv missing or empty — "
+                 "run ff_ingest.py fetch && parse.")
+    print("# %d players in snapshot %s"
+          % (len(rows), rows[0].get("observed_at", "?")))
     return rows
 
 
-def val(r) -> float:
-    try:
-        return float(r.get("value") or 0)
-    except ValueError:
-        return 0.0
-
-
-def show(rows: list[dict]) -> None:
+def show(rows) -> None:
     if not rows:
         print("  no match")
         return
-    for r in sorted(rows, key=lambda r: -val(r)):
-        print(f"  {r['name'][:28]:<28} {r['team'][:14]:<14} "
-              f"{r['position'][:12]:<12} {val(r)/1e6:>7.2f}M")
+    for r in sorted(rows, key=lambda r: -(money(r.get("value")) or 0)):
+        print("  %-28s %-14s %-12s %7.2fM"
+              % (r["name"][:28], (r.get("team") or "")[:14],
+                 (r.get("position") or "")[:12],
+                 (money(r.get("value")) or 0) / 1e6))
 
 
 def read_lines(path: Path) -> list[str]:
     if not path.exists():
-        sys.exit(f"ERROR: {path} not found.")
+        sys.exit("ERROR: %s not found." % path)
     return [ln.strip() for ln in path.read_text(encoding="utf-8").splitlines()
             if ln.strip() and not ln.strip().startswith("#")]
 
 
-def resolve_many(market: list[dict], queries: list[str]) -> None:
-    print("# paste the plain lines below into squad.txt")
+def resolve_many(rows, queries) -> None:
+    """One line per query: the canonical name, or why it could not be given.
+
+    Ambiguity is printed as candidates and never resolved silently — the
+    output of this is pasted into a ledger, where a wrong player costs money.
+    """
+    print("# paste the plain lines below into your squad or ledger")
     if not queries:
-        print("# nothing to look up — lookup.txt has no non-comment lines")
+        print("# nothing to look up — the file has no non-comment lines")
         return
     for q in queries:
-        qf = fold(q)
-        hits = [r for r in market if qf in fold(r["name"])]
-        if len(hits) == 1:
-            print(hits[0]["name"])
-        elif not hits:
-            print(f"# NO MATCH for '{q}' — try a shorter fragment")
+        hit, cands = resolve(q, rows)
+        if hit:
+            print(hit["name"])
+        elif cands:
+            print("# AMBIGUOUS '%s' — pick one:" % q)
+            for r in sorted(cands, key=lambda r: -(money(r.get("value")) or 0))[:6]:
+                print("#   %s  (%s, %s, %.2fM)"
+                      % (r["name"], r.get("team", ""), r.get("position", ""),
+                         (money(r.get("value")) or 0) / 1e6))
         else:
-            print(f"# AMBIGUOUS '{q}' — pick one:")
-            for r in sorted(hits, key=lambda r: -val(r))[:6]:
-                print(f"#   {r['name']}  ({r['team']}, {r['position']}, "
-                      f"{val(r)/1e6:.2f}M)")
+            print("# NO MATCH for '%s' — try a shorter fragment" % q)
 
 
-def check(market: list[dict], path: Path) -> None:
-    index = {fold(r["name"]): r for r in market}
+def check(rows, path: Path) -> None:
     entries = read_lines(path)
     ok, bad = [], []
     for e in entries:
-        hit = index.get(fold(e))
-        (ok if hit else bad).append(e)
-    print(f"{len(ok)}/{len(entries)} resolved")
+        hit, _ = resolve(e, rows)
+        (ok if hit else bad).append((e, hit))
+    print("%d/%d resolved" % (len(ok), len(entries)))
     if ok:
         print("\nresolved:")
-        show([index[fold(e)] for e in ok])
+        show([h for _, h in ok])
     if bad:
         print("\nNOT FOUND:")
-        for e in bad:
-            print(f"  {e}")
-            stem = fold(e).split()[-1] if fold(e).split() else fold(e)
-            for r in [r for r in market if stem in fold(r["name"])][:3]:
-                print(f"      did you mean: {r['name']}  ({r['team']})")
+        for e, _ in bad:
+            print("  %s" % e)
+            stem = (norm(e).split() or [""])[-1]
+            for r in [r for r in rows if stem and stem in norm(r["name"])][:3]:
+                print("      did you mean: %s  (%s)" % (r["name"], r.get("team", "")))
 
 
 def main() -> None:
@@ -123,22 +112,21 @@ def main() -> None:
         print(__doc__)
         return
 
-    market = latest_market()
+    rows = market()
 
     if args[0] == "--team":
-        want = fold(args[1]) if len(args) > 1 else ""
-        show([r for r in market if want and want in fold(r["team"])])
+        want = norm(args[1]) if len(args) > 1 else ""
+        show([r for r in rows if want and want in norm(r.get("team"))])
     elif args[0] == "--file":
-        resolve_many(market, read_lines(Path(args[1]) if len(args) > 1
-                                        else input_path("lookup.txt")))
+        resolve_many(rows, read_lines(Path(args[1]) if len(args) > 1
+                                      else input_path("lookup.txt")))
     elif args[0] == "--many":
-        resolve_many(market, args[1:])
+        resolve_many(rows, args[1:])
     elif args[0] == "--check":
-        check(market, Path(args[1]) if len(args) > 1
+        check(rows, Path(args[1]) if len(args) > 1
               else input_path("squad.txt"))
     else:
-        q = fold(" ".join(args))
-        show([r for r in market if q in fold(r["name"])])
+        show([r for r in rows if norm(" ".join(args)) in norm(r.get("name"))])
 
 
 if __name__ == "__main__":
