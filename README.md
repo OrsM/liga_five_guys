@@ -124,7 +124,7 @@ one. It is scratch, not state — that is what stops it drifting.
 ## Layout
 
 ```
-src/                 sources.py (the registry: what we fetch, how to read it)
+src/                 sources.py (the registry: futbolfantasy + Analítica)
                      ingest.py (fetch, parse, prune — the only network code)
                      squads.py  report.py  rivals.py  watch.py
                      digest.py (stitches REPORT.md)  find_slug.py
@@ -203,6 +203,39 @@ came to hold the same 757 players with the same totals. They carried four
 different number parsers between them. `history.py` also imported `httpx` at
 module level, so importing it broke the test job, which installs no network
 client on purpose.
+
+**Two probable-XI sources, stored side by side.** Analítica Fantasy is the
+second, as twenty registry entries — one per team — that cost one parse
+function and its fixtures, which is what the registry was built for. Their
+team page server-renders exactly the eleven they predict.
+
+What they give is **their predicted eleven, and nothing else**: no start
+percentage (their call is binary) and no fitness panel at all. So `start_pct`
+is empty and `status` is `""`, meaning *not stated*, never `ok` — a page that
+says nothing about fitness must not be stored as a clean bill of health. Their
+position codes are not stored either: the app's own positions are the ones the
+scorer uses. Their per-match pages do carry substitutes, but the URL changes
+every jornada, which the registry's static `url` cannot express without a
+discovery step, and the eleven is the part that matters.
+
+**Nothing reads them yet, deliberately.** `LINEUP_SOURCE` stays
+`futbolfantasy`. Two sources that disagree about a starter is a measurement to
+make once outcomes exist, not an average to take. The one known join hazard is
+already visible: Analítica writes `O. Mangala` where the app writes the full
+name, and names are the only join key we have.
+
+`robots.txt` allows `/equipo/`; it disallows `/api/`, which is the reason this
+reads the rendered page rather than hunting their endpoint. One request per
+team per day, at the same 1.5–3s spacing. Verified against a live page: two
+fetches forty-three bytes apart signed identically, so the deduplication holds
+here as it does for futbolfantasy.
+
+**Both team sweeps dropped to once a day.** Forty requests a day used to be
+twenty futbolfantasy pages twice; it is now twenty of each, once — the same
+budget answering more. `start_pct` moved for 22 of 511 players across a
+fortnight of twice-daily reads, so the second daily sweep was buying almost
+nothing. Market and points still run every sweep; those move daily and are two
+requests.
 
 **The lineups table names its source, and readers get exactly one.**
 `probable_xi.csv` is now `lineups.csv` with a `source` column, stamped by the

@@ -63,9 +63,11 @@ from typing import Callable, NamedTuple
 from lxml import html as lh
 
 __all__ = ["BASE", "SOURCE", "MARKET_URL", "POINTS_URL", "TEAM_URL", "TEAMS",
-           "Source", "sources", "SEVERITY",
+           "AF_BASE", "AF_SOURCE", "AF_TEAM_URL", "AF_TEAMS",
+           "Source", "sources", "source_for", "SEVERITY",
            "parse_market", "parse_team", "parse_points", "parse_fitness",
-           "season_label", "sign_market", "sign_team", "sign_points"]
+           "parse_af_team", "season_label",
+           "sign_market", "sign_team", "sign_points", "sign_af_team"]
 
 BASE = "https://www.futbolfantasy.com"
 # The `source` column on every lineups row from this site. It exists so a
@@ -534,6 +536,90 @@ def sign_team(html: str) -> str | None:
     return _digest(_surface(els))
 
 
+# ---------------------------------------------------------------------------
+# Analítica Fantasy — the second probable-XI source
+# ---------------------------------------------------------------------------
+#
+# WHAT IT GIVES, AND WHAT IT DOES NOT. Their team page server-renders exactly
+# the eleven they predict, as <ul aria-label="Titulares <Team>">, with a stable
+# numeric player id in the photo URL. There is NO start percentage — their
+# prediction is binary — and no fitness panel at all. So `start_pct` is empty
+# and `status` is "" rather than "ok": this page says nothing about fitness,
+# and silence must never be stored as a clean bill of health.
+#
+# The per-match pages (/partido/<id>-<home>-<away>) carry substitutes too, but
+# their URLs change every jornada, which the registry's static `url` cannot
+# express without a discovery step. Twenty static team pages give the eleven
+# that matters for one entry each. Their position codes are deliberately NOT
+# stored: the app's own positions are the ones the scorer must use, and a
+# column nothing reads is a column that will eventually be read by mistake.
+
+AF_BASE = "https://www.analiticafantasy.com"
+AF_SOURCE = "analitica"
+AF_TEAM_URL = f"{AF_BASE}/equipo/{{slug}}"
+
+# Our canonical team slug -> their path segment, which carries their own team
+# id. Mapped rather than derived: "athletic" is "athletic-club-531" there, and
+# guessing would break silently the day a promoted side arrives.
+AF_TEAMS = {
+    "alaves": "alaves-542", "athletic": "athletic-club-531",
+    "atletico": "atletico-madrid-530", "barcelona": "barcelona-529",
+    "betis": "real-betis-543", "celta": "celta-vigo-538",
+    "deportivo": "deportivo-la-coruna-544", "elche": "elche-797",
+    "espanyol": "espanyol-540", "getafe": "getafe-546",
+    "levante": "levante-539", "malaga": "malaga-535",
+    "osasuna": "osasuna-727", "racing": "racing-santander-4665",
+    "rayo-vallecano": "rayo-vallecano-728", "real-madrid": "real-madrid-541",
+    "real-sociedad": "real-sociedad-548", "sevilla": "sevilla-536",
+    "valencia": "valencia-532", "villarreal": "villarreal-533",
+}
+
+AF_XI_SELECTOR = 'ul[aria-label^="Titulares"] li[aria-label^="Ver resumen de"]'
+AF_NAME_PREFIX = "Ver resumen de "
+AF_PHOTO_RE = re.compile(r"/jugadores/(\d+)\.(?:png|jpg|jpeg|webp)")
+
+
+def parse_af_team(html: str, observed_at: str,
+                  key: str = "af_test") -> list[dict]:
+    """Analítica Fantasy's predicted eleven for one team.
+
+    The name comes from the row's own aria-label, not from its visible text:
+    the text is a truncated shirt-number-plus-name ("1 - Sivera") inside a
+    CSS-truncated element, while the aria-label is the full name the site
+    means. Rows carry `source` so they can share the lineups table with
+    futbolfantasy without either being mistaken for the other.
+    """
+    slug = key[3:] if key.startswith("af_") else key
+    doc = lh.fromstring(html)
+    rows, seen = [], set()
+    for li in doc.cssselect(AF_XI_SELECTOR):
+        name = (li.get("aria-label") or "")
+        name = name[len(AF_NAME_PREFIX):].strip() if \
+            name.startswith(AF_NAME_PREFIX) else ""
+        if not name or name.lower() in seen:
+            continue
+        seen.add(name.lower())
+        img = li.cssselect("img[src]")
+        m = AF_PHOTO_RE.search(img[0].get("src") or "") if img else None
+        rows.append({
+            "observed_at": observed_at,
+            "source": AF_SOURCE,
+            "team_slug": slug,
+            "player_name": name,
+            "player_slug": m.group(1) if m else None,
+            "role": "starter",
+            "start_pct": None,      # they predict a starter, not a probability
+            "status": "",           # no fitness panel — "" is "not stated"
+            "note": "",
+        })
+    return rows
+
+
+def sign_af_team(html: str) -> str | None:
+    return _digest(_surface(lh.fromstring(html).cssselect(
+        'ul[aria-label^="Titulares"]')))
+
+
 def sign_points(html: str) -> str | None:
     return _digest(_surface(lh.fromstring(html).cssselect("table")))
 
@@ -563,8 +649,14 @@ def sources(enabled_only: bool = True) -> list[Source]:
         Source("market", "market", MARKET_URL, parse_market, sign_market),
         Source("points", "points", POINTS_URL, parse_points, sign_points),
     ]
+    # Both team sweeps run once a day. Twice a day was forty requests for a
+    # page whose editorial XI moved for 22 of 511 players across a fortnight;
+    # once a day for two sources costs the same forty and answers more.
     out += [Source(f"team_{s}", "lineups", TEAM_URL.format(slug=s),
-                   parse_team, sign_team) for s in TEAMS]
+                   parse_team, sign_team, cadence="daily") for s in TEAMS]
+    out += [Source(f"af_{s}", "lineups", AF_TEAM_URL.format(slug=af),
+                   parse_af_team, sign_af_team, cadence="daily")
+            for s, af in sorted(AF_TEAMS.items())]
     return [s for s in out if s.enabled or not enabled_only]
 
 
@@ -683,6 +775,36 @@ _POINTS_FIXTURE = """
 """
 
 
+# Analítica Fantasy, trimmed to the structure the parser depends on: the
+# starters list keyed by aria-label, the shirt-number-plus-name visible text
+# the parser must NOT read, the photo URL carrying their player id, and a
+# position chip we deliberately ignore. "Aitor Mañas" appears twice — once on
+# the pitch graphic, once in the list — because the real page renders both.
+_AF_FIXTURE = """<html><body>
+<div><img alt="Foto de Aitor Ma\u00f1as"
+     src="https://assets.analiticafantasy.com/jugadores/1.png?v=13&width=90"/>
+     <button>Aitor Ma\u00f1as</button></div>
+<ul role="tabpanel" aria-label="Titulares Test">
+  <li role="button" aria-label="Ver resumen de Sivera">
+    <img alt="Foto de Sivera"
+         src="https://assets.analiticafantasy.com/jugadores/47353.png?v=13&width=66"/>
+    <span title="Portero">PT</span>
+    <p><span>1</span><span> - </span>Sivera</p></li>
+  <li role="button" aria-label="Ver resumen de Aitor Ma\u00f1as">
+    <img alt="Foto de Aitor Ma\u00f1as"
+         src="https://assets.analiticafantasy.com/jugadores/1.png?v=13&width=66"/>
+    <span title="Delantero">DL</span>
+    <p><span>9</span><span> - </span>Aitor Ma\u00f1as</p></li>
+  <li role="button" aria-label="Ver resumen de Sin Foto">
+    <span title="Defensa">DF</span>
+    <p><span>4</span><span> - </span>Sin Foto</p></li>
+</ul>
+<ul aria-label="Suplentes Test">
+  <li role="button" aria-label="Ver resumen de No Deberia">x</li>
+</ul>
+</body></html>"""
+
+
 def _selftest() -> None:
     # -- team page: the traps this parser exists to avoid -------------------
     rows = parse_team(_FIXTURE, "2026-01-01T0000Z", "team_test")
@@ -785,9 +907,37 @@ def _selftest() -> None:
     assert sign_market("<html><body>no players</body></html>") is None
     assert sign_points("<html><body>no table</body></html>") is None
 
+    # -- Analítica Fantasy --------------------------------------------------
+    af = parse_af_team(_AF_FIXTURE, "2026-01-01T0000Z", "af_test")
+    assert [r["player_name"] for r in af] == ["Sivera", "Aitor Mañas",
+                                              "Sin Foto"], af
+    assert all(r["source"] == AF_SOURCE for r in af)
+    assert all(r["team_slug"] == "test" for r in af)      # slug from the key
+    assert all(r["role"] == "starter" for r in af)
+    # The name is the aria-label, never the visible "1 - Sivera" text.
+    assert af[0]["player_name"] == "Sivera" and af[0]["player_slug"] == "47353"
+    # No probability and no fitness panel on this page. status must be "" —
+    # "ok" would be this parser inventing a clean bill of health.
+    assert all(r["start_pct"] is None and r["status"] == "" for r in af)
+    # A player with no photo still reaches the table, with no id.
+    assert af[2]["player_slug"] is None
+    # Substitutes are not collected: only the "Titulares" list is selected.
+    assert "No Deberia" not in {r["player_name"] for r in af}
+    # The row shape is byte-for-byte the futbolfantasy one, because both feed
+    # one CSV whose columns are taken from whichever row is written first.
+    assert list(af[0]) == list(rows[0]), (list(af[0]), list(rows[0]))
+    assert sign_af_team(_AF_FIXTURE) is not None
+    assert sign_af_team("<html><body>no lineup</body></html>") is None
+
     # -- the registry ------------------------------------------------------
     reg = sources()
-    assert len(reg) == 2 + len(TEAMS) == 22, len(reg)
+    assert len(reg) == 2 + len(TEAMS) + len(AF_TEAMS) == 42, len(reg)
+    assert set(AF_TEAMS) == set(TEAMS), set(AF_TEAMS) ^ set(TEAMS)
+    # Both team sweeps are daily; market and points still run every sweep.
+    assert {s.cadence for s in reg if s.key.startswith(("team_", "af_"))} \
+        == {"daily"}
+    assert {s.cadence for s in reg if s.key in ("market", "points")} \
+        == {"every_run"}
     assert {s.key for s in reg} >= {"market", "points", "team_barcelona"}
     assert len({s.key for s in reg}) == len(reg)          # keys are unique
     assert {s.table for s in reg} == {"market", "points", "lineups"}
@@ -796,13 +946,15 @@ def _selftest() -> None:
 
     # Every entry can actually parse and sign, with the key it declares —
     # this is what stops a new source being added half-wired.
+    assert source_for("af_celta").parse is parse_af_team
     fixtures = {"market": _MARKET_FIXTURE, "points": _POINTS_FIXTURE}
+    fixtures.update({f"af_{k}": _AF_FIXTURE for k in AF_TEAMS})
     for s in reg:
         html = fixtures.get(s.key, _FIXTURE)
         assert s.sign(html) is not None, s.key
         assert isinstance(s.parse(html, "2026-01-01T0000Z", s.key), list), s.key
 
-    print("sources.py selftest OK (46 cases)")
+    print("sources.py selftest OK (60 cases)")
 
 
 if __name__ == "__main__":

@@ -187,9 +187,10 @@ def due(src, prev: dict, today: str) -> bool:
     """Should this sweep request `src`?
 
     Only cadence "daily" can say no, and only when we already requested the
-    page today. Nothing in the registry uses it yet — it is here for the
-    futbolfantasy team sweep once Analítica Fantasy is the comparison source,
-    at which point twenty requests a day do the job of forty.
+    page today. Both team sweeps are daily, so a sweep asks for forty team
+    pages once a day and two pages the rest of the time. A page not due is
+    carried into this snapshot's manifest with its previous `seen`, so it is
+    due again tomorrow and `parse` still sees it today.
     """
     if src.cadence != "daily":
         return True
