@@ -10,7 +10,7 @@ Structure, top to bottom: what needs a decision today, today's market slate
 priced player by player, your team as one table (XI then bench, with the cost
 of each swap), and your own squad's price moves. League-wide movers and
 recruitment live in reports/watchlist.md; how your rivals behave lives in
-reports/behaviour.md.
+reports/rivals.md.
 
 THE SLATE IS THE REPORT when you paste one into inputs/seen.txt. The app deals
 a limited market, so a ranked list of everyone unowned is mostly players you
@@ -257,8 +257,8 @@ def sec_slate(lg, sc, by_key, pool, tot, slate, prem, cash_value,
     rows.sort(key=lambda r: (r[1] is None, -(r[1] or 0.0), -r[0]["score"]))
     better = sum(1 for _, g, _ in rows if g is not None and g > 0)
 
-    out += ["## Today's slate — %d on offer, %d improve your XI"
-            % (len(rows), better), ""]
+    out += ["## 4. Anything to do in the market?", "",
+            "**%d on offer, %d improve your XI.**" % (len(rows), better), ""]
     if not rows:
         out += ["_Every name you pasted is either already owned or missing "
                 "from the market data._", ""]
@@ -289,7 +289,7 @@ def sec_slate(lg, sc, by_key, pool, tot, slate, prem, cash_value,
                 "XI actually improves with him, strongest threat first — "
                 "`?` cash unknown (treat as live), `(n broke)` want him but "
                 "cannot pay the floor. The full manager-by-manager matrix is "
-                "in `reports/behaviour.md`.", "",
+                "in `reports/rivals.md`.", "",
                 "Bid is the floor plus what this league has actually paid over "
                 "it: %s.%s A dozen deals is not a distribution — the range is "
                 "what has happened, not a chance of winning, and every one of "
@@ -379,6 +379,190 @@ def log_squad(observed, players, chosen, formation, total, deadline,
     append_csv(path, rows, cols)
 
 
+# ---------------------------------------------------------------------------
+# The four questions
+#
+# These four sections open the report, in this order, because they are the
+# four things you can still act on before the lock. Everything else — premium
+# curves, drift, full rosters, deal history, methodology — is reference and
+# lives below the fold or in its own file.
+#
+# Question 1 leads with WHAT YOU ARE FIELDING, not with what the model would
+# field. The marks in inputs/lineup.txt are a fact; the recommendation is
+# advice, and printing advice as though it were the team is how the old report
+# managed to show two different benches under the same word.
+# ---------------------------------------------------------------------------
+
+STATE_LABEL = {
+    "injured": "🔴 injured",
+    "suspended": "🔴 suspended",
+    "unavailable": "🔴 unavailable",
+    "doubt": "🟡 doubt",
+    "ok": "fit",
+}
+
+
+def sec_eleven(marked, best, players) -> list[str]:
+    """## 1. Am I fielding the right eleven?"""
+    out = ["## 1. Am I fielding the right eleven?", ""]
+
+    if not players:
+        return out + ["_No roster. Check `inputs/rosters_initial.txt` and "
+                      "`inputs/transactions.csv`._", ""]
+    if marked is None:
+        return out + ["_No marks to read. `inputs/lineup.txt` is missing or "
+                      "empty — run `squads.py`, then tick the eleven you are "
+                      "fielding._", ""]
+
+    mtot, mxi, mbench, illegal, mwarn = marked
+    counts = Counter(p["slot"] for p in mxi if p["slot"])
+    shape = "%d-%d-%d" % (counts.get("DEF", 0), counts.get("MED", 0),
+                          counts.get("DEL", 0))
+
+    if illegal:
+        out += [f"**⚠ Not a legal eleven — {illegal}.** The app will fill the "
+                "gaps for you, and not with your choice. Fix "
+                "`inputs/lineup.txt`.", ""]
+    else:
+        out += [f"**Your XI: {shape} · ≈{mtot:.0f} pts expected next "
+                "jornada** (uncalibrated — see the methodology link at the "
+                "end)", ""]
+
+    out += ["| | Marked XI | Start% | xPts/j | State |",
+            "|---|---|--:|--:|---|"]
+    for slot in ("POR", "DEF", "MED", "DEL"):
+        for p in [x for x in mxi if x["slot"] == slot]:
+            out.append(f"| {slot} | {p['name']} | {pct_cell(p)} | "
+                       f"{p['score']:.1f} | "
+                       f"{STATE_LABEL.get(p['status'] or 'ok', p['status'])} |")
+    out.append("")
+
+    if best is None:
+        return out + ["_No legal XI available from this squad, so there is "
+                      "nothing to compare against._", ""]
+
+    btot, (d, m, f), bxi = best
+    gap = btot - mtot
+    if gap <= 0.05:
+        out += [f"**Nothing to change.** The model's best legal XI is the same "
+                f"eleven ({d}-{m}-{f}, ≈{btot:.0f} pts).", ""]
+        return out
+
+    pairs = swaps(mxi, bxi)
+    out += [f"**The model would score ≈{btot:.0f} — {gap:.1f} pts/j more.** "
+            f"Its shape is {d}-{m}-{f}.", ""]
+    if not pairs:
+        out += ["_The difference is a change of formation, not a substitution, "
+                "so there is no like-for-like swap to offer._", ""]
+        return out
+
+    out += ["| Bench this | For this | Worth |", "|---|---|--:|"]
+    for o, i in pairs:
+        out.append(f"| {o['name']} ({o['score']:.1f}) | "
+                   f"{i['name']} ({i['score']:.1f}) | "
+                   f"{i['score'] - o['score']:+.1f} |")
+    out += ["", "_Swaps are same-position only: a cross-slot difference is a "
+                "change of formation, not a substitution. Your own marks are "
+                "the row above — this table is advice._", ""]
+
+    for w in mwarn:
+        out.append(f"- ⚠ {w}")
+    if mwarn:
+        out.append("")
+    return out
+
+
+def sec_fitness(players) -> list[str]:
+    """## 2. Is anyone injured, suspended, or doubtful?
+
+    Every squad member gets a row, including the ones nothing is known about.
+    Silence and fitness must not look the same: an empty section used to be
+    indistinguishable from a clean bill of health, and for the whole life of
+    this repo that is exactly what it was — the status column was dead.
+    """
+    out = ["## 2. Is anyone injured, suspended, or doubtful?", ""]
+    if not players:
+        return out + ["_No roster to check._", ""]
+
+    flagged = [p for p in players if p["status"] and p["status"] != "ok"]
+    nodata = [p for p in players if not p["on_page"]]
+    fit = [p for p in players
+           if p["on_page"] and (not p["status"] or p["status"] == "ok")]
+
+    if flagged:
+        out += [f"**{len(flagged)} of {len(players)} flagged.**", ""]
+    else:
+        out += [f"**Nobody in your squad is flagged.** All {len(fit)} players "
+                "with an entry on their team page read as available.", ""]
+
+    out += ["| Player | State | What the page says |", "|---|---|---|"]
+    order = {"injured": 0, "suspended": 1, "unavailable": 2, "doubt": 3}
+    for p in sorted(flagged, key=lambda x: order.get(x["status"], 9)):
+        out.append(f"| {p['name']} | {STATE_LABEL.get(p['status'], p['status'])}"
+                   f" | {p['note'] or '—'} |")
+    for p in sorted(nodata, key=lambda x: x["name"]):
+        out.append(f"| {p['name']} | ⚪ no data | not listed on his team page "
+                   "— unknown, not fit |")
+    for p in sorted(fit, key=lambda x: x["name"]):
+        if not p["on_page"]:
+            continue
+        out.append(f"| {p['name']} | fit | listed, no flag |")
+    out.append("")
+
+    if nodata:
+        out += [f"_{len(nodata)} player(s) have no entry on their team page. "
+                "That is an absence of evidence, not evidence of fitness — "
+                "check them in the app before the lock._", ""]
+    out += ["_Read from the 'Estado físico', 'Sancionados' and 'No "
+            "disponibles' blocks of each team page. A knock the site still "
+            "lists as available (`Tocado`) is folded into doubt._", ""]
+    return out
+
+
+def pct_cell(p) -> str:
+    """Start percentage, marked when it is an assumption rather than a
+    reading. `~` = listed with no figure, `!` = not on the page at all."""
+    if p["pct"] is not None:
+        return f"{p['pct']:.0f}%"
+    return ("~" if p["on_page"] else "!") + \
+        f"{NEUTRAL_START if p['on_page'] else ABSENT_START:.0f}%"
+
+
+def sec_starting(marked, players, min_start) -> list[str]:
+    """## 3. Is everyone expected to start?"""
+    out = ["## 3. Is everyone expected to start?", ""]
+    if marked is None:
+        return out + ["_No marks to read — see question 1._", ""]
+
+    _, mxi, mbench, _, _ = marked
+    low = [p for p in mxi if p["pct_used"] < min_start]
+
+    if low:
+        out += [f"**{len(low)} of your marked XI are under {min_start:.0f}%:** "
+                + ", ".join(f"{p['name']} ({pct_cell(p)})" for p in low)
+                + ".", ""]
+    else:
+        out += [f"**Every marked player is at {min_start:.0f}% or above.**", ""]
+
+    out += ["| | Player | Start% | Reading |", "|---|---|--:|---|"]
+    for label, group in (("XI", mxi), ("bench", mbench)):
+        for p in sorted(group, key=lambda x: -x["pct_used"]):
+            if p["pct"] is not None:
+                how = "published"
+            elif p["on_page"]:
+                how = f"listed without a figure — assumed {NEUTRAL_START:.0f}%"
+            else:
+                how = f"absent from the page — assumed {ABSENT_START:.0f}%"
+            flag = " ⚠" if label == "XI" and p["pct_used"] < min_start else ""
+            out.append(f"| {label} | {p['name']}{flag} | {pct_cell(p)} | "
+                       f"{how} |")
+    out += ["", "_`start_pct` is futbolfantasy's editorial bucket, read twice "
+                "a day, not a live probability — it moved for only a handful "
+                "of players across the snapshots taken so far. Threshold is "
+                "`min_start` in `inputs/league.ini`._", ""]
+    return out
+
+
 def main() -> None:
     market = latest_only(load_market())
     xi_rows = latest_only(load_xi())
@@ -447,152 +631,110 @@ def main() -> None:
             lg, sc, by_key, pool, best[0] if best else None, slate,
             premiums(dl), cash_value, rival_ceiling(lg), snaps)
 
-    # --- header -----------------------------------------------------------
+    # --- assemble ---------------------------------------------------------
+    # Four questions, four tables, then a rule and everything else. The old
+    # layout led with the recommendation and buried the marked XI in a
+    # footnote; this inverts it.
+    marked = as_fielded(players, squad) if players else None
+    min_start = lg.cfg.min_start if lg else 60.0
+
     out: list[str] = [f"# Fantasy report — {observed}", ""]
 
-    alerts: list[str] = []
-    if n_slate:
-        alerts.append("**%d players on offer, %d improve your XI** — priced in "
-                      "the slate table below." % (n_slate, n_better))
-    if age_h is not None and age_h > STALE_HOURS:
-        alerts.append(f"**Data is {age_h:.0f}h old** — the ingest workflow may "
-                      "have failed. Everything below is that snapshot.")
+    ctx = []
     deadline = load_deadline()
     if deadline:
         left = (deadline - now).total_seconds() / 3600
         if left < 0:
-            alerts.append("**Deadline passed** — update `inputs/deadline.txt`.")
+            ctx.append("**Deadline passed** — update `inputs/deadline.txt`")
         elif left < 48:
-            alerts.append(f"**Locks in {left:.0f}h.** Probable XIs are at their "
-                          "most reliable now.")
+            ctx.append(f"**Locks in {left:.0f}h**")
         else:
-            alerts.append(f"Locks in {left/24:.0f} days — readings will still "
-                          "move, so this is provisional.")
+            ctx.append(f"Locks in {left / 24:.0f} days")
+    ctx.append(f"squad {eur(squad_value)}")
+    if cash and cash.value is not None:
+        ctx.append(f"cash {cash.label()}")
+        ctx.append(f"total {eur(squad_value + cash.value)}")
+    out += [" · ".join(ctx), ""]
 
+    out += sec_eleven(marked, best, players)
+    out += sec_fitness(players)
+    out += sec_starting(marked, players, min_start)
+    out += (slate_lines if slate_lines else
+            ["## 4. Anything to do in the market?", "",
+             "_No slate pasted, so there is nothing you can bid on today that "
+             "this report knows about. Paste today's market screenshot into "
+             "the `seen` input to price it. Everyone unowned is ranked in "
+             "`reports/watchlist.md`._", ""])
+
+    out += ["---", ""]
+
+    # --- below the fold ---------------------------------------------------
+    warnings: list[str] = []
+    if age_h is not None and age_h > STALE_HOURS:
+        warnings.append(f"**Data is {age_h:.0f}h old** — the ingest workflow "
+                        "may have failed. Everything above is that snapshot.")
     if best:
         for k, n in THIN.items():
             have = len(pool.get(k, []))
             if have < n:
-                alerts.append(f"**Only {have} {SLOT_LABEL[k]}"
-                              f"{'s' if have != 1 else ''}** — one knock and "
-                              "you can't field a legal XI.")
-        hurt = [p["name"] for p in best[2] if p["status"]]
-        if hurt:
-            alerts.append("**Flagged in the XI:** " + ", ".join(hurt) + ".")
+                warnings.append(f"**Only {have} {SLOT_LABEL[k]}"
+                                f"{'s' if have != 1 else ''}** — one knock and "
+                                "you can't field a legal XI.")
         guessed = [p["name"] for p in best[2] if p["assumed"]]
         if guessed:
-            alerts.append(f"**{len(guessed)} of the XI are unmodelled** "
-                          f"({', '.join(guessed)}) — no LaLiga record, so "
-                          "they're carrying an assumed baseline, not an "
-                          "earned one.")
-    marked = as_fielded(players, squad) if players else None
-    if marked and best:
-        mtot, mxi, _, illegal, mwarn = marked
-        if illegal:
-            alerts.append(f"**Your marked XI is illegal** ({illegal}) — the "
-                          "app will fill the gaps for you, and not with your "
-                          "choice. Fix `inputs/lineup.txt`.")
-        elif best[0] - mtot > 0.05:
-            pairs = swaps(mxi, best[2])
-            how = "; ".join(f"{o['name']} → {i['name']} "
-                            f"({i['score'] - o['score']:+.1f})"
-                            for o, i in pairs[:3])
-            alerts.append(f"**Your bench costs you {best[0] - mtot:.1f} "
-                          f"pts/j** — marked XI ≈{mtot:.0f}, best ≈{best[0]:.0f}"
-                          + (f". Swap {how}." if how else "."))
-        for w in mwarn:
-            alerts.append(f"**Checklist:** {w}")
-
+            warnings.append(f"**{len(guessed)} unmodelled** "
+                            f"({', '.join(guessed)}) — no LaLiga record, so "
+                            "they carry an assumed baseline, not an earned "
+                            "one.")
     if missing:
-        alerts.append("**Not found in the market:** "
-                      + ", ".join(f"`{m}`" for m in missing)
-                      + " — check them with find_slug.py.")
+        warnings.append("**Not found in the market:** "
+                        + ", ".join(f"`{m}`" for m in missing)
+                        + " — check them with find_slug.py.")
+    if cash and cash.value is not None and cash.confidence != "known":
+        warnings.append("Cash is an estimate — record an observed balance in "
+                        "`inputs/cash.txt`.")
+    elif cash and cash.value is not None:
+        last_tx = max((t.get("date") or "" for t in lg.txns), default="")
+        anchor = re.search(r"\d{4}-\d{2}-\d{2}", cash.basis or "")
+        if anchor and last_tx and last_tx[:10] > anchor.group(0):
+            warnings.append(f"Balance last checked {anchor.group(0)}, but the "
+                            f"ledger moved on {last_tx[:10]}. Re-check it.")
+    elif not cash or cash.value is None:
+        warnings.append("No cash figure — add `inputs/cash.txt`.")
 
-    if alerts:
-        out += ["## Needs a decision", ""] + [f"- {a}" for a in alerts] + [""]
+    out += ["## Warnings", ""]
+    out += ([f"- {w}" for w in warnings] if warnings
+            else ["_Nothing flagged._"])
+    out += ["", "_Compare squad value with the app; a mismatch means a name "
+                f"matched the wrong player. Roster read from the "
+                f"{squad_src}._", ""]
 
-    # --- money ------------------------------------------------------------
-    line = f"**Squad {eur(squad_value)}**"
-    if cash and cash.value is not None:
-        line += (f" · cash {cash.label()} · total "
-                 f"{eur(squad_value + cash.value)}")
-        if cash.confidence != "known":
-            line += " — cash is an estimate; record a balance in `cash.txt`."
-        else:
-            last_tx = max((t.get("date") or "" for t in lg.txns), default="")
-            anchor = re.search(r"\d{4}-\d{2}-\d{2}", cash.basis or "")
-            if anchor and last_tx and last_tx[:10] > anchor.group(0):
-                line += (f" — balance last checked {anchor.group(0)}, but the "
-                         f"ledger moved on {last_tx[:10]}. Re-check it.")
-    else:
-        line += " — add `inputs/cash.txt` to see cash alongside it."
-    out += [line, "",
-            "Compare squad value with the app; a mismatch means a name "
-            f"matched the wrong player. Roster read from the {squad_src}.", ""]
-
-    out += slate_lines
-
-    # --- team -------------------------------------------------------------
-    out += ["## Team", ""]
-    if not players:
-        out += ["_Empty — no roster found. Check `inputs/rosters_initial.txt` "
-                "and `inputs/transactions.csv`._", ""]
-    elif best is None:
-        short = [SLOT_LABEL[k] for k, n in SLOT_MIN.items()
-                 if len(pool.get(k, [])) < n]
-        out += ["_No legal XI from this squad — short of: "
-                + (", ".join(short) or "?") + "._", ""]
-    else:
+    # --- not in your XI ---------------------------------------------------
+    # THIS IS THE BENCH. The word used to name two different lists in the same
+    # report — the model's spare players in one place, your marks in another.
+    # There is now exactly one bench, and it is yours; the model's opinion is
+    # the swap table in question 1.
+    if players and best:
         tot, (d, m, f), picked = best
-        out += [f"**{d}-{m}-{f}** · **≈{tot:.0f} pts expected next jornada** "
-                "(uncalibrated — see *How the forecast works* at the end)",
-                "",
-                "| | Player | Start% | Value | 24h | xPts/j | Last season |",
-                "|---|---|--:|--:|--:|--:|---|"]
-        for slot in ("POR", "DEF", "MED", "DEL"):
-            for p in [x for x in picked if x["slot"] == slot]:
-                mark = {"injured": " **INJ**",
-                        "doubt": " **?**"}.get(p["status"], "")
-                pct_s = (f"{p['pct']:.0f}%" if p["pct"] is not None
-                         else ("~" if p["on_page"] else "!") +
-                         f"{NEUTRAL_START if p['on_page'] else ABSENT_START:.0f}%")
-                why = f"**{p['why']}**" if p["assumed"] else p["why"]
-                out.append(f"| {slot} | {p['name']}{mark} | {pct_s} | "
-                           f"{eur(p['value'])} | {eur(p['delta_1d'])} | "
-                           f"{p['score']:.1f} | {why} |")
-        out.append("")
-
-        if marked:
-            mtot, mxi, _, illegal, _ = marked
-            if illegal:
-                out += [f"_As marked in `inputs/lineup.txt`: **{illegal}** — "
-                        "not a legal eleven._", ""]
-            elif best[0] - mtot > 0.05:
-                out += [f"_As marked in `inputs/lineup.txt`: **≈{mtot:.0f} "
-                        f"pts** — {best[0] - mtot:.1f} below this XI. The "
-                        "table above is the recommendation, not what you are "
-                        "fielding._", ""]
-            else:
-                out += ["_Matches what you have marked in "
-                        "`inputs/lineup.txt`._", ""]
-
-        bench = [p for p in players if id(p) not in chosen]
-        out += ["**Bench** — gap is the expected points the XI loses per "
-                "jornada by playing him instead, after re-picking the "
-                "formation. €/pt is his value per expected point: the sell "
-                "shortlist, worst first.", ""]
-        if not bench:
+        spare = (marked[2] if marked else
+                 [p for p in players if id(p) not in chosen])
+        source = ("as you have marked them" if marked
+                  else "model's spare players — no checklist to read")
+        out += [f"## Not in your XI ({source})", ""]
+        if not spare:
             out += ["_Nobody spare._", ""]
         else:
             rank = {id(p): i for v in pool.values() for i, p in enumerate(v)}
             rows = []
-            for p in bench:
+            for p in spare:
                 forced = pick_xi(pool, force=p) if p["slot"] else None
                 gap = (forced[0] - tot) if forced else None
                 cpp = p["value"] / p["score"] if p["score"] > 0.05 \
                     else float("inf")
-                if p["status"] == "injured":
-                    why = "injured"
+                if p["status"] in ("injured", "suspended", "unavailable"):
+                    why = p["status"]
+                elif p["status"] == "doubt":
+                    why = "doubtful"
                 elif p["slot"] and rank.get(id(p), 0) >= MAX_SLOT[p["slot"]]:
                     nth = rank[id(p)] + 1
                     sfx = ("th" if nth % 100 in (11, 12, 13)
@@ -609,7 +751,10 @@ def main() -> None:
                     why = "outscored"
                 rows.append((cpp, p, gap, why))
             rows.sort(key=lambda t: t[0], reverse=True)
-            out += ["| Player | Pos | Value | xPts/j | Gap | €/pt | Why |",
+            out += ["**Gap** is what the XI loses per jornada if he has to "
+                    "play, after re-picking the formation. **€/pt** is value "
+                    "per expected point: the sell shortlist, worst first.", "",
+                    "| Player | Pos | Value | xPts/j | Gap | €/pt | Why |",
                     "|---|---|--:|--:|--:|--:|---|"]
             for cpp, p, gap, why in rows:
                 out.append(
@@ -618,12 +763,12 @@ def main() -> None:
                     f"{'—' if gap is None else format(gap, '+.1f')} | "
                     f"{'—' if cpp == float('inf') else eur(cpp)} | {why} |")
             out += ["", "_%s Who is short in this position, and who can "
-                        "still afford you, is in `reports/behaviour.md`._" % (
+                        "still afford you, is in `reports/rivals.md`._" % (
                             "Selling to the app pays the value give or take "
-                            "%.0f%%: the %d priced sales in the ledger went %s, "
-                            "so read every value above as that band, not as a "
-                            "number." % (app_prem.swing(), app_prem.n,
-                                         app_prem.label())
+                            "%.0f%%: the %d priced sales in the ledger went "
+                            "%s, so read every value above as that band, not "
+                            "as a number." % (app_prem.swing(), app_prem.n,
+                                              app_prem.label())
                             if app_prem and app_prem.n >= 3 else
                             "A sale lands above or below value depending on "
                             "who bids."), ""]
@@ -644,17 +789,17 @@ def main() -> None:
         out.append("")
 
     out += [
-        "---",
+        "## Notes",
         "",
         f"_{len(market)} players tracked, {len(sc.start_pct)} with a "
-        "probable-XI reading. Who to buy is in `reports/watchlist.md`; how "
-        "your rivals bid is in `reports/behaviour.md`._",
+        "probable-XI reading._",
         "",
-        f"_xPts/j — expected points per jornada = shrunk pts/match (K={shrink_k:.0f}"
+        f"_xPts/j — expected points per jornada = shrunk pts/match "
+        f"(K={shrink_k:.0f}"
         + (f", {hist_label}" if hist_label else ", **no points baseline**")
         + ") × P(start), from `ffcore/score.py` — the same scorer rivals.py "
-          "uses. How it works, what it ignores, and how it is tracking "
-          "reality: *How the forecast works* at the end of this report._",
+          "uses. Injured, suspended and unavailable score zero; a doubt is "
+          "halved._",
         "",
         f"_Generated {now:%Y-%m-%d %H:%M} UTC._",
     ]
