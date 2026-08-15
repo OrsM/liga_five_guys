@@ -70,7 +70,7 @@ from ffcore.score import (ABSENT_START, MAX_SLOT, NEUTRAL_START,  # noqa: E402
                           pick_xi, squad_pool)
 from ffcore.tidy import (DECISIONS, MADRID, REPORTS, SEASON,  # noqa: E402
                          append_csv, input_path, latest_only, load_deadline,
-                         load_market, load_xi, read_csv, snapshot_stamp,
+                         load_market, load_lineups, read_csv, snapshot_stamp,
                          write_lines)
 from seen import read_slate  # noqa: E402
 
@@ -593,7 +593,7 @@ def sec_starting(marked, players, min_start) -> list[str]:
 def main() -> None:
     all_market = load_market()
     market = latest_only(all_market)
-    xi_rows = latest_only(load_xi())
+    xi_rows = latest_only(load_lineups())
 
     REPORTS.mkdir(exist_ok=True)
     HISTORY.mkdir(parents=True, exist_ok=True)

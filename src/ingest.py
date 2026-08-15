@@ -287,7 +287,11 @@ def parse() -> None:
     market_rows = tables.get("market", [])
     xi_rows = tables.get("lineups", [])
     _write_csv(TIDY / "market.csv", market_rows)
-    _write_csv(TIDY / "probable_xi.csv", xi_rows)
+    _write_csv(TIDY / "lineups.csv", xi_rows)
+    # probable_xi.csv was this file before it grew a `source` column. Tidy is
+    # disposable and rebuilt whole every run, so the old copy is deleted rather
+    # than left to be read by mistake.
+    (TIDY / "probable_xi.csv").unlink(missing_ok=True)
 
     # Fail loudly on an empty parse: a silently-empty probable XI would set
     # every start probability to zero and quietly bench your best players.
@@ -298,11 +302,15 @@ def parse() -> None:
     # 14,765 rows without anything noticing; a count in the log is what makes
     # that visible the next time the markup moves.
     tally: dict[str, int] = {}
+    per_source: dict[str, int] = {}
     for r in xi_rows:
         tally[r["status"]] = tally.get(r["status"], 0) + 1
+        per_source[r["source"]] = per_source.get(r["source"], 0) + 1
     flags = ", ".join("%s %d" % (k, v) for k, v in sorted(tally.items())
                       if k != "ok")
-    print(f"market {len(market_rows)} rows, probable XI {len(xi_rows)} rows")
+    by_src = ", ".join("%s %d" % (k, v) for k, v in sorted(per_source.items()))
+    print(f"market {len(market_rows)} rows, lineups {len(xi_rows)} rows "
+          f"({by_src})")
     print("  status: ok %d%s" % (tally.get("ok", 0),
                                  (", " + flags) if flags else ""))
     if not flags:
@@ -311,14 +319,13 @@ def parse() -> None:
 
 
 def _write_csv(path: Path, rows: list[dict]) -> None:
-    """CRLF, deliberately — csv.DictWriter's default, which is what wrote
-    these two files from day one. ffcore.tidy.write_csv uses LF; unifying them
-    rewrites all 14,765 rows for no gain, so it waits for the change that
-    reshapes these files anyway."""
+    """LF, matching ffcore.tidy.write_csv. These two files were CRLF for their
+    whole life because that is csv.DictWriter's default; the reshape that added
+    the `source` column rewrote every row anyway, so the split ended here."""
     if not rows:
         return
     with path.open("w", newline="", encoding="utf-8") as fh:
-        w = csv.DictWriter(fh, fieldnames=list(rows[0]))
+        w = csv.DictWriter(fh, fieldnames=list(rows[0]), lineterminator="\n")
         w.writeheader()
         w.writerows(rows)
 

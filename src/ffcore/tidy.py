@@ -40,8 +40,9 @@ from ffcore.text import norm, resolve
 __all__ = ["ROOT", "TIDY", "SEASON", "DECISIONS", "REPORTS", "MADRID",
            "input_path", "read_csv", "write_csv", "append_csv", "write_lines",
            "snapshot_stamp", "ledger_stamp", "latest_only", "snapshots",
-           "Market", "Valuation", "load_market", "load_xi", "load_players",
-           "read_ledger", "load_deadline"]
+           "Market", "Valuation", "load_market", "load_lineups",
+           "load_players", "read_ledger", "load_deadline", "LINEUP_SOURCE",
+           "pick_source"]
 
 ROOT = Path(os.environ.get("FF_ROOT", "./data"))
 TIDY = ROOT / "tidy"
@@ -197,8 +198,28 @@ def load_market() -> list[dict]:
     return read_csv(TIDY / "market.csv")
 
 
-def load_xi() -> list[dict]:
-    return read_csv(TIDY / "probable_xi.csv")
+# Which probable-XI site the reports are built on. The lineups table can hold
+# several; every reader gets exactly one, chosen here, because two sites that
+# disagree about a starter must not be silently averaged or racing on file
+# order. Compare them against outcomes before changing this.
+LINEUP_SOURCE = "futbolfantasy"
+
+
+def load_lineups(source: str = LINEUP_SOURCE) -> list[dict]:
+    """The lineups table, one source only.
+
+    The filter is here rather than in Scorer so that no reader can forget it:
+    a caller that skipped it would get one player's row twice, from two sites,
+    with different start percentages. Pass source="" to read every row — for
+    comparing sources, which is the one job that wants them all.
+    """
+    return pick_source(read_csv(TIDY / "lineups.csv"), source)
+
+
+def pick_source(rows: list[dict], source: str) -> list[dict]:
+    """One source's rows. An empty `source` means all of them."""
+    return rows if not source else [r for r in rows
+                                    if r.get("source") == source]
 
 
 # Which tidy column feeds which report field, and how to read it. Named
@@ -246,7 +267,7 @@ def load_players() -> dict[str, dict]:
     agreed on all 655 current players and differed only by five departed
     ones, none of which reached any report.
     """
-    market, xi = latest_only(load_market()), latest_only(load_xi())
+    market, xi = latest_only(load_market()), latest_only(load_lineups())
     if not market and not xi:
         raise SystemExit("no rows in %s — run `ingest.py parse` first" % TIDY)
     players: dict[str, dict] = {}
@@ -415,7 +436,15 @@ def _selftest() -> None:
     assert c["name"] == "Cai Coro" and c["team"] == "celta" and c["start"] == 85.0
     assert "value" not in c
 
-    print("ffcore.tidy self-test OK (14 cases)")
+    both = [{"source": "futbolfantasy", "player_name": "Ane"},
+            {"source": "analitica", "player_name": "Ane"},
+            {"player_name": "Bo"}]                      # pre-source-column row
+    assert [r["source"] for r in pick_source(both, "analitica")] == ["analitica"]
+    assert len(pick_source(both, "futbolfantasy")) == 1
+    assert pick_source(both, "") == both                 # "" means all sources
+    assert pick_source(both, "nobody") == []             # a source not stored
+
+    print("ffcore.tidy self-test OK (18 cases)")
 
 
 if __name__ == "__main__":

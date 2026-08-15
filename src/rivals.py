@@ -55,7 +55,7 @@ from ffcore.score import (MAX_SLOT, SLOT_LABEL, SLOT_MIN, THIN,  # noqa: E402
                           Scorer, pick_xi, squad_pool)
 from ffcore.text import norm  # noqa: E402
 from ffcore.tidy import (DECISIONS, REPORTS, append_csv, latest_only,  # noqa: E402
-                         load_market, load_xi, read_csv, write_lines, SEASON)
+                         load_market, load_lineups, read_csv, write_lines, SEASON)
 from seen import read_slate  # noqa: E402
 
 # Drift horizons, in days after a purchase.
@@ -580,7 +580,7 @@ def main() -> None:
 
     latest = latest_only(market_rows)
     hist, hist_label = load_history()
-    sc = Scorer(latest, latest_only(load_xi()), hist)
+    sc = Scorer(latest, latest_only(load_lineups()), hist)
     by_key = lg.market.latest() if lg.market else {}
 
     dl = deals(lg, lg.market)

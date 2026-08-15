@@ -134,7 +134,8 @@ src/ffcore/          shared core: parse (numbers)  text (names)  tidy (IO+time)
                      bid (premiums, bid bands, XI gain)
 inputs/              you edit these — see above
 data/raw/dt=….tar.xz  raw HTML, deduplicated — append-only, never delete
-data/tidy/*.csv      parsed output — disposable, rebuilt from raw
+data/tidy/market.csv  values, disposable — rebuilt from raw every run
+data/tidy/lineups.csv probable XI + fitness, one row per player per source
 data/decisions/      append-only logs of estimates, for scoring later
 reports/REPORT.md    ← read this
 reports/latest.md    the four questions (report.py) — carried into REPORT.md
@@ -202,6 +203,26 @@ came to hold the same 757 players with the same totals. They carried four
 different number parsers between them. `history.py` also imported `httpx` at
 module level, so importing it broke the test job, which installs no network
 client on purpose.
+
+**The lineups table names its source, and readers get exactly one.**
+`probable_xi.csv` is now `lineups.csv` with a `source` column, stamped by the
+parse function itself so the label cannot drift from the parser that wrote the
+row. A second probable-XI site therefore lands *alongside* the first rather
+than instead of it, and both are kept.
+
+Which one the reports use is `ffcore.tidy.LINEUP_SOURCE`, enforced inside
+`load_lineups()` rather than by each caller, because a reader that forgot the
+filter would silently get one player twice with two different start
+percentages — resolved by whichever row the file happened to list first.
+**Nothing is blended.** Two sites that disagree about a starter are a fact
+worth measuring against what actually happened, not an average to take.
+`load_lineups(source="")` reads every row, which is the one job that wants
+them all: comparing sources.
+
+The reshape rewrote all 14,823 rows anyway, so the CRLF/LF split ended here
+too — `ingest._write_csv` now writes LF like `ffcore.tidy.write_csv`. Verified
+row-for-row against the old file: same 14,823 rows, identical but for the new
+column.
 
 **One named view over the tidy CSV, not a glob and thirty guesses.**
 `src/common.py` is gone. Its `load_players()` scanned *every* CSV in

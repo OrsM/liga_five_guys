@@ -62,12 +62,16 @@ from typing import Callable, NamedTuple
 
 from lxml import html as lh
 
-__all__ = ["BASE", "MARKET_URL", "POINTS_URL", "TEAM_URL", "TEAMS",
+__all__ = ["BASE", "SOURCE", "MARKET_URL", "POINTS_URL", "TEAM_URL", "TEAMS",
            "Source", "sources", "SEVERITY",
            "parse_market", "parse_team", "parse_points", "parse_fitness",
            "season_label", "sign_market", "sign_team", "sign_points"]
 
 BASE = "https://www.futbolfantasy.com"
+# The `source` column on every lineups row from this site. It exists so a
+# second probable-XI site can be stored alongside rather than instead, and so
+# a reader always knows which one it is looking at.
+SOURCE = "futbolfantasy"
 MARKET_URL = f"{BASE}/analytics/laliga-fantasy/mercado"
 POINTS_URL = f"{BASE}/analytics/laliga-fantasy/puntos"
 TEAM_URL = f"{BASE}/laliga/equipos/{{slug}}"
@@ -307,6 +311,10 @@ def parse_team(html: str, observed_at: str, key: str = "team_test") -> list[dict
 
     `key` is the snapshot page name, so the team slug is key without its
     "team_" prefix — the registry owns that naming, not the caller.
+
+    Every row carries `source`, stamped here rather than by the caller, so the
+    label cannot drift from the parser that produced the row. A second site's
+    parse function stamps its own, and both land in the same lineups table.
     """
     slug = key[5:] if key.startswith("team_") else key
     doc = lh.fromstring(html)
@@ -327,6 +335,7 @@ def parse_team(html: str, observed_at: str, key: str = "team_test") -> list[dict
             href = a.get("href") if a is not None else ""
         rows.append({
             "observed_at": observed_at,
+            "source": SOURCE,
             "team_slug": slug,
             "player_name": name,
             # _slug() reads a markup chunk, not a bare URL: it matches on
@@ -352,6 +361,7 @@ def parse_team(html: str, observed_at: str, key: str = "team_test") -> list[dict
             continue
         rows.append({
             "observed_at": observed_at,
+            "source": SOURCE,
             "team_slug": slug,
             "player_name": fit["name"],
             "player_slug": fit["slug"] or None,
@@ -726,6 +736,10 @@ def _selftest() -> None:
 
     # The team slug comes off the registry key, not a separate argument.
     assert all(r["team_slug"] == "test" for r in rows)
+    # Every row says which site it came from, starters and absentees alike, so
+    # a second probable-XI source lands in the same table without ambiguity.
+    assert all(r["source"] == SOURCE for r in rows)
+    assert {r["source"] for r in rows if r["role"] == "absent"} == {SOURCE}
 
     # -- market page -------------------------------------------------------
     m = parse_market(_MARKET_FIXTURE, "2026-01-01T0000Z")
@@ -788,7 +802,7 @@ def _selftest() -> None:
         assert s.sign(html) is not None, s.key
         assert isinstance(s.parse(html, "2026-01-01T0000Z", s.key), list), s.key
 
-    print("sources.py selftest OK (44 cases)")
+    print("sources.py selftest OK (46 cases)")
 
 
 if __name__ == "__main__":
