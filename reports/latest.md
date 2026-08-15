@@ -1,6 +1,6 @@
 # Fantasy report — 2026-08-14T2256Z
 
-**Locks in 7h** · squad 171.50M · cash 63.29M · total 234.79M
+**Locks in 6h** · squad 171.50M · cash 63.29M · total 234.79M
 
 ## 1. Am I fielding the right eleven?
 
@@ -79,19 +79,21 @@ _`start_pct` is futbolfantasy's editorial bucket, read twice a day, not a live p
 
 ## 4. Anything to do in the market?
 
-**9 on offer, 2 improve your XI.**
+**9 on offer, 2 improve your XI, 1 cover a position you are short in.**
 
-| Player | Pos | Value | Start% | xPts/j | XI gain | Bid | Competition | Verdict |
+| Player | Pos | Value | Start% | XI gain | Bid | Cost/pt | Competition | Verdict |
 |---|---|--:|--:|--:|--:|--:|---|---|
-| Pablo Fornals | med | 57.93M | 80% | 5.4 | +2.7 | 59.46M–63.29M | Magic +3.2?, (3 broke) | **Bid** — XI +2.7 |
-| Santiago Mouriño | def | 40.48M | 70% | 3.1 | +0.7 | 41.55M–49.22M | Magic +0.9?, (3 broke) | **Bid** — XI +0.7 |
-| Mario Martin | med | 3.83M | 80% | 2.3 | -0.4 | 3.93M–4.66M | Albert +1.0, +2 more, (1 broke) | pass — XI -0.4 |
-| Pelayo Fernandez | def | 1.72M | 50% | 1.9 | -0.5 | 1.77M–2.09M | Albert +0.7, +1 more | pass — XI -0.5 |
-| Clemens Riedel | def | 4.60M | 50% | 1.9 | -0.5 | 4.72M–5.59M | Albert +0.7, (1 broke) | pass — XI -0.5 |
-| Oriol Rey | med | 734K | 50% | 1.7 | -1.0 | 754K–893K | Albert +0.4, +1 more | pass — XI -1.0 |
-| Alex Freeman | def | 2.45M | 30% | 1.0 | -1.4 | 2.51M–2.97M | none | pass — XI -1.4 |
-| Zakaria Eddahchouri | del | 1.88M | 30% | 0.9 | -1.5 | 1.93M–2.29M | none | pass — XI -1.5 |
-| Dani Vivian | def | 10.82M | 30% | 0.6 | -1.8 | 11.11M–13.16M | none | pass — XI -1.8 |
+| Zakaria Eddahchouri | del | 1.88M | 30% | -1.5 | 1.93M–2.29M | — | none | **Cover** — XI -1.5, but you are 1 short here |
+| Pablo Fornals | med | 57.93M | 80% | +2.7 | 59.46M–63.29M | 1.18M | Magic +3.2?, (3 broke) | **Bid** — XI +2.7 |
+| Santiago Mouriño | def | 40.48M | 70% | +0.7 | 41.55M–49.22M | 3.34M | Magic +0.9?, (3 broke) | **Bid** — XI +0.7 |
+| Mario Martin | med | 3.83M | 80% | -0.4 | 3.93M–4.66M | — | Albert +1.0, +2 more, (1 broke) | pass — XI -0.4 |
+| Pelayo Fernandez | def | 1.72M | 50% | -0.5 | 1.77M–2.09M | — | Albert +0.7, +1 more | pass — XI -0.5 |
+| Clemens Riedel | def | 4.60M | 50% | -0.5 | 4.72M–5.59M | — | Albert +0.7, (1 broke) | pass — XI -0.5 |
+| Oriol Rey | med | 734K | 50% | -1.0 | 754K–893K | — | Albert +0.4, +1 more | pass — XI -1.0 |
+| Alex Freeman | def | 2.45M | 30% | -1.4 | 2.51M–2.97M | — | none | pass — XI -1.4 |
+| Dani Vivian | def | 10.82M | 30% | -1.8 | 11.11M–13.16M | — | none | pass — XI -1.8 |
+
+**Cost/pt** is what the marginal point actually costs, and it is not the price: a purchase is closer to a loan than a spend, because the value comes back when you sell. It is the premium you pay over the floor plus the value expected to drain away over 14 days — NOT the price, and NOT the exit. The app pays value give or take 12% on a sale, which on a large player is bigger than both other terms together; that swing is a coin flip, so it is stated here rather than averaged into a number that would look like a price. Drift is a flat mean within his price band, over readings taken before a ball was kicked — expect it to move harder once results land.
 
 Competition is demand, not roster counts: the rivals whose XI actually improves with him, strongest threat first — `?` cash unknown (treat as live), `(n broke)` want him but cannot pay the floor. The full manager-by-manager matrix is in `reports/rivals.md`.
 
@@ -148,4 +150,4 @@ _621 players tracked, 512 with a probable-XI reading._
 
 _xPts/j — expected points per jornada = shrunk pts/match (K=8, 2025-26) × P(start), from `ffcore/score.py` — the same scorer rivals.py uses. Injured, suspended and unavailable score zero; a doubt is halved._
 
-_Generated 2026-08-15 10:14 UTC._
+_Generated 2026-08-15 10:50 UTC._
