@@ -11,6 +11,17 @@ Personal use only. Don't redistribute the scraped data.
 snapshot, parses it, runs every generator in dependency order, and stitches the
 output into **`reports/REPORT.md`** — the only file you need to read.
 
+That report answers four questions, in this order, each in one table:
+
+1. **Am I fielding the right eleven?** Your marked XI first, the model's
+   swaps second.
+2. **Is anyone injured, suspended, or doubtful?** Every squad member, with an
+   explicit *no data* state — silence never reads as fitness.
+3. **Is everyone expected to start?** Start probability for every mark.
+4. **Anything to do in the market?** The slate, priced, with who can compete.
+
+Everything else is reference and is **linked**, not reprinted.
+
 It also runs itself twice a day (22:40 and 09:40 UTC), so most of the time
 there is nothing to press at all. The run summary shows what needs a decision,
 the rival cash table, and any warnings, so you can read the important part in
@@ -36,9 +47,22 @@ Four files under `inputs/`. Everything else is generated.
 | File | What goes in it |
 |---|---|
 | `transactions.csv` | Append a row for every buy and sell, yours and theirs. This is the source of truth for who owns whom. |
+| `lineup.txt` | **The marks, never the names.** `[x]` fielded, `[ ]` benched. Regenerated from the ledger every run; your marks survive, sold players vanish, and anyone you just bought arrives benched. |
 | `cash.txt` | Any balance you actually observe. One rival balance turns their whole cash estimate from an estimate into arithmetic. |
 | `rosters_initial.txt` | The starting rosters. Write once, never edit. |
-| `bench.txt` | Who is **not** in your XI. You own 12 and field 11, so this is one name. The XI is derived. |
+
+`deadline.txt` (one line, each jornada) and `league.ini` (thresholds and the
+starting budget) are the two you touch occasionally. `lookup.txt` and
+`seen.txt` are scratch. `squad.txt` is **generated** — a fallback so
+`report.py` still works if the ledger fails to load; don't hand-edit it.
+
+Every file under `inputs/` states in its own header what it is for, who writes
+it and who reads it.
+
+**The old `bench.txt` is gone.** It named who was *not* in your XI, which stopped
+scaling the moment the bench was four names, and once `lineup.txt` existed the
+two could contradict each other — silently, since whichever was read first
+won. One file describes your eleven now.
 
 ## Reading the slate off your phone
 
@@ -87,11 +111,6 @@ An OCR'd price can silently disagree with a correct one we already hold.
 `inputs/seen.txt` is git-ignored and cleared on every run that doesn't paste
 one. It is scratch, not state — that is what stops it drifting.
 
-`league.ini` holds thresholds and the starting budget. `lookup.txt` is a
-scratch input for the name resolver.
-`squad.txt` is **generated** — a fallback so `report.py` still works if the
-ledger fails to load; don't hand-edit it.
-
 ## Routine
 
 - **Most days:** open `reports/REPORT.md`. Usually nothing to do.
@@ -116,7 +135,11 @@ data/raw/dt=…/       gzipped HTML — immutable, never edit or delete
 data/tidy/*.csv      parsed output — disposable, rebuilt from raw
 data/decisions/      append-only logs of estimates, for scoring later
 reports/REPORT.md    ← read this
-reports/*.md         the individual sections REPORT.md is built from
+reports/latest.md    the four questions (report.py) — carried into REPORT.md
+reports/rivals.md    how rivals bid: premiums, drift, projected XIs (rivals.py)
+reports/squads.md    every squad, deal history, cash basis (squads.py)
+reports/watchlist.md everyone unowned, ranked (squads.py)
+reports/methodology.md  the formula and how it is tracking (methodology.py)
 docs/design.md       architecture, data sources, modelling plan
 ```
 
@@ -128,6 +151,7 @@ to `src/`:
 
 ```
 python src/ffcore/parse.py                      # number parsing
+python src/ff_ingest.py --selftest              # fitness + market parsing
 PYTHONPATH=src python src/ffcore/league.py --selftest   # config + cash
 PYTHONPATH=src python src/ffcore/bid.py                 # premiums, bands, XI gain
 PYTHONPATH=src python src/digest.py --selftest          # report stitching
@@ -136,6 +160,29 @@ PYTHONPATH=src python src/seen.py --selftest            # OCR name matching
 ```
 
 ## Design notes
+
+**Fitness is read from the panel, not from the classes.** `elemento lesionado
+elemento_jugador` is the generic class on every tile of the pitch graphic — the
+containers are called `jugadores-titulares-22421 mod lesionados`, and Barcelona
+alone carries 40 of them. Selecting on it flags the whole squad. The real
+signal is the "Estado físico de la plantilla" panel, and the *state* comes from
+the icon's alt text (`Lesionado` / `Duda` / `Tocado`), not from any class.
+Suspensions live in `section.mod.sancionados`, but that class is reused by a
+transfer-listing box holding 214 elements league-wide, none of them suspended;
+excluding `.mercado-box` is not optional. `Tocado` — a knock the site still
+lists as available — folds into `doubt`, because it drives the same decision.
+
+For the whole life of this repo the `status` column was dead: 14,765 rows, all
+`ok`. Re-parsing the retained HTML recovered 1,702 flagged readings across 29
+snapshots. Because the fix ran over raw, it repaired the history too. `parse`
+now prints the status breakdown every run and warns when nothing at all is
+flagged, which is what would have caught this in week one.
+
+**One bench, and it is yours.** The report used to print the model's spare
+players and your marked bench under the same word, in the same file, with
+different names in each. What you are fielding is a fact; what the model would
+field is advice. Question 1 leads with the fact.
+
 
 **Raw HTML is kept forever; parsed CSV is disposable.** Scrapers rot. When the
 markup changes, fix the parser and re-run over all history. Keeping only the
@@ -223,10 +270,6 @@ partial move doesn't break a run.
 
 ## Known gaps
 
-- **Injury status is never parsed.** Every row in `data/tidy/probable_xi.csv`
-  says `status=ok` because `parse_team` reads `.jugador.tipo_lista` classes,
-  while injuries live in a separate `elemento lesionado` block it never opens.
-  The markup is in the retained HTML, so this is recoverable retroactively.
 - **No outcome data yet.** Nothing records which XI you actually fielded or
   what it scored, so no prediction can be scored against reality. Until that
   exists, every model here is unvalidated.
