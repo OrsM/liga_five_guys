@@ -69,7 +69,7 @@ from collections import Counter
 from typing import NamedTuple
 
 from ffcore.league import MARKET
-from ffcore.parse import money
+from ffcore.parse import money, ratio
 from ffcore.score import SLOT_MIN, THIN, pick_xi, squad_pool
 from ffcore.tidy import ledger_stamp
 
@@ -217,6 +217,137 @@ def suggest(value, prem: Premiums | None, cash=None,
         low = min(low, cash)
         why += ", capped by your cash"
     return Advice(low, high, why)
+
+
+# ---------------------------------------------------------------------------
+# What owning him actually costs
+#
+# The price is not the cost. A purchase is closer to a loan than a spend: the
+# player carries a market value you get back when you sell, so what the deal
+# really costs you is the friction — what you pay over the floor going in, and
+# what the value does while you hold him.
+#
+# The exit is deliberately NOT folded into that number. The app pays value give
+# or take a tenth, and on a large player that swing is bigger than every other
+# term combined; averaging it to zero would hide the only figure here big
+# enough to change a decision. It is reported as a band alongside.
+# ---------------------------------------------------------------------------
+
+HOLD_DAYS = 14            # a fortnight — roughly two jornadas at this stage
+
+
+class Friction(NamedTuple):
+    """What a hold is expected to cost, in euros. Positive is a cost."""
+    entry: float          # paid over the floor
+    carry: float          # expected value lost while held
+    swing: float          # ± on exit, NOT included in expected
+    days: int
+    n_drift: int
+
+    @property
+    def expected(self) -> float:
+        return self.entry + self.carry
+
+    def per_point(self, gain_pts) -> float | None:
+        """Expected friction per marginal point per jornada, or None.
+
+        None when the player does not improve the XI: dividing a cost by a
+        gain of zero or less produces a number that looks like value and is
+        not one.
+        """
+        if not gain_pts or gain_pts <= 0:
+            return None
+        return self.expected / gain_pts
+
+
+# Cheap players and expensive ones do not drift alike — across the snapshots
+# so far the under-2M band loses about half a percent a day while the over-30M
+# band loses a fifth of that. Averaging them together and applying the result
+# to a 58M player roughly doubles his carry cost, which is the difference
+# between a buy and a pass. Banded by value, therefore.
+DRIFT_BANDS = ((0, 2e6), (2e6, 10e6), (10e6, 30e6), (30e6, float("inf")))
+
+
+def band_of(value) -> tuple:
+    """The drift band a player's value falls in."""
+    v = money(value) or 0.0
+    for lo, hi in DRIFT_BANDS:
+        if lo <= v < hi:
+            return (lo, hi)
+    return DRIFT_BANDS[-1]
+
+
+def drift_daily(rows, band=None) -> tuple[float, int]:
+    """(mean daily % value move, n) across the market readings given.
+
+    Deliberately a plain mean within a band, not a per-player fit: with a
+    handful of days of readings there is no per-player trend to fit, and
+    pretending otherwise would dress noise up as a forecast.
+    """
+    vals = []
+    for r in rows:
+        p = ratio(r.get("delta_pct_1d"))
+        if p is None:
+            continue
+        if band is not None and band_of(r.get("value")) != band:
+            continue
+        vals.append(p)
+    if not vals:
+        return 0.0, 0
+    return statistics.mean(vals), len(vals)
+
+
+def drift_bands(rows) -> dict:
+    """{band: (mean daily %, n)} — computed once, looked up per candidate.
+
+    A band with too few readings to mean anything falls back to the whole
+    market rather than reporting a mean of three numbers as a rate.
+    """
+    overall = drift_daily(rows)
+    out = {}
+    for band in DRIFT_BANDS:
+        d, n = drift_daily(rows, band)
+        out[band] = (d, n) if n >= MIN_DRIFT_N else overall
+    return out
+
+
+MIN_DRIFT_N = 50
+
+
+def friction(value, buy_prem: Premiums | None, sell_prem: Premiums | None,
+             daily_pct: float = 0.0, n_drift: int = 0,
+             days: int = HOLD_DAYS) -> Friction | None:
+    """Expected cost of owning a player worth `value` for `days`."""
+    if not value or value <= 0:
+        return None
+    entry = value * (buy_prem.median / 100.0) if buy_prem else 0.0
+    carry = -value * (daily_pct / 100.0) * days
+    swing = value * (sell_prem.swing() / 100.0) if sell_prem else 0.0
+    return Friction(entry, carry, swing, days, n_drift)
+
+
+def verdict(gain_pts, adv: Advice, short_by: int = 0) -> str:
+    """The call on one slate player.
+
+    `short_by` is how many players below the thin threshold you are in his
+    position — the report used to warn 'only 1 delantero, one knock and you
+    cannot field a legal XI' and print 'pass' against the only delantero on
+    offer, in the same run, because the verdict priced points and nothing
+    else. A player who is the difference between a legal XI and a hole the
+    app fills for you is worth having at a negative XI gain. That is not an
+    upgrade, so it is not called one: it is cover.
+    """
+    if adv.low is None:
+        return "**No** — %s" % adv.why
+    if gain_pts is None:
+        return "cannot start — depth only"
+    if gain_pts > 0:
+        base = "**Bid** — XI %+.1f" % gain_pts
+        return base + (" · covers a thin position" if short_by > 0 else "")
+    if short_by > 0:
+        return ("**Cover** — XI %+.1f, but you are %d short here"
+                % (gain_pts, short_by))
+    return "pass — XI %+.1f" % gain_pts
 
 
 def gain(pool: dict, candidate: dict, base_total: float,
@@ -555,7 +686,81 @@ def _selftest() -> None:
         {"me": snap(weak_pool), "Stuck": snap(short=["MED"])})
     assert got == "Stuck needs", got
 
-    print("ffcore.bid self-test OK (44 cases)")
+    # --- friction ----------------------------------------------------------
+    buy = Premiums(21, 2.6, -0.2, 21.6, 6)
+    sell = Premiums(13, 3.3, -9.4, 12.0, 5)
+    d, n = drift_daily([{"delta_pct_1d": "-0.2"}, {"delta_pct_1d": "-0.4"},
+                        {"delta_pct_1d": "0.0"}, {"delta_pct_1d": None},
+                        {"delta_pct_1d": "not a number"}])
+    assert n == 3 and abs(d - (-0.2)) < 1e-9, (d, n)
+    # A market with no readings at all drifts by nothing, rather than crashing.
+    assert drift_daily([]) == (0.0, 0)
+
+    # Bands. A cheap player and an expensive one do not drift alike, and
+    # applying the pooled mean to the expensive one doubles his carry cost.
+    assert band_of(1e6) == (0, 2e6)
+    assert band_of(58e6) == (30e6, float("inf"))
+    assert band_of(None) == (0, 2e6)
+    mkt = ([{"value": 1e6, "delta_pct_1d": "-1.0"}] * 60
+           + [{"value": 58e6, "delta_pct_1d": "-0.1"}] * 60)
+    cheap, _ = drift_daily(mkt, band_of(1e6))
+    dear, _ = drift_daily(mkt, band_of(58e6))
+    assert abs(cheap + 1.0) < 1e-9 and abs(dear + 0.1) < 1e-9, (cheap, dear)
+    bands = drift_bands(mkt)
+    assert abs(bands[band_of(58e6)][0] + 0.1) < 1e-9, bands
+    # A band too thin to mean anything falls back to the whole market rather
+    # than reporting the mean of three readings as a rate.
+    thin = drift_bands(mkt + [{"value": 20e6, "delta_pct_1d": "-9.0"}])
+    assert abs(thin[band_of(20e6)][0] - drift_daily(
+        mkt + [{"value": 20e6, "delta_pct_1d": "-9.0"}])[0]) < 1e-9, thin
+
+    f = friction(58e6, buy, sell, daily_pct=-0.19, n_drift=2455, days=14)
+    assert abs(f.entry - 1.508e6) < 1e3, f.entry          # 2.6% of 58M
+    assert abs(f.carry - 1.5428e6) < 1e3, f.carry         # 0.19% x 14 days
+    assert abs(f.expected - 3.05e6) < 5e3, f.expected
+    # The exit swing is reported, never averaged into the expected cost: at
+    # 12% of 58M it is larger than both other terms together, and hiding it
+    # inside a single figure would make a coin flip look like a price.
+    assert abs(f.swing - 6.96e6) < 1e3, f.swing
+    assert f.swing > f.expected
+
+    # Cost per marginal point, and no answer where there is no gain.
+    assert abs(f.per_point(2.7) - 1.13e6) < 1e4, f.per_point(2.7)
+    assert f.per_point(0) is None and f.per_point(-1.5) is None
+    assert f.per_point(None) is None
+
+    # A rising market is a negative carry — the hold pays you.
+    up = friction(10e6, buy, sell, daily_pct=+0.5, n_drift=100, days=14)
+    assert up.carry < 0, up.carry
+    assert friction(0, buy, sell) is None
+
+    # --- verdict -----------------------------------------------------------
+    reach = Advice(1.0e6, 1.1e6, "floor +2.6%")
+    broke = Advice(None, None, "3.00M short of the floor")
+
+    assert verdict(2.7, reach).startswith("**Bid**")
+    assert verdict(-0.4, reach) == "pass — XI -0.4"
+    assert verdict(None, reach) == "cannot start — depth only"
+    assert verdict(2.7, broke).startswith("**No**")
+
+    # THE CONTRADICTION THIS FIXES. The report warned "only 1 delantero — one
+    # knock and you can't field a legal XI" and printed "pass" against the
+    # only delantero on the slate, in the same run. A negative XI gain in a
+    # position you are short in is cover, not a pass.
+    v = verdict(-1.5, reach, short_by=1)
+    assert v.startswith("**Cover**"), v
+    assert "-1.5" in v and "1 short" in v, v
+    # It is never called an upgrade — the gain stays visible and negative.
+    assert "Bid" not in v, v
+    # Cover cannot conjure cash you do not have.
+    assert verdict(-1.5, broke, short_by=1).startswith("**No**")
+    # A player who improves the XI AND covers says both.
+    both = verdict(1.2, reach, short_by=1)
+    assert both.startswith("**Bid**") and "covers a thin" in both, both
+    # No shortage, no cover.
+    assert "Cover" not in verdict(-1.5, reach, short_by=0)
+
+    print("ffcore.bid self-test OK (71 cases)")
 
 
 if __name__ == "__main__":                      # pragma: no cover
