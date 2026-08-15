@@ -1,4 +1,4 @@
-# League behaviour — 2026-08-15 07:02 UTC
+# League behaviour — 2026-08-15 07:20 UTC
 
 5 managers, 35 ledger rows, 29 market snapshots, points baseline 2025-26.
 
@@ -93,6 +93,22 @@ Trapped is value held in players below 50% start probability — money that cann
 
 ## 5. Who wants what
 
+**The slate through every manager's eyes.** XI gain per jornada if that manager owned him, under the one shared scorer. `(…)` = wants him but their estimated cash cannot pay the floor. **needs** = they cannot field a legal XI without buying in this position — a forced buyer. Your column has no cash cap: you know your own balance.
+
+| Player | Pos | Value | You | Albert | BurtonGM | Magic | SusoGatt |
+|---|---|--:|--:|--:|--:|--:|--:|
+| pablo fornals | MED | 57.93M | +2.7 | (+3.5) | (+4.1) | +3.2 | (+3.4) |
+| santiago mouriño | DEF | 40.48M | +0.7 | (+1.0) | (+1.7) | +0.9 | (+1.1) |
+| mario martin | MED | 3.83M | -0.4 | +0.4 | (+1.0) | +0.1 | +0.3 |
+| clemens riedel | DEF | 4.60M | -0.5 | -0.2 | (+0.5) | -0.3 | -0.1 |
+| pelayo fernandez | DEF | 1.72M | -0.5 | -0.2 | +0.5 | -0.3 | -0.0 |
+| oriol rey | MED | 734K | -1.0 | -0.3 | +0.4 | -0.5 | -0.3 |
+| dani vivian | DEF | 10.82M | -1.2 | (-0.9) | (-0.2) | -1.0 | -0.8 |
+| alex freeman | DEF | 2.45M | -1.4 | -1.1 | (-0.4) | -1.2 | -1.0 |
+| zakaria eddahchouri | DEL | 1.88M | -1.5 | -1.2 | -0.4 | -1.3 | -1.1 |
+
+Read it as an auction map: a player whose gain is big only in YOUR column is a quiet buy at the floor; big in a funded rival's column too means price the bid off their premium in section 2, or walk.
+
 Restricted to the 9 players on today's slate — the rest of the market is not a decision you can make today.
 
 **Expect competition for these** — the position is one a rival is short in, so assume a bidding war and price accordingly.
@@ -120,10 +136,56 @@ Restricted to the 9 players on today's slate — the rest of the market is not a
 |---|---|--:|--:|---|
 | alvaro fernandez | POR | 4.73M | 20% | Albert Laporta, BurtonGM89, Magic Mike 333, SusoGattuso |
 
+## 6. Projected XIs
+
+Each manager's best legal XI under the same scorer — what a rational version of them fields. Once jornadas run, their actual points versus this forecast measures two things at once: the model's calibration (5× the sample your own squad gives), and who manages actively versus who set-and-forgets — a leak worth knowing at deal time.
+
+| Manager | ≈pts/j | vs you | Shape | Unmatched |
+|---|--:|--:|---|--:|
+| **miguel_autentico** | 35.4 | — | 4-5-1 | 0 |
+| Albert Laporta | 33.6 | -1.7 | 4-3-3 | 0 |
+| Magic Mike 333 | 32.4 | -2.9 | 3-4-3 | 0 |
+| BurtonGM89 | 31.4 | -3.9 | 5-4-1 | 0 |
+| SusoGattuso | 29.4 | -6.0 | 4-4-2 | 0 |
+
+Unmatched names are absent from that manager's total, so a big number there understates them. Variance in one jornada dwarfs these gaps; over ten it does not.
+
+**miguel_autentico** — 4-5-1 · ≈35 pts
+- POR: ionut radu 5.9
+- DEF: carl starfelt 3.1 · igor zubeldia 3.0 · robin le normand 2.6 · omar el hilali 2.4
+- MED: jon moncayola 3.9 · lucien agoume 3.2 · pepelu 3.0 · ruben garcia 2.9 · iñigo ruiz de galarreta 2.7
+- DEL: iñigo vicente 2.7
+
+**Albert Laporta** — 4-3-3 · ≈34 pts
+- POR: matias dituro 5.6
+- DEF: leandro cabrera 4.1 · diego javier llorente 2.8 · pedro bigas 2.3 · juan foyth 2.3
+- MED: arda guler 3.9 · marc roca 2.6 · ilaix moriba 1.9
+- DEL: ferran jutgla 3.7 · raul moro 2.4 · asier villalibre 2.1
+
+**Magic Mike 333** — 3-4-3 · ≈32 pts
+- POR: alfonso herrero 3.5
+- DEF: kike salas 4.3 · jose gaya 2.5 · lucas noubi 2.2
+- MED: brahim diaz 2.3 · gustavo puerta 2.3 · williot swedberg 2.2 · marc bernal 2.2
+- DEL: raphinha 5.0 · gorka guruzeta 3.7 · pere milla 2.2
+
+**BurtonGM89** — 5-4-1 · ≈31 pts
+- POR: marko dmitrovic 5.7
+- DEF: carlos romero 4.1 · justin de haas 2.8 · quilindschy hartman 2.0 · carlos puga 2.0 · giacomo quagliata 1.4
+- MED: santi comesaña 4.4 · antonio blanco 3.9 · denis suarez 1.7 · tajon buchanan 1.3~
+- DEL: karl etta eyong 2.0
+
+**SusoGattuso** — 4-4-2 · ≈29 pts
+- POR: wojciech szczesny 1.1~
+- DEF: yuri berchiche 3.4 · cesar tarrega 3.2 · abdel abqar 2.6 · jon aramburu 2.1
+- MED: alvaro garcia 3.8 · aimar oroz 2.8 · lorenzo amatucci 2.3 · izan merino 2.0
+- DEL: giuliano simeone 3.7 · andres martin 2.4
+
+`~` start probability under 50% — the model expects rotation there, so that is where their real XI will differ from this one.
+
 ## Ledger warnings
 
 - Magic Mike 333: net spend exceeds the 100M budget by 7.22M — unrecorded sales, or they started with more. Cash reported as unknown; ask before assuming they are broke.
 
 ---
 
-Sections 2 and 3 are hypotheses until the sample grows: with 35 ledger rows across 5 managers, a median is one or two deals. Section 1 and section 5 are usable today.
+Sections 2 and 3 are hypotheses until the sample grows: with 35 ledger rows across 5 managers, a median is one or two deals. Sections 1, 5 and 6 are usable today.

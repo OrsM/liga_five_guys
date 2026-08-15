@@ -84,4 +84,4 @@ _621 players tracked, 512 with a probable-XI reading. Who to buy is in `reports/
 
 _xPts/j — expected points per jornada = shrunk pts/match (K=8, 2025-26) × P(start), from `ffcore/score.py` — the same scorer rivals.py uses. How it works, what it ignores, and how it is tracking reality: *How the forecast works* at the end of this report._
 
-_Generated 2026-08-15 07:02 UTC._
+_Generated 2026-08-15 07:20 UTC._
