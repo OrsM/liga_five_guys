@@ -18,7 +18,14 @@ Five sections, in descending order of how much they are worth to you today:
                          and whether they can field a legal XI at all.
   5. Demand forecast     which unowned players each rival structurally needs
                          — so you know where not to start a bidding war, and
-                         what to list to whom.
+                         what to list to whom. With a slate pasted, this now
+                         prices every slate player through EVERY manager's
+                         eyes: their XI gain, capped by their cash.
+  6. Projected XIs       each manager's best legal XI under the same scorer,
+                         with expected points — the projected jornada table.
+                         Logged to data/decisions/rival_xi_log.csv so their
+                         forecasts can be scored against the app's actual
+                         standings once jornadas exist.
 
 Every run appends its estimates to data/decisions/rival_log.csv. Premiums and
 cash estimates are not reconstructable after the fact, and the point of
@@ -40,8 +47,8 @@ from collections import Counter
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from ffcore.bid import (MAX_LAG_H, deals, premiums, rivals_short,  # noqa: E402
-                        usable)
+from ffcore.bid import (MAX_LAG_H, deals, gain, premiums,  # noqa: E402
+                        rivals_short, usable)
 from ffcore.league import League  # noqa: E402
 from ffcore.score import (MAX_SLOT, SLOT_LABEL, SLOT_MIN, THIN,  # noqa: E402
                           Scorer, pick_xi, squad_pool)
@@ -295,11 +302,199 @@ def sec_squads(lg, sc, players_by_key) -> list[str]:
 
 
 # ---------------------------------------------------------------------------
+# shared: every manager's best XI, computed once
+# ---------------------------------------------------------------------------
+
+def xi_snapshots(lg, sc, by_key) -> dict[str, dict]:
+    """{handle: {pool, best, missing, short}} under the one shared scorer.
+
+    `best` is pick_xi's (total, shape, picked) or None — and None is a
+    finding, not an error: that manager cannot field a legal XI today.
+    `short` lists the slots below the legal minimum, which is where their
+    next purchase is forced to go.
+    """
+    out = {}
+    for m in lg:
+        names = [by_key.get(k, {}).get("name", k) for k in m.players]
+        scored, missing = sc.score_squad(names)
+        pool = squad_pool(scored)
+        counts = Counter(p.slot for p in scored if p.slot)
+        out[m.handle] = {
+            "pool": pool,
+            "best": pick_xi(pool) if scored else None,
+            "missing": missing,
+            "short": [sl for sl, need in SLOT_MIN.items()
+                      if counts.get(sl, 0) < need],
+        }
+    return out
+
+
+def short_handle(handle: str, me: bool = False) -> str:
+    """A column header that fits a phone screen."""
+    return "You" if me else handle.split()[0][:8]
+
+
+def gain_cell(g, slot: str, snap: dict, max_bid, value) -> str:
+    """One cell of the slate matrix.
+
+    `needs`   they cannot field a legal XI and this slot is a hole — they
+              are forced buyers here, premium be damned.
+    (+x.x)    the gain, but their estimated cash cannot pay even the floor,
+              so the demand is real and the threat is not.
+    """
+    if snap["best"] is None:
+        return "**needs**" if slot in snap["short"] else "—"
+    if g is None:
+        return "—"
+    cell = "%+.1f" % g
+    if max_bid is not None and value and max_bid < value:
+        return "(%s)" % cell
+    return cell
+
+
+def sec_slate_matrix(lg, sc, by_key, on_offer, snaps) -> list[str]:
+    """Every slate player through every manager's eyes."""
+    out: list[str] = []
+    if not on_offer:
+        return out
+
+    free = [r for k, r in by_key.items()
+            if k not in lg.owner and norm(r.get("name")) in on_offer]
+    cands = [sc.score(r).as_row() for r in free]
+    cands = [c for c in cands if c["slot"]]
+    if not cands:
+        return out
+
+    handles = [m.handle for m in lg]
+    max_bid = {m.handle: m.max_bid for m in lg}
+    rows = []
+    for c in cands:
+        cells = {}
+        for h in handles:
+            snap = snaps[h]
+            g = (gain(snap["pool"], c, snap["best"][0])
+                 if snap["best"] is not None else None)
+            cells[h] = gain_cell(g, c["slot"], snap,
+                                 None if h == lg.cfg.me else max_bid[h],
+                                 c["value"])
+        my = cells[lg.cfg.me]
+        try:
+            my_sort = float(my.strip("()"))
+        except ValueError:
+            my_sort = float("-inf")
+        rows.append((my_sort, c, cells))
+    rows.sort(key=lambda t: -t[0])
+
+    ordered = [lg.cfg.me] + [h for h in handles if h != lg.cfg.me]
+    out += ["**The slate through every manager's eyes.** XI gain per "
+            "jornada if that manager owned him, under the one shared "
+            "scorer. `(…)` = wants him but their estimated cash cannot pay "
+            "the floor. **needs** = they cannot field a legal XI without "
+            "buying in this position — a forced buyer. Your column has no "
+            "cash cap: you know your own balance.", "",
+            "| Player | Pos | Value | "
+            + " | ".join(short_handle(h, h == lg.cfg.me) for h in ordered)
+            + " |",
+            "|---|---|--:|" + "--:|" * len(ordered)]
+    for _, c, cells in rows:
+        out.append("| %s | %s | %s | %s |" % (
+            c["name"], c["slot"], eur(c["value"]),
+            " | ".join(cells[h] for h in ordered)))
+    out += ["",
+            "Read it as an auction map: a player whose gain is big only in "
+            "YOUR column is a quiet buy at the floor; big in a funded "
+            "rival's column too means price the bid off their premium in "
+            "section 2, or walk.", ""]
+    return out
+
+
+# ---------------------------------------------------------------------------
+# 6. projected XIs
+# ---------------------------------------------------------------------------
+
+def sec_projected(lg, snaps) -> list[str]:
+    me = lg.cfg.me
+    my_best = snaps.get(me, {}).get("best")
+    my_tot = my_best[0] if my_best else None
+
+    out = ["## 6. Projected XIs", "",
+           "Each manager's best legal XI under the same scorer — what a "
+           "rational version of them fields. Once jornadas run, their "
+           "actual points versus this forecast measures two things at "
+           "once: the model's calibration (5× the sample your own squad "
+           "gives), and who manages actively versus who set-and-forgets — "
+           "a leak worth knowing at deal time.", "",
+           "| Manager | ≈pts/j | vs you | Shape | Unmatched |",
+           "|---|--:|--:|---|--:|"]
+
+    ranked = sorted(lg, key=lambda m: -(snaps[m.handle]["best"][0]
+                                        if snaps[m.handle]["best"] else -1))
+    for m in ranked:
+        snap = snaps[m.handle]
+        best = snap["best"]
+        out.append("| %s | %s | %s | %s | %d |" % (
+            ("**%s**" % m.handle) if m.handle == me else m.handle,
+            "%.1f" % best[0] if best else "**illegal**",
+            ("—" if best is None or my_tot is None or m.handle == me
+             else "%+.1f" % (best[0] - my_tot)),
+            "-".join(str(x) for x in best[1]) if best else "—",
+            len(snap["missing"])))
+    out += ["",
+            "Unmatched names are absent from that manager's total, so a "
+            "big number there understates them. Variance in one jornada "
+            "dwarfs these gaps; over ten it does not.", ""]
+
+    for m in ranked:
+        snap = snaps[m.handle]
+        best = snap["best"]
+        if best is None:
+            out += ["**%s** — cannot field a legal XI (short at %s)."
+                    % (m.handle,
+                       ", ".join(SLOT_LABEL[sl] for sl in snap["short"])), ""]
+            continue
+        tot, (d, mm, f), picked = best
+        out.append("**%s** — %d-%d-%d · ≈%.0f pts" % (m.handle, d, mm, f, tot))
+        for slot in ("POR", "DEF", "MED", "DEL"):
+            names = ["%s %.1f%s" % (p["name"], p["score"],
+                                    "~" if (p.get("pct") or 100) < 50 else "")
+                     for p in picked if p["slot"] == slot]
+            if names:
+                out.append("- %s: %s" % (slot, " · ".join(names)))
+        out.append("")
+    out += ["`~` start probability under 50% — the model expects rotation "
+            "there, so that is where their real XI will differ from this "
+            "one.", ""]
+    return out
+
+
+def log_projections(lg, snaps) -> None:
+    stamp = dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H:%MZ")
+    rows = []
+    for m in lg:
+        best = snaps[m.handle]["best"]
+        rows.append({
+            "observed_at": stamp, "manager": m.handle,
+            "formation": ("-".join(str(x) for x in best[1])
+                          if best else "illegal"),
+            "xpts": "%.2f" % best[0] if best else "",
+            "unmatched": len(snaps[m.handle]["missing"]),
+            "players": ("|".join("%s:%.2f" % (p["name"], p["score"])
+                                 for p in best[2]) if best else ""),
+        })
+    append_csv(DECISIONS / "rival_xi_log.csv", rows,
+               ["observed_at", "manager", "formation", "xpts",
+                "unmatched", "players"])
+
+
+# ---------------------------------------------------------------------------
 # 5. demand forecast
 # ---------------------------------------------------------------------------
 
-def sec_demand(lg, sc, market_latest, on_offer=None) -> list[str]:
+def sec_demand(lg, sc, market_latest, on_offer=None, snaps=None) -> list[str]:
     out = ["## 5. Who wants what", ""]
+
+    if snaps and on_offer:
+        out += sec_slate_matrix(lg, sc, market_latest, on_offer, snaps)
 
     rivals_need = rivals_short(lg, sc, market_latest)
 
@@ -428,7 +623,9 @@ def main() -> None:
     out += sec_premium(lg, dl)
     out += sec_drift(lg, dl, lg.market)
     out += sec_squads(lg, sc, by_key)
-    out += sec_demand(lg, sc, by_key, on_offer)
+    snaps = xi_snapshots(lg, sc, by_key)
+    out += sec_demand(lg, sc, by_key, on_offer, snaps)
+    out += sec_projected(lg, snaps)
 
     if lg.warnings:
         out += ["## Ledger warnings", ""] + ["- " + w for w in lg.warnings]
@@ -437,14 +634,39 @@ def main() -> None:
     out += ["---", "",
             "Sections 2 and 3 are hypotheses until the sample grows: with "
             "%d ledger rows across %d managers, a median is one or two deals. "
-            "Section 1 and section 5 are usable today."
+            "Sections 1, 5 and 6 are usable today."
             % (len(lg.txns), len(lg.managers)), ""]
 
     REPORTS.mkdir(exist_ok=True)
     write_lines(REPORTS / "behaviour.md", out)
     log(lg, dl)
+    log_projections(lg, snaps)
     print("%d deals priced, %d managers" % (len(dl), len(lg.managers)))
 
 
+def _selftest() -> None:
+    assert short_handle("Magic Mike 333") == "Magic"
+    assert short_handle("BurtonGM89") == "BurtonGM"
+    assert short_handle("anything", me=True) == "You"
+
+    legal = {"best": (30.0, (4, 4, 2), []), "short": []}
+    broke = {"best": None, "short": ["POR"]}
+    # Funded and legal: the gain, plain.
+    assert gain_cell(2.34, "MED", legal, 50e6, 10e6) == "+2.3"
+    # Wants him but cannot pay the floor.
+    assert gain_cell(2.34, "MED", legal, 5e6, 10e6) == "(+2.3)"
+    # Your own column carries no cash cap.
+    assert gain_cell(-0.4, "MED", legal, None, 10e6) == "-0.4"
+    # Cannot field an XI: forced buyer in the hole, dash elsewhere.
+    assert gain_cell(None, "POR", broke, 1e6, 10e6) == "**needs**"
+    assert gain_cell(None, "DEF", broke, 1e6, 10e6) == "—"
+    # Can never start for a legal squad.
+    assert gain_cell(None, "MED", legal, 50e6, 10e6) == "—"
+    print("rivals.py selftest OK")
+
+
 if __name__ == "__main__":
-    main()
+    if "--selftest" in sys.argv:
+        _selftest()
+    else:
+        main()
