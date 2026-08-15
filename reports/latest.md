@@ -1,32 +1,99 @@
 # Fantasy report — 2026-08-14T2256Z
 
-## Needs a decision
+**Locks in 7h** · squad 171.50M · cash 63.29M · total 234.79M
 
-- **9 players on offer, 2 improve your XI** — priced in the slate table below.
-- **Locks in 8h.** Probable XIs are at their most reliable now.
-- **Only 1 delantero** — one knock and you can't field a legal XI.
-- **1 of the XI are unmodelled** (Iñigo Vicente) — no LaLiga record, so they're carrying an assumed baseline, not an earned one.
-- **Your bench costs you 1.1 pts/j** — marked XI ≈34, best ≈35. Swap Beñat Turrientes → Lucien Agoume (+0.6); Dani Lorenzo → Pepelu (+0.4).
+## 1. Am I fielding the right eleven?
 
-**Squad 171.50M** · cash 63.29M · total 234.79M
+**Your XI: 4-5-1 · ≈34 pts expected next jornada** (uncalibrated — see the methodology link at the end)
 
-Compare squad value with the app; a mismatch means a name matched the wrong player. Roster read from the ledger.
+| | Marked XI | Start% | xPts/j | State |
+|---|---|--:|--:|---|
+| POR | Ionut Radu | 90% | 5.9 | fit |
+| DEF | Carl Starfelt | 60% | 3.1 | fit |
+| DEF | Robin Le Normand | 60% | 2.6 | fit |
+| DEF | Igor Zubeldia | 80% | 3.0 | fit |
+| DEF | Omar El Hilali | 80% | 2.4 | fit |
+| MED | Ruben Garcia | 60% | 2.9 | fit |
+| MED | Iñigo Ruiz de Galarreta | 60% | 2.7 | fit |
+| MED | Dani Lorenzo | 90% | 2.6 | fit |
+| MED | Jon Moncayola | 90% | 3.9 | fit |
+| MED | Beñat Turrientes | 70% | 2.5 | fit |
+| DEL | Iñigo Vicente | 90% | 2.7 | fit |
 
-## Today's slate — 9 on offer, 2 improve your XI
+**The model would score ≈35 — 1.1 pts/j more.** Its shape is 4-5-1.
+
+| Bench this | For this | Worth |
+|---|---|--:|
+| Beñat Turrientes (2.5) | Lucien Agoume (3.2) | +0.6 |
+| Dani Lorenzo (2.6) | Pepelu (3.0) | +0.4 |
+
+_Swaps are same-position only: a cross-slot difference is a change of formation, not a substitution. Your own marks are the row above — this table is advice._
+
+## 2. Is anyone injured, suspended, or doubtful?
+
+**Nobody in your squad is flagged.** All 15 players with an entry on their team page read as available.
+
+| Player | State | What the page says |
+|---|---|---|
+| Alvaro Fernandez | fit | listed, no flag |
+| Beñat Turrientes | fit | listed, no flag |
+| Carl Starfelt | fit | listed, no flag |
+| Dani Lorenzo | fit | listed, no flag |
+| Igor Zubeldia | fit | listed, no flag |
+| Ionut Radu | fit | listed, no flag |
+| Iñigo Ruiz de Galarreta | fit | listed, no flag |
+| Iñigo Vicente | fit | listed, no flag |
+| Jon Moncayola | fit | listed, no flag |
+| Lucien Agoume | fit | listed, no flag |
+| Omar El Hilali | fit | listed, no flag |
+| Pepelu | fit | listed, no flag |
+| Robin Le Normand | fit | listed, no flag |
+| Ruben Garcia | fit | listed, no flag |
+| Simon Eriksson | fit | listed, no flag |
+
+_Read from the 'Estado físico', 'Sancionados' and 'No disponibles' blocks of each team page. A knock the site still lists as available (`Tocado`) is folded into doubt._
+
+## 3. Is everyone expected to start?
+
+**Every marked player is at 60% or above.**
+
+| | Player | Start% | Reading |
+|---|---|--:|---|
+| XI | Dani Lorenzo | 90% | published |
+| XI | Jon Moncayola | 90% | published |
+| XI | Iñigo Vicente | 90% | published |
+| XI | Ionut Radu | 90% | published |
+| XI | Igor Zubeldia | 80% | published |
+| XI | Omar El Hilali | 80% | published |
+| XI | Beñat Turrientes | 70% | published |
+| XI | Carl Starfelt | 60% | published |
+| XI | Robin Le Normand | 60% | published |
+| XI | Ruben Garcia | 60% | published |
+| XI | Iñigo Ruiz de Galarreta | 60% | published |
+| bench | Lucien Agoume | 80% | published |
+| bench | Pepelu | 70% | published |
+| bench | Simon Eriksson | 50% | published |
+| bench | Alvaro Fernandez | 20% | published |
+
+_`start_pct` is futbolfantasy's editorial bucket, read twice a day, not a live probability — it moved for only a handful of players across the snapshots taken so far. Threshold is `min_start` in `inputs/league.ini`._
+
+## 4. Anything to do in the market?
+
+**9 on offer, 2 improve your XI.**
 
 | Player | Pos | Value | Start% | xPts/j | XI gain | Bid | Competition | Verdict |
 |---|---|--:|--:|--:|--:|--:|---|---|
 | Pablo Fornals | med | 57.93M | 80% | 5.4 | +2.7 | 59.46M–63.29M | Magic +3.2?, (3 broke) | **Bid** — XI +2.7 |
 | Santiago Mouriño | def | 40.48M | 70% | 3.1 | +0.7 | 41.55M–49.22M | Magic +0.9?, (3 broke) | **Bid** — XI +0.7 |
-| Mario Martin | med | 3.83M | 80% | 2.3 | -0.4 | 3.93M–4.66M | Albert +0.4, +2 more, (1 broke) | pass — XI -0.4 |
-| Pelayo Fernandez | def | 1.72M | 50% | 1.9 | -0.5 | 1.77M–2.09M | BurtonGM +0.5 | pass — XI -0.5 |
-| Clemens Riedel | def | 4.60M | 50% | 1.9 | -0.5 | 4.72M–5.59M | (1 broke) | pass — XI -0.5 |
-| Oriol Rey | med | 734K | 50% | 1.7 | -1.0 | 754K–893K | BurtonGM +0.4 | pass — XI -1.0 |
-| Dani Vivian | def | 10.82M | 30% | 1.2 | -1.2 | 11.11M–13.16M | none | pass — XI -1.2 |
+| Mario Martin | med | 3.83M | 80% | 2.3 | -0.4 | 3.93M–4.66M | Albert +1.0, +2 more, (1 broke) | pass — XI -0.4 |
+| Pelayo Fernandez | def | 1.72M | 50% | 1.9 | -0.5 | 1.77M–2.09M | Albert +0.7, +1 more | pass — XI -0.5 |
+| Clemens Riedel | def | 4.60M | 50% | 1.9 | -0.5 | 4.72M–5.59M | Albert +0.7, (1 broke) | pass — XI -0.5 |
+| Oriol Rey | med | 734K | 50% | 1.7 | -1.0 | 754K–893K | Albert +0.4, +1 more | pass — XI -1.0 |
 | Alex Freeman | def | 2.45M | 30% | 1.0 | -1.4 | 2.51M–2.97M | none | pass — XI -1.4 |
 | Zakaria Eddahchouri | del | 1.88M | 30% | 0.9 | -1.5 | 1.93M–2.29M | none | pass — XI -1.5 |
+| Dani Vivian | def | 10.82M | 30% | 0.6 | -1.8 | 11.11M–13.16M | none | pass — XI -1.8 |
 
-Competition is demand, not roster counts: the rivals whose XI actually improves with him, strongest threat first — `?` cash unknown (treat as live), `(n broke)` want him but cannot pay the floor. The full manager-by-manager matrix is in `reports/behaviour.md`.
+Competition is demand, not roster counts: the rivals whose XI actually improves with him, strongest threat first — `?` cash unknown (treat as live), `(n broke)` want him but cannot pay the floor. The full manager-by-manager matrix is in `reports/rivals.md`.
 
 Bid is the floor plus what this league has actually paid over it: median +2.6%, -0.2% to +21.6% (n=21). 6 of those 21 went at the floor itself, so the minimum is not a number known to lose. A dozen deals is not a distribution — the range is what has happened, not a chance of winning, and every one of them is a bid that won.
 
@@ -41,36 +108,27 @@ OCR mangled these past matching, so they are missing from the table above — re
 - **Bright Ede** — no match
 - **Buonanotte** — no match
 
-## Team
+---
 
-**4-5-1** · **≈35 pts expected next jornada** (uncalibrated — see *How the forecast works* at the end)
+## Warnings
 
-| | Player | Start% | Value | 24h | xPts/j | Last season |
-|---|---|--:|--:|--:|--:|---|
-| POR | Ionut Radu | 90% | 39.25M | -464K | 5.9 | 254p/38j |
-| DEF | Carl Starfelt | 60% | 13.85M | 70K | 3.1 | 106p/19j |
-| DEF | Igor Zubeldia | 80% | 9.94M | 78K | 3.0 | 90p/25j |
-| DEF | Robin Le Normand | 60% | 9.98M | 140K | 2.6 | 125p/28j |
-| DEF | Omar El Hilali | 80% | 8.84M | 61K | 2.4 | 101p/36j |
-| MED | Jon Moncayola | 90% | 6.79M | 107K | 3.9 | 159p/36j |
-| MED | Lucien Agoume | 80% | 5.82M | 28K | 3.2 | 133p/34j |
-| MED | Pepelu | 70% | 7.47M | 99K | 3.0 | 135p/31j |
-| MED | Ruben Garcia | 60% | 13.75M | 173K | 2.9 | 174p/35j |
-| MED | Iñigo Ruiz de Galarreta | 60% | 12.24M | 60K | 2.7 | 156p/34j |
-| DEL | Iñigo Vicente | 90% | 19.17M | 75K | 2.7 | **assumed** |
+- **Only 1 delantero** — one knock and you can't field a legal XI.
+- **1 unmodelled** (Iñigo Vicente) — no LaLiga record, so they carry an assumed baseline, not an earned one.
 
-_As marked in `inputs/lineup.txt`: **≈34 pts** — 1.1 below this XI. The table above is the recommendation, not what you are fielding._
+_Compare squad value with the app; a mismatch means a name matched the wrong player. Roster read from the ledger._
 
-**Bench** — gap is the expected points the XI loses per jornada by playing him instead, after re-picking the formation. €/pt is his value per expected point: the sell shortlist, worst first.
+## Not in your XI (as you have marked them)
+
+**Gap** is what the XI loses per jornada if he has to play, after re-picking the formation. **€/pt** is value per expected point: the sell shortlist, worst first.
 
 | Player | Pos | Value | xPts/j | Gap | €/pt | Why |
 |---|---|--:|--:|--:|--:|---|
 | Alvaro Fernandez | por | 4.73M | 0.9 | -5.1 | 5.42M | 3rd POR — only 1 can ever play |
-| Dani Lorenzo | med | 9.69M | 2.6 | -0.1 | 3.79M | 6th MED — only 5 can ever play |
-| Beñat Turrientes | med | 7.06M | 2.5 | -0.2 | 2.81M | 7th MED — only 5 can ever play |
+| Pepelu | med | 7.47M | 3.0 | +0.0 | 2.48M | rising — sell into strength |
+| Lucien Agoume | med | 5.82M | 3.2 | +0.0 | 1.85M | as good as the man ahead |
 | Simon Eriksson | por | 2.92M | 2.2 | -3.8 | 1.34M | 2nd POR — only 1 can ever play |
 
-_Selling to the app pays the value give or take 12%: the 13 priced sales in the ledger went median +3.3%, -9.4% to +12.0% (n=13), so read every value above as that band, not as a number. Who is short in this position, and who can still afford you, is in `reports/behaviour.md`._
+_Selling to the app pays the value give or take 12%: the 13 priced sales in the ledger went median +3.3%, -9.4% to +12.0% (n=13), so read every value above as that band, not as a number. Who is short in this position, and who can still afford you, is in `reports/rivals.md`._
 
 ## Your movers (24h, over 1%)
 
@@ -84,10 +142,10 @@ _Selling to the app pays the value give or take 12%: the 13 priced sales in the 
 | Ionut Radu | 39.25M | -464K | -1.17% |
 | Alvaro Fernandez | 4.73M | -68K | -1.42% |
 
----
+## Notes
 
-_621 players tracked, 512 with a probable-XI reading. Who to buy is in `reports/watchlist.md`; how your rivals bid is in `reports/behaviour.md`._
+_621 players tracked, 512 with a probable-XI reading._
 
-_xPts/j — expected points per jornada = shrunk pts/match (K=8, 2025-26) × P(start), from `ffcore/score.py` — the same scorer rivals.py uses. How it works, what it ignores, and how it is tracking reality: *How the forecast works* at the end of this report._
+_xPts/j — expected points per jornada = shrunk pts/match (K=8, 2025-26) × P(start), from `ffcore/score.py` — the same scorer rivals.py uses. Injured, suspended and unavailable score zero; a doubt is halved._
 
-_Generated 2026-08-15 08:33 UTC._
+_Generated 2026-08-15 10:14 UTC._

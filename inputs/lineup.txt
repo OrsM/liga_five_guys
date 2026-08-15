@@ -7,6 +7,10 @@
 # xi.py logs them with the hours left, so the last row before kickoff is
 # the XI you actually fielded.
 #
+#
+# WRITTEN BY: src/squads.py (the names) and you (the marks).
+# READ BY:    src/xi.py, src/report.py.
+#
 # 11 marked · 4-5-1 legal
 
 [ ] POR alvaro fernandez

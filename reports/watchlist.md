@@ -1,4 +1,4 @@
-# Watchlist — 2026-08-15 08:33 UTC
+# Watchlist — 2026-08-15 10:14 UTC
 
 The 21 players you pasted as today's slate — everyone you can actually bid on right now, unfiltered. What each one is worth to your XI, and what to bid, is in the slate table at the top of this report.
 
@@ -10,7 +10,7 @@ The 21 players you pasted as today's slate — everyone you can actually bid on 
 | pelayo fernandez | Rayo | def | 1.72M | 0K | 50% |
 | clemens riedel | Espanyol | def | 4.60M | -58K | 50% |
 | alex freeman | Villarreal | def | 2.45M | -32K | 30% |
-| dani vivian | Athletic | def | 10.82M | -318K | 30% |
+| dani vivian ⚠︎doubt | Athletic | def | 10.82M | -318K | 30% |
 
 ## mediocampista
 
