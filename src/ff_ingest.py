@@ -28,8 +28,9 @@ import random
 from datetime import datetime, timezone
 from pathlib import Path
 
-import httpx
-
+# httpx is imported inside fetch(), not here. Parsing and the self-test need
+# only lxml, and the test job installs no network client — a top-level import
+# made `--selftest` fail on a machine that never intended to fetch anything.
 ROOT = Path(os.environ.get("FF_ROOT", "./data"))
 RAW = ROOT / "raw"
 OUT = ROOT / "tidy"
@@ -63,6 +64,8 @@ TIMEOUT = 30.0
 # ---------------------------------------------------------------------------
 
 def fetch() -> Path:
+    import httpx
+
     stamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H%MZ")
     dest = RAW / f"dt={stamp}"
     if (dest / "_SUCCESS").exists():
