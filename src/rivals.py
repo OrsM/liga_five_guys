@@ -1,7 +1,7 @@
 """
 rivals.py — how the other four behave, where it costs them, and how to use it.
 
-    python src/rivals.py            # writes reports/behaviour.md
+    python src/rivals.py            # writes reports/rivals.md
 
 Five sections, in descending order of how much they are worth to you today:
 
@@ -578,7 +578,7 @@ def main() -> None:
     market_rows = load_market()
     if not market_rows:
         REPORTS.mkdir(exist_ok=True)
-        write_lines(REPORTS / "behaviour.md",
+        write_lines(REPORTS / "rivals.md",
                     ["# League behaviour", "",
                      "No market data. Run `ff_ingest.py parse` first."])
         return
@@ -606,18 +606,22 @@ def main() -> None:
     out += sec_demand(lg, sc, by_key, on_offer, snaps)
     out += sec_projected(lg, snaps)
 
-    if lg.warnings:
-        out += ["## Ledger warnings", ""] + ["- " + w for w in lg.warnings]
-        out.append("")
-
-    out += ["---", "",
+    # Kept ABOVE the warnings, not below. digest.py excerpts the warnings
+    # into REPORT.md, and a trailing block sitting inside that section would
+    # travel with it — arriving in a file where sections 2, 3, 5 and 6 are
+    # not printed and the sentence makes no sense.
+    out += ["## How much of this to believe", "",
             "Sections 2 and 3 are hypotheses until the sample grows: with "
             "%d ledger rows across %d managers, a median is one or two deals. "
             "Sections 1, 5 and 6 are usable today."
             % (len(lg.txns), len(lg.managers)), ""]
 
+    if lg.warnings:
+        out += ["## Ledger warnings", ""] + ["- " + w for w in lg.warnings]
+        out.append("")
+
     REPORTS.mkdir(exist_ok=True)
-    write_lines(REPORTS / "behaviour.md", out)
+    write_lines(REPORTS / "rivals.md", out)
     log(lg, dl)
     log_projections(lg, snaps)
     print("%d deals priced, %d managers" % (len(dl), len(lg.managers)))
