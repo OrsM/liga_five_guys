@@ -1,4 +1,7 @@
-# One search term per line. Surnames work best — short fragments match more.
-# Edit this file, then run the "lookup players" workflow from the Actions tab.
-# Results land in reports/lookup.md.
+# SCRATCH. One search term per line; surnames work best.
+#
+# WRITTEN BY: you, or the workflow's `lookup` input.
+# READ BY:    src/find_slug.py.  Results land in reports/lookup.md.
+# Nothing else reads this and nothing depends on it — it is a lookup
+# tool, not state.
 abde
