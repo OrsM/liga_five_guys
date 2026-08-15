@@ -1,0 +1,15 @@
+# Next lock, Madrid wall-clock (the time the app shows). One line,
+# YYYY-MM-DDTHH:MM. Update it each jornada.
+#
+# Used by report.py and xi.py to stamp hours_to_lock on every logged row, so
+# the scorer can take the last row before kickoff instead of guessing which
+# of the day's runs was live. Delete the line and the column goes blank.
+#
+# J1 2026-27 is NOT one moment. LaLiga opens Sat 15 Aug 19:00 with
+# Alavés-Getafe, but the round runs to Thu 27 Aug: Atlético-Málaga is Wed 19,
+# and Valencia-Betis, Real Madrid-Real Sociedad and Barcelona-Athletic sit
+# between Tue 25 and Thu 27 (World Cup postponements). If the app locks each
+# player at HIS match rather than at the round's first kickoff, then several
+# of your XI stay editable for another week and this single number is only a
+# conservative floor. Check it in-app before trusting it.
+2026-08-15T19:00
