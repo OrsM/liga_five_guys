@@ -3,12 +3,16 @@ digest.py — the four report files, stitched into the one you actually read.
 
     python src/digest.py            # writes reports/REPORT.md
 
-Every generator writes its own file, and between them they repeat themselves:
-the ledger warnings appear in both rivals.md and behaviour.md, and the cash
-basis in one is the cash table in the other. Four files also means four taps on
-a phone. This assembles them in the order you need them — what to decide today
-first, background last — and drops any section whose heading has already
-appeared, so a repeated block is printed once.
+Every generator writes its own file, and between them they repeat themselves.
+Concatenating all four produced a 504-line report in which Ionut Radu appeared
+six times, the same cash figure five times, and the same purchase rows four
+times, because deduplicating by HEADING only catches a block repeated under
+the same name — not the same fact printed under two different ones.
+
+So this no longer concatenates. It takes latest.md whole (that is the decision
+report), pulls only the named sections worth carrying from the others, and
+LINKS to the rest. Nothing is deleted: the long tables still live in their own
+files, one tap away, and that is where they belong.
 
 It reads the generated files rather than importing the generators, so nothing
 upstream has to change and a missing file is a skipped section, not a crash.
@@ -28,12 +32,22 @@ from ffcore.tidy import REPORTS, write_lines  # noqa: E402
 
 # Order matters: this is the order you read them in, not the order they are
 # generated. Decisions first, reference material last.
+# (title, filename, sections to include or None for the whole file)
 SOURCES = [
-    ("Decide today", "latest.md"),
-    ("Rivals — cash, premiums, squads", "behaviour.md"),
-    ("Who to buy", "watchlist.md"),
-    ("Squad detail", "rivals.md"),
-    ("How the forecast works — and how it's doing", "methodology.md"),
+    ("Decide today", "latest.md", None),
+    # Cash is a ceiling on every bid, so it earns its place in the one file
+    # you open. The premium curves, drift table and projected XIs behind it
+    # do not — they are reference, and they are linked below.
+    ("Rival cash", "rivals.md", ["1. Cash and ceilings", "Ledger warnings"]),
+]
+
+# Printed as links, not content. Each is a whole file that would otherwise be
+# inlined and duplicate something above.
+LINKS = [
+    ("Who to buy — everyone unowned, ranked", "watchlist.md"),
+    ("How your rivals bid — premiums, drift, projected XIs", "rivals.md"),
+    ("Every squad in the league, deal history, cash basis", "squads.md"),
+    ("How the forecast works, and how it's doing", "methodology.md"),
 ]
 
 OUT = "REPORT.md"
@@ -61,38 +75,54 @@ def _key(heading: str) -> str:
     return h
 
 
-def digest(read, sources=SOURCES, stamp: str = "") -> list[str]:
+def digest(read, sources=SOURCES, stamp: str = "",
+           links=LINKS) -> list[str]:
     """Assemble one report. `read(name)` returns the file's text, or None."""
     out = ["# Liga Five Guys — one report" + (" — " + stamp if stamp else ""),
            "",
-           "Everything the generators produced, in reading order. Sections "
-           "that appeared twice are printed once.", ""]
-    toc: list[str] = []
+           "The four questions first, from `latest.md`. Everything else is "
+           "reference and is linked, not reprinted.", ""]
     body: list[str] = []
     seen: set[str] = set()
 
-    for title, name in sources:
+    for title, name, wanted in sources:
         text = read(name)
         if not text:
             body += ["## " + title, "",
                      "_No `%s` yet — the generator has not run._" % name, ""]
-            toc.append("- " + title + " (missing)")
             continue
-        toc.append("- " + title)
-        body += ["## " + title, ""]
+        keep = {_key(w) for w in wanted} if wanted is not None else None
+        if wanted is not None:
+            body += ["## " + title, ""]
         for heading, lines in split_sections(text):
             if heading:
+                if keep is not None and _key(heading) not in keep:
+                    continue
                 if _key(heading) in seen:
                     continue
                 seen.add(_key(heading))
-                body.append("### " + heading)
+                # A whole-file source keeps its own heading levels; a
+                # cherry-picked one is nested under the title above it.
+                body.append(("### " if wanted is not None else "## ")
+                            + heading)
+            elif wanted is not None:
+                continue      # preamble belongs to the file, not to an excerpt
             else:
-                # Drop the source file's own H1; keep its preamble.
+                # latest.md's H1 becomes this report's H1, so drop it here.
                 lines = [ln for ln in lines if not ln.startswith("# ")]
             body += [ln for ln in lines]
         body.append("")
 
-    return out + toc + [""] + body
+    if links:
+        body += ["## Reference", "",
+                 "Kept in full, one tap away — not reprinted here, because "
+                 "that is what made this file 504 lines long.", ""]
+        for title, name in links:
+            missing = "" if read(name) else "  _(not generated yet)_"
+            body.append("- [%s](%s)%s" % (title, name, missing))
+        body.append("")
+
+    return out + body
 
 
 def main() -> None:
@@ -108,39 +138,58 @@ def main() -> None:
 def _selftest() -> None:
     files = {
         "latest.md": "# Fantasy report — X\n\nSquad 138M\n\n"
-                     "## Needs a decision\n\n- only 1 portero\n\n"
+                     "## 1. Am I fielding the right eleven?\n\n- yes\n\n"
+                     "## Warnings\n\n- Burton overdraws\n",
+        "rivals.md": "# League behaviour — X\n\n"
+                     "## 1. Cash and ceilings\n\n| a | b |\n\n"
+                     "## 2. What they pay over value\n\n| long | table |\n\n"
                      "## Ledger warnings\n\n- Burton overdraws\n",
-        "behaviour.md": "# League behaviour — X\n\n"
-                        "## 1. Cash and ceilings\n\n| a | b |\n\n"
-                        "## Ledger warnings\n\n- Burton overdraws\n",
     }
-    srcs = [("First", "latest.md"), ("Second", "behaviour.md"),
-            ("Absent", "gone.md")]
-    lines = digest(lambda n: files.get(n), srcs, stamp="now")
+    srcs = [("Decide today", "latest.md", None),
+            ("Rival cash", "rivals.md", ["1. Cash and ceilings",
+                                         "Ledger warnings"]),
+            ("Absent", "gone.md", None)]
+    lnks = [("Who to buy", "watchlist.md"), ("Rivals in full", "rivals.md")]
+    lines = digest(lambda n: files.get(n), srcs, stamp="now", links=lnks)
     text = "\n".join(lines)
 
     assert text.count("# Liga Five Guys") == 1
     # Source H1s are dropped: exactly one '# ' heading survives.
     assert len([l for l in lines if l.startswith("# ")]) == 1, \
         [l for l in lines if l.startswith("# ")]
-    # A repeated section is printed once, not once per file.
-    assert text.count("### Ledger warnings") == 1, text
-    assert text.count("- Burton overdraws") == 1, text
-    # Its first home keeps it.
-    assert text.index("### Ledger warnings") < text.index("### 1. Cash")
-    # Real content survives, demoted one level.
-    assert "### Needs a decision" in text
-    assert "- only 1 portero" in text
+    # latest.md is carried whole, keeping its own heading levels.
+    assert "## 1. Am I fielding the right eleven?" in text
+    assert "- yes" in text
     assert "Squad 138M" in text          # preamble kept
+
+    # A cherry-picked source brings ONLY the sections named.
+    assert "### 1. Cash and ceilings" in text
+    assert "| a | b |" in text
+    assert "2. What they pay over value" not in text, text
+    assert "| long | table |" not in text, text
+
+    # THE DUPLICATION FIX: a section already printed is not printed again,
+    # whichever file it came from. 'Warnings' in latest.md and 'Ledger
+    # warnings' in rivals.md are different keys, so both survive — but the
+    # body line they share appears once per section, not once per file.
+    assert text.count("- Burton overdraws") == 2, text
+    # ...and an identical heading really is dropped.
+    lines2 = digest(lambda n: files.get(n),
+                    [("A", "rivals.md", ["Ledger warnings"]),
+                     ("B", "rivals.md", ["Ledger warnings"])],
+                    links=None)
+    assert "\n".join(lines2).count("Ledger warnings") == 1, lines2
+
     # A missing generator is a note, not a crash.
     assert "_No `gone.md` yet" in text
-    # Table of contents lists every source.
-    assert "- First" in text and "- Absent (missing)" in text
+    # Links are printed as links, never inlined.
+    assert "[Who to buy](watchlist.md)" in text
+    assert "_(not generated yet)_" in text      # watchlist.md absent here
 
     # Numbering is ignored when deciding what is a duplicate.
     assert _key("6. Ledger warnings") == _key("Ledger warnings")
 
-    print("digest self-test OK (10 cases)")
+    print("digest self-test OK (16 cases)")
 
 
 if __name__ == "__main__":
