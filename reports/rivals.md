@@ -1,8 +1,8 @@
-# Squads — 2026-08-15 07:20 UTC
+# Squads — 2026-08-15 08:26 UTC
 
 | Manager | Players | Squad value | Spent | Raised | Cash |
 |---|--:|--:|--:|--:|--:|
-| **miguel_autentico** | 15 | 171.50M | 55.37M | 17.79M | 62.89M |
+| **miguel_autentico** | 15 | 171.50M | 55.37M | 17.79M | 63.29M |
 | Albert Laporta | 14 | 224.79M | 125.28M | 30.47M | ~5.19M |
 | BurtonGM89 | 13 | 221.64M | 127.61M | 30.03M | ~2.42M |
 | Magic Mike 333 | 19 | 240.66M | 121.23M | 14.01M | — |
@@ -11,7 +11,7 @@
 `~` is an estimate, not an observed balance — see the basis notes at the bottom. Cash is a ceiling on what anyone can bid tomorrow, which is the point of tracking it.
 
 ## You (miguel_autentico)
-15 players · 171.50M total · 9 at 70%+ · cash 62.89M
+15 players · 171.50M total · 9 at 70%+ · cash 63.29M
 
 | Player | Team | Pos | Value | 24h | Start% |
 |---|---|--:|--:|--:|--:|
@@ -149,7 +149,7 @@
 
 ## Cash basis
 
-- **miguel_autentico** — balance you recorded on 2026-08-12, then 6 ledger row(s) (known)
+- **miguel_autentico** — balance you recorded on 2026-08-15, then 0 ledger row(s) (known)
 - **Albert Laporta** — 100M starting budget, then 8 ledger row(s) (estimated)
 - **BurtonGM89** — 100M starting budget, then 11 ledger row(s) (estimated)
 - **Magic Mike 333** — 100M starting budget, then 7 ledger row(s), which overdraws it by 7.22M (unknown)

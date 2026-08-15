@@ -3,10 +3,12 @@
 ## Needs a decision
 
 - **9 players on offer, 2 improve your XI** — priced in the slate table below.
+- **Locks in 9h.** Probable XIs are at their most reliable now.
 - **Only 1 delantero** — one knock and you can't field a legal XI.
 - **1 of the XI are unmodelled** (Iñigo Vicente) — no LaLiga record, so they're carrying an assumed baseline, not an earned one.
+- **Your marked XI is illegal** (14 players, 4-6-1) — the app will fill the gaps for you, and not with your choice. Fix `inputs/lineup.txt`.
 
-**Squad 171.50M** · cash 62.89M · total 234.39M — balance last checked 2026-08-12, but the ledger moved on 2026-08-14. Re-check it.
+**Squad 171.50M** · cash 63.29M · total 234.79M
 
 Compare squad value with the app; a mismatch means a name matched the wrong player. Roster read from the ledger.
 
@@ -14,15 +16,17 @@ Compare squad value with the app; a mismatch means a name matched the wrong play
 
 | Player | Pos | Value | Start% | xPts/j | XI gain | Bid | Competition | Verdict |
 |---|---|--:|--:|--:|--:|--:|---|---|
-| Pablo Fornals | med | 57.93M | 80% | 5.4 | +2.7 | 59.46M–62.89M | nobody short | **Bid** — XI +2.7 |
-| Santiago Mouriño | def | 40.48M | 70% | 3.1 | +0.7 | 41.55M–49.22M | nobody short | **Bid** — XI +0.7 |
-| Mario Martin | med | 3.83M | 80% | 2.3 | -0.4 | 3.93M–4.66M | nobody short | pass — XI -0.4 |
-| Pelayo Fernandez | def | 1.72M | 50% | 1.9 | -0.5 | 1.77M–2.09M | nobody short | pass — XI -0.5 |
-| Clemens Riedel | def | 4.60M | 50% | 1.9 | -0.5 | 4.72M–5.59M | nobody short | pass — XI -0.5 |
-| Oriol Rey | med | 734K | 50% | 1.7 | -1.0 | 754K–893K | nobody short | pass — XI -1.0 |
-| Dani Vivian | def | 10.82M | 30% | 1.2 | -1.2 | 11.11M–13.16M | nobody short | pass — XI -1.2 |
-| Alex Freeman | def | 2.45M | 30% | 1.0 | -1.4 | 2.51M–2.97M | nobody short | pass — XI -1.4 |
-| Zakaria Eddahchouri | del | 1.88M | 30% | 0.9 | -1.5 | 1.93M–2.29M | BurtonGM89 | pass — XI -1.5 |
+| Pablo Fornals | med | 57.93M | 80% | 5.4 | +2.7 | 59.46M–63.29M | Magic +3.2?, (3 broke) | **Bid** — XI +2.7 |
+| Santiago Mouriño | def | 40.48M | 70% | 3.1 | +0.7 | 41.55M–49.22M | Magic +0.9?, (3 broke) | **Bid** — XI +0.7 |
+| Mario Martin | med | 3.83M | 80% | 2.3 | -0.4 | 3.93M–4.66M | Albert +0.4, +2 more, (1 broke) | pass — XI -0.4 |
+| Pelayo Fernandez | def | 1.72M | 50% | 1.9 | -0.5 | 1.77M–2.09M | BurtonGM +0.5 | pass — XI -0.5 |
+| Clemens Riedel | def | 4.60M | 50% | 1.9 | -0.5 | 4.72M–5.59M | (1 broke) | pass — XI -0.5 |
+| Oriol Rey | med | 734K | 50% | 1.7 | -1.0 | 754K–893K | BurtonGM +0.4 | pass — XI -1.0 |
+| Dani Vivian | def | 10.82M | 30% | 1.2 | -1.2 | 11.11M–13.16M | none | pass — XI -1.2 |
+| Alex Freeman | def | 2.45M | 30% | 1.0 | -1.4 | 2.51M–2.97M | none | pass — XI -1.4 |
+| Zakaria Eddahchouri | del | 1.88M | 30% | 0.9 | -1.5 | 1.93M–2.29M | none | pass — XI -1.5 |
+
+Competition is demand, not roster counts: the rivals whose XI actually improves with him, strongest threat first — `?` cash unknown (treat as live), `(n broke)` want him but cannot pay the floor. The full manager-by-manager matrix is in `reports/behaviour.md`.
 
 Bid is the floor plus what this league has actually paid over it: median +2.6%, -0.2% to +21.6% (n=21). 6 of those 21 went at the floor itself, so the minimum is not a number known to lose. A dozen deals is not a distribution — the range is what has happened, not a chance of winning, and every one of them is a bid that won.
 
@@ -55,6 +59,8 @@ OCR mangled these past matching, so they are missing from the table above — re
 | MED | Iñigo Ruiz de Galarreta | 60% | 12.24M | 60K | 2.7 | 156p/34j |
 | DEL | Iñigo Vicente | 90% | 19.17M | 75K | 2.7 | **assumed** |
 
+_As marked in `inputs/lineup.txt`: **14 players, 4-6-1** — not a legal eleven._
+
 **Bench** — gap is the expected points the XI loses per jornada by playing him instead, after re-picking the formation. €/pt is his value per expected point: the sell shortlist, worst first.
 
 | Player | Pos | Value | xPts/j | Gap | €/pt | Why |
@@ -84,4 +90,4 @@ _621 players tracked, 512 with a probable-XI reading. Who to buy is in `reports/
 
 _xPts/j — expected points per jornada = shrunk pts/match (K=8, 2025-26) × P(start), from `ffcore/score.py` — the same scorer rivals.py uses. How it works, what it ignores, and how it is tracking reality: *How the forecast works* at the end of this report._
 
-_Generated 2026-08-15 07:20 UTC._
+_Generated 2026-08-15 08:26 UTC._

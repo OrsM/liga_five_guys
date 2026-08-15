@@ -1,4 +1,4 @@
-# League behaviour — 2026-08-15 07:20 UTC
+# League behaviour — 2026-08-15 08:26 UTC
 
 5 managers, 35 ledger rows, 29 market snapshots, points baseline 2025-26.
 
@@ -6,7 +6,7 @@
 
 | Manager | Players | Spent | Raised | Net | Cash | Max bid |
 |---|--:|--:|--:|--:|--:|--:|
-| **miguel_autentico** | 15 | 55.37M | 17.79M | -37.58M | 62.89M | 62.89M |
+| **miguel_autentico** | 15 | 55.37M | 17.79M | -37.58M | 63.29M | 63.29M |
 | Albert Laporta | 14 | 125.28M | 30.47M | -94.81M | ~5.19M | 5.19M |
 | BurtonGM89 | 13 | 127.61M | 30.03M | -97.58M | ~2.42M | 2.42M |
 | Magic Mike 333 | 19 | 121.23M | 14.01M | -107.22M | — | — |
@@ -75,7 +75,7 @@ Two errors this table is built to catch: buying a player who has already risen (
 
 ## 4. Squad diagnostics
 
-| Manager | XI score | Shape | Trapped | Injured | Thin at | Unmatched |
+| Manager | xPts/j | Shape | Trapped | Injured | Thin at | Unmatched |
 |---|--:|---|--:|--:|---|--:|
 | **miguel_autentico** | 35.4 | 4-5-1 | 4.73M | 0 | del | 0 |
 | Albert Laporta | 33.6 | 4-3-3 | 55.61M | 0 | por | 0 |
@@ -89,46 +89,27 @@ Two errors this table is built to catch: buying a player who has already risen (
 - Magic Mike 333 is carrying more defensa/mediocampista/delantero than can ever start.
 - SusoGattuso is carrying more delantero/defensa than can ever start.
 
-Trapped is value held in players below 50% start probability — money that cannot score. Unmatched is names in their squad missing from data/tidy, which are absent from the XI score, so a large number there means the comparison flatters you.
+Trapped is value held in players below 50% start probability — money that cannot score. Unmatched is names in their squad missing from data/tidy, which are absent from the xPts total, so a large number there means the comparison flatters you.
 
 ## 5. Who wants what
 
-**The slate through every manager's eyes.** XI gain per jornada if that manager owned him, under the one shared scorer. `(…)` = wants him but their estimated cash cannot pay the floor. **needs** = they cannot field a legal XI without buying in this position — a forced buyer. Your column has no cash cap: you know your own balance.
+Restricted to the 9 players on today's slate — the rest of the market is not a decision you can make today.
+
+**The slate through every manager's eyes.** XI gain per jornada if that manager owned him, under the one shared scorer. `(…)` = wants him but their estimated cash cannot pay the floor. `?` = wants him, cash unknown — treat as live. **needs** = they cannot field a legal XI without buying in this position — a forced buyer. Your column has no cash cap: you know your own balance.
 
 | Player | Pos | Value | You | Albert | BurtonGM | Magic | SusoGatt |
 |---|---|--:|--:|--:|--:|--:|--:|
-| pablo fornals | MED | 57.93M | +2.7 | (+3.5) | (+4.1) | +3.2 | (+3.4) |
-| santiago mouriño | DEF | 40.48M | +0.7 | (+1.0) | (+1.7) | +0.9 | (+1.1) |
-| mario martin | MED | 3.83M | -0.4 | +0.4 | (+1.0) | +0.1 | +0.3 |
-| clemens riedel | DEF | 4.60M | -0.5 | -0.2 | (+0.5) | -0.3 | -0.1 |
-| pelayo fernandez | DEF | 1.72M | -0.5 | -0.2 | +0.5 | -0.3 | -0.0 |
-| oriol rey | MED | 734K | -1.0 | -0.3 | +0.4 | -0.5 | -0.3 |
-| dani vivian | DEF | 10.82M | -1.2 | (-0.9) | (-0.2) | -1.0 | -0.8 |
-| alex freeman | DEF | 2.45M | -1.4 | -1.1 | (-0.4) | -1.2 | -1.0 |
-| zakaria eddahchouri | DEL | 1.88M | -1.5 | -1.2 | -0.4 | -1.3 | -1.1 |
+| pablo fornals | MED | 57.93M | +2.7 | (+3.5) | (+4.1) | +3.2? | (+3.4) |
+| santiago mouriño | DEF | 40.48M | +0.7 | (+1.0) | (+1.7) | +0.9? | (+1.1) |
+| mario martin | MED | 3.83M | -0.4 | +0.4 | (+1.0) | +0.1? | +0.3 |
+| clemens riedel | DEF | 4.60M | -0.5 | -0.2 | (+0.5) | -0.3? | -0.1 |
+| pelayo fernandez | DEF | 1.72M | -0.5 | -0.2 | +0.5 | -0.3? | -0.0 |
+| oriol rey | MED | 734K | -1.0 | -0.3 | +0.4 | -0.5? | -0.3 |
+| dani vivian | DEF | 10.82M | -1.2 | (-0.9) | (-0.2) | -1.0? | -0.8 |
+| alex freeman | DEF | 2.45M | -1.4 | -1.1 | (-0.4) | -1.2? | -1.0 |
+| zakaria eddahchouri | DEL | 1.88M | -1.5 | -1.2 | -0.4 | -1.3? | -1.1 |
 
 Read it as an auction map: a player whose gain is big only in YOUR column is a quiet buy at the floor; big in a funded rival's column too means price the bid off their premium in section 2, or walk.
-
-Restricted to the 9 players on today's slate — the rest of the market is not a decision you can make today.
-
-**Expect competition for these** — the position is one a rival is short in, so assume a bidding war and price accordingly.
-
-| Player | Pos | Value | Start% | Short here |
-|---|---|--:|--:|---|
-| zakaria eddahchouri | DEL | 1.88M | 30% | BurtonGM89 |
-
-**Nobody else needs these.** Same quality, no auction — take the equivalent player here instead of paying a premium above.
-
-| Player | Pos | Value | Start% |
-|---|---|--:|--:|
-| pablo fornals | MED | 57.93M | 80% |
-| santiago mouriño | DEF | 40.48M | 70% |
-| mario martin | MED | 3.83M | 80% |
-| pelayo fernandez | DEF | 1.72M | 50% |
-| clemens riedel | DEF | 4.60M | 50% |
-| oriol rey | MED | 734K | 50% |
-| dani vivian | DEF | 10.82M | 30% |
-| alex freeman | DEF | 2.45M | 30% |
 
 **List these to them.** Players of yours who aren't starting, in a position a rival is short in. You stop competing with them and start selling to them; price just under the premium they showed in section 2.
 
