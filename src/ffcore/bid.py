@@ -70,12 +70,12 @@ from typing import NamedTuple
 
 from ffcore.league import MARKET
 from ffcore.parse import money
-from ffcore.score import THIN, pick_xi
+from ffcore.score import SLOT_MIN, THIN, pick_xi, squad_pool
 from ffcore.tidy import ledger_stamp
 
 __all__ = ["MAX_LAG_H", "ROUND_TO", "FLOOR_EPS", "Premiums", "Advice",
            "is_round", "deals", "usable", "premiums", "suggest", "gain",
-           "rivals_short"]
+           "rivals_short", "xi_snapshots", "demand_summary"]
 
 # A premium computed against a snapshot further than this from the deal is
 # reported but never averaged in. Lived in rivals.py; here so report.py sizes
@@ -257,6 +257,82 @@ def rivals_short(lg, sc, by_key) -> dict[str, list[str]]:
     return out
 
 
+def xi_snapshots(lg, sc, by_key) -> dict[str, dict]:
+    """{handle: {pool, best, missing, short}} under the one shared scorer.
+
+    The one computation of every manager's best XI, shared by report.py's
+    slate and rivals.py's matrix and projections — two copies of this
+    arithmetic would drift, and a slate priced against a different XI than
+    section 6 prints is exactly the inconsistency this exists to prevent.
+
+    `best` is pick_xi's (total, shape, picked) or None — and None is a
+    finding, not an error: that manager cannot field a legal XI today.
+    `short` lists slots below the legal minimum, where their next purchase
+    is forced to go.
+    """
+    out = {}
+    for m in lg:
+        names = [by_key.get(k, {}).get("name", k) for k in m.players]
+        scored, missing = sc.score_squad(names)
+        pool = squad_pool(scored)
+        counts = Counter(p.slot for p in scored if p.slot)
+        out[m.handle] = {
+            "pool": pool,
+            "best": pick_xi(pool) if scored else None,
+            "missing": missing,
+            "short": [sl for sl, need in SLOT_MIN.items()
+                      if counts.get(sl, 0) < need],
+        }
+    return out
+
+
+def demand_summary(cand: dict, lg, snaps: dict) -> str:
+    """Rival demand for one candidate, in one table cell.
+
+    Demand is XI gain, not roster count: a rival \'wants\' him if owning him
+    improves their best eleven. Cash then splits the wanters into threats
+    and noise:
+
+        Magic +3.2?      strongest threat first; ? = their cash is unknown
+        Burton needs     cannot field a legal XI without buying this slot
+        (2 broke)        want him, but estimated cash cannot pay the floor
+        none             improves nobody\'s XI but yours
+
+    A threat with unknown cash is still a threat — unknown is not zero.
+    """
+    threats, broke = [], 0
+    for m in lg:
+        if m.handle == lg.cfg.me:
+            continue
+        snap = snaps[m.handle]
+        if snap["best"] is None:
+            if cand.get("slot") in snap["short"]:
+                threats.append((float("inf"), m.handle, "needs"))
+            continue
+        g = gain(snap["pool"], cand, snap["best"][0])
+        if g is None or g <= 0:
+            continue
+        if m.max_bid is not None and m.max_bid < (cand.get("value") or 0):
+            broke += 1
+        else:
+            threats.append((g, m.handle,
+                            "?" if m.max_bid is None else ""))
+    threats.sort(key=lambda t: -t[0])
+
+    bits = []
+    if threats:
+        g, h, mark = threats[0]
+        head = h.split()[0][:8]
+        bits.append("%s needs" % head if mark == "needs"
+                    else "%s %+.1f%s" % (head, g, mark))
+        if len(threats) > 1:
+            bits.append("+%d more" % (len(threats) - 1))
+    if broke:
+        bits.append("(%d broke)" % broke)
+    return ", ".join(bits) if bits else "none"
+
+
+
 # ---------------------------------------------------------------------------
 
 def _selftest() -> None:
@@ -431,6 +507,53 @@ def _selftest() -> None:
     assert pd.n == 2, pd
     assert (round(pd.lo, 1), round(pd.hi, 1)) == (10.0, 23.5), pd
     assert round(premiums(dl, "sell").median, 1) == -10.0, premiums(dl, "sell")
+
+        # --- demand_summary ----------------------------------------------------
+    class _M:
+        def __init__(self, handle, max_bid):
+            self.handle, self.max_bid = handle, max_bid
+
+    class _Lg:
+        class cfg:
+            me = "me"
+
+        def __init__(self, managers):
+            self._m = managers
+
+        def __iter__(self):
+            return iter(self._m)
+
+    def snap(pool=None, short=()):
+        best = pick_xi(pool) if pool else None
+        return {"best": best, "pool": pool or {},
+                "short": list(short), "missing": []}
+
+    # One MED slot, easily beaten by a 5.0 candidate.
+    weak_pool = {"POR": [{"slot": "POR", "score": 5.0}],
+                 "DEF": [{"slot": "DEF", "score": 3.0}] * 5,
+                 "MED": [{"slot": "MED", "score": 1.0}] * 5,
+                 "DEL": [{"slot": "DEL", "score": 2.0}] * 3}
+    strong_pool = {k: [dict(p, score=9.0) for p in v]
+                   for k, v in weak_pool.items()}
+    cand = {"slot": "MED", "score": 5.0, "value": 10e6, "name": "x"}
+
+    lg = _Lg([_M("me", None), _M("Rich Guy", 50e6), _M("Poor", 1e6),
+              _M("Mystery", None), _M("Full", 50e6)])
+    snaps = {"me": snap(weak_pool), "Rich Guy": snap(weak_pool),
+             "Poor": snap(weak_pool), "Mystery": snap(weak_pool),
+             "Full": snap(strong_pool)}
+    cell = demand_summary(cand, lg, snaps)
+    # Rich and Mystery are threats (Mystery marked ?), Poor is broke,
+    # Full gains nothing.
+    assert "Rich" in cell and "+1 more" in cell and "(1 broke)" in cell, cell
+    assert demand_summary(cand, _Lg([_M("me", None), _M("Full", 50e6)]),
+                          {"me": snap(weak_pool), "Full": snap(strong_pool)}
+                          ) == "none"
+    # A manager with no legal XI and a hole in this slot is a forced buyer.
+    got = demand_summary(
+        cand, _Lg([_M("me", None), _M("Stuck", 1e6)]),
+        {"me": snap(weak_pool), "Stuck": snap(short=["MED"])})
+    assert got == "Stuck needs", got
 
     print("ffcore.bid self-test OK (44 cases)")
 
