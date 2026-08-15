@@ -38,19 +38,34 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from common import (load_players, fmt_money, fmt_pct, pos_key,  # noqa: E402
-                    flag, POS_ORDER)
 from ffcore.league import League  # noqa: E402
+from ffcore.parse import fmt_money, fmt_pct  # noqa: E402
 from ffcore.score import SLOT, formations  # noqa: E402
 from ffcore.text import norm  # noqa: E402
 from ffcore.tidy import (DECISIONS, REPORTS, append_csv,  # noqa: E402
-                         write_lines)
+                         load_players, write_lines)
 from seen import read_slate  # noqa: E402
 
 HEAD = ("| Player | Team | Pos | Value | 24h | Start% |\n"
         "|---|---|--:|--:|--:|--:|")
 
 SLATE_LOG = ["observed_at", "player", "value", "start_pct"]
+
+# Pitch order, and what counts as fit. Only this module reads them.
+POS_ORDER = ["portero", "defensa", "mediocampista", "delantero", "entrenador"]
+
+OK_STATUS = ("ok", "", "none", "disponible", "available")
+
+
+def flag(rec):
+    """Marker for anything the feed says isn't a clean 'ok'."""
+    st = (rec.get("status") or "").strip().lower()
+    return "" if st in OK_STATUS else " ⚠︎%s" % st
+
+
+def pos_key(p):
+    p = (p or "").lower()
+    return POS_ORDER.index(p) if p in POS_ORDER else len(POS_ORDER)
 
 
 def row(rec):

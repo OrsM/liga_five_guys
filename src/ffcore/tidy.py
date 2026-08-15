@@ -34,14 +34,14 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import NamedTuple
 
-from ffcore.parse import money
+from ffcore.parse import money, pct100
 from ffcore.text import norm, resolve
 
 __all__ = ["ROOT", "TIDY", "SEASON", "DECISIONS", "REPORTS", "MADRID",
            "input_path", "read_csv", "write_csv", "append_csv", "write_lines",
            "snapshot_stamp", "ledger_stamp", "latest_only", "snapshots",
-           "Market", "Valuation", "load_market", "load_xi", "read_ledger",
-           "load_deadline"]
+           "Market", "Valuation", "load_market", "load_xi", "load_players",
+           "read_ledger", "load_deadline"]
 
 ROOT = Path(os.environ.get("FF_ROOT", "./data"))
 TIDY = ROOT / "tidy"
@@ -201,6 +201,60 @@ def load_xi() -> list[dict]:
     return read_csv(TIDY / "probable_xi.csv")
 
 
+# Which tidy column feeds which report field, and how to read it. Named
+# explicitly, per source: the old common.py guessed from a list of thirty
+# candidate header names against every CSV in data/tidy, so a renamed column
+# went missing quietly instead of failing where you could see it.
+MARKET_FIELDS = [("team", "team", None), ("pos", "position", None),
+                 ("value", "value", money), ("delta_1d", "delta_1d", money)]
+XI_FIELDS = [("team", "team_slug", None), ("start", "start_pct", pct100),
+             ("status", "status", None)]
+
+
+def _merge(players: dict, rows: list[dict], name_col: str, fields) -> dict:
+    """Fold one source's rows into the player index. First writer of a field
+    keeps it, so market's `team` beats the XI page's `team_slug` and a
+    duplicated name inside one snapshot doesn't flap."""
+    for r in rows:
+        key = norm(r.get(name_col))
+        if not key:
+            continue
+        rec = players.setdefault(key, {})
+        rec.setdefault("name", (r.get(name_col) or "").strip())
+        for field, col, parse in fields:
+            if field in rec:
+                continue
+            raw = r.get(col)
+            if raw in (None, ""):
+                continue
+            val = parse(raw) if parse else str(raw).strip()
+            # A field that won't parse is left unset rather than set to None,
+            # so fmt_money prints an em dash instead of a fake zero.
+            if val is not None:
+                rec[field] = val
+    return players
+
+
+def load_players() -> dict[str, dict]:
+    """{normalised name: {name, team, pos, value, delta_1d, start, status}}.
+
+    The NEWEST snapshot of each source, and only that. common.py used to
+    take the newest non-empty value per field across all snapshots, which
+    kept a player who had left the market alive forever on his last recorded
+    value — and, worse, kept a stale `start` for anyone missing from the
+    latest XI read. On the 29 snapshots stored when this changed, the two
+    agreed on all 655 current players and differed only by five departed
+    ones, none of which reached any report.
+    """
+    market, xi = latest_only(load_market()), latest_only(load_xi())
+    if not market and not xi:
+        raise SystemExit("no rows in %s — run `ingest.py parse` first" % TIDY)
+    players: dict[str, dict] = {}
+    _merge(players, market, "name", MARKET_FIELDS)
+    _merge(players, xi, "player_name", XI_FIELDS)
+    return players
+
+
 def read_ledger(name: str = "transactions.csv") -> list[dict]:
     """inputs/transactions.csv, comments stripped, oldest first.
 
@@ -321,3 +375,48 @@ class Market:
             return None
         _, v = later[0]
         return v - base.value, (v / base.value - 1) * 100.0 if base.value else None
+
+
+# ---------------------------------------------------------------------------
+# selftest — the pure parts only: no filesystem, no clock
+# ---------------------------------------------------------------------------
+
+def _selftest() -> None:
+    rows = [{"observed_at": "t1", "name": "A"}, {"observed_at": "t2",
+            "name": "B"}, {"observed_at": "t2", "name": "C"}]
+    assert [r["name"] for r in latest_only(rows)] == ["B", "C"]
+    assert latest_only([]) == []
+    assert snapshots(rows) == ["t1", "t2"]
+
+    mkt = [{"name": "Ane Aldea", "team": "Alavés", "position": "defensa",
+            "value": "2.050.000", "delta_1d": "-12.000"},
+           {"name": "Bo Bidal", "team": "Betis", "position": "delantero",
+            "value": "", "delta_1d": "0"}]
+    xi = [{"player_name": "Ane Aldea", "team_slug": "alaves",
+           "start_pct": "0.72", "status": "doubt"},
+          {"player_name": "Cai Coro", "team_slug": "celta",
+           "start_pct": "85", "status": "ok"}]
+    p = _merge(_merge({}, mkt, "name", MARKET_FIELDS), xi,
+               "player_name", XI_FIELDS)
+
+    a = p["ane aldea"]
+    assert a["value"] == 2050000.0 and a["delta_1d"] == -12000.0
+    assert a["pos"] == "defensa" and a["start"] == 72.0 and a["status"] == "doubt"
+    # market's display name and team win over the XI page's slug
+    assert a["team"] == "Alavés" and a["name"] == "Ane Aldea"
+
+    # An empty cell leaves the field unset, so fmt_money prints "—" not "0K".
+    assert "value" not in p["bo bidal"] and p["bo bidal"]["delta_1d"] == 0.0
+    # ...and a start_pct nobody published is absent, not zero.
+    assert "start" not in p["bo bidal"]
+
+    # XI-only player: name and team come from the XI page.
+    c = p["cai coro"]
+    assert c["name"] == "Cai Coro" and c["team"] == "celta" and c["start"] == 85.0
+    assert "value" not in c
+
+    print("ffcore.tidy self-test OK (14 cases)")
+
+
+if __name__ == "__main__":
+    _selftest()

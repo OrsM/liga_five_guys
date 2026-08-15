@@ -50,6 +50,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from ffcore.bid import (MAX_LAG_H, deals, gain, premiums,  # noqa: E402
                         rivals_short, usable, xi_snapshots)
 from ffcore.league import League  # noqa: E402
+from ffcore.parse import fmt_money as eur  # noqa: E402
 from ffcore.score import (MAX_SLOT, SLOT_LABEL, SLOT_MIN, THIN,  # noqa: E402
                           Scorer, pick_xi, squad_pool)
 from ffcore.text import norm  # noqa: E402
@@ -63,15 +64,9 @@ HORIZONS = (3, 7, 14)
 TRAPPED_START = 50.0
 
 
-def eur(v) -> str:
-    if v is None:
-        return "—"
-    if abs(v) >= 1e6:
-        return "%.2fM" % (v / 1e6)
-    return "%.0fK" % (v / 1e3)
-
-
 def pct(v) -> str:
+    """Signed, one decimal — a drift, not a level. Deliberately NOT
+    ffcore.parse.fmt_pct, which prints an unsigned whole-number level."""
     return "—" if v is None else "%+.1f%%" % v
 
 

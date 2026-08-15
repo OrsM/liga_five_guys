@@ -152,7 +152,8 @@ No test directory and no pytest. Each module self-tests under
 to `src/`:
 
 ```
-python src/ffcore/parse.py                      # number parsing
+python src/ffcore/parse.py                      # number parsing + formatting
+PYTHONPATH=src python src/ffcore/tidy.py        # the player view over tidy CSV
 PYTHONPATH=src python src/sources.py            # parsers + signatures
 PYTHONPATH=src python src/ingest.py --selftest   # archives + carry-forward
 PYTHONPATH=src python src/ffcore/league.py --selftest   # config + cash
@@ -201,6 +202,23 @@ came to hold the same 757 players with the same totals. They carried four
 different number parsers between them. `history.py` also imported `httpx` at
 module level, so importing it broke the test job, which installs no network
 client on purpose.
+
+**One named view over the tidy CSV, not a glob and thirty guesses.**
+`src/common.py` is gone. Its `load_players()` scanned *every* CSV in
+`data/tidy` and mapped columns by trying thirty candidate header names, so it
+could not tell you which file a field came from, and a renamed column simply
+went missing rather than failing. `ffcore.tidy.load_players()` names the
+columns it reads, per source, and reads the newest snapshot of each.
+
+That last part is a real behaviour change, and it is a fix. The old merge took
+the newest non-empty value *per field across all snapshots*, so a player who
+had left the market stayed in the index forever on his last recorded value,
+and — worse — anyone missing from the latest XI read kept a stale `start`
+indefinitely. Measured against the 29 stored snapshots, the two agree on all
+655 current players and differ only by five departed ones, none of which
+reached any report. `fmt_money` moved to `ffcore/parse.py` next to the parser
+it inverts, which absorbed the byte-identical copy `rivals.py` was carrying;
+`rivals.pct` stays local because it prints a signed drift, not a level.
 
 **Raw HTML is kept forever; parsed CSV is disposable.** Scrapers rot. When the
 markup changes, fix the parser and re-run over all history. Keeping only the

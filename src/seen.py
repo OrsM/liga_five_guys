@@ -62,7 +62,7 @@ def match(names: list[str], players: dict,
           owner: dict | None = None) -> tuple[set, list, list, list]:
     """(keys on offer, unresolved, ambiguous, resolved by ownership).
 
-    `players` is common.load_players(): norm(name) -> record. Unresolved and
+    `players` is tidy.load_players(): norm(name) -> record. Unresolved and
     ambiguous names are returned so the report can show them — a name OCR
     mangled past recognition is a player you might otherwise think isn't on
     offer, which is the opposite of what the list is for.
@@ -111,7 +111,7 @@ def read_slate(players, owner=None) -> tuple[set, list, list, list]:
     the same slate rather than each growing a copy of the same six lines.
 
     `players` is any {key: record} whose records carry a "name", so it takes
-    common.load_players() or a market row index equally. Pass `lg.owner` to get
+    tidy.load_players() or a market row index equally. Pass `lg.owner` to get
     the ownership prune described in match().
     """
     path = input_path("seen.txt")

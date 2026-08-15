@@ -5,7 +5,11 @@ A dot is a thousands separator in the app ("2.050.000" is two million) and a
 decimal point on futbolfantasy ("2.37" is two point three seven). No parser
 can tell those apart from the string alone, so this module does not try:
 you choose money() or ratio() by which field you are reading, and the caller
-records that choice once (see PARSERS in common.py).
+records that choice once, at the point it names the column.
+
+fmt_money() and fmt_pct() are the way back out, for report tables. They live
+here so a euro prints the same in every report — rivals.py carried its own
+byte-identical copy of fmt_money before this.
 
 The four parsers that existed before this module all got a case wrong:
 
@@ -28,7 +32,7 @@ from __future__ import annotations
 
 import re
 
-__all__ = ["money", "euros", "ratio", "pct100"]
+__all__ = ["money", "euros", "ratio", "pct100", "fmt_money", "fmt_pct"]
 
 # 1.234 / 1.234.567 — dot-grouped thousands, at least one full group of three.
 _DOT_GROUPED = re.compile(r"\d{1,3}(?:\.\d{3})+$")
@@ -127,6 +131,19 @@ def pct100(v):
     return x * 100.0 if 0.0 <= x <= 1.0 else x
 
 
+def fmt_money(v) -> str:
+    """A euro amount as a report cell. None prints as an em dash, never 0."""
+    if v is None:
+        return "—"
+    if abs(v) >= 1e6:
+        return "%.2fM" % (v / 1e6)
+    return "%.0fK" % (v / 1e3)
+
+
+def fmt_pct(v) -> str:
+    return "—" if v is None else "%.0f%%" % v
+
+
 def _selftest() -> None:
     cases_money = {
         "2.050.000": 2050000, "35.276.000": 35276000, "700.000": 700000,
@@ -152,8 +169,19 @@ def _selftest() -> None:
         got = pct100(raw)
         assert got == want, f"pct100({raw!r}) -> {got!r}, wanted {want!r}"
 
+    fmt_cases = {2050000.0: "2.05M", 700000.0: "700K", -468693.0: "-469K",
+                 0.0: "0K", None: "—"}
+    for raw, want in fmt_cases.items():
+        got = fmt_money(raw)
+        assert got == want, f"fmt_money({raw!r}) -> {got!r}, wanted {want!r}"
+
+    for raw, want in {72.0: "72%", 0.0: "0%", 95.5: "96%", None: "—"}.items():
+        got = fmt_pct(raw)
+        assert got == want, f"fmt_pct({raw!r}) -> {got!r}, wanted {want!r}"
+
     print("ffcore.parse self-test OK "
-          f"({len(cases_money) + len(cases_ratio) + 5} cases)")
+          f"({len(cases_money) + len(cases_ratio) + 5 + len(fmt_cases) + 4} "
+          "cases)")
 
 
 if __name__ == "__main__":

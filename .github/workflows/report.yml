@@ -67,6 +67,7 @@ jobs:
       - name: Self-tests
         run: |
           python src/ffcore/parse.py
+          PYTHONPATH=src python src/ffcore/tidy.py
           PYTHONPATH=src python src/sources.py
           PYTHONPATH=src python src/ingest.py --selftest
           PYTHONPATH=src python src/ffcore/league.py --selftest
@@ -82,7 +83,7 @@ jobs:
         # moved, a name that no longer exists.
         run: |
           cd src
-          for m in common squads report watch rivals digest xi seen \
+          for m in squads report watch rivals digest xi seen \
                    find_slug sources ingest points methodology; do
             python -c "import $m" || { echo "::error::$m failed to import"; exit 1; }
           done
