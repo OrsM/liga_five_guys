@@ -213,7 +213,7 @@ def sec_slate(lg, sc, by_key, pool, tot, slate, prem, cash_value,
         out += ["_Every name you pasted is either already owned or missing "
                 "from the market data._", ""]
     else:
-        out += ["| Player | Pos | Value | Start% | Score | XI gain | Bid | "
+        out += ["| Player | Pos | Value | Start% | xPts/j | XI gain | Bid | "
                 "Competition | Verdict |",
                 "|---|---|--:|--:|--:|--:|--:|---|---|"]
         for cand, g, adv in rows:
@@ -469,9 +469,10 @@ def main() -> None:
                 + (", ".join(short) or "?") + "._", ""]
     else:
         tot, (d, m, f), picked = best
-        out += [f"**{d}-{m}-{f}** · index {tot:.1f} "
-                "(a ranking number, not a points forecast)", "",
-                "| | Player | Start% | Value | 24h | Score | Last season |",
+        out += [f"**{d}-{m}-{f}** · **≈{tot:.0f} pts expected next jornada** "
+                "(uncalibrated — see *How the forecast works* at the end)",
+                "",
+                "| | Player | Start% | Value | 24h | xPts/j | Last season |",
                 "|---|---|--:|--:|--:|--:|---|"]
         for slot in ("POR", "DEF", "MED", "DEL"):
             for p in [x for x in picked if x["slot"] == slot]:
@@ -487,9 +488,10 @@ def main() -> None:
         out.append("")
 
         bench = [p for p in players if id(p) not in chosen]
-        out += ["**Bench** — gap is what the XI index loses by playing him "
-                "instead, after re-picking the formation. €/pt is his value "
-                "per point of score: the sell shortlist, worst first.", ""]
+        out += ["**Bench** — gap is the expected points the XI loses per "
+                "jornada by playing him instead, after re-picking the "
+                "formation. €/pt is his value per expected point: the sell "
+                "shortlist, worst first.", ""]
         if not bench:
             out += ["_Nobody spare._", ""]
         else:
@@ -518,7 +520,7 @@ def main() -> None:
                     why = "outscored"
                 rows.append((cpp, p, gap, why))
             rows.sort(key=lambda t: t[0], reverse=True)
-            out += ["| Player | Pos | Value | Score | Gap | €/pt | Why |",
+            out += ["| Player | Pos | Value | xPts/j | Gap | €/pt | Why |",
                     "|---|---|--:|--:|--:|--:|---|"]
             for cpp, p, gap, why in rows:
                 out.append(
@@ -559,11 +561,11 @@ def main() -> None:
         "probable-XI reading. Who to buy is in `reports/watchlist.md`; how "
         "your rivals bid is in `reports/behaviour.md`._",
         "",
-        f"_Score = shrunk pts/match (K={shrink_k:.0f}"
+        f"_xPts/j — expected points per jornada = shrunk pts/match (K={shrink_k:.0f}"
         + (f", {hist_label}" if hist_label else ", **no points baseline**")
         + ") × P(start), from `ffcore/score.py` — the same scorer rivals.py "
-          "uses. Recommended XIs are logged to "
-          "`data/decisions/squad_log.csv` for scoring against reality later._",
+          "uses. How it works, what it ignores, and how it is tracking "
+          "reality: *How the forecast works* at the end of this report._",
         "",
         f"_Generated {now:%Y-%m-%d %H:%M} UTC._",
     ]
