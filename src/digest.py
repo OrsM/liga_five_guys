@@ -33,6 +33,7 @@ SOURCES = [
     ("Rivals — cash, premiums, squads", "behaviour.md"),
     ("Who to buy", "watchlist.md"),
     ("Squad detail", "rivals.md"),
+    ("How the forecast works — and how it's doing", "methodology.md"),
 ]
 
 OUT = "REPORT.md"
