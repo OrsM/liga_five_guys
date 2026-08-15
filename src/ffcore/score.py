@@ -70,6 +70,11 @@ SHRINK_K = 8.0            # matches of prior weight
 NEUTRAL_START = 60.0      # listed on the XI page but no percentage given
 ABSENT_START = 15.0       # not on the XI page at all — not in the picture
 DOUBT_FACTOR = 0.5
+
+# Statuses that mean he cannot play at all, as opposed to might not. Scored
+# at zero rather than shrunk: a suspended player is not a risk, he is an
+# absence, and the XI picker has to see that difference.
+OUT_STATUSES = frozenset({"injured", "suspended", "unavailable"})
 PROMOTED_DISCOUNT = 0.70  # the LaLiga median overstates a promoted squad
 
 
@@ -96,6 +101,7 @@ class Scored(NamedTuple):
     pct_used: float         # what the score actually used
     on_page: bool
     status: str
+    note: str               # diagnosis / expected return, when published
     assumed: bool
     why: str
     value: float
@@ -133,6 +139,7 @@ class Scorer:
         self.start_pct: dict[str, float] = {}
         self.listed: set[str] = set()
         self.status: dict[str, str] = {}
+        self.notes: dict[str, str] = {}
         for r in xi or []:
             # Names are the only key both files share — the team pages expose
             # no player links, so slugs are unavailable there.
@@ -145,6 +152,8 @@ class Scorer:
                 self.start_pct[key] = max(self.start_pct.get(key, 0.0), p)
             if r.get("status") and r["status"] != "ok":
                 self.status[key] = r["status"]
+                if r.get("note"):
+                    self.notes[key] = r["note"]
 
         self.promoted = self._detect_promoted()
         self.priors, self.global_prior = self._priors()
@@ -202,7 +211,7 @@ class Scorer:
         pct_used = pct if pct is not None else (
             NEUTRAL_START if on_page else ABSENT_START)
         score = rating.ppm * pct_used / 100.0
-        if st == "injured":
+        if st in OUT_STATUSES:
             score = 0.0
         elif st == "doubt":
             score *= DOUBT_FACTOR
@@ -212,7 +221,8 @@ class Scorer:
             slot=SLOT.get((rec.get("position") or "").lower(), ""),
             pos=(rec.get("position") or "").lower(),
             score=score, ppm=rating.ppm, pct=pct, pct_used=pct_used,
-            on_page=on_page, status=st, assumed=rating.assumed,
+            on_page=on_page, status=st, note=self.notes.get(key, ""),
+            assumed=rating.assumed,
             why=rating.why,
             value=money(rec.get("value")) or 0.0,
             delta_1d=ratio(rec.get("delta_1d")) or 0.0,
