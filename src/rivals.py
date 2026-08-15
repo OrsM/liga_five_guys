@@ -53,6 +53,7 @@ from ffcore.league import League  # noqa: E402
 from ffcore.parse import fmt_money as eur  # noqa: E402
 from ffcore.score import (MAX_SLOT, SLOT_LABEL, SLOT_MIN, THIN,  # noqa: E402
                           build, pick_xi, squad_pool)
+from ffcore.second import LEGEND, af_cell, second_cells  # noqa: E402
 from ffcore.text import norm  # noqa: E402
 from ffcore.tidy import (DECISIONS, REPORTS, append_csv, latest_only,  # noqa: E402
                          load_market, load_lineups, write_lines)
@@ -75,29 +76,54 @@ def pct(v) -> str:
 # ---------------------------------------------------------------------------
 
 def sec_cash(lg) -> list[str]:
+    """Every balance as arithmetic you can check, including the negative ones.
+
+    The three terms of the estimate replace the old Net column, so the row
+    itself is the sum: Base − Bought + Sold = Cash. Net was that same figure
+    with two of its three terms removed, which meant the one question the
+    table gets asked — "where did their money go?" — could not be answered
+    from it. The terms come off Cash, not off Manager.spend/.proceeds: for a
+    manager with an observed balance only the rows AFTER it are counted, and
+    printing lifetime totals beside an anchored balance gave a row that did
+    not add up.
+    """
     out = ["## 1. Cash and ceilings", "",
-           "| Manager | Players | Spent | Raised | Net | Cash | Max bid |",
+           "| Manager | Players | Base | Bought | Sold | Cash | Max bid |",
            "|---|--:|--:|--:|--:|--:|--:|"]
     for m in lg:
+        c = m.cash
         out.append("| %s | %d | %s | %s | %s | %s | %s |" % (
             ("**%s**" % m.handle) if m.handle == lg.cfg.me else m.handle,
-            len(m.players), eur(m.spend), eur(m.proceeds), eur(m.net),
-            m.cash.label(), eur(m.max_bid)))
+            len(m.players), eur(c.base), eur(c.bought), eur(c.sold),
+            c.label(), eur(m.max_bid)))
     out += ["",
-            "`~` is an estimate: the starting budget less every ledger row, "
-            "not an observed balance. The starting squad was dealt free, so "
-            "it costs nothing here. A `—` means the ledger overdraws the "
-            "budget, so the number would be fiction — see the warnings. Any "
-            "time a rival mentions a balance, put it in `inputs/cash.txt` — "
-            "one observed number turns their whole estimate into "
-            "arithmetic.", ""]
+            "**Base − Bought + Sold = Cash**, row by row. Base is the last "
+            "balance you recorded for them in `inputs/cash.txt`, or the "
+            "starting budget when there is none, and Bought/Sold count only "
+            "the ledger rows since — so the row adds up either way. `~` marks "
+            "a balance derived rather than observed. The starting squad was "
+            "dealt free, so it costs nothing here. Any time a rival mentions "
+            "a balance, write it down: one observed number turns their whole "
+            "estimate into arithmetic.", ""]
+
+    under = [m for m in lg if m.cash.overdrawn]
+    if under:
+        out += ["**Overdrawn, which is allowed until the lock.** Committing "
+                "past the balance mid-window is legal; being under water when "
+                "the jornada locks is not. Each of these has to sell before "
+                "buying again — or the ledger is missing a sale of theirs, in "
+                "which case the figure is stale rather than wrong.", ""]
+        out += ["- **%s** — %s. %s" % (m.handle, m.cash.label(), m.cash.basis)
+                for m in under]
+        out.append("")
 
     poor = [m for m in lg
             if m.handle != lg.cfg.me and m.max_bid is not None
             and m.max_bid < 5e6]
     if poor:
         out += ["**Cash-constrained right now:** %s. Against these, open at "
-                "the minimum increment — they cannot escalate."
+                "the minimum increment — they cannot escalate today without "
+                "selling first."
                 % ", ".join("%s (%s)" % (m.handle, eur(m.max_bid))
                             for m in poor), ""]
     return out
@@ -446,8 +472,11 @@ def log_projections(lg, snaps) -> None:
 # 5. demand forecast
 # ---------------------------------------------------------------------------
 
-def sec_demand(lg, sc, market_latest, on_offer=None, snaps=None) -> list[str]:
+def sec_demand(lg, sc, market_latest, on_offer=None, snaps=None,
+               second=None) -> list[str]:
     out = ["## 5. Who wants what", ""]
+    cells = second or {}
+    split = False        # did any table below carry the FF/AF columns?
 
     rivals_need = rivals_short(lg, sc, market_latest)
 
@@ -474,14 +503,16 @@ def sec_demand(lg, sc, market_latest, on_offer=None, snaps=None) -> list[str]:
         out += ["**Expect competition for these** — the position is one a "
                 "rival is short in, so assume a bidding war and price "
                 "accordingly.", "",
-                "| Player | Pos | Value | Start% | Short here |",
-                "|---|---|--:|--:|---|"]
+                "| Player | Pos | Value | FF | AF | Short here |",
+                "|---|---|--:|--:|--:|---|"]
         for p in contested:
-            out.append("| %s | %s | %s | %s | %s |" % (
+            out.append("| %s | %s | %s | %s | %s | %s |" % (
                 p.name, p.slot, eur(p.value),
                 "—" if p.pct is None else "%.0f%%" % p.pct,
+                af_cell(cells.get(p.key)),
                 ", ".join(rivals_need[p.slot])))
         out.append("")
+        split = True
 
     uncontested = [] if on_offer else \
         [p for p in scored_free if not rivals_need.get(p.slot)][:8]
@@ -489,12 +520,15 @@ def sec_demand(lg, sc, market_latest, on_offer=None, snaps=None) -> list[str]:
         out += ["**Nobody else needs these.** Same quality, no auction — "
                 "take the equivalent player here instead of paying a premium "
                 "above.", "",
-                "| Player | Pos | Value | Start% |", "|---|---|--:|--:|"]
+                "| Player | Pos | Value | FF | AF |",
+                "|---|---|--:|--:|--:|"]
         for p in uncontested:
-            out.append("| %s | %s | %s | %s |" % (
+            out.append("| %s | %s | %s | %s | %s |" % (
                 p.name, p.slot, eur(p.value),
-                "—" if p.pct is None else "%.0f%%" % p.pct))
+                "—" if p.pct is None else "%.0f%%" % p.pct,
+                af_cell(cells.get(p.key))))
         out.append("")
+        split = True
 
     mine = lg.managers.get(lg.cfg.me)
     if mine and rivals_need:
@@ -512,18 +546,25 @@ def sec_demand(lg, sc, market_latest, on_offer=None, snaps=None) -> list[str]:
                     "starting, in a position a rival is short in. You stop "
                     "competing with them and start selling to them; price "
                     "just under the premium they showed in section 2.", "",
-                    "| Player | Pos | Value | Start% | Short |",
-                    "|---|---|--:|--:|---|"]
+                    "| Player | Pos | Value | FF | AF | Short |",
+                    "|---|---|--:|--:|--:|---|"]
             for p, buyers in sellable:
-                out.append("| %s | %s | %s | %s | %s |" % (
+                out.append("| %s | %s | %s | %s | %s | %s |" % (
                     p.name, p.slot, eur(p.value),
                     "—" if p.pct is None else "%.0f%%" % p.pct,
+                    af_cell(cells.get(p.key)),
                     ", ".join(buyers)))
             out.append("")
+            split = True
 
     if not on_offer and not contested and not uncontested:
         out += ["_Nothing to forecast: no rival is currently short anywhere, "
                 "or the market data hasn't loaded._", ""]
+        return out
+    # Once, at the foot of the section, rather than under each of the three
+    # tables that carry the columns.
+    if split:
+        out += [LEGEND, ""]
     return out
 
 
@@ -586,7 +627,11 @@ def main() -> None:
     out += sec_drift(dl, lg.market)
     out += sec_squads(lg, sc, by_key)
     snaps = xi_snapshots(lg, sc, by_key)
-    out += sec_demand(lg, sc, by_key, on_offer, snaps)
+    # The second opinion, joined once for the whole market so section 5 can
+    # print it beside futbolfantasy's figure instead of a single unlabelled
+    # Start% column.
+    second, _unclear = second_cells(r.get("name", "") for r in by_key.values())
+    out += sec_demand(lg, sc, by_key, on_offer, snaps, second)
     out += sec_projected(lg, snaps)
 
     # Kept ABOVE the warnings, not below. digest.py excerpts the warnings

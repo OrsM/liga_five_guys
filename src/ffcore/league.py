@@ -32,6 +32,14 @@ Confidence is one of:
 
 Treat "estimated" as a ceiling rather than a balance: it ignores whatever
 income the app has paid out and any deal that never appeared in the feed.
+
+A balance can be NEGATIVE, and that is a position rather than an error. The
+app lets a manager commit past the balance while the window is open; the
+constraint is being solvent when the jornada locks. So an overdrawn manager
+gets the negative number, the arithmetic that produced it in `basis`, and a
+max_bid of zero — they must sell before they can buy again. Only a missing
+budget produces "unknown", which is the one state that means "could outspend
+you" and suppresses every bid ceiling downstream.
 """
 
 from __future__ import annotations
@@ -303,6 +311,15 @@ class Cash(NamedTuple):
     confidence: str           # known | estimated | unknown
     basis: str                # one line of provenance, for the report
     as_of: str
+    # The three terms of `value`, so a report can print the sum rather than
+    # only the answer: base − bought + sold = value. `base` is the last
+    # balance you observed when there is one and the starting budget when
+    # there is not, and bought/sold count only the ledger rows AFTER that
+    # anchor — which is why they are not Manager.spend and .proceeds. Printing
+    # those two beside an anchored balance produced a row that did not add up.
+    base: float = 0.0
+    bought: float = 0.0
+    sold: float = 0.0
 
     def label(self) -> str:
         if self.value is None:
@@ -310,6 +327,17 @@ class Cash(NamedTuple):
         v = ("%.2fM" % (self.value / 1e6) if abs(self.value) >= 1e6
              else "%.0fK" % (self.value / 1e3))
         return v if self.confidence == "known" else "~" + v
+
+    @property
+    def overdrawn(self) -> bool:
+        """Spent past the budget. A real state, not an input error.
+
+        The app lets you commit beyond the balance while the window is open;
+        what it will not allow is being under water when the jornada locks. So
+        a negative balance is published as the negative number it is, with the
+        arithmetic in `basis`, rather than hidden behind "unknown".
+        """
+        return self.value is not None and self.value < 0
 
 
 @dataclass
@@ -334,7 +362,12 @@ class Manager:
 
     @property
     def max_bid(self) -> float | None:
-        """Hard ceiling on their next bid. None when cash is unknown."""
+        """Hard ceiling on their next bid. None when cash is unknown.
+
+        Zero for an overdrawn manager, which is the honest read of a negative
+        balance: they cannot buy again until they sell. It is not the same as
+        None — unknown means "could outspend you", zero means "not today".
+        """
         if self.cash.value is None:
             return None
         return max(0.0, self.cash.value)
@@ -434,7 +467,8 @@ class League:
                 base, since, conf = budget, None, "estimated"
                 basis = "%.0fM starting budget" % (budget / 1e6)
 
-            delta, counted = 0.0, 0
+            bought = sold = 0.0
+            counted = 0
             for t in self.txns:
                 when = ledger_stamp(t.get("date", ""))
                 if since and when and when <= since:
@@ -443,34 +477,34 @@ class League:
                 src = (t.get("from") or "").strip() or MARKET
                 dst = (t.get("to") or "").strip() or MARKET
                 if dst == handle:
-                    delta -= price
+                    bought += price
                     counted += 1
                 if src == handle:
-                    delta += price
+                    sold += price
                     counted += 1
 
-            value = base + delta
+            value = base + sold - bought
+            # The arithmetic, not just the answer. Every term is here so a
+            # balance that looks wrong can be checked against the ledger
+            # without re-deriving it, and so an overdrawn manager's position
+            # can be sized at a glance.
+            math = ("%s − %.2fM bought + %.2fM sold across %d ledger row(s) "
+                    "= %.2fM" % (basis, bought / 1e6, sold / 1e6, counted,
+                                 value / 1e6))
             if value < 0:
-                # Impossible in the app, so an input is wrong: unrecorded
-                # sales, income the ledger never sees, or a bigger starting
-                # balance than configured. Publishing it as a number is worse
-                # than admitting ignorance, because max_bid used to clamp it
-                # to 0 and the report then called the manager unable to
-                # escalate. Keep the arithmetic in the basis so the size of
-                # the discrepancy stays visible.
+                # NOT an input error. Committing past the balance is allowed
+                # while the window is open; the constraint is being solvent
+                # when the jornada locks. This used to be reported as
+                # "unknown" plus a warning, which threw away a real number and
+                # made every rival's ceiling unreadable through rival_ceiling.
                 self.warnings.append(
-                    "%s: net spend exceeds the %.0fM budget by %.2fM — "
-                    "unrecorded sales, or they started with more. Cash "
-                    "reported as unknown; ask before assuming they are "
-                    "broke." % (handle, budget / 1e6, -value / 1e6))
-                mgr.cash = Cash(None, "unknown",
-                                "%s, then %d ledger row(s), which overdraws "
-                                "it by %.2fM" % (basis, counted, -value / 1e6),
-                                _now())
-                continue
-            mgr.cash = Cash(value, conf,
-                            "%s, then %d ledger row(s)" % (basis, counted),
-                            _now())
+                    "%s is %.2fM overdrawn: %s. Going over the budget "
+                    "mid-window is allowed; being overdrawn when the jornada "
+                    "locks is not, so they must sell before they can buy "
+                    "again. If the ledger is missing a sale of theirs, this "
+                    "is stale rather than wrong."
+                    % (handle, -value / 1e6, math))
+            mgr.cash = Cash(value, conf, math, _now(), base, bought, sold)
 
     # -- views ---------------------------------------------------------
 
@@ -558,13 +592,32 @@ def _selftest_cash() -> None:
     # code needed a priceable market to say anything at all.
     assert lg["me"].cash.confidence == "estimated", lg["me"].cash.confidence
 
-    # Overspend must not silently clamp to a confident zero: that is what
-    # told the report four rivals "cannot escalate".
+    # The math is shown, not just the answer: every term of it is in the
+    # basis, so a balance can be checked against the ledger without
+    # re-deriving it.
+    assert "10.00M bought" in lg["rich"].cash.basis, lg["rich"].cash.basis
+    assert "4.00M sold" in lg["rich"].cash.basis
+    assert "= 94.00M" in lg["rich"].cash.basis
+
+    # Overspend is a POSITION, not a broken input. Going past the budget is
+    # allowed while the window is open, so the negative number is published
+    # with its arithmetic instead of being hidden behind "unknown".
     over = lg["spent"]
-    assert over.cash.value is None, over.cash.value
-    assert over.cash.confidence == "unknown", over.cash.confidence
-    assert over.max_bid is None, over.max_bid
-    assert any("exceeds" in w for w in lg.warnings), lg.warnings
+    assert over.cash.value == 100e6 - 124.56e6, over.cash.value
+    assert over.cash.confidence == "estimated", over.cash.confidence
+    assert over.cash.overdrawn and not lg["rich"].cash.overdrawn
+    assert "= -24.56M" in over.cash.basis, over.cash.basis
+    # Zero, not None: they cannot buy until they sell, which is a fact about
+    # today rather than an admission of ignorance. None still means "could
+    # outspend you" and still suppresses every bid ceiling.
+    assert over.max_bid == 0.0, over.max_bid
+    assert any("overdrawn" in w for w in lg.warnings), lg.warnings
+    assert not any("exceeds" in w for w in lg.warnings), lg.warnings
+
+    # A manager with no budget configured is still genuinely unknown.
+    blind = League(Config(me="nobody", budget=0.0), {"z": ["q"]}, [], None)
+    assert blind["z"].cash.value is None and blind["z"].max_bid is None
+    assert not blind["z"].cash.overdrawn
 
 
 def _selftest_identify() -> None:

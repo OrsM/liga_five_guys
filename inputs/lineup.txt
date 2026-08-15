@@ -25,6 +25,7 @@
 [x] MED iñigo ruiz de galarreta
 [x] MED jon moncayola
 [x] MED lucien agoume
+[ ] MED pablo fornals
 [x] MED pepelu
 [ ] MED ruben garcia
 [x] DEL iñigo vicente

@@ -72,6 +72,7 @@ jobs:
           PYTHONPATH=src python src/ingest.py --selftest
           PYTHONPATH=src python src/ffcore/league.py --selftest
           PYTHONPATH=src python src/ffcore/fixture.py
+          PYTHONPATH=src python src/ffcore/second.py
           PYTHONPATH=src python src/ffcore/score.py
           PYTHONPATH=src python src/ffcore/bid.py
           PYTHONPATH=src python src/digest.py --selftest

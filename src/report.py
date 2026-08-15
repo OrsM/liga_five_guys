@@ -66,6 +66,8 @@ from ffcore.bid import (HOLD_DAYS, band_of, deals,  # noqa: E402
                         premiums, suggest, verdict, xi_snapshots)
 from ffcore.fixture import FIX_BAND, HOME_EDGE  # noqa: E402
 from ffcore.league import League  # noqa: E402
+from ffcore.second import (LEGEND, SECOND_SOURCE,  # noqa: E402
+                           af_cell, second_cells)
 from ffcore.score import (ABSENT_START, MAX_SLOT, NEUTRAL_START,  # noqa: E402
                           SLOT_LABEL, THIN, build, formations,
                           pick_xi, squad_pool)
@@ -79,10 +81,6 @@ HISTORY = REPORTS / "history"
 
 STALE_HOURS = 14.0
 MOVER_PCT = 1.0           # squad price moves worth printing
-
-# The second probable-XI source. futbolfantasy is the primary — it is what the
-# scorer reads — and this one is printed BESIDE it, never blended into it.
-SECOND_SOURCE = "analitica"
 
 # Name particles that stay lowercase when title-casing a folded name.
 # "le"/"el"/"la" are deliberately absent: Le Normand and El Hilali are far
@@ -327,8 +325,8 @@ def rival_ceiling(lg) -> float | None:
 
 
 def sec_slate(lg, by_key, cands, pool, tot, slate, prem, cash_value,
-              rival_max, snaps, sell_prem=None,
-              bands=None) -> tuple[list[str], int, int]:
+              rival_max, snaps, sell_prem=None, bands=None,
+              second=None) -> tuple[list[str], int, int]:
     """Today's slate, priced. The only section that answers 'what do I do now'.
 
     Everything else in this report describes a position; this one is a list of
@@ -374,21 +372,24 @@ def sec_slate(lg, by_key, cands, pool, tot, slate, prem, cash_value,
         out += ["_Every name you pasted is either already owned or missing "
                 "from the market data._", ""]
     else:
-        out += ["| Player | Pos | Value | Start% | XI gain | Bid | Cost/pt | "
-                "Competition | Verdict |",
-                "|---|---|--:|--:|--:|--:|--:|---|---|"]
+        out += ["| Player | Pos | Value | FF | AF | XI gain | Bid | "
+                "Cost/pt | Competition | Verdict |",
+                "|---|---|--:|--:|--:|--:|--:|--:|---|---|"]
         for cand, g, adv, short_by, fr in rows:
             band = ("—" if adv.low is None
                     else eur(adv.low) if abs(adv.high - adv.low) < 1_000
                     else "%s–%s" % (eur(adv.low), eur(adv.high)))
             cpp = fr.per_point(g) if fr else None
-            out.append("| %s | %s | %s | %s | %s | %s | %s | %s | %s |" % (
-                cand["name"], (cand["pos"] or "—")[:3], eur(cand["value"]),
-                "—" if cand["pct"] is None else "%.0f%%" % cand["pct"],
-                "—" if g is None else "%+.1f" % g,
-                band, "—" if cpp is None else eur(cpp),
-                demand_summary(cand, lg, snaps),
-                verdict(g, adv, short_by)))
+            out.append(
+                "| %s | %s | %s | %s | %s | %s | %s | %s | %s | %s |"
+                % (cand["name"], (cand["pos"] or "—")[:3],
+                   eur(cand["value"]),
+                   "—" if cand["pct"] is None else "%.0f%%" % cand["pct"],
+                   af_cell((second or {}).get(cand["key"])),
+                   "—" if g is None else "%+.1f" % g,
+                   band, "—" if cpp is None else eur(cpp),
+                   demand_summary(cand, lg, snaps),
+                   verdict(g, adv, short_by)))
         out += ["",
                 "**Cost/pt** is what the marginal point actually costs, and "
                 "it is not the price: a purchase is closer to a loan than a "
@@ -406,6 +407,7 @@ def sec_slate(lg, by_key, cands, pool, tot, slate, prem, cash_value,
                    ("%.0f%%" % sell_prem.swing() if sell_prem
                     else "about a tenth")),
                 "",
+                LEGEND, "",
                 "Competition is demand, not roster counts: the rivals whose "
                 "XI actually improves with him, strongest threat first — "
                 "`?` cash unknown (treat as live), `(n broke)` want him but "
@@ -591,9 +593,12 @@ def sec_eleven(marked, best, players, second=None, buys=None) -> list[str]:
             "record at all, so the baseline is assumed. **Fix** is how much "
             "the next opponent moves it — `=` a median team, `—` no fixture "
             "known. **FF** is futbolfantasy's start percentage, **AF** is "
-            "analiticafantasy's; separate columns because neither has been "
+            "analiticafantasy's — `titular` there is a named starter with no "
+            "number attached, `?` is listed without either, `—` is not listed "
+            "at all. They are separate columns because neither has been "
             "checked against a played jornada yet, so there is no weight to "
-            "blend them by. **xPts/j** = pts/m × Fix × FF, and uses FF only. "
+            "blend them by, and a disagreement is worth more than an average. "
+            "**xPts/j** = pts/m × Fix × FF, and uses FF only. "
             "`⚠` on a name means question 2 has something on him._", ""]
     if up:
         out += ["_The `+SLOT` rows are today's slate: **xPts/j is the change "
@@ -705,47 +710,6 @@ def pct_cell(p) -> str:
         return f"{p['pct']:.0f}%"
     return ("~" if p["on_page"] else "!") + \
         f"{NEUTRAL_START if p['on_page'] else ABSENT_START:.0f}%"
-
-
-def load_second(players, source: str = SECOND_SOURCE):
-    """{player key: the second source's row}, plus the names it could not join.
-
-    Joined by name — exact first, then ffcore.text.resolve — because the two
-    sites number players differently and neither publishes the app's slug.
-    Nothing is guessed: a name with several candidates is handed back to be
-    printed, not picked between, and it carries no cell in the table.
-    """
-    from ffcore.text import resolve
-
-    rows = latest_only(load_lineups(source))
-    cells: dict = {}
-    unclear: list[tuple[str, list[str]]] = []
-    for p in players:
-        row, cands = resolve(p["name"], rows, key="player_name")
-        if row:
-            cells[p["key"]] = row
-        elif cands:
-            unclear.append((p["name"], [c["player_name"] for c in cands]))
-    return cells, unclear
-
-
-def af_cell(row) -> str:
-    """The second source's read, in its own units.
-
-    It publishes two different things on the same page, and they are not
-    interchangeable. Close to kickoff it names a starting eleven — a final
-    call, with no number attached. Before that it publishes its editors'
-    consensus as a fraction ("2/3 titular"), which IS a probability and is
-    printed as one. A final call is printed as `titular`, never dressed up as
-    100%, because turning a yes into a percentage would mean inventing the
-    constant that converts them, and no jornada has been played to fit it.
-    """
-    if not row:
-        return "—"
-    pct = row.get("start_pct")
-    if pct not in (None, ""):
-        return f"{float(pct):.0f}%"
-    return "titular" if row.get("role") == "starter" else "?"
 
 
 def ppm_cell(p) -> str:
@@ -894,6 +858,13 @@ def main() -> None:
     cands = candidates(sc, by_key, slate, lg.owner) if lg and by_key else []
     fg = flat_gains(players, cands) if cands and players else {}
     buys = [(c, fg[c["key"]]) for c in cands if c["key"] in fg]
+    # The second opinion, joined once and printed in every table below.
+    # Candidates are joined too, or their AF cell would always read `—` and
+    # look like a source that has nothing on them.
+    second, unclear = second_cells(
+        [p["name"] for p in players]
+        + [c["name"] for c in cands
+           if c["key"] not in {p["key"] for p in players}])
     slate_lines, n_slate, n_better = [], 0, 0
     if any(slate):
         # The same snapshots rivals.py prints in its section 6, so the
@@ -902,7 +873,8 @@ def main() -> None:
         slate_lines, n_slate, n_better = sec_slate(
             lg, by_key, cands, pool, best[0] if best else None, slate,
             premiums(dl), cash_value, rival_ceiling(lg), snaps,
-            sell_prem=app_prem, bands=drift_bands(all_market))
+            sell_prem=app_prem, bands=drift_bands(all_market),
+            second=second)
 
     # --- assemble ---------------------------------------------------------
     # Four questions, four tables, then a rule and everything else. The old
@@ -910,11 +882,6 @@ def main() -> None:
     # footnote; this inverts it.
     marked = as_fielded(players) if players else None
     min_start = lg.cfg.min_start if lg else 60.0
-    # Candidates are joined too, or their AF cell would always read `—` and
-    # look like a source that has nothing on them.
-    second, unclear = load_second(players + [c for c in cands
-                                             if c["key"] not in
-                                             {p["key"] for p in players}])
 
     out: list[str] = [f"# Fantasy report — {observed}", ""]
 
@@ -1035,12 +1002,17 @@ def main() -> None:
             rows.sort(key=lambda t: t[0], reverse=True)
             out += ["**Gap** is what the XI loses per jornada if he has to "
                     "play, after re-picking the formation. **€/pt** is value "
-                    "per expected point: the sell shortlist, worst first.", "",
-                    "| Player | Pos | Value | xPts/j | Gap | €/pt | Why |",
-                    "|---|---|--:|--:|--:|--:|---|"]
+                    "per expected point: the sell shortlist, worst first. "
+                    "**FF** and **AF** are the two probable-XI sources: a "
+                    "benched player both of them expect to start is a "
+                    "different sell from one neither does.", "",
+                    "| Player | Pos | Value | FF | AF | xPts/j | Gap | €/pt "
+                    "| Why |",
+                    "|---|---|--:|--:|--:|--:|--:|--:|---|"]
             for cpp, p, gap, why in rows:
                 out.append(
                     f"| {p['name']} | {p['pos'][:3]} | {eur(p['value'])} | "
+                    f"{pct_cell(p)} | {af_cell(second.get(p['key']))} | "
                     f"{p['score']:.1f} | "
                     f"{'—' if gap is None else format(gap, '+.1f')} | "
                     f"{'—' if cpp == float('inf') else eur(cpp)} | {why} |")
@@ -1183,7 +1155,23 @@ def _selftest() -> None:
     # A player with no slot can never start, so he has no gain to report.
     assert flat_gains(squad, [sq("nopos", 9.0, 9.0, "")]) == {}
 
-    print("report self-test OK (43 cases)")
+    # --- bid ceilings survive an overdrawn rival --------------------------
+    # An overdrawn manager is a zero, not an unknown, so the ceiling is still
+    # a number. When it was None, every bid in question 4 had to assume the
+    # whole league could outspend you.
+    class _M:
+        def __init__(self, handle, bid):
+            self.handle, self.max_bid = handle, bid
+
+    class _LG(list):
+        cfg = type("C", (), {"me": "me"})()
+
+    lg = _LG([_M("me", 50e6), _M("broke", 0.0), _M("rich", 30e6)])
+    assert rival_ceiling(lg) == 30e6, rival_ceiling(lg)
+    # Genuinely unknown still suppresses it, which is the case it exists for.
+    assert rival_ceiling(_LG([_M("me", 50e6), _M("who", None)])) is None
+
+    print("report self-test OK (45 cases)")
 
 
 if __name__ == "__main__":

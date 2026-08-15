@@ -41,13 +41,17 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from ffcore.league import League  # noqa: E402
 from ffcore.parse import fmt_money, fmt_pct  # noqa: E402
 from ffcore.score import SLOT, formations  # noqa: E402
+from ffcore.second import LEGEND, af_cell, second_cells  # noqa: E402
 from ffcore.text import norm  # noqa: E402
 from ffcore.tidy import (DECISIONS, REPORTS, append_csv,  # noqa: E402
                          load_players, write_lines)
 from seen import read_slate  # noqa: E402
 
-HEAD = ("| Player | Team | Pos | Value | 24h | Start% |\n"
-        "|---|---|--:|--:|--:|--:|")
+# Both probable-XI sources, side by side, in every table this module writes.
+# One unlabelled Start% column hid which site said it, and the two disagree
+# often enough that the disagreement is the useful part.
+HEAD = ("| Player | Team | Pos | Value | 24h | FF | AF |\n"
+        "|---|---|--:|--:|--:|--:|--:|")
 
 SLATE_LOG = ["observed_at", "player", "value", "start_pct"]
 
@@ -68,14 +72,15 @@ def pos_key(p):
     return POS_ORDER.index(p) if p in POS_ORDER else len(POS_ORDER)
 
 
-def row(rec):
+def row(rec, cells=None):
     return "| %s |" % " | ".join([
         rec.get("name", "?") + flag(rec),
         rec.get("team", "—"),
         (rec.get("pos") or "—")[:3],
         fmt_money(rec.get("value")),
         fmt_money(rec.get("delta_1d")),
-        fmt_pct(rec.get("start"))])
+        fmt_pct(rec.get("start")),
+        af_cell((cells or {}).get(norm(rec.get("name", ""))))])
 
 
 def log_slate(on_offer, players, stamp):
@@ -105,7 +110,7 @@ def log_slate(on_offer, players, stamp):
     append_csv(DECISIONS / "slate_log.csv", rows, SLATE_LOG)
 
 
-def write_rivals(lg, players, stamp):
+def write_rivals(lg, players, stamp, second=None):
     out = ["# Squads — %s" % stamp, ""]
 
     out += ["| Manager | Players | Squad value | Spent | Raised | Cash |",
@@ -119,8 +124,11 @@ def write_rivals(lg, players, stamp):
             fmt_money(m.proceeds), m.cash.label()))
     out += ["",
             "`~` is an estimate, not an observed balance — see the basis "
-            "notes at the bottom. Cash is a ceiling on what anyone can bid "
-            "tomorrow, which is the point of tracking it.", ""]
+            "notes at the bottom. A negative one is a real position, not a "
+            "broken input: going past the budget mid-window is allowed, and "
+            "only being under water at the lock is not. Cash is a ceiling on "
+            "what anyone can bid tomorrow, which is the point of tracking "
+            "it.", "", LEGEND, ""]
 
     for m in lg:
         recs = [players.get(k, {"name": k}) for k in m.players]
@@ -135,7 +143,7 @@ def write_rivals(lg, players, stamp):
                 "", HEAD]
         recs.sort(key=lambda r: (pos_key(r.get("pos")),
                                  -(r.get("value") or 0)))
-        out += [row(r) for r in recs]
+        out += [row(r, second) for r in recs]
         out.append("")
 
     paid = [t for t in lg.txns if (t.get("price") or "").strip()]
@@ -181,7 +189,8 @@ def write_rivals(lg, players, stamp):
     write_lines(REPORTS / "squads.md", out)
 
 
-def write_watchlist(lg, players, stamp, on_offer, unresolved, ambiguous):
+def write_watchlist(lg, players, stamp, on_offer, unresolved,
+                    ambiguous, second=None):
     cash = lg[lg.cfg.me].cash if lg.cfg.me in lg.managers else None
     budget = cash.value if cash and cash.confidence == "known" else None
 
@@ -201,6 +210,7 @@ def write_watchlist(lg, players, stamp, on_offer, unresolved, ambiguous):
         if budget:
             out += ["Filtered to what your %s of cash can reach."
                     % fmt_money(budget), ""]
+    out += [LEGEND, ""]
 
     for pos in POS_ORDER:
         if on_offer:
@@ -217,8 +227,8 @@ def write_watchlist(lg, players, stamp, on_offer, unresolved, ambiguous):
         if not pool:
             continue
         out += ["## %s" % pos, "", HEAD]
-        out += [row(r) for r in (pool if on_offer
-                                 else pool[:lg.cfg.top_n_per_pos])]
+        out += [row(r, second) for r in (pool if on_offer
+                                        else pool[:lg.cfg.top_n_per_pos])]
         out.append("")
 
     if unresolved or ambiguous:
@@ -347,8 +357,12 @@ def main():
                              len(auto)))
     log_slate(on_offer, players, now.strftime("%Y-%m-%dT%H:%MZ"))
 
-    write_rivals(lg, players, stamp)
-    write_watchlist(lg, players, stamp, on_offer, unresolved, ambiguous)
+    # The second opinion, joined once for every player either file can print.
+    second, _unclear = second_cells(r.get("name", "")
+                                    for r in players.values())
+    write_rivals(lg, players, stamp, second)
+    write_watchlist(lg, players, stamp, on_offer, unresolved, ambiguous,
+                    second)
     write_squad_file(lg, players)
     write_lineup_file(lg, players)
 
