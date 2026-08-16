@@ -792,6 +792,15 @@ def sign_points(html: str) -> str | None:
 # ROBOTS: clubelo.com serves no robots.txt (the path 302s away, with no
 # Disallow anywhere), and the API exists to be read by programs — one request
 # a day, on the daily cadence, is the whole footprint.
+#
+# OUTAGE, 2026-08-16: api.clubelo.com resolves (37.128.134.74) but answers on
+# neither 80 nor 443, from a home network and from a GitHub runner alike, and
+# clubelo.com/API — the page that documented this endpoint — now 302s to the
+# homepage. The entry is left in place because it costs one timed-out request a
+# day and starts working by itself if the host comes back; until then fetch()
+# warns and skips, and the fixture term falls back to squad-value rank. The
+# same ratings are on clubelo.com/ESP, but only inside a page built for people:
+# not worth a brittle parser for a band that is still an ungraded guess.
 ELO_SOURCE = "clubelo"
 ELO_URL = "http://api.clubelo.com/{date}"      # https is refused by the host
 ELO_COUNTRY = "ESP"
