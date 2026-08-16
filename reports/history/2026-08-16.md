@@ -19,8 +19,15 @@
 | MED | Jon Moncayola | Levante H | 4.4 | +14% | 90% | — | 4.5 |
 | MED | Lucien Agoume | Athletic A | 3.9 | -9% | 80% | — | 2.9 |
 | DEL | Iñigo Vicente | Villarreal H | ~3.0 | -5% | 90% | 100% | 2.6 |
+| +DEF | _Dean Huijsen_ | Espanyol A | 5.6 | +1% | 70% | 100% | **+1.7** |
+| +DEF | _Aitor Paredes_ | Sevilla H ★ | 4.6 | +11% | 70% | 67% | **+1.0** |
+| +DEF | _Eric Garcia_ | Elche A ★ | 5.5 | +8% | 50% | 100% | **+0.6** |
+| +MED | _Jon Ander Olasagasti_ | Espanyol A | 3.6 | +1% | 90% | — | **+0.4** |
+| +DEF | _Antonio Rudiger_ | Espanyol A | 4.8 | +1% | 50% | — | **+0.2** |
 
 _**pts/m** is points per match, last season shrunk toward the average and blended with this season as it accrues. `~` means no record at all, so the baseline is assumed. **Fix** is how much the next opponent moves it — `=` a median team, `—` no fixture known. **FF** is futbolfantasy's start percentage, **AF** is analiticafantasy's — `titular` there is a named starter with no number attached, `?` is listed without either, `—` is not listed at all. They are separate columns because neither has been checked against a played jornada yet, so there is no weight to blend them by, and a disagreement is worth more than an average. **xPts/j** = pts/m × Fix × FF, and uses FF only. `⚠` on a name means question 5 has something on him._
+
+_The `+SLOT` rows are today's slate: **xPts/j is the change to the whole eleven** if you sign him and re-pick the shape, not his own score, and it leaves the fixture OUT — you own a player for months, not for one round. `★` next to the opponent means this round's draw happens to be kind, `↓` that it is not; neither is in the number. What he would cost, and whether that is a good rate, is question 2._ _6 others on the slate would not improve this eleven, so they are priced there and not here._
 
 **The model's eleven is 3.6 better** (index 38.4, shape 4-5-1).
 
@@ -33,7 +40,31 @@ _Swaps are same-position only: a cross-slot difference is a change of formation,
 
 ## 2. Buy today
 
-_No slate pasted, so there is nothing you can bid on today that this report knows about. Paste today's market screenshot into the `seen` input to price it. Everyone unowned is ranked in `reports/watchlist.md`, and question 3 is what your cash is worth while you wait._
+**11 on offer, 1 beat the going rate for cash, 3 cover a position you are short in.**
+
+| Player | Pos | Bid | ΔxPts/j | pts/M | vs λ | Competition | Verdict |
+|---|---|--:|--:|--:|--:|---|---|
+| Gonçalo Guedes | del | 33.14M | -0.9 | -0.03 | -0.21× | none | **Cover** — -0.03/M under 0.13, but you are 1 short here |
+| Yeremay Hernandez | del | 50.62M | -1.8 | -0.03 | -0.27× | none | **Cover** — -0.03/M under 0.13, but you are 1 short here |
+| Ilias Akhomach | del | 5.24M–6.23M | -1.9 | -0.36 | -2.85× | none | **Cover** — -0.36/M under 0.13, but you are 1 short here |
+| Aitor Paredes | def | 5.26M–6.25M | +1.0 | +0.18 | 1.47× | SusoGatt +1.4, (3 broke) | **Bid** — +0.18/M vs 0.13 |
+| Jon Ander Olasagasti | med | 4.49M–5.33M | +0.4 | +0.08 | 0.67× | SusoGatt +1.1, (3 broke) | pass — +0.08/M under 0.13 |
+| Dean Huijsen | def | 32.46M | +1.7 | +0.05 | 0.41× | (4 broke) | pass — +0.05/M under 0.13 |
+| Eric Garcia | def | 44.53M | +0.6 | +0.01 | 0.10× | (4 broke) | pass — +0.01/M under 0.13 |
+| Antonio Rudiger | def | 28.64M–34.02M | +0.2 | +0.01 | 0.05× | SusoGatt +0.2, (3 broke) | pass — +0.01/M under 0.13 |
+| Miguel Loureiro | def | 3.80M–4.52M | -0.8 | -0.22 | -1.71× | (1 broke) | pass — -0.22/M under 0.13 |
+| Lucas Torro | med | 2.53M–3.00M | -1.3 | -0.51 | -4.08× | (1 broke) | pass — -0.51/M under 0.13 |
+| Jorge Cabello | def | 839K–996K | -1.9 | -2.28 | -18.16× | none | pass — -2.28/M under 0.13 |
+
+**pts/M** is ΔxPts/j divided by what winning him is expected to cost — the one currency, and the only number the verdict reads. **vs λ** is that rate over the hurdle: above 1.00× the money is better spent here than on the ladder in question 3, below it you are paying more than the going rate. A purchase is closer to a loan than a spend — the value comes back when you sell, give or take 12%, which on a large player is bigger than the premium and the drift put together. That swing is a coin flip, so a row inside a few percent of 1.00× is not a decision.
+
+**FF** is futbolfantasy's probable-XI percentage, which is the one the forecast uses. **AF** is analiticafantasy's read of the same eleven, printed beside it and never blended in — `titular` is a named starter (a final call, with no number to it), a percentage is their editors' consensus, `?` means they list him without either, and `—` means they do not have him. Two columns that disagree are the signal; that is the whole point of carrying both.
+
+Competition is demand, not roster counts: the rivals whose XI actually improves with him, strongest threat first — `?` cash unknown (treat as live), `(n broke)` want him but cannot pay the floor. The full manager-by-manager matrix is in `reports/rivals.md`.
+
+Bid is the floor plus what this league has actually paid over it: median +2.4%, -1.2% to +21.6% (n=25). 9 of those 25 went at the floor itself, so the minimum is not a number known to lose. A dozen deals is not a distribution — the range is what has happened, not a chance of winning, and every one of them is a bid that won.
+
+Already owned, so not a purchase: arda guler (Albert Laporta), ayoze perez (Albert Laporta), carlos espi (SusoGattuso), eder militao (BurtonGM89), ferran jutgla (Albert Laporta), ilaix moriba (Albert Laporta), marc roca (Albert Laporta), matias dituro (Albert Laporta), wojciech szczesny (SusoGattuso).
 
 ## 3. What you give up by spending now
 
@@ -109,4 +140,4 @@ _620 players tracked, 511 with a probable-XI reading._
 
 _xPts/j — expected points per jornada = shrunk pts/match (K=8, 2025-26) × fixture × P(start), from `ffcore/score.py` — the same scorer rivals.py uses. Injured, suspended and unavailable score zero; a doubt is halved. The fixture term is a ±12% band across the opponents ranked by summed squad value — Club Elo did not cover the league, so the wallet is standing in for the pitch, plus ±4% for home advantage; both widths are guesses, unfitted because nothing has been played, and small enough that a wrong one costs a fraction of a point._
 
-_Generated 2026-08-16 09:20 UTC._
+_Generated 2026-08-16 09:28 UTC._

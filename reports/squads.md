@@ -1,4 +1,4 @@
-# Squads — 2026-08-16 09:20 UTC
+# Squads — 2026-08-16 09:28 UTC
 
 | Manager | Players | Squad value | Spent | Raised | Cash |
 |---|--:|--:|--:|--:|--:|
