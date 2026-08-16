@@ -1,6 +1,6 @@
-# League behaviour — 2026-08-16 22:14 UTC
+# League behaviour — 2026-08-16 22:55 UTC
 
-5 managers, 44 ledger rows, 34 market snapshots, points 2025-26.
+5 managers, 44 ledger rows, 35 market snapshots, points 2025-26.
 
 ## 1. Cash and ceilings
 
@@ -46,7 +46,7 @@ A round bid was typed by a human. That is the whole of what roundness tells you 
 | 08-14T21:24 | pablo gavi | Magic Mike 333 | 35.50M | 33.40M | +6.3% | round |
 | 08-14T21:24 | tete morente | Magic Mike 333 | 2.03M | 1.99M | +2.4% | exact |
 | 08-14T21:24 | jon aramburu | SusoGattuso | 17.79M | 17.18M | +3.6% | exact |
-| 08-14T21:24 | facundo buonanotte | Albert Laporta | 7.33M | — ~ | — | exact |
+| 08-14T21:24 | facundo buonanotte | Albert Laporta | 7.33M | 6.83M ~ | +7.3% | exact |
 | 08-14T21:24 | clemens riedel | SusoGattuso | 4.60M | 4.66M | -1.2% | exact |
 | 08-14T21:24 | mario martin | SusoGattuso | 3.83M | 3.74M | +2.4% | exact |
 | 08-14T21:24 | pablo fornals | miguel_autentico | 58.22M | 58.30M | -0.1% | exact |
@@ -72,6 +72,19 @@ A round bid was typed by a human. That is the whole of what roundness tells you 
 
 | Date | Player | Actor | Side | +3d | +7d | +14d |
 |---|---|---|---|--:|--:|--:|
+| 08-13T21:26 | iago aspas | BurtonGM89 | sell | -3.6% | — | — |
+| 08-13T21:26 | unai lopez | BurtonGM89 | sell | +2.5% | — | — |
+| 08-13T21:26 | joaquin muñoz | BurtonGM89 | sell | -5.8% | — | — |
+| 08-13T21:26 | aliou dieng | BurtonGM89 | sell | -8.8% | — | — |
+| 08-13T21:25 | juan musso | BurtonGM89 | sell | -7.3% | — | — |
+| 08-13T21:24 | leandro cabrera | Albert Laporta | buy | +2.1% | — | — |
+| 08-13T21:24 | arda guler | Albert Laporta | buy | +5.5% | — | — |
+| 08-13T21:24 | giuliano simeone | SusoGattuso | buy | -3.4% | — | — |
+| 08-13T21:24 | asier villalibre | Albert Laporta | buy | +4.8% | — | — |
+| 08-13T21:24 | denis suarez | BurtonGM89 | buy | -4.7% | — | — |
+| 08-13T12:13 | hugo duro | miguel_autentico | sell | -0.0% | — | — |
+| 08-13T12:12 | orri steinn oskarsson | miguel_autentico | sell | -4.8% | — | — |
+| 08-13T12:12 | dani martinez | miguel_autentico | sell | +0.8% | — | — |
 | 08-12T21:24 | abde ezzalzouli | Albert Laporta | buy | -8.8% | — | — |
 | 08-12T21:24 | santi comesaña | BurtonGM89 | buy | +7.3% | — | — |
 | 08-12T21:24 | jon karrikaburu | Magic Mike 333 | buy | -6.9% | — | — |
@@ -84,8 +97,6 @@ A round bid was typed by a human. That is the whole of what roundness tells you 
 | 08-11T21:42 | unai egiluz | BurtonGM89 | sell | -3.0% | — | — |
 | 08-11T21:24 | giacomo quagliata | BurtonGM89 | buy | -0.1% | — | — |
 | 08-11T21:24 | carlos romero | BurtonGM89 | buy | +6.5% | — | — |
-| 08-11T21:24 | fabio cardoso | Magic Mike 333 | buy | -7.0% | — | — |
-| 08-11T21:24 | beñat turrientes | miguel_autentico | buy | +2.8% | — | — |
 
 Two errors this table is built to catch: buying a player who has already risen (paying the top of the move), and selling one who has just dipped (realising the bottom). Both show as the drift column reversing sign against the actor.
 
@@ -93,11 +104,11 @@ Two errors this table is built to catch: buying a player who has already risen (
 
 | Manager | xPts/j | Shape | Trapped | Injured | Thin at | Unmatched |
 |---|--:|---|--:|--:|---|--:|
-| **miguel_autentico** | 37.9 | 4-5-1 | 4.65M | 0 | del | 0 |
-| Albert Laporta | 32.9 | 4-3-3 | 54.60M | 0 | por | 1 |
-| BurtonGM89 | 33.4 | 5-4-1 | 24.49M | 0 | por,del | 0 |
-| Magic Mike 333 | 29.9 | 3-4-3 | 31.38M | 1 | por | 0 |
-| SusoGattuso | 31.4 | 4-4-2 | 26.27M | 0 | por | 0 |
+| **miguel_autentico** | 38.1 | 4-5-1 | 4.58M | 0 | del | 0 |
+| Albert Laporta | 32.9 | 4-3-3 | 60.51M | 0 | por | 0 |
+| BurtonGM89 | 33.4 | 5-4-1 | 24.12M | 0 | por,del | 0 |
+| Magic Mike 333 | 29.7 | 3-4-3 | 30.67M | 1 | por | 0 |
+| SusoGattuso | 31.4 | 4-4-2 | 26.20M | 0 | por | 0 |
 
 - miguel_autentico is carrying more portero/mediocampista than can ever start.
 - Albert Laporta is carrying more delantero than can ever start.
@@ -109,31 +120,41 @@ Trapped is value held in players below 50% start probability — money that cann
 
 ## 5. Who wants what
 
-Restricted to the 11 players on today's slate — the rest of the market is not a decision you can make today.
+**Expect competition for these** — the position is one a rival is short in, so assume a bidding war and price accordingly.
 
-**The slate through every manager's eyes.** XI gain per jornada if that manager owned him, under the one shared scorer. `(…)` = wants him but their estimated cash cannot pay the floor. `?` = wants him, cash unknown — treat as live. **needs** = they cannot field a legal XI without buying in this position — a forced buyer. Your column has no cash cap: you know your own balance.
+| Player | Pos | Value | FF | AF | Short here |
+|---|---|--:|--:|--:|---|
+| david soria | POR | 20.46M | 95% | 100% | Albert Laporta, BurtonGM89, Magic Mike 333, SusoGattuso |
+| joan garcia | POR | 69.44M | 80% | 100% | Albert Laporta, BurtonGM89, Magic Mike 333, SusoGattuso |
+| augusto batalla | POR | 39.61M | 95% | — | Albert Laporta, BurtonGM89, Magic Mike 333, SusoGattuso |
+| jan oblak | POR | 51.92M | 90% | 100% | Albert Laporta, BurtonGM89, Magic Mike 333, SusoGattuso |
+| kylian mbappe | DEL | 128.45M | 70% | — | BurtonGM89 |
+| vinicius junior | DEL | 107.84M | 90% | — | BurtonGM89 |
+| lamine yamal | DEL | 126.03M | 60% | — | BurtonGM89 |
+| alvaro valles | POR | 33.42M | 95% | 100% | Albert Laporta, BurtonGM89, Magic Mike 333, SusoGattuso |
+| unai simon | POR | 53.41M | 90% | 100% | Albert Laporta, BurtonGM89, Magic Mike 333, SusoGattuso |
+| stole dimitrievski | POR | 14.68M | 90% | — | Albert Laporta, BurtonGM89, Magic Mike 333, SusoGattuso |
+| ante budimir | DEL | 51.49M | 90% | — | BurtonGM89 |
+| mathew ryan | POR | 13.55M | 90% | 100% | Albert Laporta, BurtonGM89, Magic Mike 333, SusoGattuso |
 
-| Player | Pos | Value | You | Albert | BurtonGM | Magic | SusoGatt |
-|---|---|--:|--:|--:|--:|--:|--:|
-| nahuel tenaglia | DEF | 14.47M | +1.9 | (+1.9) | (+2.1) | (+2.9) | +1.9 |
-| iñaki williams | DEL | 27.36M | +0.9 | (+0.9) | (+1.8) | (+0.9) | +1.0 |
-| ivan balliu | DEF | 969K | +0.3 | (+0.3) | (+0.5) | (+1.3) | +0.3 |
-| oscar valentin | MED | 3.65M | +0.2 | (+1.3) | (+2.1) | (+1.2) | +1.2 |
-| manu hernando | DEF | 1.74M | -0.6 | (-0.6) | (-0.5) | (+0.4) | -0.6 |
-| saba sazonov | DEF | 1.22M | -0.6 | (-0.6) | (-0.4) | (+0.4) | -0.6 |
-| ferran torres | DEL | 56.90M | -1.0 | (-1.0) | (-0.2) | (-1.1) | (-1.0) |
-| leo roman | POR | 36.83M | -1.1 | (-0.4) | (-0.4) | (+1.9) | (+3.7) |
-| john chetauya | DEF | 678K | -1.8 | (-1.7) | (-1.6) | (-0.7) | -1.7 |
-| charlie patino | MED | 508K | -3.0 | (-1.9) | (-1.1) | (-2.0) | -2.0 |
-| dani cardenas | POR | 587K | -5.6 | (-4.9) | (-4.9) | (-2.6) | -0.8 |
+**Nobody else needs these.** Same quality, no auction — take the equivalent player here instead of paying a premium above.
 
-Read it as an auction map: a player whose gain is big only in YOUR column is a quiet buy at the floor; big in a funded rival's column too means price the bid off their premium in section 2, or walk.
+| Player | Pos | Value | FF | AF |
+|---|---|--:|--:|--:|
+| zaid romero | DEF | 27.95M | 90% | 100% |
+| florian lejeune | DEF | 38.07M | 90% | — |
+| federico valverde | MED | 69.63M | 90% | — |
+| andrei ratiu | DEF | 35.68M | 90% | 100% |
+| marcos alonso | DEF | 28.93M | 90% | 67% |
+| guido rodriguez | MED | 25.24M | 90% | 100% |
+| fermin lopez | MED | 66.84M | 70% | — |
+| alejandro catena | DEF | 33.67M | 80% | — |
 
 **List these to them.** Players of yours who aren't starting, in a position a rival is short in. You stop competing with them and start selling to them; price just under the premium they showed in section 2.
 
 | Player | Pos | Value | FF | AF | Short |
 |---|---|--:|--:|--:|---|
-| alvaro fernandez | POR | 4.65M | 20% | — | Albert Laporta, BurtonGM89, Magic Mike 333, SusoGattuso |
+| alvaro fernandez | POR | 4.58M | 20% | — | Albert Laporta, BurtonGM89, Magic Mike 333, SusoGattuso |
 
 **FF** is futbolfantasy's probable-XI percentage, which is the one the forecast uses. **AF** is analiticafantasy's read of the same eleven, printed beside it and never blended in — `titular` is a named starter (a final call, with no number to it), a percentage is their editors' consensus, `?` means they list him without either, and `—` means they do not have him. Two columns that disagree are the signal; that is the whole point of carrying both.
 
@@ -143,28 +164,28 @@ Each manager's best legal XI under the same scorer — what a rational version o
 
 | Manager | ≈pts/j | vs you | Shape | Unmatched |
 |---|--:|--:|---|--:|
-| **miguel_autentico** | 37.9 | — | 4-5-1 | 0 |
-| BurtonGM89 | 33.4 | -4.6 | 5-4-1 | 0 |
-| Albert Laporta | 32.9 | -5.0 | 4-3-3 | 1 |
-| SusoGattuso | 31.4 | -6.5 | 4-4-2 | 0 |
-| Magic Mike 333 | 29.9 | -8.0 | 3-4-3 | 0 |
+| **miguel_autentico** | 38.1 | — | 4-5-1 | 0 |
+| BurtonGM89 | 33.4 | -4.7 | 5-4-1 | 0 |
+| Albert Laporta | 32.9 | -5.2 | 4-3-3 | 0 |
+| SusoGattuso | 31.4 | -6.7 | 4-4-2 | 0 |
+| Magic Mike 333 | 29.7 | -8.4 | 3-4-3 | 0 |
 
 Unmatched names are absent from that manager's total, so a big number there understates them. Variance in one jornada dwarfs these gaps; over ten it does not.
 
 **miguel_autentico** — 4-5-1 · ≈38 pts
 - POR: ionut radu 6.0
 - DEF: carl starfelt 3.1 · robin le normand 2.8 · omar el hilali 2.2 · igor zubeldia 2.0
-- MED: pablo fornals 5.4 · jon moncayola 4.5 · ruben garcia 3.3 · pepelu 3.2 · iñigo ruiz de galarreta 3.0
+- MED: pablo fornals 5.4 · jon moncayola 4.6 · ruben garcia 3.4 · pepelu 3.2 · iñigo ruiz de galarreta 3.0
 - DEL: iñigo vicente 2.6
 
 **BurtonGM89** — 5-4-1 · ≈33 pts
 - POR: marko dmitrovic 5.3
 - DEF: dean huijsen 4.0 · carlos romero 3.6 · aitor paredes 3.5 · justin de haas 3.0 · quilindschy hartman 1.8
-- MED: santi comesaña 3.9 · antonio blanco 3.6 · denis suarez 1.6 · tajon buchanan 1.1~
+- MED: santi comesaña 3.9 · antonio blanco 3.7 · denis suarez 1.6 · tajon buchanan 1.1~
 - DEL: karl etta eyong 2.0
 
 **Albert Laporta** — 4-3-3 · ≈33 pts
-- POR: matias dituro 5.3
+- POR: matias dituro 5.2
 - DEF: leandro cabrera 3.7 · santiago mouriño 2.7 · diego javier llorente 2.4 · juan foyth 2.0
 - MED: arda guler 4.0 · marc roca 2.6 · ilaix moriba 1.9
 - DEL: ferran jutgla 3.7 · raul moro 2.7 · asier villalibre 2.0
@@ -172,14 +193,14 @@ Unmatched names are absent from that manager's total, so a big number there unde
 **SusoGattuso** — 4-4-2 · ≈31 pts
 - POR: wojciech szczesny 1.2~
 - DEF: yuri berchiche 3.8 · cesar tarrega 3.4 · abdel abqar 3.0 · jonny castro 2.0
-- MED: alvaro garcia 3.8 · aimar oroz 3.1 · lorenzo amatucci 2.6 · mario martin 2.3
+- MED: alvaro garcia 3.8 · aimar oroz 3.2 · lorenzo amatucci 2.6 · mario martin 2.3
 - DEL: giuliano simeone 3.9 · andres martin 2.3
 
 **Magic Mike 333** — 3-4-3 · ≈30 pts
 - POR: alfonso herrero 3.0
 - DEF: jose gaya 2.7 · lucas noubi 2.6 · alex pastor 1.0~
-- MED: marc bernal 2.4 · brahim diaz 2.3 · williot swedberg 2.2 · gustavo puerta 2.2
-- DEL: raphinha 5.3 · gorka guruzeta 4.1 · pere milla 2.0
+- MED: marc bernal 2.3 · brahim diaz 2.3 · williot swedberg 2.2 · gustavo puerta 2.2
+- DEL: raphinha 5.2 · gorka guruzeta 4.1 · pere milla 2.0
 
 `~` start probability under 50% — the model expects rotation there, so that is where their real XI will differ from this one.
 
