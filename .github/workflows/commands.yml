@@ -45,12 +45,14 @@ jobs:
 
       # tesseract reads the screenshots; the Spanish model matters because the
       # app's own text is Spanish and the accents are what the resolver leans
-      # on. httpx fetches the attachments, lxml/cssselect are the report chain.
+      # on. pillow crops and inverts the dark-mode capture first — without that
+      # tesseract reads about half the cards. httpx fetches the attachments,
+      # lxml/cssselect are the report chain.
       - name: Install deps
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq tesseract-ocr tesseract-ocr-spa
-          pip install httpx lxml cssselect
+          pip install httpx lxml cssselect pillow
 
       # The comment body reaches Python through env, never through ${{ }}:
       # interpolation is textual, so a name carrying a quote would break the

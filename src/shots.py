@@ -36,7 +36,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from ffcore.league import League  # noqa: E402
 from ffcore.text import norm  # noqa: E402
 from ffcore.tidy import input_path  # noqa: E402
-from seen import match, read_names  # noqa: E402
+from seen import match  # noqa: E402
 
 # How many players the app deals per cycle. The reply says 12/12 or names what
 # is missing, because a slate short by three is indistinguishable from three
@@ -51,6 +51,29 @@ HOSTS = ("github.com/user-attachments/", "githubusercontent.com/")
 # Markdown ![](url) and the HTML <img src="url"> the mobile app sometimes
 # produces. Both, because which one you get depends on how the image was added.
 IMG_RE = re.compile(r'!\[[^\]]*\]\(([^)\s]+)\)|<img[^>]+src="([^"]+)"')
+
+# The band of the screen a market card's name sits in, as fractions of the
+# image. Measured on a 1080x2424 Android capture and expressed as fractions so
+# a different phone still lands: names run down the middle column, with the
+# player photo to their left and the FSYP badge, value and price to their
+# right. Cropping those away is what makes this work at all — the photos turn
+# rows into noise tesseract skips, and the badge OCRs as "ssvo"/"esve" glued
+# onto the surname, which then matches nothing. Cheaper and steadier than
+# blocklisting every way four letters can be misread.
+CROP = (0.22, 0.12, 0.62, 0.82)
+
+# App chrome, in both languages the screens come in. These are words that sit
+# on the same rows as names and would otherwise be reported as players nobody
+# could find.
+STOP = set("""laliga value price available hire historical market standing team
+activity leagues ops some guy bid bids fsyp actions days injured
+mercado valor precio disponible contratar clasificacion plantilla actividad
+ligas jornada puja pujas""".split())
+
+# Below this, a token is OCR debris, not a name. Single characters were the
+# first real bug here: "E" and "U" reached the resolver, which substring-
+# matched them into half the league and reported it as ambiguity.
+MIN_TOKEN = 4
 
 
 def image_urls(body: str) -> list[str]:
@@ -67,16 +90,56 @@ def image_urls(body: str) -> list[str]:
     return out
 
 
+def prep(src: Path, dst: Path) -> Path:
+    """Crop to the name column and invert, so tesseract has black on white.
+
+    The app is dark-mode only. Tesseract binarises expecting dark text on a
+    light page, and on the raw capture it read two of four cards; inverted and
+    cropped it reads all four.
+    """
+    from PIL import Image, ImageOps
+
+    im = Image.open(src).convert("L")
+    w, h = im.size
+    box = (int(w * CROP[0]), int(h * CROP[1]),
+           int(w * CROP[2]), int(h * CROP[3]))
+    ImageOps.invert(im.crop(box)).save(dst)
+    return dst
+
+
 def ocr(path: Path) -> str:
-    """Spanish-language OCR of one screenshot.
+    """Spanish-language OCR of one prepared screenshot.
+
+    --psm 4 says "one column of text of variable sizes", which is what a
+    cropped list of cards is; the default page-segmentation mode hunts for a
+    layout that isn't there and drops rows.
 
     Fails loudly on a non-zero exit rather than returning nothing: a silent
     empty read would drop players from the slate, and a short slate reads as
     "nobody else is on offer", which is the opposite of the truth.
     """
-    r = subprocess.run(["tesseract", str(path), "stdout", "-l", "spa"],
+    r = subprocess.run(["tesseract", str(path), "stdout", "-l", "spa",
+                        "--psm", "4"],
                        capture_output=True, text=True, check=True)
     return r.stdout
+
+
+def screen_names(text: str) -> list[str]:
+    """Candidate names from OCR of a market screen, one per line.
+
+    This is seen.read_names' job for a different input. That one reads a list
+    a person typed, where every line is meant to be a name; this reads a
+    screen, where most lines are not. So it keeps only word-shaped tokens long
+    enough to be a name and drops the app's own vocabulary, and a line left
+    with nothing is dropped whole.
+    """
+    out = []
+    for line in (text or "").splitlines():
+        toks = [t for t in re.findall(r"[A-Za-zÀ-ÿ'’-]+", line)
+                if len(t) >= MIN_TOKEN and t.lower() not in STOP]
+        if toks:
+            out.append(" ".join(toks))
+    return out
 
 
 def slate_lines(keys: set, players: dict, unresolved: list,
@@ -89,12 +152,19 @@ def slate_lines(keys: set, players: dict, unresolved: list,
     names = sorted(players[k].get("name", k) for k in keys if k in players)
     out = ["**/market** — read %d image(s)." % images, ""]
 
-    mark = "✓" if len(keys) == SLATE else "—"
+    mark = "✓" if len(keys) >= SLATE else "—"
     out.append("market: %d/%d %s" % (len(keys), SLATE, mark))
     if len(keys) < SLATE:
         out.append("")
         out.append("_Short of %d: send another shot, or the names below never "
                    "resolved._" % SLATE)
+    elif len(keys) > SLATE:
+        # Over the slate means the shots caught a screen that isn't the
+        # market — a squad, a rival's bids — and those players are now priced
+        # as if you could buy them. Worth saying; not worth refusing.
+        out.append("")
+        out.append("_More than %d: one of the shots isn't the market screen._"
+                   % SLATE)
     out.append("")
 
     if names:
@@ -102,7 +172,9 @@ def slate_lines(keys: set, players: dict, unresolved: list,
     for raw, cands in ambiguous:
         out.append('- "%s" matches %s — resend with a surname.'
                    % (raw, ", ".join(cands)))
-    for raw in unresolved:
+    # Once each: the same fragment appears in every overlapping shot, and five
+    # copies of one failure hide the other four.
+    for raw in sorted(set(unresolved)):
         out.append('- "%s" matched nothing.' % raw)
     for line in resolved:
         out.append("- " + line)
@@ -142,12 +214,12 @@ def main() -> int:
                 r.raise_for_status()
                 shot = Path(tmp) / ("shot%d.png" % i)
                 shot.write_bytes(r.content)
-                text.append(ocr(shot))
+                text.append(ocr(prep(shot, Path(tmp) / ("prep%d.png" % i))))
 
     lg = League.load()
     by_key = lg.market.latest() if lg.market else {}
     keys, unresolved, ambiguous, resolved = match(
-        read_names("\n".join(text)), by_key, lg.owner)
+        screen_names("\n".join(text)), by_key, lg.owner)
     write_slate(keys, by_key, unresolved)
 
     out = slate_lines(keys, by_key, unresolved, ambiguous, resolved, len(urls))
@@ -177,6 +249,26 @@ def _selftest() -> None:
     assert image_urls("") == []
     n += 3
 
+    # A real read of one card: the name, then the chrome underneath it.
+    got = screen_names("Yeremay\nLALIGA · Available 22:15:16\nValue Price\n")
+    assert got == ["Yeremay"], got
+    n += 1
+
+    # Single characters never reach the resolver — "E" substring-matches half
+    # the league and comes back as ambiguity that means nothing.
+    assert screen_names("E U O a K\n") == [], screen_names("E U O a K\n")
+    n += 1
+
+    # Accents and hyphens survive; they are what the resolver leans on.
+    assert screen_names("Rüdiger\n") == ["Rüdiger"]
+    assert screen_names("Ruiz-Galarreta\n") == ["Ruiz-Galarreta"]
+    n += 2
+
+    # A surname with the badge still glued on keeps the surname. Cropping is
+    # what removes the badge; this only stops it being reported on its own.
+    assert screen_names("Huijsen FSYP\n") == ["Huijsen"]
+    n += 1
+
     players = {
         norm("Álvaro Valles"): {"name": "Álvaro Valles"},
         norm("Dani Martínez"): {"name": "Dani Martínez"},
@@ -196,6 +288,21 @@ def _selftest() -> None:
     # Unresolved, ambiguous and ownership-resolved names all reach the reply:
     # a name the resolver dropped is a player you would otherwise think is not
     # on offer.
+    # A slate longer than the app deals means a shot of some other screen got
+    # in, and the mark has to distinguish that from a slate that came up short.
+    over = "\n".join(slate_lines({norm("p%d" % i) for i in range(SLATE + 2)},
+                                 players, [], [], [], 3))
+    assert "market: %d/%d ✓" % (SLATE + 2, SLATE) in over, over
+    assert "More than %d" % SLATE in over, over
+    assert "Short of" not in over, over
+    n += 3
+
+    # One unresolved fragment, however many shots it appeared in.
+    dupes = "\n".join(slate_lines(keys, players, ["Xyzzy", "Xyzzy"],
+                                 [], [], 2))
+    assert dupes.count('"Xyzzy" matched nothing') == 1, dupes
+    n += 1
+
     msg = "\n".join(slate_lines(keys, players, ["Xyzzy"],
                                [("Dani", ["Dani Martínez", "Dani Lorenzo"])],
                                ["**Dani** → Dani Martínez — the only one"], 1))

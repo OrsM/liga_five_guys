@@ -139,16 +139,27 @@ and the run summary does not push-notify. So there is a pinned issue titled
 **Commands**, and a comment on it runs the pipeline.
 
 **`/market` + screenshots of the market screen.** The images are OCR'd on the
-runner (`tesseract -l spa`), the names resolved exactly as a pasted slate is,
-the report rebuilt, and the bot replies with what it read, what it could not
-place, a completeness check (`market: 12/12`), and the priced buy table. The
-reply is the notification — the GitHub app pushes comments.
+runner (`tesseract -l spa --psm 4`), the names resolved exactly as a pasted
+slate is, the report rebuilt, and the bot replies with what it read, what it
+could not place, a completeness check (`market: 12/12`), and the priced buy
+table. The reply is the notification — the GitHub app pushes comments.
+
+Each shot is cropped to the middle column and inverted before OCR, because the
+app is dark-mode only and the two columns either side of the name are the whole
+problem: the player photo turns rows into noise tesseract skips, and the FSYP
+badge reads as `ssvo` glued to the surname, which then matches nothing. On the
+first real slate that lifted the read from 1 name to 17. The crop is fractions
+of the image (`shots.CROP`), measured on a 1080x2424 Android capture.
 
 Send as many shots as the slate needs; every capture is a set, so order never
 matters and **resending is always safe**. Duplicates collapse after name
 resolution, not on the raw text, because two scrolled shots spell the same
 player differently and only the resolver knows they are one man. No fetch runs:
 the slate is priced against the market snapshot already on file.
+
+Send the market screen and nothing else. Any other screen resolves too — a
+squad, a rival's bids — and its players are then priced as if you could buy
+them, so a count over 12 is reported as a wrong shot, not as a fuller slate.
 
 Two guards. The workflow ignores any comment not written by the repo owner on
 that one issue — a public repo where anyone can type would otherwise let anyone
@@ -160,7 +171,18 @@ carrying a quote breaks the step and one carrying a semicolon runs what follows.
 built. They land on this same spine: guard, fetch the images, OCR, resolve, run
 the chain, reply. `/deals` will be the only gated one — a wrong ledger row
 poisons ownership, cash and premiums downstream, so it will propose and wait for
-`/ok` rather than commit.
+`/ok` rather than commit. It is also the only command that must read a number,
+because a price paid above market value exists nowhere else, and that is the
+second reason for the gate.
+
+Resending a shot of the Activity feed on a later day must not re-log the deals
+already in it, so a proposed row is dropped when `inputs/transactions.csv`
+already holds one with the same **date, player, from and to**. The app stamps
+every operation to the minute and a player cannot move twice in one minute along
+the same edge, so those four identify a deal. Price is deliberately not part of
+the key: it is the field OCR gets wrong, and if it were, a misread digit would
+append a second copy of a deal already logged instead of showing up as a
+disagreement to confirm.
 
 ## Routine
 
