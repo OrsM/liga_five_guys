@@ -38,7 +38,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from ffcore.fixture import FIX_BAND, HOME_EDGE  # noqa: E402
 from ffcore.score import SHRINK_K  # noqa: E402
-from ffcore.text import norm  # noqa: E402
+from ffcore.text import norm, resolve  # noqa: E402
 from ffcore.tidy import (DECISIONS, LINEUP_SOURCE, REPORTS,  # noqa: E402
                          SEASON, TIDY, load_elo, load_lineups, load_market,
                          read_csv, snapshot_stamp, write_lines)
@@ -234,13 +234,26 @@ def start_grade(intervals, claims, universe=None):
     num: dict[str, list] = {}
     nam: dict[str, list] = {}
     skipped = 0
-    for start, played in intervals:
+    for interval in intervals:
+        # A third element, when present, is the interval's population: the
+        # clubs whose eleven we hold. Appearance intervals cover every club and
+        # carry none.
+        start, played = interval[0], interval[1]
+        teams = interval[2] if len(interval) > 2 else None
         for src, byname in per.items():
             for key, hist in byname.items():
                 row = latest_before(hist, start)
                 if row is None:
                     continue
-                hit = 1.0 if key in played else 0.0
+                if teams is not None \
+                        and (row.get("team_slug") or "").strip() not in teams:
+                    continue
+                # The slug is tried as well as the name because one truth set —
+                # the realised starters off the match pages — carries the same
+                # /jugadores/ ids as futbolfantasy's claims. That join is exact
+                # where the name join is merely usually right.
+                slug = (row.get("player_slug") or "").strip()
+                hit = 1.0 if key in played or (slug and slug in played) else 0.0
                 try:
                     pct = float(row.get("start_pct"))
                 except (TypeError, ValueError):
@@ -266,6 +279,149 @@ def start_grade(intervals, claims, universe=None):
     named = [(src, len(v), 100.0 * sum(v) / len(v))
              for src, v in sorted(nam.items())]
     return numbered, named, skipped
+
+
+# ---------------------------------------------------------------------------
+# grading against who ACTUALLY started
+# ---------------------------------------------------------------------------
+#
+# The appearance grading above was the best available while the only outcome in
+# the store was the points page's `games` column. starters.csv is the real
+# thing: the confirmed elevens off each played match page, so a 20-minute
+# substitute is now a MISS rather than a hit, which is the question both
+# sources are actually answering.
+#
+# THE CUTOFF IS THE JORNADA LOCK, NOT EACH MATCH'S OWN KICKOFF. The app locks
+# the whole lineup once a round, so the last claim you could have acted on is
+# the one published before the round's FIRST kickoff. Grading a Sunday starter
+# against Sunday-morning news would credit a source with information you were
+# never able to use.
+#
+# The lock is the earliest kickoff we OBSERVED for that round, which is the
+# same rule tidy.load_deadline() uses, and it comes from fixtures.csv — the
+# Analítica hub, which lists a match only until it starts. So a round whose
+# opener was played before this repo ever swept the hub has no lock, and is
+# reported as ungraded rather than given an assumed one. Where the true opener
+# was missed the cutoff can sit a few hours late; that flatters every source
+# equally, and the count of ungraded rounds is printed so the reader can see
+# how much of the sample it is.
+# ---------------------------------------------------------------------------
+
+def team_slug_of(side: str, slugs) -> str | None:
+    """Our team slug for a fixture-page side name, or None.
+
+    "Racing Santander" -> "racing", "Real Betis" -> "betis". The two sites
+    spell clubs differently and neither publishes an id the other uses, so this
+    is the same exact-then-substring, two-candidates-is-nothing rule the
+    fixture board joins on — reused rather than reimplemented.
+    """
+    from ffcore.fixture import match_team
+
+    spelled = {s.replace("-", " "): s for s in slugs}
+    hit = match_team(side, list(spelled))
+    return spelled.get(hit) if hit else None
+
+
+def jornada_locks(matches: list[dict],
+                  fixtures: list[dict]) -> dict[int, dt.datetime]:
+    """{jornada: earliest kickoff observed in it} — the moment it locked."""
+    from ffcore.tidy import kickoff_stamp
+
+    jornada_of: dict[tuple[str, str], int] = {}
+    for m in matches:
+        try:
+            jornada_of[(m["home"], m["away"])] = int(m["jornada"])
+        except (KeyError, ValueError, TypeError):
+            continue
+    slugs = {s for pair_ in jornada_of for s in pair_}
+
+    locks: dict[int, dt.datetime] = {}
+    for f in fixtures:
+        when = kickoff_stamp(f.get("kickoff"))
+        home = team_slug_of(f.get("home") or "", slugs)
+        away = team_slug_of(f.get("away") or "", slugs)
+        jor = jornada_of.get((home, away))
+        if when is None or jor is None:
+            continue
+        if jor not in locks or when < locks[jor]:
+            locks[jor] = when
+    return locks
+
+
+def market_names(market: list[dict], slugs) -> dict[str, list[dict]]:
+    """{team slug: [one row per player the market prices for that club]}.
+
+    One row per NAME: market.csv holds a row per player per snapshot, and
+    handing all of them to resolve() would make every player ambiguous with
+    himself.
+    """
+    latest = {}
+    for r in market:
+        if r.get("name"):
+            latest[r["name"]] = r
+    out: dict[str, list[dict]] = {}
+    for r in latest.values():
+        slug = team_slug_of(r.get("team") or "", slugs)
+        if slug:
+            out.setdefault(slug, []).append(r)
+    return out
+
+
+def start_intervals(matches: list[dict], starters: list[dict],
+                    fixtures: list[dict], market: list[dict] = ()):
+    """([(lock, {keys who started}, {teams captured})], graded, no-lock rounds).
+
+    Keys are both the normalised name and the player slug, so a claim can be
+    matched on whichever it carries. Rows repeat across snapshots — a match page
+    is stored once and carried forward into every later manifest — so they are
+    deduplicated on (match, player) before anything is counted.
+
+    A match page prints the short name — "Abqar", "Blanco" — where the other
+    source publishes "Abdel Abqar". So each starter is also resolved to his
+    market name against his own club's squad, and that name goes in the key set
+    too. Ambiguity inside a squad ("Romero", of whom Sevilla have two) resolves
+    to nothing rather than to a guess: that call goes ungraded for the source
+    that has no slug on it, which is the honest outcome.
+
+    The team set is the interval's population. Absence from the key set only
+    means "did not start" for a club whose eleven we actually hold; for the rest
+    of the round it means nothing, and grading them would score a source down
+    for matches we never read.
+    """
+    jornada_of = {}
+    for m in matches:
+        try:
+            jornada_of[m["match_id"]] = int(m["jornada"])
+        except (KeyError, ValueError, TypeError):
+            continue
+    locks = jornada_locks(matches, fixtures)
+    squads = market_names(market, {r.get("team_slug") for r in starters})
+
+    seen, by_round, teams, ungraded = set(), {}, {}, set()
+    graded = 0
+    for r in starters:
+        if (r.get("role") or "") != "starter":
+            continue
+        jor = jornada_of.get(r.get("match_id"))
+        if jor is None:
+            continue
+        mark = (r.get("match_id"), r.get("player_name"))
+        if mark in seen:
+            continue
+        seen.add(mark)
+        if jor not in locks:
+            ungraded.add(jor)
+            continue
+        graded += 1
+        team = (r.get("team_slug") or "").strip()
+        priced, _ = resolve(r.get("player_name", ""), squads.get(team, []))
+        by_round.setdefault(locks[jor], set()).update(
+            k for k in (norm(r.get("player_name", "")),
+                        (r.get("player_slug") or "").strip(),
+                        norm(priced["name"]) if priced else "") if k)
+        teams.setdefault(locks[jor], set()).add(team)
+    out = [(lock, keys, teams[lock]) for lock, keys in sorted(by_round.items())]
+    return out, graded, sorted(ungraded)
 
 
 # ---------------------------------------------------------------------------
@@ -309,6 +465,19 @@ def load_universe() -> set:
     """
     return {norm(r.get("name", "")) for r in read_csv(TIDY / "market.csv")
             if r.get("name")}
+
+
+def load_starts():
+    """(intervals, starters graded, rounds with no lock) from the tidy tables.
+
+    Empty everywhere until a jornada has been played AND its opener's kickoff
+    was observed before it kicked off. Both conditions are reported by the
+    caller rather than collapsed into a silent zero.
+    """
+    return start_intervals(read_csv(TIDY / "matches.csv"),
+                           read_csv(TIDY / "starters.csv"),
+                           read_csv(TIDY / "fixtures.csv"),
+                           read_csv(TIDY / "market.csv"))
 
 
 def load_predictions() -> dict[str, list[tuple[dt.datetime, dict]]]:
@@ -449,15 +618,89 @@ def formula_lines() -> list[str]:
     ]
 
 
+def start_lines() -> list[str]:
+    """The same gate, graded on who actually started rather than who appeared.
+
+    Printed above the appearance table because it answers the real question. It
+    stays silent until there is something to say: this is the table that fills
+    in as jornadas are played, and an empty one would read as a source scoring
+    zero rather than as a season that has not started.
+    """
+    intervals, graded, ungraded = load_starts()
+    out: list[str] = []
+    if not intervals:
+        if ungraded:
+            out += ["_Confirmed elevens exist for jornada "
+                    + ", ".join(str(j) for j in ungraded)
+                    + ", but no kickoff was observed before the round locked, "
+                    "so nothing can be graded without hindsight. Rounds swept "
+                    "from now on carry their own lock._", ""]
+        return out
+
+    numbered, named, skipped = start_grade(intervals, load_lineups(source=""),
+                                           load_universe())
+    if not numbered and not named:
+        return out
+
+    out += [f"**{graded} confirmed starters** across "
+            f"{len(intervals)} locked round(s), off the match pages. A "
+            "substitute is a MISS here — this is the question both sources are "
+            "answering. The claim scored is the last one published before the "
+            "round's first kickoff, because that is when the lineup locked and "
+            "later news could not have been acted on.", "",
+            "| Source | Calls | Mean claim | Started | Brier |",
+            "|---|--:|--:|--:|--:|"]
+    for src, n, claim, rate, brier in numbered:
+        mark = " ←read" if src == LINEUP_SOURCE else ""
+        out.append(f"| {src}{mark} | {n} | {claim:.0f}% | {rate:.0f}% | "
+                   f"{brier:.3f} |")
+    out += ["", "_**Brier** is the mean squared error of the probability: "
+            "lower is better, 0.25 is a coin flip, and it punishes confidence "
+            "more than caution. A source whose mean claim sits far from its "
+            "start rate is miscalibrated even if it ranks players well._", ""]
+    if named:
+        for src, n, rate in named:
+            out.append(f"- **{src}** — {n} calls published with no number on "
+                       f"them, {rate:.0f}% started")
+        out.append("")
+    if skipped:
+        out += [f"_{skipped} claim(s) sat within {START_EDGE:.0f} points of "
+                "50%: not a call either way, so not graded._", ""]
+    out += ["_Read the gap between the sources, not the level. The clubs "
+            "playing the round's opening matches have their elevens CONFIRMED "
+            "by the time it locks, and both sources copy them, so their share "
+            "of the table is scored on published fact rather than on a "
+            "forecast. Whichever source publishes more of those looks better "
+            "than it forecasts._", ""]
+    if ungraded:
+        out += ["_Jornada " + ", ".join(str(j) for j in ungraded)
+                + " is excluded: its opener kicked off before this repo "
+                "observed a kickoff for it, so there is no honest cutoff._", ""]
+    return out
+
+
 def source_lines(actuals: list[dict]) -> list[str]:
     """The gate for LINEUP_SOURCE: which site's eleven was right more often."""
-    out = ["### Who to believe about the eleven", ""]
+    starts = start_lines()
+    out = ["### Who to believe about the eleven", ""] + starts
+    # The gate closes the section whether or not the appearance table follows
+    # it: the starts table is what decides, and a decision rule the page only
+    # states when a second table happens to exist is not a rule.
+    gate = ["**The gate.** Once a source has a few hundred graded calls, "
+            "whichever has the lower Brier **on the starts table above** "
+            "earns `LINEUP_SOURCE` in ffcore/tidy.py — a one-line change, and "
+            "the only thing that should ever move it. Appearances break a tie, "
+            "never the other way round: they are the question nobody asked. "
+            "Until then nothing is blended, because a weight fitted on one "
+            "jornada is a guess wearing a decimal point.", ""]
     intervals = appearances(actuals)
     if not intervals:
-        out += ["_No played interval yet, so neither source has a record. "
-                f"`{LINEUP_SOURCE}` is read because it was first, not because "
-                "it won anything._", ""]
-        return out
+        if not starts:
+            out += ["_No played interval yet, so neither source has a record. "
+                    f"`{LINEUP_SOURCE}` is read because it was first, not "
+                    "because it won anything._", ""]
+            return out
+        return out + gate
 
     numbered, named, skipped = start_grade(intervals, load_lineups(source=""),
                                            load_universe())
@@ -465,9 +708,11 @@ def source_lines(actuals: list[dict]) -> list[str]:
         out += ["_Played intervals exist, but no probable-XI claim was logged "
                 "before any of them — lineups.csv starts after the first "
                 "ingest run._", ""]
-        return out
+        return out + (gate if starts else [])
 
-    out += [f"Graded on **appearances**, not starts: a 20-minute substitute "
+    out += ["The wider but blunter sample, kept because it reaches back to "
+            "before the match pages were collected:", "",
+            f"Graded on **appearances**, not starts: a 20-minute substitute "
             "counts. That flatters both sources by the same amount, so the "
             "comparison holds even though the level does not. Only claims "
             "logged before the interval opened are scored.", "",
@@ -477,11 +722,6 @@ def source_lines(actuals: list[dict]) -> list[str]:
         mark = " ←read" if src == LINEUP_SOURCE else ""
         out.append(f"| {src}{mark} | {n} | {claim:.0f}% | {rate:.0f}% | "
                    f"{brier:.3f} |")
-    out += ["", "_**Brier** is the mean squared error of the probability: "
-            "lower is better, 0.25 is a coin flip, and it punishes confidence "
-            "more than caution. A source whose mean claim sits far from its "
-            "appearance rate is miscalibrated even if it ranks players well._",
-            ""]
     if named:
         out += ["Calls published with no number on them, which can only be "
                 "graded as a hit rate:", ""]
@@ -492,13 +732,7 @@ def source_lines(actuals: list[dict]) -> list[str]:
     if skipped:
         out += [f"_{skipped} claim(s) sat within {START_EDGE:.0f} points of "
                 "50% and are not graded: that is not a call either way._", ""]
-    out += ["**The gate.** Once a source has a few hundred graded calls, "
-            f"whichever has the lower Brier earns `LINEUP_SOURCE` in "
-            "ffcore/tidy.py — a one-line change, and the only thing that "
-            "should ever move it. Until then nothing is blended, because a "
-            "weight fitted on one jornada is a guess wearing a decimal "
-            "point.", ""]
-    return out
+    return out + gate
 
 
 def comparison_lines() -> list[str]:
@@ -700,6 +934,81 @@ def _selftest() -> None:
     assert skipped == 2, skipped
     # No interval, no record: never a zero.
     assert start_grade([], claims, universe) == ([], [], 0)
+
+    # -- grading against who actually started ------------------------------
+    matches = [{"match_id": "1", "jornada": "1", "home": "alaves",
+                "away": "getafe", "score": "3-0"},
+               {"match_id": "2", "jornada": "1", "home": "espanyol",
+                "away": "levante", "score": "1-0"},
+               {"match_id": "9", "jornada": "2", "home": "rayo-vallecano",
+                "away": "alaves", "score": "2-2"}]
+    # The two sites spell clubs differently and still join, and a round whose
+    # kickoff was never observed gets no lock rather than an assumed one.
+    fixtures = [{"kickoff": "2026-08-16T17:00:00+00:00", "home": "Espanyol",
+                 "away": "Levante"},
+                {"kickoff": "2026-08-15T19:30:00+00:00", "home": "Alaves",
+                 "away": "Getafe"}]
+    assert team_slug_of("Racing Santander", {"racing", "real-madrid"}) \
+        == "racing"
+    assert team_slug_of("Real Betis", {"betis", "real-sociedad"}) == "betis"
+    assert team_slug_of("Nowhere FC", {"racing"}) is None
+    locks = jornada_locks(matches, fixtures)
+    # The round locks at its EARLIEST kickoff, not each match's own: the app
+    # locks the whole lineup once, so Sunday's starter is already frozen.
+    assert list(locks) == [1] and locks[1].day == 15, locks
+    assert 2 not in locks                       # no kickoff observed for it
+
+    def start(match, name, slug, role="starter", team="alaves"):
+        return {"match_id": match, "player_name": name, "player_slug": slug,
+                "role": role, "team_slug": team}
+
+    xi = [start("1", "Ane", "ane-slug"), start("1", "Bo", "bo-slug"),
+          start("1", "Bo", "bo-slug"),          # repeats: carried forward
+          start("2", "Cai", "cai-slug", team="levante"),
+          start("2", "Dee", "dee-slug", role="sub"),   # a sub is not a starter
+          start("9", "Eve", "eve-slug")]        # round 2 has no lock
+    iv2, graded, ungraded = start_intervals(matches, xi, fixtures)
+    assert graded == 3, graded                  # Ane, Bo, Cai — Bo once
+    assert ungraded == [2], ungraded            # said out loud, not dropped
+    assert len(iv2) == 1 and iv2[0][0] == locks[1]
+    # Both keys are carried, so a claim matches on whichever it has.
+    assert iv2[0][1] == {"ane", "ane-slug", "bo", "bo-slug", "cai",
+                         "cai-slug"}, iv2[0][1]
+    assert "dee" not in iv2[0][1] and "eve" not in iv2[0][1]
+    assert iv2[0][2] == {"alaves", "levante"}, iv2[0][2]
+
+    # The short name a match page prints resolves to the market name, so a
+    # claim carrying only the full name is graded. Ambiguity inside the squad
+    # adds nothing: "Romero" stays "romero" and whoever claimed a Romero by
+    # full name alone goes ungraded rather than half-credited.
+    market = [{"name": "abdel abqar", "team": "Alaves"},
+              {"name": "abdel abqar", "team": "Alaves"},   # a second snapshot
+              {"name": "ivan romero", "team": "Alaves"},
+              {"name": "rafael romero", "team": "Alaves"},
+              {"name": "someone else", "team": "Barcelona"}]
+    iv3, _, _ = start_intervals(
+        matches, [start("1", "Abqar", "abqar-slug"),
+                  start("1", "Romero", "romero-slug")], fixtures, market)
+    assert "abdel abqar" in iv3[0][1], iv3[0][1]
+    assert "ivan romero" not in iv3[0][1] \
+        and "rafael romero" not in iv3[0][1], iv3[0][1]
+    # A club nobody played keeps its players out of the squad index entirely.
+    assert set(market_names(market, {"alaves"})) == {"alaves"}
+
+    # A claim is graded on the SLUG when the name would not match. This is the
+    # whole reason the outcome comes off the same site: "U. Núñez" on one page
+    # and "Unai Núñez" on another are the same player, and the id says so.
+    slugged = [{"source": "ff", "player_name": "Whoever They Call Him",
+                "player_slug": "ane-slug", "start_pct": "90", "role": "starter",
+                "team_slug": "alaves", "observed_at": "2026-08-14T1200Z"}]
+    num2, _, _ = start_grade(iv2, slugged, None)
+    assert num2 == [("ff", 1, 90.0, 100.0, (0.9 - 1) ** 2)], num2
+    # A confident call about a club whose match we never read is not a miss —
+    # it is not graded at all. Scoring it would punish the source for our gap.
+    absent = dict(slugged[0], player_slug="zed-slug", team_slug="barcelona")
+    assert start_grade(iv2, [absent], None) == ([], [], 0)
+    # Nothing played, nothing claimed: still not a zero score for anyone.
+    assert start_intervals([], [], []) == ([], 0, [])
 
     print("methodology.py selftest OK")
 

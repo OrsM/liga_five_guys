@@ -820,6 +820,8 @@ CAL_SCORE_RE = re.compile(r"\b(\d+\s*-\s*\d+)\b")
 
 MATCH_SIDES = (".stats-local", ".stats-visitante")   # home, away, in that order
 MATCH_SUBS_HEADER = "Suplentes"
+# The minute a player left the pitch, printed in the same cell as his name.
+MATCH_MINUTE_RE = re.compile(r"\s*\d+\s*'\s*$")
 # The match paths shorten exactly one club: /partidos/…-rayo-…, whose team page
 # is /laliga/equipos/rayo-vallecano. Without this alias his 38 matches — a
 # tenth of the season — split into nothing and vanish. Every other club spells
@@ -938,7 +940,8 @@ def parse_starters(html: str, observed_at: str,
                     "source": SOURCE,
                     "match_id": path.split("-", 1)[0],
                     "team_slug": team,
-                    "player_name": _WS.sub(" ", cell[0].text_content()).strip(),
+                    "player_name": MATCH_MINUTE_RE.sub(
+                        "", _WS.sub(" ", cell[0].text_content()).strip()),
                     "player_slug": None,
                     "role": role,
                 })
@@ -1341,8 +1344,9 @@ def _match_html(home_xi: int = 11, away_xi: int = 11) -> str:
             if i == xi:
                 out.append('<tr class="header"><td>Suplentes</td></tr>')
             out.append('<tr class="plegado plegable">'
-                       '<td class="name">%s%d</td><td class="picas">SC</td>'
-                       '</tr>' % (prefix, i))
+                       '<td class="name">%s%d%s</td>'
+                       '<td class="picas">SC</td>'
+                       '</tr>' % (prefix, i, " 64'" if i == 1 else ""))
             out.append('<tr class="desglose"><td><a href='
                        '"https://www.futbolfantasy.com/jugadores/%s%d">'
                        'Ver la ficha del jugador</a></td></tr>' % (prefix, i))
@@ -1612,6 +1616,11 @@ def _selftest() -> None:
     # THE DECOY SECTION is not read. It repeats the squad with full names and
     # no links, and reading it made the bench five times too long.
     assert not any("Completo" in r["player_name"] for r in xi), xi
+    # THE MINUTE a player came off is part of the same cell as his name. Left
+    # on, it makes "Aitor Mañas 56'" — a name that matches nothing, which is
+    # how the other source's name-only claims came to look wrong.
+    assert xi[1]["player_name"] == "loc1", xi[1]
+    assert not any("'" in r["player_name"] for r in xi), xi
 
     # A side that is not eleven players is not an eleven: those rows are
     # dropped, because a nine-man XI would bias every hit rate downwards. The
@@ -1664,7 +1673,7 @@ def _selftest() -> None:
         assert s.sign(html) is not None, s.key
         assert isinstance(s.parse(html, "2026-01-01T0000Z", s.key), list), s.key
 
-    print("sources.py selftest OK (122 cases)")
+    print("sources.py selftest OK (124 cases)")
 
 
 if __name__ == "__main__":
