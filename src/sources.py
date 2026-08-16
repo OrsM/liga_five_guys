@@ -68,7 +68,10 @@ __all__ = ["BASE", "SOURCE", "MARKET_URL", "POINTS_URL", "TEAM_URL", "TEAMS",
            "parse_market", "parse_team", "parse_points", "parse_fitness",
            "parse_af_team", "parse_af_fixtures", "season_label",
            "sign_market", "sign_team", "sign_points", "sign_af_team",
-           "sign_af_fixtures"]
+           "sign_af_fixtures",
+           "CAL_KEY", "FF_CAL_URL", "MATCH_URL", "MATCH_KEY_RE",
+           "parse_calendar", "parse_starters", "sign_calendar",
+           "sign_starters", "match_source", "played_sources"]
 
 BASE = "https://www.futbolfantasy.com"
 # The `source` column on every lineups row from this site. It exists so a
@@ -771,6 +774,223 @@ def sign_points(html: str) -> str | None:
 
 
 # ---------------------------------------------------------------------------
+# who actually started — the outcome every probable-XI source is guessing at
+# ---------------------------------------------------------------------------
+#
+# Both lineup sources publish a claim before kickoff and neither is graded,
+# because nothing in this repo ever recorded what happened. These two entries
+# record it: the calendar says which matches have been played, and each played
+# match's own page carries the confirmed elevens.
+#
+# WHY THIS SITE AND NOT FBref. The names come back in the same spellings as
+# the probable-XI pages — "U. Núñez", "El Hilali", "De la Fuente" — and, more
+# usefully, the same /jugadores/<slug> ids. So the forecast-to-outcome join is
+# on player_slug and needs no name resolution at all, which is the one step
+# that would have silently dropped exactly the players whose names are hard.
+# FBref is also behind an interactive Cloudflare challenge.
+#
+# ROBOTS, checked 2026-08-16: futbolfantasy.com/robots.txt is "User-agent: *"
+# with an empty Disallow — nothing on the site is excluded.
+#
+# WHAT A MATCH PAGE LOOKS LIKE. Two columns, .stats-local and .stats-visitante,
+# each with one table.tablestats whose tbody alternates a player row
+# (tr.plegado.plegable, name in td.name) with a collapsed detail row
+# (tr.desglose) holding the only link to that player's page. A tr.header
+# reading "Suplentes" separates the eleven from the bench. An UNPLAYED match
+# has no such table at all, which is why the calendar's score is the gate: no
+# score, no request.
+#
+# A match page is fetched ONCE, ever — cadence "once". The confirmed eleven
+# does not change after kickoff, and re-reading it for the live stats we do
+# not parse would be a request a day per match for the rest of the season.
+
+CAL_KEY = "calendario"
+FF_CAL_URL = f"{BASE}/laliga/calendario"
+MATCH_URL = f"{BASE}/partidos/{{path}}"
+
+# "/partidos/22425-espanyol-levante" — the id alone is not enough to build the
+# URL back, so the whole path segment is what a key carries.
+MATCH_PATH_RE = re.compile(r"/partidos/(\d+-[a-z0-9-]+)")
+MATCH_KEY_RE = re.compile(r"^match_(\d+-[a-z0-9-]+)$")
+# Every link on the calendar reads "Jornada 1 3-0" once played and
+# "Jornada 1 Lun 17/08 21:00h" before. The round is always there; a score means
+# the ball has been kicked, and that is all we need to know.
+CAL_JORNADA_RE = re.compile(r"Jornada\s*(\d+)")
+CAL_SCORE_RE = re.compile(r"\b(\d+\s*-\s*\d+)\b")
+
+MATCH_SIDES = (".stats-local", ".stats-visitante")   # home, away, in that order
+MATCH_SUBS_HEADER = "Suplentes"
+# The match paths shorten exactly one club: /partidos/…-rayo-…, whose team page
+# is /laliga/equipos/rayo-vallecano. Without this alias his 38 matches — a
+# tenth of the season — split into nothing and vanish. Every other club spells
+# the same in both places, checked against the whole 2026-27 calendar.
+MATCH_ALIASES = {"rayo": "rayo-vallecano"}
+# A confirmed eleven is eleven. Fewer means the page was caught half-rendered
+# or the markup moved, and a nine-man "eleven" would quietly bias every hit
+# rate computed from it downwards.
+XI_SIZE = 11
+
+
+def _match_sides(slug: str) -> tuple[str, str] | None:
+    """("real-madrid", "real-sociedad") from "real-madrid-real-sociedad".
+
+    Split against the known team slugs rather than on a hyphen: half the names
+    in the league contain one. Anything that does not split into two teams we
+    collect is not a match this repo can file — the calendar page also lists
+    the second division — so it yields None and is skipped, never half-guessed.
+    """
+    known = {t: t for t in TEAMS}
+    known.update(MATCH_ALIASES)
+    for head in known:
+        tail = slug[len(head) + 1:]
+        if slug.startswith(head + "-") and tail in known:
+            return known[head], known[tail]
+    return None
+
+
+def parse_calendar(html: str, observed_at: str,
+                   key: str = "calendario") -> list[dict]:
+    """Every match of the season: its path, its round, and its score if played.
+
+    This is the only table here that says whether a match HAPPENED, which is
+    what makes the starters sweep bounded: 380 pages across a season, each
+    fetched once, and none of them fetched before there is anything on it.
+    """
+    doc = lh.fromstring(html)
+    rows, seen = [], set()
+    for a in doc.cssselect('a[href*="/partidos/"]'):
+        m = MATCH_PATH_RE.search(a.get("href") or "")
+        if not m or m.group(1) in seen:
+            continue
+        path = m.group(1)
+        text = _WS.sub(" ", a.text_content()).strip()
+        jor = CAL_JORNADA_RE.search(text)
+        sides = _match_sides(path.split("-", 1)[1])
+        if not (jor and sides):
+            continue
+        seen.add(path)
+        score = CAL_SCORE_RE.search(text)
+        rows.append({
+            "observed_at": observed_at,
+            "source": SOURCE,
+            "match_id": path.split("-", 1)[0],
+            "path": path,
+            "jornada": int(jor.group(1)),
+            "home": sides[0],
+            "away": sides[1],
+            "score": score.group(1).replace(" ", "") if score else "",
+        })
+    return rows
+
+
+def sign_calendar(html: str) -> str | None:
+    return _digest(_surface(lh.fromstring(html).cssselect(
+        'a[href*="/partidos/"]')))
+
+
+def _xi_rows(doc, side: str) -> list:
+    """The player rows of the FIRST table.tablestats on that side of the page.
+
+    A side has four .stats-local sections and two of them hold tables of their
+    own — live stats and set pieces — repeating the same squad with FULL names
+    and no links to their pages. Taking every match turned a 12-man bench into
+    58 and lost the slug the whole join rests on. The first table is the fantasy
+    points one, and it is the only one that carries tr.desglose links.
+    """
+    tables = doc.cssselect("%s table.tablestats" % side)
+    return tables[0].cssselect("tbody tr") if tables else []
+
+
+def parse_starters(html: str, observed_at: str,
+                   key: str = "match_1-alaves-getafe") -> list[dict]:
+    """The two confirmed elevens, plus the benches, for one played match.
+
+    `role` uses the same two words the probable-XI table uses — "starter" and
+    "sub" — because the whole point is to compare the two, and a second
+    vocabulary would mean a translation step nobody would maintain.
+
+    No jornada column: it lives on the matches row this joins to by match_id,
+    and the match page states two round numbers (this one and the next), so
+    reading it here would be guessing between them.
+    """
+    m = MATCH_KEY_RE.match(key)
+    if not m:
+        return []
+    path = m.group(1)
+    sides = _match_sides(path.split("-", 1)[1])
+    if not sides:
+        return []
+    doc = lh.fromstring(html)
+    rows = []
+
+    for sel, team in zip(MATCH_SIDES, sides):
+        side_rows, role = [], "starter"
+        for tr in _xi_rows(doc, sel):
+            classes = " ".join(tr.classes)
+            if "header" in classes:
+                if MATCH_SUBS_HEADER in tr.text_content():
+                    role = "sub"
+                continue
+            cell = tr.cssselect("td.name")
+            if cell:
+                side_rows.append({
+                    "observed_at": observed_at,
+                    "source": SOURCE,
+                    "match_id": path.split("-", 1)[0],
+                    "team_slug": team,
+                    "player_name": _WS.sub(" ", cell[0].text_content()).strip(),
+                    "player_slug": None,
+                    "role": role,
+                })
+                continue
+            # The detail row that follows a player carries the only link to
+            # his page, and that slug is the join key. It arrives one row late,
+            # so it is written back onto the row it belongs to.
+            a = tr.cssselect('a[href*="/jugadores/"]')
+            if a and side_rows:
+                side_rows[-1]["player_slug"] = _slug(
+                    'href="%s"' % (a[0].get("href") or ""))
+        if sum(1 for r in side_rows if r["role"] == "starter") != XI_SIZE:
+            continue        # not an eleven: see XI_SIZE
+        rows += side_rows
+    return rows
+
+
+def sign_starters(html: str) -> str | None:
+    els = []
+    doc = lh.fromstring(html)
+    for sel in MATCH_SIDES:
+        els += _xi_rows(doc, sel)
+    return _digest(_surface(els))
+
+
+def match_source(key: str) -> Source | None:
+    """The entry for one match page, built from its key.
+
+    Match keys are not in the registry because their URLs are only known once
+    the calendar has been read, and there are 380 of them a season. The key
+    carries the whole path, so this needs no lookup table and an old snapshot
+    stays parseable long after the match is forgotten.
+    """
+    m = MATCH_KEY_RE.match(key)
+    if not m:
+        return None
+    return Source(key, "starters", MATCH_URL.format(path=m.group(1)),
+                  parse_starters, sign_starters, cadence="once")
+
+
+def played_sources(cal_html: str, observed_at: str = "") -> list[Source]:
+    """One entry per match the calendar shows a score for, in calendar order.
+
+    Handed to fetch the moment the calendar comes back, so a sweep discovers
+    its own work list. `due()` drops the ones already stored, which is what
+    makes this once-ever rather than daily.
+    """
+    return [match_source("match_%s" % r["path"])
+            for r in parse_calendar(cal_html, observed_at) if r["score"]]
+
+
+# ---------------------------------------------------------------------------
 # Club Elo — how strong a team actually is, rather than how expensive
 # ---------------------------------------------------------------------------
 #
@@ -881,6 +1101,10 @@ def sources(enabled_only: bool = True) -> list[Source]:
     # A rating changes when matches are played, so once a day is generous.
     out += [Source("elo", "elo", ELO_URL, parse_elo, sign_elo,
                    cadence="daily")]
+    # The whole season's results in one page. It is what tells the starters
+    # sweep which match pages exist and which are worth asking for.
+    out += [Source(CAL_KEY, "matches", FF_CAL_URL, parse_calendar,
+                   sign_calendar, cadence="daily")]
     return [s for s in out if s.enabled or not enabled_only]
 
 
@@ -891,7 +1115,9 @@ def source_for(key: str) -> Source | None:
     for s in sources(enabled_only=False):
         if s.key == key:
             return s
-    return None
+    # Match pages are built from their key rather than listed, so a stored one
+    # resolves here whether the calendar still mentions it or not.
+    return match_source(key)
 
 
 # ---------------------------------------------------------------------------
@@ -1083,6 +1309,61 @@ _ELO_FIXTURE = """Rank,Club,Country,Level,Elo,From,To
 78,Elche,ESP,1,1602.5,2026-08-10,2026-08-16
 ,Zaragoza,ESP,2,1521.0,2026-08-10,2026-08-16
 """
+
+
+# The calendar, one link per case it has to get right: a played LaLiga match, an
+# unplayed one, the club whose path is shortened, a duplicate link for a match
+# already seen, a second-division match (the page lists both divisions), and a
+# link with no round on it.
+_CAL_FIXTURE = """<html><body>
+<div class="calendario">
+  <h3>Jornada 1</h3>
+  <a href="/partidos/22421-alaves-getafe">Jornada 1 3-0</a>
+  <a href="/partidos/22421-alaves-getafe">Jornada 1 3-0</a>
+  <a href="/partidos/22429-sevilla-rayo">Jornada 1 2-1</a>
+  <a href="/partidos/22424-elche-betis">Jornada 1 Lun 17/08 21:00h</a>
+  <a href="/partidos/24078-cadiz-celta-fortuna">Jornada 1 1-1</a>
+  <a href="/partidos/24082-r-sociedad-b-castellon">Vie 20:30h 01</a>
+</div>
+</body></html>"""
+
+
+# A match page is a hundred rows of markup, so the fixture is built rather than
+# typed: the size of the eleven is itself a rule under test, and three variants
+# of it are needed. Everything the parser touches is here — the collapsed detail
+# row that carries the only link to the player, the "Suplentes" header, and the
+# DECOY second section, which repeats the same squad with full names and no
+# links and used to turn a 12-man bench into 58.
+def _match_html(home_xi: int = 11, away_xi: int = 11) -> str:
+    def rows(prefix, xi, subs):
+        out = []
+        for i in range(xi + subs):
+            if i == xi:
+                out.append('<tr class="header"><td>Suplentes</td></tr>')
+            out.append('<tr class="plegado plegable">'
+                       '<td class="name">%s%d</td><td class="picas">SC</td>'
+                       '</tr>' % (prefix, i))
+            out.append('<tr class="desglose"><td><a href='
+                       '"https://www.futbolfantasy.com/jugadores/%s%d">'
+                       'Ver la ficha del jugador</a></td></tr>' % (prefix, i))
+        return "\n".join(out)
+
+    def side(cls, prefix, xi, subs):
+        return ('<div class="col-12 %s"><h2 class="title">Puntos</h2>'
+                '<table class="tablestats"><tbody>%s</tbody></table></div>'
+                '<div class="col-12 %s"><h2 class="title">En directo</h2>'
+                '<table class="tablestats"><tbody>'
+                '<tr class="plegado plegable"><td class="name">'
+                'Nombre Completo Que No Vale</td></tr>'
+                '</tbody></table></div>'
+                % (cls, rows(prefix, xi, subs), cls))
+
+    return ("<html><body><div class='row stats-table'>%s%s</div></body></html>"
+            % (side("stats-local", "loc", home_xi, 3),
+               side("stats-visitante", "vis", away_xi, 2)))
+
+
+_MATCH_FIXTURE = _match_html()
 
 
 def _selftest() -> None:
@@ -1282,9 +1563,79 @@ def _selftest() -> None:
     assert ELO_URL.format(date="2026-08-16").endswith("/2026-08-16")
     assert MARKET_URL.format(date="2026-08-16") == MARKET_URL
 
+    # -- the calendar: which matches happened ------------------------------
+    cal = parse_calendar(_CAL_FIXTURE, "2026-01-01T0000Z")
+    byp = {r["path"]: r for r in cal}
+    assert len(cal) == 3, cal          # duplicate, second division, no round
+    assert byp["22421-alaves-getafe"]["score"] == "3-0"
+    assert byp["22421-alaves-getafe"]["jornada"] == 1
+    assert byp["22421-alaves-getafe"]["match_id"] == "22421"
+    # An unplayed match is still a row — it is just not a page to ask for.
+    assert byp["22424-elche-betis"]["score"] == ""
+    # The one club the match paths shorten. Without the alias his 38 matches
+    # split into nothing and the sweep never sees a tenth of the season.
+    assert byp["22429-sevilla-rayo"]["away"] == "rayo-vallecano", byp
+    assert _match_sides("real-madrid-real-sociedad") \
+        == ("real-madrid", "real-sociedad")           # hyphens in both names
+    assert _match_sides("cadiz-celta-fortuna") is None      # second division
+    # Only played matches become work, and each one resolves back to its URL.
+    ps = played_sources(_CAL_FIXTURE)
+    assert [s.key for s in ps] == ["match_22421-alaves-getafe",
+                                   "match_22429-sevilla-rayo"], ps
+    assert ps[0].url.endswith("/partidos/22421-alaves-getafe")
+    assert ps[0].cadence == "once" and ps[0].table == "starters"
+    assert sign_calendar(_CAL_FIXTURE) is not None
+    assert sign_calendar("<html><body>no matches</body></html>") is None
+
+    # -- who actually started ----------------------------------------------
+    xi = parse_starters(_MATCH_FIXTURE, "2026-01-01T0000Z",
+                        "match_22421-alaves-getafe")
+    got = {}
+    for r in xi:
+        got[(r["team_slug"], r["role"])] = got.get((r["team_slug"], r["role"]),
+                                                   0) + 1
+    assert got == {("alaves", "starter"): 11, ("alaves", "sub"): 3,
+                   ("getafe", "starter"): 11, ("getafe", "sub"): 2}, got
+    # Home is .stats-local and away is .stats-visitante, in that order.
+    assert xi[0]["team_slug"] == "alaves" and xi[0]["player_name"] == "loc0"
+    # THE JOIN KEY. It arrives one row late, on the collapsed detail row, and
+    # it is the same /jugadores/ slug the probable-XI table stores — which is
+    # why grading needs no name matching at all.
+    assert all(r["player_slug"] for r in xi), xi
+    assert xi[0]["player_slug"] == "loc0", xi[0]
+    assert xi[0]["match_id"] == "22421" and xi[0]["source"] == SOURCE
+    # Same two words the forecast uses, so the two tables compare directly.
+    assert {r["role"] for r in xi} == {"starter", "sub"}
+    assert {r["role"] for r in xi} < {r["role"] for r in rows}
+    # No jornada column: it lives on the matches row, keyed by match_id.
+    assert "jornada" not in xi[0]
+    # THE DECOY SECTION is not read. It repeats the squad with full names and
+    # no links, and reading it made the bench five times too long.
+    assert not any("Completo" in r["player_name"] for r in xi), xi
+
+    # A side that is not eleven players is not an eleven: those rows are
+    # dropped, because a nine-man XI would bias every hit rate downwards. The
+    # other side still counts.
+    short = parse_starters(_match_html(home_xi=9), "t",
+                           "match_22421-alaves-getafe")
+    assert {r["team_slug"] for r in short} == {"getafe"}, short
+    # An unplayed match page has no such table at all: no rows, and no
+    # signature either, so ingest reports it rather than storing it silently.
+    assert parse_starters("<html><body>sin datos</body></html>", "t",
+                          "match_22421-alaves-getafe") == []
+    assert sign_starters("<html><body>sin datos</body></html>") is None
+    assert sign_starters(_MATCH_FIXTURE) is not None
+    # A key that is not a match key parses to nothing rather than half a row.
+    assert parse_starters(_MATCH_FIXTURE, "t", "market") == []
+    assert match_source("market") is None
+    assert match_source("match_22421-alaves-getafe").key \
+        == "match_22421-alaves-getafe"
+    # A stored match page resolves long after the calendar has moved on.
+    assert source_for("match_22421-alaves-getafe").parse is parse_starters
+
     # -- the registry ------------------------------------------------------
     reg = sources()
-    assert len(reg) == 4 + len(TEAMS) + len(AF_TEAMS) == 44, len(reg)
+    assert len(reg) == 5 + len(TEAMS) + len(AF_TEAMS) == 45, len(reg)
     assert set(AF_TEAMS) == set(TEAMS), set(AF_TEAMS) ^ set(TEAMS)
     # Both team sweeps are daily; market and points still run every sweep.
     assert {s.cadence for s in reg if s.key.startswith(("team_", "af_"))} \
@@ -1295,7 +1646,7 @@ def _selftest() -> None:
                                     "af_fixtures"}
     assert len({s.key for s in reg}) == len(reg)          # keys are unique
     assert {s.table for s in reg} == {"market", "points", "lineups",
-                                      "fixtures", "elo"}
+                                      "fixtures", "elo", "matches"}
     assert source_for("team_celta").parse is parse_team
     assert source_for("gone") is None                     # retired page name
 
@@ -1303,7 +1654,8 @@ def _selftest() -> None:
     # this is what stops a new source being added half-wired.
     assert source_for("af_celta").parse is parse_af_team
     samples = {"market": _MARKET_FIXTURE, "points": _POINTS_FIXTURE,
-               "af_fixtures": _AF_HUB_FIXTURE, "elo": _ELO_FIXTURE}
+               "af_fixtures": _AF_HUB_FIXTURE, "elo": _ELO_FIXTURE,
+               CAL_KEY: _CAL_FIXTURE}
     # Half the AF teams get each shape, so neither branch can rot unnoticed.
     for i, k in enumerate(sorted(AF_TEAMS)):
         samples[f"af_{k}"] = _AF_FIXTURE if i % 2 else _AF_CONSENSO_FIXTURE
@@ -1312,7 +1664,7 @@ def _selftest() -> None:
         assert s.sign(html) is not None, s.key
         assert isinstance(s.parse(html, "2026-01-01T0000Z", s.key), list), s.key
 
-    print("sources.py selftest OK (92 cases)")
+    print("sources.py selftest OK (122 cases)")
 
 
 if __name__ == "__main__":

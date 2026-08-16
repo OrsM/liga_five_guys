@@ -156,6 +156,8 @@ data/tidy/market.csv  values, disposable — rebuilt from raw every run
 data/tidy/lineups.csv probable XI + fitness, one row per player per source
 data/tidy/fixtures.csv kickoffs, as published — the deadline is derived here
 data/tidy/elo.csv     Club Elo ratings, Spanish top flight — the fixture rank
+data/tidy/matches.csv  the season's 380 matches, with the score once played
+data/tidy/starters.csv who actually started — what grades the probable XIs
 data/decisions/      append-only logs of estimates, for scoring later
 reports/REPORT.md    ← read this
 reports/latest.md    the five tables (report.py) — carried into REPORT.md

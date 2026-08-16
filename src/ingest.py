@@ -65,7 +65,8 @@ from pathlib import Path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from ffcore.tidy import ROOT, SEASON, TIDY          # noqa: E402
-from sources import parse_points, season_label, source_for, sources  # noqa: E402
+from sources import (CAL_KEY, MATCH_KEY_RE, parse_points,  # noqa: E402
+                     played_sources, season_label, source_for, sources)
 
 RAW = ROOT / "raw"
 
@@ -186,15 +187,35 @@ def pages():
 def due(src, prev: dict, today: str) -> bool:
     """Should this sweep request `src`?
 
-    Only cadence "daily" can say no, and only when we already requested the
-    page today. Both team sweeps are daily, so a sweep asks for forty team
-    pages once a day and two pages the rest of the time. A page not due is
-    carried into this snapshot's manifest with its previous `seen`, so it is
-    due again tomorrow and `parse` still sees it today.
+    Cadence "daily" says no when we already requested the page today. Both team
+    sweeps are daily, so a sweep asks for forty team pages once a day and two
+    pages the rest of the time. A page not due is carried into this snapshot's
+    manifest with its previous `seen`, so it is due again tomorrow and `parse`
+    still sees it today.
+
+    Cadence "once" says no as soon as we have the page at all. That is the
+    match pages: a confirmed eleven does not change after kickoff, so asking
+    again buys the live stats we do not parse, 380 times a season.
     """
+    if src.cadence == "once":
+        return src.key not in prev
     if src.cadence != "daily":
         return True
     return not (prev.get(src.key, {}).get("seen", "")[:10] == today)
+
+
+def carry_matches(rows: list[dict], prev: dict) -> list[dict]:
+    """`rows` plus every match page the last manifest knew and this one missed.
+
+    Match pages are fetched once ever, so they have to be carried into each new
+    manifest by hand: state() reads the newest manifest alone, and a page that
+    fell out of it would look unfetched and be requested again every run for the
+    rest of the season. The calendar is only swept once a day, so on the second
+    run of a day no match page is even in the queue to be carried the usual way.
+    """
+    have = {r["page"] for r in rows}
+    return rows + [dict(r) for page, r in prev.items()
+                   if MATCH_KEY_RE.match(page) and page not in have]
 
 
 def fetch() -> Path:
@@ -214,7 +235,13 @@ def fetch() -> Path:
 
     with httpx.Client(headers=HEADERS, timeout=TIMEOUT,
                       follow_redirects=True) as c:
-        for src in sources():
+        # A queue rather than a loop over the registry, because the calendar
+        # adds work to it: the match pages it lists are not knowable until it
+        # has been read. Everything else about the sweep is unchanged — same
+        # spacing, same backoff, same manifest.
+        queue = list(sources())
+        while queue:
+            src = queue.pop(0)
             if not due(src, prev, stamp[:10]):
                 if src.key in prev:
                     rows.append(dict(prev[src.key]))     # carried, not fetched
@@ -239,6 +266,10 @@ def fetch() -> Path:
             if r.status_code != 200:
                 print(f"  warn: {r.status_code} on {src.key}, skipping")
                 continue
+            if src.key == CAL_KEY:
+                # Only matches the calendar shows a score for: an unplayed
+                # match page has no lineup on it to read.
+                queue += played_sources(r.text)
 
             sig = src.sign(r.text)
             was = prev.get(src.key, {})
@@ -262,6 +293,8 @@ def fetch() -> Path:
                              "seen": stamp})
                 print(f"  {src.key}: {len(r.text) // 1024}KB")
             time.sleep(random.uniform(*DELAY))
+
+    rows = carry_matches(rows, prev)
 
     if not rows:
         sys.exit("ERROR: no page fetched — nothing written.")
@@ -328,8 +361,15 @@ def parse() -> None:
     flags = ", ".join("%s %d" % (k or "not stated", v)
                       for k, v in sorted(tally.items()) if k != "ok")
     by_src = ", ".join("%s %d" % (k, v) for k, v in sorted(per_source.items()))
+    played = {r["match_id"] for r in tables.get("matches", []) if r["score"]}
+    starters = tables.get("starters", [])
     print(f"market {len(market_rows)} rows, lineups {len(xi_rows)} rows "
           f"({by_src}), fixtures {len(fixture_rows)} rows")
+    # The realised elevens are what grades every probable-XI source, so a match
+    # played and never read has to be visible rather than merely absent.
+    print("  played %d matches, starters %d rows for %d of them"
+          % (len(played), len(starters),
+             len({r["match_id"] for r in starters})))
     print("  status: ok %d%s" % (tally.get("ok", 0),
                                  (", " + flags) if flags else ""))
     if not flags:
@@ -532,11 +572,31 @@ def _selftest() -> None:
     assert due(daily, seen_today, "2026-08-16")      # new day
     assert due(daily, {}, "2026-08-15")              # never swept
 
+    # A match page is fetched once, ever, whatever day it is asked about.
+    from sources import match_source
+    once = match_source("match_22421-alaves-getafe")
+    assert due(once, {}, "2026-08-15")
+    assert not due(once, {once.key: {"seen": "2026-08-15T0940Z"}}, "2026-08-16")
+
+    # ...which is exactly why its manifest row has to be carried forward.
+    prev = {"market": {"page": "market", "sig": "s", "stored": "t0",
+                       "seen": "t0"},
+            once.key: {"page": once.key, "sig": "s", "stored": "t0",
+                       "seen": "t0"}}
+    carried = carry_matches(
+        [{"page": "market", "sig": "s2", "stored": "t1", "seen": "t1"}], prev)
+    assert [r["page"] for r in carried] == ["market", once.key], carried
+    # The bytes stay in the archive that first held them, and market — fetched
+    # this run — is not overwritten by the older row.
+    assert carried[1]["stored"] == "t0" and carried[0]["sig"] == "s2"
+    # A page already in this manifest is not carried twice.
+    assert len(carry_matches(carried, prev)) == 2
+
     # -- stamps read out of either layout ---------------------------------
     assert _stamp_of(Path("data/raw/dt=2026-08-15T0940Z.tar.xz")) \
         == _stamp_of(Path("data/raw/dt=2026-08-15T0940Z")) == "2026-08-15T0940Z"
 
-    print("ingest.py selftest OK (12 cases)")
+    print("ingest.py selftest OK (18 cases)")
 
 
 if __name__ == "__main__":
