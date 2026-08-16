@@ -1,0 +1,122 @@
+name: commands
+
+# THE PHONE INTERFACE. Comment on the pinned issue titled "Commands" with a
+# command word and one or more screenshots; the bot replies with what it read
+# and what it decided. The reply is also the notification — the GitHub app
+# pushes comments, and it never pushed a run summary.
+#
+# Today this handles /market only. The rest of issue #30 (/xi, /standings,
+# /deals with its commit gate, /undo) lands on top of this same spine: guard,
+# fetch the images, OCR, resolve, run the chain, reply.
+#
+# The Run-workflow form stays as it is. This adds an interface; it removes none.
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: write
+  issues: write
+
+# A second command while one is committing would race the push.
+concurrency:
+  group: commands
+  cancel-in-progress: false
+
+jobs:
+  market:
+    # AUTHOR GATE, NON-NEGOTIABLE. Public repo: without this, anybody who can
+    # type a comment can write the inputs this league's decisions are made
+    # from. Pinned-issue check as well, so a stray "/market" in a bug report
+    # cannot trigger a run.
+    if: >
+      github.event.issue.title == 'Commands' &&
+      github.event.comment.user.login == 'OrsM' &&
+      startsWith(github.event.comment.body, '/market')
+    runs-on: ubuntu-latest
+    env:
+      FF_ROOT: ./data
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      # tesseract reads the screenshots; the Spanish model matters because the
+      # app's own text is Spanish and the accents are what the resolver leans
+      # on. httpx fetches the attachments, lxml/cssselect are the report chain.
+      - name: Install deps
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq tesseract-ocr tesseract-ocr-spa
+          pip install httpx lxml cssselect
+
+      # The comment body reaches Python through env, never through ${{ }}:
+      # interpolation is textual, so a name carrying a quote would break the
+      # step and one carrying a semicolon would run whatever followed it.
+      - name: Read the screenshots
+        env:
+          COMMENT_BODY: ${{ github.event.comment.body }}
+          REPLY_FILE: ${{ runner.temp }}/reply.md
+        run: python src/shots.py
+
+      # No fetch: a slate is read against the market we already hold, and the
+      # scrape is on its own twice-daily cadence. Parsing all history again
+      # costs seconds and means a parser fix repairs every past snapshot.
+      - name: Rebuild the report
+        run: |
+          python src/ingest.py parse
+          python src/squads.py
+          python src/report.py
+          python src/digest.py
+
+      # The priced slate is the answer to /market, so the reply carries it —
+      # the rate it was judged at, then the buy table itself.
+      - name: Reply
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPLY_FILE: ${{ runner.temp }}/reply.md
+        run: |
+          {
+            grep -m1 'λ' reports/REPORT.md || echo '_no rate_'
+            echo ''
+            sed -n '/^## 2\. Buy today/,/^## 3\./p' reports/REPORT.md \
+              | sed '$d'
+            echo ''
+            echo 'Full report: `reports/REPORT.md`'
+          } >> "$REPLY_FILE"
+          gh issue comment ${{ github.event.issue.number }} \
+            --body-file "$REPLY_FILE"
+
+      - name: Commit
+        run: |
+          git config user.name  'report-bot'
+          git config user.email 'report-bot@users.noreply.github.com'
+          git add -A data reports inputs
+          if git diff --cached --quiet; then
+            echo 'nothing changed' >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          git commit -m "market: $(date -u +%Y-%m-%dT%H%MZ)"
+          for attempt in 1 2 3; do
+            if git pull --rebase --autostash -X theirs && git push; then
+              exit 0
+            fi
+            git rebase --abort || true
+            sleep 7
+          done
+          echo "::error::could not push after 3 attempts"
+          exit 1
+
+      # The reply is the notification, so a failure has to reply too. Without
+      # this, a command that read nothing looks identical to one still running.
+      - name: Say it failed
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          gh issue comment ${{ github.event.issue.number }} --body \
+            "**/market failed** — no screenshots in the comment, or the chain
+          broke. The slate on file is unchanged. [Run log]($RUN_URL)"

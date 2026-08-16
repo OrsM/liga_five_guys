@@ -78,6 +78,7 @@ jobs:
           PYTHONPATH=src python src/digest.py --selftest
           PYTHONPATH=src python src/xi.py --selftest
           PYTHONPATH=src python src/seen.py --selftest
+          PYTHONPATH=src python src/shots.py --selftest
           PYTHONPATH=src python src/points.py --selftest
           PYTHONPATH=src python src/methodology.py --selftest
           PYTHONPATH=src python src/rivals.py --selftest
@@ -87,7 +88,7 @@ jobs:
         # moved, a name that no longer exists.
         run: |
           cd src
-          for m in squads report watch rivals digest xi seen \
+          for m in squads report watch rivals digest xi seen shots \
                    find_slug sources ingest points methodology; do
             python -c "import $m" || { echo "::error::$m failed to import"; exit 1; }
           done
