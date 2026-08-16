@@ -1,63 +1,125 @@
-# Watchlist — 2026-08-16 09:58 UTC
+# Watchlist — 2026-08-16 15:15 UTC
 
-Everyone not owned by the 5 of us, 60% start or better.
-
-Filtered to what your 63.29M of cash can reach.
+The 1 players you pasted as today's slate — everyone you can actually bid on right now, unfiltered. What each one is worth to your XI, and what to bid, is in the slate table at the top of this report.
 
 **FF** is futbolfantasy's probable-XI percentage, which is the one the forecast uses. **AF** is analiticafantasy's read of the same eleven, printed beside it and never blended in — `titular` is a named starter (a final call, with no number to it), a percentage is their editors' consensus, `?` means they list him without either, and `—` means they do not have him. Two columns that disagree are the signal; that is the whole point of carrying both.
 
-## portero
+## Names I could not place
 
-| Player | Team | Pos | Value | 24h | FF | AF |
-|---|---|--:|--:|--:|--:|--:|
-| david soria | Getafe | por | 19.98M | 495K | 95% | 100% |
-| alvaro valles | Betis | por | 33.11M | 378K | 95% | 100% |
-| antonio sivera | Alavés | por | 31.59M | 118K | 95% | — |
-| augusto batalla | Rayo | por | 40.07M | -279K | 95% | — |
-| odysseas vlachodimos | Sevilla | por | 18.34M | 319K | 90% | — |
-| stole dimitrievski | Valencia | por | 14.40M | 291K | 90% | — |
-| mathew ryan | Levante | por | 13.55M | 0K | 90% | 100% |
-| alex remiro | Real Sociedad | por | 43.04M | -224K | 90% | 100% |
+OCR mangled these past matching, so they are missing from the tables above — re-read them off the app if one matters.
 
-## defensa
-
-| Player | Team | Pos | Value | 24h | FF | AF |
-|---|---|--:|--:|--:|--:|--:|
-| andrei ratiu | Rayo | def | 35.60M | 151K | 90% | 100% |
-| florian lejeune | Rayo | def | 38.32M | 104K | 90% | — |
-| nahuel tenaglia | Alavés | def | 14.47M | 77K | 90% | 100% |
-| zaid romero | Getafe | def | 28.06M | 40K | 90% | 100% |
-| adrian de la fuente | Levante | def | 14.05M | 0K | 90% | — |
-| jon martin | Real Sociedad | def | 30.11M | 0K | 90% | 100% |
-| jorge salinas | Racing | def | 5.57M | -41K | 90% | 100% |
-| marcos alonso | Celta | def | 29.19M | -132K | 90% | 67% |
-
-## mediocampista
-
-| Player | Team | Pos | Value | 24h | FF | AF |
-|---|---|--:|--:|--:|--:|--:|
-| javi guerra | Valencia | med | 24.18M | 168K | 90% | 100% |
-| jon ander olasagasti | Levante | med | 4.38M | 56K | 90% | — |
-| german valera | Elche | med | 23.30M | 31K | 90% | 100% |
-| gonzalo villar | Elche | med | 7.03M | 0K | 90% | 100% |
-| guido rodriguez | Valencia | med | 25.56M | -174K | 90% | 100% |
-| david larrubia | Málaga | med | 53.55M | -847K | 90% | 100% |
-| sergio canales | Racing | med | 23.59M | 431K | 80% | — |
-| mario soriano | Deportivo | med | 26.48M | 361K | 80% | 100% |
-
-## delantero
-
-| Player | Team | Pos | Value | 24h | FF | AF |
-|---|---|--:|--:|--:|--:|--:|
-| ante budimir | Osasuna | del | 50.98M | 563K | 90% | — |
-| angel perez | Alavés | del | 6.60M | -63K | 90% | 100% |
-| jorge de frutos | Rayo | del | 45.88M | -504K | 90% | 100% |
-| isi palazon | Rayo | del | 19.32M | 499K | 80% | 50% |
-| georges mikautadze | Villarreal | del | 62.79M | 351K | 80% | — |
-| ivan romero | Levante | del | 7.36M | 97K | 80% | 100% |
-| toni martinez | Alavés | del | 25.05M | 26K | 80% | 100% |
-| martin satriano | Getafe | del | 31.07M | -179K | 80% | — |
+- **$ [GoX! M. Dituro esvp O** — no match
+- **'** — no match
+- **' > O Albert Laporta Value 10:169** — no match
+- **( OQ LALIGA Value 837.296** — no match
+- **(+) Injured** — no match
+- **(0)** — no match
+- **(0D** — no match
+- **(A Albert Laporta Value 17.044.355** — no match
+- **(A Albert Laporta Value 9.457.860** — no match
+- **(A BurtonGM89** — no match
+- **(A SusoGattuso** — no match
+- **(O 22:15:20** — no match
+- **(O 22:37:00** — no match
+- **(O Albert Laporta** — no match
+- **(O Albert Laporta Value 7.483.749** — no match
+- **(Y Available Price 16.421.272** — no match
+- **(Y Available Price 31.925.943** — no match
+- **(Y Available Price 51.573.206** — no match
+- **(Y Available Price 7158.350** — no match
+- **(Y. Available Price 9.274.891** — no match
+- **-<Dh [60 Szczesny** — no match
+- **057** — no match
+- **1562** — no match
+- **2. á DEF Rúdiger FSYP 0)** — no match
+- **23:08 E** — no match
+- **23:08 E LI 205** — no match
+- **23:09 [** — no match
+- **3 (A Albert Laporta** — no match
+- **3 QLALIGA** — no match
+- **4** — no match
+- **46 ul! E** — no match
+- **5.071.998 Y** — no match
+- **6 "DEF M. Loureiro** — no match
+- **:** — no match
+- **: ]** — no match
+- **<** — no match
+- **= LALIGA Some Guy... Q** — no match
+- **= b (Y Available Price 27.738.349** — no match
+- **E [SM Ayoze** — no match
+- **FSYP 10)** — no match
+- **Historical** — no match
+- **IN 2057** — no match
+- **LALI GA Q 5.071.998 O)** — no match
+- **LALIGA O** — no match
+- **LALIGA Some Guy...** — no match
+- **LU Ka [MiB] Olasagasti** — no match
+- **MN + [ió] llaix Moriba FSYP 0)** — no match
+- **Market My Ops.** — no match
+- **Market My Ops. Historical** — no match
+- **My Meguee Standing Team** — no match
+- **My leagues Standing Team** — no match
+- **My leagues Standing Team arket Activity** — no match
+- **NN [5H] |. Akhomach** — no match
+- **O 2 days 1 bid** — no match
+- **O 22:15:10** — no match
+- **O 22:15:16** — no match
+- **O 22:15:16 1 bid me** — no match
+- **O 22:15:20** — no match
+- **O 22:20:44** — no match
+- **O 22:21:54** — no match
+- **O 22:22:22 1 bid Actions** — no match
+- **O 22:36:07 1 bid** — no match
+- **O 3 days** — no match
+- **O 3 days 1 bid** — no match
+- **OQ LALIGA** — no match
+- **OQ LALIGA Value 27.738.349** — no match
+- **OQ LALIGA Value 31.925.943** — no match
+- **OQ LALIGA Value 51.573.206** — no match
+- **PON á [ió] Arda Giiler** — no match
+- **Price 12.041.791** — no match
+- **Price 2.396.035** — no match
+- **Price 2.483.512** — no match
+- **Price 3.754.551** — no match
+- **Price 34.127.668** — no match
+- **Price 4.326.499** — no match
+- **Price 44.747.542** — no match
+- **Price 5.066.124** — no match
+- **Price 5.203.309** — no match
+- **Price 5.269.582** — no match
+- **Price 50.676.787** — no match
+- **Price 8.742.183** — no match
+- **TUN 2057** — no match
+- **Value 12.041.791** — no match
+- **Value 2.483.512** — no match
+- **Value 2.552.050** — no match
+- **Value 3.754.551** — no match
+- **Value 34.127.668** — no match
+- **Value 4.526.499** — no match
+- **Value 44.747.542** — no match
+- **Value 5.066.124** — no match
+- **Value 5.203.309** — no match
+- **Value 5.350.068** — no match
+- **Value 51.979.704** — no match
+- **Value 8.742.183** — no match
+- **Y Available** — no match
+- **Y Available Price 837.296** — no match
+- **Y db b9] mz E** — no match
+- **Y m8] Torró** — no match
+- **[M6] Marc Roca** — no match
+- **[op]** — no match
+- **a E] Guedes** — no match
+- **arket Activity** — no match
+- **gr á [Sl Carlos Espí** — no match
+- **kz** — no match
+- **la DEF] Huijsen Fsrp O** — no match
+- **o O d** — no match
+- **pan á "DEF E** — no match
+- **pr E DEF [e-1913[10) FSYP (0)** — no match
+- **q 5 O 22:20:48** — no match
+- **y Leo (Y Available Price 10.349.742** — no match
+- **y) 0h Te] 7 á** — no match
+- **| (A SusoGattuso** — no match
+- **¡ E [Ml Yeremay esve O** — no match
 
 ---
-
-Not all of these are purchasable today — the app deals a limited slate. Paste today's slate into the `seen` input and this list becomes the slate itself.

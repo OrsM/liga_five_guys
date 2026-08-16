@@ -1,9 +1,9 @@
-# Liga Five Guys — one report — 2026-08-16 09:58 UTC
+# Liga Five Guys — one report — 2026-08-16 15:15 UTC
 
 Field, buy, hold, sell — every table priced in the same currency, from `latest.md`. Everything else is reference and is linked, not reprinted.
 
 
-**Locks in 5h** (next kickoff) · squad 229.94M · cash 63.29M · total 293.24M · λ 0.10 pts/M · buy over 0.13
+**Locks in 2h** (next kickoff) · squad 229.94M · cash 63.29M · total 293.24M · λ 0.10 pts/M · buy over 0.13
 
 ## 1. Field these eleven
 
@@ -21,7 +21,7 @@ Field, buy, hold, sell — every table priced in the same currency, from `latest
 | MED | Pepelu | Celta Vigo H | 4.3 | +6% | 70% | 67% | 3.2 |
 | MED | Jon Moncayola | Levante H | 4.4 | +14% | 90% | — | 4.5 |
 | MED | Lucien Agoume | Athletic A | 3.9 | -9% | 80% | — | 2.9 |
-| DEL | Iñigo Vicente | Villarreal H | ~3.0 | -5% | 90% | 100% | 2.6 |
+| DEL | Iñigo Vicente | Getafe A | ~3.0 | -5% | 90% | 100% | 2.6 |
 
 _**pts/m** is points per match, last season shrunk toward the average and blended with this season as it accrues. `~` means no record at all, so the baseline is assumed. **Fix** is how much the next opponent moves it — `=` a median team, `—` no fixture known. **FF** is futbolfantasy's start percentage, **AF** is analiticafantasy's — `titular` there is a named starter with no number attached, `?` is listed without either, `—` is not listed at all. They are separate columns because neither has been checked against a played jornada yet, so there is no weight to blend them by, and a disagreement is worth more than an average. **xPts/j** = pts/m × Fix × FF, and uses FF only. `⚠` on a name means question 5 has something on him._
 
@@ -36,7 +36,11 @@ _Swaps are same-position only: a cross-slot difference is a change of formation,
 
 ## 2. Buy today
 
-_No slate pasted, so there is nothing you can bid on today that this report knows about. Paste today's market screenshot into the `seen` input to price it. Everyone unowned is ranked in `reports/watchlist.md`, and question 3 is what your cash is worth while you wait._
+**0 on offer, 0 beat the going rate for cash.**
+
+_Every name you pasted is either already owned or missing from the market data._
+
+Already owned, so not a purchase: eder militao (BurtonGM89).
 
 ## 3. What you give up by spending now
 
