@@ -48,8 +48,7 @@ Three optional inputs, all off by default:
 | `lookup` | Paste comma-separated names to resolve app spellings to CSV names. |
 | `seen` | Paste today's market slate. The report then leads with those players, priced — see below. |
 
-`report` is the only workflow you press; `commands` runs itself when you comment
-on the pinned issue (see [Commands](#commands)). The `api probe` spike and `src/fantasy_api.py`
+`report` is now the only workflow. The `api probe` spike and `src/fantasy_api.py`
 were deleted: the official API is unreachable (see below), the probe produced no
 report, and nothing depended on it. `docs/design.md` §3 keeps the token-flow
 recipe for if that ever changes, and git history keeps the code.
@@ -84,11 +83,9 @@ won. One file describes your eleven now.
 ## Reading the slate off your phone
 
 The watchlist ranks everyone nobody owns, but the app only deals a limited
-slate each cycle, so most of it isn't buyable today. To close that gap, comment
-**`/market`** on the pinned Commands issue with the market screenshots attached
-— see [Commands](#commands) below. The older path still works: long-press the
-market screenshot, **Copy Text** (iOS Live Text), and paste it into the `seen`
-input when you run the workflow.
+slate each cycle, so most of it isn't buyable today. To close that gap:
+long-press the market screenshot, **Copy Text** (iOS Live Text), and paste it
+into the `seen` input when you run the workflow.
 
 **Paste a slate and the slate becomes the report.** `reports/REPORT.md` then
 opens with one table covering only the players on offer, sorted by what each
@@ -132,63 +129,9 @@ An OCR'd price can silently disagree with a correct one we already hold.
 `inputs/seen.txt` is git-ignored and cleared on every run that doesn't paste
 one. It is scratch, not state — that is what stops it drifting.
 
-## Commands
-
-The Run-workflow form is the wrong interface for a phone: one line, no images,
-and the run summary does not push-notify. So there is a pinned issue titled
-**Commands**, and a comment on it runs the pipeline.
-
-**`/market` + screenshots of the market screen.** The images are OCR'd on the
-runner (`tesseract -l spa --psm 4`), the names resolved exactly as a pasted
-slate is, the report rebuilt, and the bot replies with what it read, what it
-could not place, a completeness check (`market: 12/12`), and the priced buy
-table. The reply is the notification — the GitHub app pushes comments.
-
-Each shot is cropped to the middle column and inverted before OCR, because the
-app is dark-mode only and the two columns either side of the name are the whole
-problem: the player photo turns rows into noise tesseract skips, and the FSYP
-badge reads as `ssvo` glued to the surname, which then matches nothing. On the
-first real slate that lifted the read from 1 name to 17. The crop is fractions
-of the image (`shots.CROP`), measured on a 1080x2424 Android capture.
-
-Send as many shots as the slate needs; every capture is a set, so order never
-matters and **resending is always safe**. Duplicates collapse after name
-resolution, not on the raw text, because two scrolled shots spell the same
-player differently and only the resolver knows they are one man. No fetch runs:
-the slate is priced against the market snapshot already on file.
-
-Send the market screen and nothing else. Any other screen resolves too — a
-squad, a rival's bids — and its players are then priced as if you could buy
-them, so a count over 12 is reported as a wrong shot, not as a fuller slate.
-
-Two guards. The workflow ignores any comment not written by the repo owner on
-that one issue — a public repo where anyone can type would otherwise let anyone
-write the inputs your money is spent from. And the comment body reaches Python
-through `env:` only, never through `${{ }}`: interpolation is textual, so a name
-carrying a quote breaks the step and one carrying a semicolon runs what follows.
-
-`/xi`, `/standings`, `/deals` and `/undo` are specified in issue #30 and not
-built. They land on this same spine: guard, fetch the images, OCR, resolve, run
-the chain, reply. `/deals` will be the only gated one — a wrong ledger row
-poisons ownership, cash and premiums downstream, so it will propose and wait for
-`/ok` rather than commit. It is also the only command that must read a number,
-because a price paid above market value exists nowhere else, and that is the
-second reason for the gate.
-
-Resending a shot of the Activity feed on a later day must not re-log the deals
-already in it, so a proposed row is dropped when `inputs/transactions.csv`
-already holds one with the same **date, player, from and to**. The app stamps
-every operation to the minute and a player cannot move twice in one minute along
-the same edge, so those four identify a deal. Price is deliberately not part of
-the key: it is the field OCR gets wrong, and if it were, a misread digit would
-append a second copy of a deal already logged instead of showing up as a
-disagreement to confirm.
-
 ## Routine
 
 - **Most days:** open `reports/REPORT.md`. Usually nothing to do.
-- **Market cycle:** comment `/market` on the pinned Commands issue with the
-  screenshots. The reply is the priced slate.
 - **Thursday/Friday:** probable XIs firm up. This is when the report earns its
   keep and when to spend.
 - **After any deal:** add the row to `inputs/transactions.csv`. Everything —
@@ -203,7 +146,6 @@ src/                 sources.py (the registry: futbolfantasy, Analítica, Club E
                      squads.py  report.py  rivals.py  watch.py
                      digest.py (stitches REPORT.md)  find_slug.py
                      points.py  xi.py  seen.py  methodology.py
-                     shots.py (screenshots in a comment → the slate)
 src/ffcore/          shared core: parse (numbers)  text (names)  tidy (IO+time)
                      league (ownership+cash)  score (ratings+XI)
                      fixture (next opponent, difficulty)
@@ -242,7 +184,6 @@ PYTHONPATH=src python src/ffcore/bid.py                 # λ, premiums, bands, s
 PYTHONPATH=src python src/digest.py --selftest          # report stitching
 PYTHONPATH=src python src/xi.py --selftest              # XI from bench
 PYTHONPATH=src python src/seen.py --selftest            # OCR name matching
-PYTHONPATH=src python src/shots.py --selftest           # comment → slate
 PYTHONPATH=src python src/points.py --selftest          # per-jornada diffs
 PYTHONPATH=src python src/methodology.py --selftest     # forecast-vs-actual join
 PYTHONPATH=src python src/rivals.py --selftest          # rival XI arithmetic
