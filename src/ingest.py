@@ -224,7 +224,14 @@ def fetch() -> Path:
             # is asking about (Club Elo). Every other URL has no placeholder
             # in it, so this is a no-op for them.
             url = src.url.format(date=stamp[:10])
-            r = c.get(url)
+            try:
+                r = c.get(url)
+            except httpx.RequestError as e:
+                # A host that refuses the connection or never answers is one
+                # missing page, not a reason to lose the sweep. Same treatment
+                # as a non-200: warn, skip, keep going.
+                print(f"  warn: {type(e).__name__} on {src.key}, skipping")
+                continue
             if r.status_code in (403, 429):
                 # Stop the whole run rather than retrying into a harder block.
                 sys.exit(f"{r.status_code} on {url} — backing off, "
