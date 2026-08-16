@@ -1,6 +1,6 @@
 # Fantasy report — 2026-08-16T0957Z
 
-**Locks in 2h** (next kickoff) · squad 229.94M · cash 63.29M · total 293.24M · λ 0.10 pts/M · buy over 0.13
+**Locks in 1h** (next kickoff) · squad 229.94M · cash 63.29M · total 293.24M · λ 0.10 pts/M · buy over 0.13
 
 ## 1. Field these eleven
 
@@ -19,8 +19,14 @@
 | MED | Jon Moncayola | Levante H | 4.4 | +14% | 90% | — | 4.5 |
 | MED | Lucien Agoume | Athletic A | 3.9 | -9% | 80% | — | 2.9 |
 | DEL | Iñigo Vicente | Getafe A | ~3.0 | -5% | 90% | 100% | 2.6 |
+| +DEF | _Dean Huijsen_ | Espanyol A | 5.6 | +1% | 70% | 100% | **+1.7** |
+| +DEF | _Aitor Paredes_ | Sevilla H ★ | 4.6 | +11% | 70% | 67% | **+1.0** |
+| +MED | _Jon Ander Olasagasti_ | Espanyol A | 3.6 | +1% | 90% | — | **+0.4** |
+| +DEF | _Antonio Rudiger_ | Espanyol A | 4.8 | +1% | 50% | — | **+0.2** |
 
 _**pts/m** is points per match, last season shrunk toward the average and blended with this season as it accrues. `~` means no record at all, so the baseline is assumed. **Fix** is how much the next opponent moves it — `=` a median team, `—` no fixture known. **FF** is futbolfantasy's start percentage, **AF** is analiticafantasy's — `titular` there is a named starter with no number attached, `?` is listed without either, `—` is not listed at all. They are separate columns because neither has been checked against a played jornada yet, so there is no weight to blend them by, and a disagreement is worth more than an average. **xPts/j** = pts/m × Fix × FF, and uses FF only. `⚠` on a name means question 5 has something on him._
+
+_The `+SLOT` rows are today's slate: **xPts/j is the change to the whole eleven** if you sign him and re-pick the shape, not his own score, and it leaves the fixture OUT — you own a player for months, not for one round. `★` next to the opponent means this round's draw happens to be kind, `↓` that it is not; neither is in the number. What he would cost, and whether that is a good rate, is question 2._ _5 others on the slate would not improve this eleven, so they are priced there and not here._
 
 **The model's eleven is 3.6 better** (index 38.4, shape 4-5-1).
 
@@ -33,129 +39,41 @@ _Swaps are same-position only: a cross-slot difference is a change of formation,
 
 ## 2. Buy today
 
-**0 on offer, 0 beat the going rate for cash.**
+**9 on offer, 1 beat the going rate for cash, 3 cover a position you are short in.**
 
-_Every name you pasted is either already owned or missing from the market data._
+| Player | Pos | Bid | ΔxPts/j | pts/M | vs λ | Competition | Verdict |
+|---|---|--:|--:|--:|--:|---|---|
+| Gonçalo Guedes | del | 33.14M | -0.9 | -0.03 | -0.21× | (1 broke) | **Cover** — -0.03/M under 0.13, but you are 1 short here |
+| Yeremay Hernandez | del | 50.62M | -1.8 | -0.03 | -0.27× | none | **Cover** — -0.03/M under 0.13, but you are 1 short here |
+| Ilias Akhomach | del | 5.24M–6.23M | -1.9 | -0.36 | -2.85× | none | **Cover** — -0.36/M under 0.13, but you are 1 short here |
+| Aitor Paredes | def | 5.26M–6.25M | +1.0 | +0.18 | 1.47× | SusoGatt +1.4, (3 broke) | **Bid** — +0.18/M vs 0.13 |
+| Jon Ander Olasagasti | med | 4.49M–5.33M | +0.4 | +0.08 | 0.67× | SusoGatt +1.1, (3 broke) | pass — +0.08/M under 0.13 |
+| Dean Huijsen | def | 32.46M | +1.7 | +0.05 | 0.41× | (4 broke) | pass — +0.05/M under 0.13 |
+| Antonio Rudiger | def | 28.64M–34.02M | +0.2 | +0.01 | 0.05× | SusoGatt +0.2, (3 broke) | pass — +0.01/M under 0.13 |
+| Lucas Torro | med | 2.53M–3.00M | -1.3 | -0.51 | -4.08× | (1 broke) | pass — -0.51/M under 0.13 |
+| Jorge Cabello | def | 839K–996K | -1.9 | -2.28 | -18.16× | none | pass — -2.28/M under 0.13 |
 
-Already owned, so not a purchase: eder militao (BurtonGM89).
+**pts/M** is ΔxPts/j divided by what winning him is expected to cost — the one currency, and the only number the verdict reads. **vs λ** is that rate over the hurdle: above 1.00× the money is better spent here than on the ladder in question 3, below it you are paying more than the going rate. A purchase is closer to a loan than a spend — the value comes back when you sell, give or take 12%, which on a large player is bigger than the premium and the drift put together. That swing is a coin flip, so a row inside a few percent of 1.00× is not a decision.
+
+**FF** is futbolfantasy's probable-XI percentage, which is the one the forecast uses. **AF** is analiticafantasy's read of the same eleven, printed beside it and never blended in — `titular` is a named starter (a final call, with no number to it), a percentage is their editors' consensus, `?` means they list him without either, and `—` means they do not have him. Two columns that disagree are the signal; that is the whole point of carrying both.
+
+Competition is demand, not roster counts: the rivals whose XI actually improves with him, strongest threat first — `?` cash unknown (treat as live), `(n broke)` want him but cannot pay the floor. The full manager-by-manager matrix is in `reports/rivals.md`.
+
+Bid is the floor plus what this league has actually paid over it: median +2.4%, -1.2% to +21.6% (n=25). 9 of those 25 went at the floor itself, so the minimum is not a number known to lose. A dozen deals is not a distribution — the range is what has happened, not a chance of winning, and every one of them is a bid that won.
+
+Already owned, so not a purchase: ayoze perez (Albert Laporta), carlos espi (SusoGattuso), eder militao (BurtonGM89), marc roca (Albert Laporta), matias dituro (Albert Laporta), wojciech szczesny (SusoGattuso).
 
 ## Names I could not place
 
 OCR mangled these past matching, so they are missing from the table above — re-read them off the app if one matters.
 
-- **$ [GoX! M. Dituro esvp O** — no match
-- **'** — no match
-- **' > O Albert Laporta Value 10:169** — no match
-- **( OQ LALIGA Value 837.296** — no match
-- **(+) Injured** — no match
-- **(0)** — no match
-- **(0D** — no match
-- **(A Albert Laporta Value 17.044.355** — no match
-- **(A Albert Laporta Value 9.457.860** — no match
-- **(A BurtonGM89** — no match
-- **(A SusoGattuso** — no match
-- **(O 22:15:20** — no match
-- **(O 22:37:00** — no match
-- **(O Albert Laporta** — no match
-- **(O Albert Laporta Value 7.483.749** — no match
-- **(Y Available Price 16.421.272** — no match
-- **(Y Available Price 31.925.943** — no match
-- **(Y Available Price 51.573.206** — no match
-- **(Y Available Price 7158.350** — no match
-- **(Y. Available Price 9.274.891** — no match
-- **-<Dh [60 Szczesny** — no match
-- **057** — no match
-- **1562** — no match
-- **2. á DEF Rúdiger FSYP 0)** — no match
-- **23:08 E** — no match
-- **23:08 E LI 205** — no match
-- **23:09 [** — no match
-- **3 (A Albert Laporta** — no match
-- **3 QLALIGA** — no match
-- **4** — no match
-- **46 ul! E** — no match
-- **5.071.998 Y** — no match
-- **6 "DEF M. Loureiro** — no match
-- **:** — no match
-- **: ]** — no match
-- **<** — no match
-- **= LALIGA Some Guy... Q** — no match
-- **= b (Y Available Price 27.738.349** — no match
-- **E [SM Ayoze** — no match
-- **FSYP 10)** — no match
-- **Historical** — no match
-- **IN 2057** — no match
-- **LALI GA Q 5.071.998 O)** — no match
-- **LALIGA O** — no match
-- **LALIGA Some Guy...** — no match
-- **LU Ka [MiB] Olasagasti** — no match
-- **MN + [ió] llaix Moriba FSYP 0)** — no match
-- **Market My Ops.** — no match
-- **Market My Ops. Historical** — no match
-- **My Meguee Standing Team** — no match
-- **My leagues Standing Team** — no match
-- **My leagues Standing Team arket Activity** — no match
-- **NN [5H] |. Akhomach** — no match
-- **O 2 days 1 bid** — no match
-- **O 22:15:10** — no match
-- **O 22:15:16** — no match
-- **O 22:15:16 1 bid me** — no match
-- **O 22:15:20** — no match
-- **O 22:20:44** — no match
-- **O 22:21:54** — no match
-- **O 22:22:22 1 bid Actions** — no match
-- **O 22:36:07 1 bid** — no match
-- **O 3 days** — no match
-- **O 3 days 1 bid** — no match
-- **OQ LALIGA** — no match
-- **OQ LALIGA Value 27.738.349** — no match
-- **OQ LALIGA Value 31.925.943** — no match
-- **OQ LALIGA Value 51.573.206** — no match
-- **PON á [ió] Arda Giiler** — no match
-- **Price 12.041.791** — no match
-- **Price 2.396.035** — no match
-- **Price 2.483.512** — no match
-- **Price 3.754.551** — no match
-- **Price 34.127.668** — no match
-- **Price 4.326.499** — no match
-- **Price 44.747.542** — no match
-- **Price 5.066.124** — no match
-- **Price 5.203.309** — no match
-- **Price 5.269.582** — no match
-- **Price 50.676.787** — no match
-- **Price 8.742.183** — no match
-- **TUN 2057** — no match
-- **Value 12.041.791** — no match
-- **Value 2.483.512** — no match
-- **Value 2.552.050** — no match
-- **Value 3.754.551** — no match
-- **Value 34.127.668** — no match
-- **Value 4.526.499** — no match
-- **Value 44.747.542** — no match
-- **Value 5.066.124** — no match
-- **Value 5.203.309** — no match
-- **Value 5.350.068** — no match
-- **Value 51.979.704** — no match
-- **Value 8.742.183** — no match
-- **Y Available** — no match
-- **Y Available Price 837.296** — no match
-- **Y db b9] mz E** — no match
-- **Y m8] Torró** — no match
-- **[M6] Marc Roca** — no match
-- **[op]** — no match
-- **a E] Guedes** — no match
-- **arket Activity** — no match
-- **gr á [Sl Carlos Espí** — no match
-- **kz** — no match
-- **la DEF] Huijsen Fsrp O** — no match
-- **o O d** — no match
-- **pan á "DEF E** — no match
-- **pr E DEF [e-1913[10) FSYP (0)** — no match
-- **q 5 O 22:20:48** — no match
-- **y Leo (Y Available Price 10.349.742** — no match
-- **y) 0h Te] 7 á** — no match
-- **| (A SusoGattuso** — no match
-- **¡ E [Ml Yeremay esve O** — no match
+- **'DEF Loureiro** — no match
+- **Albert Laporta** — no match
+- **Arda Giiler** — no match
+- **BurtonGM** — no match
+- **Ferran Jutglé** — no match
+- **SusoGattuso** — no match
+- **llaix Moriba** — no match
 
 ## 3. What you give up by spending now
 
@@ -231,4 +149,4 @@ _620 players tracked, 511 with a probable-XI reading._
 
 _xPts/j — expected points per jornada = shrunk pts/match (K=8, 2025-26) × fixture × P(start), from `ffcore/score.py` — the same scorer rivals.py uses. Injured, suspended and unavailable score zero; a doubt is halved. The fixture term is a ±12% band across the opponents ranked by summed squad value — Club Elo did not cover the league, so the wallet is standing in for the pitch, plus ±4% for home advantage; both widths are guesses, unfitted because nothing has been played, and small enough that a wrong one costs a fraction of a point._
 
-_Generated 2026-08-16 15:15 UTC._
+_Generated 2026-08-16 15:33 UTC._

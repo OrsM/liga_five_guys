@@ -1,125 +1,43 @@
-# Watchlist — 2026-08-16 15:15 UTC
+# Watchlist — 2026-08-16 15:33 UTC
 
-The 1 players you pasted as today's slate — everyone you can actually bid on right now, unfiltered. What each one is worth to your XI, and what to bid, is in the slate table at the top of this report.
+The 15 players you pasted as today's slate — everyone you can actually bid on right now, unfiltered. What each one is worth to your XI, and what to bid, is in the slate table at the top of this report.
 
 **FF** is futbolfantasy's probable-XI percentage, which is the one the forecast uses. **AF** is analiticafantasy's read of the same eleven, printed beside it and never blended in — `titular` is a named starter (a final call, with no number to it), a percentage is their editors' consensus, `?` means they list him without either, and `—` means they do not have him. Two columns that disagree are the signal; that is the whole point of carrying both.
+
+## defensa
+
+| Player | Team | Pos | Value | 24h | FF | AF |
+|---|---|--:|--:|--:|--:|--:|
+| dean huijsen | Real Madrid | def | 32.46M | 535K | 70% | 100% |
+| aitor paredes | Athletic | def | 5.14M | 75K | 70% | 67% |
+| antonio rudiger | Real Madrid | def | 27.97M | 235K | 50% | — |
+| jorge cabello | Levante | def | 819K | -18K | 10% | — |
+
+## mediocampista
+
+| Player | Team | Pos | Value | 24h | FF | AF |
+|---|---|--:|--:|--:|--:|--:|
+| jon ander olasagasti | Levante | med | 4.38M | 56K | 90% | — |
+| lucas torro | Osasuna | med | 2.47M | -17K | 50% | — |
+
+## delantero
+
+| Player | Team | Pos | Value | 24h | FF | AF |
+|---|---|--:|--:|--:|--:|--:|
+| gonçalo guedes ⚠︎doubt | Real Sociedad | del | 33.14M | -992K | 50% | 33% |
+| yeremay hernandez ⚠︎doubt | Deportivo | del | 50.62M | -957K | 30% | — |
+| ilias akhomach | Villarreal | del | 5.12M | -81K | 10% | — |
 
 ## Names I could not place
 
 OCR mangled these past matching, so they are missing from the tables above — re-read them off the app if one matters.
 
-- **$ [GoX! M. Dituro esvp O** — no match
-- **'** — no match
-- **' > O Albert Laporta Value 10:169** — no match
-- **( OQ LALIGA Value 837.296** — no match
-- **(+) Injured** — no match
-- **(0)** — no match
-- **(0D** — no match
-- **(A Albert Laporta Value 17.044.355** — no match
-- **(A Albert Laporta Value 9.457.860** — no match
-- **(A BurtonGM89** — no match
-- **(A SusoGattuso** — no match
-- **(O 22:15:20** — no match
-- **(O 22:37:00** — no match
-- **(O Albert Laporta** — no match
-- **(O Albert Laporta Value 7.483.749** — no match
-- **(Y Available Price 16.421.272** — no match
-- **(Y Available Price 31.925.943** — no match
-- **(Y Available Price 51.573.206** — no match
-- **(Y Available Price 7158.350** — no match
-- **(Y. Available Price 9.274.891** — no match
-- **-<Dh [60 Szczesny** — no match
-- **057** — no match
-- **1562** — no match
-- **2. á DEF Rúdiger FSYP 0)** — no match
-- **23:08 E** — no match
-- **23:08 E LI 205** — no match
-- **23:09 [** — no match
-- **3 (A Albert Laporta** — no match
-- **3 QLALIGA** — no match
-- **4** — no match
-- **46 ul! E** — no match
-- **5.071.998 Y** — no match
-- **6 "DEF M. Loureiro** — no match
-- **:** — no match
-- **: ]** — no match
-- **<** — no match
-- **= LALIGA Some Guy... Q** — no match
-- **= b (Y Available Price 27.738.349** — no match
-- **E [SM Ayoze** — no match
-- **FSYP 10)** — no match
-- **Historical** — no match
-- **IN 2057** — no match
-- **LALI GA Q 5.071.998 O)** — no match
-- **LALIGA O** — no match
-- **LALIGA Some Guy...** — no match
-- **LU Ka [MiB] Olasagasti** — no match
-- **MN + [ió] llaix Moriba FSYP 0)** — no match
-- **Market My Ops.** — no match
-- **Market My Ops. Historical** — no match
-- **My Meguee Standing Team** — no match
-- **My leagues Standing Team** — no match
-- **My leagues Standing Team arket Activity** — no match
-- **NN [5H] |. Akhomach** — no match
-- **O 2 days 1 bid** — no match
-- **O 22:15:10** — no match
-- **O 22:15:16** — no match
-- **O 22:15:16 1 bid me** — no match
-- **O 22:15:20** — no match
-- **O 22:20:44** — no match
-- **O 22:21:54** — no match
-- **O 22:22:22 1 bid Actions** — no match
-- **O 22:36:07 1 bid** — no match
-- **O 3 days** — no match
-- **O 3 days 1 bid** — no match
-- **OQ LALIGA** — no match
-- **OQ LALIGA Value 27.738.349** — no match
-- **OQ LALIGA Value 31.925.943** — no match
-- **OQ LALIGA Value 51.573.206** — no match
-- **PON á [ió] Arda Giiler** — no match
-- **Price 12.041.791** — no match
-- **Price 2.396.035** — no match
-- **Price 2.483.512** — no match
-- **Price 3.754.551** — no match
-- **Price 34.127.668** — no match
-- **Price 4.326.499** — no match
-- **Price 44.747.542** — no match
-- **Price 5.066.124** — no match
-- **Price 5.203.309** — no match
-- **Price 5.269.582** — no match
-- **Price 50.676.787** — no match
-- **Price 8.742.183** — no match
-- **TUN 2057** — no match
-- **Value 12.041.791** — no match
-- **Value 2.483.512** — no match
-- **Value 2.552.050** — no match
-- **Value 3.754.551** — no match
-- **Value 34.127.668** — no match
-- **Value 4.526.499** — no match
-- **Value 44.747.542** — no match
-- **Value 5.066.124** — no match
-- **Value 5.203.309** — no match
-- **Value 5.350.068** — no match
-- **Value 51.979.704** — no match
-- **Value 8.742.183** — no match
-- **Y Available** — no match
-- **Y Available Price 837.296** — no match
-- **Y db b9] mz E** — no match
-- **Y m8] Torró** — no match
-- **[M6] Marc Roca** — no match
-- **[op]** — no match
-- **a E] Guedes** — no match
-- **arket Activity** — no match
-- **gr á [Sl Carlos Espí** — no match
-- **kz** — no match
-- **la DEF] Huijsen Fsrp O** — no match
-- **o O d** — no match
-- **pan á "DEF E** — no match
-- **pr E DEF [e-1913[10) FSYP (0)** — no match
-- **q 5 O 22:20:48** — no match
-- **y Leo (Y Available Price 10.349.742** — no match
-- **y) 0h Te] 7 á** — no match
-- **| (A SusoGattuso** — no match
-- **¡ E [Ml Yeremay esve O** — no match
+- **'DEF Loureiro** — no match
+- **Albert Laporta** — no match
+- **Arda Giiler** — no match
+- **BurtonGM** — no match
+- **Ferran Jutglé** — no match
+- **SusoGattuso** — no match
+- **llaix Moriba** — no match
 
 ---
