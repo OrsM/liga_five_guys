@@ -1,4 +1,4 @@
-# League behaviour — 2026-08-16 09:58 UTC
+# League behaviour — 2026-08-16 17:26 UTC
 
 5 managers, 41 ledger rows, 34 market snapshots, points 2025-26.
 
@@ -92,11 +92,11 @@ Two errors this table is built to catch: buying a player who has already risen (
 
 | Manager | xPts/j | Shape | Trapped | Injured | Thin at | Unmatched |
 |---|--:|---|--:|--:|---|--:|
-| **miguel_autentico** | 38.4 | 4-5-1 | 4.65M | 0 | del | 0 |
-| Albert Laporta | 35.0 | 4-3-3 | 54.60M | 0 | por | 1 |
-| BurtonGM89 | 32.9 | 5-4-1 | 36.22M | 1 | por,del | 0 |
-| Magic Mike 333 | 30.4 | 3-4-3 | 31.38M | 1 | por | 0 |
-| SusoGattuso | 31.6 | 4-4-2 | 26.27M | 0 | por | 0 |
+| **miguel_autentico** | 37.9 | 4-5-1 | 4.65M | 0 | del | 0 |
+| Albert Laporta | 32.9 | 4-3-3 | 54.60M | 0 | por | 1 |
+| BurtonGM89 | 29.2 | 5-4-1 | 36.22M | 1 | por,del | 0 |
+| Magic Mike 333 | 29.9 | 3-4-3 | 31.38M | 1 | por | 0 |
+| SusoGattuso | 31.4 | 4-4-2 | 26.27M | 0 | por | 0 |
 
 - miguel_autentico is carrying more portero/mediocampista than can ever start.
 - Albert Laporta is carrying more delantero than can ever start.
@@ -121,9 +121,9 @@ Trapped is value held in players below 50% start probability — money that cann
 | vinicius junior | DEL | 107.58M | 90% | — | BurtonGM89 |
 | alvaro valles | POR | 33.11M | 95% | 100% | Albert Laporta, BurtonGM89, Magic Mike 333, SusoGattuso |
 | unai simon | POR | 54.03M | 90% | 100% | Albert Laporta, BurtonGM89, Magic Mike 333, SusoGattuso |
-| mathew ryan | POR | 13.55M | 90% | 100% | Albert Laporta, BurtonGM89, Magic Mike 333, SusoGattuso |
 | stole dimitrievski | POR | 14.40M | 90% | — | Albert Laporta, BurtonGM89, Magic Mike 333, SusoGattuso |
 | ante budimir | DEL | 50.98M | 90% | — | BurtonGM89 |
+| mathew ryan | POR | 13.55M | 90% | 100% | Albert Laporta, BurtonGM89, Magic Mike 333, SusoGattuso |
 
 **Nobody else needs these.** Same quality, no auction — take the equivalent player here instead of paying a premium above.
 
@@ -135,8 +135,8 @@ Trapped is value held in players below 50% start probability — money that cann
 | andrei ratiu | DEF | 35.60M | 90% | 100% |
 | marcos alonso | DEF | 29.19M | 90% | 67% |
 | fermin lopez | MED | 65.27M | 70% | — |
-| edu exposito | MED | 29.42M | 80% | 100% |
 | guido rodriguez | MED | 25.56M | 90% | 100% |
+| german valera | MED | 23.30M | 90% | 100% |
 
 **List these to them.** Players of yours who aren't starting, in a position a rival is short in. You stop competing with them and start selling to them; price just under the premium they showed in section 2.
 
@@ -152,35 +152,29 @@ Each manager's best legal XI under the same scorer — what a rational version o
 
 | Manager | ≈pts/j | vs you | Shape | Unmatched |
 |---|--:|--:|---|--:|
-| **miguel_autentico** | 38.4 | — | 4-5-1 | 0 |
-| Albert Laporta | 35.0 | -3.4 | 4-3-3 | 1 |
-| BurtonGM89 | 32.9 | -5.5 | 5-4-1 | 0 |
-| SusoGattuso | 31.6 | -6.8 | 4-4-2 | 0 |
-| Magic Mike 333 | 30.4 | -8.1 | 3-4-3 | 0 |
+| **miguel_autentico** | 37.9 | — | 4-5-1 | 0 |
+| Albert Laporta | 32.9 | -5.0 | 4-3-3 | 1 |
+| SusoGattuso | 31.4 | -6.5 | 4-4-2 | 0 |
+| Magic Mike 333 | 29.9 | -8.0 | 3-4-3 | 0 |
+| BurtonGM89 | 29.2 | -8.7 | 5-4-1 | 0 |
 
 Unmatched names are absent from that manager's total, so a big number there understates them. Variance in one jornada dwarfs these gaps; over ten it does not.
 
 **miguel_autentico** — 4-5-1 · ≈38 pts
 - POR: ionut radu 6.0
-- DEF: carl starfelt 3.1 · robin le normand 2.8 · omar el hilali 2.8 · igor zubeldia 2.0
+- DEF: carl starfelt 3.1 · robin le normand 2.8 · omar el hilali 2.2 · igor zubeldia 2.0
 - MED: pablo fornals 5.4 · jon moncayola 4.5 · ruben garcia 3.3 · pepelu 3.2 · iñigo ruiz de galarreta 3.0
 - DEL: iñigo vicente 2.6
 
-**Albert Laporta** — 4-3-3 · ≈35 pts
+**Albert Laporta** — 4-3-3 · ≈33 pts
 - POR: matias dituro 5.3
-- DEF: leandro cabrera 4.7 · santiago mouriño 3.3 · juan foyth 2.4 · diego javier llorente 2.4
+- DEF: leandro cabrera 3.7 · santiago mouriño 2.7 · diego javier llorente 2.4 · juan foyth 2.0
 - MED: arda guler 4.0 · marc roca 2.6 · ilaix moriba 1.9
-- DEL: ferran jutgla 3.7 · raul moro 2.7 · ayoze perez 2.2
+- DEL: ferran jutgla 3.7 · raul moro 2.7 · asier villalibre 2.0
 
-**BurtonGM89** — 5-4-1 · ≈33 pts
-- POR: marko dmitrovic 6.5
-- DEF: carlos romero 4.4 · justin de haas 3.0 · quilindschy hartman 2.3 · carlos puga 1.7 · giacomo quagliata 1.6
-- MED: santi comesaña 4.7 · antonio blanco 3.6 · denis suarez 1.6 · tajon buchanan 1.4~
-- DEL: karl etta eyong 2.1
-
-**SusoGattuso** — 4-4-2 · ≈32 pts
+**SusoGattuso** — 4-4-2 · ≈31 pts
 - POR: wojciech szczesny 1.2~
-- DEF: yuri berchiche 3.8 · cesar tarrega 3.4 · abdel abqar 3.0 · clemens riedel 2.2
+- DEF: yuri berchiche 3.8 · cesar tarrega 3.4 · abdel abqar 3.0 · jonny castro 2.0
 - MED: alvaro garcia 3.8 · aimar oroz 3.1 · lorenzo amatucci 2.6 · mario martin 2.3
 - DEL: giuliano simeone 3.9 · andres martin 2.3
 
@@ -188,7 +182,13 @@ Unmatched names are absent from that manager's total, so a big number there unde
 - POR: alfonso herrero 3.0
 - DEF: jose gaya 2.7 · lucas noubi 2.6 · alex pastor 1.0~
 - MED: marc bernal 2.4 · brahim diaz 2.3 · williot swedberg 2.2 · gustavo puerta 2.2
-- DEL: raphinha 5.3 · gorka guruzeta 4.1 · pere milla 2.5
+- DEL: raphinha 5.3 · gorka guruzeta 4.1 · pere milla 2.0
+
+**BurtonGM89** — 5-4-1 · ≈29 pts
+- POR: marko dmitrovic 5.3
+- DEF: carlos romero 3.6 · justin de haas 3.0 · quilindschy hartman 1.8 · carlos puga 1.7 · giacomo quagliata 1.6
+- MED: santi comesaña 3.9 · antonio blanco 3.6 · denis suarez 1.6 · tajon buchanan 1.1~
+- DEL: karl etta eyong 2.0
 
 `~` start probability under 50% — the model expects rotation there, so that is where their real XI will differ from this one.
 
