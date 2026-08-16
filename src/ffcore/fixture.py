@@ -152,8 +152,13 @@ def fixture_board(market: list[dict], fixtures: list[dict],
 
     "Next" is the earliest kickoff still ahead, which is the right question
     even when it belongs to a later round: J1 2026-27 runs 15-27 August while
-    J2 runs 20-24, so several teams play J2 before their postponed J1. The app
-    locks each player at HIS next match, and that is what this returns.
+    J2 runs 20-24, so several teams play J2 before their postponed J1.
+
+    This is the match his rating is adjusted for, NOT the deadline to field
+    him. The app locks the whole lineup once per jornada (verified in-app,
+    2026-08-16), so the deadline is one moment for everybody and lives in
+    tidy.load_deadline(); difficulty stays per player, because the opponent
+    he faces is his own.
 
     `elo_rows` ranks the teams by Club Elo when it covers all of them, and by
     summed squad value otherwise. Every Match says which, and carries the raw

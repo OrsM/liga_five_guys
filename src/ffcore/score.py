@@ -323,6 +323,13 @@ class Scorer:
         on_page = key in self.listed
         rating = self.rate(rec)
 
+        # Scaling by P(start) prices a non-start at zero, which is only right
+        # if a player who doesn't play cannot be covered from the bench. The
+        # free tier has no auto-substitution (verified in-app, 2026-08-16,
+        # issue #28), so it is right: a benched starter costs his whole score,
+        # not the gap to a replacement, and rotation risk is as dear as this
+        # says. If auto-subs ever arrive, this multiplication is the line to
+        # change.
         pct_used = pct if pct is not None else (
             NEUTRAL_START if on_page else ABSENT_START)
         m = self.board.get((rec.get("team") or "").strip())

@@ -160,10 +160,10 @@ def load_deadline(with_source: bool = False):
     xi.py stamps it into xi_fielded.csv, and two readings of the same deadline
     that disagree would silently mis-order the two logs against each other.
 
-    The derived value is the next kickoff in data/tidy/fixtures.csv. That is a
-    conservative floor, not the whole truth: J1 2026-27 runs from 15 to 27
-    August, and if the app locks each player at HIS match then most of your
-    squad stays editable well past the round's first kickoff. It is still
+    The derived value is the next kickoff in data/tidy/fixtures.csv, and that
+    is the whole deadline, not a floor: the app locks the lineup once per
+    jornada, so a player whose own match is on Sunday is already frozen at
+    Friday's kickoff (verified in-app, 2026-08-16, issue #28). It is also
     strictly better than the typed file, which was wrong the moment it expired
     and stayed wrong until you noticed. `with_source=True` returns
     (when, "fixtures"|"file") so the report can say which it used.

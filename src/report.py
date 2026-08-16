@@ -961,14 +961,20 @@ def sec_sell(players, pool, marked, chosen, pool_flat, total_flat,
     # one to sell, and he sorts to the top whether or not the verdict says so.
     rows.sort(key=lambda t: (t[2] is None, t[2] if t[2] is not None else 0.0))
 
-    out += ["| Player | Pos | Sale | Given up | pts/M | vs λ | Verdict | Why |",
-            "|---|---|--:|--:|--:|--:|---|---|"]
+    out += ["| Player | Pos | Sale | Take ≥ | Given up | pts/M | vs λ "
+            "| Verdict | Why |",
+            "|---|---|--:|--:|--:|--:|--:|---|---|"]
     for p, sale, rate, why in rows:
         band = ("—" if sale is None
                 else "%s–%s" % (eur(sale.lo), eur(sale.hi)))
         out.append(
-            "| %s | %s | %s | %s | %s | %s | %s | %s |"
+            "| %s | %s | %s | %s | %s | %s | %s | %s | %s |"
             % (p["name"], (p["pos"] or "—")[:3], band,
+               # A zero ask is not a missing one: he adds nothing to the
+               # eleven, so any offer clears the bar. Printing "0" reads as
+               # a bug in the column.
+               "—" if sale is None or sale.ask is None
+               else "any" if sale.ask < 1.0 else eur(sale.ask),
                "—" if sale is None or sale.loss is None
                else "%.1f" % sale.loss,
                "—" if rate is None else "%.2f" % rate,
@@ -977,7 +983,17 @@ def sec_sell(players, pool, marked, chosen, pool_flat, total_flat,
                "hold" if sale is None else sale.verdict.split(" — ")[0],
                why))
     out += ["",
-            "_**Given up** is what the eleven loses without him, after "
+            "_**Take ≥** is the number to act on, because you cannot sell on "
+            "demand: an offer arrives and you accept or refuse it. It is what "
+            "his sale has to raise for the cash to buy back what the eleven "
+            "loses, so at or above it the offer is worth taking and below it "
+            "it is not, whatever the Verdict column says — the verdict only "
+            "reports whether a typical offer already clears the bar. `any` "
+            "means he adds nothing to the eleven, so no offer is too low. The "
+            "instant sale is not a sale: it pays roughly half of value, which "
+            "is a way to free cash before a lock and almost never beats "
+            "waiting. **Given up** is what the eleven loses without him, "
+            "after "
             "re-picking the shape — not his own score, and `—` means no legal "
             "XI survives his sale, which is a Keep at any price. **pts/M** is "
             "that loss over what the sale raises: the rate you are paying to "

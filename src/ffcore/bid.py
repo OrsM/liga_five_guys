@@ -537,6 +537,7 @@ class Sale(NamedTuple):
     loss: float | None      # XI index given up, None if the XI cannot survive
     worth: float | None     # what the proceeds buy at λ, in index points
     verdict: str
+    ask: float | None = None   # lowest offer worth taking, in euros
 
 
 def marginal(pool: dict, player: dict, base_total: float,
@@ -576,6 +577,14 @@ def sell_test(pool: dict, player: dict, base_total: float,
     The proceeds are NOT the value. `premiums(deals, "sell")` over this
     ledger spans -9.4% to +9.8%, so the band is printed beside the number and
     a sale that only just clears λ is a coin flip, not a decision.
+
+    `ask` is the number to act on. You cannot sell on demand: an offer arrives
+    and you take it or refuse it, and the instant sale pays roughly half of
+    value (verified in-app, 2026-08-16, issue #28), so it is a way to raise
+    cash before a lock, not a sale. What a standing decision needs is a
+    reservation price — loss / λ, the proceeds at which the cash buys exactly
+    what the eleven gives up. At or above it, take the offer. The Sell flag
+    only says whether a typical offer already clears it.
     """
     v = player.get("value")
     v = v if isinstance(v, (int, float)) else money(v)
@@ -594,12 +603,13 @@ def sell_test(pool: dict, player: dict, base_total: float,
         return Sale(cash, cash * (1 - swing), cash * (1 + swing), loss, None,
                     "hold — no λ to price it")
     worth = hurdle * (cash / 1e6)
+    ask = loss / hurdle * 1e6
     if worth > loss:
         call = "**Sell** — %.1f bought vs %.1f given up" % (worth, loss)
     else:
         call = "hold — %.1f bought vs %.1f given up" % (worth, loss)
     return Sale(cash, cash * (1 - swing), cash * (1 + swing), loss, worth,
-                call)
+                call, ask)
 
 
 def gain(pool: dict, candidate: dict, base_total: float,
@@ -1126,10 +1136,22 @@ def _selftest() -> None:
     assert abs(s.cash - 3e6 * 1.033) < 1.0, s
     assert s.lo < s.cash < s.hi and abs(s.hi / s.cash - 1.12) < 1e-9, s
 
+    # The reservation price: 1.0 point given up at λ=1.0 pts/M needs 1M of
+    # proceeds to buy it back, so that is the lowest offer worth taking.
+    assert abs(s.ask - 1e6) < 1.0, s
+
     # The same defender at 0.9M is a wash, and a wash is not a sale.
     s = sell_test(pool, dict(back, value=0.9e6), total, par, sell)
     assert s.verdict.startswith("hold"), s
     assert abs(s.loss - 1.0) < 1e-9, s
+
+    # `ask` is what the eleven costs, not what the player is worth today, so
+    # it does not move when his value does — that is what makes it a standing
+    # instruction to hold out for rather than a second verdict.
+    assert abs(s.ask - 1e6) < 1.0, s
+    # A player no legal XI survives without has no price at all.
+    assert sell_test(pool, dict(keeper, value=99e6), total,
+                     par, sell).ask is None
 
     # THE CONTRADICTION THIS AVOIDS, from the other side. The naive rule
     # `value x λ > his xPts/j` would sell the only keeper for cash, leaving a
@@ -1151,7 +1173,7 @@ def _selftest() -> None:
     bare = sell_test(pool, dict(back, value=2e6), total, par, None)
     assert bare.cash == bare.lo == bare.hi == 2e6, bare
 
-    print("ffcore.bid self-test OK (114 cases)")
+    print("ffcore.bid self-test OK (117 cases)")
 
 
 if __name__ == "__main__":                      # pragma: no cover
