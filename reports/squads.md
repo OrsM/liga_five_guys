@@ -1,10 +1,10 @@
-# Squads — 2026-08-16 17:26 UTC
+# Squads — 2026-08-16 22:14 UTC
 
 | Manager | Players | Squad value | Spent | Raised | Cash |
 |---|--:|--:|--:|--:|--:|
 | **miguel_autentico** | 16 | 229.94M | 113.59M | 17.79M | 63.29M |
 | Albert Laporta | 15 | 260.67M | 173.13M | 35.80M | ~-37.33M |
-| BurtonGM89 | 13 | 222.02M | 127.61M | 30.03M | ~2.42M |
+| BurtonGM89 | 14 | 247.89M | 165.86M | 42.04M | ~-23.82M |
 | Magic Mike 333 | 19 | 242.16M | 121.23M | 14.01M | ~-7.22M |
 | SusoGattuso | 18 | 184.75M | 70.87M | 0K | ~29.13M |
 
@@ -56,16 +56,17 @@
 | Facundo Buonanotte | elche | — | — | — | 40% | — |
 
 ## BurtonGM89
-13 players · 222.02M total · 6 at 70%+ · cash ~2.42M
+14 players · 247.89M total · 8 at 70%+ · cash ~-23.82M
 
 | Player | Team | Pos | Value | 24h | FF | AF |
 |---|---|--:|--:|--:|--:|--:|
 | marko dmitrovic | Espanyol | por | 37.56M | 127K | 95% | — |
 | carlos romero | Villarreal | def | 44.00M | 305K | 80% | 100% |
-| eder militao ⚠︎injured | Real Madrid | def | 11.73M | -313K | 0% | — |
+| dean huijsen | Real Madrid | def | 32.46M | 535K | 70% | 100% |
 | justin de haas | Valencia | def | 9.19M | 74K | 70% | 100% |
 | quilindschy hartman | Espanyol | def | 8.75M | -135K | 50% | — |
 | carlos puga | Málaga | def | 5.24M | -39K | 70% | — |
+| aitor paredes | Athletic | def | 5.14M | 75K | 70% | 67% |
 | giacomo quagliata | Deportivo | def | 3.24M | -25K | 50% | — |
 | santi comesaña | Villarreal | med | 34.65M | 443K | 90% | 100% |
 | tajon buchanan | Villarreal | med | 18.27M | -101K | 30% | — |
@@ -127,9 +128,6 @@
 
 | Date | Player | From → To | Price |
 |---|---|---|--:|
-| 2026-08-13T12:12 | dani martinez | miguel_autentico → market | 425612 |
-| 2026-08-13T12:13 | hugo duro | miguel_autentico → market | 8800811 |
-| 2026-08-13T21:24 | leandro cabrera | market → Albert Laporta | 17500002 |
 | 2026-08-13T21:24 | arda guler | market → Albert Laporta | 50836360 |
 | 2026-08-13T21:24 | giuliano simeone | market → SusoGattuso | 44652302 |
 | 2026-08-13T21:24 | asier villalibre | market → Albert Laporta | 6954257 |
@@ -151,13 +149,16 @@
 | 2026-08-14T21:24 | mario martin | market → SusoGattuso | 3831432 |
 | 2026-08-14T21:24 | pablo fornals | market → miguel_autentico | 58220110 |
 | 2026-08-14T21:24 | santiago mouriño | market → Albert Laporta | 40516387 |
+| 2026-08-14T21:24 | huijsen | market → BurtonGM89 | 32901000 |
+| 2026-08-14T21:24 | paredes | market → BurtonGM89 | 5350000 |
+| 2026-08-14T21:26 | militao | BurtonGM89 → market | 12012022 |
 | 2026-08-14T21:51 | pedro bigas | Albert Laporta → market | 5323361 |
 
 ## Cash basis
 
 - **miguel_autentico** — balance you recorded on 2026-08-15 − 0.00M bought + 0.00M sold across 0 ledger row(s) = 63.29M (known)
 - **Albert Laporta** — 100M starting budget − 173.13M bought + 35.80M sold across 11 ledger row(s) = -37.33M (estimated)
-- **BurtonGM89** — 100M starting budget − 127.61M bought + 30.03M sold across 11 ledger row(s) = 2.42M (estimated)
+- **BurtonGM89** — 100M starting budget − 165.86M bought + 42.04M sold across 14 ledger row(s) = -23.82M (estimated)
 - **Magic Mike 333** — 100M starting budget − 121.23M bought + 14.01M sold across 7 ledger row(s) = -7.22M (estimated)
 - **SusoGattuso** — 100M starting budget − 70.87M bought + 0.00M sold across 4 ledger row(s) = 29.13M (estimated)
 
@@ -165,3 +166,12 @@
 
 - Magic Mike 333 is 7.22M overdrawn: 100M starting budget − 121.23M bought + 14.01M sold across 7 ledger row(s) = -7.22M. Going over the budget mid-window is allowed; being overdrawn when the jornada locks is not, so they must sell before they can buy again. If the ledger is missing a sale of theirs, this is stale rather than wrong.
 - Albert Laporta is 37.33M overdrawn: 100M starting budget − 173.13M bought + 35.80M sold across 11 ledger row(s) = -37.33M. Going over the budget mid-window is allowed; being overdrawn when the jornada locks is not, so they must sell before they can buy again. If the ledger is missing a sale of theirs, this is stale rather than wrong.
+- BurtonGM89 is 23.82M overdrawn: 100M starting budget − 165.86M bought + 42.04M sold across 14 ledger row(s) = -23.82M. Going over the budget mid-window is allowed; being overdrawn when the jornada locks is not, so they must sell before they can buy again. If the ledger is missing a sale of theirs, this is stale rather than wrong.
+
+## Names the ledger did not spell exactly
+
+Placed by who the counterparty was, or by what the price implies — a player sold by a manager was in that manager's squad, and a player bought from the market was in nobody's (issue #26). Fix the spelling in `inputs/transactions.csv` if one of these is the wrong player.
+
+- 2026-08-14T21:24: huijsen → dean huijsen (matched dean huijsen)
+- 2026-08-14T21:24: paredes → aitor paredes (matched aitor paredes)
+- 2026-08-14T21:26: militao → eder militao (matched eder militao)
