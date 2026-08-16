@@ -11,14 +11,26 @@ Personal use only. Don't redistribute the scraped data.
 snapshot, parses it, runs every generator in dependency order, and stitches the
 output into **`reports/REPORT.md`** — the only file you need to read.
 
-That report answers four questions, in this order, each in one table:
+**ONE NUMBER RUNS IT.** λ is the exchange rate between XI points and cash —
+index points per million euros — measured every run by spending your actual
+balance down the unowned pool, best rate first. It is printed in the header and
+every table is priced against it: buy above it, sell below it. Before λ the buy
+rule was "does he improve the eleven", which bought any upgrade at any price,
+and there was no sell rule at all.
 
-1. **Am I fielding the right eleven?** Your marked XI first, the model's
-   swaps second.
-2. **Is anyone injured, suspended, or doubtful?** Every squad member, with an
-   explicit *no data* state — silence never reads as fitness.
-3. **Is everyone expected to start?** Start probability for every mark.
-4. **Anything to do in the market?** The slate, priced, with who can compete.
+That report is five tables, in the order the decisions get made:
+
+1. **Field these eleven.** Your marks first, then who on today's slate would
+   improve them, in the same columns.
+2. **Buy today.** The slate priced in pts/M, against the hurdle, with who else
+   can compete for him.
+3. **What you give up by spending now.** The ladder λ was measured off — what
+   the same million buys if you wait for it.
+4. **Sell these.** Your bench, each priced as "what he adds" against "what his
+   sale proceeds would buy". Never a sale that leaves you unable to field a
+   legal eleven.
+5. **Exceptions.** Fitness, with an explicit *no data* state so silence never
+   reads as fitness, and the players the two probable-XI sources disagree about.
 
 Everything else is reference and is **linked**, not reprinted.
 
@@ -81,10 +93,12 @@ one is worth to your eleven:
 
 | Column | What it tells you |
 |---|---|
-| XI gain | Change in the XI ranking index from owning him, after re-picking the formation. **Frequently negative** for a player the watchlist ranks highly — your own eleven is the benchmark, not the league. |
 | Bid | The floor (= market value) plus the premium this league has actually paid over it. Capped by your recorded cash. |
+| ΔxPts/j | Change in the XI ranking index from owning him, after re-picking the formation. **Frequently negative** for a player the watchlist ranks highly — your own eleven is the benchmark, not the league. |
+| pts/M | That change divided by what he costs. The one currency. |
+| vs λ | pts/M over the hurdle. Above 1.00× the money is better spent here than waiting; below it you are paying over the going rate. |
 | Competition | Which rivals are structurally short in his position, so who you are bidding against. |
-| Verdict | `Bid` if he improves the XI, `pass` if he doesn't, `No` if you can't reach the floor. |
+| Verdict | `Bid` if he beats the hurdle, `pass` if he doesn't, `Cover` if he doesn't but you cannot field a legal XI in his position without him, `No` if you can't reach the floor. |
 
 The watchlist collapses to the same players, unfiltered — no start-probability
 or budget cuts, because a 40%-start player on today's slate is still a choice
@@ -127,7 +141,7 @@ one. It is scratch, not state — that is what stops it drifting.
 ## Layout
 
 ```
-src/                 sources.py (the registry: futbolfantasy + Analítica)
+src/                 sources.py (the registry: futbolfantasy, Analítica, Club Elo)
                      ingest.py (fetch, parse, prune — the only network code)
                      squads.py  report.py  rivals.py  watch.py
                      digest.py (stitches REPORT.md)  find_slug.py
@@ -135,15 +149,16 @@ src/                 sources.py (the registry: futbolfantasy + Analítica)
 src/ffcore/          shared core: parse (numbers)  text (names)  tidy (IO+time)
                      league (ownership+cash)  score (ratings+XI)
                      fixture (next opponent, difficulty)
-                     bid (premiums, bid bands, XI gain)
+                     bid (λ, premiums, bid bands, XI gain, the sell test)
 inputs/              you edit these — see above
 data/raw/dt=….tar.xz  raw HTML, deduplicated — append-only, never delete
 data/tidy/market.csv  values, disposable — rebuilt from raw every run
 data/tidy/lineups.csv probable XI + fitness, one row per player per source
 data/tidy/fixtures.csv kickoffs, as published — the deadline is derived here
+data/tidy/elo.csv     Club Elo ratings, Spanish top flight — the fixture rank
 data/decisions/      append-only logs of estimates, for scoring later
 reports/REPORT.md    ← read this
-reports/latest.md    the four questions (report.py) — carried into REPORT.md
+reports/latest.md    the five tables (report.py) — carried into REPORT.md
 reports/rivals.md    how rivals bid: premiums, drift, projected XIs (rivals.py)
 reports/squads.md    every squad, deal history, cash basis (squads.py)
 reports/watchlist.md everyone unowned, ranked (squads.py)
@@ -163,9 +178,9 @@ PYTHONPATH=src python src/ffcore/tidy.py        # the player view over tidy CSV
 PYTHONPATH=src python src/sources.py            # parsers + signatures
 PYTHONPATH=src python src/ingest.py --selftest   # archives + carry-forward
 PYTHONPATH=src python src/ffcore/league.py --selftest   # config + cash
-PYTHONPATH=src python src/ffcore/fixture.py             # difficulty, team join
+PYTHONPATH=src python src/ffcore/fixture.py             # difficulty, Elo, team join
 PYTHONPATH=src python src/ffcore/score.py               # the blend + fixture
-PYTHONPATH=src python src/ffcore/bid.py                 # premiums, bands, XI gain
+PYTHONPATH=src python src/ffcore/bid.py                 # λ, premiums, bands, sell test
 PYTHONPATH=src python src/digest.py --selftest          # report stitching
 PYTHONPATH=src python src/xi.py --selftest              # XI from bench
 PYTHONPATH=src python src/seen.py --selftest            # OCR name matching
@@ -289,6 +304,18 @@ percentages — resolved by whichever row the file happened to list first.
 worth measuring against what actually happened, not an average to take.
 `load_lineups(source="")` reads every row, which is the one job that wants
 them all: comparing sources.
+
+**And now they are compared, against a gate that can change the default.**
+`reports/methodology.md` scores every claim either site made about a player who
+then did or did not appear, by Brier score, off the appearance ground truth
+`points.py` already produces — a player absent from a played interval did not
+play, so no extra scrape was needed for it. Only claims logged strictly before
+the interval count. Whichever source has the lower Brier over a real sample
+earns `LINEUP_SOURCE`; until one does, `futbolfantasy` keeps it because it was
+first, and the report says so rather than implying it won something. Two limits
+are stated in the table's own footnote: it grades P(appear), not P(start) — a
+twenty-minute substitute counts, which flatters both sites equally — and an
+interval can span two jornadas.
 
 The reshape rewrote all 14,823 rows anyway, so the CRLF/LF split ended here
 too — `ingest._write_csv` now writes LF like `ffcore.tidy.write_csv`. Verified
@@ -441,8 +468,41 @@ them to. They are small enough that a wrong guess costs a fraction of a point,
 `reports/methodology.md` buckets realised points by fixture difficulty so the
 band can be widened, narrowed or deleted on evidence.
 
+**The rank now comes from Club Elo, when it covers the league.** `api.clubelo.com`
+publishes plain CSV, no key and no terms beyond "read it with a program", so one
+request a day joins a result-based rating onto the twenty clubs. A wallet is a
+transfer market's opinion; Elo is what the teams have actually done to each
+other. **Partial coverage is refused**: one club that will not join sends the
+whole board back to squad value, because half a league ranked by Elo and half by
+wallet is not a ranking and the mixture would be silently wrong in the middle of
+the table where most teams live. Which scale ran is printed in
+`reports/methodology.md`, and the raw Elo gap is logged beside the factor on
+every row — the +/-12% band is a guess, and re-fitting it later means having
+kept the continuous rating rather than the rank it was flattened into.
+
+**One currency: everything is priced in ΔxPts/j per million.** λ is measured,
+not configured. `ffcore.bid.frontier()` spends your recorded balance down the
+unowned pool, best rate first, recomputing each gain against the eleven as it
+stands after the purchase above it, and λ is the rate of the last rung it could
+afford. Anything worse than that is worse than what the same money would do
+elsewhere, so buying it is a loss **even when the XI gain is positive** — which
+was the old rule, `gain > 0`, buying any upgrade at any price. Selling is the
+same test read backwards: hold a player only while what he adds beats what his
+proceeds would buy, which is why there is no second threshold to tune. Three
+things make this safe on an uncalibrated index: it is a RATIO, so the index's
+arbitrary scale cancels; nothing multiplies the index by a number of jornadas,
+which would be a fiction with a unit on it; and the ladder is short by
+construction, because an eleven has eleven slots so at most eleven purchases
+can improve it. λ is a RESERVATION rate — the app deals twelve random free
+agents a cycle, so the ladder is what you would buy if you could buy anything,
+which biases it in the direction that says *wait*. The ladder is printed in
+question 3 so that bias can be seen instead of argued about, `lambda_buffer` in
+`league.ini` is the one haircut on it, and every run appends the rate it judged
+with to `data/decisions/lambda_log.csv` so the rule itself can be graded.
+
 **Fielding is one round; buying is months.** So the fixture is inside the
-fielding number and outside the buying one. Question 1's purchase rows show
+fielding number and outside the buying one — and outside λ, and outside the
+sell test. Question 1's purchase rows show
 what a signing adds to the whole eleven with every fixture set to neutral, and
 mark a kind or unkind next draw with a symbol instead of folding it into the
 figure. The same table carries both, in the same columns, because "would this

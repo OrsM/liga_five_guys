@@ -39,8 +39,9 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from ffcore.fixture import FIX_BAND, HOME_EDGE  # noqa: E402
 from ffcore.score import SHRINK_K  # noqa: E402
 from ffcore.text import norm  # noqa: E402
-from ffcore.tidy import (DECISIONS, REPORTS, SEASON, read_csv,  # noqa: E402
-                         snapshot_stamp, write_lines)
+from ffcore.tidy import (DECISIONS, LINEUP_SOURCE, REPORTS,  # noqa: E402
+                         SEASON, TIDY, load_elo, load_lineups, load_market,
+                         read_csv, snapshot_stamp, write_lines)
 
 LIVE = SEASON / "live"
 WINDOW_DAYS = 21
@@ -151,6 +152,123 @@ def bucket_rows(pairs: list[dict]) -> list[tuple[str, int, float, float]]:
 
 
 # ---------------------------------------------------------------------------
+# grading the probable-XI sources — the gate for LINEUP_SOURCE
+#
+# P(start) is the largest single term in every xPts/j here, and until now
+# nothing measured it. Two sites publish a probable eleven, one of them is read
+# and the other is printed beside it, and the reason nothing was blended was
+# honest: no jornada had been played, so there was no weight to fit.
+#
+# The ground truth turns out to already be in the repo, at no new cost. The
+# points page is league-wide and carries a `games` column, so points.py's
+# per-jornada diff names everyone whose appearance count went up in an
+# interval. Its diff emits only players who MOVED, so absence from an interval
+# is itself the answer: he did not play. No new host, no new parser, no
+# starters.csv.
+#
+# TWO LIMITS, both stated in the report rather than smoothed over:
+#
+#   * This grades P(APPEAR), not P(start). A 20-minute substitute counts as an
+#     appearance. That makes both sources look better than they are, equally,
+#     so the COMPARISON between them stands even though the level does not.
+#   * An interval is the gap between two kept points snapshots, which is
+#     usually one jornada but can hold two. The claim scored is the last one
+#     logged strictly before the interval opened — the same
+#     no-hindsight rule the forecast join uses.
+#
+# The graded universe is players the market prices, i.e. players who exist in
+# the app. A team page lists academy names the game does not carry; counting
+# those as misses would penalise whichever source lists more of them for being
+# more complete.
+# ---------------------------------------------------------------------------
+
+# A claim inside this band of the middle is not a call either way, and neither
+# source is graded on one: it is what they publish when they do not know.
+START_EDGE = 10.0
+
+
+def appearances(actuals: list[dict]) -> list[tuple[dt.datetime, set]]:
+    """[(interval start, {keys of everyone who played in it})], ascending.
+
+    Built from the same rows the forecast join uses. Anyone absent from an
+    interval did not play in it — points.py emits movers only.
+    """
+    by_start: dict[dt.datetime, set] = {}
+    for a in actuals:
+        seen = by_start.setdefault(a["from_dt"], set())
+        if a["games_delta"] >= 1:
+            seen.update(a["keys"])
+    return sorted(by_start.items())
+
+
+def start_grade(intervals, claims, universe=None):
+    """Per source: did the players it called actually appear?
+
+    Returns (numbered, named, skipped):
+
+      numbered  (source, n, mean claim %, appeared %, Brier) for claims that
+                carry a percentage. Brier is the mean squared error of the
+                probability, so lower is better and 0.25 is a coin flip.
+      named     (source, n, appeared %) for calls with no number on them —
+                analiticafantasy's `titular` is a final answer, not a 100%,
+                and turning it into one would invent the missing constant.
+      skipped   how many claims fell in the undecided middle band.
+
+    Whoever wins this table earns tidy.LINEUP_SOURCE. Nothing here changes
+    which source is read — that is a decision to take once the n is real.
+    """
+    per: dict[str, dict[str, list]] = {}
+    for r in claims:
+        src = (r.get("source") or "").strip()
+        key = norm(r.get("player_name", ""))
+        when = snapshot_stamp(r.get("observed_at", ""))
+        if not src or not key or when is None:
+            continue
+        if universe is not None and key not in universe:
+            continue
+        per.setdefault(src, {}).setdefault(key, []).append((when, r))
+    for byname in per.values():
+        for v in byname.values():
+            v.sort(key=lambda t: t[0])
+
+    num: dict[str, list] = {}
+    nam: dict[str, list] = {}
+    skipped = 0
+    for start, played in intervals:
+        for src, byname in per.items():
+            for key, hist in byname.items():
+                row = latest_before(hist, start)
+                if row is None:
+                    continue
+                hit = 1.0 if key in played else 0.0
+                try:
+                    pct = float(row.get("start_pct"))
+                except (TypeError, ValueError):
+                    pct = None
+                if pct is None:
+                    if (row.get("role") or "") == "starter":
+                        nam.setdefault(src, []).append(hit)
+                    else:
+                        skipped += 1
+                elif abs(pct - 50.0) < START_EDGE:
+                    skipped += 1
+                else:
+                    num.setdefault(src, []).append((pct, hit))
+
+    numbered = []
+    for src in sorted(num):
+        rows = num[src]
+        n = len(rows)
+        mean_claim = sum(p for p, _ in rows) / n
+        rate = 100.0 * sum(h for _, h in rows) / n
+        brier = sum((p / 100.0 - h) ** 2 for p, h in rows) / n
+        numbered.append((src, n, mean_claim, rate, brier))
+    named = [(src, len(v), 100.0 * sum(v) / len(v))
+             for src, v in sorted(nam.items())]
+    return numbered, named, skipped
+
+
+# ---------------------------------------------------------------------------
 # loading
 # ---------------------------------------------------------------------------
 
@@ -180,6 +298,17 @@ def load_actuals() -> tuple[list[dict], str]:
                      "from_dt": from_dt, "points_delta": pd_,
                      "games_delta": gd})
     return rows, label
+
+
+def load_universe() -> set:
+    """Every player the app prices — the only players worth grading a call on.
+
+    Read straight off the market table rather than through Market, because all
+    this needs is the set of names and building the valuation index would be
+    the expensive half of the job.
+    """
+    return {norm(r.get("name", "")) for r in read_csv(TIDY / "market.csv")
+            if r.get("name")}
 
 
 def load_predictions() -> dict[str, list[tuple[dt.datetime, dict]]]:
@@ -214,6 +343,35 @@ def load_predictions() -> dict[str, list[tuple[dt.datetime, dict]]]:
 # the page
 # ---------------------------------------------------------------------------
 
+def elo_basis() -> str:
+    """What actually ranked the opponents in today's run.
+
+    Asked of the same two functions the scorer uses, rather than described from
+    memory: this sentence was wrong about the model for as long as it was a
+    sentence, and a claim in the methodology that the code does not make is the
+    one kind of error this file exists to prevent.
+    """
+    from ffcore.fixture import elo_strength, team_strength
+
+    rows = load_elo()
+    if not rows:
+        return ("summed squad value (Club Elo has not been scraped yet, so the "
+                "wallet is standing in for the pitch)")
+    teams = list(team_strength(latest_market()))
+    if elo_strength(teams, rows) is None:
+        return ("summed squad value — Club Elo was scraped but did not cover "
+                "every club in the market, and half a league ranked by Elo is "
+                "not a ranking")
+    return "**Club Elo rating**, a result-based rating with no transfer fees in it"
+
+
+def latest_market() -> list[dict]:
+    """The newest market snapshot. Read here only to list the league's clubs."""
+    from ffcore.tidy import latest_only
+
+    return latest_only(load_market())
+
+
 def formula_lines() -> list[str]:
     k = f"{SHRINK_K:g}"
     return [
@@ -232,17 +390,21 @@ def formula_lines() -> list[str]:
         "is mostly this one, with no switch-over date to pick and no second "
         "constant to guess. With no matches played yet it collapses exactly "
         "to last season's number.", "",
-        "**Fixture** is who he plays next: teams are ranked by total squad "
-        f"value and the rank is mapped onto ±{FIX_BAND*100:.0f}%, with "
-        f"±{HOME_EDGE*100:.0f}% for home advantage. It is a RANK, not a "
-        "ratio — Real Madrid's squad is worth 4.6× the median one, and facing "
-        "them does not cost a defender four fifths of his points. **Both "
-        "numbers are guesses**, not fits: nothing has been played, so there "
-        "is nothing to fit them to. They are deliberately small, and the "
-        "table below grades them as soon as jornadas exist.", "",
+        "**Fixture** is who he plays next: teams are ranked by %s and the "
+        "rank is mapped onto ±%.0f%%, with ±%.0f%% for home advantage. It is a "
+        "RANK, not a ratio — Real Madrid's squad is worth 4.6× the median one, "
+        "and facing them does not cost a defender four fifths of his points. "
+        "**Both numbers are guesses**, not fits: nothing has been played, so "
+        "there is nothing to fit them to. They are deliberately small, and the "
+        "table below grades them as soon as jornadas exist. Every logged row "
+        "carries the raw Elo gap as well as the factor, so the band can be "
+        "re-fitted against a continuous rating rather than the rank it was "
+        "flattened into."
+        % (elo_basis(), FIX_BAND * 100, HOME_EDGE * 100), "",
         "The fixture applies to **fielding**, which is one round. It is left "
-        "OUT of the buy-side figure in question 1, because you own a player "
-        "for months and next Saturday's draw is not a reason to sign him.", "",
+        "OUT of every buy and sell figure, and out of λ, because you own a "
+        "player for months and next Saturday's draw is not a reason to sign "
+        "him.", "",
         "**P(start)** is futbolfantasy's probable-XI percentage, read twice "
         "daily. A player listed without a percentage gets a neutral prior; "
         "one absent from the page entirely gets a low one. Promoted-side "
@@ -251,9 +413,25 @@ def formula_lines() -> list[str]:
         "printed beside it and is **not** blended in: neither source has been "
         "checked against a played jornada, so there is no weight to blend "
         "them by.", "",
-        "The **team forecast** is the sum over the best legal XI, so ≈35 "
-        "means: this eleven is expected to score about 35 points in a "
-        "jornada, before variance — and single-match variance is huge.", "",
+        "The **team index** is the sum over the best legal XI. It is NOT a "
+        "points forecast and the report no longer prints it as one: the "
+        "shrunk-points term is in points, but P(start) multiplies it by a "
+        "probability and the fixture term by an unfitted guess, so the total "
+        "is a ranking number whose scale means nothing. Only DIFFERENCES in it "
+        "are worth reading — this swap is worth 3.4, that signing 1.6 — which "
+        "is exactly what the report reports.", "",
+        "**λ, the exchange rate.** Every market call is priced in one unit: "
+        "index points per million euros. λ is what your cash buys today, "
+        "measured by walking the unowned pool best-rate-first until the money "
+        "runs out (`ffcore.bid.frontier`), so it is the rate of the last "
+        "purchase you could afford. Buy above it, sell below it, and the one "
+        "setting is `lambda_buffer` — how much better than the going rate a "
+        "purchase has to be. Because it is a RATIO, the arbitrary scale of the "
+        "index cancels, which is why λ is safe on an uncalibrated forecast "
+        "when a points total is not. Each run appends the rate it judged with "
+        "to `data/decisions/lambda_log.csv`: if the season's realised ratios "
+        "sit above the λ printed at the time, λ was too low and the buffer was "
+        "covering for it.", "",
         "### What it deliberately ignores (for now)", "",
         "- **Sub cameos** — P(start) multiplies the whole average, so a 30% "
         "starter is modelled as 0.3 × his points, when in reality he often "
@@ -269,6 +447,58 @@ def formula_lines() -> list[str]:
         "Each of these is a candidate fix, but only after the comparison "
         "below shows which one actually costs points.", "",
     ]
+
+
+def source_lines(actuals: list[dict]) -> list[str]:
+    """The gate for LINEUP_SOURCE: which site's eleven was right more often."""
+    out = ["### Who to believe about the eleven", ""]
+    intervals = appearances(actuals)
+    if not intervals:
+        out += ["_No played interval yet, so neither source has a record. "
+                f"`{LINEUP_SOURCE}` is read because it was first, not because "
+                "it won anything._", ""]
+        return out
+
+    numbered, named, skipped = start_grade(intervals, load_lineups(source=""),
+                                           load_universe())
+    if not numbered and not named:
+        out += ["_Played intervals exist, but no probable-XI claim was logged "
+                "before any of them — lineups.csv starts after the first "
+                "ingest run._", ""]
+        return out
+
+    out += [f"Graded on **appearances**, not starts: a 20-minute substitute "
+            "counts. That flatters both sources by the same amount, so the "
+            "comparison holds even though the level does not. Only claims "
+            "logged before the interval opened are scored.", "",
+            "| Source | Calls | Mean claim | Appeared | Brier |",
+            "|---|--:|--:|--:|--:|"]
+    for src, n, claim, rate, brier in numbered:
+        mark = " ←read" if src == LINEUP_SOURCE else ""
+        out.append(f"| {src}{mark} | {n} | {claim:.0f}% | {rate:.0f}% | "
+                   f"{brier:.3f} |")
+    out += ["", "_**Brier** is the mean squared error of the probability: "
+            "lower is better, 0.25 is a coin flip, and it punishes confidence "
+            "more than caution. A source whose mean claim sits far from its "
+            "appearance rate is miscalibrated even if it ranks players well._",
+            ""]
+    if named:
+        out += ["Calls published with no number on them, which can only be "
+                "graded as a hit rate:", ""]
+        for src, n, rate in named:
+            out.append(f"- **{src}** — {n} named starters, {rate:.0f}% "
+                       "appeared")
+        out.append("")
+    if skipped:
+        out += [f"_{skipped} claim(s) sat within {START_EDGE:.0f} points of "
+                "50% and are not graded: that is not a call either way._", ""]
+    out += ["**The gate.** Once a source has a few hundred graded calls, "
+            f"whichever has the lower Brier earns `LINEUP_SOURCE` in "
+            "ffcore/tidy.py — a one-line change, and the only thing that "
+            "should ever move it. Until then nothing is blended, because a "
+            "weight fitted on one jornada is a guess wearing a decimal "
+            "point.", ""]
+    return out
 
 
 def comparison_lines() -> list[str]:
@@ -346,6 +576,7 @@ def main() -> None:
     out = ["# How the forecast works — and how it's doing", ""]
     out += formula_lines()
     out += comparison_lines()
+    out += source_lines(load_actuals()[0])
     write_lines(REPORTS / "methodology.md", out)
     print(f"wrote {REPORTS/'methodology.md'} ({len(out)} lines)")
 
@@ -409,6 +640,66 @@ def _selftest() -> None:
                  "points_delta": 4.0, "games_delta": 1.0}], preds)
     fx2, no_fix2 = fixture_rows(old)
     assert fx2 == [] and no_fix2 == 1, (fx2, no_fix2)
+
+    # -- grading the probable-XI sources ------------------------------------
+    # Ane and Bo played in the interval opening on the 15th; Cai did not, and
+    # says so by being absent from it — points.py emits movers only.
+    played = [{"name": "Ane", "keys": ["ane"], "from_dt": t(15),
+               "points_delta": 8.0, "games_delta": 1.0},
+              {"name": "Bo", "keys": ["bo"], "from_dt": t(15),
+               "points_delta": 4.0, "games_delta": 2.0},
+              {"name": "Didi", "keys": ["didi"], "from_dt": t(15),
+               "points_delta": 1.0, "games_delta": 0.0}]   # points, no match
+    iv = appearances(played)
+    assert [s for s, _ in iv] == [t(15)], iv
+    assert iv[0][1] == {"ane", "bo"}, iv[0][1]
+    # A row with points but no match is not an appearance.
+    assert "didi" not in iv[0][1]
+
+    def claim(src, name, pct, when=14, role="starter"):
+        return {"source": src, "player_name": name, "start_pct": pct,
+                "role": role, "observed_at": when}
+
+    # Two sites, four players, one interval. `ff` called all three right; `af`
+    # was confident about Cai, who never played.
+    claims = [claim("ff", "Ane", "90"), claim("ff", "Bo", "80"),
+              claim("ff", "Cai", "20", role="doubt"),
+              claim("af", "Ane", "90"), claim("af", "Bo", "80"),
+              claim("af", "Cai", "90"),
+              claim("ff", "Ane", "10", when=16),   # hindsight: never scored
+              claim("ff", "Ghost", "90"),          # not in the app at all
+              claim("ff", "Eve", "55"),            # no call either way
+              claim("af", "Fay", "", role="starter"),      # a named starter
+              claim("af", "Gus", "", role="doubt")]        # neither
+    # observed_at wants a stamp string; snapshot_stamp parses these.
+    for c in claims:
+        c["observed_at"] = ("2026-08-%02dT1200Z" % c["observed_at"]
+                            if isinstance(c["observed_at"], int)
+                            else c["observed_at"])
+
+    universe = {"ane", "bo", "cai", "eve", "fay", "gus"}
+    num, named, skipped = start_grade(iv, claims, universe)
+    got = {s: (n, round(b, 3)) for s, n, _, _, b in num}
+    # Three graded calls each, and af is punished for the confident miss.
+    assert got["ff"][0] == 3 and got["af"][0] == 3, got
+    assert got["af"][1] > got["ff"][1], got
+    # Perfect confidence on two hits and a correct doubt is a good Brier.
+    assert got["ff"][1] < 0.05, got
+    # The hindsight claim from the 16th never enters: only calls logged before
+    # the interval opened are scored.
+    ff = next(r for r in num if r[0] == "ff")
+    assert abs(ff[2] - (90 + 80 + 20) / 3) < 1e-9, ff
+    assert abs(ff[3] - 200.0 / 3) < 1e-9, ff        # 2 of 3 appeared
+    # A name the app does not price is not graded, so the more complete source
+    # is not penalised for being more complete.
+    assert all(n == 3 for _, n, _, _, _ in num), num
+    # A call with no number is a hit rate, never dressed up as 100%.
+    assert named == [("af", 1, 0.0)], named
+    # The undecided middle and a listing with neither figure are skipped, and
+    # the count is reported rather than silently dropped.
+    assert skipped == 2, skipped
+    # No interval, no record: never a zero.
+    assert start_grade([], claims, universe) == ([], [], 0)
 
     print("methodology.py selftest OK")
 

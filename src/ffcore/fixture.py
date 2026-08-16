@@ -60,8 +60,44 @@ class Match(NamedTuple):
     home: bool
     kickoff: datetime
     factor: float          # multiply pts/match by this
-    rank: int              # opponent's squad-value rank, 1 = richest
+    rank: int              # opponent's rank, 1 = strongest
     of: int                # out of how many ranked teams
+    basis: str = "value"   # what ranked them: "elo" or "value"
+    gap: float | None = None   # raw Elo difference, you minus opponent
+
+
+def elo_strength(market_teams, elo_rows) -> dict[str, float] | None:
+    """{market team: Elo rating}, or None unless every team joins.
+
+    PARTIAL COVERAGE IS REFUSED. A board where half the teams are ranked by
+    Elo and half by squad value is not a ranking — the two scales have nothing
+    to do with each other, and the mixture would be silently wrong in the
+    middle of the table where most of the league lives. One unjoinable club
+    sends the whole board back to squad value, which is the behaviour that was
+    there before Elo existed.
+
+    `elo_rows` is the latest Elo snapshot: rows with `club` and `elo`. Only
+    Spanish top-flight rows should reach here — the ratings file is worldwide,
+    and Elche ranking above Bayern is not a fixture.
+    """
+    have = {}
+    for r in elo_rows:
+        club = (r.get("club") or "").strip()
+        try:
+            rating = float(r.get("elo"))
+        except (TypeError, ValueError):
+            continue
+        if club:
+            have[club] = rating
+    if not have:
+        return None
+    out = {}
+    for team in market_teams:
+        club = match_team(team, list(have))
+        if club is None:
+            return None
+        out[team] = have[club]
+    return out
 
 
 def team_strength(market: list[dict]) -> dict[str, float]:
@@ -111,17 +147,26 @@ def match_team(side: str, teams) -> str | None:
 
 
 def fixture_board(market: list[dict], fixtures: list[dict],
-                  now: datetime) -> dict[str, Match]:
+                  now: datetime, elo_rows=None) -> dict[str, Match]:
     """{market team: its next Match}, for every team with one ahead of `now`.
 
     "Next" is the earliest kickoff still ahead, which is the right question
     even when it belongs to a later round: J1 2026-27 runs 15-27 August while
     J2 runs 20-24, so several teams play J2 before their postponed J1. The app
     locks each player at HIS next match, and that is what this returns.
+
+    `elo_rows` ranks the teams by Club Elo when it covers all of them, and by
+    summed squad value otherwise. Every Match says which, and carries the raw
+    Elo gap when there was one — the band below is a guess, and re-fitting it
+    later against a continuous rating means having logged the rating, not the
+    rank it was turned into.
     """
-    strength = team_strength(market)
+    value = team_strength(market)
+    teams = list(value)
+    elo = elo_strength(teams, elo_rows) if elo_rows else None
+    strength = elo if elo is not None else value
+    basis = "elo" if elo is not None else "value"
     diff = difficulty(strength)
-    teams = list(strength)
     board: dict[str, Match] = {}
 
     for r in fixtures:
@@ -139,9 +184,12 @@ def fixture_board(market: list[dict], fixtures: list[dict],
             opp = match_team(other or "", teams)
             base, rank = diff.get(opp, (1.0, 0)) if opp else (1.0, 0)
             edge = (1.0 + HOME_EDGE) if home else (1.0 - HOME_EDGE)
+            gap = (elo[team] - elo[opp]
+                   if elo is not None and opp in elo else None)
             board[team] = Match(opponent=other or "?", home=home,
                                 kickoff=when, factor=base * edge,
-                                rank=rank, of=len(teams))
+                                rank=rank, of=len(teams),
+                                basis=basis if opp else "none", gap=gap)
     return board
 
 
@@ -215,7 +263,48 @@ def _selftest() -> None:
     assert solo["Mid"].rank == 0
     assert abs(solo["Mid"].factor - (1.0 + HOME_EDGE)) < 1e-9
 
-    print("ffcore.fixture self-test OK (24 cases)")
+    # -- Club Elo, when it covers the whole league -------------------------
+    # Elo disagrees with the wallet: Poor is the strongest side on the pitch
+    # and Rich the weakest. That reordering is the whole reason to prefer a
+    # rating over a valuation, so the board has to follow it.
+    elo = [{"club": "Poor", "elo": "1900"}, {"club": "Mid", "elo": "1700"},
+           {"club": "Rich", "elo": "1500"}]
+    st_elo = elo_strength(["Rich", "Mid", "Poor"], elo)
+    assert st_elo == {"Rich": 1500.0, "Mid": 1700.0, "Poor": 1900.0}, st_elo
+    assert difficulty(st_elo)["Poor"][1] == 1        # strongest, hardest
+
+    eb = fixture_board(mk, fx, now, elo)
+    assert eb["Rich"].basis == "elo", eb["Rich"]
+    # Away at Mid, who is now the MIDDLE side by Elo as well: the factor is the
+    # away edge alone. By squad value Mid was also middle, so the check that
+    # bites is the rank, which has flipped.
+    assert eb["Mid"].rank == 1 and board["Mid"].rank == 3, (eb["Mid"], board)
+    # The raw gap is carried so the band can be re-fitted later against a
+    # continuous rating instead of the rank it was flattened into.
+    assert eb["Mid"].gap == 1700.0 - 1900.0, eb["Mid"]
+    assert board["Mid"].gap is None and board["Mid"].basis == "value"
+
+    # ONE UNJOINABLE CLUB SENDS THE WHOLE BOARD BACK TO VALUE. Half a league
+    # ranked by Elo and half by wallet is not a ranking, and the mixture would
+    # be silently wrong in the middle of the table where most teams live.
+    assert elo_strength(["Rich", "Mid", "Poor"],
+                        [{"club": "Poor", "elo": "1900"}]) is None
+    assert fixture_board(mk, fx, now,
+                         [{"club": "Poor", "elo": "1900"}])["Rich"].basis \
+        == "value"
+    # A rating that will not parse is not a rating.
+    assert elo_strength(["Rich"], [{"club": "Rich", "elo": ""}]) is None
+    assert elo_strength(["Rich"], []) is None
+    # Two Elo clubs matching one market name is never a pick, so the board
+    # falls back rather than guessing which Real is which.
+    assert elo_strength(["Real"], [{"club": "Real Madrid", "elo": "2000"},
+                                   {"club": "Real Sociedad", "elo": "1800"}]) \
+        is None
+    # No Elo at all is exactly today: the board is unchanged, byte for byte.
+    assert fixture_board(mk, fx, now, None) == board
+    assert fixture_board(mk, fx, now, []) == board
+
+    print("ffcore.fixture self-test OK (36 cases)")
 
 
 if __name__ == "__main__":

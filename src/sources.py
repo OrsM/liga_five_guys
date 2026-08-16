@@ -771,6 +771,69 @@ def sign_points(html: str) -> str | None:
 
 
 # ---------------------------------------------------------------------------
+# Club Elo — how strong a team actually is, rather than how expensive
+# ---------------------------------------------------------------------------
+#
+# The fixture term ranked teams by summed squad value, because that was the
+# only team-level number in the repo. It is a poor proxy twice over: a promoted
+# side that spends is not thereby good, and one 100M signing moves a whole
+# squad's total. Club Elo is a rating fitted on results, published free, with
+# no key, as one plain CSV a day.
+#
+# THE ONLY PAGE HERE THAT IS NOT HTML. `parse` and `sign` receive text either
+# way, so the registry needs no new concept — but nothing lxml-shaped may touch
+# this, which is why sign_elo hashes rows rather than calling _surface.
+#
+# The file is worldwide and the URL carries a date, so the signature is the
+# input surface again: only the Spanish top-flight rows this repo can read.
+# Hashing the whole file would store a fresh archive every day for four
+# thousand clubs we never rank.
+#
+# ROBOTS: clubelo.com serves no robots.txt (the path 302s away, with no
+# Disallow anywhere), and the API exists to be read by programs — one request
+# a day, on the daily cadence, is the whole footprint.
+ELO_SOURCE = "clubelo"
+ELO_URL = "http://api.clubelo.com/{date}"      # https is refused by the host
+ELO_COUNTRY = "ESP"
+ELO_LEVEL = "1"
+# The published header. Checked rather than assumed: a column order that moved
+# would otherwise be read as a rating.
+ELO_COLS = ("club", "country", "level", "elo")
+
+
+def parse_elo(text: str, observed_at: str, key: str = "elo") -> list[dict]:
+    """One row per Spanish top-flight club: its rating on the day we asked.
+
+    Columns are found BY NAME, so a reordered file still reads and a renamed
+    one yields nothing — which is the rot signal, not a rating read out of the
+    wrong column.
+    """
+    lines = [ln for ln in (text or "").splitlines() if ln.strip()]
+    if not lines:
+        return []
+    head = [c.strip().lower() for c in lines[0].split(",")]
+    if not all(c in head for c in ELO_COLS):
+        return []
+    at = {c: head.index(c) for c in ELO_COLS}
+    rows = []
+    for ln in lines[1:]:
+        cells = [c.strip() for c in ln.split(",")]
+        if len(cells) < len(head):
+            continue
+        if (cells[at["country"]] != ELO_COUNTRY
+                or cells[at["level"]] != ELO_LEVEL):
+            continue
+        rows.append({"observed_at": observed_at, "source": ELO_SOURCE,
+                     "club": cells[at["club"]], "elo": cells[at["elo"]]})
+    return rows
+
+
+def sign_elo(text: str) -> str | None:
+    return _digest(["%s=%s" % (r["club"], r["elo"])
+                    for r in parse_elo(text, "")])
+
+
+# ---------------------------------------------------------------------------
 # the registry
 # ---------------------------------------------------------------------------
 
@@ -806,6 +869,9 @@ def sources(enabled_only: bool = True) -> list[Source]:
     # One page, and it replaces a file you had to retype every jornada.
     out += [Source("af_fixtures", "fixtures", AF_HUB_URL,
                    parse_af_fixtures, sign_af_fixtures, cadence="daily")]
+    # A rating changes when matches are played, so once a day is generous.
+    out += [Source("elo", "elo", ELO_URL, parse_elo, sign_elo,
+                   cadence="daily")]
     return [s for s in out if s.enabled or not enabled_only]
 
 
@@ -999,6 +1065,16 @@ _AF_HUB_FIXTURE = """<html><body>
 <a href="/partido/999">no time, no crests</a>
 </body></html>"""
 
+# Club Elo's published shape, worldwide and multi-division — which is the whole
+# reason the parser filters on country and level rather than trusting the file.
+_ELO_FIXTURE = """Rank,Club,Country,Level,Elo,From,To
+1,Barcelona,ESP,1,2043.1,2026-08-10,2026-08-16
+3,Bayern,GER,1,2010.4,2026-08-10,2026-08-16
+4,Real Madrid,ESP,1,1988.7,2026-08-10,2026-08-16
+78,Elche,ESP,1,1602.5,2026-08-10,2026-08-16
+,Zaragoza,ESP,2,1521.0,2026-08-10,2026-08-16
+"""
+
 
 def _selftest() -> None:
     # -- team page: the traps this parser exists to avoid -------------------
@@ -1166,9 +1242,40 @@ def _selftest() -> None:
     assert sign_af_fixtures(_AF_HUB_FIXTURE) is not None
     assert sign_af_fixtures("<html><body>no matches</body></html>") is None
 
+    # -- Club Elo, the one source that is not HTML -------------------------
+    el = parse_elo(_ELO_FIXTURE, "2026-01-01T0000Z", "elo")
+    assert [r["club"] for r in el] == ["Barcelona", "Real Madrid",
+                                       "Elche"], el
+    assert el[0]["elo"] == "2043.1" and el[0]["source"] == ELO_SOURCE, el[0]
+    # The file is worldwide and multi-division; only the Spanish top flight is
+    # a fixture. Elche above Bayern is not a difficulty.
+    assert not any(r["club"] in ("Bayern", "Zaragoza") for r in el), el
+    # Columns are found by name, so a reordered header still reads.
+    swapped = "\n".join([
+        "Club,Elo,Rank,Country,Level,From,To",
+        "Barcelona,2043.1,1,ESP,1,2026-08-10,2026-08-16"])
+    assert parse_elo(swapped, "t")[0]["elo"] == "2043.1", parse_elo(swapped, "t")
+    # A RENAMED column yields nothing rather than a rating from the wrong
+    # place, and nothing is the rot signal ingest already knows how to report.
+    assert parse_elo("Club,Country,Level,Rating\nBarcelona,ESP,1,2043", "t") \
+        == []
+    assert parse_elo("", "t") == [] and parse_elo("Club\n", "t") == []
+    assert sign_elo(_ELO_FIXTURE) is not None
+    # Same clubs, same ratings, a different date in the file: one archive, not
+    # two. The signature is the surface this repo reads, as everywhere else.
+    assert sign_elo(_ELO_FIXTURE) == sign_elo(
+        _ELO_FIXTURE.replace("2026-08-16", "2026-08-17"))
+    assert sign_elo(_ELO_FIXTURE.replace("2043.1", "2050.0")) \
+        != sign_elo(_ELO_FIXTURE)
+    assert sign_elo("nothing like a csv") is None
+    # The one URL in the registry that carries the day it is asking about.
+    # ingest fills it; every other URL has no placeholder and is untouched.
+    assert ELO_URL.format(date="2026-08-16").endswith("/2026-08-16")
+    assert MARKET_URL.format(date="2026-08-16") == MARKET_URL
+
     # -- the registry ------------------------------------------------------
     reg = sources()
-    assert len(reg) == 3 + len(TEAMS) + len(AF_TEAMS) == 43, len(reg)
+    assert len(reg) == 4 + len(TEAMS) + len(AF_TEAMS) == 44, len(reg)
     assert set(AF_TEAMS) == set(TEAMS), set(AF_TEAMS) ^ set(TEAMS)
     # Both team sweeps are daily; market and points still run every sweep.
     assert {s.cadence for s in reg if s.key.startswith(("team_", "af_"))} \
@@ -1179,7 +1286,7 @@ def _selftest() -> None:
                                     "af_fixtures"}
     assert len({s.key for s in reg}) == len(reg)          # keys are unique
     assert {s.table for s in reg} == {"market", "points", "lineups",
-                                      "fixtures"}
+                                      "fixtures", "elo"}
     assert source_for("team_celta").parse is parse_team
     assert source_for("gone") is None                     # retired page name
 
@@ -1187,7 +1294,7 @@ def _selftest() -> None:
     # this is what stops a new source being added half-wired.
     assert source_for("af_celta").parse is parse_af_team
     samples = {"market": _MARKET_FIXTURE, "points": _POINTS_FIXTURE,
-               "af_fixtures": _AF_HUB_FIXTURE}
+               "af_fixtures": _AF_HUB_FIXTURE, "elo": _ELO_FIXTURE}
     # Half the AF teams get each shape, so neither branch can rot unnoticed.
     for i, k in enumerate(sorted(AF_TEAMS)):
         samples[f"af_{k}"] = _AF_FIXTURE if i % 2 else _AF_CONSENSO_FIXTURE
@@ -1196,7 +1303,7 @@ def _selftest() -> None:
         assert s.sign(html) is not None, s.key
         assert isinstance(s.parse(html, "2026-01-01T0000Z", s.key), list), s.key
 
-    print("sources.py selftest OK (81 cases)")
+    print("sources.py selftest OK (92 cases)")
 
 
 if __name__ == "__main__":

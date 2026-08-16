@@ -46,10 +46,11 @@ class Part(NamedTuple):
 # what you read on a phone before a lock; latest.md is what you read when you
 # have time.
 DECIDE = [
-    "1. Am I fielding the right eleven?",
-    "2. Is anyone injured, suspended, or doubtful?",
-    "3. Is everyone expected to start?",
-    "4. Anything to do in the market?",
+    "1. Field these eleven",
+    "2. Buy today",
+    "3. What you give up by spending now",
+    "4. Sell these",
+    "5. Exceptions",
     "Warnings",
 ]
 
@@ -104,8 +105,9 @@ def digest(read, sources=SOURCES, stamp: str = "",
     """Assemble one report. `read(name)` returns the file's text, or None."""
     out = ["# Liga Five Guys — one report" + (" — " + stamp if stamp else ""),
            "",
-           "The four questions first, from `latest.md`. Everything else is "
-           "reference and is linked, not reprinted.", ""]
+           "Field, buy, hold, sell — every table priced in the same currency, "
+           "from `latest.md`. Everything else is reference and is linked, not "
+           "reprinted.", ""]
     body: list[str] = []
     seen: set[str] = set()
     lost: list[str] = []

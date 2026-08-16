@@ -1,4 +1,4 @@
-# Watchlist — 2026-08-15 22:55 UTC
+# Watchlist — 2026-08-16 08:43 UTC
 
 Everyone not owned by the 5 of us, 60% start or better.
 
@@ -10,53 +10,53 @@ Filtered to what your 63.29M of cash can reach.
 
 | Player | Team | Pos | Value | 24h | FF | AF |
 |---|---|--:|--:|--:|--:|--:|
-| david soria | Getafe | por | 19.98M | 495K | 100% | titular |
-| odysseas vlachodimos | Sevilla | por | 18.34M | 319K | 100% | — |
-| antonio sivera | Alavés | por | 31.59M | 118K | 100% | — |
-| augusto batalla | Rayo | por | 40.07M | -279K | 100% | — |
-| alvaro valles | Betis | por | 33.11M | 378K | 95% | 100% |
-| stole dimitrievski | Valencia | por | 14.40M | 291K | 90% | — |
+| david soria | Getafe | por | 19.48M | 580K | 100% | titular |
+| odysseas vlachodimos | Sevilla | por | 18.02M | 269K | 100% | — |
+| antonio sivera | Alavés | por | 31.47M | 88K | 100% | — |
+| augusto batalla | Rayo | por | 40.35M | -305K | 100% | — |
+| alvaro valles | Betis | por | 32.74M | 255K | 95% | 100% |
+| stole dimitrievski | Valencia | por | 14.11M | 344K | 90% | — |
 | mathew ryan | Levante | por | 13.55M | 0K | 90% | 100% |
-| alex remiro | Real Sociedad | por | 43.04M | -224K | 90% | 100% |
+| alex remiro | Real Sociedad | por | 43.26M | -358K | 90% | 100% |
 
 ## defensa
 
 | Player | Team | Pos | Value | 24h | FF | AF |
 |---|---|--:|--:|--:|--:|--:|
-| dakonam djene | Getafe | def | 8.65M | 188K | 100% | — |
-| andrei ratiu | Rayo | def | 35.60M | 151K | 100% | titular |
-| florian lejeune | Rayo | def | 38.32M | 104K | 100% | — |
-| juan iglesias | Sevilla | def | 11.81M | 97K | 100% | titular |
-| joaquin oso | Sevilla | def | 13.21M | 86K | 100% | — |
-| nahuel tenaglia | Alavés | def | 14.47M | 77K | 100% | titular |
-| kiko femenia | Getafe | def | 3.97M | 64K | 100% | titular |
-| davinchi | Getafe | def | 3.08M | 64K | 100% | titular |
+| dakonam djene | Getafe | def | 8.47M | 225K | 100% | — |
+| davinchi | Getafe | def | 3.01M | 89K | 100% | titular |
+| kiko femenia | Getafe | def | 3.90M | 72K | 100% | titular |
+| juan iglesias | Sevilla | def | 11.71M | 71K | 100% | titular |
+| andrei ratiu | Rayo | def | 35.45M | 35K | 100% | titular |
+| ivan balliu | Rayo | def | 943K | 31K | 100% | — |
+| nahuel tenaglia | Alavés | def | 14.40M | 24K | 100% | titular |
+| gabriel suazo | Sevilla | def | 5.40M | 18K | 100% | titular |
 
 ## mediocampista
 
 | Player | Team | Pos | Value | 24h | FF | AF |
 |---|---|--:|--:|--:|--:|--:|
-| ramon terrats | Getafe | med | 3.00M | 98K | 100% | titular |
-| pathe ciss | Rayo | med | 12.03M | 79K | 100% | titular |
-| jon guridi | Sevilla | med | 4.85M | 61K | 100% | titular |
-| unai lopez | Rayo | med | 5.91M | 34K | 100% | titular |
-| oscar valentin | Rayo | med | 3.65M | 28K | 100% | titular |
-| pablo ibañez | Alavés | med | 3.29M | 20K | 100% | titular |
-| andres garcia | Getafe | med | 8.96M | 19K | 100% | titular |
-| orel mangala | Getafe | med | 10.83M | -85K | 100% | — |
+| ramon terrats | Getafe | med | 2.90M | 117K | 100% | titular |
+| jon guridi | Sevilla | med | 4.79M | 102K | 100% | titular |
+| pathe ciss | Rayo | med | 11.96M | 97K | 100% | titular |
+| unai lopez | Rayo | med | 5.88M | 68K | 100% | titular |
+| oscar valentin | Rayo | med | 3.63M | 33K | 100% | titular |
+| andres garcia | Getafe | med | 8.94M | 29K | 100% | titular |
+| pablo ibañez | Alavés | med | 3.27M | 18K | 100% | titular |
+| orel mangala | Getafe | med | 10.92M | -92K | 100% | — |
 
 ## delantero
 
 | Player | Team | Pos | Value | 24h | FF | AF |
 |---|---|--:|--:|--:|--:|--:|
-| isi palazon | Rayo | del | 19.32M | 499K | 100% | titular |
-| isaac romero | Sevilla | del | 6.51M | 68K | 100% | — |
-| toni martinez | Alavés | del | 25.05M | 26K | 100% | titular |
+| isi palazon | Rayo | del | 18.82M | 661K | 100% | titular |
+| isaac romero | Sevilla | del | 6.44M | 66K | 100% | — |
 | miguel sierra | Sevilla | del | 602K | 0K | 100% | titular |
-| aitor mañas | Alavés | del | 536K | -7K | 100% | titular |
-| randy nteka | Rayo | del | 1.26M | -13K | 100% | titular |
-| angel perez | Alavés | del | 6.60M | -63K | 100% | titular |
-| abde rebbach | Alavés | del | 3.69M | -65K | 100% | titular |
+| randy nteka | Rayo | del | 1.27M | -11K | 100% | titular |
+| aitor mañas | Alavés | del | 542K | -20K | 100% | titular |
+| toni martinez | Alavés | del | 25.02M | -31K | 100% | titular |
+| abde rebbach | Alavés | del | 3.75M | -59K | 100% | titular |
+| angel perez | Alavés | del | 6.66M | -78K | 100% | titular |
 
 ---
 

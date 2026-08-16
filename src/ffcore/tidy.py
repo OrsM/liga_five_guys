@@ -42,7 +42,8 @@ __all__ = ["ROOT", "TIDY", "SEASON", "DECISIONS", "REPORTS", "MADRID",
            "write_lines", "snapshot_stamp", "ledger_stamp", "latest_only", "snapshots",
            "Market", "Valuation", "load_market", "load_lineups",
            "load_players", "read_ledger", "load_deadline", "LINEUP_SOURCE",
-           "pick_source", "load_fixtures", "next_kickoff", "kickoff_stamp"]
+           "pick_source", "load_fixtures", "next_kickoff", "kickoff_stamp",
+           "load_elo"]
 
 ROOT = Path(os.environ.get("FF_ROOT", "./data"))
 TIDY = ROOT / "tidy"
@@ -287,6 +288,16 @@ def kickoff_stamp(s: str):
         return None
     return (when.replace(tzinfo=timezone.utc) if when.tzinfo is None
             else when.astimezone(timezone.utc))
+
+
+def load_elo() -> list[dict]:
+    """The newest Club Elo reading, or [] until one has been fetched.
+
+    [] is not a failure and callers must not treat it as one: ffcore.fixture
+    falls back to squad value, which is what ranked the teams before this
+    existed.
+    """
+    return latest_only(read_csv(TIDY / "elo.csv"))
 
 
 def load_fixtures() -> list[dict]:

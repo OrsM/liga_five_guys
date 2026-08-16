@@ -78,6 +78,7 @@ DEFAULTS = {
     "keeper_start": "80",
     "riser_pct": "2",
     "shrink_k": "8",
+    "lambda_buffer": "0.25",
 }
 
 
@@ -98,6 +99,9 @@ class Config:
     keeper_start: float = 80.0
     riser_pct: float = 2.0
     shrink_k: float = 8.0
+    # How much better than the going rate for cash a buy has to be before it
+    # is worth doing. The one haircut in the model — see ffcore/bid.py.
+    lambda_buffer: float = 0.25
 
 
 def load_config(name: str = "league.ini") -> Config:
@@ -127,6 +131,8 @@ def load_config(name: str = "league.ini") -> Config:
                                DEFAULTS["keeper_start"])),
         riser_pct=float(get("thresholds", "riser_pct", DEFAULTS["riser_pct"])),
         shrink_k=float(get("thresholds", "shrink_k", DEFAULTS["shrink_k"])),
+        lambda_buffer=float(get("thresholds", "lambda_buffer",
+                                DEFAULTS["lambda_buffer"])),
     )
     if cp.has_section("budget"):
         for handle, amount in cp.items("budget"):
@@ -553,6 +559,9 @@ start_cross   = 70
     assert cfg.top_n_per_pos == 8, cfg.top_n_per_pos   # '#' inline comment
     assert cfg.start_cross == 70.0, cfg.start_cross    # no comment
     assert cfg.keeper_start == 80.0, cfg.keeper_start  # absent -> default
+    # The one haircut in the bid rule has a default, so a league.ini written
+    # before it existed still loads.
+    assert cfg.lambda_buffer == 0.25, cfg.lambda_buffer
 
     # The real file must load, whatever is in it today.
     real = load_config()
@@ -560,7 +569,7 @@ start_cross   = 70
 
     _selftest_cash()
     _selftest_identify()
-    print("ffcore.league self-test OK (7 cases + cash + identify)")
+    print("ffcore.league self-test OK (8 cases + cash + identify)")
 
 
 def _selftest_cash() -> None:

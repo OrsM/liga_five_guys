@@ -184,11 +184,20 @@ jobs:
           ALERTS_FILE: ${{ runner.temp }}/ff_alerts.md
         run: |
           {
-            echo '## Decide today'
-            sed -n '/^## 1\. Am I fielding/,/^## 2\./p' reports/REPORT.md \
+            # The exchange rate every table below is priced in. First line, so
+            # the summary cannot show a verdict without the number that made it.
+            grep -m1 'λ' reports/REPORT.md || echo '_no rate_'
+            echo '## Field'
+            sed -n '/^## 1\. Field these eleven/,/^## 2\./p' reports/REPORT.md \
               | grep '^|' || echo '_no XI_'
+            echo '## Buy'
+            sed -n '/^## 2\. Buy today/,/^## 3\./p' reports/REPORT.md \
+              | grep '^|' || echo '_nothing on offer_'
+            echo '## Sell'
+            sed -n '/^## 4\. Sell these/,/^## 5\./p' reports/REPORT.md \
+              | grep '^|' || echo '_nobody spare_'
             echo '## Fitness'
-            sed -n '/^## 2\. Is anyone injured/,/^## 3\./p' reports/REPORT.md \
+            sed -n '/^### Fitness/,/^### Starting/p' reports/REPORT.md \
               | grep '^\*\*' || echo '_no fitness read_'
             echo '## Cash'
             sed -n '/^### 1\. Cash/,/^## /p' reports/REPORT.md \

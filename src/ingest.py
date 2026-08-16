@@ -220,10 +220,14 @@ def fetch() -> Path:
                     rows.append(dict(prev[src.key]))     # carried, not fetched
                 skipped += 1
                 continue
-            r = c.get(src.url)
+            # {date} is filled for the one source whose URL carries the day it
+            # is asking about (Club Elo). Every other URL has no placeholder
+            # in it, so this is a no-op for them.
+            url = src.url.format(date=stamp[:10])
+            r = c.get(url)
             if r.status_code in (403, 429):
                 # Stop the whole run rather than retrying into a harder block.
-                sys.exit(f"{r.status_code} on {src.url} — backing off, "
+                sys.exit(f"{r.status_code} on {url} — backing off, "
                          f"run again later. Nothing was written.")
             if r.status_code != 200:
                 print(f"  warn: {r.status_code} on {src.key}, skipping")
@@ -285,12 +289,15 @@ def parse() -> None:
                 print(f"  warn: {stamp}/{key}: {type(e).__name__}: {e}")
 
     TIDY.mkdir(parents=True, exist_ok=True)
+    # One file per table, named by the table. This used to be three hardcoded
+    # lines, so a new source in the registry was still half-wired here — the
+    # rows were collected and then never written. A registry entry is now the
+    # whole change.
+    for table, rows in sorted(tables.items()):
+        _write_csv(TIDY / f"{table}.csv", rows)
     market_rows = tables.get("market", [])
     xi_rows = tables.get("lineups", [])
     fixture_rows = tables.get("fixtures", [])
-    _write_csv(TIDY / "market.csv", market_rows)
-    _write_csv(TIDY / "lineups.csv", xi_rows)
-    _write_csv(TIDY / "fixtures.csv", fixture_rows)
     # probable_xi.csv was this file before it grew a `source` column. Tidy is
     # disposable and rebuilt whole every run, so the old copy is deleted rather
     # than left to be read by mistake.

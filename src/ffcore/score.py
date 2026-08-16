@@ -149,10 +149,13 @@ def build(market: list[dict], xi_rows: list[dict], now,
     have been between two different models.
     """
     from ffcore.fixture import fixture_board
-    from ffcore.tidy import load_fixtures
+    from ffcore.tidy import load_elo, load_fixtures
 
     prior, prior_label, cur, cur_label = load_points()
-    board = fixture_board(market, load_fixtures(), now)
+    # Club Elo ranks the opponents when it covers all of them and squad value
+    # ranks them otherwise — wired HERE, in the one builder, so your squad and
+    # a rival's can never be scored off two different difficulty scales.
+    board = fixture_board(market, load_fixtures(), now, load_elo())
     sc = Scorer(market, xi_rows, prior, shrink_k=shrink_k,
                 current=cur, board=board)
     return sc, (prior_label, cur_label)
@@ -193,6 +196,11 @@ class Scored(NamedTuple):
     opp: str = ""           # who he faces next, "" if no fixture is known
     home: bool = True
     cur_pj: float = 0.0     # matches of this season behind ppm
+    # What ranked the opponent — "elo", "value" or "none". Logged rather than
+    # printed: the fixture band is a guess, and re-fitting it later means
+    # knowing which scale each row's factor came off.
+    fix_basis: str = "none"
+    elo_gap: float | None = None   # raw Elo difference, you minus opponent
 
     def as_row(self) -> dict:
         """pick_xi and the report renderers work in plain dicts."""
@@ -332,6 +340,8 @@ class Scorer:
             pos=(rec.get("position") or "").lower(),
             score=score, flat=flat, fix=m.factor if m else 1.0,
             opp=m.opponent if m else "", home=m.home if m else True,
+            fix_basis=m.basis if m else "none",
+            elo_gap=m.gap if m else None,
             cur_pj=rating.cur_pj,
             ppm=rating.ppm, pct=pct, pct_used=pct_used,
             on_page=on_page, status=st, note=self.notes.get(key, ""),

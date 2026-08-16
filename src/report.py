@@ -6,11 +6,20 @@ Run after ingest.py parse.
 
     python src/report.py
 
-Structure, top to bottom: what needs a decision today, today's market slate
-priced player by player, your team as one table (XI then bench, with the cost
-of each swap), and your own squad's price moves. League-wide movers and
-recruitment live in reports/watchlist.md; how your rivals behave lives in
-reports/rivals.md.
+FIVE TABLES, one currency. λ — points of XI index per million euros — is
+measured once per run by ffcore.bid.frontier() and printed in the header, and
+every call below reads it:
+
+    1. Field these eleven          your marks, then who on the slate improves them
+    2. Buy today                   pts/M against the hurdle
+    3. What you give up            the ladder λ was measured off
+    4. Sell these                  the same rule with the sign flipped
+    5. Exceptions                  fitness, and where the two XI sources split
+
+Before λ, the buy rule was `gain > 0` — which bought any upgrade at any price —
+and there was no sell rule at all, only a €/pt column with no threshold under
+it. League-wide movers and recruitment live in reports/watchlist.md; how your
+rivals behave lives in reports/rivals.md.
 
 THE SLATE IS THE REPORT when you paste one into inputs/seen.txt. The app deals
 a limited market, so a ranked list of everyone unowned is mostly players you
@@ -31,9 +40,11 @@ It is a RANKING INDEX, not a points forecast, and it cannot know four
 things — all flagged in the report rather than hidden: promoted-side players
 carry an assumed baseline, absence from the probable-XI page is not the same
 as a blank percentage there, the fixture band is a guess nothing has graded
-yet, and none of it has been checked against reality. Every snapshot appends the whole squad, XI and bench, with the inputs
-that produced each score, to data/decisions/squad_log.csv, so that once
-jornadas exist you can ask what the ranking cost you.
+yet, and none of it has been checked against reality. Every snapshot appends the
+whole squad, XI and bench, with the inputs that produced each score, to
+data/decisions/squad_log.csv, and the λ every verdict was judged against to
+data/decisions/lambda_log.csv, so that once jornadas exist you can ask what the
+ranking cost you and whether the hurdle was set anywhere near right.
 
 MIGRATED onto ffcore. Four things changed in substance:
 
@@ -61,9 +72,15 @@ from datetime import datetime, timezone
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from ffcore.bid import (HOLD_DAYS, band_of, deals,  # noqa: E402
-                        demand_summary, drift_bands, friction, gain,
-                        premiums, suggest, verdict, xi_snapshots)
+# band_of(), drift_bands(), friction() and Friction.per_point() in ffcore/bid.py
+# lost their only caller with the Cost/pt column: λ prices the same purchase
+# against what the money would otherwise buy, which is the question Cost/pt was
+# reaching for. They are left in place, not deleted — the drift term is the
+# first thing to fold into the cost side of the ratio once a season of readings
+# exists to fit it against.
+from ffcore.bid import (Lambda, cost_of, deals,  # noqa: E402
+                        demand_summary, frontier, premiums, ratio_of,
+                        sell_test, suggest, verdict, xi_snapshots)
 from ffcore.fixture import FIX_BAND, HOME_EDGE  # noqa: E402
 from ffcore.league import League  # noqa: E402
 from ffcore.second import (LEGEND, SECOND_SOURCE,  # noqa: E402
@@ -109,7 +126,16 @@ FIX_MARK = 0.05
 LOG_COLS = ["observed_at", "hours_to_lock", "formation", "index_total",
             "player", "pos", "slot", "start_pct", "start_source", "status",
             "assumed", "value", "score", "picked",
-            "ppm", "fix", "opp", "home", "cur_pj", "flat"]
+            "ppm", "fix", "opp", "home", "cur_pj", "flat",
+            "fix_basis", "elo_gap"]
+
+# How many unowned players per position λ is measured against. The app deals
+# twelve random free agents a cycle, so the ladder is deliberately built from
+# the whole unowned pool rather than today's slate — λ is what you WOULD buy if
+# you could buy anything, which is what makes it a reservation rate. Trimmed
+# per slot because only the best few in each can ever reach an eleven, and
+# gain() is called once per candidate per rung.
+LAMBDA_DEPTH = 8
 
 
 def title_name(s: str) -> str:
@@ -231,6 +257,138 @@ def flat_gains(players, cands) -> dict[str, float]:
     return out
 
 
+# ---------------------------------------------------------------------------
+# λ, the one number
+#
+# Every judgement in this report — field, buy, hold, sell — is now priced in
+# the same unit: XI index points per million euros. λ is the going rate for
+# cash, measured by ffcore.bid.frontier() rather than configured, and it is
+# measured FIXTURE-NEUTRAL for the same reason gains are: you own a player for
+# months, not for one round.
+# ---------------------------------------------------------------------------
+
+
+def neutral_view(players) -> tuple[dict, float | None]:
+    """(pool, total) with the fixture taken back out. The buying scale."""
+    pool = squad_pool([{**p, "score": p["flat"]} for p in players])
+    best = pick_xi(pool)
+    return pool, (best[0] if best else None)
+
+
+def unowned(sc, by_key, owner, depth: int = LAMBDA_DEPTH) -> list[dict]:
+    """The best few unowned players per position, scored fixture-neutral.
+
+    Not today's slate: the slate is what you can buy in the next minute, and λ
+    has to be what the money is worth over the season. Everything the market
+    prices and nobody in the league holds is a candidate; only the top `depth`
+    of each position can reach an eleven, so the rest are dropped before the
+    greedy walk rather than during it.
+    """
+    rows: dict[str, list[dict]] = {}
+    for k, rec in by_key.items():
+        if k in owner:
+            continue
+        c = sc.score(rec).as_row()
+        if not c["slot"]:
+            continue
+        c["name"] = title_name(c["name"])
+        c["score"] = c["flat"]
+        rows.setdefault(c["slot"], []).append(c)
+    out = []
+    for v in rows.values():
+        v.sort(key=lambda p: p["score"], reverse=True)
+        out += v[:depth]
+    return out
+
+
+def lambda_now(players, pool_flat, total_flat, cands, cash, prem) -> Lambda:
+    """The going rate for your cash, or a Lambda that says why there isn't one.
+
+    Never a zero: `rate=None` means λ cannot judge today, and every verdict
+    that reads it falls back to the older question and says so.
+    """
+    if total_flat is None:
+        return Lambda(None, [], 0.0, 0.0, "no legal XI to price against")
+    return frontier(pool_flat, total_flat, cands, cash, prem)
+
+
+def fix_basis_label(players) -> str:
+    """What ranked the opponents, said out loud in the notes.
+
+    One label for the whole board, because ffcore.fixture refuses a mixture:
+    Club Elo covers every team or none of them.
+    """
+    kinds = {p.get("fix_basis") for p in players if p.get("opp")}
+    if "elo" in kinds:
+        return "Club Elo rating"
+    if "value" in kinds:
+        return ("summed squad value — Club Elo did not cover the league, so "
+                "the wallet is standing in for the pitch")
+    return "nothing: no fixture is known for anyone in your squad"
+
+
+def sec_ladder(lam: Lambda, buffer: float) -> list[str]:
+    """## 3. What you give up by spending now
+
+    The ladder λ was measured off. This is the section that makes the hurdle
+    arguable instead of magic: if the rungs are players you will never be
+    dealt, λ is too high and you can see that here rather than infer it.
+    """
+    out = ["## 3. What you give up by spending now", ""]
+    if lam.rate is None:
+        return out + ["_No rate today — %s. Every verdict above falls back to "
+                      "'does he improve the eleven', which is a weaker "
+                      "question and is marked as such._" % lam.why, ""]
+
+    out += ["**%s, hurdle %.2f.** Spending a million here means not spending "
+            "it on these, best rate first — %s."
+            % (lam.label(), lam.hurdle(buffer), lam.why), "",
+            "| | Player | Slot | Cost | ΔxPts/j | pts/M |",
+            "|---|---|---|--:|--:|--:|"]
+    for i, r in enumerate(lam.ladder, 1):
+        mark = " ←λ" if i == len(lam.ladder) else ""
+        out.append("| %d%s | %s | %s | %s | %+.1f | %.2f |"
+                   % (i, mark, r.name, r.slot, eur(r.cost), r.gain, r.ratio))
+    out += ["",
+            "_The last rung IS λ: it is the worst rate your cash could still "
+            "buy, so anything worse than it is worse than doing nothing. Each "
+            "gain is recomputed after the purchase above it, because two "
+            "players who upgrade the same slot do not both upgrade it. Costs "
+            "are the floor plus this league's median premium. Nobody in this "
+            "table is necessarily on offer today — that is the point, and it "
+            "is why λ reads as 'do not accept worse than this' rather than as "
+            "a shopping list. The one haircut on it is `lambda_buffer` in "
+            "`inputs/league.ini` (%.0f%%)._" % (buffer * 100), ""]
+    return out
+
+
+def log_lambda(observed, lam: Lambda, buffer: float) -> None:
+    """One row per snapshot: the rate every verdict that day was judged against.
+
+    Without this the rule is ungradeable. If the season's realised ratios sit
+    above the λ printed at the time, λ was too low and the buffer was covering
+    for it — a question this file can answer and a report cannot.
+    """
+    path = DECISIONS / "lambda_log.csv"
+    cols = ["observed_at", "rate", "buffer", "hurdle", "cash", "spent",
+            "rungs", "best_rate", "why"]
+    widen_csv(path, cols)
+    if observed in {r.get("observed_at") for r in read_csv(path)}:
+        return
+    hurdle = lam.hurdle(buffer)
+    append_csv(path, [{
+        "observed_at": observed,
+        "rate": "" if lam.rate is None else f"{lam.rate:.4f}",
+        "buffer": f"{buffer:.3f}",
+        "hurdle": "" if hurdle is None else f"{hurdle:.4f}",
+        "cash": f"{lam.cash:.0f}", "spent": f"{lam.spent:.0f}",
+        "rungs": len(lam.ladder),
+        "best_rate": ("" if not lam.ladder
+                      else f"{lam.ladder[0].ratio:.4f}"),
+        "why": lam.why,
+    }], cols)
+
+
 def as_fielded(players):
     """(total, xi, bench, illegal, warnings) for the XI you have MARKED.
 
@@ -324,16 +482,22 @@ def rival_ceiling(lg) -> float | None:
     return max(bids)
 
 
-def sec_slate(lg, by_key, cands, pool, tot, slate, prem, cash_value,
-              rival_max, snaps, sell_prem=None, bands=None,
-              second=None) -> tuple[list[str], int, int]:
-    """Today's slate, priced. The only section that answers 'what do I do now'.
+def sec_slate(lg, by_key, cands, pool, gains, slate, prem, cash_value,
+              rival_max, snaps, sell_prem=None,
+              second=None, lam=None, buffer=0.0) -> tuple[list[str], int, int]:
+    """Today's slate, priced in λ. The section that answers 'what do I do now'.
 
     Everything else in this report describes a position; this one is a list of
-    purchases you can make in the next few minutes, so it leads. XI gain is the
-    change in the ranking index from owning him and re-picking the formation —
-    it is what he is worth to you, and it is frequently negative for a player
-    the watchlist ranks highly, because your own eleven is the benchmark.
+    purchases you can make in the next few minutes. ΔxPts/j is the change in
+    the ranking index from owning him and re-picking the formation — frequently
+    negative for a player the watchlist ranks highly, because your own eleven is
+    the benchmark — and dividing it by what he costs gives the only number the
+    verdict reads.
+
+    `gains` is flat_gains(): fixture-neutral, the same arithmetic λ was
+    measured with. There used to be a second gain computed here off the
+    fielding scale, so question 1 and question 4 could print two different
+    numbers for the same signing.
     """
     on_offer, unresolved, ambiguous, auto = slate
     out: list[str] = []
@@ -342,29 +506,34 @@ def sec_slate(lg, by_key, cands, pool, tot, slate, prem, cash_value,
 
     rows = []
     for cand in cands:
-        g = gain(pool, cand, tot) if tot is not None else None
+        g = gains.get(cand["key"])
         adv = suggest(cand["value"], prem, cash_value, rival_max)
         # How far below the thin threshold you are in HIS position. This is
         # what turns a negative-gain forward into cover rather than a pass.
         slot = cand.get("slot")
         short_by = (max(0, THIN[slot] - len(pool.get(slot, [])))
                     if slot in THIN else 0)
-        daily_pct, n_drift = (bands or {}).get(band_of(cand["value"]),
-                                               (0.0, 0))
-        fr = friction(cand["value"], prem, sell_prem, daily_pct, n_drift)
-        rows.append((cand, g, adv, short_by, fr))
+        cost = cost_of(cand["value"], prem)
+        ratio = ratio_of(g, cost)
+        rows.append((cand, g, adv, short_by, cost, ratio))
 
-    # Best upgrade first. A player who cannot start sorts last whatever his
+    # Best RATE first, not best gain: the question is what the money buys, and
+    # a two-point upgrade for twelve million is a worse purchase than a
+    # one-point upgrade for two. Cover sorts to the top when you cannot field a
+    # legal XI without it; a player who cannot start sorts last whatever his
     # score, because the question here is what he adds to YOUR eleven.
-    # Cover first when you cannot field a legal XI without it, then by gain.
     rows.sort(key=lambda r: (-r[3] if r[1] is not None and r[1] <= 0 else 0,
-                             r[1] is None, -(r[1] or 0.0), -r[0]["score"]))
-    better = sum(1 for _, g, _, _, _ in rows if g is not None and g > 0)
-    covers = sum(1 for _, g, a, sb, _ in rows
+                             r[1] is None, -(r[5] if r[5] is not None
+                                             else -1e9)))
+    hurdle = lam.hurdle(buffer) if lam is not None else None
+    better = sum(1 for r in rows if hurdle is not None and r[5] is not None
+                 and r[5] > hurdle) if hurdle is not None else sum(
+                     1 for r in rows if r[1] is not None and r[1] > 0)
+    covers = sum(1 for _, g, a, sb, _, _ in rows
                  if sb > 0 and a.low is not None and g is not None)
 
-    out += ["## 4. Anything to do in the market?", "",
-            "**%d on offer, %d improve your XI%s.**"
+    out += ["## 2. Buy today", "",
+            "**%d on offer, %d beat the going rate for cash%s.**"
             % (len(rows), better,
                ", %d cover a position you are short in" % covers
                if covers else ""), ""]
@@ -372,40 +541,35 @@ def sec_slate(lg, by_key, cands, pool, tot, slate, prem, cash_value,
         out += ["_Every name you pasted is either already owned or missing "
                 "from the market data._", ""]
     else:
-        out += ["| Player | Pos | Value | FF | AF | XI gain | Bid | "
-                "Cost/pt | Competition | Verdict |",
-                "|---|---|--:|--:|--:|--:|--:|--:|---|---|"]
-        for cand, g, adv, short_by, fr in rows:
+        out += ["| Player | Pos | Bid | ΔxPts/j | pts/M | vs λ | "
+                "Competition | Verdict |",
+                "|---|---|--:|--:|--:|--:|---|---|"]
+        for cand, g, adv, short_by, cost, ratio in rows:
             band = ("—" if adv.low is None
                     else eur(adv.low) if abs(adv.high - adv.low) < 1_000
                     else "%s–%s" % (eur(adv.low), eur(adv.high)))
-            cpp = fr.per_point(g) if fr else None
+            vs = ("—" if ratio is None or not hurdle
+                  else "%.2f×" % (ratio / hurdle))
             out.append(
-                "| %s | %s | %s | %s | %s | %s | %s | %s | %s | %s |"
-                % (cand["name"], (cand["pos"] or "—")[:3],
-                   eur(cand["value"]),
-                   "—" if cand["pct"] is None else "%.0f%%" % cand["pct"],
-                   af_cell((second or {}).get(cand["key"])),
+                "| %s | %s | %s | %s | %s | %s | %s | %s |"
+                % (cand["name"], (cand["pos"] or "—")[:3], band,
                    "—" if g is None else "%+.1f" % g,
-                   band, "—" if cpp is None else eur(cpp),
-                   demand_summary(cand, lg, snaps),
-                   verdict(g, adv, short_by)))
+                   "—" if ratio is None else "%+.2f" % ratio,
+                   vs, demand_summary(cand, lg, snaps),
+                   verdict(g, adv, short_by, ratio, lam, buffer)))
         out += ["",
-                "**Cost/pt** is what the marginal point actually costs, and "
-                "it is not the price: a purchase is closer to a loan than a "
-                "spend, because the value comes back when you sell. It is the "
-                "premium you pay over the floor plus the value expected to "
-                "drain away over %d days — NOT the price, and NOT the exit. "
-                "The app pays value give or take %s on a sale, which on a "
-                "large player is bigger than both other terms together; that "
-                "swing is a coin flip, so it is stated here rather than "
-                "averaged into a number that would look like a price. "
-                "Drift is a flat mean within his price band, over readings "
-                "taken before a ball was kicked — expect it to move harder "
-                "once results land."
-                % (HOLD_DAYS,
-                   ("%.0f%%" % sell_prem.swing() if sell_prem
-                    else "about a tenth")),
+                "**pts/M** is ΔxPts/j divided by what winning him is expected "
+                "to cost — the one currency, and the only number the verdict "
+                "reads. **vs λ** is that rate over the hurdle: above 1.00× the "
+                "money is better spent here than on the ladder in question 3, "
+                "below it you are paying more than the going rate. A purchase "
+                "is closer to a loan than a spend — the value comes back when "
+                "you sell, give or take %s, which on a large player is bigger "
+                "than the premium and the drift put together. That swing is a "
+                "coin flip, so a row inside a few percent of 1.00× is not a "
+                "decision."
+                % ("%.0f%%" % sell_prem.swing() if sell_prem
+                   else "about a tenth"),
                 "",
                 LEGEND, "",
                 "Competition is demand, not roster counts: the rivals whose "
@@ -424,6 +588,21 @@ def sec_slate(lg, by_key, cands, pool, tot, slate, prem, cash_value,
                     "is not a number known to lose." % (prem.at_floor, prem.n)
                     if prem.at_floor else
                     " None of those %d went at the floor." % prem.n)), ""]
+        # EVERY BID IS PRICED AS IF IT WERE THE ONLY ONE. Each row asks "is
+        # this better than the going rate", and several rows can answer yes to
+        # more money than you hold — the app settles them all at once, so the
+        # arithmetic has to be stated rather than left to the reader.
+        bidding = [(c, a) for c, g, a, sb, _, r in rows
+                   if a.low is not None and hurdle is not None
+                   and r is not None and r > hurdle]
+        wanted = sum(a.low for _, a in bidding)
+        if len(bidding) > 1 and cash_value is not None and wanted > cash_value:
+            out += ["**⚠ %d bids at %s is more than the %s you hold.** Each row "
+                    "above is priced as though it were your only purchase, and "
+                    "the app settles them together — take them best rate "
+                    "first: %s."
+                    % (len(bidding), eur(wanted), eur(cash_value),
+                       ", ".join(c["name"] for c, _ in bidding)), ""]
         if rival_max is None:
             out += ["_At least one rival's cash is an estimate, so no bid here "
                     "assumes you are unopposed._", ""]
@@ -502,17 +681,25 @@ def log_squad(observed, players, chosen, formation, total, deadline,
             "ppm": f"{p['ppm']:.3f}", "fix": f"{p['fix']:.3f}",
             "opp": p["opp"], "home": int(bool(p["home"])) if p["opp"] else "",
             "cur_pj": f"{p['cur_pj']:.0f}", "flat": f"{p['flat']:.3f}",
+            # Which scale ranked his opponent, and by how much. Empty rather
+            # than zero when there was no Elo: a missing rating is not a
+            # level match-up.
+            "fix_basis": p.get("fix_basis") or "none",
+            "elo_gap": ("" if p.get("elo_gap") is None
+                        else f"{p['elo_gap']:.1f}"),
         })
     append_csv(path, rows, LOG_COLS)
 
 
 # ---------------------------------------------------------------------------
-# The four questions
+# The five tables
 #
-# These four sections open the report, in this order, because they are the
-# four things you can still act on before the lock. Everything else — premium
-# curves, drift, full rosters, deal history, methodology — is reference and
-# lives below the fold or in its own file.
+# Field these eleven, buy today, what you give up by spending now, sell these,
+# and the exceptions. In that order, because that is the order the decisions
+# get made in, and every one of them is priced in the same unit — λ, points of
+# index per million euros. A section that cannot price its call in λ says so.
+# Everything else — premium curves, drift, full rosters, deal history,
+# methodology — is reference and lives below the fold or in its own file.
 #
 # Question 1 leads with WHAT YOU ARE FIELDING, not with what the model would
 # field. The marks in inputs/lineup.txt are a fact; the recommendation is
@@ -530,8 +717,8 @@ STATE_LABEL = {
 
 
 def sec_eleven(marked, best, players, second=None, buys=None) -> list[str]:
-    """## 1. Am I fielding the right eleven?"""
-    out = ["## 1. Am I fielding the right eleven?", ""]
+    """## 1. Field these eleven"""
+    out = ["## 1. Field these eleven", ""]
 
     if not players:
         return out + ["_No roster. Check `inputs/rosters_initial.txt` and "
@@ -551,9 +738,12 @@ def sec_eleven(marked, best, players, second=None, buys=None) -> list[str]:
                 "gaps for you, and not with your choice. Fix "
                 "`inputs/lineup.txt`.", ""]
     else:
-        out += [f"**Your XI: {shape} · ≈{mtot:.0f} pts expected next "
-                "jornada** (uncalibrated — see the methodology link at the "
-                "end)", ""]
+        # NOT "≈N points": the index is an uncalibrated ranking number, and
+        # printing it with a points unit on it invited exactly the comparison
+        # it cannot support — against a rival's realised score, against last
+        # jornada. It is only ever worth reading as a difference.
+        out += [f"**Your XI: {shape} · index {mtot:.1f}** (a ranking number, "
+                "not a points forecast — only differences mean anything)", ""]
 
     # One table for both halves of the same decision: the eleven you are
     # fielding, then the players on today's slate who would improve it. They
@@ -599,15 +789,15 @@ def sec_eleven(marked, best, players, second=None, buys=None) -> list[str]:
             "checked against a played jornada yet, so there is no weight to "
             "blend them by, and a disagreement is worth more than an average. "
             "**xPts/j** = pts/m × Fix × FF, and uses FF only. "
-            "`⚠` on a name means question 2 has something on him._", ""]
+            "`⚠` on a name means question 5 has something on him._", ""]
     if up:
         out += ["_The `+SLOT` rows are today's slate: **xPts/j is the change "
                 "to the whole eleven** if you sign him and re-pick the shape, "
                 "not his own score, and it leaves the fixture OUT — you own a "
                 "player for months, not for one round. `★` next to the "
                 "opponent means this round's draw happens to be kind, `↓` that "
-                "it is not; neither is in the number. What he would cost is "
-                "question 4._"
+                "it is not; neither is in the number. What he would cost, and "
+                "whether that is a good rate, is question 2._"
                 + ("" if not passed else
                    " _%d other%s on the slate would not improve this eleven, "
                    "so they are priced there and not here._"
@@ -621,12 +811,12 @@ def sec_eleven(marked, best, players, second=None, buys=None) -> list[str]:
     gap = btot - mtot
     if gap <= 0.05:
         out += [f"**Nothing to change.** The model's best legal XI is the same "
-                f"eleven ({d}-{m}-{f}, ≈{btot:.0f} pts).", ""]
+                f"eleven ({d}-{m}-{f}, index {btot:.1f}).", ""]
         return out
 
     pairs = swaps(mxi, bxi)
-    out += [f"**The model would score ≈{btot:.0f} — {gap:.1f} pts/j more.** "
-            f"Its shape is {d}-{m}-{f}.", ""]
+    out += [f"**The model's eleven is {gap:.1f} better** (index {btot:.1f}, "
+            f"shape {d}-{m}-{f}).", ""]
     if not pairs:
         out += ["_The difference is a change of formation, not a substitution, "
                 "so there is no like-for-like swap to offer._", ""]
@@ -649,14 +839,18 @@ def sec_eleven(marked, best, players, second=None, buys=None) -> list[str]:
 
 
 def sec_fitness(players) -> list[str]:
-    """## 2. Is anyone injured, suspended, or doubtful?
+    """### Fitness — who is not available
 
     Every squad member gets a row, including the ones nothing is known about.
     Silence and fitness must not look the same: an empty section used to be
     indistinguishable from a clean bill of health, and for the whole life of
     this repo that is exactly what it was — the status column was dead.
+
+    A SUBSECTION now, not question 2. Fitness and the start splits do not price
+    anything in λ — they are the two ways the numbers above can be wrong about
+    a player, which makes them exceptions to check, not decisions to take.
     """
-    out = ["## 2. Is anyone injured, suspended, or doubtful?", ""]
+    out = ["### Fitness", ""]
     if not players:
         return out + ["_No roster to check._", ""]
 
@@ -703,6 +897,110 @@ def sec_fitness(players) -> list[str]:
     return out
 
 
+def sec_sell(players, pool, marked, chosen, pool_flat, total_flat,
+             lam: Lambda | None, buffer: float, app_prem=None) -> list[str]:
+    """## 4. Sell these
+
+    THE BENCH, PRICED. It used to be a sell shortlist ordered by €/pt — value
+    over expected points, which is a number with no threshold attached, so it
+    ranked your spare players without ever saying whether to sell one. λ
+    supplies the threshold: cash buys points at the going rate, so hold a
+    player only while what he adds to the eleven beats what his sale proceeds
+    would buy. That is the buy rule with the sign flipped, which is why there
+    is no second setting to tune.
+
+    Priced on the fixture-neutral scale, like every other λ judgement: you sell
+    a player for months, not for one round.
+    """
+    out = ["## 4. Sell these", ""]
+    if not players:
+        return out + ["_No roster to price._", ""]
+
+    spare = (marked[2] if marked else
+             [p for p in players if id(p) not in chosen])
+    source = ("as you have marked them" if marked
+              else "the model's spare players — no checklist to read")
+    if not spare:
+        return out + ["_Nobody is out of your eleven (%s), so there is nothing "
+                      "here to sell._" % source, ""]
+
+    # Keyed by name because the neutral pool holds copies, and marginal() has
+    # to be asked about the player as the pool knows him.
+    flat_by_name = {p["name"]: p for v in pool_flat.values() for p in v}
+    rank = {id(p): i for v in pool.values() for i, p in enumerate(v)}
+    hurdle = lam.hurdle(buffer) if lam is not None else None
+
+    rows = []
+    for p in spare:
+        sale = (sell_test(pool_flat, flat_by_name.get(p["name"], p),
+                          total_flat, lam, app_prem, buffer)
+                if total_flat is not None else None)
+        rate = (None if sale is None or sale.loss is None or not sale.cash
+                else sale.loss / (sale.cash / 1e6))
+        if p["status"] in ("injured", "suspended", "unavailable"):
+            why = p["status"]
+        elif p["status"] == "doubt":
+            why = "doubtful"
+        elif sale is not None and sale.loss is None:
+            why = "the only one who can fill his slot"
+        elif p["slot"] and rank.get(id(p), 0) >= MAX_SLOT[p["slot"]]:
+            nth = rank[id(p)] + 1
+            sfx = ("th" if nth % 100 in (11, 12, 13)
+                   else {1: "st", 2: "nd", 3: "rd"}.get(nth % 10, "th"))
+            why = (f"{nth}{sfx} {p['slot']} — only "
+                   f"{MAX_SLOT[p['slot']]} can ever play")
+        elif p["delta_pct"] >= MOVER_PCT:
+            why = "rising — sell into strength"
+        elif p["pos"] == "entrenador":
+            why = "coach slot"
+        else:
+            why = "outscored"
+        rows.append((p, sale, rate, why))
+
+    # Worst rate first: the man whose points cost you the most to keep is the
+    # one to sell, and he sorts to the top whether or not the verdict says so.
+    rows.sort(key=lambda t: (t[2] is None, t[2] if t[2] is not None else 0.0))
+
+    out += ["| Player | Pos | Sale | Given up | pts/M | vs λ | Verdict | Why |",
+            "|---|---|--:|--:|--:|--:|---|---|"]
+    for p, sale, rate, why in rows:
+        band = ("—" if sale is None
+                else "%s–%s" % (eur(sale.lo), eur(sale.hi)))
+        out.append(
+            "| %s | %s | %s | %s | %s | %s | %s | %s |"
+            % (p["name"], (p["pos"] or "—")[:3], band,
+               "—" if sale is None or sale.loss is None
+               else "%.1f" % sale.loss,
+               "—" if rate is None else "%.2f" % rate,
+               "—" if rate is None or not hurdle
+               else "%.2f×" % (rate / hurdle),
+               "hold" if sale is None else sale.verdict.split(" — ")[0],
+               why))
+    out += ["",
+            "_**Given up** is what the eleven loses without him, after "
+            "re-picking the shape — not his own score, and `—` means no legal "
+            "XI survives his sale, which is a Keep at any price. **pts/M** is "
+            "that loss over what the sale raises: the rate you are paying to "
+            "keep him. **vs λ** puts it against the same hurdle question 2 "
+            "uses, so **below 1.00× his points are dearer than the market's "
+            "and the money is better elsewhere**. Two things this cannot see. "
+            "Each sale is priced ON ITS OWN — sell two players out of the same "
+            "position and the second one's Given up is no longer the number "
+            "above, so re-read the thin-position warnings below the rule. And "
+            "a name question 1 wants in your eleven can still be a Sell: "
+            "fielding is one round, selling is the season, and the proceeds "
+            "buy the ladder in question 3. %s Who is short in his position, "
+            "and who can still afford you, is in `reports/rivals.md`._"
+            % ("Selling to the app pays the value give or take %.0f%%: the %d "
+               "priced sales in the ledger went %s, which is the band in the "
+               "Sale column and is wide enough that a row near 1.00× is a coin "
+               "flip." % (app_prem.swing(), app_prem.n, app_prem.label())
+               if app_prem and app_prem.n >= 3 else
+               "A sale lands above or below value depending on who bids."),
+            ""]
+    return out
+
+
 def pct_cell(p) -> str:
     """Start percentage, marked when it is an assumption rather than a
     reading. `~` = listed with no figure, `!` = not on the page at all."""
@@ -739,7 +1037,7 @@ def disagrees(p, row, min_start: float) -> str:
 
 def sec_starting(marked, min_start, second=None,
                  unclear=None) -> list[str]:
-    """## 3. Is everyone expected to start?
+    """### Starting — where the two sources disagree
 
     EXCEPTIONS ONLY. This used to print all fifteen players with a Reading
     column, and on a normal day fourteen of those rows read "published" — a
@@ -748,7 +1046,7 @@ def sec_starting(marked, min_start, second=None,
     here is only what question 1 cannot show: who is under the threshold, and
     where the two sources contradict each other.
     """
-    out = ["## 3. Is everyone expected to start?", ""]
+    out = ["### Starting", ""]
     if marked is None:
         return out + ["_No marks to read — see question 1._", ""]
 
@@ -853,11 +1151,27 @@ def main() -> None:
     # was pasted.
     dl = deals(lg, lg.market) if lg and lg.market else []
     app_prem = premiums(dl, "sell")
+    buy_prem = premiums(dl)
     # Scored once, read twice: question 1 asks what they add to the eleven,
-    # question 4 asks what they cost.
+    # question 2 asks what they cost.
     cands = candidates(sc, by_key, slate, lg.owner) if lg and by_key else []
     fg = flat_gains(players, cands) if cands and players else {}
     buys = [(c, fg[c["key"]]) for c in cands if c["key"] in fg]
+
+    # --- λ, measured once and read by every verdict below -----------------
+    # The buying scale: fixture-neutral, because you own a player for months.
+    # Both sides of the market are priced against this one number, which is the
+    # whole point of it — the old report had one rule for buying (`gain > 0`)
+    # and no rule at all for selling.
+    pool_flat, total_flat = neutral_view(players) if players else ({}, None)
+    buffer = lg.cfg.lambda_buffer if lg else 0.25
+    # A RECORDED balance, not an estimate: λ divides by it, and every verdict
+    # in the report reads λ. An estimate would move every call in the file
+    # without appearing in any of them, so a missing balance means no rate and
+    # the fallbacks say so out loud.
+    lam = lambda_now(players, pool_flat, total_flat,
+                     unowned(sc, by_key, lg.owner) if lg and by_key else [],
+                     cash_value, buy_prem)
     # The second opinion, joined once and printed in every table below.
     # Candidates are joined too, or their AF cell would always read `—` and
     # look like a source that has nothing on them.
@@ -871,15 +1185,14 @@ def main() -> None:
         # Competition column and the matrix can never disagree.
         snaps = xi_snapshots(lg, sc, by_key)
         slate_lines, n_slate, n_better = sec_slate(
-            lg, by_key, cands, pool, best[0] if best else None, slate,
-            premiums(dl), cash_value, rival_ceiling(lg), snaps,
-            sell_prem=app_prem, bands=drift_bands(all_market),
-            second=second)
+            lg, by_key, cands, pool, fg, slate,
+            buy_prem, cash_value, rival_ceiling(lg), snaps,
+            sell_prem=app_prem, second=second, lam=lam, buffer=buffer)
 
     # --- assemble ---------------------------------------------------------
-    # Four questions, four tables, then a rule and everything else. The old
-    # layout led with the recommendation and buried the marked XI in a
-    # footnote; this inverts it.
+    # FIVE TABLES, in the order the decisions get made: field, buy, what the
+    # money would otherwise buy, sell, and the exceptions that would make any
+    # of the three wrong. Everything below the rule is reference.
     marked = as_fielded(players) if players else None
     min_start = lg.cfg.min_start if lg else 60.0
 
@@ -903,19 +1216,39 @@ def main() -> None:
     if cash and cash.value is not None:
         ctx.append(f"cash {cash.label()}")
         ctx.append(f"total {eur(squad_value + cash.value)}")
+    # λ in the header, once, because it is the number every table below is
+    # measured in. Naming it here is what stops each section inventing its own
+    # threshold, which is how the report ended up buying at `gain > 0` and
+    # never selling at all.
+    ctx.append(lam.label()
+               + ("" if lam.rate is None
+                  else " · buy over %.2f" % lam.hurdle(buffer)))
     out += [" · ".join(ctx), ""]
 
     out += sec_eleven(marked, best, players, second, buys)
-    out += sec_fitness(players)
-    out += sec_starting(marked, min_start, second, unclear)
     out += (slate_lines if slate_lines else
-            ["## 4. Anything to do in the market?", "",
+            ["## 2. Buy today", "",
              "_No slate pasted, so there is nothing you can bid on today that "
              "this report knows about. Paste today's market screenshot into "
              "the `seen` input to price it. Everyone unowned is ranked in "
-             "`reports/watchlist.md`._", ""])
+             "`reports/watchlist.md`, and question 3 is what your cash is "
+             "worth while you wait._", ""])
+    out += sec_ladder(lam, buffer)
+    out += sec_sell(players, pool, marked, chosen, pool_flat, total_flat,
+                    lam, buffer, app_prem)
+    out += ["## 5. Exceptions", "",
+            "_The two ways every number above can be wrong about a player: he "
+            "is not fit, or the two probable-XI sources do not agree that he "
+            "plays. Neither prices anything, so neither is a decision — both "
+            "are prompts to open the app._", ""]
+    out += sec_fitness(players)
+    out += sec_starting(marked, min_start, second, unclear)
 
     out += ["---", ""]
+    if players and best:
+        log_squad(observed, players, chosen, best[1], best[0], deadline,
+                  obs_dt)
+    log_lambda(observed, lam, buffer)
 
     # --- below the fold ---------------------------------------------------
     warnings: list[str] = []
@@ -958,77 +1291,6 @@ def main() -> None:
                 f"matched the wrong player. Roster read from the "
                 f"{squad_src}._", ""]
 
-    # --- not in your XI ---------------------------------------------------
-    # THIS IS THE BENCH. The word used to name two different lists in the same
-    # report — the model's spare players in one place, your marks in another.
-    # There is now exactly one bench, and it is yours; the model's opinion is
-    # the swap table in question 1.
-    if players and best:
-        tot, (d, m, f), picked = best
-        spare = (marked[2] if marked else
-                 [p for p in players if id(p) not in chosen])
-        source = ("as you have marked them" if marked
-                  else "model's spare players — no checklist to read")
-        out += [f"## Not in your XI ({source})", ""]
-        if not spare:
-            out += ["_Nobody spare._", ""]
-        else:
-            rank = {id(p): i for v in pool.values() for i, p in enumerate(v)}
-            rows = []
-            for p in spare:
-                forced = pick_xi(pool, force=p) if p["slot"] else None
-                gap = (forced[0] - tot) if forced else None
-                cpp = p["value"] / p["score"] if p["score"] > 0.05 \
-                    else float("inf")
-                if p["status"] in ("injured", "suspended", "unavailable"):
-                    why = p["status"]
-                elif p["status"] == "doubt":
-                    why = "doubtful"
-                elif p["slot"] and rank.get(id(p), 0) >= MAX_SLOT[p["slot"]]:
-                    nth = rank[id(p)] + 1
-                    sfx = ("th" if nth % 100 in (11, 12, 13)
-                           else {1: "st", 2: "nd", 3: "rd"}.get(nth % 10, "th"))
-                    why = (f"{nth}{sfx} {p['slot']} — only "
-                           f"{MAX_SLOT[p['slot']]} can ever play")
-                elif p["delta_pct"] >= MOVER_PCT:
-                    why = "rising — sell into strength"
-                elif p["pos"] == "entrenador":
-                    why = "coach slot"
-                elif gap is not None and gap > -0.15:
-                    why = "as good as the man ahead"
-                else:
-                    why = "outscored"
-                rows.append((cpp, p, gap, why))
-            rows.sort(key=lambda t: t[0], reverse=True)
-            out += ["**Gap** is what the XI loses per jornada if he has to "
-                    "play, after re-picking the formation. **€/pt** is value "
-                    "per expected point: the sell shortlist, worst first. "
-                    "**FF** and **AF** are the two probable-XI sources: a "
-                    "benched player both of them expect to start is a "
-                    "different sell from one neither does.", "",
-                    "| Player | Pos | Value | FF | AF | xPts/j | Gap | €/pt "
-                    "| Why |",
-                    "|---|---|--:|--:|--:|--:|--:|--:|---|"]
-            for cpp, p, gap, why in rows:
-                out.append(
-                    f"| {p['name']} | {p['pos'][:3]} | {eur(p['value'])} | "
-                    f"{pct_cell(p)} | {af_cell(second.get(p['key']))} | "
-                    f"{p['score']:.1f} | "
-                    f"{'—' if gap is None else format(gap, '+.1f')} | "
-                    f"{'—' if cpp == float('inf') else eur(cpp)} | {why} |")
-            out += ["", "_%s Who is short in this position, and who can "
-                        "still afford you, is in `reports/rivals.md`._" % (
-                            "Selling to the app pays the value give or take "
-                            "%.0f%%: the %d priced sales in the ledger went "
-                            "%s, so read every value above as that band, not "
-                            "as a number." % (app_prem.swing(), app_prem.n,
-                                              app_prem.label())
-                            if app_prem and app_prem.n >= 3 else
-                            "A sale lands above or below value depending on "
-                            "who bids."), ""]
-
-        log_squad(observed, players, chosen, (d, m, f), tot, deadline, obs_dt)
-
     # --- your movers ------------------------------------------------------
     movers = sorted((p for p in players if abs(p["delta_pct"]) >= MOVER_PCT),
                     key=lambda p: p["delta_pct"], reverse=True)
@@ -1054,11 +1316,11 @@ def main() -> None:
         + (f" + {cur_label}" if cur_label else "")
         + ") × fixture × P(start), from `ffcore/score.py` — the same scorer "
           "rivals.py uses. Injured, suspended and unavailable score zero; a "
-          "doubt is halved. The fixture term is a rank-based ±%.0f%% for the "
-          "opponent's squad value and ±%.0f%% for home advantage; both are "
-          "guesses, unfitted because nothing has been played, and small enough "
-          "that a wrong one costs a fraction of a point._"
-          % (FIX_BAND * 100, HOME_EDGE * 100),
+          "doubt is halved. The fixture term is a ±%.0f%% band across the "
+          "opponents ranked by %s, plus ±%.0f%% for home advantage; both "
+          "widths are guesses, unfitted because nothing has been played, and "
+          "small enough that a wrong one costs a fraction of a point._"
+          % (FIX_BAND * 100, fix_basis_label(players), HOME_EDGE * 100),
         "",
         f"_Generated {now:%Y-%m-%d %H:%M} UTC._",
     ]
@@ -1171,7 +1433,37 @@ def _selftest() -> None:
     # Genuinely unknown still suppresses it, which is the case it exists for.
     assert rival_ceiling(_LG([_M("me", 50e6), _M("who", None)])) is None
 
-    print("report self-test OK (45 cases)")
+    # --- λ: what the report prints when there is no rate to print ---------
+    # A missing rate is never a zero hurdle, and the reason is in the section
+    # rather than left as a blank table. This is the case that fires on a
+    # half-configured repo, which is the one most likely to be misread.
+    none_lam = Lambda(None, [], 0.0, 0.0, "no cash to price it with")
+    txt = "\n".join(sec_ladder(none_lam, 0.25))
+    assert "no cash to price it with" in txt
+    assert "|" not in txt                      # no table, so nothing to misread
+    # With a ladder, the LAST rung is marked as λ: it is the rate, and the ones
+    # above it are what the money buys before it runs out.
+    from ffcore.bid import Rung
+    lam = Lambda(0.5, [Rung("cheap", "DEF", 2.0, 1e6, 2.0),
+                       Rung("dear", "MED", 1.0, 2e6, 0.5)], 5e6, 3e6, "two")
+    body = "\n".join(sec_ladder(lam, 0.2))
+    assert "| 2 ←λ | dear |" in body, body
+    assert "| 1 | cheap |" in body
+    assert "hurdle 0.60" in body               # 0.5 x (1 + 0.2)
+
+    # --- which scale ranked the opponents, said out loud ------------------
+    assert fix_basis_label([{"opp": "Elche", "fix_basis": "elo"}]) \
+        == "Club Elo rating"
+    # One Elo row is enough to name it, because the board refuses a mixture.
+    assert fix_basis_label([{"opp": "A", "fix_basis": "value"},
+                            {"opp": "B", "fix_basis": "elo"}]) \
+        == "Club Elo rating"
+    assert "wallet" in fix_basis_label([{"opp": "A", "fix_basis": "value"}])
+    # A squad with no fixtures at all is not "ranked by value" — it is unranked.
+    assert "no fixture is known" in fix_basis_label(
+        [{"opp": "", "fix_basis": "none"}])
+
+    print("report self-test OK (52 cases)")
 
 
 if __name__ == "__main__":
