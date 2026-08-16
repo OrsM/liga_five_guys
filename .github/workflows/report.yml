@@ -129,10 +129,15 @@ jobs:
         if: inputs.baseline
         run: python src/ingest.py baseline
 
+      # Typed text reaches the shell through env, never through ${{ }}.
+      # Interpolation is textual: a name carrying a quote breaks the quoting,
+      # and one carrying a semicolon runs whatever follows it.
       - name: Resolve names
         if: inputs.lookup != ''
+        env:
+          LOOKUP: ${{ inputs.lookup }}
         run: |
-          echo "${{ inputs.lookup }}" | tr ',' '\n' | sed 's/^ *//' \
+          echo "$LOOKUP" | tr ',' '\n' | sed 's/^ *//' \
             > inputs/lookup.txt
           python src/find_slug.py --file inputs/lookup.txt 2>&1 || true
 
@@ -140,9 +145,11 @@ jobs:
       # over from yesterday would mark players as buyable that no longer are,
       # which is exactly how the old offers.txt went wrong.
       - name: Market slate
+        env:
+          SEEN: ${{ inputs.seen }}
         run: |
-          if [ -n "${{ inputs.seen }}" ]; then
-            echo "${{ inputs.seen }}" | tr ',' '\n' | sed 's/^ *//;s/ *$//' \
+          if [ -n "$SEEN" ]; then
+            echo "$SEEN" | tr ',' '\n' | sed 's/^ *//;s/ *$//' \
               > inputs/seen.txt
             echo "slate: $(grep -c . inputs/seen.txt) name(s)" \
               >> "$GITHUB_STEP_SUMMARY"
