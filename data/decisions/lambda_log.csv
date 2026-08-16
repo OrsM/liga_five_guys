@@ -1,2 +1,3 @@
 observed_at,rate,buffer,hurdle,cash,spent,rungs,best_rate,why
 2026-08-15T1920Z,0.1080,0.250,0.1350,63292108,54456571,6,2.5177,6 buy(s) for 54.46M of 63.29M before the rate ran out
+2026-08-16T0917Z,0.1004,0.250,0.1255,63292108,57939930,3,0.1333,3 buy(s) for 57.94M of 63.29M before the rate ran out
