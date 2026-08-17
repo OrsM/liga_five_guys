@@ -78,7 +78,7 @@ from ffcore.tidy import ledger_stamp
 __all__ = ["MAX_LAG_H", "ROUND_TO", "FLOOR_EPS", "Premiums", "Advice",
            "is_round", "deals", "usable", "premiums", "suggest", "gain",
            "rivals_short", "xi_snapshots", "demand_summary",
-           "Rung", "Lambda", "Sale", "cost_of", "ratio_of", "frontier",
+           "Rung", "Lambda", "Sale", "cost_of", "ratio_of", "frontier", "basket",
            "verdict", "marginal", "sell_test"]
 
 # A premium computed against a snapshot further than this from the deal is
@@ -610,6 +610,46 @@ def sell_test(pool: dict, player: dict, base_total: float,
         call = "hold — %.1f bought vs %.1f given up" % (worth, loss)
     return Sale(cash, cash * (1 - swing), cash * (1 + swing), loss, worth,
                 call, ask)
+
+
+def basket(free: list[dict], cash) -> tuple[list[dict], float | None,
+                                            float, float]:
+    """What idle cash can buy on the replacement scale, best rate first.
+
+    Returns (bought, hurdle, spent, forgone):
+
+      bought   the rows the walk would take, in the order it takes them
+      hurdle   the worst rate it funded — the rate to beat. A player you own
+               below it can be sold and the money moved into this basket, which
+               is what makes one number serve both sides of the market.
+      spent    what the basket costs
+      forgone  the points above replacement the cash is NOT earning while it
+               sits there. This is the cost of idle cash, and it is a number
+               rather than a warning about opportunity.
+
+    Rows need `vor` and `value`. Unlike frontier(), nothing here re-picks an
+    eleven between purchases: a fixed baseline means two signings do not
+    compete for the same slot, so the walk is a sort and a running total.
+    """
+    rated = []
+    for r in free:
+        val = r.get("value")
+        if not val or r.get("vor") is None or r["vor"] <= 0:
+            continue
+        rated.append((r["vor"] / (val / 1e6), r))
+    rated.sort(key=lambda t: -t[0])
+
+    left = cash or 0.0
+    bought, hurdle, spent, forgone = [], None, 0.0, 0.0
+    for rate, r in rated:
+        if r["value"] > left:
+            continue
+        left -= r["value"]
+        spent += r["value"]
+        forgone += r["vor"]
+        hurdle = rate
+        bought.append(r)
+    return bought, hurdle, spent, forgone
 
 
 def gain(pool: dict, candidate: dict, base_total: float,
@@ -1173,7 +1213,38 @@ def _selftest() -> None:
     bare = sell_test(pool, dict(back, value=2e6), total, par, None)
     assert bare.cash == bare.lo == bare.hi == 2e6, bare
 
-    print("ffcore.bid self-test OK (117 cases)")
+    # -- the basket your idle cash can actually buy -------------------------
+    # Rows priced on the replacement scale, so a rate is points above the level
+    # the market supplies for free, per million. No pick_xi and no base total:
+    # that is the point of the fixed baseline — two purchases no longer
+    # interact, so the walk is arithmetic rather than a search.
+    def cand(name, vor_, val):
+        return {"name": name, "vor": vor_, "value": val}
+
+    free = [cand("cheap star", 2.0, 10e6),      # 0.200/M
+            cand("solid", 1.5, 15e6),           # 0.100/M
+            cand("dear", 3.0, 60e6),            # 0.050/M
+            cand("filler", 0.01, 5e6),          # 0.002/M
+            cand("waste", -1.0, 5e6)]           # negative: never bought
+    got, hurdle, spent, forgone = basket(free, 30e6)
+    assert [r["name"] for r in got] == ["cheap star", "solid", "filler"], got
+    # THE HURDLE is the worst rate you would actually fund, because a player
+    # you own below it can be sold and the money moved into this basket.
+    assert hurdle == 0.002, hurdle
+    assert spent == 30e6 and abs(forgone - 3.51) < 1e-9, (spent, forgone)
+    # "dear" is skipped for being unaffordable, not for being bad, and the
+    # walk keeps going: greedy by rate, capped by what is left.
+    assert all(r["name"] != "dear" for r in got)
+    # Negative rates are never bought, so a pool of them buys nothing and the
+    # hurdle is None rather than 0 — there is no rate to beat.
+    assert basket([cand("waste", -1.0, 5e6)], 30e6) == ([], None, 0.0, 0.0)
+    # No cash, no basket: the money is the constraint, and an empty walk says
+    # so instead of pricing a purchase you cannot make.
+    assert basket(free, 0) == ([], None, 0.0, 0.0)
+    # A row with no value cannot be rated and is skipped, not treated as free.
+    assert basket([cand("unpriced", 5.0, None)], 30e6) == ([], None, 0.0, 0.0)
+
+    print("ffcore.bid self-test OK (127 cases)")
 
 
 if __name__ == "__main__":                      # pragma: no cover

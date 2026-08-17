@@ -46,6 +46,11 @@ class Part(NamedTuple):
 # what you read on a phone before a lock; latest.md is what you read when you
 # have time.
 DECIDE = [
+    # First, because it is the answer: every asset — owned, buyable, and the
+    # cash — in one ranking. The five numbered questions below it are the
+    # workings, and they are kept because a ranking you cannot audit is a
+    # ranking you stop trusting.
+    "The board",
     "1. Field these eleven",
     "2. Buy today",
     "3. What you give up by spending now",
