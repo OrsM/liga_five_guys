@@ -1,4 +1,4 @@
-# Liga Five Guys — one report — 2026-08-17 10:54 UTC
+# Liga Five Guys — one report — 2026-08-17 11:16 UTC
 
 Field, buy, hold, sell — every table priced in the same currency, from `latest.md`. Everything else is reference and is linked, not reprinted.
 
@@ -10,33 +10,31 @@ Field, buy, hold, sell — every table priced in the same currency, from `latest
 | Asset | Pos | vs | above repl | Money | pts/M | This round | Verdict |
 |---|---|---|--:|--:|--:|--:|---|
 | Jon Moncayola ⚽ | MED | Levante H | +0.7 | 7.00M | 0.098 | 4.6 | Hold |
-| _Zaid Romero_ | DEF | Racing H ★ | +2.5 | 28.67M | 0.087 | 6.8 | **Buy** |
-| _German Valera_ | MED | La Coruna A ↓ | +1.7 | 23.77M | 0.070 | 4.6 | **Buy** |
+| _Zaid Romero_ | DEF | Racing H ★ | +2.5 | 28.67M | 0.087 | 6.8 | Watch — not on offer today |
+| _German Valera_ | MED | La Coruna A ↓ | +1.7 | 23.77M | 0.070 | 4.6 | Watch — not on offer today |
 | **CASH** | — | — | +4.2 | 52.44M | 0.070 | — | **the line** |
 | _Florian Lejeune_ | DEF | Alaves H ★ | +2.2 | 39.05M | 0.056 | 6.3 | pass |
 | _Marcos Alonso_ | DEF | Valencia A | +1.6 | 29.67M | 0.054 | 5.0 | pass |
 | _Nahuel Tenaglia_ | DEF | Rayo A ↓ | +0.8 | 15.41M | 0.051 | 3.9 | pass |
-| Pablo Fornals ⚽ | MED | Sociedad H | +2.2 | 58.30M | 0.037 | 5.4 | **Sell** |
-| Ionut Radu ⚽ | POR | Valencia A | -0.0 | 39.07M | -0.000 | 6.0 | **Sell** — below replacement — the league fields better for free |
-| Iñigo Ruiz de Galarreta ⚽ | MED | Sevilla H | -0.1 | 12.66M | -0.007 | 3.5 | **Sell** — below replacement — the league fields better for free |
-| Lucien Agoume | MED | Athletic A | -0.1 | 5.90M | -0.013 | 2.9 | **Sell** — below replacement — the league fields better for free |
-| Carl Starfelt ⚽ | DEF | Valencia A | -0.3 | 14.29M | -0.024 | 3.1 | **Sell** — below replacement — the league fields better for free |
-| Ruben Garcia ⚽ | MED | Levante H | -0.3 | 14.17M | -0.024 | 3.4 | **Sell** — below replacement — the league fields better for free |
-| Pepelu ⚽ | MED | Celta Vigo H | -0.2 | 7.76M | -0.029 | 3.2 | **Sell** — below replacement — the league fields better for free |
-| Dani Lorenzo | MED | Atletico A | -0.7 | 9.83M | -0.068 | 2.2 | **Sell** — below replacement — the league fields better for free |
-| Robin Le Normand ⚽ | DEF | Malaga H | -0.8 | 10.42M | -0.076 | 2.8 | **Sell** — below replacement — the league fields better for free |
-| Iñigo Vicente ⚽ | DEL | Getafe A | -1.6 | 19.63M | -0.084 | 2.6 | **Sell** — below replacement — the league fields better for free |
-| Omar El Hilali ⚽ | DEF | Madrid H | -1.0 | 9.21M | -0.108 | 2.2 | **Sell** — below replacement — the league fields better for free |
-| Igor Zubeldia ⚽ | DEF | Betis A | -1.2 | 10.33M | -0.116 | 2.0 | **Sell** — below replacement — the league fields better for free |
-| Beñat Turrientes | MED | Betis A | -1.1 | 7.26M | -0.148 | 1.9 | **Sell** — below replacement — the league fields better for free |
-| Alvaro Fernandez | POR | Elche H | -5.1 | 4.65M | -1.090 | 1.0 | **Sell** — below replacement — the league fields better for free |
-| Simon Eriksson | POR | Getafe A | -4.6 | 2.90M | -1.598 | 1.2 | **Sell** — below replacement — the league fields better for free |
+| Pablo Fornals ⚽ | MED | Sociedad H | +2.2 | 58.30M | 0.037 | 5.4 | Hold — worth less than the cash, with nothing to move to |
+| Ionut Radu ⚽ | POR | Valencia A | -0.0 | 39.07M | -0.000 | 6.0 | Hold — below replacement, but 39.07M buys nothing better today |
+| Iñigo Ruiz de Galarreta ⚽ | MED | Sevilla H | -0.1 | 12.66M | -0.007 | 3.5 | Hold — below replacement, but 12.66M buys nothing better today |
+| Lucien Agoume | MED | Athletic A | -0.1 | 5.90M | -0.013 | 2.9 | Hold — below replacement, but 5.90M buys nothing better today |
+| Carl Starfelt ⚽ | DEF | Valencia A | -0.3 | 14.29M | -0.024 | 3.1 | Hold — below replacement, but 14.29M buys nothing better today |
+| Ruben Garcia ⚽ | MED | Levante H | -0.3 | 14.17M | -0.024 | 3.4 | **Sell** — 6th MED — only 5 can be fielded, and tonight's draw lifts him into the XI |
+| Pepelu ⚽ | MED | Celta Vigo H | -0.2 | 7.76M | -0.029 | 3.2 | Hold — below replacement, but 7.76M buys nothing better today |
+| Dani Lorenzo | MED | Atletico A | -0.7 | 9.83M | -0.068 | 2.2 | **Sell** — 7th MED — only 5 can be fielded |
+| Robin Le Normand ⚽ | DEF | Malaga H | -0.8 | 10.42M | -0.076 | 2.8 | Hold — below replacement, but 10.42M buys nothing better today |
+| Iñigo Vicente ⚽ | DEL | Getafe A | -1.6 | 19.63M | -0.084 | 2.6 | Hold — below replacement, but 19.63M buys nothing better today |
+| Omar El Hilali ⚽ | DEF | Madrid H | -1.0 | 9.21M | -0.108 | 2.2 | Hold — below replacement, but 9.21M buys nothing better today |
+| Igor Zubeldia ⚽ | DEF | Betis A | -1.2 | 10.33M | -0.116 | 2.0 | Hold — below replacement, but 10.33M buys nothing better today |
+| Beñat Turrientes | MED | Betis A | -1.1 | 7.26M | -0.148 | 1.9 | **Sell** — 8th MED — only 5 can be fielded |
+| Alvaro Fernandez | POR | Elche H | -5.1 | 4.65M | -1.090 | 1.0 | **Sell** — 3rd POR — only 1 can be fielded |
+| Simon Eriksson | POR | Getafe A | -4.6 | 2.90M | -1.598 | 1.2 | **Sell** — 2nd POR — only 1 can be fielded |
 
-_One row per asset you could hold, ranked on **one number**: **pts/M**, index points above replacement per million euros. **above repl** is what the player is worth over the last man the league can start in his position — a fixed baseline set by the rules (five squads, and the shape each can legally field), so it does not move when your eleven does and two decisions here never interact. Negative is not an error: it says the free pool has someone better at that position. **Money** is what the asset would raise if sold or cost if bought, both at this league's median premium. **CASH** is an asset like any other and sits at the rate its own basket earns, which is why it is a row and not a warning: above the line an asset beats the money, below it the money beats the asset. That comparison, and nothing else, is the Verdict column._
+_Every asset you could hold, ranked on **pts/M** — points above replacement per million euros. That is the metric, and it is the only one: **above repl** is what the player is worth over the last man the league can start in his position, a baseline fixed by the rules (five squads, and the shapes each can legally field), so it does not move when your eleven does. Negative means the free pool has someone better there. **Money** is what the asset raises if sold or costs if bought, at this league's median premium. **CASH** is an asset with a rate of its own — what its basket earns — so above the line an asset beats the money and below it the money beats the asset._
 
-_**This round** is the only short-term number here — xPts/j, fixture included, and `⚽` marks the eleven question 1 fields tonight. A **Sell** with a `⚽` is not a contradiction: you field him tonight and take the next fair offer, because fielding is one round and selling is the season._
-
-_15 rows read Sell, which is more than you can act on: the app deals you offers rather than letting you sell on demand, you must still field eleven, and each sale re-prices nothing above it. Read it worst-first — Simon Eriksson is the one to let go of next — and treat the rest as a queue, not an instruction._
+_**Verdict is an action, so it needs a counterparty.** Rank alone never sells anyone: a **Sell** means either he can never reach your eleven, or a player ON OFFER TODAY at his position is better and his proceeds plus your cash pay for him — and the Why names him. Below the line with nothing to move to is a **Hold**. **Watch** is a rate worth having that nobody is selling. **This round** is xPts/j with the fixture in, and `⚽` marks tonight's eleven: a Sell with a `⚽` means field him, then take the offer._
 
 
 ## 1. Field these eleven

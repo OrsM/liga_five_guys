@@ -753,15 +753,43 @@ def log_squad(observed, players, chosen, formation, total, deadline,
 # ---------------------------------------------------------------------------
 
 
+def ordinal(n: int) -> str:
+    """1 -> '1st'. sec_sell computes this inline; that copy is left alone."""
+    sfx = ("th" if n % 100 in (11, 12, 13)
+           else {1: "st", 2: "nd", 3: "rd"}.get(n % 10, "th"))
+    return "%d%s" % (n, sfx)
+
+
 def board_rows(players, chosen, cands, repl, hurdle,
-               buy_prem=None, sell_prem=None) -> list[dict]:
+               buy_prem=None, sell_prem=None, cash=0.0) -> list[dict]:
     """Every asset, ranked by points above replacement per million.
 
     `hurdle` is the worst rate idle cash can still buy, from bid.basket(). The
-    CASH row is inserted at it, so position in the returned list IS the verdict.
+    CASH row is inserted at it, so position in the returned list is the RANKING.
     None means the cash cannot be deployed at all, and it ranks last: selling
     into a market with nothing to buy converts points into money for no reason.
+
+    The VERDICT is not the ranking, and this is the one place they part company.
+    Being worse than the abstract baseline is not a reason to sell — the free
+    pool is not a shop you can walk into, so "the league fields better for free"
+    describes a trade you cannot make. A Sell therefore needs a counterparty
+    that exists today: either the man can never reach your eleven at all, or an
+    AVAILABLE player at his own position is better and his proceeds plus your
+    cash would pay for him. Everything else holds, with the rate as the note.
+
+    A candidate is available when it carries `avail` — today's slate. One taken
+    off the wider market is real value and an unmakeable trade, so it reads
+    Watch, and it funds nothing.
     """
+    # Rank inside your own squad, best first: only MAX_SLOT of a position can
+    # ever be fielded, and the ones past that line are the sales that need no
+    # market at all.
+    rank = {}
+    for slot, v in squad_pool([{**p, "score": p["flat"]}
+                               for p in players]).items():
+        for i, p in enumerate(v):
+            rank[p["name"]] = (i, slot)
+
     rows = []
     for p in players:
         rows.append({"kind": "own", "name": p["name"], "slot": p["slot"],
@@ -778,6 +806,7 @@ def board_rows(players, chosen, cands, repl, hurdle,
                      # `round` when the caller scored him fixture-neutral for λ,
                      # `score` when he came off today's slate with the draw in.
                      "xpts": c.get("round", c.get("score")), "in_xi": False,
+                     "avail": bool(c.get("avail")),
                      "vs": vs_cell(c, star=True)})
     for r in rows:
         r["rate"] = ratio_of(r["vor"], r["money"])
@@ -786,26 +815,80 @@ def board_rows(players, chosen, cands, repl, hurdle,
     # rate of nothing, and the two would rank in the same place if it were.
     rows.sort(key=lambda r: (r["rate"] is not None, r["rate"]), reverse=True)
 
-    cash = {"kind": "cash", "name": "CASH", "slot": "—", "vor": None,
-            "money": None, "rate": hurdle, "xpts": None, "in_xi": False,
-            "vs": "—", "why": "", "verdict": "the line"}
+    cash_row = {"kind": "cash", "name": "CASH", "slot": "—", "vor": None,
+                "money": None, "rate": hurdle, "xpts": None, "in_xi": False,
+                "vs": "—", "why": "", "verdict": "the line"}
     at = len(rows) if hurdle is None else next(
         (i for i, r in enumerate(rows)
          if r["rate"] is None or r["rate"] < hurdle), len(rows))
+    # Who could actually replace whom, by position. Only rows on offer count:
+    # this dict is the difference between advice and a wish.
+    offers: dict[str, list[dict]] = {}
+    for r in rows:
+        if r["kind"] == "buy" and r["avail"] and r["money"]:
+            offers.setdefault(r["slot"], []).append(r)
+
+    # The sell side runs first, because what it decides to fund is what makes a
+    # purchase affordable. {id(buy row): the sale that pays for it}
+    funds: dict[int, str] = {}
     for i, r in enumerate(rows):
         above = i < at
+        if r["kind"] != "own":
+            continue
         if r["rate"] is None:
             r["verdict"], r["why"] = "—", "no price to rate him against"
-        elif r["kind"] == "buy":
-            # No hurdle means no basket, which means no money to bid with — a
-            # good rate you cannot fund is not a Buy.
-            r["verdict"] = "Buy" if above and hurdle is not None else "pass"
-        elif r["vor"] is not None and r["vor"] <= 0:
+            continue
+        nth, slot = rank.get(r["name"], (0, r["slot"]))
+        if slot and nth >= MAX_SLOT.get(slot, 99):
+            # The one sale that needs no market: he cannot reach the eleven
+            # however the rest of it moves, so any offer is a gain.
             r["verdict"] = "Sell"
-            r["why"] = "below replacement — the league fields better for free"
+            # "can be fielded", not "can ever play": the rank is on the season
+            # scale and a kind draw can lift a bench body into tonight's XI,
+            # which is exactly what the ⚽ next to a Sell means.
+            r["why"] = ("%s %s — only %d can be fielded"
+                        % (ordinal(nth + 1), slot, MAX_SLOT[slot])
+                        + (", and tonight's draw lifts him into the XI"
+                           if r["in_xi"] else ""))
+            continue
+        # A funded, available, better man at his own position. All three, or it
+        # is not a sale: better on its own is a wish, available on its own is a
+        # coincidence, and affordable on its own is just cash.
+        up = next((o for o in sorted(offers.get(r["slot"], []),
+                                     key=lambda o: -o["vor"])
+                   if o["vor"] > r["vor"]
+                   and o["money"] <= (r["money"] or 0.0) + (cash or 0.0)), None)
+        if up:
+            r["verdict"] = "Sell"
+            r["why"] = "funds %s (%+.1f, %+.1f better)" % (
+                up["name"], up["vor"], up["vor"] - r["vor"])
+            funds.setdefault(id(up), r["name"])
         else:
-            r["verdict"] = "Hold" if above else "Sell"
-    rows.insert(at, cash)
+            r["verdict"] = "Hold"
+            if r["vor"] <= 0:
+                r["why"] = ("below replacement, but %s buys nothing better "
+                            "today" % eur(r["money"]))
+            elif not above:
+                r["why"] = "worth less than the cash, with nothing to move to"
+
+    for i, r in enumerate(rows):
+        if r["kind"] != "buy":
+            continue
+        if r["rate"] is None:
+            r["verdict"], r["why"] = "—", "no price to rate him against"
+        elif not r["avail"]:
+            r["verdict"] = "Watch" if i < at else "pass"
+            r["why"] = "not on offer today" if i < at else ""
+        elif i < at and hurdle is not None:
+            r["verdict"] = "Buy"
+        elif id(r) in funds:
+            # Paid for out of a sale rather than out of the balance, which is
+            # why the two sides have to be decided in one pass.
+            r["verdict"] = "Buy"
+            r["why"] = "paid for by selling %s" % funds[id(r)]
+        else:
+            r["verdict"] = "pass"
+    rows.insert(at, cash_row)
     return rows
 
 
@@ -837,34 +920,27 @@ def sec_board(rows, cash_value, forgone) -> list[str]:
                       "%.1f" % r["xpts"] if r["xpts"] is not None else "—",
                       call + (" — %s" % r["why"] if r["why"] else "")))
 
-    sells = [r["name"] for r in rows if r["verdict"] == "Sell"]
     out += ["",
-            "_One row per asset you could hold, ranked on **one number**: "
-            "**pts/M**, index points above replacement per million euros. "
-            "**above repl** is what the player is worth over the last man the "
-            "league can start in his position — a fixed baseline set by the "
-            "rules (five squads, and the shape each can legally field), so it "
-            "does not move when your eleven does and two decisions here never "
-            "interact. Negative is not an error: it says the free pool has "
-            "someone better at that position. **Money** is what the asset "
-            "would raise if sold or cost if bought, both at this league's "
-            "median premium. **CASH** is an asset like any other and sits at "
-            "the rate its own basket earns, which is why it is a row and not a "
-            "warning: above the line an asset beats the money, below it the "
-            "money beats the asset. That comparison, and nothing else, is the "
-            "Verdict column._", "",
-            "_**This round** is the only short-term number here — xPts/j, "
-            "fixture included, and `⚽` marks the eleven question 1 fields "
-            "tonight. A **Sell** with a `⚽` is not a contradiction: you field "
-            "him tonight and take the next fair offer, because fielding is one "
-            "round and selling is the season._", ""]
-    if len(sells) > 2:
-        out += ["_%d rows read Sell, which is more than you can act on: the app "
-                "deals you offers rather than letting you sell on demand, you "
-                "must still field eleven, and each sale re-prices nothing above "
-                "it. Read it worst-first — %s is the one to let go of next — and "
-                "treat the rest as a queue, not an instruction._"
-                % (len(sells), sells[-1]), ""]
+            "_Every asset you could hold, ranked on **pts/M** — points above "
+            "replacement per million euros. That is the metric, and it is the "
+            "only one: **above repl** is what the player is worth over the last "
+            "man the league can start in his position, a baseline fixed by the "
+            "rules (five squads, and the shapes each can legally field), so it "
+            "does not move when your eleven does. Negative means the free pool "
+            "has someone better there. **Money** is what the asset raises if "
+            "sold or costs if bought, at this league's median premium. **CASH** "
+            "is an asset with a rate of its own — what its basket earns — so "
+            "above the line an asset beats the money and below it the money "
+            "beats the asset._", "",
+            "_**Verdict is an action, so it needs a counterparty.** Rank alone "
+            "never sells anyone: a **Sell** means either he can never reach "
+            "your eleven, or a player ON OFFER TODAY at his position is better "
+            "and his proceeds plus your cash pay for him — and the Why names "
+            "him. Below the line with nothing to move to is a **Hold**. "
+            "**Watch** is a rate worth having that nobody is selling. "
+            "**This round** is xPts/j with the fixture in, and `⚽` marks "
+            "tonight's eleven: a Sell with a `⚽` means field him, then take "
+            "the offer._", ""]
     return out
 
 
@@ -1423,12 +1499,15 @@ def main() -> None:
         priced.sort(key=lambda c: -c["rate"])
         above = sum(1 for c in priced
                     if hurdle is not None and c["rate"] >= hurdle)
+        # `avail` is what separates a verdict from a note: today's slate can be
+        # bid on in the next few minutes, the wider pool cannot.
         seen_keys = {c["key"] for c in cands}
-        buyable = cands + [c for c in priced[:above + BOARD_TAIL]
-                           if c["key"] not in seen_keys]
+        buyable = [{**c, "avail": True} for c in cands] \
+            + [{**c, "avail": False} for c in priced[:above + BOARD_TAIL]
+               if c["key"] not in seen_keys]
         board = sec_board(
             board_rows(players, chosen, buyable, repl, hurdle,
-                       buy_prem, app_prem),
+                       buy_prem, app_prem, cash_value or 0.0),
             spent or cash_value, forgone) + [""]
     # TWO rates, named rather than blended, because they are measured on
     # different scales: the board's line is points above REPLACEMENT per
@@ -1686,7 +1765,9 @@ def _selftest() -> None:
     mine = [asset("star", 6.0, 5.0, 10e6),      # +3.0 above repl → 0.300/M
             asset("blocked", 4.0, 0.0, 40e6),   # +1.0 → 0.025/M, benched
             asset("dud", 2.0, 1.0, 5e6)]        # -1.0 → below replacement
-    offer = [asset("bargain", 5.0, 4.0, 20e6)]  # +2.0 → 0.100/M
+    # `avail` is the whole difference between a verdict and a note: on offer in
+    # the next few minutes, or merely somewhere in the market.
+    offer = [{**asset("bargain", 5.0, 4.0, 20e6), "avail": True}]
     rows = board_rows(mine, {id(mine[0])}, offer, repl, 0.05)
 
     # ONE ranking, best rate first, with cash sitting exactly on the hurdle.
@@ -1699,14 +1780,48 @@ def _selftest() -> None:
     assert abs(by["star"]["rate"] - 0.300) < 1e-9, by["star"]
     assert abs(by["blocked"]["vor"] - 1.0) < 1e-9
 
-    # The verdict is POSITION relative to the cash row, not a separate rule.
+    # Rank is POSITION relative to the cash row. The VERDICT needs one more
+    # thing: a Sell is an action, so it needs a counterparty that exists today.
     assert by["star"]["verdict"] == "Hold"
     assert by["bargain"]["verdict"] == "Buy"
+    # `blocked` is below the line AND his 40M covers an available 20M upgrade at
+    # his own position, so the sale is funded and the verdict names what it buys.
     assert by["blocked"]["verdict"] == "Sell"
-    # Below replacement is its own reason: the league can field someone better
-    # at his position for nothing, so no offer is too low.
-    assert by["dud"]["verdict"] == "Sell"
-    assert "replacement" in by["dud"]["why"]
+    assert "bargain" in by["blocked"]["why"], by["blocked"]
+    # `dud` is worse than replacement and worse than cash, and it changes
+    # nothing: his 5M cannot fund the 20M upgrade and he is not surplus, so
+    # there is no sale to make. An abstract baseline is not a counterparty.
+    assert by["dud"]["verdict"] == "Hold", by["dud"]
+    assert "below replacement" in by["dud"]["why"]
+    assert "5.00M buys nothing better" in by["dud"]["why"], by["dud"]
+
+    # Cash joins the proceeds, because a sale plus the balance is what actually
+    # bids: 15M of his own plus 6M idle clears a 20M upgrade.
+    poor = [asset("star", 6.0, 5.0, 10e6), asset("small", 4.0, 1.0, 15e6)]
+    assert {r["name"]: r["verdict"] for r in
+            board_rows(poor, set(), offer, repl, 0.05, cash=6e6)
+            }["small"] == "Sell"
+    assert {r["name"]: r["verdict"] for r in
+            board_rows(poor, set(), offer, repl, 0.05, cash=0)
+            }["small"] == "Hold"
+
+    # A man who can NEVER reach the eleven is the one sale that needs no
+    # counterparty: only one keeper plays, so the third is dead weight at any
+    # price and the reason is a roster fact rather than a rate.
+    keepers = [asset("k%d" % i, 8.0 - i, 6.0, 20e6, "POR") for i in range(3)]
+    kr = {r["name"]: r for r in board_rows(keepers, set(), [], repl, 0.05)}
+    assert kr["k0"]["verdict"] == "Hold"
+    assert kr["k2"]["verdict"] == "Sell" and "only 1 can be fielded" in \
+        kr["k2"]["why"], kr["k2"]
+
+    # An upgrade nobody is offering is a Watch, not a Buy: the rate is real and
+    # the purchase is not available, and calling that a Buy is how a board
+    # starts recommending trades that cannot be made.
+    pool_only = [{**asset("dreamy", 9.0, 9.0, 20e6), "avail": False}]
+    dr = {r["name"]: r for r in board_rows(mine, set(), pool_only, repl, 0.05)}
+    assert dr["dreamy"]["verdict"] == "Watch", dr["dreamy"]
+    # And it cannot fund a Sell either — the money would have nowhere to go.
+    assert dr["blocked"]["verdict"] == "Hold", dr["blocked"]
     # Held or not, the fielding number rides along — long term ranks the row,
     # short term is the column beside it, and a blocked man shows both.
     assert by["star"]["in_xi"] and not by["blocked"]["in_xi"]
@@ -1716,8 +1831,12 @@ def _selftest() -> None:
     # sold to feed it — a sale into a market with nothing to buy is a loss.
     nb = board_rows(mine, set(), offer, repl, None)
     assert nb[-1]["kind"] == "cash", nb
-    assert {r["name"] for r in nb if r["verdict"] == "Sell"} == {"dud"}
-    assert {r["name"] for r in nb if r["verdict"] == "pass"} == {"bargain"}
+    nv = {r["name"]: r for r in nb}
+    # A SWAP still stands, because it needs no idle cash: the sale pays for the
+    # purchase, and both ends of it say so.
+    assert nv["blocked"]["verdict"] == "Sell" and nv["bargain"]["verdict"] == "Buy"
+    assert "paid for by selling blocked" in nv["bargain"]["why"]
+    assert nv["dud"]["verdict"] == "Hold"
 
     # An unpriced row cannot be rated, so it is ranked last and says why
     # instead of being scored as though it were free.
