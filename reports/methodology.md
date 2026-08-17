@@ -10,7 +10,7 @@ Every player's **xPts/j** — expected points per jornada — is:
 
 It runs **twice**. Last season is shrunk toward the positional prior, and the result becomes the prior for THIS season, shrunk the same way with the same K=8. So a player who has played two jornadas is still mostly last season, and one who has played twenty is mostly this one, with no switch-over date to pick and no second constant to guess. With no matches played yet it collapses exactly to last season's number.
 
-**Fixture** is who he plays next: teams are ranked by summed squad value (Club Elo has not been scraped yet, so the wallet is standing in for the pitch) and the rank is mapped onto ±12%, with ±4% for home advantage. It is a RANK, not a ratio — Real Madrid's squad is worth 4.6× the median one, and facing them does not cost a defender four fifths of his points. **Both numbers are guesses**, not fits: nothing has been played, so there is nothing to fit them to. They are deliberately small, and the table below grades them as soon as jornadas exist. Every logged row carries the raw Elo gap as well as the factor, so the band can be re-fitted against a continuous rating rather than the rank it was flattened into.
+**Fixture** is who he plays next: teams are ranked by summed squad value — Club Elo was scraped but did not cover every club in the market, and half a league ranked by Elo is not a ranking and the rank is mapped onto ±12%, with ±4% for home advantage. It is a RANK, not a ratio — Real Madrid's squad is worth 4.6× the median one, and facing them does not cost a defender four fifths of his points. **Both numbers are guesses**, not fits: nothing has been played, so there is nothing to fit them to. They are deliberately small, and the table below grades them as soon as jornadas exist. Every logged row carries the raw Elo gap as well as the factor, so the band can be re-fitted against a continuous rating rather than the rank it was flattened into.
 
 The fixture applies to **fielding**, which is one round. It is left OUT of every buy and sell figure, and out of λ, because you own a player for months and next Saturday's draw is not a reason to sign him.
 
@@ -59,13 +59,13 @@ Biggest misses (forecast − actual):
 | Source | Calls | Mean claim | Started | Brier |
 |---|--:|--:|--:|--:|
 | analitica | 26 | 88% | 85% | 0.111 |
-| futbolfantasy ←read | 170 | 43% | 42% | 0.036 |
+| futbolfantasy ←read | 175 | 43% | 42% | 0.035 |
 
 _**Brier** is the mean squared error of the probability: lower is better, 0.25 is a coin flip, and it punishes confidence more than caution. A source whose mean claim sits far from its start rate is miscalibrated even if it ranks players well._
 
 - **analitica** — 31 calls published with no number on them, 100% started
 
-_39 claim(s) sat within 10 points of 50%: not a call either way, so not graded._
+_40 claim(s) sat within 10 points of 50%: not a call either way, so not graded._
 
 _Read the gap between the sources, not the level. The clubs playing the round's opening matches have their elevens CONFIRMED by the time it locks, and both sources copy them, so their share of the table is scored on published fact rather than on a forecast. Whichever source publishes more of those looks better than it forecasts._
 
@@ -76,11 +76,11 @@ Graded on **appearances**, not starts: a 20-minute substitute counts. That flatt
 | Source | Calls | Mean claim | Appeared | Brier |
 |---|--:|--:|--:|--:|
 | analitica | 108 | 86% | 23% | 0.606 |
-| futbolfantasy ←read | 419 | 41% | 9% | 0.278 |
+| futbolfantasy ←read | 424 | 41% | 9% | 0.277 |
 Calls published with no number on them, which can only be graded as a hit rate:
 
 - **analitica** — 31 named starters, 0% appeared
 
-_97 claim(s) sat within 10 points of 50% and are not graded: that is not a call either way._
+_98 claim(s) sat within 10 points of 50% and are not graded: that is not a call either way._
 
 **The gate.** Once a source has a few hundred graded calls, whichever has the lower Brier **on the starts table above** earns `LINEUP_SOURCE` in ffcore/tidy.py — a one-line change, and the only thing that should ever move it. Appearances break a tie, never the other way round: they are the question nobody asked. Until then nothing is blended, because a weight fitted on one jornada is a guess wearing a decimal point.
