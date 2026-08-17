@@ -46,16 +46,18 @@ class Part(NamedTuple):
 # what you read on a phone before a lock; latest.md is what you read when you
 # have time.
 DECIDE = [
-    # First, because it is the answer: every asset — owned, buyable, and the
-    # cash — in one ranking. The five numbered questions below it are the
-    # workings, and they are kept because a ranking you cannot audit is a
-    # ranking you stop trusting.
+    # ONE TABLE. It absorbed the five questions: the eleven to field is the ⚽
+    # rows, the buys and sells are verdicts in it, what idle cash forgoes is the
+    # CASH row, and fitness and the probable-XI split are a glyph and a column.
+    # Every asset is priced in the same unit, so a second table could only
+    # restate one of these numbers on a different baseline — which is exactly
+    # how this report used to tell you to field a man and sell him at once.
+    #
+    # The five sections still exist, in latest.md, and are linked below. They
+    # are the workings, kept because a ranking you cannot audit is a ranking you
+    # stop trusting — and they are still on the ΔXI scale, which is why they are
+    # reference and not the report.
     "The board",
-    "1. Field these eleven",
-    "2. Buy today",
-    "3. What you give up by spending now",
-    "4. Sell these",
-    "5. Exceptions",
     "Warnings",
 ]
 
@@ -110,9 +112,8 @@ def digest(read, sources=SOURCES, stamp: str = "",
     """Assemble one report. `read(name)` returns the file's text, or None."""
     out = ["# Liga Five Guys — one report" + (" — " + stamp if stamp else ""),
            "",
-           "Field, buy, hold, sell — every table priced in the same currency, "
-           "from `latest.md`. Everything else is reference and is linked, not "
-           "reprinted.", ""]
+           "Field, buy, hold, sell — one table, one metric. Everything else is "
+           "reference and is linked, not reprinted.", ""]
     body: list[str] = []
     seen: set[str] = set()
     lost: list[str] = []
