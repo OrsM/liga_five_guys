@@ -1,4 +1,4 @@
-# Liga Five Guys — one report — 2026-08-17 11:30 UTC
+# Liga Five Guys — one report — 2026-08-17 11:45 UTC
 
 Field, buy, hold, sell — one table, one metric. Everything else is reference and is linked, not reprinted.
 
@@ -35,7 +35,7 @@ _Every asset you could hold, ranked on **pts/M** — points above replacement pe
 
 _**Verdict is an action, so it needs a counterparty.** Rank alone never sells anyone: a **Sell** means either he can never reach your eleven, or a player ON OFFER TODAY at his position is better and his proceeds plus your cash pay for him — and the Why names him. Below the line with nothing to move to is a **Hold**. **Watch** is a rate worth having that nobody is selling. **Hold** means do not chase a sale — it does not mean refuse one: if an offer arrives at or above his line price, take it._
 
-_**At the line** is the price at which the asset is worth exactly what the cash is — `vor ÷ the line`, one formula read from either side. Pay up to it, or accept from it; `any` means no offer is too low. It is the number to act on, because you cannot trade on demand: an offer arrives and you take it or refuse it._
+_**At the line** is the price at which the asset is worth exactly what the cash is — `vor ÷ the line`, one formula read from either side. Pay up to it, or accept from it; `any` means no offer is too low, and `—` means nothing is on offer today, so there is no line and no price to name. It is the number to act on, because you cannot trade on demand: an offer arrives and you take it or refuse it. Question 3 is the basket it comes from, and question 4 is this table's bench half with the sale priced._
 
 _**Tonight** is the opponent and xPts/j with the fixture in. `⚽` is the eleven to field — field the ⚽ rows — and `▼` is a man you marked whom the model benches. `⚠` means fitness or availability has something on him. **Start** is futbolfantasy's percentage then analiticafantasy's read, never averaged: `titular` is a named starter, `?` listed without a figure, `~` assumed, `!` not on the page. When the two disagree, open the app. A **Sell** with a `⚽` means field him tonight, then take the offer — fielding is one round, selling is the season._
 
@@ -52,7 +52,7 @@ _Compare squad value with the app; a mismatch means a name matched the wrong pla
 
 Kept in full, one tap away — not reprinted here, because that is what made this file 504 lines long.
 
-- [The rest of today's report — sell shortlist, movers](latest.md)
+- [The workings — bids, the basket the line came from, sales, movers](latest.md)
 - [Who to buy — everyone unowned, ranked](watchlist.md)
 - [Rival cash and ceilings, premiums, drift, projected XIs](rivals.md)
 - [Every squad in the league, deal history, cash basis](squads.md)

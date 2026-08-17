@@ -32,7 +32,7 @@ _Every asset you could hold, ranked on **pts/M** — points above replacement pe
 
 _**Verdict is an action, so it needs a counterparty.** Rank alone never sells anyone: a **Sell** means either he can never reach your eleven, or a player ON OFFER TODAY at his position is better and his proceeds plus your cash pay for him — and the Why names him. Below the line with nothing to move to is a **Hold**. **Watch** is a rate worth having that nobody is selling. **Hold** means do not chase a sale — it does not mean refuse one: if an offer arrives at or above his line price, take it._
 
-_**At the line** is the price at which the asset is worth exactly what the cash is — `vor ÷ the line`, one formula read from either side. Pay up to it, or accept from it; `any` means no offer is too low. It is the number to act on, because you cannot trade on demand: an offer arrives and you take it or refuse it._
+_**At the line** is the price at which the asset is worth exactly what the cash is — `vor ÷ the line`, one formula read from either side. Pay up to it, or accept from it; `any` means no offer is too low, and `—` means nothing is on offer today, so there is no line and no price to name. It is the number to act on, because you cannot trade on demand: an offer arrives and you take it or refuse it. Question 3 is the basket it comes from, and question 4 is this table's bench half with the sale priced._
 
 _**Tonight** is the opponent and xPts/j with the fixture in. `⚽` is the eleven to field — field the ⚽ rows — and `▼` is a man you marked whom the model benches. `⚠` means fitness or availability has something on him. **Start** is futbolfantasy's percentage then analiticafantasy's read, never averaged: `titular` is a named starter, `?` listed without a figure, `~` assumed, `!` not on the page. When the two disagree, open the app. A **Sell** with a `⚽` means field him tonight, then take the offer — fielding is one round, selling is the season._
 
@@ -72,27 +72,19 @@ _No slate pasted, so there is nothing you can bid on today that this report know
 
 ## 3. What you give up by spending now
 
-**λ 0.10 pts/M, hurdle 0.13.** Spending a million here means not spending it on these, best rate first — 3 buy(s) for 58.48M of 63.29M before the rate ran out.
-
-| | Player | Slot | Cost | ΔxPts/j | pts/M |
-|---|---|---|--:|--:|--:|
-| 1 | Zaid Romero | DEF | 28.67M | +3.7 | 0.13 |
-| 2 | Nahuel Tenaglia | DEF | 15.41M | +1.8 | 0.12 |
-| 3 ←λ | Adrian de La Fuente | DEF | 14.40M | +1.4 | 0.10 |
-
-_The last rung IS λ: it is the worst rate your cash could still buy, so anything worse than it is worse than doing nothing. Each gain is recomputed after the purchase above it, because two players who upgrade the same slot do not both upgrade it. Costs are the floor plus this league's median premium. Nobody in this table is necessarily on offer today — that is the point, and it is why λ reads as 'do not accept worse than this' rather than as a shopping list. The one haircut on it is `lambda_buffer` in `inputs/league.ini` (25%)._
+_Nothing on today's slate can be bought at any rate, so there is no line. Every verdict above falls back to 'is he above replacement at all' — the same metric and the same direction, one notch cruder, which is a degraded line and not a second scale._
 
 ## 4. Sell these
 
-| Player | Pos | Sale | Take ≥ | Given up | pts/M | vs λ | Verdict | Why |
-|---|---|--:|--:|--:|--:|--:|---|---|
-| Alvaro Fernandez | por | 4.09M–5.21M | any | 0.0 | 0.00 | 0.00× | **Sell** | 3rd POR — only 1 can ever play |
-| Ruben Garcia | med | 12.47M–15.87M | any | 0.0 | 0.00 | 0.00× | **Sell** | outscored |
-| Beñat Turrientes | med | 6.39M–8.13M | any | 0.0 | 0.00 | 0.00× | **Sell** | 8th MED — only 5 can ever play |
-| Simon Eriksson | por | 2.55M–3.25M | any | 0.0 | 0.00 | 0.00× | **Sell** | 2nd POR — only 1 can ever play |
-| Pablo Fornals | med | 51.30M–65.29M | 20.19M | 2.5 | 0.04 | 0.35× | **Sell** | outscored |
+| Player | Pos | Sale | above repl | pts/M | At the line | Verdict | Why |
+|---|---|--:|--:|--:|--:|---|---|
+| Simon Eriksson | POR | 2.55M–3.25M | -4.6 | -1.598 | — | **Sell** | 2nd POR — only 1 can be fielded |
+| Alvaro Fernandez | POR | 4.09M–5.21M | -5.1 | -1.090 | — | **Sell** | 3rd POR — only 1 can be fielded |
+| Beñat Turrientes | MED | 6.39M–8.13M | -1.1 | -0.148 | — | **Sell** | 8th MED — only 5 can be fielded |
+| Ruben Garcia | MED | 12.47M–15.87M | -0.3 | -0.024 | — | **Sell** | 6th MED — only 5 can be fielded, and tonight's draw lifts him into the XI |
+| Pablo Fornals | MED | 51.30M–65.29M | +2.2 | 0.037 | — | Hold |  |
 
-_**Take ≥** is the number to act on, because you cannot sell on demand: an offer arrives and you accept or refuse it. It is what his sale has to raise for the cash to buy back what the eleven loses, so at or above it the offer is worth taking and below it it is not, whatever the Verdict column says — the verdict only reports whether a typical offer already clears the bar. `any` means he adds nothing to the eleven, so no offer is too low. The instant sale is not a sale: it pays roughly half of value, which is a way to free cash before a lock and almost never beats waiting. **Given up** is what the eleven loses without him, after re-picking the shape — not his own score, and `—` means no legal XI survives his sale, which is a Keep at any price. **pts/M** is that loss over what the sale raises: the rate you are paying to keep him. **vs λ** puts it against the same hurdle question 2 uses, so **below 1.00× his points are dearer than the market's and the money is better elsewhere**. Two things this cannot see. Each sale is priced ON ITS OWN — sell two players out of the same position and the second one's Given up is no longer the number above, so re-read the thin-position warnings below the rule. And a name question 1 wants in your eleven can still be a Sell: fielding is one round, selling is the season, and the proceeds buy the ladder in question 3. Selling to the app pays the value give or take 12%: the 15 priced sales in the ledger went median +1.5%, -9.4% to +12.0% (n=15), which is the band in the Sale column and is wide enough that a row near 1.00× is a coin flip. Who is short in his position, and who can still afford you, is in `reports/rivals.md`._
+_Same columns, same numbers and same verdicts as the board — this is the bench half of it, with the sale priced. **Sale** is what the app pays: not the value, and not a number you can hold out for, because you cannot sell on demand. An offer arrives and you take it or refuse it, which is what **At the line** is for — the proceeds at which the cash buys back exactly what he is worth, so at or above it take the offer whatever the Verdict says. The verdict only reports whether there is a counterparty TODAY. `any` means he is below replacement, so no offer is too low, and `—` means nothing is on offer, so there is no line to price him against and no number to hold out for. The instant sale is not a sale: it pays roughly half of value, which is a way to free cash before a lock and almost never beats waiting. Two things this cannot see. Each sale is priced ON ITS OWN — sell two out of the same position and the second one leaves you short, so re-read the thin-position warnings below the rule. And a name question 1 wants in your eleven can still be a Sell: fielding is one round, selling is the season, and the proceeds buy the basket in question 3. Selling to the app pays the value give or take 12%: the 15 priced sales in the ledger went median +1.5%, -9.4% to +12.0% (n=15), which is the band in the Sale column and is wide enough that a price near the line is a coin flip. Who is short in his position, and who can still afford you, is in `reports/rivals.md`._
 
 ## 5. Exceptions
 
@@ -143,4 +135,4 @@ _627 players tracked, 512 with a probable-XI reading._
 
 _xPts/j — expected points per jornada = shrunk pts/match (K=8, 2025-26) × fixture × P(start), from `ffcore/score.py` — the same scorer rivals.py uses. Injured, suspended and unavailable score zero; a doubt is halved. The fixture term is a ±12% band across the opponents ranked by summed squad value — Club Elo did not cover the league, so the wallet is standing in for the pitch, plus ±4% for home advantage; both widths are guesses, unfitted because nothing has been played, and small enough that a wrong one costs a fraction of a point._
 
-_Generated 2026-08-17 11:30 UTC._
+_Generated 2026-08-17 11:45 UTC._

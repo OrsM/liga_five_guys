@@ -55,8 +55,8 @@ DECIDE = [
     #
     # The five sections still exist, in latest.md, and are linked below. They
     # are the workings, kept because a ranking you cannot audit is a ranking you
-    # stop trusting — and they are still on the ΔXI scale, which is why they are
-    # reference and not the report.
+    # stop trusting — and they now READ the board rather than re-deriving it, so
+    # they are reference because they repeat it, not because they disagree.
     "The board",
     "Warnings",
 ]
@@ -75,7 +75,8 @@ SOURCES = [
 # fourteen lines about four other managers sitting above the eleven names you
 # came to check.
 LINKS = [
-    ("The rest of today's report — sell shortlist, movers", "latest.md"),
+    ("The workings — bids, the basket the line came from, sales, movers",
+     "latest.md"),
     ("Who to buy — everyone unowned, ranked", "watchlist.md"),
     ("Rival cash and ceilings, premiums, drift, projected XIs", "rivals.md"),
     ("Every squad in the league, deal history, cash basis", "squads.md"),
