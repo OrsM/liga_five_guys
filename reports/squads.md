@@ -1,4 +1,4 @@
-# Squads — 2026-08-16 22:55 UTC
+# Squads — 2026-08-17 10:17 UTC
 
 | Manager | Players | Squad value | Spent | Raised | Cash |
 |---|--:|--:|--:|--:|--:|
@@ -6,27 +6,27 @@
 | Albert Laporta | 15 | 267.86M | 173.13M | 35.80M | ~-37.33M |
 | BurtonGM89 | 14 | 248.39M | 165.86M | 42.04M | ~-23.82M |
 | Magic Mike 333 | 19 | 243.44M | 121.23M | 14.01M | ~-7.22M |
-| SusoGattuso | 18 | 184.60M | 70.87M | 0K | ~29.13M |
+| SusoGattuso | 18 | 202.80M | 70.87M | 0K | ~29.13M |
 
 `~` is an estimate, not an observed balance — see the basis notes at the bottom. A negative one is a real position, not a broken input: going past the budget mid-window is allowed, and only being under water at the lock is not. Cash is a ceiling on what anyone can bid tomorrow, which is the point of tracking it.
 
 **FF** is futbolfantasy's probable-XI percentage, which is the one the forecast uses. **AF** is analiticafantasy's read of the same eleven, printed beside it and never blended in — `titular` is a named starter (a final call, with no number to it), a percentage is their editors' consensus, `?` means they list him without either, and `—` means they do not have him. Two columns that disagree are the signal; that is the whole point of carrying both.
 
 ## You (miguel_autentico)
-16 players · 229.87M total · 8 at 70%+ · cash 63.29M
+16 players · 229.87M total · 9 at 70%+ · cash 63.29M
 
 | Player | Team | Pos | Value | 24h | FF | AF |
 |---|---|--:|--:|--:|--:|--:|
 | ionut radu | Celta | por | 38.49M | -449K | 90% | 67% |
 | alvaro fernandez | Deportivo | por | 4.58M | -68K | 20% | — |
-| simon eriksson | Racing | por | 2.86M | -49K | 50% | — |
+| simon eriksson | Racing | por | 2.86M | -49K | 30% | — |
 | carl starfelt | Celta | def | 14.07M | 88K | 60% | 67% |
 | robin le normand | Atlético | def | 10.26M | 119K | 60% | 50% |
 | igor zubeldia | Real Sociedad | def | 10.17M | 126K | 60% | — |
 | omar el hilali | Espanyol | def | 9.07M | 102K | 80% | — |
 | pablo fornals | Betis | med | 57.42M | -210K | 80% | 100% |
 | ruben garcia | Osasuna | med | 13.96M | 97K | 60% | — |
-| iñigo ruiz de galarreta | Athletic | med | 12.47M | 41K | 60% | — |
+| iñigo ruiz de galarreta | Athletic | med | 12.47M | 41K | 70% | — |
 | dani lorenzo | Málaga | med | 9.68M | -35K | 90% | 100% |
 | pepelu | Valencia | med | 7.65M | 67K | 70% | 67% |
 | beñat turrientes | Real Sociedad | med | 7.15M | 15K | 60% | 33% |
@@ -41,9 +41,9 @@
 |---|---|--:|--:|--:|--:|--:|
 | matias dituro | Elche | por | 7.64M | 68K | 90% | 100% |
 | santiago mouriño | Villarreal | def | 39.55M | -669K | 70% | 100% |
-| leandro cabrera | Espanyol | def | 17.01M | 9K | 95% | — |
+| leandro cabrera ⚠︎suspended | Espanyol | def | 17.01M | 9K | 0% | — |
 | diego javier llorente | Betis | def | 13.27M | 16K | 50% | — |
-| juan foyth | Villarreal | def | 12.57M | 330K | 50% | 75% |
+| juan foyth | Villarreal | def | 12.57M | 330K | 70% | 50% |
 | arda guler | Real Madrid | med | 53.64M | 986K | 60% | 100% |
 | eduardo camavinga | Real Madrid | med | 10.04M | -160K | 30% | — |
 | ilaix moriba | Celta | med | 9.95M | -137K | 50% | — |
@@ -56,20 +56,20 @@
 | asier villalibre | Racing | del | 7.29M | 37K | 70% | — |
 
 ## BurtonGM89
-14 players · 248.39M total · 8 at 70%+ · cash ~-23.82M
+14 players · 248.39M total · 7 at 70%+ · cash ~-23.82M
 
 | Player | Team | Pos | Value | 24h | FF | AF |
 |---|---|--:|--:|--:|--:|--:|
 | marko dmitrovic | Espanyol | por | 37.60M | 43K | 95% | — |
-| carlos romero | Villarreal | def | 44.30M | 309K | 80% | 100% |
+| carlos romero | Villarreal | def | 44.30M | 309K | 70% | 100% |
 | dean huijsen | Real Madrid | def | 33.15M | 692K | 70% | 100% |
 | justin de haas | Valencia | def | 9.18M | -7K | 70% | 100% |
-| quilindschy hartman | Espanyol | def | 8.55M | -204K | 50% | — |
+| quilindschy hartman | Espanyol | def | 8.55M | -204K | 30% | — |
 | aitor paredes | Athletic | def | 5.22M | 80K | 70% | 67% |
 | carlos puga | Málaga | def | 5.17M | -73K | 70% | — |
 | giacomo quagliata | Deportivo | def | 3.19M | -56K | 50% | — |
-| santi comesaña | Villarreal | med | 34.75M | 99K | 90% | 100% |
-| tajon buchanan | Villarreal | med | 18.06M | -215K | 30% | — |
+| santi comesaña | Villarreal | med | 34.75M | 99K | 60% | 100% |
+| tajon buchanan | Villarreal | med | 18.06M | -215K | 40% | — |
 | antonio blanco | Alavés | med | 14.90M | -68K | 90% | 100% |
 | jon gorrotxategi ⚠︎doubt | Real Sociedad | med | 6.06M | -163K | 30% | — |
 | denis suarez | Alavés | med | 2.46M | -34K | 50% | — |
@@ -88,20 +88,20 @@
 | fabio cardoso | Sevilla | def | 808K | -17K | 0% | — |
 | alex pastor | Málaga | def | 378K | 1K | 40% | — |
 | pablo gavi | Barcelona | med | 31.53M | -582K | 50% | — |
-| gustavo puerta | Racing | med | 12.95M | 146K | 80% | 100% |
+| gustavo puerta | Racing | med | 12.95M | 146K | 90% | 100% |
 | brahim diaz | Real Madrid | med | 10.73M | 64K | 50% | 33% |
-| gabriel moscardo | Espanyol | med | 9.00M | -245K | 30% | — |
+| gabriel moscardo | Espanyol | med | 9.00M | -245K | 10% | — |
 | williot swedberg | Celta | med | 7.95M | -84K | 50% | — |
 | marc bernal | Barcelona | med | 7.41M | 267K | 60% | 100% |
 | pedro diaz | Rayo | med | 1.74M | -23K | 40% | 50% |
 | raphinha | Barcelona | del | 86.76M | 1.88M | 70% | 100% |
 | gorka guruzeta | Athletic | del | 14.00M | 217K | 80% | — |
-| pere milla | Espanyol | del | 9.47M | -95K | 50% | 25% |
+| pere milla | Espanyol | del | 9.47M | -95K | 30% | — |
 | tete morente | Elche | del | 1.86M | -49K | 40% | 25% |
 | jon karrikaburu | Real Sociedad | del | 555K | -7K | 0% | — |
 
 ## SusoGattuso
-18 players · 184.60M total · 12 at 70%+ · cash ~29.13M
+18 players · 202.80M total · 13 at 70%+ · cash ~29.13M
 
 | Player | Team | Pos | Value | 24h | FF | AF |
 |---|---|--:|--:|--:|--:|--:|
@@ -111,16 +111,16 @@
 | cesar tarrega | Valencia | def | 9.06M | 8K | 80% | 100% |
 | abdel abqar | Getafe | def | 7.22M | 46K | 70% | 100% |
 | jonny castro | Alavés | def | 5.47M | 65K | 70% | — |
-| clemens riedel | Espanyol | def | 4.46M | -70K | 50% | — |
-| alvaro garcia | Villarreal | def | 502K | 0K | 70% | 100% |
+| clemens riedel | Espanyol | def | 4.46M | -70K | 90% | — |
 | aleksa puric | Atlético | def | 435K | 0K | — | — |
+| alvaro garcia | Rayo | med | 18.71M | 497K | 70% | 100% |
 | aimar oroz | Osasuna | med | 16.08M | 72K | 70% | — |
 | lorenzo amatucci | Deportivo | med | 13.11M | 77K | 80% | — |
 | izan merino | Málaga | med | 6.23M | -100K | 70% | 100% |
 | johnny cardoso | Atlético | med | 5.63M | -95K | 30% | — |
 | mario martin | Getafe | med | 3.94M | 36K | 70% | 100% |
 | giuliano simeone | Atlético | del | 43.21M | -362K | 70% | — |
-| andres martin | Racing | del | 18.96M | -42K | 80% | 100% |
+| andres martin | Racing | del | 18.96M | -42K | 90% | 100% |
 | carlos espi | Real Madrid | del | 9.04M | 167K | 30% | — |
 | alex berenguer | Athletic | del | 8.84M | -92K | 30% | — |
 

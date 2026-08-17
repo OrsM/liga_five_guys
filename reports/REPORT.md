@@ -1,13 +1,13 @@
-# Liga Five Guys — one report — 2026-08-16 22:55 UTC
+# Liga Five Guys — one report — 2026-08-17 10:17 UTC
 
 Field, buy, hold, sell — every table priced in the same currency, from `latest.md`. Everything else is reference and is linked, not reprinted.
 
 
-**Locks in 20h** (next kickoff) · squad 229.87M · cash 63.29M · total 293.16M · λ 0.10 pts/M · buy over 0.13
+**Locks in 9h** (next kickoff) · squad 229.87M · cash 63.29M · total 293.16M · λ 0.10 pts/M · buy over 0.13
 
 ## 1. Field these eleven
 
-**Your XI: 4-5-1 · index 34.4** (a ranking number, not a points forecast — only differences mean anything)
+**Your XI: 4-5-1 · index 34.9** (a ranking number, not a points forecast — only differences mean anything)
 
 | | Marked XI | vs | pts/m | Fix | FF | AF | xPts/j |
 |---|---|---|--:|--:|--:|--:|--:|
@@ -16,7 +16,7 @@ Field, buy, hold, sell — every table priced in the same currency, from `latest
 | DEF | Robin Le Normand | Malaga H | 4.4 | +7% | 60% | 50% | 2.8 |
 | DEF | Igor Zubeldia | Betis A | 3.7 | -11% | 60% | — | 2.0 |
 | DEF | Omar El Hilali | Madrid H | 3.0 | -8% | 80% | — | 2.2 |
-| MED | Iñigo Ruiz de Galarreta | Sevilla H | 4.5 | +11% | 60% | — | 3.0 |
+| MED | Iñigo Ruiz de Galarreta | Sevilla H | 4.5 | +11% | 70% | — | 3.5 |
 | MED | Dani Lorenzo | Atletico A | ~2.8 | -13% | 90% | 100% | 2.2 |
 | MED | Pepelu | Celta Vigo H | 4.3 | +6% | 70% | 67% | 3.2 |
 | MED | Jon Moncayola | Levante H | 4.4 | +16% | 90% | — | 4.6 |
@@ -25,7 +25,7 @@ Field, buy, hold, sell — every table priced in the same currency, from `latest
 
 _**pts/m** is points per match, last season shrunk toward the average and blended with this season as it accrues. `~` means no record at all, so the baseline is assumed. **Fix** is how much the next opponent moves it — `=` a median team, `—` no fixture known. **FF** is futbolfantasy's start percentage, **AF** is analiticafantasy's — `titular` there is a named starter with no number attached, `?` is listed without either, `—` is not listed at all. They are separate columns because neither has been checked against a played jornada yet, so there is no weight to blend them by, and a disagreement is worth more than an average. **xPts/j** = pts/m × Fix × FF, and uses FF only. `⚠` on a name means question 5 has something on him._
 
-**The model's eleven is 3.7 better** (index 38.1, shape 4-5-1).
+**The model's eleven is 3.7 better** (index 38.6, shape 4-5-1).
 
 | Bench this | For this | Worth |
 |---|---|--:|
@@ -40,13 +40,13 @@ _No slate pasted, so there is nothing you can bid on today that this report know
 
 ## 3. What you give up by spending now
 
-**λ 0.10 pts/M, hurdle 0.13.** Spending a million here means not spending it on these, best rate first — 3 buy(s) for 58.49M of 63.29M before the rate ran out.
+**λ 0.10 pts/M, hurdle 0.13.** Spending a million here means not spending it on these, best rate first — 3 buy(s) for 58.48M of 63.29M before the rate ran out.
 
 | | Player | Slot | Cost | ΔxPts/j | pts/M |
 |---|---|---|--:|--:|--:|
 | 1 | Zaid Romero | DEF | 28.67M | +3.7 | 0.13 |
 | 2 | Nahuel Tenaglia | DEF | 15.41M | +1.8 | 0.12 |
-| 3 ←λ | Adrian de La Fuente | DEF | 14.41M | +1.4 | 0.10 |
+| 3 ←λ | Adrian de La Fuente | DEF | 14.40M | +1.4 | 0.10 |
 
 _The last rung IS λ: it is the worst rate your cash could still buy, so anything worse than it is worse than doing nothing. Each gain is recomputed after the purchase above it, because two players who upgrade the same slot do not both upgrade it. Costs are the floor plus this league's median premium. Nobody in this table is necessarily on offer today — that is the point, and it is why λ reads as 'do not accept worse than this' rather than as a shopping list. The one haircut on it is `lambda_buffer` in `inputs/league.ini` (25%)._
 
@@ -55,10 +55,10 @@ _The last rung IS λ: it is the worst rate your cash could still buy, so anythin
 | Player | Pos | Sale | Take ≥ | Given up | pts/M | vs λ | Verdict | Why |
 |---|---|--:|--:|--:|--:|--:|---|---|
 | Alvaro Fernandez | por | 4.09M–5.21M | any | 0.0 | 0.00 | 0.00× | **Sell** | 3rd POR — only 1 can ever play |
+| Ruben Garcia | med | 12.47M–15.87M | any | 0.0 | 0.00 | 0.00× | **Sell** | outscored |
 | Beñat Turrientes | med | 6.39M–8.13M | any | 0.0 | 0.00 | 0.00× | **Sell** | 8th MED — only 5 can ever play |
 | Simon Eriksson | por | 2.55M–3.25M | any | 0.0 | 0.00 | 0.00× | **Sell** | 2nd POR — only 1 can ever play |
-| Ruben Garcia | med | 12.47M–15.87M | 1.51M | 0.2 | 0.01 | 0.11× | **Sell** | outscored |
-| Pablo Fornals | med | 51.30M–65.29M | 21.72M | 2.7 | 0.05 | 0.37× | **Sell** | outscored |
+| Pablo Fornals | med | 51.30M–65.29M | 20.19M | 2.5 | 0.04 | 0.35× | **Sell** | outscored |
 
 _**Take ≥** is the number to act on, because you cannot sell on demand: an offer arrives and you accept or refuse it. It is what his sale has to raise for the cash to buy back what the eleven loses, so at or above it the offer is worth taking and below it it is not, whatever the Verdict column says — the verdict only reports whether a typical offer already clears the bar. `any` means he adds nothing to the eleven, so no offer is too low. The instant sale is not a sale: it pays roughly half of value, which is a way to free cash before a lock and almost never beats waiting. **Given up** is what the eleven loses without him, after re-picking the shape — not his own score, and `—` means no legal XI survives his sale, which is a Keep at any price. **pts/M** is that loss over what the sale raises: the rate you are paying to keep him. **vs λ** puts it against the same hurdle question 2 uses, so **below 1.00× his points are dearer than the market's and the money is better elsewhere**. Two things this cannot see. Each sale is priced ON ITS OWN — sell two players out of the same position and the second one's Given up is no longer the number above, so re-read the thin-position warnings below the rule. And a name question 1 wants in your eleven can still be a Sell: fielding is one round, selling is the season, and the proceeds buy the ladder in question 3. Selling to the app pays the value give or take 12%: the 15 priced sales in the ledger went median +1.5%, -9.4% to +12.0% (n=15), which is the band in the Sale column and is wide enough that a row near 1.00× is a coin flip. Who is short in his position, and who can still afford you, is in `reports/rivals.md`._
 
