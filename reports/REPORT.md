@@ -1,4 +1,4 @@
-# Liga Five Guys — one report — 2026-08-18 15:06 UTC
+# Liga Five Guys — one report — 2026-08-18 15:42 UTC
 
 Every move you could make, ranked by whether it wins the league. Everything else is reference and is linked, not reprinted.
 
@@ -7,24 +7,24 @@ Every move you could make, ranked by whether it wins the league. Everything else
 
 _One question, asked of every move you could make: if I did this, where would I finish?_
 
-**Locks in 28h** · squad 213.11M · cash 23.60M · total 236.71M
+**Locks in 27h** · squad 213.11M · cash 23.60M · total 236.71M
 
-**Expected finish 1.61** · **P(win) 49%** · season **1,311–1,565** (10–90)
+**Expected finish 2.14** · **P(win) 11%** · season **1,480–1,738** (10–90)
 
-_38 jornadas left · 83 players acquirable · 137 moves simulated._
+_38 jornadas left · 83 players acquirable · 149 moves simulated._
 
 | Get | Give up | P(win) | Net € |
 |---|---|--:|--:|
-| Giuliano Simeone ← SusoGattuso | 3 spares | 90% | -23.49M |
-| Yuri Berchiche ← SusoGattuso | Turrientes | 84% | -14.13M |
-| Leo Roman ← SusoGattuso | Turrientes + Lorenzo | 83% | -20.86M |
-| Marcos Alonso (free) | Turrientes | 77% | -21.83M |
-| Cesar Tarrega ← SusoGattuso | Turrientes | 74% | -7.75M |
-| Gorka Guruzeta ← Magic Mike 333 | Turrientes | 71% | -14.23M |
-| Dean Huijsen ← BurtonGM89 | Turrientes + Lorenzo | 70% | -18.42M |
-| Aitor Paredes ← BurtonGM89 | Turrientes | 67% | +1.52M |
+| Giuliano Simeone ← SusoGattuso | 3 spares | 70% | -23.49M |
+| Leo Roman ← SusoGattuso | Turrientes + Lorenzo | 67% | -20.86M |
+| Yuri Berchiche ← SusoGattuso | Turrientes | 57% | -14.13M |
+| Dean Huijsen ← BurtonGM89 | Turrientes + Lorenzo | 34% | -18.42M |
+| Cesar Tarrega ← SusoGattuso | Turrientes | 31% | -7.75M |
+| Aimar Oroz ← SusoGattuso | Turrientes | 30% | -18.55M |
+| Gorka Guruzeta ← Magic Mike 333 | Turrientes | 29% | -14.23M |
+| Ferran Jutgla ← Albert Laporta | Turrientes | 21% | -2.43M |
 
-_**P(win)** is where the move LEAVES you — your chance of winning the league after making it, against 49% if you do nothing. **Get** names the rival a steal takes him off, which is half of what a steal is worth: it raises your total and lowers theirs at once. **Net €** is what the move does to the balance — negative spends, positive raises. Who exactly you give up when it says *spares* is in the sell table below; none of them ever start._
+_**P(win)** is where the move LEAVES you — your chance of winning the league after making it, against 11% if you do nothing. **Get** names the rival a steal takes him off, which is half of what a steal is worth: it raises your total and lowers theirs at once. **Net €** is what the move does to the balance — negative spends, positive raises. Who exactly you give up when it says *spares* is in the sell table below; none of them ever start._
 
 ## Sell — these never make the eleven
 
@@ -40,15 +40,17 @@ _These start in none of the 38 remaining jornadas, so they score nothing whereve
 
 | Manager | now | simulated | 10–90 | P(I finish above) |
 |---|--:|--:|--:|--:|
-| SusoGattuso | 23 | 1,439 | 1,322–1,560 | 50% |
-| miguel_autentico **(you)** | 17 | 1,437 | 1,311–1,565 | — |
-| BurtonGM89 | 24 | 1,235 | 1,122–1,345 | 94% |
-| Albert Laporta | 10 | 1,199 | 1,082–1,318 | 97% |
-| Magic Mike 333 | 11 | 1,142 | 1,033–1,252 | 99% |
+| SusoGattuso | 23 | 1,782 | 1,656–1,910 | 11% |
+| miguel_autentico **(you)** | 17 | 1,609 | 1,480–1,738 | — |
+| BurtonGM89 | 24 | 1,470 | 1,354–1,587 | 85% |
+| Magic Mike 333 | 11 | 1,431 | 1,313–1,553 | 91% |
+| Albert Laporta | 10 | 1,245 | 1,133–1,361 | 100% |
 
 ## What the simulation cannot see
 
 _shape from the seed prior (96 observed, 200 needed)._
+
+_P(start) fitted on 240 confirmed starts across 8 team sheets: futbolfantasy recalibrated (logit -0.5 +5.8x), blended 80% with analiticafantasy where it has an opinion (a named starter counts 94%). Brier improves 0.032 on line-ups the fit had not seen._
 
 - **Jornada 1 is half played.** 8 clubs are done and their points are already in the `now` column, so the simulation only plays the rest of the round. It still re-picks an eleven that is in fact already locked.
 - **P(start) is today's, held flat over every remaining jornada.** Nothing here knows who will be injured in March.

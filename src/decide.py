@@ -48,7 +48,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from ffcore.forecast import Bootstrap, pool_from_perjornada  # noqa: E402
 from ffcore.league import League, api_key  # noqa: E402
 from ffcore.parse import fmt_money  # noqa: E402
-from ffcore.score import SLOT, build  # noqa: E402
+from ffcore.score import SLOT, build, _calibrated  # noqa: E402
 from ffcore.text import norm  # noqa: E402
 from ffcore.season import LeagueState, best_xi, simulate  # noqa: E402
 from ffcore.tidy import (TIDY, SEASON, latest_only, load_api_market,  # noqa: E402
@@ -131,6 +131,10 @@ class Universe:
     # The source's own spelling, for display. Never a key: the keys are what
     # every dict here is keyed by, and they have already lost their accents.
     name: dict[str, str] = field(default_factory=dict)
+    # How P(start) was arrived at — fitted against confirmed line-ups, or the
+    # source's own figure. Printed, never inferred: it is the input everything
+    # here rests on, and it does not look any different when it changes.
+    start_note: str = ""
 
 
 def candidates(u: Universe, expected: dict[str, float]) -> list[Action]:
@@ -445,7 +449,7 @@ def load(trials_pool=None) -> Universe:
     return Universe(
         state=LeagueState(squads, rem, me, carried), forecaster=fc, pos=pos,
         price=price, proceeds=proceeds, owner=owner, cash=cash, me=me,
-        part_played=played, name=name,
+        part_played=played, name=name, start_note=_calibrated()[0].note(),
         unjoined=list(unjoined_clubs) + list(lg.api_unjoined))
 
 

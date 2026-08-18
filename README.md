@@ -224,6 +224,7 @@ src/ffcore/          shared core: parse (numbers)  text (names)  tidy (IO+time)
                      season (LeagueState, simulate, best_xi)
                      forecast (Forecaster: expected() / draw())
                      render (names, for display — never a key)
+                     startprob (P(start), graded against confirmed XIs)
 inputs/              you edit these — see above
 data/raw/dt=….tar.xz  raw HTML, deduplicated — append-only, never delete
 data/tidy/market.csv  values, disposable — rebuilt from raw every run
@@ -253,7 +254,7 @@ docs/design.md       architecture, data sources, modelling plan
 ## Tests
 
 No test directory and no pytest. Each module self-tests under
-`if __name__ == "__main__"`, and `lfg-run` runs all twenty-three before it
+`if __name__ == "__main__"`, and `lfg-run` runs all twenty-four before it
 fetches anything. Twenty seconds, and a failure aborts the run.
 
 **Work TDD.** Add the failing assertion to the module's own `_selftest()`,
@@ -286,11 +287,23 @@ PYTHONPATH=src python src/report.py --selftest          # the cells that judge
 PYTHONPATH=src python src/ffcore/forecast.py            # the sampler + its shape
 PYTHONPATH=src python src/ffcore/season.py              # shapes, best XI, standings
 PYTHONPATH=src python src/ffcore/render.py              # folded names, made readable
+PYTHONPATH=src python src/ffcore/startprob.py           # calibration + the fit's guard
 PYTHONPATH=src python src/decide.py --selftest          # candidates, steals, ranking
 PYTHONPATH=src python src/sim.py --selftest             # the simulation's report
 ```
 
 ## Design notes
+
+**Grading P(start) moved the headline by 38 points, on eight team sheets.**
+Fitting the two probable-XI sources against confirmed line-ups took P(win)
+from 49% to 11% and expected finish from 1.61 to 2.14 — because the
+calibration sharpens everybody, and my squad turns out to hold more players
+the narrow source is quiet or negative about than my rivals' do. It is a
+validated fit (it beats the raw source on line-ups it has not seen) and it is
+also four matches of evidence. `sim.md` prints what was fitted, on how much,
+every run, so the day it changes the report says so rather than moving
+silently. Treat the level as provisional and the ORDERING as the thing to act
+on until more jornadas land.
 
 **A self-test suite that passes is not a program that runs.** Deleting the
 board took thirteen functions out of report.py; all twenty-three suites went
@@ -747,9 +760,18 @@ differently-keyed ownership map is worse than none.
   turns each snapshot pair into per-jornada points, and `methodology.py` joins
   them to the prediction logged *before* the matches. Until the first jornada
   lands, the fixture band and the two probable-XI sources are all ungraded.
-- **`start_pct` is an editorial bucket**, not a live probability — it moved for
-  only 22 of 511 players across the snapshots taken so far. That is true of
-  both sources, so two of them agreeing is two editors agreeing, not evidence.
+- **`start_pct` is an editorial bucket**, not a live probability. That is why
+  it is now GRADED rather than believed: `ffcore/startprob.py` fits it against
+  confirmed line-ups every run, and on the first jornada played it was badly
+  under-confident — everything futbolfantasy called at 70% or better started
+  96% of the time, and its 30% bucket started 12%. Analiticafantasy was much
+  the better source where it spoke (Brier 0.089 against 0.195 on the players
+  both covered) but it speaks SELECTIVELY: 82% of the players it covers
+  actually started, against a base rate of 37%. So it sharpens the wider
+  source rather than replacing it. The fit is validated by holding out a whole
+  TEAM SHEET, not one player — a manager picking an eleven is one decision,
+  not twenty-two, and cross-validating over players reported a confidence four
+  matches cannot support.
 - **Rivals' cash is still an estimate.** The API states `teamMoney` for the
   account that asks and `null` for everyone else, so the `~` stays.
 - **A 200,000 gap in the cash arithmetic, unexplained.** Rebuilding the balance

@@ -219,7 +219,8 @@ def caveats(u) -> list[str]:
     reason they are printed under the table rather than in a design document
     nobody opens on a phone.
     """
-    out = ["_" + u.forecaster.pool_note() + "._", ""]
+    out = ["_" + u.forecaster.pool_note() + "._", "",
+           "_" + u.start_note.rstrip(".") + "._", ""]
     for j, clubs in sorted(u.part_played.items()):
         out.append("- **Jornada %d is half played.** %d clubs are done and "
                    "their points are already in the `now` column, so the "
@@ -533,8 +534,14 @@ def _selftest() -> None:
     # without anybody editing it.
     u.part_played = {1: {"alaves", "getafe"}}
     u.unjoined = ["A. Ferllo"]
+    u.start_note = "P(start) fitted on 240 confirmed starts"
     cav = "\n".join(caveats(u))
     assert "seed prior" in cav, cav
+    # HOW P(start) WAS ARRIVED AT, printed. It is the input the whole
+    # simulation rests on, it changed the headline by 38 points the day it was
+    # fitted, and a reader cannot tell a fitted number from a raw one by
+    # looking at it.
+    assert "240 confirmed starts" in cav, cav
     assert "jornada 1" in cav.lower(), cav
     assert "A. Ferllo" in cav, cav
     # ...and a clean run does not invent warnings it does not have.
@@ -604,7 +611,7 @@ def _selftest() -> None:
     ph = "\n".join(placeholder("no api_teams.csv"))
     assert "no api_teams.csv" in ph and ph.startswith("# The simulation")
 
-    print("sim self-test OK (64 cases)")
+    print("sim self-test OK (65 cases)")
 
 
 def main() -> None:

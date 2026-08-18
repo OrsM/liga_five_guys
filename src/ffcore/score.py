@@ -59,6 +59,7 @@ import statistics
 from typing import NamedTuple
 
 from ffcore.parse import money, pct100, ratio
+from ffcore.startprob import Calibration
 from ffcore.text import norm
 
 __all__ = ["SLOT", "SLOT_LABEL", "SLOT_MIN", "MAX_SLOT", "THIN",
@@ -140,7 +141,7 @@ def load_points() -> tuple[dict, str, dict, str]:
 
 
 def build(market: list[dict], xi_rows: list[dict], now,
-          shrink_k: float = SHRINK_K) -> tuple:
+          shrink_k: float = SHRINK_K, calibrate: bool = True) -> tuple:
     """(Scorer, labels) wired to every input the model has.
 
     ONE builder, because report.py and rivals.py must score with identical
@@ -148,18 +149,59 @@ def build(market: list[dict], xi_rows: list[dict], now,
     previously held a copy each of the points loader, and neither knew about
     the fixture board; a comparison between your squad and a rival's would
     have been between two different models.
+
+    `calibrate` fits P(start) against confirmed line-ups (ffcore.startprob).
+    It is the one thing here that reads the past to price the future, it costs
+    a few seconds, and it turns itself off: with nothing played, or with a fit
+    that loses on line-ups it has not seen, the source's own figure stands.
     """
     from ffcore.fixture import fixture_board
     from ffcore.tidy import load_elo, load_fixtures
 
     prior, prior_label, cur, cur_label = load_points()
+    cal, second = None, None
+    if calibrate:
+        cal, second = _calibrated()
     # Club Elo ranks the opponents when it covers all of them and squad value
     # ranks them otherwise — wired HERE, in the one builder, so your squad and
     # a rival's can never be scored off two different difficulty scales.
     board = fixture_board(market, load_fixtures(), now, load_elo())
     sc = Scorer(market, xi_rows, prior, shrink_k=shrink_k,
-                current=cur, board=board)
+                current=cur, board=board, cal=cal, second=second)
     return sc, (prior_label, cur_label)
+
+
+_CAL_CACHE: list = []
+
+
+def _calibrated():
+    """(Calibration, second-source rows), fitted once per process.
+
+    Cached because the fit cross-validates over every team sheet on record and
+    costs a few seconds, while `build` is called more than once in some runs
+    and the answer cannot change between calls.
+
+    THE CUT IS THE FIRST CONFIRMED LINE-UP WE SAW. Anything the source
+    published after that may already be the team sheet rather than a forecast
+    of it — the two live on the same page — and grading a forecast against
+    itself is how a model marks its own homework.
+    """
+    if _CAL_CACHE:
+        return _CAL_CACHE[0]
+    from ffcore.startprob import Calibration, observations
+    from ffcore.tidy import load_lineups, read_csv, TIDY
+    from ffcore.second import SECOND_SOURCE
+
+    second = load_lineups(SECOND_SOURCE)
+    truth = read_csv(TIDY / "starters.csv")
+    cut = min((r.get("observed_at", "") for r in truth), default="")
+    cal = Calibration()
+    if cut:
+        cal = Calibration.fit(observations(
+            load_lineups() + second, truth, cut, neutral=NEUTRAL_START,
+            absent=ABSENT_START))
+    _CAL_CACHE.append((cal, second))
+    return _CAL_CACHE[0]
 
 
 def formations(premium: bool = False) -> list[tuple]:
@@ -220,7 +262,7 @@ class Scorer:
 
     def __init__(self, market: list[dict], xi: list[dict],
                  history: dict | None = None, shrink_k: float = SHRINK_K,
-                 current: dict | None = None, board: dict | None = None):
+                 current: dict | None = None, board: dict | None = None, cal=None, second=None):
         self.market = market
         self.history = history or {}
         self.shrink_k = shrink_k
@@ -238,6 +280,13 @@ class Scorer:
                 self.lookup[r["slug"]] = r
             if r.get("name"):
                 self.lookup[norm(r["name"])] = r
+
+        self.cal = cal or Calibration()
+        self.second: dict[str, dict] = {}
+        for r in second or []:
+            k = norm(r.get("player_name"))
+            if k:
+                self.second[k] = r
 
         self.start_pct: dict[str, float] = {}
         self.listed: set[str] = set()
@@ -331,8 +380,16 @@ class Scorer:
         # not the gap to a replacement, and rotation risk is as dear as this
         # says. If auto-subs ever arrive, this multiplication is the line to
         # change.
-        pct_used = pct if pct is not None else (
+        # THE SOURCE'S FIGURE IS NOT A PROBABILITY UNTIL IT HAS BEEN GRADED.
+        # `raw` is what the page says, or the fallback for a man it does not
+        # cover; `pct_used` is what that has been WORTH against confirmed
+        # line-ups, blended with the second source where it has an opinion.
+        # Until a jornada has been played the calibration is the identity and
+        # these are the same number — see ffcore.startprob, which reports which
+        # of the two is in force rather than leaving it to be assumed.
+        raw = pct if pct is not None else (
             NEUTRAL_START if on_page else ABSENT_START)
+        pct_used = 100.0 * self.cal.p(raw, self.second.get(key))
         m = self.board.get((rec.get("team") or "").strip())
         flat = rating.ppm * pct_used / 100.0
         score = flat * (m.factor if m else 1.0)
