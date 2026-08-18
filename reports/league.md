@@ -1,4 +1,4 @@
-# Squads — 2026-08-18 22:44 UTC
+# Squads — 2026-08-18 22:50 UTC
 
 | Manager | Players | Squad value | Spent | Raised | Cash |
 |---|--:|--:|--:|--:|--:|
@@ -150,7 +150,7 @@
 
 ## Cash basis
 
-- **miguel_autentico** — balance the app reported at 2026-08-18 22:41 UTC − 0.00M bought + 0.00M sold across 0 ledger row(s) = 23.60M (known)
+- **miguel_autentico** — balance the app reported at 2026-08-18 22:47 UTC − 0.00M bought + 0.00M sold across 0 ledger row(s) = 23.60M (known)
 - **Albert Laporta** — 100M starting budget − 188.67M bought + 43.03M sold across 13 ledger row(s) + 0.71M of daily allowance over 7 days = -44.93M (estimated)
 - **BurtonGM89** — 100M starting budget − 180.85M bought + 51.65M sold across 17 ledger row(s) + 0.71M of daily allowance over 7 days = -28.49M (estimated)
 - **Magic Mike 333** — 100M starting budget − 121.23M bought + 19.14M sold across 8 ledger row(s) + 0.71M of daily allowance over 7 days = -1.38M (estimated)
