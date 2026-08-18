@@ -127,6 +127,140 @@ def short(key, u) -> str:
     return full if clash > 1 else last
 
 
+def _bar(u) -> float:
+    """The weakest man in the eleven you would field — the line on the ladder."""
+    from ffcore.season import best_xi
+    exp = u.forecaster.expected(decide_choosable(u))
+    xi = best_xi(u.state.squads.get(u.me, {}), exp)
+    return min((exp.get(k, 0.0) for k in xi), default=0.0)
+
+
+def ladder_rows(u, rows) -> list[dict]:
+    """The ladder as data, so the phone draws the same one table.
+
+    Field, bench, sell and buy in one order, ranked by one number. Two
+    renderers drawing different tables is how this report came to contradict
+    itself, so there is one function and both read it.
+    """
+    from ffcore.season import best_xi
+
+    exp = u.forecaster.expected(decide_choosable(u))
+    mine = u.state.squads.get(u.me, {})
+    xi = set(best_xi(mine, exp))
+    dead = {k for k, _ in decide_dead(u)}
+    won = {r["action"].buy: r for r in rows if r["action"].buy}
+    bar = min((exp.get(k, 0.0) for k in xi), default=0.0)
+    spare = sum(u.proceeds.get(d, 0) for d in dead)
+
+    out = []
+    for k in mine:
+        out.append({"name": title_name(u.name.get(k, k)),
+                    "pos": u.pos.get(k, ""), "xpts": exp.get(k, 0.0),
+                    "where": "yours", "mine": True,
+                    "do": "field" if k in xi else
+                          "sell" if k in dead else "bench",
+                    "give": "", "pts": None,
+                    "money": None if k in xi else u.proceeds.get(k, 0.0),
+                    "left": None})
+    for k, price in u.price.items():
+        if k in mine or exp.get(k, 0.0) <= bar:
+            continue
+        r = won.get(k)
+        row = {"name": title_name(u.name.get(k, k)),
+               "pos": u.pos.get(k, ""), "xpts": exp.get(k, 0.0),
+               "where": u.owner.get(k, "") or "free agent", "mine": False,
+               "give": "", "pts": None, "money": -price, "left": None}
+        if r is None:
+            row["do"] = "—" if price <= u.cash + spare else "can't afford"
+        else:
+            a_ = r["action"]
+            row["do"] = "buy"
+            row["give"] = " + ".join(short(x, u) for x in a_.sell)
+            row["pts"] = r["d_pts"]
+            row["money"] = -a_.net
+            row["left"] = u.cash - a_.net
+        out.append(row)
+    return sorted(out, key=lambda r: -r["xpts"])
+
+
+def ladder(u, rows, base) -> list[str]:
+    """EVERY PLAYER YOU COULD HOLD, IN ONE TABLE, IN ONE ORDER.
+
+    Field, bench, sell and buy are not four questions with four tables — they
+    are one ladder with a line through it. Your starters, your spares and
+    everyone worth buying, ranked by the same number, so the answer to "who do
+    I field, who do I sell, what do I buy" is read off one scan instead of
+    reconciled across four sections that had begun contradicting each other.
+
+    This is the shape the old board had and the reason it was right to have
+    it. What was wrong with the board was its metric — points per million
+    above a replacement level — not its structure. The metric here is what a
+    player is expected to score, and the money is a column rather than the
+    ranking.
+    """
+    from ffcore.season import best_xi
+
+    exp = u.forecaster.expected(decide_choosable(u))
+    mine = u.state.squads.get(u.me, {})
+    xi = set(best_xi(mine, exp))
+    dead = {k for k, _ in decide_dead(u)}
+    won = {r["action"].buy: r for r in rows if r["action"].buy}
+    bar = min((exp.get(k, 0.0) for k in xi), default=0.0)
+    names = {k: title_name(u.name.get(k, k)) for k in u.name}
+
+    seen, out = [], []
+    for k in mine:
+        do = ("field" if k in xi else "**sell**" if k in dead else "bench")
+        seen.append((exp.get(k, 0.0), k, "yours", do, "",
+                     "" if k in xi else "+" + fmt_money(u.proceeds.get(k, 0)),
+                     ""))
+    for k, price in u.price.items():
+        if k in mine or exp.get(k, 0.0) <= bar:
+            continue
+        held = u.owner.get(k, "")
+        r = won.get(k)
+        if r is None:
+            # Better than your weakest starter and out of reach. Saying so is
+            # the point: a dash reads as "not worth it" when the truth is
+            # "worth it, and you cannot pay for it".
+            afford = price <= u.cash + sum(u.proceeds.get(d, 0) for d in dead)
+            seen.append((exp.get(k, 0.0), k, held or "free agent",
+                         "—" if afford else "can't afford", "", "",
+                         "−" + fmt_money(price)))
+            continue
+        a = r["action"]
+        gave = " + ".join(short(x, u) for x in a.sell) if a.sell else "—"
+        seen.append((exp.get(k, 0.0), k, held or "free agent", "**buy**",
+                     gave, "%+.0f" % r["d_pts"],
+                     "%s / %s left" % (_net(-a.net),
+                                       fmt_money(u.cash - a.net))))
+
+    out += ["| Player | Pos | xPts/j | Where | Do | Give up | Season pts | € |",
+            "|---|---|--:|---|---|---|--:|--:|"]
+    for e, k, where, do, gave, pts_or_money, money in sorted(seen,
+                                                             reverse=True):
+        pts = pts_or_money if pts_or_money.startswith(("+", "-")) \
+            and "M" not in pts_or_money else ""
+        cash = money or (pts_or_money if not pts else "")
+        out.append("| %s | %s | %.2f | %s | %s | %s | %s | %s |"
+                   % (names.get(k, k), u.pos.get(k, "—"), e, where, do,
+                      gave or "—", pts or "—", cash or "—"))
+    out += ["",
+            "_**xPts/j** is what he is expected to score a jornada, and it is "
+            "the only ranking. Above your weakest starter (%.2f) and not "
+            "yours is worth buying; below it and yours is a bench player; "
+            "starting in none of the %d jornadas left is dead weight. "
+            "**Season pts** is simulated — extra points you finish with, "
+            "measured in the same seasons with and without the move._"
+            % (bar, len(u.state.jornadas)), ""]
+    return out
+
+
+def decide_dead(u):
+    from decide import dead_weight
+    return dead_weight(u)
+
+
 def verdict(routes) -> tuple:
     """(headline, whether waiting wins). ONE ANSWER, AT THE TOP.
 
@@ -145,17 +279,19 @@ def verdict(routes) -> tuple:
     act = next((r for r in routes if r["route"] == "act"), None)
     # The watch list is not a route you can take — it is what you cannot buy.
     best = max((r for r in routes if r["route"] != "watch"),
-               key=lambda r: r["best"], default=None)
+               key=lambda r: r.get("pts", 0.0), default=None)
     if best is None:
         return "", False
     if act is None or best["route"] == "act":
         return ("**Act today.** Nothing you can wait for beats what is on "
                 "offer now.", False)
-    gap = best["best"] - act["best"]
-    return ("**Don't spend yet.** %s is worth %+.2f xPts/j against %+.2f for "
-            "the best thing you can buy today — %.2f better, and the balance "
-            "is what buys the choice." % (best["label"], best["best"],
-                                          act["best"], gap), True)
+    gap = best.get("pts", 0.0) - act.get("pts", 0.0)
+    return ("**Don't spend yet.** %s is worth about %+.0f points over the rest "
+            "of the season against %+.0f for the best thing you can buy today "
+            "— %.0f better even after paying a jornada for the delay, and the "
+            "balance is what buys the choice."
+            % (best["label"], best.get("pts", 0.0), act.get("pts", 0.0),
+               gap), True)
 
 
 def table(rows, u, base, rivals) -> list[str]:
@@ -262,10 +398,24 @@ def wait_routes(u, offers=None, rng=None) -> list[dict]:
         # Yamal at nothing.
         return max(0.0, u.market_exp.get(k, exp.get(k, 0.0)) - bar)
 
+    left = len(u.state.jornadas)
     now_best = max((gain(k) for k in u.price if k not in mine), default=0.0)
+
+    def season(rate, delay=0):
+        """A per-jornada upgrade as points over the rest of the season.
+
+        WITH THE DELAY PAID FOR. Waiting a week forgoes a jornada of the best
+        thing you can buy today, and a comparison that ignores that is a
+        comparison of rates dressed up as a comparison of outcomes. It is also
+        the only way this is in the same unit as the move table, which was the
+        whole problem: +3.69 against +110 is not a choice anybody can make.
+        """
+        return rate * max(0, left - delay) - now_best * delay
+
     out = [{"route": "act", "label": "Act today",
             "what": "%d players you can buy now" % len(u.price),
-            "best": now_best, "lo": None, "hi": None, "beats_now": None}]
+            "best": now_best, "pts": season(now_best),
+            "lo": None, "hi": None, "beats_now": None}]
 
     if offers is not None:
         band = offers.best_over(7, gain, rng or random.Random(3))
@@ -273,6 +423,7 @@ def wait_routes(u, offers=None, rng=None) -> list[dict]:
             "route": "market", "label": "Wait for the market",
             "what": "a week of new offers",
             "best": statistics.median(band),
+            "pts": season(statistics.median(band), delay=1),
             "lo": sorted(band)[int(0.1 * len(band))],
             "hi": sorted(band)[int(0.9 * len(band))],
             "beats_now": sum(1 for x in band if x > now_best) / len(band),
@@ -305,6 +456,7 @@ def wait_routes(u, offers=None, rng=None) -> list[dict]:
             "route": "clauses", "label": "Wait for the clauses",
             "what": "%d players on %s" % (len(shut), opens.strftime("%d %b")),
             "best": max((gain(k) for k in shut), default=0.0),
+            "pts": season(max((gain(k) for k in shut), default=0.0), delay=1),
             "lo": None, "hi": None, "beats_now": None,
             "helpful": sum(1 for k in shut if gain(k) > 0),
             "days": max(0.0, (opens - now).total_seconds() / 86400.0),
@@ -317,16 +469,19 @@ def waiting(u, offers=None, rng=None) -> list[str]:
     routes = wait_routes(u, offers, rng)
     if len(routes) < 2:
         return []
-    out = ["| Route | What it offers | Best upgrade |", "|---|---|--:|"]
+    out = ["| Route | What it offers | Season pts |", "|---|---|--:|"]
     for r in routes:
         if r["route"] == "watch":
             continue
-        band = ("" if r["lo"] is None
-                else " (10–90: %+.2f to %+.2f)" % (r["lo"], r["hi"]))
         name = ("**%s**" % r["label"] if r["route"] == "act" else r["label"])
-        out.append("| %s | %s | %+.2f%s |"
-                   % (name, r["what"], r["best"], band))
-    out.append("")
+        out.append("| %s | %s | %+.0f |"
+                   % (name, r["what"], r.get("pts", 0.0)))
+    out += ["",
+            "_Season points, so this can be compared with the table below "
+            "rather than sitting in its own unit. Waiting pays for the delay: "
+            "a jornada of the best thing you can buy today is forgone before "
+            "the better one arrives. These are estimates from a rate; the "
+            "table's are simulated._"]
     wat = next((r for r in routes if r["route"] == "watch"), None)
     if wat and wat.get("players"):
         out += ["", "**Not for sale, and you cannot ask.** The app deals about "
@@ -542,6 +697,8 @@ def payload(u, rows, base, rivals, locks_h=None, n_actions: int = 0,
         "moves": moves,
         "sell": [{"name": names.get(k, k), "pos": u.pos.get(k, ""),
                   "raises": got} for k, got in dead_weight(u)],
+        "ladder": ladder_rows(u, rows),
+        "bar": _bar(u),
         "wait": wait_routes(u, offers),
         "verdict": verdict(wait_routes(u, offers))[0],
         "hold": verdict(wait_routes(u, offers))[1],
@@ -666,12 +823,10 @@ def render(u, rows, base, stamp: str, rivals, n_actions: int = 0,
     # THE RANKING IS SUBORDINATE TO THE CALL, and says so in its own heading.
     # Presented as "what to do" directly above a section saying "do nothing",
     # it is a contradiction rather than a second opinion.
-    out += ["## %s" % ("If you act anyway — every move, ranked" if hold
-                       else "Do this — every move, ranked"), ""]
-    out += table(rows, u, base, rivals)
+    out += ["## %s" % ("Every player you could hold — but see the call"
+                       if hold else "Every player you could hold"), ""]
+    out += ladder(u, rows, base)
 
-    out += ["## Sell — these never make the eleven", ""]
-    out += sells(u, dead_weight(u))
     out += ["## Where the league stands", ""]
     out += standings(u, base)
     out += ["## What the simulation cannot see", ""]
@@ -955,7 +1110,7 @@ def _selftest() -> None:
     # Headings the digest picks up must not collide with the board's, or one
     # of the two silently loses its section.
     heads = [ln for ln in page.splitlines() if ln.startswith("## ")]
-    assert len(heads) == len(set(heads)) == 5, heads
+    assert len(heads) == len(set(heads)) == 4, heads
 
     # -- ONE ANSWER, AND EVERYTHING ELSE UNDER IT --------------------------
     # A ranked list reading "do this" above a section reading "wait" is a
@@ -963,14 +1118,16 @@ def _selftest() -> None:
     # twice. The verdict leads and the ranking says what it is.
     acting = [{"route": "act", "label": "Act today", "what": "x", "best": 9.0},
               {"route": "market", "label": "Wait", "what": "y", "best": 1.0}]
-    call, hold = verdict(acting)
+    call, hold = verdict([{**acting[0], "pts": 300.0},
+                          {**acting[1], "pts": 10.0}])
     assert "Act today" in call and hold is False, (call, hold)
     waitwin = [{"route": "act", "label": "Act today", "what": "x", "best": 1.0},
                {"route": "market", "label": "Wait for the market",
                 "what": "y", "best": 5.0}]
-    call, hold = verdict(waitwin)
+    call, hold = verdict([{**waitwin[0], "pts": 40.0},
+                          {**waitwin[1], "pts": 200.0}])
     assert "Don't spend yet" in call and hold is True, (call, hold)
-    assert "4.00 better" in call or "4.00" in call, call
+    assert "160 better" in call, call
     # Nothing to compare against is no verdict, rather than a made-up one.
     assert verdict([]) == ("", False)
     for banned in ("## Do this", "## The board", "## Warnings"):

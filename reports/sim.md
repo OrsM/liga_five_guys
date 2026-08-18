@@ -2,20 +2,21 @@
 
 ## The call
 
-**Don't spend yet.** Wait for the market is worth +5.64 xPts/j against +3.69 for the best thing you can buy today — 1.95 better, and the balance is what buys the choice.
+**Don't spend yet.** Wait for the market is worth about +205 points over the rest of the season against +140 for the best thing you can buy today — 65 better even after paying a jornada for the delay, and the balance is what buys the choice.
 
-**Locks in 22h** · squad 213.11M · cash 23.60M · total 236.71M
+**Locks in 21h** · squad 213.11M · cash 23.60M · total 236.71M
 
 **Expected finish 2.14** · **P(win) 11%** · season **1,480–1,738** (10–90)
 
 _38 jornadas left · 41 players acquirable · 52 moves simulated._
 
-| Route | What it offers | Best upgrade |
+| Route | What it offers | Season pts |
 |---|---|--:|
-| **Act today** | 41 players you can buy now | +3.69 |
-| Wait for the market | a week of new offers | +5.64 (10–90: +3.84 to +7.50) |
-| Wait for the clauses | 62 players on 24 Aug | +4.62 |
+| **Act today** | 41 players you can buy now | +140 |
+| Wait for the market | a week of new offers | +205 |
+| Wait for the clauses | 62 players on 24 Aug | +167 |
 
+_Season points, so this can be compared with the table below rather than sitting in its own unit. Waiting pays for the delay: a jornada of the best thing you can buy today is forgone before the better one arrives. These are estimates from a rate; the table's are simulated._
 
 **Not for sale, and you cannot ask.** The app deals about a dozen players a cycle out of five hundred, so a man you want is not something you can go and buy — being unowned is not being available:
 
@@ -29,32 +30,38 @@ _38 jornadas left · 41 players acquirable · 52 moves simulated._
 _The free market is simulated rather than guessed at: the market is modelled from 45 offers over 4 cycles, weighted by value^0.15. **114 of the 557 unowned players** would improve your eleven, and a week of offers beats the best thing you can buy today **95% of the time** — even the tenth percentile of waiting (+3.84) clears it. Spending now buys the worse of two options and gives up the choice._
 _**32 locked players would improve your eleven** and their clauses open on 24 Aug, in about 6 days. Waiting scores ZERO in the table above — not because it is worthless but because nothing there can price a market it has not seen, so every move with a positive number beats it by construction. That is the bias to hold in mind when the ranking asks you to spend the balance; the **Left** column is what buys the choice._
 
-## If you act anyway — every move, ranked
+## Every player you could hold — but see the call
 
-| Get | Give up | Season pts | Helps | Net € | Left |
-|---|---|--:|--:|--:|--:|
-| Dean Huijsen (on the market, BurtonGM89) | Turrientes + Lorenzo | +110 | 100% | -18.42M | 5.17M |
-| Ferran Jutgla (on the market, Albert Laporta) | Lorenzo | +55 | 96% | +98K | 23.69M |
-| Nahuel Tenaglia (on the market, BurtonGM89) | Turrientes | +54 | 95% | -9.92M | 13.68M |
-| Marcos Alonso (on the market, free agent) | Turrientes | +41 | 87% | -21.83M | 1.77M |
-| Aitor Paredes (on the market, BurtonGM89) | Turrientes | +41 | 86% | +1.52M | 25.12M |
-| Santiago Mouriño (on the market, Albert Laporta) | Turrientes + Lorenzo | +36 | 88% | -23.54M | 55K |
-| Antonio Blanco (on the market, BurtonGM89) | Turrientes | +31 | 80% | -7.82M | 15.78M |
-| Marc Bartra (on the market, free agent) | Lorenzo | +22 | 73% | -18.15M | 5.45M |
+| Player | Pos | xPts/j | Where | Do | Give up | Season pts | € |
+|---|---|--:|---|---|---|--:|--:|
+| Pablo Fornals | MED | 6.95 | yours | field | — | — | — |
+| Arda Guler | MED | 6.42 | Albert Laporta | can't afford | — | — | −52.65M |
+| Dean Huijsen | DEF | 5.64 | BurtonGM89 | **buy** | Turrientes + Lorenzo | +110 | -18.42M / 5.17M left |
+| Nicolas Pepe | DEL | 5.60 | free agent | can't afford | — | — | −51.46M |
+| Iñigo Ruiz de Galarreta | MED | 4.84 | yours | field | — | — | — |
+| Jon Moncayola | MED | 4.53 | yours | field | — | — | — |
+| Ionut Radu | POR | 4.47 | yours | field | — | — | — |
+| Nahuel Tenaglia | DEF | 4.20 | BurtonGM89 | **buy** | Turrientes | +54 | -9.92M / 13.68M left |
+| Ferran Jutgla | DEL | 4.19 | Albert Laporta | **buy** | Lorenzo | +55 | +98K / 23.69M left |
+| Antonio Blanco | MED | 3.92 | BurtonGM89 | **buy** | Turrientes | +31 | -7.82M / 15.78M left |
+| Santiago Mouriño | DEF | 3.82 | Albert Laporta | **buy** | Turrientes + Lorenzo | +36 | -23.54M / 55K left |
+| Marcos Alonso | DEF | 3.78 | free agent | **buy** | Turrientes | +41 | -21.83M / 1.77M left |
+| Aitor Paredes | DEF | 3.69 | BurtonGM89 | **buy** | Turrientes | +41 | +1.52M / 25.12M left |
+| Lucien Agoume | MED | 3.50 | yours | field | — | — | — |
+| Carl Starfelt | DEF | 3.36 | yours | field | — | — | — |
+| Marc Bartra | DEF | 3.29 | free agent | **buy** | Lorenzo | +22 | -18.15M / 5.45M left |
+| Marc Roca | MED | 3.13 | Albert Laporta | **buy** | Lorenzo | +2 | +4.20M / 27.80M left |
+| Pepelu | MED | 3.11 | yours | field | — | — | — |
+| Iñigo Vicente | DEL | 2.90 | yours | field | — | — | — |
+| Robin Le Normand | DEF | 2.88 | yours | field | — | — | — |
+| Isi Palazon | DEL | 2.87 | free agent | **buy** | Turrientes | +5 | -12.61M / 10.99M left |
+| Igor Zubeldia | DEF | 2.86 | yours | field | — | — | — |
+| Omar El Hilali | DEF | 2.73 | yours | field | — | — | — |
+| Dani Lorenzo | MED | 2.46 | yours | **sell** | — | — | +9.60M |
+| Beñat Turrientes | MED | 1.10 | yours | **sell** | — | — | +7.07M |
+| Alvaro Fernandez | POR | 0.05 | yours | **sell** | — | — | +4.49M |
 
-_**Season pts** is how many more points you end the season with, and **Helps** is how often — both measured inside the SAME simulated seasons, with and without the move, so the difference is the squads rather than the weather. They replaced a per-row P(win), which is not a number to act on: recalibrating P(start) moved one row's P(win) by 48 points and these two by six. Your overall chance is 11% and it is in the header, where a figure that provisional belongs. **Get** says HOW you would get him. *On the market* is an ordinary purchase whoever owns him — measured, taking a man off a rival that way denies him nothing, because the managers listing players are not the one you are racing. *Clause on X* is the raid, and today not one clause in the league is payable. **Net €** is what the move does to the balance and **Left** is what you are on afterwards — every rival is on 0K until you pay one, so that column is the whole of your ability to answer anything for the rest of the season. Who exactly you give up when it says *spares* is in the sell table below; none of them ever start. **he takes** is the rival's best answer, played before the season is._
-
-_A CLAUSE IS THREE PURCHASES AT ONCE. The market value buys the points for you, and that part is a loan rather than a spend — it comes back when you sell him. The premium over it buys something else entirely: that a RIVAL does not score them. And the balance buys nothing at all, it only stops being available. The first is priced by the market; the second is now scored net of his reply, because he is handed the money and spends it; the third is the column on the right, because nothing here can value it._
-
-## Sell — these never make the eleven
-
-| Sell | Pos | Raises |
-|---|---|--:|
-| Dani Lorenzo | MED | 9.60M |
-| Beñat Turrientes | MED | 7.07M |
-| Alvaro Fernandez | POR | 4.49M |
-
-_These start in none of the 38 remaining jornadas, so they score nothing wherever the rest of the squad goes and any offer is a gain. The simulation rates selling them at exactly zero — it cannot value the cash, which is the whole of what they are worth. What it also cannot value is cover: P(start) is held flat here, so nobody is ever injured in March and a bench that exists for that is worth nothing to it._
+_**xPts/j** is what he is expected to score a jornada, and it is the only ranking. Above your weakest starter (2.73) and not yours is worth buying; below it and yours is a bench player; starting in none of the 38 jornadas left is dead weight. **Season pts** is simulated — extra points you finish with, measured in the same seasons with and without the move._
 
 ## Where the league stands
 
