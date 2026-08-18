@@ -1,19 +1,23 @@
 # Fantasy report — 2026-08-17T2345Z
 
-**Locks in 42h** (next kickoff) · squad 213.11M · cash 23.60M · total 236.71M
+**Locks in 41h** (next kickoff) · squad 213.11M · cash 23.60M · total 236.71M
 
 ## Do this
 
-- **Buy Marcos Alonso** — DEF · 0.055 pts/M
-  Sell **one** of: Carl Starfelt (15.09M), Robin Le Normand (11.16M), Igor Zubeldia (11.05M), Omar El Hilali (10.09M)
-- **Buy Isi Palazon** — DEL · -0.039 pts/M
-  Sell **one** of: Iñigo Vicente (21.02M)
+| Do | Who | Pos | pts/M | Money |
+|---|---|---|--:|--:|
+| **Buy** | Marcos Alonso | DEF | +0.055 | − 29.08M |
+| sell 1 of ↑ | Carl Starfelt | DEF | -0.023 | + 15.09M |
+| sell 1 of ↑ | Robin Le Normand | DEF | -0.071 | + 11.16M |
+| sell 1 of ↑ | Igor Zubeldia | DEF | -0.108 | + 11.05M |
+| sell 1 of ↑ | Omar El Hilali | DEF | -0.098 | + 10.09M |
+| **Buy** | Isi Palazon | DEL | -0.039 | − 20.55M |
+| sell 1 of ↑ | Iñigo Vicente | DEL | -0.078 | + 21.02M |
+| **Sell** | Alvaro Fernandez | POR | -1.056 | + 4.80M |
+| **Sell** | Beñat Turrientes | MED | -0.142 | + 7.57M |
+| **Sell** | Dani Lorenzo | MED | -0.067 | + 10.28M |
 
-**Sell — cannot reach your eleven whatever happens:**
-
-- **Alvaro Fernandez** — POR · 2nd POR — only 1 can be fielded
-- **Beñat Turrientes** — MED · 7th MED — only 5 can be fielded
-- **Dani Lorenzo** — MED · 6th MED — only 5 can be fielded
+_**Buy** spends; `≤` is the most it is worth paying. `sell 1 of ↑` are alternatives — **one** of them funds the buy above, and the money column is what you choose between. **Sell** on its own is a player who cannot reach your eleven however the rest of it moves, so any offer is a gain._
 
 **Field** Jon Moncayola · Pablo Fornals · Ionut Radu · Iñigo Ruiz de Galarreta · Lucien Agoume · Carl Starfelt · Pepelu · Robin Le Normand · Iñigo Vicente · Omar El Hilali · Igor Zubeldia
 
