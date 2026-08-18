@@ -41,14 +41,15 @@ import csv
 import datetime as dt
 import os
 import sys
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from ffcore.forecast import Bootstrap, pool_from_perjornada  # noqa: E402
-from ffcore.league import League  # noqa: E402
+from ffcore.league import League, api_key  # noqa: E402
 from ffcore.parse import fmt_money  # noqa: E402
 from ffcore.score import SLOT, build  # noqa: E402
+from ffcore.text import norm  # noqa: E402
 from ffcore.season import LeagueState, best_xi, simulate  # noqa: E402
 from ffcore.tidy import (TIDY, SEASON, latest_only, load_api_market,  # noqa: E402
                          load_api_teams, load_lineups, load_market,
@@ -78,12 +79,17 @@ class Action:
     def net(self) -> float:
         return self.cost - self.proceeds
 
-    def label(self) -> str:
+    def label(self, names: dict[str, str] | None = None) -> str:
+        """The move in words. `names` swaps join keys for readable names —
+        the report needs that and the terminal does not, and the grammar of a
+        move is written here so there is only one of it."""
+        def show(k):
+            return (names or {}).get(k, k)
         if self.kind == "sell":
-            return "sell %s" % self.sell
-        who = "steal %s from %s" % (self.buy, self.victim) if self.victim \
-            else "buy %s" % self.buy
-        return who + (" · sell %s" % self.sell if self.sell else "")
+            return "sell %s" % show(self.sell)
+        who = "steal %s from %s" % (show(self.buy), self.victim) \
+            if self.victim else "buy %s" % show(self.buy)
+        return who + (" · sell %s" % show(self.sell) if self.sell else "")
 
 
 @dataclass
@@ -103,6 +109,14 @@ class Universe:
     owner: dict[str, str]
     cash: float
     me: str
+    # Provenance, for the report to print rather than for anything to act on:
+    # a round part-played and how much of it is left, and any club or player
+    # the app names in a way nothing else could join.
+    part_played: dict[int, set[str]] = field(default_factory=dict)
+    unjoined: list[str] = field(default_factory=list)
+    # The source's own spelling, for display. Never a key: the keys are what
+    # every dict here is keyed by, and they have already lost their accents.
+    name: dict[str, str] = field(default_factory=dict)
 
 
 def candidates(u: Universe, expected: dict[str, float]) -> list[Action]:
@@ -202,6 +216,74 @@ def rank(u: Universe, acts: list[Action], seed: int = 1) -> list[dict]:
     return rows, base
 
 
+def rounds_left(matches, teams) -> tuple[list[int], dict[int, set[str]], list]:
+    """(jornadas still to come, who has already played one, unjoined clubs).
+
+    A jornada with every score in is finished and is not simulated. A jornada
+    with SOME scores in is the August case, and it is the one that pays twice:
+    it is still ahead, so the simulator plays it — while the app has already
+    banked the played matches into the carried total. Simulating those clubs
+    again credits their points a second time, and NOT equally: on the day this
+    was found, four of ten J1 matches were in, and it was handing BurtonGM89
+    20.3 phantom points a round against my 7.8.
+
+    So the round stays, and the clubs inside it that are done drop out. Their
+    real points are already carried; what is left of the round is what has not
+    kicked off.
+
+    `teams` is the MARKET's list of clubs and the clubs come back as
+    `club_key` keys, which is what the players are keyed by too — see the note
+    there about the club with two spellings. A club that will not join comes
+    back in `unjoined` rather than being assumed unplayed, because assumed-
+    unplayed is exactly the double count this exists to remove, wearing a
+    different name.
+
+    What it still does not model: the eleven for a round in progress is
+    ALREADY LOCKED, and the simulator re-picks it from whoever is left. That
+    flatters everybody by letting them field a team they can no longer field,
+    for one round out of thirty-eight.
+    """
+    js = {r["jornada"] for r in matches if (r.get("jornada") or "").isdigit()}
+    finished = {j for j in js
+                if all(r.get("score") for r in matches if r["jornada"] == j)}
+    rem = sorted(int(j) for j in js - finished)
+
+    played: dict[int, set[str]] = {}
+    unjoined: list[str] = []
+    for r in matches:
+        j = r.get("jornada") or ""
+        if not j.isdigit() or int(j) not in rem or not r.get("score"):
+            continue
+        for side in (r.get("home"), r.get("away")):
+            club = club_key(side, teams)
+            if not club:
+                if side and side not in unjoined:
+                    unjoined.append(side)
+                continue
+            played.setdefault(int(j), set()).add(club)
+    return rem, played, unjoined
+
+
+def club_key(raw, teams) -> str:
+    """One club, one key, whichever page spelled it — or "" if it will not
+    place.
+
+    Three sources name clubs three ways: the market says "Rayo", the fixture
+    page "rayo-vallecano", and the probable-XI page files most players under
+    the first and a handful under the second. Folding the case and the
+    punctuation is not enough, because "rayo" and "rayo vallecano" are still
+    two strings. So every name is resolved against the MARKET's list — the one
+    spelling this repo treats as canonical everywhere else — through the same
+    `match_team` the fixture board uses.
+
+    "" for a name nothing can place, and "" is never equal to a club: an
+    unplaceable club must not accidentally compare equal to another one.
+    """
+    from ffcore.fixture import match_team
+    hit = match_team(raw or "", teams)
+    return norm(hit) if hit else ""
+
+
 def load(trials_pool=None) -> Universe:
     """Assemble the universe from the store. The only IO in this module."""
     lg = League.load()
@@ -210,14 +292,21 @@ def load(trials_pool=None) -> Universe:
                   dt.datetime.now(dt.timezone.utc), lg.cfg.shrink_k)
 
     m = latest_only(list(csv.DictReader(open(TIDY / "matches.csv"))))
-    js = {r["jornada"] for r in m if r["jornada"].isdigit()}
-    done = {j for j in js
-            if all(r.get("score") for r in m if r["jornada"] == j)}
-    rem = sorted(int(j) for j in js - done)
+    # The market's spelling of every club, and only the market's: it is the
+    # canonical side of the join in club_key().
+    mkt_teams = sorted({(r.get("team") or "").strip()
+                        for r in (lg.market.latest().values()
+                                  if lg.market is not None else [])
+                        if (r.get("team") or "").strip()})
+    rem, played, unjoined_clubs = rounds_left(m, mkt_teams)
 
     teams = load_api_teams()
     mkt = load_api_market()
-    owner = {r["player_name"]: r["manager"] for r in teams}
+    # OWNERSHIP IS League's, NOT RE-DERIVED HERE. It has already resolved the
+    # app's own spelling three ways (ffcore.league.api_key), and a second,
+    # weaker join in this module is not a second opinion — it is five rival
+    # players who cannot be stolen because nothing knows whose they are.
+    owner = dict(lg.owner)
     me = lg.cfg.me
 
     squads = {mgr: {k: SLOT[(players[k].get("pos") or "").lower()]
@@ -229,27 +318,36 @@ def load(trials_pool=None) -> Universe:
     # What it costs ME. A clause is instant and cannot be refused; a market
     # row is a bid that can lose, and that difference is not priced here —
     # see the module docstring.
+    #
+    # Both sides join through ffcore.league.api_key, keyed on the market's
+    # spelling like everything else. The clause is ON the api_teams row, so a
+    # name that will not resolve is not a missing price — it is a rival's
+    # player who silently cannot be bought at all.
+    index = latest_only(lg.market.rows) if lg.market is not None else []
     price: dict[str, float] = {}
     for r in mkt:
-        k = _key(r["player_name"], players)
+        k = api_key(r["player_name"], "", lg.market, owner, index,
+                    r.get("market_value"))
         if k and r.get("sale_price"):
             price[k] = float(r["sale_price"])
     for r in teams:
         if r["manager"] == me or not (r.get("buyout") or "").strip():
             continue
-        k = _key(r["player_name"], players)
+        k = api_key(r["player_name"], r["manager"], lg.market, owner, index,
+                    r.get("market_value"))
         if k:
             price.setdefault(k, float(r["buyout"]))
 
     proceeds = {k: float((players[k] or {}).get("value") or 0)
                 for k in squads.get(me, {})}
 
-    pos, base = {}, {}
+    pos, base, name = {}, {}, {}
     universe = set(price) | {k for s in squads.values() for k in s}
     for k in universe:
         rec = players.get(k)
         if not rec:
             continue
+        name[k] = rec.get("name") or k
         pos[k] = SLOT.get((rec.get("pos") or "").lower(), "MED")
         row = sc.row_for(k)
         s = sc.score(row) if row else None
@@ -258,7 +356,15 @@ def load(trials_pool=None) -> Universe:
 
     pool = pool_from_perjornada(
         csv.DictReader(open(SEASON / "live" / "perjornada_2026-27.csv")))
-    fc = Bootstrap({j: base for j in rem}, pool=pool)
+    # A round in progress carries only the players who have not played it yet.
+    # Everyone else scored their real points hours ago and they are in
+    # `carried` — see rounds_left().
+    club = {k: club_key(players[k].get("team"), mkt_teams)
+            for k in base if k in players}
+    fc = Bootstrap({j: ({k: v for k, v in base.items()
+                         if club.get(k) not in played[j]}
+                        if j in played else base)
+                    for j in rem}, pool=pool)
 
     carried = {}
     for r in teams:
@@ -269,18 +375,9 @@ def load(trials_pool=None) -> Universe:
 
     return Universe(
         state=LeagueState(squads, rem, me, carried), forecaster=fc, pos=pos,
-        price=price, proceeds=proceeds, owner={_key(n, players) or n: v
-                                               for n, v in owner.items()},
-        cash=cash, me=me)
-
-
-def _key(name, players):
-    from ffcore.text import norm, resolve
-    k = norm(name)
-    if k in players:
-        return k
-    rec, _ = resolve(name, list(players.values()))
-    return norm(rec["name"]) if rec else None
+        price=price, proceeds=proceeds, owner=owner, cash=cash, me=me,
+        part_played=played, name=name,
+        unjoined=list(unjoined_clubs) + list(lg.api_unjoined))
 
 
 def _selftest() -> None:
@@ -358,8 +455,60 @@ def _selftest() -> None:
 
     assert Action("steal", buy="X", victim="R").label() == "steal X from R"
     assert Action("swap", buy="X", sell="Y").label() == "buy X · sell Y"
+    # The grammar of a move is written once. A report that spelled it out
+    # again to swap the keys for names would be a second place for "steal"
+    # and "sell" to drift apart from each other.
+    assert Action("steal", buy="x", victim="R").label({"x": "Xavi"}) \
+        == "steal Xavi from R"
+    assert Action("sell", sell="y").label({"y": "Yuri"}) == "sell Yuri"
+    assert Action("swap", buy="x", sell="y").label({"x": "Xavi"}) \
+        == "buy Xavi · sell y"
 
-    print("decide self-test OK (16 cases)")
+    # -- a round already half played ---------------------------------------
+    # THE CASE THAT ACTUALLY EXISTS IN AUGUST, and the one that pays twice. A
+    # jornada is not finished, so it is still ahead — but four of its ten
+    # matches have been played, the app has already banked those points into
+    # the carried total, and simulating them again credits them a second time.
+    teams = ["Alavés", "Getafe", "Celta Vigo", "Osasuna", "Rayo"]
+    ms = [{"jornada": "1", "home": "alaves", "away": "getafe", "score": "3-0"},
+          {"jornada": "1", "home": "celta", "away": "osasuna", "score": ""},
+          {"jornada": "2", "home": "alaves", "away": "celta", "score": ""},
+          {"jornada": "3", "home": "alaves", "away": "getafe", "score": "1-1"},
+          {"jornada": "", "home": "alaves", "away": "celta", "score": ""}]
+    rem, done, unjoined = rounds_left(ms, teams)
+    # J1 is still ahead (six matches to come); J3 is finished and is not.
+    assert rem == [1, 2], rem
+    # ...and within J1, these two clubs have nothing left to give.
+    assert done == {1: {"alaves", "getafe"}}, done
+    assert unjoined == [], unjoined
+
+    # ONE CLUB, TWO SPELLINGS, and this is not hypothetical: the market calls
+    # them "Rayo", the fixture page "rayo-vallecano", and the probable-XI page
+    # files twenty-eight players under one and one player under the other. The
+    # two sides of this join have to land on the same key or the round-in-
+    # progress exclusion silently covers one player and misses the rest, which
+    # is the double count back under a different name. Both sides go through
+    # the MARKET's list of clubs, which is the one canonical spelling there is.
+    assert club_key("rayo-vallecano", teams) == "rayo"
+    assert club_key("Rayo", teams) == "rayo"
+    assert club_key("celta", teams) == "celta vigo"
+    # No club, or one nothing can place, is not "some club" — it is nothing,
+    # and nothing is never equal to a club that has played.
+    assert club_key("zzz-united", teams) == ""
+    assert club_key("", teams) == ""
+
+    # A club the fixture page spells in a way the market does not is NOT
+    # silently treated as unplayed — that is the double count coming back
+    # under a name nobody prints. It comes back to be reported.
+    _r, _d, un = rounds_left(
+        [{"jornada": "1", "home": "zzz-united", "away": "getafe",
+          "score": "1-0"},
+         {"jornada": "1", "home": "celta", "away": "osasuna", "score": ""}],
+        teams)
+    assert un == ["zzz-united"], un
+    assert _d == {1: {"getafe"}}, _d
+
+    print("decide self-test OK (28 cases)")
 
 
 if __name__ == "__main__":
