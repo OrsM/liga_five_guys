@@ -22,9 +22,14 @@ On this box it is a file the job rewrites in place. That is the whole reason.
     journalctl --user -u lfg.service -n 50   # what happened
 
 `~/.local/bin/lfg-run` is the chain; `lfg-publish` pushes the finished report
-to the phone, which is what serves lemonworlds.com. The Actions workflow still
-exists and its **test job still runs on every push** — only the schedule is
-off. It is the way back if this box dies.
+to the phone, which serves it at **notes.lemonworlds.com/fantasy** behind
+Cloudflare Access.
+
+**There is no GitHub Actions workflow any more.** Its schedule went when the
+report moved here, and its test job went with it on 2026-08-18: with nothing
+pushing, a job that runs on push is not a schedule. The self-tests run at the
+top of every `lfg-run` instead, and a failure stops the run rather than
+publishing a report built by code that does not pass its own checks.
 
 ## The one table
 
@@ -187,8 +192,8 @@ docs/design.md       architecture, data sources, modelling plan
 ## Tests
 
 No test directory and no pytest. Each module self-tests under
-`if __name__ == "__main__"`, and the `report` workflow runs them on every push
-to `src/` — that job is the reason the workflow file still exists.
+`if __name__ == "__main__"`, and `lfg-run` runs all eighteen before it fetches
+anything. Twenty seconds, and a failure aborts the run.
 
 Dependencies are `uv`, not pip: this box has no `pip` and no `python3-venv`,
 and installing them needs sudo. `uv sync` once, then `uv run --frozen python …`
