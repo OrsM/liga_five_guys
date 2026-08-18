@@ -127,6 +127,33 @@ def short(key, u) -> str:
     return full if clash > 1 else last
 
 
+def verdict(routes) -> tuple:
+    """(headline, whether waiting wins). ONE ANSWER, AT THE TOP.
+
+    The report has twice shown a ranked list of moves reading as "do this"
+    directly above a section saying "waiting beats all of these". Two things
+    on one screen pointing opposite ways is not extra information, it is a
+    contradiction the reader has to arbitrate — and this repo has form: the
+    board it replaced once held a man and sold him three tables later, in the
+    same unit. It cost a real sale.
+
+    So the verdict is computed once, it leads, and everything below it is
+    explicitly subordinate to it.
+    """
+    if len(routes) < 2:
+        return "", False
+    act = next((r for r in routes if r["route"] == "act"), None)
+    best = max(routes, key=lambda r: r["best"])
+    if act is None or best["route"] == "act":
+        return ("**Act today.** Nothing you can wait for beats what is on "
+                "offer now.", False)
+    gap = best["best"] - act["best"]
+    return ("**Don't spend yet.** %s is worth %+.2f xPts/j against %+.2f for "
+            "the best thing you can buy today — %.2f better, and the balance "
+            "is what buys the choice." % (best["label"], best["best"],
+                                          act["best"], gap), True)
+
+
 def table(rows, u, base, rivals) -> list[str]:
     """Every move, and where each one leaves you.
 
@@ -187,25 +214,15 @@ def table(rows, u, base, rivals) -> list[str]:
     return out
 
 
-def waiting(u, offers=None, rng=None) -> list[str]:
-    """What doing nothing is worth — the one option never on the table.
+def wait_routes(u, offers=None, rng=None) -> list[dict]:
+    """The three ways to get a better eleven, as data both renderers read.
 
-    EVERY MOVE IS SCORED AGAINST DOING NOTHING FOR THIRTY-EIGHT JORNADAS. That
-    is not the alternative. The alternative is doing something better later,
-    with the balance intact, against a market that deals a fresh dozen every
-    cycle and a set of clauses that opens on a known date. Waiting scored
-    exactly zero and anything positive beat it by construction.
-
-    So it is measured where it can be and printed where it cannot. The free
-    market is simulated (ffcore.market, fitted to the cycles on record); the
-    clause unlock needs no simulation at all, because the players and the date
-    are both known.
-
-    THE ANSWER ON REAL DATA WAS NOT THE ONE EXPECTED, which is the reason to
-    have measured it: of 557 unowned players only FOUR would improve the
-    eleven, so waiting for the free market is worth almost nothing. The
-    upgrades are all owned by somebody, and they arrive at once when the
-    clauses open.
+    ACT NOW, WAIT FOR THE MARKET, OR WAIT FOR THE CLAUSES. Every move in the
+    ranking is scored against doing nothing for thirty-eight jornadas, which
+    is not the alternative on offer — so waiting scores zero there and
+    anything positive beats it by construction. This is the correction, and it
+    is computed ONCE: the markdown table and the phone drew different things
+    twice before this was a function.
     """
     import datetime as dt
     import random
@@ -221,57 +238,80 @@ def waiting(u, offers=None, rng=None) -> list[str]:
     mine = set(u.state.squads.get(u.me, {}))
 
     def gain(k):
-        # market_exp, not the simulation's expected(): the simulation scores
-        # the 89 players who could be in a squad, and this question is about
-        # the other five hundred. A player it was never given comes back as
-        # 0.0, which is indistinguishable from worthless — and that is exactly
-        # what happened, scoring Lamine Yamal at nothing and concluding that
-        # four players in the league could improve the eleven.
+        # market_exp, not expected(): the simulation scores the 89 players who
+        # could be in a squad, and this question is about the other five
+        # hundred. One it was never given comes back 0.0, which is
+        # indistinguishable from worthless — and that is what scored Lamine
+        # Yamal at nothing.
         return max(0.0, u.market_exp.get(k, exp.get(k, 0.0)) - bar)
 
     now_best = max((gain(k) for k in u.price if k not in mine), default=0.0)
-    shut = {k: w for k, w in u.clause_until.items()
-            if w > now and k not in mine}
-    helpful = sum(1 for k in shut if gain(k) > 0)
-    then_best = max((gain(k) for k in shut), default=0.0)
+    out = [{"route": "act", "label": "Act today",
+            "what": "%d players you can buy now" % len(u.price),
+            "best": now_best, "lo": None, "hi": None, "beats_now": None}]
 
-    out = ["| Route | What it offers | Best upgrade |", "|---|---|--:|",
-           "| **Act today** | %d players you can buy now | %+.2f |"
-           % (len(u.price), now_best)]
-    lines = []
     if offers is not None:
         band = offers.best_over(7, gain, rng or random.Random(3))
-        lo, med, hi = (sorted(band)[int(0.1 * len(band))],
-                       statistics.median(band),
-                       sorted(band)[int(0.9 * len(band))])
-        out.append("| Wait for the market | a week of new offers | "
-                   "%+.2f (10–90: %+.2f to %+.2f) |" % (med, lo, hi))
-        better = 100.0 * sum(1 for x in band if x > now_best) / len(band)
-        lines.append("_The free market is simulated rather than guessed at: "
-                     "%s. **%d of the %d unowned players** would improve your "
-                     "eleven, and a week of offers beats the best thing you "
-                     "can buy today **%.0f%% of the time** — even the tenth "
-                     "percentile of waiting (%+.2f) clears it. Spending now "
-                     "buys the worse of two options and gives up the choice._"
-                     % (offers.note(),
-                        sum(1 for k in offers.pool if gain(k) > 0),
-                        len(offers.pool), better, lo))
+        out.append({
+            "route": "market", "label": "Wait for the market",
+            "what": "a week of new offers",
+            "best": statistics.median(band),
+            "lo": sorted(band)[int(0.1 * len(band))],
+            "hi": sorted(band)[int(0.9 * len(band))],
+            "beats_now": sum(1 for x in band if x > now_best) / len(band),
+            "helpful": sum(1 for k in offers.pool if gain(k) > 0),
+            "pool": len(offers.pool), "note": offers.note()})
+
+    shut = {k: w for k, w in u.clause_until.items()
+            if w > now and k not in mine}
     if shut:
         opens = min(shut.values())
-        days = max(0.0, (opens - now).total_seconds() / 86400.0)
-        out.append("| Wait for the clauses | %d players on %s | %+.2f |"
-                   % (len(shut), opens.strftime("%d %b"), then_best))
-        lines.append("_**%d of those %d locked players would improve your "
-                     "eleven** and their clauses open on %s, in about %.0f "
-                     "days. Waiting scores ZERO in the table above — not "
-                     "because it is worthless but because nothing there can "
-                     "price a market it has not seen, so every move with a "
-                     "positive number beats it by construction. That is the "
-                     "bias to hold in mind when the ranking asks you to spend "
-                     "the balance; the **Left** column is what buys the "
-                     "choice._"
-                     % (helpful, len(shut), opens.strftime("%d %b"), days))
-    return out + [""] + lines + [""] if len(out) > 2 else []
+        out.append({
+            "route": "clauses", "label": "Wait for the clauses",
+            "what": "%d players on %s" % (len(shut), opens.strftime("%d %b")),
+            "best": max((gain(k) for k in shut), default=0.0),
+            "lo": None, "hi": None, "beats_now": None,
+            "helpful": sum(1 for k in shut if gain(k) > 0),
+            "days": max(0.0, (opens - now).total_seconds() / 86400.0),
+            "opens": opens.strftime("%d %b")})
+    return out
+
+
+def waiting(u, offers=None, rng=None) -> list[str]:
+    """The routes above, as the markdown table."""
+    routes = wait_routes(u, offers, rng)
+    if len(routes) < 2:
+        return []
+    out = ["| Route | What it offers | Best upgrade |", "|---|---|--:|"]
+    for r in routes:
+        band = ("" if r["lo"] is None
+                else " (10–90: %+.2f to %+.2f)" % (r["lo"], r["hi"]))
+        name = ("**%s**" % r["label"] if r["route"] == "act" else r["label"])
+        out.append("| %s | %s | %+.2f%s |"
+                   % (name, r["what"], r["best"], band))
+    out.append("")
+    mkt = next((r for r in routes if r["route"] == "market"), None)
+    if mkt:
+        out.append("_The free market is simulated rather than guessed at: %s. "
+                   "**%d of the %d unowned players** would improve your "
+                   "eleven, and a week of offers beats the best thing you can "
+                   "buy today **%.0f%% of the time** — even the tenth "
+                   "percentile of waiting (%+.2f) clears it. Spending now "
+                   "buys the worse of two options and gives up the choice._"
+                   % (mkt["note"], mkt["helpful"], mkt["pool"],
+                      100 * mkt["beats_now"], mkt["lo"]))
+    cl = next((r for r in routes if r["route"] == "clauses"), None)
+    if cl:
+        out.append("_**%d locked players would improve your eleven** and "
+                   "their clauses open on %s, in about %.0f days. Waiting "
+                   "scores ZERO in the table above — not because it is "
+                   "worthless but because nothing there can price a market it "
+                   "has not seen, so every move with a positive number beats "
+                   "it by construction. That is the bias to hold in mind when "
+                   "the ranking asks you to spend the balance; the **Left** "
+                   "column is what buys the choice._"
+                   % (cl["helpful"], cl["opens"], cl["days"]))
+    return out + [""]
 
 
 def decide_choosable(u):
@@ -389,7 +429,8 @@ def alert_lines(u, rows, rivals) -> list[str]:
                best["d_pos"], 100 * best["d_win"])]
 
 
-def payload(u, rows, base, rivals, locks_h=None, n_actions: int = 0) -> dict:
+def payload(u, rows, base, rivals, locks_h=None, n_actions: int = 0,
+            offers=None) -> dict:
     """The report as data, for the phone to draw.
 
     Same rows as the markdown, so the two cannot disagree about order or
@@ -439,6 +480,9 @@ def payload(u, rows, base, rivals, locks_h=None, n_actions: int = 0) -> dict:
         "moves": moves,
         "sell": [{"name": names.get(k, k), "pos": u.pos.get(k, ""),
                   "raises": got} for k, got in dead_weight(u)],
+        "wait": wait_routes(u, offers),
+        "verdict": verdict(wait_routes(u, offers))[0],
+        "hold": verdict(wait_routes(u, offers))[1],
         "standings": [
             {"manager": m, "me": m == u.me,
              "now": u.state.carried.get(m, 0.0), "mean": base.mean(m),
@@ -548,15 +592,22 @@ def render(u, rows, base, stamp: str, rivals, n_actions: int = 0,
     # preamble above the first `## ` arrives in the middle of the report
     # reading as the tail of whatever section came before it — which here is
     # the board's warnings.
+    routes = wait_routes(u, offers)
+    call, hold = verdict(routes)
     out = ["# The simulation — %s" % stamp, "",
-           "## What the simulation says to do", "",
+           "## The call", "", call or
            "_One question, asked of every move you could make: if I did "
            "this, where would I finish?_", ""]
     out += header(u, base, n_actions or len(rows), locks_h)
+    if routes:
+        out += waiting(u, offers) 
+    # THE RANKING IS SUBORDINATE TO THE CALL, and says so in its own heading.
+    # Presented as "what to do" directly above a section saying "do nothing",
+    # it is a contradiction rather than a second opinion.
+    out += ["## %s" % ("If you act anyway — every move, ranked" if hold
+                       else "Do this — every move, ranked"), ""]
     out += table(rows, u, base, rivals)
-    wait = waiting(u, offers)
-    if wait:
-        out += ["## Or wait", ""] + wait
+
     out += ["## Sell — these never make the eleven", ""]
     out += sells(u, dead_weight(u))
     out += ["## Where the league stands", ""]
@@ -841,7 +892,24 @@ def _selftest() -> None:
     # Headings the digest picks up must not collide with the board's, or one
     # of the two silently loses its section.
     heads = [ln for ln in page.splitlines() if ln.startswith("## ")]
-    assert len(heads) == len(set(heads)) == 4, heads
+    assert len(heads) == len(set(heads)) == 5, heads
+
+    # -- ONE ANSWER, AND EVERYTHING ELSE UNDER IT --------------------------
+    # A ranked list reading "do this" above a section reading "wait" is a
+    # contradiction the reader has to arbitrate, and this report has done it
+    # twice. The verdict leads and the ranking says what it is.
+    acting = [{"route": "act", "label": "Act today", "what": "x", "best": 9.0},
+              {"route": "market", "label": "Wait", "what": "y", "best": 1.0}]
+    call, hold = verdict(acting)
+    assert "Act today" in call and hold is False, (call, hold)
+    waitwin = [{"route": "act", "label": "Act today", "what": "x", "best": 1.0},
+               {"route": "market", "label": "Wait for the market",
+                "what": "y", "best": 5.0}]
+    call, hold = verdict(waitwin)
+    assert "Don't spend yet" in call and hold is True, (call, hold)
+    assert "4.00 better" in call or "4.00" in call, call
+    # Nothing to compare against is no verdict, rather than a made-up one.
+    assert verdict([]) == ("", False)
     for banned in ("## Do this", "## The board", "## Warnings"):
         assert banned not in heads, heads
 
@@ -850,7 +918,7 @@ def _selftest() -> None:
     ph = "\n".join(placeholder("no api_teams.csv"))
     assert "no api_teams.csv" in ph and ph.startswith("# The simulation")
 
-    print("sim self-test OK (72 cases)")
+    print("sim self-test OK (78 cases)")
 
 
 def main() -> None:
@@ -899,7 +967,8 @@ def main() -> None:
     (REPORTS / "decisions.json").write_text(json.dumps({
         "generated_at": dt.datetime.now(dt.timezone.utc)
                           .strftime("%Y-%m-%dT%H:%MZ"),
-        **payload(u, rows, base, rivals, locks_h, len(acts)),
+        **payload(u, rows, base, rivals, locks_h, len(acts),
+                  market_model(u)),
     }, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
     print("wrote %s" % (REPORTS / "decisions.json"))
 
