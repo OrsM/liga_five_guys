@@ -1,4 +1,4 @@
-# Fantasy report — 2026-08-18T0144Z
+# Fantasy report — 2026-08-18T0152Z
 
 **Locks in 41h** (next kickoff) · squad 213.11M · cash 23.60M · total 236.71M
 

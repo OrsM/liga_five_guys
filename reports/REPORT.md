@@ -1,4 +1,4 @@
-# Liga Five Guys — one report — 2026-08-18 01:48 UTC
+# Liga Five Guys — one report — 2026-08-18 01:54 UTC
 
 Field, buy, hold, sell — one table, one metric. Everything else is reference and is linked, not reprinted.
 
