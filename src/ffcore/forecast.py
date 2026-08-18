@@ -88,6 +88,13 @@ class Bootstrap:
                  pool=()):
         # {jornada: {key: (points_if_he_plays, p_start)}}
         self.per_jornada = per_jornada
+        # THE ORDER PLAYERS DRAW IN, fixed here rather than left to the dict.
+        # One rng feeds the whole round, so the order the players come out in
+        # decides which of them gets which number — and the callers build
+        # these dicts by iterating a set, whose order over strings changes
+        # with Python's per-process hash seed. Sorted once at construction,
+        # the same data is the same season in every process, on every box.
+        self._order = {j: sorted(d) for j, d in per_jornada.items()}
         real = [p for p in pool if p is not None]
         self._real_n = len(real)
         self.pool = tuple(real) if len(real) >= MIN_POOL else SEED_POOL
@@ -110,8 +117,10 @@ class Bootstrap:
                 for k, (pts, p) in self.per_jornada.get(jornada, {}).items()}
 
     def draw(self, jornada: int, rng: random.Random) -> dict[str, float]:
+        per = self.per_jornada.get(jornada, {})
         out = {}
-        for k, (pts, p) in self.per_jornada.get(jornada, {}).items():
+        for k in self._order.get(jornada, ()):
+            pts, p = per[k]
             if p <= 0.0 or rng.random() >= p:
                 out[k] = 0.0
                 continue
@@ -181,6 +190,19 @@ def _selftest() -> None:
     b = Bootstrap({1: {"x": (4.0, 0.7)}}).draw(1, random.Random(1))
     assert a == b, (a, b)
 
+    # ...AND ACROSS PROCESSES, which is a stronger claim and the one that was
+    # not true. Every player pulls from one rng in dict order, so the SAME
+    # players inserted in a different order get each other's numbers. The
+    # callers build that dict by iterating a set, and set order over strings
+    # moves with Python's per-process hash seed — so the headline P(win) in
+    # the report drifted a point or two between runs on identical data, which
+    # is noise a reader has no way to tell from news.
+    same = {"x": (4.0, 1.0), "y": (2.0, 1.0), "z": (3.0, 1.0)}
+    fwd = Bootstrap({1: {k: same[k] for k in ("x", "y", "z")}})
+    rev = Bootstrap({1: {k: same[k] for k in ("z", "y", "x")}})
+    assert fwd.draw(1, random.Random(3)) == rev.draw(1, random.Random(3)), \
+        "the same season must not depend on dict insertion order"
+
     # -- the pool ----------------------------------------------------------
     assert "seed prior" in Bootstrap({}, pool=[1, 2, 3]).pool_note()
     big = list(range(MIN_POOL))
@@ -195,7 +217,7 @@ def _selftest() -> None:
             {"games_delta": "x", "points_delta": "3"}]     # unparseable
     assert pool_from_perjornada(rows) == [4, -1]
 
-    print("ffcore.forecast self-test OK (18 cases)")
+    print("ffcore.forecast self-test OK (19 cases)")
 
 
 if __name__ == "__main__":
