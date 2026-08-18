@@ -924,6 +924,12 @@ def board_rows(players, chosen, cands, repl, hurdle,
             r["verdict"] = "Sell"
             r["why"] = "funds %s (%+.1f, %+.1f better)" % (
                 up["name"], up["vor"], up["vor"] - r["vor"])
+            # Carried as a field, not left to be parsed back out of the
+            # sentence: several bench players can each fund the SAME buy, and
+            # they are alternatives rather than a shopping list. Listing them
+            # flat reads as "sell all five", which would gut the defence to
+            # buy one defender.
+            r["funds"] = up["name"]
             funds.setdefault(id(up), r["name"])
         else:
             r["verdict"] = "Hold"
@@ -988,6 +994,72 @@ def alerts(rows, warnings, token_days) -> list[str]:
     if token_days is not None and token_days < 14:
         out.append("**Log in again** — the league token expires in %d days "
                    "(`python -m ffcore.auth --login`)" % token_days)
+    return out
+
+
+def sec_today(rows) -> list[str]:
+    """## Do this — the answer, before the table that justifies it.
+
+    The board is nine columns wide because each one earns its place. On a
+    phone that is four columns and a sideways scroll, and the verdict is not
+    among the four, so the report answered "what should I do today" only after
+    you dragged it into view.
+
+    So this goes above it: every asset carrying an action, one line each, buys
+    first because they are what you spend on and sells are how you fund them.
+    A Hold prints nothing — the absence of news IS the news — and cash is not
+    an action. Fitness is the one exception, because a knock on a man you are
+    about to field is worth a line even though the verdict is Hold.
+    """
+    buys = [r for r in rows if r.get("verdict") == "Buy"]
+    sells = [r for r in rows if r.get("verdict") == "Sell"
+             and r.get("kind") != "cash"]
+    # A sale that funds a named buy is an OPTION for that buy. A sale of
+    # somebody who can never reach the eleven is a sale full stop.
+    funders: dict = {}
+    for r in sells:
+        if r.get("funds"):
+            funders.setdefault(r["funds"], []).append(r)
+    dead = [r for r in sells if not r.get("funds")]
+    hurt = [r for r in rows if r.get("flag") and r.get("kind") == "own"]
+    xi = [r["name"] for r in rows if r.get("in_xi")]
+
+    out = ["## Do this", ""]
+    if not buys and not dead:
+        out += ["**Nothing to buy or sell.** Every asset you hold is worth "
+                "more than the cash it would raise, and nothing on offer "
+                "beats what you have.", ""]
+
+    for r in sorted(buys, key=lambda r: -(r.get("rate") or 0)):
+        bits = [r.get("slot") or ""]
+        if r.get("rate") is not None:
+            bits.append("%.3f pts/M" % r["rate"])
+        if r.get("line"):
+            bits.append("up to %s" % eur(r["line"]))
+        out.append("- **Buy %s** — %s" % (r["name"],
+                                          " · ".join(b for b in bits if b)))
+        opts = sorted(funders.get(r["name"], []),
+                      key=lambda x: -(x.get("money") or 0))
+        if opts:
+            out.append("  Sell **one** of: %s"
+                       % ", ".join("%s (%s)" % (o["name"], eur(o["money"]))
+                                   for o in opts))
+    if buys:
+        out.append("")
+
+    if dead:
+        out += ["**Sell — cannot reach your eleven whatever happens:**", ""]
+        for r in sorted(dead, key=lambda r: (r.get("rate") or 0)):
+            out.append("- **%s** — %s · %s"
+                       % (r["name"], r.get("slot") or "", r.get("why") or ""))
+        out.append("")
+    for r in hurt:
+        out += ["- **Check %s** — fitness or availability has something on "
+                "him." % r["name"]]
+    if hurt:
+        out.append("")
+    if xi:
+        out += ["**Field** " + " · ".join(xi), ""]
     return out
 
 
@@ -1599,6 +1671,9 @@ def main() -> None:
         ctx.append("**line %.3f pts/M**" % hurdle)
     head += [" · ".join(ctx), ""]
     if brows:
+        # The answer first, then the table it came from. On a phone the table
+        # alone needs a sideways scroll before it says anything actionable.
+        head += sec_today(brows)
         head += sec_board(brows, spent or cash_value, forgone) + [""]
 
     # The workings open by naming what they are working out, and link back
@@ -2080,7 +2155,78 @@ def _selftest() -> None:
     assert any("Log in again" in ln for ln in alerts([], [], token_days=9))
     assert alerts([], [], token_days=60) == []
 
-    print("report self-test OK (95 cases)")
+    # -- the phone-first summary -------------------------------------------
+    # The board is nine columns. On a 390px screen four of them are visible
+    # and the verdict is not one, so the answer to "what do I do" needed a
+    # sideways scroll. This block is the answer, in a list, above the table.
+    brd2 = [
+        {"kind": "buy", "name": "Marcos Alonso", "slot": "DEF",
+         "verdict": "Buy", "why": "paid for by selling Carl Starfelt",
+         "rate": 0.055, "line": 66.96e6, "in_xi": False, "flag": False},
+        {"kind": "own", "name": "Dani Lorenzo", "slot": "MED",
+         "verdict": "Sell", "why": "7th MED — only 5 can be fielded",
+         "rate": -0.07, "line": None, "in_xi": False, "flag": False},
+        {"kind": "own", "name": "Jon Moncayola", "slot": "MED",
+         "verdict": "Hold", "why": "", "rate": 0.09, "line": None,
+         "in_xi": True, "flag": False},
+        {"kind": "own", "name": "Hurt Man", "slot": "DEF", "verdict": "Hold",
+         "why": "", "rate": 0.01, "line": None, "in_xi": True, "flag": True},
+        {"kind": "cash", "name": "CASH", "verdict": "the line", "why": "",
+         "rate": 0.04, "line": None, "in_xi": False, "flag": False},
+    ]
+    txt = "\n".join(sec_today(brd2))
+    # Every action, and only actions. A Hold is the absence of news.
+    assert "Marcos Alonso" in txt and "Dani Lorenzo" in txt, txt
+    assert "Jon Moncayola" not in txt.split("Field")[0], txt
+    assert "CASH" not in txt, txt
+    # Buys before sells: one tells you what to do with money, the others are
+    # how you find it, and reading them the other way round is backwards.
+    assert txt.index("Marcos Alonso") < txt.index("Dani Lorenzo"), txt
+    # The price to act at rides along, because a Buy without a ceiling is
+    # not actionable on a phone at the moment an offer appears.
+    assert "66.96M" in txt, txt
+    # The eleven is named, so fielding needs no scroll either.
+    assert "Field" in txt and "Jon Moncayola" in txt, txt
+    # Fitness is an exception worth surfacing even on a Hold.
+    assert "Hurt Man" in txt, txt
+
+    # SEVERAL SELLS CAN FUND THE SAME BUY, and they are alternatives. Listed
+    # flat they read as a shopping list, and following it would sell four
+    # defenders to buy one. The real board had exactly this: five bench
+    # players each captioned "funds Marcos Alonso".
+    many = [
+        {"kind": "buy", "name": "Target", "slot": "DEF", "verdict": "Buy",
+         "why": "", "rate": 0.05, "line": 40e6, "in_xi": False, "flag": False},
+        {"kind": "own", "name": "Funder A", "slot": "DEF", "verdict": "Sell",
+         "why": "funds Target", "funds": "Target", "money": 12e6,
+         "rate": -0.02, "line": None, "in_xi": False, "flag": False},
+        {"kind": "own", "name": "Funder B", "slot": "DEF", "verdict": "Sell",
+         "why": "funds Target", "funds": "Target", "money": 9e6,
+         "rate": -0.03, "line": None, "in_xi": False, "flag": False},
+        {"kind": "own", "name": "Spare", "slot": "POR", "verdict": "Sell",
+         "why": "2nd POR — only 1 can be fielded", "money": 4e6,
+         "rate": -1.0, "line": None, "in_xi": False, "flag": False},
+    ]
+    grouped = "\n".join(sec_today(many))
+    # The two funders appear together, on the buy, as a choice of one.
+    assert "Sell **one** of:" in grouped, grouped
+    line = [ln for ln in grouped.split("\n") if "one** of" in ln][0]
+    assert "Funder A" in line and "Funder B" in line, line
+    # …and NOT as two separate sell instructions.
+    assert "**Sell Funder A**" not in grouped, grouped
+    # The player who can never be fielded is a real sale, listed apart.
+    assert "cannot reach your eleven" in grouped, grouped
+    assert "Spare" in grouped.split("cannot reach your eleven")[1], grouped
+    # Proceeds are named, because which one to sell is a money question.
+    assert "12.00M" in line and "9.00M" in line, line
+
+    # Nothing to do is said plainly rather than left as an empty heading.
+    quiet = "\n".join(sec_today([
+        {"kind": "own", "name": "x", "slot": "MED", "verdict": "Hold",
+         "why": "", "rate": 0.1, "line": None, "in_xi": True, "flag": False}]))
+    assert "Nothing to buy or sell" in quiet, quiet
+
+    print("report self-test OK (111 cases)")
 
 
 if __name__ == "__main__":

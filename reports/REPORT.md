@@ -1,9 +1,24 @@
-# Liga Five Guys — one report — 2026-08-18 00:52 UTC
+# Liga Five Guys — one report — 2026-08-18 01:24 UTC
 
 Field, buy, hold, sell — one table, one metric. Everything else is reference and is linked, not reprinted.
 
 
 **Locks in 42h** (next kickoff) · squad 213.11M · cash 23.60M · total 236.71M
+
+## Do this
+
+- **Buy Marcos Alonso** — DEF · 0.055 pts/M
+  Sell **one** of: Carl Starfelt (15.09M), Robin Le Normand (11.16M), Igor Zubeldia (11.05M), Omar El Hilali (10.09M)
+- **Buy Isi Palazon** — DEL · -0.039 pts/M
+  Sell **one** of: Iñigo Vicente (21.02M)
+
+**Sell — cannot reach your eleven whatever happens:**
+
+- **Alvaro Fernandez** — POR · 2nd POR — only 1 can be fielded
+- **Beñat Turrientes** — MED · 7th MED — only 5 can be fielded
+- **Dani Lorenzo** — MED · 6th MED — only 5 can be fielded
+
+**Field** Jon Moncayola · Pablo Fornals · Ionut Radu · Iñigo Ruiz de Galarreta · Lucien Agoume · Carl Starfelt · Pepelu · Robin Le Normand · Iñigo Vicente · Omar El Hilali · Igor Zubeldia
 
 ## The board
 

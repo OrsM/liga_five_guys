@@ -1,4 +1,4 @@
-# Watchlist — 2026-08-18 00:51 UTC
+# Watchlist — 2026-08-18 01:24 UTC
 
 The 39 players you pasted as today's slate — everyone you can actually bid on right now, unfiltered. What each one is worth to your XI, and what to bid, is in the slate table at the top of this report.
 

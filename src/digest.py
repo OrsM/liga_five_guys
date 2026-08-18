@@ -57,6 +57,7 @@ DECIDE = [
     # are the workings, kept because a ranking you cannot audit is a ranking you
     # stop trusting — and they now READ the board rather than re-deriving it, so
     # they are reference because they repeat it, not because they disagree.
+    "Do this",
     "The board",
     "Warnings",
 ]
