@@ -294,6 +294,9 @@ def payload(u, rows, base, rivals, locks_h=None, n_actions: int = 0) -> dict:
                                               else "buy"),
             "buy": names.get(a.buy, a.buy) if a.buy else "",
             "sell": " + ".join(names.get(k, k) for k in a.sell),
+            # How many, so a renderer can make the same call the markdown
+            # table makes without parsing the string back apart.
+            "sell_n": len(a.sell),
             "victim": a.victim,
             "d_pos": r["d_pos"], "d_win": r["d_win"], "net": -a.net,
             "p_win_after": base.position().get(1, 0.0) + r["d_win"],
@@ -557,6 +560,7 @@ def _selftest() -> None:
                                         cost=1e6, proceeds=2e6)}],
                   st, ["riv"])["moves"][0]
     assert two["sell"] == "Benat Turrientes + Yuri Berchiche", two
+    assert two["sell_n"] == 2 and m["sell_n"] == 1, (two, m)
     assert m["victim"] == "riv" and m["kind"] == "steal"
     assert m["d_pos"] == 0.433 and m["d_win"] == 0.364
     # The phone draws the destination too, so it is computed once here rather
@@ -600,7 +604,7 @@ def _selftest() -> None:
     ph = "\n".join(placeholder("no api_teams.csv"))
     assert "no api_teams.csv" in ph and ph.startswith("# The simulation")
 
-    print("sim self-test OK (63 cases)")
+    print("sim self-test OK (64 cases)")
 
 
 def main() -> None:
