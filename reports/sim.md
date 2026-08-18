@@ -4,7 +4,7 @@
 
 _One question, asked of every move you could make: if I did this, where would I finish?_
 
-**Locks in 27h** · squad 213.11M · cash 23.60M · total 236.71M
+**Locks in 25h** · squad 213.11M · cash 23.60M · total 236.71M
 
 **Expected finish 2.14** · **P(win) 11%** · season **1,480–1,738** (10–90)
 
@@ -12,16 +12,16 @@ _38 jornadas left · 83 players acquirable · 188 moves simulated._
 
 | Get | Give up | P(win) | Net € |
 |---|---|--:|--:|
-| Giuliano Simeone ← SusoGattuso | 3 spares | 70% | -23.49M |
-| Leo Roman ← SusoGattuso | Turrientes + Lorenzo | 67% | -20.86M |
-| Yuri Berchiche ← SusoGattuso | Turrientes | 57% | -14.13M |
-| Dean Huijsen ← BurtonGM89 | Turrientes + Lorenzo | 34% | -18.42M |
-| Cesar Tarrega ← SusoGattuso | Turrientes | 31% | -7.75M |
-| Aimar Oroz ← SusoGattuso | Turrientes | 30% | -18.55M |
-| Gorka Guruzeta ← Magic Mike 333 | Turrientes | 29% | -14.23M |
-| Ferran Jutgla ← Albert Laporta | Turrientes | 21% | -2.43M |
+| Dean Huijsen ← BurtonGM89 | Turrientes + Lorenzo · **he takes Berchiche** | 60% | -18.42M |
+| Gorka Guruzeta ← Magic Mike 333 | Turrientes · **he takes Berchiche** | 54% | -14.23M |
+| Giuliano Simeone ← SusoGattuso | 3 spares · **he takes Huijsen** | 48% | -23.49M |
+| Leo Roman ← SusoGattuso | Turrientes + Lorenzo · **he takes Huijsen** | 47% | -20.86M |
+| Ferran Jutgla ← Albert Laporta | Turrientes · **he takes Bernal** | 21% | -2.43M |
+| Aitor Paredes ← BurtonGM89 | Turrientes · **he takes Pastor** | 18% | +1.52M |
+| Yuri Berchiche ← SusoGattuso | Turrientes · **he takes Galarreta** | 16% | -14.13M |
+| Aimar Oroz ← SusoGattuso | Turrientes · **he takes Guruzeta** | 13% | -18.55M |
 
-_**P(win)** is where the move LEAVES you — your chance of winning the league after making it, against 11% if you do nothing. **Get** names the rival a steal takes him off, which is half of what a steal is worth: it raises your total and lowers theirs at once. **Net €** is what the move does to the balance — negative spends, positive raises. Who exactly you give up when it says *spares* is in the sell table below; none of them ever start._
+_**P(win)** is where the move LEAVES you — your chance of winning the league after making it, against 11% if you do nothing. **Get** names the rival a steal takes him off, which is half of what a steal is worth: it raises your total and lowers theirs at once. **Net €** is what the move does to the balance — negative spends, positive raises. Who exactly you give up when it says *spares* is in the sell table below; none of them ever start. **he takes** is the rival's best answer, played before the season is: a clause pays the OWNER, so paying one funds the manager you are racing — and every rival is overdrawn until you do._
 
 ## Sell — these never make the eleven
 

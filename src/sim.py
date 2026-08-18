@@ -156,6 +156,9 @@ def table(rows, u, base, rivals) -> list[str]:
         gave = ("—" if not a.sell
                 else " + ".join(short(k, u) for k in a.sell)
                 if len(a.sell) <= 2 else "%d spares" % len(a.sell))
+        ans = r.get("answer")
+        if ans is not None:
+            gave += " · **he takes %s**" % short(ans.buy, u)
         out.append("| %s | %s | %.0f%% | %s |"
                    % (got, gave, 100 * (now + r["d_win"]), _net(-a.net)))
     out += ["",
@@ -165,7 +168,11 @@ def table(rows, u, base, rivals) -> list[str]:
             "what a steal is worth: it raises your total and lowers theirs at "
             "once. **Net €** is what the move does to the balance — negative "
             "spends, positive raises. Who exactly you give up when it says "
-            "*spares* is in the sell table below; none of them ever start._"
+            "*spares* is in the sell table below; none of them ever start. "
+            "**he takes** is the rival's best answer, played before the "
+            "season is: a clause pays the OWNER, so paying one funds the "
+            "manager you are racing — and every rival is overdrawn until you "
+            "do._"
             % (100 * now), ""]
     return out
 
@@ -511,6 +518,17 @@ def _selftest() -> None:
 
     # Nothing worth doing is a sentence, not an empty table with a header on
     # top of it.
+    # A rival's answer is named in the cell: a steal that funds a counter-
+    # steal is not the move the number on its own describes.
+    answered = table([{"action": Action("steal", buy="yuri", sell="benat",
+                                        cost=20e6, proceeds=5.87e6,
+                                        victim="riv"),
+                       "d_pos": 0.4, "d_win": 0.3, "d_beat": {"riv": 0.3},
+                       "mean": 1.0,
+                       "answer": Action("steal", buy="benat", victim="me")}],
+                     u, st, ["riv"])
+    assert "he takes" in "\n".join(answered), answered
+
     empty = "\n".join(table([], u, st, ["riv"]))
     assert "|" not in empty, empty
     assert "nothing" in empty.lower(), empty
@@ -677,7 +695,7 @@ def _selftest() -> None:
     ph = "\n".join(placeholder("no api_teams.csv"))
     assert "no api_teams.csv" in ph and ph.startswith("# The simulation")
 
-    print("sim self-test OK (66 cases)")
+    print("sim self-test OK (67 cases)")
 
 
 def main() -> None:

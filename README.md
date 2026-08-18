@@ -81,6 +81,41 @@ for whether replacing them helped. git remembers the code.
 λ went the same way a fortnight earlier, one layer down: it measured the
 exchange rate against *your current eleven*, so the baseline moved under it.
 
+**A CLAUSE PAYS THE OWNER, SO A STEAL FUNDS THE MAN YOU ARE RACING.** This is
+the single biggest correction the system has had, and it came from Miguel
+distrusting a table full of steals rather than from anything the code said.
+
+Scored with rivals frozen, stealing Giuliano Simeone took P(win) from 11% to
+70%. Let SusoGattuso do the obvious thing with the 44.65M he is handed — take
+Ruiz de Galarreta back off me for 19.26M — and it is 23%. Around three
+quarters of the gain was an artefact of assuming he would sit still, and he
+had 25M left over afterwards while I had 110K.
+
+The setting makes it sharper than it sounds. **Every rival is overdrawn** —
+max bid 0K, all four of them — so right now I am the only manager in the
+league who can act at all. A clause purchase ends that: it unfreezes the one
+rival I am racing and freezes me, in a single move.
+
+So `decide.respond()` gives the simulation ONE PLY. After each candidate, the
+manager who was paid makes his best single reply — chosen on expected points,
+like every other manager in this simulation — and the season is played from
+*there*. It is deliberately conservative: he may not simply buy back the man
+just taken, because a transfer resets a clause and this repo has never seen
+one to know at what.
+
+It reorders the table completely, and the new order is strategically obvious
+in a way the old one never was: **take from the managers who cannot hurt you.**
+Dean Huijsen off BurtonGM89 (29.20M overdrawn, so the money barely reaches
+solvency) now leads at 60%, while Yuri Berchiche off SusoGattuso collapsed
+from 57% to 16%. A market purchase gets no response at all, and that asymmetry
+is the point: money paid to the app leaves the league, money paid for a clause
+changes sides.
+
+WHAT IS STILL ASSUMED, and it should be checked in the app: that the clause
+payment goes to the owner. No clause purchase has ever happened in this league
+— 58 activity rows, all market buys and sells, no manager-to-manager pair — so
+the feed cannot confirm it.
+
 **A BUYOUT CLAUSE BURNS MONEY, AND THAT IS NOW CHARGED.** A free agent asks
 about his market value — median ratio 1.011 — so buying one destroys nothing:
 you swap cash for an asset you could swap back tomorrow. A clause runs a
