@@ -1248,6 +1248,12 @@ def parse_api_teams(text: str, observed_at: str,
                 "market_value": str(pm.get("marketValue") or ""),
                 "points": str(pm.get("points") or ""),
                 "buyout": str(p.get("buyoutClause") or ""),
+                # WHEN THE CLAUSE CAN ACTUALLY BE PAID. A transfer locks it
+                # for about a week, and on 2026-08-18 every one of the 76
+                # rival players in this league was locked — the whole steal
+                # side of the report was recommending moves the app would
+                # refuse. Empty means NOT STATED, never "available now".
+                "buyout_until": str(p.get("buyoutClauseLockedEndTime") or ""),
             })
     return rows
 
@@ -1680,6 +1686,7 @@ _API_TEAMS_FIXTURE = """[
  {"id":"38091967","position":3,"teamPoints":17,"teamMoney":23596582,
   "manager":{"id":"11881989","managerName":"miguel_autentico"},
   "players":[{"buyoutClause":47000000,
+    "buyoutClauseLockedEndTime":"2026-08-25T14:07:38+02:00",
               "playerMaster":{"id":"1337","nickname":"Fornals",
                               "positionId":3,"marketValue":58300000,
                               "points":5}}]},
@@ -1983,6 +1990,9 @@ def _selftest() -> None:
     assert len(tm) == 2, tm                 # the empty playerMaster is dropped
     assert tm[0]["manager"] == "miguel_autentico"
     assert tm[0]["team_money"] == "23596582" and tm[0]["buyout"] == "47000000"
+    # The lock comes through, because a clause you cannot pay is not a price.
+    assert tm[0]["buyout_until"] == "2026-08-25T14:07:38+02:00", tm[0]
+    assert tm[1]["buyout_until"] == ""
     # The limit worth encoding: a rival states no balance, and that is empty,
     # not zero. A zero here would read as "they are broke".
     assert tm[1]["team_money"] == "" and tm[1]["manager"] == "BurtonGM89"

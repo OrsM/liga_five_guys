@@ -128,6 +128,9 @@ class Universe:
     # about his value, a buyout clause runs a median 1.52x it, and the
     # difference between the two is money that never comes back.
     value: dict[str, float] = field(default_factory=dict)
+    # When each clause becomes payable again. A transfer locks it for about a
+    # week and the app says until when; absent means locked, never open.
+    clause_until: dict = field(default_factory=dict)
     # Every player's buyout clause, mine included — the app publishes them for
     # the whole league. What it costs ANYBODY to take ANYBODY, which is what a
     # rival needs to be able to answer back.
@@ -217,6 +220,23 @@ def candidates(u: Universe, expected: dict[str, float],
     return out
 
 
+def locked(until: dict, key: str, now) -> bool:
+    """Is his clause unpayable right now?
+
+    A TRANSFER LOCKS A CLAUSE. The app publishes the moment it reopens, and
+    until then no amount of money will take him — on 2026-08-18 that was every
+    single rival player in this league, which meant the entire steal half of
+    the report consisted of moves the app would have refused.
+
+    A MISSING DATE COUNTS AS LOCKED. Not stated is not "available": treating
+    an absent field as open is precisely how this was invisible in the first
+    place, and the cost of being wrong is a table full of moves you cannot
+    make. A free agent has no clause and never reaches here.
+    """
+    when = until.get(key)
+    return True if when is None else when > now
+
+
 def burn(u, a: Action) -> float | None:
     """Wealth a move destroys: what it costs, less what you end up holding.
 
@@ -295,8 +315,11 @@ def respond(u, a: Action, after: dict) -> Action | None:
     exp = u.forecaster.expected(u.state.jornadas[0]) if u.state.jornadas else {}
     base = sum(exp.get(k, 0.0) for k in best_xi(squad, exp))
 
+    now = dt.datetime.now(dt.timezone.utc)
     best, gain = None, 0.0
     for k, price in u.clause.items():
+        if locked(u.clause_until, k, now):
+            continue
         # NOT THE MAN YOU JUST TOOK. Left in, the best answer is nearly always
         # to buy him straight back at the same price — but a clause is reset
         # by the transfer that triggers it, and this repo has never observed
@@ -569,13 +592,27 @@ def load(trials_pool=None) -> Universe:
                     r.get("market_value"))
         if k and r.get("sale_price"):
             price[k] = float(r["sale_price"])
+    now = dt.datetime.now(dt.timezone.utc)
+    clause_until: dict = {}
     for r in teams:
-        if r["manager"] == me or not (r.get("buyout") or "").strip():
-            continue
         k = api_key(r["player_name"], r["manager"], lg.market, owner, index,
                     r.get("market_value"))
-        if k:
-            price.setdefault(k, float(r["buyout"]))
+        if not k:
+            continue
+        raw = (r.get("buyout_until") or "").strip()
+        if raw:
+            try:
+                clause_until[k] = dt.datetime.fromisoformat(raw)
+            except ValueError:
+                pass
+        # A CLAUSE YOU CANNOT PAY IS NOT A PRICE. He is not cheap-but-risky or
+        # worth ranking lower; the app will refuse the transaction outright, so
+        # he does not belong in the set of things you could do today.
+        if r["manager"] == me or not (r.get("buyout") or "").strip():
+            continue
+        if locked(clause_until, k, now):
+            continue
+        price.setdefault(k, float(r["buyout"]))
 
     proceeds = {k: float((players[k] or {}).get("value") or 0)
                 for k in squads.get(me, {})}
@@ -633,6 +670,7 @@ def load(trials_pool=None) -> Universe:
         state=LeagueState(squads, rem, me, carried), forecaster=fc, pos=pos,
         price=price, proceeds=proceeds, owner=owner, cash=cash, me=me,
         value=value, clause=clause, rival_cash=rival_cash,
+        clause_until=clause_until,
         part_played=played, name=name, start_note=_calibrated()[0].note(),
         unjoined=list(unjoined_clubs) + list(lg.api_unjoined))
 
@@ -815,6 +853,10 @@ def _selftest() -> None:
         forecaster=B(per5), pos={**u.pos, "star": "MED"},
         price={"th_m1": 10e6}, value={"th_m1": 6e6, "me_m1": 4e6},
         clause={"me_m1": 6e6, "th_m1": 10e6},
+        # Payable: a clause locked by a recent transfer is no answer at all,
+        # and an absent date counts as locked.
+        clause_until={"me_m1": dt.datetime(2020, 1, 1, tzinfo=dt.timezone.utc),
+                      "th_m1": dt.datetime(2020, 1, 1, tzinfo=dt.timezone.utc)},
         proceeds={}, owner={"th_m1": "riv"}, cash=12e6, me="me",
         rival_cash={"riv": 0.0})
     steal = Action("steal", buy="th_m1", cost=10e6, victim="riv")
@@ -827,6 +869,11 @@ def _selftest() -> None:
     # nearly always his best answer — but the transfer resets a clause and
     # nothing here has ever observed one to know at what.
     assert ans.buy != "th_m1", ans
+    # AND HE CANNOT ANSWER WITH A LOCKED CLAUSE EITHER. The rule binds both
+    # ways round, or the response would be free to make moves the app refuses
+    # exactly as the ranking used to.
+    u5.clause_until = {}
+    assert respond(u5, steal, apply(u5, steal)) is None
     # A move that hands him nothing leaves him where he was: broke.
     assert respond(u5, Action("buy", buy="star", cost=1e6),
                    u5.state.squads) is None
@@ -836,9 +883,28 @@ def _selftest() -> None:
                           "me"),
         forecaster=B(per5), pos=dict(u5.pos), price={"th_m1": 1e6},
         value={"th_m1": 1e6}, clause={"me_m1": 90e6}, proceeds={},
+        clause_until={"me_m1": dt.datetime(2020, 1, 1,
+                                           tzinfo=dt.timezone.utc)},
         owner={"th_m1": "riv"}, cash=12e6, me="me", rival_cash={"riv": 0.0})
     cheap = Action("steal", buy="th_m1", cost=1e6, victim="riv")
     assert respond(poor, cheap, apply(poor, cheap)) is None
+
+    # -- a clause you cannot pay is not a price ----------------------------
+    # A transfer LOCKS the clause for about a week, and on the day this was
+    # found every one of the 76 rival players in the league was locked. The
+    # whole steal side of the report was ranking moves the app would refuse —
+    # which is exactly what it looked like from the outside, and why it was
+    # queried. A lock is not a discount and not a reason to rank him lower: he
+    # is simply not for sale, and the honest table says when he will be.
+    now = dt.datetime(2026, 8, 18, tzinfo=dt.timezone.utc)
+    soon = dt.datetime(2026, 8, 24, tzinfo=dt.timezone.utc)
+    past = dt.datetime(2026, 8, 1, tzinfo=dt.timezone.utc)
+    assert locked({"th_m1": soon}, "th_m1", now) is True
+    assert locked({"th_m1": past}, "th_m1", now) is False
+    # No date is NOT STATED, and not-stated must not become "buyable": the
+    # feed omitting a field is the case that silently reopens the bug.
+    assert locked({}, "th_m1", now) is True
+    assert locked({"th_m1": None}, "th_m1", now) is True
 
     assert Action("steal", buy="X", victim="R").label() == "steal X from R"
     assert Action("swap", buy="X", sell="Y").label() == "buy X · sell Y"
@@ -908,7 +974,7 @@ def _selftest() -> None:
     assert un == ["zzz-united"], un
     assert _d == {1: {"getafe"}}, _d
 
-    print("decide self-test OK (54 cases)")
+    print("decide self-test OK (55 cases)")
 
 
 if __name__ == "__main__":

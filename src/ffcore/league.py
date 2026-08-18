@@ -48,7 +48,7 @@ import configparser
 import os
 import sys
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone as dt_timezone
 from pathlib import Path
 from typing import NamedTuple
 
@@ -79,6 +79,7 @@ DEFAULTS = {
     "keeper_start": "80",
     "riser_pct": "2",
     "shrink_k": "8",
+    "daily_bonus": "0",
 }
 
 
@@ -99,6 +100,12 @@ class Config:
     keeper_start: float = 80.0
     riser_pct: float = 2.0
     shrink_k: float = 8.0
+    # The app pays a small allowance every day. It is not in the ledger and
+    # never will be — the activity feed records deals, not gifts — so an
+    # estimate built from budget minus purchases drifts further under the
+    # truth with every day the season runs. Zero until configured, because a
+    # bonus nobody has observed is not a number to invent.
+    daily_bonus: float = 0.0
 
 
 def load_config(name: str = "league.ini") -> Config:
@@ -128,6 +135,10 @@ def load_config(name: str = "league.ini") -> Config:
                                DEFAULTS["keeper_start"])),
         riser_pct=float(get("thresholds", "riser_pct", DEFAULTS["riser_pct"])),
         shrink_k=float(get("thresholds", "shrink_k", DEFAULTS["shrink_k"])),
+        # Read from [league], beside the budget it corrects, rather than from
+        # [thresholds]: it is a fact about how the app pays, not a knob.
+        daily_bonus=money(get("league", "daily_bonus",
+                              DEFAULTS["daily_bonus"])) or 0.0,
     )
     if cp.has_section("budget"):
         for handle, amount in cp.items("budget"):
@@ -774,14 +785,33 @@ class League:
                     sold += price
                     counted += 1
 
-            value = base + sold - bought
+            # THE DAILY ALLOWANCE, from the anchor to now. The feed cannot
+            # see it, so without this the estimate falls behind by the bonus
+            # every day and a rival looks poorer — and therefore less able to
+            # answer a clause — than he is. Only ever ADDS, and only for a
+            # manager whose balance is an estimate: an observed balance
+            # already contains every bonus paid up to the moment it was read.
+            bonus, days = 0.0, 0.0
+            if conf != "known" and self.cfg.daily_bonus:
+                start = since or min(
+                    (ledger_stamp(t.get("date", "")) for t in self.txns
+                     if ledger_stamp(t.get("date", ""))), default=None)
+                if start:
+                    days = max(0.0, (datetime.now(dt_timezone.utc)
+                                     - start).total_seconds() / 86400.0)
+                    bonus = days * self.cfg.daily_bonus
+
+            value = base + sold - bought + bonus
             # The arithmetic, not just the answer. Every term is here so a
             # balance that looks wrong can be checked against the ledger
             # without re-deriving it, and so an overdrawn manager's position
             # can be sized at a glance.
-            math = ("%s − %.2fM bought + %.2fM sold across %d ledger row(s) "
-                    "= %.2fM" % (basis, bought / 1e6, sold / 1e6, counted,
-                                 value / 1e6))
+            math = ("%s − %.2fM bought + %.2fM sold across %d ledger row(s)"
+                    "%s = %.2fM"
+                    % (basis, bought / 1e6, sold / 1e6, counted,
+                       (" + %.2fM of daily allowance over %.0f days"
+                        % (bonus / 1e6, days)) if bonus else "",
+                       value / 1e6))
             if value < 0:
                 # NOT an input error. Committing past the balance is allowed
                 # while the window is open; the constraint is being solvent
@@ -1344,6 +1374,31 @@ def _selftest_identify() -> None:
                           [{"date": "2026-08-13T21:25", "player": "Xabi",
                             "from": "alice", "to": MARKET}], mkt)
     assert any("nobody was holding" in w for w in warns2), warns2
+
+    # -- the daily allowance -----------------------------------------------
+    # The feed records deals, not gifts, so an estimate built from budget
+    # minus purchases falls further under the truth every day the season runs
+    # — and a rival who looks poorer than he is looks less able to answer a
+    # clause than he is.
+    old = [{"date": "2026-01-01T12:00", "player": "P", "from": MARKET,
+            "to": "rival", "price": "10000000"}]
+    plain = League(Config(me="me", budget=100e6), {"rival": []}, old, None)
+    rich = League(Config(me="me", budget=100e6, daily_bonus=100000.0),
+                  {"rival": []}, old, None)
+    assert rich["rival"].cash.value > plain["rival"].cash.value, (
+        rich["rival"].cash.value, plain["rival"].cash.value)
+    # It is shown in the arithmetic, not folded silently into the total.
+    assert "daily allowance" in rich["rival"].cash.basis, rich["rival"].cash
+    # AN OBSERVED BALANCE ALREADY CONTAINS IT. Adding the allowance on top of
+    # a number the app stated would double-count every bonus ever paid.
+    at = "2026-08-17T2318Z"
+    mine = [{"manager": "me", "player_name": "P", "user_id": "1",
+             "team_money": "23596582", "observed_at": at}]
+    seen = League(Config(me="me", daily_bonus=100000.0), {"me": []}, [],
+                  Market([{"name": "P", "value": "1000000",
+                           "observed_at": at, "position": "MED"}]),
+                  api_teams=mine)
+    assert seen["me"].cash.value == 23596582.0, seen["me"].cash
 
 
 if __name__ == "__main__":                      # pragma: no cover

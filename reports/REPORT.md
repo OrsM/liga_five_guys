@@ -1,4 +1,4 @@
-# Liga Five Guys — one report — 2026-08-18 17:47 UTC
+# Liga Five Guys — one report — 2026-08-18 18:07 UTC
 
 Every move you could make, ranked by whether it wins the league. Everything else is reference and is linked, not reprinted.
 
@@ -11,18 +11,18 @@ _One question, asked of every move you could make: if I did this, where would I 
 
 **Expected finish 2.14** · **P(win) 11%** · season **1,480–1,738** (10–90)
 
-_38 jornadas left · 83 players acquirable · 188 moves simulated._
+_38 jornadas left · 41 players acquirable · 80 moves simulated._
 
 | Get | Give up | P(win) | Net € | Left |
 |---|---|--:|--:|--:|
-| Dean Huijsen ← BurtonGM89 | Turrientes + Lorenzo · **he takes Berchiche** | 60% | -18.42M | 5.17M |
-| Gorka Guruzeta ← Magic Mike 333 | Turrientes · **he takes Berchiche** | 54% | -14.23M | 9.37M |
-| Giuliano Simeone ← SusoGattuso | 3 spares · **he takes Huijsen** | 48% | -23.49M | 109K |
-| Leo Roman ← SusoGattuso | Turrientes + Lorenzo · **he takes Huijsen** | 47% | -20.86M | 2.74M |
-| Ferran Jutgla ← Albert Laporta | Turrientes · **he takes Bernal** | 21% | -2.43M | 21.16M |
-| Aitor Paredes ← BurtonGM89 | Turrientes · **he takes Pastor** | 18% | +1.52M | 25.12M |
-| Yuri Berchiche ← SusoGattuso | Turrientes · **he takes Galarreta** | 16% | -14.13M | 9.46M |
-| Aimar Oroz ← SusoGattuso | Turrientes · **he takes Guruzeta** | 13% | -18.55M | 5.05M |
+| Dean Huijsen ← BurtonGM89 | Turrientes + Lorenzo | 34% | -18.42M | 5.17M |
+| Ferran Jutgla ← Albert Laporta | Turrientes | 21% | -2.43M | 21.16M |
+| Marcos Alonso (free) | Turrientes | 18% | -21.83M | 1.77M |
+| Aitor Paredes ← BurtonGM89 | Turrientes | 18% | +1.52M | 25.12M |
+| Marc Bartra (free) | Turrientes | 15% | -20.68M | 2.92M |
+| Carlos Puga ← BurtonGM89 | Turrientes | 11% | +1.91M | 25.50M |
+| Marc Roca ← Albert Laporta | Turrientes | 11% | +1.67M | 25.27M |
+| Andriy Lunin (free) | Turrientes | 11% | +4.96M | 28.56M |
 
 _**P(win)** is where the move LEAVES you — your chance of winning the league after making it, against 11% if you do nothing. **Get** names the rival a steal takes him off, which is half of what a steal is worth: it raises your total and lowers theirs at once. **Net €** is what the move does to the balance and **Left** is what you are on afterwards — every rival is on 0K until you pay one, so that column is the whole of your ability to answer anything for the rest of the season. Who exactly you give up when it says *spares* is in the sell table below; none of them ever start. **he takes** is the rival's best answer, played before the season is._
 

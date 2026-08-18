@@ -81,6 +81,28 @@ for whether replacing them helped. git remembers the code.
 λ went the same way a fortnight earlier, one layer down: it measured the
 exchange rate against *your current eleven*, so the baseline moved under it.
 
+**A CLAUSE IS LOCKED FOR A WEEK AFTER A TRANSFER, AND EVERY RIVAL PLAYER IN
+THIS LEAGUE WAS LOCKED.** All 76 of them, until 24–25 August — so the entire
+steal half of the report consisted of moves the app would have refused. It was
+never visible because `buyoutClauseLockedEndTime` sits in the API payload and
+nothing parsed it. Found because Miguel looked at a table full of steals and
+said something was wrong with them.
+
+Two rules came out of the same look, both now in the code:
+
+- **A transfer resets the clause to what the buyer paid.** Measured, not
+  looked up: across 25 players whose purchase price is in the ledger, clause ÷
+  price paid has a median of **1.000**. Players never bought since the draft
+  still carry their original clause, which is why the league-wide clause ÷
+  *market value* is 1.52 and drifts — that ratio is an artefact of value
+  moving under a fixed clause, not a rule.
+- **A missing lock date counts as LOCKED**, never as available. Treating an
+  absent field as open is exactly how this stayed invisible.
+
+The rule binds both ways: the rival's reply cannot use a locked clause either,
+or the response would be free to make moves the app refuses in precisely the
+way the ranking used to.
+
 **A CLAUSE PAYS THE OWNER, SO A STEAL FUNDS THE MAN YOU ARE RACING.** This is
 the single biggest correction the system has had, and it came from Miguel
 distrusting a table full of steals rather than from anything the code said.
@@ -881,7 +903,12 @@ differently-keyed ownership map is worse than none.
   not twenty-two, and cross-validating over players reported a confidence four
   matches cannot support.
 - **Rivals' cash is still an estimate.** The API states `teamMoney` for the
-  account that asks and `null` for everyone else, so the `~` stays.
+  account that asks and `null` for everyone else, so the `~` stays. It now
+  includes the app's daily allowance (`daily_bonus` in `inputs/league.ini`,
+  100K) accrued from the anchor — the activity feed records deals, not gifts,
+  so without it every estimate drifts further under the truth each day and a
+  rival looks less able to answer a clause than he is. Added only to
+  ESTIMATED balances: an observed one already contains every bonus paid.
 - **A 200,000 gap in the cash arithmetic, unexplained.** Rebuilding the balance
   from the feed lands 200,000 under what the app reports — exactly round, which
   smells like an app credit rather than a deal. It is 0.8% and changes no
