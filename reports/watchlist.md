@@ -1,6 +1,6 @@
-# Watchlist — 2026-08-18 01:54 UTC
+# Watchlist — 2026-08-18 09:43 UTC
 
-The 39 players you pasted as today's slate — everyone you can actually bid on right now, unfiltered. What each one is worth to your XI, and what to bid, is in the slate table at the top of this report.
+The 38 players you pasted as today's slate — everyone you can actually bid on right now, unfiltered. What each one is worth to your XI, and what to bid, is in the slate table at the top of this report.
 
 **FF** is futbolfantasy's probable-XI percentage, which is the one the forecast uses. **AF** is analiticafantasy's read of the same eleven, printed beside it and never blended in — `titular` is a named starter (a final call, with no number to it), a percentage is their editors' consensus, `?` means they list him without either, and `—` means they do not have him. Two columns that disagree are the signal; that is the whole point of carrying both.
 
@@ -46,5 +46,6 @@ OCR mangled these past matching, so they are missing from the tables above — r
 
 - **Simeone** — no match
 - **Pepe** — no match
+- **A. Ferllo** — no match
 
 ---

@@ -1,9 +1,9 @@
-# Squads — 2026-08-18 01:54 UTC
+# Squads — 2026-08-18 09:43 UTC
 
 | Manager | Players | Squad value | Spent | Raised | Cash |
 |---|--:|--:|--:|--:|--:|
 | **miguel_autentico** | 14 | 213.11M | 113.59M | 36.12M | 23.60M |
-| Albert Laporta | 15 | 266.45M | 173.13M | 35.80M | ~-37.33M |
+| Albert Laporta | 15 | 266.45M | 173.13M | 43.03M | ~-30.10M |
 | BurtonGM89 | 13 | 216.29M | 180.85M | 51.65M | ~-29.20M |
 | Magic Mike 333 | 16 | 236.96M | 121.23M | 19.14M | ~-2.09M |
 | SusoGattuso | 18 | 222.57M | 108.03M | 476K | ~-7.55M |
@@ -33,7 +33,7 @@
 | iñigo vicente | Racing | del | 19.63M | 317K | 90% | 100% |
 
 ## Albert Laporta
-15 players · 266.45M total · 5 at 70%+ · cash ~-37.33M
+15 players · 266.45M total · 5 at 70%+ · cash ~-30.10M
 
 | Player | Team | Pos | Value | 24h | FF | AF |
 |---|---|--:|--:|--:|--:|--:|
@@ -122,7 +122,6 @@
 
 | Date | Player | From → To | Price |
 |---|---|---|--:|
-| 2026-08-13T22:26 | Dieng | BurtonGM89 → market | 5284122 |
 | 2026-08-13T23:40 | Purić | SusoGattuso → market | 476265 |
 | 2026-08-14T13:49 | Asencio | Magic Mike 333 → market | 5130033 |
 | 2026-08-14T13:50 | Lucas Boyé | Magic Mike 333 → market | 14013107 |
@@ -134,8 +133,8 @@
 | 2026-08-14T22:24 | Aramburu | market → SusoGattuso | 17785551 |
 | 2026-08-14T22:51 | R.P. Bigas | Albert Laporta → market | 5323361 |
 | 2026-08-15T22:24 | Mouriño | market → Albert Laporta | 40516387 |
-| 2026-08-15T22:24 | Mario Martín | market → SusoGattuso | 3831432 |
 | 2026-08-15T22:24 | Fornals | market → miguel_autentico | 58220110 |
+| 2026-08-15T22:24 | Mario Martín | market → SusoGattuso | 3831432 |
 | 2026-08-15T22:24 | Riedel | market → SusoGattuso | 4599626 |
 | 2026-08-15T22:24 | Buonanotte | market → Albert Laporta | 7331515 |
 | 2026-08-16T22:24 | Huijsen | market → BurtonGM89 | 32901000 |
@@ -147,11 +146,12 @@
 | 2026-08-17T22:24 | Leo Román | market → SusoGattuso | 37157570 |
 | 2026-08-17T22:28 | Quagliata | BurtonGM89 → market | 2951083 |
 | 2026-08-17T22:29 | Gorrotxa | BurtonGM89 → market | 6655879 |
+| 2026-08-18T07:26 | Villalibre | Albert Laporta → market | 7235234 |
 
 ## Cash basis
 
-- **miguel_autentico** — balance the app reported at 2026-08-18 01:52 UTC − 0.00M bought + 0.00M sold across 0 ledger row(s) = 23.60M (known)
-- **Albert Laporta** — 100M starting budget − 173.13M bought + 35.80M sold across 11 ledger row(s) = -37.33M (estimated)
+- **miguel_autentico** — balance the app reported at 2026-08-18 09:41 UTC − 0.00M bought + 0.00M sold across 0 ledger row(s) = 23.60M (known)
+- **Albert Laporta** — 100M starting budget − 173.13M bought + 43.03M sold across 12 ledger row(s) = -30.10M (estimated)
 - **BurtonGM89** — 100M starting budget − 180.85M bought + 51.65M sold across 17 ledger row(s) = -29.20M (estimated)
 - **Magic Mike 333** — 100M starting budget − 121.23M bought + 19.14M sold across 8 ledger row(s) = -2.09M (estimated)
 - **SusoGattuso** — 100M starting budget − 108.03M bought + 0.48M sold across 6 ledger row(s) = -7.55M (estimated)
@@ -160,8 +160,9 @@
 
 - **pedro diaz** — the ledger has him at Magic Mike 333; the app says nobody in the league holds him.
 - **tete morente** — the ledger has him at Magic Mike 333; the app says nobody in the league holds him.
+- **asier villalibre** — the app has him at Albert Laporta; the ledger has no record of him.
 - Magic Mike 333 is 2.09M overdrawn: 100M starting budget − 121.23M bought + 19.14M sold across 8 ledger row(s) = -2.09M. Going over the budget mid-window is allowed; being overdrawn when the jornada locks is not, so they must sell before they can buy again. If the ledger is missing a sale of theirs, this is stale rather than wrong.
-- Albert Laporta is 37.33M overdrawn: 100M starting budget − 173.13M bought + 35.80M sold across 11 ledger row(s) = -37.33M. Going over the budget mid-window is allowed; being overdrawn when the jornada locks is not, so they must sell before they can buy again. If the ledger is missing a sale of theirs, this is stale rather than wrong.
+- Albert Laporta is 30.10M overdrawn: 100M starting budget − 173.13M bought + 43.03M sold across 12 ledger row(s) = -30.10M. Going over the budget mid-window is allowed; being overdrawn when the jornada locks is not, so they must sell before they can buy again. If the ledger is missing a sale of theirs, this is stale rather than wrong.
 - BurtonGM89 is 29.20M overdrawn: 100M starting budget − 180.85M bought + 51.65M sold across 17 ledger row(s) = -29.20M. Going over the budget mid-window is allowed; being overdrawn when the jornada locks is not, so they must sell before they can buy again. If the ledger is missing a sale of theirs, this is stale rather than wrong.
 - SusoGattuso is 7.55M overdrawn: 100M starting budget − 108.03M bought + 0.48M sold across 6 ledger row(s) = -7.55M. Going over the budget mid-window is allowed; being overdrawn when the jornada locks is not, so they must sell before they can buy again. If the ledger is missing a sale of theirs, this is stale rather than wrong.
 
@@ -208,6 +209,7 @@ Placed by who the counterparty was, or by what the price implies — a player so
 - 2026-08-17T22:24: Tenaglia → nahuel tenaglia (matched nahuel tenaglia)
 - 2026-08-17T22:28: Quagliata → giacomo quagliata (matched giacomo quagliata)
 - 2026-08-17T22:29: Gorrotxa → jon gorrotxategi (matched jon gorrotxategi)
+- 2026-08-18T07:26: Villalibre → asier villalibre (matched asier villalibre)
 
 ## What they pay over value
 
@@ -221,7 +223,7 @@ Placed by who the counterparty was, or by what the price implies — a player so
 
 **The floor sometimes wins.** 11 of the 29 priced purchases in this league went at the market value itself and the other 18 cleared it, median +1.7%, -0.2% to +635.3% (n=29) across all of them. Bidding the minimum is therefore not the one number known to lose — but 11 of 29 is a share of the bids that WON, not the odds of winning one. Nothing in this ledger records a bid that lost, so the floor's failure rate is unmeasured and unmeasurable from here.
 
-**The app does not pay you the value — it randomises around it.** The 19 priced sales back to the market went for median +7.1%, -9.4% to +12.0% (n=19): 6 below the value and 13 above, never further than 12.0% either way. So a sale raises the value give or take a tenth, and the value is not the money you will get. Whether the same randomiser bids against you for a free agent is inferred, not measured: every row in this ledger is a bid that won.
+**The app does not pay you the value — it randomises around it.** The 20 priced sales back to the market went for median +5.4%, -9.4% to +12.0% (n=20): 7 below the value and 13 above, never further than 12.0% either way. So a sale raises the value give or take a tenth, and the value is not the money you will get. Whether the same randomiser bids against you for a free agent is inferred, not measured: every row in this ledger is a bid that won.
 
 A round bid was typed by a human. That is the whole of what roundness tells you — an exact bid is *not* the app's valuation and does not mean nobody competed, because the premium column two cells left already measures how far above the floor the buyer went. Sealed bids are paid as bid, so a purchase at exactly the value was only ever yours to take if the tie-break favoured you, and that rule is not documented anywhere we can read. Check it in-app before reading a floor purchase as a bargain you missed.
 
@@ -232,8 +234,8 @@ A round bid was typed by a human. That is the whole of what roundness tells you 
 | 08-16T22:24 | Huijsen | BurtonGM89 | 32.90M | 32.46M | +1.4% | exact |
 | 08-16T22:24 | Paredes | BurtonGM89 | 5.35M | 5.14M | +4.1% | round |
 | 08-15T22:24 | Mouriño | Albert Laporta | 40.52M | 40.48M | +0.1% | exact |
-| 08-15T22:24 | Mario Martín | SusoGattuso | 3.83M | 3.83M | +0.0% | exact |
 | 08-15T22:24 | Fornals | miguel_autentico | 58.22M | 57.93M | +0.5% | exact |
+| 08-15T22:24 | Mario Martín | SusoGattuso | 3.83M | 3.83M | +0.0% | exact |
 | 08-15T22:24 | Riedel | SusoGattuso | 4.60M | 4.60M | +0.0% | exact |
 | 08-15T22:24 | Buonanotte | Albert Laporta | 7.33M | 6.83M | +7.3% | exact |
 | 08-14T22:24 | T. Morente | Magic Mike 333 | 2.03M | 1.99M | +2.4% | exact |

@@ -61,12 +61,12 @@ Graded on **appearances**, not starts: a 20-minute substitute counts. That flatt
 
 | Source | Calls | Mean claim | Appeared | Brier |
 |---|--:|--:|--:|--:|
-| analitica | 108 | 86% | 23% | 0.606 |
-| futbolfantasy ←read | 424 | 41% | 9% | 0.277 |
+| analitica | 239 | 86% | 17% | 0.665 |
+| futbolfantasy ←read | 836 | 41% | 7% | 0.265 |
 Calls published with no number on them, which can only be graded as a hit rate:
 
-- **analitica** — 31 named starters, 0% appeared
+- **analitica** — 39 named starters, 0% appeared
 
-_98 claim(s) sat within 10 points of 50% and are not graded: that is not a call either way._
+_214 claim(s) sat within 10 points of 50% and are not graded: that is not a call either way._
 
 **The gate.** Once a source has a few hundred graded calls, whichever has the lower Brier **on the starts table above** earns `LINEUP_SOURCE` in ffcore/tidy.py — a one-line change, and the only thing that should ever move it. Appearances break a tie, never the other way round: they are the question nobody asked. Until then nothing is blended, because a weight fitted on one jornada is a guess wearing a decimal point.

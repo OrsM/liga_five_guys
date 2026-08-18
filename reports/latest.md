@@ -1,4 +1,4 @@
-# The workings — 2026-08-18T0152Z
+# The workings — 2026-08-18T0941Z
 
 _How the board in [REPORT.md](REPORT.md) was reached. Same numbers, same verdicts; this is where they come from._
 
@@ -62,7 +62,7 @@ Competition is demand, not roster counts: the rivals whose XI actually improves 
 
 Bid is the floor plus what this league has actually paid over it: median +1.7%, -0.2% to +635.3% (n=29). 11 of those 29 went at the floor itself, so the minimum is not a number known to lose. A dozen deals is not a distribution — the range is what has happened, not a chance of winning, and every one of them is a bid that won.
 
-Already owned, so not a purchase: abde ezzalzouli (Albert Laporta), aitor paredes (BurtonGM89), antonio blanco (BurtonGM89), arda guler (Albert Laporta), asier villalibre (Albert Laporta), ayoze perez (Albert Laporta), beñat turrientes (you), carl starfelt (you), carlos espi (SusoGattuso), carlos puga (BurtonGM89), dani lorenzo (you), dean huijsen (BurtonGM89), denis suarez (BurtonGM89), ferran jutgla (Albert Laporta), ilaix moriba (Albert Laporta), iñigo ruiz de galarreta (you), jon moncayola (you), juan foyth (Albert Laporta), karl etta eyong (BurtonGM89), leandro cabrera (Albert Laporta), lucien agoume (you), marc roca (Albert Laporta), matias dituro (Albert Laporta), nahuel tenaglia (BurtonGM89), pablo fornals (you), quilindschy hartman (BurtonGM89), santiago mouriño (Albert Laporta), wojciech szczesny (SusoGattuso).
+Already owned, so not a purchase: abde ezzalzouli (Albert Laporta), aitor paredes (BurtonGM89), antonio blanco (BurtonGM89), arda guler (Albert Laporta), ayoze perez (Albert Laporta), beñat turrientes (you), carl starfelt (you), carlos espi (SusoGattuso), carlos puga (BurtonGM89), dani lorenzo (you), dean huijsen (BurtonGM89), denis suarez (BurtonGM89), ferran jutgla (Albert Laporta), ilaix moriba (Albert Laporta), iñigo ruiz de galarreta (you), jon moncayola (you), juan foyth (Albert Laporta), karl etta eyong (BurtonGM89), leandro cabrera (Albert Laporta), lucien agoume (you), marc roca (Albert Laporta), matias dituro (Albert Laporta), nahuel tenaglia (BurtonGM89), pablo fornals (you), quilindschy hartman (BurtonGM89), santiago mouriño (Albert Laporta), wojciech szczesny (SusoGattuso).
 
 ## On offer but unpriced
 
@@ -70,6 +70,7 @@ The app is offering these and no market row matches the name, so they carry no r
 
 - **Simeone**
 - **Pepe**
+- **A. Ferllo**
 
 ## 3. What you give up by spending now
 
@@ -79,11 +80,11 @@ _Nothing on today's slate can be bought at any rate, so there is no line. Every 
 
 | Player | Pos | Sale | above repl | pts/M | At the line | Verdict | Why |
 |---|---|--:|--:|--:|--:|---|---|
-| Alvaro Fernandez | POR | 4.23M–5.38M | -6.1 | -1.271 | — | **Sell** | 2nd POR — only 1 can be fielded |
-| Beñat Turrientes | MED | 6.66M–8.48M | -1.5 | -0.193 | — | **Sell** | 7th MED — only 5 can be fielded |
-| Pablo Fornals | MED | 53.74M–68.40M | +2.2 | 0.035 | — | Hold |  |
+| Alvaro Fernandez | POR | 4.16M–5.30M | -6.1 | -1.292 | — | **Sell** | 2nd POR — only 1 can be fielded |
+| Beñat Turrientes | MED | 6.56M–8.35M | -1.5 | -0.196 | — | **Sell** | 7th MED — only 5 can be fielded |
+| Pablo Fornals | MED | 52.88M–67.31M | +2.2 | 0.036 | — | Hold |  |
 
-_Same columns, same numbers and same verdicts as the board — this is the bench half of it, with the sale priced. **Sale** is what the app pays: not the value, and not a number you can hold out for, because you cannot sell on demand. An offer arrives and you take it or refuse it, which is what **At the line** is for — the proceeds at which the cash buys back exactly what he is worth, so at or above it take the offer whatever the Verdict says. The verdict only reports whether there is a counterparty TODAY. `any` means he is below replacement, so no offer is too low, and `—` means nothing is on offer, so there is no line to price him against and no number to hold out for. The instant sale is not a sale: it pays roughly half of value, which is a way to free cash before a lock and almost never beats waiting. Two things this cannot see. Each sale is priced ON ITS OWN — sell two out of the same position and the second one leaves you short, so re-read the thin-position warnings below the rule. And a name question 1 wants in your eleven can still be a Sell: fielding is one round, selling is the season, and the proceeds buy the basket in question 3. Selling to the app pays the value give or take 12%: the 19 priced sales in the ledger went median +7.1%, -9.4% to +12.0% (n=19), which is the band in the Sale column and is wide enough that a price near the line is a coin flip. Who is short in his position, and who can still afford you, is in `reports/rivals.md`._
+_Same columns, same numbers and same verdicts as the board — this is the bench half of it, with the sale priced. **Sale** is what the app pays: not the value, and not a number you can hold out for, because you cannot sell on demand. An offer arrives and you take it or refuse it, which is what **At the line** is for — the proceeds at which the cash buys back exactly what he is worth, so at or above it take the offer whatever the Verdict says. The verdict only reports whether there is a counterparty TODAY. `any` means he is below replacement, so no offer is too low, and `—` means nothing is on offer, so there is no line to price him against and no number to hold out for. The instant sale is not a sale: it pays roughly half of value, which is a way to free cash before a lock and almost never beats waiting. Two things this cannot see. Each sale is priced ON ITS OWN — sell two out of the same position and the second one leaves you short, so re-read the thin-position warnings below the rule. And a name question 1 wants in your eleven can still be a Sell: fielding is one round, selling is the season, and the proceeds buy the basket in question 3. Selling to the app pays the value give or take 12%: the 20 priced sales in the ledger went median +5.4%, -9.4% to +12.0% (n=20), which is the band in the Sale column and is wide enough that a price near the line is a coin flip. Who is short in his position, and who can still afford you, is in `reports/rivals.md`._
 
 ## 5. Exceptions
 
@@ -127,4 +128,4 @@ _637 players tracked, 499 with a probable-XI reading._
 
 _xPts/j — expected points per jornada = shrunk pts/match (K=8, 2025-26) × fixture × P(start), from `ffcore/score.py` — the same scorer rivals.py uses. Injured, suspended and unavailable score zero; a doubt is halved. The fixture term is a ±12% band across the opponents ranked by Club Elo rating, plus ±4% for home advantage; both widths are guesses, unfitted because nothing has been played, and small enough that a wrong one costs a fraction of a point._
 
-_Generated 2026-08-18 01:54 UTC._
+_Generated 2026-08-18 09:43 UTC._
