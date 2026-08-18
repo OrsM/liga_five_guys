@@ -1,9 +1,11 @@
-# Liga Five Guys — one report — 2026-08-18 23:08 UTC
+# Liga Five Guys — one report — 2026-08-18 23:10 UTC
 
 Every move you could make, ranked by whether it wins the league. Everything else is reference and is linked, not reprinted.
 
 
 ## The call
+
+**You are 133K overdrawn and the jornada locks in 20 hours.** Selling is the only move that fixes it; the SELL rows raise 26.16M between them.
 
 **Act today.** Nothing you can wait for beats what is on offer now.
 
@@ -13,25 +15,7 @@ Every move you could make, ranked by whether it wins the league. Everything else
 
 _38 jornadas left · 38 players acquirable · 60 moves simulated._
 
-| Route | What it offers | Season pts |
-|---|---|--:|
-| **Act today** | 38 players you can buy now | +209 |
-| Wait for the market | a week of new offers | +198 |
-| Wait for the clauses | 62 players on 24 Aug | +160 |
-
-_Season points, so this can be compared with the table below rather than sitting in its own unit. Waiting pays for the delay: a jornada of the best thing you can buy today is forgone before the better one arrives. These are estimates from a rate; the table's are simulated._
-
-**Not for sale, and you cannot ask.** The app deals about a dozen players a cycle out of five hundred, so a man you want is not something you can go and buy — being unowned is not being available:
-
-| Player | Would add | Likely wait to be offered |
-|---|--:|--:|
-| Lamine Yamal | +7.37 | 16 days |
-| Kylian Mbappe | +6.41 | 16 days |
-| Jan Oblak | +4.91 | 18 days |
-| Zaid Romero | +4.58 | 20 days |
-
-_The free market is simulated rather than guessed at: the market is modelled from 72 offers over 5 cycles, weighted by value^0.15. **111 of the 572 unowned players** would improve your eleven, and a week of offers beats the best thing you can buy today **46% of the time** — even the tenth percentile of waiting (+3.73) clears it. Spending now buys the worse of two options and gives up the choice._
-_**31 locked players would improve your eleven** and their clauses open on 24 Aug, in about 6 days. Waiting scores ZERO in the table above — not because it is worthless but because nothing there can price a market it has not seen, so every move with a positive number beats it by construction. That is the bias to hold in mind when the ranking asks you to spend the balance; the **Left** column is what buys the choice._
+_This week's market is in the **54th percentile** of what the app usually deals — an ordinary week. A typical week offers something better 46% of the time._
 
 ## Every player you could hold
 

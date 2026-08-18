@@ -320,6 +320,48 @@ def decide_dead(u):
     return dead_weight(u)
 
 
+def market_percentile(routes) -> str:
+    """Where this week's market sits against the market's own history.
+
+    ONE LINE INSTEAD OF A PANEL. The panel compared three routes in a table of
+    its own, outside the one table, and its prose was unconditional — it went
+    on saying "spending now buys the worse of two options" on days when the
+    headline said act today. What is actually worth knowing is whether what is
+    on offer THIS week is good or bad by the standards of what gets dealt, and
+    that is a percentile.
+    """
+    mkt = next((r for r in routes if r["route"] == "market"), None)
+    if mkt is None or mkt.get("beats_now") is None:
+        return ""
+    pct = round(100 * (1 - mkt["beats_now"]))
+    how = ("an unusually good week" if pct >= 75
+           else "a poor week" if pct <= 25 else "an ordinary week")
+    return ("This week's market is in the **%d%s percentile** of what the app "
+            "usually deals — %s. A typical week offers something better %d%% "
+            "of the time." % (pct, _ord(pct), how, 100 - pct))
+
+
+def _ord(n: int) -> str:
+    return "th" if 11 <= n % 100 <= 13 else \
+        {1: "st", 2: "nd", 3: "rd"}.get(n % 10, "th")
+
+
+def overdrawn(u, locks_h) -> str:
+    """The one thing that is not a ranking question: you are in the red.
+
+    Being over the budget mid-window is allowed and being over it when the
+    jornada locks is not, so a negative balance with hours on the clock is not
+    a nuance to fold into a table — it is the only thing to do next.
+    """
+    if u.cash >= 0:
+        return ""
+    when = ("in %.0f hours" % locks_h) if locks_h and locks_h > 0 else "shortly"
+    return ("**You are %s overdrawn and the jornada locks %s.** Selling is the "
+            "only move that fixes it; the SELL rows raise %s between them."
+            % (fmt_money(-u.cash), when,
+               fmt_money(sum(v for _k, v in decide_dead(u)))))
+
+
 def verdict(routes) -> tuple:
     """(headline, whether waiting wins). ONE ANSWER, AT THE TOP.
 
@@ -524,7 +566,13 @@ def wait_routes(u, offers=None, rng=None) -> list[dict]:
 
 
 def waiting(u, offers=None, rng=None) -> list[str]:
-    """The routes above, as the markdown table."""
+    """The routes in full — for the APPENDIX, not the report.
+
+    The report carries one line: where this week's market sits against the
+    market's own history. Everything under it — the three routes, the players
+    nobody is selling and how long they take to appear — is how that line was
+    arrived at, which is a different question from what to do.
+    """
     routes = wait_routes(u, offers, rng)
     if len(routes) < 2:
         return []
@@ -779,6 +827,8 @@ def payload(u, rows, base, rivals, locks_h=None, n_actions: int = 0,
         "rival_best": _rival_best(u),
         "wait": wait_routes(u, offers),
         "verdict": verdict(wait_routes(u, offers))[0],
+        "market_pct": market_percentile(wait_routes(u, offers)),
+        "overdrawn": overdrawn(u, locks_h),
         "hold": verdict(wait_routes(u, offers))[1],
         "standings": [
             {"manager": m, "me": m == u.me,
@@ -891,13 +941,18 @@ def render(u, rows, base, stamp: str, rivals, n_actions: int = 0,
     # the board's warnings.
     routes = wait_routes(u, offers)
     call, hold = verdict(routes)
+    red = overdrawn(u, locks_h)
     out = ["# The simulation — %s" % stamp, "",
-           "## The call", "", call or
+           "## The call", ""]
+    if red:
+        out += [red, ""]
+    out += [call or
            "_One question, asked of every move you could make: if I did "
            "this, where would I finish?_", ""]
     out += header(u, base, n_actions or len(rows), locks_h)
-    if routes:
-        out += waiting(u, offers) 
+    pctl = market_percentile(routes)
+    if pctl:
+        out += ["_" + pctl + "_", ""]
     # THE RANKING IS SUBORDINATE TO THE CALL, and says so in its own heading.
     # Presented as "what to do" directly above a section saying "do nothing",
     # it is a contradiction rather than a second opinion.
@@ -905,6 +960,9 @@ def render(u, rows, base, stamp: str, rivals, n_actions: int = 0,
                        if hold else "Every player you could hold"), ""]
     out += ladder(u, rows, base, saves)
 
+    wait = waiting(u, offers)
+    if wait:
+        out += ["## Act now or wait — the workings", ""] + wait
     out += ["## Where the league stands", ""]
     out += standings(u, base)
     out += ["## What the simulation cannot see", ""]
@@ -1166,6 +1224,29 @@ def _selftest() -> None:
     flat = [{**rows[0], "d_pos": 0.0, "d_win": 0.0}]
     assert alert_lines(u, flat, ["riv"]) == [], "a move worth nothing is not news"
 
+    # -- one line instead of a panel ---------------------------------------
+    # The panel sat outside the one table, compared three routes in a table of
+    # its own, and carried prose that was unconditional — it went on saying
+    # spending now was the worse option on days the headline said act today.
+    r = [{"route": "act", "best": 1.0, "pts": 10.0},
+         {"route": "market", "best": 2.0, "pts": 20.0, "beats_now": 0.38}]
+    line = market_percentile(r)
+    assert "62nd percentile" in line, line
+    assert "better 38% of the time" in line, line
+    assert "ordinary week" in line, line
+    assert "75th percentile" in market_percentile(
+        [{"route": "market", "beats_now": 0.25}])
+    assert "unusually good" in market_percentile(
+        [{"route": "market", "beats_now": 0.25}])
+    assert market_percentile([]) == ""
+
+    # -- overdrawn is not a ranking question -------------------------------
+    u.cash = -133023.0
+    red = overdrawn(u, 20.0)
+    assert "133K overdrawn" in red and "in 20 hours" in red, red
+    u.cash = 5e6
+    assert overdrawn(u, 20.0) == ""
+
     # -- the formation, which is the first thing the app asks for ----------
     # An eleven is not an instruction until you know the shape. best_xi has
     # been choosing one since the first day and the report never said which.
@@ -1216,7 +1297,7 @@ def _selftest() -> None:
     ph = "\n".join(placeholder("no api_teams.csv"))
     assert "no api_teams.csv" in ph and ph.startswith("# The simulation")
 
-    print("sim self-test OK (81 cases)")
+    print("sim self-test OK (89 cases)")
 
 
 def main() -> None:

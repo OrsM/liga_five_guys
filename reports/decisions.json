@@ -1,6 +1,6 @@
 {
- "generated_at": "2026-08-18T23:08Z",
- "locks_in_h": 19.884359281944445,
+ "generated_at": "2026-08-18T23:10Z",
+ "locks_in_h": 19.850871174166667,
  "cash": -133023.0,
  "squad_value": 236374060.0,
  "jornadas_left": 38,
@@ -571,11 +571,13 @@
    "hi": null,
    "beats_now": null,
    "helpful": 31,
-   "days": 5.885965347777778,
+   "days": 5.884560003229167,
    "opens": "24 Aug"
   }
  ],
  "verdict": "**Act today.** Nothing you can wait for beats what is on offer now.",
+ "market_pct": "This week's market is in the **54th percentile** of what the app usually deals — an ordinary week. A typical week offers something better 46% of the time.",
+ "overdrawn": "**You are 133K overdrawn and the jornada locks in 20 hours.** Selling is the only move that fixes it; the SELL rows raise 26.16M between them.",
  "hold": false,
  "standings": [
   {

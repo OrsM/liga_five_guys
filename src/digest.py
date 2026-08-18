@@ -53,7 +53,8 @@ POSITION = ["Warnings"]
 # generated.
 # The one section of sim.md that belongs in the appendix rather than the
 # report: how each number is made is not a thing you read before a deadline.
-REPORT_SKIP = {"what the simulation cannot see"}
+REPORT_SKIP = {"what the simulation cannot see",
+               "act now or wait — the workings"}
 
 SOURCES = [
     # THE DECISION FIRST, and it is now one thing: every move you could make,
@@ -95,8 +96,9 @@ OUT = "REPORT.md"
 APPENDIX = "METHOD.md"
 
 APPENDIX_SOURCES = [
-    Part("What it cannot see", "sim.md", ["What the simulation cannot see"],
-         nest=False),
+    Part("What it cannot see", "sim.md",
+         ["What the simulation cannot see",
+          "Act now or wait — the workings"], nest=False),
     Part("The forecast, and how it is doing", "methodology.md", None,
          nest=False),
     Part("The workings", "latest.md", ["2. What to bid", "3. Exceptions",
