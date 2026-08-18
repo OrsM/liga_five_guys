@@ -392,28 +392,24 @@ def squad_pool(scored) -> dict[str, list[dict]]:
 # ---------------------------------------------------------------------------
 # replacement level — the baseline that does not move when your eleven does
 #
-# Pricing a player by what YOUR eleven loses without him is right for one
-# question — does he play on Saturday — and wrong for every other, because the
-# answer changes as you act. Sell one midfielder and every other midfielder's
-# number is stale, so the ranking cannot be read as a list of decisions.
+# Pricing a player by what YOUR eleven loses without him answers one question
+# — does he play Saturday — and is wrong for every other, because the answer
+# changes as you act: sell one midfielder and every other midfielder's number
+# is stale, so the ranking is not a list of decisions.
 #
-# The fix is the one baseball settled on and value-based drafting reuses: a
-# fixed baseline, set by the rules rather than by your roster. Value is what a
-# player is worth ABOVE THE LEVEL THE MARKET SUPPLIES FOR FREE at his position,
-# and the level is the rung where the league runs out of starters — with five
-# managers who each start four defenders, the 20th-best defender is what any
-# squad can replace a defender with. Nothing above depends on which eleven you
-# happen to field, so the ranking is stable across your own moves.
+# So: a fixed baseline set by the rules (value-based drafting's answer). Value
+# is what a player is worth ABOVE THE LEVEL THE MARKET SUPPLIES FREE at his
+# position — the rung where the league runs out of starters. Five managers
+# starting four defenders each makes the 20th-best defender replaceable by
+# anyone, and nothing above that depends on your own eleven.
 #
-# Not the positional AVERAGE, which is a much higher bar: an average starter is
-# a real asset, and measuring against average would price most of the league
-# negative and hide which positions are actually scarce. Not value-weighted
-# either, which drags the bar toward whoever is expensive.
+# Not the positional AVERAGE, a far higher bar that would price most of the
+# league negative and hide real scarcity; not value-weighted, which drags the
+# bar toward whoever is expensive.
 #
-# The rung is a MEAN over legal shapes, because the app lets you field 3-4-3 or
-# 5-4-1 and those start a different number of defenders. Averaging the shapes
-# keeps the eleven adding to eleven while letting a position that only some
-# formations use price as the scarcer thing it is.
+# The rung is a MEAN over legal shapes, because 3-4-3 and 5-4-1 start
+# different numbers of defenders — that keeps the eleven adding to eleven
+# while letting a position only some formations use price as scarcer.
 # ---------------------------------------------------------------------------
 
 def starters_per_slot(premium: bool = False) -> dict[str, float]:

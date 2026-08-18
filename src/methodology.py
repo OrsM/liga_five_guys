@@ -154,32 +154,21 @@ def bucket_rows(pairs: list[dict]) -> list[tuple[str, int, float, float]]:
 # ---------------------------------------------------------------------------
 # grading the probable-XI sources — the gate for LINEUP_SOURCE
 #
-# P(start) is the largest single term in every xPts/j here, and until now
-# nothing measured it. Two sites publish a probable eleven, one of them is read
-# and the other is printed beside it, and the reason nothing was blended was
-# honest: no jornada had been played, so there was no weight to fit.
+# P(start) is the largest term in every xPts/j and nothing measured it. The
+# ground truth was already in the repo: the points page carries `games`, so
+# points.py's per-jornada diff names everyone whose appearance count went up,
+# and absence from an interval IS the answer — he did not play.
 #
-# The ground truth turns out to already be in the repo, at no new cost. The
-# points page is league-wide and carries a `games` column, so points.py's
-# per-jornada diff names everyone whose appearance count went up in an
-# interval. Its diff emits only players who MOVED, so absence from an interval
-# is itself the answer: he did not play. No new host, no new parser, no
-# starters.csv.
+# TWO LIMITS, stated in the report rather than smoothed over. It grades
+# P(APPEAR), not P(start), so a 20-minute substitute counts — which flatters
+# both sources equally, leaving the COMPARISON valid and the level not. And an
+# interval is the gap between two kept snapshots, usually one jornada but
+# sometimes two; the claim scored is the last one logged strictly before it
+# opened, the same no-hindsight rule the forecast join uses.
 #
-# TWO LIMITS, both stated in the report rather than smoothed over:
-#
-#   * This grades P(APPEAR), not P(start). A 20-minute substitute counts as an
-#     appearance. That makes both sources look better than they are, equally,
-#     so the COMPARISON between them stands even though the level does not.
-#   * An interval is the gap between two kept points snapshots, which is
-#     usually one jornada but can hold two. The claim scored is the last one
-#     logged strictly before the interval opened — the same
-#     no-hindsight rule the forecast join uses.
-#
-# The graded universe is players the market prices, i.e. players who exist in
-# the app. A team page lists academy names the game does not carry; counting
-# those as misses would penalise whichever source lists more of them for being
-# more complete.
+# Graded universe is players the market prices. Team pages list academy names
+# the game does not carry, and counting those as misses would penalise
+# whichever source is more complete.
 # ---------------------------------------------------------------------------
 
 # A claim inside this band of the middle is not a call either way, and neither

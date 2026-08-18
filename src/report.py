@@ -94,27 +94,14 @@ from datetime import datetime, timezone
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-# band_of(), drift_bands(), friction() and Friction.per_point() in ffcore/bid.py
-# lost their only caller with the Cost/pt column: the line prices the same
-# purchase against what the money would otherwise buy, which is the question
-# Cost/pt was reaching for. They are left in place, not deleted — the drift term
-# is the first thing to fold into the cost side of the ratio once a season of
-# readings exists to fit it against.
+# band_of(), drift_bands() and friction() in ffcore/bid.py lost their caller
+# with the Cost/pt column. Kept: the drift term is the first thing to fold
+# into the cost side of the ratio once a season of readings can fit it.
 #
-# λ IS GONE, code and all, as of 2026-08-18. It measured points per million
-# against YOUR CURRENT ELEVEN, so the same player was worth different amounts
-# on consecutive days for reasons that had nothing to do with him, and the
-# ladder it came from priced a market you cannot shop in. Replacement level
-# fixes both: the rules set it and your eleven cannot move it.
-#
-# It was kept for a fortnight after being retired, on the argument that
-# `lambda_log.csv` was the only record of the old rule and the code was needed
-# to grade it. That argument does not survive being written down — the LOG is
-# what holds the evidence, and it is still here, untouched. Keeping the code
-# meant keeping Lambda, Rung, frontier(), verdict(), sell_test(), Sale,
-# marginal() and three functions in this file, all reachable from nothing, all
-# of which had to be read and skipped by anyone learning how buying works now.
-# git remembers them.
+# λ is gone, code and all — it measured points per million against YOUR
+# CURRENT ELEVEN, so the baseline moved under it. Replacement level does not.
+# `lambda_log.csv` is kept and holds what the old rule said; the code was not
+# needed to read it.
 from ffcore.bid import (basket, cost_of, deals,  # noqa: E402
                         demand_summary, premiums, ratio_of,
                         suggest, xi_snapshots)
@@ -780,26 +767,20 @@ def log_squad(observed, players, chosen, formation, total, deadline,
 # ---------------------------------------------------------------------------
 # The board — one row per asset, one rate, one order
 #
-# The five tables below each answered their own question well and left the
-# joining-up to the reader, which is how the report managed to tell you to field
-# a man in question 1 and sell him in question 4. This table is the join, and it
-# is now also the source: the five read it rather than the other way round. Every
-# asset you
-# could hold — the players you own, the players you could buy, and the cash —
-# gets one row, priced in ONE unit: index points above replacement per million
-# euros. Then it is sorted, and the cash row is dropped in at the hurdle.
+# The five sections each answered their own question and left the joining-up
+# to the reader, which is how the report told you to field a man in question 1
+# and sell him in question 4. This table is the join, and the source: the five
+# read it. Every asset you could hold — owned, buyable, and the cash — gets one
+# row priced in ONE unit, points above replacement per million.
 #
-# That last step is the whole design. Cash is not a footnote about opportunity
-# cost, it is a competing asset with a rate of its own, so the line it sits on
-# is the decision: above it an asset earns more than the money would, below it
-# the money would earn more. Hold above, sell below, buy above, pass below —
-# four verdicts from one comparison instead of four rules that can disagree.
+# CASH IS A ROW, not a footnote about opportunity cost: a competing asset with
+# a rate of its own, so the line it sits on IS the decision. Hold above, sell
+# below, buy above, pass below — four verdicts from one comparison instead of
+# four rules that can disagree.
 #
-# The rate is on the REPLACEMENT scale, and it is now the only scale in the file.
-# λ measured the same unit against your CURRENT ELEVEN, so the same player was
-# worth different amounts on consecutive days for reasons that had nothing to do
-# with him. Replacement level is fixed by the rules, so a row is a decision
-# rather than a snapshot of a search.
+# Replacement level is fixed by the rules, so a row is a decision rather than a
+# snapshot of a search. That is what λ, measured against your current eleven,
+# could not be.
 # ---------------------------------------------------------------------------
 
 

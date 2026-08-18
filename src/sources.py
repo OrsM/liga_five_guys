@@ -553,39 +553,21 @@ def sign_team(html: str) -> str | None:
 # Analítica Fantasy — the second probable-XI source
 # ---------------------------------------------------------------------------
 #
-# THEIR TEAM PAGE HAS TWO SHAPES, and which one you get depends on how close
-# the next match is. The first live sweep found only 4 of 20 pages carrying the
-# shape this parser was first written against, which is how the second shape
-# was found — before it could be mistaken for rot.
+# TWO PAGE SHAPES, depending on how close the next match is. Try Titulares,
+# fall back to Consenso; neither means rot, which is the correct outcome.
 #
-#   1. Match imminent: <ul aria-label="Titulares <Team>"> holds exactly the
-#      eleven, one <li aria-label="Ver resumen de <Name>"> each. This is their
-#      final call, and it is binary: no percentage anywhere on the page. So
-#      `start_pct` stays empty and `note` says "titular". Do NOT write 100
-#      here — a confident editorial call is not a stated probability, and the
-#      report must be able to tell the difference.
+#   1. Imminent: <ul aria-label="Titulares <Team>"> — their final call, and
+#      binary, with no percentage on the page. `start_pct` stays EMPTY and
+#      `note` says "titular". Never write 100: a confident editorial call is
+#      not a stated probability and the report must tell them apart.
+#   2. Further out: aria-label="Consenso de alineaciones" — three editors
+#      split into Unánimes and Más divididos ("Aitor Paredes2/3 titular").
+#      That fraction is a probability THEY published, so it lands in
+#      `start_pct` as 100·n/d with the raw fraction kept in `note`.
 #
-#   2. Match further out: an aria-label="Consenso de alineaciones" block
-#      instead, and this one is richer than a binary XI. It splits their three
-#      editors into "Unánimes" (in every editor's eleven) and "Más divididos"
-#      (text like "Aitor Paredes2/3 titular"). That fraction is a start
-#      probability THEY published, editor-count based — not a constant this
-#      repo invented — so it lands in `start_pct` as 100·n/d with the raw
-#      fraction preserved in `note`.
-#
-# The two shapes are mutually exclusive on every page seen so far, so the
-# parser tries Titulares and falls back to Consenso. A page with neither
-# returns no rows and ingest reports it as rot, which is the correct outcome:
-# the third shape does not exist yet, and when it does we should hear about it.
-#
-# NO FITNESS, EITHER WAY. Neither shape carries an injury panel, so `status`
-# is "" meaning *not stated*, never "ok" — silence must not be stored as a
-# clean bill of health. Their position codes are deliberately not stored: the
-# app's own positions are the ones the scorer must use.
-#
-# The per-match pages (/partido/<id>) carry substitutes too, but their URLs
-# change every jornada. We now read the ids off the hub page (see
-# parse_af_fixtures) — for kickoff times, not yet for lineups.
+# NO FITNESS on either shape, so `status` is "" (not stated), never "ok" —
+# silence must not be stored as a clean bill of health. Their position codes
+# are dropped: the app's positions are the ones the scorer uses.
 
 AF_BASE = "https://www.analiticafantasy.com"
 AF_SOURCE = "analitica"
@@ -786,32 +768,24 @@ def sign_points(html: str) -> str | None:
 # who actually started — the outcome every probable-XI source is guessing at
 # ---------------------------------------------------------------------------
 #
-# Both lineup sources publish a claim before kickoff and neither is graded,
-# because nothing in this repo ever recorded what happened. These two entries
-# record it: the calendar says which matches have been played, and each played
-# match's own page carries the confirmed elevens.
+# The ground truth that grades both probable-XI sources: the calendar says
+# which matches were played, each played match page carries the confirmed
+# elevens.
 #
-# WHY THIS SITE AND NOT FBref. The names come back in the same spellings as
-# the probable-XI pages — "U. Núñez", "El Hilali", "De la Fuente" — and, more
-# usefully, the same /jugadores/<slug> ids. So the forecast-to-outcome join is
-# on player_slug and needs no name resolution at all, which is the one step
-# that would have silently dropped exactly the players whose names are hard.
-# FBref is also behind an interactive Cloudflare challenge.
+# THIS SITE AND NOT FBref, because the outcome rows carry the same
+# /jugadores/<slug> ids as the probable-XI pages, so the join needs no name
+# resolution — the step that would have dropped exactly the hard spellings
+# ("U. Núñez", "El Hilali"). FBref is also behind a Cloudflare challenge.
+# robots.txt checked 2026-08-16: "User-agent: *", empty Disallow.
 #
-# ROBOTS, checked 2026-08-16: futbolfantasy.com/robots.txt is "User-agent: *"
-# with an empty Disallow — nothing on the site is excluded.
+# PAGE SHAPE: .stats-local / .stats-visitante, each one table.tablestats whose
+# tbody alternates a player row (tr.plegado.plegable, name in td.name) with a
+# detail row (tr.desglose) holding the only link to the player. A tr.header
+# "Suplentes" splits eleven from bench. An UNPLAYED match has no table at all,
+# which is why the calendar's score is the gate: no score, no request.
 #
-# WHAT A MATCH PAGE LOOKS LIKE. Two columns, .stats-local and .stats-visitante,
-# each with one table.tablestats whose tbody alternates a player row
-# (tr.plegado.plegable, name in td.name) with a collapsed detail row
-# (tr.desglose) holding the only link to that player's page. A tr.header
-# reading "Suplentes" separates the eleven from the bench. An UNPLAYED match
-# has no such table at all, which is why the calendar's score is the gate: no
-# score, no request.
-#
-# A match page is fetched ONCE, ever — cadence "once". The confirmed eleven
-# does not change after kickoff, and re-reading it for the live stats we do
-# not parse would be a request a day per match for the rest of the season.
+# Fetched ONCE ever. A confirmed eleven does not change after kickoff, and
+# re-reading it for live stats we do not parse would cost 380 requests a day.
 
 CAL_KEY = "calendario"
 FF_CAL_URL = f"{BASE}/laliga/calendario"
@@ -1006,24 +980,17 @@ def played_sources(cal_html: str, observed_at: str = "") -> list[Source]:
 # Club Elo — how strong a team actually is, rather than how expensive
 # ---------------------------------------------------------------------------
 #
-# The fixture term ranked teams by summed squad value, because that was the
-# only team-level number in the repo. It is a poor proxy twice over: a promoted
-# side that spends is not thereby good, and one 100M signing moves a whole
-# squad's total. Club Elo is a rating fitted on results, published free, with
-# no key, as one plain CSV a day.
+# The fixture term used summed squad value, a poor proxy twice over: a
+# promoted side that spends is not thereby good, and one 100M signing moves
+# the whole total. Elo is fitted on results, free, one plain CSV a day.
 #
-# THE ONLY PAGE HERE THAT IS NOT HTML. `parse` and `sign` receive text either
-# way, so the registry needs no new concept — but nothing lxml-shaped may touch
-# this, which is why sign_elo hashes rows rather than calling _surface.
+# NOT HTML, so nothing lxml-shaped may touch it — sign_elo hashes rows rather
+# than calling _surface. The file is worldwide, so the signature covers only
+# the Spanish top-flight rows; hashing all of it would store a fresh archive
+# daily for four thousand clubs we never rank.
 #
-# The file is worldwide and the URL carries a date, so the signature is the
-# input surface again: only the Spanish top-flight rows this repo can read.
-# Hashing the whole file would store a fresh archive every day for four
-# thousand clubs we never rank.
-#
-# ROBOTS: clubelo.com serves no robots.txt (the path 302s away, with no
-# Disallow anywhere), and the API exists to be read by programs — one request
-# a day, on the daily cadence, is the whole footprint.
+# ROBOTS: clubelo.com serves none (the path 302s away), and the API exists to
+# be read by programs. One request a day is the whole footprint.
 #
 # OUTAGE, 2026-08-16: api.clubelo.com resolves (37.128.134.74) but answers on
 # neither 80 nor 443, from a home network and from a GitHub runner alike, and
