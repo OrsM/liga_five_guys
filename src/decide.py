@@ -268,8 +268,11 @@ def cash_price(reach) -> float | None:
 def respond(u, a: Action, after: dict) -> Action | None:
     """The best single answer the manager you just paid can make, or None.
 
-    A CLAUSE PAYS THE OWNER. Paying one does not merely subtract a player from
-    a rival — it hands him the money, and on the day this was written that was
+    A CLAUSE PAYS THE OWNER — confirmed by Miguel against the app on
+    2026-08-18, and not observable here: no clause purchase has ever happened
+    in this league, so the activity feed has never had one to record. Paying
+    one does not merely subtract a player from a rival — it hands him the
+    money, and on the day this was written that was
     the difference between a league where nobody could act and one where the
     manager I am racing was the richest in it. Every rival was overdrawn; I
     was the only one who could buy anybody. A steal ends both of those facts

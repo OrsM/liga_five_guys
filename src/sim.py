@@ -147,7 +147,8 @@ def table(rows, u, base, rivals) -> list[str]:
                 "steal or swap improves the eleven._", ""]
     now = base.position().get(1, 0.0)
     ranked = sorted(rows, key=lambda r: (-r["d_win"], -r["d_pos"]))
-    out = ["| Get | Give up | P(win) | Net € |", "|---|---|--:|--:|"]
+    out = ["| Get | Give up | P(win) | Net € | Left |",
+           "|---|---|--:|--:|--:|"]
     for r in ranked[:SHOW]:
         a = r["action"]
         got = title_name(u.name.get(a.buy, a.buy)) if a.buy else "—"
@@ -159,21 +160,30 @@ def table(rows, u, base, rivals) -> list[str]:
         ans = r.get("answer")
         if ans is not None:
             gave += " · **he takes %s**" % short(ans.buy, u)
-        out.append("| %s | %s | %.0f%% | %s |"
-                   % (got, gave, 100 * (now + r["d_win"]), _net(-a.net)))
+        out.append("| %s | %s | %.0f%% | %s | %s |"
+                   % (got, gave, 100 * (now + r["d_win"]), _net(-a.net),
+                      fmt_money(u.cash - a.net)))
     out += ["",
             "_**P(win)** is where the move LEAVES you — your chance of winning "
             "the league after making it, against %.0f%% if you do nothing. "
             "**Get** names the rival a steal takes him off, which is half of "
             "what a steal is worth: it raises your total and lowers theirs at "
-            "once. **Net €** is what the move does to the balance — negative "
-            "spends, positive raises. Who exactly you give up when it says "
-            "*spares* is in the sell table below; none of them ever start. "
-            "**he takes** is the rival's best answer, played before the "
-            "season is: a clause pays the OWNER, so paying one funds the "
-            "manager you are racing — and every rival is overdrawn until you "
-            "do._"
-            % (100 * now), ""]
+            "once. **Net €** is what the move does to the balance and "
+            "**Left** is what you are on afterwards — every rival is on 0K "
+            "until you pay one, so that column is the whole of your ability "
+            "to answer anything for the rest of the season. Who exactly you "
+            "give up when it says *spares* is in the sell table below; none "
+            "of them ever start. **he takes** is the rival's best answer, "
+            "played before the season is._" % (100 * now),
+            "",
+            "_A CLAUSE IS THREE PURCHASES AT ONCE. The market value buys the "
+            "points for you, and that part is a loan rather than a spend — it "
+            "comes back when you sell him. The premium over it buys something "
+            "else entirely: that a RIVAL does not score them. And the balance "
+            "buys nothing at all, it only stops being available. The first is "
+            "priced by the market; the second is now scored net of his reply, "
+            "because he is handed the money and spends it; the third is the "
+            "column on the right, because nothing here can value it._", ""]
     return out
 
 
@@ -475,10 +485,13 @@ def _selftest() -> None:
     # MONEY LEAVING IS NEGATIVE, the way the balance sees it: this move spends
     # 20M and raises 5.87M, so it costs 14.13M.
     assert cells[3] == "-14.13M", cells
+    # WHAT YOU ARE LEFT ON. Every rival is on nothing until you pay one, so
+    # this column is the whole of your ability to answer anything later.
+    assert cells[4] == "9.47M", cells
     # The three columns that said the same thing are gone: Δpos, Δwin and the
     # rival column all tracked each other, and the rival column named the same
     # manager on every row for days.
-    assert len(cells) == 4, cells
+    assert len(cells) == 5, cells
     assert "+0.433" not in line[0] and "+36%" not in line[0], line[0]
 
     # A free agent is a different move from a steal and says so rather than
@@ -695,7 +708,7 @@ def _selftest() -> None:
     ph = "\n".join(placeholder("no api_teams.csv"))
     assert "no api_teams.csv" in ph and ph.startswith("# The simulation")
 
-    print("sim self-test OK (67 cases)")
+    print("sim self-test OK (69 cases)")
 
 
 def main() -> None:

@@ -111,10 +111,25 @@ from 57% to 16%. A market purchase gets no response at all, and that asymmetry
 is the point: money paid to the app leaves the league, money paid for a clause
 changes sides.
 
-WHAT IS STILL ASSUMED, and it should be checked in the app: that the clause
-payment goes to the owner. No clause purchase has ever happened in this league
-— 58 activity rows, all market buys and sells, no manager-to-manager pair — so
-the feed cannot confirm it.
+**Confirmed against the app on 2026-08-18**, and it cannot be confirmed here:
+no clause purchase has ever happened in this league — 58 activity rows, all
+market buys and sells, no manager-to-manager pair — so the feed has never had
+one to record. If the mechanic ever changes, this is the line to revisit.
+
+**A CLAUSE IS THREE PURCHASES AT ONCE**, and the report now says so, because
+only one of the three was ever visible:
+
+- **The market value** buys the points for yourself, and that part is a loan
+  rather than a spend — it comes back when you sell him.
+- **The premium over it** buys something else entirely: that a RIVAL does not
+  score them. Median 1.52x, so a third of the cheque. It is scored net of his
+  reply now, which is most of what changed above.
+- **The balance** buys nothing at all; it only stops being available. Every
+  rival sits on 0K until you pay one, so what you are left on is the whole of
+  your ability to answer anything for the rest of the season. That is the
+  `Left` column, and it is a column rather than a charge because nothing here
+  can value it — 0.002 places per million prices "one more move today", not
+  thirty-eight jornadas of being able to respond.
 
 **A BUYOUT CLAUSE BURNS MONEY, AND THAT IS NOW CHARGED.** A free agent asks
 about his market value — median ratio 1.011 — so buying one destroys nothing:
