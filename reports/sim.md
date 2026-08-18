@@ -2,11 +2,13 @@
 
 ## What the simulation says to do
 
-_A trial, printed beside the board rather than in place of it. Same data, one question: if I made this move, where would I finish?_
+_One question, asked of every move you could make: if I did this, where would I finish?_
+
+**Locks in 30h** · squad 213.11M · cash 23.60M · total 236.71M
 
 **Expected finish 1.61** · **P(win) 49%** · season **1,311–1,565** (10–90)
 
-_38 jornadas left · cash 23.60M · 83 players acquirable · 132 moves simulated._
+_38 jornadas left · 83 players acquirable · 132 moves simulated._
 
 | Do this | Δpos | Δwin | net € | biggest gain vs |
 |---|--:|--:|--:|---|
@@ -20,6 +22,16 @@ _38 jornadas left · cash 23.60M · 83 players acquirable · 132 moves simulated
 | steal Justin de Haas from BurtonGM89 · sell Beñat Turrientes | +0.159 | +10% | -7.36M | SusoGattuso +10% |
 
 _**Δpos** is places gained on the expected finish, **Δwin** is percentage points of P(winning the league), and **net €** is what the move does to the balance — negative spends, positive raises. **Biggest gain vs** is the rival the move takes the most from, which is the column to read when one of them is the race and the rest are not._
+
+## Sell — these never make the eleven
+
+| Sell | Pos | Raises |
+|---|---|--:|
+| Dani Lorenzo | MED | 9.60M |
+| Beñat Turrientes | MED | 7.07M |
+| Alvaro Fernandez | POR | 4.49M |
+
+_These start in none of the 38 remaining jornadas, so they score nothing wherever the rest of the squad goes and any offer is a gain. The simulation rates selling them at exactly zero — it cannot value the cash, which is the whole of what they are worth. What it also cannot value is cover: P(start) is held flat here, so nobody is ever injured in March and a bench that exists for that is worth nothing to it._
 
 ## Where the league stands
 

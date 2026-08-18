@@ -1,6 +1,6 @@
 # The workings — 2026-08-18T0941Z
 
-_How the board in [REPORT.md](REPORT.md) was reached. Same numbers, same verdicts; this is where they come from._
+_What the one table in [REPORT.md](REPORT.md) was built from: the eleven it assumes you field, what a man on today's slate should cost, and the two ways any of it can be wrong about a player._
 
 ## 1. Field these eleven
 
@@ -36,31 +36,33 @@ _The `+SLOT` rows are today's slate: **xPts/j is the change to the whole eleven*
 
 _Swaps are same-position only: a cross-slot difference is a change of formation, not a substitution. Your own marks are the row above — this table is advice._
 
-## 2. Buy today
+## 2. What to bid
 
-**11 on offer, 3 beat the going rate for cash, 2 cover a position you are short in.**
+**11 on offer.**
 
-| Player | Pos | Bid | above repl | pts/M | At the line | Competition | Verdict |
-|---|---|--:|--:|--:|--:|---|---|
-| Isi Palazon | del | 20.20M | -0.8 | -0.039 | — | (4 broke) | pass — cover, you are 1 short at DEL |
-| Aitor Mañas | del | 523K | -3.5 | -6.532 | — | none | pass — cover, you are 1 short at DEL |
-| Marcos Alonso | def | — | +1.6 | 0.055 | — | (4 broke) | **Buy** — paid for by selling Carl Starfelt |
-| Pedri Gonzalez | med | — | +0.1 | 0.001 | — | (4 broke) | pass |
-| Edin Terzic | ent | 7.18M | +0.0 | 0.000 | — | none | pass |
-| Marc Bartra | def | — | -0.8 | -0.029 | — | (4 broke) | pass |
-| Angeliño | def | 15.54M | -3.4 | -0.217 | — | none | pass |
-| Pol Lozano | med | 2.19M | -2.3 | -1.037 | — | none | pass |
-| Beñat Prados | med | 1.37M | -2.1 | -1.514 | — | (1 broke) | pass |
-| Andriy Lunin | por | 2.08M | -4.2 | -1.985 | — | none | pass |
-| Edu Altozano | med | 584K | -2.6 | -4.456 | — | none | pass |
+| Player | Pos | Bid | Competition | Note |
+|---|---|--:|---|---|
+| Isi Palazon | del | 20.20M | (4 broke) |  |
+| Angeliño | def | 15.54M | none |  |
+| Edin Terzic | ent | 7.18M | none |  |
+| Pol Lozano | med | 2.19M | none |  |
+| Andriy Lunin | por | 2.08M | none |  |
+| Beñat Prados | med | 1.37M | (1 broke) |  |
+| Edu Altozano | med | 584K | none |  |
+| Aitor Mañas | del | 523K | none |  |
+| Marc Bartra | def | — | (4 broke) |  |
+| Pedri Gonzalez | med | — | (4 broke) |  |
+| Marcos Alonso | def | — | (4 broke) |  |
 
-**above repl** and **pts/M** are the board's columns, unchanged, and so is the verdict — this table decides nothing the board has not already decided. **At the line** is the most he is worth paying: at that price he is exactly as good as leaving the money idle, so bid under it. A purchase is closer to a loan than a spend — the value comes back when you sell, give or take 12%, which on a large player is bigger than the premium and the drift put together. That swing is a coin flip, so a bid within a few percent of the line price is not a decision.
+**Bid** is what it costs to win him, and nothing here says whether he is worth winning — that is the one table in [REPORT.md](REPORT.md), which prices him at a clause because a clause cannot be refused. A purchase is closer to a loan than a spend: the value comes back when you sell, give or take 12%, which on a large player is bigger than the premium and the drift put together. That swing is a coin flip, so a bid within a few percent is not a decision.
 
 **FF** is futbolfantasy's probable-XI percentage, which is the one the forecast uses. **AF** is analiticafantasy's read of the same eleven, printed beside it and never blended in — `titular` is a named starter (a final call, with no number to it), a percentage is their editors' consensus, `?` means they list him without either, and `—` means they do not have him. Two columns that disagree are the signal; that is the whole point of carrying both.
 
 Competition is demand, not roster counts: the rivals whose XI actually improves with him, strongest threat first — `?` cash unknown (treat as live), `(n broke)` want him but cannot pay the floor. The full manager-by-manager matrix is in `reports/rivals.md`.
 
 Bid is the floor plus what this league has actually paid over it: median +1.7%, -0.2% to +635.3% (n=29). 11 of those 29 went at the floor itself, so the minimum is not a number known to lose. A dozen deals is not a distribution — the range is what has happened, not a chance of winning, and every one of them is a bid that won.
+
+**⚠ 8 bids at 49.66M is more than the 23.60M you hold.** Each row above is priced as though it were your only purchase, and the app settles them together — take them best rate first: Isi Palazon, Angeliño, Edin Terzic, Pol Lozano, Andriy Lunin, Beñat Prados, Edu Altozano, Aitor Mañas.
 
 Already owned, so not a purchase: abde ezzalzouli (Albert Laporta), aitor paredes (BurtonGM89), antonio blanco (BurtonGM89), arda guler (Albert Laporta), ayoze perez (Albert Laporta), beñat turrientes (you), carl starfelt (you), carlos espi (SusoGattuso), carlos puga (BurtonGM89), dani lorenzo (you), dean huijsen (BurtonGM89), denis suarez (BurtonGM89), ferran jutgla (Albert Laporta), ilaix moriba (Albert Laporta), iñigo ruiz de galarreta (you), jon moncayola (you), juan foyth (Albert Laporta), karl etta eyong (BurtonGM89), leandro cabrera (Albert Laporta), lucien agoume (you), marc roca (Albert Laporta), matias dituro (Albert Laporta), nahuel tenaglia (BurtonGM89), pablo fornals (you), quilindschy hartman (BurtonGM89), santiago mouriño (Albert Laporta), wojciech szczesny (SusoGattuso).
 
@@ -72,21 +74,7 @@ The app is offering these and no market row matches the name, so they carry no r
 - **Pepe**
 - **A. Ferllo**
 
-## 3. What you give up by spending now
-
-_Nothing on today's slate can be bought at any rate, so there is no line. Every verdict above falls back to 'is he above replacement at all' — the same metric and the same direction, one notch cruder, which is a degraded line and not a second scale._
-
-## 4. Sell these
-
-| Player | Pos | Sale | above repl | pts/M | At the line | Verdict | Why |
-|---|---|--:|--:|--:|--:|---|---|
-| Alvaro Fernandez | POR | 4.16M–5.30M | -6.1 | -1.292 | — | **Sell** | 2nd POR — only 1 can be fielded |
-| Beñat Turrientes | MED | 6.56M–8.35M | -1.5 | -0.196 | — | **Sell** | 7th MED — only 5 can be fielded |
-| Pablo Fornals | MED | 52.88M–67.31M | +2.2 | 0.036 | — | Hold |  |
-
-_Same columns, same numbers and same verdicts as the board — this is the bench half of it, with the sale priced. **Sale** is what the app pays: not the value, and not a number you can hold out for, because you cannot sell on demand. An offer arrives and you take it or refuse it, which is what **At the line** is for — the proceeds at which the cash buys back exactly what he is worth, so at or above it take the offer whatever the Verdict says. The verdict only reports whether there is a counterparty TODAY. `any` means he is below replacement, so no offer is too low, and `—` means nothing is on offer, so there is no line to price him against and no number to hold out for. The instant sale is not a sale: it pays roughly half of value, which is a way to free cash before a lock and almost never beats waiting. Two things this cannot see. Each sale is priced ON ITS OWN — sell two out of the same position and the second one leaves you short, so re-read the thin-position warnings below the rule. And a name question 1 wants in your eleven can still be a Sell: fielding is one round, selling is the season, and the proceeds buy the basket in question 3. Selling to the app pays the value give or take 12%: the 20 priced sales in the ledger went median +5.4%, -9.4% to +12.0% (n=20), which is the band in the Sale column and is wide enough that a price near the line is a coin flip. Who is short in his position, and who can still afford you, is in `reports/rivals.md`._
-
-## 5. Exceptions
+## 3. Exceptions
 
 _The two ways every number above can be wrong about a player: he is not fit, or the two probable-XI sources do not agree that he plays. Neither prices anything, so neither is a decision — both are prompts to open the app._
 
@@ -128,4 +116,4 @@ _637 players tracked, 499 with a probable-XI reading._
 
 _xPts/j — expected points per jornada = shrunk pts/match (K=8, 2025-26) × fixture × P(start), from `ffcore/score.py` — the same scorer rivals.py uses. Injured, suspended and unavailable score zero; a doubt is halved. The fixture term is a ±12% band across the opponents ranked by Club Elo rating, plus ±4% for home advantage; both widths are guesses, unfitted because nothing has been played, and small enough that a wrong one costs a fraction of a point._
 
-_Generated 2026-08-18 09:43 UTC._
+_Generated 2026-08-18 12:43 UTC._

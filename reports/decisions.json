@@ -1,103 +1,225 @@
 {
- "generated_at": "2026-08-18T09:43Z",
- "locks_in_h": 33.3,
+ "generated_at": "2026-08-18T12:45Z",
+ "locks_in_h": 30.26911428777778,
  "cash": 23596582.0,
  "squad_value": 213113164.0,
- "line": null,
- "rows": [
+ "jornadas_left": 38,
+ "acquirable": 83,
+ "considered": 132,
+ "expected_finish": 1.6106666666666667,
+ "p_win": 0.4856666666666667,
+ "band": [
+  1310.7381491531994,
+  1565.1969022835635
+ ],
+ "moves": [
   {
+   "label": "steal Yuri Berchiche from SusoGattuso · sell Beñat Turrientes",
+   "kind": "steal",
+   "buy": "Yuri Berchiche",
+   "sell": "Beñat Turrientes",
+   "victim": "SusoGattuso",
+   "d_pos": 0.43333333333333335,
+   "d_win": 0.3586666666666667,
+   "net": -14134537.0,
+   "vs": "SusoGattuso",
+   "vs_gain": 0.35899999999999993
+  },
+  {
+   "label": "buy Marcos Alonso · sell Beñat Turrientes",
    "kind": "buy",
-   "name": "Marcos Alonso",
-   "pos": "DEF",
-   "rate": 0.05456831262297046,
-   "money": -29083151.782312296,
-   "why": "paid for by selling Carl Starfelt",
-   "in_xi": false,
-   "flag": false,
-   "cap": null
+   "buy": "Marcos Alonso",
+   "sell": "Beñat Turrientes",
+   "victim": "",
+   "d_pos": 0.3623333333333332,
+   "d_win": 0.28200000000000003,
+   "net": -21831419.0,
+   "vs": "SusoGattuso",
+   "vs_gain": 0.27499999999999997
   },
   {
-   "kind": "fund",
-   "name": "Carl Starfelt",
-   "pos": "DEF",
-   "rate": -0.02451186441162058,
-   "money": 14843907.65801386,
-   "why": "funds Marcos Alonso (+1.6, +2.0 better)",
-   "in_xi": true,
-   "flag": false
+   "label": "steal Cesar Tarrega from SusoGattuso · sell Beñat Turrientes",
+   "kind": "steal",
+   "buy": "Cesar Tarrega",
+   "sell": "Beñat Turrientes",
+   "victim": "SusoGattuso",
+   "d_pos": 0.31066666666666665,
+   "d_win": 0.251,
+   "net": -7745029.0,
+   "vs": "SusoGattuso",
+   "vs_gain": 0.25266666666666665
   },
   {
-   "kind": "fund",
-   "name": "Robin Le Normand",
-   "pos": "DEF",
-   "rate": -0.07417076710118278,
-   "money": 10982663.715495035,
-   "why": "funds Marcos Alonso (+1.6, +2.4 better)",
-   "in_xi": true,
-   "flag": false
+   "label": "steal Gorka Guruzeta from Magic Mike 333 · sell Beñat Turrientes",
+   "kind": "steal",
+   "buy": "Gorka Guruzeta",
+   "sell": "Beñat Turrientes",
+   "victim": "Magic Mike 333",
+   "d_pos": 0.30133333333333345,
+   "d_win": 0.22533333333333327,
+   "net": -14229695.0,
+   "vs": "SusoGattuso",
+   "vs_gain": 0.21766666666666662
   },
   {
-   "kind": "fund",
-   "name": "Igor Zubeldia",
-   "pos": "DEF",
-   "rate": -0.11155151272603614,
-   "money": 10872783.266096717,
-   "why": "funds Marcos Alonso (+1.6, +2.8 better)",
-   "in_xi": true,
-   "flag": false
+   "label": "steal Aitor Paredes from BurtonGM89 · sell Beñat Turrientes",
+   "kind": "steal",
+   "buy": "Aitor Paredes",
+   "sell": "Beñat Turrientes",
+   "victim": "BurtonGM89",
+   "d_pos": 0.2610000000000001,
+   "d_win": 0.18099999999999994,
+   "net": 1523131.0,
+   "vs": "SusoGattuso",
+   "vs_gain": 0.17033333333333328
   },
   {
-   "kind": "fund",
-   "name": "Omar El Hilali",
-   "pos": "DEF",
-   "rate": -0.10197734050731722,
-   "money": 9932357.677073797,
-   "why": "funds Marcos Alonso (+1.6, +2.6 better)",
-   "in_xi": true,
-   "flag": false
+   "label": "steal Ferran Jutgla from Albert Laporta · sell Beñat Turrientes",
+   "kind": "steal",
+   "buy": "Ferran Jutgla",
+   "sell": "Beñat Turrientes",
+   "victim": "Albert Laporta",
+   "d_pos": 0.22999999999999998,
+   "d_win": 0.16133333333333333,
+   "net": -2433420.0,
+   "vs": "SusoGattuso",
+   "vs_gain": 0.15433333333333327
   },
   {
-   "kind": "sell",
-   "name": "Alvaro Fernandez",
-   "pos": "POR",
-   "rate": -1.291545356718106,
-   "money": 4727840.229482957,
-   "why": "2nd POR — only 1 can be fielded",
-   "in_xi": false,
-   "flag": false
+   "label": "steal Lucas Noubi from Magic Mike 333 · sell Beñat Turrientes",
+   "kind": "steal",
+   "buy": "Lucas Noubi",
+   "sell": "Beñat Turrientes",
+   "victim": "Magic Mike 333",
+   "d_pos": 0.17133333333333334,
+   "d_win": 0.1176666666666667,
+   "net": -11616744.0,
+   "vs": "SusoGattuso",
+   "vs_gain": 0.11166666666666664
   },
   {
-   "kind": "sell",
-   "name": "Beñat Turrientes",
-   "pos": "MED",
-   "rate": -0.19626628417034359,
-   "money": 7452928.270089323,
-   "why": "7th MED — only 5 can be fielded",
-   "in_xi": false,
-   "flag": false
+   "label": "steal Justin de Haas from BurtonGM89 · sell Beñat Turrientes",
+   "kind": "steal",
+   "buy": "Justin de Haas",
+   "sell": "Beñat Turrientes",
+   "victim": "BurtonGM89",
+   "d_pos": 0.15900000000000003,
+   "d_win": 0.10399999999999998,
+   "net": -7361690.0,
+   "vs": "SusoGattuso",
+   "vs_gain": 0.09533333333333333
   },
   {
-   "kind": "sell",
-   "name": "Dani Lorenzo",
-   "pos": "MED",
-   "rate": -0.07043713730217231,
-   "money": 10120302.231861632,
-   "why": "6th MED — only 5 can be fielded",
-   "in_xi": false,
-   "flag": false
+   "label": "steal Lorenzo Amatucci from SusoGattuso · sell Beñat Turrientes",
+   "kind": "steal",
+   "buy": "Lorenzo Amatucci",
+   "sell": "Beñat Turrientes",
+   "victim": "SusoGattuso",
+   "d_pos": 0.15200000000000014,
+   "d_win": 0.14100000000000001,
+   "net": -13004522.0,
+   "vs": "SusoGattuso",
+   "vs_gain": 0.15266666666666667
+  },
+  {
+   "label": "steal Aimar Oroz from SusoGattuso · sell Beñat Turrientes",
+   "kind": "steal",
+   "buy": "Aimar Oroz",
+   "sell": "Beñat Turrientes",
+   "victim": "SusoGattuso",
+   "d_pos": 0.1379999999999999,
+   "d_win": 0.131,
+   "net": -18548825.0,
+   "vs": "SusoGattuso",
+   "vs_gain": 0.13933333333333336
+  },
+  {
+   "label": "buy Marc Bartra · sell Beñat Turrientes",
+   "kind": "buy",
+   "buy": "Marc Bartra",
+   "sell": "Beñat Turrientes",
+   "victim": "",
+   "d_pos": 0.10999999999999988,
+   "d_win": 0.08099999999999996,
+   "net": -20678084.0,
+   "vs": "SusoGattuso",
+   "vs_gain": 0.0736666666666666
+  },
+  {
+   "label": "steal Jose Gaya from Magic Mike 333 · sell Beñat Turrientes",
+   "kind": "steal",
+   "buy": "Jose Gaya",
+   "sell": "Beñat Turrientes",
+   "victim": "Magic Mike 333",
+   "d_pos": 0.09266666666666667,
+   "d_win": 0.06233333333333335,
+   "net": -11961902.0,
+   "vs": "SusoGattuso",
+   "vs_gain": 0.05733333333333329
   }
  ],
- "xi": [
-  "Jon Moncayola",
-  "Pablo Fornals",
-  "Ionut Radu",
-  "Iñigo Ruiz de Galarreta",
-  "Lucien Agoume",
-  "Carl Starfelt",
-  "Pepelu",
-  "Robin Le Normand",
-  "Iñigo Vicente",
-  "Omar El Hilali",
-  "Igor Zubeldia"
+ "sell": [
+  {
+   "name": "Dani Lorenzo",
+   "pos": "MED",
+   "raises": 9604577.0
+  },
+  {
+   "name": "Beñat Turrientes",
+   "pos": "MED",
+   "raises": 7073131.0
+  },
+  {
+   "name": "Alvaro Fernandez",
+   "pos": "POR",
+   "raises": 4486912.0
+  }
+ ],
+ "standings": [
+  {
+   "manager": "SusoGattuso",
+   "me": false,
+   "now": 23.0,
+   "mean": 1439.4857057372767,
+   "lo": 1321.590206848855,
+   "hi": 1560.3502278010026,
+   "p_above": 0.49733333333333335
+  },
+  {
+   "manager": "miguel_autentico",
+   "me": true,
+   "now": 17.0,
+   "mean": 1437.0154534752733,
+   "lo": 1310.7381491531994,
+   "hi": 1565.1969022835635,
+   "p_above": null
+  },
+  {
+   "manager": "BurtonGM89",
+   "me": false,
+   "now": 24.0,
+   "mean": 1234.8627727589158,
+   "lo": 1121.6967811531304,
+   "hi": 1344.5646475934407,
+   "p_above": 0.9363333333333334
+  },
+  {
+   "manager": "Albert Laporta",
+   "me": false,
+   "now": 10.0,
+   "mean": 1199.4722826998452,
+   "lo": 1081.816007454427,
+   "hi": 1318.4438444781445,
+   "p_above": 0.966
+  },
+  {
+   "manager": "Magic Mike 333",
+   "me": false,
+   "now": 11.0,
+   "mean": 1141.8630859800855,
+   "lo": 1032.5931822424718,
+   "hi": 1252.2727613928894,
+   "p_above": 0.9896666666666667
+  }
  ]
 }

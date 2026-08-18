@@ -95,25 +95,30 @@ from datetime import datetime, timezone
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-# band_of(), drift_bands() and friction() in ffcore/bid.py lost their caller
-# with the Cost/pt column. Kept: the drift term is the first thing to fold
-# into the cost side of the ratio once a season of readings can fit it.
+# WHAT IS LEFT OF ffcore/bid.py's SURFACE HERE is the bid: `suggest`, the
+# premiums behind it, and the demand summary. basket(), cost_of() and
+# ratio_of() went with the board on 2026-08-18, as vor() and replacement() did
+# — they priced points per million above replacement, which was a proxy for
+# "does this move me up the table", and sim.py answers that directly. bid.py
+# itself stays: squads.py reads its premiums, and what it costs to WIN a
+# market row is a fact about this league that no simulation of the pitch can
+# supply.
 #
-# λ is gone, code and all — it measured points per million against YOUR
-# CURRENT ELEVEN, so the baseline moved under it. Replacement level does not.
-# `lambda_log.csv` is kept and holds what the old rule said; the code was not
-# needed to read it.
-from ffcore.bid import (basket, cost_of, deals,  # noqa: E402
-                        demand_summary, premiums, ratio_of,
-                        suggest, xi_snapshots)
+# λ went the same way a fortnight earlier, for the same reason one layer down:
+# it measured points per million against YOUR CURRENT ELEVEN, so the baseline
+# moved under it. `lambda_log.csv` and `line_log.csv` are both kept — they
+# hold what the old rules said, which is the only evidence that will ever
+# exist for whether replacing them helped. git remembers the code.
+from ffcore.bid import (deals, demand_summary,  # noqa: E402
+                        premiums, suggest, xi_snapshots)
 from ffcore.fixture import FIX_BAND, HOME_EDGE  # noqa: E402
 from ffcore.league import League  # noqa: E402
 from ffcore.render import title_name  # noqa: E402
 from ffcore.second import (LEGEND, SECOND_SOURCE,  # noqa: E402
                            af_cell, second_cells)
 from ffcore.score import (ABSENT_START, MAX_SLOT, NEUTRAL_START,  # noqa: E402
-                          SLOT_LABEL, THIN, build, formations,
-                          pick_xi, replacement, squad_pool, vor)
+                          SLOT_LABEL, SLOT_MIN, build, formations,
+                          pick_xi, squad_pool)
 from ffcore.tidy import (DECISIONS, REPORTS,  # noqa: E402
                          append_csv, input_path, latest_only, load_deadline,
                          load_market, load_lineups, read_csv, snapshot_stamp,
@@ -280,55 +285,6 @@ def flat_gains(players, cands) -> dict[str, float]:
 # ---------------------------------------------------------------------------
 
 
-def neutral_view(players) -> tuple[dict, float | None]:
-    """(pool, total) with the fixture taken back out. The buying scale."""
-    pool = squad_pool([{**p, "score": p["flat"]} for p in players])
-    best = pick_xi(pool)
-    return pool, (best[0] if best else None)
-
-
-def unowned(sc, by_key, owner, depth: int = POOL_DEPTH) -> list[dict]:
-    """The best few unowned players per position, scored fixture-neutral.
-
-    Not today's slate: the slate is what you can bid on in the next minute, and
-    these are the Watch rows behind it — real value that nobody is selling.
-    Everything the market prices and nobody in the league holds is a candidate;
-    only the top `depth` of each position can reach an eleven, so the rest are
-    dropped here rather than ranked and then ignored.
-    """
-    rows: dict[str, list[dict]] = {}
-    for k, rec in by_key.items():
-        if k in owner:
-            continue
-        c = sc.score(rec).as_row()
-        if not c["slot"]:
-            continue
-        c["name"] = title_name(c["name"])
-        # The fixture score is kept under its own key before `score` becomes
-        # the neutral one: the rate must not see the draw, and the board's
-        # Tonight column must.
-        c["round"] = c["score"]
-        c["score"] = c["flat"]
-        rows.setdefault(c["slot"], []).append(c)
-    out = []
-    for v in rows.values():
-        v.sort(key=lambda p: p["score"], reverse=True)
-        out += v[:depth]
-    return out
-
-
-def market_pool(sc, by_key) -> dict:
-    """Everyone the market prices, scored fixture-neutral, grouped by slot.
-
-    Owned or not, and that is deliberate: a player a rival holds still occupies
-    one of the league's starting slots, which is exactly what makes his position
-    scarce. This is the pool replacement level is read off.
-    """
-    rows = []
-    for rec in by_key.values():
-        r = sc.score(rec).as_row()
-        rows.append({**r, "name": title_name(r["name"]), "score": r["flat"]})
-    return squad_pool(rows)
 def fix_basis_label(players) -> str:
     """What ranked the opponents, said out loud in the notes.
 
@@ -344,86 +300,6 @@ def fix_basis_label(players) -> str:
     return "nothing: no fixture is known for anyone in your squad"
 
 
-def sec_basket(bought, hurdle, spent, forgone, cash) -> list[str]:
-    """## 3. What you give up by spending now
-
-    The basket the line was measured off, best rate first. This is the section
-    that makes the line arguable instead of magic: every rung is a purchase you
-    can make in the next few minutes, so if the line looks too high you can see
-    which buy set it rather than infer it.
-
-    IT REPLACED A λ LADDER, and the difference is which market it shops in. The
-    ladder was built from the whole unowned pool — what the money WOULD buy if
-    anything were for sale — which made a better answer to a question you cannot
-    act on, and its rate then priced every verdict in the report. That is how a
-    man came to read "Hold, nothing better on offer" and "take ≥ 31M" in the
-    same row: the 31M assumed the proceeds could be redeployed at a rate nobody
-    was offering.
-    """
-    out = ["## 3. What you give up by spending now", ""]
-    if hurdle is None:
-        return out + ["_Nothing on today's slate can be bought at any rate%s, "
-                      "so there is no line. Every verdict above falls back to "
-                      "'is he above replacement at all' — the same metric and "
-                      "the same direction, one notch cruder, which is a "
-                      "degraded line and not a second scale._"
-                      % ("" if cash else
-                         " and no recorded balance to buy with"), ""]
-
-    out += ["**The line is %.3f pts/M** — %d buy(s) for %s of %s before the "
-            "rate ran out. Spending a million here means not spending it on "
-            "these, best rate first."
-            % (hurdle, len(bought), eur(spent),
-               eur(cash) if cash else "an unrecorded balance"), "",
-            "| | Player | Slot | Cost | above repl | pts/M |",
-            "|---|---|---|--:|--:|--:|"]
-    for i, r in enumerate(bought, 1):
-        mark = " ←line" if i == len(bought) else ""
-        out.append("| %d%s | %s | %s | %s | %+.1f | %.3f |"
-                   % (i, mark, r["name"], r["slot"], eur(r["value"]),
-                      r["vor"], r["vor"] / (r["value"] / 1e6)))
-    out += ["",
-            "_The last rung IS the line: it is the worst rate your cash can "
-            "still buy today, so anything worse than it is worse than doing "
-            "nothing. **above repl** and **pts/M** are the board's own "
-            "columns, unchanged — one metric, one baseline, read here as a "
-            "shopping list instead of a ranking. Costs are the floor plus this "
-            "league's median premium, because what the basket spends is a bid "
-            "and not a sticker price. The rungs add up to the CASH row's "
-            "**above repl**: %+.1f points of index the money is worth while it "
-            "sits there, which is what you give up by spending it on anything "
-            "worse._" % forgone, ""]
-    return out
-
-
-def log_line(observed, hurdle, bought, spent, forgone, cash) -> None:
-    """One row per snapshot: the rate every verdict that day was judged against.
-
-    Without this the rule is ungradeable. If the season's realised rates sit
-    above the line printed at the time, the line was too low — a question this
-    file can answer and a report cannot.
-
-    It replaces log_lambda(), which logged the ΔXI hurdle. `lambda_log.csv`
-    stops on the day this landed and is KEPT: it is the record of what the old
-    rule would have said, and it is the only evidence that will ever exist for
-    whether replacing it was an improvement.
-    """
-    path = DECISIONS / "line_log.csv"
-    cols = ["observed_at", "line", "cash", "spent", "rungs", "best_rate",
-            "forgone"]
-    widen_csv(path, cols)
-    if observed in {r.get("observed_at") for r in read_csv(path)}:
-        return
-    append_csv(path, [{
-        "observed_at": observed,
-        "line": "" if hurdle is None else f"{hurdle:.4f}",
-        "cash": "" if cash is None else f"{cash:.0f}",
-        "spent": f"{spent:.0f}",
-        "rungs": len(bought),
-        "best_rate": ("" if not bought else
-                      "%.4f" % (bought[0]["vor"] / (bought[0]["value"] / 1e6))),
-        "forgone": f"{forgone:.4f}",
-    }], cols)
 def as_fielded(players):
     """(total, xi, bench, illegal, warnings) for the XI you have MARKED.
 
@@ -516,100 +392,75 @@ def rival_ceiling(lg) -> float | None:
     return max(bids)
 
 
-def sec_slate(lg, by_key, cands, pool, board, slate, prem, cash_value,
+def sec_slate(lg, by_key, cands, pool, slate, prem, cash_value,
               rival_max, snaps, sell_prem=None,
-              second=None, line=None) -> tuple[list[str], int, int]:
-    """Today's slate, priced on the board's metric. 'What do I do now'.
+              second=None) -> tuple[list[str], int, int]:
+    """Today's slate: WHAT TO BID, and who else wants him.
 
-    Everything else in this report describes a position; this one is a list of
-    purchases you can make in the next few minutes, so it carries what the
-    board cannot: what to bid, and who else wants him.
+    THE ONE QUESTION THE SIMULATION CANNOT ANSWER. sim.py says whether a
+    player is worth having — it prices the squad you would hold, which is the
+    whole decision — but it prices every acquisition at a clause, because a
+    clause is instant and cannot be refused. A market row is a bid that can
+    lose, and what it costs to win one is a fact about this league's
+    behaviour, not about the player: the floor, plus what these five managers
+    have actually paid over it.
 
-    IT NO LONGER RATES ANYBODY. It used to price each candidate as ΔxPts/j — the
-    index gained by owning him and re-picking the formation — over what he cost,
-    and judge that against λ. Two problems, both fixed by reading `board`
-    instead. The gain moved when your own eleven moved, so the same signing was
-    worth different amounts on consecutive days for reasons that had nothing to
-    do with him; and it was a different number from the one the board printed
-    for the same man, in the same unit.
+    IT RATES NOBODY, and no longer carries a verdict. It used to print the
+    board's own columns — above repl, pts/M, at the line — beside each name,
+    which made it a second copy of a ranking rather than the one thing it
+    knows. Whether to buy him is in the table above; this is what to type.
     """
     on_offer, unresolved = slate
     out: list[str] = []
 
     owned = {k: lg.owner[k] for k in on_offer if k in lg.owner}
-    # With no line there is nothing to beat, and zero stands in — above
-    # replacement at all. The same fallback the board uses, for the same reason.
-    bar = line if line is not None else 0.0
 
     rows = []
     for cand in cands:
-        br = board.get(cand["name"]) or {}
         adv = suggest(cand["value"], prem, cash_value, rival_max)
-        # How far below the thin threshold you are in HIS position. This is
-        # what turns a below-the-line forward into cover rather than a pass.
+        # Whether you can field a legal eleven in his position at all. This is
+        # the rules, not a threshold: SLOT_MIN is what the app will accept.
         slot = cand.get("slot")
-        short_by = (max(0, THIN[slot] - len(pool.get(slot, [])))
-                    if slot in THIN else 0)
-        rows.append((cand, br, adv, short_by))
+        short_by = (max(0, SLOT_MIN[slot] - len(pool.get(slot, [])))
+                    if slot in SLOT_MIN else 0)
+        rows.append((cand, adv, short_by))
 
-    # Best RATE first: the question is what the money buys, and a two-point
-    # upgrade for twelve million is a worse purchase than a one-point upgrade
-    # for two. Cover sorts to the top when you cannot field a legal XI without
-    # it, and an unrated man sorts last.
-    def rate_of(r):
-        return r[1].get("rate")
+    # Cover first — a body you cannot field an eleven without is not ranked
+    # against anything, it is required — then dearest first, because the bid
+    # is the decision here and the big ones are the ones to think about.
+    rows.sort(key=lambda r: (-r[2], -(r[1].low or 0)))
+    covers = sum(1 for c, a, sb in rows if sb > 0 and a.low is not None)
 
-    rows.sort(key=lambda r: (-r[3] if (rate_of(r) or 0.0) < bar else 0,
-                             rate_of(r) is None,
-                             -(rate_of(r) if rate_of(r) is not None else -1e9)))
-    better = sum(1 for r in rows
-                 if rate_of(r) is not None and rate_of(r) >= bar)
-    covers = sum(1 for c, br, a, sb in rows
-                 if sb > 0 and a.low is not None and br.get("rate") is not None)
-
-    out += ["## 2. Buy today", "",
-            "**%d on offer, %d beat the going rate for cash%s.**"
-            % (len(rows), better,
-               ", %d cover a position you are short in" % covers
+    out += ["## 2. What to bid", "",
+            "**%d on offer%s.**"
+            % (len(rows),
+               ", %d cover a position you cannot field without" % covers
                if covers else ""), ""]
     if not rows:
         out += ["_Every name you pasted is either already owned or missing "
                 "from the market data._", ""]
     else:
-        out += ["| Player | Pos | Bid | above repl | pts/M | At the line | "
-                "Competition | Verdict |",
-                "|---|---|--:|--:|--:|--:|---|---|"]
-        for cand, br, adv, short_by in rows:
+        out += ["| Player | Pos | Bid | Competition | Note |",
+                "|---|---|--:|---|---|"]
+        for cand, adv, short_by in rows:
             band = ("—" if adv.low is None
                     else eur(adv.low) if abs(adv.high - adv.low) < 1_000
                     else "%s–%s" % (eur(adv.low), eur(adv.high)))
-            top = br.get("line")
-            call = br.get("verdict", "—")
             out.append(
-                "| %s | %s | %s | %s | %s | %s | %s | %s |"
+                "| %s | %s | %s | %s | %s |"
                 % (cand["name"], (cand["pos"] or "—")[:3], band,
-                   "%+.1f" % br["vor"] if br.get("vor") is not None else "—",
-                   "%.3f" % br["rate"] if br.get("rate") is not None else "—",
-                   "—" if top is None
-                   else "never" if top <= 0 else "≤ " + eur(top),
                    demand_summary(cand, lg, snaps),
-                   ("**%s**" % call if call == "Buy" else call)
-                   # The one thing the board does not know: you cannot field a
-                   # legal XI without a body here, and legality beats a rate.
-                   + (" — cover, you are %d short at %s"
-                      % (short_by, cand["slot"]) if short_by > 0 else
-                      " — %s" % br["why"] if br.get("why") else "")))
+                   "cover — you are %d short at %s" % (short_by, cand["slot"])
+                   if short_by > 0 else ""))
         out += ["",
-                "**above repl** and **pts/M** are the board's columns, "
-                "unchanged, and so is the verdict — this table decides nothing "
-                "the board has not already decided. **At the line** is the most "
-                "he is worth paying: at that price he is exactly as good as "
-                "leaving the money idle, so bid under it. A purchase is closer "
-                "to a loan than a spend — the value comes back when you sell, "
-                "give or take %s, which on a large player is bigger than the "
-                "premium and the drift put together. That swing is a coin flip, "
-                "so a bid within a few percent of the line price is not a "
-                "decision."
+                "**Bid** is what it costs to win him, and nothing here says "
+                "whether he is worth winning — that is the one table in "
+                "[REPORT.md](REPORT.md), which prices him at a clause because "
+                "a clause cannot be refused. A purchase is closer to a loan "
+                "than a spend: the value comes back when you sell, give or "
+                "take %s, which on a large player is bigger than the premium "
+                "and the drift put together. That swing is a coin flip, so a "
+                "bid within a few percent is not a decision."
                 % ("%.0f%%" % sell_prem.swing() if sell_prem
                    else "about a tenth"),
                 "",
@@ -634,8 +485,7 @@ def sec_slate(lg, by_key, cands, pool, board, slate, prem, cash_value,
         # this better than the going rate", and several rows can answer yes to
         # more money than you hold — the app settles them all at once, so the
         # arithmetic has to be stated rather than left to the reader.
-        bidding = [(c, a) for c, br, a, sb in rows
-                   if a.low is not None and br.get("verdict") == "Buy"]
+        bidding = [(c, a) for c, a, sb in rows if a.low is not None]
         wanted = sum(a.low for _, a in bidding)
         if len(bidding) > 1 and cash_value is not None and wanted > cash_value:
             out += ["**⚠ %d bids at %s is more than the %s you hold.** Each row "
@@ -669,7 +519,7 @@ def sec_slate(lg, by_key, cands, pool, board, slate, prem, cash_value,
                 "name, so they carry no rating here:", ""]
         out += ["- **%s**" % u for u in unresolved]
         out.append("")
-    return out, len(rows), better
+    return out, len(rows), covers
 
 
 def log_squad(observed, players, chosen, formation, total, deadline,
@@ -761,407 +611,29 @@ def log_squad(observed, players, chosen, formation, total, deadline,
 # ---------------------------------------------------------------------------
 
 
-def start_cell(p, af) -> str:
-    """Both probable-XI reads in one cell, `/` between them, never averaged.
+def alerts(warnings, token_days) -> list[str]:
+    """What is worth interrupting somebody for ABOUT THE SQUAD, or [].
 
-    They are different kinds of claim — a percentage and a named starter — and
-    a disagreement is the signal, so it stays visible: `90%/33%` is a prompt to
-    open the app, and folding it to 62% would delete the only warning there is.
-    """
-    return "%s/%s" % (pct_cell(p), af_cell(af))
+    This is half the notification surface; sim.py writes the other half and
+    puts the decision above these, because a move is news and a shortage is
+    the context for it.
 
-
-def ordinal(n: int) -> str:
-    """1 -> '1st'. sec_sell computes this inline; that copy is left alone."""
-    sfx = ("th" if n % 100 in (11, 12, 13)
-           else {1: "st", 2: "nd", 3: "rd"}.get(n % 10, "th"))
-    return "%d%s" % (n, sfx)
-
-
-def board_rows(players, chosen, cands, repl, hurdle,
-               buy_prem=None, sell_prem=None, cash=0.0,
-               second=None, marked_xi=()) -> list[dict]:
-    """Every asset, ranked by points above replacement per million.
-
-    `hurdle` is the worst rate idle cash can still buy, from bid.basket(). The
-    CASH row is inserted at it, so position in the returned list is the RANKING.
-    None means the cash cannot be deployed at all, and it ranks last: selling
-    into a market with nothing to buy converts points into money for no reason.
-
-    The VERDICT is not the ranking, and this is the one place they part company.
-    Being worse than the abstract baseline is not a reason to sell — the free
-    pool is not a shop you can walk into, so "the league fields better for free"
-    describes a trade you cannot make. A Sell therefore needs a counterparty
-    that exists today: either the man can never reach your eleven at all, or an
-    AVAILABLE player at his own position is better and his proceeds plus your
-    cash would pay for him. Everything else holds, with the rate as the note.
-
-    A candidate is available when it carries `avail` — today's slate. One taken
-    off the wider market is real value and an unmakeable trade, so it reads
-    Watch, and it funds nothing.
-    """
-    # Rank inside your own squad, best first: only MAX_SLOT of a position can
-    # ever be fielded, and the ones past that line are the sales that need no
-    # market at all.
-    rank = {}
-    for slot, v in squad_pool([{**p, "score": p["flat"]}
-                               for p in players]).items():
-        for i, p in enumerate(v):
-            rank[p["name"]] = (i, slot)
-
-    cells = second or {}
-    mine_marked = {p["name"] for p in marked_xi}
-    rows = []
-    for p in players:
-        rows.append({"kind": "own", "name": p["name"], "slot": p["slot"],
-                     "vor": vor({**p, "score": p["flat"]}, repl),
-                     # What a sale RAISES, not what he is valued at: the money
-                     # that would go into the basket is the app's offer.
-                     "money": cost_of(p.get("value"), sell_prem),
-                     "xpts": p.get("score"), "in_xi": id(p) in chosen,
-                     # You marked him and the model benches him. Question 1's
-                     # whole argument, in one glyph.
-                     "marked": p["name"] in mine_marked and id(p) not in chosen,
-                     "flag": (p.get("status") or "ok") != "ok"
-                     or not p.get("on_page", True),
-                     "start": start_cell(p, cells.get(p.get("key"))),
-                     "vs": vs_cell(p)})
-    for c in cands:
-        rows.append({"kind": "buy", "name": c["name"], "slot": c["slot"],
-                     "vor": vor({**c, "score": c["flat"]}, repl),
-                     "money": cost_of(c.get("value"), buy_prem),
-                     # `round` when the caller scored him fixture-neutral for
-                     # the rate, `score` when he came off today's slate with the
-                     # draw in.
-                     "xpts": c.get("round", c.get("score")), "in_xi": False,
-                     "avail": bool(c.get("avail")), "marked": False,
-                     "flag": (c.get("status") or "ok") != "ok",
-                     "start": start_cell(c, cells.get(c.get("key"))),
-                     "vs": vs_cell(c, star=True)})
-    for r in rows:
-        r["rate"] = ratio_of(r["vor"], r["money"])
-        # The price at which he is worth exactly what the cash is. One formula,
-        # read from either side: pay up to it, or sell from it.
-        r["line"] = (None if hurdle is None or not hurdle or r["vor"] is None
-                     else r["vor"] / hurdle * 1e6)
-        r["why"] = ""
-    # An unrated row sorts to the bottom rather than to zero: no price is not a
-    # rate of nothing, and the two would rank in the same place if it were.
-    rows.sort(key=lambda r: (r["rate"] is not None, r["rate"]), reverse=True)
-
-    cash_row = {"kind": "cash", "name": "CASH", "slot": "—", "vor": None,
-                "money": None, "rate": hurdle, "xpts": None, "in_xi": False,
-                "vs": "—", "why": "", "verdict": "the line", "line": None,
-                "marked": False, "flag": False, "start": "—"}
-    at = len(rows) if hurdle is None else next(
-        (i for i, r in enumerate(rows)
-         if r["rate"] is None or r["rate"] < hurdle), len(rows))
-    # Who could actually replace whom, by position. Only rows on offer count:
-    # this dict is the difference between advice and a wish.
-    offers: dict[str, list[dict]] = {}
-    for r in rows:
-        if r["kind"] == "buy" and r["avail"] and r["money"]:
-            offers.setdefault(r["slot"], []).append(r)
-
-    # The sell side runs first, because what it decides to fund is what makes a
-    # purchase affordable. {id(buy row): the sale that pays for it}
-    funds: dict[int, str] = {}
-    # With nothing on offer there is no line to beat, and zero stands in: above
-    # replacement at all. Same metric, same direction — it degrades rather than
-    # inventing a second scale.
-    line = hurdle if hurdle is not None else 0.0
-    for r in rows:
-        if r["kind"] != "own":
-            continue
-        if r["rate"] is None:
-            r["verdict"], r["why"] = "—", "no price to rate him against"
-            continue
-        above = r["rate"] >= line
-        nth, slot = rank.get(r["name"], (0, r["slot"]))
-        if slot and nth >= MAX_SLOT.get(slot, 99):
-            # The one sale that needs no market: he cannot reach the eleven
-            # however the rest of it moves, so any offer is a gain.
-            r["verdict"] = "Sell"
-            # "can be fielded", not "can ever play": the rank is on the season
-            # scale and a kind draw can lift a bench body into tonight's XI,
-            # which is exactly what the ⚽ next to a Sell means.
-            r["why"] = ("%s %s — only %d can be fielded"
-                        % (ordinal(nth + 1), slot, MAX_SLOT[slot])
-                        + (", and tonight's draw lifts him into the XI"
-                           if r["in_xi"] else ""))
-            continue
-        # A funded, available, better man at his own position. All three, or it
-        # is not a sale: better on its own is a wish, available on its own is a
-        # coincidence, and affordable on its own is just cash.
-        # The upgrade must clear the line as well as beat the man being sold.
-        # A sale funding a purchase the board would not make on its own merits
-        # is a sale that funds nothing, and leaves you a player short.
-        up = next((o for o in sorted(offers.get(r["slot"], []),
-                                     key=lambda o: -o["vor"])
-                   if o["vor"] > r["vor"]
-                   and ratio_of(o["vor"], o["money"]) is not None
-                   and ratio_of(o["vor"], o["money"]) >= line
-                   and o["money"] <= (r["money"] or 0.0) + (cash or 0.0)), None)
-        if up:
-            r["verdict"] = "Sell"
-            r["why"] = "funds %s (%+.1f, %+.1f better)" % (
-                up["name"], up["vor"], up["vor"] - r["vor"])
-            # Carried as a field, not left to be parsed back out of the
-            # sentence: several bench players can each fund the SAME buy, and
-            # they are alternatives rather than a shopping list. Listing them
-            # flat reads as "sell all five", which would gut the defence to
-            # buy one defender.
-            r["funds"] = up["name"]
-            funds.setdefault(id(up), r["name"])
-        else:
-            r["verdict"] = "Hold"
-            if r["vor"] <= 0 or not above:
-                # Not "he is fine" — "there is nothing to do about it". The rate
-                # column already says he is behind; this says why that is not an
-                # instruction.
-                r["why"] = "nothing better on offer at %s" % r["slot"]
-
-    for r in rows:
-        if r["kind"] != "buy":
-            continue
-        above = r["rate"] is not None and r["rate"] >= line
-        if r["rate"] is None:
-            r["verdict"], r["why"] = "—", "no price to rate him against"
-        elif not r["avail"]:
-            r["verdict"] = "Watch" if above else "pass"
-            r["why"] = "not on offer today" if above else ""
-        elif above and hurdle is not None:
-            r["verdict"] = "Buy"
-        elif above and id(r) in funds:
-            # Paid for out of a sale rather than out of the balance, which is
-            # why the two sides have to be decided in one pass.
-            #
-            # `above` is REQUIRED here, and was missing. The sale relaxes the
-            # CASH constraint and nothing else: it says you can reach him, not
-            # that he is worth reaching. Without the check this branch bought
-            # any affordable upgrade at any rate — the rule this repo retired
-            # when the board landed — and it contradicted the row two lines
-            # above it, which passed on a BETTER rate for want of a funder.
-            r["verdict"] = "Buy"
-            r["why"] = "paid for by selling %s" % funds[id(r)]
-        else:
-            r["verdict"] = "pass"
-    rows.insert(at, cash_row)
-    return rows
-
-
-def alerts(rows, warnings, token_days) -> list[str]:
-    """The short list worth interrupting somebody for, or [].
-
-    This is the notification surface, and the whole design is what it LEAVES
-    OUT. It replaced watch.py, which diffed market values and emitted every
-    player who moved 2% in a day — thirty-odd rows, league-wide, not one of
-    them a decision. Nobody read that file, which is the only reason it was
-    harmless; pushed to a phone it would be spam, and spam is how you learn to
-    swipe away the one that mattered.
-
-    So: a verdict that asks for money to move, a fitness flag on somebody you
-    own, a warning that your XI is one knock from illegal, and the login
-    expiring. Nothing else. A Hold is the absence of news and prints nothing.
+    The whole design is what it LEAVES OUT. It replaced watch.py, which
+    diffed market values and emitted every player who moved 2% in a day —
+    thirty-odd rows, league-wide, not one of them a decision. Nobody read that
+    file, which is the only reason it was harmless; pushed to a phone it would
+    be spam, and spam is how you learn to swipe away the one that mattered.
+    The verdict scan that used to run here went the same way with the board:
+    it fired on every Buy and every Sell in a twenty-row table.
 
     Returns [] when there is nothing to say, and the caller must send NOTHING
     rather than "no news" — a twice-daily "all quiet" is the same spam by
     another route.
     """
-    out = []
-    for r in rows:
-        if r.get("kind") == "cash":
-            continue
-        v = (r.get("verdict") or "").strip()
-        if v in ("Buy", "Sell"):
-            why = r.get("why") or ""
-            out.append("**%s** — %s%s" % (v, r.get("name", "?"),
-                                          " (%s)" % why if why else ""))
-        elif r.get("flag") and r.get("kind") == "own":
-            out.append("**Fitness** — %s" % r.get("name", "?"))
-    out += ["**Squad** — %s" % w for w in warnings]
+    out = ["**Squad** — %s" % w for w in warnings]
     if token_days is not None and token_days < 14:
         out.append("**Log in again** — the league token expires in %d days "
                    "(`python -m ffcore.auth --login`)" % token_days)
-    return out
-
-
-def decisions(rows) -> list[dict]:
-    """The Do-this table as data, in render order.
-
-    Split out so the markdown table and the phone's rendered one cannot
-    disagree: both call this, and the ordering argument lives here once.
-    `kind` is what the row IS — a buy, one of that buy's funding options, or
-    an outright sale — because a renderer should not have to infer that from
-    an arrow in a string.
-    """
-    buys = [r for r in rows if r.get("verdict") == "Buy"]
-    sells = [r for r in rows if r.get("verdict") == "Sell"
-             and r.get("kind") != "cash"]
-    funders: dict = {}
-    for r in sells:
-        if r.get("funds"):
-            funders.setdefault(r["funds"], []).append(r)
-
-    def cell(r, kind, money):
-        return {"kind": kind, "name": r.get("name", "?"),
-                "pos": r.get("slot") or "", "rate": r.get("rate"),
-                "money": money, "why": r.get("why") or "",
-                "in_xi": bool(r.get("in_xi")), "flag": bool(r.get("flag"))}
-
-    out = []
-    for b in sorted(buys, key=lambda r: -(r.get("rate") or 0)):
-        out.append(cell(b, "buy", -(b.get("money") or 0)))
-        out[-1]["cap"] = b.get("line")
-        for f in sorted(funders.get(b["name"], []),
-                        key=lambda x: -(x.get("money") or 0)):
-            out.append(cell(f, "fund", f.get("money") or 0))
-    for d in sorted((r for r in sells if not r.get("funds")),
-                    key=lambda r: (r.get("rate") or 0)):
-        out.append(cell(d, "sell", d.get("money") or 0))
-    return out
-
-
-def sec_today(rows) -> list[str]:
-    """## Do this — a table, five columns, ranked by what the decision is worth.
-
-    The board is nine columns because each earns its place there. On a phone
-    that is four visible columns and a sideways scroll, and the verdict is not
-    among the four, so the report answered "what do I do today" only after you
-    dragged it into view.
-
-    THE ORDER IS THE INFORMATION. Buys first, best rate first, because a buy
-    is the only row that spends and the rate is what makes it worth spending
-    on. Each buy's funders sit directly beneath it, richest first — they are
-    alternatives, one of which pays for the row above, and the money column is
-    what you choose between. Then the players who can never reach your eleven,
-    worst rate first: those are sales whatever else happens, and the worst
-    rate is the one costing you most to keep.
-
-    Five columns fit a 390px screen. `Money` carries the direction rather than
-    a sixth column: `≤` is what you may pay, `+` is what a sale raises.
-    """
-    cells = decisions(rows)
-    hurt = [r for r in rows if r.get("flag") and r.get("kind") == "own"]
-    xi = [r["name"] for r in rows if r.get("in_xi")]
-
-    out = ["## Do this", ""]
-    if not cells:
-        out += ["**Nothing to buy or sell.** Every asset you hold is worth "
-                "more than the cash it would raise, and nothing on offer "
-                "beats what you have.", ""]
-    else:
-        out += ["| Do | Who | Pos | pts/M | Money |",
-                "|---|---|---|--:|--:|"]
-        label = {"buy": "**Buy**", "fund": "sell 1 of ↑", "sell": "**Sell**"}
-        for c in cells:
-            # The ceiling when there is one, the asking price when there is
-            # not. Never "—": a buy row whose money cell is empty is the one
-            # row you cannot act on, and with nothing on today's slate to
-            # measure a line against, that was every buy.
-            if c["kind"] == "buy":
-                money = ("≤ %s" % eur(c["cap"]) if c.get("cap")
-                         else "− %s" % eur(abs(c["money"])))
-            else:
-                money = "+ %s" % eur(c["money"])
-            rate = ("%+.3f" % c["rate"]) if c["rate"] is not None else "—"
-            out.append("| %s | %s | %s | %s | %s |"
-                       % (label[c["kind"]], c["name"], c["pos"] or "—",
-                          rate, money))
-
-        out += ["",
-                "_**Buy** spends; `≤` is the most it is worth paying. "
-                "`sell 1 of ↑` are alternatives — **one** of them funds the "
-                "buy above, and the money column is what you choose between. "
-                "**Sell** on its own is a player who cannot reach your eleven "
-                "however the rest of it moves, so any offer is a gain._", ""]
-
-    for r in hurt:
-        out += ["- **Check %s** — fitness or availability has something on "
-                "him." % r["name"]]
-    if hurt:
-        out.append("")
-    if xi:
-        out += ["**Field** " + " · ".join(xi), ""]
-    return out
-
-
-def sec_board(rows, cash_value, forgone) -> list[str]:
-    """## The board — every decision in one ranking"""
-    out = ["## The board", "",
-           "| Asset | Pos | Tonight | Start | above repl | pts/M | Money | "
-           "At the line | Do this |",
-           "|---|---|---|---|--:|--:|--:|--:|---|"]
-    for r in rows:
-        if r["kind"] == "cash":
-            out.append("| **CASH** | — | — | — | %s | %s | %s | — | "
-                       "**the line** |"
-                       % ("%+.1f" % forgone if forgone else "—",
-                          "%.3f" % r["rate"] if r["rate"] is not None
-                          else "no rate",
-                          eur(cash_value) if cash_value else "—"))
-            continue
-        # Owned reads plain, buyable reads italic. ⚽ is the eleven to field, ▼
-        # is a man you marked and the model benches, ⚠ is question 5 in a glyph.
-        name = ((r["name"] if r["kind"] == "own" else "_%s_" % r["name"])
-                + (" ⚽" if r["in_xi"] else " ▼" if r["marked"] else "")
-                + (" ⚠" if r["flag"] else ""))
-        call = ("**%s**" % r["verdict"]
-                if r["verdict"] in ("Buy", "Sell") else r["verdict"])
-        # The line price, read from the side the row is on: the most a purchase
-        # is worth paying, the least a sale is worth accepting.
-        if r["line"] is None:
-            price = "—"
-        elif r["line"] <= 0:
-            price = "any" if r["kind"] == "own" else "never"
-        else:
-            price = ("≤ " if r["kind"] == "buy" else "≥ ") + eur(r["line"])
-        out.append("| %s | %s | %s | %s | %s | %s | %s | %s | %s |"
-                   % (name, r["slot"],
-                      "%s · %s" % (r["vs"], "%.1f" % r["xpts"])
-                      if r["xpts"] is not None else r["vs"],
-                      r["start"], "%+.1f" % r["vor"],
-                      "%.3f" % r["rate"] if r["rate"] is not None else "—",
-                      eur(r["money"]) if r["money"] else "—", price,
-                      call + (" — %s" % r["why"] if r["why"] else "")))
-
-    out += ["",
-            "_Every asset you could hold, ranked on **pts/M** — points above "
-            "replacement per million euros. That is the metric, and it is the "
-            "only one: **above repl** is what the player is worth over the last "
-            "man the league can start in his position, a baseline fixed by the "
-            "rules (five squads, and the shapes each can legally field), so it "
-            "does not move when your eleven does. Negative means the free pool "
-            "has someone better there. **Money** is what the asset raises if "
-            "sold or costs if bought, at this league's median premium. **CASH** "
-            "is an asset with a rate of its own — what its basket earns — so "
-            "above the line an asset beats the money and below it the money "
-            "beats the asset._", "",
-            "_**Verdict is an action, so it needs a counterparty.** Rank alone "
-            "never sells anyone: a **Sell** means either he can never reach "
-            "your eleven, or a player ON OFFER TODAY at his position is better "
-            "and his proceeds plus your cash pay for him — and the Why names "
-            "him. Below the line with nothing to move to is a **Hold**. "
-            "**Watch** is a rate worth having that nobody is selling. **Hold** "
-            "means do not chase a sale — it does not mean refuse one: if an "
-            "offer arrives at or above his line price, take it._", "",
-            "_**At the line** is the price at which the asset is worth exactly "
-            "what the cash is — `vor ÷ the line`, one formula read from either "
-            "side. Pay up to it, or accept from it; `any` means no offer is too "
-            "low, and `—` means nothing is on offer today, so there is no line "
-            "and no price to name. It is the number to act on, because you "
-            "cannot trade on demand: an offer arrives and you take it or refuse "
-            "it. Question 3 is the basket it comes from, and question 4 is this "
-            "table's bench half with the sale priced._", "",
-            "_**Tonight** is the opponent and xPts/j with the fixture in. `⚽` "
-            "is the eleven to field — field the ⚽ rows — and `▼` is a man you "
-            "marked whom the model benches. `⚠` means fitness or availability "
-            "has something on him. **Start** is futbolfantasy's percentage then "
-            "analiticafantasy's read, never averaged: `titular` is a named "
-            "starter, `?` listed without a figure, `~` assumed, `!` not on the "
-            "page. When the two disagree, open the app. A **Sell** with a `⚽` "
-            "means field him tonight, then take the offer — fielding is one "
-            "round, selling is the season._", ""]
     return out
 
 
@@ -1355,93 +827,6 @@ def sec_fitness(players) -> list[str]:
     return out
 
 
-def sec_sell(rows, marked, chosen, players, app_prem=None) -> list[str]:
-    """## 4. Sell these
-
-    THE BENCH, PRICED — and priced by reading the board, not by asking the
-    question again.
-
-    This section used to derive its own verdict from λ, on the ΔXI scale, with
-    its own thresholds. It therefore disagreed with the board: on 2026-08-17 it
-    said "Sell Fornals" three tables under a board that held him, because the
-    two were measuring different things in the same unit. So it no longer
-    decides anything. It takes the row the board already decided, and adds the
-    two numbers the board has no column for — what a sale actually raises, and
-    the spread this league's ledger has seen around it.
-
-    Worst rate first, because the man whose points cost you the most to keep is
-    the one to sell, and he belongs at the top whether or not there is a
-    counterparty for him today.
-    """
-    out = ["## 4. Sell these", ""]
-    if not players:
-        return out + ["_No roster to price._", ""]
-
-    spare = (marked[2] if marked else
-             [p for p in players if id(p) not in chosen])
-    source = ("as you have marked them" if marked
-              else "the model's spare players — no checklist to read")
-    if not spare:
-        return out + ["_Nobody is out of your eleven (%s), so there is nothing "
-                      "here to sell._" % source, ""]
-
-    swing = app_prem.swing() / 100.0 if app_prem else 0.0
-    names = {p["name"] for p in spare}
-    mine = [r for r in rows if r["kind"] == "own" and r["name"] in names]
-    mine.sort(key=lambda r: (r["rate"] is not None,
-                             r["rate"] if r["rate"] is not None else 0.0))
-
-    out += ["| Player | Pos | Sale | above repl | pts/M | At the line "
-            "| Verdict | Why |",
-            "|---|---|--:|--:|--:|--:|---|---|"]
-    for r in mine:
-        m = r["money"]
-        band = ("—" if not m else eur(m) if not swing
-                else "%s–%s" % (eur(m * (1 - swing)), eur(m * (1 + swing))))
-        out.append(
-            "| %s | %s | %s | %s | %s | %s | %s | %s |"
-            % (r["name"], (r["slot"] or "—")[:3], band,
-               "%+.1f" % r["vor"] if r["vor"] is not None else "—",
-               "%.3f" % r["rate"] if r["rate"] is not None else "—",
-               # A zero ask is not a missing one: he is worse than the last man
-               # the league can field, so any offer beats keeping him. Printing
-               # "0" reads as a bug in the column.
-               "—" if r["line"] is None
-               else "any" if r["line"] <= 0 else "≥ " + eur(r["line"]),
-               "**%s**" % r["verdict"] if r["verdict"] == "Sell"
-               else r["verdict"],
-               r["why"]))
-    out += ["",
-            "_Same columns, same numbers and same verdicts as the board — this "
-            "is the bench half of it, with the sale priced. **Sale** is what "
-            "the app pays: not the value, and not a number you can hold out "
-            "for, because you cannot sell on demand. An offer arrives and you "
-            "take it or refuse it, which is what **At the line** is for — the "
-            "proceeds at which the cash buys back exactly what he is worth, so "
-            "at or above it take the offer whatever the Verdict says. The "
-            "verdict only reports whether there is a counterparty TODAY. `any` "
-            "means he is below replacement, so no offer is too low, and `—` "
-            "means nothing is on offer, so there is no line to price him "
-            "against and no number to hold out for. The "
-            "instant sale is not a sale: it pays roughly half of value, which "
-            "is a way to free cash before a lock and almost never beats "
-            "waiting. Two things this cannot see. Each sale is priced ON ITS "
-            "OWN — sell two out of the same position and the second one leaves "
-            "you short, so re-read the thin-position warnings below the rule. "
-            "And a name question 1 wants in your eleven can still be a Sell: "
-            "fielding is one round, selling is the season, and the proceeds buy "
-            "the basket in question 3. %s Who is short in his position, and who "
-            "can still afford you, is in `reports/rivals.md`._"
-            % ("Selling to the app pays the value give or take %.0f%%: the %d "
-               "priced sales in the ledger went %s, which is the band in the "
-               "Sale column and is wide enough that a price near the line is a "
-               "coin flip." % (app_prem.swing(), app_prem.n, app_prem.label())
-               if app_prem and app_prem.n >= 3 else
-               "A sale lands above or below value depending on who bids."),
-            ""]
-    return out
-
-
 def pct_cell(p) -> str:
     """Start percentage, marked when it is an assumption rather than a
     reading. `~` = listed with no figure, `!` = not on the page at all."""
@@ -1453,7 +838,12 @@ def pct_cell(p) -> str:
 
 def ppm_cell(p) -> str:
     """Points per match. `~` marks a player with no top-flight record, whose
-    baseline is assumed rather than earned."""
+    baseline is assumed rather than earned.
+
+    NOT the board's pts/M — that was points above replacement per million
+    euros and it went with the board. This is the raw per-match rate the
+    eleven table has always shown, and it prices nothing.
+    """
     return ("~" if p["assumed"] else "") + f"{p['ppm']:.1f}"
 
 
@@ -1608,103 +998,41 @@ def main() -> None:
     marked = as_fielded(players) if players else None
     min_start = lg.cfg.min_start if lg else 60.0
 
-    # --- the board, measured once and read by every section below ----------
-    # ONE METRIC, ONE THRESHOLD, ONE PRICE, computed here and nowhere else.
-    # Questions 2, 3 and 4 used to each derive their own rate from λ, which is
-    # how the report managed to hold a man on the board and sell him three
-    # tables later in the same unit. They are now presentations of these rows.
-    brows: list[dict] = []
-    hurdle, spent, forgone, got = None, 0.0, 0.0, []
-    if players and by_key and lg:
-        repl = replacement(market_pool(sc, by_key), len(lg.managers))
-        priced = [{**c, "vor": vor(c, repl)}
-                  for c in unowned(sc, by_key, lg.owner)]
-        # THE LINE IS WHAT YOU CAN ACTUALLY BUY TODAY. Measuring it off the
-        # whole unowned pool made it a reservation rate against a market you
-        # cannot shop in, and every price derived from it overstated: a man
-        # would read Hold and "take ≥ 31M" in the same row, because the 31M
-        # assumed cash could be redeployed at a rate nobody was offering.
-        # basket() spends the BID, not the sticker price, so it gets its own
-        # copy with value already premium-adjusted.
-        got, hurdle, spent, forgone = basket(
-            [{**c, "vor": vor(c, repl),
-              "value": cost_of(c["value"], buy_prem)} for c in cands],
-            cash_value)
-        # The buy side is both halves of "could hold": what is on offer in the
-        # next few minutes, and what the cash would take if it were offered.
-        # Ranking them together is the only way the cash row means anything.
-        for c in priced:
-            c["rate"] = ratio_of(c["vor"], cost_of(c["value"], buy_prem)) or 0.0
-        priced.sort(key=lambda c: -c["rate"])
-        # `avail` is what separates a verdict from a note: today's slate can be
-        # bid on in the next few minutes, the wider pool cannot.
-        seen_keys = {c["key"] for c in cands}
-        buyable = [{**c, "avail": True} for c in cands] \
-            + [{**c, "avail": False} for c in priced[:BOARD_TAIL]
-               if c["key"] not in seen_keys]
-        brows = board_rows(players, chosen, buyable, repl, hurdle,
-                           buy_prem, app_prem, cash_value or 0.0,
-                           second, marked[1] if marked else ())
-    by_name = {r["name"]: r for r in brows if r["kind"] == "buy"}
-
+    # THE BOARD IS GONE, and with it pts/M, above-replacement, the line, the
+    # basket and every verdict string. They were each a proxy for "does this
+    # move me up the table", which sim.py now answers directly by simulating
+    # the rest of the season. What is left here is the WORKINGS: the eleven,
+    # what to bid for a man on today's slate, who is unfit, and where the two
+    # probable-XI sources disagree — none of which the simulation produces.
     slate_lines, n_slate, n_better = [], 0, 0
     if any(slate):
         # The same snapshots rivals.py prints in its section 6, so the
         # Competition column and the matrix can never disagree.
         snaps = xi_snapshots(lg, sc, by_key)
         slate_lines, n_slate, n_better = sec_slate(
-            lg, by_key, cands, pool, by_name, slate,
+            lg, by_key, cands, pool, slate,
             buy_prem, cash_value, rival_ceiling(lg), snaps,
-            sell_prem=app_prem, second=second, line=hurdle)
+            sell_prem=app_prem, second=second)
 
     # --- assemble ---------------------------------------------------------
-    # TWO FILES, and the split is the point. `board.md` is the answer — header,
-    # the board, warnings — and it is what digest.py stitches into REPORT.md.
-    # `latest.md` is the workings: the five sections, in the order the
-    # decisions get made, plus the movers and the notes.
-    #
-    # They used to be one file, with digest pulling the board out of it. That
-    # meant the board rendered twice: once in the report you read, and again at
-    # the top of the file the report links to as "the workings" — the same
-    # twenty-row table, immediately above its own explanation.
+    # TWO FILES, and the split survived the board that caused it. `board.md`
+    # is now only what the report needs ABOUT THE POSITION rather than about
+    # the decision — the warnings — and sim.py writes the decision itself.
+    # `latest.md` is the workings: the eleven, the bid, the exceptions, the
+    # movers and the notes.
     head: list[str] = [f"# Fantasy report — {observed}", ""]
 
-    ctx = []
-    # Derived from the next kickoff when fixtures have been scraped, so it
-    # cannot go stale the way a typed date did. The source is printed: a
-    # deadline you cannot trace is one you stop trusting.
-    deadline, dl_src = load_deadline(with_source=True)
-    if deadline:
-        left = (deadline - now).total_seconds() / 3600
-        if left < 0:
-            ctx.append("**Deadline passed** — no kickoff ahead in fixtures")
-        elif left < 48:
-            ctx.append(f"**Locks in {left:.0f}h**"
-                       + (" (next kickoff)" if dl_src == "fixtures" else ""))
-        else:
-            ctx.append(f"Locks in {left / 24:.0f} days")
-    ctx.append(f"squad {eur(squad_value)}")
-    if cash and cash.value is not None:
-        ctx.append(f"cash {cash.label()}")
-        ctx.append(f"total {eur(squad_value + cash.value)}")
-    # ONE rate in the header, because there is one metric. λ used to sit here
-    # too, measured on the ΔXI scale, and two rates in a header is how a reader
-    # ends up comparing numbers that share a unit and not a baseline.
-    if hurdle is not None:
-        ctx.append("**line %.3f pts/M**" % hurdle)
-    head += [" · ".join(ctx), ""]
-    if brows:
-        # The answer first, then the table it came from. On a phone the table
-        # alone needs a sideways scroll before it says anything actionable.
-        head += sec_today(brows)
-        head += sec_board(brows, spent or cash_value, forgone) + [""]
+    # Still read here, because log_squad records it against every snapshot: a
+    # forecast is graded by how long before the lock it was made.
+    deadline, _dl_src = load_deadline(with_source=True)
 
     # The workings open by naming what they are working out, and link back
-    # rather than reprinting the board above them.
+    # rather than reprinting the decision above them.
     out: list[str] = [f"# The workings — {observed}", "",
-                      "_How the board in [REPORT.md](REPORT.md) was reached. "
-                      "Same numbers, same verdicts; this is where they come "
-                      "from._", ""]
+                      "_What the one table in [REPORT.md](REPORT.md) was "
+                      "built from: the eleven it assumes you field, what a "
+                      "man on today's slate should cost, and the two ways any "
+                      "of it can be wrong about a player._", ""]
     out += sec_eleven(marked, best, players, second, buys)
     out += (slate_lines if slate_lines else
             ["## 2. Buy today", "",
@@ -1713,9 +1041,7 @@ def main() -> None:
              "the `seen` input to price it. Everyone unowned is ranked in "
              "`reports/watchlist.md`, and question 3 is what your cash is "
              "worth while you wait._", ""])
-    out += sec_basket(got, hurdle, spent, forgone, cash_value)
-    out += sec_sell(brows, marked, chosen, players, app_prem)
-    out += ["## 5. Exceptions", "",
+    out += ["## 3. Exceptions", "",
             "_The two ways every number above can be wrong about a player: he "
             "is not fit, or the two probable-XI sources do not agree that he "
             "plays. Neither prices anything, so neither is a decision — both "
@@ -1727,7 +1053,6 @@ def main() -> None:
     if players and best:
         log_squad(observed, players, chosen, best[1], best[0], deadline,
                   obs_dt)
-    log_line(observed, hurdle, got, spent, forgone, cash_value)
 
     # --- below the fold ---------------------------------------------------
     warnings: list[str] = []
@@ -1735,9 +1060,14 @@ def main() -> None:
         warnings.append(f"**Data is {age_h:.0f}h old** — the ingest workflow "
                         "may have failed. Everything above is that snapshot.")
     if best:
-        for k, n in THIN.items():
+        # NOT A DECISION RULE ANY MORE. THIN used to gate whether a sale was
+        # allowed; what a shortage actually is, is a fact about the squad —
+        # you cannot field a legal eleven if one of these gets hurt — and the
+        # simulation prices the squad you would hold rather than consulting a
+        # threshold about it.
+        for k, n in SLOT_MIN.items():
             have = len(pool.get(k, []))
-            if have < n:
+            if have <= n:
                 warnings.append(f"**Only {have} {SLOT_LABEL[k]}"
                                 f"{'s' if have != 1 else ''}** — one knock and "
                                 "you can't field a legal XI.")
@@ -1804,22 +1134,9 @@ def main() -> None:
         f"_Generated {now:%Y-%m-%d %H:%M} UTC._",
     ]
 
-    # The same table as data, for the phone to render properly. Markdown
-    # cannot colour a verdict or right-align a number, and the site escapes
-    # raw HTML on purpose, so the one way to get a readable table on a 390px
-    # screen is to ship the rows and let a component draw them. Both come from
-    # decisions(), so they cannot disagree about order or content.
-    (REPORTS / "decisions.json").write_text(json.dumps({
-        "generated_at": now.strftime("%Y-%m-%dT%H:%MZ"),
-        "locks_in_h": round(left, 1) if deadline else None,
-        "cash": cash.value if cash and cash.value is not None else None,
-        "squad_value": squad_value,
-        "line": hurdle,
-        "rows": decisions(brows),
-        "xi": [r["name"] for r in brows if r.get("in_xi")],
-    }, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
-    print("wrote %s" % (REPORTS / "decisions.json"))
-
+    # decisions.json is sim.py's now. It is the same file the phone reads and
+    # it carries moves rather than assets, because that is what the report
+    # says; two writers would race, and the loser would be whichever ran first.
     write_lines(REPORTS / "board.md", head)
     write_lines(REPORTS / "latest.md", out)
     # History keeps both halves in one file: a day's report is the board AND
@@ -1837,7 +1154,7 @@ def main() -> None:
         token_days = TokenStore().expiry_days()
     except Exception:                                       # noqa: BLE001
         token_days = None
-    lines = alerts(brows, warnings, token_days)
+    lines = alerts(warnings, token_days)
     if lines:
         write_lines(ALERTS, [f"# Alerts — {now:%Y-%m-%d %H:%M} UTC", ""]
                     + [f"- {ln}" for ln in lines])
@@ -1867,8 +1184,6 @@ def _selftest() -> None:
     assert pct_cell(pl(pct=80.0)) == "80%"
     assert pct_cell(pl(on_page=True)).startswith("~")
     assert pct_cell(pl(on_page=False)).startswith("!")
-    assert ppm_cell(pl(ppm=3.14)) == "3.1"
-    assert ppm_cell(pl(ppm=3.14, assumed=True)) == "~3.1"
 
     # --- the disagreement that changes a decision, and the ones that don't ---
     starter = {"role": "starter", "start_pct": ""}
@@ -1949,26 +1264,6 @@ def _selftest() -> None:
     # Genuinely unknown still suppresses it, which is the case it exists for.
     assert rival_ceiling(_LG([_M("me", 50e6), _M("who", None)])) is None
 
-    # --- the basket the line is measured off ------------------------------
-    # No line is never a zero line, and the reason is in the section rather
-    # than left as a blank table. This is the case that fires on a day with
-    # nothing on offer, which is most days.
-    txt = "\n".join(sec_basket([], None, 0.0, 0.0, 40e6))
-    assert "there is no line" in txt
-    assert "|" not in txt                      # no table, so nothing to misread
-    assert "above replacement at all" in txt   # what it falls back to, named
-    # With a basket, the LAST rung IS the line: it is the rate, and the ones
-    # above it are what the money buys before it runs out. `value` is already
-    # the bid rather than the sticker price, because that is what basket() spent.
-    got = [{"name": "cheap", "slot": "DEF", "vor": 2.0, "value": 1e6},
-           {"name": "dear", "slot": "MED", "vor": 1.0, "value": 2e6}]
-    body = "\n".join(sec_basket(got, 0.5, 3e6, 3.0, 5e6))
-    assert "| 2 ←line | dear |" in body, body
-    assert "| 1 | cheap |" in body
-    assert "2.000" in body and "0.500" in body    # the board's own rates, 3dp
-    assert "The line is 0.500 pts/M" in body
-    assert "+3.0" in body                         # what idle cash is worth
-
     # --- which scale ranked the opponents, said out loud ------------------
     assert fix_basis_label([{"opp": "Elche", "fix_basis": "elo"}]) \
         == "Club Elo rating"
@@ -1981,326 +1276,66 @@ def _selftest() -> None:
     assert "no fixture is known" in fix_basis_label(
         [{"opp": "", "fix_basis": "none"}])
 
-    # --- the board: every asset in one order, cash included ----------------
-    def asset(name, flat, score, value, slot="MED"):
-        return {"name": name, "key": name, "slot": slot, "pos": slot,
-                "flat": flat, "score": score, "value": value,
-                "pct": 80.0, "pct_used": 80.0, "on_page": True, "status": "ok",
-                "fix": 1.0, "opp": "Elche", "home": True}
+    # --- what to bid, which is all this section still claims to know -------
+    from ffcore.bid import Premiums
 
-    repl = {"MED": 3.0, "POR": 3.0}
-    mine = [asset("star", 6.0, 5.0, 10e6),      # +3.0 above repl → 0.300/M
-            asset("blocked", 4.0, 0.0, 40e6),   # +1.0 → 0.025/M, benched
-            asset("dud", 2.0, 1.0, 5e6)]        # -1.0 → below replacement
-    # `avail` is the whole difference between a verdict and a note: on offer in
-    # the next few minutes, or merely somewhere in the market.
-    offer = [{**asset("bargain", 5.0, 4.0, 20e6), "avail": True}]
-    rows = board_rows(mine, {id(mine[0])}, offer, repl, 0.05)
-
-    # ONE ranking, best rate first, with cash sitting exactly on the hurdle.
-    # Everything above the cash row is worth more than money; everything below
-    # it should BE money. That is the whole table in one sentence.
-    assert [r["name"] for r in rows] == ["star", "bargain", "CASH",
-                                         "blocked", "dud"], rows
-    assert rows[2]["kind"] == "cash" and rows[2]["rate"] == 0.05
-    by = {r["name"]: r for r in rows}
-    assert abs(by["star"]["rate"] - 0.300) < 1e-9, by["star"]
-    assert abs(by["blocked"]["vor"] - 1.0) < 1e-9
-
-    # Rank is POSITION relative to the cash row. The VERDICT needs one more
-    # thing: a Sell is an action, so it needs a counterparty that exists today.
-    assert by["star"]["verdict"] == "Hold"
-    assert by["bargain"]["verdict"] == "Buy"
-    # `blocked` is below the line AND his 40M covers an available 20M upgrade at
-    # his own position, so the sale is funded and the verdict names what it buys.
-    assert by["blocked"]["verdict"] == "Sell"
-    assert "bargain" in by["blocked"]["why"], by["blocked"]
-    # `dud` is worse than replacement and worse than cash, and it changes
-    # nothing: his 5M cannot fund the 20M upgrade and he is not surplus, so
-    # there is no sale to make. An abstract baseline is not a counterparty.
-    assert by["dud"]["verdict"] == "Hold", by["dud"]
-    assert "nothing better on offer at MED" in by["dud"]["why"], by["dud"]
-
-    # Cash joins the proceeds, because a sale plus the balance is what actually
-    # bids: 15M of his own plus 6M idle clears a 20M upgrade.
-    poor = [asset("star", 6.0, 5.0, 10e6), asset("small", 4.0, 1.0, 15e6)]
-    assert {r["name"]: r["verdict"] for r in
-            board_rows(poor, set(), offer, repl, 0.05, cash=6e6)
-            }["small"] == "Sell"
-    assert {r["name"]: r["verdict"] for r in
-            board_rows(poor, set(), offer, repl, 0.05, cash=0)
-            }["small"] == "Hold"
-
-    # A man who can NEVER reach the eleven is the one sale that needs no
-    # counterparty: only one keeper plays, so the third is dead weight at any
-    # price and the reason is a roster fact rather than a rate.
-    keepers = [asset("k%d" % i, 8.0 - i, 6.0, 20e6, "POR") for i in range(3)]
-    kr = {r["name"]: r for r in board_rows(keepers, set(), [], repl, 0.05)}
-    assert kr["k0"]["verdict"] == "Hold"
-    assert kr["k2"]["verdict"] == "Sell" and "only 1 can be fielded" in \
-        kr["k2"]["why"], kr["k2"]
-
-    # An upgrade nobody is offering is a Watch, not a Buy: the rate is real and
-    # the purchase is not available, and calling that a Buy is how a board
-    # starts recommending trades that cannot be made.
-    pool_only = [{**asset("dreamy", 9.0, 9.0, 20e6), "avail": False}]
-    dr = {r["name"]: r for r in board_rows(mine, set(), pool_only, repl, 0.05)}
-    assert dr["dreamy"]["verdict"] == "Watch", dr["dreamy"]
-    # And it cannot fund a Sell either — the money would have nowhere to go.
-    assert dr["blocked"]["verdict"] == "Hold", dr["blocked"]
-    # Held or not, the fielding number rides along — long term ranks the row,
-    # short term is the column beside it, and a blocked man shows both.
-    assert by["star"]["in_xi"] and not by["blocked"]["in_xi"]
-    assert by["blocked"]["xpts"] == 0.0
-
-    # No hurdle means cash cannot be deployed, so it ranks LAST and nothing is
-    # sold to feed it — a sale into a market with nothing to buy is a loss.
-    nb = board_rows(mine, set(), offer, repl, None)
-    assert nb[-1]["kind"] == "cash", nb
-    nv = {r["name"]: r for r in nb}
-    # A SWAP still stands, because it needs no idle cash: the sale pays for the
-    # purchase, and both ends of it say so.
-    assert nv["blocked"]["verdict"] == "Sell" and nv["bargain"]["verdict"] == "Buy"
-    assert "paid for by selling blocked" in nv["bargain"]["why"]
-    assert nv["dud"]["verdict"] == "Hold"
-
-    # A FUNDED BUY STILL HAS TO CLEAR THE LINE. The sale relaxes the CASH
-    # constraint — you could not afford him from the balance, you can after
-    # selling — and nothing else. Skipping the rate check reintroduced exactly
-    # the rule this repo retired: "does he improve the eleven", which buys any
-    # upgrade at any price.
-    #
-    # It showed up in one board as Marc Bartra at -0.029 marked `pass` and Isi
-    # Palazon at -0.039 marked `Buy`: worse rate, better verdict, two rows
-    # apart in the same table.
-    # +1.0 above replacement at 25M is 0.040/M, under a 0.05 line — and still
-    # an upgrade on a man worth +0.2, and affordable out of his sale. That
-    # combination is precisely what the funded path used to buy.
-    poor = {**asset("poor upgrade", 4.0, 4.0, 25e6), "avail": True}
-    held = asset("worse", 3.2, 3.2, 25e6)
-    lb = board_rows([held], set(), [poor], repl, 0.05)
-    lv = {r["name"]: r for r in lb}
-    assert lv["poor upgrade"]["rate"] < 0.05, lv["poor upgrade"]["rate"]
-    assert lv["poor upgrade"]["verdict"] == "pass", lv["poor upgrade"]
-    # …and with no buy to fund, there is no sale either. A sale that funds
-    # nothing is just a smaller squad.
-    assert lv["worse"]["verdict"] != "Sell", lv["worse"]
-
-    # An unpriced row cannot be rated, so it is ranked last and says why
-    # instead of being scored as though it were free.
-    un = board_rows([asset("unpriced", 9.0, 9.0, None)], set(), [], repl, 0.05)
-    assert un[0]["kind"] == "cash" and un[1]["rate"] is None
-    assert un[1]["verdict"] == "—" and "no price" in un[1]["why"]
-
-    # --- one price, both sides of the market -------------------------------
-    # The price at which an asset is exactly as good as cash: vor / the line.
-    # Buy at or under it, sell at or over it — the same number, which is what
-    # having one metric buys you. `star` is +3.0 at a 0.05 line, so 60M.
-    assert abs(by["star"]["line"] - 60e6) < 1e-6, by["star"]
-    # Worse than free has no positive price: as a sale, any offer beats keeping
-    # him, and as a purchase there is no price worth paying.
-    assert by["dud"]["line"] <= 0
-    # No line, no price. Not a zero: zero would read as "give him away".
-    assert nv["star"]["line"] is None
-
-    # --- the fielding call, in the same row -------------------------------
-    # ⚽ is the eleven to field. A man you have MARKED but the model benches
-    # carries the other glyph, so question 1's advice is two columns, not a
-    # second table.
-    fm = board_rows(mine, {id(mine[0])}, offer, repl, 0.05,
-                    marked_xi=[mine[1]])
-    fb = {r["name"]: r for r in fm}
-    assert fb["star"]["in_xi"] and not fb["star"]["marked"]
-    assert fb["blocked"]["marked"] and not fb["blocked"]["in_xi"]
-
-    # --- and the section that renders it ----------------------------------
-    body = "\n".join(sec_board(rows, 30e6, 2.0))
-    assert "| **CASH** |" in body, body
-    assert "30.00M" in body and "+2.0" in body       # what idle cash forgoes
-    assert body.index("star") < body.index("CASH") < body.index("dud")
-    assert "60.00M" in body                          # star's line price
-    assert "any" in "\n".join(sec_board([by["dud"]], None, 0.0))
-    # No cash and no hurdle is not an empty table: the players still rank.
-    assert "| **CASH** |" in "\n".join(sec_board(nb, None, 0.0))
-    # The glyphs, and nothing about them in a separate section.
-    marks = "\n".join(sec_board(fm, 30e6, 2.0))
-    assert "star ⚽" in marks and "blocked ▼" in marks, marks
-
-    # --- question 2 cannot contradict the board either ---------------------
-    # It reads the same row, so the rate, the price and the verdict are the
-    # board's. What it adds is the market: what to bid, and who else wants him.
+    # It used to reprint the board's columns and its verdict beside every
+    # name, which made it a second copy of a ranking. Whether to buy him is
+    # the one table in REPORT.md now; this is what to type into the app.
     class _Mgr:
         handle, max_bid = "rival", 5e6
 
-    class _League(list):
+    class _LG:
+        owner = {}
         cfg = type("C", (), {"me": "me"})()
-        owner: dict = {}
 
-    slate_lg = _League([_Mgr()])
-    snaps = {"rival": {"best": None, "short": (), "pool": {}}}
-    by_name = {r["name"]: r for r in rows if r["kind"] == "buy"}
-    lines, n, nb = sec_slate(
-        slate_lg, {}, [offer[0]], squad_pool(mine), by_name,
-        ({"bargain"}, ["unpriced man"]), None, 30e6, None, snaps, line=0.05)
-    slate_txt = "\n".join(lines)
-    assert n == 1 and nb == 1, (n, nb)
-    assert "| above repl | pts/M | At the line |" in slate_txt, slate_txt
-    # +2.0 above replacement at a 0.05 line is worth up to 40M, and the row
-    # says so with the board's own verdict beside it.
-    assert "≤ 40.00M" in slate_txt and "**Buy**" in slate_txt, slate_txt
-    assert "0.100" in slate_txt                    # 2.0 over a 20M bid
-    # A player the app offers that the market pages do not name is REPORTED,
-    # not silently dropped: dropping him renders as "not on offer", which is
-    # the error the whole slate change exists to fix.
-    assert "**unpriced man**" in slate_txt, slate_txt
-    assert "On offer but unpriced" in slate_txt, slate_txt
+        def __iter__(self):
+            return iter([_Mgr()])
 
-    # --- question 4 cannot contradict the board, because it IS the board ----
-    # THE BUG THIS CLOSES: question 4 used to derive its own verdict off λ, so
-    # it printed "Sell Fornals" under a board that held him. It now reads the
-    # verdict off the row the board already decided, and the only numbers it
-    # adds are the ones the board has no column for.
-    from ffcore.bid import Premiums
-    sell = sec_sell(rows, None, {id(mine[0])}, mine,
-                    Premiums(15, 1.5, -9.4, 12.0))
-    row_of = {l.split(" | ")[0].lstrip("| "): l
-              for l in sell if l.startswith("| ")}
-    assert "Sell" in row_of["blocked"] and "bargain" in row_of["blocked"]
-    assert "Hold" in row_of["dud"] and "Sell" not in row_of["dud"], row_of
-    # A man in the eleven is not on a sell shortlist at all.
-    assert "star" not in row_of, row_of
-    # The sale band is what the board has no room for: the app pays around the
-    # value, and this ledger says how far around.
-    assert "M–" in row_of["blocked"], row_of["blocked"]
-    # And the line price is the SAME number by the same formula: `dud` is worse
-    # than replacement, so any offer beats keeping him, on both tables.
-    assert "any" in row_of["dud"]
-    # Nobody spare is a sentence, not an empty table.
-    assert "|" not in "\n".join(sec_sell(rows, None, {id(p) for p in mine},
-                                         mine, None))
+    cand = {"name": "Target", "key": "target", "pos": "Defensa",
+            "slot": "DEF", "value": 10e6, "flat": 4.0, "score": 4.0}
+    body, n, covers = sec_slate(
+        _LG(), {}, [cand], {"DEF": [1, 2, 3, 4]}, ({"target"}, []),
+        Premiums(12, 1.2, 0.0, 8.0), 40e6, 5e6,
+        {"rival": {"best": None, "short": set(), "pool": {}}})
+    txt = "\n".join(body)
+    assert n == 1 and covers == 0, (n, covers)
+    assert "| Target |" in txt, txt
+    # THE COLUMNS THAT WENT WITH THE BOARD. Every one of these was a proxy for
+    # a question the simulation now answers, and printing them here made this
+    # table a place the two could disagree.
+    for gone in ("pts/M", "above repl", "At the line", "Verdict"):
+        assert gone not in txt, gone
+    assert "Bid" in txt and "Competition" in txt
+
+    # A position you cannot legally field without him is not a rate at all.
+    # SLOT_MIN is the rules; THIN was a tuned threshold and is not a rule.
+    _b, _n, cov = sec_slate(
+        _LG(), {}, [cand], {"DEF": []}, ({"target"}, []),
+        Premiums(12, 1.2, 0.0, 8.0), 40e6, 5e6,
+        {"rival": {"best": None, "short": set(), "pool": {}}})
+    assert cov == 1, cov
+    assert "cover" in "\n".join(_b)
 
     # -- alerts: the short list worth interrupting somebody for -------------
     # This replaced watch.py, which diffed market values and emitted every
     # player who moved 2% in a day — thirty-odd rows, league-wide, none of them
     # a decision. As a file nobody read that was harmless; as a notification it
-    # would be spam, and spam trains you to ignore the one that mattered.
-    brd = [
-        {"kind": "own", "name": "sell me", "verdict": "Sell",
-         "why": "8th MED — only 5 can be fielded", "flag": False},
-        {"kind": "buy", "name": "buy me", "verdict": "Buy",
-         "why": "", "flag": False},
-        {"kind": "own", "name": "hurt", "verdict": "Hold",
-         "why": "", "flag": True},
-        {"kind": "own", "name": "boring", "verdict": "Hold",
-         "why": "", "flag": False},
-        {"kind": "cash", "name": "CASH", "verdict": "the line",
-         "why": "", "flag": False},
-    ]
-    al = alerts(brd, ["Only 1 delantero"], token_days=None)
-    body = "\n".join(al)
-    # Only things you would act on. A Hold is the absence of news.
-    assert "buy me" in body and "sell me" in body, body
-    assert "boring" not in body, body
-    assert "CASH" not in body, body
-    # A fitness flag on someone you own is worth knowing before the lock.
-    assert "hurt" in body, body
-    # Warnings ride along — "only 1 delantero" is one knock from unfieldable.
+    # would be spam, and spam trains you to ignore the one that mattered. The
+    # verdict scan that used to run here went with the board, for the same
+    # reason: it fired on every Buy and Sell in a twenty-row table. What is
+    # left is the squad, and sim.py puts the decision above it.
+    body = "\n".join(alerts(["Only 1 delantero"], token_days=None))
     assert "delantero" in body, body
     # Nothing to say means NO alert, not an empty one. A notification that
     # says "no news" every twelve hours is the same spam by another route.
-    assert alerts([{"kind": "own", "name": "x", "verdict": "Hold",
-                    "why": "", "flag": False}], [], None) == []
+    assert alerts([], None) == []
     # The login expiring is the one piece of plumbing worth a nudge, because
     # the failure is silent and the fix needs a human at a browser.
-    assert any("Log in again" in ln for ln in alerts([], [], token_days=9))
-    assert alerts([], [], token_days=60) == []
+    assert any("Log in again" in ln for ln in alerts([], token_days=9))
+    assert alerts([], token_days=60) == []
 
-    # -- the phone-first summary -------------------------------------------
-    # The board is nine columns. On a 390px screen four of them are visible
-    # and the verdict is not one, so the answer to "what do I do" needed a
-    # sideways scroll. This block is the answer, in a list, above the table.
-    brd2 = [
-        {"kind": "buy", "name": "Marcos Alonso", "slot": "DEF",
-         "verdict": "Buy", "why": "paid for by selling Carl Starfelt",
-         "rate": 0.055, "line": 66.96e6, "in_xi": False, "flag": False},
-        {"kind": "own", "name": "Dani Lorenzo", "slot": "MED",
-         "verdict": "Sell", "why": "7th MED — only 5 can be fielded",
-         "rate": -0.07, "line": None, "in_xi": False, "flag": False},
-        {"kind": "own", "name": "Jon Moncayola", "slot": "MED",
-         "verdict": "Hold", "why": "", "rate": 0.09, "line": None,
-         "in_xi": True, "flag": False},
-        {"kind": "own", "name": "Hurt Man", "slot": "DEF", "verdict": "Hold",
-         "why": "", "rate": 0.01, "line": None, "in_xi": True, "flag": True},
-        {"kind": "cash", "name": "CASH", "verdict": "the line", "why": "",
-         "rate": 0.04, "line": None, "in_xi": False, "flag": False},
-    ]
-    txt = "\n".join(sec_today(brd2))
-    # Every action, and only actions. A Hold is the absence of news.
-    assert "Marcos Alonso" in txt and "Dani Lorenzo" in txt, txt
-    assert "Jon Moncayola" not in txt.split("Field")[0], txt
-    assert "CASH" not in txt, txt
-    # Buys before sells: one spends, the others fund it.
-    assert txt.index("Marcos Alonso") < txt.index("Dani Lorenzo"), txt
-    # Five columns, so it fits a phone without a sideways drag.
-    head = [ln for ln in txt.split("\n") if ln.startswith("| Do |")][0]
-    assert head.count("|") == 6, head
-    # The price to act at rides along: a Buy without a ceiling is not
-    # actionable at the moment an offer appears.
-    assert "66.96M" in txt, txt
-    # The eleven is named, so fielding needs no scroll either.
-    assert "Field" in txt and "Jon Moncayola" in txt, txt
-    # Fitness is an exception worth surfacing even on a Hold.
-    assert "Hurt Man" in txt, txt
-
-    # SEVERAL SELLS CAN FUND THE SAME BUY, and they are alternatives. Listed
-    # flat they read as a shopping list, and following it would sell four
-    # defenders to buy one. The real board had exactly this: five bench
-    # players each captioned "funds Marcos Alonso".
-    many = [
-        {"kind": "buy", "name": "Target", "slot": "DEF", "verdict": "Buy",
-         "why": "", "rate": 0.05, "line": 40e6, "in_xi": False, "flag": False},
-        {"kind": "own", "name": "Funder A", "slot": "DEF", "verdict": "Sell",
-         "why": "funds Target", "funds": "Target", "money": 12e6,
-         "rate": -0.02, "line": None, "in_xi": False, "flag": False},
-        {"kind": "own", "name": "Funder B", "slot": "DEF", "verdict": "Sell",
-         "why": "funds Target", "funds": "Target", "money": 9e6,
-         "rate": -0.03, "line": None, "in_xi": False, "flag": False},
-        {"kind": "own", "name": "Spare", "slot": "POR", "verdict": "Sell",
-         "why": "2nd POR — only 1 can be fielded", "money": 4e6,
-         "rate": -1.0, "line": None, "in_xi": False, "flag": False},
-    ]
-    grouped = sec_today(many)
-    body = "\n".join(grouped)
-    rows_ = [ln for ln in grouped if ln.startswith("|")
-             and not ln.startswith("|---") and "| Do |" not in ln]
-    # The funders sit DIRECTLY under the buy they pay for, richest first, so
-    # the choice is read without cross-referencing.
-    assert "**Buy**" in rows_[0] and "Target" in rows_[0], rows_
-    assert "sell 1 of" in rows_[1] and "Funder A" in rows_[1], rows_
-    assert "sell 1 of" in rows_[2] and "Funder B" in rows_[2], rows_
-    assert "12.00M" in rows_[1] and "9.00M" in rows_[2], rows_
-    # …and are never presented as sell instructions in their own right.
-    assert "| **Sell** | Funder A" not in body, body
-    # The man who can never be fielded is a sale outright, and sorts last.
-    assert "**Sell**" in rows_[3] and "Spare" in rows_[3], rows_
-    # Direction is in the money cell rather than a sixth column.
-    assert "≤ 40.00M" in rows_[0], rows_[0]
-    # …and when there is no line to cap against, the asking price, never "—".
-    nocap = sec_today([{"kind": "buy", "name": "T", "slot": "DEF",
-                        "verdict": "Buy", "why": "", "rate": 0.05,
-                        "line": None, "money": 29.08e6, "in_xi": False,
-                        "flag": False}])
-    buyrow = [ln for ln in nocap if "**Buy**" in ln][0]
-    assert "29.08M" in buyrow and "| — |" not in buyrow, buyrow
-    assert rows_[1].count("+ ") == 1, rows_[1]
-
-    # Nothing to do is said plainly rather than left as an empty heading.
-    quiet = "\n".join(sec_today([
-        {"kind": "own", "name": "x", "slot": "MED", "verdict": "Hold",
-         "why": "", "rate": 0.1, "line": None, "in_xi": True, "flag": False}]))
-    assert "Nothing to buy or sell" in quiet, quiet
-
-    print("report self-test OK (111 cases)")
+    print("report self-test OK (%d cases)" % 78)
 
 
 if __name__ == "__main__":

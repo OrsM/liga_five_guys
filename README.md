@@ -33,66 +33,72 @@ publishing a report built by code that does not pass its own checks.
 
 ## The one table
 
-**`reports/REPORT.md`** is the only file you need to read. One table — the
-board — ranking every asset you could hold, owned or not, against cash.
+**`reports/REPORT.md`** is the only file you need to read. One table — every
+move you could make, ranked by what it does to where you finish.
 
-**ONE METRIC RUNS IT: pts/M**, points above replacement per million euros.
-Replacement level is fixed by the rules — five squads, and the shapes each can
-legally field — so it does not move when your eleven does. **CASH is a row in
-the same table**, with a rate of its own: above the line an asset beats the
-money, below it the money beats the asset.
+**THERE IS NO METRIC.** Buy, steal, swap and sell are the same question with
+different arguments — *if I did this, where would I finish?* — and the answer
+comes from playing the rest of the season out a few thousand times with that
+move made and without it. The columns are the answer: **Δpos**, places gained
+on the expected finish, and **Δwin**, percentage points of winning the league.
+Nothing to explain, no threshold to tune, and a move worth nothing shows a Δ
+of nothing.
 
-λ came before this and is **retired**. It measured the same exchange rate
-against *your current eleven*, off a ladder built from the whole unowned pool,
-so the baseline moved: the same player was worth different amounts on
-consecutive days for reasons that had nothing to do with him, and the ladder
-priced a market you cannot shop in. That is how the report came to hold Fornals
-on the board and sell him three tables later, in the same unit. The code went
-with it on 2026-08-18 — `Lambda`, `Rung`, `frontier()`, `verdict()`,
-`sell_test()`, `Sale`, `marginal()` and three functions in report.py, none of
-them reachable from anything. They were kept for a fortnight on the argument
-that `lambda_log.csv` was the only evidence for whether replacing λ helped;
-that argument does not survive being written down, because the LOG holds the
-evidence and it is still here. git remembers the code.
+**THE STEAL IS WHY IT MATTERS.** Every rival player carries a buyout clause,
+so cash can take him outright — and that REMOVES HIM FROM THEIR SQUAD. One
+move raises your total and lowers theirs, which is worth roughly twice what
+the same player is worth from the free pool. 62 of the 83 players you can buy
+today are somebody's.
 
-The five numbered sections it replaced are still generated, in
-`reports/latest.md`, as workings.
+**The board came before this and is retired**, on 2026-08-18, the same day it
+was first published beside the simulation. It ranked every asset you could
+hold on `pts/M` — points above replacement per million euros — with cash as a
+row in the same table and a line through it. One metric, and an honest one,
+but a proxy for the question above, and priced in each other's units the two
+disagreed:
+
+- **It could not see a rival's player at all.** Every candidate list it built
+  skipped anything already owned, so 62 of the 83 acquirable players were
+  invisible — and the clause that makes them buyable sits on the row it
+  skipped. Its top pick was worth +0.27 places; the simulation's was +0.43,
+  and the board rated that man −0.001 pts/M, 29th of 33, a pass.
+- **Where both could see, it named the wrong funder.** Both said buy Marcos
+  Alonso; the board paid for him by selling Starfelt, which is the worst of
+  the four options at +0.27 against Zubeldia's +0.36. Eight points of P(win)
+  in a choice it made by ranking the funders on the metric rather than asking
+  what the squad would look like afterwards.
+- The ranking was stable across four seeds, spreads of ±0.01 against gaps of
+  0.07–0.17, so this was a disagreement and not Monte Carlo noise.
+
+Gone with it: `pts/M`, `above repl`, `at the line`, the basket, the funding
+scan, `sec_board`, `sec_today`, `decisions()`, `board_rows()`, `sec_sell()`,
+`vor()`, `replacement()`, `basket()`, `cost_of()`, `ratio_of()`, `THIN` and
+`MAX_SLOT` as decision rules, and every verdict string — Buy, Sell, Hold,
+Watch, pass, Cover. `line_log.csv` and `lambda_log.csv` are both KEPT: they
+hold what the old rules said, which is the only evidence that will ever exist
+for whether replacing them helped. git remembers the code.
+
+λ went the same way a fortnight earlier, one layer down: it measured the
+exchange rate against *your current eleven*, so the baseline moved under it.
+
+**WHAT THE BOARD WAS BETTER AT, and it is still true: it could value cash.**
+Nothing in the simulation models next cycle's market, so holding money scores
+zero and a standalone sale can never come out ahead. That is why the one
+verdict left is **dead weight** — a man who starts in none of the remaining
+jornadas scores nothing wherever the squad goes, so any offer for him is a
+gain — and why nothing here will ever tell you to sell for the money. The
+simulation reproduced all three of the board's standing Sells by that route,
+which is the check that made deleting the rest defensible.
+
+The workings are still generated, in `reports/latest.md`: the eleven, what to
+bid for a man on today's slate, and the two ways any of it can be wrong about
+a player. **What to bid is the one question the simulation cannot answer** —
+it prices every acquisition at a clause, because a clause is instant and
+cannot be refused, while a market row is a bid that can lose. What it costs to
+win one is a fact about this league's behaviour, and `ffcore/bid.py` survives
+for exactly that.
 
 Everything else is reference and is **linked**, not reprinted.
-
-### The second table, on trial
-
-Underneath the board, REPORT.md now carries **the simulation** —
-`reports/sim.md`, from `src/sim.py`. It answers the board's question by
-playing the rest of the league out a few thousand times for every move you
-could make, and ranking them by **Δ expected finishing position** and
-**Δ P(winning)** rather than by a rate. There is no metric to explain and no
-threshold to tune, because the column *is* the answer.
-
-**Both are printed, and the board is still in charge.** The point of a
-side-by-side jornada is to compare them on real data before the old one goes;
-the board is the thing that currently works, and the forecast under the
-simulation still rests on approximations that all flatter a lead. They are
-listed at the foot of `sim.md` on every run, read off the data rather than
-remembered — including which shape prior is in use, and whether a jornada is
-half played.
-
-What the simulation can express and no per-player rate can: **a steal is worth
-roughly twice what the same player is worth from the free pool**, because
-taking a rival's man raises your total *and* lowers his. On the day it was
-first published, every one of the top eight moves was a steal or a swap aimed
-at SusoGattuso — the only rival inside the noise — and the best of them moved
-P(win) 36 points, from a 140-point swing against a difference-of-totals spread
-of 132.
-
-When the board goes, the deletions are listed in `sim.py`'s docstring and in
-the handoff: `pts/M`, `above repl`, `the line`, the basket, `THIN`,
-`MAX_SLOT` as a decision rule, and every verdict string.
-
-The manual workflow keeps two inputs: `fetch` (off = rebuild from stored HTML)
-and `baseline` (once a season). `lookup` and `seen` went with the tools that
-read them — `find_slug.py` resolved app spellings the API now supplies on both
-sides, and `seen` was the OCR'd market slate.
 
 ## What you edit
 
@@ -215,8 +221,10 @@ data/tidy/api_players.csv  id -> name, append-only; names the feed's history
 data/decisions/      append-only logs of estimates, for scoring later
 .runtime/alerts.md   gitignored; exists only when something wants a decision
 reports/REPORT.md    ← read this
-reports/latest.md    the five tables (report.py) — carried into REPORT.md
-reports/sim.md       the simulation (sim.py) — carried into REPORT.md, on trial
+reports/latest.md    the workings (report.py) — the eleven, the bid, fitness
+reports/sim.md       THE REPORT (sim.py) — the one table, carried into REPORT.md
+reports/board.md     what is left of report.py's front page: the warnings
+reports/decisions.json  the same table as data, for the phone to draw
 reports/rivals.md    how rivals bid: premiums, drift, projected XIs (rivals.py)
 reports/squads.md    every squad, deal history, cash basis (squads.py)
 reports/watchlist.md everyone unowned, ranked (squads.py)
@@ -265,6 +273,17 @@ PYTHONPATH=src python src/sim.py --selftest             # the simulation's repor
 ```
 
 ## Design notes
+
+**A self-test suite that passes is not a program that runs.** Deleting the
+board took thirteen functions out of report.py; all twenty-three suites went
+green, and the module then died on its first real run because `sec_eleven` —
+which stays — called `ppm_cell`, which went. Nothing exercised that line. Two
+things came out of it: a static undefined-name pass over the file after any
+deletion of that size, and, on the phone, a test that renders the decision
+table against a REAL payload. The React board had no such test, which is worse
+than it sounds — a component reading the old keys off the new JSON does not
+throw. It renders an empty table, and an empty table looks exactly like
+"nothing to do today".
 
 **A round in progress was being paid out twice.** The simulator plays every
 jornada that is not finished, and the app's carried points already include the

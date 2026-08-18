@@ -45,38 +45,25 @@ class Part(NamedTuple):
 # else, so it is left in latest.md and linked rather than deleted. This file is
 # what you read on a phone before a lock; latest.md is what you read when you
 # have time.
-DECIDE = [
-    # ONE TABLE. It absorbed the five questions: the eleven to field is the ⚽
-    # rows, the buys and sells are verdicts in it, what idle cash forgoes is the
-    # CASH row, and fitness and the probable-XI split are a glyph and a column.
-    # Every asset is priced in the same unit, so a second table could only
-    # restate one of these numbers on a different baseline — which is exactly
-    # how this report used to tell you to field a man and sell him at once.
-    #
-    # The five sections still exist, in latest.md, and are linked below. They
-    # are the workings, kept because a ranking you cannot audit is a ranking you
-    # stop trusting — and they now READ the board rather than re-deriving it, so
-    # they are reference because they repeat it, not because they disagree.
-    "Do this",
-    "The board",
-    "Warnings",
-]
+# board.md is down to one section. The board itself — "Do this" and "The
+# board", twenty rows of pts/M with a CASH row dropped in at the line — went on
+# 2026-08-18, and what is left of that file is what it always said about the
+# POSITION rather than about the decision.
+POSITION = ["Warnings"]
 
 # Order matters: this is the order you read them in, not the order they are
 # generated.
 SOURCES = [
-    Part("Decide today", "board.md", DECIDE, nest=False),
-    # THE TRIAL, PRINTED UNDERNEATH. sim.py answers the board's question by
-    # simulating the rest of the league instead of pricing a proxy for it, and
-    # the two are carried together for a few jornadas so they can be compared
-    # on real data. Below the board on purpose: the board is the thing that
-    # currently works, and the forecast under the simulation still rests on
-    # approximations it lists for itself at the foot of its own page.
+    # THE DECISION FIRST, and it is now one thing: every move you could make,
+    # ranked by what it does to where you finish. It replaced a board that
+    # ranked every asset you could hold on points per million above
+    # replacement — one metric, but a proxy for this one, and a proxy that
+    # could not see a rival's player at all.
     #
-    # Whole file, un-nested — it is a report, not an excerpt. Its headings are
-    # deliberately none of DECIDE's: an identical heading is dropped as a
-    # duplicate, and the one that arrived second would be the one to go.
-    Part("The simulation", "sim.md", None, nest=False),
+    # Whole file, un-nested: it is a report, not an excerpt.
+    Part("Decide today", "sim.md", None, nest=False),
+    # Then what is true of the position regardless of the decision.
+    Part("The squad", "board.md", POSITION, nest=False),
 ]
 
 # Printed as links, not content. Each is a whole file that would otherwise be
@@ -128,9 +115,9 @@ def digest(read, sources=SOURCES, stamp: str = "",
     """Assemble one report. `read(name)` returns the file's text, or None."""
     out = ["# Liga Five Guys — one report" + (" — " + stamp if stamp else ""),
            "",
-           "Field, buy, hold, sell — one table, one metric, and underneath it "
-           "the simulation that is being trialled to replace the lot. "
-           "Everything else is reference and is linked, not reprinted.", ""]
+           "Every move you could make, ranked by whether it wins the "
+           "league. Everything else is reference and is linked, not "
+           "reprinted.", ""]
     body: list[str] = []
     seen: set[str] = set()
     lost: list[str] = []
