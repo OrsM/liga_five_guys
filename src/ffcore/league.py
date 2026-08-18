@@ -58,7 +58,7 @@ from ffcore.tidy import (Market, input_path, ledger_stamp, load_api_teams,
                          load_market, read_ledger, snapshot_stamp)
 
 __all__ = ["MARKET", "Config", "load_config", "read_rosters", "identify",
-           "read_api_balances", "owner_from_api", "owner_drift",
+           "read_api_balances", "owner_from_api", "api_key", "owner_drift",
            "replay", "Cash", "Manager", "League"]
 
 # Reserved counterparty in the ledger: the free-agent pool.
@@ -285,6 +285,11 @@ def owner_from_api(rows: list[dict], market,
     already recorded against the SAME manager, the two sources agree and there
     is nothing left to guess. Disagreement, or two candidates on the same
     manager, stays unresolved.
+
+    The join itself is `api_key()`. This is a loop over it that keeps only the
+    manager; a caller who needs anything else off the row — the buyout clause,
+    the app's points — calls that directly rather than re-deriving a weaker
+    join of its own.
     """
     from ffcore.tidy import latest_only
     out, unjoined = {}, []
@@ -294,23 +299,55 @@ def owner_from_api(rows: list[dict], market,
         raw = (r.get("player_name") or "").strip()
         if not handle or not raw:
             continue
-        key = market.key_for(raw) if market is not None else norm(raw)
-        if not key and ledger_owner and index:
-            _rec, cands = resolve(raw, index)
-            agreed = [norm(c.get("name")) for c in cands
-                      if ledger_owner.get(norm(c.get("name"))) == handle]
-            if len(agreed) == 1:
-                key = agreed[0]
-        if not key and market is not None:
-            # Last resort, and the strongest key of the three: an EXACT market
-            # value, anywhere in the recorded history. Only when it identifies
-            # exactly one player.
-            key = _by_exact_value(r.get("market_value"), market.rows)
+        key = api_key(raw, handle, market, ledger_owner, index,
+                      r.get("market_value"))
         if key:
             out[key] = handle
         else:
             unjoined.append(raw)
     return out, unjoined
+
+
+def api_key(raw: str, handle: str, market, ledger_owner: dict | None = None,
+            index: list | None = None, market_value=None) -> str | None:
+    """One API row's player, as a key the rest of the repo recognises.
+
+    THREE JOINS IN FALLING ORDER OF TRUST, and the order is the whole design:
+
+      1. `market.key_for` — the resolution every other reader uses.
+      2. the ledger breaking a tie, when the app gave a surname the market
+         has two of and exactly one of them is already recorded against THIS
+         manager.
+      3. an EXACT market value, searched across all of history.
+
+    None means unresolved, and unresolved must stay visible: a dropped row is
+    an owned player reading as a free agent, or a rival's man who cannot be
+    bought because nothing knows his clause belongs to anybody.
+
+    `index` is the latest market snapshot, passed in when a caller is looping
+    so it is not rebuilt per row; omit it and it is derived here.
+    """
+    from ffcore.tidy import latest_only
+    raw = (raw or "").strip()
+    if not raw:
+        return None
+    if market is None:
+        return norm(raw) or None
+    key = market.key_for(raw)
+    if not key and ledger_owner:
+        if index is None:
+            index = latest_only(market.rows)
+        _rec, cands = resolve(raw, index)
+        agreed = [norm(c.get("name")) for c in cands
+                  if ledger_owner.get(norm(c.get("name"))) == handle]
+        if len(agreed) == 1:
+            key = agreed[0]
+    if not key:
+        # Last resort, and the strongest key of the three: an EXACT market
+        # value, anywhere in the recorded history. Only when it identifies
+        # exactly one player.
+        key = _by_exact_value(market_value, market.rows)
+    return key or None
 
 
 def ledger_from_api(activity: list[dict], users: dict,
@@ -878,6 +915,18 @@ def _selftest_api_owner() -> None:
         {"name": "Johnny Cardoso", "value": "6310000", "observed_at": at,
          "position": "MED"}])
     ambiguous_row = [{"manager": "Magic Mike 333", "player_name": "Cardoso"}]
+
+    # THE SAME JOIN, REACHABLE ON ITS OWN. owner_from_api throws away
+    # everything on the row except the manager, and the buyout clause is on
+    # that row: a caller who needs the price a rival's player can be taken at
+    # has to resolve his name the same three ways or it silently prices a
+    # different player. api_key() is that resolution, and owner_from_api is
+    # a loop over it.
+    led = {norm("Fabio Cardoso"): "Magic Mike 333"}
+    assert api_key("Cardoso", "Magic Mike 333", two, led) == norm("Fabio Cardoso")
+    assert api_key("Cardoso", "Magic Mike 333", two) is None
+    assert api_key("Fabio Cardoso", "Magic Mike 333", two) == norm("Fabio Cardoso")
+    assert api_key("", "Magic Mike 333", two) is None
 
     # With no ledger to lean on it stays unresolved — never a coin flip.
     owner, unjoined = owner_from_api(ambiguous_row, two)
