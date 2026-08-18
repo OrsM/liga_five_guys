@@ -50,8 +50,8 @@ _Swaps are same-position only: a cross-slot difference is a change of formation,
 | Beñat Prados | med | 1.37M | (1 broke) |  |
 | Edu Altozano | med | 584K | none |  |
 | Aitor Mañas | del | 523K | none |  |
-| Marc Bartra | def | — | (4 broke) |  |
 | Pedri Gonzalez | med | — | (4 broke) |  |
+| Marc Bartra | def | — | (4 broke) |  |
 | Marcos Alonso | def | — | (4 broke) |  |
 
 **Bid** is what it costs to win him, and nothing here says whether he is worth winning — that is the one table in [REPORT.md](REPORT.md), which prices him at a clause because a clause cannot be refused. A purchase is closer to a loan than a spend: the value comes back when you sell, give or take 12%, which on a large player is bigger than the premium and the drift put together. That swing is a coin flip, so a bid within a few percent is not a decision.
@@ -116,4 +116,4 @@ _637 players tracked, 499 with a probable-XI reading._
 
 _xPts/j — expected points per jornada = shrunk pts/match (K=8, 2025-26) × fixture × P(start), from `ffcore/score.py` — the same scorer rivals.py uses. Injured, suspended and unavailable score zero; a doubt is halved. The fixture term is a ±12% band across the opponents ranked by Club Elo rating, plus ±4% for home advantage; both widths are guesses, unfitted because nothing has been played, and small enough that a wrong one costs a fraction of a point._
 
-_Generated 2026-08-18 12:43 UTC._
+_Generated 2026-08-18 14:34 UTC._

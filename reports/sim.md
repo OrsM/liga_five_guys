@@ -4,22 +4,22 @@
 
 _One question, asked of every move you could make: if I did this, where would I finish?_
 
-**Locks in 30h** · squad 213.11M · cash 23.60M · total 236.71M
+**Locks in 28h** · squad 213.11M · cash 23.60M · total 236.71M
 
 **Expected finish 1.61** · **P(win) 49%** · season **1,311–1,565** (10–90)
 
-_38 jornadas left · 83 players acquirable · 132 moves simulated._
+_38 jornadas left · 83 players acquirable · 137 moves simulated._
 
 | Do this | Δpos | Δwin | net € | biggest gain vs |
 |---|--:|--:|--:|---|
+| steal Giuliano Simeone from SusoGattuso · sell Alvaro Fernandez + Beñat Turrientes + Dani Lorenzo | +0.492 | +41% | -23.49M | SusoGattuso +41% |
 | steal Yuri Berchiche from SusoGattuso · sell Beñat Turrientes | +0.433 | +36% | -14.13M | SusoGattuso +36% |
+| steal Leo Roman from SusoGattuso · sell Beñat Turrientes + Dani Lorenzo | +0.388 | +35% | -20.86M | SusoGattuso +39% |
 | buy Marcos Alonso · sell Beñat Turrientes | +0.362 | +28% | -21.83M | SusoGattuso +27% |
 | steal Cesar Tarrega from SusoGattuso · sell Beñat Turrientes | +0.311 | +25% | -7.75M | SusoGattuso +25% |
+| steal Dean Huijsen from BurtonGM89 · sell Beñat Turrientes + Dani Lorenzo | +0.302 | +22% | -18.42M | SusoGattuso +21% |
 | steal Gorka Guruzeta from Magic Mike 333 · sell Beñat Turrientes | +0.301 | +23% | -14.23M | SusoGattuso +22% |
 | steal Aitor Paredes from BurtonGM89 · sell Beñat Turrientes | +0.261 | +18% | +1.52M | SusoGattuso +17% |
-| steal Ferran Jutgla from Albert Laporta · sell Beñat Turrientes | +0.230 | +16% | -2.43M | SusoGattuso +15% |
-| steal Lucas Noubi from Magic Mike 333 · sell Beñat Turrientes | +0.171 | +12% | -11.62M | SusoGattuso +11% |
-| steal Justin de Haas from BurtonGM89 · sell Beñat Turrientes | +0.159 | +10% | -7.36M | SusoGattuso +10% |
 
 _**Δpos** is places gained on the expected finish, **Δwin** is percentage points of P(winning the league), and **net €** is what the move does to the balance — negative spends, positive raises. **Biggest gain vs** is the rival the move takes the most from, which is the column to read when one of them is the race and the rest are not._
 

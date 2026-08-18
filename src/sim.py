@@ -41,6 +41,7 @@ import json  # noqa: E402
 import os as _os  # noqa: E402
 from pathlib import Path  # noqa: E402
 
+from decide import dead_weight  # noqa: E402,F401
 from ffcore.parse import fmt_money  # noqa: E402
 from ffcore.render import title_name  # noqa: E402
 from ffcore.tidy import REPORTS, write_lines  # noqa: E402
@@ -142,45 +143,6 @@ def table(rows, u, rivals) -> list[str]:
             "from, which is the column to read when one of them is the race "
             "and the rest are not._", ""]
     return out
-
-
-def dead_weight(u) -> list[tuple[str, float]]:
-    """[(player, what he raises)] for everyone in my squad who never starts.
-
-    THE ONE VERDICT LEFT, and the only one the simulation can reach without
-    valuing cash. Every other Buy/Sell/Hold/Watch string was a proxy for "does
-    this move me up the table", which is now a column. This one is not: a man
-    who makes none of the remaining elevens contributes nothing on the pitch
-    whatever else happens, so selling him costs nothing and any offer is a
-    gain. The simulation agrees — it prices all three of the board's standing
-    Sells at exactly 0.000 Δpos — but a Δ of zero is easy to read as "no
-    opinion" when the opinion is "this is free money".
-
-    Checked against every jornada you can still PICK, which is not the same as
-    every jornada left. A round already in progress has its eleven locked, and
-    it fields a different one from the other thirty-seven because the players
-    whose clubs have kicked off are out of it — so a man who starts only there
-    is not being fielded by any decision still open to you. On the day this
-    was written that was Dani Lorenzo, in one jornada of thirty-eight, and
-    the board had him right: sixth midfielder, spare for the rest of the
-    season. If NO choosable round is left, the locked one is all there is and
-    second-guessing it helps nobody.
-
-    What it deliberately does NOT do is rank them against each other, or say
-    what to hold out for. That needs the option value of cash, and nothing
-    here models next cycle's market — see the caveats.
-    """
-    from ffcore.season import best_xi
-
-    mine = u.state.squads.get(u.me, {})
-    choosable = [j for j in u.state.jornadas if j not in u.part_played] \
-        or list(u.state.jornadas)
-    starts: set[str] = set()
-    for j in choosable:
-        starts.update(best_xi(mine, u.forecaster.expected(j)))
-    return sorted(((k, u.proceeds.get(k, 0.0)) for k in mine
-                   if k not in starts),
-                  key=lambda kv: -kv[1])
 
 
 def sells(u, dead) -> list[str]:
@@ -306,7 +268,7 @@ def payload(u, rows, base, rivals, locks_h=None, n_actions: int = 0) -> dict:
             "kind": "steal" if a.victim else ("sell" if a.kind == "sell"
                                               else "buy"),
             "buy": names.get(a.buy, a.buy) if a.buy else "",
-            "sell": names.get(a.sell, a.sell) if a.sell else "",
+            "sell": " + ".join(names.get(k, k) for k in a.sell),
             "victim": a.victim,
             "d_pos": r["d_pos"], "d_win": r["d_win"], "net": -a.net,
             "vs": who, "vs_gain": r["d_beat"].get(who, 0.0) if who else None,
@@ -363,7 +325,7 @@ def render(u, rows, base, stamp: str, rivals, n_actions: int = 0,
 def _selftest() -> None:
     from ffcore.forecast import Bootstrap
     from ffcore.season import LeagueState, Standings
-    from decide import Action, Universe
+    from decide import Action, Universe, dead_weight
 
     # Two managers, a season already scored so the numbers are exact and the
     # renderer is the only thing under test.
@@ -527,6 +489,13 @@ def _selftest() -> None:
     m = d["moves"][0]
     assert m["label"] == "steal Yuri Berchiche from riv · sell Benat Turrientes"
     assert m["buy"] == "Yuri Berchiche" and m["sell"] == "Benat Turrientes"
+    # More than one man can pay for a move, and the phone gets all of them.
+    two = payload(u, [{**rows[0],
+                       "action": Action("swap", buy="yuri",
+                                        sell=("benat", "yuri"),
+                                        cost=1e6, proceeds=2e6)}],
+                  st, ["riv"])["moves"][0]
+    assert two["sell"] == "Benat Turrientes + Yuri Berchiche", two
     assert m["victim"] == "riv" and m["kind"] == "steal"
     assert m["d_pos"] == 0.433 and m["d_win"] == 0.364
     assert m["net"] == -(20e6 - 5.87e6), m
@@ -567,7 +536,7 @@ def _selftest() -> None:
     ph = "\n".join(placeholder("no api_teams.csv"))
     assert "no api_teams.csv" in ph and ph.startswith("# The simulation")
 
-    print("sim self-test OK (52 cases)")
+    print("sim self-test OK (53 cases)")
 
 
 def main() -> None:

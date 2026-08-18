@@ -1,11 +1,11 @@
 {
- "generated_at": "2026-08-18T12:45Z",
- "locks_in_h": 30.26911428777778,
+ "generated_at": "2026-08-18T14:36Z",
+ "locks_in_h": 28.42326735583333,
  "cash": 23596582.0,
  "squad_value": 213113164.0,
  "jornadas_left": 38,
  "acquirable": 83,
- "considered": 132,
+ "considered": 137,
  "expected_finish": 1.6106666666666667,
  "p_win": 0.4856666666666667,
  "band": [
@@ -13,6 +13,18 @@
   1565.1969022835635
  ],
  "moves": [
+  {
+   "label": "steal Giuliano Simeone from SusoGattuso · sell Alvaro Fernandez + Beñat Turrientes + Dani Lorenzo",
+   "kind": "steal",
+   "buy": "Giuliano Simeone",
+   "sell": "Alvaro Fernandez + Beñat Turrientes + Dani Lorenzo",
+   "victim": "SusoGattuso",
+   "d_pos": 0.4923333333333333,
+   "d_win": 0.41000000000000003,
+   "net": -23487682.0,
+   "vs": "SusoGattuso",
+   "vs_gain": 0.411
+  },
   {
    "label": "steal Yuri Berchiche from SusoGattuso · sell Beñat Turrientes",
    "kind": "steal",
@@ -24,6 +36,18 @@
    "net": -14134537.0,
    "vs": "SusoGattuso",
    "vs_gain": 0.35899999999999993
+  },
+  {
+   "label": "steal Leo Roman from SusoGattuso · sell Beñat Turrientes + Dani Lorenzo",
+   "kind": "steal",
+   "buy": "Leo Roman",
+   "sell": "Beñat Turrientes + Dani Lorenzo",
+   "victim": "SusoGattuso",
+   "d_pos": 0.3883333333333334,
+   "d_win": 0.34633333333333327,
+   "net": -20859888.0,
+   "vs": "SusoGattuso",
+   "vs_gain": 0.38833333333333336
   },
   {
    "label": "buy Marcos Alonso · sell Beñat Turrientes",
@@ -48,6 +72,18 @@
    "net": -7745029.0,
    "vs": "SusoGattuso",
    "vs_gain": 0.25266666666666665
+  },
+  {
+   "label": "steal Dean Huijsen from BurtonGM89 · sell Beñat Turrientes + Dani Lorenzo",
+   "kind": "steal",
+   "buy": "Dean Huijsen",
+   "sell": "Beñat Turrientes + Dani Lorenzo",
+   "victim": "BurtonGM89",
+   "d_pos": 0.30166666666666675,
+   "d_win": 0.21833333333333327,
+   "net": -18424572.0,
+   "vs": "SusoGattuso",
+   "vs_gain": 0.2096666666666666
   },
   {
    "label": "steal Gorka Guruzeta from Magic Mike 333 · sell Beñat Turrientes",
@@ -120,42 +156,6 @@
    "net": -13004522.0,
    "vs": "SusoGattuso",
    "vs_gain": 0.15266666666666667
-  },
-  {
-   "label": "steal Aimar Oroz from SusoGattuso · sell Beñat Turrientes",
-   "kind": "steal",
-   "buy": "Aimar Oroz",
-   "sell": "Beñat Turrientes",
-   "victim": "SusoGattuso",
-   "d_pos": 0.1379999999999999,
-   "d_win": 0.131,
-   "net": -18548825.0,
-   "vs": "SusoGattuso",
-   "vs_gain": 0.13933333333333336
-  },
-  {
-   "label": "buy Marc Bartra · sell Beñat Turrientes",
-   "kind": "buy",
-   "buy": "Marc Bartra",
-   "sell": "Beñat Turrientes",
-   "victim": "",
-   "d_pos": 0.10999999999999988,
-   "d_win": 0.08099999999999996,
-   "net": -20678084.0,
-   "vs": "SusoGattuso",
-   "vs_gain": 0.0736666666666666
-  },
-  {
-   "label": "steal Jose Gaya from Magic Mike 333 · sell Beñat Turrientes",
-   "kind": "steal",
-   "buy": "Jose Gaya",
-   "sell": "Beñat Turrientes",
-   "victim": "Magic Mike 333",
-   "d_pos": 0.09266666666666667,
-   "d_win": 0.06233333333333335,
-   "net": -11961902.0,
-   "vs": "SusoGattuso",
-   "vs_gain": 0.05733333333333329
   }
  ],
  "sell": [

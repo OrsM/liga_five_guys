@@ -67,13 +67,26 @@ KEEP = 12          # how many survive screening and get the full count
 
 @dataclass(frozen=True)
 class Action:
-    """One move. `sell` is empty for a purchase out of the balance."""
+    """One move. `sell` is empty for a purchase out of the balance.
+
+    `sell` is a TUPLE because funding is not always one man. A target you
+    cannot reach on cash plus one spare is not unaffordable — it is affordable
+    by selling the men who never play, and there is no reason the table should
+    omit that move. Keeping it a single string made the staircase in the value
+    of cash invisible: every step of it needs more than one sale.
+    """
     kind: str          # "buy" | "steal" | "swap" | "steal-swap" | "sell"
     buy: str = ""
-    sell: str = ""
+    sell: tuple[str, ...] = ()
     cost: float = 0.0        # what leaves the balance
     proceeds: float = 0.0    # what a sale raises
     victim: str = ""         # the rival a steal takes from
+
+    def __post_init__(self):
+        # One man is the common case and callers pass him as a bare string.
+        if isinstance(self.sell, str):
+            object.__setattr__(self, "sell",
+                               (self.sell,) if self.sell else ())
 
     @property
     def net(self) -> float:
@@ -85,11 +98,12 @@ class Action:
         move is written here so there is only one of it."""
         def show(k):
             return (names or {}).get(k, k)
+        sold = " + ".join(show(k) for k in self.sell)
         if self.kind == "sell":
-            return "sell %s" % show(self.sell)
+            return "sell %s" % sold
         who = "steal %s from %s" % (show(self.buy), self.victim) \
             if self.victim else "buy %s" % show(self.buy)
-        return who + (" · sell %s" % show(self.sell) if self.sell else "")
+        return who + (" · sell %s" % sold if sold else "")
 
 
 @dataclass
@@ -133,6 +147,11 @@ def candidates(u: Universe, expected: dict[str, float]) -> list[Action]:
     bar = min((expected.get(k, 0.0) for k in xi), default=0.0)
     spare = sorted((k for k in mine if k not in xi),
                    key=lambda k: expected.get(k, 0.0))
+    # DEAD WEIGHT PAYS FOR THINGS. These never make the eleven, so selling
+    # them costs nothing on the pitch and the only question is what the money
+    # then buys. Biggest first, so the greedy below never sells four men to do
+    # the work of three.
+    free = sorted(dead_weight(u), key=lambda kv: -kv[1])
 
     out: list[Action] = []
     for c, price in sorted(u.price.items(), key=lambda kv: kv[1]):
@@ -140,6 +159,7 @@ def candidates(u: Universe, expected: dict[str, float]) -> list[Action]:
             continue
         victim = u.owner.get(c, "")
         kind = "steal" if victim and victim != u.me else "buy"
+        swap = kind + "-swap" if victim else "swap"
         if price <= u.cash:
             out.append(Action(kind, buy=c, cost=price, victim=victim))
         # Funded by a sale: only the cheapest few spares are worth trying,
@@ -148,17 +168,66 @@ def candidates(u: Universe, expected: dict[str, float]) -> list[Action]:
         for s in spare[:4]:
             got = u.proceeds.get(s, 0.0)
             if price <= u.cash + got:
-                out.append(Action(kind + "-swap" if victim else "swap",
-                                  buy=c, sell=s, cost=price, proceeds=got,
-                                  victim=victim))
+                out.append(Action(swap, buy=c, sell=s, cost=price,
+                                  proceeds=got, victim=victim))
+        # Out of reach on cash plus any ONE spare, but not out of reach: the
+        # fewest dead-weight sales that cover it. One combination per target
+        # rather than every subset — they are all worth the same on the pitch,
+        # so the only thing to choose between them is how few men leave.
+        if price > u.cash + max((u.proceeds.get(s, 0.0) for s in spare),
+                                default=0.0):
+            sold, got = [], 0.0
+            for k, raises in free:
+                if price <= u.cash + got:
+                    break
+                sold.append(k)
+                got += raises
+            if sold and price <= u.cash + got:
+                out.append(Action(swap, buy=c, sell=tuple(sorted(sold)),
+                                  cost=price, proceeds=got, victim=victim))
     return out
+
+
+def dead_weight(u) -> list[tuple[str, float]]:
+    """[(player, what he raises)] for everyone in my squad who never starts.
+
+    A man who makes none of the remaining elevens contributes nothing on the
+    pitch whatever else happens, so selling him costs nothing and any offer is
+    a gain. It is the one verdict this system still makes, and the only one
+    reachable without valuing cash — every other Buy/Sell/Hold/Watch string
+    was a proxy for "does this move me up the table", which is now a column.
+
+    Checked against every jornada you can still PICK, which is not the same as
+    every jornada left. A round already in progress has its eleven locked, and
+    it fields a different one from the rest because the players whose clubs
+    have kicked off are out of it — so a man who starts only there is not
+    being fielded by any decision still open to you. On the day this was
+    written that was Dani Lorenzo, in one jornada of thirty-eight, and the old
+    board had him right: sixth midfielder, spare for the rest of the season.
+    If NO choosable round is left, the locked one is all there is and second-
+    guessing it helps nobody.
+
+    What it deliberately does NOT do is rank them against each other or say
+    what to hold out for. That needs the option value of cash, and nothing
+    here models next cycle's market — but it DOES fund things: see
+    candidates(), where these pay for the moves nothing else can reach.
+    """
+    mine = u.state.squads.get(u.me, {})
+    choosable = [j for j in u.state.jornadas if j not in u.part_played] \
+        or list(u.state.jornadas)
+    starts: set[str] = set()
+    for j in choosable:
+        starts.update(best_xi(mine, u.forecaster.expected(j)))
+    return sorted(((k, u.proceeds.get(k, 0.0)) for k in mine
+                   if k not in starts),
+                  key=lambda kv: -kv[1])
 
 
 def apply(u: Universe, a: Action) -> dict[str, dict[str, str]]:
     """The squads as they would be after `a`. Pure — nothing is mutated."""
     sq = {m: dict(s) for m, s in u.state.squads.items()}
-    if a.sell:
-        sq[u.me].pop(a.sell, None)
+    for gone in a.sell:
+        sq[u.me].pop(gone, None)
     if a.buy:
         # A steal removes him from his owner. This is the whole point.
         for m in sq:
@@ -420,8 +489,51 @@ def _selftest() -> None:
     assert "th_m1" in after["me"]
     assert "th_m1" in u.state.squads["riv"], "apply must not mutate"
 
+    # -- funding a move with MORE THAN ONE sale ----------------------------
+    # The table silently omitted every move that needed two. A target you
+    # cannot reach on cash plus one spare is not unaffordable — it is
+    # affordable by selling the men who never play, and those cost nothing on
+    # the pitch by construction. This is the staircase in the value of cash,
+    # expressed as rows rather than as a second table about money: on the day
+    # it was written, three dead-weight sales raised 21.16M, which cleared
+    # Giuliano Simeone's 44.65M clause by 109K.
+    u3 = Universe(
+        state=LeagueState({"me": dict(mine), "riv": dict(theirs)}, [1], "me"),
+        forecaster=B(per), pos={**u.pos, "dear": "MED"},
+        price={"dear": 20e6},
+        # Three spares, none of whom ever start: the sixth midfielder, the
+        # seventh, and a second keeper.
+        proceeds={"me_bench": 8e6, "me_spare2": 5e6, "me_spare3": 4e6},
+        owner={}, cash=4e6, me="me")
+    u3.state.squads["me"]["me_spare2"] = "MED"
+    u3.state.squads["me"]["me_spare3"] = "POR"
+    per3 = {1: dict(per[1])}
+    per3[1].update({"dear": (11.0, 1.0), "me_spare2": (0.4, 1.0),
+                    "me_spare3": (0.3, 1.0)})
+    u3.forecaster = B(per3)
+    acts3 = candidates(u3, u3.forecaster.expected(1))
+    multi = [a for a in acts3 if a.buy == "dear" and len(a.sell) > 1]
+    assert multi, "a move needing two sales must still be on the table"
+    a3 = min(multi, key=lambda a: len(a.sell))
+    # Sell the FEWEST men that cover it: 4 + 8 + 5 = 17 is short of 20, so all
+    # three go; the greedy takes the biggest first so it never sells four to
+    # do the job of three.
+    assert set(a3.sell) == {"me_bench", "me_spare2", "me_spare3"}, a3.sell
+    assert a3.proceeds == 17e6 and a3.cost == 20e6
+    assert a3.net == 3e6
+    # Never a man who plays: the eleven is the point of the exercise.
+    assert not any(k.startswith("me_d") or k.startswith("me_m")
+                   for k in a3.sell if k != "me_bench")
+    # apply() drops every one of them.
+    after3 = apply(u3, a3)
+    assert not (set(a3.sell) & set(after3["me"])), after3["me"]
+    assert "dear" in after3["me"]
+    # ...and it reads as one sentence, not three rows.
+    assert a3.label() == "buy dear · sell me_bench + me_spare2 + me_spare3", \
+        a3.label()
+
     # A swap removes the sold man and adds the bought one.
-    sw = next(x for x in acts if x.buy == "star" and x.sell == "me_bench")
+    sw = next(x for x in acts if x.buy == "star" and x.sell == ("me_bench",))
     af = apply(u, sw)
     assert "me_bench" not in af["me"] and "star" in af["me"]
 
@@ -455,6 +567,9 @@ def _selftest() -> None:
 
     assert Action("steal", buy="X", victim="R").label() == "steal X from R"
     assert Action("swap", buy="X", sell="Y").label() == "buy X · sell Y"
+    # A bare string is still accepted, because one man is the common case.
+    assert Action("swap", buy="X", sell="Y").sell == ("Y",)
+    assert Action("buy", buy="X").sell == ()
     # The grammar of a move is written once. A report that spelled it out
     # again to swap the keys for names would be a second place for "steal"
     # and "sell" to drift apart from each other.
@@ -508,7 +623,7 @@ def _selftest() -> None:
     assert un == ["zzz-united"], un
     assert _d == {1: {"getafe"}}, _d
 
-    print("decide self-test OK (28 cases)")
+    print("decide self-test OK (36 cases)")
 
 
 if __name__ == "__main__":

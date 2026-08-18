@@ -81,6 +81,24 @@ for whether replacing them helped. git remembers the code.
 λ went the same way a fortnight earlier, one layer down: it measured the
 exchange rate against *your current eleven*, so the baseline moved under it.
 
+**MONEY IS A STAIRCASE, NOT A RATE, and the table is where you see it.** Ask
+the simulator what the best move would be with more cash and the answer barely
+moves, then jumps: +10M buys nothing at all, +25M unlocks a different player
+and +0.06 places, +50M and +100M buy nothing more on top. Cash is worth exactly
+zero until it crosses the price of the next man who is actually better, and
+averaging that into "points per million" gives a number that is wrong
+everywhere — too high below the step, too low at it. Which is precisely what
+the board's line was, and why a player could read *Hold* and *take ≥ 31M* in
+the same row.
+
+So there is no section about the value of money. `candidates()` funds a move
+with as many dead-weight sales as it takes, cheapest set that covers the
+price, and the steps appear as rows like any other move. On the day this was
+built the top row became *steal Giuliano Simeone · sell Álvaro Fernández +
+Beñat Turrientes + Dani Lorenzo* — his clause is 44.65M, the three spares plus
+the balance make 44.76M, and it clears by 109K. Before, funding was capped at
+ONE sale and that move was silently missing from the table.
+
 **WHAT THE BOARD WAS BETTER AT, and it is still true: it could value cash.**
 Nothing in the simulation models next cycle's market, so holding money scores
 zero and a standalone sale can never come out ahead. That is why the one
@@ -749,11 +767,18 @@ differently-keyed ownership map is worse than none.
   left, when in reality the lineup for that round was locked before kickoff.
   It flatters everybody, for one round out of thirty-eight, and fixing it
   needs the fielded XI for the round rather than the squad.
-- **The simulation cannot value cash, so it cannot value a sale.** Nothing
-  models next cycle's market, so holding money scores zero and a standalone
-  sale can never come out ahead. Every option it ranks is therefore a move
-  that spends, and the ones that raise money are undervalued by exactly the
-  amount nobody has measured.
+- **No model of what the market will deal next.** Holding money still scores
+  zero, so a standalone sale cannot come out ahead — what a sale is worth is
+  now visible instead as the move it funds, which covers most of the gap but
+  not the part where waiting is right. The data for that is the market's own
+  history: every cycle's offers are kept in `api_market.csv`, so what was on
+  the table before is a reference distribution for whether today's deal is
+  good or bad by experience. As of 2026-08-18 there are six snapshots over one
+  day and 42 distinct players ever offered — the right idea, not yet enough of
+  it. It grows twice a day on its own.
+- **Cover is worth nothing to it.** P(start) is flat, so nobody is injured in
+  March and a bench that exists for that prices at zero. This matters now that
+  dead weight funds purchases: the top move can sell your second keeper.
 - **Publishing to the phone is wired but unproven.** `lfg-publish` targets a
   private directory, deliberately not the public `/writing` path, and the phone
   was asleep when it was written. The phone-side route that serves it is not
