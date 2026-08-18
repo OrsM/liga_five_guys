@@ -143,7 +143,11 @@ def verdict(routes) -> tuple:
     if len(routes) < 2:
         return "", False
     act = next((r for r in routes if r["route"] == "act"), None)
-    best = max(routes, key=lambda r: r["best"])
+    # The watch list is not a route you can take — it is what you cannot buy.
+    best = max((r for r in routes if r["route"] != "watch"),
+               key=lambda r: r["best"], default=None)
+    if best is None:
+        return "", False
     if act is None or best["route"] == "act":
         return ("**Act today.** Nothing you can wait for beats what is on "
                 "offer now.", False)
@@ -268,6 +272,24 @@ def wait_routes(u, offers=None, rng=None) -> list[dict]:
             "helpful": sum(1 for k in offers.pool if gain(k) > 0),
             "pool": len(offers.pool), "note": offers.note()})
 
+    # NOT FOR SALE IS NOT THE SAME AS NOT WORTH HAVING. The best players in
+    # the free pool are simply not on offer, and you cannot ask for one — so
+    # the report names them with how long the app would take to deal them,
+    # rather than leaving "114 would improve your eleven" to read as a
+    # shopping list. That misreading cost a sale: Ruben Garcia was described
+    # as buyable back when he was merely unowned.
+    if offers is not None:
+        watch = sorted(((gain(k), k) for k in offers.pool
+                        if gain(k) > 0 and k not in u.price), reverse=True)
+        out.append({"route": "watch", "label": "Not for sale",
+                    "what": "best players nobody is offering",
+                    "best": watch[0][0] if watch else 0.0,
+                    "lo": None, "hi": None, "beats_now": None,
+                    "players": [
+                        {"name": title_name(u.name.get(k, k)), "gain": g,
+                         "wait": offers.median_wait(k)}
+                        for g, k in watch[:4]]})
+
     shut = {k: w for k, w in u.clause_until.items()
             if w > now and k not in mine}
     if shut:
@@ -290,12 +312,28 @@ def waiting(u, offers=None, rng=None) -> list[str]:
         return []
     out = ["| Route | What it offers | Best upgrade |", "|---|---|--:|"]
     for r in routes:
+        if r["route"] == "watch":
+            continue
         band = ("" if r["lo"] is None
                 else " (10–90: %+.2f to %+.2f)" % (r["lo"], r["hi"]))
         name = ("**%s**" % r["label"] if r["route"] == "act" else r["label"])
         out.append("| %s | %s | %+.2f%s |"
                    % (name, r["what"], r["best"], band))
     out.append("")
+    wat = next((r for r in routes if r["route"] == "watch"), None)
+    if wat and wat.get("players"):
+        out += ["", "**Not for sale, and you cannot ask.** The app deals about "
+                "a dozen players a cycle out of five hundred, so a man you "
+                "want is not something you can go and buy — being unowned is "
+                "not being available:", "",
+                "| Player | Would add | Likely wait to be offered |",
+                "|---|--:|--:|"]
+        for pl in wat["players"]:
+            out.append("| %s | %+.2f | %s |"
+                       % (pl["name"], pl["gain"],
+                          "%.0f days" % pl["wait"] if pl["wait"]
+                          else "essentially never"))
+        out.append("")
     mkt = next((r for r in routes if r["route"] == "market"), None)
     if mkt:
         out.append("_The free market is simulated rather than guessed at: %s. "

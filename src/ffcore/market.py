@@ -32,6 +32,7 @@ report prints the band and the sample size beside the number, always.
 
 from __future__ import annotations
 
+import math
 import random
 import statistics
 
@@ -123,6 +124,36 @@ class Offers:
             w.pop(pick)
         return out
 
+    def chance(self, key) -> float:
+        """Probability this particular player is offered in one cycle.
+
+        UNOWNED IS NOT AVAILABLE, and the difference is most of a season. The
+        app deals about a dozen players out of five hundred, and you cannot
+        ask for one — so a man you want who is not on the market today is not
+        something you can go and buy, however unowned he is. On the day this
+        was written that was Ruben Garcia, sold in error and then described as
+        "buyable for less than you sold him for", which was simply untrue.
+        """
+        total = sum(self._w)
+        if not total or key not in self.pool:
+            return 0.0
+        i = self._keys.index(key)
+        return min(1.0, self.per_cycle * self._w[i] / total)
+
+    def median_wait(self, key) -> float | None:
+        """Cycles until you would more likely than not have seen him offered.
+
+        None when he is effectively never dealt — which is an answer, and a
+        more useful one than a number in the hundreds.
+        """
+        p = self.chance(key)
+        if p <= 0.0:
+            return None
+        if p >= 1.0:
+            return 1.0
+        wait = math.log(0.5) / math.log(1.0 - p)
+        return wait if wait < 400 else None
+
     def best_over(self, cycles: int, gain, rng: random.Random,
                   trials: int = 400) -> list:
         """[best upgrade seen] over `cycles` cycles, one entry per trial.
@@ -195,7 +226,24 @@ def _selftest() -> None:
     # Waiting for nothing is worth nothing, and says so rather than erroring.
     assert set(Offers(pool).best_over(3, lambda k: 0.0, rng)) == {0.0}
 
-    print("ffcore.market self-test OK (18 cases)")
+    # -- unowned is not available ------------------------------------------
+    # The difference is most of a season. You cannot ask for a particular
+    # player; you wait until the app happens to deal him.
+    one = Offers({"a": 1e6, **{"x%d" % i: 1e6 for i in range(99)}},
+                 per_cycle=10)
+    assert abs(one.chance("a") - 0.1) < 1e-9, one.chance("a")
+    # Ten in a hundred a cycle is a coin flip in about seven of them.
+    w = one.median_wait("a")
+    assert 6.0 < w < 7.5, w
+    # A man not in the pool is never dealt, and says so rather than returning
+    # a wait that reads as a schedule.
+    assert one.chance("nobody") == 0.0
+    assert one.median_wait("nobody") is None
+    # A pool smaller than a cycle deals everyone every time.
+    assert Offers({"a": 1e6}, per_cycle=10).chance("a") == 1.0
+    assert Offers({"a": 1e6}, per_cycle=10).median_wait("a") == 1.0
+
+    print("ffcore.market self-test OK (24 cases)")
 
 
 if __name__ == "__main__":

@@ -4,7 +4,7 @@
 
 **Don't spend yet.** Wait for the market is worth +5.64 xPts/j against +3.69 for the best thing you can buy today — 1.95 better, and the balance is what buys the choice.
 
-**Locks in 23h** · squad 213.11M · cash 23.60M · total 236.71M
+**Locks in 22h** · squad 213.11M · cash 23.60M · total 236.71M
 
 **Expected finish 2.14** · **P(win) 11%** · season **1,480–1,738** (10–90)
 
@@ -15,6 +15,16 @@ _38 jornadas left · 41 players acquirable · 52 moves simulated._
 | **Act today** | 41 players you can buy now | +3.69 |
 | Wait for the market | a week of new offers | +5.64 (10–90: +3.84 to +7.50) |
 | Wait for the clauses | 62 players on 24 Aug | +4.62 |
+
+
+**Not for sale, and you cannot ask.** The app deals about a dozen players a cycle out of five hundred, so a man you want is not something you can go and buy — being unowned is not being available:
+
+| Player | Would add | Likely wait to be offered |
+|---|--:|--:|
+| Lamine Yamal | +7.50 | 20 days |
+| Kylian Mbappe | +6.54 | 20 days |
+| Joan Garcia | +5.64 | 22 days |
+| Jan Oblak | +5.04 | 23 days |
 
 _The free market is simulated rather than guessed at: the market is modelled from 45 offers over 4 cycles, weighted by value^0.15. **114 of the 557 unowned players** would improve your eleven, and a week of offers beats the best thing you can buy today **95% of the time** — even the tenth percentile of waiting (+3.84) clears it. Spending now buys the worse of two options and gives up the choice._
 _**32 locked players would improve your eleven** and their clauses open on 24 Aug, in about 6 days. Waiting scores ZERO in the table above — not because it is worthless but because nothing there can price a market it has not seen, so every move with a positive number beats it by construction. That is the bias to hold in mind when the ranking asks you to spend the balance; the **Left** column is what buys the choice._

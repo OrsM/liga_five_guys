@@ -1,6 +1,6 @@
 {
- "generated_at": "2026-08-18T20:18Z",
- "locks_in_h": 22.709619154166663,
+ "generated_at": "2026-08-18T20:55Z",
+ "locks_in_h": 22.10243704277778,
  "cash": 23596582.0,
  "squad_value": 213113164.0,
  "jornadas_left": 38,
@@ -224,6 +224,37 @@
    "note": "the market is modelled from 45 offers over 4 cycles, weighted by value^0.15"
   },
   {
+   "route": "watch",
+   "label": "Not for sale",
+   "what": "best players nobody is offering",
+   "best": 7.50419520062376,
+   "lo": null,
+   "hi": null,
+   "beats_now": null,
+   "players": [
+    {
+     "name": "Lamine Yamal",
+     "gain": 7.50419520062376,
+     "wait": 19.95048680320776
+    },
+    {
+     "name": "Kylian Mbappe",
+     "gain": 6.541889879841078,
+     "wait": 19.881558728950008
+    },
+    {
+     "name": "Joan Garcia",
+     "gain": 5.6370745709057335,
+     "wait": 21.80999054406748
+    },
+    {
+     "name": "Jan Oblak",
+     "gain": 5.039410981885338,
+     "wait": 22.863539456554236
+    }
+   ]
+  },
+  {
    "route": "clauses",
    "label": "Wait for the clauses",
    "what": "62 players on 24 Aug",
@@ -232,7 +263,7 @@
    "hi": null,
    "beats_now": null,
    "helpful": 32,
-   "days": 6.003901889155093,
+   "days": 5.97860708474537,
    "opens": "24 Aug"
   }
  ],
