@@ -123,6 +123,11 @@ class Universe:
     owner: dict[str, str]
     cash: float
     me: str
+    # What the app says he is WORTH, for everyone in the universe. Distinct
+    # from `price`, which is what it costs ME to get him: a free agent asks
+    # about his value, a buyout clause runs a median 1.52x it, and the
+    # difference between the two is money that never comes back.
+    value: dict[str, float] = field(default_factory=dict)
     # Provenance, for the report to print rather than for anything to act on:
     # a round part-played and how much of it is left, and any club or player
     # the app names in a way nothing else could join.
@@ -135,9 +140,13 @@ class Universe:
     # source's own figure. Printed, never inferred: it is the input everything
     # here rests on, and it does not look any different when it changes.
     start_note: str = ""
+    # What a million euros has been worth in places, and how that was arrived
+    # at. Set by the report, printed by it — see sim.cash_price_history().
+    cash_note: str = ""
 
 
-def candidates(u: Universe, expected: dict[str, float]) -> list[Action]:
+def candidates(u: Universe, expected: dict[str, float],
+               budget: float | None = None) -> list[Action]:
     """Every affordable move, pruned to the ones that could plausibly help.
 
     The prune is on EXPECTED points, not on the simulation: it is a filter for
@@ -145,6 +154,7 @@ def candidates(u: Universe, expected: dict[str, float]) -> list[Action]:
     thousands of combinations into dozens. A candidate who would not make your
     eleven on expectation will not make it on a draw either.
     """
+    cash = u.cash if budget is None else budget
     mine = set(u.state.squads.get(u.me, {}))
     xi = set(best_xi(u.state.squads[u.me], expected))
     # The weakest man in the current eleven is the bar a signing has to clear.
@@ -164,20 +174,27 @@ def candidates(u: Universe, expected: dict[str, float]) -> list[Action]:
         victim = u.owner.get(c, "")
         kind = "steal" if victim and victim != u.me else "buy"
         swap = kind + "-swap" if victim else "swap"
-        if price <= u.cash:
+        if price <= cash:
             out.append(Action(kind, buy=c, cost=price, victim=victim))
         # Funded by a sale: only the cheapest few spares are worth trying,
         # because selling a man you field to buy one you also field is a swap
         # the simulation will price at roughly nothing.
         for s in spare[:4]:
             got = u.proceeds.get(s, 0.0)
-            if price <= u.cash + got:
+            if price <= cash + got:
                 out.append(Action(swap, buy=c, sell=s, cost=price,
                                   proceeds=got, victim=victim))
         # Out of reach on cash plus any ONE spare, but not out of reach: the
         # fewest dead-weight sales that cover it. One combination per target
         # rather than every subset — they are all worth the same on the pitch,
         # so the only thing to choose between them is how few men leave.
+        # THE TRIGGER IS THE REAL BALANCE, not the budget. `budget` widens
+        # what gets EMITTED, so the frontier can be measured off targets you
+        # cannot afford; whether one sale is enough to reach a man is a fact
+        # about the money you actually have. Keyed to the budget instead, an
+        # unlimited one made every target reachable on cash alone and the
+        # multi-sale moves stopped being generated at all — which silently
+        # removed the best move on the board.
         if price > u.cash + max((u.proceeds.get(s, 0.0) for s in spare),
                                 default=0.0):
             sold, got = [], 0.0
@@ -186,10 +203,58 @@ def candidates(u: Universe, expected: dict[str, float]) -> list[Action]:
                     break
                 sold.append(k)
                 got += raises
-            if sold and price <= u.cash + got:
+            if sold and price <= cash + got:
                 out.append(Action(swap, buy=c, sell=tuple(sorted(sold)),
                                   cost=price, proceeds=got, victim=victim))
     return out
+
+
+def burn(u, a: Action) -> float | None:
+    """Wealth a move destroys: what it costs, less what you end up holding.
+
+    A FREE AGENT BURNS NOTHING. He asks about his market value, so you swap
+    cash for an asset worth the same and can swap back tomorrow. A BUYOUT
+    CLAUSE BURNS THE PREMIUM: it runs a median 1.52x market value in this
+    league, from 1.00 to 2.65, and the app will only ever pay you the value
+    back. That gap is gone for good.
+
+    Never negative — buying under the odds does not pay you, it just does not
+    charge you — and None when the value is unknown, because assuming no
+    premium is exactly the error this exists to correct.
+    """
+    if not a.buy:
+        return 0.0
+    val = u.value.get(a.buy)
+    if val is None:
+        return None
+    return max(0.0, a.cost - val)
+
+
+def cash_price(reach) -> float | None:
+    """Places per million, measured off `reach` = [(extra cash needed, Δpos)].
+
+    THE PRICE OF MONEY IS NOT A CHOICE AND NOT A RATE CARD — it is read off
+    what more money would actually buy you today, which is why every target
+    gets screened and not only the affordable ones. The curve is a STAIRCASE:
+    flat, because the best move you can already afford stays the best move,
+    then a step when the balance clears the price of somebody better, then
+    flat again. Averaged across the reachable range it comes out small, and
+    that is the honest answer rather than a defect — a premium costs you
+    points only if the money had somewhere better to go.
+
+    None when there is nothing to measure against. Never zero for that: zero
+    is a measurement meaning "more money buys nothing", and it is a real and
+    common answer that must not be confused with "unknown".
+    """
+    pts = sorted((max(0.0, c), d) for c, d in reach)
+    if len(pts) < 2 or pts[-1][0] <= 0:
+        return None
+    best_now = max((d for c, d in pts if c <= 0.0), default=None)
+    if best_now is None:
+        return None
+    best_any = max(d for _, d in pts)
+    span = max(c for c, _ in pts) / 1e6
+    return max(0.0, (best_any - best_now) / span) if span else None
 
 
 def dead_weight(u) -> list[tuple[str, float]]:
@@ -246,18 +311,35 @@ def _score(u: Universe, squads, trials: int, seed: int):
     return simulate(st, u.forecaster, trials=trials, seed=seed)
 
 
-def rank(u: Universe, acts: list[Action], seed: int = 1) -> list[dict]:
+def rank(u: Universe, acts: list[Action], seed: int = 1,
+         price=None) -> tuple:
     """Screen wide and cheap, then re-run the survivors properly.
 
     Returned rows carry the change in expected finishing position and in
     P(above) each rival — the second is what you act on when one rival is the
     one you are actually racing.
+
+    `acts` may contain moves you CANNOT afford today. They are screened and
+    then dropped, and the reason is that screening them is how the price of
+    cash gets measured: the frontier of "best Δpos reachable for this much
+    extra" is exactly the question "what is a million worth", and it falls out
+    of a pass that was happening anyway. See cash_price().
+
+    `price` is places per million, smoothed across runs by the caller. Given
+    one, every move is CHARGED for the wealth its clause destroys — that
+    premium is money that never comes back, and a table ranked on points alone
+    treats it as free. Without one, today's own measurement is used.
     """
     base_s = _score(u, u.state.squads, SCREEN_TRIALS, seed)
-    screened = []
+    screened, reach = [], []
     for a in acts:
         r = _score(u, apply(u, a), SCREEN_TRIALS, seed)
-        screened.append((base_s.expected_position() - r.expected_position(), a))
+        d = base_s.expected_position() - r.expected_position()
+        reach.append((a.cost - a.proceeds - u.cash, d))
+        if a.cost <= u.cash + a.proceeds:
+            screened.append((d, a))
+    measured = cash_price(reach)
+    lam = price if price is not None else measured
 
     # ONE ROW PER TARGET, chosen here rather than after the expensive pass.
     # Four funding variants of one signing screen identically — selling a man
@@ -278,15 +360,21 @@ def rank(u: Universe, acts: list[Action], seed: int = 1) -> list[dict]:
     out = []
     for _, a in screened[:KEEP]:
         r = _score(u, apply(u, a), FINAL_TRIALS, seed)
+        b_ = burn(u, a)
+        charge = 0.0 if (lam is None or b_ is None) else lam * b_ / 1e6
+        gross = base.expected_position() - r.expected_position()
         out.append({
             "action": a,
-            "d_pos": base.expected_position() - r.expected_position(),
+            "d_pos": gross - charge,
+            "gross": gross,
+            "burn": b_,
+            "charge": charge,
             "d_win": r.position().get(1, 0.0) - base.position().get(1, 0.0),
             "d_beat": {v: r.beat(v) - base.beat(v) for v in rivals},
             "mean": r.mean(u.me),
         })
     rows = sorted(out, key=lambda d: (-d["d_pos"], d["action"].net))
-    return rows, base
+    return rows, base, measured
 
 
 def rounds_left(matches, teams) -> tuple[list[int], dict[int, set[str]], list]:
@@ -413,6 +501,11 @@ def load(trials_pool=None) -> Universe:
 
     proceeds = {k: float((players[k] or {}).get("value") or 0)
                 for k in squads.get(me, {})}
+    # What the app says everyone is worth. The market's own figure, which is
+    # the one a sale pays out at — see burn(), where the gap between this and
+    # a buyout clause is the wealth a steal destroys.
+    value = {k: float((v or {}).get("value") or 0) for k, v in players.items()
+             if (v or {}).get("value")}
 
     pos, base, name = {}, {}, {}
     universe = set(price) | {k for s in squads.values() for k in s}
@@ -449,6 +542,7 @@ def load(trials_pool=None) -> Universe:
     return Universe(
         state=LeagueState(squads, rem, me, carried), forecaster=fc, pos=pos,
         price=price, proceeds=proceeds, owner=owner, cash=cash, me=me,
+        value=value,
         part_played=played, name=name, start_note=_calibrated()[0].note(),
         unjoined=list(unjoined_clubs) + list(lg.api_unjoined))
 
@@ -518,6 +612,12 @@ def _selftest() -> None:
     acts3 = candidates(u3, u3.forecaster.expected(1))
     multi = [a for a in acts3 if a.buy == "dear" and len(a.sell) > 1]
     assert multi, "a move needing two sales must still be on the table"
+    # ...AND STILL ON IT WHEN THE BUDGET IS LIFTED to measure the frontier. A
+    # budget that also decided whether a target needs more than one sale made
+    # every target look reachable on cash alone, and the multi-sale moves —
+    # including the best one on the board — stopped being generated.
+    wide = candidates(u3, u3.forecaster.expected(1), budget=float("inf"))
+    assert any(a.buy == "dear" and len(a.sell) > 1 for a in wide), wide
     a3 = min(multi, key=lambda a: len(a.sell))
     # Sell the FEWEST men that cover it: 4 + 8 + 5 = 17 is short of 20, so all
     # three go; the greedy takes the biggest first so it never sells four to
@@ -541,7 +641,7 @@ def _selftest() -> None:
     af = apply(u, sw)
     assert "me_bench" not in af["me"] and "star" in af["me"]
 
-    rows, base = rank(u, acts)
+    rows, base, _lam = rank(u, acts)
     assert rows, "something should be worth doing"
     top = rows[0]
     # Signing a 12-point player into an eleven of 3s must improve your
@@ -564,10 +664,47 @@ def _selftest() -> None:
         pos={**u.pos, "free_x": "MED", "th_m1": "MED"},
         price={"free_x": 5e6, "th_m1": 5e6}, proceeds={},
         owner={"th_m1": "riv"}, cash=6e6, me="me")
-    got, _ = rank(u2, [Action("buy", buy="free_x", cost=5e6),
-                       Action("steal", buy="th_m1", cost=5e6, victim="riv")])
+    got, _, _ = rank(u2, [Action("buy", buy="free_x", cost=5e6),
+                          Action("steal", buy="th_m1", cost=5e6, victim="riv")])
     by = {r["action"].buy: r["d_pos"] for r in got}
     assert by["th_m1"] > by["free_x"], by
+
+    # -- what a clause burns, and what that is worth in places -------------
+    # A free agent asks about what he is worth, so buying one destroys
+    # nothing: you hold an asset you could sell back for the money. A buyout
+    # clause runs a median 1.52x market value in this league, and that premium
+    # never comes back — you pay 1.52V for something the app will pay you V
+    # for. The simulation counts the cash leaving and cannot see the wealth
+    # going, because it scores money at zero.
+    u4 = Universe(
+        state=LeagueState({"me": dict(mine), "riv": dict(theirs)}, [1], "me"),
+        forecaster=B(per), pos=dict(u.pos), price={"th_m1": 8e6},
+        value={"th_m1": 5e6}, proceeds={}, owner={"th_m1": "riv"},
+        cash=20e6, me="me")
+    assert burn(u4, Action("steal", buy="th_m1", cost=8e6)) == 3e6
+    # A free agent at his market value burns nothing...
+    u4.value["free"] = 4e6
+    assert burn(u4, Action("buy", buy="free", cost=4e6)) == 0.0
+    # ...and a bargain is not a negative cost, it is zero: the app does not
+    # pay you for buying well, it just does not punish you.
+    assert burn(u4, Action("buy", buy="free", cost=3e6)) == 0.0
+    # A sale burns nothing either — the app pays market value.
+    assert burn(u4, Action("sell", sell="me_bench")) == 0.0
+    # A player nothing knows the value of cannot be priced, and an unknown is
+    # not a zero: assuming no premium is exactly the error being fixed.
+    assert burn(u4, Action("steal", buy="mystery", cost=9e6)) is None
+
+    # THE PRICE OF CASH, measured rather than chosen. Screen every target,
+    # affordable or not, and the frontier of "best Delta pos reachable for
+    # this much extra" gives places per euro. Flat here: the cheap option is
+    # already the best one, so more money buys nothing.
+    flat = [(0.0, 0.40), (5e6, 0.30), (12e6, 0.20)]
+    assert cash_price(flat) == 0.0
+    # A step: 10M more reaches +0.10 that nothing cheaper does.
+    step = [(0.0, 0.40), (10e6, 0.50)]
+    assert abs(cash_price(step) - 0.10 / 10.0) < 1e-12
+    # Nothing to measure is None, never a zero that would silently mean free.
+    assert cash_price([]) is None and cash_price([(0.0, 0.4)]) is None
 
     assert Action("steal", buy="X", victim="R").label() == "steal X from R"
     assert Action("swap", buy="X", sell="Y").label() == "buy X · sell Y"
@@ -627,7 +764,7 @@ def _selftest() -> None:
     assert un == ["zzz-united"], un
     assert _d == {1: {"getafe"}}, _d
 
-    print("decide self-test OK (36 cases)")
+    print("decide self-test OK (47 cases)")
 
 
 if __name__ == "__main__":
@@ -636,11 +773,11 @@ if __name__ == "__main__":
         raise SystemExit(0)
     u = load()
     exp = u.forecaster.expected(u.state.jornadas[0])
-    acts = candidates(u, exp)
+    acts = candidates(u, exp, budget=float("inf"))
     print("%d jornadas left · cash %s · %d players acquirable · %d actions"
           % (len(u.state.jornadas), fmt_money(u.cash), len(u.price), len(acts)))
     print(u.forecaster.pool_note())
-    rows, base = rank(u, acts)
+    rows, base, _lam = rank(u, acts)
     print("\nnow: expected position %.2f · P(win) %.0f%%"
           % (base.expected_position(), 100 * base.position().get(1, 0)))
     rivals = [m for m in u.state.squads if m != u.me]

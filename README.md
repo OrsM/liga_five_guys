@@ -81,6 +81,27 @@ for whether replacing them helped. git remembers the code.
 λ went the same way a fortnight earlier, one layer down: it measured the
 exchange rate against *your current eleven*, so the baseline moved under it.
 
+**A BUYOUT CLAUSE BURNS MONEY, AND THAT IS NOW CHARGED.** A free agent asks
+about his market value — median ratio 1.011 — so buying one destroys nothing:
+you swap cash for an asset you could swap back tomorrow. A clause runs a
+median **1.52x market value** (range 1.00 to 2.65) and the app will only ever
+pay the value back, so the premium is gone for good. It is not uniform either:
+of the moves on the board the day this was written, Leo Roman burned 0% and
+Yuri Berchiche 41%.
+
+The price it is charged at is MEASURED, not chosen. Every target gets screened
+— not only the affordable ones — and the frontier of "best Δpos reachable for
+this much extra" is exactly the question "what is a million worth". That falls
+out of a screening pass that was happening anyway. Each run appends its
+reading to `data/decisions/cash_price_log.csv` and the charge uses the median
+of the series, because one run is one market: what a million buys depends on
+who is on offer and how far the balance sits from the next man worth having.
+
+On most days the answer is *very little* — today 0.002 places per million, so
+Berchiche's 8.8M premium costs 0.018 places and reorders nothing. That is the
+honest result rather than a defect: a premium costs you points only if the
+money had somewhere better to go, and usually it does not.
+
 **MONEY IS A STAIRCASE, NOT A RATE, and the table is where you see it.** Ask
 the simulator what the best move would be with more cash and the answer barely
 moves, then jumps: +10M buys nothing at all, +25M unlocks a different player

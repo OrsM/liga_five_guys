@@ -227,6 +227,13 @@ def caveats(u) -> list[str]:
                    "simulation only plays the rest of the round. It still "
                    "re-picks an eleven that is in fact already locked."
                    % (j, len(clubs)))
+    if u.cash_note:
+        out.append("- **%s.** A clause runs a median 1.52x market value in "
+                   "this league and the app only ever pays the value back, so "
+                   "the premium is gone for good. It is charged against the "
+                   "move rather than ignored — but the price is measured off "
+                   "what more money would actually buy you today, and on most "
+                   "days that is very little." % u.cash_note)
     if u.unjoined:
         out.append("- **Named by the app in a way nothing else matches:** "
                    + ", ".join("`%s`" % n for n in u.unjoined)
@@ -323,6 +330,62 @@ def payload(u, rows, base, rivals, locks_h=None, n_actions: int = 0) -> dict:
              "p_above": None if m == u.me else base.beat(m)}
             for m in sorted(u.state.squads, key=lambda m: -base.mean(m))],
     }
+
+
+PRICE_LOG = "cash_price_log.csv"
+
+
+def cash_price_history():
+    """The price of cash, averaged over the runs that have measured it.
+
+    ONE RUN IS ONE MARKET. What a million buys today depends on who happens to
+    be on offer and how far the balance is from the next man worth having, and
+    that moves every cycle — so the number this charges premiums at is the
+    median of what has been measured, not the latest reading. The log is
+    append-only and the estimate improves on its own.
+
+    None until something has been measured, and None is not zero: zero means
+    "more money buys nothing", which is a real and common answer.
+    """
+    import statistics
+    from ffcore.tidy import DECISIONS, read_csv
+
+    seen = []
+    for r in read_csv(DECISIONS / PRICE_LOG):
+        try:
+            seen.append(float(r["places_per_million"]))
+        except (TypeError, ValueError, KeyError):
+            continue
+    return statistics.median(seen) if seen else None
+
+
+def log_cash_price(measured) -> None:
+    """Append today's reading. Never overwrites: the series IS the estimate."""
+    import datetime as dt
+    from ffcore.tidy import DECISIONS, append_csv
+
+    if measured is None:
+        return
+    DECISIONS.mkdir(parents=True, exist_ok=True)
+    append_csv(DECISIONS / PRICE_LOG,
+               [{"measured_at": dt.datetime.now(dt.timezone.utc)
+                                 .strftime("%Y-%m-%dT%H%MZ"),
+                 "places_per_million": "%.6f" % measured}],
+               ["measured_at", "places_per_million"])
+
+
+def _price_note(smoothed, measured) -> str:
+    if smoothed is None and measured is None:
+        return ("Nothing is charged for a buyout premium yet: no run has been "
+                "able to measure what a million euros is worth")
+    bits = []
+    if smoothed is not None:
+        bits.append("A buyout premium is charged at **%.3f places per "
+                    "million**, the median of every run that has measured it"
+                    % smoothed)
+    if measured is not None:
+        bits.append("today's own reading is %.3f" % measured)
+    return " — ".join(bits)
 
 
 def placeholder(why: str) -> list[str]:
@@ -545,7 +608,10 @@ def _selftest() -> None:
     assert "jornada 1" in cav.lower(), cav
     assert "A. Ferllo" in cav, cav
     # ...and a clean run does not invent warnings it does not have.
-    u.part_played, u.unjoined = {}, []
+    u.cash_note = "A buyout premium is charged at **0.002 places per million**"
+    cav2 = "\n".join(caveats(u))
+    assert "0.002 places per million" in cav2, cav2
+    u.part_played, u.unjoined, u.cash_note = {}, [], ""
     clean = "\n".join(caveats(u))
     assert "A. Ferllo" not in clean and "jornada 1" not in clean.lower(), clean
 
@@ -611,7 +677,7 @@ def _selftest() -> None:
     ph = "\n".join(placeholder("no api_teams.csv"))
     assert "no api_teams.csv" in ph and ph.startswith("# The simulation")
 
-    print("sim self-test OK (65 cases)")
+    print("sim self-test OK (66 cases)")
 
 
 def main() -> None:
@@ -642,8 +708,14 @@ def main() -> None:
         return
 
     exp = u.forecaster.expected(u.state.jornadas[0])
-    acts = decide.candidates(u, exp)
-    rows, base = decide.rank(u, acts)
+    # EVERY TARGET, not only the ones you can afford. The unaffordable ones
+    # are dropped after screening; screening them is how the price of cash
+    # gets measured, off a pass that was happening anyway.
+    acts = decide.candidates(u, exp, budget=float("inf"))
+    smoothed = cash_price_history()
+    rows, base, measured = decide.rank(u, acts, price=smoothed)
+    log_cash_price(measured)
+    u.cash_note = _price_note(smoothed, measured)
     rivals = [m for m in u.state.squads if m != u.me]
     write_lines(REPORTS / OUT,
                 render(u, rows, base, stamp, rivals, len(acts), locks_h))
