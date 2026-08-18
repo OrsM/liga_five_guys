@@ -5,8 +5,6 @@ Reads:
   inputs/transactions.csv     append-only ledger of every market operation
   inputs/league.ini           managers, budgets, thresholds (all optional)
   inputs/cash.txt             any balance you have actually seen
-                              phone. When present the watchlist BECOMES the
-                              slate. Scratch, not state.
   data/tidy/*.csv             values, 24h moves, start probabilities
 
 Writes:
@@ -14,9 +12,14 @@ Writes:
                           they can still spend. Named for what it holds:
                           wrote behaviour.md, which sent you to the wrong
                           file every time.
-  reports/watchlist.md    the slate when you pasted one, otherwise everyone
-                          unowned cut to something phone-readable
   data/decisions/slate_log.csv  append-only: which players were on offer when
+
+watchlist.md went on 2026-08-18, with the board. It re-listed the slate with
+a value and two probable-XI columns, under a heading that promised "everyone
+unowned, ranked" — and after the cutover the ranking of everyone acquirable,
+free agents and rivals' players alike, is the one table in REPORT.md. What was
+genuinely only there is the FF/AF disagreement, which is now a column of the
+bid table in latest.md, next to the player it would change your mind about.
 
 Run via workflow_dispatch. No arguments.
 
@@ -332,67 +335,6 @@ def write_league(lg, players, stamp, second=None,
     write_lines(REPORTS / "league.md", out)
 
 
-def write_watchlist(lg, players, stamp, on_offer, unresolved,
-                    ambiguous, second=None):
-    cash = lg[lg.cfg.me].cash if lg.cfg.me in lg.managers else None
-    budget = cash.value if cash and cash.confidence == "known" else None
-
-    free = [r for k, r in players.items() if k not in lg.owner]
-    out = ["# Watchlist — %s" % stamp, ""]
-    if on_offer:
-        # Slate pasted: this list IS the decision, so it is not filtered and
-        # not truncated. A 40%-start player on today's slate is a choice you
-        # are making; the 95% starter who isn't on it is not.
-        out += ["The %d players you pasted as today's slate — everyone you can "
-                "actually bid on right now, unfiltered. What each one is worth "
-                "to your XI, and what to bid, is in the slate table at the top "
-                "of this report." % len(on_offer), ""]
-    else:
-        out += ["Everyone not owned by the %d of us, %d%% start or better."
-                % (len(lg.managers), int(lg.cfg.min_start)), ""]
-        if budget:
-            out += ["Filtered to what your %s of cash can reach."
-                    % fmt_money(budget), ""]
-    out += [LEGEND, ""]
-
-    for pos in POS_ORDER:
-        if on_offer:
-            pool = [r for r in free
-                    if (r.get("pos") or "").lower() == pos
-                    and norm(r.get("name")) in on_offer]
-        else:
-            pool = [r for r in free
-                    if (r.get("pos") or "").lower() == pos
-                    and (r.get("start") or 0) >= lg.cfg.min_start
-                    and (budget is None or (r.get("value") or 0) <= budget)]
-        pool.sort(key=lambda r: (-(r.get("start") or 0),
-                                 -(r.get("delta_1d") or 0)))
-        if not pool:
-            continue
-        out += ["## %s" % pos, "", HEAD]
-        out += [row(r, second) for r in (pool if on_offer
-                                        else pool[:lg.cfg.top_n_per_pos])]
-        out.append("")
-
-    if unresolved or ambiguous:
-        out += ["## Names I could not place", "",
-                "OCR mangled these past matching, so they are missing from the "
-                "tables above — re-read them off the app if one matters.", ""]
-        out += ["- **%s** — no match" % u for u in unresolved]
-        out += ["- **%s** — could be %s" % (raw, ", ".join(cands))
-                for raw, cands in ambiguous]
-        out.append("")
-
-    out += ["---", ""]
-    if not on_offer:
-        out += ["Not all of these are purchasable today — the app deals a "
-                "limited slate. Paste today's slate into the `seen` input and "
-                "this list becomes the slate itself.", ""]
-    write_lines(REPORTS / "watchlist.md", out)
-
-
-
-
 def write_lineup_file(lg, players, path="inputs/lineup.txt"):
     """The XI checklist: every player you own, with a mark you toggle.
 
@@ -488,8 +430,6 @@ def main():
                                     for r in players.values())
     write_league(lg, players, stamp, second,
                  dl=deals(lg, lg.market), market=lg.market)
-    write_watchlist(lg, players, stamp, on_offer, unresolved, ambiguous,
-                    second)
     write_lineup_file(lg, players)
 
     unmatched = lg.unmatched(players)

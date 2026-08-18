@@ -45,10 +45,8 @@ class Part(NamedTuple):
 # else, so it is left in latest.md and linked rather than deleted. This file is
 # what you read on a phone before a lock; latest.md is what you read when you
 # have time.
-# board.md is down to one section. The board itself — "Do this" and "The
-# board", twenty rows of pts/M with a CASH row dropped in at the line — went on
-# 2026-08-18, and what is left of that file is what it always said about the
-# POSITION rather than about the decision.
+# The one section of the workings that belongs beside the decision rather than
+# behind a link: a warning is a reason to distrust the table above it.
 POSITION = ["Warnings"]
 
 # Order matters: this is the order you read them in, not the order they are
@@ -62,8 +60,11 @@ SOURCES = [
     #
     # Whole file, un-nested: it is a report, not an excerpt.
     Part("Decide today", "sim.md", None, nest=False),
-    # Then what is true of the position regardless of the decision.
-    Part("The squad", "board.md", POSITION, nest=False),
+    # Then the one section of the workings that belongs beside the decision.
+    # board.md used to sit here; it existed to hold the board, and for one
+    # afternoon after the board went it held two warnings and a stamp — a
+    # published report of eight lines. Gone.
+    Part("The squad", "latest.md", POSITION, nest=False),
 ]
 
 # Printed as links, not content. Each is a whole file that would otherwise be
@@ -80,7 +81,6 @@ SOURCES = [
 LINKS = [
     ("The workings — the eleven, bids, the basket, sales, movers",
      "latest.md"),
-    ("Who to buy — everyone unowned, ranked", "watchlist.md"),
     ("Every squad, cash, what each manager pays over value", "league.md"),
     ("How the forecast works, and how it's doing", "methodology.md"),
 ]

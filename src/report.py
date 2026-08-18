@@ -440,15 +440,24 @@ def sec_slate(lg, by_key, cands, pool, slate, prem, cash_value,
         out += ["_Every name you pasted is either already owned or missing "
                 "from the market data._", ""]
     else:
-        out += ["| Player | Pos | Bid | Competition | Note |",
-                "|---|---|--:|---|---|"]
+        out += ["| Player | Pos | Bid | XI | Competition | Note |",
+                "|---|---|--:|--:|---|---|"]
         for cand, adv, short_by in rows:
             band = ("—" if adv.low is None
                     else eur(adv.low) if abs(adv.high - adv.low) < 1_000
                     else "%s–%s" % (eur(adv.low), eur(adv.high)))
+            # FF's reading and AF's, side by side and never blended. This is
+            # the one thing watchlist.md held that nothing else did, and it
+            # belongs against the man it would change your mind about rather
+            # than in a file of its own listing everybody. Two sources that
+            # disagree about whether he starts is the signal; the forecast
+            # uses the first and prints the second so you can see it is a
+            # guess.
             out.append(
-                "| %s | %s | %s | %s | %s |"
+                "| %s | %s | %s | %s | %s | %s |"
                 % (cand["name"], (cand["pos"] or "—")[:3], band,
+                   "%s/%s" % (pct_cell(cand),
+                              af_cell((second or {}).get(cand["key"]))),
                    demand_summary(cand, lg, snaps),
                    "cover — you are %d short at %s" % (short_by, cand["slot"])
                    if short_by > 0 else ""))
@@ -464,7 +473,11 @@ def sec_slate(lg, by_key, cands, pool, slate, prem, cash_value,
                 % ("%.0f%%" % sell_prem.swing() if sell_prem
                    else "about a tenth"),
                 "",
-                LEGEND, "",
+                "**XI** is FF's probable-eleven percentage, which is the one "
+                "the forecast uses, and AF's read of the same eleven beside "
+                "it — printed, never blended. Two sources that disagree is "
+                "the signal, and it is the reason to open the app before "
+                "bidding. " + LEGEND, "",
                 "Competition is demand, not roster counts: the rivals whose "
                 "XI actually improves with him, strongest threat first — "
                 "`?` cash unknown (treat as live), `(n broke)` want him but "
@@ -1015,12 +1028,11 @@ def main() -> None:
             sell_prem=app_prem, second=second)
 
     # --- assemble ---------------------------------------------------------
-    # TWO FILES, and the split survived the board that caused it. `board.md`
-    # is now only what the report needs ABOUT THE POSITION rather than about
-    # the decision — the warnings — and sim.py writes the decision itself.
-    # `latest.md` is the workings: the eleven, the bid, the exceptions, the
-    # movers and the notes.
-    head: list[str] = [f"# Fantasy report — {observed}", ""]
+    # ONE FILE. `board.md` existed to hold the board and, for one afternoon
+    # after the board went, to hold two warnings — eight lines with a heading
+    # and a stamp on top, published to the phone as a report of its own. The
+    # warnings live at the foot of the workings now, which is where every
+    # other fact about the position already was.
 
     # Still read here, because log_squad records it against every snapshot: a
     # forecast is graded by how long before the lock it was made.
@@ -1093,12 +1105,12 @@ def main() -> None:
     elif not cash or cash.value is None:
         warnings.append("No cash figure — add `inputs/cash.txt`.")
 
-    head += ["## Warnings", ""]
-    head += ([f"- {w}" for w in warnings] if warnings
-             else ["_Nothing flagged._"])
-    head += ["", "_Compare squad value with the app; a mismatch means a name "
-                 f"matched the wrong player. Roster read from the "
-                 f"{squad_src}._", ""]
+    out += ["## Warnings", ""]
+    out += ([f"- {w}" for w in warnings] if warnings
+            else ["_Nothing flagged._"])
+    out += ["", "_Compare squad value with the app; a mismatch means a name "
+                f"matched the wrong player. Roster read from the "
+                f"{squad_src}._", ""]
 
     # --- your movers ------------------------------------------------------
     movers = sorted((p for p in players if abs(p["delta_pct"]) >= MOVER_PCT),
@@ -1137,12 +1149,11 @@ def main() -> None:
     # decisions.json is sim.py's now. It is the same file the phone reads and
     # it carries moves rather than assets, because that is what the report
     # says; two writers would race, and the loser would be whichever ran first.
-    write_lines(REPORTS / "board.md", head)
     write_lines(REPORTS / "latest.md", out)
     # History keeps both halves in one file: a day's report is the board AND
     # what produced it, and splitting the archive would make it unreadable
     # months later for the sake of a duplication that only matters live.
-    write_lines(HISTORY / f"{observed[:10]}.md", head + out[2:])
+    write_lines(HISTORY / f"{observed[:10]}.md", out)
 
     # --- the notification surface -----------------------------------------
     # Written every run, and DELETED when there is nothing to say, so a
@@ -1293,11 +1304,13 @@ def _selftest() -> None:
             return iter([_Mgr()])
 
     cand = {"name": "Target", "key": "target", "pos": "Defensa",
-            "slot": "DEF", "value": 10e6, "flat": 4.0, "score": 4.0}
+            "slot": "DEF", "value": 10e6, "flat": 4.0, "score": 4.0,
+            "pct": 90.0, "on_page": True}
     body, n, covers = sec_slate(
         _LG(), {}, [cand], {"DEF": [1, 2, 3, 4]}, ({"target"}, []),
         Premiums(12, 1.2, 0.0, 8.0), 40e6, 5e6,
-        {"rival": {"best": None, "short": set(), "pool": {}}})
+        {"rival": {"best": None, "short": set(), "pool": {}}},
+        second={"target": {"start_pct": 67.0}})
     txt = "\n".join(body)
     assert n == 1 and covers == 0, (n, covers)
     assert "| Target |" in txt, txt
@@ -1307,6 +1320,10 @@ def _selftest() -> None:
     for gone in ("pts/M", "above repl", "At the line", "Verdict"):
         assert gone not in txt, gone
     assert "Bid" in txt and "Competition" in txt
+    # THE ONE THING watchlist.md HELD THAT NOTHING ELSE DID: the two
+    # probable-XI sources side by side, against the man they disagree about
+    # rather than in a file of its own listing everybody.
+    assert "| 90%/67% |" in txt, txt
 
     # A position you cannot legally field without him is not a rate at all.
     # SLOT_MIN is the rules; THIN was a tuned threshold and is not a rule.

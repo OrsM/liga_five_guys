@@ -1,4 +1,4 @@
-# Liga Five Guys — one report — 2026-08-18 14:36 UTC
+# Liga Five Guys — one report — 2026-08-18 15:01 UTC
 
 Every move you could make, ranked by whether it wins the league. Everything else is reference and is linked, not reprinted.
 
@@ -13,18 +13,18 @@ _One question, asked of every move you could make: if I did this, where would I 
 
 _38 jornadas left · 83 players acquirable · 137 moves simulated._
 
-| Do this | Δpos | Δwin | net € | biggest gain vs |
-|---|--:|--:|--:|---|
-| steal Giuliano Simeone from SusoGattuso · sell Alvaro Fernandez + Beñat Turrientes + Dani Lorenzo | +0.492 | +41% | -23.49M | SusoGattuso +41% |
-| steal Yuri Berchiche from SusoGattuso · sell Beñat Turrientes | +0.433 | +36% | -14.13M | SusoGattuso +36% |
-| steal Leo Roman from SusoGattuso · sell Beñat Turrientes + Dani Lorenzo | +0.388 | +35% | -20.86M | SusoGattuso +39% |
-| buy Marcos Alonso · sell Beñat Turrientes | +0.362 | +28% | -21.83M | SusoGattuso +27% |
-| steal Cesar Tarrega from SusoGattuso · sell Beñat Turrientes | +0.311 | +25% | -7.75M | SusoGattuso +25% |
-| steal Dean Huijsen from BurtonGM89 · sell Beñat Turrientes + Dani Lorenzo | +0.302 | +22% | -18.42M | SusoGattuso +21% |
-| steal Gorka Guruzeta from Magic Mike 333 · sell Beñat Turrientes | +0.301 | +23% | -14.23M | SusoGattuso +22% |
-| steal Aitor Paredes from BurtonGM89 · sell Beñat Turrientes | +0.261 | +18% | +1.52M | SusoGattuso +17% |
+| Get | Give up | P(win) | Net € |
+|---|---|--:|--:|
+| Giuliano Simeone ← SusoGattuso | 3 spares | 90% | -23.49M |
+| Yuri Berchiche ← SusoGattuso | Turrientes | 84% | -14.13M |
+| Leo Roman ← SusoGattuso | Turrientes + Lorenzo | 83% | -20.86M |
+| Marcos Alonso (free) | Turrientes | 77% | -21.83M |
+| Cesar Tarrega ← SusoGattuso | Turrientes | 74% | -7.75M |
+| Gorka Guruzeta ← Magic Mike 333 | Turrientes | 71% | -14.23M |
+| Dean Huijsen ← BurtonGM89 | Turrientes + Lorenzo | 70% | -18.42M |
+| Aitor Paredes ← BurtonGM89 | Turrientes | 67% | +1.52M |
 
-_**Δpos** is places gained on the expected finish, **Δwin** is percentage points of P(winning the league), and **net €** is what the move does to the balance — negative spends, positive raises. **Biggest gain vs** is the rival the move takes the most from, which is the column to read when one of them is the race and the rest are not._
+_**P(win)** is where the move LEAVES you — your chance of winning the league after making it, against 49% if you do nothing. **Get** names the rival a steal takes him off, which is half of what a steal is worth: it raises your total and lowers theirs at once. **Net €** is what the move does to the balance — negative spends, positive raises. Who exactly you give up when it says *spares* is in the sell table below; none of them ever start._
 
 ## Sell — these never make the eleven
 
@@ -57,6 +57,8 @@ _shape from the seed prior (96 observed, 200 needed)._
 - **Cash scores zero.** Nothing models the market next cycle, so holding money looks worthless and a standalone sale can never look good.
 
 
+_What the one table in [REPORT.md](REPORT.md) was built from: the eleven it assumes you field, what a man on today's slate should cost, and the two ways any of it can be wrong about a player._
+
 ## Warnings
 
 - **Only 1 delantero** — one knock and you can't field a legal XI.
@@ -64,11 +66,11 @@ _shape from the seed prior (96 observed, 200 needed)._
 
 _Compare squad value with the app; a mismatch means a name matched the wrong player. Roster read from the ledger._
 
+
 ## Reference
 
 Kept in full, one tap away — not reprinted here, because that is what made this file 504 lines long.
 
 - [The workings — the eleven, bids, the basket, sales, movers](latest.md)
-- [Who to buy — everyone unowned, ranked](watchlist.md)
 - [Every squad, cash, what each manager pays over value](league.md)
 - [How the forecast works, and how it's doing](methodology.md)

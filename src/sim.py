@@ -113,35 +113,60 @@ def header(u, base, n_actions: int, locks_h=None) -> list[str]:
             ""]
 
 
-def table(rows, u, rivals) -> list[str]:
-    """Every move, ranked by what it does to the finish.
+def short(key, u) -> str:
+    """A player's surname, unless somebody else in the squad shares it.
 
-    The order is `rank()`'s and is not re-sorted here: a report that sorted
-    the rows itself would be a second opinion about which move is best, held
-    by the half of the system that cannot simulate anything.
+    The `give up` cell can hold three men and it renders on a 390px screen.
+    Surnames buy back most of that width — but only where they still identify
+    somebody, so the check is against the squad rather than assumed.
+    """
+    full = title_name(u.name.get(key, key))
+    last = full.split()[-1] if full.split() else full
+    clash = sum(1 for k in u.state.squads.get(u.me, {})
+                if title_name(u.name.get(k, k)).split()[-1:] == [last])
+    return full if clash > 1 else last
+
+
+def table(rows, u, base, rivals) -> list[str]:
+    """Every move, and where each one leaves you.
+
+    THE DESTINATION, NOT THE DELTA. This carried Δpos, Δwin and the rival it
+    gained most against, and all three tracked each other so closely that they
+    were one column printed three times — the rival column named the same
+    manager on every row for days. What is left is the number you land on:
+    "90%" needs no arithmetic against a figure in the header, where "+41%"
+    does.
+
+    Sorted by that number rather than by the ranking behind it. Screening is
+    on Δpos, which is the finer statistic, but the two swap the odd pair over
+    — 0.302 was worth +22% and 0.301 was worth +23% — and a column that runs
+    90, 85, 84, 77, 76, 74, 75 reads as a bug, not as a trade-off.
     """
     if not rows:
         return ["_Nothing on offer moves the finish — no affordable buy, "
                 "steal or swap improves the eleven._", ""]
-    out = ["| Do this | Δpos | Δwin | net € | biggest gain vs |",
-           "|---|--:|--:|--:|---|"]
-    for r in rows[:SHOW]:
+    now = base.position().get(1, 0.0)
+    ranked = sorted(rows, key=lambda r: (-r["d_win"], -r["d_pos"]))
+    out = ["| Get | Give up | P(win) | Net € |", "|---|---|--:|--:|"]
+    for r in ranked[:SHOW]:
         a = r["action"]
-        who = max(rivals, key=lambda v: r["d_beat"].get(v, 0.0)) \
-            if rivals else ""
-        gain = ("%s %+.0f%%" % (who, 100 * r["d_beat"].get(who, 0.0))
-                if who else "—")
-        out.append("| %s | %+.3f | %+.0f%% | %s | %s |"
-                   % (a.label({k: title_name(v) for k, v in u.name.items()}),
-                      r["d_pos"], 100 * r["d_win"],
-                      _net(-a.net), gain))
+        got = title_name(u.name.get(a.buy, a.buy)) if a.buy else "—"
+        got += (" ← %s" % a.victim if a.victim
+                else " (free)" if a.buy else "")
+        gave = ("—" if not a.sell
+                else " + ".join(short(k, u) for k in a.sell)
+                if len(a.sell) <= 2 else "%d spares" % len(a.sell))
+        out.append("| %s | %s | %.0f%% | %s |"
+                   % (got, gave, 100 * (now + r["d_win"]), _net(-a.net)))
     out += ["",
-            "_**Δpos** is places gained on the expected finish, **Δwin** is "
-            "percentage points of P(winning the league), and **net €** is "
-            "what the move does to the balance — negative spends, positive "
-            "raises. **Biggest gain vs** is the rival the move takes the most "
-            "from, which is the column to read when one of them is the race "
-            "and the rest are not._", ""]
+            "_**P(win)** is where the move LEAVES you — your chance of winning "
+            "the league after making it, against %.0f%% if you do nothing. "
+            "**Get** names the rival a steal takes him off, which is half of "
+            "what a steal is worth: it raises your total and lowers theirs at "
+            "once. **Net €** is what the move does to the balance — negative "
+            "spends, positive raises. Who exactly you give up when it says "
+            "*spares* is in the sell table below; none of them ever start._"
+            % (100 * now), ""]
     return out
 
 
@@ -259,7 +284,7 @@ def payload(u, rows, base, rivals, locks_h=None, n_actions: int = 0) -> dict:
     names = {k: title_name(v) for k, v in u.name.items()}
     lo, hi = base.band(u.me)
     moves = []
-    for r in rows:
+    for r in sorted(rows, key=lambda r: (-r["d_win"], -r["d_pos"])):
         a = r["action"]
         who = max(rivals, key=lambda v: r["d_beat"].get(v, 0.0)) \
             if rivals else ""
@@ -271,6 +296,7 @@ def payload(u, rows, base, rivals, locks_h=None, n_actions: int = 0) -> dict:
             "sell": " + ".join(names.get(k, k) for k in a.sell),
             "victim": a.victim,
             "d_pos": r["d_pos"], "d_win": r["d_win"], "net": -a.net,
+            "p_win_after": base.position().get(1, 0.0) + r["d_win"],
             "vs": who, "vs_gain": r["d_beat"].get(who, 0.0) if who else None,
         })
     return {
@@ -312,7 +338,7 @@ def render(u, rows, base, stamp: str, rivals, n_actions: int = 0,
            "_One question, asked of every move you could make: if I did "
            "this, where would I finish?_", ""]
     out += header(u, base, n_actions or len(rows), locks_h)
-    out += table(rows, u, rivals)
+    out += table(rows, u, base, rivals)
     out += ["## Sell — these never make the eleven", ""]
     out += sells(u, dead_weight(u))
     out += ["## Where the league stands", ""]
@@ -360,30 +386,65 @@ def _selftest() -> None:
                               cost=20e6, proceeds=5.87e6, victim="riv"),
              "d_pos": 0.433, "d_win": 0.364, "d_beat": {"riv": 0.37},
              "mean": 1510.0}]
-    body = table(rows, u, ["riv"])
-    line = [ln for ln in body if ln.startswith("| steal")]
+    body = table(rows, u, st, ["riv"])
+    line = [ln for ln in body if ln.startswith("| Yuri")]
     assert len(line) == 1, body
     cells = [c.strip() for c in line[0].strip("|").split("|")]
-    # NAMES, NOT KEYS. The keys are what every dict is keyed by and they are
-    # not what anybody calls these players.
-    assert cells[0] == "steal Yuri Berchiche from riv · sell Benat Turrientes", cells
-    assert cells[1] == "+0.433", cells
-    assert cells[2] == "+36%", cells
+    # WHAT YOU GET, and off whom. NAMES, NOT KEYS: the keys are what every
+    # dict is keyed by and they are not what anybody calls these players.
+    assert cells[0] == "Yuri Berchiche ← riv", cells
+    assert cells[1] == "Turrientes", cells
+    # THE NUMBER YOU LAND ON, not the one you move by. P(win) is 50% here and
+    # the move is worth +36.4 points of it, so it reads 86% — no arithmetic,
+    # and no delta that has to be added to a figure in the header.
+    assert cells[2] == "86%", cells
     # MONEY LEAVING IS NEGATIVE, the way the balance sees it: this move spends
     # 20M and raises 5.87M, so it costs 14.13M.
     assert cells[3] == "-14.13M", cells
-    assert cells[4] == "riv +37%", cells
+    # The three columns that said the same thing are gone: Δpos, Δwin and the
+    # rival column all tracked each other, and the rival column named the same
+    # manager on every row for days.
+    assert len(cells) == 4, cells
+    assert "+0.433" not in line[0] and "+36%" not in line[0], line[0]
+
+    # A free agent is a different move from a steal and says so rather than
+    # leaving the column blank.
+    free = table([{**rows[0], "action": Action("buy", buy="yuri", cost=1e6)}],
+                 u, st, ["riv"])
+    assert "| Yuri Berchiche (free) |" in "\n".join(free), free
+    # Nothing given up is a dash, never an empty cell.
+    assert "| — |" in "\n".join(free), free
 
     # A move that RAISES money reads positive, so the sign is never decoration.
     raised = table([{**rows[0],
                      "action": Action("steal", buy="yuri", sell="benat",
                                       cost=1e6, proceeds=5e6, victim="riv")}],
-                   u, ["riv"])
+                   u, st, ["riv"])
     assert "| +4.00M |" in "\n".join(raised), raised
+
+    # THE TABLE IS SORTED BY THE COLUMN IT SHOWS. Ranking is on Δpos, which is
+    # the finer statistic and the right one to screen on, but two moves can
+    # trade places between the two — 0.302 was worth +22% and 0.301 was worth
+    # +23% on the day this was written — and a P(win) column running 90, 85,
+    # 84, 77, 76, 74, 75 reads as a bug rather than as a trade-off.
+    pair = [{**rows[0], "d_pos": 0.302, "d_win": 0.22,
+             "action": Action("buy", buy="lo", cost=0.0)},
+            {**rows[0], "d_pos": 0.301, "d_win": 0.23,
+             "action": Action("buy", buy="hi", cost=0.0)}]
+    order = "\n".join(table(pair, u, st, ["riv"]))
+    assert order.index("| Hi (free)") < order.index("| Lo (free)"), order
+
+    # Two men given up are both named; three is where it stops naming them,
+    # because the cell is on a 390px screen and the detail is one tap away.
+    many = table([{**rows[0],
+                   "action": Action("swap", buy="yuri",
+                                    sell=("benat", "a", "b"), cost=1e6)}],
+                 u, st, ["riv"])
+    assert "3 spares" in "\n".join(many), many
 
     # Nothing worth doing is a sentence, not an empty table with a header on
     # top of it.
-    empty = "\n".join(table([], u, ["riv"]))
+    empty = "\n".join(table([], u, st, ["riv"]))
     assert "|" not in empty, empty
     assert "nothing" in empty.lower(), empty
 
@@ -498,6 +559,9 @@ def _selftest() -> None:
     assert two["sell"] == "Benat Turrientes + Yuri Berchiche", two
     assert m["victim"] == "riv" and m["kind"] == "steal"
     assert m["d_pos"] == 0.433 and m["d_win"] == 0.364
+    # The phone draws the destination too, so it is computed once here rather
+    # than added to a base figure by every renderer that wants it.
+    assert abs(m["p_win_after"] - (0.5 + 0.364)) < 1e-9, m
     assert m["net"] == -(20e6 - 5.87e6), m
     assert m["vs"] == "riv" and m["vs_gain"] == 0.37
     # The standings carry who I am, so the renderer does not have to know my
@@ -536,7 +600,7 @@ def _selftest() -> None:
     ph = "\n".join(placeholder("no api_teams.csv"))
     assert "no api_teams.csv" in ph and ph.startswith("# The simulation")
 
-    print("sim self-test OK (53 cases)")
+    print("sim self-test OK (63 cases)")
 
 
 def main() -> None:

@@ -40,23 +40,23 @@ _Swaps are same-position only: a cross-slot difference is a change of formation,
 
 **11 on offer.**
 
-| Player | Pos | Bid | Competition | Note |
-|---|---|--:|---|---|
-| Isi Palazon | del | 20.20M | (4 broke) |  |
-| Angeliño | def | 15.54M | none |  |
-| Edin Terzic | ent | 7.18M | none |  |
-| Pol Lozano | med | 2.19M | none |  |
-| Andriy Lunin | por | 2.08M | none |  |
-| Beñat Prados | med | 1.37M | (1 broke) |  |
-| Edu Altozano | med | 584K | none |  |
-| Aitor Mañas | del | 523K | none |  |
-| Pedri Gonzalez | med | — | (4 broke) |  |
-| Marc Bartra | def | — | (4 broke) |  |
-| Marcos Alonso | def | — | (4 broke) |  |
+| Player | Pos | Bid | XI | Competition | Note |
+|---|---|--:|--:|---|---|
+| Isi Palazon | del | 20.20M | 80%/50% | (4 broke) |  |
+| Angeliño | def | 15.54M | 0%/— | none |  |
+| Edin Terzic | ent | 7.18M | !15%/— | none |  |
+| Pol Lozano | med | 2.19M | 30%/— | none |  |
+| Andriy Lunin | por | 2.08M | 30%/— | none |  |
+| Beñat Prados | med | 1.37M | 30%/— | (1 broke) |  |
+| Edu Altozano | med | 584K | !15%/— | none |  |
+| Aitor Mañas | del | 523K | 30%/— | none |  |
+| Marc Bartra | def | — | 50%/67% | (4 broke) |  |
+| Pedri Gonzalez | med | — | 50%/— | (4 broke) |  |
+| Marcos Alonso | def | — | 90%/67% | (4 broke) |  |
 
 **Bid** is what it costs to win him, and nothing here says whether he is worth winning — that is the one table in [REPORT.md](REPORT.md), which prices him at a clause because a clause cannot be refused. A purchase is closer to a loan than a spend: the value comes back when you sell, give or take 12%, which on a large player is bigger than the premium and the drift put together. That swing is a coin flip, so a bid within a few percent is not a decision.
 
-**FF** is futbolfantasy's probable-XI percentage, which is the one the forecast uses. **AF** is analiticafantasy's read of the same eleven, printed beside it and never blended in — `titular` is a named starter (a final call, with no number to it), a percentage is their editors' consensus, `?` means they list him without either, and `—` means they do not have him. Two columns that disagree are the signal; that is the whole point of carrying both.
+**XI** is FF's probable-eleven percentage, which is the one the forecast uses, and AF's read of the same eleven beside it — printed, never blended. Two sources that disagree is the signal, and it is the reason to open the app before bidding. **FF** is futbolfantasy's probable-XI percentage, which is the one the forecast uses. **AF** is analiticafantasy's read of the same eleven, printed beside it and never blended in — `titular` is a named starter (a final call, with no number to it), a percentage is their editors' consensus, `?` means they list him without either, and `—` means they do not have him. Two columns that disagree are the signal; that is the whole point of carrying both.
 
 Competition is demand, not roster counts: the rivals whose XI actually improves with him, strongest threat first — `?` cash unknown (treat as live), `(n broke)` want him but cannot pay the floor. The full manager-by-manager matrix is in `reports/rivals.md`.
 
@@ -98,6 +98,13 @@ _Both figures are editorial reads refreshed a few times a day, not live probabil
 
 ---
 
+## Warnings
+
+- **Only 1 delantero** — one knock and you can't field a legal XI.
+- **1 unmodelled** (Iñigo Vicente) — no LaLiga record, so they carry an assumed baseline, not an earned one.
+
+_Compare squad value with the app; a mismatch means a name matched the wrong player. Roster read from the ledger._
+
 ## Your movers (24h, over 1%)
 
 | Player | Value | 24h | % |
@@ -116,4 +123,4 @@ _637 players tracked, 499 with a probable-XI reading._
 
 _xPts/j — expected points per jornada = shrunk pts/match (K=8, 2025-26) × fixture × P(start), from `ffcore/score.py` — the same scorer rivals.py uses. Injured, suspended and unavailable score zero; a doubt is halved. The fixture term is a ±12% band across the opponents ranked by Club Elo rating, plus ±4% for home advantage; both widths are guesses, unfitted because nothing has been played, and small enough that a wrong one costs a fraction of a point._
 
-_Generated 2026-08-18 14:34 UTC._
+_Generated 2026-08-18 14:58 UTC._
