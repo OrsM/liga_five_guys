@@ -134,9 +134,7 @@ def digest(read, sources=SOURCES, stamp: str = "",
     out = [("# " + (title or "Liga Five Guys — one report"))
            + (" — " + stamp if stamp else ""),
            "",
-           lead or "Every move you could make, ranked by whether it wins the "
-           "league. Everything else is reference and is linked, not "
-           "reprinted.", ""]
+           lead or "", ""]
     body: list[str] = []
     seen: set[str] = set()
     lost: list[str] = []
@@ -275,6 +273,9 @@ def _selftest() -> None:
                  title="How the numbers are made", lead="the fits")
     assert apx[0].startswith("# How the numbers are made")
     assert "the fits" in apx[2]
+    # NO STANDING BLURB on the report: it was a sentence restating the title.
+    plain = digest(lambda n: files.get(n), [], links=None)
+    assert plain[2] == "", plain[:4]
 
     # THE SILENT-SHORTENING GUARD: a renamed heading is reported, not dropped.
     renamed = digest(lambda n: files.get(n),

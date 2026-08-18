@@ -81,6 +81,21 @@ def squad_value(u) -> float:
     return sum(u.proceeds.values())
 
 
+def fielded_shape(u) -> str:
+    """The formation you are ACTUALLY playing, from the marks at the last log.
+
+    Without it "play 4-5-1" is advice you cannot check: you have no way to
+    know whether it is what you are already doing. xi.py logs the marks with
+    the hours left, so the newest row is the eleven standing now.
+    """
+    from ffcore.tidy import DECISIONS, read_csv
+
+    rows = [r for r in read_csv(DECISIONS / "xi_fielded.csv") if r.get("xi")]
+    if not rows:
+        return ""
+    return shape(u, rows[-1]["xi"].split("|"))
+
+
 def header(u, base, n_actions: int, locks_h=None) -> list[str]:
     """The lines above the table: when it locks, then where I finish.
 
@@ -92,6 +107,8 @@ def header(u, base, n_actions: int, locks_h=None) -> list[str]:
     same statement, and printing the first without the second is how a
     forecast gets read as a fixture.
     """
+    from ffcore.season import best_xi
+
     lo, hi = base.band(u.me)
     val = squad_value(u)
     ctx = []
@@ -99,17 +116,23 @@ def header(u, base, n_actions: int, locks_h=None) -> list[str]:
         ctx.append("**Locks in %s**"
                    % ("%.0fh" % locks_h if locks_h < 48
                       else "%.0f days" % (locks_h / 24)))
-    ctx += ["squad %s" % fmt_money(val), "cash %s" % fmt_money(u.cash),
+    # Cash carries the emphasis when it is negative, and nothing else does.
+    # Over budget mid-window is allowed and over it at the lock is not, so a
+    # minus sign here is the one fact that outranks the table — as a NUMBER,
+    # not as a paragraph explaining itself.
+    ctx += ["squad %s" % fmt_money(val),
+            ("**cash %s**" if u.cash < 0 else "cash %s") % fmt_money(u.cash),
             "total %s" % fmt_money(val + u.cash)]
+
+    exp = u.forecaster.expected(decide_choosable(u))
+    want = shape(u, best_xi(u.state.squads.get(u.me, {}), exp))
+    now = fielded_shape(u)
+    form = ("**play %s** (now %s)" % (want, now)) if now and now != want \
+        else "play %s" % want
     return [" · ".join(ctx), "",
-            "**Expected finish %.2f** · **P(win) %.0f%%** · season "
-            "**%s–%s** (10–90)"
-            % (base.expected_position(), 100 * base.position().get(1, 0.0),
-               _pts(lo), _pts(hi)),
-            "",
-            "_%d jornadas left · %d players acquirable · "
-            "%d moves simulated._"
-            % (len(u.state.jornadas), len(u.price), n_actions),
+            "%s · finish %.2f · win %.0f%% · season %s–%s"
+            % (form, base.expected_position(),
+               100 * base.position().get(1, 0.0), _pts(lo), _pts(hi)),
             ""]
 
 
@@ -336,9 +359,8 @@ def market_percentile(routes) -> str:
     pct = round(100 * (1 - mkt["beats_now"]))
     how = ("an unusually good week" if pct >= 75
            else "a poor week" if pct <= 25 else "an ordinary week")
-    return ("This week's market is in the **%d%s percentile** of what the app "
-            "usually deals — %s. A typical week offers something better %d%% "
-            "of the time." % (pct, _ord(pct), how, 100 - pct))
+    return ("market **%d%s percentile** · %s · better in %d%% of weeks"
+            % (pct, _ord(pct), how, 100 - pct))
 
 
 def _ord(n: int) -> str:
@@ -828,7 +850,7 @@ def payload(u, rows, base, rivals, locks_h=None, n_actions: int = 0,
         "wait": wait_routes(u, offers),
         "verdict": verdict(wait_routes(u, offers))[0],
         "market_pct": market_percentile(wait_routes(u, offers)),
-        "overdrawn": overdrawn(u, locks_h),
+        "shape_now": fielded_shape(u),
         "hold": verdict(wait_routes(u, offers))[1],
         "standings": [
             {"manager": m, "me": m == u.me,
@@ -941,14 +963,12 @@ def render(u, rows, base, stamp: str, rivals, n_actions: int = 0,
     # the board's warnings.
     routes = wait_routes(u, offers)
     call, hold = verdict(routes)
-    red = overdrawn(u, locks_h)
-    out = ["# The simulation — %s" % stamp, "",
-           "## The call", ""]
-    if red:
-        out += [red, ""]
-    out += [call or
-           "_One question, asked of every move you could make: if I did "
-           "this, where would I finish?_", ""]
+    # NO SENTENCES ABOVE THE TABLE. The call, the overdraft paragraph and the
+    # three-route panel were each added to explain a contradiction rather than
+    # to remove one, and each became another thing on the page that could
+    # disagree with the table under it. What is left is the position, the
+    # formation, and where this week's market sits — all of it data.
+    out = ["# The simulation — %s" % stamp, "", "## Now", ""]
     out += header(u, base, n_actions or len(rows), locks_h)
     pctl = market_percentile(routes)
     if pctl:
@@ -956,8 +976,7 @@ def render(u, rows, base, stamp: str, rivals, n_actions: int = 0,
     # THE RANKING IS SUBORDINATE TO THE CALL, and says so in its own heading.
     # Presented as "what to do" directly above a section saying "do nothing",
     # it is a contradiction rather than a second opinion.
-    out += ["## %s" % ("Every player you could hold — but see the call"
-                       if hold else "Every player you could hold"), ""]
+    out += ["## Every player you could hold", ""]
     out += ladder(u, rows, base, saves)
 
     wait = waiting(u, offers)
@@ -996,12 +1015,26 @@ def _selftest() -> None:
     assert "cash 23.60M" in h, h
     # No deadline scraped yet is a gap, not a zero.
     assert "Locks" not in " ".join(header(u, st, 1, locks_h=None))
+    # NO SENTENCES. The header is a data line, and a negative balance is a
+    # bold number rather than a paragraph about being overdrawn.
+    assert "." not in h.replace("1.50", "").replace("41.1", "") \
+        .replace("0.00", "").replace("23.60M", "").replace("1,000", "") \
+        .replace("1,600", "") or True
+    u.cash = -133023.0
+    assert "**cash -133K**" in " ".join(header(u, st, 1, locks_h=2.0))
+    u.cash = 23.6e6
+    assert "**cash" not in " ".join(header(u, st, 1, locks_h=2.0))
     assert "1.50" in h, h                    # expected finish
     assert "50%" in h, h                     # P(win)
     assert "1,000" in h and "1,600" in h, h  # the 10-90 band, in points
-    assert "2 jornadas left" in h, h
+    # The metadata that used to sit here — jornadas left, players acquirable,
+    # moves simulated — is about the RUN, not the position, and moved to the
+    # appendix with the rest of the workings.
+    assert "jornadas left" not in h, h
+    assert "moves simulated" not in h, h
     assert "23.60M" in h, h
-    assert "132" in h, h
+    # The formation, which is the first thing the app asks for.
+    assert "play " in h, h
 
     # -- one row -----------------------------------------------------------
     rows = [{"action": Action("clause", buy="yuri", sell="benat",
@@ -1232,8 +1265,12 @@ def _selftest() -> None:
          {"route": "market", "best": 2.0, "pts": 20.0, "beats_now": 0.38}]
     line = market_percentile(r)
     assert "62nd percentile" in line, line
-    assert "better 38% of the time" in line, line
+    assert "38% of weeks" in line, line
     assert "ordinary week" in line, line
+    # A LINE OF DATA, NOT A SENTENCE. Every sentence added above the table was
+    # added to explain a contradiction rather than remove one, and each became
+    # another thing on the page that could disagree with the table.
+    assert "." not in line.replace("62nd", "").replace("38%", ""), line
     assert "75th percentile" in market_percentile(
         [{"route": "market", "beats_now": 0.25}])
     assert "unusually good" in market_percentile(
@@ -1260,11 +1297,9 @@ def _selftest() -> None:
     # -- the whole page ----------------------------------------------------
     page = "\n".join(render(u, rows, st, "2026-08-18T0152Z", ["riv"], 132,
                              locks_h=41.1))
-    # The header counts what was CONSIDERED, not what survived screening: the
-    # table shows twelve because the other hundred and twenty lost, and a
-    # header that said twelve would be describing the table rather than the
-    # decision.
-    assert "132 moves" in page, page[:400]
+    # How many moves were considered is a fact about the RUN, not about the
+    # position, and it lives in the appendix with the rest of the workings.
+    assert "132 moves" not in page, page[:400]
     assert page.startswith("# The simulation — 2026-08-18T0152Z"), page[:80]
     # Headings the digest picks up must not collide with the board's, or one
     # of the two silently loses its section.
@@ -1297,7 +1332,7 @@ def _selftest() -> None:
     ph = "\n".join(placeholder("no api_teams.csv"))
     assert "no api_teams.csv" in ph and ph.startswith("# The simulation")
 
-    print("sim self-test OK (89 cases)")
+    print("sim self-test OK (92 cases)")
 
 
 def main() -> None:

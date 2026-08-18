@@ -1,21 +1,15 @@
-# Liga Five Guys — one report — 2026-08-18 23:10 UTC
-
-Every move you could make, ranked by whether it wins the league. Everything else is reference and is linked, not reprinted.
+# Liga Five Guys — one report — 2026-08-18 23:29 UTC
 
 
-## The call
 
-**You are 133K overdrawn and the jornada locks in 20 hours.** Selling is the only move that fixes it; the SELL rows raise 26.16M between them.
 
-**Act today.** Nothing you can wait for beats what is on offer now.
+## Now
 
-**Locks in 20h** · squad 236.37M · cash -133K · total 236.24M
+**Locks in 20h** · squad 236.37M · **cash -133K** · total 236.24M
 
-**Expected finish 1.95** · **P(win) 20%** · season **1,529–1,787** (10–90)
+play 4-5-1 · finish 1.95 · win 20% · season 1,529–1,787
 
-_38 jornadas left · 38 players acquirable · 60 moves simulated._
-
-_This week's market is in the **54th percentile** of what the app usually deals — an ordinary week. A typical week offers something better 46% of the time._
+_market **54th percentile** · an ordinary week · better in 46% of weeks_
 
 ## Every player you could hold
 

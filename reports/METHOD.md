@@ -1,4 +1,4 @@
-# Liga Five Guys — how the numbers are made — 2026-08-18 23:10 UTC
+# Liga Five Guys — how the numbers are made — 2026-08-18 23:29 UTC
 
 Everything about HOW, so the report can be the numbers. The fits, the estimates, and every way each one is known to be wrong.
 
