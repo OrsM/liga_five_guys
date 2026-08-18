@@ -1,24 +1,24 @@
-# Squads — 2026-08-18 22:50 UTC
+# Squads — 2026-08-18 23:02 UTC
 
 | Manager | Players | Squad value | Spent | Raised | Cash |
 |---|--:|--:|--:|--:|--:|
-| **miguel_autentico** | 14 | 212.40M | 142.18M | 40.88M | 23.60M |
-| Albert Laporta | 15 | 265.30M | 188.67M | 43.03M | ~-44.93M |
+| **miguel_autentico** | 14 | 236.37M | 142.18M | 40.88M | -133K |
+| Albert Laporta | 15 | 273.49M | 188.67M | 43.03M | ~-44.93M |
 | BurtonGM89 | 13 | 216.17M | 180.85M | 51.65M | ~-28.49M |
 | Magic Mike 333 | 16 | 238.19M | 121.23M | 19.14M | ~-1.38M |
-| SusoGattuso | 18 | 223.44M | 128.17M | 2.61M | ~-24.85M |
+| SusoGattuso | 18 | 241.76M | 128.17M | 2.61M | ~-24.85M |
 
 `~` is an estimate, not an observed balance — see the basis notes at the bottom. A negative one is a real position, not a broken input: going past the budget mid-window is allowed, and only being under water at the lock is not. Cash is a ceiling on what anyone can bid tomorrow, which is the point of tracking it.
 
 **FF** is futbolfantasy's probable-XI percentage, which is the one the forecast uses. **AF** is analiticafantasy's read of the same eleven, printed beside it and never blended in — `titular` is a named starter (a final call, with no number to it), a percentage is their editors' consensus, `?` means they list him without either, and `—` means they do not have him. Two columns that disagree are the signal; that is the whole point of carrying both.
 
 ## You (miguel_autentico)
-14 players · 212.40M total · 9 at 70%+ · cash 23.60M
+14 players · 236.37M total · 10 at 70%+ · cash -133K
 
 | Player | Team | Pos | Value | 24h | FF | AF |
 |---|---|--:|--:|--:|--:|--:|
 | ionut radu | Celta | por | 37.44M | -524K | 90% | 67% |
-| alvaro fernandez | Deportivo | por | 4.35M | -129K | 0% | — |
+| marcos alonso | Celta | def | 28.33M | -228K | 90% | 67% |
 | carl starfelt | Celta | def | 14.08M | 14K | 60% | 67% |
 | robin le normand | Atlético | def | 10.61M | 207K | 60% | 50% |
 | igor zubeldia | Real Sociedad | def | 10.30M | -0K | 60% | — |
@@ -33,13 +33,14 @@
 | iñigo vicente | Racing | del | 19.85M | 253K | 90% | 100% |
 
 ## Albert Laporta
-15 players · 265.30M total · 5 at 70%+ · cash ~-44.93M
+15 players · 273.49M total · 4 at 70%+ · cash ~-44.93M
 
 | Player | Team | Pos | Value | 24h | FF | AF |
 |---|---|--:|--:|--:|--:|--:|
 | matias dituro | Elche | por | 7.89M | 155K | 100% | 33% |
 | santiago mouriño | Villarreal | def | 37.27M | -1.09M | 70% | 100% |
 | leandro cabrera ⚠︎suspended | Espanyol | def | 16.01M | -516K | 0% | — |
+| angeliño | Deportivo | def | 15.32M | -185K | 0% | — |
 | juan foyth | Villarreal | def | 13.31M | 440K | 70% | 50% |
 | diego javier llorente | Betis | def | 13.03M | -155K | 50% | — |
 | arda guler | Real Madrid | med | 56.09M | 1.67M | 60% | 100% |
@@ -51,7 +52,6 @@
 | ayoze perez | Villarreal | del | 17.66M | -10K | 50% | 50% |
 | raul moro | Osasuna | del | 14.08M | 181K | 60% | 100% |
 | ferran jutgla | Celta | del | 9.57M | 19K | 80% | — |
-| asier villalibre | Racing | del | 7.14M | -88K | 70% | — |
 
 ## BurtonGM89
 13 players · 216.17M total · 7 at 70%+ · cash ~-28.49M
@@ -95,12 +95,11 @@
 | jon karrikaburu | Real Sociedad | del | 539K | -8K | 0% | — |
 
 ## SusoGattuso
-18 players · 223.44M total · 14 at 70%+ · cash ~-24.85M
+18 players · 241.76M total · 15 at 70%+ · cash ~-24.85M
 
 | Player | Team | Pos | Value | 24h | FF | AF |
 |---|---|--:|--:|--:|--:|--:|
 | leo roman | Deportivo | por | 38.10M | 638K | 100% | — |
-| wojciech szczesny | Barcelona | por | 2.15M | -52K | 20% | — |
 | jon aramburu | Real Sociedad | def | 18.02M | 148K | 80% | 100% |
 | yuri berchiche | Athletic | def | 12.29M | -98K | 70% | — |
 | cesar tarrega | Valencia | def | 9.14M | 14K | 80% | 100% |
@@ -114,6 +113,7 @@
 | johnny cardoso | Atlético | med | 5.41M | -122K | 30% | — |
 | mario martin | Getafe | med | 4.09M | 95K | 70% | 100% |
 | giuliano simeone | Atlético | del | 42.36M | -485K | 70% | — |
+| isi palazon | Rayo | del | 20.47M | 327K | 80% | 50% |
 | andres martin | Racing | del | 19.90M | 494K | 90% | 100% |
 | carlos espi | Real Madrid | del | 9.56M | 282K | 30% | — |
 | alex berenguer | Athletic | del | 8.65M | -107K | 30% | — |
@@ -150,7 +150,7 @@
 
 ## Cash basis
 
-- **miguel_autentico** — balance the app reported at 2026-08-18 22:47 UTC − 0.00M bought + 0.00M sold across 0 ledger row(s) = 23.60M (known)
+- **miguel_autentico** — balance the app reported at 2026-08-18 22:58 UTC − 0.00M bought + 0.00M sold across 0 ledger row(s) = -0.13M (known)
 - **Albert Laporta** — 100M starting budget − 188.67M bought + 43.03M sold across 13 ledger row(s) + 0.71M of daily allowance over 7 days = -44.93M (estimated)
 - **BurtonGM89** — 100M starting budget − 180.85M bought + 51.65M sold across 17 ledger row(s) + 0.71M of daily allowance over 7 days = -28.49M (estimated)
 - **Magic Mike 333** — 100M starting budget − 121.23M bought + 19.14M sold across 8 ledger row(s) + 0.71M of daily allowance over 7 days = -1.38M (estimated)
@@ -159,13 +159,10 @@
 ## Ledger warnings
 
 - 2026-08-19T00:18: miguel_autentico sold A. Ferllo, but nobody was holding him — missing a purchase, or a different spelling?
-- **angelino** — the ledger has him at Albert Laporta; the app says nobody in the league holds him.
-- **isi palazon** — the ledger has him at SusoGattuso; the app says nobody in the league holds him.
-- **marcos alonso** — the ledger has him at miguel_autentico; the app says nobody in the league holds him.
+- **alvaro fernandez** — the ledger has him at miguel_autentico; the app says nobody in the league holds him.
 - **pedro diaz** — the ledger has him at Magic Mike 333; the app says nobody in the league holds him.
 - **tete morente** — the ledger has him at Magic Mike 333; the app says nobody in the league holds him.
-- **asier villalibre** — the app has him at Albert Laporta; the ledger has no record of him.
-- **wojciech szczesny** — the app has him at SusoGattuso; the ledger has no record of him.
+- miguel_autentico is 0.13M overdrawn: balance the app reported at 2026-08-18 22:58 UTC − 0.00M bought + 0.00M sold across 0 ledger row(s) = -0.13M. Going over the budget mid-window is allowed; being overdrawn when the jornada locks is not, so they must sell before they can buy again. If the ledger is missing a sale of theirs, this is stale rather than wrong.
 - Magic Mike 333 is 1.38M overdrawn: 100M starting budget − 121.23M bought + 19.14M sold across 8 ledger row(s) + 0.71M of daily allowance over 7 days = -1.38M. Going over the budget mid-window is allowed; being overdrawn when the jornada locks is not, so they must sell before they can buy again. If the ledger is missing a sale of theirs, this is stale rather than wrong.
 - Albert Laporta is 44.93M overdrawn: 100M starting budget − 188.67M bought + 43.03M sold across 13 ledger row(s) + 0.71M of daily allowance over 7 days = -44.93M. Going over the budget mid-window is allowed; being overdrawn when the jornada locks is not, so they must sell before they can buy again. If the ledger is missing a sale of theirs, this is stale rather than wrong.
 - BurtonGM89 is 28.49M overdrawn: 100M starting budget − 180.85M bought + 51.65M sold across 17 ledger row(s) + 0.71M of daily allowance over 7 days = -28.49M. Going over the budget mid-window is allowed; being overdrawn when the jornada locks is not, so they must sell before they can buy again. If the ledger is missing a sale of theirs, this is stale rather than wrong.

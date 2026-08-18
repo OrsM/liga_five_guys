@@ -1,4 +1,4 @@
-# The workings — 2026-08-18T2247Z
+# The workings — 2026-08-18T2258Z
 
 _What the one table in [REPORT.md](REPORT.md) was built from: the eleven it assumes you field, what a man on today's slate should cost, and the two ways any of it can be wrong about a player._
 
@@ -20,39 +20,38 @@ _What the one table in [REPORT.md](REPORT.md) was built from: the eleven it assu
 | MED | Lucien Agoume | Athletic A | 3.9 | -6% | 80% | — | 3.5 |
 | DEL | Iñigo Vicente | Getafe A | ~3.0 | -3% | 90% | 100% | 2.9 |
 | +POR | _Joan Garcia_ | Elche A | 8.1 | +4% | 80% | 100% | **+3.2** |
-| +DEL | _Isi Palazon_ | Alaves H ★ | 4.4 | +9% | 80% | 50% | **+0.1** |
 
 _**pts/m** is points per match, last season shrunk toward the average and blended with this season as it accrues. `~` means no record at all, so the baseline is assumed. **Fix** is how much the next opponent moves it — `=` a median team, `—` no fixture known. **FF** is futbolfantasy's start percentage, **AF** is analiticafantasy's — `titular` there is a named starter with no number attached, `?` is listed without either, `—` is not listed at all. They are separate columns because neither has been checked against a played jornada yet, so there is no weight to blend them by, and a disagreement is worth more than an average. **xPts/j** = pts/m × Fix × FF, and uses FF only. `⚠` on a name means question 5 has something on him._
 
 _The `+SLOT` rows are today's slate: **xPts/j is the change to the whole eleven** if you sign him and re-pick the shape, not his own score, and it leaves the fixture OUT — you own a player for months, not for one round. `★` next to the opponent means this round's draw happens to be kind, `↓` that it is not; neither is in the number. What he would cost, and whether that is a good rate, is question 2._ _10 others on the slate would not improve this eleven, so they are priced there and not here._
 
-**The model's eleven is 4.5 better** (index 42.1, shape 4-5-1).
+**The model's eleven is 5.6 better** (index 43.1, shape 4-5-1).
 
 | Bench this | For this | Worth |
 |---|---|--:|
 | Dani Lorenzo (2.4) | Pablo Fornals (6.9) | +4.5 |
+| Omar El Hilali (2.7) | Marcos Alonso (3.8) | +1.0 |
 
 _Swaps are same-position only: a cross-slot difference is a change of formation, not a substitution. Your own marks are the row above — this table is advice._
 
 ## 2. What to bid
 
-**13 on offer.**
+**12 on offer.**
 
 | Player | Pos | Bid | XI | Competition | Note |
 |---|---|--:|--:|---|---|
-| Trent Alexander-Arnold | def | 22.36M | 50%/— | (2 broke) |  |
-| Isi Palazon | del | 20.47M | 80%/50% | (3 broke) |  |
-| Iago Aspas | del | 6.93M | 40%/— | none |  |
-| Javi Puado | med | 5.73M | 0%/— | none |  |
-| Nico Guillen | med | 4.70M | 50%/— | (3 broke) |  |
-| Peter Gulacsi | por | 4.11M | 40%/— | none |  |
-| Iñigo Perez | ent | 2.10M | !15%/— | none |  |
-| Peque | del | 2.05M | 50%/— | none |  |
-| Matias Vecino | med | 1.83M | 20%/— | none |  |
-| Abiel Osorio | del | 1.32M | !15%/— | none |  |
-| Manel Usedo | med | 745K | !15%/— | none |  |
+| Abiel Osorio | del | — | !15%/— | none |  |
+| Iñigo Perez | ent | — | !15%/— | none |  |
+| Javi Puado | med | — | 0%/— | none |  |
 | Joan Garcia | por | — | 80%/100% | (4 broke) |  |
+| Peque | del | — | 50%/— | none |  |
+| Peter Gulacsi | por | — | 40%/— | none |  |
+| Manel Usedo | med | — | !15%/— | none |  |
 | Mario Soriano | med | — | 100%/— | (4 broke) |  |
+| Nico Guillen | med | — | 50%/— | (3 broke) |  |
+| Matias Vecino | med | — | 20%/— | none |  |
+| Iago Aspas | del | — | 40%/— | none |  |
+| Trent Alexander-Arnold | def | — | 50%/— | (2 broke) |  |
 
 **Bid** is what it costs to win him, and nothing here says whether he is worth winning — that is the one table in [REPORT.md](REPORT.md), which prices him at a clause because a clause cannot be refused. A purchase is closer to a loan than a spend: the value comes back when you sell, give or take 12%, which on a large player is bigger than the premium and the drift put together. That swing is a coin flip, so a bid within a few percent is not a decision.
 
@@ -62,9 +61,7 @@ Competition is demand, not roster counts: the rivals whose XI actually improves 
 
 Bid is the floor plus what this league has actually paid over it: median +1.4%, -0.3% to +635.3% (n=32). 14 of those 32 went at the floor itself, so the minimum is not a number known to lose. A dozen deals is not a distribution — the range is what has happened, not a chance of winning, and every one of them is a bid that won.
 
-**⚠ 11 bids at 72.34M is more than the 23.60M you hold.** Each row above is priced as though it were your only purchase, and the app settles them together — take them best rate first: Trent Alexander-Arnold, Isi Palazon, Iago Aspas, Javi Puado, Nico Guillen, Peter Gulacsi, Iñigo Perez, Peque, Matias Vecino, Abiel Osorio, Manel Usedo.
-
-Already owned, so not a purchase: abde ezzalzouli (Albert Laporta), aitor paredes (BurtonGM89), antonio blanco (BurtonGM89), arda guler (Albert Laporta), ayoze perez (Albert Laporta), beñat turrientes (you), carlos espi (SusoGattuso), carlos puga (BurtonGM89), cesar tarrega (SusoGattuso), dani lorenzo (you), dean huijsen (BurtonGM89), denis suarez (BurtonGM89), ferran jutgla (Albert Laporta), ilaix moriba (Albert Laporta), izan merino (SusoGattuso), johnny cardoso (SusoGattuso), juan foyth (Albert Laporta), karl etta eyong (BurtonGM89), leandro cabrera (Albert Laporta), marc roca (Albert Laporta), mario martin (SusoGattuso), matias dituro (Albert Laporta), quilindschy hartman (BurtonGM89), santiago mouriño (Albert Laporta), yuri berchiche (SusoGattuso).
+Already owned, so not a purchase: abde ezzalzouli (Albert Laporta), aitor paredes (BurtonGM89), antonio blanco (BurtonGM89), arda guler (Albert Laporta), ayoze perez (Albert Laporta), beñat turrientes (you), carlos espi (SusoGattuso), carlos puga (BurtonGM89), cesar tarrega (SusoGattuso), dani lorenzo (you), dean huijsen (BurtonGM89), denis suarez (BurtonGM89), ferran jutgla (Albert Laporta), ilaix moriba (Albert Laporta), isi palazon (SusoGattuso), izan merino (SusoGattuso), johnny cardoso (SusoGattuso), juan foyth (Albert Laporta), karl etta eyong (BurtonGM89), leandro cabrera (Albert Laporta), marc roca (Albert Laporta), mario martin (SusoGattuso), matias dituro (Albert Laporta), quilindschy hartman (BurtonGM89), santiago mouriño (Albert Laporta), yuri berchiche (SusoGattuso).
 
 ## On offer but unpriced
 
@@ -80,7 +77,7 @@ _The two ways every number above can be wrong about a player: he is not fit, or 
 
 **Nobody in your squad is flagged.** All 14 players with an entry on their team page read as available.
 
-_Listed with no flag (14): Alvaro Fernandez, Beñat Turrientes, Carl Starfelt, Dani Lorenzo, Igor Zubeldia, Ionut Radu, Iñigo Ruiz de Galarreta, Iñigo Vicente, Jon Moncayola, Lucien Agoume, Omar El Hilali, Pablo Fornals, Pepelu, Robin Le Normand._
+_Listed with no flag (14): Beñat Turrientes, Carl Starfelt, Dani Lorenzo, Igor Zubeldia, Ionut Radu, Iñigo Ruiz de Galarreta, Iñigo Vicente, Jon Moncayola, Lucien Agoume, Marcos Alonso, Omar El Hilali, Pablo Fornals, Pepelu, Robin Le Normand._
 
 _Read from the 'Estado físico', 'Sancionados' and 'No disponibles' blocks of each team page. A knock the site still lists as available (`Tocado`) is folded into doubt._
 
@@ -94,6 +91,7 @@ _Both figures are editorial reads refreshed a few times a day, not live probabil
 
 ## Warnings
 
+- **Only 1 portero** — one knock and you can't field a legal XI.
 - **Only 1 delantero** — one knock and you can't field a legal XI.
 - **1 unmodelled** (Iñigo Vicente) — no LaLiga record, so they carry an assumed baseline, not an earned one.
 - Balance last checked 2026-08-18, but the ledger moved on 2026-08-19. Re-check it.
@@ -112,7 +110,6 @@ _Compare squad value with the app; a mismatch means a name matched the wrong pla
 | Ionut Radu | 37.44M | -524K | -1.38% |
 | Dani Lorenzo | 9.45M | -144K | -1.50% |
 | Beñat Turrientes | 6.96M | -108K | -1.52% |
-| Alvaro Fernandez | 4.35M | -129K | -2.87% |
 
 ## Notes
 
@@ -120,4 +117,4 @@ _652 players tracked, 499 with a probable-XI reading._
 
 _xPts/j — expected points per jornada = shrunk pts/match (K=8, 2025-26) × fixture × P(start), from `ffcore/score.py` — the same scorer rivals.py uses. Injured, suspended and unavailable score zero; a doubt is halved. The fixture term is a ±12% band across the opponents ranked by Club Elo rating, plus ±4% for home advantage; both widths are guesses, unfitted because nothing has been played, and small enough that a wrong one costs a fraction of a point._
 
-_Generated 2026-08-18 22:50 UTC._
+_Generated 2026-08-18 23:02 UTC._

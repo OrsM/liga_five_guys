@@ -13,10 +13,10 @@
 #
 # 11 marked · 4-5-1 legal
 
-[ ] POR alvaro fernandez
 [x] POR ionut radu
 [x] DEF carl starfelt
 [x] DEF igor zubeldia
+[ ] DEF marcos alonso
 [x] DEF omar el hilali
 [x] DEF robin le normand
 [ ] MED beñat turrientes

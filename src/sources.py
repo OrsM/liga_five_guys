@@ -1370,10 +1370,15 @@ def league_sources(leagues_json: str, observed_at: str = "") -> list[Source]:
         out.append(Source("api_market", "api_market",
                           API_MARKET_URL.format(base="{base}", league=lg),
                           parse_api_market, sign_api_market, auth=True))
+        # EVERY RUN, not daily. It was daily to save a call, and the cost of
+        # that was the squad being up to a day stale — so the report went on
+        # telling you to sell a player you had already sold, and the rerun
+        # button, whose entire purpose is picking up a deal you just made,
+        # could not see it. One extra API call a run against the report being
+        # wrong about what you own is not a trade.
         out.append(Source("api_teams", "api_teams",
                           API_TEAMS_URL.format(base="{base}", league=lg),
-                          parse_api_teams, sign_api_teams,
-                          cadence="daily", auth=True))
+                          parse_api_teams, sign_api_teams, auth=True))
         # Page 0 is the newest ~55 rows and page 1 the remainder; the feed is
         # short because the season is young. Both are swept so the ledger can
         # be rebuilt from scratch rather than appended to, which is what makes
@@ -2003,6 +2008,10 @@ def _selftest() -> None:
     assert [s.key for s in disc] == ["api_market", "api_teams",
                                      "api_activity_0", "api_activity_1"], disc
     assert all(s.auth for s in disc), "every API entry needs the bearer"
+    # THE SQUAD IS FETCHED EVERY RUN. On a daily cadence the report kept
+    # recommending the sale of a player already sold, and the rerun button
+    # could not see a deal at all — which is the only thing it is for.
+    assert all(s.cadence == "every_run" for s in disc if s.key == "api_teams")
     assert "017998544" in disc[0].url and "{base}" in disc[0].url
     # Nothing to discover from a rotted page means no work queued, not a crash.
     assert league_sources("<html>") == []

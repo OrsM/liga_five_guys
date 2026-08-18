@@ -53,7 +53,7 @@ from ffcore.text import norm  # noqa: E402
 from ffcore.season import LeagueState, best_xi, simulate  # noqa: E402
 from ffcore.tidy import (TIDY, SEASON, latest_only, load_api_market,  # noqa: E402
                          load_api_teams, load_lineups, load_market,
-                         load_players)
+                         load_players, read_csv)
 
 __all__ = ["Action", "candidates", "rank", "Universe"]
 
@@ -748,8 +748,13 @@ def load(trials_pool=None) -> Universe:
     carried = {}
     for r in teams:
         carried.setdefault(r["manager"], float(r["team_points"] or 0))
+    # LATEST, not first. `next()` over the raw file takes the OLDEST row in
+    # it, because the CSV is append-only and oldest-first — so the balance
+    # shown was the first one ever recorded and never moved again. On
+    # 2026-08-18 that reported 23.60M against a real -133K, right after a
+    # purchase, which is the one moment the number has to be right.
     cash = next((float(r["money"]) for r in
-                 csv.DictReader(open(TIDY / "api_leagues.csv"))
+                 reversed(latest_only(read_csv(TIDY / "api_leagues.csv")))
                  if r.get("money")), 0.0)
 
     return Universe(
