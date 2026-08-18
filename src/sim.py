@@ -324,6 +324,13 @@ def payload(u, rows, base, rivals, locks_h=None, n_actions: int = 0) -> dict:
             "sell_n": len(a.sell),
             "victim": a.victim,
             "d_pos": r["d_pos"], "d_win": r["d_win"], "net": -a.net,
+            # What you are on afterwards, and what he does about it. Both are
+            # in the markdown table; the phone could not draw them because
+            # they were never in the payload, which is the two renderers
+            # drifting apart again.
+            "left": u.cash - a.net,
+            "answer": (None if r.get("answer") is None
+                       else names.get(r["answer"].buy, r["answer"].buy)),
             "p_win_after": base.position().get(1, 0.0) + r["d_win"],
             "vs": who, "vs_gain": r["d_beat"].get(who, 0.0) if who else None,
         })
@@ -670,6 +677,14 @@ def _selftest() -> None:
     # The phone draws the destination too, so it is computed once here rather
     # than added to a base figure by every renderer that wants it.
     assert abs(m["p_win_after"] - (0.5 + 0.364)) < 1e-9, m
+    # The balance afterwards, and the rival's reply, travel with the row.
+    assert m["left"] == 23.6e6 - (20e6 - 5.87e6), m
+    assert m["answer"] is None, m
+    withans = payload(u, [{**rows[0],
+                           "answer": Action("steal", buy="yuri",
+                                            victim="me")}],
+                      st, ["riv"])["moves"][0]
+    assert withans["answer"] == "Yuri Berchiche", withans
     assert m["net"] == -(20e6 - 5.87e6), m
     assert m["vs"] == "riv" and m["vs_gain"] == 0.37
     # The standings carry who I am, so the renderer does not have to know my
@@ -708,7 +723,7 @@ def _selftest() -> None:
     ph = "\n".join(placeholder("no api_teams.csv"))
     assert "no api_teams.csv" in ph and ph.startswith("# The simulation")
 
-    print("sim self-test OK (69 cases)")
+    print("sim self-test OK (72 cases)")
 
 
 def main() -> None:

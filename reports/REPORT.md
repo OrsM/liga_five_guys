@@ -1,4 +1,4 @@
-# Liga Five Guys — one report — 2026-08-18 18:07 UTC
+# Liga Five Guys — one report — 2026-08-18 18:17 UTC
 
 Every move you could make, ranked by whether it wins the league. Everything else is reference and is linked, not reprinted.
 
