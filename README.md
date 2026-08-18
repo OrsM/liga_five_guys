@@ -235,6 +235,7 @@ src/                 sources.py (the registry: futbolfantasy, Analítica,
                      squads.py  report.py  rivals.py  slate.py
                      decide.py (every move, ranked by Δ P(finish above))
                      sim.py (that ranking, written out as reports/sim.md)
+                     crosswalk.py (builds players.csv + clubs.csv, once)
                      digest.py (stitches REPORT.md)
                      points.py  xi.py  methodology.py
 src/ffcore/          shared core: parse (numbers)  text (names)  tidy (IO+time)
@@ -246,6 +247,8 @@ src/ffcore/          shared core: parse (numbers)  text (names)  tidy (IO+time)
                      forecast (Forecaster: expected() / draw())
                      render (names, for display — never a key)
                      startprob (P(start), graded against confirmed XIs)
+                     crosswalk (one player is one player, whatever a feed
+                       calls him — the table, not the resolution)
 inputs/              you edit these — see above
 data/raw/dt=….tar.xz  raw HTML, deduplicated — append-only, never delete
 data/tidy/market.csv  values, disposable — rebuilt from raw every run
@@ -254,6 +257,8 @@ data/tidy/fixtures.csv kickoffs, as published — the deadline is derived here
 data/tidy/elo.csv     Club Elo ratings, Spanish top flight — the fixture rank
 data/tidy/matches.csv  the season's 380 matches, with the score once played
 data/tidy/starters.csv who actually started — what grades the probable XIs
+data/tidy/players.csv  the crosswalk: every feed's key for every player
+data/tidy/clubs.csv    the same for the 20 clubs, Elo's city names included
 data/tidy/api_market.csv   the market as the app deals it, with bid counts
 data/tidy/api_teams.csv    every squad, from the app; your balance
 data/tidy/api_activity.csv every deal, as the app recorded it
@@ -275,7 +280,7 @@ docs/design.md       architecture, data sources, modelling plan
 ## Tests
 
 No test directory and no pytest. Each module self-tests under
-`if __name__ == "__main__"`, and `lfg-run` runs all twenty-four before it
+`if __name__ == "__main__"`, and `lfg-run` runs all twenty-six before it
 fetches anything. Twenty seconds, and a failure aborts the run.
 
 **Work TDD.** Add the failing assertion to the module's own `_selftest()`,
@@ -309,6 +314,8 @@ PYTHONPATH=src python src/ffcore/forecast.py            # the sampler + its shap
 PYTHONPATH=src python src/ffcore/season.py              # shapes, best XI, standings
 PYTHONPATH=src python src/ffcore/render.py              # folded names, made readable
 PYTHONPATH=src python src/ffcore/startprob.py           # calibration + the fit's guard
+PYTHONPATH=src python src/ffcore/crosswalk.py           # the crosswalk table + merging
+PYTHONPATH=src python src/crosswalk.py --selftest       # resolving every feed's keys
 PYTHONPATH=src python src/decide.py --selftest          # candidates, steals, ranking
 PYTHONPATH=src python src/sim.py --selftest             # the simulation's report
 ```
@@ -325,6 +332,36 @@ also four matches of evidence. `sim.md` prints what was fitted, on how much,
 every run, so the day it changes the report says so rather than moving
 silently. Treat the level as provisional and the ORDERING as the thing to act
 on until more jornadas land.
+
+**Four feeds, four identity spaces, and names as the only bridge.** Measured
+across the store on 2026-08-18, not one pair of slug namespaces overlapped at
+all — market to futbolfantasy, 0 of 553 — and the name joins carrying the load
+ran from 25% to 93%:
+
+    starters -> futbolfantasy  by slug   93%
+    starters -> market         by name   25%
+    api_teams -> market        by name   25%
+    analitica -> futbolfantasy by slug    0%
+
+Seven functions existed to paper over that — `norm`, `resolve`, `key_for`,
+`api_key`, `_by_exact_value`, `match_team`, `club_key` — and every consumer
+re-derived the join from whatever subset of the evidence it happened to have
+loaded. That is not a theoretical complaint: `decide.py`'s own weaker version
+hid five rival players who could not then be bought, and a grader joining
+confirmed line-ups to market rows matched a quarter of them and fitted a model
+on the wreckage.
+
+`data/tidy/players.csv` and `clubs.csv` are the fix — one row per player and
+per club, carrying every feed's key for it, built by `src/crosswalk.py` right
+after `parse`. **It is a crosswalk, not a renumbering:** the id stays
+`norm(market name)`, which is what every dict in the repo is already keyed by,
+so adopting it is additive. And it MERGES rather than rebuilds, so a player
+the API named once is nameable forever after the run that saw him, and a feed
+that skips a sweep erases nothing. Coverage is printed every run.
+
+It did not change a single number the day it landed — for the eight clubs that
+had played, the name join happened to work — and that is the point. It removes
+the way those numbers go wrong silently.
 
 **A self-test suite that passes is not a program that runs.** Deleting the
 board took thirteen functions out of report.py; all twenty-three suites went

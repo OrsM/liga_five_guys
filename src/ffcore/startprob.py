@@ -263,19 +263,20 @@ def _titular_rate(obs) -> float:
 
 
 def observations(lineups, starters, cut: str, roster=None,
-                 neutral: float = 60.0, absent: float = 15.0) -> list[Obs]:
+                 neutral: float = 60.0, absent: float = 15.0,
+                 xw=None) -> list[Obs]:
     """Predictions made before `cut`, joined to who actually started.
 
     Only the clubs a confirmed line-up exists for: everyone else has not
     played, and scoring a prediction against a match that has not happened is
     how a grader flatters itself.
 
-    THE JOIN IS BY SLUG, AND ONLY FOR THE WIDER SOURCE. Confirmed line-ups and
-    the wider source's probable elevens come off the same site, so they share
-    a player slug and 169 of 182 match exactly. The narrow source is a
-    different site with its own slugs — zero overlap — so it joins by folded
-    name, which is the join this repo warns about everywhere and the reason it
-    is confined to one line here.
+    THE JOIN IS THE CROSSWALK'S when one is passed, and that is the whole
+    point of having one: every feed's key for a player resolves to the same id
+    without this module doing any guessing. Without it, confirmed line-ups and
+    the wider source share a slug (169 of 182 match) while the narrow source
+    shares nothing with anybody and falls back to a folded name at 66% — the
+    join this repo warns about everywhere.
 
     THE UNIVERSE IS THE WIDER SOURCE'S OWN LIST, plus anyone who turned out to
     play. Not the matchday eighteen — that drops everyone left out of the
@@ -298,6 +299,16 @@ def observations(lineups, starters, cut: str, roster=None,
     name_of = {r["player_slug"]: r.get("player_name", "") for r in truth}
     team_of = {r["player_slug"]: r.get("team_slug", "") for r in truth}
 
+    def ident(r):
+        """One player, however this feed spells him."""
+        if xw is not None:
+            hit = xw.player(ff_slug=r.get("player_slug"),
+                            af_slug=r.get("player_slug"),
+                            name=r.get("player_name"))
+            if hit:
+                return hit
+        return None
+
     wide: dict[str, dict] = {}
     narrow: dict[str, dict] = {}
     for r in sorted((r for r in lineups
@@ -307,7 +318,7 @@ def observations(lineups, starters, cut: str, roster=None,
         if (r.get("source") or "").startswith("futbol"):
             wide[r.get("player_slug") or norm(r.get("player_name"))] = r
         else:
-            narrow[norm(r.get("player_name"))] = r
+            narrow[ident(r) or norm(r.get("player_name"))] = r
 
     out = []
     for slug in sorted(set(wide) | set(truth and name_of)):
@@ -322,7 +333,12 @@ def observations(lineups, starters, cut: str, roster=None,
                 except (TypeError, ValueError):
                     pass
         nm = (row or {}).get("player_name") or name_of.get(slug, "")
-        out.append(Obs(fp, af_prob(narrow.get(norm(nm)), 1.0),
+        af = narrow.get(norm(nm))
+        if af is None and xw is not None:
+            pid = xw.player(ff_slug=slug, name=nm)
+            if pid:
+                af = narrow.get(pid)
+        out.append(Obs(fp, af_prob(af, 1.0),
                        slug in started,
                        (row or {}).get("team_slug") or team_of.get(slug, "")))
     return out
@@ -458,7 +474,28 @@ def _selftest() -> None:
                for o in got), got
     assert observations(lineups, [], cut="M") == []
 
-    print("ffcore.startprob self-test OK (46 cases)")
+    # THE CROSSWALK MAKES THE NARROW SOURCE'S JOIN EXACT. It shares no slug
+    # with anybody, so without one it is matched on a folded name at 66% — and
+    # the third of it that misses is a source silently having no opinion.
+    class _XW:
+        def player(self, **kw):
+            if kw.get("af_slug") == "af-only-slug":
+                return "starter man"
+            if kw.get("ff_slug") == "starter-man":
+                return "starter man"
+            return None
+
+    odd = [r for r in lineups if r["source"] == "futbolfantasy"] + [
+        {"observed_at": "A", "source": "analitica", "team_slug": "t",
+         "player_slug": "af-only-slug", "player_name": "S. Man",
+         "start_pct": "75", "role": "starter"}]
+    # The narrow source spells him differently, so the name join finds nothing.
+    assert all(o.af is None for o in observations(odd, starters, cut="M"))
+    # Through the crosswalk it lands on the right player.
+    got2 = observations(odd, starters, cut="M", xw=_XW())
+    assert any(o.af == 0.75 for o in got2), got2
+
+    print("ffcore.startprob self-test OK (48 cases)")
 
 
 if __name__ == "__main__":

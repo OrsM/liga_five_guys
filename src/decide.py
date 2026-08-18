@@ -425,7 +425,7 @@ def rounds_left(matches, teams) -> tuple[list[int], dict[int, set[str]], list]:
     return rem, played, unjoined
 
 
-def club_key(raw, teams) -> str:
+def club_key(raw, teams, xw=None) -> str:
     """One club, one key, whichever page spelled it — or "" if it will not
     place.
 
@@ -433,13 +433,19 @@ def club_key(raw, teams) -> str:
     page "rayo-vallecano", and the probable-XI page files most players under
     the first and a handful under the second. Folding the case and the
     punctuation is not enough, because "rayo" and "rayo vallecano" are still
-    two strings. So every name is resolved against the MARKET's list — the one
-    spelling this repo treats as canonical everywhere else — through the same
-    `match_team` the fixture board uses.
+    two strings.
+
+    THE CROSSWALK ANSWERS THIS when there is one — clubs.csv holds every
+    spelling against one id, resolved once. Without it, the fallback is the
+    same `match_team` the fixture board uses, against the market's list.
 
     "" for a name nothing can place, and "" is never equal to a club: an
     unplaceable club must not accidentally compare equal to another one.
     """
+    if xw is not None:
+        hit = xw.club(ff_slug=raw, name=raw)
+        if hit:
+            return hit
     from ffcore.fixture import match_team
     hit = match_team(raw or "", teams)
     return norm(hit) if hit else ""
@@ -746,6 +752,16 @@ def _selftest() -> None:
     # is the double count back under a different name. Both sides go through
     # the MARKET's list of clubs, which is the one canonical spelling there is.
     assert club_key("rayo-vallecano", teams) == "rayo"
+
+    # THE CROSSWALK ANSWERS FIRST when there is one, because it resolved this
+    # once with every feed in front of it instead of guessing per call.
+    class _XW:
+        def club(self, **kw):
+            return "rayo" if "vallecano" in str(kw.values()).lower() else None
+
+    assert club_key("Rayo Vallecano", [], xw=_XW()) == "rayo"
+    # ...and the fallback still works where the table has nothing.
+    assert club_key("celta", teams, xw=_XW()) == "celta vigo"
     assert club_key("Rayo", teams) == "rayo"
     assert club_key("celta", teams) == "celta vigo"
     # No club, or one nothing can place, is not "some club" — it is nothing,
@@ -764,7 +780,7 @@ def _selftest() -> None:
     assert un == ["zzz-united"], un
     assert _d == {1: {"getafe"}}, _d
 
-    print("decide self-test OK (47 cases)")
+    print("decide self-test OK (49 cases)")
 
 
 if __name__ == "__main__":

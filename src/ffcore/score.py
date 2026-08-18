@@ -188,6 +188,7 @@ def _calibrated():
     """
     if _CAL_CACHE:
         return _CAL_CACHE[0]
+    from ffcore.crosswalk import Crosswalk
     from ffcore.startprob import Calibration, observations
     from ffcore.tidy import load_lineups, read_csv, TIDY
     from ffcore.second import SECOND_SOURCE
@@ -195,11 +196,14 @@ def _calibrated():
     second = load_lineups(SECOND_SOURCE)
     truth = read_csv(TIDY / "starters.csv")
     cut = min((r.get("observed_at", "") for r in truth), default="")
+    # The crosswalk is what lets the narrow source be joined exactly rather
+    # than on a folded name: it shares no slug with anything else.
+    xw = Crosswalk.read(TIDY / "players.csv", TIDY / "clubs.csv")
     cal = Calibration()
     if cut:
         cal = Calibration.fit(observations(
             load_lineups() + second, truth, cut, neutral=NEUTRAL_START,
-            absent=ABSENT_START))
+            absent=ABSENT_START, xw=xw))
     _CAL_CACHE.append((cal, second))
     return _CAL_CACHE[0]
 
