@@ -1,4 +1,4 @@
-# Liga Five Guys — one report — 2026-08-18 01:30 UTC
+# Liga Five Guys — one report — 2026-08-18 01:43 UTC
 
 Field, buy, hold, sell — one table, one metric. Everything else is reference and is linked, not reprinted.
 
@@ -14,8 +14,6 @@ Field, buy, hold, sell — one table, one metric. Everything else is reference a
 | sell 1 of ↑ | Robin Le Normand | DEF | -0.071 | + 11.16M |
 | sell 1 of ↑ | Igor Zubeldia | DEF | -0.108 | + 11.05M |
 | sell 1 of ↑ | Omar El Hilali | DEF | -0.098 | + 10.09M |
-| **Buy** | Isi Palazon | DEL | -0.039 | − 20.55M |
-| sell 1 of ↑ | Iñigo Vicente | DEL | -0.078 | + 21.02M |
 | **Sell** | Alvaro Fernandez | POR | -1.056 | + 4.80M |
 | **Sell** | Beñat Turrientes | MED | -0.142 | + 7.57M |
 | **Sell** | Dani Lorenzo | MED | -0.067 | + 10.28M |
@@ -42,10 +40,10 @@ _**Buy** spends; `≤` is the most it is worth paying. `sell 1 of ↑` are alter
 | Carl Starfelt ⚽ | DEF | Valencia A · 2.9 | 60%/67% | -0.3 | -0.023 | 15.09M | — | **Sell** — funds Marcos Alonso (+1.6, +2.0 better) |
 | Pepelu ⚽ | MED | Celta Vigo H · 3.0 | 70%/67% | -0.2 | -0.027 | 8.22M | — | Hold — nothing better on offer at MED |
 | _Marc Bartra_ | DEF | Sociedad H · 2.7 | 50%/67% | -0.8 | -0.029 | 28.07M | — | pass |
-| _Isi Palazon_ | DEL | Alaves H ★ · 3.9 | 80%/50% | -0.8 | -0.039 | 20.55M | — | **Buy** — paid for by selling Iñigo Vicente |
+| _Isi Palazon_ | DEL | Alaves H ★ · 3.9 | 80%/50% | -0.8 | -0.039 | 20.55M | — | pass |
 | Dani Lorenzo ▼ | MED | Atletico A · 2.2 | 90%/100% | -0.7 | -0.067 | 10.28M | — | **Sell** — 6th MED — only 5 can be fielded |
 | Robin Le Normand ⚽ | DEF | Malaga H · 3.0 | 60%/50% | -0.8 | -0.071 | 11.16M | — | **Sell** — funds Marcos Alonso (+1.6, +2.4 better) |
-| Iñigo Vicente ⚽ | DEL | Getafe A · 2.6 | 90%/100% | -1.6 | -0.078 | 21.02M | — | **Sell** — funds Isi Palazon (-0.8, +0.9 better) |
+| Iñigo Vicente ⚽ | DEL | Getafe A · 2.6 | 90%/100% | -1.6 | -0.078 | 21.02M | — | Hold — nothing better on offer at DEL |
 | Omar El Hilali ⚽ | DEF | Madrid H · 2.2 | 80%/— | -1.0 | -0.098 | 10.09M | — | **Sell** — funds Marcos Alonso (+1.6, +2.6 better) |
 | Igor Zubeldia ⚽ | DEF | Betis A · 2.0 | 60%/— | -1.2 | -0.108 | 11.05M | — | **Sell** — funds Marcos Alonso (+1.6, +2.8 better) |
 | _Angeliño_ | DEF | Malaga A ★ · 1.5 | 50%/— | -2.0 | -0.127 | 15.81M | — | pass |

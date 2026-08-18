@@ -42,7 +42,7 @@ _Swaps are same-position only: a cross-slot difference is a change of formation,
 
 | Player | Pos | Bid | above repl | pts/M | At the line | Competition | Verdict |
 |---|---|--:|--:|--:|--:|---|---|
-| Isi Palazon | del | 20.20M | -0.8 | -0.039 | — | (4 broke) | **Buy** — cover, you are 1 short at DEL |
+| Isi Palazon | del | 20.20M | -0.8 | -0.039 | — | (4 broke) | pass — cover, you are 1 short at DEL |
 | Aitor Mañas | del | 523K | -3.5 | -6.532 | — | none | pass — cover, you are 1 short at DEL |
 | Marcos Alonso | def | — | +1.6 | 0.055 | — | (4 broke) | **Buy** — paid for by selling Carl Starfelt |
 | Pedri Gonzalez | med | — | +0.1 | 0.002 | — | (4 broke) | pass |
@@ -128,4 +128,4 @@ _637 players tracked, 512 with a probable-XI reading._
 
 _xPts/j — expected points per jornada = shrunk pts/match (K=8, 2025-26) × fixture × P(start), from `ffcore/score.py` — the same scorer rivals.py uses. Injured, suspended and unavailable score zero; a doubt is halved. The fixture term is a ±12% band across the opponents ranked by Club Elo rating, plus ±4% for home advantage; both widths are guesses, unfitted because nothing has been played, and small enough that a wrong one costs a fraction of a point._
 
-_Generated 2026-08-18 01:30 UTC._
+_Generated 2026-08-18 01:43 UTC._

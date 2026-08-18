@@ -1,0 +1,103 @@
+{
+ "generated_at": "2026-08-18T01:43Z",
+ "locks_in_h": 41.3,
+ "cash": 23596582.0,
+ "squad_value": 213113164.0,
+ "line": null,
+ "rows": [
+  {
+   "kind": "buy",
+   "name": "Marcos Alonso",
+   "pos": "DEF",
+   "rate": 0.05520951369662748,
+   "money": -29083151.782312296,
+   "why": "paid for by selling Carl Starfelt",
+   "in_xi": false,
+   "flag": false,
+   "cap": null
+  },
+  {
+   "kind": "fund",
+   "name": "Carl Starfelt",
+   "pos": "DEF",
+   "rate": -0.022883352112276305,
+   "money": 15085364.329927472,
+   "why": "funds Marcos Alonso (+1.6, +2.0 better)",
+   "in_xi": true,
+   "flag": false
+  },
+  {
+   "kind": "fund",
+   "name": "Robin Le Normand",
+   "pos": "DEF",
+   "rate": -0.07131280357116862,
+   "money": 11161311.918554839,
+   "why": "funds Marcos Alonso (+1.6, +2.4 better)",
+   "in_xi": true,
+   "flag": false
+  },
+  {
+   "kind": "fund",
+   "name": "Igor Zubeldia",
+   "pos": "DEF",
+   "rate": -0.10807834719784712,
+   "money": 11049644.111795416,
+   "why": "funds Marcos Alonso (+1.6, +2.8 better)",
+   "in_xi": true,
+   "flag": false
+  },
+  {
+   "kind": "fund",
+   "name": "Omar El Hilali",
+   "pos": "DEF",
+   "rate": -0.09849762574291614,
+   "money": 10093921.200925762,
+   "why": "funds Marcos Alonso (+1.6, +2.6 better)",
+   "in_xi": true,
+   "flag": false
+  },
+  {
+   "kind": "sell",
+   "name": "Alvaro Fernandez",
+   "pos": "POR",
+   "rate": -1.0558060206326345,
+   "money": 4804745.084555533,
+   "why": "2nd POR — only 1 can be fielded",
+   "in_xi": false,
+   "flag": false
+  },
+  {
+   "kind": "sell",
+   "name": "Beñat Turrientes",
+   "pos": "MED",
+   "rate": -0.14222426955511955,
+   "money": 7574160.448136127,
+   "why": "7th MED — only 5 can be fielded",
+   "in_xi": false,
+   "flag": false
+  },
+  {
+   "kind": "sell",
+   "name": "Dani Lorenzo",
+   "pos": "MED",
+   "rate": -0.0666170781806349,
+   "money": 10284922.93363122,
+   "why": "6th MED — only 5 can be fielded",
+   "in_xi": false,
+   "flag": false
+  }
+ ],
+ "xi": [
+  "Jon Moncayola",
+  "Pablo Fornals",
+  "Ionut Radu",
+  "Iñigo Ruiz de Galarreta",
+  "Lucien Agoume",
+  "Carl Starfelt",
+  "Pepelu",
+  "Robin Le Normand",
+  "Iñigo Vicente",
+  "Omar El Hilali",
+  "Igor Zubeldia"
+ ]
+}
