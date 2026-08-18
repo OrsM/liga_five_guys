@@ -482,40 +482,6 @@ def starters_per_slot(premium: bool = False) -> dict[str, float]:
     return out
 
 
-def replacement(pool: dict, squads: int,
-                premium: bool = False) -> dict[str, float]:
-    """{slot: the score of the last man the league can start there}.
-
-    `pool` is squad_pool() over everyone the market prices — owned or not,
-    because a player a rival holds still occupies one of the league's starting
-    slots, which is exactly what makes the position scarce.
-
-    A position with fewer players than the rung replaces at its own last man:
-    that is the worst anyone can be replaced with, and inventing a lower number
-    would price a thin position as though it were deep.
-    """
-    per = starters_per_slot(premium)
-    out = {}
-    for slot, rows in pool.items():
-        if not rows:
-            continue
-        rung = max(1, round(squads * per.get(slot, 0.0)))
-        out[slot] = rows[min(rung, len(rows)) - 1]["score"]
-    return out
-
-
-def vor(row: dict, repl: dict) -> float:
-    """Score above replacement at this player's slot.
-
-    Negative is meaningful and is not clipped: it says the league can field
-    someone better at that position without paying for him.
-    """
-    slot = row.get("slot")
-    if not slot:
-        return 0.0                      # never startable: worth no more than 0
-    return row.get("score", 0.0) - repl.get(slot, 0.0)
-
-
 def pick_xi(pool: dict, force: dict | None = None, premium: bool = False):
     """Best legal XI by total score, or None if no legal shape fits.
 
@@ -633,11 +599,11 @@ def _selftest() -> None:
     # meant to reach, and as_row() carries the new fields to the renderers.
     assert "fix" in s.as_row() and "flat" in s.as_row()
 
-    # -- replacement level --------------------------------------------------
-    # How many of each position the league starts, averaged over the shapes the
-    # app allows. It has to average: 3-4-3 and 5-4-1 start a different number
-    # of defenders, so no single count is "the" number, and the eleven still
-    # adds up to eleven.
+    # -- how many of each position the league starts -----------------------
+    # It has to be an average: 3-4-3 and 5-4-1 start a different number of
+    # defenders, so no single count is "the" number, and the eleven still adds
+    # up to eleven. `replacement` and `vor` were built on this and went with
+    # the board on 2026-08-18 — it stays because formations() needs it.
     per = starters_per_slot()
     assert per == {"POR": 1.0, "DEF": 4.0, "MED": 4.0, "DEL": 2.0}, per
     assert abs(sum(per.values()) - 11.0) < 1e-9
@@ -647,33 +613,7 @@ def _selftest() -> None:
     assert prem["DEL"] > per["DEL"] and prem["MED"] < per["MED"], prem
     assert abs(sum(prem.values()) - 11.0) < 1e-9
 
-    # The rung: with 5 managers the league starts 5 keepers and 20 defenders,
-    # so the 5th keeper and the 20th defender are what a squad can replace a
-    # man with. Everyone above his own rung is worth owning; below it, the
-    # position is already covered league-wide.
-    pool = squad_pool([{"slot": "POR", "score": 10.0 - i, "name": "k%d" % i}
-                       for i in range(8)]
-                      + [{"slot": "DEF", "score": 30.0 - i, "name": "d%d" % i}
-                         for i in range(25)])
-    repl = replacement(pool, 5)
-    assert repl["POR"] == 6.0, repl        # 5th best: 10, 9, 8, 7, 6
-    assert repl["DEF"] == 11.0, repl      # 20th best: 30 - 19
-    assert vor({"slot": "DEF", "score": 30.0}, repl) == 19.0
-    # Below his rung a player is worth less than what the market can replace
-    # him with, and the number says so rather than clipping at zero.
-    assert vor({"slot": "POR", "score": 4.0}, repl) == -2.0
-    # A slot too thin to reach the rung falls back to its last man rather than
-    # to a number nobody in the league can be measured against.
-    thin = replacement(squad_pool([{"slot": "DEL", "score": 3.0, "name": "f"}]),
-                       5)
-    assert thin["DEL"] == 3.0, thin
-    assert vor({"slot": "DEL", "score": 3.0}, thin) == 0.0
-    # An empty position replaces at nothing, so every player at it is surplus.
-    assert vor({"slot": "MED", "score": 2.0}, repl) == 2.0
-    # No slot at all is never startable, so he is worth no more than the bench.
-    assert vor({"slot": "", "score": 9.0}, repl) == 0.0
-
-    print("ffcore.score self-test OK (31 cases)")
+    print("ffcore.score self-test OK (23 cases)")
 
 
 if __name__ == "__main__":

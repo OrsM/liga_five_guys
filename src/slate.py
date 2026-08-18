@@ -19,7 +19,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from ffcore.text import norm  # noqa: E402
 
-__all__ = ["read_slate", "slate_from_api", "slate_prices"]
+__all__ = ["read_slate", "slate_from_api"]
 
 
 def slate_from_api(rows: list[dict], market) -> tuple[set, list]:
@@ -44,33 +44,6 @@ def slate_from_api(rows: list[dict], market) -> tuple[set, list]:
         else:
             unresolved.append(raw)
     return keys, unresolved
-
-
-def slate_prices(rows: list[dict], market) -> dict:
-    """{player key: {sale_price, bids, seller, expires_at}}.
-
-    `bids` is None when the feed did not state one (manager-listed players
-    carry null). None must never become 0: that reads as "nobody is bidding"
-    rather than "we do not know".
-    """
-    out = {}
-    for r in rows:
-        raw = (r.get("player_name") or "").strip()
-        if not raw:
-            continue
-        key = market.key_for(raw) if market is not None else norm(raw)
-        if not key:
-            continue
-        try:
-            price = float(r.get("sale_price") or 0) or None
-        except ValueError:
-            price = None
-        bids = (r.get("bids") or "").strip()
-        out[key] = {"sale_price": price,
-                    "bids": int(bids) if bids.isdigit() else None,
-                    "seller": r.get("seller") or "",
-                    "expires_at": r.get("expires_at") or ""}
-    return out
 
 
 def read_slate(market, rows=None) -> tuple[set, list]:
@@ -123,16 +96,6 @@ def _selftest() -> None:
     # ownership prune here and there must not be one.
     assert norm("Stole Dimitrievski") in slate_from_api(rows, market)[0]
 
-    px = slate_prices(rows, market)
-    assert px[norm("Álvaro Valles")]["sale_price"] == 31900000.0
-    assert px[norm("Stole Dimitrievski")]["bids"] == 2
-    assert px[norm("Stole Dimitrievski")]["seller"] == "marketPlayerTeam"
-    # Null bids is NOT STATED, never zero.
-    assert slate_prices([{"player_name": "Fornals", "bids": ""}],
-                        market)[norm("Pablo Fornals")]["bids"] is None
-    # An unjoinable name carries no price row either — a price keyed on a name
-    # nothing recognises would never be read and would look like a gap.
-    assert slate_prices([{"player_name": "Nobody"}], market) == {}
 
     # No feed is no slate.
     assert read_slate(market, rows=[]) == (set(), [])

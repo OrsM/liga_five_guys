@@ -51,6 +51,10 @@ POSITION = ["Warnings"]
 
 # Order matters: this is the order you read them in, not the order they are
 # generated.
+# The one section of sim.md that belongs in the appendix rather than the
+# report: how each number is made is not a thing you read before a deadline.
+REPORT_SKIP = {"what the simulation cannot see"}
+
 SOURCES = [
     # THE DECISION FIRST, and it is now one thing: every move you could make,
     # ranked by what it does to where you finish. It replaced a board that
@@ -79,13 +83,25 @@ SOURCES = [
 # between them printed the cash table twice, the ledger warnings twice and the
 # squads twice, from one module with no tests and one with a few.
 LINKS = [
-    ("The workings — the eleven, bids, the basket, sales, movers",
-     "latest.md"),
-    ("Every squad, cash, what each manager pays over value", "league.md"),
-    ("How the forecast works, and how it's doing", "methodology.md"),
+    ("How every number here is made, and what it cannot see", "METHOD.md"),
 ]
 
 OUT = "REPORT.md"
+
+# THE APPENDIX. Everything true about HOW the numbers are made, so the report
+# can be the numbers. It is a second stitched file rather than a tail on the
+# first because the caveats are long, they change rarely, and they were
+# sitting between the table you act on and the league table you check.
+APPENDIX = "METHOD.md"
+
+APPENDIX_SOURCES = [
+    Part("What it cannot see", "sim.md", ["What the simulation cannot see"],
+         nest=False),
+    Part("The forecast, and how it is doing", "methodology.md", None,
+         nest=False),
+    Part("The workings", "latest.md", ["2. What to bid", "3. Exceptions",
+                                       "Notes"], nest=False),
+]
 
 
 def split_sections(text: str) -> list[tuple[str, list[str]]]:
@@ -111,11 +127,12 @@ def _key(heading: str) -> str:
 
 
 def digest(read, sources=SOURCES, stamp: str = "",
-           links=LINKS) -> list[str]:
+           links=LINKS, skip=frozenset(), title="", lead="") -> list[str]:
     """Assemble one report. `read(name)` returns the file's text, or None."""
-    out = ["# Liga Five Guys — one report" + (" — " + stamp if stamp else ""),
+    out = [("# " + (title or "Liga Five Guys — one report"))
+           + (" — " + stamp if stamp else ""),
            "",
-           "Every move you could make, ranked by whether it wins the "
+           lead or "Every move you could make, ranked by whether it wins the "
            "league. Everything else is reference and is linked, not "
            "reprinted.", ""]
     body: list[str] = []
@@ -137,6 +154,8 @@ def digest(read, sources=SOURCES, stamp: str = "",
         for heading, lines in split_sections(text):
             if heading:
                 if keep is not None and _key(heading) not in keep:
+                    continue
+                if _key(heading) in skip:
                     continue
                 if _key(heading) in seen:
                     continue
@@ -184,7 +203,13 @@ def main() -> None:
 
     stamp = dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
     REPORTS.mkdir(exist_ok=True)
-    write_lines(REPORTS / OUT, digest(read, stamp=stamp))
+    write_lines(REPORTS / OUT, digest(read, stamp=stamp, skip=REPORT_SKIP))
+    write_lines(REPORTS / APPENDIX,
+                digest(read, APPENDIX_SOURCES, stamp=stamp, links=None,
+                       title="Liga Five Guys — how the numbers are made",
+                       lead="Everything about HOW, so the report can be the "
+                            "numbers. The fits, the estimates, and every way "
+                            "each one is known to be wrong."))
 
 
 def _selftest() -> None:
@@ -235,6 +260,20 @@ def _selftest() -> None:
     # The second ask found nothing, and says so rather than going quiet.
     assert "Sections missing" in text2 and "rivals.md → Ledger" in text2
 
+    # A section can be SKIPPED rather than cherry-picked, which is how one
+    # source feeds both the report and the appendix without either of them
+    # naming every heading the other wants.
+    both = digest(lambda n: files.get(n),
+                  [Part("D", "latest.md", None, nest=False)],
+                  links=None, skip={"warnings"})
+    assert "1. Am I fielding" in "\n".join(both)
+    assert "## Warnings" not in "\n".join(both), both
+    # ...and a different title and lead, for the appendix.
+    apx = digest(lambda n: files.get(n), [], links=None,
+                 title="How the numbers are made", lead="the fits")
+    assert apx[0].startswith("# How the numbers are made")
+    assert "the fits" in apx[2]
+
     # THE SILENT-SHORTENING GUARD: a renamed heading is reported, not dropped.
     renamed = digest(lambda n: files.get(n),
                      [Part("D", "latest.md", ["Warnings", "5. Gone"],
@@ -262,7 +301,7 @@ def _selftest() -> None:
     # Numbering is ignored when deciding what is a duplicate.
     assert _key("6. Ledger warnings") == _key("Ledger warnings")
 
-    print("digest self-test OK (24 cases)")
+    print("digest self-test OK (28 cases)")
 
 
 if __name__ == "__main__":

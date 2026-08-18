@@ -1,4 +1,4 @@
-# Liga Five Guys — one report — 2026-08-18 22:20 UTC
+# Liga Five Guys — one report — 2026-08-18 22:36 UTC
 
 Every move you could make, ranked by whether it wins the league. Everything else is reference and is linked, not reprinted.
 
@@ -7,7 +7,7 @@ Every move you could make, ranked by whether it wins the league. Everything else
 
 **Don't spend yet.** Wait for the market is worth about +205 points over the rest of the season against +140 for the best thing you can buy today — 65 better even after paying a jornada for the delay, and the balance is what buys the choice.
 
-**Locks in 21h** · squad 213.11M · cash 23.60M · total 236.71M
+**Locks in 20h** · squad 213.11M · cash 23.60M · total 236.71M
 
 **Expected finish 2.14** · **P(win) 11%** · season **1,480–1,738** (10–90)
 
@@ -81,18 +81,6 @@ _Read it top to bottom: it is a plan, not a menu. The funding is implicit — se
 | Magic Mike 333 | 11 | 1,431 | 1,313–1,553 | 91% |
 | Albert Laporta | 10 | 1,245 | 1,133–1,361 | 100% |
 
-## What the simulation cannot see
-
-_shape from the seed prior (96 observed, 200 needed)._
-
-_P(start) fitted on 240 confirmed starts across 8 team sheets: futbolfantasy recalibrated (logit -0.5 +5.8x), blended 80% with analiticafantasy where it has an opinion (a named starter counts 94%). Brier improves 0.032 on line-ups the fit had not seen._
-
-- **Jornada 1 is half played.** 8 clubs are done and their points are already in the `now` column, so the simulation only plays the rest of the round. It still re-picks an eleven that is in fact already locked.
-- **A buyout premium is charged at **0.000 places per million**, the median of every run that has measured it — today's own reading is 0.000.** A clause runs a median 1.52x market value in this league and the app only ever pays the value back, so the premium is gone for good. It is charged against the move rather than ignored — but the price is measured off what more money would actually buy you today, and on most days that is very little.
-- **P(start) is today's, held flat over every remaining jornada.** Nothing here knows who will be injured in March.
-- **Rivals never transfer.** A steal that guts a squad assumes its manager does not simply buy someone back.
-- **Teammates score independently.** Two defenders of one club share a clean sheet, so a concentrated squad really has more variance than this shows.
-- **Cash scores zero.** Nothing models the market next cycle, so holding money looks worthless and a standalone sale can never look good.
 
 
 _What the one table in [REPORT.md](REPORT.md) was built from: the eleven it assumes you field, what a man on today's slate should cost, and the two ways any of it can be wrong about a player._
@@ -109,6 +97,4 @@ _Compare squad value with the app; a mismatch means a name matched the wrong pla
 
 Kept in full, one tap away — not reprinted here, because that is what made this file 504 lines long.
 
-- [The workings — the eleven, bids, the basket, sales, movers](latest.md)
-- [Every squad, cash, what each manager pays over value](league.md)
-- [How the forecast works, and how it's doing](methodology.md)
+- [How every number here is made, and what it cannot see](METHOD.md)

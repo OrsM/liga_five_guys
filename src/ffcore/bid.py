@@ -32,8 +32,6 @@ directly:
     prem = premiums(deals)                  # what winning has cost so far
     adv  = suggest(value, prem, cash, ceil)  # what to bid for this one
     g    = gain(pool, candidate, xi_total)   # what he adds if you play him
-    got, line, spent, forgone = basket(free, cash)   # what cash itself buys
-    ratio_of(g, cost_of(value, prem)) > line          # the whole rule
 
 NOTHING HERE ASSERTS HOW OFTEN THE FLOOR WINS. An earlier version of this
 module said it never had, on the strength of ten buys that all cleared the
@@ -77,8 +75,7 @@ from ffcore.tidy import ledger_stamp
 
 __all__ = ["MAX_LAG_H", "ROUND_TO", "FLOOR_EPS", "HORIZONS", "Premiums", "Advice",
            "is_round", "deals", "usable", "premiums", "suggest", "gain",
-           "rivals_short", "xi_snapshots", "demand_summary",
-           "cost_of", "ratio_of", "basket",
+           "xi_snapshots", "demand_summary",
            ]
 
 # How long after a deal to look at what the price did. Three, seven and
@@ -306,92 +303,7 @@ def drift_daily(rows, band=None) -> tuple[float, int]:
     return statistics.mean(vals), len(vals)
 
 
-def drift_bands(rows) -> dict:
-    """{band: (mean daily %, n)} — computed once, looked up per candidate.
-
-    A band with too few readings to mean anything falls back to the whole
-    market rather than reporting a mean of three numbers as a rate.
-    """
-    overall = drift_daily(rows)
-    out = {}
-    for band in DRIFT_BANDS:
-        d, n = drift_daily(rows, band)
-        out[band] = (d, n) if n >= MIN_DRIFT_N else overall
-    return out
-
-
 MIN_DRIFT_N = 50
-
-
-def friction(value, buy_prem: Premiums | None, sell_prem: Premiums | None,
-             daily_pct: float = 0.0, n_drift: int = 0,
-             days: int = HOLD_DAYS) -> Friction | None:
-    """Expected cost of owning a player worth `value` for `days`."""
-    if not value or value <= 0:
-        return None
-    entry = value * (buy_prem.median / 100.0) if buy_prem else 0.0
-    carry = -value * (daily_pct / 100.0) * days
-    swing = value * (sell_prem.swing() / 100.0) if sell_prem else 0.0
-    return Friction(entry, carry, swing, days, n_drift)
-def cost_of(value, prem: Premiums | None = None) -> float | None:
-    """What winning him is expected to cost: the floor plus the going premium.
-
-    None when there is no value to bid against — never zero, because a zero
-    cost divides into an infinite ratio and would buy anything.
-    """
-    v = value if isinstance(value, (int, float)) else money(value)
-    if not v or v <= 0:
-        return None
-    return v * (1.0 + prem.median / 100.0) if prem else float(v)
-
-
-def ratio_of(gain_pts, cost) -> float | None:
-    """XI index points per million euros. The one currency.
-
-    None when either side is missing. A NEGATIVE ratio is a real answer: it
-    prices a player who makes your eleven worse, which is what a cover buy is.
-    """
-    if gain_pts is None or not cost or cost <= 0:
-        return None
-    return gain_pts / (cost / 1e6)
-def basket(free: list[dict], cash) -> tuple[list[dict], float | None,
-                                            float, float]:
-    """What idle cash can buy on the replacement scale, best rate first.
-
-    Returns (bought, hurdle, spent, forgone):
-
-      bought   the rows the walk would take, in the order it takes them
-      hurdle   the worst rate it funded — the rate to beat. A player you own
-               below it can be sold and the money moved into this basket, which
-               is what makes one number serve both sides of the market.
-      spent    what the basket costs
-      forgone  the points above replacement the cash is NOT earning while it
-               sits there. This is the cost of idle cash, and it is a number
-               rather than a warning about opportunity.
-
-    Rows need `vor` and `value`. Unlike frontier(), nothing here re-picks an
-    eleven between purchases: a fixed baseline means two signings do not
-    compete for the same slot, so the walk is a sort and a running total.
-    """
-    rated = []
-    for r in free:
-        val = r.get("value")
-        if not val or r.get("vor") is None or r["vor"] <= 0:
-            continue
-        rated.append((r["vor"] / (val / 1e6), r))
-    rated.sort(key=lambda t: -t[0])
-
-    left = cash or 0.0
-    bought, hurdle, spent, forgone = [], None, 0.0, 0.0
-    for rate, r in rated:
-        if r["value"] > left:
-            continue
-        left -= r["value"]
-        spent += r["value"]
-        forgone += r["vor"]
-        hurdle = rate
-        bought.append(r)
-    return bought, hurdle, spent, forgone
 
 
 def gain(pool: dict, candidate: dict, base_total: float,
@@ -411,25 +323,6 @@ def gain(pool: dict, candidate: dict, base_total: float,
     trial[slot].sort(key=lambda p: p["score"], reverse=True)
     best = pick_xi(trial, force=candidate, premium=premium)
     return None if best is None else best[0] - base_total
-
-
-def rivals_short(lg, sc, by_key) -> dict[str, list[str]]:
-    """{slot: [rival handles thin there]} — who is likely to bid against you.
-
-    You are excluded: the question this answers is who competes, and your own
-    shortage is already the reason you are looking.
-    """
-    out: dict[str, list[str]] = {}
-    for m in lg:
-        if m.handle == lg.cfg.me:
-            continue
-        scored, _ = sc.score_squad(
-            [by_key.get(k, {}).get("name", k) for k in m.players])
-        counts = Counter(p.slot for p in scored if p.slot)
-        for slot, floor in THIN.items():
-            if counts.get(slot, 0) < floor:
-                out.setdefault(slot, []).append(m.handle)
-    return out
 
 
 def xi_snapshots(lg, sc, by_key) -> dict[str, dict]:
@@ -729,85 +622,6 @@ def _selftest() -> None:
         cand, _Lg([_M("me", None), _M("Stuck", 1e6)]),
         {"me": snap(weak_pool), "Stuck": snap(short=["MED"])})
     assert got == "Stuck needs", got
-
-    # --- friction ----------------------------------------------------------
-    buy = Premiums(21, 2.6, -0.2, 21.6, 6)
-    sell = Premiums(13, 3.3, -9.4, 12.0, 5)
-    d, n = drift_daily([{"delta_pct_1d": "-0.2"}, {"delta_pct_1d": "-0.4"},
-                        {"delta_pct_1d": "0.0"}, {"delta_pct_1d": None},
-                        {"delta_pct_1d": "not a number"}])
-    assert n == 3 and abs(d - (-0.2)) < 1e-9, (d, n)
-    # A market with no readings at all drifts by nothing, rather than crashing.
-    assert drift_daily([]) == (0.0, 0)
-
-    # Bands. A cheap player and an expensive one do not drift alike, and
-    # applying the pooled mean to the expensive one doubles his carry cost.
-    assert band_of(1e6) == (0, 2e6)
-    assert band_of(58e6) == (30e6, float("inf"))
-    assert band_of(None) == (0, 2e6)
-    mkt = ([{"value": 1e6, "delta_pct_1d": "-1.0"}] * 60
-           + [{"value": 58e6, "delta_pct_1d": "-0.1"}] * 60)
-    cheap, _ = drift_daily(mkt, band_of(1e6))
-    dear, _ = drift_daily(mkt, band_of(58e6))
-    assert abs(cheap + 1.0) < 1e-9 and abs(dear + 0.1) < 1e-9, (cheap, dear)
-    bands = drift_bands(mkt)
-    assert abs(bands[band_of(58e6)][0] + 0.1) < 1e-9, bands
-    # A band too thin to mean anything falls back to the whole market rather
-    # than reporting the mean of three readings as a rate.
-    thin = drift_bands(mkt + [{"value": 20e6, "delta_pct_1d": "-9.0"}])
-    assert abs(thin[band_of(20e6)][0] - drift_daily(
-        mkt + [{"value": 20e6, "delta_pct_1d": "-9.0"}])[0]) < 1e-9, thin
-
-    f = friction(58e6, buy, sell, daily_pct=-0.19, n_drift=2455, days=14)
-    assert abs(f.entry - 1.508e6) < 1e3, f.entry          # 2.6% of 58M
-    assert abs(f.carry - 1.5428e6) < 1e3, f.carry         # 0.19% x 14 days
-    assert abs(f.expected - 3.05e6) < 5e3, f.expected
-    # The exit swing is reported, never averaged into the expected cost: at
-    # 12% of 58M it is larger than both other terms together, and hiding it
-    # inside a single figure would make a coin flip look like a price.
-    assert abs(f.swing - 6.96e6) < 1e3, f.swing
-    assert f.swing > f.expected
-
-    # Cost per marginal point, and no answer where there is no gain.
-    assert abs(f.per_point(2.7) - 1.13e6) < 1e4, f.per_point(2.7)
-    assert f.per_point(0) is None and f.per_point(-1.5) is None
-    assert f.per_point(None) is None
-
-    # A rising market is a negative carry — the hold pays you.
-    up = friction(10e6, buy, sell, daily_pct=+0.5, n_drift=100, days=14)
-    assert up.carry < 0, up.carry
-    assert friction(0, buy, sell) is None
-
-    # -- the basket your idle cash can actually buy -------------------------
-    # Rows priced on the replacement scale, so a rate is points above the level
-    # the market supplies for free, per million. No pick_xi and no base total:
-    # that is the point of the fixed baseline — two purchases no longer
-    # interact, so the walk is arithmetic rather than a search.
-    def cand(name, vor_, val):
-        return {"name": name, "vor": vor_, "value": val}
-
-    free = [cand("cheap star", 2.0, 10e6),      # 0.200/M
-            cand("solid", 1.5, 15e6),           # 0.100/M
-            cand("dear", 3.0, 60e6),            # 0.050/M
-            cand("filler", 0.01, 5e6),          # 0.002/M
-            cand("waste", -1.0, 5e6)]           # negative: never bought
-    got, hurdle, spent, forgone = basket(free, 30e6)
-    assert [r["name"] for r in got] == ["cheap star", "solid", "filler"], got
-    # THE HURDLE is the worst rate you would actually fund, because a player
-    # you own below it can be sold and the money moved into this basket.
-    assert hurdle == 0.002, hurdle
-    assert spent == 30e6 and abs(forgone - 3.51) < 1e-9, (spent, forgone)
-    # "dear" is skipped for being unaffordable, not for being bad, and the
-    # walk keeps going: greedy by rate, capped by what is left.
-    assert all(r["name"] != "dear" for r in got)
-    # Negative rates are never bought, so a pool of them buys nothing and the
-    # hurdle is None rather than 0 — there is no rate to beat.
-    assert basket([cand("waste", -1.0, 5e6)], 30e6) == ([], None, 0.0, 0.0)
-    # No cash, no basket: the money is the constraint, and an empty walk says
-    # so instead of pricing a purchase you cannot make.
-    assert basket(free, 0) == ([], None, 0.0, 0.0)
-    # A row with no value cannot be rated and is skipped, not treated as free.
-    assert basket([cand("unpriced", 5.0, None)], 30e6) == ([], None, 0.0, 0.0)
 
     print("ffcore.bid self-test OK (127 cases)")
 

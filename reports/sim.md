@@ -4,7 +4,7 @@
 
 **Don't spend yet.** Wait for the market is worth about +205 points over the rest of the season against +140 for the best thing you can buy today — 65 better even after paying a jornada for the delay, and the balance is what buys the choice.
 
-**Locks in 21h** · squad 213.11M · cash 23.60M · total 236.71M
+**Locks in 20h** · squad 213.11M · cash 23.60M · total 236.71M
 
 **Expected finish 2.14** · **P(win) 11%** · season **1,480–1,738** (10–90)
 

@@ -582,27 +582,6 @@ def decide_choosable(u):
     return choosable(u)
 
 
-def sells(u, dead) -> list[str]:
-    """The dead weight, and what the app pays for it."""
-    if not dead:
-        return ["_Nothing spare — every player in the squad starts in at "
-                "least one of the remaining jornadas._", ""]
-    out = ["| Sell | Pos | Raises |", "|---|---|--:|"]
-    for k, got in dead:
-        out.append("| %s | %s | %s |"
-                   % (title_name(u.name.get(k, k)), u.pos.get(k, "—"),
-                      fmt_money(got)))
-    out += ["",
-            "_These start in none of the %d remaining jornadas, so they score "
-            "nothing wherever the rest of the squad goes and any offer is a "
-            "gain. The simulation rates selling them at exactly zero — it "
-            "cannot value the cash, which is the whole of what they are "
-            "worth. What it also cannot value is cover: P(start) is held flat "
-            "here, so nobody is ever injured in March and a bench that exists "
-            "for that is worth nothing to it._" % len(u.state.jornadas), ""]
-    return out
-
-
 def standings(u, base) -> list[str]:
     """The levels the Δ columns above are differences from.
 
@@ -1081,16 +1060,6 @@ def _selftest() -> None:
     u2.state.jornadas = [1]
     assert "spare_m" not in dict(dead_weight(u2))
     u2.state.jornadas, u2.part_played = [1, 2], {}
-
-    sl = "\n".join(sells(u2, dead))
-    assert "Beñat Turrientes" not in sl      # the name comes from `name`
-    assert "Benat Turrientes" in sl, sl
-    assert "7.45M" in sl, sl
-    # A squad with nothing spare says so rather than printing a bare header.
-    tight = Universe(state=LeagueState({"me": {}, "riv": {}}, [1], "me"),
-                     forecaster=Bootstrap({}), pos={}, price={}, proceeds={},
-                     owner={}, cash=0.0, me="me")
-    assert "|" not in "\n".join(sells(tight, []))
 
     # -- where the league stands -------------------------------------------
     # The Δ columns above are differences. Without the levels they are
