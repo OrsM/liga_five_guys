@@ -66,6 +66,17 @@ DECIDE = [
 # generated.
 SOURCES = [
     Part("Decide today", "board.md", DECIDE, nest=False),
+    # THE TRIAL, PRINTED UNDERNEATH. sim.py answers the board's question by
+    # simulating the rest of the league instead of pricing a proxy for it, and
+    # the two are carried together for a few jornadas so they can be compared
+    # on real data. Below the board on purpose: the board is the thing that
+    # currently works, and the forecast under the simulation still rests on
+    # approximations it lists for itself at the foot of its own page.
+    #
+    # Whole file, un-nested — it is a report, not an excerpt. Its headings are
+    # deliberately none of DECIDE's: an identical heading is dropped as a
+    # duplicate, and the one that arrived second would be the one to go.
+    Part("The simulation", "sim.md", None, nest=False),
 ]
 
 # Printed as links, not content. Each is a whole file that would otherwise be
@@ -117,8 +128,9 @@ def digest(read, sources=SOURCES, stamp: str = "",
     """Assemble one report. `read(name)` returns the file's text, or None."""
     out = ["# Liga Five Guys — one report" + (" — " + stamp if stamp else ""),
            "",
-           "Field, buy, hold, sell — one table, one metric. Everything else is "
-           "reference and is linked, not reprinted.", ""]
+           "Field, buy, hold, sell — one table, one metric, and underneath it "
+           "the simulation that is being trialled to replace the lot. "
+           "Everything else is reference and is linked, not reprinted.", ""]
     body: list[str] = []
     seen: set[str] = set()
     lost: list[str] = []

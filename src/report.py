@@ -108,6 +108,7 @@ from ffcore.bid import (basket, cost_of, deals,  # noqa: E402
                         suggest, xi_snapshots)
 from ffcore.fixture import FIX_BAND, HOME_EDGE  # noqa: E402
 from ffcore.league import League  # noqa: E402
+from ffcore.render import title_name  # noqa: E402
 from ffcore.second import (LEGEND, SECOND_SOURCE,  # noqa: E402
                            af_cell, second_cells)
 from ffcore.score import (ABSENT_START, MAX_SLOT, NEUTRAL_START,  # noqa: E402
@@ -127,12 +128,6 @@ ALERTS = Path(os.environ.get("LFG_ALERTS", ".runtime/alerts.md"))
 
 STALE_HOURS = 14.0
 MOVER_PCT = 1.0           # squad price moves worth printing
-
-# Name particles that stay lowercase when title-casing a folded name.
-# "le"/"el"/"la" are deliberately absent: Le Normand and El Hilali are far
-# more common in this league than "de la Fuente" losing its lowercase.
-PARTICLES = {"de", "del", "van", "von", "der", "den", "di", "da", "dos",
-             "do", "y", "bin", "ibn", "ter"}
 
 # Words dropped when a club name has to fit in a table cell.
 TEAM_NOISE = {"real", "club", "cf", "fc", "ud", "cd", "rc", "rcd", "sd",
@@ -170,25 +165,6 @@ LOG_COLS = ["observed_at", "hours_to_lock", "formation", "index_total",
 # reach an eleven. It used to be λ's ladder depth, and the number that made it a
 # reservation rate against a market you cannot shop in.
 POOL_DEPTH = 8
-
-
-def title_name(s: str) -> str:
-    """market.csv hands us folded names; make them readable again.
-
-    Accents survive (they're in the source string), particles stay lowercase,
-    hyphenated parts are capitalised on both sides. Moves to ffcore/render.py
-    when the other reports are migrated.
-    """
-    s = (s or "").strip()
-    if not s or s != s.lower():
-        return s  # already cased — leave it alone
-    words = []
-    for i, w in enumerate(s.split()):
-        if i and w in PARTICLES:
-            words.append(w)
-        else:
-            words.append("-".join(p[:1].upper() + p[1:] for p in w.split("-")))
-    return " ".join(words)
 
 
 def eur(v) -> str:
@@ -1910,9 +1886,8 @@ def _selftest() -> None:
 
     # --- names ---
     # A particle stays lowercase inside a name, but not as its first word.
+    # title_name itself is tested in ffcore/render.py, where it lives now.
     assert title_name("nico van gaal") == "Nico van Gaal"
-    assert title_name("de la fuente") == "De La Fuente"
-    assert title_name("Vini Jr.") == "Vini Jr."      # already cased
 
     # --- teams, shortened without merging two clubs into one ---
     assert short_team("Real Madrid") == "Madrid"

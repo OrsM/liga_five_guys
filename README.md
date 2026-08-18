@@ -60,6 +60,35 @@ The five numbered sections it replaced are still generated, in
 
 Everything else is reference and is **linked**, not reprinted.
 
+### The second table, on trial
+
+Underneath the board, REPORT.md now carries **the simulation** —
+`reports/sim.md`, from `src/sim.py`. It answers the board's question by
+playing the rest of the league out a few thousand times for every move you
+could make, and ranking them by **Δ expected finishing position** and
+**Δ P(winning)** rather than by a rate. There is no metric to explain and no
+threshold to tune, because the column *is* the answer.
+
+**Both are printed, and the board is still in charge.** The point of a
+side-by-side jornada is to compare them on real data before the old one goes;
+the board is the thing that currently works, and the forecast under the
+simulation still rests on approximations that all flatter a lead. They are
+listed at the foot of `sim.md` on every run, read off the data rather than
+remembered — including which shape prior is in use, and whether a jornada is
+half played.
+
+What the simulation can express and no per-player rate can: **a steal is worth
+roughly twice what the same player is worth from the free pool**, because
+taking a rival's man raises your total *and* lowers his. On the day it was
+first published, every one of the top eight moves was a steal or a swap aimed
+at SusoGattuso — the only rival inside the noise — and the best of them moved
+P(win) 36 points, from a 140-point swing against a difference-of-totals spread
+of 132.
+
+When the board goes, the deletions are listed in `sim.py`'s docstring and in
+the handoff: `pts/M`, `above repl`, `the line`, the basket, `THIN`,
+`MAX_SLOT` as a decision rule, and every verdict string.
+
 The manual workflow keeps two inputs: `fetch` (off = rebuild from stored HTML)
 and `baseline` (once a season). `lookup` and `seen` went with the tools that
 read them — `find_slug.py` resolved app spellings the API now supplies on both
@@ -159,6 +188,8 @@ src/                 sources.py (the registry: futbolfantasy, Analítica,
                      ingest.py (fetch, parse, prune — the only network code)
                      ledger.py (the activity feed -> transactions.csv)
                      squads.py  report.py  rivals.py  slate.py
+                     decide.py (every move, ranked by Δ P(finish above))
+                     sim.py (that ranking, written out as reports/sim.md)
                      digest.py (stitches REPORT.md)
                      points.py  xi.py  methodology.py
 src/ffcore/          shared core: parse (numbers)  text (names)  tidy (IO+time)
@@ -166,6 +197,9 @@ src/ffcore/          shared core: parse (numbers)  text (names)  tidy (IO+time)
                      league (ownership+cash)  score (ratings+XI)
                      fixture (next opponent, difficulty)
                      bid (premiums, bid bands, XI gain, the basket)
+                     season (LeagueState, simulate, best_xi)
+                     forecast (Forecaster: expected() / draw())
+                     render (names, for display — never a key)
 inputs/              you edit these — see above
 data/raw/dt=….tar.xz  raw HTML, deduplicated — append-only, never delete
 data/tidy/market.csv  values, disposable — rebuilt from raw every run
@@ -182,6 +216,7 @@ data/decisions/      append-only logs of estimates, for scoring later
 .runtime/alerts.md   gitignored; exists only when something wants a decision
 reports/REPORT.md    ← read this
 reports/latest.md    the five tables (report.py) — carried into REPORT.md
+reports/sim.md       the simulation (sim.py) — carried into REPORT.md, on trial
 reports/rivals.md    how rivals bid: premiums, drift, projected XIs (rivals.py)
 reports/squads.md    every squad, deal history, cash basis (squads.py)
 reports/watchlist.md everyone unowned, ranked (squads.py)
@@ -192,8 +227,12 @@ docs/design.md       architecture, data sources, modelling plan
 ## Tests
 
 No test directory and no pytest. Each module self-tests under
-`if __name__ == "__main__"`, and `lfg-run` runs all eighteen before it fetches
-anything. Twenty seconds, and a failure aborts the run.
+`if __name__ == "__main__"`, and `lfg-run` runs all twenty-three before it
+fetches anything. Twenty seconds, and a failure aborts the run.
+
+**Work TDD.** Add the failing assertion to the module's own `_selftest()`,
+watch it fail, then implement. The three bugs in the Design notes below were
+all found that way and none of them by reading the code.
 
 Dependencies are `uv`, not pip: this box has no `pip` and no `python3-venv`,
 and installing them needs sudo. `uv sync` once, then `uv run --frozen python …`
@@ -218,9 +257,55 @@ PYTHONPATH=src python src/points.py --selftest          # per-jornada diffs
 PYTHONPATH=src python src/methodology.py --selftest     # forecast-vs-actual join
 PYTHONPATH=src python src/rivals.py --selftest          # rival XI arithmetic
 PYTHONPATH=src python src/report.py --selftest          # the cells that judge
+PYTHONPATH=src python src/ffcore/forecast.py            # the sampler + its shape
+PYTHONPATH=src python src/ffcore/season.py              # shapes, best XI, standings
+PYTHONPATH=src python src/ffcore/render.py              # folded names, made readable
+PYTHONPATH=src python src/decide.py --selftest          # candidates, steals, ranking
+PYTHONPATH=src python src/sim.py --selftest             # the simulation's report
 ```
 
 ## Design notes
+
+**A round in progress was being paid out twice.** The simulator plays every
+jornada that is not finished, and the app's carried points already include the
+matches inside that round which *have* been played. On 2026-08-18, four of
+jornada 1's ten matches were in — so every manager was credited a second time
+for them, and not equally: seven of BurtonGM89's eleven had played, against
+three of mine. He was being handed 20.3 phantom points a round to my 7.8.
+`decide.rounds_left()` now keeps the round and drops the clubs inside it that
+are done. It still lets everybody re-pick an eleven that is in fact already
+locked, for one round out of thirty-eight; that one is in Known gaps.
+
+The join that fix needs is the trap underneath it: **one club has three
+spellings**. The market says `Rayo`, the fixture page `rayo-vallecano`, and the
+probable-XI page files twenty-eight players under the first and one under the
+second. Folding case and punctuation is not enough — `rayo` and `rayo
+vallecano` are still two strings — so both sides go through `club_key()`,
+which resolves against the *market's* list of clubs, the one canonical
+spelling this repo has. Matched against the raw pool instead, the slug
+resolves to itself, one player is excluded and twenty-eight are not, and the
+double count comes back wearing a different name.
+
+**The same season was not the same season in another process.** `simulate()`
+promises that one seed is one season, which is what makes two candidate squads
+comparable — but `Bootstrap.draw` walked the players in dict order, one rng
+feeding the whole round, so the *order* decided which player got which number.
+The callers build that dict by iterating a set, and set order over strings
+moves with Python's per-process hash seed. Identical data therefore produced a
+headline P(win) that drifted a point or two between runs, which is noise a
+reader cannot tell from news. The order is sorted once at construction now.
+
+**One join, in one place: `ffcore.league.api_key()`.** The app spells players
+its own way — `A. Ferllo` is Álvaro Fernández, `Llorente` is one of two — and
+`owner_from_api()` had the only correct resolution: `Market.key_for`, then the
+ledger breaking a tie when exactly one candidate is already recorded against
+*that* manager, then an exact market value searched across all history.
+`decide.py` re-derived a weaker one of its own, and the cost was not
+ownership — it was that the **buyout clause is on the row that would not
+join**, so five rival players could not be bought at all. Two of them were
+SusoGattuso's, and he is the only rival inside the noise. Extracting the
+three-step join so both callers use it took the acquirable universe from 75
+players to 82.
 
 **Fitness is read from the panel, not from the classes.** `elemento lesionado
 elemento_jugador` is the generic class on every tile of the pitch graphic — the
@@ -639,6 +724,17 @@ differently-keyed ownership map is worse than none.
   manager-to-manager transfer is not a paired buy and sell — checked across all
   57 rows. So the derived ledger writes the pool as one side of every deal.
   Exact for ownership, prices and premiums; lossy only for who dealt with whom.
+- **A round in progress re-picks an eleven that is already locked.** The
+  clubs that have played are excluded from it, so their points are not counted
+  twice — but the simulator still chooses the best eleven from whoever is
+  left, when in reality the lineup for that round was locked before kickoff.
+  It flatters everybody, for one round out of thirty-eight, and fixing it
+  needs the fielded XI for the round rather than the squad.
+- **The simulation cannot value cash, so it cannot value a sale.** Nothing
+  models next cycle's market, so holding money scores zero and a standalone
+  sale can never come out ahead. Every option it ranks is therefore a move
+  that spends, and the ones that raise money are undervalued by exactly the
+  amount nobody has measured.
 - **Publishing to the phone is wired but unproven.** `lfg-publish` targets a
   private directory, deliberately not the public `/writing` path, and the phone
   was asleep when it was written. The phone-side route that serves it is not
