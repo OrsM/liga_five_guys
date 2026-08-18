@@ -506,8 +506,22 @@ def rank(u: Universe, acts: list[Action], seed: int = 1,
         b_ = burn(u, a)
         charge = 0.0 if (lam is None or b_ is None) else lam * b_ / 1e6
         gross = base.expected_position() - r.expected_position()
+        # PAIRED, WITHIN THE SAME SEASONS. Every option runs against the
+        # same seed, so for each trial there is a total with the move and a
+        # total without, and the difference is the squads rather than the
+        # weather. That difference is what survives a change of model: on
+        # 2026-08-18 recalibrating P(start) moved a row's P(win) by 48 points
+        # and its paired figures by six, which is the difference between a
+        # number you can act on and one you cannot.
+        mine, was = r.totals.get(u.me, []), base.totals.get(u.me, [])
+        pairs = sorted(x - y for x, y in zip(mine, was))
         out.append({
             "action": a,
+            "helps": (sum(1 for d in pairs if d > 0) / len(pairs)
+                      if pairs else 0.0),
+            "d_pts": pairs[len(pairs) // 2] if pairs else 0.0,
+            "pts_lo": pairs[int(0.1 * len(pairs))] if pairs else 0.0,
+            "pts_hi": pairs[int(0.9 * len(pairs))] if pairs else 0.0,
             "d_pos": gross - charge,
             "gross": gross,
             "burn": b_,
@@ -851,6 +865,12 @@ def _selftest() -> None:
     rows, base, _lam = rank(u, acts)
     assert rows, "something should be worth doing"
     top = rows[0]
+    # The paired pair: how often it helps, and by how much, in the same
+    # seasons. A move that adds a twelve-point player to an eleven of threes
+    # helps in nearly all of them.
+    assert 0.5 < top["helps"] <= 1.0, top["helps"]
+    assert top["d_pts"] > 0, top["d_pts"]
+    assert top["pts_lo"] <= top["d_pts"] <= top["pts_hi"]
     # Signing a 12-point player into an eleven of 3s must improve your
     # position, and the table must be sorted by that.
     assert top["d_pos"] > 0, top
@@ -1076,7 +1096,7 @@ def _selftest() -> None:
     assert un == ["zzz-united"], un
     assert _d == {1: {"getafe"}}, _d
 
-    print("decide self-test OK (60 cases)")
+    print("decide self-test OK (63 cases)")
 
 
 if __name__ == "__main__":

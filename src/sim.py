@@ -177,9 +177,9 @@ def table(rows, u, base, rivals) -> list[str]:
         return ["_Nothing on offer moves the finish — no affordable buy, "
                 "steal or swap improves the eleven._", ""]
     now = base.position().get(1, 0.0)
-    ranked = sorted(rows, key=lambda r: (-r["d_win"], -r["d_pos"]))
-    out = ["| Get | Give up | P(win) | Net € | Left |",
-           "|---|---|--:|--:|--:|"]
+    ranked = sorted(rows, key=lambda r: (-r.get("d_pts", 0.0), -r["d_pos"]))
+    out = ["| Get | Give up | Season pts | Helps | Net € | Left |",
+           "|---|---|--:|--:|--:|--:|"]
     for r in ranked[:SHOW]:
         a = r["action"]
         got = title_name(u.name.get(a.buy, a.buy)) if a.buy else "—"
@@ -195,12 +195,19 @@ def table(rows, u, base, rivals) -> list[str]:
         ans = r.get("answer")
         if ans is not None:
             gave += " · **he takes %s**" % short(ans.buy, u)
-        out.append("| %s | %s | %.0f%% | %s | %s |"
-                   % (got, gave, 100 * (now + r["d_win"]), _net(-a.net),
+        out.append("| %s | %s | %+.0f | %.0f%% | %s | %s |"
+                   % (got, gave, r.get("d_pts", 0.0),
+                      100 * r.get("helps", 0.0), _net(-a.net),
                       fmt_money(u.cash - a.net)))
     out += ["",
-            "_**P(win)** is where the move LEAVES you — your chance of winning "
-            "the league after making it, against %.0f%% if you do nothing. "
+            "_**Season pts** is how many more points you end the season with, "
+            "and **Helps** is how often — both measured inside the SAME "
+            "simulated seasons, with and without the move, so the difference "
+            "is the squads rather than the weather. They replaced a per-row "
+            "P(win), which is not a number to act on: recalibrating P(start) "
+            "moved one row's P(win) by 48 points and these two by six. Your "
+            "overall chance is %.0f%% and it is in the header, where a figure "
+            "that provisional belongs. "
             "**Get** says HOW you would get him. *On the market* is an "
             "ordinary purchase whoever owns him — measured, taking a man off "
             "a rival that way denies him nothing, because the managers "
@@ -507,6 +514,11 @@ def payload(u, rows, base, rivals, locks_h=None, n_actions: int = 0,
             # off the market was not taken off anybody.
             "owner": u.owner.get(a.buy, "") if a.buy else "",
             "d_pos": r["d_pos"], "d_win": r["d_win"], "net": -a.net,
+            # The paired pair — how many more points, and how often. These are
+            # what the phone should draw: a per-row P(win) moved 48 points on
+            # a recalibration and these moved six.
+            "d_pts": r.get("d_pts", 0.0), "helps": r.get("helps", 0.0),
+            "pts_lo": r.get("pts_lo", 0.0), "pts_hi": r.get("pts_hi", 0.0),
             # What you are on afterwards, and what he does about it. Both are
             # in the markdown table; the phone could not draw them because
             # they were never in the payload, which is the two renderers
@@ -704,7 +716,7 @@ def _selftest() -> None:
     rows = [{"action": Action("clause", buy="yuri", sell="benat",
                               cost=20e6, proceeds=5.87e6, victim="riv"),
              "d_pos": 0.433, "d_win": 0.364, "d_beat": {"riv": 0.37},
-             "mean": 1510.0}]
+             "d_pts": 120.0, "helps": 0.90, "mean": 1510.0}]
     body = table(rows, u, st, ["riv"])
     line = [ln for ln in body if ln.startswith("| Yuri")]
     assert len(line) == 1, body
@@ -716,17 +728,18 @@ def _selftest() -> None:
     # THE NUMBER YOU LAND ON, not the one you move by. P(win) is 50% here and
     # the move is worth +36.4 points of it, so it reads 86% — no arithmetic,
     # and no delta that has to be added to a figure in the header.
-    assert cells[2] == "86%", cells
+    assert cells[2] == "+120", cells      # season points, paired
+    assert cells[3] == "90%", cells       # ...and how often it helps
     # MONEY LEAVING IS NEGATIVE, the way the balance sees it: this move spends
     # 20M and raises 5.87M, so it costs 14.13M.
-    assert cells[3] == "-14.13M", cells
+    assert cells[4] == "-14.13M", cells
     # WHAT YOU ARE LEFT ON. Every rival is on nothing until you pay one, so
     # this column is the whole of your ability to answer anything later.
-    assert cells[4] == "9.47M", cells
+    assert cells[5] == "9.47M", cells
     # The three columns that said the same thing are gone: Δpos, Δwin and the
     # rival column all tracked each other, and the rival column named the same
     # manager on every row for days.
-    assert len(cells) == 5, cells
+    assert len(cells) == 6, cells
     assert "+0.433" not in line[0] and "+36%" not in line[0], line[0]
 
     # A free agent is a different move from a steal and says so rather than
@@ -745,14 +758,12 @@ def _selftest() -> None:
                    u, st, ["riv"])
     assert "| +4.00M |" in "\n".join(raised), raised
 
-    # THE TABLE IS SORTED BY THE COLUMN IT SHOWS. Ranking is on Δpos, which is
-    # the finer statistic and the right one to screen on, but two moves can
-    # trade places between the two — 0.302 was worth +22% and 0.301 was worth
-    # +23% on the day this was written — and a P(win) column running 90, 85,
-    # 84, 77, 76, 74, 75 reads as a bug rather than as a trade-off.
-    pair = [{**rows[0], "d_pos": 0.302, "d_win": 0.22,
+    # THE TABLE IS SORTED BY THE COLUMN IT SHOWS. Screening ranks on Δpos,
+    # which is the finer statistic, but the two trade the odd pair over and a
+    # column running out of order reads as a bug rather than a trade-off.
+    pair = [{**rows[0], "d_pos": 0.302, "d_pts": 10.0,
              "action": Action("buy", buy="lo", cost=0.0)},
-            {**rows[0], "d_pos": 0.301, "d_win": 0.23,
+            {**rows[0], "d_pos": 0.301, "d_pts": 40.0,
              "action": Action("buy", buy="hi", cost=0.0)}]
     order = "\n".join(table(pair, u, st, ["riv"]))
     assert order.index("| Hi (on the market") \

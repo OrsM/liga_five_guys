@@ -31,18 +31,18 @@ _**32 locked players would improve your eleven** and their clauses open on 24 Au
 
 ## If you act anyway — every move, ranked
 
-| Get | Give up | P(win) | Net € | Left |
-|---|---|--:|--:|--:|
-| Dean Huijsen (on the market, BurtonGM89) | Turrientes + Lorenzo | 34% | -18.42M | 5.17M |
-| Ferran Jutgla (on the market, Albert Laporta) | Lorenzo | 21% | +98K | 23.69M |
-| Nahuel Tenaglia (on the market, BurtonGM89) | Turrientes | 20% | -9.92M | 13.68M |
-| Marcos Alonso (on the market, free agent) | Turrientes | 18% | -21.83M | 1.77M |
-| Aitor Paredes (on the market, BurtonGM89) | Turrientes | 18% | +1.52M | 25.12M |
-| Santiago Mouriño (on the market, Albert Laporta) | Turrientes + Lorenzo | 17% | -23.54M | 55K |
-| Antonio Blanco (on the market, BurtonGM89) | Turrientes | 16% | -7.82M | 15.78M |
-| Marc Bartra (on the market, free agent) | Lorenzo | 15% | -18.15M | 5.45M |
+| Get | Give up | Season pts | Helps | Net € | Left |
+|---|---|--:|--:|--:|--:|
+| Dean Huijsen (on the market, BurtonGM89) | Turrientes + Lorenzo | +110 | 100% | -18.42M | 5.17M |
+| Ferran Jutgla (on the market, Albert Laporta) | Lorenzo | +55 | 96% | +98K | 23.69M |
+| Nahuel Tenaglia (on the market, BurtonGM89) | Turrientes | +54 | 95% | -9.92M | 13.68M |
+| Marcos Alonso (on the market, free agent) | Turrientes | +41 | 87% | -21.83M | 1.77M |
+| Aitor Paredes (on the market, BurtonGM89) | Turrientes | +41 | 86% | +1.52M | 25.12M |
+| Santiago Mouriño (on the market, Albert Laporta) | Turrientes + Lorenzo | +36 | 88% | -23.54M | 55K |
+| Antonio Blanco (on the market, BurtonGM89) | Turrientes | +31 | 80% | -7.82M | 15.78M |
+| Marc Bartra (on the market, free agent) | Lorenzo | +22 | 73% | -18.15M | 5.45M |
 
-_**P(win)** is where the move LEAVES you — your chance of winning the league after making it, against 11% if you do nothing. **Get** says HOW you would get him. *On the market* is an ordinary purchase whoever owns him — measured, taking a man off a rival that way denies him nothing, because the managers listing players are not the one you are racing. *Clause on X* is the raid, and today not one clause in the league is payable. **Net €** is what the move does to the balance and **Left** is what you are on afterwards — every rival is on 0K until you pay one, so that column is the whole of your ability to answer anything for the rest of the season. Who exactly you give up when it says *spares* is in the sell table below; none of them ever start. **he takes** is the rival's best answer, played before the season is._
+_**Season pts** is how many more points you end the season with, and **Helps** is how often — both measured inside the SAME simulated seasons, with and without the move, so the difference is the squads rather than the weather. They replaced a per-row P(win), which is not a number to act on: recalibrating P(start) moved one row's P(win) by 48 points and these two by six. Your overall chance is 11% and it is in the header, where a figure that provisional belongs. **Get** says HOW you would get him. *On the market* is an ordinary purchase whoever owns him — measured, taking a man off a rival that way denies him nothing, because the managers listing players are not the one you are racing. *Clause on X* is the raid, and today not one clause in the league is payable. **Net €** is what the move does to the balance and **Left** is what you are on afterwards — every rival is on 0K until you pay one, so that column is the whole of your ability to answer anything for the rest of the season. Who exactly you give up when it says *spares* is in the sell table below; none of them ever start. **he takes** is the rival's best answer, played before the season is._
 
 _A CLAUSE IS THREE PURCHASES AT ONCE. The market value buys the points for you, and that part is a loan rather than a spend — it comes back when you sell him. The premium over it buys something else entirely: that a RIVAL does not score them. And the balance buys nothing at all, it only stops being available. The first is priced by the market; the second is now scored net of his reply, because he is handed the money and spends it; the third is the column on the right, because nothing here can value it._
 
