@@ -94,7 +94,35 @@ This is the mechanical half of a fair complaint from Miguel: that the report
 kept proposing to overspend and give up two players for one, for marginal
 returns. It did, and this is why.
 
-**THE OTHER HALF IS NOT FIXED AND MAY NOT BE FIXABLE HERE.** Every move is
+**SPEND NOW OR SPEND LATER, MEASURED.** `ffcore/market.py` simulates what the
+app is likely to deal you next, fitted to every cycle on record, and the
+answer was not the one anybody expected:
+
+    | Act today            | 41 players you can buy now | +3.69 |
+    | Wait for the market  | a week of new offers       | +0.14 (10-90: 0.00 to +2.88) |
+    | Wait for the clauses | 62 players on 24 Aug       | +4.62 |
+
+**Only 4 of the 557 unowned players would improve the eleven at all.** The
+free pool is exhausted — waiting for it is worth almost nothing, because the
+talent is not there to be dealt. Meanwhile **32 of the 62 locked players
+would**, and they all arrive at once when the clauses open.
+
+That reframes the whole argument. The reason the report keeps proposing to
+take players off rivals is not a bug in how it values them: it is that rivals'
+squads are the only place upgrades exist. And the reason to wait is not that
+something cheaper is coming on the market — it is that on 24 August the set of
+things you can buy goes from four useful players to thirty-six at once, and
+the balance is what buys the choice.
+
+THE MARKET IS NOT A RANDOM DRAW, and assuming it was would have been worse
+than not modelling it. Players actually offered are 5.6x more valuable than
+the pool they come from — median 9.58M against 1.72M — while the position mix
+is near proportional. So the sampler is weighted by value with the exponent
+FITTED to reproduce the observed quantiles (0.15 on 45 offers over 4 cycles),
+not chosen: uniform would deal journeymen and flatter waiting, proportional
+would deal Raphinha every cycle and flatter it far more.
+
+**WHAT IS STILL NOT PRICED.** Every move is
 scored against DOING NOTHING FOR THIRTY-EIGHT JORNADAS, which is not the
 alternative. The alternative is doing something better later, with the balance
 intact, against a market that deals twelve new players a day. The simulation
@@ -351,6 +379,8 @@ src/ffcore/          shared core: parse (numbers)  text (names)  tidy (IO+time)
                      startprob (P(start), graded against confirmed XIs)
                      crosswalk (one player is one player, whatever a feed
                        calls him — the table, not the resolution)
+                     market (what the app will deal next, fitted to what it
+                       has dealt — the price of waiting)
 inputs/              you edit these — see above
 data/raw/dt=….tar.xz  raw HTML, deduplicated — append-only, never delete
 data/tidy/market.csv  values, disposable — rebuilt from raw every run
@@ -382,7 +412,7 @@ docs/design.md       architecture, data sources, modelling plan
 ## Tests
 
 No test directory and no pytest. Each module self-tests under
-`if __name__ == "__main__"`, and `lfg-run` runs all twenty-six before it
+`if __name__ == "__main__"`, and `lfg-run` runs all twenty-seven before it
 fetches anything. Twenty seconds, and a failure aborts the run.
 
 **Work TDD.** Add the failing assertion to the module's own `_selftest()`,
@@ -417,6 +447,7 @@ PYTHONPATH=src python src/ffcore/season.py              # shapes, best XI, stand
 PYTHONPATH=src python src/ffcore/render.py              # folded names, made readable
 PYTHONPATH=src python src/ffcore/startprob.py           # calibration + the fit's guard
 PYTHONPATH=src python src/ffcore/crosswalk.py           # the crosswalk table + merging
+PYTHONPATH=src python src/ffcore/market.py              # the offer sampler + its fit
 PYTHONPATH=src python src/crosswalk.py --selftest       # resolving every feed's keys
 PYTHONPATH=src python src/decide.py --selftest          # candidates, steals, ranking
 PYTHONPATH=src python src/sim.py --selftest             # the simulation's report

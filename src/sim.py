@@ -187,53 +187,84 @@ def table(rows, u, base, rivals) -> list[str]:
     return out
 
 
-def waiting(u) -> list[str]:
-    """What doing nothing is worth, which is the one option never on the table.
+def waiting(u, offers=None, rng=None) -> list[str]:
+    """What doing nothing is worth — the one option never on the table.
 
     EVERY MOVE IS SCORED AGAINST DOING NOTHING FOR THIRTY-EIGHT JORNADAS. That
-    is not the alternative. The alternative is doing something better later —
-    with the balance intact, against a market that deals twelve new players a
-    day, and after the clauses open. The simulation cannot price that: it has
-    no model of a future market, so waiting scores exactly zero and anything
-    with a positive number beats it.
+    is not the alternative. The alternative is doing something better later,
+    with the balance intact, against a market that deals a fresh dozen every
+    cycle and a set of clauses that opens on a known date. Waiting scored
+    exactly zero and anything positive beat it by construction.
 
-    So the choice is printed rather than priced. What is locked, when it
-    opens, and how the best of it compares to the best you can do today — and
-    the reader decides whether six days of patience beats a first move made
-    against a fifth of the league.
+    So it is measured where it can be and printed where it cannot. The free
+    market is simulated (ffcore.market, fitted to the cycles on record); the
+    clause unlock needs no simulation at all, because the players and the date
+    are both known.
+
+    THE ANSWER ON REAL DATA WAS NOT THE ONE EXPECTED, which is the reason to
+    have measured it: of 557 unowned players only FOUR would improve the
+    eleven, so waiting for the free market is worth almost nothing. The
+    upgrades are all owned by somebody, and they arrive at once when the
+    clauses open.
     """
     import datetime as dt
+    import random
+    import statistics
+    from ffcore.season import best_xi
 
     now = dt.datetime.now(dt.timezone.utc)
-    shut = {k: w for k, w in u.clause_until.items() if w > now
-            and u.owner.get(k) and u.owner[k] != u.me}
-    if not shut:
-        return []
-    opens = min(shut.values())
     exp = u.forecaster.expected(decide_choosable(u))
-    xi = [k for k in u.state.squads.get(u.me, {})]
-    from ffcore.season import best_xi
     eleven = best_xi(u.state.squads.get(u.me, {}), exp)
-    bar = min((exp.get(k, 0.0) for k in eleven), default=0.0)
+    if not eleven:
+        return []
+    bar = min(exp.get(k, 0.0) for k in eleven)
+    mine = set(u.state.squads.get(u.me, {}))
 
-    def upgrade(keys):
-        return max((exp.get(k, 0.0) - bar for k in keys), default=0.0)
+    def gain(k):
+        return max(0.0, exp.get(k, 0.0) - bar)
 
-    now_best = upgrade([k for k in u.price if k not in xi])
-    then_best = upgrade(shut)
-    days = max(0.0, (opens - now).total_seconds() / 86400.0)
-    return ["| Wait | %d players | %.0f days | %+.2f vs %+.2f |"
-            % (len(shut), days, then_best, now_best),
-            "",
-            "_**%d rival players have a locked clause** and open on %s, in "
-            "about %.0f days. The best of them is worth %+.2f xPts/j against "
-            "your eleven; the best you can buy today is %+.2f. Waiting scores "
-            "ZERO in the table above — not because it is worthless but because "
-            "nothing here models a market you have not seen yet, so every move "
-            "with a positive number beats it by construction. The balance in "
-            "the **Left** column is what buys the choice._"
-            % (len(shut), opens.strftime("%d %b"), days, then_best, now_best),
-            ""]
+    now_best = max((gain(k) for k in u.price if k not in mine), default=0.0)
+    shut = {k: w for k, w in u.clause_until.items()
+            if w > now and k not in mine}
+    helpful = sum(1 for k in shut if gain(k) > 0)
+    then_best = max((gain(k) for k in shut), default=0.0)
+
+    out = ["| Route | What it offers | Best upgrade |", "|---|---|--:|",
+           "| **Act today** | %d players you can buy now | %+.2f |"
+           % (len(u.price), now_best)]
+    lines = []
+    if offers is not None:
+        band = offers.best_over(7, gain, rng or random.Random(3))
+        lo, med, hi = (sorted(band)[int(0.1 * len(band))],
+                       statistics.median(band),
+                       sorted(band)[int(0.9 * len(band))])
+        out.append("| Wait for the market | a week of new offers | "
+                   "%+.2f (10–90: %+.2f to %+.2f) |" % (med, lo, hi))
+        lines.append("_The free market is simulated rather than guessed at: "
+                     "%s. Only **%d of the %d unowned players** would improve "
+                     "your eleven at all, which is why a week of it is worth "
+                     "so little — the talent is not there to be dealt._"
+                     % (offers.note(),
+                        sum(1 for k in offers.pool if gain(k) > 0),
+                        len(offers.pool)))
+    if shut:
+        opens = min(shut.values())
+        days = max(0.0, (opens - now).total_seconds() / 86400.0)
+        out.append("| Wait for the clauses | %d players on %s | %+.2f |"
+                   % (len(shut), opens.strftime("%d %b"), then_best))
+        lines.append("_**%d of those %d have a clause that opens on %s**, in "
+                     "about %.0f days, and %d of them would improve your "
+                     "eleven — against %d in the whole free pool. That is "
+                     "where the upgrades are, and none of it is buyable "
+                     "today. Waiting scores ZERO in the table above, not "
+                     "because it is worthless but because nothing there can "
+                     "price a market it has not seen; the **Left** column is "
+                     "what buys the choice._"
+                     % (helpful, len(shut), opens.strftime("%d %b"), days,
+                        helpful,
+                        sum(1 for k in (offers.pool if offers else {})
+                            if gain(k) > 0)))
+    return out + [""] + lines + [""] if len(out) > 2 else []
 
 
 def decide_choosable(u):
@@ -410,6 +441,34 @@ def payload(u, rows, base, rivals, locks_h=None, n_actions: int = 0) -> dict:
     }
 
 
+def market_model(u):
+    """The free market as it has actually behaved, fitted from every cycle.
+
+    None when nothing has been recorded — the caller then prints no line about
+    it at all, rather than a simulated number with no evidence under it.
+    """
+    import collections
+    import statistics
+    from ffcore.crosswalk import Crosswalk
+    from ffcore.market import Offers
+    from ffcore.tidy import TIDY, read_csv
+
+    xw = Crosswalk.read(TIDY / "players.csv", TIDY / "clubs.csv")
+    cycles = collections.defaultdict(set)
+    for r in read_csv(TIDY / "api_market.csv"):
+        k = xw.player(app_id=r.get("player_id"),
+                      app_name=r.get("player_name"))
+        if k and k in u.value:
+            cycles[(r.get("expires_at") or "")[:10]].add(k)
+    if not cycles:
+        return None
+    seen = [u.value[k] for s in cycles.values() for k in s]
+    owned = {k for sq in u.state.squads.values() for k in sq}
+    pool = {k: v for k, v in u.value.items() if k not in owned}
+    per = int(statistics.median(len(v) for v in cycles.values())) or 1
+    return Offers.fit(pool, seen, per_cycle=per, cycles=len(cycles))
+
+
 PRICE_LOG = "cash_price_log.csv"
 
 
@@ -472,7 +531,7 @@ def placeholder(why: str) -> list[str]:
 
 
 def render(u, rows, base, stamp: str, rivals, n_actions: int = 0,
-           locks_h=None) -> list[str]:
+           locks_h=None, offers=None) -> list[str]:
     # EVERYTHING UNDER A HEADING, including the preamble. digest.py drops a
     # source's H1 when it stitches REPORT.md and keeps what follows, so a
     # preamble above the first `## ` arrives in the middle of the report
@@ -484,11 +543,9 @@ def render(u, rows, base, stamp: str, rivals, n_actions: int = 0,
            "this, where would I finish?_", ""]
     out += header(u, base, n_actions or len(rows), locks_h)
     out += table(rows, u, base, rivals)
-    wait = waiting(u)
+    wait = waiting(u, offers)
     if wait:
-        out += ["## Or wait", "",
-                "| Do | What opens | When | best upgrade then vs now |",
-                "|---|---|--:|--:|"] + wait
+        out += ["## Or wait", ""] + wait
     out += ["## Sell — these never make the eleven", ""]
     out += sells(u, dead_weight(u))
     out += ["## Where the league stands", ""]
@@ -823,7 +880,8 @@ def main() -> None:
     u.cash_note = _price_note(smoothed, measured)
     rivals = [m for m in u.state.squads if m != u.me]
     write_lines(REPORTS / OUT,
-                render(u, rows, base, stamp, rivals, len(acts), locks_h))
+                render(u, rows, base, stamp, rivals, len(acts), locks_h,
+                       market_model(u)))
     print("wrote %s (%d moves, %d simulated in full)"
           % (REPORTS / OUT, len(acts), len(rows)))
 

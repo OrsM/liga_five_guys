@@ -1,4 +1,4 @@
-# Liga Five Guys — one report — 2026-08-18 18:31 UTC
+# Liga Five Guys — one report — 2026-08-18 19:33 UTC
 
 Every move you could make, ranked by whether it wins the league. Everything else is reference and is linked, not reprinted.
 
@@ -7,7 +7,7 @@ Every move you could make, ranked by whether it wins the league. Everything else
 
 _One question, asked of every move you could make: if I did this, where would I finish?_
 
-**Locks in 25h** · squad 213.11M · cash 23.60M · total 236.71M
+**Locks in 23h** · squad 213.11M · cash 23.60M · total 236.71M
 
 **Expected finish 2.14** · **P(win) 11%** · season **1,480–1,738** (10–90)
 
@@ -30,11 +30,14 @@ _A CLAUSE IS THREE PURCHASES AT ONCE. The market value buys the points for you, 
 
 ## Or wait
 
-| Do | What opens | When | best upgrade then vs now |
-|---|---|--:|--:|
-| Wait | 62 players | 6 days | +4.62 vs +3.69 |
+| Route | What it offers | Best upgrade |
+|---|---|--:|
+| **Act today** | 41 players you can buy now | +3.69 |
+| Wait for the market | a week of new offers | +0.14 (10–90: +0.00 to +2.88) |
+| Wait for the clauses | 62 players on 24 Aug | +4.62 |
 
-_**62 rival players have a locked clause** and open on 24 Aug, in about 6 days. The best of them is worth +4.62 xPts/j against your eleven; the best you can buy today is +3.69. Waiting scores ZERO in the table above — not because it is worthless but because nothing here models a market you have not seen yet, so every move with a positive number beats it by construction. The balance in the **Left** column is what buys the choice._
+_The free market is simulated rather than guessed at: the market is modelled from 45 offers over 4 cycles, weighted by value^0.15. Only **4 of the 557 unowned players** would improve your eleven at all, which is why a week of it is worth so little — the talent is not there to be dealt._
+_**32 of those 62 have a clause that opens on 24 Aug**, in about 6 days, and 32 of them would improve your eleven — against 4 in the whole free pool. That is where the upgrades are, and none of it is buyable today. Waiting scores ZERO in the table above, not because it is worthless but because nothing there can price a market it has not seen; the **Left** column is what buys the choice._
 
 ## Sell — these never make the eleven
 
