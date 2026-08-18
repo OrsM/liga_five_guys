@@ -30,11 +30,11 @@ _A CLAUSE IS THREE PURCHASES AT ONCE. The market value buys the points for you, 
 | Route | What it offers | Best upgrade |
 |---|---|--:|
 | **Act today** | 41 players you can buy now | +3.69 |
-| Wait for the market | a week of new offers | +0.14 (10–90: +0.00 to +2.88) |
+| Wait for the market | a week of new offers | +5.64 (10–90: +3.84 to +7.50) |
 | Wait for the clauses | 62 players on 24 Aug | +4.62 |
 
-_The free market is simulated rather than guessed at: the market is modelled from 45 offers over 4 cycles, weighted by value^0.15. Only **4 of the 557 unowned players** would improve your eleven at all, which is why a week of it is worth so little — the talent is not there to be dealt._
-_**32 of those 62 have a clause that opens on 24 Aug**, in about 6 days, and 32 of them would improve your eleven — against 4 in the whole free pool. That is where the upgrades are, and none of it is buyable today. Waiting scores ZERO in the table above, not because it is worthless but because nothing there can price a market it has not seen; the **Left** column is what buys the choice._
+_The free market is simulated rather than guessed at: the market is modelled from 45 offers over 4 cycles, weighted by value^0.15. **114 of the 557 unowned players** would improve your eleven, and a week of offers beats the best thing you can buy today **95% of the time** — even the tenth percentile of waiting (+3.84) clears it. Spending now buys the worse of two options and gives up the choice._
+_**32 of those 62 locked players would improve your eleven** and their clauses open on 24 Aug, in about 6 days. Waiting scores ZERO in the table above — not because it is worthless but because nothing there can price a market it has not seen, so every move with a positive number beats it by construction. That is the bias to hold in mind when the ranking asks you to spend the balance; the **Left** column is what buys the choice._
 
 ## Sell — these never make the eleven
 

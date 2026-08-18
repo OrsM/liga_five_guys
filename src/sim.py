@@ -221,7 +221,13 @@ def waiting(u, offers=None, rng=None) -> list[str]:
     mine = set(u.state.squads.get(u.me, {}))
 
     def gain(k):
-        return max(0.0, exp.get(k, 0.0) - bar)
+        # market_exp, not the simulation's expected(): the simulation scores
+        # the 89 players who could be in a squad, and this question is about
+        # the other five hundred. A player it was never given comes back as
+        # 0.0, which is indistinguishable from worthless — and that is exactly
+        # what happened, scoring Lamine Yamal at nothing and concluding that
+        # four players in the league could improve the eleven.
+        return max(0.0, u.market_exp.get(k, exp.get(k, 0.0)) - bar)
 
     now_best = max((gain(k) for k in u.price if k not in mine), default=0.0)
     shut = {k: w for k, w in u.clause_until.items()
@@ -240,30 +246,31 @@ def waiting(u, offers=None, rng=None) -> list[str]:
                        sorted(band)[int(0.9 * len(band))])
         out.append("| Wait for the market | a week of new offers | "
                    "%+.2f (10–90: %+.2f to %+.2f) |" % (med, lo, hi))
+        better = 100.0 * sum(1 for x in band if x > now_best) / len(band)
         lines.append("_The free market is simulated rather than guessed at: "
-                     "%s. Only **%d of the %d unowned players** would improve "
-                     "your eleven at all, which is why a week of it is worth "
-                     "so little — the talent is not there to be dealt._"
+                     "%s. **%d of the %d unowned players** would improve your "
+                     "eleven, and a week of offers beats the best thing you "
+                     "can buy today **%.0f%% of the time** — even the tenth "
+                     "percentile of waiting (%+.2f) clears it. Spending now "
+                     "buys the worse of two options and gives up the choice._"
                      % (offers.note(),
                         sum(1 for k in offers.pool if gain(k) > 0),
-                        len(offers.pool)))
+                        len(offers.pool), better, lo))
     if shut:
         opens = min(shut.values())
         days = max(0.0, (opens - now).total_seconds() / 86400.0)
         out.append("| Wait for the clauses | %d players on %s | %+.2f |"
                    % (len(shut), opens.strftime("%d %b"), then_best))
-        lines.append("_**%d of those %d have a clause that opens on %s**, in "
-                     "about %.0f days, and %d of them would improve your "
-                     "eleven — against %d in the whole free pool. That is "
-                     "where the upgrades are, and none of it is buyable "
-                     "today. Waiting scores ZERO in the table above, not "
+        lines.append("_**%d of those %d locked players would improve your "
+                     "eleven** and their clauses open on %s, in about %.0f "
+                     "days. Waiting scores ZERO in the table above — not "
                      "because it is worthless but because nothing there can "
-                     "price a market it has not seen; the **Left** column is "
-                     "what buys the choice._"
-                     % (helpful, len(shut), opens.strftime("%d %b"), days,
-                        helpful,
-                        sum(1 for k in (offers.pool if offers else {})
-                            if gain(k) > 0)))
+                     "price a market it has not seen, so every move with a "
+                     "positive number beats it by construction. That is the "
+                     "bias to hold in mind when the ranking asks you to spend "
+                     "the balance; the **Left** column is what buys the "
+                     "choice._"
+                     % (helpful, len(shut), opens.strftime("%d %b"), days))
     return out + [""] + lines + [""] if len(out) > 2 else []
 
 
@@ -464,7 +471,11 @@ def market_model(u):
         return None
     seen = [u.value[k] for s in cycles.values() for k in s]
     owned = {k for sq in u.state.squads.values() for k in sq}
-    pool = {k: v for k, v in u.value.items() if k not in owned}
+    # Priced AND scored: a player the scorer knows nothing about cannot be
+    # weighed as an opportunity, and leaving him in the pool at an implied
+    # zero is how the free market came to look empty.
+    pool = {k: v for k, v in u.value.items()
+            if k not in owned and k in u.market_exp}
     per = int(statistics.median(len(v) for v in cycles.values())) or 1
     return Offers.fit(pool, seen, per_cycle=per, cycles=len(cycles))
 

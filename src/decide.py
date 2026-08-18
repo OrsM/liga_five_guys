@@ -128,6 +128,14 @@ class Universe:
     # about his value, a buyout clause runs a median 1.52x it, and the
     # difference between the two is money that never comes back.
     value: dict[str, float] = field(default_factory=dict)
+    # Expected points for EVERY player the market prices, not only the 89 the
+    # simulation needs. The simulation scores who could be in a squad; asking
+    # what the market might deal you next is a question about the other five
+    # hundred, and `expected()` returning 0.0 for a player it was never given
+    # is indistinguishable from him being worthless. That is not hypothetical:
+    # it made Lamine Yamal and Vinicius Junior score zero, and produced the
+    # finding that four players in the whole league could improve the eleven.
+    market_exp: dict[str, float] = field(default_factory=dict)
     # When each clause becomes payable again. A transfer locks it for about a
     # week and the app says until when; absent means locked, never open.
     clause_until: dict = field(default_factory=dict)
@@ -667,6 +675,17 @@ def load(trials_pool=None) -> Universe:
         base[k] = ((max(0.0, s.ppm * s.fix), min(1.0, (s.pct_used or 0) / 100))
                    if s else (2.0, 0.5))
 
+    # Everyone the market prices, scored the same way — for the question of
+    # what might come up later, which is about the players NOT in the
+    # simulation's universe.
+    market_exp: dict[str, float] = {}
+    for k, rec in players.items():
+        row = sc.row_for(k)
+        sc_ = sc.score(row) if row else None
+        if sc_ is not None:
+            market_exp[k] = max(0.0, sc_.ppm * sc_.fix) * min(
+                1.0, (sc_.pct_used or 0) / 100)
+
     pool = pool_from_perjornada(
         csv.DictReader(open(SEASON / "live" / "perjornada_2026-27.csv")))
     # A round in progress carries only the players who have not played it yet.
@@ -689,7 +708,8 @@ def load(trials_pool=None) -> Universe:
     return Universe(
         state=LeagueState(squads, rem, me, carried), forecaster=fc, pos=pos,
         price=price, proceeds=proceeds, owner=owner, cash=cash, me=me,
-        value=value, clause=clause, rival_cash=rival_cash,
+        value=value, market_exp=market_exp, clause=clause,
+        rival_cash=rival_cash,
         clause_until=clause_until,
         part_played=played, name=name, start_note=_calibrated()[0].note(),
         unjoined=list(unjoined_clubs) + list(lg.api_unjoined))

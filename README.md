@@ -102,17 +102,25 @@ answer was not the one anybody expected:
     | Wait for the market  | a week of new offers       | +0.14 (10-90: 0.00 to +2.88) |
     | Wait for the clauses | 62 players on 24 Aug       | +4.62 |
 
-**Only 4 of the 557 unowned players would improve the eleven at all.** The
-free pool is exhausted — waiting for it is worth almost nothing, because the
-talent is not there to be dealt. Meanwhile **32 of the 62 locked players
-would**, and they all arrive at once when the clauses open.
+**A week of offers beats the best thing you can buy today 95% of the time**,
+and even the tenth percentile of waiting (+3.84) clears it. 114 of the 557
+unowned players would improve the eleven. Spending now buys the worse of two
+options and gives up the choice — which is exactly what Miguel had been saying
+before any of this was measured.
 
-That reframes the whole argument. The reason the report keeps proposing to
-take players off rivals is not a bug in how it values them: it is that rivals'
-squads are the only place upgrades exist. And the reason to wait is not that
-something cheaper is coming on the market — it is that on 24 August the set of
-things you can buy goes from four useful players to thirty-six at once, and
-the balance is what buys the choice.
+THE FIRST ANSWER WAS WRONG, AND THE WAY IT WAS WRONG IS WORTH KEEPING. It came
+out as "only 4 of 557 unowned players could improve the eleven, so the free
+pool is exhausted and waiting is worthless" — a tidy, surprising finding that
+was pure artefact. `decide.load()` scores the 89 players who could be in
+somebody's squad, because that is all the SIMULATION needs; every other player
+came back from `expected()` as 0.0, and a player nobody scored is
+indistinguishable from a player worth nothing. Lamine Yamal at 125M scored
+zero. Vinicius Junior scored zero. It was caught in under a minute by Miguel
+saying "that sounds wrong, how can that be" — the fourth time in this session
+that reading the output beat reading the code.
+
+`Universe.market_exp` now scores every player the market prices, all 633,
+which is what a question about the players NOT in the simulation requires.
 
 THE MARKET IS NOT A RANDOM DRAW, and assuming it was would have been worse
 than not modelling it. Players actually offered are 5.6x more valuable than
