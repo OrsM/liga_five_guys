@@ -1,4 +1,4 @@
-# Squads — 2026-08-18 01:43 UTC
+# Squads — 2026-08-18 01:48 UTC
 
 | Manager | Players | Squad value | Spent | Raised | Cash |
 |---|--:|--:|--:|--:|--:|
@@ -18,7 +18,7 @@
 | Player | Team | Pos | Value | 24h | FF | AF |
 |---|---|--:|--:|--:|--:|--:|
 | ionut radu | Celta | por | 38.01M | -452K | 90% | 67% |
-| alvaro fernandez | Deportivo | por | 4.49M | -93K | 20% | — |
+| alvaro fernandez | Deportivo | por | 4.49M | -93K | 0% | — |
 | carl starfelt | Celta | def | 14.09M | 33K | 60% | 67% |
 | robin le normand | Atlético | def | 10.42M | 172K | 60% | 50% |
 | igor zubeldia | Real Sociedad | def | 10.32M | 158K | 60% | — |
@@ -27,7 +27,7 @@
 | iñigo ruiz de galarreta | Athletic | med | 12.65M | 199K | 70% | — |
 | dani lorenzo | Málaga | med | 9.60M | -68K | 90% | 100% |
 | pepelu | Valencia | med | 7.68M | 40K | 70% | 67% |
-| beñat turrientes | Real Sociedad | med | 7.07M | -71K | 60% | 33% |
+| beñat turrientes | Real Sociedad | med | 7.07M | -71K | 50% | 33% |
 | jon moncayola | Osasuna | med | 6.93M | 43K | 90% | — |
 | lucien agoume | Sevilla | med | 5.76M | -42K | 80% | — |
 | iñigo vicente | Racing | del | 19.63M | 317K | 90% | 100% |
@@ -37,7 +37,7 @@
 
 | Player | Team | Pos | Value | 24h | FF | AF |
 |---|---|--:|--:|--:|--:|--:|
-| matias dituro | Elche | por | 7.75M | 120K | 90% | 100% |
+| matias dituro | Elche | por | 7.75M | 120K | 100% | 33% |
 | santiago mouriño | Villarreal | def | 38.38M | -1.15M | 70% | 100% |
 | leandro cabrera ⚠︎suspended | Espanyol | def | 16.53M | -465K | 0% | — |
 | diego javier llorente | Betis | def | 13.20M | -49K | 50% | — |
@@ -45,7 +45,7 @@
 | arda guler | Real Madrid | med | 54.55M | 987K | 60% | 100% |
 | eduardo camavinga | Real Madrid | med | 9.87M | -166K | 30% | — |
 | ilaix moriba | Celta | med | 9.83M | -116K | 50% | — |
-| facundo buonanotte | Elche | med | 6.70M | -128K | 40% | — |
+| facundo buonanotte | Elche | med | 6.70M | -128K | 0% | — |
 | marc roca | Betis | med | 5.38M | -22K | 60% | 67% |
 | abde ezzalzouli ⚠︎doubt | Betis | del | 42.93M | -684K | 30% | — |
 | ayoze perez | Villarreal | del | 17.70M | 22K | 50% | 50% |
@@ -78,7 +78,7 @@
 | Player | Team | Pos | Value | 24h | FF | AF |
 |---|---|--:|--:|--:|--:|--:|
 | alfonso herrero | Málaga | por | 8.47M | 97K | 80% | 100% |
-| lucas noubi | Deportivo | def | 13.09M | 336K | 80% | 100% |
+| lucas noubi | Deportivo | def | 13.09M | 336K | 100% | — |
 | kike salas ⚠︎suspended | Sevilla | def | 11.64M | -362K | 0% | — |
 | jose gaya | Valencia | def | 10.71M | -81K | 60% | 100% |
 | fabio cardoso | Sevilla | def | 790K | -17K | 0% | — |
@@ -99,7 +99,7 @@
 
 | Player | Team | Pos | Value | 24h | FF | AF |
 |---|---|--:|--:|--:|--:|--:|
-| leo roman | Deportivo | por | 37.54M | 380K | 80% | 100% |
+| leo roman | Deportivo | por | 37.54M | 380K | 100% | — |
 | wojciech szczesny | Barcelona | por | 2.21M | -52K | 20% | — |
 | jon aramburu | Real Sociedad | def | 17.91M | 258K | 80% | 100% |
 | yuri berchiche | Athletic | def | 12.41M | -46K | 70% | — |
@@ -109,7 +109,7 @@
 | clemens riedel | Espanyol | def | 4.58M | 123K | 90% | — |
 | alvaro garcia | Villarreal | def | 502K | 0K | 70% | 100% |
 | aimar oroz | Osasuna | med | 16.10M | 36K | 70% | — |
-| lorenzo amatucci | Deportivo | med | 13.19M | 101K | 80% | — |
+| lorenzo amatucci | Deportivo | med | 13.19M | 101K | 100% | — |
 | izan merino | Málaga | med | 6.15M | -75K | 70% | 100% |
 | johnny cardoso | Atlético | med | 5.54M | -90K | 30% | — |
 | mario martin | Getafe | med | 4.01M | 70K | 70% | 100% |
@@ -150,7 +150,7 @@
 
 ## Cash basis
 
-- **miguel_autentico** — balance the app reported at 2026-08-17 23:45 UTC − 0.00M bought + 0.00M sold across 0 ledger row(s) = 23.60M (known)
+- **miguel_autentico** — balance the app reported at 2026-08-18 01:44 UTC − 0.00M bought + 0.00M sold across 0 ledger row(s) = 23.60M (known)
 - **Albert Laporta** — 100M starting budget − 173.13M bought + 35.80M sold across 11 ledger row(s) = -37.33M (estimated)
 - **BurtonGM89** — 100M starting budget − 180.85M bought + 51.65M sold across 17 ledger row(s) = -29.20M (estimated)
 - **Magic Mike 333** — 100M starting budget − 121.23M bought + 19.14M sold across 8 ledger row(s) = -2.09M (estimated)

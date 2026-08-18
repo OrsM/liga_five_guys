@@ -1,4 +1,4 @@
-# Watchlist — 2026-08-18 01:43 UTC
+# Watchlist — 2026-08-18 01:48 UTC
 
 The 39 players you pasted as today's slate — everyone you can actually bid on right now, unfiltered. What each one is worth to your XI, and what to bid, is in the slate table at the top of this report.
 
@@ -15,8 +15,8 @@ The 39 players you pasted as today's slate — everyone you can actually bid on 
 | Player | Team | Pos | Value | 24h | FF | AF |
 |---|---|--:|--:|--:|--:|--:|
 | marcos alonso | Celta | def | 28.59M | -315K | 90% | 67% |
-| angeliño | Deportivo | def | 15.54M | 45K | 50% | — |
 | marc bartra | Betis | def | 27.59M | -157K | 50% | 67% |
+| angeliño | Deportivo | def | 15.54M | 45K | 0% | — |
 
 ## mediocampista
 
