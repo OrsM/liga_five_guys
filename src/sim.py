@@ -256,8 +256,10 @@ def ladder(u, rows, base, saves=None) -> list[str]:
     best_riv = max(((sum(exp.get(x, 0.0) for x in best_xi(sq, exp)), m)
                     for m, sq in u.state.squads.items() if m != u.me),
                    default=(0.0, ""))
-    out.append("| **Your eleven** | | | **%.2f** | vs %s **%.2f** | | **%+.2f** |"
-               % (tot, best_riv[1], best_riv[0], tot - best_riv[0]))
+    out.append("| **Your eleven — play %s** | | | **%.2f** | "
+               "vs %s **%.2f** | | **%+.2f** |"
+               % (shape(u, xi), tot, best_riv[1], best_riv[0],
+                  tot - best_riv[0]))
 
     keep = [k for k in mine if k not in xi and k not in dead]
     if keep:
@@ -671,11 +673,31 @@ def alert_lines(u, rows, rivals) -> list[str]:
                best["d_pos"], 100 * best["d_win"])]
 
 
+def shape(u, keys) -> str:
+    """The formation an eleven implies — "4-5-1", the thing you must set.
+
+    best_xi searches every shape the app allows and picks the best one, so the
+    report has been CHOOSING a formation from the first day and never saying
+    which. Eleven names in a list is not an instruction you can follow: the
+    app asks for a shape before it asks for names.
+    """
+    n = {}
+    for k in keys:
+        n[u.pos.get(k, "")] = n.get(u.pos.get(k, ""), 0) + 1
+    return "%d-%d-%d" % (n.get("DEF", 0), n.get("MED", 0), n.get("DEL", 0))
+
+
 def _xi_total(u, who) -> float:
     from ffcore.season import best_xi
     exp = u.forecaster.expected(decide_choosable(u))
     return sum(exp.get(k, 0.0) for k in best_xi(u.state.squads.get(who, {}),
                                                 exp))
+
+
+def _shape_now(u) -> str:
+    from ffcore.season import best_xi
+    exp = u.forecaster.expected(decide_choosable(u))
+    return shape(u, best_xi(u.state.squads.get(u.me, {}), exp))
 
 
 def _rival_best(u) -> dict:
@@ -753,6 +775,7 @@ def payload(u, rows, base, rivals, locks_h=None, n_actions: int = 0,
         "ladder": ladder_rows(u, rows, saves),
         "bar": _bar(u),
         "xi_total": _xi_total(u, u.me),
+        "shape": _shape_now(u),
         "rival_best": _rival_best(u),
         "wait": wait_routes(u, offers),
         "verdict": verdict(wait_routes(u, offers))[0],
@@ -1143,6 +1166,16 @@ def _selftest() -> None:
     flat = [{**rows[0], "d_pos": 0.0, "d_win": 0.0}]
     assert alert_lines(u, flat, ["riv"]) == [], "a move worth nothing is not news"
 
+    # -- the formation, which is the first thing the app asks for ----------
+    # An eleven is not an instruction until you know the shape. best_xi has
+    # been choosing one since the first day and the report never said which.
+    u.pos = {"a": "POR", "b": "DEF", "c": "DEF", "d": "DEF", "e": "DEF",
+             "f": "MED", "g": "MED", "h": "MED", "i": "MED", "j": "DEL",
+             "k": "DEL"}
+    assert shape(u, list("abcdefghijk")) == "4-4-2"
+    assert shape(u, ["a", "b", "c", "d", "f", "g"]) == "3-2-0"
+    assert shape(u, []) == "0-0-0"
+
     # -- the whole page ----------------------------------------------------
     page = "\n".join(render(u, rows, st, "2026-08-18T0152Z", ["riv"], 132,
                              locks_h=41.1))
@@ -1183,7 +1216,7 @@ def _selftest() -> None:
     ph = "\n".join(placeholder("no api_teams.csv"))
     assert "no api_teams.csv" in ph and ph.startswith("# The simulation")
 
-    print("sim self-test OK (78 cases)")
+    print("sim self-test OK (81 cases)")
 
 
 def main() -> None:
