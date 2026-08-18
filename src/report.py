@@ -998,24 +998,27 @@ def alerts(rows, warnings, token_days) -> list[str]:
 
 
 def sec_today(rows) -> list[str]:
-    """## Do this — the answer, before the table that justifies it.
+    """## Do this — a table, five columns, ranked by what the decision is worth.
 
-    The board is nine columns wide because each one earns its place. On a
-    phone that is four columns and a sideways scroll, and the verdict is not
-    among the four, so the report answered "what should I do today" only after
-    you dragged it into view.
+    The board is nine columns because each earns its place there. On a phone
+    that is four visible columns and a sideways scroll, and the verdict is not
+    among the four, so the report answered "what do I do today" only after you
+    dragged it into view.
 
-    So this goes above it: every asset carrying an action, one line each, buys
-    first because they are what you spend on and sells are how you fund them.
-    A Hold prints nothing — the absence of news IS the news — and cash is not
-    an action. Fitness is the one exception, because a knock on a man you are
-    about to field is worth a line even though the verdict is Hold.
+    THE ORDER IS THE INFORMATION. Buys first, best rate first, because a buy
+    is the only row that spends and the rate is what makes it worth spending
+    on. Each buy's funders sit directly beneath it, richest first — they are
+    alternatives, one of which pays for the row above, and the money column is
+    what you choose between. Then the players who can never reach your eleven,
+    worst rate first: those are sales whatever else happens, and the worst
+    rate is the one costing you most to keep.
+
+    Five columns fit a 390px screen. `Money` carries the direction rather than
+    a sixth column: `≤` is what you may pay, `+` is what a sale raises.
     """
     buys = [r for r in rows if r.get("verdict") == "Buy"]
     sells = [r for r in rows if r.get("verdict") == "Sell"
              and r.get("kind") != "cash"]
-    # A sale that funds a named buy is an OPTION for that buy. A sale of
-    # somebody who can never reach the eleven is a sale full stop.
     funders: dict = {}
     for r in sells:
         if r.get("funds"):
@@ -1029,30 +1032,37 @@ def sec_today(rows) -> list[str]:
         out += ["**Nothing to buy or sell.** Every asset you hold is worth "
                 "more than the cash it would raise, and nothing on offer "
                 "beats what you have.", ""]
+    else:
+        out += ["| Do | Who | Pos | pts/M | Money |",
+                "|---|---|---|--:|--:|"]
 
-    for r in sorted(buys, key=lambda r: -(r.get("rate") or 0)):
-        bits = [r.get("slot") or ""]
-        if r.get("rate") is not None:
-            bits.append("%.3f pts/M" % r["rate"])
-        if r.get("line"):
-            bits.append("up to %s" % eur(r["line"]))
-        out.append("- **Buy %s** — %s" % (r["name"],
-                                          " · ".join(b for b in bits if b)))
-        opts = sorted(funders.get(r["name"], []),
-                      key=lambda x: -(x.get("money") or 0))
-        if opts:
-            out.append("  Sell **one** of: %s"
-                       % ", ".join("%s (%s)" % (o["name"], eur(o["money"]))
-                                   for o in opts))
-    if buys:
-        out.append("")
+        def row(do, r, money):
+            rate = ("%+.3f" % r["rate"]) if r.get("rate") is not None else "—"
+            return "| %s | %s | %s | %s | %s |" % (
+                do, r.get("name", "?"), r.get("slot") or "—", rate, money)
 
-    if dead:
-        out += ["**Sell — cannot reach your eleven whatever happens:**", ""]
-        for r in sorted(dead, key=lambda r: (r.get("rate") or 0)):
-            out.append("- **%s** — %s · %s"
-                       % (r["name"], r.get("slot") or "", r.get("why") or ""))
-        out.append("")
+        for b in sorted(buys, key=lambda r: -(r.get("rate") or 0)):
+            # The ceiling when there is one, the asking price when there is
+            # not. Never "—": a buy row whose money cell is empty is the one
+            # row in the table you cannot act on, and with nothing on today's
+            # slate to measure a line against, that was every buy.
+            cap = ("≤ %s" % eur(b["line"]) if b.get("line")
+                   else "− %s" % eur(b.get("money") or 0))
+            out.append(row("**Buy**", b, cap))
+            for f in sorted(funders.get(b["name"], []),
+                            key=lambda x: -(x.get("money") or 0)):
+                out.append(row("sell 1 of ↑", f,
+                               "+ %s" % eur(f.get("money") or 0)))
+        for d in sorted(dead, key=lambda r: (r.get("rate") or 0)):
+            out.append(row("**Sell**", d, "+ %s" % eur(d.get("money") or 0)))
+
+        out += ["",
+                "_**Buy** spends; `≤` is the most it is worth paying. "
+                "`sell 1 of ↑` are alternatives — **one** of them funds the "
+                "buy above, and the money column is what you choose between. "
+                "**Sell** on its own is a player who cannot reach your eleven "
+                "however the rest of it moves, so any offer is a gain._", ""]
+
     for r in hurt:
         out += ["- **Check %s** — fitness or availability has something on "
                 "him." % r["name"]]
@@ -2179,11 +2189,13 @@ def _selftest() -> None:
     assert "Marcos Alonso" in txt and "Dani Lorenzo" in txt, txt
     assert "Jon Moncayola" not in txt.split("Field")[0], txt
     assert "CASH" not in txt, txt
-    # Buys before sells: one tells you what to do with money, the others are
-    # how you find it, and reading them the other way round is backwards.
+    # Buys before sells: one spends, the others fund it.
     assert txt.index("Marcos Alonso") < txt.index("Dani Lorenzo"), txt
-    # The price to act at rides along, because a Buy without a ceiling is
-    # not actionable on a phone at the moment an offer appears.
+    # Five columns, so it fits a phone without a sideways drag.
+    head = [ln for ln in txt.split("\n") if ln.startswith("| Do |")][0]
+    assert head.count("|") == 6, head
+    # The price to act at rides along: a Buy without a ceiling is not
+    # actionable at the moment an offer appears.
     assert "66.96M" in txt, txt
     # The eleven is named, so fielding needs no scroll either.
     assert "Field" in txt and "Jon Moncayola" in txt, txt
@@ -2207,18 +2219,30 @@ def _selftest() -> None:
          "why": "2nd POR — only 1 can be fielded", "money": 4e6,
          "rate": -1.0, "line": None, "in_xi": False, "flag": False},
     ]
-    grouped = "\n".join(sec_today(many))
-    # The two funders appear together, on the buy, as a choice of one.
-    assert "Sell **one** of:" in grouped, grouped
-    line = [ln for ln in grouped.split("\n") if "one** of" in ln][0]
-    assert "Funder A" in line and "Funder B" in line, line
-    # …and NOT as two separate sell instructions.
-    assert "**Sell Funder A**" not in grouped, grouped
-    # The player who can never be fielded is a real sale, listed apart.
-    assert "cannot reach your eleven" in grouped, grouped
-    assert "Spare" in grouped.split("cannot reach your eleven")[1], grouped
-    # Proceeds are named, because which one to sell is a money question.
-    assert "12.00M" in line and "9.00M" in line, line
+    grouped = sec_today(many)
+    body = "\n".join(grouped)
+    rows_ = [ln for ln in grouped if ln.startswith("|")
+             and not ln.startswith("|---") and "| Do |" not in ln]
+    # The funders sit DIRECTLY under the buy they pay for, richest first, so
+    # the choice is read without cross-referencing.
+    assert "**Buy**" in rows_[0] and "Target" in rows_[0], rows_
+    assert "sell 1 of" in rows_[1] and "Funder A" in rows_[1], rows_
+    assert "sell 1 of" in rows_[2] and "Funder B" in rows_[2], rows_
+    assert "12.00M" in rows_[1] and "9.00M" in rows_[2], rows_
+    # …and are never presented as sell instructions in their own right.
+    assert "| **Sell** | Funder A" not in body, body
+    # The man who can never be fielded is a sale outright, and sorts last.
+    assert "**Sell**" in rows_[3] and "Spare" in rows_[3], rows_
+    # Direction is in the money cell rather than a sixth column.
+    assert "≤ 40.00M" in rows_[0], rows_[0]
+    # …and when there is no line to cap against, the asking price, never "—".
+    nocap = sec_today([{"kind": "buy", "name": "T", "slot": "DEF",
+                        "verdict": "Buy", "why": "", "rate": 0.05,
+                        "line": None, "money": 29.08e6, "in_xi": False,
+                        "flag": False}])
+    buyrow = [ln for ln in nocap if "**Buy**" in ln][0]
+    assert "29.08M" in buyrow and "| — |" not in buyrow, buyrow
+    assert rows_[1].count("+ ") == 1, rows_[1]
 
     # Nothing to do is said plainly rather than left as an empty heading.
     quiet = "\n".join(sec_today([
