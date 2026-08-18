@@ -81,6 +81,36 @@ for whether replacing them helped. git remembers the code.
 λ went the same way a fortnight earlier, one layer down: it measured the
 exchange rate against *your current eleven*, so the baseline moved under it.
 
+**THE ELEVEN A SIGNING HAS TO BEAT WAS THE WRONG ELEVEN.** `candidates()`
+pruned against jornada 1 — the round already in progress, whose eleven is
+locked and whose available players are only those whose clubs have not kicked
+off. Three of mine were absent from it, so the "weakest man in my eleven" came
+out at **0.00 xPts/j** against a real 2.73, and every journeyman in the league
+cleared the bar. 180 candidate moves became **31**, ten distinct targets, and
+a genuinely good move that had been buried surfaced second: Ferran Jutgla for
+**+98K net** — you end up with more money than you started.
+
+This is the mechanical half of a fair complaint from Miguel: that the report
+kept proposing to overspend and give up two players for one, for marginal
+returns. It did, and this is why.
+
+**THE OTHER HALF IS NOT FIXED AND MAY NOT BE FIXABLE HERE.** Every move is
+scored against DOING NOTHING FOR THIRTY-EIGHT JORNADAS, which is not the
+alternative. The alternative is doing something better later, with the balance
+intact, against a market that deals twelve new players a day. The simulation
+has no model of a market it has not seen, so waiting scores exactly zero and
+anything with a positive number beats it *by construction*.
+
+So the report prints the choice instead of pricing it — an **Or wait** row
+carrying what is locked, when it opens, and how the best of it compares:
+
+    | Wait | 62 players | 6 days | +4.62 vs +3.69 |
+
+Six days of patience roughly doubles the choice set and the best thing in it
+is better than anything buyable today. Nothing in the ranking can say that,
+which is the honest position: the table ranks moves against each other, and
+whether to move AT ALL is still a judgement the numbers do not make.
+
 **A CLAUSE IS LOCKED FOR A WEEK AFTER A TRANSFER, AND EVERY RIVAL PLAYER IN
 THIS LEAGUE WAS LOCKED.** All 76 of them, until 24–25 August — so the entire
 steal half of the report consisted of moves the app would have refused. It was

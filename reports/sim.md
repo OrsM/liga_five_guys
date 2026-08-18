@@ -8,22 +8,30 @@ _One question, asked of every move you could make: if I did this, where would I 
 
 **Expected finish 2.14** · **P(win) 11%** · season **1,480–1,738** (10–90)
 
-_38 jornadas left · 41 players acquirable · 80 moves simulated._
+_38 jornadas left · 41 players acquirable · 52 moves simulated._
 
 | Get | Give up | P(win) | Net € | Left |
 |---|---|--:|--:|--:|
 | Dean Huijsen ← BurtonGM89 | Turrientes + Lorenzo | 34% | -18.42M | 5.17M |
-| Ferran Jutgla ← Albert Laporta | Turrientes | 21% | -2.43M | 21.16M |
+| Ferran Jutgla ← Albert Laporta | Lorenzo | 21% | +98K | 23.69M |
+| Nahuel Tenaglia ← BurtonGM89 | Turrientes | 20% | -9.92M | 13.68M |
 | Marcos Alonso (free) | Turrientes | 18% | -21.83M | 1.77M |
 | Aitor Paredes ← BurtonGM89 | Turrientes | 18% | +1.52M | 25.12M |
-| Marc Bartra (free) | Turrientes | 15% | -20.68M | 2.92M |
-| Carlos Puga ← BurtonGM89 | Turrientes | 11% | +1.91M | 25.50M |
-| Marc Roca ← Albert Laporta | Turrientes | 11% | +1.67M | 25.27M |
-| Andriy Lunin (free) | Turrientes | 11% | +4.96M | 28.56M |
+| Santiago Mouriño ← Albert Laporta | Turrientes + Lorenzo | 17% | -23.54M | 55K |
+| Antonio Blanco ← BurtonGM89 | Turrientes | 16% | -7.82M | 15.78M |
+| Marc Bartra (free) | Lorenzo | 15% | -18.15M | 5.45M |
 
 _**P(win)** is where the move LEAVES you — your chance of winning the league after making it, against 11% if you do nothing. **Get** names the rival a steal takes him off, which is half of what a steal is worth: it raises your total and lowers theirs at once. **Net €** is what the move does to the balance and **Left** is what you are on afterwards — every rival is on 0K until you pay one, so that column is the whole of your ability to answer anything for the rest of the season. Who exactly you give up when it says *spares* is in the sell table below; none of them ever start. **he takes** is the rival's best answer, played before the season is._
 
 _A CLAUSE IS THREE PURCHASES AT ONCE. The market value buys the points for you, and that part is a loan rather than a spend — it comes back when you sell him. The premium over it buys something else entirely: that a RIVAL does not score them. And the balance buys nothing at all, it only stops being available. The first is priced by the market; the second is now scored net of his reply, because he is handed the money and spends it; the third is the column on the right, because nothing here can value it._
+
+## Or wait
+
+| Do | What opens | When | best upgrade then vs now |
+|---|---|--:|--:|
+| Wait | 62 players | 6 days | +4.62 vs +3.69 |
+
+_**62 rival players have a locked clause** and open on 24 Aug, in about 6 days. The best of them is worth +4.62 xPts/j against your eleven; the best you can buy today is +3.69. Waiting scores ZERO in the table above — not because it is worthless but because nothing here models a market you have not seen yet, so every move with a positive number beats it by construction. The balance in the **Left** column is what buys the choice._
 
 ## Sell — these never make the eleven
 

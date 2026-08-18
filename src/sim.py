@@ -187,6 +187,60 @@ def table(rows, u, base, rivals) -> list[str]:
     return out
 
 
+def waiting(u) -> list[str]:
+    """What doing nothing is worth, which is the one option never on the table.
+
+    EVERY MOVE IS SCORED AGAINST DOING NOTHING FOR THIRTY-EIGHT JORNADAS. That
+    is not the alternative. The alternative is doing something better later —
+    with the balance intact, against a market that deals twelve new players a
+    day, and after the clauses open. The simulation cannot price that: it has
+    no model of a future market, so waiting scores exactly zero and anything
+    with a positive number beats it.
+
+    So the choice is printed rather than priced. What is locked, when it
+    opens, and how the best of it compares to the best you can do today — and
+    the reader decides whether six days of patience beats a first move made
+    against a fifth of the league.
+    """
+    import datetime as dt
+
+    now = dt.datetime.now(dt.timezone.utc)
+    shut = {k: w for k, w in u.clause_until.items() if w > now
+            and u.owner.get(k) and u.owner[k] != u.me}
+    if not shut:
+        return []
+    opens = min(shut.values())
+    exp = u.forecaster.expected(decide_choosable(u))
+    xi = [k for k in u.state.squads.get(u.me, {})]
+    from ffcore.season import best_xi
+    eleven = best_xi(u.state.squads.get(u.me, {}), exp)
+    bar = min((exp.get(k, 0.0) for k in eleven), default=0.0)
+
+    def upgrade(keys):
+        return max((exp.get(k, 0.0) - bar for k in keys), default=0.0)
+
+    now_best = upgrade([k for k in u.price if k not in xi])
+    then_best = upgrade(shut)
+    days = max(0.0, (opens - now).total_seconds() / 86400.0)
+    return ["| Wait | %d players | %.0f days | %+.2f vs %+.2f |"
+            % (len(shut), days, then_best, now_best),
+            "",
+            "_**%d rival players have a locked clause** and open on %s, in "
+            "about %.0f days. The best of them is worth %+.2f xPts/j against "
+            "your eleven; the best you can buy today is %+.2f. Waiting scores "
+            "ZERO in the table above — not because it is worthless but because "
+            "nothing here models a market you have not seen yet, so every move "
+            "with a positive number beats it by construction. The balance in "
+            "the **Left** column is what buys the choice._"
+            % (len(shut), opens.strftime("%d %b"), days, then_best, now_best),
+            ""]
+
+
+def decide_choosable(u):
+    from decide import choosable
+    return choosable(u)
+
+
 def sells(u, dead) -> list[str]:
     """The dead weight, and what the app pays for it."""
     if not dead:
@@ -430,6 +484,11 @@ def render(u, rows, base, stamp: str, rivals, n_actions: int = 0,
            "this, where would I finish?_", ""]
     out += header(u, base, n_actions or len(rows), locks_h)
     out += table(rows, u, base, rivals)
+    wait = waiting(u)
+    if wait:
+        out += ["## Or wait", "",
+                "| Do | What opens | When | best upgrade then vs now |",
+                "|---|---|--:|--:|"] + wait
     out += ["## Sell — these never make the eleven", ""]
     out += sells(u, dead_weight(u))
     out += ["## Where the league stands", ""]

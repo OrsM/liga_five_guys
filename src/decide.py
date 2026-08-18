@@ -156,6 +156,22 @@ class Universe:
     cash_note: str = ""
 
 
+def choosable(u) -> int:
+    """A jornada whose eleven you can still pick, for judging a signing by.
+
+    NOT the round in progress. Its eleven is locked and the players whose
+    clubs have kicked off are absent from it, so the team it describes is
+    whatever happens to be left — and the weakest man in that team can be a
+    reserve scoring nothing. Anything at all then clears the bar a signing has
+    to beat. Measured on 2026-08-18: the bar off jornada 1 was 0.00 and off
+    jornada 2 was 2.73, and every journeyman in the league sat in between.
+    """
+    for j in u.state.jornadas:
+        if j not in u.part_played:
+            return j
+    return u.state.jornadas[0] if u.state.jornadas else 0
+
+
 def candidates(u: Universe, expected: dict[str, float],
                budget: float | None = None) -> list[Action]:
     """Every affordable move, pruned to the ones that could plausibly help.
@@ -167,11 +183,15 @@ def candidates(u: Universe, expected: dict[str, float],
     """
     cash = u.cash if budget is None else budget
     mine = set(u.state.squads.get(u.me, {}))
-    xi = set(best_xi(u.state.squads[u.me], expected))
+    # The eleven the signing has to beat is one you can still pick — see
+    # choosable(). `expected` may be any round; the BAR never comes off a
+    # locked one.
+    bar_exp = u.forecaster.expected(choosable(u)) or expected
+    xi = set(best_xi(u.state.squads[u.me], bar_exp))
     # The weakest man in the current eleven is the bar a signing has to clear.
-    bar = min((expected.get(k, 0.0) for k in xi), default=0.0)
+    bar = min((bar_exp.get(k, 0.0) for k in xi), default=0.0)
     spare = sorted((k for k in mine if k not in xi),
-                   key=lambda k: expected.get(k, 0.0))
+                   key=lambda k: bar_exp.get(k, 0.0))
     # DEAD WEIGHT PAYS FOR THINGS. These never make the eleven, so selling
     # them costs nothing on the pitch and the only question is what the money
     # then buys. Biggest first, so the greedy below never sells four men to do
@@ -180,7 +200,7 @@ def candidates(u: Universe, expected: dict[str, float],
 
     out: list[Action] = []
     for c, price in sorted(u.price.items(), key=lambda kv: kv[1]):
-        if c in mine or expected.get(c, 0.0) <= bar:
+        if c in mine or bar_exp.get(c, 0.0) <= bar:
             continue
         victim = u.owner.get(c, "")
         kind = "steal" if victim and victim != u.me else "buy"
@@ -889,6 +909,27 @@ def _selftest() -> None:
     cheap = Action("steal", buy="th_m1", cost=1e6, victim="riv")
     assert respond(poor, cheap, apply(poor, cheap)) is None
 
+    # -- the bar is a round you can still pick -----------------------------
+    # THE ELEVEN A SIGNING HAS TO BEAT must be the one you would actually
+    # field. Measured against a round already in progress it is not: the
+    # players whose clubs have kicked off are out of it, so the eleven is
+    # whatever is left, the weakest man in it can be a reserve scoring
+    # nothing, and every journeyman in the league clears the bar. On the day
+    # this was found the bar off jornada 1 was 0.00 and off jornada 2 was
+    # 2.73, and the candidate list was inflated by everyone in between.
+    half = Universe(
+        state=LeagueState({"me": dict(mine), "riv": dict(theirs)}, [1, 2],
+                          "me", ),
+        forecaster=B({1: {"me_k": (0.1, 1.0), "dud": (1.0, 1.0)},
+                      2: {**{k: (5.0, 1.0) for k in mine}, "dud": (1.0, 1.0)}}),
+        pos={**u.pos, "dud": "MED"}, price={"dud": 1e6}, proceeds={},
+        owner={}, cash=50e6, me="me")
+    half.part_played = {1: {"somewhere"}}
+    # Off the locked round the bar is 0.1 and the journeyman clears it; off a
+    # round you can still pick it is 5.0 and he does not.
+    assert not any(a.buy == "dud"
+                   for a in candidates(half, half.forecaster.expected(2)))
+
     # -- a clause you cannot pay is not a price ----------------------------
     # A transfer LOCKS the clause for about a week, and on the day this was
     # found every one of the 76 rival players in the league was locked. The
@@ -974,7 +1015,7 @@ def _selftest() -> None:
     assert un == ["zzz-united"], un
     assert _d == {1: {"getafe"}}, _d
 
-    print("decide self-test OK (55 cases)")
+    print("decide self-test OK (56 cases)")
 
 
 if __name__ == "__main__":
