@@ -85,6 +85,7 @@ MIGRATED onto ffcore. Four things changed in substance:
 
 from __future__ import annotations
 
+import json
 import os
 import re
 import sys
@@ -916,9 +917,14 @@ def board_rows(players, chosen, cands, repl, hurdle,
         # A funded, available, better man at his own position. All three, or it
         # is not a sale: better on its own is a wish, available on its own is a
         # coincidence, and affordable on its own is just cash.
+        # The upgrade must clear the line as well as beat the man being sold.
+        # A sale funding a purchase the board would not make on its own merits
+        # is a sale that funds nothing, and leaves you a player short.
         up = next((o for o in sorted(offers.get(r["slot"], []),
                                      key=lambda o: -o["vor"])
                    if o["vor"] > r["vor"]
+                   and ratio_of(o["vor"], o["money"]) is not None
+                   and ratio_of(o["vor"], o["money"]) >= line
                    and o["money"] <= (r["money"] or 0.0) + (cash or 0.0)), None)
         if up:
             r["verdict"] = "Sell"
@@ -950,9 +956,16 @@ def board_rows(players, chosen, cands, repl, hurdle,
             r["why"] = "not on offer today" if above else ""
         elif above and hurdle is not None:
             r["verdict"] = "Buy"
-        elif id(r) in funds:
+        elif above and id(r) in funds:
             # Paid for out of a sale rather than out of the balance, which is
             # why the two sides have to be decided in one pass.
+            #
+            # `above` is REQUIRED here, and was missing. The sale relaxes the
+            # CASH constraint and nothing else: it says you can reach him, not
+            # that he is worth reaching. Without the check this branch bought
+            # any affordable upgrade at any rate — the rule this repo retired
+            # when the board landed — and it contradicted the row two lines
+            # above it, which passed on a BETTER rate for want of a funder.
             r["verdict"] = "Buy"
             r["why"] = "paid for by selling %s" % funds[id(r)]
         else:
@@ -997,6 +1010,42 @@ def alerts(rows, warnings, token_days) -> list[str]:
     return out
 
 
+def decisions(rows) -> list[dict]:
+    """The Do-this table as data, in render order.
+
+    Split out so the markdown table and the phone's rendered one cannot
+    disagree: both call this, and the ordering argument lives here once.
+    `kind` is what the row IS — a buy, one of that buy's funding options, or
+    an outright sale — because a renderer should not have to infer that from
+    an arrow in a string.
+    """
+    buys = [r for r in rows if r.get("verdict") == "Buy"]
+    sells = [r for r in rows if r.get("verdict") == "Sell"
+             and r.get("kind") != "cash"]
+    funders: dict = {}
+    for r in sells:
+        if r.get("funds"):
+            funders.setdefault(r["funds"], []).append(r)
+
+    def cell(r, kind, money):
+        return {"kind": kind, "name": r.get("name", "?"),
+                "pos": r.get("slot") or "", "rate": r.get("rate"),
+                "money": money, "why": r.get("why") or "",
+                "in_xi": bool(r.get("in_xi")), "flag": bool(r.get("flag"))}
+
+    out = []
+    for b in sorted(buys, key=lambda r: -(r.get("rate") or 0)):
+        out.append(cell(b, "buy", -(b.get("money") or 0)))
+        out[-1]["cap"] = b.get("line")
+        for f in sorted(funders.get(b["name"], []),
+                        key=lambda x: -(x.get("money") or 0)):
+            out.append(cell(f, "fund", f.get("money") or 0))
+    for d in sorted((r for r in sells if not r.get("funds")),
+                    key=lambda r: (r.get("rate") or 0)):
+        out.append(cell(d, "sell", d.get("money") or 0))
+    return out
+
+
 def sec_today(rows) -> list[str]:
     """## Do this — a table, five columns, ranked by what the decision is worth.
 
@@ -1016,45 +1065,33 @@ def sec_today(rows) -> list[str]:
     Five columns fit a 390px screen. `Money` carries the direction rather than
     a sixth column: `≤` is what you may pay, `+` is what a sale raises.
     """
-    buys = [r for r in rows if r.get("verdict") == "Buy"]
-    sells = [r for r in rows if r.get("verdict") == "Sell"
-             and r.get("kind") != "cash"]
-    funders: dict = {}
-    for r in sells:
-        if r.get("funds"):
-            funders.setdefault(r["funds"], []).append(r)
-    dead = [r for r in sells if not r.get("funds")]
+    cells = decisions(rows)
     hurt = [r for r in rows if r.get("flag") and r.get("kind") == "own"]
     xi = [r["name"] for r in rows if r.get("in_xi")]
 
     out = ["## Do this", ""]
-    if not buys and not dead:
+    if not cells:
         out += ["**Nothing to buy or sell.** Every asset you hold is worth "
                 "more than the cash it would raise, and nothing on offer "
                 "beats what you have.", ""]
     else:
         out += ["| Do | Who | Pos | pts/M | Money |",
                 "|---|---|---|--:|--:|"]
-
-        def row(do, r, money):
-            rate = ("%+.3f" % r["rate"]) if r.get("rate") is not None else "—"
-            return "| %s | %s | %s | %s | %s |" % (
-                do, r.get("name", "?"), r.get("slot") or "—", rate, money)
-
-        for b in sorted(buys, key=lambda r: -(r.get("rate") or 0)):
+        label = {"buy": "**Buy**", "fund": "sell 1 of ↑", "sell": "**Sell**"}
+        for c in cells:
             # The ceiling when there is one, the asking price when there is
             # not. Never "—": a buy row whose money cell is empty is the one
-            # row in the table you cannot act on, and with nothing on today's
-            # slate to measure a line against, that was every buy.
-            cap = ("≤ %s" % eur(b["line"]) if b.get("line")
-                   else "− %s" % eur(b.get("money") or 0))
-            out.append(row("**Buy**", b, cap))
-            for f in sorted(funders.get(b["name"], []),
-                            key=lambda x: -(x.get("money") or 0)):
-                out.append(row("sell 1 of ↑", f,
-                               "+ %s" % eur(f.get("money") or 0)))
-        for d in sorted(dead, key=lambda r: (r.get("rate") or 0)):
-            out.append(row("**Sell**", d, "+ %s" % eur(d.get("money") or 0)))
+            # row you cannot act on, and with nothing on today's slate to
+            # measure a line against, that was every buy.
+            if c["kind"] == "buy":
+                money = ("≤ %s" % eur(c["cap"]) if c.get("cap")
+                         else "− %s" % eur(abs(c["money"])))
+            else:
+                money = "+ %s" % eur(c["money"])
+            rate = ("%+.3f" % c["rate"]) if c["rate"] is not None else "—"
+            out.append("| %s | %s | %s | %s | %s |"
+                       % (label[c["kind"]], c["name"], c["pos"] or "—",
+                          rate, money))
 
         out += ["",
                 "_**Buy** spends; `≤` is the most it is worth paying. "
@@ -1791,6 +1828,22 @@ def main() -> None:
         f"_Generated {now:%Y-%m-%d %H:%M} UTC._",
     ]
 
+    # The same table as data, for the phone to render properly. Markdown
+    # cannot colour a verdict or right-align a number, and the site escapes
+    # raw HTML on purpose, so the one way to get a readable table on a 390px
+    # screen is to ship the rows and let a component draw them. Both come from
+    # decisions(), so they cannot disagree about order or content.
+    (REPORTS / "decisions.json").write_text(json.dumps({
+        "generated_at": now.strftime("%Y-%m-%dT%H:%MZ"),
+        "locks_in_h": round(left, 1) if deadline else None,
+        "cash": cash.value if cash and cash.value is not None else None,
+        "squad_value": squad_value,
+        "line": hurdle,
+        "rows": decisions(brows),
+        "xi": [r["name"] for r in brows if r.get("in_xi")],
+    }, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
+    print("wrote %s" % (REPORTS / "decisions.json"))
+
     write_lines(REPORTS / "board.md", head)
     write_lines(REPORTS / "latest.md", out)
     # History keeps both halves in one file: a day's report is the board AND
@@ -2035,6 +2088,28 @@ def _selftest() -> None:
     assert nv["blocked"]["verdict"] == "Sell" and nv["bargain"]["verdict"] == "Buy"
     assert "paid for by selling blocked" in nv["bargain"]["why"]
     assert nv["dud"]["verdict"] == "Hold"
+
+    # A FUNDED BUY STILL HAS TO CLEAR THE LINE. The sale relaxes the CASH
+    # constraint — you could not afford him from the balance, you can after
+    # selling — and nothing else. Skipping the rate check reintroduced exactly
+    # the rule this repo retired: "does he improve the eleven", which buys any
+    # upgrade at any price.
+    #
+    # It showed up in one board as Marc Bartra at -0.029 marked `pass` and Isi
+    # Palazon at -0.039 marked `Buy`: worse rate, better verdict, two rows
+    # apart in the same table.
+    # +1.0 above replacement at 25M is 0.040/M, under a 0.05 line — and still
+    # an upgrade on a man worth +0.2, and affordable out of his sale. That
+    # combination is precisely what the funded path used to buy.
+    poor = {**asset("poor upgrade", 4.0, 4.0, 25e6), "avail": True}
+    held = asset("worse", 3.2, 3.2, 25e6)
+    lb = board_rows([held], set(), [poor], repl, 0.05)
+    lv = {r["name"]: r for r in lb}
+    assert lv["poor upgrade"]["rate"] < 0.05, lv["poor upgrade"]["rate"]
+    assert lv["poor upgrade"]["verdict"] == "pass", lv["poor upgrade"]
+    # …and with no buy to fund, there is no sale either. A sale that funds
+    # nothing is just a smaller squad.
+    assert lv["worse"]["verdict"] != "Sell", lv["worse"]
 
     # An unpriced row cannot be rated, so it is ranked last and says why
     # instead of being scored as though it were free.
