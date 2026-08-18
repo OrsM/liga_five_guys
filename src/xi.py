@@ -23,7 +23,7 @@ checklist does not mention at all is benched AND reported: silently fielding
 someone you never considered is the one failure this must not have.
 
 ONLY THE MARKS AT LOCK MATTER. The scheduled run logs twice a day, so most
-rows record a file you did not touch. hours_to_lock (from inputs/deadline.txt,
+rows record a file you did not touch. hours_to_lock (from the next kickoff,
 the same reading report.py uses) is stamped on every row, so the scorer can
 take the last row before kickoff per jornada instead of guessing which one
 was live. Without a deadline file the column is blank and nothing else
@@ -198,7 +198,13 @@ def read_input(squad):
 
 
 def main() -> None:
-    lg = League.load(with_market=False)
+    # WITH the market, even though this script prices nothing. Ownership now
+    # comes from the league API, and that join needs Market.key_for to key
+    # players the way every other reader does; without it League falls back to
+    # the ledger replay and this script ends up with a different squad from
+    # the checklist squads.py just wrote — each then reports the other's
+    # players as strangers. Loading market.csv costs a second.
+    lg = League.load()
     squad = lg.squad(lg.cfg.me)
 
     bench_names, warnings, source = read_input(squad)

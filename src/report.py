@@ -88,6 +88,7 @@ from __future__ import annotations
 import os
 import re
 import sys
+from pathlib import Path
 from collections import Counter
 from datetime import datetime, timezone
 
@@ -100,19 +101,23 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 # is the first thing to fold into the cost side of the ratio once a season of
 # readings exists to fit it against.
 #
-# λ WENT THE SAME WAY, and it is a bigger list: Lambda, Rung, frontier(),
-# verdict(), sell_test(), Sale, marginal() and lambda_now()/sec_ladder()/
-# log_lambda() below have no caller left. λ measured points per million against
-# YOUR CURRENT ELEVEN, so the same player was worth different amounts on
-# consecutive days for reasons that had nothing to do with him, and the ladder
-# it came from priced a market you cannot shop in. Both are fixed by measuring
-# against replacement level instead, which the rules fix and your eleven cannot
-# move. Nothing is deleted: `data/decisions/lambda_log.csv` is the only record
-# of what the old rule said, and these functions are what would have to be
-# re-read to grade it.
-from ffcore.bid import (Lambda, basket, cost_of, deals,  # noqa: E402,F401
-                        demand_summary, frontier, premiums, ratio_of,
-                        sell_test, suggest, verdict, xi_snapshots)
+# λ IS GONE, code and all, as of 2026-08-18. It measured points per million
+# against YOUR CURRENT ELEVEN, so the same player was worth different amounts
+# on consecutive days for reasons that had nothing to do with him, and the
+# ladder it came from priced a market you cannot shop in. Replacement level
+# fixes both: the rules set it and your eleven cannot move it.
+#
+# It was kept for a fortnight after being retired, on the argument that
+# `lambda_log.csv` was the only record of the old rule and the code was needed
+# to grade it. That argument does not survive being written down — the LOG is
+# what holds the evidence, and it is still here, untouched. Keeping the code
+# meant keeping Lambda, Rung, frontier(), verdict(), sell_test(), Sale,
+# marginal() and three functions in this file, all reachable from nothing, all
+# of which had to be read and skipped by anyone learning how buying works now.
+# git remembers them.
+from ffcore.bid import (basket, cost_of, deals,  # noqa: E402
+                        demand_summary, premiums, ratio_of,
+                        suggest, xi_snapshots)
 from ffcore.fixture import FIX_BAND, HOME_EDGE  # noqa: E402
 from ffcore.league import League  # noqa: E402
 from ffcore.second import (LEGEND, SECOND_SOURCE,  # noqa: E402
@@ -124,9 +129,13 @@ from ffcore.tidy import (DECISIONS, REPORTS,  # noqa: E402
                          append_csv, input_path, latest_only, load_deadline,
                          load_market, load_lineups, read_csv, snapshot_stamp,
                          widen_csv, write_lines)
-from seen import read_slate  # noqa: E402
+from slate import read_slate  # noqa: E402
 
 HISTORY = REPORTS / "history"
+# In .runtime/ (gitignored): this file is a signal for a notifier, not a
+# document. Under reports/ or data/ the run would commit a "you have a Buy"
+# note that stops being true within the hour.
+ALERTS = Path(os.environ.get("LFG_ALERTS", ".runtime/alerts.md"))
 
 STALE_HOURS = 14.0
 MOVER_PCT = 1.0           # squad price moves worth printing
@@ -356,19 +365,6 @@ def market_pool(sc, by_key) -> dict:
         r = sc.score(rec).as_row()
         rows.append({**r, "name": title_name(r["name"]), "score": r["flat"]})
     return squad_pool(rows)
-
-
-def lambda_now(players, pool_flat, total_flat, cands, cash, prem) -> Lambda:
-    """DEAD — the going rate for cash on the ΔXI scale. bid.basket() replaced it.
-
-    Never a zero: `rate=None` means λ cannot judge today, and every verdict
-    that reads it falls back to the older question and says so.
-    """
-    if total_flat is None:
-        return Lambda(None, [], 0.0, 0.0, "no legal XI to price against")
-    return frontier(pool_flat, total_flat, cands, cash, prem)
-
-
 def fix_basis_label(players) -> str:
     """What ranked the opponents, said out loud in the notes.
 
@@ -464,35 +460,6 @@ def log_line(observed, hurdle, bought, spent, forgone, cash) -> None:
                       "%.4f" % (bought[0]["vor"] / (bought[0]["value"] / 1e6))),
         "forgone": f"{forgone:.4f}",
     }], cols)
-
-
-def log_lambda(observed, lam: Lambda, buffer: float) -> None:
-    """DEAD — log_line() replaced it. The written rows are kept, not the caller.
-
-    Without this the rule is ungradeable. If the season's realised ratios sit
-    above the λ printed at the time, λ was too low and the buffer was covering
-    for it — a question this file can answer and a report cannot.
-    """
-    path = DECISIONS / "lambda_log.csv"
-    cols = ["observed_at", "rate", "buffer", "hurdle", "cash", "spent",
-            "rungs", "best_rate", "why"]
-    widen_csv(path, cols)
-    if observed in {r.get("observed_at") for r in read_csv(path)}:
-        return
-    hurdle = lam.hurdle(buffer)
-    append_csv(path, [{
-        "observed_at": observed,
-        "rate": "" if lam.rate is None else f"{lam.rate:.4f}",
-        "buffer": f"{buffer:.3f}",
-        "hurdle": "" if hurdle is None else f"{hurdle:.4f}",
-        "cash": f"{lam.cash:.0f}", "spent": f"{lam.spent:.0f}",
-        "rungs": len(lam.ladder),
-        "best_rate": ("" if not lam.ladder
-                      else f"{lam.ladder[0].ratio:.4f}"),
-        "why": lam.why,
-    }], cols)
-
-
 def as_fielded(players):
     """(total, xi, bench, illegal, warnings) for the XI you have MARKED.
 
@@ -553,24 +520,23 @@ def swaps(fielded_xi, best_xi):
     return pairs
 
 
-def load_squad_file() -> list[str]:
-    """inputs/squad.txt — fallback only. The ledger is the source of truth."""
-    path = input_path("squad.txt")
-    if not path.exists():
-        return []
-    return [ln.strip() for ln in path.read_text(encoding="utf-8").splitlines()
-            if ln.strip() and not ln.strip().startswith("#")]
-
-
 def squad_names(lg) -> tuple[list[str], str]:
-    """Your roster, and where it came from."""
+    """Your roster, and where it came from.
+
+    There is no squad.txt fallback any more. It was a generated copy of this
+    same list, read only when League failed to load — but squads.py is what
+    wrote it and squads.py needs League too, so a fresh one could never exist
+    at the moment it was wanted. All the fallback could ever do was serve a
+    stale squad, silently, in the one situation where you most needed to be
+    told something was wrong.
+    """
     if lg is not None:
         mine = lg.managers.get(lg.cfg.me)
         if mine and mine.players:
             by_key = lg.market.latest() if lg.market else {}
             return ([by_key.get(k, {}).get("name", k) for k in mine.players],
                     "ledger")
-    return load_squad_file(), "squad.txt"
+    return [], "nothing"
 
 
 def rival_ceiling(lg) -> float | None:
@@ -603,7 +569,7 @@ def sec_slate(lg, by_key, cands, pool, board, slate, prem, cash_value,
     do with him; and it was a different number from the one the board printed
     for the same man, in the same unit.
     """
-    on_offer, unresolved, ambiguous, auto = slate
+    on_offer, unresolved = slate
     out: list[str] = []
 
     owned = {k: lg.owner[k] for k in on_offer if k in lg.owner}
@@ -728,26 +694,16 @@ def sec_slate(lg, by_key, cands, pool, board, slate, prem, cash_value,
                          "you" if h == lg.cfg.me else h)
             for k, h in sorted(owned.items())), ""]
 
-    if auto:
-        # Printed, not hidden: this is the one place the repo guesses between
-        # candidates, and it guesses off a ledger you maintain by hand. If a
-        # line here names the wrong player, the fix is a missing row in
-        # transactions.csv (issue #26).
-        out += ["**Placed by ownership, not by the name.** The app deals free "
-                "agents, so a candidate somebody already holds is not the one "
-                "on offer — check these if one looks wrong:", ""]
-        out += ["- " + a for a in auto] + [""]
-
-    if unresolved or ambiguous:
-        # A heading, not bold text, so digest.py prints it once instead of
-        # repeating the watchlist's copy of the same list.
-        out += ["## Names I could not place", "",
-                "OCR mangled these past matching, so they are missing from "
-                "the table above — re-read them off the app if one matters.",
-                ""]
-        out += ["- **%s** — no match" % u for u in unresolved]
-        out += ["- **%s** — could be %s" % (raw, ", ".join(c))
-                for raw, c in ambiguous]
+    if unresolved:
+        # There is no ambiguity list any more and no "placed by ownership"
+        # list: the feed states who is on offer, so nothing is guessed between
+        # candidates and nothing needs the ledger to break a tie. What is left
+        # is the one honest failure — the app names a player the market pages
+        # do not, so he cannot be priced and is missing from the table.
+        out += ["## On offer but unpriced", "",
+                "The app is offering these and no market row matches the "
+                "name, so they carry no rating here:", ""]
+        out += ["- **%s**" % u for u in unresolved]
         out.append("")
     return out, len(rows), better
 
@@ -1016,6 +972,42 @@ def board_rows(players, chosen, cands, repl, hurdle,
             r["verdict"] = "pass"
     rows.insert(at, cash_row)
     return rows
+
+
+def alerts(rows, warnings, token_days) -> list[str]:
+    """The short list worth interrupting somebody for, or [].
+
+    This is the notification surface, and the whole design is what it LEAVES
+    OUT. It replaced watch.py, which diffed market values and emitted every
+    player who moved 2% in a day — thirty-odd rows, league-wide, not one of
+    them a decision. Nobody read that file, which is the only reason it was
+    harmless; pushed to a phone it would be spam, and spam is how you learn to
+    swipe away the one that mattered.
+
+    So: a verdict that asks for money to move, a fitness flag on somebody you
+    own, a warning that your XI is one knock from illegal, and the login
+    expiring. Nothing else. A Hold is the absence of news and prints nothing.
+
+    Returns [] when there is nothing to say, and the caller must send NOTHING
+    rather than "no news" — a twice-daily "all quiet" is the same spam by
+    another route.
+    """
+    out = []
+    for r in rows:
+        if r.get("kind") == "cash":
+            continue
+        v = (r.get("verdict") or "").strip()
+        if v in ("Buy", "Sell"):
+            why = r.get("why") or ""
+            out.append("**%s** — %s%s" % (v, r.get("name", "?"),
+                                          " (%s)" % why if why else ""))
+        elif r.get("flag") and r.get("kind") == "own":
+            out.append("**Fitness** — %s" % r.get("name", "?"))
+    out += ["**Squad** — %s" % w for w in warnings]
+    if token_days is not None and token_days < 14:
+        out.append("**Log in again** — the league token expires in %d days "
+                   "(`python -m ffcore.auth --login`)" % token_days)
+    return out
 
 
 def sec_board(rows, cash_value, forgone) -> list[str]:
@@ -1477,13 +1469,12 @@ def main() -> None:
         print("no market data; wrote placeholder report")
         return
 
-    try:
-        lg = League.load()
-    except SystemExit as exc:
-        # rosters_initial.txt missing — fall back to squad.txt so a
-        # half-configured repo still produces a report.
-        print("league not loaded (%s); using squad.txt" % exc)
-        lg = None
+    # No try/except. A League that will not load means rosters_initial.txt is
+    # missing, and the only thing the old fallback could produce was a report
+    # built on a stale generated copy of the squad. Failing here is the honest
+    # outcome: the run stops, systemd records it, and nothing publishes a
+    # report that looks fine and is not.
+    lg = League.load()
 
     # One builder, shared with rivals.py: the same points blend and the same
     # fixture board score your squad and theirs.
@@ -1518,7 +1509,7 @@ def main() -> None:
     cash = lg[lg.cfg.me].cash if lg and lg.cfg.me in lg.managers else None
     cash_value = cash.value if cash and cash.confidence == "known" else None
     by_key = lg.market.latest() if lg and lg.market else {}
-    slate = read_slate(by_key, lg.owner) if by_key else (set(), [], [], [])
+    slate = read_slate(lg.market) if by_key else (set(), [])
     # Priced once: the buy side sizes a bid, and the sell side is what the app
     # pays you for a player, which the bench table needs whether or not a slate
     # was pasted.
@@ -1591,10 +1582,16 @@ def main() -> None:
             sell_prem=app_prem, second=second, line=hurdle)
 
     # --- assemble ---------------------------------------------------------
-    # FIVE TABLES, in the order the decisions get made: field, buy, what the
-    # money would otherwise buy, sell, and the exceptions that would make any
-    # of the three wrong. Everything below the rule is reference.
-    out: list[str] = [f"# Fantasy report — {observed}", ""]
+    # TWO FILES, and the split is the point. `board.md` is the answer — header,
+    # the board, warnings — and it is what digest.py stitches into REPORT.md.
+    # `latest.md` is the workings: the five sections, in the order the
+    # decisions get made, plus the movers and the notes.
+    #
+    # They used to be one file, with digest pulling the board out of it. That
+    # meant the board rendered twice: once in the report you read, and again at
+    # the top of the file the report links to as "the workings" — the same
+    # twenty-row table, immediately above its own explanation.
+    head: list[str] = [f"# Fantasy report — {observed}", ""]
 
     ctx = []
     # Derived from the next kickoff when fixtures have been scraped, so it
@@ -1604,7 +1601,7 @@ def main() -> None:
     if deadline:
         left = (deadline - now).total_seconds() / 3600
         if left < 0:
-            ctx.append("**Deadline passed** — update `inputs/deadline.txt`")
+            ctx.append("**Deadline passed** — no kickoff ahead in fixtures")
         elif left < 48:
             ctx.append(f"**Locks in {left:.0f}h**"
                        + (" (next kickoff)" if dl_src == "fixtures" else ""))
@@ -1619,11 +1616,16 @@ def main() -> None:
     # ends up comparing numbers that share a unit and not a baseline.
     if hurdle is not None:
         ctx.append("**line %.3f pts/M**" % hurdle)
-    out += [" · ".join(ctx), ""]
-    # The board is the answer and the five questions are its workings, so it is
-    # printed first.
+    head += [" · ".join(ctx), ""]
     if brows:
-        out += sec_board(brows, spent or cash_value, forgone) + [""]
+        head += sec_board(brows, spent or cash_value, forgone) + [""]
+
+    # The workings open by naming what they are working out, and link back
+    # rather than reprinting the board above them.
+    out: list[str] = [f"# The workings — {observed}", "",
+                      "_How the board in [REPORT.md](REPORT.md) was reached. "
+                      "Same numbers, same verdicts; this is where they come "
+                      "from._", ""]
     out += sec_eleven(marked, best, players, second, buys)
     out += (slate_lines if slate_lines else
             ["## 2. Buy today", "",
@@ -1669,7 +1671,7 @@ def main() -> None:
     if missing:
         warnings.append("**Not found in the market:** "
                         + ", ".join(f"`{m}`" for m in missing)
-                        + " — check them with find_slug.py.")
+                        + ".")
     if cash and cash.value is not None and cash.confidence != "known":
         warnings.append("Cash is an estimate — record an observed balance in "
                         "`inputs/cash.txt`.")
@@ -1682,12 +1684,12 @@ def main() -> None:
     elif not cash or cash.value is None:
         warnings.append("No cash figure — add `inputs/cash.txt`.")
 
-    out += ["## Warnings", ""]
-    out += ([f"- {w}" for w in warnings] if warnings
-            else ["_Nothing flagged._"])
-    out += ["", "_Compare squad value with the app; a mismatch means a name "
-                f"matched the wrong player. Roster read from the "
-                f"{squad_src}._", ""]
+    head += ["## Warnings", ""]
+    head += ([f"- {w}" for w in warnings] if warnings
+             else ["_Nothing flagged._"])
+    head += ["", "_Compare squad value with the app; a mismatch means a name "
+                 f"matched the wrong player. Roster read from the "
+                 f"{squad_src}._", ""]
 
     # --- your movers ------------------------------------------------------
     movers = sorted((p for p in players if abs(p["delta_pct"]) >= MOVER_PCT),
@@ -1723,8 +1725,30 @@ def main() -> None:
         f"_Generated {now:%Y-%m-%d %H:%M} UTC._",
     ]
 
+    write_lines(REPORTS / "board.md", head)
     write_lines(REPORTS / "latest.md", out)
-    write_lines(HISTORY / f"{observed[:10]}.md", out)
+    # History keeps both halves in one file: a day's report is the board AND
+    # what produced it, and splitting the archive would make it unreadable
+    # months later for the sake of a duplication that only matters live.
+    write_lines(HISTORY / f"{observed[:10]}.md", head + out[2:])
+
+    # --- the notification surface -----------------------------------------
+    # Written every run, and DELETED when there is nothing to say, so a
+    # notifier can simply test for the file rather than parse it to find out
+    # whether it matters. An empty alerts file that has to be read to discover
+    # it is empty is how "no news" gets pushed to a phone twice a day.
+    try:
+        from ffcore.auth import TokenStore
+        token_days = TokenStore().expiry_days()
+    except Exception:                                       # noqa: BLE001
+        token_days = None
+    lines = alerts(brows, warnings, token_days)
+    if lines:
+        write_lines(ALERTS, [f"# Alerts — {now:%Y-%m-%d %H:%M} UTC", ""]
+                    + [f"- {ln}" for ln in lines])
+    else:
+        Path(ALERTS).unlink(missing_ok=True)
+        print("no alerts")
 
 
 def _selftest() -> None:
@@ -2001,7 +2025,7 @@ def _selftest() -> None:
     by_name = {r["name"]: r for r in rows if r["kind"] == "buy"}
     lines, n, nb = sec_slate(
         slate_lg, {}, [offer[0]], squad_pool(mine), by_name,
-        ({"bargain"}, ["blurry"], [], []), None, 30e6, None, snaps, line=0.05)
+        ({"bargain"}, ["unpriced man"]), None, 30e6, None, snaps, line=0.05)
     slate_txt = "\n".join(lines)
     assert n == 1 and nb == 1, (n, nb)
     assert "| above repl | pts/M | At the line |" in slate_txt, slate_txt
@@ -2009,8 +2033,11 @@ def _selftest() -> None:
     # says so with the board's own verdict beside it.
     assert "≤ 40.00M" in slate_txt and "**Buy**" in slate_txt, slate_txt
     assert "0.100" in slate_txt                    # 2.0 over a 20M bid
-    # A name the OCR mangled is named, not silently dropped from the slate.
-    assert "**blurry** — no match" in slate_txt
+    # A player the app offers that the market pages do not name is REPORTED,
+    # not silently dropped: dropping him renders as "not on offer", which is
+    # the error the whole slate change exists to fix.
+    assert "**unpriced man**" in slate_txt, slate_txt
+    assert "On offer but unpriced" in slate_txt, slate_txt
 
     # --- question 4 cannot contradict the board, because it IS the board ----
     # THE BUG THIS CLOSES: question 4 used to derive its own verdict off λ, so
@@ -2036,7 +2063,43 @@ def _selftest() -> None:
     assert "|" not in "\n".join(sec_sell(rows, None, {id(p) for p in mine},
                                          mine, None))
 
-    print("report self-test OK (86 cases)")
+    # -- alerts: the short list worth interrupting somebody for -------------
+    # This replaced watch.py, which diffed market values and emitted every
+    # player who moved 2% in a day — thirty-odd rows, league-wide, none of them
+    # a decision. As a file nobody read that was harmless; as a notification it
+    # would be spam, and spam trains you to ignore the one that mattered.
+    brd = [
+        {"kind": "own", "name": "sell me", "verdict": "Sell",
+         "why": "8th MED — only 5 can be fielded", "flag": False},
+        {"kind": "buy", "name": "buy me", "verdict": "Buy",
+         "why": "", "flag": False},
+        {"kind": "own", "name": "hurt", "verdict": "Hold",
+         "why": "", "flag": True},
+        {"kind": "own", "name": "boring", "verdict": "Hold",
+         "why": "", "flag": False},
+        {"kind": "cash", "name": "CASH", "verdict": "the line",
+         "why": "", "flag": False},
+    ]
+    al = alerts(brd, ["Only 1 delantero"], token_days=None)
+    body = "\n".join(al)
+    # Only things you would act on. A Hold is the absence of news.
+    assert "buy me" in body and "sell me" in body, body
+    assert "boring" not in body, body
+    assert "CASH" not in body, body
+    # A fitness flag on someone you own is worth knowing before the lock.
+    assert "hurt" in body, body
+    # Warnings ride along — "only 1 delantero" is one knock from unfieldable.
+    assert "delantero" in body, body
+    # Nothing to say means NO alert, not an empty one. A notification that
+    # says "no news" every twelve hours is the same spam by another route.
+    assert alerts([{"kind": "own", "name": "x", "verdict": "Hold",
+                    "why": "", "flag": False}], [], None) == []
+    # The login expiring is the one piece of plumbing worth a nudge, because
+    # the failure is silent and the fix needs a human at a browser.
+    assert any("Log in again" in ln for ln in alerts([], [], token_days=9))
+    assert alerts([], [], token_days=60) == []
+
+    print("report self-test OK (95 cases)")
 
 
 if __name__ == "__main__":

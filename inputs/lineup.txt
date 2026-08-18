@@ -15,7 +15,6 @@
 
 [ ] POR alvaro fernandez
 [x] POR ionut radu
-[ ] POR simon eriksson
 [x] DEF carl starfelt
 [x] DEF igor zubeldia
 [x] DEF omar el hilali
@@ -27,5 +26,4 @@
 [x] MED lucien agoume
 [ ] MED pablo fornals
 [x] MED pepelu
-[ ] MED ruben garcia
 [x] DEL iñigo vicente

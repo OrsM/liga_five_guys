@@ -66,6 +66,18 @@ class Match(NamedTuple):
     gap: float | None = None   # raw Elo difference, you minus opponent
 
 
+# Club Elo names two Spanish clubs after their CITY where the market names the
+# club: Athletic Club is "Bilbao" and Racing de Santander is "Santander". They
+# share no substring with the market's spelling, so `match_team` cannot bridge
+# them and never should be taught to guess across a gap that wide.
+#
+# This is not cosmetic. `elo_strength` refuses partial coverage on purpose, so
+# these two alone sent all twenty clubs back to squad-value rank — Elo was
+# scraped, parsed, stored, and then not used, with the reports saying only
+# that coverage was incomplete. Two aliases is the whole fix.
+ELO_ALIASES = {"athletic": "Bilbao", "racing": "Santander"}
+
+
 def elo_strength(market_teams, elo_rows) -> dict[str, float] | None:
     """{market team: Elo rating}, or None unless every team joins.
 
@@ -94,6 +106,11 @@ def elo_strength(market_teams, elo_rows) -> dict[str, float] | None:
     out = {}
     for team in market_teams:
         club = match_team(team, list(have))
+        if club is None:
+            # The city-named clubs, and only after the ordinary join has had
+            # its go — an alias must never shadow a name that matched.
+            alias = ELO_ALIASES.get(norm(team))
+            club = alias if alias in have else None
         if club is None:
             return None
         out[team] = have[club]
@@ -299,6 +316,24 @@ def _selftest() -> None:
         == "value"
     # A rating that will not parse is not a rating.
     assert elo_strength(["Rich"], [{"club": "Rich", "elo": ""}]) is None
+
+    # -- the two clubs Club Elo names after their city ---------------------
+    # Real: the live 2026-08-17 file spells these "Bilbao" and "Santander",
+    # sharing no substring with the market's "Athletic" and "Racing". They
+    # cost the whole league its Elo ranking until this existed.
+    city = [{"club": "Bilbao", "elo": "1800"},
+            {"club": "Santander", "elo": "1600"}]
+    assert elo_strength(["Athletic", "Racing"], city) \
+        == {"Athletic": 1800.0, "Racing": 1600.0}
+    # An alias must not rescue a club Elo genuinely does not carry, or the
+    # partial-coverage refusal stops meaning anything.
+    assert elo_strength(["Athletic", "Racing"],
+                        [{"club": "Bilbao", "elo": "1800"}]) is None
+    # …and must never shadow a name that joined on its own merits. If Elo ever
+    # renamed Bilbao to Athletic, the ordinary join wins and the alias is
+    # simply unused.
+    assert elo_strength(["Athletic"], [{"club": "Athletic", "elo": "1750"}]) \
+        == {"Athletic": 1750.0}
     assert elo_strength(["Rich"], []) is None
     # Two Elo clubs matching one market name is never a pick, so the board
     # falls back rather than guessing which Real is which.

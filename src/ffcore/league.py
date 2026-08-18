@@ -53,11 +53,12 @@ from pathlib import Path
 from typing import NamedTuple
 
 from ffcore.parse import money
-from ffcore.text import norm
-from ffcore.tidy import (Market, input_path, ledger_stamp, load_market,
-                         read_ledger, snapshot_stamp)
+from ffcore.text import norm, resolve
+from ffcore.tidy import (Market, input_path, ledger_stamp, load_api_teams,
+                         load_market, read_ledger, snapshot_stamp)
 
 __all__ = ["MARKET", "Config", "load_config", "read_rosters", "identify",
+           "read_api_balances", "owner_from_api", "owner_drift",
            "replay", "Cash", "Manager", "League"]
 
 # Reserved counterparty in the ledger: the free-agent pool.
@@ -78,7 +79,6 @@ DEFAULTS = {
     "keeper_start": "80",
     "riser_pct": "2",
     "shrink_k": "8",
-    "lambda_buffer": "0.25",
 }
 
 
@@ -99,9 +99,6 @@ class Config:
     keeper_start: float = 80.0
     riser_pct: float = 2.0
     shrink_k: float = 8.0
-    # How much better than the going rate for cash a buy has to be before it
-    # is worth doing. The one haircut in the model — see ffcore/bid.py.
-    lambda_buffer: float = 0.25
 
 
 def load_config(name: str = "league.ini") -> Config:
@@ -131,8 +128,6 @@ def load_config(name: str = "league.ini") -> Config:
                                DEFAULTS["keeper_start"])),
         riser_pct=float(get("thresholds", "riser_pct", DEFAULTS["riser_pct"])),
         shrink_k=float(get("thresholds", "shrink_k", DEFAULTS["shrink_k"])),
-        lambda_buffer=float(get("thresholds", "lambda_buffer",
-                                DEFAULTS["lambda_buffer"])),
     )
     if cp.has_section("budget"):
         for handle, amount in cp.items("budget"):
@@ -194,6 +189,200 @@ def read_balances(name: str = "cash.txt") -> dict[str, tuple[float, str]]:
         handle = " ".join(parts[:i]).strip()
         out[handle] = (money(parts[i]),
                        parts[i + 1] if len(parts) > i + 1 else "")
+    return out
+
+
+def read_api_balances(rows=None) -> dict[str, tuple[float, str]]:
+    """{manager: (balance, date)} straight from the league's own API.
+
+    Only managers the API actually states a balance for, which today is you
+    and nobody else — `teamMoney` comes back null for every other team. An
+    empty string is NOT STATED and must never become 0.0, or a rival reads as
+    broke and every bid ceiling built on it is wrong.
+
+    Returns {} when the API has never been fetched, which is the state every
+    caller has always handled: the typed anchors in cash.txt take over.
+    """
+    out: dict[str, tuple[float, str]] = {}
+    for r in (load_api_teams() if rows is None else rows):
+        handle = (r.get("manager") or "").strip()
+        raw = (r.get("team_money") or "").strip()
+        if not handle or not raw:
+            continue
+        try:
+            value = float(raw)
+        except ValueError:
+            continue
+        # THE WHOLE MOMENT, not the day, and parsed as UTC. This balance is
+        # the app's answer as of the sweep, so every deal up to then is
+        # already inside it. Truncating to a date makes every deal later the
+        # same day look like it happened after the observation and subtracts
+        # it from a number that already counted it — 23.60M reported as
+        # 41.92M. And it must be snapshot_stamp, not ledger_stamp: the sweep
+        # stamp ends in Z and means UTC, while ledger_stamp reads the ledger's
+        # local wall-clock, so the wrong one is two hours out in summer.
+        out[handle] = (value, snapshot_stamp(r.get("observed_at") or ""))
+    return out
+
+
+def _by_exact_value(raw_value, rows) -> str | None:
+    """The one market player who has ever been worth exactly this, or None.
+
+    EXACT, with no tolerance, on purpose. The join is only trustworthy because
+    futbolfantasy publishes the same euro figure the app does; allow a euro of
+    slack and it becomes a fuzzy match over a dense number line where several
+    players sit within a rounding error of each other.
+
+    ACROSS ALL OF HISTORY, though, not just the newest snapshot. api_teams is
+    swept once a day and market.csv every run, so hours later the app's figure
+    is one the market has already moved on from. Searching only the latest
+    reading made this join work for half an hour and then quietly stop.
+
+    Uniqueness is per PLAYER, not per row: the same player at the same value
+    in thirty snapshots is one candidate, while two different players who have
+    each been worth 500 at some point are two, and two is no answer.
+    """
+    try:
+        want = float(raw_value)
+    except (TypeError, ValueError):
+        return None
+    if not want:
+        return None
+    hits = set()
+    for row in rows:
+        try:
+            if float(row.get("value")) == want:
+                hits.add(norm(row.get("name")))
+        except (TypeError, ValueError):
+            continue
+    return hits.pop() if len(hits) == 1 else None
+
+
+def owner_from_api(rows: list[dict], market,
+                   ledger_owner: dict | None = None) -> tuple[dict, list]:
+    """({player key: manager}, unjoined names) from the app's own squads.
+
+    Ownership WITHOUT a replay. `replay()` reconstructs who owns whom by
+    reading a starting roster and applying every transaction ever typed, so it
+    inherits every gap in that file; this is the app answering the question
+    directly. No accumulation, so no accumulated drift.
+
+    Keyed through `market.key_for`, which is the same resolution every other
+    reader in this repo uses, because a key nothing else recognises is a
+    player who quietly vanishes from the watchlist and the board. Unjoined
+    names come back to be printed, never dropped — dropping one marks an owned
+    player as a free agent, which is how you end up bidding for somebody a
+    rival already has.
+
+    `market` may be None (the `with_market=False` path), in which case the
+    app's own spelling is used and the caller is on its own for joins.
+
+    `ledger_owner` breaks the one tie the app creates for us. The app lists
+    some players by surname alone — "Cardoso" with a Fabio and a Johnny in the
+    market, "Llorente" with a Marcos and a Diego Javier — and `key_for`
+    refuses to pick, correctly. But the ledger identified those players at
+    purchase time, price check and all, so when exactly ONE candidate is
+    already recorded against the SAME manager, the two sources agree and there
+    is nothing left to guess. Disagreement, or two candidates on the same
+    manager, stays unresolved.
+    """
+    from ffcore.tidy import latest_only
+    out, unjoined = {}, []
+    index = latest_only(market.rows) if market is not None else []
+    for r in rows:
+        handle = (r.get("manager") or "").strip()
+        raw = (r.get("player_name") or "").strip()
+        if not handle or not raw:
+            continue
+        key = market.key_for(raw) if market is not None else norm(raw)
+        if not key and ledger_owner and index:
+            _rec, cands = resolve(raw, index)
+            agreed = [norm(c.get("name")) for c in cands
+                      if ledger_owner.get(norm(c.get("name"))) == handle]
+            if len(agreed) == 1:
+                key = agreed[0]
+        if not key and market is not None:
+            # Last resort, and the strongest key of the three: an EXACT market
+            # value, anywhere in the recorded history. Only when it identifies
+            # exactly one player.
+            key = _by_exact_value(r.get("market_value"), market.rows)
+        if key:
+            out[key] = handle
+        else:
+            unjoined.append(raw)
+    return out, unjoined
+
+
+def ledger_from_api(activity: list[dict], users: dict,
+                    names: dict) -> list[dict]:
+    """The transaction ledger, derived from the app's activity feed.
+
+    `inputs/transactions.csv` was typed by hand after every deal, which made
+    it the one input that could silently fall behind — and on 2026-08-17 it
+    was three days behind, which is what made the report offer a 63.29M budget
+    against a real 23.60M. A feed cannot forget.
+
+    ONE THING THE FEED CANNOT SAY: who the counterparty was. Every row names
+    `user1Id` and nobody else, and a manager-to-manager transfer does NOT
+    appear as a paired buy and sell — checked against all 57 rows, and no two
+    share a player and a moment. So a buy is written as coming from the pool
+    and a sale as going to it, which is right for ownership and right for
+    every premium (those need the price and the buyer, both of which are
+    here), and wrong only for the narrative of who dealt with whom. The
+    hand-typed file's `from`/`to` columns are kept in git history, where that
+    detail survives for the rows that had it.
+
+    A row whose player or manager cannot be named is DROPPED rather than
+    written blank: a ledger row with no player joins to no market value, and
+    would quietly distort the premium medians built on it.
+    """
+    out = []
+    for r in sorted(activity, key=lambda x: x.get("at") or ""):
+        kind = r.get("kind")
+        if kind not in ("buy", "sell"):
+            continue
+        who = users.get(str(r.get("user_id") or ""))
+        player = names.get(str(r.get("player_id") or ""))
+        if not who or not player:
+            continue
+        out.append({
+            # The ledger's own format: minutes, no offset. ledger_stamp reads
+            # this and nothing wider.
+            "date": (r.get("at") or "")[:16],
+            "player": player,
+            "from": MARKET if kind == "buy" else who,
+            "to": who if kind == "buy" else MARKET,
+            "price": str(r.get("amount") or ""),
+            "note": "from the app",
+        })
+    return out
+
+
+def owner_drift(ledger: dict, api: dict) -> list[str]:
+    """Where the typed ledger and the app disagree, one line each.
+
+    Silence on agreement. This exists to be READ, so it must not print the
+    hundreds of rows the two agree about — only the ones where acting on the
+    ledger would act on a false premise.
+
+    An empty `api` yields nothing at all rather than "everything is wrong":
+    no token, no claim.
+    """
+    if not api:
+        return []
+    out = []
+    for key, held in sorted(ledger.items()):
+        now = api.get(key)
+        if now is None:
+            out.append("**%s** — the ledger has him at %s; the app says "
+                       "nobody in the league holds him." % (key, held))
+        elif now != held:
+            out.append("**%s** — the ledger has him at %s; the app says %s."
+                       % (key, held, now))
+    for key, now in sorted(api.items()):
+        if key not in ledger:
+            out.append("**%s** — the app has him at %s; the ledger has no "
+                       "record of him." % (key, now))
     return out
 
 
@@ -382,13 +571,48 @@ class Manager:
 class League:
     """Current state of the league, assembled from the three input files."""
 
-    def __init__(self, cfg: Config, rosters, txns, market: Market | None):
+    def __init__(self, cfg: Config, rosters, txns, market: Market | None,
+                 api_teams=None):
         self.cfg = cfg
         self.rosters = rosters
         self.txns = txns
         self.market = market
         self.owner, self.warnings, self.resolved = replay(rosters, txns,
                                                           market)
+
+        # THE APP OVERRULES THE LEDGER. `replay()` accumulates typed
+        # transactions over a starting roster, so it inherits every row nobody
+        # typed; the API states ownership outright. The replay still runs — it
+        # produces the prices and premiums — but its ownership is superseded.
+        #
+        # An EMPTY feed changes nothing, and that is the case that matters: a
+        # token expiring mid-season must degrade to the ledger, never announce
+        # that nobody owns anybody.
+        self.api_unjoined: list[str] = []
+        self._api_teams = api_teams
+        # No market, no override. The join needs `Market.key_for` to produce
+        # keys the rest of the repo recognises; without one the app's own
+        # spelling becomes the key and the squad silently stops matching the
+        # checklist, the watchlist and the board. The cash anchor below is
+        # unaffected — a balance needs no name.
+        if api_teams and market is None:
+            api_teams = None
+        if api_teams:
+            # Keyed through Market.key_for — the same resolution every other
+            # reader uses. Keying on the app's own spelling looks right and is
+            # not: the two sets never meet and every owned player reads as a
+            # free agent, with the player COUNTS still correct, which is what
+            # makes it convincing.
+            api_owner, self.api_unjoined = owner_from_api(
+                api_teams, market, ledger_owner=self.owner)
+            if api_owner:
+                self.warnings += owner_drift(self.owner, api_owner)
+                for raw in self.api_unjoined:
+                    self.warnings.append(
+                        "**%s** — the app says he is owned, but no market row "
+                        "matches the name, so he is missing from the board."
+                        % raw)
+                self.owner = api_owner
 
         self.managers: dict[str, Manager] = {
             h: Manager(h) for h in rosters
@@ -411,7 +635,10 @@ class League:
     def load(cls, with_market: bool = True) -> "League":
         cfg = load_config()
         market = Market(load_market()) if with_market else None
-        return cls(cfg, read_rosters(), read_ledger(), market)
+        # load_api_teams() is [] until the API has been swept, which is the
+        # state every caller already handles: the ledger takes over.
+        return cls(cfg, read_rosters(), read_ledger(), market,
+                   api_teams=load_api_teams())
 
     def __getitem__(self, handle: str) -> Manager:
         return self.managers[handle]
@@ -450,6 +677,18 @@ class League:
         me_balance = balances.pop("__me__", None)
         if me_balance:
             balances.setdefault(self.cfg.me, me_balance)
+        # The app's own number wins over anything typed. It is still an
+        # OBSERVED balance — the same kind cash.txt holds — just observed by
+        # machine, to the euro, on every sweep, so it can never be the thing
+        # that went stale. On 2026-08-17 the typed anchor was two days old and
+        # the report offered 63.29M against a real 23.60M.
+        #
+        # Rivals are not in here: the API states `teamMoney` for the account
+        # that asks and null for everyone else, so their estimate is untouched
+        # and the `~` on it stays honest.
+        for handle, (value, when) in read_api_balances(
+                self._api_teams).items():
+            balances[handle] = (value, when)
 
         for handle, mgr in self.managers.items():
             budget = self.cfg.budgets.get(handle, self.cfg.budget)
@@ -457,10 +696,19 @@ class League:
 
             if anchor:
                 base, since_s = anchor
-                since = ledger_stamp(since_s) if since_s else None
+                # cash.txt hands us a typed date (local wall-clock);
+                # read_api_balances hands us an already-parsed UTC moment.
+                # Both are legitimate anchors and only the parsing differs.
+                if isinstance(since_s, datetime):
+                    since, from_app = since_s, True
+                else:
+                    since = ledger_stamp(since_s) if since_s else None
+                    from_app = False
                 conf = "known"
-                basis = "balance you recorded%s" % (
-                    " on " + since_s if since_s else "")
+                basis = ("balance the app reported at %s"
+                         % since.strftime("%Y-%m-%d %H:%M UTC")) if from_app \
+                    else ("balance you recorded%s"
+                          % (" on " + since_s if since_s else ""))
             else:
                 if not budget:
                     mgr.cash = Cash(None, "unknown",
@@ -559,9 +807,11 @@ start_cross   = 70
     assert cfg.top_n_per_pos == 8, cfg.top_n_per_pos   # '#' inline comment
     assert cfg.start_cross == 70.0, cfg.start_cross    # no comment
     assert cfg.keeper_start == 80.0, cfg.keeper_start  # absent -> default
-    # The one haircut in the bid rule has a default, so a league.ini written
-    # before it existed still loads.
-    assert cfg.lambda_buffer == 0.25, cfg.lambda_buffer
+    # A key nothing reads any more must not stop the file loading: league.ini
+    # still carrying `lambda_buffer` from before λ was retired is ignored, not
+    # an error, because config files outlive the code that read them.
+    assert load_config is not None
+    assert not hasattr(cfg, "lambda_buffer"), "lambda_buffer should be gone"
 
     # The real file must load, whatever is in it today.
     real = load_config()
@@ -569,7 +819,335 @@ start_cross   = 70
 
     _selftest_cash()
     _selftest_identify()
-    print("ffcore.league self-test OK (8 cases + cash + identify)")
+    _selftest_api_owner()
+    print("ffcore.league self-test OK (8 cases + cash + identify + api)")
+
+
+def _selftest_api_owner() -> None:
+    """Ownership straight from the app, and the drift it exposes."""
+    # A real Market, because the join goes through key_for and testing it
+    # against a hand-made dict is what let the key mismatch through the first
+    # time: the counts were right and every key was wrong.
+    at = "2026-08-17T2246Z"
+    players = Market([
+        {"name": "Pablo Fornals", "value": "10000000", "observed_at": at,
+         "position": "MED"},
+        {"name": "Simeone", "value": "5000000", "observed_at": at,
+         "position": "DEL"},
+        {"name": "Carl Starfelt", "value": "9000000", "observed_at": at,
+         "position": "DEF"}])
+    rows = [{"manager": "miguel_autentico", "player_name": "Pablo Fornals"},
+            {"manager": "BurtonGM89", "player_name": "Simeone"}]
+
+    owner, unjoined = owner_from_api(rows, players)
+    assert owner == {norm("Pablo Fornals"): "miguel_autentico",
+                     norm("Simeone"): "BurtonGM89"}, owner
+    assert unjoined == [], unjoined
+
+    # A name the market index does not carry is REPORTED, never dropped.
+    # Dropping it would silently mark an owned player as a free agent, and the
+    # watchlist would then offer you somebody a rival already has.
+    owner, unjoined = owner_from_api(
+        rows + [{"manager": "SusoGattuso", "player_name": "Nobody At All"}],
+        players)
+    assert unjoined == ["Nobody At All"], unjoined
+    assert len(owner) == 2, owner
+
+    # A row with no manager or no name is skipped, not turned into a key of "".
+    owner, _ = owner_from_api([{"manager": "", "player_name": "Simeone"},
+                               {"manager": "x", "player_name": ""}], players)
+    assert owner == {}, owner
+
+    # THE KEY MUST BE THE MARKET'S, not the app's spelling. The app writes
+    # "Fornals" where the market writes "Pablo Fornals"; keyed on the former
+    # the player is owned by nobody as far as every other reader can tell.
+    owner, unjoined = owner_from_api(
+        [{"manager": "miguel_autentico", "player_name": "Fornals"}], players)
+    assert owner == {norm("Pablo Fornals"): "miguel_autentico"}, owner
+    assert unjoined == [], unjoined
+
+    # -- the surname the app shortens, and two players who answer to it -----
+    # Real: the app lists "Cardoso" and the market has both Fabio and Johnny;
+    # "Llorente" has Marcos and Diego Javier. `key_for` refuses to guess, and
+    # is right to. But the LEDGER already identified them at purchase time,
+    # price check and all, so if exactly one candidate is one this manager was
+    # already recorded as holding, that is not a guess — it is agreement.
+    two = Market([
+        {"name": "Fabio Cardoso", "value": "925408", "observed_at": at,
+         "position": "DEF"},
+        {"name": "Johnny Cardoso", "value": "6310000", "observed_at": at,
+         "position": "MED"}])
+    ambiguous_row = [{"manager": "Magic Mike 333", "player_name": "Cardoso"}]
+
+    # With no ledger to lean on it stays unresolved — never a coin flip.
+    owner, unjoined = owner_from_api(ambiguous_row, two)
+    assert owner == {} and unjoined == ["Cardoso"], (owner, unjoined)
+
+    # The ledger settles it, and only for the manager who actually holds him.
+    led = {norm("Fabio Cardoso"): "Magic Mike 333"}
+    owner, unjoined = owner_from_api(ambiguous_row, two, ledger_owner=led)
+    assert owner == {norm("Fabio Cardoso"): "Magic Mike 333"}, owner
+    assert unjoined == [], unjoined
+
+    # A ledger that puts the candidate with a DIFFERENT manager settles
+    # nothing: the app says Magic Mike holds a Cardoso, and the only Cardoso
+    # the ledger knows belongs to someone else, so the two disagree and the
+    # answer is "unresolved", not "believe the ledger".
+    owner, unjoined = owner_from_api(
+        ambiguous_row, two, ledger_owner={norm("Fabio Cardoso"): "BurtonGM89"})
+    assert owner == {} and unjoined == ["Cardoso"], (owner, unjoined)
+
+    # Both candidates on the same manager is still ambiguous — he owns two
+    # Cardosos and the app named one of them.
+    owner, unjoined = owner_from_api(
+        ambiguous_row, two,
+        ledger_owner={norm("Fabio Cardoso"): "Magic Mike 333",
+                      norm("Johnny Cardoso"): "Magic Mike 333"})
+    assert owner == {} and unjoined == ["Cardoso"], (owner, unjoined)
+
+    # -- the name that shares nothing at all, joined on price --------------
+    # Real: the app calls Jonny Castro "Jonny Otto" and Álvaro Fernández
+    # "A. Ferllo". No substring, no initials, no candidates — `resolve` finds
+    # nothing to be ambiguous about, so the ledger tie-break cannot help
+    # either. But futbolfantasy's values match the app TO THE EURO (that is
+    # why this repo does not need the API for pricing), so an exact value
+    # match is a stronger identification than any spelling.
+    priced = Market([
+        {"name": "Jonny Castro", "value": "5602302", "observed_at": at,
+         "position": "DEF"},
+        {"name": "Someone Else", "value": "9999999", "observed_at": at,
+         "position": "DEF"}])
+    owner, unjoined = owner_from_api(
+        [{"manager": "SusoGattuso", "player_name": "Jonny Otto",
+          "market_value": "5602302"}], priced)
+    assert owner == {norm("Jonny Castro"): "SusoGattuso"}, owner
+    assert unjoined == [], unjoined
+
+    # NEAR is not a match. A euro out is a different player, because the whole
+    # strength of this key is that it is exact — a tolerance would turn it
+    # into the fuzzy name join it exists to avoid.
+    owner, unjoined = owner_from_api(
+        [{"manager": "SusoGattuso", "player_name": "Jonny Otto",
+          "market_value": "5602303"}], priced)
+    assert owner == {} and unjoined == ["Jonny Otto"], (owner, unjoined)
+
+    # THE VALUE MUST BE LOOKED FOR IN ALL OF HISTORY, not just the newest
+    # snapshot. api_teams is swept daily and market.csv every run, so within
+    # hours the two readings are from different moments and the app's figure
+    # matches a value the market USED to publish. Keyed on the latest
+    # snapshot alone, "A. Ferllo" joined at 22:46 and stopped joining at
+    # 23:18, and the only visible symptom was xi.py complaining that a player
+    # in the squad was not on the checklist.
+    aged = Market([
+        {"name": "Alvaro Fernandez", "value": "4486912",
+         "observed_at": "2026-08-17T2246Z", "position": "POR"},
+        {"name": "Alvaro Fernandez", "value": "4499000",
+         "observed_at": "2026-08-17T2318Z", "position": "POR"},
+        {"name": "Other Keeper", "value": "3000000",
+         "observed_at": "2026-08-17T2318Z", "position": "POR"}])
+    owner, unjoined = owner_from_api(
+        [{"manager": "me", "player_name": "A. Ferllo",
+          "market_value": "4486912"}], aged)
+    assert owner == {norm("Alvaro Fernandez"): "me"}, owner
+    assert unjoined == [], unjoined
+
+    # A value two different players have held at different times is still
+    # ambiguous — uniqueness is per PLAYER, not per row.
+    shared = Market([
+        {"name": "One", "value": "500", "observed_at": "2026-08-16T0000Z",
+         "position": "DEF"},
+        {"name": "Two", "value": "500", "observed_at": "2026-08-17T0000Z",
+         "position": "DEF"}])
+    owner, unjoined = owner_from_api(
+        [{"manager": "me", "player_name": "Nobody", "market_value": "500"}],
+        shared)
+    assert owner == {} and unjoined == ["Nobody"], (owner, unjoined)
+
+    # …but the SAME player at that value across many snapshots is one player,
+    # not many, and must still resolve.
+    repeated = Market([
+        {"name": "One", "value": "500", "observed_at": "2026-08-16T0000Z",
+         "position": "DEF"},
+        {"name": "One", "value": "500", "observed_at": "2026-08-17T0000Z",
+         "position": "DEF"}])
+    owner, _ = owner_from_api(
+        [{"manager": "me", "player_name": "Nobody", "market_value": "500"}],
+        repeated)
+    assert owner == {norm("One"): "me"}, owner
+
+    # Two players sharing a value exactly settles nothing.
+    twinned = Market([
+        {"name": "A One", "value": "500", "observed_at": at,
+         "position": "DEF"},
+        {"name": "B Two", "value": "500", "observed_at": at,
+         "position": "DEF"}])
+    owner, unjoined = owner_from_api(
+        [{"manager": "x", "player_name": "Unknown", "market_value": "500"}],
+        twinned)
+    assert owner == {} and unjoined == ["Unknown"], (owner, unjoined)
+
+    # And the price must never override a name that DID resolve: the name is
+    # the primary key and this is a fallback, not a competitor.
+    owner, _ = owner_from_api(
+        [{"manager": "x", "player_name": "Jonny Castro",
+          "market_value": "9999999"}], priced)
+    assert owner == {norm("Jonny Castro"): "x"}, owner
+
+    _selftest_derived_ledger()
+
+
+def _selftest_derived_ledger() -> None:
+    """The ledger, rebuilt from the feed instead of typed."""
+    users = {"11881989": "miguel_autentico", "11883172": "BurtonGM89"}
+    names = {"1337": "Fornals", "652": "Hugo Duro"}
+    feed = [
+        {"at": "2026-08-15T22:24:00+02:00", "kind": "buy", "user_id":
+         "11881989", "player_id": "1337", "amount": "58220110"},
+        {"at": "2026-08-17T00:21:10+02:00", "kind": "sell", "user_id":
+         "11881989", "player_id": "652", "amount": "15202722"},
+        {"at": "2026-08-10T22:24:00+02:00", "kind": "joined", "user_id":
+         "3480702", "player_id": "", "amount": "0"},
+    ]
+    rows = ledger_from_api(feed, users, names)
+
+    # Oldest first, and the "joined" row is not a transaction.
+    assert len(rows) == 2, rows
+    assert rows[0]["date"] < rows[1]["date"], rows
+
+    # A buy comes FROM the pool and TO the manager; a sell is the reverse.
+    # The feed names only one side, so the other is always `market` — see the
+    # docstring for why that is a real limit and not a shortcut.
+    assert rows[0] == {"date": "2026-08-15T22:24", "player": "Fornals",
+                       "from": MARKET, "to": "miguel_autentico",
+                       "price": "58220110", "note": "from the app"}, rows[0]
+    assert rows[1]["from"] == "miguel_autentico", rows[1]
+    assert rows[1]["to"] == MARKET and rows[1]["player"] == "Hugo Duro"
+
+    # The date is trimmed to the ledger's own minute format, not the feed's
+    # ISO-with-offset, because ledger_stamp reads the former.
+    assert rows[0]["date"] == "2026-08-15T22:24", rows[0]
+
+    # A player nothing can name is DROPPED with the name reported, not written
+    # as a blank: a ledger row with no player joins to no market value and
+    # would silently distort every premium built on it.
+    rows2 = ledger_from_api(
+        feed + [{"at": "2026-08-16T10:00:00+02:00", "kind": "buy",
+                 "user_id": "11881989", "player_id": "9999",
+                 "amount": "1"}], users, names)
+    assert len(rows2) == 2, rows2
+
+    # An unknown user is likewise not guessed at.
+    rows3 = ledger_from_api(
+        [{"at": "2026-08-16T10:00:00+02:00", "kind": "buy",
+          "user_id": "404", "player_id": "1337", "amount": "1"}],
+        users, names)
+    assert rows3 == [], rows3
+
+    # Empty feed is an empty ledger, and the caller must never write that over
+    # a good file — see the guard in the writer.
+    assert ledger_from_api([], users, names) == []
+
+    _selftest_anchor_is_current()
+
+
+def _selftest_anchor_is_current() -> None:
+    """The app's balance is NOW, so nothing before it may be applied twice.
+
+    The bug this pins: the API anchor was stamped with a DATE, so every deal
+    later the same day was subtracted from a balance that already reflected
+    it. Real cash 23.60M was reported as 41.92M — wrong in the generous
+    direction, which is the dangerous one for a thing that tells you what you
+    can bid.
+    """
+    at = "2026-08-17T2318Z"
+    mkt = Market([{"name": "P", "value": "1000000", "observed_at": at,
+                   "position": "MED"}])
+    # A deal EARLIER on the same day as the observation.
+    txns = [{"date": "2026-08-17T22:24", "player": "P", "from": "market",
+             "to": "me", "price": "10000000", "note": ""}]
+    api_teams = [{"manager": "me", "player_name": "P", "user_id": "1",
+                  "team_money": "23596582", "observed_at": at}]
+
+    lg = League(Config(me="me"), {"me": []}, txns, mkt, api_teams=api_teams)
+    got = lg["me"].cash.value
+    assert got == 23596582.0, (
+        "the app's balance is current; a deal it already includes was "
+        "subtracted again — got %r" % got)
+    assert lg["me"].cash.confidence == "known", lg["me"].cash
+
+    # A deal AFTER the observation is a different matter and must still count:
+    # the sweep ran, then something happened.
+    later = txns + [{"date": "2026-08-18T09:00", "player": "P",
+                     "from": "market", "to": "me", "price": "1000000",
+                     "note": ""}]
+    lg2 = League(Config(me="me"), {"me": []}, later, mkt, api_teams=api_teams)
+    assert lg2["me"].cash.value == 23596582.0 - 1000000.0, lg2["me"].cash
+
+    # -- no market, no override --------------------------------------------
+    # WITHOUT a market there is no key_for and no value fallback, so the app's
+    # own spelling would become the key — and every other reader keys on the
+    # market's. xi.py loads with_market=False, and the result was a squad
+    # holding "a ferllo" while the checklist, correctly, held "alvaro
+    # fernandez": each file complained the other was wrong.
+    #
+    # Applying a differently-keyed ownership map is worse than not applying
+    # one, so without a market the replay stands.
+    api_odd = [{"manager": "me", "player_name": "A. Ferllo", "user_id": "1",
+                "team_money": "23596582", "observed_at": at}]
+    lg3 = League(Config(me="me"), {"me": ["P"]}, [], None,
+                 api_teams=api_odd)
+    assert norm("a ferllo") not in lg3.owner, lg3.owner
+    assert lg3.owner.get(norm("P")) == "me", lg3.owner
+    # The balance still comes through: it needs no name join at all.
+    assert lg3["me"].cash.value == 23596582.0, lg3["me"].cash
+
+    # -- the drift report --------------------------------------------------
+    # The point of keeping BOTH: the ledger says one thing, the app says
+    # another, and the difference is what is worth printing. On 2026-08-17 the
+    # ledger had Magic Mike on 19 players and the app on 16.
+    ledger = {norm("Pablo Fornals"): "miguel_autentico",
+              norm("Simeone"): "SusoGattuso",              # wrong owner
+              norm("Carl Starfelt"): "miguel_autentico"}   # already sold
+    api = {norm("Pablo Fornals"): "miguel_autentico",
+           norm("Simeone"): "BurtonGM89"}
+    drift = owner_drift(ledger, api)
+    assert any("simeone" in d.lower() and "SusoGattuso" in d
+               and "BurtonGM89" in d for d in drift), drift
+    assert any("starfelt" in d.lower() and "nobody" in d for d in drift), drift
+    assert len(drift) == 2, drift
+    # Agreement is silence. A drift report that lists matches is noise nobody
+    # reads, and this one has to be read.
+    assert owner_drift(api, api) == []
+    # No API data is no claim of drift, NOT "the ledger is entirely wrong".
+    assert owner_drift(ledger, {}) == []
+
+    # -- League prefers the app, and says where it differed ----------------
+    mkt = Market([{"name": "Pablo Fornals", "value": "10000000",
+                   "observed_at": "2026-08-17T2246Z", "position": "MED"},
+                  {"name": "Simeone", "value": "5000000",
+                   "observed_at": "2026-08-17T2246Z", "position": "DEL"}])
+    rosters = {"miguel_autentico": ["Pablo Fornals", "Simeone"],
+               "BurtonGM89": []}
+    api_rows = [{"manager": "miguel_autentico", "player_name": "Pablo Fornals"},
+                {"manager": "BurtonGM89", "player_name": "Simeone"}]
+
+    # Without the API, the roster stands — the behaviour that always existed.
+    plain = League(Config(me="miguel_autentico"), rosters, [], mkt)
+    assert plain.owner[norm("Simeone")] == "miguel_autentico"
+
+    # With it, the app wins and Simeone moves.
+    lg2 = League(Config(me="miguel_autentico"), rosters, [], mkt,
+                 api_teams=api_rows)
+    assert lg2.owner[norm("Simeone")] == "BurtonGM89", lg2.owner
+    assert lg2["BurtonGM89"].players == [norm("Simeone")], lg2["BurtonGM89"]
+    # …and the disagreement is on the record rather than quietly applied.
+    assert any("simeone" in w.lower() for w in lg2.warnings), lg2.warnings
+
+    # An empty feed must not empty the league. This is the dangerous failure:
+    # a token that expired mid-season should degrade to the ledger, never
+    # report that nobody owns anybody.
+    lg3 = League(Config(me="miguel_autentico"), rosters, [], mkt, api_teams=[])
+    assert lg3.owner[norm("Simeone")] == "miguel_autentico", lg3.owner
 
 
 def _selftest_cash() -> None:

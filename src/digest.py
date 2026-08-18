@@ -64,22 +64,25 @@ DECIDE = [
 # Order matters: this is the order you read them in, not the order they are
 # generated.
 SOURCES = [
-    Part("Decide today", "latest.md", DECIDE, nest=False),
+    Part("Decide today", "board.md", DECIDE, nest=False),
 ]
 
 # Printed as links, not content. Each is a whole file that would otherwise be
 # inlined and duplicate something above.
 #
 # Rival cash used to be stitched in here, on the argument that cash is a
-# ceiling on every bid. It is, and it is one tap away in rivals.md — but it was
+# ceiling on every bid. It is, and it is one tap away in league.md — but it was
 # fourteen lines about four other managers sitting above the eleven names you
 # came to check.
+#
+# league.md was two files until 2026-08-18: squads.md and rivals.md, which
+# between them printed the cash table twice, the ledger warnings twice and the
+# squads twice, from one module with no tests and one with a few.
 LINKS = [
-    ("The workings — bids, the basket the line came from, sales, movers",
+    ("The workings — the eleven, bids, the basket, sales, movers",
      "latest.md"),
     ("Who to buy — everyone unowned, ranked", "watchlist.md"),
-    ("Rival cash and ceilings, premiums, drift, projected XIs", "rivals.md"),
-    ("Every squad in the league, deal history, cash basis", "squads.md"),
+    ("Every squad, cash, what each manager pays over value", "league.md"),
     ("How the forecast works, and how it's doing", "methodology.md"),
 ]
 

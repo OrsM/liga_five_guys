@@ -1,7 +1,4 @@
-# Liga Five Guys — one report — 2026-08-18 00:36 UTC
-
-Field, buy, hold, sell — one table, one metric. Everything else is reference and is linked, not reprinted.
-
+# Fantasy report — 2026-08-17T2345Z
 
 **Locks in 42h** (next kickoff) · squad 213.11M · cash 23.60M · total 236.71M
 
@@ -54,12 +51,3 @@ _**Tonight** is the opponent and xPts/j with the fixture in. `⚽` is the eleven
 - **1 unmodelled** (Iñigo Vicente) — no LaLiga record, so they carry an assumed baseline, not an earned one.
 
 _Compare squad value with the app; a mismatch means a name matched the wrong player. Roster read from the ledger._
-
-## Reference
-
-Kept in full, one tap away — not reprinted here, because that is what made this file 504 lines long.
-
-- [The workings — the eleven, bids, the basket, sales, movers](latest.md)
-- [Who to buy — everyone unowned, ranked](watchlist.md)
-- [Every squad, cash, what each manager pays over value](league.md)
-- [How the forecast works, and how it's doing](methodology.md)

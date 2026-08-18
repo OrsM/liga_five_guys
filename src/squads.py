@@ -5,27 +5,23 @@ Reads:
   inputs/transactions.csv     append-only ledger of every market operation
   inputs/league.ini           managers, budgets, thresholds (all optional)
   inputs/cash.txt             any balance you have actually seen
-  inputs/seen.txt             optional — today's market slate, OCR'd off your
                               phone. When present the watchlist BECOMES the
                               slate. Scratch, not state.
   data/tidy/*.csv             values, 24h moves, start probabilities
 
 Writes:
-  reports/squads.md       every squad in the league, what they paid, what
+  reports/league.md       every squad in the league, what they paid, what
                           they can still spend. Named for what it holds:
-                          it used to be called rivals.md while rivals.py
                           wrote behaviour.md, which sent you to the wrong
                           file every time.
   reports/watchlist.md    the slate when you pasted one, otherwise everyone
                           unowned cut to something phone-readable
-  inputs/squad.txt        GENERATED — your roster, so report.py keeps working
-                          unchanged. Stop hand-editing this file.
   data/decisions/slate_log.csv  append-only: which players were on offer when
 
 Run via workflow_dispatch. No arguments.
 
 MIGRATED: read_initial() and apply_transactions() now live in
-ffcore.league, so rivals.py replays the ledger the same way rather than
+ffcore.league, so every reader replays the ledger the same way rather than
 forking a second copy. The tuning constants that used to sit at the top of
 this file moved to inputs/league.ini — several were stale after the league
 grew from three managers to five, which is the argument for having them in
@@ -38,6 +34,8 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
+from ffcore.bid import (HORIZONS, MAX_LAG_H, deals,  # noqa: E402
+                        premiums, usable)
 from ffcore.league import League  # noqa: E402
 from ffcore.parse import fmt_money, fmt_pct  # noqa: E402
 from ffcore.score import SLOT, formations  # noqa: E402
@@ -45,7 +43,7 @@ from ffcore.second import LEGEND, af_cell, second_cells  # noqa: E402
 from ffcore.text import norm  # noqa: E402
 from ffcore.tidy import (DECISIONS, REPORTS, append_csv,  # noqa: E402
                          load_players, write_lines)
-from seen import read_slate  # noqa: E402
+from slate import read_slate  # noqa: E402
 
 # Both probable-XI sources, side by side, in every table this module writes.
 # One unlabelled Start% column hid which site said it, and the two disagree
@@ -110,7 +108,141 @@ def log_slate(on_offer, players, stamp):
     append_csv(DECISIONS / "slate_log.csv", rows, SLATE_LOG)
 
 
-def write_rivals(lg, players, stamp, second=None):
+
+
+def pct(v) -> str:
+    """Signed, one decimal — a drift, not a level. Deliberately NOT
+    ffcore.parse.fmt_pct, which prints an unsigned whole-number level."""
+    return "—" if v is None else "%+.1f%%" % v
+
+
+
+# ---------------------------------------------------------------------------
+# 2. premium curve
+# ---------------------------------------------------------------------------
+
+def sec_premium(lg, dl) -> list[str]:
+    out = ["## What they pay over value", ""]
+    buys = [d for d in dl if d["side"] == "buy"]
+    good = [d for d in buys if usable(d)]
+    if not good:
+        return out + ["_No purchase yet lines up with a market snapshot "
+                      "close enough in time to price. This fills in as the "
+                      "ingest history grows._", ""]
+
+    out += ["| Manager | Buys | Median premium | Range | Round bids |",
+            "|---|--:|--:|---|--:|"]
+    for m in lg:
+        mine = [d for d in good if d["actor"] == m.handle]
+        if not mine:
+            continue
+        prem = sorted(d["premium"] for d in mine)
+        rnd = sum(1 for d in buys if d["actor"] == m.handle and d["round"])
+        out.append("| %s | %d | %s | %s to %s | %d/%d |" % (
+            m.handle, len(mine), pct(prem[len(prem) // 2]),
+            pct(prem[0]), pct(prem[-1]), rnd,
+            len([d for d in buys if d["actor"] == m.handle])))
+
+    all_prem = premiums(dl)
+    if all_prem:
+        # Computed, never asserted. This paragraph used to state that the floor
+        # had never won, which was true of the first ten buys and false by the
+        # fifteenth while still printing as fact (issue #23).
+        won = all_prem.at_floor
+        if won:
+            head = ("**The floor sometimes wins.** %d of the %d priced "
+                    "purchases in this league went at the market value itself "
+                    "and the other %d cleared it, %s across all of them. "
+                    "Bidding the minimum is therefore not the one number known "
+                    "to lose — but %d of %d is a share of the bids that WON, "
+                    "not the odds of winning one. Nothing in this ledger "
+                    "records a bid that lost, so the floor's failure rate is "
+                    "unmeasured and unmeasurable from here."
+                    % (won, all_prem.n, all_prem.n - won, all_prem.label(),
+                       won, all_prem.n))
+        else:
+            head = ("**The floor has not won yet.** All %d priced purchases in "
+                    "this league landed above the market value at the time: "
+                    "%s. On this evidence the minimum legal bid is the one "
+                    "number every deal has beaten — but %d deals is a fortnight "
+                    "of a season, not a rule."
+                    % (all_prem.n, all_prem.label(), all_prem.n))
+        out += ["", head]
+
+    app = premiums(dl, "sell")
+    if app and app.n >= 3:
+        out += ["",
+                "**The app does not pay you the value — it randomises around "
+                "it.** The %d priced sales back to the market went for %s: %d "
+                "below the value and %d above, never further than %.1f%% "
+                "either way. So a sale raises the value give or take a tenth, "
+                "and the value is not the money you will get. Whether the same "
+                "randomiser bids against you for a free agent is inferred, not "
+                "measured: every row in this ledger is a bid that won."
+                % (app.n, app.label(), app.at_floor, app.n - app.at_floor,
+                   app.swing())]
+
+    out += ["",
+            "A round bid was typed by a human. That is the whole of what "
+            "roundness tells you — an exact bid is *not* the app's valuation "
+            "and does not mean nobody competed, because the premium column "
+            "two cells left already measures how far above the floor the "
+            "buyer went. Sealed bids are paid as bid, so a purchase at exactly "
+            "the value was only ever yours to take if the tie-break favoured "
+            "you, and that rule is not documented anywhere we can read. Check "
+            "it in-app before reading a floor purchase as a bargain you "
+            "missed.", "",
+            "| Date | Player | Buyer | Paid | Value then | Premium | Bid |",
+            "|---|---|---|--:|--:|--:|---|"]
+    for d in sorted(buys, key=lambda d: d["date"], reverse=True)[:25]:
+        mark = "" if usable(d) else " ~"
+        out.append("| %s | %s | %s | %s | %s%s | %s | %s |" % (
+            d["date"][5:], d["player"], d["actor"], fmt_money(d["price"]),
+            fmt_money(d["value"]), mark, pct(d["premium"]),
+            "round" if d["round"] else "exact"))
+    out += ["", "`~` priced against a snapshot more than %dh away and left "
+            "out of the medians." % MAX_LAG_H, ""]
+    return out
+
+
+
+# ---------------------------------------------------------------------------
+# 3. post-buy drift
+# ---------------------------------------------------------------------------
+
+def sec_drift(dl, market) -> list[str]:
+    out = ["## What a deal did to the price", ""]
+    rows = []
+    for d in dl:
+        drifts = [market.drift(d["player"], d["when"], h) for h in HORIZONS]
+        if any(x is not None for x in drifts):
+            rows.append((d, drifts))
+    if not rows:
+        return out + ["_No horizon has elapsed inside the snapshot history "
+                      "yet. Needs %d days of daily ingest past a "
+                      "transaction._" % min(HORIZONS), ""]
+
+    out += ["| Date | Player | Actor | Side | " +
+            " | ".join("+%dd" % h for h in HORIZONS) + " |",
+            "|---|---|---|---|" + "--:|" * len(HORIZONS)]
+    for d, drifts in sorted(rows, key=lambda r: r[0]["date"], reverse=True)[:25]:
+        cells = [pct(x[1]) if x else "—" for x in drifts]
+        out.append("| %s | %s | %s | %s | %s |" % (
+            d["date"][5:], d["player"], d["actor"], d["side"],
+            " | ".join(cells)))
+
+    chasing = [d for d, _ in rows
+               if d["side"] == "buy" and (d.get("value") or 0) > 0]
+    if chasing:
+        out += ["", "Two errors this table is built to catch: buying a "
+                "player who has already risen (paying the top of the move), "
+                "and selling one who has just dipped (realising the bottom). "
+                "Both show as the drift column reversing sign against the "
+                "actor.", ""]
+    return out
+
+def write_league(lg, players, stamp, second=None,
+                 dl=None, market=None):
     out = ["# Squads — %s" % stamp, ""]
 
     out += ["| Manager | Players | Squad value | Spent | Raised | Cash |",
@@ -181,12 +313,23 @@ def write_rivals(lg, players, stamp, second=None):
     if unmatched:
         out += ["## Unmatched names", "",
                 "In the ledger or the initial rosters but not in the tidy "
-                "data — check spelling with find_slug.py. Until they match, "
+                "data. Until the names match, "
                 "they carry no value and are missing from every total above.",
                 ""]
         out += ["- " + u for u in unmatched] + [""]
 
-    write_lines(REPORTS / "squads.md", out)
+    # The empirical bid data, folded in from the old rivals.py. It lived in a
+    # second 15KB file that also reprinted this file's cash table, this file's
+    # ledger warnings and a second view of the same squads — two reports over
+    # the same facts, and the other one had 21 lines of tests behind 497 lines
+    # of code. What it uniquely knew is these two tables, and they belong
+    # beside the squads they describe.
+    if dl:
+        out += sec_premium(lg, dl)
+        if market is not None:
+            out += sec_drift(dl, market)
+
+    write_lines(REPORTS / "league.md", out)
 
 
 def write_watchlist(lg, players, stamp, on_offer, unresolved,
@@ -248,23 +391,6 @@ def write_watchlist(lg, players, stamp, on_offer, unresolved,
     write_lines(REPORTS / "watchlist.md", out)
 
 
-def write_squad_file(lg, players, path="inputs/squad.txt"):
-    """Regenerate squad.txt from the ledger so report.py needs no changes.
-
-    Written in the app's own spelling where we have it, one name per line,
-    which is exactly the format report.py already reads.
-    """
-    names = sorted(players.get(k, {}).get("name", k)
-                   for k in lg.squad(lg.cfg.me))
-    write_lines(path, [
-        "# GENERATED — do not edit. Your marks live in inputs/lineup.txt.",
-        "#",
-        "# WRITTEN BY: src/squads.py, from the ledger.",
-        "# READ BY:    src/report.py, and only as a fallback for when",
-        "#             rosters_initial.txt + transactions.csv fail to load.",
-        "# Source of truth is inputs/rosters_initial.txt + "
-        "inputs/transactions.csv.",
-        ""] + names)
 
 
 def write_lineup_file(lg, players, path="inputs/lineup.txt"):
@@ -288,7 +414,7 @@ def write_lineup_file(lg, players, path="inputs/lineup.txt"):
 
     from xi import read_checklist
 
-    # Written to inputs/ like squad.txt, never to the repo root: input_path's
+    # Written to inputs/, never to the repo root: input_path's
     # fallback is for reading files that may not exist yet, not for choosing
     # where a generated one lands.
     path = Path(path)
@@ -350,20 +476,20 @@ def main():
     lg = League.load()
     print("replayed %d transaction(s)" % len(lg.txns))
 
-    on_offer, unresolved, ambiguous, auto = read_slate(players, lg.owner)
-    if on_offer or unresolved or ambiguous:
-        print("slate: %d on offer, %d unresolved, %d ambiguous, %d placed by "
-              "ownership" % (len(on_offer), len(unresolved), len(ambiguous),
-                             len(auto)))
+    on_offer, unresolved = read_slate(lg.market)
+    ambiguous, auto = [], []      # the feed states who is on offer; nothing
+    if on_offer or unresolved:    # is guessed, so nothing can be ambiguous
+        print("slate: %d on offer, %d unjoined"
+              % (len(on_offer), len(unresolved)))
     log_slate(on_offer, players, now.strftime("%Y-%m-%dT%H:%MZ"))
 
     # The second opinion, joined once for every player either file can print.
     second, _unclear = second_cells(r.get("name", "")
                                     for r in players.values())
-    write_rivals(lg, players, stamp, second)
+    write_league(lg, players, stamp, second,
+                 dl=deals(lg, lg.market), market=lg.market)
     write_watchlist(lg, players, stamp, on_offer, unresolved, ambiguous,
                     second)
-    write_squad_file(lg, players)
     write_lineup_file(lg, players)
 
     unmatched = lg.unmatched(players)

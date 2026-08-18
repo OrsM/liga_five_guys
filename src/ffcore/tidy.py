@@ -153,33 +153,29 @@ def append_csv(path, rows, fieldnames=None) -> None:
 
 
 def load_deadline(with_source: bool = False):
-    """The next lock as aware UTC, or None. Fixtures first, the file second.
+    """The next lock as aware UTC, or None — always the next kickoff.
 
-    Madrid wall-clock in the file, because that is what the app shows. Shared
-    rather than copied: report.py stamps hours_to_lock into squad_log.csv and
-    xi.py stamps it into xi_fielded.csv, and two readings of the same deadline
-    that disagree would silently mis-order the two logs against each other.
+    Shared rather than copied: report.py stamps hours_to_lock into
+    squad_log.csv and xi.py stamps it into xi_fielded.csv, and two readings of
+    the same deadline that disagree would silently mis-order the two logs
+    against each other.
 
-    The derived value is the next kickoff in data/tidy/fixtures.csv, and that
-    is the whole deadline, not a floor: the app locks the lineup once per
-    jornada, so a player whose own match is on Sunday is already frozen at
-    Friday's kickoff (verified in-app, 2026-08-16, issue #28). It is also
-    strictly better than the typed file, which was wrong the moment it expired
-    and stayed wrong until you noticed. `with_source=True` returns
-    (when, "fixtures"|"file") so the report can say which it used.
+    The next kickoff in data/tidy/fixtures.csv IS the whole deadline, not a
+    floor: the app locks the lineup once per jornada, so a player whose own
+    match is on Sunday is already frozen at Friday's kickoff (verified in-app,
+    2026-08-16, issue #28).
+
+    THE TYPED FALLBACK IS GONE. inputs/deadline.txt was read when no fixture
+    was available, and it was wrong the moment it expired and stayed wrong
+    until somebody noticed — which is exactly what happened: the file held a
+    lapsed date and the report read it as "deadline passed". A fixture list
+    that cannot answer should say None, and the report should say it does not
+    know, rather than substitute a number that is wrong in a way nothing can
+    detect. `with_source=True` still returns (when, "fixtures"|"none") so the
+    report can say so.
     """
     when = next_kickoff()
-    if when is not None:
-        return (when, "fixtures") if with_source else when
-
-    path = input_path("deadline.txt")
-    if not path.exists():
-        return (None, "none") if with_source else None
-    body = "\n".join(ln.split("#")[0] for ln in
-                     path.read_text(encoding="utf-8").splitlines())
-    m = re.search(r"\d{4}-\d{2}-\d{2}[T ]?\d{0,2}:?\d{0,2}", body)
-    when = ledger_stamp(m.group(0)) if m else None
-    return (when, "file" if when else "none") if with_source else when
+    return (when, "fixtures" if when else "none") if with_source else when
 
 
 def write_lines(path, lines) -> None:
@@ -298,6 +294,46 @@ def load_elo() -> list[dict]:
     existed.
     """
     return latest_only(read_csv(TIDY / "elo.csv"))
+
+
+def load_api_teams() -> list[dict]:
+    """The newest squad reading from the league's own API, or [].
+
+    One row per player per squad. [] means the API has never been fetched —
+    no token, or the sweep skipped it — and every caller must degrade to the
+    ledger rather than treat it as an empty league.
+    """
+    return latest_only(read_csv(TIDY / "api_teams.csv"))
+
+
+def load_api_activity() -> list[dict]:
+    """The league's transaction feed, oldest first, or [].
+
+    Sorted by the app's own timestamp rather than by observation, because this
+    is a history: the order that matters is the order the deals happened.
+    """
+    rows = latest_only(read_csv(TIDY / "api_activity.csv"))
+    return sorted(rows, key=lambda r: r.get("at") or "")
+
+
+def load_api_market() -> list[dict]:
+    """What is on offer in the league right now, or []."""
+    return latest_only(read_csv(TIDY / "api_market.csv"))
+
+
+def load_api_players() -> dict[str, str]:
+    """{player id: the app's name for him} — the feed's missing half.
+
+    NOT latest_only: this is a lookup table that only ever grows, and a player
+    sold weeks ago is exactly the one the activity feed still mentions and
+    nothing else can name. Keeping only the newest snapshot's rows would throw
+    away the names this table exists to hold.
+    """
+    out = {}
+    for r in read_csv(TIDY / "api_players.csv"):
+        if r.get("player_id") and r.get("player_name"):
+            out[r["player_id"]] = r["player_name"]
+    return out
 
 
 def load_fixtures() -> list[dict]:

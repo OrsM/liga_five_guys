@@ -57,6 +57,7 @@ and warns.
 from __future__ import annotations
 
 import hashlib
+import json
 import re
 from typing import Callable, NamedTuple
 
@@ -71,7 +72,15 @@ __all__ = ["BASE", "SOURCE", "MARKET_URL", "POINTS_URL", "TEAM_URL", "TEAMS",
            "sign_af_fixtures",
            "CAL_KEY", "FF_CAL_URL", "MATCH_URL", "MATCH_KEY_RE",
            "parse_calendar", "parse_starters", "sign_calendar",
-           "sign_starters", "match_source", "played_sources"]
+           "sign_starters", "match_source", "played_sources",
+           "LFG_SOURCE", "API_LEAGUES_KEY", "API_LEAGUES_URL",
+           "API_MARKET_URL", "API_ACTIVITY_URL", "API_TEAMS_URL",
+           "ACT_KIND", "ACT_JOINED", "ACT_BUY", "ACT_SELL",
+           "parse_api_leagues", "parse_api_market", "parse_api_activity",
+           "parse_api_teams", "sign_api_leagues", "sign_api_market",
+           "sign_api_activity", "sign_api_teams", "league_sources",
+           "API_PLAYER_URL", "parse_api_player", "sign_api_player",
+           "player_source", "player_sources"]
 
 BASE = "https://www.futbolfantasy.com"
 # The `source` column on every lineups row from this site. It exists so a
@@ -1066,6 +1075,345 @@ def sign_elo(text: str) -> str | None:
 
 
 # ---------------------------------------------------------------------------
+# the league's own API — the state no public page publishes
+# ---------------------------------------------------------------------------
+#
+# Everything above is a public page read anonymously. These four are LaLiga's
+# own endpoints, behind the token ffcore/auth.py holds, and they carry what no
+# scrape could: the live market (including players managers have listed), every
+# transaction, and the balances. Worth a credential because the hand-typed
+# alternatives went stale — see ledger.py.
+#
+# They return JSON, not HTML; `parse` and `sign` take text either way, as Club
+# Elo's CSV does, so the registry needs no new concept.
+#
+# TERMS: the app's own API, read with the account's own credential for its own
+# league. No robots.txt applies, but the same restraint does — ask once a day,
+# cache, never poll.
+LFG_SOURCE = "laliga"
+API_LEAGUES_KEY = "api_leagues"
+# {base} is filled by ingest from ffcore.auth.API_BASE rather than hardcoded,
+# so the host lives in exactly one place — next to the token that opens it.
+API_LEAGUES_URL = "{base}/v1/competition/1/leagues?x-lang=es"
+API_MARKET_URL = "{base}/v1/competition/1/league/{league}/market?x-lang=es"
+API_ACTIVITY_URL = ("{base}/v1/competition/1/leagues/{league}"
+                    "/activity/{page}?x-lang=es")
+API_TEAMS_URL = "{base}/v1/competition/1/leagues/{league}/teams?x-lang=es"
+
+# The feed's verbs, decoded 2026-08-18 by checking each against the squad it
+# should have produced: of five type-31 rows, four were still in the squad
+# (the fifth was later sold); of five type-33, NONE were. A 9 is a manager
+# joining — there were exactly five, one per manager.
+ACT_JOINED, ACT_BUY, ACT_SELL = 9, 31, 33
+ACT_KIND = {ACT_JOINED: "joined", ACT_BUY: "buy", ACT_SELL: "sell"}
+
+
+def _j(text: str):
+    """JSON or nothing. A rotted endpoint returns HTML, not an exception."""
+    try:
+        return json.loads(text or "")
+    except (ValueError, TypeError):
+        return None
+
+
+def _pm(item: dict) -> dict:
+    return (item or {}).get("playerMaster") or {}
+
+
+def parse_api_leagues(text: str, observed_at: str,
+                      key: str = "api_leagues") -> list[dict]:
+    """One row per league this account plays in — normally exactly one.
+
+    This is the discovery page: it is what turns a league id and a team id
+    into the URLs of the three entries below, the same way the calendar turns
+    into 380 match pages.
+    """
+    d = _j(text)
+    if not isinstance(d, list):
+        return []
+    rows = []
+    for lg in d:
+        t = lg.get("team") or {}
+        if not lg.get("id"):
+            continue
+        rows.append({
+            "observed_at": observed_at, "source": LFG_SOURCE,
+            "league_id": str(lg["id"]), "league_name": lg.get("name") or "",
+            "access": lg.get("access") or "",
+            "managers": str(lg.get("managersNumber") or ""),
+            "team_id": str(t.get("id") or ""),
+            # Your own balance, to the euro. The one number cash.txt asked you
+            # to read off a screen. Rivals' is null here — see parse_api_teams.
+            "money": str(t.get("money") or ""),
+            "team_value": str(t.get("teamValue") or ""),
+            "team_points": str(t.get("teamPoints") or ""),
+        })
+    return rows
+
+
+def sign_api_leagues(text: str) -> str | None:
+    return _digest(["%s=%s/%s" % (r["league_id"], r["money"], r["team_value"])
+                    for r in parse_api_leagues(text, "")])
+
+
+def parse_api_market(text: str, observed_at: str,
+                     key: str = "api_market") -> list[dict]:
+    """Everything on offer in this league right now.
+
+    Two kinds of row, and the difference matters: `marketPlayerLeague` is the
+    app dealing a free agent, `marketPlayerTeam` is a manager listing one of
+    his own. The OCR slate only ever saw the first kind and only as many as
+    fitted on a screenshot — the live feed carried 41 rows the day this was
+    written, 13 of them app-dealt and 28 listed by managers.
+
+    `numberOfBids` is the genuinely new thing. Nothing else in this repo can
+    see how many people are already bidding on a player.
+    """
+    d = _j(text)
+    if not isinstance(d, list):
+        return []
+    rows = []
+    for it in d:
+        pm = _pm(it)
+        if not pm.get("id"):
+            continue
+        rows.append({
+            "observed_at": observed_at, "source": LFG_SOURCE,
+            "market_id": str(it.get("id") or ""),
+            "player_id": str(pm["id"]),
+            "player_name": pm.get("nickname") or pm.get("name") or "",
+            "position_id": str(pm.get("positionId") or ""),
+            "sale_price": str(it.get("salePrice") or ""),
+            "market_value": str(pm.get("marketValue") or ""),
+            "bids": "" if it.get("numberOfBids") is None
+                    else str(it["numberOfBids"]),
+            "seller": it.get("discr") or "",
+            "status": it.get("status") or "",
+            "expires_at": it.get("expirationDate") or "",
+        })
+    return rows
+
+
+def sign_api_market(text: str) -> str | None:
+    # The slate turns over on a clock and prices move; both belong in the
+    # signature, and expirationDate deliberately does NOT — it ticks down
+    # continuously and would store a fresh archive every single sweep.
+    return _digest(["%s@%s/%s" % (r["player_id"], r["sale_price"], r["bids"])
+                    for r in parse_api_market(text, "")])
+
+
+def parse_api_activity(text: str, observed_at: str,
+                       key: str = "api_activity") -> list[dict]:
+    """The league's transaction feed — what `transactions.csv` was typed from.
+
+    The feed names only `user1Id`, never a counterparty, so a row says "X
+    bought" or "X sold" and not who from. That is enough: replaying buys and
+    sells in order reconstructs ownership exactly, and the counterparty is
+    recoverable from whoever last held the player.
+
+    Rows are stamped with the kind rather than the raw id, because 31 and 33
+    are meaningless three months from now and the mapping was established
+    empirically (see ACT_KIND).
+    """
+    d = _j(text)
+    if not isinstance(d, list):
+        return []
+    rows = []
+    for a in d:
+        tid = a.get("activityTypeId")
+        if tid not in ACT_KIND or not a.get("id"):
+            continue
+        rows.append({
+            "observed_at": observed_at, "source": LFG_SOURCE,
+            "activity_id": str(a["id"]),
+            "at": a.get("createdAt") or "",
+            "kind": ACT_KIND[tid],
+            "user_id": str(a.get("user1Id") or ""),
+            "player_id": str(a.get("playerMasterId") or ""),
+            "amount": str(a.get("amount") or ""),
+        })
+    return rows
+
+
+def sign_api_activity(text: str) -> str | None:
+    # Append-only in practice, so the newest id would do — but a feed that
+    # rewrote history would then look unchanged, and this feed is about to
+    # become the ledger. Hash every id.
+    return _digest(sorted(r["activity_id"]
+                          for r in parse_api_activity(text, "")))
+
+
+def parse_api_teams(text: str, observed_at: str,
+                    key: str = "api_teams") -> list[dict]:
+    """Every squad in the league, as the app holds it — one row per player.
+
+    This is ownership without a replay: no ledger, no starting roster, no
+    accumulated drift. It also carries each manager's points and position.
+
+    ONE THING IT WILL NOT TELL YOU: `teamMoney` is null for everyone but you.
+    Rivals' cash stays an estimate and `inputs/cash.txt` keeps its job — the
+    `~` in the reports is still honest. Verified 2026-08-18: of five teams,
+    only the account's own carried a balance.
+    """
+    d = _j(text)
+    if not isinstance(d, list):
+        return []
+    rows = []
+    for t in d:
+        m = t.get("manager") or {}
+        for p in (t.get("players") or []):
+            pm = _pm(p)
+            if not pm.get("id"):
+                continue
+            rows.append({
+                "observed_at": observed_at, "source": LFG_SOURCE,
+                "team_id": str(t.get("id") or ""),
+                "user_id": str(m.get("id") or ""),
+                "manager": m.get("managerName") or "",
+                "position": str(t.get("position") or ""),
+                "team_points": str(t.get("teamPoints") or ""),
+                # Empty for everyone but you. Empty means NOT STATED, never
+                # zero — the same rule the fitness parser follows.
+                "team_money": str(t.get("teamMoney") or ""),
+                "player_id": str(pm["id"]),
+                "player_name": pm.get("nickname") or pm.get("name") or "",
+                "position_id": str(pm.get("positionId") or ""),
+                "market_value": str(pm.get("marketValue") or ""),
+                "points": str(pm.get("points") or ""),
+                "buyout": str(p.get("buyoutClause") or ""),
+            })
+    return rows
+
+
+def sign_api_teams(text: str) -> str | None:
+    return _digest(["%s:%s" % (r["team_id"], r["player_id"])
+                    for r in parse_api_teams(text, "")]
+                   + ["$%s=%s" % (r["team_id"], r["team_money"])
+                      for r in parse_api_teams(text, "")])
+
+
+# One player, fetched once ever, purely to put a name to an id the activity
+# feed mentions. See the self-test for why nothing else can do it.
+API_PLAYER_URL = "{base}/v1/competition/1/player/{pid}?x-lang=es"
+API_PLAYER_KEY_RE = re.compile(r"^api_player_(\d+)$")
+
+
+def parse_api_player(text: str, observed_at: str,
+                     key: str = "api_player_0") -> list[dict]:
+    """One row naming one player.
+
+    The id comes from the KEY, not the body: a payload that stopped carrying
+    `id` would otherwise produce rows keyed on nothing.
+
+    `player_name` is the NICKNAME ("Hugo Duro") because that is futbolfantasy's
+    spelling and therefore what every join here goes through; the legal name
+    rides along for when the nickname is too short to resolve.
+    """
+    d = _j(text)
+    if not isinstance(d, dict):
+        return []
+    m = API_PLAYER_KEY_RE.match(key or "")
+    pid = m.group(1) if m else str(d.get("id") or "")
+    if not pid:
+        return []
+    return [{
+        "observed_at": observed_at, "source": LFG_SOURCE,
+        "player_id": pid,
+        "player_name": d.get("nickname") or d.get("name") or "",
+        "full_name": d.get("name") or "",
+        "position_id": str(d.get("positionId") or ""),
+        "market_value": str(d.get("marketValue") or ""),
+        "team_id": str(d.get("teamId") or ""),
+    }]
+
+
+def sign_api_player(text: str) -> str | None:
+    rows = parse_api_player(text, "")
+    return _digest([rows[0]["player_name"]]) if rows else None
+
+
+def player_source(key: str) -> Source | None:
+    """The entry for one player lookup, rebuilt from its key."""
+    m = API_PLAYER_KEY_RE.match(key or "")
+    if not m:
+        return None
+    return Source(key, "api_players",
+                  API_PLAYER_URL.format(base="{base}", pid=m.group(1)),
+                  parse_api_player, sign_api_player, cadence="once", auth=True)
+
+
+def player_sources(activity_json: str, observed_at: str = "") -> list[Source]:
+    """One lookup per player the activity feed mentions, in feed order.
+
+    Queued the moment the feed comes back, exactly like the calendar's match
+    pages, and deduplicated the same way: cadence "once" means `due()` skips
+    every id already in the store, so this is ~50 requests on the first sweep
+    and none on the next.
+    """
+    out, seen = [], set()
+    for r in parse_api_activity(activity_json, observed_at):
+        pid = r.get("player_id")
+        if not pid or pid in seen:
+            continue
+        seen.add(pid)
+        out.append(player_source("api_player_%s" % pid))
+    return out
+
+
+def api_source(key: str) -> Source | None:
+    """The entry for a stored API page, rebuilt from its key alone.
+
+    The three below are queued at run time from a league id, so they are not
+    in the registry and `source_for` cannot find them — exactly the problem
+    `match_source` solves for match pages, and solved the same way. Parsing a
+    stored page needs the parser and the table, never the URL, so the URL here
+    is the un-substituted template: a snapshot stays readable years after the
+    league id in it has stopped meaning anything.
+    """
+    table = {"api_market": (API_MARKET_URL, parse_api_market, sign_api_market),
+             "api_teams": (API_TEAMS_URL, parse_api_teams, sign_api_teams)}
+    if key.startswith("api_activity_"):
+        return Source(key, "api_activity", API_ACTIVITY_URL,
+                      parse_api_activity, sign_api_activity, auth=True)
+    if key in table:
+        url, p, s = table[key]
+        return Source(key, key, url, p, s,
+                      cadence="daily" if key == "api_teams" else "every_run",
+                      auth=True)
+    return None
+
+
+def league_sources(leagues_json: str, observed_at: str = "") -> list[Source]:
+    """The three entries whose URLs the discovery page just revealed.
+
+    Handed to fetch the moment `api_leagues` comes back, exactly as
+    `played_sources` is handed the calendar. The league id is therefore never
+    configured anywhere: it is read from the account that owns it, so it
+    cannot go stale and there is no id to paste into league.ini.
+    """
+    out = []
+    for r in parse_api_leagues(leagues_json, observed_at):
+        lg = r["league_id"]
+        out.append(Source("api_market", "api_market",
+                          API_MARKET_URL.format(base="{base}", league=lg),
+                          parse_api_market, sign_api_market, auth=True))
+        out.append(Source("api_teams", "api_teams",
+                          API_TEAMS_URL.format(base="{base}", league=lg),
+                          parse_api_teams, sign_api_teams,
+                          cadence="daily", auth=True))
+        # Page 0 is the newest ~55 rows and page 1 the remainder; the feed is
+        # short because the season is young. Both are swept so the ledger can
+        # be rebuilt from scratch rather than appended to, which is what makes
+        # a missed run harmless.
+        for page in (0, 1):
+            out.append(Source(
+                "api_activity_%d" % page, "api_activity",
+                API_ACTIVITY_URL.format(base="{base}", league=lg, page=page),
+                parse_api_activity, sign_api_activity, auth=True))
+    return out
+
+
+# ---------------------------------------------------------------------------
 # the registry
 # ---------------------------------------------------------------------------
 
@@ -1075,8 +1423,13 @@ class Source(NamedTuple):
     url: str
     parse: Callable               # (html, observed_at, key) -> rows
     sign: Callable                # (html) -> signature or None
-    cadence: str = "every_run"    # "every_run" | "daily"
+    cadence: str = "every_run"    # "every_run" | "daily" | "once"
     enabled: bool = True
+    # Does this page need the league bearer token? The entry says THAT it
+    # does; ingest.py knows HOW, because this module is pure by design and a
+    # credential means a file to read and a token to refresh. Keeping the two
+    # apart is what lets sources.py self-test with lxml and nothing else.
+    auth: bool = False
 
 
 def sources(enabled_only: bool = True) -> list[Source]:
@@ -1108,6 +1461,12 @@ def sources(enabled_only: bool = True) -> list[Source]:
     # sweep which match pages exist and which are worth asking for.
     out += [Source(CAL_KEY, "matches", FF_CAL_URL, parse_calendar,
                    sign_calendar, cadence="daily")]
+    # The league's own API. Only the discovery page is listed: the market,
+    # activity and squad URLs all carry a league id that this page is what
+    # tells us, so they are added to the sweep at run time by
+    # league_sources() — the same shape as the calendar and its match pages.
+    out += [Source(API_LEAGUES_KEY, "api_leagues", API_LEAGUES_URL,
+                   parse_api_leagues, sign_api_leagues, auth=True)]
     return [s for s in out if s.enabled or not enabled_only]
 
 
@@ -1118,9 +1477,10 @@ def source_for(key: str) -> Source | None:
     for s in sources(enabled_only=False):
         if s.key == key:
             return s
-    # Match pages are built from their key rather than listed, so a stored one
-    # resolves here whether the calendar still mentions it or not.
-    return match_source(key)
+    # Match pages and the API's discovered pages are built from their key
+    # rather than listed, so a stored one resolves here whether the calendar
+    # or the league still mentions it or not.
+    return match_source(key) or api_source(key) or player_source(key)
 
 
 # ---------------------------------------------------------------------------
@@ -1312,6 +1672,57 @@ _ELO_FIXTURE = """Rank,Club,Country,Level,Elo,From,To
 78,Elche,ESP,1,1602.5,2026-08-10,2026-08-16
 ,Zaragoza,ESP,2,1521.0,2026-08-10,2026-08-16
 """
+
+
+# --- the API, trimmed from real 2026-08-18 payloads ------------------------
+# Trimmed, not invented: field names, the string/int mixture and the nulls are
+# exactly as the API returns them. The nulls are the point of several cases
+# below — `teamMoney` is null for rivals, `numberOfBids` is null on a
+# manager-listed player, and both must read as NOT STATED rather than zero.
+_API_LEAGUES_FIXTURE = """[{"id":"017998544","access":"private",
+ "name":"Some Guys","managersNumber":5,
+ "team":{"id":"38091967","money":23596582,"teamValue":213113164,
+         "teamPoints":17,"playersNumber":14}}]"""
+
+_API_MARKET_FIXTURE = """[
+ {"id":"m1","salePrice":5552694,"numberOfBids":0,"status":"on_sale",
+  "discr":"marketPlayerLeague","expirationDate":"2026-08-18T22:00:00+02:00",
+  "playerMaster":{"id":"2621","nickname":"Simeone","positionId":5,
+                  "marketValue":5552694}},
+ {"id":"m2","salePrice":5403735,"numberOfBids":null,"status":"on_sale",
+  "discr":"marketPlayerTeam","expirationDate":"2026-08-19T22:00:00+02:00",
+  "playerMaster":{"id":"2963","nickname":"Marc Roca","positionId":3,
+                  "marketValue":5100000}},
+ {"id":"m3","salePrice":1,"playerMaster":{}}]"""
+
+_API_PLAYER_FIXTURE = """{"id":"1191","name":"Hugo Duro Perales",
+ "nickname":"Hugo Duro","positionId":4,"marketValue":8534068,
+ "teamId":"12","points":0}"""
+
+_API_ACTIVITY_FIXTURE = """[
+ {"id":"a1","activityTypeId":31,"amount":58220110,"playerMasterId":1337,
+  "user1Id":11881989,"createdAt":"2026-08-15T22:24:00+02:00"},
+ {"id":"a2","activityTypeId":33,"amount":15202722,"playerMasterId":652,
+  "user1Id":11881989,"createdAt":"2026-08-17T00:21:10+02:00"},
+ {"id":"a3","activityTypeId":9,"amount":0,"playerMasterId":null,
+  "user1Id":3480702,"createdAt":"2026-08-10T22:24:00+02:00"},
+ {"id":"a4","activityTypeId":77,"amount":1,"playerMasterId":1,"user1Id":1,
+  "createdAt":"2026-08-10T22:24:00+02:00"}]"""
+
+_API_TEAMS_FIXTURE = """[
+ {"id":"38091967","position":3,"teamPoints":17,"teamMoney":23596582,
+  "manager":{"id":"11881989","managerName":"miguel_autentico"},
+  "players":[{"buyoutClause":47000000,
+              "playerMaster":{"id":"1337","nickname":"Fornals",
+                              "positionId":3,"marketValue":58300000,
+                              "points":5}}]},
+ {"id":"38099509","position":1,"teamPoints":24,"teamMoney":null,
+  "manager":{"id":"11883172","managerName":"BurtonGM89"},
+  "players":[{"buyoutClause":null,
+              "playerMaster":{"id":"2621","nickname":"Simeone",
+                              "positionId":5,"marketValue":5552694,
+                              "points":1}},
+             {"playerMaster":{}}]}]"""
 
 
 # The calendar, one link per case it has to get right: a played LaLiga match, an
@@ -1567,6 +1978,104 @@ def _selftest() -> None:
     assert ELO_URL.format(date="2026-08-16").endswith("/2026-08-16")
     assert MARKET_URL.format(date="2026-08-16") == MARKET_URL
 
+    # -- the league's own API ---------------------------------------------
+    lg = parse_api_leagues(_API_LEAGUES_FIXTURE, "2026-01-01T0000Z")
+    assert len(lg) == 1 and lg[0]["league_id"] == "017998544", lg
+    assert lg[0]["team_id"] == "38091967" and lg[0]["money"] == "23596582", lg
+    assert lg[0]["source"] == LFG_SOURCE
+    # HTML where JSON was promised is rot, and rot yields nothing rather than
+    # an exception that loses the whole sweep.
+    assert parse_api_leagues("<html>maintenance</html>", "t") == []
+    assert sign_api_leagues("<html>") is None
+
+    mk = parse_api_market(_API_MARKET_FIXTURE, "t")
+    assert len(mk) == 2, mk                 # the id-less third row is dropped
+    assert mk[0]["bids"] == "0" and mk[0]["seller"] == "marketPlayerLeague"
+    # A manager-listed player has null bids. Empty means NOT STATED; storing
+    # it as "0" would claim nobody is bidding, which is a different fact.
+    assert mk[1]["bids"] == "" and mk[1]["seller"] == "marketPlayerTeam", mk[1]
+    # The clock in expirationDate ticks every sweep and must not sign.
+    assert sign_api_market(_API_MARKET_FIXTURE) == sign_api_market(
+        _API_MARKET_FIXTURE.replace("2026-08-18T22", "2026-08-20T22"))
+    # A price move or a new bid must.
+    assert sign_api_market(_API_MARKET_FIXTURE) != sign_api_market(
+        _API_MARKET_FIXTURE.replace("5552694,\"numberOfBids\":0",
+                                    "5552694,\"numberOfBids\":3"))
+
+    ac = parse_api_activity(_API_ACTIVITY_FIXTURE, "t")
+    # Three known verbs kept, the unknown 77 dropped rather than guessed at.
+    assert [r["kind"] for r in ac] == ["buy", "sell", "joined"], ac
+    assert ac[0]["amount"] == "58220110" and ac[0]["user_id"] == "11881989"
+    assert sign_api_activity(_API_ACTIVITY_FIXTURE) is not None
+    # Reordering the feed is not a change; a new row is.
+    import json as _json
+    _rev = _json.dumps(list(reversed(_json.loads(_API_ACTIVITY_FIXTURE))))
+    assert sign_api_activity(_rev) == sign_api_activity(_API_ACTIVITY_FIXTURE)
+
+    tm = parse_api_teams(_API_TEAMS_FIXTURE, "t")
+    assert len(tm) == 2, tm                 # the empty playerMaster is dropped
+    assert tm[0]["manager"] == "miguel_autentico"
+    assert tm[0]["team_money"] == "23596582" and tm[0]["buyout"] == "47000000"
+    # The limit worth encoding: a rival states no balance, and that is empty,
+    # not zero. A zero here would read as "they are broke".
+    assert tm[1]["team_money"] == "" and tm[1]["manager"] == "BurtonGM89"
+    assert tm[1]["buyout"] == ""
+
+    # Discovery: the league id comes off the account, never a config file.
+    disc = league_sources(_API_LEAGUES_FIXTURE)
+    assert [s.key for s in disc] == ["api_market", "api_teams",
+                                     "api_activity_0", "api_activity_1"], disc
+    assert all(s.auth for s in disc), "every API entry needs the bearer"
+    assert "017998544" in disc[0].url and "{base}" in disc[0].url
+    # Nothing to discover from a rotted page means no work queued, not a crash.
+    assert league_sources("<html>") == []
+    # A stored API page must resolve by key alone, or `parse` silently drops
+    # it — which is exactly what happened the first time this was wired: the
+    # pages were fetched and stored, and no tidy table appeared.
+    for k in ("api_market", "api_teams", "api_activity_0", "api_activity_1"):
+        assert source_for(k) is not None, k
+        assert source_for(k).table == ("api_activity"
+                                       if "activity" in k else k), k
+    assert source_for("api_market").parse is parse_api_market
+    assert api_source("market") is None      # the scraped one is not the API's
+
+    # -- naming the players the feed only gives an id for -------------------
+    # The activity feed says "user 11881989 bought playerMasterId 1191". Half
+    # those ids belong to players who have since been sold and are neither in
+    # a squad nor on the market, so nothing else in the store can name them —
+    # 24 of 50 on the day this was written. A named player is the whole point
+    # of a ledger row, so each id is fetched once, ever, exactly like a match
+    # page: same "once" cadence, same discovery-from-a-feed, same dedup.
+    pl = parse_api_player(_API_PLAYER_FIXTURE, "t", "api_player_1191")
+    assert len(pl) == 1, pl
+    assert pl[0]["player_id"] == "1191", pl
+    # The NICKNAME is the market's spelling ("Hugo Duro"), not the full legal
+    # name ("Hugo Duro Perales"), and the market is what everything joins on.
+    assert pl[0]["player_name"] == "Hugo Duro", pl
+    assert pl[0]["full_name"] == "Hugo Duro Perales", pl
+    assert pl[0]["market_value"] == "8534068", pl
+    assert parse_api_player("<html>", "t", "api_player_1") == []
+
+    # The id comes from the KEY, not the body, so a stored page still names
+    # itself if the payload ever stops carrying an id.
+    assert parse_api_player('{"nickname":"X"}', "t",
+                            "api_player_777")[0]["player_id"] == "777"
+
+    # One entry per id in the feed; `due()` drops the ones already stored,
+    # which is what makes 50 requests today and none tomorrow.
+    ps = player_sources(_API_ACTIVITY_FIXTURE)
+    assert [s.key for s in ps] == ["api_player_1337", "api_player_652"], ps
+    assert all(s.cadence == "once" and s.auth for s in ps), ps
+    assert all(s.table == "api_players" for s in ps), ps
+    # A "joined" row carries no player and must not become a lookup.
+    assert not any("None" in s.key or s.key == "api_player_" for s in ps)
+    # Resolvable by key alone, long after the deal is forgotten.
+    assert source_for("api_player_1191").parse is parse_api_player
+    assert source_for("api_player_1191").table == "api_players"
+    # And the public sources must NOT be marked auth — a bearer sent to
+    # futbolfantasy is a credential leaked to a third party.
+    assert not any(s.auth for s in sources() if not s.key.startswith("api_"))
+
     # -- the calendar: which matches happened ------------------------------
     cal = parse_calendar(_CAL_FIXTURE, "2026-01-01T0000Z")
     byp = {r["path"]: r for r in cal}
@@ -1644,7 +2153,10 @@ def _selftest() -> None:
 
     # -- the registry ------------------------------------------------------
     reg = sources()
-    assert len(reg) == 5 + len(TEAMS) + len(AF_TEAMS) == 45, len(reg)
+    # 6 standalone pages: market, points, af_fixtures, elo, the calendar, and
+    # the API's discovery page. The three API entries it reveals are not here
+    # — they are queued at run time, like the match pages.
+    assert len(reg) == 6 + len(TEAMS) + len(AF_TEAMS) == 46, len(reg)
     assert set(AF_TEAMS) == set(TEAMS), set(AF_TEAMS) ^ set(TEAMS)
     # Both team sweeps are daily; market and points still run every sweep.
     assert {s.cadence for s in reg if s.key.startswith(("team_", "af_"))} \
@@ -1655,7 +2167,8 @@ def _selftest() -> None:
                                     "af_fixtures"}
     assert len({s.key for s in reg}) == len(reg)          # keys are unique
     assert {s.table for s in reg} == {"market", "points", "lineups",
-                                      "fixtures", "elo", "matches"}
+                                      "fixtures", "elo", "matches",
+                                      "api_leagues"}
     assert source_for("team_celta").parse is parse_team
     assert source_for("gone") is None                     # retired page name
 
@@ -1664,7 +2177,7 @@ def _selftest() -> None:
     assert source_for("af_celta").parse is parse_af_team
     samples = {"market": _MARKET_FIXTURE, "points": _POINTS_FIXTURE,
                "af_fixtures": _AF_HUB_FIXTURE, "elo": _ELO_FIXTURE,
-               CAL_KEY: _CAL_FIXTURE}
+               CAL_KEY: _CAL_FIXTURE, API_LEAGUES_KEY: _API_LEAGUES_FIXTURE}
     # Half the AF teams get each shape, so neither branch can rot unnoticed.
     for i, k in enumerate(sorted(AF_TEAMS)):
         samples[f"af_{k}"] = _AF_FIXTURE if i % 2 else _AF_CONSENSO_FIXTURE
@@ -1673,7 +2186,7 @@ def _selftest() -> None:
         assert s.sign(html) is not None, s.key
         assert isinstance(s.parse(html, "2026-01-01T0000Z", s.key), list), s.key
 
-    print("sources.py selftest OK (124 cases)")
+    print("sources.py selftest OK (168 cases)")
 
 
 if __name__ == "__main__":

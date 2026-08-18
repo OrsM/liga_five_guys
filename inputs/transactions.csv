@@ -1,62 +1,64 @@
+# GENERATED — do not hand-edit. Rebuilt from the app's activity feed by
+# src/ledger.py on every run; anything typed here is overwritten.
+#
+# This was a hand-maintained file until 2026-08-18. It fell three days behind
+# and the report offered a budget 39.69M larger than the real one, so it is
+# derived now. Git history is the audit trail.
+#
+# `from`/`to` name the pool as one side of every deal: the feed reports only
+# the manager who acted, and a manager-to-manager transfer does not appear as
+# a paired buy and sell, so the counterparty genuinely cannot be recovered.
+# Ownership, prices and premiums are unaffected.
 date,player,from,to,price,note
-# Append-only ledger. From the app's Activity feed, one row per Market
-# operation; ignore "New member" entries. Never delete rows — current
-# ownership is derived by replaying all of them over
-# inputs/rosters_initial.txt.
-#
-# date   full timestamp, YYYY-MM-DDTHH:MM, same clock as the app shows.
-#        Sorted as text, so ISO order = real order. Get this right: two
-#        rows for the same player on the same day depend on it.
-# player the name as it appears in data/tidy, not as the app abbreviates
-#        it. Resolve with find_slug.py first.
-# from   app handle from rosters_initial.txt, or "market"
-# to     same, or "market" for a sale
-# price  euros, digits only
-#
-# "X has purchased P from LALIGA"  -> from=market, to=X
-# "X has sold player P to LALIGA"  -> from=X,      to=market
-# A manager-to-manager deal is one row: from=X, to=Y.
-2026-08-11T21:24,giacomo quagliata,market,BurtonGM89,4000000,
-2026-08-11T21:24,carlos romero,market,BurtonGM89,45739000,
-2026-08-11T21:24,fabio cardoso,market,Magic Mike 333,949269,price confirms Fabio not Johnny
-2026-08-11T21:24,beñat turrientes,market,miguel_autentico,6892898,bid resolved
-2026-08-11T21:42,unai egiluz,BurtonGM89,market,468693,
-2026-08-11T22:24,dani vivian,Albert Laporta,market,11664367,
-2026-08-11T22:25,manuel fernandez,Albert Laporta,market,373500,
-2026-08-11T22:25,pathe ciss,Albert Laporta,market,10393147,
-2026-08-11T22:26,javi puado,Albert Laporta,market,8041411,
-2026-08-12T21:24,abde ezzalzouli,market,Albert Laporta,49991863,
-2026-08-12T21:24,santi comesaña,market,BurtonGM89,35276000,
-2026-08-12T21:24,jon karrikaburu,market,Magic Mike 333,700000,
-2026-08-12T21:24,pedro diaz,market,Magic Mike 333,2050000,
-2026-08-12T21:24,raphinha,market,Magic Mike 333,80000000,
-2026-08-12T21:24,marko dmitrovic,market,BurtonGM89,40010000,
-2026-08-13T12:12,orri steinn oskarsson,miguel_autentico,market,8567036,
-2026-08-13T12:12,dani martinez,miguel_autentico,market,425612,
-2026-08-13T12:13,hugo duro,miguel_autentico,market,8800811,
-2026-08-13T21:24,leandro cabrera,market,Albert Laporta,17500002,
-2026-08-13T21:24,arda guler,market,Albert Laporta,50836360,
-2026-08-13T21:24,giuliano simeone,market,SusoGattuso,44652302,
-2026-08-13T21:24,asier villalibre,market,Albert Laporta,6954257,
-2026-08-13T21:24,denis suarez,market,BurtonGM89,2580315,
-2026-08-13T21:25,juan musso,BurtonGM89,market,4748599,
-2026-08-13T21:26,iago aspas,BurtonGM89,market,7275530,
-2026-08-13T21:26,unai lopez,BurtonGM89,market,5762182,
-2026-08-13T21:26,joaquin muñoz,BurtonGM89,market,6489738,
-2026-08-13T21:26,aliou dieng,BurtonGM89,market,5284122,
-2026-08-14T12:50,lucas boye,Magic Mike 333,market,14013107,
-2026-08-14T21:24,ionut radu,market,miguel_autentico,39655832,OCR read I as l
-2026-08-14T21:24,lucien agoume,market,miguel_autentico,5891526,
-2026-08-14T21:24,simon eriksson,market,miguel_autentico,2933863,
-2026-08-14T21:24,pablo gavi,market,Magic Mike 333,35500000,
-2026-08-14T21:24,tete morente,market,Magic Mike 333,2033651,
-2026-08-14T21:24,jon aramburu,market,SusoGattuso,17785551,
-2026-08-14T21:24,facundo buonanotte,market,Albert Laporta,7331515,in the Elche team page but not in the market list
-2026-08-14T21:24,clemens riedel,market,SusoGattuso,4599626,
-2026-08-14T21:24,mario martin,market,SusoGattuso,3831432,
-2026-08-14T21:24,pablo fornals,market,miguel_autentico,58220110,
-2026-08-14T21:24,santiago mouriño,market,Albert Laporta,40516387,
-2026-08-14T21:51,pedro bigas,Albert Laporta,market,5323361,
-2026-08-14T21:24,huijsen,market,BurtonGM89,32901000,resolve slug
-2026-08-14T21:24,paredes,market,BurtonGM89,5350000,resolve slug
-2026-08-14T21:26,militao,BurtonGM89,market,12012022,resolve slug
+2026-08-11T22:24,Cardoso,market,Magic Mike 333,949269,from the app
+2026-08-11T22:24,C. Romero,market,BurtonGM89,45739000,from the app
+2026-08-11T22:24,Quagliata,market,BurtonGM89,4000000,from the app
+2026-08-11T22:24,Turrientes,market,miguel_autentico,6892898,from the app
+2026-08-11T22:42,Egiluz,BurtonGM89,market,468693,from the app
+2026-08-11T23:24,Vivian,Albert Laporta,market,11664367,from the app
+2026-08-11T23:25,Manuel Fernández,Albert Laporta,market,373500,from the app
+2026-08-11T23:25,Pathé I. Ciss,Albert Laporta,market,10393147,from the app
+2026-08-11T23:26,Puado,Albert Laporta,market,8041411,from the app
+2026-08-12T22:24,Pedro Díaz,market,Magic Mike 333,2050000,from the app
+2026-08-12T22:24,Dmitrovic,market,BurtonGM89,40010000,from the app
+2026-08-12T22:24,Raphinha,market,Magic Mike 333,80000000,from the app
+2026-08-12T22:24,Karrikaburu,market,Magic Mike 333,700000,from the app
+2026-08-12T22:24,Comesaña,market,BurtonGM89,35276000,from the app
+2026-08-12T22:24,Ez Abde,market,Albert Laporta,49991863,from the app
+2026-08-13T13:12,Oskarsson,miguel_autentico,market,8567036,from the app
+2026-08-13T13:12,D. Martínez,miguel_autentico,market,425612,from the app
+2026-08-13T13:13,Hugo Duro,miguel_autentico,market,8800811,from the app
+2026-08-13T22:24,Denis Suárez,market,BurtonGM89,2580315,from the app
+2026-08-13T22:24,Villalibre,market,Albert Laporta,6954257,from the app
+2026-08-13T22:24,Cabrera,market,Albert Laporta,17500002,from the app
+2026-08-13T22:24,Arda Güler,market,Albert Laporta,50836360,from the app
+2026-08-13T22:24,Giuliano,market,SusoGattuso,44652302,from the app
+2026-08-13T22:25,J. Musso,BurtonGM89,market,4748599,from the app
+2026-08-13T22:26,Iago Aspas,BurtonGM89,market,7275530,from the app
+2026-08-13T22:26,Unai Lopez,BurtonGM89,market,5762182,from the app
+2026-08-13T22:26,Joaquín,BurtonGM89,market,6489738,from the app
+2026-08-13T22:26,Dieng,BurtonGM89,market,5284122,from the app
+2026-08-13T23:40,Purić,SusoGattuso,market,476265,from the app
+2026-08-14T13:49,Asencio,Magic Mike 333,market,5130033,from the app
+2026-08-14T13:50,Lucas Boyé,Magic Mike 333,market,14013107,from the app
+2026-08-14T22:24,T. Morente,market,Magic Mike 333,2033651,from the app
+2026-08-14T22:24,Ionut Radu,market,miguel_autentico,39655832,from the app
+2026-08-14T22:24,Agoumé,market,miguel_autentico,5891526,from the app
+2026-08-14T22:24,Gavi,market,Magic Mike 333,35500000,from the app
+2026-08-14T22:24,Eriksson,market,miguel_autentico,2933863,from the app
+2026-08-14T22:24,Aramburu,market,SusoGattuso,17785551,from the app
+2026-08-14T22:51,R.P. Bigas,Albert Laporta,market,5323361,from the app
+2026-08-15T22:24,Mouriño,market,Albert Laporta,40516387,from the app
+2026-08-15T22:24,Mario Martín,market,SusoGattuso,3831432,from the app
+2026-08-15T22:24,Fornals,market,miguel_autentico,58220110,from the app
+2026-08-15T22:24,Riedel,market,SusoGattuso,4599626,from the app
+2026-08-15T22:24,Buonanotte,market,Albert Laporta,7331515,from the app
+2026-08-16T22:24,Huijsen,market,BurtonGM89,32901000,from the app
+2026-08-16T22:24,Paredes,market,BurtonGM89,5350000,from the app
+2026-08-16T22:26,E. Militão,BurtonGM89,market,12012022,from the app
+2026-08-17T00:20,Eriksson,miguel_autentico,market,3121862,from the app
+2026-08-17T00:21,Rubén García,miguel_autentico,market,15202722,from the app
+2026-08-17T22:24,Tenaglia,market,BurtonGM89,14992195,from the app
+2026-08-17T22:24,Leo Román,market,SusoGattuso,37157570,from the app
+2026-08-17T22:28,Quagliata,BurtonGM89,market,2951083,from the app
+2026-08-17T22:29,Gorrotxa,BurtonGM89,market,6655879,from the app

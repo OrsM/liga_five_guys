@@ -6,18 +6,25 @@ name: report
 # every generator run in dependency order, then digest.py stitches the output
 # into reports/REPORT.md. There is nothing else to press.
 #
-# It also runs on a schedule, twice a day, matching LaLiga's ~00:15
-# Europe/Madrid value recompute (22:40 UTC = 00:40 CEST) and again at 09:40 UTC
-# once probable XIs have firmed up. Cron is UTC: switch to '40 23 * * *' when
-# Spain returns to CET at the end of October.
-#
 # Optional inputs let one button cover the occasional jobs too, so `baseline`
 # and `lookup` no longer need workflows of their own.
+#
+# The twice-daily schedule that used to live here now lives in lfg.timer on the
+# Asus box, in LOCAL time, which is why it no longer needs the note about
+# editing the cron when Spain goes back to CET in October.
 
+# THE SCHEDULE IS OFF, deliberately, since 2026-08-18. The report moved to the
+# Asus box: it holds the league API token, and a runner does not. A scheduled
+# run here would still work — it would fetch the public pages, read the ledger,
+# and push a report — but it would be a report built WITHOUT the league's own
+# data, so its cash figure would be the stale ledger estimate (63.29M against a
+# real 23.60M on the day this was written) and it would commit that over the
+# box's correct one. Two schedulers writing the same file is the drift this
+# whole migration is about.
+#
+# The test job below still runs on every push and is the reason this file
+# stays. `workflow_dispatch` also stays: it is the way back if the box dies.
 on:
-  schedule:
-    - cron: '40 22 * * *'
-    - cron: '40 9 * * *'
   push:
     paths:
       - 'src/**'
@@ -32,14 +39,6 @@ on:
         description: 'Refresh the season points baseline (once a season)'
         type: boolean
         default: false
-      lookup:
-        description: 'Names to resolve, comma-separated (blank to skip)'
-        type: string
-        default: ''
-      seen:
-        description: "Today's market slate — paste the names, comma-separated"
-        type: string
-        default: ''
 
 permissions:
   contents: write
@@ -68,6 +67,8 @@ jobs:
         run: |
           python src/ffcore/parse.py
           PYTHONPATH=src python src/ffcore/tidy.py
+          PYTHONPATH=src python src/ffcore/auth.py
+          PYTHONPATH=src python src/ledger.py --selftest
           PYTHONPATH=src python src/sources.py
           PYTHONPATH=src python src/ingest.py --selftest
           PYTHONPATH=src python src/ffcore/league.py --selftest
@@ -77,18 +78,17 @@ jobs:
           PYTHONPATH=src python src/ffcore/bid.py
           PYTHONPATH=src python src/digest.py --selftest
           PYTHONPATH=src python src/xi.py --selftest
-          PYTHONPATH=src python src/seen.py --selftest
+          PYTHONPATH=src python src/slate.py --selftest
           PYTHONPATH=src python src/points.py --selftest
           PYTHONPATH=src python src/methodology.py --selftest
-          PYTHONPATH=src python src/rivals.py --selftest
           PYTHONPATH=src python src/report.py --selftest
       - name: Import every module
         # Catches the break that only shows at import time — a helper that
         # moved, a name that no longer exists.
         run: |
           cd src
-          for m in squads report watch rivals digest xi seen \
-                   find_slug sources ingest points methodology; do
+          for m in squads report digest xi \
+                   slate ledger sources ingest points methodology; do
             python -c "import $m" || { echo "::error::$m failed to import"; exit 1; }
           done
           echo 'all modules import cleanly' >> "$GITHUB_STEP_SUMMARY"
@@ -110,9 +110,10 @@ jobs:
       - name: Install deps
         run: pip install httpx lxml cssselect
 
-      # inputs.fetch is empty on a schedule, so default to fetching.
+      # Only reachable by hand now that the schedule is off, so inputs.fetch
+      # is always explicitly set by whoever pressed the button.
       - name: Fetch
-        if: github.event_name == 'schedule' || inputs.fetch
+        if: inputs.fetch
         run: python src/ingest.py fetch
 
       # Re-parsing all history each run takes seconds and means a parser fix
@@ -129,34 +130,6 @@ jobs:
         if: inputs.baseline
         run: python src/ingest.py baseline
 
-      # Typed text reaches the shell through env, never through ${{ }}.
-      # Interpolation is textual: a name carrying a quote breaks the quoting,
-      # and one carrying a semicolon runs whatever follows it.
-      - name: Resolve names
-        if: inputs.lookup != ''
-        env:
-          LOOKUP: ${{ inputs.lookup }}
-        run: |
-          echo "$LOOKUP" | tr ',' '\n' | sed 's/^ *//' \
-            > inputs/lookup.txt
-          python src/find_slug.py --file inputs/lookup.txt 2>&1 || true
-
-      # Today's slate, or nothing. Cleared when you don't paste: a slate left
-      # over from yesterday would mark players as buyable that no longer are,
-      # which is exactly how the old offers.txt went wrong.
-      - name: Market slate
-        env:
-          SEEN: ${{ inputs.seen }}
-        run: |
-          if [ -n "$SEEN" ]; then
-            echo "$SEEN" | tr ',' '\n' | sed 's/^ *//;s/ *$//' \
-              > inputs/seen.txt
-            echo "slate: $(grep -c . inputs/seen.txt) name(s)" \
-              >> "$GITHUB_STEP_SUMMARY"
-          else
-            rm -f inputs/seen.txt
-          fi
-
       # --- the chain, in dependency order ---------------------------------
       # squads.py replays ownership and must run before anything reading it.
       - name: Ownership and watchlist
@@ -164,9 +137,6 @@ jobs:
 
       - name: Daily report
         run: python src/report.py
-
-      - name: League behaviour
-        run: python src/rivals.py
 
       # Append-only: records the XI standing at this run, so a prediction can
       # be scored against what you actually fielded.
@@ -177,43 +147,27 @@ jobs:
       - name: Forecast methodology
         run: python src/methodology.py
 
-      - name: Alerts
-        env:
-          ALERTS_FILE: ${{ runner.temp }}/ff_alerts.md
-        run: python src/watch.py > /dev/null 2>&1 || true
-
       - name: Stitch into one report
         run: python src/digest.py
 
       # --- read it without opening a file ---------------------------------
       - name: Summary
-        env:
-          ALERTS_FILE: ${{ runner.temp }}/ff_alerts.md
         run: |
           {
-            # The exchange rate every table below is priced in. First line, so
-            # the summary cannot show a verdict without the number that made it.
-            grep -m1 'λ' reports/REPORT.md || echo '_no rate_'
-            echo '## Field'
-            sed -n '/^## 1\. Field these eleven/,/^## 2\./p' reports/REPORT.md \
-              | grep '^|' || echo '_no XI_'
-            echo '## Buy'
-            sed -n '/^## 2\. Buy today/,/^## 3\./p' reports/REPORT.md \
-              | grep '^|' || echo '_nothing on offer_'
-            echo '## Sell'
-            sed -n '/^## 4\. Sell these/,/^## 5\./p' reports/REPORT.md \
-              | grep '^|' || echo '_nobody spare_'
-            echo '## Fitness'
-            sed -n '/^### Fitness/,/^### Starting/p' reports/REPORT.md \
-              | grep '^\*\*' || echo '_no fitness read_'
-            echo '## Cash'
-            sed -n '/^### 1\. Cash/,/^## /p' reports/REPORT.md \
-              | grep '^|' || echo '_no cash table_'
+            # REPORT.md is one table now, not five numbered sections, so the
+            # summary is the header (which carries the line) plus the board
+            # plus the warnings. The old version sed'd for '## 1. Field these
+            # eleven' and friends and silently printed nothing once those
+            # headings stopped existing.
+            grep -m1 'Locks in' reports/REPORT.md || echo '_no header_'
+            echo '## The board'
+            sed -n '/^## The board/,/^_Every asset/p' reports/REPORT.md \
+              | grep '^|' || echo '_no board_'
             echo '## Warnings'
             sed -n '/^## Warnings/,/^## /p' reports/REPORT.md \
               | grep '^- ' || echo '_none_'
             echo '## Alerts'
-            cat "$ALERTS_FILE" 2>/dev/null || echo '_none_'
+            cat .runtime/alerts.md 2>/dev/null || echo '_none_'
             echo ''
             echo 'Full report: `reports/REPORT.md`'
           } >> "$GITHUB_STEP_SUMMARY"

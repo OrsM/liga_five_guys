@@ -6,7 +6,7 @@ its points page and your own ledger all spell players differently, and none of
 them carry an id you can rely on across sources.
 
 Before this module there were two normalisers. common.norm() stripped dots,
-hyphens and apostrophes; fold() in report/offers/bids/find_slug stripped only
+hyphens and apostrophes; the old fold() in report/offers/bids stripped only
 accents. So:
 
     "N'Diaye"       norm -> ndiaye        fold -> n'diaye
@@ -17,7 +17,6 @@ second, which means any name carrying an apostrophe or an initial silently
 failed to join between the two halves of the repo. There is now one function.
 
     norm()     the key. Use it for every dict keyed by player.
-    fold()     deprecated alias, so files can migrate one at a time.
     tokens()   norm() split into words worth matching on.
     resolve()  the shared fuzzy lookup: exact, then substring, then tokens.
 
@@ -49,12 +48,6 @@ def norm(s) -> str:
     s = "".join(c for c in s if not unicodedata.combining(c))
     s = s.lower().translate(_DELETE).translate(_TO_SPACE)
     return _WS.sub(" ", s).strip()
-
-
-# Deprecated. Present so report.py, offers.py and find_slug.py can be
-# migrated one file at a time instead of in one risky commit. Delete once no
-# module imports it.
-fold = norm
 
 
 def tokens(s) -> list[str]:

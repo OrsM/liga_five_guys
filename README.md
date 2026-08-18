@@ -1,76 +1,111 @@
 # liga_five_guys
 
 Data-driven decision system for LaLiga Fantasy Oficial. Private league of 5
-managers. Runs entirely on GitHub Actions — no local machine, phone only.
+managers. Runs on the Asus box, twice a day, unattended.
 
 Personal use only. Don't redistribute the scraped data.
 
-## The one button
+## Where it runs, and why it moved
 
-**Actions → report → Run workflow.** That is the whole interface. It fetches a
-snapshot, parses it, runs every generator in dependency order, and stitches the
-output into **`reports/REPORT.md`** — the only file you need to read.
+**It used to run entirely on GitHub Actions — no local machine, phone only.**
+That ended on 2026-08-18, when the league's own API came within reach.
 
-**ONE NUMBER RUNS IT.** λ is the exchange rate between XI points and cash —
-index points per million euros — measured every run by spending your actual
-balance down the unowned pool, best rate first. It is printed in the header and
-every table is priced against it: buy above it, sell below it. Before λ the buy
-rule was "does he improve the eleven", which bought any upgrade at any price,
-and there was no sell rule at all.
+The API is what finally supplies the three things no public page publishes:
+the market as the app actually deals it, every transaction, and the balances.
+It is reached with an OAuth token that **rotates on every single use**, and
+persisting a rotating secret back into repo secrets means a PAT, an API call,
+and a write that fails closed — one missed write and the next run has nothing.
+On this box it is a file the job rewrites in place. That is the whole reason.
 
-That report is five tables, in the order the decisions get made:
+    systemctl --user status lfg.timer     # is it running
+    systemctl --user start lfg.service    # run it now
+    journalctl --user -u lfg.service -n 50   # what happened
 
-1. **Field these eleven.** Your marks first, then who on today's slate would
-   improve them, in the same columns.
-2. **Buy today.** The slate priced in pts/M, against the hurdle, with who else
-   can compete for him.
-3. **What you give up by spending now.** The ladder λ was measured off — what
-   the same million buys if you wait for it.
-4. **Sell these.** Your bench, each priced as "what he adds" against "what his
-   sale proceeds would buy". Never a sale that leaves you unable to field a
-   legal eleven.
-5. **Exceptions.** Fitness, with an explicit *no data* state so silence never
-   reads as fitness, and the players the two probable-XI sources disagree about.
+`~/.local/bin/lfg-run` is the chain; `lfg-publish` pushes the finished report
+to the phone, which is what serves lemonworlds.com. The Actions workflow still
+exists and its **test job still runs on every push** — only the schedule is
+off. It is the way back if this box dies.
+
+## The one table
+
+**`reports/REPORT.md`** is the only file you need to read. One table — the
+board — ranking every asset you could hold, owned or not, against cash.
+
+**ONE METRIC RUNS IT: pts/M**, points above replacement per million euros.
+Replacement level is fixed by the rules — five squads, and the shapes each can
+legally field — so it does not move when your eleven does. **CASH is a row in
+the same table**, with a rate of its own: above the line an asset beats the
+money, below it the money beats the asset.
+
+λ came before this and is **retired**. It measured the same exchange rate
+against *your current eleven*, off a ladder built from the whole unowned pool,
+so the baseline moved: the same player was worth different amounts on
+consecutive days for reasons that had nothing to do with him, and the ladder
+priced a market you cannot shop in. That is how the report came to hold Fornals
+on the board and sell him three tables later, in the same unit. The code went
+with it on 2026-08-18 — `Lambda`, `Rung`, `frontier()`, `verdict()`,
+`sell_test()`, `Sale`, `marginal()` and three functions in report.py, none of
+them reachable from anything. They were kept for a fortnight on the argument
+that `lambda_log.csv` was the only evidence for whether replacing λ helped;
+that argument does not survive being written down, because the LOG holds the
+evidence and it is still here. git remembers the code.
+
+The five numbered sections it replaced are still generated, in
+`reports/latest.md`, as workings.
 
 Everything else is reference and is **linked**, not reprinted.
 
-It also runs itself twice a day (22:40 and 09:40 UTC), so most of the time
-there is nothing to press at all. The run summary shows what needs a decision,
-the rival cash table, and any warnings, so you can read the important part in
-the GitHub mobile app without opening a file.
-
-Three optional inputs, all off by default:
-
-| Input | When to use it |
-|---|---|
-| `fetch` | On by default. Turn **off** to rebuild reports from stored HTML without hitting the site. |
-| `baseline` | Once a season. Refreshes the season points baseline. |
-| `lookup` | Paste comma-separated names to resolve app spellings to CSV names. |
-| `seen` | Paste today's market slate. The report then leads with those players, priced — see below. |
-
-`report` is now the only workflow. The `api probe` spike and `src/fantasy_api.py`
-were deleted: the official API is unreachable (see below), the probe produced no
-report, and nothing depended on it. `docs/design.md` §3 keeps the token-flow
-recipe for if that ever changes, and git history keeps the code.
+The manual workflow keeps two inputs: `fetch` (off = rebuild from stored HTML)
+and `baseline` (once a season). `lookup` and `seen` went with the tools that
+read them — `find_slug.py` resolved app spellings the API now supplies on both
+sides, and `seen` was the OCR'd market slate.
 
 ## What you edit
 
-Four files under `inputs/`. Everything else is generated.
+**One file.** `inputs/lineup.txt` — the marks, never the names. `[x]` fielded,
+`[ ]` benched. It is regenerated every run: your marks survive, sold players
+vanish, anyone you just bought arrives benched.
 
-| File | What goes in it |
-|---|---|
-| `transactions.csv` | Append a row for every buy and sell, yours and theirs. This is the source of truth for who owns whom. |
-| `lineup.txt` | **The marks, never the names.** `[x]` fielded, `[ ]` benched. Regenerated from the ledger every run; your marks survive, sold players vanish, and anyone you just bought arrives benched. |
-| `cash.txt` | Any balance you actually observe. One rival balance turns their whole cash estimate from an estimate into arithmetic. |
-| `rosters_initial.txt` | The starting rosters. Write once, never edit. |
+That is the whole routine now. Three of the four files that used to need you
+are derived from the league's own API:
+
+| File | Was | Now |
+|---|---|---|
+| `transactions.csv` | append a row after every deal | **generated** from the app's activity feed by `src/ledger.py` |
+| `cash.txt` | a balance you read off a screen | your balance comes from the app, to the euro, every run |
+| `rosters_initial.txt` | the starting rosters, written once | ownership comes from the app directly — no replay to seed |
+| `seen.txt` | OCR the market screenshot | **deleted** — the market feed, all 41 rows, with bid counts |
+| `squad.txt` | generated fallback roster | **deleted** — see below |
+| `deadline.txt` | typed lock time | **deleted** — the next kickoff is the lock |
+
+**Why this changed, in one incident.** `transactions.csv` was the one input
+that could silently fall behind, and on 2026-08-17 it was three days behind.
+Ownership and cash are both replayed from it, so the report offered a **63.29M
+budget against a real 23.60M** and recommended selling a player who had already
+gone. The file was never wrong; it was late, which for a decision system is the
+same thing. A feed cannot forget.
+
+`cash.txt` and `rosters_initial.txt` are **kept, not deleted**: the API states
+`teamMoney` for the account that asks and `null` for every other team, so
+rivals' cash is still an estimate and one overheard balance still turns it into
+arithmetic. The `~` in the reports is still honest.
 
 `league.ini` (thresholds and the starting budget) is the one you touch
-occasionally. `deadline.txt` is now a **fallback**: the lock is derived from
-the next kickoff in `data/tidy/fixtures.csv`, and the report says which of the
-two it used. A typed deadline goes stale silently — the one in the file had
-expired and the report was reading it as passed. `lookup.txt` and
-`seen.txt` are scratch. `squad.txt` is **generated** — a fallback so
-`report.py` still works if the ledger fails to load; don't hand-edit it.
+occasionally.
+
+**Three files were deleted rather than kept, and each for the same reason: a
+fallback that cannot fire is worse than none.**
+
+- `squad.txt` was a generated copy of your roster, read only when `League`
+  failed to load — but `squads.py` is what wrote it and needs `League` too, so
+  a fresh one could never exist at the moment it was wanted. All it could do
+  was serve a stale squad, silently, exactly when you needed to be told.
+- `deadline.txt` was read when no fixture was available, and was wrong the
+  moment it expired and stayed wrong until noticed — which happened: it held a
+  lapsed date and the report read it as "deadline passed". The next kickoff in
+  `fixtures.csv` is the lock; if that cannot answer, the report says so.
+- `lookup.txt` fed `find_slug.py`, which resolved app spellings to CSV names.
+  The API now gives both sides of that join.
 
 Every file under `inputs/` states in its own header what it is for, who writes
 it and who reads it.
@@ -80,76 +115,52 @@ scaling the moment the bench was four names, and once `lineup.txt` existed the
 two could contradict each other — silently, since whichever was read first
 won. One file describes your eleven now.
 
-## Reading the slate off your phone
+## The slate
 
-The watchlist ranks everyone nobody owns, but the app only deals a limited
-slate each cycle, so most of it isn't buyable today. To close that gap:
-long-press the market screenshot, **Copy Text** (iOS Live Text), and paste it
-into the `seen` input when you run the workflow.
+**You no longer read this off your phone.** The league's market feed carries
+everything on offer — 41 rows the day it landed, against the dozen a
+screenshot showed — and it distinguishes the free agents the app deals
+(`marketPlayerLeague`) from players a manager has listed (`marketPlayerTeam`),
+which is 28 of those 41 and was invisible before. It also carries
+`numberOfBids`: how many people are already bidding, which nothing else in this
+repo could ever see.
 
-**Paste a slate and the slate becomes the report.** `reports/REPORT.md` then
-opens with one table covering only the players on offer, sorted by what each
-one is worth to your eleven:
-
-| Column | What it tells you |
-|---|---|
-| Bid | The floor (= market value) plus the premium this league has actually paid over it. Capped by your recorded cash. |
-| ΔxPts/j | Change in the XI ranking index from owning him, after re-picking the formation. **Frequently negative** for a player the watchlist ranks highly — your own eleven is the benchmark, not the league. |
-| pts/M | That change divided by what he costs. The one currency. |
-| vs λ | pts/M over the hurdle. Above 1.00× the money is better spent here than waiting; below it you are paying over the going rate. |
-| Competition | Which rivals are structurally short in his position, so who you are bidding against. |
-| Verdict | `Bid` if he beats the hurdle, `pass` if he doesn't, `Cover` if he doesn't but you cannot field a legal XI in his position without him, `No` if you can't reach the floor. |
-
-The watchlist collapses to the same players, unfiltered — no start-probability
-or budget cuts, because a 40%-start player on today's slate is still a choice
-you are making — and `rivals.md` §5 restricts its demand forecast to them.
-
-OCR output is expected to be bad and that's fine — `Inigo Ruiz Galarreta`
-resolves to `Iñigo Ruiz de Galarreta`. Where the name alone is ambiguous,
-ownership settles it: the app deals free agents, so a candidate somebody in the
-league already holds is not the one on offer. `Llorente` therefore resolves to
-Marcos, because Diego Javier is owned. Every such placement is printed under
-"Placed by ownership, not by the name" so you can catch it, since it is only as
-good as `transactions.csv` is current.
-
-What it still will never do is guess between candidates the ledger can't
-separate: a bare `Dani` with ten Danis unowned is reported under "Names I could
-not place" with the candidates, because a wrong player costs real money.
-
-Every slate you paste is appended to `data/decisions/slate_log.csv`. A player
-who sat on the slate and never appears in `transactions.csv` is one nobody
-would pay the floor for — the closest thing to a losing-bid ceiling that
-doesn't require typing anything. Nothing reads it yet; a fortnight of slates is
-not a base rate.
-
-**Names only, never prices.** Values are already scraped to the euro, and the
-minimum legal bid *is* the market value, so OCR only needs to tell you *who*.
-An OCR'd price can silently disagree with a correct one we already hold.
-
-`inputs/seen.txt` is git-ignored and cleared on every run that doesn't paste
-one. It is scratch, not state — that is what stops it drifting.
+`seen.py` was 348 lines — two input shapes, exact-then-substring-then-token
+matching, an ambiguity report, and an ownership prune to break ties the string
+could not. All of it careful, and all of it in service of reading text off a
+photograph. It is gone, and the fallback went with it: the token lasts 90 days,
+the report warns 14 days out, and renewing it is a browser tab and a paste.
+Kept "just in case", 348 lines exercised roughly never would be broken by the
+time they mattered — and worse than broken, they would quietly serve a stale
+slate from whatever `seen.txt` still held while the report looked normal.
 
 ## Routine
 
 - **Most days:** open `reports/REPORT.md`. Usually nothing to do.
 - **Thursday/Friday:** probable XIs firm up. This is when the report earns its
   keep and when to spend.
-- **After any deal:** add the row to `inputs/transactions.csv`. Everything —
-  ownership, cash, premiums — is replayed from that file.
-- **Whenever a rival mentions a balance:** put it in `inputs/cash.txt`.
+- **After any deal:** ~~add the row to `inputs/transactions.csv`~~ — nothing.
+  The feed has it before you could have typed it.
+- **Whenever a rival mentions a balance:** put it in `inputs/cash.txt`. Still
+  worth doing: theirs is the one balance the API will not tell you.
+- **Every ~90 days**, or when the report says the login is close to expiring:
+  `python -m ffcore.auth --login`. It needs a browser once.
 
 ## Layout
 
 ```
-src/                 sources.py (the registry: futbolfantasy, Analítica, Club Elo)
+src/                 sources.py (the registry: futbolfantasy, Analítica,
+                       Club Elo, and the league's own API)
                      ingest.py (fetch, parse, prune — the only network code)
-                     squads.py  report.py  rivals.py  watch.py
-                     digest.py (stitches REPORT.md)  find_slug.py
-                     points.py  xi.py  seen.py  methodology.py
+                     ledger.py (the activity feed -> transactions.csv)
+                     squads.py  report.py  rivals.py  slate.py
+                     digest.py (stitches REPORT.md)
+                     points.py  xi.py  methodology.py
 src/ffcore/          shared core: parse (numbers)  text (names)  tidy (IO+time)
+                     auth (the B2C token — the only credential here)
                      league (ownership+cash)  score (ratings+XI)
                      fixture (next opponent, difficulty)
-                     bid (λ, premiums, bid bands, XI gain, the sell test)
+                     bid (premiums, bid bands, XI gain, the basket)
 inputs/              you edit these — see above
 data/raw/dt=….tar.xz  raw HTML, deduplicated — append-only, never delete
 data/tidy/market.csv  values, disposable — rebuilt from raw every run
@@ -158,7 +169,12 @@ data/tidy/fixtures.csv kickoffs, as published — the deadline is derived here
 data/tidy/elo.csv     Club Elo ratings, Spanish top flight — the fixture rank
 data/tidy/matches.csv  the season's 380 matches, with the score once played
 data/tidy/starters.csv who actually started — what grades the probable XIs
+data/tidy/api_market.csv   the market as the app deals it, with bid counts
+data/tidy/api_teams.csv    every squad, from the app; your balance
+data/tidy/api_activity.csv every deal, as the app recorded it
+data/tidy/api_players.csv  id -> name, append-only; names the feed's history
 data/decisions/      append-only logs of estimates, for scoring later
+.runtime/alerts.md   gitignored; exists only when something wants a decision
 reports/REPORT.md    ← read this
 reports/latest.md    the five tables (report.py) — carried into REPORT.md
 reports/rivals.md    how rivals bid: premiums, drift, projected XIs (rivals.py)
@@ -172,20 +188,27 @@ docs/design.md       architecture, data sources, modelling plan
 
 No test directory and no pytest. Each module self-tests under
 `if __name__ == "__main__"`, and the `report` workflow runs them on every push
-to `src/`:
+to `src/` — that job is the reason the workflow file still exists.
+
+Dependencies are `uv`, not pip: this box has no `pip` and no `python3-venv`,
+and installing them needs sudo. `uv sync` once, then `uv run --frozen python …`
+— the same pattern `n2t-api.service` uses. `--frozen` so a run never tries to
+re-resolve dependencies, because a boot without network would otherwise hang.
 
 ```
 python src/ffcore/parse.py                      # number parsing + formatting
+PYTHONPATH=src python src/ffcore/auth.py        # token rotation, atomicity
+PYTHONPATH=src python src/ledger.py --selftest  # the derived ledger + guards
 PYTHONPATH=src python src/ffcore/tidy.py        # the player view over tidy CSV
 PYTHONPATH=src python src/sources.py            # parsers + signatures
 PYTHONPATH=src python src/ingest.py --selftest   # archives + carry-forward
 PYTHONPATH=src python src/ffcore/league.py --selftest   # config + cash
 PYTHONPATH=src python src/ffcore/fixture.py             # difficulty, Elo, team join
 PYTHONPATH=src python src/ffcore/score.py               # the blend + fixture
-PYTHONPATH=src python src/ffcore/bid.py                 # λ, premiums, bands, sell test
+PYTHONPATH=src python src/ffcore/bid.py                 # premiums, bands, the basket
 PYTHONPATH=src python src/digest.py --selftest          # report stitching
 PYTHONPATH=src python src/xi.py --selftest              # XI from bench
-PYTHONPATH=src python src/seen.py --selftest            # OCR name matching
+PYTHONPATH=src python src/slate.py --selftest           # what is on offer
 PYTHONPATH=src python src/points.py --selftest          # per-jornada diffs
 PYTHONPATH=src python src/methodology.py --selftest     # forecast-vs-actual join
 PYTHONPATH=src python src/rivals.py --selftest          # rival XI arithmetic
@@ -398,10 +421,12 @@ owned. There is no external feed to replace it with: the slate is 12 free
 agents drawn at random per league, on a clock set by the hour your league was
 created, and every market endpoint is namespaced by private league id.
 `reports/watchlist.md` covers the same ground without typing — it ranks
-everyone the ledger says nobody owns, so it cannot go stale. `inputs/seen.txt`
-is not that mistake returning: it is OCR'd rather than typed, it is names only,
-and it is deleted on every run that doesn't paste one, so it can never be
-mistaken for state.
+everyone nobody owns, so it cannot go stale.
+
+That paragraph was written when there was no feed. There is one now: the
+league's own market endpoint lists every offer, so the slate is neither typed
+nor photographed nor inferred. `seen.txt` — the OCR'd middle step — went the
+same way as `offers.txt`, for the same reason, one iteration later.
 
 **Roundness never proved anything, and no count of floor wins is hardcoded.**
 `rivals.py` used to read a non-round price as "the app's own valuation, so
@@ -482,25 +507,24 @@ the table where most teams live. Which scale ran is printed in
 every row — the +/-12% band is a guess, and re-fitting it later means having
 kept the continuous rating rather than the rank it was flattened into.
 
-**One currency: everything is priced in ΔxPts/j per million.** λ is measured,
-not configured. `ffcore.bid.frontier()` spends your recorded balance down the
-unowned pool, best rate first, recomputing each gain against the eleven as it
-stands after the purchase above it, and λ is the rate of the last rung it could
-afford. Anything worse than that is worse than what the same money would do
-elsewhere, so buying it is a loss **even when the XI gain is positive** — which
-was the old rule, `gain > 0`, buying any upgrade at any price. Selling is the
-same test read backwards: hold a player only while what he adds beats what his
-proceeds would buy, which is why there is no second threshold to tune. Three
-things make this safe on an uncalibrated index: it is a RATIO, so the index's
-arbitrary scale cancels; nothing multiplies the index by a number of jornadas,
-which would be a fiction with a unit on it; and the ladder is short by
-construction, because an eleven has eleven slots so at most eleven purchases
-can improve it. λ is a RESERVATION rate — the app deals twelve random free
-agents a cycle, so the ladder is what you would buy if you could buy anything,
-which biases it in the direction that says *wait*. The ladder is printed in
-question 3 so that bias can be seen instead of argued about, `lambda_buffer` in
-`league.ini` is the one haircut on it, and every run appends the rate it judged
-with to `data/decisions/lambda_log.csv` so the rule itself can be graded.
+**One currency: everything is priced in points above replacement per million.**
+`ffcore.bid.basket()` spends idle cash down TODAY'S SLATE, best rate first, and
+the line is the worst rate it could fund. Anything worse than that is worse
+than what the same money would do elsewhere, so buying it is a loss **even when
+the XI gain is positive** — which was the old rule, `gain > 0`, buying any
+upgrade at any price. Selling is the same test read backwards: hold a player
+only while what he adds beats what his proceeds would buy, which is why there
+is no second threshold to tune.
+
+Three things make this safe on an uncalibrated index: it is a RATIO, so the
+index's arbitrary scale cancels; nothing multiplies the index by a number of
+jornadas, which would be a fiction with a unit on it; and replacement level is
+fixed by the rules, so two purchases do not compete for the same slot and the
+walk is arithmetic rather than a search.
+
+Every run appends the rate it judged with to `data/decisions/line_log.csv` so
+the rule itself can be graded. `lambda_log.csv` sits beside it, frozen on the
+day λ was retired, holding what the old rule would have said.
 
 **Fielding is one round; buying is months.** So the fixture is inside the
 fielding number and outside the buying one — and outside λ, and outside the
@@ -521,6 +545,73 @@ partial move doesn't break a run.
 **Be a good citizen.** One sweep per run, 1.5–3s between requests, aborts on
 403/429.
 
+**The league's own API, and the one secret this repo has.** Four endpoints
+behind LaLiga's Azure B2C tenant, reached with the account's own credential:
+the market as dealt (41 rows the day it landed — 13 free agents the app deals
+plus 28 players listed by managers, where the OCR slate saw a screenshot's
+worth), the activity feed, every squad, and the balances. `ffcore/auth.py` is
+the only module that holds a credential, and the token file lives outside the
+working tree at `~/.config/liga_five_guys/token.json`, 0600.
+
+**The refresh token rotates on every use**, so the write is atomic — temp file,
+fsync, rename — and happens *before* the caller is handed anything. A
+half-written token file is indistinguishable from no token file and costs an
+interactive browser login. A refresh response that carries no new refresh token
+is refused rather than persisted, because the old one may still be good.
+
+Getting the first token needs a human and a browser, once per 90 days:
+
+    python -m ffcore.auth --login     # prints a URL; sign in, paste back
+    python -m ffcore.auth --status    # days left
+
+**The registry needed one new concept and no new scripts.** `Source` gained
+`auth: bool`. The entry declares *that* it needs the bearer; `ingest.py` knows
+*how*, because `sources.py` is pure by design and a credential means a file to
+read and a token to refresh. The bearer is a per-request header, never
+client-wide — sending it to futbolfantasy would hand a third party the
+credential to the league account, and there is a self-test asserting no public
+source is marked `auth`.
+
+**Discovery, not configuration.** Only the leagues endpoint is in the registry.
+It yields a league id, and `league_sources()` turns that into the market, squad
+and activity entries — exactly as the calendar turns into 380 match pages. So
+there is no league id to paste into `league.ini` and none to go stale.
+
+**Three joins, in falling order of trust.** The API names players its own way
+and the rest of the repo keys on the market's spelling, so every API row is
+joined through `Market.key_for`. When that is ambiguous — the app writes
+"Cardoso" and the market has a Fabio and a Johnny — the ledger breaks the tie
+if exactly one candidate is already recorded against that same manager. When
+the name shares nothing at all — "A. Ferllo" for Álvaro Fernández, "Jonny Otto"
+for Jonny Castro — an **exact market value** settles it, because
+futbolfantasy's values match the app to the euro. Exact, with no tolerance, and
+searched across all of history rather than the newest snapshot: the two feeds
+are swept on different cadences, so within hours the app's figure is one the
+market has already moved on from. That last detail made the join work for half
+an hour and then stop.
+
+**Half the feed's players cannot be named by anything else.** The activity feed
+gives a player id and no name, and 24 of 50 ids belonged to players since sold
+— in no squad and on no market page. Each is fetched once, ever, with the same
+`"once"` cadence the match pages use, into `api_players.csv`. 50 requests on
+the first sweep, none on the next.
+
+**The app's balance is NOW.** It is an anchor like any in `cash.txt`, but
+current, so nothing before the moment of the sweep may be applied to it. It is
+stamped with the whole moment and parsed as UTC — truncating it to a date made
+every deal later the same day subtract from a number that already counted it,
+and reported 23.60M as 41.92M. Wrong in the generous direction, which is the
+dangerous one for a thing that tells you what you can bid.
+
+**Ownership from the app supersedes the replay, and the disagreement is
+printed.** `replay()` still runs — it is what produces the prices and premiums
+— but its ownership is a season's typed rows accumulated over a starting
+roster, and the app simply states the answer. Where the two differ, the report
+says so. An **empty** feed changes nothing at all: a token that expires
+mid-season must degrade to the ledger, never announce that nobody owns anybody.
+Without a market loaded the override is skipped entirely, because a
+differently-keyed ownership map is worse than none.
+
 ## Known gaps
 
 - **No outcome data yet.** 2026-27 has not kicked off, so no prediction can be
@@ -532,6 +623,21 @@ partial move doesn't break a run.
 - **`start_pct` is an editorial bucket**, not a live probability — it moved for
   only 22 of 511 players across the snapshots taken so far. That is true of
   both sources, so two of them agreeing is two editors agreeing, not evidence.
+- **Rivals' cash is still an estimate.** The API states `teamMoney` for the
+  account that asks and `null` for everyone else, so the `~` stays.
+- **A 200,000 gap in the cash arithmetic, unexplained.** Rebuilding the balance
+  from the feed lands 200,000 under what the app reports — exactly round, which
+  smells like an app credit rather than a deal. It is 0.8% and changes no
+  decision, but it means "rebuild cash purely from the feed" is not yet
+  provably exact, which is why the app's own figure is the anchor.
+- **The feed cannot name a counterparty.** Every row names one manager, and a
+  manager-to-manager transfer is not a paired buy and sell — checked across all
+  57 rows. So the derived ledger writes the pool as one side of every deal.
+  Exact for ownership, prices and premiums; lossy only for who dealt with whom.
+- **Publishing to the phone is wired but unproven.** `lfg-publish` targets a
+  private directory, deliberately not the public `/writing` path, and the phone
+  was asleep when it was written. The phone-side route that serves it is not
+  built yet.
 
 ## Roadmap
 
@@ -549,10 +655,40 @@ partial move doesn't break a run.
 
 Phases 2+ can't be validated until ~8 jornadas exist to backtest against.
 
-## The official API
+## The official API — reached, 2026-08-18
 
-Unreachable. There is no web version of LaLiga Fantasy — `fantasy.laliga.com`
-is a download splash and `miliga.laliga.com` is a different product. No
-browser session means no token, on any device. `docs/design.md` §3 documents
-the endpoints for if that ever changes; futbolfantasy's values match the app
-to the euro, so the API isn't needed for pricing anyway.
+It was written off here as "unreachable: no browser session means no token, on
+any device". That was true of `fantasy.laliga.com`, which is a download splash,
+and it does not generalise. **The token does not come from the app; it comes
+from the B2C tenant behind it**, which serves an ordinary sign-in page to any
+browser.
+
+Two findings undid the blocker:
+
+- **Facebook is a registered identity provider** on the tenant, alongside
+  Google, Apple, Twitter, Twitch, Amazon and Instagram. The concern that the
+  account was federated past reach came from LaLigaApp's own UI advertising
+  Google and email/password only — a statement about their app, not the tenant.
+- **`https://jwt.ms` is a registered redirect URI** for the mobile client.
+  Every other value returns `AADB2C90006`, and the error is itself delivered to
+  jwt.ms, which is how you can tell. So the one interactive login is a URL
+  pasted into any browser: sign in, land on jwt.ms, copy the `code` out of the
+  address bar. No app to build, no `authredirect://` scheme to register, and
+  the box's 2GB of free RAM stops being a constraint.
+
+| | |
+|---|---|
+| Tenant | `laligadspprob2c.onmicrosoft.com` on `login.laliga.es` |
+| Policy | `B2C_1A_5ULAIP_PARAMETRIZED_SIGNIN` |
+| client_id | `af88bcff-1157-40a0-b579-030728aacf0b` (public, no secret) |
+| Base path | `https://fantasy-api.llt-services.com/api` |
+| Tokens | access 24h, refresh **90 days**, rotates on every use |
+
+**The `/api` prefix is not decoration.** Without it every path 404s with a
+`{"code","message"}` body that looks exactly like a permissions failure and
+sends you back to re-check a token that was fine.
+
+Constants and the flow live in `ffcore/auth.py`; `docs/design.md` §3 keeps the
+older recipe. futbolfantasy's values still match the app to the euro, so the
+API is not needed for pricing — it is needed for the things no page publishes,
+and for one of them, the exact join key.

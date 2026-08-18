@@ -313,19 +313,47 @@ observed_at,hours_to_lock,formation,index_total,player,pos,slot,start_pct,start_
 2026-08-17T1014Z,8.8,4-5-1,38.58,Lucien Agoume,mediocampista,MED,80,read,ok,0,5807375,2.854,0,3.940,0.905,Athletic Club,0,0,3.152,value,
 2026-08-17T1014Z,8.8,4-5-1,38.58,Simon Eriksson,portero,POR,30,read,ok,1,2858799,1.247,0,4.359,0.954,Getafe,0,0,1.308,value,
 2026-08-17T1014Z,8.8,4-5-1,38.58,Pablo Fornals,mediocampista,MED,80,read,ok,0,57416212,5.381,1,6.766,0.994,Real Sociedad,1,0,5.413,value,
-2026-08-17T2256Z,44.1,4-5-1,38.57,Alvaro Fernandez,portero,POR,20,read,ok,1,4486912,0.874,0,4.359,1.002,Malaga,0,0,0.872,value,
-2026-08-17T2256Z,44.1,4-5-1,38.57,Carl Starfelt,defensa,DEF,60,read,ok,0,14087470,3.114,1,5.116,1.015,Valencia,0,0,3.070,value,
-2026-08-17T2256Z,44.1,4-5-1,38.57,Robin Le Normand,defensa,DEF,60,read,ok,0,10422993,2.844,1,4.365,1.086,Malaga,1,0,2.619,value,
-2026-08-17T2256Z,44.1,4-5-1,38.57,Igor Zubeldia,defensa,DEF,60,read,ok,0,10318712,1.984,1,3.701,0.893,Real Betis,0,0,2.221,value,
-2026-08-17T2256Z,44.1,4-5-1,38.57,Omar El Hilali,defensa,DEF,80,read,ok,0,9426210,2.215,1,3.026,0.915,Real Madrid,1,0,2.421,value,
-2026-08-17T2256Z,44.1,4-5-1,38.57,Ruben Garcia,mediocampista,MED,60,read,ok,0,14025906,3.276,1,4.796,1.139,Levante,1,0,2.878,value,
-2026-08-17T2256Z,44.1,4-5-1,38.57,Iñigo Ruiz de Galarreta,mediocampista,MED,70,read,ok,0,12650951,3.490,1,4.482,1.112,Sevilla,1,0,3.137,value,
-2026-08-17T2256Z,44.1,4-5-1,38.57,Dani Lorenzo,mediocampista,MED,90,read,ok,1,9604577,2.207,0,2.821,0.869,Atletico Madrid,0,0,2.539,value,
-2026-08-17T2256Z,44.1,4-5-1,38.57,Pepelu,mediocampista,MED,70,read,ok,0,7676025,3.181,1,4.288,1.060,Celta Vigo,1,0,3.002,value,
-2026-08-17T2256Z,44.1,4-5-1,38.57,Jon Moncayola,mediocampista,MED,90,read,ok,0,6933138,4.454,1,4.346,1.139,Levante,1,0,3.912,value,
-2026-08-17T2256Z,44.1,4-5-1,38.57,Iñigo Vicente,delantero,DEL,90,read,ok,1,19633737,2.604,1,2.995,0.966,Getafe,0,0,2.696,value,
-2026-08-17T2256Z,44.1,4-5-1,38.57,Beñat Turrientes,mediocampista,MED,60,read,ok,0,7073131,1.918,0,3.578,0.893,Real Betis,0,0,2.147,value,
-2026-08-17T2256Z,44.1,4-5-1,38.57,Ionut Radu,portero,POR,90,read,ok,0,38006426,6.031,1,6.605,1.015,Valencia,0,0,5.944,value,
-2026-08-17T2256Z,44.1,4-5-1,38.57,Lucien Agoume,mediocampista,MED,80,read,ok,0,5760043,2.850,0,3.934,0.905,Athletic Club,0,0,3.147,value,
-2026-08-17T2256Z,44.1,4-5-1,38.57,Simon Eriksson,portero,POR,30,read,ok,1,2778598,1.263,0,4.359,0.966,Getafe,0,0,1.308,value,
-2026-08-17T2256Z,44.1,4-5-1,38.57,Pablo Fornals,mediocampista,MED,80,read,ok,0,57032839,5.376,1,6.761,0.994,Real Sociedad,1,0,5.409,value,
+2026-08-17T2246Z,44.2,4-5-1,37.58,Alvaro Fernandez,portero,POR,20,read,ok,1,4486912,0.927,0,4.359,1.063,Malaga,0,0,0.872,elo,-22.3
+2026-08-17T2246Z,44.2,4-5-1,37.58,Carl Starfelt,defensa,DEF,60,read,ok,0,14087470,2.854,1,5.116,0.930,Valencia,0,0,3.070,elo,3.4
+2026-08-17T2246Z,44.2,4-5-1,37.58,Robin Le Normand,defensa,DEF,60,read,ok,0,10422993,3.016,1,4.365,1.152,Malaga,1,0,2.619,elo,259.0
+2026-08-17T2246Z,44.2,4-5-1,37.58,Igor Zubeldia,defensa,DEF,60,read,ok,0,10318712,1.984,1,3.701,0.893,Real Betis,0,0,2.221,elo,-77.7
+2026-08-17T2246Z,44.2,4-5-1,37.58,Omar El Hilali,defensa,DEF,80,read,ok,0,9426210,2.247,1,3.026,0.928,Real Madrid,1,0,2.421,elo,-293.5
+2026-08-17T2246Z,44.2,4-5-1,37.58,Ruben Garcia,mediocampista,MED,60,read,ok,0,14025906,3.087,1,4.796,1.073,Levante,1,0,2.878,elo,11.5
+2026-08-17T2246Z,44.2,4-5-1,37.58,Iñigo Ruiz de Galarreta,mediocampista,MED,70,read,ok,0,12650951,3.490,1,4.482,1.112,Sevilla,1,0,3.137,elo,52.0
+2026-08-17T2246Z,44.2,4-5-1,37.58,Dani Lorenzo,mediocampista,MED,90,read,ok,1,9604577,2.207,0,2.821,0.869,Atletico Madrid,0,0,2.539,elo,-259.0
+2026-08-17T2246Z,44.2,4-5-1,37.58,Pepelu,mediocampista,MED,70,read,ok,0,7676025,2.984,1,4.288,0.994,Celta Vigo,1,0,3.002,elo,-3.4
+2026-08-17T2246Z,44.2,4-5-1,37.58,Jon Moncayola,mediocampista,MED,90,read,ok,0,6933138,4.197,1,4.346,1.073,Levante,1,0,3.912,elo,11.5
+2026-08-17T2246Z,44.2,4-5-1,37.58,Iñigo Vicente,delantero,DEL,90,read,ok,1,19633737,2.604,1,2.995,0.966,Getafe,0,0,2.696,elo,-82.1
+2026-08-17T2246Z,44.2,4-5-1,37.58,Beñat Turrientes,mediocampista,MED,60,read,ok,0,7073131,1.918,0,3.578,0.893,Real Betis,0,0,2.147,elo,-77.7
+2026-08-17T2246Z,44.2,4-5-1,37.58,Ionut Radu,portero,POR,90,read,ok,0,38006426,5.526,1,6.605,0.930,Valencia,0,0,5.944,elo,3.4
+2026-08-17T2246Z,44.2,4-5-1,37.58,Lucien Agoume,mediocampista,MED,80,read,ok,0,5760043,2.964,0,3.934,0.942,Athletic Club,0,0,3.147,elo,-52.0
+2026-08-17T2246Z,44.2,4-5-1,37.58,Simon Eriksson,portero,POR,30,read,ok,1,2778598,1.263,0,4.359,0.966,Getafe,0,0,1.308,elo,-82.1
+2026-08-17T2246Z,44.2,4-5-1,37.58,Pablo Fornals,mediocampista,MED,80,read,ok,0,57032839,5.590,1,6.761,1.033,Real Sociedad,1,0,5.409,elo,77.7
+2026-08-17T2318Z,43.7,4-5-1,37.46,Alvaro Fernandez,portero,POR,20,read,ok,1,4486912,0.927,0,4.359,1.063,Malaga,0,0,0.872,elo,-22.3
+2026-08-17T2318Z,43.7,4-5-1,37.46,Iñigo Vicente,delantero,DEL,90,read,ok,1,19633737,2.604,1,2.995,0.966,Getafe,0,0,2.696,elo,-82.1
+2026-08-17T2318Z,43.7,4-5-1,37.46,Pepelu,mediocampista,MED,70,read,ok,0,7676025,2.984,1,4.288,0.994,Celta Vigo,1,0,3.002,elo,-3.4
+2026-08-17T2318Z,43.7,4-5-1,37.46,Iñigo Ruiz de Galarreta,mediocampista,MED,70,read,ok,0,12650951,3.490,1,4.482,1.112,Sevilla,1,0,3.137,elo,52.0
+2026-08-17T2318Z,43.7,4-5-1,37.46,Dani Lorenzo,mediocampista,MED,90,read,ok,1,9604577,2.207,0,2.821,0.869,Atletico Madrid,0,0,2.539,elo,-259.0
+2026-08-17T2318Z,43.7,4-5-1,37.46,Jon Moncayola,mediocampista,MED,90,read,ok,0,6933138,4.197,1,4.346,1.073,Levante,1,0,3.912,elo,11.5
+2026-08-17T2318Z,43.7,4-5-1,37.46,Carl Starfelt,defensa,DEF,60,read,ok,0,14087470,2.854,1,5.116,0.930,Valencia,0,0,3.070,elo,3.4
+2026-08-17T2318Z,43.7,4-5-1,37.46,Robin Le Normand,defensa,DEF,60,read,ok,0,10422993,3.016,1,4.365,1.152,Malaga,1,0,2.619,elo,259.0
+2026-08-17T2318Z,43.7,4-5-1,37.46,Igor Zubeldia,defensa,DEF,60,read,ok,0,10318712,1.984,1,3.701,0.893,Real Betis,0,0,2.221,elo,-77.7
+2026-08-17T2318Z,43.7,4-5-1,37.46,Omar El Hilali,defensa,DEF,80,read,ok,0,9426210,2.247,1,3.026,0.928,Real Madrid,1,0,2.421,elo,-293.5
+2026-08-17T2318Z,43.7,4-5-1,37.46,Beñat Turrientes,mediocampista,MED,60,read,ok,0,7073131,1.918,0,3.578,0.893,Real Betis,0,0,2.147,elo,-77.7
+2026-08-17T2318Z,43.7,4-5-1,37.46,Lucien Agoume,mediocampista,MED,80,read,ok,0,5760043,2.964,1,3.934,0.942,Athletic Club,0,0,3.147,elo,-52.0
+2026-08-17T2318Z,43.7,4-5-1,37.46,Ionut Radu,portero,POR,90,read,ok,0,38006426,5.526,1,6.605,0.930,Valencia,0,0,5.944,elo,3.4
+2026-08-17T2318Z,43.7,4-5-1,37.46,Pablo Fornals,mediocampista,MED,80,read,ok,0,57032839,5.590,1,6.761,1.033,Real Sociedad,1,0,5.409,elo,77.7
+2026-08-17T2345Z,43.2,4-5-1,37.46,Alvaro Fernandez,portero,POR,20,read,ok,1,4486912,0.927,0,4.359,1.063,Malaga,0,0,0.872,elo,-22.3
+2026-08-17T2345Z,43.2,4-5-1,37.46,Iñigo Vicente,delantero,DEL,90,read,ok,1,19633737,2.604,1,2.995,0.966,Getafe,0,0,2.696,elo,-82.1
+2026-08-17T2345Z,43.2,4-5-1,37.46,Pepelu,mediocampista,MED,70,read,ok,0,7676025,2.984,1,4.288,0.994,Celta Vigo,1,0,3.002,elo,-3.4
+2026-08-17T2345Z,43.2,4-5-1,37.46,Iñigo Ruiz de Galarreta,mediocampista,MED,70,read,ok,0,12650951,3.490,1,4.482,1.112,Sevilla,1,0,3.137,elo,52.0
+2026-08-17T2345Z,43.2,4-5-1,37.46,Dani Lorenzo,mediocampista,MED,90,read,ok,1,9604577,2.207,0,2.821,0.869,Atletico Madrid,0,0,2.539,elo,-259.0
+2026-08-17T2345Z,43.2,4-5-1,37.46,Jon Moncayola,mediocampista,MED,90,read,ok,0,6933138,4.197,1,4.346,1.073,Levante,1,0,3.912,elo,11.5
+2026-08-17T2345Z,43.2,4-5-1,37.46,Carl Starfelt,defensa,DEF,60,read,ok,0,14087470,2.854,1,5.116,0.930,Valencia,0,0,3.070,elo,3.4
+2026-08-17T2345Z,43.2,4-5-1,37.46,Robin Le Normand,defensa,DEF,60,read,ok,0,10422993,3.016,1,4.365,1.152,Malaga,1,0,2.619,elo,259.0
+2026-08-17T2345Z,43.2,4-5-1,37.46,Igor Zubeldia,defensa,DEF,60,read,ok,0,10318712,1.984,1,3.701,0.893,Real Betis,0,0,2.221,elo,-77.7
+2026-08-17T2345Z,43.2,4-5-1,37.46,Omar El Hilali,defensa,DEF,80,read,ok,0,9426210,2.247,1,3.026,0.928,Real Madrid,1,0,2.421,elo,-293.5
+2026-08-17T2345Z,43.2,4-5-1,37.46,Beñat Turrientes,mediocampista,MED,60,read,ok,0,7073131,1.918,0,3.578,0.893,Real Betis,0,0,2.147,elo,-77.7
+2026-08-17T2345Z,43.2,4-5-1,37.46,Lucien Agoume,mediocampista,MED,80,read,ok,0,5760043,2.964,1,3.934,0.942,Athletic Club,0,0,3.147,elo,-52.0
+2026-08-17T2345Z,43.2,4-5-1,37.46,Ionut Radu,portero,POR,90,read,ok,0,38006426,5.526,1,6.605,0.930,Valencia,0,0,5.944,elo,3.4
+2026-08-17T2345Z,43.2,4-5-1,37.46,Pablo Fornals,mediocampista,MED,80,read,ok,0,57032839,5.590,1,6.761,1.033,Real Sociedad,1,0,5.409,elo,77.7

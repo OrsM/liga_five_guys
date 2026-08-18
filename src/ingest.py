@@ -64,9 +64,11 @@ from pathlib import Path
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
+from ffcore.auth import API_BASE                    # noqa: E402
 from ffcore.tidy import ROOT, SEASON, TIDY          # noqa: E402
-from sources import (CAL_KEY, MATCH_KEY_RE, parse_points,  # noqa: E402
-                     played_sources, season_label, source_for, sources)
+from sources import (API_LEAGUES_KEY, CAL_KEY, MATCH_KEY_RE,  # noqa: E402
+                     league_sources, parse_points, played_sources, player_sources,
+                     season_label, source_for, sources)
 
 RAW = ROOT / "raw"
 
@@ -233,6 +235,25 @@ def fetch() -> Path:
     rows: list[dict] = []
     unchanged = skipped = rotted = 0
 
+    # One token for the whole sweep, fetched before the first request so a
+    # login that has expired fails here — loudly, once — rather than four
+    # times in the middle of a queue. A missing token is NOT fatal: the public
+    # scrapers are the older half of this repo and still work without it, so
+    # the sweep degrades to what it always did rather than producing nothing.
+    bearer = None
+    try:
+        from ffcore.auth import TokenStore
+        store_ = TokenStore()
+        bearer = store_.bearer()
+        left = store_.expiry_days()
+        if left is not None and left < 14:
+            print(f"  WARNING: league login expires in {left:.0f} days — "
+                  f"run `python -m ffcore.auth --login` before it does.")
+    except FileNotFoundError:
+        print("  note: no league token; API sources will be skipped.")
+    except Exception as e:                              # noqa: BLE001
+        print(f"  warn: league token unusable ({e}); API sources skipped.")
+
     with httpx.Client(headers=HEADERS, timeout=TIMEOUT,
                       follow_redirects=True) as c:
         # A queue rather than a loop over the registry, because the calendar
@@ -248,11 +269,24 @@ def fetch() -> Path:
                 skipped += 1
                 continue
             # {date} is filled for the one source whose URL carries the day it
-            # is asking about (Club Elo). Every other URL has no placeholder
-            # in it, so this is a no-op for them.
-            url = src.url.format(date=stamp[:10])
+            # is asking about (Club Elo); {base} for the league API, whose host
+            # lives next to the token that opens it. Every other URL has no
+            # placeholder in it, so this is a no-op for them.
+            url = src.url.format(date=stamp[:10], base=API_BASE)
+            # The bearer goes ONLY on entries that asked for it. Sending it
+            # with a futbolfantasy request would hand a third party the
+            # credential to the league account, so this is a per-request
+            # header and never a client-wide one.
+            extra = {}
+            if src.auth:
+                if bearer is None:
+                    print(f"  warn: {src.key} needs the league token and "
+                          f"there is none — skipping. "
+                          f"Run `python -m ffcore.auth --login`.")
+                    continue
+                extra["Authorization"] = f"Bearer {bearer}"
             try:
-                r = c.get(url)
+                r = c.get(url, headers=extra) if extra else c.get(url)
             except httpx.RequestError as e:
                 # A host that refuses the connection or never answers is one
                 # missing page, not a reason to lose the sweep. Same treatment
@@ -270,6 +304,18 @@ def fetch() -> Path:
                 # Only matches the calendar shows a score for: an unplayed
                 # match page has no lineup on it to read.
                 queue += played_sources(r.text)
+            if src.table == "api_activity":
+                # The feed names players only by id, and half of them belong
+                # to players since sold — neither in a squad nor on the
+                # market, so nothing else in the store can name them. One
+                # lookup each, once ever, deduplicated by the "once" cadence.
+                queue += player_sources(r.text)
+            if src.key == API_LEAGUES_KEY:
+                # Same trick: the market, squad and activity URLs all carry a
+                # league id that this page is what tells us, so the sweep
+                # discovers its own work rather than reading an id out of a
+                # config file that could go stale.
+                queue += league_sources(r.text)
 
             sig = src.sign(r.text)
             was = prev.get(src.key, {})

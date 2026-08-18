@@ -1,0 +1,22 @@
+[project]
+name = "liga-five-guys"
+version = "0.1.0"
+description = "Data-driven decision system for LaLiga Fantasy -- one private league"
+requires-python = ">=3.12"
+
+# The three the workflow installed by hand, now declared once. There is no
+# fourth: every other import in src/ is stdlib, deliberately, because this runs
+# unattended and each dependency is a thing that can break a Saturday.
+#
+#   lxml + cssselect  the HTML parsers in sources.py; cssselect is what
+#                     lxml's .cssselect() needs and is not pulled in by lxml.
+#   httpx             the only network client, imported INSIDE ingest.fetch()
+#                     so the test path never needs it.
+dependencies = [
+    "httpx>=0.27",
+    "lxml>=5.0",
+    "cssselect>=1.2",
+]
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F"]
