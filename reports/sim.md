@@ -32,36 +32,41 @@ _**32 locked players would improve your eleven** and their clauses open on 24 Au
 
 ## Every player you could hold — but see the call
 
-| Player | Pos | xPts/j | Where | Do | Give up | Season pts | € |
-|---|---|--:|---|---|---|--:|--:|
-| Pablo Fornals | MED | 6.95 | yours | field | — | — | — |
-| Arda Guler | MED | 6.42 | Albert Laporta | can't afford | — | — | −52.65M |
-| Dean Huijsen | DEF | 5.64 | BurtonGM89 | **buy** | Turrientes + Lorenzo | +110 | -18.42M / 5.17M left |
-| Nicolas Pepe | DEL | 5.60 | free agent | can't afford | — | — | −51.46M |
-| Iñigo Ruiz de Galarreta | MED | 4.84 | yours | field | — | — | — |
-| Jon Moncayola | MED | 4.53 | yours | field | — | — | — |
-| Ionut Radu | POR | 4.47 | yours | field | — | — | — |
-| Nahuel Tenaglia | DEF | 4.20 | BurtonGM89 | **buy** | Turrientes | +54 | -9.92M / 13.68M left |
-| Ferran Jutgla | DEL | 4.19 | Albert Laporta | **buy** | Lorenzo | +55 | +98K / 23.69M left |
-| Antonio Blanco | MED | 3.92 | BurtonGM89 | **buy** | Turrientes | +31 | -7.82M / 15.78M left |
-| Santiago Mouriño | DEF | 3.82 | Albert Laporta | **buy** | Turrientes + Lorenzo | +36 | -23.54M / 55K left |
-| Marcos Alonso | DEF | 3.78 | free agent | **buy** | Turrientes | +41 | -21.83M / 1.77M left |
-| Aitor Paredes | DEF | 3.69 | BurtonGM89 | **buy** | Turrientes | +41 | +1.52M / 25.12M left |
-| Lucien Agoume | MED | 3.50 | yours | field | — | — | — |
-| Carl Starfelt | DEF | 3.36 | yours | field | — | — | — |
-| Marc Bartra | DEF | 3.29 | free agent | **buy** | Lorenzo | +22 | -18.15M / 5.45M left |
-| Marc Roca | MED | 3.13 | Albert Laporta | **buy** | Lorenzo | +2 | +4.20M / 27.80M left |
-| Pepelu | MED | 3.11 | yours | field | — | — | — |
-| Iñigo Vicente | DEL | 2.90 | yours | field | — | — | — |
-| Robin Le Normand | DEF | 2.88 | yours | field | — | — | — |
-| Isi Palazon | DEL | 2.87 | free agent | **buy** | Turrientes | +5 | -12.61M / 10.99M left |
-| Igor Zubeldia | DEF | 2.86 | yours | field | — | — | — |
-| Omar El Hilali | DEF | 2.73 | yours | field | — | — | — |
-| Dani Lorenzo | MED | 2.46 | yours | **sell** | — | — | +9.60M |
-| Beñat Turrientes | MED | 1.10 | yours | **sell** | — | — | +7.07M |
-| Alvaro Fernandez | POR | 0.05 | yours | **sell** | — | — | +4.49M |
+| Player | Pos | Start | xPts/j | Where | € | Season |
+|---|---|--:|--:|---|--:|--:|
+| **FIELD — your eleven** | | | | | | |
+| Pablo Fornals | MED | 99% | 6.95 | yours | — | — |
+| Iñigo Ruiz de Galarreta | MED | 97% | 4.84 | yours | — | — |
+| Jon Moncayola | MED | 97% | 4.53 | yours | — | — |
+| Ionut Radu | POR | 73% | 4.47 | yours | — | — |
+| Lucien Agoume | MED | 94% | 3.50 | yours | — | — |
+| Carl Starfelt | DEF | 71% | 3.36 | yours | — | — |
+| Pepelu | MED | 73% | 3.11 | yours | — | — |
+| Iñigo Vicente | DEL | 99% | 2.90 | yours | — | — |
+| Robin Le Normand | DEF | 57% | 2.88 | yours | — | — |
+| Igor Zubeldia | DEF | 86% | 2.86 | yours | — | — |
+| Omar El Hilali | DEF | 97% | 2.73 | yours | — | — |
+| **Your eleven** | | | **42.13** | vs SusoGattuso **46.57** | | **-4.44** |
+| **SELL — never start** | | | | | | |
+| Dani Lorenzo | MED | 99% | 2.46 | yours | +9.60M | — |
+| Beñat Turrientes | MED | 34% | 1.10 | yours | +7.07M | — |
+| Alvaro Fernandez | POR | 1% | 0.05 | yours | +4.49M | — |
+| **BUY — with the proceeds** | | | | | | |
+| Dean Huijsen | DEF | 99% | 5.64 | BurtonGM89 | -18.42M | +110 |
+| Nahuel Tenaglia | DEF | 99% | 4.20 | BurtonGM89 | -9.92M | +54 |
+| Ferran Jutgla | DEL | 97% | 4.19 | Albert Laporta | +0.10M | +55 |
+| Antonio Blanco | MED | 99% | 3.92 | BurtonGM89 | -7.82M | +31 |
+| Santiago Mouriño | DEF | 99% | 3.82 | Albert Laporta | -23.54M | +36 |
+| Marcos Alonso | DEF | 73% | 3.78 | free agent | -21.83M | +41 |
+| Aitor Paredes | DEF | 73% | 3.69 | BurtonGM89 | +1.52M | +41 |
+| Marc Bartra | DEF | 61% | 3.29 | free agent | -18.15M | +22 |
+| Marc Roca | MED | 71% | 3.13 | Albert Laporta | +4.20M | +2 |
+| Isi Palazon | DEL | 59% | 2.87 | free agent | -12.61M | +5 |
+| **SAVE — better than yours, out of reach** | | | | | | |
+| Arda Guler | MED | 97% | 6.42 | Albert Laporta | 7.89M short | +126 if you could |
+| Nicolas Pepe | DEL | 99% | 5.60 | free agent | 6.70M short | +102 if you could |
 
-_**xPts/j** is what he is expected to score a jornada, and it is the only ranking. Above your weakest starter (2.73) and not yours is worth buying; below it and yours is a bench player; starting in none of the 38 jornadas left is dead weight. **Season pts** is simulated — extra points you finish with, measured in the same seasons with and without the move._
+_Read it top to bottom: it is a plan, not a menu. The funding is implicit — sell the SELL rows and the BUY rows are what the money reaches. **Start** is one number, futbolfantasy recalibrated against confirmed line-ups and blended with analiticafantasy where it has an opinion, and it is the same figure the forecast multiplies by. **xPts/j** is what he scores a jornada with that already applied. **€** is negative to buy, positive to sell, and on a SAVE row it is how far short you are. **Season** is simulated: extra points over the 38 jornadas left, measured in the same seasons with and without the move._
 
 ## Where the league stands
 

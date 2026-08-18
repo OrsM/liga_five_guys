@@ -135,12 +135,95 @@ def _bar(u) -> float:
     return min((exp.get(k, 0.0) for k in xi), default=0.0)
 
 
-def ladder_rows(u, rows) -> list[dict]:
-    """The ladder as data, so the phone draws the same one table.
+def ladder_rows(u, rows, saves=None) -> list[dict]:
+    """The grouped plan as data, so the phone draws the same one table.
 
-    Field, bench, sell and buy in one order, ranked by one number. Two
-    renderers drawing different tables is how this report came to contradict
-    itself, so there is one function and both read it.
+    Same groups, same order, same numbers. Two renderers drawing different
+    tables is how this report came to contradict itself; there is one shape
+    and both read it.
+    """
+    from ffcore.season import best_xi
+
+    exp = u.forecaster.expected(decide_choosable(u))
+    mine = u.state.squads.get(u.me, {})
+    xi = set(best_xi(mine, exp))
+    dead = {k for k, _ in decide_dead(u)}
+    won = {r["action"].buy: r for r in rows if r["action"].buy}
+    bar = min((exp.get(k, 0.0) for k in xi), default=0.0)
+    spare = sum(v for _k, v in decide_dead(u))
+
+    def cell(k, group, where, money, pts, note=""):
+        return {"name": title_name(u.name.get(k, k)),
+                "pos": u.pos.get(k, ""), "start": u.start.get(k, 0.0),
+                "xpts": exp.get(k, 0.0), "group": group, "where": where,
+                "money": money, "pts": pts, "note": note}
+
+    out = []
+    for k in sorted(xi, key=lambda k: -exp.get(k, 0.0)):
+        out.append(cell(k, "field", "yours", None, None))
+    for k in sorted((k for k in mine if k not in xi and k not in dead),
+                    key=lambda k: -exp.get(k, 0.0)):
+        out.append(cell(k, "keep", "yours", None, None))
+    for k in sorted(dead, key=lambda k: -exp.get(k, 0.0)):
+        out.append(cell(k, "sell", "yours", u.proceeds.get(k, 0.0), None))
+    rest = [k for k in u.price if k not in mine and exp.get(k, 0.0) > bar]
+    for k in sorted((k for k in rest if k in won), key=lambda k: -exp.get(k, 0.0)):
+        r = won[k]
+        out.append(cell(k, "buy", u.owner.get(k) or "free agent",
+                        -r["action"].net, r["d_pts"]))
+    for k in sorted((k for k in rest if k not in won
+                     and u.price[k] > u.cash + spare),
+                    key=lambda k: -exp.get(k, 0.0)):
+        out.append(cell(k, "save", u.owner.get(k) or "free agent",
+                        -(u.price[k] - u.cash - spare),
+                        (saves or {}).get(k), "short"))
+    for k in sorted((k for k in rest if k not in won
+                     and u.price[k] <= u.cash + spare),
+                    key=lambda k: -exp.get(k, 0.0)):
+        out.append(cell(k, "pass", u.owner.get(k) or "free agent",
+                        -u.price[k], None))
+    return out
+
+
+
+
+def price_saves(u, keys, base, seed: int = 1) -> dict:
+    """What a player you cannot yet afford would be worth if you could.
+
+    "Can't afford" is not an answer to whether saving toward him is worth it,
+    and on the day this was written the two out of reach were the second and
+    fourth best players on the board — one of them 7.89M short once the dead
+    weight is sold, and worth MORE than the best move you can afford. Scored
+    exactly like an affordable move, funded by everything spare, and marked
+    conditional wherever it is printed.
+    """
+    import decide
+
+    dead = tuple(sorted(k for k, _ in decide_dead(u)))
+    got = sum(v for _k, v in decide_dead(u))
+    out = {}
+    for k in keys:
+        a = decide.Action("buy", buy=k, sell=dead, cost=u.price.get(k, 0.0),
+                          proceeds=got)
+        r = decide._score(u, decide.apply(u, a), decide.FINAL_TRIALS, seed)
+        mine = r.totals.get(u.me, [])
+        was = base.totals.get(u.me, [])
+        pairs = sorted(x - y for x, y in zip(mine, was))
+        out[k] = pairs[len(pairs) // 2] if pairs else 0.0
+    return out
+
+
+def ladder(u, rows, base, saves=None) -> list[str]:
+    """EVERY PLAYER YOU COULD HOLD, GROUPED BY WHAT TO DO WITH HIM.
+
+    Not one long ranking: a plan. The eleven you should field, then the ones
+    to keep on the bench, then the ones to sell, then what to buy with the
+    proceeds, then what you cannot afford yet. Read top to bottom it is the
+    whole decision, and the funding is implicit — sell the SELL rows and the
+    BUY rows are what the money reaches.
+
+    Field, bench, sell and buy were four sections that had begun contradicting
+    each other. They are one table because they were always one question.
     """
     from ffcore.season import best_xi
 
@@ -151,108 +234,82 @@ def ladder_rows(u, rows) -> list[dict]:
     won = {r["action"].buy: r for r in rows if r["action"].buy}
     bar = min((exp.get(k, 0.0) for k in xi), default=0.0)
     spare = sum(u.proceeds.get(d, 0) for d in dead)
-
-    out = []
-    for k in mine:
-        out.append({"name": title_name(u.name.get(k, k)),
-                    "pos": u.pos.get(k, ""), "xpts": exp.get(k, 0.0),
-                    "where": "yours", "mine": True,
-                    "do": "field" if k in xi else
-                          "sell" if k in dead else "bench",
-                    "give": "", "pts": None,
-                    "money": None if k in xi else u.proceeds.get(k, 0.0),
-                    "left": None})
-    for k, price in u.price.items():
-        if k in mine or exp.get(k, 0.0) <= bar:
-            continue
-        r = won.get(k)
-        row = {"name": title_name(u.name.get(k, k)),
-               "pos": u.pos.get(k, ""), "xpts": exp.get(k, 0.0),
-               "where": u.owner.get(k, "") or "free agent", "mine": False,
-               "give": "", "pts": None, "money": -price, "left": None}
-        if r is None:
-            row["do"] = "—" if price <= u.cash + spare else "can't afford"
-        else:
-            a_ = r["action"]
-            row["do"] = "buy"
-            row["give"] = " + ".join(short(x, u) for x in a_.sell)
-            row["pts"] = r["d_pts"]
-            row["money"] = -a_.net
-            row["left"] = u.cash - a_.net
-        out.append(row)
-    return sorted(out, key=lambda r: -r["xpts"])
-
-
-def ladder(u, rows, base) -> list[str]:
-    """EVERY PLAYER YOU COULD HOLD, IN ONE TABLE, IN ONE ORDER.
-
-    Field, bench, sell and buy are not four questions with four tables — they
-    are one ladder with a line through it. Your starters, your spares and
-    everyone worth buying, ranked by the same number, so the answer to "who do
-    I field, who do I sell, what do I buy" is read off one scan instead of
-    reconciled across four sections that had begun contradicting each other.
-
-    This is the shape the old board had and the reason it was right to have
-    it. What was wrong with the board was its metric — points per million
-    above a replacement level — not its structure. The metric here is what a
-    player is expected to score, and the money is a column rather than the
-    ranking.
-    """
-    from ffcore.season import best_xi
-
-    exp = u.forecaster.expected(decide_choosable(u))
-    mine = u.state.squads.get(u.me, {})
-    xi = set(best_xi(mine, exp))
-    dead = {k for k, _ in decide_dead(u)}
-    won = {r["action"].buy: r for r in rows if r["action"].buy}
-    bar = min((exp.get(k, 0.0) for k in xi), default=0.0)
     names = {k: title_name(u.name.get(k, k)) for k in u.name}
 
-    seen, out = [], []
-    for k in mine:
-        do = ("field" if k in xi else "**sell**" if k in dead else "bench")
-        seen.append((exp.get(k, 0.0), k, "yours", do, "",
-                     "" if k in xi else "+" + fmt_money(u.proceeds.get(k, 0)),
-                     ""))
-    for k, price in u.price.items():
-        if k in mine or exp.get(k, 0.0) <= bar:
-            continue
-        held = u.owner.get(k, "")
-        r = won.get(k)
-        if r is None:
-            # Better than your weakest starter and out of reach. Saying so is
-            # the point: a dash reads as "not worth it" when the truth is
-            # "worth it, and you cannot pay for it".
-            afford = price <= u.cash + sum(u.proceeds.get(d, 0) for d in dead)
-            seen.append((exp.get(k, 0.0), k, held or "free agent",
-                         "—" if afford else "can't afford", "", "",
-                         "−" + fmt_money(price)))
-            continue
-        a = r["action"]
-        gave = " + ".join(short(x, u) for x in a.sell) if a.sell else "—"
-        seen.append((exp.get(k, 0.0), k, held or "free agent", "**buy**",
-                     gave, "%+.0f" % r["d_pts"],
-                     "%s / %s left" % (_net(-a.net),
-                                       fmt_money(u.cash - a.net))))
+    def row(k, where, money, pts):
+        return ("| %s | %s | %.0f%% | %.2f | %s | %s | %s |"
+                % (names.get(k, k), u.pos.get(k, "—"),
+                   100 * u.start.get(k, 0.0), exp.get(k, 0.0), where,
+                   ("%+.2fM" % (money / 1e6)) if money else "—",
+                   ("%+.0f" % pts) if pts is not None else "—"))
 
-    out += ["| Player | Pos | xPts/j | Where | Do | Give up | Season pts | € |",
-            "|---|---|--:|---|---|---|--:|--:|"]
-    for e, k, where, do, gave, pts_or_money, money in sorted(seen,
-                                                             reverse=True):
-        pts = pts_or_money if pts_or_money.startswith(("+", "-")) \
-            and "M" not in pts_or_money else ""
-        cash = money or (pts_or_money if not pts else "")
-        out.append("| %s | %s | %.2f | %s | %s | %s | %s | %s |"
-                   % (names.get(k, k), u.pos.get(k, "—"), e, where, do,
-                      gave or "—", pts or "—", cash or "—"))
+    def by_xpts(keys):
+        return sorted(keys, key=lambda k: -exp.get(k, 0.0))
+
+    out = ["| Player | Pos | Start | xPts/j | Where | € | Season |",
+           "|---|---|--:|--:|---|--:|--:|"]
+
+    out.append("| **FIELD — your eleven** | | | | | | |")
+    for k in by_xpts(xi):
+        out.append(row(k, "yours", None, None))
+    tot = sum(exp.get(k, 0.0) for k in xi)
+    best_riv = max(((sum(exp.get(x, 0.0) for x in best_xi(sq, exp)), m)
+                    for m, sq in u.state.squads.items() if m != u.me),
+                   default=(0.0, ""))
+    out.append("| **Your eleven** | | | **%.2f** | vs %s **%.2f** | | **%+.2f** |"
+               % (tot, best_riv[1], best_riv[0], tot - best_riv[0]))
+
+    keep = [k for k in mine if k not in xi and k not in dead]
+    if keep:
+        out.append("| **KEEP — bench** | | | | | | |")
+        for k in by_xpts(keep):
+            out.append(row(k, "yours", None, None))
+
+    if dead:
+        out.append("| **SELL — never start** | | | | | | |")
+        for k in by_xpts(dead):
+            out.append(row(k, "yours", u.proceeds.get(k, 0.0), None))
+
+    buys = [k for k in u.price if k not in mine and k in won]
+    pss = [k for k in u.price
+           if k not in mine and k not in won and exp.get(k, 0.0) > bar]
+    if buys:
+        out.append("| **BUY — with the proceeds** | | | | | | |")
+        for k in by_xpts(buys):
+            r = won[k]
+            out.append(row(k, u.owner.get(k) or "free agent",
+                           -r["action"].net, r["d_pts"]))
+    save = [k for k in pss
+            if u.price[k] > u.cash + spare]
+    pss = [k for k in pss if k not in save]
+    if save:
+        out.append("| **SAVE — better than yours, out of reach** | | | | | | |")
+        for k in by_xpts(save):
+            short_by = u.price[k] - u.cash - spare
+            out.append("| %s | %s | %.0f%% | %.2f | %s | %.2fM short | %s |"
+                       % (names.get(k, k), u.pos.get(k, "—"),
+                          100 * u.start.get(k, 0.0), exp.get(k, 0.0),
+                          u.owner.get(k) or "free agent", short_by / 1e6,
+                          ("%+.0f if you could" % (saves or {})[k]
+                           if (saves or {}).get(k) is not None else "—")))
+    if pss:
+        out.append("| **PASS** | | | | | | |")
+        for k in by_xpts(pss):
+            out.append(row(k, u.owner.get(k) or "free agent",
+                           -u.price[k], None))
+
     out += ["",
-            "_**xPts/j** is what he is expected to score a jornada, and it is "
-            "the only ranking. Above your weakest starter (%.2f) and not "
-            "yours is worth buying; below it and yours is a bench player; "
-            "starting in none of the %d jornadas left is dead weight. "
-            "**Season pts** is simulated — extra points you finish with, "
-            "measured in the same seasons with and without the move._"
-            % (bar, len(u.state.jornadas)), ""]
+            "_Read it top to bottom: it is a plan, not a menu. The funding is "
+            "implicit — sell the SELL rows and the BUY rows are what the money "
+            "reaches. **Start** is one number, futbolfantasy recalibrated "
+            "against confirmed line-ups and blended with analiticafantasy "
+            "where it has an opinion, and it is the same figure the forecast "
+            "multiplies by. **xPts/j** is what he scores a jornada with that "
+            "already applied. **€** is negative to buy, positive to sell, and "
+            "on a SAVE row it is how far short you are. **Season** is "
+            "simulated: extra points over the %d jornadas left, measured in "
+            "the same seasons with and without the move._"
+            % len(u.state.jornadas), ""]
     return out
 
 
@@ -635,8 +692,25 @@ def alert_lines(u, rows, rivals) -> list[str]:
                best["d_pos"], 100 * best["d_win"])]
 
 
+def _xi_total(u, who) -> float:
+    from ffcore.season import best_xi
+    exp = u.forecaster.expected(decide_choosable(u))
+    return sum(exp.get(k, 0.0) for k in best_xi(u.state.squads.get(who, {}),
+                                                exp))
+
+
+def _rival_best(u) -> dict:
+    """The strongest eleven anybody else can field — the number you are
+    actually chasing, and the one the ranking never showed."""
+    out = [(_xi_total(u, m), m) for m in u.state.squads if m != u.me]
+    if not out:
+        return {}
+    total, who = max(out)
+    return {"manager": who, "xi": total, "gap": _xi_total(u, u.me) - total}
+
+
 def payload(u, rows, base, rivals, locks_h=None, n_actions: int = 0,
-            offers=None) -> dict:
+            offers=None, saves=None) -> dict:
     """The report as data, for the phone to draw.
 
     Same rows as the markdown, so the two cannot disagree about order or
@@ -697,8 +771,10 @@ def payload(u, rows, base, rivals, locks_h=None, n_actions: int = 0,
         "moves": moves,
         "sell": [{"name": names.get(k, k), "pos": u.pos.get(k, ""),
                   "raises": got} for k, got in dead_weight(u)],
-        "ladder": ladder_rows(u, rows),
+        "ladder": ladder_rows(u, rows, saves),
         "bar": _bar(u),
+        "xi_total": _xi_total(u, u.me),
+        "rival_best": _rival_best(u),
         "wait": wait_routes(u, offers),
         "verdict": verdict(wait_routes(u, offers))[0],
         "hold": verdict(wait_routes(u, offers))[1],
@@ -805,7 +881,7 @@ def placeholder(why: str) -> list[str]:
 
 
 def render(u, rows, base, stamp: str, rivals, n_actions: int = 0,
-           locks_h=None, offers=None) -> list[str]:
+           locks_h=None, offers=None, saves=None) -> list[str]:
     # EVERYTHING UNDER A HEADING, including the preamble. digest.py drops a
     # source's H1 when it stitches REPORT.md and keeps what follows, so a
     # preamble above the first `## ` arrives in the middle of the report
@@ -825,7 +901,7 @@ def render(u, rows, base, stamp: str, rivals, n_actions: int = 0,
     # it is a contradiction rather than a second opinion.
     out += ["## %s" % ("Every player you could hold — but see the call"
                        if hold else "Every player you could hold"), ""]
-    out += ladder(u, rows, base)
+    out += ladder(u, rows, base, saves)
 
     out += ["## Where the league stands", ""]
     out += standings(u, base)
@@ -1178,9 +1254,20 @@ def main() -> None:
     log_cash_price(measured)
     u.cash_note = _price_note(smoothed, measured)
     rivals = [m for m in u.state.squads if m != u.me]
+    # What the two out of reach would be worth if the money were there —
+    # which is the only thing that makes "save toward him" a decision.
+    from ffcore.season import best_xi as _bxi
+    _exp = u.forecaster.expected(decide_choosable(u))
+    _bar = min((_exp.get(k, 0.0) for k in _bxi(u.state.squads[u.me], _exp)),
+               default=0.0)
+    _spare = sum(v for _k, v in decide_dead(u))
+    saves = price_saves(u, [k for k, p in u.price.items()
+                            if k not in u.state.squads[u.me]
+                            and _exp.get(k, 0.0) > _bar
+                            and p > u.cash + _spare], base)
     write_lines(REPORTS / OUT,
                 render(u, rows, base, stamp, rivals, len(acts), locks_h,
-                       market_model(u)))
+                       market_model(u), saves))
     print("wrote %s (%d moves, %d simulated in full)"
           % (REPORTS / OUT, len(acts), len(rows)))
 
@@ -1188,7 +1275,7 @@ def main() -> None:
         "generated_at": dt.datetime.now(dt.timezone.utc)
                           .strftime("%Y-%m-%dT%H:%MZ"),
         **payload(u, rows, base, rivals, locks_h, len(acts),
-                  market_model(u)),
+                  market_model(u), saves),
     }, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
     print("wrote %s" % (REPORTS / "decisions.json"))
 

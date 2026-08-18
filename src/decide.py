@@ -139,6 +139,13 @@ class Universe:
     # it made Lamine Yamal and Vinicius Junior score zero, and produced the
     # finding that four players in the whole league could improve the eleven.
     market_exp: dict[str, float] = field(default_factory=dict)
+    # P(he starts) as ONE number — futbolfantasy's reading recalibrated
+    # against confirmed line-ups and blended with analiticafantasy where it
+    # has an opinion (ffcore.startprob). Printing "80/100" made the reader do
+    # the weighting; the weighting is fitted, so it should be done once and
+    # the answer shown. It is the same figure the forecast already multiplies
+    # by, so the table and the simulation cannot disagree about him.
+    start: dict[str, float] = field(default_factory=dict)
     # When each clause becomes payable again. A transfer locks it for about a
     # week and the app says until when; absent means locked, never open.
     clause_until: dict = field(default_factory=dict)
@@ -718,12 +725,13 @@ def load(trials_pool=None) -> Universe:
     # what might come up later, which is about the players NOT in the
     # simulation's universe.
     market_exp: dict[str, float] = {}
+    start: dict[str, float] = {}
     for k, rec in players.items():
         row = sc.row_for(k)
         sc_ = sc.score(row) if row else None
         if sc_ is not None:
-            market_exp[k] = max(0.0, sc_.ppm * sc_.fix) * min(
-                1.0, (sc_.pct_used or 0) / 100)
+            start[k] = min(1.0, (sc_.pct_used or 0) / 100)
+            market_exp[k] = max(0.0, sc_.ppm * sc_.fix) * start[k]
 
     pool = pool_from_perjornada(
         csv.DictReader(open(SEASON / "live" / "perjornada_2026-27.csv")))
@@ -747,7 +755,8 @@ def load(trials_pool=None) -> Universe:
     return Universe(
         state=LeagueState(squads, rem, me, carried), forecaster=fc, pos=pos,
         price=price, proceeds=proceeds, owner=owner, cash=cash, me=me,
-        value=value, market_exp=market_exp, clause=clause, route=route,
+        value=value, market_exp=market_exp, start=start, clause=clause,
+        route=route,
         rival_cash=rival_cash,
         clause_until=clause_until,
         part_played=played, name=name, start_note=_calibrated()[0].note(),
