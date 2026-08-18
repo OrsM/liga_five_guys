@@ -45,7 +45,7 @@ Biggest misses (forecast − actual):
 | Source | Calls | Mean claim | Started | Brier |
 |---|--:|--:|--:|--:|
 | analitica | 26 | 88% | 85% | 0.111 |
-| futbolfantasy ←read | 175 | 43% | 42% | 0.035 |
+| futbolfantasy ←read | 176 | 42% | 41% | 0.035 |
 
 _**Brier** is the mean squared error of the probability: lower is better, 0.25 is a coin flip, and it punishes confidence more than caution. A source whose mean claim sits far from its start rate is miscalibrated even if it ranks players well._
 
@@ -62,11 +62,11 @@ Graded on **appearances**, not starts: a 20-minute substitute counts. That flatt
 | Source | Calls | Mean claim | Appeared | Brier |
 |---|--:|--:|--:|--:|
 | analitica | 239 | 86% | 17% | 0.665 |
-| futbolfantasy ←read | 836 | 41% | 7% | 0.265 |
+| futbolfantasy ←read | 856 | 40% | 7% | 0.261 |
 Calls published with no number on them, which can only be graded as a hit rate:
 
 - **analitica** — 39 named starters, 0% appeared
 
-_214 claim(s) sat within 10 points of 50% and are not graded: that is not a call either way._
+_220 claim(s) sat within 10 points of 50% and are not graded: that is not a call either way._
 
 **The gate.** Once a source has a few hundred graded calls, whichever has the lower Brier **on the starts table above** earns `LINEUP_SOURCE` in ffcore/tidy.py — a one-line change, and the only thing that should ever move it. Appearances break a tie, never the other way round: they are the question nobody asked. Until then nothing is blended, because a weight fitted on one jornada is a guess wearing a decimal point.

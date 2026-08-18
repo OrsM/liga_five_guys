@@ -1,20 +1,20 @@
-# The simulation — 2026-08-18T0941Z
+# The simulation — 2026-08-18T2241Z
 
 ## The call
 
-**Don't spend yet.** Wait for the market is worth about +205 points over the rest of the season against +140 for the best thing you can buy today — 65 better even after paying a jornada for the delay, and the balance is what buys the choice.
+**Act today.** Nothing you can wait for beats what is on offer now.
 
-**Locks in 20h** · squad 213.11M · cash 23.60M · total 236.71M
+**Locks in 20h** · squad 212.40M · cash 23.60M · total 236.00M
 
-**Expected finish 2.14** · **P(win) 11%** · season **1,480–1,738** (10–90)
+**Expected finish 2.12** · **P(win) 12%** · season **1,482–1,743** (10–90)
 
-_38 jornadas left · 41 players acquirable · 52 moves simulated._
+_38 jornadas left · 38 players acquirable · 56 moves simulated._
 
 | Route | What it offers | Season pts |
 |---|---|--:|
-| **Act today** | 41 players you can buy now | +140 |
-| Wait for the market | a week of new offers | +205 |
-| Wait for the clauses | 62 players on 24 Aug | +167 |
+| **Act today** | 38 players you can buy now | +214 |
+| Wait for the market | a week of new offers | +203 |
+| Wait for the clauses | 62 players on 24 Aug | +165 |
 
 _Season points, so this can be compared with the table below rather than sitting in its own unit. Waiting pays for the delay: a jornada of the best thing you can buy today is forgone before the better one arrives. These are estimates from a rate; the table's are simulated._
 
@@ -22,15 +22,15 @@ _Season points, so this can be compared with the table below rather than sitting
 
 | Player | Would add | Likely wait to be offered |
 |---|--:|--:|
-| Lamine Yamal | +7.50 | 20 days |
-| Kylian Mbappe | +6.54 | 20 days |
-| Joan Garcia | +5.64 | 22 days |
-| Jan Oblak | +5.04 | 23 days |
+| Lamine Yamal | +7.50 | 19 days |
+| Kylian Mbappe | +6.54 | 19 days |
+| Jan Oblak | +5.04 | 21 days |
+| Zaid Romero | +4.72 | 22 days |
 
-_The free market is simulated rather than guessed at: the market is modelled from 45 offers over 4 cycles, weighted by value^0.15. **114 of the 557 unowned players** would improve your eleven, and a week of offers beats the best thing you can buy today **95% of the time** — even the tenth percentile of waiting (+3.84) clears it. Spending now buys the worse of two options and gives up the choice._
+_The free market is simulated rather than guessed at: the market is modelled from 72 offers over 5 cycles, weighted by value^0.10. **114 of the 572 unowned players** would improve your eleven, and a week of offers beats the best thing you can buy today **38% of the time** — even the tenth percentile of waiting (+3.86) clears it. Spending now buys the worse of two options and gives up the choice._
 _**32 locked players would improve your eleven** and their clauses open on 24 Aug, in about 6 days. Waiting scores ZERO in the table above — not because it is worthless but because nothing there can price a market it has not seen, so every move with a positive number beats it by construction. That is the bias to hold in mind when the ranking asks you to spend the balance; the **Left** column is what buys the choice._
 
-## Every player you could hold — but see the call
+## Every player you could hold
 
 | Player | Pos | Start | xPts/j | Where | € | Season |
 |---|---|--:|--:|---|--:|--:|
@@ -46,25 +46,26 @@ _**32 locked players would improve your eleven** and their clauses open on 24 Au
 | Robin Le Normand | DEF | 57% | 2.88 | yours | — | — |
 | Igor Zubeldia | DEF | 86% | 2.86 | yours | — | — |
 | Omar El Hilali | DEF | 97% | 2.73 | yours | — | — |
-| **Your eleven** | | | **42.13** | vs SusoGattuso **46.57** | | **-4.44** |
+| **Your eleven — play 4-5-1** | | | **42.13** | vs SusoGattuso **46.57** | | **-4.44** |
 | **SELL — never start** | | | | | | |
-| Dani Lorenzo | MED | 99% | 2.46 | yours | +9.60M | — |
-| Beñat Turrientes | MED | 34% | 1.10 | yours | +7.07M | — |
-| Alvaro Fernandez | POR | 1% | 0.05 | yours | +4.49M | — |
+| Dani Lorenzo | MED | 99% | 2.46 | yours | +9.45M | — |
+| Beñat Turrientes | MED | 34% | 1.10 | yours | +6.96M | — |
+| Alvaro Fernandez | POR | 1% | 0.05 | yours | +4.35M | — |
 | **BUY — with the proceeds** | | | | | | |
-| Dean Huijsen | DEF | 99% | 5.64 | BurtonGM89 | -18.42M | +110 |
-| Nahuel Tenaglia | DEF | 99% | 4.20 | BurtonGM89 | -9.92M | +54 |
-| Ferran Jutgla | DEL | 97% | 4.19 | Albert Laporta | +0.10M | +55 |
-| Antonio Blanco | MED | 99% | 3.92 | BurtonGM89 | -7.82M | +31 |
-| Santiago Mouriño | DEF | 99% | 3.82 | Albert Laporta | -23.54M | +36 |
-| Marcos Alonso | DEF | 73% | 3.78 | free agent | -21.83M | +41 |
-| Aitor Paredes | DEF | 73% | 3.69 | BurtonGM89 | +1.52M | +41 |
-| Marc Bartra | DEF | 61% | 3.29 | free agent | -18.15M | +22 |
-| Marc Roca | MED | 71% | 3.13 | Albert Laporta | +4.20M | +2 |
-| Isi Palazon | DEL | 59% | 2.87 | free agent | -12.61M | +5 |
+| Dean Huijsen | DEF | 99% | 5.64 | BurtonGM89 | -20.55M | +112 |
+| Yuri Berchiche | DEF | 97% | 5.27 | SusoGattuso | -5.34M | +100 |
+| Ferran Jutgla | DEL | 97% | 4.19 | Albert Laporta | -2.55M | +58 |
+| Cesar Tarrega | DEF | 99% | 3.93 | SusoGattuso | -2.18M | +48 |
+| Antonio Blanco | MED | 99% | 3.92 | BurtonGM89 | -5.34M | +29 |
+| Santiago Mouriño | DEF | 99% | 3.82 | Albert Laporta | -19.46M | +37 |
+| Aitor Paredes | DEF | 73% | 3.69 | BurtonGM89 | +4.17M | +38 |
+| Mario Martin | MED | 99% | 3.22 | SusoGattuso | +2.96M | +4 |
+| Marc Roca | MED | 71% | 3.13 | Albert Laporta | +4.04M | +1 |
+| Mario Soriano | MED | 99% | 3.00 | free agent | -17.71M | +0 |
+| Isi Palazon | DEL | 59% | 2.87 | free agent | -13.19M | +4 |
 | **SAVE — better than yours, out of reach** | | | | | | |
-| Arda Guler | MED | 97% | 6.42 | Albert Laporta | 7.89M short | +126 if you could |
-| Nicolas Pepe | DEL | 99% | 5.60 | free agent | 6.70M short | +102 if you could |
+| Joan Garcia | POR | 99% | 8.36 | free agent | 25.65M short | +144 if you could |
+| Arda Guler | MED | 97% | 6.42 | Albert Laporta | 8.30M short | +125 if you could |
 
 _Read it top to bottom: it is a plan, not a menu. The funding is implicit — sell the SELL rows and the BUY rows are what the money reaches. **Start** is one number, futbolfantasy recalibrated against confirmed line-ups and blended with analiticafantasy where it has an opinion, and it is the same figure the forecast multiplies by. **xPts/j** is what he scores a jornada with that already applied. **€** is negative to buy, positive to sell, and on a SAVE row it is how far short you are. **Season** is simulated: extra points over the 38 jornadas left, measured in the same seasons with and without the move._
 
@@ -72,11 +73,11 @@ _Read it top to bottom: it is a plan, not a menu. The funding is implicit — se
 
 | Manager | now | simulated | 10–90 | P(I finish above) |
 |---|--:|--:|--:|--:|
-| SusoGattuso | 23 | 1,782 | 1,656–1,910 | 11% |
-| miguel_autentico **(you)** | 17 | 1,609 | 1,480–1,738 | — |
-| BurtonGM89 | 24 | 1,470 | 1,354–1,587 | 85% |
-| Magic Mike 333 | 11 | 1,431 | 1,313–1,553 | 91% |
-| Albert Laporta | 10 | 1,245 | 1,133–1,361 | 100% |
+| SusoGattuso | 23 | 1,779 | 1,657–1,898 | 12% |
+| miguel_autentico **(you)** | 17 | 1,613 | 1,482–1,743 | — |
+| BurtonGM89 | 24 | 1,470 | 1,354–1,586 | 85% |
+| Magic Mike 333 | 11 | 1,434 | 1,319–1,551 | 90% |
+| Albert Laporta | 10 | 1,244 | 1,132–1,360 | 100% |
 
 ## What the simulation cannot see
 

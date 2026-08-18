@@ -1,4 +1,4 @@
-# Liga Five Guys — how the numbers are made — 2026-08-18 22:36 UTC
+# Liga Five Guys — how the numbers are made — 2026-08-18 22:46 UTC
 
 Everything about HOW, so the report can be the numbers. The fits, the estimates, and every way each one is known to be wrong.
 
@@ -62,7 +62,7 @@ Biggest misses (forecast − actual):
 | Source | Calls | Mean claim | Started | Brier |
 |---|--:|--:|--:|--:|
 | analitica | 26 | 88% | 85% | 0.111 |
-| futbolfantasy ←read | 175 | 43% | 42% | 0.035 |
+| futbolfantasy ←read | 176 | 42% | 41% | 0.035 |
 
 _**Brier** is the mean squared error of the probability: lower is better, 0.25 is a coin flip, and it punishes confidence more than caution. A source whose mean claim sits far from its start rate is miscalibrated even if it ranks players well._
 
@@ -79,12 +79,12 @@ Graded on **appearances**, not starts: a 20-minute substitute counts. That flatt
 | Source | Calls | Mean claim | Appeared | Brier |
 |---|--:|--:|--:|--:|
 | analitica | 239 | 86% | 17% | 0.665 |
-| futbolfantasy ←read | 836 | 41% | 7% | 0.265 |
+| futbolfantasy ←read | 856 | 40% | 7% | 0.261 |
 Calls published with no number on them, which can only be graded as a hit rate:
 
 - **analitica** — 39 named starters, 0% appeared
 
-_214 claim(s) sat within 10 points of 50% and are not graded: that is not a call either way._
+_220 claim(s) sat within 10 points of 50% and are not graded: that is not a call either way._
 
 **The gate.** Once a source has a few hundred graded calls, whichever has the lower Brier **on the starts table above** earns `LINEUP_SOURCE` in ffcore/tidy.py — a one-line change, and the only thing that should ever move it. Appearances break a tie, never the other way round: they are the question nobody asked. Until then nothing is blended, because a weight fitted on one jornada is a guess wearing a decimal point.
 
@@ -93,21 +93,23 @@ _What the one table in [REPORT.md](REPORT.md) was built from: the eleven it assu
 
 ## 2. What to bid
 
-**11 on offer.**
+**13 on offer.**
 
 | Player | Pos | Bid | XI | Competition | Note |
 |---|---|--:|--:|---|---|
-| Isi Palazon | del | 20.20M | 80%/50% | (3 broke) |  |
-| Angeliño | def | 15.54M | 0%/— | none |  |
-| Edin Terzic | ent | 7.18M | !15%/— | none |  |
-| Pol Lozano | med | 2.19M | 30%/— | none |  |
-| Andriy Lunin | por | 2.08M | 30%/— | none |  |
-| Beñat Prados | med | 1.37M | 30%/— | (1 broke) |  |
-| Edu Altozano | med | 584K | !15%/— | none |  |
-| Aitor Mañas | del | 523K | 30%/— | (2 broke) |  |
-| Marc Bartra | def | — | 50%/67% | (4 broke) |  |
-| Pedri Gonzalez | med | — | 50%/— | (3 broke) |  |
-| Marcos Alonso | def | — | 90%/67% | (4 broke) |  |
+| Trent Alexander-Arnold | def | 22.36M | 50%/— | (2 broke) |  |
+| Isi Palazon | del | 20.47M | 80%/50% | (3 broke) |  |
+| Iago Aspas | del | 6.93M | 40%/— | none |  |
+| Javi Puado | med | 5.73M | 0%/— | none |  |
+| Nico Guillen | med | 4.70M | 50%/— | (3 broke) |  |
+| Peter Gulacsi | por | 4.11M | 40%/— | none |  |
+| Iñigo Perez | ent | 2.10M | !15%/— | none |  |
+| Peque | del | 2.05M | 50%/— | none |  |
+| Matias Vecino | med | 1.83M | 20%/— | none |  |
+| Abiel Osorio | del | 1.32M | !15%/— | none |  |
+| Manel Usedo | med | 745K | !15%/— | none |  |
+| Joan Garcia | por | — | 80%/100% | (4 broke) |  |
+| Mario Soriano | med | — | 100%/— | (4 broke) |  |
 
 **Bid** is what it costs to win him, and nothing here says whether he is worth winning — that is the one table in [REPORT.md](REPORT.md), which prices him at a clause because a clause cannot be refused. A purchase is closer to a loan than a spend: the value comes back when you sell, give or take 12%, which on a large player is bigger than the premium and the drift put together. That swing is a coin flip, so a bid within a few percent is not a decision.
 
@@ -115,11 +117,11 @@ _What the one table in [REPORT.md](REPORT.md) was built from: the eleven it assu
 
 Competition is demand, not roster counts: the rivals whose XI actually improves with him, strongest threat first — `?` cash unknown (treat as live), `(n broke)` want him but cannot pay the floor. The full manager-by-manager matrix is in `reports/rivals.md`.
 
-Bid is the floor plus what this league has actually paid over it: median +1.7%, -0.2% to +635.3% (n=29). 11 of those 29 went at the floor itself, so the minimum is not a number known to lose. A dozen deals is not a distribution — the range is what has happened, not a chance of winning, and every one of them is a bid that won.
+Bid is the floor plus what this league has actually paid over it: median +1.4%, -0.3% to +635.3% (n=32). 14 of those 32 went at the floor itself, so the minimum is not a number known to lose. A dozen deals is not a distribution — the range is what has happened, not a chance of winning, and every one of them is a bid that won.
 
-**⚠ 8 bids at 49.66M is more than the 23.60M you hold.** Each row above is priced as though it were your only purchase, and the app settles them together — take them best rate first: Isi Palazon, Angeliño, Edin Terzic, Pol Lozano, Andriy Lunin, Beñat Prados, Edu Altozano, Aitor Mañas.
+**⚠ 11 bids at 72.34M is more than the 23.60M you hold.** Each row above is priced as though it were your only purchase, and the app settles them together — take them best rate first: Trent Alexander-Arnold, Isi Palazon, Iago Aspas, Javi Puado, Nico Guillen, Peter Gulacsi, Iñigo Perez, Peque, Matias Vecino, Abiel Osorio, Manel Usedo.
 
-Already owned, so not a purchase: abde ezzalzouli (Albert Laporta), aitor paredes (BurtonGM89), antonio blanco (BurtonGM89), arda guler (Albert Laporta), ayoze perez (Albert Laporta), beñat turrientes (you), carl starfelt (you), carlos espi (SusoGattuso), carlos puga (BurtonGM89), dani lorenzo (you), dean huijsen (BurtonGM89), denis suarez (BurtonGM89), ferran jutgla (Albert Laporta), ilaix moriba (Albert Laporta), iñigo ruiz de galarreta (you), jon moncayola (you), juan foyth (Albert Laporta), karl etta eyong (BurtonGM89), leandro cabrera (Albert Laporta), lucien agoume (you), marc roca (Albert Laporta), matias dituro (Albert Laporta), nahuel tenaglia (BurtonGM89), pablo fornals (you), quilindschy hartman (BurtonGM89), santiago mouriño (Albert Laporta), wojciech szczesny (SusoGattuso).
+Already owned, so not a purchase: abde ezzalzouli (Albert Laporta), aitor paredes (BurtonGM89), antonio blanco (BurtonGM89), arda guler (Albert Laporta), ayoze perez (Albert Laporta), beñat turrientes (you), carlos espi (SusoGattuso), carlos puga (BurtonGM89), cesar tarrega (SusoGattuso), dani lorenzo (you), dean huijsen (BurtonGM89), denis suarez (BurtonGM89), ferran jutgla (Albert Laporta), ilaix moriba (Albert Laporta), izan merino (SusoGattuso), johnny cardoso (SusoGattuso), juan foyth (Albert Laporta), karl etta eyong (BurtonGM89), leandro cabrera (Albert Laporta), marc roca (Albert Laporta), mario martin (SusoGattuso), matias dituro (Albert Laporta), quilindschy hartman (BurtonGM89), santiago mouriño (Albert Laporta), yuri berchiche (SusoGattuso).
 
 ## 3. Exceptions
 
@@ -143,8 +145,8 @@ _Both figures are editorial reads refreshed a few times a day, not live probabil
 
 ## Notes
 
-_637 players tracked, 499 with a probable-XI reading._
+_652 players tracked, 499 with a probable-XI reading._
 
 _xPts/j — expected points per jornada = shrunk pts/match (K=8, 2025-26) × fixture × P(start), from `ffcore/score.py` — the same scorer rivals.py uses. Injured, suspended and unavailable score zero; a doubt is halved. The fixture term is a ±12% band across the opponents ranked by Club Elo rating, plus ±4% for home advantage; both widths are guesses, unfitted because nothing has been played, and small enough that a wrong one costs a fraction of a point._
 
-_Generated 2026-08-18 22:34 UTC._
+_Generated 2026-08-18 22:44 UTC._
