@@ -1,4 +1,4 @@
-# The workings — 2026-08-18T2258Z
+# The workings — 2026-08-18T2303Z
 
 _What the one table in [REPORT.md](REPORT.md) was built from: the eleven it assumes you field, what a man on today's slate should cost, and the two ways any of it can be wrong about a player._
 
@@ -40,18 +40,18 @@ _Swaps are same-position only: a cross-slot difference is a change of formation,
 
 | Player | Pos | Bid | XI | Competition | Note |
 |---|---|--:|--:|---|---|
-| Abiel Osorio | del | — | !15%/— | none |  |
-| Iñigo Perez | ent | — | !15%/— | none |  |
 | Javi Puado | med | — | 0%/— | none |  |
-| Joan Garcia | por | — | 80%/100% | (4 broke) |  |
-| Peque | del | — | 50%/— | none |  |
-| Peter Gulacsi | por | — | 40%/— | none |  |
-| Manel Usedo | med | — | !15%/— | none |  |
-| Mario Soriano | med | — | 100%/— | (4 broke) |  |
-| Nico Guillen | med | — | 50%/— | (3 broke) |  |
 | Matias Vecino | med | — | 20%/— | none |  |
-| Iago Aspas | del | — | 40%/— | none |  |
+| Abiel Osorio | del | — | !15%/— | none |  |
+| Peter Gulacsi | por | — | 40%/— | none |  |
 | Trent Alexander-Arnold | def | — | 50%/— | (2 broke) |  |
+| Mario Soriano | med | — | 100%/— | (4 broke) |  |
+| Iñigo Perez | ent | — | !15%/— | none |  |
+| Nico Guillen | med | — | 50%/— | (3 broke) |  |
+| Joan Garcia | por | — | 80%/100% | (4 broke) |  |
+| Manel Usedo | med | — | !15%/— | none |  |
+| Iago Aspas | del | — | 40%/— | none |  |
+| Peque | del | — | 50%/— | none |  |
 
 **Bid** is what it costs to win him, and nothing here says whether he is worth winning — that is the one table in [REPORT.md](REPORT.md), which prices him at a clause because a clause cannot be refused. A purchase is closer to a loan than a spend: the value comes back when you sell, give or take 12%, which on a large player is bigger than the premium and the drift put together. That swing is a coin flip, so a bid within a few percent is not a decision.
 
@@ -117,4 +117,4 @@ _652 players tracked, 499 with a probable-XI reading._
 
 _xPts/j — expected points per jornada = shrunk pts/match (K=8, 2025-26) × fixture × P(start), from `ffcore/score.py` — the same scorer rivals.py uses. Injured, suspended and unavailable score zero; a doubt is halved. The fixture term is a ±12% band across the opponents ranked by Club Elo rating, plus ±4% for home advantage; both widths are guesses, unfitted because nothing has been played, and small enough that a wrong one costs a fraction of a point._
 
-_Generated 2026-08-18 23:02 UTC._
+_Generated 2026-08-18 23:06 UTC._
