@@ -1,4 +1,4 @@
-# Liga Five Guys — one report — 2026-08-18 20:04 UTC
+# Liga Five Guys — one report — 2026-08-18 20:19 UTC
 
 Every move you could make, ranked by whether it wins the league. Everything else is reference and is linked, not reprinted.
 
@@ -26,16 +26,16 @@ _**32 locked players would improve your eleven** and their clauses open on 24 Au
 
 | Get | Give up | P(win) | Net € | Left |
 |---|---|--:|--:|--:|
-| Dean Huijsen ← BurtonGM89 | Turrientes + Lorenzo | 34% | -18.42M | 5.17M |
-| Ferran Jutgla ← Albert Laporta | Lorenzo | 21% | +98K | 23.69M |
-| Nahuel Tenaglia ← BurtonGM89 | Turrientes | 20% | -9.92M | 13.68M |
-| Marcos Alonso (free) | Turrientes | 18% | -21.83M | 1.77M |
-| Aitor Paredes ← BurtonGM89 | Turrientes | 18% | +1.52M | 25.12M |
-| Santiago Mouriño ← Albert Laporta | Turrientes + Lorenzo | 17% | -23.54M | 55K |
-| Antonio Blanco ← BurtonGM89 | Turrientes | 16% | -7.82M | 15.78M |
-| Marc Bartra (free) | Lorenzo | 15% | -18.15M | 5.45M |
+| Dean Huijsen (on the market, BurtonGM89) | Turrientes + Lorenzo | 34% | -18.42M | 5.17M |
+| Ferran Jutgla (on the market, Albert Laporta) | Lorenzo | 21% | +98K | 23.69M |
+| Nahuel Tenaglia (on the market, BurtonGM89) | Turrientes | 20% | -9.92M | 13.68M |
+| Marcos Alonso (on the market, free agent) | Turrientes | 18% | -21.83M | 1.77M |
+| Aitor Paredes (on the market, BurtonGM89) | Turrientes | 18% | +1.52M | 25.12M |
+| Santiago Mouriño (on the market, Albert Laporta) | Turrientes + Lorenzo | 17% | -23.54M | 55K |
+| Antonio Blanco (on the market, BurtonGM89) | Turrientes | 16% | -7.82M | 15.78M |
+| Marc Bartra (on the market, free agent) | Lorenzo | 15% | -18.15M | 5.45M |
 
-_**P(win)** is where the move LEAVES you — your chance of winning the league after making it, against 11% if you do nothing. **Get** names the rival a steal takes him off, which is half of what a steal is worth: it raises your total and lowers theirs at once. **Net €** is what the move does to the balance and **Left** is what you are on afterwards — every rival is on 0K until you pay one, so that column is the whole of your ability to answer anything for the rest of the season. Who exactly you give up when it says *spares* is in the sell table below; none of them ever start. **he takes** is the rival's best answer, played before the season is._
+_**P(win)** is where the move LEAVES you — your chance of winning the league after making it, against 11% if you do nothing. **Get** says HOW you would get him. *On the market* is an ordinary purchase whoever owns him — measured, taking a man off a rival that way denies him nothing, because the managers listing players are not the one you are racing. *Clause on X* is the raid, and today not one clause in the league is payable. **Net €** is what the move does to the balance and **Left** is what you are on afterwards — every rival is on 0K until you pay one, so that column is the whole of your ability to answer anything for the rest of the season. Who exactly you give up when it says *spares* is in the sell table below; none of them ever start. **he takes** is the rival's best answer, played before the season is._
 
 _A CLAUSE IS THREE PURCHASES AT ONCE. The market value buys the points for you, and that part is a loan rather than a spend — it comes back when you sell him. The premium over it buys something else entirely: that a RIVAL does not score them. And the balance buys nothing at all, it only stops being available. The first is priced by the market; the second is now scored net of his reply, because he is handed the money and spends it; the third is the column on the right, because nothing here can value it._
 

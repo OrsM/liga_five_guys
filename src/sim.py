@@ -179,8 +179,12 @@ def table(rows, u, base, rivals) -> list[str]:
     for r in ranked[:SHOW]:
         a = r["action"]
         got = title_name(u.name.get(a.buy, a.buy)) if a.buy else "—"
-        got += (" ← %s" % a.victim if a.victim
-                else " (free)" if a.buy else "")
+        # Only a clause names a victim. A market purchase says where he came
+        # from without implying you took anything off anybody.
+        held = u.owner.get(a.buy, "")
+        got += (" ← clause on %s" % a.victim if a.victim
+                else " (on the market, %s)" % (held or "free agent")
+                if a.buy else "")
         gave = ("—" if not a.sell
                 else " + ".join(short(k, u) for k in a.sell)
                 if len(a.sell) <= 2 else "%d spares" % len(a.sell))
@@ -193,9 +197,11 @@ def table(rows, u, base, rivals) -> list[str]:
     out += ["",
             "_**P(win)** is where the move LEAVES you — your chance of winning "
             "the league after making it, against %.0f%% if you do nothing. "
-            "**Get** names the rival a steal takes him off, which is half of "
-            "what a steal is worth: it raises your total and lowers theirs at "
-            "once. **Net €** is what the move does to the balance and "
+            "**Get** says HOW you would get him. *On the market* is an "
+            "ordinary purchase whoever owns him — measured, taking a man off "
+            "a rival that way denies him nothing, because the managers "
+            "listing players are not the one you are racing. *Clause on X* is "
+            "the raid, and today not one clause in the league is payable. **Net €** is what the move does to the balance and "
             "**Left** is what you are on afterwards — every rival is on 0K "
             "until you pay one, so that column is the whole of your ability "
             "to answer anything for the rest of the season. Who exactly you "
@@ -448,14 +454,20 @@ def payload(u, rows, base, rivals, locks_h=None, n_actions: int = 0,
             if rivals else ""
         moves.append({
             "label": a.label(names),
-            "kind": "steal" if a.victim else ("sell" if a.kind == "sell"
-                                              else "buy"),
+            # "clause" is the only route that takes a man off somebody
+            # against their will. Buying one off the market is a purchase
+            # whoever owns him, and its measured denial value is zero.
+            "kind": ("clause" if a.victim
+                     else "sell" if a.kind == "sell" else "buy"),
             "buy": names.get(a.buy, a.buy) if a.buy else "",
             "sell": " + ".join(names.get(k, k) for k in a.sell),
             # How many, so a renderer can make the same call the markdown
             # table makes without parsing the string back apart.
             "sell_n": len(a.sell),
             "victim": a.victim,
+            # Who holds him, which is not the same as a victim: a man bought
+            # off the market was not taken off anybody.
+            "owner": u.owner.get(a.buy, "") if a.buy else "",
             "d_pos": r["d_pos"], "d_win": r["d_win"], "net": -a.net,
             # What you are on afterwards, and what he does about it. Both are
             # in the markdown table; the phone could not draw them because
@@ -651,7 +663,7 @@ def _selftest() -> None:
     assert "132" in h, h
 
     # -- one row -----------------------------------------------------------
-    rows = [{"action": Action("steal", buy="yuri", sell="benat",
+    rows = [{"action": Action("clause", buy="yuri", sell="benat",
                               cost=20e6, proceeds=5.87e6, victim="riv"),
              "d_pos": 0.433, "d_win": 0.364, "d_beat": {"riv": 0.37},
              "mean": 1510.0}]
@@ -661,7 +673,7 @@ def _selftest() -> None:
     cells = [c.strip() for c in line[0].strip("|").split("|")]
     # WHAT YOU GET, and off whom. NAMES, NOT KEYS: the keys are what every
     # dict is keyed by and they are not what anybody calls these players.
-    assert cells[0] == "Yuri Berchiche ← riv", cells
+    assert cells[0] == "Yuri Berchiche ← clause on riv", cells
     assert cells[1] == "Turrientes", cells
     # THE NUMBER YOU LAND ON, not the one you move by. P(win) is 50% here and
     # the move is worth +36.4 points of it, so it reads 86% — no arithmetic,
@@ -683,13 +695,14 @@ def _selftest() -> None:
     # leaving the column blank.
     free = table([{**rows[0], "action": Action("buy", buy="yuri", cost=1e6)}],
                  u, st, ["riv"])
-    assert "| Yuri Berchiche (free) |" in "\n".join(free), free
+    assert "| Yuri Berchiche (on the market, free agent) |" \
+        in "\n".join(free), free
     # Nothing given up is a dash, never an empty cell.
     assert "| — |" in "\n".join(free), free
 
     # A move that RAISES money reads positive, so the sign is never decoration.
     raised = table([{**rows[0],
-                     "action": Action("steal", buy="yuri", sell="benat",
+                     "action": Action("clause", buy="yuri", sell="benat",
                                       cost=1e6, proceeds=5e6, victim="riv")}],
                    u, st, ["riv"])
     assert "| +4.00M |" in "\n".join(raised), raised
@@ -704,7 +717,8 @@ def _selftest() -> None:
             {**rows[0], "d_pos": 0.301, "d_win": 0.23,
              "action": Action("buy", buy="hi", cost=0.0)}]
     order = "\n".join(table(pair, u, st, ["riv"]))
-    assert order.index("| Hi (free)") < order.index("| Lo (free)"), order
+    assert order.index("| Hi (on the market") \
+        < order.index("| Lo (on the market"), order
 
     # Two men given up are both named; three is where it stops naming them,
     # because the cell is on a 390px screen and the detail is one tap away.
@@ -718,12 +732,12 @@ def _selftest() -> None:
     # top of it.
     # A rival's answer is named in the cell: a steal that funds a counter-
     # steal is not the move the number on its own describes.
-    answered = table([{"action": Action("steal", buy="yuri", sell="benat",
+    answered = table([{"action": Action("clause", buy="yuri", sell="benat",
                                         cost=20e6, proceeds=5.87e6,
                                         victim="riv"),
                        "d_pos": 0.4, "d_win": 0.3, "d_beat": {"riv": 0.3},
                        "mean": 1.0,
-                       "answer": Action("steal", buy="benat", victim="me")}],
+                       "answer": Action("clause", buy="benat", victim="me")}],
                      u, st, ["riv"])
     assert "he takes" in "\n".join(answered), answered
 
@@ -840,7 +854,7 @@ def _selftest() -> None:
     assert d["band"] == [1000.0, 1600.0], d
     assert d["locks_in_h"] == 41.1 and d["cash"] == 23.6e6
     m = d["moves"][0]
-    assert m["label"] == "steal Yuri Berchiche from riv · sell Benat Turrientes"
+    assert m["label"] == "clause Yuri Berchiche from riv · sell Benat Turrientes"
     assert m["buy"] == "Yuri Berchiche" and m["sell"] == "Benat Turrientes"
     # More than one man can pay for a move, and the phone gets all of them.
     two = payload(u, [{**rows[0],
@@ -850,7 +864,7 @@ def _selftest() -> None:
                   st, ["riv"])["moves"][0]
     assert two["sell"] == "Benat Turrientes + Yuri Berchiche", two
     assert two["sell_n"] == 2 and m["sell_n"] == 1, (two, m)
-    assert m["victim"] == "riv" and m["kind"] == "steal"
+    assert m["victim"] == "riv" and m["kind"] == "clause"
     assert m["d_pos"] == 0.433 and m["d_win"] == 0.364
     # The phone draws the destination too, so it is computed once here rather
     # than added to a base figure by every renderer that wants it.
@@ -859,7 +873,7 @@ def _selftest() -> None:
     assert m["left"] == 23.6e6 - (20e6 - 5.87e6), m
     assert m["answer"] is None, m
     withans = payload(u, [{**rows[0],
-                           "answer": Action("steal", buy="yuri",
+                           "answer": Action("clause", buy="yuri",
                                             victim="me")}],
                       st, ["riv"])["moves"][0]
     assert withans["answer"] == "Yuri Berchiche", withans

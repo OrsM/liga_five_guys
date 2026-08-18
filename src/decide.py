@@ -93,6 +93,9 @@ class Action:
         return self.cost - self.proceeds
 
     def label(self, names: dict[str, str] | None = None) -> str:
+        # "steal X from Y" is reserved for paying a clause, which is the only
+        # transaction that takes a man off somebody against their will. A
+        # market purchase says "buy", however he came to be on the market.
         """The move in words. `names` swaps join keys for readable names —
         the report needs that and the terminal does not, and the grammar of a
         move is written here so there is only one of it."""
@@ -101,7 +104,7 @@ class Action:
         sold = " + ".join(show(k) for k in self.sell)
         if self.kind == "sell":
             return "sell %s" % sold
-        who = "steal %s from %s" % (show(self.buy), self.victim) \
+        who = "clause %s from %s" % (show(self.buy), self.victim) \
             if self.victim else "buy %s" % show(self.buy)
         return who + (" · sell %s" % sold if sold else "")
 
@@ -143,6 +146,14 @@ class Universe:
     # the whole league. What it costs ANYBODY to take ANYBODY, which is what a
     # rival needs to be able to answer back.
     clause: dict[str, float] = field(default_factory=dict)
+    # HOW you would get each player: "market" if he is on the market and can
+    # simply be bought, "clause" if the only route is paying his buyout. They
+    # are different transactions and only one of them is a raid — calling a
+    # market purchase a steal implies a denial benefit that, measured, is
+    # zero, and it is what made a table of ordinary buys read as a raiding
+    # plan. On 2026-08-18 every acquirable player was route "market" and not
+    # one clause in the league was payable.
+    route: dict[str, str] = field(default_factory=dict)
     # What each rival could spend. Estimates, and mostly negative: on the day
     # the response was modelled every one of them was overdrawn and could not
     # buy a soul until I paid one of their clauses.
@@ -211,10 +222,18 @@ def candidates(u: Universe, expected: dict[str, float],
         if c in mine or bar_exp.get(c, 0.0) <= bar:
             continue
         victim = u.owner.get(c, "")
-        kind = "steal" if victim and victim != u.me else "buy"
-        swap = kind + "-swap" if victim else "swap"
+        # A RAID IS PAYING A CLAUSE. Buying a man off the market is a
+        # purchase, whoever happens to own him — and the measured denial value
+        # of doing so was zero, because the managers listing players are not
+        # the one being raced. Labelling those "steal" implied a benefit that
+        # is not there and made an ordinary shopping list read as a raid.
+        raid = bool(victim and victim != u.me
+                    and u.route.get(c, "market") == "clause")
+        kind = "clause" if raid else "buy"
+        swap = kind + "-swap" if raid else "swap"
         if price <= cash:
-            out.append(Action(kind, buy=c, cost=price, victim=victim))
+            out.append(Action(kind, buy=c, cost=price,
+                              victim=victim if raid else ""))
         # Funded by a sale: only the cheapest few spares are worth trying,
         # because selling a man you field to buy one you also field is a swap
         # the simulation will price at roughly nothing.
@@ -222,7 +241,8 @@ def candidates(u: Universe, expected: dict[str, float],
             got = u.proceeds.get(s, 0.0)
             if price <= cash + got:
                 out.append(Action(swap, buy=c, sell=s, cost=price,
-                                  proceeds=got, victim=victim))
+                                  proceeds=got,
+                                  victim=victim if raid else ""))
         # Out of reach on cash plus any ONE spare, but not out of reach: the
         # fewest dead-weight sales that cover it. One combination per target
         # rather than every subset — they are all worth the same on the pitch,
@@ -244,7 +264,8 @@ def candidates(u: Universe, expected: dict[str, float],
                 got += raises
             if sold and price <= cash + got:
                 out.append(Action(swap, buy=c, sell=tuple(sorted(sold)),
-                                  cost=price, proceeds=got, victim=victim))
+                                  cost=price, proceeds=got,
+                                  victim=victim if raid else ""))
     return out
 
 
@@ -615,11 +636,13 @@ def load(trials_pool=None) -> Universe:
     # player who silently cannot be bought at all.
     index = latest_only(lg.market.rows) if lg.market is not None else []
     price: dict[str, float] = {}
+    route: dict[str, str] = {}
     for r in mkt:
         k = api_key(r["player_name"], "", lg.market, owner, index,
                     r.get("market_value"))
         if k and r.get("sale_price"):
             price[k] = float(r["sale_price"])
+            route[k] = "market"
     now = dt.datetime.now(dt.timezone.utc)
     clause_until: dict = {}
     for r in teams:
@@ -640,6 +663,8 @@ def load(trials_pool=None) -> Universe:
             continue
         if locked(clause_until, k, now):
             continue
+        if k not in price:
+            route[k] = "clause"
         price.setdefault(k, float(r["buyout"]))
 
     proceeds = {k: float((players[k] or {}).get("value") or 0)
@@ -708,7 +733,7 @@ def load(trials_pool=None) -> Universe:
     return Universe(
         state=LeagueState(squads, rem, me, carried), forecaster=fc, pos=pos,
         price=price, proceeds=proceeds, owner=owner, cash=cash, me=me,
-        value=value, market_exp=market_exp, clause=clause,
+        value=value, market_exp=market_exp, clause=clause, route=route,
         rival_cash=rival_cash,
         clause_until=clause_until,
         part_played=played, name=name, start_note=_calibrated()[0].note(),
@@ -735,6 +760,7 @@ def _selftest() -> None:
                                 **{k: v for k, v in theirs.items()},
                                 "star": "MED", "dud": "MED"},
         price={"star": 10e6, "dud": 1e6, "th_m1": 5e6},
+        route={"th_m1": "clause"},
         proceeds={"me_bench": 8e6}, owner={"th_m1": "riv"},
         cash=12e6, me="me")
     exp = u.forecaster.expected(1)
@@ -744,8 +770,21 @@ def _selftest() -> None:
     # A player worse than the weakest man you field is not a candidate.
     assert "dud" not in names, names
     assert "star" in names, names
-    # A rival's player is reachable through his clause, and marked a steal.
-    assert any(a.kind.startswith("steal") and a.buy == "th_m1" for a in acts)
+    # A rival's player reachable ONLY through his clause is marked a raid;
+    # one sitting on the market is an ordinary purchase, whoever owns him,
+    # because taking him denies nobody anything they were not already selling.
+    u.route["th_m1"] = "clause"
+    acts = candidates(u, exp)
+    assert any(a.kind.startswith("clause") and a.buy == "th_m1"
+               for a in acts), [a.kind for a in acts]
+    u.route["th_m1"] = "market"
+    listed = candidates(u, exp)
+    got = [a for a in listed if a.buy == "th_m1"]
+    assert got and all(a.kind.startswith("buy") or a.kind == "swap"
+                       for a in got), [a.kind for a in got]
+    assert all(not a.victim for a in got), got
+    u.route["th_m1"] = "clause"
+    acts = candidates(u, exp)
     assert all(a.cost <= u.cash + a.proceeds for a in acts), acts
 
     # apply() is pure and a steal takes him OFF the rival.
@@ -830,10 +869,12 @@ def _selftest() -> None:
         state=LeagueState({"me": dict(mine), "riv": dict(theirs)}, [1], "me"),
         forecaster=B(per2),
         pos={**u.pos, "free_x": "MED", "th_m1": "MED"},
-        price={"free_x": 5e6, "th_m1": 5e6}, proceeds={},
+        price={"free_x": 5e6, "th_m1": 5e6}, route={"th_m1": "clause"},
+        proceeds={},
         owner={"th_m1": "riv"}, cash=6e6, me="me")
     got, _, _ = rank(u2, [Action("buy", buy="free_x", cost=5e6),
-                          Action("steal", buy="th_m1", cost=5e6, victim="riv")])
+                          Action("clause", buy="th_m1", cost=5e6,
+                                 victim="riv")])
     by = {r["action"].buy: r["d_pos"] for r in got}
     assert by["th_m1"] > by["free_x"], by
 
@@ -967,7 +1008,7 @@ def _selftest() -> None:
     assert locked({}, "th_m1", now) is True
     assert locked({"th_m1": None}, "th_m1", now) is True
 
-    assert Action("steal", buy="X", victim="R").label() == "steal X from R"
+    assert Action("clause", buy="X", victim="R").label() == "clause X from R"
     assert Action("swap", buy="X", sell="Y").label() == "buy X · sell Y"
     # A bare string is still accepted, because one man is the common case.
     assert Action("swap", buy="X", sell="Y").sell == ("Y",)
@@ -975,8 +1016,8 @@ def _selftest() -> None:
     # The grammar of a move is written once. A report that spelled it out
     # again to swap the keys for names would be a second place for "steal"
     # and "sell" to drift apart from each other.
-    assert Action("steal", buy="x", victim="R").label({"x": "Xavi"}) \
-        == "steal Xavi from R"
+    assert Action("clause", buy="x", victim="R").label({"x": "Xavi"}) \
+        == "clause Xavi from R"
     assert Action("sell", sell="y").label({"y": "Yuri"}) == "sell Yuri"
     assert Action("swap", buy="x", sell="y").label({"x": "Xavi"}) \
         == "buy Xavi · sell y"
@@ -1035,7 +1076,7 @@ def _selftest() -> None:
     assert un == ["zzz-united"], un
     assert _d == {1: {"getafe"}}, _d
 
-    print("decide self-test OK (56 cases)")
+    print("decide self-test OK (60 cases)")
 
 
 if __name__ == "__main__":
