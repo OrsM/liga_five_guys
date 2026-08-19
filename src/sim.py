@@ -453,7 +453,7 @@ def ladder(u, rows, base, saves=None) -> list[str]:
             "against confirmed line-ups and blended with analiticafantasy "
             "where it has an opinion, and it is the same figure the forecast "
             "multiplies by. **xPts/j** is what he scores a jornada with that "
-            "already applied. **€** is negative to buy, positive to sell, and "
+            "already applied. **€** is the cash you END UP with for doing that row, funding included — a SELL row is what it raises, a BUY row is that money minus what he costs — and "
             "on a SAVE row it is how far short you are. **Season** is "
             "simulated: extra points over the %d jornadas left, measured in "
             "the same seasons with and without the move._"
@@ -787,21 +787,38 @@ def decide_choosable(u):
     return choosable(u)
 
 
+def _cash_cell(u, manager: str) -> str:
+    """What one manager can bid with, marked as observed or estimated.
+
+    The app states `teamMoney` for the account that asks and null for every
+    other, so yours is a reading and theirs is a replay of the ledger from the
+    starting budget. The `~` is not decoration — a rival's number can be wrong
+    by a whole sale nobody has seen yet.
+    """
+    if manager == u.me:
+        return fmt_money(u.cash)
+    return "~" + fmt_money(u.rival_cash.get(manager, 0.0))
+
+
 def standings(u, base) -> list[str]:
     """The levels the Δ columns above are differences from.
 
     +37% against a rival is 50→87 or 8→45, and those are not the same
     situation. This is the table that says which.
     """
-    out = ["| Manager | now | simulated | 10–90 | P(I finish above) |",
-           "|---|--:|--:|--:|--:|"]
+    out = ["| Manager | now | cash | simulated | 10–90 | P(I finish above) |",
+           "|---|--:|--:|--:|--:|--:|"]
     order = sorted(u.state.squads, key=lambda m: -base.mean(m))
     for m in order:
         lo, hi = base.band(m)
-        out.append("| %s | %.0f | %s | %s–%s | %s |"
+        # CASH BELONGS BESIDE THE POINTS. It is what each of them can answer a
+        # clause with tomorrow, and it was in league.md — a file the phone
+        # does not open. `~` on a rival is the estimate mark the ledger earns:
+        # the app states teamMoney for your account alone.
+        out.append("| %s | %.0f | %s | %s | %s–%s | %s |"
                    % (m + (" **(you)**" if m == u.me else ""),
-                      u.state.carried.get(m, 0.0), _pts(base.mean(m)),
-                      _pts(lo), _pts(hi),
+                      u.state.carried.get(m, 0.0), _cash_cell(u, m),
+                      _pts(base.mean(m)), _pts(lo), _pts(hi),
                       "—" if m == u.me
                       else "%.0f%%" % (100 * base.beat(m))))
     out.append("")
@@ -989,6 +1006,8 @@ def payload(u, rows, base, rivals, locks_h=None, n_actions: int = 0,
             {"manager": m, "me": m == u.me,
              "now": u.state.carried.get(m, 0.0), "mean": base.mean(m),
              "lo": base.band(m)[0], "hi": base.band(m)[1],
+             "cash": u.cash if m == u.me else u.rival_cash.get(m, 0.0),
+             "cash_known": m == u.me,
              "p_above": None if m == u.me else base.beat(m)}
             for m in sorted(u.state.squads, key=lambda m: -base.mean(m))],
     }
