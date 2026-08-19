@@ -75,7 +75,7 @@ __all__ = ["BASE", "SOURCE", "MARKET_URL", "POINTS_URL", "TEAM_URL", "TEAMS",
            "sign_starters", "match_source", "played_sources",
            "LFG_SOURCE", "API_LEAGUES_KEY", "API_LEAGUES_URL",
            "API_MARKET_URL", "API_ACTIVITY_URL", "API_TEAMS_URL",
-           "ACT_KIND", "ACT_JOINED", "ACT_BUY", "ACT_SELL",
+           "ACT_KIND", "ACT_JOINED", "ACT_BUY", "ACT_SELL", "STORE_ONCE",
            "parse_api_leagues", "parse_api_market", "parse_api_activity",
            "parse_api_teams", "sign_api_leagues", "sign_api_market",
            "sign_api_activity", "sign_api_teams", "league_sources",
@@ -1123,6 +1123,27 @@ API_TEAMS_URL = "{base}/v1/competition/1/leagues/{league}/teams?x-lang=es"
 # should have produced: of five type-31 rows, four were still in the squad
 # (the fifth was later sold); of five type-33, NONE were. A 9 is a manager
 # joining — there were exactly five, one per manager.
+# Tables whose rows are IMMUTABLE FACTS, keyed by an id that never changes.
+#
+# Most tidy tables are time series: a market value, a buyout clause and a bid
+# count all move, and a row per sweep is the point of them. These two are not.
+# A transfer that happened on 15 August is the same row in every sweep since,
+# and a player id has one name for ever — so the feed hands back its whole
+# history every time we ask, and the store was keeping every copy of it.
+#
+# That is quadratic, not merely untidy. Each sweep rewrites the file with one
+# more copy of everything and the run commits it: api_activity.csv went from
+# 14.5 KB to 77 KB in thirty-six hours, and the increment grows with the
+# history. A season of it is hundreds of megabytes of git saying the same
+# thing, and `latest_only` on such a table would then be reading a full copy
+# to answer a question about one event.
+#
+# The value is the KEY, not the columns: ingest keeps the first sighting of
+# each and drops the rest, so `observed_at` on these two means "when this
+# entered the store" rather than "when it was last true".
+STORE_ONCE = {"api_activity": ("activity_id",),
+              "api_players": ("player_id",)}
+
 ACT_JOINED, ACT_BUY, ACT_SELL = 9, 31, 33
 ACT_KIND = {ACT_JOINED: "joined", ACT_BUY: "buy", ACT_SELL: "sell"}
 

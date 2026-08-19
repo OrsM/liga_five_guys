@@ -522,8 +522,8 @@ FILLS = {
     "api_leagues": "your cash and the league's id",
     "api_market": "what is on offer, and the bids on it",
     "api_teams": "all five squads",
-    "api_activity": "every transfer, which is what the ledger replays",
-    "api_players": "names for players nobody owns any more",
+    "api_activity": "every transfer, which is what the ledger replays — one row per deal, so the newest is the last deal and not the last sweep",
+    "api_players": "names for players nobody owns any more — one row per player, first sighting kept",
     "players": "the crosswalk: one key per player across all four spellings",
     "clubs": "the same, for clubs",
 }
@@ -545,6 +545,17 @@ HOSTS = {"api_leagues": ("LaLiga Fantasy API", "every_run"),
          # scored and not a health reading.
          "points": ("futbolfantasy.com", "as played")}
 
+# The same distinction, derived rather than listed: a table in
+# sources.STORE_ONCE keeps the FIRST sighting of each fact, so its newest row
+# is the last thing that HAPPENED and not the last time the feed answered.
+# Ageing it as a health reading called the activity feed "17 hours stale" the
+# moment it stopped being stored once per sweep — while it was answering every
+# sweep, with nothing to report but a quiet transfer window.
+def _as_it_happens() -> dict[str, str]:
+    from sources import STORE_ONCE
+
+    return {t: "as dealt" for t in STORE_ONCE}
+
 # The column that carries the reading's time, where it is not observed_at.
 STAMPED = {"points": "to_stamp"}
 
@@ -557,7 +568,7 @@ STAMPED = {"points": "to_stamp"}
 # scorer had thrown it away would be the exact contradiction this file exists
 # to prevent.
 FRESH = {"every_run": 0.5, "daily": DAILY_FRESH_DAYS, "once": 1e9,
-         "as played": 1e9, "derived": 1e9}
+         "as played": 1e9, "as dealt": 1e9, "derived": 1e9}
 
 
 def _hosts() -> dict[str, tuple[str, str, int]]:
@@ -644,6 +655,7 @@ def feed_lines() -> list[str]:
             cadence = HOSTS.get(name, (None, cadence or "derived"))[1]
         if name in DERIVED:
             host, cadence = "src/crosswalk.py", "derived"
+        cadence = _as_it_happens().get(name, cadence)
 
         if cadence == "derived":
             state = "rebuilt every run"

@@ -69,8 +69,8 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from ffcore.auth import API_BASE                    # noqa: E402
 from ffcore.tidy import ROOT, SEASON, TIDY, append_csv  # noqa: E402
 from sources import (API_LEAGUES_KEY, CAL_KEY, MATCH_KEY_RE,  # noqa: E402
-                     league_sources, parse_points, played_sources, player_sources,
-                     season_label, source_for, sources)
+                     STORE_ONCE, league_sources, parse_points, played_sources,
+                     player_sources, season_label, source_for, sources)
 
 RAW = ROOT / "raw"
 
@@ -580,6 +580,12 @@ def parse() -> None:
     # rows were collected and then never written. A registry entry is now the
     # whole change.
     for table, rows in sorted(tables.items()):
+        # A table of immutable facts keeps the first sighting of each and
+        # nothing else — see sources.STORE_ONCE. Applied here, once, at the
+        # only place tidy files are written, so a new such table is one
+        # registry line rather than a special case in a writer.
+        if table in STORE_ONCE:
+            rows = first_seen(rows, STORE_ONCE[table])
         _write_csv(TIDY / f"{table}.csv", rows)
     market_rows = tables.get("market", [])
     xi_rows = tables.get("lineups", [])
@@ -694,6 +700,29 @@ def _save_parse_cache(docs: dict, name: str = _CACHE) -> None:
             encoding="utf-8")
     except OSError:
         pass
+
+
+def first_seen(rows: list[dict], key: tuple) -> list[dict]:
+    """`rows` with every repeat of a key after its first sighting dropped.
+
+    For the tables in sources.STORE_ONCE, which the feed republishes whole on
+    every sweep. The FIRST copy is the one kept, so `observed_at` records when
+    a fact entered the store and never moves again — which also means the file
+    only ever gains lines, and git only ever stores the difference.
+
+    A row with an empty key is not collapsed. Two unlabelled rows are two
+    facts we cannot tell apart, and throwing one away because neither carries
+    an id is worse than keeping both.
+    """
+    out, seen = [], set()
+    for r in rows:
+        k = tuple((r.get(c) or "") for c in key)
+        if all(k):
+            if k in seen:
+                continue
+            seen.add(k)
+        out.append(r)
+    return out
 
 
 def _write_csv(path: Path, rows: list[dict]) -> None:
@@ -930,6 +959,46 @@ def _selftest() -> None:
     # A pre-migration directory has no manifest: the files on disk are it.
     legacy = _manifest({"market.html": "x", "team_celta.html": "y"})
     assert [r["page"] for r in legacy] == ["market", "team_celta"], legacy
+
+    # -- an immutable fact is stored once, not once per sweep ---------------
+    # THE FEED REPEATS ITSELF ON EVERY SWEEP and the store was keeping every
+    # copy. A transfer that happened on 15 August is the same row in all
+    # twenty snapshots that have seen it since: on 2026-08-19 api_activity.csv
+    # held 1,225 rows carrying 63 distinct events, api_players.csv 1,020 rows
+    # carrying 55 names. Worse than untidy — it is QUADRATIC. Every sweep
+    # rewrites the whole file with one more copy of everything, and every run
+    # commits it: 14.5 KB to 77 KB in thirty-six hours, and the increment
+    # itself grows. A season of it is hundreds of megabytes of git history
+    # saying the same thing.
+    ev = [{"activity_id": "a1", "at": "2026-08-15T22:24", "observed_at": "t1"},
+          {"activity_id": "a2", "at": "2026-08-16T09:00", "observed_at": "t1"},
+          {"activity_id": "a1", "at": "2026-08-15T22:24", "observed_at": "t2"},
+          {"activity_id": "a3", "at": "2026-08-17T11:00", "observed_at": "t2"}]
+    once_only = first_seen(ev, ("activity_id",))
+    assert [r["activity_id"] for r in once_only] == ["a1", "a2", "a3"], once_only
+    # THE FIRST SIGHTING WINS, so observed_at means "when this entered the
+    # store" and stays put. Keeping the last would rewrite the whole file
+    # every sweep and lose the one fact the column carries here.
+    assert once_only[0]["observed_at"] == "t1", once_only[0]
+    # Order is the order things were first seen, because the file is a log.
+    assert [r["observed_at"] for r in once_only] == ["t1", "t1", "t2"]
+    # A row missing the key is kept rather than collapsed onto every other
+    # row missing it — dropping a fact because it is unlabelled is worse.
+    odd = first_seen([{"activity_id": "", "at": "x", "observed_at": "t1"},
+                      {"activity_id": "", "at": "y", "observed_at": "t2"}],
+                     ("activity_id",))
+    assert len(odd) == 2, odd
+    # Compound keys, for a table whose identity is a pair.
+    pairs = first_seen([{"a": "1", "b": "1"}, {"a": "1", "b": "2"},
+                        {"a": "1", "b": "1"}], ("a", "b"))
+    assert len(pairs) == 2, pairs
+    assert first_seen([], ("activity_id",)) == []
+    # Only the tables that ARE immutable. api_teams and api_market are time
+    # series — a value, a clause and a bid count all move — and collapsing
+    # those would throw away the history the market model is fitted on.
+    from sources import STORE_ONCE
+    assert set(STORE_ONCE) == {"api_activity", "api_players"}, STORE_ONCE
+    assert "api_teams" not in STORE_ONCE and "market" not in STORE_ONCE
 
     # -- cadence ----------------------------------------------------------
     from sources import Source, parse_market, sign_market

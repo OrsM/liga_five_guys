@@ -378,14 +378,37 @@ def load_api_teams() -> list[dict]:
     return latest_only(read_csv(TIDY / "api_teams.csv"))
 
 
+def _activity_order(r: dict):
+    """(when it happened, which one) — a total order over the feed.
+
+    The app stamps a whole day's deals with the same minute, so sorting on the
+    stamp alone leaves ties to be broken by whatever order the rows happened
+    to be read in. That was invisible while the store held a fresh copy of the
+    feed per sweep and is not now, and an arbitrary order in a file this repo
+    commits is a diff every run that means nothing. The id is the app's own
+    sequence, so it breaks the tie chronologically — read as an integer,
+    because as text "15676725" sorts before "9629986".
+    """
+    raw = (r.get("activity_id") or "").strip()
+    return (r.get("at") or "", int(raw) if raw.isdigit() else 0)
+
+
 def load_api_activity() -> list[dict]:
     """The league's transaction feed, oldest first, or [].
 
     Sorted by the app's own timestamp rather than by observation, because this
     is a history: the order that matters is the order the deals happened.
+
+    NOT latest_only, and that is load-bearing. It used to be, and it worked
+    only because the feed republished every event on every sweep and the store
+    kept every copy — so "the newest snapshot" happened to contain the whole
+    season. That storage was quadratic and is gone (sources.STORE_ONCE), which
+    makes this file what it always described itself as: an event log, read
+    whole. Reading only the newest rows here would now hand the ledger the
+    handful of deals done since the last sweep and delete the rest of the
+    season from it.
     """
-    rows = latest_only(read_csv(TIDY / "api_activity.csv"))
-    return sorted(rows, key=lambda r: r.get("at") or "")
+    return sorted(read_csv(TIDY / "api_activity.csv"), key=_activity_order)
 
 
 def load_api_market() -> list[dict]:
