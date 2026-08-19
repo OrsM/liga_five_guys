@@ -1,4 +1,4 @@
-# Liga Five Guys — how the numbers are made — 2026-08-19 00:27 UTC
+# Liga Five Guys — how the numbers are made — 2026-08-19 00:28 UTC
 
 Everything about HOW, so the report can be the numbers. The fits, the estimates, and every way each one is known to be wrong.
 
@@ -119,18 +119,18 @@ _What the one table in [REPORT.md](REPORT.md) was built from: the eleven it assu
 
 | Player | Pos | Bid | XI | Competition | Note |
 |---|---|--:|--:|---|---|
-| Peque | del | — | 50%/— | none |  |
-| Mario Soriano | med | — | 80%/100% | (4 broke) |  |
-| Manel Usedo | med | — | !15%/— | none |  |
-| Peter Gulacsi | por | — | 40%/— | none |  |
 | Nico Guillen | med | — | 50%/— | (3 broke) |  |
-| Iñigo Perez | ent | — | !15%/— | none |  |
-| Matias Vecino | med | — | 20%/— | none |  |
-| Abiel Osorio | del | — | 0%/— | none |  |
 | Joan Garcia | por | — | 80%/100% | (4 broke) |  |
-| Trent Alexander-Arnold | def | — | 50%/— | (2 broke) |  |
-| Javi Puado | med | — | 0%/— | none |  |
+| Peque | del | — | 50%/— | none |  |
+| Abiel Osorio | del | — | 0%/— | none |  |
 | Iago Aspas | del | — | 40%/— | none |  |
+| Matias Vecino | med | — | 20%/— | none |  |
+| Javi Puado | med | — | 0%/— | none |  |
+| Iñigo Perez | ent | — | !15%/— | none |  |
+| Peter Gulacsi | por | — | 40%/— | none |  |
+| Manel Usedo | med | — | !15%/— | none |  |
+| Mario Soriano | med | — | 80%/100% | (4 broke) |  |
+| Trent Alexander-Arnold | def | — | 50%/— | (2 broke) |  |
 
 **Bid** is what it costs to win him, and nothing here says whether he is worth winning — that is the one table in [REPORT.md](REPORT.md), which prices him at a clause because a clause cannot be refused. A purchase is closer to a loan than a spend: the value comes back when you sell, give or take 12%, which on a large player is bigger than the premium and the drift put together. That swing is a coin flip, so a bid within a few percent is not a decision.
 
@@ -172,4 +172,4 @@ _652 players tracked, 512 with a probable-XI reading._
 
 _xPts/j — expected points per jornada = shrunk pts/match (K=8, 2025-26) × fixture × P(start), from `ffcore/score.py` — the same scorer rivals.py uses. Injured, suspended and unavailable score zero; a doubt is halved. The fixture term is a ±12% band across the opponents ranked by Club Elo rating, plus ±4% for home advantage; both widths are guesses, unfitted because nothing has been played, and small enough that a wrong one costs a fraction of a point._
 
-_Generated 2026-08-19 00:27 UTC._
+_Generated 2026-08-19 00:28 UTC._
