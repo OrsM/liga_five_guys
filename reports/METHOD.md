@@ -1,4 +1,4 @@
-# Liga Five Guys — how the numbers are made — 2026-08-19 15:44 UTC
+# Liga Five Guys — how the numbers are made — 2026-08-19 16:22 UTC
 
 
 
@@ -8,14 +8,14 @@
 | Route | What it offers | Season pts | Beats acting today |
 |---|---|--:|--:|
 | **Act today** | 40 players you can buy now | +210 | — |
-| Wait for the market | a week of new offers | +199 | 48% |
-| Wait for the clauses | 61 players on 24 Aug | +157 | — |
+| Wait for the market | a week of new offers | +199 | 47% |
+| Wait for the clauses | 60 players on 24 Aug | +157 | — |
 
 | The workings | |
 |---|--:|
-| Unowned players who would improve your eleven | 113 of 572 |
-| Tenth percentile of a week's waiting | +4.03 |
-| Market model | the market is modelled from 74 offers over 5 cycles, weighted by value^0.15 |
+| Unowned players who would improve your eleven | 112 of 571 |
+| Tenth percentile of a week's waiting | +3.70 |
+| Market model | the market is modelled from 75 offers over 5 cycles, weighted by value^0.15 |
 | Locked players who would improve your eleven | 32 |
 | Their clauses open | 24 Aug, in about 5 days |
 
@@ -33,7 +33,6 @@
 |---|---|
 | Jornada 1 is half played — 10 clubs are done | their points are already in `now`, so only the rest of the round is simulated, and it still re-picks an eleven that is in fact already locked |
 | A buyout premium is charged at **0.000 places per million**, the median of every run that has measured it — today's own reading is 0.000 | a clause runs a median 1.52× market value here and the app pays back only the value, so the premium is gone for good. It is charged against the move, but priced off what more money would buy you today — most days, very little |
-| Named by the app in a way nothing else matches: `Jonny Otto` | missing from the simulation entirely |
 | P(start) is today's, held flat over every remaining jornada | nothing here knows who will be injured in March |
 | Rivals never transfer | a steal that guts a squad assumes its manager does not simply buy someone back — flatters the steal |
 | Teammates score independently | two defenders of one club share a clean sheet, so a concentrated squad has more variance than this shows |
@@ -50,6 +49,7 @@
 | api_leagues | your cash and the league's id | LaLiga Fantasy API | 20 | 19 Aug 14:54 | ok |
 | api_market | what is on offer, and the bids on it | LaLiga Fantasy API | 807 | 19 Aug 14:54 | ok |
 | api_players | names for players nobody owns any more — one row per player, first sighting kept | LaLiga Fantasy API | 55 | 18 Aug 22:41 | ok |
+| api_standings | the league table — position, points, squad value, and your balance | LaLiga Fantasy API | 100 | 19 Aug 14:54 | ok |
 | api_stats | what the app scored each player, broken into what he did — one row per player per week per stat, a correction being a later row rather than an overwrite | LaLiga Fantasy API | 714 | 18 Aug 22:58 | ok |
 | api_teams | all five squads | LaLiga Fantasy API | 1,520 | 19 Aug 14:54 | ok |
 | clubs | the same, for clubs | src/crosswalk.py | 20 | — | rebuilt every run |
@@ -130,7 +130,7 @@ _What the one table in [REPORT.md](REPORT.md) was built from: the eleven it assu
 | Player — 12 on offer | Pos | Bid | XI | Competition | Note |
 |---|---|--:|--:|---|---|
 | Abiel Osorio | del | — | 0%/— | none |  |
-| Iago Aspas | del | — | 40%/— | none |  |
+| Iago Aspas | del | — | 40%/— | (1 broke) |  |
 | Iñigo Perez | ent | — | !15%/— | none |  |
 | Javi Puado | med | — | 0%/— | none |  |
 | Joan Garcia | por | — | 80%/100% | (4 broke) |  |
@@ -138,7 +138,7 @@ _What the one table in [REPORT.md](REPORT.md) was built from: the eleven it assu
 | Mario Soriano | med | — | 80%/100% | (4 broke) |  |
 | Matias Vecino | med | — | 20%/— | none |  |
 | Nico Guillen | med | — | 50%/— | (3 broke) |  |
-| Peque | del | — | 50%/— | none |  |
+| Peque | del | — | 50%/— | (1 broke) |  |
 | Peter Gulacsi | por | — | 40%/— | none |  |
 | Trent Alexander-Arnold | def | — | 50%/— | (2 broke) |  |
 
@@ -212,4 +212,4 @@ _Both figures are editorial reads refreshed a few times a day, not live probabil
 | Zeroed | injured, suspended, unavailable; a doubt is halved |
 | Fixture term | ±12% across the opponents ranked by Club Elo rating, plus ±4% for home advantage — both widths guesses, unfitted, and small enough that a wrong one costs a fraction of a point |
 
-_Generated 2026-08-19 15:44 UTC._
+_Generated 2026-08-19 16:22 UTC._

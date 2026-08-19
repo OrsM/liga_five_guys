@@ -1,4 +1,4 @@
-# Liga Five Guys — one report — 2026-08-19 15:44 UTC
+# Liga Five Guys — one report — 2026-08-19 16:22 UTC
 
 
 
@@ -7,9 +7,9 @@
 
 **Locks in 3h** · squad 236.37M · **cash -33K** · total 236.34M
 
-play 4-5-1 · finish 1.57 · win 52% · season 1,517–1,774
+play 4-5-1 · finish 1.62 · win 51% · season 1,516–1,775
 
-_market **52nd percentile** · an ordinary week · better in 48% of weeks_
+_market **53rd percentile** · an ordinary week · better in 47% of weeks_
 
 ## Every player you could hold
 
@@ -35,18 +35,18 @@ _market **52nd percentile** · an ordinary week · better in 48% of weeks_
 | **BUY — with the proceeds** | | | | | | |
 | Yuri Berchiche | DEF | 92% | 4.79 | SusoGattuso | +7.45M | +76 |
 | Matias Dituro | POR | 76% | 4.32 | Albert Laporta | +2.72M | -1 |
-| Ferran Jutgla | DEL | 97% | 4.13 | Albert Laporta | +0.79M | +53 |
+| Ferran Jutgla | DEL | 97% | 4.13 | Albert Laporta | +0.79M | +54 |
 | Antonio Blanco | MED | 99% | 4.11 | BurtonGM89 | +4.96M | +30 |
-| Cesar Tarrega | DEF | 99% | 3.97 | SusoGattuso | +1.16M | +47 |
-| Aitor Paredes | DEF | 74% | 3.63 | BurtonGM89 | +4.17M | +34 |
+| Cesar Tarrega | DEF | 99% | 3.97 | SusoGattuso | +1.16M | +48 |
+| Aitor Paredes | DEF | 74% | 3.63 | BurtonGM89 | +5.02M | +33 |
 | Mario Martin | MED | 97% | 3.16 | SusoGattuso | +2.96M | +0 |
 | Isi Palazon | DEL | 64% | 3.02 | SusoGattuso | +6.55M | +5 |
 | Marc Roca | MED | 68% | 2.85 | Albert Laporta | +4.04M | -0 |
 | **SAVE — better than yours, out of reach** | | | | | | |
-| Joan Garcia | POR | 99% | 8.24 | free agent | 43.33M short | +132 if you could |
+| Joan Garcia | POR | 99% | 8.24 | free agent | 43.33M short | +134 if you could |
 | Arda Guler | MED | 91% | 6.01 | Albert Laporta | 25.99M short | +104 if you could |
-| Dean Huijsen | DEF | 97% | 5.53 | BurtonGM89 | 10.29M short | +104 if you could |
-| Santiago Mouriño | DEF | 97% | 3.75 | Albert Laporta | 13.55M short | +33 if you could |
+| Dean Huijsen | DEF | 97% | 5.53 | BurtonGM89 | 10.29M short | +102 if you could |
+| Santiago Mouriño | DEF | 97% | 3.75 | Albert Laporta | 13.55M short | +32 if you could |
 | Mario Soriano | MED | 99% | 2.99 | free agent | 0.50M short | -4 if you could |
 
 _Read it top to bottom: it is a plan, not a menu. The funding is implicit — sell the SELL rows and the BUY rows are what the money reaches. **Start** is one number, futbolfantasy recalibrated against confirmed line-ups and blended with analiticafantasy where it has an opinion, and it is the same figure the forecast multiplies by. **xPts/j** is what he scores a jornada with that already applied. **€** is negative to buy, positive to sell, and on a SAVE row it is how far short you are. **Season** is simulated: extra points over the 38 jornadas left, measured in the same seasons with and without the move._
@@ -55,11 +55,11 @@ _Read it top to bottom: it is a plan, not a menu. The funding is implicit — se
 
 | Manager | now | simulated | 10–90 | P(I finish above) |
 |---|--:|--:|--:|--:|
-| miguel_autentico **(you)** | 17 | 1,645 | 1,517–1,774 | — |
-| SusoGattuso | 23 | 1,634 | 1,518–1,752 | 54% |
-| BurtonGM89 | 24 | 1,456 | 1,344–1,572 | 92% |
-| Magic Mike 333 | 11 | 1,381 | 1,267–1,497 | 97% |
-| Albert Laporta | 10 | 1,270 | 1,151–1,390 | 100% |
+| miguel_autentico **(you)** | 17 | 1,646 | 1,516–1,775 | — |
+| SusoGattuso | 23 | 1,630 | 1,512–1,749 | 54% |
+| BurtonGM89 | 24 | 1,499 | 1,380–1,617 | 86% |
+| Magic Mike 333 | 11 | 1,379 | 1,265–1,494 | 98% |
+| Albert Laporta | 10 | 1,265 | 1,152–1,380 | 100% |
 
 
 

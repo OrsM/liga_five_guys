@@ -8,6 +8,7 @@
 | api_leagues | your cash and the league's id | LaLiga Fantasy API | 20 | 19 Aug 14:54 | ok |
 | api_market | what is on offer, and the bids on it | LaLiga Fantasy API | 807 | 19 Aug 14:54 | ok |
 | api_players | names for players nobody owns any more — one row per player, first sighting kept | LaLiga Fantasy API | 55 | 18 Aug 22:41 | ok |
+| api_standings | the league table — position, points, squad value, and your balance | LaLiga Fantasy API | 100 | 19 Aug 14:54 | ok |
 | api_stats | what the app scored each player, broken into what he did — one row per player per week per stat, a correction being a later row rather than an overwrite | LaLiga Fantasy API | 714 | 18 Aug 22:58 | ok |
 | api_teams | all five squads | LaLiga Fantasy API | 1,520 | 19 Aug 14:54 | ok |
 | clubs | the same, for clubs | src/crosswalk.py | 20 | — | rebuilt every run |
