@@ -524,6 +524,9 @@ FILLS = {
     "api_teams": "all five squads",
     "api_activity": "every transfer, which is what the ledger replays — one row per deal, so the newest is the last deal and not the last sweep",
     "api_players": "names for players nobody owns any more — one row per player, first sighting kept",
+    "api_stats": "what the app scored each player, broken into what he did — "
+                 "one row per player per week per stat, a correction being a "
+                 "later row rather than an overwrite",
     "players": "the crosswalk: one key per player across all four spellings",
     "clubs": "the same, for clubs",
 }
@@ -539,6 +542,7 @@ HOSTS = {"api_leagues": ("LaLiga Fantasy API", "every_run"),
          "api_teams": ("LaLiga Fantasy API", "every_run"),
          "api_activity": ("LaLiga Fantasy API", "every_run"),
          "api_players": ("LaLiga Fantasy API", "once"),
+         "api_stats": ("LaLiga Fantasy API", "every_run"),
          "starters": ("futbolfantasy.com", "once"),
          # The points PAGE is fetched every run; this table only gains a row
          # when somebody actually plays, so its age is the last jornada

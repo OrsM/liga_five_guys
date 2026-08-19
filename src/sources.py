@@ -76,6 +76,7 @@ __all__ = ["BASE", "SOURCE", "MARKET_URL", "POINTS_URL", "TEAM_URL", "TEAMS",
            "LFG_SOURCE", "API_LEAGUES_KEY", "API_LEAGUES_URL",
            "API_MARKET_URL", "API_ACTIVITY_URL", "API_TEAMS_URL",
            "ACT_KIND", "ACT_JOINED", "ACT_BUY", "ACT_SELL", "STORE_ONCE",
+           "ROW_TABLE",
            "parse_api_leagues", "parse_api_market", "parse_api_activity",
            "parse_api_teams", "sign_api_leagues", "sign_api_market",
            "sign_api_activity", "sign_api_teams", "league_sources",
@@ -1142,7 +1143,22 @@ API_TEAMS_URL = "{base}/v1/competition/1/leagues/{league}/teams?x-lang=es"
 # each and drops the rest, so `observed_at` on these two means "when this
 # entered the store" rather than "when it was last true".
 STORE_ONCE = {"api_activity": ("activity_id",),
-              "api_players": ("player_id",)}
+              "api_players": ("player_id",),
+              # A stat line is a corrigible fact, so the key carries the VALUE
+              # as well as the identity: an unchanged line is stored once, and
+              # a correction arrives as a second row with a later observed_at
+              # rather than overwriting what was published first. Bounded
+              # either way — without this it is 76 players x 21 stats x every
+              # week x every sweep.
+              "api_stats": ("player_id", "week", "stat", "value", "points")}
+
+# ONE DOCUMENT, TWO GRAINS. A source has one table and its rows go there —
+# except that the squad feed carries both a squad (one row per player) and
+# that player's match history (one row per player per week per stat). They
+# arrive in one payload and must not be fetched twice, so a row may name the
+# table it belongs to and ingest routes on it. Every row carries the column,
+# so nothing has to guess what an absent one meant.
+ROW_TABLE = "table"
 
 ACT_JOINED, ACT_BUY, ACT_SELL = 9, 31, 33
 ACT_KIND = {ACT_JOINED: "joined", ACT_BUY: "buy", ACT_SELL: "sell"}
@@ -1219,6 +1235,7 @@ def parse_api_market(text: str, observed_at: str,
             continue
         rows.append({
             "observed_at": observed_at, "source": LFG_SOURCE,
+            ROW_TABLE: "api_market",
             "market_id": str(it.get("id") or ""),
             "player_id": str(pm["id"]),
             "player_name": pm.get("nickname") or pm.get("name") or "",
@@ -1228,10 +1245,29 @@ def parse_api_market(text: str, observed_at: str,
             "position_id": str(pm.get("positionId") or ""),
             "sale_price": str(it.get("salePrice") or ""),
             "market_value": str(pm.get("marketValue") or ""),
-            "bids": "" if it.get("numberOfBids") is None
-                    else str(it["numberOfBids"]),
+            # HOW MANY PEOPLE ARE ALREADY BIDDING — under whichever name this
+            # kind of row uses for it. The app dealing a free agent calls it
+            # `numberOfBids`; a manager listing one of his own calls it
+            # `numberOfOffers` and carries no numberOfBids at all. Reading
+            # only the first left 28 of 41 rows saying "nobody knows" about
+            # the one number this feed exists to supply. Empty still means NOT
+            # STATED; "0" means listed with nobody bidding, a different fact.
+            "bids": next((str(it[k]) for k in ("numberOfBids", "numberOfOffers")
+                          if it.get(k) is not None), ""),
             "seller": it.get("discr") or "",
             "status": it.get("status") or "",
+            # The app's own fitness, as on the squad rows. `status` above is
+            # the LISTING's state (on_sale); this is the player's.
+            "player_status": pm.get("playerStatus") or "",
+            # SHIELDED MEANS THE CLAUSE CANNOT BE PAID. The lock already
+            # taught this repo that a clause you cannot pay is not a price and
+            # cost a whole report of unbuyable recommendations; this is the
+            # other way it can be unpayable. Only manager-listed rows carry
+            # it, and every one seen so far is false — so it is stored, and
+            # nothing acts on it until a true has actually been observed.
+            "shielded": "" if (it.get("playerTeam") or {}).get("isShielded")
+                              is None else
+                        str((it["playerTeam"]["isShielded"])).lower(),
             "expires_at": it.get("expirationDate") or "",
         })
     return rows
@@ -1310,6 +1346,7 @@ def parse_api_teams(text: str, observed_at: str,
                 continue
             rows.append({
                 "observed_at": observed_at, "source": LFG_SOURCE,
+                ROW_TABLE: "api_teams",
                 "team_id": str(t.get("id") or ""),
                 "user_id": str(m.get("id") or ""),
                 "manager": m.get("managerName") or "",
@@ -1343,15 +1380,55 @@ def parse_api_teams(text: str, observed_at: str,
                 # side of the report was recommending moves the app would
                 # refuse. Empty means NOT STATED, never "available now".
                 "buyout_until": str(p.get("buyoutClauseLockedEndTime") or ""),
+                # THE OPERATOR'S OWN FITNESS. Both probable-XI columns in
+                # every report are editorial reads off two websites; this is
+                # the game itself saying whether he can play. Stored beside
+                # them and not blended into them — nothing here has been
+                # graded against a played jornada. Empty is NOT STATED.
+                "player_status": pm.get("playerStatus") or "",
             })
+            rows += _stat_rows(pm, observed_at)
     return rows
 
 
+# What the app scored him, broken into what he actually did. LONG and not
+# wide: each stat carries TWO numbers — the count and the points it earned —
+# so a wide table would be 42 columns and a new stat would widen it. Long, a
+# new stat is a new row and every reader keeps working.
+#
+# The week total is DERIVED, not stored: sum(points) == totalPoints held for
+# all 32 stat lines in the store on 2026-08-19. If that stops being true the
+# shape has moved, and the raw archive is what re-reads it.
+def _stat_rows(pm: dict, observed_at: str) -> list[dict]:
+    out = []
+    for line in (pm.get("lastStats") or []):
+        week = line.get("weekNumber")
+        for stat, pair in (line.get("stats") or {}).items():
+            # Every value the feed publishes is [what he did, what it scored].
+            # Anything else is the shape moving, and is skipped rather than
+            # read as a number in the wrong place.
+            if not isinstance(pair, list) or len(pair) != 2:
+                continue
+            out.append({
+                "observed_at": observed_at, "source": LFG_SOURCE,
+                ROW_TABLE: "api_stats",
+                "player_id": str(pm.get("id") or ""),
+                "week": str(week if week is not None else ""),
+                "stat": str(stat),
+                "value": str(pair[0]), "points": str(pair[1]),
+            })
+    return out
+
+
 def sign_api_teams(text: str) -> str | None:
-    return _digest(["%s:%s" % (r["team_id"], r["player_id"])
-                    for r in parse_api_teams(text, "")]
+    """Who is in which squad, and what you have. NOT the stat lines: points
+    are recalculated after a match and a stored archive per recalculation
+    would be a copy of every squad to record a corrected assist."""
+    squads = [r for r in parse_api_teams(text, "")
+              if r[ROW_TABLE] == "api_teams"]
+    return _digest(["%s:%s" % (r["team_id"], r["player_id"]) for r in squads]
                    + ["$%s=%s" % (r["team_id"], r["team_money"])
-                      for r in parse_api_teams(text, "")])
+                      for r in squads])
 
 
 # One player, fetched once ever, purely to put a name to an id the activity
@@ -1794,9 +1871,15 @@ _API_MARKET_FIXTURE = """[
  {"id":"m1","salePrice":5552694,"numberOfBids":0,"status":"on_sale",
   "discr":"marketPlayerLeague","expirationDate":"2026-08-18T22:00:00+02:00",
   "playerMaster":{"id":"2621","nickname":"Simeone","positionId":5,
-                  "name":"Giuliano Simeone","marketValue":5552694}},
- {"id":"m2","salePrice":5403735,"numberOfBids":null,"status":"on_sale",
+                  "name":"Giuliano Simeone","playerStatus":"ok",
+                  "marketValue":5552694}},
+ {"id":"m2","salePrice":5403735,"numberOfOffers":3,"status":"on_sale",
   "discr":"marketPlayerTeam","expirationDate":"2026-08-19T22:00:00+02:00",
+  "directOffer":false,
+  "sellerTeam":{"id":"38066616",
+                "manager":{"id":"3480702","managerName":"Albert Laporta"}},
+  "playerTeam":{"buyoutClause":8477136,"isShielded":true,
+                "buyoutClauseLockedEndTime":"2026-08-24T22:26:49+02:00"},
   "playerMaster":{"id":"2963","nickname":"Marc Roca","positionId":3,
                   "marketValue":5100000}},
  {"id":"m3","salePrice":1,"playerMaster":{}}]"""
@@ -1820,10 +1903,15 @@ _API_TEAMS_FIXTURE = """[
   "manager":{"id":"11881989","managerName":"miguel_autentico"},
   "players":[{"buyoutClause":47000000,
     "buyoutClauseLockedEndTime":"2026-08-25T14:07:38+02:00",
+    "playerMarket":{"id":"14186511","numberOfOffers":2,"directOffer":false,
+                    "expirationDate":"2026-08-21T22:46:38+02:00"},
               "playerMaster":{"id":"1337","nickname":"Fornals",
                               "name":"Pablo Fornals Malla","slug":"fornals",
                               "positionId":3,"marketValue":58300000,
-                              "points":5}}]},
+                              "playerStatus":"doubt","points":5,
+   "lastStats":[{"weekNumber":1,"totalPoints":5,
+                 "stats":{"mins_played":[90,2],"goals":[1,4],
+                          "yellow_card":[1,-1],"marca_points":[7,0]}}]}}]},
  {"id":"38099509","position":1,"teamPoints":24,"teamMoney":null,
   "manager":{"id":"11883172","managerName":"BurtonGM89"},
   "players":[{"buyoutClause":null,
@@ -2111,9 +2199,24 @@ def _selftest() -> None:
     mk = parse_api_market(_API_MARKET_FIXTURE, "t")
     assert len(mk) == 2, mk                 # the id-less third row is dropped
     assert mk[0]["bids"] == "0" and mk[0]["seller"] == "marketPlayerLeague"
-    # A manager-listed player has null bids. Empty means NOT STATED; storing
-    # it as "0" would claim nobody is bidding, which is a different fact.
-    assert mk[1]["bids"] == "" and mk[1]["seller"] == "marketPlayerTeam", mk[1]
+    # THE TWO KINDS COUNT THEIR BIDDERS UNDER DIFFERENT NAMES, and reading
+    # only one of them left the count blank for the larger half. The app deals
+    # a free agent and calls it `numberOfBids`; a manager lists one of his own
+    # and it is `numberOfOffers`, on a row that carries no numberOfBids at
+    # all. On 2026-08-19 that was 28 of 41 rows reading as "nobody knows" —
+    # the exact number this feed exists to supply.
+    assert mk[1]["bids"] == "3" and mk[1]["seller"] == "marketPlayerTeam", mk[1]
+    # Empty is still NOT STATED, for a row that states neither.
+    assert parse_api_market(
+        _API_MARKET_FIXTURE.replace('"numberOfOffers":3,', ""), "t")[1]["bids"] == ""
+    # A CLAUSE YOU CANNOT PAY IS NOT A PRICE — the lock already taught this
+    # repo that. A shield is the other way it can be unpayable, and it rides
+    # on the listing rather than on the squad. No True has been seen in the
+    # wild yet (28 of 28 False on 2026-08-19), so it is stored and not acted
+    # on, which is the only honest thing to do with an unobserved flag.
+    assert mk[1]["shielded"] == "true" and mk[0]["shielded"] == "", mk[1]
+    # The app's own fitness, on the market rows too.
+    assert mk[0]["player_status"] == "ok" and mk[1]["player_status"] == ""
     # BOTH NAMES ARE KEPT. The app publishes a nickname and a full name, and
     # neither one joins on its own: measured across the 76 owned players on
     # 2026-08-19, 12 join only on the nickname ("Raphinha", "Pepelu") and 3
@@ -2145,7 +2248,12 @@ def _selftest() -> None:
     _rev = _json.dumps(list(reversed(_json.loads(_API_ACTIVITY_FIXTURE))))
     assert sign_api_activity(_rev) == sign_api_activity(_API_ACTIVITY_FIXTURE)
 
-    tm = parse_api_teams(_API_TEAMS_FIXTURE, "t")
+    # ONE DOCUMENT, TWO GRAINS: the squad and the match history come in one
+    # payload and every row names which table it is for, so the split is read
+    # off the row rather than guessed at by shape.
+    all_rows = parse_api_teams(_API_TEAMS_FIXTURE, "t")
+    assert {r[ROW_TABLE] for r in all_rows} == {"api_teams", "api_stats"}
+    tm = [r for r in all_rows if r[ROW_TABLE] == "api_teams"]
     assert len(tm) == 2, tm                 # the empty playerMaster is dropped
     assert tm[0]["manager"] == "miguel_autentico"
     assert tm[0]["team_money"] == "23596582" and tm[0]["buyout"] == "47000000"
@@ -2162,6 +2270,48 @@ def _selftest() -> None:
     assert tm[0]["player_name"] == "Fornals", tm[0]
     assert tm[0]["player_name_full"] == "Pablo Fornals Malla", tm[0]
     assert tm[1]["player_name_full"] == "Giuliano Simeone", tm[1]
+
+    # -- what the app knows and nobody was reading --------------------------
+    # THE APP'S OWN FITNESS. Both probable-XI columns in every report are
+    # editorial reads off two websites; this is the operator of the game
+    # saying whether he can play. Stored beside them, not blended into them —
+    # nothing has been graded against a played jornada yet.
+    assert tm[0]["player_status"] == "doubt", tm[0]
+    assert tm[1]["player_status"] == "", tm[1]      # absent is not "ok"
+    # `playerMarket` ON A SQUAD ROW IS NOT KEPT, and that is a decision. It
+    # says the player is listed and how many offers are in — and every one of
+    # its 28 blocks joined, id for id, to a marketPlayerTeam row already in
+    # api_market, with the same expiry to the second. Two copies of one fact
+    # in two tables is how a number gets added to one and not the other, which
+    # has bitten this repo three times. The market table is the one place; a
+    # squad row reaches it on player_id.
+    assert "offers" not in tm[0] and "listed_until" not in tm[0], tm[0]
+
+    # THE STAT LINES, one row per player per week per stat. Long and not wide
+    # because each stat carries TWO numbers — what he did and what it scored —
+    # so a wide table would be 42 columns and a new stat would widen it. Long,
+    # a new stat is a new row and every reader keeps working.
+    st = [r for r in all_rows if r[ROW_TABLE] == "api_stats"]
+    assert len(st) == 4, st
+    goals = next(r for r in st if r["stat"] == "goals")
+    assert goals["player_id"] == "1337" and goals["week"] == "1", goals
+    assert goals["value"] == "1" and goals["points"] == "4", goals
+    # A stat that costs points keeps its sign.
+    assert next(r for r in st if r["stat"] == "yellow_card")["points"] == "-1"
+    # THE WEEK TOTAL IS THE SUM OF THE PARTS — verified against all 32 stat
+    # lines in the store on 2026-08-19, 32 of 32 — so it is derived and not
+    # stored. If that ever stops being true it is the shape moving, and the
+    # raw archive is what re-reads it.
+    assert sum(int(r["points"]) for r in st) == 5
+    # The squad rows are NOT polluted by the stat rows: one document, two
+    # grains, and the router splits them on the table each row names.
+    assert len(tm) == 2 and "stat" not in tm[0], tm[0]
+    # A player who has not played carries no stat line, which is not a zero.
+    assert not any(r["player_id"] == "2621" for r in st), st
+    # The signature is about the SQUAD, not the stats: a points recalculation
+    # must not store a fresh archive of everything.
+    assert sign_api_teams(_API_TEAMS_FIXTURE) == sign_api_teams(
+        _API_TEAMS_FIXTURE.replace('"goals":[1,4]', '"goals":[1,9]'))
 
     # Discovery: the league id comes off the account, never a config file.
     disc = league_sources(_API_LEAGUES_FIXTURE)
@@ -2336,7 +2486,7 @@ def _selftest() -> None:
         assert s.sign(html) is not None, s.key
         assert isinstance(s.parse(html, "2026-01-01T0000Z", s.key), list), s.key
 
-    print("sources.py selftest OK (178 cases)")
+    print("sources.py selftest OK (192 cases)")
 
 
 if __name__ == "__main__":

@@ -69,8 +69,9 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from ffcore.auth import API_BASE                    # noqa: E402
 from ffcore.tidy import ROOT, SEASON, TIDY, append_csv  # noqa: E402
 from sources import (API_LEAGUES_KEY, CAL_KEY, MATCH_KEY_RE,  # noqa: E402
-                     STORE_ONCE, league_sources, parse_points, played_sources,
-                     player_sources, season_label, source_for, sources)
+                     ROW_TABLE, STORE_ONCE, league_sources, parse_points,
+                     played_sources, player_sources, season_label,
+                     source_for, sources)
 
 RAW = ROOT / "raw"
 
@@ -568,8 +569,7 @@ def parse() -> None:
             rows = cache.get(ck, [])
             hits += 1
             fresh[ck] = rows
-            tables.setdefault(src.table, []).extend(
-                [{**r, "observed_at": stamp} for r in rows])
+            route(tables, rows, src.table, stamp)
     hits -= misses
     _save_parse_cache(fresh)
     print("  parsed %d documents, reused %d" % (misses, hits))
@@ -700,6 +700,26 @@ def _save_parse_cache(docs: dict, name: str = _CACHE) -> None:
             encoding="utf-8")
     except OSError:
         pass
+
+
+def route(tables: dict, rows: list[dict], default: str, stamp: str) -> None:
+    """File each row under the table it names, or the source's if it names
+    none, stamped with the snapshot it was observed in.
+
+    A ROW MAY NAME ITS OWN TABLE, and almost none do: a source has one table
+    and its rows go there. The exception is a document carrying two grains —
+    the squad feed answers with a squad (one row per player) and with each
+    player's match history (one row per player per week per stat), and
+    fetching it twice to separate them would be absurd. See sources.ROW_TABLE.
+
+    The marker is consumed here rather than written out: how a row was routed
+    is not a fact about the row.
+    """
+    for r in rows:
+        table = r.get(ROW_TABLE) or default
+        tables.setdefault(table, []).append(
+            {k: v for k, v in r.items() if k != ROW_TABLE}
+            | {"observed_at": stamp})
 
 
 def first_seen(rows: list[dict], key: tuple) -> list[dict]:
@@ -996,9 +1016,37 @@ def _selftest() -> None:
     # Only the tables that ARE immutable. api_teams and api_market are time
     # series — a value, a clause and a bid count all move — and collapsing
     # those would throw away the history the market model is fitted on.
-    from sources import STORE_ONCE
-    assert set(STORE_ONCE) == {"api_activity", "api_players"}, STORE_ONCE
+    assert set(STORE_ONCE) == {"api_activity", "api_players",
+                              "api_stats"}, STORE_ONCE
     assert "api_teams" not in STORE_ONCE and "market" not in STORE_ONCE
+    # A CORRECTED STAT IS A NEW FACT, not a repeat: the key carries the value,
+    # so an unchanged line is stored once and a rescored one arrives as a
+    # second row with a later observed_at rather than overwriting the first.
+    line = {"player_id": "1337", "week": "1", "stat": "goals",
+            "value": "1", "points": "4", "observed_at": "t1"}
+    again = dict(line, observed_at="t2")
+    fixed = dict(line, points="6", observed_at="t3")
+    kept = first_seen([line, again, fixed], STORE_ONCE["api_stats"])
+    assert [r["observed_at"] for r in kept] == ["t1", "t3"], kept
+
+    # -- one document, two grains ------------------------------------------
+    # The squad feed carries a squad and each player's match history in one
+    # payload. A row names its own table and the assembler routes on it, so
+    # neither grain is fetched twice or split by guessing at its shape.
+    out: dict[str, list] = {}
+    route(out, [{"a": "1"}, {ROW_TABLE: "api_stats", "stat": "goals"}],
+          "api_teams", "t1")
+    assert set(out) == {"api_teams", "api_stats"}, list(out)
+    # The stamp is written onto every row wherever it lands.
+    assert out["api_teams"][0] == {"a": "1", "observed_at": "t1"}
+    assert out["api_stats"][0]["observed_at"] == "t1"
+    # A row that names no table belongs to its source's, and a row that names
+    # its source's own table is not a special case.
+    route(out, [{ROW_TABLE: "api_teams", "b": "2"}], "api_teams", "t2")
+    assert len(out["api_teams"]) == 2, out["api_teams"]
+    # The marker itself is not a column in the file it routed to: it is how
+    # the row got there, not something anybody would read afterwards.
+    assert all(ROW_TABLE not in r for rs in out.values() for r in rs), out
 
     # -- cadence ----------------------------------------------------------
     from sources import Source, parse_market, sign_market

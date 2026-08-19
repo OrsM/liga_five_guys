@@ -43,7 +43,7 @@ __all__ = ["ROOT", "TIDY", "SEASON", "DECISIONS", "REPORTS", "MADRID",
            "Market", "Valuation", "load_market", "load_lineups",
            "load_players", "read_ledger", "LEDGER", "load_deadline", "LINEUP_SOURCE",
            "pick_source", "load_fixtures", "next_kickoff", "kickoff_stamp",
-           "load_elo", "fresh_only", "DAILY_FRESH_DAYS"]
+           "load_elo", "fresh_only", "DAILY_FRESH_DAYS", "load_api_stats"]
 
 ROOT = Path(os.environ.get("FF_ROOT", "./data"))
 TIDY = ROOT / "tidy"
@@ -414,6 +414,21 @@ def load_api_activity() -> list[dict]:
 def load_api_market() -> list[dict]:
     """What is on offer in the league right now, or []."""
     return latest_only(read_csv(TIDY / "api_market.csv"))
+
+
+def load_api_stats() -> list[dict]:
+    """Every stat line the app has published, oldest sighting first.
+
+    One row per player per week per stat, each carrying what he did and what
+    it scored. NOT latest_only: this is a history, and the whole point of it
+    is the weeks already played.
+
+    A CORRECTION IS A LATER ROW, not an overwrite — the store keys these on
+    the value as well as the identity (sources.STORE_ONCE), so a rescored
+    match appears twice and a reader wanting today's answer takes the last
+    row per (player, week, stat).
+    """
+    return read_csv(TIDY / "api_stats.csv")
 
 
 def load_api_players() -> dict[str, str]:
