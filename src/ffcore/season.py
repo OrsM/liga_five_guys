@@ -37,12 +37,14 @@ WHAT IT DOES NOT MODEL, and each of these makes it optimistic:
 
 from __future__ import annotations
 
+import os
 import random
 from dataclasses import dataclass, field
 
 from ffcore.score import MAX_SLOT, SLOT_MIN
 
-__all__ = ["LeagueState", "Standings", "simulate", "best_xi"]
+__all__ = ["LeagueState", "Standings", "simulate",
+           "simulate_many", "best_xi"]
 
 XI_SIZE = 11
 
@@ -167,6 +169,120 @@ class Standings:
         return sum(k * p for k, p in self.position(manager).items())
 
 
+def _chunk(args):
+    """One worker's slice of the trials. Module level, so it can be pickled."""
+    states, forecaster, lo, hi, seed = args
+    return _run(states, forecaster, range(lo, hi), seed)
+
+
+def simulate_many(states: list, forecaster, trials: int = 2000,
+                  seed: int = 0, workers: int | None = None) -> list:
+    """Play one set of seasons and score EVERY candidate squad against it.
+
+    THE DRAWS DO NOT DEPEND ON THE SQUADS. Same seed, same forecaster, same
+    jornadas — so every call to simulate() was redrawing an identical season
+    and throwing it away. Ranking twelve options at three thousand trials over
+    thirty-eight jornadas meant eight million draws where a hundred thousand
+    would do, and the draw is the expensive part: a dict of ninety players,
+    two rng calls each.
+
+    Drawing once per (trial, jornada) and scoring all the states against it is
+    exactly the same arithmetic in a different order, which is why the
+    self-test asserts the numbers are IDENTICAL rather than close.
+
+    Returns one Standings per state, in order.
+    """
+    if not states:
+        return []
+    # ACROSS CORES, AND EXACTLY. Every trial seeds its own rng from the trial
+    # NUMBER, so splitting the range over processes gives the same seasons in
+    # the same order — the self-test asserts the totals are identical, not
+    # close. Only worth the pickling above a few hundred trials.
+    n = workers if workers is not None else (os.cpu_count() or 1)
+    if n > 1 and trials >= 400 and len(states) > 1:
+        import concurrent.futures as cf
+
+        edges = [trials * i // n for i in range(n + 1)]
+        jobs = [(states, forecaster, edges[i], edges[i + 1], seed)
+                for i in range(n) if edges[i] < edges[i + 1]]
+        parts = []
+        try:
+            with cf.ProcessPoolExecutor(max_workers=len(jobs)) as ex:
+                parts = list(ex.map(_chunk, jobs))
+        except Exception:                                   # noqa: BLE001
+            # A box that cannot fork is a slow report, not a failed one.
+            parts = []
+        if parts:
+            out = []
+            for i, st in enumerate(states):
+                merged = {m: [v for p in parts for v in p[i][m]]
+                          for m in st.squads}
+                out.append(Standings(totals=merged, me=st.me))
+            return out
+    return [Standings(totals=tot, me=st.me)
+            for tot, st in zip(_run(states, forecaster, range(trials), seed),
+                               states)]
+
+
+def _run(states: list, forecaster, which, seed: int) -> list:
+    """{manager: [total per trial]} per state, for the trials in `which`."""
+    managers = [list(st.squads) for st in states]
+    idx = list(which)
+    totals = [{m: [float(st.carried.get(m, 0.0))] * len(idx) for m in ms}
+              for st, ms in zip(states, managers)]
+
+    # The eleven each manager fields depends only on expectations, so it is
+    # the same in every trial and is picked once per state rather than
+    # `trials` times.
+    xis = []
+    for st in states:
+        per = {}
+        for j in st.jornadas:
+            exp = forecaster.expected(j)
+            per[j] = {m: best_xi(sq, exp) for m, sq in st.squads.items()}
+        xis.append(per)
+
+    # SCORE THE FIRST STATE, THEN THE DIFFERENCES. A candidate squad is the
+    # base squad with two or three men moved, and every other manager is
+    # untouched — so summing eleven names for five managers for every one of
+    # thirteen states repeats work that cannot have changed. Each state keeps
+    # only who ENTERED and who LEFT each eleven relative to state zero, which
+    # is typically four names against fifty-five.
+    jornadas = states[0].jornadas
+    deltas = []
+    for i in range(1, len(states)):
+        per = {}
+        for j in jornadas:
+            for m in managers[i]:
+                was = set(xis[0][j].get(m, ()))
+                now = set(xis[i][j].get(m, ()))
+                if was != now:
+                    per[(j, m)] = (tuple(now - was), tuple(was - now))
+        deltas.append(per)
+
+    for n, t in enumerate(idx):
+        rng = random.Random(seed * 1_000_003 + t)
+        for j in jornadas:
+            drawn = forecaster.draw(j, rng)
+            get = drawn.get
+            base = {}
+            for m in managers[0]:
+                v = sum(get(k, 0.0) for k in xis[0][j][m])
+                base[m] = v
+                totals[0][m][n] += v
+            for i in range(1, len(states)):
+                tot, per = totals[i], deltas[i - 1]
+                for m in managers[i]:
+                    v = base.get(m, 0.0)
+                    ch = per.get((j, m))
+                    if ch is not None:
+                        v += sum(get(k, 0.0) for k in ch[0])
+                        v -= sum(get(k, 0.0) for k in ch[1])
+                    tot[m][n] += v
+
+    return totals
+
+
 def simulate(state: LeagueState, forecaster, trials: int = 2000,
              seed: int = 0) -> Standings:
     """Play the remaining jornadas `trials` times.
@@ -269,7 +385,40 @@ def _selftest() -> None:
     r2 = simulate(st, Bootstrap(per), trials=200, seed=4)
     assert r1.totals == r2.totals
 
-    print("ffcore.season self-test OK (22 cases)")
+    # -- one draw, many squads ---------------------------------------------
+    # IDENTICAL, not close. simulate_many is the same arithmetic in a
+    # different order — draw the season once, score every candidate against
+    # it — so anything but an exact match means the reordering changed the
+    # rng stream, which is the one thing it must not do.
+    b2 = {f"b_{k}": v for k, v in sq.items()}
+    alt = LeagueState(squads={"A": dict(a), "B": dict(b2)}, jornadas=[1],
+                      me="A")
+    one = simulate(st, Bootstrap(per), trials=150, seed=9)
+    two = simulate(alt, Bootstrap(per), trials=150, seed=9)
+    both = simulate_many([st, alt], Bootstrap(per), trials=150, seed=9)
+    assert both[0].totals == one.totals, "draw order changed"
+    assert both[1].totals == two.totals, "draw order changed"
+    assert simulate_many([], Bootstrap(per), trials=10) == []
+
+    # A state with a manager the base does not have is scored from scratch,
+    # not silently given the base's total for a manager that is not there.
+    solo = LeagueState(squads={"A": dict(a), "C": dict(b2)}, jornadas=[1],
+                       me="A")
+    got = simulate_many([st, solo], Bootstrap(per), trials=120, seed=3)
+    want = simulate(solo, Bootstrap(per), trials=120, seed=3)
+    assert got[1].totals == want.totals, "a new manager must be scored fully"
+
+    # ACROSS CORES, AND EXACTLY. Every trial seeds its own rng from the trial
+    # number, so splitting the range over processes must give the same
+    # seasons in the same order — identical, not close.
+    serial = simulate_many([st, alt], Bootstrap(per), trials=500, seed=2,
+                           workers=1)
+    forked = simulate_many([st, alt], Bootstrap(per), trials=500, seed=2,
+                           workers=4)
+    assert [x.totals for x in serial] == [x.totals for x in forked], \
+        "splitting the trials changed the seasons"
+
+    print("ffcore.season self-test OK (27 cases)")
 
 
 if __name__ == "__main__":

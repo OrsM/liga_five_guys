@@ -254,7 +254,7 @@ def _fold(name: str) -> str:
 
 def _flagged_name(el) -> tuple[str, str]:
     """(display name, player-page slug) from a fitness block element."""
-    a = el.cssselect("a.jugador")
+    a = _css(el, "a.jugador")
     if not a:
         return "", ""
     href = a[0].get("href") or ""
@@ -269,14 +269,14 @@ def _note(el) -> str:
     whether to sell him.
     """
     parts = [" ".join(c.text_content().split())
-             for c in el.cssselect(".comentario")]
+             for c in _css(el, ".comentario")]
     return " · ".join(p for p in parts if p)[:200]
 
 
 def _suspension_sections(doc):
     """section.mod.sancionados, minus the transfer-listing box that shares
     the class. Shared with sign_team so the two cannot disagree."""
-    return [s for s in doc.cssselect("section.mod.sancionados")
+    return [s for s in _css(doc, "section.mod.sancionados")
             if "mercado-box" not in " ".join(s.classes)]
 
 
@@ -299,9 +299,9 @@ def parse_fitness(doc) -> dict[str, dict]:
         found[key] = {"name": name, "slug": slug, "status": status,
                       "note": note}
 
-    for el in doc.cssselect(
+    for el in _css(doc, 
             ".lesionados_wrapper section.mod.lesionados > .elemento"):
-        icon = el.cssselect(".icono img")
+        icon = _css(el, ".icono img")
         alt = (icon[0].get("alt") or "").strip().lower() if icon else ""
         status = FITNESS_ALT.get(alt)
         if not status:
@@ -310,11 +310,11 @@ def parse_fitness(doc) -> dict[str, dict]:
         put(name, slug, status, _note(el))
 
     for sec in _suspension_sections(doc):
-        for el in sec.cssselect(".elemento"):
+        for el in _css(sec, ".elemento"):
             name, slug = _flagged_name(el)
             put(name, slug, "suspended", _note(el))
 
-    for el in doc.cssselect("section.mod.nodisponibles .elemento"):
+    for el in _css(doc, "section.mod.nodisponibles .elemento"):
         name, slug = _flagged_name(el)
         put(name, slug, "unavailable", _note(el))
 
@@ -363,9 +363,9 @@ def parse_team(html: str, observed_at: str, key: str = "team_test") -> list[dict
             "note": fit["note"] if fit else "",
         })
 
-    for el in doc.cssselect(XI_SELECTORS[0]):
+    for el in _css(doc, XI_SELECTORS[0]):
         add(el, "starter")
-    for el in doc.cssselect(XI_SELECTORS[1]):
+    for el in _css(doc, XI_SELECTORS[1]):
         add(el, "sub")
 
     # A flagged player who appears in neither list still has to reach the CSV.
@@ -401,6 +401,22 @@ WANT = {
     "games": ["pj"],
     "avg": ["media", "med"],
 }
+
+
+# COMPILED ONCE PER SELECTOR. lxml's .cssselect(css) translates the CSS to
+# XPath and compiles it on EVERY call, and parse walks three hundred and
+# eighty documents through thirty selectors — fifteen seconds of the run was
+# recompiling the same handful of strings. The translation cannot change, so
+# it is done once and kept.
+_SELECTORS: dict[str, object] = {}
+
+
+def _css(node, css: str):
+    sel = _SELECTORS.get(css)
+    if sel is None:
+        from lxml.cssselect import CSSSelector
+        sel = _SELECTORS[css] = CSSSelector(css)
+    return sel(node)
 
 
 def _cell_texts(el) -> list[str]:
@@ -531,8 +547,8 @@ def _surface(elements) -> list[str]:
     out: list[str] = []
     for el in elements:
         out.append(_WS.sub(" ", el.text_content()).strip())
-        out += [a.get("href") or "" for a in el.cssselect("a[href]")]
-        out += [i.get("alt") or "" for i in el.cssselect("img[alt]")]
+        out += [a.get("href") or "" for a in _css(el, "a[href]")]
+        out += [i.get("alt") or "" for i in _css(el, "img[alt]")]
     return out
 
 
@@ -544,7 +560,7 @@ def sign_team(html: str) -> str | None:
     doc = lh.fromstring(html)
     els = []
     for sel in XI_SELECTORS + FITNESS_SELECTORS:
-        els += doc.cssselect(sel)
+        els += _css(doc, sel)
     els += _suspension_sections(doc)
     return _digest(_surface(els))
 
@@ -664,10 +680,10 @@ def parse_af_team(html: str, observed_at: str,
                             role, start_pct, note))
 
     def photo(li):
-        img = li.cssselect("img[src]")
+        img = _css(li, "img[src]")
         return img[0].get("src") if img else ""
 
-    for li in doc.cssselect(AF_XI_SELECTOR):
+    for li in _css(doc, AF_XI_SELECTOR):
         label = li.get("aria-label") or ""
         name = (label[len(AF_NAME_PREFIX):].strip()
                 if label.startswith(AF_NAME_PREFIX) else "")
@@ -676,12 +692,12 @@ def parse_af_team(html: str, observed_at: str,
     if rows:
         return rows
 
-    for block in doc.cssselect(AF_CONSENSO_SELECTOR):
-        for ul in block.cssselect("ul"):
+    for block in _css(doc, AF_CONSENSO_SELECTOR):
+        for ul in _css(block, "ul"):
             section = _af_section(ul)
             if section is None:
                 continue            # captain candidates and anything new
-            for li in ul.cssselect("li"):
+            for li in _css(ul, "li"):
                 text = _WS.sub(" ", li.text_content()).strip()
                 if section == AF_UNANIMOUS:
                     # Second guard: a name with any fraction glued to it is not
@@ -707,8 +723,8 @@ def sign_af_team(html: str) -> str | None:
     """Signs both shapes, so a page that switches shape is never called
     unchanged."""
     doc = lh.fromstring(html)
-    return _digest(_surface(doc.cssselect('ul[aria-label^="Titulares"]')
-                            + doc.cssselect(AF_CONSENSO_SELECTOR)))
+    return _digest(_surface(_css(doc, 'ul[aria-label^="Titulares"]')
+                            + _css(doc, AF_CONSENSO_SELECTOR)))
 
 
 # --- fixtures ---------------------------------------------------------------
@@ -737,10 +753,10 @@ def parse_af_fixtures(html: str, observed_at: str,
     """
     doc = lh.fromstring(html)
     rows, seen = [], set()
-    for a in doc.cssselect('a[href*="/partido/"]'):
+    for a in _css(doc, 'a[href*="/partido/"]'):
         m = AF_MATCH_RE.search(a.get("href") or "")
-        times = a.cssselect("time[datetime]")
-        teams = [i.get("alt") for i in a.cssselect("img[alt]") if i.get("alt")]
+        times = _css(a, "time[datetime]")
+        teams = [i.get("alt") for i in _css(a, "img[alt]") if i.get("alt")]
         if not (m and times and len(teams) >= 2) or m.group(1) in seen:
             continue
         seen.add(m.group(1))
@@ -843,7 +859,7 @@ def parse_calendar(html: str, observed_at: str,
     """
     doc = lh.fromstring(html)
     rows, seen = [], set()
-    for a in doc.cssselect('a[href*="/partidos/"]'):
+    for a in _css(doc, 'a[href*="/partidos/"]'):
         m = MATCH_PATH_RE.search(a.get("href") or "")
         if not m or m.group(1) in seen:
             continue
@@ -882,8 +898,8 @@ def _xi_rows(doc, side: str) -> list:
     58 and lost the slug the whole join rests on. The first table is the fantasy
     points one, and it is the only one that carries tr.desglose links.
     """
-    tables = doc.cssselect("%s table.tablestats" % side)
-    return tables[0].cssselect("tbody tr") if tables else []
+    tables = _css(doc, "%s table.tablestats" % side)
+    return _css(tables[0], "tbody tr") if tables else []
 
 
 def parse_starters(html: str, observed_at: str,
@@ -916,7 +932,7 @@ def parse_starters(html: str, observed_at: str,
                 if MATCH_SUBS_HEADER in tr.text_content():
                     role = "sub"
                 continue
-            cell = tr.cssselect("td.name")
+            cell = _css(tr, "td.name")
             if cell:
                 side_rows.append({
                     "observed_at": observed_at,
@@ -932,7 +948,7 @@ def parse_starters(html: str, observed_at: str,
             # The detail row that follows a player carries the only link to
             # his page, and that slug is the join key. It arrives one row late,
             # so it is written back onto the row it belongs to.
-            a = tr.cssselect('a[href*="/jugadores/"]')
+            a = _css(tr, 'a[href*="/jugadores/"]')
             if a and side_rows:
                 side_rows[-1]["player_slug"] = _slug(
                     'href="%s"' % (a[0].get("href") or ""))

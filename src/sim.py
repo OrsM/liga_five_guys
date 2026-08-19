@@ -222,16 +222,21 @@ def price_saves(u, keys, base, seed: int = 1) -> dict:
     """
     import decide
 
+    keys = list(keys)
+    if not keys:
+        return {}
     dead = tuple(sorted(k for k, _ in decide_dead(u)))
     got = sum(v for _k, v in decide_dead(u))
+    # ONE PASS, like the ranking. Scored one at a time these were two full
+    # simulations on their own — as much work again as ranking every move.
+    acts = [decide.Action("buy", buy=k, sell=dead, cost=u.price.get(k, 0.0),
+                          proceeds=got) for k in keys]
+    scored = decide._score_many(u, [decide.apply(u, a) for a in acts],
+                                decide.FINAL_TRIALS, seed)
     out = {}
-    for k in keys:
-        a = decide.Action("buy", buy=k, sell=dead, cost=u.price.get(k, 0.0),
-                          proceeds=got)
-        r = decide._score(u, decide.apply(u, a), decide.FINAL_TRIALS, seed)
-        mine = r.totals.get(u.me, [])
-        was = base.totals.get(u.me, [])
-        pairs = sorted(x - y for x, y in zip(mine, was))
+    was = base.totals.get(u.me, [])
+    for k, r in zip(keys, scored):
+        pairs = sorted(x - y for x, y in zip(r.totals.get(u.me, []), was))
         out[k] = pairs[len(pairs) // 2] if pairs else 0.0
     return out
 

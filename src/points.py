@@ -160,16 +160,28 @@ def load_snapshots() -> dict[str, list[tuple[str, list[dict]]]]:
     from sources import parse_points, season_label
 
     by_label: dict[str, list[tuple[str, list[dict]]]] = {}
+    # PARSED ONCE PER DOCUMENT, NOT ONCE PER SNAPSHOT — the same fix as
+    # ingest.parse, for the same reason. The carry-forward hands the same
+    # points page to every stamp since it last changed, and lxml was running
+    # over all forty-seven of them: five seconds of parsing for a handful of
+    # distinct documents. The rows carry no stamp, so a hit needs no rewrite.
+    seen: dict[int, list[dict]] = {}
     for stamp, docs in pages():
         html = docs.get("points")
         if html is None:
             continue
-        try:
-            rows = parse_points(html)
-        except Exception as e:
-            # One bad page must not lose the rest of the run.
-            print(f"  warn: {stamp}/points: {type(e).__name__}: {e}")
-            continue
+        ck = hash(html)
+        if ck in seen:
+            rows = seen[ck]
+        else:
+            try:
+                rows = parse_points(html)
+            except Exception as e:
+                # One bad page must not lose the rest of the run.
+                print(f"  warn: {stamp}/points: {type(e).__name__}: {e}")
+                seen[ck] = []
+                continue
+            seen[ck] = rows
         if not rows:
             # An EMPTY season is not a broken parser. Between the rollover and
             # the first whistle the site serves the table with "no results"

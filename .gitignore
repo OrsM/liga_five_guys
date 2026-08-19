@@ -15,3 +15,9 @@ reports/latest_files/
 # state: every workflow does `git add -A inputs`, and a committed slate would
 # be read by tomorrow's run as if it were still current.
 inputs/seen.txt
+
+# The parse cache: rows keyed by page CONTENT, so lxml runs only over
+# documents it has not seen. Derived from data/raw, rebuilt on demand, and
+# invalidated whole when sources.py changes — nothing here is evidence.
+data/tidy/parsed.json
+data/tidy/startcal.json

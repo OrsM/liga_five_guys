@@ -49,7 +49,9 @@ to break `--selftest` on a machine that never intended to fetch anything.
 from __future__ import annotations
 
 import csv
+import hashlib
 import io
+import json
 import gzip
 import lzma
 import os
@@ -359,20 +361,44 @@ def fetch() -> Path:
 # ---------------------------------------------------------------------------
 
 def parse() -> None:
-    """Every snapshot ever taken -> data/tidy/*.csv. Full rebuild each run."""
+    """Every snapshot ever taken -> data/tidy/*.csv. Full rebuild each run.
+
+    PARSED ONCE PER DOCUMENT, NOT ONCE PER SNAPSHOT. The carry-forward hands
+    the same market page to forty-seven consecutive stamps when it changed
+    twice, and every one of them was being run through lxml again — a hundred
+    seconds a run, growing with the season. A page is now parsed once per
+    distinct CONTENT and the rows are re-stamped for every snapshot that
+    carried it, which is the same output by construction: `observed_at` is the
+    only field any parser takes from the stamp, and the self-test holds that.
+    """
     tables: dict[str, list[dict]] = {}
+    cache, fresh = _parse_cache(), {}
+    hits = misses = 0
 
     for stamp, docs in pages():
         for key, html in sorted(docs.items()):
             src = source_for(key)
             if src is None or src.table == "points":
                 continue          # points feeds data/season/live, via points.py
-            try:
-                tables.setdefault(src.table, []).extend(
-                    src.parse(html, stamp, key))
-            except Exception as e:
-                # One bad page must not lose the rest of the run.
-                print(f"  warn: {stamp}/{key}: {type(e).__name__}: {e}")
+            ck = "%s:%s" % (key, hashlib.blake2b(
+                html.encode("utf-8", "replace"), digest_size=12).hexdigest())
+            rows = cache.get(ck)
+            if rows is None:
+                misses += 1
+                try:
+                    rows = src.parse(html, stamp, key)
+                except Exception as e:
+                    # One bad page must not lose the rest of the run.
+                    print(f"  warn: {stamp}/{key}: {type(e).__name__}: {e}")
+                    rows = []
+                cache[ck] = rows
+            else:
+                hits += 1
+            fresh[ck] = rows
+            tables.setdefault(src.table, []).extend(
+                [{**r, "observed_at": stamp} for r in rows])
+    _save_parse_cache(fresh)
+    print("  parsed %d documents, reused %d" % (misses, hits))
 
     TIDY.mkdir(parents=True, exist_ok=True)
     # One file per table, named by the table. This used to be three hardcoded
@@ -421,6 +447,50 @@ def parse() -> None:
     if not flags:
         print("  warn: no player flagged in any snapshot — if the site still "
               "shows injuries, the fitness selectors have rotted.")
+
+
+# Parsed rows, kept between runs and keyed by the CONTENT of the page.
+#
+# lxml over three hundred and eighty documents is twelve seconds, every run,
+# for documents that have not changed since the last one — the raw archives
+# are immutable, so the parse of a given page can only change when the PARSER
+# changes. The fingerprint is the parser source: touch sources.py and the
+# whole cache is discarded, which is the only event that can invalidate it.
+#
+# Content-hashed rather than stamp-ranged, so the carry-forward needs no
+# special case and a re-fetched identical page costs nothing.
+_CACHE = "parsed.json"
+
+
+def _fingerprint() -> str:
+    import hashlib as _h
+    src = Path(__file__).with_name("sources.py")
+    try:
+        return _h.blake2b(src.read_bytes(), digest_size=8).hexdigest()
+    except OSError:
+        return ""
+
+
+def _parse_cache() -> dict:
+    try:
+        blob = json.loads((TIDY / _CACHE).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    if blob.get("parser") != _fingerprint():
+        return {}
+    return blob.get("docs", {})
+
+
+def _save_parse_cache(docs: dict) -> None:
+    """Only what THIS run used, so the file cannot grow without bound: a page
+    nobody carried forward any more is a page nobody will ask about again."""
+    TIDY.mkdir(parents=True, exist_ok=True)
+    try:
+        (TIDY / _CACHE).write_text(
+            json.dumps({"parser": _fingerprint(), "docs": docs}),
+            encoding="utf-8")
+    except OSError:
+        pass
 
 
 def _write_csv(path: Path, rows: list[dict]) -> None:

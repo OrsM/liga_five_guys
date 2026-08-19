@@ -188,6 +188,7 @@ def _calibrated():
     """
     if _CAL_CACHE:
         return _CAL_CACHE[0]
+    import json
     from ffcore.crosswalk import Crosswalk
     from ffcore.startprob import Calibration, observations
     from ffcore.tidy import load_lineups, read_csv, TIDY
@@ -199,11 +200,34 @@ def _calibrated():
     # The crosswalk is what lets the narrow source be joined exactly rather
     # than on a folded name: it shares no slug with anything else.
     xw = Crosswalk.read(TIDY / "players.csv", TIDY / "clubs.csv")
+    # ON DISK, KEYED BY WHAT IT WAS FITTED ON. The fit cross-validates over
+    # every team sheet on record and costs six seconds — in EVERY process, and
+    # the chain runs several. It cannot change unless the confirmed line-ups
+    # do, so the answer is written down and the fingerprint is the evidence
+    # that produced it. A changed fingerprint refits; nothing else does.
+    stamp = "%d:%s" % (len(truth), cut)
+    path = TIDY / "startcal.json"
     cal = Calibration()
-    if cut:
+    try:
+        was = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        was = {}
+    if cut and was.get("fingerprint") == stamp:
+        cal = Calibration(was["alpha"], was["beta"], was["weight"],
+                          was["titular"], was["n"], was["fitted"],
+                          was["gain"], was["why"], was["groups"])
+    elif cut:
         cal = Calibration.fit(observations(
             load_lineups() + second, truth, cut, neutral=NEUTRAL_START,
             absent=ABSENT_START, xw=xw))
+        try:
+            path.write_text(json.dumps({
+                "fingerprint": stamp, "alpha": cal.alpha, "beta": cal.beta,
+                "weight": cal.weight, "titular": cal.titular, "n": cal.n,
+                "fitted": cal.fitted, "gain": cal.gain, "why": cal.why,
+                "groups": cal.groups}) + "\n", encoding="utf-8")
+        except OSError:
+            pass
     _CAL_CACHE.append((cal, second))
     return _CAL_CACHE[0]
 

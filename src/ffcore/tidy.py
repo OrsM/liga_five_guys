@@ -453,6 +453,10 @@ class Market:
 
     def __init__(self, rows: list[dict]):
         self.rows = rows
+        self._latest: list | None = None
+        # The fuzzy answers, kept. The same handful of unresolvable spellings
+        # are asked about again and again — once per feed row, per run.
+        self._resolved: dict[str, str | None] = {}
         self._by_key: dict[str, list[tuple[datetime, dict]]] = {}
         for r in rows:
             key = norm(r.get("name"))
@@ -466,14 +470,31 @@ class Market:
     def __len__(self) -> int:
         return len(self._by_key)
 
+    def latest_rows(self) -> list:
+        """The newest snapshot, computed ONCE.
+
+        key_for() rebuilt this on every lookup — latest_only over every row
+        ever recorded, twenty-nine thousand of them, for each name that did
+        not resolve exactly. Building the crosswalk called it twelve hundred
+        times and spent twenty-three seconds inside norm(), three million
+        calls of it. Nothing about the answer changes between lookups.
+        """
+        if self._latest is None:
+            self._latest = latest_only(self.rows)
+        return self._latest
+
     def key_for(self, name):
         """Normalised key for a human-typed name, or None if it doesn't
         resolve uniquely. Substring and initials handled by ffcore.text."""
         k = norm(name)
         if k in self._by_key:
             return k
-        row, _cands = resolve(name, latest_only(self.rows))
-        return norm(row["name"]) if row else None
+        if k in self._resolved:
+            return self._resolved[k]
+        row, _cands = resolve(name, self.latest_rows())
+        got = norm(row["name"]) if row else None
+        self._resolved[k] = got
+        return got
 
     def latest(self) -> dict[str, dict]:
         """{key: newest row} — the 'what exists today' view."""

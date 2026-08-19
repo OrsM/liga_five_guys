@@ -50,7 +50,8 @@ from ffcore.league import League, api_key  # noqa: E402
 from ffcore.parse import fmt_money  # noqa: E402
 from ffcore.score import SLOT, build, _calibrated  # noqa: E402
 from ffcore.text import norm  # noqa: E402
-from ffcore.season import LeagueState, best_xi, simulate  # noqa: E402
+from ffcore.season import (LeagueState, best_xi,  # noqa: E402
+                           simulate, simulate_many)
 from ffcore.tidy import (TIDY, SEASON, latest_only, load_api_market,  # noqa: E402
                          load_api_teams, load_lineups, load_market,
                          load_players, read_csv)
@@ -450,6 +451,14 @@ def _score(u: Universe, squads, trials: int, seed: int):
     return simulate(st, u.forecaster, trials=trials, seed=seed)
 
 
+def _score_many(u: Universe, many: list, trials: int, seed: int):
+    """Every candidate squad against ONE set of seasons. Same numbers."""
+    return simulate_many(
+        [LeagueState(squads=sq, jornadas=u.state.jornadas, me=u.me,
+                     carried=u.state.carried) for sq in many],
+        u.forecaster, trials=trials, seed=seed)
+
+
 def rank(u: Universe, acts: list[Action], seed: int = 1,
          price=None) -> tuple:
     """Screen wide and cheap, then re-run the survivors properly.
@@ -469,10 +478,15 @@ def rank(u: Universe, acts: list[Action], seed: int = 1,
     premium is money that never comes back, and a table ranked on points alone
     treats it as free. Without one, today's own measurement is used.
     """
-    base_s = _score(u, u.state.squads, SCREEN_TRIALS, seed)
+    # ONE DRAW PASS FOR THE WHOLE SCREEN. Every option is scored against the
+    # same seed, so simulate() was redrawing an identical season for each of
+    # them and throwing it away — eight million draws where a hundred thousand
+    # do. See ffcore.season.simulate_many; the numbers are unchanged.
+    screen = _score_many(u, [u.state.squads] + [apply(u, a) for a in acts],
+                         SCREEN_TRIALS, seed)
+    base_s, rest = screen[0], screen[1:]
     screened, reach = [], []
-    for a in acts:
-        r = _score(u, apply(u, a), SCREEN_TRIALS, seed)
+    for a, r in zip(acts, rest):
         d = base_s.expected_position() - r.expected_position()
         reach.append((a.cost - a.proceeds - u.cash, d))
         if a.cost <= u.cash + a.proceeds:
@@ -494,10 +508,10 @@ def rank(u: Universe, acts: list[Action], seed: int = 1,
             pick[k] = (d, a)
     screened = sorted(pick.values(), key=lambda t: (-t[0], t[1].net))
 
-    base = _score(u, u.state.squads, FINAL_TRIALS, seed)
-    rivals = [m for m in u.state.squads if m != u.me]
-    out = []
-    for _, a in screened[:KEEP]:
+    # ...and one for the survivors, at the full count.
+    keep = [a for _, a in screened[:KEEP]]
+    answers, afters = [], []
+    for a in keep:
         after = apply(u, a)
         # HE ANSWERS BEFORE THE SEASON IS PLAYED. Scoring the position the
         # instant after my move prices a duel as an execution — and a clause
@@ -509,7 +523,13 @@ def rank(u: Universe, acts: list[Action], seed: int = 1,
             for m in after:
                 after[m].pop(ans.buy, None)
             after[a.victim][ans.buy] = u.pos.get(ans.buy, "MED")
-        r = _score(u, after, FINAL_TRIALS, seed)
+        answers.append(ans)
+        afters.append(after)
+    final = _score_many(u, [u.state.squads] + afters, FINAL_TRIALS, seed)
+    base, scored = final[0], final[1:]
+    rivals = [m for m in u.state.squads if m != u.me]
+    out = []
+    for a, ans, r in zip(keep, answers, scored):
         b_ = burn(u, a)
         charge = 0.0 if (lam is None or b_ is None) else lam * b_ / 1e6
         gross = base.expected_position() - r.expected_position()
