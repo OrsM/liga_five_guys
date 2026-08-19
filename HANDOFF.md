@@ -89,16 +89,26 @@ tables. Two wrong numbers were found and fixed on the way.
 
 ## What to do next
 
-1. **THE PRIMARY KEY IS A NORMALISED NAME AND A NAME IS NOT UNIQUE.** This is the biggest
-   correctness item left. LaLiga fields an Álvaro García at Villarreal and another at Rayo;
-   to this repo they are one player, with one price history built out of both their rows,
-   worth 0.50M or 19.76M depending on which row a lookup reaches first. Four of 647 keys
-   today, one of them owned. `crosswalk.namesakes()` prints them every run and marks the
-   owned ones — that is a warning, not a fix. Fixing it means keying on something unique:
-   the market's own slug is the candidate, `players.csv` already carries `market_slug`, and
-   two of the four colliding pairs have an EMPTY slug on one side, so it is not a free
-   substitution. It touches every reader in the repo. **Do not start this in the last hour
-   of a session.**
+1. **DONE 2026-08-20 — a shared name is keyed `name@club`.** Three names of 651
+   belonged to two players each, and one of them was owned: SusoGattuso's Álvaro
+   García read as the Villarreal reserve at 0.50M when the app says he holds the
+   Rayo one at 20.23M. His squad was 19.73M light, his projected season 27 points
+   light, and your odds against him 4 points flattering.
+
+   Four indexes keyed the same rows and now share one rule
+   (`ffcore.tidy.shared_names` / `row_key`): the market index, the player index,
+   the scorer's lookup and the crosswalk. The market slug was NOT the answer —
+   two of the six colliding rows have none. What decides is the club, and where
+   a caller has no club the app's own stated value does it instead
+   (`Market.key_for(name, value=...)`, the same evidence `api_key` already
+   trusts). A shared name asked without either REFUSES rather than picking one.
+
+   Two follow-ons, both small: the crosswalk drops a bare key once the market
+   says two men answer to it (it merges rather than rebuilds, so the stale key
+   otherwise lives for ever carrying one of their app ids), and
+   `inputs/rosters_initial.txt` accepts `alvaro garcia (Rayo)` — the one file a
+   human still types a name into.
+
 2. **Nothing yet reads the new data, and wiring it is a MODEL change.** Three separate
    decisions, each needing grading in `METHOD.md` rather than plumbing:
    - `api_stats` — per-week components, including `mins_played`, from the scorer itself.

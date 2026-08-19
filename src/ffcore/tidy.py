@@ -41,6 +41,7 @@ __all__ = ["ROOT", "TIDY", "SEASON", "DECISIONS", "REPORTS", "MADRID",
            "input_path", "read_csv", "write_csv", "append_csv", "widen_csv",
            "write_lines", "snapshot_stamp", "ledger_stamp", "latest_only", "snapshots",
            "Market", "Valuation", "load_market", "load_lineups",
+           "shared_names", "row_key",
            "load_players", "read_ledger", "LEDGER", "load_deadline", "LINEUP_SOURCE",
            "pick_source", "load_fixtures", "next_kickoff", "kickoff_stamp",
            "load_elo", "fresh_only", "DAILY_FRESH_DAYS",
@@ -602,14 +603,27 @@ XI_FIELDS = [("team", "team_slug", None), ("start", "start_pct", pct100),
              ("status", "status", None)]
 
 
-def _merge(players: dict, rows: list[dict], name_col: str, fields) -> dict:
+def _merge(players: dict, rows: list[dict], name_col: str, fields,
+           shared=(), club_of=None) -> dict:
     """Fold one source's rows into the player index. First writer of a field
     keeps it, so market's `team` beats the XI page's `team_slug` and a
-    duplicated name inside one snapshot doesn't flap."""
+    duplicated name inside one snapshot doesn't flap.
+
+    `shared` are the names two players answer to. A row carrying one of them
+    is filed under name@club — and a row from a source that cannot say which
+    club is DROPPED rather than folded into one of them, which is what used
+    to put a Villarreal reserve's price on a rival's 20M defender.
+    """
     for r in rows:
         key = norm(r.get(name_col))
         if not key:
             continue
+        if key in shared:
+            club = _club(r) or (club_of or {}).get(
+                norm(r.get("team_slug") or ""), "")
+            if not club:
+                continue
+            key = "%s@%s" % (key, club)
         rec = players.setdefault(key, {})
         rec.setdefault("name", (r.get(name_col) or "").strip())
         for field, col, parse in fields:
@@ -640,9 +654,17 @@ def load_players() -> dict[str, dict]:
     market, xi = latest_only(load_market()), latest_only(load_lineups())
     if not market and not xi:
         raise SystemExit("no rows in %s — run `ingest.py parse` first" % TIDY)
+    shared = shared_names(market)
+    # The probable-XI feeds name a club by slug, the market by name; the
+    # crosswalk holds both, so it is what lets an XI row for a shared name
+    # find the right man.
+    club_of = {}
+    for c in read_csv(TIDY / "clubs.csv"):
+        if c.get("ff_slug") and c.get("market"):
+            club_of[norm(c["ff_slug"])] = norm(c["market"])
     players: dict[str, dict] = {}
-    _merge(players, market, "name", MARKET_FIELDS)
-    _merge(players, xi, "player_name", XI_FIELDS)
+    _merge(players, market, "name", MARKET_FIELDS, shared, club_of)
+    _merge(players, xi, "player_name", XI_FIELDS, shared, club_of)
     return players
 
 
@@ -687,6 +709,39 @@ class Valuation(NamedTuple):
     name: str
 
 
+# How far apart two readings of one player's value may be and still be the
+# same player. ffcore.league uses the same figure on the same evidence: across
+# 70 owned players the two sources agreed to within 0.2%, and the one wrong
+# join was out by 603%.
+VALUE_TOLERANCE = 0.05
+
+
+def _club(row: dict) -> str:
+    """The club a market row belongs to, normalised — "" when it says none."""
+    return norm(row.get("team") or "")
+
+
+def shared_names(rows) -> set:
+    """The names in these market rows that belong to more than one player.
+
+    THREE INDEXES KEY THE SAME ROWS — Market here, the Scorer's lookup, and
+    the crosswalk — and they have to agree about this or a squad key from one
+    misses in the next. Three of 651 names on 2026-08-19.
+    """
+    clubs: dict[str, set] = {}
+    for r in rows:
+        n = norm(r.get("name"))
+        if n:
+            clubs.setdefault(n, set()).add(_club(r))
+    return {n for n, c in clubs.items() if len(c) > 1}
+
+
+def row_key(row: dict, shared: set) -> str:
+    """The key one market row belongs under: its name, or name@club."""
+    n = norm(row.get("name"))
+    return "%s@%s" % (n, _club(row)) if n in shared else n
+
+
 class Market:
     """Every market snapshot, indexed by normalised name.
 
@@ -703,14 +758,42 @@ class Market:
         # are asked about again and again — once per feed row, per run.
         self._resolved: dict[str, str | None] = {}
         self._by_key: dict[str, list[tuple[datetime, dict]]] = {}
+        # A NAME IS NOT A PLAYER. Two men called Álvaro García, one at Rayo
+        # worth 20.23M and one at Villarreal worth 0.50M, shared a key and
+        # therefore shared a price history — and a lookup got whichever the
+        # index happened to hand back. The name alone stays the key for the
+        # 648 players who have it to themselves; the three who do not get the
+        # club welded on, so the two histories cannot mix.
+        # WHO IS SHARED IS DECIDED BY TODAY'S MARKET, not by all of history.
+        # The other two indexes — load_players and the Scorer — see only the
+        # newest snapshot, and a key one of them splits while another merges
+        # is a lookup that silently misses. Over history five names were ever
+        # shared; three of them are two players today, and the other two are
+        # one player and a man who has left.
+        latest = latest_only(rows)
+        self._clubs: dict[str, set] = {}
+        for r in latest:
+            n = norm(r.get("name"))
+            if n:
+                self._clubs.setdefault(n, set()).add(_club(r))
+        self._shared = shared_names(latest)
         for r in rows:
-            key = norm(r.get("name"))
+            key = self.key_of(r)
             when = snapshot_stamp(r.get("observed_at", ""))
             if not key or when is None:
                 continue
             self._by_key.setdefault(key, []).append((when, r))
         for hist in self._by_key.values():
             hist.sort(key=lambda t: t[0])
+
+    def key_of(self, row: dict) -> str:
+        """The key a market row belongs under — its name, or name@club.
+
+        Public because the crosswalk and the scorer key the same rows and all
+        three indexes have to agree: one keeping both Álvaro Garcías apart
+        while another merges them is worse than either doing it alone.
+        """
+        return row_key(row, self._shared)
 
     def __len__(self) -> int:
         return len(self._by_key)
@@ -728,18 +811,46 @@ class Market:
             self._latest = latest_only(self.rows)
         return self._latest
 
-    def key_for(self, name):
-        """Normalised key for a human-typed name, or None if it doesn't
-        resolve uniquely. Substring and initials handled by ffcore.text."""
+    def key_for(self, name, team: str = "", value=None):
+        """Key for a human-typed name, or None if it doesn't resolve uniquely.
+
+        Substring and initials are handled by ffcore.text. A name TWO players
+        share resolves only when something says which: the club, or the price
+        somebody else put on him. Without one of those it returns None — the
+        state every caller already handles — because answering with either
+        man is the wrong number this exists to stop.
+        """
         k = norm(name)
+        if k in self._shared:
+            return self._pick(k, team, value)
         if k in self._by_key:
             return k
         if k in self._resolved:
             return self._resolved[k]
         row, _cands = resolve(name, self.latest_rows())
-        got = norm(row["name"]) if row else None
+        got = self.key_of(row) if row else None
         self._resolved[k] = got
         return got
+
+    def _pick(self, shared: str, team: str, value):
+        """Which of the men sharing this name, by club or by price."""
+        keys = ["%s@%s" % (shared, c) for c in sorted(self._clubs[shared])]
+        keys = [k for k in keys if k in self._by_key]
+        if team:
+            want = "%s@%s" % (shared, _club({"team": team}))
+            return want if want in keys else None
+        if value is None:
+            return None
+        # The price is an independent identifier and these are not close —
+        # the pair that started this differ by forty times. The tolerance is
+        # the one api_key already uses on the same evidence.
+        val = money(value) if isinstance(value, str) else float(value)
+        hits = []
+        for k in keys:
+            got = money((self._by_key[k][-1][1]).get("value"))
+            if got and val and abs(got - val) <= VALUE_TOLERANCE * max(got, val):
+                hits.append(k)
+        return hits[0] if len(hits) == 1 else None
 
     def latest(self) -> dict[str, dict]:
         """{key: newest row} — the 'what exists today' view."""
@@ -912,6 +1023,50 @@ def _selftest() -> None:
     # A table nothing has ever written is not "stale" — it never answered,
     # and the caller that degrades to the ledger says so differently.
     assert "api_nothing" not in stale_feeds(now=stale, names=("api_nothing",))
+
+    # -- a name is not a player ---------------------------------------------
+    # THE OLDEST KNOWN WRONG NUMBER IN THE REPO. The key was a normalised
+    # name, and LaLiga fields an Álvaro García at Villarreal worth 0.50M and
+    # another at Rayo worth 20.23M. To this index they were ONE player with
+    # one price history built out of both, and whichever row a lookup reached
+    # first decided what a squad was worth. One of the three collisions on
+    # 2026-08-19 was a player somebody owned.
+    tw = [{"name": "Álvaro García", "team": "Rayo", "value": "20233300",
+           "observed_at": "2026-08-19T1639Z"},
+          {"name": "Álvaro García", "team": "Villarreal", "value": "501929",
+           "observed_at": "2026-08-19T1639Z"},
+          {"name": "Pepelu", "team": "Valencia", "value": "7669774",
+           "observed_at": "2026-08-19T1639Z"}]
+    tm = Market(tw)
+    # Two men, two keys, two price histories.
+    assert len(tm) == 3, len(tm)
+    rayo, villa = tm.key_for("Álvaro García", team="Rayo"), \
+        tm.key_for("Álvaro García", team="Villarreal")
+    assert rayo and villa and rayo != villa, (rayo, villa)
+    assert tm.at(rayo, snapshot_stamp("2026-08-19T1700Z")).value == 20233300.0
+    assert tm.at(villa, snapshot_stamp("2026-08-19T1700Z")).value == 501929.0
+
+    # ASKED WITHOUT A DISCRIMINATOR, IT REFUSES. Returning either one is the
+    # bug; None is a caller that has to say which, and every caller of this
+    # already handles an unresolved name.
+    assert tm.key_for("Álvaro García") is None
+    assert tm.key_for("alvaro garcia") is None
+
+    # The app's own price tells them apart when the club is not to hand — the
+    # same evidence api_key already trusts, and it is not close: these two
+    # differ by forty times.
+    assert tm.key_for("Álvaro García", value=20233300) == rayo
+    assert tm.key_for("Álvaro García", value=501929) == villa
+    # A price that matches neither resolves to neither.
+    assert tm.key_for("Álvaro García", value=9e6) is None
+    # A club nobody of that name plays for is not a near miss.
+    assert tm.key_for("Álvaro García", team="Elche") is None
+
+    # AND NOTHING ELSE MOVES. A name only one man has keeps the key it always
+    # had, which is what keeps the ledger, the crosswalk and every stored
+    # decision readable.
+    assert tm.key_for("Pepelu") == norm("Pepelu")
+    assert norm("Pepelu") in tm.latest()
 
     mkt = [{"name": "Ane Aldea", "team": "Alavés", "position": "defensa",
             "value": "2.050.000", "delta_1d": "-12.000"},

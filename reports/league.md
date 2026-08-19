@@ -1,4 +1,4 @@
-# Squads — 2026-08-19 23:16 UTC
+# Squads — 2026-08-19 23:26 UTC
 
 | Manager | Players | Squad value | Spent | Raised | Cash |
 |---|--:|--:|--:|--:|--:|
@@ -6,7 +6,7 @@
 | Albert Laporta | 14 | 215.15M | 188.67M | 97.21M | ~9.81M |
 | BurtonGM89 | 12 | 210.95M | 182.90M | 97.50M | ~15.88M |
 | Magic Mike 333 | 16 | 238.94M | 121.23M | 19.14M | ~-817K |
-| SusoGattuso | 16 | 218.40M | 128.17M | 29.03M | ~2.13M |
+| SusoGattuso | 16 | 238.13M | 128.17M | 29.03M | ~2.13M |
 
 `~` is an estimate, not an observed balance — see the basis notes at the bottom. A negative one is a real position, not a broken input: going past the budget mid-window is allowed, and only being under water at the lock is not. Cash is a ceiling on what anyone can bid tomorrow, which is the point of tracking it.
 
@@ -91,7 +91,7 @@
 | jon karrikaburu | Real Sociedad | del | 533K | -6K | 0% | — |
 
 ## SusoGattuso
-16 players · 218.40M total · 12 at 70%+ · cash ~2.13M
+16 players · 238.13M total · 12 at 70%+ · cash ~2.13M
 
 | Player | Team | Pos | Value | 24h | FF | AF |
 |---|---|--:|--:|--:|--:|--:|
@@ -102,7 +102,7 @@
 | abdel abqar | Getafe | def | 7.25M | 37K | 70% | 100% |
 | jonny castro | Alavés | def | 6.00M | 224K | 70% | — |
 | clemens riedel | Espanyol | def | 4.93M | 152K | 90% | — |
-| alvaro garcia | Villarreal | def | 502K | 0K | 70% | 100% |
+| alvaro garcia | Rayo | med | 20.23M | 505K | 70% | 100% |
 | aimar oroz | Osasuna | med | 16.10M | 0K | 70% | 100% |
 | lorenzo amatucci | Deportivo | med | 13.56M | 257K | 90% | — |
 | izan merino | Málaga | med | 5.93M | -85K | 70% | 100% |

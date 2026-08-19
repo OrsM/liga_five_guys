@@ -69,7 +69,8 @@ alvaro djalo,alvaro djalo,athletic,11983,lvaro-djalo,,,
 alvaro f carreras,alvaro f. carreras,real madrid,10176,lvaro-fernandez-1,,,
 alvaro fernandez,alvaro fernandez,deportivo,3612,alvaro-fernandez,,2975,A. Ferllo
 alvaro fidalgo,alvaro fidalgo,betis,6393,lvaro-fidalgo,,,
-alvaro garcia,alvaro garcia,rayo,867,alvaro-garcia,47543,1029,Álvaro García
+alvaro garcia@rayo,alvaro garcia,rayo,867,alvaro-garcia,47543,1029,Álvaro García
+alvaro garcia@villarreal,alvaro garcia,villarreal,,,,,
 alvaro jimenez,alvaro jimenez,racing,,,,,
 alvaro mantilla,alvaro mantilla,racing,10336,lvaro-mantilla,181685,,
 alvaro nunez,alvaro nuñez,celta,11767,lvaro-nunez,182661,,
@@ -280,7 +281,8 @@ igor zubeldia,igor zubeldia,real sociedad,2802,igor-zubeldia,,265,Zubeldia
 iker cordoba,iker cordoba,valencia,14034,iker-cordoba,,,
 iker losada,iker losada,betis,7201,iker-losada,,,
 iker monreal,iker monreal,athletic,,,,,
-iker munoz,iker muñoz,osasuna,11362,iker-munoz,182621,2876,Iker Muñoz
+iker munoz@osasuna,iker muñoz,osasuna,11362,iker-munoz,182621,,
+iker munoz@sevilla,iker muñoz,sevilla,,iker-munoz-1,,2876,Iker Muñoz
 ilaix moriba,ilaix moriba,celta,8082,ilaix-moriba,,2607,Ilaix Moriba
 ilias akhomach,ilias akhomach,villarreal,9763,ilias-akhomach,,,
 inaki ruperez,iñaki ruperez,real sociedad,12694,inaki-ruperez,,,
@@ -483,7 +485,8 @@ mikel santos,mikel santos,athletic,14016,,,,
 moi gomez,moi gomez,osasuna,841,moi-gomez,,,
 morten hjulmand,morten hjulmand,atletico,10393,morten-hjulmand,,,
 mouctar diakhaby,mouctar diakhaby,valencia,3607,mouctar-diakhaby,,,
-moussa diarra,moussa diarra,alaves,12355,moussa-diarra-1,,,
+moussa diarra,moussa diarra,malaga,10832,moussa-diarra,,,
+moussa diarra@malaga,moussa diarra,malaga,10832,moussa-diarra,,,
 mykyta aleksandrov,mykyta aleksandrov,getafe,,,,,
 nacho perez,nacho perez,levante,16020,nacho-perez-1,504605,,
 nahuel tenaglia,nahuel tenaglia,alaves,9909,nahuel-tenaglia,6233,1337,Tenaglia
@@ -511,7 +514,8 @@ pablo busto,pablo busto,betis,12441,,,,
 pablo campos,pablo campos,levante,11807,pablo-campos,,,
 pablo duran,pablo duran,celta,10822,pablo-duran,,,
 pablo fornals,pablo fornals,betis,2632,pablo-fornals,1697,3099,Fornals
-pablo garcia,pablo garcia,deportivo,14097,pablo-garcia-1,443163,,
+pablo garcia@betis,pablo garcia,betis,13822,pablo-garcia-1,443163,,
+pablo garcia@deportivo,pablo garcia,deportivo,14097,,,,
 pablo gavi,pablo gavi,barcelona,9273,pablo-gavi,,1221,Gavi
 pablo ibanez,pablo ibañez,alaves,10258,pablo-ibanez,139001,,
 pablo lopez,pablo lopez,valencia,15000,,,,
@@ -605,6 +609,7 @@ tete morente,tete morente,elche,6882,tete-morente,,2941,T. Morente
 teun gijselhart,teun gijselhart,deportivo,18017,teun-gijselhart,,,
 theo folgado,theo folgado,real sociedad,16155,,,,
 thiago fernandez,thiago fernandez,levante,17116,thiago-fernandez,,,
+thiago fernandez@levante,thiago fernandez,levante,17116,thiago-fernandez,,,
 thiago pitarch,thiago pitarch,real madrid,16237,thiago-pitarch,,,
 thibaut courtois,thibaut courtois,real madrid,59,thibaut-courtois,,,
 thomas lemar,thomas lemar,atletico,3427,thomas-lemar,,,

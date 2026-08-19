@@ -309,12 +309,19 @@ class Scorer:
         # silently average opponent.
         self.board = board or {}
 
+        # THE SAME KEY THE MARKET INDEX USES. Keyed on norm(name) alone this
+        # held one row for the two Álvaro Garcías — so a squad that correctly
+        # named the Rayo one scored a blank, because the only row filed under
+        # that name was the Villarreal one.
+        from ffcore.tidy import row_key, shared_names
+
+        shared = shared_names(market)
         self.lookup: dict[str, dict] = {}
         for r in market:
             if r.get("slug"):
                 self.lookup[r["slug"]] = r
             if r.get("name"):
-                self.lookup[norm(r["name"])] = r
+                self.lookup[row_key(r, shared)] = r
 
         self.cal = cal or Calibration()
         self.second: dict[str, dict] = {}

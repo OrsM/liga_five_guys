@@ -28,7 +28,8 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from ffcore.crosswalk import Club, Crosswalk, Player  # noqa: E402
 from ffcore.text import norm  # noqa: E402
-from ffcore.tidy import TIDY, latest_only, read_csv  # noqa: E402
+from ffcore.tidy import (TIDY, latest_only, read_csv,  # noqa: E402
+                         row_key, shared_names)
 
 PLAYERS = "players.csv"
 CLUBS = "clubs.csv"
@@ -79,11 +80,15 @@ def namesakes(market) -> list[tuple[str, list]]:
     2026-08-19 that was 4 keys of 647, one of them owned — SusoGattuso's
     Álvaro García, 19.76M or 0.50M depending on which of them answered.
 
-    This does not fix it. Fixing it means keying on something that IS unique,
-    which is the market's own slug, and that is every reader in the repo. It
-    makes it VISIBLE, which is the difference between a known limit and a
-    silent wrong number: the run says so every time, and the day a collision
-    lands on a player somebody owns, it says that too.
+    THEY ARE KEPT APART NOW. Since 2026-08-20 a shared name is keyed
+    `name@club` — by ffcore.tidy.Market, by the player index, by the scorer's
+    lookup and here, all from one rule so the four cannot disagree. This list
+    is what that rule fired on, which is worth printing for the same reason
+    the freshness lights are: a silent mechanism is one nobody checks.
+
+    What still needs a human is the roster file, the one place a name is
+    typed: write `alvaro garcia (Rayo)` there and the club is folded into the
+    key. A shared name without one names either man.
     """
     seen: dict[str, set] = {}
     for r in market:
@@ -98,19 +103,52 @@ def build_players(market, lineups, starters, api_rows, lg, clubs) -> dict:
     from ffcore.league import api_key, app_ids_known
 
     by_club = {c.ff_slug: c.club_id for c in clubs.values() if c.ff_slug}
+    # ff_slug -> the club key the market index uses, so a probable-XI row can
+    # say WHICH of two men of one name it means.
+    ff_to_market = {c.ff_slug: norm(c.market) for c in clubs.values()
+                    if c.ff_slug and c.market}
+    # ONE RULE FOR THE KEY, shared with ffcore.tidy so the market index, the
+    # player index, the scorer and this table cannot disagree about which
+    # names belong to two men.
+    market_shared = shared_names(market)
     out: dict[str, Player] = {}
+    club_of: dict[str, str] = {}
     for r in market:
-        pid = norm(r.get("name"))
+        # THE MARKET'S OWN KEY, not norm(name). Two players share a name in
+        # this league and keying on the name alone kept one Player record for
+        # the pair — whichever row came last won, and the other man's club,
+        # slug and price history were simply gone.
+        pid = row_key(r, market_shared)
         if not pid:
             continue
         out[pid] = Player(pid, (r.get("name") or "").strip(),
                           norm(r.get("team")), (r.get("slug") or "").strip())
+        # Kept beside the record because Player.club_id is overwritten with a
+        # real club id further down, and the market's own spelling is what a
+        # probable-XI row has to be matched against.
+        club_of[pid] = norm(r.get("team"))
+
+    shared: dict[str, list] = {}
+    for p in out.values():
+        shared.setdefault(norm(p.name), []).append(p)
+
+    def by_name(name: str, team_slug: str = ""):
+        """The Player a feed row means, or None when the name is two men and
+        the row cannot say which."""
+        hits = shared.get(norm(name)) or []
+        if len(hits) == 1:
+            return hits[0]
+        want = ff_to_market.get((team_slug or "").strip())
+        if not want:
+            return None
+        found = [p for p in hits if club_of.get(p.player_id) == want]
+        return found[0] if len(found) == 1 else None
 
     # The two probable-XI feeds. Neither shares a slug space with the market
     # or with each other, so the name is the only way in — and it is done ONCE,
     # here, rather than in every module that wants a probability.
     for r in lineups:
-        pid = out.get(norm(r.get("player_name")))
+        pid = by_name(r.get("player_name"), r.get("team_slug"))
         slug = (r.get("player_slug") or "").strip()
         if pid is None or not slug:
             continue
@@ -130,7 +168,7 @@ def build_players(market, lineups, starters, api_rows, lg, clubs) -> dict:
         slug = (r.get("player_slug") or "").strip()
         if slug in ff_index:
             continue
-        p = out.get(norm(r.get("player_name")))
+        p = by_name(r.get("player_name"), r.get("team_slug"))
         if p is not None and slug and not p.ff_slug:
             p.ff_slug = slug
 
@@ -178,11 +216,26 @@ def main() -> None:
 
     fresh = Crosswalk(players, clubs)
     kept = Crosswalk.read(TIDY / PLAYERS, TIDY / CLUBS)
+    # A KEY THAT IS NOW KNOWN TO BE TWO PLAYERS IS DROPPED. This table merges
+    # rather than rebuilds, which is what makes an id resolved once stay
+    # resolved — and it is also what kept the bare `alvaro garcia` alive after
+    # the pair were split into name@club. It carried the app id of one of
+    # them, so the ledger went on joining a rival's 20.23M defender to a key
+    # that means either man. Only ever drops a key the market itself now says
+    # is ambiguous; nothing else about the merge changes.
+    doubled = {norm(p.name) for p in players.values()
+               if "@" in p.player_id}
+    dropped = [k for k in list(kept.players) if k in doubled]
+    for k in dropped:
+        del kept.players[k]
     kept.merge(fresh)
     kept.write(TIDY / PLAYERS, TIDY / CLUBS)
 
     c = kept.coverage()
     print("wrote %s and %s" % (TIDY / PLAYERS, TIDY / CLUBS))
+    if dropped:
+        print("  dropped %d key(s) that two players answered to: %s"
+              % (len(dropped), ", ".join(sorted(dropped))))
     print("%d players, %d clubs — %.0f%% carry a probable-XI slug, "
           "%.0f%% the second source's, %.0f%% an app id"
           % (c["players"], c["clubs"], 100 * c["ff"], 100 * c["af"],

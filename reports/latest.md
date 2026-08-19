@@ -23,16 +23,15 @@ _What the one table in [REPORT.md](REPORT.md) was built from: the eleven it assu
 
 _**pts/m** is points per match, last season shrunk toward the average and blended with this season as it accrues. `~` means no record at all, so the baseline is assumed. **Fix** is how much the next opponent moves it — `=` a median team, `—` no fixture known. **FF** is futbolfantasy's start percentage, **AF** is analiticafantasy's — `titular` there is a named starter with no number attached, `?` is listed without either, `—` is not listed at all. They are separate columns because neither has been checked against a played jornada yet, so there is no weight to blend them by, and a disagreement is worth more than an average. **xPts/j** = pts/m × Fix × FF, and uses FF only. `⚠` on a name means question 5 has something on him._
 
-_The `+SLOT` rows are today's slate: **xPts/j is the change to the whole eleven** if you sign him and re-pick the shape, not his own score, and it leaves the fixture OUT — you own a player for months, not for one round. `★` next to the opponent means this round's draw happens to be kind, `↓` that it is not; neither is in the number. What he would cost, and whether that is a good rate, is question 2._ _9 others on the slate would not improve this eleven, so they are priced there and not here._
+_The `+SLOT` rows are today's slate: **xPts/j is the change to the whole eleven** if you sign him and re-pick the shape, not his own score, and it leaves the fixture OUT — you own a player for months, not for one round. `★` next to the opponent means this round's draw happens to be kind, `↓` that it is not; neither is in the number. What he would cost, and whether that is a good rate, is question 2._ _8 others on the slate would not improve this eleven, so they are priced there and not here._
 
 **Nothing to change.** The model's best legal XI is the same eleven (4-5-1, index 46.5).
 
 ## 2. What to bid
 
-| Player — 11 on offer | Pos | Bid | XI | Competition | Note |
+| Player — 10 on offer | Pos | Bid | XI | Competition | Note |
 |---|---|--:|--:|---|---|
 | Juan Musso | por | 4.11M–15.98M | 10%/— | none |  |
-| Iker Muñoz | med | 1.30M–9.40M | 50%/75% | Albert +1.8, +1 more, (1 broke) |  |
 | Alberto Calatrava | med | 940K–6.82M | !15%/— | none |  |
 | Jose Alberto Lopez | ent | 879K–6.38M | !15%/— | none |  |
 | Kevin Sanchez | del | 854K–6.19M | 10%/— | none |  |
@@ -74,6 +73,7 @@ The app is offering these and no market row matches the name, so they carry no r
 
 - **Adama**
 - **Canales**
+- **Iker Muñoz**
 
 ## 3. Exceptions
 
@@ -124,4 +124,4 @@ _Compare squad value with the app; a mismatch means a name matched the wrong pla
 | Zeroed | injured, suspended, unavailable; a doubt is halved |
 | Fixture term | ±12% across the opponents ranked by Club Elo rating, plus ±4% for home advantage — both widths guesses, unfitted, and small enough that a wrong one costs a fraction of a point |
 
-_Generated 2026-08-19 23:17 UTC._
+_Generated 2026-08-19 23:26 UTC._

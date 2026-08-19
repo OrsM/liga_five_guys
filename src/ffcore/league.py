@@ -48,6 +48,8 @@ you" and suppresses every bid ceiling downstream.
 from __future__ import annotations
 
 import configparser
+import pathlib
+import re
 import os
 import sys
 from dataclasses import dataclass, field
@@ -138,7 +140,14 @@ def load_config(name: str = "league.ini") -> Config:
 
 
 def read_rosters(name: str = "rosters_initial.txt") -> dict[str, list[str]]:
-    """[manager] sections, one player name per line, # for comments."""
+    """[manager] sections, one player name per line, # for comments.
+
+    A NAME TWO PLAYERS ANSWER TO NEEDS A CLUB, and this file is the one place
+    a human still types a name. Write it as `alvaro garcia (Rayo)` and the
+    club is folded into the key the rest of the repo uses — the same
+    `name@club` the market index builds for a shared name. Without it the
+    line names either man and the app's own ownership silently disagrees.
+    """
     path = input_path(name)
     if not path.exists():
         raise SystemExit("missing %s" % path)
@@ -152,8 +161,16 @@ def read_rosters(name: str = "rosters_initial.txt") -> dict[str, list[str]]:
                 current = line[1:-1].strip()
                 rosters.setdefault(current, [])
             elif current:
+                m = _ROSTER_CLUB.match(line)
+                if m:
+                    line = "%s@%s" % (norm(m.group(1)), norm(m.group(2)))
                 rosters[current].append(line)
     return rosters
+
+
+# "alvaro garcia (Rayo)" — the club a shared name needs, in the one file a
+# human still writes.
+_ROSTER_CLUB = re.compile(r"^(.*?)\s*\(([^)]+)\)\s*$")
 
 
 def read_balances(name: str = "cash.txt") -> dict[str, tuple[float, str]]:
@@ -519,11 +536,17 @@ def api_key(raw: str, handle: str, market, ledger_owner: dict | None = None,
     # name that resolves to somebody the market values differently has found a
     # different player, and falling through to the next join is better than
     # confidently seating him in a rival's squad.
-    key = market.key_for(raw)
+    # THE PRICE ALSO SAYS WHICH OF TWO MEN OF ONE NAME. Two Álvaro Garcías
+    # play in this league, at Rayo and at Villarreal, 20.23M and 0.50M — and
+    # the market index now refuses that name outright unless something says
+    # which. The app states the value on the very row being joined, so it is
+    # handed in rather than checked afterwards: without it the join fails and
+    # a rival's best defender reads as a 0.50M reserve.
+    key = market.key_for(raw, value=market_value)
     if not _priced_like(key, raw, market_value, index):
         key = None
     if not key and (full or "").strip():
-        key = market.key_for(full.strip())
+        key = market.key_for(full.strip(), value=market_value)
         if not _priced_like(key, full, market_value, index):
             key = None
     if not key and app_ids and (app_id or "").strip():
@@ -1611,6 +1634,19 @@ def _selftest_cash() -> None:
     # No anchor at all: the caller falls back to the first deal on record, so
     # this must say so rather than invent a start.
     assert allowance(None, now, 100000) == (0.0, 0.0)
+
+    # -- a roster line can name the club, and must when the name is two men --
+    import tempfile as _tf
+    with _tf.TemporaryDirectory() as d:
+        f = pathlib.Path(d) / "r.txt"
+        f.write_text("[me]\nalvaro garcia (Rayo)\npepelu\n", encoding="utf-8")
+        got = read_rosters(f)["me"]
+    # THE ONE FILE A HUMAN STILL TYPES A NAME INTO, and a name is not a
+    # player: two Álvaro Garcías play in this league, 20.23M at Rayo and
+    # 0.50M at Villarreal. The club in brackets becomes the same name@club
+    # key the market index uses, so the roster and the app agree about which
+    # man a rival owns instead of disagreeing in a warning.
+    assert got == ["alvaro garcia@rayo", "pepelu"], got
 
     # -- what the app pays, measured on the one account that states a balance
     # THE FEED CANNOT SEE INCOME. Crediting rivals a bonus per day since the
