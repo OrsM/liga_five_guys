@@ -70,8 +70,8 @@ from ffcore.auth import API_BASE                    # noqa: E402
 from ffcore.tidy import ROOT, SEASON, TIDY, append_csv  # noqa: E402
 from sources import (API_LEAGUES_KEY, CAL_KEY, MATCH_KEY_RE,  # noqa: E402
                      ROW_TABLE, STORE_ONCE, league_sources, parse_points,
-                     played_sources, player_sources, season_label,
-                     source_for, sources)
+                     parser_sig, played_sources, player_sources,
+                     season_label, source_for, sources)
 
 RAW = ROOT / "raw"
 
@@ -546,7 +546,8 @@ def parse() -> None:
     for stamp, docs in walk:
         for key, (ck, origin) in docs.items():
             src = source_for(key)
-            if src is not None and src.table != "points" and ck not in cache:
+            if (src is not None and src.table != "points"
+                    and parse_key(ck, src) not in cache):
                 need.setdefault(origin, set()).add(key)
     misses = sum(len(v) for v in need.values())
 
@@ -558,7 +559,7 @@ def parse() -> None:
             # One bad page must not lose the rest of the run.
             print(f"  warn: {origin}/{key}: {type(e).__name__}: {e}")
             rows = []
-        cache[keys.of(key, html)] = rows
+        cache[parse_key(keys.of(key, html), src)] = rows
 
     hits = 0
     for stamp, docs in walk:
@@ -566,9 +567,10 @@ def parse() -> None:
             src = source_for(key)
             if src is None or src.table == "points":
                 continue          # points feeds data/season/live, via points.py
-            rows = cache.get(ck, [])
+            pk = parse_key(ck, src)
+            rows = cache.get(pk, [])
             hits += 1
-            fresh[ck] = rows
+            fresh[pk] = rows
             route(tables, rows, src.table, stamp)
     hits -= misses
     _save_parse_cache(fresh)
@@ -671,13 +673,28 @@ class _Sigs:
         return ck
 
 
-def _fingerprint() -> str:
-    import hashlib as _h
-    src = Path(__file__).with_name("sources.py")
-    try:
-        return _h.blake2b(src.read_bytes(), digest_size=8).hexdigest()
-    except OSError:
-        return ""
+_SIG_CACHE: dict[str, str] = {}
+
+
+def parse_key(content_key: str, src) -> str:
+    """The cache key for one document read by one parser.
+
+    THE CONTENT KEY IS NOT ENOUGH. A parse is a function OF the page and of
+    the code that reads it, and this cache used to carry only the page: a
+    single fingerprint over the whole of sources.py gated the lot, so touching
+    any parser — or a fixture string, or a comment — discarded four hundred
+    documents' worth of work and cost a forty-second rebuild.
+
+    Keyed per parser instead, on the closure of everything in sources.py that
+    parser can reach. A changed parser misses its own entries and re-parses
+    only its own pages; everybody else's stay. Stale entries need no eviction
+    because _save_parse_cache writes back only what this run actually used.
+    """
+    name = getattr(src.parse, "__name__", "")
+    sig = _SIG_CACHE.get(name)
+    if sig is None:
+        sig = _SIG_CACHE[name] = parser_sig(name)
+    return "%s@%s" % (content_key, sig)
 
 
 def _parse_cache(name: str = _CACHE) -> dict:
@@ -685,19 +702,16 @@ def _parse_cache(name: str = _CACHE) -> dict:
         blob = json.loads((TIDY / name).read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return {}
-    if blob.get("parser") != _fingerprint():
-        return {}
     return blob.get("docs", {})
 
 
 def _save_parse_cache(docs: dict, name: str = _CACHE) -> None:
     """Only what THIS run used, so the file cannot grow without bound: a page
-    nobody carried forward any more is a page nobody will ask about again."""
+    nobody carried forward any more is a page nobody will ask about again —
+    and neither is a parser nobody has any more."""
     TIDY.mkdir(parents=True, exist_ok=True)
     try:
-        (TIDY / name).write_text(
-            json.dumps({"parser": _fingerprint(), "docs": docs}),
-            encoding="utf-8")
+        (TIDY / name).write_text(json.dumps({"docs": docs}), encoding="utf-8")
     except OSError:
         pass
 

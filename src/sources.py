@@ -76,7 +76,7 @@ __all__ = ["BASE", "SOURCE", "MARKET_URL", "POINTS_URL", "TEAM_URL", "TEAMS",
            "LFG_SOURCE", "API_LEAGUES_KEY", "API_LEAGUES_URL",
            "API_MARKET_URL", "API_ACTIVITY_URL", "API_TEAMS_URL",
            "ACT_KIND", "ACT_JOINED", "ACT_BUY", "ACT_SELL", "STORE_ONCE",
-           "ROW_TABLE",
+           "ROW_TABLE", "parser_sig", "parser_deps", "top_level",
            "parse_api_leagues", "parse_api_market", "parse_api_activity",
            "parse_api_teams", "sign_api_leagues", "sign_api_market",
            "sign_api_activity", "sign_api_teams", "league_sources",
@@ -522,6 +522,122 @@ _WS = re.compile(r"\s+")
 # its input surface is those attributes rather than a region of the document.
 MARKET_SURFACE_RE = re.compile(
     r'data-(?:nombre|posicion|valor|diferencia1|diferencia-pct1|equipo)="[^"]*"')
+
+
+# ---------------------------------------------------------------------------
+# what a parser is made of — so a cache only dies when its own parser changes
+# ---------------------------------------------------------------------------
+#
+# ingest keeps every document's parsed rows between runs, keyed on the content
+# of the page, and threw the WHOLE cache away whenever this file changed. That
+# is correct and far too broad: touching one parser re-parses four hundred
+# documents through the other twenty, and a rebuild is forty seconds. Editing
+# a fixture string did it too.
+#
+# So a document's cache key carries the fingerprint of the parser that will
+# read it, and nothing else in this file can invalidate it. The fingerprint is
+# the function's own source plus the source of every top-level name it reaches,
+# transitively — its helpers, its constants, its regexes. This module imports
+# nothing from the repo (see the header: it self-tests with lxml alone), so
+# that closure is the whole of what a parse can depend on here, and the
+# exposure to a change in lxml itself is exactly what it was before.
+#
+# A name that cannot be found is not a reason to guess: `parser_sig` falls
+# back to the digest of the entire file, which is what it always used.
+
+
+_DEFS: dict[int, dict] = {}
+
+
+def _defs(source: str) -> dict[str, tuple[str, set]]:
+    """{top-level name: (its source text, the top-level names it references)}.
+
+    ONE PASS AND ONE MEMO. This file is 2,400 lines and every parser in the
+    registry wants the same map; building it per parser, and re-parsing each
+    definition to walk it, put six seconds into a run that has one second of
+    parsing to do.
+    """
+    import ast
+
+    hit = _DEFS.get(hash(source))
+    if hit is not None:
+        return hit
+    tree = ast.parse(source)
+    # Sliced off a list split ONCE. ast.get_source_segment re-splits the whole
+    # file per node, which over 2,400 lines and two hundred definitions was
+    # most of the cost of building this map.
+    lines = source.splitlines()
+    bodies: dict[str, list] = {}
+    text: dict[str, str] = {}
+    for node in tree.body:
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef,
+                             ast.ClassDef)):
+            names = [node.name]
+        elif isinstance(node, ast.Assign):
+            names = [t.id for t in node.targets if isinstance(t, ast.Name)]
+        elif isinstance(node, ast.AnnAssign) and isinstance(node.target,
+                                                            ast.Name):
+            names = [node.target.id]
+        else:
+            continue
+        seg = "\n".join(lines[node.lineno - 1:(node.end_lineno or node.lineno)])
+        for n in names:
+            text[n] = text.get(n, "") + seg
+            bodies.setdefault(n, []).append(node)
+    out = {n: (text[n],
+               {d.id for node in bodies[n] for d in ast.walk(node)
+                if isinstance(d, ast.Name)})
+           for n in bodies}
+    # Only references to things defined HERE are dependencies; a builtin, an
+    # import or a local simply is not in the map.
+    out = {n: (t, refs & set(out)) for n, (t, refs) in out.items()}
+    _DEFS[hash(source)] = out
+    return out
+
+
+def top_level(source: str) -> dict[str, str]:
+    """{top-level name: the source text that defines it}."""
+    return {n: t for n, (t, _refs) in _defs(source).items()}
+
+
+def parser_deps(source: str, name: str) -> set[str]:
+    """`name` and every top-level name it reaches, transitively.
+
+    Attribute access counts as a plain name — `SEVERITY.get` reaches SEVERITY
+    — because ast.Name covers the base of the attribute chain. Anything not
+    defined at the top level of this module drops out.
+    """
+    defs = _defs(source)
+    if name not in defs:
+        return set()
+    seen, stack = set(), [name]
+    while stack:
+        cur = stack.pop()
+        if cur in seen:
+            continue
+        seen.add(cur)
+        stack.extend(defs[cur][1] - seen)
+    return seen
+
+
+def parser_sig(name: str, source: str | None = None) -> str:
+    """A digest of everything in this file that `name` can depend on."""
+    if source is None:
+        source = _MY_SOURCE
+    defs, deps = top_level(source), parser_deps(source, name)
+    if not deps:
+        return hashlib.blake2b(source.encode("utf-8", "replace"),
+                               digest_size=8).hexdigest()
+    body = "\n".join("%s=%s" % (n, defs[n]) for n in sorted(deps))
+    return hashlib.blake2b(body.encode("utf-8", "replace"),
+                           digest_size=8).hexdigest()
+
+
+try:
+    _MY_SOURCE = __import__("pathlib").Path(__file__).read_text(
+        encoding="utf-8")
+except OSError:                                          # pragma: no cover
+    _MY_SOURCE = ""
 
 
 def _digest(parts) -> str | None:
@@ -2177,6 +2293,47 @@ def _selftest() -> None:
     assert sign_af_fixtures(_AF_HUB_FIXTURE) is not None
     assert sign_af_fixtures("<html><body>no matches</body></html>") is None
 
+    # -- what a parser is made of ------------------------------------------
+    # A document's parse is cached between runs and the WHOLE cache used to be
+    # discarded whenever this file changed — correct, and far too broad:
+    # touching one parser re-parsed four hundred documents through the other
+    # twenty, forty seconds, and editing a fixture string did it too.
+    sample = "\n".join([
+        "A = 1", "B = 2",
+        "def helper(x):", "    return x + A",
+        "def one(t):", "    return helper(t)",
+        "def two(t):", "    return B",
+    ])
+    assert parser_deps(sample, "one") == {"one", "helper", "A"}, \
+        parser_deps(sample, "one")
+    assert parser_deps(sample, "two") == {"two", "B"}
+    # A name defined nowhere at the top level — a builtin, an import, a local
+    # — is simply not in the map and drops out rather than being guessed at.
+    assert parser_deps(sample, "helper") == {"helper", "A"}
+    assert parser_deps(sample, "missing") == set()
+    # THE POINT: a change reaches exactly the parsers that can see it.
+    edited = sample.replace("return x + A", "return x - A")
+    assert parser_sig("one", edited) != parser_sig("one", sample)
+    assert parser_sig("two", edited) == parser_sig("two", sample)
+    # ...and a change to an unrelated constant reaches neither.
+    assert parser_sig("one", sample.replace("B = 2", "B = 3")) \
+        == parser_sig("one", sample)
+    # Two parsers are two fingerprints, or one cache entry would answer for
+    # the other the moment they were keyed together.
+    assert parser_sig("one", sample) != parser_sig("two", sample)
+    # Recursion terminates.
+    rec = "def loops(x):\n    return loops(x)"
+    assert parser_deps(rec, "loops") == {"loops"}
+    # A name nothing defines falls back to the digest of the whole file, which
+    # is what this always used to be — the safe answer, never a guess.
+    assert parser_sig("missing", sample) != parser_sig("missing", edited)
+
+    # Every parser in the registry must actually resolve, or it silently gets
+    # the whole-file fallback and the cache goes back to being all-or-nothing.
+    whole = parser_sig("no such function at all")
+    for src_ in sources():
+        assert parser_sig(src_.parse.__name__) != whole, src_.key
+
     # -- Club Elo, read out of a chart rather than off an API --------------
     el = parse_elo(_ELO_FIXTURE, "2026-01-01T0000Z", "elo")
     assert [r["club"] for r in el] == ["Barcelona", "Real Madrid",
@@ -2548,7 +2705,7 @@ def _selftest() -> None:
         assert s.sign(html) is not None, s.key
         assert isinstance(s.parse(html, "2026-01-01T0000Z", s.key), list), s.key
 
-    print("sources.py selftest OK (206 cases)")
+    print("sources.py selftest OK (218 cases)")
 
 
 if __name__ == "__main__":
