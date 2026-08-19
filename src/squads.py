@@ -17,7 +17,7 @@ Writes:
 watchlist.md went on 2026-08-18, with the board. It re-listed the slate with
 a value and two probable-XI columns, under a heading that promised "everyone
 unowned, ranked" — and after the cutover the ranking of everyone acquirable,
-free agents and rivals' players alike, is the one table in REPORT.md. What was
+free agents and rivals' players alike, is the one table on the board. What was
 genuinely only there is the FF/AF disagreement, which is now a column of the
 bid table in latest.md, next to the player it would change your mind about.
 
@@ -44,7 +44,7 @@ from ffcore.parse import fmt_money, fmt_pct  # noqa: E402
 from ffcore.score import SLOT, formations  # noqa: E402
 from ffcore.second import LEGEND, af_cell, second_cells  # noqa: E402
 from ffcore.text import norm  # noqa: E402
-from ffcore.tidy import (DECISIONS, REPORTS, append_csv,  # noqa: E402
+from ffcore.tidy import (DECISIONS, PARTS, append_csv,  # noqa: E402
                          load_players, write_lines)
 from slate import read_slate  # noqa: E402
 
@@ -333,7 +333,8 @@ def write_league(lg, players, stamp, second=None,
         if market is not None:
             out += sec_drift(dl, market)
 
-    write_lines(REPORTS / "league.md", out)
+    PARTS.mkdir(parents=True, exist_ok=True)
+    write_lines(PARTS / "league.md", out)
 
 
 def main():

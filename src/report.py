@@ -120,13 +120,16 @@ from ffcore.score import (ABSENT_START, MAX_SLOT, NEUTRAL_START,  # noqa: E402
                           SLOT_LABEL, SLOT_MIN, build, formations,
                           pick_xi, squad_pool)
 from ffcore.league import app_fielded  # noqa: E402
-from ffcore.tidy import (DECISIONS, REPORTS,  # noqa: E402
+from ffcore.tidy import (DECISIONS, PARTS,  # noqa: E402
                          age_phrase, append_csv, input_path, latest_only,
                          load_deadline, load_market, load_lineups, read_csv,
                          snapshot_stamp, stale_feeds, widen_csv, write_lines)
 from slate import read_slate  # noqa: E402
 
-HISTORY = REPORTS / "history"
+# reports/history/ held a copy of the workings per day. Git already holds
+# every version of every generated file with the run that produced it, so the
+# archive was a second copy of one, and it was the only thing in reports/ that
+# grew without bound. Dropped 2026-08-20.
 # In .runtime/ (gitignored): this file is a signal for a notifier, not a
 # document. Under reports/ or data/ the run would commit a "you have a Buy"
 # note that stops being true within the hour.
@@ -472,7 +475,7 @@ def sec_slate(lg, by_key, cands, pool, slate, prem, cash_value,
         # legend is a lookup, and a lookup is a table.
         out += ["", "| Column | What it is |", "|---|---|",
                 "| Bid | what it costs to win him — never whether he is worth "
-                "winning, which is the one table in [REPORT.md](REPORT.md). "
+                "winning, which is the one table on the board. "
                 "A purchase is closer to a loan than a spend: the value comes "
                 "back on sale, give or take %s, so a bid within a few percent "
                 "is not a decision |"
@@ -957,11 +960,10 @@ def main() -> None:
     market = latest_only(all_market)
     xi_rows = latest_only(load_lineups())
 
-    REPORTS.mkdir(exist_ok=True)
-    HISTORY.mkdir(parents=True, exist_ok=True)
+    PARTS.mkdir(parents=True, exist_ok=True)
 
     if not market:
-        write_lines(REPORTS / "latest.md", [
+        write_lines(PARTS / "latest.md", [
             "# Fantasy report", "",
             "No market data in `data/tidy/market.csv`. "
             "Did `ingest.py parse` run?"])
@@ -1061,7 +1063,7 @@ def main() -> None:
     # The workings open by naming what they are working out, and link back
     # rather than reprinting the decision above them.
     out: list[str] = [f"# The workings — {observed}", "",
-                      "_What the one table in [REPORT.md](REPORT.md) was "
+                      "_What the one table on the board was "
                       "built from: the eleven it assumes you field, what a "
                       "man on today's slate should cost, and the two ways any "
                       "of it can be wrong about a player._", ""]
@@ -1170,11 +1172,7 @@ def main() -> None:
     # decisions.json is sim.py's now. It is the same file the phone reads and
     # it carries moves rather than assets, because that is what the report
     # says; two writers would race, and the loser would be whichever ran first.
-    write_lines(REPORTS / "latest.md", out)
-    # History keeps both halves in one file: a day's report is the board AND
-    # what produced it, and splitting the archive would make it unreadable
-    # months later for the sake of a duplication that only matters live.
-    write_lines(HISTORY / f"{observed[:10]}.md", out)
+    write_lines(PARTS / "latest.md", out)
 
     # --- the notification surface -----------------------------------------
     # Written every run, and DELETED when there is nothing to say, so a
@@ -1333,7 +1331,7 @@ def _selftest() -> None:
 
     # It used to reprint the board's columns and its verdict beside every
     # name, which made it a second copy of a ranking. Whether to buy him is
-    # the one table in REPORT.md now; this is what to type into the app.
+    # the one table on the board now; this is what to type into the app.
     class _Mgr:
         handle, max_bid = "rival", 5e6
 

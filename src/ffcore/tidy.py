@@ -37,7 +37,7 @@ from typing import NamedTuple
 from ffcore.parse import money, pct100
 from ffcore.text import norm, resolve
 
-__all__ = ["ROOT", "TIDY", "SEASON", "DECISIONS", "REPORTS", "MADRID",
+__all__ = ["ROOT", "TIDY", "SEASON", "DECISIONS", "REPORTS", "PARTS", "MADRID",
            "input_path", "read_csv", "write_csv", "append_csv", "widen_csv",
            "write_lines", "snapshot_stamp", "ledger_stamp", "latest_only", "snapshots",
            "Market", "Valuation", "load_market", "load_lineups",
@@ -53,7 +53,17 @@ ROOT = Path(os.environ.get("FF_ROOT", "./data"))
 TIDY = ROOT / "tidy"
 SEASON = ROOT / "season"
 DECISIONS = ROOT / "decisions"
+# WHAT THE SITE GETS, and nothing else. reports/ held six markdown files and a
+# JSON; two of them were published and four existed only to be stitched into
+# those two, while a fifth was the same content as the board in another
+# rendering. A directory called "reports" that holds four things nobody reads
+# is four more places a number can appear and disagree with itself.
 REPORTS = Path("reports")
+
+# The render fragments the appendix is stitched from. Build artifacts, under
+# .runtime/ with the rest of them, untracked and unpublished — they are how
+# METHOD.md is made, not something to read.
+PARTS = Path(os.environ.get("LFG_PARTS", ".runtime/parts"))
 
 
 def _madrid():

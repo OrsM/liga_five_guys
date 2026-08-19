@@ -2,7 +2,7 @@
 methodology.py — how the forecast works, and how it is doing against reality.
 
 Writes reports/methodology.md, which digest.py stitches in as the LAST
-section of REPORT.md. Two halves:
+section of the appendix. Two halves:
 
   1. The formula, in words — pulled together from ffcore/score.py's
      constants so the text cannot drift from the code silently.
@@ -39,7 +39,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from ffcore.fixture import FIX_BAND, HOME_EDGE  # noqa: E402
 from ffcore.score import SHRINK_K  # noqa: E402
 from ffcore.text import norm, resolve  # noqa: E402
-from ffcore.tidy import (DECISIONS, LINEUP_SOURCE, REPORTS,  # noqa: E402
+from ffcore.tidy import (DECISIONS, PARTS, LINEUP_SOURCE,  # noqa: E402
                          DAILY_FRESH_DAYS, EVERY_RUN_FRESH_DAYS,
                          SEASON, TIDY, age_phrase, load_elo,
                          stale_feeds,
@@ -1055,8 +1055,9 @@ def main() -> None:
     out += formula_lines()
     out += comparison_lines()
     out += source_lines(load_actuals()[0])
-    write_lines(REPORTS / "methodology.md", out)
-    print(f"wrote {REPORTS/'methodology.md'} ({len(out)} lines)")
+    PARTS.mkdir(parents=True, exist_ok=True)
+    write_lines(PARTS / "methodology.md", out)
+    print(f"wrote {PARTS / 'methodology.md'} ({len(out)} lines)")
 
 
 # ---------------------------------------------------------------------------

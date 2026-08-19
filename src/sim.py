@@ -45,7 +45,8 @@ from decide import dead_weight  # noqa: E402,F401
 from ffcore.parse import fmt_money  # noqa: E402
 from ffcore.league import app_fielded  # noqa: E402
 from ffcore.render import title_name  # noqa: E402
-from ffcore.tidy import (REPORTS, age_phrase, stale_feeds,  # noqa: E402
+from ffcore.tidy import (PARTS, REPORTS, age_phrase,  # noqa: E402
+                         stale_feeds,
                          write_lines)
 
 OUT = "sim.md"
@@ -1129,7 +1130,7 @@ def placeholder(why: str) -> list[str]:
 def render(u, rows, base, stamp: str, rivals, n_actions: int = 0,
            locks_h=None, offers=None, saves=None) -> list[str]:
     # EVERYTHING UNDER A HEADING, including the preamble. digest.py drops a
-    # source's H1 when it stitches REPORT.md and keeps what follows, so a
+    # source's H1 when it stitches the appendix and keeps what follows, so a
     # preamble above the first `## ` arrives in the middle of the report
     # reading as the tail of whatever section came before it — which here is
     # the board's warnings.
@@ -1577,6 +1578,7 @@ def main() -> None:
     from ffcore.tidy import TIDY, latest_only, load_deadline, read_csv
 
     REPORTS.mkdir(exist_ok=True)
+    PARTS.mkdir(parents=True, exist_ok=True)
     rows_m = latest_only(read_csv(TIDY / "market.csv"))
     stamp = rows_m[0]["observed_at"] if rows_m else ""
     deadline = load_deadline()
@@ -1587,15 +1589,15 @@ def main() -> None:
     # The three states that are data problems rather than crashes, named
     # rather than rendered as an empty answer.
     if len(u.state.squads) < 2:
-        write_lines(REPORTS / OUT,
+        write_lines(PARTS / OUT,
                     placeholder("the league API has not been swept, so there "
                                 "are no rival squads to simulate against"))
-        print("wrote %s (placeholder)" % (REPORTS / OUT))
+        print("wrote %s (placeholder)" % (PARTS / OUT))
         return
     if not u.state.jornadas:
-        write_lines(REPORTS / OUT,
+        write_lines(PARTS / OUT,
                     placeholder("there are no jornadas left to play"))
-        print("wrote %s (placeholder)" % (REPORTS / OUT))
+        print("wrote %s (placeholder)" % (PARTS / OUT))
         return
 
     exp = u.forecaster.expected(u.state.jornadas[0])
@@ -1619,11 +1621,11 @@ def main() -> None:
                             if k not in u.state.squads[u.me]
                             and _exp.get(k, 0.0) > _bar
                             and p > u.cash + _spare], base)
-    write_lines(REPORTS / OUT,
+    write_lines(PARTS / OUT,
                 render(u, rows, base, stamp, rivals, len(acts), locks_h,
                        market_model(u), saves))
     print("wrote %s (%d moves, %d simulated in full)"
-          % (REPORTS / OUT, len(acts), len(rows)))
+          % (PARTS / OUT, len(acts), len(rows)))
 
     (REPORTS / "decisions.json").write_text(json.dumps({
         "generated_at": dt.datetime.now(dt.timezone.utc)

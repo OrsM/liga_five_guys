@@ -1,21 +1,22 @@
 """
-digest.py — the four report files, stitched into the one you actually read.
+digest.py — the render fragments, stitched into the appendix.
 
-    python src/digest.py            # writes reports/REPORT.md
+    python src/digest.py            # writes reports/METHOD.md
 
-Every generator writes its own file, and between them they repeat themselves.
-Concatenating all four produced a 504-line report in which Ionut Radu appeared
-six times, the same cash figure five times, and the same purchase rows four
-times, because deduplicating by HEADING only catches a block repeated under
-the same name — not the same fact printed under two different ones.
+THE REPORT IS THE BOARD. decisions.json carries the position, the change list,
+the ladder, the league table and the warnings, and the phone draws it with
+colour and alignment that markdown on a phone cannot manage. This file used to
+build a second rendering of exactly that — REPORT.md — and two renderings of
+one answer is how they come to disagree, which happened twice in one evening.
+So there is one document now, and it is the one thing the board does not say:
+how every number is made and every way it is known to be wrong.
 
-So this no longer concatenates. It takes latest.md whole (that is the decision
-report), pulls only the named sections worth carrying from the others, and
-LINKS to the rest. Nothing is deleted: the long tables still live in their own
-files, one tap away, and that is where they belong.
+Its sources are fragments under .runtime/parts/, one per generator. They are
+build artifacts rather than reports: nothing reads them, nothing publishes
+them, and reports/ holds exactly what the site gets.
 
-It reads the generated files rather than importing the generators, so nothing
-upstream has to change and a missing file is a skipped section, not a crash.
+It reads those fragments rather than importing the generators, so nothing
+upstream has to change and a missing one is a skipped section, not a crash.
 
 Run `python src/digest.py --selftest` to execute the self-test below.
 """
@@ -30,7 +31,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from typing import NamedTuple  # noqa: E402
 
-from ffcore.tidy import REPORTS, write_lines  # noqa: E402
+from ffcore.tidy import PARTS, REPORTS, write_lines  # noqa: E402
 
 
 class Part(NamedTuple):
@@ -40,55 +41,13 @@ class Part(NamedTuple):
     nest: bool = True          # False = keep own heading levels and preamble
 
 
-# latest.md's decision sections, and only these. It carries more — the sell
-# shortlist, the movers table — and that material is NOT duplicated anywhere
-# else, so it is left in latest.md and linked rather than deleted. This file is
-# what you read on a phone before a lock; latest.md is what you read when you
-# have time.
-# The one section of the workings that belongs beside the decision rather than
-# behind a link: a warning is a reason to distrust the table above it.
-POSITION = ["Warnings"]
-
-# Order matters: this is the order you read them in, not the order they are
-# generated.
-# The one section of sim.md that belongs in the appendix rather than the
-# report: how each number is made is not a thing you read before a deadline.
-REPORT_SKIP = {"what the simulation cannot see",
-               "act now or wait — the workings"}
-
-SOURCES = [
-    # THE DECISION FIRST, and it is now one thing: every move you could make,
-    # ranked by what it does to where you finish. It replaced a board that
-    # ranked every asset you could hold on points per million above
-    # replacement — one metric, but a proxy for this one, and a proxy that
-    # could not see a rival's player at all.
-    #
-    # Whole file, un-nested: it is a report, not an excerpt.
-    Part("Decide today", "sim.md", None, nest=False),
-    # Then the one section of the workings that belongs beside the decision.
-    # board.md used to sit here; it existed to hold the board, and for one
-    # afternoon after the board went it held two warnings and a stamp — a
-    # published report of eight lines. Gone.
-    Part("The squad", "latest.md", POSITION, nest=False),
-]
-
-# Printed as links, not content. Each is a whole file that would otherwise be
-# inlined and duplicate something above.
+# THE ONE DOCUMENT THIS BUILDS. There were two: REPORT.md, which was the
+# board's content rendered as markdown, and this. The board draws Now, the
+# ladder, the league table and — since 2026-08-20 — the warnings, in a
+# renderer that can colour a verdict and align a column; a second rendering of
+# one answer is how two of them come to disagree, which this repo has managed
+# twice. So the report is the board, and the only document is the appendix.
 #
-# Rival cash used to be stitched in here, on the argument that cash is a
-# ceiling on every bid. It is, and it is one tap away in league.md — but it was
-# fourteen lines about four other managers sitting above the eleven names you
-# came to check.
-#
-# league.md was two files until 2026-08-18: squads.md and rivals.md, which
-# between them printed the cash table twice, the ledger warnings twice and the
-# squads twice, from one module with no tests and one with a few.
-LINKS = [
-    ("How every number here is made, and what it cannot see", "METHOD.md"),
-]
-
-OUT = "REPORT.md"
-
 # THE APPENDIX. Everything true about HOW the numbers are made, so the report
 # can be the numbers. It is a second stitched file rather than a tail on the
 # first because the caveats are long, they change rarely, and they were
@@ -128,8 +87,8 @@ def _key(heading: str) -> str:
     return h
 
 
-def digest(read, sources=SOURCES, stamp: str = "",
-           links=LINKS, skip=frozenset(), title="", lead="") -> list[str]:
+def digest(read, sources=APPENDIX_SOURCES, stamp: str = "",
+           links=None, skip=frozenset(), title="", lead="") -> list[str]:
     """Assemble one report. `read(name)` returns the file's text, or None."""
     out = [("# " + (title or "Liga Five Guys — one report"))
            + (" — " + stamp if stamp else ""),
@@ -198,12 +157,13 @@ def digest(read, sources=SOURCES, stamp: str = "",
 
 def main() -> None:
     def read(name):
-        p = REPORTS / name
+        # The fragments, not reports/: these are how the appendix is made and
+        # are build artifacts under .runtime/, alongside every other one.
+        p = PARTS / name
         return p.read_text(encoding="utf-8") if p.exists() else None
 
     stamp = dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
     REPORTS.mkdir(exist_ok=True)
-    write_lines(REPORTS / OUT, digest(read, stamp=stamp, skip=REPORT_SKIP))
     write_lines(REPORTS / APPENDIX,
                 digest(read, APPENDIX_SOURCES, stamp=stamp, links=None,
                        # NO LEAD. It was a sentence restating the title,

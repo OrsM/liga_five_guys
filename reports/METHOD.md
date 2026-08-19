@@ -1,4 +1,4 @@
-# Liga Five Guys — how the numbers are made — 2026-08-19 23:34 UTC
+# Liga Five Guys — how the numbers are made — 2026-08-19 23:44 UTC
 
 
 
@@ -49,23 +49,23 @@
 
 | | Table | What it is used for | Fetched from | Rows | Newest row | Fetching |
 |---|---|---|---|--:|---|---|
-| 🟢 | api_activity | every transfer, which is what the ledger replays — one row per deal, so the newest is the last deal and not the last sweep | LaLiga Fantasy API | 71 | 19 Aug 23:07 | fetched 19 minutes ago |
-| 🟢 | api_leagues | your cash and the league's id | LaLiga Fantasy API | 28 | 19 Aug 23:16 | fetched 19 minutes ago |
-| 🟢 | api_lineup | the eleven you have actually fielded, and the formation the app says you are playing | LaLiga Fantasy API | 55 | 19 Aug 23:16 | fetched 19 minutes ago |
-| 🟢 | api_market | what is on offer, and the bids on it | LaLiga Fantasy API | 1,074 | 19 Aug 23:16 | fetched 19 minutes ago |
+| 🟢 | api_activity | every transfer, which is what the ledger replays — one row per deal, so the newest is the last deal and not the last sweep | LaLiga Fantasy API | 71 | 19 Aug 23:07 | fetched 29 minutes ago |
+| 🟢 | api_leagues | your cash and the league's id | LaLiga Fantasy API | 28 | 19 Aug 23:16 | fetched 29 minutes ago |
+| 🟢 | api_lineup | the eleven you have actually fielded, and the formation the app says you are playing | LaLiga Fantasy API | 55 | 19 Aug 23:16 | fetched 29 minutes ago |
+| 🟢 | api_market | what is on offer, and the bids on it | LaLiga Fantasy API | 1,074 | 19 Aug 23:16 | fetched 29 minutes ago |
 | 🟢 | api_players | names for players nobody owns any more — one row per player, first sighting kept | LaLiga Fantasy API | 58 | 19 Aug 22:20 | fetched 1 hour ago |
-| 🟢 | api_standings | the league table — position, points, squad value, and your balance | LaLiga Fantasy API | 140 | 19 Aug 23:16 | fetched 19 minutes ago |
-| 🟢 | api_stats | what the app scored each player, broken into what he did — one row per player per week per stat, a correction being a later row rather than an overwrite | LaLiga Fantasy API | 882 | 19 Aug 22:20 | fetched 19 minutes ago |
-| 🟢 | api_teams | all five squads | LaLiga Fantasy API | 2,101 | 19 Aug 23:16 | fetched 19 minutes ago |
+| 🟢 | api_standings | the league table — position, points, squad value, and your balance | LaLiga Fantasy API | 140 | 19 Aug 23:16 | fetched 29 minutes ago |
+| 🟢 | api_stats | what the app scored each player, broken into what he did — one row per player per week per stat, a correction being a later row rather than an overwrite | LaLiga Fantasy API | 882 | 19 Aug 22:20 | fetched 29 minutes ago |
+| 🟢 | api_teams | all five squads | LaLiga Fantasy API | 2,101 | 19 Aug 23:16 | fetched 29 minutes ago |
 | ⚪ | clubs | the same, for clubs | src/crosswalk.py | 20 | — | rebuilt every run from the tables above |
 | 🟢 | elo | team strength, which ranks the fixture term | clubelo.com | 200 | 19 Aug 23:16 | fetched 6 hours ago |
 | 🟢 | fixtures | who plays whom next, for the fixture term | analiticafantasy.com | 547 | 19 Aug 23:16 | fetched 6 hours ago |
 | 🟢 | lineups | probable XI percentages, both sources | analiticafantasy.com, futbolfantasy.com ×40 | 41,197 | 19 Aug 23:16 | fetched 6 hours ago |
-| 🟢 | market | price, value, position, fitness — every player in the game | futbolfantasy.com | 40,988 | 19 Aug 23:16 | fetched 19 minutes ago |
+| 🟢 | market | price, value, position, fitness — every player in the game | futbolfantasy.com | 40,988 | 19 Aug 23:16 | fetched 29 minutes ago |
 | 🟢 | matches | fixtures, kickoffs, results | futbolfantasy.com | 11,780 | 19 Aug 23:16 | fetched 6 hours ago |
 | ⚪ | players | the crosswalk: one key per player across all four spellings | src/crosswalk.py | 657 | — | rebuilt every run from the tables above |
-| 🟢 | points | realised points per jornada, the actuals in every table below | futbolfantasy.com | 132 | 19 Aug 22:20 | fetched 19 minutes ago |
-| 🟢 | starters | confirmed elevens, which is what P(start) is graded on | futbolfantasy.com | 6,470 | 19 Aug 23:16 | fetched 23 hours ago |
+| 🟢 | points | realised points per jornada, the actuals in every table below | futbolfantasy.com | 132 | 19 Aug 22:20 | fetched 29 minutes ago |
+| 🟢 | starters | confirmed elevens, which is what P(start) is graded on | futbolfantasy.com | 6,470 | 19 Aug 23:16 | fetched 24 hours ago |
 
 ### The model, as configured right now
 
@@ -135,7 +135,7 @@ _Per player-match. Positive error on **easier** together with negative on **hard
 _Brier: mean squared error of the probability, 0 perfect and 0.25 a coin flip. Claims are scored as last published before the round's first kickoff. Lower Brier **on starts** earns `LINEUP_SOURCE` in ffcore/tidy.py; appearances break ties only._
 
 
-_What the one table in [REPORT.md](REPORT.md) was built from: the eleven it assumes you field, what a man on today's slate should cost, and the two ways any of it can be wrong about a player._
+_What the one table on the board was built from: the eleven it assumes you field, what a man on today's slate should cost, and the two ways any of it can be wrong about a player._
 
 ## 2. What to bid
 
@@ -154,7 +154,7 @@ _What the one table in [REPORT.md](REPORT.md) was built from: the eleven it assu
 
 | Column | What it is |
 |---|---|
-| Bid | what it costs to win him — never whether he is worth winning, which is the one table in [REPORT.md](REPORT.md). A purchase is closer to a loan than a spend: the value comes back on sale, give or take 12%, so a bid within a few percent is not a decision |
+| Bid | what it costs to win him — never whether he is worth winning, which is the one table on the board. A purchase is closer to a loan than a spend: the value comes back on sale, give or take 12%, so a bid within a few percent is not a decision |
 | Bid, how it is priced | the floor plus what this league has actually paid over it: median +1.4%, -0.3% to +635.3% (n=33). 15 of those 33 went at the floor itself, so the minimum is not a number known to lose. The range is what has happened, not a chance of winning — and every one of them is a bid that won |
 | XI | FF's probable-eleven percentage — the one the forecast uses — then AF's read of the same eleven. Printed, never blended: two sources that disagree is the signal, and the reason to open the app before bidding |
 | XI, the marks | **FF** is futbolfantasy's probable-XI percentage, which is the one the forecast uses. **AF** is analiticafantasy's read of the same eleven, printed beside it and never blended in — `titular` is a named starter (a final call, with no number to it), a percentage is their editors' consensus, `?` means they list him without either, and `—` means they do not have him. Two columns that disagree are the signal; that is the whole point of carrying both. |
@@ -208,4 +208,4 @@ _Both figures are editorial reads refreshed a few times a day, not live probabil
 | Zeroed | injured, suspended, unavailable; a doubt is halved |
 | Fixture term | ±12% across the opponents ranked by Club Elo rating, plus ±4% for home advantage — both widths guesses, unfitted, and small enough that a wrong one costs a fraction of a point |
 
-_Generated 2026-08-19 23:34 UTC._
+_Generated 2026-08-19 23:44 UTC._
