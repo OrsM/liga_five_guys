@@ -17,17 +17,20 @@ The app publishes no balances, so this reconstructs them:
 
     cash = anchor_balance - buys_since_anchor + sales_since_anchor
 
-An anchor is a balance you actually observed, in inputs/cash.txt. For
-yourself you always have one. For rivals you usually don't, so the fallback
-anchor is `budget - (market value of their initial roster at the first
-snapshot)`, which assumes they paid roughly value for their starting squad.
-That assumption is wrong in both directions — draft prices aren't market
-values — so those estimates are labelled "estimated" and every consumer is
-expected to show the label, not just the number.
+An anchor is a balance somebody observed: the app's own `teamMoney` on this
+sweep for you, or a line typed into inputs/cash.txt. For rivals there usually
+is none — the API states `teamMoney` for the account that asks and null for
+everyone else — so the fallback anchor is the whole starting budget, because
+the draft deals the starting squad free.
+
+`budget - (market value of the initial roster)` was tried and was WRONG: it
+charged every manager for players they were given and put all four rivals tens
+of millions under water. Nothing computes it any more; the method that did was
+carried, uncalled, until 2026-08-19.
 
 Confidence is one of:
-    known      anchored on a balance you saw, plus exact ledger arithmetic
-    estimated  anchored on budget minus initial roster value
+    known      anchored on a balance somebody saw, plus exact ledger arithmetic
+    estimated  anchored on the starting budget
     unknown    no budget configured, or no ledger coverage — value is None
 
 Treat "estimated" as a ceiling rather than a balance: it ignores whatever
@@ -48,7 +51,7 @@ import configparser
 import os
 import sys
 from dataclasses import dataclass, field
-from datetime import datetime, timezone as dt_timezone
+from datetime import datetime, timedelta, timezone as dt_timezone
 from pathlib import Path
 from typing import NamedTuple
 
@@ -59,6 +62,7 @@ from ffcore.tidy import (Market, input_path, ledger_stamp, load_api_teams,
 
 __all__ = ["MARKET", "Config", "load_config", "read_rosters", "identify",
            "read_api_balances", "owner_from_api", "api_key", "owner_drift",
+           "allowance",
            "replay", "Cash", "Manager", "League"]
 
 # Reserved counterparty in the ledger: the free-agent pool.
@@ -223,6 +227,27 @@ def read_api_balances(rows=None) -> dict[str, tuple[float, str]]:
         # local wall-clock, so the wrong one is two hours out in summer.
         out[handle] = (value, snapshot_stamp(r.get("observed_at") or ""))
     return out
+
+
+def allowance(since, now, daily_bonus: float) -> tuple[float, float]:
+    """(euros the app has paid out since `since`, days it covers).
+
+    THE ANCHOR IS THE START, WHATEVER LABELLED IT. This used to be applied
+    only to ESTIMATED balances, on the reasoning that an observed balance
+    already contains every bonus paid — true of the moment it was read, and
+    false of every day after. The app's own reading is seconds old so it is
+    owed ~0 either way; a line typed into cash.txt four days ago is owed four
+    days, and without them it came back 0.40M light while still calling
+    itself "known".
+
+    No anchor is (0, 0) rather than a guess: the caller decides what to
+    measure from. A `since` in the future pays nothing — a clock a little out
+    is not a windfall.
+    """
+    if since is None or now is None:
+        return 0.0, 0.0
+    days = max(0.0, (now - since).total_seconds() / 86400.0)
+    return days * (daily_bonus or 0.0), days
 
 
 def _by_exact_value(raw_value, rows) -> str | None:
@@ -687,28 +712,6 @@ class League:
 
     # -- cash ----------------------------------------------------------
 
-    def _initial_value(self, handle: str):
-        """Market value of a manager's starting roster at the first snapshot.
-
-        None if the market data doesn't cover enough of it — better to admit
-        no estimate than to anchor on a squad we only priced half of.
-        """
-        if not self.market or not len(self.market):
-            return None
-        names = self.rosters.get(handle) or []
-        if not names:
-            return None
-        first = min((snapshot_stamp(r.get("observed_at", ""))
-                     for r in self.market.rows
-                     if snapshot_stamp(r.get("observed_at", ""))), default=None)
-        if first is None:
-            return None
-        vals = [self.market.at(n, first) for n in names]
-        got = [v.value for v in vals if v]
-        if len(got) < max(1, int(0.8 * len(names))):
-            return None
-        return sum(got)
-
     def _estimate_cash(self) -> None:
         balances = read_balances()
         me_balance = balances.pop("__me__", None)
@@ -775,20 +778,21 @@ class League:
                     counted += 1
 
             # THE DAILY ALLOWANCE, from the anchor to now. The feed cannot
-            # see it, so without this the estimate falls behind by the bonus
-            # every day and a rival looks poorer — and therefore less able to
-            # answer a clause — than he is. Only ever ADDS, and only for a
-            # manager whose balance is an estimate: an observed balance
-            # already contains every bonus paid up to the moment it was read.
-            bonus, days = 0.0, 0.0
-            if conf != "known" and self.cfg.daily_bonus:
-                start = since or min(
-                    (ledger_stamp(t.get("date", "")) for t in self.txns
-                     if ledger_stamp(t.get("date", ""))), default=None)
-                if start:
-                    days = max(0.0, (datetime.now(dt_timezone.utc)
-                                     - start).total_seconds() / 86400.0)
-                    bonus = days * self.cfg.daily_bonus
+            # see it, so without this a balance falls behind by the bonus
+            # every day and a manager looks poorer — and therefore less able
+            # to answer a clause — than he is. Only ever ADDS.
+            #
+            # EVERY ANCHOR, not only the estimated ones. An observed balance
+            # contains every bonus paid up to the moment it was READ and none
+            # of the ones paid since, so what matters is the anchor's age and
+            # not its label. The app's own reading is seconds old and collects
+            # nothing; the typed anchor in cash.txt was four days old and was
+            # 0.40M light for exactly this reason, while calling itself known.
+            start = since or min(
+                (ledger_stamp(t.get("date", "")) for t in self.txns
+                 if ledger_stamp(t.get("date", ""))), default=None)
+            bonus, days = allowance(start, datetime.now(dt_timezone.utc),
+                                    self.cfg.daily_bonus)
 
             value = base + sold - bought + bonus
             # The arithmetic, not just the answer. Every term is here so a
@@ -1273,6 +1277,28 @@ def _selftest_cash() -> None:
     assert any("overdrawn" in w for w in lg.warnings), lg.warnings
     assert not any("exceeds" in w for w in lg.warnings), lg.warnings
 
+    # -- the allowance an OBSERVED anchor is still owed ---------------------
+    # A typed balance contains every bonus paid up to the moment it was read
+    # and NONE of the ones paid since. Suppressing the allowance for every
+    # anchor labelled "known" was right for the app's own reading, which is
+    # seconds old, and wrong for a line in cash.txt: on 2026-08-19 the typed
+    # anchor of 2026-08-15 came back 0.40M light against the app's own figure
+    # and reported it as "known" — a stale number wearing the label that means
+    # observed. Days since the anchor x allowance is exactly that gap.
+    now = datetime(2026, 8, 19, 12, 0, tzinfo=dt_timezone.utc)
+    four_days = datetime(2026, 8, 15, 12, 0, tzinfo=dt_timezone.utc)
+    assert allowance(four_days, now, 100000) == (400000.0, 4.0)
+    # The app's own anchor is minutes old, so it is owed nothing worth
+    # printing — which is why this could never be caught on the API path.
+    assert allowance(now, now, 100000) == (0.0, 0.0)
+    # No allowance configured is no allowance, and an anchor from the future
+    # never pays one out.
+    assert allowance(four_days, now, 0) == (0.0, 4.0)
+    assert allowance(now, four_days, 100000) == (0.0, 0.0)
+    # No anchor at all: the caller falls back to the first deal on record, so
+    # this must say so rather than invent a start.
+    assert allowance(None, now, 100000) == (0.0, 0.0)
+
     # A manager with no budget configured is still genuinely unknown.
     blind = League(Config(me="nobody", budget=0.0), {"z": ["q"]}, [], None)
     assert blind["z"].cash.value is None and blind["z"].max_bid is None
@@ -1382,16 +1408,32 @@ def _selftest_identify() -> None:
         rich["rival"].cash.value, plain["rival"].cash.value)
     # It is shown in the arithmetic, not folded silently into the total.
     assert "daily allowance" in rich["rival"].cash.basis, rich["rival"].cash
-    # AN OBSERVED BALANCE ALREADY CONTAINS IT. Adding the allowance on top of
-    # a number the app stated would double-count every bonus ever paid.
-    at = "2026-08-17T2318Z"
-    mine = [{"manager": "me", "player_name": "P", "user_id": "1",
-             "team_money": "23596582", "observed_at": at}]
-    seen = League(Config(me="me", daily_bonus=100000.0), {"me": []}, [],
-                  Market([{"name": "P", "value": "1000000",
-                           "observed_at": at, "position": "MED"}]),
-                  api_teams=mine)
-    assert seen["me"].cash.value == 23596582.0, seen["me"].cash
+    # AN OBSERVED BALANCE ALREADY CONTAINS THE BONUSES PAID BEFORE IT WAS
+    # READ, AND NONE OF THE ONES PAID SINCE. So a reading taken on this sweep
+    # collects nothing — adding a season of allowance on top of a number the
+    # app stated would double-count every bonus ever paid…
+    def _mine(at, money="23596582"):
+        return [{"manager": "me", "player_name": "P", "user_id": "1",
+                 "team_money": money, "observed_at": at}]
+
+    def _seen(at):
+        return League(Config(me="me", daily_bonus=100000.0), {"me": []}, [],
+                      Market([{"name": "P", "value": "1000000",
+                               "observed_at": at, "position": "MED"}]),
+                      api_teams=_mine(at))
+
+    fresh_at = datetime.now(dt_timezone.utc).strftime("%Y-%m-%dT%H%MZ")
+    assert abs(_seen(fresh_at)["me"].cash.value - 23596582.0) < 5000, \
+        _seen(fresh_at)["me"].cash
+    # …but a reading the sweep has not refreshed for days HAS fallen behind by
+    # the allowance, and saying so is the whole point of tracking it. This is
+    # the same shape as the stale Elo rating: the number does not announce its
+    # own age, so the code has to.
+    stale_at = (datetime.now(dt_timezone.utc)
+                - timedelta(days=4)).strftime("%Y-%m-%dT%H%MZ")
+    aged = _seen(stale_at)["me"].cash
+    assert abs(aged.value - (23596582.0 + 400000.0)) < 5000, aged
+    assert "4 days" in aged.basis, aged.basis
 
 
 if __name__ == "__main__":                      # pragma: no cover

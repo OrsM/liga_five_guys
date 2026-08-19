@@ -289,8 +289,8 @@ are derived from the league's own API:
 | File | Was | Now |
 |---|---|---|
 | `transactions.csv` | append a row after every deal | **generated** from the app's activity feed by `src/ledger.py`, and moved to `data/tidy/` on 2026-08-19 — a file the run overwrites does not belong in the one directory you are asked to maintain |
-| `cash.txt` | a balance you read off a screen | your balance comes from the app, to the euro, every run |
-| `rosters_initial.txt` | the starting rosters, written once | still yours, and still needed: ownership comes from the app, but the draft does not — the feed's `joined` events name a manager and no players, so the 14 each began with exist nowhere else, and the replay off them is what prices every purchase and anchors every rival's cash |
+| `cash.txt` | a balance you read off a screen | your balance comes from the app, to the euro, every run — so the typed line is now purely the degradation path, and it was measured rather than trusted: with the API's balance withheld it reconstructs **0.04M against the app's own -0.03M**, where having no line at all gives -0.53M. It only earns that after 2026-08-19, when the allowance an anchor accrues *after* it was written stopped being suppressed. Rival balances have no other source at all: `teamMoney` is null for everyone but you. |
+| `rosters_initial.txt` | the starting rosters, written once | still yours, and still needed — but for one narrow job, measured: the app lists some players by surname alone (`Aimar`, `Brahim`, `Llorente`) and the market has two of each. The replay off this file is what breaks those ties. Delete it and **three owned players read as free agents**. It anchors no cash and prices no purchase; both of those come from the feed. |
 | `seen.txt` | OCR the market screenshot | **deleted** — the market feed, all 41 rows, with bid counts |
 | `squad.txt` | generated fallback roster | **deleted** — see below |
 | `deadline.txt` | typed lock time | **deleted** — the next kickoff is the lock |
