@@ -1,7 +1,7 @@
 # Starting rosters — the 14 each manager began the season with.
 #
 # WRITE ONCE. Never edit this to reflect a transfer; that is what
-# inputs/transactions.csv is for. Current ownership is derived by
+# the ledger (data/tidy/transactions.csv) is for. Current ownership is derived by
 # replaying the whole ledger on top of this, every run.
 #
 # Section names are the app handles exactly as the Activity feed writes

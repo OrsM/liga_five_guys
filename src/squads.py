@@ -2,7 +2,7 @@
 
 Reads:
   inputs/rosters_initial.txt  starting rosters — write once, never edit
-  inputs/transactions.csv     append-only ledger of every market operation
+  data/tidy/transactions.csv  the ledger of every market operation, generated
   inputs/league.ini           managers, budgets, thresholds (all optional)
   inputs/cash.txt             any balance you have actually seen
   data/tidy/*.csv             values, 24h moves, start probabilities
@@ -91,7 +91,7 @@ def log_slate(on_offer, players, stamp):
     the floor for, which is the ceiling evidence issue #21 asked about — and it
     arrives for free, as a by-product of the paste you already do, rather than
     from a field you have to come back and update. Join it to
-    inputs/transactions.csv to ask what went unsold.
+    the ledger to ask what went unsold.
 
     Nothing reads this yet. A fortnight of slates is not a base rate, and
     saying so is cheaper than a section that pretends otherwise.
@@ -308,8 +308,9 @@ def write_league(lg, players, stamp, second=None,
                 "Placed by who the counterparty was, or by what the price "
                 "implies — a player sold by a manager was in that manager's "
                 "squad, and a player bought from the market was in nobody's "
-                "(issue #26). Fix the spelling in `inputs/transactions.csv` if "
-                "one of these is the wrong player.", ""]
+                "(issue #26). The ledger itself is generated and editing it "
+                "does nothing, so a wrong player here is fixed in "
+                "`inputs/rosters_initial.txt`.", ""]
         out += ["- " + r for r in lg.resolved] + [""]
 
     unmatched = lg.unmatched(players)

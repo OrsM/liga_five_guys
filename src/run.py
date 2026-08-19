@@ -13,7 +13,7 @@ keyed on the thing itself rather than on a name: ffcore.text.norm on the
 string, sources._css on the selector, the parse caches on document content,
 and ffcore.tidy.read_csv on the file's mtime and size — with every writer in
 that module dropping its own path as well. That last one is the load-bearing
-case, because ledger rewrites inputs/transactions.csv and squads reads it
+case, because ledger rewrites data/tidy/transactions.csv and squads reads it
 back, and points writes data/season/live for methodology to read. A read
 cache keyed on the path alone would turn this file from a speed-up into a
 stale-data bug.

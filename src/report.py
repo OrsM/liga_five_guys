@@ -668,7 +668,7 @@ def sec_eleven(marked, best, players, second=None, buys=None) -> list[str]:
 
     if not players:
         return out + ["_No roster. Check `inputs/rosters_initial.txt` and "
-                      "`inputs/transactions.csv`._", ""]
+                      "`data/tidy/transactions.csv`._", ""]
     if marked is None:
         return out + ["_No marks to read. `inputs/lineup.txt` is missing or "
                       "empty — run `squads.py`, then tick the eleven you are "

@@ -17,7 +17,7 @@ current code ever looks at.
 
 TIMEZONES, the trap this module exists to close. ff_ingest stamps snapshots
 in UTC ("2026-08-12T2100Z"). The app's Activity feed, and therefore every
-date in inputs/transactions.csv, is Europe/Madrid wall-clock with no offset
+date in the ledger, is Europe/Madrid wall-clock with no offset
 written down ("2026-08-12T21:24"). In August that is two hours apart. Compare
 them naively and a purchase gets matched to a snapshot taken two hours after
 it, which is exactly the direction that makes an overpay look like a bargain.
@@ -41,7 +41,7 @@ __all__ = ["ROOT", "TIDY", "SEASON", "DECISIONS", "REPORTS", "MADRID",
            "input_path", "read_csv", "write_csv", "append_csv", "widen_csv",
            "write_lines", "snapshot_stamp", "ledger_stamp", "latest_only", "snapshots",
            "Market", "Valuation", "load_market", "load_lineups",
-           "load_players", "read_ledger", "load_deadline", "LINEUP_SOURCE",
+           "load_players", "read_ledger", "LEDGER", "load_deadline", "LINEUP_SOURCE",
            "pick_source", "load_fixtures", "next_kickoff", "kickoff_stamp",
            "load_elo", "fresh_only", "DAILY_FRESH_DAYS"]
 
@@ -244,7 +244,7 @@ def snapshot_stamp(s: str):
 
 
 def ledger_stamp(s: str):
-    """A transactions.csv date -> aware UTC.
+    """A ledger date -> aware UTC.
 
     The string is Madrid wall-clock because that is what the app displayed
     when you copied it. Read as UTC it would be two hours early all summer.
@@ -482,13 +482,22 @@ def load_players() -> dict[str, dict]:
     return players
 
 
-def read_ledger(name: str = "transactions.csv") -> list[dict]:
-    """inputs/transactions.csv, comments stripped, oldest first.
+# Every market operation of the season, rebuilt from the app's activity feed
+# by src/ledger.py. IT LIVES IN data/ BECAUSE NOBODY TYPES IT ANY MORE. It sat
+# in inputs/ for as long as a human had to append a row after every deal;
+# ledger.py took that job on 2026-08-18 and the file stayed where it was,
+# which left the one directory a human is asked to maintain holding a file
+# that overwrites anything typed into it on the next run.
+LEDGER = TIDY / "transactions.csv"
+
+
+def read_ledger(path=LEDGER) -> list[dict]:
+    """The ledger, comments stripped, oldest first.
 
     The file carries its own documentation as # lines below the header, and
     a row whose player field is blank is a stray comma, not a transaction.
     """
-    path = input_path(name)
+    path = Path(path)
     if not path.exists():
         return []
     with path.open(newline="", encoding="utf-8") as fh:

@@ -74,10 +74,7 @@ DEFAULTS = {
     "me": "miguel_autentico",
     "budget": "100000000",
     "min_start": "60",
-    "top_n_per_pos": "8",
     "start_cross": "70",
-    "keeper_start": "80",
-    "riser_pct": "2",
     "shrink_k": "8",
     "daily_bonus": "0",
 }
@@ -95,10 +92,7 @@ class Config:
     budget: float = float(DEFAULTS["budget"])
     budgets: dict = field(default_factory=dict)   # per-manager override
     min_start: float = 60.0
-    top_n_per_pos: int = 8
     start_cross: float = 70.0
-    keeper_start: float = 80.0
-    riser_pct: float = 2.0
     shrink_k: float = 8.0
     # The app pays a small allowance every day. It is not in the ledger and
     # never will be — the activity feed records deals, not gifts — so an
@@ -127,13 +121,8 @@ def load_config(name: str = "league.ini") -> Config:
         me=get("league", "me", DEFAULTS["me"]),
         budget=money(get("league", "budget", DEFAULTS["budget"])) or 0.0,
         min_start=float(get("thresholds", "min_start", DEFAULTS["min_start"])),
-        top_n_per_pos=int(get("thresholds", "top_n_per_pos",
-                              DEFAULTS["top_n_per_pos"])),
         start_cross=float(get("thresholds", "start_cross",
                               DEFAULTS["start_cross"])),
-        keeper_start=float(get("thresholds", "keeper_start",
-                               DEFAULTS["keeper_start"])),
-        riser_pct=float(get("thresholds", "riser_pct", DEFAULTS["riser_pct"])),
         shrink_k=float(get("thresholds", "shrink_k", DEFAULTS["shrink_k"])),
         # Read from [league], beside the budget it corrects, rather than from
         # [thresholds]: it is a fact about how the app pays, not a knob.
@@ -365,7 +354,7 @@ def ledger_from_api(activity: list[dict], users: dict,
                     names: dict) -> list[dict]:
     """The transaction ledger, derived from the app's activity feed.
 
-    `inputs/transactions.csv` was typed by hand after every deal, which made
+    The ledger was typed by hand after every deal, which made
     it the one input that could silently fall behind — and on 2026-08-17 it
     was three days behind, which is what made the report offer a 63.29M budget
     against a real 23.60M. A feed cannot forget.
@@ -860,8 +849,7 @@ budget = 100.000.000
 
 [thresholds]
 min_start     = 60    ; watchlist floor
-top_n_per_pos = 8     # rows per position
-start_cross   = 70
+start_cross   = 70    # rows per position
 """
     with tempfile.TemporaryDirectory() as tmp:
         p = Path(tmp) / "league.ini"
@@ -871,14 +859,19 @@ start_cross   = 70
     assert cfg.me == "someone", cfg.me
     assert cfg.budget == 100_000_000, cfg.budget
     assert cfg.min_start == 60.0, cfg.min_start        # ';' inline comment
-    assert cfg.top_n_per_pos == 8, cfg.top_n_per_pos   # '#' inline comment
-    assert cfg.start_cross == 70.0, cfg.start_cross    # no comment
-    assert cfg.keeper_start == 80.0, cfg.keeper_start  # absent -> default
+    assert cfg.start_cross == 70.0, cfg.start_cross    # '#' inline comment
+    assert cfg.shrink_k == 8.0, cfg.shrink_k           # absent -> default
     # A key nothing reads any more must not stop the file loading: league.ini
     # still carrying `lambda_buffer` from before λ was retired is ignored, not
     # an error, because config files outlive the code that read them.
     assert load_config is not None
     assert not hasattr(cfg, "lambda_buffer"), "lambda_buffer should be gone"
+    # THE SAME RETIREMENT, THREE MORE KEYS. `top_n_per_pos`, `keeper_start`
+    # and `riser_pct` sized the watchlist and watch.py's alerts, both gone
+    # with the board on 2026-08-18. A threshold the code still parses is a
+    # knob the reader believes is connected to something.
+    for gone in ("top_n_per_pos", "keeper_start", "riser_pct"):
+        assert not hasattr(cfg, gone), gone
 
     # The real file must load, whatever is in it today.
     real = load_config()

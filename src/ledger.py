@@ -1,11 +1,11 @@
 """
-ledger.py — rebuild inputs/transactions.csv from the app's activity feed.
+ledger.py — rebuild data/tidy/transactions.csv from the app's activity feed.
 
     python src/ledger.py            # show what would change
     python src/ledger.py --write    # write it
     python src/ledger.py --selftest
 
-`inputs/transactions.csv` was the one input a human had to remember to update.
+The ledger was the one input a human had to remember to update.
 On 2026-08-17 it was three days behind and the report offered a 63.29M budget
 against a real 23.60M. It was never wrong, only late — which for a decision
 system is the same thing.
@@ -30,7 +30,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from ffcore.league import ledger_from_api  # noqa: E402
-from ffcore.tidy import (input_path, load_api_activity,  # noqa: E402
+from ffcore.tidy import (LEDGER, load_api_activity,  # noqa: E402
                          load_api_players, load_api_teams)
 
 FIELDS = ["date", "player", "from", "to", "price", "note"]
@@ -69,8 +69,7 @@ def render(rows: list[dict]) -> str:
     return buf.getvalue()
 
 
-def existing() -> list[dict]:
-    path = input_path("transactions.csv")
+def existing(path=LEDGER) -> list[dict]:
     if not path.exists():
         return []
     with open(path, encoding="utf-8") as fh:
@@ -79,7 +78,7 @@ def existing() -> list[dict]:
             if r.get("date")]
 
 
-def write(rows: list[dict], force: bool = False) -> str:
+def write(rows: list[dict], force: bool = False, path=LEDGER) -> str:
     """Replace the ledger, or refuse and say why.
 
     THE GUARD IS THE POINT. An empty feed is indistinguishable from a feed we
@@ -88,14 +87,14 @@ def write(rows: list[dict], force: bool = False) -> str:
     in a file that is then committed. So a build that produces fewer rows than
     the file already holds is refused unless asked twice.
     """
-    path = input_path("transactions.csv")
-    had = len(existing())
+    had = len(existing(path))
     if not rows:
         return "REFUSED: the feed produced no rows at all — nothing written."
     if len(rows) < had and not force:
         return ("REFUSED: would shrink the ledger from %d rows to %d. "
                 "That is what a failed fetch looks like. Re-run with --force "
                 "if the shrink is real." % (had, len(rows)))
+    path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(render(rows), encoding="utf-8")
     return "wrote %d rows to %s (was %d)" % (len(rows), path, had)
 
@@ -113,39 +112,37 @@ def _selftest() -> None:
     assert all(ln.startswith("#") for ln in HEADER.splitlines()), HEADER
 
     # -- the guard ---------------------------------------------------------
+    # Against a real file in a temp directory, and by ARGUMENT rather than by
+    # monkeypatching the path resolver: the guard is about what is on disk, so
+    # a test that fakes the disk is testing something else. This used to swap
+    # out ffcore.tidy.input_path and set an FF_INPUTS nothing ever read.
     import tempfile
     from pathlib import Path
     with tempfile.TemporaryDirectory() as d:
-        os.environ["FF_INPUTS"] = d
         p = Path(d) / "transactions.csv"
         p.write_text(render(rows * 3))
+        assert len(existing(p)) == 3, existing(p)
+        # An empty build never writes, whatever else is true.
+        msg = write([], path=p)
+        assert msg.startswith("REFUSED") and "no rows" in msg, msg
+        assert len(existing(p)) == 3, "an empty build wrote anyway"
+        # A shrink is refused by default…
+        msg = write(rows, path=p)
+        assert msg.startswith("REFUSED") and "shrink" in msg, msg
+        assert len(existing(p)) == 3, "a shrink wrote anyway"
+        # …and allowed when asked twice.
+        msg = write(rows, force=True, path=p)
+        assert msg.startswith("wrote 1 rows"), msg
+        assert len(existing(p)) == 1, existing(p)
+        # Growth is the normal case and needs no flag.
+        assert write(rows * 5, path=p).startswith("wrote 5 rows")
+        # A ledger that has never been written is not a shrink.
+        fresh = Path(d) / "new" / "transactions.csv"
+        assert existing(fresh) == []
+        assert write(rows, path=fresh).startswith("wrote 1 rows")
+        assert len(existing(fresh)) == 1
 
-        import ffcore.tidy as tidy
-        real = tidy.input_path
-        tidy.input_path = lambda n: Path(d) / n
-        globals()["input_path"] = tidy.input_path
-        try:
-            assert len(existing()) == 3, existing()
-            # An empty build never writes, whatever else is true.
-            msg = write([])
-            assert msg.startswith("REFUSED") and "no rows" in msg, msg
-            assert len(existing()) == 3, "an empty build wrote anyway"
-            # A shrink is refused by default…
-            msg = write(rows)
-            assert msg.startswith("REFUSED") and "shrink" in msg, msg
-            assert len(existing()) == 3, "a shrink wrote anyway"
-            # …and allowed when asked twice.
-            msg = write(rows, force=True)
-            assert msg.startswith("wrote 1 rows"), msg
-            assert len(existing()) == 1, existing()
-            # Growth is the normal case and needs no flag.
-            assert write(rows * 5).startswith("wrote 5 rows")
-        finally:
-            tidy.input_path = real
-            globals()["input_path"] = real
-            os.environ.pop("FF_INPUTS", None)
-
-    print("ledger.py self-test OK (12 cases)")
+    print("ledger.py self-test OK (15 cases)")
 
 
 if __name__ == "__main__":
