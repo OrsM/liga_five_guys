@@ -40,18 +40,18 @@ Biggest misses (forecast − actual):
 
 ### Who to believe about the eleven
 
-**88 confirmed starters** across 1 locked round(s), off the match pages. A substitute is a MISS here — this is the question both sources are answering. The claim scored is the last one published before the round's first kickoff, because that is when the lineup locked and later news could not have been acted on.
+**110 confirmed starters** across 1 locked round(s), off the match pages. A substitute is a MISS here — this is the question both sources are answering. The claim scored is the last one published before the round's first kickoff, because that is when the lineup locked and later news could not have been acted on.
 
 | Source | Calls | Mean claim | Started | Brier |
 |---|--:|--:|--:|--:|
-| analitica | 26 | 88% | 85% | 0.111 |
-| futbolfantasy ←read | 176 | 42% | 41% | 0.035 |
+| analitica | 43 | 87% | 79% | 0.134 |
+| futbolfantasy ←read | 224 | 41% | 41% | 0.045 |
 
 _**Brier** is the mean squared error of the probability: lower is better, 0.25 is a coin flip, and it punishes confidence more than caution. A source whose mean claim sits far from its start rate is miscalibrated even if it ranks players well._
 
 - **analitica** — 31 calls published with no number on them, 100% started
 
-_40 claim(s) sat within 10 points of 50%: not a call either way, so not graded._
+_49 claim(s) sat within 10 points of 50%: not a call either way, so not graded._
 
 _Read the gap between the sources, not the level. The clubs playing the round's opening matches have their elevens CONFIRMED by the time it locks, and both sources copy them, so their share of the table is scored on published fact rather than on a forecast. Whichever source publishes more of those looks better than it forecasts._
 

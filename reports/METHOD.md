@@ -1,4 +1,4 @@
-# Liga Five Guys — how the numbers are made — 2026-08-19 00:00 UTC
+# Liga Five Guys — how the numbers are made — 2026-08-19 00:06 UTC
 
 Everything about HOW, so the report can be the numbers. The fits, the estimates, and every way each one is known to be wrong.
 
@@ -7,8 +7,8 @@ Everything about HOW, so the report can be the numbers. The fits, the estimates,
 
 | Route | What it offers | Season pts |
 |---|---|--:|
-| **Act today** | 38 players you can buy now | +209 |
-| Wait for the market | a week of new offers | +198 |
+| **Act today** | 39 players you can buy now | +213 |
+| Wait for the market | a week of new offers | +202 |
 | Wait for the clauses | 62 players on 24 Aug | +160 |
 
 _Season points, so this can be compared with the table below rather than sitting in its own unit. Waiting pays for the delay: a jornada of the best thing you can buy today is forgone before the better one arrives. These are estimates from a rate; the table's are simulated._
@@ -17,21 +17,21 @@ _Season points, so this can be compared with the table below rather than sitting
 
 | Player | Would add | Likely wait to be offered |
 |---|--:|--:|
-| Lamine Yamal | +7.37 | 16 days |
-| Kylian Mbappe | +6.41 | 16 days |
-| Jan Oblak | +4.91 | 18 days |
-| Zaid Romero | +4.58 | 20 days |
+| Lamine Yamal | +6.86 | 16 days |
+| Kylian Mbappe | +6.36 | 16 days |
+| Jan Oblak | +5.02 | 18 days |
+| Zaid Romero | +4.69 | 20 days |
 
-_The free market is simulated rather than guessed at: the market is modelled from 72 offers over 5 cycles, weighted by value^0.15. **111 of the 572 unowned players** would improve your eleven, and a week of offers beats the best thing you can buy today **46% of the time** — even the tenth percentile of waiting (+3.73) clears it. Spending now buys the worse of two options and gives up the choice._
+_The free market is simulated rather than guessed at: the market is modelled from 73 offers over 5 cycles, weighted by value^0.15. **110 of the 572 unowned players** would improve your eleven, and a week of offers beats the best thing you can buy today **46% of the time** — even the tenth percentile of waiting (+3.86) clears it. Spending now buys the worse of two options and gives up the choice._
 _**31 locked players would improve your eleven** and their clauses open on 24 Aug, in about 6 days. Waiting scores ZERO in the table above — not because it is worthless but because nothing there can price a market it has not seen, so every move with a positive number beats it by construction. That is the bias to hold in mind when the ranking asks you to spend the balance; the **Left** column is what buys the choice._
 
 ## What the simulation cannot see
 
 _shape from the seed prior (96 observed, 200 needed)._
 
-_P(start) fitted on 240 confirmed starts across 8 team sheets: futbolfantasy recalibrated (logit -0.5 +5.8x), blended 80% with analiticafantasy where it has an opinion (a named starter counts 94%). Brier improves 0.032 on line-ups the fit had not seen._
+_P(start) fitted on 300 confirmed starts across 10 team sheets: futbolfantasy recalibrated (logit -0.5 +3.4x), blended 70% with analiticafantasy where it has an opinion (a named starter counts 92%). Brier improves 0.023 on line-ups the fit had not seen._
 
-- **Jornada 1 is half played.** 8 clubs are done and their points are already in the `now` column, so the simulation only plays the rest of the round. It still re-picks an eleven that is in fact already locked.
+- **Jornada 1 is half played.** 10 clubs are done and their points are already in the `now` column, so the simulation only plays the rest of the round. It still re-picks an eleven that is in fact already locked.
 - **A buyout premium is charged at **0.000 places per million**, the median of every run that has measured it — today's own reading is 0.000.** A clause runs a median 1.52x market value in this league and the app only ever pays the value back, so the premium is gone for good. It is charged against the move rather than ignored — but the price is measured off what more money would actually buy you today, and on most days that is very little.
 - **P(start) is today's, held flat over every remaining jornada.** Nothing here knows who will be injured in March.
 - **Rivals never transfer.** A steal that guts a squad assumes its manager does not simply buy someone back.
@@ -79,18 +79,18 @@ Biggest misses (forecast − actual):
 
 ### Who to believe about the eleven
 
-**88 confirmed starters** across 1 locked round(s), off the match pages. A substitute is a MISS here — this is the question both sources are answering. The claim scored is the last one published before the round's first kickoff, because that is when the lineup locked and later news could not have been acted on.
+**110 confirmed starters** across 1 locked round(s), off the match pages. A substitute is a MISS here — this is the question both sources are answering. The claim scored is the last one published before the round's first kickoff, because that is when the lineup locked and later news could not have been acted on.
 
 | Source | Calls | Mean claim | Started | Brier |
 |---|--:|--:|--:|--:|
-| analitica | 26 | 88% | 85% | 0.111 |
-| futbolfantasy ←read | 176 | 42% | 41% | 0.035 |
+| analitica | 43 | 87% | 79% | 0.134 |
+| futbolfantasy ←read | 224 | 41% | 41% | 0.045 |
 
 _**Brier** is the mean squared error of the probability: lower is better, 0.25 is a coin flip, and it punishes confidence more than caution. A source whose mean claim sits far from its start rate is miscalibrated even if it ranks players well._
 
 - **analitica** — 31 calls published with no number on them, 100% started
 
-_40 claim(s) sat within 10 points of 50%: not a call either way, so not graded._
+_49 claim(s) sat within 10 points of 50%: not a call either way, so not graded._
 
 _Read the gap between the sources, not the level. The clubs playing the round's opening matches have their elevens CONFIRMED by the time it locks, and both sources copy them, so their share of the table is scored on published fact rather than on a forecast. Whichever source publishes more of those looks better than it forecasts._
 
@@ -119,18 +119,18 @@ _What the one table in [REPORT.md](REPORT.md) was built from: the eleven it assu
 
 | Player | Pos | Bid | XI | Competition | Note |
 |---|---|--:|--:|---|---|
-| Peter Gulacsi | por | — | 40%/— | none |  |
+| Matias Vecino | med | — | 20%/— | none |  |
 | Manel Usedo | med | — | !15%/— | none |  |
 | Peque | del | — | 50%/— | none |  |
-| Nico Guillen | med | — | 50%/— | (3 broke) |  |
-| Iñigo Perez | ent | — | !15%/— | none |  |
-| Mario Soriano | med | — | 100%/— | (4 broke) |  |
-| Joan Garcia | por | — | 80%/100% | (4 broke) |  |
-| Matias Vecino | med | — | 20%/— | none |  |
-| Trent Alexander-Arnold | def | — | 50%/— | (2 broke) |  |
 | Iago Aspas | del | — | 40%/— | none |  |
-| Abiel Osorio | del | — | !15%/— | none |  |
+| Nico Guillen | med | — | 50%/— | (3 broke) |  |
+| Mario Soriano | med | — | 80%/100% | (4 broke) |  |
+| Joan Garcia | por | — | 80%/100% | (4 broke) |  |
 | Javi Puado | med | — | 0%/— | none |  |
+| Abiel Osorio | del | — | 0%/— | none |  |
+| Peter Gulacsi | por | — | 40%/— | none |  |
+| Trent Alexander-Arnold | def | — | 50%/— | (2 broke) |  |
+| Iñigo Perez | ent | — | !15%/— | none |  |
 
 **Bid** is what it costs to win him, and nothing here says whether he is worth winning — that is the one table in [REPORT.md](REPORT.md), which prices him at a clause because a clause cannot be refused. A purchase is closer to a loan than a spend: the value comes back when you sell, give or take 12%, which on a large player is bigger than the premium and the drift put together. That swing is a coin flip, so a bid within a few percent is not a decision.
 
@@ -140,7 +140,7 @@ Competition is demand, not roster counts: the rivals whose XI actually improves 
 
 Bid is the floor plus what this league has actually paid over it: median +1.4%, -0.3% to +635.3% (n=32). 14 of those 32 went at the floor itself, so the minimum is not a number known to lose. A dozen deals is not a distribution — the range is what has happened, not a chance of winning, and every one of them is a bid that won.
 
-Already owned, so not a purchase: abde ezzalzouli (Albert Laporta), aitor paredes (BurtonGM89), antonio blanco (BurtonGM89), arda guler (Albert Laporta), ayoze perez (Albert Laporta), beñat turrientes (you), carlos espi (SusoGattuso), carlos puga (BurtonGM89), cesar tarrega (SusoGattuso), dani lorenzo (you), dean huijsen (BurtonGM89), denis suarez (BurtonGM89), ferran jutgla (Albert Laporta), ilaix moriba (Albert Laporta), isi palazon (SusoGattuso), izan merino (SusoGattuso), johnny cardoso (SusoGattuso), juan foyth (Albert Laporta), karl etta eyong (BurtonGM89), leandro cabrera (Albert Laporta), marc roca (Albert Laporta), mario martin (SusoGattuso), matias dituro (Albert Laporta), quilindschy hartman (BurtonGM89), santiago mouriño (Albert Laporta), yuri berchiche (SusoGattuso).
+Already owned, so not a purchase: abde ezzalzouli (Albert Laporta), aitor paredes (BurtonGM89), antonio blanco (BurtonGM89), arda guler (Albert Laporta), ayoze perez (Albert Laporta), beñat turrientes (you), carlos espi (SusoGattuso), carlos puga (BurtonGM89), cesar tarrega (SusoGattuso), dani lorenzo (you), dean huijsen (BurtonGM89), denis suarez (BurtonGM89), ferran jutgla (Albert Laporta), ilaix moriba (Albert Laporta), isi palazon (SusoGattuso), izan merino (SusoGattuso), johnny cardoso (SusoGattuso), juan foyth (Albert Laporta), karl etta eyong (BurtonGM89), leandro cabrera (Albert Laporta), marc roca (Albert Laporta), mario martin (SusoGattuso), matias dituro (Albert Laporta), omar el hilali (you), quilindschy hartman (BurtonGM89), santiago mouriño (Albert Laporta), yuri berchiche (SusoGattuso).
 
 ## 3. Exceptions
 
@@ -156,7 +156,11 @@ _Read from the 'Estado físico', 'Sancionados' and 'No disponibles' blocks of ea
 
 ### Starting
 
-**1 of your marked XI are under 60%:** Robin Le Normand (60%).
+**The two sources disagree** — one of them has him in the eleven and the other does not. Neither has a track record here yet, so this is a prompt to open the app, not a verdict:
+
+| | Player | The split |
+|---|---|---|
+| XI | Robin Le Normand | futbolfantasy 70%, analitica 50% |
 
 _Both figures are editorial reads refreshed a few times a day, not live probabilities. `~` means listed with no figure (assumed 60%), `!` not on the page at all (assumed 15%). Threshold is `min_start` in `inputs/league.ini`._
 
@@ -164,8 +168,8 @@ _Both figures are editorial reads refreshed a few times a day, not live probabil
 
 ## Notes
 
-_652 players tracked, 499 with a probable-XI reading._
+_652 players tracked, 512 with a probable-XI reading._
 
 _xPts/j — expected points per jornada = shrunk pts/match (K=8, 2025-26) × fixture × P(start), from `ffcore/score.py` — the same scorer rivals.py uses. Injured, suspended and unavailable score zero; a doubt is halved. The fixture term is a ±12% band across the opponents ranked by Club Elo rating, plus ±4% for home advantage; both widths are guesses, unfitted because nothing has been played, and small enough that a wrong one costs a fraction of a point._
 
-_Generated 2026-08-19 00:00 UTC._
+_Generated 2026-08-19 00:05 UTC._

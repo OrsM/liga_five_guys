@@ -1,4 +1,4 @@
-# Squads — 2026-08-19 00:00 UTC
+# Squads — 2026-08-19 00:05 UTC
 
 | Manager | Players | Squad value | Spent | Raised | Cash |
 |---|--:|--:|--:|--:|--:|
@@ -13,14 +13,14 @@
 **FF** is futbolfantasy's probable-XI percentage, which is the one the forecast uses. **AF** is analiticafantasy's read of the same eleven, printed beside it and never blended in — `titular` is a named starter (a final call, with no number to it), a percentage is their editors' consensus, `?` means they list him without either, and `—` means they do not have him. Two columns that disagree are the signal; that is the whole point of carrying both.
 
 ## You (miguel_autentico)
-14 players · 236.37M total · 10 at 70%+ · cash -133K
+14 players · 236.37M total · 11 at 70%+ · cash -133K
 
 | Player | Team | Pos | Value | 24h | FF | AF |
 |---|---|--:|--:|--:|--:|--:|
 | ionut radu | Celta | por | 37.44M | -524K | 90% | 67% |
 | marcos alonso | Celta | def | 28.33M | -228K | 90% | 67% |
 | carl starfelt | Celta | def | 14.08M | 14K | 60% | 67% |
-| robin le normand | Atlético | def | 10.61M | 207K | 60% | 50% |
+| robin le normand | Atlético | def | 10.61M | 207K | 70% | 50% |
 | igor zubeldia | Real Sociedad | def | 10.30M | -0K | 60% | — |
 | omar el hilali | Espanyol | def | 9.76M | 365K | 80% | — |
 | pablo fornals | Betis | med | 56.56M | -391K | 80% | 100% |
@@ -37,16 +37,16 @@
 
 | Player | Team | Pos | Value | 24h | FF | AF |
 |---|---|--:|--:|--:|--:|--:|
-| matias dituro | Elche | por | 7.89M | 155K | 100% | 33% |
+| matias dituro | Elche | por | 7.89M | 155K | 90% | 67% |
 | santiago mouriño | Villarreal | def | 37.27M | -1.09M | 70% | 100% |
 | leandro cabrera ⚠︎suspended | Espanyol | def | 16.01M | -516K | 0% | — |
-| angeliño | Deportivo | def | 15.32M | -185K | 0% | — |
+| angeliño | Deportivo | def | 15.32M | -185K | 50% | — |
 | juan foyth | Villarreal | def | 13.31M | 440K | 70% | 50% |
 | diego javier llorente | Betis | def | 13.03M | -155K | 50% | — |
 | arda guler | Real Madrid | med | 56.09M | 1.67M | 60% | 100% |
 | eduardo camavinga | Real Madrid | med | 9.66M | -202K | 30% | — |
 | ilaix moriba | Celta | med | 9.65M | -169K | 50% | — |
-| facundo buonanotte | Elche | med | 6.52M | -175K | 0% | — |
+| facundo buonanotte | Elche | med | 6.52M | -175K | 40% | — |
 | marc roca | Betis | med | 5.35M | -26K | 60% | 67% |
 | abde ezzalzouli ⚠︎doubt | Betis | del | 42.09M | -794K | 30% | — |
 | ayoze perez | Villarreal | del | 17.66M | -10K | 50% | 50% |
@@ -66,7 +66,7 @@
 | aitor paredes | Athletic | def | 5.39M | 106K | 70% | 67% |
 | carlos puga | Málaga | def | 5.01M | -84K | 70% | — |
 | santi comesaña | Villarreal | med | 32.98M | -955K | 60% | 100% |
-| tajon buchanan | Villarreal | med | 17.32M | -384K | 40% | — |
+| tajon buchanan | Villarreal | med | 17.32M | -384K | 30% | — |
 | antonio blanco | Alavés | med | 14.73M | -54K | 90% | 100% |
 | denis suarez | Alavés | med | 2.39M | -32K | 50% | — |
 | karl etta eyong | Levante | del | 24.97M | -510K | 50% | — |
@@ -78,7 +78,7 @@
 | Player | Team | Pos | Value | 24h | FF | AF |
 |---|---|--:|--:|--:|--:|--:|
 | alfonso herrero | Málaga | por | 8.49M | 43K | 80% | 100% |
-| lucas noubi | Deportivo | def | 13.13M | 83K | 100% | — |
+| lucas noubi | Deportivo | def | 13.13M | 83K | 80% | 100% |
 | kike salas ⚠︎suspended | Sevilla | def | 11.29M | -348K | 0% | — |
 | jose gaya | Valencia | def | 10.55M | -146K | 60% | 100% |
 | fabio cardoso | Sevilla | def | 771K | -18K | 0% | — |
@@ -95,11 +95,11 @@
 | jon karrikaburu | Real Sociedad | del | 539K | -8K | 0% | — |
 
 ## SusoGattuso
-18 players · 241.76M total · 15 at 70%+ · cash ~-24.85M
+18 players · 241.76M total · 14 at 70%+ · cash ~-24.85M
 
 | Player | Team | Pos | Value | 24h | FF | AF |
 |---|---|--:|--:|--:|--:|--:|
-| leo roman | Deportivo | por | 38.10M | 638K | 100% | — |
+| leo roman | Deportivo | por | 38.10M | 638K | 80% | 100% |
 | jon aramburu | Real Sociedad | def | 18.02M | 148K | 80% | 100% |
 | yuri berchiche | Athletic | def | 12.29M | -98K | 70% | — |
 | cesar tarrega | Valencia | def | 9.14M | 14K | 80% | 100% |
@@ -108,11 +108,11 @@
 | clemens riedel | Espanyol | def | 4.79M | 218K | 90% | — |
 | alvaro garcia | Villarreal | def | 502K | 0K | 70% | 100% |
 | aimar oroz | Osasuna | med | 16.11M | 45K | 70% | — |
-| lorenzo amatucci | Deportivo | med | 13.32M | 156K | 100% | — |
+| lorenzo amatucci | Deportivo | med | 13.32M | 156K | 90% | — |
 | izan merino | Málaga | med | 6.02M | -130K | 70% | 100% |
 | johnny cardoso | Atlético | med | 5.41M | -122K | 30% | — |
 | mario martin | Getafe | med | 4.09M | 95K | 70% | 100% |
-| giuliano simeone | Atlético | del | 42.36M | -485K | 70% | — |
+| giuliano simeone | Atlético | del | 42.36M | -485K | 50% | — |
 | isi palazon | Rayo | del | 20.47M | 327K | 80% | 50% |
 | andres martin | Racing | del | 19.90M | 494K | 90% | 100% |
 | carlos espi | Real Madrid | del | 9.56M | 282K | 30% | — |
@@ -150,7 +150,7 @@
 
 ## Cash basis
 
-- **miguel_autentico** — balance the app reported at 2026-08-18 23:03 UTC − 0.00M bought + 0.00M sold across 0 ledger row(s) = -0.13M (known)
+- **miguel_autentico** — balance the app reported at 2026-08-19 00:02 UTC − 0.00M bought + 0.00M sold across 0 ledger row(s) = -0.13M (known)
 - **Albert Laporta** — 100M starting budget − 188.67M bought + 43.03M sold across 13 ledger row(s) + 0.72M of daily allowance over 7 days = -44.92M (estimated)
 - **BurtonGM89** — 100M starting budget − 180.85M bought + 51.65M sold across 17 ledger row(s) + 0.72M of daily allowance over 7 days = -28.49M (estimated)
 - **Magic Mike 333** — 100M starting budget − 121.23M bought + 19.14M sold across 8 ledger row(s) + 0.72M of daily allowance over 7 days = -1.37M (estimated)
@@ -162,7 +162,7 @@
 - **alvaro fernandez** — the ledger has him at miguel_autentico; the app says nobody in the league holds him.
 - **pedro diaz** — the ledger has him at Magic Mike 333; the app says nobody in the league holds him.
 - **tete morente** — the ledger has him at Magic Mike 333; the app says nobody in the league holds him.
-- miguel_autentico is 0.13M overdrawn: balance the app reported at 2026-08-18 23:03 UTC − 0.00M bought + 0.00M sold across 0 ledger row(s) = -0.13M. Going over the budget mid-window is allowed; being overdrawn when the jornada locks is not, so they must sell before they can buy again. If the ledger is missing a sale of theirs, this is stale rather than wrong.
+- miguel_autentico is 0.13M overdrawn: balance the app reported at 2026-08-19 00:02 UTC − 0.00M bought + 0.00M sold across 0 ledger row(s) = -0.13M. Going over the budget mid-window is allowed; being overdrawn when the jornada locks is not, so they must sell before they can buy again. If the ledger is missing a sale of theirs, this is stale rather than wrong.
 - Magic Mike 333 is 1.37M overdrawn: 100M starting budget − 121.23M bought + 19.14M sold across 8 ledger row(s) + 0.72M of daily allowance over 7 days = -1.37M. Going over the budget mid-window is allowed; being overdrawn when the jornada locks is not, so they must sell before they can buy again. If the ledger is missing a sale of theirs, this is stale rather than wrong.
 - Albert Laporta is 44.92M overdrawn: 100M starting budget − 188.67M bought + 43.03M sold across 13 ledger row(s) + 0.72M of daily allowance over 7 days = -44.92M. Going over the budget mid-window is allowed; being overdrawn when the jornada locks is not, so they must sell before they can buy again. If the ledger is missing a sale of theirs, this is stale rather than wrong.
 - BurtonGM89 is 28.49M overdrawn: 100M starting budget − 180.85M bought + 51.65M sold across 17 ledger row(s) + 0.72M of daily allowance over 7 days = -28.49M. Going over the budget mid-window is allowed; being overdrawn when the jornada locks is not, so they must sell before they can buy again. If the ledger is missing a sale of theirs, this is stale rather than wrong.
