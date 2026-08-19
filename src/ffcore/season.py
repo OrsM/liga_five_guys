@@ -198,6 +198,14 @@ def simulate_many(states: list, forecaster, trials: int = 2000,
     # NUMBER, so splitting the range over processes gives the same seasons in
     # the same order — the self-test asserts the totals are identical, not
     # close. Only worth the pickling above a few hundred trials.
+    # Arrays first: one vectorised pass beats four processes doing it a
+    # number at a time, and it needs no agreement between them.
+    if workers is None:
+        fast = _run_np(states, forecaster, trials, seed)
+        if fast is not None:
+            return [Standings(totals=tot, me=st.me)
+                    for tot, st in zip(fast, states)]
+
     n = workers if workers is not None else (os.cpu_count() or 1)
     if n > 1 and trials >= 400 and len(states) > 1:
         import concurrent.futures as cf
@@ -222,6 +230,66 @@ def simulate_many(states: list, forecaster, trials: int = 2000,
     return [Standings(totals=tot, me=st.me)
             for tot, st in zip(_run(states, forecaster, range(trials), seed),
                                states)]
+
+
+def _run_np(states: list, forecaster, trials: int, seed: int):
+    """The same seasons, drawn as arrays. None if numpy is not installed.
+
+    THE DRAW IS THE WHOLE COST and it is embarrassingly rectangular: for one
+    jornada it is a coin per player per trial and a resample per player per
+    trial. In Python that is twenty million calls; as two arrays it is one.
+
+    The generator is seeded from (seed, jornada), so a jornada's matrix is the
+    same however the work is divided — which is what lets the process pool go
+    away entirely rather than being made to agree with itself.
+
+    NOT the same numbers as the Python path: a different generator draws a
+    different sample from the same distributions. Statistically equivalent,
+    not identical, and the report says so where it matters.
+    """
+    try:
+        import numpy as np
+    except ImportError:
+        return None
+
+    order = getattr(forecaster, "_order", None)
+    per_j = getattr(forecaster, "per_jornada", None)
+    pool = getattr(forecaster, "pool", None)
+    mean = getattr(forecaster, "_pool_mean", None)
+    if order is None or per_j is None or not pool:
+        return None
+
+    pool_a = np.asarray(pool, dtype=float)
+    managers = [list(st.squads) for st in states]
+    totals = [{m: np.full(trials, float(st.carried.get(m, 0.0)))
+               for m in ms} for st, ms in zip(states, managers)]
+
+    # The eleven depends only on expectations, so it is picked once per state
+    # per jornada — not once per state per jornada per pass through the draw.
+    # Left inside the loop it was two and a half thousand shape searches.
+    xis = [{j: {m: best_xi(sq, forecaster.expected(j))
+                for m, sq in st.squads.items()}
+            for j in st.jornadas} for st in states]
+
+    for j in states[0].jornadas:
+        keys = order.get(j, [])
+        if not keys:
+            continue
+        at = {k: i for i, k in enumerate(keys)}
+        per = per_j[j]
+        pts = np.array([per[k][0] for k in keys], dtype=float)
+        p = np.array([per[k][1] for k in keys], dtype=float)
+        rng = np.random.default_rng([seed, j])
+        drawn = np.where(rng.random((trials, len(keys))) < p,
+                         pool_a[rng.integers(0, len(pool_a),
+                                             (trials, len(keys)))]
+                         * (pts / mean), 0.0)
+        for i in range(len(states)):
+            for m in managers[i]:
+                idx = [at[k] for k in xis[i][j][m] if k in at]
+                if idx:
+                    totals[i][m] += drawn[:, idx].sum(axis=1)
+    return [{m: v.tolist() for m, v in tot.items()} for tot in totals]
 
 
 def _run(states: list, forecaster, which, seed: int) -> list:
@@ -291,26 +359,11 @@ def simulate(state: LeagueState, forecaster, trials: int = 2000,
     candidate squads comparable: the difference between them is then the
     squads, not the weather. Comparing a buy against a hold on independently
     drawn seasons would bury a one-point edge under a ±75-point spread.
+
+    One state through simulate_many, so the two cannot drift apart: they held
+    a copy each of the same loop, and the copies had to be asserted equal.
     """
-    managers = list(state.squads)
-    totals = {m: [float(state.carried.get(m, 0.0))] * trials
-              for m in managers}
-
-    # The eleven each manager fields depends only on expectations, so it is
-    # the same in every trial and is picked once rather than `trials` times.
-    xis: dict[int, dict[str, list[str]]] = {}
-    for j in state.jornadas:
-        exp = forecaster.expected(j)
-        xis[j] = {m: best_xi(sq, exp) for m, sq in state.squads.items()}
-
-    for t in range(trials):
-        rng = random.Random(seed * 1_000_003 + t)
-        for j in state.jornadas:
-            drawn = forecaster.draw(j, rng)
-            for m in managers:
-                totals[m][t] += sum(drawn.get(k, 0.0) for k in xis[j][m])
-
-    return Standings(totals=totals, me=state.me)
+    return simulate_many([state], forecaster, trials=trials, seed=seed)[0]
 
 
 def _selftest() -> None:

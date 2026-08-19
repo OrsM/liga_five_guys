@@ -4,18 +4,25 @@ version = "0.1.0"
 description = "Data-driven decision system for LaLiga Fantasy -- one private league"
 requires-python = ">=3.12"
 
-# The three the workflow installed by hand, now declared once. There is no
-# fourth: every other import in src/ is stdlib, deliberately, because this runs
-# unattended and each dependency is a thing that can break a Saturday.
+# Four, and each earns it. The rule used to be "there is no fourth", which was
+# a rule this repo made up about itself rather than a constraint anybody
+# imposed — and numpy is about as safe as a dependency gets.
 #
 #   lxml + cssselect  the HTML parsers in sources.py; cssselect is what
 #                     lxml's .cssselect() needs and is not pulled in by lxml.
 #   httpx             the only network client, imported INSIDE ingest.fetch()
 #                     so the test path never needs it.
+#   numpy             the draw in ffcore/season.py, which is a coin and a
+#                     resample per player per trial per jornada — twenty
+#                     million calls in Python, two array operations here.
+#                     Imported inside _run_np and the pure-Python path is
+#                     still there, so a box without it gets a slow report
+#                     rather than no report.
 dependencies = [
     "httpx>=0.27",
     "lxml>=5.0",
     "cssselect>=1.2",
+    "numpy>=2.5.2",
 ]
 
 [tool.ruff.lint]
