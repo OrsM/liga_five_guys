@@ -41,7 +41,8 @@ from ffcore.score import SHRINK_K  # noqa: E402
 from ffcore.text import norm, resolve  # noqa: E402
 from ffcore.tidy import (DECISIONS, LINEUP_SOURCE, REPORTS,  # noqa: E402
                          DAILY_FRESH_DAYS, EVERY_RUN_FRESH_DAYS,
-                         SEASON, TIDY, load_elo,
+                         SEASON, TIDY, age_phrase, load_elo,
+                         stale_feeds,
                          load_lineups, load_market,
                          read_csv, snapshot_stamp, write_lines)
 
@@ -578,8 +579,13 @@ STAMPED = {"points": "to_stamp"}
 # "every_run" was 0.5 here and nowhere else, and it was wrong: the timer's
 # legs are 11h and 13h, so this column called a feed that had answered every
 # sweep "13 hours stale" every night between 23:50 and the 00:40 run.
+# "twice_daily" gets the same bound as "every_run" and that is not a mistake:
+# the timer's two sweeps are 11h and 13h apart, both longer than the 6-hour
+# rule, so with this schedule a twice-daily page IS asked every sweep and the
+# 6 hours only stop a rerun from re-asking forty sites an hour later.
 FRESH = {"every_run": EVERY_RUN_FRESH_DAYS, "daily": DAILY_FRESH_DAYS,
-         "once": 1e9, "as played": 1e9, "as dealt": 1e9, "derived": 1e9}
+         "twice_daily": EVERY_RUN_FRESH_DAYS, "once": 1e9, "as played": 1e9,
+         "as dealt": 1e9, "derived": 1e9}
 
 
 def _hosts() -> dict[str, tuple[str, str, int]]:
@@ -640,6 +646,85 @@ def _age(stamp: str, now: dt.datetime) -> tuple[float | None, str]:
     return days, when.strftime("%d %b %H:%M")
 
 
+# Which fetched page feeds which tidy table, for the pages the registry cannot
+# name statically. One payload can fill several tables: the squad call carries
+# the league table and every player's stat lines as well as the squads.
+API_PAGES = {"match": ("starters",),
+             "api_leagues": ("api_leagues",),
+             "api_market": ("api_market",),
+             "api_teams": ("api_teams", "api_standings", "api_stats"),
+             "api_activity": ("api_activity",),
+             "api_player": ("api_players",)}
+
+
+def _fetched() -> dict[str, list[float]]:
+    """{table: [hours since each of its pages was last ASKED FOR]}.
+
+    THE ONE HONEST AGE, and it is not the one the tidy store holds. parse
+    re-stamps a carried-forward document with the sweep that carried it, so
+    `observed_at` says "now" for a page nobody has requested since midnight —
+    by design, because that column answers "which snapshot is this row from".
+    The manifest keeps the other half: `seen` is when the page was last
+    actually fetched, and that is what says whether a source is still feeding
+    us. On 2026-08-19 the probable-XI pages read "ok, 0 hours" in this table
+    while the last request for them was 17.6 hours old.
+    """
+    from ingest import state
+
+    reg = _hosts()
+    of_table: dict[str, list[float]] = {}
+    now = dt.datetime.now(dt.timezone.utc)
+    for page, row in state().items():
+        when = snapshot_stamp(row.get("seen") or "")
+        if when is None:
+            continue
+        hours = (now - when).total_seconds() / 3600.0
+        tables = [t for t, (_h, _c, keys) in reg.items() if page in keys]
+        for prefix, named in API_PAGES.items():
+            if page == prefix or page.startswith(prefix + "_"):
+                tables = list(named)
+        for t in tables:
+            of_table.setdefault(t, []).append(hours)
+    return of_table
+
+
+# The light. A table is green when every page behind it was fetched within its
+# own cadence, amber when one of them has missed a turn, red when the readers
+# have given up on it — ffcore.tidy refuses a reading past FRESH, so red here
+# and a fallback downstream are the same event.
+GREEN, AMBER, RED, GREY = "🟢", "🟡", "🔴", "⚪"
+
+
+def _light(cadence: str, ages: list[float], refused: bool) -> tuple[str, str]:
+    """(light, what it means) for one table, from when its pages were fetched."""
+    if cadence == "derived":
+        return GREY, "rebuilt every run from the tables above"
+    if not ages:
+        # A page the last sweep did not put in its manifest: it failed, or it
+        # has never been asked for at all. `why` below names which, off the
+        # fetch log, because a 403 and a page nobody has ever requested are
+        # not the same problem.
+        return RED, "**not in the last sweep**"
+    bound = FRESH.get(cadence, 1e9) * 24
+    newest, oldest = min(ages), max(ages)
+    if refused or newest > 2 * bound:
+        return RED, "**not fetched for %s — the readers have dropped it**" % (
+            age_phrase(newest / 24))
+    if newest > bound:
+        return AMBER, "**%s since it was asked** (due every %s)" % (
+            age_phrase(newest / 24), CADENCE_WORD.get(cadence, cadence))
+    if oldest > bound and len(ages) > 1:
+        return AMBER, "%d of %d pages last asked %s ago" % (
+            sum(1 for a in ages if a > bound), len(ages),
+            age_phrase(oldest / 24))
+    return GREEN, "fetched %s ago" % age_phrase(newest / 24)
+
+
+CADENCE_WORD = {"every_run": "sweep", "twice_daily": "6 hours",
+                "daily": "day", "once": "—", "as played": "—",
+                "as dealt": "—"}
+
+
 def feed_lines() -> list[str]:
     """The data flow, and which parts of it have stopped answering.
 
@@ -651,6 +736,7 @@ def feed_lines() -> list[str]:
     """
     now = dt.datetime.now(dt.timezone.utc)
     reg, feeds = _hosts(), _feed_state()
+    asked, quiet = _fetched(), stale_feeds()
     rows = []
     for name in sorted(FILLS):
         path = (SEASON / "live" / "perjornada_2026-27.csv") if name == "points" \
@@ -668,27 +754,28 @@ def feed_lines() -> list[str]:
             host, cadence = "src/crosswalk.py", "derived"
         cadence = _as_it_happens().get(name, cadence)
 
-        if cadence == "derived":
-            state = "rebuilt every run"
-        elif days is None:
-            state = "**never answered**"
-        elif days <= FRESH.get(cadence, 1e9):
-            state = "ok"
-        else:
-            state = "**%s stale**" % (
-                "%.0f days" % days if days >= 2 else "%.0f hours" % (days * 24))
-            why = sorted({feeds[k] for k in pages if k in feeds})
-            if why:
-                state += " — " + "; ".join(why)
-        rows.append("| %s | %s | %s | %s | %s | %s |" % (
-            name, FILLS[name],
+        light, state = _light(cadence, asked.get(name, []), name in quiet)
+        if days is None and cadence != "derived":
+            light, state = RED, "**never answered**"
+        why = sorted({feeds[k] for k in pages if k in feeds})
+        if why and light != GREEN:
+            state += " — " + "; ".join(why)
+        rows.append("| %s | %s | %s | %s | %s | %s | %s |" % (
+            light, name, FILLS[name],
             host + (" ×%d" % len(pages) if len(pages) > 1 else ""),
             "{:,}".format(len(got)), seen, state))
 
     return ["## Where the numbers come from", "",
-            "| Table | What it is used for | Fetched from | Rows | "
-            "Newest row | State |",
-            "|---|---|---|--:|---|---|"] + rows + [""]
+            "🟢 asked for within its own cadence · 🟡 it has missed a turn and "
+            "what you are reading is the last answer · 🔴 the readers have "
+            "dropped it and the report is on its fallback · ⚪ not fetched at "
+            "all, built here from the rest.", "",
+            "**Newest row** is the snapshot that carried the reading, which is "
+            "not when it was fetched: a page nobody asked for is carried into "
+            "the next sweep and re-stamped. The light is on the asking.", "",
+            "| | Table | What it is used for | Fetched from | Rows | "
+            "Newest row | Fetching |",
+            "|---|---|---|---|--:|---|---|"] + rows + [""]
 
 
 def elo_basis() -> str:
@@ -937,6 +1024,22 @@ def main() -> None:
 # ---------------------------------------------------------------------------
 
 def _selftest() -> None:
+    # -- the light is on the asking, not on the re-stamp --------------------
+    # A page carried into a sweep it was never asked for is re-stamped with
+    # that sweep, so `observed_at` said "0 hours" for probable-XI pages last
+    # requested seventeen hours earlier. These are the states that must be
+    # distinguishable at a glance.
+    assert _light("every_run", [0.5], False)[0] == GREEN
+    assert _light("twice_daily", [17.6], False)[0] == AMBER      # missed 11:40
+    assert _light("twice_daily", [0.2, 30.0], False)[0] == AMBER  # one page of forty
+    assert "1 of 2 pages" in _light("twice_daily", [0.2, 30.0], False)[1]
+    assert _light("every_run", [80.0], False)[0] == RED
+    # Refused by ffcore.tidy's gate IS red, whatever the clock says: the
+    # readers have already dropped it and the report is on its fallback.
+    assert _light("every_run", [1.0], True)[0] == RED
+    assert _light("every_run", [], False)[0] == RED
+    assert _light("derived", [], False)[0] == GREY
+
     utc = dt.timezone.utc
     t = lambda d, h=0: dt.datetime(2026, 8, d, h, tzinfo=utc)  # noqa: E731
 

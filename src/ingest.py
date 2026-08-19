@@ -292,14 +292,29 @@ def documents(need: dict[str, set]):
 # fetch
 # ---------------------------------------------------------------------------
 
-def due(src, prev: dict, today: str) -> bool:
-    """Should this sweep request `src`?
+# How long a "twice_daily" page may go unasked. Six hours, so both scheduled
+# sweeps get their own reading — 00:40 and 11:40 are eleven hours apart — while
+# a rerun pressed from the phone an hour later re-uses what is already stored
+# instead of asking forty sites again.
+TWICE_DAILY_HOURS = 6.0
 
-    Cadence "daily" says no when we already requested the page today. Both team
-    sweeps are daily, so a sweep asks for forty team pages once a day and two
-    pages the rest of the time. A page not due is carried into this snapshot's
-    manifest with its previous `seen`, so it is due again tomorrow and `parse`
-    still sees it today.
+
+def due(src, prev: dict, now: str) -> bool:
+    """Should this sweep request `src`? `now` is this sweep's stamp.
+
+    Cadence "daily" says no when we already requested the page today. A page
+    not due is carried into this snapshot's manifest with its previous `seen`,
+    so it is due again tomorrow and `parse` still sees it today.
+
+    Cadence "twice_daily" says no until TWICE_DAILY_HOURS have passed since it
+    was last asked. THE CALENDAR IS THE WRONG BOUND FOR A PAGE THAT MOVES
+    DURING THE DAY: the probable-XI pages were "daily", so the 11:40 sweep —
+    the run that exists because the XIs have firmed up by late morning, which
+    is what lfg.timer says about itself — skipped them and reported the reading
+    from 00:13. Forcing the sweep at 17:50 on 2026-08-19 measured what that
+    costs: futbolfantasy moved 23 of 512 rows, analitica 70 of 197, and four
+    rows of the fielded squad. Hours rather than a second calendar rule,
+    because a rerun at five past midnight must not re-ask forty pages.
 
     Cadence "once" says no as soon as we have the page at all. That is the
     match pages: a confirmed eleven does not change after kickoff, so asking
@@ -307,9 +322,27 @@ def due(src, prev: dict, today: str) -> bool:
     """
     if src.cadence == "once":
         return src.key not in prev
+    seen = prev.get(src.key, {}).get("seen", "")
+    if src.cadence == "twice_daily":
+        gap = _hours_between(seen, now)
+        return gap is None or gap >= TWICE_DAILY_HOURS
     if src.cadence != "daily":
         return True
-    return not (prev.get(src.key, {}).get("seen", "")[:10] == today)
+    return not (seen[:10] == now[:10])
+
+
+def _hours_between(then: str, now: str) -> float | None:
+    """Hours from one sweep stamp to another, or None if either is unreadable.
+
+    None means "ask": a stamp we cannot read is not evidence that the page is
+    current, and one extra fetch is cheaper than a day of not noticing.
+    """
+    from ffcore.tidy import snapshot_stamp
+
+    a, b = snapshot_stamp(then), snapshot_stamp(now)
+    if a is None or b is None:
+        return None
+    return (b - a).total_seconds() / 3600.0
 
 
 def carry_matches(rows: list[dict], prev: dict) -> list[dict]:
@@ -376,7 +409,7 @@ def fetch() -> Path:
         queue = list(sources())
         while queue:
             src = queue.pop(0)
-            if not due(src, prev, stamp[:10]):
+            if not due(src, prev, stamp):
                 if src.key in prev:
                     rows.append(dict(prev[src.key]))     # carried, not fetched
                 skipped += 1
@@ -1071,6 +1104,23 @@ def _selftest() -> None:
     assert not due(daily, seen_today, "2026-08-15")  # already swept today
     assert due(daily, seen_today, "2026-08-16")      # new day
     assert due(daily, {}, "2026-08-15")              # never swept
+
+    # TWICE A DAY, BOUNDED BY HOURS AND NOT BY THE CALENDAR. The probable-XI
+    # pages were "daily", which the 11:40 sweep read as "already done at
+    # 00:13" — so the run whose whole reason is that the XIs have firmed up
+    # was reading XIs from just after midnight. Measured on 2026-08-19 by
+    # forcing the sweep at 17:50: futbolfantasy moved 23 of 512 rows since
+    # 00:13 and analitica 70 of 197, four of them in the fielded squad.
+    twice = Source("m", "market", "u", parse_market, sign_market, "twice_daily")
+    assert not due(twice, {"m": {"seen": "2026-08-15T0940Z"}},
+                   "2026-08-15T1200Z")               # 2.3h ago — not yet
+    assert due(twice, {"m": {"seen": "2026-08-15T0940Z"}},
+               "2026-08-15T1600Z")                   # 6.3h ago — due
+    assert due(twice, {}, "2026-08-15T0000Z")        # never swept
+    # The hours are what bound it, so a rerun at 00:05 does not refetch forty
+    # pages just because the date changed.
+    assert not due(twice, {"m": {"seen": "2026-08-15T2340Z"}},
+                   "2026-08-16T0005Z")
 
     # A match page is fetched once, ever, whatever day it is asked about.
     from sources import match_source

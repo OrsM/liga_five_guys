@@ -1,35 +1,35 @@
-# The workings — 2026-08-19T1639Z
+# The workings — 2026-08-19T1750Z
 
 _What the one table in [REPORT.md](REPORT.md) was built from: the eleven it assumes you field, what a man on today's slate should cost, and the two ways any of it can be wrong about a player._
 
 ## 1. Field these eleven
 
-**Your XI: 4-5-1 · index 37.2** (a ranking number, not a points forecast — only differences mean anything)
+**Your XI: 4-5-1 · index 40.2** (a ranking number, not a points forecast — only differences mean anything)
 
 | | Marked XI | vs | pts/m | Fix | FF | AF | xPts/j |
 |---|---|---|--:|--:|--:|--:|--:|
-| POR | Ionut Radu | Valencia A | 6.6 | -8% | 90% | 67% | 4.6 |
-| DEF | Carl Starfelt | Valencia A | 5.1 | -8% | 60% | 67% | 3.2 |
+| POR | Ionut Radu | Valencia A | 6.6 | -8% | 90% | 100% | 6.0 |
+| DEF | Carl Starfelt | Valencia A | 5.1 | -8% | 60% | 100% | 4.3 |
 | DEF | Robin Le Normand | Malaga H | 4.4 | +15% | 70% | 50% | 3.1 |
 | DEF | Igor Zubeldia | Betis A | 3.7 | -11% | 60% | — | 2.3 |
 | DEF | Omar El Hilali | Madrid H | 3.0 | -7% | 80% | — | 2.7 |
-| MED | Pepelu | Celta Vigo H | 4.3 | +1% | 70% | 67% | 3.2 |
+| MED | Pepelu | Celta Vigo H | 4.3 | +1% | 70% | 75% | 3.5 |
 | MED | Iñigo Ruiz de Galarreta | Sevilla H | 4.5 | +7% | 70% | — | 4.4 |
 | MED | Dani Lorenzo | Atletico A | ~2.8 | -13% | 90% | 100% | 2.4 |
 | MED | Jon Moncayola | Levante H | 4.3 | +13% | 90% | — | 4.7 |
-| MED | Lucien Agoume | Athletic A | 3.9 | -6% | 80% | — | 3.5 |
+| MED | Lucien Agoume | Athletic A | 3.9 | -6% | 80% | 100% | 3.7 |
 | DEL | Iñigo Vicente | Getafe A | ~3.0 | = | 90% | 100% | 3.0 |
-| +POR | _Joan Garcia_ | Elche A | 8.1 | +3% | 80% | 100% | **+3.0** |
+| +POR | _Joan Garcia_ | Elche A | 8.1 | +3% | 90% | 100% | **+1.5** |
 
 _**pts/m** is points per match, last season shrunk toward the average and blended with this season as it accrues. `~` means no record at all, so the baseline is assumed. **Fix** is how much the next opponent moves it — `=` a median team, `—` no fixture known. **FF** is futbolfantasy's start percentage, **AF** is analiticafantasy's — `titular` there is a named starter with no number attached, `?` is listed without either, `—` is not listed at all. They are separate columns because neither has been checked against a played jornada yet, so there is no weight to blend them by, and a disagreement is worth more than an average. **xPts/j** = pts/m × Fix × FF, and uses FF only. `⚠` on a name means question 5 has something on him._
 
 _The `+SLOT` rows are today's slate: **xPts/j is the change to the whole eleven** if you sign him and re-pick the shape, not his own score, and it leaves the fixture OUT — you own a player for months, not for one round. `★` next to the opponent means this round's draw happens to be kind, `↓` that it is not; neither is in the number. What he would cost, and whether that is a good rate, is question 2._ _10 others on the slate would not improve this eleven, so they are priced there and not here._
 
-**The model's eleven is 5.7 better** (index 42.9, shape 4-5-1).
+**The model's eleven is 6.9 better** (index 47.0, shape 4-5-1).
 
 | Bench this | For this | Worth |
 |---|---|--:|
-| Igor Zubeldia (2.3) | Marcos Alonso (3.9) | +1.5 |
+| Igor Zubeldia (2.3) | Marcos Alonso (5.1) | +2.7 |
 | Dani Lorenzo (2.4) | Pablo Fornals (6.6) | +4.1 |
 
 _Swaps are same-position only: a cross-slot difference is a change of formation, not a substitution. Your own marks are the row above — this table is advice._
@@ -39,15 +39,15 @@ _Swaps are same-position only: a cross-slot difference is a change of formation,
 | Player — 12 on offer | Pos | Bid | XI | Competition | Note |
 |---|---|--:|--:|---|---|
 | Abiel Osorio | del | — | 0%/— | none |  |
-| Iago Aspas | del | — | 40%/— | (1 broke) |  |
+| Iago Aspas | del | — | 40%/50% | (2 broke) |  |
 | Iñigo Perez | ent | — | !15%/— | none |  |
 | Javi Puado | med | — | 0%/— | none |  |
-| Joan Garcia | por | — | 80%/100% | (4 broke) |  |
+| Joan Garcia | por | — | 90%/100% | (4 broke) |  |
 | Manel Usedo | med | — | !15%/— | none |  |
 | Mario Soriano | med | — | 80%/100% | (4 broke) |  |
-| Matias Vecino | med | — | 20%/— | none |  |
-| Nico Guillen | med | — | 50%/— | (3 broke) |  |
-| Peque | del | — | 50%/— | (1 broke) |  |
+| Matias Vecino | med | — | 0%/— | none |  |
+| Nico Guillen | med | — | 50%/— | Albert +0.9, (2 broke) |  |
+| Peque | del | — | 50%/50% | (2 broke) |  |
 | Peter Gulacsi | por | — | 40%/— | none |  |
 | Trent Alexander-Arnold | def | — | 50%/— | (2 broke) |  |
 
@@ -64,7 +64,6 @@ _Swaps are same-position only: a cross-slot difference is a change of formation,
 | abde ezzalzouli | Albert Laporta |
 | aitor paredes | BurtonGM89 |
 | antonio blanco | BurtonGM89 |
-| arda guler | Albert Laporta |
 | ayoze perez | Albert Laporta |
 | beñat turrientes | you |
 | carlos espi | SusoGattuso |
@@ -143,9 +142,9 @@ _Compare squad value with the app; a mismatch means a name matched the wrong pla
 
 | | |
 |---|---|
-| Players tracked | 650, 512 with a probable-XI reading |
+| Players tracked | 650, 510 with a probable-XI reading |
 | xPts/j | expected points per jornada = shrunk pts/match (K=8, 2025-26) × fixture × P(start), from `ffcore/score.py` — the same scorer rivals.py uses |
 | Zeroed | injured, suspended, unavailable; a doubt is halved |
 | Fixture term | ±12% across the opponents ranked by Club Elo rating, plus ±4% for home advantage — both widths guesses, unfitted, and small enough that a wrong one costs a fraction of a point |
 
-_Generated 2026-08-19 17:35 UTC._
+_Generated 2026-08-19 17:58 UTC._

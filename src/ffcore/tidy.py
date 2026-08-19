@@ -385,8 +385,19 @@ GATED_API = ("api_teams", "api_market", "api_standings")
 
 
 def age_phrase(days: float) -> str:
-    """How old, in the coarsest unit that is still true."""
-    return "%.0f days" % days if days >= 2 else "%.0f hours" % (days * 24)
+    """How old, in the coarsest unit that is still true.
+
+    Minutes below the hour, because "fetched 0 hours ago" is what a table
+    printed for every page in a sweep that had just finished.
+    """
+    def unit(n: float, word: str) -> str:
+        return "%.0f %s%s" % (n, word, "" if round(n) == 1 else "s")
+
+    if days >= 2:
+        return unit(days, "day")
+    if days * 24 >= 1:
+        return unit(days * 24, "hour")
+    return unit(max(1, round(days * 1440)), "minute")
 
 
 def stale_feeds(now=None, names=GATED_API) -> dict[str, float]:
@@ -836,6 +847,10 @@ def _selftest() -> None:
     # A clock skew that puts the reading in the future is not staleness.
     assert fresh_only([{"observed_at": "2026-08-19T2300Z"}],
                       DAILY_FRESH_DAYS, now) != []
+
+    assert age_phrase(3.2) == "3 days" and age_phrase(0.5) == "12 hours"
+    assert age_phrase(0.01) == "14 minutes" and age_phrase(0.0) == "1 minute"
+    assert age_phrase(1 / 24) == "1 hour", age_phrase(1 / 24)
 
     # -- the same gate, on the feeds swept every run -----------------------
     # The bound is the TIMER's longest healthy leg, not half a day. lfg.timer

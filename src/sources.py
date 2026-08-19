@@ -1738,13 +1738,24 @@ def sources(enabled_only: bool = True) -> list[Source]:
         Source("market", "market", MARKET_URL, parse_market, sign_market),
         Source("points", "points", POINTS_URL, parse_points, sign_points),
     ]
-    # Both team sweeps run once a day. Twice a day was forty requests for a
-    # page whose editorial XI moved for 22 of 511 players across a fortnight;
-    # once a day for two sources costs the same forty and answers more.
+    # BOTH TEAM SWEEPS, TWICE A DAY. They were "daily", which the sweep read
+    # as once per calendar day, so the 11:40 run — the one lfg.timer says
+    # exists because the probable XIs have firmed up by late morning — was
+    # reading the XIs fetched at 00:13 and calling them current.
+    #
+    # Once a day was chosen on a measurement: a second sweep moved the XI for
+    # 22 of 511 players across a fortnight, and the same forty requests bought
+    # a whole second source instead. That trade is no longer forced. Forcing a
+    # full sweep at 17:50 on 2026-08-19 cost 4 seconds of request time for
+    # fifty pages, and moved 23 of 512 futbolfantasy rows and 70 of 197
+    # analitica rows against the 00:13 reading — analitica firms up through
+    # the morning as more pundits publish, which is the whole value of the
+    # column. Four of the moved rows were in the fielded squad.
     out += [Source(f"team_{s}", "lineups", TEAM_URL.format(slug=s),
-                   parse_team, sign_team, cadence="daily") for s in TEAMS]
+                   parse_team, sign_team, cadence="twice_daily")
+            for s in TEAMS]
     out += [Source(f"af_{s}", "lineups", AF_TEAM_URL.format(slug=af),
-                   parse_af_team, sign_af_team, cadence="daily")
+                   parse_af_team, sign_af_team, cadence="twice_daily")
             for s, af in sorted(AF_TEAMS.items())]
     # One page, and it replaces a file you had to retype every jornada.
     out += [Source("af_fixtures", "fixtures", AF_HUB_URL,
@@ -2677,9 +2688,14 @@ def _selftest() -> None:
     # — they are queued at run time, like the match pages.
     assert len(reg) == 6 + len(TEAMS) + len(AF_TEAMS) == 46, len(reg)
     assert set(AF_TEAMS) == set(TEAMS), set(AF_TEAMS) ^ set(TEAMS)
-    # Both team sweeps are daily; market and points still run every sweep.
-    assert {s.cadence for s in reg if s.key.startswith(("team_", "af_"))} \
-        == {"daily"}
+    # Both team sweeps run twice a day — the 11:40 sweep exists because the
+    # XIs firm up late morning, and a calendar-day cadence skipped it there.
+    # market and points still run every sweep.
+    # (af_fixtures is the hub page, not a team page, and stays daily: a
+    # kickoff time does not move between breakfast and lunch.)
+    assert {s.cadence for s in reg if s.key.startswith(("team_", "af_"))
+            and s.key != "af_fixtures"} == {"twice_daily"}
+    assert next(s.cadence for s in reg if s.key == "af_fixtures") == "daily"
     assert {s.cadence for s in reg if s.key in ("market", "points")} \
         == {"every_run"}
     assert {s.key for s in reg} >= {"market", "points", "team_barcelona",
