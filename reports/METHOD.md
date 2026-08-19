@@ -1,4 +1,4 @@
-# Liga Five Guys — how the numbers are made — 2026-08-19 09:11 UTC
+# Liga Five Guys — how the numbers are made — 2026-08-19 09:12 UTC
 
 
 
@@ -7,15 +7,15 @@
 
 | Route | What it offers | Season pts | Beats acting today |
 |---|---|--:|--:|
-| **Act today** | 39 players you can buy now | +213 | — |
-| Wait for the market | a week of new offers | +202 | 48% |
-| Wait for the clauses | 62 players on 24 Aug | +160 | — |
+| **Act today** | 40 players you can buy now | +213 | — |
+| Wait for the market | a week of new offers | +202 | 44% |
+| Wait for the clauses | 61 players on 24 Aug | +160 | — |
 
 | The workings | |
 |---|--:|
-| Unowned players who would improve your eleven | 110 of 572 |
-| Tenth percentile of a week's waiting | +3.95 |
-| Market model | the market is modelled from 73 offers over 5 cycles, weighted by value^0.15 |
+| Unowned players who would improve your eleven | 110 of 573 |
+| Tenth percentile of a week's waiting | +4.03 |
+| Market model | the market is modelled from 74 offers over 5 cycles, weighted by value^0.15 |
 | Locked players who would improve your eleven | 31 |
 | Their clauses open | 24 Aug, in about 5 days |
 
@@ -33,6 +33,7 @@
 |---|---|
 | Jornada 1 is half played — 10 clubs are done | their points are already in `now`, so only the rest of the round is simulated, and it still re-picks an eleven that is in fact already locked |
 | A buyout premium is charged at **0.000 places per million**, the median of every run that has measured it — today's own reading is 0.000 | a clause runs a median 1.52× market value here and the app pays back only the value, so the premium is gone for good. It is charged against the move, but priced off what more money would buy you today — most days, very little |
+| Named by the app in a way nothing else matches: `Jonny Otto` | missing from the simulation entirely |
 | P(start) is today's, held flat over every remaining jornada | nothing here knows who will be injured in March |
 | Rivals never transfer | a steal that guts a squad assumes its manager does not simply buy someone back — flatters the steal |
 | Teammates score independently | two defenders of one club share a clean sheet, so a concentrated squad has more variance than this shows |
@@ -45,20 +46,20 @@
 
 | Table | What it is used for | Fetched from | Rows | Newest row | State |
 |---|---|---|--:|---|---|
-| api_activity | every transfer, which is what the ledger replays | LaLiga Fantasy API | 910 | 19 Aug 00:29 | ok |
-| api_leagues | your cash and the league's id | LaLiga Fantasy API | 15 | 19 Aug 00:29 | ok |
-| api_market | what is on offer, and the bids on it | LaLiga Fantasy API | 602 | 19 Aug 00:29 | ok |
-| api_players | names for players nobody owns any more | LaLiga Fantasy API | 745 | 19 Aug 00:29 | ok |
-| api_teams | all five squads | LaLiga Fantasy API | 1,140 | 19 Aug 00:29 | ok |
+| api_activity | every transfer, which is what the ledger replays | LaLiga Fantasy API | 973 | 19 Aug 09:11 | ok |
+| api_leagues | your cash and the league's id | LaLiga Fantasy API | 16 | 19 Aug 09:11 | ok |
+| api_market | what is on offer, and the bids on it | LaLiga Fantasy API | 643 | 19 Aug 09:11 | ok |
+| api_players | names for players nobody owns any more | LaLiga Fantasy API | 800 | 19 Aug 09:11 | ok |
+| api_teams | all five squads | LaLiga Fantasy API | 1,216 | 19 Aug 09:11 | ok |
 | clubs | the same, for clubs | src/crosswalk.py | 20 | — | rebuilt every run |
-| elo | team strength, which ranks the fixture term | api.clubelo.com | 80 | 17 Aug 23:45 | **33 hours stale** |
-| fixtures | who plays whom next, for the fixture term | analiticafantasy.com | 352 | 19 Aug 00:29 | ok |
-| lineups | probable XI percentages, both sources | analiticafantasy.com, futbolfantasy.com ×40 | 31,597 | 19 Aug 00:29 | ok |
-| market | price, value, position, fitness — every player in the game | futbolfantasy.com | 32,515 | 19 Aug 00:29 | ok |
-| matches | fixtures, kickoffs, results | futbolfantasy.com | 6,840 | 19 Aug 00:29 | ok |
+| elo | team strength, which ranks the fixture term | api.clubelo.com | 80 | 17 Aug 23:45 | **33 hours stale**, the sweep is failing on it |
+| fixtures | who plays whom next, for the fixture term | analiticafantasy.com | 367 | 19 Aug 09:11 | ok |
+| lineups | probable XI percentages, both sources | analiticafantasy.com, futbolfantasy.com ×40 | 32,322 | 19 Aug 09:11 | ok |
+| market | price, value, position, fitness — every player in the game | futbolfantasy.com | 33,167 | 19 Aug 09:11 | ok |
+| matches | fixtures, kickoffs, results | futbolfantasy.com | 7,220 | 19 Aug 09:11 | ok |
 | players | the crosswalk: one key per player across all four spellings | src/crosswalk.py | 648 | — | rebuilt every run |
 | points | realised points per jornada, the actuals in every table below | futbolfantasy.com | 100 | 18 Aug 09:41 | ok |
-| starters | confirmed elevens, which is what P(start) is graded on | futbolfantasy.com | 3,506 | 19 Aug 00:29 | ok |
+| starters | confirmed elevens, which is what P(start) is graded on | futbolfantasy.com | 3,734 | 19 Aug 09:11 | ok |
 
 ### The model, as configured right now
 
@@ -163,6 +164,7 @@ _What the one table in [REPORT.md](REPORT.md) was built from: the eleven it assu
 | dean huijsen | BurtonGM89 |
 | denis suarez | BurtonGM89 |
 | ferran jutgla | Albert Laporta |
+| igor zubeldia | you |
 | ilaix moriba | Albert Laporta |
 | isi palazon | SusoGattuso |
 | izan merino | SusoGattuso |
@@ -209,4 +211,4 @@ _Both figures are editorial reads refreshed a few times a day, not live probabil
 | Zeroed | injured, suspended, unavailable; a doubt is halved |
 | Fixture term | ±12% across the opponents ranked by Club Elo rating, plus ±4% for home advantage — both widths guesses, unfitted, and small enough that a wrong one costs a fraction of a point |
 
-_Generated 2026-08-19 09:11 UTC._
+_Generated 2026-08-19 09:12 UTC._

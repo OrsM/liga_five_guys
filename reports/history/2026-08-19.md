@@ -1,4 +1,4 @@
-# The workings — 2026-08-19T0029Z
+# The workings — 2026-08-19T0911Z
 
 _What the one table in [REPORT.md](REPORT.md) was built from: the eleven it assumes you field, what a man on today's slate should cost, and the two ways any of it can be wrong about a player._
 
@@ -74,6 +74,7 @@ _Swaps are same-position only: a cross-slot difference is a change of formation,
 | dean huijsen | BurtonGM89 |
 | denis suarez | BurtonGM89 |
 | ferran jutgla | Albert Laporta |
+| igor zubeldia | you |
 | ilaix moriba | Albert Laporta |
 | isi palazon | SusoGattuso |
 | izan merino | SusoGattuso |
@@ -147,4 +148,4 @@ _Compare squad value with the app; a mismatch means a name matched the wrong pla
 | Zeroed | injured, suspended, unavailable; a doubt is halved |
 | Fixture term | ±12% across the opponents ranked by Club Elo rating, plus ±4% for home advantage — both widths guesses, unfitted, and small enough that a wrong one costs a fraction of a point |
 
-_Generated 2026-08-19 09:11 UTC._
+_Generated 2026-08-19 09:12 UTC._
