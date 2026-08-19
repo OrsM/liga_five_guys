@@ -1,7 +1,10 @@
 # liga_five_guys — handoff, 2026-08-19 (evening)
 
-Private repo `OrsM/liga_five_guys`, working tree clean, committed through `43f6905`.
-**Not pushed** — pushing is opt-in and stays that way.
+Private repo `OrsM/liga_five_guys`, working tree clean, **pushed** through this handoff.
+Push by default and when in doubt — Miguel's instruction, 2026-08-19. The timer has been
+doing it all along (`LFG_PUSH=1` is in `lfg.service`, and `lfg-run` only logs a push when
+it FAILS, which is why the journal looks silent); what was lagging was the by-hand work in
+a session. So: commit as you go, and push before you hand over.
 Read `README.md` first — it holds the design decisions and why each was made.
 
 ## Run it
