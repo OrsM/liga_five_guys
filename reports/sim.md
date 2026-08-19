@@ -2,7 +2,7 @@
 
 ## Now
 
-**Locks in 2h** · squad 236.37M · **cash -33K** · total 236.34M
+**Locks in 1h** · squad 236.37M · **cash -33K** · total 236.34M
 
 play 4-5-1 · finish 1.62 · win 51% · season 1,516–1,775
 

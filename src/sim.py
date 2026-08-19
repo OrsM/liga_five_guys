@@ -44,7 +44,8 @@ from pathlib import Path  # noqa: E402
 from decide import dead_weight  # noqa: E402,F401
 from ffcore.parse import fmt_money  # noqa: E402
 from ffcore.render import title_name  # noqa: E402
-from ffcore.tidy import REPORTS, write_lines  # noqa: E402
+from ffcore.tidy import (REPORTS, age_phrase, stale_feeds,  # noqa: E402
+                         write_lines)
 
 OUT = "sim.md"
 
@@ -367,7 +368,7 @@ def decide_dead(u):
     return dead_weight(u)
 
 
-def market_percentile(routes) -> str:
+def market_percentile(routes, quiet=None) -> str:
     """Where this week's market sits against the market's own history.
 
     ONE LINE INSTEAD OF A PANEL. The panel compared three routes in a table of
@@ -377,6 +378,15 @@ def market_percentile(routes) -> str:
     on offer THIS week is good or bad by the standards of what gets dealt, and
     that is a percentile.
     """
+    quiet = stale_feeds() if quiet is None else quiet
+    # A QUIET FEED IS NOT A POOR MARKET, and this line is where the two get
+    # confused. Gate api_market on freshness and nothing is buyable, so
+    # now_best is 0, every simulated week beats it, and this printed "0th
+    # percentile · a poor week" — a claim about the market with no market in
+    # front of it. Say which it is.
+    if "api_market" in quiet:
+        return ("the app's market feed is **%s stale** — what is on offer now "
+                "is unknown, not empty" % age_phrase(quiet["api_market"]))
     mkt = next((r for r in routes if r["route"] == "market"), None)
     if mkt is None or mkt.get("beats_now") is None:
         return ""
@@ -1300,6 +1310,18 @@ def _selftest() -> None:
     assert "unusually good" in market_percentile(
         [{"route": "market", "beats_now": 0.25}])
     assert market_percentile([]) == ""
+    # A QUIET FEED IS NOT A POOR MARKET. With api_market gated on freshness,
+    # nothing is buyable, now_best is 0, every simulated offer beats it, and
+    # this line said "0th percentile · a poor week · better in 100% of weeks"
+    # — the report's headline claim about the market, made with no market in
+    # front of it. Measured by ageing the store three days and generating.
+    blind = market_percentile(r, quiet={"api_market": 3.1})
+    assert "percentile" not in blind, blind
+    assert "3 days stale" in blind, blind
+    assert "unknown" in blind, blind
+    # ...and a fresh feed is unaffected, whatever else has gone quiet.
+    assert "62nd percentile" in market_percentile(
+        r, quiet={"api_teams": 3.1}), r
 
     # -- overdrawn is not a ranking question -------------------------------
     u.cash = -133023.0

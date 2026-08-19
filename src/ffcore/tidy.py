@@ -43,7 +43,9 @@ __all__ = ["ROOT", "TIDY", "SEASON", "DECISIONS", "REPORTS", "MADRID",
            "Market", "Valuation", "load_market", "load_lineups",
            "load_players", "read_ledger", "LEDGER", "load_deadline", "LINEUP_SOURCE",
            "pick_source", "load_fixtures", "next_kickoff", "kickoff_stamp",
-           "load_elo", "fresh_only", "DAILY_FRESH_DAYS", "load_api_stats"]
+           "load_elo", "fresh_only", "DAILY_FRESH_DAYS",
+           "EVERY_RUN_FRESH_DAYS", "load_api_stats", "stale_feeds",
+           "GATED_API", "age_phrase", "last_api_standings"]
 
 ROOT = Path(os.environ.get("FF_ROOT", "./data"))
 TIDY = ROOT / "tidy"
@@ -272,6 +274,14 @@ def latest_only(rows: list[dict]) -> list[dict]:
 # off this same number, so the table and the refusal below cannot disagree.
 DAILY_FRESH_DAYS = 1.05
 
+# The same bound for a feed swept EVERY RUN. It is not half a day, however
+# obvious that looks: lfg.timer fires at 00:40 and 11:40 local, so the two
+# legs are 11h and 13h, and RandomizedDelaySec puts another 5 minutes on
+# either. A feed answering every single sweep is 13h10m old at its oldest, and
+# 0.5 would have called that a dead feed every night. 0.6 clears the longest
+# healthy leg by an hour and still catches a missed sweep well inside the day.
+EVERY_RUN_FRESH_DAYS = 0.6
+
 
 def fresh_only(rows: list[dict], max_age_days: float, now=None) -> list[dict]:
     """`rows` if the newest of them is recent enough, [] if it is not.
@@ -368,14 +378,60 @@ def load_elo(now=None) -> list[dict]:
                       DAILY_FRESH_DAYS, now)
 
 
-def load_api_teams() -> list[dict]:
+# The API tables that are a SNAPSHOT of now, and so are gated above. Listed
+# once, because both the refusal and the sentence that explains it have to be
+# about the same set of feeds.
+GATED_API = ("api_teams", "api_market", "api_standings")
+
+
+def age_phrase(days: float) -> str:
+    """How old, in the coarsest unit that is still true."""
+    return "%.0f days" % days if days >= 2 else "%.0f hours" % (days * 24)
+
+
+def stale_feeds(now=None, names=GATED_API) -> dict[str, float]:
+    """{table: how many days old} for each gated feed that has gone quiet.
+
+    THE REFUSAL IS NOT THE WHOLE JOB. A gate hands the reader [], and []
+    reads as "nothing there": with the market feed three days old the report
+    said "market 0th percentile, a poor week" and printed no BUY list at all
+    — an emptiness presented as a finding. Measured, by ageing the store three
+    days and generating. So the reason has to be sayable, and this says it.
+
+    A table that has NEVER been written is absent from the result. It has not
+    gone quiet; it has never spoken, and the callers already have a sentence
+    for that ("add a token", "the ledger takes over").
+    """
+    now = now or datetime.now(timezone.utc)
+    out = {}
+    for name in names:
+        rows = read_csv(TIDY / f"{name}.csv")
+        when = snapshot_stamp(max((r.get("observed_at", "") for r in rows),
+                                  default=""))
+        if when is None:
+            continue
+        age = (now - when).total_seconds() / 86400.0
+        if age > EVERY_RUN_FRESH_DAYS:
+            out[name] = age
+    return out
+
+
+def load_api_teams(now=None) -> list[dict]:
     """The newest squad reading from the league's own API, or [].
 
-    One row per player per squad. [] means the API has never been fetched —
-    no token, or the sweep skipped it — and every caller must degrade to the
-    ledger rather than treat it as an empty league.
+    One row per player per squad. [] means the API has not answered recently
+    enough to be about today's squads — never fetched, no token, or the sweep
+    has been failing — and every caller must degrade to the ledger rather than
+    treat it as an empty league.
+
+    GATED, for the reason load_elo is. A dead token does not empty this file;
+    the tidy store keeps the last good reading for ever, so the failure mode
+    is a squad that is three days old, joins perfectly, and prices a market
+    that has moved. That is the stale Elo rating and the stale cash anchor a
+    third time, and three is where it stops being a coincidence.
     """
-    return latest_only(read_csv(TIDY / "api_teams.csv"))
+    return fresh_only(latest_only(read_csv(TIDY / "api_teams.csv")),
+                      EVERY_RUN_FRESH_DAYS, now)
 
 
 def _activity_order(r: dict):
@@ -411,19 +467,46 @@ def load_api_activity() -> list[dict]:
     return sorted(read_csv(TIDY / "api_activity.csv"), key=_activity_order)
 
 
-def load_api_market() -> list[dict]:
-    """What is on offer in the league right now, or []."""
-    return latest_only(read_csv(TIDY / "api_market.csv"))
+def load_api_market(now=None) -> list[dict]:
+    """What is on offer in the league right now, or [].
+
+    "Right now" is the whole claim, so it is gated: a listing that expired
+    yesterday is not an opportunity, and a bid count from a stale sweep is a
+    number about a market that has since closed.
+    """
+    return fresh_only(latest_only(read_csv(TIDY / "api_market.csv")),
+                      EVERY_RUN_FRESH_DAYS, now)
 
 
-def load_api_standings() -> list[dict]:
+def load_api_standings(now=None) -> list[dict]:
     """The newest league table from the app, one row per team, or [].
+
+    Gated on freshness: this row carries your BALANCE, and league.py anchors
+    the cash estimate on it in preference to anything typed. An anchor that
+    calls itself observed while being three days old is the exact bug the
+    allowance fix was about, with the app in the typist's chair.
 
     Position, points, squad value and — for your account alone — the balance.
     This used to ride on every player row in api_teams: five managers' worth
     of team facts repeated 76 times a sweep. A fact about a team belongs at
     the grain of a team, which is also what makes the season's standings
     readable without deduplicating a player table.
+    """
+    return fresh_only(latest_only(read_csv(TIDY / "api_standings.csv")),
+                      EVERY_RUN_FRESH_DAYS, now)
+
+
+def last_api_standings() -> list[dict]:
+    """The newest league table there is, however old.
+
+    FOR THE COLUMNS THAT ARE HISTORY, and only those: points scored and
+    position reached only ever grow, so a three-day-old reading of them is
+    incomplete rather than wrong. The balance on the same row is not like
+    that and must come through the gated reader — read_api_balances does.
+
+    This exists because gating the whole row zeroed `carried` and made the
+    season simulation project every manager from nought, which is a worse
+    answer than the stale one it replaced.
     """
     return latest_only(read_csv(TIDY / "api_standings.csv"))
 
@@ -753,6 +836,47 @@ def _selftest() -> None:
     # A clock skew that puts the reading in the future is not staleness.
     assert fresh_only([{"observed_at": "2026-08-19T2300Z"}],
                       DAILY_FRESH_DAYS, now) != []
+
+    # -- the same gate, on the feeds swept every run -----------------------
+    # The bound is the TIMER's longest healthy leg, not half a day. lfg.timer
+    # fires at 00:40 and 11:40 local with up to 5 minutes of jitter, so a feed
+    # that answers every sweep is still 13h10m old just before the overnight
+    # run — and 0.5 days would have called that "stale" and thrown it away.
+    # Measured on the store: the largest gap between consecutive api_teams
+    # snapshots over 21 sweeps was 13.0 hours, and no sweep was missed.
+    assert EVERY_RUN_FRESH_DAYS * 24 > 13 + 10 / 60
+    # It must still be inside a day, or a feed that missed BOTH of a day's
+    # sweeps would read as current.
+    assert EVERY_RUN_FRESH_DAYS < 1.0
+    healthy = [{"observed_at": "2026-08-18T2300Z"}]      # 13.0h before `now`
+    missed = [{"observed_at": "2026-08-18T1100Z"}]       # a sweep skipped
+    assert fresh_only(healthy, EVERY_RUN_FRESH_DAYS, now) == healthy
+    assert fresh_only(missed, EVERY_RUN_FRESH_DAYS, now) == []
+
+    # And the loaders are gated, not just the constant. A reading from the
+    # far past is no answer at all, whatever the store happens to hold.
+    stale = datetime(2099, 1, 1, tzinfo=timezone.utc)
+    assert load_api_teams(now=stale) == []
+    assert load_api_market(now=stale) == []
+    assert load_api_standings(now=stale) == []
+
+    # A gated feed that has gone quiet must be SAYABLE, not merely refused.
+    # Refusing it in silence turns "I cannot see the market" into "there is
+    # nothing to buy, a poor week" — measured, on the store aged three days.
+    # POINTS ALREADY SCORED ARE NOT A SNAPSHOT. The gate above throws away
+    # the whole standings row when the feed goes quiet, and the row carries
+    # two different kinds of fact: a balance, which must be today's, and a
+    # season-to-date total, which only grows. Gating both zeroed every
+    # manager's points and simulated the rest of the season from 0 — a wrong
+    # number where a slightly old one was available.
+    assert last_api_standings() != [] or read_csv(TIDY / "api_standings.csv") == []
+
+    quiet = stale_feeds(now=stale)
+    assert set(quiet) == {"api_teams", "api_market", "api_standings"}, quiet
+    assert min(quiet.values()) > 365 * 70
+    # A table nothing has ever written is not "stale" — it never answered,
+    # and the caller that degrades to the ledger says so differently.
+    assert "api_nothing" not in stale_feeds(now=stale, names=("api_nothing",))
 
     mkt = [{"name": "Ane Aldea", "team": "Alavés", "position": "defensa",
             "value": "2.050.000", "delta_1d": "-12.000"},

@@ -120,9 +120,9 @@ from ffcore.score import (ABSENT_START, MAX_SLOT, NEUTRAL_START,  # noqa: E402
                           SLOT_LABEL, SLOT_MIN, build, formations,
                           pick_xi, squad_pool)
 from ffcore.tidy import (DECISIONS, REPORTS,  # noqa: E402
-                         append_csv, input_path, latest_only, load_deadline,
-                         load_market, load_lineups, read_csv, snapshot_stamp,
-                         widen_csv, write_lines)
+                         age_phrase, append_csv, input_path, latest_only,
+                         load_deadline, load_market, load_lineups, read_csv,
+                         snapshot_stamp, stale_feeds, widen_csv, write_lines)
 from slate import read_slate  # noqa: E402
 
 HISTORY = REPORTS / "history"
@@ -627,6 +627,27 @@ def log_squad(observed, players, chosen, formation, total, deadline,
 # ---------------------------------------------------------------------------
 
 
+def stale_feed_warnings(quiet=None) -> list[str]:
+    """The app's feed has gone quiet — said once, or [].
+
+    A GATE THAT ONLY REFUSES IS HALF A FIX. ffcore.tidy hands every reader []
+    once the league's API stops answering, which is the honest thing to do
+    with a three-day-old squad; but [] arrives downstream as "nobody owns
+    anybody and nothing is for sale". Aged three days, the store still
+    produced a full report: squads silently fell back to the ledger, all five
+    managers' points read 0, and the only word about it was one row in
+    METHOD.md's appendix. This is the sentence that belongs next to the
+    numbers it explains.
+    """
+    quiet = stale_feeds() if quiet is None else quiet
+    if not quiet:
+        return []
+    return ["**The app's own feed is %s stale** (%s) — squads, prices and "
+            "balances below are the ledger's estimate, not the app's reading. "
+            "The token may have expired: `python -m ffcore.auth --login`."
+            % (age_phrase(max(quiet.values())), ", ".join(sorted(quiet)))]
+
+
 def alerts(warnings, token_days) -> list[str]:
     """What is worth interrupting somebody for ABOUT THE SQUAD, or [].
 
@@ -1064,7 +1085,7 @@ def main() -> None:
                   obs_dt)
 
     # --- below the fold ---------------------------------------------------
-    warnings: list[str] = []
+    warnings: list[str] = stale_feed_warnings()
     if age_h is not None and age_h > STALE_HOURS:
         warnings.append(f"**Data is {age_h:.0f}h old** — the ingest workflow "
                         "may have failed. Everything above is that snapshot.")
@@ -1175,6 +1196,17 @@ def main() -> None:
 def _selftest() -> None:
     """The cells that carry a judgement. main() needs a repo to run against;
     these do not, so they are the part CI can hold still."""
+    # -- a feed that has gone quiet is a warning, not a silence ------------
+    # The gate in ffcore.tidy hands every reader [] when the app's feed goes
+    # stale, and [] reads downstream as "you own nothing, nothing is for
+    # sale". Measured on the store aged three days: the squad table quietly
+    # became the ledger's, five managers' points all read 0, and nothing on
+    # the page said why.
+    w = stale_feed_warnings({"api_teams": 3.1, "api_market": 3.1})
+    assert len(w) == 1 and "3 days" in w[0], w
+    assert "api_teams" in w[0] and "api_market" in w[0], w
+    assert stale_feed_warnings({}) == []
+
     def pl(pct=None, on_page=True, used=None, ppm=4.0, assumed=False):
         return {"pct": pct, "on_page": on_page, "ppm": ppm, "assumed": assumed,
                 "pct_used": pct if used is None else used}

@@ -40,7 +40,8 @@ from ffcore.fixture import FIX_BAND, HOME_EDGE  # noqa: E402
 from ffcore.score import SHRINK_K  # noqa: E402
 from ffcore.text import norm, resolve  # noqa: E402
 from ffcore.tidy import (DECISIONS, LINEUP_SOURCE, REPORTS,  # noqa: E402
-                         DAILY_FRESH_DAYS, SEASON, TIDY, load_elo,
+                         DAILY_FRESH_DAYS, EVERY_RUN_FRESH_DAYS,
+                         SEASON, TIDY, load_elo,
                          load_lineups, load_market,
                          read_csv, snapshot_stamp, write_lines)
 
@@ -570,12 +571,15 @@ STAMPED = {"points": "to_stamp"}
 # asked for on every sweep and missing from the last one has failed; a daily
 # page has a day, and not much more, because the sweep runs twice a day and
 # missing both is not a cadence.
-# "daily" is ffcore.tidy's number, not a second opinion about it: load_elo()
-# REFUSES a reading older than that, so a table calling one "ok" while the
-# scorer had thrown it away would be the exact contradiction this file exists
-# to prevent.
-FRESH = {"every_run": 0.5, "daily": DAILY_FRESH_DAYS, "once": 1e9,
-         "as played": 1e9, "as dealt": 1e9, "derived": 1e9}
+# BOTH numbers are ffcore.tidy's, not a second opinion about them: load_elo()
+# and the three load_api_* readers REFUSE a reading older than these, so a
+# table calling one "ok" while the scorer had thrown it away would be the
+# exact contradiction this file exists to prevent.
+# "every_run" was 0.5 here and nowhere else, and it was wrong: the timer's
+# legs are 11h and 13h, so this column called a feed that had answered every
+# sweep "13 hours stale" every night between 23:50 and the 00:40 run.
+FRESH = {"every_run": EVERY_RUN_FRESH_DAYS, "daily": DAILY_FRESH_DAYS,
+         "once": 1e9, "as played": 1e9, "as dealt": 1e9, "derived": 1e9}
 
 
 def _hosts() -> dict[str, tuple[str, str, int]]:

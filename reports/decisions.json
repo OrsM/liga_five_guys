@@ -1,6 +1,6 @@
 {
- "generated_at": "2026-08-19T16:39Z",
- "locks_in_h": 2.336291823611111,
+ "generated_at": "2026-08-19T17:31Z",
+ "locks_in_h": 1.4826595441666668,
  "cash": -33023.0,
  "squad_value": 236374060.0,
  "jornadas_left": 38,
@@ -603,7 +603,7 @@
    "hi": null,
    "beats_now": null,
    "helpful": 32,
-   "days": 5.156086194363426,
+   "days": 5.120518985150463,
    "opens": "24 Aug"
   }
  ],

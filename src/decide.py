@@ -53,7 +53,7 @@ from ffcore.text import norm  # noqa: E402
 from ffcore.season import (LeagueState, best_xi,  # noqa: E402
                            simulate, simulate_many)
 from ffcore.tidy import (TIDY, SEASON, latest_only, load_api_market,  # noqa: E402
-                         load_api_standings, load_api_teams,
+                         last_api_standings, load_api_teams,
                          load_lineups, load_market,
                          load_players, read_csv)
 
@@ -769,8 +769,11 @@ def load(trials_pool=None) -> Universe:
     # What everybody has already scored, off the league table — five rows at
     # the grain the fact belongs to, rather than the first of each manager's
     # fourteen player rows.
+    # NOT the gated reader: what everyone has already scored is a history,
+    # and the last reading of it is incomplete rather than wrong. The gate
+    # belongs on the balance beside it, which read_api_balances applies.
     carried = {}
-    for r in load_api_standings():
+    for r in last_api_standings():
         if r.get("manager"):
             carried.setdefault(r["manager"], float(r.get("team_points") or 0))
     # LATEST, not first. `next()` over the raw file takes the OLDEST row in
