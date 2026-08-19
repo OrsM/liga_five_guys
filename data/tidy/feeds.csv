@@ -7,3 +7,11 @@ observed_at,page,status,seconds
 2026-08-19T0911Z,api_teams,200,0.60
 2026-08-19T0911Z,api_activity_0,200,0.12
 2026-08-19T0911Z,api_activity_1,200,0.11
+2026-08-19T0941Z,market,200,0.31
+2026-08-19T0941Z,points,200,0.10
+2026-08-19T0941Z,elo,FAILED,8.09
+2026-08-19T0941Z,api_leagues,200,0.21
+2026-08-19T0941Z,api_market,200,0.96
+2026-08-19T0941Z,api_teams,200,0.60
+2026-08-19T0941Z,api_activity_0,200,0.11
+2026-08-19T0941Z,api_activity_1,200,0.11
