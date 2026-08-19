@@ -35,6 +35,21 @@ it fail, then implement.
   runs a subset. Each stage is still runnable alone, which is how a failure gets bisected.
 - `lfg.timer` 00:40 and 11:40 local; `lfg-watch.timer` polls the phone's rerun button every 60s.
 
+
+## The reports — there are two
+
+    reports/decisions.json    THE report. The phone draws it: position, the XI
+                              change list, the ladder, the league table with
+                              cash, the warnings. Written by src/sim.py.
+    reports/METHOD.md         The methodology. Stitched by src/digest.py from
+                              fragments in .runtime/parts/ — which are build
+                              artifacts, not reports.
+
+Nothing else is generated and nothing else is published. REPORT.md was the
+board's content as markdown and went on 2026-08-20 with reports/history/; two
+renderings of one answer is how they come to disagree, which happened twice in
+one evening. If you add a file to reports/, publish it or do not write it.
+
 ## Where it stands
 
 Live as of this handoff: cash **-29K** (red), formation **4-5-1**, finish 1.62, P(win) 51%,
