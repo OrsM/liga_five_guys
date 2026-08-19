@@ -1,8 +1,8 @@
-# Squads — 2026-08-19 14:54 UTC
+# Squads — 2026-08-19 15:09 UTC
 
 | Manager | Players | Squad value | Spent | Raised | Cash |
 |---|--:|--:|--:|--:|--:|
-| **miguel_autentico** | 14 | 236.37M | 142.18M | 40.88M | -33K |
+| **miguel_autentico** | 14 | 236.37M | 142.18M | 40.88M | -32K |
 | Albert Laporta | 15 | 273.49M | 188.67M | 43.03M | ~-44.86M |
 | BurtonGM89 | 13 | 216.17M | 180.85M | 51.65M | ~-28.42M |
 | Magic Mike 333 | 16 | 238.19M | 121.23M | 19.14M | ~-1.31M |
@@ -13,7 +13,7 @@
 **FF** is futbolfantasy's probable-XI percentage, which is the one the forecast uses. **AF** is analiticafantasy's read of the same eleven, printed beside it and never blended in — `titular` is a named starter (a final call, with no number to it), a percentage is their editors' consensus, `?` means they list him without either, and `—` means they do not have him. Two columns that disagree are the signal; that is the whole point of carrying both.
 
 ## You (miguel_autentico)
-14 players · 236.37M total · 11 at 70%+ · cash -33K
+14 players · 236.37M total · 11 at 70%+ · cash -32K
 
 | Player | Team | Pos | Value | 24h | FF | AF |
 |---|---|--:|--:|--:|--:|--:|
@@ -149,7 +149,7 @@
 
 ## Cash basis
 
-- **miguel_autentico** — balance the app reported at 2026-08-19 14:54 UTC − 0.00M bought + 0.00M sold across 0 ledger row(s) = -0.03M (known)
+- **miguel_autentico** — balance the app reported at 2026-08-19 14:54 UTC − 0.00M bought + 0.00M sold across 0 ledger row(s) + 0.00M of daily allowance over 0 days = -0.03M (known)
 - **Albert Laporta** — 100M starting budget − 188.67M bought + 43.03M sold across 13 ledger row(s) + 0.78M of daily allowance over 8 days = -44.86M (estimated)
 - **BurtonGM89** — 100M starting budget − 180.85M bought + 51.65M sold across 17 ledger row(s) + 0.78M of daily allowance over 8 days = -28.42M (estimated)
 - **Magic Mike 333** — 100M starting budget − 121.23M bought + 19.14M sold across 8 ledger row(s) + 0.78M of daily allowance over 8 days = -1.31M (estimated)
@@ -163,7 +163,7 @@
 - **pedro diaz** — the ledger has him at Magic Mike 333; the app says nobody in the league holds him.
 - **tete morente** — the ledger has him at Magic Mike 333; the app says nobody in the league holds him.
 - **Jonny Otto** — the app says he is owned, but no market row matches the name, so he is missing from the board.
-- miguel_autentico is 0.03M overdrawn: balance the app reported at 2026-08-19 14:54 UTC − 0.00M bought + 0.00M sold across 0 ledger row(s) = -0.03M. Going over the budget mid-window is allowed; being overdrawn when the jornada locks is not, so they must sell before they can buy again. If the ledger is missing a sale of theirs, this is stale rather than wrong.
+- miguel_autentico is 0.03M overdrawn: balance the app reported at 2026-08-19 14:54 UTC − 0.00M bought + 0.00M sold across 0 ledger row(s) + 0.00M of daily allowance over 0 days = -0.03M. Going over the budget mid-window is allowed; being overdrawn when the jornada locks is not, so they must sell before they can buy again. If the ledger is missing a sale of theirs, this is stale rather than wrong.
 - Magic Mike 333 is 1.31M overdrawn: 100M starting budget − 121.23M bought + 19.14M sold across 8 ledger row(s) + 0.78M of daily allowance over 8 days = -1.31M. Going over the budget mid-window is allowed; being overdrawn when the jornada locks is not, so they must sell before they can buy again. If the ledger is missing a sale of theirs, this is stale rather than wrong.
 - Albert Laporta is 44.86M overdrawn: 100M starting budget − 188.67M bought + 43.03M sold across 13 ledger row(s) + 0.78M of daily allowance over 8 days = -44.86M. Going over the budget mid-window is allowed; being overdrawn when the jornada locks is not, so they must sell before they can buy again. If the ledger is missing a sale of theirs, this is stale rather than wrong.
 - BurtonGM89 is 28.42M overdrawn: 100M starting budget − 180.85M bought + 51.65M sold across 17 ledger row(s) + 0.78M of daily allowance over 8 days = -28.42M. Going over the budget mid-window is allowed; being overdrawn when the jornada locks is not, so they must sell before they can buy again. If the ledger is missing a sale of theirs, this is stale rather than wrong.
