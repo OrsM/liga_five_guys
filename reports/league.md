@@ -1,4 +1,4 @@
-# Squads — 2026-08-19 22:20 UTC
+# Squads — 2026-08-19 22:22 UTC
 
 | Manager | Players | Squad value | Spent | Raised | Cash |
 |---|--:|--:|--:|--:|--:|
@@ -145,7 +145,7 @@
 
 ## Cash basis
 
-- **miguel_autentico** — balance the app reported at 2026-08-19 22:20 UTC − 0.00M bought + 0.00M sold across 0 ledger row(s) + 0.00M of daily allowance over 0 days = 8.91M (known)
+- **miguel_autentico** — balance the app reported at 2026-08-19 22:21 UTC − 0.00M bought + 0.00M sold across 0 ledger row(s) + 0.00M of daily allowance over 0 days = 8.91M (known)
 - **Albert Laporta** — 100M starting budget − 188.67M bought + 97.21M sold across 14 ledger row(s) + 1.27M the app has paid you since the season began, which it pays everyone = 9.81M (estimated)
 - **BurtonGM89** — 100M starting budget − 182.90M bought + 97.50M sold across 20 ledger row(s) + 1.27M the app has paid you since the season began, which it pays everyone = 15.88M (estimated)
 - **Magic Mike 333** — 100M starting budget − 121.23M bought + 19.14M sold across 8 ledger row(s) + 1.27M the app has paid you since the season began, which it pays everyone = -0.82M (estimated)
@@ -261,6 +261,7 @@ A round bid was typed by a human. That is the whole of what roundness tells you 
 
 | Date | Player | Actor | Side | +3d | +7d | +14d |
 |---|---|---|---|--:|--:|--:|
+| 08-17T00:21 | Rubén García | miguel_autentico | sell | +1.6% | — | — |
 | 08-17T00:20 | Eriksson | miguel_autentico | sell | -9.4% | — | — |
 | 08-16T22:26 | E. Militão | BurtonGM89 | sell | -10.5% | — | — |
 | 08-16T22:24 | Paredes | BurtonGM89 | buy | +6.5% | — | — |
@@ -285,6 +286,5 @@ A round bid was typed by a human. That is the whole of what roundness tells you 
 | 08-13T22:26 | Dieng | BurtonGM89 | sell | -8.7% | — | — |
 | 08-13T22:25 | J. Musso | BurtonGM89 | sell | -7.2% | — | — |
 | 08-13T22:24 | Giuliano | SusoGattuso | buy | -3.2% | — | — |
-| 08-13T22:24 | Arda Güler | Albert Laporta | buy | +5.8% | — | — |
 
 Two errors this table is built to catch: buying a player who has already risen (paying the top of the move), and selling one who has just dipped (realising the bottom). Both show as the drift column reversing sign against the actor.
