@@ -71,7 +71,7 @@ def build_clubs(market, lineups, elo_rows) -> dict:
 
 def build_players(market, lineups, starters, api_rows, lg, clubs) -> dict:
     """{player_id: Player} — every feed's key for every player it names."""
-    from ffcore.league import api_key
+    from ffcore.league import api_key, app_ids_known
 
     by_club = {c.ff_slug: c.club_id for c in clubs.values() if c.ff_slug}
     out: dict[str, Player] = {}
@@ -114,13 +114,20 @@ def build_players(market, lineups, starters, api_rows, lg, clubs) -> dict:
     # three-step join in ffcore.league — market key, then the ledger breaking a
     # tie, then an exact market value across all of history.
     index = latest_only(lg.market.rows) if lg and lg.market is not None else []
+    # WHAT THE LAST BUILD RESOLVED, read back in. This table merges rather
+    # than rebuilds, so an id resolved on any past sweep stays resolved — and
+    # the build that produced it is exactly the caller that should not have
+    # to work it out again. On the first ever run this is {}.
+    known = app_ids_known()
     for r in api_rows:
         raw = (r.get("player_name") or "").strip()
         if not raw:
             continue
         key = api_key(raw, (r.get("manager") or "").strip(),
                       lg.market if lg else None, lg.owner if lg else None,
-                      index, r.get("market_value"))
+                      index, r.get("market_value"),
+                      r.get("player_name_full") or "",
+                      known, r.get("player_id") or "")
         p = out.get(key) if key else None
         if p is None:
             continue

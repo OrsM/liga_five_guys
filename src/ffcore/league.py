@@ -62,6 +62,7 @@ from ffcore.tidy import (Market, input_path, ledger_stamp, load_api_teams,
 
 __all__ = ["MARKET", "Config", "load_config", "read_rosters", "identify",
            "read_api_balances", "owner_from_api", "api_key", "owner_drift",
+           "app_ids_known",
            "allowance",
            "replay", "Cash", "Manager", "League"]
 
@@ -283,8 +284,32 @@ def _by_exact_value(raw_value, rows) -> str | None:
     return hits.pop() if len(hits) == 1 else None
 
 
-def owner_from_api(rows: list[dict], market,
-                   ledger_owner: dict | None = None) -> tuple[dict, list]:
+def app_ids_known() -> dict:
+    """{the app's player id: this repo's key}, from the crosswalk, or {}.
+
+    THE TABLE ALREADY KNEW. players.csv is the merged answer of every join
+    ever made — "IT MERGES, IT DOES NOT REBUILD" — so a player the app named
+    once in a market row is nameable for ever afterwards, while the ownership
+    join re-derives him from today's row alone and can fail. Reading it back
+    here is the difference between resolving Jonny Otto once and resolving him
+    every run.
+
+    THE CYCLE IS DELIBERATE AND ONE-WAY. crosswalk.py builds players.csv using
+    api_key, and api_key now reads players.csv — but it reads the file on
+    disk, which is the PREVIOUS run's answer, and the map is only ever added
+    to a join that would otherwise have failed. No file is not an error: on a
+    cold start this is {} and every caller behaves exactly as it did before
+    the table existed.
+    """
+    from ffcore.crosswalk import Crosswalk
+    from ffcore.tidy import TIDY
+
+    xw = Crosswalk.read(TIDY / "players.csv", TIDY / "clubs.csv")
+    return {p.app_id: p.player_id for p in xw.players.values() if p.app_id}
+
+
+def owner_from_api(rows: list[dict], market, ledger_owner: dict | None = None,
+                   app_ids: dict | None = None) -> tuple[dict, list]:
     """({player key: manager}, unjoined names) from the app's own squads.
 
     Ownership WITHOUT a replay. `replay()` reconstructs who owns whom by
@@ -328,7 +353,8 @@ def owner_from_api(rows: list[dict], market,
         if not handle or not raw:
             continue
         key = api_key(raw, handle, market, ledger_owner, index,
-                      r.get("market_value"), r.get("player_name_full") or "")
+                      r.get("market_value"), r.get("player_name_full") or "",
+                      app_ids, r.get("player_id") or "")
         if key:
             out[key] = handle
         else:
@@ -338,10 +364,11 @@ def owner_from_api(rows: list[dict], market,
 
 def api_key(raw: str, handle: str, market, ledger_owner: dict | None = None,
             index: list | None = None, market_value=None,
-            full: str = "") -> str | None:
+            full: str = "", app_ids: dict | None = None,
+            app_id: str = "") -> str | None:
     """One API row's player, as a key the rest of the repo recognises.
 
-    FOUR JOINS IN FALLING ORDER OF TRUST, and the order is the whole design:
+    FIVE JOINS IN FALLING ORDER OF TRUST, and the order is the whole design:
 
       1. `market.key_for` on the app's nickname — the resolution every other
          reader uses.
@@ -353,10 +380,18 @@ def api_key(raw: str, handle: str, market, ledger_owner: dict | None = None,
          nickname is the better single guess — of 76 owned players, twelve
          join ONLY on it, their full name being a birth name nothing else
          uses ("Pepelu" is "José Luis García Vayá").
-      3. the ledger breaking a tie, when the app gave a surname the market
+      3. the app's player id, looked up in the crosswalk this repo already
+         built. It is an exact id and it outranks both fallbacks below; it
+         sits under the two name joins because it is only as good as whatever
+         resolved it originally, while key_for on a name the market itself
+         carries is the resolution every other reader uses. `app_ids` is
+         {app id: key}, from data/tidy/players.csv — which is built BY this
+         function, so it is absent on a cold start and must stay additive:
+         no table means exactly the behaviour there was before it existed.
+      4. the ledger breaking a tie, when the app gave a surname the market
          has two of and exactly one of them is already recorded against THIS
          manager.
-      4. an EXACT market value, searched across all of history.
+      5. an EXACT market value, searched across all of history.
 
     None means unresolved, and unresolved must stay visible: a dropped row is
     an owned player reading as a free agent, or a rival's man who cannot be
@@ -374,6 +409,8 @@ def api_key(raw: str, handle: str, market, ledger_owner: dict | None = None,
     key = market.key_for(raw)
     if not key and (full or "").strip():
         key = market.key_for(full.strip())
+    if not key and app_ids and (app_id or "").strip():
+        key = app_ids.get(app_id.strip())
     if not key and ledger_owner:
         if index is None:
             index = latest_only(market.rows)
@@ -681,7 +718,8 @@ class League:
             # free agent, with the player COUNTS still correct, which is what
             # makes it convincing.
             api_owner, self.api_unjoined = owner_from_api(
-                api_teams, market, ledger_owner=self.owner)
+                api_teams, market, ledger_owner=self.owner,
+                app_ids=app_ids_known())
             if api_owner:
                 self.warnings += owner_drift(self.owner, api_owner)
                 for raw in self.api_unjoined:
@@ -1018,6 +1056,46 @@ def _selftest_api_owner() -> None:
         ledger_owner={norm("Fabio Cardoso"): "Magic Mike 333",
                       norm("Johnny Cardoso"): "Magic Mike 333"})
     assert owner == {} and unjoined == ["Cardoso"], (owner, unjoined)
+
+    # -- the id the crosswalk already resolved, once, and wrote down -------
+    # REAL, AND STILL COSTING A PLAYER. The app calls Jonny Castro "Jonny
+    # Otto" and his full name "Jonathan Castro Otto"; no spelling joins, and
+    # the value tier finds nothing because the app's figure for him appears
+    # nowhere in futbolfantasy's history — so the claim that the two match to
+    # the euro does not hold for every player. Meanwhile players.csv HAS had
+    # him since some earlier sweep resolved a market row: app_id 2552 ->
+    # jonny castro. This join re-derived that from scratch every run and
+    # failed, while the table that solved it sat unread beside it.
+    #
+    # It is an EXACT id, so it outranks both fallbacks below. It sits under
+    # the two name joins because it is only as good as whatever resolved it
+    # in the first place, and key_for on a name the market itself carries is
+    # the resolution every other reader uses.
+    lone = Market([{"name": "Jonny Castro", "value": "5602302",
+                    "observed_at": at, "position": "DEF"}])
+    assert api_key("Jonny Otto", "SusoGattuso", lone) is None
+    assert api_key("Jonny Otto", "SusoGattuso", lone,
+                   app_ids={"2552": norm("Jonny Castro")},
+                   app_id="2552") == norm("Jonny Castro")
+    # An id the table has never seen changes nothing.
+    assert api_key("Jonny Otto", "SusoGattuso", lone,
+                   app_ids={"9999": "somebody"}, app_id="2552") is None
+    # NO TABLE IS NOT A FAILURE. players.csv is built BY this join, so on a
+    # cold start it does not exist and every caller must degrade to what it
+    # did before — additive only, never a dependency.
+    assert api_key("Fornals", "miguel_autentico", players,
+                   app_ids=None) == norm("Pablo Fornals")
+    # A name that joins on its own is never overridden by an id, so a stale
+    # crosswalk row cannot drag a player away from the market's own answer.
+    assert api_key("Jonny Castro", "SusoGattuso", lone,
+                   app_ids={"2552": "someone else"},
+                   app_id="2552") == norm("Jonny Castro")
+    # And the loop passes the row's id through.
+    owner, unjoined = owner_from_api(
+        [{"manager": "SusoGattuso", "player_name": "Jonny Otto",
+          "player_id": "2552"}], lone, app_ids={"2552": norm("Jonny Castro")})
+    assert owner == {norm("Jonny Castro"): "SusoGattuso"}, owner
+    assert unjoined == [], unjoined
 
     # -- the name that shares nothing at all, joined on price --------------
     # Real: the app calls Jonny Castro "Jonny Otto" and Álvaro Fernández
