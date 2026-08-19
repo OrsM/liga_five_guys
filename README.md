@@ -834,17 +834,36 @@ them to. They are small enough that a wrong guess costs a fraction of a point,
 `reports/methodology.md` buckets realised points by fixture difficulty so the
 band can be widened, narrowed or deleted on evidence.
 
-**The rank now comes from Club Elo, when it covers the league.** `api.clubelo.com`
-publishes plain CSV, no key and no terms beyond "read it with a program", so one
-request a day joins a result-based rating onto the twenty clubs. A wallet is a
-transfer market's opinion; Elo is what the teams have actually done to each
-other. **Partial coverage is refused**: one club that will not join sends the
-whole board back to squad value, because half a league ranked by Elo and half by
+**The rank now comes from Club Elo, when it covers the league.** One request a
+day joins a result-based rating onto the twenty clubs. A wallet is a transfer
+market's opinion; Elo is what the teams have actually done to each other.
+**Partial coverage is refused**: one club that will not join sends the whole
+board back to squad value, because half a league ranked by Elo and half by
 wallet is not a ranking and the mixture would be silently wrong in the middle of
 the table where most teams live. Which scale ran is printed in
 `reports/methodology.md`, and the raw Elo gap is logged beside the factor on
 every row — the +/-12% band is a guess, and re-fitting it later means having
 kept the continuous rating rather than the rank it was flattened into.
+
+**It is read off `clubelo.com/ESP`, not off the CSV API, and it is gated on
+age.** Two changes on 2026-08-19, both of them the same bug seen twice:
+
+- `api.clubelo.com` published plain CSV until its HOST died on 2026-08-17. It
+  still resolves to 37.128.134.74 and still answers on neither port, while the
+  site itself moved to a new host that serves current ratings and 302s every
+  API path to its homepage. There is nothing to move the CSV reader to, so the
+  source now reads the country page — which embeds its ranking chart as a
+  Vega-Lite spec, so the clubs come out of JSON with their federation and
+  division attached rather than out of the rendered table beside it. The chart
+  is a top-N of the country, so a top-flight club could fall off it; that is
+  exactly what refusing partial coverage already handles.
+- **The dead feed did not look dead.** A failed fetch leaves the last rows in
+  `data/tidy/elo.csv`, all twenty still joined, `elo_strength()` still
+  succeeded, and the board ranked the league for two days on form from before
+  the jornada. `ffcore.tidy.load_elo()` now returns nothing once the newest
+  reading is more than a day and a bit old — the same number the feed table
+  calls "stale", imported rather than repeated — and the board falls back to
+  the wallet, which is a worse ranking and an honest one.
 
 **One currency: everything is priced in points above replacement per million.**
 `ffcore.bid.basket()` spends idle cash down TODAY'S SLATE, best rate first, and

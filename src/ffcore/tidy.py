@@ -43,7 +43,7 @@ __all__ = ["ROOT", "TIDY", "SEASON", "DECISIONS", "REPORTS", "MADRID",
            "Market", "Valuation", "load_market", "load_lineups",
            "load_players", "read_ledger", "load_deadline", "LINEUP_SOURCE",
            "pick_source", "load_fixtures", "next_kickoff", "kickoff_stamp",
-           "load_elo"]
+           "load_elo", "fresh_only", "DAILY_FRESH_DAYS"]
 
 ROOT = Path(os.environ.get("FF_ROOT", "./data"))
 TIDY = ROOT / "tidy"
@@ -266,6 +266,35 @@ def latest_only(rows: list[dict]) -> list[dict]:
     return [r for r in rows if r.get("observed_at") == newest]
 
 
+# How long a DAILY feed may go unanswered before its last reading stops being
+# today's. The sweep runs twice a day, so missing both of a day's sweeps is not
+# a cadence — it is a feed that has stopped. src/methodology.py prints "stale"
+# off this same number, so the table and the refusal below cannot disagree.
+DAILY_FRESH_DAYS = 1.05
+
+
+def fresh_only(rows: list[dict], max_age_days: float, now=None) -> list[dict]:
+    """`rows` if the newest of them is recent enough, [] if it is not.
+
+    A FEED THAT STOPS ANSWERING DOES NOT LOOK BROKEN ANYWHERE. Its last rows
+    stay in the tidy store, they still parse, they still join, and every
+    reader treats them as current. Nothing but the stamp can tell the
+    difference, so the stamp is checked here rather than trusted by each
+    caller in turn.
+
+    A reading in the future is not stale: a clock a few minutes out is a
+    machine problem, and throwing away good data over it would be worse than
+    the skew.
+    """
+    if not rows:
+        return []
+    when = snapshot_stamp(max(r.get("observed_at", "") for r in rows))
+    if when is None:
+        return []
+    now = now or datetime.now(timezone.utc)
+    return rows if (now - when).total_seconds() <= max_age_days * 86400 else []
+
+
 def snapshots(rows: list[dict]) -> list[str]:
     """Distinct observed_at values, oldest first."""
     return sorted({r.get("observed_at", "") for r in rows if r.get("observed_at")})
@@ -319,14 +348,24 @@ def kickoff_stamp(s: str):
             else when.astimezone(timezone.utc))
 
 
-def load_elo() -> list[dict]:
-    """The newest Club Elo reading, or [] until one has been fetched.
+def load_elo(now=None) -> list[dict]:
+    """The newest Club Elo reading, or [] until one has been fetched — and []
+    again once the newest one is too old to be about today's teams.
 
     [] is not a failure and callers must not treat it as one: ffcore.fixture
     falls back to squad value, which is what ranked the teams before this
     existed.
+
+    THE GATE IS THE POINT. Club Elo's API host died on 2026-08-17 and this
+    returned the same twenty ratings for two days; they covered every club, so
+    `elo_strength` succeeded and the fixture board ranked the league on form
+    from before the jornada. Falling back to the wallet is a worse ranking and
+    an honest one. This is the ONE place ratings are loaded — score.py builds
+    the board for your squad and every rival's from this call — so the gate
+    belongs here and not in the readers.
     """
-    return latest_only(read_csv(TIDY / "elo.csv"))
+    return fresh_only(latest_only(read_csv(TIDY / "elo.csv")),
+                      DAILY_FRESH_DAYS, now)
 
 
 def load_api_teams() -> list[dict]:
@@ -631,6 +670,31 @@ def _selftest() -> None:
     assert latest_only([]) == []
     assert snapshots(rows) == ["t1", "t2"]
 
+    # -- a reading that is too old is not a reading -------------------------
+    # THE BUG THIS EXISTS FOR: a feed that stops answering leaves its last
+    # rows in the tidy store, and every reader downstream treats them as
+    # today's. Club Elo died on 2026-08-17 and the fixture board went on
+    # ranking twenty clubs by ratings from before the jornada for two days,
+    # because all twenty still joined. Age is the only thing that says so.
+    now = datetime(2026, 8, 19, 12, 0, tzinfo=timezone.utc)
+    day_old = [{"observed_at": "2026-08-18T2246Z", "club": "Barcelona"}]
+    two_days = [{"observed_at": "2026-08-17T2246Z", "club": "Barcelona"}]
+    assert fresh_only(day_old, DAILY_FRESH_DAYS, now) == day_old
+    assert fresh_only(two_days, DAILY_FRESH_DAYS, now) == []
+    # The boundary is a day and a bit — 25.2 hours — because the sweep runs
+    # twice a day and a daily source is allowed to answer the later one.
+    assert fresh_only([{"observed_at": "2026-08-18T1030Z"}],
+                      DAILY_FRESH_DAYS, now) == []
+    assert fresh_only([{"observed_at": "2026-08-18T1100Z"}],
+                      DAILY_FRESH_DAYS, now) != []
+    # A stamp nothing can read is not evidence of freshness.
+    assert fresh_only([{"observed_at": "whenever"}], DAILY_FRESH_DAYS, now) == []
+    assert fresh_only([{}], DAILY_FRESH_DAYS, now) == []
+    assert fresh_only([], DAILY_FRESH_DAYS, now) == []
+    # A clock skew that puts the reading in the future is not staleness.
+    assert fresh_only([{"observed_at": "2026-08-19T2300Z"}],
+                      DAILY_FRESH_DAYS, now) != []
+
     mkt = [{"name": "Ane Aldea", "team": "Alavés", "position": "defensa",
             "value": "2.050.000", "delta_1d": "-12.000"},
            {"name": "Bo Bidal", "team": "Betis", "position": "delantero",
@@ -713,7 +777,7 @@ def _selftest() -> None:
         # A file that does not exist yet is not a migration.
         assert widen_csv(Path(tmp) / "nope.csv", ["a"]) is False
 
-    print("ffcore.tidy self-test OK (33 cases)")
+    print("ffcore.tidy self-test OK (41 cases)")
 
 
 if __name__ == "__main__":

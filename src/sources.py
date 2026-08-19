@@ -998,57 +998,93 @@ def played_sources(cal_html: str, observed_at: str = "") -> list[Source]:
 #
 # The fixture term used summed squad value, a poor proxy twice over: a
 # promoted side that spends is not thereby good, and one 100M signing moves
-# the whole total. Elo is fitted on results, free, one plain CSV a day.
+# the whole total. Elo is fitted on results, free, and published daily.
 #
-# NOT HTML, so nothing lxml-shaped may touch it — sign_elo hashes rows rather
-# than calling _surface. The file is worldwide, so the signature covers only
-# the Spanish top-flight rows; hashing all of it would store a fresh archive
-# daily for four thousand clubs we never rank.
+# NOT AN HTML TABLE, so nothing lxml-shaped may touch it — the country page
+# embeds its ranking chart as a Vega-Lite spec, and the clubs are records in
+# that spec's `datasets` with their federation and division on the record.
+# That is a structured read, not a scrape of the rendered table beside it:
+# a moved column cannot silently become a rating, and a renamed key yields
+# nothing, which is the rot signal.
 #
-# ROBOTS: clubelo.com serves none (the path 302s away), and the API exists to
-# be read by programs. One request a day is the whole footprint.
+# ROBOTS: clubelo.com serves none (the path 302s away). One request a day.
 #
-# OUTAGE, 2026-08-16: api.clubelo.com resolves (37.128.134.74) but answers on
-# neither 80 nor 443, from a home network and from a GitHub runner alike, and
-# clubelo.com/API — the page that documented this endpoint — now 302s to the
-# homepage. The entry is left in place because it costs one timed-out request a
-# day and starts working by itself if the host comes back; until then fetch()
-# warns and skips, and the fixture term falls back to squad-value rank. The
-# same ratings are on clubelo.com/ESP, but only inside a page built for people:
-# not worth a brittle parser for a band that is still an ungraded guess.
+# THE CSV API DIED WITH ITS HOST, 2026-08-17. `api.clubelo.com` still resolves
+# to 37.128.134.74 and answers on neither 80 nor 443, from a home network and
+# from a GitHub runner alike, while the SITE moved to a new one — clubelo.com
+# now resolves into Cloudflare in front of an ondigitalocean.app, serves
+# current ratings, and 302s `/API`, `/api/<date>` and `/<date>` to its
+# homepage. There is no CSV endpoint on the new host to move to, so this reads
+# the country page the site does publish. It cost two days of a fixture board
+# ranked on pre-jornada ratings to notice, because a failed fetch leaves the
+# last rows in place and every one of them still joins — see load_elo(), which
+# now refuses a reading older than the cadence allows.
 ELO_SOURCE = "clubelo"
-ELO_URL = "http://api.clubelo.com/{date}"      # https is refused by the host
+ELO_URL = "https://clubelo.com/ESP"
 ELO_COUNTRY = "ESP"
 ELO_LEVEL = "1"
-# The published header. Checked rather than assumed: a column order that moved
-# would otherwise be read as a rating.
-ELO_COLS = ("club", "country", "level", "elo")
+# The record shape, checked rather than assumed. `FedURL` and not `Federation`
+# because it is the same three-letter code the old CSV filtered on, and a code
+# does not get translated.
+ELO_COLS = ("Name", "Elo", "FedURL", "Level")
+# What the chart data is assigned to. The page carries exactly one of these;
+# every one found is read, so a second chart is a second source of clubs and
+# not a reason for the first to be missed.
+ELO_MARK = "var vegaJson ="
+
+
+def _elo_records(html: str) -> list[dict]:
+    """Every club record in the page's chart data, or [].
+
+    The spec is JSON in a <script>, so it is decoded rather than matched: a
+    regex for the closing brace would end at the first nested one, and the
+    spec is nothing but nested ones. `raw_decode` reads one value and stops
+    where it ends, which is what makes the trailing `;` and the rest of the
+    page harmless.
+    """
+    text, out, at = html or "", [], 0
+    dec = json.JSONDecoder()
+    while True:
+        at = text.find(ELO_MARK, at)
+        if at < 0:
+            return out
+        at += len(ELO_MARK)
+        start = text.find("{", at)
+        if start < 0:
+            return out
+        try:
+            spec, at = dec.raw_decode(text, start)
+        except ValueError:
+            continue
+        if not isinstance(spec, dict):
+            continue
+        for data in (spec.get("datasets") or {}).values():
+            if isinstance(data, list):
+                out += [r for r in data if isinstance(r, dict)
+                        and all(c in r for c in ELO_COLS)]
 
 
 def parse_elo(text: str, observed_at: str, key: str = "elo") -> list[dict]:
     """One row per Spanish top-flight club: its rating on the day we asked.
 
-    Columns are found BY NAME, so a reordered file still reads and a renamed
-    one yields nothing — which is the rot signal, not a rating read out of the
-    wrong column.
+    THE CHART IS A TOP-N, not the division. It plots the strongest clubs in
+    the country, so a top-flight side that sank below the cut is simply
+    absent — and that is why `ffcore.fixture.elo_strength` refuses partial
+    coverage rather than ranking nineteen clubs by Elo and one by its wallet.
     """
-    lines = [ln for ln in (text or "").splitlines() if ln.strip()]
-    if not lines:
-        return []
-    head = [c.strip().lower() for c in lines[0].split(",")]
-    if not all(c in head for c in ELO_COLS):
-        return []
-    at = {c: head.index(c) for c in ELO_COLS}
     rows = []
-    for ln in lines[1:]:
-        cells = [c.strip() for c in ln.split(",")]
-        if len(cells) < len(head):
+    for rec in _elo_records(text):
+        if (str(rec["FedURL"]).strip() != ELO_COUNTRY
+                or str(rec["Level"]).strip() != ELO_LEVEL):
             continue
-        if (cells[at["country"]] != ELO_COUNTRY
-                or cells[at["level"]] != ELO_LEVEL):
-            continue
-        rows.append({"observed_at": observed_at, "source": ELO_SOURCE,
-                     "club": cells[at["club"]], "elo": cells[at["elo"]]})
+        club = str(rec["Name"]).strip()
+        try:
+            rating = float(rec["Elo"])
+        except (TypeError, ValueError):
+            continue                  # a rating that is not a number is none
+        if club:
+            rows.append({"observed_at": observed_at, "source": ELO_SOURCE,
+                         "club": club, "elo": str(rating)})
     return rows
 
 
@@ -1457,9 +1493,11 @@ def sources(enabled_only: bool = True) -> list[Source]:
     # A rating changes when matches are played, so once a day is generous.
     # EIGHT SECONDS, NOT THIRTY. Club Elo is the one source nothing depends
     # on — a missing rating sends the fixture board back to squad value, which
-    # is where it was before Elo existed — and it has been timing out since
-    # 2026-08-17, costing thirty of the thirty-two seconds a sweep took. A
-    # host that cannot answer in eight is not going to answer in thirty.
+    # is where it was before Elo existed — and while the dead API host was
+    # still in this slot it timed out on every sweep, costing thirty of the
+    # thirty-two seconds a sweep took. The new host answers in a third of a
+    # second; the short timeout stays, because the reason it is short is what
+    # this source is worth, not who was hosting it.
     out += [Source("elo", "elo", ELO_URL, parse_elo, sign_elo,
                    cadence="daily", timeout=8.0)]
     # The whole season's results in one page. It is what tells the starters
@@ -1668,15 +1706,41 @@ _AF_HUB_FIXTURE = """<html><body>
 <a href="/partido/999">no time, no crests</a>
 </body></html>"""
 
-# Club Elo's published shape, worldwide and multi-division — which is the whole
-# reason the parser filters on country and level rather than trusting the file.
-_ELO_FIXTURE = """Rank,Club,Country,Level,Elo,From,To
-1,Barcelona,ESP,1,2043.1,2026-08-10,2026-08-16
-3,Bayern,GER,1,2010.4,2026-08-10,2026-08-16
-4,Real Madrid,ESP,1,1988.7,2026-08-10,2026-08-16
-78,Elche,ESP,1,1602.5,2026-08-10,2026-08-16
-,Zaragoza,ESP,2,1521.0,2026-08-10,2026-08-16
-"""
+# Club Elo's published shape: the chart spec the country page embeds, trimmed
+# from the real 2026-08-19 /ESP page. Worldwide and multi-division — which is
+# the whole reason the parser filters on federation and level rather than
+# trusting what the chart happens to plot.
+_ELO_FIXTURE = """<!DOCTYPE html><html><body>
+<h2><a href="ESP/Ranking">Ranking</a></h2>
+<div id="chartEloGolo" style="width: 100%;"></div>
+<script type="text/javascript">
+            var vegaJson = {
+  "$schema": "https://vega.github.io/schema/vega-lite/v5.20.1.json",
+  "config": {"background": "#A2AAA5", "view": {"continuousWidth": 300}},
+  "datasets": {
+    "data-4f53cda18c2baa0c0354bb5f9a3ecbe5": [],
+    "data-7c739729bfdfdd6abc8ff5e88cc19d07": [
+      {"Colour": "#A4234B", "Elo": 2043.1, "FedURL": "ESP",
+       "Federation": "Spain", "Golo": 2.029053, "Level": 1,
+       "Name": "Barcelona", "TLC": "BAR"},
+      {"Colour": "#DC052D", "Elo": 2010.4, "FedURL": "GER",
+       "Federation": "Germany", "Golo": 1.94, "Level": 1,
+       "Name": "Bayern", "TLC": "BAY"},
+      {"Colour": "#FFFFFF", "Elo": 1988.7, "FedURL": "ESP",
+       "Federation": "Spain", "Golo": 1.585982, "Level": 1,
+       "Name": "Real Madrid", "TLC": "RMA"},
+      {"Colour": "#00913F", "Elo": 1602.5, "FedURL": "ESP",
+       "Federation": "Spain", "Golo": 1.08, "Level": 1,
+       "Name": "Elche", "TLC": "ELC"},
+      {"Colour": "#0B4EA2", "Elo": 1521.0, "FedURL": "ESP",
+       "Federation": "Spain", "Golo": 1.01, "Level": 2,
+       "Name": "Zaragoza", "TLC": "ZAR"}
+    ]
+  },
+  "mark": {"type": "point"}
+};
+        </script>
+</body></html>"""
 
 
 # --- the API, trimmed from real 2026-08-18 payloads ------------------------
@@ -1953,35 +2017,46 @@ def _selftest() -> None:
     assert sign_af_fixtures(_AF_HUB_FIXTURE) is not None
     assert sign_af_fixtures("<html><body>no matches</body></html>") is None
 
-    # -- Club Elo, the one source that is not HTML -------------------------
+    # -- Club Elo, read out of a chart rather than off an API --------------
     el = parse_elo(_ELO_FIXTURE, "2026-01-01T0000Z", "elo")
     assert [r["club"] for r in el] == ["Barcelona", "Real Madrid",
                                        "Elche"], el
     assert el[0]["elo"] == "2043.1" and el[0]["source"] == ELO_SOURCE, el[0]
-    # The file is worldwide and multi-division; only the Spanish top flight is
-    # a fixture. Elche above Bayern is not a difficulty.
+    # The chart is worldwide and multi-division; only the Spanish top flight
+    # is a fixture. Elche above Bayern is not a difficulty.
     assert not any(r["club"] in ("Bayern", "Zaragoza") for r in el), el
-    # Columns are found by name, so a reordered header still reads.
-    swapped = "\n".join([
-        "Club,Elo,Rank,Country,Level,From,To",
-        "Barcelona,2043.1,1,ESP,1,2026-08-10,2026-08-16"])
-    assert parse_elo(swapped, "t")[0]["elo"] == "2043.1", parse_elo(swapped, "t")
-    # A RENAMED column yields nothing rather than a rating from the wrong
-    # place, and nothing is the rot signal ingest already knows how to report.
-    assert parse_elo("Club,Country,Level,Rating\nBarcelona,ESP,1,2043", "t") \
-        == []
-    assert parse_elo("", "t") == [] and parse_elo("Club\n", "t") == []
+    # A rating arrives at the precision the page carries it, because the band
+    # it feeds is still unfitted and rounding is a decision nobody has made.
+    assert parse_elo(_ELO_FIXTURE.replace("2043.1", "1980.0455939177232"),
+                     "t")[0]["elo"] == "1980.0455939177232"
+    # Records are found BY KEY, so a reordered or extended chart still reads
+    # and a RENAMED key yields nothing rather than a rating from the wrong
+    # field — the rot signal ingest already knows how to report.
+    assert parse_elo(_ELO_FIXTURE.replace('"Elo":', '"Rating":'), "t") == []
+    assert parse_elo(_ELO_FIXTURE.replace('"FedURL":', '"Fed":'), "t") == []
+    # A rating that is not a number is dropped, not stored as one.
+    assert [r["club"] for r in
+            parse_elo(_ELO_FIXTURE.replace("2043.1", '"n/a"'), "t")] \
+        == ["Real Madrid", "Elche"]
+    # Neither a page without the chart nor a page that is not this page is a
+    # rating, and neither may raise.
+    assert parse_elo("", "t") == []
+    assert parse_elo("<html><body>no chart here</body></html>", "t") == []
+    assert parse_elo("<script>var vegaJson = {not json;</script>", "t") == []
     assert sign_elo(_ELO_FIXTURE) is not None
-    # Same clubs, same ratings, a different date in the file: one archive, not
-    # two. The signature is the surface this repo reads, as everywhere else.
+    # Same clubs, same ratings, a different colour in the chart: one archive,
+    # not two. The signature is the surface this repo reads, as everywhere
+    # else — and the /ESP page carries fixtures, odds and kickoff times that
+    # move all day for clubs no fantasy squad can hold.
     assert sign_elo(_ELO_FIXTURE) == sign_elo(
-        _ELO_FIXTURE.replace("2026-08-16", "2026-08-17"))
+        _ELO_FIXTURE.replace("#A4234B", "#123456"))
     assert sign_elo(_ELO_FIXTURE.replace("2043.1", "2050.0")) \
         != sign_elo(_ELO_FIXTURE)
-    assert sign_elo("nothing like a csv") is None
-    # The one URL in the registry that carries the day it is asking about.
-    # ingest fills it; every other URL has no placeholder and is untouched.
-    assert ELO_URL.format(date="2026-08-16").endswith("/2026-08-16")
+    assert sign_elo("nothing like the page") is None
+    # No URL in the registry carries the day it is asking about any more; the
+    # substitution is left in ingest because it costs nothing and the next
+    # dated source will want it.
+    assert ELO_URL.format(date="2026-08-16") == ELO_URL
     assert MARKET_URL.format(date="2026-08-16") == MARKET_URL
 
     # -- the league's own API ---------------------------------------------
@@ -2203,7 +2278,7 @@ def _selftest() -> None:
         assert s.sign(html) is not None, s.key
         assert isinstance(s.parse(html, "2026-01-01T0000Z", s.key), list), s.key
 
-    print("sources.py selftest OK (168 cases)")
+    print("sources.py selftest OK (172 cases)")
 
 
 if __name__ == "__main__":

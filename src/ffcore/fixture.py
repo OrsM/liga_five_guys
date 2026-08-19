@@ -66,15 +66,22 @@ class Match(NamedTuple):
     gap: float | None = None   # raw Elo difference, you minus opponent
 
 
-# Club Elo names two Spanish clubs after their CITY where the market names the
-# club: Athletic Club is "Bilbao" and Racing de Santander is "Santander". They
-# share no substring with the market's spelling, so `match_team` cannot bridge
-# them and never should be taught to guess across a gap that wide.
+# Club Elo names some Spanish clubs after their CITY where the market names
+# the club: Racing de Santander is "Santander". They share no substring with
+# the market's spelling, so `match_team` cannot bridge them and never should
+# be taught to guess across a gap that wide.
 #
 # This is not cosmetic. `elo_strength` refuses partial coverage on purpose, so
-# these two alone sent all twenty clubs back to squad-value rank — Elo was
+# these alone sent all twenty clubs back to squad-value rank — Elo was
 # scraped, parsed, stored, and then not used, with the reports saying only
-# that coverage was incomplete. Two aliases is the whole fix.
+# that coverage was incomplete. An alias each is the whole fix.
+#
+# "Bilbao" IS KEPT THOUGH NOTHING SERVES IT TODAY. The CSV API spelled Athletic
+# that way; the country page this now reads spells it "Athletic Club", which
+# `match_team` joins on its own. An alias is only consulted after the ordinary
+# join has failed, so a spelling that never arrives costs nothing — and the
+# day one of these sources goes back to the other spelling, twenty clubs do
+# not silently drop to squad value again.
 ELO_ALIASES = {"athletic": "Bilbao", "racing": "Santander"}
 
 
@@ -335,6 +342,32 @@ def _selftest() -> None:
     assert elo_strength(["Athletic"], [{"club": "Athletic", "elo": "1750"}]) \
         == {"Athletic": 1750.0}
     assert elo_strength(["Rich"], []) is None
+
+    # THE WHOLE LEAGUE, in the two spellings that actually meet: the market's
+    # names on the left, Club Elo's country page on the right. Elo is only
+    # ever used when all twenty join, so this is the test that says whether it
+    # is used at all — and it is a join between two sites that rename clubs
+    # without telling anybody.
+    market_20 = ["Alavés", "Athletic", "Atlético", "Barcelona", "Betis",
+                 "Celta", "Deportivo", "Elche", "Espanyol", "Getafe",
+                 "Levante", "Málaga", "Osasuna", "Racing", "Rayo",
+                 "Real Madrid", "Real Sociedad", "Sevilla", "Valencia",
+                 "Villarreal"]
+    elo_20 = ["Alaves", "Athletic Club", "Atlético", "Barcelona", "Betis",
+              "Celta", "Depor", "Elche", "Espanyol", "Getafe", "Levante",
+              "Malaga", "Osasuna", "Santander", "Rayo Vallecano",
+              "Real Madrid", "Real Sociedad", "Sevilla", "Valencia",
+              "Villarreal"]
+    full = elo_strength(market_20, [{"club": c, "elo": str(1500 + i)}
+                                    for i, c in enumerate(elo_20)])
+    assert full is not None and len(full) == 20, full
+    assert full["Racing"] == 1513.0 and full["Athletic"] == 1501.0, full
+    # And the spelling the dead CSV API used still joins, because the alias
+    # for it is still there.
+    assert elo_strength(market_20,
+                        [{"club": "Bilbao" if c == "Athletic Club" else c,
+                          "elo": str(1500 + i)}
+                         for i, c in enumerate(elo_20)]) == full
     # Two Elo clubs matching one market name is never a pick, so the board
     # falls back rather than guessing which Real is which.
     assert elo_strength(["Real"], [{"club": "Real Madrid", "elo": "2000"},
@@ -344,7 +377,7 @@ def _selftest() -> None:
     assert fixture_board(mk, fx, now, None) == board
     assert fixture_board(mk, fx, now, []) == board
 
-    print("ffcore.fixture self-test OK (36 cases)")
+    print("ffcore.fixture self-test OK (40 cases)")
 
 
 if __name__ == "__main__":

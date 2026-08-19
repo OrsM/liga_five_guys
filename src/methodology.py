@@ -40,7 +40,8 @@ from ffcore.fixture import FIX_BAND, HOME_EDGE  # noqa: E402
 from ffcore.score import SHRINK_K  # noqa: E402
 from ffcore.text import norm, resolve  # noqa: E402
 from ffcore.tidy import (DECISIONS, LINEUP_SOURCE, REPORTS,  # noqa: E402
-                         SEASON, TIDY, load_elo, load_lineups, load_market,
+                         DAILY_FRESH_DAYS, SEASON, TIDY, load_elo,
+                         load_lineups, load_market,
                          read_csv, snapshot_stamp, write_lines)
 
 LIVE = SEASON / "live"
@@ -551,7 +552,11 @@ STAMPED = {"points": "to_stamp"}
 # asked for on every sweep and missing from the last one has failed; a daily
 # page has a day, and not much more, because the sweep runs twice a day and
 # missing both is not a cadence.
-FRESH = {"every_run": 0.5, "daily": 1.05, "once": 1e9,
+# "daily" is ffcore.tidy's number, not a second opinion about it: load_elo()
+# REFUSES a reading older than that, so a table calling one "ok" while the
+# scorer had thrown it away would be the exact contradiction this file exists
+# to prevent.
+FRESH = {"every_run": 0.5, "daily": DAILY_FRESH_DAYS, "once": 1e9,
          "as played": 1e9, "derived": 1e9}
 
 
@@ -673,10 +678,17 @@ def elo_basis() -> str:
     """
     from ffcore.fixture import elo_strength, team_strength
 
+    # load_elo() returns nothing for two different reasons and the reader is
+    # owed which: never fetched, or fetched and now too old to be about these
+    # teams. The raw file separates them — it still holds the stale rows.
     rows = load_elo()
     if not rows:
-        return ("summed squad value (Club Elo has not been scraped yet, so the "
-                "wallet is standing in for the pitch)")
+        return ("summed squad value — %s, so the wallet is standing in for "
+                "the pitch (see the feed table for how long)"
+                % ("Club Elo has stopped answering and its last reading is "
+                   "too old to rank a jornada it predates"
+                   if read_csv(TIDY / "elo.csv") else
+                   "Club Elo has not been scraped yet"))
     teams = list(team_strength(latest_market()))
     if elo_strength(teams, rows) is None:
         return ("summed squad value — Club Elo was scraped but did not cover "
