@@ -1,4 +1,4 @@
-# The simulation — 2026-08-19T0941Z
+# The simulation — 2026-08-19T1018Z
 
 ## Now
 
@@ -6,7 +6,7 @@
 
 play 4-5-1 · finish 1.52 · win 56% · season 1,525–1,785
 
-_market **56th percentile** · an ordinary week · better in 44% of weeks_
+_market **52nd percentile** · an ordinary week · better in 48% of weeks_
 
 ## Every player you could hold
 
@@ -53,12 +53,12 @@ _Read it top to bottom: it is a plan, not a menu. The funding is implicit — se
 | Route | What it offers | Season pts | Beats acting today |
 |---|---|--:|--:|
 | **Act today** | 40 players you can buy now | +213 | — |
-| Wait for the market | a week of new offers | +202 | 44% |
+| Wait for the market | a week of new offers | +202 | 48% |
 | Wait for the clauses | 61 players on 24 Aug | +160 | — |
 
 | The workings | |
 |---|--:|
-| Unowned players who would improve your eleven | 110 of 573 |
+| Unowned players who would improve your eleven | 110 of 572 |
 | Tenth percentile of a week's waiting | +4.03 |
 | Market model | the market is modelled from 74 offers over 5 cycles, weighted by value^0.15 |
 | Locked players who would improve your eleven | 31 |

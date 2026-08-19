@@ -1,4 +1,4 @@
-# Liga Five Guys — one report — 2026-08-19 09:42 UTC
+# Liga Five Guys — one report — 2026-08-19 10:18 UTC
 
 
 
@@ -9,7 +9,7 @@
 
 play 4-5-1 · finish 1.52 · win 56% · season 1,525–1,785
 
-_market **56th percentile** · an ordinary week · better in 44% of weeks_
+_market **52nd percentile** · an ordinary week · better in 48% of weeks_
 
 ## Every player you could hold
 

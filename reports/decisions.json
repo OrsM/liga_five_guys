@@ -1,6 +1,6 @@
 {
- "generated_at": "2026-08-19T09:42Z",
- "locks_in_h": 9.292508346388889,
+ "generated_at": "2026-08-19T10:18Z",
+ "locks_in_h": 8.689411058888888,
  "cash": -33023.0,
  "squad_value": 236374060.0,
  "jornadas_left": 38,
@@ -557,9 +557,9 @@
    "pts": 202.02587021505911,
    "lo": 4.029154957886957,
    "hi": 6.863641099395386,
-   "beats_now": 0.4425,
+   "beats_now": 0.48,
    "helpful": 110,
-   "pool": 573,
+   "pool": 572,
    "note": "the market is modelled from 74 offers over 5 cycles, weighted by value^0.15"
   },
   {
@@ -574,22 +574,22 @@
     {
      "name": "Lamine Yamal",
      "gain": 6.863641099395386,
-     "wait": 15.984177608255461
+     "wait": 15.952943017207469
     },
     {
      "name": "Kylian Mbappe",
      "gain": 6.361033940708905,
-     "wait": 15.929410060849843
+     "wait": 15.89828015334345
     },
     {
      "name": "Jan Oblak",
      "gain": 5.015969952824647,
-     "wait": 18.365604467308366
+     "wait": 18.329817783760497
     },
     {
      "name": "Zaid Romero",
      "gain": 4.693098902766798,
-     "wait": 20.170114249034818
+     "wait": 20.13087804752915
     }
    ]
   },
@@ -603,12 +603,12 @@
    "hi": null,
    "beats_now": null,
    "helpful": 31,
-   "days": 5.445930989050926,
+   "days": 5.420801521898149,
    "opens": "24 Aug"
   }
  ],
  "verdict": "**Act today.** Nothing you can wait for beats what is on offer now.",
- "market_pct": "market **56th percentile** · an ordinary week · better in 44% of weeks",
+ "market_pct": "market **52nd percentile** · an ordinary week · better in 48% of weeks",
  "shape_now": "4-5-1",
  "hold": false,
  "standings": [

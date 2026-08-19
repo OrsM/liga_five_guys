@@ -1,4 +1,4 @@
-# The workings — 2026-08-19T0941Z
+# The workings — 2026-08-19T1018Z
 
 _What the one table in [REPORT.md](REPORT.md) was built from: the eleven it assumes you field, what a man on today's slate should cost, and the two ways any of it can be wrong about a player._
 
@@ -143,9 +143,9 @@ _Compare squad value with the app; a mismatch means a name matched the wrong pla
 
 | | |
 |---|---|
-| Players tracked | 652, 512 with a probable-XI reading |
+| Players tracked | 651, 512 with a probable-XI reading |
 | xPts/j | expected points per jornada = shrunk pts/match (K=8, 2025-26) × fixture × P(start), from `ffcore/score.py` — the same scorer rivals.py uses |
 | Zeroed | injured, suspended, unavailable; a doubt is halved |
 | Fixture term | ±12% across the opponents ranked by Club Elo rating, plus ±4% for home advantage — both widths guesses, unfitted, and small enough that a wrong one costs a fraction of a point |
 
-_Generated 2026-08-19 09:42 UTC._
+_Generated 2026-08-19 10:18 UTC._
