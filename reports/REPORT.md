@@ -1,15 +1,15 @@
-# Liga Five Guys — one report — 2026-08-19 22:22 UTC
+# Liga Five Guys — one report — 2026-08-19 23:07 UTC
 
 
 
 
 ## Now
 
-**Locks in 21h** · squad 226.88M · cash 8.91M · total 235.79M
+**Locks in 20h** · squad 220.04M · cash 15.98M · total 236.02M
 
-play 4-5-1 · finish 1.24 · win 80% · season 1,610–1,981
+play 4-5-1 · finish 1.25 · win 79% · season 1,603–1,984
 
-_market **31st percentile** · an ordinary week · better in 69% of weeks_
+_market **39th percentile** · an ordinary week · better in 61% of weeks_
 
 ## Every player you could hold
 
@@ -19,19 +19,18 @@ _market **31st percentile** · an ordinary week · better in 69% of weeks_
 | **Your eleven — play 4-5-1** | | | **46.56** | vs SusoGattuso **42.17** | | **+4.39** |
 | **SELL — never start** | | | | | | |
 | Igor Zubeldia | DEF | 71% | 2.34 | yours | +10.35M | — |
-| Beñat Turrientes | MED | 35% | 1.11 | yours | +6.84M | — |
 | **BUY — with the proceeds** | | | | | | |
-| David Soria | POR | 99% | 7.33 | free agent | -4.29M | +46 |
-| Yuri Berchiche | DEF | 92% | 4.79 | SusoGattuso | -1.95M | +81 |
-| Antonio Blanco | MED | 99% | 4.11 | BurtonGM89 | -7.94M | +23 |
-| Cesar Tarrega | DEF | 99% | 3.97 | SusoGattuso | -2.30M | +53 |
-| Aitor Paredes | DEF | 80% | 3.92 | BurtonGM89 | +1.56M | +50 |
-| Izan Merino | MED | 97% | 3.23 | SusoGattuso | +0.83M | +1 |
-| Carlos Puga | DEF | 92% | 3.01 | BurtonGM89 | +1.74M | +17 |
-| Sergio Canales | MED | 97% | 2.76 | free agent | -7.81M | -2 |
+| David Soria | POR | 99% | 7.33 | free agent | -11.13M | +47 |
+| Yuri Berchiche | DEF | 92% | 4.79 | SusoGattuso | -1.95M | +82 |
+| Antonio Blanco | MED | 99% | 4.11 | BurtonGM89 | -14.78M | +23 |
+| Cesar Tarrega | DEF | 99% | 3.97 | SusoGattuso | +1.21M | +53 |
+| Aitor Paredes | DEF | 80% | 3.92 | BurtonGM89 | -5.28M | +52 |
+| Izan Merino | MED | 97% | 3.23 | SusoGattuso | +4.33M | +1 |
+| Carlos Puga | DEF | 92% | 3.01 | BurtonGM89 | +5.25M | +11 |
+| Sergio Canales | MED | 97% | 2.76 | free agent | -14.65M | -1 |
 | **SAVE — better than yours, out of reach** | | | | | | |
-| Marko Dmitrovic | POR | 97% | 5.44 | BurtonGM89 | 12.55M short | -2 if you could |
-| Pierre-Emerick Aubameyang | DEL | 97% | 3.11 | free agent | 10.78M short | +17 if you could |
+| Marko Dmitrovic | POR | 97% | 5.44 | BurtonGM89 | 12.31M short | -1 if you could |
+| Pierre-Emerick Aubameyang | DEL | 97% | 3.11 | free agent | 10.55M short | +16 if you could |
 
 _Read it top to bottom: it is a plan, not a menu. The funding is implicit — sell the SELL rows and the BUY rows are what the money reaches. **Start** is one number, futbolfantasy recalibrated against confirmed line-ups and blended with analiticafantasy where it has an opinion, and it is the same figure the forecast multiplies by. **xPts/j** is what he scores a jornada with that already applied. **€** is the cash you END UP with for doing that row, funding included — a SELL row is what it raises, a BUY row is that money minus what he costs — and on a SAVE row it is how far short you are. **Season** is simulated: extra points over the 38 jornadas left, measured in the same seasons with and without the move._
 
@@ -39,11 +38,11 @@ _Read it top to bottom: it is a plan, not a menu. The funding is implicit — se
 
 | Manager | now | cash | simulated | 10–90 | P(I finish above) |
 |---|--:|--:|--:|--:|--:|
-| miguel_autentico **(you)** | 31 | 8.91M | 1,795 | 1,610–1,981 | — |
-| SusoGattuso | 26 | ~2.13M | 1,606 | 1,422–1,783 | 83% |
-| BurtonGM89 | 28 | ~15.88M | 1,455 | 1,285–1,623 | 96% |
-| Magic Mike 333 | 15 | ~-817K | 1,369 | 1,177–1,565 | 98% |
-| Albert Laporta | 10 | ~9.81M | 1,171 | 1,025–1,323 | 100% |
+| miguel_autentico **(you)** | 31 | 15.98M | 1,793 | 1,603–1,984 | — |
+| SusoGattuso | 26 | ~2.13M | 1,612 | 1,426–1,798 | 81% |
+| BurtonGM89 | 28 | ~15.88M | 1,451 | 1,276–1,632 | 96% |
+| Magic Mike 333 | 15 | ~-817K | 1,366 | 1,176–1,559 | 98% |
+| Albert Laporta | 10 | ~9.81M | 1,169 | 1,021–1,323 | 100% |
 
 
 

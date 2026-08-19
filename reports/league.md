@@ -1,8 +1,8 @@
-# Squads — 2026-08-19 22:22 UTC
+# Squads — 2026-08-19 23:07 UTC
 
 | Manager | Players | Squad value | Spent | Raised | Cash |
 |---|--:|--:|--:|--:|--:|
-| **miguel_autentico** | 13 | 226.88M | 142.18M | 49.82M | 8.91M |
+| **miguel_autentico** | 12 | 220.04M | 142.18M | 56.89M | 15.98M |
 | Albert Laporta | 14 | 215.15M | 188.67M | 97.21M | ~9.81M |
 | BurtonGM89 | 12 | 210.95M | 182.90M | 97.50M | ~15.88M |
 | Magic Mike 333 | 16 | 238.94M | 121.23M | 19.14M | ~-817K |
@@ -13,7 +13,7 @@
 **FF** is futbolfantasy's probable-XI percentage, which is the one the forecast uses. **AF** is analiticafantasy's read of the same eleven, printed beside it and never blended in — `titular` is a named starter (a final call, with no number to it), a percentage is their editors' consensus, `?` means they list him without either, and `—` means they do not have him. Two columns that disagree are the signal; that is the whole point of carrying both.
 
 ## You (miguel_autentico)
-13 players · 226.88M total · 10 at 70%+ · cash 8.91M
+12 players · 220.04M total · 10 at 70%+ · cash 15.98M
 
 | Player | Team | Pos | Value | 24h | FF | AF |
 |---|---|--:|--:|--:|--:|--:|
@@ -27,7 +27,6 @@
 | iñigo ruiz de galarreta | Athletic | med | 12.95M | 176K | 70% | — |
 | pepelu | Valencia | med | 7.70M | 28K | 70% | 75% |
 | jon moncayola | Osasuna | med | 6.90M | -4K | 90% | — |
-| beñat turrientes | Real Sociedad | med | 6.84M | -111K | 50% | — |
 | lucien agoume | Sevilla | med | 5.64M | -40K | 80% | 100% |
 | iñigo vicente | Racing | del | 20.07M | 248K | 90% | 100% |
 
@@ -117,7 +116,6 @@
 
 | Date | Player | From → To | Price |
 |---|---|---|--:|
-| 2026-08-15T22:24 | Mario Martín | market → SusoGattuso | 3831432 |
 | 2026-08-15T22:24 | Riedel | market → SusoGattuso | 4599626 |
 | 2026-08-15T22:24 | Buonanotte | market → Albert Laporta | 7331515 |
 | 2026-08-16T22:24 | Paredes | market → BurtonGM89 | 5350000 |
@@ -142,10 +140,11 @@
 | 2026-08-19T23:12 | Q. Hartman | BurtonGM89 → market | 8474875 |
 | 2026-08-20T00:01 | Isi | SusoGattuso → market | 22371647 |
 | 2026-08-20T00:01 | Mario Martín | SusoGattuso → market | 4048567 |
+| 2026-08-20T01:05 | Turrientes | miguel_autentico → market | 7074690 |
 
 ## Cash basis
 
-- **miguel_autentico** — balance the app reported at 2026-08-19 22:21 UTC − 0.00M bought + 0.00M sold across 0 ledger row(s) + 0.00M of daily allowance over 0 days = 8.91M (known)
+- **miguel_autentico** — balance the app reported at 2026-08-19 23:07 UTC − 0.00M bought + 0.00M sold across 0 ledger row(s) + 0.00M of daily allowance over 0 days = 15.98M (known)
 - **Albert Laporta** — 100M starting budget − 188.67M bought + 97.21M sold across 14 ledger row(s) + 1.27M the app has paid you since the season began, which it pays everyone = 9.81M (estimated)
 - **BurtonGM89** — 100M starting budget − 182.90M bought + 97.50M sold across 20 ledger row(s) + 1.27M the app has paid you since the season began, which it pays everyone = 15.88M (estimated)
 - **Magic Mike 333** — 100M starting budget − 121.23M bought + 19.14M sold across 8 ledger row(s) + 1.27M the app has paid you since the season began, which it pays everyone = -0.82M (estimated)
@@ -210,6 +209,7 @@ Placed by who the counterparty was, or by what the price implies — a player so
 - 2026-08-19T22:25: Huijsen → dean huijsen (matched dean huijsen)
 - 2026-08-19T23:12: Q. Hartman → quilindschy hartman (matched quilindschy hartman)
 - 2026-08-20T00:01: Isi → isi palazon (matched isi palazon)
+- 2026-08-20T01:05: Turrientes → benat turrientes (matched beñat turrientes)
 
 ## What they pay over value
 
@@ -223,7 +223,7 @@ Placed by who the counterparty was, or by what the price implies — a player so
 
 **The floor sometimes wins.** 15 of the 33 priced purchases in this league went at the market value itself and the other 18 cleared it, median +1.4%, -0.3% to +635.3% (n=33) across all of them. Bidding the minimum is therefore not the one number known to lose — but 15 of 33 is a share of the bids that WON, not the odds of winning one. Nothing in this ledger records a bid that lost, so the floor's failure rate is unmeasured and unmeasurable from here.
 
-**The app does not pay you the value — it randomises around it.** The 27 priced sales back to the market went for median +3.7%, -9.4% to +12.0% (n=27): 11 below the value and 16 above, never further than 12.0% either way. So a sale raises the value give or take a tenth, and the value is not the money you will get. Whether the same randomiser bids against you for a free agent is inferred, not measured: every row in this ledger is a bid that won.
+**The app does not pay you the value — it randomises around it.** The 28 priced sales back to the market went for median +3.5%, -9.4% to +12.0% (n=28): 11 below the value and 17 above, never further than 12.0% either way. So a sale raises the value give or take a tenth, and the value is not the money you will get. Whether the same randomiser bids against you for a free agent is inferred, not measured: every row in this ledger is a bid that won.
 
 A round bid was typed by a human. That is the whole of what roundness tells you — an exact bid is *not* the app's valuation and does not mean nobody competed, because the premium column two cells left already measures how far above the floor the buyer went. Sealed bids are paid as bid, so a purchase at exactly the value was only ever yours to take if the tie-break favoured you, and that rule is not documented anywhere we can read. Check it in-app before reading a floor purchase as a bargain you missed.
 
