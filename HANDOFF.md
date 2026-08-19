@@ -1,257 +1,158 @@
-# liga_five_guys — handoff, 2026-08-19 (evening)
+# liga_five_guys — handoff, 2026-08-20
 
-Private repo `OrsM/liga_five_guys`, working tree clean, **pushed** through this handoff.
-Push by default and when in doubt — Miguel's instruction, 2026-08-19. The timer has been
-doing it all along (`LFG_PUSH=1` is in `lfg.service`, and `lfg-run` only logs a push when
-it FAILS, which is why the journal looks silent); what was lagging was the by-hand work in
-a session. So: commit as you go, and push before you hand over.
-Read `README.md` first — it holds the design decisions and why each was made.
+Private repo `OrsM/liga_five_guys`, working tree clean, **pushed**, 28 suites pass.
+
+## Start here, and do not open with an audit
+
+**This file is the map. Read it, run the one command below, then start on item 1 of
+"What to do next".** The last session ended with everything committed, deployed and
+verified; there is nothing to discover about the current state that is not written
+here, and a session that spends its first twenty tool calls re-deriving it has spent
+them on something Miguel already paid for once.
+
+One command confirms the whole state — the suites, the pipeline and the two outputs:
+
+    cd ~/claude_projects/liga_five_guys && \
+      LFG_NO_FETCH=1 LFG_NO_COMMIT=1 ~/.local/bin/lfg-run 2>&1 | tail -4
+
+If that says `28 suites pass` and publishes 2 files, nothing has rotted. Read
+`README.md` only when you need the WHY behind a design decision — it is 1,085 lines
+and is reference, not orientation.
 
 ## Run it
 
-**THE TIMER IS OFF.** `lfg.timer` was disabled 2026-08-19 at Miguel's request:
-the report is run on demand now, from the phone's "Run again" button — which
-`lfg-watch.timer` still polls for every 60s — or by hand. Nothing else changed;
-`lfg-run` is the same command. Re-enable with
-`systemctl --user enable --now lfg.timer`. The unit file carries the same note.
+`uv`, never pip — this box has no pip and no python3-venv, and installing them needs
+sudo.
 
-Because nothing runs on a schedule, EVERY READING IS AS OLD AS THE LAST TIME
-somebody pressed the button — which is exactly why the freshness gates and the
-traffic-light table went in first. Expect ambers in the feed table on a report
-generated hours after its sweep; that is the table working.
-
-`uv`, never pip — this box has no pip and no python3-venv, and installing them needs sudo.
-
-    cd ~/claude_projects/liga_five_guys
     PYTHONPATH=src FF_ROOT=./data uv run --frozen python src/<module>.py
 
-Every module self-tests under `if __name__ == "__main__"`; there is no pytest and no test
-directory. **Work TDD**: add the failing assertion to the module's own `_selftest()`, watch
-it fail, then implement.
+Every module self-tests under `__main__`; several need `--selftest` (report, sim,
+league, ingest, crosswalk, digest, methodology). There is no pytest and no test
+directory. **Work TDD**: add the failing assertion to the module's own `_selftest()`,
+watch it fail, then implement.
 
-- `~/.local/bin/lfg-run` — 28 suites (parallel, 4 at a time), fetch, generate, publish,
-  commit. `LFG_NO_FETCH=1`, `LFG_NO_COMMIT=1`, `LFG_PUSH=1` are the switches.
-- `src/run.py` — the ten generator stages in ONE interpreter. `python src/run.py sim digest`
-  runs a subset. Each stage is still runnable alone, which is how a failure gets bisected.
-- `lfg.timer` 00:40 and 11:40 local; `lfg-watch.timer` polls the phone's rerun button every 60s.
-
+- `~/.local/bin/lfg-run` — 28 suites, fetch, generate, publish, commit.
+  `LFG_NO_FETCH=1`, `LFG_NO_COMMIT=1`, `LFG_PUSH=1` are the switches.
+- `src/run.py` — the ten stages in ONE interpreter. `python src/run.py sim digest`
+  runs a subset, which is how a failure gets bisected.
+- **The scheduled timer is OFF** (disabled 2026-08-19 at Miguel's request). The report
+  runs on demand: the phone's "Run again" button, which `lfg-watch.timer` polls for
+  every 60s, or `lfg-run` by hand. `systemctl --user enable --now lfg.timer` brings
+  the schedule back. Consequence to remember: every reading is as old as the last
+  press, which is what the freshness gates and the traffic-light table are for.
 
 ## The reports — there are two
 
-    reports/decisions.json    THE report. The phone draws it: position, the XI
-                              change list, the ladder, the league table with
-                              cash, the warnings. Written by src/sim.py.
+    reports/decisions.json    THE report. The phone draws it: position, the XI change
+                              list, the ladder, the league table with cash, the
+                              warnings. Written by src/sim.py.
     reports/METHOD.md         The methodology. Stitched by src/digest.py from
-                              fragments in .runtime/parts/ — which are build
-                              artifacts, not reports.
+                              fragments in .runtime/parts/ — build artifacts, not
+                              reports.
 
-Nothing else is generated and nothing else is published. REPORT.md was the
-board's content as markdown and went on 2026-08-20 with reports/history/; two
-renderings of one answer is how they come to disagree, which happened twice in
-one evening. If you add a file to reports/, publish it or do not write it.
+Nothing else is generated and nothing else is published. **If you add a file to
+`reports/`, publish it or do not write it.** REPORT.md was the board's content as
+markdown and went on 2026-08-20 along with `reports/history/`: two renderings of one
+answer is how they come to disagree, which happened twice in one evening.
 
 ## Where it stands
 
-Live as of this handoff: cash **-29K** (red), formation **4-5-1**, finish 1.62, P(win) 51%,
-season band 1,516–1,775. The report is still the simulation and still one grouped table.
-(The headline cash moved -33K → -29K on purpose: it reads League's estimator now, which
-accrues the daily allowance since the anchor, instead of a second raw read of the app's
-balance.)
+Live: cash **15.98M**, squad **220.04M**, formation **4-5-1** (which is what he is
+already fielding), finish 1.24, P(win) 76%, season band 1,612–1,979.
 
-**A later session, same evening, did the freshness work item 6 below asked for.** Three
-commits: the API tables are gated on age like Club Elo already was; a gated feed that goes
-quiet now says so in the headline and in the warnings that reach the phone; and the never
-used per-manager budget override is gone. Nothing in the live report moved except that
-cash figure — the whole of it shows up only when the app stops answering, which is the
-point. The degradation path was measured, not argued: aged three days, the report keeps
-the real 17 points and projects 1,644 against 1,646 fresh, and says twice why it is not
-the app's reading.
+What the last session changed, all of it measured and none of it cosmetic:
 
-**This session was an audit, not a feature.** Nine commits, and the report barely moved —
-which is the point. What changed is that the inputs are honest about their own age, the
-store is at the right grain, and half the API payload that was being parsed past is now in
-tables. Two wrong numbers were found and fixed on the way.
-
-### Done, in order
-
-1. **Club Elo reads `clubelo.com/ESP`.** The CSV API did not move — its HOST died.
-   `api.clubelo.com` still resolves to 37.128.134.74 and answers on neither port; the site
-   moved to a new host that 302s every API path to its homepage. The country page embeds
-   its ranking chart as a Vega-Lite spec, so the clubs come out of JSON with federation and
-   division attached. 200 in 0.14s where the dead host cost 8.1s of an ~11s sweep.
-2. **`load_elo()` refuses a stale rating.** A failed fetch left the last rows in place, all
-   twenty still joined, and the board ranked the league on form from before the jornada for
-   two days. `fresh_only()` gates it, and `methodology.FRESH["daily"]` imports the same
-   number so the feed table cannot call a reading "ok" that the scorer threw away.
-3. **`transactions.csv` moved to `data/tidy/`**, and three dead knobs left `league.ini`.
-4. **The daily allowance accrues from the anchor, whatever labelled it.** It was applied
-   only to ESTIMATED balances; an observed balance contains the bonuses paid before it was
-   READ and none of the ones paid since. cash.txt's four-day-old anchor was 0.40M light
-   while calling itself "known".
-5. **Both names the app publishes are kept.** `nickname` AND `name`: 12 of 76 owned players
-   join only on the nickname, 3 only on the full name.
-6. **A fact is stored once, not once per sweep.** `api_activity` and `api_players` are
-   immutable and the feed republishes them whole every time — 1,225 rows carrying 63 events.
-   Quadratic, and committed. 103,825 → 5,402 bytes and 69,408 → 3,825.
-7. **The rest of the squad feed.** `lastStats` → `data/tidy/api_stats.csv` (long: player ×
-   week × stat, with what he did and what it scored). `playerStatus` → the app's own
-   fitness. `shielded`. And the bid count, which was blank for 28 of 41 market rows because
-   the two listing kinds count bidders under different names.
-8. **`api_key` reads the crosswalk**, so an id resolved on any past sweep stays resolved.
-9. **The league table moved to its own grain** — `api_standings.csv`, five rows a sweep.
-10. **The price argues with a guessed name**, and namesakes are announced.
-11. **The parse cache is keyed per parser**, so touching one no longer costs 40s.
+1. **The fielded XI comes from the app.** `/v1/competition/1/teams/{team}/lineup/week/
+   {n}` returns the eleven, the formation and `teamSnapshotTookOn`. The repo believed
+   no such endpoint existed because every guess had been made under the LEAGUE path.
+   `inputs/lineup.txt` and its checklist machinery are deleted; `ffcore.league.
+   app_fielded` is the one reader, and it returns [] unless EVERY man resolves.
+2. **The eleven is a change list**: PUT ON / TAKE OFF against what you are fielding,
+   or one line saying there is nothing to change. Not a team sheet you have to diff in
+   your head.
+3. **A name is not a player.** Three names of 651 are two men; keyed `name@club` now,
+   by one rule (`ffcore.tidy.shared_names` / `row_key`) shared by four indexes.
+   SusoGattuso's squad was 19.73M light because of it.
+4. **The rate's own error is simulated** — one draw per season, sd = pool cv over
+   √(matches + K). Band 259 → 365 points, P(win) 74% → 64%. The mean is unchanged by
+   construction.
+5. **Rivals are credited what the app actually pays** (`flat_income`, measured 1.27M
+   on the one account that states a balance), not a guessed daily bonus.
+6. **The API tables are gated on freshness** and a quiet feed says so — in the
+   headline, in the warnings, and as a traffic light in METHOD.md keyed on when a page
+   was last ASKED FOR, not on the re-stamp.
 
 ## What to do next
 
-1. **DONE 2026-08-20 — a shared name is keyed `name@club`.** Three names of 651
-   belonged to two players each, and one of them was owned: SusoGattuso's Álvaro
-   García read as the Villarreal reserve at 0.50M when the app says he holds the
-   Rayo one at 20.23M. His squad was 19.73M light, his projected season 27 points
-   light, and your odds against him 4 points flattering.
+1. **Delete `ffcore/bid.py`. Measure first, then delete.** 630 lines and five
+   constants (`MAX_LAG_H`, `ROUND_TO`, `FLOOR_EPS`, `HOLD_DAYS`, `MIN_DRIFT_N`)
+   inferring what a rival will bid from the roundness of past prices. Its own
+   docstring records that inference being inverted and wrong. The measurement: stub it
+   out, run `src/run.py` on the same store, diff `reports/decisions.json` and
+   `reports/METHOD.md`. If nothing moves, delete it and its callers; if something
+   moves, say what and stop. Half an hour, and it is the whole task.
 
-   Four indexes keyed the same rows and now share one rule
-   (`ffcore.tidy.shared_names` / `row_key`): the market index, the player index,
-   the scorer's lookup and the crosswalk. The market slug was NOT the answer —
-   two of the six colliding rows have none. What decides is the club, and where
-   a caller has no club the app's own stated value does it instead
-   (`Market.key_for(name, value=...)`, the same evidence `api_key` already
-   trusts). A shared name asked without either REFUSES rather than picking one.
+2. **Split model from render at `decisions.json`.** The one real refactor.
+   `report.py` scores AND renders, `sim.py` simulates AND renders, `methodology.py`
+   re-reads every tidy table to describe what the other two did — three modules
+   re-deriving the same numbers, which is why two surfaces could disagree about the
+   formation. Target: the model writes `decisions.json`, every renderer reads only
+   that and cannot reach the tidy store. Groundwork is done — the fragments are
+   already build artifacts and there is one document left to assemble. Do it in one
+   sitting and diff the outputs: they should be byte-identical the day it lands.
 
-   Two follow-ons, both small: the crosswalk drops a bare key once the market
-   says two men answer to it (it merges rather than rebuilds, so the stale key
-   otherwise lives for ever carrying one of their app ids), and
-   `inputs/rosters_initial.txt` accepts `alvaro garcia (Rayo)` — the one file a
-   human still types a name into.
+3. **Waiting on data — judge nothing yet.** `FIX_BAND` (±12%) and `HOME_EDGE` (+4%)
+   are unfitted guesses with n=1 per bucket. `DOUBT_FACTOR = 0.5` is a hardcoded
+   decision rule in a repo whose standing instruction forbids them. Club correlation
+   in the season risk needs per-jornada per-club history: the pool is at 96 matches
+   and grows ~200 a round, and `MIN_POOL = 200` is the same threshold that takes the
+   shape prior off its seed — one measurement unlocks both, in about a week.
 
-2. **Nothing yet reads the new data, and wiring it is a MODEL change.** Three separate
-   decisions, each needing grading in `METHOD.md` rather than plumbing:
-   - `api_stats` — per-week components, including `mins_played`, from the scorer itself.
-     This is what could finally grade P(start) against minutes rather than against a
-     binary started/did-not.
-   - `player_status` — the operator's own fitness, against two editorial scrapes. Store
-     both, use one, compare when outcomes exist — the same rule `second.py` follows for AF.
-   - `bids` — 41 of 41 rows now state it, and eight players had a live bid on the day this
-     was written, two of them in the report's own BUY list. A bid you are about to outbid
-     is worth knowing; a decision rule built on it is not (see the standing instruction).
-3. **Club Elo's chart is a TOP-N of Spain, not the division.** A top-flight club that sinks
-   below the cut simply drops out of the payload. `elo_strength` refuses partial coverage
-   so it degrades honestly to squad value, but it would go quiet rather than loud. Worth a
-   count in the feed table if it ever bites.
-4. **Both fixture widths are still guesses** — ±12% band, +4% home, never fitted. The
-   "Next fixture" table in METHOD.md is what will settle them; it has n=1 per bucket.
-   Judge nothing yet.
-5. **The shape prior is still the seed** (96 observed, 200 needed) — `pool_note()` prints
-   which is in use, never assume.
-6. **`inputs/` is three files and all three now earn it — measured, on the path that
-   actually happens.** The previous handoff suspected `rosters_initial.txt` and `cash.txt`
-   were kept for a scenario that could not occur, because "API gone" had been tested with
-   an EMPTY feed while a dead token only makes the store STALE. That was right about the
-   test and wrong about the conclusion: gating the API tables (this session) is what turns
-   stale into empty, so the empty case is now the real degradation path, and both files
-   were re-measured against it.
-
-   With the store aged three days and the gate on, against a fresh run:
-
-   | Input | Fresh run | Stale run (the path that happens) |
-   |---|---|---|
-   | `rosters_initial.txt` | no change at all | squad 15 players → 5, 240.73M → 134.96M |
-   | `cash.txt` | no change at all | 49K "known" → -518K "estimated", 0.57M and the label |
-   | `lineup.txt` | **deleted** — the app publishes the fielded XI after all | — |
-
-   `lineup.txt` was deleted the same evening. "Nothing we fetch publishes a
-   fielded flag" was wrong, and it was wrong because the guesses were made
-   under the LEAGUE path: `/v1/competition/1/teams/{team}/lineup/week/{n}`
-   returns the eleven, the formation and `teamSnapshotTookOn`. It is fetched
-   every run now and three readers share it. The file is the fallback for a
-   quiet API, and the next measurement to make is whether that fallback is
-   worth keeping at all — the same question, asked of the same file, with the
-   answer now pointing the other way.
-
-   So nothing here is a candidate for deletion on the ownership side. What is left of the direction is
-   to keep asking what each one buys in units — `cash.txt`'s answer shrinks every time the
-   app's own balance is fresh, and it is worth re-running that measurement if the anchor
-   ever goes a week untouched.
-
-7. **The remaining API feeds are ungated, and one of them may want it.** `api_leagues` no
-   longer reaches the report (the headline cash reads League's estimator now), but the
-   table is still swept and still nothing checks its age. `api_activity`, `api_stats` and
-   `api_players` are histories and must NOT be gated — that is written in their docstrings
-   so it does not get "fixed". `fixtures` is a snapshot and is not gated: a stale fixture
-   list would blank the sim entirely, and whether that is more honest than a day-old
-   kickoff time has not been measured. Do not change it on the argument alone.
-
+4. **Fetched but unread.** `api_stats` (per-week components including `mins_played`,
+   which is what could grade P(start) against minutes rather than a binary),
+   `player_status` (the app's own fitness, against two editorial scrapes), and the bid
+   counts. Each is a MODEL decision needing grading in METHOD.md, not plumbing.
 
 ## Traps that cost real time — do not rediscover these
 
-Everything in the previous handoff still holds. New this session:
-
-- **The freshness bound for an every-run feed is NOT half a day, and 0.5 was already in
-  the code.** `lfg.timer` fires at 00:40 and 11:40 local, so the two legs are 11h and 13h
-  and `RandomizedDelaySec` adds five minutes to either. A feed answering every single
-  sweep is 13h10m old at its oldest — measured on the store, the largest gap over 21
-  sweeps was 13.0h with nothing missed — so 0.5 days condemns a healthy feed every night.
-  `EVERY_RUN_FRESH_DAYS = 0.6` clears the long leg by an hour and still catches a missed
-  sweep inside the day.
-- **A gate that only refuses is half a fix.** Handing every reader `[]` is honest about
-  the data and silent about the reason, and `[]` arrives downstream as "nothing is for
-  sale". Aged three days, the report still came out in full and its headline read "market
-  0th percentile · a poor week" — a claim about a market it could not see. Whatever you
-  gate, give it a `stale_feeds()` sentence next to the numbers it explains.
-- **One row can hold two kinds of fact.** `api_standings` carries a balance, which must be
-  today's, and a season-to-date point total, which only grows. Gating the row threw both
-  away and simulated all five managers from nought — a wrong number where a slightly old
-  one was available. `last_api_standings()` is the ungated reader for the history half.
-
-- **"THE APP DOES NOT PUBLISH IT" WAS A GUESS THAT BECAME A FACT BY REPETITION.**
-  It was in three docstrings and a handoff, and it was never true: the fielded
-  XI hangs off `/teams/{team}/lineup/week/{n}`, not off the league path every
-  guess had used. A whole hand-maintained file, and a class of wrong report,
-  existed because of it. When a source "must not have" something, spend ten
-  minutes probing before designing around the absence.
-- **A claim read off the code is not a finding.** I told Miguel `rosters_initial.txt`
-  anchored every rival's cash; emptying it changed every balance by zero, because the
-  method that would have used it had no callers. He called it out. Measure, then say.
-- **A feed that republishes its whole history makes `latest_only` accidentally correct.**
-  `load_api_activity` used it and worked only BECAUSE the store kept a copy per sweep.
-  Deduplicate the store and the ledger silently collapses to the last few days.
-- **The app stamps a whole day's deals with the same minute.** Any sort on the stamp alone
-  leaves ties to file order, which is a diff every run. Break them on the app's own id, read
-  as an integer — "15676725" sorts before "9629986" as text.
-- **Two copies of one fact in two tables is how a number gets added to one and not the
-  other.** I had `offers`/`listed_until` on the squad rows until I joined them: all 28
-  matched a market row already in `api_market`, same expiry to the second. Deleted.
-- **The two market listing kinds use different field names.** `numberOfBids` for an
-  app-dealt free agent, `numberOfOffers` for a manager listing his own, and neither row
-  carries the other. Reading one left 68% of the market saying "nobody knows".
-- **The app's price is an independent identifier and it catches wrong joins.** The two
-  sources agree to within 0.2% for a correct join; the wrong one was out by 603%. But
-  check a GUESS only — an exact name match is the strongest evidence there is and the
-  money must never overrule it.
-- **`ast.get_source_segment` re-splits the whole file per node.** It was most of the cost
-  of the parser-fingerprint pass: 0.285s → 0.043s slicing off a list split once.
-- **A `running` written to a file is a claim that needs an age.** The phone's report page
-  adopts run.json on load so a refresh does not lose the console; without a stamp, a run
-  the unit killed would leave the button disabled for ever.
-
-## The website, same day
-
-`~/claude_projects/website`, committed `9af9405` and **deployed** (`./deploy.sh`, verified
-on the phone). Refreshing the report page mid-run used to lose the console: `FantasyIndex`
-initialised its run state to `idle` and the only code that asked `/api/fantasy-run` was the
-poller, which is gated on already knowing a run is in flight. Pressing the button again
-queued a SECOND run. It now adopts what the box says on mount, `run.json` carries `at`, and
-`liveRun` downgrades a `running` older than the unit's TimeoutStartSec to `stale`. The log
-renders for `failed` and `stale` too — it was gated on `running`, so the two moments you
-most want it were the two that hid it.
+- **"THE SOURCE DOES NOT PUBLISH IT" IS A GUESS UNTIL YOU HAVE PROBED THE SHAPE.**
+  The fielded XI hangs off `/teams/{team}/...`, not the league path every guess used.
+  That guess became a fact by repetition — three docstrings and a handoff — and cost a
+  hand-maintained file and a class of wrong report. Vary the path shape, not just the
+  noun, before designing around an absence.
+- **A claim read off the code is not a finding.** Measure it, then say it. Miguel has
+  called this out twice and been right twice.
+- **A gate that only refuses is half a fix.** `[]` arrives downstream as "nothing is
+  for sale": aged three days the report said "market 0th percentile · a poor week"
+  about a market it could not see. Whatever you gate, give it a sentence next to the
+  numbers it explains.
+- **One row can hold two kinds of fact.** `api_standings` carries a balance that must
+  be today's and a points total that only grows. Gating both zeroed everyone's season.
+- **`observed_at` is the sweep that CARRIED a page, not when it was fetched.** parse
+  re-stamps a carried-forward document, so a page nobody has requested since midnight
+  reads as minutes old. The manifest's `seen` is the honest column.
+- **Freshness bounds come from the timer, not from a round number.** The legs are 11h
+  and 13h, so 0.5 days condemns a healthy feed every night. `EVERY_RUN_FRESH_DAYS`.
+- **The app stamps a whole day's deals with the same minute.** Break ties on its own
+  id read as an integer — "15676725" sorts before "9629986" as text.
+- **The app's price is an independent identifier and it catches wrong joins** (0.2%
+  agreement when right, 603% out when wrong) — and it is also what tells two men of
+  one name apart. But check a GUESS only: an exact name match is the strongest
+  evidence there is and money must never overrule it.
+- **Two copies of one fact is how a number gets corrected in one and not the other.**
+  The headline cash and league.md's cash were two independent reads until the gate
+  moved one of them.
 
 ## Standing instructions
 
-Be sceptical of the numbers, including mine. Every substantive bug this session was found by
-distrusting output, not by reading code. When something looks too good, check it against the
-data before shipping it. **When Miguel says a claim of mine is wrong, re-derive it from the
-data rather than defending it — he has been right both times.**
+Be sceptical of the numbers, including mine. Every substantive bug in the last two
+sessions was found by distrusting output, not by reading code. **When Miguel says a
+claim of mine is wrong, re-derive it from the data rather than defending it — he has
+been right every time.**
 
 Do not hardcode a decision rule. If a rule is needed, it is a sign the metric is wrong.
 
 No prose in the reports. Tables.
+
+And do not explain away a bug by pointing at what the user should have maintained.
+The checklist that went stale was ours to remove, not his to re-tick.
