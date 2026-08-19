@@ -304,44 +304,30 @@ def fix_basis_label(players) -> str:
 def as_fielded(players):
     """(total, xi, bench, illegal, warnings) for the XI YOU ARE FIELDING.
 
-    THE APP FIRST, the checklist second. inputs/lineup.txt is a file you tick
-    by hand and it goes one short every time a fielded player is sold, which
-    is how this section came to print "not a legal eleven, 4-4-1" about a team
-    playing a perfectly legal 4-5-1. The app publishes the real answer, and
-    both reports have to read the same one or they contradict each other:
-    src/sim.py prints the change list off exactly this source.
+    FROM THE APP, which publishes it — see ffcore.league.app_fielded. None
+    when it will not say, and then the comparison is skipped rather than faked
+    from the recommendation or from a file somebody last ticked.
 
-    Returns None when neither can say: the comparison is skipped, never faked
-    from the recommendation.
+    What this used to read was inputs/lineup.txt, a hand-ticked checklist that
+    lost a mark every time a fielded player was sold. Measured 2026-08-19:
+    with the app answering, deleting that file changed both reports by
+    nothing; with the app quiet it produced "not a legal eleven — 10 players,
+    4-4-1" about a team playing a perfectly legal 4-5-1. A fallback that is
+    only ever consulted when it is wrong is not a fallback.
 
-    `illegal` is the shape when the eleven is not a legal one. Off the app
-    that should never happen; off the marks it happens whenever you have not
-    re-ticked, and it is worth flagging loudly — the app fills the gap for
-    you, and not with your choice.
+    `illegal` stays because the shape is still checked. Off the app it should
+    never fire, and if it does the reading is not about a fielded eleven.
     """
     from ffcore.text import norm
-    from xi import bench_from_checklist, read_checklist
 
     by_key = {p.get("key"): p for p in players if p.get("key")}
     on = app_fielded(list(by_key), {k: p["name"] for k, p in by_key.items()})
-    if on:
-        fielded = {norm(by_key[k]["name"]) for k in on}
-        xi = [p for p in players if norm(p["name"]) in fielded]
-        bench = [p for p in players if norm(p["name"]) not in fielded]
-        warnings = []
-    else:
-        path = input_path("lineup.txt")
-        if not path.exists():
-            return None
-        entries = read_checklist(path.read_text(encoding="utf-8"))
-        if not entries:
-            return None
-
-        names = [p["name"] for p in players]
-        bench_keys, warnings = bench_from_checklist(names, entries)
-        benched = {norm(b) for b in bench_keys}
-        xi = [p for p in players if norm(p["name"]) not in benched]
-        bench = [p for p in players if norm(p["name"]) in benched]
+    if not on:
+        return None
+    fielded = {norm(by_key[k]["name"]) for k in on}
+    xi = [p for p in players if norm(p["name"]) in fielded]
+    bench = [p for p in players if norm(p["name"]) not in fielded]
+    warnings = []
 
     counts = Counter(p["slot"] for p in xi if p["slot"])
     shape = (counts.get("DEF", 0), counts.get("MED", 0), counts.get("DEL", 0))
@@ -617,9 +603,9 @@ def log_squad(observed, players, chosen, formation, total, deadline,
 # own file.
 #
 # Question 1 leads with WHAT YOU ARE FIELDING, not with what the model would
-# field. The marks in inputs/lineup.txt are a fact; the recommendation is
-# advice, and printing advice as though it were the team is how the old report
-# managed to show two different benches under the same word.
+# field. The app's own lineup is a fact; the recommendation is advice, and
+# printing advice as though it were the team is how the old report managed to
+# show two different benches under the same word.
 # ---------------------------------------------------------------------------
 
 # ---------------------------------------------------------------------------
@@ -706,9 +692,9 @@ def sec_eleven(marked, best, players, second=None, buys=None) -> list[str]:
         return out + ["_No roster. Check `inputs/rosters_initial.txt` and "
                       "`data/tidy/transactions.csv`._", ""]
     if marked is None:
-        return out + ["_No marks to read. `inputs/lineup.txt` is missing or "
-                      "empty — run `squads.py`, then tick the eleven you are "
-                      "fielding._", ""]
+        return out + ["_The app has not said which eleven you are fielding "
+                      "— its lineup feed is quiet, so there is nothing to "
+                      "compare the best eleven against._", ""]
 
     mtot, mxi, mbench, illegal, mwarn = marked
     counts = Counter(p["slot"] for p in mxi if p["slot"])
@@ -717,8 +703,7 @@ def sec_eleven(marked, best, players, second=None, buys=None) -> list[str]:
 
     if illegal:
         out += [f"**⚠ Not a legal eleven — {illegal}.** The app will fill the "
-                "gaps for you, and not with your choice. Fix "
-                "`inputs/lineup.txt`.", ""]
+                "gaps for you, and not with your choice.", ""]
     else:
         # NOT "≈N points": the index is an uncalibrated ranking number, and
         # printing it with a points unit on it invited exactly the comparison

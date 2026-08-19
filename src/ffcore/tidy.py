@@ -533,8 +533,10 @@ def load_api_lineup(now=None) -> list[dict]:
     "what you are fielding" is how a change list would tell you to take off a
     man you have already taken off.
 
-    [] means the API has not answered recently — the caller falls back to the
-    marks in inputs/lineup.txt, which is where this fact used to live.
+    [] means the API has not answered recently enough, and there is no second
+    source: inputs/lineup.txt held this by hand until 2026-08-19 and was
+    deleted, because the only runs that ever read it were runs where a sale
+    had already made it wrong.
     """
     return fresh_only(latest_only(read_csv(TIDY / "api_lineup.csv")),
                       EVERY_RUN_FRESH_DAYS, now)

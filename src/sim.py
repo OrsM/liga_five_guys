@@ -84,40 +84,31 @@ def squad_value(u) -> float:
 
 
 def fielded_keys(u=None) -> list[str]:
-    """The eleven you are actually fielding, from the app if it will say.
+    """The eleven you are actually fielding, from the app — [] if it is quiet.
 
     THE APP KNOWS. /v1/competition/1/teams/{team}/lineup/week/{n} returns the
     formation you have set, and this repo spent a season believing no such
-    thing was published because every guess was made under the LEAGUE path.
-    That belief cost inputs/lineup.txt: a checklist ticked by hand, which went
-    one short whenever a fielded player was sold — and the report then read
-    the hole as a formation change and told somebody already playing 4-5-1 to
-    switch.
+    thing was published because every guess had been made under the LEAGUE
+    path.
 
-    Falls back to the marks when the API has not answered. The reading is
-    gated on freshness, so a lineup from a round already played counts as no
-    answer at all.
+    [] rather than a fallback, deliberately. What used to be here was
+    inputs/lineup.txt, a checklist ticked by hand which lost a mark whenever a
+    fielded player was sold — and the only moments it was ever read were the
+    moments it was wrong. Measured: with the app answering it changed nothing;
+    with the app quiet it produced "not a legal eleven, 4-4-1" about a legal
+    4-5-1. No answer prints the whole sheet, which is what the report did
+    before any of this existed.
     """
-    from ffcore.league import app_fielded
-    from ffcore.tidy import DECISIONS, read_csv
-
-    if u is not None:
-        keys = app_fielded(u.state.squads.get(u.me, {}), u.name)
-        if keys:
-            return keys
-    rows = [r for r in read_csv(DECISIONS / "xi_fielded.csv") if r.get("xi")]
-    if not rows:
-        return []
-    return [k for k in rows[-1]["xi"].split("|") if k]
+    return app_fielded(u.state.squads.get(u.me, {}), u.name) if u else []
 
 
 def xi_note(u) -> str:
     """The one line the change list cannot say by existing, or "".
 
-    Two states have no rows to show for them and both matter: the marks are
-    not an eleven (so the whole sheet is printed and you should know why), or
-    they are the best eleven already (so there is nothing to do, which is an
-    answer and not an empty table).
+    Two states have no rows to show for them and both matter: the app has not
+    told us which eleven you are fielding (so the whole sheet is printed and
+    you should know why), or you are already fielding the best one (so there
+    is nothing to do, which is an answer and not an empty table).
     """
     from ffcore.season import best_xi
 
@@ -125,9 +116,8 @@ def xi_note(u) -> str:
     chg = xi_change(fielded_keys(u),
                     best_xi(u.state.squads.get(u.me, {}), exp))
     if not chg["legal"]:
-        return ("%d marks, not an eleven — tick the missing man in "
-                "inputs/lineup.txt and this becomes a change list"
-                % chg["marked"])
+        return ("the app has not said which eleven you are fielding, so this "
+                "is the whole sheet rather than a change list")
     if not chg["in"] and not chg["out"]:
         return "no change — you are already fielding the best eleven"
     return ""
@@ -142,11 +132,12 @@ def xi_change(marked: list[str], best) -> dict:
     whether or not anything moved. Two names and a direction is the same
     information you can act on.
 
-    `legal` is false when the marks are not an eleven, and then there is no
-    diff at all rather than a misleading one. That is not a rare state: sell a
-    player who was in your eleven and squads.py drops him from the checklist,
-    leaving ten marks — which is exactly how "play 4-5-1 (now 4-4-1)" came to
-    tell somebody already playing 4-5-1 to change formation.
+    `legal` is false when we do not have an eleven to diff against — the app's
+    lineup feed is quiet — and then there is no diff at all rather than a
+    misleading one. It used to be false far more often, when this was read off
+    a hand-ticked file that lost a mark on every sale: that is how "play 4-5-1
+    (now 4-4-1)" came to tell somebody already playing 4-5-1 to change
+    formation.
     """
     best = list(best)
     if len(marked) != len(best) or not marked:
@@ -390,8 +381,8 @@ def ladder(u, rows, base, saves=None) -> list[str]:
     if not chg["legal"]:
         # No trustworthy marks to diff against, so the whole sheet — and a
         # line saying why you are being asked to read one.
-        out.append("| **FIELD — your eleven — %d marks, not an eleven, so "
-                   "this is the whole sheet** | | | | | | |" % chg["marked"])
+        out.append("| **FIELD — your eleven — the app has not said what you "
+                   "are playing** | | | | | | |")
         for k in by_slot(u, xi):
             out.append(row(k, "yours", None, None))
     elif not chg["in"] and not chg["out"]:
@@ -1149,7 +1140,7 @@ def _selftest() -> None:
     # -- the eleven comes from the APP, not from a checklist ----------------
     # inputs/lineup.txt was ticked by hand and went one short every time a
     # fielded player was sold. The app publishes the answer — /teams/{team}/
-    # lineup/week/{n} — so the marks are the fallback now, not the source.
+    # lineup/week/{n} — and the checklist is gone.
     rows = [{"player_id": "1070", "player_name": "Ionut Radu",
              "player_name_full": "Ionut Andrei Radu"},
             {"player_id": "2464", "player_name": "Pepelu",

@@ -279,18 +279,18 @@ Everything else is reference and is **linked**, not reprinted.
 
 ## What you edit
 
-**One file.** `inputs/lineup.txt` — the marks, never the names. `[x]` fielded,
-`[ ]` benched. It is regenerated every run: your marks survive, sold players
-vanish, anyone you just bought arrives benched.
+**Nothing, day to day.** You set your eleven in the app, which is where you were
+going to set it anyway, and the report reads it back.
 
-That is the whole routine now. Three of the four files that used to need you
-are derived from the league's own API:
+That is the whole routine now. Every file that used to need you is derived from
+the league's own API:
 
 | File | Was | Now |
 |---|---|---|
 | `transactions.csv` | append a row after every deal | **generated** from the app's activity feed by `src/ledger.py`, and moved to `data/tidy/` on 2026-08-19 — a file the run overwrites does not belong in the one directory you are asked to maintain |
 | `cash.txt` | a balance you read off a screen | your balance comes from the app, to the euro, every run — so the typed line is now purely the degradation path, and it was measured rather than trusted: with the API's balance withheld it reconstructs **0.04M against the app's own -0.03M**, where having no line at all gives -0.53M. It only earns that after 2026-08-19, when the allowance an anchor accrues *after* it was written stopped being suppressed. Rival balances have no other source at all: `teamMoney` is null for everyone but you. |
 | `rosters_initial.txt` | the starting rosters, written once | still yours, and still needed — but for one narrow job, measured: the app lists some players by surname alone (`Aimar`, `Brahim`, `Llorente`) and the market has two of each. The replay off this file is what breaks those ties. Delete it and **three owned players read as free agents**. It anchors no cash and prices no purchase; both of those come from the feed. |
+| `lineup.txt` | tick the eleven you are fielding | **deleted** 2026-08-19 — the app publishes the fielded XI at `/v1/competition/1/teams/{team}/lineup/week/{n}`, which this repo had spent a season believing did not exist because every guess was made under the LEAGUE path. The checklist lost a mark whenever a fielded player was sold, so the only runs that ever read it were runs where it was wrong: measured, with the app answering it changed both reports by nothing, and with the app quiet it produced "not a legal eleven — 10 players, 4-4-1" about a team playing a legal 4-5-1 |
 | `seen.txt` | OCR the market screenshot | **deleted** — the market feed, all 41 rows, with bid counts |
 | `squad.txt` | generated fallback roster | **deleted** — see below |
 | `deadline.txt` | typed lock time | **deleted** — the next kickoff is the lock |
@@ -327,10 +327,10 @@ fallback that cannot fire is worse than none.**
 Every file under `inputs/` states in its own header what it is for, who writes
 it and who reads it.
 
-**The old `bench.txt` is gone.** It named who was *not* in your XI, which stopped
-scaling the moment the bench was four names, and once `lineup.txt` existed the
-two could contradict each other — silently, since whichever was read first
-won. One file describes your eleven now.
+**`bench.txt` and `lineup.txt` are both gone.** `bench.txt` named who was *not*
+in your XI, which stopped scaling the moment the bench was four names; the
+checklist that replaced it stopped being needed the moment the app's own lineup
+was found. Nothing describes your eleven now except your eleven.
 
 ## The slate
 

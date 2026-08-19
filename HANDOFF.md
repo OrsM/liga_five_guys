@@ -9,6 +9,17 @@ Read `README.md` first — it holds the design decisions and why each was made.
 
 ## Run it
 
+**THE TIMER IS OFF.** `lfg.timer` was disabled 2026-08-19 at Miguel's request:
+the report is run on demand now, from the phone's "Run again" button — which
+`lfg-watch.timer` still polls for every 60s — or by hand. Nothing else changed;
+`lfg-run` is the same command. Re-enable with
+`systemctl --user enable --now lfg.timer`. The unit file carries the same note.
+
+Because nothing runs on a schedule, EVERY READING IS AS OLD AS THE LAST TIME
+somebody pressed the button — which is exactly why the freshness gates and the
+traffic-light table went in first. Expect ambers in the feed table on a report
+generated hours after its sweep; that is the table working.
+
 `uv`, never pip — this box has no pip and no python3-venv, and installing them needs sudo.
 
     cd ~/claude_projects/liga_five_guys
@@ -121,9 +132,9 @@ tables. Two wrong numbers were found and fixed on the way.
    |---|---|---|
    | `rosters_initial.txt` | no change at all | squad 15 players → 5, 240.73M → 134.96M |
    | `cash.txt` | no change at all | 49K "known" → -518K "estimated", 0.57M and the label |
-   | `lineup.txt` | **superseded** — the app publishes the fielded XI after all | fallback only |
+   | `lineup.txt` | **deleted** — the app publishes the fielded XI after all | — |
 
-   `lineup.txt` changed status the same evening. "Nothing we fetch publishes a
+   `lineup.txt` was deleted the same evening. "Nothing we fetch publishes a
    fielded flag" was wrong, and it was wrong because the guesses were made
    under the LEAGUE path: `/v1/competition/1/teams/{team}/lineup/week/{n}`
    returns the eleven, the formation and `teamSnapshotTookOn`. It is fetched
