@@ -1,4 +1,4 @@
-# Squads — 2026-08-19 14:53 UTC
+# Squads — 2026-08-19 14:54 UTC
 
 | Manager | Players | Squad value | Spent | Raised | Cash |
 |---|--:|--:|--:|--:|--:|
@@ -149,7 +149,7 @@
 
 ## Cash basis
 
-- **miguel_autentico** — balance the app reported at 2026-08-19 12:45 UTC − 0.00M bought + 0.00M sold across 0 ledger row(s) = -0.03M (known)
+- **miguel_autentico** — balance the app reported at 2026-08-19 14:54 UTC − 0.00M bought + 0.00M sold across 0 ledger row(s) = -0.03M (known)
 - **Albert Laporta** — 100M starting budget − 188.67M bought + 43.03M sold across 13 ledger row(s) + 0.78M of daily allowance over 8 days = -44.86M (estimated)
 - **BurtonGM89** — 100M starting budget − 180.85M bought + 51.65M sold across 17 ledger row(s) + 0.78M of daily allowance over 8 days = -28.42M (estimated)
 - **Magic Mike 333** — 100M starting budget − 121.23M bought + 19.14M sold across 8 ledger row(s) + 0.78M of daily allowance over 8 days = -1.31M (estimated)
@@ -163,7 +163,7 @@
 - **pedro diaz** — the ledger has him at Magic Mike 333; the app says nobody in the league holds him.
 - **tete morente** — the ledger has him at Magic Mike 333; the app says nobody in the league holds him.
 - **Jonny Otto** — the app says he is owned, but no market row matches the name, so he is missing from the board.
-- miguel_autentico is 0.03M overdrawn: balance the app reported at 2026-08-19 12:45 UTC − 0.00M bought + 0.00M sold across 0 ledger row(s) = -0.03M. Going over the budget mid-window is allowed; being overdrawn when the jornada locks is not, so they must sell before they can buy again. If the ledger is missing a sale of theirs, this is stale rather than wrong.
+- miguel_autentico is 0.03M overdrawn: balance the app reported at 2026-08-19 14:54 UTC − 0.00M bought + 0.00M sold across 0 ledger row(s) = -0.03M. Going over the budget mid-window is allowed; being overdrawn when the jornada locks is not, so they must sell before they can buy again. If the ledger is missing a sale of theirs, this is stale rather than wrong.
 - Magic Mike 333 is 1.31M overdrawn: 100M starting budget − 121.23M bought + 19.14M sold across 8 ledger row(s) + 0.78M of daily allowance over 8 days = -1.31M. Going over the budget mid-window is allowed; being overdrawn when the jornada locks is not, so they must sell before they can buy again. If the ledger is missing a sale of theirs, this is stale rather than wrong.
 - Albert Laporta is 44.86M overdrawn: 100M starting budget − 188.67M bought + 43.03M sold across 13 ledger row(s) + 0.78M of daily allowance over 8 days = -44.86M. Going over the budget mid-window is allowed; being overdrawn when the jornada locks is not, so they must sell before they can buy again. If the ledger is missing a sale of theirs, this is stale rather than wrong.
 - BurtonGM89 is 28.42M overdrawn: 100M starting budget − 180.85M bought + 51.65M sold across 17 ledger row(s) + 0.78M of daily allowance over 8 days = -28.42M. Going over the budget mid-window is allowed; being overdrawn when the jornada locks is not, so they must sell before they can buy again. If the ledger is missing a sale of theirs, this is stale rather than wrong.

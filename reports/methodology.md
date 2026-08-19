@@ -4,20 +4,20 @@
 
 | Table | What it is used for | Fetched from | Rows | Newest row | State |
 |---|---|---|--:|---|---|
-| api_activity | every transfer, which is what the ledger replays | LaLiga Fantasy API | 1,162 | 19 Aug 12:45 | ok |
-| api_leagues | your cash and the league's id | LaLiga Fantasy API | 19 | 19 Aug 12:45 | ok |
-| api_market | what is on offer, and the bids on it | LaLiga Fantasy API | 766 | 19 Aug 12:45 | ok |
-| api_players | names for players nobody owns any more | LaLiga Fantasy API | 965 | 19 Aug 12:45 | ok |
-| api_teams | all five squads | LaLiga Fantasy API | 1,444 | 19 Aug 12:45 | ok |
+| api_activity | every transfer, which is what the ledger replays | LaLiga Fantasy API | 1,225 | 19 Aug 14:54 | ok |
+| api_leagues | your cash and the league's id | LaLiga Fantasy API | 20 | 19 Aug 14:54 | ok |
+| api_market | what is on offer, and the bids on it | LaLiga Fantasy API | 807 | 19 Aug 14:54 | ok |
+| api_players | names for players nobody owns any more | LaLiga Fantasy API | 1,020 | 19 Aug 14:54 | ok |
+| api_teams | all five squads | LaLiga Fantasy API | 1,520 | 19 Aug 14:54 | ok |
 | clubs | the same, for clubs | src/crosswalk.py | 20 | — | rebuilt every run |
-| elo | team strength, which ranks the fixture term | clubelo.com | 20 | 19 Aug 12:45 | ok |
-| fixtures | who plays whom next, for the fixture term | analiticafantasy.com | 412 | 19 Aug 12:45 | ok |
-| lineups | probable XI percentages, both sources | analiticafantasy.com, futbolfantasy.com ×40 | 34,497 | 19 Aug 12:45 | ok |
-| market | price, value, position, fitness — every player in the game | futbolfantasy.com | 35,121 | 19 Aug 12:45 | ok |
-| matches | fixtures, kickoffs, results | futbolfantasy.com | 8,360 | 19 Aug 12:45 | ok |
+| elo | team strength, which ranks the fixture term | clubelo.com | 40 | 19 Aug 14:54 | ok |
+| fixtures | who plays whom next, for the fixture term | analiticafantasy.com | 427 | 19 Aug 14:54 | ok |
+| lineups | probable XI percentages, both sources | analiticafantasy.com, futbolfantasy.com ×40 | 35,222 | 19 Aug 14:54 | ok |
+| market | price, value, position, fitness — every player in the game | futbolfantasy.com | 35,772 | 19 Aug 14:54 | ok |
+| matches | fixtures, kickoffs, results | futbolfantasy.com | 8,740 | 19 Aug 14:54 | ok |
 | players | the crosswalk: one key per player across all four spellings | src/crosswalk.py | 648 | — | rebuilt every run |
 | points | realised points per jornada, the actuals in every table below | futbolfantasy.com | 100 | 18 Aug 09:41 | ok |
-| starters | confirmed elevens, which is what P(start) is graded on | futbolfantasy.com | 4,418 | 19 Aug 12:45 | ok |
+| starters | confirmed elevens, which is what P(start) is graded on | futbolfantasy.com | 4,646 | 19 Aug 14:54 | ok |
 
 ### The model, as configured right now
 
