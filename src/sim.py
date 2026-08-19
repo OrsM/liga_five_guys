@@ -102,6 +102,21 @@ def fielded_keys(u=None) -> list[str]:
     return app_fielded(u.state.squads.get(u.me, {}), u.name) if u else []
 
 
+def _warnings() -> list:
+    """What report.py flagged this run, or [] — never recomputed here.
+
+    Two modules deriving the same list is how they come to disagree; this one
+    reads what the other wrote, and an absent file means report.py has not run
+    yet, which is a gap and not a clean bill of health.
+    """
+    p = Path(_os.environ.get("LFG_WARNINGS", ".runtime/warnings.json"))
+    try:
+        got = json.loads(p.read_text(encoding="utf-8"))
+        return got if isinstance(got, list) else []
+    except (OSError, ValueError):
+        return []
+
+
 def xi_note(u) -> str:
     """The one line the change list cannot say by existing, or "".
 
@@ -1001,6 +1016,11 @@ def payload(u, rows, base, rivals, locks_h=None, n_actions: int = 0,
         "market_pct": market_percentile(wait_routes(u, offers)),
         "shape_now": fielded_shape(u),
         "xi_note": xi_note(u),
+        # Written by report.py minutes earlier in the same run — the board
+        # draws them, so "only 1 portero" or "the app's feed is 3 days stale"
+        # reaches the phone instead of living in a markdown file nobody opens
+        # when the board is right there.
+        "warnings": _warnings(),
         "hold": verdict(wait_routes(u, offers))[1],
         "standings": [
             {"manager": m, "me": m == u.me,

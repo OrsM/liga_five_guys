@@ -131,6 +131,8 @@ HISTORY = REPORTS / "history"
 # document. Under reports/ or data/ the run would commit a "you have a Buy"
 # note that stops being true within the hour.
 ALERTS = Path(os.environ.get("LFG_ALERTS", ".runtime/alerts.md"))
+# The same warnings as data, for the renderers that are not markdown.
+WARNINGS = Path(os.environ.get("LFG_WARNINGS", ".runtime/warnings.json"))
 
 STALE_HOURS = 14.0
 MOVER_PCT = 1.0           # squad price moves worth printing
@@ -1184,6 +1186,15 @@ def main() -> None:
         token_days = TokenStore().expiry_days()
     except Exception:                                       # noqa: BLE001
         token_days = None
+    # THE WARNINGS BELONG ON THE PAGE THAT IS READ, and the page that is read
+    # is the board on the phone. They were only ever in REPORT.md, which is
+    # the same content the board draws — so the one section the board did NOT
+    # have was the one telling you something is wrong. Handed over as data;
+    # sim.py folds it into decisions.json a moment later.
+    WARNINGS.parent.mkdir(parents=True, exist_ok=True)
+    WARNINGS.write_text(json.dumps(warnings, ensure_ascii=False),
+                        encoding="utf-8")
+
     lines = alerts(warnings, token_days)
     if lines:
         write_lines(ALERTS, [f"# Alerts — {now:%Y-%m-%d %H:%M} UTC", ""]
