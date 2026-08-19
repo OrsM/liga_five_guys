@@ -1,0 +1,129 @@
+# liga_five_guys — handoff, 2026-08-19
+
+Private repo `OrsM/liga_five_guys`, working tree clean, pushed through `58eea3d`.
+Read `README.md` first — it holds the design decisions and why each was made.
+
+## Run it
+
+`uv`, never pip — this box has no pip and no python3-venv, and installing them needs sudo.
+
+    cd ~/claude_projects/liga_five_guys
+    PYTHONPATH=src FF_ROOT=./data uv run --frozen python src/<module>.py
+
+Every module self-tests under `if __name__ == "__main__"`; there is no pytest and no test
+directory. **Work TDD**: add the failing assertion to the module's own `_selftest()`, watch
+it fail, then implement.
+
+- `~/.local/bin/lfg-run` — 28 suites (parallel, 4 at a time), fetch, generate, publish,
+  commit. `LFG_NO_FETCH=1`, `LFG_NO_COMMIT=1`, `LFG_PUSH=1` are the switches.
+- `src/run.py` — the ten generator stages in ONE interpreter. `python src/run.py sim digest`
+  runs a subset. Each stage is still runnable alone, which is how a failure gets bisected.
+- `lfg.timer` 00:40 and 11:40 local; `lfg-watch.timer` polls the phone's rerun button every 60s.
+
+## Where it stands
+
+The report IS the simulation. All four steps of the previous handoff are done: the board,
+the metric zoo (`pts/M`, above-replacement, the line, every verdict string) and the funding
+scan are gone. `reports/REPORT.md` is one grouped table — recommended XI, keep, sell,
+buy/steal, do nothing — plus a data-only header. `reports/METHOD.md` is the appendix.
+`reports/decisions.json` feeds the phone's React table
+(`~/claude_projects/website/src/pages/Fantasy.jsx`).
+
+Live as of this handoff: cash **-33K** (red), formation **4-5-1**, finish 1.52, P(win) 56%,
+season band 1,525–1,785.
+
+### This session, in two pieces
+
+**1. The appendix is tables.** One line in METHOD.md is not a table and it is a count.
+Model constants gained a "Fitted?" column; accuracy prose became Measure/Value; the two
+probable-XI samples became one table with a sample row plus a "Not graded" table; caveats
+became `Not modelled | which way it bends the answer`; the bid legend became
+`Column | what it is`. What survives outside a table: eight one-line italic legends that
+define a symbol or a threshold. **Do not add prose back.** The standing instruction is
+"as much as possible a standard automated report" — if something needs explaining, it is a
+column or a row.
+
+New in METHOD.md: **the feed table**, which is the data flow and its health.
+
+    | elo | team strength, which ranks the fixture term | api.clubelo.com | 80
+          | 17 Aug 23:45 | **33 hours stale** — failed the last sweep, 8.1s |
+
+Freshness comes from each source's own cadence, read out of the source registry, so a new
+entry in `sources.py` appears without anyone remembering. `ingest` appends
+`data/tidy/feeds.csv` (status and seconds per request per sweep) and the State column counts
+consecutive failures at the tail.
+
+**2. The chain is 47.8s → 7.6s** (end to end without a fetch, 13s):
+
+    parse 10.3 -> 1.0   points 8.2 -> 0.1   sim 14.1 -> 3.0
+    crosswalk 5.0 -> 1.6   squads 4.1 -> 0.6   self-tests 20 -> 3
+
+- `ffcore/text.py` — `norm()` memoised. 813,488 calls on ~1,500 distinct names.
+- `ffcore/market.py` — the offer sampler vectorised by the exponential race
+  (Efraimidis-Spirakis). Same distribution as sequential weighted-without-replacement, and
+  the self-test holds both paths against each other across three orders of magnitude of weight.
+- `ingest.doc_keys()` + `data/tidy/snapindex.json` — which document each stamp carried is a
+  fact about immutable archives. Validated by file size. `ingest.documents()` batches the
+  cold-cache reads by archive; the first version opened one per document and turned a
+  rebuild from 40s into 70s.
+- `src/run.py` — one interpreter.
+- `ffcore/tidy.py` — `read_csv` caches one parse per file keyed on mtime and size, and every
+  writer drops its own path. **Callers get their own dicts.** Handing back the cached rows
+  would be faster and would be a silent-corruption bug waiting for the first of sixty-one
+  read sites that writes to a row. Two self-tests hold both guarantees.
+
+Verified byte-identical: `market.csv`, `data/season`, `REPORT.md`, `sim.md`. The only moving
+numbers are the market percentile and beats-now share — Monte Carlo off the new sampler,
+which drift ~2 points between any two runs anyway.
+
+## What to do next
+
+1. **Club Elo has been dead since 2026-08-17T2345Z.** It is not degrading gracefully: a
+   failed fetch leaves the last rows in place, all 20 clubs still join, `elo_strength()`
+   succeeds, and the fixture board ranks by a rating from before the jornada. It costs 8.1s
+   of an ~11s sweep. Either find the moved endpoint (it is plain HTTP; https is refused) or
+   drop the source and let `fixture.py`'s squad-value fallback take over honestly. The feed
+   table now makes the decision visible; nothing makes it for you.
+2. **`inputs/transactions.csv` is generated by `ledger.py`, not an input.** It belongs in
+   `data/`. Deferred twice now to keep the performance commits clean.
+3. **The input tidiness review is half done.** Speed took priority. What is left is the
+   duplication question the user actually asked: which of the four identity spaces
+   (market slugs, futbolfantasy slugs, analitica slugs, app player_id) still gets re-derived
+   somewhere instead of read from `data/tidy/players.csv`.
+4. **Both fixture widths are still guesses** — ±12% band, +4% home, never fitted. The
+   "Next fixture" table in METHOD.md is what will settle them; it has n=1 per bucket.
+   Judge nothing yet.
+5. **The shape prior is still the seed** (96 observed, 200 needed) — `pool_note()` prints
+   which is in use, never assume.
+
+## Traps that cost real time — do not rediscover these
+
+- **All 23 suites passed while `report.py` was fatally broken** (a deleted helper still
+  called). There is now a static AST undefined-name pass. Green does not mean it renders.
+- **`Market.key_for` is the only correct join.** The API spells players its own way
+  ("A. Ferllo" = Álvaro Fernández). Keying on the app's spelling puts every owned player in
+  a namespace nothing else reads; the player COUNTS stay right, which is what makes it
+  convincing.
+- **Append-only files: read the LAST row, not the first.** Cash was read off row one and
+  reported 23.60M against a real -133K.
+- **A feed that stops answering does not look broken anywhere.** Cash, `api_teams` on a
+  daily cadence, and Club Elo were all the same bug. The feed table exists for this.
+- **`ProtectSystem` / `PrivateTmp` / `ProtectControlGroups` break ssh in a systemd USER
+  unit** — publishing and pushing fail while the run reports success. `NoNewPrivileges` is safe.
+- **The phone's LAN address moves.** Always resolve with `~/.local/bin/phone-addr`.
+- **The league API needs `/api` as the base path**, and the token rotates on every exchange.
+- **Two renderers drift.** Markdown and `decisions.json` are both published; a number added
+  to one and not the other has bitten this repo three times.
+- **Contradictions on one screen have driven a wrong sale.** Rubén García, sold 17 Aug for
+  15.20M, back in the free pool at 14.03M and worth more than two players still held. Never
+  print a recommendation next to a caveat that negates it.
+
+## Standing instructions
+
+Be sceptical of the numbers, including mine. Every substantive bug this session was found by
+distrusting output, not by reading code. When something looks too good, check it against the
+data before shipping it.
+
+Do not hardcode a decision rule. If a rule is needed, it is a sign the metric is wrong.
+
+No prose in the reports. Tables.
