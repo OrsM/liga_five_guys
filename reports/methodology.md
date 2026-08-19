@@ -4,10 +4,11 @@
 
 | Table | What it is used for | Fetched from | Rows | Newest row | State |
 |---|---|---|--:|---|---|
-| api_activity | every transfer, which is what the ledger replays | LaLiga Fantasy API | 1,225 | 19 Aug 14:54 | ok |
+| api_activity | every transfer, which is what the ledger replays — one row per deal, so the newest is the last deal and not the last sweep | LaLiga Fantasy API | 63 | 18 Aug 22:41 | ok |
 | api_leagues | your cash and the league's id | LaLiga Fantasy API | 20 | 19 Aug 14:54 | ok |
 | api_market | what is on offer, and the bids on it | LaLiga Fantasy API | 807 | 19 Aug 14:54 | ok |
-| api_players | names for players nobody owns any more | LaLiga Fantasy API | 1,020 | 19 Aug 14:54 | ok |
+| api_players | names for players nobody owns any more — one row per player, first sighting kept | LaLiga Fantasy API | 55 | 18 Aug 22:41 | ok |
+| api_stats | what the app scored each player, broken into what he did — one row per player per week per stat, a correction being a later row rather than an overwrite | LaLiga Fantasy API | 714 | 18 Aug 22:58 | ok |
 | api_teams | all five squads | LaLiga Fantasy API | 1,520 | 19 Aug 14:54 | ok |
 | clubs | the same, for clubs | src/crosswalk.py | 20 | — | rebuilt every run |
 | elo | team strength, which ranks the fixture term | clubelo.com | 40 | 19 Aug 14:54 | ok |

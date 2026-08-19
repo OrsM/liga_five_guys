@@ -1,8 +1,8 @@
-# Squads — 2026-08-19 15:21 UTC
+# Squads — 2026-08-19 15:44 UTC
 
 | Manager | Players | Squad value | Spent | Raised | Cash |
 |---|--:|--:|--:|--:|--:|
-| **miguel_autentico** | 14 | 236.37M | 142.18M | 40.88M | -31K |
+| **miguel_autentico** | 14 | 236.37M | 142.18M | 40.88M | -30K |
 | Albert Laporta | 15 | 273.49M | 188.67M | 43.03M | ~-44.86M |
 | BurtonGM89 | 13 | 216.17M | 180.85M | 51.65M | ~-28.42M |
 | Magic Mike 333 | 16 | 238.19M | 121.23M | 19.14M | ~-1.31M |
@@ -13,7 +13,7 @@
 **FF** is futbolfantasy's probable-XI percentage, which is the one the forecast uses. **AF** is analiticafantasy's read of the same eleven, printed beside it and never blended in — `titular` is a named starter (a final call, with no number to it), a percentage is their editors' consensus, `?` means they list him without either, and `—` means they do not have him. Two columns that disagree are the signal; that is the whole point of carrying both.
 
 ## You (miguel_autentico)
-14 players · 236.37M total · 11 at 70%+ · cash -31K
+14 players · 236.37M total · 11 at 70%+ · cash -30K
 
 | Player | Team | Pos | Value | 24h | FF | AF |
 |---|---|--:|--:|--:|--:|--:|
@@ -121,29 +121,29 @@
 
 | Date | Player | From → To | Price |
 |---|---|---|--:|
-| 2026-08-14T22:24 | Ionut Radu | market → miguel_autentico | 39655832 |
-| 2026-08-14T22:24 | Agoumé | market → miguel_autentico | 5891526 |
 | 2026-08-14T22:24 | Eriksson | market → miguel_autentico | 2933863 |
-| 2026-08-14T22:24 | Aramburu | market → SusoGattuso | 17785551 |
+| 2026-08-14T22:24 | Gavi | market → Magic Mike 333 | 35500000 |
+| 2026-08-14T22:24 | Agoumé | market → miguel_autentico | 5891526 |
+| 2026-08-14T22:24 | Ionut Radu | market → miguel_autentico | 39655832 |
 | 2026-08-14T22:51 | R.P. Bigas | Albert Laporta → market | 5323361 |
 | 2026-08-15T22:24 | Mouriño | market → Albert Laporta | 40516387 |
-| 2026-08-15T22:24 | Buonanotte | market → Albert Laporta | 7331515 |
-| 2026-08-15T22:24 | Riedel | market → SusoGattuso | 4599626 |
-| 2026-08-15T22:24 | Mario Martín | market → SusoGattuso | 3831432 |
 | 2026-08-15T22:24 | Fornals | market → miguel_autentico | 58220110 |
-| 2026-08-16T22:24 | Huijsen | market → BurtonGM89 | 32901000 |
+| 2026-08-15T22:24 | Mario Martín | market → SusoGattuso | 3831432 |
+| 2026-08-15T22:24 | Riedel | market → SusoGattuso | 4599626 |
+| 2026-08-15T22:24 | Buonanotte | market → Albert Laporta | 7331515 |
 | 2026-08-16T22:24 | Paredes | market → BurtonGM89 | 5350000 |
+| 2026-08-16T22:24 | Huijsen | market → BurtonGM89 | 32901000 |
 | 2026-08-16T22:26 | E. Militão | BurtonGM89 → market | 12012022 |
 | 2026-08-17T00:20 | Eriksson | miguel_autentico → market | 3121862 |
 | 2026-08-17T00:21 | Rubén García | miguel_autentico → market | 15202722 |
-| 2026-08-17T22:24 | Tenaglia | market → BurtonGM89 | 14992195 |
 | 2026-08-17T22:24 | Leo Román | market → SusoGattuso | 37157570 |
+| 2026-08-17T22:24 | Tenaglia | market → BurtonGM89 | 14992195 |
 | 2026-08-17T22:28 | Quagliata | BurtonGM89 → market | 2951083 |
 | 2026-08-17T22:29 | Gorrotxa | BurtonGM89 → market | 6655879 |
 | 2026-08-18T07:26 | Villalibre | Albert Laporta → market | 7235234 |
-| 2026-08-18T22:24 | Marcos Alonso | market → miguel_autentico | 28589508 |
-| 2026-08-18T22:24 | Angeliño | market → Albert Laporta | 15537090 |
 | 2026-08-18T22:24 | Isi | market → SusoGattuso | 20144326 |
+| 2026-08-18T22:24 | Angeliño | market → Albert Laporta | 15537090 |
+| 2026-08-18T22:24 | Marcos Alonso | market → miguel_autentico | 28589508 |
 | 2026-08-18T22:28 | Szczesny | SusoGattuso → market | 2133987 |
 | 2026-08-19T00:18 | A. Ferllo | miguel_autentico → market | 4759903 |
 
@@ -181,32 +181,32 @@ Placed by who the counterparty was, or by what the price implies — a player so
 - 2026-08-11T23:24: Vivian → dani vivian (matched dani vivian)
 - 2026-08-11T23:25: Pathé I. Ciss → pathe ciss (matched pathe ciss)
 - 2026-08-11T23:26: Puado → javi puado (matched javi puado)
+- 2026-08-12T22:24: Dmitrovic → marko dmitrovic (matched marko dmitrovic)
 - 2026-08-12T22:24: Karrikaburu → jon karrikaburu (matched jon karrikaburu)
 - 2026-08-12T22:24: Comesaña → santi comesana (matched santi comesaña)
 - 2026-08-12T22:24: Ez Abde → abde ezzalzouli (matched abde ezzalzouli)
-- 2026-08-12T22:24: Dmitrovic → marko dmitrovic (matched marko dmitrovic)
 - 2026-08-13T13:12: Oskarsson → orri steinn oskarsson (matched orri steinn oskarsson)
 - 2026-08-13T13:12: D. Martínez → dani martinez (held by miguel_autentico at the time)
 - 2026-08-13T22:24: Giuliano → giuliano simeone (matched giuliano simeone)
-- 2026-08-13T22:24: Villalibre → asier villalibre (matched asier villalibre)
 - 2026-08-13T22:24: Cabrera → leandro cabrera (matched leandro cabrera)
+- 2026-08-13T22:24: Villalibre → asier villalibre (matched asier villalibre)
 - 2026-08-13T22:25: J. Musso → juan musso (matched juan musso)
 - 2026-08-13T22:26: Joaquín → joaquin munoz (held by BurtonGM89 at the time)
 - 2026-08-13T22:26: Dieng → aliou dieng (matched aliou dieng)
 - 2026-08-13T23:40: Purić → aleksa puric (matched aleksa puric)
 - 2026-08-14T13:49: Asencio → raul asencio (matched raul asencio)
 - 2026-08-14T22:24: T. Morente → tete morente (matched tete morente)
+- 2026-08-14T22:24: Aramburu → jon aramburu (matched jon aramburu)
+- 2026-08-14T22:24: Eriksson → simon eriksson (matched simon eriksson)
 - 2026-08-14T22:24: Gavi → pablo gavi (matched pablo gavi)
 - 2026-08-14T22:24: Agoumé → lucien agoume (matched lucien agoume)
-- 2026-08-14T22:24: Eriksson → simon eriksson (matched simon eriksson)
-- 2026-08-14T22:24: Aramburu → jon aramburu (matched jon aramburu)
 - 2026-08-14T22:51: R.P. Bigas → pedro bigas (matched pedro bigas)
 - 2026-08-15T22:24: Mouriño → santiago mourino (matched santiago mouriño)
-- 2026-08-15T22:24: Buonanotte → facundo buonanotte (matched facundo buonanotte)
-- 2026-08-15T22:24: Riedel → clemens riedel (matched clemens riedel)
 - 2026-08-15T22:24: Fornals → pablo fornals (matched pablo fornals)
-- 2026-08-16T22:24: Huijsen → dean huijsen (matched dean huijsen)
+- 2026-08-15T22:24: Riedel → clemens riedel (matched clemens riedel)
+- 2026-08-15T22:24: Buonanotte → facundo buonanotte (matched facundo buonanotte)
 - 2026-08-16T22:24: Paredes → aitor paredes (matched aitor paredes)
+- 2026-08-16T22:24: Huijsen → dean huijsen (matched dean huijsen)
 - 2026-08-16T22:26: E. Militão → eder militao (matched eder militao)
 - 2026-08-17T00:20: Eriksson → simon eriksson (matched simon eriksson)
 - 2026-08-17T22:24: Tenaglia → nahuel tenaglia (matched nahuel tenaglia)
@@ -234,31 +234,31 @@ A round bid was typed by a human. That is the whole of what roundness tells you 
 
 | Date | Player | Buyer | Paid | Value then | Premium | Bid |
 |---|---|---|--:|--:|--:|---|
-| 08-18T22:24 | Marcos Alonso | miguel_autentico | 28.59M | 28.59M | +0.0% | exact |
-| 08-18T22:24 | Angeliño | Albert Laporta | 15.54M | 15.54M | +0.0% | exact |
 | 08-18T22:24 | Isi | SusoGattuso | 20.14M | 20.20M | -0.3% | exact |
-| 08-17T22:24 | Tenaglia | BurtonGM89 | 14.99M | 15.02M | -0.2% | exact |
+| 08-18T22:24 | Angeliño | Albert Laporta | 15.54M | 15.54M | +0.0% | exact |
+| 08-18T22:24 | Marcos Alonso | miguel_autentico | 28.59M | 28.59M | +0.0% | exact |
 | 08-17T22:24 | Leo Román | SusoGattuso | 37.16M | 37.20M | -0.1% | exact |
-| 08-16T22:24 | Huijsen | BurtonGM89 | 32.90M | 32.46M | +1.4% | exact |
+| 08-17T22:24 | Tenaglia | BurtonGM89 | 14.99M | 15.02M | -0.2% | exact |
 | 08-16T22:24 | Paredes | BurtonGM89 | 5.35M | 5.14M | +4.1% | round |
+| 08-16T22:24 | Huijsen | BurtonGM89 | 32.90M | 32.46M | +1.4% | exact |
 | 08-15T22:24 | Mouriño | Albert Laporta | 40.52M | 40.48M | +0.1% | exact |
-| 08-15T22:24 | Buonanotte | Albert Laporta | 7.33M | 6.83M | +7.3% | exact |
-| 08-15T22:24 | Riedel | SusoGattuso | 4.60M | 4.60M | +0.0% | exact |
-| 08-15T22:24 | Mario Martín | SusoGattuso | 3.83M | 3.83M | +0.0% | exact |
 | 08-15T22:24 | Fornals | miguel_autentico | 58.22M | 57.93M | +0.5% | exact |
+| 08-15T22:24 | Mario Martín | SusoGattuso | 3.83M | 3.83M | +0.0% | exact |
+| 08-15T22:24 | Riedel | SusoGattuso | 4.60M | 4.60M | +0.0% | exact |
+| 08-15T22:24 | Buonanotte | Albert Laporta | 7.33M | 6.83M | +7.3% | exact |
 | 08-14T22:24 | T. Morente | Magic Mike 333 | 2.03M | 1.99M | +2.4% | exact |
-| 08-14T22:24 | Gavi | Magic Mike 333 | 35.50M | 33.40M | +6.3% | round |
-| 08-14T22:24 | Ionut Radu | miguel_autentico | 39.66M | 39.71M | -0.1% | exact |
-| 08-14T22:24 | Agoumé | miguel_autentico | 5.89M | 5.79M | +1.7% | exact |
-| 08-14T22:24 | Eriksson | miguel_autentico | 2.93M | 2.93M | +0.0% | exact |
 | 08-14T22:24 | Aramburu | SusoGattuso | 17.79M | 17.18M | +3.6% | exact |
+| 08-14T22:24 | Eriksson | miguel_autentico | 2.93M | 2.93M | +0.0% | exact |
+| 08-14T22:24 | Gavi | Magic Mike 333 | 35.50M | 33.40M | +6.3% | round |
+| 08-14T22:24 | Agoumé | miguel_autentico | 5.89M | 5.79M | +1.7% | exact |
+| 08-14T22:24 | Ionut Radu | miguel_autentico | 39.66M | 39.71M | -0.1% | exact |
 | 08-13T22:24 | Giuliano | SusoGattuso | 44.65M | 44.65M | +0.0% | exact |
 | 08-13T22:24 | Arda Güler | Albert Laporta | 50.84M | 50.68M | +0.3% | exact |
-| 08-13T22:24 | Villalibre | Albert Laporta | 6.95M | 6.94M | +0.2% | exact |
 | 08-13T22:24 | Cabrera | Albert Laporta | 17.50M | 16.61M | +5.4% | exact |
+| 08-13T22:24 | Villalibre | Albert Laporta | 6.95M | 6.94M | +0.2% | exact |
 | 08-13T22:24 | Denis Suárez | BurtonGM89 | 2.58M | 2.58M | +0.2% | exact |
-| 08-12T22:24 | Karrikaburu | Magic Mike 333 | 700K | 604K | +15.9% | round |
-| 08-12T22:24 | Pedro Díaz | Magic Mike 333 | 2.05M | 1.86M | +9.9% | round |
+| 08-12T22:24 | Dmitrovic | BurtonGM89 | 40.01M | 36.84M | +8.6% | round |
+| 08-12T22:24 | Raphinha | Magic Mike 333 | 80.00M | 76.79M | +4.2% | round |
 
 `~` priced against a snapshot more than 36h away and left out of the medians.
 
@@ -267,17 +267,17 @@ A round bid was typed by a human. That is the whole of what roundness tells you 
 | Date | Player | Actor | Side | +3d | +7d | +14d |
 |---|---|---|---|--:|--:|--:|
 | 08-15T22:24 | Mouriño | Albert Laporta | buy | -7.9% | — | — |
-| 08-15T22:24 | Buonanotte | Albert Laporta | buy | -4.6% | — | — |
-| 08-15T22:24 | Riedel | SusoGattuso | buy | +4.1% | — | — |
-| 08-15T22:24 | Mario Martín | SusoGattuso | buy | +6.8% | — | — |
 | 08-15T22:24 | Fornals | miguel_autentico | buy | -2.4% | — | — |
+| 08-15T22:24 | Mario Martín | SusoGattuso | buy | +6.8% | — | — |
+| 08-15T22:24 | Riedel | SusoGattuso | buy | +4.1% | — | — |
+| 08-15T22:24 | Buonanotte | Albert Laporta | buy | -4.6% | — | — |
 | 08-14T22:51 | R.P. Bigas | Albert Laporta | sell | -9.6% | — | — |
 | 08-14T22:24 | T. Morente | Magic Mike 333 | buy | -8.9% | — | — |
-| 08-14T22:24 | Gavi | Magic Mike 333 | buy | -7.4% | — | — |
-| 08-14T22:24 | Ionut Radu | miguel_autentico | buy | -4.3% | — | — |
-| 08-14T22:24 | Agoumé | miguel_autentico | buy | -0.5% | — | — |
-| 08-14T22:24 | Eriksson | miguel_autentico | buy | -5.3% | — | — |
 | 08-14T22:24 | Aramburu | SusoGattuso | buy | +4.3% | — | — |
+| 08-14T22:24 | Eriksson | miguel_autentico | buy | -5.3% | — | — |
+| 08-14T22:24 | Gavi | Magic Mike 333 | buy | -7.4% | — | — |
+| 08-14T22:24 | Agoumé | miguel_autentico | buy | -0.5% | — | — |
+| 08-14T22:24 | Ionut Radu | miguel_autentico | buy | -4.3% | — | — |
 | 08-14T13:50 | Lucas Boyé | Magic Mike 333 | sell | -9.3% | — | — |
 | 08-14T13:49 | Asencio | Magic Mike 333 | sell | -10.7% | — | — |
 | 08-13T23:40 | Purić | SusoGattuso | sell | +0.0% | — | — |
@@ -287,8 +287,8 @@ A round bid was typed by a human. That is the whole of what roundness tells you 
 | 08-13T22:25 | J. Musso | BurtonGM89 | sell | -7.2% | — | — |
 | 08-13T22:24 | Giuliano | SusoGattuso | buy | -3.2% | — | — |
 | 08-13T22:24 | Arda Güler | Albert Laporta | buy | +5.8% | — | — |
-| 08-13T22:24 | Villalibre | Albert Laporta | buy | +5.0% | — | — |
 | 08-13T22:24 | Cabrera | Albert Laporta | buy | +2.4% | — | — |
+| 08-13T22:24 | Villalibre | Albert Laporta | buy | +5.0% | — | — |
 | 08-13T22:24 | Denis Suárez | BurtonGM89 | buy | -4.6% | — | — |
 | 08-13T13:13 | Hugo Duro | miguel_autentico | sell | -0.0% | — | — |
 

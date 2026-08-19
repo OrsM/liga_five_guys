@@ -1,11 +1,11 @@
-# Liga Five Guys — one report — 2026-08-19 15:21 UTC
+# Liga Five Guys — one report — 2026-08-19 15:44 UTC
 
 
 
 
 ## Now
 
-**Locks in 4h** · squad 236.37M · **cash -33K** · total 236.34M
+**Locks in 3h** · squad 236.37M · **cash -33K** · total 236.34M
 
 play 4-5-1 · finish 1.57 · win 52% · season 1,517–1,774
 
