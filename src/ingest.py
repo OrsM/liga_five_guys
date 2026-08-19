@@ -236,6 +236,13 @@ def fetch() -> Path:
     store: dict[str, str] = {}
     rows: list[dict] = []
     unchanged = skipped = rotted = 0
+    # WHICH PAGES COST THE TIME, AND WHICH ARE ROTTING. The sweep is the
+    # longest step in the run by a distance and nothing said where it went —
+    # forty pages fetched in a queue with one line of output for the lot. A
+    # source that times out every day is a source to drop; without this the
+    # only evidence was a warn line scrolling past in a journal.
+    timing: list[tuple] = []
+    fails: dict[str, str] = {}
 
     # One token for the whole sweep, fetched before the first request so a
     # login that has expired fails here — loudly, once — rather than four
@@ -287,14 +294,21 @@ def fetch() -> Path:
                           f"Run `python -m ffcore.auth --login`.")
                     continue
                 extra["Authorization"] = f"Bearer {bearer}"
+            t0 = time.monotonic()
+            kw = {"headers": extra} if extra else {}
+            if src.timeout is not None:
+                kw["timeout"] = src.timeout
             try:
-                r = c.get(url, headers=extra) if extra else c.get(url)
+                r = c.get(url, **kw)
             except httpx.RequestError as e:
+                timing.append((time.monotonic() - t0, src.key, "FAILED"))
+                fails[src.key] = type(e).__name__
                 # A host that refuses the connection or never answers is one
                 # missing page, not a reason to lose the sweep. Same treatment
                 # as a non-200: warn, skip, keep going.
                 print(f"  warn: {type(e).__name__} on {src.key}, skipping")
                 continue
+            timing.append((time.monotonic() - t0, src.key, r.status_code))
             if r.status_code in (403, 429):
                 # Stop the whole run rather than retrying into a harder block.
                 sys.exit(f"{r.status_code} on {url} — backing off, "
@@ -340,7 +354,15 @@ def fetch() -> Path:
                 rows.append({"page": src.key, "sig": sig, "stored": stamp,
                              "seen": stamp})
                 print(f"  {src.key}: {len(r.text) // 1024}KB")
-            time.sleep(random.uniform(*DELAY))
+            # THE GAP IS FOR THE SCRAPED SITES, and only for them. It is
+            # there because someone maintains futbolfantasy for free; the
+            # league's own API is this account asking the app about itself,
+            # over an authenticated connection, and pausing two seconds
+            # between those requests is politeness aimed at nobody. Keyed on
+            # `auth` because that is exactly the line: the bearer marks a
+            # first-party call.
+            if not src.auth:
+                time.sleep(random.uniform(*DELAY))
 
     rows = carry_matches(rows, prev)
 
@@ -353,6 +375,16 @@ def fetch() -> Path:
     print(f"snapshot: {dest} ({dest.stat().st_size // 1024}KB) — "
           f"{len(store)} stored, {unchanged} unchanged, {skipped} not due"
           + (f", {rotted} ROTTED" if rotted else ""))
+    if timing:
+        slow = sorted(timing, reverse=True)[:5]
+        print("  slowest: " + ", ".join(
+            "%s %.1fs%s" % (k, t, "" if st == 200 else " [%s]" % st)
+            for t, k, st in slow))
+        print("  fetch %.0fs over %d requests%s"
+              % (sum(t for t, _k, _s in timing), len(timing),
+                 (" — FAILED: " + ", ".join("%s (%s)" % kv
+                                            for kv in fails.items()))
+                 if fails else ""))
     return dest
 
 

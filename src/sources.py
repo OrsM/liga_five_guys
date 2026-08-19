@@ -1418,6 +1418,12 @@ class Source(NamedTuple):
     parse: Callable               # (html, observed_at, key) -> rows
     sign: Callable                # (html) -> signature or None
     cadence: str = "every_run"    # "every_run" | "daily" | "once"
+    # Seconds to wait on THIS host. One global timeout means a single dead
+    # source holds the whole sweep for it: Club Elo has been timing out since
+    # 2026-08-17 and was costing thirty of the thirty-two seconds a sweep took
+    # — 94% of it, for a page that never arrived. A source nothing depends on
+    # gets a short one and the sweep moves on.
+    timeout: float | None = None
     enabled: bool = True
     # Does this page need the league bearer token? The entry says THAT it
     # does; ingest.py knows HOW, because this module is pure by design and a
@@ -1449,8 +1455,13 @@ def sources(enabled_only: bool = True) -> list[Source]:
     out += [Source("af_fixtures", "fixtures", AF_HUB_URL,
                    parse_af_fixtures, sign_af_fixtures, cadence="daily")]
     # A rating changes when matches are played, so once a day is generous.
+    # EIGHT SECONDS, NOT THIRTY. Club Elo is the one source nothing depends
+    # on — a missing rating sends the fixture board back to squad value, which
+    # is where it was before Elo existed — and it has been timing out since
+    # 2026-08-17, costing thirty of the thirty-two seconds a sweep took. A
+    # host that cannot answer in eight is not going to answer in thirty.
     out += [Source("elo", "elo", ELO_URL, parse_elo, sign_elo,
-                   cadence="daily")]
+                   cadence="daily", timeout=8.0)]
     # The whole season's results in one page. It is what tells the starters
     # sweep which match pages exist and which are worth asking for.
     out += [Source(CAL_KEY, "matches", FF_CAL_URL, parse_calendar,
@@ -2024,6 +2035,10 @@ def _selftest() -> None:
     assert [s.key for s in disc] == ["api_market", "api_teams",
                                      "api_activity_0", "api_activity_1"], disc
     assert all(s.auth for s in disc), "every API entry needs the bearer"
+    # The one source nothing depends on waits the least. A global timeout let
+    # it hold 94% of the sweep for a page that never arrived.
+    elo = next(s for s in sources() if s.key == "elo")
+    assert elo.timeout == 8.0, elo.timeout
     # THE SQUAD IS FETCHED EVERY RUN. On a daily cadence the report kept
     # recommending the sale of a player already sold, and the rerun button
     # could not see a deal at all — which is the only thing it is for.

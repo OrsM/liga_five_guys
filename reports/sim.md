@@ -1,4 +1,4 @@
-# The simulation — 2026-08-19T0002Z
+# The simulation — 2026-08-19T0016Z
 
 ## Now
 
@@ -13,17 +13,17 @@ _market **54th percentile** · an ordinary week · better in 46% of weeks_
 | Player | Pos | Start | xPts/j | Where | € | Season |
 |---|---|--:|--:|---|--:|--:|
 | **FIELD — your eleven** | | | | | | |
-| Pablo Fornals | MED | 99% | 6.93 | yours | — | — |
 | Ionut Radu | POR | 76% | 4.65 | yours | — | — |
+| Marcos Alonso | DEF | 76% | 3.93 | yours | — | — |
+| Carl Starfelt | DEF | 68% | 3.23 | yours | — | — |
+| Robin Le Normand | DEF | 62% | 3.14 | yours | — | — |
+| Omar El Hilali | DEF | 97% | 2.73 | yours | — | — |
+| Pablo Fornals | MED | 99% | 6.93 | yours | — | — |
 | Iñigo Ruiz de Galarreta | MED | 92% | 4.57 | yours | — | — |
 | Jon Moncayola | MED | 97% | 4.53 | yours | — | — |
-| Marcos Alonso | DEF | 76% | 3.93 | yours | — | — |
 | Lucien Agoume | MED | 93% | 3.46 | yours | — | — |
-| Carl Starfelt | DEF | 68% | 3.23 | yours | — | — |
 | Pepelu | MED | 74% | 3.17 | yours | — | — |
-| Robin Le Normand | DEF | 62% | 3.14 | yours | — | — |
 | Iñigo Vicente | DEL | 99% | 2.89 | yours | — | — |
-| Omar El Hilali | DEF | 97% | 2.73 | yours | — | — |
 | **Your eleven — play 4-5-1** | | | **43.23** | vs SusoGattuso **43.00** | | **+0.23** |
 | **SELL — never start** | | | | | | |
 | Dani Lorenzo | MED | 99% | 2.45 | yours | +9.45M | — |

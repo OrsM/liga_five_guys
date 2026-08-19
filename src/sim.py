@@ -150,6 +150,23 @@ def short(key, u) -> str:
     return full if clash > 1 else last
 
 
+# The order a team sheet is read in, and the order the app lists them.
+SLOT_ORDER = {"POR": 0, "DEF": 1, "MED": 2, "DEL": 3}
+
+
+def by_slot(u, keys):
+    """Keeper, defence, midfield, attack — then best first inside each.
+
+    An eleven ranked purely by expected points interleaves a keeper between
+    two midfielders, which is not how anybody reads a team sheet or how the
+    app lays one out. Ranking still decides who is IN it; position decides the
+    order you check them off in.
+    """
+    exp = u.forecaster.expected(decide_choosable(u))
+    return sorted(keys, key=lambda k: (SLOT_ORDER.get(u.pos.get(k, ""), 9),
+                                       -exp.get(k, 0.0)))
+
+
 def _bar(u) -> float:
     """The weakest man in the eleven you would field — the line on the ladder."""
     from ffcore.season import best_xi
@@ -182,10 +199,12 @@ def ladder_rows(u, rows, saves=None) -> list[dict]:
                 "money": money, "pts": pts, "note": note}
 
     out = []
-    for k in sorted(xi, key=lambda k: -exp.get(k, 0.0)):
+    # The eleven in team-sheet order — keeper, defence, midfield, attack —
+    # because that is how it is read and how the app lays it out. Everything
+    # below it stays ranked, because those are choices rather than a sheet.
+    for k in by_slot(u, xi):
         out.append(cell(k, "field", "yours", None, None))
-    for k in sorted((k for k in mine if k not in xi and k not in dead),
-                    key=lambda k: -exp.get(k, 0.0)):
+    for k in by_slot(u, [k for k in mine if k not in xi and k not in dead]):
         out.append(cell(k, "keep", "yours", None, None))
     for k in sorted(dead, key=lambda k: -exp.get(k, 0.0)):
         out.append(cell(k, "sell", "yours", u.proceeds.get(k, 0.0), None))
@@ -278,7 +297,7 @@ def ladder(u, rows, base, saves=None) -> list[str]:
            "|---|---|--:|--:|---|--:|--:|"]
 
     out.append("| **FIELD — your eleven** | | | | | | |")
-    for k in by_xpts(xi):
+    for k in by_slot(u, xi):
         out.append(row(k, "yours", None, None))
     tot = sum(exp.get(k, 0.0) for k in xi)
     best_riv = max(((sum(exp.get(x, 0.0) for x in best_xi(sq, exp)), m)
@@ -292,7 +311,7 @@ def ladder(u, rows, base, saves=None) -> list[str]:
     keep = [k for k in mine if k not in xi and k not in dead]
     if keep:
         out.append("| **KEEP — bench** | | | | | | |")
-        for k in by_xpts(keep):
+        for k in by_slot(u, keep):
             out.append(row(k, "yours", None, None))
 
     if dead:
@@ -1289,6 +1308,16 @@ def _selftest() -> None:
     u.cash = 5e6
     assert overdrawn(u, 20.0) == ""
 
+    # -- a team sheet reads keeper first ------------------------------------
+    # Ranked purely by points, an eleven puts the keeper between two
+    # midfielders. Ranking decides who is IN it; position decides the order
+    # you check them off in.
+    u.pos = {"k": "POR", "d": "DEF", "m": "MED", "f": "DEL"}
+    u.forecaster = Bootstrap({1: {"k": (1.0, 1.0), "d": (9.0, 1.0),
+                                  "m": (5.0, 1.0), "f": (7.0, 1.0)}})
+    u.state.jornadas = [1]
+    assert by_slot(u, ["m", "f", "k", "d"]) == ["k", "d", "m", "f"]
+
     # -- the formation, which is the first thing the app asks for ----------
     # An eleven is not an instruction until you know the shape. best_xi has
     # been choosing one since the first day and the report never said which.
@@ -1337,7 +1366,7 @@ def _selftest() -> None:
     ph = "\n".join(placeholder("no api_teams.csv"))
     assert "no api_teams.csv" in ph and ph.startswith("# The simulation")
 
-    print("sim self-test OK (92 cases)")
+    print("sim self-test OK (93 cases)")
 
 
 def main() -> None:

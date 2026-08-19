@@ -1,6 +1,6 @@
 {
- "generated_at": "2026-08-19T00:06Z",
- "locks_in_h": 18.90187742138889,
+ "generated_at": "2026-08-19T00:18Z",
+ "locks_in_h": 18.697886181944448,
  "cash": -133023.0,
  "squad_value": 236374060.0,
  "jornadas_left": 38,
@@ -222,10 +222,10 @@
  ],
  "ladder": [
   {
-   "name": "Pablo Fornals",
-   "pos": "MED",
-   "start": 0.991,
-   "xpts": 6.929606209236223,
+   "name": "Ionut Radu",
+   "pos": "POR",
+   "start": 0.7579,
+   "xpts": 4.653752589473684,
    "group": "field",
    "where": "yours",
    "money": null,
@@ -233,10 +233,54 @@
    "note": ""
   },
   {
-   "name": "Ionut Radu",
-   "pos": "POR",
+   "name": "Marcos Alonso",
+   "pos": "DEF",
    "start": 0.7579,
-   "xpts": 4.653752589473684,
+   "xpts": 3.9328851065263155,
+   "group": "field",
+   "where": "yours",
+   "money": null,
+   "pts": null,
+   "note": ""
+  },
+  {
+   "name": "Carl Starfelt",
+   "pos": "DEF",
+   "start": 0.6788584478108934,
+   "xpts": 3.231978110500452,
+   "group": "field",
+   "where": "yours",
+   "money": null,
+   "pts": null,
+   "note": ""
+  },
+  {
+   "name": "Robin Le Normand",
+   "pos": "DEF",
+   "start": 0.62460572822199,
+   "xpts": 3.142430039530249,
+   "group": "field",
+   "where": "yours",
+   "money": null,
+   "pts": null,
+   "note": ""
+  },
+  {
+   "name": "Omar El Hilali",
+   "pos": "DEF",
+   "start": 0.97,
+   "xpts": 2.7273833135566186,
+   "group": "field",
+   "where": "yours",
+   "money": null,
+   "pts": null,
+   "note": ""
+  },
+  {
+   "name": "Pablo Fornals",
+   "pos": "MED",
+   "start": 0.991,
+   "xpts": 6.929606209236223,
    "group": "field",
    "where": "yours",
    "money": null,
@@ -266,32 +310,10 @@
    "note": ""
   },
   {
-   "name": "Marcos Alonso",
-   "pos": "DEF",
-   "start": 0.7579,
-   "xpts": 3.9328851065263155,
-   "group": "field",
-   "where": "yours",
-   "money": null,
-   "pts": null,
-   "note": ""
-  },
-  {
    "name": "Lucien Agoume",
    "pos": "MED",
    "start": 0.9316779661016948,
    "xpts": 3.457309910066383,
-   "group": "field",
-   "where": "yours",
-   "money": null,
-   "pts": null,
-   "note": ""
-  },
-  {
-   "name": "Carl Starfelt",
-   "pos": "DEF",
-   "start": 0.6788584478108934,
-   "xpts": 3.231978110500452,
    "group": "field",
    "where": "yours",
    "money": null,
@@ -310,32 +332,10 @@
    "note": ""
   },
   {
-   "name": "Robin Le Normand",
-   "pos": "DEF",
-   "start": 0.62460572822199,
-   "xpts": 3.142430039530249,
-   "group": "field",
-   "where": "yours",
-   "money": null,
-   "pts": null,
-   "note": ""
-  },
-  {
    "name": "Iñigo Vicente",
    "pos": "DEL",
    "start": 0.991,
    "xpts": 2.8868345159514166,
-   "group": "field",
-   "where": "yours",
-   "money": null,
-   "pts": null,
-   "note": ""
-  },
-  {
-   "name": "Omar El Hilali",
-   "pos": "DEF",
-   "start": 0.97,
-   "xpts": 2.7273833135566186,
    "group": "field",
    "where": "yours",
    "money": null,
@@ -603,7 +603,7 @@
    "hi": null,
    "beats_now": null,
    "helpful": 31,
-   "days": 5.846117275717593,
+   "days": 5.837619192083333,
    "opens": "24 Aug"
   }
  ],
