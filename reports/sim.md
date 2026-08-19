@@ -2,9 +2,9 @@
 
 ## Now
 
-**Locks in 1h** · squad 226.93M · cash 8.91M · total 235.83M
+**Locks in 0h** · squad 226.93M · cash 8.91M · total 235.83M
 
-**play 4-5-1** (now 4-4-1) · finish 1.20 · win 81% · season 1,672–1,934
+play 4-5-1 · finish 1.20 · win 81% · season 1,672–1,934
 
 _market **54th percentile** · an ordinary week · better in 46% of weeks_
 
@@ -12,7 +12,7 @@ _market **54th percentile** · an ordinary week · better in 46% of weeks_
 
 | Player | Pos | Start | xPts/j | Where | € | Season |
 |---|---|--:|--:|---|--:|--:|
-| **FIELD — your eleven** | | | | | | |
+| **FIELD — your eleven — 10 marks, not an eleven, so this is the whole sheet** | | | | | | |
 | Ionut Radu | POR | 99% | 6.01 | yours | — | — |
 | Marcos Alonso | DEF | 99% | 5.08 | yours | — | — |
 | Carl Starfelt | DEF | 91% | 4.29 | yours | — | — |

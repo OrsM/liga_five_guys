@@ -82,19 +82,83 @@ def squad_value(u) -> float:
     return sum(u.proceeds.values())
 
 
-def fielded_shape(u) -> str:
-    """The formation you are ACTUALLY playing, from the marks at the last log.
+def fielded_keys() -> list[str]:
+    """The men you have marked, as of the last log — [] if nothing is logged.
 
-    Without it "play 4-5-1" is advice you cannot check: you have no way to
-    know whether it is what you are already doing. xi.py logs the marks with
-    the hours left, so the newest row is the eleven standing now.
+    xi.py writes the marks with the hours left on every run, so the newest row
+    is the eleven standing now. This is the ONLY thing that knows what you are
+    currently fielding: the app publishes squads, prices, balances and bids,
+    but not a fielded flag — checked again on 2026-08-19 against the squad
+    payload and ten guessed lineup endpoints, all 404.
     """
     from ffcore.tidy import DECISIONS, read_csv
 
     rows = [r for r in read_csv(DECISIONS / "xi_fielded.csv") if r.get("xi")]
     if not rows:
-        return ""
-    return shape(u, rows[-1]["xi"].split("|"))
+        return []
+    return [k for k in rows[-1]["xi"].split("|") if k]
+
+
+def xi_note(u) -> str:
+    """The one line the change list cannot say by existing, or "".
+
+    Two states have no rows to show for them and both matter: the marks are
+    not an eleven (so the whole sheet is printed and you should know why), or
+    they are the best eleven already (so there is nothing to do, which is an
+    answer and not an empty table).
+    """
+    from ffcore.season import best_xi
+
+    exp = u.forecaster.expected(decide_choosable(u))
+    chg = xi_change(fielded_keys(),
+                    best_xi(u.state.squads.get(u.me, {}), exp))
+    if not chg["legal"]:
+        return ("%d marks, not an eleven — tick the missing man in "
+                "inputs/lineup.txt and this becomes a change list"
+                % chg["marked"])
+    if not chg["in"] and not chg["out"]:
+        return "no change — you are already fielding the best eleven"
+    return ""
+
+
+def xi_change(marked: list[str], best) -> dict:
+    """What to CHANGE about the eleven: {legal, marked, in, out}.
+
+    THE DIFFERENCE IS THE DECISION. Printing all eleven asks you to compare
+    two team sheets in your head, and the report has no idea which of the
+    eleven you already have on — so it reads as "field these", every run,
+    whether or not anything moved. Two names and a direction is the same
+    information you can act on.
+
+    `legal` is false when the marks are not an eleven, and then there is no
+    diff at all rather than a misleading one. That is not a rare state: sell a
+    player who was in your eleven and squads.py drops him from the checklist,
+    leaving ten marks — which is exactly how "play 4-5-1 (now 4-4-1)" came to
+    tell somebody already playing 4-5-1 to change formation.
+    """
+    best = list(best)
+    if len(marked) != len(best) or not marked:
+        return {"legal": False, "marked": len(marked), "in": [], "out": []}
+    have, want = set(marked), set(best)
+    return {"legal": True, "marked": len(marked),
+            "in": [k for k in best if k not in have],
+            "out": [k for k in marked if k not in want]}
+
+
+def fielded_shape(u) -> str:
+    """The formation you are ACTUALLY playing, from the marks at the last log.
+
+    Without it "play 4-5-1" is advice you cannot check: you have no way to
+    know whether it is what you are already doing. Empty when the marks are
+    not an eleven — a shape read off ten men is not a formation anybody is
+    playing, and printing it as one is worse than printing nothing.
+    """
+    from ffcore.season import best_xi
+
+    exp = u.forecaster.expected(decide_choosable(u))
+    best = best_xi(u.state.squads.get(u.me, {}), exp)
+    keys = fielded_keys()
+    return shape(u, keys) if xi_change(keys, best)["legal"] else ""
 
 
 def header(u, base, n_actions: int, locks_h=None) -> list[str]:
@@ -200,12 +264,25 @@ def ladder_rows(u, rows, saves=None) -> list[dict]:
                 "money": money, "pts": pts, "note": note}
 
     out = []
-    # The eleven in team-sheet order — keeper, defence, midfield, attack —
-    # because that is how it is read and how the app lays it out. Everything
-    # below it stays ranked, because those are choices rather than a sheet.
-    for k in by_slot(u, xi):
-        out.append(cell(k, "field", "yours", None, None))
-    for k in by_slot(u, [k for k in mine if k not in xi and k not in dead]):
+    # WHAT TO CHANGE, not what to have. When the marks are a legal eleven the
+    # top of the ladder is the difference between it and the best one — two
+    # names and a direction — and the whole sheet is printed only when the
+    # marks cannot be trusted to diff against.
+    chg = xi_change(fielded_keys(), xi)
+    if chg["legal"]:
+        for k in by_slot(u, chg["in"]):
+            out.append(cell(k, "in", "bench", None, None))
+        for k in by_slot(u, chg["out"]):
+            out.append(cell(k, "out", "yours", None, None))
+    else:
+        for k in by_slot(u, xi):
+            out.append(cell(k, "field", "yours", None, None))
+    # A man named in the diff is not named again as bench furniture: the OUT
+    # row already says where he is going.
+    moving = set(chg["in"]) | set(chg["out"])
+    benched = [k for k in mine if k not in xi and k not in dead
+               and k not in moving]
+    for k in by_slot(u, benched):
         out.append(cell(k, "keep", "yours", None, None))
     for k in sorted(dead, key=lambda k: -exp.get(k, 0.0)):
         out.append(cell(k, "sell", "yours", u.proceeds.get(k, 0.0), None))
@@ -297,9 +374,26 @@ def ladder(u, rows, base, saves=None) -> list[str]:
     out = ["| Player | Pos | Start | xPts/j | Where | € | Season |",
            "|---|---|--:|--:|---|--:|--:|"]
 
-    out.append("| **FIELD — your eleven** | | | | | | |")
-    for k in by_slot(u, xi):
-        out.append(row(k, "yours", None, None))
+    chg = xi_change(fielded_keys(), xi)
+    if not chg["legal"]:
+        # No trustworthy marks to diff against, so the whole sheet — and a
+        # line saying why you are being asked to read one.
+        out.append("| **FIELD — your eleven — %d marks, not an eleven, so "
+                   "this is the whole sheet** | | | | | | |" % chg["marked"])
+        for k in by_slot(u, xi):
+            out.append(row(k, "yours", None, None))
+    elif not chg["in"] and not chg["out"]:
+        out.append("| **XI — no change, you are fielding the best eleven** "
+                   "| | | | | | |")
+    else:
+        if chg["in"]:
+            out.append("| **PUT ON** | | | | | | |")
+            for k in by_slot(u, chg["in"]):
+                out.append(row(k, "bench", None, None))
+        if chg["out"]:
+            out.append("| **TAKE OFF** | | | | | | |")
+            for k in by_slot(u, chg["out"]):
+                out.append(row(k, "yours", None, None))
     tot = sum(exp.get(k, 0.0) for k in xi)
     best_riv = max(((sum(exp.get(x, 0.0) for x in best_xi(sq, exp)), m)
                     for m, sq in u.state.squads.items() if m != u.me),
@@ -309,7 +403,8 @@ def ladder(u, rows, base, saves=None) -> list[str]:
                % (shape(u, xi), tot, best_riv[1], best_riv[0],
                   tot - best_riv[0]))
 
-    keep = [k for k in mine if k not in xi and k not in dead]
+    keep = [k for k in mine if k not in xi and k not in dead
+            and k not in set(chg["in"]) | set(chg["out"])]
     if keep:
         out.append("| **KEEP — bench** | | | | | | |")
         for k in by_slot(u, keep):
@@ -885,6 +980,7 @@ def payload(u, rows, base, rivals, locks_h=None, n_actions: int = 0,
         "verdict": verdict(wait_routes(u, offers))[0],
         "market_pct": market_percentile(wait_routes(u, offers)),
         "shape_now": fielded_shape(u),
+        "xi_note": xi_note(u),
         "hold": verdict(wait_routes(u, offers))[1],
         "standings": [
             {"manager": m, "me": m == u.me,
@@ -1037,6 +1133,25 @@ def _selftest() -> None:
                  forecaster=Bootstrap({}, pool=[1, 2, 3]), pos={}, price={},
                  proceeds={}, owner={}, cash=23.6e6, me="me",
                  name={"yuri": "yuri berchiche", "benat": "benat turrientes"})
+
+    # -- what to CHANGE about the eleven, not what the eleven is ------------
+    # THE SCREENSHOT THAT PROMPTED THIS: the report listed all eleven men and
+    # said "play 4-5-1 (now 4-4-1)", which read as "change your formation"
+    # when the formation was already right — the marks were one short because
+    # a player had just been sold out from under them. What is worth printing
+    # is the difference: put this one on, take that one off.
+    best = ["gk", "d1", "d2", "d3", "d4", "m1", "m2", "m3", "m4", "m5", "f1"]
+    same = xi_change(list(best), best)
+    assert same["legal"] and same["in"] == [] and same["out"] == []
+    swap = xi_change([k for k in best if k != "m5"] + ["bench1"], best)
+    assert swap["in"] == ["m5"] and swap["out"] == ["bench1"], swap
+    # Ten marks are not an eleven, so there is no honest diff to take — and
+    # saying "now 4-4-1" off them is a claim about a lineup nobody made.
+    short_marks = xi_change(best[:10], best)
+    assert not short_marks["legal"] and short_marks["marked"] == 10
+    assert short_marks["in"] == [] and short_marks["out"] == []
+    # Nothing logged yet is the same case, not a crash.
+    assert not xi_change([], best)["legal"]
 
     # -- the header --------------------------------------------------------
     # THE THREE NUMBERS THE JOB ASKED FOR, in the line above the table: where
