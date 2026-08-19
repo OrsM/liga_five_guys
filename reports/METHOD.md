@@ -1,4 +1,4 @@
-# Liga Five Guys — how the numbers are made — 2026-08-19 17:33 UTC
+# Liga Five Guys — how the numbers are made — 2026-08-19 17:35 UTC
 
 
 
@@ -212,4 +212,4 @@ _Both figures are editorial reads refreshed a few times a day, not live probabil
 | Zeroed | injured, suspended, unavailable; a doubt is halved |
 | Fixture term | ±12% across the opponents ranked by Club Elo rating, plus ±4% for home advantage — both widths guesses, unfitted, and small enough that a wrong one costs a fraction of a point |
 
-_Generated 2026-08-19 17:33 UTC._
+_Generated 2026-08-19 17:35 UTC._

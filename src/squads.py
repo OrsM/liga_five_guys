@@ -3,7 +3,7 @@
 Reads:
   inputs/rosters_initial.txt  starting rosters — write once, never edit
   data/tidy/transactions.csv  the ledger of every market operation, generated
-  inputs/league.ini           managers, budgets, thresholds (all optional)
+  inputs/league.ini           managers, budget, thresholds (all optional)
   inputs/cash.txt             any balance you have actually seen
   data/tidy/*.csv             values, 24h moves, start probabilities
 

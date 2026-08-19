@@ -96,7 +96,6 @@ class Config:
     """
     me: str = DEFAULTS["me"]
     budget: float = float(DEFAULTS["budget"])
-    budgets: dict = field(default_factory=dict)   # per-manager override
     min_start: float = 60.0
     start_cross: float = 70.0
     shrink_k: float = 8.0
@@ -135,11 +134,6 @@ def load_config(name: str = "league.ini") -> Config:
         daily_bonus=money(get("league", "daily_bonus",
                               DEFAULTS["daily_bonus"])) or 0.0,
     )
-    if cp.has_section("budget"):
-        for handle, amount in cp.items("budget"):
-            v = money(amount)
-            if v is not None:
-                cfg.budgets[handle] = v
     return cfg
 
 
@@ -848,7 +842,11 @@ class League:
             balances[handle] = (value, when)
 
         for handle, mgr in self.managers.items():
-            budget = self.cfg.budgets.get(handle, self.cfg.budget)
+            # ONE BUDGET, because everyone in this league started with the
+            # same one. The [budget] section that overrode it per manager was
+            # in league.ini for a year and never held a value; a knob that has
+            # never been turned buys nothing and can still go wrong.
+            budget = self.cfg.budget
             anchor = balances.get(handle)
 
             if anchor:
