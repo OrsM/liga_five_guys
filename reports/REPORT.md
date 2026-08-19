@@ -1,13 +1,13 @@
-# Liga Five Guys — one report — 2026-08-19 10:18 UTC
+# Liga Five Guys — one report — 2026-08-19 12:46 UTC
 
 
 
 
 ## Now
 
-**Locks in 9h** · squad 236.37M · **cash -33K** · total 236.34M
+**Locks in 6h** · squad 236.37M · **cash -33K** · total 236.34M
 
-play 4-5-1 · finish 1.52 · win 56% · season 1,525–1,785
+play 4-5-1 · finish 1.57 · win 52% · season 1,517–1,774
 
 _market **52nd percentile** · an ordinary week · better in 48% of weeks_
 
@@ -16,35 +16,35 @@ _market **52nd percentile** · an ordinary week · better in 48% of weeks_
 | Player | Pos | Start | xPts/j | Where | € | Season |
 |---|---|--:|--:|---|--:|--:|
 | **FIELD — your eleven** | | | | | | |
-| Ionut Radu | POR | 76% | 4.65 | yours | — | — |
-| Marcos Alonso | DEF | 76% | 3.93 | yours | — | — |
-| Carl Starfelt | DEF | 68% | 3.23 | yours | — | — |
+| Ionut Radu | POR | 76% | 4.59 | yours | — | — |
+| Marcos Alonso | DEF | 76% | 3.88 | yours | — | — |
+| Carl Starfelt | DEF | 68% | 3.19 | yours | — | — |
 | Robin Le Normand | DEF | 62% | 3.14 | yours | — | — |
 | Omar El Hilali | DEF | 97% | 2.73 | yours | — | — |
-| Pablo Fornals | MED | 99% | 6.93 | yours | — | — |
-| Iñigo Ruiz de Galarreta | MED | 92% | 4.57 | yours | — | — |
-| Jon Moncayola | MED | 97% | 4.53 | yours | — | — |
+| Pablo Fornals | MED | 99% | 6.58 | yours | — | — |
+| Jon Moncayola | MED | 97% | 4.75 | yours | — | — |
+| Iñigo Ruiz de Galarreta | MED | 92% | 4.41 | yours | — | — |
 | Lucien Agoume | MED | 93% | 3.46 | yours | — | — |
-| Pepelu | MED | 74% | 3.17 | yours | — | — |
-| Iñigo Vicente | DEL | 99% | 2.89 | yours | — | — |
-| **Your eleven — play 4-5-1** | | | **43.23** | vs SusoGattuso **43.00** | | **+0.23** |
+| Pepelu | MED | 74% | 3.21 | yours | — | — |
+| Iñigo Vicente | DEL | 99% | 3.00 | yours | — | — |
+| **Your eleven — play 4-5-1** | | | **42.93** | vs SusoGattuso **42.98** | | **-0.05** |
 | **SELL — never start** | | | | | | |
 | Dani Lorenzo | MED | 99% | 2.45 | yours | +9.45M | — |
 | Igor Zubeldia | DEF | 71% | 2.34 | yours | +10.30M | — |
 | Beñat Turrientes | MED | 35% | 1.11 | yours | +6.96M | — |
 | **BUY — with the proceeds** | | | | | | |
-| Yuri Berchiche | DEF | 92% | 4.97 | SusoGattuso | +7.45M | +83 |
+| Yuri Berchiche | DEF | 92% | 4.79 | SusoGattuso | +7.45M | +76 |
 | Matias Dituro | POR | 76% | 4.32 | Albert Laporta | +2.72M | -1 |
-| Ferran Jutgla | DEL | 97% | 4.19 | Albert Laporta | +0.79M | +56 |
-| Cesar Tarrega | DEF | 99% | 3.92 | SusoGattuso | +0.31M | +45 |
-| Antonio Blanco | MED | 99% | 3.90 | BurtonGM89 | +4.96M | +24 |
-| Aitor Paredes | DEF | 74% | 3.77 | BurtonGM89 | +5.02M | +40 |
+| Ferran Jutgla | DEL | 97% | 4.13 | Albert Laporta | +0.79M | +53 |
+| Antonio Blanco | MED | 99% | 4.11 | BurtonGM89 | +4.96M | +30 |
+| Cesar Tarrega | DEF | 99% | 3.97 | SusoGattuso | +1.16M | +47 |
+| Aitor Paredes | DEF | 74% | 3.63 | BurtonGM89 | +4.17M | +34 |
 | Mario Martin | MED | 97% | 3.16 | SusoGattuso | +2.96M | +0 |
-| Isi Palazon | DEL | 64% | 3.10 | SusoGattuso | +6.55M | +8 |
-| Marc Roca | MED | 68% | 3.01 | Albert Laporta | +4.04M | -0 |
+| Isi Palazon | DEL | 64% | 3.02 | SusoGattuso | +6.55M | +5 |
+| Marc Roca | MED | 68% | 2.85 | Albert Laporta | +4.04M | -0 |
 | **SAVE — better than yours, out of reach** | | | | | | |
-| Joan Garcia | POR | 99% | 8.34 | free agent | 43.33M short | +134 if you could |
-| Arda Guler | MED | 91% | 6.01 | Albert Laporta | 25.99M short | +106 if you could |
+| Joan Garcia | POR | 99% | 8.24 | free agent | 43.33M short | +132 if you could |
+| Arda Guler | MED | 91% | 6.01 | Albert Laporta | 25.99M short | +104 if you could |
 | Dean Huijsen | DEF | 97% | 5.53 | BurtonGM89 | 10.29M short | +104 if you could |
 | Santiago Mouriño | DEF | 97% | 3.75 | Albert Laporta | 13.55M short | +33 if you could |
 | Mario Soriano | MED | 99% | 2.99 | free agent | 0.50M short | -4 if you could |
@@ -55,11 +55,11 @@ _Read it top to bottom: it is a plan, not a menu. The funding is implicit — se
 
 | Manager | now | simulated | 10–90 | P(I finish above) |
 |---|--:|--:|--:|--:|
-| miguel_autentico **(you)** | 17 | 1,656 | 1,525–1,785 | — |
-| SusoGattuso | 23 | 1,634 | 1,519–1,754 | 57% |
-| BurtonGM89 | 24 | 1,439 | 1,327–1,555 | 94% |
-| Magic Mike 333 | 11 | 1,388 | 1,275–1,505 | 98% |
-| Albert Laporta | 10 | 1,275 | 1,155–1,395 | 100% |
+| miguel_autentico **(you)** | 17 | 1,645 | 1,517–1,774 | — |
+| SusoGattuso | 23 | 1,634 | 1,518–1,752 | 54% |
+| BurtonGM89 | 24 | 1,456 | 1,344–1,572 | 92% |
+| Magic Mike 333 | 11 | 1,381 | 1,267–1,497 | 97% |
+| Albert Laporta | 10 | 1,270 | 1,151–1,390 | 100% |
 
 
 

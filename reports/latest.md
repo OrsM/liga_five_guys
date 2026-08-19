@@ -1,36 +1,36 @@
-# The workings — 2026-08-19T1018Z
+# The workings — 2026-08-19T1245Z
 
 _What the one table in [REPORT.md](REPORT.md) was built from: the eleven it assumes you field, what a man on today's slate should cost, and the two ways any of it can be wrong about a player._
 
 ## 1. Field these eleven
 
-**Your XI: 4-5-1 · index 37.1** (a ranking number, not a points forecast — only differences mean anything)
+**Your XI: 4-5-1 · index 37.2** (a ranking number, not a points forecast — only differences mean anything)
 
 | | Marked XI | vs | pts/m | Fix | FF | AF | xPts/j |
 |---|---|---|--:|--:|--:|--:|--:|
-| POR | Ionut Radu | Valencia A | 6.6 | -7% | 90% | 67% | 4.7 |
-| DEF | Carl Starfelt | Valencia A | 5.1 | -7% | 60% | 67% | 3.2 |
+| POR | Ionut Radu | Valencia A | 6.6 | -8% | 90% | 67% | 4.6 |
+| DEF | Carl Starfelt | Valencia A | 5.1 | -8% | 60% | 67% | 3.2 |
 | DEF | Robin Le Normand | Malaga H | 4.4 | +15% | 70% | 50% | 3.1 |
 | DEF | Igor Zubeldia | Betis A | 3.7 | -11% | 60% | — | 2.3 |
 | DEF | Omar El Hilali | Madrid H | 3.0 | -7% | 80% | — | 2.7 |
-| MED | Pepelu | Celta Vigo H | 4.3 | -1% | 70% | 67% | 3.2 |
-| MED | Iñigo Ruiz de Galarreta | Sevilla H | 4.5 | +11% | 70% | — | 4.6 |
+| MED | Pepelu | Celta Vigo H | 4.3 | +1% | 70% | 67% | 3.2 |
+| MED | Iñigo Ruiz de Galarreta | Sevilla H | 4.5 | +7% | 70% | — | 4.4 |
 | MED | Dani Lorenzo | Atletico A | ~2.8 | -13% | 90% | 100% | 2.4 |
-| MED | Jon Moncayola | Levante H | 4.3 | +7% | 90% | — | 4.5 |
+| MED | Jon Moncayola | Levante H | 4.3 | +13% | 90% | — | 4.7 |
 | MED | Lucien Agoume | Athletic A | 3.9 | -6% | 80% | — | 3.5 |
-| DEL | Iñigo Vicente | Getafe A | ~3.0 | -3% | 90% | 100% | 2.9 |
-| +POR | _Joan Garcia_ | Elche A | 8.1 | +4% | 80% | 100% | **+3.0** |
+| DEL | Iñigo Vicente | Getafe A | ~3.0 | = | 90% | 100% | 3.0 |
+| +POR | _Joan Garcia_ | Elche A | 8.1 | +3% | 80% | 100% | **+3.0** |
 
 _**pts/m** is points per match, last season shrunk toward the average and blended with this season as it accrues. `~` means no record at all, so the baseline is assumed. **Fix** is how much the next opponent moves it — `=` a median team, `—` no fixture known. **FF** is futbolfantasy's start percentage, **AF** is analiticafantasy's — `titular` there is a named starter with no number attached, `?` is listed without either, `—` is not listed at all. They are separate columns because neither has been checked against a played jornada yet, so there is no weight to blend them by, and a disagreement is worth more than an average. **xPts/j** = pts/m × Fix × FF, and uses FF only. `⚠` on a name means question 5 has something on him._
 
 _The `+SLOT` rows are today's slate: **xPts/j is the change to the whole eleven** if you sign him and re-pick the shape, not his own score, and it leaves the fixture OUT — you own a player for months, not for one round. `★` next to the opponent means this round's draw happens to be kind, `↓` that it is not; neither is in the number. What he would cost, and whether that is a good rate, is question 2._ _10 others on the slate would not improve this eleven, so they are priced there and not here._
 
-**The model's eleven is 6.1 better** (index 43.2, shape 4-5-1).
+**The model's eleven is 5.7 better** (index 42.9, shape 4-5-1).
 
 | Bench this | For this | Worth |
 |---|---|--:|
-| Igor Zubeldia (2.3) | Marcos Alonso (3.9) | +1.6 |
-| Dani Lorenzo (2.4) | Pablo Fornals (6.9) | +4.5 |
+| Igor Zubeldia (2.3) | Marcos Alonso (3.9) | +1.5 |
+| Dani Lorenzo (2.4) | Pablo Fornals (6.6) | +4.1 |
 
 _Swaps are same-position only: a cross-slot difference is a change of formation, not a substitution. Your own marks are the row above — this table is advice._
 
@@ -148,4 +148,4 @@ _Compare squad value with the app; a mismatch means a name matched the wrong pla
 | Zeroed | injured, suspended, unavailable; a doubt is halved |
 | Fixture term | ±12% across the opponents ranked by Club Elo rating, plus ±4% for home advantage — both widths guesses, unfitted, and small enough that a wrong one costs a fraction of a point |
 
-_Generated 2026-08-19 10:18 UTC._
+_Generated 2026-08-19 12:46 UTC._
