@@ -5557,3 +5557,231 @@ observed_at,source,match_id,team_slug,player_name,player_slug,role
 2026-08-19T1904Z,futbolfantasy,22429,rayo-vallecano,Camello,sergio-camello,sub
 2026-08-19T1904Z,futbolfantasy,22429,rayo-vallecano,Alemão,alemo,sub
 2026-08-19T1904Z,futbolfantasy,22429,rayo-vallecano,Iván Alonso,ivan-alonso,sub
+2026-08-19T2220Z,futbolfantasy,22421,alaves,Sivera,antonio-sivera,starter
+2026-08-19T2220Z,futbolfantasy,22421,alaves,Jonny,jonny-castro,starter
+2026-08-19T2220Z,futbolfantasy,22421,alaves,Tenaglia,nahuel-tenaglia,starter
+2026-08-19T2220Z,futbolfantasy,22421,alaves,Ángel Pérez,angel-perez-1,starter
+2026-08-19T2220Z,futbolfantasy,22421,alaves,Koski,ville-koski,starter
+2026-08-19T2220Z,futbolfantasy,22421,alaves,Denis Suárez,denis-suarez,starter
+2026-08-19T2220Z,futbolfantasy,22421,alaves,Blanco,antonio-blanco,starter
+2026-08-19T2220Z,futbolfantasy,22421,alaves,Ibáñez,pablo-ibanez,starter
+2026-08-19T2220Z,futbolfantasy,22421,alaves,Rebbach,abde-rebbach,starter
+2026-08-19T2220Z,futbolfantasy,22421,alaves,Toni Martinez,antonio-martinez,starter
+2026-08-19T2220Z,futbolfantasy,22421,alaves,Aitor Mañas,aitor-manas,starter
+2026-08-19T2220Z,futbolfantasy,22421,alaves,Adrián,adrian-rodriguez,sub
+2026-08-19T2220Z,futbolfantasy,22421,alaves,Swiderski,gregoire-swiderski-1,sub
+2026-08-19T2220Z,futbolfantasy,22421,alaves,Novoa,hugo-novoa,sub
+2026-08-19T2220Z,futbolfantasy,22421,alaves,Diarra,moussa-diarra-1,sub
+2026-08-19T2220Z,futbolfantasy,22421,alaves,Youssef,youssef-enriquez,sub
+2026-08-19T2220Z,futbolfantasy,22421,alaves,Oláiz,xanet-olaiz,sub
+2026-08-19T2220Z,futbolfantasy,22421,alaves,Aleñá,carles-alena,sub
+2026-08-19T2220Z,futbolfantasy,22421,alaves,Guevara,ander-guevara,sub
+2026-08-19T2220Z,futbolfantasy,22421,alaves,Protesoni,carlos-benavidez,sub
+2026-08-19T2220Z,futbolfantasy,22421,alaves,Mikel Rodriguez,mikel-rodriguez,sub
+2026-08-19T2220Z,futbolfantasy,22421,alaves,Mariano,mariano-diaz,sub
+2026-08-19T2220Z,futbolfantasy,22421,alaves,Boyé,lucas-boye,sub
+2026-08-19T2220Z,futbolfantasy,22421,alaves,Miguel,miguel-rodriguez-1,sub
+2026-08-19T2220Z,futbolfantasy,22421,getafe,Soria,david-soria,starter
+2026-08-19T2220Z,futbolfantasy,22421,getafe,Femenia,kiko-femenia,starter
+2026-08-19T2220Z,futbolfantasy,22421,getafe,Djené,dakonam-djene,starter
+2026-08-19T2220Z,futbolfantasy,22421,getafe,Abqar,abdel-abqar,starter
+2026-08-19T2220Z,futbolfantasy,22421,getafe,Andrés García,andres-garcia,starter
+2026-08-19T2220Z,futbolfantasy,22421,getafe,Romero,zaid-romero,starter
+2026-08-19T2220Z,futbolfantasy,22421,getafe,Davinchi,davinchi,starter
+2026-08-19T2220Z,futbolfantasy,22421,getafe,Terrats,terrats,starter
+2026-08-19T2220Z,futbolfantasy,22421,getafe,Mangala,orel-mangala,starter
+2026-08-19T2220Z,futbolfantasy,22421,getafe,Mario Martín,mario-martin,starter
+2026-08-19T2220Z,futbolfantasy,22421,getafe,Satriano,martin-satriano,starter
+2026-08-19T2220Z,futbolfantasy,22421,getafe,Ferrer,diego-ferrer,sub
+2026-08-19T2220Z,futbolfantasy,22421,getafe,Letácek,jiri-letacek,sub
+2026-08-19T2220Z,futbolfantasy,22421,getafe,Mojica,johan-mojica,sub
+2026-08-19T2220Z,futbolfantasy,22421,getafe,Sazonov,saba-sazonov,sub
+2026-08-19T2220Z,futbolfantasy,22421,getafe,Valou,jean-ives-valou,sub
+2026-08-19T2220Z,futbolfantasy,22421,getafe,Boselli,sebastian-boselli,sub
+2026-08-19T2220Z,futbolfantasy,22421,getafe,Risco,alberto-risco,sub
+2026-08-19T2220Z,futbolfantasy,22421,getafe,Mayoral,borja-mayoral,sub
+2026-08-19T2220Z,futbolfantasy,22421,getafe,Enes Ünal,enes-unal,sub
+2026-08-19T2220Z,futbolfantasy,22421,getafe,Drammeh,ebrahima-drammeh,sub
+2026-08-19T2220Z,futbolfantasy,22424,deportivo,Leo Román,leo-roman,starter
+2026-08-19T2220Z,futbolfantasy,22424,deportivo,Ximo,ximo-navarro,starter
+2026-08-19T2220Z,futbolfantasy,22424,deportivo,Altimira,adria-altimira,starter
+2026-08-19T2220Z,futbolfantasy,22424,deportivo,Quagliata,giacomo-quagliata,starter
+2026-08-19T2220Z,futbolfantasy,22424,deportivo,Noubi,lucas-noubi,starter
+2026-08-19T2220Z,futbolfantasy,22424,deportivo,Ede,bright-ede,starter
+2026-08-19T2220Z,futbolfantasy,22424,deportivo,Mario,mario-soriano,starter
+2026-08-19T2220Z,futbolfantasy,22424,deportivo,Amatucci,lorenzo-amatucci,starter
+2026-08-19T2220Z,futbolfantasy,22424,deportivo,Asp Jensen,jonathan-asp-jensen,starter
+2026-08-19T2220Z,futbolfantasy,22424,deportivo,Aubameyang,pierre-emerick-aubameyang,starter
+2026-08-19T2220Z,futbolfantasy,22424,deportivo,Bil Nsongo,bil-nsongo,starter
+2026-08-19T2220Z,futbolfantasy,22424,deportivo,Germán Parreño,german-parreno,sub
+2026-08-19T2220Z,futbolfantasy,22424,deportivo,Álvaro,alvaro-fernandez,sub
+2026-08-19T2220Z,futbolfantasy,22424,deportivo,Angeliño,angelino,sub
+2026-08-19T2220Z,futbolfantasy,22424,deportivo,Comas,arnau-comas,sub
+2026-08-19T2220Z,futbolfantasy,22424,deportivo,Loureiro,miguel-loureiro,sub
+2026-08-19T2220Z,futbolfantasy,22424,deportivo,Riki,riki-rodriguez,sub
+2026-08-19T2220Z,futbolfantasy,22424,deportivo,Luismi,luismi-cruz,sub
+2026-08-19T2220Z,futbolfantasy,22424,deportivo,Villares,diego-villares,sub
+2026-08-19T2220Z,futbolfantasy,22424,deportivo,Gijselhart,teun-gijselhart,sub
+2026-08-19T2220Z,futbolfantasy,22424,deportivo,Mella,david-mella,sub
+2026-08-19T2220Z,futbolfantasy,22424,deportivo,Kevin Sánchez,kevin-sanchez,sub
+2026-08-19T2220Z,futbolfantasy,22424,deportivo,Eddahchouri,zakaria-eddahchouri,sub
+2026-08-19T2220Z,futbolfantasy,22424,elche,Dituro,matias-dituro,starter
+2026-08-19T2220Z,futbolfantasy,22424,elche,Chust,victor-chust,starter
+2026-08-19T2220Z,futbolfantasy,22424,elche,Affengruber,david-affengruber,starter
+2026-08-19T2220Z,futbolfantasy,22424,elche,Sangaré,buba-sangare,starter
+2026-08-19T2220Z,futbolfantasy,22424,elche,Villar,gonzalo-villar,starter
+2026-08-19T2220Z,futbolfantasy,22424,elche,Valera,german-valera,starter
+2026-08-19T2220Z,futbolfantasy,22424,elche,Aguado,marc-aguado,starter
+2026-08-19T2220Z,futbolfantasy,22424,elche,Martim Neto,martim-neto,starter
+2026-08-19T2220Z,futbolfantasy,22424,elche,Ali Houary,-ali-houary,starter
+2026-08-19T2220Z,futbolfantasy,22424,elche,Redondo,federico-redondo,starter
+2026-08-19T2220Z,futbolfantasy,22424,elche,Fer Niño,fernando-nino,starter
+2026-08-19T2220Z,futbolfantasy,22424,elche,Iturbe,alejandro-iturbe,sub
+2026-08-19T2220Z,futbolfantasy,22424,elche,Bigas,pedro-bigas,sub
+2026-08-19T2220Z,futbolfantasy,22424,elche,Barzic,matia-barzic,sub
+2026-08-19T2220Z,futbolfantasy,22424,elche,Josan,josan,sub
+2026-08-19T2220Z,futbolfantasy,22424,elche,Tete Morente,tete-morente,sub
+2026-08-19T2220Z,futbolfantasy,22424,elche,Buonanotte,facundo-buonanotte,sub
+2026-08-19T2220Z,futbolfantasy,22424,elche,Al Lal,nordin-al-lal,sub
+2026-08-19T2220Z,futbolfantasy,22424,elche,Cepeda,lucas-cepeda,sub
+2026-08-19T2220Z,futbolfantasy,22424,elche,Morcillo,javi-morcillo,sub
+2026-08-19T2220Z,futbolfantasy,22424,elche,Padilla,alvaro-padilla,sub
+2026-08-19T2220Z,futbolfantasy,22424,elche,Ponce,ezequiel-ponce,sub
+2026-08-19T2220Z,futbolfantasy,22424,elche,Umaru,umaru-konare,sub
+2026-08-19T2220Z,futbolfantasy,22425,espanyol,Dmitrovic,marko-dmitrovic,starter
+2026-08-19T2220Z,futbolfantasy,22425,espanyol,U. Núñez,unai-nunez,starter
+2026-08-19T2220Z,futbolfantasy,22425,espanyol,El Hilali,omar-el-hilali,starter
+2026-08-19T2220Z,futbolfantasy,22425,espanyol,Hinojo,roger-hinojo,starter
+2026-08-19T2220Z,futbolfantasy,22425,espanyol,Riedel,clemens-riedel,starter
+2026-08-19T2220Z,futbolfantasy,22425,espanyol,Edu Expósito,edu-exposito,starter
+2026-08-19T2220Z,futbolfantasy,22425,espanyol,Urko,urko-gonzalez-de-zarate,starter
+2026-08-19T2220Z,futbolfantasy,22425,espanyol,Calatrava,lex-calatrava,starter
+2026-08-19T2220Z,futbolfantasy,22425,espanyol,Javier Hernández,javier-hernandez,starter
+2026-08-19T2220Z,futbolfantasy,22425,espanyol,Roberto,roberto-fernandez-1,starter
+2026-08-19T2220Z,futbolfantasy,22425,espanyol,Dolan,tyrhys-dolan,starter
+2026-08-19T2220Z,futbolfantasy,22425,espanyol,Fortuño,ngel-fortuno,sub
+2026-08-19T2220Z,futbolfantasy,22425,espanyol,Serred,-llorenc-serred,sub
+2026-08-19T2220Z,futbolfantasy,22425,espanyol,Hartman,quilindschy-hartman,sub
+2026-08-19T2220Z,futbolfantasy,22425,espanyol,Drkusic,vanja-drkusic,sub
+2026-08-19T2220Z,futbolfantasy,22425,espanyol,José Ángel,jose-angel-lopez,sub
+2026-08-19T2220Z,futbolfantasy,22425,espanyol,Timera,adama-timera,sub
+2026-08-19T2220Z,futbolfantasy,22425,espanyol,Pere Milla,pere-milla,sub
+2026-08-19T2220Z,futbolfantasy,22425,espanyol,Lozano,pol-lozano,sub
+2026-08-19T2220Z,futbolfantasy,22425,espanyol,Jofre,jofre-carreras,sub
+2026-08-19T2220Z,futbolfantasy,22425,espanyol,Bauzà,rafel-bauza,sub
+2026-08-19T2220Z,futbolfantasy,22425,espanyol,Moscardo,gabriel-moscardo,sub
+2026-08-19T2220Z,futbolfantasy,22425,espanyol,Marcos,marcos-fernandez-1,sub
+2026-08-19T2220Z,futbolfantasy,22425,levante,Ryan,mat-ryan,starter
+2026-08-19T2220Z,futbolfantasy,22425,levante,Mandi,aissa-mandi,starter
+2026-08-19T2220Z,futbolfantasy,22425,levante,De la Fuente,adrian-de-la-fuente,starter
+2026-08-19T2220Z,futbolfantasy,22425,levante,Manu Sánchez,manu-sanchez,starter
+2026-08-19T2220Z,futbolfantasy,22425,levante,Víctor García,victor-garcia-1,starter
+2026-08-19T2220Z,futbolfantasy,22425,levante,Nacho Pérez,nacho-perez-1,starter
+2026-08-19T2220Z,futbolfantasy,22425,levante,Oriol Rey,oriol-rey,starter
+2026-08-19T2220Z,futbolfantasy,22425,levante,C. Álvarez,carlos-lvarez,starter
+2026-08-19T2220Z,futbolfantasy,22425,levante,Olasagasti,jon-ander-olasagasti,starter
+2026-08-19T2220Z,futbolfantasy,22425,levante,Cortés,paco-cortes,starter
+2026-08-19T2220Z,futbolfantasy,22425,levante,Iván Romero,ivan-romero,starter
+2026-08-19T2220Z,futbolfantasy,22425,levante,Cuñat Campos,pablo-campos,sub
+2026-08-19T2220Z,futbolfantasy,22425,levante,Galdin,igor-galdin,sub
+2026-08-19T2220Z,futbolfantasy,22425,levante,Toljan,jeremy-toljan,sub
+2026-08-19T2220Z,futbolfantasy,22425,levante,Jorge Cabello,jorge-cabello,sub
+2026-08-19T2220Z,futbolfantasy,22425,levante,Marc Santos,marc-santos,sub
+2026-08-19T2220Z,futbolfantasy,22425,levante,Tunde,kareem-tunde,sub
+2026-08-19T2220Z,futbolfantasy,22425,levante,Bardeli,enzo-bardelli,sub
+2026-08-19T2220Z,futbolfantasy,22425,levante,Calatrava,alberto-calatrava,sub
+2026-08-19T2220Z,futbolfantasy,22425,levante,Usedo,manel-usedo,sub
+2026-08-19T2220Z,futbolfantasy,22425,levante,Etta Eyong,etta-eyong,sub
+2026-08-19T2220Z,futbolfantasy,22427,racing,Agirrezabala,julen-agirrezabala,starter
+2026-08-19T2220Z,futbolfantasy,22427,racing,Pablo Ramón,pablo-ramon,starter
+2026-08-19T2220Z,futbolfantasy,22427,racing,Mantilla,lvaro-mantilla,starter
+2026-08-19T2220Z,futbolfantasy,22427,racing,Salinas,jorge-salinas,starter
+2026-08-19T2220Z,futbolfantasy,22427,racing,Pedro Felipe,pedro-felipe,starter
+2026-08-19T2220Z,futbolfantasy,22427,racing,Canales,sergio-canales,starter
+2026-08-19T2220Z,futbolfantasy,22427,racing,Iñigo Vicente,inigo-vicente,starter
+2026-08-19T2220Z,futbolfantasy,22427,racing,Puerta,gustavo-puerta,starter
+2026-08-19T2220Z,futbolfantasy,22427,racing,Sergio Martínez,sergio-martinez,starter
+2026-08-19T2220Z,futbolfantasy,22427,racing,Villalibre,asier-villalibre,starter
+2026-08-19T2220Z,futbolfantasy,22427,racing,Andrés Martín,andres-martin,starter
+2026-08-19T2220Z,futbolfantasy,22427,racing,Eriksson,simon-eriksson,sub
+2026-08-19T2220Z,futbolfantasy,22427,racing,Hernando,manu-hernando,sub
+2026-08-19T2220Z,futbolfantasy,22427,racing,Facu González,facundo-gonzalez,sub
+2026-08-19T2220Z,futbolfantasy,22427,racing,Carlos Sánchez,carlos-sanchez-3,sub
+2026-08-19T2220Z,futbolfantasy,22427,racing,Sainz-Maza,nigo-sainz-maza,sub
+2026-08-19T2220Z,futbolfantasy,22427,racing,Maguette,maguette-gueye,sub
+2026-08-19T2220Z,futbolfantasy,22427,racing,Diego Diaz,diego-diaz,sub
+2026-08-19T2220Z,futbolfantasy,22427,racing,Vallecillo,andres-vallecillo,sub
+2026-08-19T2220Z,futbolfantasy,22427,racing,Castellanos,jorge-castellanos,sub
+2026-08-19T2220Z,futbolfantasy,22427,racing,Hugo Pérez,hugo-perez-2,sub
+2026-08-19T2220Z,futbolfantasy,22427,racing,Hugo Martín,hugo-martin-1,sub
+2026-08-19T2220Z,futbolfantasy,22427,racing,Arana,juan-carlos-arana,sub
+2026-08-19T2220Z,futbolfantasy,22427,racing,Zabiri,yassir-zabiri,sub
+2026-08-19T2220Z,futbolfantasy,22427,villarreal,Luiz Junior,luiz-junior,starter
+2026-08-19T2220Z,futbolfantasy,22427,villarreal,Foyth,juan-foyth,starter
+2026-08-19T2220Z,futbolfantasy,22427,villarreal,Veiga,renato-veiga,starter
+2026-08-19T2220Z,futbolfantasy,22427,villarreal,Romero,carlos-romero,starter
+2026-08-19T2220Z,futbolfantasy,22427,villarreal,Mouriño,santiago-mourino,starter
+2026-08-19T2220Z,futbolfantasy,22427,villarreal,Comesaña,santi-comesana,starter
+2026-08-19T2220Z,futbolfantasy,22427,villarreal,Pape Gueye,pape-gueye,starter
+2026-08-19T2220Z,futbolfantasy,22427,villarreal,Moleiro,alberto-moleiro,starter
+2026-08-19T2220Z,futbolfantasy,22427,villarreal,Ayoze,ayoze-perez,starter
+2026-08-19T2220Z,futbolfantasy,22427,villarreal,Pépé,nicolas-pepe,starter
+2026-08-19T2220Z,futbolfantasy,22427,villarreal,Mikautadze,georges-mikautadze,starter
+2026-08-19T2220Z,futbolfantasy,22427,villarreal,Gulacsi,peter-gulacsi,sub
+2026-08-19T2220Z,futbolfantasy,22427,villarreal,S. Cardona,sergi-cardona,sub
+2026-08-19T2220Z,futbolfantasy,22427,villarreal,Logan Costa,logan-costa,sub
+2026-08-19T2220Z,futbolfantasy,22427,villarreal,Kambwala,willy-kambwala,sub
+2026-08-19T2220Z,futbolfantasy,22427,villarreal,Pau Navarro,pau-navarro,sub
+2026-08-19T2220Z,futbolfantasy,22427,villarreal,Freeman,alex-freeman,sub
+2026-08-19T2220Z,futbolfantasy,22427,villarreal,Akhomach,ilias-akhomach,sub
+2026-08-19T2220Z,futbolfantasy,22427,villarreal,Buchanan,tajon-buchanan,sub
+2026-08-19T2220Z,futbolfantasy,22427,villarreal,Carlos Macià,carlos-macia,sub
+2026-08-19T2220Z,futbolfantasy,22427,villarreal,Thiam,cheikh-thiam,sub
+2026-08-19T2220Z,futbolfantasy,22427,villarreal,Gerard,gerard-moreno,sub
+2026-08-19T2220Z,futbolfantasy,22427,villarreal,Oluwaseyi,tani-oluwaseyi,sub
+2026-08-19T2220Z,futbolfantasy,22429,sevilla,Vlachodimos,odysseas-vlachodimos,starter
+2026-08-19T2220Z,futbolfantasy,22429,sevilla,Iglesias,juan-iglesias,starter
+2026-08-19T2220Z,futbolfantasy,22429,sevilla,Kike Salas,kike-salas,starter
+2026-08-19T2220Z,futbolfantasy,22429,sevilla,Suazo,gabriel-suazo,starter
+2026-08-19T2220Z,futbolfantasy,22429,sevilla,Oso,joaquin-oso,starter
+2026-08-19T2220Z,futbolfantasy,22429,sevilla,Sangante,arouna-sangante,starter
+2026-08-19T2220Z,futbolfantasy,22429,sevilla,Guridi,jon-guridi,starter
+2026-08-19T2220Z,futbolfantasy,22429,sevilla,Agoume,lucien-agoume,starter
+2026-08-19T2220Z,futbolfantasy,22429,sevilla,Guillén,nico-guillen,starter
+2026-08-19T2220Z,futbolfantasy,22429,sevilla,Sierra,miguel-sierra,starter
+2026-08-19T2220Z,futbolfantasy,22429,sevilla,Romero,isaac-romero,starter
+2026-08-19T2220Z,futbolfantasy,22429,sevilla,Rafa,rafael-romero,sub
+2026-08-19T2220Z,futbolfantasy,22429,sevilla,Fran González,fran-gonzalez-2,sub
+2026-08-19T2220Z,futbolfantasy,22429,sevilla,Carmona,jose-ngel-carmona,sub
+2026-08-19T2220Z,futbolfantasy,22429,sevilla,Castrín,andres-castrin,sub
+2026-08-19T2220Z,futbolfantasy,22429,sevilla,Iker Muñoz,iker-munoz-1,sub
+2026-08-19T2220Z,futbolfantasy,22429,sevilla,Julio Díaz,julio-diaz,sub
+2026-08-19T2220Z,futbolfantasy,22429,sevilla,Manu Bueno,manu-bueno,sub
+2026-08-19T2220Z,futbolfantasy,22429,sevilla,Ejuke,chidera-ejuke,sub
+2026-08-19T2220Z,futbolfantasy,22429,sevilla,Altozano,edu-altozano,sub
+2026-08-19T2220Z,futbolfantasy,22429,sevilla,Vargas,ruben-vargas,sub
+2026-08-19T2220Z,futbolfantasy,22429,sevilla,Peque,peque,sub
+2026-08-19T2220Z,futbolfantasy,22429,sevilla,Ibra,ibrahima-sow,sub
+2026-08-19T2220Z,futbolfantasy,22429,sevilla,Ure,robbie-ure,sub
+2026-08-19T2220Z,futbolfantasy,22429,rayo-vallecano,Batalla,augusto-batalla,starter
+2026-08-19T2220Z,futbolfantasy,22429,rayo-vallecano,Lejeune,florian-lejeune,starter
+2026-08-19T2220Z,futbolfantasy,22429,rayo-vallecano,Ratiu,andrei-florin,starter
+2026-08-19T2220Z,futbolfantasy,22429,rayo-vallecano,Balliu,ivan-balliu,starter
+2026-08-19T2220Z,futbolfantasy,22429,rayo-vallecano,Álvaro García,alvaro-garcia,starter
+2026-08-19T2220Z,futbolfantasy,22429,rayo-vallecano,Unai López,unai-lopez,starter
+2026-08-19T2220Z,futbolfantasy,22429,rayo-vallecano,De Frutos,jorge-de-frutos,starter
+2026-08-19T2220Z,futbolfantasy,22429,rayo-vallecano,Valentín,scar-valentin,starter
+2026-08-19T2220Z,futbolfantasy,22429,rayo-vallecano,Isi,isi-palazon,starter
+2026-08-19T2220Z,futbolfantasy,22429,rayo-vallecano,Pathé Ciss,pathe-ciss,starter
+2026-08-19T2220Z,futbolfantasy,22429,rayo-vallecano,Nteka,randy-nteka,starter
+2026-08-19T2220Z,futbolfantasy,22429,rayo-vallecano,Cárdenas,dani-cardenas,sub
+2026-08-19T2220Z,futbolfantasy,22429,rayo-vallecano,Pelayo,pelayo-fernandez,sub
+2026-08-19T2220Z,futbolfantasy,22429,rayo-vallecano,Lozano,sergio-jose-lozano,sub
+2026-08-19T2220Z,futbolfantasy,22429,rayo-vallecano,De la Sías,marco-de-la-sias,sub
+2026-08-19T2220Z,futbolfantasy,22429,rayo-vallecano,Vertrouwd,jozhua-vertrouwd,sub
+2026-08-19T2220Z,futbolfantasy,22429,rayo-vallecano,Pedro Díaz,pedro-diaz,sub
+2026-08-19T2220Z,futbolfantasy,22429,rayo-vallecano,Fran Pérez,fran-perez,sub
+2026-08-19T2220Z,futbolfantasy,22429,rayo-vallecano,Román,marco-roman,sub
+2026-08-19T2220Z,futbolfantasy,22429,rayo-vallecano,Camello,sergio-camello,sub
+2026-08-19T2220Z,futbolfantasy,22429,rayo-vallecano,Alemão,alemo,sub
+2026-08-19T2220Z,futbolfantasy,22429,rayo-vallecano,Iván Alonso,ivan-alonso,sub
