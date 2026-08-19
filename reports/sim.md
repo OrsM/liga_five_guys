@@ -50,25 +50,27 @@ _Read it top to bottom: it is a plan, not a menu. The funding is implicit — se
 
 ## Act now or wait — the workings
 
-| Route | What it offers | Season pts |
-|---|---|--:|
-| **Act today** | 39 players you can buy now | +213 |
-| Wait for the market | a week of new offers | +202 |
-| Wait for the clauses | 62 players on 24 Aug | +160 |
+| Route | What it offers | Season pts | Beats acting today |
+|---|---|--:|--:|
+| **Act today** | 39 players you can buy now | +213 | — |
+| Wait for the market | a week of new offers | +202 | 48% |
+| Wait for the clauses | 62 players on 24 Aug | +160 | — |
 
-_Season points, so this can be compared with the table below rather than sitting in its own unit. Waiting pays for the delay: a jornada of the best thing you can buy today is forgone before the better one arrives. These are estimates from a rate; the table's are simulated._
+| The workings | |
+|---|--:|
+| Unowned players who would improve your eleven | 110 of 572 |
+| Tenth percentile of a week's waiting | +3.95 |
+| Market model | the market is modelled from 73 offers over 5 cycles, weighted by value^0.15 |
+| Locked players who would improve your eleven | 31 |
+| Their clauses open | 24 Aug, in about 5 days |
 
-**Not for sale, and you cannot ask.** The app deals about a dozen players a cycle out of five hundred, so a man you want is not something you can go and buy — being unowned is not being available:
-
-| Player | Would add | Likely wait to be offered |
+| Nobody is offering | Would add | Likely wait |
 |---|--:|--:|
 | Lamine Yamal | +6.86 | 16 days |
 | Kylian Mbappe | +6.36 | 16 days |
 | Jan Oblak | +5.02 | 18 days |
 | Zaid Romero | +4.69 | 20 days |
 
-_The free market is simulated rather than guessed at: the market is modelled from 73 offers over 5 cycles, weighted by value^0.15. **110 of the 572 unowned players** would improve your eleven, and a week of offers beats the best thing you can buy today **48% of the time** — even the tenth percentile of waiting (+3.95) clears it. Spending now buys the worse of two options and gives up the choice._
-_**31 locked players would improve your eleven** and their clauses open on 24 Aug, in about 5 days. Waiting scores ZERO in the table above — not because it is worthless but because nothing there can price a market it has not seen, so every move with a positive number beats it by construction. That is the bias to hold in mind when the ranking asks you to spend the balance; the **Left** column is what buys the choice._
 
 ## Where the league stands
 
@@ -82,13 +84,13 @@ _**31 locked players would improve your eleven** and their clauses open on 24 Au
 
 ## What the simulation cannot see
 
-_shape from the seed prior (96 observed, 200 needed)._
-
-_P(start) fitted on 300 confirmed starts across 10 team sheets: futbolfantasy recalibrated (logit -0.5 +3.4x), blended 70% with analiticafantasy where it has an opinion (a named starter counts 92%). Brier improves 0.023 on line-ups the fit had not seen._
-
-- **Jornada 1 is half played.** 10 clubs are done and their points are already in the `now` column, so the simulation only plays the rest of the round. It still re-picks an eleven that is in fact already locked.
-- **A buyout premium is charged at **0.000 places per million**, the median of every run that has measured it — today's own reading is 0.000.** A clause runs a median 1.52x market value in this league and the app only ever pays the value back, so the premium is gone for good. It is charged against the move rather than ignored — but the price is measured off what more money would actually buy you today, and on most days that is very little.
-- **P(start) is today's, held flat over every remaining jornada.** Nothing here knows who will be injured in March.
-- **Rivals never transfer.** A steal that guts a squad assumes its manager does not simply buy someone back.
-- **Teammates score independently.** Two defenders of one club share a clean sheet, so a concentrated squad really has more variance than this shows.
-- **Cash scores zero.** Nothing models the market next cycle, so holding money looks worthless and a standalone sale can never look good.
+| Not modelled | Which way it bends the answer |
+|---|---|
+| Jornada 1 is half played — 10 clubs are done | their points are already in `now`, so only the rest of the round is simulated, and it still re-picks an eleven that is in fact already locked |
+| A buyout premium is charged at **0.000 places per million**, the median of every run that has measured it — today's own reading is 0.000 | a clause runs a median 1.52× market value here and the app pays back only the value, so the premium is gone for good. It is charged against the move, but priced off what more money would buy you today — most days, very little |
+| P(start) is today's, held flat over every remaining jornada | nothing here knows who will be injured in March |
+| Rivals never transfer | a steal that guts a squad assumes its manager does not simply buy someone back — flatters the steal |
+| Teammates score independently | two defenders of one club share a clean sheet, so a concentrated squad has more variance than this shows |
+| Cash scores zero | nothing models the market next cycle, so holding money looks worthless and a standalone sale can never look good |
+| Shape prior | shape from the seed prior (96 observed, 200 needed) |
+| P(start) fit | P(start) fitted on 300 confirmed starts across 10 team sheets: futbolfantasy recalibrated (logit -0.5 +3.4x), blended 70% with analiticafantasy where it has an opinion (a named starter counts 92%). Brier improves 0.023 on line-ups the fit had not seen |

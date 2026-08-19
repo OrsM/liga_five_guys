@@ -185,9 +185,9 @@ def digest(read, sources=SOURCES, stamp: str = "",
         body.append("")
 
     if links:
-        body += ["## Reference", "",
-                 "Kept in full, one tap away — not reprinted here, because "
-                 "that is what made this file 504 lines long.", ""]
+        # No blurb. These are links; a sentence saying they are links was
+        # the last piece of prose on the page.
+        body += ["## Reference", ""]
         for title, name in links:
             missing = "" if read(name) else "  _(not generated yet)_"
             body.append("- [%s](%s)%s" % (title, name, missing))
@@ -206,10 +206,9 @@ def main() -> None:
     write_lines(REPORTS / OUT, digest(read, stamp=stamp, skip=REPORT_SKIP))
     write_lines(REPORTS / APPENDIX,
                 digest(read, APPENDIX_SOURCES, stamp=stamp, links=None,
-                       title="Liga Five Guys — how the numbers are made",
-                       lead="Everything about HOW, so the report can be the "
-                            "numbers. The fits, the estimates, and every way "
-                            "each one is known to be wrong."))
+                       # NO LEAD. It was a sentence restating the title,
+                       # sitting above the first table on a phone screen.
+                       title="Liga Five Guys — how the numbers are made"))
 
 
 def _selftest() -> None:

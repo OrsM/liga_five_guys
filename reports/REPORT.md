@@ -1,4 +1,4 @@
-# Liga Five Guys — one report — 2026-08-19 08:56 UTC
+# Liga Five Guys — one report — 2026-08-19 09:06 UTC
 
 
 
@@ -75,7 +75,5 @@ _Compare squad value with the app; a mismatch means a name matched the wrong pla
 
 
 ## Reference
-
-Kept in full, one tap away — not reprinted here, because that is what made this file 504 lines long.
 
 - [How every number here is made, and what it cannot see](METHOD.md)

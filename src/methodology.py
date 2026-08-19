@@ -46,6 +46,11 @@ from ffcore.tidy import (DECISIONS, LINEUP_SOURCE, REPORTS,  # noqa: E402
 LIVE = SEASON / "live"
 WINDOW_DAYS = 21
 
+# Rows for the one "not graded, and why" table. Filled by the graders as they
+# discard a claim, so nothing is dropped silently: a source that looks good
+# because half its calls were thrown away is the failure mode here.
+NOT_GRADED: list[str] = []
+
 
 # ---------------------------------------------------------------------------
 # pure join logic — selftested below
@@ -501,6 +506,144 @@ def load_predictions() -> dict[str, list[tuple[dt.datetime, dict]]]:
 # the page
 # ---------------------------------------------------------------------------
 
+# What each tidy table is FOR, in the report's terms. The feeds themselves are
+# read out of the source registry so a new one cannot be missed here; this is
+# only the half a registry entry does not know, which is what the number is
+# used for once it arrives.
+FILLS = {
+    "market": "price, value, position, fitness — every player in the game",
+    "lineups": "probable XI percentages, both sources",
+    "matches": "fixtures, kickoffs, results",
+    "starters": "confirmed elevens, which is what P(start) is graded on",
+    "fixtures": "who plays whom next, for the fixture term",
+    "elo": "team strength, which ranks the fixture term",
+    "points": "realised points per jornada, the actuals in every table below",
+    "api_leagues": "your cash and the league's id",
+    "api_market": "what is on offer, and the bids on it",
+    "api_teams": "all five squads",
+    "api_activity": "every transfer, which is what the ledger replays",
+    "api_players": "names for players nobody owns any more",
+    "players": "the crosswalk: one key per player across all four spellings",
+    "clubs": "the same, for clubs",
+}
+
+# Written by src/crosswalk.py out of the tables above rather than fetched.
+DERIVED = {"players", "clubs"}
+
+# Sources the registry cannot name statically, because the sweep discovers
+# them: the API's urls carry a league id that the API itself supplies, and the
+# match pages are whichever ones the calendar says have been played.
+HOSTS = {"api_leagues": ("LaLiga Fantasy API", "every_run"),
+         "api_market": ("LaLiga Fantasy API", "every_run"),
+         "api_teams": ("LaLiga Fantasy API", "every_run"),
+         "api_activity": ("LaLiga Fantasy API", "every_run"),
+         "api_players": ("LaLiga Fantasy API", "once"),
+         "starters": ("futbolfantasy.com", "once"),
+         # The points PAGE is fetched every run; this table only gains a row
+         # when somebody actually plays, so its age is the last jornada
+         # scored and not a health reading.
+         "points": ("futbolfantasy.com", "as played")}
+
+# The column that carries the reading's time, where it is not observed_at.
+STAMPED = {"points": "to_stamp"}
+
+# How long a feed may go without answering before its age is the news. A page
+# asked for on every sweep and missing from the last one has failed; a daily
+# page has a day, and not much more, because the sweep runs twice a day and
+# missing both is not a cadence.
+FRESH = {"every_run": 0.5, "daily": 1.05, "once": 1e9,
+         "as played": 1e9, "derived": 1e9}
+
+
+def _hosts() -> dict[str, tuple[str, str, int]]:
+    """{table: (host, cadence, how many pages)} from the source registry.
+
+    Read from the registry rather than listed here, so a source added to
+    sources.py appears in the appendix without anyone remembering to say so.
+    """
+    from urllib.parse import urlparse
+
+    from sources import sources
+
+    out: dict[str, tuple[set, set, set]] = {}
+    for src in sources():
+        host = urlparse(src.url).netloc.removeprefix("www.")
+        hosts, cadences, keys = out.get(src.table, (set(), set(), set()))
+        out[src.table] = (hosts | ({host} if host else set()),
+                          cadences | {src.cadence}, keys | {src.key})
+    return {t: (", ".join(sorted(h)) or HOSTS.get(t, ("—",))[0],
+                "/".join(sorted(c)), k)
+            for t, (h, c, k) in out.items()}
+
+
+def _feed_state() -> dict[str, tuple[str, str]]:
+    """{page: (last status, when)} from the sweep log, newest wins."""
+    out = {}
+    for r in read_csv(TIDY / "feeds.csv"):
+        if r.get("page"):
+            out[r["page"]] = (r.get("status", ""), r.get("observed_at", ""))
+    return out
+
+
+def _age(stamp: str, now: dt.datetime) -> tuple[float | None, str]:
+    when = snapshot_stamp(stamp)
+    if when is None:
+        return None, "—"
+    days = (now - when).total_seconds() / 86400.0
+    return days, when.strftime("%d %b %H:%M")
+
+
+def feed_lines() -> list[str]:
+    """The data flow, and which parts of it have stopped answering.
+
+    THIS IS THE TABLE THE ELO BUG NEEDED. A fetch that fails leaves the last
+    good rows in the tidy store and every reader downstream treats them as
+    today's — the fixture board ranked twenty clubs by a rating from before
+    the jornada for two days, and nothing anywhere said so. Age is the only
+    honest thing to print about an input, so it is a column.
+    """
+    now = dt.datetime.now(dt.timezone.utc)
+    reg, feeds = _hosts(), _feed_state()
+    rows = []
+    for name in sorted(FILLS):
+        path = (SEASON / "live" / "perjornada_2026-27.csv") if name == "points" \
+            else (TIDY / f"{name}.csv")
+        got = read_csv(path)
+        col = STAMPED.get(name, "observed_at")
+        newest = max((r.get(col, "") for r in got), default="")
+        days, seen = _age(newest, now)
+
+        host, cadence, pages = reg.get(name, (None, None, set()))
+        if host is None or name in HOSTS:
+            host = (host or HOSTS.get(name, ("—", ""))[0])
+            cadence = HOSTS.get(name, (None, cadence or "derived"))[1]
+        if name in DERIVED:
+            host, cadence = "src/crosswalk.py", "derived"
+
+        if cadence == "derived":
+            state = "rebuilt every run"
+        elif days is None:
+            state = "**never answered**"
+        elif days <= FRESH.get(cadence, 1e9):
+            state = "ok"
+        else:
+            state = "**%s stale**" % (
+                "%.0f days" % days if days >= 2 else "%.0f hours" % (days * 24))
+            why = sorted({st for k, (st, _) in feeds.items()
+                          if k in pages and st == "FAILED"})
+            if why:
+                state += ", the sweep is failing on it"
+        rows.append("| %s | %s | %s | %s | %s | %s |" % (
+            name, FILLS[name],
+            host + (" ×%d" % len(pages) if len(pages) > 1 else ""),
+            "{:,}".format(len(got)), seen, state))
+
+    return ["## Where the numbers come from", "",
+            "| Table | What it is used for | Fetched from | Rows | "
+            "Newest row | State |",
+            "|---|---|---|--:|---|---|"] + rows + [""]
+
+
 def elo_basis() -> str:
     """What actually ranked the opponents in today's run.
 
@@ -520,27 +663,11 @@ def elo_basis() -> str:
         return ("summed squad value — Club Elo was scraped but did not cover "
                 "every club in the market, and half a league ranked by Elo is "
                 "not a ranking")
-    # HOW OLD IT IS, because a fetch that fails leaves the LAST reading in
-    # place and everything downstream carries on as though it were today's.
-    # Club Elo has been timing out since 2026-08-17 and nothing said so: the
-    # board was still ranked by Elo, just by an Elo from before the jornada.
-    # Ratings move only when matches are played, so a couple of days is
-    # harmless and a couple of weeks is not — either way it should be read
-    # off the file rather than assumed.
-    import datetime as dt
-    from ffcore.tidy import snapshot_stamp
-
-    seen = max((r.get("observed_at", "") for r in rows), default="")
-    when = snapshot_stamp(seen)
-    age = ((dt.datetime.now(dt.timezone.utc) - when).total_seconds() / 86400.0
-           if when else None)
-    if age is not None and age >= 1.0:
-        return ("**Club Elo rating, read %s** (%s) — the scrape has "
-                "not succeeded since, so the ranking is from before whatever "
-                "has been played in between. Ratings move only on results, so "
-                "this is harmless for days and not for weeks"
-                % ("yesterday" if age < 2 else "%.0f days ago" % age,
-                   when.strftime("%d %b")))
+    # AGE LIVES IN THE FEEDS TABLE, not here. A fetch that fails leaves the
+    # last reading in place and everything downstream carries on as though it
+    # were today's — Club Elo went two days without answering and the board
+    # was still ranked by it. That is a fact about a feed, so it is a column
+    # in the feed table rather than a sentence in this one.
     return "**Club Elo rating**, a result-based rating with no transfer fees in it"
 
 
@@ -566,26 +693,21 @@ def formula_lines() -> list[str]:
     below are read from the modules that use them, so a changed K or a changed
     band shows up here on the next run.
     """
-    basis = elo_basis()
     return [
         "### The model, as configured right now", "",
-        "`xPts/j = shrunk points-per-match x fixture x P(start)`. What each "
-        "term means, why it is shaped that way, and what it deliberately "
-        "ignores is in the README — this table is only what the code is "
-        "currently set to, read from the code so it cannot drift.", "",
-        "| Term | Setting |",
-        "|---|---|",
-        f"| Shrinkage | K = {SHRINK_K:g} matches, applied twice (last season "
-        "toward the positional prior, then this season toward that) |",
-        f"| Fixture band | ±{FIX_BAND * 100:.0f}%, plus "
-        f"{HOME_EDGE * 100:.0f}% at home — a RANK, not a ratio |",
-        f"| Team strength | {basis} |",
-        f"| P(start) read from | `{LINEUP_SOURCE}` |",
-        "| Fixture applies to | fielding only — never to a buy, a sale, or "
-        "the line |",
-        "",
-        "**Both fixture numbers are guesses, not fits.** The tables below are "
-        "what will eventually settle them.", "",
+        "| Term | Setting | Fitted? |",
+        "|---|---|---|",
+        f"| Formula | `xPts/j = shrunk pts-per-match × fixture × P(start)` | "
+        "— |",
+        f"| Shrinkage | K = {SHRINK_K:g} matches, applied twice: last season "
+        "toward the positional prior, then this season toward that | yes |",
+        f"| Fixture band | ±{FIX_BAND * 100:.0f}% across the opponents by "
+        "rank, not by ratio | **no, a guess** |",
+        f"| Home advantage | +{HOME_EDGE * 100:.0f}% | **no, a guess** |",
+        f"| Team strength | {elo_basis()} | — |",
+        f"| P(start) read from | `{LINEUP_SOURCE}` | see the Brier table |",
+        "| Fixture applies to | fielding only — never a buy, a sale or the "
+        "line | — |", "",
     ]
 
 
@@ -602,11 +724,10 @@ def start_lines() -> list[str]:
     out: list[str] = []
     if not intervals:
         if ungraded:
-            out += ["_Confirmed elevens exist for jornada "
-                    + ", ".join(str(j) for j in ungraded)
-                    + ", but no kickoff was observed before the round locked, "
-                    "so nothing can be graded without hindsight. Rounds swept "
-                    "from now on carry their own lock._", ""]
+            NOT_GRADED.append(
+                "| jornada " + ", ".join(str(j) for j in ungraded)
+                + " — confirmed elevens exist but no kickoff was observed "
+                  "before the round locked | all |")
         return out
 
     numbered, named, skipped = start_grade(intervals, load_lineups(source=""),
@@ -614,128 +735,108 @@ def start_lines() -> list[str]:
     if not numbered and not named:
         return out
 
-    out += [f"**{graded} confirmed starters** across "
-            f"{len(intervals)} locked round(s), off the match pages. A "
-            "substitute is a MISS here — this is the question both sources are "
-            "answering. The claim scored is the last one published before the "
-            "round's first kickoff, because that is when the lineup locked and "
-            "later news could not have been acted on.", "",
-            "| Source | Calls | Mean claim | Started | Brier |",
-            "|---|--:|--:|--:|--:|"]
+    out += [f"| **starts** — {graded} confirmed, {len(intervals)} locked "
+            "round(s) | | | | |"]
     for src, n, claim, rate, brier in numbered:
         mark = " ←read" if src == LINEUP_SOURCE else ""
         out.append(f"| {src}{mark} | {n} | {claim:.0f}% | {rate:.0f}% | "
                    f"{brier:.3f} |")
-    out += ["", "_**Brier** is the mean squared error of the probability: "
-            "lower is better, 0.25 is a coin flip, and it punishes confidence "
-            "more than caution. A source whose mean claim sits far from its "
-            "start rate is miscalibrated even if it ranks players well._", ""]
-    if named:
-        for src, n, rate in named:
-            out.append(f"- **{src}** — {n} calls published with no number on "
-                       f"them, {rate:.0f}% started")
-        out.append("")
+    for src, n, rate in named:
+        out.append(f"| {src} — named, no number | {n} | — | {rate:.0f}% | — |")
     if skipped:
-        out += [f"_{skipped} claim(s) sat within {START_EDGE:.0f} points of "
-                "50%: not a call either way, so not graded._", ""]
-    out += ["_Read the gap between the sources, not the level. The clubs "
-            "playing the round's opening matches have their elevens CONFIRMED "
-            "by the time it locks, and both sources copy them, so their share "
-            "of the table is scored on published fact rather than on a "
-            "forecast. Whichever source publishes more of those looks better "
-            "than it forecasts._", ""]
+        NOT_GRADED.append(f"| within {START_EDGE:.0f} points of 50%, on "
+                          f"starts | {skipped} |")
     if ungraded:
-        out += ["_Jornada " + ", ".join(str(j) for j in ungraded)
-                + " is excluded: its opener kicked off before this repo "
-                "observed a kickoff for it, so there is no honest cutoff._", ""]
+        NOT_GRADED.append(
+            "| jornada " + ", ".join(str(j) for j in ungraded)
+            + " — its opener kicked off before this repo saw a kickoff for "
+              "it, so there is no honest cutoff | all |")
     return out
 
 
 def source_lines(actuals: list[dict]) -> list[str]:
-    """The gate for LINEUP_SOURCE: which site's eleven was right more often."""
+    """The gate for LINEUP_SOURCE: which site's eleven was right more often.
+
+    ONE TABLE, TWO SAMPLES. Starts is the question — a substitute is a miss —
+    and appearances is the blunter one kept because it reaches back to before
+    the match pages were collected, where a twenty-minute substitute counts.
+    They flatter both sources equally, so the comparison holds even though the
+    level does not; printing them as one table with a Sample column is what
+    stops the second being read as the answer.
+    """
+    NOT_GRADED.clear()
     starts = start_lines()
-    out = ["### Who to believe about the eleven", ""] + starts
-    # The gate closes the section whether or not the appearance table follows
-    # it: the starts table is what decides, and a decision rule the page only
-    # states when a second table happens to exist is not a rule.
-    gate = ["**The gate.** Once a source has a few hundred graded calls, "
-            "whichever has the lower Brier **on the starts table above** "
-            "earns `LINEUP_SOURCE` in ffcore/tidy.py — a one-line change, and "
-            "the only thing that should ever move it. Appearances break a tie, "
-            "never the other way round: they are the question nobody asked. "
-            "Until then nothing is blended, because a weight fitted on one "
-            "jornada is a guess wearing a decimal point.", ""]
-    intervals = appearances(actuals)
-    if not intervals:
-        if not starts:
-            out += ["_No played interval yet, so neither source has a record. "
-                    f"`{LINEUP_SOURCE}` is read because it was first, not "
-                    "because it won anything._", ""]
-            return out
-        return out + gate
-
-    numbered, named, skipped = start_grade(intervals, load_lineups(source=""),
-                                           load_universe())
-    if not numbered and not named:
-        out += ["_Played intervals exist, but no probable-XI claim was logged "
-                "before any of them — lineups.csv starts after the first "
-                "ingest run._", ""]
-        return out + (gate if starts else [])
-
-    out += ["The wider but blunter sample, kept because it reaches back to "
-            "before the match pages were collected:", "",
-            f"Graded on **appearances**, not starts: a 20-minute substitute "
-            "counts. That flatters both sources by the same amount, so the "
-            "comparison holds even though the level does not. Only claims "
-            "logged before the interval opened are scored.", "",
-            "| Source | Calls | Mean claim | Appeared | Brier |",
+    head = ["### Who to believe about the eleven", "",
+            "| Source | Calls | Mean claim | Hit | Brier |",
             "|---|--:|--:|--:|--:|"]
-    for src, n, claim, rate, brier in numbered:
-        mark = " ←read" if src == LINEUP_SOURCE else ""
-        out.append(f"| {src}{mark} | {n} | {claim:.0f}% | {rate:.0f}% | "
-                   f"{brier:.3f} |")
-    if named:
-        out += ["Calls published with no number on them, which can only be "
-                "graded as a hit rate:", ""]
+    rows = list(starts)
+
+    intervals = appearances(actuals)
+    numbered, named, skipped = ([], [], 0) if not intervals else start_grade(
+        intervals, load_lineups(source=""), load_universe())
+    if numbered or named:
+        rows.append("| **appearances** — the wider, blunter sample; a "
+                    "20-minute substitute counts | | | | |")
+        for src, n, claim, rate, brier in numbered:
+            mark = " ←read" if src == LINEUP_SOURCE else ""
+            rows.append(f"| {src}{mark} | {n} | {claim:.0f}% | {rate:.0f}% | "
+                        f"{brier:.3f} |")
         for src, n, rate in named:
-            out.append(f"- **{src}** — {n} named starters, {rate:.0f}% "
-                       "appeared")
-        out.append("")
-    if skipped:
-        out += [f"_{skipped} claim(s) sat within {START_EDGE:.0f} points of "
-                "50% and are not graded: that is not a call either way._", ""]
-    return out + gate
+            rows.append(f"| {src} — named, no number | {n} | — | {rate:.0f}% "
+                        "| — |")
+        if skipped:
+            NOT_GRADED.append(f"| within {START_EDGE:.0f} points of 50%, on "
+                              f"appearances | {skipped} |")
+
+    if not rows:
+        return head[:2] + [
+            f"| `{LINEUP_SOURCE}` | 0 | — | — | — |", "",
+            "_Read because it was first, not because it won anything._", ""]
+
+    out = head + rows + [""]
+    if NOT_GRADED:
+        out += ["| Not graded | Calls |", "|---|--:|"] + NOT_GRADED + [""]
+    out += ["_Brier: mean squared error of the probability, 0 perfect and "
+            "0.25 a coin flip. Claims are scored as last published before the "
+            "round's first kickoff. Lower Brier **on starts** earns "
+            "`LINEUP_SOURCE` in ffcore/tidy.py; appearances break ties only._",
+            ""]
+    return out
 
 
 def comparison_lines() -> list[str]:
     out = [f"### Forecast vs actual — last {WINDOW_DAYS} days", ""]
     actuals, label = load_actuals()
     if not actuals:
-        out += ["_No completed jornada in the window yet. points.py has no "
-                "per-jornada rows to compare against; this section fills "
-                "itself in after the first matches._", ""]
+        out += ["| Player-intervals scored | 0 |", "|---|--:|",
+                "| Why | no completed jornada in the window yet |", ""]
         return out
 
     pairs = pair(actuals, load_predictions())
     if not pairs:
-        out += [f"_{len(actuals)} per-jornada rows exist for {label}, but "
-                "none matched a prediction logged before the matches — "
-                "squad_log.csv starts recording only once report.py has "
-                "run with a roster._", ""]
+        out += ["| Player-intervals scored | 0 |", "|---|--:|",
+                f"| Per-jornada rows for {label} | {len(actuals)} |",
+                "| Why none matched | no prediction was logged before the "
+                "matches; squad_log.csv starts once report.py has run with a "
+                "roster |", ""]
         return out
 
     n = len(pairs)
     tp = sum(p["predicted"] for p in pairs)
     ta = sum(p["actual"] for p in pairs)
     mae = sum(abs(p["err"]) / p["matches"] for p in pairs) / n
+    fx, no_fix = fixture_rows(pairs)
     out += [
-        f"**{n} player-intervals** ({label}): predicted **{tp:.0f}** pts "
-        f"total, actual **{ta:.0f}**. Mean absolute error "
-        f"**{mae:.1f} pts per player-match** — read every xPts/j in this "
-        "report as ± that, at least.", "",
-        "Only predictions logged **before** each interval are scored; "
-        "hindsight is excluded by construction. Sample is your own squad, "
-        "so it grows ~15 pairs a jornada.", "",
+        "| Measure | Value |", "|---|--:|",
+        f"| Player-intervals scored ({label}) | {n} |",
+        f"| Predicted, total | {tp:.0f} pts |",
+        f"| Actual, total | {ta:.0f} pts |",
+        f"| **Mean absolute error** | **{mae:.1f} pts per player-match** |",
+        f"| Pairs predating the fixture term | {no_fix} of {n} |", "",
+        "_Read every xPts/j in this report as ± the error above, at least. "
+        "Only predictions logged before an interval are scored, so hindsight "
+        "is excluded by construction; the sample is your own squad and grows "
+        "about 15 pairs a jornada._", "",
         "| Forecast bucket | n | Mean forecast | Mean actual |",
         "|---|--:|--:|--:|",
     ]
@@ -744,42 +845,32 @@ def comparison_lines() -> list[str]:
     out.append("")
 
     # Attribution: not "how wrong", but "wrong about WHAT". One factor at a
-    # time, starting with the newest and least-justified one.
-    fx, no_fix = fixture_rows(pairs)
+    # time, starting with the newest and least-justified one — this is the
+    # table that decides whether the fixture band is kept, widened or deleted.
     if fx:
-        out += [f"**Is the fixture term earning its place?** It moves a "
-                f"forecast by up to ±{FIX_BAND*100:.0f}% and was never "
-                "fitted, so this is the table that decides whether to keep "
-                "it, widen it, or delete it.", "",
-                "| Next fixture | n | Mean forecast | Mean actual | Error |",
+        out += [f"| Next fixture (±{FIX_BAND*100:.0f}%, unfitted) | n | Mean "
+                "forecast | Mean actual | Error |",
                 "|---|--:|--:|--:|--:|"]
         for label_, cnt, mp, ma, me in fx:
             out.append(f"| {label_} | {cnt} | {mp:.1f} | {ma:.1f} | "
                        f"{me:+.1f} |")
-        out += ["", "_Per player-match. A positive error against an **easier** "
-                "fixture together with a negative one against a **harder** "
-                "fixture means the band is too wide; the reverse means too "
-                "narrow; both near zero means it is roughly right. Judge "
-                "nothing on a bucket with a single-digit n._", ""]
-        if no_fix:
-            out += [f"_{no_fix} of {n} pairs predate the fixture term and "
-                    "carry no factor, so they are in the totals above but not "
-                    "in this table._", ""]
-    elif no_fix:
-        out += [f"_All {no_fix} pairs predate the fixture term, so there is "
-                "nothing to grade it with yet._", ""]
+        out += ["", "_Per player-match. Positive error on **easier** together "
+                "with negative on **harder** means the band is too wide; the "
+                "reverse, too narrow; both near zero, about right. Judge "
+                "nothing on a single-digit n._", ""]
 
-    worst = sorted(pairs, key=lambda p: -abs(p["err"]))[:5]
-    out += ["Biggest misses (forecast − actual):", ""]
-    for p in worst:
-        out.append(f"- **{p['name']}** — forecast {p['predicted']:.1f}, "
-                   f"actual {p['actual']:.0f} ({p['err']:+.1f})")
+    out += ["| Biggest miss | Forecast | Actual | Error |",
+            "|---|--:|--:|--:|"]
+    for p in sorted(pairs, key=lambda p: -abs(p["err"]))[:5]:
+        out.append(f"| {p['name']} | {p['predicted']:.1f} | "
+                   f"{p['actual']:.0f} | {p['err']:+.1f} |")
     out.append("")
     return out
 
 
 def main() -> None:
     out = ["# How the forecast works — and how it's doing", ""]
+    out += feed_lines()
     out += formula_lines()
     out += comparison_lines()
     out += source_lines(load_actuals()[0])

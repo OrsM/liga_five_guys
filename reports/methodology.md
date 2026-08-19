@@ -1,72 +1,80 @@
 # How the forecast works — and how it's doing
 
+## Where the numbers come from
+
+| Table | What it is used for | Fetched from | Rows | Newest row | State |
+|---|---|---|--:|---|---|
+| api_activity | every transfer, which is what the ledger replays | LaLiga Fantasy API | 910 | 19 Aug 00:29 | ok |
+| api_leagues | your cash and the league's id | LaLiga Fantasy API | 15 | 19 Aug 00:29 | ok |
+| api_market | what is on offer, and the bids on it | LaLiga Fantasy API | 602 | 19 Aug 00:29 | ok |
+| api_players | names for players nobody owns any more | LaLiga Fantasy API | 745 | 19 Aug 00:29 | ok |
+| api_teams | all five squads | LaLiga Fantasy API | 1,140 | 19 Aug 00:29 | ok |
+| clubs | the same, for clubs | src/crosswalk.py | 20 | — | rebuilt every run |
+| elo | team strength, which ranks the fixture term | api.clubelo.com | 80 | 17 Aug 23:45 | **33 hours stale** |
+| fixtures | who plays whom next, for the fixture term | analiticafantasy.com | 352 | 19 Aug 00:29 | ok |
+| lineups | probable XI percentages, both sources | analiticafantasy.com, futbolfantasy.com ×40 | 31,597 | 19 Aug 00:29 | ok |
+| market | price, value, position, fitness — every player in the game | futbolfantasy.com | 32,515 | 19 Aug 00:29 | ok |
+| matches | fixtures, kickoffs, results | futbolfantasy.com | 6,840 | 19 Aug 00:29 | ok |
+| players | the crosswalk: one key per player across all four spellings | src/crosswalk.py | 648 | — | rebuilt every run |
+| points | realised points per jornada, the actuals in every table below | futbolfantasy.com | 100 | 18 Aug 09:41 | ok |
+| starters | confirmed elevens, which is what P(start) is graded on | futbolfantasy.com | 3,506 | 19 Aug 00:29 | ok |
+
 ### The model, as configured right now
 
-`xPts/j = shrunk points-per-match x fixture x P(start)`. What each term means, why it is shaped that way, and what it deliberately ignores is in the README — this table is only what the code is currently set to, read from the code so it cannot drift.
-
-| Term | Setting |
-|---|---|
-| Shrinkage | K = 8 matches, applied twice (last season toward the positional prior, then this season toward that) |
-| Fixture band | ±12%, plus 4% at home — a RANK, not a ratio |
-| Team strength | **Club Elo rating, read yesterday** (17 Aug) — the scrape has not succeeded since, so the ranking is from before whatever has been played in between. Ratings move only on results, so this is harmless for days and not for weeks |
-| P(start) read from | `futbolfantasy` |
-| Fixture applies to | fielding only — never to a buy, a sale, or the line |
-
-**Both fixture numbers are guesses, not fits.** The tables below are what will eventually settle them.
+| Term | Setting | Fitted? |
+|---|---|---|
+| Formula | `xPts/j = shrunk pts-per-match × fixture × P(start)` | — |
+| Shrinkage | K = 8 matches, applied twice: last season toward the positional prior, then this season toward that | yes |
+| Fixture band | ±12% across the opponents by rank, not by ratio | **no, a guess** |
+| Home advantage | +4% | **no, a guess** |
+| Team strength | **Club Elo rating**, a result-based rating with no transfer fees in it | — |
+| P(start) read from | `futbolfantasy` | see the Brier table |
+| Fixture applies to | fielding only — never a buy, a sale or the line | — |
 
 ### Forecast vs actual — last 21 days
 
-**2 player-intervals** (2026-27): predicted **5** pts total, actual **14**. Mean absolute error **4.3 pts per player-match** — read every xPts/j in this report as ± that, at least.
+| Measure | Value |
+|---|--:|
+| Player-intervals scored (2026-27) | 2 |
+| Predicted, total | 5 pts |
+| Actual, total | 14 pts |
+| **Mean absolute error** | **4.3 pts per player-match** |
+| Pairs predating the fixture term | 0 of 2 |
 
-Only predictions logged **before** each interval are scored; hindsight is excluded by construction. Sample is your own squad, so it grows ~15 pairs a jornada.
+_Read every xPts/j in this report as ± the error above, at least. Only predictions logged before an interval are scored, so hindsight is excluded by construction; the sample is your own squad and grows about 15 pairs a jornada._
 
 | Forecast bucket | n | Mean forecast | Mean actual |
 |---|--:|--:|--:|
 | 2–3 | 2 | 2.7 | 7.0 |
 
-**Is the fixture term earning its place?** It moves a forecast by up to ±12% and was never fitted, so this is the table that decides whether to keep it, widen it, or delete it.
-
-| Next fixture | n | Mean forecast | Mean actual | Error |
+| Next fixture (±12%, unfitted) | n | Mean forecast | Mean actual | Error |
 |---|--:|--:|--:|--:|
 | harder | 1 | 2.6 | 6.0 | -3.4 |
 | easier | 1 | 2.8 | 8.0 | -5.2 |
 
-_Per player-match. A positive error against an **easier** fixture together with a negative one against a **harder** fixture means the band is too wide; the reverse means too narrow; both near zero means it is roughly right. Judge nothing on a bucket with a single-digit n._
+_Per player-match. Positive error on **easier** together with negative on **harder** means the band is too wide; the reverse, too narrow; both near zero, about right. Judge nothing on a single-digit n._
 
-Biggest misses (forecast − actual):
-
-- **Omar El Hilali** — forecast 2.8, actual 8 (-5.2)
-- **Iñigo Vicente** — forecast 2.6, actual 6 (-3.4)
+| Biggest miss | Forecast | Actual | Error |
+|---|--:|--:|--:|
+| Omar El Hilali | 2.8 | 8 | -5.2 |
+| Iñigo Vicente | 2.6 | 6 | -3.4 |
 
 ### Who to believe about the eleven
 
-**110 confirmed starters** across 1 locked round(s), off the match pages. A substitute is a MISS here — this is the question both sources are answering. The claim scored is the last one published before the round's first kickoff, because that is when the lineup locked and later news could not have been acted on.
-
-| Source | Calls | Mean claim | Started | Brier |
+| Source | Calls | Mean claim | Hit | Brier |
 |---|--:|--:|--:|--:|
+| **starts** — 110 confirmed, 1 locked round(s) | | | | |
 | analitica | 43 | 87% | 79% | 0.134 |
 | futbolfantasy ←read | 224 | 41% | 41% | 0.045 |
-
-_**Brier** is the mean squared error of the probability: lower is better, 0.25 is a coin flip, and it punishes confidence more than caution. A source whose mean claim sits far from its start rate is miscalibrated even if it ranks players well._
-
-- **analitica** — 31 calls published with no number on them, 100% started
-
-_49 claim(s) sat within 10 points of 50%: not a call either way, so not graded._
-
-_Read the gap between the sources, not the level. The clubs playing the round's opening matches have their elevens CONFIRMED by the time it locks, and both sources copy them, so their share of the table is scored on published fact rather than on a forecast. Whichever source publishes more of those looks better than it forecasts._
-
-The wider but blunter sample, kept because it reaches back to before the match pages were collected:
-
-Graded on **appearances**, not starts: a 20-minute substitute counts. That flatters both sources by the same amount, so the comparison holds even though the level does not. Only claims logged before the interval opened are scored.
-
-| Source | Calls | Mean claim | Appeared | Brier |
-|---|--:|--:|--:|--:|
+| analitica — named, no number | 31 | — | 100% | — |
+| **appearances** — the wider, blunter sample; a 20-minute substitute counts | | | | |
 | analitica | 239 | 86% | 17% | 0.665 |
 | futbolfantasy ←read | 856 | 40% | 7% | 0.261 |
-Calls published with no number on them, which can only be graded as a hit rate:
+| analitica — named, no number | 39 | — | 0% | — |
 
-- **analitica** — 39 named starters, 0% appeared
+| Not graded | Calls |
+|---|--:|
+| within 10 points of 50%, on starts | 49 |
+| within 10 points of 50%, on appearances | 220 |
 
-_220 claim(s) sat within 10 points of 50% and are not graded: that is not a call either way._
-
-**The gate.** Once a source has a few hundred graded calls, whichever has the lower Brier **on the starts table above** earns `LINEUP_SOURCE` in ffcore/tidy.py — a one-line change, and the only thing that should ever move it. Appearances break a tie, never the other way round: they are the question nobody asked. Until then nothing is blended, because a weight fitted on one jornada is a guess wearing a decimal point.
+_Brier: mean squared error of the probability, 0 perfect and 0.25 a coin flip. Claims are scored as last published before the round's first kickoff. Lower Brier **on starts** earns `LINEUP_SOURCE` in ffcore/tidy.py; appearances break ties only._

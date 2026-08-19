@@ -36,32 +36,58 @@ _Swaps are same-position only: a cross-slot difference is a change of formation,
 
 ## 2. What to bid
 
-**12 on offer.**
-
-| Player | Pos | Bid | XI | Competition | Note |
+| Player — 12 on offer | Pos | Bid | XI | Competition | Note |
 |---|---|--:|--:|---|---|
-| Trent Alexander-Arnold | def | — | 50%/— | (2 broke) |  |
-| Peter Gulacsi | por | — | 40%/— | none |  |
 | Abiel Osorio | del | — | 0%/— | none |  |
-| Iago Aspas | del | — | 40%/— | none |  |
-| Joan Garcia | por | — | 80%/100% | (4 broke) |  |
-| Iñigo Perez | ent | — | !15%/— | none |  |
-| Javi Puado | med | — | 0%/— | none |  |
-| Peque | del | — | 50%/— | none |  |
 | Mario Soriano | med | — | 80%/100% | (4 broke) |  |
+| Javi Puado | med | — | 0%/— | none |  |
 | Matias Vecino | med | — | 20%/— | none |  |
-| Manel Usedo | med | — | !15%/— | none |  |
+| Iago Aspas | del | — | 40%/— | none |  |
+| Peque | del | — | 50%/— | none |  |
+| Joan Garcia | por | — | 80%/100% | (4 broke) |  |
 | Nico Guillen | med | — | 50%/— | (3 broke) |  |
+| Iñigo Perez | ent | — | !15%/— | none |  |
+| Peter Gulacsi | por | — | 40%/— | none |  |
+| Manel Usedo | med | — | !15%/— | none |  |
+| Trent Alexander-Arnold | def | — | 50%/— | (2 broke) |  |
 
-**Bid** is what it costs to win him, and nothing here says whether he is worth winning — that is the one table in [REPORT.md](REPORT.md), which prices him at a clause because a clause cannot be refused. A purchase is closer to a loan than a spend: the value comes back when you sell, give or take 12%, which on a large player is bigger than the premium and the drift put together. That swing is a coin flip, so a bid within a few percent is not a decision.
+| Column | What it is |
+|---|---|
+| Bid | what it costs to win him — never whether he is worth winning, which is the one table in [REPORT.md](REPORT.md). A purchase is closer to a loan than a spend: the value comes back on sale, give or take 12%, so a bid within a few percent is not a decision |
+| Bid, how it is priced | the floor plus what this league has actually paid over it: median +1.4%, -0.3% to +635.3% (n=32). 14 of those 32 went at the floor itself, so the minimum is not a number known to lose. The range is what has happened, not a chance of winning — and every one of them is a bid that won |
+| XI | FF's probable-eleven percentage — the one the forecast uses — then AF's read of the same eleven. Printed, never blended: two sources that disagree is the signal, and the reason to open the app before bidding |
+| XI, the marks | **FF** is futbolfantasy's probable-XI percentage, which is the one the forecast uses. **AF** is analiticafantasy's read of the same eleven, printed beside it and never blended in — `titular` is a named starter (a final call, with no number to it), a percentage is their editors' consensus, `?` means they list him without either, and `—` means they do not have him. Two columns that disagree are the signal; that is the whole point of carrying both. |
+| Competition | demand, not roster counts: the rivals whose XI actually improves with him, strongest threat first. `?` cash unknown (treat as live), `(n broke)` want him but cannot pay the floor. Manager by manager in `reports/rivals.md` |
 
-**XI** is FF's probable-eleven percentage, which is the one the forecast uses, and AF's read of the same eleven beside it — printed, never blended. Two sources that disagree is the signal, and it is the reason to open the app before bidding. **FF** is futbolfantasy's probable-XI percentage, which is the one the forecast uses. **AF** is analiticafantasy's read of the same eleven, printed beside it and never blended in — `titular` is a named starter (a final call, with no number to it), a percentage is their editors' consensus, `?` means they list him without either, and `—` means they do not have him. Two columns that disagree are the signal; that is the whole point of carrying both.
-
-Competition is demand, not roster counts: the rivals whose XI actually improves with him, strongest threat first — `?` cash unknown (treat as live), `(n broke)` want him but cannot pay the floor. The full manager-by-manager matrix is in `reports/rivals.md`.
-
-Bid is the floor plus what this league has actually paid over it: median +1.4%, -0.3% to +635.3% (n=32). 14 of those 32 went at the floor itself, so the minimum is not a number known to lose. A dozen deals is not a distribution — the range is what has happened, not a chance of winning, and every one of them is a bid that won.
-
-Already owned, so not a purchase: abde ezzalzouli (Albert Laporta), aitor paredes (BurtonGM89), antonio blanco (BurtonGM89), arda guler (Albert Laporta), ayoze perez (Albert Laporta), beñat turrientes (you), carlos espi (SusoGattuso), carlos puga (BurtonGM89), cesar tarrega (SusoGattuso), dani lorenzo (you), dean huijsen (BurtonGM89), denis suarez (BurtonGM89), ferran jutgla (Albert Laporta), ilaix moriba (Albert Laporta), isi palazon (SusoGattuso), izan merino (SusoGattuso), johnny cardoso (SusoGattuso), juan foyth (Albert Laporta), karl etta eyong (BurtonGM89), leandro cabrera (Albert Laporta), marc roca (Albert Laporta), mario martin (SusoGattuso), matias dituro (Albert Laporta), omar el hilali (you), quilindschy hartman (BurtonGM89), santiago mouriño (Albert Laporta), yuri berchiche (SusoGattuso).
+| Already owned, so not a purchase | Held by |
+|---|---|
+| abde ezzalzouli | Albert Laporta |
+| aitor paredes | BurtonGM89 |
+| antonio blanco | BurtonGM89 |
+| arda guler | Albert Laporta |
+| ayoze perez | Albert Laporta |
+| beñat turrientes | you |
+| carlos espi | SusoGattuso |
+| carlos puga | BurtonGM89 |
+| cesar tarrega | SusoGattuso |
+| dani lorenzo | you |
+| dean huijsen | BurtonGM89 |
+| denis suarez | BurtonGM89 |
+| ferran jutgla | Albert Laporta |
+| ilaix moriba | Albert Laporta |
+| isi palazon | SusoGattuso |
+| izan merino | SusoGattuso |
+| johnny cardoso | SusoGattuso |
+| juan foyth | Albert Laporta |
+| karl etta eyong | BurtonGM89 |
+| leandro cabrera | Albert Laporta |
+| marc roca | Albert Laporta |
+| mario martin | SusoGattuso |
+| matias dituro | Albert Laporta |
+| omar el hilali | you |
+| quilindschy hartman | BurtonGM89 |
+| santiago mouriño | Albert Laporta |
+| yuri berchiche | SusoGattuso |
 
 ## On offer but unpriced
 
@@ -71,21 +97,19 @@ The app is offering these and no market row matches the name, so they carry no r
 
 ## 3. Exceptions
 
-_The two ways every number above can be wrong about a player: he is not fit, or the two probable-XI sources do not agree that he plays. Neither prices anything, so neither is a decision — both are prompts to open the app._
-
 ### Fitness
 
-**Nobody in your squad is flagged.** All 14 players with an entry on their team page read as available.
+| Fitness | Players |
+|---|---|
+| flagged | **0** of 14 |
+| listed, no flag | 14 — Beñat Turrientes, Carl Starfelt, Dani Lorenzo, Igor Zubeldia, Ionut Radu, Iñigo Ruiz de Galarreta, Iñigo Vicente, Jon Moncayola, Lucien Agoume, Marcos Alonso, Omar El Hilali, Pablo Fornals, Pepelu, Robin Le Normand |
+| no entry on their team page — unknown, not fit | 0 |
 
-_Listed with no flag (14): Beñat Turrientes, Carl Starfelt, Dani Lorenzo, Igor Zubeldia, Ionut Radu, Iñigo Ruiz de Galarreta, Iñigo Vicente, Jon Moncayola, Lucien Agoume, Marcos Alonso, Omar El Hilali, Pablo Fornals, Pepelu, Robin Le Normand._
-
-_Read from the 'Estado físico', 'Sancionados' and 'No disponibles' blocks of each team page. A knock the site still lists as available (`Tocado`) is folded into doubt._
+_Read from the 'Estado físico', 'Sancionados' and 'No disponibles' blocks of each team page; `Tocado` — a knock the site still lists as available — is folded into doubt. No entry is an absence of evidence, not evidence of fitness._
 
 ### Starting
 
-**The two sources disagree** — one of them has him in the eleven and the other does not. Neither has a track record here yet, so this is a prompt to open the app, not a verdict:
-
-| | Player | The split |
+| | Player | The two sources disagree |
 |---|---|---|
 | XI | Robin Le Normand | futbolfantasy 70%, analitica 50% |
 
@@ -116,8 +140,11 @@ _Compare squad value with the app; a mismatch means a name matched the wrong pla
 
 ## Notes
 
-_652 players tracked, 512 with a probable-XI reading._
+| | |
+|---|---|
+| Players tracked | 652, 512 with a probable-XI reading |
+| xPts/j | expected points per jornada = shrunk pts/match (K=8, 2025-26) × fixture × P(start), from `ffcore/score.py` — the same scorer rivals.py uses |
+| Zeroed | injured, suspended, unavailable; a doubt is halved |
+| Fixture term | ±12% across the opponents ranked by Club Elo rating, plus ±4% for home advantage — both widths guesses, unfitted, and small enough that a wrong one costs a fraction of a point |
 
-_xPts/j — expected points per jornada = shrunk pts/match (K=8, 2025-26) × fixture × P(start), from `ffcore/score.py` — the same scorer rivals.py uses. Injured, suspended and unavailable score zero; a doubt is halved. The fixture term is a ±12% band across the opponents ranked by Club Elo rating, plus ±4% for home advantage; both widths are guesses, unfitted because nothing has been played, and small enough that a wrong one costs a fraction of a point._
-
-_Generated 2026-08-19 08:56 UTC._
+_Generated 2026-08-19 09:06 UTC._

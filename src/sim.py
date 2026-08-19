@@ -622,26 +622,48 @@ def waiting(u, offers=None, rng=None) -> list[str]:
     routes = wait_routes(u, offers, rng)
     if len(routes) < 2:
         return []
-    out = ["| Route | What it offers | Season pts |", "|---|---|--:|"]
+    mkt = next((r for r in routes if r["route"] == "market"), None)
+    cl = next((r for r in routes if r["route"] == "clauses"), None)
+
+    # Season points, so the routes can be compared with the move table rather
+    # than sitting in their own unit. Waiting pays for the delay: a jornada of
+    # the best thing you can buy today is forgone before the better one
+    # arrives. These are estimates from a rate; the move table's are simulated.
+    out = ["| Route | What it offers | Season pts | Beats acting today |",
+           "|---|---|--:|--:|"]
     for r in routes:
         if r["route"] == "watch":
             continue
         name = ("**%s**" % r["label"] if r["route"] == "act" else r["label"])
-        out.append("| %s | %s | %+.0f |"
-                   % (name, r["what"], r.get("pts", 0.0)))
-    out += ["",
-            "_Season points, so this can be compared with the table below "
-            "rather than sitting in its own unit. Waiting pays for the delay: "
-            "a jornada of the best thing you can buy today is forgone before "
-            "the better one arrives. These are estimates from a rate; the "
-            "table's are simulated._"]
+        beats = r.get("beats_now")
+        out.append("| %s | %s | %+.0f | %s |"
+                   % (name, r["what"], r.get("pts", 0.0),
+                      "—" if beats is None else "%.0f%%" % (100 * beats)))
+    out.append("")
+
+    facts = []
+    if mkt:
+        facts += [
+            "| Unowned players who would improve your eleven | %d of %d |"
+            % (mkt["helpful"], mkt["pool"]),
+            "| Tenth percentile of a week's waiting | %+.2f |" % mkt["lo"],
+            "| Market model | %s |" % mkt["note"]]
+    if cl:
+        facts += [
+            "| Locked players who would improve your eleven | %d |"
+            % cl["helpful"],
+            "| Their clauses open | %s, in about %.0f days"
+            % (cl["opens"], cl["days"]) + " |"]
+    if facts:
+        out += ["| The workings | |", "|---|--:|"] + facts + [""]
+
+    # UNOWNED IS NOT AVAILABLE. The app deals about a dozen players a cycle
+    # out of five hundred and you cannot ask for one, so a man who is merely
+    # unowned is not a man you can go and buy. Leaving that implicit cost a
+    # sale once; the wait column is what says it.
     wat = next((r for r in routes if r["route"] == "watch"), None)
     if wat and wat.get("players"):
-        out += ["", "**Not for sale, and you cannot ask.** The app deals about "
-                "a dozen players a cycle out of five hundred, so a man you "
-                "want is not something you can go and buy — being unowned is "
-                "not being available:", "",
-                "| Player | Would add | Likely wait to be offered |",
+        out += ["| Nobody is offering | Would add | Likely wait |",
                 "|---|--:|--:|"]
         for pl in wat["players"]:
             out.append("| %s | %+.2f | %s |"
@@ -649,27 +671,6 @@ def waiting(u, offers=None, rng=None) -> list[str]:
                           "%.0f days" % pl["wait"] if pl["wait"]
                           else "essentially never"))
         out.append("")
-    mkt = next((r for r in routes if r["route"] == "market"), None)
-    if mkt:
-        out.append("_The free market is simulated rather than guessed at: %s. "
-                   "**%d of the %d unowned players** would improve your "
-                   "eleven, and a week of offers beats the best thing you can "
-                   "buy today **%.0f%% of the time** — even the tenth "
-                   "percentile of waiting (%+.2f) clears it. Spending now "
-                   "buys the worse of two options and gives up the choice._"
-                   % (mkt["note"], mkt["helpful"], mkt["pool"],
-                      100 * mkt["beats_now"], mkt["lo"]))
-    cl = next((r for r in routes if r["route"] == "clauses"), None)
-    if cl:
-        out.append("_**%d locked players would improve your eleven** and "
-                   "their clauses open on %s, in about %.0f days. Waiting "
-                   "scores ZERO in the table above — not because it is "
-                   "worthless but because nothing there can price a market it "
-                   "has not seen, so every move with a positive number beats "
-                   "it by construction. That is the bias to hold in mind when "
-                   "the ranking asks you to spend the balance; the **Left** "
-                   "column is what buys the choice._"
-                   % (cl["helpful"], cl["opens"], cl["days"]))
     return out + [""]
 
 
@@ -706,36 +707,35 @@ def caveats(u) -> list[str]:
     reason they are printed under the table rather than in a design document
     nobody opens on a phone.
     """
-    out = ["_" + u.forecaster.pool_note() + "._", "",
-           "_" + u.start_note.rstrip(".") + "._", ""]
+    out = ["| Not modelled | Which way it bends the answer |", "|---|---|"]
     for j, clubs in sorted(u.part_played.items()):
-        out.append("- **Jornada %d is half played.** %d clubs are done and "
-                   "their points are already in the `now` column, so the "
-                   "simulation only plays the rest of the round. It still "
-                   "re-picks an eleven that is in fact already locked."
-                   % (j, len(clubs)))
+        out.append("| Jornada %d is half played — %d clubs are done | their "
+                   "points are already in `now`, so only the rest of the "
+                   "round is simulated, and it still re-picks an eleven that "
+                   "is in fact already locked |" % (j, len(clubs)))
     if u.cash_note:
-        out.append("- **%s.** A clause runs a median 1.52x market value in "
-                   "this league and the app only ever pays the value back, so "
-                   "the premium is gone for good. It is charged against the "
-                   "move rather than ignored — but the price is measured off "
-                   "what more money would actually buy you today, and on most "
-                   "days that is very little." % u.cash_note)
+        out.append("| %s | a clause runs a median 1.52× market value here and "
+                   "the app pays back only the value, so the premium is gone "
+                   "for good. It is charged against the move, but priced off "
+                   "what more money would buy you today — most days, very "
+                   "little |" % u.cash_note)
     if u.unjoined:
-        out.append("- **Named by the app in a way nothing else matches:** "
-                   + ", ".join("`%s`" % n for n in u.unjoined)
-                   + " — missing from the simulation entirely.")
+        out.append("| Named by the app in a way nothing else matches: %s | "
+                   "missing from the simulation entirely |"
+                   % ", ".join("`%s`" % n for n in u.unjoined))
     out += [
-        "- **P(start) is today's, held flat over every remaining jornada.** "
-        "Nothing here knows who will be injured in March.",
-        "- **Rivals never transfer.** A steal that guts a squad assumes its "
-        "manager does not simply buy someone back.",
-        "- **Teammates score independently.** Two defenders of one club share "
-        "a clean sheet, so a concentrated squad really has more variance "
-        "than this shows.",
-        "- **Cash scores zero.** Nothing models the market next cycle, so "
+        "| P(start) is today's, held flat over every remaining jornada | "
+        "nothing here knows who will be injured in March |",
+        "| Rivals never transfer | a steal that guts a squad assumes its "
+        "manager does not simply buy someone back — flatters the steal |",
+        "| Teammates score independently | two defenders of one club share a "
+        "clean sheet, so a concentrated squad has more variance than this "
+        "shows |",
+        "| Cash scores zero | nothing models the market next cycle, so "
         "holding money looks worthless and a standalone sale can never look "
-        "good.",
+        "good |",
+        "| Shape prior | %s |" % u.forecaster.pool_note(),
+        "| P(start) fit | %s |" % u.start_note.rstrip("."),
         ""]
     return out
 

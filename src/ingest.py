@@ -67,7 +67,7 @@ from pathlib import Path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from ffcore.auth import API_BASE                    # noqa: E402
-from ffcore.tidy import ROOT, SEASON, TIDY          # noqa: E402
+from ffcore.tidy import ROOT, SEASON, TIDY, append_csv  # noqa: E402
 from sources import (API_LEAGUES_KEY, CAL_KEY, MATCH_KEY_RE,  # noqa: E402
                      league_sources, parse_points, played_sources, player_sources,
                      season_label, source_for, sources)
@@ -478,6 +478,7 @@ def fetch() -> Path:
     print(f"snapshot: {dest} ({dest.stat().st_size // 1024}KB) — "
           f"{len(store)} stored, {unchanged} unchanged, {skipped} not due"
           + (f", {rotted} ROTTED" if rotted else ""))
+    _log_feeds(stamp, timing, fails)
     if timing:
         slow = sorted(timing, reverse=True)[:5]
         print("  slowest: " + ", ".join(
@@ -489,6 +490,32 @@ def fetch() -> Path:
                                             for kv in fails.items()))
                  if fails else ""))
     return dest
+
+
+FEEDS = "feeds.csv"
+FEED_FIELDS = ["observed_at", "page", "status", "seconds"]
+
+
+def _log_feeds(stamp: str, timing: list, fails: dict) -> None:
+    """One row per request per sweep, appended.
+
+    A SOURCE THAT STOPS ANSWERING DOES NOT LOOK BROKEN ANYWHERE. Club Elo had
+    been timing out for two days and the fixture board carried on ranking
+    twenty clubs by a rating from before the jornada, because a failed fetch
+    leaves the last good rows in the tidy store and every reader downstream
+    treats them as today's. The warn line scrolls past in a journal nobody
+    reads.
+
+    This is the record that lets the appendix print how old each feed's last
+    answer is, which is the only form of that fact anyone will see.
+    """
+    if not timing:
+        return
+    TIDY.mkdir(parents=True, exist_ok=True)
+    append_csv(TIDY / FEEDS,
+               [{"observed_at": stamp, "page": k, "status": st,
+                 "seconds": "%.2f" % t} for t, k, st in timing],
+               FEED_FIELDS)
 
 
 # ---------------------------------------------------------------------------

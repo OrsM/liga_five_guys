@@ -431,17 +431,16 @@ def sec_slate(lg, by_key, cands, pool, slate, prem, cash_value,
     rows.sort(key=lambda r: (-r[2], -(r[1].low or 0)))
     covers = sum(1 for c, a, sb in rows if sb > 0 and a.low is not None)
 
-    out += ["## 2. What to bid", "",
-            "**%d on offer%s.**"
+    out += ["## 2. What to bid", ""]
+    head = ("| Player — %d on offer%s | Pos | Bid | XI | Competition | Note |"
             % (len(rows),
-               ", %d cover a position you cannot field without" % covers
-               if covers else ""), ""]
+               ", %d covering a position you cannot field without" % covers
+               if covers else ""))
     if not rows:
         out += ["_Every name you pasted is either already owned or missing "
                 "from the market data._", ""]
     else:
-        out += ["| Player | Pos | Bid | XI | Competition | Note |",
-                "|---|---|--:|--:|---|---|"]
+        out += [head, "|---|---|--:|--:|---|---|"]
         for cand, adv, short_by in rows:
             band = ("—" if adv.low is None
                     else eur(adv.low) if abs(adv.high - adv.low) < 1_000
@@ -461,39 +460,38 @@ def sec_slate(lg, by_key, cands, pool, slate, prem, cash_value,
                    demand_summary(cand, lg, snaps),
                    "cover — you are %d short at %s" % (short_by, cand["slot"])
                    if short_by > 0 else ""))
-        out += ["",
-                "**Bid** is what it costs to win him, and nothing here says "
-                "whether he is worth winning — that is the one table in "
-                "[REPORT.md](REPORT.md), which prices him at a clause because "
-                "a clause cannot be refused. A purchase is closer to a loan "
-                "than a spend: the value comes back when you sell, give or "
-                "take %s, which on a large player is bigger than the premium "
-                "and the drift put together. That swing is a coin flip, so a "
-                "bid within a few percent is not a decision."
+        # WHAT EACH COLUMN IS, as a table rather than four paragraphs of it.
+        # The prose said the same things and said them at length; a column
+        # legend is a lookup, and a lookup is a table.
+        out += ["", "| Column | What it is |", "|---|---|",
+                "| Bid | what it costs to win him — never whether he is worth "
+                "winning, which is the one table in [REPORT.md](REPORT.md). "
+                "A purchase is closer to a loan than a spend: the value comes "
+                "back on sale, give or take %s, so a bid within a few percent "
+                "is not a decision |"
                 % ("%.0f%%" % sell_prem.swing() if sell_prem
                    else "about a tenth"),
-                "",
-                "**XI** is FF's probable-eleven percentage, which is the one "
-                "the forecast uses, and AF's read of the same eleven beside "
-                "it — printed, never blended. Two sources that disagree is "
-                "the signal, and it is the reason to open the app before "
-                "bidding. " + LEGEND, "",
-                "Competition is demand, not roster counts: the rivals whose "
-                "XI actually improves with him, strongest threat first — "
-                "`?` cash unknown (treat as live), `(n broke)` want him but "
-                "cannot pay the floor. The full manager-by-manager matrix is "
-                "in `reports/rivals.md`.", "",
-                "Bid is the floor plus what this league has actually paid over "
-                "it: %s.%s A dozen deals is not a distribution — the range is "
-                "what has happened, not a chance of winning, and every one of "
-                "them is a bid that won."
+                "| Bid, how it is priced | the floor plus what this league "
+                "has actually paid over it: %s.%s The range is what has "
+                "happened, not a chance of winning — and every one of them "
+                "is a bid that won |"
                 % (prem.label() if prem else
                    "no priced purchase yet, so these are floors",
                    ("" if not prem else
                     " %d of those %d went at the floor itself, so the minimum "
                     "is not a number known to lose." % (prem.at_floor, prem.n)
                     if prem.at_floor else
-                    " None of those %d went at the floor." % prem.n)), ""]
+                    " None of those %d went at the floor." % prem.n)),
+                "| XI | FF's probable-eleven percentage — the one the "
+                "forecast uses — then AF's read of the same eleven. Printed, "
+                "never blended: two sources that disagree is the signal, and "
+                "the reason to open the app before bidding |",
+                "| XI, the marks | %s |" % LEGEND.replace("\n", " "),
+                "| Competition | demand, not roster counts: the rivals whose "
+                "XI actually improves with him, strongest threat first. `?` "
+                "cash unknown (treat as live), `(n broke)` want him but "
+                "cannot pay the floor. Manager by manager in "
+                "`reports/rivals.md` |", ""]
         # EVERY BID IS PRICED AS IF IT WERE THE ONLY ONE. Each row asks "is
         # this better than the going rate", and several rows can answer yes to
         # more money than you hold — the app settles them all at once, so the
@@ -516,10 +514,11 @@ def sec_slate(lg, by_key, cands, pool, slate, prem, cash_value,
                     "`inputs/cash.txt`._", ""]
 
     if owned:
-        out += ["Already owned, so not a purchase: %s." % ", ".join(
-            "%s (%s)" % (by_key.get(k, {}).get("name", k),
-                         "you" if h == lg.cfg.me else h)
-            for k, h in sorted(owned.items())), ""]
+        out += ["| Already owned, so not a purchase | Held by |", "|---|---|"]
+        out += ["| %s | %s |" % (by_key.get(k, {}).get("name", k),
+                                 "you" if h == lg.cfg.me else h)
+                for k, h in sorted(owned.items())]
+        out += [""]
 
     if unresolved:
         # There is no ambiguity list any more and no "placed by ownership"
@@ -802,11 +801,14 @@ def sec_fitness(players) -> list[str]:
     fit = [p for p in players
            if p["on_page"] and (not p["status"] or p["status"] == "ok")]
 
-    if flagged:
-        out += [f"**{len(flagged)} of {len(players)} flagged.**", ""]
-    else:
-        out += [f"**Nobody in your squad is flagged.** All {len(fit)} players "
-                "with an entry on their team page read as available.", ""]
+    out += ["| Fitness | Players |", "|---|---|",
+            "| flagged | **%d** of %d |" % (len(flagged), len(players)),
+            "| listed, no flag | %d%s |"
+            % (len(fit), (" — " + ", ".join(
+                p["name"] for p in sorted(fit, key=lambda x: x["name"])))
+               if fit else ""),
+            "| no entry on their team page — unknown, not fit | %d |"
+            % len(nodata), ""]
 
     # Rows for what is wrong or unknown; one line for what is fine. Every
     # player is still accounted for — the guarantee above is that silence and
@@ -824,19 +826,10 @@ def sec_fitness(players) -> list[str]:
             out.append(f"| {p['name']} | ⚪ no data | not listed on his team "
                        "page — unknown, not fit |")
         out.append("")
-    if fit:
-        out += [f"_Listed with no flag ({len(fit)}): "
-                + ", ".join(p["name"] for p in sorted(fit,
-                                                      key=lambda x: x["name"]))
-                + "._", ""]
-
-    if nodata:
-        out += [f"_{len(nodata)} player(s) have no entry on their team page. "
-                "That is an absence of evidence, not evidence of fitness — "
-                "check them in the app before the lock._", ""]
     out += ["_Read from the 'Estado físico', 'Sancionados' and 'No "
-            "disponibles' blocks of each team page. A knock the site still "
-            "lists as available (`Tocado`) is folded into doubt._", ""]
+            "disponibles' blocks of each team page; `Tocado` — a knock the "
+            "site still lists as available — is folded into doubt. No entry "
+            "is an absence of evidence, not evidence of fitness._", ""]
     return out
 
 
@@ -906,15 +899,15 @@ def sec_starting(marked, min_start, second=None,
                 f"{min_start:.0f}% or above on futbolfantasy, and "
                 f"analiticafantasy does not contradict any of them.", ""]
     if low:
-        out += [f"**{len(low)} of your marked XI are under {min_start:.0f}%:** "
-                + ", ".join(f"{p['name']} ({pct_cell(p)})" for p in low)
-                + ".", ""]
+        out += ["| Marked XI under %.0f%% | Reading |" % min_start,
+                "|---|--:|"]
+        out += ["| %s | %s |" % (p["name"], pct_cell(p)) for p in low]
+        out += [""]
     if split:
-        out += ["**The two sources disagree** — one of them has him in the "
-                "eleven and the other does not. Neither has a track record "
-                "here yet, so this is a prompt to open the app, not a verdict:",
-                ""]
-        out += ["| | Player | The split |", "|---|---|---|"]
+        # One source has him in the eleven and the other does not. Neither has
+        # a track record here yet, so this is a prompt to open the app, not a
+        # verdict — which is what "the split" as a column says.
+        out += ["| | Player | The two sources disagree |", "|---|---|---|"]
         for p, lab, why in split:
             out.append(f"| {lab} | {p['name']} | {why} |")
         out.append("")
@@ -1053,11 +1046,11 @@ def main() -> None:
              "the `seen` input to price it. Everyone unowned is ranked in "
              "`reports/watchlist.md`, and question 3 is what your cash is "
              "worth while you wait._", ""])
-    out += ["## 3. Exceptions", "",
-            "_The two ways every number above can be wrong about a player: he "
-            "is not fit, or the two probable-XI sources do not agree that he "
-            "plays. Neither prices anything, so neither is a decision — both "
-            "are prompts to open the app._", ""]
+    # The two ways every number above can be wrong about a player: he is not
+    # fit, or the two probable-XI sources disagree that he plays. Neither
+    # prices anything, so neither is a decision — both are prompts to open the
+    # app, and that is what the tables under here say without a preamble.
+    out += ["## 3. Exceptions", ""]
     out += sec_fitness(players)
     out += sec_starting(marked, min_start, second, unclear)
 
@@ -1128,20 +1121,21 @@ def main() -> None:
     out += [
         "## Notes",
         "",
-        f"_{len(market)} players tracked, {len(sc.start_pct)} with a "
-        "probable-XI reading._",
-        "",
-        f"_xPts/j — expected points per jornada = shrunk pts/match "
+        "| | |",
+        "|---|---|",
+        f"| Players tracked | {len(market)}, {len(sc.start_pct)} with a "
+        "probable-XI reading |",
+        "| xPts/j | expected points per jornada = shrunk pts/match "
         f"(K={shrink_k:.0f}"
         + (f", {hist_label}" if hist_label else ", **no points baseline**")
         + (f" + {cur_label}" if cur_label else "")
         + ") × fixture × P(start), from `ffcore/score.py` — the same scorer "
-          "rivals.py uses. Injured, suspended and unavailable score zero; a "
-          "doubt is halved. The fixture term is a ±%.0f%% band across the "
-          "opponents ranked by %s, plus ±%.0f%% for home advantage; both "
-          "widths are guesses, unfitted because nothing has been played, and "
-          "small enough that a wrong one costs a fraction of a point._"
-          % (FIX_BAND * 100, fix_basis_label(players), HOME_EDGE * 100),
+          "rivals.py uses |",
+        "| Zeroed | injured, suspended, unavailable; a doubt is halved |",
+        "| Fixture term | ±%.0f%% across the opponents ranked by %s, plus "
+        "±%.0f%% for home advantage — both widths guesses, unfitted, and "
+        "small enough that a wrong one costs a fraction of a point |"
+        % (FIX_BAND * 100, fix_basis_label(players), HOME_EDGE * 100),
         "",
         f"_Generated {now:%Y-%m-%d %H:%M} UTC._",
     ]
