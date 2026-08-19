@@ -428,7 +428,11 @@ def sec_slate(lg, by_key, cands, pool, slate, prem, cash_value,
     # Cover first — a body you cannot field an eleven without is not ranked
     # against anything, it is required — then dearest first, because the bid
     # is the decision here and the big ones are the ones to think about.
-    rows.sort(key=lambda r: (-r[2], -(r[1].low or 0)))
+    # Name last, so the order is TOTAL. Without it every row on an unpriced
+    # slate ties at (0, 0) and the table comes out in a different order on
+    # every run — stable sort, unstable input — which makes a diff between two
+    # reports unreadable and looks like the slate changed when it did not.
+    rows.sort(key=lambda r: (-r[2], -(r[1].low or 0), r[0]["name"]))
     covers = sum(1 for c, a, sb in rows if sb > 0 and a.low is not None)
 
     out += ["## 2. What to bid", ""]

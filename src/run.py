@@ -8,15 +8,15 @@ tidy store. Nothing here needs isolation from anything else; the stages
 already share a data directory, and running them in one process makes the
 work each of them does once get done once for all of them.
 
-WHAT IS SHARED, AND WHY THAT IS SAFE. Only pure memoisation: ffcore.text.norm
-(a function of a string), sources._css (a function of a selector), and the
-per-document parse caches, which are keyed on content. No stage caches a FILE
-across the run, which is what makes this sound: ledger rewrites
-inputs/transactions.csv and squads reads it back, points writes
-data/season/live and methodology reads that, and every one of those reads hits
-the disk exactly as it did when they were separate processes. If a read cache
-is ever added to ffcore.tidy, it must key on the file's mtime or this becomes
-a stale-data bug rather than a speed-up.
+WHAT IS SHARED, AND WHY THAT IS SAFE. Only memoisation, and every cache is
+keyed on the thing itself rather than on a name: ffcore.text.norm on the
+string, sources._css on the selector, the parse caches on document content,
+and ffcore.tidy.read_csv on the file's mtime and size — with every writer in
+that module dropping its own path as well. That last one is the load-bearing
+case, because ledger rewrites inputs/transactions.csv and squads reads it
+back, and points writes data/season/live for methodology to read. A read
+cache keyed on the path alone would turn this file from a speed-up into a
+stale-data bug.
 
 The stages are still runnable one at a time — `python src/sim.py` is
 unchanged, and that is how a failure gets bisected. This only takes the place

@@ -267,9 +267,30 @@ def _run_np(states: list, forecaster, trials: int, seed: int):
     # The eleven depends only on expectations, so it is picked once per state
     # per jornada — not once per state per jornada per pass through the draw.
     # Left inside the loop it was two and a half thousand shape searches.
-    xis = [{j: {m: best_xi(sq, forecaster.expected(j))
-                for m, sq in st.squads.items()}
-            for j in st.jornadas} for st in states]
+    #
+    # AND ONCE PER SQUAD, not once per state. The candidate options differ by
+    # one squad each: my own, or the one rival a steal takes a player from.
+    # The other four managers' elevens are the same search repeated for every
+    # option on the table — 15,519 shape searches for about 1,900 distinct
+    # questions. Keyed on the squad itself so a state that shares one gets the
+    # answer, which is exactly the condition under which the answer is shared.
+    exp_by_j = {}
+    xi_memo: dict = {}
+    xis = []
+    for st in states:
+        per_state = {}
+        for j in st.jornadas:
+            if j not in exp_by_j:
+                exp_by_j[j] = forecaster.expected(j)
+            row = {}
+            for m, sq in st.squads.items():
+                k = (j, tuple(sorted(sq.items())))
+                got = xi_memo.get(k)
+                if got is None:
+                    got = xi_memo[k] = best_xi(sq, exp_by_j[j])
+                row[m] = got
+            per_state[j] = row
+        xis.append(per_state)
 
     for j in states[0].jornadas:
         keys = order.get(j, [])

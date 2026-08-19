@@ -74,18 +74,50 @@ def input_path(name: str) -> Path:
     return p if p.exists() else Path(name)
 
 
+# One parse per file per process, keyed on what the file IS rather than on
+# what it is called.
+#
+# The chain runs in one interpreter now (src/run.py), and in that interpreter
+# market.csv was parsed sixteen times and lineups.csv eleven — 2.9 of ten
+# seconds spent turning the same 2.8 MB into the same 32,515 dicts, because
+# every stage that wants a player asks for the whole table.
+#
+# CALLERS GET THEIR OWN DICTS. Handing back the cached rows would be faster
+# again and would be a silent-corruption bug waiting for the first caller that
+# writes to a row: this file has sixty-one read sites and auditing them all is
+# exactly the kind of proof that goes stale the next time somebody adds one.
+# The copy costs a sixth of the parse, so safety here is nearly free.
+#
+# Invalidated two ways, deliberately overlapping: the key carries the file's
+# mtime and size, and every writer below drops its own path. The key alone
+# would be enough except in the case nobody thinks about — a rewrite inside
+# one clock tick that happens to land on the same length.
+_READ_CACHE: dict[str, tuple] = {}
+
+
+def _forget(path) -> None:
+    _READ_CACHE.pop(str(Path(path)), None)
+
+
 def read_csv(path) -> list[dict]:
     """Rows as dicts. Missing file is empty, not an error — a report that
     hasn't been fed yet should say so, not crash."""
     path = Path(path)
-    if not path.exists():
+    try:
+        st = path.stat()
+    except OSError:
         return []
-    with path.open(encoding="utf-8") as fh:
-        return list(csv.DictReader(fh))
+    hit = _READ_CACHE.get(str(path))
+    if hit is None or hit[0] != (st.st_mtime_ns, st.st_size):
+        with path.open(encoding="utf-8") as fh:
+            hit = ((st.st_mtime_ns, st.st_size), list(csv.DictReader(fh)))
+        _READ_CACHE[str(path)] = hit
+    return [dict(r) for r in hit[1]]
 
 
 def write_csv(path, rows, fieldnames=None) -> None:
     path = Path(path)
+    _forget(path)
     if not rows:
         return
     fieldnames = fieldnames or list(rows[0])
@@ -132,6 +164,7 @@ def append_csv(path, rows, fieldnames=None) -> None:
     whole reason they get written down as they are made.
     """
     path = Path(path)
+    _forget(path)
     if not rows:
         return
     fieldnames = fieldnames or list(rows[0])
@@ -557,7 +590,41 @@ class Market:
 # selftest — the pure parts only: no filesystem, no clock
 # ---------------------------------------------------------------------------
 
+def _selftest_cache() -> None:
+    """The read cache must be invisible: same rows, and never anyone else's.
+
+    Two guarantees, and the second is the one that would rot quietly. A caller
+    that writes to a row it was handed must not change what the next caller
+    reads — there are sixty-one read sites and any of them may start doing
+    that tomorrow.
+    """
+    import tempfile
+
+    with tempfile.TemporaryDirectory() as tmp:
+        p = Path(tmp) / "t.csv"
+        write_csv(p, [{"a": "1", "b": "x"}, {"a": "2", "b": "y"}])
+        first = read_csv(p)
+        assert [r["a"] for r in first] == ["1", "2"], first
+
+        # Mutating what you were handed changes nothing for anyone else.
+        first[0]["a"] = "999"
+        first.append({"a": "3", "b": "z"})
+        assert [r["a"] for r in read_csv(p)] == ["1", "2"], read_csv(p)
+
+        # A rewrite is seen, whatever the clock did.
+        write_csv(p, [{"a": "7", "b": "q"}])
+        assert [r["a"] for r in read_csv(p)] == ["7"], read_csv(p)
+
+        # ...and so is an append.
+        append_csv(p, [{"a": "8", "b": "r"}])
+        assert [r["a"] for r in read_csv(p)] == ["7", "8"], read_csv(p)
+
+        # A file that is not there is empty, not an error, cache or no cache.
+        assert read_csv(Path(tmp) / "nope.csv") == []
+
+
 def _selftest() -> None:
+    _selftest_cache()
     rows = [{"observed_at": "t1", "name": "A"}, {"observed_at": "t2",
             "name": "B"}, {"observed_at": "t2", "name": "C"}]
     assert [r["name"] for r in latest_only(rows)] == ["B", "C"]

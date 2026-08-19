@@ -39,16 +39,16 @@ _Swaps are same-position only: a cross-slot difference is a change of formation,
 | Player — 12 on offer | Pos | Bid | XI | Competition | Note |
 |---|---|--:|--:|---|---|
 | Abiel Osorio | del | — | 0%/— | none |  |
-| Mario Soriano | med | — | 80%/100% | (4 broke) |  |
-| Javi Puado | med | — | 0%/— | none |  |
-| Matias Vecino | med | — | 20%/— | none |  |
 | Iago Aspas | del | — | 40%/— | none |  |
-| Peque | del | — | 50%/— | none |  |
-| Joan Garcia | por | — | 80%/100% | (4 broke) |  |
-| Nico Guillen | med | — | 50%/— | (3 broke) |  |
 | Iñigo Perez | ent | — | !15%/— | none |  |
-| Peter Gulacsi | por | — | 40%/— | none |  |
+| Javi Puado | med | — | 0%/— | none |  |
+| Joan Garcia | por | — | 80%/100% | (4 broke) |  |
 | Manel Usedo | med | — | !15%/— | none |  |
+| Mario Soriano | med | — | 80%/100% | (4 broke) |  |
+| Matias Vecino | med | — | 20%/— | none |  |
+| Nico Guillen | med | — | 50%/— | (3 broke) |  |
+| Peque | del | — | 50%/— | none |  |
+| Peter Gulacsi | por | — | 40%/— | none |  |
 | Trent Alexander-Arnold | def | — | 50%/— | (2 broke) |  |
 
 | Column | What it is |
@@ -147,4 +147,4 @@ _Compare squad value with the app; a mismatch means a name matched the wrong pla
 | Zeroed | injured, suspended, unavailable; a doubt is halved |
 | Fixture term | ±12% across the opponents ranked by Club Elo rating, plus ±4% for home advantage — both widths guesses, unfitted, and small enough that a wrong one costs a fraction of a point |
 
-_Generated 2026-08-19 09:06 UTC._
+_Generated 2026-08-19 09:11 UTC._
