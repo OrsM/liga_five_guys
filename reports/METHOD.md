@@ -1,4 +1,4 @@
-# Liga Five Guys — how the numbers are made — 2026-08-19 09:12 UTC
+# Liga Five Guys — how the numbers are made — 2026-08-19 09:13 UTC
 
 
 
@@ -52,7 +52,7 @@
 | api_players | names for players nobody owns any more | LaLiga Fantasy API | 800 | 19 Aug 09:11 | ok |
 | api_teams | all five squads | LaLiga Fantasy API | 1,216 | 19 Aug 09:11 | ok |
 | clubs | the same, for clubs | src/crosswalk.py | 20 | — | rebuilt every run |
-| elo | team strength, which ranks the fixture term | api.clubelo.com | 80 | 17 Aug 23:45 | **33 hours stale**, the sweep is failing on it |
+| elo | team strength, which ranks the fixture term | api.clubelo.com | 80 | 17 Aug 23:45 | **33 hours stale** — failed the last sweep, 8.1s |
 | fixtures | who plays whom next, for the fixture term | analiticafantasy.com | 367 | 19 Aug 09:11 | ok |
 | lineups | probable XI percentages, both sources | analiticafantasy.com, futbolfantasy.com ×40 | 32,322 | 19 Aug 09:11 | ok |
 | market | price, value, position, fitness — every player in the game | futbolfantasy.com | 33,167 | 19 Aug 09:11 | ok |
@@ -211,4 +211,4 @@ _Both figures are editorial reads refreshed a few times a day, not live probabil
 | Zeroed | injured, suspended, unavailable; a doubt is halved |
 | Fixture term | ±12% across the opponents ranked by Club Elo rating, plus ±4% for home advantage — both widths guesses, unfitted, and small enough that a wrong one costs a fraction of a point |
 
-_Generated 2026-08-19 09:12 UTC._
+_Generated 2026-08-19 09:13 UTC._

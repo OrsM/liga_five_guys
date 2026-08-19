@@ -576,12 +576,32 @@ def _hosts() -> dict[str, tuple[str, str, int]]:
             for t, (h, c, k) in out.items()}
 
 
-def _feed_state() -> dict[str, tuple[str, str]]:
-    """{page: (last status, when)} from the sweep log, newest wins."""
-    out = {}
+def _feed_state() -> dict[str, str]:
+    """{page: what the sweep has been doing lately}, or {} before the first
+    sweep that logged anything.
+
+    Consecutive failures at the TAIL, and what they cost. A source that has
+    failed once is weather; one that has failed every sweep for a week is a
+    decision — either its url moved or it should be dropped — and the seconds
+    it burns while never answering is the number that decides which. Club Elo
+    was taking eight of a sweep's eleven seconds for a page that did not come.
+    """
+    runs: dict[str, list[dict]] = {}
     for r in read_csv(TIDY / "feeds.csv"):
         if r.get("page"):
-            out[r["page"]] = (r.get("status", ""), r.get("observed_at", ""))
+            runs.setdefault(r["page"], []).append(r)
+    out = {}
+    for page, rows in runs.items():
+        bad = []
+        for r in reversed(rows):
+            if r.get("status") != "FAILED":
+                break
+            bad.append(float(r.get("seconds") or 0))
+        if bad:
+            out[page] = ("failed the last sweep, %.1fs" % bad[0]
+                         if len(bad) == 1 else
+                         "failed the last %d sweeps, %.1fs each"
+                         % (len(bad), sum(bad) / len(bad)))
     return out
 
 
@@ -629,10 +649,9 @@ def feed_lines() -> list[str]:
         else:
             state = "**%s stale**" % (
                 "%.0f days" % days if days >= 2 else "%.0f hours" % (days * 24))
-            why = sorted({st for k, (st, _) in feeds.items()
-                          if k in pages and st == "FAILED"})
+            why = sorted({feeds[k] for k in pages if k in feeds})
             if why:
-                state += ", the sweep is failing on it"
+                state += " — " + "; ".join(why)
         rows.append("| %s | %s | %s | %s | %s | %s |" % (
             name, FILLS[name],
             host + (" ×%d" % len(pages) if len(pages) > 1 else ""),
