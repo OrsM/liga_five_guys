@@ -1,8 +1,8 @@
-# Squads — 2026-08-19 15:09 UTC
+# Squads — 2026-08-19 15:21 UTC
 
 | Manager | Players | Squad value | Spent | Raised | Cash |
 |---|--:|--:|--:|--:|--:|
-| **miguel_autentico** | 14 | 236.37M | 142.18M | 40.88M | -32K |
+| **miguel_autentico** | 14 | 236.37M | 142.18M | 40.88M | -31K |
 | Albert Laporta | 15 | 273.49M | 188.67M | 43.03M | ~-44.86M |
 | BurtonGM89 | 13 | 216.17M | 180.85M | 51.65M | ~-28.42M |
 | Magic Mike 333 | 16 | 238.19M | 121.23M | 19.14M | ~-1.31M |
@@ -13,7 +13,7 @@
 **FF** is futbolfantasy's probable-XI percentage, which is the one the forecast uses. **AF** is analiticafantasy's read of the same eleven, printed beside it and never blended in — `titular` is a named starter (a final call, with no number to it), a percentage is their editors' consensus, `?` means they list him without either, and `—` means they do not have him. Two columns that disagree are the signal; that is the whole point of carrying both.
 
 ## You (miguel_autentico)
-14 players · 236.37M total · 11 at 70%+ · cash -32K
+14 players · 236.37M total · 11 at 70%+ · cash -31K
 
 | Player | Team | Pos | Value | 24h | FF | AF |
 |---|---|--:|--:|--:|--:|--:|
