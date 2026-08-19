@@ -1,22 +1,23 @@
-# The workings — 2026-08-19T1823Z
+# The workings — 2026-08-19T1904Z
 
 _What the one table in [REPORT.md](REPORT.md) was built from: the eleven it assumes you field, what a man on today's slate should cost, and the two ways any of it can be wrong about a player._
 
 ## 1. Field these eleven
 
-**⚠ Not a legal eleven — 10 players, 4-4-1.** The app will fill the gaps for you, and not with your choice. Fix `inputs/lineup.txt`.
+**Your XI: 4-5-1 · index 46.5** (a ranking number, not a points forecast — only differences mean anything)
 
-| | Marked XI | vs | pts/m | Fix | FF | AF | xPts/j |
+| | Your XI | vs | pts/m | Fix | FF | AF | xPts/j |
 |---|---|---|--:|--:|--:|--:|--:|
 | POR | Ionut Radu | Valencia A | 6.6 | -8% | 90% | 100% | 6.0 |
 | DEF | Carl Starfelt | Valencia A | 5.1 | -8% | 60% | 100% | 4.3 |
-| DEF | Robin Le Normand | Malaga H | 4.4 | +15% | 70% | 50% | 3.1 |
-| DEF | Igor Zubeldia | Betis A | 3.7 | -11% | 60% | — | 2.3 |
+| DEF | Robin Le Normand | Villarreal H | 4.4 | -5% | 70% | 50% | 2.6 |
 | DEF | Omar El Hilali | Madrid H | 3.0 | -7% | 80% | — | 2.7 |
+| DEF | Marcos Alonso | Valencia A | 5.6 | -8% | 90% | 100% | 5.1 |
 | MED | Pepelu | Celta Vigo H | 4.3 | +1% | 70% | 75% | 3.5 |
 | MED | Iñigo Ruiz de Galarreta | Sevilla H | 4.5 | +7% | 70% | — | 4.4 |
 | MED | Jon Moncayola | Levante H | 4.3 | +13% | 90% | — | 4.7 |
 | MED | Lucien Agoume | Athletic A | 3.9 | -6% | 80% | 100% | 3.7 |
+| MED | Pablo Fornals | Sociedad H | 6.8 | -2% | 80% | 100% | 6.6 |
 | DEL | Iñigo Vicente | Getafe A | ~3.0 | = | 90% | 100% | 3.0 |
 | +POR | _Joan Garcia_ | Elche A | 8.1 | +3% | 90% | 100% | **+1.5** |
 
@@ -24,13 +25,7 @@ _**pts/m** is points per match, last season shrunk toward the average and blende
 
 _The `+SLOT` rows are today's slate: **xPts/j is the change to the whole eleven** if you sign him and re-pick the shape, not his own score, and it leaves the fixture OUT — you own a player for months, not for one round. `★` next to the opponent means this round's draw happens to be kind, `↓` that it is not; neither is in the number. What he would cost, and whether that is a good rate, is question 2._ _10 others on the slate would not improve this eleven, so they are priced there and not here._
 
-**The model's eleven is 9.3 better** (index 47.0, shape 4-5-1).
-
-| Bench this | For this | Worth |
-|---|---|--:|
-| Igor Zubeldia (2.3) | Marcos Alonso (5.1) | +2.7 |
-
-_Swaps are same-position only: a cross-slot difference is a change of formation, not a substitution. Your own marks are the row above — this table is advice._
+**Nothing to change.** The model's best legal XI is the same eleven (4-5-1, index 46.5).
 
 ## 2. What to bid
 
@@ -46,7 +41,7 @@ _Swaps are same-position only: a cross-slot difference is a change of formation,
 | Abiel Osorio | del | 1.34M–8.91M | 0%/— | none |  |
 | Manel Usedo | med | 755K–5.48M | !15%/— | none |  |
 | Joan Garcia | por | — | 90%/100% | (4 broke) |  |
-| Mario Soriano | med | — | 80%/100% | (4 broke) |  |
+| Mario Soriano | med | — | 80%/100% | (3 broke) |  |
 | Trent Alexander-Arnold | def | — | 50%/— | (2 broke) |  |
 
 | Column | What it is |
@@ -145,4 +140,4 @@ _Compare squad value with the app; a mismatch means a name matched the wrong pla
 | Zeroed | injured, suspended, unavailable; a doubt is halved |
 | Fixture term | ±12% across the opponents ranked by Club Elo rating, plus ±4% for home advantage — both widths guesses, unfitted, and small enough that a wrong one costs a fraction of a point |
 
-_Generated 2026-08-19 18:41 UTC._
+_Generated 2026-08-19 19:07 UTC._

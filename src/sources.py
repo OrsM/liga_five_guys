@@ -1235,6 +1235,23 @@ API_MARKET_URL = "{base}/v1/competition/1/league/{league}/market?x-lang=es"
 API_ACTIVITY_URL = ("{base}/v1/competition/1/leagues/{league}"
                     "/activity/{page}?x-lang=es")
 API_TEAMS_URL = "{base}/v1/competition/1/leagues/{league}/teams?x-lang=es"
+# THE ELEVEN YOU HAVE ACTUALLY FIELDED, which this repo believed the app did
+# not publish. It does, and the belief cost a whole hand-maintained file: a
+# checklist in inputs/lineup.txt that goes one short every time you sell
+# somebody out of your eleven, and a report that read the hole as a formation
+# change. Found 2026-08-19 by asking for it in the right shape — note it hangs
+# off /teams/{team}, NOT /leagues/{league}/teams/{team}, which is why ten
+# guesses under the league path all came back 404.
+API_LINEUP_URL = ("{base}/v1/competition/1/teams/{team}"
+                  "/lineup/week/{week}?x-lang=es")
+# THE LAST ROUND OF THE SEASON, and asking for it is deliberate. Any round
+# not yet played answers with the lineup standing NOW — verified 2026-08-19,
+# weeks 2, 5 and 38 returned byte-identical elevens and the same
+# teamSnapshotTookOn, while 39 is a 404. So asking for 38 needs no idea of
+# which round is current, and cannot quietly start reading a PAST lineup the
+# way a derived week can when a calendar page lags. On the final round it is
+# the current round, which is still the right answer.
+LINEUP_WEEK = 38
 
 # The feed's verbs, decoded 2026-08-18 by checking each against the squad it
 # should have produced: of five type-31 rows, four were still in the squad
@@ -1576,6 +1593,86 @@ def sign_api_teams(text: str) -> str | None:
                                      r["position"]) for r in table])
 
 
+# The app's own answer to "who am I playing", by slot. The keys are the app's
+# and the order inside each is the app's; `tacticalFormation` is [4, 5, 1].
+LINEUP_SLOTS = {"goalkeeper": "POR", "defender": "DEF",
+                "midfield": "MED", "striker": "DEL"}
+
+LINEUP_WEEK_RE = re.compile(r"api_lineup_(\d+)$")
+
+
+def parse_api_lineup(text: str, observed_at: str,
+                     key: str = "api_lineup_1") -> list[dict]:
+    """The eleven you are fielding this week, one row per man.
+
+    WHAT THIS REPLACES: `inputs/lineup.txt`, a checklist a human ticked. The
+    marks went stale the moment a fielded player was sold — squads.py drops
+    him and the file is left with ten — and the report then read ten men as a
+    formation and told somebody already playing 4-5-1 to change it.
+
+    `snapshot_at` is the app's own `teamSnapshotTookOn`: when the lineup was
+    last CHANGED, which is a different fact from when we asked, and the one
+    that says whether you have touched it since the last deal.
+
+    A future week answers with the lineup standing now, so asking for the
+    round being played and the round after it gives the same eleven. The week
+    is in the page key rather than the payload, which does not name it.
+    """
+    d = _j(text)
+    if not isinstance(d, dict):
+        return []
+    form = d.get("formation") or {}
+    tactical = form.get("tacticalFormation") or []
+    m = LINEUP_WEEK_RE.search(key or "")
+    rows = []
+    for slot, men in form.items():
+        if slot not in LINEUP_SLOTS or not isinstance(men, list):
+            continue
+        for p in men:
+            pm = (p or {}).get("playerMaster") or {}
+            if not pm.get("id"):
+                continue
+            rows.append({
+                "observed_at": observed_at,
+                "source": "laliga",
+                "week": m.group(1) if m else "",
+                "slot": LINEUP_SLOTS[slot],
+                "formation": "-".join(str(n) for n in tactical),
+                "player_id": str(pm.get("id")),
+                "player_name": str(pm.get("nickname") or ""),
+                "player_name_full": str(pm.get("name") or ""),
+                "position_id": str(pm.get("positionId") or ""),
+                "market_value": str(pm.get("marketValue") or ""),
+                # When YOU last moved it, not when we read it.
+                "snapshot_at": str(d.get("teamSnapshotTookOn") or ""),
+                "points": str(d.get("points") if d.get("points") is not None
+                              else ""),
+            })
+    return rows
+
+
+def sign_api_lineup(text: str) -> str | None:
+    """Who is on, in which slot. Points and market values move under a lineup
+    nobody has touched, and storing a copy for those would archive the same
+    eleven twice a day for a season."""
+    rows = parse_api_lineup(text, "")
+    return _digest(["%s:%s" % (r["slot"], r["player_id"]) for r in rows]
+                   + ["=%s" % (rows[0]["formation"] if rows else "")])
+
+
+def lineup_source(team_id: str, week: int) -> Source:
+    """The fielded-XI page for one team and one round.
+
+    EVERY RUN, like the squad it must agree with: the whole point of the
+    rerun button is picking up something you just changed, and a lineup you
+    edited on the phone two minutes ago is exactly that.
+    """
+    return Source("api_lineup_%d" % week, "api_lineup",
+                  API_LINEUP_URL.format(base="{base}", team=team_id,
+                                        week=week),
+                  parse_api_lineup, sign_api_lineup, auth=True)
+
+
 # One player, fetched once ever, purely to put a name to an id the activity
 # feed mentions. See the self-test for why nothing else can do it.
 API_PLAYER_URL = "{base}/v1/competition/1/player/{pid}?x-lang=es"
@@ -1659,6 +1756,9 @@ def api_source(key: str) -> Source | None:
     if key.startswith("api_activity_"):
         return Source(key, "api_activity", API_ACTIVITY_URL,
                       parse_api_activity, sign_api_activity, auth=True)
+    if key.startswith("api_lineup_"):
+        return Source(key, "api_lineup", API_LINEUP_URL,
+                      parse_api_lineup, sign_api_lineup, auth=True)
     if key in table:
         url, p, s = table[key]
         return Source(key, key, url, p, s,
@@ -1694,6 +1794,11 @@ def league_sources(leagues_json: str, observed_at: str = "") -> list[Source]:
         # short because the season is young. Both are swept so the ledger can
         # be rebuilt from scratch rather than appended to, which is what makes
         # a missed run harmless.
+        # The eleven you are actually fielding, from the same account. It
+        # hangs off the TEAM and not the league, which is why it was believed
+        # not to exist.
+        if r.get("team_id"):
+            out.append(lineup_source(r["team_id"], LINEUP_WEEK))
         for page in (0, 1):
             out.append(Source(
                 "api_activity_%d" % page, "api_activity",
@@ -2138,6 +2243,23 @@ def _match_html(home_xi: int = 11, away_xi: int = 11) -> str:
 _MATCH_FIXTURE = _match_html()
 
 
+LINEUP_FIXTURE = """
+{"formation": {"goalkeeper": [{"playerMaster": {"id": "1070",
+   "nickname": "Ionut Radu", "name": "Ionut Andrei Radu", "positionId": 1,
+   "marketValue": 4350000}}],
+  "defender": [{"playerMaster": {"id": "255", "nickname": "Starfelt",
+   "name": "Carl Starfelt", "positionId": 2, "marketValue": 9000000}}],
+  "midfield": [{"playerMaster": {"id": "2464", "nickname": "Pepelu",
+   "name": "Jos\u00e9 Luis Garc\u00eda Vay\u00e1", "positionId": 3,
+   "marketValue": 7669774}}],
+  "striker": [{"playerMaster": {"id": "3123", "nickname": "I\u00f1igo Vicente",
+   "name": "I\u00f1igo Vicente", "positionId": 4, "marketValue": 12000000}}],
+  "tacticalFormation": [4, 5, 1]},
+ "teamSnapshotTookOn": "2026-08-19T20:26:10+02:00", "points": 0,
+ "initialPoints": 0}
+"""
+
+
 def _selftest() -> None:
     # -- team page: the traps this parser exists to avoid -------------------
     rows = parse_team(_FIXTURE, "2026-01-01T0000Z", "team_test")
@@ -2546,7 +2668,11 @@ def _selftest() -> None:
     # Discovery: the league id comes off the account, never a config file.
     disc = league_sources(_API_LEAGUES_FIXTURE)
     assert [s.key for s in disc] == ["api_market", "api_teams",
+                                     "api_lineup_%d" % LINEUP_WEEK,
                                      "api_activity_0", "api_activity_1"], disc
+    # The lineup page hangs off the TEAM id, which the same payload states.
+    assert "/teams/38091967/lineup/" in next(
+        s.url for s in disc if s.table == "api_lineup")
     assert all(s.auth for s in disc), "every API entry needs the bearer"
     # The one source nothing depends on waits the least. A global timeout let
     # it hold 94% of the sweep for a page that never arrived.
@@ -2682,6 +2808,30 @@ def _selftest() -> None:
     assert source_for("match_22421-alaves-getafe").parse is parse_starters
 
     # -- the registry ------------------------------------------------------
+    # -- the eleven you are actually fielding -------------------------------
+    # THE FILE THIS REPLACES was ticked by hand and went one short every time
+    # a fielded player was sold. The app has published the answer all along,
+    # off /teams/{team} rather than /leagues/{league}/teams/{team}.
+    ln = parse_api_lineup(LINEUP_FIXTURE, "t1", "api_lineup_38")
+    assert len(ln) == 4, ln
+    assert [r["slot"] for r in ln] == ["POR", "DEF", "MED", "DEL"], ln
+    assert {r["formation"] for r in ln} == {"4-5-1"}
+    assert ln[0]["week"] == "38" and ln[0]["player_id"] == "1070"
+    # The nickname AND the birth name, because the crosswalk joins on both:
+    # twelve of 76 owned players resolve only on one of them.
+    assert ln[2]["player_name"] == "Pepelu"
+    assert ln[2]["player_name_full"].startswith("Jos")
+    # WHEN YOU LAST MOVED IT, which is not when we asked.
+    assert ln[0]["snapshot_at"].startswith("2026-08-19T20:26")
+    # A signature over who is on and where, so a run that only moved market
+    # values does not archive the same eleven again.
+    assert sign_api_lineup(LINEUP_FIXTURE) == sign_api_lineup(
+        LINEUP_FIXTURE.replace("4350000", "4360000"))
+    assert sign_api_lineup(LINEUP_FIXTURE) != sign_api_lineup(
+        LINEUP_FIXTURE.replace('"1070"', '"1071"'))
+    assert parse_api_lineup("not json", "t1") == []
+    assert source_for("api_lineup_38").table == "api_lineup"
+
     reg = sources()
     # 6 standalone pages: market, points, af_fixtures, elo, the calendar, and
     # the API's discovery page. The three API entries it reveals are not here

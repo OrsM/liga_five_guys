@@ -524,6 +524,8 @@ FILLS = {
     "api_leagues": "your cash and the league's id",
     "api_market": "what is on offer, and the bids on it",
     "api_teams": "all five squads",
+    "api_lineup": "the eleven you have actually fielded, and the formation "
+                  "the app says you are playing",
     "api_standings": "the league table — position, points, squad value, and "
                      "your balance",
     "api_activity": "every transfer, which is what the ledger replays — one row per deal, so the newest is the last deal and not the last sweep",
@@ -544,6 +546,7 @@ DERIVED = {"players", "clubs"}
 HOSTS = {"api_leagues": ("LaLiga Fantasy API", "every_run"),
          "api_market": ("LaLiga Fantasy API", "every_run"),
          "api_teams": ("LaLiga Fantasy API", "every_run"),
+         "api_lineup": ("LaLiga Fantasy API", "every_run"),
          "api_standings": ("LaLiga Fantasy API", "every_run"),
          "api_activity": ("LaLiga Fantasy API", "every_run"),
          "api_players": ("LaLiga Fantasy API", "once"),
@@ -650,6 +653,7 @@ def _age(stamp: str, now: dt.datetime) -> tuple[float | None, str]:
 # name statically. One payload can fill several tables: the squad call carries
 # the league table and every player's stat lines as well as the squads.
 API_PAGES = {"match": ("starters",),
+             "api_lineup": ("api_lineup",),
              "api_leagues": ("api_leagues",),
              "api_market": ("api_market",),
              "api_teams": ("api_teams", "api_standings", "api_stats"),

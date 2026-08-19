@@ -63,7 +63,7 @@ from ffcore.tidy import (Market, input_path, ledger_stamp,
 
 __all__ = ["MARKET", "Config", "load_config", "read_rosters", "identify",
            "read_api_balances", "owner_from_api", "api_key", "owner_drift",
-           "app_ids_known",
+           "app_ids_known", "app_fielded",
            "allowance",
            "replay", "Cash", "Manager", "League"]
 
@@ -401,6 +401,46 @@ def _priced_like(key: str, raw: str, market_value, index) -> bool:
     if not ours:
         return True
     return abs(theirs - ours) <= VALUE_TOLERANCE * ours
+
+
+def app_fielded(squad, names: dict, rows=None, ids=None) -> list[str]:
+    """The eleven the APP says you are fielding, as this repo's keys, or [].
+
+    THE APP PUBLISHES IT. /v1/competition/1/teams/{team}/lineup/week/{n}
+    returns the formation you have set — found 2026-08-19, after a season of
+    believing it did not exist because every guess had been made under the
+    LEAGUE path. What it replaces is inputs/lineup.txt, a checklist ticked by
+    hand that went one short whenever a fielded player was sold, and a report
+    that read the hole as a formation change.
+
+    ALL OR NOTHING. The result is about to be diffed against the best eleven,
+    and a man who fails to resolve does not go missing quietly: he drops out
+    of "what you are fielding" and comes back as "put him on" — advice to make
+    a change you have already made. One unresolved row and this returns [] so
+    the caller falls back to the marks instead.
+
+    The app's own player id is tried first because it is exact; the nickname
+    and the birth name are the fallbacks, which is the same pair of strings
+    every other API reader joins on.
+    """
+    from ffcore.tidy import load_api_lineup
+
+    rows = load_api_lineup() if rows is None else rows
+    ids = app_ids_known() if ids is None else ids
+    squad = set(squad)
+    by_name = {norm(names.get(k, k)): k for k in squad}
+    out = []
+    for r in rows or []:
+        key = ids.get((r.get("player_id") or "").strip())
+        if key is None:
+            for field in ("player_name", "player_name_full"):
+                key = by_name.get(norm(r.get(field) or ""))
+                if key:
+                    break
+        if not key or key not in squad:
+            return []
+        out.append(key)
+    return out
 
 
 def api_key(raw: str, handle: str, market, ledger_owner: dict | None = None,

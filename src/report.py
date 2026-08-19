@@ -119,6 +119,7 @@ from ffcore.second import (LEGEND, SECOND_SOURCE,  # noqa: E402
 from ffcore.score import (ABSENT_START, MAX_SLOT, NEUTRAL_START,  # noqa: E402
                           SLOT_LABEL, SLOT_MIN, build, formations,
                           pick_xi, squad_pool)
+from ffcore.league import app_fielded  # noqa: E402
 from ffcore.tidy import (DECISIONS, REPORTS,  # noqa: E402
                          age_phrase, append_csv, input_path, latest_only,
                          load_deadline, load_market, load_lineups, read_csv,
@@ -301,32 +302,46 @@ def fix_basis_label(players) -> str:
 
 
 def as_fielded(players):
-    """(total, xi, bench, illegal, warnings) for the XI you have MARKED.
+    """(total, xi, bench, illegal, warnings) for the XI YOU ARE FIELDING.
 
-    Reads inputs/lineup.txt — the checklist squads.py regenerates — so the
-    report can say what your actual eleven is worth, not only what the best
-    one would be. Returns None when there is no checklist to read: the
-    comparison is skipped, never faked from the recommendation.
+    THE APP FIRST, the checklist second. inputs/lineup.txt is a file you tick
+    by hand and it goes one short every time a fielded player is sold, which
+    is how this section came to print "not a legal eleven, 4-4-1" about a team
+    playing a perfectly legal 4-5-1. The app publishes the real answer, and
+    both reports have to read the same one or they contradict each other:
+    src/sim.py prints the change list off exactly this source.
 
-    `illegal` is the shape when the marks do not make a legal eleven, which
-    is worth flagging louder than a suboptimal one — the app will fill the
-    gap for you, and not with your choice.
+    Returns None when neither can say: the comparison is skipped, never faked
+    from the recommendation.
+
+    `illegal` is the shape when the eleven is not a legal one. Off the app
+    that should never happen; off the marks it happens whenever you have not
+    re-ticked, and it is worth flagging loudly — the app fills the gap for
+    you, and not with your choice.
     """
     from ffcore.text import norm
     from xi import bench_from_checklist, read_checklist
 
-    path = input_path("lineup.txt")
-    if not path.exists():
-        return None
-    entries = read_checklist(path.read_text(encoding="utf-8"))
-    if not entries:
-        return None
+    by_key = {p.get("key"): p for p in players if p.get("key")}
+    on = app_fielded(list(by_key), {k: p["name"] for k, p in by_key.items()})
+    if on:
+        fielded = {norm(by_key[k]["name"]) for k in on}
+        xi = [p for p in players if norm(p["name"]) in fielded]
+        bench = [p for p in players if norm(p["name"]) not in fielded]
+        warnings = []
+    else:
+        path = input_path("lineup.txt")
+        if not path.exists():
+            return None
+        entries = read_checklist(path.read_text(encoding="utf-8"))
+        if not entries:
+            return None
 
-    names = [p["name"] for p in players]
-    bench_keys, warnings = bench_from_checklist(names, entries)
-    benched = {norm(b) for b in bench_keys}
-    xi = [p for p in players if norm(p["name"]) not in benched]
-    bench = [p for p in players if norm(p["name"]) in benched]
+        names = [p["name"] for p in players]
+        bench_keys, warnings = bench_from_checklist(names, entries)
+        benched = {norm(b) for b in bench_keys}
+        xi = [p for p in players if norm(p["name"]) not in benched]
+        bench = [p for p in players if norm(p["name"]) in benched]
 
     counts = Counter(p["slot"] for p in xi if p["slot"])
     shape = (counts.get("DEF", 0), counts.get("MED", 0), counts.get("DEL", 0))
@@ -723,7 +738,7 @@ def sec_eleven(marked, best, players, second=None, buys=None) -> list[str]:
     # the two start columns, and that is exactly where it would hide a
     # disagreement worth seeing. State has moved to question 2.
     cells = second or {}
-    out += ["| | Marked XI | vs | pts/m | Fix | FF | AF | xPts/j |",
+    out += ["| | Your XI | vs | pts/m | Fix | FF | AF | xPts/j |",
             "|---|---|---|--:|--:|--:|--:|--:|"]
     for slot in ("POR", "DEF", "MED", "DEL"):
         for p in [x for x in mxi if x["slot"] == slot]:
@@ -924,7 +939,7 @@ def sec_starting(marked, min_start, second=None,
                 f"{min_start:.0f}% or above on futbolfantasy, and "
                 f"analiticafantasy does not contradict any of them.", ""]
     if low:
-        out += ["| Marked XI under %.0f%% | Reading |" % min_start,
+        out += ["| Your XI under %.0f%% | Reading |" % min_start,
                 "|---|--:|"]
         out += ["| %s | %s |" % (p["name"], pct_cell(p)) for p in low]
         out += [""]

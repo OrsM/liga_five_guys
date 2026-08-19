@@ -45,7 +45,8 @@ __all__ = ["ROOT", "TIDY", "SEASON", "DECISIONS", "REPORTS", "MADRID",
            "pick_source", "load_fixtures", "next_kickoff", "kickoff_stamp",
            "load_elo", "fresh_only", "DAILY_FRESH_DAYS",
            "EVERY_RUN_FRESH_DAYS", "load_api_stats", "stale_feeds",
-           "GATED_API", "age_phrase", "last_api_standings"]
+           "GATED_API", "age_phrase", "last_api_standings",
+           "load_api_lineup"]
 
 ROOT = Path(os.environ.get("FF_ROOT", "./data"))
 TIDY = ROOT / "tidy"
@@ -381,7 +382,8 @@ def load_elo(now=None) -> list[dict]:
 # The API tables that are a SNAPSHOT of now, and so are gated above. Listed
 # once, because both the refusal and the sentence that explains it have to be
 # about the same set of feeds.
-GATED_API = ("api_teams", "api_market", "api_standings")
+GATED_API = ("api_teams", "api_market", "api_standings",
+             "api_lineup")
 
 
 def age_phrase(days: float) -> str:
@@ -520,6 +522,22 @@ def last_api_standings() -> list[dict]:
     answer than the stale one it replaced.
     """
     return latest_only(read_csv(TIDY / "api_standings.csv"))
+
+
+def load_api_lineup(now=None) -> list[dict]:
+    """The eleven you have fielded, as the app holds it, or [].
+
+    ONE ROW PER MAN, with the slot he is in and the formation the app itself
+    states. Gated on freshness like the other snapshots: a lineup from three
+    days ago is a lineup for a round already played, and reading it as
+    "what you are fielding" is how a change list would tell you to take off a
+    man you have already taken off.
+
+    [] means the API has not answered recently — the caller falls back to the
+    marks in inputs/lineup.txt, which is where this fact used to live.
+    """
+    return fresh_only(latest_only(read_csv(TIDY / "api_lineup.csv")),
+                      EVERY_RUN_FRESH_DAYS, now)
 
 
 def load_api_stats() -> list[dict]:
@@ -887,7 +905,7 @@ def _selftest() -> None:
     assert last_api_standings() != [] or read_csv(TIDY / "api_standings.csv") == []
 
     quiet = stale_feeds(now=stale)
-    assert set(quiet) == {"api_teams", "api_market", "api_standings"}, quiet
+    assert set(quiet) == set(GATED_API), quiet
     assert min(quiet.values()) > 365 * 70
     # A table nothing has ever written is not "stale" — it never answered,
     # and the caller that degrades to the ledger says so differently.

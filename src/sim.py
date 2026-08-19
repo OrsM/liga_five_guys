@@ -43,6 +43,7 @@ from pathlib import Path  # noqa: E402
 
 from decide import dead_weight  # noqa: E402,F401
 from ffcore.parse import fmt_money  # noqa: E402
+from ffcore.league import app_fielded  # noqa: E402
 from ffcore.render import title_name  # noqa: E402
 from ffcore.tidy import (REPORTS, age_phrase, stale_feeds,  # noqa: E402
                          write_lines)
@@ -82,17 +83,28 @@ def squad_value(u) -> float:
     return sum(u.proceeds.values())
 
 
-def fielded_keys() -> list[str]:
-    """The men you have marked, as of the last log — [] if nothing is logged.
+def fielded_keys(u=None) -> list[str]:
+    """The eleven you are actually fielding, from the app if it will say.
 
-    xi.py writes the marks with the hours left on every run, so the newest row
-    is the eleven standing now. This is the ONLY thing that knows what you are
-    currently fielding: the app publishes squads, prices, balances and bids,
-    but not a fielded flag — checked again on 2026-08-19 against the squad
-    payload and ten guessed lineup endpoints, all 404.
+    THE APP KNOWS. /v1/competition/1/teams/{team}/lineup/week/{n} returns the
+    formation you have set, and this repo spent a season believing no such
+    thing was published because every guess was made under the LEAGUE path.
+    That belief cost inputs/lineup.txt: a checklist ticked by hand, which went
+    one short whenever a fielded player was sold — and the report then read
+    the hole as a formation change and told somebody already playing 4-5-1 to
+    switch.
+
+    Falls back to the marks when the API has not answered. The reading is
+    gated on freshness, so a lineup from a round already played counts as no
+    answer at all.
     """
+    from ffcore.league import app_fielded
     from ffcore.tidy import DECISIONS, read_csv
 
+    if u is not None:
+        keys = app_fielded(u.state.squads.get(u.me, {}), u.name)
+        if keys:
+            return keys
     rows = [r for r in read_csv(DECISIONS / "xi_fielded.csv") if r.get("xi")]
     if not rows:
         return []
@@ -110,7 +122,7 @@ def xi_note(u) -> str:
     from ffcore.season import best_xi
 
     exp = u.forecaster.expected(decide_choosable(u))
-    chg = xi_change(fielded_keys(),
+    chg = xi_change(fielded_keys(u),
                     best_xi(u.state.squads.get(u.me, {}), exp))
     if not chg["legal"]:
         return ("%d marks, not an eleven — tick the missing man in "
@@ -157,7 +169,7 @@ def fielded_shape(u) -> str:
 
     exp = u.forecaster.expected(decide_choosable(u))
     best = best_xi(u.state.squads.get(u.me, {}), exp)
-    keys = fielded_keys()
+    keys = fielded_keys(u)
     return shape(u, keys) if xi_change(keys, best)["legal"] else ""
 
 
@@ -268,7 +280,7 @@ def ladder_rows(u, rows, saves=None) -> list[dict]:
     # top of the ladder is the difference between it and the best one — two
     # names and a direction — and the whole sheet is printed only when the
     # marks cannot be trusted to diff against.
-    chg = xi_change(fielded_keys(), xi)
+    chg = xi_change(fielded_keys(u), xi)
     if chg["legal"]:
         for k in by_slot(u, chg["in"]):
             out.append(cell(k, "in", "bench", None, None))
@@ -374,7 +386,7 @@ def ladder(u, rows, base, saves=None) -> list[str]:
     out = ["| Player | Pos | Start | xPts/j | Where | € | Season |",
            "|---|---|--:|--:|---|--:|--:|"]
 
-    chg = xi_change(fielded_keys(), xi)
+    chg = xi_change(fielded_keys(u), xi)
     if not chg["legal"]:
         # No trustworthy marks to diff against, so the whole sheet — and a
         # line saying why you are being asked to read one.
@@ -1133,6 +1145,29 @@ def _selftest() -> None:
                  forecaster=Bootstrap({}, pool=[1, 2, 3]), pos={}, price={},
                  proceeds={}, owner={}, cash=23.6e6, me="me",
                  name={"yuri": "yuri berchiche", "benat": "benat turrientes"})
+
+    # -- the eleven comes from the APP, not from a checklist ----------------
+    # inputs/lineup.txt was ticked by hand and went one short every time a
+    # fielded player was sold. The app publishes the answer — /teams/{team}/
+    # lineup/week/{n} — so the marks are the fallback now, not the source.
+    rows = [{"player_id": "1070", "player_name": "Ionut Radu",
+             "player_name_full": "Ionut Andrei Radu"},
+            {"player_id": "2464", "player_name": "Pepelu",
+             "player_name_full": "José Luis García Vayá"}]
+    squad = {"ionut radu": 1, "pepelu": 1}
+    assert app_fielded(squad, {"pepelu": "Pepelu"}, rows,
+                       {"1070": "ionut radu"}) == ["ionut radu", "pepelu"]
+    # ALL OR NOTHING. A lineup with one man unresolved is not a lineup you can
+    # diff against — it would read as "take him off", which is the one wrong
+    # answer this whole change exists to stop giving.
+    # A man neither the id map nor the names can place: no diff to take.
+    assert app_fielded(squad, {}, rows + [{"player_id": "999",
+                                           "player_name": "Nobody"}], {}) == []
+    # A man the app fields who is not in the squad we hold means the two
+    # readings disagree, and a diff across them is meaningless.
+    assert app_fielded(squad, {}, rows,
+                       {"1070": "ionut radu", "2464": "someone else"}) == []
+    assert app_fielded({}, {}, [], {}) == []
 
     # -- what to CHANGE about the eleven, not what the eleven is ------------
     # THE SCREENSHOT THAT PROMPTED THIS: the report listed all eleven men and

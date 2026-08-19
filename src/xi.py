@@ -48,7 +48,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from ffcore.league import League  # noqa: E402
+from ffcore.league import League, app_fielded  # noqa: E402
 from ffcore.text import norm  # noqa: E402
 from ffcore.tidy import (DECISIONS, append_csv, input_path,  # noqa: E402
                          load_deadline, read_csv, write_csv)
@@ -177,14 +177,23 @@ def migrate(path, fields) -> None:
     print("migrated %s to %d columns" % (path, len(fields)))
 
 
-def read_input(squad):
-    """(bench_names, warnings, source) — from the checklist, and only it.
+def read_input(squad, names=None):
+    """(bench_names, warnings, source) — the app first, the checklist second.
+
+    THIS LOG IS THE HISTORICAL RECORD of what was actually fielded, which is
+    what a P(start) grade will be judged against one day. Logging the marks
+    made it a record of what somebody had remembered to tick: sell a man out
+    of your eleven and squads.py drops him, leaving ten — and the log then
+    says you fielded ten.
 
     inputs/bench.txt used to be a fallback here. It was a second hand-typed
     answer to a question the checklist already answers from the ledger, and
     once both existed they could disagree — silently, because whichever one
-    was read first won. There is one file now.
+    was read first won. There is one file now, and the app above it.
     """
+    on = app_fielded(squad, names or {})
+    if on:
+        return [k for k in squad if k not in set(on)], [], "the app"
     chk = input_path("lineup.txt")
     if not chk.exists():
         return [], ["no inputs/lineup.txt — run squads.py to generate the "
@@ -207,6 +216,8 @@ def main() -> None:
     lg = League.load()
     squad = lg.squad(lg.cfg.me)
 
+    # No name map: a squad key IS the normalised name, which is what the
+    # app's nickname normalises to, so the fallback join needs nothing extra.
     bench_names, warnings, source = read_input(squad)
     xi, benched, more = pick_xi(squad, bench_names)
     warnings += more
