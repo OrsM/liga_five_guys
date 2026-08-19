@@ -520,6 +520,27 @@ def elo_basis() -> str:
         return ("summed squad value — Club Elo was scraped but did not cover "
                 "every club in the market, and half a league ranked by Elo is "
                 "not a ranking")
+    # HOW OLD IT IS, because a fetch that fails leaves the LAST reading in
+    # place and everything downstream carries on as though it were today's.
+    # Club Elo has been timing out since 2026-08-17 and nothing said so: the
+    # board was still ranked by Elo, just by an Elo from before the jornada.
+    # Ratings move only when matches are played, so a couple of days is
+    # harmless and a couple of weeks is not — either way it should be read
+    # off the file rather than assumed.
+    import datetime as dt
+    from ffcore.tidy import snapshot_stamp
+
+    seen = max((r.get("observed_at", "") for r in rows), default="")
+    when = snapshot_stamp(seen)
+    age = ((dt.datetime.now(dt.timezone.utc) - when).total_seconds() / 86400.0
+           if when else None)
+    if age is not None and age >= 1.0:
+        return ("**Club Elo rating, read %s** (%s) — the scrape has "
+                "not succeeded since, so the ranking is from before whatever "
+                "has been played in between. Ratings move only on results, so "
+                "this is harmless for days and not for weeks"
+                % ("yesterday" if age < 2 else "%.0f days ago" % age,
+                   when.strftime("%d %b")))
     return "**Club Elo rating**, a result-based rating with no transfer fees in it"
 
 

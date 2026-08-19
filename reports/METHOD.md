@@ -1,4 +1,4 @@
-# Liga Five Guys — how the numbers are made — 2026-08-19 00:30 UTC
+# Liga Five Guys — how the numbers are made — 2026-08-19 07:07 UTC
 
 Everything about HOW, so the report can be the numbers. The fits, the estimates, and every way each one is known to be wrong.
 
@@ -47,7 +47,7 @@ _P(start) fitted on 300 confirmed starts across 10 team sheets: futbolfantasy re
 |---|---|
 | Shrinkage | K = 8 matches, applied twice (last season toward the positional prior, then this season toward that) |
 | Fixture band | ±12%, plus 4% at home — a RANK, not a ratio |
-| Team strength | **Club Elo rating**, a result-based rating with no transfer fees in it |
+| Team strength | **Club Elo rating, read yesterday** (17 Aug) — the scrape has not succeeded since, so the ranking is from before whatever has been played in between. Ratings move only on results, so this is harmless for days and not for weeks |
 | P(start) read from | `futbolfantasy` |
 | Fixture applies to | fielding only — never to a buy, a sale, or the line |
 

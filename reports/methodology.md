@@ -8,7 +8,7 @@
 |---|---|
 | Shrinkage | K = 8 matches, applied twice (last season toward the positional prior, then this season toward that) |
 | Fixture band | ±12%, plus 4% at home — a RANK, not a ratio |
-| Team strength | **Club Elo rating**, a result-based rating with no transfer fees in it |
+| Team strength | **Club Elo rating, read yesterday** (17 Aug) — the scrape has not succeeded since, so the ranking is from before whatever has been played in between. Ratings move only on results, so this is harmless for days and not for weeks |
 | P(start) read from | `futbolfantasy` |
 | Fixture applies to | fielding only — never to a buy, a sale, or the line |
 
