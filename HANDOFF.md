@@ -121,9 +121,18 @@ tables. Two wrong numbers were found and fixed on the way.
    |---|---|---|
    | `rosters_initial.txt` | no change at all | squad 15 players → 5, 240.73M → 134.96M |
    | `cash.txt` | no change at all | 49K "known" → -518K "estimated", 0.57M and the label |
-   | `lineup.txt` | load-bearing always — nothing fetched publishes a fielded flag | — |
+   | `lineup.txt` | **superseded** — the app publishes the fielded XI after all | fallback only |
 
-   So nothing here is a candidate for deletion any more. What is left of the direction is
+   `lineup.txt` changed status the same evening. "Nothing we fetch publishes a
+   fielded flag" was wrong, and it was wrong because the guesses were made
+   under the LEAGUE path: `/v1/competition/1/teams/{team}/lineup/week/{n}`
+   returns the eleven, the formation and `teamSnapshotTookOn`. It is fetched
+   every run now and three readers share it. The file is the fallback for a
+   quiet API, and the next measurement to make is whether that fallback is
+   worth keeping at all — the same question, asked of the same file, with the
+   answer now pointing the other way.
+
+   So nothing here is a candidate for deletion on the ownership side. What is left of the direction is
    to keep asking what each one buys in units — `cash.txt`'s answer shrinks every time the
    app's own balance is fresh, and it is worth re-running that measurement if the anchor
    ever goes a week untouched.
@@ -158,6 +167,12 @@ Everything in the previous handoff still holds. New this session:
   away and simulated all five managers from nought — a wrong number where a slightly old
   one was available. `last_api_standings()` is the ungated reader for the history half.
 
+- **"THE APP DOES NOT PUBLISH IT" WAS A GUESS THAT BECAME A FACT BY REPETITION.**
+  It was in three docstrings and a handoff, and it was never true: the fielded
+  XI hangs off `/teams/{team}/lineup/week/{n}`, not off the league path every
+  guess had used. A whole hand-maintained file, and a class of wrong report,
+  existed because of it. When a source "must not have" something, spend ten
+  minutes probing before designing around the absence.
 - **A claim read off the code is not a finding.** I told Miguel `rosters_initial.txt`
   anchored every rival's cash; emptying it changed every balance by zero, because the
   method that would have used it had no callers. He called it out. Measure, then say.
