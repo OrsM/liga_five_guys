@@ -522,6 +522,8 @@ FILLS = {
     "api_leagues": "your cash and the league's id",
     "api_market": "what is on offer, and the bids on it",
     "api_teams": "all five squads",
+    "api_standings": "the league table — position, points, squad value, and "
+                     "your balance",
     "api_activity": "every transfer, which is what the ledger replays — one row per deal, so the newest is the last deal and not the last sweep",
     "api_players": "names for players nobody owns any more — one row per player, first sighting kept",
     "api_stats": "what the app scored each player, broken into what he did — "
@@ -540,6 +542,7 @@ DERIVED = {"players", "clubs"}
 HOSTS = {"api_leagues": ("LaLiga Fantasy API", "every_run"),
          "api_market": ("LaLiga Fantasy API", "every_run"),
          "api_teams": ("LaLiga Fantasy API", "every_run"),
+         "api_standings": ("LaLiga Fantasy API", "every_run"),
          "api_activity": ("LaLiga Fantasy API", "every_run"),
          "api_players": ("LaLiga Fantasy API", "once"),
          "api_stats": ("LaLiga Fantasy API", "every_run"),

@@ -1340,6 +1340,37 @@ def parse_api_teams(text: str, observed_at: str,
     rows = []
     for t in d:
         m = t.get("manager") or {}
+        # THE LEAGUE TABLE IS A FACT ABOUT A TEAM, and it used to ride on
+        # every player row: five managers' position, points and balance
+        # repeated 76 times a sweep, 27% of the bytes in the file. Wrong grain
+        # as much as wasteful — a season of standings was buried in a
+        # player-grain table and could not be read without deduplicating it.
+        # A team with no players is still a row here.
+        if t.get("id"):
+            rows.append({
+                "observed_at": observed_at, "source": LFG_SOURCE,
+                ROW_TABLE: "api_standings",
+                "team_id": str(t["id"]),
+                "user_id": str(m.get("id") or ""),
+                "manager": m.get("managerName") or "",
+                "position": str(t.get("position") or ""),
+                # HOW THE TABLE MOVED, which a snapshot of position cannot
+                # say on its own.
+                "previous_position": str(t.get("previousPosition") or ""),
+                "team_points": str(t.get("teamPoints") or ""),
+                "fixture_points": str(t.get("fixturePoints") or ""),
+                # The app's own valuation of the squad, against the one this
+                # repo sums out of market prices. Two answers to one question
+                # is a check, as long as nobody quietly averages them.
+                "team_value": str(t.get("teamValue") or ""),
+                # Empty for everyone but you: `teamMoney` is null for other
+                # accounts. Empty means NOT STATED, never zero — a zero reads
+                # as broke and wrongly zeroes every bid ceiling built on it.
+                "team_money": str(t.get("teamMoney") or ""),
+                "banned": "" if t.get("banned") is None
+                          else str(t["banned"]).lower(),
+                "starting_week": str(t.get("startingWeek") or ""),
+            })
         for p in (t.get("players") or []):
             pm = _pm(p)
             if not pm.get("id"):
@@ -1347,14 +1378,11 @@ def parse_api_teams(text: str, observed_at: str,
             rows.append({
                 "observed_at": observed_at, "source": LFG_SOURCE,
                 ROW_TABLE: "api_teams",
+                # What is true of a PLAYER, plus the manager who owns him —
+                # which is the grain of the row and not a repeated fact. The
+                # team's position, points and balance moved to api_standings.
                 "team_id": str(t.get("id") or ""),
-                "user_id": str(m.get("id") or ""),
                 "manager": m.get("managerName") or "",
-                "position": str(t.get("position") or ""),
-                "team_points": str(t.get("teamPoints") or ""),
-                # Empty for everyone but you. Empty means NOT STATED, never
-                # zero — the same rule the fitness parser follows.
-                "team_money": str(t.get("teamMoney") or ""),
                 "player_id": str(pm["id"]),
                 # TWO NAMES, AND BOTH ARE NEEDED. The app publishes a
                 # nickname and a full name and neither joins the market on
@@ -1424,11 +1452,12 @@ def sign_api_teams(text: str) -> str | None:
     """Who is in which squad, and what you have. NOT the stat lines: points
     are recalculated after a match and a stored archive per recalculation
     would be a copy of every squad to record a corrected assist."""
-    squads = [r for r in parse_api_teams(text, "")
-              if r[ROW_TABLE] == "api_teams"]
+    rows = parse_api_teams(text, "")
+    squads = [r for r in rows if r[ROW_TABLE] == "api_teams"]
+    table = [r for r in rows if r[ROW_TABLE] == "api_standings"]
     return _digest(["%s:%s" % (r["team_id"], r["player_id"]) for r in squads]
-                   + ["$%s=%s" % (r["team_id"], r["team_money"])
-                      for r in squads])
+                   + ["$%s=%s/%s" % (r["team_id"], r["team_money"],
+                                     r["position"]) for r in table])
 
 
 # One player, fetched once ever, purely to put a name to an id the activity
@@ -1899,7 +1928,9 @@ _API_ACTIVITY_FIXTURE = """[
   "createdAt":"2026-08-10T22:24:00+02:00"}]"""
 
 _API_TEAMS_FIXTURE = """[
- {"id":"38091967","position":3,"teamPoints":17,"teamMoney":23596582,
+ {"id":"38091967","position":3,"previousPosition":5,"teamPoints":17,
+  "fixturePoints":17,"teamValue":236374060,"banned":false,"startingWeek":"1",
+  "teamMoney":23596582,
   "manager":{"id":"11881989","managerName":"miguel_autentico"},
   "players":[{"buyoutClause":47000000,
     "buyoutClauseLockedEndTime":"2026-08-25T14:07:38+02:00",
@@ -1912,7 +1943,9 @@ _API_TEAMS_FIXTURE = """[
    "lastStats":[{"weekNumber":1,"totalPoints":5,
                  "stats":{"mins_played":[90,2],"goals":[1,4],
                           "yellow_card":[1,-1],"marca_points":[7,0]}}]}}]},
- {"id":"38099509","position":1,"teamPoints":24,"teamMoney":null,
+ {"id":"38099509","position":1,"previousPosition":5,"teamPoints":24,
+  "fixturePoints":24,"teamValue":253280692,"banned":false,"startingWeek":"1",
+  "teamMoney":null,
   "manager":{"id":"11883172","managerName":"BurtonGM89"},
   "players":[{"buyoutClause":null,
               "playerMaster":{"id":"2621","nickname":"Simeone",
@@ -2252,24 +2285,53 @@ def _selftest() -> None:
     # payload and every row names which table it is for, so the split is read
     # off the row rather than guessed at by shape.
     all_rows = parse_api_teams(_API_TEAMS_FIXTURE, "t")
-    assert {r[ROW_TABLE] for r in all_rows} == {"api_teams", "api_stats"}
+    assert {r[ROW_TABLE] for r in all_rows} == {"api_teams", "api_stats",
+                                            "api_standings"}
     tm = [r for r in all_rows if r[ROW_TABLE] == "api_teams"]
     assert len(tm) == 2, tm                 # the empty playerMaster is dropped
     assert tm[0]["manager"] == "miguel_autentico"
-    assert tm[0]["team_money"] == "23596582" and tm[0]["buyout"] == "47000000"
+    assert tm[0]["buyout"] == "47000000", tm[0]
     # The lock comes through, because a clause you cannot pay is not a price.
     assert tm[0]["buyout_until"] == "2026-08-25T14:07:38+02:00", tm[0]
     assert tm[1]["buyout_until"] == ""
-    # The limit worth encoding: a rival states no balance, and that is empty,
-    # not zero. A zero here would read as "they are broke".
-    assert tm[1]["team_money"] == "" and tm[1]["manager"] == "BurtonGM89"
-    assert tm[1]["buyout"] == ""
+    assert tm[1]["manager"] == "BurtonGM89" and tm[1]["buyout"] == ""
     # The same two names as the market rows, for the same reason — this is
     # the feed the ownership join reads, so it is the one the full name
     # actually rescues players in.
     assert tm[0]["player_name"] == "Fornals", tm[0]
     assert tm[0]["player_name_full"] == "Pablo Fornals Malla", tm[0]
     assert tm[1]["player_name_full"] == "Giuliano Simeone", tm[1]
+
+    # -- the league table is a fact about a TEAM ----------------------------
+    # It was carried on every player row: five managers' positions, points and
+    # balances repeated 76 times a sweep, 27% of the bytes in the file. Wrong
+    # grain as well as wasteful — the standings over a season were buried in a
+    # player-grain table and could not be read without deduplicating it.
+    sd = [r for r in all_rows if r[ROW_TABLE] == "api_standings"]
+    assert len(sd) == 2, sd
+    assert sd[0]["manager"] == "miguel_autentico" and sd[0]["position"] == "3"
+    assert sd[0]["team_points"] == "17" and sd[0]["team_money"] == "23596582"
+    assert sd[0]["user_id"] == "11881989" and sd[0]["team_id"] == "38091967"
+    # ...and it brings the fields nobody was reading either. previous_position
+    # is how the table MOVED, which a snapshot of position alone cannot say.
+    assert sd[0]["previous_position"] == "5", sd[0]
+    assert sd[0]["team_value"] == "236374060" and sd[0]["fixture_points"] == "17"
+    assert sd[0]["banned"] == "false" and sd[0]["starting_week"] == "1"
+    # A rival states no balance, and empty is NOT STATED — never zero, which
+    # would read as broke and wrongly zero every bid ceiling built on it.
+    assert sd[1]["team_money"] == "" and sd[1]["manager"] == "BurtonGM89"
+    # A team with no players at all is still a row in the table: it is a fact
+    # about the team, not about anybody's squad.
+    lonely = parse_api_teams(
+        '[{"id":"9","position":5,"manager":{"id":"7","managerName":"Empty"},'
+        '"players":[]}]', "t")
+    assert [r[ROW_TABLE] for r in lonely] == ["api_standings"], lonely
+
+    # The squad rows keep only what is true of a PLAYER, plus the manager who
+    # owns him — which is the grain of the row, not a repeated fact.
+    assert "team_points" not in tm[0] and "team_money" not in tm[0], tm[0]
+    assert "position" not in tm[0] and "user_id" not in tm[0], tm[0]
+    assert tm[0]["manager"] == "miguel_autentico" and tm[0]["team_id"]
 
     # -- what the app knows and nobody was reading --------------------------
     # THE APP'S OWN FITNESS. Both probable-XI columns in every report are
@@ -2486,7 +2548,7 @@ def _selftest() -> None:
         assert s.sign(html) is not None, s.key
         assert isinstance(s.parse(html, "2026-01-01T0000Z", s.key), list), s.key
 
-    print("sources.py selftest OK (192 cases)")
+    print("sources.py selftest OK (206 cases)")
 
 
 if __name__ == "__main__":

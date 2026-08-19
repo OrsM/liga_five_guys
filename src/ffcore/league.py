@@ -57,7 +57,8 @@ from typing import NamedTuple
 
 from ffcore.parse import money
 from ffcore.text import norm, resolve
-from ffcore.tidy import (Market, input_path, ledger_stamp, load_api_teams,
+from ffcore.tidy import (Market, input_path, ledger_stamp,
+                         load_api_standings, load_api_teams,
                          load_market, read_ledger, snapshot_stamp)
 
 __all__ = ["MARKET", "Config", "load_config", "read_rosters", "identify",
@@ -207,9 +208,13 @@ def read_api_balances(rows=None) -> dict[str, tuple[float, str]]:
 
     Returns {} when the API has never been fetched, which is the state every
     caller has always handled: the typed anchors in cash.txt take over.
+
+    Reads the STANDINGS, which is where a team's balance belongs and where it
+    now lives — it used to be copied onto all fourteen of that manager's
+    player rows.
     """
     out: dict[str, tuple[float, str]] = {}
-    for r in (load_api_teams() if rows is None else rows):
+    for r in (load_api_standings() if rows is None else rows):
         handle = (r.get("manager") or "").strip()
         raw = (r.get("team_money") or "").strip()
         if not handle or not raw:
@@ -686,7 +691,7 @@ class League:
     """Current state of the league, assembled from the three input files."""
 
     def __init__(self, cfg: Config, rosters, txns, market: Market | None,
-                 api_teams=None):
+                 api_teams=None, standings=None):
         self.cfg = cfg
         self.rosters = rosters
         self.txns = txns
@@ -704,6 +709,10 @@ class League:
         # that nobody owns anybody.
         self.api_unjoined: list[str] = []
         self._api_teams = api_teams
+        # The balances live at the grain of a team now. None means "read the
+        # store"; [] means the sweep genuinely returned no table, which is the
+        # case that must degrade to cash.txt rather than to zeroes.
+        self._standings = standings
         # No market, no override. The join needs `Market.key_for` to produce
         # keys the rest of the repo recognises; without one the app's own
         # spelling becomes the key and the squad silently stops matching the
@@ -753,7 +762,8 @@ class League:
         # load_api_teams() is [] until the API has been swept, which is the
         # state every caller already handles: the ledger takes over.
         return cls(cfg, read_rosters(), read_ledger(), market,
-                   api_teams=load_api_teams())
+                   api_teams=load_api_teams(),
+                   standings=load_api_standings())
 
     def __getitem__(self, handle: str) -> Manager:
         return self.managers[handle]
@@ -780,7 +790,7 @@ class League:
         # that asks and null for everyone else, so their estimate is untouched
         # and the `~` on it stays honest.
         for handle, (value, when) in read_api_balances(
-                self._api_teams).items():
+                self._standings).items():
             balances[handle] = (value, when)
 
         for handle, mgr in self.managers.items():
@@ -1257,10 +1267,13 @@ def _selftest_anchor_is_current() -> None:
     # A deal EARLIER on the same day as the observation.
     txns = [{"date": "2026-08-17T22:24", "player": "P", "from": "market",
              "to": "me", "price": "10000000", "note": ""}]
-    api_teams = [{"manager": "me", "player_name": "P", "user_id": "1",
-                  "team_money": "23596582", "observed_at": at}]
+    api_teams = [{"manager": "me", "player_name": "P", "observed_at": at}]
+    # The balance is a fact about the TEAM and comes in at that grain now.
+    table = [{"manager": "me", "user_id": "1", "team_id": "1",
+              "team_money": "23596582", "observed_at": at}]
 
-    lg = League(Config(me="me"), {"me": []}, txns, mkt, api_teams=api_teams)
+    lg = League(Config(me="me"), {"me": []}, txns, mkt, api_teams=api_teams,
+                standings=table)
     got = lg["me"].cash.value
     assert got == 23596582.0, (
         "the app's balance is current; a deal it already includes was "
@@ -1272,7 +1285,8 @@ def _selftest_anchor_is_current() -> None:
     later = txns + [{"date": "2026-08-18T09:00", "player": "P",
                      "from": "market", "to": "me", "price": "1000000",
                      "note": ""}]
-    lg2 = League(Config(me="me"), {"me": []}, later, mkt, api_teams=api_teams)
+    lg2 = League(Config(me="me"), {"me": []}, later, mkt,
+                 api_teams=api_teams, standings=table)
     assert lg2["me"].cash.value == 23596582.0 - 1000000.0, lg2["me"].cash
 
     # -- no market, no override --------------------------------------------
@@ -1284,10 +1298,9 @@ def _selftest_anchor_is_current() -> None:
     #
     # Applying a differently-keyed ownership map is worse than not applying
     # one, so without a market the replay stands.
-    api_odd = [{"manager": "me", "player_name": "A. Ferllo", "user_id": "1",
-                "team_money": "23596582", "observed_at": at}]
+    api_odd = [{"manager": "me", "player_name": "A. Ferllo", "observed_at": at}]
     lg3 = League(Config(me="me"), {"me": ["P"]}, [], None,
-                 api_teams=api_odd)
+                 api_teams=api_odd, standings=table)
     assert norm("a ferllo") not in lg3.owner, lg3.owner
     assert lg3.owner.get(norm("P")) == "me", lg3.owner
     # The balance still comes through: it needs no name join at all.
@@ -1529,14 +1542,16 @@ def _selftest_identify() -> None:
     # collects nothing — adding a season of allowance on top of a number the
     # app stated would double-count every bonus ever paid…
     def _mine(at, money="23596582"):
-        return [{"manager": "me", "player_name": "P", "user_id": "1",
+        return [{"manager": "me", "user_id": "1", "team_id": "1",
                  "team_money": money, "observed_at": at}]
 
     def _seen(at):
         return League(Config(me="me", daily_bonus=100000.0), {"me": []}, [],
                       Market([{"name": "P", "value": "1000000",
                                "observed_at": at, "position": "MED"}]),
-                      api_teams=_mine(at))
+                      api_teams=[{"manager": "me", "player_name": "P",
+                                  "observed_at": at}],
+                      standings=_mine(at))
 
     fresh_at = datetime.now(dt_timezone.utc).strftime("%Y-%m-%dT%H%MZ")
     assert abs(_seen(fresh_at)["me"].cash.value - 23596582.0) < 5000, \

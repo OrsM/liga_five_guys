@@ -416,6 +416,18 @@ def load_api_market() -> list[dict]:
     return latest_only(read_csv(TIDY / "api_market.csv"))
 
 
+def load_api_standings() -> list[dict]:
+    """The newest league table from the app, one row per team, or [].
+
+    Position, points, squad value and — for your account alone — the balance.
+    This used to ride on every player row in api_teams: five managers' worth
+    of team facts repeated 76 times a sweep. A fact about a team belongs at
+    the grain of a team, which is also what makes the season's standings
+    readable without deduplicating a player table.
+    """
+    return latest_only(read_csv(TIDY / "api_standings.csv"))
+
+
 def load_api_stats() -> list[dict]:
     """Every stat line the app has published, oldest sighting first.
 

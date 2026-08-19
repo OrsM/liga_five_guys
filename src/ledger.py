@@ -31,7 +31,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from ffcore.league import ledger_from_api  # noqa: E402
 from ffcore.tidy import (LEDGER, load_api_activity,  # noqa: E402
-                         load_api_players, load_api_teams)
+                         load_api_players, load_api_standings)
 
 FIELDS = ["date", "player", "from", "to", "price", "note"]
 
@@ -51,8 +51,13 @@ HEADER = """\
 
 
 def user_map() -> dict:
-    """{app user id: manager handle}, from the squad feed."""
-    return {r["user_id"]: r["manager"] for r in load_api_teams()
+    """{app user id: manager handle}, from the league table.
+
+    A team's id is a fact about the team, so it comes off api_standings —
+    five rows — rather than off seventy-six player rows carrying the same
+    five pairs.
+    """
+    return {r["user_id"]: r["manager"] for r in load_api_standings()
             if r.get("user_id") and r.get("manager")}
 
 
