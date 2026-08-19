@@ -92,13 +92,36 @@ tables. Two wrong numbers were found and fixed on the way.
    Judge nothing yet.
 5. **The shape prior is still the seed** (96 observed, 200 needed) — `pool_note()` prints
    which is in use, never assume.
-6. **`inputs/` is three files now and two of them exist only for the degradation path.**
-   `rosters_initial.txt` changes nothing at all while the API answers (measured: identical
-   ownership), and carries it from 30 players to 79 when the API is gone. `cash.txt` is
-   worth 0.07M of accuracy against 0.50M without it, and only since the allowance fix.
-   `lineup.txt` is the one genuinely hand-written file — the app publishes no fielded flag
-   in anything we fetch, so it cannot be derived. If the token ever dies, those two are
-   what stands between the report and nonsense; test them before deleting either.
+6. **KEEP TRIMMING `inputs/`. It is three files and two of them may not earn it.**
+   Today: `rosters_initial.txt` changes nothing at all while the API answers (measured —
+   identical ownership to the player) and carries it from 30 to 79 when the API is gone.
+   `cash.txt` is worth 0.07M of accuracy against 0.50M without it, and only since the
+   allowance fix. `lineup.txt` is the one genuinely hand-written file and stays: nothing we
+   fetch publishes a fielded flag, so the marks cannot be derived.
+
+   **The measurement that justifies both is probably the wrong one, and that is the next
+   thing to check.** "API gone" was tested by passing an EMPTY feed — but the tidy store is
+   on disk and keeps the last good reading for ever, so a dead token does not empty
+   `api_teams.csv`, it makes it STALE. The empty case only happens on a cold start that has
+   never authenticated. If that is right, then the real degradation path never reaches
+   either file, and both are being kept for a scenario that cannot occur.
+
+   Do it in this order, because the second answer depends on the first:
+
+   a. **Gate the API tables on freshness**, the way `load_elo` already is. A three-day-old
+      squad reading joins perfectly and prices a market that has moved — same bug as the
+      stale Elo rating and the stale cash anchor, and the third instance is where you stop
+      calling it a coincidence. `fresh_only()` and `DAILY_FRESH_DAYS` are already in
+      `ffcore/tidy.py`; these feeds are `every_run`, so the bound is tighter.
+   b. **Then re-measure the two files against the path that actually happens** — stale
+      store, not empty store — rather than against the one I tested.
+   c. **And trim what is left.** `league.ini`'s `[budget]` section has never held a value;
+      `budget` itself may be derivable now that the API states `teamValue` and the ledger is
+      exact. Anything that survives should be able to say what it buys, in units.
+
+   The direction is one file a human edits and nothing else. Every input removed is a thing
+   that cannot go stale behind your back — which is what the whole of this session was
+   about.
 
 ## Traps that cost real time — do not rediscover these
 
