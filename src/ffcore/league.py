@@ -302,6 +302,9 @@ def owner_from_api(rows: list[dict], market,
     `market` may be None (the `with_market=False` path), in which case the
     app's own spelling is used and the caller is on its own for joins.
 
+    The row's `player_name_full` is passed through, because the app publishes
+    two names per player and neither joins alone. See `api_key`.
+
     `ledger_owner` breaks the one tie the app creates for us. The app lists
     some players by surname alone — "Cardoso" with a Fabio and a Johnny in the
     market, "Llorente" with a Marcos and a Diego Javier — and `key_for`
@@ -325,7 +328,7 @@ def owner_from_api(rows: list[dict], market,
         if not handle or not raw:
             continue
         key = api_key(raw, handle, market, ledger_owner, index,
-                      r.get("market_value"))
+                      r.get("market_value"), r.get("player_name_full") or "")
         if key:
             out[key] = handle
         else:
@@ -334,16 +337,26 @@ def owner_from_api(rows: list[dict], market,
 
 
 def api_key(raw: str, handle: str, market, ledger_owner: dict | None = None,
-            index: list | None = None, market_value=None) -> str | None:
+            index: list | None = None, market_value=None,
+            full: str = "") -> str | None:
     """One API row's player, as a key the rest of the repo recognises.
 
-    THREE JOINS IN FALLING ORDER OF TRUST, and the order is the whole design:
+    FOUR JOINS IN FALLING ORDER OF TRUST, and the order is the whole design:
 
-      1. `market.key_for` — the resolution every other reader uses.
-      2. the ledger breaking a tie, when the app gave a surname the market
+      1. `market.key_for` on the app's nickname — the resolution every other
+         reader uses.
+      2. `market.key_for` again on the app's FULL name. The same resolution
+         given a better string, which is why it outranks everything below it
+         rather than being another kind of guess: the app publishes both, the
+         shortened one is the nickname, and "Cardoso" spelled out is "Fábio
+         Rafael Rodrigues Cardoso". It runs second and not first because the
+         nickname is the better single guess — of 76 owned players, twelve
+         join ONLY on it, their full name being a birth name nothing else
+         uses ("Pepelu" is "José Luis García Vayá").
+      3. the ledger breaking a tie, when the app gave a surname the market
          has two of and exactly one of them is already recorded against THIS
          manager.
-      3. an EXACT market value, searched across all of history.
+      4. an EXACT market value, searched across all of history.
 
     None means unresolved, and unresolved must stay visible: a dropped row is
     an owned player reading as a free agent, or a rival's man who cannot be
@@ -359,6 +372,8 @@ def api_key(raw: str, handle: str, market, ledger_owner: dict | None = None,
     if market is None:
         return norm(raw) or None
     key = market.key_for(raw)
+    if not key and (full or "").strip():
+        key = market.key_for(full.strip())
     if not key and ledger_owner:
         if index is None:
             index = latest_only(market.rows)
@@ -954,6 +969,29 @@ def _selftest_api_owner() -> None:
     assert api_key("Cardoso", "Magic Mike 333", two) is None
     assert api_key("Fabio Cardoso", "Magic Mike 333", two) == norm("Fabio Cardoso")
     assert api_key("", "Magic Mike 333", two) is None
+
+    # THE FULL NAME SETTLES IT WITHOUT ANY OF THAT, when the app sends one.
+    # It publishes `nickname` AND `name`, and the shortened one is the
+    # nickname: "Cardoso" is "Fábio Rafael Rodrigues Cardoso", "Aimar" is
+    # "Aimar Oroz", "Brahim" is "Brahim Díaz". This is a second pass through
+    # the SAME key_for, so it ranks above both fallbacks below — it is the
+    # market's own resolution given a better string, not a new kind of guess.
+    assert api_key("Cardoso", "Magic Mike 333", two,
+                   full="Fabio Cardoso") == norm("Fabio Cardoso")
+    # And it must not override a nickname that already joined: twelve of the
+    # 76 owned players join ONLY on the nickname, because the full name is a
+    # birth name nothing else uses ("Pepelu" is "José Luis García Vayá").
+    assert api_key("Fabio Cardoso", "Magic Mike 333", two,
+                   full="Somebody Entirely Different") == norm("Fabio Cardoso")
+    # An absent full name changes nothing at all.
+    assert api_key("Cardoso", "Magic Mike 333", two, full="") is None
+    owner, unjoined = owner_from_api(
+        [{"manager": "Magic Mike 333", "player_name": "Cardoso",
+          "player_name_full": "Fabio Cardoso"}], two)
+    assert owner == {norm("Fabio Cardoso"): "Magic Mike 333"}, owner
+    assert unjoined == [], unjoined
+    # A full name that is ITSELF ambiguous resolves nothing, same rule.
+    assert api_key("Cardoso", "Magic Mike 333", two, full="Cardoso") is None
 
     # With no ledger to lean on it stays unresolved — never a coin flip.
     owner, unjoined = owner_from_api(ambiguous_row, two)

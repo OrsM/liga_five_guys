@@ -1201,6 +1201,9 @@ def parse_api_market(text: str, observed_at: str,
             "market_id": str(it.get("id") or ""),
             "player_id": str(pm["id"]),
             "player_name": pm.get("nickname") or pm.get("name") or "",
+            # BOTH, because neither joins alone — see parse_api_teams.
+            "player_name_full": (pm.get("name") or "")
+                                if pm.get("nickname") else "",
             "position_id": str(pm.get("positionId") or ""),
             "sale_price": str(it.get("salePrice") or ""),
             "market_value": str(pm.get("marketValue") or ""),
@@ -1295,7 +1298,20 @@ def parse_api_teams(text: str, observed_at: str,
                 # zero — the same rule the fitness parser follows.
                 "team_money": str(t.get("teamMoney") or ""),
                 "player_id": str(pm["id"]),
+                # TWO NAMES, AND BOTH ARE NEEDED. The app publishes a
+                # nickname and a full name and neither joins the market on
+                # its own: of the 76 owned players on 2026-08-19, twelve join
+                # only on the nickname ("Raphinha", "Pepelu", "Gavi") and
+                # three only on the full name — "Aimar" is Aimar Oroz,
+                # "Brahim" is Brahim Díaz, and "Llorente" is one of the two
+                # the market carries. Keeping the nickname alone is what left
+                # ffcore.league.api_key with a ledger tie-breaker to build.
+                # The nickname stays `player_name` because it is the better
+                # single guess; the full name rides beside it, and is empty
+                # rather than duplicated when there is only one name.
                 "player_name": pm.get("nickname") or pm.get("name") or "",
+                "player_name_full": (pm.get("name") or "")
+                                    if pm.get("nickname") else "",
                 "position_id": str(pm.get("positionId") or ""),
                 "market_value": str(pm.get("marketValue") or ""),
                 "points": str(pm.get("points") or ""),
@@ -1757,7 +1773,7 @@ _API_MARKET_FIXTURE = """[
  {"id":"m1","salePrice":5552694,"numberOfBids":0,"status":"on_sale",
   "discr":"marketPlayerLeague","expirationDate":"2026-08-18T22:00:00+02:00",
   "playerMaster":{"id":"2621","nickname":"Simeone","positionId":5,
-                  "marketValue":5552694}},
+                  "name":"Giuliano Simeone","marketValue":5552694}},
  {"id":"m2","salePrice":5403735,"numberOfBids":null,"status":"on_sale",
   "discr":"marketPlayerTeam","expirationDate":"2026-08-19T22:00:00+02:00",
   "playerMaster":{"id":"2963","nickname":"Marc Roca","positionId":3,
@@ -1784,12 +1800,14 @@ _API_TEAMS_FIXTURE = """[
   "players":[{"buyoutClause":47000000,
     "buyoutClauseLockedEndTime":"2026-08-25T14:07:38+02:00",
               "playerMaster":{"id":"1337","nickname":"Fornals",
+                              "name":"Pablo Fornals Malla","slug":"fornals",
                               "positionId":3,"marketValue":58300000,
                               "points":5}}]},
  {"id":"38099509","position":1,"teamPoints":24,"teamMoney":null,
   "manager":{"id":"11883172","managerName":"BurtonGM89"},
   "players":[{"buyoutClause":null,
               "playerMaster":{"id":"2621","nickname":"Simeone",
+                              "name":"Giuliano Simeone","slug":"simeone-1",
                               "positionId":5,"marketValue":5552694,
                               "points":1}},
              {"playerMaster":{}}]}]"""
@@ -2075,6 +2093,19 @@ def _selftest() -> None:
     # A manager-listed player has null bids. Empty means NOT STATED; storing
     # it as "0" would claim nobody is bidding, which is a different fact.
     assert mk[1]["bids"] == "" and mk[1]["seller"] == "marketPlayerTeam", mk[1]
+    # BOTH NAMES ARE KEPT. The app publishes a nickname and a full name, and
+    # neither one joins on its own: measured across the 76 owned players on
+    # 2026-08-19, 12 join only on the nickname ("Raphinha", "Pepelu") and 3
+    # only on the full name — "Aimar" is Aimar Oroz, "Brahim" is Brahim Díaz,
+    # "Llorente" is one of two Llorentes in the market. Keeping one and
+    # discarding the other is what made a three-tier fallback necessary
+    # downstream. `player_name` stays the nickname because it is the better
+    # single guess; the full name rides beside it.
+    assert mk[0]["player_name"] == "Simeone", mk[0]
+    assert mk[0]["player_name_full"] == "Giuliano Simeone", mk[0]
+    # Absent is empty, never the nickname repeated: a caller trying both must
+    # be able to tell that there was only ever one.
+    assert mk[1]["player_name_full"] == "", mk[1]
     # The clock in expirationDate ticks every sweep and must not sign.
     assert sign_api_market(_API_MARKET_FIXTURE) == sign_api_market(
         _API_MARKET_FIXTURE.replace("2026-08-18T22", "2026-08-20T22"))
@@ -2104,6 +2135,12 @@ def _selftest() -> None:
     # not zero. A zero here would read as "they are broke".
     assert tm[1]["team_money"] == "" and tm[1]["manager"] == "BurtonGM89"
     assert tm[1]["buyout"] == ""
+    # The same two names as the market rows, for the same reason — this is
+    # the feed the ownership join reads, so it is the one the full name
+    # actually rescues players in.
+    assert tm[0]["player_name"] == "Fornals", tm[0]
+    assert tm[0]["player_name_full"] == "Pablo Fornals Malla", tm[0]
+    assert tm[1]["player_name_full"] == "Giuliano Simeone", tm[1]
 
     # Discovery: the league id comes off the account, never a config file.
     disc = league_sources(_API_LEAGUES_FIXTURE)
@@ -2278,7 +2315,7 @@ def _selftest() -> None:
         assert s.sign(html) is not None, s.key
         assert isinstance(s.parse(html, "2026-01-01T0000Z", s.key), list), s.key
 
-    print("sources.py selftest OK (172 cases)")
+    print("sources.py selftest OK (178 cases)")
 
 
 if __name__ == "__main__":
