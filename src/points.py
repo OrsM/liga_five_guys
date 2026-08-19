@@ -150,50 +150,71 @@ def diff(prev_rows: list[dict], cur_rows: list[dict],
 # rebuild from raw
 # ---------------------------------------------------------------------------
 
+_CACHE = "parsed_points.json"
+
+
 def load_snapshots() -> dict[str, list[tuple[str, list[dict]]]]:
     """{season label: [(stamp, rows)]} from every snapshot, in order.
 
     ingest.pages and sources.parse_points are imported lazily so --selftest
     needs neither lxml nor a raw store.
     """
-    from ingest import pages
+    from ingest import (_parse_cache, _save_parse_cache, _Sigs,
+                        doc_keys, documents)
     from sources import parse_points, season_label
 
     by_label: dict[str, list[tuple[str, list[dict]]]] = {}
-    # PARSED ONCE PER DOCUMENT, NOT ONCE PER SNAPSHOT — the same fix as
-    # ingest.parse, for the same reason. The carry-forward hands the same
-    # points page to every stamp since it last changed, and lxml was running
-    # over all forty-seven of them: five seconds of parsing for a handful of
-    # distinct documents. The rows carry no stamp, so a hit needs no rewrite.
-    seen: dict[int, list[dict]] = {}
-    for stamp, docs in pages():
-        html = docs.get("points")
-        if html is None:
+    # PARSED ONCE PER DOCUMENT, NOT ONCE PER SNAPSHOT, AND ONCE PER SEASON,
+    # NOT ONCE PER RUN. The carry-forward hands the same points page to every
+    # stamp since it last changed, and lxml was running over all forty-seven
+    # of them; the raw archives are then immutable, so the answer it comes to
+    # cannot change unless the parser does, which is what the cache is
+    # fingerprinted on. Between them that was five seconds a run rebuilding
+    # rows that were already correct.
+    #
+    # The label and the empty-season reading are cached beside the rows
+    # because they are the only other things read off the page, and caching
+    # the rows alone would have kept the archive open for them.
+    cache, fresh, walk = _parse_cache(_CACHE), {}, doc_keys()
+
+    # Read first, parse second, in one pass per archive — see ingest.documents.
+    need: dict[str, set] = {}
+    for _stamp, docs in walk:
+        if "points" in docs and not isinstance(cache.get(docs["points"][0]),
+                                               dict):
+            need.setdefault(docs["points"][1], set()).add("points")
+    for origin, _key, html in documents(need):
+        try:
+            rows = parse_points(html)
+            got = {"rows": rows, "label": season_label(html),
+                   "empty": bool(empty_season(html))}
+        except Exception as e:
+            # One bad page must not lose the rest of the run.
+            print(f"  warn: {origin}/points: {type(e).__name__}: {e}")
+            got = {"rows": [], "label": "", "empty": True}
+        cache[_Sigs().of("points", html)] = got
+
+    for stamp, docs in walk:
+        if "points" not in docs:
             continue
-        ck = hash(html)
-        if ck in seen:
-            rows = seen[ck]
-        else:
-            try:
-                rows = parse_points(html)
-            except Exception as e:
-                # One bad page must not lose the rest of the run.
-                print(f"  warn: {stamp}/points: {type(e).__name__}: {e}")
-                seen[ck] = []
-                continue
-            seen[ck] = rows
-        if not rows:
+        ck, origin = docs["points"]
+        got = cache.get(ck)
+        if not isinstance(got, dict):
+            continue
+        fresh[ck] = got
+        if not got["rows"]:
             # An EMPTY season is not a broken parser. Between the rollover and
             # the first whistle the site serves the table with "no results"
             # in it, and calling that markup rot would print a false alarm on
             # every run for a fortnight — which is how a real one gets
             # ignored. The two states are told apart by the site's own words.
             print(f"  note: {stamp}/points has no rows yet — the season has "
-                  "not started." if empty_season(html) else
+                  "not started." if got["empty"] else
                   f"  warn: {stamp}/points parsed to 0 rows — markup "
                   "changed? Raw is kept; fix parse and re-run.")
             continue
-        by_label.setdefault(season_label(html), []).append((stamp, rows))
+        by_label.setdefault(got["label"], []).append((stamp, got["rows"]))
+    _save_parse_cache(fresh, _CACHE)
     return by_label
 
 

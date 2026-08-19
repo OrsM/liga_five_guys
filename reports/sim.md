@@ -2,11 +2,11 @@
 
 ## Now
 
-**Locks in 18h** · squad 236.37M · **cash -133K** · total 236.24M
+**Locks in 10h** · squad 236.37M · **cash -133K** · total 236.24M
 
 play 4-5-1 · finish 1.52 · win 55% · season 1,530–1,790
 
-_market **54th percentile** · an ordinary week · better in 46% of weeks_
+_market **52nd percentile** · an ordinary week · better in 48% of weeks_
 
 ## Every player you could hold
 
@@ -67,8 +67,8 @@ _Season points, so this can be compared with the table below rather than sitting
 | Jan Oblak | +5.02 | 18 days |
 | Zaid Romero | +4.69 | 20 days |
 
-_The free market is simulated rather than guessed at: the market is modelled from 73 offers over 5 cycles, weighted by value^0.15. **110 of the 572 unowned players** would improve your eleven, and a week of offers beats the best thing you can buy today **46% of the time** — even the tenth percentile of waiting (+3.86) clears it. Spending now buys the worse of two options and gives up the choice._
-_**31 locked players would improve your eleven** and their clauses open on 24 Aug, in about 6 days. Waiting scores ZERO in the table above — not because it is worthless but because nothing there can price a market it has not seen, so every move with a positive number beats it by construction. That is the bias to hold in mind when the ranking asks you to spend the balance; the **Left** column is what buys the choice._
+_The free market is simulated rather than guessed at: the market is modelled from 73 offers over 5 cycles, weighted by value^0.15. **110 of the 572 unowned players** would improve your eleven, and a week of offers beats the best thing you can buy today **48% of the time** — even the tenth percentile of waiting (+3.95) clears it. Spending now buys the worse of two options and gives up the choice._
+_**31 locked players would improve your eleven** and their clauses open on 24 Aug, in about 5 days. Waiting scores ZERO in the table above — not because it is worthless but because nothing there can price a market it has not seen, so every move with a positive number beats it by construction. That is the bias to hold in mind when the ranking asks you to spend the balance; the **Left** column is what buys the choice._
 
 ## Where the league stands
 

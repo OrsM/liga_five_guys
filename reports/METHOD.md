@@ -1,4 +1,4 @@
-# Liga Five Guys — how the numbers are made — 2026-08-19 07:07 UTC
+# Liga Five Guys — how the numbers are made — 2026-08-19 08:56 UTC
 
 Everything about HOW, so the report can be the numbers. The fits, the estimates, and every way each one is known to be wrong.
 
@@ -22,8 +22,8 @@ _Season points, so this can be compared with the table below rather than sitting
 | Jan Oblak | +5.02 | 18 days |
 | Zaid Romero | +4.69 | 20 days |
 
-_The free market is simulated rather than guessed at: the market is modelled from 73 offers over 5 cycles, weighted by value^0.15. **110 of the 572 unowned players** would improve your eleven, and a week of offers beats the best thing you can buy today **46% of the time** — even the tenth percentile of waiting (+3.86) clears it. Spending now buys the worse of two options and gives up the choice._
-_**31 locked players would improve your eleven** and their clauses open on 24 Aug, in about 6 days. Waiting scores ZERO in the table above — not because it is worthless but because nothing there can price a market it has not seen, so every move with a positive number beats it by construction. That is the bias to hold in mind when the ranking asks you to spend the balance; the **Left** column is what buys the choice._
+_The free market is simulated rather than guessed at: the market is modelled from 73 offers over 5 cycles, weighted by value^0.15. **110 of the 572 unowned players** would improve your eleven, and a week of offers beats the best thing you can buy today **48% of the time** — even the tenth percentile of waiting (+3.95) clears it. Spending now buys the worse of two options and gives up the choice._
+_**31 locked players would improve your eleven** and their clauses open on 24 Aug, in about 5 days. Waiting scores ZERO in the table above — not because it is worthless but because nothing there can price a market it has not seen, so every move with a positive number beats it by construction. That is the bias to hold in mind when the ranking asks you to spend the balance; the **Left** column is what buys the choice._
 
 ## What the simulation cannot see
 
@@ -119,18 +119,18 @@ _What the one table in [REPORT.md](REPORT.md) was built from: the eleven it assu
 
 | Player | Pos | Bid | XI | Competition | Note |
 |---|---|--:|--:|---|---|
-| Iñigo Perez | ent | — | !15%/— | none |  |
-| Iago Aspas | del | — | 40%/— | none |  |
-| Nico Guillen | med | — | 50%/— | (3 broke) |  |
-| Joan Garcia | por | — | 80%/100% | (4 broke) |  |
-| Abiel Osorio | del | — | 0%/— | none |  |
-| Javi Puado | med | — | 0%/— | none |  |
 | Trent Alexander-Arnold | def | — | 50%/— | (2 broke) |  |
-| Manel Usedo | med | — | !15%/— | none |  |
-| Peque | del | — | 50%/— | none |  |
-| Matias Vecino | med | — | 20%/— | none |  |
-| Mario Soriano | med | — | 80%/100% | (4 broke) |  |
 | Peter Gulacsi | por | — | 40%/— | none |  |
+| Abiel Osorio | del | — | 0%/— | none |  |
+| Iago Aspas | del | — | 40%/— | none |  |
+| Joan Garcia | por | — | 80%/100% | (4 broke) |  |
+| Iñigo Perez | ent | — | !15%/— | none |  |
+| Javi Puado | med | — | 0%/— | none |  |
+| Peque | del | — | 50%/— | none |  |
+| Mario Soriano | med | — | 80%/100% | (4 broke) |  |
+| Matias Vecino | med | — | 20%/— | none |  |
+| Manel Usedo | med | — | !15%/— | none |  |
+| Nico Guillen | med | — | 50%/— | (3 broke) |  |
 
 **Bid** is what it costs to win him, and nothing here says whether he is worth winning — that is the one table in [REPORT.md](REPORT.md), which prices him at a clause because a clause cannot be refused. A purchase is closer to a loan than a spend: the value comes back when you sell, give or take 12%, which on a large player is bigger than the premium and the drift put together. That swing is a coin flip, so a bid within a few percent is not a decision.
 
@@ -172,4 +172,4 @@ _652 players tracked, 512 with a probable-XI reading._
 
 _xPts/j — expected points per jornada = shrunk pts/match (K=8, 2025-26) × fixture × P(start), from `ffcore/score.py` — the same scorer rivals.py uses. Injured, suspended and unavailable score zero; a doubt is halved. The fixture term is a ±12% band across the opponents ranked by Club Elo rating, plus ±4% for home advantage; both widths are guesses, unfitted because nothing has been played, and small enough that a wrong one costs a fraction of a point._
 
-_Generated 2026-08-19 00:30 UTC._
+_Generated 2026-08-19 08:56 UTC._

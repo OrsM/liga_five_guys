@@ -36,6 +36,11 @@ import math
 import random
 import statistics
 
+try:                                     # numpy is the fast path, not the only one
+    import numpy as np
+except ImportError:                      # pragma: no cover
+    np = None
+
 __all__ = ["Offers", "quantiles"]
 
 # Exponents tried when fitting. Below this the market looks uniform and above
@@ -71,6 +76,8 @@ class Offers:
         self._w = [max(0.0, v) ** exponent for v in self.pool.values()]
         if not any(self._w):
             self._w = [1.0] * len(self._keys)
+        self._at = {k: i for i, k in enumerate(self._keys)}
+        self._wa = np.asarray(self._w, dtype=float) if np is not None else None
 
     # -- fitting -----------------------------------------------------------
     @classmethod
@@ -89,12 +96,18 @@ class Offers:
             return cls(pool, per_cycle, 0.0, len(observed or []), cycles)
         want = quantiles(observed)
         rng = random.Random(seed)
+        nprng = np.random.default_rng(seed) if np is not None else None
         best, arg = None, 0.0
         for e in EXPONENTS:
             trial = cls(pool, per_cycle, e)
-            got = []
-            for _ in range(trials):
-                got += [trial.pool[k] for k in trial.draw(rng)]
+            idx = trial._draw_np(nprng, trials) if nprng is not None else None
+            if idx is None:
+                got = []
+                for _ in range(trials):
+                    got += [trial.pool[k] for k in trial.draw(rng)]
+            else:
+                got = np.asarray(list(trial.pool.values()),
+                                 dtype=float)[idx].ravel()
             q = quantiles(got)
             # Relative error, because the quantiles span two orders of
             # magnitude and an absolute one would fit the top and ignore the
@@ -116,13 +129,41 @@ class Offers:
     def draw(self, rng: random.Random) -> list:
         """One cycle's offers. Without replacement: the app deals a dozen
         different players, not a dozen draws that may repeat."""
+        return [self._keys[i] for i in self._draw_idx(rng)]
+
+    def _draw_idx(self, rng: random.Random) -> list:
+        """One cycle, as positions. The scalar path, kept as the reference the
+        vectorised one is checked against and as the answer when numpy is not
+        installed."""
         n = min(self.per_cycle, len(self._keys))
-        keys, w, out = list(self._keys), list(self._w), []
+        at, w, out = list(range(len(self._keys))), list(self._w), []
         for _ in range(n):
-            pick = rng.choices(range(len(keys)), weights=w, k=1)[0]
-            out.append(keys.pop(pick))
+            pick = rng.choices(range(len(at)), weights=w, k=1)[0]
+            out.append(at.pop(pick))
             w.pop(pick)
         return out
+
+    def _draw_np(self, rng, cycles: int):
+        """`cycles` cycles' worth of offers at once, as a (cycles, n) index
+        matrix. None when numpy is missing.
+
+        Weighted sampling WITHOUT replacement, vectorised by the exponential
+        race (Efraimidis-Spirakis): give every player a clock that ticks at his
+        own weight, Exp(1)/w, and deal the n that ring first. That is not an
+        approximation of the loop below — it is the same distribution, which is
+        the only reason it is allowed to replace it.
+
+        The loop it replaces cost 10 of the 14 seconds the report took: 25,200
+        cycles, each one copying a 570-entry list twice and then calling
+        random.choices twelve times over the whole of it. Same answer, drawn
+        in one array operation instead of 302,400 scalar ones.
+        """
+        if np is None or not self._keys:
+            return None
+        n = min(self.per_cycle, len(self._keys))
+        w = np.where(self._wa > 0, self._wa, np.finfo(float).tiny)
+        clock = rng.exponential(size=(cycles, len(self._keys))) / w
+        return np.argpartition(clock, n - 1, axis=1)[:, :n]
 
     def chance(self, key) -> float:
         """Probability this particular player is offered in one cycle.
@@ -137,8 +178,7 @@ class Offers:
         total = sum(self._w)
         if not total or key not in self.pool:
             return 0.0
-        i = self._keys.index(key)
-        return min(1.0, self.per_cycle * self._w[i] / total)
+        return min(1.0, self.per_cycle * self._w[self._at[key]] / total)
 
     def median_wait(self, key) -> float | None:
         """Cycles until you would more likely than not have seen him offered.
@@ -162,19 +202,48 @@ class Offers:
         a DISTRIBUTION and must be reported as one: the median is what a
         typical wait buys and the upper decile is the reason to wait at all.
         """
+        # gain() is asked about each player ONCE, not once per time he is
+        # dealt. It was being called 33,600 times for 572 distinct answers.
+        gains = [float(gain(k)) for k in self._keys]
+        idx = self._draw_np(np.random.default_rng(rng.randrange(2 ** 32)),
+                            trials * cycles) if np is not None else None
+        if idx is not None:
+            best = np.asarray(gains)[idx].max(axis=1)
+            return list(best.reshape(trials, cycles).max(axis=1))
+
         out = []
         for _ in range(trials):
             best = 0.0
             for _ in range(cycles):
-                for k in self.draw(rng):
-                    g = gain(k)
-                    if g > best:
-                        best = g
+                for i in self._draw_idx(rng):
+                    if gains[i] > best:
+                        best = gains[i]
             out.append(best)
         return out
 
 
 def _selftest() -> None:
+    # -- the vectorised draw IS the scalar draw ----------------------------
+    # The exponential race replaced a sequential weighted-without-replacement
+    # loop, and "it is the same distribution" is a claim, not a comment. This
+    # is what checks it: the same pool, the same exponent, selection rates
+    # per player from each path. Spread over three orders of magnitude of
+    # weight, so a path that quietly went proportional or uniform fails here.
+    if np is not None:
+        from collections import Counter
+
+        pool = {"p%d" % i: float(v) for i, v in
+                enumerate([1, 2, 3, 5, 8, 13, 21, 34, 55, 89])}
+        m = Offers(pool, per_cycle=4, exponent=0.7)
+        rng, n = random.Random(1), 20000
+        scalar = Counter()
+        for _ in range(n):
+            scalar.update(m._draw_idx(rng))
+        vec = Counter(m._draw_np(np.random.default_rng(7), n).ravel().tolist())
+        for i in range(len(pool)):
+            gap = abs(scalar[i] - vec[i]) / n
+            assert gap < 0.015, (i, scalar[i] / n, vec[i] / n)
+
     # -- quantiles ---------------------------------------------------------
     assert quantiles([1, 2, 3, 4, 5], (0.5,)) == (3,)
     assert quantiles([], (0.5,)) == (0.0,)
@@ -243,7 +312,7 @@ def _selftest() -> None:
     assert Offers({"a": 1e6}, per_cycle=10).chance("a") == 1.0
     assert Offers({"a": 1e6}, per_cycle=10).median_wait("a") == 1.0
 
-    print("ffcore.market self-test OK (24 cases)")
+    print("ffcore.market self-test OK (25 cases)")
 
 
 if __name__ == "__main__":

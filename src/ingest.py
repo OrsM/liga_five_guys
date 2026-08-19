@@ -106,15 +106,25 @@ def snapshots() -> list[Path]:
     return sorted(found, key=_stamp_of)
 
 
-def _read(path: Path) -> dict[str, str]:
-    """{member name: text} for one snapshot, whichever layout it is in."""
+def _read(path: Path, only: set | None = None) -> dict[str, str]:
+    """{member name: text} for one snapshot, whichever layout it is in.
+
+    `only` is the set of members worth decoding, MANIFEST.csv aside — a reader
+    that wants one page out of forty (points.py wants exactly that) pays for
+    the archive's decompression either way, but not for turning twenty team
+    pages it will throw away into str. The manifest is always kept because
+    that is what says which pages the snapshot claims to hold.
+    """
+    want = None if only is None else set(only) | {MANIFEST}
     if path.is_dir():
         return {f.name.removesuffix(".gz"):
                 gzip.open(f, "rt", encoding="utf-8", errors="replace").read()
-                for f in sorted(path.glob("*.html.gz"))}
+                for f in sorted(path.glob("*.html.gz"))
+                if want is None or f.name.removesuffix(".gz") in want}
     with tarfile.open(path, "r:xz") as tf:
         return {m.name: tf.extractfile(m).read().decode("utf-8", "replace")
-                for m in tf.getmembers() if m.isfile()}
+                for m in tf.getmembers()
+                if m.isfile() and (want is None or m.name in want)}
 
 
 def _write(path: Path, members: dict[str, str]) -> None:
@@ -168,20 +178,113 @@ def state() -> dict[str, dict]:
     return {r["page"]: r for r in _manifest(_read(snaps[-1]))}
 
 
-def pages():
+def pages(only: set | None = None):
     """(stamp, {page: html}) per snapshot, oldest first, carrying forward.
 
     The carry-forward is what makes deduplication invisible downstream: a
     snapshot that stored no new market page still yields the market page that
     was current at the time, so market.csv has the same rows it always had.
+
+    `only` narrows it to the pages named, for a caller that wants one of them.
     """
+    keep = None if only is None else {"%s.html" % p for p in only}
     carried: dict[str, str] = {}
     for snap in snapshots():
-        members = _read(snap)
+        members = _read(snap, keep)
         carried.update({k.removesuffix(".html"): v for k, v in members.items()
                         if k.endswith(".html")})
         present = [r["page"] for r in _manifest(members)]
         yield _stamp_of(snap), {p: carried[p] for p in present if p in carried}
+
+
+_INDEX = "snapindex.json"
+
+
+def _index_load() -> dict:
+    try:
+        blob = json.loads((TIDY / _INDEX).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    return blob.get("snaps", {})
+
+
+def _index_save(snaps: dict) -> None:
+    TIDY.mkdir(parents=True, exist_ok=True)
+    try:
+        (TIDY / _INDEX).write_text(json.dumps({"snaps": snaps}),
+                                   encoding="utf-8")
+    except OSError:
+        pass
+
+
+def _size_of(path: Path) -> int:
+    return path.stat().st_size if path.is_file() else -1
+
+
+def doc_keys():
+    """[(stamp, {page: (content key, the stamp that stored it)})], oldest
+    first — the same sequence pages() yields, named rather than read.
+
+    THE ARCHIVES ARE IMMUTABLE, so which document each stamp carried is a fact
+    that only has to be established once. Establishing it every run meant
+    decompressing thirteen megabytes and decoding two thousand documents to
+    rediscover a mapping that had not changed since the season started, and
+    that cost grows with the season — four of parse's seven seconds by the
+    time this was written, on the way to a minute by May.
+
+    The index is written next to the parse cache and validated by file size,
+    so an archive that was rewritten is re-read rather than trusted. A stamp
+    that is not in the index is read normally, which makes the usual case —
+    a run with one new snapshot in it — cost one archive rather than fifty.
+
+    Callers get keys, not text, and fetch the text only for a document whose
+    parse they do not already have; `document()` is how.
+    """
+    idx, out, carried, keys = _index_load(), [], {}, _Sigs()
+    fresh, opened = {}, 0
+    for snap in snapshots():
+        stamp, size = _stamp_of(snap), _size_of(snap)
+        have = idx.get(stamp)
+        if have is not None and have.get("size") == size:
+            resolved = {p: (v[0], v[1]) for p, v in have["pages"].items()}
+        else:
+            opened += 1
+            members = _read(snap)
+            carried.update({
+                k.removesuffix(".html"): (keys.of(k.removesuffix(".html"), v),
+                                          stamp)
+                for k, v in members.items() if k.endswith(".html")})
+            present = [r["page"] for r in _manifest(members)]
+            resolved = {p: carried[p] for p in present if p in carried}
+        carried.update(resolved)
+        fresh[stamp] = {"size": size,
+                        "pages": {p: list(v) for p, v in resolved.items()}}
+        out.append((stamp, resolved))
+    if fresh != idx:
+        _index_save(fresh)
+    if opened:
+        print("  read %d of %d snapshots from disk" % (opened, len(out)))
+    return out
+
+
+def documents(need: dict[str, set]):
+    """Yield (stamp, page, html) for the documents named in {stamp: {page}}.
+
+    BATCHED, because the caller's misses are correlated: a cold parse cache
+    wants every document there is, and fetching them one at a time meant a
+    scan of the snapshot list and an archive open per document — 2,500 opens
+    of 53 archives, which turned a rebuild from forty seconds into seventy.
+    A parser change is exactly when a rebuild happens, and exactly when you
+    are iterating and cannot wait a minute for each attempt.
+    """
+    for snap in snapshots():
+        stamp = _stamp_of(snap)
+        want = need.get(stamp)
+        if not want:
+            continue
+        for name, html in _read(snap, {"%s.html" % p for p in want}).items():
+            if name.endswith(".html"):
+                yield stamp, name.removesuffix(".html"), html
 
 
 # ---------------------------------------------------------------------------
@@ -405,30 +508,42 @@ def parse() -> None:
     """
     tables: dict[str, list[dict]] = {}
     cache, fresh = _parse_cache(), {}
-    hits = misses = 0
+    walk = doc_keys()
+    keys = _Sigs()
 
-    for stamp, docs in pages():
-        for key, html in sorted(docs.items()):
+    # What has to be read off disk: the documents this run needs a parse of
+    # and does not already have one for. Gathered first so the archives can be
+    # opened once each rather than once per document.
+    need: dict[str, set] = {}
+    for stamp, docs in walk:
+        for key, (ck, origin) in docs.items():
+            src = source_for(key)
+            if src is not None and src.table != "points" and ck not in cache:
+                need.setdefault(origin, set()).add(key)
+    misses = sum(len(v) for v in need.values())
+
+    for origin, key, html in documents(need):
+        src = source_for(key)
+        try:
+            rows = src.parse(html, origin, key)
+        except Exception as e:
+            # One bad page must not lose the rest of the run.
+            print(f"  warn: {origin}/{key}: {type(e).__name__}: {e}")
+            rows = []
+        cache[keys.of(key, html)] = rows
+
+    hits = 0
+    for stamp, docs in walk:
+        for key, (ck, origin) in sorted(docs.items()):
             src = source_for(key)
             if src is None or src.table == "points":
                 continue          # points feeds data/season/live, via points.py
-            ck = "%s:%s" % (key, hashlib.blake2b(
-                html.encode("utf-8", "replace"), digest_size=12).hexdigest())
-            rows = cache.get(ck)
-            if rows is None:
-                misses += 1
-                try:
-                    rows = src.parse(html, stamp, key)
-                except Exception as e:
-                    # One bad page must not lose the rest of the run.
-                    print(f"  warn: {stamp}/{key}: {type(e).__name__}: {e}")
-                    rows = []
-                cache[ck] = rows
-            else:
-                hits += 1
+            rows = cache.get(ck, [])
+            hits += 1
             fresh[ck] = rows
             tables.setdefault(src.table, []).extend(
                 [{**r, "observed_at": stamp} for r in rows])
+    hits -= misses
     _save_parse_cache(fresh)
     print("  parsed %d documents, reused %d" % (misses, hits))
 
@@ -494,6 +609,35 @@ def parse() -> None:
 _CACHE = "parsed.json"
 
 
+class _Sigs:
+    """Cache key per document, computed once per DISTINCT document.
+
+    The carry-forward hands the same market page to every stamp since it last
+    changed, and it hands back the same str OBJECT each time — so hashing it
+    per stamp was hashing 2.4 GB of html to get a few hundred distinct
+    digests. Two seconds of every run, spent proving that a string equals
+    itself.
+
+    Memoised on (page, len, hash) rather than on the text, because CPython
+    stores a str's hash on the object the first time it is asked for: the
+    carried-forward copies are the same object, so every lookup after the
+    first is free and nothing has to be held onto. Holding onto them was the
+    first attempt and it ran the box out of memory — a quarter of a gigabyte
+    of pinned html to save two seconds is not a trade.
+    """
+
+    def __init__(self) -> None:
+        self._at: dict[tuple, str] = {}
+
+    def of(self, page: str, html: str) -> str:
+        k = (page, len(html), hash(html))
+        ck = self._at.get(k)
+        if ck is None:
+            ck = self._at[k] = "%s:%s" % (page, hashlib.blake2b(
+                html.encode("utf-8", "replace"), digest_size=12).hexdigest())
+        return ck
+
+
 def _fingerprint() -> str:
     import hashlib as _h
     src = Path(__file__).with_name("sources.py")
@@ -503,9 +647,9 @@ def _fingerprint() -> str:
         return ""
 
 
-def _parse_cache() -> dict:
+def _parse_cache(name: str = _CACHE) -> dict:
     try:
-        blob = json.loads((TIDY / _CACHE).read_text(encoding="utf-8"))
+        blob = json.loads((TIDY / name).read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return {}
     if blob.get("parser") != _fingerprint():
@@ -513,12 +657,12 @@ def _parse_cache() -> dict:
     return blob.get("docs", {})
 
 
-def _save_parse_cache(docs: dict) -> None:
+def _save_parse_cache(docs: dict, name: str = _CACHE) -> None:
     """Only what THIS run used, so the file cannot grow without bound: a page
     nobody carried forward any more is a page nobody will ask about again."""
     TIDY.mkdir(parents=True, exist_ok=True)
     try:
-        (TIDY / _CACHE).write_text(
+        (TIDY / name).write_text(
             json.dumps({"parser": _fingerprint(), "docs": docs}),
             encoding="utf-8")
     except OSError:
@@ -702,6 +846,56 @@ def _selftest() -> None:
         _write(q, members)
         assert p.read_bytes() == q.read_bytes(), "archive not reproducible"
 
+    # -- the snapshot index answers the same walk without reading disk -----
+    # This is the load-bearing claim of doc_keys: that the second run of a
+    # season sees exactly what the first one did, having opened no archives.
+    # If it ever drifts, every tidy CSV is quietly built from a stale picture
+    # of which snapshot carried which page — the worst failure in the repo,
+    # because nothing downstream would look wrong.
+    import io as _io
+    import contextlib
+
+    global RAW, TIDY
+    _raw, _tidy = RAW, TIDY
+    with tempfile.TemporaryDirectory() as tmp:
+        RAW, TIDY = Path(tmp) / "raw", Path(tmp) / "tidy"
+        RAW.mkdir(parents=True)
+        man = lambda *ps: _manifest_csv(                        # noqa: E731
+            [{"page": p, "sig": "s", "stored": "t", "seen": "t"} for p in ps])
+        _write(RAW / "dt=2026-01-01T0000Z.tar.xz",
+               {"market.html": "<html>a</html>", MANIFEST: man("market")})
+        # The second snapshot stores nothing new: market is CARRIED into it,
+        # which is the case the index has to reproduce and the reason it
+        # records the stamp that stored each document rather than just its key.
+        _write(RAW / "dt=2026-01-02T0000Z.tar.xz", {MANIFEST: man("market")})
+
+        cold = doc_keys()
+        assert [st for st, _ in cold] == ["2026-01-01T0000Z",
+                                          "2026-01-02T0000Z"], cold
+        assert cold[1][1]["market"] == cold[0][1]["market"], "carry-forward lost"
+        assert cold[1][1]["market"][1] == "2026-01-01T0000Z", "wrong origin"
+
+        buf = _io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            warm = doc_keys()
+        assert warm == cold, (warm, cold)
+        assert "read" not in buf.getvalue(), "archives re-read on a warm index"
+
+        # A rewritten archive is a different size, and a different size is the
+        # only thing standing between the index and trusting itself blindly.
+        _write(RAW / "dt=2026-01-02T0000Z.tar.xz",
+               {"market.html": "<html>bb</html>", MANIFEST: man("market")})
+        buf = _io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            again = doc_keys()
+        assert "read 1 of 2" in buf.getvalue(), buf.getvalue()
+        assert again[1][1]["market"] != cold[1][1]["market"], again
+
+        # documents() opens each archive once and hands back what was asked.
+        got = list(documents({"2026-01-01T0000Z": {"market"}}))
+        assert got == [("2026-01-01T0000Z", "market", "<html>a</html>")], got
+    RAW, TIDY = _raw, _tidy
+
     # -- the manifest defines what a snapshot observed ---------------------
     rows = [{"page": "market", "sig": "s1", "stored": "t0", "seen": "t1"}]
     assert _manifest({MANIFEST: _manifest_csv(rows)}) == rows
@@ -744,7 +938,7 @@ def _selftest() -> None:
     assert _stamp_of(Path("data/raw/dt=2026-08-15T0940Z.tar.xz")) \
         == _stamp_of(Path("data/raw/dt=2026-08-15T0940Z")) == "2026-08-15T0940Z"
 
-    print("ingest.py selftest OK (18 cases)")
+    print("ingest.py selftest OK (24 cases)")
 
 
 if __name__ == "__main__":

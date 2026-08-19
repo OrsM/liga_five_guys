@@ -1,6 +1,6 @@
 {
- "generated_at": "2026-08-19T00:30Z",
- "locks_in_h": 18.49878801611111,
+ "generated_at": "2026-08-19T08:56Z",
+ "locks_in_h": 10.053087351666667,
  "cash": -133023.0,
  "squad_value": 236374060.0,
  "jornadas_left": 38,
@@ -126,7 +126,7 @@
    "sell_n": 2,
    "victim": "",
    "owner": "BurtonGM89",
-   "d_pos": 0.12997782850799988,
+   "d_pos": 0.1299938800239999,
    "d_win": 0.07000000000000006,
    "net": 4957146.0,
    "d_pts": 23.68442466386341,
@@ -168,7 +168,7 @@
    "sell_n": 1,
    "victim": "",
    "owner": "Albert Laporta",
-   "d_pos": 0.005310542341333412,
+   "d_pos": 0.005327042357333412,
    "d_win": 0.0,
    "net": 4042937.0,
    "d_pts": -0.14948604712594715,
@@ -555,9 +555,9 @@
    "what": "a week of new offers",
    "best": 5.611829728196087,
    "pts": 202.02587021505911,
-   "lo": 3.8643443547049454,
+   "lo": 3.952741899840511,
    "hi": 6.863641099395386,
-   "beats_now": 0.455,
+   "beats_now": 0.48,
    "helpful": 110,
    "pool": 572,
    "note": "the market is modelled from 73 offers over 5 cycles, weighted by value^0.15"
@@ -603,12 +603,12 @@
    "hi": null,
    "beats_now": null,
    "helpful": 31,
-   "days": 5.829443670798611,
+   "days": 5.477608642361111,
    "opens": "24 Aug"
   }
  ],
  "verdict": "**Act today.** Nothing you can wait for beats what is on offer now.",
- "market_pct": "market **54th percentile** · an ordinary week · better in 46% of weeks",
+ "market_pct": "market **52nd percentile** · an ordinary week · better in 48% of weeks",
  "shape_now": "4-5-1",
  "hold": false,
  "standings": [

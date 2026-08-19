@@ -29,6 +29,7 @@ from __future__ import annotations
 
 import re
 import unicodedata
+from functools import lru_cache
 
 __all__ = ["norm", "fold", "tokens", "resolve", "index_by"]
 
@@ -40,14 +41,29 @@ _DELETE = str.maketrans({"'": "", "\u2019": "", "`": "", "\u00b4": ""})
 _WS = re.compile(r"\s+")
 
 
+# Memoised because this is the hottest function in the repo by an order of
+# magnitude and it is a pure function of a string. One report calls it 813,488
+# times on roughly 1,500 distinct names — the same squad, the same market, the
+# same five spellings of Álvaro Fernández, re-decomposed character by character
+# for every join in every stage. Caching it is not a micro-optimisation; it was
+# 45% of squads.py and 40% of the crosswalk.
+#
+# Unbounded on purpose. The key space is names, which is bounded by the league,
+# so an LRU ceiling would only add a wall nothing reaches. The cache lives for
+# the life of the process and every process here is a batch job.
+@lru_cache(maxsize=None)
+def _norm(s: str) -> str:
+    s = unicodedata.normalize("NFKD", s)
+    s = "".join(c for c in s if not unicodedata.combining(c))
+    s = s.lower().translate(_DELETE).translate(_TO_SPACE)
+    return _WS.sub(" ", s).strip()
+
+
 def norm(s) -> str:
     """Accent-insensitive, case-insensitive, punctuation-insensitive key."""
     if s is None:
         return ""
-    s = unicodedata.normalize("NFKD", str(s))
-    s = "".join(c for c in s if not unicodedata.combining(c))
-    s = s.lower().translate(_DELETE).translate(_TO_SPACE)
-    return _WS.sub(" ", s).strip()
+    return _norm(s if type(s) is str else str(s))
 
 
 def tokens(s) -> list[str]:
