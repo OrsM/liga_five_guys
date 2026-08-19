@@ -26,8 +26,20 @@ it fail, then implement.
 
 ## Where it stands
 
-Live as of this handoff: cash **-33K** (red), formation **4-5-1**, finish 1.62, P(win) 51%,
+Live as of this handoff: cash **-29K** (red), formation **4-5-1**, finish 1.62, P(win) 51%,
 season band 1,516–1,775. The report is still the simulation and still one grouped table.
+(The headline cash moved -33K → -29K on purpose: it reads League's estimator now, which
+accrues the daily allowance since the anchor, instead of a second raw read of the app's
+balance.)
+
+**A later session, same evening, did the freshness work item 6 below asked for.** Three
+commits: the API tables are gated on age like Club Elo already was; a gated feed that goes
+quiet now says so in the headline and in the warnings that reach the phone; and the never
+used per-manager budget override is gone. Nothing in the live report moved except that
+cash figure — the whole of it shows up only when the app stops answering, which is the
+point. The degradation path was measured, not argued: aged three days, the report keeps
+the real 17 points and projects 1,644 against 1,646 fresh, and says twice why it is not
+the app's reading.
 
 **This session was an audit, not a feature.** Nine commits, and the report barely moved —
 which is the point. What changed is that the inputs are honest about their own age, the
@@ -95,40 +107,56 @@ tables. Two wrong numbers were found and fixed on the way.
    Judge nothing yet.
 5. **The shape prior is still the seed** (96 observed, 200 needed) — `pool_note()` prints
    which is in use, never assume.
-6. **KEEP TRIMMING `inputs/`. It is three files and two of them may not earn it.**
-   Today: `rosters_initial.txt` changes nothing at all while the API answers (measured —
-   identical ownership to the player) and carries it from 30 to 79 when the API is gone.
-   `cash.txt` is worth 0.07M of accuracy against 0.50M without it, and only since the
-   allowance fix. `lineup.txt` is the one genuinely hand-written file and stays: nothing we
-   fetch publishes a fielded flag, so the marks cannot be derived.
+6. **`inputs/` is three files and all three now earn it — measured, on the path that
+   actually happens.** The previous handoff suspected `rosters_initial.txt` and `cash.txt`
+   were kept for a scenario that could not occur, because "API gone" had been tested with
+   an EMPTY feed while a dead token only makes the store STALE. That was right about the
+   test and wrong about the conclusion: gating the API tables (this session) is what turns
+   stale into empty, so the empty case is now the real degradation path, and both files
+   were re-measured against it.
 
-   **The measurement that justifies both is probably the wrong one, and that is the next
-   thing to check.** "API gone" was tested by passing an EMPTY feed — but the tidy store is
-   on disk and keeps the last good reading for ever, so a dead token does not empty
-   `api_teams.csv`, it makes it STALE. The empty case only happens on a cold start that has
-   never authenticated. If that is right, then the real degradation path never reaches
-   either file, and both are being kept for a scenario that cannot occur.
+   With the store aged three days and the gate on, against a fresh run:
 
-   Do it in this order, because the second answer depends on the first:
+   | Input | Fresh run | Stale run (the path that happens) |
+   |---|---|---|
+   | `rosters_initial.txt` | no change at all | squad 15 players → 5, 240.73M → 134.96M |
+   | `cash.txt` | no change at all | 49K "known" → -518K "estimated", 0.57M and the label |
+   | `lineup.txt` | load-bearing always — nothing fetched publishes a fielded flag | — |
 
-   a. **Gate the API tables on freshness**, the way `load_elo` already is. A three-day-old
-      squad reading joins perfectly and prices a market that has moved — same bug as the
-      stale Elo rating and the stale cash anchor, and the third instance is where you stop
-      calling it a coincidence. `fresh_only()` and `DAILY_FRESH_DAYS` are already in
-      `ffcore/tidy.py`; these feeds are `every_run`, so the bound is tighter.
-   b. **Then re-measure the two files against the path that actually happens** — stale
-      store, not empty store — rather than against the one I tested.
-   c. **And trim what is left.** `league.ini`'s `[budget]` section has never held a value;
-      `budget` itself may be derivable now that the API states `teamValue` and the ledger is
-      exact. Anything that survives should be able to say what it buys, in units.
+   So nothing here is a candidate for deletion any more. What is left of the direction is
+   to keep asking what each one buys in units — `cash.txt`'s answer shrinks every time the
+   app's own balance is fresh, and it is worth re-running that measurement if the anchor
+   ever goes a week untouched.
 
-   The direction is one file a human edits and nothing else. Every input removed is a thing
-   that cannot go stale behind your back — which is what the whole of this session was
-   about.
+7. **The remaining API feeds are ungated, and one of them may want it.** `api_leagues` no
+   longer reaches the report (the headline cash reads League's estimator now), but the
+   table is still swept and still nothing checks its age. `api_activity`, `api_stats` and
+   `api_players` are histories and must NOT be gated — that is written in their docstrings
+   so it does not get "fixed". `fixtures` is a snapshot and is not gated: a stale fixture
+   list would blank the sim entirely, and whether that is more honest than a day-old
+   kickoff time has not been measured. Do not change it on the argument alone.
+
 
 ## Traps that cost real time — do not rediscover these
 
 Everything in the previous handoff still holds. New this session:
+
+- **The freshness bound for an every-run feed is NOT half a day, and 0.5 was already in
+  the code.** `lfg.timer` fires at 00:40 and 11:40 local, so the two legs are 11h and 13h
+  and `RandomizedDelaySec` adds five minutes to either. A feed answering every single
+  sweep is 13h10m old at its oldest — measured on the store, the largest gap over 21
+  sweeps was 13.0h with nothing missed — so 0.5 days condemns a healthy feed every night.
+  `EVERY_RUN_FRESH_DAYS = 0.6` clears the long leg by an hour and still catches a missed
+  sweep inside the day.
+- **A gate that only refuses is half a fix.** Handing every reader `[]` is honest about
+  the data and silent about the reason, and `[]` arrives downstream as "nothing is for
+  sale". Aged three days, the report still came out in full and its headline read "market
+  0th percentile · a poor week" — a claim about a market it could not see. Whatever you
+  gate, give it a `stale_feeds()` sentence next to the numbers it explains.
+- **One row can hold two kinds of fact.** `api_standings` carries a balance, which must be
+  today's, and a season-to-date point total, which only grows. Gating the row threw both
+  away and simulated all five managers from nought — a wrong number where a slightly old
+  one was available. `last_api_standings()` is the ungated reader for the history half.
 
 - **A claim read off the code is not a finding.** I told Miguel `rosters_initial.txt`
   anchored every rival's cash; emptying it changed every balance by zero, because the
