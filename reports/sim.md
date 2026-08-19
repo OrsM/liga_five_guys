@@ -1,12 +1,12 @@
-# The simulation — 2026-08-19T1454Z
+# The simulation — 2026-08-19T1639Z
 
 ## Now
 
-**Locks in 3h** · squad 236.37M · **cash -33K** · total 236.34M
+**Locks in 2h** · squad 236.37M · **cash -33K** · total 236.34M
 
 play 4-5-1 · finish 1.62 · win 51% · season 1,516–1,775
 
-_market **53rd percentile** · an ordinary week · better in 47% of weeks_
+_market **56th percentile** · an ordinary week · better in 44% of weeks_
 
 ## Every player you could hold
 
@@ -53,13 +53,13 @@ _Read it top to bottom: it is a plan, not a menu. The funding is implicit — se
 | Route | What it offers | Season pts | Beats acting today |
 |---|---|--:|--:|
 | **Act today** | 40 players you can buy now | +210 | — |
-| Wait for the market | a week of new offers | +199 | 47% |
+| Wait for the market | a week of new offers | +199 | 44% |
 | Wait for the clauses | 60 players on 24 Aug | +157 | — |
 
 | The workings | |
 |---|--:|
 | Unowned players who would improve your eleven | 112 of 571 |
-| Tenth percentile of a week's waiting | +3.70 |
+| Tenth percentile of a week's waiting | +3.78 |
 | Market model | the market is modelled from 75 offers over 5 cycles, weighted by value^0.15 |
 | Locked players who would improve your eleven | 32 |
 | Their clauses open | 24 Aug, in about 5 days |

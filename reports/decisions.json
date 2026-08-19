@@ -1,6 +1,6 @@
 {
- "generated_at": "2026-08-19T16:22Z",
- "locks_in_h": 2.6244590819444444,
+ "generated_at": "2026-08-19T16:39Z",
+ "locks_in_h": 2.336291823611111,
  "cash": -33023.0,
  "squad_value": 236374060.0,
  "jornadas_left": 38,
@@ -555,9 +555,9 @@
    "what": "a week of new offers",
    "best": 5.514484828876018,
    "pts": 198.52145383953663,
-   "lo": 3.7048670724082937,
+   "lo": 3.775930556767457,
    "hi": 6.751683615975713,
-   "beats_now": 0.4725,
+   "beats_now": 0.44,
    "helpful": 112,
    "pool": 571,
    "note": "the market is modelled from 75 offers over 5 cycles, weighted by value^0.15"
@@ -603,12 +603,12 @@
    "hi": null,
    "beats_now": null,
    "helpful": 32,
-   "days": 5.168093441018518,
+   "days": 5.156086194363426,
    "opens": "24 Aug"
   }
  ],
  "verdict": "**Act today.** Nothing you can wait for beats what is on offer now.",
- "market_pct": "market **53rd percentile** · an ordinary week · better in 47% of weeks",
+ "market_pct": "market **56th percentile** · an ordinary week · better in 44% of weeks",
  "shape_now": "4-5-1",
  "hold": false,
  "standings": [
