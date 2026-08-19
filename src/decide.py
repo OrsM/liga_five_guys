@@ -776,14 +776,16 @@ def load(trials_pool=None) -> Universe:
     for r in last_api_standings():
         if r.get("manager"):
             carried.setdefault(r["manager"], float(r.get("team_points") or 0))
-    # LATEST, not first. `next()` over the raw file takes the OLDEST row in
-    # it, because the CSV is append-only and oldest-first — so the balance
-    # shown was the first one ever recorded and never moved again. On
-    # 2026-08-18 that reported 23.60M against a real -133K, right after a
-    # purchase, which is the one moment the number has to be right.
-    cash = next((float(r["money"]) for r in
-                 reversed(latest_only(read_csv(TIDY / "api_leagues.csv")))
-                 if r.get("money")), 0.0)
+    # THE SAME CASH AS EVERY OTHER MANAGER'S, out of the same estimator that
+    # writes league.md — rival_cash three hundred lines up already reads it
+    # this way. This used to be a second, independent read of the raw
+    # api_leagues balance, and two copies of one fact in two places is how a
+    # number gets corrected in one and not the other: the gate on the API
+    # tables moved league.md's cash and left the headline quoting a
+    # three-day-old balance from a feed everything else had refused. The
+    # estimator also accrues the daily allowance since the anchor, which the
+    # raw balance cannot, and states its own confidence.
+    cash = lg[me].cash.value or 0.0
 
     return Universe(
         state=LeagueState(squads, rem, me, carried), forecaster=fc, pos=pos,

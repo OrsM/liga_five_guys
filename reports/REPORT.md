@@ -1,11 +1,11 @@
-# Liga Five Guys — one report — 2026-08-19 17:31 UTC
+# Liga Five Guys — one report — 2026-08-19 17:33 UTC
 
 
 
 
 ## Now
 
-**Locks in 1h** · squad 236.37M · **cash -33K** · total 236.34M
+**Locks in 1h** · squad 236.37M · **cash -29K** · total 236.34M
 
 play 4-5-1 · finish 1.62 · win 51% · season 1,516–1,775
 
@@ -44,10 +44,10 @@ _market **56th percentile** · an ordinary week · better in 44% of weeks_
 | Marc Roca | MED | 68% | 2.85 | Albert Laporta | +4.04M | -0 |
 | **SAVE — better than yours, out of reach** | | | | | | |
 | Joan Garcia | POR | 99% | 8.24 | free agent | 43.33M short | +134 if you could |
-| Arda Guler | MED | 91% | 6.01 | Albert Laporta | 25.99M short | +104 if you could |
+| Arda Guler | MED | 91% | 6.01 | Albert Laporta | 25.98M short | +104 if you could |
 | Dean Huijsen | DEF | 97% | 5.53 | BurtonGM89 | 10.29M short | +102 if you could |
 | Santiago Mouriño | DEF | 97% | 3.75 | Albert Laporta | 13.55M short | +32 if you could |
-| Mario Soriano | MED | 99% | 2.99 | free agent | 0.50M short | -4 if you could |
+| Mario Soriano | MED | 99% | 2.99 | free agent | 0.49M short | -4 if you could |
 
 _Read it top to bottom: it is a plan, not a menu. The funding is implicit — sell the SELL rows and the BUY rows are what the money reaches. **Start** is one number, futbolfantasy recalibrated against confirmed line-ups and blended with analiticafantasy where it has an opinion, and it is the same figure the forecast multiplies by. **xPts/j** is what he scores a jornada with that already applied. **€** is negative to buy, positive to sell, and on a SAVE row it is how far short you are. **Season** is simulated: extra points over the 38 jornadas left, measured in the same seasons with and without the move._
 
