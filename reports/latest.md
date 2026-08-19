@@ -1,10 +1,10 @@
-# The workings — 2026-08-19T1750Z
+# The workings — 2026-08-19T1823Z
 
 _What the one table in [REPORT.md](REPORT.md) was built from: the eleven it assumes you field, what a man on today's slate should cost, and the two ways any of it can be wrong about a player._
 
 ## 1. Field these eleven
 
-**Your XI: 4-5-1 · index 40.2** (a ranking number, not a points forecast — only differences mean anything)
+**⚠ Not a legal eleven — 10 players, 4-4-1.** The app will fill the gaps for you, and not with your choice. Fix `inputs/lineup.txt`.
 
 | | Marked XI | vs | pts/m | Fix | FF | AF | xPts/j |
 |---|---|---|--:|--:|--:|--:|--:|
@@ -15,7 +15,6 @@ _What the one table in [REPORT.md](REPORT.md) was built from: the eleven it assu
 | DEF | Omar El Hilali | Madrid H | 3.0 | -7% | 80% | — | 2.7 |
 | MED | Pepelu | Celta Vigo H | 4.3 | +1% | 70% | 75% | 3.5 |
 | MED | Iñigo Ruiz de Galarreta | Sevilla H | 4.5 | +7% | 70% | — | 4.4 |
-| MED | Dani Lorenzo | Atletico A | ~2.8 | -13% | 90% | 100% | 2.4 |
 | MED | Jon Moncayola | Levante H | 4.3 | +13% | 90% | — | 4.7 |
 | MED | Lucien Agoume | Athletic A | 3.9 | -6% | 80% | 100% | 3.7 |
 | DEL | Iñigo Vicente | Getafe A | ~3.0 | = | 90% | 100% | 3.0 |
@@ -25,12 +24,11 @@ _**pts/m** is points per match, last season shrunk toward the average and blende
 
 _The `+SLOT` rows are today's slate: **xPts/j is the change to the whole eleven** if you sign him and re-pick the shape, not his own score, and it leaves the fixture OUT — you own a player for months, not for one round. `★` next to the opponent means this round's draw happens to be kind, `↓` that it is not; neither is in the number. What he would cost, and whether that is a good rate, is question 2._ _10 others on the slate would not improve this eleven, so they are priced there and not here._
 
-**The model's eleven is 6.9 better** (index 47.0, shape 4-5-1).
+**The model's eleven is 9.3 better** (index 47.0, shape 4-5-1).
 
 | Bench this | For this | Worth |
 |---|---|--:|
 | Igor Zubeldia (2.3) | Marcos Alonso (5.1) | +2.7 |
-| Dani Lorenzo (2.4) | Pablo Fornals (6.6) | +4.1 |
 
 _Swaps are same-position only: a cross-slot difference is a change of formation, not a substitution. Your own marks are the row above — this table is advice._
 
@@ -38,17 +36,17 @@ _Swaps are same-position only: a cross-slot difference is a change of formation,
 
 | Player — 12 on offer | Pos | Bid | XI | Competition | Note |
 |---|---|--:|--:|---|---|
-| Abiel Osorio | del | — | 0%/— | none |  |
-| Iago Aspas | del | — | 40%/50% | (2 broke) |  |
-| Iñigo Perez | ent | — | !15%/— | none |  |
-| Javi Puado | med | — | 0%/— | none |  |
+| Iago Aspas | del | 7.03M–8.91M | 40%/50% | (2 broke) |  |
+| Javi Puado | med | 5.81M–8.91M | 0%/— | none |  |
+| Nico Guillen | med | 4.76M–8.91M | 50%/— | Albert +0.9, (2 broke) |  |
+| Peter Gulacsi | por | 4.17M–8.91M | 40%/— | none |  |
+| Iñigo Perez | ent | 2.13M–8.91M | !15%/— | none |  |
+| Peque | del | 2.08M–8.91M | 50%/50% | (2 broke) |  |
+| Matias Vecino | med | 1.85M–8.91M | 0%/— | none |  |
+| Abiel Osorio | del | 1.34M–8.91M | 0%/— | none |  |
+| Manel Usedo | med | 755K–5.48M | !15%/— | none |  |
 | Joan Garcia | por | — | 90%/100% | (4 broke) |  |
-| Manel Usedo | med | — | !15%/— | none |  |
 | Mario Soriano | med | — | 80%/100% | (4 broke) |  |
-| Matias Vecino | med | — | 0%/— | none |  |
-| Nico Guillen | med | — | 50%/— | Albert +0.9, (2 broke) |  |
-| Peque | del | — | 50%/50% | (2 broke) |  |
-| Peter Gulacsi | por | — | 40%/— | none |  |
 | Trent Alexander-Arnold | def | — | 50%/— | (2 broke) |  |
 
 | Column | What it is |
@@ -58,6 +56,8 @@ _Swaps are same-position only: a cross-slot difference is a change of formation,
 | XI | FF's probable-eleven percentage — the one the forecast uses — then AF's read of the same eleven. Printed, never blended: two sources that disagree is the signal, and the reason to open the app before bidding |
 | XI, the marks | **FF** is futbolfantasy's probable-XI percentage, which is the one the forecast uses. **AF** is analiticafantasy's read of the same eleven, printed beside it and never blended in — `titular` is a named starter (a final call, with no number to it), a percentage is their editors' consensus, `?` means they list him without either, and `—` means they do not have him. Two columns that disagree are the signal; that is the whole point of carrying both. |
 | Competition | demand, not roster counts: the rivals whose XI actually improves with him, strongest threat first. `?` cash unknown (treat as live), `(n broke)` want him but cannot pay the floor. Manager by manager in `reports/rivals.md` |
+
+**⚠ 9 bids at 29.92M is more than the 8.91M you hold.** Each row above is priced as though it were your only purchase, and the app settles them together — take them best rate first: Iago Aspas, Javi Puado, Nico Guillen, Peter Gulacsi, Iñigo Perez, Peque, Matias Vecino, Abiel Osorio, Manel Usedo.
 
 | Already owned, so not a purchase | Held by |
 |---|---|
@@ -69,7 +69,6 @@ _Swaps are same-position only: a cross-slot difference is a change of formation,
 | carlos espi | SusoGattuso |
 | carlos puga | BurtonGM89 |
 | cesar tarrega | SusoGattuso |
-| dani lorenzo | you |
 | dean huijsen | BurtonGM89 |
 | denis suarez | BurtonGM89 |
 | ferran jutgla | Albert Laporta |
@@ -101,8 +100,8 @@ The app is offering these and no market row matches the name, so they carry no r
 
 | Fitness | Players |
 |---|---|
-| flagged | **0** of 14 |
-| listed, no flag | 14 — Beñat Turrientes, Carl Starfelt, Dani Lorenzo, Igor Zubeldia, Ionut Radu, Iñigo Ruiz de Galarreta, Iñigo Vicente, Jon Moncayola, Lucien Agoume, Marcos Alonso, Omar El Hilali, Pablo Fornals, Pepelu, Robin Le Normand |
+| flagged | **0** of 13 |
+| listed, no flag | 13 — Beñat Turrientes, Carl Starfelt, Igor Zubeldia, Ionut Radu, Iñigo Ruiz de Galarreta, Iñigo Vicente, Jon Moncayola, Lucien Agoume, Marcos Alonso, Omar El Hilali, Pablo Fornals, Pepelu, Robin Le Normand |
 | no entry on their team page — unknown, not fit | 0 |
 
 _Read from the 'Estado físico', 'Sancionados' and 'No disponibles' blocks of each team page; `Tocado` — a knock the site still lists as available — is folded into doubt. No entry is an absence of evidence, not evidence of fitness._
@@ -135,7 +134,6 @@ _Compare squad value with the app; a mismatch means a name matched the wrong pla
 | Iñigo Vicente | 19.85M | 253K | +1.29% |
 | Lucien Agoume | 5.68M | -70K | -1.21% |
 | Ionut Radu | 37.44M | -524K | -1.38% |
-| Dani Lorenzo | 9.45M | -144K | -1.50% |
 | Beñat Turrientes | 6.96M | -108K | -1.52% |
 
 ## Notes
@@ -147,4 +145,4 @@ _Compare squad value with the app; a mismatch means a name matched the wrong pla
 | Zeroed | injured, suspended, unavailable; a doubt is halved |
 | Fixture term | ±12% across the opponents ranked by Club Elo rating, plus ±4% for home advantage — both widths guesses, unfitted, and small enough that a wrong one costs a fraction of a point |
 
-_Generated 2026-08-19 17:58 UTC._
+_Generated 2026-08-19 18:23 UTC._

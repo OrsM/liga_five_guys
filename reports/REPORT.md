@@ -1,13 +1,13 @@
-# Liga Five Guys — one report — 2026-08-19 17:58 UTC
+# Liga Five Guys — one report — 2026-08-19 18:23 UTC
 
 
 
 
 ## Now
 
-**Locks in 1h** · squad 236.37M · **cash -32K** · total 236.34M
+**Locks in 1h** · squad 226.93M · cash 8.91M · total 235.83M
 
-play 4-5-1 · finish 1.19 · win 82% · season 1,676–1,938
+**play 4-5-1** (now 4-4-1) · finish 1.20 · win 81% · season 1,672–1,934
 
 _market **54th percentile** · an ordinary week · better in 46% of weeks_
 
@@ -29,25 +29,24 @@ _market **54th percentile** · an ordinary week · better in 46% of weeks_
 | Iñigo Vicente | DEL | 99% | 3.00 | yours | — | — |
 | **Your eleven — play 4-5-1** | | | **47.10** | vs SusoGattuso **44.06** | | **+3.04** |
 | **SELL — never start** | | | | | | |
-| Dani Lorenzo | MED | 99% | 2.45 | yours | +9.45M | — |
 | Igor Zubeldia | DEF | 71% | 2.34 | yours | +10.30M | — |
 | Beñat Turrientes | MED | 35% | 1.11 | yours | +6.96M | — |
 | **BUY — with the proceeds** | | | | | | |
-| Matias Dituro | POR | 99% | 5.65 | Albert Laporta | +2.72M | -1 |
-| Yuri Berchiche | DEF | 92% | 4.79 | SusoGattuso | +7.45M | +76 |
-| Ferran Jutgla | DEL | 97% | 4.13 | Albert Laporta | +0.79M | +54 |
-| Antonio Blanco | MED | 99% | 4.11 | BurtonGM89 | +4.96M | +20 |
-| Cesar Tarrega | DEF | 99% | 3.97 | SusoGattuso | +1.16M | +48 |
-| Aitor Paredes | DEF | 80% | 3.92 | BurtonGM89 | +5.02M | +45 |
-| Isi Palazon | DEL | 82% | 3.85 | SusoGattuso | +6.55M | +35 |
-| Marc Roca | MED | 91% | 3.83 | Albert Laporta | +4.04M | +15 |
-| Mario Martin | MED | 97% | 3.16 | SusoGattuso | +5.45M | -1 |
-| Juan Foyth | DEF | 80% | 3.15 | Albert Laporta | +7.51M | +12 |
+| Matias Dituro | POR | 99% | 5.65 | Albert Laporta | -7.57M | +0 |
+| Yuri Berchiche | DEF | 92% | 4.79 | SusoGattuso | -2.00M | +77 |
+| Ferran Jutgla | DEL | 97% | 4.13 | Albert Laporta | -2.55M | +54 |
+| Antonio Blanco | MED | 99% | 4.11 | BurtonGM89 | -7.83M | +23 |
+| Cesar Tarrega | DEF | 99% | 3.97 | SusoGattuso | +1.16M | +47 |
+| Aitor Paredes | DEF | 80% | 3.92 | BurtonGM89 | +5.02M | +44 |
+| Isi Palazon | DEL | 82% | 3.85 | SusoGattuso | -2.89M | +36 |
+| Marc Roca | MED | 91% | 3.83 | Albert Laporta | +4.89M | +14 |
+| Mario Martin | MED | 97% | 3.16 | SusoGattuso | +6.30M | -1 |
+| Juan Foyth | DEF | 80% | 3.15 | Albert Laporta | -5.28M | +14 |
 | **SAVE — better than yours, out of reach** | | | | | | |
-| Joan Garcia | POR | 99% | 8.24 | free agent | 43.33M short | +79 if you could |
-| Dean Huijsen | DEF | 97% | 5.53 | BurtonGM89 | 10.29M short | +104 if you could |
-| Santiago Mouriño | DEF | 97% | 3.75 | Albert Laporta | 13.55M short | +34 if you could |
-| Mario Soriano | MED | 99% | 2.99 | free agent | 0.50M short | -4 if you could |
+| Joan Garcia | POR | 99% | 8.24 | free agent | 43.84M short | +83 if you could |
+| Dean Huijsen | DEF | 97% | 5.53 | BurtonGM89 | 10.80M short | +102 if you could |
+| Santiago Mouriño | DEF | 97% | 3.75 | Albert Laporta | 14.06M short | +34 if you could |
+| Mario Soriano | MED | 99% | 2.99 | free agent | 1.00M short | -2 if you could |
 
 _Read it top to bottom: it is a plan, not a menu. The funding is implicit — sell the SELL rows and the BUY rows are what the money reaches. **Start** is one number, futbolfantasy recalibrated against confirmed line-ups and blended with analiticafantasy where it has an opinion, and it is the same figure the forecast multiplies by. **xPts/j** is what he scores a jornada with that already applied. **€** is negative to buy, positive to sell, and on a SAVE row it is how far short you are. **Season** is simulated: extra points over the 38 jornadas left, measured in the same seasons with and without the move._
 
@@ -55,11 +54,11 @@ _Read it top to bottom: it is a plan, not a menu. The funding is implicit — se
 
 | Manager | now | simulated | 10–90 | P(I finish above) |
 |---|--:|--:|--:|--:|
-| miguel_autentico **(you)** | 17 | 1,805 | 1,676–1,938 | — |
-| SusoGattuso | 23 | 1,674 | 1,559–1,791 | 83% |
-| BurtonGM89 | 24 | 1,508 | 1,392–1,628 | 98% |
-| Magic Mike 333 | 11 | 1,317 | 1,205–1,432 | 100% |
-| Albert Laporta | 10 | 1,171 | 1,063–1,276 | 100% |
+| miguel_autentico **(you)** | 17 | 1,800 | 1,672–1,934 | — |
+| SusoGattuso | 23 | 1,675 | 1,556–1,797 | 81% |
+| BurtonGM89 | 24 | 1,509 | 1,391–1,629 | 98% |
+| Magic Mike 333 | 11 | 1,316 | 1,205–1,432 | 100% |
+| Albert Laporta | 10 | 1,171 | 1,070–1,281 | 100% |
 
 
 

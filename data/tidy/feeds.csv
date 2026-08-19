@@ -95,3 +95,11 @@ observed_at,page,status,seconds
 2026-08-19T1750Z,api_teams,200,0.58
 2026-08-19T1750Z,api_activity_0,200,0.10
 2026-08-19T1750Z,api_activity_1,200,0.19
+2026-08-19T1823Z,market,200,0.20
+2026-08-19T1823Z,points,200,0.06
+2026-08-19T1823Z,api_leagues,200,0.27
+2026-08-19T1823Z,api_market,200,0.40
+2026-08-19T1823Z,api_teams,200,0.50
+2026-08-19T1823Z,api_activity_0,200,0.10
+2026-08-19T1823Z,api_activity_1,200,0.11
+2026-08-19T1823Z,api_player_3036,200,0.01

@@ -1,8 +1,8 @@
-# Squads — 2026-08-19 17:58 UTC
+# Squads — 2026-08-19 18:23 UTC
 
 | Manager | Players | Squad value | Spent | Raised | Cash |
 |---|--:|--:|--:|--:|--:|
-| **miguel_autentico** | 14 | 236.37M | 142.18M | 40.88M | -32K |
+| **miguel_autentico** | 13 | 226.93M | 142.18M | 49.82M | 8.91M |
 | Albert Laporta | 14 | 217.40M | 188.67M | 97.21M | ~9.33M |
 | BurtonGM89 | 13 | 253.28M | 180.85M | 51.65M | ~-28.41M |
 | Magic Mike 333 | 16 | 238.19M | 121.23M | 19.14M | ~-1.30M |
@@ -13,7 +13,7 @@
 **FF** is futbolfantasy's probable-XI percentage, which is the one the forecast uses. **AF** is analiticafantasy's read of the same eleven, printed beside it and never blended in — `titular` is a named starter (a final call, with no number to it), a percentage is their editors' consensus, `?` means they list him without either, and `—` means they do not have him. Two columns that disagree are the signal; that is the whole point of carrying both.
 
 ## You (miguel_autentico)
-14 players · 236.37M total · 11 at 70%+ · cash -32K
+13 players · 226.93M total · 10 at 70%+ · cash 8.91M
 
 | Player | Team | Pos | Value | 24h | FF | AF |
 |---|---|--:|--:|--:|--:|--:|
@@ -25,7 +25,6 @@
 | omar el hilali | Espanyol | def | 9.76M | 365K | 80% | — |
 | pablo fornals | Betis | med | 56.56M | -391K | 80% | 100% |
 | iñigo ruiz de galarreta | Athletic | med | 12.79M | 166K | 70% | — |
-| dani lorenzo | Málaga | med | 9.45M | -144K | 90% | 100% |
 | pepelu | Valencia | med | 7.68M | 16K | 70% | 75% |
 | beñat turrientes | Real Sociedad | med | 6.96M | -108K | 50% | — |
 | jon moncayola | Osasuna | med | 6.91M | -8K | 90% | — |
@@ -121,7 +120,6 @@
 
 | Date | Player | From → To | Price |
 |---|---|---|--:|
-| 2026-08-14T22:24 | Gavi | market → Magic Mike 333 | 35500000 |
 | 2026-08-14T22:24 | Agoumé | market → miguel_autentico | 5891526 |
 | 2026-08-14T22:24 | Ionut Radu | market → miguel_autentico | 39655832 |
 | 2026-08-14T22:51 | R.P. Bigas | Albert Laporta → market | 5323361 |
@@ -146,10 +144,11 @@
 | 2026-08-18T22:28 | Szczesny | SusoGattuso → market | 2133987 |
 | 2026-08-19T00:18 | A. Ferllo | miguel_autentico → market | 4759903 |
 | 2026-08-19T19:37 | Arda Güler | Albert Laporta → market | 54175985 |
+| 2026-08-19T20:05 | Dani Lorenzo | miguel_autentico → market | 8939207 |
 
 ## Cash basis
 
-- **miguel_autentico** — balance the app reported at 2026-08-19 17:50 UTC − 0.00M bought + 0.00M sold across 0 ledger row(s) + 0.00M of daily allowance over 0 days = -0.03M (known)
+- **miguel_autentico** — balance the app reported at 2026-08-19 18:23 UTC − 0.00M bought + 0.00M sold across 0 ledger row(s) + 0.00M of daily allowance over 0 days = 8.91M (known)
 - **Albert Laporta** — 100M starting budget − 188.67M bought + 97.21M sold across 14 ledger row(s) + 0.79M of daily allowance over 8 days = 9.33M (estimated)
 - **BurtonGM89** — 100M starting budget − 180.85M bought + 51.65M sold across 17 ledger row(s) + 0.79M of daily allowance over 8 days = -28.41M (estimated)
 - **Magic Mike 333** — 100M starting budget − 121.23M bought + 19.14M sold across 8 ledger row(s) + 0.79M of daily allowance over 8 days = -1.30M (estimated)
@@ -163,7 +162,6 @@
 - **pedro diaz** — the ledger has him at Magic Mike 333; the app says nobody in the league holds him.
 - **tete morente** — the ledger has him at Magic Mike 333; the app says nobody in the league holds him.
 - **carlos romero** — the app has him at BurtonGM89; the ledger has no record of him.
-- miguel_autentico is 0.03M overdrawn: balance the app reported at 2026-08-19 17:50 UTC − 0.00M bought + 0.00M sold across 0 ledger row(s) + 0.00M of daily allowance over 0 days = -0.03M. Going over the budget mid-window is allowed; being overdrawn when the jornada locks is not, so they must sell before they can buy again. If the ledger is missing a sale of theirs, this is stale rather than wrong.
 - Magic Mike 333 is 1.30M overdrawn: 100M starting budget − 121.23M bought + 19.14M sold across 8 ledger row(s) + 0.79M of daily allowance over 8 days = -1.30M. Going over the budget mid-window is allowed; being overdrawn when the jornada locks is not, so they must sell before they can buy again. If the ledger is missing a sale of theirs, this is stale rather than wrong.
 - BurtonGM89 is 28.41M overdrawn: 100M starting budget − 180.85M bought + 51.65M sold across 17 ledger row(s) + 0.79M of daily allowance over 8 days = -28.41M. Going over the budget mid-window is allowed; being overdrawn when the jornada locks is not, so they must sell before they can buy again. If the ledger is missing a sale of theirs, this is stale rather than wrong.
 - SusoGattuso is 24.77M overdrawn: 100M starting budget − 128.17M bought + 2.61M sold across 8 ledger row(s) + 0.79M of daily allowance over 8 days = -24.77M. Going over the budget mid-window is allowed; being overdrawn when the jornada locks is not, so they must sell before they can buy again. If the ledger is missing a sale of theirs, this is stale rather than wrong.
@@ -227,7 +225,7 @@ Placed by who the counterparty was, or by what the price implies — a player so
 
 **The floor sometimes wins.** 14 of the 32 priced purchases in this league went at the market value itself and the other 18 cleared it, median +1.4%, -0.3% to +635.3% (n=32) across all of them. Bidding the minimum is therefore not the one number known to lose — but 14 of 32 is a share of the bids that WON, not the odds of winning one. Nothing in this ledger records a bid that lost, so the floor's failure rate is unmeasured and unmeasurable from here.
 
-**The app does not pay you the value — it randomises around it.** The 22 priced sales back to the market went for median +3.0%, -9.4% to +12.0% (n=22): 9 below the value and 13 above, never further than 12.0% either way. So a sale raises the value give or take a tenth, and the value is not the money you will get. Whether the same randomiser bids against you for a free agent is inferred, not measured: every row in this ledger is a bid that won.
+**The app does not pay you the value — it randomises around it.** The 23 priced sales back to the market went for median +2.4%, -9.4% to +12.0% (n=23): 10 below the value and 13 above, never further than 12.0% either way. So a sale raises the value give or take a tenth, and the value is not the money you will get. Whether the same randomiser bids against you for a free agent is inferred, not measured: every row in this ledger is a bid that won.
 
 A round bid was typed by a human. That is the whole of what roundness tells you — an exact bid is *not* the app's valuation and does not mean nobody competed, because the premium column two cells left already measures how far above the floor the buyer went. Sealed bids are paid as bid, so a purchase at exactly the value was only ever yours to take if the tie-break favoured you, and that rule is not documented anywhere we can read. Check it in-app before reading a floor purchase as a bargain you missed.
 

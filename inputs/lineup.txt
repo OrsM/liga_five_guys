@@ -11,7 +11,7 @@
 # WRITTEN BY: src/squads.py (the names) and you (the marks).
 # READ BY:    src/xi.py, src/report.py.
 #
-# 11 marked · 4-5-1 legal
+# 10 marked · NOT a legal XI — fix the marks
 
 [x] POR ionut radu
 [x] DEF carl starfelt
@@ -20,7 +20,6 @@
 [x] DEF omar el hilali
 [x] DEF robin le normand
 [ ] MED beñat turrientes
-[x] MED dani lorenzo
 [x] MED iñigo ruiz de galarreta
 [x] MED jon moncayola
 [x] MED lucien agoume
