@@ -367,6 +367,48 @@ def owner_from_api(rows: list[dict], market, ledger_owner: dict | None = None,
     return out, unjoined
 
 
+# How far the app's price for a player may sit from futbolfantasy's before the
+# two are not describing the same man.
+#
+# NOT A TUNED NUMBER, and the measurement is why. Across the 70 owned players
+# that joined on 2026-08-19 the two sources agreed to within 0.2% in every
+# single case — they are read minutes apart and drift a little, which is why
+# it is not zero — while the one WRONG join was out by 603%. Three thousand
+# times the worst true disagreement: anything between the two does the same
+# job, and this is not a knob to turn when an answer displeases.
+VALUE_TOLERANCE = 0.05
+
+
+def _priced_like(key: str, raw: str, market_value, index) -> bool:
+    """Does the market price this player roughly the way the app does?
+
+    THE PRICE CHECKS A GUESS, NEVER AN EXACT MATCH. `key_for` answers two
+    quite different questions with one string: sometimes the market carries
+    that very name, and sometimes it resolved an abbreviation to the only
+    plausible candidate. The first is the strongest evidence there is and the
+    money must not be allowed to argue with it — a name the market spells the
+    same way is that player. The second is a guess, and the app states his
+    price on the same row: "C. Romero" resolved to ISAAC Romero, at 6.15M
+    against the 43.24M the app had just quoted for him.
+
+    True when either side is silent, because an absent number disproves
+    nothing.
+    """
+    if not key or key == norm(raw):
+        return True                       # the market carries this very name
+    if market_value in (None, ""):
+        return True
+    try:
+        theirs = float(str(market_value).strip())
+    except (TypeError, ValueError):
+        return True
+    ours = next((money(r.get("value")) for r in (index or [])
+                 if norm(r.get("name")) == key), None)
+    if not ours:
+        return True
+    return abs(theirs - ours) <= VALUE_TOLERANCE * ours
+
+
 def api_key(raw: str, handle: str, market, ledger_owner: dict | None = None,
             index: list | None = None, market_value=None,
             full: str = "", app_ids: dict | None = None,
@@ -411,14 +453,26 @@ def api_key(raw: str, handle: str, market, ledger_owner: dict | None = None,
         return None
     if market is None:
         return norm(raw) or None
+    if index is None:
+        index = latest_only(market.rows)
+    # Each NAME join is checked against the price the app puts on the row: a
+    # name that resolves to somebody the market values differently has found a
+    # different player, and falling through to the next join is better than
+    # confidently seating him in a rival's squad.
     key = market.key_for(raw)
+    if not _priced_like(key, raw, market_value, index):
+        key = None
     if not key and (full or "").strip():
         key = market.key_for(full.strip())
+        if not _priced_like(key, full, market_value, index):
+            key = None
     if not key and app_ids and (app_id or "").strip():
         key = app_ids.get(app_id.strip())
+        # The crosswalk learned its ids from these same joins, so a wrong one
+        # can be written down. The price catches that too.
+        if not _priced_like(key, "", market_value, index):
+            key = None
     if not key and ledger_owner:
-        if index is None:
-            index = latest_only(market.rows)
         _rec, cands = resolve(raw, index)
         agreed = [norm(c.get("name")) for c in cands
                   if ledger_owner.get(norm(c.get("name"))) == handle]
@@ -1066,6 +1120,48 @@ def _selftest_api_owner() -> None:
         ledger_owner={norm("Fabio Cardoso"): "Magic Mike 333",
                       norm("Johnny Cardoso"): "Magic Mike 333"})
     assert owner == {} and unjoined == ["Cardoso"], (owner, unjoined)
+
+    # -- the price the app puts on him, as a check on the NAME -------------
+    # REAL, AND IT WAS PUTTING THE WRONG PLAYER IN A RIVAL'S SQUAD. The app
+    # calls Carlos Romero "C. Romero"; the market carries Carlos, Isaac and
+    # Iván Romero, and key_for confidently returned ISAAC. Nothing about the
+    # name could tell — but the app states his value, 43.24M against Isaac's
+    # 6.15M, and the two feeds price the same player to within a fifth of a
+    # percent. A name join that disagrees about the money by six hundred
+    # percent has found a different man.
+    twins = Market([
+        {"name": "Carlos Romero", "value": "43240000", "observed_at": at,
+         "position": "DEF"},
+        {"name": "Isaac Romero", "value": "6150000", "observed_at": at,
+         "position": "DEL"}])
+    # Left to the name alone this picks one of them and cannot say which.
+    # With the price on the row it can: the nickname's answer is checked, and
+    # rejected, and the full name is tried and agrees.
+    assert api_key("C. Romero", "BurtonGM89", twins,
+                   market_value="43244323",
+                   full="Carlos Romero") == norm("Carlos Romero")
+    # A join nothing contradicts stands: no value stated, no check possible.
+    assert api_key("Isaac Romero", "BurtonGM89", twins) == norm("Isaac Romero")
+    assert api_key("Isaac Romero", "BurtonGM89", twins,
+                   market_value="6150000") == norm("Isaac Romero")
+    # AND AN EXACT NAME IS NEVER OVERRULED BY THE MONEY. The market carrying
+    # that very spelling is the strongest evidence there is; if the app's
+    # price disagrees, something else is wrong and quietly reassigning the
+    # player is the worst available answer.
+    assert api_key("Isaac Romero", "BurtonGM89", twins,
+                   market_value="43244323") == norm("Isaac Romero")
+    # THE TOLERANCE IS NOT A TUNED NUMBER. Across the 70 owned players that
+    # joined on 2026-08-19 the two sources agreed to within 0.2% in every
+    # case, and the one wrong join was out by 603% — three thousand times the
+    # worst true disagreement. Anything between the two works; the prices are
+    # read minutes apart and drift a little, so it is not zero.
+    assert api_key("Isaac Romero", "BurtonGM89", twins,
+                   market_value="6160000") == norm("Isaac Romero")
+    # And when NOTHING survives the check, the answer is None and the row is
+    # reported unjoined — an owned player nobody can price is a gap to look
+    # at, not a licence to pick the cheaper of two strangers.
+    assert api_key("C. Romero", "BurtonGM89", twins,
+                   market_value="43244323") is None
 
     # -- the id the crosswalk already resolved, once, and wrote down -------
     # REAL, AND STILL COSTING A PLAYER. The app calls Jonny Castro "Jonny

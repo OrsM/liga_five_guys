@@ -69,6 +69,30 @@ def build_clubs(market, lineups, elo_rows) -> dict:
     return clubs
 
 
+def namesakes(market) -> list[tuple[str, list]]:
+    """[(key, [the clubs that share it])] — every key that is two players.
+
+    THE KEY IS A NORMALISED NAME, and a name is not unique. LaLiga fields an
+    Álvaro García at Villarreal and another at Rayo; to this repo they are one
+    player, with one price history built out of both of their rows, and
+    whichever row a lookup reaches first decides what he is worth. On
+    2026-08-19 that was 4 keys of 647, one of them owned — SusoGattuso's
+    Álvaro García, 19.76M or 0.50M depending on which of them answered.
+
+    This does not fix it. Fixing it means keying on something that IS unique,
+    which is the market's own slug, and that is every reader in the repo. It
+    makes it VISIBLE, which is the difference between a known limit and a
+    silent wrong number: the run says so every time, and the day a collision
+    lands on a player somebody owns, it says that too.
+    """
+    seen: dict[str, set] = {}
+    for r in market:
+        key = norm(r.get("name"))
+        if key:
+            seen.setdefault(key, set()).add((r.get("team") or "").strip())
+    return sorted((k, sorted(v)) for k, v in seen.items() if len(v) > 1)
+
+
 def build_players(market, lineups, starters, api_rows, lg, clubs) -> dict:
     """{player_id: Player} — every feed's key for every player it names."""
     from ffcore.league import api_key, app_ids_known
@@ -163,9 +187,34 @@ def main() -> None:
           "%.0f%% the second source's, %.0f%% an app id"
           % (c["players"], c["clubs"], 100 * c["ff"], 100 * c["af"],
              100 * c["app"]))
+    twins = namesakes(market)
+    if twins:
+        owned = {k for k in lg.owner} if lg else set()
+        print("  warn: %d name(s) belong to more than one player, so this repo "
+              "cannot tell them apart:" % len(twins))
+        for key, clubs_ in twins:
+            print("    %-24s %s%s" % (key, ", ".join(clubs_),
+                                      "  <- SOMEBODY OWNS HIM"
+                                      if key in owned else ""))
 
 
 def _selftest() -> None:
+    # -- one name, two players ---------------------------------------------
+    # The key is a normalised name and a name is not unique: LaLiga fields an
+    # Álvaro García at Villarreal and another at Rayo, worth 0.50M and 19.76M.
+    # This cannot resolve them — it says so, which is the whole point.
+    twins = namesakes([{"name": "Álvaro García", "team": "Villarreal"},
+                       {"name": "Alvaro Garcia", "team": "Rayo"},
+                       {"name": "Pablo Fornals", "team": "Betis"},
+                       {"name": "Pablo Fornals", "team": "Betis"}])
+    assert twins == [("alvaro garcia", ["Rayo", "Villarreal"])], twins
+    # The same player in the same club twice is a repeated row, not a clash.
+    assert namesakes([{"name": "A", "team": "X"}, {"name": "A", "team": "X"}]) == []
+    assert namesakes([]) == []
+    # A row with no name cannot collide with anything.
+    assert namesakes([{"name": "", "team": "X"}, {"name": "", "team": "Y"}]) == []
+
+
     market = [{"name": "Álvaro Fernández", "slug": "alvaro-fernandez-m",
                "team": "Espanyol"},
               {"name": "Jonny Castro", "slug": "jonny-castro-m",
@@ -201,7 +250,7 @@ def _selftest() -> None:
     # An unlisted feed leaves a gap rather than a wrong answer.
     assert xw.player(app_id="9999") is None
 
-    print("crosswalk self-test OK (8 cases)")
+    print("crosswalk self-test OK (12 cases)")
 
 
 if __name__ == "__main__":
