@@ -243,6 +243,12 @@ class Rating(NamedTuple):
     why: str            # "412p/34j" or "assumed"
     assumed: bool       # no top-flight record — treat with suspicion
     cur_pj: float = 0.0  # matches of THIS season inside ppm, 0 = none yet
+    # HOW MUCH EVIDENCE IS UNDER THE RATE, in matches, prior and current
+    # together. A rate off 34 matches and a rate off 4 are not the same claim,
+    # and until this was carried the simulation treated them as if they were —
+    # every player's rate entered the season as a fact. ffcore.forecast turns
+    # it into the width of that rate's own uncertainty.
+    pj: float = 0.0
 
 
 class Scored(NamedTuple):
@@ -267,6 +273,7 @@ class Scored(NamedTuple):
     opp: str = ""           # who he faces next, "" if no fixture is known
     home: bool = True
     cur_pj: float = 0.0     # matches of this season behind ppm
+    pj: float = 0.0         # every match behind ppm, prior season included
     # What ranked the opponent — "elo", "value" or "none". Logged rather than
     # printed: the fixture band is a guess, and re-fitting it later means
     # knowing which scale each row's factor came off.
@@ -372,6 +379,7 @@ class Scorer:
         k = self.shrink_k
 
         h = self.history.get(key)
+        prior_pj = float(h["pj"]) if h and h["pj"] > 0 else 0.0
         if h and h["pj"] > 0:
             base, why, assumed = ((h["pts"] + k * prior) / (h["pj"] + k),
                                   "%.0fp/%.0fj" % (h["pts"], h["pj"]), False)
@@ -387,8 +395,9 @@ class Scorer:
         if c and c["pj"] > 0:
             return Rating((c["pts"] + k * base) / (c["pj"] + k),
                           "%s + %.0fp/%.0fj now" % (why, c["pts"], c["pj"]),
-                          assumed and c["pj"] < k, c["pj"])
-        return Rating(base, why, assumed)
+                          assumed and c["pj"] < k, c["pj"],
+                          prior_pj + float(c["pj"]))
+        return Rating(base, why, assumed, 0.0, prior_pj)
 
     def row_for(self, name):
         """Market row for a player name or slug, or None."""
@@ -435,7 +444,7 @@ class Scorer:
             opp=m.opponent if m else "", home=m.home if m else True,
             fix_basis=m.basis if m else "none",
             elo_gap=m.gap if m else None,
-            cur_pj=rating.cur_pj,
+            cur_pj=rating.cur_pj, pj=rating.pj,
             ppm=rating.ppm, pct=pct, pct_used=pct_used,
             on_page=on_page, status=st, note=self.notes.get(key, ""),
             assumed=rating.assumed,

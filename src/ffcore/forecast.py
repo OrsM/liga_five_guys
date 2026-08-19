@@ -34,6 +34,7 @@ league. Shape comes from the data instead.
 from __future__ import annotations
 
 import random
+import math
 import statistics
 from typing import Protocol, runtime_checkable
 
@@ -52,6 +53,11 @@ SEED_POOL = (-1, -1, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1,
 # Below this the pooled shape is mostly the seed above, and saying so is more
 # useful than pretending 30 matches is a distribution.
 MIN_POOL = 200
+
+# The shrinkage's pseudo-matches, the same 8 the scorer anchors a rate with
+# (ffcore.score.SHRINK_K). Imported as a number rather than from score.py to
+# keep this module free of that import; the self-test holds the two equal.
+SHRINK_MATCHES = 8.0
 
 
 @runtime_checkable
@@ -85,7 +91,7 @@ class Bootstrap:
     """
 
     def __init__(self, per_jornada: dict[int, dict[str, tuple[float, float]]],
-                 pool=()):
+                 pool=(), matches=None):
         # {jornada: {key: (points_if_he_plays, p_start)}}
         self.per_jornada = per_jornada
         # THE ORDER PLAYERS DRAW IN, fixed here rather than left to the dict.
@@ -102,6 +108,24 @@ class Bootstrap:
         # Guard a degenerate pool rather than dividing by it: a pool that
         # averages zero would send every scaled draw to zero or to infinity.
         self._pool_mean = mean if abs(mean) > 1e-9 else 1.0
+        sd = statistics.pstdev(self.pool) if len(self.pool) > 1 else 0.0
+        # HOW WRONG THE RATE ITSELF CAN BE. Everything above draws a season
+        # around a rate taken as given, and a rate is an average of a handful
+        # of matches: 34 of them for a regular, four for a man who came up in
+        # January. The two are not the same claim and were being simulated as
+        # if they were, which is most of why a 74% chance of winning could sit
+        # under a table showing third place.
+        #
+        # sd of a mean over n matches is the per-match sd over root n; the
+        # per-match sd scales with the player's own level (the draw is
+        # multiplicative), so as a FRACTION of his rate it is the pool's
+        # coefficient of variation over root n. n counts the shrinkage's
+        # pseudo-matches, because a shrunk rate really is anchored by them.
+        self._cv = (sd / self._pool_mean) if self._pool_mean else 0.0
+        self.rate_rel = {}
+        for k, n in (matches or {}).items():
+            self.rate_rel[k] = self._cv / math.sqrt(
+                max(1.0, float(n) + SHRINK_MATCHES))
 
     # -- provenance --------------------------------------------------------
     def pool_note(self) -> str:
@@ -116,7 +140,21 @@ class Bootstrap:
         return {k: pts * p
                 for k, (pts, p) in self.per_jornada.get(jornada, {}).items()}
 
-    def draw(self, jornada: int, rng: random.Random) -> dict[str, float]:
+    def rate_draw(self, rng: random.Random) -> dict[str, float]:
+        """One multiplier per player, for one whole SEASON.
+
+        The rate is estimated once and is then wrong in the same direction for
+        every jornada of a trial — that is what makes it different from
+        match-to-match noise, and why it cannot be averaged away over 38
+        rounds. Drawn per trial, never per jornada.
+
+        Truncated at zero: a rate is points per match and cannot be negative.
+        """
+        return {k: max(0.0, 1.0 + rng.gauss(0.0, rel))
+                for k, rel in self.rate_rel.items()}
+
+    def draw(self, jornada: int, rng: random.Random,
+             rates: dict | None = None) -> dict[str, float]:
         per = self.per_jornada.get(jornada, {})
         out = {}
         for k in self._order.get(jornada, ()):
@@ -124,7 +162,8 @@ class Bootstrap:
             if p <= 0.0 or rng.random() >= p:
                 out[k] = 0.0
                 continue
-            out[k] = rng.choice(self.pool) * (pts / self._pool_mean)
+            m = 1.0 if rates is None else rates.get(k, 1.0)
+            out[k] = rng.choice(self.pool) * (pts * m / self._pool_mean)
         return out
 
 
@@ -146,6 +185,35 @@ def pool_from_perjornada(rows) -> list[int]:
 
 
 def _selftest() -> None:
+    # -- how wrong the RATE is, not just the match ---------------------------
+    # THE VARIANCE THAT DOES NOT AVERAGE OUT. A season drawn around a fixed
+    # rate says the rate is a fact; it is a mean of a handful of matches, and
+    # being wrong about it is wrong in the same direction all 38 rounds. This
+    # is what made a 74% chance of winning sit under a table showing third.
+    from ffcore.score import SHRINK_K
+    assert SHRINK_MATCHES == SHRINK_K, "one shrinkage, two modules"
+
+    thin = Bootstrap({1: {"vet": (5.0, 1.0), "kid": (5.0, 1.0)}},
+                     pool=[0, 2, 4, 6, 8] * 40, matches={"vet": 34, "kid": 0})
+    # A rate off 34 matches is a firmer claim than one off none, and the
+    # shrinkage's own pseudo-matches are what stop the second being infinite.
+    assert thin.rate_rel["vet"] < thin.rate_rel["kid"], thin.rate_rel
+    assert 0.05 < thin.rate_rel["vet"] < 0.25, thin.rate_rel
+    # cv of that pool is sd/mean = 2.83/4 = 0.707; over sqrt(34+8) = 6.48.
+    assert abs(thin.rate_rel["vet"] - 0.707 / 42 ** 0.5) < 0.01, thin.rate_rel
+    assert abs(thin.rate_rel["kid"] - 0.707 / 8 ** 0.5) < 0.01, thin.rate_rel
+    # No evidence count is no widening — the caller that passes nothing gets
+    # exactly the behaviour there was before this existed.
+    assert Bootstrap({1: {"vet": (5.0, 1.0)}}, pool=[1, 2, 3]).rate_rel == {}
+
+    # The multiplier is drawn once per SEASON and averages one, so the mean of
+    # the forecast is untouched and only its spread moves.
+    r = random.Random(3)
+    draws = [thin.rate_draw(r)["kid"] for _ in range(4000)]
+    assert abs(sum(draws) / len(draws) - 1.0) < 0.02, sum(draws) / len(draws)
+    assert min(draws) >= 0.0, "a rate cannot be negative"
+    assert max(draws) > 1.3, "and it has to be able to be wrong"
+
     rng = random.Random(7)
     # One jornada, three players: a nailed-on starter, a rotation risk, and
     # somebody who is not playing at all.

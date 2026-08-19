@@ -260,6 +260,24 @@ def _run_np(states: list, forecaster, trials: int, seed: int):
         return None
 
     pool_a = np.asarray(pool, dtype=float)
+    # THE RATE'S OWN ERROR, drawn once per trial and held for the whole
+    # season. Every jornada below multiplies a player's rate by the same
+    # number, because being wrong about a rate is wrong in the same direction
+    # in March as in August — which is exactly why 38 rounds do not average it
+    # away, and why leaving it out made the bands too narrow and the leader
+    # too certain. Seeded off the trial and not off the jornada for the same
+    # reason.
+    rel = getattr(forecaster, "rate_rel", None) or {}
+    rate_mult = {}
+    if rel:
+        all_keys = sorted({k for ks in order.values() for k in ks} & set(rel))
+        if all_keys:
+            rrng = np.random.default_rng([seed, 7919])
+            sd = np.array([rel[k] for k in all_keys], dtype=float)
+            m = np.clip(1.0 + rrng.standard_normal((trials, len(all_keys)))
+                        * sd, 0.0, None)
+            rate_mult = {k: m[:, i] for i, k in enumerate(all_keys)}
+
     managers = [list(st.squads) for st in states]
     totals = [{m: np.full(trials, float(st.carried.get(m, 0.0)))
                for m in ms} for st, ms in zip(states, managers)]
@@ -301,10 +319,16 @@ def _run_np(states: list, forecaster, trials: int, seed: int):
         pts = np.array([per[k][0] for k in keys], dtype=float)
         p = np.array([per[k][1] for k in keys], dtype=float)
         rng = np.random.default_rng([seed, j])
+        # (trials, players) of rate multipliers, 1.0 where nothing says how
+        # thin the evidence is — same shape as the draw, so it multiplies
+        # into it without a loop.
+        scale = np.ones((trials, len(keys))) if not rate_mult else np.stack(
+            [rate_mult[k] if k in rate_mult else np.ones(trials)
+             for k in keys], axis=1)
         drawn = np.where(rng.random((trials, len(keys))) < p,
                          pool_a[rng.integers(0, len(pool_a),
                                              (trials, len(keys)))]
-                         * (pts / mean), 0.0)
+                         * (pts / mean) * scale, 0.0)
         for i in range(len(states)):
             for m in managers[i]:
                 idx = [at[k] for k in xis[i][j][m] if k in at]
@@ -349,10 +373,16 @@ def _run(states: list, forecaster, which, seed: int) -> list:
                     per[(j, m)] = (tuple(now - was), tuple(was - now))
         deltas.append(per)
 
+    rate_of = getattr(forecaster, "rate_draw", None)
     for n, t in enumerate(idx):
         rng = random.Random(seed * 1_000_003 + t)
+        # ONE RATE DRAW PER TRIAL, before the jornadas — the same multiplier
+        # rides every round of this season, because a rate estimated wrong is
+        # wrong all season. Drawn from its own generator so adding it does not
+        # shift the match-to-match numbers underneath it.
+        rates = rate_of(random.Random(seed * 7919 + t)) if rate_of else None
         for j in jornadas:
-            drawn = forecaster.draw(j, rng)
+            drawn = forecaster.draw(j, rng, rates)
             get = drawn.get
             base = {}
             for m in managers[0]:

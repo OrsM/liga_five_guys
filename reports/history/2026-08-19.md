@@ -31,14 +31,14 @@ _The `+SLOT` rows are today's slate: **xPts/j is the change to the whole eleven*
 
 | Player — 12 on offer | Pos | Bid | XI | Competition | Note |
 |---|---|--:|--:|---|---|
-| Iago Aspas | del | 7.03M–8.91M | 40%/50% | (2 broke) |  |
-| Javi Puado | med | 5.81M–8.91M | 0%/— | none |  |
-| Nico Guillen | med | 4.76M–8.91M | 50%/— | Albert +0.9, (2 broke) |  |
-| Peter Gulacsi | por | 4.17M–8.91M | 40%/— | none |  |
-| Iñigo Perez | ent | 2.13M–8.91M | !15%/— | none |  |
-| Peque | del | 2.08M–8.91M | 50%/50% | (2 broke) |  |
-| Matias Vecino | med | 1.85M–8.91M | 0%/— | none |  |
-| Abiel Osorio | del | 1.34M–8.91M | 0%/— | none |  |
+| Iago Aspas | del | 7.03M–8.92M | 40%/50% | (2 broke) |  |
+| Javi Puado | med | 5.81M–8.92M | 0%/— | none |  |
+| Nico Guillen | med | 4.76M–8.92M | 50%/— | Albert +0.9, (2 broke) |  |
+| Peter Gulacsi | por | 4.17M–8.92M | 40%/— | none |  |
+| Iñigo Perez | ent | 2.13M–8.92M | !15%/— | none |  |
+| Peque | del | 2.08M–8.92M | 50%/50% | (2 broke) |  |
+| Matias Vecino | med | 1.85M–8.92M | 0%/— | none |  |
+| Abiel Osorio | del | 1.34M–8.92M | 0%/— | none |  |
 | Manel Usedo | med | 755K–5.48M | !15%/— | none |  |
 | Joan Garcia | por | — | 90%/100% | (4 broke) |  |
 | Mario Soriano | med | — | 80%/100% | (3 broke) |  |
@@ -52,7 +52,7 @@ _The `+SLOT` rows are today's slate: **xPts/j is the change to the whole eleven*
 | XI, the marks | **FF** is futbolfantasy's probable-XI percentage, which is the one the forecast uses. **AF** is analiticafantasy's read of the same eleven, printed beside it and never blended in — `titular` is a named starter (a final call, with no number to it), a percentage is their editors' consensus, `?` means they list him without either, and `—` means they do not have him. Two columns that disagree are the signal; that is the whole point of carrying both. |
 | Competition | demand, not roster counts: the rivals whose XI actually improves with him, strongest threat first. `?` cash unknown (treat as live), `(n broke)` want him but cannot pay the floor. Manager by manager in `reports/rivals.md` |
 
-**⚠ 9 bids at 29.92M is more than the 8.91M you hold.** Each row above is priced as though it were your only purchase, and the app settles them together — take them best rate first: Iago Aspas, Javi Puado, Nico Guillen, Peter Gulacsi, Iñigo Perez, Peque, Matias Vecino, Abiel Osorio, Manel Usedo.
+**⚠ 9 bids at 29.92M is more than the 8.92M you hold.** Each row above is priced as though it were your only purchase, and the app settles them together — take them best rate first: Iago Aspas, Javi Puado, Nico Guillen, Peter Gulacsi, Iñigo Perez, Peque, Matias Vecino, Abiel Osorio, Manel Usedo.
 
 | Already owned, so not a purchase | Held by |
 |---|---|
@@ -140,4 +140,4 @@ _Compare squad value with the app; a mismatch means a name matched the wrong pla
 | Zeroed | injured, suspended, unavailable; a doubt is halved |
 | Fixture term | ±12% across the opponents ranked by Club Elo rating, plus ±4% for home advantage — both widths guesses, unfitted, and small enough that a wrong one costs a fraction of a point |
 
-_Generated 2026-08-19 19:46 UTC._
+_Generated 2026-08-19 21:41 UTC._

@@ -63,7 +63,7 @@ from ffcore.tidy import (Market, input_path, ledger_stamp,
 
 __all__ = ["MARKET", "Config", "load_config", "read_rosters", "identify",
            "read_api_balances", "owner_from_api", "api_key", "owner_drift",
-           "app_ids_known", "app_fielded",
+           "app_ids_known", "app_fielded", "flat_income",
            "allowance",
            "replay", "Cash", "Manager", "League"]
 
@@ -227,6 +227,32 @@ def read_api_balances(rows=None) -> dict[str, tuple[float, str]]:
         # local wall-clock, so the wrong one is two hours out in summer.
         out[handle] = (value, snapshot_stamp(r.get("observed_at") or ""))
     return out
+
+
+def flat_income(observed, budget: float, bought: float, sold: float):
+    """What the app has paid the account beyond its transfers, or None.
+
+    ONE ACCOUNT STATES A BALANCE and every other is a replay, so the only
+    place the app's payouts can be MEASURED is your own row: whatever your
+    balance holds that the budget and the transfer feed do not explain is
+    what the app has handed you since the season began. Measured 2026-08-19:
+    1.27M, against the 0.80M that eight days of the configured daily bonus
+    came to — so every rival's ceiling was half a million light, and a rival
+    who can outbid you by 0.4M is exactly the kind of thing that is worth
+    knowing.
+
+    It is credited to rivals on the assumption the app pays everyone alike,
+    which is what the one clean observation says: a day with no deal in it
+    moved the balance by exactly +100,000. If it ever turns out to pay by
+    position or by points, this is the number that will stop reconciling.
+
+    Never negative. A balance BELOW what the ledger explains is a ledger that
+    has missed a purchase, and spreading that across four rivals as a negative
+    award would turn one bad row into five.
+    """
+    if observed is None:
+        return None
+    return max(0.0, observed - (budget + sold - bought))
 
 
 def allowance(since, now, daily_bonus: float) -> tuple[float, float]:
@@ -881,6 +907,21 @@ class League:
                 self._standings).items():
             balances[handle] = (value, when)
 
+        # WHAT THE APP HAS PAID, measured rather than assumed — see
+        # flat_income(). Computed once, from the one account that states a
+        # balance, and credited to every manager who has none.
+        paid = None
+        me_anchor = balances.get(self.cfg.me)
+        if me_anchor and isinstance(me_anchor[1], datetime) and self.cfg.budget:
+            b, sd = 0.0, 0.0
+            for t in self.txns:
+                price = money(t.get("price")) or 0.0
+                if (t.get("to") or "").strip() == self.cfg.me:
+                    b += price
+                if (t.get("from") or "").strip() == self.cfg.me:
+                    sd += price
+            paid = flat_income(me_anchor[0], self.cfg.budget, b, sd)
+
         for handle, mgr in self.managers.items():
             # ONE BUDGET, because everyone in this league started with the
             # same one. The [budget] section that overrode it per manager was
@@ -943,11 +984,17 @@ class League:
             # not its label. The app's own reading is seconds old and collects
             # nothing; the typed anchor in cash.txt was four days old and was
             # 0.40M light for exactly this reason, while calling itself known.
-            start = since or min(
-                (ledger_stamp(t.get("date", "")) for t in self.txns
-                 if ledger_stamp(t.get("date", ""))), default=None)
-            bonus, days = allowance(start, datetime.now(dt_timezone.utc),
-                                    self.cfg.daily_bonus)
+            if since is None and paid is not None:
+                # A rival, and we can do better than a guess at how long the
+                # app has been paying: your own balance says how much it has
+                # paid YOU since the same season started, and it pays alike.
+                bonus, days = paid, None
+            else:
+                start = since or min(
+                    (ledger_stamp(t.get("date", "")) for t in self.txns
+                     if ledger_stamp(t.get("date", ""))), default=None)
+                bonus, days = allowance(start, datetime.now(dt_timezone.utc),
+                                        self.cfg.daily_bonus)
 
             value = base + sold - bought + bonus
             # The arithmetic, not just the answer. Every term is here so a
@@ -957,8 +1004,11 @@ class League:
             math = ("%s − %.2fM bought + %.2fM sold across %d ledger row(s)"
                     "%s = %.2fM"
                     % (basis, bought / 1e6, sold / 1e6, counted,
-                       (" + %.2fM of daily allowance over %.0f days"
-                        % (bonus / 1e6, days)) if bonus else "",
+                       ((" + %.2fM of daily allowance over %.0f days"
+                         % (bonus / 1e6, days)) if days is not None
+                        else (" + %.2fM the app has paid you since the season "
+                              "began, which it pays everyone" % (bonus / 1e6)))
+                       if bonus else "",
                        value / 1e6))
             if value < 0:
                 # NOT an input error. Committing past the balance is allowed
@@ -1561,6 +1611,23 @@ def _selftest_cash() -> None:
     # No anchor at all: the caller falls back to the first deal on record, so
     # this must say so rather than invent a start.
     assert allowance(None, now, 100000) == (0.0, 0.0)
+
+    # -- what the app pays, measured on the one account that states a balance
+    # THE FEED CANNOT SEE INCOME. Crediting rivals a bonus per day since the
+    # first transfer was a guess at both the rate and the start, and it was
+    # short: on 2026-08-19 the account's own balance implied 1.27M of income
+    # while eight days of allowance came to 0.80M. Whatever the app is paying
+    # — a daily award, a prize for a jornada — it pays it to everyone, so the
+    # honest figure to credit a rival is the one your own balance proves.
+    assert flat_income(8906184.0, 100e6, 142.18e6, 49.82e6) == 8906184.0 - (
+        100e6 - 142.18e6 + 49.82e6)
+    assert round(flat_income(8906184.0, 100e6, 142.18e6, 49.82e6)) == 1266184
+    # Income only. A balance BELOW what the ledger explains is a ledger that
+    # has missed a purchase, not the app taking money back, and inventing a
+    # negative award would spread that error across four rivals.
+    assert flat_income(1.0, 100e6, 0.0, 0.0) == 0.0
+    # Nothing observed is no evidence, not zero evidence.
+    assert flat_income(None, 100e6, 0.0, 0.0) is None
 
     # A manager with no budget configured is still genuinely unknown.
     blind = League(Config(me="nobody", budget=0.0), {"z": ["q"]}, [], None)

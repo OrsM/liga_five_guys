@@ -761,10 +761,18 @@ def load(trials_pool=None) -> Universe:
     # `carried` — see rounds_left().
     club = {k: club_key(players[k].get("team"), mkt_teams)
             for k in base if k in players}
+    # HOW MANY MATCHES EACH RATE RESTS ON, handed to the forecaster so a
+    # thin record widens the season it draws instead of passing as a fact.
+    matches = {}
+    for k in base:
+        row = sc.row_for(k)
+        s_ = sc.score(row) if row else None
+        if s_ is not None:
+            matches[k] = s_.pj
     fc = Bootstrap({j: ({k: v for k, v in base.items()
                          if club.get(k) not in played[j]}
                         if j in played else base)
-                    for j in rem}, pool=pool)
+                    for j in rem}, pool=pool, matches=matches)
 
     # What everybody has already scored, off the league table — five rows at
     # the grain the fact belongs to, rather than the first of each manager's

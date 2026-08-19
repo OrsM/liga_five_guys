@@ -852,9 +852,45 @@ def formula_lines() -> list[str]:
         f"| Team strength | {elo_basis()} | — |",
         f"| P(start) read from | `{LINEUP_SOURCE}` | see the Brier table |",
         "| Fixture applies to | fielding only — never a buy, a sale or the "
-        "line | — |", "",
+        "line | — |",
+        "| Season spread, match to match | each round resamples a real "
+        "per-match score, rescaled to the player's rate | from %d observed "
+        "matches |" % getattr(_fc(), "_real_n", 0),
+        "| Season spread, RATE ERROR | the rate is a mean of a few matches, "
+        "so each simulated season multiplies it by one draw of "
+        "cv/√(matches+K) held all year — median %s across the squads | "
+        "derived, not fitted |" % _rate_note(), "",
     ]
 
+
+
+def _fc():
+    """The forecaster this run built, or None — asked, never described."""
+    try:
+        import decide
+        return decide.load().forecaster
+    except Exception:                                    # pragma: no cover
+        return None
+
+
+_RATE_NOTE: list = []
+
+
+def _rate_note() -> str:
+    """How wide the rate uncertainty came out, in this run's own numbers.
+
+    THE ROW HAS TO BE ABLE TO BE WRONG. Printing "cv over root n" without the
+    number it produced would be a formula nobody can check against the bands
+    it widened — 10-90 went from 259 points to 365 the day this went in.
+    """
+    if _RATE_NOTE:
+        return _RATE_NOTE[0]
+    import statistics
+    fc = _fc()
+    rel = sorted(getattr(fc, "rate_rel", {}).values())
+    _RATE_NOTE.append("±%.0f%% of a rate" % (100 * statistics.median(rel))
+                      if rel else "not applied — no match counts")
+    return _RATE_NOTE[0]
 
 
 def start_lines() -> list[str]:
