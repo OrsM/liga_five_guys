@@ -255,15 +255,30 @@ def load_points() -> tuple[dict, str, dict, str]:
     appeared as a completed-season snapshot, every rating would have been
     rebuilt from that one file and the actual prior would have vanished.
     """
-    from ffcore.tidy import SEASON, read_csv
+    from ffcore.tidy import SEASON, load_crosswalk, read_csv
 
     files = sorted(SEASON.glob("points_*.csv")) if SEASON.exists() else []
+    xw = load_crosswalk()
 
     def read(path) -> dict:
         out: dict[str, dict] = {}
         for r in read_csv(path):
             rec = {"pts": ratio(r.get("points")) or 0.0,
                    "pj": ratio(r.get("games")) or 0.0}
+            # THE ID FIRST, under the market's CURRENT name for him — the
+            # same fix rosters_initial.txt and the current-season blend
+            # already got: a display name a season is free to move on
+            # from is not a stable key, and a completed prior-season
+            # snapshot is exactly that shape, frozen at whatever names were
+            # true when it was written. ff_id was missing from every
+            # points_*.csv before 2026-08-21 (ingest.baseline's writer
+            # dropped it though parse_points() already extracted it), so
+            # this degrades to the name-only behaviour below for an older
+            # file rather than losing rows written before the fix.
+            pid = (r.get("ff_id") or "").strip()
+            player = xw.players.get(pid) if pid and xw is not None else None
+            if player and player.name:
+                out.setdefault(norm(player.name), rec)
             for key in (r.get("player_name"), r.get("player_name_full")):
                 if key:
                     out.setdefault(norm(key), rec)

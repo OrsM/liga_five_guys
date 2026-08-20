@@ -843,21 +843,36 @@ def baseline(url: str = "", label: str = "") -> None:
                  "the last good file is untouched. The markup has probably "
                  "changed: fix sources.parse_points.")
 
+    _write_points_csv(rows, label, url)
+
+
+# The fields written to data/season/points_<label>.csv. ff_id WAS MISSING —
+# parse_points() already extracts it (the same id every other reader in this
+# repo joins on), but this writer's own fieldnames list did not name it, so
+# csv.DictWriter silently dropped it from every row before it ever reached
+# disk. That made the PRIOR season — a name-keyed, never-updated snapshot,
+# exactly the shape rosters_initial.txt was — the one place left where a
+# player whose display name moved on between seasons would silently lose
+# his shrinkage prior rather than being found by id.
+POINTS_FIELDS = ["player_name", "player_name_full", "team", "points",
+                 "games", "avg", "ff_id", "season", "observed_at",
+                 "source_url"]
+
+
+def _write_points_csv(rows: list[dict], label: str, url: str) -> None:
     stamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%MZ")
     out = SEASON / f"points_{label}.csv"
     out.parent.mkdir(parents=True, exist_ok=True)
     with out.open("w", newline="", encoding="utf-8") as fh:
-        w = csv.DictWriter(fh, fieldnames=[
-            "player_name", "player_name_full", "team", "points", "games",
-            "avg", "season", "observed_at", "source_url"])
+        w = csv.DictWriter(fh, fieldnames=POINTS_FIELDS)
         w.writeheader()
         for row in rows:
             row.update(season=label, observed_at=stamp, source_url=url)
             w.writerow(row)
 
     played = sum(1 for r in rows if (r["games"] or "0") != "0")
-    print(f"wrote {out} — {len(rows)} players, {played} with minutes, "
-          f"season label '{label}'")
+    print(f"wrote {SEASON / f'points_{label}.csv'} — {len(rows)} players, "
+          f"{played} with minutes, season label '{label}'")
     print("Spot-check a few names against the app before trusting the report.")
 
 
