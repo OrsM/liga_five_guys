@@ -118,10 +118,11 @@ from ffcore.score import (ABSENT_START, NEUTRAL_START,  # noqa: E402
                           SLOT_LABEL, SLOT_MIN, formations,
                           pick_xi, squad_pool)
 from ffcore.league import app_fielded  # noqa: E402
+from ffcore.attributes import Fitness, resolve_fitness  # noqa: E402
 from ffcore.tidy import (run_now,  # noqa: E402
                          DECISIONS, PARTS,  # noqa: E402
-                         age_phrase, append_csv, load_crosswalk,
-                         load_deadline, read_csv,
+                         age_phrase, append_csv, load_api_teams,
+                         load_crosswalk, load_deadline, read_csv,
                          snapshot_stamp, stale_feeds, widen_csv, write_lines)
 from slate import read_slate  # noqa: E402
 
@@ -813,7 +814,7 @@ def sec_eleven(marked, best, players, second=None, buys=None) -> list[str]:
     return out
 
 
-def sec_fitness(players) -> list[str]:
+def sec_fitness(players, fitness=None) -> list[str]:
     """### Fitness — who is not available
 
     Every squad member gets a row, including the ones nothing is known about.
@@ -824,18 +825,31 @@ def sec_fitness(players) -> list[str]:
     A SUBSECTION now, not question 2. Fitness and the start splits do not price
     anything — they are the two ways the numbers above can be wrong about
     a player, which makes them exceptions to check, not decisions to take.
+
+    `fitness` is {key: ffcore.attributes.Fitness} — FF's editorial panel
+    cross-checked against the app's OWN operator-stated availability, which
+    used to be parsed and read by nothing. Optional so a caller with no
+    crosswalk (a cold start, or the self-test) still gets FF's reading alone.
     """
     out = ["### Fitness", ""]
     if not players:
         return out + ["_No roster to check._", ""]
+    fitness = fitness or {}
 
     flagged = [p for p in players if p["status"] and p["status"] != "ok"]
     nodata = [p for p in players if not p["on_page"]]
     fit = [p for p in players
            if p["on_page"] and (not p["status"] or p["status"] == "ok")]
+    # THE APP FLAGS HIM, FF's PANEL DOES NOT — the case player_status existed
+    # to catch and nothing was checking for. Drawn from `fit`, not `flagged`:
+    # a player already flagged by FF has his row below either way.
+    _no_read = Fitness(None, True, None)
+    app_only = [p for p in fit
+               if not fitness.get(p["key"], _no_read).agree]
 
     out += ["| Fitness | Players |", "|---|---|",
             "| flagged | **%d** of %d |" % (len(flagged), len(players)),
+            "| app disagrees, FF's panel does not | **%d** |" % len(app_only),
             "| listed, no flag | %d%s |"
             % (len(fit), (" — " + ", ".join(
                 p["name"] for p in sorted(fit, key=lambda x: x["name"])))
@@ -848,21 +862,30 @@ def sec_fitness(players) -> list[str]:
     # fitness must not look the same, and they do not: a no-data player keeps
     # his own row and the fit ones are named, not merely counted. What is gone
     # is fifteen table rows reading "fit | listed, no flag" on a phone screen.
-    if flagged or nodata:
-        out += ["| Player | State | What the page says |", "|---|---|---|"]
+    if flagged or nodata or app_only:
+        out += ["| Player | State | What the page says | App |",
+                "|---|---|---|---|"]
         order = {"injured": 0, "suspended": 1, "unavailable": 2, "doubt": 3}
         for p in sorted(flagged, key=lambda x: order.get(x["status"], 9)):
+            f = fitness.get(p["key"])
+            app = ("⚠ " + f.app_state if f and not f.agree and f.app_state
+                  else (f.app_state or "—") if f else "—")
             out.append(f"| {p['name']} | "
                        f"{STATE_LABEL.get(p['status'], p['status'])}"
-                       f" | {p['note'] or '—'} |")
+                       f" | {p['note'] or '—'} | {app} |")
+        for p in sorted(app_only, key=lambda x: x["name"]):
+            f = fitness[p["key"]]
+            out.append(f"| {p['name']} | ok (FF) | — | ⚠ {f.app_state} |")
         for p in sorted(nodata, key=lambda x: x["name"]):
             out.append(f"| {p['name']} | ⚪ no data | not listed on his team "
-                       "page — unknown, not fit |")
+                       "page — unknown, not fit | — |")
         out.append("")
-    out += ["_Read from the 'Estado físico', 'Sancionados' and 'No "
+    out += ["_FF's read is from the 'Estado físico', 'Sancionados' and 'No "
             "disponibles' blocks of each team page; `Tocado` — a knock the "
             "site still lists as available — is folded into doubt. No entry "
-            "is an absence of evidence, not evidence of fitness._", ""]
+            "is an absence of evidence, not evidence of fitness. 'App' is "
+            "the game's own operator-stated availability, shown whenever it "
+            "differs from FF's read._", ""]
     return out
 
 
@@ -1000,6 +1023,26 @@ def main() -> None:
         row["name"] = title_name(row["name"])
         players.append(row)
 
+    # ONE CROSSWALK LOAD for the run, not two — the identifier table used to
+    # resolve fitness below is the same one the clash warning reads further
+    # down.
+    xw = load_crosswalk()
+    # THE APP'S OWN FITNESS READ, resolved against FF's editorial one instead
+    # of sitting parsed and unread. See ffcore.attributes: player_status was
+    # captured in api_teams.csv and read by nothing downstream until now.
+    player_status_by_key = {}
+    if xw is not None:
+        for r in load_api_teams():
+            pid = (r.get("player_id") or "").strip()
+            st = r.get("player_status")
+            if not pid or st is None:
+                continue
+            key = xw.player(app_id=pid)
+            if key:
+                player_status_by_key[key] = st
+    fitness = resolve_fitness({p["key"]: p["status"] for p in players},
+                              player_status_by_key)
+
     pool = squad_pool(players)
     best = pick_xi(pool) if players else None
     chosen = {id(p) for p in best[2]} if best else set()
@@ -1081,7 +1124,7 @@ def main() -> None:
     # prices anything, so neither is a decision — both are prompts to open the
     # app, and that is what the tables under here say without a preamble.
     out += ["## 3. Exceptions", ""]
-    out += sec_fitness(players)
+    out += sec_fitness(players, fitness)
     out += sec_starting(marked, min_start, second, unclear)
 
     out += ["---", ""]
@@ -1125,7 +1168,6 @@ def main() -> None:
                 len(below_floor), "" if len(below_floor) == 1 else "s",
                 ", ".join("%s %+.1f%%" % (d["player"], d["premium"])
                           for d in below_floor)))
-    xw = load_crosswalk()
     clashes = xw.clashes() if xw else {}
     if clashes:
         # A clash means an identifier two players claim, which identifies
@@ -1416,7 +1458,28 @@ def _selftest() -> None:
     assert any("Log in again" in ln for ln in alerts([], token_days=9))
     assert alerts([], token_days=60) == []
 
-    print("report self-test OK (%d cases)" % 78)
+    # -- sec_fitness: the app's read surfaces, not just FF's -----------------
+    from ffcore.attributes import resolve_fitness
+
+    def sp(key, name, status, on_page=True):
+        return {"key": key, "name": name, "status": status, "note": "",
+                "on_page": on_page}
+
+    players = [sp("a", "Clean", ""), sp("b", "Flagged", "doubt"),
+              sp("c", "AppOnly", "")]
+    fit = resolve_fitness({p["key"]: p["status"] for p in players},
+                          {"c": "injured"})
+    sec = "\n".join(sec_fitness(players, fit))
+    # A player FF's panel calls fine, that the app calls injured, gets his
+    # own row and his own count — this is the whole point of resolving both
+    # sources instead of reading one and ignoring the other.
+    assert "app disagrees, FF's panel does not | **1**" in sec, sec
+    assert "AppOnly" in sec and "injured" in sec, sec
+    # No fitness map at all still renders — a cold start or a caller with no
+    # crosswalk must not crash.
+    assert "Flagged" in "\n".join(sec_fitness(players))
+
+    print("report self-test OK (%d cases)" % 80)
 
 
 if __name__ == "__main__":
