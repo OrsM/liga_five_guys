@@ -69,7 +69,7 @@ from collections import Counter
 from typing import NamedTuple
 
 from ffcore.league import MARKET
-from ffcore.parse import money, ratio
+from ffcore.parse import money
 from ffcore.score import SLOT_MIN, THIN, pick_xi, squad_pool
 from ffcore.tidy import ledger_stamp
 
@@ -231,87 +231,6 @@ def suggest(value, prem: Premiums | None, cash=None,
         low = min(low, cash)
         why += ", capped by your cash"
     return Advice(low, high, why)
-
-
-# ---------------------------------------------------------------------------
-# What owning him actually costs
-#
-# The price is not the cost. A purchase is closer to a loan than a spend: the
-# player carries a market value you get back when you sell, so what the deal
-# really costs you is the friction — what you pay over the floor going in, and
-# what the value does while you hold him.
-#
-# The exit is deliberately NOT folded into that number. The app pays value give
-# or take a tenth, and on a large player that swing is bigger than every other
-# term combined; averaging it to zero would hide the only figure here big
-# enough to change a decision. It is reported as a band alongside.
-# ---------------------------------------------------------------------------
-
-HOLD_DAYS = 14            # a fortnight — roughly two jornadas at this stage
-
-
-class Friction(NamedTuple):
-    """What a hold is expected to cost, in euros. Positive is a cost."""
-    entry: float          # paid over the floor
-    carry: float          # expected value lost while held
-    swing: float          # ± on exit, NOT included in expected
-    days: int
-    n_drift: int
-
-    @property
-    def expected(self) -> float:
-        return self.entry + self.carry
-
-    def per_point(self, gain_pts) -> float | None:
-        """Expected friction per marginal point per jornada, or None.
-
-        None when the player does not improve the XI: dividing a cost by a
-        gain of zero or less produces a number that looks like value and is
-        not one.
-        """
-        if not gain_pts or gain_pts <= 0:
-            return None
-        return self.expected / gain_pts
-
-
-# Cheap players and expensive ones do not drift alike — across the snapshots
-# so far the under-2M band loses about half a percent a day while the over-30M
-# band loses a fifth of that. Averaging them together and applying the result
-# to a 58M player roughly doubles his carry cost, which is the difference
-# between a buy and a pass. Banded by value, therefore.
-DRIFT_BANDS = ((0, 2e6), (2e6, 10e6), (10e6, 30e6), (30e6, float("inf")))
-
-
-def band_of(value) -> tuple:
-    """The drift band a player's value falls in."""
-    v = money(value) or 0.0
-    for lo, hi in DRIFT_BANDS:
-        if lo <= v < hi:
-            return (lo, hi)
-    return DRIFT_BANDS[-1]
-
-
-def drift_daily(rows, band=None) -> tuple[float, int]:
-    """(mean daily % value move, n) across the market readings given.
-
-    Deliberately a plain mean within a band, not a per-player fit: with a
-    handful of days of readings there is no per-player trend to fit, and
-    pretending otherwise would dress noise up as a forecast.
-    """
-    vals = []
-    for r in rows:
-        p = ratio(r.get("delta_pct_1d"))
-        if p is None:
-            continue
-        if band is not None and band_of(r.get("value")) != band:
-            continue
-        vals.append(p)
-    if not vals:
-        return 0.0, 0
-    return statistics.mean(vals), len(vals)
-
-
-MIN_DRIFT_N = 50
 
 
 def gain(pool: dict, candidate: dict, base_total: float,
