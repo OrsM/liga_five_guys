@@ -65,7 +65,7 @@ from ffcore.text import norm
 __all__ = ["SLOT", "SLOT_LABEL", "SLOT_MIN", "MAX_SLOT", "THIN",
            "FREE_FORMATIONS", "PREMIUM_FORMATIONS", "formations",
            "Rating", "Scorer", "pick_xi", "squad_pool",
-           "starters_per_slot", "replacement", "vor",
+           "replacement", "vor",
            "load_points", "build"]
 
 SLOT = {
@@ -551,13 +551,6 @@ def squad_pool(scored) -> dict[str, list[dict]]:
 # while letting a position only some formations use price as scarcer.
 # ---------------------------------------------------------------------------
 
-def starters_per_slot(premium: bool = False) -> dict[str, float]:
-    """{slot: mean starters at it across the legal shapes}. Sums to 11."""
-    shapes = formations(premium)
-    out = {"POR": 1.0}
-    for i, slot in enumerate(("DEF", "MED", "DEL")):
-        out[slot] = sum(s[i] for s in shapes) / len(shapes)
-    return out
 
 
 def pick_xi(pool: dict, force: dict | None = None, premium: bool = False):
@@ -677,21 +670,7 @@ def _selftest() -> None:
     # meant to reach, and as_row() carries the new fields to the renderers.
     assert "fix" in s.as_row() and "flat" in s.as_row()
 
-    # -- how many of each position the league starts -----------------------
-    # It has to be an average: 3-4-3 and 5-4-1 start a different number of
-    # defenders, so no single count is "the" number, and the eleven still adds
-    # up to eleven. `replacement` and `vor` were built on this and went with
-    # the board on 2026-08-18 — it stays because formations() needs it.
-    per = starters_per_slot()
-    assert per == {"POR": 1.0, "DEF": 4.0, "MED": 4.0, "DEL": 2.0}, per
-    assert abs(sum(per.values()) - 11.0) < 1e-9
-    # The premium shapes are the attacking ones — 4-2-4, 3-3-4, 5-2-3 — so a
-    # premium league starts more forwards and the rung there is deeper.
-    prem = starters_per_slot(premium=True)
-    assert prem["DEL"] > per["DEL"] and prem["MED"] < per["MED"], prem
-    assert abs(sum(prem.values()) - 11.0) < 1e-9
-
-    print("ffcore.score self-test OK (23 cases)")
+    print("ffcore.score self-test OK (20 cases)")
 
 
 if __name__ == "__main__":

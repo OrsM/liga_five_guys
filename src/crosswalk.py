@@ -253,6 +253,11 @@ def main() -> None:
     elo_rows = read_csv(TIDY / "elo.csv")
     lg = League.load()
 
+    # Every id the market has ever published — a player who left is still a
+    # real row, and keying on "in today's market" would drop him each sweep.
+    market_ids = {r["ff_id"] for r in read_csv(TIDY / "market.csv")
+                  if (r.get("ff_id") or "").strip()}
+
     clubs = build_clubs(market, lineups, elo_rows,
                         latest_only(read_csv(TIDY / "fixtures.csv")))
     players = build_players(market, lineups, starters, api_rows, lg, clubs)
@@ -272,7 +277,38 @@ def main() -> None:
     for k in dropped:
         del kept.players[k]
     kept.merge(fresh)
+
+    # ONE ROW PER PLAYER. This table merges rather than rebuilds, so when the
+    # key changed from a normalised name to the site's own id it did not
+    # replace the old rows — it kept them, and 654 players became 1,311. The
+    # name-keyed half is unreachable: nothing looks a player up by name any
+    # more. What it still held was identifiers learned before the change,
+    # mostly analiticafantasy's, so they are moved onto the live row first
+    # and only then is the ghost dropped. Matched on the ghost's own key,
+    # which IS the normalised name the live row carries.
+    live = {k: pl for k, pl in kept.players.items() if k in market_ids}
+    by_name = {}
+    for k, pl in live.items():
+        by_name.setdefault(norm(pl.name), k)
+    moved, dropped_ghosts = 0, []
+    for k, pl in list(kept.players.items()):
+        if k in market_ids:
+            continue
+        target = live.get(by_name.get(k, ""))
+        if target is not None:
+            for f in ("ff_slug", "af_slug", "app_id"):
+                if getattr(pl, f) and not getattr(target, f):
+                    setattr(target, f, getattr(pl, f))
+                    moved += 1
+            target.app_names |= pl.app_names
+        dropped_ghosts.append(k)
+        del kept.players[k]
+    kept._reindex()
     kept.write(TIDY / PLAYERS, TIDY / CLUBS)
+    if dropped_ghosts:
+        print("  dropped %d row(s) keyed the old way, after moving %d "
+              "identifier(s) onto the live row"
+              % (len(dropped_ghosts), moved))
 
     c = kept.coverage()
     print("wrote %s and %s" % (TIDY / PLAYERS, TIDY / CLUBS))
@@ -283,15 +319,24 @@ def main() -> None:
           "%.0f%% the second source's, %.0f%% an app id"
           % (c["players"], c["clubs"], 100 * c["ff"], 100 * c["af"],
              100 * c["app"]))
+    # A SHARED NAME IS NO LONGER A PROBLEM — the site issues an id per player
+    # and this table keys on it, so the two Álvaro Garcías are two rows and
+    # always were two players. Printed as a fact rather than a warning.
     twins = namesakes(market)
     if twins:
-        owned = {k for k in lg.owner} if lg else set()
-        print("  warn: %d name(s) belong to more than one player, so this repo "
-              "cannot tell them apart:" % len(twins))
-        for key, clubs_ in twins:
-            print("    %-24s %s%s" % (key, ", ".join(clubs_),
-                                      "  <- SOMEBODY OWNS HIM"
-                                      if key in owned else ""))
+        print("  %d name(s) belong to two players; the ids tell them apart: %s"
+              % (len(twins), ", ".join(k for k, _ in twins)))
+
+    # WHAT IS ACTUALLY WORTH WARNING ABOUT: two players claiming one
+    # identifier. That means a join that wrote an id down was wrong and its
+    # row is still in the table — the state that had app_id 2614 on both
+    # Carlos and Isaac Romero, answering by whichever was reindexed last.
+    clashes = kept.clashes()
+    if clashes:
+        print("  warn: an identifier two players claim identifies neither, "
+              "and these are refused until it is resolved:")
+        for idx, ids in clashes.items():
+            print("    %-12s %s" % (idx, ", ".join(ids)))
 
 
 def _selftest() -> None:

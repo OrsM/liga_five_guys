@@ -517,20 +517,6 @@ def _ord(n: int) -> str:
         {1: "st", 2: "nd", 3: "rd"}.get(n % 10, "th")
 
 
-def overdrawn(u, locks_h) -> str:
-    """The one thing that is not a ranking question: you are in the red.
-
-    Being over the budget mid-window is allowed and being over it when the
-    jornada locks is not, so a negative balance with hours on the clock is not
-    a nuance to fold into a table — it is the only thing to do next.
-    """
-    if u.cash >= 0:
-        return ""
-    when = ("in %.0f hours" % locks_h) if locks_h and locks_h > 0 else "shortly"
-    return ("**You are %s overdrawn and the jornada locks %s.** Selling is the "
-            "only move that fixes it; the SELL rows raise %s between them."
-            % (fmt_money(-u.cash), when,
-               fmt_money(sum(v for _k, v in decide_dead(u)))))
 
 
 def verdict(routes) -> tuple:
@@ -1506,12 +1492,6 @@ def _selftest() -> None:
         r, quiet={"api_teams": 3.1}), r
 
     # -- overdrawn is not a ranking question -------------------------------
-    u.cash = -133023.0
-    red = overdrawn(u, 20.0)
-    assert "133K overdrawn" in red and "in 20 hours" in red, red
-    u.cash = 5e6
-    assert overdrawn(u, 20.0) == ""
-
     # -- a team sheet reads keeper first ------------------------------------
     # Ranked purely by points, an eleven puts the keeper between two
     # midfielders. Ranking decides who is IN it; position decides the order

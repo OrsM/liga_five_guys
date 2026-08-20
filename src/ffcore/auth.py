@@ -31,7 +31,7 @@ import os
 import time
 from pathlib import Path
 
-__all__ = ["TokenStore", "access_token", "authorize_url", "TENANT",
+__all__ = ["TokenStore", "authorize_url", "TENANT",
            "CLIENT_ID", "SIGNIN_POLICY", "REDIRECT_URI", "API_BASE"]
 
 # --- the tenant -----------------------------------------------------------
@@ -182,9 +182,6 @@ def _post(url: str, form: dict) -> dict:
     return r.json()
 
 
-def access_token(post=None) -> str:
-    """Module-level convenience: the bearer for this run."""
-    return TokenStore().bearer(post=post)
 
 
 def authorize_url(verifier: str | None = None) -> tuple[str, str, str]:

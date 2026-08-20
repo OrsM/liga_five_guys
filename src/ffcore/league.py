@@ -1111,9 +1111,6 @@ class League:
     def squad(self, handle: str) -> list[str]:
         return sorted(k for k, m in self.owner.items() if m == handle)
 
-    def unowned(self, keys) -> list[str]:
-        """Which of these player keys nobody in the league holds."""
-        return [k for k in keys if k not in self.owner]
 
     def unmatched(self, known_keys) -> list[str]:
         """Owned names absent from data/tidy — spelling to fix with

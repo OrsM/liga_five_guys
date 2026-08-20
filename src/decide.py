@@ -447,10 +447,6 @@ def apply(u: Universe, a: Action) -> dict[str, dict[str, str]]:
     return sq
 
 
-def _score(u: Universe, squads, trials: int, seed: int):
-    st = LeagueState(squads=squads, jornadas=u.state.jornadas, me=u.me,
-                     carried=u.state.carried)
-    return simulate(st, u.forecaster, trials=trials, seed=seed)
 
 
 def _score_many(u: Universe, many: list, trials: int, seed: int):
