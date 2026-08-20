@@ -67,7 +67,7 @@ from ffcore.tidy import SEASON, write_csv  # noqa: E402
 
 LIVE = SEASON / "live"
 
-DIFF_FIELDS = ["from_stamp", "to_stamp", "season", "player_name",
+DIFF_FIELDS = ["from_stamp", "to_stamp", "season", "ff_id", "player_name",
                "player_name_full", "team", "points_delta", "games_delta",
                "points_total", "games_total"]
 
@@ -92,11 +92,25 @@ def empty_season(html: str) -> bool:
     return any(m in low for m in EMPTY_MARKS)
 
 
+def player_key(r: dict) -> str:
+    """The one key a points row is filed under.
+
+    THE PAGE'S OWN ID FIRST. It is in the row's click handler rather than a
+    data-* attribute, which is why it went unread and the season's points
+    history was diffed by name — so a player whose display name changed
+    spelling between two sweeps read as one player leaving and another
+    arriving. The name is the fallback for snapshots taken before the id was
+    extracted, which is most of the history and cannot be re-fetched.
+    """
+    return ((r.get("ff_id") or "").strip()
+            or norm(r.get("player_name_full") or r.get("player_name") or ""))
+
+
 def totals(rows: list[dict]) -> dict[str, tuple[float, float]]:
     """{key: (points, games)} — the comparable core of one snapshot."""
     out = {}
     for r in rows:
-        key = norm(r.get("player_name_full") or r.get("player_name") or "")
+        key = player_key(r)
         if key:
             out[key] = (float(r["points"]), float(r["games"]))
     return out
@@ -126,7 +140,7 @@ def diff(prev_rows: list[dict], cur_rows: list[dict],
     prev = totals(prev_rows)
     out = []
     for r in cur_rows:
-        key = norm(r.get("player_name_full") or r.get("player_name") or "")
+        key = player_key(r)
         if not key:
             continue
         pts, pj = float(r["points"]), float(r["games"])
@@ -135,6 +149,7 @@ def diff(prev_rows: list[dict], cur_rows: list[dict],
             continue
         out.append({
             "from_stamp": from_stamp, "to_stamp": to_stamp, "season": season,
+            "ff_id": (r.get("ff_id") or "").strip(),
             "player_name": r.get("player_name", ""),
             "player_name_full": r.get("player_name_full", ""),
             "team": r.get("team", ""),
@@ -159,7 +174,7 @@ def load_snapshots() -> dict[str, list[tuple[str, list[dict]]]]:
     ingest.pages and sources.parse_points are imported lazily so --selftest
     needs neither lxml nor a raw store.
     """
-    from ingest import (_parse_cache, _save_parse_cache, _Sigs,
+    from ingest import (_parse_cache, _save_parse_cache, _Sigs, parser_sig,
                         doc_keys, documents)
     from sources import parse_points, season_label
 
@@ -175,13 +190,19 @@ def load_snapshots() -> dict[str, list[tuple[str, list[dict]]]]:
     # The label and the empty-season reading are cached beside the rows
     # because they are the only other things read off the page, and caching
     # the rows alone would have kept the archive open for them.
+    # A PARSE IS A FUNCTION OF THE PAGE *AND* OF THE PARSER. ingest.parse_key
+    # already knows that; this path keyed on the page alone, so teaching
+    # parse_points to read the player id off the row left every stored
+    # snapshot on the old shape and the id absent from the whole history
+    # until the cache was deleted by hand. Same closure, same guarantee.
+    _psig = parser_sig("parse_points")
     cache, fresh, walk = _parse_cache(_CACHE), {}, doc_keys()
 
     # Read first, parse second, in one pass per archive — see ingest.documents.
     need: dict[str, set] = {}
     for _stamp, docs in walk:
-        if "points" in docs and not isinstance(cache.get(docs["points"][0]),
-                                               dict):
+        if "points" in docs and not isinstance(
+                cache.get("%s@%s" % (docs["points"][0], _psig)), dict):
             need.setdefault(docs["points"][1], set()).add("points")
     for origin, _key, html in documents(need):
         try:
@@ -192,12 +213,13 @@ def load_snapshots() -> dict[str, list[tuple[str, list[dict]]]]:
             # One bad page must not lose the rest of the run.
             print(f"  warn: {origin}/points: {type(e).__name__}: {e}")
             got = {"rows": [], "label": "", "empty": True}
-        cache[_Sigs().of("points", html)] = got
+        cache["%s@%s" % (_Sigs().of("points", html), _psig)] = got
 
     for stamp, docs in walk:
         if "points" not in docs:
             continue
         ck, origin = docs["points"]
+        ck = "%s@%s" % (ck, _psig)
         got = cache.get(ck)
         if not isinstance(got, dict):
             continue

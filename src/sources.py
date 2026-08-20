@@ -445,13 +445,29 @@ def _map_headers(cells: list[str]) -> dict:
     return got
 
 
+_POINTS_ID_RE = re.compile(r"openPlayerPointsStats\(\s*(\d+)")
+
+
+def _points_id(tr) -> str:
+    """The site's player id, from the row's own click handler."""
+    m = _POINTS_ID_RE.search(tr.get("onclick") or "")
+    return m.group(1) if m else ""
+
+
 def parse_points(html: str, observed_at: str = "", key: str = "points") -> list[dict]:
     """Total points, matches played and average per player.
 
     The table has no position column — positions come from market.csv at
     report time. The player cell holds two names, the full one and the short
-    display form; both are kept, because the market page uses the short form
-    and the name is the only join key this site gives us.
+    display form; both are kept, for display and for the rows that predate
+    the id.
+
+    THE ID IS ON THE ROW, in the click handler rather than a data-* attribute:
+    onclick="openPlayerPointsStats(63, 'Koke Resurrección', ...)". It is the
+    same namespace as the market page's data-id — on the 2026-08-20 sweep 266
+    of 274 ids appear in the market and every one agrees about the name — so
+    the season's points history joins on an identifier instead of on "the
+    only join key this site gives us", which it was not.
 
     Numbers go through ffcore.parse.ratio, imported lazily so this module
     stays importable from anywhere: it used to have a fourth private copy of
@@ -493,6 +509,7 @@ def parse_points(html: str, observed_at: str = "", key: str = "points") -> list[
             if pts is None or pj is None:
                 continue
             rows.append({
+                "ff_id": _points_id(tr),
                 "player_name": short,
                 "player_name_full": full,
                 "team": team,
@@ -2001,7 +2018,8 @@ _POINTS_FIXTURE = """
 <table><thead><tr><th>Jugador</th><th>PuntosPts</th><th>PJ</th>
   <th>MediaMed</th></tr></thead>
 <tbody>
-  <tr><td><span>Íñigo Ruiz de Galarreta</span>
+  <tr onclick="openPlayerPointsStats(4242, 'Íñigo Ruiz de Galarreta', 'R. de Galarreta', 'laliga-fantasy');">
+      <td><span>Íñigo Ruiz de Galarreta</span>
           <span>R. de Galarreta</span><span>Athletic</span></td>
       <td>156</td><td>34</td><td>4,59</td></tr>
   <tr><td><span>Sin Datos</span></td><td>-</td><td>-</td><td>-</td></tr>
@@ -2345,6 +2363,13 @@ def _selftest() -> None:
     assert p[0]["player_name_full"] == "Íñigo Ruiz de Galarreta"
     assert p[0]["points"] == "156" and p[0]["games"] == "34"
     assert p[0]["avg"] == "4.590", p[0]             # comma decimal, via ratio()
+    # THE ID IS IN THE CLICK HANDLER, not a data-* attribute — the only place
+    # this page puts it, and the reason the season's points history was
+    # keyed by name for as long as it was.
+    assert p[0]["ff_id"] == "4242", p[0]
+    # A row without one still parses; the oldest snapshots have no handler.
+    assert parse_points(_POINTS_FIXTURE.replace(
+        "openPlayerPointsStats(4242,", "somethingElse("))[0]["ff_id"] == ""
     assert season_label(_POINTS_FIXTURE) == "2025-26"
     assert season_label("<html>nothing</html>") == "unknown"
 
