@@ -1,6 +1,6 @@
 player_id,name,club_id,ff_slug,af_slug,app_id,app_names
 10003,joseda alvarez,alaves,,,,
-10005,pablo barrios,atletico,pablo-barrios,336594,,
+10005,pablo barrios,atletico,pablo-barrios,336594,1565,Barrios
 10114,renato veiga,villarreal,renato-veiga,336671,,
 10176,alvaro f. carreras,real madrid,lvaro-fernandez-1,,,
 10191,alejandro primo,levante,alejandro-primo,,,
@@ -8,7 +8,7 @@ player_id,name,club_id,ff_slug,af_slug,app_id,app_names
 10207,williot swedberg,celta,williot-swedberg,,2394,Williot
 10208,jonathan dubasin,osasuna,jonathan-dubasin,,,
 10209,facundo gonzalez,racing,facundo-gonzalez,286595,,
-10210,fran perez,rayo,fran-perez,,,
+10210,fran perez,rayo,fran-perez,162931,,
 10213,beñat gerenabarrena,athletic,benat-gerenabarrena,,,
 10214,alex padilla,athletic,alex-padilla,,,
 10217,marc casado,barcelona,marc-casado,,,
@@ -21,7 +21,7 @@ player_id,name,club_id,ff_slug,af_slug,app_id,app_names
 10287,julian alvarez,atletico,julian-lvarez,6009,,
 10326,karl etta eyong,levante,etta-eyong,,2700,Etta Eyong
 10336,alvaro mantilla,racing,lvaro-mantilla,181685,,
-10338,iñigo sainz-maza,racing,nigo-sainz-maza,,,
+10338,iñigo sainz-maza,racing,nigo-sainz-maza,,3000,Iñigo
 10341,peque,sevilla,peque,,2455,Peque
 10353,alex pastor,malaga,lex-pastor,,3059,Pastor
 10357,adria altimira,deportivo,adria-altimira,,,
@@ -34,13 +34,13 @@ player_id,name,club_id,ff_slug,af_slug,app_id,app_names
 10478,miguel loureiro,deportivo,miguel-loureiro,,,
 10533,andre almeida,valencia,andre-almeida-1,,,
 10564,yvan neyou,getafe,yvan-neyou,,,
-1059,antonio sivera,alaves,antonio-sivera,,,
+1059,antonio sivera,alaves,antonio-sivera,,988,Sivera
 10638,tajon buchanan,villarreal,tajon-buchanan,,2556,Buchanan
 10658,roony bardghji,barcelona,roony-bardghji,,,
 10660,orri steinn oskarsson,real sociedad,orri-steinn-skarsson,,2448,Oskarsson
 10767,sergio mestre,real madrid,,,,
 10822,pablo duran,celta,pablo-duran,,,
-10823,juan cruz,malaga,juan-cruz-2,,,
+10823,juan cruz,malaga,juan-cruz-2,,3140,Juan Cruz
 10830,pablo marin,real sociedad,pablo-marin,290106,,
 10832,moussa diarra,malaga,moussa-diarra,,,
 10860,carlos dotor,malaga,carlos-dotor,,,
@@ -135,7 +135,7 @@ player_id,name,club_id,ff_slug,af_slug,app_id,app_names
 12990,nordin al lal,elche,nordin-al-lal,,,
 12993,alvaro garcia,villarreal,,,,
 13007,vicent abril,valencia,,,,
-13035,javi rueda,celta,javi-rueda,,,
+13035,javi rueda,celta,javi-rueda,,2714,Javi Rueda
 13036,yoel lago,celta,yoel-lago,,,
 13040,jon balda,real sociedad,jon-balda,,,
 13119,vanja drkusic,espanyol,vanja-drkusic,,,
@@ -325,7 +325,7 @@ player_id,name,club_id,ff_slug,af_slug,app_id,app_names
 17284,ville koski,alaves,ville-koski,106759,,
 17406,lamini fati,real madrid,,,,
 1743,mathew ryan,levante,mat-ryan,2741,,
-17445,adama timera,espanyol,,,,
+17445,adama timera,espanyol,,,3170,Timera
 17493,carlos sanchez,racing,carlos-sanchez-3,,,
 17495,javi morcillo,elche,javi-morcillo,,,
 175,iago aspas,celta,iago-aspas,47445,2492,Iago Aspas
@@ -373,7 +373,7 @@ player_id,name,club_id,ff_slug,af_slug,app_id,app_names
 2534,wojciech szczesny,barcelona,wojciech-szczesny,,2783,Szczesny
 2536,antonio rudiger,real madrid,antonio-rudiger,,,
 2632,pablo fornals,betis,pablo-fornals,1697,3099,Fornals
-2663,pablo maffeo,valencia,,,,
+2663,pablo maffeo,valencia,pablo-maffeo,,,
 2675,mikel oyarzabal,real sociedad,mikel-oyarzabal,,,
 2715,pepelu,valencia,pepelu,47463,2464,Pepelu
 2727,ezequiel ponce,elche,ezequiel-ponce,,,
@@ -385,7 +385,7 @@ player_id,name,club_id,ff_slug,af_slug,app_id,app_names
 2807,alvaro odriozola,real sociedad,alvaro-odriozola,,,
 3106,peter gulacsi,villarreal,peter-gulacsi,,3130,Gulácsi
 3174,einar galilea,malaga,einar-galilea,14470,,
-3178,kiko femenia,getafe,kiko-femenia,,,
+3178,kiko femenia,getafe,kiko-femenia,18794,2774,Kiko F.
 3204,alex berenguer,athletic,alex-berenguer,,927,Berenguer
 3206,kike barja,osasuna,kike-barja,,,
 3215,marc roca,betis,marc-roca,47341,2418,Marc Roca
@@ -482,10 +482,11 @@ player_id,name,club_id,ff_slug,af_slug,app_id,app_names
 6442,iñigo vicente,racing,inigo-vicente,47293,3002,Iñigo Vicente
 6446,yangel herrera,real sociedad,yangel-herrera,2449,,
 6450,rodrigo riquelme,betis,rodrigo-riquelme,,,
-6487,javi galan,celta,javi-galan,,,
+6487,javi galan,celta,javi-galan,,2329,Javi Galán
 6493,alejandro catena,osasuna,alejandro-catena,,,
 6560,andrei ratiu,rayo,andrei-florin,1703,,
-6562,sergio camello,rayo,sergio-camello,,,
+6562,sergio camello,rayo,sergio-camello,52,,
+6563,ivan martin,racing,ivan-martin,,,
 660,ruben garcia,osasuna,ruben-garcia,46658,652,Rubén García
 6605,manu sanchez,levante,manu-sanchez,64309,,
 6606,carles perez,celta,carles-perez,,,
@@ -509,7 +510,7 @@ player_id,name,club_id,ff_slug,af_slug,app_id,app_names
 7006,oihan sancet,athletic,oihan-sancet,128398,,
 7027,raul garcia,osasuna,raul-garcia-1,,,
 707,diego javier llorente,betis,diego-javier-llorente,,2415,Llorente
-7081,fernando niño,elche,fernando-nino,,,
+7081,fernando niño,elche,fernando-nino,,3147,Fer Niño
 7082,jorge herrando,osasuna,jorge-herrando,,,
 7091,takefusa kubo,real sociedad,takefusa-kubo,,,
 7100,marash kumbulla,rayo,marash-kumbulla,,,
@@ -533,7 +534,7 @@ player_id,name,club_id,ff_slug,af_slug,app_id,app_names
 7629,ivan romero,levante,ivan-romero,192032,,
 7638,jesus areso,athletic,jesus-areso,182181,,
 7644,victor garcia,levante,victor-garcia-1,46790,,
-7645,alex baena,atletico,lex-baena,182219,,
+7645,alex baena,atletico,lex-baena,182219,2534,Álex Baena
 7658,german valera,elche,german-valera,161963,,
 7676,guido rodriguez,valencia,guido-rodriguez,2476,,
 7686,julen lobete,malaga,julen-lobete,,,
@@ -547,7 +548,7 @@ player_id,name,club_id,ff_slug,af_slug,app_id,app_names
 7916,aitor paredes,athletic,aitor-paredes,183849,2315,Paredes
 7917,beñat prados,athletic,benat-prados,,1787,Prados
 7920,nico serrano,athletic,nico-serrano,,,
-7995,francho serrano,getafe,francho-serrano,,,
+7995,francho serrano,getafe,francho-serrano,162249,,
 8080,miguel rodriguez,alaves,miguel-rodriguez-1,,,
 8082,ilaix moriba,celta,ilaix-moriba,,2607,Ilaix Moriba
 8088,oriol rey,levante,oriol-rey,,,
@@ -621,7 +622,7 @@ player_id,name,club_id,ff_slug,af_slug,app_id,app_names
 9763,ilias akhomach,villarreal,ilias-akhomach,,,
 9772,luismi cruz,deportivo,luismi-cruz,,,
 9796,ruben iranzo,valencia,ruben-iranzo,,,
-9823,marc pubill,atletico,marc-pubill,295793,,
+9823,marc pubill,atletico,marc-pubill,295793,2562,Marc Pubill
 9847,charlie patino,deportivo,charlie-patino,284466,,
 9850,jofre carreras,espanyol,jofre-carreras,,,
 9854,arnau comas,deportivo,arnau-comas,,,
@@ -646,7 +647,7 @@ e120,pellegrino matarazzo,real sociedad,,,,
 e123,luis miguel ramis,osasuna,,,,
 e168,jose alberto lopez,racing,,,3004,José Alberto
 e169,edin terzic,athletic,,,3094,Edin Terzic
-e170,antonio hidalgo,deportivo,,,,
+e170,antonio hidalgo,deportivo,,,2986,Antonio Hidalgo
 e171,martin anselmi,elche,,,,
 e172,juan funes,malaga,,,,
 e173,beñat san jose,rayo,,,,
