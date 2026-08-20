@@ -49,7 +49,8 @@ from ffcore.tidy import (run_now,  # noqa: E402
                          DECISIONS, append_csv, input_path,  # noqa: E402
                          load_deadline, read_csv, write_csv)
 
-FIELDS = ["logged_at", "hours_to_lock", "n_xi", "xi", "bench", "warnings"]
+FIELDS = ["logged_at", "hours_to_lock", "n_xi", "xi", "bench",
+          "xi_names", "bench_names", "warnings"]
 
 # 11 on the pitch. Fewer means the app would have auto-filled someone and the
 # log would not match what actually played.
@@ -104,9 +105,12 @@ def main() -> None:
     lg = League.load()
     squad = lg.squad(lg.cfg.me)
 
-    # No name map: a squad key IS the normalised name, which is what the
-    # app's nickname normalises to, so the join needs nothing extra.
+    # A squad key is the site's ID now, not a normalised name, so the log
+    # gets both: the ids are what a later grade joins on, and the names are
+    # what makes a row anybody keeps for months readable.
     xi, benched, warnings = fielded(squad)
+    named = {k: (v.get("name") or k)
+             for k, v in (lg.market.latest().items() if lg.market else ())}
     if not xi:
         for w in warnings:
             print("  warning:", w)
@@ -126,11 +130,13 @@ def main() -> None:
         "n_xi": len(xi),
         "xi": "|".join(xi),
         "bench": "|".join(benched),
+        "xi_names": "|".join(named.get(k, k) for k in xi),
+        "bench_names": "|".join(named.get(k, k) for k in benched),
         "warnings": "; ".join(warnings),
     }], FIELDS)
 
     print("logged XI of %d from the app (bench: %s)%s"
-          % (len(xi), ", ".join(benched) or "—",
+          % (len(xi), ", ".join(named.get(k, k) for k in benched) or "—",
              "" if not htl else " — %sh to lock" % htl))
     for w in warnings:
         print("  warning:", w)
