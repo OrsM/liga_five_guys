@@ -58,7 +58,7 @@ from pathlib import Path
 from typing import NamedTuple
 
 from ffcore.parse import money
-from ffcore.text import norm, resolve
+from ffcore.text import norm
 from ffcore.tidy import (load_crosswalk,  # noqa: E402
                          run_now,  # noqa: E402
                          Market, input_path, ledger_stamp,

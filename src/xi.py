@@ -36,9 +36,7 @@ fielded are two different facts, and scoring needs both kept apart.
 
 from __future__ import annotations
 
-import datetime as dt
 import os
-import re
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -46,8 +44,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from ffcore.league import League, app_fielded  # noqa: E402
 from ffcore.text import norm  # noqa: E402
 from ffcore.tidy import (run_now,  # noqa: E402
-                         DECISIONS, append_csv, input_path,  # noqa: E402
-                         load_deadline, read_csv, write_csv)
+                         DECISIONS, append_csv, load_deadline, read_csv, write_csv)
 
 FIELDS = ["logged_at", "hours_to_lock", "n_xi", "xi", "bench",
           "xi_names", "bench_names", "warnings"]

@@ -91,7 +91,6 @@ import re
 import sys
 from pathlib import Path
 from collections import Counter
-from datetime import datetime, timezone
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
@@ -112,18 +111,16 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from ffcore.bid import (deals, demand_summary, low_priced_buys,  # noqa: E402
                         premiums, suggest, xi_snapshots)
 from ffcore.fixture import FIX_BAND, HOME_EDGE  # noqa: E402
-from ffcore.league import League  # noqa: E402
 from ffcore.render import title_name  # noqa: E402
 from ffcore.second import (LEGEND, SECOND_SOURCE,  # noqa: E402
                            af_cell, second_cells)
-from ffcore.score import (ABSENT_START, MAX_SLOT, NEUTRAL_START,  # noqa: E402
-                          SLOT_LABEL, SLOT_MIN, build, formations,
+from ffcore.score import (ABSENT_START, NEUTRAL_START,  # noqa: E402
+                          SLOT_LABEL, SLOT_MIN, formations,
                           pick_xi, squad_pool)
 from ffcore.league import app_fielded  # noqa: E402
 from ffcore.tidy import (run_now,  # noqa: E402
                          DECISIONS, PARTS,  # noqa: E402
-                         age_phrase, append_csv, input_path, latest_only,
-                         load_deadline, load_market, load_lineups, read_csv,
+                         age_phrase, append_csv, load_deadline, read_csv,
                          snapshot_stamp, stale_feeds, widen_csv, write_lines)
 from slate import read_slate  # noqa: E402
 
@@ -290,9 +287,6 @@ def flat_gains(players, cands) -> dict[str, float]:
 # unit: index points above replacement level per million euros. It is measured
 # FIXTURE-NEUTRAL, because you own a player for months and not for one round,
 # which is why the market pool below re-scores everyone off `flat`.
-#
-# neutral_view() is what λ was measured off and has no caller left. It is kept
-# with the rest of the λ machinery named in the import block above.
 # ---------------------------------------------------------------------------
 
 
@@ -970,8 +964,7 @@ def main() -> None:
     # nothing said which was right.
     from ffcore.model import session
     m = session()
-    market, xi_rows = m.market, m.xi_rows
-    all_market = market
+    market = m.market
 
     PARTS.mkdir(parents=True, exist_ok=True)
 
@@ -1005,7 +998,6 @@ def main() -> None:
         row = s.as_row()
         row["name"] = title_name(row["name"])
         players.append(row)
-    squad_value = sum(p["value"] for p in players)
 
     pool = squad_pool(players)
     best = pick_xi(pool) if players else None

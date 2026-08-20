@@ -635,7 +635,6 @@ def wait_routes(u, offers=None, rng=None) -> list[dict]:
     is computed ONCE: the markdown table and the phone drew different things
     twice before this was a function.
     """
-    import datetime as dt
     import random
     import statistics
     from ffcore.season import best_xi
@@ -1082,7 +1081,6 @@ def cash_price_history():
 
 def log_cash_price(measured) -> None:
     """Append today's reading. Never overwrites: the series IS the estimate."""
-    import datetime as dt
     from ffcore.tidy import DECISIONS, append_csv
 
     if measured is None:
@@ -1363,12 +1361,18 @@ def _selftest() -> None:
     # jornada of thirty-eight, and it was the half-played one, only because a
     # midfielder whose club had already kicked off was excluded from it.
     u2.part_played = {1: {"alaves"}}
+    # Starting only in jornada 2 — still choosable — is a real starting slot,
+    # not spare, even with jornada 1 locked.
     u2.forecaster = Bootstrap({1: {k: (v, 1.0) for k, v in val.items()},
                                2: {k: ((9.0 if k == "spare_m" else v), 1.0)
                                    for k, v in val.items()}})
-    u2.forecaster, only_j1 = Bootstrap(
+    assert "spare_m" not in dict(dead_weight(u2)), \
+        "a man who starts in a round still ahead is not spare"
+    # Starting only in jornada 1 — locked — is not a decision left to make,
+    # so it does not save him from being spare.
+    u2.forecaster = Bootstrap(
         {1: {k: ((9.0 if k == "spare_m" else v), 1.0) for k, v in val.items()},
-         2: {k: (v, 1.0) for k, v in val.items()}}), True
+         2: {k: (v, 1.0) for k, v in val.items()}})
     assert "spare_m" in dict(dead_weight(u2)), \
         "a man who starts only in a locked round is still spare"
     # ...unless there is no choosable round left at all, in which case the
@@ -1554,7 +1558,6 @@ def _selftest() -> None:
 
 
 def main() -> None:
-    import datetime as dt
     import decide
     from ffcore.model import session
     from ffcore.tidy import load_deadline

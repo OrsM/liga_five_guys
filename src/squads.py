@@ -31,7 +31,6 @@ grew from three managers to five, which is the argument for having them in
 one place.
 """
 
-import datetime as dt
 import os
 import sys
 
@@ -41,7 +40,6 @@ from ffcore.bid import (HORIZONS, MAX_LAG_H, deals,  # noqa: E402
                         premiums, usable)
 from ffcore.league import League  # noqa: E402
 from ffcore.parse import fmt_money, fmt_pct  # noqa: E402
-from ffcore.score import SLOT, formations  # noqa: E402
 from ffcore.second import LEGEND, af_cell, second_cells  # noqa: E402
 from ffcore.text import norm  # noqa: E402
 from ffcore.tidy import (run_now,  # noqa: E402
@@ -355,8 +353,7 @@ def main():
     print("replayed %d transaction(s)" % len(lg.txns))
 
     on_offer, unresolved = read_slate(lg.market)
-    ambiguous, auto = [], []      # the feed states who is on offer; nothing
-    if on_offer or unresolved:    # is guessed, so nothing can be ambiguous
+    if on_offer or unresolved:
         print("slate: %d on offer, %d unjoined"
               % (len(on_offer), len(unresolved)))
     log_slate(on_offer, players, now.strftime("%Y-%m-%dT%H:%MZ"))

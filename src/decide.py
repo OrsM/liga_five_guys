@@ -46,17 +46,16 @@ from dataclasses import dataclass, field
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from ffcore.forecast import Bootstrap, pool_from_perjornada  # noqa: E402
-from ffcore.league import League, api_key  # noqa: E402
+from ffcore.league import api_key  # noqa: E402
 from ffcore.parse import fmt_money  # noqa: E402
-from ffcore.score import SLOT, build, _calibrated  # noqa: E402
+from ffcore.score import SLOT, _calibrated  # noqa: E402
 from ffcore.text import norm  # noqa: E402
 from ffcore.season import (LeagueState, best_xi,  # noqa: E402
-                           simulate, simulate_many)
+                           simulate_many)
 from ffcore.tidy import (run_now,  # noqa: E402
                          TIDY, SEASON, latest_only, load_api_market,  # noqa: E402
                          last_api_standings, load_api_teams,
-                         load_lineups, load_market,
-                         load_players, read_csv)
+                         load_players)
 
 __all__ = ["Action", "candidates", "rank", "Universe"]
 

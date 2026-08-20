@@ -94,7 +94,6 @@ def second_cells(who, source: str = SECOND_SOURCE, rows=None, xw=None):
             continue
         pid = xw.player(ff_slug=r.get("player_slug")) if xw else None
         by_slug[slug] = (pid, r)
-    slug_to_key = {s: k for s, (k, _r) in by_slug.items() if k}
     cells: dict = {}
     unclear: list[tuple[str, list[str]]] = []
     seen: set = set()

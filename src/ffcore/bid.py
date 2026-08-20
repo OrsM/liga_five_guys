@@ -70,7 +70,7 @@ from typing import NamedTuple
 
 from ffcore.league import MARKET
 from ffcore.parse import money
-from ffcore.score import SLOT_MIN, THIN, pick_xi, squad_pool
+from ffcore.score import SLOT_MIN, pick_xi, squad_pool
 from ffcore.tidy import ledger_stamp
 
 __all__ = ["MAX_LAG_H", "ROUND_TO", "FLOOR_EPS", "HORIZONS", "Premiums", "Advice",
