@@ -118,15 +118,38 @@ class Crosswalk:
     def _reindex(self) -> None:
         self._by_ff, self._by_af, self._by_app = {}, {}, {}
         self._by_app_name, self._by_market_slug = {}, {}
+        # AN IDENTIFIER TWO PLAYERS CLAIM IDENTIFIES NEITHER. These indexes
+        # were plain assignment, so the second writer won and the answer
+        # depended on dict order. That is the worst failure available here: a
+        # unique id is trusted precisely BECAUSE it does not guess, and a
+        # silent coin toss wearing an id's clothes is trusted the same way.
+        # A clash is recorded, refused, and reported by clashes().
+        self._clash: dict[str, set] = {}
         for p in self.players.values():
-            for idx, key in ((self._by_ff, p.ff_slug),
-                             (self._by_af, p.af_slug),
-                             (self._by_app, p.app_id),
-                             (self._by_market_slug, p.market_slug)):
-                if key:
-                    idx[key] = p.player_id
+            for idx, key, label in (
+                    (self._by_ff, p.ff_slug, "ff_slug"),
+                    (self._by_af, p.af_slug, "af_slug"),
+                    (self._by_app, p.app_id, "app_id"),
+                    (self._by_market_slug, p.market_slug, "market_slug")):
+                if not key:
+                    continue
+                if key in idx and idx[key] != p.player_id:
+                    self._clash.setdefault(label, set()).add(key)
+                idx[key] = p.player_id
             for n in p.app_names:
-                self._by_app_name[norm(n)] = p.player_id
+                k = norm(n)
+                if not k:
+                    continue
+                if k in self._by_app_name \
+                        and self._by_app_name[k] != p.player_id:
+                    self._clash.setdefault("app_name", set()).add(k)
+                self._by_app_name[k] = p.player_id
+        for label, keys in self._clash.items():
+            idx = {"ff_slug": self._by_ff, "af_slug": self._by_af,
+                   "app_id": self._by_app, "app_name": self._by_app_name,
+                   "market_slug": self._by_market_slug}[label]
+            for k in keys:
+                idx.pop(k, None)
         self._club_ff = {c.ff_slug: c.club_id for c in self.clubs.values()
                          if c.ff_slug}
         self._club_alias = {}
@@ -136,6 +159,15 @@ class Crosswalk:
                     self._club_alias[norm(a)] = c.club_id
 
     # -- asking ------------------------------------------------------------
+    def clashes(self) -> dict:
+        """{index: [ids two or more players claim]} — empty when all is well.
+
+        Surfaced rather than swallowed: a clash means one of the joins that
+        wrote an id down was wrong, and the row it wrote is still in the
+        table. The report says so instead of the index quietly picking one.
+        """
+        return {k: sorted(v) for k, v in sorted(self._clash.items()) if v}
+
     def player(self, *, name=None, ff_slug=None, af_slug=None, app_id=None,
                app_name=None, market_slug=None) -> str | None:
         """The repo's key for a player, from whatever key you happen to hold.
@@ -212,8 +244,43 @@ class Crosswalk:
                                         key=lambda c: c.club_id)])
 
     def merge(self, other: "Crosswalk") -> "Crosswalk":
-        """This table, plus anything `other` learned. Never subtracts."""
+        """This table, plus anything `other` learned.
+
+        Never subtracts, WITH ONE EXCEPTION: a unique id that `other` gives
+        to a different player is taken off the player holding it here. Never
+        subtracting is right for a feed that skipped a sweep and wrong for an
+        identifier — app_id 2614 was written onto Isaac Romero by a name join
+        that has since been fixed, and absorb() kept it there for every
+        rebuild afterwards, so the corrected table and the stale one both
+        claimed it. A fix that cannot displace what the bug wrote down is not
+        a fix.
+        """
         for pid, p in other.players.items():
+            # EVERY UNIQUE IDENTIFIER THE INCOMING TABLE ASSIGNS IS TAKEN OFF
+            # WHOEVER ELSE HOLDS IT. app_id showed why: a name join wrote
+            # 2614 onto Isaac Romero, the join was fixed, and absorb() kept
+            # the wrong row alive through every rebuild. The slugs had the
+            # same disease from a different cause — when shared_names stopped
+            # splitting `moussa diarra`, the old `moussa diarra@malaga` row
+            # stayed behind still holding his ff_slug and market_slug, so one
+            # player held one slug under two keys.
+            for f in ("app_id", "ff_slug", "af_slug", "market_slug"):
+                val = getattr(p, f)
+                if not val:
+                    continue
+                for cur in self.players.values():
+                    if cur.player_id != pid and getattr(cur, f) == val:
+                        setattr(cur, f, "")
+            # An alias the incoming table hangs on THIS player comes off
+            # everyone else, for the reason above: app_name is a key
+            # sim.py's market model looks players up by, and two holders
+            # make it answer by dict order or not at all.
+            if p.app_names:
+                fresh = {norm(n) for n in p.app_names}
+                for cur in self.players.values():
+                    if cur.player_id != pid and cur.app_names:
+                        cur.app_names = {n for n in cur.app_names
+                                         if norm(n) not in fresh}
             if pid in self.players:
                 self.players[pid].absorb(p)
             else:
@@ -273,6 +340,57 @@ def _selftest() -> None:
     # when the table was built, with every feed in front of it.
     assert xw.player(ff_slug="who-is-this") is None
     assert xw.player() is None
+
+    # -- A UNIQUE ID BELONGS TO ONE PLAYER, AND A CLASH IS NOT AN ANSWER ---
+    # REAL, AND IT OUTLIVED THE BUG THAT MADE IT. app_id 2614 is the app's
+    # own id for Carlos Romero. A name join that read the app's abbreviated
+    # "C. Romero" as Isaac Romero wrote 2614 onto Isaac; the join was fixed,
+    # Carlos correctly took 2614 too, and NOTHING TOOK IT OFF ISAAC. Two
+    # players then claimed one id and the index answered with whichever it
+    # reindexed last — a coin toss wearing an identifier's clothes.
+    clash = Crosswalk({
+        "carlos romero": Player("carlos romero", app_id="2614"),
+        "isaac romero": Player("isaac romero", app_id="2614")})
+    assert clash.player(app_id="2614") is None, clash.player(app_id="2614")
+    assert clash.clashes() == {"app_id": ["2614"]}, clash.clashes()
+    # One holder, one answer.
+    solo = Crosswalk({"carlos romero": Player("carlos romero", app_id="2614"),
+                      "isaac romero": Player("isaac romero")})
+    assert solo.player(app_id="2614") == "carlos romero"
+    assert solo.clashes() == {}
+
+    # A CORRECTED ID DISPLACES A STALE ONE ACROSS A MERGE. Never-subtracts
+    # is right for a feed that skipped a sweep; for an identifier it would
+    # keep the wrong answer alive forever.
+    stale = Crosswalk({"isaac romero": Player("isaac romero", app_id="2614"),
+                       "carlos romero": Player("carlos romero")})
+    fixed = Crosswalk({"carlos romero": Player("carlos romero",
+                                               app_id="2614")})
+    stale.merge(fixed)
+    assert stale.players["isaac romero"].app_id == ""
+    # The same for a slug, which went stale for a different reason: a key
+    # that changed shape left a ghost row still holding the identifiers.
+    ghost = Crosswalk({
+        "moussa diarra@malaga": Player("moussa diarra@malaga",
+                                       market_slug="10832",
+                                       ff_slug="moussa-diarra"),
+        "moussa diarra": Player("moussa diarra")})
+    ghost.merge(Crosswalk({"moussa diarra": Player("moussa diarra",
+                                                   market_slug="10832",
+                                                   ff_slug="moussa-diarra")}))
+    assert ghost.players["moussa diarra@malaga"].market_slug == ""
+    assert ghost.player(market_slug="10832") == "moussa diarra"
+    assert ghost.clashes() == {}
+    assert stale.player(app_id="2614") == "carlos romero"
+    assert stale.clashes() == {}
+    # The display name moves with the id, and for the same reason.
+    st2 = Crosswalk({"isaac romero": Player("isaac romero",
+                                            app_names={"C. Romero"}),
+                     "carlos romero": Player("carlos romero")})
+    st2.merge(Crosswalk({"carlos romero": Player("carlos romero",
+                                                 app_names={"C. Romero"})}))
+    assert st2.players["isaac romero"].app_names == set()
+    assert st2.player(app_name="C. Romero") == "carlos romero"
 
     # -- clubs, which have three spellings and one identity ----------------
     assert xw.club(ff_slug="rayo-vallecano") == "rayo"

@@ -193,9 +193,28 @@ def build_players(market, lineups, starters, api_rows, lg, clubs) -> dict:
         p = out.get(key) if key else None
         if p is None:
             continue
+        # The app's display name belongs to the player the app hangs it on,
+        # for the same reason its id does. Isaac Romero kept the alias
+        # "C. Romero" after losing the id to Carlos, and app_name is the key
+        # sim.py's market model looks players up by.
+        for other in out.values():
+            if other is not p:
+                other.app_names = {n for n in other.app_names
+                                   if norm(n) != norm(raw)}
         p.app_names.add(raw)
-        if r.get("player_id") and not p.app_id:
-            p.app_id = str(r["player_id"]).strip()
+        pid = str(r.get("player_id") or "").strip()
+        if not pid:
+            continue
+        # THE APP'S OWN ROW IS THE AUTHORITY FOR THE APP'S OWN ID, and it
+        # takes the id OFF whoever held it before. `not p.app_id` alone only
+        # ever added: when a name join wrote 2614 onto Isaac Romero and the
+        # fixed join later gave 2614 to Carlos, both kept it and the index
+        # answered with whichever it saw last. A stale claim outliving the
+        # bug that made it is how a fix fails to take.
+        for other in out.values():
+            if other is not p and other.app_id == pid:
+                other.app_id = ""
+        p.app_id = pid
     return out
 
 
