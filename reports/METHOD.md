@@ -1,4 +1,4 @@
-# Liga Five Guys — how the numbers are made — 2026-08-20 17:51 UTC
+# Liga Five Guys — how the numbers are made — 2026-08-20 18:17 UTC
 
 
 
@@ -7,24 +7,24 @@
 
 | Route | What it offers | Season pts | Beats acting today |
 |---|---|--:|--:|
-| **Act today** | 27 players you can buy now | +160 | — |
-| Wait for the market | a week of new offers | +186 | 70% |
-| Wait for the clauses | 58 players on 24 Aug | +144 | — |
+| **Act today** | 27 players you can buy now | +196 | — |
+| Wait for the market | a week of new offers | +210 | 83% |
+| Wait for the clauses | 58 players on 24 Aug | +190 | — |
 
 | The workings | |
 |---|--:|
-| Unowned players who would improve your eleven | 94 of 585 |
-| Tenth percentile of a week's waiting | +3.32 |
+| Unowned players who would improve your eleven | 144 of 585 |
+| Tenth percentile of a week's waiting | +4.83 |
 | Market model | the market is modelled from 90 offers over 6 cycles, weighted by value^0.15, and only just — value^0.20 fits within 10.1% of it, so read the exponent as roughly this, not exactly this |
-| Locked players who would improve your eleven | 25 |
+| Locked players who would improve your eleven | 33 |
 | Their clauses open | 24 Aug, in about 4 days |
 
 | Nobody is offering | Would add | Likely wait |
 |---|--:|--:|
-| Lamine Yamal | +6.46 | 16 days |
-| Kylian Mbappe | +5.48 | 16 days |
-| Joan Garcia | +5.13 | 18 days |
-| Zaid Romero | +4.31 | 21 days |
+| Lamine Yamal | +7.84 | 16 days |
+| Kylian Mbappe | +6.24 | 16 days |
+| Augusto Batalla | +5.80 | 20 days |
+| Joan Garcia | +5.79 | 18 days |
 
 
 ## What the simulation cannot see
@@ -50,22 +50,22 @@
 | | Table | What it is used for | Fetched from | Rows | Newest row | Fetching |
 |---|---|---|---|--:|---|---|
 | 🟢 | api_activity | every transfer, which is what the ledger replays — one row per deal, so the newest is the last deal and not the last sweep | LaLiga Fantasy API | 71 | 19 Aug 23:07 | fetched 1 minute ago |
-| 🟢 | api_leagues | your cash and the league's id | LaLiga Fantasy API | 57 | 20 Aug 17:51 | fetched 1 minute ago |
-| 🟢 | api_lineup | the eleven you have actually fielded, and the formation the app says you are playing | LaLiga Fantasy API | 374 | 20 Aug 17:51 | fetched 1 minute ago |
-| 🟢 | api_market | what is on offer, and the bids on it | LaLiga Fantasy API | 1,857 | 20 Aug 17:51 | fetched 1 minute ago |
+| 🟢 | api_leagues | your cash and the league's id | LaLiga Fantasy API | 58 | 20 Aug 18:17 | fetched 1 minute ago |
+| 🟢 | api_lineup | the eleven you have actually fielded, and the formation the app says you are playing | LaLiga Fantasy API | 385 | 20 Aug 18:17 | fetched 1 minute ago |
+| 🟢 | api_market | what is on offer, and the bids on it | LaLiga Fantasy API | 1,884 | 20 Aug 18:17 | fetched 1 minute ago |
 | 🟢 | api_players | names for players nobody owns any more — one row per player, first sighting kept | LaLiga Fantasy API | 58 | 19 Aug 22:20 | fetched 20 hours ago |
-| 🟢 | api_standings | the league table — position, points, squad value, and your balance | LaLiga Fantasy API | 285 | 20 Aug 17:51 | fetched 1 minute ago |
+| 🟢 | api_standings | the league table — position, points, squad value, and your balance | LaLiga Fantasy API | 290 | 20 Aug 18:17 | fetched 1 minute ago |
 | 🟢 | api_stats | what the app scored each player, broken into what he did — one row per player per week per stat, a correction being a later row rather than an overwrite | LaLiga Fantasy API | 882 | 19 Aug 22:20 | fetched 1 minute ago |
-| 🟢 | api_teams | all five squads | LaLiga Fantasy API | 4,131 | 20 Aug 17:51 | fetched 1 minute ago |
+| 🟢 | api_teams | all five squads | LaLiga Fantasy API | 4,201 | 20 Aug 18:17 | fetched 1 minute ago |
 | ⚪ | clubs | the same, for clubs | src/crosswalk.py | 20 | — | rebuilt every run from the tables above |
-| 🟢 | elo | team strength, which ranks the fixture term | clubelo.com | 780 | 20 Aug 17:51 | fetched 11 hours ago |
-| 🟢 | fixtures | who plays whom next, for the fixture term | analiticafantasy.com | 954 | 20 Aug 17:51 | fetched 11 hours ago |
-| 🟢 | lineups | probable XI percentages, both sources | analiticafantasy.com, futbolfantasy.com ×40 | 62,620 | 20 Aug 17:51 | fetched 4 hours ago |
-| 🟢 | market | price, value, position, fitness — every player in the game | futbolfantasy.com | 59,952 | 20 Aug 17:51 | fetched 1 minute ago |
-| 🟢 | matches | fixtures, kickoffs, results | futbolfantasy.com | 22,800 | 20 Aug 17:51 | fetched 11 hours ago |
+| 🟢 | elo | team strength, which ranks the fixture term | clubelo.com | 800 | 20 Aug 18:17 | fetched 11 hours ago |
+| 🟢 | fixtures | who plays whom next, for the fixture term | analiticafantasy.com | 968 | 20 Aug 18:17 | fetched 11 hours ago |
+| 🟢 | lineups | probable XI percentages, both sources | analiticafantasy.com, futbolfantasy.com ×40 | 63,359 | 20 Aug 18:17 | fetched 4 hours ago |
+| 🟢 | market | price, value, position, fitness — every player in the game | futbolfantasy.com | 60,607 | 20 Aug 18:17 | fetched 1 minute ago |
+| 🟢 | matches | fixtures, kickoffs, results | futbolfantasy.com | 23,180 | 20 Aug 18:17 | fetched 11 hours ago |
 | ⚪ | players | the crosswalk: one key per player across all four spellings | src/crosswalk.py | 656 | — | rebuilt every run from the tables above |
 | 🟢 | points | realised points per jornada, the actuals in every table below | futbolfantasy.com | 132 | 19 Aug 22:20 | fetched 1 minute ago |
-| 🟢 | starters | confirmed elevens, which is what P(start) is graded on | futbolfantasy.com | 14,370 | 20 Aug 17:51 | fetched 11 hours ago |
+| 🟢 | starters | confirmed elevens, which is what P(start) is graded on | futbolfantasy.com | 14,644 | 20 Aug 18:17 | fetched 11 hours ago |
 
 ### The model, as configured right now
 
@@ -205,6 +205,6 @@ _Both figures are editorial reads refreshed a few times a day, not live probabil
 | Players tracked | 655, 497 with a probable-XI reading |
 | xPts/j | expected points per jornada = shrunk pts/match (K=8, 2025-26 + 2026-27) × fixture × P(start), from `ffcore/score.py` — the same scorer rivals.py uses |
 | Zeroed | injured, suspended, unavailable; a doubt is halved |
-| Fixture term | ±12% across the opponents ranked by Club Elo rating, plus ±4% for home advantage — both widths guesses, unfitted, and small enough that a wrong one costs a fraction of a point |
+| Fixture term | ±12% across the opponents ranked by nothing: no fixture is known for anyone in your squad, plus ±4% for home advantage — both widths guesses, unfitted, and small enough that a wrong one costs a fraction of a point |
 
-_Generated 2026-08-20 17:51 UTC._
+_Generated 2026-08-20 18:17 UTC._
