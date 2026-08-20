@@ -737,9 +737,16 @@ def shared_names(rows) -> set:
     THREE INDEXES KEY THE SAME ROWS — Market here, the Scorer's lookup, and
     the crosswalk — and they have to agree about this or a squad key from one
     misses in the next. Three of 651 names on 2026-08-19.
+
+    Decided by TODAY'S market, whatever you hand it: latest_only is applied
+    here rather than trusted from the caller. It used to be the caller's job
+    and the callers did not agree — Market and the crosswalk filtered, and
+    decide.py passed the whole history, which shares a name between a man who
+    left and a man who arrived. latest_only is idempotent, so a caller that
+    already filtered pays one max() for the guarantee.
     """
     clubs: dict[str, set] = {}
-    for r in rows:
+    for r in latest_only(rows):
         n = norm(r.get("name"))
         if n:
             clubs.setdefault(n, set()).add(_club(r))
@@ -1077,6 +1084,24 @@ def _selftest() -> None:
     # decision readable.
     assert tm.key_for("Pepelu") == norm("Pepelu")
     assert norm("Pepelu") in tm.latest()
+
+    # WHO IS SHARED IS DECIDED BY TODAY'S MARKET, WHATEVER YOU HAND IT.
+    # This was prose in the docstring and a parameter in the signature, so
+    # three callers each computed the set themselves off different rows:
+    # Market and the crosswalk passed latest_only, decide.py passed the whole
+    # 41,642-row history. A man who left in July and a man who arrived in
+    # August then shared a name in ONE index and not the others, and a squad
+    # naming either missed the lookup and scored blank. The rule belongs in
+    # the function, not in the callers.
+    gone = [{"name": "Iker Munoz", "team": "Osasuna", "value": "1000000",
+             "observed_at": "2026-07-01T1000Z"},
+            {"name": "Iker Munoz", "team": "Getafe", "value": "2000000",
+             "observed_at": "2026-07-01T1000Z"},
+            {"name": "Iker Munoz", "team": "Getafe", "value": "2100000",
+             "observed_at": "2026-08-19T1639Z"}]
+    assert shared_names(gone) == set(), shared_names(gone)
+    assert shared_names(latest_only(gone)) == shared_names(gone)
+    assert row_key(gone[-1], shared_names(gone)) == norm("Iker Munoz")
 
     mkt = [{"name": "Ane Aldea", "team": "Alavés", "position": "defensa",
             "value": "2.050.000", "delta_1d": "-12.000"},
