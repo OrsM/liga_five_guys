@@ -630,7 +630,7 @@ def ledger_from_api(activity: list[dict], users: dict,
     return out
 
 
-def owner_drift(ledger: dict, api: dict) -> list[str]:
+def owner_drift(ledger: dict, api: dict, names=None) -> list[str]:
     """Where the typed ledger and the app disagree, one line each.
 
     Silence on agreement. This exists to be READ, so it must not print the
@@ -642,19 +642,26 @@ def owner_drift(ledger: dict, api: dict) -> list[str]:
     """
     if not api:
         return []
+    # KEYS ARE IDS NOW, AND A WARNING IS FOR A HUMAN. `names` maps key ->
+    # display name; without it this printed "**9931** — the app has him at
+    # Magic Mike 333", which names nobody. The key is still what the two
+    # sides are compared on.
+    def _who(k):
+        return (names or {}).get(k) or k
+
     out = []
     for key, held in sorted(ledger.items()):
         now = api.get(key)
         if now is None:
             out.append("**%s** — the ledger has him at %s; the app says "
-                       "nobody in the league holds him." % (key, held))
+                       "nobody in the league holds him." % (_who(key), held))
         elif now != held:
             out.append("**%s** — the ledger has him at %s; the app says %s."
-                       % (key, held, now))
+                       % (_who(key), held, now))
     for key, now in sorted(api.items()):
         if key not in ledger:
             out.append("**%s** — the app has him at %s; the ledger has no "
-                       "record of him." % (key, now))
+                       "record of him." % (_who(key), now))
     return out
 
 
@@ -897,7 +904,11 @@ class League:
                 api_teams, market, ledger_owner=self.owner,
                 app_ids=app_ids_known())
             if api_owner:
-                self.warnings += owner_drift(self.owner, api_owner)
+                self.warnings += owner_drift(
+                    self.owner, api_owner,
+                    {k: (v.get("name") or k)
+                     for k, v in (market.latest().items()
+                                  if market is not None else ())})
                 for raw in self.api_unjoined:
                     self.warnings.append(
                         "**%s** — the app says he is owned, but no market row "

@@ -46,7 +46,7 @@ from ffcore.second import LEGEND, af_cell, second_cells  # noqa: E402
 from ffcore.text import norm  # noqa: E402
 from ffcore.tidy import (run_now,  # noqa: E402
                          DECISIONS, PARTS, append_csv,  # noqa: E402
-                         load_players, write_lines)
+                         load_players, widen_csv, write_lines)
 from slate import read_slate  # noqa: E402
 
 # Both probable-XI sources, side by side, in every table this module writes.
@@ -55,7 +55,7 @@ from slate import read_slate  # noqa: E402
 HEAD = ("| Player | Team | Pos | Value | 24h | FF | AF |\n"
         "|---|---|--:|--:|--:|--:|--:|")
 
-SLATE_LOG = ["observed_at", "player", "value", "start_pct"]
+SLATE_LOG = ["observed_at", "ff_id", "player", "value", "start_pct"]
 
 # Pitch order, and what counts as fit. Only this module reads them.
 POS_ORDER = ["portero", "defensa", "mediocampista", "delantero", "entrenador"]
@@ -104,12 +104,21 @@ def log_slate(on_offer, players, stamp):
         rec = players.get(k, {})
         rows.append({
             "observed_at": stamp,
+            # The key IS the site's id now — logged as its own column so a
+            # later grade joins on it rather than on the display name beside
+            # it. See report.LOG_COLS.
+            "ff_id": k,
             "player": rec.get("name", k),
             "value": "" if rec.get("value") is None else "%.0f" % rec["value"],
             "start_pct": ("" if rec.get("start") is None
                           else "%.0f" % rec["start"]),
         })
-    append_csv(DECISIONS / "slate_log.csv", rows, SLATE_LOG)
+    # Before appending, not after: append_csv lets the FILE's header win, so
+    # a new column is silently dropped rather than misaligned. Same migration
+    # report.log_squad does for squad_log.
+    path = DECISIONS / "slate_log.csv"
+    widen_csv(path, SLATE_LOG)
+    append_csv(path, rows, SLATE_LOG)
 
 
 

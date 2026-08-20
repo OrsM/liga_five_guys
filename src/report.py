@@ -164,8 +164,12 @@ BOARD_TAIL = 4
 # cannot answer that, and the two fixture constants are guesses waiting to be
 # graded. Rows written before they existed keep an empty cell, which honestly
 # says "not measured" rather than "average".
+# `player` is a display name and stays one, for reading. `ff_id` is what a
+# later grade will actually join on: a log keyed on a spelling is a log that
+# stops matching the moment the source changes how it writes somebody's name,
+# and this file exists to be graded months from now.
 LOG_COLS = ["observed_at", "hours_to_lock", "formation", "index_total",
-            "player", "pos", "slot", "start_pct", "start_source", "status",
+            "ff_id", "player", "pos", "slot", "start_pct", "start_source", "status",
             "assumed", "value", "score", "picked",
             "ppm", "fix", "opp", "home", "cur_pj", "flat",
             "fix_basis", "elo_gap"]
@@ -578,6 +582,7 @@ def log_squad(observed, players, chosen, formation, total, deadline,
             "observed_at": observed, "hours_to_lock": htl,
             "formation": "-".join(str(x) for x in formation),
             "index_total": f"{total:.2f}",
+            "ff_id": p.get("key", ""),
             "player": p["name"], "pos": p["pos"], "slot": p["slot"],
             "start_pct": "" if p["pct"] is None else f"{p['pct']:.0f}",
             "start_source": src, "status": p["status"] or "ok",
