@@ -653,7 +653,7 @@ def identify(t: dict, owner: dict, market=None) -> tuple[str, str]:
     ambiguous, which is the manual step the ledger's own notes record: "price
     confirms Fabio not Johnny".
 
-    Three prunes, applied to the candidates ffcore.text.resolve() hands back
+    Three prunes, applied to the candidates Market.candidates() hands back
     rather than replacing it — an exact name is returned untouched and is never
     second-guessed:
 

@@ -349,7 +349,7 @@ def fresh_only(rows: list[dict], max_age_days: float, now=None) -> list[dict]:
     when = snapshot_stamp(max(r.get("observed_at", "") for r in rows))
     if when is None:
         return []
-    now = now or datetime.now(timezone.utc)
+    now = now or run_now()
     return rows if (now - when).total_seconds() <= max_age_days * 86400 else []
 
 
@@ -462,7 +462,7 @@ def stale_feeds(now=None, names=GATED_API) -> dict[str, float]:
     gone quiet; it has never spoken, and the callers already have a sentence
     for that ("add a token", "the ledger takes over").
     """
-    now = now or datetime.now(timezone.utc)
+    now = now or run_now()
     out = {}
     for name in names:
         rows = read_csv(TIDY / f"{name}.csv")
@@ -633,7 +633,7 @@ def next_kickoff(now=None):
     started (their page drops a match once it is under way, so a stale file
     goes quiet rather than stale-and-confident).
     """
-    now = now or datetime.now(timezone.utc)
+    now = now or run_now()
     ahead = [k for k in (kickoff_stamp(r.get("kickoff"))
                          for r in load_fixtures()) if k and k > now]
     return min(ahead) if ahead else None
@@ -1071,6 +1071,15 @@ def _selftest() -> None:
     now = datetime(2026, 8, 19, 12, 0, tzinfo=timezone.utc)
     day_old = [{"observed_at": "2026-08-18T2246Z", "club": "Barcelona"}]
     two_days = [{"observed_at": "2026-08-17T2246Z", "club": "Barcelona"}]
+    # ...and the functions that DEFAULT a `now` take the run's instant too.
+    # These read `now = now or <clock>`, so left to themselves they each
+    # sampled again — the freshness gate could disagree with the timestamp
+    # printed beside it in the same document.
+    import inspect as _inspect
+    for _fn in (fresh_only, stale_feeds):
+        _src = _inspect.getsource(_fn)
+        assert "now or run_now()" in _src, _fn.__name__
+
     # ONE INSTANT PER RUN. Asked twice, it must not have moved.
     assert run_now() is run_now()
     assert run_now().tzinfo is timezone.utc
