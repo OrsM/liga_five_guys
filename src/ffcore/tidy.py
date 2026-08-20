@@ -35,7 +35,7 @@ from pathlib import Path
 from typing import NamedTuple
 
 from ffcore.parse import money, pct100
-from ffcore.text import norm, resolve
+from ffcore.text import index_by, norm, resolve
 
 __all__ = ["ROOT", "TIDY", "SEASON", "DECISIONS", "REPORTS", "PARTS", "MADRID",
            "input_path", "read_csv", "write_csv", "append_csv", "widen_csv",
@@ -844,6 +844,7 @@ class Market:
     def __init__(self, rows: list[dict]):
         self.rows = rows
         self._latest: list | None = None
+        self._name_idx: dict | None = None
         # The fuzzy answers, kept. The same handful of unresolvable spellings
         # are asked about again and again — once per feed row, per run.
         self._resolved: dict[str, str | None] = {}
@@ -909,6 +910,18 @@ class Market:
             self._latest = latest_only(self.rows)
         return self._latest
 
+    def _name_index(self) -> dict:
+        """{norm(name): row} over latest_rows(), built ONCE.
+
+        resolve() was rebuilding this identical dict on every call — 5,146
+        times over the same 654 rows to resolve one run's crosswalk, 81% of
+        its runtime. The rows never change between calls; nor should the
+        index built from them.
+        """
+        if self._name_idx is None:
+            self._name_idx = index_by(self.latest_rows(), "name")
+        return self._name_idx
+
     def key_for(self, name, team: str = "", value=None):
         """Key for a human-typed name, or None if it doesn't resolve uniquely.
 
@@ -928,7 +941,7 @@ class Market:
         # brought the evidence to settle it.
         if value is None and k in self._resolved:
             return self._resolved[k]
-        row, cands = resolve(name, self.latest_rows())
+        row, cands = resolve(name, self.latest_rows(), index=self._name_index())
         if row is not None:
             got = self.key_of(row)
             self._resolved[k] = got
@@ -967,7 +980,7 @@ class Market:
                           if key in self._by_key]
         if k in self._by_key:
             return k, []
-        row, cands = resolve(name, self.latest_rows())
+        row, cands = resolve(name, self.latest_rows(), index=self._name_index())
         if row is not None:
             return self.key_of(row), []
         return None, [self.key_of(r) for r in cands]

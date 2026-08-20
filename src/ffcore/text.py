@@ -94,7 +94,7 @@ def _contains_words(haystack: str, needle: str) -> bool:
     return (" %s " % needle) in (" %s " % haystack)
 
 
-def resolve(query, rows, key="name"):
+def resolve(query, rows, key="name", index=None):
     """Find one row for a human-typed name.
 
     Returns (row, candidates). Exactly one of them is meaningful:
@@ -105,12 +105,18 @@ def resolve(query, rows, key="name"):
     Three passes, narrowest first: exact key, substring, then all-tokens
     subset. Nothing here guesses between candidates; ambiguity is handed back
     for a human to settle, because a wrong player silently costs money.
+
+    `index`, if given, is `index_by(rows, key)` computed ONCE by a caller that
+    calls resolve() on the SAME rows repeatedly — a caller rebuilding it every
+    call was 81% of crosswalk's runtime, rebuilding an identical dict off the
+    same 654-row market on every one of 5,146 lookups. Must be exactly
+    `index_by(rows, key)` for these rows; nothing here checks that.
     """
     q = norm(query)
     if not q:
         return None, []
 
-    idx = index_by(rows, key)
+    idx = index if index is not None else index_by(rows, key)
     if q in idx:
         return idx[q], []
 

@@ -247,9 +247,20 @@ def main() -> None:
     market = latest_only(read_csv(TIDY / "market.csv"))
     lineups = latest_only(read_csv(TIDY / "lineups.csv"))
     starters = read_csv(TIDY / "starters.csv")
-    api_rows = (read_csv(TIDY / "api_teams.csv")
-                + read_csv(TIDY / "api_market.csv")
-                + read_csv(TIDY / "api_players.csv"))
+    # latest_only PER TABLE, not on the concatenation: api_teams is swept
+    # daily and api_market every run, so their newest observed_at stamps
+    # differ. latest_only on the combined list would pick the single overall
+    # newest stamp and silently drop every api_teams row that did not happen
+    # to share it. Applied per table, this also cuts the resolution loop
+    # below from a 24x-redundant walk over every historical snapshot (43
+    # sweeps of the same 80 api_teams players, measured) to one pass over
+    # who is actually here today — the SAME final answer, since that loop
+    # already overwrites a player's app_id on every row seen, last write
+    # wins, so the older rows were only ever recomputing what the newest
+    # row would say anyway.
+    api_rows = (latest_only(read_csv(TIDY / "api_teams.csv"))
+                + latest_only(read_csv(TIDY / "api_market.csv"))
+                + latest_only(read_csv(TIDY / "api_players.csv")))
     elo_rows = read_csv(TIDY / "elo.csv")
     lg = League.load()
 
