@@ -81,6 +81,19 @@ def index_by(rows, key="name") -> dict:
     return {norm(r.get(key)): r for r in rows if norm(r.get(key))}
 
 
+def _contains_words(haystack: str, needle: str) -> bool:
+    """Is `needle` in `haystack` as whole words?
+
+    A raw `in` matched across a word boundary: "c romero" is inside
+    "isaa|c romero|", so the app's "C. Romero" resolved to Isaac Romero and
+    reported no ambiguity. Both strings are already normalised to
+    space-separated words, so padding with spaces is the whole test.
+    """
+    if not needle:
+        return False
+    return (" %s " % needle) in (" %s " % haystack)
+
+
 def resolve(query, rows, key="name"):
     """Find one row for a human-typed name.
 
@@ -101,7 +114,7 @@ def resolve(query, rows, key="name"):
     if q in idx:
         return idx[q], []
 
-    subs = [r for r in rows if q in norm(r.get(key))]
+    subs = [r for r in rows if _contains_words(norm(r.get(key)), q)]
     if len(subs) == 1:
         return subs[0], []
     if subs:
@@ -117,3 +130,55 @@ def resolve(query, rows, key="name"):
             return None, hits
 
     return None, []
+
+
+# ---------------------------------------------------------------------------
+
+def _selftest() -> None:
+    rows = [{"name": "Isaac Romero"}, {"name": "Cristian Romero"},
+            {"name": "Carlos Romero"}, {"name": "Lamine Yamal"},
+            {"name": "Álvaro Fernández"}]
+
+    # An exact name is the strongest evidence there is and nothing overrules it.
+    assert resolve("Lamine Yamal", rows)[0]["name"] == "Lamine Yamal"
+    assert resolve("lamine yamal", rows)[0]["name"] == "Lamine Yamal"
+    assert resolve("Alvaro Fernandez", rows)[0]["name"] == "Álvaro Fernández"
+
+    # A surname on its own is a substring match, and one man has it.
+    assert resolve("Yamal", rows)[0]["name"] == "Lamine Yamal"
+
+    # THE SUBSTRING PASS MUST NOT MATCH ACROSS A WORD BOUNDARY. "c romero" is
+    # inside "isaa|c romero|", so the app's abbreviated "C. Romero" resolved
+    # to Isaac Romero with no ambiguity reported — a 45.7M purchase priced
+    # against a 6.2M player, +635% premium, and it set the top of every bid
+    # band in METHOD.md. The initial is dropped by tokens() as noise, so the
+    # honest answer is the two men it could be, handed back for a caller with
+    # a club or a price to settle.
+    # tokens() then drops the initial as noise, so all three Romeros come
+    # back as candidates and NOTHING is returned. Refusing is the right
+    # answer here — a caller holding the price can settle it, and key_for
+    # does exactly that.
+    row, cands = resolve("C. Romero", rows)
+    assert row is None, row
+    assert sorted(r["name"] for r in cands) == ["Carlos Romero",
+                                                "Cristian Romero",
+                                                "Isaac Romero"], cands
+
+    # Ambiguity is handed back, never guessed between.
+    row, cands = resolve("Romero", rows)
+    assert row is None and len(cands) == 3, (row, cands)
+
+    # A query matching nothing is not a near miss.
+    assert resolve("Haaland", rows) == (None, [])
+    assert resolve("", rows) == (None, [])
+
+    # tokens() drops single letters, which is why the initial cannot rescue
+    # the match on its own.
+    assert tokens("C. Romero") == ["romero"]
+    assert index_by(rows)["lamine yamal"]["name"] == "Lamine Yamal"
+
+    print("ffcore.text self-test OK (13 cases)")
+
+
+if __name__ == "__main__":
+    _selftest()
