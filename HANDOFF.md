@@ -1,158 +1,172 @@
-# liga_five_guys — handoff, 2026-08-20
+# liga_five_guys — handoff, 2026-08-20 (evening)
 
-Private repo `OrsM/liga_five_guys`, working tree clean, **pushed**, 28 suites pass.
+Private repo `OrsM/liga_five_guys`, working tree clean, **pushed** at `e988144`,
+29 suites pass.
 
 ## Start here, and do not open with an audit
 
-**This file is the map. Read it, run the one command below, then start on item 1 of
-"What to do next".** The last session ended with everything committed, deployed and
-verified; there is nothing to discover about the current state that is not written
-here, and a session that spends its first twenty tool calls re-deriving it has spent
-them on something Miguel already paid for once.
-
-One command confirms the whole state — the suites, the pipeline and the two outputs:
+**This file is the map.** Read it, run the one command below, then start on item 1
+of "What to do next." Everything up to here is committed, deployed and verified —
+a session that re-derives it has spent its first twenty tool calls on something
+already paid for.
 
     cd ~/claude_projects/liga_five_guys && \
       LFG_NO_FETCH=1 LFG_NO_COMMIT=1 ~/.local/bin/lfg-run 2>&1 | tail -4
 
-If that says `28 suites pass` and publishes 2 files, nothing has rotted. Read
-`README.md` only when you need the WHY behind a design decision — it is 1,085 lines
-and is reference, not orientation.
+If that says `29 suites pass` and publishes 2 files, nothing has rotted.
 
-## Run it
+**Outside the repo:** `~/.local/bin/lfg-run` was edited today to register
+`ffcore/model.py`'s suite (28 → 29). That file is not tracked by git — if this box
+is ever rebuilt from the repo alone, re-add `ffcore/model.py` to the `TESTS=(...)`
+list near the top, or the run will report 28 and be wrong.
 
-`uv`, never pip — this box has no pip and no python3-venv, and installing them needs
-sudo.
+## What today was: identifiers, not names
 
-    PYTHONPATH=src FF_ROOT=./data uv run --frozen python src/<module>.py
+A long session moved every join in the repo from a normalised NAME to the
+identifier each source actually publishes — the market page's `data-id`, the
+app's `player_id`, the points page's click-handler id, club ids on both fixture
+sources. Four comments in the code asserted an identifier didn't exist; all four
+were wrong, found by opening the raw page rather than re-reading the code. Full
+account, with the measurements: https://claude.ai/code/artifact/36a202e6-978e-4d16-a2af-b4cc28214afa
 
-Every module self-tests under `__main__`; several need `--selftest` (report, sim,
-league, ingest, crosswalk, digest, methodology). There is no pytest and no test
-directory. **Work TDD**: add the failing assertion to the module's own `_selftest()`,
-watch it fail, then implement.
+Consequence for you: the C. Romero bug (a wrong join that priced a 45.7M
+purchase against a 6.2M player) is fixed, ledger joins are 66/66 instead of
+60/66, and a corrected id now displaces a stale one instead of both surviving
+forever. Three of my own regressions along the way were caught by MEASURING
+outputs, not by reading code — that discipline is the reason to keep doing this
+the same way: control run, treatment run, diff `decisions.json` on a **pinned
+clock** (`LFG_NOW=2026-08-20T0700Z ...`, see `ffcore/model.py`'s docstring),
+understand every line that moves before committing.
 
-- `~/.local/bin/lfg-run` — 28 suites, fetch, generate, publish, commit.
-  `LFG_NO_FETCH=1`, `LFG_NO_COMMIT=1`, `LFG_PUSH=1` are the switches.
-- `src/run.py` — the ten stages in ONE interpreter. `python src/run.py sim digest`
-  runs a subset, which is how a failure gets bisected.
-- **The scheduled timer is OFF** (disabled 2026-08-19 at Miguel's request). The report
-  runs on demand: the phone's "Run again" button, which `lfg-watch.timer` polls for
-  every 60s, or `lfg-run` by hand. `systemctl --user enable --now lfg.timer` brings
-  the schedule back. Consequence to remember: every reading is as old as the last
-  press, which is what the freshness gates and the traffic-light table are for.
+## THE THING THAT ACTUALLY MATTERS — READ THIS BEFORE TOUCHING CODE
 
-## The reports — there are two
+Miguel looked at `p_win: 0.92` on the first day of a 5-manager league and said,
+correctly, that it doesn't pass a smell test. **He was right, and it is not a
+bug in the arithmetic — it is what the simulation is actually simulating.**
 
-    reports/decisions.json    THE report. The phone draws it: position, the XI change
-                              list, the ladder, the league table with cash, the
-                              warnings. Written by src/sim.py.
-    reports/METHOD.md         The methodology. Stitched by src/digest.py from
-                              fragments in .runtime/parts/ — build artifacts, not
-                              reports.
+`ffcore/season.simulate()` plays out all 38 remaining jornadas with EVERY
+manager's squad frozen exactly as it stands today. No manager — you or any
+rival — ever makes a transfer, in any of the 2,000 trials. It compounds day-one
+squad value across an entire season and calls the result "P(win)." The
+per-rival `p_above` figures ARE internally consistent with that assumption (I
+checked the arithmetic by hand against the season bands) — the assumption
+itself is the problem, not the code computing it.
 
-Nothing else is generated and nothing else is published. **If you add a file to
-`reports/`, publish it or do not write it.** REPORT.md was the board's content as
-markdown and went on 2026-08-20 along with `reports/history/`: two renderings of one
-answer is how they come to disagree, which happened twice in one evening.
+Why it exists: `simulate_many`'s docstring is explicit — it was built so that
+comparing "buy this player" against "hold" replays the SAME random season for
+both squads, which is exactly right for a one-week decision (`decide.py`'s
+buy/wait ranking). It was never designed to answer "what's my probability of
+winning the league," and reusing it for that silently assumes the other four
+managers never touch their squads again. That is the whole gap between 92% and
+believable.
 
-## Where it stands
+A second, smaller effect stacks on top: `Bootstrap.rate_draw` draws each
+player's season-long rate uncertainty INDEPENDENTLY. A real club's slump moves
+every one of its players' returns together; the model doesn't have that
+correlation, so it understates variance further. That's `MIN_POOL = 200` in
+`ffcore/forecast.py`, currently at 96 real match observations — the seed pool
+covers the gap and the note says so (`pool_note()`), but the correlation itself
+isn't modelled yet either way. Real, but the smaller of the two effects — do it
+second.
 
-Live: cash **15.98M**, squad **220.04M**, formation **4-5-1** (which is what he is
-already fielding), finish 1.24, P(win) 76%, season band 1,612–1,979.
+### What to do about it, in order
 
-What the last session changed, all of it measured and none of it cosmetic:
+1. **Relabel `p_win` before doing anything else.** It currently reads as a
+   forecast; it is a squad-quality sanity check under a frozen-roster
+   assumption. Cheap, honest, stops the number misleading anyone while the real
+   fix gets built. Touches `sim.py`'s render text and `reports/METHOD.md`'s
+   wording — no model change, so it should be byte-identical on
+   `decisions.json` except the label itself.
+2. **Give the season simulation a transfer policy — the real fix.** Each
+   trial, each jornada, each manager (rivals included) makes a small number of
+   plausible swaps toward their best-value pool. `sim.py` already has a market
+   model for "wait vs act" (`Offers.fit` in `ffcore/market.py`) — the shape of
+   the mechanism to reuse for rivals is there, the season loop isn't wired to
+   call it per-jornada per-manager yet. This is genuinely more work than
+   anything else on this list; expect it to be its own session.
+3. **Club correlation, once the match pool clears 200.** Second-order next to
+   #2. `MIN_POOL` in `ffcore/forecast.py` — check the pool size before starting
+   here; if it's not close, note it and move on rather than half-building it.
 
-1. **The fielded XI comes from the app.** `/v1/competition/1/teams/{team}/lineup/week/
-   {n}` returns the eleven, the formation and `teamSnapshotTookOn`. The repo believed
-   no such endpoint existed because every guess had been made under the LEAGUE path.
-   `inputs/lineup.txt` and its checklist machinery are deleted; `ffcore.league.
-   app_fielded` is the one reader, and it returns [] unless EVERY man resolves.
-2. **The eleven is a change list**: PUT ON / TAKE OFF against what you are fielding,
-   or one line saying there is nothing to change. Not a team sheet you have to diff in
-   your head.
-3. **A name is not a player.** Three names of 651 are two men; keyed `name@club` now,
-   by one rule (`ffcore.tidy.shared_names` / `row_key`) shared by four indexes.
-   SusoGattuso's squad was 19.73M light because of it.
-4. **The rate's own error is simulated** — one draw per season, sd = pool cv over
-   √(matches + K). Band 259 → 365 points, P(win) 74% → 64%. The mean is unchanged by
-   construction.
-5. **Rivals are credited what the app actually pays** (`flat_income`, measured 1.27M
-   on the one account that states a balance), not a guessed daily bonus.
-6. **The API tables are gated on freshness** and a quiet feed says so — in the
-   headline, in the warnings, and as a traffic light in METHOD.md keyed on when a page
-   was last ASKED FOR, not on the re-stamp.
+If you only do one thing this session, do #1 — it costs an hour and stops the
+number lying in the meantime.
 
-## What to do next
+## Standing method (keep doing this)
 
-1. **Delete `ffcore/bid.py`. Measure first, then delete.** 630 lines and five
-   constants (`MAX_LAG_H`, `ROUND_TO`, `FLOOR_EPS`, `HOLD_DAYS`, `MIN_DRIFT_N`)
-   inferring what a rival will bid from the roundness of past prices. Its own
-   docstring records that inference being inverted and wrong. The measurement: stub it
-   out, run `src/run.py` on the same store, diff `reports/decisions.json` and
-   `reports/METHOD.md`. If nothing moves, delete it and its callers; if something
-   moves, say what and stop. Half an hour, and it is the whole task.
+- **Measure before believing.** A claim read off the code is not a finding —
+  every real defect found today was caught by running the code and diffing
+  outputs, not by reading comments. Several comments this session were
+  confidently wrong.
+- **Control vs treatment, one store, clock pinned.** `LFG_NOW=<stamp>` on both
+  runs, or an in-between fetch reads as a fake regression — this cost real time
+  twice today (once looked like a 7-point P(win) swing, once like 3M of cash
+  appearing).
+- **TDD against the module's own `_selftest()`.** Add the failing assertion
+  first, watch it fail, then fix. No pytest, no test directory.
+- **One and only one implementation per key operation.** If you find a second
+  place computing the same fact, that is the bug, not a style complaint — see
+  the artifact above for the pattern (methods own state that can be wrong,
+  free functions stay free).
+- **Do not hardcode a decision rule.** If a rule is needed, the metric is
+  wrong. `FIX_BAND`, `HOME_EDGE`, `DOUBT_FACTOR` are still unfitted guesses
+  sitting in `ffcore/fixture.py` / `sim.py` — n=1 per bucket, lower priority
+  than the transfer-policy work above but real.
+- **No prose in the reports. Tables.**
+- **`git push` and deploy by default** once a fix is committed and verified —
+  do not ask.
 
-2. **Split model from render at `decisions.json`.** The one real refactor.
-   `report.py` scores AND renders, `sim.py` simulates AND renders, `methodology.py`
-   re-reads every tidy table to describe what the other two did — three modules
-   re-deriving the same numbers, which is why two surfaces could disagree about the
-   formation. Target: the model writes `decisions.json`, every renderer reads only
-   that and cannot reach the tidy store. Groundwork is done — the fragments are
-   already build artifacts and there is one document left to assemble. Do it in one
-   sitting and diff the outputs: they should be byte-identical the day it lands.
+## Where the league stands right now
 
-3. **Waiting on data — judge nothing yet.** `FIX_BAND` (±12%) and `HOME_EDGE` (+4%)
-   are unfitted guesses with n=1 per bucket. `DOUBT_FACTOR = 0.5` is a hardcoded
-   decision rule in a repo whose standing instruction forbids them. Club correlation
-   in the season risk needs per-jornada per-club history: the pool is at 96 matches
-   and grows ~200 a round, and `MIN_POOL = 200` is the same threshold that takes the
-   shape prior off its seed — one measurement unlocks both, in about a week.
+Cash **19.18M**, squad **220.04M**, formation not yet reported (early season),
+expected finish **1.09**, `p_win` **0.92** (see above — read this number as
+"if nobody transfers again," not as a forecast). Season band 1,592–1,954 pts.
+Standings (1 jornada played):
 
-4. **Fetched but unread.** `api_stats` (per-week components including `mins_played`,
-   which is what could grade P(start) against minutes rather than a binary),
-   `player_status` (the app's own fitness, against two editorial scrapes), and the bid
-   counts. Each is a MODEL decision needing grading in METHOD.md, not plumbing.
+| manager | now | projected mean | cash | p(I beat them) |
+|---|---|---|---|---|
+| **miguel_autentico (me)** | 31 | 1,772 | 19.18M | — |
+| SusoGattuso | 26 | 1,482 | 5.33M | 93.7% |
+| BurtonGM89 | 28 | 1,383 | 19.08M | 97.7% |
+| Magic Mike 333 | 15 | 1,239 | 2.38M | 99.7% |
+| Albert Laporta | 10 | 1,133 | 1,278 | 100% |
+
+## Also open, untouched today
+
+- **Buy-below-floor as a live warning.** A purchase can never legally price
+  below the player's value — cheapest, sharpest bad-join detector there is,
+  and it's how the C. Romero bug actually surfaced this session. Exists only
+  as a manual query today (`ffcore/bid.py`'s `usable()` path is where it
+  belongs).
+- **`api_stats` and `player_status`, fetched and unread.** 882 rows of
+  `api_stats` include `mins_played` — P(start) is currently graded binary
+  (played/didn't), not by minutes. `player_status` is the app's own fitness
+  read, sitting next to two editorial scrapes it's never been checked against.
+  Straight accuracy upgrade, no plumbing needed, data's already in
+  `data/tidy/`.
+- **Render/store boundary, mostly closed, not locked in.** `ffcore/model.py`
+  now holds the one League + one Scorer per run (`session()`); `report.py` and
+  `sim.py` point at it. Remaining reads in `report.py` (log dedup,
+  `load_deadline`) are legitimately per-stage. What's missing is a guard test
+  asserting no renderer imports `ffcore.tidy` except `methodology.py` (which
+  legitimately describes the store). Low priority next to #1/#2 above — code
+  hygiene, not model accuracy.
 
 ## Traps that cost real time — do not rediscover these
 
-- **"THE SOURCE DOES NOT PUBLISH IT" IS A GUESS UNTIL YOU HAVE PROBED THE SHAPE.**
-  The fielded XI hangs off `/teams/{team}/...`, not the league path every guess used.
-  That guess became a fact by repetition — three docstrings and a handoff — and cost a
-  hand-maintained file and a class of wrong report. Vary the path shape, not just the
-  noun, before designing around an absence.
-- **A claim read off the code is not a finding.** Measure it, then say it. Miguel has
-  called this out twice and been right twice.
-- **A gate that only refuses is half a fix.** `[]` arrives downstream as "nothing is
-  for sale": aged three days the report said "market 0th percentile · a poor week"
-  about a market it could not see. Whatever you gate, give it a sentence next to the
-  numbers it explains.
-- **One row can hold two kinds of fact.** `api_standings` carries a balance that must
-  be today's and a points total that only grows. Gating both zeroed everyone's season.
-- **`observed_at` is the sweep that CARRIED a page, not when it was fetched.** parse
-  re-stamps a carried-forward document, so a page nobody has requested since midnight
-  reads as minutes old. The manifest's `seen` is the honest column.
-- **Freshness bounds come from the timer, not from a round number.** The legs are 11h
-  and 13h, so 0.5 days condemns a healthy feed every night. `EVERY_RUN_FRESH_DAYS`.
-- **The app stamps a whole day's deals with the same minute.** Break ties on its own
-  id read as an integer — "15676725" sorts before "9629986" as text.
-- **The app's price is an independent identifier and it catches wrong joins** (0.2%
-  agreement when right, 603% out when wrong) — and it is also what tells two men of
-  one name apart. But check a GUESS only: an exact name match is the strongest
-  evidence there is and money must never overrule it.
-- **Two copies of one fact is how a number gets corrected in one and not the other.**
-  The headline cash and league.md's cash were two independent reads until the gate
-  moved one of them.
-
-## Standing instructions
-
-Be sceptical of the numbers, including mine. Every substantive bug in the last two
-sessions was found by distrusting output, not by reading code. **When Miguel says a
-claim of mine is wrong, re-derive it from the data rather than defending it — he has
-been right every time.**
-
-Do not hardcode a decision rule. If a rule is needed, it is a sign the metric is wrong.
-
-No prose in the reports. Tables.
-
-And do not explain away a bug by pointing at what the user should have maintained.
-The checklist that went stale was ours to remove, not his to re-tick.
+- **"THE SOURCE DOES NOT PUBLISH IT" IS A GUESS UNTIL PROBED.** Four comments
+  this session asserted an identifier didn't exist. All four were wrong.
+- **Pinning the clock is not pinning the store.** A fetch landing between two
+  runs looks exactly like a regression.
+- **A half-migrated key looks exactly like a model change.** `score()` moved
+  to id keys while `second` (the analiticafantasy blend) stayed name-keyed for
+  one commit — every player silently lost the second opinion, and every
+  calibrated P(start) moved. Caught by diffing one player's inputs, not by
+  reading.
+- **A merge-not-rebuild table can silently double.** The crosswalk kept 657
+  name-keyed ghost rows alive after the key changed to ids, because `merge()`
+  never subtracts by design. Fixed (`548fdb1`) — the pattern is worth
+  remembering if another table's key ever changes shape.
+- **A purchase PRICE is not a VALUE.** It's the value plus whatever it took to
+  win. A join that treats them as interchangeable prefers the wrong man and
+  produces an impossible buy (below the floor) — which is exactly the signal
+  the open "buy-below-floor warning" item above is meant to catch by default.
