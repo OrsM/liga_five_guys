@@ -717,6 +717,11 @@ class Valuation(NamedTuple):
     observed_at: str
     lag_h: float
     name: str
+    # True when the NAME alone did not identify this player and the price
+    # was what settled it. Such a reading cannot then testify about the
+    # premium — it agrees with the price by construction — so premiums()
+    # drops it. It is still the right value for everything else.
+    by_price: bool = False
 
 
 # How far apart two readings of one player's value may be and still be the
@@ -842,12 +847,27 @@ class Market:
             return self._pick(k, team, value)
         if k in self._by_key:
             return k
-        if k in self._resolved:
+        # The memo holds the no-evidence answer only. Cached before the price
+        # is consulted, a refusal would be handed back to the caller that
+        # brought the evidence to settle it.
+        if value is None and k in self._resolved:
             return self._resolved[k]
-        row, _cands = resolve(name, self.latest_rows())
-        got = self.key_of(row) if row else None
-        self._resolved[k] = got
-        return got
+        row, cands = resolve(name, self.latest_rows())
+        if row is not None:
+            got = self.key_of(row)
+            self._resolved[k] = got
+            return got
+        # AN EXACT NAME IS NEVER OVERRULED — this runs only where resolve()
+        # has already refused, which is the definition of a guess. The app
+        # abbreviates first names ("C. Romero"), so a candidate list and the
+        # price that was paid are often all there is, and refusing when the
+        # money names one of them unambiguously is throwing evidence away.
+        if cands and value is not None:
+            return self._by_price(
+                {self.key_of(r): r.get("value") for r in cands}, value)
+        if value is None:
+            self._resolved[k] = None
+        return None
 
     def _pick(self, shared: str, team: str, value):
         """Which of the men sharing this name, by club or by price."""
@@ -856,16 +876,29 @@ class Market:
         if team:
             want = "%s@%s" % (shared, _club({"team": team}))
             return want if want in keys else None
+        return self._by_price(
+            {k: (self._by_key[k][-1][1]).get("value") for k in keys}, value)
+
+    def _by_price(self, values: dict, value) -> str | None:
+        """The one key in `values` whose price agrees, or None.
+
+        THE ONE PLACE THIS REPO DECIDES THAT TWO PRICES ARE THE SAME PRICE.
+        The price is an independent identifier and the men it separates are
+        not close — the pair that started this differ by forty times. Two
+        agreeing keys settle nothing and neither does none, because the point
+        of asking is to get one answer or no answer, never a preference
+        between two. The tolerance is the one api_key already uses on the
+        same evidence.
+        """
         if value is None:
             return None
-        # The price is an independent identifier and these are not close —
-        # the pair that started this differ by forty times. The tolerance is
-        # the one api_key already uses on the same evidence.
         val = money(value) if isinstance(value, str) else float(value)
+        if not val:
+            return None
         hits = []
-        for k in keys:
-            got = money((self._by_key[k][-1][1]).get("value"))
-            if got and val and abs(got - val) <= VALUE_TOLERANCE * max(got, val):
+        for k, raw in values.items():
+            got = money(raw)
+            if got and abs(got - val) <= VALUE_TOLERANCE * max(got, val):
                 hits.append(k)
         return hits[0] if len(hits) == 1 else None
 
@@ -873,7 +906,7 @@ class Market:
         """{key: newest row} — the 'what exists today' view."""
         return {k: hist[-1][1] for k, hist in self._by_key.items() if hist}
 
-    def at(self, name, when: datetime | None) -> Valuation | None:
+    def at(self, name, when: datetime | None, value=None) -> Valuation | None:
         """Value from the last snapshot at or before `when`.
 
         Falls back to the earliest snapshot if the moment predates the data —
@@ -883,6 +916,10 @@ class Market:
         it should be treated as indicative only.
         """
         key = self.key_for(name)
+        by_price = False
+        if key is None and value is not None:
+            key = self.key_for(name, value=value)
+            by_price = key is not None
         if not key or when is None:
             return None
         hist = self._by_key.get(key) or []
@@ -895,7 +932,7 @@ class Market:
             return None
         return Valuation(val, r.get("observed_at", ""),
                          (when - t).total_seconds() / 3600.0,
-                         r.get("name", name))
+                         r.get("name", name), by_price)
 
     def series(self, name) -> list[tuple[datetime, float]]:
         """[(when, value)] oldest first — the input to post-buy drift."""
@@ -1102,6 +1139,41 @@ def _selftest() -> None:
     assert shared_names(gone) == set(), shared_names(gone)
     assert shared_names(latest_only(gone)) == shared_names(gone)
     assert row_key(gone[-1], shared_names(gone)) == norm("Iker Munoz")
+
+    # A GUESS IS SETTLED BY THE PRICE; AN EXACT NAME IS NEVER OVERRULED.
+    # The app writes "C. Romero" and the market holds three Romeros, so
+    # resolve() rightly refuses. The caller holding the 45.74M that was paid
+    # can do better than refuse: one of the three agrees with it and the
+    # others are nowhere near. Same evidence and same tolerance _pick already
+    # trusts for two men of one name — applied only where the alternative is
+    # no answer at all.
+    rom = [{"name": "Isaac Romero", "team": "Sevilla", "value": "6023939",
+            "observed_at": "2026-08-19T1639Z"},
+           {"name": "Cristian Romero", "team": "Atletico", "value": "47546565",
+            "observed_at": "2026-08-19T1639Z"},
+           {"name": "Carlos Romero", "team": "Espanyol", "value": "42510131",
+            "observed_at": "2026-08-19T1639Z"}]
+    rm = Market(rom)
+    assert rm.key_for("C. Romero") is None
+    assert rm.key_for("C. Romero", value=45739000) == norm("Cristian Romero")
+    # A price agreeing with two of them settles nothing.
+    assert rm.key_for("C. Romero", value=45000000) is None
+    # A price agreeing with none of them settles nothing either.
+    assert rm.key_for("C. Romero", value=1000) is None
+    # AND THE PRICE NEVER OVERRULES A NAME. Isaac is named exactly, so he is
+    # the answer whatever money is waved at it.
+    assert rm.key_for("Isaac Romero", value=47546565) == norm("Isaac Romero")
+    # Refusing is still cached as a refusal, not as the priced answer.
+    assert rm.key_for("C. Romero") is None
+
+    rv = rm.at("C. Romero", snapshot_stamp("2026-08-19T1700Z"),
+               value=45739000)
+    assert rv.name == "Cristian Romero" and rv.by_price is True, rv
+    assert rm.at("C. Romero", snapshot_stamp("2026-08-19T1700Z")) is None
+    # A name that stands on its own is not flagged, price or no price.
+    rv = rm.at("Isaac Romero", snapshot_stamp("2026-08-19T1700Z"),
+               value=6023939)
+    assert rv.by_price is False, rv
 
     mkt = [{"name": "Ane Aldea", "team": "Alavés", "position": "defensa",
             "value": "2.050.000", "delta_1d": "-12.000"},

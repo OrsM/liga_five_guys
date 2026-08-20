@@ -1268,11 +1268,20 @@ def _selftest_api_owner() -> None:
     # read minutes apart and drift a little, so it is not zero.
     assert api_key("Isaac Romero", "BurtonGM89", twins,
                    market_value="6160000") == norm("Isaac Romero")
-    # And when NOTHING survives the check, the answer is None and the row is
-    # reported unjoined — an owned player nobody can price is a gap to look
-    # at, not a licence to pick the cheaper of two strangers.
+    # AND THE NICKNAME ALONE IS NOW ENOUGH, without the full name beside it.
+    # This asserted None until 2026-08-20, and the None was a limitation
+    # being written down as an intention: resolve() would answer ISAAC on a
+    # substring that crossed a word boundary, _priced_like would reject him,
+    # and with no full name, no app id and no ledger owner there was nothing
+    # left to try. The boundary fix makes resolve() refuse instead of
+    # guessing, and key_for then asks the price which of the candidates it
+    # is — the same evidence this function already hands in, for this exact
+    # reason. Carlos at 43.24M against a stated 43.24M; Isaac at 6.15M is not
+    # close. Note what has NOT changed: nobody picks the cheaper of two
+    # strangers, and a price agreeing with two of them still resolves to
+    # neither.
     assert api_key("C. Romero", "BurtonGM89", twins,
-                   market_value="43244323") is None
+                   market_value="43244323") == norm("Carlos Romero")
 
     # -- the id the crosswalk already resolved, once, and wrote down -------
     # REAL, AND STILL COSTING A PLAYER. The app calls Jonny Castro "Jonny

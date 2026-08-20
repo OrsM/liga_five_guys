@@ -146,7 +146,11 @@ def deals(lg, market) -> list[dict]:
         when = ledger_stamp(t.get("date", ""))
         if price is None or when is None:
             continue
-        v = market.at(t["player"], when)
+        # The price goes in as evidence: the app abbreviates first names and
+        # the market holds several men per surname, so for a fair number of
+        # rows the money is the only thing that says which. What comes back
+        # carries whether it was needed — see usable().
+        v = market.at(t["player"], when, value=price)
         src = (t.get("from") or "").strip() or MARKET
         dst = (t.get("to") or "").strip() or MARKET
         rows.append({
@@ -159,13 +163,21 @@ def deals(lg, market) -> list[dict]:
             "premium": ((price / v.value - 1) * 100.0
                         if v and v.value else None),
             "round": is_round(t.get("price")),
+            "by_price": bool(v and v.by_price),
         })
     return rows
 
 
 def usable(d) -> bool:
-    """Is this deal's premium priced closely enough in time to average in?"""
+    """Is this deal's premium worth averaging in?
+
+    Two ways to fail. Priced too far from the deal in time, which is what
+    MAX_LAG_H is for. Or joined to its player BY the price — then the premium
+    agrees with the value to within the join's own tolerance by construction,
+    and averaging it in would be reading the evidence back out as a finding.
+    """
     return (d.get("premium") is not None and d.get("lag_h") is not None
+            and not d.get("by_price")
             and abs(d["lag_h"]) <= MAX_LAG_H)
 
 
@@ -532,11 +544,20 @@ def _selftest() -> None:
     class _Val(NamedTuple):
         value: float
         lag_h: float
+        by_price: bool = False
 
     class _Market:
-        """Every player worth 1M, priced 2h from the deal."""
-        def at(self, name, when):
-            return None if name == "Unpriced" else _Val(1_000_000.0, 2.0)
+        """Every player worth 1M, priced 2h from the deal.
+
+        "Guessed" stands for a name the market could only identify once the
+        price was handed to it — the app's abbreviated first names. The
+        signature carries `value` because the real Market's does: the caller
+        holds the money and the join is better for having it.
+        """
+        def at(self, name, when, value=None):
+            if name == "Unpriced":
+                return None
+            return _Val(1_000_000.0, 2.0, name == "Guessed")
 
     class _Lg:
         txns = [
@@ -555,11 +576,27 @@ def _selftest() -> None:
              "from": "", "to": "me", "price": ""},        # no price: skipped
             {"date": "nonsense", "player": "Undated",
              "from": "", "to": "me", "price": "1.000.000"},   # skipped
+            # joined to its player BY the price, so its premium is not
+            # evidence about premiums — usable() must drop it
+            {"date": "2026-08-10 12:00", "player": "Guessed",
+             "from": "", "to": "me", "price": "1.020.000"},
         ]
 
     dl = deals(_Lg(), _Market())
     assert [d["player"] for d in dl] == ["Bought", "Sold", "Traded",
-                                         "Unpriced"], dl
+                                         "Unpriced", "Guessed"], dl
+
+    # A ROW JOINED BY ITS PRICE CANNOT TESTIFY ABOUT PREMIUMS. It agrees with
+    # the value to within the join's own tolerance by construction, so
+    # averaging it in reads the evidence back out as a finding. It is still a
+    # priced, valued row for everything else.
+    guessed = [d for d in dl if d["player"] == "Guessed"][0]
+    assert guessed["value"] == 1_000_000.0
+    assert round(guessed["premium"], 6) == 2.0, guessed["premium"]
+    assert guessed["by_price"] is True
+    assert usable(guessed) is False
+    assert usable([d for d in dl if d["player"] == "Bought"][0]) is True
+    assert 2.0 not in [round(d["premium"], 6) for d in dl if usable(d)]
     d0 = dl[0]
     assert d0["side"] == "buy" and d0["actor"] == "me", d0
     assert round(d0["premium"], 1) == 10.0, d0
