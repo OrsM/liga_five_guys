@@ -365,6 +365,21 @@ def market_names(market: list[dict], slugs) -> dict[str, list[dict]]:
     return out
 
 
+_XW_CACHE: list = []
+
+
+def _market_key(slug) -> str:
+    """The market key for a futbolfantasy player-slug, or ""."""
+    slug = (slug or "").strip()
+    if not slug:
+        return ""
+    if not _XW_CACHE:
+        from ffcore.tidy import load_crosswalk
+        _XW_CACHE.append(load_crosswalk())
+    xw = _XW_CACHE[0]
+    return (xw.player(ff_slug=slug) or "") if xw else ""
+
+
 def start_intervals(matches: list[dict], starters: list[dict],
                     fixtures: list[dict], market: list[dict] = ()):
     """([(lock, {keys who started}, {teams captured})], graded, no-lock rounds).
@@ -413,8 +428,14 @@ def start_intervals(matches: list[dict], starters: list[dict],
         graded += 1
         team = (r.get("team_slug") or "").strip()
         priced, _ = resolve(r.get("player_name", ""), squads.get(team, []))
+        # THE MARKET KEY FIRST — the site's own id, reached from the slug on
+        # this very row through the crosswalk. The name and the slug stay in
+        # the set beside it: this is a membership test, and the predictions
+        # it is matched against were keyed by name for every run before
+        # squad_log carried the id. Dropping them would ungrade the history.
         by_round.setdefault(locks[jor], set()).update(
-            k for k in (norm(r.get("player_name", "")),
+            k for k in (_market_key(r.get("player_slug")),
+                        norm(r.get("player_name", "")),
                         (r.get("player_slug") or "").strip(),
                         norm(priced["name"]) if priced else "") if k)
         teams.setdefault(locks[jor], set()).add(team)
@@ -498,7 +519,11 @@ def load_predictions() -> dict[str, list[tuple[dt.datetime, dict]]]:
                 fac[col] = float(r[col])
             except (KeyError, ValueError, TypeError):
                 fac[col] = None
-        key = norm(r.get("player", ""))
+        # THE ID THE ROW WAS LOGGED WITH, and the name for the rows written
+        # before the column existed. Both sides of the grade have to agree
+        # about who a prediction was about, and the confirmed-starts side
+        # carries the id, the slug and the name for the same reason.
+        key = (r.get("ff_id") or "").strip() or norm(r.get("player", ""))
         if key and when is not None:
             preds.setdefault(key, []).append((when, fac))
     for v in preds.values():
