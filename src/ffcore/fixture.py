@@ -171,7 +171,7 @@ def match_team(side: str, teams) -> str | None:
 
 
 def fixture_board(market: list[dict], fixtures: list[dict],
-                  now: datetime, elo_rows=None) -> dict[str, Match]:
+                  now: datetime, elo_rows=None, xw=None) -> dict[str, Match]:
     """{market team: its next Match}, for every team with one ahead of `now`.
 
     "Next" is the earliest kickoff still ahead, which is the right question
@@ -192,6 +192,19 @@ def fixture_board(market: list[dict], fixtures: list[dict],
     """
     value = team_strength(market)
     teams = list(value)
+    # THE FIXTURE PAGE STATES ITS OWN CLUB ID on both crests of every match,
+    # and the crosswalk has been told which club each one is. Joining on it
+    # means "Celta" and "Celta Vigo" stop being a substring puzzle that can
+    # return two candidates and answer with neither. The name match stays for
+    # a club the table has not learned yet, and for the fixtures recorded
+    # before the id was extracted.
+    by_af = {}
+    if xw is not None:
+        for c in xw.clubs.values():
+            if c.af_id and c.market:
+                hit = match_team(c.market, teams)
+                if hit:
+                    by_af[c.af_id] = hit
     elo = elo_strength(teams, elo_rows) if elo_rows else None
     strength = elo if elo is not None else value
     basis = "elo" if elo is not None else "value"
@@ -202,15 +215,20 @@ def fixture_board(market: list[dict], fixtures: list[dict],
         when = kickoff_stamp(r.get("kickoff"))
         if not when or when <= now:
             continue
-        for side, other, home in ((r.get("home"), r.get("away"), True),
-                                  (r.get("away"), r.get("home"), False)):
-            team = match_team(side or "", teams)
+        for side, other, sid, oid, home in (
+                (r.get("home"), r.get("away"), r.get("home_id"),
+                 r.get("away_id"), True),
+                (r.get("away"), r.get("home"), r.get("away_id"),
+                 r.get("home_id"), False)):
+            team = by_af.get((sid or "").strip()) or match_team(side or "",
+                                                                teams)
             if not team:
                 continue
             prev = board.get(team)
             if prev and prev.kickoff <= when:
                 continue
-            opp = match_team(other or "", teams)
+            opp = by_af.get((oid or "").strip()) or match_team(other or "",
+                                                               teams)
             base, rank = diff.get(opp, (1.0, 0)) if opp else (1.0, 0)
             edge = (1.0 + HOME_EDGE) if home else (1.0 - HOME_EDGE)
             gap = (elo[team] - elo[opp]

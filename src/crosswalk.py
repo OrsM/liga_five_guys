@@ -35,7 +35,7 @@ PLAYERS = "players.csv"
 CLUBS = "clubs.csv"
 
 
-def build_clubs(market, lineups, elo_rows) -> dict:
+def build_clubs(market, lineups, elo_rows, fixtures=()) -> dict:
     """{club_id: Club}, keyed on the market's spelling folded.
 
     The market is the canonical side because it is the one every price in this
@@ -49,12 +49,35 @@ def build_clubs(market, lineups, elo_rows) -> dict:
                     if (r.get("team") or "").strip()})
     clubs = {norm(t): Club(norm(t), t) for t in teams}
 
+    # futbolfantasy states its own club id on every market row (data-equipo),
+    # so the club a price belongs to is an id, not a spelling.
+    for r in market:
+        t = (r.get("team") or "").strip()
+        tid = (r.get("team_id") or "").strip()
+        if t and tid and norm(t) in clubs:
+            clubs[norm(t)].market_id = clubs[norm(t)].market_id or tid
+
     for slug in sorted({(r.get("team_slug") or "").strip() for r in lineups
                         if (r.get("team_slug") or "").strip()}):
         hit = match_team(slug, teams)
         if hit:
             clubs[norm(hit)].ff_slug = clubs[norm(hit)].ff_slug or slug
             clubs[norm(hit)].aliases.add(slug)
+
+    # analiticafantasy states its club id on both crests of every fixture.
+    # Learned ONCE, by the name match, and written down — after which the
+    # fixture board joins on the id and never on "Celta" against "Celta Vigo".
+    for r in fixtures or []:
+        for side, col in (("home", "home_id"), ("away", "away_id")):
+            nm = (r.get(side) or "").strip()
+            aid = (r.get(col) or "").strip()
+            if not nm or not aid:
+                continue
+            hit = match_team(nm, teams)
+            if hit and not clubs[norm(hit)].af_id:
+                clubs[norm(hit)].af_id = aid
+            if hit:
+                clubs[norm(hit)].aliases.add(nm)
 
     for r in elo_rows or []:
         club = (r.get("club") or "").strip()
@@ -230,7 +253,8 @@ def main() -> None:
     elo_rows = read_csv(TIDY / "elo.csv")
     lg = League.load()
 
-    clubs = build_clubs(market, lineups, elo_rows)
+    clubs = build_clubs(market, lineups, elo_rows,
+                        latest_only(read_csv(TIDY / "fixtures.csv")))
     players = build_players(market, lineups, starters, api_rows, lg, clubs)
 
     fresh = Crosswalk(players, clubs)

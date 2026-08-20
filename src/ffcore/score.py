@@ -165,7 +165,9 @@ def build(market: list[dict], xi_rows: list[dict], now,
     # Club Elo ranks the opponents when it covers all of them and squad value
     # ranks them otherwise — wired HERE, in the one builder, so your squad and
     # a rival's can never be scored off two different difficulty scales.
-    board = fixture_board(market, load_fixtures(), now, load_elo())
+    from ffcore.tidy import load_crosswalk
+    board = fixture_board(market, load_fixtures(), now, load_elo(),
+                          xw=load_crosswalk())
     sc = Scorer(market, xi_rows, prior, shrink_k=shrink_k,
                 current=cur, board=board, cal=cal, second=second)
     return sc, (prior_label, cur_label)

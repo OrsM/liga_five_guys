@@ -50,7 +50,9 @@ __all__ = ["Player", "Club", "Crosswalk", "PLAYER_COLS", "CLUB_COLS"]
 
 PLAYER_COLS = ["player_id", "name", "club_id", "market_slug", "ff_slug",
                "af_slug", "app_id", "app_names"]
-CLUB_COLS = ["club_id", "market", "ff_slug", "elo", "aliases"]
+CLUB_FIELDS = ["club_id", "market", "ff_slug", "elo", "market_id", "af_id",
+               "aliases"]
+CLUB_COLS = CLUB_FIELDS
 
 
 def _join(vals) -> str:
@@ -100,10 +102,19 @@ class Club:
     ff_slug: str = ""
     elo: str = ""
     aliases: set = field(default_factory=set)
+    # THE IDS THE SOURCES PUBLISH. market_id is futbolfantasy's data-equipo,
+    # on every market row; af_id is analiticafantasy's data-af-team, on both
+    # crests of every match anchor. Neither was read, so clubs were joined by
+    # spelling — "Celta" against "Celta Vigo", "Betis" against "Real Betis" —
+    # through a substring matcher that could return two candidates and then
+    # answer with neither.
+    market_id: str = ""
+    af_id: str = ""
 
     def row(self) -> dict:
         return {"club_id": self.club_id, "market": self.market,
                 "ff_slug": self.ff_slug, "elo": self.elo,
+                "market_id": self.market_id, "af_id": self.af_id,
                 "aliases": _join(self.aliases)}
 
 
@@ -232,7 +243,8 @@ class Crosswalk:
             if cid:
                 clubs[cid] = Club(cid, r.get("market", ""),
                                   r.get("ff_slug", ""), r.get("elo", ""),
-                                  _split(r.get("aliases")))
+                                  _split(r.get("aliases")),
+                                  r.get("market_id", ""), r.get("af_id", ""))
         return cls(players, clubs)
 
     def write(self, players_path, clubs_path) -> None:
@@ -293,6 +305,8 @@ class Crosswalk:
                 cur.market = cur.market or c.market
                 cur.ff_slug = cur.ff_slug or c.ff_slug
                 cur.elo = cur.elo or c.elo
+                cur.market_id = cur.market_id or c.market_id
+                cur.af_id = cur.af_id or c.af_id
                 cur.aliases |= c.aliases
         self._reindex()
         return self

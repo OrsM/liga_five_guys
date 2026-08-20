@@ -894,6 +894,8 @@ def parse_af_fixtures(html: str, observed_at: str,
         m = AF_MATCH_RE.search(a.get("href") or "")
         times = _css(a, "time[datetime]")
         teams = [i.get("alt") for i in _css(a, "img[alt]") if i.get("alt")]
+        ids = [i.get("data-af-team")
+               for i in _css(a, "img[data-af-team]") if i.get("data-af-team")]
         if not (m and times and len(teams) >= 2) or m.group(1) in seen:
             continue
         seen.add(m.group(1))
@@ -904,6 +906,9 @@ def parse_af_fixtures(html: str, observed_at: str,
             "kickoff": times[0].get("datetime"),
             "home": teams[0],
             "away": teams[1],
+            # data-af-team on the crest, inside this match's own anchor.
+            "home_id": ids[0] if len(ids) > 1 else "",
+            "away_id": ids[1] if len(ids) > 1 else "",
         })
     return rows
 
@@ -2096,8 +2101,9 @@ _AF_HUB_FIXTURE = """<html><body>
 <a href="/partido/100011934">
   <time datetime="2026-08-15T19:30:00+00:00">15 ago, 21:30</time>
   <span>Once posibles →</span>
-  <img alt="Sevilla" src="/escudos/536.png"/><span>Sevilla</span>
-  <img alt="Rayo Vallecano" src="/escudos/728.png"/><span>Rayo Vallecano</span>
+  <img alt="Sevilla" src="/escudos/536.png" data-af-team="536"/><span>Sevilla</span>
+  <img alt="Rayo Vallecano" src="/escudos/728.png" data-af-team="728"/>
+  <span>Rayo Vallecano</span>
 </a>
 <a href="/partido/100011934">duplicate, same id</a>
 <a href="/partido/999">no time, no crests</a>
@@ -2457,6 +2463,11 @@ def _selftest() -> None:
     assert len(fx) == 1, fx        # duplicate id and the time-less link dropped
     assert fx[0]["match_id"] == "100011934"
     assert fx[0]["home"] == "Sevilla" and fx[0]["away"] == "Rayo Vallecano"
+    # THEIR OWN CLUB IDS, inside the match anchor — both of them, on all 14
+    # matches of the 2026-08-20 page. The names are kept for reading; the
+    # ids are what the fixture board should join on, because "Celta" and
+    # "Celta Vigo" are the same club and only one of those strings knows it.
+    assert fx[0]["home_id"] == "536" and fx[0]["away_id"] == "728", fx[0]
     # Stored exactly as published, offset included — see the docstring.
     assert fx[0]["kickoff"] == "2026-08-15T19:30:00+00:00", fx[0]
     assert fx[0]["source"] == AF_SOURCE

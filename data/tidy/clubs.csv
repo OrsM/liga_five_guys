@@ -1,21 +1,21 @@
-club_id,market,ff_slug,elo,aliases
-alaves,Alavés,alaves,Alaves,Alaves|alaves
-athletic,Athletic,athletic,Bilbao,Athletic Club|Bilbao|athletic
-atletico,Atlético,atletico,Atletico,Atletico|Atlético|atletico
-barcelona,Barcelona,barcelona,Barcelona,Barcelona|barcelona
-betis,Betis,betis,Betis,Betis|betis
-celta,Celta,celta,Celta,Celta|celta
-deportivo,Deportivo,deportivo,Depor,Depor|deportivo
-elche,Elche,elche,Elche,Elche|elche
-espanyol,Espanyol,espanyol,Espanyol,Espanyol|espanyol
-getafe,Getafe,getafe,Getafe,Getafe|getafe
-levante,Levante,levante,Levante,Levante|levante
-malaga,Málaga,malaga,Malaga,Malaga|malaga
-osasuna,Osasuna,osasuna,Osasuna,Osasuna|osasuna
-racing,Racing,racing,Santander,Santander|racing
-rayo,Rayo,rayo-vallecano,Rayo Vallecano,Rayo Vallecano|rayo-vallecano
-real madrid,Real Madrid,real-madrid,Real Madrid,Real Madrid|real-madrid
-real sociedad,Real Sociedad,real-sociedad,Sociedad,Real Sociedad|Sociedad|real-sociedad
-sevilla,Sevilla,sevilla,Sevilla,Sevilla|sevilla
-valencia,Valencia,valencia,Valencia,Valencia|valencia
-villarreal,Villarreal,villarreal,Villarreal,Villarreal|villarreal
+club_id,market,ff_slug,elo,market_id,af_id,aliases
+alaves,Alavés,alaves,Alaves,28,542,Alaves|alaves
+athletic,Athletic,athletic,Bilbao,1,531,Athletic Club|Bilbao|athletic
+atletico,Atlético,atletico,Atletico,2,530,Atletico|Atletico Madrid|Atlético|atletico
+barcelona,Barcelona,barcelona,Barcelona,3,529,Barcelona|barcelona
+betis,Betis,betis,Betis,4,543,Betis|Real Betis|betis
+celta,Celta,celta,Celta,5,538,Celta|Celta Vigo|celta
+deportivo,Deportivo,deportivo,Depor,6,544,Depor|Deportivo La Coruna|deportivo
+elche,Elche,elche,Elche,21,797,Elche|elche
+espanyol,Espanyol,espanyol,Espanyol,7,540,Espanyol|espanyol
+getafe,Getafe,getafe,Getafe,8,546,Getafe|getafe
+levante,Levante,levante,Levante,10,539,Levante|levante
+malaga,Málaga,malaga,Malaga,11,535,Malaga|malaga
+osasuna,Osasuna,osasuna,Osasuna,13,727,Osasuna|osasuna
+racing,Racing,racing,Santander,42,4665,Racing Santander|Santander|racing
+rayo,Rayo,rayo-vallecano,Rayo Vallecano,14,728,Rayo Vallecano|rayo-vallecano
+real madrid,Real Madrid,real-madrid,Real Madrid,15,541,Real Madrid|real-madrid
+real sociedad,Real Sociedad,real-sociedad,Sociedad,16,548,Real Sociedad|Sociedad|real-sociedad
+sevilla,Sevilla,sevilla,Sevilla,17,536,Sevilla|sevilla
+valencia,Valencia,valencia,Valencia,18,532,Valencia|valencia
+villarreal,Villarreal,villarreal,Villarreal,22,533,Villarreal|villarreal
