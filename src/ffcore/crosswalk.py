@@ -48,7 +48,7 @@ from ffcore.text import norm
 
 __all__ = ["Player", "Club", "Crosswalk", "PLAYER_COLS", "CLUB_COLS"]
 
-PLAYER_COLS = ["player_id", "name", "club_id", "market_slug", "ff_slug",
+PLAYER_COLS = ["player_id", "name", "club_id", "ff_slug",
                "af_slug", "app_id", "app_names"]
 CLUB_FIELDS = ["club_id", "market", "ff_slug", "elo", "market_id", "af_id",
                "aliases"]
@@ -66,10 +66,9 @@ def _split(cell) -> set:
 
 @dataclass
 class Player:
-    player_id: str                 # norm(market name) — the repo's own key
+    player_id: str                 # the site's own id — the repo's key
     name: str = ""                 # the market's spelling, for display
     club_id: str = ""
-    market_slug: str = ""
     ff_slug: str = ""
     af_slug: str = ""
     app_id: str = ""
@@ -77,7 +76,7 @@ class Player:
 
     def row(self) -> dict:
         return {"player_id": self.player_id, "name": self.name,
-                "club_id": self.club_id, "market_slug": self.market_slug,
+                "club_id": self.club_id,
                 "ff_slug": self.ff_slug, "af_slug": self.af_slug,
                 "app_id": self.app_id, "app_names": _join(self.app_names)}
 
@@ -88,7 +87,7 @@ class Player:
         erase what an earlier run learned from it — that is the difference
         between a crosswalk that improves and one that flickers.
         """
-        for f in ("name", "club_id", "market_slug", "ff_slug", "af_slug",
+        for f in ("name", "club_id", "ff_slug", "af_slug",
                   "app_id"):
             if not getattr(self, f) and getattr(other, f):
                 setattr(self, f, getattr(other, f))
@@ -128,7 +127,7 @@ class Crosswalk:
 
     def _reindex(self) -> None:
         self._by_ff, self._by_af, self._by_app = {}, {}, {}
-        self._by_app_name, self._by_market_slug = {}, {}
+        self._by_app_name = {}
         # AN IDENTIFIER TWO PLAYERS CLAIM IDENTIFIES NEITHER. These indexes
         # were plain assignment, so the second writer won and the answer
         # depended on dict order. That is the worst failure available here: a
@@ -140,8 +139,7 @@ class Crosswalk:
             for idx, key, label in (
                     (self._by_ff, p.ff_slug, "ff_slug"),
                     (self._by_af, p.af_slug, "af_slug"),
-                    (self._by_app, p.app_id, "app_id"),
-                    (self._by_market_slug, p.market_slug, "market_slug")):
+                    (self._by_app, p.app_id, "app_id")):
                 if not key:
                     continue
                 if key in idx and idx[key] != p.player_id:
@@ -157,8 +155,8 @@ class Crosswalk:
                 self._by_app_name[k] = p.player_id
         for label, keys in self._clash.items():
             idx = {"ff_slug": self._by_ff, "af_slug": self._by_af,
-                   "app_id": self._by_app, "app_name": self._by_app_name,
-                   "market_slug": self._by_market_slug}[label]
+                   "app_id": self._by_app,
+                   "app_name": self._by_app_name}[label]
             for k in keys:
                 idx.pop(k, None)
         self._club_ff = {c.ff_slug: c.club_id for c in self.clubs.values()
@@ -180,7 +178,7 @@ class Crosswalk:
         return {k: sorted(v) for k, v in sorted(self._clash.items()) if v}
 
     def player(self, *, name=None, ff_slug=None, af_slug=None, app_id=None,
-               app_name=None, market_slug=None) -> str | None:
+               app_name=None) -> str | None:
         """The repo's key for a player, from whatever key you happen to hold.
 
         Exact lookups only. Nothing here guesses: the guessing happened once,
@@ -189,8 +187,7 @@ class Crosswalk:
         gap, and a gap that stays visible is one that gets fixed.
         """
         for key, idx in ((ff_slug, self._by_ff), (af_slug, self._by_af),
-                         (app_id, self._by_app),
-                         (market_slug, self._by_market_slug)):
+                         (app_id, self._by_app)):
             if key and key in idx:
                 return idx[key]
         if name:
@@ -235,7 +232,7 @@ class Crosswalk:
             if pid:
                 players[pid] = Player(
                     pid, r.get("name", ""), r.get("club_id", ""),
-                    r.get("market_slug", ""), r.get("ff_slug", ""),
+                    r.get("ff_slug", ""),
                     r.get("af_slug", ""), r.get("app_id", ""),
                     _split(r.get("app_names")))
         for r in _rows(clubs_path):
@@ -274,9 +271,9 @@ class Crosswalk:
             # the wrong row alive through every rebuild. The slugs had the
             # same disease from a different cause — when shared_names stopped
             # splitting `moussa diarra`, the old `moussa diarra@malaga` row
-            # stayed behind still holding his ff_slug and market_slug, so one
-            # player held one slug under two keys.
-            for f in ("app_id", "ff_slug", "af_slug", "market_slug"):
+            # stayed behind still holding his ff_slug, so one player held
+            # one identifier under two keys.
+            for f in ("app_id", "ff_slug", "af_slug"):
                 val = getattr(p, f)
                 if not val:
                     continue
@@ -330,8 +327,7 @@ def _selftest() -> None:
     xw = Crosswalk({
         "alvaro fernandez": Player(
             "alvaro fernandez", "Alvaro Fernandez", "espanyol",
-            "alvaro-fernandez-m", "alvaro-fernandez", "af-alvaro", "2101",
-            {"A. Ferllo"}),
+            "alvaro-fernandez", "af-alvaro", "2101", {"A. Ferllo"}),
         "jonny castro": Player("jonny castro", "Jonny Castro", "alaves",
                                ff_slug="jonny-castro",
                                app_names={"Jonny Otto"}),
@@ -342,8 +338,7 @@ def _selftest() -> None:
     # -- every feed's key reaches the same player --------------------------
     for kw in ({"name": "Alvaro Fernandez"}, {"ff_slug": "alvaro-fernandez"},
                {"af_slug": "af-alvaro"}, {"app_id": "2101"},
-               {"app_name": "A. Ferllo"},
-               {"market_slug": "alvaro-fernandez-m"}):
+               {"app_name": "A. Ferllo"}):
         assert xw.player(**kw) == "alvaro fernandez", kw
     # THE ONE THAT USED TO COST MONEY: the app's abbreviation resolves, so a
     # rival's player carrying a buyout clause is buyable rather than invisible.
@@ -386,14 +381,12 @@ def _selftest() -> None:
     # that changed shape left a ghost row still holding the identifiers.
     ghost = Crosswalk({
         "moussa diarra@malaga": Player("moussa diarra@malaga",
-                                       market_slug="10832",
                                        ff_slug="moussa-diarra"),
         "moussa diarra": Player("moussa diarra")})
     ghost.merge(Crosswalk({"moussa diarra": Player("moussa diarra",
-                                                   market_slug="10832",
                                                    ff_slug="moussa-diarra")}))
-    assert ghost.players["moussa diarra@malaga"].market_slug == ""
-    assert ghost.player(market_slug="10832") == "moussa diarra"
+    assert ghost.players["moussa diarra@malaga"].ff_slug == ""
+    assert ghost.player(ff_slug="moussa-diarra") == "moussa diarra"
     assert ghost.clashes() == {}
     assert stale.player(app_id="2614") == "carlos romero"
     assert stale.clashes() == {}

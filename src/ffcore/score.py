@@ -324,8 +324,6 @@ class Scorer:
         # name names one man.
         self._name_keys: dict[str, list] = {}
         for r in market:
-            if r.get("slug"):
-                self.lookup[r["slug"]] = r
             if r.get("name"):
                 k = row_key(r, shared)
                 self.lookup[k] = r

@@ -145,7 +145,7 @@ def build_players(market, lineups, starters, api_rows, lg, clubs) -> dict:
         if not pid:
             continue
         out[pid] = Player(pid, (r.get("name") or "").strip(),
-                          norm(r.get("team")), (r.get("slug") or "").strip())
+                          norm(r.get("team")))
         # Kept beside the record because Player.club_id is overwritten with a
         # real club id further down, and the market's own spelling is what a
         # probable-XI row has to be matched against.
@@ -336,7 +336,6 @@ def _selftest() -> None:
     assert xw.player(name="Alvaro Fernandez") == "alvaro fernandez"
     assert xw.player(ff_slug="alvaro-fdez") == "alvaro fernandez"
     assert xw.player(af_slug="af-alvaro") == "alvaro fernandez"
-    assert xw.player(market_slug="alvaro-fernandez-m") == "alvaro fernandez"
     # A confirmed line-up names a player the probable-XI feed never listed, and
     # his slug is learned from it rather than lost.
     assert xw.player(ff_slug="jonny-castro-ff") == "jonny castro"

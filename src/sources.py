@@ -185,8 +185,6 @@ def parse_market(html: str, observed_at: str, key: str = "market") -> list[dict]
             "value": int(value),
             "delta_1d": _num(_attr(chunk, "diferencia1")),
             "delta_pct_1d": _num(_attr(chunk, "diferencia-pct1")),
-            "slug": _slug(chunk),
-            "player_path": _player_path(chunk),
         })
     return rows
 
@@ -2352,7 +2350,12 @@ def _selftest() -> None:
     assert m[0]["name"] == "Pedri" and m[0]["value"] == 21500000
     assert m[0]["team"] == "Barcelona", m[0]        # team_id -> name via select
     assert m[0]["position"] == "mediocampista"
-    assert m[0]["slug"] == "pedri", m[0]            # anchor beats the photo id
+    # NO `slug` AND NO `player_path`. slug was this parser's own id, dug out
+    # of the anchor or the photo filename — and it is the SAME NUMBER as
+    # data-id, on every one of the 40,136 rows that had one, while data-id is
+    # on all 48,182. A derived duplicate of a published id, missing 8,046
+    # rows. player_path was never populated at all.
+    assert "slug" not in m[0] and "player_path" not in m[0], m[0]
     # THE PAGE'S OWN ID, ON EVERY ROW. data-id sits beside data-nombre in the
     # same element and was never read: the parser took the name and derived a
     # slug from the anchor, which is absent for 112 of 654 players. On the
