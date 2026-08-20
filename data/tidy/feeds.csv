@@ -301,3 +301,11 @@ observed_at,page,status,seconds
 2026-08-20T0850Z,api_lineup_38,200,0.14
 2026-08-20T0850Z,api_activity_0,200,0.10
 2026-08-20T0850Z,api_activity_1,200,0.10
+2026-08-20T0907Z,market,200,0.22
+2026-08-20T0907Z,points,200,0.06
+2026-08-20T0907Z,api_leagues,200,0.16
+2026-08-20T0907Z,api_market,200,0.31
+2026-08-20T0907Z,api_teams,200,0.62
+2026-08-20T0907Z,api_lineup_38,200,0.22
+2026-08-20T0907Z,api_activity_0,200,0.11
+2026-08-20T0907Z,api_activity_1,200,0.11
