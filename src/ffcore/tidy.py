@@ -44,7 +44,7 @@ __all__ = ["ROOT", "TIDY", "SEASON", "DECISIONS", "REPORTS", "PARTS", "MADRID",
            "shared_names", "row_key", "run_now", "load_crosswalk",
            "load_players", "read_ledger", "LEDGER", "load_deadline", "LINEUP_SOURCE",
            "pick_source", "load_fixtures", "next_kickoff", "kickoff_stamp",
-           "load_elo", "fresh_only", "DAILY_FRESH_DAYS",
+           "load_elo", "load_results_history", "fresh_only", "DAILY_FRESH_DAYS",
            "EVERY_RUN_FRESH_DAYS", "stale_feeds",
            "GATED_API", "age_phrase", "last_api_standings",
            "load_api_lineup"]
@@ -624,6 +624,16 @@ def load_fixtures() -> list[dict]:
     """The newest fixtures reading, earliest kickoff first."""
     rows = latest_only(read_csv(TIDY / "fixtures.csv"))
     return sorted(rows, key=lambda r: r.get("kickoff") or "")
+
+
+def load_results_history() -> list[dict]:
+    """Every match football-data.co.uk has ever recorded that this repo has
+    fetched — several seasons, not a latest snapshot, so NOT latest_only():
+    a result does not go stale and does not get superseded by a later one,
+    it just accumulates. STORE_ONCE (sources.STORE_ONCE) already keeps this
+    table from duplicating itself run over run.
+    """
+    return read_csv(TIDY / "results_history.csv")
 
 
 def next_kickoff(now=None):

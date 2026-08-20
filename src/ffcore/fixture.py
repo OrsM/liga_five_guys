@@ -3,7 +3,8 @@ fixture.py — who each team plays next, and how much that should move a forecas
 
     board = fixture_board(market_rows, fixture_rows, now)
     m = board.get("Celta")      # Match(opponent="Osasuna", home=True, ...)
-    ppm * m.factor * pct/100    # this round's expectation
+    ppm * m.def_factor * pct/100   # a defender's/keeper's expectation
+    ppm * m.atk_factor * pct/100   # a midfielder's/forward's expectation
 
 Until this existed, `pts/m x P(start)` was OPPONENT-BLIND: it valued Celta at
 home to Elche exactly as it valued Celta away at Real Madrid. That was the
@@ -20,18 +21,24 @@ clean sheet. So teams are RANKED by squad value and the rank is mapped onto a
 narrow band. Rank is also robust to the thing value is worst at: one 100M
 signing moving a whole squad's total.
 
-THE TWO CONSTANTS BELOW ARE GUESSES. They are not fitted, because nothing has
-been played yet — this is the same reason the two probable-XI sources are
-printed side by side instead of blended. They are deliberately small, so a
-wrong guess costs a fraction of a point rather than reordering an eleven, and
-they are named in methodology.md so the monitor can grade them against
-realised points once jornadas exist. When it can, FIX_BAND is the first number
-to re-fit, and per-position sensitivity is the first thing to add: a clean
-sheet is far more opponent-driven than a forward's goal, and this model cannot
-yet say so because no goals data is scraped.
+THE TWO CONSTANTS BELOW ARE GUESSES, when they are used at all. They were
+not fitted because nothing had been played yet — the same reason the two
+probable-XI sources are printed side by side instead of blended — and are
+deliberately small, so a wrong guess costs a fraction of a point rather
+than reordering an eleven.
 
-A team with no fixture ahead — or a player with no team — gets factor 1.0 and
-says so. Never a guess: a missing fixture must not silently become an easy one.
+PER-POSITION SENSITIVITY, ADDED: a clean sheet is opponent-ATTACK-driven, a
+goal opponent-DEFENSE-driven, and attack_defense() now says so from real
+match results (data/tidy/results_history.csv, football-data.co.uk) instead
+of a single squad-value rank applied to every position alike. FIX_BAND and
+the rank-based `difficulty()` are still what a club falls back to when it
+has fewer than MIN_AD_MATCHES of real results (freshly promoted, most
+often) — a per-CLUB fallback, not per-league, so one thin-history side does
+not send the whole board back to the guess the way one Elo gap would.
+
+A team with no fixture ahead — or a player with no team — gets both factors
+at 1.0 and says so. Never a guess: a missing fixture must not silently
+become an easy one.
 
 Run `python src/ffcore/fixture.py` to execute the self-test below.
 """
@@ -59,10 +66,16 @@ class Match(NamedTuple):
     opponent: str          # the opponent, as the fixture page spells it
     home: bool
     kickoff: datetime
-    factor: float          # multiply pts/match by this
+    # TWO FACTORS, NOT ONE: a clean sheet is driven by the opponent's ATTACK,
+    # a goal by the opponent's DEFENSE — the same number priced both until
+    # attack_defense() existed to tell them apart. def_factor is for
+    # POR/DEF, atk_factor for MED/DEL; ffcore.score.Scored.score picks
+    # between them by slot.
+    atk_factor: float      # multiply a MED/DEL's pts/match by this
+    def_factor: float      # multiply a POR/DEF's pts/match by this
     rank: int              # opponent's rank, 1 = strongest
     of: int                # out of how many ranked teams
-    basis: str = "value"   # what ranked them: "elo" or "value"
+    basis: str = "value"   # what ranked them: "attack_defense", "elo", "value"
     gap: float | None = None   # raw Elo difference, you minus opponent
 
 
@@ -135,6 +148,67 @@ def team_strength(market: list[dict]) -> dict[str, float]:
     return tot
 
 
+# Matches of real history before a club's fitted attack/defense rating is
+# trusted over the squad-value/Elo rank fallback. Same number ffcore.score's
+# _priors() uses for "enough of a record to mean something" — not tuned
+# separately, just borrowed, so there is one answer to "how much history is
+# enough" rather than two that could drift apart.
+MIN_AD_MATCHES = 10
+
+
+def attack_defense(results: list[dict],
+                   teams) -> dict[str, tuple[float, float]]:
+    """{team: (attack, defense)}, from real match results — goals scored and
+    conceded, home and away pooled, relative to the league's own average.
+
+    attack > 1.0 scores more than an average team that season; defense > 1.0
+    CONCEDES more than an average team (worse defense), < 1.0 fewer (better).
+    Both centred on 1.0 by construction, the same centring difficulty()'s
+    rank-based factor uses — which is what makes blending the two per team
+    safe below, unlike elo_strength()'s refusal to mix scales.
+
+    PER-TEAM COVERAGE, NOT ALL-OR-NOTHING. elo_strength() refuses the whole
+    board if even one club lacks an Elo rating, because Elo and squad value
+    are two INCOMPARABLE scales and a board mixing them client-team-by-team
+    would be worse than either alone. A club with MIN_AD_MATCHES fewer
+    real results (freshly promoted, most often) simply has no entry here;
+    the caller falls back to the rank-based factor for that one club and
+    nothing else, since both answers already live on the same 1.0-centred
+    scale.
+
+    Only clubs in `teams` are returned — this repo's current twenty, since a
+    club that cannot be anyone's opponent this season is not worth carrying.
+    """
+    scored: dict[str, float] = {}
+    conceded: dict[str, float] = {}
+    played: dict[str, int] = {}
+    total_goals, total_matches = 0.0, 0
+    for r in results:
+        home, away = (r.get("home") or "").strip(), (r.get("away") or "").strip()
+        try:
+            hg, ag = float(r["home_goals"]), float(r["away_goals"])
+        except (TypeError, ValueError, KeyError):
+            continue
+        if home:
+            scored[home] = scored.get(home, 0.0) + hg
+            conceded[home] = conceded.get(home, 0.0) + ag
+            played[home] = played.get(home, 0) + 1
+        if away:
+            scored[away] = scored.get(away, 0.0) + ag
+            conceded[away] = conceded.get(away, 0.0) + hg
+            played[away] = played.get(away, 0) + 1
+        total_goals += hg + ag
+        total_matches += 1
+    if not total_matches:
+        return {}
+    league_avg = total_goals / (total_matches * 2)   # per team, per match
+    if not league_avg:
+        return {}
+    return {t: (scored[t] / played[t] / league_avg,
+               conceded[t] / played[t] / league_avg)
+           for t in teams if played.get(t, 0) >= MIN_AD_MATCHES}
+
+
 def difficulty(strength: dict[str, float]) -> dict[str, tuple[float, int]]:
     """{team: (factor if you FACE them away from home, rank)}.
 
@@ -171,7 +245,8 @@ def match_team(side: str, teams) -> str | None:
 
 
 def fixture_board(market: list[dict], fixtures: list[dict],
-                  now: datetime, elo_rows=None, xw=None) -> dict[str, Match]:
+                  now: datetime, elo_rows=None, xw=None,
+                  results=None) -> dict[str, Match]:
     """{market team: its next Match}, for every team with one ahead of `now`.
 
     "Next" is the earliest kickoff still ahead, which is the right question
@@ -185,13 +260,26 @@ def fixture_board(market: list[dict], fixtures: list[dict],
     he faces is his own.
 
     `elo_rows` ranks the teams by Club Elo when it covers all of them, and by
-    summed squad value otherwise. Every Match says which, and carries the raw
-    Elo gap when there was one — the band below is a guess, and re-fitting it
-    later against a continuous rating means having logged the rating, not the
-    rank it was turned into.
+    summed squad value otherwise; `results` (ffcore.tidy.load_results_history)
+    fits a real attack/defense rating PER OPPONENT from real match results,
+    falling back to the elo-or-value rank for whichever clubs
+    attack_defense() refuses (thin history — see MIN_AD_MATCHES). Every
+    Match says which basis it got, and carries the raw Elo gap when there
+    was one.
     """
     value = team_strength(market)
     teams = list(value)
+    # results_history.csv IS KEYED ON ff_slug ("real-madrid"), not the
+    # market's own spelling ("Real Madrid") `teams` holds — two different
+    # namespaces this repo already tracks the mapping between, on
+    # ffcore.crosswalk.Club. Without translating through it, attack_defense()
+    # was being asked "does 'Real Madrid' have 10 results?" against a table
+    # that only ever says "real-madrid" — zero matches, basis="elo" for
+    # every single team, silently, despite the data being right there.
+    slug_of = {c.market: c.ff_slug for c in xw.clubs.values()
+              if c.market and c.ff_slug} if xw is not None else {}
+    ad_by_slug = (attack_defense(results, list(slug_of.values()))
+                 if results and slug_of else {})
     # THE FIXTURE PAGE STATES ITS OWN CLUB ID on both crests of every match,
     # and the crosswalk has been told which club each one is. Joining on it
     # means "Celta" and "Celta Vigo" stop being a substring puzzle that can
@@ -233,10 +321,26 @@ def fixture_board(market: list[dict], fixtures: list[dict],
             edge = (1.0 + HOME_EDGE) if home else (1.0 - HOME_EDGE)
             gap = (elo[team] - elo[opp]
                    if elo is not None and opp in elo else None)
+            # FITTED WHERE THE DATA SUPPORTS IT, the rank-based base
+            # otherwise — per opponent, not all-or-nothing (see
+            # attack_defense()'s own note on why that is safe here and not
+            # for Elo). def_factor answers to the opponent's ATTACK (harder
+            # to keep a clean sheet against a side that scores a lot);
+            # atk_factor to the opponent's DEFENSE (easier to score against
+            # a side that concedes a lot).
+            opp_ad = ad_by_slug.get(slug_of.get(opp)) if opp else None
+            if opp_ad is not None:
+                atk_base, def_base = opp_ad[1], 1.0 / opp_ad[0]
+                row_basis = "attack_defense"
+            else:
+                atk_base = def_base = base
+                row_basis = basis if opp else "none"
             board[team] = Match(opponent=other or "?", home=home,
-                                kickoff=when, factor=base * edge,
+                                kickoff=when,
+                                atk_factor=atk_base * edge,
+                                def_factor=def_base * edge,
                                 rank=rank, of=len(teams),
-                                basis=basis if opp else "none", gap=gap)
+                                basis=row_basis, gap=gap)
     return board
 
 
@@ -259,6 +363,37 @@ def _selftest() -> None:
     assert diff["Rich"][1] == 1 and diff["Poor"][1] == 3
     # One team alone is neutral, not divide-by-zero.
     assert difficulty({"Only": 1.0})["Only"] == (1.0, 1)
+
+    # -- attack_defense -------------------------------------------------
+    # A tiny 3-team league, MIN_AD_MATCHES results each for Strong and Weak,
+    # one short for Thin — Strong scores a lot and concedes little, Weak the
+    # opposite, Thin has a real record but not enough of one to trust.
+    results = (
+        [{"home": "Strong", "away": "Weak", "home_goals": "3", "away_goals": "0"},
+         {"home": "Weak", "away": "Strong", "home_goals": "0", "away_goals": "2"}]
+        * 5     # 10 matches each for Strong and Weak
+        + [{"home": "Thin", "away": "Weak", "home_goals": "1", "away_goals": "1"}]
+          * 9   # 9 matches for Thin: one short of MIN_AD_MATCHES
+    )
+    ad = attack_defense(results, ["Strong", "Weak", "Thin"])
+    assert set(ad) == {"Strong", "Weak"}, ad     # Thin refused, not guessed
+    # League average goals/team/match: (3+0+0+2)*5/(20*2) + (1+1)*9/(18*2)
+    # — easier to just check the ORDERING, which is what this exists for.
+    assert ad["Strong"][0] > 1.0 > ad["Weak"][0], ad          # attack
+    assert ad["Weak"][1] > 1.0 > ad["Strong"][1], ad           # defense
+    # An unresolved side ("" — a club not in this repo's current twenty) is
+    # simply not accumulated for — the match's goals still count toward the
+    # league average (via `total_goals`/`total_matches`), but there is no
+    # "" entry to return since `teams` never asks for one.
+    only = attack_defense(
+        [{"home": "Strong", "away": "", "home_goals": "5", "away_goals": "0"}]
+        * MIN_AD_MATCHES,
+        ["Strong"])
+    assert set(only) == {"Strong"}, only
+    assert attack_defense([], ["Strong"]) == {}
+    # A row with no goals at all (a parse gap) is skipped, not zero.
+    assert attack_defense([{"home": "A", "away": "B", "home_goals": "",
+                            "away_goals": ""}], ["A", "B"]) == {}
 
     # The two pages spell clubs differently and still join.
     teams = ["Celta", "Betis", "Atlético", "Real Madrid", "Real Sociedad"]
@@ -287,11 +422,14 @@ def _selftest() -> None:
     # it does so regardless of the order the rows arrive in.
     assert board["Mid"].opponent == "Poor", board["Mid"]
     assert board["Mid"].kickoff.day == 16
-    # Away at the poorest team: easiest opponent, minus the away edge.
-    assert abs(board["Mid"].factor
+    # Away at the poorest team: easiest opponent, minus the away edge. No
+    # `results` passed, so atk_factor and def_factor both fall back to the
+    # same rank-based number.
+    assert abs(board["Mid"].atk_factor
                - (1.0 + FIX_BAND) * (1.0 - HOME_EDGE)) < 1e-9
+    assert board["Mid"].atk_factor == board["Mid"].def_factor
     # Home to the middle team is the away trip's mirror.
-    assert abs(board["Poor"].factor - (1.0 * (1.0 + HOME_EDGE))) < 1e-9
+    assert abs(board["Poor"].atk_factor - (1.0 * (1.0 + HOME_EDGE))) < 1e-9
     # Rank is carried so the report can say WHY, not just how much.
     assert board["Mid"].rank == 3 and board["Mid"].of == 3
 
@@ -308,7 +446,52 @@ def _selftest() -> None:
     solo = fixture_board(mk, [{"kickoff": "2026-08-20T19:00:00+00:00",
                                "home": "Mid", "away": "Nowhere FC"}], now)
     assert solo["Mid"].rank == 0
-    assert abs(solo["Mid"].factor - (1.0 + HOME_EDGE)) < 1e-9
+    assert abs(solo["Mid"].atk_factor - (1.0 + HOME_EDGE)) < 1e-9
+
+    # -- fixture_board with real results: fitted per opponent, rank-based
+    # -- fallback for whoever attack_defense() refuses --------------------
+    # results_history.csv IS KEYED ON ff_slug, not the market's own
+    # spelling — "rich-slug" here, deliberately DIFFERENT from "Rich", to
+    # exercise the actual translation rather than have it pass by both
+    # sides accidentally being the same string. Missed exactly this once
+    # already: a first version left `xw` out of this test, so the mismatch
+    # it was supposed to catch didn't get caught until real market data
+    # (title case) met real results_history.csv data (slugs) and every
+    # single team fell back to "elo" silently.
+    from ffcore.crosswalk import Club, Crosswalk
+
+    xw2 = Crosswalk({}, {
+        "rich": Club("rich", market="Rich", ff_slug="rich-slug"),
+        "mid": Club("mid", market="Mid", ff_slug="mid-slug"),
+        "poor": Club("poor", market="Poor", ff_slug="poor-slug"),
+    })
+    # Rich has MIN_AD_MATCHES of real results: weak attack (0.75x league
+    # average) and a leaky defense (1.25x average conceded) — hand-computed
+    # from a 3-5 scoreline repeated ten times, league average 4.0 goals.
+    ad_results = [{"home": "rich-slug", "away": "x-slug", "home_goals": "3",
+                  "away_goals": "5"}] * MIN_AD_MATCHES
+    fx2 = [{"kickoff": "2026-08-20T19:00:00+00:00",
+           "home": "Mid", "away": "Rich"}]
+    real = fixture_board(mk, fx2, now, results=ad_results, xw=xw2)
+    assert real["Mid"].basis == "attack_defense", real["Mid"]
+    # def_factor answers to Rich's ATTACK (0.75, weak): 1/0.75 * home edge.
+    # atk_factor answers to Rich's DEFENSE (1.25, leaky): 1.25 * home edge.
+    # THE TWO NUMBERS MUST DIFFER — that is the entire point of splitting
+    # them — and each must match its own hand-computed value, not just
+    # "some fitted number".
+    assert real["Mid"].def_factor != real["Mid"].atk_factor, real["Mid"]
+    assert abs(real["Mid"].def_factor - (1.0 / 0.75) * (1.0 + HOME_EDGE)) \
+        < 1e-9, real["Mid"]
+    assert abs(real["Mid"].atk_factor - 1.25 * (1.0 + HOME_EDGE)) < 1e-9, \
+        real["Mid"]
+    # Rich itself faces "X", which attack_defense() never rated (never the
+    # home or away side of a match Rich wasn't in) — falls back to rank.
+    assert real["Rich"].basis in ("value", "none")
+    # No crosswalk at all: cannot translate market spelling to ff_slug, so
+    # results are unusable and everyone falls back — not a crash, not a
+    # silent wrong answer, the same behaviour as no results at all.
+    no_xw = fixture_board(mk, fx2, now, results=ad_results)
+    assert no_xw["Mid"].basis != "attack_defense", no_xw["Mid"]
 
     # -- Club Elo, when it covers the whole league -------------------------
     # Elo disagrees with the wallet: Poor is the strongest side on the pitch
@@ -395,7 +578,7 @@ def _selftest() -> None:
     assert fixture_board(mk, fx, now, None) == board
     assert fixture_board(mk, fx, now, []) == board
 
-    print("ffcore.fixture self-test OK (40 cases)")
+    print("ffcore.fixture self-test OK (56 cases)")
 
 
 if __name__ == "__main__":

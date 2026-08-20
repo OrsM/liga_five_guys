@@ -307,11 +307,13 @@ def build(market: list[dict], xi_rows: list[dict], now,
     if calibrate:
         cal, second = _calibrated()
     # Club Elo ranks the opponents when it covers all of them and squad value
-    # ranks them otherwise — wired HERE, in the one builder, so your squad and
-    # a rival's can never be scored off two different difficulty scales.
-    from ffcore.tidy import load_crosswalk
+    # ranks them otherwise, per club that real results (below) don't reach —
+    # wired HERE, in the one builder, so your squad and a rival's can never
+    # be scored off two different difficulty scales.
+    from ffcore.tidy import load_crosswalk, load_results_history
     board = fixture_board(market, load_fixtures(), now, load_elo(),
-                          xw=load_crosswalk())
+                          xw=load_crosswalk(),
+                          results=load_results_history())
     sc = Scorer(market, xi_rows, prior, shrink_k=shrink_k,
                 current=cur, board=board, cal=cal, second=second)
     return sc, (prior_label, cur_label)
@@ -617,8 +619,16 @@ class Scorer:
             NEUTRAL_START if on_page else ABSENT_START)
         pct_used = 100.0 * self.cal.p(raw, self.second.get(key))
         m = self.board.get((rec.get("team") or "").strip())
+        slot = SLOT.get((rec.get("position") or "").lower(), "")
+        # A CLEAN SHEET IS OPPONENT-ATTACK-DRIVEN, A GOAL OPPONENT-DEFENSE-
+        # DRIVEN — the whole reason Match carries two factors instead of
+        # one. A slot this repo does not recognise (should not happen; SLOT
+        # covers every position the market publishes) gets the attacking
+        # number rather than crashing, since attacking is the larger group.
+        fix_factor = (m.def_factor if slot in ("POR", "DEF")
+                     else m.atk_factor) if m else 1.0
         flat = rating.ppm * pct_used / 100.0
-        score = flat * (m.factor if m else 1.0)
+        score = flat * fix_factor
         if st in OUT_STATUSES:
             score = flat = 0.0
         elif st == "doubt":
@@ -627,9 +637,9 @@ class Scorer:
 
         return Scored(
             name=rec.get("name", key), key=key,
-            slot=SLOT.get((rec.get("position") or "").lower(), ""),
+            slot=slot,
             pos=(rec.get("position") or "").lower(),
-            score=score, flat=flat, fix=m.factor if m else 1.0,
+            score=score, flat=flat, fix=fix_factor,
             opp=m.opponent if m else "", home=m.home if m else True,
             fix_basis=m.basis if m else "none",
             elo_gap=m.gap if m else None,
@@ -789,12 +799,20 @@ def _selftest() -> None:
     # fielding number moves with the opponent and the buying number does not.
     when = __import__("datetime").datetime.fromisoformat(
         "2026-08-20T19:00:00+00:00")
-    easy = Match("Elche", True, when, 1.10, 20, 20)
+    # atk_factor and def_factor DIFFER here on purpose — p0 is a defensa
+    # (mk()'s default), so score() must reach for def_factor (1.10), not
+    # atk_factor (1.30).
+    easy = Match("Elche", True, when, atk_factor=1.30, def_factor=1.10,
+                rank=20, of=20)
     sc3 = Scorer(market, xi, hist, board={"Mid": easy})
     s = sc3.score(mk("p0"))
     assert abs(s.flat - full.ppm) < 1e-9              # P(start) is 100%
     assert abs(s.score - full.ppm * 1.10) < 1e-9
     assert s.opp == "Elche" and s.home and s.fix == 1.10
+    # The SAME fixture, a delantero instead: atk_factor, not def_factor.
+    fwd = sc3.score(mk("p0", pos="delantero"))
+    assert abs(fwd.score - full.ppm * 1.30) < 1e-9, fwd
+    assert fwd.fix == 1.30
     # No fixture for his team: neutral, and the report can see it is unknown.
     solo = Scorer(market, xi, hist, board={}).score(mk("p0"))
     assert solo.fix == 1.0 and solo.opp == "" and solo.score == solo.flat
