@@ -65,13 +65,18 @@ class Offers:
     """How the app picks who to put on the market, fitted from what it did."""
 
     def __init__(self, pool: dict, per_cycle: int = 12, exponent: float = 0.0,
-                 n_observed: int = 0, cycles: int = 0):
+                 n_observed: int = 0, cycles: int = 0, runner: tuple = ()):
         # {player key: market value}
         self.pool = dict(pool)
         self.per_cycle = max(1, per_cycle)
         self.exponent = exponent
         self.n_observed = n_observed
         self.cycles = cycles
+        # (exponent, how much worse it fits, as a fraction) for the second
+        # best exponent on the grid. HOW SHARP THE FIT IS, reported rather
+        # than assumed: an argmin says nothing about whether the runner-up
+        # was a whisker behind or nowhere near, and here it is a whisker.
+        self.runner = runner
         self._keys = list(self.pool)
         self._w = [max(0.0, v) ** exponent for v in self.pool.values()]
         if not any(self._w):
@@ -97,7 +102,7 @@ class Offers:
         want = quantiles(observed)
         rng = random.Random(seed)
         nprng = np.random.default_rng(seed) if np is not None else None
-        best, arg = None, 0.0
+        scored: list = []
         for e in EXPONENTS:
             trial = cls(pool, per_cycle, e)
             idx = trial._draw_np(nprng, trials) if nprng is not None else None
@@ -113,17 +118,26 @@ class Offers:
             # magnitude and an absolute one would fit the top and ignore the
             # rest.
             err = sum(abs(a - b) / max(1.0, b) for a, b in zip(q, want))
-            if best is None or err < best:
-                best, arg = err, e
-        return cls(pool, per_cycle, arg, len(observed), cycles)
+            scored.append((err, e))
+        scored.sort()
+        best, arg = scored[0]
+        runner = ()
+        if len(scored) > 1 and best > 0:
+            runner = (scored[1][1], scored[1][0] / best - 1.0)
+        return cls(pool, per_cycle, arg, len(observed), cycles, runner)
 
     def note(self) -> str:
         if not self.n_observed:
             return ("the market is modelled as a uniform draw — no cycle has "
                     "been recorded yet to fit anything against")
-        return ("the market is modelled from %d offers over %d cycles, "
-                "weighted by value^%.2f" % (self.n_observed, self.cycles,
-                                            self.exponent))
+        out = ("the market is modelled from %d offers over %d cycles, "
+               "weighted by value^%.2f" % (self.n_observed, self.cycles,
+                                           self.exponent))
+        if self.runner:
+            out += (", and only just — value^%.2f fits within %.1f%% of it, "
+                    "so read the exponent as roughly this, not exactly this"
+                    % (self.runner[0], self.runner[1] * 100.0))
+        return out
 
     # -- use ---------------------------------------------------------------
     def draw(self, rng: random.Random) -> list:
@@ -250,6 +264,20 @@ def _selftest() -> None:
 
     pool = {"cheap%d" % i: 1e6 for i in range(200)}
     pool.update({"dear%d" % i: 50e6 for i in range(20)})
+    # HOW SHARP IS THE FIT? A fitted exponent with a runner-up a whisker
+    # behind is a range wearing a point estimate's clothes, and on the live
+    # pool it is exactly that: two players of 584 entering the pool moved the
+    # argmin from ^0.30 to ^0.15 and the wait estimate from 9.8 to 16.3 days.
+    # Not seed noise — the argmin is stable across seeds — a flat curve. So
+    # the note says how close the next one came instead of asserting a
+    # precision the 90 observed offers do not support.
+    flat = Offers.fit({"a": 1e6, "b": 2e6, "c": 30e6}, [1e6, 2e6], cycles=1)
+    assert flat.runner and 0.0 <= flat.runner[1], flat.runner
+    assert "within" in flat.note() and "roughly" in flat.note(), flat.note()
+    # Nothing observed, nothing fitted, nothing claimed.
+    assert Offers.fit({"a": 1e6}, []).runner == ()
+    assert "uniform draw" in Offers.fit({"a": 1e6}, []).note()
+
     rng = random.Random(4)
 
     # -- uniform is the honest default -------------------------------------
