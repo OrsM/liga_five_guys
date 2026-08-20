@@ -636,10 +636,12 @@ def club_key(raw, teams, xw=None) -> str:
 
 def load(trials_pool=None) -> Universe:
     """Assemble the universe from the store. The only IO in this module."""
-    lg = League.load()
+    # The run's one model — the same League and the same Scorer report.py
+    # describes. See ffcore/model.py.
+    from ffcore.model import session
+    _m = session()
+    lg, sc = _m.lg, _m.sc
     players = load_players()
-    sc, _ = build(load_market(), latest_only(load_lineups()),
-                  run_now(), lg.cfg.shrink_k)
 
     m = latest_only(list(csv.DictReader(open(TIDY / "matches.csv"))))
     # The market's spelling of every club, and only the market's: it is the

@@ -964,9 +964,14 @@ def sec_starting(marked, min_start, second=None,
 
 
 def main() -> None:
-    all_market = load_market()
-    market = latest_only(all_market)
-    xi_rows = latest_only(load_lineups())
+    # ONE MODEL PER RUN — see ffcore/model.py. This built its own League and
+    # its own Scorer while decide.load() built a second pair from different
+    # rows, so the two surfaces could describe two different models and
+    # nothing said which was right.
+    from ffcore.model import session
+    m = session()
+    market, xi_rows = m.market, m.xi_rows
+    all_market = market
 
     PARTS.mkdir(parents=True, exist_ok=True)
 
@@ -983,14 +988,9 @@ def main() -> None:
     # built on a stale generated copy of the squad. Failing here is the honest
     # outcome: the run stops, systemd records it, and nothing publishes a
     # report that looks fine and is not.
-    lg = League.load()
-
-    # One builder, shared with rivals.py: the same points blend and the same
-    # fixture board score your squad and theirs.
+    lg = m.lg
+    sc, hist_label, cur_label = m.sc, m.hist_label, m.cur_label
     shrink_k = lg.cfg.shrink_k if lg else 8.0
-    sc, (hist_label, cur_label) = build(market, xi_rows,
-                                        run_now(),
-                                        shrink_k=shrink_k)
 
     observed = market[0]["observed_at"]
     obs_dt = snapshot_stamp(observed)
