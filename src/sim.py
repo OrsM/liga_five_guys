@@ -1556,11 +1556,14 @@ def _selftest() -> None:
 def main() -> None:
     import datetime as dt
     import decide
-    from ffcore.tidy import TIDY, latest_only, load_deadline, read_csv
+    from ffcore.model import session
+    from ffcore.tidy import load_deadline
 
     REPORTS.mkdir(exist_ok=True)
     PARTS.mkdir(parents=True, exist_ok=True)
-    rows_m = latest_only(read_csv(TIDY / "market.csv"))
+    # THE RUN'S OWN MARKET, not a second read of market.csv. decide.load()
+    # below asks for the same session() and gets the same rows back.
+    rows_m = session().market
     stamp = rows_m[0]["observed_at"] if rows_m else ""
     deadline = load_deadline()
     locks_h = None if deadline is None else (
