@@ -313,20 +313,52 @@ class Scorer:
         # held one row for the two Álvaro Garcías — so a squad that correctly
         # named the Rayo one scored a blank, because the only row filed under
         # that name was the Villarreal one.
-        from ffcore.tidy import row_key, shared_names
+        from ffcore.tidy import row_key, shared_names, load_crosswalk
 
         shared = shared_names(market)
         self.lookup: dict[str, dict] = {}
+        # name -> the market keys answering to it, so the probable-XI feed
+        # can fall back to a name when it has no slug — but only when the
+        # name names one man.
+        self._name_keys: dict[str, list] = {}
         for r in market:
             if r.get("slug"):
                 self.lookup[r["slug"]] = r
             if r.get("name"):
-                self.lookup[row_key(r, shared)] = r
+                k = row_key(r, shared)
+                self.lookup[k] = r
+                # DISTINCT keys. `market` is sometimes every snapshot ever,
+                # so appending blindly filed one player's key once per
+                # reading and the "does this name name one man" test could
+                # never be true — which silently dropped the second source
+                # for everyone whose slug is not in the crosswalk.
+                seen_for = self._name_keys.setdefault(norm(r.get("name")), [])
+                if k not in seen_for:
+                    seen_for.append(k)
+        # ff_slug -> market key. THE TEAM PAGES DO PUBLISH PLAYER LINKS —
+        # /jugadores/<slug>, 153 of them on one page — and the comment below
+        # used to say they did not, so the one identifier both files share
+        # went unused and the join ran on names. By slug 497 of 512 XI rows
+        # reach a player and none is ambiguous; by name 494 do and three name
+        # two men.
+        xw = load_crosswalk()
+        self._by_ff_slug = {norm(p.ff_slug): p.player_id
+                            for p in (xw.players.values() if xw else ())
+                            if p.ff_slug}
 
         self.cal = cal or Calibration()
         self.second: dict[str, dict] = {}
         for r in second or []:
-            k = norm(r.get("player_name"))
+            # By identifier, like everything else. Keyed by name while
+            # score() looked players up by id, EVERY player silently lost
+            # the second source and every calibrated P(start) moved with it
+            # — which is what a key that only half-migrated looks like.
+            # These rows carry the same name-slug the probable-XI pages do:
+            # 247 of 274 reach the crosswalk's ff_slug, none reach af_slug.
+            k = self._by_ff_slug.get(norm(r.get("player_slug") or ""))
+            if not k:
+                hits = self._name_keys.get(norm(r.get("player_name") or ""), [])
+                k = hits[0] if len(hits) == 1 else None
             if k:
                 self.second[k] = r
 
@@ -335,9 +367,11 @@ class Scorer:
         self.status: dict[str, str] = {}
         self.notes: dict[str, str] = {}
         for r in xi or []:
-            # Names are the only key both files share — the team pages expose
-            # no player links, so slugs are unavailable there.
-            key = norm(r.get("player_name")) or r.get("player_slug")
+            # The slug first: it is an identifier, the name is not.
+            key = self._by_ff_slug.get(norm(r.get("player_slug") or ""))
+            if not key:
+                hits = self._name_keys.get(norm(r.get("player_name") or ""), [])
+                key = hits[0] if len(hits) == 1 else None
             if not key:
                 continue
             self.listed.add(key)
@@ -411,7 +445,11 @@ class Scorer:
         return self.lookup.get(name) or self.lookup.get(norm(name))
 
     def score(self, rec: dict) -> Scored:
-        key = norm(rec.get("name", ""))
+        from ffcore.tidy import row_key
+        # The row's own key, so fitness and start probability are looked up
+        # by the same identifier everything else uses. This was norm(name),
+        # which meant two men of one name shared a fitness reading.
+        key = row_key(rec, ()) or norm(rec.get("name", ""))
         st = self.status.get(key, "")
         pct = self.start_pct.get(key)
         on_page = key in self.listed
