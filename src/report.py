@@ -109,7 +109,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 # moved under it. `lambda_log.csv` and `line_log.csv` are both kept — they
 # hold what the old rules said, which is the only evidence that will ever
 # exist for whether replacing them helped. git remembers the code.
-from ffcore.bid import (deals, demand_summary, impossible_buys,  # noqa: E402
+from ffcore.bid import (deals, demand_summary, low_priced_buys,  # noqa: E402
                         premiums, suggest, xi_snapshots)
 from ffcore.fixture import FIX_BAND, HOME_EDGE  # noqa: E402
 from ffcore.league import League  # noqa: E402
@@ -1123,12 +1123,12 @@ def main() -> None:
         warnings.append("**Not found in the market:** "
                         + ", ".join(f"`{m}`" for m in missing)
                         + ".")
-    below_floor = impossible_buys(dl)
+    below_floor = low_priced_buys(dl)
     if below_floor:
         warnings.append(
-            "**%d purchase%s priced below the floor** (%s) — a buy cannot "
-            "legally cost less than the player's value, so this is a bad "
-            "join, not a bargain." % (
+            "**%d purchase%s priced below the floor** (%s) — check by hand: "
+            "either a mis-join, or a discounted relist after an instant "
+            "sale (unverified either way)." % (
                 len(below_floor), "" if len(below_floor) == 1 else "s",
                 ", ".join("%s %+.1f%%" % (d["player"], d["premium"])
                           for d in below_floor)))
