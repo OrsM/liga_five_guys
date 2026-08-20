@@ -194,7 +194,7 @@ player_id,name,club_id,ff_slug,af_slug,app_id,app_names
 14118,ali houary,elche,-ali-houary,448243,,
 14125,luiz junior,villarreal,luiz-junior,278619,,
 14135,manu gonzalez,betis,manu-gonzalez,,,
-14155,maguette gueye,racing,maguette-gueye,,,
+14155,maguette gueye,racing,maguette-gueye,334014,,
 14177,andres cespedes,malaga,,,,
 14210,zaid romero,getafe,zaid-romero,180927,,
 14700,david jimenez,real madrid,,,,
@@ -310,7 +310,7 @@ player_id,name,club_id,ff_slug,af_slug,app_id,app_names
 16975,iker muñoz,sevilla,iker-munoz-1,,2876,Iker Muñoz
 16976,noe carrillo,deportivo,noe-carrillo,,,
 16982,unai santos,osasuna,,,,
-17116,thiago fernandez,levante,thiago-fernandez,,,
+17116,thiago fernandez,levante,thiago-fernandez,362750,,
 17119,joselillo gaitan,villarreal,,,,
 17126,alvaro jimenez,racing,,,,
 17129,julio diaz,sevilla,julio-diaz,,,
@@ -353,6 +353,7 @@ player_id,name,club_id,ff_slug,af_slug,app_id,app_names
 18314,robbie ure,sevilla,robbie-ure,,,
 1859,josan ferrandez,elche,josan,,,
 1881,unai lopez,rayo,unai-lopez,47285,2384,Unai Lopez
+1882,joao cancelo,barcelona,joao-cancelo,,,
 189,jonny castro,alaves,jonny-castro,,2552,Jonny Otto
 1919,david soria,getafe,david-soria,47247,184,David Soria
 1927,pere milla,espanyol,pere-milla,47398,2400,Pere Milla
