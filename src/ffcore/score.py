@@ -109,11 +109,20 @@ OUT_STATUSES = frozenset({"injured", "suspended", "unavailable"})
 PROMOTED_DISCOUNT = 0.70  # the LaLiga median overstates a promoted squad
 
 
-def _current_minutes(starters_rows) -> dict[str, float]:
-    """{norm(player_name): total minutes played this season}, from confirmed
-    line-ups — sources.parse_starters's `minute` (off-minute for a starter,
-    on-minute for a sub, blank meaning he played the whole match or none of
-    it respectively; see that module for the rule).
+def _current_minutes(starters_rows, xw) -> dict[str, float]:
+    """{crosswalk player_id: total minutes played this season}, from
+    confirmed line-ups — sources.parse_starters's `minute` (off-minute for a
+    starter, on-minute for a sub, blank meaning he played the whole match or
+    none of it respectively; see that module for the rule).
+
+    KEYED ON THE CROSSWALK, NOT A NAME STRING. starters.csv carries only the
+    short display form ("Blanco"); the market — what Scorer.rate() actually
+    looks players up by — carries the full name ("Antonio Blanco"). Checked
+    against the app's own mins_played stat (api_stats.csv) for the players
+    it covers: keying on raw name strings matched 10 of 42 and silently
+    scored the other 32 as zero minutes despite api_stats showing real
+    ones (89, 90, 56...) — the crosswalk exists exactly to stop this join.
+    `player_slug` (futbolfantasy's own id) resolves through it instead.
 
     MATCH LENGTH IS APPROXIMATED AT 90. Stoppage time is not on the page a
     starter's off-minute comes from, so a man who plays the whole match is
@@ -129,18 +138,21 @@ def _current_minutes(starters_rows) -> dict[str, float]:
     confirmed line-up dozens of times over, once per sweep since the match
     was first read. Measured: one player's minute row appeared 57 times for
     a single match, and summing all 57 credited him 5,130 minutes in a
-    season that had played one jornada. Deduped here on (match_id, name)
+    season that had played one jornada. Deduped here on (match_id, player)
     before anything is summed.
     """
     MATCH_LEN = 90.0
     seen: set[tuple[str, str]] = set()
     out: dict[str, float] = {}
     for r in starters_rows:
-        name = norm(r.get("player_name") or "")
+        slug = (r.get("player_slug") or "").strip()
         match_id = (r.get("match_id") or "").strip()
-        if not name or not match_id:
+        if not slug or not match_id:
             continue
-        dedup_key = (match_id, name)
+        key = xw.player(ff_slug=slug, name=r.get("player_name"))
+        if not key:
+            continue
+        dedup_key = (match_id, key)
         if dedup_key in seen:
             continue
         seen.add(dedup_key)
@@ -152,22 +164,32 @@ def _current_minutes(starters_rows) -> dict[str, float]:
             mins = (MATCH_LEN - float(raw)) if raw else 0.0
         else:
             continue
-        out[name] = out.get(name, 0.0) + max(0.0, mins)
+        out[key] = out.get(key, 0.0) + max(0.0, mins)
     return out
 
 
 def _current_from_perjornada() -> tuple[dict, str]:
-    """{norm(name): {"pts": season-to-date points, "pj": minutes / 90}} from
-    this season's per-jornada tracker, or ({}, "") before it exists.
+    """{norm(market name): {"pts": season-to-date points,
+    "pj": minutes / 90}} from this season's per-jornada tracker, or
+    ({}, "") before it exists.
 
     WHY NOT data/season/points_<this season>.csv, WHICH load_points() ALSO
     LOOKS FOR: that file is a snapshot of the points PAGE, and the page
     reads empty until J1 is fully played — see this module's own opening
-    docstring, "which is where it sits today." data/season/live/
-    perjornada_*.csv is written every run from snapshots this repo already
-    takes (points.py) and has real numbers from the first confirmed match,
-    so it is the actual live source, not points_*.csv's hypothetical future
-    one.
+    docstring. data/season/live/perjornada_*.csv is written every run from
+    snapshots this repo already takes (points.py) and has real numbers from
+    the first confirmed match, so it is the actual live source, not
+    points_*.csv's hypothetical future one.
+
+    KEYED THROUGH THE CROSSWALK, TWICE — once to join perjornada's own
+    `ff_id` (which IS the crosswalk's player_id directly, verified: 5 of 5
+    checked matched exactly) to a canonical player, and again to translate
+    that back into norm(market name), because that is what Scorer.rate()
+    actually looks self.current up by. Going name-to-name directly (what
+    the first version of this did) meant perjornada's own two name
+    columns and starters.csv's short form were three different spellings
+    of the same person, agreeing by luck on some players and silently
+    giving others zero minutes on the rest.
 
     "pj" IS MINUTES, NOT AN APPEARANCE COUNT — games_total in the perjornada
     file weights a 10-minute cameo and a full 90 identically, the same
@@ -178,13 +200,16 @@ def _current_from_perjornada() -> tuple[dict, str]:
     not a guess — silence about how long he played is not evidence he
     played the average amount.
     """
-    from ffcore.tidy import SEASON, TIDY, read_csv
+    from ffcore.tidy import SEASON, TIDY, load_crosswalk, read_csv
 
     live = SEASON / "live"
     files = sorted(live.glob("perjornada_*.csv")) if live.exists() else []
     if not files:
         return {}, ""
     label = files[-1].stem.replace("perjornada_", "")
+    xw = load_crosswalk()
+    if xw is None:
+        return {}, ""
 
     # LAST WRITE WINS: the file is append-only, one row per player per
     # jornada with activity, in chronological order, and *_total columns
@@ -192,21 +217,19 @@ def _current_from_perjornada() -> tuple[dict, str]:
     # season-to-date state, not something to sum by hand.
     latest: dict[str, dict] = {}
     for r in read_csv(files[-1]):
-        for key in (r.get("player_name"), r.get("player_name_full")):
-            if key:
-                latest[norm(key)] = r
+        pid = (r.get("ff_id") or "").strip()
+        key = pid if pid in xw.players else xw.player(
+            name=r.get("player_name_full") or r.get("player_name"))
+        if key:
+            latest[key] = r
 
-    # starters.csv HAS NO FULL-NAME COLUMN, only the short display form — so
-    # a `latest` key registered under player_name_full (perjornada carries
-    # both, same as read() below) has no minutes to find and gets 0.0, not
-    # a share of what his short-name key found. Bounded: it under-weights
-    # his season contribution for that one lookup path rather than
-    # inventing a number, and a caller that resolves the short-name key
-    # instead is unaffected.
-    minutes = _current_minutes(read_csv(TIDY / "starters.csv"))
-    out = {key: {"pts": ratio(r.get("points_total")) or 0.0,
-                "pj": minutes.get(key, 0.0) / 90.0}
-          for key, r in latest.items()}
+    minutes = _current_minutes(read_csv(TIDY / "starters.csv"), xw)
+    out = {}
+    for key, r in latest.items():
+        player = xw.players.get(key)
+        market_name = norm(player.name) if player else key
+        out[market_name] = {"pts": ratio(r.get("points_total")) or 0.0,
+                            "pj": minutes.get(key, 0.0) / 90.0}
     return out, label
 
 
@@ -792,49 +815,62 @@ def _selftest() -> None:
     assert "fix" in s.as_row() and "flat" in s.as_row()
 
     # -- _current_minutes: a 90-minute match and a cameo must not weigh the
-    # -- same ------------------------------------------------------------
+    # -- same, and a SHORT display name must still resolve to the right man
+    # ------------------------------------------------------------------
+    from ffcore.crosswalk import Crosswalk, Player
+
+    xw2 = Crosswalk({
+        "antonio blanco": Player("antonio blanco", "Antonio Blanco",
+                                 ff_slug="blanco"),
+        "came on": Player("came on", "Came On", ff_slug="came-on"),
+        "unused sub": Player("unused sub", "Unused Sub", ff_slug="unused"),
+    }, {})
     rows = [
-        # Full match, uncredited (no minute marker): 90.
-        {"player_name": "Full Match", "role": "starter", "minute": "",
-         "match_id": "m1"},
-        # Subbed off at 60: 60, not 90.
-        {"player_name": "Subbed Off", "role": "starter", "minute": "60",
-         "match_id": "m1"},
+        # starters.csv's SHORT form ("Blanco") must still resolve to the
+        # market's full name's crosswalk key — this is the actual bug: a
+        # first version matched on the raw name string, matched 10 of 42
+        # real players against api_stats' ground-truth minutes, and
+        # silently scored the other 32 (Antonio Blanco among them, 89
+        # real minutes) as zero.
+        {"player_name": "Blanco", "player_slug": "blanco",
+         "role": "starter", "minute": "", "match_id": "m1"},
         # Came on at 70: the REMAINING 20, not a full match.
-        {"player_name": "Came On", "role": "sub", "minute": "70",
-         "match_id": "m1"},
+        {"player_name": "Came On", "player_slug": "came-on",
+         "role": "sub", "minute": "70", "match_id": "m1"},
         # Unused substitute: zero, not a guess.
-        {"player_name": "Unused Sub", "role": "sub", "minute": "",
-         "match_id": "m1"},
+        {"player_name": "Unused Sub", "player_slug": "unused",
+         "role": "sub", "minute": "", "match_id": "m1"},
         # A SECOND match: minutes ACCUMULATE.
-        {"player_name": "Full Match", "role": "starter", "minute": "45",
-         "match_id": "m2"},
+        {"player_name": "Blanco", "player_slug": "blanco",
+         "role": "starter", "minute": "45", "match_id": "m2"},
         # A role that is neither "starter" nor "sub" contributes nothing —
         # a page that changes its vocabulary must not silently count as a
         # full match.
-        {"player_name": "Weird Role", "role": "coach", "minute": "",
-         "match_id": "m1"},
+        {"player_name": "Blanco", "player_slug": "blanco",
+         "role": "coach", "minute": "", "match_id": "m3"},
+        # No slug at all does not resolve — skipped, not guessed.
+        {"player_name": "Nobody", "player_slug": "", "role": "starter",
+         "minute": "", "match_id": "m1"},
         # THE SAME MATCH, CARRIED FORWARD into 56 more snapshots — exactly
         # what starters.csv's raw table actually holds, measured: one
         # player's row for one match appeared 57 times, and summing all of
         # them credited him 5,130 minutes in a season that had played one
         # jornada. Must count once, not 57 times.
-        *({"player_name": "Full Match", "role": "starter", "minute": "",
-           "match_id": "m1"} for _ in range(56)),
+        *({"player_name": "Blanco", "player_slug": "blanco",
+           "role": "starter", "minute": "", "match_id": "m1"}
+          for _ in range(56)),
     ]
-    mins = _current_minutes(rows)
-    assert mins["full match"] == 135.0, mins       # 90 (m1) + 45 (m2), not x57
-    assert mins["subbed off"] == 60.0, mins
+    mins = _current_minutes(rows, xw2)
+    assert mins["antonio blanco"] == 135.0, mins   # 90 (m1) + 45 (m2), not x57
     assert mins["came on"] == 20.0, mins
     assert mins["unused sub"] == 0.0, mins
-    assert "weird role" not in mins, mins
-    assert _current_minutes([]) == {}
+    assert _current_minutes([], xw2) == {}
     # No match_id at all is not evidence of a match — skipped, not counted
     # as a fresh one.
-    assert _current_minutes([{"player_name": "No Match", "role": "starter",
-                              "minute": ""}]) == {}
+    assert _current_minutes([{"player_name": "Blanco", "player_slug": "blanco",
+                              "role": "starter", "minute": ""}], xw2) == {}
 
-    print("ffcore.score self-test OK (28 cases)")
+    print("ffcore.score self-test OK (30 cases)")
 
 
 if __name__ == "__main__":
