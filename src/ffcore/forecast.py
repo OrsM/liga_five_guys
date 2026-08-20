@@ -17,10 +17,22 @@ question is not "is it right" but "can it be swapped".
 defenders from the same club share a clean sheet; two forwards share the goals
 they are competing for. Sampling players independently understates the
 variance of a squad that is concentrated in a few clubs, and overstates how
-reliably a differential punt pays off. The baseline below ignores that
-correlation — but a model that wants it needs no interface change, because it
-is handed the whole round at once. That is the one design decision here that
-would be expensive to get wrong.
+reliably a differential punt pays off. The interface needs no change for a
+model that wants that correlation, because it is handed the whole round at
+once — that is the one design decision here that would be expensive to get
+wrong.
+
+PARTIALLY DONE, HONESTLY: rate_draw()'s SEASON-LONG multiplier now has a
+per-club shared component (club_rel, from ffcore.fixture.club_volatility) on
+top of each player's own individual uncertainty — two players of the same
+club move together across a WHOLE TRIAL's 38 rounds. What is still
+independent is the PER-MATCH noise inside draw() itself: `rng.choice(pool)`
+draws each player's individual-match luck separately, so two teammates can
+still land on opposite ends of the pool in the SAME round of the SAME trial.
+The season-long piece is the bigger of the two — a club's whole SEASON
+being stronger or weaker than expected compounds over 38 rounds where a
+single round's noise does not — but per-match correlation is real and not
+yet built.
 
 WHY NOT A NORMAL. The obvious sampler is mean plus sd times a standard normal,
 and every fantasy Monte Carlo write-up I could find does exactly that. Real
@@ -91,7 +103,7 @@ class Bootstrap:
     """
 
     def __init__(self, per_jornada: dict[int, dict[str, tuple[float, float]]],
-                 pool=(), matches=None):
+                 pool=(), matches=None, club_of=None, club_rel=None):
         # {jornada: {key: (points_if_he_plays, p_start)}}
         self.per_jornada = per_jornada
         # THE ORDER PLAYERS DRAW IN, fixed here rather than left to the dict.
@@ -126,6 +138,11 @@ class Bootstrap:
         for k, n in (matches or {}).items():
             self.rate_rel[k] = self._cv / math.sqrt(
                 max(1.0, float(n) + SHRINK_MATCHES))
+        # {player key: club}, and {club: rel} — ffcore.fixture.club_volatility().
+        # ADDED to rate_rel's own individual uncertainty, not netted against
+        # it — see rate_draw()'s docstring for why.
+        self.club_of = dict(club_of or {})
+        self.club_rel = dict(club_rel or {})
 
     # -- provenance --------------------------------------------------------
     def pool_note(self) -> str:
@@ -148,10 +165,34 @@ class Bootstrap:
         match-to-match noise, and why it cannot be averaged away over 38
         rounds. Drawn per trial, never per jornada.
 
+        TWO INDEPENDENT SOURCES OF "WRONG", COMBINED MULTIPLICATIVELY: this
+        player's own rate could be off (rate_rel, as before), and separately
+        his WHOLE CLUB could be having a stronger or weaker season than its
+        own attack_defense() rating expects (club_rel — see
+        ffcore.fixture.club_volatility). The second is what makes two
+        players of the same club move together in a trial instead of
+        independently, which is most of why sampling a squad concentrated
+        in a few clubs used to understate its own variance — see this
+        module's own opening docstring, "the baseline below ignores that
+        correlation". A player with no club_of entry (club_rel empty, or a
+        club too thin on history — see MIN_AD_MATCHES) draws exactly as
+        before: shared=1.0 is a no-op, not a guess.
+
+        CLUB SHOCKS DRAWN FIRST, sorted, always — same reason players draw
+        in a fixed order (see __init__): which rng call lands on which key
+        decides its value, and a dict's own iteration order is not
+        something two processes are guaranteed to agree on.
+
         Truncated at zero: a rate is points per match and cannot be negative.
         """
-        return {k: max(0.0, 1.0 + rng.gauss(0.0, rel))
-                for k, rel in self.rate_rel.items()}
+        club_shock = {c: max(0.0, 1.0 + rng.gauss(0.0, self.club_rel[c]))
+                     for c in sorted(self.club_rel)}
+        out = {}
+        for k in sorted(self.rate_rel):
+            individual = max(0.0, 1.0 + rng.gauss(0.0, self.rate_rel[k]))
+            shared = club_shock.get(self.club_of.get(k, ""), 1.0)
+            out[k] = individual * shared
+        return out
 
     def draw(self, jornada: int, rng: random.Random,
              rates: dict | None = None) -> dict[str, float]:
@@ -213,6 +254,50 @@ def _selftest() -> None:
     assert abs(sum(draws) / len(draws) - 1.0) < 0.02, sum(draws) / len(draws)
     assert min(draws) >= 0.0, "a rate cannot be negative"
     assert max(draws) > 1.3, "and it has to be able to be wrong"
+
+    # -- club_rel: two players of one club move TOGETHER --------------------
+    # No club_of/club_rel passed: exactly the old behaviour, not a new
+    # no-op path that happens to look the same.
+    assert thin.club_of == {} and thin.club_rel == {}
+
+    same_club = Bootstrap(
+        {1: {"a": (5.0, 1.0), "b": (5.0, 1.0), "c": (5.0, 1.0)}},
+        pool=[0, 2, 4, 6, 8] * 40, matches={"a": 20, "b": 20, "c": 20},
+        club_of={"a": "Rich", "b": "Rich", "c": "Poor"},
+        club_rel={"Rich": 0.20, "Poor": 0.0})
+    # "a" and "b" share Rich's shock; "c" is on Poor, rel 0.0 — his OWN
+    # rate_rel still applies (players still individually wrong), but the
+    # CLUB component is exactly a no-op multiplier for him.
+    trials = [same_club.rate_draw(random.Random(i)) for i in range(500)]
+    # THE ACTUAL CLAIM: a and b are CORRELATED (same club, same shock) far
+    # more than either is with c (different club). Measured as how often
+    # a and b land on the SAME SIDE of 1.0, against how often a and c do.
+    ab_same_side = sum(1 for t in trials
+                       if (t["a"] > 1.0) == (t["b"] > 1.0))
+    ac_same_side = sum(1 for t in trials
+                       if (t["a"] > 1.0) == (t["c"] > 1.0))
+    assert ab_same_side > ac_same_side, (ab_same_side, ac_same_side)
+    # a and b are NOT identical — each still carries his own individual
+    # rate_rel on top of the shared club shock.
+    assert any(t["a"] != t["b"] for t in trials)
+    # The mean is still ~1.0 — an ADDED source of spread, not a bias.
+    a_mean = sum(t["a"] for t in trials) / len(trials)
+    assert abs(a_mean - 1.0) < 0.05, a_mean
+
+    # REPRODUCIBLE, THE SAME STRONGER CLAIM AS draw() BELOW: fixed order
+    # (sorted club names, then sorted player keys), not dict-insertion or
+    # per-process hash-seed order — the exact bug class .draw() already had
+    # to be fixed for once.
+    fwd_clubs = {"a": "Rich", "b": "Rich", "c": "Poor"}
+    rev_clubs = {"c": "Poor", "b": "Rich", "a": "Rich"}
+    fwd_cs = Bootstrap({1: {"a": (5.0, 1.0), "b": (5.0, 1.0), "c": (5.0, 1.0)}},
+                       matches={"a": 20, "b": 20, "c": 20}, club_of=fwd_clubs,
+                       club_rel={"Rich": 0.2, "Poor": 0.1})
+    rev_cs = Bootstrap({1: {"a": (5.0, 1.0), "b": (5.0, 1.0), "c": (5.0, 1.0)}},
+                       matches={"a": 20, "b": 20, "c": 20}, club_of=rev_clubs,
+                       club_rel={"Poor": 0.1, "Rich": 0.2})
+    assert fwd_cs.rate_draw(random.Random(9)) == rev_cs.rate_draw(
+        random.Random(9)), "insertion order must not change the season"
 
     rng = random.Random(7)
     # One jornada, three players: a nailed-on starter, a rotation risk, and
@@ -285,7 +370,7 @@ def _selftest() -> None:
             {"games_delta": "x", "points_delta": "3"}]     # unparseable
     assert pool_from_perjornada(rows) == [4, -1]
 
-    print("ffcore.forecast self-test OK (19 cases)")
+    print("ffcore.forecast self-test OK (28 cases)")
 
 
 if __name__ == "__main__":

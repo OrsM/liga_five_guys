@@ -45,7 +45,9 @@ Run `python src/ffcore/fixture.py` to execute the self-test below.
 
 from __future__ import annotations
 
+import math
 import os
+import statistics
 import sys
 from datetime import datetime
 from typing import NamedTuple
@@ -207,6 +209,61 @@ def attack_defense(results: list[dict],
     return {t: (scored[t] / played[t] / league_avg,
                conceded[t] / played[t] / league_avg)
            for t in teams if played.get(t, 0) >= MIN_AD_MATCHES}
+
+
+def club_volatility(results: list[dict], teams) -> dict[str, float]:
+    """{team: rel} — how uncertain THIS CLUB'S OWN attack_defense() rating
+    is, as a fraction, from how much its match-to-match goal involvement
+    (scored + conceded, one number per match) actually varied.
+
+    THE SAME SHAPE ffcore.score._priors()/ffcore.forecast.Bootstrap's
+    rate_rel ALREADY USES for a PLAYER's rate: standard error of a mean
+    over n observations is the per-observation spread over root n, so a
+    rating fit from more matches is trusted more, one that has barely
+    settled is trusted less. Not a new idea, the same one at club scale
+    — un-netted against player-level rate_rel deliberately: there is no
+    clean way to say how much of a player's existing individual
+    uncertainty already reflects his club's shared risk and how much is
+    truly his own, so this is meant to be ADDED as an extra source of
+    correlated uncertainty, not to replace or shrink what already exists.
+    Errs toward wider bands, which is the documented gap this exists to
+    narrow, rather than toward a redistribution that could get the split
+    wrong in either direction.
+
+    GOALS INVOLVEMENT (scored + conceded), NOT SCORED ALONE — a club's bad
+    week usually shows up both ways at once (their attack goes quiet AND
+    their defense leaks), and one number keeps the shared per-trial shock
+    (below) simple: every one of a club's players, attacker or defender,
+    inherits the same "this club had a wild/quiet stretch" draw. Splitting
+    attack-volatility from defense-volatility separately is a real
+    refinement this does not attempt.
+
+    Same MIN_AD_MATCHES threshold and per-team (not all-or-nothing)
+    coverage as attack_defense() — see its own note on why that is safe.
+    """
+    involvement: dict[str, list[float]] = {}
+    for r in results:
+        home, away = (r.get("home") or "").strip(), (r.get("away") or "").strip()
+        try:
+            hg, ag = float(r["home_goals"]), float(r["away_goals"])
+        except (TypeError, ValueError, KeyError):
+            continue
+        if home:
+            involvement.setdefault(home, []).append(hg + ag)
+        if away:
+            involvement.setdefault(away, []).append(hg + ag)
+    out = {}
+    for t in teams:
+        vals = involvement.get(t, [])
+        n = len(vals)
+        if n < MIN_AD_MATCHES:
+            continue
+        mean = statistics.mean(vals)
+        if mean <= 0:
+            continue
+        cv = statistics.pstdev(vals) / mean
+        out[t] = cv / math.sqrt(n)
+    return out
 
 
 def difficulty(strength: dict[str, float]) -> dict[str, tuple[float, int]]:
@@ -395,6 +452,27 @@ def _selftest() -> None:
     assert attack_defense([{"home": "A", "away": "B", "home_goals": "",
                             "away_goals": ""}], ["A", "B"]) == {}
 
+    # -- club_volatility ------------------------------------------------
+    # Steady always scores/concedes 2 total goals a match — pstdev 0, so
+    # rel is exactly 0, not merely small. Wild swings from 0 to 8, real
+    # spread, real rel.
+    steady = [{"home": "Steady", "away": "Weak", "home_goals": "1",
+              "away_goals": "1"}] * MIN_AD_MATCHES
+    wild = ([{"home": "Wild", "away": "Weak", "home_goals": "0",
+             "away_goals": "0"}] * (MIN_AD_MATCHES // 2)
+           + [{"home": "Wild", "away": "Weak", "home_goals": "8",
+              "away_goals": "0"}] * (MIN_AD_MATCHES // 2))
+    vol = club_volatility(steady + wild, ["Steady", "Wild", "Thin"])
+    assert vol["Steady"] == 0.0, vol
+    assert vol["Wild"] > 0.0, vol
+    assert "Thin" not in vol, vol           # under MIN_AD_MATCHES, refused
+    assert club_volatility([], ["Steady"]) == {}
+    # A team that never scores or concedes (mean involvement 0) is a
+    # divide-by-zero avoided, not a crash.
+    assert club_volatility(
+        [{"home": "Empty", "away": "X", "home_goals": "0",
+          "away_goals": "0"}] * MIN_AD_MATCHES, ["Empty"]) == {}
+
     # The two pages spell clubs differently and still join.
     teams = ["Celta", "Betis", "Atlético", "Real Madrid", "Real Sociedad"]
     assert match_team("Celta Vigo", teams) == "Celta"
@@ -578,7 +656,7 @@ def _selftest() -> None:
     assert fixture_board(mk, fx, now, None) == board
     assert fixture_board(mk, fx, now, []) == board
 
-    print("ffcore.fixture self-test OK (56 cases)")
+    print("ffcore.fixture self-test OK (62 cases)")
 
 
 if __name__ == "__main__":

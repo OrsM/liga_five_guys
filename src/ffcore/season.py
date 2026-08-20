@@ -268,14 +268,46 @@ def _run_np(states: list, forecaster, trials: int, seed: int):
     # too certain. Seeded off the trial and not off the jornada for the same
     # reason.
     rel = getattr(forecaster, "rate_rel", None) or {}
+    # CLUB-CORRELATED, THE SAME FEATURE Bootstrap.rate_draw() HAS — but
+    # this NUMPY path is a SEPARATE implementation of the same draw, not a
+    # caller of that one (see _run_np's own docstring: "statistically
+    # equivalent, not identical" is already the accepted relationship
+    # between the two paths). Building rate_draw()'s club correlation and
+    # stopping there would have made it inert in production: this is the
+    # path _run_np() actually takes whenever numpy is installed, which it
+    # is here — verified by comparing p_win before/after on the same
+    # pinned data and finding it bit-for-bit unchanged, which a real
+    # widening of the bands cannot produce by chance across thousands of
+    # trials.
+    club_of = getattr(forecaster, "club_of", None) or {}
+    club_rel = getattr(forecaster, "club_rel", None) or {}
     rate_mult = {}
     if rel:
         all_keys = sorted({k for ks in order.values() for k in ks} & set(rel))
         if all_keys:
             rrng = np.random.default_rng([seed, 7919])
             sd = np.array([rel[k] for k in all_keys], dtype=float)
-            m = np.clip(1.0 + rrng.standard_normal((trials, len(all_keys)))
-                        * sd, 0.0, None)
+            individual = np.clip(
+                1.0 + rrng.standard_normal((trials, len(all_keys))) * sd,
+                0.0, None)
+            clubs = sorted(club_rel)
+            if clubs:
+                # A SEPARATE rng STREAM (a different second seed component)
+                # so the club draw and the individual draw are independent
+                # sources of "wrong", not the same bits reused twice.
+                crng = np.random.default_rng([seed, 7920])
+                csd = np.array([club_rel[c] for c in clubs], dtype=float)
+                shock = np.clip(
+                    1.0 + crng.standard_normal((trials, len(clubs))) * csd,
+                    0.0, None)
+                shock_of = {c: shock[:, i] for i, c in enumerate(clubs)}
+                ones = np.ones(trials)
+                shared = np.stack(
+                    [shock_of.get(club_of.get(k, ""), ones)
+                     for k in all_keys], axis=1)
+                m = individual * shared
+            else:
+                m = individual
             rate_mult = {k: m[:, i] for i, k in enumerate(all_keys)}
 
     managers = [list(st.squads) for st in states]
@@ -418,6 +450,8 @@ def simulate(state: LeagueState, forecaster, trials: int = 2000,
 
 
 def _selftest() -> None:
+    import statistics
+
     from ffcore.forecast import Bootstrap
 
     # -- shapes -------------------------------------------------------------
@@ -489,6 +523,42 @@ def _selftest() -> None:
     r2 = simulate(st, Bootstrap(per), trials=200, seed=4)
     assert r1.totals == r2.totals
 
+    # -- club-correlated variance actually widens a real season sim --------
+    # A squad entirely from ONE club should show MORE season-total spread
+    # once that club's players share a strong correlated shock than when
+    # they draw independently — this is the actual claim ffcore.forecast's
+    # club_rel exists for, checked through simulate() itself (whichever of
+    # _run/_run_np is active), not just at the Bootstrap unit level.
+    # KEYED ON a/b's PREFIXED NAMES ("a_k", "b_d1", ...), not sq's bare
+    # ones — rate_rel is looked up by the SAME key per_jornada uses, and a
+    # mismatch here means an empty intersection in _run_np's `all_keys`,
+    # silently applying NO rate uncertainty to either run and making them
+    # look identical for a reason that has nothing to do with correlation.
+    # Caught exactly that way once already, before fixing it here.
+    matches = {k: 20 for k in list(a) + list(b)}
+    club_of_a = {f"a_{k}": "OneClub" for k in sq}
+    baseline_fc = Bootstrap(per, matches=matches)
+    correlated_fc = Bootstrap(per, matches=matches, club_of=club_of_a,
+                              club_rel={"OneClub": 0.6})
+    base_res = simulate(st, baseline_fc, trials=1500, seed=11)
+    corr_res = simulate(st, correlated_fc, trials=1500, seed=11)
+    base_sd = statistics.pstdev(base_res.totals["A"])
+    corr_sd = statistics.pstdev(corr_res.totals["A"])
+    assert corr_sd > base_sd, (base_sd, corr_sd)
+    # The MEAN barely moves — this widens the band, it does not bias it.
+    assert abs(statistics.mean(corr_res.totals["A"])
+              - statistics.mean(base_res.totals["A"])) < 5.0
+    # Squad B, uncorrelated in both runs, is a control: its own spread
+    # should not have moved just because A's forecaster changed.
+    assert abs(statistics.pstdev(base_res.totals["B"])
+              - statistics.pstdev(corr_res.totals["B"])) < 1e-6
+    # Reproducible with the feature on, the same as without it.
+    corr_res2 = simulate(st, Bootstrap(per, matches=matches,
+                                       club_of=club_of_a,
+                                       club_rel={"OneClub": 0.6}),
+                         trials=1500, seed=11)
+    assert corr_res.totals == corr_res2.totals
+
     # -- one draw, many squads ---------------------------------------------
     # IDENTICAL, not close. simulate_many is the same arithmetic in a
     # different order — draw the season once, score every candidate against
@@ -522,7 +592,7 @@ def _selftest() -> None:
     assert [x.totals for x in serial] == [x.totals for x in forked], \
         "splitting the trials changed the seasons"
 
-    print("ffcore.season self-test OK (27 cases)")
+    print("ffcore.season self-test OK (29 cases)")
 
 
 if __name__ == "__main__":

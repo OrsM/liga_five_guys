@@ -772,10 +772,27 @@ def load(trials_pool=None) -> Universe:
         s_ = sc.score(row) if row else None
         if s_ is not None:
             matches[k] = s_.pj
+    # CLUB-CORRELATED SEASON UNCERTAINTY — ffcore.fixture.club_volatility().
+    # `club` above is keyed on the MARKET's own spelling (club_key's
+    # canonical side); results_history.csv, and so club_volatility(), is
+    # keyed on ff_slug — the exact mismatch fixture_board() already had to
+    # be fixed for once, translated the same way, through ffcore.crosswalk.
+    from ffcore.fixture import club_volatility
+    from ffcore.tidy import load_results_history
+    # norm(c.market), not c.market raw: club_key()'s fallback path (used
+    # above to build `club`) always returns norm(match_team(...)) — a
+    # second mismatch of the same kind fixture_board() had, caught the
+    # same way, by checking the real join actually landed on real data
+    # rather than trusting that passing an xw through was enough.
+    slug_of = {norm(c.market): c.ff_slug for c in lg.xw.clubs.values()
+              if c.market and c.ff_slug} if lg.xw is not None else {}
+    club_of_slug = {k: slug_of[v] for k, v in club.items() if v in slug_of}
+    club_rel = club_volatility(load_results_history(), list(slug_of.values()))
     fc = Bootstrap({j: ({k: v for k, v in base.items()
                          if club.get(k) not in played[j]}
                         if j in played else base)
-                    for j in rem}, pool=pool, matches=matches)
+                    for j in rem}, pool=pool, matches=matches,
+                   club_of=club_of_slug, club_rel=club_rel)
 
     # What everybody has already scored, off the league table — five rows at
     # the grain the fact belongs to, rather than the first of each manager's
