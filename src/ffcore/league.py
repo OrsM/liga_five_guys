@@ -747,37 +747,41 @@ def identify(t: dict, owner: dict, market=None, xw=None) -> tuple[str, str]:
 def _roster_key(raw: str, market, xw=None) -> str:
     """The canonical key for one rosters_initial.txt line.
 
+    THE FILE IS ID-PER-LINE NOW (migrated 2026-08-21), so the common case
+    is the fast path below: the crosswalk's own key, verbatim, no
+    resolution needed — that is the entire point of storing an id instead
+    of a name a season can outgrow. Everything after this handles a line
+    that is NOT a bare id: a hand-typed name from before the migration, or
+    one added by hand despite "write once" — never dropping a roster entry
+    either way.
+
     market.key_for() — the SAME resolution identify() uses for every
     transacted player, and every other reader in this repo — not a bare
     norm(). Untransacted roster players never went through identify(), so a
     plain norm(name) key was the only kind that never got reconciled to
-    whatever key_for() (usually the market's own numeric id, not a name
-    string) actually resolves everyone else to. Silent today only because
-    League overwrites this with the app's own ownership whenever api_teams
-    answers; the day that feed is down, an unreconciled roster entry reads
-    as unowned rather than as this manager's.
+    whatever key_for() (usually the market's own numeric id) actually
+    resolves everyone else to. This is the bug an id-keyed file cannot
+    have again: a numeric id does not drift the way a display name does.
 
-    read_rosters() already folds "alvaro garcia (Rayo)" into
-    "alvaro garcia@rayo" for a shared name — split back apart here so the
-    club reaches key_for()'s own `team` disambiguator, the same signal
-    Market._pick() already knows how to use.
+    read_rosters() folds "alvaro garcia (Rayo)" into "alvaro garcia@rayo"
+    for a shared name — split back apart here so the club reaches
+    key_for()'s own `team` disambiguator, the same signal Market._pick()
+    already knows how to use.
 
     xw.player(app_name=...) IS TRIED SECOND, not first: key_for() is the
-    market's own current spelling, which is the trustworthy side of a join
+    market's own current spelling, the trustworthy side of a join
     everywhere else in this repo; app_name is the app's ACCUMULATED past
-    spellings for him, useful precisely when the market's CURRENT name has
-    moved on. Measured: "Manuel Fernández", typed in the roster at the
-    season's start, is not anyone's key_for() match today — the market now
-    shows this player as "Manu Fernandez" — but the crosswalk already
-    holds "Manuel Fernández" as an app_name alias for the right player,
-    learned from the app's OWN activity feed the day he was later sold.
-    Trying it here closes the same gap key_for() cannot: a name that was
-    once right and has since drifted.
+    spellings, useful precisely when the market's CURRENT name has moved
+    on — measured case: "Manuel Fernández", typed in the pre-migration
+    roster, matched nothing once the market moved on to "Manu Fernandez",
+    but the crosswalk already held the old name as an app_name alias.
 
     Falls back to norm(raw): no market to resolve against, or neither path
-    can place him (never yet seen anywhere, or still ambiguous). Never
-    drops a roster entry either way.
+    can place him (never yet seen anywhere, or still ambiguous).
     """
+    stripped = raw.strip()
+    if stripped.isdigit():
+        return stripped
     name, _, club = raw.partition("@")
     if market is not None:
         got = market.key_for(name, team=club)
@@ -1923,6 +1927,12 @@ def _selftest_identify() -> None:
     # No market at all: falls back to norm(), same as always, rather than
     # crashing or dropping the entry.
     assert _roster_key("Raul Moro", None) == "raul moro"
+    # THE COMMON CASE NOW: a bare id, verbatim, no resolution at all — not
+    # even a market lookup. This is the whole point of the 2026-08-21
+    # migration to an id-per-line file: nothing left to drift.
+    assert _roster_key("7870", id_mkt) == "7870"
+    assert _roster_key("7870", None) == "7870"
+    assert _roster_key(" 7870 ", id_mkt) == "7870"
     # A name the market has never heard of: still norm(), not lost.
     assert _roster_key("Nobody At All", id_mkt) == "nobody at all"
 

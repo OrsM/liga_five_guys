@@ -4,89 +4,96 @@
 # the ledger (data/tidy/transactions.csv) is for. Current ownership is derived by
 # replaying the whole ledger on top of this, every run.
 #
-# Section names are the app handles exactly as the Activity feed writes
-# them, so a line pasted from the feed needs no translation.
+# ONE LINE, ONE ID — this repo's own crosswalk key (players.csv), not a
+# display name. A name is not stable: the market's own spelling for a
+# player can move on mid-season ("Manuel Fernández" became "Manu
+# Fernandez"), and this file is a fixed point in time by design — it
+# cannot follow. The trailing comment is for a human reading the file,
+# never read by the parser, and is not kept in sync if a name drifts
+# further after this was written.
 #
 # Reconstructed by rolling the ledger backwards from the rosters typed
 # 2026-08-11T23:06. All five came out at 14, which is the check that
-# nothing is missing.
+# nothing is missing. Migrated from name-per-line to id-per-line
+# 2026-08-21, after three separate name-drift bugs surfaced from the
+# same root cause.
 
 [miguel_autentico]
-alvaro fernandez
-carl starfelt
-robin le normand
-igor zubeldia
-omar el hilali
-dani martinez
-ruben garcia
-iñigo ruiz de galarreta
-dani lorenzo
-pepelu
-jon moncayola
-iñigo vicente
-hugo duro
-orri steinn oskarsson
+3612  # alvaro fernandez
+9612  # carl starfelt
+6002  # robin le normand
+2802  # igor zubeldia
+10220  # omar el hilali
+11861  # dani martinez
+660  # ruben garcia
+44  # iñigo ruiz de galarreta
+16286  # dani lorenzo
+2715  # pepelu
+7204  # jon moncayola
+6442  # iñigo vicente
+5019  # hugo duro
+10660  # orri steinn oskarsson
 
 [Magic Mike 333]
-kike salas
-marc bernal
-lucas boye
-pere milla
-jose gaya
-raul asencio
-lucas noubi
-alex pastor
-williot swedberg
-gabriel moscardo
-gorka guruzeta
-brahim diaz
-alfonso herrero
-gustavo puerta
+9931  # kike salas
+13864  # marc bernal
+5124  # lucas boye
+1927  # pere milla
+663  # jose gaya
+12639  # raul asencio
+16099  # lucas noubi
+10353  # alex pastor
+10207  # williot swedberg
+15957  # gabriel moscardo
+5859  # gorka guruzeta
+5035  # brahim diaz
+6973  # alfonso herrero
+12079  # gustavo puerta
 
 [Albert Laporta]
-ilaix moriba
-marc roca
-raul moro
-ferran jutgla
-juan foyth
-eduardo camavinga
-ayoze perez
-diego javier llorente
-matias dituro
-pedro bigas
-javi puado
-pathe ciss
-manuel fernandez
-dani vivian
+8082  # ilaix moriba
+3215  # marc roca
+7870  # raul moro
+7842  # ferran jutgla
+4705  # juan foyth
+8479  # eduardo camavinga
+4511  # ayoze perez
+707  # diego javier llorente
+9161  # matias dituro
+404  # pedro bigas
+3807  # javi puado
+7307  # pathe ciss
+16003  # manu fernandez
+5245  # dani vivian
 
 [BurtonGM89]
-unai lopez
-iago aspas
-justin de haas
-tajon buchanan
-jon gorrotxategi
-antonio blanco
-aliou dieng
-karl etta eyong
-joaquin muñoz
-juan musso
-eder militao
-carlos puga
-quilindschy hartman
-unai egiluz
+1881  # unai lopez
+175  # iago aspas
+18018  # justin de haas
+10638  # tajon buchanan
+11683  # jon gorrotxategi
+8737  # antonio blanco
+15928  # aliou dieng
+10326  # karl etta eyong
+6050  # joaquin muñoz
+5942  # juan musso
+6062  # eder militao
+13982  # carlos puga
+11467  # quilindschy hartman
+11676  # unai egiluz
 
 [SusoGattuso]
-alvaro garcia (Rayo)
-andres martin
-carlos espi
-wojciech szczesny
-yuri berchiche
-cesar tarrega
-aleksa puric
-johnny cardoso
-izan merino
-lorenzo amatucci
-alex berenguer
-aimar oroz
-jonny castro
-abdel abqar
+867  # alvaro garcia
+6890  # andres martin
+12870  # carlos espi
+2534  # wojciech szczesny
+735  # yuri berchiche
+9762  # cesar tarrega
+16940  # aleksa puric
+12647  # johnny cardoso
+13983  # izan merino
+11198  # lorenzo amatucci
+3204  # alex berenguer
+7203  # aimar oroz
+189  # jonny castro
+5083  # abdel abqar
