@@ -120,7 +120,8 @@ from ffcore.score import (ABSENT_START, NEUTRAL_START,  # noqa: E402
 from ffcore.league import app_fielded  # noqa: E402
 from ffcore.tidy import (run_now,  # noqa: E402
                          DECISIONS, PARTS,  # noqa: E402
-                         age_phrase, append_csv, load_deadline, read_csv,
+                         age_phrase, append_csv, load_crosswalk,
+                         load_deadline, read_csv,
                          snapshot_stamp, stale_feeds, widen_csv, write_lines)
 from slate import read_slate  # noqa: E402
 
@@ -1124,6 +1125,21 @@ def main() -> None:
                 len(below_floor), "" if len(below_floor) == 1 else "s",
                 ", ".join("%s %+.1f%%" % (d["player"], d["premium"])
                           for d in below_floor)))
+    xw = load_crosswalk()
+    clashes = xw.clashes() if xw else {}
+    if clashes:
+        # A clash means an identifier two players claim, which identifies
+        # neither — crosswalk.py refuses it rather than guessing, so nothing
+        # crashes, but it silently costs a join everywhere that id was the
+        # only bridge. This ran unattended and printed to a log nobody reads
+        # (2026-08-20) until surfaced here; the identity bug it would have
+        # caught (app_id 2614 held by two players) predates this warning.
+        warnings.append(
+            "**Crosswalk identifier clash:** %s — an id two players claim, "
+            "refused rather than guessed at. Run `python src/crosswalk.py` "
+            "to see which players." % (
+                "; ".join("%s: %s" % (k, ", ".join(v))
+                          for k, v in clashes.items())))
     if cash and cash.value is not None and cash.confidence != "known":
         warnings.append("Cash is an estimate — record an observed balance in "
                         "`inputs/cash.txt`.")
