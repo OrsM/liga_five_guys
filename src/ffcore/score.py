@@ -14,19 +14,26 @@ position:
 
     shrunk = (total_points + K * prior) / (matches + K)      K = 8 matches
 
-THIS SEASON, ONCE IT EXISTS, is a second stage of the same shrinkage — last
-season's shrunk figure becomes the prior that this season's points are pulled
-toward, with the same K:
+THIS SEASON is a second stage of the same shrinkage — last season's shrunk
+figure becomes the prior that this season's points are pulled toward, with
+the same K:
 
     ppm = (points_now + K * shrunk_last_season) / (matches_now + K)
 
-So one jornada moves a rating by about a ninth of the gap between the two, and
-by the twentieth it is almost entirely this season. No new constant, and with
-no current-season data it collapses EXACTLY to the line above — which is where
-it sits today: futbolfantasy's points page reads "No se encontraron
-resultados" until J1 finishes. This is the fix for the model's most concrete
+So one jornada moves a rating by about a ninth of the gap between the two,
+and by the twentieth it is almost entirely this season. No new constant, and
+with no current-season data — the state before J1 finishes, and the state
+this collapsed to for the whole of 2026-08-16 to 2026-08-20 while nothing
+read data/season/live/perjornada_*.csv, which already had it — it collapses
+EXACTLY to the line above. This is the fix for the model's most concrete
 error, which is not the formula but the input: last season's average cannot
 know that a player changed club, aged, or lost his place.
+
+"matches_now" IS MINUTES, NOT AN APPEARANCE COUNT — see
+_current_from_perjornada(). A 10-minute cameo and a full 90 were being
+weighted identically otherwise, which is the same distortion the shrinkage
+above already exists to correct for on the PRIOR side and was silently
+reintroducing on the live one.
 
 THE FIXTURE FACTOR comes from ffcore.fixture and is the opponent the player
 actually faces next, home or away. `score` carries it; `flat` is the same
@@ -102,18 +109,128 @@ OUT_STATUSES = frozenset({"injured", "suspended", "unavailable"})
 PROMOTED_DISCOUNT = 0.70  # the LaLiga median overstates a promoted squad
 
 
+def _current_minutes(starters_rows) -> dict[str, float]:
+    """{norm(player_name): total minutes played this season}, from confirmed
+    line-ups — sources.parse_starters's `minute` (off-minute for a starter,
+    on-minute for a sub, blank meaning he played the whole match or none of
+    it respectively; see that module for the rule).
+
+    MATCH LENGTH IS APPROXIMATED AT 90. Stoppage time is not on the page a
+    starter's off-minute comes from, so a man who plays the whole match is
+    credited 90 rather than the 94 he may actually have been on for. The
+    same small error for everyone who finishes a match uncredited with a
+    substitution, so it does not distort ranking between them — it is a
+    constant offset, not noise.
+
+    ONE ROW PER (match, player), NOT PER SNAPSHOT. starters.csv is written
+    once per match (cadence "once") but CARRIED FORWARD into every later
+    snapshot's manifest with a fresh observed_at, the same carry-forward
+    every "once"/"daily" source gets — so the raw table holds the same
+    confirmed line-up dozens of times over, once per sweep since the match
+    was first read. Measured: one player's minute row appeared 57 times for
+    a single match, and summing all 57 credited him 5,130 minutes in a
+    season that had played one jornada. Deduped here on (match_id, name)
+    before anything is summed.
+    """
+    MATCH_LEN = 90.0
+    seen: set[tuple[str, str]] = set()
+    out: dict[str, float] = {}
+    for r in starters_rows:
+        name = norm(r.get("player_name") or "")
+        match_id = (r.get("match_id") or "").strip()
+        if not name or not match_id:
+            continue
+        dedup_key = (match_id, name)
+        if dedup_key in seen:
+            continue
+        seen.add(dedup_key)
+        role = r.get("role")
+        raw = (r.get("minute") or "").strip()
+        if role == "starter":
+            mins = float(raw) if raw else MATCH_LEN
+        elif role == "sub":
+            mins = (MATCH_LEN - float(raw)) if raw else 0.0
+        else:
+            continue
+        out[name] = out.get(name, 0.0) + max(0.0, mins)
+    return out
+
+
+def _current_from_perjornada() -> tuple[dict, str]:
+    """{norm(name): {"pts": season-to-date points, "pj": minutes / 90}} from
+    this season's per-jornada tracker, or ({}, "") before it exists.
+
+    WHY NOT data/season/points_<this season>.csv, WHICH load_points() ALSO
+    LOOKS FOR: that file is a snapshot of the points PAGE, and the page
+    reads empty until J1 is fully played — see this module's own opening
+    docstring, "which is where it sits today." data/season/live/
+    perjornada_*.csv is written every run from snapshots this repo already
+    takes (points.py) and has real numbers from the first confirmed match,
+    so it is the actual live source, not points_*.csv's hypothetical future
+    one.
+
+    "pj" IS MINUTES, NOT AN APPEARANCE COUNT — games_total in the perjornada
+    file weights a 10-minute cameo and a full 90 identically, the same
+    distortion fixed here that a raw pts/games average already gets
+    shrunk to correct for on the PRIOR side; this fixes it at the source
+    for the season that is actually live. A player perjornada has a row
+    for but starters.csv has never confirmed a line-up for gets 0 minutes,
+    not a guess — silence about how long he played is not evidence he
+    played the average amount.
+    """
+    from ffcore.tidy import SEASON, TIDY, read_csv
+
+    live = SEASON / "live"
+    files = sorted(live.glob("perjornada_*.csv")) if live.exists() else []
+    if not files:
+        return {}, ""
+    label = files[-1].stem.replace("perjornada_", "")
+
+    # LAST WRITE WINS: the file is append-only, one row per player per
+    # jornada with activity, in chronological order, and *_total columns
+    # are already cumulative — so the latest row for a key is his current
+    # season-to-date state, not something to sum by hand.
+    latest: dict[str, dict] = {}
+    for r in read_csv(files[-1]):
+        for key in (r.get("player_name"), r.get("player_name_full")):
+            if key:
+                latest[norm(key)] = r
+
+    # starters.csv HAS NO FULL-NAME COLUMN, only the short display form — so
+    # a `latest` key registered under player_name_full (perjornada carries
+    # both, same as read() below) has no minutes to find and gets 0.0, not
+    # a share of what his short-name key found. Bounded: it under-weights
+    # his season contribution for that one lookup path rather than
+    # inventing a number, and a caller that resolves the short-name key
+    # instead is unaffected.
+    minutes = _current_minutes(read_csv(TIDY / "starters.csv"))
+    out = {key: {"pts": ratio(r.get("points_total")) or 0.0,
+                "pj": minutes.get(key, 0.0) / 90.0}
+          for key, r in latest.items()}
+    return out, label
+
+
 def load_points() -> tuple[dict, str, dict, str]:
     """(prior, prior_label, current, current_label) from data/season/.
 
-    Two files, not one. The newest points_*.csv is THIS season; the one before
-    it is the prior the blend shrinks toward. Reading only the newest — which
-    is what report.py and rivals.py each did, in their own copy of this
-    function — was a bug waiting for the season to roll over: the moment
-    points_2026-27.csv appeared, every rating would have been rebuilt from a
-    one-jornada sample and last season would have vanished.
+    PRIOR: the newest data/season/points_*.csv — last season's completed
+    totals, written once a year by `ingest.py baseline` when the points page
+    flips to a new season. CURRENT: this season's live per-jornada tracker,
+    minutes-weighted — see _current_from_perjornada().
 
-    With one file present it is the prior and there is no current season, which
-    is today's state.
+    The historical two-points-files shape (this season's own points_*.csv as
+    "current", shrinking further into an even older prior) is kept below for
+    the day `baseline` is run again at THIS season's actual close and a
+    second such file exists; perjornada takes priority over it whenever it
+    has data, being the fresher source while the season is still live.
+
+    Two files, not one, on the PRIOR side specifically. The newest
+    points_*.csv is what a naive read would call "this season"; reading only
+    the newest — which is what report.py and rivals.py each did, in their
+    own copy of this function, before this module existed — was a bug
+    waiting for the season to roll over: the moment points_2026-27.csv
+    appeared as a completed-season snapshot, every rating would have been
+    rebuilt from that one file and the actual prior would have vanished.
     """
     from ffcore.tidy import SEASON, read_csv
 
@@ -132,12 +249,16 @@ def load_points() -> tuple[dict, str, dict, str]:
     def label(path) -> str:
         return path.stem.replace("points_", "")
 
+    cur, cur_label = _current_from_perjornada()
     if not files:
-        return {}, "", {}, ""
-    if len(files) == 1:
-        return read(files[0]), label(files[0]), {}, ""
-    return (read(files[-2]), label(files[-2]),
-            read(files[-1]), label(files[-1]))
+        return {}, "", cur, cur_label
+    prior, prior_label = read(files[-1]), label(files[-1])
+    if cur:
+        return prior, prior_label, cur, cur_label
+    if len(files) > 1:
+        return (read(files[-2]), label(files[-2]),
+                read(files[-1]), label(files[-1]))
+    return prior, prior_label, {}, ""
 
 
 def build(market: list[dict], xi_rows: list[dict], now,
@@ -670,7 +791,50 @@ def _selftest() -> None:
     # meant to reach, and as_row() carries the new fields to the renderers.
     assert "fix" in s.as_row() and "flat" in s.as_row()
 
-    print("ffcore.score self-test OK (20 cases)")
+    # -- _current_minutes: a 90-minute match and a cameo must not weigh the
+    # -- same ------------------------------------------------------------
+    rows = [
+        # Full match, uncredited (no minute marker): 90.
+        {"player_name": "Full Match", "role": "starter", "minute": "",
+         "match_id": "m1"},
+        # Subbed off at 60: 60, not 90.
+        {"player_name": "Subbed Off", "role": "starter", "minute": "60",
+         "match_id": "m1"},
+        # Came on at 70: the REMAINING 20, not a full match.
+        {"player_name": "Came On", "role": "sub", "minute": "70",
+         "match_id": "m1"},
+        # Unused substitute: zero, not a guess.
+        {"player_name": "Unused Sub", "role": "sub", "minute": "",
+         "match_id": "m1"},
+        # A SECOND match: minutes ACCUMULATE.
+        {"player_name": "Full Match", "role": "starter", "minute": "45",
+         "match_id": "m2"},
+        # A role that is neither "starter" nor "sub" contributes nothing —
+        # a page that changes its vocabulary must not silently count as a
+        # full match.
+        {"player_name": "Weird Role", "role": "coach", "minute": "",
+         "match_id": "m1"},
+        # THE SAME MATCH, CARRIED FORWARD into 56 more snapshots — exactly
+        # what starters.csv's raw table actually holds, measured: one
+        # player's row for one match appeared 57 times, and summing all of
+        # them credited him 5,130 minutes in a season that had played one
+        # jornada. Must count once, not 57 times.
+        *({"player_name": "Full Match", "role": "starter", "minute": "",
+           "match_id": "m1"} for _ in range(56)),
+    ]
+    mins = _current_minutes(rows)
+    assert mins["full match"] == 135.0, mins       # 90 (m1) + 45 (m2), not x57
+    assert mins["subbed off"] == 60.0, mins
+    assert mins["came on"] == 20.0, mins
+    assert mins["unused sub"] == 0.0, mins
+    assert "weird role" not in mins, mins
+    assert _current_minutes([]) == {}
+    # No match_id at all is not evidence of a match — skipped, not counted
+    # as a fresh one.
+    assert _current_minutes([{"player_name": "No Match", "role": "starter",
+                              "minute": ""}]) == {}
+
+    print("ffcore.score self-test OK (28 cases)")
 
 
 if __name__ == "__main__":
