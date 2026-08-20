@@ -56,11 +56,16 @@ and warns.
 
 from __future__ import annotations
 
+import csv
 import hashlib
+import io
 import json
 import re
+from datetime import datetime, timezone
 from functools import lru_cache
 from typing import Callable, NamedTuple
+
+from ffcore.text import norm  # pure stdlib itself; not ffcore.fixture/tidy
 
 from lxml import html as lh
 
@@ -71,6 +76,9 @@ __all__ = ["BASE", "SOURCE", "MARKET_URL", "POINTS_URL", "TEAM_URL", "TEAMS",
            "parse_af_team", "parse_af_fixtures", "season_label",
            "sign_market", "sign_team", "sign_points", "sign_af_team",
            "sign_af_fixtures",
+           "FD_BASE", "FD_URL", "FD_SOURCE", "FD_ALIASES", "FD_SEASONS_BACK",
+           "fd_season_code", "fd_sources", "parse_fd_results",
+           "sign_fd_results",
            "CAL_KEY", "FF_CAL_URL", "MATCH_URL", "MATCH_KEY_RE",
            "parse_calendar", "parse_starters", "sign_calendar",
            "sign_starters", "match_source", "played_sources",
@@ -1246,6 +1254,185 @@ def sign_elo(text: str) -> str | None:
 
 
 # ---------------------------------------------------------------------------
+# football-data.co.uk — real match results, team-level, free
+# ---------------------------------------------------------------------------
+#
+# WHAT THIS ADDS. Every strength signal in this repo so far is either squad
+# value (a wealth proxy) or Club Elo (one scalar, and its historical archive
+# died with its host on 2026-08-17 — see the note above ELO_SOURCE). Neither
+# can say a clean sheet is opponent-DEFENSE-driven while a goal is opponent-
+# DEFENSE-driven the other way; fixture.py has wanted that split since it was
+# written. football-data.co.uk publishes real match results — goals, shots,
+# shots on target, corners — for every La Liga season back to 1993-94, as
+# one flat CSV per season, free, no auth, no scraping fragility (it is a
+# file download, not a page to parse for structure). THIS SEASON'S file
+# also carries HxG/AxG (expected goals) — checked live, 2026-08-20: new to
+# the site with 2026-27, not backfilled onto 2025-26's completed file.
+#
+# TWENTY NAMES, NOT SIX HUNDRED. This is team-level, not player-level: the
+# whole join is twenty club spellings against this repo's own twenty slugs,
+# solved the same way ELO_ALIASES already is two sections up — match_team()
+# first, a named alias only when that ordinary join fails.
+FD_BASE = "https://www.football-data.co.uk"
+FD_URL = FD_BASE + "/mmz4281/{season}/SP1.csv"
+FD_SOURCE = "football-data"
+
+# Consulted only after match_team()'s ordinary join has failed, same rule as
+# ELO_ALIASES — an alias must never shadow a name that matched on its own —
+# but the OPPOSITE direction: ELO_ALIASES goes from this repo's own name to
+# the other site's spelling, because elo_strength() starts from OUR teams.
+# Here the input is football-data's name (from its own CSV row) and the
+# answer has to be OUR slug, so this is keyed by THEIRS, normalised.
+# Checked against a live pull of the 2025-26 season (20 of 20 clubs) plus
+# 2026-27's first weeks, 2026-08-20 — every current-season club resolves via
+# one of the two.
+FD_ALIASES = {
+    "ath bilbao": "athletic", "ath madrid": "atletico",
+    "espanol": "espanyol", "sociedad": "real-sociedad",
+    "vallecano": "rayo-vallecano", "dep a coruna": "deportivo",
+    "santander": "racing",
+}
+
+# How many COMPLETED seasons behind the current one to backfill, once. Not a
+# promise every one of this season's clubs played top flight in all of them
+# — a promoted side's earlier seasons here are simply absent, a fact about
+# its history rather than a join failure.
+FD_SEASONS_BACK = 3
+
+# The columns this repo reads. Checked live, 2026-08-20: HxG/AxG (expected
+# goals) exist on the CURRENT season's file (2026-27) only — 2025-26's
+# completed-season file has no such column at all, so this is new to the
+# site rather than backfilled. A season without it gets "" rather than a
+# guess — nothing here estimates a number the page does not state.
+FD_FIELDS = ("FTHG", "FTAG", "HxG", "AxG", "HS", "AS", "HST", "AST",
+            "HC", "AC")
+
+
+def fd_season_code(now: datetime) -> str:
+    """"2627" for the season running Aug 2026 - Jun 2027, from today's date.
+
+    La Liga's close season is June-July; competitive fixtures run Aug-May.
+    July is the cutover because it is the one point in the year this cannot
+    be wrong at — no match of either the outgoing or incoming season is ever
+    played in July.
+    """
+    y = now.year if now.month >= 7 else now.year - 1
+    return "%02d%02d" % (y % 100, (y + 1) % 100)
+
+
+def fd_sources(now: datetime | None = None) -> list["Source"]:
+    """The current season's file (updates as it's played) plus FD_SEASONS_BACK
+    completed ones (fetched once, never again — a finished season's result
+    does not change).
+    """
+    now = now or datetime.now(timezone.utc)
+    cur_y = now.year if now.month >= 7 else now.year - 1
+    out = []
+    for back in range(FD_SEASONS_BACK + 1):
+        y = cur_y - back
+        season = "%02d%02d" % (y % 100, (y + 1) % 100)
+        out.append(Source(
+            "fd_%s" % season, "results_history",
+            FD_URL.format(season=season), parse_fd_results, sign_fd_results,
+            cadence="every_run" if back == 0 else "once"))
+    return out
+
+
+def _fd_rows(text: str) -> list[dict]:
+    """csv.DictReader over the file, BOM stripped. Empty on anything that
+    does not even look like the file this parser expects, rather than an
+    exception mid-run."""
+    if not text:
+        return []
+    return list(csv.DictReader(io.StringIO(text.lstrip("﻿"))))
+
+
+def _fd_date(raw: str) -> str:
+    """dd/mm/yy or dd/mm/yyyy -> yyyy-mm-dd. "" on anything else — a date
+    this repo cannot read is not evidence of when the match was played."""
+    for fmt in ("%d/%m/%Y", "%d/%m/%y"):
+        try:
+            return datetime.strptime(raw, fmt).strftime("%Y-%m-%d")
+        except ValueError:
+            continue
+    return ""
+
+
+def _fd_match_team(side: str, teams) -> str | None:
+    """Exact then substring, over this repo's own twenty slugs.
+
+    A SMALL COPY of ffcore.fixture.match_team's rule, not an import of it:
+    that module pulls in ffcore.tidy, and sources.py stays pure so it can
+    self-test with lxml and nothing else — the same reason ffcore.auth's
+    credential handling stays out of it. Two functions, one small rule; see
+    ffcore.fixture.match_team's own docstring for the rule itself.
+    """
+    q = norm(side)
+    if not q:
+        return None
+    exact = [t for t in teams if norm(t) == q]
+    if exact:
+        return exact[0]
+    hits = [t for t in teams if norm(t) and (norm(t) in q or q in norm(t))]
+    return hits[0] if len(hits) == 1 else None
+
+
+def _fd_slug(name: str) -> str:
+    """This repo's slug for a football-data team name, or "" unresolved.
+
+    "" is kept, not dropped: a match with one side in this repo's current
+    twenty and one side that has since been relegated still says something
+    real about the side that IS current.
+    """
+    hit = _fd_match_team(name, TEAMS)
+    if hit:
+        return hit
+    slug = FD_ALIASES.get(norm(name) or "")
+    return slug if slug in TEAMS else ""
+
+
+def parse_fd_results(text: str, observed_at: str,
+                     key: str = "fd_2526") -> list[dict]:
+    """One row per match: goals, xG where the file carries it, and both
+    teams resolved to this repo's own club slugs.
+    """
+    m = re.match(r"^fd_(\d{4})$", key)
+    season = m.group(1) if m else ""
+    rows = []
+    for r in _fd_rows(text):
+        home, away = (r.get("HomeTeam") or "").strip(), \
+                     (r.get("AwayTeam") or "").strip()
+        if not home or not away:
+            continue
+        row = {
+            "observed_at": observed_at, "source": FD_SOURCE,
+            "season": season, "date": _fd_date(r.get("Date") or ""),
+            "home_name": home, "away_name": away,
+            "home": _fd_slug(home), "away": _fd_slug(away),
+        }
+        for col, out_key in zip(FD_FIELDS,
+                                ("home_goals", "away_goals", "home_xg",
+                                 "away_xg", "home_shots", "away_shots",
+                                 "home_shots_on_target", "away_shots_on_target",
+                                 "home_corners", "away_corners")):
+            row[out_key] = (r.get(col) or "").strip()
+        rows.append(row)
+    return rows
+
+
+def sign_fd_results(text: str) -> str | None:
+    """One digest per season, over every match RESULT — not the odds
+    columns, which move after publication and would make yesterday's
+    scoreline look like new content."""
+    rows = _fd_rows(text)
+    if not rows:
+        return None
+    return _digest(["%s|%s|%s|%s|%s" % (r.get("Date"), r.get("HomeTeam"),
+                                        r.get("AwayTeam"), r.get("FTHG"),
+                                        r.get("FTAG")) for r in rows])
+
+
+# ---------------------------------------------------------------------------
 # the league's own API — the state no public page publishes
 # ---------------------------------------------------------------------------
 #
@@ -1917,6 +2104,11 @@ def sources(enabled_only: bool = True) -> list[Source]:
     # this source is worth, not who was hosting it.
     out += [Source("elo", "elo", ELO_URL, parse_elo, sign_elo,
                    cadence="daily", timeout=8.0)]
+    # Real match results, team-level. Deterministic from today's date alone
+    # (fd_sources() computes which seasons, no discovery page needed first),
+    # so it is listed directly rather than queued at run time the way the
+    # calendar's match pages and the league's discovered pages are.
+    out += fd_sources()
     # The whole season's results in one page. It is what tells the starters
     # sweep which match pages exist and which are worth asking for.
     out += [Source(CAL_KEY, "matches", FF_CAL_URL, parse_calendar,
@@ -2579,6 +2771,68 @@ def _selftest() -> None:
     assert ELO_URL.format(date="2026-08-16") == ELO_URL
     assert MARKET_URL.format(date="2026-08-16") == MARKET_URL
 
+    # -- football-data.co.uk --------------------------------------------
+    # Real column order and BOM, pulled live 2026-08-20 from
+    # football-data.co.uk/mmz4281/2627/SP1.csv (current season, so it
+    # carries HxG/AxG) and mmz4281/2223/SP1.csv (older, no xG columns).
+    _FD_CUR = ("﻿Div,Date,Time,HomeTeam,AwayTeam,FTHG,FTAG,FTR,HTHG,"
+              "HTAG,HTR,HxG,AxG,HS,AS,HST,AST,HF,AF,HC,AC,HY,AY,HR,AR\n"
+              "SP1,15/08/2026,18:30,Alaves,Getafe,3,0,H,0,0,D,1.93,0.24,"
+              "18,6,8,2,16,13,5,3,4,3,0,1\n"
+              "SP1,15/08/2026,20:30,Sevilla,Vallecano,2,1,H,0,1,A,2.19,"
+              "1.89,13,6,4,3,18,18,1,2,4,4,1,0\n")
+    _FD_OLD = ("﻿Div,Date,HomeTeam,AwayTeam,FTHG,FTAG,FTR\n"
+              "SP1,17/08/22,Ath Bilbao,Girona,0,0,D\n")
+
+    cur = parse_fd_results(_FD_CUR, "2026-08-20T1200Z", "fd_2627")
+    assert len(cur) == 2, cur
+    assert cur[0]["season"] == "2627" and cur[0]["date"] == "2026-08-15"
+    # Both club names resolve WITHOUT an alias — "Alaves"/"Getafe" already
+    # match this repo's own slugs exactly.
+    assert cur[0]["home"] == "alaves" and cur[0]["away"] == "getafe"
+    assert cur[0]["home_goals"] == "3" and cur[0]["home_xg"] == "1.93"
+    assert cur[1]["home"] == "sevilla" and cur[1]["away"] == "rayo-vallecano"
+
+    old = parse_fd_results(_FD_OLD, "2026-08-20T1200Z", "fd_2223")
+    assert len(old) == 1, old
+    # No xG column in an old file: "" not a guess, not a crash.
+    assert old[0]["home_xg"] == "" and old[0]["away_xg"] == ""
+    assert old[0]["home"] == "athletic"
+    # A club not in this repo's current twenty (Girona, relegated since)
+    # resolves to "" — kept, not dropped: Athletic's side of that match
+    # still says something real about Athletic.
+    assert old[0]["away"] == "", old[0]
+    assert old[0]["away_name"] == "Girona"
+
+    assert parse_fd_results("", "t", "fd_2627") == []
+    assert parse_fd_results("not a csv file at all", "t", "fd_2627") == []
+    # A row with no team names at all (a blank line, a header repeated) is
+    # skipped rather than emitted with two empty slugs and no evidence.
+    assert parse_fd_results("﻿Div,Date,HomeTeam,AwayTeam,FTHG,FTAG\n"
+                            "SP1,17/08/22,,,,\n", "t", "fd_2223") == []
+
+    assert sign_fd_results(_FD_CUR) is not None
+    assert sign_fd_results("") is None
+    # The odds columns move after publication; the signature must not, or a
+    # result already stored looks like new content every sweep.
+    assert sign_fd_results(_FD_CUR) == sign_fd_results(
+        _FD_CUR.replace("18,6,8,2", "99,6,8,2"))
+    # The RESULT moving is real content.
+    assert sign_fd_results(_FD_CUR) != sign_fd_results(
+        _FD_CUR.replace("Alaves,Getafe,3,0", "Alaves,Getafe,4,0"))
+
+    assert fd_season_code(datetime(2026, 8, 20, tzinfo=timezone.utc)) == "2627"
+    assert fd_season_code(datetime(2027, 5, 1, tzinfo=timezone.utc)) == "2627"
+    assert fd_season_code(datetime(2026, 6, 30, tzinfo=timezone.utc)) == "2526"
+    assert fd_season_code(datetime(2026, 7, 1, tzinfo=timezone.utc)) == "2627"
+
+    fs = fd_sources(datetime(2026, 8, 20, tzinfo=timezone.utc))
+    assert [s.key for s in fs] == ["fd_2627", "fd_2526", "fd_2425", "fd_2324"]
+    assert fs[0].cadence == "every_run"
+    assert all(s.cadence == "once" for s in fs[1:])
+    assert all(s.table == "results_history" for s in fs)
+    assert source_for("fd_2627").parse is parse_fd_results
+
     # -- the league's own API ---------------------------------------------
     lg = parse_api_leagues(_API_LEAGUES_FIXTURE, "2026-01-01T0000Z")
     assert len(lg) == 1 and lg[0]["league_id"] == "017998544", lg
@@ -2910,8 +3164,11 @@ def _selftest() -> None:
     reg = sources()
     # 6 standalone pages: market, points, af_fixtures, elo, the calendar, and
     # the API's discovery page. The three API entries it reveals are not here
-    # — they are queued at run time, like the match pages.
-    assert len(reg) == 6 + len(TEAMS) + len(AF_TEAMS) == 46, len(reg)
+    # — they are queued at run time, like the match pages. Plus FD_SEASONS_BACK
+    # + 1 football-data entries (deterministic from today's date, so listed
+    # directly rather than queued).
+    assert len(reg) == 6 + len(TEAMS) + len(AF_TEAMS) + FD_SEASONS_BACK + 1 \
+        == 50, len(reg)
     assert set(AF_TEAMS) == set(TEAMS), set(AF_TEAMS) ^ set(TEAMS)
     # Both team sweeps run twice a day — the 11:40 sweep exists because the
     # XIs firm up late morning, and a calendar-day cadence skipped it there.
@@ -2928,7 +3185,7 @@ def _selftest() -> None:
     assert len({s.key for s in reg}) == len(reg)          # keys are unique
     assert {s.table for s in reg} == {"market", "points", "lineups",
                                       "fixtures", "elo", "matches",
-                                      "api_leagues"}
+                                      "api_leagues", "results_history"}
     assert source_for("team_celta").parse is parse_team
     assert source_for("gone") is None                     # retired page name
 
@@ -2946,7 +3203,7 @@ def _selftest() -> None:
         assert s.sign(html) is not None, s.key
         assert isinstance(s.parse(html, "2026-01-01T0000Z", s.key), list), s.key
 
-    print("sources.py selftest OK (218 cases)")
+    print("sources.py selftest OK (264 cases)")
 
 
 if __name__ == "__main__":
