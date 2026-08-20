@@ -175,6 +175,9 @@ def parse_market(html: str, observed_at: str, key: str = "market") -> list[dict]
         team_id = _attr(chunk, "equipo")
         rows.append({
             "observed_at": observed_at,
+            # The site's own player id. See the self-test: present and unique
+            # on every row, and it tells apart the names that collide.
+            "ff_id": _attr(chunk, "id") or "",
             "name": name,
             "position": (_attr(chunk, "posicion") or "").lower(),
             "team_id": team_id,
@@ -1982,7 +1985,8 @@ _MARKET_FIXTURE = """
 <html><body>
 <select name="equipo"><option value="0">Todos</option>
   <option value="7">Barcelona</option></select>
-<div class="elemento_jugador" data-nombre="Pedri" data-posicion="Mediocampista"
+<div class="elemento_jugador" data-id="1234" data-nombre="Pedri"
+     data-posicion="Mediocampista"
      data-valor="21500000" data-diferencia1="150000"
      data-diferencia-pct1="0.7" data-equipo="7">
   <img src="/jugadores/ficha/1234.png"/>
@@ -2325,6 +2329,14 @@ def _selftest() -> None:
     assert m[0]["team"] == "Barcelona", m[0]        # team_id -> name via select
     assert m[0]["position"] == "mediocampista"
     assert m[0]["slug"] == "pedri", m[0]            # anchor beats the photo id
+    # THE PAGE'S OWN ID, ON EVERY ROW. data-id sits beside data-nombre in the
+    # same element and was never read: the parser took the name and derived a
+    # slug from the anchor, which is absent for 112 of 654 players. On the
+    # 2026-08-19 snapshot data-id is present and DISTINCT on all 654, and it
+    # separates the three names two men share — iker muñoz is 16975 and
+    # 11362. Every key built out of "name, or name@club when two men share
+    # it" existed because this attribute was not being read.
+    assert m[0]["ff_id"] == "1234", m[0]
 
     # -- points table ------------------------------------------------------
     p = parse_points(_POINTS_FIXTURE)

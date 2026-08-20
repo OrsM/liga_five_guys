@@ -380,9 +380,11 @@ def squad_names(lg) -> tuple[list[str], str]:
     if lg is not None:
         mine = lg.managers.get(lg.cfg.me)
         if mine and mine.players:
-            by_key = lg.market.latest() if lg.market else {}
-            return ([by_key.get(k, {}).get("name", k) for k in mine.players],
-                    "ledger")
+            # THE KEYS, NOT THEIR NAMES. Turning a key back into a name so
+            # the scorer can match the name is a round trip through the one
+            # thing that does not identify anybody — and since the market
+            # keys on the site's own id, the name no longer resolves at all.
+            return (list(mine.players), "ledger")
     return [], "nothing"
 
 

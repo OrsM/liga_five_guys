@@ -1,4 +1,4 @@
-# Liga Five Guys — how the numbers are made — 2026-08-20 07:49 UTC
+# Liga Five Guys — how the numbers are made — 2026-08-20 08:30 UTC
 
 
 
@@ -17,7 +17,7 @@
 | Tenth percentile of a week's waiting | +3.71 |
 | Market model | the market is modelled from 90 offers over 6 cycles, weighted by value^0.15, and only just — value^0.25 fits within 1.6% of it, so read the exponent as roughly this, not exactly this |
 | Locked players who would improve your eleven | 30 |
-| Their clauses open | 24 Aug, in about 5 days |
+| Their clauses open | 24 Aug, in about 4 days |
 
 | Nobody is offering | Would add | Likely wait |
 |---|--:|--:|
@@ -49,23 +49,23 @@
 
 | | Table | What it is used for | Fetched from | Rows | Newest row | Fetching |
 |---|---|---|---|--:|---|---|
-| 🟢 | api_activity | every transfer, which is what the ledger replays — one row per deal, so the newest is the last deal and not the last sweep | LaLiga Fantasy API | 71 | 19 Aug 23:07 | fetched 1 minute ago |
-| 🟢 | api_leagues | your cash and the league's id | LaLiga Fantasy API | 34 | 20 Aug 07:49 | fetched 1 minute ago |
-| 🟢 | api_lineup | the eleven you have actually fielded, and the formation the app says you are playing | LaLiga Fantasy API | 121 | 20 Aug 07:49 | fetched 1 minute ago |
-| 🟢 | api_market | what is on offer, and the bids on it | LaLiga Fantasy API | 1,236 | 20 Aug 07:49 | fetched 1 minute ago |
-| 🟢 | api_players | names for players nobody owns any more — one row per player, first sighting kept | LaLiga Fantasy API | 58 | 19 Aug 22:20 | fetched 9 hours ago |
-| 🟢 | api_standings | the league table — position, points, squad value, and your balance | LaLiga Fantasy API | 170 | 20 Aug 07:49 | fetched 1 minute ago |
-| 🟢 | api_stats | what the app scored each player, broken into what he did — one row per player per week per stat, a correction being a later row rather than an overwrite | LaLiga Fantasy API | 882 | 19 Aug 22:20 | fetched 1 minute ago |
-| 🟢 | api_teams | all five squads | LaLiga Fantasy API | 2,521 | 20 Aug 07:49 | fetched 1 minute ago |
+| 🟢 | api_activity | every transfer, which is what the ledger replays — one row per deal, so the newest is the last deal and not the last sweep | LaLiga Fantasy API | 71 | 19 Aug 23:07 | fetched 41 minutes ago |
+| 🟢 | api_leagues | your cash and the league's id | LaLiga Fantasy API | 34 | 20 Aug 07:49 | fetched 41 minutes ago |
+| 🟢 | api_lineup | the eleven you have actually fielded, and the formation the app says you are playing | LaLiga Fantasy API | 121 | 20 Aug 07:49 | fetched 41 minutes ago |
+| 🟢 | api_market | what is on offer, and the bids on it | LaLiga Fantasy API | 1,236 | 20 Aug 07:49 | fetched 41 minutes ago |
+| 🟢 | api_players | names for players nobody owns any more — one row per player, first sighting kept | LaLiga Fantasy API | 58 | 19 Aug 22:20 | fetched 10 hours ago |
+| 🟢 | api_standings | the league table — position, points, squad value, and your balance | LaLiga Fantasy API | 170 | 20 Aug 07:49 | fetched 41 minutes ago |
+| 🟢 | api_stats | what the app scored each player, broken into what he did — one row per player per week per stat, a correction being a later row rather than an overwrite | LaLiga Fantasy API | 882 | 19 Aug 22:20 | fetched 41 minutes ago |
+| 🟢 | api_teams | all five squads | LaLiga Fantasy API | 2,521 | 20 Aug 07:49 | fetched 41 minutes ago |
 | ⚪ | clubs | the same, for clubs | src/crosswalk.py | 20 | — | rebuilt every run from the tables above |
-| 🟢 | elo | team strength, which ranks the fixture term | clubelo.com | 320 | 20 Aug 07:49 | fetched 59 minutes ago |
-| 🟢 | fixtures | who plays whom next, for the fixture term | analiticafantasy.com | 632 | 20 Aug 07:49 | fetched 59 minutes ago |
-| 🟢 | lineups | probable XI percentages, both sources | analiticafantasy.com, futbolfantasy.com ×40 | 45,637 | 20 Aug 07:49 | fetched 59 minutes ago |
-| 🟢 | market | price, value, position, fitness — every player in the game | futbolfantasy.com | 44,912 | 20 Aug 07:49 | fetched 1 minute ago |
-| 🟢 | matches | fixtures, kickoffs, results | futbolfantasy.com | 14,060 | 20 Aug 07:49 | fetched 59 minutes ago |
-| ⚪ | players | the crosswalk: one key per player across all four spellings | src/crosswalk.py | 657 | — | rebuilt every run from the tables above |
-| 🟢 | points | realised points per jornada, the actuals in every table below | futbolfantasy.com | 132 | 19 Aug 22:20 | fetched 1 minute ago |
-| 🟢 | starters | confirmed elevens, which is what P(start) is graded on | futbolfantasy.com | 8,068 | 20 Aug 07:49 | fetched 59 minutes ago |
+| 🟢 | elo | team strength, which ranks the fixture term | clubelo.com | 320 | 20 Aug 07:49 | fetched 2 hours ago |
+| 🟢 | fixtures | who plays whom next, for the fixture term | analiticafantasy.com | 632 | 20 Aug 07:49 | fetched 2 hours ago |
+| 🟢 | lineups | probable XI percentages, both sources | analiticafantasy.com, futbolfantasy.com ×40 | 45,637 | 20 Aug 07:49 | fetched 2 hours ago |
+| 🟢 | market | price, value, position, fitness — every player in the game | futbolfantasy.com | 44,912 | 20 Aug 07:49 | fetched 41 minutes ago |
+| 🟢 | matches | fixtures, kickoffs, results | futbolfantasy.com | 14,060 | 20 Aug 07:49 | fetched 2 hours ago |
+| ⚪ | players | the crosswalk: one key per player across all four spellings | src/crosswalk.py | 1,311 | — | rebuilt every run from the tables above |
+| 🟢 | points | realised points per jornada, the actuals in every table below | futbolfantasy.com | 132 | 19 Aug 22:20 | fetched 41 minutes ago |
+| 🟢 | starters | confirmed elevens, which is what P(start) is graded on | futbolfantasy.com | 8,068 | 20 Aug 07:49 | fetched 2 hours ago |
 
 ### The model, as configured right now
 
@@ -162,20 +162,20 @@ _What the one table on the board was built from: the eleven it assumes you field
 
 | Already owned, so not a purchase | Held by |
 |---|---|
-| aitor paredes | BurtonGM89 |
-| antonio blanco | BurtonGM89 |
+| omar el hilali | you |
+| karl etta eyong | BurtonGM89 |
+| johnny cardoso | SusoGattuso |
 | carlos espi | SusoGattuso |
 | carlos puga | BurtonGM89 |
-| cesar tarrega | SusoGattuso |
+| izan merino | SusoGattuso |
 | denis suarez | BurtonGM89 |
 | igor zubeldia | you |
-| ionut radu | you |
-| izan merino | SusoGattuso |
-| johnny cardoso | SusoGattuso |
-| karl etta eyong | BurtonGM89 |
 | marko dmitrovic | BurtonGM89 |
-| omar el hilali | you |
+| ionut radu | you |
 | yuri berchiche | SusoGattuso |
+| aitor paredes | BurtonGM89 |
+| antonio blanco | BurtonGM89 |
+| cesar tarrega | SusoGattuso |
 
 ## 3. Exceptions
 
@@ -191,9 +191,7 @@ _Read from the 'Estado físico', 'Sancionados' and 'No disponibles' blocks of ea
 
 ### Starting
 
-**Nothing to check.** Every marked player is at 60% or above on futbolfantasy, and analiticafantasy does not contradict any of them.
-
-_Both figures are editorial reads refreshed a few times a day, not live probabilities. `~` means listed with no figure (assumed 60%), `!` not on the page at all (assumed 15%). Threshold is `min_start` in `inputs/league.ini`._
+_No marks to read — see question 1._
 
 ---
 
@@ -206,4 +204,4 @@ _Both figures are editorial reads refreshed a few times a day, not live probabil
 | Zeroed | injured, suspended, unavailable; a doubt is halved |
 | Fixture term | ±12% across the opponents ranked by Club Elo rating, plus ±4% for home advantage — both widths guesses, unfitted, and small enough that a wrong one costs a fraction of a point |
 
-_Generated 2026-08-20 07:49 UTC._
+_Generated 2026-08-20 08:30 UTC._

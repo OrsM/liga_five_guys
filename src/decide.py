@@ -730,13 +730,18 @@ def load(trials_pool=None) -> Universe:
     value = {k: float((v or {}).get("value") or 0) for k, v in players.items()
              if (v or {}).get("value")}
 
-    pos, base, name = {}, {}, {}
+    pos, base = {}, {}
+    # A DISPLAY NAME FOR EVERY PLAYER THE INDEX KNOWS, not just the ones in
+    # the universe. Keys are the site's ids now, so a key that reaches the
+    # renderer without a name in this map is printed as a number — which is
+    # what "best players nobody is offering" did: those players are by
+    # definition neither owned nor priced, so the universe never held them.
+    name = {k: (rec.get("name") or k) for k, rec in players.items()}
     universe = set(price) | {k for s in squads.values() for k in s}
     for k in universe:
         rec = players.get(k)
         if not rec:
             continue
-        name[k] = rec.get("name") or k
         pos[k] = SLOT.get((rec.get("pos") or "").lower(), "MED")
         row = sc.row_for(k)
         s = sc.score(row) if row else None

@@ -275,8 +275,8 @@ def xi_snapshots(lg, sc, by_key) -> dict[str, dict]:
     """
     out = {}
     for m in lg:
-        names = [by_key.get(k, {}).get("name", k) for k in m.players]
-        scored, missing = sc.score_squad(names)
+        # Keys, not names — see report.squad_names.
+        scored, missing = sc.score_squad(m.players)
         pool = squad_pool(scored)
         counts = Counter(p.slot for p in scored if p.slot)
         out[m.handle] = {

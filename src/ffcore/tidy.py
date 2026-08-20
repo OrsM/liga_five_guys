@@ -664,7 +664,7 @@ XI_FIELDS = [("team", "team_slug", None), ("start", "start_pct", pct100),
 
 
 def _merge(players: dict, rows: list[dict], name_col: str, fields,
-           shared=(), club_of=None) -> dict:
+           shared=(), club_of=None, by_ff_slug=None) -> dict:
     """Fold one source's rows into the player index. First writer of a field
     keeps it, so market's `team` beats the XI page's `team_slug` and a
     duplicated name inside one snapshot doesn't flap.
@@ -675,15 +675,28 @@ def _merge(players: dict, rows: list[dict], name_col: str, fields,
     to put a Villarreal reserve's price on a rival's 20M defender.
     """
     for r in rows:
-        key = norm(r.get(name_col))
+        # ONE KEYING RULE, THE SAME ONE THE MARKET INDEX USES. This built its
+        # own — norm(name), then name@club for the shared ones — so the two
+        # agreed only for as long as somebody kept them in step. row_key
+        # answers with the site's own id where the row carries one.
+        key = row_key(r, shared) if r.get("ff_id") else ""
+        if not key:
+            # A source with no id of the market's kind: the probable-XI pages
+            # key players by name-slug, a different namespace entirely (zero
+            # of 512 overlap the market's numeric ids), so the crosswalk is
+            # what carries one to the other.
+            key = (by_ff_slug or {}).get(
+                norm(r.get("player_slug") or "")) or ""
+        if not key:
+            key = norm(r.get(name_col))
+            if key in shared:
+                club = _club(r) or (club_of or {}).get(
+                    norm(r.get("team_slug") or ""), "")
+                if not club:
+                    continue
+                key = "%s@%s" % (key, club)
         if not key:
             continue
-        if key in shared:
-            club = _club(r) or (club_of or {}).get(
-                norm(r.get("team_slug") or ""), "")
-            if not club:
-                continue
-            key = "%s@%s" % (key, club)
         rec = players.setdefault(key, {})
         rec.setdefault("name", (r.get(name_col) or "").strip())
         for field, col, parse in fields:
@@ -722,9 +735,18 @@ def load_players() -> dict[str, dict]:
     for c in read_csv(TIDY / "clubs.csv"):
         if c.get("ff_slug") and c.get("market"):
             club_of[norm(c["ff_slug"])] = norm(c["market"])
+    # ff_slug -> the market key, so an XI row reaches the same player the
+    # market row does without either of them going through a name.
+    xw = load_crosswalk()
+    by_ff_slug = {}
+    if xw is not None:
+        for pl in xw.players.values():
+            if pl.ff_slug:
+                by_ff_slug[norm(pl.ff_slug)] = pl.player_id
     players: dict[str, dict] = {}
     _merge(players, market, "name", MARKET_FIELDS, shared, club_of)
-    _merge(players, xi, "player_name", XI_FIELDS, shared, club_of)
+    _merge(players, xi, "player_name", XI_FIELDS, shared, club_of,
+           by_ff_slug=by_ff_slug)
     return players
 
 
@@ -804,7 +826,21 @@ def shared_names(rows) -> set:
 
 
 def row_key(row: dict, shared: set) -> str:
-    """The key one market row belongs under: its name, or name@club."""
+    """The key one market row belongs under: the site's id for him.
+
+    THE SOURCE PUBLISHES ONE AND IT WAS NOT BEING READ. Every player element
+    on the market page carries data-id; the parser took data-nombre and
+    derived a slug from the anchor, so the repo keyed players by name and
+    then had to invent name@club for the three that two men share. On the
+    44,912 rows of market history data-id is present on every one and gives
+    666 distinct players — including 16975 and 11362, the two Iker Muñoz.
+
+    Falls back to the name for a row with no id, which is what a
+    hand-written fixture and the oldest snapshots look like.
+    """
+    fid = (row.get("ff_id") or "").strip()
+    if fid:
+        return fid
     n = norm(row.get("name"))
     return "%s@%s" % (n, _club(row)) if n in shared else n
 
@@ -838,12 +874,20 @@ class Market:
         # shared; three of them are two players today, and the other two are
         # one player and a man who has left.
         latest = latest_only(rows)
-        self._clubs: dict[str, set] = {}
+        # name -> the KEYS that answer to it. Two men of one name are two
+        # keys, and there is nothing to invent: the site's id already tells
+        # them apart. This used to be name -> clubs, so that "name@club"
+        # could be assembled as a key of its own — a key the source never
+        # issued, existing only because the id beside the name went unread.
+        self._by_name: dict[str, list] = {}
         for r in latest:
             n = norm(r.get("name"))
-            if n:
-                self._clubs.setdefault(n, set()).add(_club(r))
-        self._shared = shared_names(latest)
+            k = row_key(r, ())
+            if n and k:
+                self._by_name.setdefault(n, [])
+                if k not in self._by_name[n]:
+                    self._by_name[n].append(k)
+        self._shared = {n for n, ks in self._by_name.items() if len(ks) > 1}
         for r in rows:
             key = self.key_of(r)
             when = snapshot_stamp(r.get("observed_at", ""))
@@ -932,8 +976,8 @@ class Market:
         """
         k = norm(name)
         if k in self._shared:
-            keys = ["%s@%s" % (k, c) for c in sorted(self._clubs[k])]
-            return None, [key for key in keys if key in self._by_key]
+            return None, [key for key in self._by_name.get(k, [])
+                          if key in self._by_key]
         if k in self._by_key:
             return k, []
         row, cands = resolve(name, self.latest_rows())
@@ -943,11 +987,12 @@ class Market:
 
     def _pick(self, shared: str, team: str, value):
         """Which of the men sharing this name, by club or by price."""
-        keys = ["%s@%s" % (shared, c) for c in sorted(self._clubs[shared])]
-        keys = [k for k in keys if k in self._by_key]
+        keys = [k for k in self._by_name.get(shared, []) if k in self._by_key]
         if team:
-            want = "%s@%s" % (shared, _club({"team": team}))
-            return want if want in keys else None
+            want = _club({"team": team})
+            hit = [k for k in keys
+                   if _club(self._by_key[k][-1][1]) == want]
+            return hit[0] if len(hit) == 1 else None
         return self._by_price(
             {k: (self._by_key[k][-1][1]).get("value") for k in keys}, value)
 
@@ -1174,18 +1219,22 @@ def _selftest() -> None:
     # one price history built out of both, and whichever row a lookup reached
     # first decided what a squad was worth. One of the three collisions on
     # 2026-08-19 was a player somebody owned.
-    tw = [{"name": "Álvaro García", "team": "Rayo", "value": "20233300",
-           "observed_at": "2026-08-19T1639Z"},
-          {"name": "Álvaro García", "team": "Villarreal", "value": "501929",
-           "observed_at": "2026-08-19T1639Z"},
-          {"name": "Pepelu", "team": "Valencia", "value": "7669774",
-           "observed_at": "2026-08-19T1639Z"}]
+    # THE SITE ISSUES AN ID PER PLAYER and always did — data-id, in the same
+    # element as data-nombre. Reading it is what makes the two of them two,
+    # so the fixture carries it exactly as the page does.
+    tw = [{"ff_id": "867", "name": "Álvaro García", "team": "Rayo",
+           "value": "20233300", "observed_at": "2026-08-19T1639Z"},
+          {"ff_id": "12993", "name": "Álvaro García", "team": "Villarreal",
+           "value": "501929", "observed_at": "2026-08-19T1639Z"},
+          {"ff_id": "5001", "name": "Pepelu", "team": "Valencia",
+           "value": "7669774", "observed_at": "2026-08-19T1639Z"}]
     tm = Market(tw)
-    # Two men, two keys, two price histories.
+    # Two men, two keys, two price histories — and the keys are the site's.
     assert len(tm) == 3, len(tm)
+    assert sorted(tm.latest()) == ["12993", "5001", "867"], sorted(tm.latest())
     rayo, villa = tm.key_for("Álvaro García", team="Rayo"), \
         tm.key_for("Álvaro García", team="Villarreal")
-    assert rayo and villa and rayo != villa, (rayo, villa)
+    assert (rayo, villa) == ("867", "12993"), (rayo, villa)
     assert tm.at(rayo, snapshot_stamp("2026-08-19T1700Z")).value == 20233300.0
     assert tm.at(villa, snapshot_stamp("2026-08-19T1700Z")).value == 501929.0
 
@@ -1208,8 +1257,12 @@ def _selftest() -> None:
     # AND NOTHING ELSE MOVES. A name only one man has keeps the key it always
     # had, which is what keeps the ledger, the crosswalk and every stored
     # decision readable.
-    assert tm.key_for("Pepelu") == norm("Pepelu")
-    assert norm("Pepelu") in tm.latest()
+    assert tm.key_for("Pepelu") == "5001"
+    assert "5001" in tm.latest()
+    # AND NO name@club KEY IS INVENTED ANY MORE. It never came from the
+    # source; it was the repo's own answer to a collision the source does
+    # not have.
+    assert not [k for k in tm.latest() if "@" in k]
 
     # WHO IS SHARED IS DECIDED BY TODAY'S MARKET, WHATEVER YOU HAND IT.
     # This was prose in the docstring and a parameter in the signature, so
@@ -1257,10 +1310,9 @@ def _selftest() -> None:
 
     # candidates() answers in the market's own keys, and a shared name is
     # two candidates rather than a confident wrong one.
-    assert tm.candidates("Pepelu") == (norm("Pepelu"), [])
+    assert tm.candidates("Pepelu") == ("5001", [])
     got, cands = tm.candidates("Álvaro García")
-    assert got is None and sorted(cands) == ["alvaro garcia@rayo",
-                                             "alvaro garcia@villarreal"], cands
+    assert got is None and sorted(cands) == ["12993", "867"], cands
     assert rm.candidates("C. Romero")[0] is None
     assert sorted(rm.candidates("C. Romero")[1]) == [
         norm("Carlos Romero"), norm("Cristian Romero"),

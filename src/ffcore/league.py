@@ -295,7 +295,7 @@ def allowance(since, now, daily_bonus: float) -> tuple[float, float]:
     return days * (daily_bonus or 0.0), days
 
 
-def _by_exact_value(raw_value, rows) -> str | None:
+def _by_exact_value(raw_value, market) -> str | None:
     """The one market player who has ever been worth exactly this, or None.
 
     EXACT, with no tolerance, on purpose. The join is only trustworthy because
@@ -318,13 +318,18 @@ def _by_exact_value(raw_value, rows) -> str | None:
         return None
     if not want:
         return None
+    # IN THE MARKET'S OWN KEYS. This answered norm(name), which was the key
+    # only for as long as the market keyed on names — and a key the index
+    # does not contain resolves nowhere, which reads downstream as a player
+    # nobody owns rather than as a join that missed.
     hits = set()
-    for row in rows:
+    for row in market.rows:
         try:
             if float(row.get("value")) == want:
-                hits.add(norm(row.get("name")))
+                hits.add(market.key_of(row))
         except (TypeError, ValueError):
             continue
+    hits.discard("")
     return hits.pop() if len(hits) == 1 else None
 
 
@@ -568,7 +573,7 @@ def api_key(raw: str, handle: str, market, ledger_owner: dict | None = None,
         # Last resort, and the strongest key of the three: an EXACT market
         # value, anywhere in the recorded history. Only when it identifies
         # exactly one player.
-        key = _by_exact_value(market_value, market.rows)
+        key = _by_exact_value(market_value, market)
     return key or None
 
 
@@ -1778,20 +1783,23 @@ def _selftest_identify() -> None:
     from ffcore.tidy import Market as _RealMarket
     _at = "2026-08-19T1639Z"
     twins2 = _RealMarket([
-        {"name": "Álvaro García", "team": "Rayo", "value": "20233300",
-         "observed_at": _at},
-        {"name": "Álvaro García", "team": "Villarreal", "value": "501929",
-         "observed_at": _at}])
-    owner2 = {"alvaro garcia@rayo": "alice"}
+        {"ff_id": "867", "name": "Álvaro García", "team": "Rayo",
+         "value": "20233300", "observed_at": _at},
+        {"ff_id": "12993", "name": "Álvaro García", "team": "Villarreal",
+         "value": "501929", "observed_at": _at}])
+    owner2 = {"867": "alice"}
     key, why = identify({"player": "Álvaro García", "from": "alice",
                          "to": MARKET}, owner2, twins2)
-    assert key == "alvaro garcia@rayo", (key, why)
+    assert key == "867", (key, why)
     assert "alice" in why, why
     # Nobody's man, so nothing prunes: the row is left alone rather than
     # assigned to whichever of them the index happened to hold.
     key, why = identify({"player": "Álvaro García", "from": "bob",
                          "to": MARKET}, owner2, twins2)
     assert key == norm("Álvaro García") and why == "", (key, why)
+    # The two men are two KEYS now, and they are the site's own ids — there
+    # is no name@club to construct because there is no collision to resolve.
+    assert sorted(twins2.latest()) == ["12993", "867"]
 
     # Price settles it too, and on its own: with neither owned, 949,269 is
     # +2.6% on Fabio and -84.9% on Johnny. This is the hand-written
