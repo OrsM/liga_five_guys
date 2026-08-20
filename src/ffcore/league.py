@@ -744,6 +744,34 @@ def identify(t: dict, owner: dict, market=None, xw=None) -> tuple[str, str]:
     return cands[0], why
 
 
+def _roster_key(raw: str, market) -> str:
+    """The canonical key for one rosters_initial.txt line.
+
+    market.key_for() — the SAME resolution identify() uses for every
+    transacted player, and every other reader in this repo — not a bare
+    norm(). Untransacted roster players never went through identify(), so a
+    plain norm(name) key was the only kind that never got reconciled to
+    whatever key_for() (usually the market's own numeric id, not a name
+    string) actually resolves everyone else to. Silent today only because
+    League overwrites this with the app's own ownership whenever api_teams
+    answers; the day that feed is down, an unreconciled roster entry reads
+    as unowned rather than as this manager's.
+
+    read_rosters() already folds "alvaro garcia (Rayo)" into
+    "alvaro garcia@rayo" for a shared name — split back apart here so the
+    club reaches key_for()'s own `team` disambiguator, the same signal
+    Market._pick() already knows how to use.
+
+    Falls back to norm(raw): no market to resolve against, or key_for()
+    genuinely cannot place him (never yet seen in the market, or still
+    ambiguous even with the club). Never drops a roster entry either way.
+    """
+    name, _, club = raw.partition("@")
+    if market is None:
+        return norm(raw)
+    return market.key_for(name, team=club) or norm(raw)
+
+
 def replay(rosters: dict[str, list[str]], txns: list[dict], market=None,
            xw=None):
     """initial rosters + full ledger = current ownership.
@@ -759,7 +787,7 @@ def replay(rosters: dict[str, list[str]], txns: list[dict], market=None,
     owner: dict[str, str] = {}
     for mgr, names in rosters.items():
         for n in names:
-            owner[norm(n)] = mgr
+            owner[_roster_key(n, market)] = mgr
     warnings: list[str] = []
     resolved: list[str] = []
     for t in txns:
@@ -1844,6 +1872,41 @@ def _selftest_identify() -> None:
     assert own2 == {}, own2
     assert notes and "dani lorenzo" in notes[0], notes
     assert not warns, warns
+
+    # -- _roster_key: an untransacted roster player still gets the
+    # -- market's OWN key (usually numeric), not a bare norm() ------------
+    # Real market rows carry ff_id on every one of them (row_key()'s own
+    # docstring: 44,912 checked, all present) — a hand-fixture without it
+    # falls back to a name key and would not have caught this. This one
+    # has it, on purpose.
+    id_mkt = _RealMarket([
+        {"name": "Raul Moro", "ff_id": "7870", "team": "Racing",
+         "value": "2000000", "observed_at": _seen},
+        {"name": "Alvaro Garcia", "ff_id": "12993", "team": "Villarreal",
+         "value": "500000", "observed_at": _seen},
+        {"name": "Alvaro Garcia", "ff_id": "867", "team": "Rayo",
+         "value": "19000000", "observed_at": _seen}])
+    id_owner = {}
+    for mgr, names in {"laporta": ["Raul Moro"]}.items():
+        for n in names:
+            id_owner[_roster_key(n, id_mkt)] = mgr
+    # NOT "raul moro" — the market's own numeric id, the same key everything
+    # else in this repo (identify(), the crosswalk, api_key()) resolves him
+    # to. A plain norm() key here is exactly what left him permanently
+    # unreconciled and reading as unowned the moment the app feed a report
+    # relies on for the OVERWRITE (League.__init__) is down.
+    assert id_owner == {"7870": "laporta"}, id_owner
+    # THE SHARED-NAME CASE, disambiguated by club — read_rosters() already
+    # folds "Alvaro Garcia (Rayo)" into "alvaro garcia@rayo" before this
+    # ever sees it; the club has to reach key_for()'s own disambiguator or
+    # the ambiguous name resolves to neither man.
+    assert _roster_key("alvaro garcia@rayo", id_mkt) == "867"
+    assert _roster_key("alvaro garcia@villarreal", id_mkt) == "12993"
+    # No market at all: falls back to norm(), same as always, rather than
+    # crashing or dropping the entry.
+    assert _roster_key("Raul Moro", None) == "raul moro"
+    # A name the market has never heard of: still norm(), not lost.
+    assert _roster_key("Nobody At All", id_mkt) == "nobody at all"
 
     # A sale of a player nobody is recorded as holding used to pass in
     # silence: the key simply wasn't in the map, so the pop did nothing.
