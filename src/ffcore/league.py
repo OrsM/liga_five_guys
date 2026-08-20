@@ -557,9 +557,10 @@ def api_key(raw: str, handle: str, market, ledger_owner: dict | None = None,
         if not _priced_like(key, "", market_value, index):
             key = None
     if not key and ledger_owner:
-        _rec, cands = resolve(raw, index)
-        agreed = [norm(c.get("name")) for c in cands
-                  if ledger_owner.get(norm(c.get("name"))) == handle]
+        # Same producer, same keys — the ledger's owner map is keyed the way
+        # the market keys players, so a candidate must be too.
+        _got, cands = market.candidates(raw)
+        agreed = [c for c in cands if ledger_owner.get(c) == handle]
         if len(agreed) == 1:
             key = agreed[0]
     if not key:
@@ -668,14 +669,16 @@ def identify(t: dict, owner: dict, market=None) -> tuple[str, str]:
     caller is expected to report it: this guesses, so it has to say so.
     """
     key = norm(t["player"])
-    rows = market.latest() if market is not None else {}
-    if not rows or key in rows:
+    if market is None:
         return key, ""
 
-    from ffcore.text import resolve
-    rec, cands = resolve(t["player"], list(rows.values()))
-    if rec:
-        return norm(rec.get("name")), "matched %s" % rec.get("name")
+    # Candidates come from the market, in the market's own keys. Asking
+    # ffcore.text.resolve() over a raw row list instead lost a shared name to
+    # an index that holds one row per name, and keyed the answer norm(name) —
+    # a key this market does not contain. See Market.candidates.
+    got, cands = market.candidates(t["player"])
+    if got is not None:
+        return (got, "" if got == key else "matched %s" % got)
     if not cands:
         return key, ""
 
@@ -684,11 +687,11 @@ def identify(t: dict, owner: dict, market=None) -> tuple[str, str]:
     why = ""
 
     if src != MARKET:
-        kept = [c for c in cands if owner.get(norm(c.get("name"))) == src]
+        kept = [c for c in cands if owner.get(c) == src]
         if kept:
             cands, why = kept, "held by %s at the time" % src
     elif dst != MARKET:
-        kept = [c for c in cands if norm(c.get("name")) not in owner]
+        kept = [c for c in cands if c not in owner]
         if kept:
             cands, why = kept, "the only one nobody owned"
 
@@ -697,7 +700,7 @@ def identify(t: dict, owner: dict, market=None) -> tuple[str, str]:
     if len(cands) > 1 and price and when:
         kept = []
         for c in cands:
-            v = market.at(c.get("name"), when)
+            v = market.at(c, when)
             if v and v.value and 1 / PLAUSIBLE <= price / v.value <= PLAUSIBLE:
                 kept.append(c)
         if kept:
@@ -707,7 +710,7 @@ def identify(t: dict, owner: dict, market=None) -> tuple[str, str]:
 
     if len(cands) != 1:
         return key, ""
-    return norm(cands[0].get("name")), why
+    return cands[0], why
 
 
 def replay(rosters: dict[str, list[str]], txns: list[dict], market=None):
@@ -1688,23 +1691,22 @@ def _selftest_identify() -> None:
     market names one nobody held. Both prune a candidate list that string
     matching alone leaves ambiguous.
     """
-    class _Val(NamedTuple):
-        value: float
-        lag_h: float
-
-    class _Market:
-        """Two Cardosos, an order of magnitude apart — the real collision."""
-        vals = {"fabio cardoso": 925_408.0, "johnny cardoso": 6_306_919.0,
-                "dani lorenzo": 4_000_000.0, "dani martinez": 500_000.0}
-
-        def at(self, name, when):
-            v = self.vals.get(norm(name))
-            return None if v is None else _Val(v, 2.0)
-
-        def latest(self):
-            return {k: {"name": k} for k in self.vals}
-
-    mkt = _Market()
+    # A REAL Market, not a stand-in. The stand-in had its own at() and its
+    # own latest(), so it agreed with the real index only for as long as
+    # somebody kept them in step — and it was the stand-in's row list, one
+    # row per name, that hid the shared-name bug below from this very test.
+    from ffcore.tidy import Market as _RealMarket
+    _seen = "2026-08-01T0000Z"
+    mkt = _RealMarket([
+        # Two Cardosos, an order of magnitude apart — the real collision.
+        {"name": "Fabio Cardoso", "team": "Alaves", "value": "925408",
+         "observed_at": _seen},
+        {"name": "Johnny Cardoso", "team": "Betis", "value": "6306919",
+         "observed_at": _seen},
+        {"name": "Dani Lorenzo", "team": "Betis", "value": "4000000",
+         "observed_at": _seen},
+        {"name": "Dani Martinez", "team": "Levante", "value": "500000",
+         "observed_at": _seen}])
     owner = {"dani lorenzo": "alice", "johnny cardoso": "bob"}
 
     # A sale by alice can only be a player alice was holding, so the two Danis
@@ -1726,6 +1728,31 @@ def _selftest_identify() -> None:
                          "price": "949269", "date": "2026-08-11T21:24"},
                         owner, mkt)
     assert key == "fabio cardoso", (key, why)
+
+    # A NAME TWO MEN SHARE MUST COME BACK AS TWO CANDIDATES, AND THE KEY
+    # MUST BE THE MARKET'S OWN. This resolved over a raw list of rows, whose
+    # exact-match index holds one row per NAME — so of the two Álvaro Garcías
+    # it silently kept whichever was last and never reached the pruning at
+    # all. Worse, it then keyed the answer norm(name): "alvaro garcia", which
+    # is not a key the market has, because the market splits shared names on
+    # club. A key that exists nowhere misses every lookup downstream.
+    from ffcore.tidy import Market as _RealMarket
+    _at = "2026-08-19T1639Z"
+    twins2 = _RealMarket([
+        {"name": "Álvaro García", "team": "Rayo", "value": "20233300",
+         "observed_at": _at},
+        {"name": "Álvaro García", "team": "Villarreal", "value": "501929",
+         "observed_at": _at}])
+    owner2 = {"alvaro garcia@rayo": "alice"}
+    key, why = identify({"player": "Álvaro García", "from": "alice",
+                         "to": MARKET}, owner2, twins2)
+    assert key == "alvaro garcia@rayo", (key, why)
+    assert "alice" in why, why
+    # Nobody's man, so nothing prunes: the row is left alone rather than
+    # assigned to whichever of them the index happened to hold.
+    key, why = identify({"player": "Álvaro García", "from": "bob",
+                         "to": MARKET}, owner2, twins2)
+    assert key == norm("Álvaro García") and why == "", (key, why)
 
     # Price settles it too, and on its own: with neither owned, 949,269 is
     # +2.6% on Fabio and -84.9% on Johnny. This is the hand-written

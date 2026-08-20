@@ -753,11 +753,6 @@ class Valuation(NamedTuple):
     observed_at: str
     lag_h: float
     name: str
-    # True when the NAME alone did not identify this player and the price
-    # was what settled it. Such a reading cannot then testify about the
-    # premium — it agrees with the price by construction — so premiums()
-    # drops it. It is still the right value for everything else.
-    by_price: bool = False
 
 
 # How far apart two readings of one player's value may be and still be the
@@ -905,6 +900,33 @@ class Market:
             self._resolved[k] = None
         return None
 
+    def candidates(self, name) -> tuple:
+        """(key, []) resolved · (None, [keys]) ambiguous · (None, []) no match.
+
+        THE ONE PRODUCER OF MARKET CANDIDATES, and it answers in this index's
+        own keys. Callers with evidence of their own — who held him, which
+        way the deal went, what was paid — prune the list and must not have
+        to reconstruct a key to do it.
+
+        It exists because they were calling ffcore.text.resolve() over a raw
+        list of rows instead. That list's exact-name index holds ONE row per
+        name, so the two Álvaro Garcías arrived as a confident single match
+        rather than as the ambiguity they are, and the answer was then keyed
+        norm(name) — "alvaro garcia", which this index does not contain,
+        because a shared name is keyed on club. A guess and an unusable key
+        in one step.
+        """
+        k = norm(name)
+        if k in self._shared:
+            keys = ["%s@%s" % (k, c) for c in sorted(self._clubs[k])]
+            return None, [key for key in keys if key in self._by_key]
+        if k in self._by_key:
+            return k, []
+        row, cands = resolve(name, self.latest_rows())
+        if row is not None:
+            return self.key_of(row), []
+        return None, [self.key_of(r) for r in cands]
+
     def _pick(self, shared: str, team: str, value):
         """Which of the men sharing this name, by club or by price."""
         keys = ["%s@%s" % (shared, c) for c in sorted(self._clubs[shared])]
@@ -942,7 +964,7 @@ class Market:
         """{key: newest row} — the 'what exists today' view."""
         return {k: hist[-1][1] for k, hist in self._by_key.items() if hist}
 
-    def at(self, name, when: datetime | None, value=None) -> Valuation | None:
+    def at(self, name, when: datetime | None) -> Valuation | None:
         """Value from the last snapshot at or before `when`.
 
         Falls back to the earliest snapshot if the moment predates the data —
@@ -952,10 +974,6 @@ class Market:
         it should be treated as indicative only.
         """
         key = self.key_for(name)
-        by_price = False
-        if key is None and value is not None:
-            key = self.key_for(name, value=value)
-            by_price = key is not None
         if not key or when is None:
             return None
         hist = self._by_key.get(key) or []
@@ -968,7 +986,7 @@ class Market:
             return None
         return Valuation(val, r.get("observed_at", ""),
                          (when - t).total_seconds() / 3600.0,
-                         r.get("name", name), by_price)
+                         r.get("name", name))
 
     def series(self, name) -> list[tuple[datetime, float]]:
         """[(when, value)] oldest first — the input to post-buy drift."""
@@ -1214,14 +1232,23 @@ def _selftest() -> None:
     # Refusing is still cached as a refusal, not as the priced answer.
     assert rm.key_for("C. Romero") is None
 
-    rv = rm.at("C. Romero", snapshot_stamp("2026-08-19T1700Z"),
-               value=45739000)
-    assert rv.name == "Cristian Romero" and rv.by_price is True, rv
+    # candidates() answers in the market's own keys, and a shared name is
+    # two candidates rather than a confident wrong one.
+    assert tm.candidates("Pepelu") == (norm("Pepelu"), [])
+    got, cands = tm.candidates("Álvaro García")
+    assert got is None and sorted(cands) == ["alvaro garcia@rayo",
+                                             "alvaro garcia@villarreal"], cands
+    assert rm.candidates("C. Romero")[0] is None
+    assert sorted(rm.candidates("C. Romero")[1]) == [
+        norm("Carlos Romero"), norm("Cristian Romero"),
+        norm("Isaac Romero")]
+    assert tm.candidates("Nobody At All") == (None, [])
+
+    # at() takes no price. THE CALLER'S MONEY IS NOT A VALUE unless the
+    # caller is quoting a value: api_key is handed the app's own figure for
+    # the player and key_for can trust it, but a PURCHASE price carries the
+    # premium on top and agreeing with it to 5% is not identity evidence.
     assert rm.at("C. Romero", snapshot_stamp("2026-08-19T1700Z")) is None
-    # A name that stands on its own is not flagged, price or no price.
-    rv = rm.at("Isaac Romero", snapshot_stamp("2026-08-19T1700Z"),
-               value=6023939)
-    assert rv.by_price is False, rv
 
     mkt = [{"name": "Ane Aldea", "team": "Alavés", "position": "defensa",
             "value": "2.050.000", "delta_1d": "-12.000"},
