@@ -31,6 +31,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from typing import NamedTuple  # noqa: E402
 
+from ffcore.tidy import run_now
 from ffcore.tidy import PARTS, REPORTS, write_lines  # noqa: E402
 
 
@@ -162,7 +163,7 @@ def main() -> None:
         p = PARTS / name
         return p.read_text(encoding="utf-8") if p.exists() else None
 
-    stamp = dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+    stamp = run_now().strftime("%Y-%m-%d %H:%M UTC")
     REPORTS.mkdir(exist_ok=True)
     write_lines(REPORTS / APPENDIX,
                 digest(read, APPENDIX_SOURCES, stamp=stamp, links=None,

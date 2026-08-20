@@ -44,7 +44,8 @@ from ffcore.parse import fmt_money, fmt_pct  # noqa: E402
 from ffcore.score import SLOT, formations  # noqa: E402
 from ffcore.second import LEGEND, af_cell, second_cells  # noqa: E402
 from ffcore.text import norm  # noqa: E402
-from ffcore.tidy import (DECISIONS, PARTS, append_csv,  # noqa: E402
+from ffcore.tidy import (run_now,  # noqa: E402
+                         DECISIONS, PARTS, append_csv,  # noqa: E402
                          load_players, write_lines)
 from slate import read_slate  # noqa: E402
 
@@ -338,7 +339,7 @@ def write_league(lg, players, stamp, second=None,
 
 
 def main():
-    now = dt.datetime.now(dt.timezone.utc)
+    now = run_now()
     stamp = now.strftime("%Y-%m-%d %H:%M UTC")
     players = load_players()
     lg = League.load()

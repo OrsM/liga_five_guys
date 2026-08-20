@@ -45,7 +45,8 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from ffcore.league import League, app_fielded  # noqa: E402
 from ffcore.text import norm  # noqa: E402
-from ffcore.tidy import (DECISIONS, append_csv, input_path,  # noqa: E402
+from ffcore.tidy import (run_now,  # noqa: E402
+                         DECISIONS, append_csv, input_path,  # noqa: E402
                          load_deadline, read_csv, write_csv)
 
 FIELDS = ["logged_at", "hours_to_lock", "n_xi", "xi", "bench", "warnings"]
@@ -112,7 +113,7 @@ def main() -> None:
         print("nothing logged")
         return
 
-    now = dt.datetime.now(dt.timezone.utc)
+    now = run_now()
     deadline = load_deadline()
     htl = ("" if deadline is None
            else "%.1f" % ((deadline - now).total_seconds() / 3600))

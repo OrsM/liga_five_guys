@@ -59,7 +59,8 @@ from typing import NamedTuple
 
 from ffcore.parse import money
 from ffcore.text import norm, resolve
-from ffcore.tidy import (Market, input_path, ledger_stamp,
+from ffcore.tidy import (run_now,  # noqa: E402
+                         Market, input_path, ledger_stamp,
                          load_api_standings, load_api_teams,
                          load_market, read_ledger, snapshot_stamp)
 
@@ -1016,7 +1017,7 @@ class League:
                 start = since or min(
                     (ledger_stamp(t.get("date", "")) for t in self.txns
                      if ledger_stamp(t.get("date", ""))), default=None)
-                bonus, days = allowance(start, datetime.now(dt_timezone.utc),
+                bonus, days = allowance(start, run_now(),
                                         self.cfg.daily_bonus)
 
             value = base + sold - bought + bonus
@@ -1065,7 +1066,7 @@ class League:
 
 
 def _now() -> str:
-    return datetime.now().astimezone().strftime("%Y-%m-%d %H:%M")
+    return run_now().astimezone().strftime("%Y-%m-%d %H:%M")
 
 
 def _selftest() -> None:

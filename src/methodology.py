@@ -39,7 +39,8 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from ffcore.fixture import FIX_BAND, HOME_EDGE  # noqa: E402
 from ffcore.score import SHRINK_K  # noqa: E402
 from ffcore.text import norm, resolve  # noqa: E402
-from ffcore.tidy import (DECISIONS, PARTS, LINEUP_SOURCE,  # noqa: E402
+from ffcore.tidy import (run_now,  # noqa: E402
+                         DECISIONS, PARTS, LINEUP_SOURCE,  # noqa: E402
                          DAILY_FRESH_DAYS, EVERY_RUN_FRESH_DAYS,
                          SEASON, TIDY, age_phrase, load_elo,
                          stale_feeds,
@@ -431,7 +432,7 @@ def load_actuals() -> tuple[list[dict], str]:
     if not files:
         return [], ""
     label = files[-1].stem.replace("perjornada_", "")
-    cutoff = (dt.datetime.now(dt.timezone.utc)
+    cutoff = (run_now()
               - dt.timedelta(days=WINDOW_DAYS))
     rows = []
     for r in read_csv(files[-1]):
@@ -677,7 +678,7 @@ def _fetched() -> dict[str, list[float]]:
 
     reg = _hosts()
     of_table: dict[str, list[float]] = {}
-    now = dt.datetime.now(dt.timezone.utc)
+    now = run_now()
     for page, row in state().items():
         when = snapshot_stamp(row.get("seen") or "")
         if when is None:
@@ -738,7 +739,7 @@ def feed_lines() -> list[str]:
     the jornada for two days, and nothing anywhere said so. Age is the only
     honest thing to print about an input, so it is a column.
     """
-    now = dt.datetime.now(dt.timezone.utc)
+    now = run_now()
     reg, feeds = _hosts(), _feed_state()
     asked, quiet = _fetched(), stale_feeds()
     rows = []

@@ -41,7 +41,7 @@ __all__ = ["ROOT", "TIDY", "SEASON", "DECISIONS", "REPORTS", "PARTS", "MADRID",
            "input_path", "read_csv", "write_csv", "append_csv", "widen_csv",
            "write_lines", "snapshot_stamp", "ledger_stamp", "latest_only", "snapshots",
            "Market", "Valuation", "load_market", "load_lineups",
-           "shared_names", "row_key",
+           "shared_names", "row_key", "run_now",
            "load_players", "read_ledger", "LEDGER", "load_deadline", "LINEUP_SOURCE",
            "pick_source", "load_fixtures", "next_kickoff", "kickoff_stamp",
            "load_elo", "fresh_only", "DAILY_FRESH_DAYS",
@@ -293,6 +293,42 @@ DAILY_FRESH_DAYS = 1.05
 # 0.5 would have called that a dead feed every night. 0.6 clears the longest
 # healthy leg by an hour and still catches a missed sweep well inside the day.
 EVERY_RUN_FRESH_DAYS = 0.6
+
+
+_NOW: list = []
+
+
+def run_now() -> datetime:
+    """The instant this RUN is describing. Sampled once per process.
+
+    NOT named `now`: fresh_only and stale_feeds both take a `now` argument,
+    and a module function of that name is shadowed exactly where it is most
+    needed.
+
+    Twenty-five call sites asked the clock themselves, so one report could
+    stamp 23:52 while the document explaining it stamped 23:53, and the cash
+    a rival was credited grew between the stage that scored him and the stage
+    that printed him. None of that was ever a wrong answer, but it made the
+    outputs undiffable: re-running unchanged code moved nine fields, so
+    "nothing moved" could not be asserted about a change, only eyeballed
+    around the noise. run.py executes every reporting stage in ONE
+    interpreter, so one sample here is one instant for the whole report.
+
+    NOT for the sweep. ingest.py fetches over minutes and observed_at must be
+    when a page was actually asked for — it keeps the live clock, and it runs
+    in its own process anyway.
+
+    LFG_NOW pins it, which is what makes an output diff mean something: run
+    the pipeline twice over one store with the clock held and the two reports
+    are byte-identical, so anything that moves is the change under test and
+    not the eleven seconds between runs. It is a measuring tool — the timer
+    and every real run leave it unset.
+    """
+    if not _NOW:
+        pinned = os.environ.get("LFG_NOW", "").strip()
+        _NOW.append(snapshot_stamp(pinned) if pinned
+                    else datetime.now(timezone.utc))
+    return _NOW[0]
 
 
 def fresh_only(rows: list[dict], max_age_days: float, now=None) -> list[dict]:
@@ -1017,6 +1053,18 @@ def _selftest() -> None:
     now = datetime(2026, 8, 19, 12, 0, tzinfo=timezone.utc)
     day_old = [{"observed_at": "2026-08-18T2246Z", "club": "Barcelona"}]
     two_days = [{"observed_at": "2026-08-17T2246Z", "club": "Barcelona"}]
+    # ONE INSTANT PER RUN. Asked twice, it must not have moved.
+    assert run_now() is run_now()
+    assert run_now().tzinfo is timezone.utc
+    # Pinned, it is whatever was asked for — the whole point being that two
+    # runs over one store then produce byte-identical reports.
+    _NOW.clear()
+    os.environ["LFG_NOW"] = "2026-08-20T0900Z"
+    assert run_now() == snapshot_stamp("2026-08-20T0900Z")
+    del os.environ["LFG_NOW"]
+    _NOW.clear()
+    assert run_now().year >= 2026
+
     assert fresh_only(day_old, DAILY_FRESH_DAYS, now) == day_old
     assert fresh_only(two_days, DAILY_FRESH_DAYS, now) == []
     # The boundary is a day and a bit — 25.2 hours — because the sweep runs

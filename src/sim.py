@@ -45,7 +45,8 @@ from decide import dead_weight  # noqa: E402,F401
 from ffcore.parse import fmt_money  # noqa: E402
 from ffcore.league import app_fielded  # noqa: E402
 from ffcore.render import title_name  # noqa: E402
-from ffcore.tidy import (PARTS, REPORTS, age_phrase,  # noqa: E402
+from ffcore.tidy import (run_now,  # noqa: E402
+                         PARTS, REPORTS, age_phrase,  # noqa: E402
                          stale_feeds,
                          write_lines)
 
@@ -653,7 +654,7 @@ def wait_routes(u, offers=None, rng=None) -> list[dict]:
     import statistics
     from ffcore.season import best_xi
 
-    now = dt.datetime.now(dt.timezone.utc)
+    now = run_now()
     exp = u.forecaster.expected(decide_choosable(u))
     eleven = best_xi(u.state.squads.get(u.me, {}), exp)
     if not eleven:
@@ -1102,7 +1103,7 @@ def log_cash_price(measured) -> None:
         return
     DECISIONS.mkdir(parents=True, exist_ok=True)
     append_csv(DECISIONS / PRICE_LOG,
-               [{"measured_at": dt.datetime.now(dt.timezone.utc)
+               [{"measured_at": run_now()
                                  .strftime("%Y-%m-%dT%H%MZ"),
                  "places_per_million": "%.6f" % measured}],
                ["measured_at", "places_per_million"])
@@ -1583,7 +1584,7 @@ def main() -> None:
     stamp = rows_m[0]["observed_at"] if rows_m else ""
     deadline = load_deadline()
     locks_h = None if deadline is None else (
-        deadline - dt.datetime.now(dt.timezone.utc)).total_seconds() / 3600
+        deadline - run_now()).total_seconds() / 3600
 
     u = decide.load()
     # The three states that are data problems rather than crashes, named
@@ -1628,7 +1629,7 @@ def main() -> None:
           % (PARTS / OUT, len(acts), len(rows)))
 
     (REPORTS / "decisions.json").write_text(json.dumps({
-        "generated_at": dt.datetime.now(dt.timezone.utc)
+        "generated_at": run_now()
                           .strftime("%Y-%m-%dT%H:%MZ"),
         **payload(u, rows, base, rivals, locks_h, len(acts),
                   market_model(u), saves),
@@ -1650,7 +1651,7 @@ def main() -> None:
         if body:
             ALERTS.parent.mkdir(parents=True, exist_ok=True)
             write_lines(ALERTS, ["# Alerts — %s UTC"
-                                 % dt.datetime.now(dt.timezone.utc)
+                                 % run_now()
                                      .strftime("%Y-%m-%d %H:%M"), ""] + body)
         else:
             ALERTS.unlink(missing_ok=True)

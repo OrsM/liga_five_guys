@@ -120,7 +120,8 @@ from ffcore.score import (ABSENT_START, MAX_SLOT, NEUTRAL_START,  # noqa: E402
                           SLOT_LABEL, SLOT_MIN, build, formations,
                           pick_xi, squad_pool)
 from ffcore.league import app_fielded  # noqa: E402
-from ffcore.tidy import (DECISIONS, PARTS,  # noqa: E402
+from ffcore.tidy import (run_now,  # noqa: E402
+                         DECISIONS, PARTS,  # noqa: E402
                          age_phrase, append_csv, input_path, latest_only,
                          load_deadline, load_market, load_lineups, read_csv,
                          snapshot_stamp, stale_feeds, widen_csv, write_lines)
@@ -981,12 +982,12 @@ def main() -> None:
     # fixture board score your squad and theirs.
     shrink_k = lg.cfg.shrink_k if lg else 8.0
     sc, (hist_label, cur_label) = build(market, xi_rows,
-                                        datetime.now(timezone.utc),
+                                        run_now(),
                                         shrink_k=shrink_k)
 
     observed = market[0]["observed_at"]
     obs_dt = snapshot_stamp(observed)
-    now = datetime.now(timezone.utc)
+    now = run_now()
     age_h = (now - obs_dt).total_seconds() / 3600 if obs_dt else None
 
     # --- build squad records ---------------------------------------------

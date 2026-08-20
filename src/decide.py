@@ -52,7 +52,8 @@ from ffcore.score import SLOT, build, _calibrated  # noqa: E402
 from ffcore.text import norm  # noqa: E402
 from ffcore.season import (LeagueState, best_xi,  # noqa: E402
                            simulate, simulate_many)
-from ffcore.tidy import (TIDY, SEASON, latest_only, load_api_market,  # noqa: E402
+from ffcore.tidy import (run_now,  # noqa: E402
+                         TIDY, SEASON, latest_only, load_api_market,  # noqa: E402
                          last_api_standings, load_api_teams,
                          load_lineups, load_market,
                          load_players, read_csv)
@@ -373,7 +374,7 @@ def respond(u, a: Action, after: dict) -> Action | None:
     exp = u.forecaster.expected(u.state.jornadas[0]) if u.state.jornadas else {}
     base = sum(exp.get(k, 0.0) for k in best_xi(squad, exp))
 
-    now = dt.datetime.now(dt.timezone.utc)
+    now = run_now()
     best, gain = None, 0.0
     for k, price in u.clause.items():
         if locked(u.clause_until, k, now):
@@ -642,7 +643,7 @@ def load(trials_pool=None) -> Universe:
     lg = League.load()
     players = load_players()
     sc, _ = build(load_market(), latest_only(load_lineups()),
-                  dt.datetime.now(dt.timezone.utc), lg.cfg.shrink_k)
+                  run_now(), lg.cfg.shrink_k)
 
     m = latest_only(list(csv.DictReader(open(TIDY / "matches.csv"))))
     # The market's spelling of every club, and only the market's: it is the
@@ -685,7 +686,7 @@ def load(trials_pool=None) -> Universe:
         if k and r.get("sale_price"):
             price[k] = float(r["sale_price"])
             route[k] = "market"
-    now = dt.datetime.now(dt.timezone.utc)
+    now = run_now()
     clause_until: dict = {}
     for r in teams:
         k = api_key(r["player_name"], r["manager"], lg.market, owner, index,
