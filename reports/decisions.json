@@ -1,8 +1,8 @@
 {
- "generated_at": "2026-08-20T22:50Z",
- "locks_in_h": 20.15796169888889,
- "cash": 19180910.270699073,
- "squad_value": 220380704.0,
+ "generated_at": "2026-08-20T23:01Z",
+ "locks_in_h": 19.96797868638889,
+ "cash": 19180937.977695603,
+ "squad_value": 220603148.0,
  "jornadas_left": 38,
  "acquirable": 33,
  "considered": 40,
@@ -28,7 +28,7 @@
    "helps": 0.9346666666666666,
    "pts_lo": 8.901784891860416,
    "pts_hi": 141.84510077637697,
-   "left": 24253744.270699073,
+   "left": 24253771.977695603,
    "answer": null,
    "p_win_after": 0.9793333333333333,
    "vs": "BurtonGM89",
@@ -49,7 +49,7 @@
    "helps": 0.9496666666666667,
    "pts_lo": 13.381513366919535,
    "pts_hi": 123.34676203279218,
-   "left": 10040991.270699073,
+   "left": 10041018.977695603,
    "answer": null,
    "p_win_after": 0.974,
    "vs": "SusoGattuso",
@@ -70,7 +70,7 @@
    "helps": 0.795,
    "pts_lo": -21.037816992293756,
    "pts_hi": 99.26277562904829,
-   "left": 4396093.270699073,
+   "left": 4396120.977695603,
    "answer": null,
    "p_win_after": 0.97,
    "vs": "BurtonGM89",
@@ -91,7 +91,7 @@
    "helps": 0.859,
    "pts_lo": -9.604996599673768,
    "pts_hi": 108.29219804582453,
-   "left": 6886576.270699073,
+   "left": 6886603.977695603,
    "answer": null,
    "p_win_after": 0.9663333333333334,
    "vs": "SusoGattuso",
@@ -112,7 +112,7 @@
    "helps": 0.6626666666666666,
    "pts_lo": -37.67934209386431,
    "pts_hi": 83.78929232785549,
-   "left": 24437650.270699073,
+   "left": 24437677.977695603,
    "answer": null,
    "p_win_after": 0.961,
    "vs": "BurtonGM89",
@@ -133,7 +133,7 @@
    "helps": 0.813,
    "pts_lo": -17.898819177725272,
    "pts_hi": 120.41738455172572,
-   "left": 15450805.270699073,
+   "left": 15450832.977695603,
    "answer": null,
    "p_win_after": 0.9563333333333334,
    "vs": "SusoGattuso",
@@ -154,7 +154,7 @@
    "helps": 0.8246666666666667,
    "pts_lo": -11.707014346604183,
    "pts_hi": 104.76312171569543,
-   "left": 14767886.270699073,
+   "left": 14767913.977695603,
    "answer": null,
    "p_win_after": 0.954,
    "vs": "BurtonGM89",
@@ -175,7 +175,7 @@
    "helps": 0.027333333333333334,
    "pts_lo": -6.758432509143859,
    "pts_hi": 0.0,
-   "left": 4082216.2706990726,
+   "left": 4082243.977695603,
    "answer": null,
    "p_win_after": 0.9476666666666667,
    "vs": "BurtonGM89",
@@ -196,7 +196,7 @@
    "helps": 0.027333333333333334,
    "pts_lo": -6.758432509143859,
    "pts_hi": 0.0,
-   "left": 27113470.270699073,
+   "left": 27113497.977695603,
    "answer": null,
    "p_win_after": 0.9473333333333334,
    "vs": "BurtonGM89",
@@ -217,7 +217,7 @@
    "helps": 0.601,
    "pts_lo": -35.50584414872469,
    "pts_hi": 59.89780124476715,
-   "left": 26004319.270699073,
+   "left": 26004346.977695603,
    "answer": null,
    "p_win_after": 0.9436666666666667,
    "vs": "BurtonGM89",
@@ -238,7 +238,7 @@
    "helps": 0.6586666666666666,
    "pts_lo": -41.95052312705002,
    "pts_hi": 85.19996210533213,
-   "left": 15737391.270699073,
+   "left": 15737418.977695603,
    "answer": null,
    "p_win_after": 0.9403333333333334,
    "vs": "SusoGattuso",
@@ -392,7 +392,7 @@
    "xpts": 5.476075522490964,
    "group": "save",
    "where": "free agent",
-   "money": -12369183.729300927,
+   "money": -12369156.022304397,
    "pts": 86.89210421357188,
    "note": "short"
   },
@@ -403,7 +403,7 @@
    "xpts": 4.656383399209486,
    "group": "save",
    "where": "free agent",
-   "money": -4290957.729300927,
+   "money": -4290930.022304397,
    "pts": 0.0,
    "note": "short"
   },
@@ -414,7 +414,7 @@
    "xpts": 4.1569238945738745,
    "group": "save",
    "where": "BurtonGM89",
-   "money": -9104144.729300927,
+   "money": -9104117.022304397,
    "pts": 0.0,
    "note": "short"
   },
@@ -425,7 +425,7 @@
    "xpts": 3.863856330697434,
    "group": "save",
    "where": "free agent",
-   "money": -20727893.729300927,
+   "money": -20727866.022304397,
    "pts": 26.93787123988318,
    "note": "short"
   },
@@ -436,7 +436,7 @@
    "xpts": 2.7855133091167357,
    "group": "save",
    "where": "BurtonGM89",
-   "money": -2556925.7293009274,
+   "money": -2556898.022304397,
    "pts": 0.0,
    "note": "short"
   },
@@ -447,7 +447,7 @@
    "xpts": 2.55850417348939,
    "group": "save",
    "where": "Albert Laporta",
-   "money": -6793471.729300927,
+   "money": -6793444.022304397,
    "pts": 13.40841116309366,
    "note": "short"
   }
@@ -481,8 +481,8 @@
    "hi": 7.838610440258449,
    "beats_now": 1.0,
    "helpful": 146,
-   "pool": 586,
-   "note": "the market is modelled from 109 offers over 6 cycles, weighted by value^0.45, and only just — value^0.40 fits within 7.7% of it, so read the exponent as roughly this, not exactly this"
+   "pool": 587,
+   "note": "the market is modelled from 109 offers over 6 cycles, weighted by value^0.45, and only just — value^0.20 fits within 10.0% of it, so read the exponent as roughly this, not exactly this"
   },
   {
    "route": "watch",
@@ -496,22 +496,22 @@
     {
      "name": "Lamine Yamal",
      "gain": 7.838610440258449,
-     "wait": 5.127796805437897
+     "wait": 5.135121301745365
     },
     {
      "name": "Kylian Mbappe",
      "gain": 6.24269178216413,
-     "wait": 5.063975719112916
+     "wait": 5.075826655944812
     },
     {
      "name": "Joan Garcia",
      "gain": 5.793307189585215,
-     "wait": 6.7404092034485945
+     "wait": 6.749879680560067
     },
     {
      "name": "Alvaro Valles",
      "gain": 4.833157002197229,
-     "wait": 9.566584716871574
+     "wait": 9.578099441233805
     }
    ]
   },
@@ -525,7 +525,7 @@
    "hi": null,
    "beats_now": null,
    "helpful": 35,
-   "days": 3.8986882189351855,
+   "days": 3.8907722600810186,
    "opens": "24 Aug"
   }
  ],
@@ -547,7 +547,7 @@
    "mean": 1818.971558688526,
    "lo": 1618.3613168671343,
    "hi": 2029.310389347371,
-   "cash": 19180910.270699073,
+   "cash": 19180937.977695603,
    "cash_known": true,
    "p_above": null
   },

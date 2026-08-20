@@ -1071,3 +1071,15 @@ observed_at,hours_to_lock,formation,index_total,player,pos,slot,start_pct,start_
 2026-08-20T2250Z,20.2,4-5-1,47.39,Ionut Radu,portero,POR,90,read,ok,0,36743791,7.290,1,6.605,1.117,Valencia,0,0,6.525,attack_defense,-2.0,5978
 2026-08-20T2250Z,20.2,4-5-1,47.39,Pablo Fornals,mediocampista,MED,90,read,ok,0,56030044,6.710,1,6.766,1.004,Real Sociedad,1,0,6.685,attack_defense,21.7,2632
 2026-08-20T2250Z,20.2,4-5-1,47.39,Marcos Alonso,defensa,DEF,90,read,ok,0,27894022,6.161,1,5.582,1.117,Valencia,0,0,5.515,attack_defense,-2.0,4397
+2026-08-20T2301Z,20.0,4-5-1,47.39,Iñigo Vicente,delantero,DEL,90,read,ok,1,20236302,2.772,1,3.329,0.843,Getafe,0,1,3.289,attack_defense,-13.9,6442
+2026-08-20T2301Z,20.0,4-5-1,47.39,Pepelu,mediocampista,MED,70,read,ok,0,7744946,3.676,1,4.294,1.114,Celta Vigo,1,0,3.301,attack_defense,2.0,2715
+2026-08-20T2301Z,20.0,4-5-1,47.39,Iñigo Ruiz de Galarreta,mediocampista,MED,60,read,ok,0,12945639,3.103,1,4.488,1.158,Sevilla,1,0,2.678,attack_defense,52.2,44
+2026-08-20T2301Z,20.0,4-5-1,47.39,Jon Moncayola,mediocampista,MED,90,read,ok,0,6901032,5.429,1,4.352,1.286,Levante,1,0,4.221,attack_defense,32.8,7204
+2026-08-20T2301Z,20.0,4-5-1,47.39,Carl Starfelt,defensa,DEF,60,read,ok,0,14023243,4.798,1,5.121,1.117,Valencia,0,0,4.295,attack_defense,-2.0,9612
+2026-08-20T2301Z,20.0,4-5-1,47.39,Robin Le Normand,defensa,DEF,70,read,ok,0,11391686,2.283,1,4.883,0.756,Villarreal,1,1,3.021,attack_defense,87.6,6002
+2026-08-20T2301Z,20.0,4-5-1,47.39,Igor Zubeldia,defensa,DEF,60,read,ok,0,10353067,1.958,0,3.705,0.886,Real Betis,0,0,2.211,attack_defense,-21.7,2802
+2026-08-20T2301Z,20.0,4-5-1,47.39,Omar El Hilali,defensa,DEF,80,read,ok,0,10451843,2.160,1,3.581,0.650,Real Madrid,1,1,3.322,attack_defense,-258.7,10220
+2026-08-20T2301Z,20.0,4-5-1,47.39,Lucien Agoume,mediocampista,MED,80,read,ok,0,5638188,3.010,1,3.940,0.787,Athletic Club,0,0,3.826,attack_defense,-52.2,7249
+2026-08-20T2301Z,20.0,4-5-1,47.39,Ionut Radu,portero,POR,90,read,ok,0,36743791,7.290,1,6.605,1.117,Valencia,0,0,6.525,attack_defense,-2.0,5978
+2026-08-20T2301Z,20.0,4-5-1,47.39,Pablo Fornals,mediocampista,MED,90,read,ok,0,56279389,6.710,1,6.766,1.004,Real Sociedad,1,0,6.685,attack_defense,21.7,2632
+2026-08-20T2301Z,20.0,4-5-1,47.39,Marcos Alonso,defensa,DEF,90,read,ok,0,27894022,6.161,1,5.582,1.117,Valencia,0,0,5.515,attack_defense,-2.0,4397

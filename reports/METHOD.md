@@ -1,4 +1,4 @@
-# Liga Five Guys — how the numbers are made — 2026-08-20 22:50 UTC
+# Liga Five Guys — how the numbers are made — 2026-08-20 23:01 UTC
 
 
 
@@ -13,9 +13,9 @@
 
 | The workings | |
 |---|--:|
-| Unowned players who would improve your eleven | 146 of 586 |
+| Unowned players who would improve your eleven | 146 of 587 |
 | Tenth percentile of a week's waiting | +5.79 |
-| Market model | the market is modelled from 109 offers over 6 cycles, weighted by value^0.45, and only just — value^0.40 fits within 7.7% of it, so read the exponent as roughly this, not exactly this |
+| Market model | the market is modelled from 109 offers over 6 cycles, weighted by value^0.45, and only just — value^0.20 fits within 10.0% of it, so read the exponent as roughly this, not exactly this |
 | Locked players who would improve your eleven | 35 |
 | Their clauses open | 24 Aug, in about 4 days |
 
@@ -50,22 +50,22 @@
 | | Table | What it is used for | Fetched from | Rows | Newest row | Fetching |
 |---|---|---|---|--:|---|---|
 | 🟢 | api_activity | every transfer, which is what the ledger replays — one row per deal, so the newest is the last deal and not the last sweep | LaLiga Fantasy API | 77 | 20 Aug 22:41 | fetched 1 minute ago |
-| 🟢 | api_leagues | your cash and the league's id | LaLiga Fantasy API | 61 | 20 Aug 22:50 | fetched 1 minute ago |
-| 🟢 | api_lineup | the eleven you have actually fielded, and the formation the app says you are playing | LaLiga Fantasy API | 418 | 20 Aug 22:50 | fetched 1 minute ago |
-| 🟢 | api_market | what is on offer, and the bids on it | LaLiga Fantasy API | 1,983 | 20 Aug 22:50 | fetched 1 minute ago |
-| 🟢 | api_players | names for players nobody owns any more — one row per player, first sighting kept | LaLiga Fantasy API | 64 | 20 Aug 22:41 | fetched 10 minutes ago |
-| 🟢 | api_standings | the league table — position, points, squad value, and your balance | LaLiga Fantasy API | 305 | 20 Aug 22:50 | fetched 1 minute ago |
+| 🟢 | api_leagues | your cash and the league's id | LaLiga Fantasy API | 62 | 20 Aug 23:01 | fetched 1 minute ago |
+| 🟢 | api_lineup | the eleven you have actually fielded, and the formation the app says you are playing | LaLiga Fantasy API | 429 | 20 Aug 23:01 | fetched 1 minute ago |
+| 🟢 | api_market | what is on offer, and the bids on it | LaLiga Fantasy API | 2,016 | 20 Aug 23:01 | fetched 1 minute ago |
+| 🟢 | api_players | names for players nobody owns any more — one row per player, first sighting kept | LaLiga Fantasy API | 64 | 20 Aug 22:41 | fetched 21 minutes ago |
+| 🟢 | api_standings | the league table — position, points, squad value, and your balance | LaLiga Fantasy API | 310 | 20 Aug 23:01 | fetched 1 minute ago |
 | 🟢 | api_stats | what the app scored each player, broken into what he did — one row per player per week per stat, a correction being a later row rather than an overwrite | LaLiga Fantasy API | 1,050 | 20 Aug 22:41 | fetched 1 minute ago |
-| 🟢 | api_teams | all five squads | LaLiga Fantasy API | 4,411 | 20 Aug 22:50 | fetched 1 minute ago |
+| 🟢 | api_teams | all five squads | LaLiga Fantasy API | 4,481 | 20 Aug 23:01 | fetched 1 minute ago |
 | ⚪ | clubs | the same, for clubs | src/crosswalk.py | 20 | — | rebuilt every run from the tables above |
-| 🟢 | elo | team strength, which ranks the fixture term | clubelo.com | 860 | 20 Aug 22:50 | fetched 16 hours ago |
-| 🟢 | fixtures | who plays whom next, for the fixture term | analiticafantasy.com | 1,010 | 20 Aug 22:50 | fetched 16 hours ago |
-| 🟢 | lineups | probable XI percentages, both sources | analiticafantasy.com, futbolfantasy.com ×40 | 65,558 | 20 Aug 22:50 | fetched 10 minutes ago |
-| 🟢 | market | price, value, position, fitness — every player in the game | futbolfantasy.com | 62,575 | 20 Aug 22:50 | fetched 1 minute ago |
-| 🟢 | matches | fixtures, kickoffs, results | futbolfantasy.com | 24,320 | 20 Aug 22:50 | fetched 16 hours ago |
-| ⚪ | players | the crosswalk: one key per player across all four spellings | src/crosswalk.py | 657 | — | rebuilt every run from the tables above |
+| 🟢 | elo | team strength, which ranks the fixture term | clubelo.com | 880 | 20 Aug 23:01 | fetched 16 hours ago |
+| 🟢 | fixtures | who plays whom next, for the fixture term | analiticafantasy.com | 1,024 | 20 Aug 23:01 | fetched 16 hours ago |
+| 🟢 | lineups | probable XI percentages, both sources | analiticafantasy.com, futbolfantasy.com ×40 | 66,291 | 20 Aug 23:01 | fetched 21 minutes ago |
+| 🟢 | market | price, value, position, fitness — every player in the game | futbolfantasy.com | 63,232 | 20 Aug 23:01 | fetched 1 minute ago |
+| 🟢 | matches | fixtures, kickoffs, results | futbolfantasy.com | 24,700 | 20 Aug 23:01 | fetched 16 hours ago |
+| ⚪ | players | the crosswalk: one key per player across all four spellings | src/crosswalk.py | 658 | — | rebuilt every run from the tables above |
 | 🟢 | points | realised points per jornada, the actuals in every table below | futbolfantasy.com | 132 | 19 Aug 22:20 | fetched 1 minute ago |
-| 🟢 | starters | confirmed elevens, which is what P(start) is graded on | futbolfantasy.com | 15,466 | 20 Aug 22:50 | fetched 16 hours ago |
+| 🟢 | starters | confirmed elevens, which is what P(start) is graded on | futbolfantasy.com | 15,740 | 20 Aug 23:01 | fetched 16 hours ago |
 
 ### The model, as configured right now
 
@@ -143,8 +143,8 @@ _What the one table on the board was built from: the eleven it assumes you field
 |---|---|--:|--:|---|---|
 | Juan Cruz | med | 14.82M–17.76M | 50%/— | Albert +1.3, (1 broke) |  |
 | Ruben Garcia | med | 14.30M–17.13M | 60%/75% | Albert +4.3, (3 broke) |  |
-| Fernando Niño | del | 13.74M–16.47M | 70%/— | (3 broke) |  |
-| Javi Galan | def | 11.43M–13.70M | 30%/— | Albert +0.2 |  |
+| Fernando Niño | del | 14.00M–16.78M | 70%/— | (3 broke) |  |
+| Javi Galan | def | 11.55M–13.84M | 30%/— | Albert +0.2 |  |
 | Javi Rueda | def | 4.49M–5.38M | 60%/— | Albert +3.2, +1 more, (2 broke) |  |
 | Kiko Femenia | def | 3.48M–4.17M | 0%/titular | none |  |
 | Antonio Hidalgo | ent | 1.42M–1.70M | !15%/— | none |  |
@@ -162,7 +162,7 @@ _What the one table on the board was built from: the eleven it assumes you field
 | XI, the marks | **FF** is futbolfantasy's probable-XI percentage, which is the one the forecast uses. **AF** is analiticafantasy's read of the same eleven, printed beside it and never blended in — `titular` is a named starter (a final call, with no number to it), a percentage is their editors' consensus, `?` means they list him without either, and `—` means they do not have him. Two columns that disagree are the signal; that is the whole point of carrying both. |
 | Competition | demand, not roster counts: the rivals whose XI actually improves with him, strongest threat first. `?` cash unknown (treat as live), `(n broke)` want him but cannot pay the floor. Manager by manager in `reports/rivals.md` |
 
-**⚠ 8 bids at 64.30M is more than the 19.18M you hold.** Each row above is priced as though it were your only purchase, and the app settles them together — take them best rate first: Juan Cruz, Ruben Garcia, Fernando Niño, Javi Galan, Javi Rueda, Kiko Femenia, Antonio Hidalgo, Adama Timera.
+**⚠ 8 bids at 64.67M is more than the 19.18M you hold.** Each row above is priced as though it were your only purchase, and the app settles them together — take them best rate first: Juan Cruz, Ruben Garcia, Fernando Niño, Javi Galan, Javi Rueda, Kiko Femenia, Antonio Hidalgo, Adama Timera.
 
 | Already owned, so not a purchase | Held by |
 |---|---|
@@ -216,9 +216,9 @@ _Both figures are editorial reads refreshed a few times a day, not live probabil
 
 | | |
 |---|---|
-| Players tracked | 656, 493 with a probable-XI reading |
+| Players tracked | 657, 493 with a probable-XI reading |
 | xPts/j | expected points per jornada = shrunk pts/match (K=8, 2025-26 + 2026-27) × fixture × P(start), from `ffcore/score.py` — the same scorer rivals.py uses |
 | Zeroed | injured, suspended, unavailable; a doubt is halved |
 | Fixture term | ±12% across the opponents ranked by nothing: no fixture is known for anyone in your squad, plus ±4% for home advantage — both widths guesses, unfitted, and small enough that a wrong one costs a fraction of a point |
 
-_Generated 2026-08-20 22:50 UTC._
+_Generated 2026-08-20 23:01 UTC._
