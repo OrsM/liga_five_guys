@@ -744,7 +744,7 @@ def identify(t: dict, owner: dict, market=None, xw=None) -> tuple[str, str]:
     return cands[0], why
 
 
-def _roster_key(raw: str, market) -> str:
+def _roster_key(raw: str, market, xw=None) -> str:
     """The canonical key for one rosters_initial.txt line.
 
     market.key_for() — the SAME resolution identify() uses for every
@@ -762,14 +762,32 @@ def _roster_key(raw: str, market) -> str:
     club reaches key_for()'s own `team` disambiguator, the same signal
     Market._pick() already knows how to use.
 
-    Falls back to norm(raw): no market to resolve against, or key_for()
-    genuinely cannot place him (never yet seen in the market, or still
-    ambiguous even with the club). Never drops a roster entry either way.
+    xw.player(app_name=...) IS TRIED SECOND, not first: key_for() is the
+    market's own current spelling, which is the trustworthy side of a join
+    everywhere else in this repo; app_name is the app's ACCUMULATED past
+    spellings for him, useful precisely when the market's CURRENT name has
+    moved on. Measured: "Manuel Fernández", typed in the roster at the
+    season's start, is not anyone's key_for() match today — the market now
+    shows this player as "Manu Fernandez" — but the crosswalk already
+    holds "Manuel Fernández" as an app_name alias for the right player,
+    learned from the app's OWN activity feed the day he was later sold.
+    Trying it here closes the same gap key_for() cannot: a name that was
+    once right and has since drifted.
+
+    Falls back to norm(raw): no market to resolve against, or neither path
+    can place him (never yet seen anywhere, or still ambiguous). Never
+    drops a roster entry either way.
     """
     name, _, club = raw.partition("@")
-    if market is None:
-        return norm(raw)
-    return market.key_for(name, team=club) or norm(raw)
+    if market is not None:
+        got = market.key_for(name, team=club)
+        if got:
+            return got
+    if xw is not None:
+        got = xw.player(app_name=name)
+        if got:
+            return got
+    return norm(raw)
 
 
 def replay(rosters: dict[str, list[str]], txns: list[dict], market=None,
@@ -787,7 +805,7 @@ def replay(rosters: dict[str, list[str]], txns: list[dict], market=None,
     owner: dict[str, str] = {}
     for mgr, names in rosters.items():
         for n in names:
-            owner[_roster_key(n, market)] = mgr
+            owner[_roster_key(n, market, xw)] = mgr
     warnings: list[str] = []
     resolved: list[str] = []
     for t in txns:
@@ -1907,6 +1925,28 @@ def _selftest_identify() -> None:
     assert _roster_key("Raul Moro", None) == "raul moro"
     # A name the market has never heard of: still norm(), not lost.
     assert _roster_key("Nobody At All", id_mkt) == "nobody at all"
+
+    # -- _roster_key: the market's CURRENT spelling has moved on, but the
+    # -- crosswalk still holds the roster's spelling as an app_name -------
+    # "Manuel Fernández", typed at the season's start, is nobody's
+    # key_for() match once the market shows him as "Manu Fernandez" — real
+    # case, 2026-08-21. xw.player(app_name=...) is what identify() itself
+    # would have resolved this same string to, via the app's own activity
+    # feed; a roster entry deserves the same answer.
+    from ffcore.crosswalk import Crosswalk, Player
+
+    xw_fern = Crosswalk({"16003": Player("16003", "Manu Fernandez",
+                                         app_names={"Manuel Fernández"})}, {})
+    empty_mkt = _RealMarket([{"name": "Manu Fernandez", "ff_id": "16003",
+                              "team": "Celta", "value": "500000",
+                              "observed_at": _seen}])
+    assert _roster_key("Manuel Fernández", empty_mkt, xw_fern) == "16003"
+    # key_for() still wins when BOTH would answer — the market's current
+    # spelling is the trustworthy side of this join everywhere else in the
+    # repo, checked first for a reason.
+    assert _roster_key("Manu Fernandez", empty_mkt, xw_fern) == "16003"
+    # Neither market nor app_name has heard of him: still norm(), not lost.
+    assert _roster_key("Total Stranger", empty_mkt, xw_fern) == "total stranger"
 
     # A sale of a player nobody is recorded as holding used to pass in
     # silence: the key simply wasn't in the map, so the pop did nothing.
