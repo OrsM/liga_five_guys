@@ -74,7 +74,8 @@ from ffcore.score import SLOT_MIN, THIN, pick_xi, squad_pool
 from ffcore.tidy import ledger_stamp
 
 __all__ = ["MAX_LAG_H", "ROUND_TO", "FLOOR_EPS", "HORIZONS", "Premiums", "Advice",
-           "is_round", "deals", "usable", "premiums", "suggest", "gain",
+           "is_round", "deals", "usable", "premiums", "impossible_buys",
+           "suggest", "gain",
            "xi_snapshots", "demand_summary",
            ]
 
@@ -209,6 +210,20 @@ def premiums(deals, side: str = "buy") -> Premiums | None:
         return None
     return Premiums(len(vals), statistics.median(vals), vals[0], vals[-1],
                     sum(1 for v in vals if v <= FLOOR_EPS))
+
+
+def impossible_buys(deals) -> list[dict]:
+    """Buy-side deals priced below the floor — which cannot happen legally.
+
+    Not filtered by `usable()`: a lag beyond MAX_LAG_H makes a premium too
+    stale to AVERAGE, but a negative one is still a fact about the join, not
+    about timing. This is the cheapest, sharpest bad-join detector there is —
+    it is how the C. Romero mis-join (2026-08-20) actually surfaced, by hand,
+    once. It belongs in every run instead.
+    """
+    return [d for d in deals if d.get("side") == "buy"
+            and d.get("premium") is not None
+            and d["premium"] < -FLOOR_EPS]
 
 
 def suggest(value, prem: Premiums | None, cash=None,
@@ -375,6 +390,27 @@ def _selftest() -> None:
     # A lag beyond the cut is excluded, not clamped.
     assert usable({"premium": 1.0, "lag_h": MAX_LAG_H}) is True
     assert usable({"premium": 1.0, "lag_h": MAX_LAG_H + 0.1}) is False
+
+    # -- impossible_buys ---------------------------------------------------
+    # A buy cannot legally price below the value — a negative premium beyond
+    # the float/rounding band is a bad join, not a bargain, and it is a fact
+    # about the deal, not about how stale the snapshot is. So it is flagged
+    # even at a lag `usable()` would exclude from the averages.
+    deals_ = [
+        {"player": "C. Romero", "side": "buy", "premium": -87.0,
+         "lag_h": 1.0},                                   # impossible
+        {"player": "Far lag", "side": "buy", "premium": -50.0,
+         "lag_h": MAX_LAG_H + 50},                         # still impossible
+        {"player": "At floor", "side": "buy", "premium": -0.1,
+         "lag_h": 1.0},                                    # inside FLOOR_EPS
+        {"player": "Normal", "side": "buy", "premium": 8.9, "lag_h": 1.0},
+        {"player": "App pays", "side": "sell", "premium": -50.0,
+         "lag_h": 1.0},                                    # not a buy
+        {"player": "Unpriced", "side": "buy", "premium": None, "lag_h": 1.0},
+    ]
+    bad = impossible_buys(deals_)
+    assert [d["player"] for d in bad] == ["C. Romero", "Far lag"], bad
+    assert impossible_buys([]) == []
 
     # -- suggest ----------------------------------------------------------
     prem = Premiums(10, 8.9, 1.45, 21.6)
