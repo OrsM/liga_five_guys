@@ -362,8 +362,8 @@ def main():
     log_slate(on_offer, players, now.strftime("%Y-%m-%dT%H:%MZ"))
 
     # The second opinion, joined once for every player either file can print.
-    second, _unclear = second_cells(r.get("name", "")
-                                    for r in players.values())
+    second, _unclear = second_cells((k, r.get("name", ""))
+                                    for k, r in players.items())
     write_league(lg, players, stamp, second,
                  dl=deals(lg, lg.market), market=lg.market)
 

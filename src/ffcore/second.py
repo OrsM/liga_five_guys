@@ -64,26 +64,48 @@ def af_cell(row) -> str:
     return "titular" if row.get("role") == "starter" else "?"
 
 
-def second_cells(names, source: str = SECOND_SOURCE, rows=None):
-    """{norm(name): the second source's row}, plus the names it could not join.
+def second_cells(who, source: str = SECOND_SOURCE, rows=None, xw=None):
+    """{market key: the second source's row}, plus the names it could not join.
 
-    Keyed by norm() so a caller holding scored players can look up p["key"]
-    and a caller holding raw market rows can look up norm(r["name"]) — they
-    are the same string by construction (ffcore/score.py builds `key` that
-    way).
+    `who` is (key, name) pairs. It used to be names alone, keyed by norm(),
+    and the docstring said a caller could look up p["key"] because key WAS
+    norm(name) "by construction". That construction ended when the market
+    started keying on the site's own id: every caller looked up an id in a
+    dict of names and got nothing, so the second-source column read "—" for
+    all 654 players and no test noticed, because the column is only in
+    METHOD.md and "—" is a legitimate value.
+
+    The join itself goes by slug first — the same identifier ffcore.score
+    uses for the same rows — and falls back to the name.
 
     `rows` is for the selftest: pass a list and no CSV is read.
     """
     if rows is None:
         rows = latest_only(load_lineups(source))
+    if xw is None:
+        from ffcore.tidy import load_crosswalk
+        xw = load_crosswalk()
+    if xw is False:            # the self-test: no table, name join only
+        xw = None
+    by_slug = {}
+    for r in rows:
+        slug = norm(r.get("player_slug") or "")
+        if not slug:
+            continue
+        pid = xw.player(ff_slug=r.get("player_slug")) if xw else None
+        by_slug[slug] = (pid, r)
+    slug_to_key = {s: k for s, (k, _r) in by_slug.items() if k}
     cells: dict = {}
     unclear: list[tuple[str, list[str]]] = []
     seen: set = set()
-    for name in names:
-        key = norm(name)
+    for key, name in who:
         if not key or key in seen:
             continue
         seen.add(key)
+        hit = [r for s, (k, r) in by_slug.items() if k == key]
+        if hit:
+            cells[key] = hit[0]
+            continue
         row, cands = resolve(name, rows, key="player_name")
         if row:
             cells[key] = row
@@ -116,23 +138,26 @@ def _selftest() -> None:
             {"player_name": "Cai Coro Dos", "role": "doubt",
              "start_pct": "25"}]
 
-    cells, unclear = second_cells(["Ane Aldea", "Bo Bidal", "Didi Duna"],
-                                  rows=rows)
-    assert af_cell(cells.get("ane aldea")) == "titular"
-    assert af_cell(cells.get("bo bidal")) == "50%"
+    # (market key, display name) pairs — the key is what the caller holds
+    # and what the answer is filed under, so the two cannot drift apart.
+    cells, unclear = second_cells([("101", "Ane Aldea"), ("102", "Bo Bidal"),
+                                   ("103", "Didi Duna")], rows=rows, xw=False)
+    assert af_cell(cells.get("101")) == "titular"
+    assert af_cell(cells.get("102")) == "50%"
     # A name the source does not carry gets no cell and no complaint: silence
     # is not ambiguity.
-    assert "didi duna" not in cells and unclear == [], unclear
+    assert "103" not in cells and unclear == [], unclear
 
     # Two candidates are reported, never picked between — a wrong player
     # silently costs money.
-    cells, unclear = second_cells(["Cai Coro"], rows=rows)
+    cells, unclear = second_cells([("104", "Cai Coro")], rows=rows, xw=False)
     assert cells == {}, cells
     assert unclear == [("Cai Coro", ["Cai Coro Uno", "Cai Coro Dos"])], unclear
 
     # The same player arriving twice (squad and slate both list him) is one
     # lookup and one entry, not a duplicated ambiguity report.
-    cells, unclear = second_cells(["Cai Coro", "cai coro", ""], rows=rows)
+    cells, unclear = second_cells([("104", "Cai Coro"), ("104", "cai coro"),
+                                   ("", "")], rows=rows, xw=False)
     assert len(unclear) == 1, unclear
 
     print("ffcore.second selftest OK (14 cases)")

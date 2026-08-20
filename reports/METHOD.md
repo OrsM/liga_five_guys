@@ -149,7 +149,7 @@ _What the one table on the board was built from: the eleven it assumes you field
 | Diego Ferrer | por | 660K–792K | !15%/— | none |  |
 | Jean Ives Valou | def | 574K–688K | 20%/— | none |  |
 | Llorenç Serred | por | 541K–649K | !15%/— | none |  |
-| David Soria | por | — | 95%/— | (4 broke) |  |
+| David Soria | por | — | 95%/100% | (4 broke) |  |
 | Pierre-Emerick Aubameyang | del | — | 90%/— | (4 broke) |  |
 
 | Column | What it is |

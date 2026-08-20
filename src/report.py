@@ -1035,8 +1035,8 @@ def main() -> None:
     # Candidates are joined too, or their AF cell would always read `—` and
     # look like a source that has nothing on them.
     second, unclear = second_cells(
-        [p["name"] for p in players]
-        + [c["name"] for c in cands
+        [(p["key"], p["name"]) for p in players]
+        + [(c["key"], c["name"]) for c in cands
            if c["key"] not in {p["key"] for p in players}])
     marked = as_fielded(players) if players else None
     min_start = lg.cfg.min_start if lg else 60.0
