@@ -59,6 +59,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+from functools import lru_cache
 from typing import Callable, NamedTuple
 
 from lxml import html as lh
@@ -1866,8 +1867,15 @@ class Source(NamedTuple):
     auth: bool = False
 
 
+@lru_cache(maxsize=None)
 def sources(enabled_only: bool = True) -> list[Source]:
     """Every page we collect, in fetch order.
+
+    MEMOISED. The registry is built from static constants (TEAMS, AF_TEAMS,
+    the URL templates) — nothing about the answer changes between calls. It
+    was being rebuilt from scratch, all ~46 entries with a .format() call
+    each, on every one of source_for()'s 13,040 calls in one parse() run —
+    34% of parse's runtime for a lookup that should have been near-free.
 
     Team pages are one entry each rather than one entry with twenty URLs, so
     that a per-page signature, a per-page failure and a per-page cadence all
