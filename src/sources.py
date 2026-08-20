@@ -961,6 +961,15 @@ MATCH_SIDES = (".stats-local", ".stats-visitante")   # home, away, in that order
 MATCH_SUBS_HEADER = "Suplentes"
 # The minute a player left the pitch, printed in the same cell as his name.
 MATCH_MINUTE_RE = re.compile(r"\s*\d+\s*'\s*$")
+# The same marker, captured rather than deleted. What it MEANS depends on
+# `role`, and nothing in this module interprets that — it only carries the
+# number off the page: on a starter's row it is the minute he was
+# substituted OFF (blank means he played the whole match); on a sub's row it
+# is the minute he came ON (blank means an unused substitute, zero minutes).
+# Checked against a raw snapshot (match_22422-atletico-malaga,
+# 2026-08-20T0651Z) rather than assumed: every starter or sub missing the
+# marker was exactly the one who played start-to-finish or not at all.
+MATCH_MINUTE_CAPTURE_RE = re.compile(r"(\d+)\s*'\s*$")
 # The match paths shorten exactly one club: /partidos/…-rayo-…, whose team page
 # is /laliga/equipos/rayo-vallecano. Without this alias his 38 matches — a
 # tenth of the season — split into nothing and vanish. Every other club spells
@@ -1074,15 +1083,17 @@ def parse_starters(html: str, observed_at: str,
                 continue
             cell = _css(tr, "td.name")
             if cell:
+                raw = _WS.sub(" ", cell[0].text_content()).strip()
+                m = MATCH_MINUTE_CAPTURE_RE.search(raw)
                 side_rows.append({
                     "observed_at": observed_at,
                     "source": SOURCE,
                     "match_id": path.split("-", 1)[0],
                     "team_slug": team,
-                    "player_name": MATCH_MINUTE_RE.sub(
-                        "", _WS.sub(" ", cell[0].text_content()).strip()),
+                    "player_name": MATCH_MINUTE_RE.sub("", raw),
                     "player_slug": None,
                     "role": role,
+                    "minute": m.group(1) if m else "",
                 })
                 continue
             # The detail row that follows a player carries the only link to
@@ -2837,6 +2848,11 @@ def _selftest() -> None:
     # how the other source's name-only claims came to look wrong.
     assert xi[1]["player_name"] == "loc1", xi[1]
     assert not any("'" in r["player_name"] for r in xi), xi
+    # CAPTURED, NOT JUST DELETED. What it means depends on role (off-minute
+    # for a starter, on-minute for a sub) — nothing here decides that, it
+    # only carries the number off the page.
+    assert xi[1]["minute"] == "64", xi[1]
+    assert xi[0]["minute"] == "", xi[0]
 
     # A side that is not eleven players is not an eleven: those rows are
     # dropped, because a nine-man XI would bias every hit rate downwards. The
