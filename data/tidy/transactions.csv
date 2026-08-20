@@ -9,70 +9,70 @@
 # the manager who acted, and a manager-to-manager transfer does not appear as
 # a paired buy and sell, so the counterparty genuinely cannot be recovered.
 # Ownership, prices and premiums are unaffected.
-date,player,from,to,price,note
-2026-08-11T22:24,Cardoso,market,Magic Mike 333,949269,from the app
-2026-08-11T22:24,Turrientes,market,miguel_autentico,6892898,from the app
-2026-08-11T22:24,Quagliata,market,BurtonGM89,4000000,from the app
-2026-08-11T22:24,C. Romero,market,BurtonGM89,45739000,from the app
-2026-08-11T22:42,Egiluz,BurtonGM89,market,468693,from the app
-2026-08-11T23:24,Vivian,Albert Laporta,market,11664367,from the app
-2026-08-11T23:25,Manuel Fernández,Albert Laporta,market,373500,from the app
-2026-08-11T23:25,Pathé I. Ciss,Albert Laporta,market,10393147,from the app
-2026-08-11T23:26,Puado,Albert Laporta,market,8041411,from the app
-2026-08-12T22:24,Dmitrovic,market,BurtonGM89,40010000,from the app
-2026-08-12T22:24,Raphinha,market,Magic Mike 333,80000000,from the app
-2026-08-12T22:24,Pedro Díaz,market,Magic Mike 333,2050000,from the app
-2026-08-12T22:24,Karrikaburu,market,Magic Mike 333,700000,from the app
-2026-08-12T22:24,Comesaña,market,BurtonGM89,35276000,from the app
-2026-08-12T22:24,Ez Abde,market,Albert Laporta,49991863,from the app
-2026-08-13T13:12,Oskarsson,miguel_autentico,market,8567036,from the app
-2026-08-13T13:12,D. Martínez,miguel_autentico,market,425612,from the app
-2026-08-13T13:13,Hugo Duro,miguel_autentico,market,8800811,from the app
-2026-08-13T22:24,Giuliano,market,SusoGattuso,44652302,from the app
-2026-08-13T22:24,Arda Güler,market,Albert Laporta,50836360,from the app
-2026-08-13T22:24,Cabrera,market,Albert Laporta,17500002,from the app
-2026-08-13T22:24,Villalibre,market,Albert Laporta,6954257,from the app
-2026-08-13T22:24,Denis Suárez,market,BurtonGM89,2580315,from the app
-2026-08-13T22:25,J. Musso,BurtonGM89,market,4748599,from the app
-2026-08-13T22:26,Iago Aspas,BurtonGM89,market,7275530,from the app
-2026-08-13T22:26,Unai Lopez,BurtonGM89,market,5762182,from the app
-2026-08-13T22:26,Joaquín,BurtonGM89,market,6489738,from the app
-2026-08-13T22:26,Dieng,BurtonGM89,market,5284122,from the app
-2026-08-13T23:40,Purić,SusoGattuso,market,476265,from the app
-2026-08-14T13:49,Asencio,Magic Mike 333,market,5130033,from the app
-2026-08-14T13:50,Lucas Boyé,Magic Mike 333,market,14013107,from the app
-2026-08-14T22:24,T. Morente,market,Magic Mike 333,2033651,from the app
-2026-08-14T22:24,Aramburu,market,SusoGattuso,17785551,from the app
-2026-08-14T22:24,Eriksson,market,miguel_autentico,2933863,from the app
-2026-08-14T22:24,Gavi,market,Magic Mike 333,35500000,from the app
-2026-08-14T22:24,Agoumé,market,miguel_autentico,5891526,from the app
-2026-08-14T22:24,Ionut Radu,market,miguel_autentico,39655832,from the app
-2026-08-14T22:51,R.P. Bigas,Albert Laporta,market,5323361,from the app
-2026-08-15T22:24,Mouriño,market,Albert Laporta,40516387,from the app
-2026-08-15T22:24,Fornals,market,miguel_autentico,58220110,from the app
-2026-08-15T22:24,Mario Martín,market,SusoGattuso,3831432,from the app
-2026-08-15T22:24,Riedel,market,SusoGattuso,4599626,from the app
-2026-08-15T22:24,Buonanotte,market,Albert Laporta,7331515,from the app
-2026-08-16T22:24,Paredes,market,BurtonGM89,5350000,from the app
-2026-08-16T22:24,Huijsen,market,BurtonGM89,32901000,from the app
-2026-08-16T22:26,E. Militão,BurtonGM89,market,12012022,from the app
-2026-08-17T00:20,Eriksson,miguel_autentico,market,3121862,from the app
-2026-08-17T00:21,Rubén García,miguel_autentico,market,15202722,from the app
-2026-08-17T22:24,Leo Román,market,SusoGattuso,37157570,from the app
-2026-08-17T22:24,Tenaglia,market,BurtonGM89,14992195,from the app
-2026-08-17T22:28,Quagliata,BurtonGM89,market,2951083,from the app
-2026-08-17T22:29,Gorrotxa,BurtonGM89,market,6655879,from the app
-2026-08-18T07:26,Villalibre,Albert Laporta,market,7235234,from the app
-2026-08-18T22:24,Isi,market,SusoGattuso,20144326,from the app
-2026-08-18T22:24,Angeliño,market,Albert Laporta,15537090,from the app
-2026-08-18T22:24,Marcos Alonso,market,miguel_autentico,28589508,from the app
-2026-08-18T22:28,Szczesny,SusoGattuso,market,2133987,from the app
-2026-08-19T00:18,A. Ferllo,miguel_autentico,market,4759903,from the app
-2026-08-19T19:37,Arda Güler,Albert Laporta,market,54175985,from the app
-2026-08-19T20:05,Dani Lorenzo,miguel_autentico,market,8939207,from the app
-2026-08-19T22:24,Peque,market,BurtonGM89,2046753,from the app
-2026-08-19T22:25,Huijsen,BurtonGM89,market,37379004,from the app
-2026-08-19T23:12,Q. Hartman,BurtonGM89,market,8474875,from the app
-2026-08-20T00:01,Isi,SusoGattuso,market,22371647,from the app
-2026-08-20T00:01,Mario Martín,SusoGattuso,market,4048567,from the app
-2026-08-20T01:05,Turrientes,miguel_autentico,market,7074690,from the app
+date,player,player_id,from,to,price,note
+2026-08-11T22:24,Cardoso,2790,market,Magic Mike 333,949269,from the app
+2026-08-11T22:24,Turrientes,1215,market,miguel_autentico,6892898,from the app
+2026-08-11T22:24,Quagliata,2963,market,BurtonGM89,4000000,from the app
+2026-08-11T22:24,C. Romero,2614,market,BurtonGM89,45739000,from the app
+2026-08-11T22:42,Egiluz,2936,BurtonGM89,market,468693,from the app
+2026-08-11T23:24,Vivian,2314,Albert Laporta,market,11664367,from the app
+2026-08-11T23:25,Manuel Fernández,2653,Albert Laporta,market,373500,from the app
+2026-08-11T23:25,Pathé I. Ciss,2383,Albert Laporta,market,10393147,from the app
+2026-08-11T23:26,Puado,2516,Albert Laporta,market,8041411,from the app
+2026-08-12T22:24,Dmitrovic,2507,market,BurtonGM89,40010000,from the app
+2026-08-12T22:24,Raphinha,2522,market,Magic Mike 333,80000000,from the app
+2026-08-12T22:24,Pedro Díaz,2385,market,Magic Mike 333,2050000,from the app
+2026-08-12T22:24,Karrikaburu,2619,market,Magic Mike 333,700000,from the app
+2026-08-12T22:24,Comesaña,1031,market,BurtonGM89,35276000,from the app
+2026-08-12T22:24,Ez Abde,3089,market,Albert Laporta,49991863,from the app
+2026-08-13T13:12,Oskarsson,2448,miguel_autentico,market,8567036,from the app
+2026-08-13T13:12,D. Martínez,2881,miguel_autentico,market,425612,from the app
+2026-08-13T13:13,Hugo Duro,1191,miguel_autentico,market,8800811,from the app
+2026-08-13T22:24,Giuliano,1210,market,SusoGattuso,44652302,from the app
+2026-08-13T22:24,Arda Güler,1674,market,Albert Laporta,50836360,from the app
+2026-08-13T22:24,Cabrera,3068,market,Albert Laporta,17500002,from the app
+2026-08-13T22:24,Villalibre,3022,market,Albert Laporta,6954257,from the app
+2026-08-13T22:24,Denis Suárez,2474,market,BurtonGM89,2580315,from the app
+2026-08-13T22:25,J. Musso,2321,BurtonGM89,market,4748599,from the app
+2026-08-13T22:26,Iago Aspas,2492,BurtonGM89,market,7275530,from the app
+2026-08-13T22:26,Unai Lopez,2384,BurtonGM89,market,5762182,from the app
+2026-08-13T22:26,Joaquín,3034,BurtonGM89,market,6489738,from the app
+2026-08-13T22:26,Dieng,3121,BurtonGM89,market,5284122,from the app
+2026-08-13T23:40,Purić,2883,SusoGattuso,market,476265,from the app
+2026-08-14T13:49,Asencio,2146,Magic Mike 333,market,5130033,from the app
+2026-08-14T13:50,Lucas Boyé,2768,Magic Mike 333,market,14013107,from the app
+2026-08-14T22:24,T. Morente,2941,market,Magic Mike 333,2033651,from the app
+2026-08-14T22:24,Aramburu,2443,market,SusoGattuso,17785551,from the app
+2026-08-14T22:24,Eriksson,3018,market,miguel_autentico,2933863,from the app
+2026-08-14T22:24,Gavi,1221,market,Magic Mike 333,35500000,from the app
+2026-08-14T22:24,Agoumé,2453,market,miguel_autentico,5891526,from the app
+2026-08-14T22:24,Ionut Radu,2713,market,miguel_autentico,39655832,from the app
+2026-08-14T22:51,R.P. Bigas,2294,Albert Laporta,market,5323361,from the app
+2026-08-15T22:24,Mouriño,1959,market,Albert Laporta,40516387,from the app
+2026-08-15T22:24,Fornals,3099,market,miguel_autentico,58220110,from the app
+2026-08-15T22:24,Mario Martín,2640,market,SusoGattuso,3831432,from the app
+2026-08-15T22:24,Riedel,2785,market,SusoGattuso,4599626,from the app
+2026-08-15T22:24,Buonanotte,3151,market,Albert Laporta,7331515,from the app
+2026-08-16T22:24,Paredes,2315,market,BurtonGM89,5350000,from the app
+2026-08-16T22:24,Huijsen,2530,market,BurtonGM89,32901000,from the app
+2026-08-16T22:26,E. Militão,2426,BurtonGM89,market,12012022,from the app
+2026-08-17T00:20,Eriksson,3018,miguel_autentico,market,3121862,from the app
+2026-08-17T00:21,Rubén García,652,miguel_autentico,market,15202722,from the app
+2026-08-17T22:24,Leo Román,3109,market,SusoGattuso,37157570,from the app
+2026-08-17T22:24,Tenaglia,1337,market,BurtonGM89,14992195,from the app
+2026-08-17T22:28,Quagliata,2963,BurtonGM89,market,2951083,from the app
+2026-08-17T22:29,Gorrotxa,2621,BurtonGM89,market,6655879,from the app
+2026-08-18T07:26,Villalibre,3022,Albert Laporta,market,7235234,from the app
+2026-08-18T22:24,Isi,2382,market,SusoGattuso,20144326,from the app
+2026-08-18T22:24,Angeliño,3142,market,Albert Laporta,15537090,from the app
+2026-08-18T22:24,Marcos Alonso,3123,market,miguel_autentico,28589508,from the app
+2026-08-18T22:28,Szczesny,2783,SusoGattuso,market,2133987,from the app
+2026-08-19T00:18,A. Ferllo,2975,miguel_autentico,market,4759903,from the app
+2026-08-19T19:37,Arda Güler,1674,Albert Laporta,market,54175985,from the app
+2026-08-19T20:05,Dani Lorenzo,3036,miguel_autentico,market,8939207,from the app
+2026-08-19T22:24,Peque,2455,market,BurtonGM89,2046753,from the app
+2026-08-19T22:25,Huijsen,2530,BurtonGM89,market,37379004,from the app
+2026-08-19T23:12,Q. Hartman,3098,BurtonGM89,market,8474875,from the app
+2026-08-20T00:01,Isi,2382,SusoGattuso,market,22371647,from the app
+2026-08-20T00:01,Mario Martín,2640,SusoGattuso,market,4048567,from the app
+2026-08-20T01:05,Turrientes,1215,miguel_autentico,market,7074690,from the app

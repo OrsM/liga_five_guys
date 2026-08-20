@@ -41,7 +41,7 @@ __all__ = ["ROOT", "TIDY", "SEASON", "DECISIONS", "REPORTS", "PARTS", "MADRID",
            "input_path", "read_csv", "write_csv", "append_csv", "widen_csv",
            "write_lines", "snapshot_stamp", "ledger_stamp", "latest_only", "snapshots",
            "Market", "Valuation", "load_market", "load_lineups",
-           "shared_names", "row_key", "run_now",
+           "shared_names", "row_key", "run_now", "load_crosswalk",
            "load_players", "read_ledger", "LEDGER", "load_deadline", "LINEUP_SOURCE",
            "pick_source", "load_fixtures", "next_kickoff", "kickoff_stamp",
            "load_elo", "fresh_only", "DAILY_FRESH_DAYS",
@@ -617,6 +617,20 @@ def load_api_players() -> dict[str, str]:
         if r.get("player_id") and r.get("player_name"):
             out[r["player_id"]] = r["player_name"]
     return out
+
+
+def load_crosswalk():
+    """The identifier table, or None before the crosswalk stage has run.
+
+    None rather than an empty Crosswalk: "I have no id table" and "the id
+    table knows nothing" lead to the same fallbacks today, but only one of
+    them is a state worth seeing in a warning.
+    """
+    from ffcore.crosswalk import Crosswalk
+    path = TIDY / "players.csv"
+    if not path.exists():
+        return None
+    return Crosswalk.read(path, TIDY / "clubs.csv")
 
 
 def load_fixtures() -> list[dict]:

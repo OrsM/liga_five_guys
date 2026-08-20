@@ -33,7 +33,7 @@ from ffcore.league import ledger_from_api  # noqa: E402
 from ffcore.tidy import (LEDGER, load_api_activity,  # noqa: E402
                          load_api_players, load_api_standings)
 
-FIELDS = ["date", "player", "from", "to", "price", "note"]
+FIELDS = ["date", "player", "player_id", "from", "to", "price", "note"]
 
 HEADER = """\
 # GENERATED — do not hand-edit. Rebuilt from the app's activity feed by
@@ -106,11 +106,18 @@ def write(rows: list[dict], force: bool = False, path=LEDGER) -> str:
 
 def _selftest() -> None:
     rows = [{"date": "2026-08-15T22:24", "player": "Fornals",
-             "from": "market", "to": "me", "price": "1", "note": "from the app"}]
+             "player_id": "1337", "from": "market", "to": "me",
+             "price": "1", "note": "from the app"}]
     body = render(rows)
     assert body.startswith("# GENERATED"), body[:40]
-    assert "date,player,from,to,price,note" in body, body
-    assert "2026-08-15T22:24,Fornals,market,me,1,from the app" in body, body
+    assert "date,player,player_id,from,to,price,note" in body, body
+    assert "2026-08-15T22:24,Fornals,1337,market,me,1,from the app" in body, body
+    # A row from before the feed carried ids still writes, with the column
+    # blank — git history holds hand-typed rows and they are not rewritten.
+    old_row = [{"date": "2026-08-01T10:00", "player": "Someone",
+                "from": "market", "to": "me", "price": "2",
+                "note": "typed"}]
+    assert "2026-08-01T10:00,Someone,,market,me,2,typed" in render(old_row)
 
     # The header must be comment-only, so the existing reader (which strips
     # '#' lines) sees exactly the same shape it always did.

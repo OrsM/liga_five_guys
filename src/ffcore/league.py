@@ -59,7 +59,8 @@ from typing import NamedTuple
 
 from ffcore.parse import money
 from ffcore.text import norm, resolve
-from ffcore.tidy import (run_now,  # noqa: E402
+from ffcore.tidy import (load_crosswalk,  # noqa: E402
+                         run_now,  # noqa: E402
                          Market, input_path, ledger_stamp,
                          load_api_standings, load_api_teams,
                          load_market, read_ledger, snapshot_stamp)
@@ -608,6 +609,14 @@ def ledger_from_api(activity: list[dict], users: dict,
             # this and nothing wider.
             "date": (r.get("at") or "")[:16],
             "player": player,
+            # THE APP'S OWN ID FOR HIM, CARRIED RATHER THAN THROWN AWAY.
+            # This row arrives identified. Writing only the display name and
+            # matching it back against the market is how "C. Romero" became
+            # Isaac Romero: a unique id spent on a fuzzy string. All 58
+            # distinct ids in this ledger resolve through the crosswalk, and
+            # none disagrees with the app's own full name; the names resolve
+            # 60 of 66 rows.
+            "player_id": str(r.get("player_id") or ""),
             "from": MARKET if kind == "buy" else who,
             "to": who if kind == "buy" else MARKET,
             "price": str(r.get("amount") or ""),
@@ -644,7 +653,7 @@ def owner_drift(ledger: dict, api: dict) -> list[str]:
     return out
 
 
-def identify(t: dict, owner: dict, market=None) -> tuple[str, str]:
+def identify(t: dict, owner: dict, market=None, xw=None) -> tuple[str, str]:
     """(player key, why) for one ledger row — issue #26.
 
     The counterparty is evidence about who the player is. A sale names someone
@@ -669,6 +678,16 @@ def identify(t: dict, owner: dict, market=None) -> tuple[str, str]:
     caller is expected to report it: this guesses, so it has to say so.
     """
     key = norm(t["player"])
+    # AN IDENTIFIER FIRST, AND THEN IT IS NOT A GUESS AT ALL. Everything
+    # below is string matching with a counterparty and a price to prune it;
+    # this is the app telling you which player the row is about. It is only
+    # skipped when the feed did not carry one (the hand-typed rows in git
+    # history) or the crosswalk has never seen it.
+    pid = str(t.get("player_id") or "").strip()
+    if pid and xw is not None:
+        got = xw.player(app_id=pid)
+        if got:
+            return got, ""
     if market is None:
         return key, ""
 
@@ -713,7 +732,8 @@ def identify(t: dict, owner: dict, market=None) -> tuple[str, str]:
     return cands[0], why
 
 
-def replay(rosters: dict[str, list[str]], txns: list[dict], market=None):
+def replay(rosters: dict[str, list[str]], txns: list[dict], market=None,
+           xw=None):
     """initial rosters + full ledger = current ownership.
 
     Every transaction is replayed, oldest first, so identify() can use the
@@ -731,7 +751,7 @@ def replay(rosters: dict[str, list[str]], txns: list[dict], market=None):
     warnings: list[str] = []
     resolved: list[str] = []
     for t in txns:
-        key, why = identify(t, owner, market)
+        key, why = identify(t, owner, market, xw)
         if why:
             resolved.append("%s: %s → %s (%s)" % (
                 t.get("date", "?"), t["player"], key, why))
@@ -832,13 +852,14 @@ class League:
     """Current state of the league, assembled from the three input files."""
 
     def __init__(self, cfg: Config, rosters, txns, market: Market | None,
-                 api_teams=None, standings=None):
+                 api_teams=None, standings=None, xw=None):
         self.cfg = cfg
         self.rosters = rosters
         self.txns = txns
         self.market = market
+        self.xw = xw
         self.owner, self.warnings, self.resolved = replay(rosters, txns,
-                                                          market)
+                                                          market, xw)
 
         # THE APP OVERRULES THE LEDGER. `replay()` accumulates typed
         # transactions over a starting roster, so it inherits every row nobody
@@ -904,7 +925,24 @@ class League:
         # state every caller already handles: the ledger takes over.
         return cls(cfg, read_rosters(), read_ledger(), market,
                    api_teams=load_api_teams(),
-                   standings=load_api_standings())
+                   standings=load_api_standings(), xw=load_crosswalk())
+
+    def txn_key(self, t: dict) -> str | None:
+        """The player key one ledger row is about, or None.
+
+        THE ONE PLACE A LEDGER ROW BECOMES A PLAYER. deals() used to take
+        t["player"] and match the string all over again, which is a second
+        answer to a question replay() had already answered — and the two
+        could differ, because only one of them had the counterparty and the
+        id to work with.
+        """
+        pid = str(t.get("player_id") or "").strip()
+        if pid and self.xw is not None:
+            got = self.xw.player(app_id=pid)
+            if got:
+                return got
+        key, _why = identify(t, self.owner, self.market, self.xw)
+        return key or None
 
     def __getitem__(self, handle: str) -> Manager:
         return self.managers[handle]
@@ -1440,6 +1478,7 @@ def _selftest_derived_ledger() -> None:
     # The feed names only one side, so the other is always `market` — see the
     # docstring for why that is a real limit and not a shortcut.
     assert rows[0] == {"date": "2026-08-15T22:24", "player": "Fornals",
+                       "player_id": "1337",
                        "from": MARKET, "to": "miguel_autentico",
                        "price": "58220110", "note": "from the app"}, rows[0]
     assert rows[1]["from"] == "miguel_autentico", rows[1]

@@ -146,6 +146,12 @@ def deals(lg, market) -> list[dict]:
         when = ledger_stamp(t.get("date", ""))
         if price is None or when is None:
             continue
+        # THE ROW ARRIVES IDENTIFIED — ask the league which player it is
+        # rather than matching its display name all over again. That second
+        # match was a second answer to a question replay() had already
+        # settled, and the two could differ because only one of them had the
+        # app's id, the counterparty and the price in front of it.
+        #
         # NOT market.at(..., value=price). A purchase PRICE is not a VALUE:
         # it is the value plus whatever it took to win, measured here at up
         # to +21.6%. Handing it to a join that tests value-agreement within
@@ -154,11 +160,13 @@ def deals(lg, market) -> list[dict]:
         # weak, they were impossible. Two of the three it "rescued" were
         # wrong, and the app's own ownership feed said so. Who owned him is
         # the evidence that settles a ledger row; see league.identify.
-        v = market.at(t["player"], when)
+        who = lg.txn_key(t) if hasattr(lg, "txn_key") else None
+        v = market.at(who or t["player"], when)
         src = (t.get("from") or "").strip() or MARKET
         dst = (t.get("to") or "").strip() or MARKET
         rows.append({
             "date": t.get("date", ""), "player": t["player"],
+            "key": who,
             "actor": dst if dst != MARKET else src,
             "side": "buy" if dst != MARKET else "sell",
             "price": price, "when": when,
