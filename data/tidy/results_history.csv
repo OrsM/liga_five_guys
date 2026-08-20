@@ -2289,3 +2289,1148 @@ observed_at,source,season,date,home_name,away_name,home,away,home_goals,away_goa
 2026-08-20T1517Z,football-data,2627,2026-08-16,Santander,Villarreal,racing,villarreal,2,2,1.87,0.66,17,12,3,7,6,10
 2026-08-20T1517Z,football-data,2627,2026-08-16,Espanol,Levante,espanyol,levante,3,0,1.56,0.28,16,4,6,0,0,1
 2026-08-20T1517Z,football-data,2627,2026-08-17,Dep. A Coruna,Elche,deportivo,elche,1,1,0.34,1.41,8,11,3,6,2,6
+2026-08-20T1714Z,football-data,2324,2023-08-11,Almeria,Vallecano,,rayo-vallecano,0,2,,,19,10,5,4,8,3
+2026-08-20T1714Z,football-data,2324,2023-08-11,Sevilla,Valencia,sevilla,valencia,1,2,,,9,10,3,3,8,1
+2026-08-20T1714Z,football-data,2324,2023-08-12,Sociedad,Girona,real-sociedad,,1,1,,,15,6,2,1,4,1
+2026-08-20T1714Z,football-data,2324,2023-08-12,Las Palmas,Mallorca,,,1,1,,,5,12,2,2,3,6
+2026-08-20T1714Z,football-data,2324,2023-08-12,Ath Bilbao,Real Madrid,athletic,real-madrid,0,2,,,7,14,1,8,7,5
+2026-08-20T1714Z,football-data,2324,2023-08-13,Celta,Osasuna,celta,osasuna,0,2,,,11,11,1,5,7,2
+2026-08-20T1714Z,football-data,2324,2023-08-13,Villarreal,Betis,villarreal,betis,1,2,,,18,12,5,5,9,4
+2026-08-20T1714Z,football-data,2324,2023-08-13,Getafe,Barcelona,getafe,barcelona,0,0,,,5,14,2,4,3,4
+2026-08-20T1714Z,football-data,2324,2023-08-14,Cadiz,Alaves,,alaves,1,0,,,12,10,3,2,2,4
+2026-08-20T1714Z,football-data,2324,2023-08-14,Ath Madrid,Granada,atletico,,3,1,,,14,7,6,4,3,3
+2026-08-20T1714Z,football-data,2324,2023-08-18,Mallorca,Villarreal,,villarreal,0,1,,,8,15,1,3,6,5
+2026-08-20T1714Z,football-data,2324,2023-08-18,Valencia,Las Palmas,valencia,,1,0,,,9,7,4,1,6,4
+2026-08-20T1714Z,football-data,2324,2023-08-19,Sociedad,Celta,real-sociedad,celta,1,1,,,11,17,2,6,9,7
+2026-08-20T1714Z,football-data,2324,2023-08-19,Almeria,Real Madrid,,real-madrid,1,3,,,20,24,8,9,4,5
+2026-08-20T1714Z,football-data,2324,2023-08-19,Osasuna,Ath Bilbao,osasuna,athletic,0,2,,,18,8,7,2,5,3
+2026-08-20T1714Z,football-data,2324,2023-08-20,Girona,Getafe,,getafe,3,0,,,7,9,6,2,3,2
+2026-08-20T1714Z,football-data,2324,2023-08-20,Barcelona,Cadiz,barcelona,,2,0,,,23,10,10,1,10,2
+2026-08-20T1714Z,football-data,2324,2023-08-20,Betis,Ath Madrid,betis,atletico,0,0,,,14,5,0,1,2,7
+2026-08-20T1714Z,football-data,2324,2023-08-21,Alaves,Sevilla,alaves,sevilla,4,3,,,14,12,7,2,4,4
+2026-08-20T1714Z,football-data,2324,2023-08-21,Granada,Vallecano,,rayo-vallecano,0,2,,,14,17,7,9,5,6
+2026-08-20T1714Z,football-data,2324,2023-08-25,Las Palmas,Sociedad,,real-sociedad,0,0,,,11,8,5,1,5,7
+2026-08-20T1714Z,football-data,2324,2023-08-25,Celta,Real Madrid,celta,real-madrid,0,1,,,13,10,4,3,3,5
+2026-08-20T1714Z,football-data,2324,2023-08-26,Cadiz,Almeria,,,1,1,,,11,5,3,2,7,3
+2026-08-20T1714Z,football-data,2324,2023-08-26,Granada,Mallorca,,,3,2,,,10,10,4,5,5,3
+2026-08-20T1714Z,football-data,2324,2023-08-26,Sevilla,Girona,sevilla,,1,2,,,21,8,4,3,6,6
+2026-08-20T1714Z,football-data,2324,2023-08-27,Villarreal,Barcelona,villarreal,barcelona,3,4,,,13,21,6,11,2,6
+2026-08-20T1714Z,football-data,2324,2023-08-27,Valencia,Osasuna,valencia,osasuna,1,2,,,16,7,4,2,6,3
+2026-08-20T1714Z,football-data,2324,2023-08-27,Ath Bilbao,Betis,athletic,betis,4,2,,,14,7,6,3,5,3
+2026-08-20T1714Z,football-data,2324,2023-08-28,Getafe,Alaves,getafe,alaves,1,0,,,15,16,4,2,4,5
+2026-08-20T1714Z,football-data,2324,2023-08-28,Vallecano,Ath Madrid,rayo-vallecano,atletico,0,7,,,12,17,3,10,8,3
+2026-08-20T1714Z,football-data,2324,2023-09-01,Cadiz,Villarreal,,villarreal,3,1,,,18,7,4,3,7,3
+2026-08-20T1714Z,football-data,2324,2023-09-01,Almeria,Celta,,celta,2,3,,,16,14,5,8,6,5
+2026-08-20T1714Z,football-data,2324,2023-09-02,Sociedad,Granada,real-sociedad,,5,3,,,15,8,6,5,2,5
+2026-08-20T1714Z,football-data,2324,2023-09-02,Real Madrid,Getafe,real-madrid,getafe,2,1,,,26,6,12,2,11,1
+2026-08-20T1714Z,football-data,2324,2023-09-02,Alaves,Valencia,alaves,valencia,1,0,,,7,9,1,4,1,2
+2026-08-20T1714Z,football-data,2324,2023-09-02,Betis,Vallecano,betis,rayo-vallecano,1,0,,,14,15,5,6,2,3
+2026-08-20T1714Z,football-data,2324,2023-09-03,Girona,Las Palmas,,,1,0,,,11,10,6,5,3,5
+2026-08-20T1714Z,football-data,2324,2023-09-03,Mallorca,Ath Bilbao,,athletic,0,0,,,8,11,2,3,3,5
+2026-08-20T1714Z,football-data,2324,2023-09-03,Osasuna,Barcelona,osasuna,barcelona,1,2,,,11,9,3,4,8,5
+2026-08-20T1714Z,football-data,2324,2023-09-15,Vallecano,Alaves,rayo-vallecano,alaves,2,0,,,20,9,11,1,5,3
+2026-08-20T1714Z,football-data,2324,2023-09-16,Ath Bilbao,Cadiz,athletic,,3,0,,,20,5,9,4,5,4
+2026-08-20T1714Z,football-data,2324,2023-09-16,Valencia,Ath Madrid,valencia,atletico,3,0,,,12,11,8,3,5,8
+2026-08-20T1714Z,football-data,2324,2023-09-16,Celta,Mallorca,celta,,0,1,,,16,7,4,4,10,1
+2026-08-20T1714Z,football-data,2324,2023-09-16,Barcelona,Betis,barcelona,betis,5,0,,,17,11,9,2,9,5
+2026-08-20T1714Z,football-data,2324,2023-09-17,Getafe,Osasuna,getafe,osasuna,3,2,,,11,8,6,3,6,3
+2026-08-20T1714Z,football-data,2324,2023-09-17,Villarreal,Almeria,villarreal,,2,1,,,10,17,4,7,7,6
+2026-08-20T1714Z,football-data,2324,2023-09-17,Sevilla,Las Palmas,sevilla,,1,0,,,26,12,9,2,7,3
+2026-08-20T1714Z,football-data,2324,2023-09-17,Real Madrid,Sociedad,real-madrid,real-sociedad,2,1,,,17,15,8,5,4,3
+2026-08-20T1714Z,football-data,2324,2023-09-18,Granada,Girona,,,2,4,,,12,13,5,7,4,5
+2026-08-20T1714Z,football-data,2324,2023-09-22,Alaves,Ath Bilbao,alaves,athletic,0,2,,,15,11,5,3,3,4
+2026-08-20T1714Z,football-data,2324,2023-09-23,Girona,Mallorca,,,5,3,,,23,15,10,5,6,5
+2026-08-20T1714Z,football-data,2324,2023-09-23,Osasuna,Sevilla,osasuna,sevilla,0,0,,,16,15,2,3,7,4
+2026-08-20T1714Z,football-data,2324,2023-09-23,Barcelona,Celta,barcelona,celta,3,2,,,15,13,6,7,2,3
+2026-08-20T1714Z,football-data,2324,2023-09-23,Almeria,Valencia,,valencia,2,2,,,17,7,10,5,8,3
+2026-08-20T1714Z,football-data,2324,2023-09-24,Sociedad,Getafe,real-sociedad,getafe,4,3,,,10,10,6,7,2,1
+2026-08-20T1714Z,football-data,2324,2023-09-24,Vallecano,Villarreal,rayo-vallecano,villarreal,1,1,,,11,13,6,6,2,8
+2026-08-20T1714Z,football-data,2324,2023-09-24,Betis,Cadiz,betis,,1,1,,,21,5,7,1,11,8
+2026-08-20T1714Z,football-data,2324,2023-09-24,Las Palmas,Granada,,,1,0,,,10,2,3,1,6,7
+2026-08-20T1714Z,football-data,2324,2023-09-24,Ath Madrid,Real Madrid,atletico,real-madrid,3,1,,,10,20,4,5,6,11
+2026-08-20T1714Z,football-data,2324,2023-09-26,Sevilla,Almeria,sevilla,,5,1,,,18,10,9,1,9,4
+2026-08-20T1714Z,football-data,2324,2023-09-26,Mallorca,Barcelona,,barcelona,2,2,,,10,10,5,4,7,2
+2026-08-20T1714Z,football-data,2324,2023-09-27,Ath Bilbao,Getafe,athletic,getafe,2,2,,,9,13,4,5,5,4
+2026-08-20T1714Z,football-data,2324,2023-09-27,Real Madrid,Las Palmas,real-madrid,,2,0,,,21,16,9,2,7,2
+2026-08-20T1714Z,football-data,2324,2023-09-27,Villarreal,Girona,villarreal,,1,2,,,14,17,3,5,5,6
+2026-08-20T1714Z,football-data,2324,2023-09-27,Cadiz,Vallecano,,rayo-vallecano,0,0,,,9,9,2,4,1,2
+2026-08-20T1714Z,football-data,2324,2023-09-27,Valencia,Sociedad,valencia,real-sociedad,0,1,,,9,2,2,1,0,2
+2026-08-20T1714Z,football-data,2324,2023-09-28,Celta,Alaves,celta,alaves,1,1,,,8,21,0,11,2,8
+2026-08-20T1714Z,football-data,2324,2023-09-28,Granada,Betis,,betis,1,1,,,19,13,7,3,5,7
+2026-08-20T1714Z,football-data,2324,2023-09-28,Osasuna,Ath Madrid,osasuna,atletico,0,2,,,13,4,2,3,7,2
+2026-08-20T1714Z,football-data,2324,2023-09-29,Barcelona,Sevilla,barcelona,sevilla,1,0,,,18,12,5,3,13,3
+2026-08-20T1714Z,football-data,2324,2023-09-30,Getafe,Villarreal,getafe,villarreal,0,0,,,22,3,9,0,6,4
+2026-08-20T1714Z,football-data,2324,2023-09-30,Vallecano,Mallorca,rayo-vallecano,,2,2,,,19,9,5,4,5,0
+2026-08-20T1714Z,football-data,2324,2023-09-30,Girona,Real Madrid,,real-madrid,0,3,,,13,14,3,7,1,4
+2026-08-20T1714Z,football-data,2324,2023-09-30,Sociedad,Ath Bilbao,real-sociedad,athletic,3,0,,,8,18,5,3,5,7
+2026-08-20T1714Z,football-data,2324,2023-10-01,Almeria,Granada,,,3,3,,,17,19,5,4,1,5
+2026-08-20T1714Z,football-data,2324,2023-10-01,Alaves,Osasuna,alaves,osasuna,0,2,,,17,10,3,3,4,2
+2026-08-20T1714Z,football-data,2324,2023-10-01,Ath Madrid,Cadiz,atletico,,3,2,,,18,8,9,4,5,3
+2026-08-20T1714Z,football-data,2324,2023-10-01,Betis,Valencia,betis,valencia,3,0,,,15,9,7,2,5,3
+2026-08-20T1714Z,football-data,2324,2023-10-02,Las Palmas,Celta,,celta,2,1,,,16,11,5,3,4,5
+2026-08-20T1714Z,football-data,2324,2023-10-06,Ath Bilbao,Almeria,athletic,,3,0,,,23,4,9,1,6,2
+2026-08-20T1714Z,football-data,2324,2023-10-07,Cadiz,Girona,,,0,1,,,8,20,2,5,5,5
+2026-08-20T1714Z,football-data,2324,2023-10-07,Real Madrid,Osasuna,real-madrid,osasuna,4,0,,,19,7,9,1,5,4
+2026-08-20T1714Z,football-data,2324,2023-10-07,Mallorca,Valencia,,valencia,1,1,,,9,11,5,3,3,6
+2026-08-20T1714Z,football-data,2324,2023-10-07,Sevilla,Vallecano,sevilla,rayo-vallecano,2,2,,,22,7,6,4,12,2
+2026-08-20T1714Z,football-data,2324,2023-10-08,Villarreal,Las Palmas,villarreal,,1,2,,,9,8,4,5,7,2
+2026-08-20T1714Z,football-data,2324,2023-10-08,Ath Madrid,Sociedad,atletico,real-sociedad,2,1,,,14,13,5,4,1,4
+2026-08-20T1714Z,football-data,2324,2023-10-08,Alaves,Betis,alaves,betis,1,1,,,15,6,5,2,5,3
+2026-08-20T1714Z,football-data,2324,2023-10-08,Celta,Getafe,celta,getafe,2,2,,,26,3,11,2,13,1
+2026-08-20T1714Z,football-data,2324,2023-10-08,Granada,Barcelona,,barcelona,2,2,,,7,22,2,10,1,11
+2026-08-20T1714Z,football-data,2324,2023-10-20,Osasuna,Granada,osasuna,,2,0,,,12,13,6,3,1,7
+2026-08-20T1714Z,football-data,2324,2023-10-21,Sociedad,Mallorca,real-sociedad,,1,0,,,14,18,6,7,2,5
+2026-08-20T1714Z,football-data,2324,2023-10-21,Getafe,Betis,getafe,betis,1,1,,,14,13,4,3,4,8
+2026-08-20T1714Z,football-data,2324,2023-10-21,Sevilla,Real Madrid,sevilla,real-madrid,1,1,,,17,14,7,5,4,6
+2026-08-20T1714Z,football-data,2324,2023-10-21,Celta,Ath Madrid,celta,atletico,0,3,,,16,12,3,7,7,5
+2026-08-20T1714Z,football-data,2324,2023-10-22,Las Palmas,Vallecano,,rayo-vallecano,0,1,,,12,12,6,4,10,5
+2026-08-20T1714Z,football-data,2324,2023-10-22,Girona,Almeria,,,5,2,,,19,9,8,5,9,6
+2026-08-20T1714Z,football-data,2324,2023-10-22,Villarreal,Alaves,villarreal,alaves,1,1,,,12,16,3,7,9,3
+2026-08-20T1714Z,football-data,2324,2023-10-22,Barcelona,Ath Bilbao,barcelona,athletic,1,0,,,12,10,7,3,4,7
+2026-08-20T1714Z,football-data,2324,2023-10-23,Valencia,Cadiz,valencia,,2,0,,,12,5,4,4,4,6
+2026-08-20T1714Z,football-data,2324,2023-10-27,Girona,Celta,,celta,1,0,,,12,4,2,2,10,1
+2026-08-20T1714Z,football-data,2324,2023-10-28,Almeria,Las Palmas,,,1,2,,,10,10,4,3,3,2
+2026-08-20T1714Z,football-data,2324,2023-10-28,Barcelona,Real Madrid,barcelona,real-madrid,1,2,,,15,13,3,4,6,3
+2026-08-20T1714Z,football-data,2324,2023-10-28,Mallorca,Getafe,,getafe,0,0,,,15,8,4,0,8,3
+2026-08-20T1714Z,football-data,2324,2023-10-28,Cadiz,Sevilla,,sevilla,2,2,,,10,20,5,10,2,4
+2026-08-20T1714Z,football-data,2324,2023-10-29,Betis,Osasuna,betis,osasuna,2,1,,,9,7,2,1,6,3
+2026-08-20T1714Z,football-data,2324,2023-10-29,Vallecano,Sociedad,rayo-vallecano,real-sociedad,2,2,,,16,15,7,3,4,5
+2026-08-20T1714Z,football-data,2324,2023-10-29,Ath Bilbao,Valencia,athletic,valencia,2,2,,,12,11,7,5,10,4
+2026-08-20T1714Z,football-data,2324,2023-10-29,Ath Madrid,Alaves,atletico,alaves,2,1,,,11,8,7,1,4,4
+2026-08-20T1714Z,football-data,2324,2023-10-30,Granada,Villarreal,,villarreal,2,3,,,18,6,8,5,4,1
+2026-08-20T1714Z,football-data,2324,2023-11-03,Las Palmas,Ath Madrid,,atletico,2,1,,,9,13,3,5,3,4
+2026-08-20T1714Z,football-data,2324,2023-11-04,Osasuna,Girona,osasuna,,2,4,,,15,11,3,4,2,7
+2026-08-20T1714Z,football-data,2324,2023-11-04,Betis,Mallorca,betis,,2,0,,,22,8,3,1,6,1
+2026-08-20T1714Z,football-data,2324,2023-11-04,Celta,Sevilla,celta,sevilla,1,1,,,15,13,3,5,4,6
+2026-08-20T1714Z,football-data,2324,2023-11-04,Sociedad,Barcelona,real-sociedad,barcelona,0,1,,,13,12,6,4,8,3
+2026-08-20T1714Z,football-data,2324,2023-11-05,Alaves,Almeria,alaves,,1,0,,,23,9,3,3,12,6
+2026-08-20T1714Z,football-data,2324,2023-11-05,Valencia,Granada,valencia,,1,0,,,11,6,2,1,0,4
+2026-08-20T1714Z,football-data,2324,2023-11-05,Villarreal,Ath Bilbao,villarreal,athletic,2,3,,,17,17,6,7,9,3
+2026-08-20T1714Z,football-data,2324,2023-11-05,Real Madrid,Vallecano,real-madrid,rayo-vallecano,0,0,,,22,4,5,0,11,1
+2026-08-20T1714Z,football-data,2324,2023-11-06,Getafe,Cadiz,getafe,,1,0,,,13,6,3,2,6,3
+2026-08-20T1714Z,football-data,2324,2023-11-10,Ath Bilbao,Celta,athletic,celta,4,3,,,21,13,12,5,7,2
+2026-08-20T1714Z,football-data,2324,2023-11-11,Vallecano,Girona,rayo-vallecano,,1,2,,,22,19,9,7,8,3
+2026-08-20T1714Z,football-data,2324,2023-11-11,Almeria,Sociedad,,real-sociedad,1,3,,,7,18,2,6,5,5
+2026-08-20T1714Z,football-data,2324,2023-11-11,Granada,Getafe,,getafe,1,1,,,12,10,6,6,3,5
+2026-08-20T1714Z,football-data,2324,2023-11-11,Osasuna,Las Palmas,osasuna,,1,1,,,11,6,3,1,8,3
+2026-08-20T1714Z,football-data,2324,2023-11-11,Real Madrid,Valencia,real-madrid,valencia,5,1,,,16,10,7,4,4,4
+2026-08-20T1714Z,football-data,2324,2023-11-12,Barcelona,Alaves,barcelona,alaves,2,1,,,11,8,6,1,2,1
+2026-08-20T1714Z,football-data,2324,2023-11-12,Sevilla,Betis,sevilla,betis,1,1,,,13,14,4,6,9,5
+2026-08-20T1714Z,football-data,2324,2023-11-12,Ath Madrid,Villarreal,atletico,villarreal,3,1,,,25,11,10,7,6,3
+2026-08-20T1714Z,football-data,2324,2023-11-24,Alaves,Granada,alaves,,3,1,,,8,11,5,4,6,2
+2026-08-20T1714Z,football-data,2324,2023-11-25,Vallecano,Barcelona,rayo-vallecano,barcelona,1,1,,,10,15,4,4,1,4
+2026-08-20T1714Z,football-data,2324,2023-11-25,Valencia,Celta,valencia,celta,0,0,,,8,13,0,1,5,7
+2026-08-20T1714Z,football-data,2324,2023-11-25,Getafe,Almeria,getafe,,2,1,,,18,13,5,4,3,6
+2026-08-20T1714Z,football-data,2324,2023-11-25,Ath Madrid,Mallorca,atletico,,1,0,,,20,8,3,1,7,3
+2026-08-20T1714Z,football-data,2324,2023-11-26,Villarreal,Osasuna,villarreal,osasuna,3,1,,,10,15,3,7,2,4
+2026-08-20T1714Z,football-data,2324,2023-11-26,Sociedad,Sevilla,real-sociedad,sevilla,2,1,,,11,8,8,2,4,4
+2026-08-20T1714Z,football-data,2324,2023-11-26,Cadiz,Real Madrid,,real-madrid,0,3,,,13,14,4,5,4,4
+2026-08-20T1714Z,football-data,2324,2023-11-26,Betis,Las Palmas,betis,,1,0,,,12,15,6,4,7,6
+2026-08-20T1714Z,football-data,2324,2023-11-27,Girona,Ath Bilbao,,athletic,1,1,,,12,13,2,6,2,6
+2026-08-20T1714Z,football-data,2324,2023-11-29,Mallorca,Cadiz,,,1,1,,,16,6,3,3,7,0
+2026-08-20T1714Z,football-data,2324,2023-12-01,Las Palmas,Getafe,,getafe,2,0,,,11,12,6,4,4,4
+2026-08-20T1714Z,football-data,2324,2023-12-02,Girona,Valencia,,valencia,2,1,,,9,9,5,3,3,2
+2026-08-20T1714Z,football-data,2324,2023-12-02,Ath Bilbao,Vallecano,athletic,rayo-vallecano,4,0,,,9,11,4,3,7,2
+2026-08-20T1714Z,football-data,2324,2023-12-02,Real Madrid,Granada,real-madrid,,2,0,,,11,1,4,0,6,0
+2026-08-20T1714Z,football-data,2324,2023-12-02,Osasuna,Sociedad,osasuna,real-sociedad,1,1,,,9,17,3,5,1,8
+2026-08-20T1714Z,football-data,2324,2023-12-03,Mallorca,Alaves,,alaves,0,0,,,7,7,3,4,5,4
+2026-08-20T1714Z,football-data,2324,2023-12-03,Almeria,Betis,,betis,0,0,,,20,6,8,2,4,6
+2026-08-20T1714Z,football-data,2324,2023-12-03,Sevilla,Villarreal,sevilla,villarreal,1,1,,,18,5,4,4,8,4
+2026-08-20T1714Z,football-data,2324,2023-12-03,Barcelona,Ath Madrid,barcelona,atletico,1,0,,,13,9,2,4,7,2
+2026-08-20T1714Z,football-data,2324,2023-12-04,Celta,Cadiz,celta,,1,1,,,26,2,7,1,12,1
+2026-08-20T1714Z,football-data,2324,2023-12-08,Getafe,Valencia,getafe,valencia,1,0,,,8,3,6,0,7,0
+2026-08-20T1714Z,football-data,2324,2023-12-09,Alaves,Las Palmas,alaves,,0,1,,,19,9,5,2,12,3
+2026-08-20T1714Z,football-data,2324,2023-12-09,Betis,Real Madrid,betis,real-madrid,1,1,,,14,12,6,2,8,6
+2026-08-20T1714Z,football-data,2324,2023-12-09,Villarreal,Sociedad,villarreal,real-sociedad,0,3,,,20,16,4,5,5,3
+2026-08-20T1714Z,football-data,2324,2023-12-09,Mallorca,Sevilla,,sevilla,1,0,,,6,19,3,5,4,12
+2026-08-20T1714Z,football-data,2324,2023-12-10,Ath Madrid,Almeria,atletico,,2,1,,,13,19,4,5,3,15
+2026-08-20T1714Z,football-data,2324,2023-12-10,Cadiz,Osasuna,,osasuna,1,1,,,12,13,5,5,2,4
+2026-08-20T1714Z,football-data,2324,2023-12-10,Barcelona,Girona,barcelona,,2,4,,,31,15,11,7,8,3
+2026-08-20T1714Z,football-data,2324,2023-12-11,Granada,Ath Bilbao,,athletic,1,1,,,7,19,4,4,1,8
+2026-08-20T1714Z,football-data,2324,2023-12-11,Vallecano,Celta,rayo-vallecano,celta,0,0,,,17,4,4,2,8,1
+2026-08-20T1714Z,football-data,2324,2023-12-15,Osasuna,Vallecano,osasuna,rayo-vallecano,1,0,,,10,9,4,3,9,1
+2026-08-20T1714Z,football-data,2324,2023-12-16,Celta,Granada,celta,,1,0,,,11,7,4,2,7,1
+2026-08-20T1714Z,football-data,2324,2023-12-16,Ath Bilbao,Ath Madrid,athletic,atletico,2,0,,,16,7,7,3,3,7
+2026-08-20T1714Z,football-data,2324,2023-12-16,Sevilla,Getafe,sevilla,getafe,0,3,,,12,14,4,7,4,2
+2026-08-20T1714Z,football-data,2324,2023-12-16,Valencia,Barcelona,valencia,barcelona,1,1,,,11,16,4,8,4,6
+2026-08-20T1714Z,football-data,2324,2023-12-17,Almeria,Mallorca,,,0,0,,,7,20,1,2,4,4
+2026-08-20T1714Z,football-data,2324,2023-12-17,Sociedad,Betis,real-sociedad,betis,0,0,,,12,12,4,3,3,7
+2026-08-20T1714Z,football-data,2324,2023-12-17,Las Palmas,Cadiz,,,1,1,,,7,13,2,5,4,6
+2026-08-20T1714Z,football-data,2324,2023-12-17,Real Madrid,Villarreal,real-madrid,villarreal,4,1,,,22,3,9,1,11,0
+2026-08-20T1714Z,football-data,2324,2023-12-18,Girona,Alaves,,alaves,3,0,,,9,12,4,2,3,2
+2026-08-20T1714Z,football-data,2324,2023-12-19,Vallecano,Valencia,rayo-vallecano,valencia,0,1,,,7,8,1,3,8,1
+2026-08-20T1714Z,football-data,2324,2023-12-19,Ath Madrid,Getafe,atletico,getafe,3,3,,,8,29,4,9,1,12
+2026-08-20T1714Z,football-data,2324,2023-12-19,Granada,Sevilla,,sevilla,0,3,,,12,12,3,5,6,4
+2026-08-20T1714Z,football-data,2324,2023-12-20,Barcelona,Almeria,barcelona,,3,2,,,30,10,11,5,12,0
+2026-08-20T1714Z,football-data,2324,2023-12-20,Ath Bilbao,Las Palmas,athletic,,1,0,,,19,5,10,1,5,2
+2026-08-20T1714Z,football-data,2324,2023-12-20,Villarreal,Celta,villarreal,celta,3,2,,,12,15,8,5,4,7
+2026-08-20T1714Z,football-data,2324,2023-12-21,Betis,Girona,betis,,1,1,,,21,12,4,4,7,6
+2026-08-20T1714Z,football-data,2324,2023-12-21,Cadiz,Sociedad,,real-sociedad,0,0,,,10,8,2,1,7,5
+2026-08-20T1714Z,football-data,2324,2023-12-21,Alaves,Real Madrid,alaves,real-madrid,0,1,,,8,9,2,4,3,3
+2026-08-20T1714Z,football-data,2324,2023-12-21,Mallorca,Osasuna,,osasuna,3,2,,,15,12,8,7,6,0
+2026-08-20T1714Z,football-data,2324,2023-12-23,Ath Madrid,Sevilla,atletico,sevilla,1,0,,,12,8,4,2,6,5
+2026-08-20T1714Z,football-data,2324,2024-01-02,Getafe,Vallecano,getafe,rayo-vallecano,0,2,,,5,12,0,8,2,3
+2026-08-20T1714Z,football-data,2324,2024-01-02,Sociedad,Alaves,real-sociedad,alaves,1,1,,,16,7,6,2,6,4
+2026-08-20T1714Z,football-data,2324,2024-01-02,Valencia,Villarreal,valencia,villarreal,3,1,,,11,8,8,4,4,3
+2026-08-20T1714Z,football-data,2324,2024-01-03,Granada,Cadiz,,,2,0,,,15,15,8,2,5,6
+2026-08-20T1714Z,football-data,2324,2024-01-03,Celta,Betis,celta,betis,2,1,,,19,14,6,3,8,7
+2026-08-20T1714Z,football-data,2324,2024-01-03,Real Madrid,Mallorca,real-madrid,,1,0,,,17,7,5,0,5,4
+2026-08-20T1714Z,football-data,2324,2024-01-03,Girona,Ath Madrid,,atletico,4,3,,,17,18,9,12,7,8
+2026-08-20T1714Z,football-data,2324,2024-01-04,Osasuna,Almeria,osasuna,,1,0,,,14,4,2,0,5,4
+2026-08-20T1714Z,football-data,2324,2024-01-04,Sevilla,Ath Bilbao,sevilla,athletic,0,2,,,11,15,2,6,5,4
+2026-08-20T1714Z,football-data,2324,2024-01-04,Las Palmas,Barcelona,,barcelona,1,2,,,12,15,3,5,5,10
+2026-08-20T1714Z,football-data,2324,2024-01-12,Sevilla,Alaves,sevilla,alaves,2,3,,,19,16,4,8,5,4
+2026-08-20T1714Z,football-data,2324,2024-01-13,Las Palmas,Villarreal,,villarreal,3,0,,,8,17,3,3,4,6
+2026-08-20T1714Z,football-data,2324,2024-01-13,Mallorca,Celta,,celta,1,1,,,17,6,6,2,10,1
+2026-08-20T1714Z,football-data,2324,2024-01-13,Ath Bilbao,Sociedad,athletic,real-sociedad,2,1,,,10,9,3,1,5,5
+2026-08-20T1714Z,football-data,2324,2024-01-13,Betis,Granada,betis,,1,0,,,25,6,6,2,13,1
+2026-08-20T1714Z,football-data,2324,2024-01-14,Almeria,Girona,,,0,0,,,20,5,3,1,4,3
+2026-08-20T1714Z,football-data,2324,2024-01-14,Cadiz,Valencia,,valencia,1,4,,,10,9,2,5,3,1
+2026-08-20T1714Z,football-data,2324,2024-01-19,Alaves,Cadiz,alaves,,1,0,,,13,9,3,1,4,4
+2026-08-20T1714Z,football-data,2324,2024-01-20,Vallecano,Las Palmas,rayo-vallecano,,0,2,,,16,10,3,5,12,0
+2026-08-20T1714Z,football-data,2324,2024-01-20,Villarreal,Mallorca,villarreal,,1,1,,,18,8,5,2,4,6
+2026-08-20T1714Z,football-data,2324,2024-01-20,Valencia,Ath Bilbao,valencia,athletic,1,0,,,6,6,1,3,4,2
+2026-08-20T1714Z,football-data,2324,2024-01-20,Celta,Sociedad,celta,real-sociedad,0,1,,,6,6,2,2,6,3
+2026-08-20T1714Z,football-data,2324,2024-01-21,Osasuna,Getafe,osasuna,getafe,3,2,,,13,10,7,7,1,4
+2026-08-20T1714Z,football-data,2324,2024-01-21,Real Madrid,Almeria,real-madrid,,3,2,,,18,10,6,2,6,3
+2026-08-20T1714Z,football-data,2324,2024-01-21,Betis,Barcelona,betis,barcelona,2,4,,,14,11,5,4,3,4
+2026-08-20T1714Z,football-data,2324,2024-01-21,Girona,Sevilla,,sevilla,5,1,,,12,9,8,3,4,5
+2026-08-20T1714Z,football-data,2324,2024-01-22,Granada,Ath Madrid,,atletico,0,1,,,17,10,2,5,6,2
+2026-08-20T1714Z,football-data,2324,2024-01-26,Almeria,Alaves,,alaves,0,3,,,19,11,7,3,11,3
+2026-08-20T1714Z,football-data,2324,2024-01-27,Sociedad,Vallecano,real-sociedad,rayo-vallecano,0,0,,,6,5,3,0,2,2
+2026-08-20T1714Z,football-data,2324,2024-01-27,Las Palmas,Real Madrid,,real-madrid,1,2,,,7,13,2,5,1,6
+2026-08-20T1714Z,football-data,2324,2024-01-27,Barcelona,Villarreal,barcelona,villarreal,3,5,,,22,9,10,6,10,0
+2026-08-20T1714Z,football-data,2324,2024-01-27,Mallorca,Betis,,betis,0,1,,,14,8,1,2,5,4
+2026-08-20T1714Z,football-data,2324,2024-01-28,Celta,Girona,celta,,0,1,,,10,15,5,6,5,7
+2026-08-20T1714Z,football-data,2324,2024-01-28,Cadiz,Ath Bilbao,,athletic,0,0,,,9,8,2,0,6,8
+2026-08-20T1714Z,football-data,2324,2024-01-28,Sevilla,Osasuna,sevilla,osasuna,1,1,,,10,11,5,4,2,4
+2026-08-20T1714Z,football-data,2324,2024-01-28,Ath Madrid,Valencia,atletico,valencia,2,0,,,12,10,8,3,3,6
+2026-08-20T1714Z,football-data,2324,2024-01-29,Getafe,Granada,getafe,,2,0,,,7,16,4,3,4,3
+2026-08-20T1714Z,football-data,2324,2024-01-31,Barcelona,Osasuna,barcelona,osasuna,1,0,,,16,9,4,1,6,6
+2026-08-20T1714Z,football-data,2324,2024-01-31,Ath Madrid,Vallecano,atletico,rayo-vallecano,2,1,,,8,10,3,2,5,6
+2026-08-20T1714Z,football-data,2324,2024-02-01,Getafe,Real Madrid,getafe,real-madrid,0,2,,,10,16,2,9,2,6
+2026-08-20T1714Z,football-data,2324,2024-02-02,Ath Bilbao,Mallorca,athletic,,4,0,,,13,6,6,2,6,2
+2026-08-20T1714Z,football-data,2324,2024-02-03,Valencia,Almeria,valencia,,2,1,,,7,15,2,5,0,6
+2026-08-20T1714Z,football-data,2324,2024-02-03,Granada,Las Palmas,,,1,1,,,3,16,1,6,2,9
+2026-08-20T1714Z,football-data,2324,2024-02-03,Alaves,Barcelona,alaves,barcelona,1,3,,,13,8,2,5,14,5
+2026-08-20T1714Z,football-data,2324,2024-02-03,Girona,Sociedad,,real-sociedad,0,0,,,11,11,3,2,3,4
+2026-08-20T1714Z,football-data,2324,2024-02-04,Villarreal,Cadiz,villarreal,,0,0,,,19,8,4,2,13,2
+2026-08-20T1714Z,football-data,2324,2024-02-04,Osasuna,Celta,osasuna,celta,0,3,,,18,6,1,5,9,1
+2026-08-20T1714Z,football-data,2324,2024-02-04,Betis,Getafe,betis,getafe,1,1,,,9,11,3,2,3,5
+2026-08-20T1714Z,football-data,2324,2024-02-04,Real Madrid,Ath Madrid,real-madrid,atletico,1,1,,,17,10,4,5,2,8
+2026-08-20T1714Z,football-data,2324,2024-02-05,Vallecano,Sevilla,rayo-vallecano,sevilla,1,2,,,22,10,5,6,6,0
+2026-08-20T1714Z,football-data,2324,2024-02-09,Cadiz,Betis,,betis,0,2,,,14,13,5,5,5,3
+2026-08-20T1714Z,football-data,2324,2024-02-10,Alaves,Villarreal,alaves,villarreal,1,1,,,17,12,4,4,10,9
+2026-08-20T1714Z,football-data,2324,2024-02-10,Sociedad,Osasuna,real-sociedad,osasuna,0,1,,,21,9,3,2,7,4
+2026-08-20T1714Z,football-data,2324,2024-02-10,Real Madrid,Girona,real-madrid,,4,0,,,16,5,6,0,0,2
+2026-08-20T1714Z,football-data,2324,2024-02-10,Las Palmas,Valencia,,valencia,2,0,,,8,7,3,1,5,0
+2026-08-20T1714Z,football-data,2324,2024-02-11,Getafe,Celta,getafe,celta,3,2,,,11,9,4,4,0,4
+2026-08-20T1714Z,football-data,2324,2024-02-11,Mallorca,Vallecano,,rayo-vallecano,2,1,,,8,11,5,4,5,1
+2026-08-20T1714Z,football-data,2324,2024-02-11,Sevilla,Ath Madrid,sevilla,atletico,1,0,,,10,16,6,5,2,7
+2026-08-20T1714Z,football-data,2324,2024-02-11,Barcelona,Granada,barcelona,,3,3,,,11,11,6,5,6,2
+2026-08-20T1714Z,football-data,2324,2024-02-12,Almeria,Ath Bilbao,,athletic,0,0,,,10,12,4,4,4,10
+2026-08-20T1714Z,football-data,2324,2024-02-16,Villarreal,Getafe,villarreal,getafe,1,1,,,20,11,7,2,8,3
+2026-08-20T1714Z,football-data,2324,2024-02-17,Ath Madrid,Las Palmas,atletico,,5,0,,,13,11,7,2,3,5
+2026-08-20T1714Z,football-data,2324,2024-02-17,Osasuna,Cadiz,osasuna,,2,0,,,11,5,4,1,5,4
+2026-08-20T1714Z,football-data,2324,2024-02-17,Celta,Barcelona,celta,barcelona,1,2,,,13,14,4,4,2,5
+2026-08-20T1714Z,football-data,2324,2024-02-17,Valencia,Sevilla,valencia,sevilla,0,0,,,14,1,4,1,7,2
+2026-08-20T1714Z,football-data,2324,2024-02-18,Vallecano,Real Madrid,rayo-vallecano,real-madrid,1,1,,,8,11,3,4,4,10
+2026-08-20T1714Z,football-data,2324,2024-02-18,Granada,Almeria,,,1,1,,,19,13,7,3,10,4
+2026-08-20T1714Z,football-data,2324,2024-02-18,Mallorca,Sociedad,,real-sociedad,1,2,,,4,19,1,5,3,9
+2026-08-20T1714Z,football-data,2324,2024-02-18,Betis,Alaves,betis,alaves,0,0,,,13,13,2,4,6,8
+2026-08-20T1714Z,football-data,2324,2024-02-19,Ath Bilbao,Girona,athletic,,3,2,,,14,12,7,6,3,4
+2026-08-20T1714Z,football-data,2324,2024-02-23,Sociedad,Villarreal,real-sociedad,villarreal,1,3,,,21,6,8,4,13,2
+2026-08-20T1714Z,football-data,2324,2024-02-24,Barcelona,Getafe,barcelona,getafe,4,0,,,17,10,9,4,5,8
+2026-08-20T1714Z,football-data,2324,2024-02-24,Alaves,Mallorca,alaves,,1,1,,,9,15,1,8,3,3
+2026-08-20T1714Z,football-data,2324,2024-02-24,Almeria,Ath Madrid,,atletico,2,2,,,9,18,4,9,2,7
+2026-08-20T1714Z,football-data,2324,2024-02-25,Cadiz,Celta,,celta,2,2,,,19,7,6,3,9,1
+2026-08-20T1714Z,football-data,2324,2024-02-25,Betis,Ath Bilbao,betis,athletic,3,1,,,13,3,5,1,5,3
+2026-08-20T1714Z,football-data,2324,2024-02-25,Las Palmas,Osasuna,,osasuna,1,1,,,9,6,3,2,6,7
+2026-08-20T1714Z,football-data,2324,2024-02-25,Real Madrid,Sevilla,real-madrid,sevilla,1,0,,,16,4,6,1,7,2
+2026-08-20T1714Z,football-data,2324,2024-02-26,Girona,Vallecano,,rayo-vallecano,3,0,,,14,7,8,1,2,2
+2026-08-20T1714Z,football-data,2324,2024-03-01,Celta,Almeria,celta,,1,0,,,15,3,6,0,7,0
+2026-08-20T1714Z,football-data,2324,2024-03-02,Sevilla,Sociedad,sevilla,real-sociedad,3,2,,,12,13,5,4,2,5
+2026-08-20T1714Z,football-data,2324,2024-03-02,Vallecano,Cadiz,rayo-vallecano,,1,1,,,9,16,5,5,4,9
+2026-08-20T1714Z,football-data,2324,2024-03-02,Getafe,Las Palmas,getafe,,3,3,,,16,14,5,5,4,4
+2026-08-20T1714Z,football-data,2324,2024-03-02,Valencia,Real Madrid,valencia,real-madrid,2,2,,,12,10,5,5,2,2
+2026-08-20T1714Z,football-data,2324,2024-03-03,Villarreal,Granada,villarreal,,5,1,,,16,9,10,3,6,4
+2026-08-20T1714Z,football-data,2324,2024-03-03,Ath Madrid,Betis,atletico,betis,2,1,,,17,12,12,6,4,6
+2026-08-20T1714Z,football-data,2324,2024-03-03,Mallorca,Girona,,,1,0,,,16,15,2,4,8,5
+2026-08-20T1714Z,football-data,2324,2024-03-03,Ath Bilbao,Barcelona,athletic,barcelona,0,0,,,8,8,2,2,4,4
+2026-08-20T1714Z,football-data,2324,2024-03-04,Osasuna,Alaves,osasuna,alaves,1,0,,,15,10,4,4,5,5
+2026-08-20T1714Z,football-data,2324,2024-03-08,Barcelona,Mallorca,barcelona,,1,0,,,20,9,6,3,4,1
+2026-08-20T1714Z,football-data,2324,2024-03-09,Valencia,Getafe,valencia,getafe,1,0,,,10,15,3,5,5,5
+2026-08-20T1714Z,football-data,2324,2024-03-09,Cadiz,Ath Madrid,,atletico,2,0,,,7,8,3,4,3,1
+2026-08-20T1714Z,football-data,2324,2024-03-09,Granada,Sociedad,,real-sociedad,2,3,,,13,11,6,8,4,6
+2026-08-20T1714Z,football-data,2324,2024-03-09,Girona,Osasuna,,osasuna,2,0,,,11,7,6,1,5,7
+2026-08-20T1714Z,football-data,2324,2024-03-10,Alaves,Vallecano,alaves,rayo-vallecano,1,0,,,12,9,4,3,7,5
+2026-08-20T1714Z,football-data,2324,2024-03-10,Las Palmas,Ath Bilbao,,athletic,0,2,,,14,7,2,2,10,3
+2026-08-20T1714Z,football-data,2324,2024-03-10,Real Madrid,Celta,real-madrid,celta,4,0,,,24,11,13,1,12,1
+2026-08-20T1714Z,football-data,2324,2024-03-10,Betis,Villarreal,betis,villarreal,2,3,,,13,6,4,4,11,4
+2026-08-20T1714Z,football-data,2324,2024-03-11,Almeria,Sevilla,,sevilla,2,2,,,14,19,4,6,1,8
+2026-08-20T1714Z,football-data,2324,2024-03-15,Sociedad,Cadiz,real-sociedad,,2,0,,,14,13,6,2,8,2
+2026-08-20T1714Z,football-data,2324,2024-03-16,Mallorca,Granada,,,1,0,,,18,8,8,3,10,2
+2026-08-20T1714Z,football-data,2324,2024-03-16,Osasuna,Real Madrid,osasuna,real-madrid,2,4,,,9,17,4,9,5,7
+2026-08-20T1714Z,football-data,2324,2024-03-16,Getafe,Girona,getafe,,1,0,,,11,13,3,3,2,5
+2026-08-20T1714Z,football-data,2324,2024-03-16,Ath Bilbao,Alaves,athletic,alaves,2,0,,,16,7,4,3,5,4
+2026-08-20T1714Z,football-data,2324,2024-03-17,Sevilla,Celta,sevilla,celta,1,2,,,11,18,4,5,3,8
+2026-08-20T1714Z,football-data,2324,2024-03-17,Las Palmas,Almeria,,,0,1,,,21,3,6,2,11,3
+2026-08-20T1714Z,football-data,2324,2024-03-17,Villarreal,Valencia,villarreal,valencia,1,0,,,13,14,7,7,6,2
+2026-08-20T1714Z,football-data,2324,2024-03-17,Vallecano,Betis,rayo-vallecano,betis,2,0,,,8,11,4,1,4,8
+2026-08-20T1714Z,football-data,2324,2024-03-17,Ath Madrid,Barcelona,atletico,barcelona,0,3,,,12,9,3,5,7,3
+2026-08-20T1714Z,football-data,2324,2024-03-29,Cadiz,Granada,,,1,0,,,13,10,5,2,5,2
+2026-08-20T1714Z,football-data,2324,2024-03-30,Getafe,Sevilla,getafe,sevilla,0,1,,,18,10,5,3,7,3
+2026-08-20T1714Z,football-data,2324,2024-03-30,Almeria,Osasuna,,osasuna,0,3,,,12,6,5,4,6,1
+2026-08-20T1714Z,football-data,2324,2024-03-30,Valencia,Mallorca,valencia,,0,0,,,14,11,5,3,3,3
+2026-08-20T1714Z,football-data,2324,2024-03-30,Barcelona,Las Palmas,barcelona,,1,0,,,14,8,2,0,6,1
+2026-08-20T1714Z,football-data,2324,2024-03-31,Celta,Vallecano,celta,rayo-vallecano,0,0,,,13,8,0,2,3,2
+2026-08-20T1714Z,football-data,2324,2024-03-31,Girona,Betis,,betis,3,2,,,9,7,5,4,5,4
+2026-08-20T1714Z,football-data,2324,2024-03-31,Alaves,Sociedad,alaves,real-sociedad,0,1,,,3,12,0,3,3,8
+2026-08-20T1714Z,football-data,2324,2024-03-31,Real Madrid,Ath Bilbao,real-madrid,athletic,2,0,,,9,7,4,3,4,7
+2026-08-20T1714Z,football-data,2324,2024-04-01,Villarreal,Ath Madrid,villarreal,atletico,1,2,,,11,14,2,8,3,3
+2026-08-20T1714Z,football-data,2324,2024-04-04,Granada,Valencia,,valencia,0,1,,,13,6,3,2,5,4
+2026-08-20T1714Z,football-data,2324,2024-04-12,Betis,Celta,betis,celta,2,1,,,15,12,3,5,6,5
+2026-08-20T1714Z,football-data,2324,2024-04-13,Ath Madrid,Girona,atletico,,3,1,,,17,12,4,5,2,0
+2026-08-20T1714Z,football-data,2324,2024-04-13,Vallecano,Getafe,rayo-vallecano,getafe,0,0,,,11,7,2,0,3,0
+2026-08-20T1714Z,football-data,2324,2024-04-13,Mallorca,Real Madrid,,real-madrid,0,1,,,6,16,2,9,4,2
+2026-08-20T1714Z,football-data,2324,2024-04-13,Cadiz,Barcelona,,barcelona,0,1,,,14,12,3,2,8,4
+2026-08-20T1714Z,football-data,2324,2024-04-14,Las Palmas,Sevilla,,sevilla,0,2,,,5,10,2,3,6,2
+2026-08-20T1714Z,football-data,2324,2024-04-14,Granada,Alaves,,alaves,2,0,,,9,8,3,3,1,5
+2026-08-20T1714Z,football-data,2324,2024-04-14,Ath Bilbao,Villarreal,athletic,villarreal,1,1,,,13,10,6,2,3,1
+2026-08-20T1714Z,football-data,2324,2024-04-14,Sociedad,Almeria,real-sociedad,,2,2,,,17,7,4,3,5,1
+2026-08-20T1714Z,football-data,2324,2024-04-15,Osasuna,Valencia,osasuna,valencia,0,1,,,13,4,2,3,4,1
+2026-08-20T1714Z,football-data,2324,2024-04-19,Ath Bilbao,Granada,athletic,,1,1,,,17,5,6,0,11,4
+2026-08-20T1714Z,football-data,2324,2024-04-20,Celta,Las Palmas,celta,,4,1,,,21,9,13,4,8,4
+2026-08-20T1714Z,football-data,2324,2024-04-20,Vallecano,Osasuna,rayo-vallecano,osasuna,2,1,,,17,6,6,2,5,1
+2026-08-20T1714Z,football-data,2324,2024-04-20,Valencia,Betis,valencia,betis,1,2,,,8,12,5,6,7,6
+2026-08-20T1714Z,football-data,2324,2024-04-20,Girona,Cadiz,,,4,1,,,10,12,5,5,2,4
+2026-08-20T1714Z,football-data,2324,2024-04-21,Getafe,Sociedad,getafe,real-sociedad,1,1,,,6,7,4,3,0,4
+2026-08-20T1714Z,football-data,2324,2024-04-21,Almeria,Villarreal,,villarreal,1,2,,,24,11,5,3,5,2
+2026-08-20T1714Z,football-data,2324,2024-04-21,Alaves,Ath Madrid,alaves,atletico,2,0,,,8,15,3,4,1,11
+2026-08-20T1714Z,football-data,2324,2024-04-21,Real Madrid,Barcelona,real-madrid,barcelona,3,2,,,14,14,8,6,2,8
+2026-08-20T1714Z,football-data,2324,2024-04-22,Sevilla,Mallorca,sevilla,,2,1,,,11,8,4,6,4,4
+2026-08-20T1714Z,football-data,2324,2024-04-26,Sociedad,Real Madrid,real-sociedad,real-madrid,0,1,,,9,5,3,3,11,3
+2026-08-20T1714Z,football-data,2324,2024-04-27,Las Palmas,Girona,,,0,2,,,10,6,5,3,4,2
+2026-08-20T1714Z,football-data,2324,2024-04-27,Almeria,Getafe,,getafe,1,3,,,21,8,11,5,9,2
+2026-08-20T1714Z,football-data,2324,2024-04-27,Alaves,Celta,alaves,celta,3,0,,,16,4,8,0,8,3
+2026-08-20T1714Z,football-data,2324,2024-04-27,Ath Madrid,Ath Bilbao,atletico,athletic,3,1,,,8,7,3,1,3,5
+2026-08-20T1714Z,football-data,2324,2024-04-28,Cadiz,Mallorca,,,1,1,,,10,9,2,2,3,1
+2026-08-20T1714Z,football-data,2324,2024-04-28,Granada,Osasuna,,osasuna,3,0,,,12,11,4,2,0,6
+2026-08-20T1714Z,football-data,2324,2024-04-28,Villarreal,Vallecano,villarreal,rayo-vallecano,3,0,,,15,20,7,4,3,6
+2026-08-20T1714Z,football-data,2324,2024-04-28,Betis,Sevilla,betis,sevilla,1,1,,,15,10,5,1,4,6
+2026-08-20T1714Z,football-data,2324,2024-04-29,Barcelona,Valencia,barcelona,valencia,4,2,,,27,5,13,3,15,1
+2026-08-20T1714Z,football-data,2324,2024-05-03,Getafe,Ath Bilbao,getafe,athletic,0,2,,,34,7,9,2,10,6
+2026-08-20T1714Z,football-data,2324,2024-05-04,Sociedad,Las Palmas,real-sociedad,,2,0,,,9,7,4,1,7,2
+2026-08-20T1714Z,football-data,2324,2024-05-04,Real Madrid,Cadiz,real-madrid,,3,0,,,19,7,9,2,7,4
+2026-08-20T1714Z,football-data,2324,2024-05-04,Girona,Barcelona,,barcelona,4,2,,,9,16,7,7,5,4
+2026-08-20T1714Z,football-data,2324,2024-05-04,Mallorca,Ath Madrid,,atletico,0,1,,,7,9,4,4,6,2
+2026-08-20T1714Z,football-data,2324,2024-05-05,Osasuna,Betis,osasuna,betis,0,2,,,12,10,2,4,8,5
+2026-08-20T1714Z,football-data,2324,2024-05-05,Celta,Villarreal,celta,villarreal,3,2,,,23,11,7,3,2,1
+2026-08-20T1714Z,football-data,2324,2024-05-05,Valencia,Alaves,valencia,alaves,0,1,,,13,14,1,4,5,7
+2026-08-20T1714Z,football-data,2324,2024-05-05,Sevilla,Granada,sevilla,,3,0,,,11,8,5,3,5,4
+2026-08-20T1714Z,football-data,2324,2024-05-05,Vallecano,Almeria,rayo-vallecano,,0,1,,,27,7,10,2,9,2
+2026-08-20T1714Z,football-data,2324,2024-05-10,Alaves,Girona,alaves,,2,2,,,14,15,8,5,5,3
+2026-08-20T1714Z,football-data,2324,2024-05-11,Mallorca,Las Palmas,,,1,0,,,7,7,2,1,2,2
+2026-08-20T1714Z,football-data,2324,2024-05-11,Villarreal,Sevilla,villarreal,sevilla,3,2,,,25,8,7,4,10,1
+2026-08-20T1714Z,football-data,2324,2024-05-11,Granada,Real Madrid,,real-madrid,0,4,,,12,13,1,7,8,5
+2026-08-20T1714Z,football-data,2324,2024-05-11,Ath Bilbao,Osasuna,athletic,osasuna,2,2,,,15,13,6,3,8,6
+2026-08-20T1714Z,football-data,2324,2024-05-12,Cadiz,Getafe,,getafe,1,0,,,13,10,6,4,6,2
+2026-08-20T1714Z,football-data,2324,2024-05-12,Ath Madrid,Celta,atletico,celta,1,0,,,21,6,8,2,4,7
+2026-08-20T1714Z,football-data,2324,2024-05-12,Valencia,Vallecano,valencia,rayo-vallecano,0,0,,,13,12,5,1,6,3
+2026-08-20T1714Z,football-data,2324,2024-05-12,Betis,Almeria,betis,,3,2,,,14,14,7,7,3,5
+2026-08-20T1714Z,football-data,2324,2024-05-13,Barcelona,Sociedad,barcelona,real-sociedad,2,0,,,14,10,5,3,6,2
+2026-08-20T1714Z,football-data,2324,2024-05-14,Osasuna,Mallorca,osasuna,,1,1,,,10,10,4,4,2,4
+2026-08-20T1714Z,football-data,2324,2024-05-14,Real Madrid,Alaves,real-madrid,alaves,5,0,,,22,18,11,10,4,1
+2026-08-20T1714Z,football-data,2324,2024-05-14,Girona,Villarreal,,villarreal,0,1,,,22,11,5,3,5,1
+2026-08-20T1714Z,football-data,2324,2024-05-15,Sevilla,Cadiz,sevilla,,0,1,,,14,19,3,7,1,9
+2026-08-20T1714Z,football-data,2324,2024-05-15,Vallecano,Granada,rayo-vallecano,,2,1,,,18,10,9,1,6,6
+2026-08-20T1714Z,football-data,2324,2024-05-15,Celta,Ath Bilbao,celta,athletic,2,1,,,10,7,4,2,2,3
+2026-08-20T1714Z,football-data,2324,2024-05-15,Getafe,Ath Madrid,getafe,atletico,0,3,,,8,7,3,3,6,3
+2026-08-20T1714Z,football-data,2324,2024-05-16,Las Palmas,Betis,,betis,2,2,,,16,6,9,4,4,8
+2026-08-20T1714Z,football-data,2324,2024-05-16,Almeria,Barcelona,,barcelona,0,2,,,12,16,3,7,4,7
+2026-08-20T1714Z,football-data,2324,2024-05-16,Sociedad,Valencia,real-sociedad,valencia,1,0,,,10,7,5,3,3,3
+2026-08-20T1714Z,football-data,2324,2024-05-18,Alaves,Getafe,alaves,getafe,1,0,,,9,10,2,4,2,1
+2026-08-20T1714Z,football-data,2324,2024-05-19,Ath Bilbao,Sevilla,athletic,sevilla,2,0,,,15,9,6,4,8,3
+2026-08-20T1714Z,football-data,2324,2024-05-19,Ath Madrid,Osasuna,atletico,osasuna,1,4,,,15,15,2,6,7,5
+2026-08-20T1714Z,football-data,2324,2024-05-19,Barcelona,Vallecano,barcelona,rayo-vallecano,3,0,,,14,15,6,4,7,5
+2026-08-20T1714Z,football-data,2324,2024-05-19,Betis,Sociedad,betis,real-sociedad,0,2,,,18,5,9,2,6,2
+2026-08-20T1714Z,football-data,2324,2024-05-19,Cadiz,Las Palmas,,,0,0,,,10,9,3,1,5,3
+2026-08-20T1714Z,football-data,2324,2024-05-19,Granada,Celta,,celta,1,2,,,11,8,3,5,10,2
+2026-08-20T1714Z,football-data,2324,2024-05-19,Mallorca,Almeria,,,2,2,,,29,7,8,3,12,2
+2026-08-20T1714Z,football-data,2324,2024-05-19,Valencia,Girona,valencia,,1,3,,,20,18,6,5,5,4
+2026-08-20T1714Z,football-data,2324,2024-05-19,Villarreal,Real Madrid,villarreal,real-madrid,4,4,,,21,12,7,6,3,3
+2026-08-20T1714Z,football-data,2324,2024-05-24,Girona,Granada,,,7,0,,,16,10,9,2,4,2
+2026-08-20T1714Z,football-data,2324,2024-05-25,Osasuna,Villarreal,osasuna,villarreal,1,1,,,12,11,6,3,6,4
+2026-08-20T1714Z,football-data,2324,2024-05-25,Sociedad,Ath Madrid,real-sociedad,atletico,0,2,,,14,10,4,4,8,4
+2026-08-20T1714Z,football-data,2324,2024-05-25,Almeria,Cadiz,,,6,1,,,27,12,12,4,1,4
+2026-08-20T1714Z,football-data,2324,2024-05-25,Vallecano,Ath Bilbao,rayo-vallecano,athletic,0,1,,,17,7,4,1,8,2
+2026-08-20T1714Z,football-data,2324,2024-05-25,Real Madrid,Betis,real-madrid,betis,0,0,,,13,11,5,3,4,5
+2026-08-20T1714Z,football-data,2324,2024-05-26,Getafe,Mallorca,getafe,,1,2,,,16,9,6,4,3,4
+2026-08-20T1714Z,football-data,2324,2024-05-26,Celta,Valencia,celta,valencia,2,2,,,9,12,4,1,2,2
+2026-08-20T1714Z,football-data,2324,2024-05-26,Las Palmas,Alaves,,alaves,1,1,,,10,14,4,4,2,6
+2026-08-20T1714Z,football-data,2324,2024-05-26,Sevilla,Barcelona,sevilla,barcelona,1,2,,,15,11,6,6,6,5
+2026-08-20T1714Z,football-data,2425,2024-08-15,Ath Bilbao,Getafe,athletic,getafe,1,1,,,7,9,4,2,5,6
+2026-08-20T1714Z,football-data,2425,2024-08-15,Betis,Girona,betis,,1,1,,,19,13,4,2,4,4
+2026-08-20T1714Z,football-data,2425,2024-08-16,Celta,Alaves,celta,alaves,2,1,,,6,10,4,2,3,3
+2026-08-20T1714Z,football-data,2425,2024-08-16,Las Palmas,Sevilla,,sevilla,2,2,,,13,16,5,5,6,3
+2026-08-20T1714Z,football-data,2425,2024-08-17,Osasuna,Leganes,osasuna,,1,1,,,16,10,5,4,6,4
+2026-08-20T1714Z,football-data,2425,2024-08-17,Valencia,Barcelona,valencia,barcelona,1,2,,,6,18,1,8,3,8
+2026-08-20T1714Z,football-data,2425,2024-08-18,Sociedad,Vallecano,real-sociedad,rayo-vallecano,1,2,,,11,12,5,5,10,5
+2026-08-20T1714Z,football-data,2425,2024-08-18,Mallorca,Real Madrid,,real-madrid,1,1,,,12,13,5,4,8,7
+2026-08-20T1714Z,football-data,2425,2024-08-19,Valladolid,Espanol,,espanyol,1,0,,,12,10,3,2,3,2
+2026-08-20T1714Z,football-data,2425,2024-08-19,Villarreal,Ath Madrid,villarreal,atletico,2,2,,,8,10,3,5,2,3
+2026-08-20T1714Z,football-data,2425,2024-08-23,Celta,Valencia,celta,valencia,3,1,,,7,13,5,5,4,7
+2026-08-20T1714Z,football-data,2425,2024-08-23,Sevilla,Villarreal,sevilla,villarreal,1,2,,,15,6,9,5,7,2
+2026-08-20T1714Z,football-data,2425,2024-08-24,Osasuna,Mallorca,osasuna,,1,0,,,15,11,5,2,5,4
+2026-08-20T1714Z,football-data,2425,2024-08-24,Barcelona,Ath Bilbao,barcelona,athletic,2,1,,,13,9,5,2,5,6
+2026-08-20T1714Z,football-data,2425,2024-08-24,Espanol,Sociedad,espanyol,real-sociedad,0,1,,,13,8,3,4,7,4
+2026-08-20T1714Z,football-data,2425,2024-08-24,Getafe,Vallecano,getafe,rayo-vallecano,0,0,,,12,3,0,1,3,2
+2026-08-20T1714Z,football-data,2425,2024-08-25,Real Madrid,Valladolid,real-madrid,,3,0,,,17,8,9,2,5,5
+2026-08-20T1714Z,football-data,2425,2024-08-25,Leganes,Las Palmas,,,2,1,,,10,10,5,5,3,7
+2026-08-20T1714Z,football-data,2425,2024-08-25,Alaves,Betis,alaves,betis,0,0,,,3,13,1,3,3,8
+2026-08-20T1714Z,football-data,2425,2024-08-25,Ath Madrid,Girona,atletico,,3,0,,,11,13,6,5,1,9
+2026-08-20T1714Z,football-data,2425,2024-08-26,Villarreal,Celta,villarreal,celta,4,3,,,22,18,9,8,7,4
+2026-08-20T1714Z,football-data,2425,2024-08-27,Mallorca,Sevilla,,sevilla,0,0,,,12,16,4,7,5,9
+2026-08-20T1714Z,football-data,2425,2024-08-27,Vallecano,Barcelona,rayo-vallecano,barcelona,1,2,,,8,22,4,5,6,6
+2026-08-20T1714Z,football-data,2425,2024-08-28,Ath Bilbao,Valencia,athletic,valencia,1,0,,,13,2,4,0,5,3
+2026-08-20T1714Z,football-data,2425,2024-08-28,Valladolid,Leganes,,,0,0,,,12,8,2,1,4,4
+2026-08-20T1714Z,football-data,2425,2024-08-28,Ath Madrid,Espanol,atletico,espanyol,0,0,,,24,8,7,1,9,3
+2026-08-20T1714Z,football-data,2425,2024-08-28,Sociedad,Alaves,real-sociedad,alaves,1,2,,,8,12,1,5,8,6
+2026-08-20T1714Z,football-data,2425,2024-08-29,Girona,Osasuna,,osasuna,4,0,,,10,1,5,0,5,0
+2026-08-20T1714Z,football-data,2425,2024-08-29,Las Palmas,Real Madrid,,real-madrid,1,1,,,7,25,3,8,2,6
+2026-08-20T1714Z,football-data,2425,2024-08-31,Barcelona,Valladolid,barcelona,,7,0,,,23,5,10,2,10,1
+2026-08-20T1714Z,football-data,2425,2024-08-31,Ath Bilbao,Ath Madrid,athletic,atletico,0,1,,,8,9,1,2,2,2
+2026-08-20T1714Z,football-data,2425,2024-08-31,Espanol,Vallecano,espanyol,rayo-vallecano,2,1,,,10,17,5,5,3,7
+2026-08-20T1714Z,football-data,2425,2024-08-31,Leganes,Mallorca,,,0,1,,,4,12,2,3,1,3
+2026-08-20T1714Z,football-data,2425,2024-08-31,Valencia,Villarreal,valencia,villarreal,1,1,,,22,9,6,3,14,3
+2026-08-20T1714Z,football-data,2425,2024-09-01,Alaves,Las Palmas,alaves,,2,0,,,15,12,5,7,6,5
+2026-08-20T1714Z,football-data,2425,2024-09-01,Osasuna,Celta,osasuna,celta,3,2,,,10,12,4,3,6,3
+2026-08-20T1714Z,football-data,2425,2024-09-01,Sevilla,Girona,sevilla,,0,2,,,16,11,5,4,7,5
+2026-08-20T1714Z,football-data,2425,2024-09-01,Getafe,Sociedad,getafe,real-sociedad,0,0,,,16,1,1,0,4,1
+2026-08-20T1714Z,football-data,2425,2024-09-01,Real Madrid,Betis,real-madrid,betis,2,0,,,20,12,8,2,7,3
+2026-08-20T1714Z,football-data,2425,2024-09-13,Betis,Leganes,betis,,2,0,,,14,3,5,0,11,1
+2026-08-20T1714Z,football-data,2425,2024-09-14,Mallorca,Villarreal,,villarreal,1,2,,,10,21,5,4,7,6
+2026-08-20T1714Z,football-data,2425,2024-09-14,Espanol,Alaves,espanyol,alaves,3,2,,,9,19,4,6,0,5
+2026-08-20T1714Z,football-data,2425,2024-09-14,Sevilla,Getafe,sevilla,getafe,1,0,,,10,15,4,4,3,4
+2026-08-20T1714Z,football-data,2425,2024-09-14,Sociedad,Real Madrid,real-sociedad,real-madrid,0,2,,,11,16,2,7,6,6
+2026-08-20T1714Z,football-data,2425,2024-09-15,Celta,Valladolid,celta,,3,1,,,14,6,7,1,5,3
+2026-08-20T1714Z,football-data,2425,2024-09-15,Girona,Barcelona,,barcelona,1,4,,,9,20,4,9,1,6
+2026-08-20T1714Z,football-data,2425,2024-09-15,Las Palmas,Ath Bilbao,,athletic,2,3,,,15,9,6,4,9,3
+2026-08-20T1714Z,football-data,2425,2024-09-15,Ath Madrid,Valencia,atletico,valencia,3,0,,,14,5,5,1,7,3
+2026-08-20T1714Z,football-data,2425,2024-09-16,Vallecano,Osasuna,rayo-vallecano,osasuna,3,1,,,17,5,6,2,7,4
+2026-08-20T1714Z,football-data,2425,2024-09-17,Mallorca,Sociedad,,real-sociedad,1,0,,,10,13,4,4,5,5
+2026-08-20T1714Z,football-data,2425,2024-09-18,Betis,Getafe,betis,getafe,2,1,,,18,15,8,5,8,4
+2026-08-20T1714Z,football-data,2425,2024-09-19,Leganes,Ath Bilbao,,athletic,0,2,,,14,10,3,4,4,7
+2026-08-20T1714Z,football-data,2425,2024-09-20,Alaves,Sevilla,alaves,sevilla,2,1,,,10,8,4,2,3,5
+2026-08-20T1714Z,football-data,2425,2024-09-21,Valladolid,Sociedad,,real-sociedad,0,0,,,15,14,2,4,5,7
+2026-08-20T1714Z,football-data,2425,2024-09-21,Osasuna,Las Palmas,osasuna,,2,1,,,13,11,2,4,2,4
+2026-08-20T1714Z,football-data,2425,2024-09-21,Valencia,Girona,valencia,,2,0,,,7,8,2,3,5,4
+2026-08-20T1714Z,football-data,2425,2024-09-21,Real Madrid,Espanol,real-madrid,espanyol,4,1,,,31,10,14,2,9,4
+2026-08-20T1714Z,football-data,2425,2024-09-22,Getafe,Leganes,getafe,,1,1,,,12,6,3,3,6,2
+2026-08-20T1714Z,football-data,2425,2024-09-22,Ath Bilbao,Celta,athletic,celta,3,1,,,10,11,7,4,3,6
+2026-08-20T1714Z,football-data,2425,2024-09-22,Villarreal,Barcelona,villarreal,barcelona,1,5,,,13,17,4,10,7,3
+2026-08-20T1714Z,football-data,2425,2024-09-22,Vallecano,Ath Madrid,rayo-vallecano,atletico,1,1,,,15,10,3,5,3,4
+2026-08-20T1714Z,football-data,2425,2024-09-23,Betis,Mallorca,betis,,1,2,,,14,6,6,6,6,3
+2026-08-20T1714Z,football-data,2425,2024-09-24,Sevilla,Valladolid,sevilla,,2,1,,,22,8,5,2,6,4
+2026-08-20T1714Z,football-data,2425,2024-09-24,Valencia,Osasuna,valencia,osasuna,0,0,,,10,9,2,2,10,5
+2026-08-20T1714Z,football-data,2425,2024-09-24,Real Madrid,Alaves,real-madrid,alaves,3,2,,,10,12,4,3,4,4
+2026-08-20T1714Z,football-data,2425,2024-09-25,Girona,Vallecano,,rayo-vallecano,0,0,,,11,2,0,0,4,3
+2026-08-20T1714Z,football-data,2425,2024-09-25,Barcelona,Getafe,barcelona,getafe,1,0,,,16,7,4,1,7,5
+2026-08-20T1714Z,football-data,2425,2024-09-26,Espanol,Villarreal,espanyol,villarreal,1,2,,,11,15,2,4,4,1
+2026-08-20T1714Z,football-data,2425,2024-09-26,Las Palmas,Betis,,betis,1,1,,,8,14,2,5,1,4
+2026-08-20T1714Z,football-data,2425,2024-09-26,Celta,Ath Madrid,celta,atletico,0,1,,,9,7,4,2,2,3
+2026-08-20T1714Z,football-data,2425,2024-09-27,Valladolid,Mallorca,,,1,2,,,11,14,1,6,7,4
+2026-08-20T1714Z,football-data,2425,2024-09-28,Getafe,Alaves,getafe,alaves,2,0,,,14,9,8,1,2,2
+2026-08-20T1714Z,football-data,2425,2024-09-28,Vallecano,Leganes,rayo-vallecano,,1,1,,,15,13,6,3,5,5
+2026-08-20T1714Z,football-data,2425,2024-09-28,Sociedad,Valencia,real-sociedad,valencia,3,0,,,11,9,6,4,6,4
+2026-08-20T1714Z,football-data,2425,2024-09-28,Osasuna,Barcelona,osasuna,barcelona,4,2,,,11,12,6,5,5,8
+2026-08-20T1714Z,football-data,2425,2024-09-29,Celta,Girona,celta,,1,1,,,12,9,2,4,4,4
+2026-08-20T1714Z,football-data,2425,2024-09-29,Ath Bilbao,Sevilla,athletic,sevilla,1,1,,,13,13,3,4,4,7
+2026-08-20T1714Z,football-data,2425,2024-09-29,Betis,Espanol,betis,espanyol,1,0,,,20,8,12,1,8,4
+2026-08-20T1714Z,football-data,2425,2024-09-29,Ath Madrid,Real Madrid,atletico,real-madrid,1,1,,,12,12,4,4,5,5
+2026-08-20T1714Z,football-data,2425,2024-09-30,Villarreal,Las Palmas,villarreal,,3,1,,,17,7,7,3,3,2
+2026-08-20T1714Z,football-data,2425,2024-10-04,Leganes,Valencia,,valencia,0,0,,,8,6,0,1,1,2
+2026-08-20T1714Z,football-data,2425,2024-10-05,Espanol,Mallorca,espanyol,,2,1,,,8,11,3,4,4,6
+2026-08-20T1714Z,football-data,2425,2024-10-05,Getafe,Osasuna,getafe,osasuna,1,1,,,11,6,3,2,4,2
+2026-08-20T1714Z,football-data,2425,2024-10-05,Las Palmas,Celta,,celta,0,1,,,24,8,5,1,11,2
+2026-08-20T1714Z,football-data,2425,2024-10-05,Valladolid,Vallecano,,rayo-vallecano,1,2,,,13,17,5,3,5,13
+2026-08-20T1714Z,football-data,2425,2024-10-05,Real Madrid,Villarreal,real-madrid,villarreal,2,0,,,11,10,2,1,2,5
+2026-08-20T1714Z,football-data,2425,2024-10-06,Girona,Ath Bilbao,,athletic,2,1,,,14,13,6,4,6,1
+2026-08-20T1714Z,football-data,2425,2024-10-06,Alaves,Barcelona,alaves,barcelona,0,3,,,11,14,2,8,11,3
+2026-08-20T1714Z,football-data,2425,2024-10-06,Sevilla,Betis,sevilla,betis,1,0,,,14,11,5,3,4,1
+2026-08-20T1714Z,football-data,2425,2024-10-06,Sociedad,Ath Madrid,real-sociedad,atletico,1,1,,,16,4,8,1,5,1
+2026-08-20T1714Z,football-data,2425,2024-10-18,Alaves,Valladolid,alaves,,2,3,,,10,12,4,4,5,6
+2026-08-20T1714Z,football-data,2425,2024-10-19,Ath Bilbao,Espanol,athletic,espanyol,4,1,,,10,5,6,2,5,5
+2026-08-20T1714Z,football-data,2425,2024-10-19,Osasuna,Betis,osasuna,betis,1,2,,,19,11,6,7,10,2
+2026-08-20T1714Z,football-data,2425,2024-10-19,Girona,Sociedad,,real-sociedad,0,1,,,8,14,3,4,6,6
+2026-08-20T1714Z,football-data,2425,2024-10-19,Celta,Real Madrid,celta,real-madrid,1,2,,,13,10,5,3,6,2
+2026-08-20T1714Z,football-data,2425,2024-10-20,Mallorca,Vallecano,,rayo-vallecano,1,0,,,19,10,5,2,9,2
+2026-08-20T1714Z,football-data,2425,2024-10-20,Ath Madrid,Leganes,atletico,,3,1,,,24,5,9,2,8,2
+2026-08-20T1714Z,football-data,2425,2024-10-20,Villarreal,Getafe,villarreal,getafe,1,1,,,10,21,4,4,5,5
+2026-08-20T1714Z,football-data,2425,2024-10-20,Barcelona,Sevilla,barcelona,sevilla,5,1,,,21,7,9,1,5,5
+2026-08-20T1714Z,football-data,2425,2024-10-21,Valencia,Las Palmas,valencia,,2,3,,,14,11,7,6,11,2
+2026-08-20T1714Z,football-data,2425,2024-10-25,Espanol,Sevilla,espanyol,sevilla,0,2,,,16,6,1,3,13,2
+2026-08-20T1714Z,football-data,2425,2024-10-26,Valladolid,Villarreal,,villarreal,1,2,,,7,21,3,9,4,6
+2026-08-20T1714Z,football-data,2425,2024-10-26,Vallecano,Alaves,rayo-vallecano,alaves,1,0,,,16,15,4,7,6,2
+2026-08-20T1714Z,football-data,2425,2024-10-26,Las Palmas,Girona,,,1,0,,,12,8,3,3,3,5
+2026-08-20T1714Z,football-data,2425,2024-10-26,Real Madrid,Barcelona,real-madrid,barcelona,0,4,,,9,15,4,7,10,3
+2026-08-20T1714Z,football-data,2425,2024-10-27,Leganes,Celta,,celta,3,0,,,7,18,4,5,4,2
+2026-08-20T1714Z,football-data,2425,2024-10-27,Getafe,Valencia,getafe,valencia,1,1,,,15,2,4,1,8,2
+2026-08-20T1714Z,football-data,2425,2024-10-27,Betis,Ath Madrid,betis,atletico,1,0,,,24,10,3,3,3,10
+2026-08-20T1714Z,football-data,2425,2024-10-27,Sociedad,Osasuna,real-sociedad,osasuna,0,2,,,19,10,9,4,14,4
+2026-08-20T1714Z,football-data,2425,2024-10-28,Mallorca,Ath Bilbao,,athletic,0,0,,,4,20,1,1,1,14
+2026-08-20T1714Z,football-data,2425,2024-11-01,Alaves,Mallorca,alaves,,1,0,,,13,7,3,2,7,2
+2026-08-20T1714Z,football-data,2425,2024-11-02,Osasuna,Valladolid,osasuna,,1,0,,,20,7,4,4,7,2
+2026-08-20T1714Z,football-data,2425,2024-11-02,Girona,Leganes,,,4,3,,,15,8,6,5,6,1
+2026-08-20T1714Z,football-data,2425,2024-11-03,Ath Madrid,Las Palmas,atletico,,2,0,,,15,1,3,1,9,1
+2026-08-20T1714Z,football-data,2425,2024-11-03,Barcelona,Espanol,barcelona,espanyol,3,1,,,14,10,9,3,9,5
+2026-08-20T1714Z,football-data,2425,2024-11-03,Sevilla,Sociedad,sevilla,real-sociedad,0,2,,,8,9,0,3,5,9
+2026-08-20T1714Z,football-data,2425,2024-11-03,Ath Bilbao,Betis,athletic,betis,1,1,,,17,7,8,4,6,2
+2026-08-20T1714Z,football-data,2425,2024-11-04,Celta,Getafe,celta,getafe,1,0,,,10,10,3,2,0,2
+2026-08-20T1714Z,football-data,2425,2024-11-08,Vallecano,Las Palmas,rayo-vallecano,,1,3,,,35,11,7,3,12,4
+2026-08-20T1714Z,football-data,2425,2024-11-09,Real Madrid,Osasuna,real-madrid,osasuna,4,0,,,18,2,8,0,11,3
+2026-08-20T1714Z,football-data,2425,2024-11-09,Villarreal,Alaves,villarreal,alaves,3,0,,,13,9,3,3,7,2
+2026-08-20T1714Z,football-data,2425,2024-11-09,Leganes,Sevilla,,sevilla,1,0,,,8,13,4,2,0,6
+2026-08-20T1714Z,football-data,2425,2024-11-10,Betis,Celta,betis,celta,2,2,,,19,3,6,2,2,0
+2026-08-20T1714Z,football-data,2425,2024-11-10,Mallorca,Ath Madrid,,atletico,0,1,,,12,9,6,2,7,2
+2026-08-20T1714Z,football-data,2425,2024-11-10,Getafe,Girona,getafe,,0,1,,,8,3,0,2,5,2
+2026-08-20T1714Z,football-data,2425,2024-11-10,Valladolid,Ath Bilbao,,athletic,1,1,,,6,17,3,1,5,5
+2026-08-20T1714Z,football-data,2425,2024-11-10,Sociedad,Barcelona,real-sociedad,barcelona,1,0,,,14,11,6,0,7,6
+2026-08-20T1714Z,football-data,2425,2024-11-22,Getafe,Valladolid,getafe,,2,0,,,12,6,5,3,3,2
+2026-08-20T1714Z,football-data,2425,2024-11-23,Valencia,Betis,valencia,betis,4,2,,,11,7,5,3,2,4
+2026-08-20T1714Z,football-data,2425,2024-11-23,Ath Madrid,Alaves,atletico,alaves,2,1,,,11,4,8,1,5,0
+2026-08-20T1714Z,football-data,2425,2024-11-23,Girona,Espanol,,espanyol,4,1,,,12,9,5,1,6,3
+2026-08-20T1714Z,football-data,2425,2024-11-23,Las Palmas,Mallorca,,,2,3,,,14,10,3,3,4,3
+2026-08-20T1714Z,football-data,2425,2024-11-23,Celta,Barcelona,celta,barcelona,2,2,,,15,9,8,4,5,1
+2026-08-20T1714Z,football-data,2425,2024-11-24,Osasuna,Villarreal,osasuna,villarreal,2,2,,,4,17,3,7,0,8
+2026-08-20T1714Z,football-data,2425,2024-11-24,Sevilla,Vallecano,sevilla,rayo-vallecano,1,0,,,11,9,3,1,8,3
+2026-08-20T1714Z,football-data,2425,2024-11-24,Leganes,Real Madrid,,real-madrid,0,3,,,4,16,0,9,2,4
+2026-08-20T1714Z,football-data,2425,2024-11-24,Ath Bilbao,Sociedad,athletic,real-sociedad,1,0,,,12,6,4,1,4,4
+2026-08-20T1714Z,football-data,2425,2024-11-29,Mallorca,Valencia,,valencia,2,1,,,9,7,3,1,3,6
+2026-08-20T1714Z,football-data,2425,2024-11-30,Barcelona,Las Palmas,barcelona,,1,2,,,27,5,8,3,7,0
+2026-08-20T1714Z,football-data,2425,2024-11-30,Alaves,Leganes,alaves,,1,1,,,18,6,7,3,13,8
+2026-08-20T1714Z,football-data,2425,2024-11-30,Espanol,Celta,espanyol,celta,3,1,,,9,16,5,2,2,5
+2026-08-20T1714Z,football-data,2425,2024-11-30,Valladolid,Ath Madrid,,atletico,0,5,,,9,13,1,9,3,5
+2026-08-20T1714Z,football-data,2425,2024-12-01,Villarreal,Girona,villarreal,,2,2,,,13,13,4,6,1,5
+2026-08-20T1714Z,football-data,2425,2024-12-01,Real Madrid,Getafe,real-madrid,getafe,2,0,,,13,8,4,3,5,3
+2026-08-20T1714Z,football-data,2425,2024-12-01,Vallecano,Ath Bilbao,rayo-vallecano,athletic,1,2,,,7,12,4,7,1,7
+2026-08-20T1714Z,football-data,2425,2024-12-01,Sociedad,Betis,real-sociedad,betis,2,0,,,2,7,1,2,0,4
+2026-08-20T1714Z,football-data,2425,2024-12-02,Sevilla,Osasuna,sevilla,osasuna,1,1,,,12,7,5,3,5,1
+2026-08-20T1714Z,football-data,2425,2024-12-03,Mallorca,Barcelona,,barcelona,1,5,,,6,20,1,9,2,5
+2026-08-20T1714Z,football-data,2425,2024-12-04,Ath Bilbao,Real Madrid,athletic,real-madrid,2,1,,,9,10,3,5,5,2
+2026-08-20T1714Z,football-data,2425,2024-12-06,Celta,Mallorca,celta,,2,0,,,12,9,5,4,3,3
+2026-08-20T1714Z,football-data,2425,2024-12-07,Las Palmas,Valladolid,,,2,1,,,11,9,5,2,3,3
+2026-08-20T1714Z,football-data,2425,2024-12-07,Betis,Barcelona,betis,barcelona,2,2,,,12,9,6,3,6,4
+2026-08-20T1714Z,football-data,2425,2024-12-07,Valencia,Vallecano,valencia,rayo-vallecano,0,1,,,14,6,6,1,9,4
+2026-08-20T1714Z,football-data,2425,2024-12-07,Girona,Real Madrid,,real-madrid,0,3,,,10,10,4,7,6,3
+2026-08-20T1714Z,football-data,2425,2024-12-08,Leganes,Sociedad,,real-sociedad,0,3,,,11,15,2,5,5,3
+2026-08-20T1714Z,football-data,2425,2024-12-08,Ath Bilbao,Villarreal,athletic,villarreal,2,0,,,12,11,4,1,3,3
+2026-08-20T1714Z,football-data,2425,2024-12-08,Osasuna,Alaves,osasuna,alaves,2,2,,,16,6,8,3,8,3
+2026-08-20T1714Z,football-data,2425,2024-12-08,Ath Madrid,Sevilla,atletico,sevilla,4,3,,,14,4,9,3,5,3
+2026-08-20T1714Z,football-data,2425,2024-12-09,Getafe,Espanol,getafe,espanyol,1,0,,,15,9,6,1,3,3
+2026-08-20T1714Z,football-data,2425,2024-12-13,Valladolid,Valencia,,valencia,1,0,,,2,14,1,2,1,7
+2026-08-20T1714Z,football-data,2425,2024-12-14,Espanol,Osasuna,espanyol,osasuna,0,0,,,9,6,3,0,5,4
+2026-08-20T1714Z,football-data,2425,2024-12-14,Mallorca,Girona,,,2,1,,,8,13,2,1,2,4
+2026-08-20T1714Z,football-data,2425,2024-12-14,Sevilla,Celta,sevilla,celta,1,0,,,8,10,3,2,3,4
+2026-08-20T1714Z,football-data,2425,2024-12-14,Vallecano,Real Madrid,rayo-vallecano,real-madrid,3,3,,,14,13,5,6,4,3
+2026-08-20T1714Z,football-data,2425,2024-12-15,Ath Madrid,Getafe,atletico,getafe,1,0,,,11,7,3,1,8,3
+2026-08-20T1714Z,football-data,2425,2024-12-15,Alaves,Ath Bilbao,alaves,athletic,1,1,,,6,9,3,2,2,4
+2026-08-20T1714Z,football-data,2425,2024-12-15,Sociedad,Las Palmas,real-sociedad,,0,0,,,15,9,4,3,8,6
+2026-08-20T1714Z,football-data,2425,2024-12-15,Villarreal,Betis,villarreal,betis,1,2,,,17,10,4,4,5,5
+2026-08-20T1714Z,football-data,2425,2024-12-15,Barcelona,Leganes,barcelona,,0,1,,,20,6,4,4,8,2
+2026-08-20T1714Z,football-data,2425,2024-12-18,Espanol,Valencia,espanyol,valencia,1,1,,,10,14,3,4,4,7
+2026-08-20T1714Z,football-data,2425,2024-12-18,Villarreal,Vallecano,villarreal,rayo-vallecano,1,1,,,14,18,5,3,7,7
+2026-08-20T1714Z,football-data,2425,2024-12-20,Girona,Valladolid,,,3,0,,,23,1,7,1,9,1
+2026-08-20T1714Z,football-data,2425,2024-12-21,Getafe,Mallorca,getafe,,0,1,,,18,9,5,2,3,0
+2026-08-20T1714Z,football-data,2425,2024-12-21,Celta,Sociedad,celta,real-sociedad,2,0,,,11,7,7,1,5,7
+2026-08-20T1714Z,football-data,2425,2024-12-21,Osasuna,Ath Bilbao,osasuna,athletic,1,2,,,6,13,3,8,4,4
+2026-08-20T1714Z,football-data,2425,2024-12-21,Barcelona,Ath Madrid,barcelona,atletico,1,2,,,19,5,7,4,11,3
+2026-08-20T1714Z,football-data,2425,2024-12-22,Valencia,Alaves,valencia,alaves,2,2,,,8,11,3,3,5,4
+2026-08-20T1714Z,football-data,2425,2024-12-22,Real Madrid,Sevilla,real-madrid,sevilla,4,2,,,16,10,8,5,6,6
+2026-08-20T1714Z,football-data,2425,2024-12-22,Las Palmas,Espanol,,espanyol,1,0,,,10,9,4,2,2,2
+2026-08-20T1714Z,football-data,2425,2024-12-22,Leganes,Villarreal,,villarreal,2,5,,,5,18,3,9,1,5
+2026-08-20T1714Z,football-data,2425,2024-12-22,Betis,Vallecano,betis,rayo-vallecano,1,1,,,14,10,5,4,5,5
+2026-08-20T1714Z,football-data,2425,2025-01-03,Valencia,Real Madrid,valencia,real-madrid,1,2,,,8,17,5,5,2,5
+2026-08-20T1714Z,football-data,2425,2025-01-10,Vallecano,Celta,rayo-vallecano,celta,2,1,,,8,23,5,7,3,3
+2026-08-20T1714Z,football-data,2425,2025-01-11,Alaves,Girona,alaves,,0,1,,,11,3,2,1,6,3
+2026-08-20T1714Z,football-data,2425,2025-01-11,Valladolid,Betis,,betis,1,0,,,12,14,1,3,1,8
+2026-08-20T1714Z,football-data,2425,2025-01-11,Espanol,Leganes,espanyol,,1,1,,,15,14,5,6,8,4
+2026-08-20T1714Z,football-data,2425,2025-01-11,Sevilla,Valencia,sevilla,valencia,1,1,,,15,5,5,1,10,1
+2026-08-20T1714Z,football-data,2425,2025-01-12,Las Palmas,Getafe,,getafe,1,2,,,15,12,7,3,4,5
+2026-08-20T1714Z,football-data,2425,2025-01-12,Ath Madrid,Osasuna,atletico,osasuna,1,0,,,9,6,5,1,4,0
+2026-08-20T1714Z,football-data,2425,2025-01-13,Sociedad,Villarreal,real-sociedad,villarreal,1,0,,,6,15,3,5,3,7
+2026-08-20T1714Z,football-data,2425,2025-01-17,Espanol,Valladolid,espanyol,,2,1,,,12,11,4,4,1,7
+2026-08-20T1714Z,football-data,2425,2025-01-18,Girona,Sevilla,,sevilla,1,2,,,7,14,4,6,7,4
+2026-08-20T1714Z,football-data,2425,2025-01-18,Leganes,Ath Madrid,,atletico,1,0,,,9,19,3,4,2,9
+2026-08-20T1714Z,football-data,2425,2025-01-18,Betis,Alaves,betis,alaves,1,3,,,7,9,2,5,2,3
+2026-08-20T1714Z,football-data,2425,2025-01-18,Getafe,Barcelona,getafe,barcelona,1,1,,,10,21,4,5,2,10
+2026-08-20T1714Z,football-data,2425,2025-01-19,Celta,Ath Bilbao,celta,athletic,1,2,,,3,14,1,6,3,4
+2026-08-20T1714Z,football-data,2425,2025-01-19,Real Madrid,Las Palmas,real-madrid,,4,1,,,26,6,13,2,8,2
+2026-08-20T1714Z,football-data,2425,2025-01-19,Osasuna,Vallecano,osasuna,rayo-vallecano,1,1,,,12,8,3,3,6,3
+2026-08-20T1714Z,football-data,2425,2025-01-19,Valencia,Sociedad,valencia,real-sociedad,1,0,,,7,9,2,3,4,7
+2026-08-20T1714Z,football-data,2425,2025-01-20,Villarreal,Mallorca,villarreal,,4,0,,,14,9,7,2,6,5
+2026-08-20T1714Z,football-data,2425,2025-01-24,Las Palmas,Osasuna,,osasuna,1,1,,,16,16,7,4,4,2
+2026-08-20T1714Z,football-data,2425,2025-01-25,Mallorca,Betis,,betis,0,1,,,16,8,3,3,4,4
+2026-08-20T1714Z,football-data,2425,2025-01-25,Ath Madrid,Villarreal,atletico,villarreal,1,1,,,20,11,8,1,5,6
+2026-08-20T1714Z,football-data,2425,2025-01-25,Sevilla,Espanol,sevilla,espanyol,1,1,,,25,6,4,1,5,1
+2026-08-20T1714Z,football-data,2425,2025-01-25,Valladolid,Real Madrid,,real-madrid,0,3,,,6,20,2,4,1,7
+2026-08-20T1714Z,football-data,2425,2025-01-26,Vallecano,Girona,rayo-vallecano,,2,1,,,17,12,7,5,4,1
+2026-08-20T1714Z,football-data,2425,2025-01-26,Sociedad,Getafe,real-sociedad,getafe,0,3,,,13,13,4,4,5,2
+2026-08-20T1714Z,football-data,2425,2025-01-26,Ath Bilbao,Leganes,athletic,,0,0,,,29,5,3,2,16,1
+2026-08-20T1714Z,football-data,2425,2025-01-26,Barcelona,Valencia,barcelona,valencia,7,1,,,22,7,11,2,14,4
+2026-08-20T1714Z,football-data,2425,2025-01-27,Alaves,Celta,alaves,celta,1,1,,,3,5,1,2,3,4
+2026-08-20T1714Z,football-data,2425,2025-01-31,Leganes,Vallecano,,rayo-vallecano,0,1,,,5,19,1,3,2,9
+2026-08-20T1714Z,football-data,2425,2025-02-01,Getafe,Sevilla,getafe,sevilla,0,0,,,7,13,1,1,6,5
+2026-08-20T1714Z,football-data,2425,2025-02-01,Villarreal,Valladolid,villarreal,,5,1,,,22,8,8,2,3,6
+2026-08-20T1714Z,football-data,2425,2025-02-01,Ath Madrid,Mallorca,atletico,,2,0,,,17,10,5,1,10,4
+2026-08-20T1714Z,football-data,2425,2025-02-01,Espanol,Real Madrid,espanyol,real-madrid,1,0,,,5,21,2,7,1,8
+2026-08-20T1714Z,football-data,2425,2025-02-02,Barcelona,Alaves,barcelona,alaves,1,0,,,11,3,4,0,5,2
+2026-08-20T1714Z,football-data,2425,2025-02-02,Valencia,Celta,valencia,celta,2,1,,,8,3,5,2,5,2
+2026-08-20T1714Z,football-data,2425,2025-02-02,Osasuna,Sociedad,osasuna,real-sociedad,2,1,,,11,13,4,3,3,5
+2026-08-20T1714Z,football-data,2425,2025-02-02,Betis,Ath Bilbao,betis,athletic,2,2,,,10,12,6,4,3,7
+2026-08-20T1714Z,football-data,2425,2025-02-03,Girona,Las Palmas,,,2,1,,,12,10,4,2,11,3
+2026-08-20T1714Z,football-data,2425,2025-02-07,Vallecano,Valladolid,rayo-vallecano,,1,0,,,20,8,6,3,4,2
+2026-08-20T1714Z,football-data,2425,2025-02-08,Celta,Betis,celta,betis,3,2,,,14,12,6,5,4,7
+2026-08-20T1714Z,football-data,2425,2025-02-08,Ath Bilbao,Girona,athletic,,3,0,,,23,3,8,1,11,2
+2026-08-20T1714Z,football-data,2425,2025-02-08,Las Palmas,Villarreal,,villarreal,1,2,,,20,9,4,4,6,5
+2026-08-20T1714Z,football-data,2425,2025-02-08,Real Madrid,Ath Madrid,real-madrid,atletico,1,1,,,23,10,9,1,6,1
+2026-08-20T1714Z,football-data,2425,2025-02-09,Alaves,Getafe,alaves,getafe,0,1,,,12,4,4,3,8,3
+2026-08-20T1714Z,football-data,2425,2025-02-09,Valencia,Leganes,valencia,,2,0,,,18,12,4,4,9,3
+2026-08-20T1714Z,football-data,2425,2025-02-09,Sociedad,Espanol,real-sociedad,espanyol,2,1,,,13,4,3,1,6,0
+2026-08-20T1714Z,football-data,2425,2025-02-09,Sevilla,Barcelona,sevilla,barcelona,1,4,,,8,10,4,6,5,6
+2026-08-20T1714Z,football-data,2425,2025-02-10,Mallorca,Osasuna,,osasuna,1,1,,,10,19,2,4,7,11
+2026-08-20T1714Z,football-data,2425,2025-02-14,Girona,Getafe,,getafe,1,2,,,14,10,4,6,3,3
+2026-08-20T1714Z,football-data,2425,2025-02-15,Leganes,Alaves,,alaves,3,3,,,8,16,3,7,3,2
+2026-08-20T1714Z,football-data,2425,2025-02-15,Osasuna,Real Madrid,osasuna,real-madrid,1,1,,,11,17,4,6,6,2
+2026-08-20T1714Z,football-data,2425,2025-02-15,Ath Madrid,Celta,atletico,celta,1,1,,,9,11,3,4,2,7
+2026-08-20T1714Z,football-data,2425,2025-02-15,Villarreal,Valencia,villarreal,valencia,1,1,,,13,12,4,3,4,5
+2026-08-20T1714Z,football-data,2425,2025-02-16,Espanol,Ath Bilbao,espanyol,athletic,1,1,,,12,14,4,4,2,7
+2026-08-20T1714Z,football-data,2425,2025-02-16,Valladolid,Sevilla,,sevilla,0,4,,,7,11,2,6,3,2
+2026-08-20T1714Z,football-data,2425,2025-02-16,Mallorca,Las Palmas,,,3,1,,,14,9,5,4,3,5
+2026-08-20T1714Z,football-data,2425,2025-02-16,Betis,Sociedad,betis,real-sociedad,3,0,,,24,5,8,1,5,5
+2026-08-20T1714Z,football-data,2425,2025-02-17,Barcelona,Vallecano,barcelona,rayo-vallecano,1,0,,,14,9,5,4,4,5
+2026-08-20T1714Z,football-data,2425,2025-02-21,Celta,Osasuna,celta,osasuna,1,0,,,12,18,5,1,5,4
+2026-08-20T1714Z,football-data,2425,2025-02-22,Alaves,Espanol,alaves,espanyol,0,1,,,15,9,5,2,7,0
+2026-08-20T1714Z,football-data,2425,2025-02-22,Vallecano,Villarreal,rayo-vallecano,villarreal,0,1,,,10,10,5,5,3,5
+2026-08-20T1714Z,football-data,2425,2025-02-22,Valencia,Ath Madrid,valencia,atletico,0,3,,,18,11,2,3,7,0
+2026-08-20T1714Z,football-data,2425,2025-02-22,Las Palmas,Barcelona,,barcelona,0,2,,,10,15,2,5,5,3
+2026-08-20T1714Z,football-data,2425,2025-02-23,Ath Bilbao,Valladolid,athletic,,7,1,,,29,5,16,3,4,4
+2026-08-20T1714Z,football-data,2425,2025-02-23,Real Madrid,Girona,real-madrid,,2,0,,,22,6,5,2,11,5
+2026-08-20T1714Z,football-data,2425,2025-02-23,Getafe,Betis,getafe,betis,1,2,,,10,13,4,6,2,5
+2026-08-20T1714Z,football-data,2425,2025-02-23,Sociedad,Leganes,real-sociedad,,3,0,,,12,8,5,2,3,3
+2026-08-20T1714Z,football-data,2425,2025-02-24,Sevilla,Mallorca,sevilla,,1,1,,,19,13,4,2,4,4
+2026-08-20T1714Z,football-data,2425,2025-02-28,Valladolid,Las Palmas,,,1,1,,,23,4,7,3,13,4
+2026-08-20T1714Z,football-data,2425,2025-03-01,Girona,Celta,,celta,2,2,,,9,10,6,6,4,2
+2026-08-20T1714Z,football-data,2425,2025-03-01,Vallecano,Sevilla,rayo-vallecano,sevilla,1,1,,,20,10,8,5,6,6
+2026-08-20T1714Z,football-data,2425,2025-03-01,Betis,Real Madrid,betis,real-madrid,2,1,,,18,9,3,2,9,2
+2026-08-20T1714Z,football-data,2425,2025-03-01,Ath Madrid,Ath Bilbao,atletico,athletic,1,0,,,12,15,4,3,6,2
+2026-08-20T1714Z,football-data,2425,2025-03-02,Leganes,Getafe,,getafe,1,0,,,5,9,1,0,2,6
+2026-08-20T1714Z,football-data,2425,2025-03-02,Barcelona,Sociedad,barcelona,real-sociedad,4,0,,,33,0,10,0,12,0
+2026-08-20T1714Z,football-data,2425,2025-03-02,Mallorca,Alaves,,alaves,1,1,,,15,19,4,7,3,9
+2026-08-20T1714Z,football-data,2425,2025-03-02,Osasuna,Valencia,osasuna,valencia,3,3,,,12,12,5,5,3,3
+2026-08-20T1714Z,football-data,2425,2025-03-08,Celta,Leganes,celta,,2,1,,,7,12,4,6,2,5
+2026-08-20T1714Z,football-data,2425,2025-03-08,Alaves,Villarreal,alaves,villarreal,1,0,,,5,24,3,2,1,6
+2026-08-20T1714Z,football-data,2425,2025-03-08,Valencia,Valladolid,valencia,,2,1,,,17,11,4,4,5,4
+2026-08-20T1714Z,football-data,2425,2025-03-09,Getafe,Ath Madrid,getafe,atletico,2,1,,,11,4,3,2,4,4
+2026-08-20T1714Z,football-data,2425,2025-03-09,Real Madrid,Vallecano,real-madrid,rayo-vallecano,2,1,,,10,20,5,6,4,6
+2026-08-20T1714Z,football-data,2425,2025-03-09,Ath Bilbao,Mallorca,athletic,,1,1,,,8,9,2,2,3,3
+2026-08-20T1714Z,football-data,2425,2025-03-09,Betis,Las Palmas,betis,,1,0,,,14,8,6,1,11,1
+2026-08-20T1714Z,football-data,2425,2025-03-09,Sociedad,Sevilla,real-sociedad,sevilla,0,1,,,7,9,2,4,6,3
+2026-08-20T1714Z,football-data,2425,2025-03-10,Espanol,Girona,espanyol,,1,1,,,7,18,4,4,4,9
+2026-08-20T1714Z,football-data,2425,2025-03-14,Las Palmas,Alaves,,alaves,2,2,,,14,9,7,3,4,5
+2026-08-20T1714Z,football-data,2425,2025-03-15,Valladolid,Celta,,celta,0,1,,,5,10,2,1,3,4
+2026-08-20T1714Z,football-data,2425,2025-03-15,Mallorca,Espanol,,espanyol,2,1,,,20,2,7,0,6,2
+2026-08-20T1714Z,football-data,2425,2025-03-15,Villarreal,Real Madrid,villarreal,real-madrid,1,2,,,23,9,10,5,11,4
+2026-08-20T1714Z,football-data,2425,2025-03-15,Girona,Valencia,,valencia,1,1,,,14,12,4,2,9,4
+2026-08-20T1714Z,football-data,2425,2025-03-16,Leganes,Betis,,betis,2,3,,,10,21,4,6,3,7
+2026-08-20T1714Z,football-data,2425,2025-03-16,Sevilla,Ath Bilbao,sevilla,athletic,0,1,,,11,9,4,4,4,6
+2026-08-20T1714Z,football-data,2425,2025-03-16,Osasuna,Getafe,osasuna,getafe,1,2,,,12,7,4,4,3,2
+2026-08-20T1714Z,football-data,2425,2025-03-16,Vallecano,Sociedad,rayo-vallecano,real-sociedad,2,2,,,10,8,5,4,4,4
+2026-08-20T1714Z,football-data,2425,2025-03-16,Ath Madrid,Barcelona,atletico,barcelona,2,4,,,7,13,2,6,6,6
+2026-08-20T1714Z,football-data,2425,2025-03-27,Barcelona,Osasuna,barcelona,osasuna,3,0,,,19,4,5,0,8,4
+2026-08-20T1714Z,football-data,2425,2025-03-29,Sociedad,Valladolid,real-sociedad,,2,1,,,12,12,2,5,3,6
+2026-08-20T1714Z,football-data,2425,2025-03-29,Espanol,Ath Madrid,espanyol,atletico,1,1,,,8,13,1,2,4,3
+2026-08-20T1714Z,football-data,2425,2025-03-29,Alaves,Vallecano,alaves,rayo-vallecano,0,2,,,12,11,4,5,8,5
+2026-08-20T1714Z,football-data,2425,2025-03-29,Real Madrid,Leganes,real-madrid,,3,2,,,24,10,10,4,8,3
+2026-08-20T1714Z,football-data,2425,2025-03-30,Getafe,Villarreal,getafe,villarreal,1,2,,,11,9,4,3,3,1
+2026-08-20T1714Z,football-data,2425,2025-03-30,Barcelona,Girona,barcelona,,4,1,,,21,4,9,2,10,2
+2026-08-20T1714Z,football-data,2425,2025-03-30,Ath Bilbao,Osasuna,athletic,osasuna,0,0,,,11,5,5,2,3,4
+2026-08-20T1714Z,football-data,2425,2025-03-30,Valencia,Mallorca,valencia,,1,0,,,8,8,2,2,4,5
+2026-08-20T1714Z,football-data,2425,2025-03-30,Betis,Sevilla,betis,sevilla,2,1,,,11,6,3,2,2,2
+2026-08-20T1714Z,football-data,2425,2025-03-31,Celta,Las Palmas,celta,,1,1,,,19,4,7,2,4,2
+2026-08-20T1714Z,football-data,2425,2025-04-04,Vallecano,Espanol,rayo-vallecano,espanyol,0,4,,,16,15,5,7,8,4
+2026-08-20T1714Z,football-data,2425,2025-04-05,Girona,Alaves,,alaves,0,1,,,11,14,6,3,1,5
+2026-08-20T1714Z,football-data,2425,2025-04-05,Real Madrid,Valencia,real-madrid,valencia,1,2,,,21,10,9,2,9,4
+2026-08-20T1714Z,football-data,2425,2025-04-05,Mallorca,Celta,,celta,1,2,,,7,10,2,4,4,2
+2026-08-20T1714Z,football-data,2425,2025-04-05,Barcelona,Betis,barcelona,betis,1,1,,,13,6,5,2,9,3
+2026-08-20T1714Z,football-data,2425,2025-04-06,Las Palmas,Sociedad,,real-sociedad,1,3,,,13,13,5,8,5,4
+2026-08-20T1714Z,football-data,2425,2025-04-06,Sevilla,Ath Madrid,sevilla,atletico,1,2,,,11,13,6,5,7,7
+2026-08-20T1714Z,football-data,2425,2025-04-06,Valladolid,Getafe,,getafe,0,4,,,5,16,0,9,3,4
+2026-08-20T1714Z,football-data,2425,2025-04-06,Villarreal,Ath Bilbao,villarreal,athletic,0,0,,,12,11,4,2,6,5
+2026-08-20T1714Z,football-data,2425,2025-04-07,Leganes,Osasuna,,osasuna,1,1,,,13,14,7,6,4,8
+2026-08-20T1714Z,football-data,2425,2025-04-11,Valencia,Sevilla,valencia,sevilla,1,0,,,8,12,6,5,3,3
+2026-08-20T1714Z,football-data,2425,2025-04-12,Sociedad,Mallorca,real-sociedad,,0,2,,,15,7,4,3,8,2
+2026-08-20T1714Z,football-data,2425,2025-04-12,Getafe,Las Palmas,getafe,,1,3,,,11,10,6,5,3,2
+2026-08-20T1714Z,football-data,2425,2025-04-12,Celta,Espanol,celta,espanyol,0,2,,,16,5,6,3,13,5
+2026-08-20T1714Z,football-data,2425,2025-04-12,Leganes,Barcelona,,barcelona,0,1,,,6,12,1,3,4,8
+2026-08-20T1714Z,football-data,2425,2025-04-13,Osasuna,Girona,osasuna,,2,1,,,13,18,6,8,4,4
+2026-08-20T1714Z,football-data,2425,2025-04-13,Alaves,Real Madrid,alaves,real-madrid,0,1,,,13,11,6,4,4,4
+2026-08-20T1714Z,football-data,2425,2025-04-13,Betis,Villarreal,betis,villarreal,1,2,,,24,8,5,2,5,5
+2026-08-20T1714Z,football-data,2425,2025-04-13,Ath Bilbao,Vallecano,athletic,rayo-vallecano,3,1,,,13,11,4,3,7,1
+2026-08-20T1714Z,football-data,2425,2025-04-14,Ath Madrid,Valladolid,atletico,,4,2,,,24,6,9,3,5,1
+2026-08-20T1714Z,football-data,2425,2025-04-18,Espanol,Getafe,espanyol,getafe,1,0,,,9,9,3,4,6,8
+2026-08-20T1714Z,football-data,2425,2025-04-19,Vallecano,Valencia,rayo-vallecano,valencia,1,1,,,11,10,4,3,5,2
+2026-08-20T1714Z,football-data,2425,2025-04-19,Barcelona,Celta,barcelona,celta,4,3,,,18,11,6,8,4,1
+2026-08-20T1714Z,football-data,2425,2025-04-19,Mallorca,Leganes,,,0,0,,,11,15,1,1,4,4
+2026-08-20T1714Z,football-data,2425,2025-04-19,Las Palmas,Ath Madrid,,atletico,1,0,,,8,7,2,2,4,4
+2026-08-20T1714Z,football-data,2425,2025-04-20,Valladolid,Osasuna,,osasuna,2,3,,,12,11,5,6,5,2
+2026-08-20T1714Z,football-data,2425,2025-04-20,Villarreal,Sociedad,villarreal,real-sociedad,2,2,,,20,4,5,4,10,4
+2026-08-20T1714Z,football-data,2425,2025-04-20,Sevilla,Alaves,sevilla,alaves,1,1,,,10,11,2,3,3,6
+2026-08-20T1714Z,football-data,2425,2025-04-20,Real Madrid,Ath Bilbao,real-madrid,athletic,1,0,,,22,3,7,1,14,1
+2026-08-20T1714Z,football-data,2425,2025-04-21,Girona,Betis,,betis,1,3,,,11,17,5,9,8,9
+2026-08-20T1714Z,football-data,2425,2025-04-22,Valencia,Espanol,valencia,espanyol,1,1,,,16,8,7,3,6,4
+2026-08-20T1714Z,football-data,2425,2025-04-22,Barcelona,Mallorca,barcelona,,1,0,,,40,4,13,0,13,2
+2026-08-20T1714Z,football-data,2425,2025-04-23,Ath Bilbao,Las Palmas,athletic,,1,0,,,13,10,4,2,3,3
+2026-08-20T1714Z,football-data,2425,2025-04-23,Celta,Villarreal,celta,villarreal,3,0,,,21,4,9,1,6,3
+2026-08-20T1714Z,football-data,2425,2025-04-23,Alaves,Sociedad,alaves,real-sociedad,1,0,,,10,6,1,0,6,6
+2026-08-20T1714Z,football-data,2425,2025-04-23,Getafe,Real Madrid,getafe,real-madrid,0,1,,,20,14,6,7,4,4
+2026-08-20T1714Z,football-data,2425,2025-04-24,Leganes,Girona,,,1,1,,,7,8,1,3,4,5
+2026-08-20T1714Z,football-data,2425,2025-04-24,Osasuna,Sevilla,osasuna,sevilla,1,0,,,9,12,2,3,4,4
+2026-08-20T1714Z,football-data,2425,2025-04-24,Ath Madrid,Vallecano,atletico,rayo-vallecano,3,0,,,10,12,5,5,6,3
+2026-08-20T1714Z,football-data,2425,2025-04-24,Betis,Valladolid,betis,,5,1,,,16,10,6,5,4,4
+2026-08-20T1714Z,football-data,2425,2025-04-27,Villarreal,Espanol,villarreal,espanyol,1,0,,,14,12,5,1,8,6
+2026-08-20T1714Z,football-data,2425,2025-05-02,Vallecano,Getafe,rayo-vallecano,getafe,1,0,,,13,12,8,1,7,3
+2026-08-20T1714Z,football-data,2425,2025-05-03,Alaves,Ath Madrid,alaves,atletico,0,0,,,8,9,2,2,3,5
+2026-08-20T1714Z,football-data,2425,2025-05-03,Villarreal,Osasuna,villarreal,osasuna,4,2,,,15,11,5,4,2,8
+2026-08-20T1714Z,football-data,2425,2025-05-03,Las Palmas,Valencia,,valencia,2,3,,,15,10,3,5,9,5
+2026-08-20T1714Z,football-data,2425,2025-05-03,Valladolid,Barcelona,,barcelona,1,2,,,5,24,4,7,4,8
+2026-08-20T1714Z,football-data,2425,2025-05-04,Real Madrid,Celta,real-madrid,celta,3,2,,,17,14,6,7,4,6
+2026-08-20T1714Z,football-data,2425,2025-05-04,Sevilla,Leganes,sevilla,,2,2,,,25,9,7,3,8,2
+2026-08-20T1714Z,football-data,2425,2025-05-04,Espanol,Betis,espanyol,betis,1,2,,,11,20,5,10,3,7
+2026-08-20T1714Z,football-data,2425,2025-05-04,Sociedad,Ath Bilbao,real-sociedad,athletic,0,0,,,12,3,3,1,7,3
+2026-08-20T1714Z,football-data,2425,2025-05-05,Girona,Mallorca,,,1,0,,,13,9,6,1,5,2
+2026-08-20T1714Z,football-data,2425,2025-05-09,Las Palmas,Vallecano,,rayo-vallecano,0,1,,,11,16,2,5,8,8
+2026-08-20T1714Z,football-data,2425,2025-05-10,Valencia,Getafe,valencia,getafe,3,0,,,10,10,6,3,2,6
+2026-08-20T1714Z,football-data,2425,2025-05-10,Celta,Sevilla,celta,sevilla,3,2,,,8,19,4,10,3,6
+2026-08-20T1714Z,football-data,2425,2025-05-10,Girona,Villarreal,,villarreal,0,1,,,7,14,0,5,5,3
+2026-08-20T1714Z,football-data,2425,2025-05-10,Mallorca,Valladolid,,,2,1,,,12,16,4,7,5,10
+2026-08-20T1714Z,football-data,2425,2025-05-10,Ath Madrid,Sociedad,atletico,real-sociedad,4,0,,,13,6,7,1,3,3
+2026-08-20T1714Z,football-data,2425,2025-05-11,Leganes,Espanol,,espanyol,3,2,,,13,12,5,6,3,8
+2026-08-20T1714Z,football-data,2425,2025-05-11,Barcelona,Real Madrid,barcelona,real-madrid,4,3,,,23,9,9,5,10,2
+2026-08-20T1714Z,football-data,2425,2025-05-11,Ath Bilbao,Alaves,athletic,alaves,1,0,,,11,4,3,1,9,2
+2026-08-20T1714Z,football-data,2425,2025-05-11,Betis,Osasuna,betis,osasuna,1,1,,,10,16,5,5,6,7
+2026-08-20T1714Z,football-data,2425,2025-05-13,Valladolid,Girona,,,0,1,,,11,13,4,5,6,4
+2026-08-20T1714Z,football-data,2425,2025-05-13,Sociedad,Celta,real-sociedad,celta,0,1,,,15,6,5,2,14,1
+2026-08-20T1714Z,football-data,2425,2025-05-13,Sevilla,Las Palmas,sevilla,,1,0,,,10,14,3,3,4,2
+2026-08-20T1714Z,football-data,2425,2025-05-14,Alaves,Valencia,alaves,valencia,1,0,,,11,10,5,3,9,4
+2026-08-20T1714Z,football-data,2425,2025-05-14,Villarreal,Leganes,villarreal,,3,0,,,17,23,7,6,3,6
+2026-08-20T1714Z,football-data,2425,2025-05-14,Real Madrid,Mallorca,real-madrid,,2,1,,,39,4,13,2,26,0
+2026-08-20T1714Z,football-data,2425,2025-05-15,Vallecano,Betis,rayo-vallecano,betis,2,2,,,20,10,6,3,10,7
+2026-08-20T1714Z,football-data,2425,2025-05-15,Osasuna,Ath Madrid,osasuna,atletico,2,0,,,9,9,3,5,3,5
+2026-08-20T1714Z,football-data,2425,2025-05-15,Espanol,Barcelona,espanyol,barcelona,0,2,,,9,12,1,4,3,3
+2026-08-20T1714Z,football-data,2425,2025-05-15,Getafe,Ath Bilbao,getafe,athletic,0,2,,,11,9,1,2,2,5
+2026-08-20T1714Z,football-data,2425,2025-05-18,Ath Madrid,Betis,atletico,betis,4,1,,,20,12,11,7,7,4
+2026-08-20T1714Z,football-data,2425,2025-05-18,Barcelona,Villarreal,barcelona,villarreal,2,3,,,24,7,9,3,11,3
+2026-08-20T1714Z,football-data,2425,2025-05-18,Celta,Vallecano,celta,rayo-vallecano,1,2,,,24,7,7,2,9,2
+2026-08-20T1714Z,football-data,2425,2025-05-18,Las Palmas,Leganes,,,0,1,,,12,11,3,4,9,2
+2026-08-20T1714Z,football-data,2425,2025-05-18,Mallorca,Getafe,,getafe,1,2,,,7,10,1,4,3,4
+2026-08-20T1714Z,football-data,2425,2025-05-18,Osasuna,Espanol,osasuna,espanyol,2,0,,,16,16,3,6,8,6
+2026-08-20T1714Z,football-data,2425,2025-05-18,Sevilla,Real Madrid,sevilla,real-madrid,0,2,,,6,16,1,6,1,7
+2026-08-20T1714Z,football-data,2425,2025-05-18,Sociedad,Girona,real-sociedad,,3,2,,,15,9,9,5,9,2
+2026-08-20T1714Z,football-data,2425,2025-05-18,Valencia,Ath Bilbao,valencia,athletic,0,1,,,6,10,2,4,5,3
+2026-08-20T1714Z,football-data,2425,2025-05-18,Valladolid,Alaves,,alaves,0,1,,,7,14,1,4,5,9
+2026-08-20T1714Z,football-data,2425,2025-05-23,Betis,Valencia,betis,valencia,1,1,,,14,9,4,2,3,2
+2026-08-20T1714Z,football-data,2425,2025-05-24,Real Madrid,Sociedad,real-madrid,real-sociedad,2,0,,,16,9,8,1,11,4
+2026-08-20T1714Z,football-data,2425,2025-05-24,Espanol,Las Palmas,espanyol,,2,0,,,8,10,3,4,3,6
+2026-08-20T1714Z,football-data,2425,2025-05-24,Leganes,Valladolid,,,3,0,,,16,6,6,2,3,4
+2026-08-20T1714Z,football-data,2425,2025-05-24,Alaves,Osasuna,alaves,osasuna,1,1,,,14,19,5,5,5,9
+2026-08-20T1714Z,football-data,2425,2025-05-24,Getafe,Celta,getafe,celta,1,2,,,6,15,1,8,2,6
+2026-08-20T1714Z,football-data,2425,2025-05-24,Vallecano,Mallorca,rayo-vallecano,,0,0,,,27,9,8,2,11,2
+2026-08-20T1714Z,football-data,2425,2025-05-25,Girona,Ath Madrid,,atletico,0,4,,,2,19,1,11,1,8
+2026-08-20T1714Z,football-data,2425,2025-05-25,Villarreal,Sevilla,villarreal,sevilla,4,2,,,12,17,7,6,3,5
+2026-08-20T1714Z,football-data,2425,2025-05-25,Ath Bilbao,Barcelona,athletic,barcelona,0,3,,,10,13,1,4,2,6
+2026-08-20T1714Z,football-data,2526,2025-08-15,Girona,Vallecano,,rayo-vallecano,1,3,,,7,16,2,5,2,4
+2026-08-20T1714Z,football-data,2526,2025-08-15,Villarreal,Oviedo,villarreal,,2,0,,,25,5,10,4,10,1
+2026-08-20T1714Z,football-data,2526,2025-08-16,Mallorca,Barcelona,,barcelona,0,3,,,4,24,1,8,3,6
+2026-08-20T1714Z,football-data,2526,2025-08-16,Alaves,Levante,alaves,levante,2,1,,,15,7,4,3,10,1
+2026-08-20T1714Z,football-data,2526,2025-08-16,Valencia,Sociedad,valencia,real-sociedad,1,1,,,18,13,2,3,8,7
+2026-08-20T1714Z,football-data,2526,2025-08-17,Celta,Getafe,celta,getafe,0,2,,,11,10,3,3,9,3
+2026-08-20T1714Z,football-data,2526,2025-08-17,Ath Bilbao,Sevilla,athletic,sevilla,3,2,,,14,12,3,6,10,1
+2026-08-20T1714Z,football-data,2526,2025-08-17,Espanol,Ath Madrid,espanyol,atletico,2,1,,,10,15,5,4,1,3
+2026-08-20T1714Z,football-data,2526,2025-08-18,Elche,Betis,elche,betis,1,1,,,6,12,2,4,1,3
+2026-08-20T1714Z,football-data,2526,2025-08-19,Real Madrid,Osasuna,real-madrid,osasuna,1,0,,,18,2,5,0,7,0
+2026-08-20T1714Z,football-data,2526,2025-08-22,Betis,Alaves,betis,alaves,1,0,,,16,11,5,5,5,2
+2026-08-20T1714Z,football-data,2526,2025-08-23,Mallorca,Celta,,celta,1,1,,,12,8,4,2,3,4
+2026-08-20T1714Z,football-data,2526,2025-08-23,Ath Madrid,Elche,atletico,elche,1,1,,,13,6,6,2,10,2
+2026-08-20T1714Z,football-data,2526,2025-08-23,Levante,Barcelona,levante,barcelona,2,3,,,8,26,5,10,0,11
+2026-08-20T1714Z,football-data,2526,2025-08-24,Osasuna,Valencia,osasuna,valencia,1,0,,,16,4,4,1,3,4
+2026-08-20T1714Z,football-data,2526,2025-08-24,Sociedad,Espanol,real-sociedad,espanyol,2,2,,,15,14,7,3,5,2
+2026-08-20T1714Z,football-data,2526,2025-08-24,Villarreal,Girona,villarreal,,5,0,,,19,5,7,2,8,1
+2026-08-20T1714Z,football-data,2526,2025-08-24,Oviedo,Real Madrid,,real-madrid,0,3,,,6,26,3,10,1,9
+2026-08-20T1714Z,football-data,2526,2025-08-25,Ath Bilbao,Vallecano,athletic,rayo-vallecano,1,0,,,11,6,4,1,3,6
+2026-08-20T1714Z,football-data,2526,2025-08-25,Sevilla,Getafe,sevilla,getafe,1,2,,,12,9,3,6,5,3
+2026-08-20T1714Z,football-data,2526,2025-08-27,Celta,Betis,celta,betis,1,1,,,14,7,5,2,10,4
+2026-08-20T1714Z,football-data,2526,2025-08-29,Elche,Levante,elche,levante,2,0,,,16,11,5,1,4,2
+2026-08-20T1714Z,football-data,2526,2025-08-29,Valencia,Getafe,valencia,getafe,3,0,,,7,11,4,1,8,6
+2026-08-20T1714Z,football-data,2526,2025-08-30,Alaves,Ath Madrid,alaves,atletico,1,1,,,5,15,2,6,1,6
+2026-08-20T1714Z,football-data,2526,2025-08-30,Oviedo,Sociedad,,real-sociedad,1,0,,,8,18,1,6,1,10
+2026-08-20T1714Z,football-data,2526,2025-08-30,Girona,Sevilla,,sevilla,0,2,,,20,13,5,4,11,3
+2026-08-20T1714Z,football-data,2526,2025-08-30,Real Madrid,Mallorca,real-madrid,,2,1,,,17,9,7,5,4,5
+2026-08-20T1714Z,football-data,2526,2025-08-31,Celta,Villarreal,celta,villarreal,1,1,,,10,8,2,3,1,5
+2026-08-20T1714Z,football-data,2526,2025-08-31,Betis,Ath Bilbao,betis,athletic,1,2,,,9,15,2,6,4,10
+2026-08-20T1714Z,football-data,2526,2025-08-31,Espanol,Osasuna,espanyol,osasuna,1,0,,,10,10,4,3,2,3
+2026-08-20T1714Z,football-data,2526,2025-08-31,Vallecano,Barcelona,rayo-vallecano,barcelona,1,1,,,12,12,6,3,9,4
+2026-08-20T1714Z,football-data,2526,2025-09-12,Sevilla,Elche,sevilla,elche,2,2,,,7,5,3,2,2,2
+2026-08-20T1714Z,football-data,2526,2025-09-13,Getafe,Oviedo,getafe,,2,0,,,10,5,3,1,4,3
+2026-08-20T1714Z,football-data,2526,2025-09-13,Sociedad,Real Madrid,real-sociedad,real-madrid,1,2,,,23,16,4,6,12,4
+2026-08-20T1714Z,football-data,2526,2025-09-13,Ath Bilbao,Alaves,athletic,alaves,0,1,,,12,4,3,2,6,6
+2026-08-20T1714Z,football-data,2526,2025-09-13,Ath Madrid,Villarreal,atletico,villarreal,2,0,,,8,8,3,1,8,3
+2026-08-20T1714Z,football-data,2526,2025-09-14,Celta,Girona,celta,,1,1,,,21,13,7,8,10,3
+2026-08-20T1714Z,football-data,2526,2025-09-14,Levante,Betis,levante,betis,2,2,,,5,28,2,9,4,12
+2026-08-20T1714Z,football-data,2526,2025-09-14,Osasuna,Vallecano,osasuna,rayo-vallecano,2,0,,,9,19,7,6,3,6
+2026-08-20T1714Z,football-data,2526,2025-09-14,Barcelona,Valencia,barcelona,valencia,6,0,,,24,2,10,1,5,4
+2026-08-20T1714Z,football-data,2526,2025-09-15,Espanol,Mallorca,espanyol,,3,2,,,9,24,3,10,3,9
+2026-08-20T1714Z,football-data,2526,2025-09-19,Betis,Sociedad,betis,real-sociedad,3,1,,,21,11,6,5,3,5
+2026-08-20T1714Z,football-data,2526,2025-09-20,Girona,Levante,,levante,0,4,,,7,14,1,7,5,4
+2026-08-20T1714Z,football-data,2526,2025-09-20,Real Madrid,Espanol,real-madrid,espanyol,2,0,,,16,8,5,1,5,3
+2026-08-20T1714Z,football-data,2526,2025-09-20,Alaves,Sevilla,alaves,sevilla,1,2,,,8,9,5,3,4,4
+2026-08-20T1714Z,football-data,2526,2025-09-20,Villarreal,Osasuna,villarreal,osasuna,2,1,,,26,6,8,3,7,0
+2026-08-20T1714Z,football-data,2526,2025-09-20,Valencia,Ath Bilbao,valencia,athletic,2,0,,,13,11,5,5,5,6
+2026-08-20T1714Z,football-data,2526,2025-09-21,Vallecano,Celta,rayo-vallecano,celta,1,1,,,15,9,5,5,5,7
+2026-08-20T1714Z,football-data,2526,2025-09-21,Mallorca,Ath Madrid,,atletico,1,1,,,8,12,3,7,3,6
+2026-08-20T1714Z,football-data,2526,2025-09-21,Elche,Oviedo,elche,,1,0,,,15,12,5,4,3,3
+2026-08-20T1714Z,football-data,2526,2025-09-21,Barcelona,Getafe,barcelona,getafe,3,0,,,16,3,7,2,3,2
+2026-08-20T1714Z,football-data,2526,2025-09-23,Ath Bilbao,Girona,athletic,,1,1,,,17,6,5,3,8,1
+2026-08-20T1714Z,football-data,2526,2025-09-23,Espanol,Valencia,espanyol,valencia,2,2,,,21,5,10,2,8,3
+2026-08-20T1714Z,football-data,2526,2025-09-23,Levante,Real Madrid,levante,real-madrid,1,4,,,11,24,2,10,1,7
+2026-08-20T1714Z,football-data,2526,2025-09-23,Sevilla,Villarreal,sevilla,villarreal,1,2,,,16,12,2,5,3,3
+2026-08-20T1714Z,football-data,2526,2025-09-24,Getafe,Alaves,getafe,alaves,1,1,,,7,10,1,4,2,7
+2026-08-20T1714Z,football-data,2526,2025-09-24,Ath Madrid,Vallecano,atletico,rayo-vallecano,3,2,,,20,9,8,3,8,6
+2026-08-20T1714Z,football-data,2526,2025-09-24,Sociedad,Mallorca,real-sociedad,,1,0,,,17,7,4,3,11,2
+2026-08-20T1714Z,football-data,2526,2025-09-25,Osasuna,Elche,osasuna,elche,1,1,,,9,12,2,4,2,3
+2026-08-20T1714Z,football-data,2526,2025-09-25,Oviedo,Barcelona,,barcelona,1,3,,,7,22,3,10,6,9
+2026-08-20T1714Z,football-data,2526,2025-09-26,Girona,Espanol,,espanyol,0,0,,,12,20,3,5,8,4
+2026-08-20T1714Z,football-data,2526,2025-09-27,Getafe,Levante,getafe,levante,1,1,,,11,11,4,3,6,2
+2026-08-20T1714Z,football-data,2526,2025-09-27,Ath Madrid,Real Madrid,atletico,real-madrid,5,2,,,13,6,7,2,7,2
+2026-08-20T1714Z,football-data,2526,2025-09-27,Mallorca,Alaves,,alaves,1,0,,,12,12,3,3,4,8
+2026-08-20T1714Z,football-data,2526,2025-09-27,Villarreal,Ath Bilbao,villarreal,athletic,1,0,,,14,16,5,4,6,5
+2026-08-20T1714Z,football-data,2526,2025-09-28,Vallecano,Sevilla,rayo-vallecano,sevilla,0,1,,,18,4,6,1,12,4
+2026-08-20T1714Z,football-data,2526,2025-09-28,Elche,Celta,elche,celta,2,1,,,17,8,8,2,7,2
+2026-08-20T1714Z,football-data,2526,2025-09-28,Barcelona,Sociedad,barcelona,real-sociedad,2,1,,,22,7,12,2,12,1
+2026-08-20T1714Z,football-data,2526,2025-09-28,Betis,Osasuna,betis,osasuna,2,0,,,12,12,6,1,5,5
+2026-08-20T1714Z,football-data,2526,2025-09-30,Valencia,Oviedo,valencia,,1,2,,,16,10,5,4,5,4
+2026-08-20T1714Z,football-data,2526,2025-10-03,Osasuna,Getafe,osasuna,getafe,2,1,,,7,6,3,2,1,6
+2026-08-20T1714Z,football-data,2526,2025-10-04,Oviedo,Levante,,levante,0,2,,,13,14,2,5,9,3
+2026-08-20T1714Z,football-data,2526,2025-10-04,Girona,Valencia,,valencia,2,1,,,4,19,4,6,0,7
+2026-08-20T1714Z,football-data,2526,2025-10-04,Ath Bilbao,Mallorca,athletic,,2,1,,,18,7,5,2,7,2
+2026-08-20T1714Z,football-data,2526,2025-10-04,Real Madrid,Villarreal,real-madrid,villarreal,3,1,,,26,9,7,2,4,0
+2026-08-20T1714Z,football-data,2526,2025-10-05,Alaves,Elche,alaves,elche,3,1,,,25,6,5,3,14,4
+2026-08-20T1714Z,football-data,2526,2025-10-05,Sevilla,Barcelona,sevilla,barcelona,4,1,,,13,17,5,8,7,6
+2026-08-20T1714Z,football-data,2526,2025-10-05,Espanol,Betis,espanyol,betis,1,2,,,14,12,5,3,10,5
+2026-08-20T1714Z,football-data,2526,2025-10-05,Sociedad,Vallecano,real-sociedad,rayo-vallecano,0,1,,,10,7,3,2,7,5
+2026-08-20T1714Z,football-data,2526,2025-10-05,Celta,Ath Madrid,celta,atletico,1,1,,,18,6,4,1,6,3
+2026-08-20T1714Z,football-data,2526,2025-10-17,Oviedo,Espanol,,espanyol,0,2,,,13,19,4,10,3,5
+2026-08-20T1714Z,football-data,2526,2025-10-18,Sevilla,Mallorca,sevilla,,1,3,,,13,7,4,6,9,2
+2026-08-20T1714Z,football-data,2526,2025-10-18,Barcelona,Girona,barcelona,,2,1,,,27,11,9,4,11,5
+2026-08-20T1714Z,football-data,2526,2025-10-18,Villarreal,Betis,villarreal,betis,2,2,,,7,16,3,3,5,6
+2026-08-20T1714Z,football-data,2526,2025-10-18,Ath Madrid,Osasuna,atletico,osasuna,1,0,,,18,9,9,2,4,2
+2026-08-20T1714Z,football-data,2526,2025-10-19,Elche,Ath Bilbao,elche,athletic,0,0,,,15,4,5,1,6,2
+2026-08-20T1714Z,football-data,2526,2025-10-19,Celta,Sociedad,celta,real-sociedad,1,1,,,4,17,1,7,1,10
+2026-08-20T1714Z,football-data,2526,2025-10-19,Levante,Vallecano,levante,rayo-vallecano,0,3,,,17,10,4,5,11,4
+2026-08-20T1714Z,football-data,2526,2025-10-19,Getafe,Real Madrid,getafe,real-madrid,0,1,,,7,23,1,10,1,4
+2026-08-20T1714Z,football-data,2526,2025-10-20,Alaves,Valencia,alaves,valencia,0,0,,,13,5,3,2,7,0
+2026-08-20T1714Z,football-data,2526,2025-10-24,Sociedad,Sevilla,real-sociedad,sevilla,2,1,,,5,6,3,1,1,9
+2026-08-20T1714Z,football-data,2526,2025-10-25,Girona,Oviedo,,,3,3,,,8,10,6,5,11,4
+2026-08-20T1714Z,football-data,2526,2025-10-25,Espanol,Elche,espanyol,elche,1,0,,,16,13,7,4,4,2
+2026-08-20T1714Z,football-data,2526,2025-10-25,Ath Bilbao,Getafe,athletic,getafe,0,1,,,7,8,4,3,1,5
+2026-08-20T1714Z,football-data,2526,2025-10-25,Valencia,Villarreal,valencia,villarreal,0,2,,,15,12,3,5,7,5
+2026-08-20T1714Z,football-data,2526,2025-10-26,Mallorca,Levante,,levante,1,1,,,20,13,4,5,5,4
+2026-08-20T1714Z,football-data,2526,2025-10-26,Real Madrid,Barcelona,real-madrid,barcelona,2,1,,,23,15,10,6,12,4
+2026-08-20T1714Z,football-data,2526,2025-10-26,Osasuna,Celta,osasuna,celta,2,3,,,17,11,7,5,6,2
+2026-08-20T1714Z,football-data,2526,2025-10-26,Vallecano,Alaves,rayo-vallecano,alaves,1,0,,,15,12,5,2,7,5
+2026-08-20T1714Z,football-data,2526,2025-10-27,Betis,Ath Madrid,betis,atletico,0,2,,,17,9,5,4,2,5
+2026-08-20T1714Z,football-data,2526,2025-10-31,Getafe,Girona,getafe,,2,1,,,12,8,4,4,8,3
+2026-08-20T1714Z,football-data,2526,2025-11-01,Villarreal,Vallecano,villarreal,rayo-vallecano,4,0,,,16,13,7,3,3,5
+2026-08-20T1714Z,football-data,2526,2025-11-01,Ath Madrid,Sevilla,atletico,sevilla,3,0,,,15,10,6,2,9,4
+2026-08-20T1714Z,football-data,2526,2025-11-01,Sociedad,Ath Bilbao,real-sociedad,athletic,3,2,,,9,11,5,4,6,2
+2026-08-20T1714Z,football-data,2526,2025-11-01,Real Madrid,Valencia,real-madrid,valencia,4,0,,,21,4,11,1,7,1
+2026-08-20T1714Z,football-data,2526,2025-11-02,Levante,Celta,levante,celta,1,2,,,9,20,3,6,4,4
+2026-08-20T1714Z,football-data,2526,2025-11-02,Alaves,Espanol,alaves,espanyol,2,1,,,13,18,4,2,1,6
+2026-08-20T1714Z,football-data,2526,2025-11-02,Barcelona,Elche,barcelona,elche,3,1,,,17,9,5,3,6,3
+2026-08-20T1714Z,football-data,2526,2025-11-02,Betis,Mallorca,betis,,3,0,,,15,14,8,1,4,5
+2026-08-20T1714Z,football-data,2526,2025-11-03,Oviedo,Osasuna,,osasuna,0,0,,,8,11,2,5,4,2
+2026-08-20T1714Z,football-data,2526,2025-11-07,Elche,Sociedad,elche,real-sociedad,1,1,,,12,13,3,5,1,3
+2026-08-20T1714Z,football-data,2526,2025-11-08,Girona,Alaves,,alaves,1,0,,,10,14,2,5,6,1
+2026-08-20T1714Z,football-data,2526,2025-11-08,Sevilla,Osasuna,sevilla,osasuna,1,0,,,10,9,4,3,5,6
+2026-08-20T1714Z,football-data,2526,2025-11-08,Ath Madrid,Levante,atletico,levante,3,1,,,25,6,10,3,21,4
+2026-08-20T1714Z,football-data,2526,2025-11-08,Espanol,Villarreal,espanyol,villarreal,0,2,,,14,9,3,3,4,2
+2026-08-20T1714Z,football-data,2526,2025-11-09,Ath Bilbao,Oviedo,athletic,,1,0,,,21,5,7,2,7,4
+2026-08-20T1714Z,football-data,2526,2025-11-09,Vallecano,Real Madrid,rayo-vallecano,real-madrid,0,0,,,13,21,2,5,5,8
+2026-08-20T1714Z,football-data,2526,2025-11-09,Mallorca,Getafe,,getafe,1,0,,,6,14,4,3,1,14
+2026-08-20T1714Z,football-data,2526,2025-11-09,Valencia,Betis,valencia,betis,1,1,,,17,9,4,2,7,2
+2026-08-20T1714Z,football-data,2526,2025-11-09,Celta,Barcelona,celta,barcelona,2,4,,,5,21,3,9,2,5
+2026-08-20T1714Z,football-data,2526,2025-11-21,Valencia,Levante,valencia,levante,1,0,,,14,8,3,1,7,0
+2026-08-20T1714Z,football-data,2526,2025-11-22,Alaves,Celta,alaves,celta,0,1,,,5,7,2,4,4,2
+2026-08-20T1714Z,football-data,2526,2025-11-22,Barcelona,Ath Bilbao,barcelona,athletic,4,0,,,19,13,7,2,5,7
+2026-08-20T1714Z,football-data,2526,2025-11-22,Osasuna,Sociedad,osasuna,real-sociedad,1,3,,,14,19,4,9,3,3
+2026-08-20T1714Z,football-data,2526,2025-11-22,Villarreal,Mallorca,villarreal,,2,1,,,14,9,7,3,3,1
+2026-08-20T1714Z,football-data,2526,2025-11-23,Oviedo,Vallecano,,rayo-vallecano,0,0,,,8,11,3,3,5,6
+2026-08-20T1714Z,football-data,2526,2025-11-23,Betis,Girona,betis,,1,1,,,23,11,7,4,8,0
+2026-08-20T1714Z,football-data,2526,2025-11-23,Getafe,Ath Madrid,getafe,atletico,0,1,,,9,13,1,6,6,7
+2026-08-20T1714Z,football-data,2526,2025-11-23,Elche,Real Madrid,elche,real-madrid,2,2,,,15,20,6,7,2,8
+2026-08-20T1714Z,football-data,2526,2025-11-24,Espanol,Sevilla,espanyol,sevilla,2,1,,,8,22,5,6,4,13
+2026-08-20T1714Z,football-data,2526,2025-11-28,Getafe,Elche,getafe,elche,1,0,,,15,9,6,4,3,5
+2026-08-20T1714Z,football-data,2526,2025-11-29,Mallorca,Osasuna,,osasuna,2,2,,,7,14,4,2,2,8
+2026-08-20T1714Z,football-data,2526,2025-11-29,Barcelona,Alaves,barcelona,alaves,3,1,,,18,9,6,2,5,4
+2026-08-20T1714Z,football-data,2526,2025-11-29,Levante,Ath Bilbao,levante,athletic,0,2,,,11,14,4,4,4,2
+2026-08-20T1714Z,football-data,2526,2025-11-29,Ath Madrid,Oviedo,atletico,,2,0,,,14,12,8,1,7,2
+2026-08-20T1714Z,football-data,2526,2025-11-30,Sociedad,Villarreal,real-sociedad,villarreal,2,3,,,18,10,7,5,8,2
+2026-08-20T1714Z,football-data,2526,2025-11-30,Sevilla,Betis,sevilla,betis,0,2,,,9,9,3,4,6,4
+2026-08-20T1714Z,football-data,2526,2025-11-30,Celta,Espanol,celta,espanyol,0,1,,,11,9,4,2,4,3
+2026-08-20T1714Z,football-data,2526,2025-11-30,Girona,Real Madrid,,real-madrid,1,1,,,10,25,4,4,2,5
+2026-08-20T1714Z,football-data,2526,2025-12-01,Vallecano,Valencia,rayo-vallecano,valencia,1,1,,,19,10,7,2,10,5
+2026-08-20T1714Z,football-data,2526,2025-12-02,Barcelona,Ath Madrid,barcelona,atletico,3,1,,,19,7,6,2,5,4
+2026-08-20T1714Z,football-data,2526,2025-12-03,Ath Bilbao,Real Madrid,athletic,real-madrid,0,3,,,9,13,4,8,5,7
+2026-08-20T1714Z,football-data,2526,2025-12-05,Oviedo,Mallorca,,,0,0,,,15,13,3,6,8,5
+2026-08-20T1714Z,football-data,2526,2025-12-06,Villarreal,Getafe,villarreal,getafe,2,0,,,10,6,5,0,5,3
+2026-08-20T1714Z,football-data,2526,2025-12-06,Alaves,Sociedad,alaves,real-sociedad,1,0,,,14,10,3,1,5,8
+2026-08-20T1714Z,football-data,2526,2025-12-06,Betis,Barcelona,betis,barcelona,3,5,,,17,16,5,8,7,7
+2026-08-20T1714Z,football-data,2526,2025-12-06,Ath Bilbao,Ath Madrid,athletic,atletico,1,0,,,14,7,3,3,5,6
+2026-08-20T1714Z,football-data,2526,2025-12-07,Elche,Girona,elche,,3,0,,,11,8,6,4,2,2
+2026-08-20T1714Z,football-data,2526,2025-12-07,Valencia,Sevilla,valencia,sevilla,1,1,,,11,4,3,1,2,2
+2026-08-20T1714Z,football-data,2526,2025-12-07,Espanol,Vallecano,espanyol,rayo-vallecano,1,0,,,9,6,2,2,6,2
+2026-08-20T1714Z,football-data,2526,2025-12-07,Real Madrid,Celta,real-madrid,celta,0,2,,,23,7,7,5,8,1
+2026-08-20T1714Z,football-data,2526,2025-12-08,Osasuna,Levante,osasuna,levante,2,0,,,14,11,6,5,3,3
+2026-08-20T1714Z,football-data,2526,2025-12-12,Sociedad,Girona,real-sociedad,,1,2,,,9,14,4,3,4,3
+2026-08-20T1714Z,football-data,2526,2025-12-13,Ath Madrid,Valencia,atletico,valencia,2,1,,,10,13,6,2,5,7
+2026-08-20T1714Z,football-data,2526,2025-12-13,Mallorca,Elche,,elche,3,1,,,15,9,8,0,1,1
+2026-08-20T1714Z,football-data,2526,2025-12-13,Barcelona,Osasuna,barcelona,osasuna,2,0,,,24,3,7,2,14,1
+2026-08-20T1714Z,football-data,2526,2025-12-13,Getafe,Espanol,getafe,espanyol,0,1,,,11,6,1,4,6,4
+2026-08-20T1714Z,football-data,2526,2025-12-14,Sevilla,Oviedo,sevilla,,4,0,,,13,5,7,1,5,3
+2026-08-20T1714Z,football-data,2526,2025-12-14,Celta,Ath Bilbao,celta,athletic,2,0,,,5,14,2,2,1,4
+2026-08-20T1714Z,football-data,2526,2025-12-14,Alaves,Real Madrid,alaves,real-madrid,1,2,,,6,13,2,6,5,7
+2026-08-20T1714Z,football-data,2526,2025-12-15,Vallecano,Betis,rayo-vallecano,betis,0,0,,,23,13,7,6,8,3
+2026-08-20T1714Z,football-data,2526,2025-12-19,Valencia,Mallorca,valencia,,1,1,,,17,4,2,2,12,3
+2026-08-20T1714Z,football-data,2526,2025-12-20,Oviedo,Celta,,celta,0,0,,,10,6,3,2,4,3
+2026-08-20T1714Z,football-data,2526,2025-12-20,Levante,Sociedad,levante,real-sociedad,1,1,,,13,18,3,6,7,10
+2026-08-20T1714Z,football-data,2526,2025-12-20,Osasuna,Alaves,osasuna,alaves,3,0,,,16,7,7,3,9,0
+2026-08-20T1714Z,football-data,2526,2025-12-20,Real Madrid,Sevilla,real-madrid,sevilla,2,0,,,18,14,8,5,6,5
+2026-08-20T1714Z,football-data,2526,2025-12-21,Girona,Ath Madrid,,atletico,0,3,,,9,14,2,6,3,4
+2026-08-20T1714Z,football-data,2526,2025-12-21,Villarreal,Barcelona,villarreal,barcelona,0,2,,,14,19,5,5,5,10
+2026-08-20T1714Z,football-data,2526,2025-12-21,Elche,Vallecano,elche,rayo-vallecano,4,0,,,18,18,6,8,4,5
+2026-08-20T1714Z,football-data,2526,2025-12-21,Betis,Getafe,betis,getafe,4,0,,,19,15,8,3,7,5
+2026-08-20T1714Z,football-data,2526,2025-12-22,Ath Bilbao,Espanol,athletic,espanyol,1,2,,,17,10,7,5,8,4
+2026-08-20T1714Z,football-data,2526,2026-01-02,Vallecano,Getafe,rayo-vallecano,getafe,1,1,,,13,12,4,4,3,2
+2026-08-20T1714Z,football-data,2526,2026-01-03,Celta,Valencia,celta,valencia,4,1,,,12,16,6,5,2,4
+2026-08-20T1714Z,football-data,2526,2026-01-03,Osasuna,Ath Bilbao,osasuna,athletic,1,1,,,11,16,4,6,1,9
+2026-08-20T1714Z,football-data,2526,2026-01-03,Elche,Villarreal,elche,villarreal,1,3,,,15,12,2,4,6,2
+2026-08-20T1714Z,football-data,2526,2026-01-03,Espanol,Barcelona,espanyol,barcelona,0,2,,,14,15,7,6,5,7
+2026-08-20T1714Z,football-data,2526,2026-01-04,Sevilla,Levante,sevilla,levante,0,3,,,15,6,7,4,5,1
+2026-08-20T1714Z,football-data,2526,2026-01-04,Real Madrid,Betis,real-madrid,betis,5,1,,,19,13,9,5,5,8
+2026-08-20T1714Z,football-data,2526,2026-01-04,Alaves,Oviedo,alaves,,1,1,,,18,18,7,6,6,7
+2026-08-20T1714Z,football-data,2526,2026-01-04,Mallorca,Girona,,,1,2,,,9,9,2,4,3,6
+2026-08-20T1714Z,football-data,2526,2026-01-04,Sociedad,Ath Madrid,real-sociedad,atletico,1,1,,,18,10,8,2,6,6
+2026-08-20T1714Z,football-data,2526,2026-01-09,Getafe,Sociedad,getafe,real-sociedad,1,2,,,6,12,3,5,2,4
+2026-08-20T1714Z,football-data,2526,2026-01-10,Oviedo,Betis,,betis,1,1,,,13,15,3,6,5,2
+2026-08-20T1714Z,football-data,2526,2026-01-10,Villarreal,Alaves,villarreal,alaves,3,1,,,11,16,4,5,1,6
+2026-08-20T1714Z,football-data,2526,2026-01-10,Girona,Osasuna,,osasuna,1,0,,,8,13,4,1,2,1
+2026-08-20T1714Z,football-data,2526,2026-01-10,Valencia,Elche,valencia,elche,1,1,,,16,5,4,1,8,6
+2026-08-20T1714Z,football-data,2526,2026-01-11,Vallecano,Mallorca,rayo-vallecano,,2,1,,,14,9,5,2,6,5
+2026-08-20T1714Z,football-data,2526,2026-01-11,Levante,Espanol,levante,espanyol,1,1,,,8,19,2,3,4,3
+2026-08-20T1714Z,football-data,2526,2026-01-12,Sevilla,Celta,sevilla,celta,0,1,,,7,9,2,7,6,1
+2026-08-20T1714Z,football-data,2526,2026-01-16,Espanol,Girona,espanyol,,0,2,,,14,7,2,4,5,4
+2026-08-20T1714Z,football-data,2526,2026-01-17,Real Madrid,Levante,real-madrid,levante,2,0,,,26,10,11,0,8,0
+2026-08-20T1714Z,football-data,2526,2026-01-17,Mallorca,Ath Bilbao,,athletic,3,2,,,18,21,9,11,3,7
+2026-08-20T1714Z,football-data,2526,2026-01-17,Osasuna,Oviedo,osasuna,,3,2,,,16,13,5,5,3,6
+2026-08-20T1714Z,football-data,2526,2026-01-17,Betis,Villarreal,betis,villarreal,2,0,,,15,9,6,3,2,3
+2026-08-20T1714Z,football-data,2526,2026-01-18,Getafe,Valencia,getafe,valencia,0,1,,,14,7,3,1,9,3
+2026-08-20T1714Z,football-data,2526,2026-01-18,Ath Madrid,Alaves,atletico,alaves,1,0,,,23,8,6,0,6,6
+2026-08-20T1714Z,football-data,2526,2026-01-18,Celta,Vallecano,celta,rayo-vallecano,3,0,,,11,14,7,3,5,7
+2026-08-20T1714Z,football-data,2526,2026-01-18,Sociedad,Barcelona,real-sociedad,barcelona,2,1,,,8,25,6,9,6,8
+2026-08-20T1714Z,football-data,2526,2026-01-19,Elche,Sevilla,elche,sevilla,2,2,,,10,25,5,8,9,7
+2026-08-20T1714Z,football-data,2526,2026-01-23,Levante,Elche,levante,elche,3,2,,,26,6,6,3,9,1
+2026-08-20T1714Z,football-data,2526,2026-01-24,Vallecano,Osasuna,rayo-vallecano,osasuna,1,3,,,11,14,4,5,4,3
+2026-08-20T1714Z,football-data,2526,2026-01-24,Valencia,Espanol,valencia,espanyol,3,2,,,10,16,5,6,2,7
+2026-08-20T1714Z,football-data,2526,2026-01-24,Sevilla,Ath Bilbao,sevilla,athletic,2,1,,,10,15,7,3,5,5
+2026-08-20T1714Z,football-data,2526,2026-01-24,Villarreal,Real Madrid,villarreal,real-madrid,0,2,,,8,14,1,4,6,6
+2026-08-20T1714Z,football-data,2526,2026-01-25,Ath Madrid,Mallorca,atletico,,3,0,,,17,6,8,1,10,3
+2026-08-20T1714Z,football-data,2526,2026-01-25,Barcelona,Oviedo,barcelona,,3,0,,,15,12,7,3,10,1
+2026-08-20T1714Z,football-data,2526,2026-01-25,Sociedad,Celta,real-sociedad,celta,3,1,,,10,17,4,4,2,9
+2026-08-20T1714Z,football-data,2526,2026-01-25,Alaves,Betis,alaves,betis,2,1,,,17,18,9,4,6,4
+2026-08-20T1714Z,football-data,2526,2026-01-26,Girona,Getafe,,getafe,1,1,,,12,8,4,2,3,4
+2026-08-20T1714Z,football-data,2526,2026-01-30,Espanol,Alaves,espanyol,alaves,1,2,,,10,11,3,7,4,2
+2026-08-20T1714Z,football-data,2526,2026-01-31,Oviedo,Girona,,,1,0,,,8,9,4,1,4,4
+2026-08-20T1714Z,football-data,2526,2026-01-31,Osasuna,Villarreal,osasuna,villarreal,2,2,,,15,5,5,4,6,2
+2026-08-20T1714Z,football-data,2526,2026-01-31,Levante,Ath Madrid,levante,atletico,0,0,,,10,10,2,4,4,7
+2026-08-20T1714Z,football-data,2526,2026-01-31,Elche,Barcelona,elche,barcelona,1,3,,,9,30,3,8,2,8
+2026-08-20T1714Z,football-data,2526,2026-02-01,Real Madrid,Vallecano,real-madrid,rayo-vallecano,2,1,,,16,11,6,4,9,4
+2026-08-20T1714Z,football-data,2526,2026-02-01,Betis,Valencia,betis,valencia,2,1,,,14,15,2,4,3,5
+2026-08-20T1714Z,football-data,2526,2026-02-01,Getafe,Celta,getafe,celta,0,0,,,9,5,2,1,5,3
+2026-08-20T1714Z,football-data,2526,2026-02-01,Ath Bilbao,Sociedad,athletic,real-sociedad,1,1,,,19,9,4,6,6,3
+2026-08-20T1714Z,football-data,2526,2026-02-02,Mallorca,Sevilla,,sevilla,4,1,,,11,15,7,5,4,8
+2026-08-20T1714Z,football-data,2526,2026-02-06,Celta,Osasuna,celta,osasuna,1,2,,,18,8,4,2,7,3
+2026-08-20T1714Z,football-data,2526,2026-02-07,Barcelona,Mallorca,barcelona,,3,0,,,24,9,7,4,12,3
+2026-08-20T1714Z,football-data,2526,2026-02-07,Sociedad,Elche,real-sociedad,elche,3,1,,,11,11,3,5,2,4
+2026-08-20T1714Z,football-data,2526,2026-02-08,Alaves,Getafe,alaves,getafe,0,2,,,13,17,5,5,6,3
+2026-08-20T1714Z,football-data,2526,2026-02-08,Ath Bilbao,Levante,athletic,levante,4,2,,,22,6,7,3,4,3
+2026-08-20T1714Z,football-data,2526,2026-02-08,Sevilla,Girona,sevilla,,1,1,,,11,15,3,6,5,7
+2026-08-20T1714Z,football-data,2526,2026-02-08,Ath Madrid,Betis,atletico,betis,0,1,,,10,8,5,4,7,3
+2026-08-20T1714Z,football-data,2526,2026-02-08,Valencia,Real Madrid,valencia,real-madrid,0,2,,,7,11,0,6,5,8
+2026-08-20T1714Z,football-data,2526,2026-02-09,Villarreal,Espanol,villarreal,espanyol,4,1,,,10,9,3,2,5,8
+2026-08-20T1714Z,football-data,2526,2026-02-13,Elche,Osasuna,elche,osasuna,0,0,,,17,6,5,2,10,3
+2026-08-20T1714Z,football-data,2526,2026-02-14,Espanol,Celta,espanyol,celta,2,2,,,9,14,3,5,2,2
+2026-08-20T1714Z,football-data,2526,2026-02-14,Getafe,Villarreal,getafe,villarreal,2,1,,,5,8,2,2,3,4
+2026-08-20T1714Z,football-data,2526,2026-02-14,Sevilla,Alaves,sevilla,alaves,1,1,,,4,12,2,1,0,3
+2026-08-20T1714Z,football-data,2526,2026-02-14,Real Madrid,Sociedad,real-madrid,real-sociedad,4,1,,,11,13,5,3,4,6
+2026-08-20T1714Z,football-data,2526,2026-02-15,Oviedo,Ath Bilbao,,athletic,1,2,,,7,13,1,4,2,3
+2026-08-20T1714Z,football-data,2526,2026-02-15,Vallecano,Ath Madrid,rayo-vallecano,atletico,3,0,,,13,9,9,3,4,8
+2026-08-20T1714Z,football-data,2526,2026-02-15,Levante,Valencia,levante,valencia,0,2,,,9,5,1,2,3,2
+2026-08-20T1714Z,football-data,2526,2026-02-15,Mallorca,Betis,,betis,1,2,,,14,17,3,8,7,3
+2026-08-20T1714Z,football-data,2526,2026-02-16,Girona,Barcelona,,barcelona,2,1,,,13,27,9,4,3,7
+2026-08-20T1714Z,football-data,2526,2026-02-18,Levante,Villarreal,levante,villarreal,0,1,,,16,15,4,6,3,2
+2026-08-20T1714Z,football-data,2526,2026-02-20,Ath Bilbao,Elche,athletic,elche,2,1,,,18,2,8,2,4,1
+2026-08-20T1714Z,football-data,2526,2026-02-21,Sociedad,Oviedo,real-sociedad,,3,3,,,15,14,8,6,7,6
+2026-08-20T1714Z,football-data,2526,2026-02-21,Betis,Vallecano,betis,rayo-vallecano,1,1,,,14,12,3,3,3,5
+2026-08-20T1714Z,football-data,2526,2026-02-21,Osasuna,Real Madrid,osasuna,real-madrid,2,1,,,13,15,2,5,3,7
+2026-08-20T1714Z,football-data,2526,2026-02-21,Ath Madrid,Espanol,atletico,espanyol,4,2,,,18,8,9,2,5,3
+2026-08-20T1714Z,football-data,2526,2026-02-22,Getafe,Sevilla,getafe,sevilla,0,1,,,6,6,3,1,2,2
+2026-08-20T1714Z,football-data,2526,2026-02-22,Barcelona,Levante,barcelona,levante,3,0,,,22,5,9,2,13,6
+2026-08-20T1714Z,football-data,2526,2026-02-22,Celta,Mallorca,celta,,2,0,,,20,1,7,0,7,2
+2026-08-20T1714Z,football-data,2526,2026-02-22,Villarreal,Valencia,villarreal,valencia,2,1,,,12,8,5,3,5,4
+2026-08-20T1714Z,football-data,2526,2026-02-23,Alaves,Girona,alaves,,2,2,,,17,10,6,5,7,6
+2026-08-20T1714Z,football-data,2526,2026-02-27,Levante,Alaves,levante,alaves,2,0,,,22,17,5,7,10,6
+2026-08-20T1714Z,football-data,2526,2026-02-28,Vallecano,Ath Bilbao,rayo-vallecano,athletic,1,1,,,15,8,7,2,5,4
+2026-08-20T1714Z,football-data,2526,2026-02-28,Barcelona,Villarreal,barcelona,villarreal,4,1,,,19,6,8,1,3,2
+2026-08-20T1714Z,football-data,2526,2026-02-28,Mallorca,Sociedad,,real-sociedad,0,1,,,6,12,1,2,3,7
+2026-08-20T1714Z,football-data,2526,2026-02-28,Oviedo,Ath Madrid,,atletico,0,1,,,16,12,6,1,8,3
+2026-08-20T1714Z,football-data,2526,2026-03-01,Elche,Espanol,elche,espanyol,2,2,,,17,9,9,4,3,1
+2026-08-20T1714Z,football-data,2526,2026-03-01,Valencia,Osasuna,valencia,osasuna,1,0,,,14,8,1,0,5,4
+2026-08-20T1714Z,football-data,2526,2026-03-01,Betis,Sevilla,betis,sevilla,2,2,,,9,14,2,6,4,3
+2026-08-20T1714Z,football-data,2526,2026-03-01,Girona,Celta,,celta,1,2,,,15,7,7,5,10,6
+2026-08-20T1714Z,football-data,2526,2026-03-02,Real Madrid,Getafe,real-madrid,getafe,0,1,,,18,9,7,3,10,2
+2026-08-20T1714Z,football-data,2526,2026-03-04,Vallecano,Oviedo,rayo-vallecano,,3,0,,,19,8,7,2,12,2
+2026-08-20T1714Z,football-data,2526,2026-03-06,Celta,Real Madrid,celta,real-madrid,1,2,,,8,14,4,3,1,6
+2026-08-20T1714Z,football-data,2526,2026-03-07,Osasuna,Mallorca,osasuna,,2,2,,,22,8,5,4,8,0
+2026-08-20T1714Z,football-data,2526,2026-03-07,Levante,Girona,levante,,1,1,,,14,22,4,5,2,3
+2026-08-20T1714Z,football-data,2526,2026-03-07,Ath Madrid,Sociedad,atletico,real-sociedad,3,2,,,24,7,9,3,8,1
+2026-08-20T1714Z,football-data,2526,2026-03-07,Ath Bilbao,Barcelona,athletic,barcelona,0,1,,,10,7,3,2,2,4
+2026-08-20T1714Z,football-data,2526,2026-03-08,Villarreal,Elche,villarreal,elche,2,1,,,16,13,7,6,4,6
+2026-08-20T1714Z,football-data,2526,2026-03-08,Getafe,Betis,getafe,betis,2,0,,,9,14,5,5,3,8
+2026-08-20T1714Z,football-data,2526,2026-03-08,Sevilla,Vallecano,sevilla,rayo-vallecano,1,1,,,11,9,2,2,6,2
+2026-08-20T1714Z,football-data,2526,2026-03-08,Valencia,Alaves,valencia,alaves,3,2,,,19,10,8,4,10,2
+2026-08-20T1714Z,football-data,2526,2026-03-09,Espanol,Oviedo,espanyol,,1,1,,,28,6,9,3,8,0
+2026-08-20T1714Z,football-data,2526,2026-03-13,Alaves,Villarreal,alaves,villarreal,1,1,,,8,10,0,4,5,2
+2026-08-20T1714Z,football-data,2526,2026-03-14,Girona,Ath Bilbao,,athletic,3,0,,,14,20,6,9,2,9
+2026-08-20T1714Z,football-data,2526,2026-03-14,Ath Madrid,Getafe,atletico,getafe,1,0,,,16,7,5,3,10,3
+2026-08-20T1714Z,football-data,2526,2026-03-14,Oviedo,Valencia,,valencia,1,0,,,11,13,6,2,4,7
+2026-08-20T1714Z,football-data,2526,2026-03-14,Real Madrid,Elche,real-madrid,elche,4,1,,,14,11,6,1,5,4
+2026-08-20T1714Z,football-data,2526,2026-03-15,Mallorca,Espanol,,espanyol,2,1,,,26,10,12,2,5,6
+2026-08-20T1714Z,football-data,2526,2026-03-15,Barcelona,Sevilla,barcelona,sevilla,5,2,,,13,8,8,4,3,4
+2026-08-20T1714Z,football-data,2526,2026-03-15,Betis,Celta,betis,celta,1,1,,,19,7,6,3,3,4
+2026-08-20T1714Z,football-data,2526,2026-03-15,Sociedad,Osasuna,real-sociedad,osasuna,3,1,,,14,13,6,5,3,5
+2026-08-20T1714Z,football-data,2526,2026-03-16,Vallecano,Levante,rayo-vallecano,levante,1,1,,,18,19,4,5,5,6
+2026-08-20T1714Z,football-data,2526,2026-03-20,Villarreal,Sociedad,villarreal,real-sociedad,3,1,,,21,11,10,4,4,5
+2026-08-20T1714Z,football-data,2526,2026-03-21,Elche,Mallorca,elche,,2,1,,,13,11,4,4,2,2
+2026-08-20T1714Z,football-data,2526,2026-03-21,Espanol,Getafe,espanyol,getafe,1,2,,,15,10,5,5,12,9
+2026-08-20T1714Z,football-data,2526,2026-03-21,Levante,Oviedo,levante,,4,2,,,20,10,8,2,3,1
+2026-08-20T1714Z,football-data,2526,2026-03-21,Osasuna,Girona,osasuna,,1,0,,,19,5,11,0,6,2
+2026-08-20T1714Z,football-data,2526,2026-03-21,Sevilla,Valencia,sevilla,valencia,0,2,,,13,9,2,4,1,3
+2026-08-20T1714Z,football-data,2526,2026-03-22,Barcelona,Vallecano,barcelona,rayo-vallecano,1,0,,,15,8,4,4,6,9
+2026-08-20T1714Z,football-data,2526,2026-03-22,Celta,Alaves,celta,alaves,3,4,,,12,14,5,6,4,1
+2026-08-20T1714Z,football-data,2526,2026-03-22,Ath Bilbao,Betis,athletic,betis,2,1,,,11,11,6,3,6,5
+2026-08-20T1714Z,football-data,2526,2026-03-22,Real Madrid,Ath Madrid,real-madrid,atletico,3,2,,,17,13,10,7,4,1
+2026-08-20T1714Z,football-data,2526,2026-04-03,Vallecano,Elche,rayo-vallecano,elche,1,0,,,21,9,5,4,9,4
+2026-08-20T1714Z,football-data,2526,2026-04-04,Sociedad,Levante,real-sociedad,levante,2,0,,,18,8,5,4,11,5
+2026-08-20T1714Z,football-data,2526,2026-04-04,Mallorca,Real Madrid,,real-madrid,2,1,,,6,15,2,6,6,4
+2026-08-20T1714Z,football-data,2526,2026-04-04,Betis,Espanol,betis,espanyol,0,0,,,19,8,6,1,4,3
+2026-08-20T1714Z,football-data,2526,2026-04-04,Ath Madrid,Barcelona,atletico,barcelona,1,2,,,6,22,2,8,1,9
+2026-08-20T1714Z,football-data,2526,2026-04-05,Getafe,Ath Bilbao,getafe,athletic,2,0,,,10,5,6,0,4,3
+2026-08-20T1714Z,football-data,2526,2026-04-05,Valencia,Celta,valencia,celta,2,3,,,13,9,4,5,6,0
+2026-08-20T1714Z,football-data,2526,2026-04-05,Oviedo,Sevilla,,sevilla,1,0,,,7,9,4,0,5,9
+2026-08-20T1714Z,football-data,2526,2026-04-05,Alaves,Osasuna,alaves,osasuna,2,2,,,18,8,6,5,7,1
+2026-08-20T1714Z,football-data,2526,2026-04-06,Girona,Villarreal,,villarreal,1,0,,,10,9,2,0,7,4
+2026-08-20T1714Z,football-data,2526,2026-04-10,Real Madrid,Girona,real-madrid,,1,1,,,22,10,9,2,10,1
+2026-08-20T1714Z,football-data,2526,2026-04-11,Sociedad,Alaves,real-sociedad,alaves,3,3,,,12,12,4,2,9,5
+2026-08-20T1714Z,football-data,2526,2026-04-11,Elche,Valencia,elche,valencia,1,0,,,8,22,2,8,5,9
+2026-08-20T1714Z,football-data,2526,2026-04-11,Barcelona,Espanol,barcelona,espanyol,4,1,,,20,10,10,2,7,5
+2026-08-20T1714Z,football-data,2526,2026-04-11,Sevilla,Ath Madrid,sevilla,atletico,2,1,,,11,13,2,2,6,6
+2026-08-20T1714Z,football-data,2526,2026-04-12,Osasuna,Betis,osasuna,betis,1,1,,,12,8,4,3,6,3
+2026-08-20T1714Z,football-data,2526,2026-04-12,Mallorca,Vallecano,,rayo-vallecano,3,0,,,12,17,4,3,6,7
+2026-08-20T1714Z,football-data,2526,2026-04-12,Celta,Oviedo,celta,,0,3,,,9,8,6,5,4,1
+2026-08-20T1714Z,football-data,2526,2026-04-12,Ath Bilbao,Villarreal,athletic,villarreal,1,2,,,18,12,6,6,15,3
+2026-08-20T1714Z,football-data,2526,2026-04-13,Levante,Getafe,levante,getafe,1,0,,,22,5,4,1,8,2
+2026-08-20T1714Z,football-data,2526,2026-04-21,Ath Bilbao,Osasuna,athletic,osasuna,1,0,,,7,8,2,3,5,4
+2026-08-20T1714Z,football-data,2526,2026-04-21,Mallorca,Valencia,,valencia,1,1,,,20,10,8,3,7,4
+2026-08-20T1714Z,football-data,2526,2026-04-21,Girona,Betis,,betis,2,3,,,9,7,2,3,3,1
+2026-08-20T1714Z,football-data,2526,2026-04-21,Real Madrid,Alaves,real-madrid,alaves,2,1,,,24,19,8,5,9,6
+2026-08-20T1714Z,football-data,2526,2026-04-22,Elche,Ath Madrid,elche,atletico,3,2,,,14,6,6,3,13,3
+2026-08-20T1714Z,football-data,2526,2026-04-22,Sociedad,Getafe,real-sociedad,getafe,0,1,,,13,5,4,0,6,3
+2026-08-20T1714Z,football-data,2526,2026-04-22,Barcelona,Celta,barcelona,celta,1,0,,,10,6,3,3,5,3
+2026-08-20T1714Z,football-data,2526,2026-04-23,Levante,Sevilla,levante,sevilla,2,0,,,8,7,3,0,3,6
+2026-08-20T1714Z,football-data,2526,2026-04-23,Vallecano,Espanol,rayo-vallecano,espanyol,1,0,,,17,15,6,4,6,5
+2026-08-20T1714Z,football-data,2526,2026-04-23,Oviedo,Villarreal,,villarreal,1,1,,,16,7,4,3,7,0
+2026-08-20T1714Z,football-data,2526,2026-04-24,Betis,Real Madrid,betis,real-madrid,1,1,,,19,12,4,8,7,6
+2026-08-20T1714Z,football-data,2526,2026-04-25,Alaves,Mallorca,alaves,,2,1,,,15,4,4,2,9,4
+2026-08-20T1714Z,football-data,2526,2026-04-25,Getafe,Barcelona,getafe,barcelona,0,2,,,4,13,0,4,6,3
+2026-08-20T1714Z,football-data,2526,2026-04-25,Valencia,Girona,valencia,,2,1,,,12,7,3,4,4,4
+2026-08-20T1714Z,football-data,2526,2026-04-25,Ath Madrid,Ath Bilbao,atletico,athletic,3,2,,,6,12,4,4,3,4
+2026-08-20T1714Z,football-data,2526,2026-04-26,Vallecano,Sociedad,rayo-vallecano,real-sociedad,3,3,,,24,13,9,8,6,4
+2026-08-20T1714Z,football-data,2526,2026-04-26,Oviedo,Elche,,elche,1,2,,,12,4,3,4,6,1
+2026-08-20T1714Z,football-data,2526,2026-04-26,Osasuna,Sevilla,osasuna,sevilla,2,1,,,15,8,7,2,4,4
+2026-08-20T1714Z,football-data,2526,2026-04-26,Villarreal,Celta,villarreal,celta,2,1,,,13,9,4,3,7,5
+2026-08-20T1714Z,football-data,2526,2026-04-27,Espanol,Levante,espanyol,levante,0,0,,,9,8,3,4,4,4
+2026-08-20T1714Z,football-data,2526,2026-05-01,Girona,Mallorca,,,0,1,,,14,8,4,4,5,2
+2026-08-20T1714Z,football-data,2526,2026-05-02,Villarreal,Levante,villarreal,levante,5,1,,,20,12,8,3,7,3
+2026-08-20T1714Z,football-data,2526,2026-05-02,Valencia,Ath Madrid,valencia,atletico,0,2,,,12,20,0,5,1,7
+2026-08-20T1714Z,football-data,2526,2026-05-02,Alaves,Ath Bilbao,alaves,athletic,2,4,,,7,9,4,4,4,7
+2026-08-20T1714Z,football-data,2526,2026-05-02,Osasuna,Barcelona,osasuna,barcelona,1,2,,,9,13,4,4,3,7
+2026-08-20T1714Z,football-data,2526,2026-05-03,Celta,Elche,celta,elche,3,1,,,6,15,4,4,4,2
+2026-08-20T1714Z,football-data,2526,2026-05-03,Getafe,Vallecano,getafe,rayo-vallecano,0,2,,,13,10,3,6,4,1
+2026-08-20T1714Z,football-data,2526,2026-05-03,Betis,Oviedo,betis,,3,0,,,10,17,5,5,5,4
+2026-08-20T1714Z,football-data,2526,2026-05-03,Espanol,Real Madrid,espanyol,real-madrid,0,2,,,17,15,3,5,5,6
+2026-08-20T1714Z,football-data,2526,2026-05-04,Sevilla,Sociedad,sevilla,real-sociedad,1,0,,,19,6,5,0,3,3
+2026-08-20T1714Z,football-data,2526,2026-05-08,Levante,Osasuna,levante,osasuna,3,2,,,35,5,12,3,15,1
+2026-08-20T1714Z,football-data,2526,2026-05-09,Elche,Alaves,elche,alaves,1,1,,,16,12,5,4,7,3
+2026-08-20T1714Z,football-data,2526,2026-05-09,Sevilla,Espanol,sevilla,espanyol,2,1,,,21,10,6,5,4,6
+2026-08-20T1714Z,football-data,2526,2026-05-09,Ath Madrid,Celta,atletico,celta,0,1,,,20,3,4,1,10,0
+2026-08-20T1714Z,football-data,2526,2026-05-09,Sociedad,Betis,real-sociedad,betis,2,2,,,14,14,6,6,4,3
+2026-08-20T1714Z,football-data,2526,2026-05-10,Mallorca,Villarreal,,villarreal,1,1,,,18,7,8,2,5,4
+2026-08-20T1714Z,football-data,2526,2026-05-10,Ath Bilbao,Valencia,athletic,valencia,0,1,,,14,7,4,3,13,5
+2026-08-20T1714Z,football-data,2526,2026-05-10,Oviedo,Getafe,,getafe,0,0,,,8,22,4,4,1,9
+2026-08-20T1714Z,football-data,2526,2026-05-10,Barcelona,Real Madrid,barcelona,real-madrid,2,0,,,10,8,7,1,4,8
+2026-08-20T1714Z,football-data,2526,2026-05-11,Vallecano,Girona,rayo-vallecano,,1,1,,,18,9,5,5,9,5
+2026-08-20T1714Z,football-data,2526,2026-05-12,Celta,Levante,celta,levante,2,3,,,11,14,6,6,4,4
+2026-08-20T1714Z,football-data,2526,2026-05-12,Betis,Elche,betis,elche,2,1,,,16,8,7,2,8,1
+2026-08-20T1714Z,football-data,2526,2026-05-12,Osasuna,Ath Madrid,osasuna,atletico,1,2,,,23,5,5,4,8,4
+2026-08-20T1714Z,football-data,2526,2026-05-13,Espanol,Ath Bilbao,espanyol,athletic,2,0,,,12,11,5,4,8,9
+2026-08-20T1714Z,football-data,2526,2026-05-13,Villarreal,Sevilla,villarreal,sevilla,2,3,,,6,13,4,5,6,4
+2026-08-20T1714Z,football-data,2526,2026-05-13,Alaves,Barcelona,alaves,barcelona,1,0,,,9,8,3,0,6,4
+2026-08-20T1714Z,football-data,2526,2026-05-13,Getafe,Mallorca,getafe,,3,1,,,6,9,4,2,3,3
+2026-08-20T1714Z,football-data,2526,2026-05-14,Valencia,Vallecano,valencia,rayo-vallecano,1,1,,,12,6,3,3,5,1
+2026-08-20T1714Z,football-data,2526,2026-05-14,Girona,Sociedad,,real-sociedad,1,1,,,29,6,4,2,6,3
+2026-08-20T1714Z,football-data,2526,2026-05-14,Real Madrid,Oviedo,real-madrid,,2,0,,,19,9,7,1,4,5
+2026-08-20T1714Z,football-data,2526,2026-05-17,Ath Bilbao,Celta,athletic,celta,1,1,,,27,3,9,2,5,0
+2026-08-20T1714Z,football-data,2526,2026-05-17,Ath Madrid,Girona,atletico,,1,0,,,17,25,4,11,9,8
+2026-08-20T1714Z,football-data,2526,2026-05-17,Elche,Getafe,elche,getafe,1,0,,,10,4,3,0,4,0
+2026-08-20T1714Z,football-data,2526,2026-05-17,Levante,Mallorca,levante,,2,0,,,15,8,3,3,4,6
+2026-08-20T1714Z,football-data,2526,2026-05-17,Osasuna,Espanol,osasuna,espanyol,1,2,,,24,7,8,3,9,2
+2026-08-20T1714Z,football-data,2526,2026-05-17,Oviedo,Alaves,,alaves,0,1,,,8,7,0,1,5,2
+2026-08-20T1714Z,football-data,2526,2026-05-17,Sevilla,Real Madrid,sevilla,real-madrid,0,1,,,14,12,6,1,4,4
+2026-08-20T1714Z,football-data,2526,2026-05-17,Sociedad,Valencia,real-sociedad,valencia,3,4,,,8,13,3,6,3,2
+2026-08-20T1714Z,football-data,2526,2026-05-17,Vallecano,Villarreal,rayo-vallecano,villarreal,2,0,,,15,11,7,2,1,9
+2026-08-20T1714Z,football-data,2526,2026-05-17,Barcelona,Betis,barcelona,betis,3,1,,,15,7,9,2,6,4
+2026-08-20T1714Z,football-data,2526,2026-05-23,Alaves,Vallecano,alaves,rayo-vallecano,1,2,,,19,15,11,7,10,5
+2026-08-20T1714Z,football-data,2526,2026-05-23,Betis,Levante,betis,levante,2,1,,,18,15,8,7,4,8
+2026-08-20T1714Z,football-data,2526,2026-05-23,Celta,Sevilla,celta,sevilla,1,0,,,12,9,3,2,4,3
+2026-08-20T1714Z,football-data,2526,2026-05-23,Espanol,Sociedad,espanyol,real-sociedad,1,1,,,17,9,8,4,3,5
+2026-08-20T1714Z,football-data,2526,2026-05-23,Getafe,Osasuna,getafe,osasuna,1,0,,,6,11,3,5,2,4
+2026-08-20T1714Z,football-data,2526,2026-05-23,Girona,Elche,,elche,1,1,,,10,3,7,1,2,1
+2026-08-20T1714Z,football-data,2526,2026-05-23,Mallorca,Oviedo,,,3,0,,,23,7,7,0,5,5
+2026-08-20T1714Z,football-data,2526,2026-05-23,Real Madrid,Ath Bilbao,real-madrid,athletic,4,2,,,13,8,8,2,2,1
+2026-08-20T1714Z,football-data,2526,2026-05-23,Valencia,Barcelona,valencia,barcelona,3,1,,,19,11,6,4,7,8
+2026-08-20T1714Z,football-data,2526,2026-05-24,Villarreal,Ath Madrid,villarreal,atletico,5,1,,,14,9,8,4,5,9
+2026-08-20T1714Z,football-data,2627,2026-08-15,Alaves,Getafe,alaves,getafe,3,0,1.93,0.24,18,6,8,2,5,3
+2026-08-20T1714Z,football-data,2627,2026-08-15,Sevilla,Vallecano,sevilla,rayo-vallecano,2,1,2.19,1.89,13,6,4,3,1,2
+2026-08-20T1714Z,football-data,2627,2026-08-16,Santander,Villarreal,racing,villarreal,2,2,1.87,0.66,17,12,3,7,6,10
+2026-08-20T1714Z,football-data,2627,2026-08-16,Espanol,Levante,espanyol,levante,3,0,1.56,0.28,16,4,6,0,0,1
+2026-08-20T1714Z,football-data,2627,2026-08-17,Dep. A Coruna,Elche,deportivo,elche,1,1,0.34,1.41,8,11,3,6,2,6
