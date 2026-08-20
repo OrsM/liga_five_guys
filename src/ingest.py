@@ -1064,7 +1064,7 @@ def _selftest() -> None:
     # series — a value, a clause and a bid count all move — and collapsing
     # those would throw away the history the market model is fitted on.
     assert set(STORE_ONCE) == {"api_activity", "api_players",
-                              "api_stats"}, STORE_ONCE
+                              "api_stats", "results_history"}, STORE_ONCE
     assert "api_teams" not in STORE_ONCE and "market" not in STORE_ONCE
     # A CORRECTED STAT IS A NEW FACT, not a repeat: the key carries the value,
     # so an unchanged line is stored once and a rescored one arrives as a

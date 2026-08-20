@@ -1505,7 +1505,19 @@ STORE_ONCE = {"api_activity": ("activity_id",),
               # rather than overwriting what was published first. Bounded
               # either way — without this it is 76 players x 21 stats x every
               # week x every sweep.
-              "api_stats": ("player_id", "week", "stat", "value", "points")}
+              "api_stats": ("player_id", "week", "stat", "value", "points"),
+              # The CURRENT season's file (fd_sources()'s back==0 entry) is
+              # cadence="every_run" — it has to be, new results appear as
+              # the season is played — and every run re-parses the WHOLE
+              # file, republishing every match already seen. Without this,
+              # results_history.csv gained one more copy of the same five
+              # matches on every run: 5 rows became 20 in four runs.
+              # Corrigible the same way a stat line is (VAR, a corrected
+              # scoreline), so the score is part of the key: an unchanged
+              # result collapses to one row, a genuine correction is a new
+              # one rather than overwriting what was first published.
+              "results_history": ("season", "date", "home_name", "away_name",
+                                  "home_goals", "away_goals")}
 
 # ONE DOCUMENT, TWO GRAINS. A source has one table and its rows go there —
 # except that the squad feed carries both a squad (one row per player) and
