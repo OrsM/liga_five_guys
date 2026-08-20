@@ -317,3 +317,11 @@ observed_at,page,status,seconds
 2026-08-20T0911Z,api_lineup_38,200,0.14
 2026-08-20T0911Z,api_activity_0,200,0.10
 2026-08-20T0911Z,api_activity_1,200,0.11
+2026-08-20T0916Z,market,200,0.21
+2026-08-20T0916Z,points,200,0.05
+2026-08-20T0916Z,api_leagues,200,0.22
+2026-08-20T0916Z,api_market,200,0.36
+2026-08-20T0916Z,api_teams,200,0.61
+2026-08-20T0916Z,api_lineup_38,200,0.15
+2026-08-20T0916Z,api_activity_0,200,0.11
+2026-08-20T0916Z,api_activity_1,200,0.10
