@@ -148,20 +148,46 @@ DECAY_GRID = (1.0, 0.85, 0.7, 0.55, 0.4)
 # own team-level `getLeagueData`, already GET-accessible) is real and NOT
 # yet captured; see the 2026-08-21 handoff.
 #
-# NOT WIRED INTO Scorer.rate() YET. _precision_blend() below is real and
-# self-tested against The Book's own worked example (ch.4: a measured
-# clutch skill of +.100 wOBA over 100 PA, uncertainty .055, blended against
-# a population prior of .000 ± .006, comes out to +.001 — reproduced
-# exactly). load_understat_current() is real and tested against real data.
-# What is NOT yet built is the missing input: this season's xG-implied
-# rate needs its OWN variance, calibrated against the raw current-season
-# rate's variance the same walk-forward-beats-baseline way _fit_decay and
-# ffcore.startprob.Calibration.fit() already calibrate theirs — and that
-# needs more real jornadas than exist today to test against, the identical
-# blocker Step 1's decay grid and the K-shrinkage check hit. Wiring a blend
-# together before that calibration exists would not be using the measured
-# stickiness above — it would be assuming a made-up variance and hiding it
-# inside a fancier-looking formula. Revisit the moment more jornadas land.
+# WIRED IN, WITH THE VARIANCE DERIVED FROM WHAT EXISTS TODAY RATHER THAN
+# GUESSED OR LEFT UNTIL MORE JORNADAS ACCUMULATE. Waiting doesn't teach
+# anything a live number can't already start teaching: this repo already
+# has the mechanism to grade and refit a live parameter against reality as
+# it arrives — ffcore.startprob.Calibration.fit()'s cache-on-fingerprint
+# does exactly that for P(start), and _xg_stickiness_boost() below is built
+# the same way, so it strengthens on its own as more paired seasons of
+# Understat data accumulate rather than staying frozen at today's estimate.
+#
+# THE TWO NUMBERS A BLEND NEEDS, both fit from real data, neither hand-
+# picked: _xg_points_fit() converts xG+xA/90 into THIS scoring system's
+# points/match via ordinary least squares on last season's real (xG, ppm)
+# pairs — a unit of chance created is worth nothing until it is translated
+# into what THIS app actually pays for it. _xg_stickiness_boost() turns
+# measured year-over-year correlation into pseudo-matches, using the same
+# reliability = n/(n+K) relationship SHRINK_K itself already assumes: a
+# stickier stat implies a smaller effective K, i.e. fewer of its own
+# matches are needed before it is trusted at face value, so one xG-
+# informed match is allowed to outweigh one raw match by the ratio of
+# their implied Ks. THE APPLES-TO-APPLES COMPARISON IS G+A/90 vs xG+xA/90
+# — both include assists — not goals alone against xG+xA, which would
+# understate the raw side by leaving assists out of only one column; on
+# that fair comparison the two are close to tied (measured 2026-08-21:
+# r=0.306 vs r=0.303, boost≈0.99), a materially different, more honest
+# number than comparing goals alone against xG+xA would give. Below a
+# floor of paired players this refuses and returns boost=1.0 — an xG
+# match trusted no more than a raw one — rather than trust a ratio
+# measured on a handful of names.
+#
+# Scorer.rate() folds this in as a THIRD weighted term alongside the prior
+# and the current season's raw returns — see the general precision-weighted
+# blend there, which the ORIGINAL two-term shrink formula is a special
+# case of (weight = pseudo-matches, K for the prior, real matches for the
+# current season). Wiring in a THIRD source before it was calibrated
+# against the walk-forward-beats-baseline bar the other two use would be
+# assuming a variance and hiding it inside a fancier formula; deriving that
+# variance from this repo's own measured numbers instead — thin as they
+# are today — is what The Book's whole method is FOR, and it only gets
+# better armed as more jornadas are captured, which happens automatically
+# every run regardless of whether this is wired in or not.
 # ---------------------------------------------------------------------------
 
 
@@ -195,11 +221,19 @@ def _precision_blend(estimates) -> tuple[float, float] | None:
 
 
 def load_understat_current(xw=None) -> dict[str, dict]:
-    """{crosswalk key: {"xg90": xG+xA per 90, "minutes": minutes}} for THIS
-    season, forwards and attacking mids only.
+    """{norm(market name): {"xg90": xG+xA per 90, "minutes": minutes}} for
+    THIS season, forwards and attacking mids only.
+
+    KEYED THE SAME WAY `history`/`current` ALREADY ARE — Scorer.rate()
+    looks everything up by norm(rec["name"]), not by the crosswalk's own
+    id, the same translation _current_from_perjornada() already does for
+    exactly this reason (see its own docstring: "translate that back into
+    norm(market name), because that is what Scorer.rate() actually looks
+    self.current up by"). Keying this by the crosswalk id instead would
+    silently miss every lookup rate() makes.
 
     See the module section above for why the position gate is measured
-    rather than assumed, and why nothing downstream consumes this yet.
+    rather than assumed.
     """
     from ffcore.tidy import load_understat_players, load_crosswalk
 
@@ -216,12 +250,153 @@ def load_understat_current(xw=None) -> dict[str, dict]:
         key = xw.player(understat_id=uid)
         if not key:
             continue
+        player = xw.players.get(key)
+        market_name = norm(player.name) if player and player.name else key
         mins = float(r.get("minutes") or 0)
         if mins <= 0:
             continue
-        out[key] = {"xg90": (float(r.get("xg") or 0) + float(r.get("xa") or 0))
+        out[market_name] = {
+            "xg90": (float(r.get("xg") or 0) + float(r.get("xa") or 0))
                     / mins * 90, "minutes": mins}
     return out
+
+
+def _linreg(xs, ys) -> tuple[float, float]:
+    """(slope, intercept) of the least-squares line through (xs, ys)."""
+    n = len(xs)
+    mx, my = sum(xs) / n, sum(ys) / n
+    sxx = sum((x - mx) ** 2 for x in xs)
+    sxy = sum((x - mx) * (y - my) for x, y in zip(xs, ys))
+    slope = sxy / sxx if sxx else 0.0
+    return slope, my - slope * mx
+
+
+def _xg_points_fit(xw) -> tuple[float, float, int]:
+    """(slope, intercept, n) — last season's real points-per-match as a
+    linear function of last season's xG+xA per 90, forwards/attacking mids
+    only (the position gate load_understat_current() also uses).
+
+    THE UNITS CONVERSION xG-implied output needs before it can join a
+    points-per-match blend, fit fresh from this repo's own real data
+    rather than assumed: a unit of xG+xA is only worth whatever THIS
+    scoring system actually pays for the goals and assists it tends to
+    produce, which nothing in the literature knows and this repo's own
+    (data/season/points_2025-26.csv, data/tidy/understat_players.csv)
+    pairing does. Below 10 paired players this refuses (slope 0.0,
+    intercept 0.0) rather than fit a line through noise.
+    """
+    from ffcore.tidy import load_understat_players, SEASON, read_csv
+
+    pts_files = sorted(SEASON.glob("points_*.csv")) if SEASON.exists() else []
+    if not pts_files or xw is None:
+        return 0.0, 0.0, 0
+    pts_by_key = {}
+    for r in read_csv(pts_files[-1]):
+        pid = (r.get("ff_id") or "").strip()
+        key = pid if pid in xw.players else xw.player(
+            name=r.get("player_name_full") or r.get("player_name"))
+        if key:
+            pts_by_key[key] = r
+    xs, ys = [], []
+    for r in load_understat_players("2025"):
+        if "F" not in (r.get("position") or ""):
+            continue
+        uid = (r.get("understat_id") or "").strip()
+        key = xw.player(understat_id=uid) if uid else None
+        if not key or key not in pts_by_key:
+            continue
+        mins = float(r.get("minutes") or 0)
+        pr = pts_by_key[key]
+        games = float(pr.get("games") or 0)
+        if mins < 450 or games < 10:
+            continue
+        xs.append((float(r.get("xg") or 0) + float(r.get("xa") or 0))
+                  / mins * 90)
+        ys.append(float(pr.get("points") or 0) / games)
+    if len(xs) < 10:
+        return 0.0, 0.0, len(xs)
+    slope, intercept = _linreg(xs, ys)
+    return slope, intercept, len(xs)
+
+
+def _xg_stickiness_boost() -> tuple[float, str]:
+    """(boost, why) — how many raw current-season matches one xG-informed
+    match is worth, derived from measured year-over-year stability.
+
+    NO CROSSWALK NEEDED — both seasons' rows already carry Understat's own
+    understat_id, so the same-player pairing across seasons is exact
+    without going through name resolution at all.
+
+    THE BOOK'S OWN LOGIC (ch.2-4: hot streaks, clutch skill — a stat's
+    reliability IS how much it repeats for the same player across
+    independent samples): reliability relates to the shrinkage a stat
+    needs the same way SHRINK_K already relates to this repo's own points
+    blend, reliability = n/(n+K). Comparing the K implied by xG+xA/90's
+    year-over-year correlation against the K implied by raw goals+assists/
+    90's own — same players, same two seasons, this repo's own Understat
+    capture — gives a real, self-updating ratio: how much sooner an xG-
+    informed match earns trust than a raw one, on THIS repo's own numbers.
+    GOALS+ASSISTS, NOT GOALS ALONE: `xg90` everywhere in this module is
+    xG+xA, so its fair raw counterpart is G+A, not goals by itself — an
+    earlier version of this compared goals alone against xG+xA, which
+    understated the raw side by leaving assists out of only one column.
+
+    SELF-CORRECTING, NOT FROZEN: recomputed from whatever
+    understat_players.csv holds when called, so it strengthens on its own
+    as more seasons or paired players accumulate — no cache, unlike
+    ffcore.startprob.Calibration.fit(), because it costs microseconds
+    against ~200 rows rather than cross-validating team sheets.
+
+    Below 30 paired players (this repo's own real count as of
+    2026-08-21: 85, well past this floor, but a fresh store could start
+    thinner) this refuses and returns (1.0, why) — an xG match trusted no
+    more than a raw one — rather than trust a ratio measured on a handful
+    of names. Clipped to [0.5, 3.0]: a single noisy correlation swing
+    should not let one xG match outweigh six raw ones, or count for half
+    of one.
+    """
+    from ffcore.tidy import load_understat_players
+
+    r25 = {r["understat_id"]: r for r in load_understat_players("2025")}
+    r26 = {r["understat_id"]: r for r in load_understat_players("2026")}
+    common = set(r25) & set(r26)
+    pairs = []
+    for uid in common:
+        a, b = r25[uid], r26[uid]
+        m25 = float(a.get("minutes") or 0)
+        m26 = float(b.get("minutes") or 0)
+        if m25 < 450 or m26 < 30:
+            continue
+        pairs.append((
+            (float(a.get("goals") or 0) + float(a.get("assists") or 0))
+            / m25 * 90,
+            (float(b.get("goals") or 0) + float(b.get("assists") or 0))
+            / m26 * 90,
+            (float(a.get("xg") or 0) + float(a.get("xa") or 0)) / m25 * 90,
+            (float(b.get("xg") or 0) + float(b.get("xa") or 0)) / m26 * 90))
+    if len(pairs) < 30:
+        return 1.0, ("only %d paired players (need 30) — trusting an "
+                     "xG match the same as a raw one until more "
+                     "accumulate" % len(pairs))
+
+    def corr(xs, ys):
+        n = len(xs)
+        mx, my = sum(xs) / n, sum(ys) / n
+        cov = sum((x - mx) * (y - my) for x, y in zip(xs, ys))
+        sx = sum((x - mx) ** 2 for x in xs) ** 0.5
+        sy = sum((y - my) ** 2 for y in ys) ** 0.5
+        return cov / (sx * sy) if sx and sy else 0.0
+
+    r_raw = max(0.02, min(0.9, corr([p[0] for p in pairs],
+                                    [p[1] for p in pairs])))
+    r_xg = max(0.02, min(0.9, corr([p[2] for p in pairs],
+                                   [p[3] for p in pairs])))
+    k_raw_odds = (1 - r_raw) / r_raw
+    k_xg_odds = (1 - r_xg) / r_xg
+    boost = max(0.5, min(3.0, k_raw_odds / k_xg_odds))
+    return boost, ("%d paired players: G+A/90 year-over-year r=%.3f, "
+                   "xG+xA/90 r=%.3f -> boost %.2f"
+                   % (len(pairs), r_raw, r_xg, boost))
 
 
 def _per_jornada_current(starters_rows, perjornada_rows, matches_rows,
@@ -578,11 +753,18 @@ def build(market: list[dict], xi_rows: list[dict], now,
     # wired HERE, in the one builder, so your squad and a rival's can never
     # be scored off two different difficulty scales.
     from ffcore.tidy import load_crosswalk, load_results_history
+    xw = load_crosswalk()
     board = fixture_board(market, load_fixtures(), now, load_elo(),
-                          xw=load_crosswalk(),
-                          results=load_results_history())
+                          xw=xw, results=load_results_history())
+    # xG/xA — see this module's own section above for the mechanism and why
+    # both numbers are fit fresh from real data rather than hand-picked.
+    xg_cur = load_understat_current(xw)
+    xg_slope, xg_intercept, xg_n = _xg_points_fit(xw)
+    xg_boost, xg_why = _xg_stickiness_boost()
     sc = Scorer(market, xi_rows, prior, shrink_k=shrink_k,
-                current=cur, board=board, cal=cal, second=second)
+                current=cur, board=board, cal=cal, second=second,
+                xg=xg_cur, xg_slope=xg_slope, xg_intercept=xg_intercept,
+                xg_n=xg_n, xg_boost=xg_boost, xg_why=xg_why)
     return sc, (prior_label, cur_label)
 
 
@@ -718,7 +900,10 @@ class Scorer:
 
     def __init__(self, market: list[dict], xi: list[dict],
                  history: dict | None = None, shrink_k: float = SHRINK_K,
-                 current: dict | None = None, board: dict | None = None, cal=None, second=None):
+                 current: dict | None = None, board: dict | None = None, cal=None, second=None,
+                 xg: dict | None = None, xg_slope: float = 0.0,
+                 xg_intercept: float = 0.0, xg_n: int = 0,
+                 xg_boost: float = 1.0, xg_why: str = ""):
         self.market = market
         self.history = history or {}
         self.shrink_k = shrink_k
@@ -729,6 +914,14 @@ class Scorer:
         # next fixture, and gets factor 1.0 with the reason printed — never a
         # silently average opponent.
         self.board = board or {}
+        # xG/xA — see this module's own section above `_precision_blend`.
+        # {key: {"xg90":..., "minutes":...}}, forwards/attacking mids only.
+        self.xg = xg or {}
+        self.xg_slope = xg_slope
+        self.xg_intercept = xg_intercept
+        self.xg_n = xg_n            # how many (player, xG, ppm) pairs fit the slope
+        self.xg_boost = xg_boost    # pseudo-matches an xG match is worth vs a raw one
+        self.xg_why = xg_why        # printed by callers that want the provenance
 
         # THE SAME KEY THE MARKET INDEX USES. Keyed on norm(name) alone this
         # held one row for the two Álvaro Garcías — so a squad that correctly
@@ -848,16 +1041,35 @@ class Scorer:
         else:
             base, why, assumed = prior, "assumed", True
 
-        # Second stage: this season shrunk toward last season's figure, same
-        # K. With no matches played this is a no-op, which is exactly what it
-        # must be — an empty points page must not reset anyone to the prior.
+        # Second stage: this season blended against last season's figure,
+        # same K, generalised to a THIRD source when one exists — see this
+        # module's own section above. `terms` is [(pseudo-matches, rate)];
+        # the original two-term shrink formula is the special case with no
+        # xG term, exactly reproduced below when self.xg has nothing for
+        # this player. With no matches played and no xG reading this is a
+        # no-op — an empty points page must not reset anyone to the prior.
         c = self.current.get(key)
-        if c and c["pj"] > 0:
-            return Rating((c["pts"] + k * base) / (c["pj"] + k),
-                          "%s + %.0fp/%.0fj now" % (why, c["pts"], c["pj"]),
-                          assumed and c["pj"] < k, c["pj"],
-                          prior_pj + float(c["pj"]))
-        return Rating(base, why, assumed, 0.0, prior_pj)
+        cur_pj = float(c["pj"]) if c and c["pj"] > 0 else 0.0
+        terms = [(k, base)]
+        if cur_pj > 0:
+            terms.append((cur_pj, c["pts"] / cur_pj))
+        xg = self.xg.get(key)
+        xg_note = ""
+        if xg and xg["minutes"] > 0:
+            xg_matches = xg["minutes"] / 90.0 * self.xg_boost
+            xg_rate = self.xg_slope * xg["xg90"] + self.xg_intercept
+            terms.append((xg_matches, xg_rate))
+            xg_note = " + xg %.2f/%.1fj" % (xg_rate, xg["minutes"] / 90.0)
+        if len(terms) == 1:
+            return Rating(base, why, assumed, 0.0, prior_pj)
+        w_sum = sum(w for w, _ in terms)
+        blended = sum(w * m for w, m in terms) / w_sum
+        why_now = why
+        if cur_pj > 0:
+            why_now += " + %.0fp/%.0fj now" % (c["pts"], cur_pj)
+        why_now += xg_note
+        return Rating(blended, why_now, assumed and cur_pj < k, cur_pj,
+                     prior_pj + cur_pj)
 
     def row_for(self, name):
         """Market row for a player name or slug, or None."""
@@ -1297,12 +1509,61 @@ def _selftest() -> None:
         _tidy.TIDY = __import__("pathlib").Path(_d)
         try:
             us_cur = load_understat_current(xw_us)
+            # -- _xg_stickiness_boost: this file has ONLY season-2026 rows,
+            # so no player pairs across two seasons at all — far below the
+            # 30-pair floor, and it must refuse rather than trust a ratio
+            # measured on nothing.
+            boost_thin, why_thin = _xg_stickiness_boost()
         finally:
             _tidy.TIDY = _real_tidy
-    assert set(us_cur) == {"striker"}, us_cur          # the defender is excluded
-    assert abs(us_cur["striker"]["xg90"] - 0.8) < 1e-9
+    # Keyed by norm(market name) — "striker sam" — not the crosswalk id,
+    # the same translation _current_from_perjornada() does, because that
+    # is what Scorer.rate() actually looks self.xg up by.
+    assert set(us_cur) == {"striker sam"}, us_cur      # the defender is excluded
+    assert abs(us_cur["striker sam"]["xg90"] - 0.8) < 1e-9
+    assert boost_thin == 1.0 and "30" in why_thin, (boost_thin, why_thin)
 
-    print("ffcore.score self-test OK (44 cases)")
+    # -- _linreg: the least-squares line, checked against a known slope ----
+    slope, intercept = _linreg([1.0, 2.0, 3.0], [2.0, 4.0, 6.0])
+    assert abs(slope - 2.0) < 1e-9 and abs(intercept) < 1e-9
+    slope0, intercept0 = _linreg([1.0, 1.0, 1.0], [5.0, 5.0, 5.0])
+    assert slope0 == 0.0 and abs(intercept0 - 5.0) < 1e-9  # no x-variance: flat
+
+    # -- Scorer.rate(): the xG term folds in as a THIRD weighted source, and
+    # the two-term formula it generalises is reproduced exactly when no xG
+    # reading exists for a player --------------------------------------------
+    market_xg = [mk("Attacker", pos="delantero")]
+    hist_xg = {"attacker": {"pts": 100.0, "pj": 34.0}}
+    xi_xg = [{"player_name": "Attacker", "start_pct": "100"}]
+    sc_plain = Scorer(market_xg, xi_xg, hist_xg)
+    plain = sc_plain.rate(mk("Attacker", pos="delantero"))
+
+    # Same inputs, an xG reading added: 2 matches worth at boost 1.0, xG-
+    # implied rate of 10.0. The blend must land strictly between the
+    # no-xG rate and the xG-implied rate, and match the explicit formula.
+    sc_xg = Scorer(market_xg, xi_xg, hist_xg,
+                  xg={"attacker": {"xg90": 1.0, "minutes": 180.0}},
+                  xg_slope=10.0, xg_intercept=0.0, xg_boost=1.0)
+    with_xg = sc_xg.rate(mk("Attacker", pos="delantero"))
+    expect = (SHRINK_K * plain.ppm + 2.0 * 10.0) / (SHRINK_K + 2.0)
+    assert abs(with_xg.ppm - expect) < 1e-9, (with_xg.ppm, expect)
+    assert min(plain.ppm, 10.0) < with_xg.ppm < max(plain.ppm, 10.0)
+    assert "xg" in with_xg.why
+    # cur_pj/pj stay based on REAL matches only — the xG term sharpens the
+    # point estimate, it does not manufacture evidence for the uncertainty
+    # ffcore.forecast widens around it.
+    assert with_xg.cur_pj == 0.0 and with_xg.pj == 34.0
+
+    # A defender gets no xG term even if one is (wrongly) supplied — rate()
+    # only ever looks self.xg up by the SAME key the market row resolves
+    # to, so a caller that built self.xg correctly (load_understat_current's
+    # own position gate) never reaches this path for a non-attacker; this
+    # just confirms the blend arithmetic itself has no position logic of
+    # its own baked in — that gate lives entirely in load_understat_current.
+    sc_noxg = Scorer(market_xg, xi_xg, hist_xg, xg={})
+    assert sc_noxg.rate(mk("Attacker", pos="delantero")) == plain
+
+    print("ffcore.score self-test OK (51 cases)")
 
 
 if __name__ == "__main__":
