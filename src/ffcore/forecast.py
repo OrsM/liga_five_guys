@@ -141,7 +141,7 @@ SHRINK_MATCHES = 8.0
 # realised-error check, n=5 and growing as of 2026-08-21) has enough
 # rows to say the model is well-calibrated at a tighter spread — not
 # from another correlation analogy.
-DRIFT_FRAC = 2.0
+DRIFT_FRAC = 1.0
 
 
 @runtime_checkable
