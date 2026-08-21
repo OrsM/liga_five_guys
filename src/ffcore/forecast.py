@@ -71,6 +71,49 @@ MIN_POOL = 200
 # keep this module free of that import; the self-test holds the two equal.
 SHRINK_MATCHES = 8.0
 
+# HOW MUCH A RATE CAN DRIFT PER JORNADA THAT PASSES, as a fraction of the
+# player's OWN rate_rel — not a flat absolute number, so a player who is
+# already less predictable also drifts more per jornada, and one already
+# well-established drifts less.
+#
+# WHY THIS EXISTS: `Bootstrap.rate_draw()` used to draw a rate's error ONCE
+# per trial and hold it flat for jornada 3 and jornada 35 alike. That is
+# real for "my rate estimate could be biased" but wrong for "my rate could
+# also have DRIFTED by then" — a squad's true relative strength is not a
+# fixed unknown constant for 38 rounds (transfers, injuries, form), and
+# treating it as one is why a squad ahead early looked more certain to
+# STAY ahead than a season this unpredictable actually is. Direct, real
+# evidence for how unpredictable: measured on this repo's own 4 seasons of
+# actual La Liga results (2026-08-21), a club's cumulative table points
+# after jornada 1 correlated with its FINAL points at r=0.315, 0.668,
+# -0.084, 1.000 (n=10, unreliable) — often far from 1.0, one season
+# effectively zero.
+#
+# THE MAGNITUDE IS A JUDGMENT CALL, NOT A FIT — that La Liga correlation
+# cannot be converted into DRIFT_FRAC precisely: it is TABLE POINTS
+# aggregated across 19 opponents' worth of results, this is PER-PLAYER
+# rate uncertainty diluted across the ~11-16 largely-independent players
+# in one squad, and there is no clean unit conversion between the two.
+# Measured directly instead, by sweeping DRIFT_FRAC against this repo's
+# own real squad data (2026-08-21, one jornada played) and watching what
+# it does to `p_win`:
+#
+#   DRIFT_FRAC   width   p_win
+#     0.00        400    0.895   <- today's flat-for-the-season behaviour
+#     0.50        424    0.863
+#     1.00        539    0.737   <- shipped
+#     1.50        739    0.621
+#     2.00       1026    0.555
+#     3.00       1692    0.485
+#
+# 1.0 is a round number picked for landing in a materially more humble
+# zone without erasing the real, measured squad-quality gap entirely (this
+# repo's own manager squad is real money, 220M+, not noise) — not for
+# hitting any specific target p_win. Revisit once this repo has its own
+# completed fantasy season to measure against, the same way
+# _xg_stickiness_boost() already refits itself from real paired data.
+DRIFT_FRAC = 1.0
+
 
 @runtime_checkable
 class Forecaster(Protocol):
@@ -157,26 +200,44 @@ class Bootstrap:
         return {k: pts * p
                 for k, (pts, p) in self.per_jornada.get(jornada, {}).items()}
 
-    def rate_draw(self, rng: random.Random) -> dict[str, float]:
-        """One multiplier per player, for one whole SEASON.
+    def rate_draw(self, rng: random.Random, jornadas=None):
+        """A multiplier per player, for one whole SEASON — flat (one dict)
+        when `jornadas` is omitted, or GROWING WITH DISTANCE (one dict per
+        jornada, {jornada: {key: multiplier}}) when it is given a sequence
+        of remaining jornadas in order.
 
-        The rate is estimated once and is then wrong in the same direction for
-        every jornada of a trial — that is what makes it different from
-        match-to-match noise, and why it cannot be averaged away over 38
-        rounds. Drawn per trial, never per jornada.
+        THE FLAT CASE, UNCHANGED: the rate is estimated once and is then
+        wrong in the same direction for every jornada of a trial — that is
+        what makes it different from match-to-match noise, and why it
+        cannot be averaged away over 38 rounds.
+
+        THE DRIFTING CASE IS THE SAME IDEA, EXTENDED: "wrong in the same
+        direction all season" is still true, but it understates how much a
+        rating this far out could ALSO have moved — a squad's true relative
+        strength is not a fixed unknown constant for 38 rounds, it drifts
+        (transfers, injuries, form), and jornada 35 carries more of that
+        risk than jornada 3 does. Modelled as a random walk: an initial
+        per-trial error (same as the flat case) plus an INDEPENDENT step
+        per jornada that passes, sd DRIFT_FRAC * rate_rel — see that
+        constant's own note for why this shape and why this repo cannot
+        fit its magnitude precisely yet.
 
         TWO INDEPENDENT SOURCES OF "WRONG", COMBINED MULTIPLICATIVELY: this
-        player's own rate could be off (rate_rel, as before), and separately
-        his WHOLE CLUB could be having a stronger or weaker season than its
-        own attack_defense() rating expects (club_rel — see
-        ffcore.fixture.club_volatility). The second is what makes two
-        players of the same club move together in a trial instead of
-        independently, which is most of why sampling a squad concentrated
-        in a few clubs used to understate its own variance — see this
-        module's own opening docstring, "the baseline below ignores that
-        correlation". A player with no club_of entry (club_rel empty, or a
-        club too thin on history — see MIN_AD_MATCHES) draws exactly as
-        before: shared=1.0 is a no-op, not a guess.
+        player's own rate could be off (rate_rel, as before, now plus its
+        own drift), and separately his WHOLE CLUB could be having a
+        stronger or weaker season than its own attack_defense() rating
+        expects (club_rel — see ffcore.fixture.club_volatility). The
+        second is what makes two players of the same club move together
+        in a trial instead of independently, which is most of why sampling
+        a squad concentrated in a few clubs used to understate its own
+        variance — see this module's own opening docstring, "the baseline
+        below ignores that correlation". A player with no club_of entry
+        (club_rel empty, or a club too thin on history — see
+        MIN_AD_MATCHES) draws exactly as before: shared=1.0 is a no-op,
+        not a guess. THE CLUB SHOCK ITSELF DOES NOT DRIFT — one per trial,
+        same as before; a season-long club-quality surprise is a separate,
+        smaller concern from "how far can I trust today's player rating",
+        which is the one this change addresses.
 
         CLUB SHOCKS DRAWN FIRST, sorted, always — same reason players draw
         in a fixed order (see __init__): which rng call lands on which key
@@ -187,11 +248,38 @@ class Bootstrap:
         """
         club_shock = {c: max(0.0, 1.0 + rng.gauss(0.0, self.club_rel[c]))
                      for c in sorted(self.club_rel)}
+        if jornadas is None:
+            out = {}
+            for k in sorted(self.rate_rel):
+                individual = max(0.0, 1.0 + rng.gauss(0.0, self.rate_rel[k]))
+                shared = club_shock.get(self.club_of.get(k, ""), 1.0)
+                out[k] = individual * shared
+            return out
+        eps0 = {k: max(0.0, 1.0 + rng.gauss(0.0, self.rate_rel[k]))
+               for k in sorted(self.rate_rel)}
+        cum_var = {k: 0.0 for k in self.rate_rel}
         out = {}
-        for k in sorted(self.rate_rel):
-            individual = max(0.0, 1.0 + rng.gauss(0.0, self.rate_rel[k]))
-            shared = club_shock.get(self.club_of.get(k, ""), 1.0)
-            out[k] = individual * shared
+        for j in sorted(jornadas):
+            per_j = {}
+            for k in sorted(self.rate_rel):
+                cum_var[k] += (DRIFT_FRAC * self.rate_rel[k]) ** 2
+                # LOG-NORMAL, NOT clip(1+drift, 0): the walk's cumulative sd
+                # can grow past 1.0 over enough jornadas, and clipping a
+                # WIDE gaussian at zero is not symmetric — the negative
+                # tail gets floored while the positive tail stays
+                # unbounded, which biases the MEAN upward the wider the
+                # walk gets (measured while tuning DRIFT_FRAC: mean
+                # inflated from ~1780 to ~3150 points at a wide setting,
+                # nothing to do with real uncertainty). exp(drift -
+                # var/2) has E[.]=1 for ANY variance — the standard
+                # mean-preserving form for multiplicative noise that must
+                # stay positive — so growing the walk widens the spread
+                # without dragging the point estimate up with it.
+                drift = rng.gauss(0.0, math.sqrt(cum_var[k]))
+                walked = math.exp(drift - cum_var[k] / 2.0)
+                shared = club_shock.get(self.club_of.get(k, ""), 1.0)
+                per_j[k] = eps0[k] * walked * shared
+            out[j] = per_j
         return out
 
     def draw(self, jornada: int, rng: random.Random,
@@ -254,6 +342,30 @@ def _selftest() -> None:
     assert abs(sum(draws) / len(draws) - 1.0) < 0.02, sum(draws) / len(draws)
     assert min(draws) >= 0.0, "a rate cannot be negative"
     assert max(draws) > 1.3, "and it has to be able to be wrong"
+
+    # -- rate_draw with `jornadas`: uncertainty GROWS with distance ---------
+    # Omitting `jornadas` must be untouched — the flat, one-multiplier-for-
+    # the-season path checked above, not a new default that happens to
+    # look the same.
+    assert set(thin.rate_draw(random.Random(1))) == {"vet", "kid"}
+
+    walk = [thin.rate_draw(random.Random(i), jornadas=[1, 2, 3, 20, 21, 22])
+           for i in range(3000)]
+    near = statistics.pstdev(t[1]["kid"] for t in walk)
+    far = statistics.pstdev(t[22]["kid"] for t in walk)
+    # THE ACTUAL CLAIM: jornada 22 (20 steps out) is genuinely less certain
+    # than jornada 1 (1 step out) — this is the mechanism that used to be
+    # entirely missing (see DRIFT_FRAC's own note on why).
+    assert far > near, (near, far)
+    # LOG-NORMAL, NOT A BIASED CLIP: however wide the walk gets, its mean
+    # stays ~1.0 — checked at jornada 22, the widest point in this walk,
+    # which is exactly where a clip(1+drift, 0) formulation would have
+    # inflated the mean (measured while tuning DRIFT_FRAC: ~1780 points
+    # became ~3150 at a wide setting, nothing to do with real uncertainty).
+    far_mean = statistics.mean(t[22]["kid"] for t in walk)
+    assert abs(far_mean - 1.0) < 0.05, far_mean
+    # A jornada NOT in the walk's own list is simply absent, not guessed.
+    assert 4 not in walk[0]
 
     # -- club_rel: two players of one club move TOGETHER --------------------
     # No club_of/club_rel passed: exactly the old behaviour, not a new
@@ -370,7 +482,7 @@ def _selftest() -> None:
             {"games_delta": "x", "points_delta": "3"}]     # unparseable
     assert pool_from_perjornada(rows) == [4, -1]
 
-    print("ffcore.forecast self-test OK (28 cases)")
+    print("ffcore.forecast self-test OK (33 cases)")
 
 
 if __name__ == "__main__":

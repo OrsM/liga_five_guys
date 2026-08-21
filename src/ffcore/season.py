@@ -260,13 +260,14 @@ def _run_np(states: list, forecaster, trials: int, seed: int):
         return None
 
     pool_a = np.asarray(pool, dtype=float)
-    # THE RATE'S OWN ERROR, drawn once per trial and held for the whole
-    # season. Every jornada below multiplies a player's rate by the same
-    # number, because being wrong about a rate is wrong in the same direction
-    # in March as in August — which is exactly why 38 rounds do not average it
-    # away, and why leaving it out made the bands too narrow and the leader
-    # too certain. Seeded off the trial and not off the jornada for the same
-    # reason.
+    # THE RATE'S OWN ERROR, drawn once per trial (eps0 below) plus a RANDOM
+    # WALK that grows with how far out a jornada is — see
+    # ffcore.forecast.Bootstrap.rate_draw's own docstring and DRIFT_FRAC's
+    # note for why a flat-for-the-whole-season error understated how much a
+    # rating this far out could ALSO have drifted since. Seeded off the
+    # trial (eps0) and off (trial, walk-step) for the drift, never off the
+    # jornada number alone, so redrawing is reproducible regardless of how
+    # the trial range is split across processes.
     rel = getattr(forecaster, "rate_rel", None) or {}
     # CLUB-CORRELATED, THE SAME FEATURE Bootstrap.rate_draw() HAS — but
     # this NUMPY path is a SEPARATE implementation of the same draw, not a
@@ -278,37 +279,43 @@ def _run_np(states: list, forecaster, trials: int, seed: int):
     # is here — verified by comparing p_win before/after on the same
     # pinned data and finding it bit-for-bit unchanged, which a real
     # widening of the bands cannot produce by chance across thousands of
-    # trials.
+    # trials. THE CLUB SHOCK ITSELF DOES NOT DRIFT — one per trial, same
+    # reasoning as rate_draw()'s own note on why.
     club_of = getattr(forecaster, "club_of", None) or {}
     club_rel = getattr(forecaster, "club_rel", None) or {}
-    rate_mult = {}
-    if rel:
-        all_keys = sorted({k for ks in order.values() for k in ks} & set(rel))
-        if all_keys:
-            rrng = np.random.default_rng([seed, 7919])
-            sd = np.array([rel[k] for k in all_keys], dtype=float)
-            individual = np.clip(
-                1.0 + rrng.standard_normal((trials, len(all_keys))) * sd,
+    all_keys = sorted({k for ks in order.values() for k in ks} & set(rel)) \
+        if rel else []
+    eps0 = shared = drng = cum_var = None
+    if all_keys:
+        from ffcore.forecast import DRIFT_FRAC
+
+        rrng = np.random.default_rng([seed, 7919])
+        sd = np.array([rel[k] for k in all_keys], dtype=float)
+        eps0 = np.clip(
+            1.0 + rrng.standard_normal((trials, len(all_keys))) * sd,
+            0.0, None)
+        clubs = sorted(club_rel)
+        if clubs:
+            # A SEPARATE rng STREAM (a different second seed component) so
+            # the club draw and the individual draw are independent sources
+            # of "wrong", not the same bits reused twice.
+            crng = np.random.default_rng([seed, 7920])
+            csd = np.array([club_rel[c] for c in clubs], dtype=float)
+            shock = np.clip(
+                1.0 + crng.standard_normal((trials, len(clubs))) * csd,
                 0.0, None)
-            clubs = sorted(club_rel)
-            if clubs:
-                # A SEPARATE rng STREAM (a different second seed component)
-                # so the club draw and the individual draw are independent
-                # sources of "wrong", not the same bits reused twice.
-                crng = np.random.default_rng([seed, 7920])
-                csd = np.array([club_rel[c] for c in clubs], dtype=float)
-                shock = np.clip(
-                    1.0 + crng.standard_normal((trials, len(clubs))) * csd,
-                    0.0, None)
-                shock_of = {c: shock[:, i] for i, c in enumerate(clubs)}
-                ones = np.ones(trials)
-                shared = np.stack(
-                    [shock_of.get(club_of.get(k, ""), ones)
-                     for k in all_keys], axis=1)
-                m = individual * shared
-            else:
-                m = individual
-            rate_mult = {k: m[:, i] for i, k in enumerate(all_keys)}
+            shock_of = {c: shock[:, i] for i, c in enumerate(clubs)}
+            ones = np.ones(trials)
+            shared = np.stack(
+                [shock_of.get(club_of.get(k, ""), ones) for k in all_keys],
+                axis=1)
+        # A THIRD, SEPARATE STREAM for the walk's per-jornada steps — drawn
+        # incrementally inside the jornada loop below, one call per
+        # jornada, since a random walk's steps must be independent draws in
+        # ORDER, not one big draw sliced afterward.
+        drng = np.random.default_rng([seed, 7921])
+        step_sd = DRIFT_FRAC * sd
+        cum_var = np.zeros(len(all_keys))
 
     managers = [list(st.squads) for st in states]
     totals = [{m: np.full(trials, float(st.carried.get(m, 0.0)))
@@ -342,7 +349,34 @@ def _run_np(states: list, forecaster, trials: int, seed: int):
             per_state[j] = row
         xis.append(per_state)
 
+    rate_mult = {}
     for j in states[0].jornadas:
+        # ONE MORE RANDOM-WALK STEP, taken every jornada in the remaining
+        # calendar — BEFORE the "nothing to score" skip below, and matching
+        # ffcore.forecast.Bootstrap.rate_draw()'s own walk (which knows
+        # nothing of `order`/keys and advances for every jornada handed to
+        # it). A jornada with no keys still elapses; skipping its step here
+        # would make the walk depend on which weeks happen to have zero
+        # scoring rows, an artifact of the calendar rather than real time
+        # passing. Recomputed each iteration rather than drawn once up
+        # front: a random walk's steps must be independent draws taken IN
+        # ORDER, not sliced out of one big array.
+        if all_keys:
+            cum_var += (step_sd ** 2)
+            # LOG-NORMAL, NOT clip(1+drift, 0) — see
+            # ffcore.forecast.Bootstrap.rate_draw()'s matching note. A wide
+            # walk clipped at zero is not symmetric (the negative tail
+            # floors, the positive tail does not), which biased the MEAN
+            # upward the wider it got — measured while tuning DRIFT_FRAC,
+            # not a rounding error. exp(drift - var/2) has E[.]=1 for any
+            # variance, so the walk widens the spread without dragging the
+            # point estimate up with it.
+            drift = drng.standard_normal((trials, len(all_keys))) \
+                * np.sqrt(cum_var)
+            walked = np.exp(drift - cum_var / 2.0)
+            individual = eps0 * walked
+            m = individual * shared if shared is not None else individual
+            rate_mult = {k: m[:, i] for i, k in enumerate(all_keys)}
         keys = order.get(j, [])
         if not keys:
             continue
@@ -408,12 +442,19 @@ def _run(states: list, forecaster, which, seed: int) -> list:
     rate_of = getattr(forecaster, "rate_draw", None)
     for n, t in enumerate(idx):
         rng = random.Random(seed * 1_000_003 + t)
-        # ONE RATE DRAW PER TRIAL, before the jornadas — the same multiplier
-        # rides every round of this season, because a rate estimated wrong is
-        # wrong all season. Drawn from its own generator so adding it does not
+        # ONE RATE-DRIFT WALK PER TRIAL, before the jornadas — a rate
+        # estimated wrong is wrong all season, but the FURTHER a jornada is
+        # the more it could ALSO have drifted since (see
+        # ffcore.forecast.Bootstrap.rate_draw's own docstring and
+        # DRIFT_FRAC's note on why). Passing `jornadas` gets one dict PER
+        # jornada rather than one flat dict for the whole season; a
+        # forecaster with no rate_draw at all still runs with no rate
+        # uncertainty. Drawn from its own generator so adding it does not
         # shift the match-to-match numbers underneath it.
-        rates = rate_of(random.Random(seed * 7919 + t)) if rate_of else None
+        rates_by_j = (rate_of(random.Random(seed * 7919 + t), jornadas)
+                     if rate_of else None)
         for j in jornadas:
+            rates = rates_by_j.get(j) if rates_by_j else None
             drawn = forecaster.draw(j, rng, rates)
             get = drawn.get
             base = {}
@@ -592,7 +633,39 @@ def _selftest() -> None:
     assert [x.totals for x in serial] == [x.totals for x in forked], \
         "splitting the trials changed the seasons"
 
-    print("ffcore.season self-test OK (29 cases)")
+    # -- rate DRIFT actually widens a real season sim, mean unbiased --------
+    # Ten jornadas, not one — the walk needs distance to have anything to
+    # grow over. Same squads as the club-correlation check above, but no
+    # club_rel here: isolating the drift mechanism on its own.
+    import ffcore.forecast as forecast
+
+    many_j = list(range(1, 11))
+    per10 = {j: {k: (3.0, 1.0) for k in list(a) + list(b)} for j in many_j}
+    st10 = LeagueState(squads={"A": a, "B": b}, jornadas=many_j, me="A")
+    matches10 = {k: 20 for k in list(a) + list(b)}
+    was_drift = forecast.DRIFT_FRAC
+    try:
+        forecast.DRIFT_FRAC = 0.0
+        flat_res = simulate(st10, Bootstrap(per10, matches=matches10),
+                            trials=1500, seed=13)
+        forecast.DRIFT_FRAC = 1.0
+        drift_res = simulate(st10, Bootstrap(per10, matches=matches10),
+                             trials=1500, seed=13)
+    finally:
+        forecast.DRIFT_FRAC = was_drift
+    flat_sd = statistics.pstdev(flat_res.totals["A"])
+    drift_sd = statistics.pstdev(drift_res.totals["A"])
+    assert drift_sd > flat_sd, (flat_sd, drift_sd)
+    # THE MEAN MUST NOT MOVE — the exact bug caught and fixed while tuning
+    # DRIFT_FRAC (a clip(1+drift, 0) formulation biased it upward the
+    # wider the walk got). A generous tolerance against real Monte Carlo
+    # noise at 1500 trials, not against a systematic shift.
+    flat_mean = statistics.mean(flat_res.totals["A"])
+    drift_mean = statistics.mean(drift_res.totals["A"])
+    assert abs(drift_mean - flat_mean) / flat_mean < 0.03, \
+        (flat_mean, drift_mean)
+
+    print("ffcore.season self-test OK (32 cases)")
 
 
 if __name__ == "__main__":
