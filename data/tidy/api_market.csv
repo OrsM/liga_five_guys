@@ -2246,3 +2246,37 @@ observed_at,source,market_id,player_id,player_name,player_name_full,position_id,
 2026-08-21T0630Z,laliga,15560007,2415,Llorente ,Diego Llorente,2,12888927,12782327,1,marketPlayerTeam,on_sale,ok,false,2026-08-23T22:21:26+02:00
 2026-08-21T0630Z,laliga,15567842,3125,Canales,Sergio Canales,3,25451761,25960607,0,marketPlayerTeam,on_sale,ok,false,2026-08-23T22:30:32+02:00
 2026-08-21T0630Z,laliga,15568099,1031,Comesaña,Santiago Comesaña,3,32090903,31255536,0,marketPlayerTeam,on_sale,ok,false,2026-08-23T22:30:51+02:00
+2026-08-21T1150Z,laliga,75951402,2986,Antonio Hidalgo,Antonio Hidalgo,5,1439124,1396833,0,marketPlayerLeague,on_sale,ok,,2026-08-21T22:24:00+02:00
+2026-08-21T1150Z,laliga,75951403,2774,Kiko F.,Kiko Femenía,2,3529658,3427419,0,marketPlayerLeague,on_sale,suspended,,2026-08-21T22:24:00+02:00
+2026-08-21T1150Z,laliga,75951404,3170,Timera,Adama Timera,2,632210,622196,0,marketPlayerLeague,on_sale,ok,,2026-08-21T22:24:00+02:00
+2026-08-21T1150Z,laliga,75951405,652,Rubén García,Rubén García Santos,3,14083172,14090964,0,marketPlayerLeague,on_sale,ok,,2026-08-21T22:24:00+02:00
+2026-08-21T1150Z,laliga,75951406,3147,Fer Niño,Fer Niño,4,13796586,13543677,0,marketPlayerLeague,on_sale,ok,,2026-08-21T22:24:00+02:00
+2026-08-21T1150Z,laliga,75951407,2534,Álex Baena,Álex Baena,3,50261871,50749569,0,marketPlayerLeague,on_sale,ok,,2026-08-21T22:24:00+02:00
+2026-08-21T1150Z,laliga,75951409,3140,Juan Cruz,Juan Cruz,3,14953348,14605677,0,marketPlayerLeague,on_sale,ok,,2026-08-21T22:24:00+02:00
+2026-08-21T1150Z,laliga,75951411,1565,Barrios,Pablo Barrios,3,41903161,42769697,1,marketPlayerLeague,on_sale,ok,,2026-08-21T22:24:00+02:00
+2026-08-21T1150Z,laliga,75951413,2562,Marc Pubill,Marc Pubill,2,56068321,55300819,0,marketPlayerLeague,on_sale,ok,,2026-08-21T22:24:00+02:00
+2026-08-21T1150Z,laliga,75951421,2329,Javi Galán,Javi Galán,2,11380884,11268628,0,marketPlayerLeague,on_sale,ok,,2026-08-21T22:24:00+02:00
+2026-08-21T1150Z,laliga,75951423,988,Sivera,Antonio Sivera,1,33824935,34412976,0,marketPlayerLeague,on_sale,ok,,2026-08-21T22:24:00+02:00
+2026-08-21T1150Z,laliga,75951425,3000,Iñigo,Íñigo Sainz-Maza,2,692218,679803,0,marketPlayerLeague,on_sale,ok,,2026-08-21T22:24:00+02:00
+2026-08-21T1150Z,laliga,75951428,2714,Javi Rueda,Javi Rueda,2,4413024,4421896,0,marketPlayerLeague,on_sale,ok,,2026-08-21T22:24:00+02:00
+2026-08-21T1150Z,laliga,11705725,3129,Carlos Espí,Carlos Espí,4,9282313,9973382,1,marketPlayerTeam,on_sale,ok,false,2026-08-21T21:57:07+02:00
+2026-08-21T1150Z,laliga,12717104,1959,Mouriño,Santiago Mouriño,2,36327449,35379177,1,marketPlayerTeam,on_sale,ok,false,2026-08-23T22:21:19+02:00
+2026-08-21T1150Z,laliga,12717146,3068,Cabrera,Leandro Cabrera,2,15549740,15085835,1,marketPlayerTeam,on_sale,suspended,false,2026-08-23T22:21:32+02:00
+2026-08-21T1150Z,laliga,12717862,3089,Ez Abde,Abde Ezzalzouli,4,41408166,40470353,0,marketPlayerTeam,on_sale,injured,false,2026-08-23T22:21:59+02:00
+2026-08-21T1150Z,laliga,14185646,3037,C. Puga,Carlos Puga,2,5096327,4981968,1,marketPlayerTeam,on_sale,ok,false,2026-08-21T22:45:24+02:00
+2026-08-21T1150Z,laliga,14186088,2315,Paredes,Aitor Paredes,2,5280233,5577844,2,marketPlayerTeam,on_sale,ok,false,2026-08-21T22:46:04+02:00
+2026-08-21T1150Z,laliga,14186254,2474,Denis Suárez,Denis Suárez,3,2420507,2345839,1,marketPlayerTeam,on_sale,ok,false,2026-08-21T22:46:18+02:00
+2026-08-21T1150Z,laliga,14186359,3069,Blanco,Antonio Blanco,3,14784817,14554549,1,marketPlayerTeam,on_sale,ok,false,2026-08-21T22:46:26+02:00
+2026-08-21T1150Z,laliga,14186511,2700,Etta Eyong,Karl Edouard Blaise Etta Eyong,4,25480174,23998951,1,marketPlayerTeam,on_sale,ok,false,2026-08-21T22:46:38+02:00
+2026-08-21T1150Z,laliga,14243057,74,Yuri,Yuri Berchiche Izeta,2,12294334,12393953,1,marketPlayerTeam,on_sale,ok,false,2026-08-22T00:16:06+02:00
+2026-08-21T1150Z,laliga,14243153,1991,Tárrega,César Tárrega,2,9139919,9130371,1,marketPlayerTeam,on_sale,ok,false,2026-08-22T00:16:18+02:00
+2026-08-21T1150Z,laliga,14243525,2480,Johnny,Johnny Cardoso,3,5412259,5199668,1,marketPlayerTeam,on_sale,ok,false,2026-08-22T00:16:59+02:00
+2026-08-21T1150Z,laliga,14243639,3035,Izan M.,Izan Merino,3,6015339,5852631,1,marketPlayerTeam,on_sale,ok,false,2026-08-22T00:17:12+02:00
+2026-08-21T1150Z,laliga,14270371,1930,El Hilali,Omar El Hilali,2,9760951,10450818,1,marketPlayerTeam,on_sale,ok,false,2026-08-22T01:11:35+02:00
+2026-08-21T1150Z,laliga,14293583,265,Zubeldia,Igor Zubeldia,2,10295291,10352538,1,marketPlayerTeam,on_sale,ok,false,2026-08-22T02:31:14+02:00
+2026-08-21T1150Z,laliga,14898744,2507,Dmitrovic,Marko Dmitrovic,1,38638122,39752309,1,marketPlayerTeam,on_sale,ok,false,2026-08-22T23:21:01+02:00
+2026-08-21T1150Z,laliga,14948006,2713,Ionut Radu,Ionut Radu,1,37095939,36743508,1,marketPlayerTeam,on_sale,ok,false,2026-08-23T00:25:58+02:00
+2026-08-21T1150Z,laliga,15560007,2415,Llorente ,Diego Llorente,2,12888927,12782225,1,marketPlayerTeam,on_sale,ok,false,2026-08-23T22:21:26+02:00
+2026-08-21T1150Z,laliga,15567842,3125,Canales,Sergio Canales,3,25451761,25961421,0,marketPlayerTeam,on_sale,ok,false,2026-08-23T22:30:32+02:00
+2026-08-21T1150Z,laliga,15568099,1031,Comesaña,Santiago Comesaña,3,32090903,31255335,0,marketPlayerTeam,on_sale,ok,false,2026-08-23T22:30:51+02:00
+2026-08-21T1150Z,laliga,15859287,2556,Buchanan,Tajon Buchanan,3,16734076,16734076,0,marketPlayerTeam,on_sale,ok,false,2026-08-24T13:09:32+02:00
