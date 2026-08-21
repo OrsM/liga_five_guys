@@ -202,6 +202,72 @@ class Crosswalk:
                 return k
         return None
 
+    def resolve(self, raw="", *, hint_app_id="", hint_club="",
+                hint_price=None, hint_full="", market=None) -> str | None:
+        """The repo's one join: given whatever a source calls a player, his key.
+
+        THE FIRST STEP OF UNWINDING SIX RESOLVERS INTO ONE. `player()` above,
+        `Market.key_for`/`candidates`, `text.resolve`, and league.py's
+        `api_key`/`identify`/`_roster_key` each grew their own answer to this
+        question, at different times, against different assumptions about
+        what a "key" looks like — and every identity bug found in the
+        2026-08-20/21 session was two of them disagreeing about it. This is
+        not everything those six do (api_key's ledger tie-break and
+        identify's counterparty pruning are domain-specific to a ledger row,
+        not to identity, and stay where they are) — it is the join itself,
+        meant to be the one thing every caller reaches for instead of
+        re-deriving it.
+
+        Order of trust, in the order it is checked:
+          1. `raw` is already a bare digit string — this repo's own key IS
+             numeric for the overwhelming majority of players today
+             (`row_key()`: 44,912 rows checked, `ff_id` on every one), so a
+             source that already hands one over needs no resolution at all.
+             This is `_roster_key()`'s fast path, generalised.
+          2. `market.key_for(raw, ...)` — the market's CURRENT spelling,
+             disambiguated by `hint_club`/`hint_price` when two players share
+             the name. Outranks the crosswalk because a display name moves
+             with the market and this always resolves against the newest
+             snapshot; every other reader already trusts this join most.
+          3. The same, against `hint_full` — a longer alternate spelling
+             (birth name vs. nickname) tried only once `raw` alone misses,
+             because the shorter name is usually the better single guess
+             (`api_key`'s docstring: of 76 owned players, 12 join ONLY on the
+             nickname).
+          4. `self.player(app_id=hint_app_id)` — an id from a source that
+             does not speak the market's own namespace (the league app's
+             own integer ids) but that this crosswalk has already learned.
+          5. `self.player(app_name=raw)` then `self.player(name=raw)` — the
+             crosswalk's own memory, last resort before refusing. This is
+             what catches a source whose current spelling the market has
+             moved past (`Manuel Fernández` -> `Manu Fernandez`,
+             mid-season) but whose OLD spelling the crosswalk still holds.
+
+        None means genuinely unresolved — never a guess, and never a
+        candidate list picked for you; a caller that wants to prune an
+        ambiguous market name by its own evidence (ledger counterparty,
+        purchase price) still goes to `market.candidates()` directly.
+        """
+        raw = (raw or "").strip()
+        if raw.isdigit():
+            return raw
+        if market is not None:
+            for candidate in (raw, (hint_full or "").strip()):
+                if not candidate:
+                    continue
+                key = market.key_for(candidate, team=hint_club,
+                                     value=hint_price)
+                if key:
+                    return key
+        hint_app_id = (hint_app_id or "").strip()
+        if hint_app_id:
+            got = self.player(app_id=hint_app_id)
+            if got:
+                return got
+        if raw:
+            return self.player(app_name=raw) or self.player(name=raw)
+        return None
+
     def club(self, *, ff_slug=None, name=None) -> str | None:
         if ff_slug and ff_slug in self._club_ff:
             return self._club_ff[ff_slug]
@@ -442,7 +508,63 @@ def _selftest() -> None:
     assert cov["players"] == 3 and cov["clubs"] == 2
     assert 0.0 < cov["ff"] < 1.0
 
-    print("ffcore.crosswalk self-test OK (28 cases)")
+    # -- resolve(): the one join, against the same real scenarios that broke
+    # the six it is replacing ------------------------------------------------
+    from ffcore.tidy import Market
+
+    # A bare digit is already this repo's key — no lookup at all, the fast
+    # path _roster_key() relies on for a migrated rosters_initial.txt line.
+    assert xw.resolve("2101") == "2101"
+
+    # Two men share a name; the market refuses without a discriminator, and
+    # resolve() must refuse too rather than pick one.
+    ag = Market([
+        {"ff_id": "867", "name": "Álvaro García", "team": "Rayo",
+         "value": "20233300", "observed_at": "2026-08-19T1639Z"},
+        {"ff_id": "12993", "name": "Álvaro García", "team": "Villarreal",
+         "value": "501929", "observed_at": "2026-08-19T1639Z"}])
+    assert xw.resolve("Álvaro García", market=ag) is None
+    assert xw.resolve("Álvaro García", hint_club="Rayo", market=ag) == "867"
+    assert xw.resolve("Álvaro García", hint_price=501929, market=ag) \
+        == "12993"
+
+    # An abbreviated surname three players share, settled by price only —
+    # the +635% premium bug (C. Romero -> Isaac Romero) this repo already
+    # fixed once, checked again here so resolve() cannot reintroduce it.
+    rm = Market([
+        {"ff_id": "1", "name": "Isaac Romero", "team": "Sevilla",
+         "value": "6023939", "observed_at": "2026-08-19T1639Z"},
+        {"ff_id": "2", "name": "Cristian Romero", "team": "Atletico",
+         "value": "47546565", "observed_at": "2026-08-19T1639Z"},
+        {"ff_id": "3", "name": "Carlos Romero", "team": "Espanyol",
+         "value": "42510131", "observed_at": "2026-08-19T1639Z"}])
+    assert xw.resolve("C. Romero", market=rm) is None
+    assert xw.resolve("C. Romero", hint_price=45739000, market=rm) == "2"
+
+    # A full name reaches a player the abbreviated nickname alone cannot —
+    # api_key's own reason for trying hint_full second, not first.
+    nick = Market([{"ff_id": "9", "name": "Pepelu", "team": "Valencia",
+                    "value": "7669774", "observed_at": "2026-08-19T1639Z"}])
+    assert xw.resolve("nobody knows this nickname", market=nick) is None
+    assert xw.resolve("nobody knows this nickname",
+                      hint_full="Pepelu", market=nick) == "9"
+
+    # THE MEASURED CASE: a roster line typed against a spelling the market
+    # has since moved past. The market no longer has "Manuel Fernández" at
+    # all — only the crosswalk's app_name memory does — so market.key_for()
+    # must miss and the crosswalk fallback must catch it.
+    moved = Crosswalk({"manu fernandez": Player(
+        "manu fernandez", "Manu Fernandez", app_names={"Manuel Fernández"})})
+    empty_market = Market([])
+    assert moved.resolve("Manuel Fernández") == "manu fernandez"
+    assert moved.resolve("Manuel Fernández", market=empty_market) \
+        == "manu fernandez"
+
+    # Nothing anywhere knows this name — refuse, don't guess.
+    assert xw.resolve("Absolutely Nobody") is None
+    assert xw.resolve("") is None
+
+    print("ffcore.crosswalk self-test OK (34 cases)")
 
 
 if __name__ == "__main__":

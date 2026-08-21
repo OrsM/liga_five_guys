@@ -747,48 +747,34 @@ def identify(t: dict, owner: dict, market=None, xw=None) -> tuple[str, str]:
 def _roster_key(raw: str, market, xw=None) -> str:
     """The canonical key for one rosters_initial.txt line.
 
-    THE FILE IS ID-PER-LINE NOW (migrated 2026-08-21), so the common case
-    is the fast path below: the crosswalk's own key, verbatim, no
-    resolution needed — that is the entire point of storing an id instead
-    of a name a season can outgrow. Everything after this handles a line
-    that is NOT a bare id: a hand-typed name from before the migration, or
-    one added by hand despite "write once" — never dropping a roster entry
-    either way.
-
-    market.key_for() — the SAME resolution identify() uses for every
-    transacted player, and every other reader in this repo — not a bare
-    norm(). Untransacted roster players never went through identify(), so a
-    plain norm(name) key was the only kind that never got reconciled to
-    whatever key_for() (usually the market's own numeric id) actually
-    resolves everyone else to. This is the bug an id-keyed file cannot
-    have again: a numeric id does not drift the way a display name does.
+    A THIN WRAPPER OVER `Crosswalk.resolve()` now — the first of the six
+    call-site-specific identity resolvers to be migrated onto the one join
+    function, per the 2026-08-21 handoff. Behaviour is unchanged: same fast
+    path for an id-per-line entry, same market join, same crosswalk
+    app_name fallback for a name the market has since moved past. Only the
+    resolution logic itself moved; read `Crosswalk.resolve()`'s docstring
+    for why each step is ordered the way it is.
 
     read_rosters() folds "alvaro garcia (Rayo)" into "alvaro garcia@rayo"
     for a shared name — split back apart here so the club reaches
-    key_for()'s own `team` disambiguator, the same signal Market._pick()
-    already knows how to use.
+    resolve()'s `hint_club`, the same signal Market._pick() already knows
+    how to use.
 
-    xw.player(app_name=...) IS TRIED SECOND, not first: key_for() is the
-    market's own current spelling, the trustworthy side of a join
-    everywhere else in this repo; app_name is the app's ACCUMULATED past
-    spellings, useful precisely when the market's CURRENT name has moved
-    on — measured case: "Manuel Fernández", typed in the pre-migration
-    roster, matched nothing once the market moved on to "Manu Fernandez",
-    but the crosswalk already held the old name as an app_name alias.
-
-    Falls back to norm(raw): no market to resolve against, or neither path
-    can place him (never yet seen anywhere, or still ambiguous).
+    Falls back to norm(raw) when resolve() has nothing (no crosswalk given,
+    or neither path can place him — never yet seen anywhere, or still
+    ambiguous), which resolve() itself cannot do: it has no crosswalk to
+    fall back to without one.
     """
     stripped = raw.strip()
     if stripped.isdigit():
         return stripped
     name, _, club = raw.partition("@")
-    if market is not None:
-        got = market.key_for(name, team=club)
+    if xw is not None:
+        got = xw.resolve(name, hint_club=club, market=market)
         if got:
             return got
-    if xw is not None:
-        got = xw.player(app_name=name)
+    elif market is not None:
+        got = market.key_for(name, team=club)
         if got:
             return got
     return norm(raw)
