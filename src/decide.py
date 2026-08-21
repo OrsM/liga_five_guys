@@ -456,6 +456,21 @@ def _score_many(u: Universe, many: list, trials: int, seed: int):
         u.forecaster, trials=trials, seed=seed)
 
 
+def value_rate(pts, cost) -> float | None:
+    """Season points per million of a GENUINE positive cost, or None.
+
+    Shared by rank() (a BUY row's net spend) and sim.ladder()/
+    ladder_rows() (a SAVE row's shortfall) — the same "is the price worth
+    it" question, only ever answered when there is a real price: `cost`
+    <= 0 means nothing to divide by (a funded sale that pays for itself,
+    or a degenerate shortfall), and the raw points figure beside this one
+    already says whether that is worth doing.
+    """
+    if pts is None or cost is None or cost <= 0:
+        return None
+    return pts / (cost / 1e6)
+
+
 def rank(u: Universe, acts: list[Action], seed: int = 1,
          price=None) -> tuple:
     """Screen wide and cheap, then re-run the survivors properly.
@@ -539,11 +554,12 @@ def rank(u: Universe, acts: list[Action], seed: int = 1,
         # number you can act on and one you cannot.
         mine, was = r.totals.get(u.me, []), base.totals.get(u.me, [])
         pairs = sorted(x - y for x, y in zip(mine, was))
+        d_pts = pairs[len(pairs) // 2] if pairs else 0.0
         out.append({
             "action": a,
             "helps": (sum(1 for d in pairs if d > 0) / len(pairs)
                       if pairs else 0.0),
-            "d_pts": pairs[len(pairs) // 2] if pairs else 0.0,
+            "d_pts": d_pts,
             "pts_lo": pairs[int(0.1 * len(pairs))] if pairs else 0.0,
             "pts_hi": pairs[int(0.9 * len(pairs))] if pairs else 0.0,
             "d_pos": gross - charge,
@@ -554,6 +570,36 @@ def rank(u: Universe, acts: list[Action], seed: int = 1,
             "d_win": r.position().get(1, 0.0) - base.position().get(1, 0.0),
             "d_beat": {v: r.beat(v) - base.beat(v) for v in rivals},
             "mean": r.mean(u.me),
+            # VALUE FOR MONEY: season points gained per million ACTUALLY
+            # PAID — the question this table never answered before,
+            # "can I pay the price for the incremental points, or is the
+            # price too high for what it buys". `d_pts`, NOT `d_pos`: the
+            # table's own primary unit is season points, and the reader
+            # asking this question is asking about points, not the more
+            # abstract position statistic screening uses internally.
+            #
+            # NOT THE OLD λ, on purpose — λ (retired 2026-08-17, c8c4032)
+            # measured points-of-XI-index per million against YOUR CURRENT
+            # ELEVEN off a ladder built from the whole unowned pool: the
+            # baseline moved (the same player was worth a different λ on
+            # consecutive days for reasons that had nothing to do with
+            # him), and the ladder priced a market nobody could actually
+            # shop in. This is neither: `d_pts` comes from `rank()`'s own
+            # paired Monte Carlo — the SAME simulated seasons, with the
+            # move and without it — which is what "PAIRED, WITHIN THE SAME
+            # SEASONS" a few lines up already exists to make robust to a
+            # changing model. Normalising an already-grounded number by
+            # its cost is not the same mistake as normalising by an
+            # ungrounded one.
+            #
+            # ONLY DEFINED FOR A GENUINE SPEND (net > 0). A sale that
+            # raises MORE than it costs (net <= 0) is not "how many points
+            # per million" — it is free money plus points, which needs no
+            # rate to justify: it is obviously worth doing if d_pts > 0
+            # and obviously not if d_pts < 0, and dividing by a near-zero
+            # or negative net would either blow up or invert the sign
+            # into something that reads backwards.
+            "value": value_rate(d_pts, a.net),
         })
     rows = sorted(out, key=lambda d: (-d["d_pos"], d["action"].net))
     return rows, base, measured
@@ -950,6 +996,18 @@ def _selftest() -> None:
         (r["d_pos"] for r in rows), reverse=True)
     assert set(top["d_beat"]) == {"riv"}
 
+    # VALUE FOR MONEY: points per million ACTUALLY PAID, only for a genuine
+    # spend (net > 0) — the formula itself, checked against the row it came
+    # from, not just "it exists".
+    spend = next(r for r in rows if r["action"].net > 0)
+    assert abs(spend["value"] - spend["d_pts"] / (spend["action"].net / 1e6)
+              ) < 1e-9, spend
+    # A pure sale (net <= 0) gets no ratio — see rank()'s own note on why
+    # dividing by a non-positive net would blow up or read backwards.
+    sale = next((r for r in rows if r["action"].net <= 0), None)
+    if sale is not None:
+        assert sale["value"] is None, sale
+
     # THE STEAL IS WORTH MORE THAN THE SAME PLAYER FROM THE POOL. Compared
     # like for like — same points, same price, same funding — taking him off a
     # rival beats buying an equivalent free agent, because it moves both
@@ -1168,7 +1226,15 @@ def _selftest() -> None:
     assert un == ["zzz-united"], un
     assert _d == {1: {"getafe"}}, _d
 
-    print("decide self-test OK (63 cases)")
+    # -- value_rate: the shared primitive, on its own -----------------------
+    assert value_rate(120.0, 14.13e6) is not None
+    assert abs(value_rate(120.0, 14.13e6) - 120.0 / 14.13) < 1e-9
+    assert value_rate(120.0, 0.0) is None       # nothing to divide by
+    assert value_rate(120.0, -5e6) is None       # a net-negative "cost" is not one
+    assert value_rate(None, 5e6) is None
+    assert value_rate(0.0, 5e6) == 0.0           # a real price, zero return: 0, not None
+
+    print("decide self-test OK (71 cases)")
 
 
 if __name__ == "__main__":

@@ -41,7 +41,7 @@ import json  # noqa: E402
 import os as _os  # noqa: E402
 from pathlib import Path  # noqa: E402
 
-from decide import dead_weight  # noqa: E402,F401
+from decide import dead_weight, value_rate  # noqa: E402,F401
 from ffcore.parse import fmt_money  # noqa: E402
 from ffcore.league import app_fielded  # noqa: E402
 from ffcore.render import title_name  # noqa: E402
@@ -277,11 +277,11 @@ def ladder_rows(u, rows, saves=None) -> list[dict]:
     bar = min((exp.get(k, 0.0) for k in xi), default=0.0)
     spare = sum(v for _k, v in decide_dead(u))
 
-    def cell(k, group, where, money, pts, note=""):
+    def cell(k, group, where, money, pts, note="", value=None):
         return {"name": title_name(u.name.get(k, k)),
                 "pos": u.pos.get(k, ""), "start": u.start.get(k, 0.0),
                 "xpts": exp.get(k, 0.0), "group": group, "where": where,
-                "money": money, "pts": pts, "note": note}
+                "money": money, "pts": pts, "note": note, "value": value}
 
     out = []
     # WHAT TO CHANGE, not what to have. When the marks are a legal eleven the
@@ -310,13 +310,15 @@ def ladder_rows(u, rows, saves=None) -> list[dict]:
     for k in sorted((k for k in rest if k in won), key=lambda k: -exp.get(k, 0.0)):
         r = won[k]
         out.append(cell(k, "buy", u.owner.get(k) or "free agent",
-                        -r["action"].net, r["d_pts"]))
+                        -r["action"].net, r["d_pts"], value=r.get("value")))
     for k in sorted((k for k in rest if k not in won
                      and u.price[k] > u.cash + spare),
                     key=lambda k: -exp.get(k, 0.0)):
+        short_by = u.price[k] - u.cash - spare
+        save_pts = (saves or {}).get(k)
         out.append(cell(k, "save", u.owner.get(k) or "free agent",
-                        -(u.price[k] - u.cash - spare),
-                        (saves or {}).get(k), "short"))
+                        -short_by, save_pts, "short",
+                        value=value_rate(save_pts, short_by)))
     for k in sorted((k for k in rest if k not in won
                      and u.price[k] <= u.cash + spare),
                     key=lambda k: -exp.get(k, 0.0)):
@@ -381,37 +383,38 @@ def ladder(u, rows, base, saves=None) -> list[str]:
     spare = sum(u.proceeds.get(d, 0) for d in dead)
     names = {k: title_name(u.name.get(k, k)) for k in u.name}
 
-    def row(k, where, money, pts):
-        return ("| %s | %s | %.0f%% | %.2f | %s | %s | %s |"
+    def row(k, where, money, pts, value=None):
+        return ("| %s | %s | %.0f%% | %.2f | %s | %s | %s | %s |"
                 % (names.get(k, k), u.pos.get(k, "—"),
                    100 * u.start.get(k, 0.0), exp.get(k, 0.0), where,
                    ("%+.2fM" % (money / 1e6)) if money else "—",
-                   ("%+.0f" % pts) if pts is not None else "—"))
+                   ("%+.0f" % pts) if pts is not None else "—",
+                   ("%.1f" % value) if value is not None else "—"))
 
     def by_xpts(keys):
         return sorted(keys, key=lambda k: -exp.get(k, 0.0))
 
-    out = ["| Player | Pos | Start | xPts/j | Where | € | Season |",
-           "|---|---|--:|--:|---|--:|--:|"]
+    out = ["| Player | Pos | Start | xPts/j | Where | € | Season | pts/M€ |",
+           "|---|---|--:|--:|---|--:|--:|--:|"]
 
     chg = xi_change(fielded_keys(u), xi)
     if not chg["legal"]:
         # No trustworthy marks to diff against, so the whole sheet — and a
         # line saying why you are being asked to read one.
         out.append("| **FIELD — your eleven — the app has not said what you "
-                   "are playing** | | | | | | |")
+                   "are playing** | | | | | | | |")
         for k in by_slot(u, xi):
             out.append(row(k, "yours", None, None))
     elif not chg["in"] and not chg["out"]:
         out.append("| **XI — no change, you are fielding the best eleven** "
-                   "| | | | | | |")
+                   "| | | | | | | |")
     else:
         if chg["in"]:
-            out.append("| **PUT ON** | | | | | | |")
+            out.append("| **PUT ON** | | | | | | | |")
             for k in by_slot(u, chg["in"]):
                 out.append(row(k, "bench", None, None))
         if chg["out"]:
-            out.append("| **TAKE OFF** | | | | | | |")
+            out.append("| **TAKE OFF** | | | | | | | |")
             for k in by_slot(u, chg["out"]):
                 out.append(row(k, "yours", None, None))
     tot = sum(exp.get(k, 0.0) for k in xi)
@@ -419,19 +422,19 @@ def ladder(u, rows, base, saves=None) -> list[str]:
                     for m, sq in u.state.squads.items() if m != u.me),
                    default=(0.0, ""))
     out.append("| **Your eleven — play %s** | | | **%.2f** | "
-               "vs %s **%.2f** | | **%+.2f** |"
+               "vs %s **%.2f** | | **%+.2f** | |"
                % (shape(u, xi), tot, best_riv[1], best_riv[0],
                   tot - best_riv[0]))
 
     keep = [k for k in mine if k not in xi and k not in dead
             and k not in set(chg["in"]) | set(chg["out"])]
     if keep:
-        out.append("| **KEEP — bench** | | | | | | |")
+        out.append("| **KEEP — bench** | | | | | | | |")
         for k in by_slot(u, keep):
             out.append(row(k, "yours", None, None))
 
     if dead:
-        out.append("| **SELL — never start** | | | | | | |")
+        out.append("| **SELL — never start** | | | | | | | |")
         for k in by_xpts(dead):
             out.append(row(k, "yours", u.proceeds.get(k, 0.0), None))
 
@@ -439,26 +442,30 @@ def ladder(u, rows, base, saves=None) -> list[str]:
     pss = [k for k in u.price
            if k not in mine and k not in won and exp.get(k, 0.0) > bar]
     if buys:
-        out.append("| **BUY — with the proceeds** | | | | | | |")
+        out.append("| **BUY — with the proceeds** | | | | | | | |")
         for k in by_xpts(buys):
             r = won[k]
             out.append(row(k, u.owner.get(k) or "free agent",
-                           -r["action"].net, r["d_pts"]))
+                           -r["action"].net, r["d_pts"], r.get("value")))
     save = [k for k in pss
             if u.price[k] > u.cash + spare]
     pss = [k for k in pss if k not in save]
     if save:
-        out.append("| **SAVE — better than yours, out of reach** | | | | | | |")
+        out.append("| **SAVE — better than yours, out of reach** | | | | | | | |")
         for k in by_xpts(save):
             short_by = u.price[k] - u.cash - spare
-            out.append("| %s | %s | %.0f%% | %.2f | %s | %.2fM short | %s |"
+            save_pts = (saves or {}).get(k)
+            save_value = value_rate(save_pts, short_by)
+            out.append("| %s | %s | %.0f%% | %.2f | %s | %.2fM short | %s | %s |"
                        % (names.get(k, k), u.pos.get(k, "—"),
                           100 * u.start.get(k, 0.0), exp.get(k, 0.0),
                           u.owner.get(k) or "free agent", short_by / 1e6,
-                          ("%+.0f if you could" % (saves or {})[k]
-                           if (saves or {}).get(k) is not None else "—")))
+                          ("%+.0f if you could" % save_pts
+                           if save_pts is not None else "—"),
+                          ("%.1f" % save_value) if save_value is not None
+                          else "—"))
     if pss:
-        out.append("| **PASS** | | | | | | |")
+        out.append("| **PASS** | | | | | | | |")
         for k in by_xpts(pss):
             out.append(row(k, u.owner.get(k) or "free agent",
                            -u.price[k], None))
@@ -473,7 +480,24 @@ def ladder(u, rows, base, saves=None) -> list[str]:
             "already applied. **€** is the cash you END UP with for doing that row, funding included — a SELL row is what it raises, a BUY row is that money minus what he costs — and "
             "on a SAVE row it is how far short you are. **Season** is "
             "simulated: extra points over the %d jornadas left, measured in "
-            "the same seasons with and without the move._"
+            "the same seasons with and without the move. **pts/M€** is "
+            "Season points per million the move actually costs — not just "
+            "whether it helps, but whether the price is worth it, so a big "
+            "gain at a steep price and a small gain that is nearly free "
+            "read against each other rather than only against themselves. "
+            "`—` on a BUY row means the move is net cash-NEUTRAL-OR-"
+            "POSITIVE (the funding sales raise at least as much as the "
+            "buy costs) — there is no price to divide by, and Season "
+            "already says whether it is worth doing. On a SAVE row it is "
+            "the shortfall's own rate, which nobody can act on yet, only "
+            "plan toward. This is "
+            "NOT the old λ (retired 2026-08-17): λ was measured against "
+            "your OWN current eleven off a ladder of the whole unowned "
+            "pool, so the same player was worth a different λ on "
+            "different days for reasons that had nothing to do with him. "
+            "This divides the SAME paired Season figure in the column "
+            "beside it — the same simulated seasons, with the move and "
+            "without it — so it only moves when the real trade-off does._"
             % len(u.state.jornadas), ""]
     return out
 
@@ -572,8 +596,8 @@ def table(rows, u, base, rivals) -> list[str]:
                 "steal or swap improves the eleven._", ""]
     now = base.position().get(1, 0.0)
     ranked = sorted(rows, key=lambda r: (-r.get("d_pts", 0.0), -r["d_pos"]))
-    out = ["| Get | Give up | Season pts | Helps | Net € | Left |",
-           "|---|---|--:|--:|--:|--:|"]
+    out = ["| Get | Give up | Season pts | pts/M€ | Helps | Net € | Left |",
+           "|---|---|--:|--:|--:|--:|--:|"]
     for r in ranked[:SHOW]:
         a = r["action"]
         got = title_name(u.name.get(a.buy, a.buy)) if a.buy else "—"
@@ -589,8 +613,10 @@ def table(rows, u, base, rivals) -> list[str]:
         ans = r.get("answer")
         if ans is not None:
             gave += " · **he takes %s**" % short(ans.buy, u)
-        out.append("| %s | %s | %+.0f | %.0f%% | %s | %s |"
+        value = r.get("value")
+        out.append("| %s | %s | %+.0f | %s | %.0f%% | %s | %s |"
                    % (got, gave, r.get("d_pts", 0.0),
+                      ("%.1f" % value) if value is not None else "free",
                       100 * r.get("helps", 0.0), _net(-a.net),
                       fmt_money(u.cash - a.net)))
     out += ["",
@@ -602,6 +628,22 @@ def table(rows, u, base, rivals) -> list[str]:
             "moved one row's P(win) by 48 points and these two by six. Your "
             "overall chance is %.0f%% and it is in the header, where a figure "
             "that provisional belongs. "
+            "**pts/M€** is season points per million ACTUALLY PAID — the "
+            "question the rest of this table never answered: not just "
+            "'does this help' but 'is the price worth it', so a big gain "
+            "at a steep price and a small gain that is nearly free can be "
+            "read against each other rather than only against themselves. "
+            "*free* means the move is net cash-NEUTRAL-OR-POSITIVE (a "
+            "sale raises at least as much as the buy costs) — there is no "
+            "price to divide by, and there does not need to be: Season "
+            "pts already says whether it is worth doing. This is NOT the "
+            "old λ (retired 2026-08-17): λ measured against your OWN "
+            "current eleven off a ladder of the whole unowned pool, so "
+            "the same player was worth a different λ on different days "
+            "for reasons that had nothing to do with him. This divides "
+            "the SAME paired Season pts figure above — the same simulated "
+            "seasons, with the move and without it — so it moves only "
+            "when the real trade-off does. "
             "**Get** says HOW you would get him. *On the market* is an "
             "ordinary purchase whoever owns him — measured, taking a man off "
             "a rival that way denies him nothing, because the managers "
@@ -1240,7 +1282,8 @@ def _selftest() -> None:
     rows = [{"action": Action("clause", buy="yuri", sell="benat",
                               cost=20e6, proceeds=5.87e6, victim="riv"),
              "d_pos": 0.433, "d_win": 0.364, "d_beat": {"riv": 0.37},
-             "d_pts": 120.0, "helps": 0.90, "mean": 1510.0}]
+             "d_pts": 120.0, "helps": 0.90, "mean": 1510.0,
+             "value": 120.0 / (14.13e6 / 1e6)}]
     body = table(rows, u, st, ["riv"])
     line = [ln for ln in body if ln.startswith("| Yuri")]
     assert len(line) == 1, body
@@ -1253,17 +1296,40 @@ def _selftest() -> None:
     # the move is worth +36.4 points of it, so it reads 86% — no arithmetic,
     # and no delta that has to be added to a figure in the header.
     assert cells[2] == "+120", cells      # season points, paired
-    assert cells[3] == "90%", cells       # ...and how often it helps
+    # VALUE FOR MONEY: 120 points for 14.13M actually paid.
+    assert cells[3] == "8.5", cells
+    assert cells[4] == "90%", cells       # ...and how often it helps
     # MONEY LEAVING IS NEGATIVE, the way the balance sees it: this move spends
     # 20M and raises 5.87M, so it costs 14.13M.
-    assert cells[4] == "-14.13M", cells
+    assert cells[5] == "-14.13M", cells
     # WHAT YOU ARE LEFT ON. Every rival is on nothing until you pay one, so
     # this column is the whole of your ability to answer anything later.
-    assert cells[5] == "9.47M", cells
+    assert cells[6] == "9.47M", cells
     # The three columns that said the same thing are gone: Δpos, Δwin and the
     # rival column all tracked each other, and the rival column named the same
     # manager on every row for days.
-    assert len(cells) == 6, cells
+    assert len(cells) == 7, cells
+
+    # A move with no `value` key at all (an older-shaped row) reads as
+    # "free" rather than crashing — .get(), not [], is what makes that true.
+    no_value = [{**rows[0], "action": Action(
+        "buy", buy="yuri", cost=20e6, proceeds=5.87e6)}]
+    del no_value[0]["value"]
+    line2 = [ln for ln in table(no_value, u, st, ["riv"])
+            if ln.startswith("| Yuri")]
+    cells2 = [c.strip() for c in line2[0].strip("|").split("|")]
+    assert cells2[3] == "free", cells2
+
+    # A GENUINE net<=0 SALE gets the same "free" reading, on the real
+    # formula this time (rank() itself refuses to compute a ratio here —
+    # see its own note on why dividing by a non-positive net reads
+    # backwards).
+    cash_pos = [{**rows[0], "action": Action(
+        "sell", sell="benat", proceeds=5.0e6), "value": None}]
+    line3 = [ln for ln in table(cash_pos, u, st, ["riv"])
+            if "Turrientes" in ln]
+    cells3 = [c.strip() for c in line3[0].strip("|").split("|")]
+    assert cells3[3] == "free", cells3
     assert "+0.433" not in line[0] and "+36%" not in line[0], line[0]
 
     # A free agent is a different move from a steal and says so rather than
@@ -1554,7 +1620,7 @@ def _selftest() -> None:
     ph = "\n".join(placeholder("no api_teams.csv"))
     assert "no api_teams.csv" in ph and ph.startswith("# The simulation")
 
-    print("sim self-test OK (93 cases)")
+    print("sim self-test OK (99 cases)")
 
 
 def main() -> None:
