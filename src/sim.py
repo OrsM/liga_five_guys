@@ -938,17 +938,16 @@ def caveats(u) -> list[str]:
         "holding money looks worthless and a standalone sale can never look "
         "good |",
         "| p_win's season-long spread rests on one hand-picked constant "
-        "(DRIFT_FRAC), not a fit | checked two real anchors and they "
-        "disagree: jornada-1-vs-final club points correlate at r=0.11-0.45 "
-        "(weak — argues for MORE spread), but season-to-season club points "
-        "correlate at r=0.71-0.88 (strong — argues for LESS). Neither "
-        "converts cleanly into a per-player weekly drift. Published models "
-        "(538's NBA/NHL/MLB) skip this problem entirely: they revert the "
-        "PRIOR once by a measured fraction and then check the resulting "
-        "spread against REALISED forecast error, not a guessed future-drift "
-        "term. This repo's own version of that check is the Forecast vs "
-        "actual table above — trust it over DRIFT_FRAC once it has enough "
-        "rows (n=15-20+) to say something |",
+        "(DRIFT_FRAC=2.0), not a fit | two real anchors on this repo's own "
+        "data disagree on the exact magnitude (weak jornada-1-vs-final "
+        "correlation argues wider, strong season-to-season correlation "
+        "argues narrower), but every published win-probability model "
+        "checked (538's NBA/NHL/MLB) is far more humble than 70%+ about a "
+        "full season this early regardless — that floor doesn't need the "
+        "two anchors resolved. Widened from a prior setting that read 72% "
+        "to land near a coin flip instead. Tighten only once the Forecast "
+        "vs actual table above (the real, realised-error check) has enough "
+        "rows (n=15-20+) to say the model is already well-calibrated |",
         "| Shape prior | %s |" % u.forecaster.pool_note(),
         "| P(start) fit | %s |" % u.start_note.rstrip("."),
         ""]

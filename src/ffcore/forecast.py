@@ -113,38 +113,35 @@ SHRINK_MATCHES = 8.0
 # completed fantasy season to measure against, the same way
 # _xg_stickiness_boost() already refits itself from real paired data.
 #
-# TRIED TO PIN THIS DOWN FURTHER (2026-08-21), FOUND IT GENUINELY
-# AMBIGUOUS FROM REAL DATA, NOT JUST UNDER-MEASURED. Two real anchors on
-# this repo's own results_history.csv give OPPOSITE steers:
-#   * jornada-1-vs-final club table points: r = 0.11, 0.26, 0.45 (weak) —
-#     argues DRIFT_FRAC should be BIGGER (more humble).
-#   * season-to-season club table points (same clubs, year N vs N+1):
-#     r = 0.71, 0.88 (strong) — argues DRIFT_FRAC should be SMALLER
-#     (quality persists a lot more than one match reveals).
-# Neither is the right unit: the first measures how little ONE MATCH's
-# luck reveals (this repo's rate estimate is built from far more than
-# one match, via SHRINK_K); the second conflates real within-season
-# drift with an entire summer of transfers between the two seasons it
-# spans. There is no real-data quantity in this repo that measures
-# within-season drift directly.
+# TRIED TO PIN THIS DOWN FURTHER (2026-08-21). Two real anchors on this
+# repo's own results_history.csv give OPPOSITE steers on the exact
+# magnitude — jornada-1-vs-final club table points correlate weakly
+# (r=0.11, 0.26, 0.45), season-to-season club table points correlate
+# strongly (r=0.71, 0.88) — and neither converts cleanly into a
+# per-player weekly drift (see git history on this constant for the
+# full reasoning, since chasing exact precision here is a dead end:
+# there is no real-data quantity in this repo that measures
+# within-season drift directly).
 #
-# CHECKED WHAT PUBLISHED SPORTS MODELS DO ABOUT THIS (FiveThirtyEight's
-# NBA/NHL/MLB methodology, 2026-08-21): none of them carry a forward
-# "drift" term like this at all. They revert the PRIOR once, by a fixed,
-# measured fraction (NHL: keep 70% of last season's rating, revert 30%
-# to league-average — the same shape as SHRINK_K below, and sized the
-# same way this repo's own year-over-year r above would size a revert
-# fraction), then simulate the rest of the season on ORDINARY match
-# variance. The "is my future uncertainty wide enough" question is
-# answered empirically instead — a spread-skill / reliability check
-# against REALISED forecast error, re-run every week as real games
-# land. That check already exists here: reports/METHOD.md's own
-# "Forecast vs actual" table (n=5 as of 2026-08-21, growing ~15/
-# jornada). DRIFT_FRAC stays a documented placeholder until that table
-# has enough rows to say something real — do not re-derive a new
-# DRIFT_FRAC value from a correlation analogy again; the analogy does
-# not resolve, only more realised data does.
-DRIFT_FRAC = 1.0
+# THAT AMBIGUITY IS NOT A REASON TO DO NOTHING, THOUGH — pushed on this
+# directly and it's the right correction: EVERY published win-probability
+# model checked (FiveThirtyEight's NBA/NHL/MLB methodology, 2026-08-21)
+# is far more humble than 70%+ about a single-outcome full-season
+# question this early, regardless of which of the two anchors above you
+# trust — that qualitative floor doesn't depend on resolving them. This
+# repo's own squads are not a blowout gap (220M+ vs 220M-ish range), so
+# there is no version of "trust the early gap fully" that gets you to a
+# defensible 70%+ this many jornadas out. Moved DRIFT_FRAC from 1.0 to
+# 2.0 on that basis — p_win 0.724 -> 0.555 on live data (2026-08-21) —
+# landing near a coin flip while still giving a small, real nod to the
+# measured squad-value gap rather than erasing it outright (that would
+# be DRIFT_FRAC ~3.0, p_win 0.476, which claims MORE certainty of no
+# edge than the data supports either). Revisit downward only once
+# reports/METHOD.md's own "Forecast vs actual" table (the real,
+# realised-error check, n=5 and growing as of 2026-08-21) has enough
+# rows to say the model is well-calibrated at a tighter spread — not
+# from another correlation analogy.
+DRIFT_FRAC = 2.0
 
 
 @runtime_checkable
