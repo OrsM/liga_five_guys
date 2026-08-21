@@ -1054,7 +1054,7 @@ def main() -> None:
     cash = lg[lg.cfg.me].cash if lg and lg.cfg.me in lg.managers else None
     cash_value = cash.value if cash and cash.confidence == "known" else None
     by_key = lg.market.latest() if lg and lg.market else {}
-    slate = read_slate(lg.market) if by_key else (set(), [])
+    slate = read_slate(lg.market, xw=lg.xw) if by_key else (set(), [])
     # Priced once: the buy side sizes a bid, and the sell side is what the app
     # pays you for a player, which the bench table needs whether or not a slate
     # was pasted.

@@ -202,8 +202,9 @@ class Crosswalk:
                 return k
         return None
 
-    def resolve(self, raw="", *, hint_app_id="", hint_club="",
-                hint_price=None, hint_full="", market=None) -> str | None:
+    def resolve(self, raw="", *, hint_app_id="", hint_ff_slug="",
+                hint_af_slug="", hint_club="", hint_price=None,
+                hint_full="", market=None) -> str | None:
         """The repo's one join: given whatever a source calls a player, his key.
 
         THE FIRST STEP OF UNWINDING SIX RESOLVERS INTO ONE. `player()` above,
@@ -218,29 +219,41 @@ class Crosswalk:
         meant to be the one thing every caller reaches for instead of
         re-deriving it.
 
+        AN ID BEATS A NAME, ALWAYS — asked directly, and right: none of
+        `hint_app_id`/`hint_ff_slug`/`hint_af_slug` involves any derivation
+        or guessing on the identifier itself, each is a raw fact straight
+        off its source's own row. The one thing that IS derived is the
+        MAPPING from that id to this repo's key, learned once by some
+        earlier join and stored in the crosswalk — and that is where the
+        one historical bug lived (app_id 2614, written onto the wrong
+        Romero by a bad name join, once). `Crosswalk.merge()` now
+        self-heals exactly that: a corrected join displaces a stale id off
+        whoever wrongly holds it on every rebuild, which runs every
+        pipeline run. That is the safety net now, not per-call name
+        priority, so a name match no longer needs to outrank an id to
+        protect against a stale one.
+
         Order of trust, in the order it is checked:
           1. `raw` is already a bare digit string — this repo's own key IS
              numeric for the overwhelming majority of players today
              (`row_key()`: 44,912 rows checked, `ff_id` on every one), so a
-             source that already hands one over needs no resolution at all.
-             This is `_roster_key()`'s fast path, generalised.
-          2. `market.key_for(raw, ...)` — the market's CURRENT spelling,
-             disambiguated by `hint_club`/`hint_price` when two players share
-             the name. Outranks the crosswalk because a display name moves
-             with the market and this always resolves against the newest
-             snapshot; every other reader already trusts this join most.
-          3. The same, against `hint_full` — a longer alternate spelling
-             (birth name vs. nickname) tried only once `raw` alone misses,
-             because the shorter name is usually the better single guess
-             (`api_key`'s docstring: of 76 owned players, 12 join ONLY on the
-             nickname).
-          4. `self.player(app_id=hint_app_id)` — an id from a source that
-             does not speak the market's own namespace (the league app's
-             own integer ids) but that this crosswalk has already learned.
-          5. `self.player(app_name=raw)` then `self.player(name=raw)` — the
-             crosswalk's own memory, last resort before refusing. This is
-             what catches a source whose current spelling the market has
-             moved past (`Manuel Fernández` -> `Manu Fernandez`,
+             source that already hands one over needs no resolution at
+             all. This is `_roster_key()`'s fast path, generalised.
+          2. `self.player(app_id=hint_app_id, ff_slug=hint_ff_slug,
+             af_slug=hint_af_slug)` — any id a source hands in, translated
+             through the crosswalk's own table. Checked before any name is
+             touched at all, per the above.
+          3. `market.key_for(raw, ...)` — the market's CURRENT spelling,
+             disambiguated by `hint_club`/`hint_price` when two players
+             share the name. This IS the fuzzy/team/money machinery, run
+             only once no id was offered or none of the offered ids
+             resolved.
+          4. The same, against `hint_full` — a longer alternate spelling
+             (birth name vs. nickname), tried only once `raw` alone misses.
+          5. `self.player(app_name=raw)` then `self.player(name=raw)` —
+             the crosswalk's own memory, last resort before refusing. This
+             is what catches a source whose current spelling the market
+             has moved past (`Manuel Fernández` -> `Manu Fernandez`,
              mid-season) but whose OLD spelling the crosswalk still holds.
 
         None means genuinely unresolved — never a guess, and never a
@@ -251,6 +264,15 @@ class Crosswalk:
         raw = (raw or "").strip()
         if raw.isdigit():
             return raw
+        hint_app_id = (hint_app_id or "").strip()
+        hint_ff_slug = (hint_ff_slug or "").strip()
+        hint_af_slug = (hint_af_slug or "").strip()
+        if hint_app_id or hint_ff_slug or hint_af_slug:
+            got = self.player(app_id=hint_app_id or None,
+                              ff_slug=hint_ff_slug or None,
+                              af_slug=hint_af_slug or None)
+            if got:
+                return got
         if market is not None:
             for candidate in (raw, (hint_full or "").strip()):
                 if not candidate:
@@ -259,11 +281,6 @@ class Crosswalk:
                                      value=hint_price)
                 if key:
                     return key
-        hint_app_id = (hint_app_id or "").strip()
-        if hint_app_id:
-            got = self.player(app_id=hint_app_id)
-            if got:
-                return got
         if raw:
             return self.player(app_name=raw) or self.player(name=raw)
         return None
@@ -564,7 +581,33 @@ def _selftest() -> None:
     assert xw.resolve("Absolutely Nobody") is None
     assert xw.resolve("") is None
 
-    print("ffcore.crosswalk self-test OK (34 cases)")
+    # AN ID BEATS A NAME, EVEN ONE THAT WOULD OTHERWISE RESOLVE CLEANLY.
+    # "Jonny Castro" matches the market exactly, and app_id "9" is (for this
+    # test only) mapped to a different player entirely — resolve() must
+    # still answer with the id, because the id involves no derivation and
+    # Crosswalk.merge()'s stale-id displacement is the safety net now, not
+    # per-call name priority. This is an intentional reversal of the
+    # priority league.api_key() used to hard-code (see its migration).
+    jc = Market([{"ff_id": "77", "name": "Jonny Castro", "team": "Alaves",
+                 "value": "5602302", "observed_at": "2026-08-19T1639Z"}])
+    elsewhere = Crosswalk({"someone else": Player("someone else", app_id="9")})
+    assert elsewhere.resolve("Jonny Castro", hint_app_id="9", market=jc) \
+        == "someone else"
+    # And with no id offered at all, the name still resolves on its own.
+    assert elsewhere.resolve("Jonny Castro", market=jc) == "77"
+
+    # ff_slug/af_slug are exact ids too, and outrank the market the same way.
+    slugged = Crosswalk({"alvaro fernandez": Player(
+        "alvaro fernandez", ff_slug="alvaro-slug", af_slug="af-alvaro")})
+    assert slugged.resolve("whatever a page called him",
+                           hint_ff_slug="alvaro-slug") == "alvaro fernandez"
+    assert slugged.resolve("whatever a page called him",
+                           hint_af_slug="af-alvaro") == "alvaro fernandez"
+    # An id nothing knows changes nothing — falls through to the name path.
+    assert slugged.resolve("Alvaro Fernandez",
+                           hint_ff_slug="no-such-slug") == "alvaro fernandez"
+
+    print("ffcore.crosswalk self-test OK (39 cases)")
 
 
 if __name__ == "__main__":

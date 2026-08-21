@@ -352,7 +352,7 @@ def main():
     lg = League.load()
     print("replayed %d transaction(s)" % len(lg.txns))
 
-    on_offer, unresolved = read_slate(lg.market)
+    on_offer, unresolved = read_slate(lg.market, xw=lg.xw)
     if on_offer or unresolved:
         print("slate: %d on offer, %d unjoined"
               % (len(on_offer), len(unresolved)))

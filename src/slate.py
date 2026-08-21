@@ -22,13 +22,18 @@ from ffcore.text import norm  # noqa: E402
 __all__ = ["read_slate", "slate_from_api"]
 
 
-def slate_from_api(rows: list[dict], market) -> tuple[set, list]:
+def slate_from_api(rows: list[dict], market, xw=None) -> tuple[set, list]:
     """(player keys on offer, names that would not join).
 
-    Keyed through `market.key_for`, the resolution every other reader uses: a
-    key nothing else recognises is a player who vanishes from the board. So an
-    unjoinable name is REPORTED, never dropped — dropped, it renders as "not
-    on offer", which is the bug this replaced.
+    THE ROW'S OWN `player_id` FIRST, when a crosswalk is given to translate
+    it — api_market.csv carries the app's own id on every row, and this used
+    to ignore it and join on `player_name` alone, the exact "fuzzy name
+    instead of the id the source already handed us" gap `Crosswalk.resolve()`
+    exists to close. Falls back to `market.key_for` (the resolution every
+    other reader uses) when there is no crosswalk, no id, or the id is one
+    the crosswalk has not learned — a key nothing recognises is a player who
+    vanishes from the board, so an unjoinable name is REPORTED, never
+    dropped, either way.
 
     No ownership prune. A player being owned is not evidence against his being
     on offer: that is exactly what `marketPlayerTeam` is.
@@ -38,7 +43,11 @@ def slate_from_api(rows: list[dict], market) -> tuple[set, list]:
         raw = (r.get("player_name") or "").strip()
         if not raw:
             continue
-        key = market.key_for(raw) if market is not None else norm(raw)
+        if xw is not None:
+            key = xw.resolve(raw, hint_app_id=r.get("player_id") or "",
+                             market=market)
+        else:
+            key = market.key_for(raw) if market is not None else norm(raw)
         if key:
             keys.add(key)
         else:
@@ -46,7 +55,7 @@ def slate_from_api(rows: list[dict], market) -> tuple[set, list]:
     return keys, unresolved
 
 
-def read_slate(market, rows=None) -> tuple[set, list]:
+def read_slate(market, rows=None, xw=None) -> tuple[set, list]:
     """The live slate: (keys on offer, unjoined names).
 
     An empty feed is "no slate" — every caller treats that as "do not filter",
@@ -55,7 +64,7 @@ def read_slate(market, rows=None) -> tuple[set, list]:
     if rows is None:
         from ffcore.tidy import load_api_market
         rows = load_api_market()
-    return slate_from_api(rows, market)
+    return slate_from_api(rows, market, xw)
 
 
 def _selftest() -> None:
@@ -100,7 +109,22 @@ def _selftest() -> None:
     # No feed is no slate.
     assert read_slate(market, rows=[]) == (set(), [])
 
-    print("slate self-test OK (13 cases)")
+    # THE APP'S OWN player_id, WHEN A CROSSWALK IS GIVEN TO TRANSLATE IT —
+    # api_market.csv carries this on every row and it went unread. Even a
+    # name the market cannot join at all still resolves through the id.
+    from ffcore.crosswalk import Crosswalk, Player
+    xw = Crosswalk({"pablo fornals": Player("pablo fornals", "Pablo Fornals",
+                                            app_id="1337")})
+    keys, unres = slate_from_api(
+        [{"player_name": "Nickname Nothing Joins On", "player_id": "1337"}],
+        market, xw=xw)
+    assert keys == {"pablo fornals"} and unres == [], (keys, unres)
+    # An id the crosswalk has never seen falls back to the name join.
+    keys, unres = slate_from_api(
+        [{"player_name": "Fornals", "player_id": "9999"}], market, xw=xw)
+    assert keys == {norm("Pablo Fornals")} and unres == [], (keys, unres)
+
+    print("slate self-test OK (15 cases)")
 
 
 if __name__ == "__main__":

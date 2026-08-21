@@ -499,26 +499,31 @@ def api_key(raw: str, handle: str, market, ledger_owner: dict | None = None,
             app_id: str = "") -> str | None:
     """One API row's player, as a key the rest of the repo recognises.
 
-    FIVE JOINS IN FALLING ORDER OF TRUST, and the order is the whole design:
+    AN ID FIRST, ALWAYS — reordered 2026-08-21. This used to run two name
+    joins ahead of the app's own id, specifically to protect against a
+    stale crosswalk mapping (app_id 2614 was once written onto the wrong
+    Romero by a bad name join). That protection is `Crosswalk.merge()`'s
+    job now — a corrected join displaces a stale id off whoever wrongly
+    holds it, on every rebuild, which runs every pipeline run — and the id
+    itself involves no derivation at all: it is a raw fact straight off
+    the app's row. See `Crosswalk.resolve()`'s docstring, which makes the
+    same argument once for every caller; this function still hand-rolls
+    its own chain rather than calling it because `app_ids` here is a flat
+    {app id: key} dict, not a `Crosswalk`, and this function's ledger
+    tie-break and exact-value fallback are domain-specific to a squad row
+    rather than generic identity.
 
-      1. `market.key_for` on the app's nickname — the resolution every other
-         reader uses.
-      2. `market.key_for` again on the app's FULL name. The same resolution
-         given a better string, which is why it outranks everything below it
-         rather than being another kind of guess: the app publishes both, the
-         shortened one is the nickname, and "Cardoso" spelled out is "Fábio
-         Rafael Rodrigues Cardoso". It runs second and not first because the
-         nickname is the better single guess — of 76 owned players, twelve
-         join ONLY on it, their full name being a birth name nothing else
-         uses ("Pepelu" is "José Luis García Vayá").
-      3. the app's player id, looked up in the crosswalk this repo already
-         built. It is an exact id and it outranks both fallbacks below; it
-         sits under the two name joins because it is only as good as whatever
-         resolved it originally, while key_for on a name the market itself
-         carries is the resolution every other reader uses. `app_ids` is
-         {app id: key}, from data/tidy/players.csv — which is built BY this
-         function, so it is absent on a cold start and must stay additive:
-         no table means exactly the behaviour there was before it existed.
+      1. the app's player id, looked up in `app_ids` ({app id: this
+         repo's key}, from data/tidy/players.csv — built BY this function,
+         so it is absent on a cold start and must stay additive: no table
+         means exactly the behaviour there was before it existed).
+      2. `market.key_for` on the app's nickname.
+      3. `market.key_for` again on the app's FULL name. The app publishes
+         both, the shortened one is the nickname, and "Cardoso" spelled
+         out is "Fábio Rafael Rodrigues Cardoso" — tried second because
+         the nickname is the better single guess: of 76 owned players,
+         twelve join ONLY on it, their full name being a birth name
+         nothing else uses ("Pepelu" is "José Luis García Vayá").
       4. the ledger breaking a tie, when the app gave a surname the market
          has two of and exactly one of them is already recorded against THIS
          manager.
@@ -539,6 +544,13 @@ def api_key(raw: str, handle: str, market, ledger_owner: dict | None = None,
         return norm(raw) or None
     if index is None:
         index = latest_only(market.rows)
+    key = None
+    if app_ids and (app_id or "").strip():
+        key = app_ids.get(app_id.strip())
+        # Still checked against the price when one is stated: cheap, and
+        # true (never blocking) whenever the row is silent about it.
+        if not _priced_like(key, "", market_value, index):
+            key = None
     # Each NAME join is checked against the price the app puts on the row: a
     # name that resolves to somebody the market values differently has found a
     # different player, and falling through to the next join is better than
@@ -549,18 +561,13 @@ def api_key(raw: str, handle: str, market, ledger_owner: dict | None = None,
     # which. The app states the value on the very row being joined, so it is
     # handed in rather than checked afterwards: without it the join fails and
     # a rival's best defender reads as a 0.50M reserve.
-    key = market.key_for(raw, value=market_value)
-    if not _priced_like(key, raw, market_value, index):
-        key = None
+    if not key:
+        key = market.key_for(raw, value=market_value)
+        if not _priced_like(key, raw, market_value, index):
+            key = None
     if not key and (full or "").strip():
         key = market.key_for(full.strip(), value=market_value)
         if not _priced_like(key, full, market_value, index):
-            key = None
-    if not key and app_ids and (app_id or "").strip():
-        key = app_ids.get(app_id.strip())
-        # The crosswalk learned its ids from these same joins, so a wrong one
-        # can be written down. The price catches that too.
-        if not _priced_like(key, "", market_value, index):
             key = None
     if not key and ledger_owner:
         # Same producer, same keys — the ledger's owner map is keyed the way
@@ -1384,10 +1391,9 @@ def _selftest_api_owner() -> None:
     # jonny castro. This join re-derived that from scratch every run and
     # failed, while the table that solved it sat unread beside it.
     #
-    # It is an EXACT id, so it outranks both fallbacks below. It sits under
-    # the two name joins because it is only as good as whatever resolved it
-    # in the first place, and key_for on a name the market itself carries is
-    # the resolution every other reader uses.
+    # It is an EXACT id, checked FIRST now: no derivation on the id itself,
+    # only on the table's app_id -> key mapping, and Crosswalk.merge()'s
+    # stale-id displacement is what protects that now, not join order here.
     lone = Market([{"name": "Jonny Castro", "value": "5602302",
                     "observed_at": at, "position": "DEF"}])
     assert api_key("Jonny Otto", "SusoGattuso", lone) is None
@@ -1402,11 +1408,14 @@ def _selftest_api_owner() -> None:
     # did before — additive only, never a dependency.
     assert api_key("Fornals", "miguel_autentico", players,
                    app_ids=None) == norm("Pablo Fornals")
-    # A name that joins on its own is never overridden by an id, so a stale
-    # crosswalk row cannot drag a player away from the market's own answer.
+    # AND THE ID NOW WINS OVER A NAME THAT WOULD OTHERWISE JOIN CLEANLY —
+    # an intentional reversal (2026-08-21) of the priority this docstring
+    # used to describe. The app row states an id; the id involves no
+    # guessing, so it is trusted over the name outright, the same call
+    # Crosswalk.resolve() makes for every caller.
     assert api_key("Jonny Castro", "SusoGattuso", lone,
                    app_ids={"2552": "someone else"},
-                   app_id="2552") == norm("Jonny Castro")
+                   app_id="2552") == "someone else"
     # And the loop passes the row's id through.
     owner, unjoined = owner_from_api(
         [{"manager": "SusoGattuso", "player_name": "Jonny Otto",
