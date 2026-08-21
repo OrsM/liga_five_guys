@@ -98,7 +98,17 @@ FREE_FORMATIONS = [(5, 4, 1), (5, 3, 2), (4, 5, 1), (4, 4, 2), (4, 3, 3),
 # Premium subscription: these shapes, the captain boost and the coach slot.
 PREMIUM_FORMATIONS = [(5, 2, 3), (4, 6, 0), (4, 2, 4), (3, 6, 1), (3, 3, 4)]
 
-SHRINK_K = 8.0            # matches of prior weight
+# Matches of prior weight. UNFIT, same as ffcore.forecast.DRIFT_FRAC — a
+# round number, not measured against this repo's own reliability data.
+# This matters more than it looks: checked what published win-probability
+# models actually rely on for "how much should an early lead be trusted"
+# (FiveThirtyEight's NBA/NHL/MLB methodology, 2026-08-21) and it is THIS
+# mechanism — a one-time, measured revert-to-mean fraction on the prior —
+# not a forward drift term. See DRIFT_FRAC's own note for the full
+# reasoning. Blocked the same way: needs real reliability data this repo
+# does not have enough of yet (MIN_POOL=200 observed matches, 159 as of
+# 2026-08-21) to fit properly rather than guess.
+SHRINK_K = 8.0
 NEUTRAL_START = 60.0      # listed on the XI page but no percentage given
 ABSENT_START = 15.0       # not on the XI page at all — not in the picture
 DOUBT_FACTOR = 0.5

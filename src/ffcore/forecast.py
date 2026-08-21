@@ -112,6 +112,38 @@ SHRINK_MATCHES = 8.0
 # hitting any specific target p_win. Revisit once this repo has its own
 # completed fantasy season to measure against, the same way
 # _xg_stickiness_boost() already refits itself from real paired data.
+#
+# TRIED TO PIN THIS DOWN FURTHER (2026-08-21), FOUND IT GENUINELY
+# AMBIGUOUS FROM REAL DATA, NOT JUST UNDER-MEASURED. Two real anchors on
+# this repo's own results_history.csv give OPPOSITE steers:
+#   * jornada-1-vs-final club table points: r = 0.11, 0.26, 0.45 (weak) —
+#     argues DRIFT_FRAC should be BIGGER (more humble).
+#   * season-to-season club table points (same clubs, year N vs N+1):
+#     r = 0.71, 0.88 (strong) — argues DRIFT_FRAC should be SMALLER
+#     (quality persists a lot more than one match reveals).
+# Neither is the right unit: the first measures how little ONE MATCH's
+# luck reveals (this repo's rate estimate is built from far more than
+# one match, via SHRINK_K); the second conflates real within-season
+# drift with an entire summer of transfers between the two seasons it
+# spans. There is no real-data quantity in this repo that measures
+# within-season drift directly.
+#
+# CHECKED WHAT PUBLISHED SPORTS MODELS DO ABOUT THIS (FiveThirtyEight's
+# NBA/NHL/MLB methodology, 2026-08-21): none of them carry a forward
+# "drift" term like this at all. They revert the PRIOR once, by a fixed,
+# measured fraction (NHL: keep 70% of last season's rating, revert 30%
+# to league-average — the same shape as SHRINK_K below, and sized the
+# same way this repo's own year-over-year r above would size a revert
+# fraction), then simulate the rest of the season on ORDINARY match
+# variance. The "is my future uncertainty wide enough" question is
+# answered empirically instead — a spread-skill / reliability check
+# against REALISED forecast error, re-run every week as real games
+# land. That check already exists here: reports/METHOD.md's own
+# "Forecast vs actual" table (n=5 as of 2026-08-21, growing ~15/
+# jornada). DRIFT_FRAC stays a documented placeholder until that table
+# has enough rows to say something real — do not re-derive a new
+# DRIFT_FRAC value from a correlation analogy again; the analogy does
+# not resolve, only more realised data does.
 DRIFT_FRAC = 1.0
 
 
