@@ -497,7 +497,16 @@ def ladder(u, rows, base, saves=None) -> list[str]:
             "different days for reasons that had nothing to do with him. "
             "This divides the SAME paired Season figure in the column "
             "beside it — the same simulated seasons, with the move and "
-            "without it — so it only moves when the real trade-off does._"
+            "without it — so it only moves when the real trade-off does. "
+            "READ IT BESIDE SEASON, NEVER ALONE: there are only eleven "
+            "starting shirts, so a rate on its own cannot say whether a "
+            "move earns one. Season already prices that in — it is the "
+            "REAL simulated gain, picking the actual best eleven every "
+            "jornada, so a player who cannot break in shows up there as a "
+            "small or a zero, and a small Season figure at a tiny price "
+            "can still carry a flattering rate despite being a marginal "
+            "move. The rate says how CHEAPLY a gain arrived, not how BIG "
+            "it is — check Season first._"
             % len(u.state.jornadas), ""]
     return out
 
@@ -529,7 +538,30 @@ def market_percentile(routes, quiet=None) -> str:
     mkt = next((r for r in routes if r["route"] == "market"), None)
     if mkt is None or mkt.get("beats_now") is None:
         return ""
-    pct = round(100 * (1 - mkt["beats_now"]))
+    beats = mkt["beats_now"]
+    # AT THE EDGE OF WHAT THE SAMPLE CAN RESOLVE. beats_now is a count out
+    # of `n_band` simulated weeks (ffcore.market.Offers.best_over(),
+    # default trials=400) — if EVERY one of them beat today, or NONE did,
+    # the true percentile could be anywhere inside the smallest gap that
+    # many trials can tell apart, not exactly 0 or 100. Reporting a bare
+    # "0th percentile · better in 100% of weeks" claims a precision the
+    # sample does not have. Real case, 2026-08-21: today's actual
+    # 33-player market topped out at a gain of 4.03; the sim draws from
+    # the full ~600-player unowned pool (weighted toward value) and its
+    # single BEST trial alone reached 7.11 — every one of 400 draws beat
+    # today's number, which is a real, extreme, thin-listing day, not a
+    # bug, but "0th percentile" overstated how precisely that is known.
+    n = mkt.get("n_band", 400)
+    if n and (beats <= 0.0 or beats >= 1.0):
+        floor = max(1, round(100 / n))
+        if beats >= 1.0:
+            return ("market **under the %d%s percentile** · an unusually "
+                    "poor week · better in over %d%% of weeks"
+                    % (floor, _ord(floor), 100 - floor))
+        return ("market **over the %d%s percentile** · an unusually "
+                "good week · better in under %d%% of weeks"
+                % (100 - floor, _ord(100 - floor), floor))
+    pct = round(100 * (1 - beats))
     how = ("an unusually good week" if pct >= 75
            else "a poor week" if pct <= 25 else "an ordinary week")
     return ("market **%d%s percentile** · %s · better in %d%% of weeks"
@@ -726,6 +758,7 @@ def wait_routes(u, offers=None, rng=None) -> list[dict]:
             "lo": sorted(band)[int(0.1 * len(band))],
             "hi": sorted(band)[int(0.9 * len(band))],
             "beats_now": sum(1 for x in band if x > now_best) / len(band),
+            "n_band": len(band),
             "helpful": sum(1 for k in offers.pool if gain(k) > 0),
             "pool": len(offers.pool), "note": offers.note()})
 
@@ -1561,6 +1594,29 @@ def _selftest() -> None:
     assert "62nd percentile" in market_percentile(
         r, quiet={"api_teams": 3.1}), r
 
+    # -- EVERY simulated week beating today is a REAL result (a thin day's
+    # actual listings vs. the full pool a typical week draws from, not a
+    # stale/empty feed) — but reporting it as an exact "0th percentile" and
+    # "100%" overclaims what n_band trials can resolve. Real case,
+    # 2026-08-21: n_band=400, so the finest percentile it can name is
+    # 1/400 = 0.25%, rounding to 1. ------------------------------------------
+    extreme = market_percentile(
+        [{"route": "market", "beats_now": 1.0, "n_band": 400}])
+    assert "under the 1st percentile" in extreme, extreme
+    assert "unusually poor" in extreme, extreme
+    assert "over 99%" in extreme, extreme
+    assert "0th" not in extreme and "100%" not in extreme, extreme
+    # The mirror case: NOTHING beat today, an unusually good market.
+    best_ever = market_percentile(
+        [{"route": "market", "beats_now": 0.0, "n_band": 400}])
+    assert "over the 99th percentile" in best_ever, best_ever
+    assert "unusually good" in best_ever, best_ever
+    assert "under 1%" in best_ever, best_ever
+    # A smaller sample has a coarser floor — n=50 can only resolve to 2%.
+    coarse = market_percentile(
+        [{"route": "market", "beats_now": 1.0, "n_band": 50}])
+    assert "under the 2nd percentile" in coarse, coarse
+
     # -- overdrawn is not a ranking question -------------------------------
     # -- a team sheet reads keeper first ------------------------------------
     # Ranked purely by points, an eleven puts the keeper between two
@@ -1620,7 +1676,7 @@ def _selftest() -> None:
     ph = "\n".join(placeholder("no api_teams.csv"))
     assert "no api_teams.csv" in ph and ph.startswith("# The simulation")
 
-    print("sim self-test OK (99 cases)")
+    print("sim self-test OK (106 cases)")
 
 
 def main() -> None:
