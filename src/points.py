@@ -63,13 +63,13 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from ffcore.text import norm  # noqa: E402
-from ffcore.tidy import SEASON, write_csv  # noqa: E402
+from ffcore.tidy import SEASON, TIDY, read_csv, write_csv  # noqa: E402
 
 LIVE = SEASON / "live"
 
 DIFF_FIELDS = ["from_stamp", "to_stamp", "season", "ff_id", "player_name",
                "player_name_full", "team", "points_delta", "games_delta",
-               "points_total", "games_total"]
+               "points_total", "games_total", "jornada"]
 
 # What the site puts in the table body when the season it is showing has no
 # played matches. Matched as text on the raw page, because the parser cannot
@@ -90,6 +90,53 @@ def empty_season(html: str) -> bool:
     """
     low = (html or "").lower()
     return any(m in low for m in EMPTY_MARKS)
+
+
+def match_jornadas(matches_history: list[dict]) -> list[tuple[str, int]]:
+    """[(when this match's result was first seen, jornada)], oldest first.
+
+    THE JORNADA NUMBER A POINTS DIFF ROW BELONGS TO, closed here rather than
+    left "a join for model code to do later" (this module's own opening
+    docstring). data/tidy/matches.csv had no date column and no id space
+    shared with the fixtures feed, so there was no calendar to join a
+    `points_delta` row's `to_stamp` against — but the calendar page IS swept
+    every run and its `score` column goes from blank to filled the moment a
+    match finishes, and that transition IS observed, timestamped, in the
+    tidy store's own history. `matches_history` must be the FULL table, not
+    latest_only() — the first snapshot where a match_id's score is non-empty
+    is this repo's own record of when it learned that match was over, which
+    is the closest thing available to "when this jornada's points became
+    knowable" without a kickoff-date feed in a matching id space.
+
+    ONE ENTRY PER MATCH, first-seen-scored only: a later re-scrape of an
+    already-scored match must not push its jornada later.
+    """
+    first_scored: dict[str, tuple[str, int]] = {}
+    for r in sorted(matches_history, key=lambda r: r.get("observed_at", "")):
+        mid = (r.get("match_id") or "").strip()
+        score = (r.get("score") or "").strip()
+        if not mid or not score or mid in first_scored:
+            continue
+        try:
+            jor = int(r.get("jornada"))
+        except (TypeError, ValueError):
+            continue
+        first_scored[mid] = (r.get("observed_at", ""), jor)
+    return sorted(first_scored.values())
+
+
+def jornada_asof(timeline: list[tuple[str, int]], stamp: str) -> int | None:
+    """The jornada of the most recently confirmed-scored match at or before
+    `stamp`, or None if nothing had finished yet. `timeline` is
+    `match_jornadas()`'s own output — already oldest first.
+    """
+    best = None
+    for when, jor in timeline:
+        if when <= stamp:
+            best = jor
+        else:
+            break
+    return best
 
 
 def player_key(r: dict) -> str:
@@ -131,13 +178,21 @@ def keep_changed(seq: list[tuple[str, list[dict]]]) -> list[tuple[str, list[dict
 
 
 def diff(prev_rows: list[dict], cur_rows: list[dict],
-         from_stamp: str, to_stamp: str, season: str) -> list[dict]:
+         from_stamp: str, to_stamp: str, season: str,
+         jornada_timeline: list[tuple[str, int]] = ()) -> list[dict]:
     """Per-player deltas between two kept snapshots.
 
     Emits only players whose points or games moved. A player absent from the
     earlier snapshot diffs against (0, 0).
+
+    `jornada_timeline` (`match_jornadas()`'s output) stamps each row with
+    the jornada most likely responsible for it — `jornada_asof(timeline,
+    to_stamp)`, one lookup per row rather than per player, since every row
+    from the same diff shares one `to_stamp`. Blank ("") when no timeline is
+    given or nothing had finished yet, never a guess.
     """
     prev = totals(prev_rows)
+    jor = jornada_asof(jornada_timeline, to_stamp)
     out = []
     for r in cur_rows:
         key = player_key(r)
@@ -157,6 +212,7 @@ def diff(prev_rows: list[dict], cur_rows: list[dict],
             "games_delta": f"{pj - j0:g}",
             "points_total": f"{pts:g}",
             "games_total": f"{pj:g}",
+            "jornada": "" if jor is None else str(jor),
         })
     return out
 
@@ -246,12 +302,17 @@ def main() -> None:
         sys.exit("no points page found in any snapshot under data/raw/ — "
                  "run ingest.py fetch first")
 
+    # THE FULL HISTORY, NOT latest_only() — see match_jornadas()'s own
+    # docstring for why a snapshot table's whole past is what answers "when
+    # did this match's score first appear" at all.
+    timeline = match_jornadas(read_csv(TIDY / "matches.csv"))
+
     for label, seq in sorted(by_label.items()):
         kept = keep_changed(seq)
 
         deltas = []
         for (s0, r0), (s1, r1) in zip(kept, kept[1:]):
-            deltas.append(diff(r0, r1, s0, s1, label))
+            deltas.append(diff(r0, r1, s0, s1, label, timeline))
 
         LIVE.mkdir(parents=True, exist_ok=True)
         flat = [row for d in deltas for row in d]
@@ -302,6 +363,30 @@ def _selftest() -> None:
     assert empty_season("<TD>NO SE ENCONTRARON RESULTADOS</TD>")   # case-blind
     assert not empty_season("<tbody><tr><td>Ane Aldea</td>")
     assert not empty_season("")
+
+    # -- jornada, stamped from when a match's score was first seen ---------
+    history = [
+        # Two snapshots of the SAME match: unscored, then scored. Only the
+        # FIRST scored sighting counts.
+        {"observed_at": "t0", "match_id": "1", "jornada": "1", "score": ""},
+        {"observed_at": "t1", "match_id": "1", "jornada": "1", "score": "2-0"},
+        {"observed_at": "t2", "match_id": "1", "jornada": "1", "score": "2-0"},
+        {"observed_at": "t3", "match_id": "2", "jornada": "2", "score": "1-1"},
+        # A row with no jornada (unparseable) is skipped, not a crash.
+        {"observed_at": "t1b", "match_id": "3", "jornada": "", "score": "0-0"},
+    ]
+    tl = match_jornadas(history)
+    assert tl == [("t1", 1), ("t3", 2)], tl
+    assert jornada_asof(tl, "t0") is None       # nothing finished yet
+    assert jornada_asof(tl, "t1") == 1
+    assert jornada_asof(tl, "t2") == 1           # between J1 and J2 finishing
+    assert jornada_asof(tl, "t3") == 2
+    assert jornada_asof(tl, "t9") == 2           # still the latest known
+
+    d3 = diff(a, c, "t0", "t2", "s", jornada_timeline=tl)
+    assert d3[0]["jornada"] == "1", d3
+    # No timeline at all: blank, never a guess.
+    assert diff(a, c, "t0", "t2", "s")[0]["jornada"] == ""
 
     print("points.py selftest OK")
 

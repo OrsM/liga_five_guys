@@ -652,10 +652,10 @@ def minutes_played(role: str, raw_minute, match_len: float = MATCH_LEN) -> float
     THE SAME COLUMN READ IN OPPOSITE DIRECTIONS, and that is the whole rule.
     A STARTER's `minute` is when he came OFF — blank means he played the
     whole match. A SUB's `minute` is when he came ON — blank means he never
-    did. `ffcore.score._current_minutes` (season totals, keyed through the
-    crosswalk) and `ffcore.startprob.observations` (a graded per-match
-    label for P(start)'s own fit) both need exactly this, and used to each
-    carry their own copy of it.
+    did. `ffcore.score._per_jornada_current` (this season's rate, keyed
+    through the crosswalk) and `ffcore.startprob.observations` (a graded
+    per-match label for P(start)'s own fit) both need exactly this, and
+    used to each carry their own copy of it.
 
     0.0 for any other role (a coach row, say) — not an error, just nobody
     on the pitch.

@@ -110,51 +110,201 @@ OUT_STATUSES = frozenset({"injured", "suspended", "unavailable"})
 PROMOTED_DISCOUNT = 0.70  # the LaLiga median overstates a promoted squad
 
 
-def _current_minutes(starters_rows, xw) -> dict[str, float]:
-    """{crosswalk player_id: total minutes played this season}, from
-    confirmed line-ups — `ffcore.tidy.minutes_played()` on each row (off-
-    minute for a starter, on-minute for a sub, blank meaning he played the
-    whole match or none of it respectively; see that function for the
-    rule, and its own docstring for MATCH_LEN's 90-minute approximation).
+# Candidate half-lives for the current-season rate's recency weighting, in
+# jornadas — 1.0 is "no decay at all" (this season's flat average, today's
+# behaviour), included so the grid can validly choose it. Coarse, like
+# startprob's grids: the data cannot resolve finer, and a grid is auditable
+# where a solver's answer is not.
+DECAY_GRID = (1.0, 0.85, 0.7, 0.55, 0.4)
 
-    KEYED ON THE CROSSWALK, NOT A NAME STRING. starters.csv carries only the
-    short display form ("Blanco"); the market — what Scorer.rate() actually
-    looks players up by — carries the full name ("Antonio Blanco"). Checked
-    against the app's own mins_played stat (api_stats.csv) for the players
-    it covers: keying on raw name strings matched 10 of 42 and silently
-    scored the other 32 as zero minutes despite api_stats showing real
-    ones (89, 90, 56...) — the crosswalk exists exactly to stop this join.
-    `player_slug` (futbolfantasy's own id) resolves through it instead.
 
-    ONE ROW PER (match, player), NOT PER SNAPSHOT. starters.csv is written
-    once per match (cadence "once") but CARRIED FORWARD into every later
-    snapshot's manifest with a fresh observed_at, the same carry-forward
-    every "once"/"daily" source gets — so the raw table holds the same
-    confirmed line-up dozens of times over, once per sweep since the match
-    was first read. Measured: one player's minute row appeared 57 times for
-    a single match, and summing all 57 credited him 5,130 minutes in a
-    season that had played one jornada. Deduped here on (match_id, player)
-    before anything is summed.
+def _per_jornada_current(starters_rows, perjornada_rows, matches_rows,
+                         xw) -> dict[str, dict[int, tuple[float, float]]]:
+    """{crosswalk key: {jornada: (points, minutes)}} for the live season.
+
+    THE JOIN points.py's own docstring called "model code to do later":
+    starters.csv's minutes are keyed by match_id, which matches.csv's own
+    rows translate to a jornada number directly; perjornada.csv's points
+    now carry a `jornada` column of their own (points.match_jornadas(),
+    stamped from when a match's score was first seen in the tidy store's
+    history — the closest thing to a calendar this repo has without a
+    kickoff-date feed in a matching id space). Both halves land on the
+    same jornada axis, which is what makes them combinable at all.
+
+    A jornada absent from `matches.csv` (unparsed, or the calendar hasn't
+    been swept) or from a points row (no timeline, or nothing had finished
+    yet when it was observed) is dropped from that side rather than
+    guessed — a player is credited 0 for a jornada he is silent about, not
+    the average of the ones he is not.
     """
+    jornada_of_match: dict[str, int] = {}
+    for r in matches_rows:
+        mid = (r.get("match_id") or "").strip()
+        if mid and mid not in jornada_of_match:
+            try:
+                jornada_of_match[mid] = int(r.get("jornada"))
+            except (TypeError, ValueError):
+                continue
+
+    minutes_by_jor: dict[str, dict[int, float]] = {}
     seen: set[tuple[str, str]] = set()
-    out: dict[str, float] = {}
     for r in starters_rows:
         slug = (r.get("player_slug") or "").strip()
-        match_id = (r.get("match_id") or "").strip()
-        if not slug or not match_id:
-            continue
-        if r.get("role") not in ("starter", "sub"):
+        mid = (r.get("match_id") or "").strip()
+        jor = jornada_of_match.get(mid)
+        if not slug or jor is None or r.get("role") not in ("starter", "sub"):
             continue
         key = xw.player(ff_slug=slug, name=r.get("player_name"))
         if not key:
             continue
-        dedup_key = (match_id, key)
-        if dedup_key in seen:
+        dedup = (mid, key)
+        if dedup in seen:
             continue
-        seen.add(dedup_key)
-        out[key] = out.get(key, 0.0) + minutes_played(r.get("role"),
-                                                       r.get("minute"))
+        seen.add(dedup)
+        by_j = minutes_by_jor.setdefault(key, {})
+        by_j[jor] = by_j.get(jor, 0.0) + minutes_played(r.get("role"),
+                                                         r.get("minute"))
+
+    # ANCHORED ON points_total, NOT SUMMED FROM points_delta — a real bug,
+    # caught on real data: points.py's diff() never emits a row for the
+    # very FIRST kept snapshot (nothing precedes it to diff against), so a
+    # player who already had points on the board by then has that baseline
+    # in no delta at all. Measured: Abde Rebbach's one row says
+    # points_delta=7, points_total=11 — the missing 4 is whatever he had
+    # before this file's own history starts. Summing deltas alone would
+    # have under-rated him forever; points_total is the page's own
+    # cumulative figure and carries no such gap.
+    end_total: dict[str, dict[int, float]] = {}
+    for r in perjornada_rows:
+        raw_jor = (r.get("jornada") or "").strip()
+        if not raw_jor:
+            continue
+        jor = int(raw_jor)
+        pid = (r.get("ff_id") or "").strip()
+        key = pid if pid in xw.players else xw.player(
+            name=r.get("player_name_full") or r.get("player_name"))
+        if not key:
+            continue
+        total = ratio(r.get("points_total"))
+        if total is None:
+            continue
+        # LAST WRITE FOR THE JORNADA WINS, by observation order in the
+        # file (points.py writes rows chronologically) — a correction row
+        # for a jornada already seen must overwrite its running total,
+        # not add to it twice.
+        end_total.setdefault(key, {})[jor] = total
+
+    points_by_jor: dict[str, dict[int, float]] = {}
+    for key, totals in end_total.items():
+        prev = 0.0
+        for jor in sorted(totals):
+            points_by_jor.setdefault(key, {})[jor] = totals[jor] - prev
+            prev = totals[jor]
+
+    # THE UNIVERSE IS THE POINTS-PAGE'S OWN, not everyone starters.csv ever
+    # names — checked on real data and deliberately narrower than a plain
+    # union: 90 players who have real starters.csv minutes carry NO row on
+    # the points page at all (verified: zero, not a join failure — nothing
+    # under any spelling). Whether that silence means "scored exactly
+    # zero" or "this page does not track him" is not knowable from here,
+    # and this repo already has a name for guessing between two readings
+    # of silence — NEUTRAL_START vs ABSENT_START exists for exactly this
+    # question on the OTHER source. Including him at pts=0 would shrink a
+    # possibly-real season toward zero on a guess; leaving him out keeps
+    # him on last season's rate, which is what happened before this
+    # function existed. Matches the pre-2026-08-21 universe exactly.
+    out: dict[str, dict[int, tuple[float, float]]] = {}
+    for key, points_jd in points_by_jor.items():
+        minutes_jd = minutes_by_jor.get(key, {})
+        jors = set(points_jd) | set(minutes_jd)
+        out[key] = {j: (points_jd.get(j, 0.0), minutes_jd.get(j, 0.0))
+                   for j in jors}
     return out
+
+
+def _weighted_totals(per_jornada: dict[int, tuple[float, float]],
+                     decay: float) -> tuple[float, float]:
+    """(weighted points, weighted matches) for one player.
+
+    The most recent jornada he has a row for weighs 1; one back weighs
+    `decay`; two back `decay**2`; and so on — decay=1.0 is an exact flat
+    sum, so this collapses to today's cumulative behaviour with no special
+    case. `matches` is minutes/90, decayed the same way, so the ratio the
+    caller divides by is a like-for-like recency-weighted rate, not a
+    decayed numerator over an undecayed denominator.
+    """
+    if not per_jornada:
+        return 0.0, 0.0
+    latest = max(per_jornada)
+    wpts = wmatch = 0.0
+    for j, (pts, mins) in per_jornada.items():
+        w = decay ** (latest - j)
+        wpts += pts * w
+        wmatch += (mins / 90.0) * w
+    return wpts, wmatch
+
+
+def _fit_decay(by_key: dict[str, dict[int, tuple[float, float]]]) -> tuple[float, str]:
+    """(decay, why) — the recency weighting earns its use ONLY if it beats
+    the flat average out of sample, same discipline `ffcore.startprob.
+    Calibration.fit()` already uses for P(start).
+
+    WALK-FORWARD, NOT ARBITRARY LEAVE-ONE-OUT — deliberately not the
+    pattern Calibration.fit() uses (holding out one team SHEET, order
+    irrelevant, because sheets have no time-order that matters to what is
+    being predicted). Jornadas do: predicting jornada 3 from jornadas 1
+    and 5 is not a forecast, it is hindsight, and scoring it that way once
+    handed a run of monotonically increasing jornadas a training set with
+    FUTURE data on both sides of the point being "predicted" — the error
+    looked identical for every decay candidate because the flat mean of
+    two symmetric bracketing points already equals a linear trend's
+    midpoint, so decay could never show an edge no matter how real the
+    trend was. Here, jornada J is only ever predicted from jornadas
+    STRICTLY BEFORE it, exactly like the live report does the week before
+    a new one is played.
+
+    THE TEST: for each player's jornadas in order, from the second onward,
+    predict his per-match rate from everything strictly earlier (weighted
+    by each decay candidate) and score against what he actually returned
+    — points per match he was actually on the pitch for, so a jornada he
+    did not feature in contributes nothing to either side rather than a
+    phantom zero. Needs at least one player with 2+ distinct jornadas on
+    record; with the whole sample on 1 (where this repo stands at the
+    time of writing) there is nothing to walk forward through and this
+    always returns decay=1.0 — the flat average, correctly, because there
+    is no evidence recency weighting would help yet.
+    """
+    def walk_error(decay: float) -> tuple[float, int]:
+        se, n = 0.0, 0
+        for jd in by_key.values():
+            jors = sorted(jd)
+            for i in range(1, len(jors)):
+                target = jors[i]
+                actual_pts, actual_min = jd[target]
+                if actual_min <= 0:
+                    continue                       # did not feature — no claim
+                train = {j: jd[j] for j in jors[:i]}
+                wpts, wmatch = _weighted_totals(train, decay)
+                if wmatch <= 0:
+                    continue
+                pred = wpts / wmatch
+                actual = actual_pts / (actual_min / 90.0)
+                se += (pred - actual) ** 2
+                n += 1
+        return (se / n, n) if n else (float("inf"), 0)
+
+    baseline, base_n = walk_error(1.0)
+    if base_n == 0:
+        return 1.0, "no player has a second jornada to predict yet"
+    best_decay, best_err = 1.0, baseline
+    for d in DECAY_GRID:
+        err, n = walk_error(d)
+        if n and err < best_err:
+            best_decay, best_err = d, err
+    if best_decay == 1.0:
+        return 1.0, "flat average %.3f, no decay beat it out of sample" % baseline
+    return best_decay, "decay %.2f beat flat %.3f with %.3f out of sample" % (
+        best_decay, baseline, best_err)
 
 
 def _current_from_perjornada() -> tuple[dict, str]:
@@ -188,6 +338,21 @@ def _current_from_perjornada() -> tuple[dict, str]:
     for but starters.csv has never confirmed a line-up for gets 0 minutes,
     not a guess — silence about how long he played is not evidence he
     played the average amount.
+
+    RECENCY-WEIGHTED NOW, NOT A FLAT SEASON AVERAGE — Step 1 of the
+    2026-08-21 forecasting plan. Both `pts` and `pj` are rebuilt per
+    jornada (`_per_jornada_current`) and combined with a decay
+    (`_weighted_totals`) chosen the same way `ffcore.startprob.Calibration.
+    fit()` chooses its parameters: used ONLY if it beats the flat average
+    (decay=1.0) walking forward through real jornadas, one at a time
+    (`_fit_decay` — deliberately NOT leave-one-out here; see its own
+    docstring for why arbitrary leave-one-out let future jornadas leak
+    into a "prediction" for an earlier one). With one jornada on record —
+    where this repo stands at the time of writing — nobody has a second
+    one to walk forward to, and this is a flat sum, identical to what
+    this function returned before; verified byte-identical against the
+    pre-change output on the real store. It starts weighting recent form
+    the moment there is evidence that doing so helps, not before.
     """
     from ffcore.tidy import SEASON, TIDY, load_crosswalk, read_csv
 
@@ -200,25 +365,17 @@ def _current_from_perjornada() -> tuple[dict, str]:
     if xw is None:
         return {}, ""
 
-    # LAST WRITE WINS: the file is append-only, one row per player per
-    # jornada with activity, in chronological order, and *_total columns
-    # are already cumulative — so the latest row for a key is his current
-    # season-to-date state, not something to sum by hand.
-    latest: dict[str, dict] = {}
-    for r in read_csv(files[-1]):
-        pid = (r.get("ff_id") or "").strip()
-        key = pid if pid in xw.players else xw.player(
-            name=r.get("player_name_full") or r.get("player_name"))
-        if key:
-            latest[key] = r
+    by_key = _per_jornada_current(
+        read_csv(TIDY / "starters.csv"), read_csv(files[-1]),
+        read_csv(TIDY / "matches.csv"), xw)
+    decay, _why = _fit_decay(by_key)
 
-    minutes = _current_minutes(read_csv(TIDY / "starters.csv"), xw)
     out = {}
-    for key, r in latest.items():
+    for key, per_jornada in by_key.items():
         player = xw.players.get(key)
         market_name = norm(player.name) if player else key
-        out[market_name] = {"pts": ratio(r.get("points_total")) or 0.0,
-                            "pj": minutes.get(key, 0.0) / 90.0}
+        wpts, wmatch = _weighted_totals(per_jornada, decay)
+        out[market_name] = {"pts": wpts, "pj": wmatch}
     return out, label
 
 
@@ -842,18 +999,23 @@ def _selftest() -> None:
     # meant to reach, and as_row() carries the new fields to the renderers.
     assert "fix" in s.as_row() and "flat" in s.as_row()
 
-    # -- _current_minutes: a 90-minute match and a cameo must not weigh the
-    # -- same, and a SHORT display name must still resolve to the right man
-    # ------------------------------------------------------------------
+    # -- _per_jornada_current: minutes weighted, corrections folded in, and
+    # -- Step 1's recency weighting gated on real out-of-sample evidence --
     from ffcore.crosswalk import Crosswalk, Player
 
     xw2 = Crosswalk({
         "antonio blanco": Player("antonio blanco", "Antonio Blanco",
-                                 ff_slug="blanco"),
+                                 ff_slug="blanco", app_id="1"),
         "came on": Player("came on", "Came On", ff_slug="came-on"),
         "unused sub": Player("unused sub", "Unused Sub", ff_slug="unused"),
     }, {})
-    rows = [
+    matches_rows = [
+        {"match_id": "m1", "jornada": "1"},
+        {"match_id": "m2", "jornada": "2"},
+        # A second sighting of the same match must not change its jornada.
+        {"match_id": "m1", "jornada": "1"},
+    ]
+    starters_rows = [
         # starters.csv's SHORT form ("Blanco") must still resolve to the
         # market's full name's crosswalk key — this is the actual bug: a
         # first version matched on the raw name string, matched 10 of 42
@@ -868,12 +1030,11 @@ def _selftest() -> None:
         # Unused substitute: zero, not a guess.
         {"player_name": "Unused Sub", "player_slug": "unused",
          "role": "sub", "minute": "", "match_id": "m1"},
-        # A SECOND match: minutes ACCUMULATE.
+        # A SECOND match, a SEPARATE jornada — minutes land in their own
+        # bucket rather than accumulating into one season total.
         {"player_name": "Blanco", "player_slug": "blanco",
          "role": "starter", "minute": "45", "match_id": "m2"},
-        # A role that is neither "starter" nor "sub" contributes nothing —
-        # a page that changes its vocabulary must not silently count as a
-        # full match.
+        # A role that is neither "starter" nor "sub" contributes nothing.
         {"player_name": "Blanco", "player_slug": "blanco",
          "role": "coach", "minute": "", "match_id": "m3"},
         # No slug at all does not resolve — skipped, not guessed.
@@ -888,17 +1049,89 @@ def _selftest() -> None:
            "role": "starter", "minute": "", "match_id": "m1"}
           for _ in range(56)),
     ]
-    mins = _current_minutes(rows, xw2)
-    assert mins["antonio blanco"] == 135.0, mins   # 90 (m1) + 45 (m2), not x57
-    assert mins["came on"] == 20.0, mins
-    assert mins["unused sub"] == 0.0, mins
-    assert _current_minutes([], xw2) == {}
-    # No match_id at all is not evidence of a match — skipped, not counted
-    # as a fresh one.
-    assert _current_minutes([{"player_name": "Blanco", "player_slug": "blanco",
-                              "role": "starter", "minute": ""}], xw2) == {}
+    perjornada_rows = [
+        # THE UNDIFFED-BASELINE CASE, REAL AND MEASURED: this repo's own
+        # points_delta once read 7 for a player whose points_total said
+        # 11 — the missing 4 being whatever he had on the board before
+        # this file's own history started. Anchoring on points_total
+        # rather than summing points_delta is what recovers the true 8
+        # here despite a delta that only claims 3.
+        {"ff_id": "1", "player_name_full": "Antonio Blanco",
+         "points_delta": "3", "points_total": "8", "jornada": "1"},
+        {"ff_id": "1", "player_name_full": "Antonio Blanco",
+         "points_delta": "5", "points_total": "13", "jornada": "2"},
+        # No jornada at all (nothing had finished yet when observed) is
+        # dropped, not guessed into either bucket.
+        {"ff_id": "1", "player_name_full": "Antonio Blanco",
+         "points_delta": "99", "points_total": "112", "jornada": ""},
+    ]
+    by_key = _per_jornada_current(starters_rows, perjornada_rows,
+                                  matches_rows, xw2)
+    assert by_key["antonio blanco"] == {1: (8.0, 90.0), 2: (5.0, 45.0)}, \
+        by_key["antonio blanco"]
+    # REAL, MEASURED GAP: "Came On" and "Unused Sub" have starters.csv
+    # minutes but no row on the points page at all — 90 such players on
+    # this repo's own store. Left OUT of the universe entirely rather than
+    # entered at pts=0: that would guess "he scored nothing" where the
+    # honest reading is "this page does not say," the same distinction
+    # NEUTRAL_START/ABSENT_START already draws for the other source.
+    assert "came on" not in by_key, by_key
+    assert "unused sub" not in by_key, by_key
+    assert _per_jornada_current([], [], [], xw2) == {}
 
-    print("ffcore.score self-test OK (30 cases)")
+    # A CORRECTION WITHIN ONE JORNADA (bonus points posted after the fact,
+    # the exact case that produced a second row for one match in this
+    # repo's own store) must OVERWRITE that jornada's running total, not
+    # add another jornada's worth on top of it.
+    corrected = _per_jornada_current(
+        starters_rows,
+        [{"ff_id": "1", "player_name_full": "Antonio Blanco",
+          "points_total": "8", "jornada": "1"},
+         {"ff_id": "1", "player_name_full": "Antonio Blanco",
+          "points_total": "9", "jornada": "1"}],   # +1 bonus point, same jornada
+        matches_rows, xw2)
+    # jornada 2 still carries his minutes (from starters_rows) with 0
+    # points, since this fixture's perjornada_rows says nothing about it.
+    assert corrected["antonio blanco"] == {1: (9.0, 90.0), 2: (0.0, 45.0)}, \
+        corrected
+
+    # Flat sum (decay=1.0) equals what the old cumulative approach gave:
+    # 90 + 45 minutes, 8 + 5 points.
+    wpts, wmatch = _weighted_totals(by_key["antonio blanco"], 1.0)
+    assert (wpts, wmatch) == (13.0, 1.5), (wpts, wmatch)
+    # Decayed at 0.5, one jornada back counts half: pts = 5 + 8*0.5 = 9.
+    wpts, wmatch = _weighted_totals(by_key["antonio blanco"], 0.5)
+    assert abs(wpts - 9.0) < 1e-9, wpts
+    assert _weighted_totals({}, 0.5) == (0.0, 0.0)
+
+    # ONLY ONE JORNADA ON RECORD: nobody has a second one to walk forward
+    # to, so the fit must refuse and hand back decay=1.0 — this is where
+    # this repo's own live data stands at the time of writing, and it
+    # must be provably inert.
+    one_jornada = {"a": {1: (4.0, 90.0)}, "b": {1: (2.0, 45.0)}}
+    decay, why = _fit_decay(one_jornada)
+    assert decay == 1.0 and "second jornada" in why, (decay, why)
+    assert _fit_decay({}) == (1.0, "no player has a second jornada to "
+                              "predict yet")
+    # TWO JORNADAS total is STILL not enough: walking forward to jornada 2
+    # trains on exactly one jornada, and decay cannot differ from flat
+    # with only one training point to weight.
+    decay0, _ = _fit_decay(
+        {p: {1: (1.0, 90.0), 2: (9.0, 90.0)} for p in "ab"})
+    assert decay0 == 1.0, decay0
+
+    # THREE JORNADAS, A REAL RECENCY SIGNAL: a steady rise, predicted from
+    # jornada 3 with two training points (1 and 2) to weight differently —
+    # decay can only show an edge once there is more than one training
+    # point, which is exactly why this needs 3 jornadas and not 2.
+    # Synthetic, but it proves the grid can actually win when the evidence
+    # favours it, and hand back a note that says so.
+    trending = {p: {1: (1.0, 90.0), 2: (5.0, 90.0), 3: (9.0, 90.0)}
+               for p in ("p%d" % i for i in range(8))}
+    decay2, why2 = _fit_decay(trending)
+    assert decay2 < 1.0 and "beat flat" in why2, (decay2, why2)
+
+    print("ffcore.score self-test OK (34 cases)")
 
 
 if __name__ == "__main__":
