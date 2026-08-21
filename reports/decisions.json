@@ -1,59 +1,59 @@
 {
- "generated_at": "2026-08-21T06:11Z",
- "locks_in_h": 12.804858603333333,
- "cash": 19280923.200263888,
+ "generated_at": "2026-08-21T10:36Z",
+ "locks_in_h": 8.390268881388888,
+ "cash": 19297997.87966088,
  "squad_value": 220380704.0,
  "jornadas_left": 38,
  "acquirable": 33,
  "considered": 38,
- "expected_finish": 1.131,
- "p_win": 0.8893333333333333,
+ "expected_finish": 1.3406666666666667,
+ "p_win": 0.7243333333333334,
  "band": [
-  1573.99575652934,
-  1979.895831555061
+  1508.2214024209593,
+  2044.5547180377039
  ],
  "moves": [
   {
-   "label": "buy Aitor Paredes · sell Igor Zubeldia",
-   "kind": "buy",
-   "buy": "Aitor Paredes",
-   "sell": "Igor Zubeldia",
-   "sell_n": 1,
-   "victim": "",
-   "owner": "BurtonGM89",
-   "d_pos": 0.09699999999999998,
-   "d_win": 0.07900000000000007,
-   "net": 5072834.0,
-   "d_pts": 67.86939879874035,
-   "helps": 0.9293333333333333,
-   "pts_lo": 8.163575085828143,
-   "pts_hi": 138.97404437083924,
-   "left": 24353757.200263888,
-   "answer": null,
-   "p_win_after": 0.9683333333333334,
-   "vs": "BurtonGM89",
-   "vs_gain": 0.06866666666666665
-  },
-  {
-   "label": "buy Antonio Blanco · sell Igor Zubeldia",
+   "label": "buy Antonio Blanco",
    "kind": "buy",
    "buy": "Antonio Blanco",
-   "sell": "Igor Zubeldia",
-   "sell_n": 1,
+   "sell": "",
+   "sell_n": 0,
    "victim": "",
    "owner": "BurtonGM89",
-   "d_pos": 0.09533333333333327,
-   "d_win": 0.07800000000000007,
-   "net": -4431750.0,
-   "d_pts": 56.063207956616,
-   "helps": 0.8723333333333333,
-   "pts_lo": -6.63512752576321,
-   "pts_hi": 120.87211861788364,
-   "left": 14849173.200263888,
+   "d_pos": 0.1519999999999999,
+   "d_win": 0.10966666666666658,
+   "net": -14784817.0,
+   "d_pts": 56.192881098268344,
+   "helps": 0.8206666666666667,
+   "pts_lo": -22.654603854438392,
+   "pts_hi": 142.1994790223182,
+   "left": 4513180.879660878,
    "answer": null,
-   "p_win_after": 0.9673333333333334,
+   "p_win_after": 0.834,
    "vs": "BurtonGM89",
-   "vs_gain": 0.07099999999999995
+   "vs_gain": 0.10599999999999998
+  },
+  {
+   "label": "buy Aitor Paredes",
+   "kind": "buy",
+   "buy": "Aitor Paredes",
+   "sell": "",
+   "sell_n": 0,
+   "victim": "",
+   "owner": "BurtonGM89",
+   "d_pos": 0.15166666666666662,
+   "d_win": 0.10833333333333328,
+   "net": -5280233.0,
+   "d_pts": 62.99240771058089,
+   "helps": 0.8743333333333333,
+   "pts_lo": -5.824164052985452,
+   "pts_hi": 160.19085007239073,
+   "left": 14017764.879660878,
+   "answer": null,
+   "p_win_after": 0.8326666666666667,
+   "vs": "BurtonGM89",
+   "vs_gain": 0.09699999999999998
   },
   {
    "label": "buy Cesar Tarrega · sell Igor Zubeldia",
@@ -63,18 +63,39 @@
    "sell_n": 1,
    "victim": "",
    "owner": "SusoGattuso",
-   "d_pos": 0.07433333333333336,
-   "d_win": 0.05900000000000005,
+   "d_pos": 0.1156666666666668,
+   "d_win": 0.08033333333333326,
    "net": 1213148.0,
-   "d_pts": 61.34075416377664,
-   "helps": 0.9423333333333334,
-   "pts_lo": 10.73703136847098,
-   "pts_hi": 118.17494840129439,
-   "left": 20494071.200263888,
+   "d_pts": 57.03849232859693,
+   "helps": 0.8906666666666667,
+   "pts_lo": -1.7759739499638272,
+   "pts_hi": 129.4496271576245,
+   "left": 20511145.87966088,
    "answer": null,
-   "p_win_after": 0.9483333333333334,
-   "vs": "BurtonGM89",
-   "vs_gain": 0.03866666666666663
+   "p_win_after": 0.8046666666666666,
+   "vs": "SusoGattuso",
+   "vs_gain": 0.06066666666666665
+  },
+  {
+   "label": "buy Yuri Berchiche · sell Igor Zubeldia",
+   "kind": "buy",
+   "buy": "Yuri Berchiche",
+   "sell": "Igor Zubeldia",
+   "sell_n": 1,
+   "victim": "",
+   "owner": "SusoGattuso",
+   "d_pos": 0.07033333333333336,
+   "d_win": 0.04899999999999993,
+   "net": -1941267.0,
+   "d_pts": 35.31064692981499,
+   "helps": 0.7626666666666667,
+   "pts_lo": -25.924812741432106,
+   "pts_hi": 111.63189895133269,
+   "left": 17356730.87966088,
+   "answer": null,
+   "p_win_after": 0.7733333333333333,
+   "vs": "SusoGattuso",
+   "vs_gain": 0.04200000000000004
   },
   {
    "label": "buy Carlos Puga · sell Igor Zubeldia",
@@ -84,60 +105,39 @@
    "sell_n": 1,
    "victim": "",
    "owner": "BurtonGM89",
-   "d_pos": 0.057333333333333236,
-   "d_win": 0.047666666666666746,
+   "d_pos": 0.06166666666666676,
+   "d_win": 0.04566666666666663,
    "net": 5256740.0,
-   "d_pts": 16.58167282832619,
-   "helps": 0.6386666666666667,
-   "pts_lo": -38.535971509260435,
-   "pts_hi": 77.04443816960884,
-   "left": 24537663.200263888,
+   "d_pts": -4.947973308484052,
+   "helps": 0.46266666666666667,
+   "pts_lo": -60.81747876902364,
+   "pts_hi": 103.11755641900163,
+   "left": 24554737.87966088,
    "answer": null,
-   "p_win_after": 0.937,
+   "p_win_after": 0.77,
    "vs": "BurtonGM89",
-   "vs_gain": 0.046666666666666634
+   "vs_gain": 0.05166666666666664
   },
   {
-   "label": "buy Yuri Berchiche",
-   "kind": "buy",
-   "buy": "Yuri Berchiche",
-   "sell": "",
-   "sell_n": 0,
-   "victim": "",
-   "owner": "SusoGattuso",
-   "d_pos": 0.05833333333333335,
-   "d_win": 0.04600000000000004,
-   "net": -12294334.0,
-   "d_pts": 42.46403619578132,
-   "helps": 0.8453333333333334,
-   "pts_lo": -11.012110303497593,
-   "pts_hi": 101.43862881125347,
-   "left": 6986589.200263888,
-   "answer": null,
-   "p_win_after": 0.9353333333333333,
-   "vs": "SusoGattuso",
-   "vs_gain": 0.029333333333333322
-  },
-  {
-   "label": "buy Ruben Garcia",
+   "label": "buy Ruben Garcia · sell Igor Zubeldia",
    "kind": "buy",
    "buy": "Ruben Garcia",
-   "sell": "",
-   "sell_n": 0,
+   "sell": "Igor Zubeldia",
+   "sell_n": 1,
    "victim": "",
    "owner": "",
-   "d_pos": 0.03866666666666663,
-   "d_win": 0.031000000000000028,
-   "net": -14083172.0,
-   "d_pts": 39.58523697721921,
-   "helps": 0.79,
-   "pts_lo": -21.332799792119886,
-   "pts_hi": 112.21585383443471,
-   "left": 5197751.200263888,
+   "d_pos": 0.05466666666666664,
+   "d_win": 0.03933333333333333,
+   "net": -3730105.0,
+   "d_pts": 33.31425156511182,
+   "helps": 0.72,
+   "pts_lo": -40.29617711889796,
+   "pts_hi": 124.94645440007525,
+   "left": 15567892.879660878,
    "answer": null,
-   "p_win_after": 0.9203333333333333,
+   "p_win_after": 0.7636666666666667,
    "vs": "BurtonGM89",
-   "vs_gain": 0.022333333333333316
+   "vs_gain": 0.024333333333333318
   },
   {
    "label": "buy Javi Rueda",
@@ -147,39 +147,18 @@
    "sell_n": 0,
    "victim": "",
    "owner": "",
-   "d_pos": 0.036666666666666625,
-   "d_win": 0.02966666666666673,
+   "d_pos": 0.04933333333333323,
+   "d_win": 0.035666666666666624,
    "net": -4413024.0,
-   "d_pts": 35.230533809380404,
-   "helps": 0.8076666666666666,
-   "pts_lo": -14.331553592597857,
-   "pts_hi": 98.3933234099627,
-   "left": 14867899.200263888,
+   "d_pts": 31.680509333969212,
+   "helps": 0.7426666666666667,
+   "pts_lo": -28.00724508123153,
+   "pts_hi": 114.4578761852124,
+   "left": 14884973.879660878,
    "answer": null,
-   "p_win_after": 0.919,
+   "p_win_after": 0.76,
    "vs": "BurtonGM89",
-   "vs_gain": 0.02066666666666661
-  },
-  {
-   "label": "buy Denis Suarez",
-   "kind": "buy",
-   "buy": "Denis Suarez",
-   "sell": "",
-   "sell_n": 0,
-   "victim": "",
-   "owner": "BurtonGM89",
-   "d_pos": 0.03633333333333333,
-   "d_win": 0.029333333333333322,
-   "net": -2420507.0,
-   "d_pts": 0.0,
-   "helps": 0.0,
-   "pts_lo": 0.0,
-   "pts_hi": 0.0,
-   "left": 16860416.200263888,
-   "answer": null,
-   "p_win_after": 0.9186666666666666,
-   "vs": "BurtonGM89",
-   "vs_gain": 0.03633333333333333
+   "vs_gain": 0.024666666666666615
   },
   {
    "label": "buy Sergio Canales · sell Igor Zubeldia",
@@ -189,18 +168,39 @@
    "sell_n": 1,
    "victim": "",
    "owner": "BurtonGM89",
-   "d_pos": 0.03200000000000003,
-   "d_win": 0.026000000000000023,
+   "d_pos": 0.033666666666666734,
+   "d_win": 0.02499999999999991,
    "net": -15098694.0,
    "d_pts": 0.0,
    "helps": 0.025333333333333333,
-   "pts_lo": -6.385015663590821,
+   "pts_lo": -6.337126372454804,
    "pts_hi": 0.0,
-   "left": 4182229.2002638876,
+   "left": 4199303.879660878,
    "answer": null,
-   "p_win_after": 0.9153333333333333,
+   "p_win_after": 0.7493333333333333,
    "vs": "BurtonGM89",
-   "vs_gain": 0.03266666666666662
+   "vs_gain": 0.035666666666666624
+  },
+  {
+   "label": "buy Denis Suarez · sell Igor Zubeldia",
+   "kind": "buy",
+   "buy": "Denis Suarez",
+   "sell": "Igor Zubeldia",
+   "sell_n": 1,
+   "victim": "",
+   "owner": "BurtonGM89",
+   "d_pos": 0.03166666666666673,
+   "d_win": 0.022666666666666613,
+   "net": 7932560.0,
+   "d_pts": 0.0,
+   "helps": 0.025333333333333333,
+   "pts_lo": -6.337126372454804,
+   "pts_hi": 0.0,
+   "left": 27230557.87966088,
+   "answer": null,
+   "p_win_after": 0.747,
+   "vs": "BurtonGM89",
+   "vs_gain": 0.03366666666666662
   },
   {
    "label": "buy Fernando Niño · sell Igor Zubeldia",
@@ -210,18 +210,18 @@
    "sell_n": 1,
    "victim": "",
    "owner": "",
-   "d_pos": 0.011666666666666714,
-   "d_win": 0.012333333333333307,
+   "d_pos": 0.008000000000000007,
+   "d_win": 0.010666666666666602,
    "net": -3443519.0,
-   "d_pts": 14.430189709500382,
-   "helps": 0.6283333333333333,
-   "pts_lo": -40.270422056966936,
-   "pts_hi": 76.82372981170147,
-   "left": 15837404.200263888,
+   "d_pts": -4.051215861746414,
+   "helps": 0.473,
+   "pts_lo": -60.7402735864564,
+   "pts_hi": 106.39620049341056,
+   "left": 15854478.879660878,
    "answer": null,
-   "p_win_after": 0.9016666666666666,
-   "vs": "BurtonGM89",
-   "vs_gain": 0.0086666666666666
+   "p_win_after": 0.735,
+   "vs": "SusoGattuso",
+   "vs_gain": 0.005333333333333412
   }
  ],
  "sell": [
@@ -241,7 +241,8 @@
    "where": "yours",
    "money": 10353067.0,
    "pts": null,
-   "note": ""
+   "note": "",
+   "value": null
   },
   {
    "name": "Antonio Blanco",
@@ -250,9 +251,10 @@
    "xpts": 4.447941058539125,
    "group": "buy",
    "where": "BurtonGM89",
-   "money": -4431750.0,
-   "pts": 56.063207956616,
-   "note": ""
+   "money": -14784817.0,
+   "pts": 56.192881098268344,
+   "note": "",
+   "value": 3.8007153621359224
   },
   {
    "name": "Ruben Garcia",
@@ -261,9 +263,10 @@
    "xpts": 3.917281528468303,
    "group": "buy",
    "where": "free agent",
-   "money": -14083172.0,
-   "pts": 39.58523697721921,
-   "note": ""
+   "money": -3730105.0,
+   "pts": 33.31425156511182,
+   "note": "",
+   "value": 8.931183321947188
   },
   {
    "name": "Aitor Paredes",
@@ -272,9 +275,10 @@
    "xpts": 3.893937971616777,
    "group": "buy",
    "where": "BurtonGM89",
-   "money": 5072834.0,
-   "pts": 67.86939879874035,
-   "note": ""
+   "money": -5280233.0,
+   "pts": 62.99240771058089,
+   "note": "",
+   "value": 11.929853798228391
   },
   {
    "name": "Cesar Tarrega",
@@ -284,8 +288,9 @@
    "group": "buy",
    "where": "SusoGattuso",
    "money": 1213148.0,
-   "pts": 61.34075416377664,
-   "note": ""
+   "pts": 57.03849232859693,
+   "note": "",
+   "value": null
   },
   {
    "name": "Yuri Berchiche",
@@ -294,9 +299,10 @@
    "xpts": 3.1284738629531343,
    "group": "buy",
    "where": "SusoGattuso",
-   "money": -12294334.0,
-   "pts": 42.46403619578132,
-   "note": ""
+   "money": -1941267.0,
+   "pts": 35.31064692981499,
+   "note": "",
+   "value": 18.189484975438717
   },
   {
    "name": "Javi Rueda",
@@ -306,8 +312,9 @@
    "group": "buy",
    "where": "free agent",
    "money": -4413024.0,
-   "pts": 35.230533809380404,
-   "note": ""
+   "pts": 31.680509333969212,
+   "note": "",
+   "value": 7.178866313432515
   },
   {
    "name": "Carlos Puga",
@@ -317,19 +324,21 @@
    "group": "buy",
    "where": "BurtonGM89",
    "money": 5256740.0,
-   "pts": 16.58167282832619,
-   "note": ""
+   "pts": -4.947973308484052,
+   "note": "",
+   "value": null
   },
   {
    "name": "Fernando Niño",
    "pos": "DEL",
    "start": 0.7359718508223303,
-   "xpts": 2.5601165481578145,
+   "xpts": 2.591111116457505,
    "group": "buy",
    "where": "free agent",
    "money": -3443519.0,
-   "pts": 14.430189709500382,
-   "note": ""
+   "pts": -4.051215861746414,
+   "note": "",
+   "value": -1.176475536143815
   },
   {
    "name": "Sergio Canales",
@@ -340,7 +349,8 @@
    "where": "BurtonGM89",
    "money": -15098694.0,
    "pts": 0.0,
-   "note": ""
+   "note": "",
+   "value": 0.0
   },
   {
    "name": "Denis Suarez",
@@ -349,9 +359,10 @@
    "xpts": 2.2327567061853215,
    "group": "buy",
    "where": "BurtonGM89",
-   "money": -2420507.0,
+   "money": 7932560.0,
    "pts": 0.0,
-   "note": ""
+   "note": "",
+   "value": null
   },
   {
    "name": "Antonio Sivera",
@@ -360,9 +371,10 @@
    "xpts": 6.079007465963988,
    "group": "save",
    "where": "free agent",
-   "money": -4190944.7997361124,
+   "money": -4173870.1203391217,
    "pts": 0.0,
-   "note": "short"
+   "note": "short",
+   "value": 0.0
   },
   {
    "name": "Pablo Barrios",
@@ -371,9 +383,10 @@
    "xpts": 4.960708810739088,
    "group": "save",
    "where": "free agent",
-   "money": -12269170.799736112,
-   "pts": 73.8112992007234,
-   "note": "short"
+   "money": -12252096.120339122,
+   "pts": 65.67684806900024,
+   "note": "short",
+   "value": 5.360458114589326
   },
   {
    "name": "Marko Dmitrovic",
@@ -382,9 +395,10 @@
    "xpts": 4.1569238945738745,
    "group": "save",
    "where": "BurtonGM89",
-   "money": -9004131.799736112,
+   "money": -8987057.120339122,
    "pts": 0.0,
-   "note": "short"
+   "note": "short",
+   "value": 0.0
   },
   {
    "name": "Alex Baena",
@@ -393,9 +407,10 @@
    "xpts": 4.007624337987968,
    "group": "save",
    "where": "free agent",
-   "money": -20627880.799736112,
-   "pts": 36.331551015819514,
-   "note": "short"
+   "money": -20610806.12033912,
+   "pts": 34.438017184032105,
+   "note": "short",
+   "value": 1.6708719194659758
   },
   {
    "name": "Santi Comesaña",
@@ -404,9 +419,10 @@
    "xpts": 2.438836059258294,
    "group": "save",
    "where": "BurtonGM89",
-   "money": -2456912.7997361124,
+   "money": -2439838.1203391217,
    "pts": 0.0,
-   "note": "short"
+   "note": "short",
+   "value": 0.0
   },
   {
    "name": "Santiago Mouriño",
@@ -415,9 +431,10 @@
    "xpts": 2.3440788021312975,
    "group": "save",
    "where": "Albert Laporta",
-   "money": -6693458.799736112,
-   "pts": 8.707086466908777,
-   "note": "short"
+   "money": -6676384.120339122,
+   "pts": 7.912795561778012,
+   "note": "short",
+   "value": 1.185191777338313
   }
  ],
  "bar": 2.049620797948033,
@@ -448,6 +465,7 @@
    "lo": 5.300685196953402,
    "hi": 7.110697050537914,
    "beats_now": 1.0,
+   "n_band": 400,
    "helpful": 144,
    "pool": 589,
    "note": "the market is modelled from 109 offers over 6 cycles, weighted by value^0.40, and only just — value^0.45 fits within 3.8% of it, so read the exponent as roughly this, not exactly this"
@@ -493,12 +511,12 @@
    "hi": null,
    "beats_now": null,
    "helpful": 36,
-   "days": 3.592308923287037,
+   "days": 3.4083676848726854,
    "opens": "24 Aug"
   }
  ],
  "verdict": "**Don't spend yet.** Wait for the market is worth about +259 points over the rest of the season against +153 for the best thing you can buy today — 106 better even after paying a jornada for the delay, and the balance is what buys the choice.",
- "market_pct": "market **0th percentile** · a poor week · better in 100% of weeks",
+ "market_pct": "market **under the 1st percentile** · an unusually poor week · better in over 99% of weeks",
  "shape_now": "4-5-1",
  "xi_note": "no change — you are already fielding the best eleven",
  "warnings": [
@@ -512,10 +530,10 @@
    "manager": "miguel_autentico",
    "me": true,
    "now": 31.0,
-   "mean": 1772.4271721859816,
-   "lo": 1573.99575652934,
-   "hi": 1979.895831555061,
-   "cash": 19280923.200263888,
+   "mean": 1775.6661087041143,
+   "lo": 1508.2214024209593,
+   "hi": 2044.5547180377039,
+   "cash": 19297997.87966088,
    "cash_known": true,
    "p_above": null
   },
@@ -523,45 +541,45 @@
    "manager": "BurtonGM89",
    "me": false,
    "now": 37.0,
-   "mean": 1469.8465964429004,
-   "lo": 1288.0338091207532,
-   "hi": 1659.592374585528,
+   "mean": 1469.747905613536,
+   "lo": 1188.4583298639934,
+   "hi": 1756.7858423704176,
    "cash": -29272535.0,
    "cash_known": false,
-   "p_above": 0.921
+   "p_above": 0.8383333333333334
   },
   {
    "manager": "SusoGattuso",
    "me": false,
    "now": 28.0,
-   "mean": 1440.6175310485323,
-   "lo": 1272.3910383055086,
-   "hi": 1607.3436732150956,
+   "mean": 1433.29546269563,
+   "lo": 1182.6302330595597,
+   "hi": 1680.4612265971837,
    "cash": 5432427.0,
    "cash_known": false,
-   "p_above": 0.955
+   "p_above": 0.8813333333333333
   },
   {
    "manager": "Magic Mike 333",
    "me": false,
    "now": 15.0,
-   "mean": 1266.6909979676782,
-   "lo": 1085.4654863132928,
-   "hi": 1455.9018188824514,
+   "mean": 1255.9577674496645,
+   "lo": 993.8394517741002,
+   "hi": 1547.7159564811202,
    "cash": 2482988.0,
    "cash_known": false,
-   "p_above": 0.993
+   "p_above": 0.952
   },
   {
    "manager": "Albert Laporta",
    "me": false,
    "now": 10.0,
-   "mean": 942.6290430620204,
-   "lo": 799.1228081845687,
-   "hi": 1084.6618016863556,
+   "mean": 945.3994067588853,
+   "lo": 726.6466687291494,
+   "hi": 1176.5191551995845,
    "cash": 16239786.0,
    "cash_known": false,
-   "p_above": 1.0
+   "p_above": 0.9876666666666667
   }
  ]
 }
