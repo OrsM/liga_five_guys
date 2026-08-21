@@ -1,661 +1,661 @@
-player_id,name,club_id,ff_slug,af_slug,app_id,app_names
-10003,joseda alvarez,alaves,,,,
-10005,pablo barrios,atletico,pablo-barrios,336594,1565,Barrios
-10114,renato veiga,villarreal,renato-veiga,336671,,
-10176,alvaro f. carreras,real madrid,lvaro-fernandez-1,,,
-10191,alejandro primo,levante,alejandro-primo,,,
-10192,carlos gimenez,atletico,,,,
-10207,williot swedberg,celta,williot-swedberg,,2394,Williot
-10208,jonathan dubasin,osasuna,jonathan-dubasin,,,
-10209,facundo gonzalez,racing,facundo-gonzalez,286595,,
-10210,fran perez,rayo,fran-perez,162931,,
-10213,beñat gerenabarrena,athletic,benat-gerenabarrena,,,
-10214,alex padilla,athletic,alex-padilla,,,
-10217,marc casado,barcelona,marc-casado,,,
-10219,angel fortuño,espanyol,ngel-fortuno,,,
-10220,omar el hilali,espanyol,omar-el-hilali,,1930,El Hilali
-10233,angel ortiz,betis,ngel-ortiz,334574,,
-10237,rodrigo mendoza,atletico,rodrigo-mendoza,341371,,
-10247,arnau sola,atletico,,,,
-10258,pablo ibañez,alaves,pablo-ibanez,139001,,
-10287,julian alvarez,atletico,julian-lvarez,6009,,
-10326,karl etta eyong,levante,etta-eyong,,2700,Etta Eyong
-10336,alvaro mantilla,racing,lvaro-mantilla,181685,,
-10338,iñigo sainz-maza,racing,nigo-sainz-maza,,3000,Iñigo
-10341,peque,sevilla,peque,,2455,Peque
-10353,alex pastor,malaga,lex-pastor,,3059,Pastor
-10357,adria altimira,deportivo,adria-altimira,,,
-10358,marc aguado,elche,marc-aguado,187318,,
-10393,morten hjulmand,atletico,morten-hjulmand,,,
-10448,carlos benavidez,alaves,carlos-benavidez,,,
-10463,orel mangala,getafe,orel-mangala,,,
-10473,giacomo quagliata,deportivo,giacomo-quagliata,,2963,Quagliata
-10476,abde rebbach,alaves,abde-rebbach,183751,,
-10478,miguel loureiro,deportivo,miguel-loureiro,,,
-10533,andre almeida,valencia,andre-almeida-1,,,
-10564,yvan neyou,getafe,yvan-neyou,,,
-1059,antonio sivera,alaves,antonio-sivera,,988,Sivera
-10638,tajon buchanan,villarreal,tajon-buchanan,,2556,Buchanan
-10658,roony bardghji,barcelona,roony-bardghji,,,
-10660,orri steinn oskarsson,real sociedad,orri-steinn-skarsson,,2448,Oskarsson
-10767,sergio mestre,real madrid,,,,
-10822,pablo duran,celta,pablo-duran,,,
-10823,juan cruz,malaga,juan-cruz-2,,3140,Juan Cruz
-10830,pablo marin,real sociedad,pablo-marin,290106,,
-10832,moussa diarra,malaga,moussa-diarra,,,
-10860,carlos dotor,malaga,carlos-dotor,,,
-10893,marcos fernandez,espanyol,marcos-fernandez-1,,,
-11172,carlos romero,villarreal,carlos-romero,184420,2614,C. Romero
-11180,manu bueno,sevilla,manu-bueno,,2687,Manu Bueno
-11198,lorenzo amatucci,deportivo,lorenzo-amatucci,,3119,Amatucci
-11202,mario martin,getafe,mario-martin,343205,2640,Mario Martín
-11214,facundo buonanotte,elche,facundo-buonanotte,,3151,Buonanotte
-1123,raul de tomas,rayo,raul-de-tomas,,,
-11230,abel bretones,osasuna,abel-bretones,181259,,
-11362,iker muñoz,osasuna,iker-munoz,182621,,
-11391,alberto mari,valencia,alberto-mari,,,
-11439,arda guler,real madrid,arda-gler,291964,1674,Arda Güler
-11467,quilindschy hartman,espanyol,quilindschy-hartman,,3098,Q. Hartman
-11520,lamine yamal,barcelona,lamine-yamal,386828,,
-11554,fran gonzalez,sevilla,fran-gonzalez-2,,,
-11562,yago santiago,elche,yago-santiago,,,
-11577,hector fort,barcelona,hector-fort,,,
-11579,arnau ortiz,atletico,arnau-ortiz,183948,,
-11676,unai egiluz,athletic,unai-egiluz,,2936,Egiluz
-11677,hugo rincon,athletic,hugo-rincon,,,
-11678,santiago mouriño,villarreal,santiago-mourino,311773,1959,Mouriño
-11680,isaac romero,sevilla,isaac-romero,,,
-11683,jon gorrotxategi,real sociedad,jon-gorrotxategi,,2621,Gorrotxa
-11684,mikel goti,real sociedad,mikel-goti,,,
-11688,adama boiro,athletic,adama-boiro,,2545,Adama
-11706,pau cubarsi,barcelona,pau-cubarsi,396623,,
-11709,fermin lopez,barcelona,fermin-lopez,,,
-11714,jorge benito,getafe,,,,
-11719,selu diallo,alaves,,,,
-11758,alemao,rayo,alemo,,,
-11766,alex sancris,getafe,lex-sancris,,,
-11767,alvaro nuñez,celta,lvaro-nunez,182661,,
-11790,mario gonzalez,valencia,,,,
-11792,jon martin,real sociedad,jon-martin,405073,,
-11793,alex lebarbier,real sociedad,,,,
-11807,pablo campos,levante,pablo-campos,,,
-11813,natan,betis,natan,195100,,
-11816,aitor fraga,real sociedad,,,,
-11830,dean huijsen,real madrid,dean-huijsen,361497,2530,Huijsen
-11861,dani martinez,atletico,dani-martinez,386869,2881,D. Martínez
-11863,alex calatrava,espanyol,lex-calatrava,,,
-11886,manuel angel,real madrid,,,,
-11905,saba sazonov,getafe,saba-sazonov,,,
-11916,andres garcia,getafe,andres-garcia,388013,,
-11983,alvaro djalo,athletic,lvaro-djalo,,,
-12025,filip ugrinic,valencia,filip-ugrinic,48465,,
-12042,chidera ejuke,sevilla,chidera-ejuke,,,
-12079,gustavo puerta,racing,gustavo-puerta,324034,3028,G. Puerta
-12139,georges mikautadze,villarreal,georges-mikautadze,,,
-12354,logan costa,villarreal,logan-costa,,,
-12358,gabriel suazo,sevilla,gabriel-suazo,11421,,
-12420,abdoulaye faye,celta,abdoulaye-faye,,,
-12441,pablo busto,betis,,,,
-12453,asier osambela,osasuna,asier-osambela,,,
-12475,adrian niño,malaga,adrian-nino,,,
-12479,ruben montero,alaves,,,,
-12484,javier boñar,atletico,javier-bonar,,,
-12534,javi rodriguez,celta,javi-rodriguez,384135,,
-12536,isra dominguez,sevilla,,,,
-12538,jon aramburu,real sociedad,jon-aramburu,199044,2443,Aramburu
-12539,joselu perez,getafe,,,,
-12566,aron yaakobishvili,barcelona,,,,
-12590,ibrahima sow,sevilla,,,3176,Ibra
-12594,david otorbi,valencia,,,,
-12596,joaquin oso,sevilla,joaquin-oso,,,
-12598,dani requena,levante,dani-requena,,,
-12604,aingeru olabarrieta,athletic,,,,
-12605,mikel jauregizar,athletic,mikel-jauregizar,,,
-12608,rayane belaid,atletico,,,,
-12611,alberto collado,sevilla,,,,
-12634,willy kambwala,villarreal,willy-kambwala,,,
-12639,raul asencio,real madrid,raul-asencio-1,,2146,Asencio
-12641,gerard martin,barcelona,gerard-martin,181701,,
-12647,johnny cardoso,atletico,johnny-cardoso,,2480,Johnny
-12651,augusto batalla,rayo,augusto-batalla,,,
-12694,iñaki ruperez,real sociedad,inaki-ruperez,,,
-12695,djordjije medenica,getafe,,,,
-12823,iñigo arguibide,osasuna,inigo-arguibide,,,
-12860,pau navarro,villarreal,pau-navarro,435552,,
-12870,carlos espi,real madrid,carlos-espi,,3129,Carlos Espí
-12878,buba sangare,elche,buba-sangare,446067,,
-12879,jorge cabello,levante,jorge-cabello,,,
-12883,ian forns,betis,,,,
-12891,llorenç serred,espanyol,,,3171,Llorenç
-12917,alberto risco,getafe,alberto-risco,,,
-12918,rafel bauza,espanyol,rafel-bauza,,,
-12922,adam boayar,elche,adam-boayar,,,
-12925,aitor mañas,alaves,aitor-manas,,2887,Mañas
-12975,yassin tallal,getafe,,,,
-12990,nordin al lal,elche,nordin-al-lal,,,
-12993,alvaro garcia,villarreal,,,,
-13007,vicent abril,valencia,,,,
-13035,javi rueda,celta,javi-rueda,,2714,Javi Rueda
-13036,yoel lago,celta,yoel-lago,,,
-13040,jon balda,real sociedad,jon-balda,,,
-13119,vanja drkusic,espanyol,vanja-drkusic,,,
-13145,paco cortes,levante,paco-cortes,,,
-132,sergio canales,racing,sergio-canales,,3125,Canales
-13440,tani oluwaseyi,villarreal,tani-oluwaseyi,,,
-13564,endrick,real madrid,endrick,,,
-13748,martin krug,levante,,,,
-13780,christantus uche,getafe,chrisantus-uche,,,
-13801,pelayo fernandez,rayo,pelayo-fernandez,,,
-13808,miguel roman,celta,miguel-roman,333502,,
-13811,etienne eto&#039;o,rayo,,,,
-13812,sergio jose lozano,rayo,,,3178,Lozano
-13813,adrian molina,rayo,,,,
-13814,marco de la sias,rayo,,,,
-13822,pablo garcia,betis,pablo-garcia-1,443163,,
-13830,maroan sannadi,athletic,maroan-sannadi,,,
-13859,guille fernandez,barcelona,,,,
-13860,toni fernandez,barcelona,,,,
-13864,marc bernal,barcelona,marc-bernal,433396,2784,Marc Bernal
-13865,nico guillen,sevilla,nico-guillen,,3175,Guillén
-13871,taufik seidu,atletico,,,,
-13872,geronimo spina,atletico,,,,
-13875,ismael bekhoucha,getafe,,,,
-13876,diego ferrer,getafe,,,2819,Ferrer
-13877,jiri letacek,getafe,jiri-letacek,,,
-13883,martim neto,elche,martim-neto,,,
-13888,andres castrin,sevilla,andres-castrin,,,
-13968,eric puerto,deportivo,eric-puerto,,,
-13970,dani barcia,deportivo,dani-barcia,,,
-13972,diego villares,deportivo,diego-villares,,,
-13973,ruben lopez,deportivo,,,,
-13974,yeremay hernandez,deportivo,yeremay-hernandez,,,
-13975,david mella,deportivo,david-mella,,,
-13978,carlos lopez,malaga,carlos-lopez,,,
-13979,diego murillo,malaga,diego-murillo,,,
-13980,dani sanchez,malaga,dani-sanchez,,,
-13982,carlos puga,malaga,carlos-puga,,3037,C. Puga
-13983,izan merino,malaga,izan-merino,394372,3035,Izan M.
-13984,aaron ochoa,malaga,aaron-ochoa,,,
-14004,jozhua vertrouwd,rayo,jozhua-vertrouwd,,,
-14016,mikel santos,athletic,,,,
-14017,peio canales,athletic,peio-canales,,,
-14020,arkaitz mariezkurrena,real sociedad,,,,
-14021,job ochieng,real sociedad,job-ochieng,,,
-14022,alassane diatta,villarreal,alassane-diatta,,,
-14024,javier hernandez,espanyol,javier-hernandez,,,
-14034,iker cordoba,valencia,iker-cordoba,,,
-14036,joan martinez,real madrid,,,,
-14045,facundo garces,alaves,facundo-garces,,,
-14096,chupete,malaga,chupete,,,
-14097,pablo garcia,deportivo,,,,
-14100,raul jimenez,valencia,,,,
-14105,jorge salinas,racing,jorge-salinas,482469,,
-14115,matia barzic,elche,matia-barzic,,,
-14118,ali houary,elche,-ali-houary,448243,,
-14125,luiz junior,villarreal,luiz-junior,278619,,
-14135,manu gonzalez,betis,manu-gonzalez,,,
-14155,maguette gueye,racing,maguette-gueye,334014,,
-14177,andres cespedes,malaga,,,,
-14210,zaid romero,getafe,zaid-romero,180927,,
-14700,david jimenez,real madrid,,,,
-14766,aitor crespo,racing,,,,
-14812,ruben gomez,villarreal,,,,
-14816,jean ives valou,getafe,jean-ives-valou,,2699,J. Ives Valou
-14832,albert niculaesei,elche,,,,
-14866,diego diaz,racing,diego-diaz,,,
-14869,samu fernandez,deportivo,,,,
-14876,kevin sanchez,deportivo,kevin-sanchez,,3186,Kevin
-14881,alex marchal,real sociedad,,,,
-14882,alvaro cortes,barcelona,,,,
-14886,diego aguado,real madrid,,,,
-14894,ismael santana,valencia,,,,
-14903,hugo de llanos,real madrid,,,,
-14904,daniel yañez,real madrid,,,,
-14928,jose angel lopez,espanyol,,,,
-14935,youssef enriquez,alaves,youssef-enriquez,,,
-14962,mario solorzano,racing,,,,
-14967,juanpe gil,rayo,,,,
-14979,nicolas valentini,alaves,nicolas-valentini,,,
-14980,jones el-abdellaoui,celta,jones-el-abdellaoui,,,
-15000,pablo lopez,valencia,,,,
-15033,simon eriksson,racing,simon-eriksson,,3018,Eriksson
-15127,angel perez,alaves,angel-perez-1,331369,,
-15133,gregoire swiderski,alaves,,,,
-15135,pol fortuny,real madrid,,,,
-15164,zakaria eddahchouri,deportivo,zakaria-eddahchouri,,,
-15227,mario rivas,real madrid,,,,
-15273,luken beitia,real sociedad,luken-beitia,,,
-15315,pablo arriaza,malaga,pablo-arriaza,,,
-15316,roger hinojo,espanyol,roger-hinojo,450716,,
-15336,rafa rodriguez,malaga,rafa-rodriguez,335221,,
-15342,yan diomande,real madrid,yan-diomande,,,
-15344,rafa garrido,malaga,rafa-garrido,,,
-15351,jonathan asp jensen,deportivo,jonathan-asp-jensen,,,
-15409,alejandro rego,athletic,alejandro-rego,,,
-15417,angel recio,malaga,angel-recio,316115,,
-15422,salvi esquivel,atletico,,,,
-15423,lander pinillos,alaves,,,,
-15505,federico redondo,elche,federico-redondo,,,
-15572,obed vargas,atletico,obed-vargas,,,
-1566,aissa mandi,levante,aissa-mandi,1567,,
-15696,nelson deossa,betis,nelson-deossa,,,
-15736,facundo bernal,betis,facundo-bernal,316519,,
-15928,aliou dieng,valencia,aliou-dieng,,3121,Dieng
-15957,gabriel moscardo,espanyol,gabriel-moscardo,,3127,Moscardo
-15961,jesus fortea,real madrid,,,,
-16003,manu fernandez,celta,manu-fernandez-1,,2653,Manuel Fernández
-16004,davinchi,getafe,davinchi,471478,,
-16014,antonio martinez bastida,elche,,,,
-16017,alejandro panach,valencia,,,,
-16018,aimar blazquez,valencia,,,,
-16020,nacho perez,levante,nacho-perez-1,504605,,
-16022,kareem tunde,levante,kareem-tunde,579287,,
-16099,lucas noubi,deportivo,lucas-noubi,319512,2985,Noubi
-16146,samu becerra,rayo,,,,
-16147,ivan alonso,rayo,ivan-alonso,,,
-16155,theo folgado,real sociedad,,,,
-16156,oscar marcos,celta,,,,
-16158,mauro echegoyen,osasuna,,,,
-16166,mykyta aleksandrov,getafe,,,,
-16171,juan hernandez,barcelona,,,,
-16186,mikel rodriguez,alaves,mikel-rodriguez,332645,,
-16198,edu altozano,sevilla,,,2745,Edu Altozano
-16201,mahamoud barry,villarreal,,,,
-16202,tyrhys dolan,espanyol,tyrhys-dolan,,,
-16203,valentin gomez,betis,valentin-gomez,,,
-16217,kazunari kita,real sociedad,laliga-26-27,,,
-16235,alex costa,sevilla,,,,
-16236,miguel sierra,sevilla,miguel-sierra,546798,,
-16237,thiago pitarch,real madrid,thiago-pitarch,,,
-16247,lander astiazaran,,,,,
-16262,sergio martinez,racing,sergio-martinez,643970,,
-16263,santi franco,racing,,,,
-16286,dani lorenzo,malaga,dani-lorenzo-1,337523,3036,Dani Lorenzo
-16287,ivan corralejo,betis,,,,
-16308,clemens riedel,espanyol,clemens-riedel,,2785,Riedel
-16317,marcos navarro,valencia,,,,
-16349,adrian perez,athletic,,,,
-16350,iker monreal,athletic,,,,
-16359,laro gomez,racing,laro-gomez,,,
-16723,eder aller,barcelona,,,,
-16735,javi navarro,real madrid,,,,
-16758,carlos ballestero,alaves,,,,
-16760,pedro felipe,racing,pedro-felipe,,,
-16763,hugo rios,deportivo,,,,
-16764,quique teijo,deportivo,,,,
-16765,xavi espart,barcelona,xavi-espart,568001,,
-16767,david delgado,elche,,,,
-16797,damian canedo,deportivo,,,,
-16798,marc jurado,valencia,,,,
-16801,pablo meixus,celta,,,,
-16802,andres antañon,celta,,,,
-16803,hugo burcio,celta,,,,
-16809,ferran gomez,espanyol,,,,
-16810,selton sanchez,athletic,selton-sanchez,,,
-16818,asier hierro,athletic,,,,
-16863,bil nsongo,deportivo,bil-nsongo,574733,,
-16867,ibai aguirre,,,,,
-16873,angel arcos,celta,,,,
-16874,joel fontanet,valencia,,,,
-16917,jorge montes,getafe,,,,
-16920,izei hernandez,alaves,,,,
-16922,gorka carrera,real sociedad,,,,
-16923,tomas marques,barcelona,,,,
-16924,huseini nakoha,levante,,,,
-16931,xanet olaiz,alaves,xanet-olaiz,,,
-16933,pablo roson,levante,,,,
-16938,carlos macia,villarreal,carlos-macia,,,
-16940,aleksa puric,atletico,,,2883,Purić
-16948,jorge cestero,real madrid,,,,
-16975,iker muñoz,sevilla,iker-munoz-1,,2876,Iker Muñoz
-16976,noe carrillo,deportivo,noe-carrillo,,,
-16982,unai santos,osasuna,,,,
-17116,thiago fernandez,levante,thiago-fernandez,362750,,
-17119,joselillo gaitan,villarreal,,,,
-17126,alvaro jimenez,racing,,,,
-17129,julio diaz,sevilla,julio-diaz,,,
-17145,adrian riquelme,getafe,,,,
-17148,giorgi guliashvili,racing,giorgi-guliashvili,,,
-17151,abiel osorio,elche,abiel-osorio,,2922,Osorio
-17161,sebastian boselli,getafe,sebastian-boselli,,,
-17166,dani mesonero,real madrid,,,,
-17190,alex sanchez,elche,,,,
-17248,lucas cepeda,elche,lucas-cepeda,318592,,
-17275,alex freeman,villarreal,alex-freeman,,,
-17284,ville koski,alaves,ville-koski,106759,,
-17406,lamini fati,real madrid,,,,
-1743,mathew ryan,levante,mat-ryan,2741,,
-17445,adama timera,espanyol,,,3170,Timera
-17493,carlos sanchez,racing,carlos-sanchez-3,,,
-17495,javi morcillo,elche,javi-morcillo,,,
-175,iago aspas,celta,iago-aspas,47445,2492,Iago Aspas
-17529,miguel cubo,atletico,,,,
-1778,denis suarez,alaves,denis-suarez,,2474,Denis Suárez
-18006,enzo bardelli,levante,enzo-bardelli,,,
-18014,arouna sangante,sevilla,arouna-sangante,,,
-18017,teun gijselhart,deportivo,teun-gijselhart,,,
-18018,justin de haas,valencia,justin-de-haas,36884,3120,De Haas
-18021,alvaro padilla,elche,alvaro-padilla,,,
-18027,igor galdin,levante,,,,
-18028,marc santos,levante,marc-santos,,,
-18029,alberto calatrava,levante,,,3168,Alberto Calatrava
-18030,bright ede,deportivo,bright-ede,497393,,
-18039,cheikh thiam,villarreal,,,,
-18048,marco roman,rayo,,,,
-18214,jorge castillo,atletico,,,,
-18218,andres vallecillo,racing,,,,
-18221,jorge castellanos,racing,,,,
-18224,miguel angel santaella,malaga,,,,
-18225,juani,malaga,juani,,,
-18241,manel usedo,levante,,,3166,Manel Usedo
-18250,ibrahima danfakha,getafe,,,,
-1826,jan oblak,atletico,jan-oblak,29,,
-18282,yassir zabiri,racing,yassir-zabiri,,,
-18309,umaru konare,elche,umaru-konare,,,
-18314,robbie ure,sevilla,robbie-ure,,,
-18378,joseph otu,malaga,,,,
-1859,josan ferrandez,elche,josan,,,
-1881,unai lopez,rayo,unai-lopez,47285,2384,Unai Lopez
-1882,joao cancelo,barcelona,joao-cancelo,,,
-189,jonny castro,alaves,jonny-castro,,2552,Jonny Otto
-1919,david soria,getafe,david-soria,47247,184,David Soria
-1927,pere milla,espanyol,pere-milla,47398,2400,Pere Milla
-1928,lucas torro,osasuna,lucas-torro,1825,,
-1931,marcos llorente,atletico,marcos-llorente,753,,
-1934,iñaki williams,athletic,inaki-williams,47294,,
-1945,borja iglesias,celta,borja-iglesias,,,
-1972,yeray alvarez,athletic,yeray-alvarez,,,
-1975,alex remiro,real sociedad,alex-remiro,47269,,
-1980,jose angel jurado,deportivo,jose-angel-jurado,,,
-1981,javi muñoz,getafe,javi-munoz,,,
-1989,borja mayoral,getafe,borja-mayoral,,,
-2153,hector bellerin,betis,hector-bellerin,,,
-2242,gonçalo guedes,real sociedad,goncalo-guedes,925,,
-2288,dani olmo,barcelona,dani-olmo,,,
-2417,andreas christensen,barcelona,andreas-christensen,,,
-2534,wojciech szczesny,barcelona,wojciech-szczesny,,2783,Szczesny
-2536,antonio rudiger,real madrid,antonio-rudiger,,,
-2632,pablo fornals,betis,pablo-fornals,1697,3099,Fornals
-2663,pablo maffeo,valencia,pablo-maffeo,,,
-2675,mikel oyarzabal,real sociedad,mikel-oyarzabal,,,
-2715,pepelu,valencia,pepelu,47463,2464,Pepelu
-2727,ezequiel ponce,elche,ezequiel-ponce,,,
-2751,kike garcia,espanyol,kike-garcia,,,
-2759,carles aleña,alaves,carles-alena,143,,
-2771,alex grimaldo,atletico,alex-grimaldo,563,,
-2799,carlos soler,real sociedad,carlos-soler,930,,
-2802,igor zubeldia,real sociedad,igor-zubeldia,,265,Zubeldia
-2807,alvaro odriozola,real sociedad,alvaro-odriozola,,,
-3106,peter gulacsi,villarreal,peter-gulacsi,,3130,Gulácsi
-3174,einar galilea,malaga,einar-galilea,14470,,
-3178,kiko femenia,getafe,kiko-femenia,18794,2774,Kiko F.
-3204,alex berenguer,athletic,alex-berenguer,,927,Berenguer
-3206,kike barja,osasuna,kike-barja,,,
-3215,marc roca,betis,marc-roca,47341,2418,Marc Roca
-322,marc bartra,betis,marc-bartra,1561,121,Bartra
-3226,mariano diaz,alaves,mariano-diaz,,,
-3235,diego rico,osasuna,diego-rico,,,
-3255,ivan villar,celta,ivan-villar,,,
-336,isco alarcon,betis,isco-alarcon,,,
-340,juanmi jimenez,getafe,juanmi-jimenez,,,
-3414,pierre-emerick aubameyang,deportivo,pierre-emerick-aubameyang,,3108,Aubameyang
-3427,thomas lemar,atletico,thomas-lemar,,,
-3429,kylian mbappe,real madrid,kylian-mbappe,278,,
-3431,bernardo silva,real madrid,bernardo-silva,636,,
-3605,angeliño,deportivo,angelino,,3142,Angeliño
-3607,mouctar diakhaby,valencia,mouctar-diakhaby,,,
-3612,alvaro fernandez,deportivo,alvaro-fernandez,,2975,A. Ferllo
-3623,pedro diaz,rayo,pedro-diaz,46887,2385,Pedro Díaz
-3671,asier villalibre,racing,asier-villalibre,,3022,Villalibre
-3686,alvaro valles,betis,alvaro-valles,46990,,
-3693,unai simon,athletic,unai-simon,47270,,
-3717,giovani lo celso,betis,giovani-lo-celso,,,
-3732,daniel raba,valencia,daniel-raba,,,
-3736,jon guridi,sevilla,jon-guridi,104821,,
-3738,edu exposito,espanyol,edu-exposito,46799,,
-3751,enes unal,getafe,enes-unal,47499,,
-3758,federico valverde,real madrid,federico-valverde,,,
-3759,marko dmitrovic,espanyol,marko-dmitrovic,,2507,Dmitrovic
-3785,unai nuñez,espanyol,unai-nunez,47277,,
-3799,andoni gorosabel,athletic,andoni-gorosabel,,,
-3802,ander guevara,alaves,ander-guevara,,,
-3807,javi puado,espanyol,javi-puado,,2516,Puado
-3836,manu hernando,racing,manu-hernando,165713,,
-3879,pol lozano,espanyol,pol-lozano,,,
-3881,dakonam djene,getafe,dakonam-djene,,,
-392,ximo navarro,deportivo,ximo-navarro,47360,,
-404,pedro bigas,elche,pedro-bigas,,2294,R.P. Bigas
-4208,marcao,sevilla,marcao,,,
-4288,raphinha,barcelona,raphinha,1496,2522,Raphinha
-4397,marcos alonso,celta,marcos-alonso,2278,3123,Marcos Alonso
-44,iñigo ruiz de galarreta,athletic,inigo-ruiz-de-galarreta,,1070,De Galarreta
-4434,ademola lookman,atletico,ademola-lookman,,,
-4480,trent alexander-arnold,real madrid,trent-alexander-arnold,,2531,Trent
-4511,ayoze perez,villarreal,ayoze-perez,18906,2504,Ayoze
-4620,junior firpo,betis,junior-firpo,,,
-4705,juan foyth,villarreal,juan-foyth,166,2470,Foyth
-4884,ibrahima konate,real madrid,ibrahima-konate,,,
-4976,jeremy toljan,levante,jeremy-toljan,,,
-5013,marc cucurella,real madrid,marc-cucurella,,,
-5019,hugo duro,valencia,hugo-duro,47264,1191,Hugo Duro
-5022,bambo diaby,elche,bambo-diaby,,,
-5032,toni martinez,alaves,antonio-martinez,47181,,
-5035,brahim diaz,real madrid,brahim-diaz,744,2431,Brahim
-5051,aitor ruibal,betis,aitor-ruibal,,,
-5080,cristian rivero,valencia,cristian-rivero,,,
-5083,abdel abqar,getafe,abdel-abqar,46813,2776,A. Abqar
-5124,lucas boye,alaves,lucas-boye,608,2768,Lucas Boyé
-5134,alexander sorloth,atletico,alexander-sorloth,,,
-5194,grady diangana,elche,grady-diangana,,,
-5220,miguel angel rubio,espanyol,miguel-ngel-rubio,,,
-5227,gonzalo villar,elche,gonzalo-villar,46982,,
-5245,dani vivian,athletic,dani-vivian,,2314,Vivian
-5313,matias vecino,celta,matias-vecino,,2945,Vecino
-5526,andriy lunin,real madrid,andriy-lunin,,2423,Lunin
-5546,cucho hernandez,betis,cucho-hernandez,47582,,
-5549,santi comesaña,villarreal,santi-comesana,47541,1031,Comesaña
-5553,fernando calero,malaga,fernando-calero,47478,,
-5565,vinicius junior,real madrid,vinicius-junior,,,
-5587,adria pedrosa,sevilla,adria-pedrosa,,,
-5671,juan berrocal,getafe,juan-berrocal,,,
-5705,luiz felipe,rayo,luiz-felipe,,,
-582,leandro cabrera,espanyol,leandro-cabrera,,3068,Cabrera
-5859,gorka guruzeta,athletic,gorka-guruzeta,,1484,Guruzeta
-59,thibaut courtois,real madrid,thibaut-courtois,,,
-5942,juan musso,atletico,juan-musso,,2321,J. Musso
-5978,ionut radu,celta,andrei-radu,30765,2713,Ionut Radu
-5995,david hancko,atletico,david-hancko,,,
-6002,robin le normand,atletico,robin-le-normand,47301,255,Le Normand
-6050,joaquin muñoz,malaga,joaquin-munoz,60,3034,Joaquín
-6055,denzel dumfries,real madrid,denzel-dumfries,,,
-6062,eder militao,real madrid,der-milito,,2426,E. Militão
-6158,ferland mendy,real madrid,ferland-mendy,,,
-6174,arnaut danjuma,valencia,arnaut-danjuma,83,,
-6180,sergio gomez,real sociedad,sergio-gomez,23,,
-6210,frenkie de jong,barcelona,frenkie-de-jong,,,
-6235,odysseas vlachodimos,sevilla,odysseas-vlachodimos,,,
-63,koke resurreccion,atletico,koke-resurreccion,,,
-6310,cristian romero,atletico,cristian-romero,,,
-6337,kang-in lee,atletico,lee-kang-in,927,,
-6346,adrian de la fuente,levante,adrian-de-la-fuente,,,
-6363,ander barrenetxea,real sociedad,ander-barrenetxea,,,
-6392,fran garcia,betis,fran-garcia,736,,
-6393,alvaro fidalgo,betis,lvaro-fidalgo,,,
-6394,aihen muñoz,real sociedad,aihen-munoz,,,
-6442,iñigo vicente,racing,inigo-vicente,47293,3002,Iñigo Vicente
-6446,yangel herrera,real sociedad,yangel-herrera,2449,,
-6450,rodrigo riquelme,betis,rodrigo-riquelme,,,
-6487,javi galan,celta,javi-galan,,2329,Javi Galán
-6493,alejandro catena,osasuna,alejandro-catena,,,
-6560,andrei ratiu,rayo,andrei-florin,1703,,
-6562,sergio camello,rayo,sergio-camello,52,,
-6563,ivan martin,racing,ivan-martin,,,
-660,ruben garcia,osasuna,ruben-garcia,46658,652,Rubén García
-6605,manu sanchez,levante,manu-sanchez,64309,,
-6606,carles perez,celta,carles-perez,,,
-6611,sergio herrera,osasuna,sergio-herrera,46646,,
-663,jose gaya,valencia,jose-gaya,918,302,Gayá
-6631,rodrygo goes,real madrid,rodrygo-goes,,,
-6633,jorge de frutos,rayo,jorge-de-frutos,128582,,
-6635,ante budimir,osasuna,ante-budimir,46746,,
-6665,luis rioja,valencia,luis-rioja,,,
-6674,jules kounde,barcelona,jules-kounde,,,
-6814,eneko jauregi,malaga,eneko-jauregi,,,
-6853,randy nteka,rayo,randy-nteka,,,
-6882,tete morente,elche,tete-morente,,2941,T. Morente
-6885,aleix febas,celta,aleix-febas,,,
-6889,oscar valentin,rayo,scar-valentin,47109,,
-6890,andres martin,racing,andres-martin,47209,3073,Andrés Martín
-6957,isi palazon,rayo,isi-palazon,131546,2382,Isi
-697,aymeric laporte,athletic,aymeric-laporte,,,
-6973,alfonso herrero,malaga,alfonso-herrero,46843,3040,A. Herrero
-698,german parreño,deportivo,german-parreno,,,
-7006,oihan sancet,athletic,oihan-sancet,128398,,
-7027,raul garcia,osasuna,raul-garcia-1,,,
-707,diego javier llorente,betis,diego-javier-llorente,,2415,Llorente
-7081,fernando niño,elche,fernando-nino,,3147,Fer Niño
-7082,jorge herrando,osasuna,jorge-herrando,,,
-7091,takefusa kubo,real sociedad,takefusa-kubo,,,
-7100,marash kumbulla,rayo,marash-kumbulla,,,
-7199,sergio carreira,celta,sergio-carreira,157988,,
-7201,iker losada,betis,iker-losada,,,
-7203,aimar oroz,osasuna,aimar-oroz,67939,2338,Aimar
-7204,jon moncayola,osasuna,jon-moncayola,,637,Moncayola
-7209,nicolas pepe,villarreal,nicolas-pepe,3246,3087,Pepe
-7238,juanpe jimenez,malaga,juanpe-jimenez,,,
-7249,lucien agoume,sevilla,lucien-agoume,21004,2453,Agoumé
-7251,ivan balliu,rayo,ivan-balliu,,,
-7257,pedri gonzalez,barcelona,pedri-gonzalez,,3100,Pedri
-7279,joan garcia,barcelona,joan-garcia,182718,2634,Joan García
-7293,robert navarro,athletic,robert-navarro,84086,,
-7307,pathe ciss,rayo,pathe-ciss,41552,2383,Pathé I. Ciss
-7309,riki rodriguez,deportivo,riki-rodriguez,,,
-735,yuri berchiche,athletic,yuri-berchiche,,74,Yuri
-7542,eric garcia,barcelona,eric-garcia,619,,
-7554,diego conde,betis,diego-conde,,,
-7570,dani cardenas,rayo,dani-cardenas,,,
-7629,ivan romero,levante,ivan-romero,192032,,
-7638,jesus areso,athletic,jesus-areso,182181,,
-7644,victor garcia,levante,victor-garcia-1,46790,,
-7645,alex baena,atletico,lex-baena,182219,2534,Álex Baena
-7658,german valera,elche,german-valera,161963,,
-7676,guido rodriguez,valencia,guido-rodriguez,2476,,
-7686,julen lobete,malaga,julen-lobete,,,
-7703,ramon enriquez,malaga,ramon-enriquez,,,
-7725,jon pacheco,real sociedad,jon-pacheco,,,
-7737,unai vencedor,athletic,unai-vencedor,,,
-775,jose maria gimenez,atletico,jose-maria-gimenez,,,
-7842,ferran jutgla,celta,ferran-jutgla,,2603,Ferran Jutglà
-7870,raul moro,osasuna,raul-moro,264470,2923,Raúl Moro
-7902,hugo novoa,alaves,hugo-novoa,,,
-7916,aitor paredes,athletic,aitor-paredes,183849,2315,Paredes
-7917,beñat prados,athletic,benat-prados,,1787,Prados
-7920,nico serrano,athletic,nico-serrano,,,
-7995,francho serrano,getafe,francho-serrano,162249,,
-8080,miguel rodriguez,alaves,miguel-rodriguez-1,,,
-8082,ilaix moriba,celta,ilaix-moriba,,2607,Ilaix Moriba
-8088,oriol rey,levante,oriol-rey,,,
-8228,urko gonzalez de zarate,espanyol,urko-gonzalez-de-zarate,,,
-8250,jose salinas,malaga,jose-salinas,184407,,
-8273,victor chust,elche,victor-chust,162058,,
-829,aitor fernandez,osasuna,aitor-fernandez,,,
-8294,umar sadiq,valencia,umar-sadiq,,,
-8337,georgiy tsitaishvili,rayo,georgiy-tsitaishvili,,,
-8386,jude bellingham,real madrid,jude-bellingham,,,
-8392,luka sucic,real sociedad,luka-sucic,7332,,
-8405,antony,betis,antony,9971,,
-841,moi gomez,osasuna,moi-gomez,,,
-8413,pape gueye,villarreal,pape-gueye,20696,,
-843,gerard moreno,villarreal,gerard-moreno,1707,,
-8479,eduardo camavinga,real madrid,eduardo-camavinga,,1300,Camavinga
-8496,martin satriano,getafe,martin-satriano,,,
-863,florian lejeune,rayo,florian-lejeune,,,
-8634,rafael romero,sevilla,,,,
-8646,carlos alvarez,levante,carlos-lvarez,,,
-8651,beñat turrientes,real sociedad,benat-turrientes,183744,1215,Turrientes
-867,alvaro garcia,rayo,alvaro-garcia,47543,1029,Álvaro García
-8679,unai marrero,real sociedad,unai-marrero,,,
-8680,john chetauya,elche,john-nwankwo,,,
-8684,jesus vazquez,valencia,jesus-vazquez-1,162175,,
-8686,juan iglesias,sevilla,juan-iglesias,119742,,
-8693,nico williams,athletic,nico-williams,183799,,
-8695,boyomo,osasuna,boyomo,279822,,
-8703,alfonso gonzalez,sevilla,alfonso-gonzalez,,,
-8712,mario soriano,deportivo,mario-soriano,161965,2995,Mario Soriano
-8737,antonio blanco,alaves,antonio-blanco,162686,3069,Blanco
-8780,david larrubia,malaga,david-larrubia,190253,,
-8816,david affengruber,elche,david-affengruber,,,
-8944,ramon terrats,getafe,terrats,187987,,
-8961,jon ander olasagasti,levante,jon-ander-olasagasti,,,
-8972,pablo ramon,racing,pablo-ramon,46734,,
-8986,eneko ortiz,villarreal,,,,
-8988,hugo sotelo,levante,hugo-sotelo,313651,,
-899,johan mojica,getafe,johan-mojica,,,
-9011,arsen zakharyan,real sociedad,arsen-zakharyan,,,
-9012,altay bayindir,celta,altay-bayindir,,,
-9125,ruben vargas,sevilla,ruben-vargas,48471,,
-9157,roger brugue,levante,roger-brugue,,,
-9161,matias dituro,elche,matias-dituro,11346,2613,M. Dituro
-9201,sergi canos,valencia,sergi-canos,,,
-9213,julen agirrezabala,racing,julen-agirrezabala,,,
-9234,jose manuel copete,valencia,jose-manuel-copete,,,
-9273,pablo gavi,barcelona,pablo-gavi,,1221,Gavi
-9276,giuliano simeone,atletico,giuliano-simeone,,1210,Giuliano
-9304,diego lopez,valencia,diego-lopez-1,,,
-9314,javi serrano,atletico,,,,
-9316,alejandro balde,barcelona,alejandro-balde,,,
-9317,jose angel carmona,sevilla,jose-ngel-carmona,,,
-9321,haitam abaida,malaga,haitam-abaida,,,
-9405,leo roman,deportivo,leo-roman,179139,3109,Leo Román
-9423,jon karrikaburu,real sociedad,jon-karrikaburu,,2619,Karrikaburu
-943,dimitri foulquier,valencia,dimitri-foulquier,,,
-9500,fabio cardoso,sevilla,fabio-cardoso,,2790,Cardoso
-9531,valentin rosier,osasuna,valentin-rosier,,,
-9612,carl starfelt,celta,carl-starfelt,47988,2390,Starfelt
-9638,coke carrillo,celta,,,,
-9644,jesus owono,alaves,jesus-owono,,,
-9669,aurelien tchouameni,real madrid,aurelien-tchouameni,,,
-9695,ruben sanchez,espanyol,ruben-sanchez-1,,,
-9740,hugo alvarez,celta,hugo-lvarez-,,,
-9744,hugo gonzalez,celta,hugo-gonzalez,161875,,
-9750,abde ezzalzouli,betis,abde-ezzalzouli,,3089,Ez Abde
-9755,carlos martin,atletico,carlos-martin,324750,,
-9759,alejandro iturbe,elche,alejandro-iturbe,,,
-9762,cesar tarrega,valencia,cesar-tarrega,333672,1991,Tárrega
-9763,ilias akhomach,villarreal,ilias-akhomach,,,
-9772,luismi cruz,deportivo,luismi-cruz,,,
-9796,ruben iranzo,valencia,ruben-iranzo,,,
-9823,marc pubill,atletico,marc-pubill,295793,2562,Marc Pubill
-9847,charlie patino,deportivo,charlie-patino,284466,,
-9850,jofre carreras,espanyol,jofre-carreras,,,
-9854,arnau comas,deportivo,arnau-comas,,,
-9863,tomas mendes,alaves,,,,
-989,stole dimitrievski,valencia,stole-dimitrievski,,,
-9897,adrian rodriguez,alaves,adrian-rodriguez,,,
-9909,nahuel tenaglia,alaves,nahuel-tenaglia,6233,1337,Tenaglia
-9927,javi guerra,valencia,javi-guerra-1,315699,,
-9930,juan carlos arana,racing,juan-carlos-arana,,,
-9931,kike salas,sevilla,kike-salas,297311,2479,Kike Salas
-9987,roberto fernandez,espanyol,roberto-fernandez-1,,,
-9989,sergi cardona,villarreal,sergi-cardona,,,
-9990,alberto moleiro,villarreal,alberto-moleiro,182519,,
-e100,iñigo perez,villarreal,,,1849,Iñigo Perez
-e101,claudio giraldez,celta,,,,
-e103,hansi flick,barcelona,,,,
-e105,manolo gonzalez,espanyol,,,,
-e109,carlos corberan,valencia,,,,
-e11,quique sanchez,alaves,,,,
-e119,luis castro,levante,,,,
-e120,pellegrino matarazzo,real sociedad,,,,
-e123,luis miguel ramis,osasuna,,,,
-e168,jose alberto lopez,racing,,,3004,José Alberto
-e169,edin terzic,athletic,,,3094,Edin Terzic
-e170,antonio hidalgo,deportivo,,,2986,Antonio Hidalgo
-e171,martin anselmi,elche,,,,
-e172,juan funes,malaga,,,,
-e173,beñat san jose,rayo,,,,
-e174,jose mourinho,real madrid,,,,
-e35,pepe bordalas,getafe,,,,
-e5,diego simeone,atletico,,,2527,Simeone
-e61,luis garcia,sevilla,,,,
-e72,manuel pellegrini,betis,,,,
+player_id,name,club_id,ff_slug,af_slug,app_id,understat_id,app_names
+10003,joseda alvarez,alaves,,,,,
+10005,pablo barrios,atletico,pablo-barrios,336594,1565,,Barrios
+10114,renato veiga,villarreal,renato-veiga,336671,,11383,
+10176,alvaro f. carreras,real madrid,lvaro-fernandez-1,,,,
+10191,alejandro primo,levante,alejandro-primo,,,,
+10192,carlos gimenez,atletico,,,,,
+10207,williot swedberg,celta,williot-swedberg,,2394,10870,Williot
+10208,jonathan dubasin,osasuna,jonathan-dubasin,,,,
+10209,facundo gonzalez,racing,facundo-gonzalez,286595,,14691,
+10210,fran perez,rayo,fran-perez,162931,,10944,
+10213,beñat gerenabarrena,athletic,benat-gerenabarrena,,,,
+10214,alex padilla,athletic,alex-padilla,,,12227,
+10217,marc casado,barcelona,marc-casado,,,11151,
+10219,angel fortuño,espanyol,ngel-fortuno,,,10874,
+10220,omar el hilali,espanyol,omar-el-hilali,,1930,10875,El Hilali
+10233,angel ortiz,betis,ngel-ortiz,334574,,13374,
+10237,rodrigo mendoza,atletico,rodrigo-mendoza,341371,,11216,
+10247,arnau sola,atletico,,,,,
+10258,pablo ibañez,alaves,pablo-ibanez,139001,,10857,
+10287,julian alvarez,atletico,julian-lvarez,6009,,10846,
+10326,karl etta eyong,levante,etta-eyong,,2700,10930,Etta Eyong
+10336,alvaro mantilla,racing,lvaro-mantilla,181685,,14686,
+10338,iñigo sainz-maza,racing,nigo-sainz-maza,,3000,,Iñigo
+10341,peque,sevilla,peque,,2455,12742,Peque
+10353,alex pastor,malaga,lex-pastor,,3059,,Pastor
+10357,adria altimira,deportivo,adria-altimira,,,11834,
+10358,marc aguado,elche,marc-aguado,187318,,13839,
+10393,morten hjulmand,atletico,morten-hjulmand,,,10903,
+10448,carlos benavidez,alaves,carlos-benavidez,,,11826,
+10463,orel mangala,getafe,orel-mangala,,,6088,
+10473,giacomo quagliata,deportivo,giacomo-quagliata,,2963,10940,Quagliata
+10476,abde rebbach,alaves,abde-rebbach,183751,,,
+10478,miguel loureiro,deportivo,miguel-loureiro,,,,
+10533,andre almeida,valencia,andre-almeida-1,,,11057,
+10564,yvan neyou,getafe,yvan-neyou,,,8689,
+1059,antonio sivera,alaves,antonio-sivera,,988,6075,Sivera
+10638,tajon buchanan,villarreal,tajon-buchanan,,2556,12322,Buchanan
+10658,roony bardghji,barcelona,roony-bardghji,,,14064,
+10660,orri steinn oskarsson,real sociedad,orri-steinn-skarsson,,2448,13048,Oskarsson
+10767,sergio mestre,real madrid,,,,,
+10822,pablo duran,celta,pablo-duran,,,11154,
+10823,juan cruz,malaga,juan-cruz-2,,3140,6759,Juan Cruz
+10830,pablo marin,real sociedad,pablo-marin,290106,,11185,
+10832,moussa diarra,malaga,moussa-diarra,,,,
+10860,carlos dotor,malaga,carlos-dotor,,,11540,
+10893,marcos fernandez,espanyol,marcos-fernandez-1,,,13601,
+11172,carlos romero,villarreal,carlos-romero,184420,2614,11402,C. Romero
+11180,manu bueno,sevilla,manu-bueno,,2687,11266,Manu Bueno
+11198,lorenzo amatucci,deportivo,lorenzo-amatucci,,3119,11282,Amatucci
+11202,mario martin,getafe,mario-martin,343205,2640,11349,Mario Martín
+11214,facundo buonanotte,elche,facundo-buonanotte,,3151,,Buonanotte
+1123,raul de tomas,rayo,raul-de-tomas,,,,
+11230,abel bretones,osasuna,abel-bretones,181259,,12790,
+11362,iker muñoz,osasuna,iker-munoz,182621,,11395,
+11391,alberto mari,valencia,alberto-mari,,,,
+11439,arda guler,real madrid,arda-gler,291964,1674,12190,Arda Güler
+11467,quilindschy hartman,espanyol,quilindschy-hartman,,3098,,Q. Hartman
+11520,lamine yamal,barcelona,lamine-yamal,386828,,11527,
+11554,fran gonzalez,sevilla,fran-gonzalez-2,,,,
+11562,yago santiago,elche,yago-santiago,,,,
+11577,hector fort,barcelona,hector-fort,,,,
+11579,arnau ortiz,atletico,arnau-ortiz,183948,,14722,
+11676,unai egiluz,athletic,unai-egiluz,,2936,,Egiluz
+11677,hugo rincon,athletic,hugo-rincon,,,,
+11678,santiago mouriño,villarreal,santiago-mourino,311773,1959,13003,Mouriño
+11680,isaac romero,sevilla,isaac-romero,,,12305,
+11683,jon gorrotxategi,real sociedad,jon-gorrotxategi,,2621,13936,Gorrotxa
+11684,mikel goti,real sociedad,mikel-goti,,,13580,
+11688,adama boiro,athletic,adama-boiro,,2545,12724,Adama
+11706,pau cubarsi,barcelona,pau-cubarsi,396623,,12005,
+11709,fermin lopez,barcelona,fermin-lopez,,,11822,
+11714,jorge benito,getafe,,,,,
+11719,selu diallo,alaves,,,,,
+11758,alemao,rayo,alemo,,,14059,
+11766,alex sancris,getafe,lex-sancris,,,14086,
+11767,alvaro nuñez,celta,lvaro-nunez,182661,,,
+11790,mario gonzalez,valencia,,,,,
+11792,jon martin,real sociedad,jon-martin,405073,,12353,
+11793,alex lebarbier,real sociedad,,,,,
+11807,pablo campos,levante,pablo-campos,,,,
+11813,natan,betis,natan,195100,,11890,
+11816,aitor fraga,real sociedad,,,,,
+11830,dean huijsen,real madrid,dean-huijsen,361497,2530,11943,Huijsen
+11861,dani martinez,atletico,dani-martinez,386869,2881,14233,D. Martínez
+11863,alex calatrava,espanyol,lex-calatrava,,,14700,
+11886,manuel angel,real madrid,,,,14502,
+11905,saba sazonov,getafe,saba-sazonov,,,9381,
+11916,andres garcia,getafe,andres-garcia,388013,,13392,
+11983,alvaro djalo,athletic,lvaro-djalo,,,,
+12025,filip ugrinic,valencia,filip-ugrinic,48465,,13761,
+12042,chidera ejuke,sevilla,chidera-ejuke,,,8694,
+12079,gustavo puerta,racing,gustavo-puerta,324034,3028,11869,G. Puerta
+12139,georges mikautadze,villarreal,georges-mikautadze,,,8187,
+12354,logan costa,villarreal,logan-costa,,,8200,
+12358,gabriel suazo,sevilla,gabriel-suazo,11421,,11343,
+12420,abdoulaye faye,celta,abdoulaye-faye,,,,
+12441,pablo busto,betis,,,,,
+12453,asier osambela,osasuna,asier-osambela,,,12537,
+12475,adrian niño,malaga,adrian-nino,,,,
+12479,ruben montero,alaves,,,,,
+12484,javier boñar,atletico,javier-bonar,,,14225,
+12534,javi rodriguez,celta,javi-rodriguez,384135,,,
+12536,isra dominguez,sevilla,,,,,
+12538,jon aramburu,real sociedad,jon-aramburu,199044,2443,12182,Aramburu
+12539,joselu perez,getafe,,,,13790,
+12566,aron yaakobishvili,barcelona,,,,,
+12590,ibrahima sow,sevilla,,,3176,,Ibra
+12594,david otorbi,valencia,,,,,
+12596,joaquin oso,sevilla,joaquin-oso,,,13615,
+12598,dani requena,levante,dani-requena,,,,
+12604,aingeru olabarrieta,athletic,,,,,
+12605,mikel jauregizar,athletic,mikel-jauregizar,,,12263,
+12608,rayane belaid,atletico,,,,12257,
+12611,alberto collado,sevilla,,,,,
+12634,willy kambwala,villarreal,willy-kambwala,,,12275,
+12639,raul asencio,real madrid,raul-asencio-1,,2146,13201,Asencio
+12641,gerard martin,barcelona,gerard-martin,181701,,12821,
+12647,johnny cardoso,atletico,johnny-cardoso,,2480,12323,Johnny
+12651,augusto batalla,rayo,augusto-batalla,,,12298,
+12694,iñaki ruperez,real sociedad,inaki-ruperez,,,12354,
+12695,djordjije medenica,getafe,,,,,
+12823,iñigo arguibide,osasuna,inigo-arguibide,,,12472,
+12860,pau navarro,villarreal,pau-navarro,435552,,12914,
+12870,carlos espi,real madrid,carlos-espi,,3129,,Carlos Espí
+12878,buba sangare,elche,buba-sangare,446067,,12870,
+12879,jorge cabello,levante,jorge-cabello,,,13766,
+12883,ian forns,betis,,,,,
+12891,llorenç serred,espanyol,,,3171,,Llorenç
+12917,alberto risco,getafe,alberto-risco,,,12566,
+12918,rafel bauza,espanyol,rafel-bauza,,,,
+12922,adam boayar,elche,adam-boayar,,,,
+12925,aitor mañas,alaves,aitor-manas,,2887,14222,Mañas
+12975,yassin tallal,getafe,,,,,
+12990,nordin al lal,elche,nordin-al-lal,,,,
+12993,alvaro garcia,villarreal,,,,,
+13007,vicent abril,valencia,,,,,
+13035,javi rueda,celta,javi-rueda,,2714,,Javi Rueda
+13036,yoel lago,celta,yoel-lago,,,12642,
+13040,jon balda,real sociedad,jon-balda,,,,
+13119,vanja drkusic,espanyol,vanja-drkusic,,,,
+13145,paco cortes,levante,paco-cortes,,,13770,
+132,sergio canales,racing,sergio-canales,,3125,2571,Canales
+13440,tani oluwaseyi,villarreal,tani-oluwaseyi,,,13996,
+13564,endrick,real madrid,endrick,,,12884,
+13748,martin krug,levante,,,,,
+13780,christantus uche,getafe,chrisantus-uche,,,12726,
+13801,pelayo fernandez,rayo,pelayo-fernandez,,,12864,
+13808,miguel roman,celta,miguel-roman,333502,,13620,
+13811,etienne eto&#039;o,rayo,,,,,
+13812,sergio jose lozano,rayo,,,3178,,Lozano
+13813,adrian molina,rayo,,,,,
+13814,marco de la sias,rayo,,,,,
+13822,pablo garcia,betis,pablo-garcia-1,443163,,13376,
+13830,maroan sannadi,athletic,maroan-sannadi,,,13417,
+13859,guille fernandez,barcelona,,,,,
+13860,toni fernandez,barcelona,,,,13110,
+13864,marc bernal,barcelona,marc-bernal,433396,2784,12820,Marc Bernal
+13865,nico guillen,sevilla,nico-guillen,,3175,14607,Guillén
+13871,taufik seidu,atletico,,,,14080,
+13872,geronimo spina,atletico,,,,,
+13875,ismael bekhoucha,getafe,,,,13334,
+13876,diego ferrer,getafe,,,2819,,Ferrer
+13877,jiri letacek,getafe,jiri-letacek,,,,
+13883,martim neto,elche,martim-neto,,,13840,
+13888,andres castrin,sevilla,andres-castrin,,,13600,
+13968,eric puerto,deportivo,eric-puerto,,,,
+13970,dani barcia,deportivo,dani-barcia,,,,
+13972,diego villares,deportivo,diego-villares,,,14712,
+13973,ruben lopez,deportivo,,,,,
+13974,yeremay hernandez,deportivo,yeremay-hernandez,,,,
+13975,david mella,deportivo,david-mella,,,14710,
+13978,carlos lopez,malaga,carlos-lopez,,,,
+13979,diego murillo,malaga,diego-murillo,,,,
+13980,dani sanchez,malaga,dani-sanchez,,,,
+13982,carlos puga,malaga,carlos-puga,,3037,14725,C. Puga
+13983,izan merino,malaga,izan-merino,394372,3035,14729,Izan M.
+13984,aaron ochoa,malaga,aaron-ochoa,,,,
+14004,jozhua vertrouwd,rayo,jozhua-vertrouwd,,,13694,
+14016,mikel santos,athletic,,,,,
+14017,peio canales,athletic,peio-canales,,,,
+14020,arkaitz mariezkurrena,real sociedad,,,,13267,
+14021,job ochieng,real sociedad,job-ochieng,,,14364,
+14022,alassane diatta,villarreal,alassane-diatta,,,13229,
+14024,javier hernandez,espanyol,javier-hernandez,,,14074,
+14034,iker cordoba,valencia,iker-cordoba,,,,
+14036,joan martinez,real madrid,,,,,
+14045,facundo garces,alaves,facundo-garces,,,13319,
+14096,chupete,malaga,chupete,,,14732,
+14097,pablo garcia,deportivo,,,,,
+14100,raul jimenez,valencia,,,,,
+14105,jorge salinas,racing,jorge-salinas,482469,,14687,
+14115,matia barzic,elche,matia-barzic,,,,
+14118,ali houary,elche,-ali-houary,448243,,13838,
+14125,luiz junior,villarreal,luiz-junior,278619,,12917,
+14135,manu gonzalez,betis,manu-gonzalez,,,,
+14155,maguette gueye,racing,maguette-gueye,334014,,14689,
+14177,andres cespedes,malaga,,,,,
+14210,zaid romero,getafe,zaid-romero,180927,,14387,
+14700,david jimenez,real madrid,,,,13113,
+14766,aitor crespo,racing,,,,,
+14812,ruben gomez,villarreal,,,,,
+14816,jean ives valou,getafe,jean-ives-valou,,2699,13696,J. Ives Valou
+14832,albert niculaesei,elche,,,,,
+14866,diego diaz,racing,diego-diaz,,,14690,
+14869,samu fernandez,deportivo,,,,,
+14876,kevin sanchez,deportivo,kevin-sanchez,,3186,14711,Kevin
+14881,alex marchal,real sociedad,,,,,
+14882,alvaro cortes,barcelona,,,,13227,
+14886,diego aguado,real madrid,,,,13236,
+14894,ismael santana,valencia,,,,,
+14903,hugo de llanos,real madrid,,,,,
+14904,daniel yañez,real madrid,,,,13266,
+14928,jose angel lopez,espanyol,,,,,
+14935,youssef enriquez,alaves,youssef-enriquez,,,,
+14962,mario solorzano,racing,,,,,
+14967,juanpe gil,rayo,,,,,
+14979,nicolas valentini,alaves,nicolas-valentini,,,,
+14980,jones el-abdellaoui,celta,jones-el-abdellaoui,,,13361,
+15000,pablo lopez,valencia,,,,,
+15033,simon eriksson,racing,simon-eriksson,,3018,,Eriksson
+15127,angel perez,alaves,angel-perez-1,331369,,14392,
+15133,gregoire swiderski,alaves,,,,,
+15135,pol fortuny,real madrid,,,,,
+15164,zakaria eddahchouri,deportivo,zakaria-eddahchouri,,,14709,
+15227,mario rivas,real madrid,,,,,
+15273,luken beitia,real sociedad,luken-beitia,,,13482,
+15315,pablo arriaza,malaga,pablo-arriaza,,,,
+15316,roger hinojo,espanyol,roger-hinojo,450716,,13533,
+15336,rafa rodriguez,malaga,rafa-rodriguez,335221,,14735,
+15342,yan diomande,real madrid,yan-diomande,,,,
+15344,rafa garrido,malaga,rafa-garrido,,,,
+15351,jonathan asp jensen,deportivo,jonathan-asp-jensen,,,12620,
+15409,alejandro rego,athletic,alejandro-rego,,,13627,
+15417,angel recio,malaga,angel-recio,316115,,14727,
+15422,salvi esquivel,atletico,,,,,
+15423,lander pinillos,alaves,,,,13646,
+15505,federico redondo,elche,federico-redondo,,,13841,
+15572,obed vargas,atletico,obed-vargas,,,14439,
+1566,aissa mandi,levante,aissa-mandi,1567,,3237,
+15696,nelson deossa,betis,nelson-deossa,,,14001,
+15736,facundo bernal,betis,facundo-bernal,316519,,,
+15928,aliou dieng,valencia,aliou-dieng,,3121,,Dieng
+15957,gabriel moscardo,espanyol,gabriel-moscardo,,3127,,Moscardo
+15961,jesus fortea,real madrid,,,,,
+16003,manu fernandez,celta,manu-fernandez-1,,2653,,Manuel Fernández
+16004,davinchi,getafe,davinchi,471478,,13788,
+16014,antonio martinez bastida,elche,,,,,
+16017,alejandro panach,valencia,,,,,
+16018,aimar blazquez,valencia,,,,,
+16020,nacho perez,levante,nacho-perez-1,504605,,13772,
+16022,kareem tunde,levante,kareem-tunde,579287,,14258,
+16099,lucas noubi,deportivo,lucas-noubi,319512,2985,14706,Noubi
+16146,samu becerra,rayo,,,,13695,
+16147,ivan alonso,rayo,ivan-alonso,,,,
+16155,theo folgado,real sociedad,,,,,
+16156,oscar marcos,celta,,,,,
+16158,mauro echegoyen,osasuna,,,,,
+16166,mykyta aleksandrov,getafe,,,,,
+16171,juan hernandez,barcelona,,,,,
+16186,mikel rodriguez,alaves,mikel-rodriguez,332645,,14681,
+16198,edu altozano,sevilla,,,2745,,Edu Altozano
+16201,mahamoud barry,villarreal,,,,,
+16202,tyrhys dolan,espanyol,tyrhys-dolan,,,13829,
+16203,valentin gomez,betis,valentin-gomez,,,13845,
+16217,kazunari kita,real sociedad,laliga-26-27,,,,
+16235,alex costa,sevilla,,,,,
+16236,miguel sierra,sevilla,miguel-sierra,546798,,13823,
+16237,thiago pitarch,real madrid,thiago-pitarch,,,13848,
+16247,lander astiazaran,,,,,,
+16262,sergio martinez,racing,sergio-martinez,643970,,14688,
+16263,santi franco,racing,,,,,
+16286,dani lorenzo,malaga,dani-lorenzo-1,337523,3036,14731,Dani Lorenzo
+16287,ivan corralejo,betis,,,,13855,
+16308,clemens riedel,espanyol,clemens-riedel,,2785,11924,Riedel
+16317,marcos navarro,valencia,,,,,
+16349,adrian perez,athletic,,,,,
+16350,iker monreal,athletic,,,,,
+16359,laro gomez,racing,laro-gomez,,,,
+16723,eder aller,barcelona,,,,,
+16735,javi navarro,real madrid,,,,,
+16758,carlos ballestero,alaves,,,,14117,
+16760,pedro felipe,racing,pedro-felipe,,,14122,
+16763,hugo rios,deportivo,,,,,
+16764,quique teijo,deportivo,,,,,
+16765,xavi espart,barcelona,xavi-espart,568001,,14129,
+16767,david delgado,elche,,,,,
+16797,damian canedo,deportivo,,,,,
+16798,marc jurado,valencia,,,,,
+16801,pablo meixus,celta,,,,,
+16802,andres antañon,celta,,,,14500,
+16803,hugo burcio,celta,,,,14362,
+16809,ferran gomez,espanyol,,,,,
+16810,selton sanchez,athletic,selton-sanchez,,,14167,
+16818,asier hierro,athletic,,,,14183,
+16863,bil nsongo,deportivo,bil-nsongo,574733,,14708,
+16867,ibai aguirre,,,,,,
+16873,angel arcos,celta,,,,,
+16874,joel fontanet,valencia,,,,,
+16917,jorge montes,getafe,,,,14202,
+16920,izei hernandez,alaves,,,,,
+16922,gorka carrera,real sociedad,,,,14208,
+16923,tomas marques,barcelona,,,,14205,
+16924,huseini nakoha,levante,,,,,
+16931,xanet olaiz,alaves,xanet-olaiz,,,,
+16933,pablo roson,levante,,,,,
+16938,carlos macia,villarreal,carlos-macia,,,14221,
+16940,aleksa puric,atletico,,,2883,14224,Purić
+16948,jorge cestero,real madrid,,,,14246,
+16975,iker muñoz,sevilla,iker-munoz-1,,2876,,Iker Muñoz
+16976,noe carrillo,deportivo,noe-carrillo,,,,
+16982,unai santos,osasuna,,,,,
+17116,thiago fernandez,levante,thiago-fernandez,362750,,,
+17119,joselillo gaitan,villarreal,,,,,
+17126,alvaro jimenez,racing,,,,,
+17129,julio diaz,sevilla,julio-diaz,,,,
+17145,adrian riquelme,getafe,,,,,
+17148,giorgi guliashvili,racing,giorgi-guliashvili,,,,
+17151,abiel osorio,elche,abiel-osorio,,2922,,Osorio
+17161,sebastian boselli,getafe,sebastian-boselli,,,14389,
+17166,dani mesonero,real madrid,,,,,
+17190,alex sanchez,elche,,,,14366,
+17248,lucas cepeda,elche,lucas-cepeda,318592,,14400,
+17275,alex freeman,villarreal,alex-freeman,,,,
+17284,ville koski,alaves,ville-koski,106759,,14519,
+17406,lamini fati,real madrid,,,,,
+1743,mathew ryan,levante,mat-ryan,2741,,2385,
+17445,adama timera,espanyol,,,3170,,Timera
+17493,carlos sanchez,racing,carlos-sanchez-3,,,,
+17495,javi morcillo,elche,javi-morcillo,,,,
+175,iago aspas,celta,iago-aspas,47445,2492,2290,Iago Aspas
+17529,miguel cubo,atletico,,,,14586,
+1778,denis suarez,alaves,denis-suarez,,2474,2308,Denis Suárez
+18006,enzo bardelli,levante,enzo-bardelli,,,,
+18014,arouna sangante,sevilla,arouna-sangante,,,11788,
+18017,teun gijselhart,deportivo,teun-gijselhart,,,,
+18018,justin de haas,valencia,justin-de-haas,36884,3120,,De Haas
+18021,alvaro padilla,elche,alvaro-padilla,,,14718,
+18027,igor galdin,levante,,,,,
+18028,marc santos,levante,marc-santos,,,14702,
+18029,alberto calatrava,levante,,,3168,,Alberto Calatrava
+18030,bright ede,deportivo,bright-ede,497393,,14707,
+18039,cheikh thiam,villarreal,,,,,
+18048,marco roman,rayo,,,,,
+18214,jorge castillo,atletico,,,,,
+18218,andres vallecillo,racing,,,,,
+18221,jorge castellanos,racing,,,,,
+18224,miguel angel santaella,malaga,,,,,
+18225,juani,malaga,juani,,,,
+18241,manel usedo,levante,,,3166,,Manel Usedo
+18250,ibrahima danfakha,getafe,,,,,
+1826,jan oblak,atletico,jan-oblak,29,,2261,
+18282,yassir zabiri,racing,yassir-zabiri,,,14459,
+18309,umaru konare,elche,umaru-konare,,,14717,
+18314,robbie ure,sevilla,robbie-ure,,,14683,
+18378,joseph otu,malaga,,,,,
+1859,josan ferrandez,elche,josan,,,8893,
+1881,unai lopez,rayo,unai-lopez,47285,2384,4091,Unai Lopez
+1882,joao cancelo,barcelona,joao-cancelo,,,2379,
+189,jonny castro,alaves,jonny-castro,,2552,2280,Jonny Otto
+1919,david soria,getafe,david-soria,47247,184,2415,David Soria
+1927,pere milla,espanyol,pere-milla,47398,2400,4175,Pere Milla
+1928,lucas torro,osasuna,lucas-torro,1825,,7050,
+1931,marcos llorente,atletico,marcos-llorente,753,,2518,
+1934,iñaki williams,athletic,inaki-williams,47294,,2399,
+1945,borja iglesias,celta,borja-iglesias,,,2543,
+1972,yeray alvarez,athletic,yeray-alvarez,,,5062,
+1975,alex remiro,real sociedad,alex-remiro,47269,,2555,
+1980,jose angel jurado,deportivo,jose-angel-jurado,,,,
+1981,javi muñoz,getafe,javi-munoz,,,4168,
+1989,borja mayoral,getafe,borja-mayoral,,,2252,
+2153,hector bellerin,betis,hector-bellerin,,,492,
+2242,gonçalo guedes,real sociedad,goncalo-guedes,925,,5682,
+2288,dani olmo,barcelona,dani-olmo,,,8292,
+2417,andreas christensen,barcelona,andreas-christensen,,,200,
+2534,wojciech szczesny,barcelona,wojciech-szczesny,,2783,1244,Szczesny
+2536,antonio rudiger,real madrid,antonio-rudiger,,,1822,
+2632,pablo fornals,betis,pablo-fornals,1697,3099,2335,Fornals
+2663,pablo maffeo,valencia,pablo-maffeo,,,,
+2675,mikel oyarzabal,real sociedad,mikel-oyarzabal,,,2234,
+2715,pepelu,valencia,pepelu,47463,2464,2551,Pepelu
+2727,ezequiel ponce,elche,ezequiel-ponce,,,,
+2751,kike garcia,espanyol,kike-garcia,,,5074,
+2759,carles aleña,alaves,carles-alena,143,,5058,
+2771,alex grimaldo,atletico,alex-grimaldo,563,,,
+2799,carlos soler,real sociedad,carlos-soler,930,,2478,
+2802,igor zubeldia,real sociedad,igor-zubeldia,,265,2417,Zubeldia
+2807,alvaro odriozola,real sociedad,alvaro-odriozola,,,2418,
+3106,peter gulacsi,villarreal,peter-gulacsi,,3130,,Gulácsi
+3174,einar galilea,malaga,einar-galilea,14470,,14726,
+3178,kiko femenia,getafe,kiko-femenia,18794,2774,5043,Kiko F.
+3204,alex berenguer,athletic,alex-berenguer,,927,5091,Berenguer
+3206,kike barja,osasuna,kike-barja,,,5140,
+3215,marc roca,betis,marc-roca,47341,2418,5086,Marc Roca
+322,marc bartra,betis,marc-bartra,1561,121,2453,Bartra
+3226,mariano diaz,alaves,mariano-diaz,,,5110,
+3235,diego rico,osasuna,diego-rico,,,,
+3255,ivan villar,celta,ivan-villar,,,,
+336,isco alarcon,betis,isco-alarcon,,,2255,
+340,juanmi jimenez,getafe,juanmi-jimenez,,,897,
+3414,pierre-emerick aubameyang,deportivo,pierre-emerick-aubameyang,,3108,318,Aubameyang
+3427,thomas lemar,atletico,thomas-lemar,,,,
+3429,kylian mbappe,real madrid,kylian-mbappe,278,,,
+3431,bernardo silva,real madrid,bernardo-silva,636,,,
+3605,angeliño,deportivo,angelino,,3142,,Angeliño
+3607,mouctar diakhaby,valencia,mouctar-diakhaby,,,5666,
+3612,alvaro fernandez,deportivo,alvaro-fernandez,,2975,,A. Ferllo
+3623,pedro diaz,rayo,pedro-diaz,46887,2385,12863,Pedro Díaz
+3671,asier villalibre,racing,asier-villalibre,,3022,5173,Villalibre
+3686,alvaro valles,betis,alvaro-valles,46990,,11740,
+3693,unai simon,athletic,unai-simon,47270,,5185,
+3717,giovani lo celso,betis,giovani-lo-celso,,,5681,
+3732,daniel raba,valencia,daniel-raba,,,5199,
+3736,jon guridi,sevilla,jon-guridi,104821,,5179,
+3738,edu exposito,espanyol,edu-exposito,46799,,5081,
+3751,enes unal,getafe,enes-unal,47499,,6219,
+3758,federico valverde,real madrid,federico-valverde,,,6241,
+3759,marko dmitrovic,espanyol,marko-dmitrovic,,2507,6224,Dmitrovic
+3785,unai nuñez,espanyol,unai-nunez,47277,,6149,
+3799,andoni gorosabel,athletic,andoni-gorosabel,,,6325,
+3802,ander guevara,alaves,ander-guevara,,,6126,
+3807,javi puado,espanyol,javi-puado,,2516,6933,Puado
+3836,manu hernando,racing,manu-hernando,165713,,14692,
+3879,pol lozano,espanyol,pol-lozano,,,7916,
+3881,dakonam djene,getafe,dakonam-djene,,,6151,
+392,ximo navarro,deportivo,ximo-navarro,47360,,4052,
+404,pedro bigas,elche,pedro-bigas,,2294,2353,R.P. Bigas
+4208,marcao,sevilla,marcao,,,10999,
+4288,raphinha,barcelona,raphinha,1496,2522,8026,Raphinha
+4397,marcos alonso,celta,marcos-alonso,2278,3123,1621,Marcos Alonso
+44,iñigo ruiz de galarreta,athletic,inigo-ruiz-de-galarreta,,1070,9755,De Galarreta
+4434,ademola lookman,atletico,ademola-lookman,,,5556,
+4480,trent alexander-arnold,real madrid,trent-alexander-arnold,,2531,1791,Trent
+4511,ayoze perez,villarreal,ayoze-perez,18906,2504,770,Ayoze
+4620,junior firpo,betis,junior-firpo,,,6485,
+4705,juan foyth,villarreal,juan-foyth,166,2470,6306,Foyth
+4884,ibrahima konate,real madrid,ibrahima-konate,,,,
+4976,jeremy toljan,levante,jeremy-toljan,,,257,
+5013,marc cucurella,real madrid,marc-cucurella,,,,
+5019,hugo duro,valencia,hugo-duro,47264,1191,6637,Hugo Duro
+5022,bambo diaby,elche,bambo-diaby,,,13843,
+5032,toni martinez,alaves,antonio-martinez,47181,,,
+5035,brahim diaz,real madrid,brahim-diaz,744,2431,6421,Brahim
+5051,aitor ruibal,betis,aitor-ruibal,,,6427,
+5080,cristian rivero,valencia,cristian-rivero,,,,
+5083,abdel abqar,getafe,abdel-abqar,46813,2776,,A. Abqar
+5124,lucas boye,alaves,lucas-boye,608,2768,1189,Lucas Boyé
+5134,alexander sorloth,atletico,alexander-sorloth,,,,
+5194,grady diangana,elche,grady-diangana,,,6651,
+5220,miguel angel rubio,espanyol,miguel-ngel-rubio,,,6740,
+5227,gonzalo villar,elche,gonzalo-villar,46982,,6750,
+5245,dani vivian,athletic,dani-vivian,,2314,6766,Vivian
+5313,matias vecino,celta,matias-vecino,,2945,1423,Vecino
+5526,andriy lunin,real madrid,andriy-lunin,,2423,7194,Lunin
+5546,cucho hernandez,betis,cucho-hernandez,47582,,,
+5549,santi comesaña,villarreal,santi-comesana,47541,1031,,Comesaña
+5553,fernando calero,malaga,fernando-calero,47478,,,
+5565,vinicius junior,real madrid,vinicius-junior,,,7008,
+5587,adria pedrosa,sevilla,adria-pedrosa,,,,
+5671,juan berrocal,getafe,juan-berrocal,,,,
+5705,luiz felipe,rayo,luiz-felipe,,,6177,
+582,leandro cabrera,espanyol,leandro-cabrera,,3068,6168,Cabrera
+5859,gorka guruzeta,athletic,gorka-guruzeta,,1484,7020,Guruzeta
+59,thibaut courtois,real madrid,thibaut-courtois,,,680,
+5942,juan musso,atletico,juan-musso,,2321,7095,J. Musso
+5978,ionut radu,celta,andrei-radu,30765,2713,1830,Ionut Radu
+5995,david hancko,atletico,david-hancko,,,7086,
+6002,robin le normand,atletico,robin-le-normand,47301,255,7276,Le Normand
+6050,joaquin muñoz,malaga,joaquin-munoz,60,3034,7258,Joaquín
+6055,denzel dumfries,real madrid,denzel-dumfries,,,,
+6062,eder militao,real madrid,der-milito,,2426,7829,E. Militão
+6158,ferland mendy,real madrid,ferland-mendy,,,6233,
+6174,arnaut danjuma,valencia,arnaut-danjuma,83,,,
+6180,sergio gomez,real sociedad,sergio-gomez,23,,6656,
+6210,frenkie de jong,barcelona,frenkie-de-jong,,,7781,
+6235,odysseas vlachodimos,sevilla,odysseas-vlachodimos,,,,
+63,koke resurreccion,atletico,koke-resurreccion,,,2269,
+6310,cristian romero,atletico,cristian-romero,,,,
+6337,kang-in lee,atletico,lee-kang-in,927,,7313,
+6346,adrian de la fuente,levante,adrian-de-la-fuente,,,10319,
+6363,ander barrenetxea,real sociedad,ander-barrenetxea,,,7308,
+6392,fran garcia,betis,fran-garcia,736,,,
+6393,alvaro fidalgo,betis,lvaro-fidalgo,,,14440,
+6394,aihen muñoz,real sociedad,aihen-munoz,,,7306,
+6442,iñigo vicente,racing,inigo-vicente,47293,3002,8921,Iñigo Vicente
+6446,yangel herrera,real sociedad,yangel-herrera,2449,,7350,
+6450,rodrigo riquelme,betis,rodrigo-riquelme,,,8002,
+6487,javi galan,celta,javi-galan,,2329,,Javi Galán
+6493,alejandro catena,osasuna,alejandro-catena,,,7604,
+6560,andrei ratiu,rayo,andrei-florin,1703,,7515,
+6562,sergio camello,rayo,sergio-camello,52,,7528,
+6563,ivan martin,racing,ivan-martin,,,,
+660,ruben garcia,osasuna,ruben-garcia,46658,652,2183,Rubén García
+6605,manu sanchez,levante,manu-sanchez,64309,,,
+6606,carles perez,celta,carles-perez,,,,
+6611,sergio herrera,osasuna,sergio-herrera,46646,,7859,
+663,jose gaya,valencia,jose-gaya,918,302,2505,Gayá
+6631,rodrygo goes,real madrid,rodrygo-goes,,,8015,
+6633,jorge de frutos,rayo,jorge-de-frutos,128582,,8107,
+6635,ante budimir,osasuna,ante-budimir,46746,,1235,
+6665,luis rioja,valencia,luis-rioja,,,7870,
+6674,jules kounde,barcelona,jules-kounde,,,6433,
+6814,eneko jauregi,malaga,eneko-jauregi,,,14733,
+6853,randy nteka,rayo,randy-nteka,,,9813,
+6882,tete morente,elche,tete-morente,,2941,8895,T. Morente
+6885,aleix febas,celta,aleix-febas,,,,
+6889,oscar valentin,rayo,scar-valentin,47109,,9811,
+6890,andres martin,racing,andres-martin,47209,3073,9814,Andrés Martín
+6957,isi palazon,rayo,isi-palazon,131546,2382,9812,Isi
+697,aymeric laporte,athletic,aymeric-laporte,,,2498,
+6973,alfonso herrero,malaga,alfonso-herrero,46843,3040,14724,A. Herrero
+698,german parreño,deportivo,german-parreno,,,,
+7006,oihan sancet,athletic,oihan-sancet,128398,,7779,
+7027,raul garcia,osasuna,raul-garcia-1,,,8042,
+707,diego javier llorente,betis,diego-javier-llorente,,2415,2163,Llorente
+7081,fernando niño,elche,fernando-nino,,3147,8271,Fer Niño
+7082,jorge herrando,osasuna,jorge-herrando,,,10858,
+7091,takefusa kubo,real sociedad,takefusa-kubo,,,8001,
+7100,marash kumbulla,rayo,marash-kumbulla,,,,
+7199,sergio carreira,celta,sergio-carreira,157988,,8122,
+7201,iker losada,betis,iker-losada,,,,
+7203,aimar oroz,osasuna,aimar-oroz,67939,2338,8424,Aimar
+7204,jon moncayola,osasuna,jon-moncayola,,637,7857,Moncayola
+7209,nicolas pepe,villarreal,nicolas-pepe,3246,3087,5656,Pepe
+7238,juanpe jimenez,malaga,juanpe-jimenez,,,,
+7249,lucien agoume,sevilla,lucien-agoume,21004,2453,8165,Agoumé
+7251,ivan balliu,rayo,ivan-balliu,,,5672,
+7257,pedri gonzalez,barcelona,pedri-gonzalez,,3100,8935,Pedri
+7279,joan garcia,barcelona,joan-garcia,182718,2634,9773,Joan García
+7293,robert navarro,athletic,robert-navarro,84086,,,
+7307,pathe ciss,rayo,pathe-ciss,41552,2383,9815,Pathé I. Ciss
+7309,riki rodriguez,deportivo,riki-rodriguez,,,,
+735,yuri berchiche,athletic,yuri-berchiche,,74,2229,Yuri
+7542,eric garcia,barcelona,eric-garcia,619,,8045,
+7554,diego conde,betis,diego-conde,,,,
+7570,dani cardenas,rayo,dani-cardenas,,,,
+7629,ivan romero,levante,ivan-romero,192032,,9275,
+7638,jesus areso,athletic,jesus-areso,182181,,9768,
+7644,victor garcia,levante,victor-garcia-1,46790,,8500,
+7645,alex baena,atletico,lex-baena,182219,2534,8417,Álex Baena
+7658,german valera,elche,german-valera,161963,,8230,
+7676,guido rodriguez,valencia,guido-rodriguez,2476,,8267,
+7686,julen lobete,malaga,julen-lobete,,,,
+7703,ramon enriquez,malaga,ramon-enriquez,,,14734,
+7725,jon pacheco,real sociedad,jon-pacheco,,,,
+7737,unai vencedor,athletic,unai-vencedor,,,,
+775,jose maria gimenez,atletico,jose-maria-gimenez,,,,
+7842,ferran jutgla,celta,ferran-jutgla,,2603,8549,Ferran Jutglà
+7870,raul moro,osasuna,raul-moro,264470,2923,8584,Raúl Moro
+7902,hugo novoa,alaves,hugo-novoa,,,,
+7916,aitor paredes,athletic,aitor-paredes,183849,2315,8948,Paredes
+7917,beñat prados,athletic,benat-prados,,1787,9505,Prados
+7920,nico serrano,athletic,nico-serrano,,,,
+7995,francho serrano,getafe,francho-serrano,162249,,,
+8080,miguel rodriguez,alaves,miguel-rodriguez-1,,,,
+8082,ilaix moriba,celta,ilaix-moriba,,2607,9243,Ilaix Moriba
+8088,oriol rey,levante,oriol-rey,,,8764,
+8228,urko gonzalez de zarate,espanyol,urko-gonzalez-de-zarate,,,8861,
+8250,jose salinas,malaga,jose-salinas,184407,,8902,
+8273,victor chust,elche,victor-chust,162058,,8972,
+829,aitor fernandez,osasuna,aitor-fernandez,,,4193,
+8294,umar sadiq,valencia,umar-sadiq,,,,
+8337,georgiy tsitaishvili,rayo,georgiy-tsitaishvili,,,,
+8386,jude bellingham,real madrid,jude-bellingham,,,8824,
+8392,luka sucic,real sociedad,luka-sucic,7332,,12862,
+8405,antony,betis,antony,9971,,11094,
+841,moi gomez,osasuna,moi-gomez,,,2198,
+8413,pape gueye,villarreal,pape-gueye,20696,,,
+843,gerard moreno,villarreal,gerard-moreno,1707,,2120,
+8479,eduardo camavinga,real madrid,eduardo-camavinga,,1300,7359,Camavinga
+8496,martin satriano,getafe,martin-satriano,,,9001,
+863,florian lejeune,rayo,florian-lejeune,,,5073,
+8634,rafael romero,sevilla,,,,,
+8646,carlos alvarez,levante,carlos-lvarez,,,11264,
+8651,beñat turrientes,real sociedad,benat-turrientes,183744,1215,9465,Turrientes
+867,alvaro garcia,rayo,alvaro-garcia,47543,1029,7071,Álvaro García
+8679,unai marrero,real sociedad,unai-marrero,,,9198,
+8680,john chetauya,elche,john-nwankwo,,,,
+8684,jesus vazquez,valencia,jesus-vazquez-1,162175,,9217,
+8686,juan iglesias,sevilla,juan-iglesias,119742,,9218,
+8693,nico williams,athletic,nico-williams,183799,,9211,
+8695,boyomo,osasuna,boyomo,279822,,,
+8703,alfonso gonzalez,sevilla,alfonso-gonzalez,,,,
+8712,mario soriano,deportivo,mario-soriano,161965,2995,9247,Mario Soriano
+8737,antonio blanco,alaves,antonio-blanco,162686,3069,9280,Blanco
+8780,david larrubia,malaga,david-larrubia,190253,,14730,
+8816,david affengruber,elche,david-affengruber,,,13837,
+8944,ramon terrats,getafe,terrats,187987,,10947,
+8961,jon ander olasagasti,levante,jon-ander-olasagasti,,,9466,
+8972,pablo ramon,racing,pablo-ramon,46734,,9477,
+8986,eneko ortiz,villarreal,,,,,
+8988,hugo sotelo,levante,hugo-sotelo,313651,,,
+899,johan mojica,getafe,johan-mojica,,,,
+9011,arsen zakharyan,real sociedad,arsen-zakharyan,,,8760,
+9012,altay bayindir,celta,altay-bayindir,,,,
+9125,ruben vargas,sevilla,ruben-vargas,48471,,7810,
+9157,roger brugue,levante,roger-brugue,,,13767,
+9161,matias dituro,elche,matias-dituro,11346,2613,9793,M. Dituro
+9201,sergi canos,valencia,sergi-canos,,,,
+9213,julen agirrezabala,racing,julen-agirrezabala,,,9824,
+9234,jose manuel copete,valencia,jose-manuel-copete,,,10982,
+9273,pablo gavi,barcelona,pablo-gavi,,1221,9804,Gavi
+9276,giuliano simeone,atletico,giuliano-simeone,,1210,9796,Giuliano
+9304,diego lopez,valencia,diego-lopez-1,,,9694,
+9314,javi serrano,atletico,,,,,
+9316,alejandro balde,barcelona,alejandro-balde,,,,
+9317,jose angel carmona,sevilla,jose-ngel-carmona,,,9809,
+9321,haitam abaida,malaga,haitam-abaida,,,,
+9405,leo roman,deportivo,leo-roman,179139,3109,9839,Leo Román
+9423,jon karrikaburu,real sociedad,jon-karrikaburu,,2619,9922,Karrikaburu
+943,dimitri foulquier,valencia,dimitri-foulquier,,,2509,
+9500,fabio cardoso,sevilla,fabio-cardoso,,2790,14012,Cardoso
+9531,valentin rosier,osasuna,valentin-rosier,,,5615,
+9612,carl starfelt,celta,carl-starfelt,47988,2390,7655,Starfelt
+9638,coke carrillo,celta,,,,,
+9644,jesus owono,alaves,jesus-owono,,,,
+9669,aurelien tchouameni,real madrid,aurelien-tchouameni,,,6560,
+9695,ruben sanchez,espanyol,ruben-sanchez-1,,,10067,
+9740,hugo alvarez,celta,hugo-lvarez-,,,10078,
+9744,hugo gonzalez,celta,hugo-gonzalez,161875,,10082,
+9750,abde ezzalzouli,betis,abde-ezzalzouli,,3089,,Ez Abde
+9755,carlos martin,atletico,carlos-martin,324750,,10101,
+9759,alejandro iturbe,elche,alejandro-iturbe,,,,
+9762,cesar tarrega,valencia,cesar-tarrega,333672,1991,10107,Tárrega
+9763,ilias akhomach,villarreal,ilias-akhomach,,,10121,
+9772,luismi cruz,deportivo,luismi-cruz,,,10163,
+9796,ruben iranzo,valencia,ruben-iranzo,,,10155,
+9823,marc pubill,atletico,marc-pubill,295793,2562,10189,Marc Pubill
+9847,charlie patino,deportivo,charlie-patino,284466,,,
+9850,jofre carreras,espanyol,jofre-carreras,,,10209,
+9854,arnau comas,deportivo,arnau-comas,,,,
+9863,tomas mendes,alaves,,,,,
+989,stole dimitrievski,valencia,stole-dimitrievski,,,2619,
+9897,adrian rodriguez,alaves,adrian-rodriguez,,,,
+9909,nahuel tenaglia,alaves,nahuel-tenaglia,6233,1337,10364,Tenaglia
+9927,javi guerra,valencia,javi-guerra-1,315699,,,
+9930,juan carlos arana,racing,juan-carlos-arana,,,,
+9931,kike salas,sevilla,kike-salas,297311,2479,10334,Kike Salas
+9987,roberto fernandez,espanyol,roberto-fernandez-1,,,13350,
+9989,sergi cardona,villarreal,sergi-cardona,,,11744,
+9990,alberto moleiro,villarreal,alberto-moleiro,182519,,12160,
+e100,iñigo perez,villarreal,,,1849,,Iñigo Perez
+e101,claudio giraldez,celta,,,,,
+e103,hansi flick,barcelona,,,,,
+e105,manolo gonzalez,espanyol,,,,,
+e109,carlos corberan,valencia,,,,,
+e11,quique sanchez,alaves,,,,,
+e119,luis castro,levante,,,,,
+e120,pellegrino matarazzo,real sociedad,,,,,
+e123,luis miguel ramis,osasuna,,,,,
+e168,jose alberto lopez,racing,,,3004,,José Alberto
+e169,edin terzic,athletic,,,3094,,Edin Terzic
+e170,antonio hidalgo,deportivo,,,2986,,Antonio Hidalgo
+e171,martin anselmi,elche,,,,,
+e172,juan funes,malaga,,,,,
+e173,beñat san jose,rayo,,,,,
+e174,jose mourinho,real madrid,,,,,
+e35,pepe bordalas,getafe,,,,,
+e5,diego simeone,atletico,,,2527,,Simeone
+e61,luis garcia,sevilla,,,,,
+e72,manuel pellegrini,betis,,,,,

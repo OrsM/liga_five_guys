@@ -49,7 +49,7 @@ from ffcore.text import norm
 __all__ = ["Player", "Club", "Crosswalk", "PLAYER_COLS", "CLUB_COLS"]
 
 PLAYER_COLS = ["player_id", "name", "club_id", "ff_slug",
-               "af_slug", "app_id", "app_names"]
+               "af_slug", "app_id", "understat_id", "app_names"]
 CLUB_FIELDS = ["club_id", "market", "ff_slug", "elo", "market_id", "af_id",
                "aliases"]
 CLUB_COLS = CLUB_FIELDS
@@ -72,13 +72,15 @@ class Player:
     ff_slug: str = ""
     af_slug: str = ""
     app_id: str = ""
+    understat_id: str = ""
     app_names: set = field(default_factory=set)
 
     def row(self) -> dict:
         return {"player_id": self.player_id, "name": self.name,
                 "club_id": self.club_id,
                 "ff_slug": self.ff_slug, "af_slug": self.af_slug,
-                "app_id": self.app_id, "app_names": _join(self.app_names)}
+                "app_id": self.app_id, "understat_id": self.understat_id,
+                "app_names": _join(self.app_names)}
 
     def absorb(self, other: "Player") -> None:
         """Take anything `other` knows that this row does not.
@@ -88,7 +90,7 @@ class Player:
         between a crosswalk that improves and one that flickers.
         """
         for f in ("name", "club_id", "ff_slug", "af_slug",
-                  "app_id"):
+                  "app_id", "understat_id"):
             if not getattr(self, f) and getattr(other, f):
                 setattr(self, f, getattr(other, f))
         self.app_names |= other.app_names
@@ -127,6 +129,7 @@ class Crosswalk:
 
     def _reindex(self) -> None:
         self._by_ff, self._by_af, self._by_app = {}, {}, {}
+        self._by_understat = {}
         self._by_app_name = {}
         # AN IDENTIFIER TWO PLAYERS CLAIM IDENTIFIES NEITHER. These indexes
         # were plain assignment, so the second writer won and the answer
@@ -139,7 +142,8 @@ class Crosswalk:
             for idx, key, label in (
                     (self._by_ff, p.ff_slug, "ff_slug"),
                     (self._by_af, p.af_slug, "af_slug"),
-                    (self._by_app, p.app_id, "app_id")):
+                    (self._by_app, p.app_id, "app_id"),
+                    (self._by_understat, p.understat_id, "understat_id")):
                 if not key:
                     continue
                 if key in idx and idx[key] != p.player_id:
@@ -155,7 +159,7 @@ class Crosswalk:
                 self._by_app_name[k] = p.player_id
         for label, keys in self._clash.items():
             idx = {"ff_slug": self._by_ff, "af_slug": self._by_af,
-                   "app_id": self._by_app,
+                   "app_id": self._by_app, "understat_id": self._by_understat,
                    "app_name": self._by_app_name}[label]
             for k in keys:
                 idx.pop(k, None)
@@ -178,7 +182,7 @@ class Crosswalk:
         return {k: sorted(v) for k, v in sorted(self._clash.items()) if v}
 
     def player(self, *, name=None, ff_slug=None, af_slug=None, app_id=None,
-               app_name=None) -> str | None:
+               understat_id=None, app_name=None) -> str | None:
         """The repo's key for a player, from whatever key you happen to hold.
 
         Exact lookups only. Nothing here guesses: the guessing happened once,
@@ -187,7 +191,8 @@ class Crosswalk:
         gap, and a gap that stays visible is one that gets fixed.
         """
         for key, idx in ((ff_slug, self._by_ff), (af_slug, self._by_af),
-                         (app_id, self._by_app)):
+                         (app_id, self._by_app),
+                         (understat_id, self._by_understat)):
             if key and key in idx:
                 return idx[key]
         if name:
@@ -304,6 +309,8 @@ class Crosswalk:
                 "ff": sum(1 for p in self.players.values() if p.ff_slug) / n,
                 "af": sum(1 for p in self.players.values() if p.af_slug) / n,
                 "app": sum(1 for p in self.players.values() if p.app_id) / n,
+                "understat": sum(1 for p in self.players.values()
+                                 if p.understat_id) / n,
                 "clubs": len(self.clubs)}
 
     # -- persistence -------------------------------------------------------
@@ -317,6 +324,7 @@ class Crosswalk:
                     pid, r.get("name", ""), r.get("club_id", ""),
                     r.get("ff_slug", ""),
                     r.get("af_slug", ""), r.get("app_id", ""),
+                    r.get("understat_id", ""),
                     _split(r.get("app_names")))
         for r in _rows(clubs_path):
             cid = r.get("club_id")
@@ -356,7 +364,7 @@ class Crosswalk:
             # splitting `moussa diarra`, the old `moussa diarra@malaga` row
             # stayed behind still holding his ff_slug, so one player held
             # one identifier under two keys.
-            for f in ("app_id", "ff_slug", "af_slug"):
+            for f in ("app_id", "ff_slug", "af_slug", "understat_id"):
                 val = getattr(p, f)
                 if not val:
                     continue
@@ -410,7 +418,8 @@ def _selftest() -> None:
     xw = Crosswalk({
         "alvaro fernandez": Player(
             "alvaro fernandez", "Alvaro Fernandez", "espanyol",
-            "alvaro-fernandez", "af-alvaro", "2101", {"A. Ferllo"}),
+            "alvaro-fernandez", "af-alvaro", "2101",
+            app_names={"A. Ferllo"}),
         "jonny castro": Player("jonny castro", "Jonny Castro", "alaves",
                                ff_slug="jonny-castro",
                                app_names={"Jonny Otto"}),
@@ -607,7 +616,32 @@ def _selftest() -> None:
     assert slugged.resolve("Alvaro Fernandez",
                            hint_ff_slug="no-such-slug") == "alvaro fernandez"
 
-    print("ffcore.crosswalk self-test OK (39 cases)")
+    # -- understat_id: a fourth identity space, joined and displaced the
+    # same way as the other three -------------------------------------------
+    us = Crosswalk({"alvaro fernandez": Player(
+        "alvaro fernandez", "Alvaro Fernandez", understat_id="555")})
+    assert us.player(understat_id="555") == "alvaro fernandez"
+    assert "understat" in us.coverage()
+    us_clash = Crosswalk({
+        "carlos romero": Player("carlos romero", understat_id="9"),
+        "isaac romero": Player("isaac romero", understat_id="9")})
+    assert us_clash.player(understat_id="9") is None
+    assert us_clash.clashes() == {"understat_id": ["9"]}
+    us_stale = Crosswalk({"isaac romero": Player("isaac romero",
+                                                  understat_id="9"),
+                          "carlos romero": Player("carlos romero")})
+    us_stale.merge(Crosswalk({"carlos romero": Player(
+        "carlos romero", understat_id="9")}))
+    assert us_stale.players["isaac romero"].understat_id == ""
+    assert us_stale.player(understat_id="9") == "carlos romero"
+    # A round trip through the files carries it too.
+    with tempfile.TemporaryDirectory() as d:
+        pp, cc = os.path.join(d, "p2.csv"), os.path.join(d, "c2.csv")
+        us.write(pp, cc)
+        again2 = Crosswalk.read(pp, cc)
+        assert again2.player(understat_id="555") == "alvaro fernandez"
+
+    print("ffcore.crosswalk self-test OK (44 cases)")
 
 
 if __name__ == "__main__":

@@ -241,6 +241,65 @@ def build_players(market, lineups, starters, api_rows, lg, clubs) -> dict:
     return out
 
 
+def build_understat_ids(rows, players: dict, clubs: dict) -> int:
+    """Join Understat's own numeric id onto the crosswalk by name + team.
+
+    THE FIRST REAL JOIN for a fourth identity space, same bootstrap every
+    other feed already went through: understat_id shares no namespace with
+    ff_slug/af_slug/app_id, so name+team is the only way in, same as the
+    app's id was before api_key() learned it. Scoped to one club at a time
+    — matching a bare name across the whole league would confuse every
+    Fernandez in LaLiga — then ffcore.text.resolve() narrows within that
+    club's roster the same three-pass way a human-typed name gets resolved
+    elsewhere in this repo, so this join does not grow an eighth resolver.
+
+    Only ever WRITES a blank — `not hit.understat_id` — so a player already
+    joined on an earlier sweep is never re-guessed, and a name collision
+    within one club (two team-mates who share a surname) resolves to
+    ambiguous and is left for a future, more specific sweep rather than
+    picked at random.
+
+    Returns the count newly matched, for the run's own coverage summary.
+    """
+    from ffcore.fixture import match_team
+    from ffcore.text import resolve as text_resolve
+
+    market_teams = sorted({c.market for c in clubs.values() if c.market})
+    by_club: dict[str, list] = {}
+    for p in players.values():
+        by_club.setdefault(p.club_id, []).append(p)
+
+    # ONE ROW PER UNDERSTAT PLAYER, preferring the live season's spelling
+    # and club over last season's — a player who transferred over the
+    # summer is on his NEW team by the time this runs, and matching him
+    # against his old team would silently miss.
+    best: dict[str, dict] = {}
+    for r in rows:
+        uid = (r.get("understat_id") or "").strip()
+        if not uid:
+            continue
+        prev = best.get(uid)
+        if prev is None or (r.get("season") or "") >= (prev.get("season") or ""):
+            best[uid] = r
+
+    matched = 0
+    for uid, r in best.items():
+        team = match_team(r.get("team_title") or "", market_teams)
+        if not team:
+            continue
+        candidates = by_club.get(norm(team), [])
+        if not candidates:
+            continue
+        # text.resolve() wants dict-like rows; wrap rather than duplicate
+        # its three-pass narrowing here as an eighth resolver.
+        wrapped = [{"name": p.name, "_p": p} for p in candidates]
+        hit, _cands = text_resolve(r.get("player_name") or "", wrapped)
+        if hit is not None and not hit["_p"].understat_id:
+            hit["_p"].understat_id = uid
+            matched += 1
+    return matched
+
+
 def main() -> None:
     from ffcore.league import League
 
@@ -272,6 +331,8 @@ def main() -> None:
     clubs = build_clubs(market, lineups, elo_rows,
                         latest_only(read_csv(TIDY / "fixtures.csv")))
     players = build_players(market, lineups, starters, api_rows, lg, clubs)
+    understat_matched = build_understat_ids(
+        read_csv(TIDY / "understat_players.csv"), players, clubs)
 
     fresh = Crosswalk(players, clubs)
     kept = Crosswalk.read(TIDY / PLAYERS, TIDY / CLUBS)
@@ -327,9 +388,10 @@ def main() -> None:
         print("  dropped %d key(s) that two players answered to: %s"
               % (len(dropped), ", ".join(sorted(dropped))))
     print("%d players, %d clubs — %.0f%% carry a probable-XI slug, "
-          "%.0f%% the second source's, %.0f%% an app id"
+          "%.0f%% the second source's, %.0f%% an app id, %.0f%% an "
+          "understat id (%d newly matched this run)"
           % (c["players"], c["clubs"], 100 * c["ff"], 100 * c["af"],
-             100 * c["app"]))
+             100 * c["app"], 100 * c["understat"], understat_matched))
     # A SHARED NAME IS NO LONGER A PROBLEM — the site issues an id per player
     # and this table keys on it, so the two Álvaro Garcías are two rows and
     # always were two players. Printed as a fact rather than a warning.
@@ -401,7 +463,30 @@ def _selftest() -> None:
     # An unlisted feed leaves a gap rather than a wrong answer.
     assert xw.player(app_id="9999") is None
 
-    print("crosswalk self-test OK (12 cases)")
+    # -- build_understat_ids: name+team, the same bootstrap every other feed
+    # went through, and the same refuse-rather-than-guess on ambiguity -------
+    understat = [
+        {"understat_id": "701", "player_name": "Alvaro Fernandez",
+         "team_title": "Espanyol", "season": "2025"},
+        # A row for a club this market does not have is skipped, not guessed
+        # onto the nearest name.
+        {"understat_id": "999", "player_name": "Nobody Real",
+         "team_title": "Nowhere FC", "season": "2025"},
+    ]
+    matched = build_understat_ids(understat, players, clubs)
+    assert matched == 1, matched
+    assert players["alvaro fernandez"].understat_id == "701"
+    assert xw.player(understat_id="701") is None  # xw was built before the join
+    assert Crosswalk(players, clubs).player(understat_id="701") \
+        == "alvaro fernandez"
+    # A player already joined is never re-guessed on a later sweep.
+    matched2 = build_understat_ids(
+        [{"understat_id": "999999", "player_name": "Alvaro Fernandez",
+          "team_title": "Espanyol", "season": "2025"}], players, clubs)
+    assert matched2 == 0
+    assert players["alvaro fernandez"].understat_id == "701"
+
+    print("crosswalk self-test OK (15 cases)")
 
 
 if __name__ == "__main__":
