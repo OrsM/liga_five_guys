@@ -3,11 +3,11 @@ scout — the tidy facts about your squad, no model in between.
 
 Nothing here shrinks a rate, blends a prior, or simulates a season. Every
 column is a real number read straight off a tidy CSV this repo already
-parses: last season's real points/match, this season's real points/match so
-far, market price, probable-XI%, fitness. `ffcore.score.Scorer` exists to
-turn these into ONE blended estimate for ranking transfers; this exists for
-the opposite job — looking at the raw ingredients yourself before trusting
-anyone's blend of them, mine included.
+parses: last season's real points/match, this season jornada by jornada
+(not lumped into one average), market price, probable-XI%, fitness.
+`ffcore.score.Scorer` exists to turn these into ONE blended estimate for
+ranking transfers; this exists for the opposite job — looking at the raw
+ingredients yourself before trusting anyone's blend of them, mine included.
 
     python src/scout.py            your current squad, sorted by position
 """
@@ -47,21 +47,23 @@ def _last_season() -> dict[str, tuple[float, float]]:
     return out
 
 
-def _this_season() -> dict[str, tuple[float, float]]:
-    """{ff_id: (points, games)}, summed straight off the real per-jornada
-    log — no recency weighting, no decay grid, just added up."""
+def _this_season() -> dict[str, dict[int, float]]:
+    """{ff_id: {jornada: points}}, read straight off the real per-jornada
+    log — one row per jornada, not lumped into a season average. Form
+    this early is a trend across a handful of real matches, not a mean;
+    an average of one jornada IS that jornada, so the shape only starts
+    to matter once there are several to look at side by side."""
     path = SEASON / "live" / "perjornada_2026-27.csv"
     if not path.exists():
         return {}
-    out: dict[str, list[float]] = {}
+    out: dict[str, dict[int, float]] = {}
     for r in csv.DictReader(open(path, encoding="utf-8")):
         pid = (r.get("ff_id") or "").strip()
-        if not pid:
+        j = r.get("jornada")
+        if not pid or not j:
             continue
-        acc = out.setdefault(pid, [0.0, 0.0])
-        acc[0] += float(r.get("points_delta") or 0)
-        acc[1] += float(r.get("games_delta") or 0)
-    return {k: (v[0], v[1]) for k, v in out.items()}
+        out.setdefault(pid, {})[int(j)] = float(r.get("points_delta") or 0)
+    return out
 
 
 def table(me: str | None = None) -> list[dict]:
@@ -79,7 +81,7 @@ def table(me: str | None = None) -> list[dict]:
     for key in u.state.squads.get(me, {}):
         p = players.get(key, {})
         lp, lg = last.get(key, (None, None))
-        cp, cg = cur.get(key, (None, None))
+        by_jornada = cur.get(key, {})
         rows.append({
             "name": p.get("name", key),
             "pos": SLOT.get(p.get("pos", ""), "?"),
@@ -90,18 +92,30 @@ def table(me: str | None = None) -> list[dict]:
             "status": p.get("status") or "ok",
             "last_season_avg": (lp / lg) if lg else None,
             "last_season_pj": lg,
-            "this_season_avg": (cp / cg) if cg else None,
-            "this_season_pj": cg,
+            "by_jornada": by_jornada,
         })
     rows.sort(key=lambda r: (POS_ORDER.get(r["pos"], 9),
                              -(r["last_season_avg"] or 0)))
     return rows
 
 
+def _form(by_jornada: dict[int, float], n: int = 5) -> str:
+    """Last `n` real jornadas, most recent first — a trend, not an
+    average. '-' for a jornada with no row at all (did not play), so a
+    blank week is never confused with a zero he actually scored."""
+    if not by_jornada:
+        return "-"
+    latest = max(by_jornada)
+    cells = []
+    for j in range(latest, max(latest - n, 0), -1):
+        cells.append("%g" % by_jornada[j] if j in by_jornada else "-")
+    return " ".join(cells)
+
+
 def render(rows: list[dict]) -> list[str]:
     out = ["| Pos | Player | Team | Price | 1d | XI% | Fit | LastSzn avg/pj "
-           "| ThisSzn avg/pj |",
-          "|---|---|---|--:|--:|--:|---|--:|--:|"]
+           "| Form (newest first) |",
+          "|---|---|---|--:|--:|--:|---|--:|---|"]
     for r in rows:
         out.append(
             "| %s | %s | %s | %s | %s | %s | %s | %s | %s |" % (
@@ -115,8 +129,7 @@ def render(rows: list[dict]) -> list[str]:
                 r["status"],
                 ("%.2f/%d" % (r["last_season_avg"], r["last_season_pj"]))
                 if r["last_season_avg"] is not None else "-",
-                ("%.2f/%d" % (r["this_season_avg"], r["this_season_pj"]))
-                if r["this_season_avg"] is not None else "-",
+                _form(r["by_jornada"]),
             ))
     return out
 
@@ -128,20 +141,26 @@ def main() -> None:
 
 
 def _selftest() -> None:
+    # -- _form(): newest first, a gap is "-" not a missing row -------------
+    assert _form({}) == "-"
+    assert _form({1: 6.0}) == "6"
+    assert _form({1: 6.0, 3: 2.0}, n=3) == "2 - 6"
+    assert _form({1: 1, 2: 2, 3: 3, 4: 4, 5: 5, 6: 6}) == "6 5 4 3 2"
+
     rows = [
         {"name": "A", "pos": "def", "team": "X", "price_eur": 5_000_000,
          "delta_1d_eur": 12_000, "xi_pct": 80, "status": "ok",
          "last_season_avg": 3.5, "last_season_pj": 30,
-         "this_season_avg": 4.0, "this_season_pj": 1},
+         "by_jornada": {1: 4.0}},
         {"name": "B", "pos": "del", "team": "Y", "price_eur": None,
          "delta_1d_eur": None, "xi_pct": None, "status": "doubt",
          "last_season_avg": None, "last_season_pj": None,
-         "this_season_avg": None, "this_season_pj": None},
+         "by_jornada": {}},
     ]
     lines = render(rows)
-    assert any("A" in l and "3.50/30" in l for l in lines), lines
-    assert any("B" in l and "?" in l and "-" in l for l in lines), lines
-    print("scout self-test OK (2 cases)")
+    assert any("A" in l and "3.50/30" in l and "| 4 |" in l for l in lines), lines
+    assert any("B" in l and "?" in l for l in lines), lines
+    print("scout self-test OK (6 cases)")
 
 
 if __name__ == "__main__":
