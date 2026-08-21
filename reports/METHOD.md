@@ -1,4 +1,4 @@
-# Liga Five Guys — how the numbers are made — 2026-08-21 11:52 UTC
+# Liga Five Guys — how the numbers are made — 2026-08-21 12:32 UTC
 
 
 
@@ -7,16 +7,16 @@
 
 | Route | What it offers | Season pts | Beats acting today |
 |---|---|--:|--:|
-| **Act today** | 34 players you can buy now | +153 | — |
-| Wait for the market | a week of new offers | +213 | 100% |
-| Wait for the clauses | 58 players on 24 Aug | +189 | — |
+| **Act today** | 33 players you can buy now | +153 | — |
+| Wait for the market | a week of new offers | +259 | 100% |
+| Wait for the clauses | 56 players on 24 Aug | +189 | — |
 
 | The workings | |
 |---|--:|
-| Unowned players who would improve your eleven | 145 of 588 |
+| Unowned players who would improve your eleven | 146 of 589 |
 | Tenth percentile of a week's waiting | +5.30 |
-| Market model | the market is modelled from 110 offers over 7 cycles, weighted by value^0.45, and only just — value^0.20 fits within 0.0% of it, so read the exponent as roughly this, not exactly this |
-| Locked players who would improve your eleven | 36 |
+| Market model | the market is modelled from 110 offers over 7 cycles, weighted by value^0.45, and only just — value^0.20 fits within 3.6% of it, so read the exponent as roughly this, not exactly this |
+| Locked players who would improve your eleven | 34 |
 | Their clauses open | 24 Aug, in about 3 days |
 
 | Nobody is offering | Would add | Likely wait |
@@ -35,8 +35,9 @@
 | A buyout premium is charged at **0.000 places per million**, the median of every run that has measured it — today's own reading is 0.000 | a clause runs a median 1.52× market value here and the app pays back only the value, so the premium is gone for good. It is charged against the move, but priced off what more money would buy you today — most days, very little |
 | P(start) is today's, held flat over every remaining jornada | nothing here knows who will be injured in March |
 | Rivals never transfer | a steal that guts a squad assumes its manager does not simply buy someone back — flatters the steal |
-| Teammates score independently | two defenders of one club share a clean sheet, so a concentrated squad has more variance than this shows |
+| Teammates score independently, MATCH TO MATCH | two defenders of one club still land on opposite ends of the per-match pool in the same round — only their SEASON-LONG rating (club_rel) is shared, not one week's luck |
 | Cash scores zero | nothing models the market next cycle, so holding money looks worthless and a standalone sale can never look good |
+| p_win's season-long spread rests on one hand-picked constant (DRIFT_FRAC), not a fit | checked two real anchors and they disagree: jornada-1-vs-final club points correlate at r=0.11-0.45 (weak — argues for MORE spread), but season-to-season club points correlate at r=0.71-0.88 (strong — argues for LESS). Neither converts cleanly into a per-player weekly drift. Published models (538's NBA/NHL/MLB) skip this problem entirely: they revert the PRIOR once by a measured fraction and then check the resulting spread against REALISED forecast error, not a guessed future-drift term. This repo's own version of that check is the Forecast vs actual table above — trust it over DRIFT_FRAC once it has enough rows (n=15-20+) to say something |
 | Shape prior | shape from the seed prior (159 observed, 200 needed) |
 | P(start) fit | P(start) fitted on 362 confirmed starts across 12 team sheets: futbolfantasy recalibrated (logit -0.5 +1.8x), blended 40% with analiticafantasy where it has an opinion (a named starter counts 84%). Brier improves 0.009 on line-ups the fit had not seen |
 
@@ -49,23 +50,23 @@
 
 | | Table | What it is used for | Fetched from | Rows | Newest row | Fetching |
 |---|---|---|---|--:|---|---|
-| 🟢 | api_activity | every transfer, which is what the ledger replays — one row per deal, so the newest is the last deal and not the last sweep | LaLiga Fantasy API | 77 | 20 Aug 22:41 | fetched 3 minutes ago |
-| 🟢 | api_leagues | your cash and the league's id | LaLiga Fantasy API | 70 | 21 Aug 11:50 | fetched 3 minutes ago |
-| 🟢 | api_lineup | the eleven you have actually fielded, and the formation the app says you are playing | LaLiga Fantasy API | 517 | 21 Aug 11:50 | fetched 3 minutes ago |
-| 🟢 | api_market | what is on offer, and the bids on it | LaLiga Fantasy API | 2,281 | 21 Aug 11:50 | fetched 3 minutes ago |
-| 🟢 | api_players | names for players nobody owns any more — one row per player, first sighting kept | LaLiga Fantasy API | 64 | 20 Aug 22:41 | fetched 13 hours ago |
-| 🟢 | api_standings | the league table — position, points, squad value, and your balance | LaLiga Fantasy API | 350 | 21 Aug 11:50 | fetched 3 minutes ago |
-| 🟢 | api_stats | what the app scored each player, broken into what he did — one row per player per week per stat, a correction being a later row rather than an overwrite | LaLiga Fantasy API | 1,050 | 20 Aug 22:41 | fetched 3 minutes ago |
-| 🟢 | api_teams | all five squads | LaLiga Fantasy API | 5,041 | 21 Aug 11:50 | fetched 3 minutes ago |
+| 🟢 | api_activity | every transfer, which is what the ledger replays — one row per deal, so the newest is the last deal and not the last sweep | LaLiga Fantasy API | 78 | 21 Aug 12:32 | fetched 1 minute ago |
+| 🟢 | api_leagues | your cash and the league's id | LaLiga Fantasy API | 71 | 21 Aug 12:32 | fetched 1 minute ago |
+| 🟢 | api_lineup | the eleven you have actually fielded, and the formation the app says you are playing | LaLiga Fantasy API | 528 | 21 Aug 12:32 | fetched 1 minute ago |
+| 🟢 | api_market | what is on offer, and the bids on it | LaLiga Fantasy API | 2,314 | 21 Aug 12:32 | fetched 1 minute ago |
+| 🟢 | api_players | names for players nobody owns any more — one row per player, first sighting kept | LaLiga Fantasy API | 64 | 20 Aug 22:41 | fetched 14 hours ago |
+| 🟢 | api_standings | the league table — position, points, squad value, and your balance | LaLiga Fantasy API | 355 | 21 Aug 12:32 | fetched 1 minute ago |
+| 🟢 | api_stats | what the app scored each player, broken into what he did — one row per player per week per stat, a correction being a later row rather than an overwrite | LaLiga Fantasy API | 1,050 | 20 Aug 22:41 | fetched 1 minute ago |
+| 🟢 | api_teams | all five squads | LaLiga Fantasy API | 5,110 | 21 Aug 12:32 | fetched 1 minute ago |
 | ⚪ | clubs | the same, for clubs | src/crosswalk.py | 20 | — | rebuilt every run from the tables above |
-| 🟢 | elo | team strength, which ranks the fixture term | clubelo.com | 1,040 | 21 Aug 11:50 | fetched 7 hours ago |
-| 🟢 | fixtures | who plays whom next, for the fixture term | analiticafantasy.com | 1,131 | 21 Aug 11:50 | fetched 7 hours ago |
-| 🟢 | lineups | probable XI percentages, both sources | analiticafantasy.com, futbolfantasy.com ×40 | 72,133 | 21 Aug 11:50 | fetched 3 minutes ago |
-| 🟢 | market | price, value, position, fitness — every player in the game | futbolfantasy.com | 68,497 | 21 Aug 11:50 | fetched 3 minutes ago |
-| 🟢 | matches | fixtures, kickoffs, results | futbolfantasy.com | 27,740 | 21 Aug 11:50 | fetched 7 hours ago |
+| 🟢 | elo | team strength, which ranks the fixture term | clubelo.com | 1,060 | 21 Aug 12:32 | fetched 7 hours ago |
+| 🟢 | fixtures | who plays whom next, for the fixture term | analiticafantasy.com | 1,144 | 21 Aug 12:32 | fetched 7 hours ago |
+| 🟢 | lineups | probable XI percentages, both sources | analiticafantasy.com, futbolfantasy.com ×40 | 72,840 | 21 Aug 12:32 | fetched 43 minutes ago |
+| 🟢 | market | price, value, position, fitness — every player in the game | futbolfantasy.com | 69,155 | 21 Aug 12:32 | fetched 1 minute ago |
+| 🟢 | matches | fixtures, kickoffs, results | futbolfantasy.com | 28,120 | 21 Aug 12:32 | fetched 7 hours ago |
 | ⚪ | players | the crosswalk: one key per player across all four spellings | src/crosswalk.py | 660 | — | rebuilt every run from the tables above |
-| 🟢 | points | realised points per jornada, the actuals in every table below | futbolfantasy.com | 163 | 21 Aug 05:22 | fetched 3 minutes ago |
-| 🟢 | starters | confirmed elevens, which is what P(start) is graded on | futbolfantasy.com | 17,932 | 21 Aug 11:50 | fetched 29 hours ago |
+| 🟢 | points | realised points per jornada, the actuals in every table below | futbolfantasy.com | 163 | 21 Aug 05:22 | fetched 1 minute ago |
+| 🟢 | starters | confirmed elevens, which is what P(start) is graded on | futbolfantasy.com | 18,206 | 21 Aug 12:32 | fetched 30 hours ago |
 
 ### The model, as configured right now
 
@@ -145,7 +146,7 @@ _What the one table on the board was built from: the eleven it assumes you field
 | Ruben Garcia | med | 14.30M–17.13M | 60%/75% | Albert +3.9, (3 broke) |  |
 | Fernando Niño | del | 13.74M–16.47M | 70%/— | (3 broke) |  |
 | Javi Galan | def | 11.43M–13.70M | 30%/— | Albert +0.3 |  |
-| Javi Rueda | def | 4.49M–5.38M | 60%/— | Albert +3.0, +1 more, (2 broke) |  |
+| Javi Rueda | def | 4.49M–5.38M | 60%/— | Albert +3.0, +2 more, (1 broke) |  |
 | Kiko Femenia | def | 3.48M–4.17M | 0%/— | none |  |
 | Antonio Hidalgo | ent | 1.42M–1.70M | !15%/— | none |  |
 | Iñigo Sainz-Maza | def | 690K–827K | 30%/— | Albert +0.4, +1 more |  |
@@ -178,7 +179,6 @@ _What the one table on the board was built from: the eleven it assumes you field
 | izan merino | SusoGattuso |
 | denis suarez | BurtonGM89 |
 | igor zubeldia | you |
-| marko dmitrovic | BurtonGM89 |
 | santi comesaña | BurtonGM89 |
 | leandro cabrera | Albert Laporta |
 | ionut radu | you |
@@ -225,4 +225,4 @@ _Both figures are editorial reads refreshed a few times a day, not live probabil
 | Zeroed | injured, suspended, unavailable; a doubt is halved |
 | Fixture term | ±12% across the opponents ranked by nothing: no fixture is known for anyone in your squad, plus ±4% for home advantage — both widths guesses, unfitted, and small enough that a wrong one costs a fraction of a point |
 
-_Generated 2026-08-21 11:52 UTC._
+_Generated 2026-08-21 12:32 UTC._
