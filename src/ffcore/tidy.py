@@ -40,7 +40,8 @@ from ffcore.text import index_by, norm, resolve
 __all__ = ["ROOT", "TIDY", "SEASON", "DECISIONS", "REPORTS", "PARTS", "MADRID",
            "input_path", "read_csv", "write_csv", "append_csv", "widen_csv",
            "write_lines", "snapshot_stamp", "ledger_stamp", "latest_only", "snapshots",
-           "Market", "Valuation", "load_market", "load_lineups",
+           "Market", "Valuation", "VALUE_TOLERANCE", "price_agrees",
+           "load_market", "load_lineups",
            "shared_names", "row_key", "run_now", "load_crosswalk",
            "load_players", "read_ledger", "LEDGER", "load_deadline", "LINEUP_SOURCE",
            "pick_source", "load_fixtures", "next_kickoff", "kickoff_stamp",
@@ -789,10 +790,32 @@ class Valuation(NamedTuple):
 
 
 # How far apart two readings of one player's value may be and still be the
-# same player. ffcore.league uses the same figure on the same evidence: across
-# 70 owned players the two sources agreed to within 0.2%, and the one wrong
-# join was out by 603%.
+# same player. Across 70 owned players the two sources agreed to within
+# 0.2%, and the one wrong join was out by 603% — three thousand times the
+# worst true disagreement, so anything between the two works.
+#
+# ONE CONSTANT, NOT TWO. ffcore.league used to define its own copy of this
+# exact figure, on the same evidence, tuned nowhere but drifting silently
+# possible everywhere: a change made to one would not touch the other.
 VALUE_TOLERANCE = 0.05
+
+
+def price_agrees(a, b, tolerance: float = VALUE_TOLERANCE) -> bool:
+    """Are these two euro figures close enough to be the same player's price?
+
+    THE ONE PLACE THIS REPO DECIDES TWO PRICES ARE THE SAME PRICE — reused
+    by `Market._by_price` (picking among several candidates who share a
+    name) and by `ffcore.league._priced_like` (checking a name join against
+    the app's own stated figure), which used to each carry a separate
+    implementation of this same comparison.
+
+    False on a missing or zero figure: an absent number is not evidence
+    either way, and callers that want "silent means agree" say so
+    themselves rather than this function guessing it for them.
+    """
+    if not a or not b:
+        return False
+    return abs(a - b) <= tolerance * max(a, b)
 
 
 def _club(row: dict) -> str:
@@ -1009,24 +1032,19 @@ class Market:
     def _by_price(self, values: dict, value) -> str | None:
         """The one key in `values` whose price agrees, or None.
 
-        THE ONE PLACE THIS REPO DECIDES THAT TWO PRICES ARE THE SAME PRICE.
-        The price is an independent identifier and the men it separates are
-        not close — the pair that started this differ by forty times. Two
-        agreeing keys settle nothing and neither does none, because the point
-        of asking is to get one answer or no answer, never a preference
-        between two. The tolerance is the one api_key already uses on the
-        same evidence.
+        `price_agrees()` is THE ONE PLACE THIS REPO DECIDES THAT TWO PRICES
+        ARE THE SAME PRICE. The price is an independent identifier and the
+        men it separates are not close — the pair that started this differ
+        by forty times. Two agreeing keys settle nothing and neither does
+        none, because the point of asking is to get one answer or no
+        answer, never a preference between two.
         """
         if value is None:
             return None
         val = money(value) if isinstance(value, str) else float(value)
         if not val:
             return None
-        hits = []
-        for k, raw in values.items():
-            got = money(raw)
-            if got and abs(got - val) <= VALUE_TOLERANCE * max(got, val):
-                hits.append(k)
+        hits = [k for k, raw in values.items() if price_agrees(money(raw), val)]
         return hits[0] if len(hits) == 1 else None
 
     def latest(self) -> dict[str, dict]:

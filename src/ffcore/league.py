@@ -63,7 +63,8 @@ from ffcore.tidy import (load_crosswalk,  # noqa: E402
                          run_now,  # noqa: E402
                          Market, input_path, ledger_stamp,
                          load_api_standings, load_api_teams,
-                         load_market, read_ledger, snapshot_stamp)
+                         load_market, price_agrees, read_ledger,
+                         snapshot_stamp)
 
 __all__ = ["MARKET", "Config", "load_config", "read_rosters", "identify",
            "read_api_balances", "owner_from_api", "api_key", "owner_drift",
@@ -333,6 +334,18 @@ def _by_exact_value(raw_value, market) -> str | None:
     return hits.pop() if len(hits) == 1 else None
 
 
+def _app_ids_of(xw) -> dict:
+    """{the app's player id: this repo's key}, read off an already-loaded
+    Crosswalk. The one place this dict is ever built, shared by
+    `app_ids_known()` (which loads its own Crosswalk, for a caller with none
+    to hand) and `League.__init__` (which already has `self.xw` in memory
+    and used to re-read and re-parse players.csv a second time to get here).
+    """
+    if xw is None:
+        return {}
+    return {p.app_id: p.player_id for p in xw.players.values() if p.app_id}
+
+
 def app_ids_known() -> dict:
     """{the app's player id: this repo's key}, from the crosswalk, or {}.
 
@@ -349,12 +362,16 @@ def app_ids_known() -> dict:
     to a join that would otherwise have failed. No file is not an error: on a
     cold start this is {} and every caller behaves exactly as it did before
     the table existed.
+
+    FOR A CALLER WITH NO CROSSWALK ALREADY IN MEMORY. `League.__init__` has
+    one (`self.xw`) and calls `_app_ids_of(self.xw)` directly rather than
+    this — this function's own disk read would otherwise duplicate one
+    `League.load()` had already done moments earlier.
     """
     from ffcore.crosswalk import Crosswalk
     from ffcore.tidy import TIDY
 
-    xw = Crosswalk.read(TIDY / "players.csv", TIDY / "clubs.csv")
-    return {p.app_id: p.player_id for p in xw.players.values() if p.app_id}
+    return _app_ids_of(Crosswalk.read(TIDY / "players.csv", TIDY / "clubs.csv"))
 
 
 def owner_from_api(rows: list[dict], market, ledger_owner: dict | None = None,
@@ -411,18 +428,6 @@ def owner_from_api(rows: list[dict], market, ledger_owner: dict | None = None,
     return out, unjoined
 
 
-# How far the app's price for a player may sit from futbolfantasy's before the
-# two are not describing the same man.
-#
-# NOT A TUNED NUMBER, and the measurement is why. Across the 70 owned players
-# that joined on 2026-08-19 the two sources agreed to within 0.2% in every
-# single case — they are read minutes apart and drift a little, which is why
-# it is not zero — while the one WRONG join was out by 603%. Three thousand
-# times the worst true disagreement: anything between the two does the same
-# job, and this is not a knob to turn when an answer displeases.
-VALUE_TOLERANCE = 0.05
-
-
 def _priced_like(key: str, raw: str, market_value, index) -> bool:
     """Does the market price this player roughly the way the app does?
 
@@ -435,8 +440,14 @@ def _priced_like(key: str, raw: str, market_value, index) -> bool:
     price on the same row: "C. Romero" resolved to ISAAC Romero, at 6.15M
     against the 43.24M the app had just quoted for him.
 
+    `price_agrees()` (ffcore.tidy) is the same tolerance check `Market.
+    _by_price` uses to disambiguate candidates — this used to be a second,
+    separately-tuned copy of it (its own VALUE_TOLERANCE, its own formula).
+
     True when either side is silent, because an absent number disproves
-    nothing.
+    nothing — `price_agrees` itself is stricter (False on a missing figure,
+    since it also serves candidate-picking, where silence must not count as
+    a match), so silence is handled here, before it is ever called.
     """
     if not key or key == norm(raw):
         return True                       # the market carries this very name
@@ -450,7 +461,7 @@ def _priced_like(key: str, raw: str, market_value, index) -> bool:
                  if norm(r.get("name")) == key), None)
     if not ours:
         return True
-    return abs(theirs - ours) <= VALUE_TOLERANCE * ours
+    return price_agrees(theirs, ours)
 
 
 def app_fielded(squad, names: dict, rows=None, ids=None) -> list[str]:
@@ -945,7 +956,7 @@ class League:
             # makes it convincing.
             api_owner, self.api_unjoined = owner_from_api(
                 api_teams, market, ledger_owner=self.owner,
-                app_ids=app_ids_known())
+                app_ids=_app_ids_of(self.xw))
             if api_owner:
                 self.warnings += owner_drift(
                     self.owner, api_owner,
