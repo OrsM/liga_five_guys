@@ -45,8 +45,8 @@ __all__ = ["ROOT", "TIDY", "SEASON", "DECISIONS", "REPORTS", "PARTS", "MADRID",
            "shared_names", "row_key", "run_now", "load_crosswalk",
            "load_players", "read_ledger", "LEDGER", "load_deadline", "LINEUP_SOURCE",
            "pick_source", "load_fixtures", "next_kickoff", "kickoff_stamp",
-           "load_elo", "load_results_history", "MATCH_LEN", "minutes_played",
-           "fresh_only", "DAILY_FRESH_DAYS",
+           "load_elo", "load_results_history", "load_understat_players",
+           "MATCH_LEN", "minutes_played", "fresh_only", "DAILY_FRESH_DAYS",
            "EVERY_RUN_FRESH_DAYS", "stale_feeds",
            "GATED_API", "age_phrase", "last_api_standings",
            "load_api_lineup"]
@@ -636,6 +636,31 @@ def load_results_history() -> list[dict]:
     table from duplicating itself run over run.
     """
     return read_csv(TIDY / "results_history.csv")
+
+
+def load_understat_players(season: str = "") -> list[dict]:
+    """Player-level xG/xA (sources.parse_understat_players), the newest
+    reading for each (season, understat_id) pair.
+
+    NOT wired into forecasting yet — captured deliberately unused, the same
+    shape starters.csv's per-match minutes and ffcore.attributes.
+    resolve_fitness() were the session they were added: verified against
+    real data before anything downstream depends on it, not the same day
+    it starts flowing.
+
+    `season` filters to one Understat season label ("2026" for 2026/2027);
+    "" (default) returns every season on record — a caller comparing a
+    player's prior-season xG rate to his current one wants both at once.
+    """
+    rows = read_csv(TIDY / "understat_players.csv")
+    if season:
+        rows = [r for r in rows if r.get("season") == season]
+    latest: dict[tuple, dict] = {}
+    for r in sorted(rows, key=lambda r: r.get("observed_at", "")):
+        key = (r.get("season"), r.get("understat_id"))
+        if key[1]:
+            latest[key] = r
+    return list(latest.values())
 
 
 # Approximated, not measured: stoppage time is not on the page a starter's

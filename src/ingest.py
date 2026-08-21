@@ -436,7 +436,13 @@ def fetch() -> Path:
             if src.timeout is not None:
                 kw["timeout"] = src.timeout
             try:
-                r = c.get(url, **kw)
+                # BODY MEANS POST, ITS ONLY JOB. Every source before
+                # Understat left this None and got exactly the GET this
+                # loop always sent; a source that sets it is asking for
+                # its own player-stats endpoint, which answers a GET with
+                # an error rather than the data (verified directly).
+                r = (c.post(url, data=src.body, **kw) if src.body is not None
+                    else c.get(url, **kw))
             except httpx.RequestError as e:
                 timing.append((time.monotonic() - t0, src.key, "FAILED"))
                 fails[src.key] = type(e).__name__

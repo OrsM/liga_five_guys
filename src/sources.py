@@ -1432,6 +1432,125 @@ def sign_fd_results(text: str) -> str | None:
                                         r.get("FTAG")) for r in rows])
 
 
+# PLAYER-LEVEL xG/xA — the "skill" side of the signal/noise split raw points
+# cannot give on its own: a shot on target scores or doesn't on a coin a
+# player's own quality only partly loads, while xG scores the CHANCE, not
+# whether it went in. Team-level xG already exists here (football-data.co.uk,
+# above) for fixture strength; this is the same idea at the grain a rating
+# actually needs it.
+#
+# VERIFIED DIRECTLY, NOT ASSUMED FROM AN OLD SCRAPING WRITE-UP. The
+# well-known "playersData embedded in a <script> tag" pattern other guides
+# describe is gone from the page as served in 2026 — this repo's own fetch
+# of the league page confirmed no such variable exists any more. What the
+# page's own JS actually calls (league.min.js) is
+# POST main/getPlayersStats/ with {league, season} form data, confirmed by
+# curling that exact endpoint and reading real rows back (600 players for a
+# completed season, id/name/games/time/goals/xG/assists/xA/npxG among them).
+# The GET form of the same URL was tried too and answers an error — this is
+# the one source in this repo that needs `Source.body` at all.
+UNDERSTAT_URL = "https://understat.com/main/getPlayersStats/"
+UNDERSTAT_SOURCE = "understat"
+UNDERSTAT_LEAGUE = "La_liga"
+# One prior completed season alongside the live one — the same shape
+# points.py's own baseline/live split already uses, not a new convention.
+UNDERSTAT_SEASONS_BACK = 1
+
+
+def understat_sources(now: datetime | None = None) -> list["Source"]:
+    """This season's player stats, refreshed every run, plus
+    UNDERSTAT_SEASONS_BACK completed ones fetched once — a finished season's
+    xG does not change. Understat labels a season by its START year
+    ("2026" for 2026/2027), which `now.month >= 7` derives the same way
+    fd_sources() derives football-data.co.uk's two-digit season code.
+    """
+    now = now or datetime.now(timezone.utc)
+    cur_y = now.year if now.month >= 7 else now.year - 1
+    out = []
+    for back in range(UNDERSTAT_SEASONS_BACK + 1):
+        y = cur_y - back
+        out.append(Source(
+            "understat_%d" % y, "understat_players", UNDERSTAT_URL,
+            parse_understat_players, sign_understat_players,
+            cadence="every_run" if back == 0 else "once",
+            body={"league": UNDERSTAT_LEAGUE, "season": str(y)}))
+    return out
+
+
+def _understat_rows(text: str) -> list[dict]:
+    """The response's own `players` list, or [] on anything else — a
+    malformed or error body ({"error": {...}}, seen from the GET form of
+    this same URL) is not evidence of an empty league.
+    """
+    try:
+        data = json.loads(text or "")
+    except (TypeError, ValueError):
+        return []
+    if not isinstance(data, dict) or not data.get("success"):
+        return []
+    players = data.get("players")
+    return players if isinstance(players, list) else []
+
+
+def parse_understat_players(text: str, observed_at: str,
+                            key: str = "understat_2026") -> list[dict]:
+    """One row per player, this source's own season totals.
+
+    THE CLUB RESOLVED TO THIS REPO'S OWN SLUG, same matcher football-data.co.
+    uk's team names already go through (`_fd_match_team`) — not a second
+    aliasing scheme for a third source to drift out of step with the other
+    two. Unresolved is kept, not dropped: a team_title this repo cannot
+    place still says something real about the player, the way an
+    unresolved football-data.co.uk side does.
+
+    Understat's OWN numeric id is carried through as `understat_id` — a
+    fourth identity space this repo's crosswalk does not yet bridge to the
+    other three. Deliberately not resolved here: `sources.py` stays pure,
+    with no crosswalk import, the same reason `_fd_match_team` is a small
+    copy of `ffcore.fixture.match_team`'s rule rather than an import of it.
+    """
+    m = re.match(r"^understat_(\d{4})$", key)
+    season = m.group(1) if m else ""
+    out = []
+    for p in _understat_rows(text):
+        pid = str(p.get("id") or "").strip()
+        name = (p.get("player_name") or "").strip()
+        if not pid or not name:
+            continue
+        out.append({
+            "observed_at": observed_at, "source": UNDERSTAT_SOURCE,
+            "season": season, "understat_id": pid, "player_name": name,
+            "team_title": (p.get("team_title") or "").strip(),
+            "team": _fd_match_team(p.get("team_title") or "", TEAMS) or "",
+            "position": (p.get("position") or "").strip(),
+            "games": (p.get("games") or "").strip(),
+            "minutes": (p.get("time") or "").strip(),
+            "goals": (p.get("goals") or "").strip(),
+            "assists": (p.get("assists") or "").strip(),
+            "xg": (p.get("xG") or "").strip(),
+            "xa": (p.get("xA") or "").strip(),
+            "npg": (p.get("npg") or "").strip(),
+            "npxg": (p.get("npxG") or "").strip(),
+            "shots": (p.get("shots") or "").strip(),
+            "key_passes": (p.get("key_passes") or "").strip(),
+        })
+    return out
+
+
+def sign_understat_players(text: str) -> str | None:
+    """One digest per season, over every player's own counting stats — not
+    xGChain/xGBuildup, which can drift by a thousandth between two reads of
+    the same underlying match data and would make an unchanged page look
+    like new content every run.
+    """
+    rows = _understat_rows(text)
+    if not rows:
+        return None
+    return _digest(["%s|%s|%s|%s|%s|%s" % (
+        p.get("id"), p.get("games"), p.get("time"), p.get("goals"),
+        p.get("assists"), p.get("xG")) for p in rows])
+
+
 # ---------------------------------------------------------------------------
 # the league's own API — the state no public page publishes
 # ---------------------------------------------------------------------------
@@ -2052,6 +2171,13 @@ class Source(NamedTuple):
     parse: Callable               # (html, observed_at, key) -> rows
     sign: Callable                # (html) -> signature or None
     cadence: str = "every_run"    # "every_run" | "daily" | "once"
+    # GET for every source until Understat: its player-stats endpoint is a
+    # POST-only XHR (verified directly — the GET form of the same URL
+    # answers {"error": {...}}), so `body` (form data, sent to a POST) is
+    # the one field that turns "which HTTP verb" from a repo-wide constant
+    # into a per-source choice. None means GET, unchanged for every
+    # existing source.
+    body: dict | None = None
     # Seconds to wait on THIS host. One global timeout means a single dead
     # source holds the whole sweep for it: Club Elo has been timing out since
     # 2026-08-17 and was costing thirty of the thirty-two seconds a sweep took
@@ -2121,6 +2247,8 @@ def sources(enabled_only: bool = True) -> list[Source]:
     # so it is listed directly rather than queued at run time the way the
     # calendar's match pages and the league's discovered pages are.
     out += fd_sources()
+    # Player-level xG/xA — see understat_sources()'s own docstring.
+    out += understat_sources()
     # The whole season's results in one page. It is what tells the starters
     # sweep which match pages exist and which are worth asking for.
     out += [Source(CAL_KEY, "matches", FF_CAL_URL, parse_calendar,
@@ -2845,6 +2973,80 @@ def _selftest() -> None:
     assert all(s.table == "results_history" for s in fs)
     assert source_for("fd_2627").parse is parse_fd_results
 
+    # -- understat: player-level xG/xA -------------------------------------
+    # Real rows, pulled live 2026-08-21 from a direct POST to
+    # understat.com/main/getPlayersStats/ with {league: La_liga,
+    # season: 2025|2026} — the GET form of the same URL was tried first and
+    # answers {"error": {...}}, which is why this is the one source that
+    # needs Source.body.
+    _UNDERSTAT_PAST = ('{"success": true, "players": [{"id": "3423", '
+                       '"player_name": "Kylian Mbappe-Lottin", "games": '
+                       '"31", "time": "2623", "goals": "25", "xG": '
+                       '"25.796528611332178", "assists": "5", "xA": '
+                       '"7.240631651133299", "shots": "146", '
+                       '"key_passes": "65", "position": "F S", '
+                       '"team_title": "Real Madrid", "npg": "17", '
+                       '"npxG": "19.107029650360346"}]}')
+    _UNDERSTAT_LIVE = ('{"success": true, "players": [{"id": "13350", '
+                       '"player_name": "Roberto Fern\\u00e1ndez", "games": '
+                       '"1", "time": "90", "goals": "2", "xG": '
+                       '"1.1255605220794678", "assists": "0", "xA": '
+                       '"0.1955643743276596", "shots": "2", '
+                       '"key_passes": "2", "position": "F", "team_title": '
+                       '"Espanyol", "npg": "2", "npxG": '
+                       '"1.1255605220794678"}]}')
+
+    past = parse_understat_players(_UNDERSTAT_PAST, "2026-08-21T0000Z",
+                                   "understat_2025")
+    assert len(past) == 1, past
+    assert past[0]["season"] == "2025" and past[0]["understat_id"] == "3423"
+    assert past[0]["player_name"] == "Kylian Mbappe-Lottin"
+    # "Real Madrid" resolves to this repo's own slug without an alias.
+    assert past[0]["team"] == "real-madrid", past[0]
+    assert past[0]["games"] == "31" and past[0]["minutes"] == "2623"
+    assert past[0]["xg"] == "25.796528611332178"
+    assert past[0]["xa"] == "7.240631651133299"
+
+    live = parse_understat_players(_UNDERSTAT_LIVE, "2026-08-21T0522Z",
+                                   "understat_2026")
+    assert live[0]["player_name"] == "Roberto Fernández"  # á decoded
+    assert live[0]["team"] == "espanyol" and live[0]["season"] == "2026"
+
+    # A GET-form error body is not an empty league — it is unusable, and the
+    # two must not be confused: [] either way, but proven here to be the
+    # SAME [] a genuinely empty response gives, not a crash.
+    assert parse_understat_players('{"error": {"error_code": 4}}', "t") == []
+    assert parse_understat_players("", "t") == []
+    assert parse_understat_players("not json at all", "t") == []
+    # A row missing an id or a name is dropped, not emitted half-blank.
+    assert parse_understat_players(
+        '{"success": true, "players": [{"id": "", "player_name": "X"}, '
+        '{"id": "1", "player_name": ""}]}', "t") == []
+
+    assert sign_understat_players(_UNDERSTAT_PAST) is not None
+    assert sign_understat_players("") is None
+    assert sign_understat_players('{"success": true, "players": []}') is None
+    # npxG/shots/key_passes are NOT in the signature — xGChain/xGBuildup-
+    # style figures can drift by a thousandth between two reads of the same
+    # match data, and the counting stats (games, minutes, goals, assists,
+    # xG) are what a changed page actually means here.
+    assert sign_understat_players(_UNDERSTAT_PAST) == sign_understat_players(
+        _UNDERSTAT_PAST.replace('"shots": "146"', '"shots": "147"'))
+    # A real counting-stat change IS new content.
+    assert sign_understat_players(_UNDERSTAT_PAST) != sign_understat_players(
+        _UNDERSTAT_PAST.replace('"goals": "25"', '"goals": "26"'))
+
+    us = understat_sources(datetime(2026, 8, 20, tzinfo=timezone.utc))
+    assert [s.key for s in us] == ["understat_2026", "understat_2025"]
+    assert us[0].cadence == "every_run" and us[1].cadence == "once"
+    assert all(s.table == "understat_players" for s in us)
+    assert all(s.url == UNDERSTAT_URL for s in us)
+    assert us[0].body == {"league": "La_liga", "season": "2026"}
+    assert us[1].body == {"league": "La_liga", "season": "2025"}
+    # Every OTHER source in the registry is still a plain GET.
+    assert all(s.body is None for s in sources() if s.key not in
+              ("understat_2026", "understat_2025"))
+
     # -- the league's own API ---------------------------------------------
     lg = parse_api_leagues(_API_LEAGUES_FIXTURE, "2026-01-01T0000Z")
     assert len(lg) == 1 and lg[0]["league_id"] == "017998544", lg
@@ -3176,11 +3378,12 @@ def _selftest() -> None:
     reg = sources()
     # 6 standalone pages: market, points, af_fixtures, elo, the calendar, and
     # the API's discovery page. The three API entries it reveals are not here
-    # — they are queued at run time, like the match pages. Plus FD_SEASONS_BACK
-    # + 1 football-data entries (deterministic from today's date, so listed
-    # directly rather than queued).
-    assert len(reg) == 6 + len(TEAMS) + len(AF_TEAMS) + FD_SEASONS_BACK + 1 \
-        == 50, len(reg)
+    # — they are queued at run time, like the match pages. Plus
+    # FD_SEASONS_BACK + 1 football-data entries and UNDERSTAT_SEASONS_BACK
+    # + 1 understat entries (both deterministic from today's date, so
+    # listed directly rather than queued).
+    assert len(reg) == (6 + len(TEAMS) + len(AF_TEAMS) + FD_SEASONS_BACK + 1
+                        + UNDERSTAT_SEASONS_BACK + 1) == 52, len(reg)
     assert set(AF_TEAMS) == set(TEAMS), set(AF_TEAMS) ^ set(TEAMS)
     # Both team sweeps run twice a day — the 11:40 sweep exists because the
     # XIs firm up late morning, and a calendar-day cadence skipped it there.
@@ -3197,7 +3400,8 @@ def _selftest() -> None:
     assert len({s.key for s in reg}) == len(reg)          # keys are unique
     assert {s.table for s in reg} == {"market", "points", "lineups",
                                       "fixtures", "elo", "matches",
-                                      "api_leagues", "results_history"}
+                                      "api_leagues", "results_history",
+                                      "understat_players"}
     assert source_for("team_celta").parse is parse_team
     assert source_for("gone") is None                     # retired page name
 
@@ -3206,7 +3410,9 @@ def _selftest() -> None:
     assert source_for("af_celta").parse is parse_af_team
     samples = {"market": _MARKET_FIXTURE, "points": _POINTS_FIXTURE,
                "af_fixtures": _AF_HUB_FIXTURE, "elo": _ELO_FIXTURE,
-               CAL_KEY: _CAL_FIXTURE, API_LEAGUES_KEY: _API_LEAGUES_FIXTURE}
+               CAL_KEY: _CAL_FIXTURE, API_LEAGUES_KEY: _API_LEAGUES_FIXTURE,
+               "understat_2026": _UNDERSTAT_LIVE,
+               "understat_2025": _UNDERSTAT_PAST}
     # Half the AF teams get each shape, so neither branch can rot unnoticed.
     for i, k in enumerate(sorted(AF_TEAMS)):
         samples[f"af_{k}"] = _AF_FIXTURE if i % 2 else _AF_CONSENSO_FIXTURE
