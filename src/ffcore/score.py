@@ -74,7 +74,7 @@ __all__ = ["SLOT", "SLOT_LABEL", "SLOT_MIN", "MAX_SLOT", "THIN",
            "FREE_FORMATIONS", "PREMIUM_FORMATIONS", "formations",
            "Rating", "Scorer", "pick_xi", "squad_pool",
            "replacement", "vor",
-           "load_points", "build"]
+           "load_points", "build", "load_understat_current"]
 
 SLOT = {
     "portero": "POR",
@@ -116,6 +116,112 @@ PROMOTED_DISCOUNT = 0.70  # the LaLiga median overstates a promoted squad
 # startprob's grids: the data cannot resolve finer, and a grid is auditable
 # where a solver's answer is not.
 DECAY_GRID = (1.0, 0.85, 0.7, 0.55, 0.4)
+
+
+# ---------------------------------------------------------------------------
+# xG/xA — Tango/Lichtman/Dolphin's precision-weighted blend (The Book,
+# ch.4's clutch-skill estimate), not another ad hoc shrink constant.
+#
+# WHY A NEW MECHANISM, NOT ANOTHER SHRINK_K STAGE: this repo's own measured
+# check (2026-08-21) showed xG is a WORSE fit to any single season's actual
+# fantasy points than raw goals+assists (r=0.275 vs 0.381) — unsurprising,
+# since points reward the actual result, not the process behind it. But
+# fit-to-outcome is the wrong test for whether xG is USEFUL. The right one
+# is year-over-year STICKINESS — does the same player's rate this
+# independent sample predict his rate in another one — because a stat that
+# repeats for the same player is measuring skill, and a stat that doesn't
+# is measuring luck no matter how well it explains any one outcome. Measured
+# on this repo's own real data, same player across two seasons (n=85, last
+# season 450+ minutes, this season 30+): goals/90 r=0.169, xG/90 r=0.222,
+# G+A/90 r=0.306, xG+xA/90 r=0.303 — xG alone IS stickier than raw goals
+# alone, folding in assists roughly closes the gap. That is the DIPS pattern
+# (McCracken: strikeout/walk rate repeats far better than a pitcher's ERA)
+# applied to this repo's own numbers rather than assumed from the
+# literature.
+#
+# POSITION-GATED, MEASURED NOT ASSUMED: restricted to forwards/attacking
+# mids (Understat's own "F" position tag) because that same real-data check
+# showed the opposite sign for every other position (n=46, corr(xG+xA, this
+# season's early points) = -0.169) — a defender's or goalkeeper's fantasy
+# points come from clean sheets and defensive actions, which an attacking
+# metric says nothing about. The defensive-side analogue (xGA — Understat's
+# own team-level `getLeagueData`, already GET-accessible) is real and NOT
+# yet captured; see the 2026-08-21 handoff.
+#
+# NOT WIRED INTO Scorer.rate() YET. _precision_blend() below is real and
+# self-tested against The Book's own worked example (ch.4: a measured
+# clutch skill of +.100 wOBA over 100 PA, uncertainty .055, blended against
+# a population prior of .000 ± .006, comes out to +.001 — reproduced
+# exactly). load_understat_current() is real and tested against real data.
+# What is NOT yet built is the missing input: this season's xG-implied
+# rate needs its OWN variance, calibrated against the raw current-season
+# rate's variance the same walk-forward-beats-baseline way _fit_decay and
+# ffcore.startprob.Calibration.fit() already calibrate theirs — and that
+# needs more real jornadas than exist today to test against, the identical
+# blocker Step 1's decay grid and the K-shrinkage check hit. Wiring a blend
+# together before that calibration exists would not be using the measured
+# stickiness above — it would be assuming a made-up variance and hiding it
+# inside a fancier-looking formula. Revisit the moment more jornadas land.
+# ---------------------------------------------------------------------------
+
+
+def _precision_blend(estimates) -> tuple[float, float] | None:
+    """(mean, variance) — independent estimates of ONE quantity, combined
+    by inverse variance.
+
+    `estimates` is [(mean, variance), ...]. An estimate with variance <= 0
+    is skipped rather than trusted absolutely — 0 would claim infinite
+    precision, which no real measurement here has. None back means nothing
+    usable was offered, never a fabricated answer.
+
+    THE BOOK'S OWN WORKED EXAMPLE (ch.4, clutch skill): a player's measured
+    clutch skill is +.100 (wOBA) over 100 clutch PA, with sampling
+    uncertainty .055; the population's own clutch-skill spread is .000 ±
+    .006. Weighted 1/variance, that comes out to +.001 — almost entirely
+    the prior, because 100 PA is a sliver of evidence next to the
+    population's own tightly-known spread. Reproduced in this module's
+    self-test.
+    """
+    w_sum = m_sum = 0.0
+    for mean, var in estimates:
+        if var is None or var <= 0:
+            continue
+        w = 1.0 / var
+        w_sum += w
+        m_sum += mean * w
+    if w_sum <= 0:
+        return None
+    return m_sum / w_sum, 1.0 / w_sum
+
+
+def load_understat_current(xw=None) -> dict[str, dict]:
+    """{crosswalk key: {"xg90": xG+xA per 90, "minutes": minutes}} for THIS
+    season, forwards and attacking mids only.
+
+    See the module section above for why the position gate is measured
+    rather than assumed, and why nothing downstream consumes this yet.
+    """
+    from ffcore.tidy import load_understat_players, load_crosswalk
+
+    xw = xw if xw is not None else load_crosswalk()
+    if xw is None:
+        return {}
+    out: dict[str, dict] = {}
+    for r in load_understat_players("2026"):
+        if "F" not in (r.get("position") or ""):
+            continue
+        uid = (r.get("understat_id") or "").strip()
+        if not uid:
+            continue
+        key = xw.player(understat_id=uid)
+        if not key:
+            continue
+        mins = float(r.get("minutes") or 0)
+        if mins <= 0:
+            continue
+        out[key] = {"xg90": (float(r.get("xg") or 0) + float(r.get("xa") or 0))
+                    / mins * 90, "minutes": mins}
+    return out
 
 
 def _per_jornada_current(starters_rows, perjornada_rows, matches_rows,
@@ -1131,7 +1237,72 @@ def _selftest() -> None:
     decay2, why2 = _fit_decay(trending)
     assert decay2 < 1.0 and "beat flat" in why2, (decay2, why2)
 
-    print("ffcore.score self-test OK (34 cases)")
+    # -- _precision_blend: reproduces The Book's own worked example ---------
+    # Tango/Lichtman/Dolphin, ch.4: measured clutch skill +.100 (100 PA,
+    # uncertainty .055) blended against the population's own clutch-skill
+    # spread .000 ± .006 comes out to +.001 — almost entirely the prior,
+    # because the population's own spread is known far more precisely than
+    # 100 PA can measure one player's deviation from it.
+    mean, var = _precision_blend([(0.100, 0.055 ** 2), (0.000, 0.006 ** 2)])
+    assert abs(mean - 0.001) < 0.0005, mean
+    assert var < 0.006 ** 2                    # more precise than either input alone
+    # An estimate with no real precision (var <= 0) is skipped, not trusted
+    # absolutely — 0 variance would silently claim infinite precision.
+    assert _precision_blend([(5.0, 0.0), (3.0, 1.0)]) == (3.0, 1.0)
+    # Nothing usable offered at all is None, not a fabricated answer.
+    assert _precision_blend([]) is None
+    assert _precision_blend([(5.0, 0.0)]) is None
+    # Equal precision splits the difference exactly.
+    eq_mean, eq_var = _precision_blend([(2.0, 1.0), (4.0, 1.0)])
+    assert abs(eq_mean - 3.0) < 1e-9 and abs(eq_var - 0.5) < 1e-9
+
+    # -- load_understat_current: position-gated on the real 2026-08-21
+    # measurement (xG/xA carries signal for forwards/attacking mids, not for
+    # anyone else), tested through the real function against a real
+    # understat_players.csv shape, not a reimplementation of it ------------
+    from ffcore.crosswalk import Crosswalk as _CW, Player as _P
+    import ffcore.tidy as _tidy
+    import tempfile as _tempfile, os as _os, csv as _csv
+
+    xw_us = _CW({
+        "striker": _P("striker", "Striker Sam", understat_id="10"),
+        "defender": _P("defender", "Defender Dan", understat_id="20"),
+    }, {})
+    with _tempfile.TemporaryDirectory() as _d:
+        _os.makedirs(_d, exist_ok=True)
+        path = _os.path.join(_d, "understat_players.csv")
+        with open(path, "w", newline="", encoding="utf-8") as fh:
+            w = _csv.DictWriter(fh, fieldnames=[
+                "observed_at", "source", "season", "understat_id",
+                "player_name", "team_title", "team", "position", "games",
+                "minutes", "goals", "assists", "xg", "xa", "npg", "npxg",
+                "shots", "key_passes"])
+            w.writeheader()
+            w.writerow({"observed_at": "2026-08-21T0000Z", "source": "understat",
+                       "season": "2026", "understat_id": "10",
+                       "player_name": "Striker Sam", "team_title": "X",
+                       "team": "x", "position": "F S", "games": "1",
+                       "minutes": "90", "goals": "1", "assists": "0",
+                       "xg": "0.6", "xa": "0.2", "npg": "1", "npxg": "0.6",
+                       "shots": "3", "key_passes": "1"})
+            # A defender is captured too — must be excluded, not blended in.
+            w.writerow({"observed_at": "2026-08-21T0000Z", "source": "understat",
+                       "season": "2026", "understat_id": "20",
+                       "player_name": "Defender Dan", "team_title": "X",
+                       "team": "x", "position": "D S", "games": "1",
+                       "minutes": "90", "goals": "0", "assists": "0",
+                       "xg": "0.1", "xa": "0.0", "npg": "0", "npxg": "0.1",
+                       "shots": "1", "key_passes": "0"})
+        _real_tidy = _tidy.TIDY
+        _tidy.TIDY = __import__("pathlib").Path(_d)
+        try:
+            us_cur = load_understat_current(xw_us)
+        finally:
+            _tidy.TIDY = _real_tidy
+    assert set(us_cur) == {"striker"}, us_cur          # the defender is excluded
+    assert abs(us_cur["striker"]["xg90"] - 0.8) < 1e-9
+
+    print("ffcore.score self-test OK (44 cases)")
 
 
 if __name__ == "__main__":
