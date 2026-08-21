@@ -524,6 +524,15 @@ def api_key(raw: str, handle: str, market, ledger_owner: dict | None = None,
     tie-break and exact-value fallback are domain-specific to a squad row
     rather than generic identity.
 
+    TODO: steps 1-3 below still duplicate what `Crosswalk.resolve()` now
+    does. Not migrated yet because `_priced_like` needs to apply
+    differently per step (unconditional trust on the id, price-validated
+    on the two name guesses) and `resolve()`'s single return value doesn't
+    say which step answered — merging them cleanly needs `resolve()` to
+    expose that, or this function to accept an `xw: Crosswalk` alongside
+    `app_ids` and call the id/name pieces separately. Left alone rather
+    than force a fit.
+
       1. the app's player id, looked up in `app_ids` ({app id: this
          repo's key}, from data/tidy/players.csv — built BY this function,
          so it is absent on a cold start and must stay additive: no table
