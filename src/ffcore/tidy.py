@@ -45,7 +45,8 @@ __all__ = ["ROOT", "TIDY", "SEASON", "DECISIONS", "REPORTS", "PARTS", "MADRID",
            "shared_names", "row_key", "run_now", "load_crosswalk",
            "load_players", "read_ledger", "LEDGER", "load_deadline", "LINEUP_SOURCE",
            "pick_source", "load_fixtures", "next_kickoff", "kickoff_stamp",
-           "load_elo", "load_results_history", "fresh_only", "DAILY_FRESH_DAYS",
+           "load_elo", "load_results_history", "MATCH_LEN", "minutes_played",
+           "fresh_only", "DAILY_FRESH_DAYS",
            "EVERY_RUN_FRESH_DAYS", "stale_feeds",
            "GATED_API", "age_phrase", "last_api_standings",
            "load_api_lineup"]
@@ -635,6 +636,38 @@ def load_results_history() -> list[dict]:
     table from duplicating itself run over run.
     """
     return read_csv(TIDY / "results_history.csv")
+
+
+# Approximated, not measured: stoppage time is not on the page a starter's
+# off-minute comes from, so a man who plays the whole match is credited this
+# rather than the 94 or so he may actually have been on for. The same small
+# error for everyone uncredited with a substitution, so it does not distort
+# ranking between them — a constant offset, not noise.
+MATCH_LEN = 90.0
+
+
+def minutes_played(role: str, raw_minute, match_len: float = MATCH_LEN) -> float:
+    """One player's minutes in one match, from starters.csv's own columns.
+
+    THE SAME COLUMN READ IN OPPOSITE DIRECTIONS, and that is the whole rule.
+    A STARTER's `minute` is when he came OFF — blank means he played the
+    whole match. A SUB's `minute` is when he came ON — blank means he never
+    did. `ffcore.score._current_minutes` (season totals, keyed through the
+    crosswalk) and `ffcore.startprob.observations` (a graded per-match
+    label for P(start)'s own fit) both need exactly this, and used to each
+    carry their own copy of it.
+
+    0.0 for any other role (a coach row, say) — not an error, just nobody
+    on the pitch.
+    """
+    raw = (raw_minute or "").strip()
+    if role == "starter":
+        mins = float(raw) if raw else match_len
+    elif role == "sub":
+        mins = (match_len - float(raw)) if raw else 0.0
+    else:
+        return 0.0
+    return max(0.0, mins)
 
 
 def next_kickoff(now=None):
@@ -1435,7 +1468,15 @@ def _selftest() -> None:
         # A file that does not exist yet is not a migration.
         assert widen_csv(Path(tmp) / "nope.csv", ["a"]) is False
 
-    print("ffcore.tidy self-test OK (41 cases)")
+    # -- minutes_played(): the one column, read in opposite directions ------
+    assert minutes_played("starter", "") == 90.0          # played the whole match
+    assert minutes_played("starter", "64") == 64.0         # subbed off at 64'
+    assert minutes_played("sub", "") == 0.0                 # never came on
+    assert minutes_played("sub", "64") == 26.0              # came on at 64', played 26
+    assert minutes_played("coach", "") == 0.0               # nobody on the pitch
+    assert minutes_played("starter", "0") == 0.0            # subbed off at kickoff
+
+    print("ffcore.tidy self-test OK (47 cases)")
 
 
 if __name__ == "__main__":

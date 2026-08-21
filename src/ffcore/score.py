@@ -68,6 +68,7 @@ from typing import NamedTuple
 from ffcore.parse import money, pct100, ratio
 from ffcore.startprob import Calibration
 from ffcore.text import norm
+from ffcore.tidy import minutes_played
 
 __all__ = ["SLOT", "SLOT_LABEL", "SLOT_MIN", "MAX_SLOT", "THIN",
            "FREE_FORMATIONS", "PREMIUM_FORMATIONS", "formations",
@@ -111,9 +112,10 @@ PROMOTED_DISCOUNT = 0.70  # the LaLiga median overstates a promoted squad
 
 def _current_minutes(starters_rows, xw) -> dict[str, float]:
     """{crosswalk player_id: total minutes played this season}, from
-    confirmed line-ups — sources.parse_starters's `minute` (off-minute for a
-    starter, on-minute for a sub, blank meaning he played the whole match or
-    none of it respectively; see that module for the rule).
+    confirmed line-ups — `ffcore.tidy.minutes_played()` on each row (off-
+    minute for a starter, on-minute for a sub, blank meaning he played the
+    whole match or none of it respectively; see that function for the
+    rule, and its own docstring for MATCH_LEN's 90-minute approximation).
 
     KEYED ON THE CROSSWALK, NOT A NAME STRING. starters.csv carries only the
     short display form ("Blanco"); the market — what Scorer.rate() actually
@@ -123,13 +125,6 @@ def _current_minutes(starters_rows, xw) -> dict[str, float]:
     scored the other 32 as zero minutes despite api_stats showing real
     ones (89, 90, 56...) — the crosswalk exists exactly to stop this join.
     `player_slug` (futbolfantasy's own id) resolves through it instead.
-
-    MATCH LENGTH IS APPROXIMATED AT 90. Stoppage time is not on the page a
-    starter's off-minute comes from, so a man who plays the whole match is
-    credited 90 rather than the 94 he may actually have been on for. The
-    same small error for everyone who finishes a match uncredited with a
-    substitution, so it does not distort ranking between them — it is a
-    constant offset, not noise.
 
     ONE ROW PER (match, player), NOT PER SNAPSHOT. starters.csv is written
     once per match (cadence "once") but CARRIED FORWARD into every later
@@ -141,13 +136,14 @@ def _current_minutes(starters_rows, xw) -> dict[str, float]:
     season that had played one jornada. Deduped here on (match_id, player)
     before anything is summed.
     """
-    MATCH_LEN = 90.0
     seen: set[tuple[str, str]] = set()
     out: dict[str, float] = {}
     for r in starters_rows:
         slug = (r.get("player_slug") or "").strip()
         match_id = (r.get("match_id") or "").strip()
         if not slug or not match_id:
+            continue
+        if r.get("role") not in ("starter", "sub"):
             continue
         key = xw.player(ff_slug=slug, name=r.get("player_name"))
         if not key:
@@ -156,15 +152,8 @@ def _current_minutes(starters_rows, xw) -> dict[str, float]:
         if dedup_key in seen:
             continue
         seen.add(dedup_key)
-        role = r.get("role")
-        raw = (r.get("minute") or "").strip()
-        if role == "starter":
-            mins = float(raw) if raw else MATCH_LEN
-        elif role == "sub":
-            mins = (MATCH_LEN - float(raw)) if raw else 0.0
-        else:
-            continue
-        out[key] = out.get(key, 0.0) + max(0.0, mins)
+        out[key] = out.get(key, 0.0) + minutes_played(r.get("role"),
+                                                       r.get("minute"))
     return out
 
 
@@ -353,7 +342,7 @@ def _calibrated():
         return _CAL_CACHE[0]
     import json
     from ffcore.crosswalk import Crosswalk
-    from ffcore.startprob import Calibration, observations
+    from ffcore.startprob import Calibration, METHOD_VERSION, observations
     from ffcore.tidy import load_lineups, read_csv, TIDY
     from ffcore.second import SECOND_SOURCE
 
@@ -368,7 +357,13 @@ def _calibrated():
     # the chain runs several. It cannot change unless the confirmed line-ups
     # do, so the answer is written down and the fingerprint is the evidence
     # that produced it. A changed fingerprint refits; nothing else does.
-    stamp = "%d:%s" % (len(truth), cut)
+    #
+    # METHOD_VERSION IS PART OF THAT EVIDENCE, not just the data. Real bug,
+    # caught before it shipped: the fingerprint used to be data-only, so
+    # Step 4 changing what fit() optimises (binary played/didn't -> minutes-
+    # graded) touched no confirmed line-up and no cut, and the stale
+    # binary-fitted coefficients would have kept being read off disk forever.
+    stamp = "%d:%d:%s" % (METHOD_VERSION, len(truth), cut)
     path = TIDY / "startcal.json"
     cal = Calibration()
     try:

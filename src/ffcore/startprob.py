@@ -44,7 +44,18 @@ from __future__ import annotations
 
 import math
 
-__all__ = ["Obs", "Calibration", "observations", "af_prob"]
+__all__ = ["Obs", "Calibration", "observations", "af_prob", "METHOD_VERSION"]
+
+# Bumped whenever fit()/observations() changes what it optimises, not what
+# data it sees. score.py's on-disk cache (startcal.json) keys itself on this
+# alongside the data fingerprint — REAL BUG, CAUGHT BEFORE IT SHIPPED: the
+# fingerprint used to be (len(truth), cut) alone, so switching Step 4's
+# Brier target from binary played/didn't to minutes-graded changed nothing
+# about the DATA, and the stale binary-fitted coefficients would have kept
+# being read from disk forever, silently, until starters.csv's row count or
+# earliest observed_at happened to move. A methodology change with no data
+# change is exactly the case a data-only fingerprint cannot catch.
+METHOD_VERSION = 2
 
 # The exponent grid for FF's recalibration and the weight grid for AF. Coarse
 # on purpose: the data cannot resolve finer, and a grid is auditable where a
@@ -71,11 +82,24 @@ FLOOR, CEIL = 0.01, 0.97
 
 
 class Obs(tuple):
-    """(ff probability, af probability or None, did he start, whose team).
+    """(ff probability, af probability or None, minutes-graded outcome, team).
 
     `ff` is what the scorer WOULD USE — the published percentage, or the
     neutral/absent fallback — never None, so the baseline this is measured
     against is the live behaviour rather than a strawman.
+
+    `started` IS GRADED ON MINUTES NOW, not binary played/didn't (Step 4,
+    2026-08-21) — `minutes_played(role, minute) / MATCH_LEN`, clamped to
+    [0, 1] by construction (a starter tops out at 1.0, an unused sub sits
+    at 0.0). P(start) is used downstream as a straight multiplier on
+    points-per-minute (`Scorer.score`: `flat = rating.ppm * pct_used /
+    100.0`), so the quantity actually being predicted was always closer to
+    "how much of the match will he play" than to "was he in the printed
+    eleven" — a starter hooked at half-time and one who plays the full 90
+    used to score identically against the fit, discarding exactly the
+    signal that determines whether the multiplier is right. The name stays
+    `started` because it is still true at the extremes and every existing
+    reader already expects a value in [0, 1].
     """
     __slots__ = ()
 
@@ -251,7 +275,10 @@ def _pct(ff):
 
 
 def _titular_rate(obs) -> float:
-    """How often AF's wordless "named starter" actually started.
+    """How much of the match AF's wordless "named starter" actually played,
+    on average — graded on minutes now (Obs.started), same as everything
+    else `fit()` scores against, so a starter hooked early costs this
+    exactly what he costs the Brier objective he is feeding.
 
     Falls back to 0.9 rather than 1.0 when nothing has been seen: a call with
     no evidence behind it must not enter a Bernoulli at certainty.
@@ -289,13 +316,20 @@ def observations(lineups, starters, cut: str, roster=None,
     """
     from ffcore.text import norm
 
+    from ffcore.tidy import MATCH_LEN, minutes_played
+
     truth = [r for r in starters if r.get("role")]
     if not truth:
         return []
     last = max(r["observed_at"] for r in truth)
     truth = [r for r in truth if r["observed_at"] == last]
     teams = {r.get("team_slug") for r in truth}
-    started = {r["player_slug"] for r in truth if r["role"] == "starter"}
+    # GRADED ON MINUTES, NOT BINARY — see Obs's own docstring. A player not
+    # in `truth` at all (never in the 18) gets 0.0 from the .get() default
+    # below, which is exactly right: silence about him is not a guess, it
+    # is nobody having named him.
+    minutes_of = {r["player_slug"]: minutes_played(r["role"], r.get("minute"))
+                 for r in truth}
     name_of = {r["player_slug"]: r.get("player_name", "") for r in truth}
     team_of = {r["player_slug"]: r.get("team_slug", "") for r in truth}
 
@@ -338,8 +372,8 @@ def observations(lineups, starters, cut: str, roster=None,
             pid = xw.player(ff_slug=slug, name=nm)
             if pid:
                 af = narrow.get(pid)
-        out.append(Obs(fp, af_prob(af, 1.0),
-                       slug in started,
+        graded = min(1.0, minutes_of.get(slug, 0.0) / MATCH_LEN)
+        out.append(Obs(fp, af_prob(af, 1.0), graded,
                        (row or {}).get("team_slug") or team_of.get(slug, "")))
     return out
 
@@ -495,7 +529,34 @@ def _selftest() -> None:
     got2 = observations(odd, starters, cut="M", xw=_XW())
     assert any(o.af == 0.75 for o in got2), got2
 
-    print("ffcore.startprob self-test OK (48 cases)")
+    # -- Step 4: graded on minutes, not binary played/didn't ---------------
+    # A starter hooked early and a sub who plays most of the match used to
+    # score identically against the fit as, respectively, a full 90 and an
+    # unused sub — discarding exactly the involvement P(start) is meant to
+    # predict (it multiplies points-per-minute downstream; see score.py).
+    graded_lineups = [
+        {"observed_at": "A", "source": "futbolfantasy", "team_slug": "t",
+         "player_slug": "hooked-early", "player_name": "Hooked Early",
+         "start_pct": "90", "role": "starter"},
+        {"observed_at": "A", "source": "futbolfantasy", "team_slug": "t",
+         "player_slug": "heavy-sub", "player_name": "Heavy Sub",
+         "start_pct": "10", "role": "sub"},
+    ]
+    graded_starters = [
+        # Started, subbed off at the half — half credit, not full.
+        {"observed_at": "K", "team_slug": "t", "player_slug": "hooked-early",
+         "player_name": "Hooked Early", "role": "starter", "minute": "45"},
+        # Came on at the half and played the rest — half credit too, from
+        # the opposite direction, and it is the SAME half.
+        {"observed_at": "K", "team_slug": "t", "player_slug": "heavy-sub",
+         "player_name": "Heavy Sub", "role": "sub", "minute": "45"},
+    ]
+    graded = {o.ff: o.started
+             for o in observations(graded_lineups, graded_starters, cut="M")}
+    assert abs(graded[0.9] - 0.5) < 1e-9, graded    # 45 of 90 minutes
+    assert abs(graded[0.1] - 0.5) < 1e-9, graded    # on at 45', 45 minutes
+
+    print("ffcore.startprob self-test OK (50 cases)")
 
 
 if __name__ == "__main__":
