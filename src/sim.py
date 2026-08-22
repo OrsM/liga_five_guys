@@ -677,97 +677,6 @@ def verdict(routes) -> tuple:
                gap), True)
 
 
-def table(rows, u, base, rivals) -> list[str]:
-    """Every move, and where each one leaves you.
-
-    THE DESTINATION, NOT THE DELTA. This carried Δpos, Δwin and the rival it
-    gained most against, and all three tracked each other so closely that they
-    were one column printed three times — the rival column named the same
-    manager on every row for days. What is left is the number you land on:
-    "90%" needs no arithmetic against a figure in the header, where "+41%"
-    does.
-
-    Sorted by that number rather than by the ranking behind it. Screening is
-    on Δpos, which is the finer statistic, but the two swap the odd pair over
-    — 0.302 was worth +22% and 0.301 was worth +23% — and a column that runs
-    90, 85, 84, 77, 76, 74, 75 reads as a bug, not as a trade-off.
-    """
-    if not rows:
-        return ["_Nothing on offer moves the finish — no affordable buy, "
-                "steal or swap improves the eleven._", ""]
-    now = base.position().get(1, 0.0)
-    ranked = sorted(rows, key=lambda r: (-r.get("d_pts", 0.0), -r["d_pos"]))
-    out = ["| Get | Give up | Season pts | pts/M€ | Helps | Net € | Left |",
-           "|---|---|--:|--:|--:|--:|--:|"]
-    for r in ranked[:SHOW]:
-        a = r["action"]
-        got = title_name(u.name.get(a.buy, a.buy)) if a.buy else "—"
-        # Only a clause names a victim. A market purchase says where he came
-        # from without implying you took anything off anybody.
-        held = u.owner.get(a.buy, "")
-        got += (" ← clause on %s" % a.victim if a.victim
-                else " (on the market, %s)" % (held or "free agent")
-                if a.buy else "")
-        gave = ("—" if not a.sell
-                else " + ".join(short(k, u) for k in a.sell)
-                if len(a.sell) <= 2 else "%d spares" % len(a.sell))
-        ans = r.get("answer")
-        if ans is not None:
-            gave += " · **he takes %s**" % short(ans.buy, u)
-        value = r.get("value")
-        out.append("| %s | %s | %+.0f | %s | %.0f%% | %s | %s |"
-                   % (got, gave, r.get("d_pts", 0.0),
-                      ("%.1f" % value) if value is not None else "free",
-                      100 * r.get("helps", 0.0), _net(-a.net),
-                      fmt_money(u.cash - a.net)))
-    out += ["",
-            "_**Season pts** is how many more points you end the season with, "
-            "and **Helps** is how often — both measured inside the SAME "
-            "simulated seasons, with and without the move, so the difference "
-            "is the squads rather than the weather. They replaced a per-row "
-            "P(win), which is not a number to act on: recalibrating P(start) "
-            "moved one row's P(win) by 48 points and these two by six. Your "
-            "overall chance is %.0f%% and it is in the header, where a figure "
-            "that provisional belongs. "
-            "**pts/M€** is season points per million ACTUALLY PAID — the "
-            "question the rest of this table never answered: not just "
-            "'does this help' but 'is the price worth it', so a big gain "
-            "at a steep price and a small gain that is nearly free can be "
-            "read against each other rather than only against themselves. "
-            "*free* means the move is net cash-NEUTRAL-OR-POSITIVE (a "
-            "sale raises at least as much as the buy costs) — there is no "
-            "price to divide by, and there does not need to be: Season "
-            "pts already says whether it is worth doing. This is NOT the "
-            "old λ (retired 2026-08-17): λ measured against your OWN "
-            "current eleven off a ladder of the whole unowned pool, so "
-            "the same player was worth a different λ on different days "
-            "for reasons that had nothing to do with him. This divides "
-            "the SAME paired Season pts figure above — the same simulated "
-            "seasons, with the move and without it — so it moves only "
-            "when the real trade-off does. "
-            "**Get** says HOW you would get him. *On the market* is an "
-            "ordinary purchase whoever owns him — measured, taking a man off "
-            "a rival that way denies him nothing, because the managers "
-            "listing players are not the one you are racing. *Clause on X* is "
-            "the raid, and today not one clause in the league is payable. **Net €** is what the move does to the balance and "
-            "**Left** is what you are on afterwards — every rival is on 0K "
-            "until you pay one, so that column is the whole of your ability "
-            "to answer anything for the rest of the season. Who exactly you "
-            "give up when it says *spares* is in the sell table below; none "
-            "of them ever start. **he takes** is the rival's best answer, "
-            "played before the season is._" % (100 * now),
-            "",
-            "_A CLAUSE IS THREE PURCHASES AT ONCE. The market value buys the "
-            "points for you, and that part is a loan rather than a spend — it "
-            "comes back when you sell him. The premium over it buys something "
-            "else entirely: that a RIVAL does not score them. And the balance "
-            "buys nothing at all, it only stops being available. The first is "
-            "priced by the market; the second is now scored net of his reply, "
-            "because he is handed the money and spends it; the third is the "
-            "column on the right, because nothing here can value it._", ""]
-    return out
-
-
 def wait_routes(u, offers=None, rng=None) -> list[dict]:
     """The three ways to get a better eleven, as data both renderers read.
 
@@ -1490,111 +1399,18 @@ def _selftest() -> None:
     # The formation, which is the first thing the app asks for.
     assert "play " in h, h
 
-    # -- one row -----------------------------------------------------------
+    # -- one row's worth of a real move, shared by every test below --------
+    # table() used to build its own assertions straight off this fixture;
+    # retired 2026-08-22 (dead code, never called outside its own test —
+    # see handoff_2026-08-21_evening.md, which already found this and
+    # redirected the feature into ladder()/ladder_rows() without deleting
+    # the original). The fixture itself stays: payload(), alert_lines() and
+    # render() below are still real callers and still need one.
     rows = [{"action": Action("clause", buy="yuri", sell="benat",
                               cost=20e6, proceeds=5.87e6, victim="riv"),
              "d_pos": 0.433, "d_win": 0.364, "d_beat": {"riv": 0.37},
              "d_pts": 120.0, "helps": 0.90, "mean": 1510.0,
              "value": 120.0 / (14.13e6 / 1e6)}]
-    body = table(rows, u, st, ["riv"])
-    line = [ln for ln in body if ln.startswith("| Yuri")]
-    assert len(line) == 1, body
-    cells = [c.strip() for c in line[0].strip("|").split("|")]
-    # WHAT YOU GET, and off whom. NAMES, NOT KEYS: the keys are what every
-    # dict is keyed by and they are not what anybody calls these players.
-    assert cells[0] == "Yuri Berchiche ← clause on riv", cells
-    assert cells[1] == "Turrientes", cells
-    # THE NUMBER YOU LAND ON, not the one you move by. P(win) is 50% here and
-    # the move is worth +36.4 points of it, so it reads 86% — no arithmetic,
-    # and no delta that has to be added to a figure in the header.
-    assert cells[2] == "+120", cells      # season points, paired
-    # VALUE FOR MONEY: 120 points for 14.13M actually paid.
-    assert cells[3] == "8.5", cells
-    assert cells[4] == "90%", cells       # ...and how often it helps
-    # MONEY LEAVING IS NEGATIVE, the way the balance sees it: this move spends
-    # 20M and raises 5.87M, so it costs 14.13M.
-    assert cells[5] == "-14.13M", cells
-    # WHAT YOU ARE LEFT ON. Every rival is on nothing until you pay one, so
-    # this column is the whole of your ability to answer anything later.
-    assert cells[6] == "9.47M", cells
-    # The three columns that said the same thing are gone: Δpos, Δwin and the
-    # rival column all tracked each other, and the rival column named the same
-    # manager on every row for days.
-    assert len(cells) == 7, cells
-
-    # A move with no `value` key at all (an older-shaped row) reads as
-    # "free" rather than crashing — .get(), not [], is what makes that true.
-    no_value = [{**rows[0], "action": Action(
-        "buy", buy="yuri", cost=20e6, proceeds=5.87e6)}]
-    del no_value[0]["value"]
-    line2 = [ln for ln in table(no_value, u, st, ["riv"])
-            if ln.startswith("| Yuri")]
-    cells2 = [c.strip() for c in line2[0].strip("|").split("|")]
-    assert cells2[3] == "free", cells2
-
-    # A GENUINE net<=0 SALE gets the same "free" reading, on the real
-    # formula this time (rank() itself refuses to compute a ratio here —
-    # see its own note on why dividing by a non-positive net reads
-    # backwards).
-    cash_pos = [{**rows[0], "action": Action(
-        "sell", sell="benat", proceeds=5.0e6), "value": None}]
-    line3 = [ln for ln in table(cash_pos, u, st, ["riv"])
-            if "Turrientes" in ln]
-    cells3 = [c.strip() for c in line3[0].strip("|").split("|")]
-    assert cells3[3] == "free", cells3
-    assert "+0.433" not in line[0] and "+36%" not in line[0], line[0]
-
-    # A free agent is a different move from a steal and says so rather than
-    # leaving the column blank.
-    free = table([{**rows[0], "action": Action("buy", buy="yuri", cost=1e6)}],
-                 u, st, ["riv"])
-    assert "| Yuri Berchiche (on the market, free agent) |" \
-        in "\n".join(free), free
-    # Nothing given up is a dash, never an empty cell.
-    assert "| — |" in "\n".join(free), free
-
-    # A move that RAISES money reads positive, so the sign is never decoration.
-    raised = table([{**rows[0],
-                     "action": Action("clause", buy="yuri", sell="benat",
-                                      cost=1e6, proceeds=5e6, victim="riv")}],
-                   u, st, ["riv"])
-    assert "| +4.00M |" in "\n".join(raised), raised
-
-    # THE TABLE IS SORTED BY THE COLUMN IT SHOWS. Screening ranks on Δpos,
-    # which is the finer statistic, but the two trade the odd pair over and a
-    # column running out of order reads as a bug rather than a trade-off.
-    pair = [{**rows[0], "d_pos": 0.302, "d_pts": 10.0,
-             "action": Action("buy", buy="lo", cost=0.0)},
-            {**rows[0], "d_pos": 0.301, "d_pts": 40.0,
-             "action": Action("buy", buy="hi", cost=0.0)}]
-    order = "\n".join(table(pair, u, st, ["riv"]))
-    assert order.index("| Hi (on the market") \
-        < order.index("| Lo (on the market"), order
-
-    # Two men given up are both named; three is where it stops naming them,
-    # because the cell is on a 390px screen and the detail is one tap away.
-    many = table([{**rows[0],
-                   "action": Action("swap", buy="yuri",
-                                    sell=("benat", "a", "b"), cost=1e6)}],
-                 u, st, ["riv"])
-    assert "3 spares" in "\n".join(many), many
-
-    # Nothing worth doing is a sentence, not an empty table with a header on
-    # top of it.
-    # A rival's answer is named in the cell: a steal that funds a counter-
-    # steal is not the move the number on its own describes.
-    answered = table([{"action": Action("clause", buy="yuri", sell="benat",
-                                        cost=20e6, proceeds=5.87e6,
-                                        victim="riv"),
-                       "d_pos": 0.4, "d_win": 0.3, "d_beat": {"riv": 0.3},
-                       "mean": 1.0,
-                       "answer": Action("clause", buy="benat", victim="me")}],
-                     u, st, ["riv"])
-    assert "he takes" in "\n".join(answered), answered
-
-    empty = "\n".join(table([], u, st, ["riv"]))
-    assert "|" not in empty, empty
-    assert "nothing" in empty.lower(), empty
 
     # -- dead weight -------------------------------------------------------
     # THE ONE VERDICT THE SIMULATION KEEPS, and the only one it can make
