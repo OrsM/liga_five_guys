@@ -260,12 +260,21 @@ def _bar(u) -> float:
     return min((exp.get(k, 0.0) for k in xi), default=0.0)
 
 
-def ladder_rows(u, rows, saves=None) -> list[dict]:
+def ladder_rows(u, rows, base=None) -> list[dict]:
     """The grouped plan as data, so the phone draws the same one table.
 
     Same groups, same order, same numbers. Two renderers drawing different
     tables is how this report came to contradict itself; there is one shape
     and both read it.
+
+    `base`, when given, prices EVERY row through player_bands() — a real
+    season band (pts_lo/pts_hi), not just the point estimate xpts already
+    carried. Before this, only "buy" rows (already ranked as a move) had
+    one; a squad member's own row showed a bare xPts/j snapshot with no
+    uncertainty at all, which is a single jornada's P(start), not a season
+    of them — see player_bands()'s own note on why that understates a
+    bench player's real range. `base=None` (an old caller, or the
+    self-test) is the previous behaviour exactly, not a crash.
     """
     from ffcore.season import best_xi
 
@@ -276,12 +285,20 @@ def ladder_rows(u, rows, saves=None) -> list[dict]:
     won = {r["action"].buy: r for r in rows if r["action"].buy}
     bar = min((exp.get(k, 0.0) for k in xi), default=0.0)
     spare = sum(v for _k, v in decide_dead(u))
+    rest = [k for k in u.price if k not in mine and exp.get(k, 0.0) > bar]
+    bands = (player_bands(u, base, own_keys=list(mine),
+                          candidate_keys=[k for k in rest if k not in won])
+             if base is not None else {})
 
-    def cell(k, group, where, money, pts, note="", value=None):
+    def cell(k, group, where, money, pts, note="", value=None,
+            lo=None, hi=None):
+        if k in bands:
+            pts, lo, hi = bands[k]
         return {"name": title_name(u.name.get(k, k)),
                 "pos": u.pos.get(k, ""), "start": u.start.get(k, 0.0),
                 "xpts": exp.get(k, 0.0), "group": group, "where": where,
-                "money": money, "pts": pts, "note": note, "value": value}
+                "money": money, "pts": pts,
+                "pts_lo": lo, "pts_hi": hi, "note": note, "value": value}
 
     out = []
     # WHAT TO CHANGE, not what to have. When the marks are a legal eleven the
@@ -306,16 +323,16 @@ def ladder_rows(u, rows, saves=None) -> list[dict]:
         out.append(cell(k, "keep", "yours", None, None))
     for k in sorted(dead, key=lambda k: -exp.get(k, 0.0)):
         out.append(cell(k, "sell", "yours", u.proceeds.get(k, 0.0), None))
-    rest = [k for k in u.price if k not in mine and exp.get(k, 0.0) > bar]
     for k in sorted((k for k in rest if k in won), key=lambda k: -exp.get(k, 0.0)):
         r = won[k]
         out.append(cell(k, "buy", u.owner.get(k) or "free agent",
-                        -r["action"].net, r["d_pts"], value=r.get("value")))
+                        -r["action"].net, r["d_pts"], value=r.get("value"),
+                        lo=r.get("pts_lo"), hi=r.get("pts_hi")))
     for k in sorted((k for k in rest if k not in won
                      and u.price[k] > u.cash + spare),
                     key=lambda k: -exp.get(k, 0.0)):
         short_by = u.price[k] - u.cash - spare
-        save_pts = (saves or {}).get(k)
+        save_pts = bands[k][0] if k in bands else None
         out.append(cell(k, "save", u.owner.get(k) or "free agent",
                         -short_by, save_pts, "short",
                         value=value_rate(save_pts, short_by)))
@@ -329,38 +346,64 @@ def ladder_rows(u, rows, saves=None) -> list[dict]:
 
 
 
-def price_saves(u, keys, base, seed: int = 1) -> dict:
-    """What a player you cannot yet afford would be worth if you could.
+def player_bands(u, base, own_keys=(), candidate_keys=(), seed: int = 1
+                 ) -> dict[str, tuple[float, float, float]]:
+    """{key: (median season d_pts, pts_lo, pts_hi)} for EVERY player the
+    ladder shows, not just the ones already ranked as a move — a squad
+    member's OWN marginal contribution (what selling him alone would cost,
+    no replacement bought) for `own_keys`, a candidate's (what buying him
+    alone would gain) for `candidate_keys`. Same batched-pass shape
+    rank()'s own scoring uses, same reason: ranking these one simulation at
+    a time would be as much work again as ranking every move already is.
+    Retired price_saves() (2026-08-22), which did the same batching for the
+    SAVE group alone, median only, in a second simulation pass this
+    function's own candidate_keys already covers — see ladder()'s and
+    ladder_rows()'s own notes on the duplication that was.
 
-    "Can't afford" is not an answer to whether saving toward him is worth it,
-    and on the day this was written the two out of reach were the second and
-    fourth best players on the board — one of them 7.89M short once the dead
-    weight is sold, and worth MORE than the best move you can afford. Scored
-    exactly like an affordable move, funded by everything spare, and marked
-    conditional wherever it is printed.
+    WHY THIS MATTERS MORE THAN IT LOOKS: dead_weight() decides who counts
+    as sellable by checking best_xi() against forecaster.expected(j) for
+    every remaining jornada — but expected() returns a FLAT p_start for
+    every jornada (per_jornada[j][key][1] never varies by j), so looping
+    over twenty jornadas re-checks the identical frozen number twenty
+    times. The only place a jornada's DISTANCE actually widens anything is
+    inside the stochastic trials this function runs (Bootstrap.start_draw,
+    wired into rate_draw's own DRIFT_FRAC-style walk) — so a player who
+    reads as safely dead weight on today's snapshot can still show a real,
+    wide pts_hi here if the season has enough jornadas left for his rate
+    to plausibly recover. The classification (dead_weight) stays the cheap
+    heuristic gate; the BAND shown for him is the real answer.
+
+    A pure sell (buy="") is a legal Action — apply() already handles
+    a.buy == "" as a no-op purchase, only removing a.sell.
     """
     import decide
 
-    keys = list(keys)
-    if not keys:
+    own_keys, candidate_keys = list(own_keys), list(candidate_keys)
+    if not own_keys and not candidate_keys:
         return {}
     dead = tuple(sorted(k for k, _ in decide_dead(u)))
     got = sum(v for _k, v in decide_dead(u))
-    # ONE PASS, like the ranking. Scored one at a time these were two full
-    # simulations on their own — as much work again as ranking every move.
-    acts = [decide.Action("buy", buy=k, sell=dead, cost=u.price.get(k, 0.0),
-                          proceeds=got) for k in keys]
+    acts = [decide.Action("sell", sell=(k,), proceeds=u.proceeds.get(k, 0.0))
+           for k in own_keys]
+    acts += [decide.Action("buy", buy=k, sell=dead,
+                           cost=u.price.get(k, 0.0), proceeds=got)
+            for k in candidate_keys]
     scored = decide._score_many(u, [decide.apply(u, a) for a in acts],
                                 decide.FINAL_TRIALS, seed)
-    out = {}
     was = base.totals.get(u.me, [])
-    for k, r in zip(keys, scored):
+    out = {}
+    for a, r in zip(acts, scored):
+        key = a.sell[0] if a.kind == "sell" else a.buy
         pairs = sorted(x - y for x, y in zip(r.totals.get(u.me, []), was))
-        out[k] = pairs[len(pairs) // 2] if pairs else 0.0
+        if not pairs:
+            out[key] = (0.0, 0.0, 0.0)
+            continue
+        out[key] = (pairs[len(pairs) // 2], pairs[int(0.1 * len(pairs))],
+                   pairs[int(0.9 * len(pairs))])
     return out
 
 
-def ladder(u, rows, base, saves=None) -> list[str]:
+def ladder(u, rows, base, data=None) -> list[str]:
     """EVERY PLAYER YOU COULD HOLD, GROUPED BY WHAT TO DO WITH HIM.
 
     Not one long ranking: a plan. The eleven you should field, then the ones
@@ -371,52 +414,69 @@ def ladder(u, rows, base, saves=None) -> list[str]:
 
     Field, bench, sell and buy were four sections that had begun contradicting
     each other. They are one table because they were always one question.
+
+    RENDERS ladder_rows()'s OWN OUTPUT, computes nothing of its own beyond
+    the aggregate "Your eleven" line (best_xi/expected — deterministic, no
+    simulation, so recomputing it here cannot drift). This used to be a
+    second, independent implementation — its own exp/xi/dead/won/bands,
+    the exact duplication this repo's own design principle warns against
+    ("two renderings of one answer is how they come to disagree"). Fixed
+    2026-08-22: player_bands() ran twice, once per renderer, before this —
+    real simulated numbers, computed twice, on the strength of "same seed
+    gives the same answer" rather than there being only one computation to
+    give it.
+
+    `data`, when given, is ladder_rows()'s OWN result, computed once by a
+    caller feeding both this and payload() — main() does, so the real
+    simulation behind every band runs ONCE per report, not once per
+    renderer. `data=None` (a caller with no JSON side, or the self-test)
+    computes it here exactly as before, not a crash.
     """
     from ffcore.season import best_xi
 
     exp = u.forecaster.expected(decide_choosable(u))
     mine = u.state.squads.get(u.me, {})
     xi = set(best_xi(mine, exp))
-    dead = {k for k, _ in decide_dead(u)}
-    won = {r["action"].buy: r for r in rows if r["action"].buy}
-    bar = min((exp.get(k, 0.0) for k in xi), default=0.0)
-    spare = sum(u.proceeds.get(d, 0) for d in dead)
-    names = {k: title_name(u.name.get(k, k)) for k in u.name}
+    data = data if data is not None else ladder_rows(u, rows, base)
+    by_group: dict[str, list[dict]] = {}
+    for r in data:
+        by_group.setdefault(r["group"], []).append(r)
 
-    def row(k, where, money, pts, value=None):
+    def row_md(r):
+        if r["group"] == "save":
+            season = ("—" if r["pts"] is None else
+                      "%+.0f (%+.0f–%+.0f) if you could"
+                      % (r["pts"], r["pts_lo"], r["pts_hi"]))
+            money = "%.2fM short" % (-r["money"] / 1e6)
+        else:
+            season = ("—" if r["pts"] is None else
+                      "%+.0f (%+.0f–%+.0f)" % (r["pts"], r["pts_lo"], r["pts_hi"])
+                      if r["pts_lo"] is not None else "%+.0f" % r["pts"])
+            money = ("%+.2fM" % (r["money"] / 1e6)) if r["money"] else "—"
         return ("| %s | %s | %.0f%% | %.2f | %s | %s | %s | %s |"
-                % (names.get(k, k), u.pos.get(k, "—"),
-                   100 * u.start.get(k, 0.0), exp.get(k, 0.0), where,
-                   ("%+.2fM" % (money / 1e6)) if money else "—",
-                   ("%+.0f" % pts) if pts is not None else "—",
-                   ("%.1f" % value) if value is not None else "—"))
-
-    def by_xpts(keys):
-        return sorted(keys, key=lambda k: -exp.get(k, 0.0))
+                % (r["name"], r["pos"] or "—", 100 * r["start"], r["xpts"],
+                   r["where"], money, season,
+                   ("%.1f" % r["value"]) if r["value"] is not None else "—"))
 
     out = ["| Player | Pos | Start | xPts/j | Where | € | Season | pts/M€ |",
            "|---|---|--:|--:|---|--:|--:|--:|"]
 
-    chg = xi_change(fielded_keys(u), xi)
-    if not chg["legal"]:
+    if by_group.get("field"):
         # No trustworthy marks to diff against, so the whole sheet — and a
         # line saying why you are being asked to read one.
         out.append("| **FIELD — your eleven — the app has not said what you "
                    "are playing** | | | | | | | |")
-        for k in by_slot(u, xi):
-            out.append(row(k, "yours", None, None))
-    elif not chg["in"] and not chg["out"]:
+        out += [row_md(r) for r in by_group["field"]]
+    elif not by_group.get("in") and not by_group.get("out"):
         out.append("| **XI — no change, you are fielding the best eleven** "
                    "| | | | | | | |")
     else:
-        if chg["in"]:
+        if by_group.get("in"):
             out.append("| **PUT ON** | | | | | | | |")
-            for k in by_slot(u, chg["in"]):
-                out.append(row(k, "bench", None, None))
-        if chg["out"]:
+            out += [row_md(r) for r in by_group["in"]]
+        if by_group.get("out"):
             out.append("| **TAKE OFF** | | | | | | | |")
-            for k in by_slot(u, chg["out"]):
-                out.append(row(k, "yours", None, None))
+            out += [row_md(r) for r in by_group["out"]]
     tot = sum(exp.get(k, 0.0) for k in xi)
     best_riv = max(((sum(exp.get(x, 0.0) for x in best_xi(sq, exp)), m)
                     for m, sq in u.state.squads.items() if m != u.me),
@@ -426,49 +486,25 @@ def ladder(u, rows, base, saves=None) -> list[str]:
                % (shape(u, xi), tot, best_riv[1], best_riv[0],
                   tot - best_riv[0]))
 
-    keep = [k for k in mine if k not in xi and k not in dead
-            and k not in set(chg["in"]) | set(chg["out"])]
-    if keep:
+    if by_group.get("keep"):
         out.append("| **KEEP — bench** | | | | | | | |")
-        for k in by_slot(u, keep):
-            out.append(row(k, "yours", None, None))
+        out += [row_md(r) for r in by_group["keep"]]
 
-    if dead:
+    if by_group.get("sell"):
         out.append("| **SELL — never start** | | | | | | | |")
-        for k in by_xpts(dead):
-            out.append(row(k, "yours", u.proceeds.get(k, 0.0), None))
+        out += [row_md(r) for r in by_group["sell"]]
 
-    buys = [k for k in u.price if k not in mine and k in won]
-    pss = [k for k in u.price
-           if k not in mine and k not in won and exp.get(k, 0.0) > bar]
-    if buys:
+    if by_group.get("buy"):
         out.append("| **BUY — with the proceeds** | | | | | | | |")
-        for k in by_xpts(buys):
-            r = won[k]
-            out.append(row(k, u.owner.get(k) or "free agent",
-                           -r["action"].net, r["d_pts"], r.get("value")))
-    save = [k for k in pss
-            if u.price[k] > u.cash + spare]
-    pss = [k for k in pss if k not in save]
-    if save:
+        out += [row_md(r) for r in by_group["buy"]]
+
+    if by_group.get("save"):
         out.append("| **SAVE — better than yours, out of reach** | | | | | | | |")
-        for k in by_xpts(save):
-            short_by = u.price[k] - u.cash - spare
-            save_pts = (saves or {}).get(k)
-            save_value = value_rate(save_pts, short_by)
-            out.append("| %s | %s | %.0f%% | %.2f | %s | %.2fM short | %s | %s |"
-                       % (names.get(k, k), u.pos.get(k, "—"),
-                          100 * u.start.get(k, 0.0), exp.get(k, 0.0),
-                          u.owner.get(k) or "free agent", short_by / 1e6,
-                          ("%+.0f if you could" % save_pts
-                           if save_pts is not None else "—"),
-                          ("%.1f" % save_value) if save_value is not None
-                          else "—"))
-    if pss:
+        out += [row_md(r) for r in by_group["save"]]
+
+    if by_group.get("pass"):
         out.append("| **PASS** | | | | | | | |")
-        for k in by_xpts(pss):
-            out.append(row(k, u.owner.get(k) or "free agent",
-                           -u.price[k], None))
+        out += [row_md(r) for r in by_group["pass"]]
 
     out += ["",
             "_Read it top to bottom: it is a plan, not a menu. The funding is "
@@ -1125,7 +1161,7 @@ def _rival_best(u) -> dict:
 
 
 def payload(u, rows, base, rivals, locks_h=None, n_actions: int = 0,
-            offers=None, saves=None) -> dict:
+            offers=None, ladder_data=None) -> dict:
     """The report as data, for the phone to draw.
 
     Same rows as the markdown, so the two cannot disagree about order or
@@ -1133,6 +1169,10 @@ def payload(u, rows, base, rivals, locks_h=None, n_actions: int = 0,
     pass over the universe. `kind` is what the move IS rather than something a
     renderer has to infer from a string, and the label is carried anyway so a
     renderer that just wants the sentence has it.
+
+    `ladder_data`, when given, is ladder_rows()'s own result already
+    computed by the caller — see ladder()'s matching note. `None` computes
+    it here, exactly as before.
     """
     names = {k: title_name(v) for k, v in u.name.items()}
     lo, hi = base.band(u.me)
@@ -1186,7 +1226,8 @@ def payload(u, rows, base, rivals, locks_h=None, n_actions: int = 0,
         "moves": moves,
         "sell": [{"name": names.get(k, k), "pos": u.pos.get(k, ""),
                   "raises": got} for k, got in dead_weight(u)],
-        "ladder": ladder_rows(u, rows, saves),
+        "ladder": (ladder_data if ladder_data is not None
+                  else ladder_rows(u, rows, base)),
         "bar": _bar(u),
         "xi_total": _xi_total(u, u.me),
         "shape": _shape_now(u),
@@ -1326,7 +1367,7 @@ def placeholder(why: str) -> list[str]:
 
 
 def render(u, rows, base, stamp: str, rivals, n_actions: int = 0,
-           locks_h=None, offers=None, saves=None) -> list[str]:
+           locks_h=None, offers=None, ladder_data=None) -> list[str]:
     # EVERYTHING UNDER A HEADING, including the preamble. digest.py drops a
     # source's H1 when it stitches the appendix and keeps what follows, so a
     # preamble above the first `## ` arrives in the middle of the report
@@ -1348,7 +1389,7 @@ def render(u, rows, base, stamp: str, rivals, n_actions: int = 0,
     # Presented as "what to do" directly above a section saying "do nothing",
     # it is a contradiction rather than a second opinion.
     out += ["## Every player you could hold", ""]
-    out += ladder(u, rows, base, saves)
+    out += ladder(u, rows, base, ladder_data)
 
     wait = waiting(u, offers)
     if wait:
@@ -1925,7 +1966,52 @@ def _selftest() -> None:
     ph = "\n".join(placeholder("no api_teams.csv"))
     assert "no api_teams.csv" in ph and ph.startswith("# The simulation")
 
-    print("sim self-test OK (119 cases)")
+    # -- player_bands: a real season band for EVERY player, not just moves --
+    # THIS WAS NEVER EXERCISED BEFORE any simulation-touching helper in this
+    # file got its own real test. Built here first, before wiring it into
+    # the ladder, so a broken band cannot
+    # silently reach the report.
+    from decide import Universe as U2
+    from ffcore.season import LeagueState as LS2, simulate
+
+    many_j = list(range(1, 11))
+    # A full legal eleven ("star" is one of five real MEDs, so removing him
+    # still leaves a legal XI to re-pick from — the real case, a squad
+    # short a slot with no replacement, has no legal XI at all and every
+    # trial's total collapses to the same degenerate number).
+    sqb = {"k": "POR", **{f"d{i}": "DEF" for i in range(1, 5)},
+          "star": "MED", **{f"m{i}": "MED" for i in range(1, 5)},
+          "f1": "DEL", "dead": "MED"}
+    riv = {"rk": "POR", **{f"rd{i}": "DEF" for i in range(1, 5)},
+          **{f"rm{i}": "MED" for i in range(1, 5)}, "rf1": "DEL"}
+    perb = {j: {**{k: (3.0, 0.9) for k in sqb if k not in ("star", "dead")},
+               "star": (6.0, 0.9), "dead": (3.0, 0.05), "cand": (5.0, 0.8),
+               **{k: (3.0, 0.9) for k in riv}} for j in many_j}
+    ub = U2(state=LS2({"me": dict(sqb), "riv": dict(riv)}, many_j, "me"),
+           forecaster=Bootstrap(perb, matches={k: 30 for k in
+                                               (*sqb, *riv, "cand")}),
+           pos={**{k: v for k, v in sqb.items()}, "cand": "MED"},
+           price={"cand": 5e6}, proceeds={"dead": 1e6, "star": 20e6},
+           owner={}, cash=10e6, me="me")
+    baseb = simulate(ub.state, ub.forecaster, trials=1500, seed=7)
+
+    bands = player_bands(ub, baseb, own_keys=["star", "dead"],
+                         candidate_keys=["cand"])
+    assert set(bands) == {"star", "dead", "cand"}, bands
+    for key in bands:
+        med, lo, hi = bands[key]
+        assert lo <= med <= hi, (key, bands[key])
+    # SELLING YOUR NAILED STARTER COSTS YOU POINTS — a real, clearly
+    # negative median, not a snapshot of one jornada.
+    assert bands["star"][0] < -20, bands["star"]
+    # SELLING DEAD WEIGHT IS NEAR FREE — small in magnitude, unlike star's.
+    assert abs(bands["dead"][0]) < abs(bands["star"][0]) / 2, bands
+    # BUYING A GOOD CANDIDATE GAINS POINTS — positive median.
+    assert bands["cand"][0] > 0, bands["cand"]
+    # No keys given at all: no simulation run, not an error.
+    assert player_bands(ub, baseb) == {}
+
+    print("sim self-test OK (125 cases)")
 
 
 def main() -> None:
@@ -1968,20 +2054,18 @@ def main() -> None:
     log_cash_price(measured)
     u.cash_note = _price_note(smoothed, measured)
     rivals = [m for m in u.state.squads if m != u.me]
-    # What the two out of reach would be worth if the money were there —
-    # which is the only thing that makes "save toward him" a decision.
-    from ffcore.season import best_xi as _bxi
-    _exp = u.forecaster.expected(decide_choosable(u))
-    _bar = min((_exp.get(k, 0.0) for k in _bxi(u.state.squads[u.me], _exp)),
-               default=0.0)
-    _spare = sum(v for _k, v in decide_dead(u))
-    saves = price_saves(u, [k for k, p in u.price.items()
-                            if k not in u.state.squads[u.me]
-                            and _exp.get(k, 0.0) > _bar
-                            and p > u.cash + _spare], base)
+    # ONE COMPUTATION, READ BY BOTH RENDERERS. This used to be two: a
+    # separate price_saves() call here feeding the markdown's SAVE section
+    # a median with no band, and ladder_rows() (JSON) running its own
+    # player_bands() pass for the same players plus a real range —
+    # the exact "two renderings of one answer" duplication ladder()'s own
+    # docstring now names directly. ladder_rows() already covers "save"
+    # (and every other group) with a real band, so the separate median-only
+    # pass is retired rather than kept as a second source for the same fact.
+    ladder_data = ladder_rows(u, rows, base)
     write_lines(PARTS / OUT,
                 render(u, rows, base, stamp, rivals, len(acts), locks_h,
-                       market_model(u), saves))
+                       market_model(u), ladder_data))
     print("wrote %s (%d moves, %d simulated in full)"
           % (PARTS / OUT, len(acts), len(rows)))
 
@@ -1989,7 +2073,7 @@ def main() -> None:
         "generated_at": run_now()
                           .strftime("%Y-%m-%dT%H:%MZ"),
         **payload(u, rows, base, rivals, locks_h, len(acts),
-                  market_model(u), saves),
+                  market_model(u), ladder_data=ladder_data),
     }, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
     print("wrote %s" % (REPORTS / "decisions.json"))
 
