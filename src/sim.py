@@ -699,7 +699,13 @@ def wait_routes(u, offers=None, rng=None) -> list[dict]:
     bar = min(exp.get(k, 0.0) for k in eleven)
     mine = set(u.state.squads.get(u.me, {}))
 
-    def gain(k):
+    def approx_gain(k):
+        # NOT ffcore.bid.gain() — that re-picks a whole best XI per
+        # candidate via pick_xi(), real but too expensive to run per
+        # candidate per Monte Carlo trial here. This is the cheap linear
+        # stand-in this question has always used; named apart from the
+        # real one so the two are never mistaken for each other.
+        #
         # market_exp, not expected(): the simulation scores the 89 players who
         # could be in a squad, and this question is about the other five
         # hundred. One it was never given comes back 0.0, which is
@@ -708,7 +714,8 @@ def wait_routes(u, offers=None, rng=None) -> list[dict]:
         return max(0.0, u.market_exp.get(k, exp.get(k, 0.0)) - bar)
 
     left = len(u.state.jornadas)
-    now_best = max((gain(k) for k in u.price if k not in mine), default=0.0)
+    now_best = max((approx_gain(k) for k in u.price if k not in mine),
+                  default=0.0)
 
     def season(rate, delay=0):
         """A per-jornada upgrade as points over the rest of the season.
@@ -727,7 +734,7 @@ def wait_routes(u, offers=None, rng=None) -> list[dict]:
             "lo": None, "hi": None, "beats_now": None}]
 
     if offers is not None:
-        band = offers.best_over(7, gain, rng or random.Random(3))
+        band = offers.best_over(7, approx_gain, rng or random.Random(3))
         # BEATS_NOW GRADED AGAINST REAL SINGLE CYCLES, NOT THE RESAMPLED
         # BAND ABOVE. `band` (best_over) is a maximum over many independent
         # draws from the whole pool — it beats one real day's actual
@@ -742,7 +749,7 @@ def wait_routes(u, offers=None, rng=None) -> list[dict]:
         # old test fixture) falls back to `band` exactly as before, not a
         # crash.
         real = getattr(offers, "real_cycles", None)
-        hist = (real_cycle_bests(real, gain).get("", []) if real else None)
+        hist = (real_cycle_bests(real, approx_gain).get("", []) if real else None)
         beats_now = (sum(1 for x in hist if x > now_best) / len(hist)
                     if hist else
                     sum(1 for x in band if x > now_best) / len(band))
@@ -763,10 +770,10 @@ def wait_routes(u, offers=None, rng=None) -> list[dict]:
                 grp = group_of(k)
                 if grp is None:
                     continue
-                g = gain(k)
+                g = approx_gain(k)
                 if g > now_by_group.get(grp, 0.0):
                     now_by_group[grp] = g
-            hist_by_group = (real_cycle_bests(real, gain, real_group_of)
+            hist_by_group = (real_cycle_bests(real, approx_gain, real_group_of)
                              if real else {})
             return {grp: {"n": len(vals), "now_best": now_by_group[grp],
                          "beats_now": sum(1 for x in vals
@@ -810,7 +817,7 @@ def wait_routes(u, offers=None, rng=None) -> list[dict]:
             # hide (see decide.Universe.route's own docstring).
             "by_route": graded_by(lambda k: u.route.get(k),
                                  lambda k: real_routes.get(k)),
-            "helpful": sum(1 for k in offers.pool if gain(k) > 0),
+            "helpful": sum(1 for k in offers.pool if approx_gain(k) > 0),
             "pool": len(offers.pool), "note": offers.note()})
 
     # NOT FOR SALE IS NOT THE SAME AS NOT WORTH HAVING. The best players in
@@ -820,8 +827,8 @@ def wait_routes(u, offers=None, rng=None) -> list[dict]:
     # shopping list. That misreading cost a sale: Ruben Garcia was described
     # as buyable back when he was merely unowned.
     if offers is not None:
-        watch = sorted(((gain(k), k) for k in offers.pool
-                        if gain(k) > 0 and k not in u.price), reverse=True)
+        watch = sorted(((approx_gain(k), k) for k in offers.pool
+                        if approx_gain(k) > 0 and k not in u.price), reverse=True)
         out.append({"route": "watch", "label": "Not for sale",
                     "what": "best players nobody is offering",
                     "best": watch[0][0] if watch else 0.0,
@@ -838,10 +845,10 @@ def wait_routes(u, offers=None, rng=None) -> list[dict]:
         out.append({
             "route": "clauses", "label": "Wait for the clauses",
             "what": "%d players on %s" % (len(shut), opens.strftime("%d %b")),
-            "best": max((gain(k) for k in shut), default=0.0),
-            "pts": season(max((gain(k) for k in shut), default=0.0), delay=1),
+            "best": max((approx_gain(k) for k in shut), default=0.0),
+            "pts": season(max((approx_gain(k) for k in shut), default=0.0), delay=1),
             "lo": None, "hi": None, "beats_now": None,
-            "helpful": sum(1 for k in shut if gain(k) > 0),
+            "helpful": sum(1 for k in shut if approx_gain(k) > 0),
             "days": max(0.0, (opens - now).total_seconds() / 86400.0),
             "opens": opens.strftime("%d %b")})
     return out

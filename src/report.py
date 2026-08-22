@@ -240,7 +240,7 @@ def fix_cell(p) -> str:
     return "=" if abs(pct) < 0.5 else "%+.0f%%" % pct
 
 
-def candidates(sc, by_key, slate, owner) -> list[dict]:
+def slate_candidates(sc, by_key, slate, owner) -> list[dict]:
     """Scored rows for everything on today's slate you do not already own.
 
     One list, two tables: question 1 asks what a purchase would add to the
@@ -1022,7 +1022,8 @@ def main() -> None:
     buy_prem = premiums(dl)
     # Scored once, read twice: question 1 asks what they add to the eleven,
     # question 2 asks what they cost.
-    cands = candidates(sc, by_key, slate, lg.owner) if lg and by_key else []
+    cands = (slate_candidates(sc, by_key, slate, lg.owner)
+            if lg and by_key else [])
     fg = flat_gains(players, cands) if cands and players else {}
     buys = [(c, fg[c["key"]]) for c in cands if c["key"] in fg]
 
