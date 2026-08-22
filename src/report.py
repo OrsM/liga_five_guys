@@ -344,19 +344,24 @@ def as_fielded(players):
     return sum(p["score"] for p in xi), xi, bench, illegal, warnings
 
 
-def swaps(fielded_xi, best_xi):
+def swaps(fielded_xi, best):
     """[(out, in)] — who to bench for whom, paired within a position.
 
     Only same-slot pairs are offered. A cross-slot difference is a change of
     formation, not a substitution, and printing it as one would suggest an
     illegal move.
+
+    `best` is a list of scored player dicts — the eleven, not
+    ffcore.season.best_xi (the function that picks one). Named apart from
+    it on purpose: this module never imports that function, but a
+    parameter sharing its name read like it might be shadowing it.
     """
     from ffcore.text import norm
 
-    best_keys = {norm(p["name"]) for p in best_xi}
+    best_keys = {norm(p["name"]) for p in best}
     out_ = [p for p in fielded_xi if norm(p["name"]) not in best_keys]
     have = {norm(p["name"]) for p in fielded_xi}
-    in_ = [p for p in best_xi if norm(p["name"]) not in have]
+    in_ = [p for p in best if norm(p["name"]) not in have]
     pairs = []
     for o in sorted(out_, key=lambda p: p["score"]):
         cand = [i for i in in_ if i["slot"] == o["slot"]]
