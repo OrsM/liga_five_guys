@@ -535,6 +535,32 @@ def _weighted_totals(per_jornada: dict[int, tuple[float, float]],
     return wpts, wmatch
 
 
+def _weighted_start(per_jornada: dict[int, tuple[float, float]],
+                    decay: float) -> tuple[float, float]:
+    """(recency-weighted participation rate, weighted jornada count).
+
+    SAME per_jornada, SAME decay as _weighted_totals — one already-fitted
+    recency weighting, applied a second time to a second question. Where
+    that function's `wmatch` is a decayed NUMERATOR (minutes/90, to be
+    divided by decayed points), this is a decayed RATE in its own right:
+    Sigma(w * min(1, minutes/90)) / Sigma(w), a share of a jornada rather
+    than a share of points, so it lives in [0, 1] and can stand in for a
+    start probability directly. A jornada he is silent about (0 minutes,
+    same "silence is not evidence of the average" rule as the points side)
+    pulls the rate down; a jornada nobody has a row for yet does not enter
+    the sum at all.
+    """
+    if not per_jornada:
+        return 0.0, 0.0
+    latest = max(per_jornada)
+    wsum = wn = 0.0
+    for j, (_pts, mins) in per_jornada.items():
+        w = decay ** (latest - j)
+        wsum += w * min(1.0, mins / 90.0)
+        wn += w
+    return (wsum / wn if wn else 0.0), wn
+
+
 def _fit_decay(by_key: dict[str, dict[int, tuple[float, float]]]) -> tuple[float, str]:
     """(decay, why) — the recency weighting earns its use ONLY if it beats
     the flat average out of sample, same discipline `ffcore.startprob.
@@ -599,9 +625,10 @@ def _fit_decay(by_key: dict[str, dict[int, tuple[float, float]]]) -> tuple[float
 
 
 def _current_from_perjornada() -> tuple[dict, str]:
-    """{norm(market name): {"pts": season-to-date points,
-    "pj": minutes / 90}} from this season's per-jornada tracker, or
-    ({}, "") before it exists.
+    """{norm(market name): {"pts": season-to-date points, "pj": minutes / 90,
+    "start_rate": recency-weighted share of a jornada started,
+    "start_n": weighted jornada count behind that rate}} from this
+    season's per-jornada tracker, or ({}, "") before it exists.
 
     WHY NOT data/season/points_<this season>.csv, WHICH load_points() ALSO
     LOOKS FOR: that file is a snapshot of the points PAGE, and the page
@@ -666,7 +693,9 @@ def _current_from_perjornada() -> tuple[dict, str]:
         player = xw.players.get(key)
         market_name = norm(player.name) if player else key
         wpts, wmatch = _weighted_totals(per_jornada, decay)
-        out[market_name] = {"pts": wpts, "pj": wmatch}
+        start_rate, start_n = _weighted_start(per_jornada, decay)
+        out[market_name] = {"pts": wpts, "pj": wmatch,
+                            "start_rate": start_rate, "start_n": start_n}
     return out, label
 
 
@@ -1113,6 +1142,23 @@ class Scorer:
         raw = pct if pct is not None else (
             NEUTRAL_START if on_page else ABSENT_START)
         pct_used = 100.0 * self.cal.p(raw, self.second.get(key))
+        # BLENDED AGAINST WHAT HE HAS ACTUALLY DONE THIS SEASON, the same
+        # k-shrink stage rate() already runs on the POINTS side (self.current
+        # is that stage's own dict, "start_rate"/"start_n" its participation
+        # half — see _weighted_start). Editorial P(start) is real news
+        # (this week's team talk, a fresh knock) that minutes history
+        # cannot know about, so it stays the WHOLE answer until a player has
+        # actually featured; once he has, real recent minutes pull the
+        # number toward what is happening rather than waiting on the page
+        # to catch up. Keyed by norm(name), same as rate()'s own lookup —
+        # not the row_key `key` above, which self.current was never built
+        # against.
+        cur = self.current.get(norm(rec.get("name", "")))
+        start_n = cur.get("start_n", 0.0) if cur else 0.0
+        if start_n > 0.0:
+            k_s = self.shrink_k
+            pct_used = (k_s * pct_used + start_n * 100.0 * cur["start_rate"]
+                       ) / (k_s + start_n)
         m = self.board.get((rec.get("team") or "").strip())
         slot = SLOT.get((rec.get("position") or "").lower(), "")
         # A CLEAN SHEET IS OPPONENT-ATTACK-DRIVEN, A GOAL OPPONENT-DEFENSE-
@@ -1326,6 +1372,28 @@ def _selftest() -> None:
     # pick_xi still ranks on `score`, so the fixture reaches the eleven it is
     # meant to reach, and as_row() carries the new fields to the renderers.
     assert "fix" in s.as_row() and "flat" in s.as_row()
+
+    # -- P(start) blended against real recent minutes, same stage as pts ---
+    # Editorial says 100%; he has actually started nothing lately. The
+    # blend must pull pct_used DOWN from 100, not leave it as the whole
+    # answer — the actual behaviour "does a player go out of rotation"
+    # needs, ahead of the editorial page catching up.
+    benched_cur = {"p0": {"pts": 30.0, "pj": 3.0,
+                          "start_rate": 0.0, "start_n": 6.0}}
+    sc4 = Scorer(market, xi, hist, current=benched_cur, board={"Mid": easy})
+    benched_s = sc4.score(mk("p0"))
+    assert benched_s.pct_used < 100.0, benched_s.pct_used
+    # SHRUNK, NOT OVERWRITTEN: 6 weighted jornadas of real zero against
+    # shrink_k=8 pseudo-matches of editorial 100% is still a blend, and the
+    # formula is exact — (8*100 + 6*0) / (8+6).
+    assert abs(benched_s.pct_used - 800.0 / 14.0) < 1e-9, benched_s.pct_used
+
+    # NO CURRENT-SEASON EVIDENCE IS A NO-OP, same discipline as the points
+    # blend above — an editorial 100% with nothing to weigh it against
+    # stays 100%.
+    untouched = Scorer(market, xi, hist, current={}, board={"Mid": easy}
+                       ).score(mk("p0"))
+    assert untouched.pct_used == 100.0, untouched.pct_used
 
     # -- _per_jornada_current: minutes weighted, corrections folded in, and
     # -- Step 1's recency weighting gated on real out-of-sample evidence --
@@ -1573,7 +1641,7 @@ def _selftest() -> None:
     sc_noxg = Scorer(market_xg, xi_xg, hist_xg, xg={})
     assert sc_noxg.rate(mk("Attacker", pos="delantero")) == plain
 
-    print("ffcore.score self-test OK (51 cases)")
+    print("ffcore.score self-test OK (54 cases)")
 
 
 if __name__ == "__main__":

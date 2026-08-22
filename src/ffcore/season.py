@@ -317,6 +317,26 @@ def _run_np(states: list, forecaster, trials: int, seed: int):
         step_sd = DRIFT_FRAC * sd
         cum_var = np.zeros(len(all_keys))
 
+    # P(START)'S OWN ERROR, the same shape as the rate's above but on a
+    # SEPARATE stream (seed component 7927+, not 7919+) and ADDITIVE on
+    # logit(p) rather than multiplicative on a rate — see
+    # ffcore.forecast.Bootstrap.start_draw's own docstring for why a
+    # proportion needs a different shape of shock than a rate does. No
+    # club term here, same reason start_draw() has none.
+    srel = getattr(forecaster, "start_rel", None) or {}
+    all_start_keys = sorted(
+        {k for ks in order.values() for k in ks} & set(srel)) if srel else []
+    seps0 = sdrng = cum_var_s = None
+    if all_start_keys:
+        from ffcore.forecast import DRIFT_FRAC as _DF
+
+        srrng = np.random.default_rng([seed, 7927])
+        ssd = np.array([srel[k] for k in all_start_keys], dtype=float)
+        seps0 = srrng.standard_normal((trials, len(all_start_keys))) * ssd
+        sdrng = np.random.default_rng([seed, 7928])
+        step_sd_s = _DF * ssd
+        cum_var_s = np.zeros(len(all_start_keys))
+
     managers = [list(st.squads) for st in states]
     totals = [{m: np.full(trials, float(st.carried.get(m, 0.0)))
                for m in ms} for st, ms in zip(states, managers)]
@@ -377,6 +397,18 @@ def _run_np(states: list, forecaster, trials: int, seed: int):
             individual = eps0 * walked
             m = individual * shared if shared is not None else individual
             rate_mult = {k: m[:, i] for i, k in enumerate(all_keys)}
+        # SAME WALK, ON P(START) — logit-additive rather than log-normal
+        # multiplicative, and on its own stream (7927/7928, never 7919-21),
+        # so a trial where the scoring rate ran hot is not, for no reason,
+        # also the trial where he starts more.
+        start_shift = {}
+        if all_start_keys:
+            cum_var_s += (step_sd_s ** 2)
+            drift_s = sdrng.standard_normal((trials, len(all_start_keys))) \
+                * np.sqrt(cum_var_s)
+            walk_s = seps0 + drift_s
+            start_shift = {k: walk_s[:, i]
+                           for i, k in enumerate(all_start_keys)}
         keys = order.get(j, [])
         if not keys:
             continue
@@ -391,7 +423,19 @@ def _run_np(states: list, forecaster, trials: int, seed: int):
         scale = np.ones((trials, len(keys))) if not rate_mult else np.stack(
             [rate_mult[k] if k in rate_mult else np.ones(trials)
              for k in keys], axis=1)
-        drawn = np.where(rng.random((trials, len(keys))) < p,
+        if start_shift:
+            from ffcore.startprob import FLOOR, CEIL
+
+            shift = np.stack(
+                [start_shift[k] if k in start_shift else np.zeros(trials)
+                 for k in keys], axis=1)
+            p_clip = np.clip(p, 1e-6, 1.0 - 1e-6)
+            logit_p = np.log(p_clip / (1.0 - p_clip))
+            p_trial = 1.0 / (1.0 + np.exp(-(logit_p[None, :] + shift)))
+            p_trial = np.clip(p_trial, FLOOR, CEIL)
+        else:
+            p_trial = p[None, :]
+        drawn = np.where(rng.random((trials, len(keys))) < p_trial,
                          pool_a[rng.integers(0, len(pool_a),
                                              (trials, len(keys)))]
                          * (pts / mean) * scale, 0.0)
@@ -440,6 +484,7 @@ def _run(states: list, forecaster, which, seed: int) -> list:
         deltas.append(per)
 
     rate_of = getattr(forecaster, "rate_draw", None)
+    start_of = getattr(forecaster, "start_draw", None)
     for n, t in enumerate(idx):
         rng = random.Random(seed * 1_000_003 + t)
         # ONE RATE-DRIFT WALK PER TRIAL, before the jornadas — a rate
@@ -453,9 +498,16 @@ def _run(states: list, forecaster, which, seed: int) -> list:
         # shift the match-to-match numbers underneath it.
         rates_by_j = (rate_of(random.Random(seed * 7919 + t), jornadas)
                      if rate_of else None)
+        # SAME IDEA, A SEPARATE STREAM (seed*7927, not 7919) — start_draw's
+        # own walk must not share bits with rate_draw's, or "the rate was
+        # wrong high" and "he starts more than expected" would move
+        # together for no reason grounded in anything.
+        starts_by_j = (start_of(random.Random(seed * 7927 + t), jornadas)
+                       if start_of else None)
         for j in jornadas:
             rates = rates_by_j.get(j) if rates_by_j else None
-            drawn = forecaster.draw(j, rng, rates)
+            starts = starts_by_j.get(j) if starts_by_j else None
+            drawn = forecaster.draw(j, rng, rates, starts)
             get = drawn.get
             base = {}
             for m in managers[0]:
@@ -665,7 +717,45 @@ def _selftest() -> None:
     assert abs(drift_mean - flat_mean) / flat_mean < 0.03, \
         (flat_mean, drift_mean)
 
-    print("ffcore.season self-test OK (32 cases)")
+    # -- start_rel DRIFT actually widens a real season sim, isolated from
+    # the points-rate mechanism above -------------------------------------
+    # A CONSTANT pool (cv=0, so rate_rel is 0.0 for everyone regardless of
+    # n) with real_n >= MIN_POOL so it is actually used rather than falling
+    # back to the seed prior — the points side is neutralised without
+    # touching start_rel, which depends on p and n, not on the points pool
+    # at all. p=0.7, not 1.0: start_rel's own guard zeroes it for a
+    # certain reading, so the mechanism needs something to be uncertain
+    # ABOUT.
+    from ffcore.forecast import MIN_POOL
+
+    per10_s = {j: {k: (3.0, 0.7) for k in list(a) + list(b)} for j in many_j}
+    const_pool = [3] * (MIN_POOL + 50)
+    was_drift = forecast.DRIFT_FRAC
+    try:
+        forecast.DRIFT_FRAC = 0.0
+        sflat_res = simulate(
+            st10, Bootstrap(per10_s, pool=const_pool, matches=matches10),
+            trials=1500, seed=17)
+        forecast.DRIFT_FRAC = 1.0
+        sdrift_res = simulate(
+            st10, Bootstrap(per10_s, pool=const_pool, matches=matches10),
+            trials=1500, seed=17)
+    finally:
+        forecast.DRIFT_FRAC = was_drift
+    sflat_sd = statistics.pstdev(sflat_res.totals["A"])
+    sdrift_sd = statistics.pstdev(sdrift_res.totals["A"])
+    assert sdrift_sd > sflat_sd, (sflat_sd, sdrift_sd)
+    # Same mean-preservation claim as the points side: a wider walk on
+    # WHETHER he plays must not, itself, change how often he plays on
+    # average — sigmoid(logit(p) + N(0, sd)) is not mean-preserving in p
+    # the way exp(drift - var/2) is in a rate, so this is a real check,
+    # not a restatement of the formula.
+    sflat_mean = statistics.mean(sflat_res.totals["A"])
+    sdrift_mean = statistics.mean(sdrift_res.totals["A"])
+    assert abs(sdrift_mean - sflat_mean) / sflat_mean < 0.05, \
+        (sflat_mean, sdrift_mean)
+
+    print("ffcore.season self-test OK (34 cases)")
 
 
 if __name__ == "__main__":

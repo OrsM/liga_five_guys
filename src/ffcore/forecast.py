@@ -216,6 +216,39 @@ class Bootstrap:
         self.club_of = dict(club_of or {})
         self.club_rel = dict(club_rel or {})
 
+        # HOW WRONG P(START) ITSELF CAN BE — the same fact as rate_rel
+        # above, about the OTHER number this class draws. A start
+        # percentage is also a rate estimated from a handful of matches
+        # (see ffcore.startprob's own fit), and holding it flat for every
+        # remaining jornada makes the same mistake rate_rel exists to fix,
+        # just on the "does he play at all" side rather than "how well".
+        #
+        # NOT THE SAME cv: rate_rel's cv comes from the POINTS POOL, and
+        # is roughly constant across players because Bootstrap rescales
+        # the pool multiplicatively — a fixed shape stretched to each
+        # player's own level. A start rate has no such rescaling; it is a
+        # proportion, and a proportion's own sampling variance depends on
+        # p itself (tightest near 0 or 1, widest near 0.5 — a coin you've
+        # never seen come up tails is a very different claim from one
+        # you've seen split 50/50 twenty times). sqrt((1-p)/p) is that
+        # shape for a rate expressed as odds rather than a share; it
+        # reproduces the usual sqrt(p(1-p))/p Bernoulli coefficient of
+        # variation up to a constant absorbed into SHRINK_MATCHES, which
+        # this repo already trusts to be the right pseudo-count from
+        # rate_rel's own use of it.
+        p0 = {}
+        for j in sorted(per_jornada):
+            for k, (_pts, p) in per_jornada[j].items():
+                p0.setdefault(k, p)
+        self.start_rel = {}
+        for k, n in (matches or {}).items():
+            p = p0.get(k)
+            if p is None or p <= 0.0 or p >= 1.0:
+                self.start_rel[k] = 0.0
+                continue
+            self.start_rel[k] = math.sqrt((1.0 - p) / p) / math.sqrt(
+                max(1.0, float(n) + SHRINK_MATCHES))
+
     # -- provenance --------------------------------------------------------
     def pool_note(self) -> str:
         """Which shape is in use, and on what. Printed, never inferred."""
@@ -311,18 +344,68 @@ class Bootstrap:
             out[j] = per_j
         return out
 
+    def start_draw(self, rng: random.Random, jornadas=None):
+        """A LOGIT SHIFT per player, for one whole season — same shape as
+        rate_draw() (flat, or growing with distance), but additive on
+        logit(p) rather than multiplicative on a rate, because p must stay
+        in (0, 1) and a logit shift is the natural way to move a
+        probability without a separate clamp fighting the walk. No club
+        term: a club-wide rotation shock (a new manager who plays
+        everybody less) is real but is a second, smaller effect on TOP of
+        "how far can this one man's own start rate be trusted" — the one
+        this addresses — and stacking an unfitted guess on an unfitted
+        guess buys confusion, not accuracy. Left for later, same as
+        rate_draw()'s own club term was until club_volatility() existed to
+        measure it.
+        """
+        if jornadas is None:
+            return {k: rng.gauss(0.0, self.start_rel[k])
+                   for k in sorted(self.start_rel)}
+        eps0 = {k: rng.gauss(0.0, self.start_rel[k])
+               for k in sorted(self.start_rel)}
+        cum_var = {k: 0.0 for k in self.start_rel}
+        out = {}
+        for j in sorted(jornadas):
+            per_j = {}
+            for k in sorted(self.start_rel):
+                cum_var[k] += (DRIFT_FRAC * self.start_rel[k]) ** 2
+                drift = rng.gauss(0.0, math.sqrt(cum_var[k]))
+                per_j[k] = eps0[k] + drift
+            out[j] = per_j
+        return out
+
     def draw(self, jornada: int, rng: random.Random,
-             rates: dict | None = None) -> dict[str, float]:
+             rates: dict | None = None,
+             starts: dict | None = None) -> dict[str, float]:
         per = self.per_jornada.get(jornada, {})
         out = {}
         for k in self._order.get(jornada, ()):
             pts, p = per[k]
+            if starts and k in starts:
+                p = _shift_p(p, starts[k])
             if p <= 0.0 or rng.random() >= p:
                 out[k] = 0.0
                 continue
             m = 1.0 if rates is None else rates.get(k, 1.0)
             out[k] = rng.choice(self.pool) * (pts * m / self._pool_mean)
         return out
+
+
+def _shift_p(p: float, shift: float) -> float:
+    """p moved by `shift` in logit space, clamped to startprob's own bounds.
+
+    THE SAME BOUNDS P(START) ITSELF ALREADY LIVES WITHIN — ffcore.startprob
+    clamps its fitted calibration to [FLOOR, CEIL] for exactly the reason
+    given there: nothing is certain, and a Bernoulli at 0 or 1 costs the
+    simulator the thing that actually decides a league. A drift that pushed
+    a player outside those bounds would be claiming more certainty than the
+    number it started from is allowed to claim.
+    """
+    from ffcore.startprob import FLOOR, CEIL
+    p = min(1.0 - 1e-6, max(1e-6, p))
+    z = math.log(p / (1.0 - p)) + shift
+    q = 1.0 / (1.0 + math.exp(-max(-40.0, min(40.0, z))))
+    return min(CEIL, max(FLOOR, q))
 
 
 def pool_from_perjornada(rows) -> list[int]:
@@ -511,7 +594,64 @@ def _selftest() -> None:
             {"games_delta": "x", "points_delta": "3"}]     # unparseable
     assert pool_from_perjornada(rows) == [4, -1]
 
-    print("ffcore.forecast self-test OK (33 cases)")
+    # -- start_rel: the same fact as rate_rel, on p rather than the rate ----
+    # "vet" starts 90% on 34 matches of evidence; "kid" starts 90% on none.
+    sthin = Bootstrap({1: {"vet": (5.0, 0.9), "kid": (5.0, 0.9)}},
+                      matches={"vet": 34, "kid": 0})
+    assert sthin.start_rel["vet"] < sthin.start_rel["kid"], sthin.start_rel
+    # A CERTAIN reading (p=0 or p=1) has no odds to be wrong about — the
+    # guard exists so a genuinely-never-plays man does not blow up sqrt of
+    # a negative or divide by zero.
+    certain = Bootstrap({1: {"never": (5.0, 0.0), "always": (5.0, 1.0)}},
+                        matches={"never": 10, "always": 10})
+    assert certain.start_rel == {"never": 0.0, "always": 0.0}
+    # No evidence handed in at all: no widening, same as rate_rel's own
+    # no-matches behaviour above.
+    assert Bootstrap({1: {"vet": (5.0, 0.9)}}).start_rel == {}
+
+    # -- start_draw: flat case averages to no shift, grows with distance ---
+    r = random.Random(5)
+    sdraws = [sthin.start_draw(r)["kid"] for _ in range(4000)]
+    assert abs(sum(sdraws) / len(sdraws)) < 0.03, sum(sdraws) / len(sdraws)
+
+    swalk = [sthin.start_draw(random.Random(i), jornadas=[1, 2, 3, 20, 21, 22])
+            for i in range(3000)]
+    snear = statistics.pstdev(t[1]["kid"] for t in swalk)
+    sfar = statistics.pstdev(t[22]["kid"] for t in swalk)
+    assert sfar > snear, (snear, sfar)
+    # A player with real evidence (vet) must not drift as wide as one
+    # without (kid), at the same horizon.
+    sfar_vet = statistics.pstdev(t[22]["vet"] for t in swalk)
+    assert sfar_vet < sfar, (sfar_vet, sfar)
+
+    # -- _shift_p: a shift of 0 is the identity; the walk cannot escape
+    # startprob's own [FLOOR, CEIL] bounds no matter how wide it gets.
+    from ffcore.startprob import FLOOR, CEIL
+    assert abs(_shift_p(0.8, 0.0) - 0.8) < 1e-6
+    assert _shift_p(0.8, -50.0) >= FLOOR
+    assert _shift_p(0.8, 50.0) <= CEIL
+
+    # -- draw() with `starts`: a large enough shift moves who plays -------
+    # A wide-enough negative shift can bench a nailed-on man; this is the
+    # actual behaviour change start_draw()'s widening band buys — a player
+    # this repo used to treat as a fact can now, in a trial far enough out,
+    # come up benched.
+    pinned = Bootstrap({1: {"nailed": (5.0, 0.9)}})
+    # -50 in logit space drives p toward startprob's own FLOOR (0.01), not
+    # literally 0 — nothing here claims more certainty than that module
+    # already allows itself, so "almost always benched" is the claim, not
+    # "always".
+    benched = [pinned.draw(1, random.Random(i), starts={"nailed": -50.0})
+              for i in range(2000)]
+    still_played = sum(1 for d in benched if d["nailed"] > 0.0)
+    assert still_played / len(benched) < 0.03, still_played / len(benched)
+    # A shift of exactly 0.0 changes nothing — the no-op case a caller with
+    # no real uncertainty to add (start_rel == {}) will always hit.
+    a = pinned.draw(1, random.Random(11))
+    b = pinned.draw(1, random.Random(11), starts={"nailed": 0.0})
+    assert a == b, (a, b)
+
+    print("ffcore.forecast self-test OK (38 cases)")
 
 
 if __name__ == "__main__":
