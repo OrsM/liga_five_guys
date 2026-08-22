@@ -210,6 +210,42 @@ def choosable(u) -> int:
     return u.state.jornadas[0] if u.state.jornadas else 0
 
 
+def current_xi(u, who: str | None = None) -> tuple[dict[str, float], set[str]]:
+    """(exp, xi) — this round's expected points and the best legal eleven
+    `who` (default u.me) could field from them, right now.
+
+    THE ONE COMPUTATION EVERY "what is my/a rival's current best eleven
+    worth" QUESTION IN THIS REPO USED TO REBUILD BY HAND — found duplicated
+    across xi_note(), fielded_shape(), ladder_rows(), wait_routes(),
+    _xi_total(), _shape_now() (all sim.py) and candidates() (this module),
+    each with its own `exp = u.forecaster.expected(choosable(u)); xi =
+    best_xi(squad, exp)` pair. All deterministic — no randomness, so no
+    trial-to-trial drift risk the way ladder()'s old duplicate
+    player_bands() simulation had — but still the same "no single owner"
+    shape: seven implementations of one fact, kept in sync by hand rather
+    than by construction, is exactly the mess a future change to best_xi()'s
+    tie-breaking (or choosable()'s own jornada pick) would fall through.
+    `exp` is the SAME dict regardless of `who` — only the squad it is read
+    against differs — so a caller wanting several managers' bands calls
+    this once per manager, not once for `exp` and again per squad.
+    """
+    exp = u.forecaster.expected(choosable(u))
+    xi = set(best_xi(u.state.squads.get(who or u.me, {}), exp))
+    return exp, xi
+
+
+def xi_bar(exp: dict[str, float], xi) -> float:
+    """The weakest man in an eleven — the number a signing has to clear.
+
+    One line, but the same line was hand-written at every current_xi()
+    call site that needed it (candidates(), wait_routes(), ladder_rows())
+    before this existed, which is how "min(..., default=0.0)" is exactly
+    the kind of detail that drifts silently if one copy is edited and the
+    others are not.
+    """
+    return min((exp.get(k, 0.0) for k in xi), default=0.0)
+
+
 def candidates(u: Universe, expected: dict[str, float],
                budget: float | None = None) -> list[Action]:
     """Every affordable move, pruned to the ones that could plausibly help.
@@ -222,12 +258,15 @@ def candidates(u: Universe, expected: dict[str, float],
     cash = u.cash if budget is None else budget
     mine = set(u.state.squads.get(u.me, {}))
     # The eleven the signing has to beat is one you can still pick — see
-    # choosable(). `expected` may be any round; the BAR never comes off a
-    # locked one.
-    bar_exp = u.forecaster.expected(choosable(u)) or expected
-    xi = set(best_xi(u.state.squads[u.me], bar_exp))
-    # The weakest man in the current eleven is the bar a signing has to clear.
-    bar = min((bar_exp.get(k, 0.0) for k in xi), default=0.0)
+    # choosable(), which current_xi() already calls. `expected` may be any
+    # round; the BAR never comes off a locked one, so a choosable() that
+    # comes back with nothing (no jornada left to pick at all) falls back
+    # to the round passed in rather than a bar of zero that clears nothing.
+    bar_exp, xi = current_xi(u)
+    if not bar_exp:
+        bar_exp = expected
+        xi = set(best_xi(u.state.squads[u.me], bar_exp))
+    bar = xi_bar(bar_exp, xi)
     spare = sorted((k for k in mine if k not in xi),
                    key=lambda k: bar_exp.get(k, 0.0))
     # DEAD WEIGHT PAYS FOR THINGS. These never make the eleven, so selling
@@ -943,6 +982,29 @@ def _selftest() -> None:
         cash=12e6, me="me")
     exp = u.forecaster.expected(1)
 
+    # -- current_xi / xi_bar: the one computation seven call sites used to
+    # each rebuild by hand ---------------------------------------------
+    cxi_exp, cxi = current_xi(u)
+    assert cxi_exp == u.forecaster.expected(choosable(u)), cxi_exp
+    # me_bench (rate 0.5) is the weakest of the 12 — never picked over the
+    # other 11 real starters, so it must not be in the eleven.
+    assert "me_bench" not in cxi, cxi
+    assert len(cxi) == 11, cxi
+    # A different manager: a DIFFERENT eleven, same exp dict — the whole
+    # reason exp is not recomputed per manager.
+    riv_exp, riv_xi = current_xi(u, who="riv")
+    assert riv_exp is cxi_exp or riv_exp == cxi_exp, (riv_exp, cxi_exp)
+    assert riv_xi != cxi, (riv_xi, cxi)
+    assert "th_bench" not in riv_xi, riv_xi
+    # xi_bar: the weakest man IN the eleven, not the weakest man overall —
+    # me_bench (0.5) is weaker than everyone in cxi, but it is not IN cxi,
+    # so it must not set the bar.
+    bar = xi_bar(cxi_exp, cxi)
+    assert bar == min(cxi_exp.get(k, 0.0) for k in cxi), bar
+    assert bar > 0.5, bar
+    # No eleven at all: the bar is 0.0, not a crash.
+    assert xi_bar(cxi_exp, set()) == 0.0
+
     acts = candidates(u, exp)
     names = {a.buy for a in acts}
     # A player worse than the weakest man you field is not a candidate.
@@ -1315,7 +1377,7 @@ def _selftest() -> None:
     assert value_rate(None, 5e6) is None
     assert value_rate(0.0, 5e6) == 0.0           # a real price, zero return: 0, not None
 
-    print("decide self-test OK (73 cases)")
+    print("decide self-test OK (78 cases)")
 
 
 if __name__ == "__main__":

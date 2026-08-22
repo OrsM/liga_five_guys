@@ -127,11 +127,10 @@ def xi_note(u) -> str:
     you should know why), or you are already fielding the best one (so there
     is nothing to do, which is an answer and not an empty table).
     """
-    from ffcore.season import best_xi
+    import decide
 
-    exp = u.forecaster.expected(decide_choosable(u))
-    chg = xi_change(fielded_keys(u),
-                    best_xi(u.state.squads.get(u.me, {}), exp))
+    _, xi = decide.current_xi(u)
+    chg = xi_change(fielded_keys(u), xi)
     if not chg["legal"]:
         return ("the app has not said which eleven you are fielding, so this "
                 "is the whole sheet rather than a change list")
@@ -173,10 +172,9 @@ def fielded_shape(u) -> str:
     not an eleven — a shape read off ten men is not a formation anybody is
     playing, and printing it as one is worse than printing nothing.
     """
-    from ffcore.season import best_xi
+    import decide
 
-    exp = u.forecaster.expected(decide_choosable(u))
-    best = best_xi(u.state.squads.get(u.me, {}), exp)
+    _, best = decide.current_xi(u)
     keys = fielded_keys(u)
     return shape(u, keys) if xi_change(keys, best)["legal"] else ""
 
@@ -276,14 +274,13 @@ def ladder_rows(u, rows, base=None) -> list[dict]:
     bench player's real range. `base=None` (an old caller, or the
     self-test) is the previous behaviour exactly, not a crash.
     """
-    from ffcore.season import best_xi
+    import decide
 
-    exp = u.forecaster.expected(decide_choosable(u))
+    exp, xi = decide.current_xi(u)
     mine = u.state.squads.get(u.me, {})
-    xi = set(best_xi(mine, exp))
     dead = {k for k, _ in decide_dead(u)}
     won = {r["action"].buy: r for r in rows if r["action"].buy}
-    bar = min((exp.get(k, 0.0) for k in xi), default=0.0)
+    bar = decide.xi_bar(exp, xi)
     spare = sum(v for _k, v in decide_dead(u))
     rest = [k for k in u.price if k not in mine and exp.get(k, 0.0) > bar]
     bands = (player_bands(u, base, own_keys=list(mine),
@@ -432,11 +429,9 @@ def ladder(u, rows, base, data=None) -> list[str]:
     renderer. `data=None` (a caller with no JSON side, or the self-test)
     computes it here exactly as before, not a crash.
     """
-    from ffcore.season import best_xi
+    import decide
 
-    exp = u.forecaster.expected(decide_choosable(u))
-    mine = u.state.squads.get(u.me, {})
-    xi = set(best_xi(mine, exp))
+    exp, xi = decide.current_xi(u)
     data = data if data is not None else ladder_rows(u, rows, base)
     by_group: dict[str, list[dict]] = {}
     for r in data:
@@ -478,13 +473,14 @@ def ladder(u, rows, base, data=None) -> list[str]:
             out.append("| **TAKE OFF** | | | | | | | |")
             out += [row_md(r) for r in by_group["out"]]
     tot = sum(exp.get(k, 0.0) for k in xi)
-    best_riv = max(((sum(exp.get(x, 0.0) for x in best_xi(sq, exp)), m)
-                    for m, sq in u.state.squads.items() if m != u.me),
-                   default=(0.0, ""))
+    # _rival_best(u), not a second re-derivation of it — this used to
+    # rebuild the exact same "strongest eleven anybody else can field"
+    # fact inline, under a different name.
+    riv = _rival_best(u)
+    riv_total, riv_who = riv.get("xi", 0.0), riv.get("manager", "")
     out.append("| **Your eleven — play %s** | | | **%.2f** | "
                "vs %s **%.2f** | | **%+.2f** | |"
-               % (shape(u, xi), tot, best_riv[1], best_riv[0],
-                  tot - best_riv[0]))
+               % (shape(u, xi), tot, riv_who, riv_total, tot - riv_total))
 
     if by_group.get("keep"):
         out.append("| **KEEP — bench** | | | | | | | |")
@@ -689,14 +685,13 @@ def wait_routes(u, offers=None, rng=None) -> list[dict]:
     """
     import random
     import statistics
-    from ffcore.season import best_xi
+    import decide
 
     now = run_now()
-    exp = u.forecaster.expected(decide_choosable(u))
-    eleven = best_xi(u.state.squads.get(u.me, {}), exp)
+    exp, eleven = decide.current_xi(u)
     if not eleven:
         return []
-    bar = min(exp.get(k, 0.0) for k in eleven)
+    bar = decide.xi_bar(exp, eleven)
     mine = set(u.state.squads.get(u.me, {}))
 
     def approx_gain(k):
@@ -1054,16 +1049,15 @@ def shape(u, keys) -> str:
 
 
 def _xi_total(u, who) -> float:
-    from ffcore.season import best_xi
-    exp = u.forecaster.expected(decide_choosable(u))
-    return sum(exp.get(k, 0.0) for k in best_xi(u.state.squads.get(who, {}),
-                                                exp))
+    import decide
+    exp, xi = decide.current_xi(u, who)
+    return sum(exp.get(k, 0.0) for k in xi)
 
 
 def _shape_now(u) -> str:
-    from ffcore.season import best_xi
-    exp = u.forecaster.expected(decide_choosable(u))
-    return shape(u, best_xi(u.state.squads.get(u.me, {}), exp))
+    import decide
+    _, xi = decide.current_xi(u)
+    return shape(u, xi)
 
 
 def _rival_best(u) -> dict:
