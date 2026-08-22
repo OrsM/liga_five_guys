@@ -791,10 +791,12 @@ def build(market: list[dict], xi_rows: list[dict], now,
     # ranks them otherwise, per club that real results (below) don't reach —
     # wired HERE, in the one builder, so your squad and a rival's can never
     # be scored off two different difficulty scales.
-    from ffcore.tidy import load_crosswalk, load_results_history
+    from ffcore.tidy import (load_crosswalk, load_results_history,
+                             load_understat_players)
     xw = load_crosswalk()
     board = fixture_board(market, load_fixtures(), now, load_elo(),
-                          xw=xw, results=load_results_history())
+                          xw=xw, results=load_results_history(),
+                          understat_rows=load_understat_players("2025"))
     # xG/xA — see this module's own section above for the mechanism and why
     # both numbers are fit fresh from real data rather than hand-picked.
     xg_cur = load_understat_current(xw)

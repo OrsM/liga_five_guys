@@ -157,11 +157,87 @@ def team_strength(market: list[dict]) -> dict[str, float]:
 # enough" rather than two that could drift apart.
 MIN_AD_MATCHES = 10
 
+# HOW MUCH ONE SEASON'S BOTTOM-UP XG CLUB RATING (xg_club_attack) IS WORTH,
+# in the same pseudo-match currency attack_defense() already blends real
+# matches with (see MIN_AD_MATCHES, ffcore.score.SHRINK_K) — A JUDGMENT
+# CALL, NOT A FIT, same status as DRIFT_FRAC. Measured in-sample only
+# (xg_club_attack() against attack_defense()'s own real-goals attack, both
+# 2025-26): Pearson r=0.884, n=20 clubs — real, not noise, but the same
+# season's own goals built both numbers, so this cannot yet say xG PREDICTS
+# better than the answer it correlates with. One divergence worth naming:
+# Sevilla ranked 10th of 20 on real goals, 19th on this rating — real
+# over-performance last season, or a goal-scoring midfielder this
+# position gate excludes (see xg_club_attack()'s own note), not knowable
+# from here. A genuine held-out test needs either match-level team xG
+# (results_history.csv carries it — 7 rows so far this season, nowhere
+# near the ~200 MIN_AD_MATCHES-per-club would need) or a second paired
+# season of Understat coverage (one exists today). Until one of those
+# exists, this stays a round number in the same order of magnitude as
+# this repo's other pseudo-match constants rather than a measured weight.
+XG_CLUB_PSEUDO_MATCHES = 10.0
 
-def attack_defense(results: list[dict],
-                   teams) -> dict[str, tuple[float, float]]:
+
+def xg_club_attack(understat_rows, xw) -> dict[str, float]:
+    """{ff_slug: relative xG+xA attacking rate}, 1.0-centred the same way
+    attack_defense()'s own attack/defense numbers are.
+
+    BOTTOM-UP FROM INDIVIDUAL PLAYERS, because no team-level xG source is
+    usable yet — see XG_CLUB_PSEUDO_MATCHES's own note. Forwards and
+    attacking mids only, the same position gate ffcore.score's xG blend
+    already uses and for the same measured reason: an attacking metric
+    says nothing about a defender's or goalkeeper's fantasy points.
+
+    A row whose `team_title` contains a comma is a player Understat folds
+    two clubs' worth of one season into a single string (a mid-season
+    move) — dropped rather than split, since the season-aggregate endpoint
+    carries no date to split it on.
+    """
+    from collections import defaultdict
+
+    xg: dict[str, float] = defaultdict(float)
+    mins: dict[str, float] = defaultdict(float)
+    for r in understat_rows:
+        if "F" not in (r.get("position") or ""):
+            continue
+        team = r.get("team_title") or ""
+        if not team or "," in team:
+            continue
+        m = float(r.get("minutes") or 0)
+        if m <= 0:
+            continue
+        xg[team] += float(r.get("xg") or 0) + float(r.get("xa") or 0)
+        mins[team] += m
+    rate = {t: xg[t] / mins[t] * 90 for t in xg if mins[t] > 0}
+    if not rate:
+        return {}
+    league_avg = sum(rate.values()) / len(rate)
+    if not league_avg:
+        return {}
+    out = {}
+    for name, v in rate.items():
+        cid = xw.club(name=name) if xw is not None else None
+        slug = xw.clubs[cid].ff_slug if cid and cid in xw.clubs else None
+        if slug:
+            out[slug] = v / league_avg
+    return out
+
+
+def attack_defense(results: list[dict], teams,
+                   xg_attack: dict[str, float] | None = None,
+                   xg_pseudo: float = XG_CLUB_PSEUDO_MATCHES
+                   ) -> dict[str, tuple[float, float]]:
     """{team: (attack, defense)}, from real match results — goals scored and
     conceded, home and away pooled, relative to the league's own average.
+
+    `xg_attack`, when given (xg_club_attack()'s own output), blends into
+    the ATTACK half only — DEFENSE stays real-goals-only, because nothing
+    here has a bottom-up xG signal for it (that would need real match-
+    level xG-against, not summed player output; see XG_CLUB_PSEUDO_
+    MATCHES's own note). Weighted by real matches played against a fixed
+    pseudo-match count for the xG side, the same shrink-toward-a-prior
+    shape SHRINK_K already uses — so a club with few real matches (near
+    MIN_AD_MATCHES) leans on the xG rating more than an established one
+    with 50+ does.
 
     attack > 1.0 scores more than an average team that season; defense > 1.0
     CONCEDES more than an average team (worse defense), < 1.0 fewer (better).
@@ -206,9 +282,17 @@ def attack_defense(results: list[dict],
     league_avg = total_goals / (total_matches * 2)   # per team, per match
     if not league_avg:
         return {}
-    return {t: (scored[t] / played[t] / league_avg,
-               conceded[t] / played[t] / league_avg)
-           for t in teams if played.get(t, 0) >= MIN_AD_MATCHES}
+    out = {}
+    for t in teams:
+        n = played.get(t, 0)
+        if n < MIN_AD_MATCHES:
+            continue
+        atk = scored[t] / n / league_avg
+        xg = xg_attack.get(t) if xg_attack else None
+        if xg is not None:
+            atk = (n * atk + xg_pseudo * xg) / (n + xg_pseudo)
+        out[t] = (atk, conceded[t] / n / league_avg)
+    return out
 
 
 def club_volatility(results: list[dict], teams) -> dict[str, float]:
@@ -303,7 +387,7 @@ def match_team(side: str, teams) -> str | None:
 
 def fixture_board(market: list[dict], fixtures: list[dict],
                   now: datetime, elo_rows=None, xw=None,
-                  results=None) -> dict[str, Match]:
+                  results=None, understat_rows=None) -> dict[str, Match]:
     """{market team: its next Match}, for every team with one ahead of `now`.
 
     "Next" is the earliest kickoff still ahead, which is the right question
@@ -322,7 +406,9 @@ def fixture_board(market: list[dict], fixtures: list[dict],
     falling back to the elo-or-value rank for whichever clubs
     attack_defense() refuses (thin history — see MIN_AD_MATCHES). Every
     Match says which basis it got, and carries the raw Elo gap when there
-    was one.
+    was one. `understat_rows`, when given, blends a bottom-up xG attacking
+    rating into attack_defense()'s own ATTACK half — see
+    XG_CLUB_PSEUDO_MATCHES's own note on why that weight is a judgment call.
     """
     value = team_strength(market)
     teams = list(value)
@@ -335,7 +421,9 @@ def fixture_board(market: list[dict], fixtures: list[dict],
     # every single team, silently, despite the data being right there.
     slug_of = {c.market: c.ff_slug for c in xw.clubs.values()
               if c.market and c.ff_slug} if xw is not None else {}
-    ad_by_slug = (attack_defense(results, list(slug_of.values()))
+    xg_attack = (xg_club_attack(understat_rows, xw)
+                if understat_rows and xw is not None else {})
+    ad_by_slug = (attack_defense(results, list(slug_of.values()), xg_attack)
                  if results and slug_of else {})
     # THE FIXTURE PAGE STATES ITS OWN CLUB ID on both crests of every match,
     # and the crosswalk has been told which club each one is. Joining on it
@@ -451,6 +539,61 @@ def _selftest() -> None:
     # A row with no goals at all (a parse gap) is skipped, not zero.
     assert attack_defense([{"home": "A", "away": "B", "home_goals": "",
                             "away_goals": ""}], ["A", "B"]) == {}
+
+    # -- xg_club_attack ---------------------------------------------------
+    from ffcore.crosswalk import Crosswalk, Club
+
+    xw3 = Crosswalk({}, {
+        "strong club": Club("strong club", market="Strong", ff_slug="Strong"),
+        "weak club": Club("weak club", market="Weak", ff_slug="Weak"),
+    })
+    und_rows = (
+        [{"position": "F", "team_title": "Strong", "minutes": "900",
+          "xg": "9", "xa": "0"}] * 3
+        + [{"position": "F", "team_title": "Weak", "minutes": "900",
+           "xg": "1", "xa": "0"}] * 3
+        # Not a forward: excluded from the position gate.
+        + [{"position": "D", "team_title": "Strong", "minutes": "900",
+           "xg": "20", "xa": "0"}]
+        # A mid-season move: the comma marks it, dropped rather than split.
+        + [{"position": "F", "team_title": "Strong,Weak",
+           "minutes": "900", "xg": "5", "xa": "0"}]
+    )
+    xga = xg_club_attack(und_rows, xw3)
+    assert xga["Strong"] > 1.0 > xga["Weak"], xga
+    assert xg_club_attack([], xw3) == {}
+    # No crosswalk: cannot resolve a name to a slug, so nothing comes back —
+    # not a crash, not a guess at the mapping.
+    assert xg_club_attack(und_rows, None) == {}
+
+    # -- attack_defense blended with xg_club_attack ------------------------
+    # Same Strong/Weak results as above, MIN_AD_MATCHES each. Real goals
+    # alone already say Strong > 1.0 > Weak; the xG side agrees in
+    # direction here, so the blended number should still order the same
+    # way, and MOVE relative to the real-goals-only figure (this is the
+    # actual claim — the xG side is not a no-op once supplied).
+    real_only = attack_defense(results, ["Strong", "Weak"])
+    blended = attack_defense(results, ["Strong", "Weak"], xga)
+    assert blended["Strong"][0] > 1.0 > blended["Weak"][0], blended
+    assert blended["Strong"][0] != real_only["Strong"][0], \
+        "xg_attack must move the number, not be silently ignored"
+    # DEFENSE IS UNTOUCHED — no bottom-up xG-against signal exists yet
+    # (see the function's own docstring), so blending in an attack rating
+    # must not, as a side effect, change the defense half at all.
+    assert blended["Strong"][1] == real_only["Strong"][1]
+    assert blended["Weak"][1] == real_only["Weak"][1]
+    # A club with no xg_attack entry (not covered by Understat, e.g. a
+    # newly-promoted side) is a no-op — real goals are the whole answer,
+    # same as when xg_attack is omitted entirely.
+    partial = attack_defense(results, ["Strong", "Weak"], {"Strong": 2.0})
+    assert partial["Weak"] == real_only["Weak"], partial
+    # A HUGE pseudo-match count should pull the blended figure close to
+    # the xG reading itself; a TINY one should barely move it from real
+    # goals — the shrink-toward-a-prior shape this borrows from SHRINK_K.
+    heavy = attack_defense(results, ["Strong"], xga, xg_pseudo=1e6)
+    light = attack_defense(results, ["Strong"], xga, xg_pseudo=1e-6)
+    assert abs(heavy["Strong"][0] - xga["Strong"]) < 1e-3, heavy
+    assert abs(light["Strong"][0] - real_only["Strong"][0]) < 1e-3, light
 
     # -- club_volatility ------------------------------------------------
     # Steady always scores/concedes 2 total goals a match — pstdev 0, so
@@ -656,7 +799,7 @@ def _selftest() -> None:
     assert fixture_board(mk, fx, now, None) == board
     assert fixture_board(mk, fx, now, []) == board
 
-    print("ffcore.fixture self-test OK (62 cases)")
+    print("ffcore.fixture self-test OK (70 cases)")
 
 
 if __name__ == "__main__":
