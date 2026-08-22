@@ -2376,3 +2376,27 @@ observed_at,source,market_id,player_id,player_name,player_name_full,position_id,
 2026-08-21T2127Z,laliga,16235820,3037,C. Puga,Carlos Puga,2,4981968,4981968,0,marketPlayerTeam,on_sale,ok,false,2026-08-24T23:02:43+02:00
 2026-08-21T2127Z,laliga,16235912,3120,De Haas,Justin de Haas,2,8870623,8870623,0,marketPlayerTeam,on_sale,ok,false,2026-08-24T23:02:48+02:00
 2026-08-21T2127Z,laliga,16236032,2714,Javi Rueda,Javi Rueda,2,4421896,4421896,0,marketPlayerTeam,on_sale,ok,false,2026-08-24T23:02:55+02:00
+2026-08-22T0713Z,laliga,80190329,2638,Manolo González,José Manuel González Álvarez,5,980031,957310,0,marketPlayerLeague,on_sale,ok,,2026-08-22T22:24:00+02:00
+2026-08-22T0713Z,laliga,80190331,3095,Ramis,Luis Miguel Ramis,5,1237211,1204202,0,marketPlayerLeague,on_sale,ok,,2026-08-22T22:24:00+02:00
+2026-08-22T0713Z,laliga,80190333,2449,Marcao,Marcos do Nascimento Teixeira,2,581191,574423,0,marketPlayerLeague,on_sale,ok,,2026-08-22T22:24:00+02:00
+2026-08-22T0713Z,laliga,80190335,2715,A. Iturbe,Alejandro Iturbe,1,736767,723776,0,marketPlayerLeague,on_sale,ok,,2026-08-22T22:24:00+02:00
+2026-08-22T0713Z,laliga,80190337,3153,Miguel Rodríguez,Miguel Rodríguez,4,2718871,2638081,0,marketPlayerLeague,on_sale,ok,,2026-08-22T22:24:00+02:00
+2026-08-22T0713Z,laliga,80190339,2501,Nico Serrano,Nico Serrano,4,786494,771514,0,marketPlayerLeague,on_sale,ok,,2026-08-22T22:24:00+02:00
+2026-08-22T0713Z,laliga,80190343,2467,Júnior R.,Luiz Lúcio Reis Júnior,1,35936870,35588100,0,marketPlayerLeague,on_sale,ok,,2026-08-22T22:24:00+02:00
+2026-08-22T0713Z,laliga,80190349,3183,Dubasin,Jonathan Dubasin,4,13784903,13451605,0,marketPlayerLeague,on_sale,ok,,2026-08-22T22:24:00+02:00
+2026-08-22T0713Z,laliga,80190355,2398,F. Calero,Fernando Calero,2,2455925,2385018,0,marketPlayerLeague,on_sale,injured,,2026-08-22T22:24:00+02:00
+2026-08-22T0713Z,laliga,80190359,3188,E. Ponce,Ezequiel Ponce,4,1718420,1673990,0,marketPlayerLeague,on_sale,ok,,2026-08-22T22:24:00+02:00
+2026-08-22T0713Z,laliga,80190362,2446,Zakharyan,Arsen Zakharyan,3,904949,885231,0,marketPlayerLeague,on_sale,ok,,2026-08-22T22:24:00+02:00
+2026-08-22T0713Z,laliga,80190366,2560,Raba,Dani Raba,4,1406656,1371776,0,marketPlayerLeague,on_sale,ok,,2026-08-22T22:24:00+02:00
+2026-08-22T0713Z,laliga,80190370,2386,Nteka,Randy Nteka,4,1237606,1255625,0,marketPlayerLeague,on_sale,ok,,2026-08-22T22:24:00+02:00
+2026-08-22T0713Z,laliga,11705725,3129,Carlos Espí,Carlos Espí,4,9973382,10182989,0,marketPlayerTeam,on_sale,ok,false,2026-08-24T23:10:35+02:00
+2026-08-22T0713Z,laliga,12717104,1959,Mouriño,Santiago Mouriño,2,36327449,34464778,1,marketPlayerTeam,on_sale,ok,false,2026-08-23T22:21:19+02:00
+2026-08-22T0713Z,laliga,12717146,3068,Cabrera,Leandro Cabrera,2,15549740,14650321,1,marketPlayerTeam,on_sale,suspended,false,2026-08-23T22:21:32+02:00
+2026-08-22T0713Z,laliga,12717862,3089,Ez Abde,Abde Ezzalzouli,4,41408166,39475136,1,marketPlayerTeam,on_sale,injured,false,2026-08-23T22:21:59+02:00
+2026-08-22T0713Z,laliga,14186359,3069,Blanco,Antonio Blanco,3,14554549,14588917,1,marketPlayerTeam,on_sale,ok,false,2026-08-24T23:02:37+02:00
+2026-08-22T0713Z,laliga,14948006,2713,Ionut Radu,Ionut Radu,1,37095939,36378011,1,marketPlayerTeam,on_sale,ok,false,2026-08-23T00:25:58+02:00
+2026-08-22T0713Z,laliga,15560007,2415,Llorente ,Diego Llorente,2,12888927,12586758,1,marketPlayerTeam,on_sale,ok,false,2026-08-23T22:21:26+02:00
+2026-08-22T0713Z,laliga,16235615,3125,Canales,Sergio Canales,3,25961421,26439859,0,marketPlayerTeam,on_sale,ok,false,2026-08-24T23:02:32+02:00
+2026-08-22T0713Z,laliga,16235820,3037,C. Puga,Carlos Puga,2,4981968,4982161,0,marketPlayerTeam,on_sale,ok,false,2026-08-24T23:02:43+02:00
+2026-08-22T0713Z,laliga,16235912,3120,De Haas,Justin de Haas,2,8870623,8729681,0,marketPlayerTeam,on_sale,ok,false,2026-08-24T23:02:48+02:00
+2026-08-22T0713Z,laliga,16236032,2714,Javi Rueda,Javi Rueda,2,4421896,4407631,0,marketPlayerTeam,on_sale,ok,false,2026-08-24T23:02:55+02:00

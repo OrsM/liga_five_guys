@@ -380,6 +380,7 @@ player_id,name,club_id,ff_slug,af_slug,app_id,understat_id,app_names
 2675,mikel oyarzabal,real sociedad,mikel-oyarzabal,,,2234,
 2715,pepelu,valencia,pepelu,47463,2464,2551,Pepelu
 2727,ezequiel ponce,elche,ezequiel-ponce,,3188,,E. Ponce
+2733,rodri hernandez,barcelona,rodri-hernandez,,,,
 2751,kike garcia,espanyol,kike-garcia,,,5074,
 2759,carles aleña,alaves,carles-alena,143,,5058,
 2771,alex grimaldo,atletico,alex-grimaldo,563,,,
@@ -534,6 +535,7 @@ player_id,name,club_id,ff_slug,af_slug,app_id,understat_id,app_names
 7542,eric garcia,barcelona,eric-garcia,619,,8045,
 7554,diego conde,betis,diego-conde,,,,
 7570,dani cardenas,rayo,dani-cardenas,,,,
+7614,pablo martinez,malaga,pablo-martinez,,,,
 7629,ivan romero,levante,ivan-romero,192032,,9275,
 7638,jesus areso,athletic,jesus-areso,182181,,9768,
 7644,victor garcia,levante,victor-garcia-1,46790,,8500,
@@ -563,6 +565,7 @@ player_id,name,club_id,ff_slug,af_slug,app_id,understat_id,app_names
 8337,georgiy tsitaishvili,rayo,georgiy-tsitaishvili,,,,
 8386,jude bellingham,real madrid,jude-bellingham,,,8824,
 8392,luka sucic,real sociedad,luka-sucic,7332,,12862,
+8395,karim adeyemi,barcelona,karim-adeyemi,,,,
 8405,antony,betis,antony,9971,,11094,
 841,moi gomez,osasuna,moi-gomez,,,2198,
 8413,pape gueye,villarreal,pape-gueye,20696,,,
