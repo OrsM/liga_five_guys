@@ -1041,6 +1041,22 @@ differently-keyed ownership map is worse than none.
   private directory, deliberately not the public `/writing` path, and the phone
   was asleep when it was written. The phone-side route that serves it is not
   built yet.
+- **The fixture's attack rating now blends in a bottom-up xG signal
+  (2026-08-22), at a guessed weight.** `ffcore.fixture.xg_club_attack()`
+  sums each club's own forwards/attacking-mids' real xG+xA (Understat,
+  same position gate `score.py`'s player-level blend already uses) and
+  blends it into `attack_defense()`'s real-goals attack rating —
+  `XG_CLUB_PSEUDO_MATCHES=10.0`, a round number in the same order of
+  magnitude as this repo's other pseudo-match constants (`SHRINK_K`,
+  `MIN_AD_MATCHES`), not a fitted one. Checked before shipping: the two
+  ratings correlate at r=0.884 (n=20 clubs, 2025-26) — real, not noise,
+  but in-sample, so this cannot yet say xG predicts better than the
+  number it agrees with. A real held-out test needs match-level team xG
+  (`results_history.csv` carries the column; 7 rows so far this season,
+  nowhere near enough) or a second paired season of Understat coverage
+  (one exists today). DEFENSE stays real-goals-only — no bottom-up xG-
+  against signal exists, that would need real opponent identity per
+  match rather than summed player output.
 
 ## Roadmap
 
