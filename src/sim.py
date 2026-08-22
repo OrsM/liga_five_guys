@@ -190,8 +190,6 @@ def header(u, base, n_actions: int, locks_h=None) -> list[str]:
     same statement, and printing the first without the second is how a
     forecast gets read as a fixture.
     """
-    from ffcore.season import best_xi
-
     lo, hi = base.band(u.me)
     val = squad_value(u)
     ctx = []
@@ -207,8 +205,7 @@ def header(u, base, n_actions: int, locks_h=None) -> list[str]:
             ("**cash %s**" if u.cash < 0 else "cash %s") % fmt_money(u.cash),
             "total %s" % fmt_money(val + u.cash)]
 
-    exp = u.forecaster.expected(decide_choosable(u))
-    want = shape(u, best_xi(u.state.squads.get(u.me, {}), exp))
+    want = _shape_now(u)
     now = fielded_shape(u)
     form = ("**play %s** (now %s)" % (want, now)) if now and now != want \
         else "play %s" % want
@@ -252,10 +249,9 @@ def by_slot(u, keys):
 
 def _bar(u) -> float:
     """The weakest man in the eleven you would field — the line on the ladder."""
-    from ffcore.season import best_xi
-    exp = u.forecaster.expected(decide_choosable(u))
-    xi = best_xi(u.state.squads.get(u.me, {}), exp)
-    return min((exp.get(k, 0.0) for k in xi), default=0.0)
+    import decide
+    exp, xi = decide.current_xi(u)
+    return decide.xi_bar(exp, xi)
 
 
 def ladder_rows(u, rows, base=None) -> list[dict]:

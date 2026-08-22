@@ -38,7 +38,6 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from ffcore.bid import (HORIZONS, MAX_LAG_H, deals,  # noqa: E402
                         premiums, usable)
-from ffcore.league import League  # noqa: E402
 from ffcore.parse import fmt_money, fmt_pct  # noqa: E402
 from ffcore.second import LEGEND, af_cell, second_cells  # noqa: E402
 from ffcore.text import norm  # noqa: E402
@@ -349,7 +348,15 @@ def main():
     now = run_now()
     stamp = now.strftime("%Y-%m-%d %H:%M UTC")
     players = load_players()
-    lg = League.load()
+    # session().lg, not a second League.load() — this stage runs before
+    # report/decide/sim in run.py's own order, so it is the FIRST caller
+    # to build the run's one League+Scorer now, not a second, independent
+    # one describing the same squad on a second surface. See
+    # ffcore/model.py's own docstring for the bug two separate loads in
+    # one run already caused once (2026-08-20).
+    from ffcore.model import session
+
+    lg = session().lg
     print("replayed %d transaction(s)" % len(lg.txns))
 
     on_offer, unresolved = read_slate(lg.market, xw=lg.xw)

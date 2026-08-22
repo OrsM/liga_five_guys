@@ -41,7 +41,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from ffcore.league import League, app_fielded  # noqa: E402
+from ffcore.league import app_fielded  # noqa: E402
 from ffcore.text import norm  # noqa: E402
 from ffcore.tidy import (run_now,  # noqa: E402
                          DECISIONS, append_csv, load_deadline, read_csv, write_csv)
@@ -93,13 +93,18 @@ def migrate(path, fields) -> None:
 
 
 def main() -> None:
-    # WITH the market, even though this script prices nothing. Ownership now
-    # comes from the league API, and that join needs Market.key_for to key
-    # players the way every other reader does; without it League falls back to
-    # the ledger replay and this script ends up with a different squad from
-    # the checklist squads.py just wrote — each then reports the other's
-    # players as strangers. Loading market.csv costs a second.
-    lg = League.load()
+    # session().lg, NOT A SECOND League.load() — this file used to build its
+    # own, which is the exact "two models, two answers" shape ffcore/model.py
+    # was built to kill (2026-08-20): report.py/decide.py/sim.py already
+    # share one League+Scorer per run through session(), and this stage runs
+    # in the same process (run.py), so a second load here was a second
+    # opinion about ownership, not a second fact. The market is IN it either
+    # way — session() builds League.load() the same market-aware way this
+    # comment used to justify calling directly, so nothing about the ledger-
+    # replay-fallback risk changes, only that the load now happens once.
+    from ffcore.model import session
+
+    lg = session().lg
     squad = lg.squad(lg.cfg.me)
 
     # A squad key is the site's ID now, not a normalised name, so the log
