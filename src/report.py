@@ -35,15 +35,14 @@ sell rule at all, only a €/pt column with no threshold under it.
 A VERDICT NEEDS A COUNTERPARTY. Being worse than the baseline is not a reason to
 sell, because the free pool is not a shop you can walk into. A Sell means either
 the man can never reach your eleven, or someone ON OFFER TODAY at his position
-is better and his proceeds plus your cash pay for him. League-wide movers and
-recruitment live in reports/watchlist.md; how your rivals behave lives in
-reports/rivals.md.
+is better and his proceeds plus your cash pay for him.
 
-THE SLATE IS THE REPORT when you paste one into inputs/seen.txt. The app deals
-a limited market, so a ranked list of everyone unowned is mostly players you
-cannot buy. sec_slate() answers the only live question — of the players on
-offer right now, which improve my XI, what should I bid, and who else wants
-them — using ffcore.bid: the XI index gained by owning him, and the floor plus
+THE SLATE IS THE REPORT — read live from the league's own market feed, not
+pasted. The app deals a limited market, so a ranked list of everyone unowned
+is mostly players you cannot buy. sec_slate() answers the only live question
+— of the players on offer right now, which improve my XI, what should I bid,
+and who else wants them — using ffcore.bid: the XI index gained by owning
+him, and the floor plus
 the premium this league has actually paid over it. How many purchases went at
 the floor is counted from the ledger on every run rather than stated here,
 because the sentence that stated it went stale inside a fortnight (issue #23).
@@ -503,8 +502,7 @@ def sec_slate(lg, by_key, cands, pool, slate, prem, cash_value,
                 "| Competition | demand, not roster counts: the rivals whose "
                 "XI actually improves with him, strongest threat first. `?` "
                 "cash unknown (treat as live), `(n broke)` want him but "
-                "cannot pay the floor. Manager by manager in "
-                "`reports/rivals.md` |", ""]
+                "cannot pay the floor |", ""]
         # EVERY BID IS PRICED AS IF IT WERE THE ONLY ONE. Each row asks "is
         # this better than the going rate", and several rows can answer yes to
         # more money than you hold — the app settles them all at once, so the
@@ -1114,11 +1112,8 @@ def main() -> None:
     out += sec_eleven(marked, best, players, second, buys)
     out += (slate_lines if slate_lines else
             ["## 2. Buy today", "",
-             "_No slate pasted, so there is nothing you can bid on today that "
-             "this report knows about. Paste today's market screenshot into "
-             "the `seen` input to price it. Everyone unowned is ranked in "
-             "`reports/watchlist.md`, and question 3 is what your cash is "
-             "worth while you wait._", ""])
+             "_The league's own market feed has nothing on offer right now — "
+             "not a missing input, just an empty market._", ""])
     # The two ways every number above can be wrong about a player: he is not
     # fit, or the two probable-XI sources disagree that he plays. Neither
     # prices anything, so neither is a decision — both are prompts to open the

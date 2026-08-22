@@ -1,7 +1,7 @@
 """
 sim.py — the simulation, written out as the report it is going to become.
 
-    python src/sim.py             # writes reports/sim.md
+    python src/sim.py             # writes .runtime/parts/sim.md
     python src/sim.py --selftest
 
 ONE TABLE, ONE QUESTION: for every move I could make, how much does it change

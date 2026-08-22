@@ -1,7 +1,7 @@
 """
 methodology.py — how the forecast works, and how it is doing against reality.
 
-Writes reports/methodology.md, which digest.py stitches in as the LAST
+Writes .runtime/parts/methodology.md, which digest.py stitches in as the LAST
 section of the appendix. Two halves:
 
   1. The formula, in words — pulled together from ffcore/score.py's
@@ -24,7 +24,7 @@ section states that and stops; an empty comparison is a fact, not an error.
 
 Nothing else imports this. Deps: stdlib only.
 
-    python src/methodology.py             # writes reports/methodology.md
+    python src/methodology.py             # writes .runtime/parts/methodology.md
     python src/methodology.py --selftest  # pure join logic, no IO
 """
 
