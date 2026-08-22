@@ -516,6 +516,39 @@ def decide_dead(u):
     return dead_weight(u)
 
 
+def real_cycle_bests(cycles: dict[str, set], gain, group_of=None
+                     ) -> dict[str, list[float]]:
+    """{group: [best gain() seen, one number per REAL cycle that offered a
+    player of that group]} — from `cycles` (market_model()'s own {label:
+    {player keys offered that cycle}}), not a resampled hypothetical.
+
+    ONE NUMBER PER CYCLE, not one per player: a cycle offering three duds
+    and one gem is a single real observation of "what a cycle can produce,"
+    and counting all four would let a crowded cycle drown out a thin one
+    that happened to offer exactly the right man.
+
+    `group_of(key)`, when given, buckets each cycle's own best by group
+    (position, route, whatever the caller wants graded separately) — a
+    cycle with no entry for a group contributes NOTHING to that group's
+    list, silence rather than a guessed zero, same rule this repo already
+    applies to a jornada nobody has a row for. `group_of=None` puts
+    everything in one bucket, keyed "".
+    """
+    out: dict[str, list[float]] = {}
+    for keys in cycles.values():
+        best_by_group: dict[str, float] = {}
+        for k in keys:
+            g = float(gain(k))
+            grp = group_of(k) if group_of else ""
+            if grp is None:
+                continue
+            if g > best_by_group.get(grp, float("-inf")):
+                best_by_group[grp] = g
+        for grp, best in best_by_group.items():
+            out.setdefault(grp, []).append(best)
+    return out
+
+
 def market_percentile(routes, quiet=None) -> str:
     """Where this week's market sits against the market's own history.
 
@@ -750,6 +783,40 @@ def wait_routes(u, offers=None, rng=None) -> list[dict]:
 
     if offers is not None:
         band = offers.best_over(7, gain, rng or random.Random(3))
+        # BEATS_NOW GRADED AGAINST REAL SINGLE CYCLES, NOT THE RESAMPLED
+        # BAND ABOVE. `band` (best_over) is a maximum over many independent
+        # draws from the whole pool — it beats one real day's actual
+        # listing almost by construction, which is why this line read
+        # "under the 1st percentile" on 15 real days running regardless of
+        # whether the market was actually weak that day. real_cycle_bests()
+        # asks the fair question instead: how does today's real best
+        # compare to the OTHER real cycles this repo has observed. Only
+        # `real_cycles` (a getattr, same optional-capability pattern
+        # forecaster.rate_draw/start_draw use) carries that; an `offers`
+        # built without it (a caller not wired to market_model(), or an
+        # old test fixture) falls back to `band` exactly as before, not a
+        # crash.
+        real = getattr(offers, "real_cycles", None)
+        hist = (real_cycle_bests(real, gain).get("", []) if real else None)
+        beats_now = (sum(1 for x in hist if x > now_best) / len(hist)
+                    if hist else
+                    sum(1 for x in band if x > now_best) / len(band))
+        n_band = len(hist) if hist else len(band)
+        # TODAY'S OWN BEST, BY POSITION — a defender's real percentile
+        # needs a defender's real today, not the single best offer of any
+        # position compared against a defender's history.
+        now_best_pos: dict[str, float] = {}
+        for k in u.price:
+            if k in mine:
+                continue
+            p = u.pos.get(k)
+            if p is None:
+                continue
+            g = gain(k)
+            if g > now_best_pos.get(p, 0.0):
+                now_best_pos[p] = g
+        by_pos = (real_cycle_bests(real, gain, lambda k: u.pos.get(k))
+                 if real else {})
         out.append({
             "route": "market", "label": "Wait for the market",
             "what": "a week of new offers",
@@ -757,8 +824,18 @@ def wait_routes(u, offers=None, rng=None) -> list[dict]:
             "pts": season(statistics.median(band), delay=1),
             "lo": sorted(band)[int(0.1 * len(band))],
             "hi": sorted(band)[int(0.9 * len(band))],
-            "beats_now": sum(1 for x in band if x > now_best) / len(band),
-            "n_band": len(band),
+            "beats_now": beats_now,
+            "n_band": n_band,
+            # ONE NUMBER PER POSITION, graded against that position's OWN
+            # today's best, not the single best offer of any position — a
+            # position with zero real cycles offering one, or nothing of
+            # that position live today, gets no entry rather than a
+            # guessed percentile.
+            "by_position": {
+                pos: {"n": len(vals), "now_best": now_best_pos[pos],
+                     "beats_now": sum(1 for x in vals
+                                      if x > now_best_pos[pos]) / len(vals)}
+                for pos, vals in by_pos.items() if vals and pos in now_best_pos},
             "helpful": sum(1 for k in offers.pool if gain(k) > 0),
             "pool": len(offers.pool), "note": offers.note()})
 
@@ -1136,7 +1213,17 @@ def market_model(u):
     pool = {k: v for k, v in u.value.items()
             if k not in owned and k in u.market_exp}
     per = int(statistics.median(len(v) for v in cycles.values())) or 1
-    return Offers.fit(pool, seen, per_cycle=per, cycles=len(cycles))
+    off = Offers.fit(pool, seen, per_cycle=per, cycles=len(cycles))
+    # THE RAW PER-CYCLE SETS, attached rather than returned separately —
+    # Offers.cycles is already a COUNT (len(cycles)), so this cannot
+    # collide with it, and every caller of market_model() that only wants
+    # the fitted sampler is unaffected. wait_routes() reads it (via
+    # getattr, the same optional-capability pattern forecaster.rate_draw/
+    # start_draw already use) to grade today's real best against real
+    # single-cycle history instead of a resampled hypothetical — see
+    # real_cycle_bests()'s own docstring for why that comparison exists.
+    off.real_cycles = dict(cycles)
+    return off
 
 
 PRICE_LOG = "cash_price_log.csv"
@@ -1574,6 +1661,85 @@ def _selftest() -> None:
     flat = [{**rows[0], "d_pos": 0.0, "d_win": 0.0}]
     assert alert_lines(u, flat, ["riv"]) == [], "a move worth nothing is not news"
 
+    # -- real_cycle_bests: real single-day bests, not a resampled fiction --
+    # market_percentile() used to compare today's real best against a band
+    # RESAMPLED from the whole unowned pool every simulated trial — which
+    # beats a real day's actual listing almost by construction (a maximum
+    # over many independent draws vs. one real day's), and read "under the
+    # 1st percentile" on 15 real days running regardless of whether the
+    # market was actually good or bad that day. This asks the fair question:
+    # how does today's real best compare to the OTHER real days this repo
+    # has actually observed.
+    cyc = {"2026-08-15": {"def1", "med1"}, "2026-08-16": {"def2", "del1"},
+          "2026-08-17": {"med2"}}
+    posn = {"def1": "DEF", "def2": "DEF", "med1": "MED", "med2": "MED",
+           "del1": "DEL"}.get
+    gains = {"def1": 1.0, "def2": 3.0, "med1": 2.0, "med2": 0.5,
+            "del1": 5.0}.get
+    # One bucket, unstratified (group_of=None): the best PER CYCLE, not
+    # every player's own gain — a cycle offering three duds and one gem is
+    # one real observation of "what a cycle can produce," not four.
+    flat_hist = real_cycle_bests(cyc, gains)
+    assert flat_hist == {"": [2.0, 5.0, 0.5]}, flat_hist
+    # STRATIFIED: DEF's own history only has two real cycles with a DEF row
+    # in them at all — the third cycle (med2 only) contributes nothing to
+    # DEF's bucket, silence rather than a guessed zero.
+    by_pos = real_cycle_bests(cyc, gains, posn)
+    assert by_pos == {"DEF": [1.0, 3.0], "MED": [2.0, 0.5], "DEL": [5.0]}, \
+        by_pos
+    assert real_cycle_bests({}, gains) == {}
+
+    # -- wait_routes()'s "market" branch actually reads real_cycles --------
+    # THIS WAS NEVER EXERCISED BEFORE — no test in this file constructed a
+    # real `offers` and called wait_routes with it, so the whole `if offers
+    # is not None:` branch (everything above) could have been silently
+    # broken and every suite would still have read green. Built here rather
+    # than left green-by-omission.
+    import random
+    from ffcore.market import Offers
+    from ffcore.season import LeagueState as LS
+
+    sqw = {"k": "POR", **{f"d{i}": "DEF" for i in range(1, 5)},
+          **{f"m{i}": "MED" for i in range(1, 6)}, "f1": "DEL"}
+    perw = {1: {f"me_{k}": (3.0, 1.0) for k in sqw}}
+    uw = Universe(
+        state=LS({"me": {f"me_{k}": v for k, v in sqw.items()}}, [1], "me"),
+        forecaster=Bootstrap(perw), pos={"free_def": "DEF", "hist_def": "DEF",
+                                         "hist_med": "MED"},
+        price={"free_def": 1e6}, proceeds={}, owner={}, cash=99e6, me="me",
+        market_exp={"free_def": 4.0, "hist_def": 6.0, "hist_med": 5.0})
+    # today's only DEF offer (free_def) gains 4.0 - bar; two real past
+    # cycles each offered ONE better DEF (hist_def, gain 6.0) — a real,
+    # thin, but genuine history to grade against.
+    off = Offers.fit({"free_def": 4e6, "hist_def": 6e6, "hist_med": 5e6},
+                     [4e6, 6e6], per_cycle=2, cycles=2)
+    off.real_cycles = {"c1": {"hist_def"}, "c2": {"hist_def", "hist_med"}}
+    routes = wait_routes(uw, off, random.Random(1))
+    mkt = next(r for r in routes if r["route"] == "market")
+    # GRADED AGAINST THE 2 REAL CYCLES, not best_over()'s resampled band —
+    # n_band says so directly, and it is nowhere near best_over's own
+    # trial count (400 by default).
+    assert mkt["n_band"] == 2, mkt["n_band"]
+    assert "DEF" in mkt["by_position"], mkt["by_position"]
+    # hist_def (gain 6.0) beat today's own DEF best (free_def, gain ~2.0
+    # after the bar) in BOTH real cycles — beats_now must read 1.0, not
+    # some fraction only best_over()'s hypothetical band could produce.
+    assert mkt["by_position"]["DEF"]["beats_now"] == 1.0, mkt["by_position"]
+    assert mkt["by_position"]["DEF"]["n"] == 2
+    # MED has real history (one cycle, c2) but NOTHING of that position is
+    # actually offered today — "how does today's MED market compare" has
+    # no today to grade, so it is correctly absent, not padded to zero.
+    assert "MED" not in mkt["by_position"], mkt["by_position"]
+
+    # A market_model()-shaped offers with NO real_cycles attached (an old
+    # fixture, or a caller not wired to it) falls back to best_over()'s
+    # band exactly as before — not a crash, not an empty report.
+    off_plain = Offers.fit({"free_def": 4e6}, [4e6], per_cycle=1, cycles=1)
+    plain_routes = wait_routes(uw, off_plain, random.Random(1))
+    plain_mkt = next(r for r in plain_routes if r["route"] == "market")
+    assert plain_mkt["by_position"] == {}, plain_mkt["by_position"]
+    assert plain_mkt["n_band"] > 2, plain_mkt["n_band"]   # best_over's trials
+
     # -- one line instead of a panel ---------------------------------------
     # The panel sat outside the one table, compared three routes in a table of
     # its own, and carried prose that was unconditional — it went on saying
@@ -1688,7 +1854,7 @@ def _selftest() -> None:
     ph = "\n".join(placeholder("no api_teams.csv"))
     assert "no api_teams.csv" in ph and ph.startswith("# The simulation")
 
-    print("sim self-test OK (106 cases)")
+    print("sim self-test OK (113 cases)")
 
 
 def main() -> None:
