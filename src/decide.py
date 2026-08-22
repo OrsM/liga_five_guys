@@ -155,14 +155,24 @@ class Universe:
     # the whole league. What it costs ANYBODY to take ANYBODY, which is what a
     # rival needs to be able to answer back.
     clause: dict[str, float] = field(default_factory=dict)
-    # HOW you would get each player: "market" if he is on the market and can
-    # simply be bought, "clause" if the only route is paying his buyout. They
-    # are different transactions and only one of them is a raid — calling a
-    # market purchase a steal implies a denial benefit that, measured, is
-    # zero, and it is what made a table of ordinary buys read as a raiding
-    # plan. On 2026-08-18 every acquirable player was route "market" and not
-    # one clause in the league was payable.
+    # HOW you would get each player: "free" if a free agent the app itself is
+    # dealing, "listed" if he is owned and a manager has put him up for sale
+    # (a real owner who can simply not sell, and other managers may already
+    # be bidding — see market_routes()), "clause" if the only route is
+    # paying his buyout. Three different transactions and only "clause" is a
+    # raid in the sense that pays the owner — calling a market purchase a
+    # steal implies a denial benefit that, measured, is zero, and it is what
+    # made a table of ordinary buys read as a raiding plan. On 2026-08-18
+    # every acquirable player was route "market" (this field's old,
+    # undifferentiated third value) and not one clause was payable; "free"
+    # vs "listed" split out 2026-08-22, once it was measured that MOST of a
+    # day's "market" rows are usually a rival's own listing, not a free
+    # agent (28 of 41 the day the feed's own seller field was first read).
     route: dict[str, str] = field(default_factory=dict)
+    # How many other managers are already bidding on a "listed" row — 0 for
+    # a "free"/"clause" entry, since neither is a contest. What makes a
+    # "listed" price a real number to plan around rather than a done deal.
+    bids: dict[str, int] = field(default_factory=dict)
     # What each rival could spend. Estimates, and mostly negative: on the day
     # the response was modelled every one of them was overdrawn and could not
     # buy a soul until I paid one of their clauses.
@@ -679,6 +689,45 @@ def club_key(raw, teams, xw=None) -> str:
     return norm(hit) if hit else ""
 
 
+# WHICH SELLER VALUE IS A FREE AGENT, so a new one added by the app defaults
+# to the safe reading (the app dealing him) rather than silently starting to
+# treat every row as a contested rival listing — see market_routes()'s own
+# docstring for why the two are not the same transaction.
+LISTED_SELLER = "marketPlayerTeam"
+
+
+def market_routes(mkt: list[dict], key_of) -> tuple[dict[str, float],
+                                                    dict[str, str],
+                                                    dict[str, int]]:
+    """(price, route, bids) from api_market.csv's own rows.
+
+    `seller` HAS ALWAYS SAID WHICH IS WHICH — `marketPlayerLeague` is the app
+    dealing a free agent, `marketPlayerTeam` is a manager listing one of
+    theirs (slate.py has documented this since the feed was added) — but
+    every row here used to be labelled "market" regardless, collapsing "the
+    app deals him, nobody can refuse" into the same bucket as "an owner who
+    might simply not sell, and other managers may already be bidding
+    (`numberOfBids`)." Those are not the same transaction, the same reason a
+    clause and an ordinary buy are not: only one of them has a real owner
+    who can say no.
+
+    `key_of(row)` resolves a raw market row to this repo's own player key —
+    the same join `load()` used inline before this was pulled out, handed in
+    rather than imported so this stays testable on synthetic rows.
+    """
+    price: dict[str, float] = {}
+    route: dict[str, str] = {}
+    bids: dict[str, int] = {}
+    for r in mkt:
+        k = key_of(r)
+        if not k or not r.get("sale_price"):
+            continue
+        price[k] = float(r["sale_price"])
+        route[k] = "listed" if r.get("seller") == LISTED_SELLER else "free"
+        bids[k] = int(r.get("bids") or 0)
+    return price, route, bids
+
+
 def load(trials_pool=None) -> Universe:
     """Assemble the universe from the store. The only IO in this module."""
     # The run's one model — the same League and the same Scorer report.py
@@ -714,21 +763,18 @@ def load(trials_pool=None) -> Universe:
 
     # What it costs ME. A clause is instant and cannot be refused; a market
     # row is a bid that can lose, and that difference is not priced here —
-    # see the module docstring.
+    # see the module docstring. WITHIN "market", see market_routes()'s own
+    # docstring for the further split it draws between a free agent and a
+    # rival's own player put up for sale.
     #
     # Both sides join through ffcore.league.api_key, keyed on the market's
     # spelling like everything else. The clause is ON the api_teams row, so a
     # name that will not resolve is not a missing price — it is a rival's
     # player who silently cannot be bought at all.
     index = latest_only(lg.market.rows) if lg.market is not None else []
-    price: dict[str, float] = {}
-    route: dict[str, str] = {}
-    for r in mkt:
-        k = api_key(r["player_name"], "", lg.market, owner, index,
-                    r.get("market_value"))
-        if k and r.get("sale_price"):
-            price[k] = float(r["sale_price"])
-            route[k] = "market"
+    price, route, bids = market_routes(
+        mkt, lambda r: api_key(r["player_name"], "", lg.market, owner,
+                               index, r.get("market_value")))
     now = run_now()
     clause_until: dict = {}
     for r in teams:
@@ -867,7 +913,7 @@ def load(trials_pool=None) -> Universe:
         value=value, market_exp=market_exp, start=start, clause=clause,
         route=route,
         rival_cash=rival_cash,
-        clause_until=clause_until,
+        clause_until=clause_until, bids=bids,
         part_played=played, name=name, start_note=_calibrated()[0].note(),
         unjoined=list(unjoined_clubs) + list(lg.api_unjoined))
 
@@ -903,13 +949,13 @@ def _selftest() -> None:
     assert "dud" not in names, names
     assert "star" in names, names
     # A rival's player reachable ONLY through his clause is marked a raid;
-    # one sitting on the market is an ordinary purchase, whoever owns him,
+    # one he has LISTED himself is an ordinary purchase, whoever owns him,
     # because taking him denies nobody anything they were not already selling.
     u.route["th_m1"] = "clause"
     acts = candidates(u, exp)
     assert any(a.kind.startswith("clause") and a.buy == "th_m1"
                for a in acts), [a.kind for a in acts]
-    u.route["th_m1"] = "market"
+    u.route["th_m1"] = "listed"
     listed = candidates(u, exp)
     got = [a for a in listed if a.buy == "th_m1"]
     assert got and all(a.kind.startswith("buy") or a.kind == "swap"
@@ -925,6 +971,41 @@ def _selftest() -> None:
     assert "th_m1" not in after["riv"], after["riv"]
     assert "th_m1" in after["me"]
     assert "th_m1" in u.state.squads["riv"], "apply must not mutate"
+
+    # -- market_routes: a free agent is not a rival's listed player --------
+    # api_market.csv's own `seller` column already says which is which
+    # (marketPlayerLeague = the app dealing a free agent, marketPlayerTeam =
+    # a manager listing one of theirs) — this repo has known that since
+    # slate.py, but decide.py labelled every row "market" regardless,
+    # collapsing "nobody can refuse this" into the same bucket as "an owner
+    # who might not sell, and other managers may already be bidding."
+    mkt_rows = [
+        {"player_name": "Free Agent", "sale_price": "5000000",
+         "seller": "marketPlayerLeague", "bids": "0"},
+        {"player_name": "Listed Rival", "sale_price": "8000000",
+         "seller": "marketPlayerTeam", "bids": "2"},
+        # No sale_price at all: not on offer, not priced, not routed.
+        {"player_name": "Not Priced", "sale_price": "",
+         "seller": "marketPlayerLeague"},
+        # Resolves to no key: silently skipped, not a crash.
+        {"player_name": "Unjoinable", "sale_price": "1000000",
+         "seller": "marketPlayerTeam"},
+    ]
+    key_of = {"Free Agent": "free_agent", "Listed Rival": "listed_rival",
+             "Not Priced": "not_priced"}.get
+    price, route, bids = market_routes(
+        mkt_rows, lambda r: key_of((r.get("player_name") or "")))
+    assert price == {"free_agent": 5000000.0, "listed_rival": 8000000.0}, price
+    assert route == {"free_agent": "free", "listed_rival": "listed"}, route
+    assert bids == {"free_agent": 0, "listed_rival": 2}, bids
+    assert "not_priced" not in route and "not_priced" not in price
+    # An unrecognised seller value defaults to "free" — the app dealing it
+    # is the ordinary case, and a new discriminator value should not
+    # silently start reading every row as a contested rival listing.
+    unknown_seller = [{"player_name": "Free Agent", "sale_price": "1",
+                       "seller": "something_new"}]
+    _, r2, _ = market_routes(unknown_seller, lambda r: "free_agent")
+    assert r2 == {"free_agent": "free"}, r2
 
     # -- funding a move with MORE THAN ONE sale ----------------------------
     # The table silently omitted every move that needed two. A target you
@@ -1234,7 +1315,7 @@ def _selftest() -> None:
     assert value_rate(None, 5e6) is None
     assert value_rate(0.0, 5e6) == 0.0           # a real price, zero return: 0, not None
 
-    print("decide self-test OK (71 cases)")
+    print("decide self-test OK (73 cases)")
 
 
 if __name__ == "__main__":
