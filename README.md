@@ -1022,9 +1022,21 @@ differently-keyed ownership map is worse than none.
   good or bad by experience. As of 2026-08-18 there are six snapshots over one
   day and 42 distinct players ever offered — the right idea, not yet enough of
   it. It grows twice a day on its own.
-- **Cover is worth nothing to it.** P(start) is flat, so nobody is injured in
-  March and a bench that exists for that prices at zero. This matters now that
-  dead weight funds purchases: the top move can sell your second keeper.
+- **P(start) now carries its own uncertainty (2026-08-22).** It used to be
+  one flat number, held for every remaining jornada and blended against
+  nothing but itself. Two additions, both reusing machinery already trusted
+  for the points rate rather than inventing new statistics: `score.py`
+  blends `pct_used` against this season's actual recent minutes
+  (`_weighted_start`, same recency decay `_fit_decay` already validates), so
+  a real drop in playing time moves the number ahead of the editorial page
+  catching up; `ffcore.forecast.Bootstrap.start_rel`/`start_draw` widen the
+  simulated band the further a jornada is projected, scaled by how much real
+  evidence (`Scored.pj`) backs the reading — a rotation player and a nailed
+  starter published at the same percentage are no longer simulated
+  identically. Still not modelled: an injury's own return timeline (still a
+  flat categorical zero/halve, not a hazard curve), and there is no
+  player-level "will he start" market to lean on — La Liga does not publish
+  one at the depth Phase 2's team-level odds plan would need.
 - **Publishing to the phone is wired but unproven.** `lfg-publish` targets a
   private directory, deliberately not the public `/writing` path, and the phone
   was asleep when it was written. The phone-side route that serves it is not
