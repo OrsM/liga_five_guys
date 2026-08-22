@@ -1,7 +1,8 @@
 # liga_five_guys
 
 Data-driven decision system for LaLiga Fantasy Oficial. Private league of 5
-managers. Runs on the Asus box, twice a day, unattended.
+managers. Runs on the Asus box: once a night unattended, plus on demand
+whenever the phone asks for it.
 
 Personal use only. Don't redistribute the scraped data.
 
@@ -17,13 +18,30 @@ persisting a rotating secret back into repo secrets means a PAT, an API call,
 and a write that fails closed — one missed write and the next run has nothing.
 On this box it is a file the job rewrites in place. That is the whole reason.
 
-    systemctl --user status lfg.timer     # is it running
-    systemctl --user start lfg.service    # run it now
-    journalctl --user -u lfg.service -n 50   # what happened
+    systemctl --user status lfg.timer       # the nightly sweep, is it running
+    systemctl --user status lfg-watch.timer # the on-demand watcher, is it running
+    systemctl --user start lfg.service      # run it now
+    journalctl --user -u lfg.service -n 50     # what happened
+    journalctl --user -u lfg-watch -n 30       # what an on-demand run did
 
 `~/.local/bin/lfg-run` is the chain; `lfg-publish` pushes the finished report
 to the phone, which serves it at **notes.lemonworlds.com/fantasy** behind
 Cloudflare Access.
+
+**Two triggers, one script, and no special-casing between them.** `lfg.timer`
+fires once a night (00:40 local, just after LaLiga's own ~00:15 market
+recompute settles) so data never drifts stale beyond a day even if nobody
+opens the report; the "Run again" button on the phone leaves a request file
+that `lfg-watch.timer` polls for every 60s and acts on within the minute.
+Both call the identical `lfg-run` — same self-tests, same fetch, same 10-stage
+chain — so a click minutes after the nightly sweep costs nothing extra:
+`ingest.py`'s own per-source cadence (`due()` — "every_run"/"twice_daily"/
+"daily"/"once") governs what actually gets re-fetched regardless of which
+trigger asked, external pages included exactly the same as the league API.
+Twice-daily-on-a-clock (`lfg.timer`'s original design, 00:40 and 11:40) was
+disabled 2026-08-19 once on-demand existed and no longer needed the second
+run to guess when you'd want a fresh one; re-enabled once-nightly 2026-08-22
+as the floor under on-demand, not a replacement for it.
 
 **There is no GitHub Actions workflow any more.** Its schedule went when the
 report moved here, and its test job went with it on 2026-08-18: with nothing
