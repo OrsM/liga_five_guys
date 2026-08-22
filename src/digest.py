@@ -58,10 +58,16 @@ APPENDIX_SOURCES = [
     Part("What it cannot see", "sim.md",
          ["What the simulation cannot see",
           "Act now or wait — the workings"], nest=False),
+    # NOT "The workings" (latest.md's bid table, fitness, notes) ANY MORE —
+    # removed 2026-08-22. That was DATA, re-stitched here byte-identical to
+    # what the daily report already shows, the exact duplication problem
+    # this module's own docstring says the appendix exists to avoid ("two
+    # renderings of one answer"). What belongs here is HOW those numbers
+    # are made — methodology.md's own column_guide_lines() now carries the
+    # column explanations the daily report used to repeat in full every
+    # run; the live data stays in the one place it can't drift from itself.
     Part("The forecast, and how it is doing", "methodology.md", None,
          nest=False),
-    Part("The workings", "latest.md", ["2. What to bid", "3. Exceptions",
-                                       "Notes"], nest=False),
 ]
 
 

@@ -281,10 +281,10 @@ def gain(pool: dict, candidate: dict, base_total: float,
 def xi_snapshots(lg, sc, by_key) -> dict[str, dict]:
     """{handle: {pool, best, missing, short}} under the one shared scorer.
 
-    The one computation of every manager's best XI, shared by report.py's
-    slate and rivals.py's matrix and projections — two copies of this
-    arithmetic would drift, and a slate priced against a different XI than
-    section 6 prints is exactly the inconsistency this exists to prevent.
+    The one computation of every manager's best XI, computed once here and
+    read by every candidate's demand_summary() below — O(managers), not
+    O(managers x candidates), and one number for "can he field a legal XI"
+    rather than a second copy of the arithmetic that could drift from it.
 
     `best` is pick_xi's (total, shape, picked) or None — and None is a
     finding, not an error: that manager cannot field a legal XI today.

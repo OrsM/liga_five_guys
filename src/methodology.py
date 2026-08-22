@@ -37,7 +37,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from ffcore.fixture import FIX_BAND, HOME_EDGE  # noqa: E402
-from ffcore.score import SHRINK_K  # noqa: E402
+from ffcore.score import ABSENT_START, NEUTRAL_START, SHRINK_K  # noqa: E402
 from ffcore.text import norm, resolve  # noqa: E402
 from ffcore.tidy import (run_now,  # noqa: E402
                          DECISIONS, PARTS, LINEUP_SOURCE,  # noqa: E402
@@ -890,6 +890,61 @@ def formula_lines() -> list[str]:
 
 
 
+def column_guide_lines() -> list[str]:
+    """The full explanation of every table column the daily report only
+    footnotes in one line now.
+
+    MOVED HERE 2026-08-22, not deleted. The daily report used to carry this
+    in full every single run — a 5-row column legend under the bid table, a
+    paragraph under the XI table, another under fitness, another under
+    starting — unchanging wording, re-read every day whether or not anything
+    below it had changed. The report now prints one line per table pointing
+    here; this is the "click here for details" the pointer promises, static
+    because what a column MEANS does not change run to run, only what is in
+    it does.
+    """
+    from ffcore.second import LEGEND
+
+    return [
+        "### How to read the tables", "",
+        "**Field these eleven** — `pts/m` is points per match, last "
+        "season shrunk toward the average and blended with this season as "
+        "it accrues (`~` = no record at all, the baseline is assumed). "
+        "`Fix` is how much the next opponent moves it (`=` a median team, "
+        "`—` no fixture known). `FF`/`AF` are separate, never blended, "
+        "because neither has been checked against a played jornada yet and "
+        "a disagreement is worth more than an average. `xPts/j` = pts/m × "
+        "Fix × FF, and uses FF only. `⚠` on a name means the Fitness or "
+        "Starting section has something on him. On a `+SLOT` row, xPts/j "
+        "is the change to the WHOLE eleven if you sign him and re-pick the "
+        "shape — his own score, fixture excluded, since you'd own him for "
+        "months, not one round.", "",
+        "**What to bid** — `Bid` is what it costs to win him, never "
+        "whether he is worth winning (that is the eleven table). A "
+        "purchase is closer to a loan than a spend: the value comes back "
+        "on sale, give or take a tenth, so a bid within a few percent is "
+        "not a decision. It is priced as the floor plus what this league "
+        "has actually paid over it — the range is what has happened, not "
+        "a chance of winning, and every one of them is a bid that won. "
+        f"`XI` is two readings, printed side by side. {LEGEND} `Competition` "
+        "is demand, not roster counts: the rivals whose XI actually "
+        "improves with him, strongest threat first — `?` means their cash "
+        "is unknown (treat as live), `(n broke)` means they want him but "
+        "cannot pay the floor.", "",
+        "**Fitness** — FF's read is from the 'Estado físico', "
+        "'Sancionados' and 'No disponibles' blocks of each team page; "
+        "`Tocado` — a knock the site still lists as available — is folded "
+        "into doubt. No entry is an absence of evidence, not evidence of "
+        "fitness. 'App' is the game's own operator-stated availability, "
+        "shown only when it differs from FF's read.", "",
+        "**Starting** — both figures are editorial reads refreshed a few "
+        "times a day, not live probabilities. `~` means listed with no "
+        f"figure (assumed {NEUTRAL_START:.0f}%), `!` means not on the page "
+        f"at all (assumed {ABSENT_START:.0f}%). The under-threshold "
+        "cutoff is `min_start` in `inputs/league.ini`.", "",
+    ]
+
+
 def _fc():
     """The forecaster this run built, or None — asked, never described."""
     try:
@@ -1079,6 +1134,7 @@ def main() -> None:
     out = ["# How the forecast works — and how it's doing", ""]
     out += feed_lines()
     out += formula_lines()
+    out += column_guide_lines()
     out += comparison_lines()
     out += source_lines(load_actuals()[0])
     PARTS.mkdir(parents=True, exist_ok=True)
@@ -1296,6 +1352,18 @@ def _selftest() -> None:
     assert start_grade(iv2, [absent], None) == ([], [], 0)
     # Nothing played, nothing claimed: still not a zero score for anyone.
     assert start_intervals([], [], []) == ([], 0, [])
+
+    # -- column_guide_lines: the full explanation, moved here 2026-08-22 ---
+    guide = "\n".join(column_guide_lines())
+    for heading in ("Field these eleven", "What to bid", "Fitness",
+                   "Starting"):
+        assert heading in guide, heading
+    # The live NEUTRAL_START/ABSENT_START numbers, not hand-typed duplicates
+    # of them — this drifting from ffcore.score silently is exactly the
+    # class of bug formula_lines() already guards against for the other
+    # constants.
+    assert f"{NEUTRAL_START:.0f}%" in guide
+    assert f"{ABSENT_START:.0f}%" in guide
 
     print("methodology.py selftest OK")
 

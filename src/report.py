@@ -47,9 +47,10 @@ the premium this league has actually paid over it. How many purchases went at
 the floor is counted from the ledger on every run rather than stated here,
 because the sentence that stated it went stale inside a fortnight (issue #23).
 
-SCORING lives in ffcore/score.py now, shared with rivals.py so that your
-squad and theirs are ranked by the same arithmetic — one builder, build(), so
-the two reports cannot drift apart:
+SCORING lives in ffcore/score.py now, shared with sim.py so that your squad
+and every rival's are ranked by the same arithmetic — one builder, build(),
+one session (ffcore/model.py) — so the report and the simulation cannot
+drift apart:
 
     score = shrunk points-per-match  x  fixture  x  P(start)
 
@@ -111,7 +112,7 @@ from ffcore.bid import (deals, demand_summary, low_priced_buys,  # noqa: E402
                         premiums, suggest, xi_snapshots)
 from ffcore.fixture import FIX_BAND, HOME_EDGE  # noqa: E402
 from ffcore.render import title_name  # noqa: E402
-from ffcore.second import (LEGEND, SECOND_SOURCE,  # noqa: E402
+from ffcore.second import (SECOND_SOURCE,  # noqa: E402
                            af_cell, second_cells)
 from ffcore.score import (ABSENT_START, NEUTRAL_START,  # noqa: E402
                           SLOT_LABEL, SLOT_MIN, formations,
@@ -401,8 +402,7 @@ def rival_ceiling(lg) -> float | None:
 
 
 def sec_slate(lg, by_key, cands, pool, slate, prem, cash_value,
-              rival_max, snaps, sell_prem=None,
-              second=None) -> tuple[list[str], int, int]:
+              rival_max, snaps, second=None) -> tuple[list[str], int, int]:
     """Today's slate: WHAT TO BID, and who else wants him.
 
     THE ONE QUESTION THE SIMULATION CANNOT ANSWER. sim.py says whether a
@@ -472,37 +472,18 @@ def sec_slate(lg, by_key, cands, pool, slate, prem, cash_value,
                    demand_summary(cand, lg, snaps),
                    "cover — you are %d short at %s" % (short_by, cand["slot"])
                    if short_by > 0 else ""))
-        # WHAT EACH COLUMN IS, as a table rather than four paragraphs of it.
-        # The prose said the same things and said them at length; a column
-        # legend is a lookup, and a lookup is a table.
-        out += ["", "| Column | What it is |", "|---|---|",
-                "| Bid | what it costs to win him — never whether he is worth "
-                "winning, which is the one table on the board. "
-                "A purchase is closer to a loan than a spend: the value comes "
-                "back on sale, give or take %s, so a bid within a few percent "
-                "is not a decision |"
-                % ("%.0f%%" % sell_prem.swing() if sell_prem
-                   else "about a tenth"),
-                "| Bid, how it is priced | the floor plus what this league "
-                "has actually paid over it: %s.%s The range is what has "
-                "happened, not a chance of winning — and every one of them "
-                "is a bid that won |"
-                % (prem.label() if prem else
-                   "no priced purchase yet, so these are floors",
-                   ("" if not prem else
-                    " %d of those %d went at the floor itself, so the minimum "
-                    "is not a number known to lose." % (prem.at_floor, prem.n)
-                    if prem.at_floor else
-                    " None of those %d went at the floor." % prem.n)),
-                "| XI | FF's probable-eleven percentage — the one the "
-                "forecast uses — then AF's read of the same eleven. Printed, "
-                "never blended: two sources that disagree is the signal, and "
-                "the reason to open the app before bidding |",
-                "| XI, the marks | %s |" % LEGEND.replace("\n", " "),
-                "| Competition | demand, not roster counts: the rivals whose "
-                "XI actually improves with him, strongest threat first. `?` "
-                "cash unknown (treat as live), `(n broke)` want him but "
-                "cannot pay the floor |", ""]
+        # ONE LINE, THE LIVE NUMBERS ONLY — what each column means, in
+        # general, is static and belongs in METHOD.md's own column guide
+        # (methodology.py), not re-explained here every run. What stays here
+        # is what actually changes run to run: the real premium this league
+        # has paid, and how many bids went at the floor.
+        out += ["",
+               "_**Bid** floor + %s%s · **XI** FF/AF, never blended · "
+               "**Competition** rivals whose XI improves, strongest first. "
+               "Full column guide in METHOD.md._"
+               % (prem.label() if prem else "no priced purchase yet",
+                  (" (%d/%d at the floor)" % (prem.at_floor, prem.n)
+                   if prem else "")), ""]
         # EVERY BID IS PRICED AS IF IT WERE THE ONLY ONE. Each row asks "is
         # this better than the going rate", and several rows can answer yes to
         # more money than you hold — the app settles them all at once, so the
@@ -752,26 +733,16 @@ def sec_eleven(marked, best, players, second=None, buys=None) -> list[str]:
                    f"{af_cell(cells.get(cand['key']))} | **{g:+.1f}** |")
 
     out += ["",
-            "_**pts/m** is points per match, last season shrunk toward the "
-            "average and blended with this season as it accrues. `~` means no "
-            "record at all, so the baseline is assumed. **Fix** is how much "
-            "the next opponent moves it — `=` a median team, `—` no fixture "
-            "known. **FF** is futbolfantasy's start percentage, **AF** is "
-            "analiticafantasy's — `titular` there is a named starter with no "
-            "number attached, `?` is listed without either, `—` is not listed "
-            "at all. They are separate columns because neither has been "
-            "checked against a played jornada yet, so there is no weight to "
-            "blend them by, and a disagreement is worth more than an average. "
-            "**xPts/j** = pts/m × Fix × FF, and uses FF only. "
-            "`⚠` on a name means question 5 has something on him._", ""]
+            "_**pts/m** points/match, shrunk toward the average · **Fix** "
+            "next-opponent adjustment (`=` median, `—` unknown) · **FF**/"
+            "**AF** probable-XI reads, never blended · **xPts/j** = pts/m × "
+            "Fix × FF · `⚠` = Fitness or Starting has something on him. "
+            "Full column guide in METHOD.md._", ""]
     if up:
-        out += ["_The `+SLOT` rows are today's slate: **xPts/j is the change "
-                "to the whole eleven** if you sign him and re-pick the shape, "
-                "not his own score, and it leaves the fixture OUT — you own a "
-                "player for months, not for one round. `★` next to the "
-                "opponent means this round's draw happens to be kind, `↓` that "
-                "it is not; neither is in the number. What he would cost, and "
-                "whether that is a good rate, is question 2._"
+        out += ["_`+SLOT` rows are today's slate: xPts/j is the change to "
+                "the WHOLE eleven, fixture left out. `★`/`↓` mark this "
+                "round's draw as kind/unkind, not counted in the number. "
+                "What he'd cost is question 2._"
                 + ("" if not passed else
                    " _%d other%s on the slate would not improve this eleven, "
                    "so they are priced there and not here._"
@@ -878,12 +849,8 @@ def sec_fitness(players, fitness=None) -> list[str]:
             out.append(f"| {p['name']} | ⚪ no data | not listed on his team "
                        "page — unknown, not fit | — |")
         out.append("")
-    out += ["_FF's read is from the 'Estado físico', 'Sancionados' and 'No "
-            "disponibles' blocks of each team page; `Tocado` — a knock the "
-            "site still lists as available — is folded into doubt. No entry "
-            "is an absence of evidence, not evidence of fitness. 'App' is "
-            "the game's own operator-stated availability, shown whenever it "
-            "differs from FF's read._", ""]
+    out += ["_FF's read (`Tocado` folds into doubt); 'App' shown only when "
+            "it disagrees. Full column guide in METHOD.md._", ""]
     return out
 
 
@@ -971,11 +938,9 @@ def sec_starting(marked, min_start, second=None,
                 + "; ".join(f"**{n}** → {', '.join(c)}" for n, c in unclear)
                 + ". A wrong player is worse than a blank one._", ""]
 
-    out += ["_Both figures are editorial reads refreshed a few times a day, "
-            "not live probabilities. `~` means listed with no figure "
-            f"(assumed {NEUTRAL_START:.0f}%), `!` not on the page at all "
-            f"(assumed {ABSENT_START:.0f}%). Threshold is `min_start` in "
-            "`inputs/league.ini`._", ""]
+    out += [f"_Editorial reads, not live probabilities. `~`=assumed "
+            f"{NEUTRAL_START:.0f}%, `!`=assumed {ABSENT_START:.0f}%. "
+            "Full column guide in METHOD.md._", ""]
     return out
 
 
@@ -1053,11 +1018,7 @@ def main() -> None:
     cash_value = cash.value if cash and cash.confidence == "known" else None
     by_key = lg.market.latest() if lg and lg.market else {}
     slate = read_slate(lg.market, xw=lg.xw) if by_key else (set(), [])
-    # Priced once: the buy side sizes a bid, and the sell side is what the app
-    # pays you for a player, which the bench table needs whether or not a slate
-    # was pasted.
     dl = deals(lg, lg.market) if lg and lg.market else []
-    app_prem = premiums(dl, "sell")
     buy_prem = premiums(dl)
     # Scored once, read twice: question 1 asks what they add to the eleven,
     # question 2 asks what they cost.
@@ -1083,13 +1044,12 @@ def main() -> None:
     # probable-XI sources disagree — none of which the simulation produces.
     slate_lines, n_slate, n_better = [], 0, 0
     if any(slate):
-        # The same snapshots rivals.py prints in its section 6, so the
-        # Competition column and the matrix can never disagree.
+        # Built once, read by every candidate's Competition cell below —
+        # xi_snapshots() is O(managers), not O(managers x candidates).
         snaps = xi_snapshots(lg, sc, by_key)
         slate_lines, n_slate, n_better = sec_slate(
             lg, by_key, cands, pool, slate,
-            buy_prem, cash_value, rival_ceiling(lg), snaps,
-            sell_prem=app_prem, second=second)
+            buy_prem, cash_value, rival_ceiling(lg), snaps, second=second)
 
     # --- assemble ---------------------------------------------------------
     # ONE FILE. `board.md` existed to hold the board and, for one afternoon
@@ -1221,7 +1181,7 @@ def main() -> None:
         + (f", {hist_label}" if hist_label else ", **no points baseline**")
         + (f" + {cur_label}" if cur_label else "")
         + ") × fixture × P(start), from `ffcore/score.py` — the same scorer "
-          "rivals.py uses |",
+          "sim.py scores every rival with |",
         "| Zeroed | injured, suspended, unavailable; a doubt is halved |",
         "| Fixture term | ±%.0f%% across the opponents ranked by %s, plus "
         "±%.0f%% for home advantage — both widths guesses, unfitted, and "
