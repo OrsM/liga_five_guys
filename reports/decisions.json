@@ -1,10 +1,10 @@
 {
- "generated_at": "2026-08-22T15:32Z",
- "locks_in_h": 1.9619921338888888,
- "cash": 19380893.477219906,
+ "generated_at": "2026-08-22T15:38Z",
+ "locks_in_h": 1.850119718888889,
+ "cash": 19380942.945615742,
  "squad_value": 220480727.0,
  "jornadas_left": 38,
- "acquirable": 25,
+ "acquirable": 26,
  "considered": 24,
  "expected_finish": 1.514,
  "p_win": 0.62,
@@ -28,7 +28,7 @@
    "helps": 0.9873333333333333,
    "pts_lo": 45.92384671471336,
    "pts_hi": 188.08474076838888,
-   "left": 17868523.477219906,
+   "left": 17868572.945615742,
    "answer": null,
    "p_win_after": 0.7876666666666666,
    "vs": "BurtonGM89",
@@ -49,7 +49,7 @@
    "helps": 0.7796666666666666,
    "pts_lo": -23.26929697613923,
    "pts_hi": 174.51175474001548,
-   "left": 10510270.477219906,
+   "left": 10510319.945615742,
    "answer": null,
    "p_win_after": 0.718,
    "vs": "BurtonGM89",
@@ -70,7 +70,7 @@
    "helps": 0.877,
    "pts_lo": -4.739641201379982,
    "pts_hi": 128.45774433370866,
-   "left": 28001176.477219906,
+   "left": 28001225.945615742,
    "answer": null,
    "p_win_after": 0.7043333333333334,
    "vs": "BurtonGM89",
@@ -91,7 +91,7 @@
    "helps": 0.8996666666666666,
    "pts_lo": -0.0791693741839481,
    "pts_hi": 94.9711680711298,
-   "left": 20096703.477219906,
+   "left": 20096752.945615742,
    "answer": null,
    "p_win_after": 0.6766666666666666,
    "vs": "BurtonGM89",
@@ -112,7 +112,7 @@
    "helps": 0.7233333333333334,
    "pts_lo": -25.680468756259415,
    "pts_hi": 97.72980771892594,
-   "left": 19534145.477219906,
+   "left": 19534194.945615742,
    "answer": null,
    "p_win_after": 0.6656666666666666,
    "vs": "BurtonGM89",
@@ -133,7 +133,7 @@
    "helps": 0.6333333333333333,
    "pts_lo": -35.16340361162679,
    "pts_hi": 112.10650931864984,
-   "left": 27441104.477219906,
+   "left": 27441153.945615742,
    "answer": null,
    "p_win_after": 0.664,
    "vs": "BurtonGM89",
@@ -154,7 +154,7 @@
    "helps": 0.5996666666666667,
    "pts_lo": -37.42445349185209,
    "pts_hi": 96.07666287319921,
-   "left": 6461651.477219906,
+   "left": 6461700.945615742,
    "answer": null,
    "p_win_after": 0.6456666666666667,
    "vs": "BurtonGM89",
@@ -175,7 +175,7 @@
    "helps": 0.5103333333333333,
    "pts_lo": -47.852032252183335,
    "pts_hi": 107.91005418830014,
-   "left": 18638169.477219906,
+   "left": 18638218.945615742,
    "answer": null,
    "p_win_after": 0.6433333333333333,
    "vs": "BurtonGM89",
@@ -196,7 +196,7 @@
    "helps": 0.4826666666666667,
    "pts_lo": -40.88475576629594,
    "pts_hi": 45.11382491932682,
-   "left": 31185466.477219906,
+   "left": 31185515.945615742,
    "answer": null,
    "p_win_after": 0.619,
    "vs": "BurtonGM89",
@@ -338,7 +338,7 @@
    "xpts": 3.513872039522414,
    "group": "save",
    "where": "free agent",
-   "money": -3513797.5227800943,
+   "money": -3513748.0543842576,
    "pts": 0.0,
    "note": "short",
    "value": 0.0
@@ -350,10 +350,10 @@
    "xpts": 2.283515583632917,
    "group": "save",
    "where": "Albert Laporta",
-   "money": -3904376.5227800943,
+   "money": -3904327.0543842576,
    "pts": 34.08662169258855,
    "note": "short",
-   "value": 8.730362323846093
+   "value": 8.730472938815899
   }
  ],
  "bar": 1.3321683814760215,
@@ -368,7 +368,7 @@
   {
    "route": "act",
    "label": "Act today",
-   "what": "25 players you can buy now",
+   "what": "26 players you can buy now",
    "best": 3.1013802704668336,
    "pts": 117.85245027773968,
    "lo": null,
@@ -396,15 +396,15 @@
      "now_best": 0.07631687712872881,
      "beats_now": 0.2857142857142857
     },
+    "MED": {
+     "n": 7,
+     "now_best": 3.1013802704668336,
+     "beats_now": 0.2857142857142857
+    },
     "POR": {
      "n": 4,
      "now_best": 2.181703658046392,
      "beats_now": 0.5
-    },
-    "MED": {
-     "n": 6,
-     "now_best": 3.1013802704668336,
-     "beats_now": 0.3333333333333333
     }
    },
    "by_route": {
@@ -421,7 +421,7 @@
    },
    "helpful": 195,
    "pool": 589,
-   "note": "the market is modelled from 129 offers over 8 cycles, weighted by value^0.40, and only just — value^0.15 fits within 4.9% of it, so read the exponent as roughly this, not exactly this"
+   "note": "the market is modelled from 130 offers over 8 cycles, weighted by value^0.15, and only just — value^0.40 fits within 11.7% of it, so read the exponent as roughly this, not exactly this"
   },
   {
    "route": "watch",
@@ -435,22 +435,22 @@
     {
      "name": "Lamine Yamal",
      "gain": 7.369203029109666,
-     "wait": 6.012109811992737
+     "wait": 13.5247616030998
     },
     {
      "name": "Joan Garcia",
      "gain": 6.605497706281776,
-     "wait": 7.655895536262651
+     "wait": 14.772157221897407
     },
     {
      "name": "Kylian Mbappe",
      "gain": 5.9802933860268075,
-     "wait": 5.950469599558772
+     "wait": 13.474270861726795
     },
     {
      "name": "Zaid Romero",
      "gain": 5.838558449112398,
-     "wait": 11.479266166415172
+     "wait": 17.155113238757806
     }
    ]
   },
@@ -464,7 +464,7 @@
    "hi": null,
    "beats_now": null,
    "helpful": 43,
-   "days": 2.2030228203935183,
+   "days": 2.1983614697685185,
    "opens": "24 Aug"
   }
  ],
@@ -486,7 +486,7 @@
    "mean": 1654.7720295232732,
    "lo": 1405.964018329342,
    "hi": 1914.8015414663737,
-   "cash": 19380893.477219906,
+   "cash": 19380942.945615742,
    "cash_known": true,
    "p_above": null
   },
