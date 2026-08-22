@@ -831,13 +831,28 @@ def wait_routes(u, offers=None, rng=None) -> list[dict]:
                    if vals and grp in now_by_group}
 
         real_routes = getattr(offers, "real_routes", {})
+        # SAME FIX AS beats_now, ONE LEVEL UP: "best" (the median), "lo"
+        # and "hi" used to read straight off best_over()'s resampled band
+        # too — the exact reason a live check the day this was fixed found
+        # its median at 7.37 against real history's own 4.15, with the
+        # band's MINIMUM (4.33) already above the real MEDIAN. A player
+        # who has never actually been offered (this repo's own "Not for
+        # sale" table already knows who) still gets drawn into that
+        # resample by value alone, and skews every number built from it.
+        # Real history first when there is enough of it to say anything;
+        # the resampled band remains the fallback, unchanged, for an
+        # `offers` with no real_cycles attached.
+        pool_stats = sorted(hist) if hist else sorted(band)
+        best = statistics.median(pool_stats)
+        lo = pool_stats[int(0.1 * len(pool_stats))]
+        hi = pool_stats[int(0.9 * len(pool_stats))]
         out.append({
             "route": "market", "label": "Wait for the market",
             "what": "a week of new offers",
-            "best": statistics.median(band),
-            "pts": season(statistics.median(band), delay=1),
-            "lo": sorted(band)[int(0.1 * len(band))],
-            "hi": sorted(band)[int(0.9 * len(band))],
+            "best": best,
+            "pts": season(best, delay=1),
+            "lo": lo,
+            "hi": hi,
             "beats_now": beats_now,
             "n_band": n_band,
             "by_position": graded_by(lambda k: u.pos.get(k),
@@ -1732,11 +1747,19 @@ def _selftest() -> None:
                                          "hist_med": "MED"},
         price={"free_def": 1e6}, proceeds={}, owner={}, cash=99e6, me="me",
         route={"free_def": "free"},
-        market_exp={"free_def": 4.0, "hist_def": 6.0, "hist_med": 5.0})
+        market_exp={"free_def": 4.0, "hist_def": 6.0, "hist_med": 5.0,
+                   "phantom_star": 23.0})
     # today's only DEF offer (free_def) gains 4.0 - bar; two real past
     # cycles each offered ONE better DEF (hist_def, gain 6.0) — a real,
-    # thin, but genuine history to grade against.
-    off = Offers.fit({"free_def": 4e6, "hist_def": 6e6, "hist_med": 5e6},
+    # thin, but genuine history to grade against. phantom_star is in the
+    # SIMULATED pool (value-weighted, so best_over() draws him often) but
+    # has NEVER actually been observed in a real cycle — the exact Lamine
+    # Yamal pattern that made best_over()'s own median 7.37 against a real
+    # median of 4.15 on live data. If "best"/"lo"/"hi" still read from
+    # best_over() he shows up in them; if they read from real_cycles he
+    # cannot, because he is not in it.
+    off = Offers.fit({"free_def": 4e6, "hist_def": 6e6, "hist_med": 5e6,
+                      "phantom_star": 200e6},
                      [4e6, 6e6], per_cycle=2, cycles=2)
     off.real_cycles = {"c1": {"hist_def"}, "c2": {"hist_def", "hist_med"}}
     # hist_def has always been a rival's own LISTED player (contested,
@@ -1748,6 +1771,14 @@ def _selftest() -> None:
     # n_band says so directly, and it is nowhere near best_over's own
     # trial count (400 by default).
     assert mkt["n_band"] == 2, mkt["n_band"]
+    # "best" (really the median) and the 10/90 band GRADED FROM THE SAME
+    # REAL HISTORY, not best_over()'s resample — real per-cycle bests here
+    # are gain(hist_def)=3.0 in c1, max(gain(hist_def), gain(hist_med))=3.0
+    # in c2, so the honest median of two real, equal observations is
+    # exactly 3.0, not whatever random.Random(1) drew from best_over()'s
+    # much wider hypothetical band.
+    assert mkt["best"] == 3.0, mkt["best"]
+    assert mkt["lo"] == 3.0 and mkt["hi"] == 3.0, (mkt["lo"], mkt["hi"])
     assert "DEF" in mkt["by_position"], mkt["by_position"]
     # hist_def (gain 6.0) beat today's own DEF best (free_def, gain ~2.0
     # after the bar) in BOTH real cycles — beats_now must read 1.0, not
@@ -1894,7 +1925,7 @@ def _selftest() -> None:
     ph = "\n".join(placeholder("no api_teams.csv"))
     assert "no api_teams.csv" in ph and ph.startswith("# The simulation")
 
-    print("sim self-test OK (117 cases)")
+    print("sim self-test OK (119 cases)")
 
 
 def main() -> None:
