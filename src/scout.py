@@ -20,6 +20,7 @@ from pathlib import Path
 
 sys.path.insert(0, "src")
 
+from ffcore.score import OUT_STATUSES  # noqa: E402
 from ffcore.tidy import load_players  # noqa: E402
 
 SEASON = Path("data/season")
@@ -66,30 +67,46 @@ def _this_season() -> dict[str, dict[int, float]]:
     return out
 
 
+def _play(status: str, xi_pct: float | None, min_start: float) -> str:
+    """A direct read of two real facts, not a model: OUT_STATUSES and
+    min_start are the same ones the rest of this repo already uses to
+    call a player a probable starter — reused here, not re-derived."""
+    if status in OUT_STATUSES:
+        return "OUT (%s)" % status
+    if xi_pct is None:
+        return "?"
+    return "likely" if xi_pct >= min_start else "doubt"
+
+
 def table(me: str | None = None) -> list[dict]:
     """One real row per player you own. `me` picks the manager; the
     league's own config default is used when it is omitted."""
     import decide
+    from ffcore.league import League
 
     u = decide.load()
     me = me or u.me
     players = load_players()
     last = _last_season()
     cur = _this_season()
+    min_start = League.load(with_market=False).cfg.min_start
 
     rows = []
     for key in u.state.squads.get(me, {}):
         p = players.get(key, {})
         lp, lg = last.get(key, (None, None))
         by_jornada = cur.get(key, {})
+        status = p.get("status") or "ok"
+        xi_pct = p.get("start")
         rows.append({
             "name": p.get("name", key),
             "pos": SLOT.get(p.get("pos", ""), "?"),
             "team": p.get("team", ""),
             "price_eur": p.get("value"),
             "delta_1d_eur": p.get("delta_1d"),
-            "xi_pct": p.get("start"),
-            "status": p.get("status") or "ok",
+            "xi_pct": xi_pct,
+            "status": status,
+            "play": _play(status, xi_pct, min_start),
             "last_season_avg": (lp / lg) if lg else None,
             "last_season_pj": lg,
             "by_jornada": by_jornada,
@@ -113,12 +130,12 @@ def _form(by_jornada: dict[int, float], n: int = 5) -> str:
 
 
 def render(rows: list[dict]) -> list[str]:
-    out = ["| Pos | Player | Team | Price | 1d | XI% | Fit | LastSzn avg/pj "
-           "| Form (newest first) |",
-          "|---|---|---|--:|--:|--:|---|--:|---|"]
+    out = ["| Pos | Player | Team | Price | 1d | XI% | Play? | Fit "
+           "| LastSzn avg/pj | Form (newest first) |",
+          "|---|---|---|--:|--:|--:|---|---|--:|---|"]
     for r in rows:
         out.append(
-            "| %s | %s | %s | %s | %s | %s | %s | %s | %s |" % (
+            "| %s | %s | %s | %s | %s | %s | %s | %s | %s | %s |" % (
                 r["pos"].upper(),
                 r["name"],
                 r["team"],
@@ -126,6 +143,7 @@ def render(rows: list[dict]) -> list[str]:
                 "%+.0fk" % (r["delta_1d_eur"] / 1e3)
                 if r["delta_1d_eur"] is not None else "?",
                 "%.0f%%" % r["xi_pct"] if r["xi_pct"] is not None else "?",
+                r["play"],
                 r["status"],
                 ("%.2f/%d" % (r["last_season_avg"], r["last_season_pj"]))
                 if r["last_season_avg"] is not None else "-",
@@ -147,20 +165,28 @@ def _selftest() -> None:
     assert _form({1: 6.0, 3: 2.0}, n=3) == "2 - 6"
     assert _form({1: 1, 2: 2, 3: 3, 4: 4, 5: 5, 6: 6}) == "6 5 4 3 2"
 
+    # -- _play(): OUT_STATUSES beats any XI%, then a plain threshold read --
+    assert _play("injured", 90.0, 60.0) == "OUT (injured)"
+    assert _play("ok", None, 60.0) == "?"
+    assert _play("ok", 80.0, 60.0) == "likely"
+    assert _play("ok", 40.0, 60.0) == "doubt"
+    assert _play("ok", 60.0, 60.0) == "likely"          # the threshold itself
+
     rows = [
         {"name": "A", "pos": "def", "team": "X", "price_eur": 5_000_000,
          "delta_1d_eur": 12_000, "xi_pct": 80, "status": "ok",
-         "last_season_avg": 3.5, "last_season_pj": 30,
+         "play": "likely", "last_season_avg": 3.5, "last_season_pj": 30,
          "by_jornada": {1: 4.0}},
         {"name": "B", "pos": "del", "team": "Y", "price_eur": None,
-         "delta_1d_eur": None, "xi_pct": None, "status": "doubt",
-         "last_season_avg": None, "last_season_pj": None,
-         "by_jornada": {}},
+         "delta_1d_eur": None, "xi_pct": None, "status": "injured",
+         "play": "OUT (injured)", "last_season_avg": None,
+         "last_season_pj": None, "by_jornada": {}},
     ]
     lines = render(rows)
-    assert any("A" in l and "3.50/30" in l and "| 4 |" in l for l in lines), lines
-    assert any("B" in l and "?" in l for l in lines), lines
-    print("scout self-test OK (6 cases)")
+    assert any("A" in l and "3.50/30" in l and "| 4 |" in l
+              and "likely" in l for l in lines), lines
+    assert any("B" in l and "OUT (injured)" in l for l in lines), lines
+    print("scout self-test OK (11 cases)")
 
 
 if __name__ == "__main__":
