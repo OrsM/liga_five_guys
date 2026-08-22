@@ -1,4 +1,4 @@
-# Liga Five Guys — how the numbers are made — 2026-08-22 14:01 UTC
+# Liga Five Guys — how the numbers are made — 2026-08-22 14:43 UTC
 
 
 
@@ -8,7 +8,7 @@
 | Route | What it offers | Season pts | Beats acting today |
 |---|---|--:|--:|
 | **Act today** | 24 players you can buy now | +94 | — |
-| Wait for the market | a week of new offers | +247 | 100% |
+| Wait for the market | a week of new offers | +247 | 71% |
 | Wait for the clauses | 57 players on 24 Aug | +194 | — |
 
 | The workings | |

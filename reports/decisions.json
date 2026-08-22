@@ -1,7 +1,7 @@
 {
- "generated_at": "2026-08-22T14:01Z",
- "locks_in_h": 0.9806753844444445,
- "cash": 19409218.40812037,
+ "generated_at": "2026-08-22T14:43Z",
+ "locks_in_h": 0.27815868444444447,
+ "cash": 19412145.561037038,
  "squad_value": 220480727.0,
  "jornadas_left": 38,
  "acquirable": 24,
@@ -28,7 +28,7 @@
    "helps": 0.818,
    "pts_lo": -26.448044614858873,
    "pts_hi": 147.71960389719197,
-   "left": 15202345.408120371,
+   "left": 15205272.561037038,
    "answer": null,
    "p_win_after": 0.7713333333333333,
    "vs": "BurtonGM89",
@@ -49,7 +49,7 @@
    "helps": 0.608,
    "pts_lo": -50.136280452618394,
    "pts_hi": 150.2122303565252,
-   "left": 20886271.40812037,
+   "left": 20889198.561037038,
    "answer": null,
    "p_win_after": 0.7246666666666667,
    "vs": "BurtonGM89",
@@ -70,7 +70,7 @@
    "helps": 0.7263333333333334,
    "pts_lo": -28.139031720959565,
    "pts_hi": 107.56724239072787,
-   "left": 14987322.408120371,
+   "left": 14990249.561037038,
    "answer": null,
    "p_win_after": 0.7113333333333334,
    "vs": "BurtonGM89",
@@ -91,7 +91,7 @@
    "helps": 0.515,
    "pts_lo": -50.46547846870112,
    "pts_hi": 74.9742436095953,
-   "left": 16867967.40812037,
+   "left": 16870894.561037038,
    "answer": null,
    "p_win_after": 0.682,
    "vs": "Albert Laporta",
@@ -112,7 +112,7 @@
    "helps": 0.437,
    "pts_lo": -58.86056203171847,
    "pts_hi": 91.46061900113614,
-   "left": 14427250.408120371,
+   "left": 14430177.561037038,
    "answer": null,
    "p_win_after": 0.6676666666666666,
    "vs": "BurtonGM89",
@@ -133,7 +133,7 @@
    "helps": 0.03,
    "pts_lo": -4.461153726656448,
    "pts_hi": 0.0,
-   "left": 3795473.4081203714,
+   "left": 3798400.5610370375,
    "answer": null,
    "p_win_after": 0.6646666666666666,
    "vs": "BurtonGM89",
@@ -239,7 +239,7 @@
    "xpts": 3.513872039522414,
    "group": "save",
    "where": "free agent",
-   "money": -6179975.591879629,
+   "money": -6177048.4389629625,
    "pts": 0.0,
    "note": "short",
    "value": 0.0
@@ -251,10 +251,10 @@
    "xpts": 2.283515583632917,
    "group": "save",
    "where": "Albert Laporta",
-   "money": -6570554.591879629,
+   "money": -6567627.4389629625,
    "pts": 9.923843065640085,
    "note": "short",
-   "value": 1.5103509036976415
+   "value": 1.5110240582110537
   }
  ],
  "bar": 1.9578842796157292,
@@ -284,8 +284,25 @@
    "pts": 247.03335947356135,
    "lo": 5.3545774878871,
    "hi": 6.743487130969958,
-   "beats_now": 1.0,
-   "n_band": 400,
+   "beats_now": 0.7142857142857143,
+   "n_band": 7,
+   "by_position": {
+    "DEF": {
+     "n": 7,
+     "now_best": 1.272022711462474,
+     "beats_now": 0.7142857142857143
+    },
+    "MED": {
+     "n": 6,
+     "now_best": 2.475664372327126,
+     "beats_now": 0.3333333333333333
+    },
+    "POR": {
+     "n": 4,
+     "now_best": 1.5559877599066847,
+     "beats_now": 0.5
+    }
+   },
    "helpful": 139,
    "pool": 589,
    "note": "the market is modelled from 128 offers over 7 cycles, weighted by value^0.35, and only just — value^0.15 fits within 4.4% of it, so read the exponent as roughly this, not exactly this"
@@ -331,12 +348,12 @@
    "hi": null,
    "beats_now": null,
    "helpful": 38,
-   "days": 2.2663012891666665,
+   "days": 2.23702976,
    "opens": "24 Aug"
   }
  ],
  "verdict": "**Don't spend yet.** Wait for the market is worth about +247 points over the rest of the season against +94 for the best thing you can buy today — 153 better even after paying a jornada for the delay, and the balance is what buys the choice.",
- "market_pct": "market **under the 1st percentile** · an unusually poor week · better in over 99% of weeks",
+ "market_pct": "market **29th percentile** · an ordinary week · better in 71% of weeks",
  "shape_now": "4-5-1",
  "xi_note": "no change — you are already fielding the best eleven",
  "warnings": [
@@ -353,7 +370,7 @@
    "mean": 1678.5002299874345,
    "lo": 1419.7763541068982,
    "hi": 1940.9737457708889,
-   "cash": 19409218.40812037,
+   "cash": 19412145.561037038,
    "cash_known": true,
    "p_above": null
   },
