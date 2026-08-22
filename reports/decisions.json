@@ -1,7 +1,7 @@
 {
- "generated_at": "2026-08-22T14:43Z",
- "locks_in_h": 0.27815868444444447,
- "cash": 19412145.561037038,
+ "generated_at": "2026-08-22T14:47Z",
+ "locks_in_h": 0.2048822525,
+ "cash": 19412450.879503474,
  "squad_value": 220480727.0,
  "jornadas_left": 38,
  "acquirable": 24,
@@ -28,7 +28,7 @@
    "helps": 0.818,
    "pts_lo": -26.448044614858873,
    "pts_hi": 147.71960389719197,
-   "left": 15205272.561037038,
+   "left": 15205577.879503474,
    "answer": null,
    "p_win_after": 0.7713333333333333,
    "vs": "BurtonGM89",
@@ -49,7 +49,7 @@
    "helps": 0.608,
    "pts_lo": -50.136280452618394,
    "pts_hi": 150.2122303565252,
-   "left": 20889198.561037038,
+   "left": 20889503.879503474,
    "answer": null,
    "p_win_after": 0.7246666666666667,
    "vs": "BurtonGM89",
@@ -70,7 +70,7 @@
    "helps": 0.7263333333333334,
    "pts_lo": -28.139031720959565,
    "pts_hi": 107.56724239072787,
-   "left": 14990249.561037038,
+   "left": 14990554.879503474,
    "answer": null,
    "p_win_after": 0.7113333333333334,
    "vs": "BurtonGM89",
@@ -91,7 +91,7 @@
    "helps": 0.515,
    "pts_lo": -50.46547846870112,
    "pts_hi": 74.9742436095953,
-   "left": 16870894.561037038,
+   "left": 16871199.879503474,
    "answer": null,
    "p_win_after": 0.682,
    "vs": "Albert Laporta",
@@ -112,7 +112,7 @@
    "helps": 0.437,
    "pts_lo": -58.86056203171847,
    "pts_hi": 91.46061900113614,
-   "left": 14430177.561037038,
+   "left": 14430482.879503474,
    "answer": null,
    "p_win_after": 0.6676666666666666,
    "vs": "BurtonGM89",
@@ -133,7 +133,7 @@
    "helps": 0.03,
    "pts_lo": -4.461153726656448,
    "pts_hi": 0.0,
-   "left": 3798400.5610370375,
+   "left": 3798705.8795034736,
    "answer": null,
    "p_win_after": 0.6646666666666666,
    "vs": "BurtonGM89",
@@ -239,7 +239,7 @@
    "xpts": 3.513872039522414,
    "group": "save",
    "where": "free agent",
-   "money": -6177048.4389629625,
+   "money": -6176743.120496526,
    "pts": 0.0,
    "note": "short",
    "value": 0.0
@@ -251,10 +251,10 @@
    "xpts": 2.283515583632917,
    "group": "save",
    "where": "Albert Laporta",
-   "money": -6567627.4389629625,
+   "money": -6567322.120496526,
    "pts": 9.923843065640085,
    "note": "short",
-   "value": 1.5110240582110537
+   "value": 1.5110943065618634
   }
  ],
  "bar": 1.9578842796157292,
@@ -303,6 +303,18 @@
      "beats_now": 0.5
     }
    },
+   "by_route": {
+    "free": {
+     "n": 5,
+     "now_best": 1.5559877599066847,
+     "beats_now": 0.8
+    },
+    "listed": {
+     "n": 7,
+     "now_best": 2.475664372327126,
+     "beats_now": 0.5714285714285714
+    }
+   },
    "helpful": 139,
    "pool": 589,
    "note": "the market is modelled from 128 offers over 7 cycles, weighted by value^0.35, and only just — value^0.15 fits within 4.4% of it, so read the exponent as roughly this, not exactly this"
@@ -348,7 +360,7 @@
    "hi": null,
    "beats_now": null,
    "helpful": 38,
-   "days": 2.23702976,
+   "days": 2.233976575335648,
    "opens": "24 Aug"
   }
  ],
@@ -370,7 +382,7 @@
    "mean": 1678.5002299874345,
    "lo": 1419.7763541068982,
    "hi": 1940.9737457708889,
-   "cash": 19412145.561037038,
+   "cash": 19412450.879503474,
    "cash_known": true,
    "p_above": null
   },
