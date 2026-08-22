@@ -802,21 +802,35 @@ def wait_routes(u, offers=None, rng=None) -> list[dict]:
                     if hist else
                     sum(1 for x in band if x > now_best) / len(band))
         n_band = len(hist) if hist else len(band)
-        # TODAY'S OWN BEST, BY POSITION — a defender's real percentile
-        # needs a defender's real today, not the single best offer of any
-        # position compared against a defender's history.
-        now_best_pos: dict[str, float] = {}
-        for k in u.price:
-            if k in mine:
-                continue
-            p = u.pos.get(k)
-            if p is None:
-                continue
-            g = gain(k)
-            if g > now_best_pos.get(p, 0.0):
-                now_best_pos[p] = g
-        by_pos = (real_cycle_bests(real, gain, lambda k: u.pos.get(k))
-                 if real else {})
+
+        def graded_by(group_of, real_group_of):
+            """{group: {n, now_best, beats_now}} — TODAY'S OWN best per
+            group (never the single best offer of ANY group compared
+            against one group's history), graded against that same
+            group's real cycle history. A group with no real cycles behind
+            it, or nothing of it live today, is silently absent — the same
+            rule real_cycle_bests() already applies one level up.
+            """
+            now_by_group: dict[str, float] = {}
+            for k in u.price:
+                if k in mine:
+                    continue
+                grp = group_of(k)
+                if grp is None:
+                    continue
+                g = gain(k)
+                if g > now_by_group.get(grp, 0.0):
+                    now_by_group[grp] = g
+            hist_by_group = (real_cycle_bests(real, gain, real_group_of)
+                             if real else {})
+            return {grp: {"n": len(vals), "now_best": now_by_group[grp],
+                         "beats_now": sum(1 for x in vals
+                                          if x > now_by_group[grp])
+                                     / len(vals)}
+                   for grp, vals in hist_by_group.items()
+                   if vals and grp in now_by_group}
+
+        real_routes = getattr(offers, "real_routes", {})
         out.append({
             "route": "market", "label": "Wait for the market",
             "what": "a week of new offers",
@@ -826,16 +840,16 @@ def wait_routes(u, offers=None, rng=None) -> list[dict]:
             "hi": sorted(band)[int(0.9 * len(band))],
             "beats_now": beats_now,
             "n_band": n_band,
-            # ONE NUMBER PER POSITION, graded against that position's OWN
-            # today's best, not the single best offer of any position — a
-            # position with zero real cycles offering one, or nothing of
-            # that position live today, gets no entry rather than a
-            # guessed percentile.
-            "by_position": {
-                pos: {"n": len(vals), "now_best": now_best_pos[pos],
-                     "beats_now": sum(1 for x in vals
-                                      if x > now_best_pos[pos]) / len(vals)}
-                for pos, vals in by_pos.items() if vals and pos in now_best_pos},
+            "by_position": graded_by(lambda k: u.pos.get(k),
+                                    lambda k: u.pos.get(k)),
+            # FREE AGENT vs A RIVAL'S OWN LISTED PLAYER — Step 1's split,
+            # graded here rather than blended: "how good is today's real
+            # free-pickup market" and "how good is today's contested-bid
+            # market" are different questions with different risk, the
+            # exact thing conflating them under one "market" label used to
+            # hide (see decide.Universe.route's own docstring).
+            "by_route": graded_by(lambda k: u.route.get(k),
+                                 lambda k: real_routes.get(k)),
             "helpful": sum(1 for k in offers.pool if gain(k) > 0),
             "pool": len(offers.pool), "note": offers.note()})
 
@@ -1196,13 +1210,22 @@ def market_model(u):
     from ffcore.market import Offers
     from ffcore.tidy import TIDY, read_csv
 
+    from decide import LISTED_SELLER
+
     xw = Crosswalk.read(TIDY / "players.csv", TIDY / "clubs.csv")
     cycles = collections.defaultdict(set)
+    # LAST ROW SEEN WINS, same as decide.market_routes() — a player's route
+    # rarely flips inside the observed window, so "his most recently seen
+    # listing type" is the reading used for every cycle he appeared in,
+    # not a per-cycle-exact one the feed does not cheaply support here.
+    route_of: dict[str, str] = {}
     for r in read_csv(TIDY / "api_market.csv"):
         k = xw.player(app_id=r.get("player_id"),
                       app_name=r.get("player_name"))
         if k and k in u.value:
             cycles[(r.get("expires_at") or "")[:10]].add(k)
+            route_of[k] = ("listed" if r.get("seller") == LISTED_SELLER
+                           else "free")
     if not cycles:
         return None
     seen = [u.value[k] for s in cycles.values() for k in s]
@@ -1223,6 +1246,7 @@ def market_model(u):
     # single-cycle history instead of a resampled hypothetical — see
     # real_cycle_bests()'s own docstring for why that comparison exists.
     off.real_cycles = dict(cycles)
+    off.real_routes = route_of
     return off
 
 
@@ -1707,6 +1731,7 @@ def _selftest() -> None:
         forecaster=Bootstrap(perw), pos={"free_def": "DEF", "hist_def": "DEF",
                                          "hist_med": "MED"},
         price={"free_def": 1e6}, proceeds={}, owner={}, cash=99e6, me="me",
+        route={"free_def": "free"},
         market_exp={"free_def": 4.0, "hist_def": 6.0, "hist_med": 5.0})
     # today's only DEF offer (free_def) gains 4.0 - bar; two real past
     # cycles each offered ONE better DEF (hist_def, gain 6.0) — a real,
@@ -1714,6 +1739,9 @@ def _selftest() -> None:
     off = Offers.fit({"free_def": 4e6, "hist_def": 6e6, "hist_med": 5e6},
                      [4e6, 6e6], per_cycle=2, cycles=2)
     off.real_cycles = {"c1": {"hist_def"}, "c2": {"hist_def", "hist_med"}}
+    # hist_def has always been a rival's own LISTED player (contested,
+    # per Step 1); hist_med has always been a true free agent.
+    off.real_routes = {"hist_def": "listed", "hist_med": "free"}
     routes = wait_routes(uw, off, random.Random(1))
     mkt = next(r for r in routes if r["route"] == "market")
     # GRADED AGAINST THE 2 REAL CYCLES, not best_over()'s resampled band —
@@ -1731,6 +1759,17 @@ def _selftest() -> None:
     # no today to grade, so it is correctly absent, not padded to zero.
     assert "MED" not in mkt["by_position"], mkt["by_position"]
 
+    # -- by_route: a free pickup graded against real free history, a
+    # contested rival listing against real listed history — never blended,
+    # the whole reason Step 1 split "market" into "free"/"listed" at all.
+    assert mkt["by_route"]["free"]["n"] == 1, mkt["by_route"]     # hist_med
+    assert "listed" not in mkt["by_route"], mkt["by_route"]
+    # WHY "listed" IS ABSENT: today's only real offer (free_def) is
+    # route="free" — nothing LISTED is on offer today, so there is no
+    # "today" for the listed side to grade, same silence-not-a-guess rule
+    # as MED above. hist_def's real history (2 cycles, all "listed")
+    # exists but has nothing of TODAY to compare against.
+
     # A market_model()-shaped offers with NO real_cycles attached (an old
     # fixture, or a caller not wired to it) falls back to best_over()'s
     # band exactly as before — not a crash, not an empty report.
@@ -1738,6 +1777,7 @@ def _selftest() -> None:
     plain_routes = wait_routes(uw, off_plain, random.Random(1))
     plain_mkt = next(r for r in plain_routes if r["route"] == "market")
     assert plain_mkt["by_position"] == {}, plain_mkt["by_position"]
+    assert plain_mkt["by_route"] == {}, plain_mkt["by_route"]
     assert plain_mkt["n_band"] > 2, plain_mkt["n_band"]   # best_over's trials
 
     # -- one line instead of a panel ---------------------------------------
@@ -1854,7 +1894,7 @@ def _selftest() -> None:
     ph = "\n".join(placeholder("no api_teams.csv"))
     assert "no api_teams.csv" in ph and ph.startswith("# The simulation")
 
-    print("sim self-test OK (113 cases)")
+    print("sim self-test OK (117 cases)")
 
 
 def main() -> None:
