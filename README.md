@@ -51,8 +51,11 @@ publishing a report built by code that does not pass its own checks.
 
 ## The one table
 
-**`reports/REPORT.md`** is the only file you need to read. One table — every
-move you could make, ranked by what it does to where you finish.
+**The phone app is the only thing you need to look at** — rendered from
+`reports/decisions.json`, the board draws colour and alignment markdown on a
+phone cannot. One table — every move you could make, ranked by what it does
+to where you finish. `reports/METHOD.md` is the appendix: how every number
+in it is made, and every way it is known to be wrong.
 
 **THERE IS NO METRIC.** Buy, steal, swap and sell are the same question with
 different arguments — *if I did this, where would I finish?* — and the answer
@@ -371,7 +374,8 @@ slate from whatever `seen.txt` still held while the report looked normal.
 
 ## Routine
 
-- **Most days:** open `reports/REPORT.md`. Usually nothing to do.
+- **Most days:** open the phone app, or click "Run again" for a fresh read.
+  Usually nothing to do.
 - **Thursday/Friday:** probable XIs firm up. This is when the report earns its
   keep and when to spend.
 - **After any deal:** ~~add the row to the ledger~~ — nothing.
@@ -383,63 +387,77 @@ slate from whatever `seen.txt` still held while the report looked normal.
 
 ## Layout
 
+Rebuilt 2026-08-22 — the previous version of this section predated the
+2026-08-18 API migration (and several refactors after it) badly enough to
+list four files that no longer exist (`rivals.py`, `reports/board.md`,
+`reports/REPORT.md`, `reports/squads.md`) and omit four real ones
+(`run.py`, `ffcore/model.py`, `ffcore/attributes.py`, `scout.py`). Verified
+against the actual filesystem rather than carried forward again.
+
 ```
 src/                 sources.py (the registry: futbolfantasy, Analítica,
-                       Club Elo, and the league's own API)
+                       Club Elo, Understat, football-data.co.uk, and the
+                       league's own API)
                      ingest.py (fetch, parse, prune — the only network code)
+                     run.py (the ten-stage chain, one interpreter)
                      ledger.py (the activity feed -> transactions.csv)
-                     squads.py  report.py  rivals.py  slate.py
-                     decide.py (every move, ranked by Δ P(finish above))
-                     sim.py (that ranking, written out as reports/sim.md)
+                     squads.py (replays ownership from the ledger)
+                     report.py  slate.py  scout.py  xi.py  points.py
+                     methodology.py (the formula, and how it's doing)
+                     decide.py (every move, screened and ranked)
+                     sim.py (plays out the season — the one table)
                      crosswalk.py (builds players.csv + clubs.csv, once)
-                     digest.py (stitches REPORT.md)
-                     points.py  xi.py  methodology.py
+                     digest.py (stitches reports/METHOD.md)
 src/ffcore/          shared core: parse (numbers)  text (names)  tidy (IO+time)
+                     model (ONE League + Scorer per run, shared by every
+                       generator so two of them cannot describe two squads)
                      auth (the B2C token — the only credential here)
                      league (ownership+cash)  score (ratings+XI)
-                     fixture (next opponent, difficulty)
+                     attributes (Fitness — FF's panel vs the app's own)
+                     fixture (next opponent, difficulty, attack/defense)
                      bid (premiums, bid bands, XI gain, the basket)
                      season (LeagueState, simulate, best_xi)
-                     forecast (Forecaster: expected() / draw())
-                     render (names, for display — never a key)
+                     forecast (Forecaster: expected() / draw(), the
+                       season-long rate and start-probability uncertainty)
                      startprob (P(start), graded against confirmed XIs)
+                     second (the second probable-XI source, printed beside
+                       the first, never blended)
+                     render (names, for display — never a key)
                      crosswalk (one player is one player, whatever a feed
                        calls him — the table, not the resolution)
                      market (what the app will deal next, fitted to what it
                        has dealt — the price of waiting)
-inputs/              you edit these — see above
+inputs/               you edit these — see above
 data/raw/dt=….tar.xz  raw HTML, deduplicated — append-only, never delete
 data/tidy/market.csv  values, disposable — rebuilt from raw every run
 data/tidy/lineups.csv probable XI + fitness, one row per player per source
+data/tidy/starters.csv who actually started — what grades the probable XIs
 data/tidy/fixtures.csv kickoffs, as published — the deadline is derived here
 data/tidy/elo.csv     Club Elo ratings, Spanish top flight — the fixture rank
-data/tidy/matches.csv  the season's 380 matches, with the score once played
-data/tidy/starters.csv who actually started — what grades the probable XIs
+data/tidy/matches.csv the season's fixtures, with the score once played
+data/tidy/results_history.csv real results back to 2023-24, the attack/
+                       defense fixture rating's own evidence
+data/tidy/understat_players.csv real xG/xA per player per season
 data/tidy/transactions.csv every deal of the season, generated by ledger.py
-data/tidy/players.csv  the crosswalk: every feed's key for every player
-data/tidy/clubs.csv    the same for the 20 clubs, Elo's city names included
-data/tidy/api_market.csv   the market as the app deals it, with bid counts
-data/tidy/api_teams.csv    every squad, from the app; your balance
+data/tidy/players.csv the crosswalk: every feed's key for every player
+data/tidy/clubs.csv   the same for the 20 clubs, Elo's city names included
+data/tidy/api_market.csv  the market as the app deals it, seller + bid count
+data/tidy/api_teams.csv   every squad, from the app; your balance
 data/tidy/api_activity.csv every deal, as the app recorded it
-data/tidy/api_players.csv  id -> name, append-only; names the feed's history
-data/decisions/      append-only logs of estimates, for scoring later
-.runtime/alerts.md   gitignored; exists only when something wants a decision
-reports/REPORT.md    ← read this
-reports/latest.md    the workings (report.py) — the eleven, the bid, fitness
-reports/sim.md       THE REPORT (sim.py) — the one table, carried into REPORT.md
-reports/board.md     what is left of report.py's front page: the warnings
-reports/decisions.json  the same table as data, for the phone to draw
-reports/rivals.md    how rivals bid: premiums, drift, projected XIs (rivals.py)
-reports/squads.md    every squad, deal history, cash basis (squads.py)
-reports/watchlist.md everyone unowned, ranked (squads.py)
-reports/methodology.md  the formula and how it is tracking (methodology.py)
-docs/design.md       architecture, data sources, modelling plan
+data/decisions/       append-only logs of estimates, for scoring later
+.runtime/parts/       build artifacts, one fragment per generator — nothing
+                       reads these directly, digest.py stitches them
+.runtime/alerts.md    gitignored; exists only when something wants a decision
+reports/decisions.json  the report as data, for the phone to draw
+reports/METHOD.md     how the numbers are made, and how they're doing —
+                       stitched by digest.py from .runtime/parts/
+docs/design.md        architecture, data sources, modelling plan
 ```
 
 ## Tests
 
 No test directory and no pytest. Each module self-tests under
-`if __name__ == "__main__"`, and `lfg-run` runs all twenty-seven before it
+`if __name__ == "__main__"`, and `lfg-run` runs all thirty before it
 fetches anything. Twenty seconds, and a failure aborts the run.
 
 **Work TDD.** Add the failing assertion to the module's own `_selftest()`,
@@ -451,33 +469,42 @@ and installing them needs sudo. `uv sync` once, then `uv run --frozen python …
 — the same pattern `n2t-api.service` uses. `--frozen` so a run never tries to
 re-resolve dependencies, because a boot without network would otherwise hang.
 
+The list below is `lfg-run`'s own `TESTS` array, in order — copied from
+`~/.local/bin/lfg-run` rather than maintained a second time by hand, which is
+exactly how it drifted to list a deleted `rivals.py` and omit four real
+suites the last time this section was updated.
+
 ```
-python src/ffcore/parse.py                      # number parsing + formatting
-PYTHONPATH=src python src/ffcore/auth.py        # token rotation, atomicity
-PYTHONPATH=src python src/ledger.py --selftest  # the derived ledger + guards
-PYTHONPATH=src python src/ffcore/tidy.py        # the player view over tidy CSV
-PYTHONPATH=src python src/sources.py            # parsers + signatures
-PYTHONPATH=src python src/ingest.py --selftest   # archives + carry-forward
-PYTHONPATH=src python src/ffcore/league.py --selftest   # config + cash
-PYTHONPATH=src python src/ffcore/fixture.py             # difficulty, Elo, team join
-PYTHONPATH=src python src/ffcore/score.py               # the blend + fixture
-PYTHONPATH=src python src/ffcore/bid.py                 # premiums, bands, the basket
-PYTHONPATH=src python src/digest.py --selftest          # report stitching
-PYTHONPATH=src python src/xi.py --selftest              # XI from bench
-PYTHONPATH=src python src/slate.py --selftest           # what is on offer
-PYTHONPATH=src python src/points.py --selftest          # per-jornada diffs
-PYTHONPATH=src python src/methodology.py --selftest     # forecast-vs-actual join
-PYTHONPATH=src python src/rivals.py --selftest          # rival XI arithmetic
-PYTHONPATH=src python src/report.py --selftest          # the cells that judge
-PYTHONPATH=src python src/ffcore/forecast.py            # the sampler + its shape
-PYTHONPATH=src python src/ffcore/season.py              # shapes, best XI, standings
-PYTHONPATH=src python src/ffcore/render.py              # folded names, made readable
-PYTHONPATH=src python src/ffcore/startprob.py           # calibration + the fit's guard
-PYTHONPATH=src python src/ffcore/crosswalk.py           # the crosswalk table + merging
-PYTHONPATH=src python src/ffcore/market.py              # the offer sampler + its fit
-PYTHONPATH=src python src/crosswalk.py --selftest       # resolving every feed's keys
-PYTHONPATH=src python src/decide.py --selftest          # candidates, steals, ranking
-PYTHONPATH=src python src/sim.py --selftest             # the simulation's report
+PYTHONPATH=src python src/ffcore/parse.py                # number parsing + formatting
+PYTHONPATH=src python src/ffcore/text.py                 # name normalising
+PYTHONPATH=src python src/ffcore/tidy.py                 # the player view over tidy CSV
+PYTHONPATH=src python src/ffcore/auth.py                 # token rotation, atomicity
+PYTHONPATH=src python src/ffcore/model.py                # the one League+Scorer per run
+PYTHONPATH=src python src/ffcore/attributes.py            # Fitness — FF's panel vs the app
+PYTHONPATH=src python src/ffcore/forecast.py              # the sampler + its shape
+PYTHONPATH=src python src/ffcore/season.py                # shapes, best XI, standings
+PYTHONPATH=src python src/ffcore/render.py                # folded names, made readable
+PYTHONPATH=src python src/ffcore/startprob.py             # calibration + the fit's guard
+PYTHONPATH=src python src/ffcore/crosswalk.py             # the crosswalk table + merging
+PYTHONPATH=src python src/ffcore/market.py                # the offer sampler + its fit
+PYTHONPATH=src python src/sources.py                      # parsers + signatures
+PYTHONPATH=src python src/ingest.py --selftest            # archives + carry-forward
+PYTHONPATH=src python src/ffcore/league.py --selftest     # config + cash
+PYTHONPATH=src python src/ffcore/fixture.py               # difficulty, Elo, attack/defense
+PYTHONPATH=src python src/ffcore/second.py                # the second XI source, unblended
+PYTHONPATH=src python src/ffcore/score.py                 # the blend + fixture
+PYTHONPATH=src python src/ffcore/bid.py                   # premiums, bands, the basket
+PYTHONPATH=src python src/digest.py --selftest            # report stitching
+PYTHONPATH=src python src/xi.py --selftest                # XI from bench
+PYTHONPATH=src python src/slate.py --selftest             # what is on offer
+PYTHONPATH=src python src/points.py --selftest            # per-jornada diffs
+PYTHONPATH=src python src/methodology.py --selftest       # forecast-vs-actual join
+PYTHONPATH=src python src/report.py --selftest            # the cells that judge
+PYTHONPATH=src python src/ledger.py --selftest             # the derived ledger + guards
+PYTHONPATH=src python src/decide.py --selftest             # candidates, steals, ranking
+PYTHONPATH=src python src/sim.py --selftest                # the simulation's report
+PYTHONPATH=src python src/crosswalk.py --selftest          # resolving every feed's keys
+PYTHONPATH=src python src/run.py --selftest                # the ten-stage chain
 ```
 
 ## Design notes
