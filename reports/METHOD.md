@@ -1,4 +1,4 @@
-# Liga Five Guys — how the numbers are made — 2026-08-22 15:06 UTC
+# Liga Five Guys — how the numbers are made — 2026-08-22 15:14 UTC
 
 
 
@@ -8,13 +8,13 @@
 | Route | What it offers | Season pts | Beats acting today |
 |---|---|--:|--:|
 | **Act today** | 25 players you can buy now | +118 | — |
-| Wait for the market | a week of new offers | +270 | 62% |
+| Wait for the market | a week of new offers | +151 | 62% |
 | Wait for the clauses | 57 players on 24 Aug | +216 | — |
 
 | The workings | |
 |---|--:|
 | Unowned players who would improve your eleven | 195 of 589 |
-| Tenth percentile of a week's waiting | +5.98 |
+| Tenth percentile of a week's waiting | +1.16 |
 | Market model | the market is modelled from 129 offers over 8 cycles, weighted by value^0.40, and only just — value^0.15 fits within 4.9% of it, so read the exponent as roughly this, not exactly this |
 | Locked players who would improve your eleven | 43 |
 | Their clauses open | 24 Aug, in about 2 days |
