@@ -230,7 +230,7 @@ player_id,name,club_id,ff_slug,af_slug,app_id,understat_id,app_names
 15316,roger hinojo,espanyol,roger-hinojo,450716,,13533,
 15336,rafa rodriguez,malaga,rafa-rodriguez,335221,,14735,
 15342,yan diomande,real madrid,yan-diomande,513776,,13561,
-15344,rafa garrido,malaga,rafa-garrido,,,,
+15344,rafa garrido,malaga,rafa-garrido,,3041,,Rafita
 15351,jonathan asp jensen,deportivo,jonathan-asp-jensen,,,12620,
 15409,alejandro rego,athletic,alejandro-rego,,,13627,
 15417,angel recio,malaga,angel-recio,316115,,14727,
@@ -607,7 +607,7 @@ player_id,name,club_id,ff_slug,af_slug,app_id,understat_id,app_names
 9276,giuliano simeone,atletico,giuliano-simeone,,1210,9796,Giuliano
 9304,diego lopez,valencia,diego-lopez-1,,,9694,
 9314,javi serrano,atletico,,,,,
-9316,alejandro balde,barcelona,alejandro-balde,,,,
+9316,alejandro balde,barcelona,alejandro-balde,,1218,,Álex Balde
 9317,jose angel carmona,sevilla,jose-ngel-carmona,,,9809,
 9321,haitam abaida,malaga,haitam-abaida,,,,
 9405,leo roman,deportivo,leo-roman,179139,3109,9839,Leo Román

@@ -2773,3 +2773,28 @@ observed_at,source,market_id,player_id,player_name,player_name_full,position_id,
 2026-08-23T2215Z,laliga,16873147,1031,Comesaña,Santiago Comesaña,3,30413980,28857492,1,marketPlayerTeam,on_sale,ok,false,2026-08-25T21:14:54+02:00
 2026-08-23T2215Z,laliga,16946002,1300,Camavinga,Eduardo Celmi Camavinga,3,9187358,8843131,1,marketPlayerTeam,on_sale,ok,false,2026-08-25T22:19:05+02:00
 2026-08-23T2215Z,laliga,17785988,2776,A. Abqar,Abdel Abqar,2,7213778,7133058,1,marketPlayerTeam,on_sale,ok,false,2026-08-26T21:19:16+02:00
+2026-08-23T2243Z,laliga,89114748,1976,Hansi Flick,Hans-Dieter Flick,5,8019084,7810686,0,marketPlayerLeague,on_sale,ok,,2026-08-24T22:24:00+02:00
+2026-08-23T2243Z,laliga,89114749,1218,Álex Balde,Alejandro Balde Martínez,2,23924895,23435435,0,marketPlayerLeague,on_sale,injured,,2026-08-24T22:24:00+02:00
+2026-08-23T2243Z,laliga,89114750,3088,Julián Alvarez,Julián Alvarez,4,66418917,65479021,0,marketPlayerLeague,on_sale,ok,,2026-08-24T22:24:00+02:00
+2026-08-23T2243Z,laliga,89114751,3020,Carlos Sánchez,Carlos Sánchez,2,623831,615916,0,marketPlayerLeague,on_sale,ok,,2026-08-24T22:24:00+02:00
+2026-08-23T2243Z,laliga,89114752,2912,Julio Díaz,Julio Díaz,2,443297,442604,0,marketPlayerLeague,on_sale,ok,,2026-08-24T22:24:00+02:00
+2026-08-23T2243Z,laliga,89114753,3181,Ibra Drj,Ebrahima Drammeh,4,606930,599691,0,marketPlayerLeague,on_sale,ok,,2026-08-24T22:24:00+02:00
+2026-08-23T2243Z,laliga,89114754,2757,Gerard Martín,Gerard Martín,2,39253280,39580232,0,marketPlayerLeague,on_sale,ok,,2026-08-24T22:24:00+02:00
+2026-08-23T2243Z,laliga,89114755,2698,Pau Navarro,Pau Navarro,2,7595755,7388326,0,marketPlayerLeague,on_sale,ok,,2026-08-24T22:24:00+02:00
+2026-08-23T2243Z,laliga,89114756,2754,Alfon,Alfon González,4,4799049,4651495,0,marketPlayerLeague,on_sale,doubtful,,2026-08-24T22:24:00+02:00
+2026-08-23T2243Z,laliga,89114757,3041,Rafita,Rafael Garrido Hierro,2,4674593,4695749,0,marketPlayerLeague,on_sale,ok,,2026-08-24T22:24:00+02:00
+2026-08-23T2243Z,laliga,89114758,3081,Ratiu,Andrei Ratiu,2,35572936,35221591,0,marketPlayerLeague,on_sale,ok,,2026-08-24T22:24:00+02:00
+2026-08-23T2243Z,laliga,89114759,3047,Dani Sánchez,Dani Sánchez,2,636085,627680,0,marketPlayerLeague,on_sale,ok,,2026-08-24T22:24:00+02:00
+2026-08-23T2243Z,laliga,89114760,2624,Manu Sánchez,Manu Sánchez,2,4710322,4593066,0,marketPlayerLeague,on_sale,ok,,2026-08-24T22:24:00+02:00
+2026-08-23T2243Z,laliga,11705725,3129,Carlos Espí,Carlos Espí,4,9973382,10958461,1,marketPlayerTeam,on_sale,ok,false,2026-08-24T23:10:35+02:00
+2026-08-23T2243Z,laliga,11943633,637,Moncayola,Jon Moncayola,3,6767492,6696460,1,marketPlayerTeam,on_sale,ok,false,2026-08-26T13:59:54+02:00
+2026-08-23T2243Z,laliga,14186254,2474,Denis Suárez,Denis Suárez,3,2423936,2469862,1,marketPlayerTeam,on_sale,ok,false,2026-08-26T07:00:30+02:00
+2026-08-23T2243Z,laliga,14186359,3069,Blanco,Antonio Blanco,3,14554549,14866595,1,marketPlayerTeam,on_sale,ok,false,2026-08-24T23:02:37+02:00
+2026-08-23T2243Z,laliga,14293583,265,Zubeldia,Igor Zubeldia,2,10248552,10122272,1,marketPlayerTeam,on_sale,ok,false,2026-08-26T14:00:09+02:00
+2026-08-23T2243Z,laliga,16235615,3125,Canales,Sergio Canales,3,25961421,27084545,1,marketPlayerTeam,on_sale,ok,false,2026-08-24T23:02:32+02:00
+2026-08-23T2243Z,laliga,16235820,3037,C. Puga,Carlos Puga,2,4981968,4949387,1,marketPlayerTeam,on_sale,ok,false,2026-08-24T23:02:43+02:00
+2026-08-23T2243Z,laliga,16236032,2714,Javi Rueda,Javi Rueda,2,4421896,4281442,1,marketPlayerTeam,on_sale,ok,false,2026-08-24T23:02:55+02:00
+2026-08-23T2243Z,laliga,16872949,2455,Peque,Gerard Fernández Castellano,4,2378686,2574360,1,marketPlayerTeam,on_sale,ok,false,2026-08-25T21:14:41+02:00
+2026-08-23T2243Z,laliga,16873147,1031,Comesaña,Santiago Comesaña,3,30413980,28857492,1,marketPlayerTeam,on_sale,ok,false,2026-08-25T21:14:54+02:00
+2026-08-23T2243Z,laliga,16946002,1300,Camavinga,Eduardo Celmi Camavinga,3,9187358,8843131,1,marketPlayerTeam,on_sale,ok,false,2026-08-25T22:19:05+02:00
+2026-08-23T2243Z,laliga,17785988,2776,A. Abqar,Abdel Abqar,2,7213778,7133058,1,marketPlayerTeam,on_sale,ok,false,2026-08-26T21:19:16+02:00
