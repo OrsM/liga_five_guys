@@ -1,10 +1,10 @@
 {
- "generated_at": "2026-08-23T11:50Z",
- "locks_in_h": 3.1660446597222225,
- "cash": 19380946.036140047,
+ "generated_at": "2026-08-23T12:28Z",
+ "locks_in_h": 2.5271994244444445,
+ "cash": 19480899.557953704,
  "squad_value": 220943048.0,
  "jornadas_left": 38,
- "acquirable": 28,
+ "acquirable": 30,
  "considered": 30,
  "expected_finish": 1.2436666666666667,
  "p_win": 0.7986666666666666,
@@ -28,7 +28,7 @@
    "helps": 0.9536666666666667,
    "pts_lo": 18.931052879032904,
    "pts_hi": 154.71990214641187,
-   "left": 15074949.036140047,
+   "left": 15174902.557953704,
    "answer": null,
    "p_win_after": 0.8993333333333333,
    "vs": "BurtonGM89",
@@ -49,7 +49,7 @@
    "helps": 0.945,
    "pts_lo": 17.48612865068776,
    "pts_hi": 170.74000119341895,
-   "left": 24550559.036140047,
+   "left": 24650512.557953704,
    "answer": null,
    "p_win_after": 0.88,
    "vs": "BurtonGM89",
@@ -70,7 +70,7 @@
    "helps": 0.9463333333333334,
    "pts_lo": 17.976298326430424,
    "pts_hi": 149.0105741324512,
-   "left": 5614989.036140047,
+   "left": 5714942.557953704,
    "answer": null,
    "p_win_after": 0.874,
    "vs": "SusoGattuso",
@@ -91,7 +91,7 @@
    "helps": 0.9366666666666666,
    "pts_lo": 12.699228199669278,
    "pts_hi": 171.6507032004008,
-   "left": 6061321.036140047,
+   "left": 6161274.557953704,
    "answer": null,
    "p_win_after": 0.8726666666666667,
    "vs": "SusoGattuso",
@@ -112,7 +112,7 @@
    "helps": 0.8313333333333334,
    "pts_lo": -13.69358484831423,
    "pts_hi": 97.22823491854706,
-   "left": 13006330.036140047,
+   "left": 13106283.557953704,
    "answer": null,
    "p_win_after": 0.839,
    "vs": "SusoGattuso",
@@ -133,7 +133,7 @@
    "helps": 0.5093333333333333,
    "pts_lo": -71.2448117484912,
    "pts_hi": 89.44809607959087,
-   "left": 14398978.036140047,
+   "left": 14498931.557953704,
    "answer": null,
    "p_win_after": 0.831,
    "vs": "BurtonGM89",
@@ -154,7 +154,7 @@
    "helps": 0.645,
    "pts_lo": -43.24427971455202,
    "pts_hi": 122.31844615356295,
-   "left": 9839342.036140047,
+   "left": 9939295.557953704,
    "answer": null,
    "p_win_after": 0.828,
    "vs": "BurtonGM89",
@@ -175,7 +175,7 @@
    "helps": 0.58,
    "pts_lo": -44.02288469971586,
    "pts_hi": 63.04107759496037,
-   "left": 27205562.036140047,
+   "left": 27305515.557953704,
    "answer": null,
    "p_win_after": 0.8256666666666667,
    "vs": "BurtonGM89",
@@ -196,7 +196,7 @@
    "helps": 0.5866666666666667,
    "pts_lo": -61.49476009068394,
    "pts_hi": 69.9098048872097,
-   "left": 3831206.036140047,
+   "left": 3931159.557953704,
    "answer": null,
    "p_win_after": 0.8153333333333334,
    "vs": "Albert Laporta",
@@ -217,7 +217,7 @@
    "helps": 0.5443333333333333,
    "pts_lo": -68.36920467358641,
    "pts_hi": 79.33695549635172,
-   "left": 6492019.036140047,
+   "left": 6591972.557953704,
    "answer": null,
    "p_win_after": 0.8116666666666666,
    "vs": "Albert Laporta",
@@ -238,7 +238,7 @@
    "helps": 0.4216666666666667,
    "pts_lo": -61.74231450477373,
    "pts_hi": 61.880170557967176,
-   "left": 3668077.036140047,
+   "left": 3768030.557953704,
    "answer": null,
    "p_win_after": 0.81,
    "vs": "BurtonGM89",
@@ -259,7 +259,7 @@
    "helps": 0.475,
    "pts_lo": -72.22320739706493,
    "pts_hi": 71.74658175619447,
-   "left": 18493280.036140047,
+   "left": 18593233.557953704,
    "answer": null,
    "p_win_after": 0.7946666666666666,
    "vs": "SusoGattuso",
@@ -491,12 +491,12 @@
    "xpts": 2.32402416895129,
    "group": "save",
    "where": "BurtonGM89",
-   "money": -784481.963859953,
+   "money": -684528.4420462959,
    "pts": 10.795561904087663,
    "pts_lo": -38.4642391638688,
    "pts_hi": 60.39156193417898,
    "note": "short",
-   "value": 13.761389555687611
+   "value": 15.77080109603034
   },
   {
    "name": "Santiago Mouriño",
@@ -505,12 +505,12 @@
    "xpts": 2.28365609469858,
    "group": "save",
    "where": "Albert Laporta",
-   "money": -6697950.963859953,
+   "money": -6597997.442046296,
    "pts": 14.570071613098435,
    "pts_lo": -56.171361222211544,
    "pts_hi": 66.88111048987412,
    "note": "short",
-   "value": 2.1753028189835937
+   "value": 2.208256632573002
   }
  ],
  "bar": 1.8004345211693862,
@@ -525,7 +525,7 @@
   {
    "route": "act",
    "label": "Act today",
-   "what": "28 players you can buy now",
+   "what": "30 players you can buy now",
    "best": 2.7035688776035744,
    "pts": 102.73561734893583,
    "lo": null,
@@ -538,25 +538,25 @@
    "what": "a week of new offers",
    "best": 3.9694501839451775,
    "pts": 144.166087928368,
-   "lo": 0.5028473927792956,
+   "lo": 0.5235896477819038,
    "hi": 6.137231566588412,
-   "beats_now": 0.6666666666666666,
+   "beats_now": 0.7777777777777778,
    "n_band": 9,
    "by_position": {
+    "DEF": {
+     "n": 9,
+     "now_best": 0.5928247165408729,
+     "beats_now": 0.3333333333333333
+    },
     "DEL": {
      "n": 8,
      "now_best": 0.2903377845897117,
      "beats_now": 0.25
     },
-    "DEF": {
-     "n": 8,
-     "now_best": 0.5928247165408729,
-     "beats_now": 0.375
-    },
     "MED": {
      "n": 8,
      "now_best": 2.7035688776035744,
-     "beats_now": 0.25
+     "beats_now": 0.375
     }
    },
    "by_route": {
@@ -568,12 +568,12 @@
     "listed": {
      "n": 9,
      "now_best": 2.634316376615045,
-     "beats_now": 0.5555555555555556
+     "beats_now": 0.6666666666666666
     }
    },
    "helpful": 171,
    "pool": 589,
-   "note": "the market is modelled from 147 offers over 9 cycles, weighted by value^0.15, and only just — value^0.20 fits within 17.6% of it, so read the exponent as roughly this, not exactly this"
+   "note": "the market is modelled from 149 offers over 9 cycles, weighted by value^0.15, and only just — value^0.20 fits within 17.6% of it, so read the exponent as roughly this, not exactly this"
   },
   {
    "route": "watch",
@@ -616,12 +616,12 @@
    "hi": null,
    "beats_now": null,
    "helpful": 35,
-   "days": 1.3573583423032407,
+   "days": 1.3307397908333334,
    "opens": "24 Aug"
   }
  ],
  "verdict": "**Don't spend yet.** Wait for the clauses is worth about +199 points over the rest of the season against +103 for the best thing you can buy today — 97 better even after paying a jornada for the delay, and the balance is what buys the choice.",
- "market_pct": "market **33rd percentile** · an ordinary week · better in 67% of weeks",
+ "market_pct": "market **22nd percentile** · a poor week · better in 78% of weeks",
  "shape_now": "5-4-1",
  "xi_note": "",
  "warnings": [
@@ -638,7 +638,7 @@
    "mean": 1638.640360454105,
    "lo": 1435.700801181537,
    "hi": 1854.673117531374,
-   "cash": 19380946.036140047,
+   "cash": 19480899.557953704,
    "cash_known": true,
    "p_above": null
   },
@@ -649,7 +649,7 @@
    "mean": 1332.3133522787527,
    "lo": 1130.2642301370138,
    "hi": 1541.738013093127,
-   "cash": 8432284.0,
+   "cash": 8532284.0,
    "cash_known": false,
    "p_above": 0.9103333333333333
   },
@@ -660,7 +660,7 @@
    "mean": 1325.0960522525318,
    "lo": 1116.4968500873426,
    "hi": 1553.3597470011678,
-   "cash": 5532427.0,
+   "cash": 5632427.0,
    "cash_known": false,
    "p_above": 0.906
   },
@@ -671,7 +671,7 @@
    "mean": 1191.9977121712654,
    "lo": 956.7303210168357,
    "hi": 1433.8185661151379,
-   "cash": 2582988.0,
+   "cash": 2682988.0,
    "cash_known": false,
    "p_above": 0.9516666666666667
   },
@@ -682,7 +682,7 @@
    "mean": 1037.906730515681,
    "lo": 846.1303261139564,
    "hi": 1238.1583137457803,
-   "cash": 16339786.0,
+   "cash": 16439786.0,
    "cash_known": false,
    "p_above": 0.9883333333333333
   }
