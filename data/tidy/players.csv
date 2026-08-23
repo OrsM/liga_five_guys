@@ -189,7 +189,7 @@ player_id,name,club_id,ff_slug,af_slug,app_id,understat_id,app_names
 14045,facundo garces,alaves,facundo-garces,,,13319,
 14096,chupete,malaga,chupete,,,14732,
 14097,pablo garcia,deportivo,,,,,
-14100,raul jimenez,valencia,,,,,
+14100,raul jimenez,valencia,raul-jimenez-1,,,,
 14105,jorge salinas,racing,jorge-salinas,482469,,14687,
 14115,matia barzic,elche,matia-barzic,,,,
 14118,ali houary,elche,-ali-houary,448243,,13838,
@@ -229,7 +229,7 @@ player_id,name,club_id,ff_slug,af_slug,app_id,understat_id,app_names
 15315,pablo arriaza,malaga,pablo-arriaza,,,,
 15316,roger hinojo,espanyol,roger-hinojo,450716,,13533,
 15336,rafa rodriguez,malaga,rafa-rodriguez,335221,,14735,
-15342,yan diomande,real madrid,yan-diomande,,,13561,
+15342,yan diomande,real madrid,yan-diomande,513776,,13561,
 15344,rafa garrido,malaga,rafa-garrido,,,,
 15351,jonathan asp jensen,deportivo,jonathan-asp-jensen,,,12620,
 15409,alejandro rego,athletic,alejandro-rego,,,13627,
@@ -305,7 +305,7 @@ player_id,name,club_id,ff_slug,af_slug,app_id,understat_id,app_names
 16924,huseini nakoha,levante,,,,,
 16931,xanet olaiz,alaves,xanet-olaiz,,,,
 16933,pablo roson,levante,,,,,
-16938,carlos macia,villarreal,carlos-macia,,,14221,
+16938,carlos macia,villarreal,carlos-macia,548734,,14221,
 16940,aleksa puric,atletico,,,2883,14224,Purić
 16948,jorge cestero,real madrid,jorge-cestero,,,14246,
 16975,iker muñoz,sevilla,iker-munoz-1,,2876,,Iker Muñoz
