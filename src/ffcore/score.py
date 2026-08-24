@@ -904,7 +904,10 @@ class Scored(NamedTuple):
     flat: float            # ignores the fixture — for BUYING, which is months
     ppm: float
     pct: float | None       # as published, None if unknown
-    pct_used: float         # what the score actually used
+    pct_used: float         # what the score actually used, THIS jornada
+    # HIS STANDING RATE, for every jornada AFTER this one — see score()'s
+    # own note on why pct_used cannot answer for the rest of the season.
+    pct_rest: float
     on_page: bool
     status: str
     note: str               # diagnosis / expected return, when published
@@ -1157,10 +1160,35 @@ class Scorer:
         # against.
         cur = self.current.get(norm(rec.get("name", "")))
         start_n = cur.get("start_n", 0.0) if cur else 0.0
+        # `pct_used` ABOVE ANSWERS FOR ONE JORNADA — the next one, which is
+        # the only match this week's editorial page and status flag (a
+        # suspension, a knock, a doubt) actually describe. Bootstrap.
+        # __init__ used to be handed this SAME number for the whole
+        # remaining season (decide.load() reused one `base` dict for every
+        # jornada) — so a player suspended for one match read as ~unlikely
+        # to start for the other thirty-seven too, and a player rested for
+        # one week never recovered in the forecast. On 2026-08-25 that
+        # priced a first-choice centre-back (91.7% of this season's
+        # minutes, one card suspension) at 27% for the rest of his season
+        # and had decide.dead_weight() list him as sellable for zero points.
+        #
+        # `pct_rest` is what jornadas AFTER the next one get instead: his
+        # own recency-weighted minutes share this season, shrunk toward
+        # NEUTRAL_START (not toward this week's status-tainted editorial
+        # reading — see NEUTRAL_START's own note, "no percentage given" is
+        # exactly the "no news either way" case this wants) by the same
+        # SHRINK_K this repo already trusts for the points side. Nothing to
+        # shrink AGAINST but this week's own number when he has no current-
+        # season minutes at all (start_n == 0) — a debutant's forecast
+        # cannot know more about jornada 10 than it does about jornada 3.
         if start_n > 0.0:
             k_s = self.shrink_k
+            pct_rest = (k_s * NEUTRAL_START + start_n * 100.0
+                       * cur["start_rate"]) / (k_s + start_n)
             pct_used = (k_s * pct_used + start_n * 100.0 * cur["start_rate"]
                        ) / (k_s + start_n)
+        else:
+            pct_rest = pct_used
         m = self.board.get((rec.get("team") or "").strip())
         slot = SLOT.get((rec.get("position") or "").lower(), "")
         # A CLEAN SHEET IS OPPONENT-ATTACK-DRIVEN, A GOAL OPPONENT-DEFENSE-
@@ -1187,7 +1215,7 @@ class Scorer:
             fix_basis=m.basis if m else "none",
             elo_gap=m.gap if m else None,
             cur_pj=rating.cur_pj, pj=rating.pj,
-            ppm=rating.ppm, pct=pct, pct_used=pct_used,
+            ppm=rating.ppm, pct=pct, pct_used=pct_used, pct_rest=pct_rest,
             on_page=on_page, status=st, note=self.notes.get(key, ""),
             assumed=rating.assumed,
             why=rating.why,
@@ -1396,6 +1424,31 @@ def _selftest() -> None:
     untouched = Scorer(market, xi, hist, current={}, board={"Mid": easy}
                        ).score(mk("p0"))
     assert untouched.pct_used == 100.0, untouched.pct_used
+    # ...and pct_rest, with no season evidence to differ on, is the same
+    # number — nothing else to answer jornada 10 with either.
+    assert untouched.pct_rest == 100.0, untouched.pct_rest
+
+    # -- pct_rest: a REGULAR STARTER'S standing rate survives ONE bad
+    # week's editorial reading; pct_used, which answers for the very next
+    # jornada, does not have to. A card suspension (editorial 0%, thin
+    # season sample — 2 weighted jornadas, the actual shape a real
+    # suspended defender's own current-season record has) should read as
+    # "out this week" (pct_used pulled toward 0), not "a rotation risk all
+    # season" (pct_rest should stay well above it — anchored at NEUTRAL_
+    # START, not at this week's 0%).
+    starter_cur = {"p0": {"pts": 30.0, "pj": 2.0,
+                          "start_rate": 0.9, "start_n": 2.0}}
+    susp = [{"player_name": "p0", "start_pct": "0", "status": "suspended"}]
+    sc5 = Scorer(market, susp, hist, current=starter_cur, board={"Mid": easy})
+    susp_s = sc5.score(mk("p0"))
+    # THE FORMULAS ARE EXACT, same shrink_k=8 pseudo-matches both blends
+    # already trust — pct_used anchored on this week's editorial 0%,
+    # pct_rest on NEUTRAL_START, and only NEUTRAL_START's anchor never
+    # sees the suspension.
+    assert abs(susp_s.pct_used - (8 * 0.0 + 2 * 90.0) / 10) < 1e-9, susp_s
+    assert abs(susp_s.pct_rest - (8 * NEUTRAL_START + 2 * 90.0) / 10) < 1e-9, \
+        susp_s
+    assert susp_s.pct_rest > susp_s.pct_used + 25.0, susp_s
 
     # -- _per_jornada_current: minutes weighted, corrections folded in, and
     # -- Step 1's recency weighting gated on real out-of-sample evidence --
@@ -1643,7 +1696,7 @@ def _selftest() -> None:
     sc_noxg = Scorer(market_xg, xi_xg, hist_xg, xg={})
     assert sc_noxg.rate(mk("Attacker", pos="delantero")) == plain
 
-    print("ffcore.score self-test OK (54 cases)")
+    print("ffcore.score self-test OK (58 cases)")
 
 
 if __name__ == "__main__":

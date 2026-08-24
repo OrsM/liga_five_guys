@@ -767,6 +767,43 @@ def rounds_left(matches, teams) -> tuple[list[int], dict[int, set[str]], list]:
     return rem, played, unjoined
 
 
+def next_then_rest(base: dict, base_rest: dict, rem: list[int],
+                   played: dict[int, set[str]], club: dict[str, str]
+                   ) -> dict[int, dict]:
+    """Bootstrap's own `per_jornada` — `base` for a player's FIRST
+    remaining jornada, `base_rest` for every one after it.
+
+    THE ONLY MATCH THIS WEEK'S STATUS FLAG CAN ACTUALLY SPEAK FOR. `base`
+    carries this week's editorial reading (a suspension, a knock) blended
+    in — real news about the one game it was published for. Handing that
+    SAME reading to every remaining jornada of the season, which is what
+    this repo did before, was reading a "he plays Sunday" answer as also
+    "he plays in March" — see ffcore.score.Scored.pct_rest's own note for
+    the case that found this, and cost.
+
+    "First remaining jornada" is PER PLAYER, not one global jornada: a
+    partial round mid-sweep drops a player from `rem[0]` once his own club
+    has already played it (see rounds_left()'s own note on why), so his
+    true next jornada is wherever he first appears here — which `played`
+    already answers, one club at a time.
+    """
+    first_seen: set[str] = set()
+    out: dict[int, dict] = {}
+    for j in rem:
+        this_j = ({k: v for k, v in base.items()
+                  if club.get(k) not in played[j]}
+                 if j in played else base)
+        layer = {}
+        for k, v in this_j.items():
+            if k in first_seen:
+                layer[k] = base_rest.get(k, v)
+            else:
+                first_seen.add(k)
+                layer[k] = v
+        out[j] = layer
+    return out
+
+
 def club_key(raw, teams, xw=None) -> str:
     """One club, one key, whichever page spelled it — or "" if it will not
     place.
@@ -923,7 +960,7 @@ def load(trials_pool=None) -> Universe:
     value = {k: float((v or {}).get("value") or 0) for k, v in players.items()
              if (v or {}).get("value")}
 
-    pos, base = {}, {}
+    pos, base, base_rest = {}, {}, {}
     # A DISPLAY NAME FOR EVERY PLAYER THE INDEX KNOWS, not just the ones in
     # the universe. Keys are the site's ids now, so a key that reaches the
     # renderer without a name in this map is printed as a number — which is
@@ -931,6 +968,10 @@ def load(trials_pool=None) -> Universe:
     # definition neither owned nor priced, so the universe never held them.
     name = {k: (rec.get("name") or k) for k, rec in players.items()}
     universe = set(price) | {k for s in squads.values() for k in s}
+    # SCORED ONCE PER PLAYER, kept rather than re-derived a few lines down
+    # for `matches` — sc.score(row) was being called a second time for the
+    # same row to read one more field off the same Scored.
+    scored: dict[str, object] = {}
     for k in universe:
         rec = players.get(k)
         if not rec:
@@ -938,8 +979,17 @@ def load(trials_pool=None) -> Universe:
         pos[k] = SLOT.get((rec.get("pos") or "").lower(), "MED")
         row = sc.row_for(k)
         s = sc.score(row) if row else None
+        scored[k] = s
         base[k] = ((max(0.0, s.ppm * s.fix), min(1.0, (s.pct_used or 0) / 100))
                    if s else (2.0, 0.5))
+        # THE SAME PAIR, ONE JORNADA LATER — see ffcore.score.Scored.pct_rest
+        # for why this cannot just be `base` again. Only the START side
+        # differs; a rate this thin has no more evidence about jornada 10
+        # than about jornada 3, but P(start) does, once he has any
+        # current-season minutes at all — see that field's own note.
+        base_rest[k] = ((max(0.0, s.ppm * s.fix),
+                        min(1.0, (s.pct_rest or 0) / 100))
+                       if s else (2.0, 0.5))
 
     # Everyone the market prices, scored the same way — for the question of
     # what might come up later, which is about the players NOT in the
@@ -964,8 +1014,7 @@ def load(trials_pool=None) -> Universe:
     # thin record widens the season it draws instead of passing as a fact.
     matches = {}
     for k in base:
-        row = sc.row_for(k)
-        s_ = sc.score(row) if row else None
+        s_ = scored.get(k)
         if s_ is not None:
             matches[k] = s_.pj
     # CLUB-CORRELATED SEASON UNCERTAINTY — ffcore.fixture.club_volatility().
@@ -984,11 +1033,9 @@ def load(trials_pool=None) -> Universe:
               if c.market and c.ff_slug} if lg.xw is not None else {}
     club_of_slug = {k: slug_of[v] for k, v in club.items() if v in slug_of}
     club_rel = club_volatility(load_results_history(), list(slug_of.values()))
-    fc = Bootstrap({j: ({k: v for k, v in base.items()
-                         if club.get(k) not in played[j]}
-                        if j in played else base)
-                    for j in rem}, pool=pool, matches=matches,
-                   club_of=club_of_slug, club_rel=club_rel)
+    fc = Bootstrap(next_then_rest(base, base_rest, rem, played, club),
+                  pool=pool, matches=matches,
+                  club_of=club_of_slug, club_rel=club_rel)
 
     # What everybody has already scored, off the league table — five rows at
     # the grain the fact belongs to, rather than the first of each manager's
@@ -1434,6 +1481,25 @@ def _selftest() -> None:
     assert un == ["zzz-united"], un
     assert _d == {1: {"getafe"}}, _d
 
+    # -- next_then_rest: this week's status answers for ONE jornada ---------
+    # A suspended man's club has NOT played J1 (he is in J1's dict, base
+    # applies), and a normal man's has (dropped from J1 via `played`, so his
+    # first appearance — base — is J2).
+    rem2, played2 = [1, 2, 3], {1: {"alaves"}}
+    base2 = {"susp": (5.0, 0.05), "normal": (4.0, 0.9)}
+    rest2 = {"susp": (5.0, 0.9), "normal": (4.0, 0.9)}
+    club2 = {"susp": "getafe", "normal": "alaves"}
+    pj = next_then_rest(base2, rest2, rem2, played2, club2)
+    assert pj[1] == {"susp": base2["susp"]}, pj[1]
+    assert "normal" not in pj[1], pj[1]
+    assert pj[2] == {"susp": rest2["susp"], "normal": base2["normal"]}, pj[2]
+    assert pj[3] == {"susp": rest2["susp"], "normal": rest2["normal"]}, pj[3]
+
+    # No played-club filtering at all (an ordinary full jornada): first
+    # remaining jornada gets `base` for everyone, every later one `rest`.
+    pj2 = next_then_rest(base2, rest2, [1, 2], {}, {})
+    assert pj2[1] == base2 and pj2[2] == rest2, pj2
+
     # -- value_rate: the shared primitive, on its own -----------------------
     assert value_rate(120.0, 14.13e6) is not None
     assert abs(value_rate(120.0, 14.13e6) - 120.0 / 14.13) < 1e-9
@@ -1442,7 +1508,7 @@ def _selftest() -> None:
     assert value_rate(None, 5e6) is None
     assert value_rate(0.0, 5e6) == 0.0           # a real price, zero return: 0, not None
 
-    print("decide self-test OK (78 cases)")
+    print("decide self-test OK (84 cases)")
 
 
 if __name__ == "__main__":
