@@ -200,7 +200,7 @@ player_id,name,club_id,ff_slug,af_slug,app_id,understat_id,app_names
 14210,zaid romero,getafe,zaid-romero,180927,,14387,
 14700,david jimenez,real madrid,,,,13113,
 14766,aitor crespo,racing,,,,,
-14812,ruben gomez,villarreal,,,,,
+14812,ruben gomez,villarreal,ruben-gomez-1,,,,
 14816,jean ives valou,getafe,jean-ives-valou,,2699,13696,J. Ives Valou
 14832,albert niculaesei,elche,,,,,
 14866,diego diaz,racing,diego-diaz,,3031,14690,Diego Diaz
@@ -372,7 +372,7 @@ player_id,name,club_id,ff_slug,af_slug,app_id,understat_id,app_names
 1989,borja mayoral,getafe,borja-mayoral,,,2252,
 2153,hector bellerin,betis,hector-bellerin,,,492,
 2242,gonçalo guedes,real sociedad,goncalo-guedes,925,,5682,
-2288,dani olmo,barcelona,dani-olmo,,,8292,
+2288,dani olmo,barcelona,dani-olmo,1323,,8292,
 2417,andreas christensen,barcelona,andreas-christensen,,,200,
 2534,wojciech szczesny,barcelona,wojciech-szczesny,,2783,1244,Szczesny
 2536,antonio rudiger,real madrid,antonio-rudiger,,,1822,
