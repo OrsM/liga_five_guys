@@ -254,21 +254,21 @@ def _bar(u) -> float:
     return decide.xi_bar(exp, xi)
 
 
-def ladder_rows(u, rows, base=None) -> list[dict]:
+def ladder_rows(u, rows, bands=None) -> list[dict]:
     """The grouped plan as data, so the phone draws the same one table.
 
     Same groups, same order, same numbers. Two renderers drawing different
     tables is how this report came to contradict itself; there is one shape
     and both read it.
 
-    `base`, when given, prices EVERY row through player_bands() — a real
-    season band (pts_lo/pts_hi), not just the point estimate xpts already
+    `bands`, when given, is decide.rank()'s own `bands` — a real season band
+    (pts_lo/pts_hi) for EVERY row, not just the point estimate xpts already
     carried. Before this, only "buy" rows (already ranked as a move) had
     one; a squad member's own row showed a bare xPts/j snapshot with no
     uncertainty at all, which is a single jornada's P(start), not a season
-    of them — see player_bands()'s own note on why that understates a
-    bench player's real range. `base=None` (an old caller, or the
-    self-test) is the previous behaviour exactly, not a crash.
+    of them — see band_acts()'s own note on why that understates a bench
+    player's real range. `bands=None` (an old caller, or the self-test) is
+    the unpriced table, not a crash.
     """
     import decide
 
@@ -279,9 +279,9 @@ def ladder_rows(u, rows, base=None) -> list[dict]:
     bar = decide.xi_bar(exp, xi)
     spare = sum(v for _k, v in decide_dead(u))
     rest = [k for k in u.price if k not in mine and exp.get(k, 0.0) > bar]
-    bands = (player_bands(u, base, own_keys=list(mine),
-                          candidate_keys=[k for k in rest if k not in won])
-             if base is not None else {})
+    # A won row carries rank()'s own band, off the squad the victim's
+    # response leaves behind — which is why rank() never bands them twice.
+    bands = {k: v for k, v in (bands or {}).items() if k not in won}
 
     def cell(k, group, where, money, pts, note="", value=None,
             lo=None, hi=None):
@@ -339,19 +339,27 @@ def ladder_rows(u, rows, base=None) -> list[dict]:
 
 
 
-def player_bands(u, base, own_keys=(), candidate_keys=(), seed: int = 1
-                 ) -> dict[str, tuple[float, float, float]]:
-    """{key: (median season d_pts, pts_lo, pts_hi)} for EVERY player the
-    ladder shows, not just the ones already ranked as a move — a squad
-    member's OWN marginal contribution (what selling him alone would cost,
-    no replacement bought) for `own_keys`, a candidate's (what buying him
-    alone would gain) for `candidate_keys`. Same batched-pass shape
-    rank()'s own scoring uses, same reason: ranking these one simulation at
-    a time would be as much work again as ranking every move already is.
-    Retired price_saves() (2026-08-22), which did the same batching for the
-    SAVE group alone, median only, in a second simulation pass this
-    function's own candidate_keys already covers — see ladder()'s and
+def band_acts(u) -> list:
+    """The one-man questions the ladder needs a season band for, as Actions.
+
+    For EVERY player the ladder shows, not just the ones already ranked as a
+    move: a squad member's OWN marginal contribution (what selling him alone
+    would cost, no replacement bought), and a reachable candidate's (what
+    buying him alone would gain).
+
+    COMPUTES NOTHING — it names the questions and decide.rank() answers them
+    in the final pass it was already running, handing them back as its
+    `bands`. This used to be player_bands(), a SECOND simulation at
+    FINAL_TRIALS against the same seed and the same seasons: the draw does
+    not depend on the squad, so that pass re-drew about 1.2s of identical
+    seasons to score squads the first pass could have scored for 0.03s each
+    (measured 2026-08-24). Retired price_saves() before it (2026-08-22),
+    which did the same for the SAVE group alone — see ladder()'s and
     ladder_rows()'s own notes on the duplication that was.
+
+    Deliberately does NOT drop the players rank() ends up ranking as moves.
+    Which moves survive screening is rank()'s own answer and is not known
+    here; rank() makes that cut itself, where it is known.
 
     WHY THIS MATTERS MORE THAN IT LOOKS: dead_weight() decides who counts
     as sellable by checking best_xi() against forecaster.expected(j) for
@@ -359,8 +367,9 @@ def player_bands(u, base, own_keys=(), candidate_keys=(), seed: int = 1
     every jornada (per_jornada[j][key][1] never varies by j), so looping
     over twenty jornadas re-checks the identical frozen number twenty
     times. The only place a jornada's DISTANCE actually widens anything is
-    inside the stochastic trials this function runs (Bootstrap.start_draw,
-    wired into rate_draw's own DRIFT_FRAC-style walk) — so a player who
+    inside the stochastic trials these Actions are scored in
+    (Bootstrap.start_draw, wired into rate_draw's own DRIFT_FRAC-style
+    walk) — so a player who
     reads as safely dead weight on today's snapshot can still show a real,
     wide pts_hi here if the season has enough jornadas left for his rate
     to plausibly recover. The classification (dead_weight) stays the cheap
@@ -371,29 +380,21 @@ def player_bands(u, base, own_keys=(), candidate_keys=(), seed: int = 1
     """
     import decide
 
-    own_keys, candidate_keys = list(own_keys), list(candidate_keys)
-    if not own_keys and not candidate_keys:
-        return {}
+    exp, xi = decide.current_xi(u)
+    mine = u.state.squads.get(u.me, {})
+    bar = decide.xi_bar(exp, xi)
     dead = tuple(sorted(k for k, _ in decide_dead(u)))
     got = sum(v for _k, v in decide_dead(u))
+    # THE SAME POOL ladder_rows() ranks — every man you hold, and everyone
+    # you do not who beats the weakest man in your eleven. One derivation of
+    # "who is on the ladder", read there for rendering and here for pricing.
     acts = [decide.Action("sell", sell=(k,), proceeds=u.proceeds.get(k, 0.0))
-           for k in own_keys]
+            for k in mine]
     acts += [decide.Action("buy", buy=k, sell=dead,
                            cost=u.price.get(k, 0.0), proceeds=got)
-            for k in candidate_keys]
-    scored = decide._score_many(u, [decide.apply(u, a) for a in acts],
-                                decide.FINAL_TRIALS, seed)
-    was = base.totals.get(u.me, [])
-    out = {}
-    for a, r in zip(acts, scored):
-        key = a.sell[0] if a.kind == "sell" else a.buy
-        pairs = sorted(x - y for x, y in zip(r.totals.get(u.me, []), was))
-        if not pairs:
-            out[key] = (0.0, 0.0, 0.0)
-            continue
-        out[key] = (pairs[len(pairs) // 2], pairs[int(0.1 * len(pairs))],
-                   pairs[int(0.9 * len(pairs))])
-    return out
+             for k in u.price
+             if k not in mine and exp.get(k, 0.0) > bar]
+    return acts
 
 
 def ladder(u, rows, base, data=None) -> list[str]:
@@ -414,21 +415,21 @@ def ladder(u, rows, base, data=None) -> list[str]:
     second, independent implementation — its own exp/xi/dead/won/bands,
     the exact duplication this repo's own design principle warns against
     ("two renderings of one answer is how they come to disagree"). Fixed
-    2026-08-22: player_bands() ran twice, once per renderer, before this —
-    real simulated numbers, computed twice, on the strength of "same seed
-    gives the same answer" rather than there being only one computation to
-    give it.
+    2026-08-22: the bands ran twice, once per renderer, before this — real
+    simulated numbers, computed twice, on the strength of "same seed gives
+    the same answer" rather than there being only one computation to give
+    it.
 
     `data`, when given, is ladder_rows()'s OWN result, computed once by a
     caller feeding both this and payload() — main() does, so the real
     simulation behind every band runs ONCE per report, not once per
     renderer. `data=None` (a caller with no JSON side, or the self-test)
-    computes it here exactly as before, not a crash.
+    draws the same table with no bands in it, not a crash.
     """
     import decide
 
     exp, xi = decide.current_xi(u)
-    data = data if data is not None else ladder_rows(u, rows, base)
+    data = data if data is not None else ladder_rows(u, rows)
     by_group: dict[str, list[dict]] = {}
     for r in data:
         by_group.setdefault(r["group"], []).append(r)
@@ -1133,7 +1134,7 @@ def payload(u, rows, base, rivals, locks_h=None, n_actions: int = 0,
         "sell": [{"name": names.get(k, k), "pos": u.pos.get(k, ""),
                   "raises": got} for k, got in dead_weight(u)],
         "ladder": (ladder_data if ladder_data is not None
-                  else ladder_rows(u, rows, base)),
+                  else ladder_rows(u, rows)),
         "bar": _bar(u),
         "xi_total": _xi_total(u, u.me),
         "shape": _shape_now(u),
@@ -1308,6 +1309,7 @@ def render(u, rows, base, stamp: str, rivals, n_actions: int = 0,
 
 
 def _selftest() -> None:
+    import decide
     from ffcore.forecast import Bootstrap
     from ffcore.season import LeagueState, Standings
     from decide import Action, Universe, dead_weight
@@ -1779,13 +1781,13 @@ def _selftest() -> None:
     ph = "\n".join(placeholder("no api_teams.csv"))
     assert "no api_teams.csv" in ph and ph.startswith("# The simulation")
 
-    # -- player_bands: a real season band for EVERY player, not just moves --
+    # -- band_acts: a real season band for EVERY player, not just moves --
     # THIS WAS NEVER EXERCISED BEFORE any simulation-touching helper in this
     # file got its own real test. Built here first, before wiring it into
     # the ladder, so a broken band cannot
     # silently reach the report.
     from decide import Universe as U2
-    from ffcore.season import LeagueState as LS2, simulate
+    from ffcore.season import LeagueState as LS2
 
     many_j = list(range(1, 11))
     # A full legal eleven ("star" is one of five real MEDs, so removing him
@@ -1806,11 +1808,17 @@ def _selftest() -> None:
            pos={**{k: v for k, v in sqb.items()}, "cand": "MED"},
            price={"cand": 5e6}, proceeds={"dead": 1e6, "star": 20e6},
            owner={}, cash=10e6, me="me")
-    baseb = simulate(ub.state, ub.forecaster, trials=1500, seed=7)
+    # EVERY MAN YOU HOLD gets a sell, everyone above the bar you do not hold
+    # gets a buy. "cand" is the only priced non-squad key here.
+    asked = band_acts(ub)
+    assert {decide.band_key(a) for a in asked} == {*sqb, "cand"}, asked
+    assert [a for a in asked if a.buy == "cand"], asked
 
-    bands = player_bands(ub, baseb, own_keys=["star", "dead"],
-                         candidate_keys=["cand"])
-    assert set(bands) == {"star", "dead", "cand"}, bands
+    # ...and rank() answers them in its own final pass. No `acts`, so no move
+    # survives screening and nothing is dropped from `extra` — the bands are
+    # the whole answer.
+    _rows, baseb, _lam, bands = decide.rank(ub, [], extra=asked)
+    assert set(bands) == {*sqb, "cand"}, sorted(bands)
     for key in bands:
         med, lo, hi = bands[key]
         assert lo <= med <= hi, (key, bands[key])
@@ -1821,10 +1829,20 @@ def _selftest() -> None:
     assert abs(bands["dead"][0]) < abs(bands["star"][0]) / 2, bands
     # BUYING A GOOD CANDIDATE GAINS POINTS — positive median.
     assert bands["cand"][0] > 0, bands["cand"]
-    # No keys given at all: no simulation run, not an error.
-    assert player_bands(ub, baseb) == {}
+    # Nothing asked for at all: no extra squads scored, not an error.
+    assert decide.rank(ub, [], extra=[])[3] == {}
 
-    print("sim self-test OK (125 cases)")
+    # THE BAND RIDES THE SAME SEASONS AS THE MOVES. A move rank() ranks is
+    # NOT banded twice — its own row's pts_lo/pts_hi is the answer, off the
+    # squad the victim's response leaves behind, so "cand" drops out of
+    # `bands` the moment it is affordable enough to survive screening.
+    buy_cand = decide.Action("buy", buy="cand", cost=5e6)
+    rows2, _b2, _l2, bands2 = decide.rank(ub, [buy_cand], extra=asked)
+    assert [r for r in rows2 if r["action"].buy == "cand"], rows2
+    assert "cand" not in bands2, sorted(bands2)
+    assert set(bands2) == set(sqb), sorted(bands2)
+
+    print("sim self-test OK (131 cases)")
 
 
 def main() -> None:
@@ -1863,19 +1881,23 @@ def main() -> None:
     # gets measured, off a pass that was happening anyway.
     acts = decide.candidates(u, exp, budget=float("inf"))
     smoothed = cash_price_history()
-    rows, base, measured = decide.rank(u, acts, price=smoothed)
+    # ONE SIMULATION AT FINAL_TRIALS, not two. band_acts() names the ladder's
+    # one-man questions and rank() answers them in the pass it was already
+    # running — see its own note on why a second pass re-drew identical
+    # seasons for nothing.
+    rows, base, measured, bands = decide.rank(u, acts, price=smoothed,
+                                              extra=band_acts(u))
     log_cash_price(measured)
     u.cash_note = _price_note(smoothed, measured)
     rivals = [m for m in u.state.squads if m != u.me]
     # ONE COMPUTATION, READ BY BOTH RENDERERS. This used to be two: a
     # separate price_saves() call here feeding the markdown's SAVE section
-    # a median with no band, and ladder_rows() (JSON) running its own
-    # player_bands() pass for the same players plus a real range —
+    # a median with no band, and a second banded pass for the same players —
     # the exact "two renderings of one answer" duplication ladder()'s own
     # docstring now names directly. ladder_rows() already covers "save"
     # (and every other group) with a real band, so the separate median-only
     # pass is retired rather than kept as a second source for the same fact.
-    ladder_data = ladder_rows(u, rows, base)
+    ladder_data = ladder_rows(u, rows, bands)
     write_lines(PARTS / OUT,
                 render(u, rows, base, stamp, rivals, len(acts), locks_h,
                        market_model(u), ladder_data))

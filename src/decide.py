@@ -220,8 +220,8 @@ def current_xi(u, who: str | None = None) -> tuple[dict[str, float], set[str]]:
     _xi_total(), _shape_now() (all sim.py) and candidates() (this module),
     each with its own `exp = u.forecaster.expected(choosable(u)); xi =
     best_xi(squad, exp)` pair. All deterministic — no randomness, so no
-    trial-to-trial drift risk the way ladder()'s old duplicate
-    player_bands() simulation had — but still the same "no single owner"
+    trial-to-trial drift risk the way ladder()'s old duplicate band
+    simulation had — but still the same "no single owner"
     shape: seven implementations of one fact, kept in sync by hand rather
     than by construction, is exactly the mess a future change to best_xi()'s
     tie-breaking (or choosable()'s own jornada pick) would fall through.
@@ -505,6 +505,51 @@ def _score_many(u: Universe, many: list, trials: int, seed: int):
         u.forecaster, trials=trials, seed=seed)
 
 
+def paired(after, base, me) -> list[float]:
+    """The per-trial difference `after` minus `base`, sorted.
+
+    PAIRED, WITHIN THE SAME SEASONS — trial n with the move against trial n
+    without it, so the difference is the squads rather than the weather. See
+    rank()'s own note for what that buys: recalibrating P(start) on
+    2026-08-18 moved a row's P(win) by 48 points and its paired figures by
+    six.
+
+    Sorted because every reader of this is a quantile of it (band() below,
+    and rank()'s "helps", which only counts signs). Empty when the two
+    Standings disagree about how many trials were run, which zip() makes
+    silent — the callers all treat empty as "no answer", not as zero.
+    """
+    return sorted(x - y for x, y in zip(after.totals.get(me, []),
+                                        base.totals.get(me, [])))
+
+
+def band(pairs) -> tuple[float, float, float]:
+    """(median, 10th, 90th) of paired()'s output — ONE definition of a band.
+
+    rank() (a ranked move's d_pts/pts_lo/pts_hi) and sim.ladder_rows() (a
+    squad member's or a candidate's own season band) print the same three
+    numbers off the same paired differences, and each used to compute them
+    from its own copy of these three index expressions. Two spellings of one
+    quantile is how they come to disagree about what "the band" means.
+
+    (0, 0, 0) for no pairs: nothing was simulated, so there is no spread to
+    report, and every caller renders that as the no-change row it is.
+    """
+    if not pairs:
+        return (0.0, 0.0, 0.0)
+    return (pairs[len(pairs) // 2], pairs[int(0.1 * len(pairs))],
+            pairs[int(0.9 * len(pairs))])
+
+
+def band_key(a: Action) -> str:
+    """The player an Action is ABOUT — the buy, or the man being sold.
+
+    A band is looked up by player, not by Action, and a pure sale
+    (`buy == ""`) is about the one name in `sell`.
+    """
+    return a.buy or (a.sell[0] if a.sell else "")
+
+
 def value_rate(pts, cost) -> float | None:
     """Season points per million of a GENUINE positive cost, or None.
 
@@ -521,12 +566,29 @@ def value_rate(pts, cost) -> float | None:
 
 
 def rank(u: Universe, acts: list[Action], seed: int = 1,
-         price=None) -> tuple:
+         price=None, extra: list[Action] = ()) -> tuple:
     """Screen wide and cheap, then re-run the survivors properly.
+
+    Returns `(rows, base, measured, bands)`.
 
     Returned rows carry the change in expected finishing position and in
     P(above) each rival — the second is what you act on when one rival is the
     one you are actually racing.
+
+    `extra` is scored IN THE SAME FINAL PASS and comes back as `bands`,
+    `{player: (median, lo, hi)}` — the ladder's own "what would this one man
+    alone be worth" question (see sim.band_acts()). It rides along rather
+    than running second because THE DRAW DOES NOT DEPEND ON THE SQUAD: at
+    3000 trials the pass costs about 1.2s of drawing plus 0.03s per squad
+    scored (measured 2026-08-24), so a second pass paid the 1.2s again for
+    nothing. Same seed, same trials, so the numbers are the numbers a
+    separate pass gave.
+
+    An `extra` about a player rank() is ALREADY returning a row for is
+    dropped: that row's own pts_lo/pts_hi answer the question better, off the
+    squad the victim's response leaves behind rather than a bare purchase.
+    The caller cannot make that cut itself — which moves survive screening is
+    this function's own answer — which is why `extra` is handed over whole.
 
     `acts` may contain moves you CANNOT afford today. They are screened and
     then dropped, and the reason is that screening them is how the price of
@@ -586,31 +648,34 @@ def rank(u: Universe, acts: list[Action], seed: int = 1,
             after[a.victim][ans.buy] = u.pos.get(ans.buy, "MED")
         answers.append(ans)
         afters.append(after)
-    final = _score_many(u, [u.state.squads] + afters, FINAL_TRIALS, seed)
-    base, scored = final[0], final[1:]
+    # RIDING ALONG IN THE SAME PASS — see the docstring. Anything `extra`
+    # asks about a player already kept is dropped here, where `keep` is
+    # known, rather than by a caller guessing at it.
+    won = {a.buy for a in keep if a.buy}
+    rest = [a for a in extra if band_key(a) not in won]
+    final = _score_many(u, [u.state.squads] + afters
+                        + [apply(u, a) for a in rest], FINAL_TRIALS, seed)
+    base, scored = final[0], final[1:len(afters) + 1]
+    bands = {band_key(a): band(paired(r, base, u.me))
+             for a, r in zip(rest, final[len(afters) + 1:])}
     rivals = [m for m in u.state.squads if m != u.me]
     out = []
     for a, ans, r in zip(keep, answers, scored):
         b_ = burn(u, a)
         charge = 0.0 if (lam is None or b_ is None) else lam * b_ / 1e6
         gross = base.expected_position() - r.expected_position()
-        # PAIRED, WITHIN THE SAME SEASONS. Every option runs against the
-        # same seed, so for each trial there is a total with the move and a
-        # total without, and the difference is the squads rather than the
-        # weather. That difference is what survives a change of model: on
-        # 2026-08-18 recalibrating P(start) moved a row's P(win) by 48 points
-        # and its paired figures by six, which is the difference between a
-        # number you can act on and one you cannot.
-        mine, was = r.totals.get(u.me, []), base.totals.get(u.me, [])
-        pairs = sorted(x - y for x, y in zip(mine, was))
-        d_pts = pairs[len(pairs) // 2] if pairs else 0.0
+        # PAIRED, WITHIN THE SAME SEASONS — see paired()'s own docstring,
+        # which is where this used to be spelled out and where the band
+        # quantiles below used to be spelled a second time.
+        pairs = paired(r, base, u.me)
+        d_pts, lo, hi = band(pairs)
         out.append({
             "action": a,
             "helps": (sum(1 for d in pairs if d > 0) / len(pairs)
                       if pairs else 0.0),
             "d_pts": d_pts,
-            "pts_lo": pairs[int(0.1 * len(pairs))] if pairs else 0.0,
-            "pts_hi": pairs[int(0.9 * len(pairs))] if pairs else 0.0,
+            "pts_lo": lo,
+            "pts_hi": hi,
             "d_pos": gross - charge,
             "gross": gross,
             "burn": b_,
@@ -651,7 +716,7 @@ def rank(u: Universe, acts: list[Action], seed: int = 1,
             "value": value_rate(d_pts, a.net),
         })
     rows = sorted(out, key=lambda d: (-d["d_pos"], d["action"].net))
-    return rows, base, measured
+    return rows, base, measured, bands
 
 
 def rounds_left(matches, teams) -> tuple[list[int], dict[int, set[str]], list]:
@@ -1123,7 +1188,7 @@ def _selftest() -> None:
     af = apply(u, sw)
     assert "me_bench" not in af["me"] and "star" in af["me"]
 
-    rows, base, _lam = rank(u, acts)
+    rows, base, _lam, _b = rank(u, acts)
     assert rows, "something should be worth doing"
     top = rows[0]
     # The paired pair: how often it helps, and by how much, in the same
@@ -1165,7 +1230,7 @@ def _selftest() -> None:
         price={"free_x": 5e6, "th_m1": 5e6}, route={"th_m1": "clause"},
         proceeds={},
         owner={"th_m1": "riv"}, cash=6e6, me="me")
-    got, _, _ = rank(u2, [Action("buy", buy="free_x", cost=5e6),
+    got, _, _, _ = rank(u2, [Action("buy", buy="free_x", cost=5e6),
                           Action("clause", buy="th_m1", cost=5e6,
                                  victim="riv")])
     by = {r["action"].buy: r["d_pos"] for r in got}
@@ -1390,7 +1455,7 @@ if __name__ == "__main__":
     print("%d jornadas left · cash %s · %d players acquirable · %d actions"
           % (len(u.state.jornadas), fmt_money(u.cash), len(u.price), len(acts)))
     print(u.forecaster.pool_note())
-    rows, base, _lam = rank(u, acts)
+    rows, base, _lam, _b = rank(u, acts)
     print("\nnow: expected position %.2f · P(win) %.0f%%"
           % (base.expected_position(), 100 * base.position().get(1, 0)))
     rivals = [m for m in u.state.squads if m != u.me]

@@ -117,7 +117,27 @@ def _forget(path) -> None:
 
 def read_csv(path) -> list[dict]:
     """Rows as dicts. Missing file is empty, not an error — a report that
-    hasn't been fed yet should say so, not crash."""
+    hasn't been fed yet should say so, not crash.
+
+    THE COPY ON THE WAY OUT IS THE CACHE'S ONLY ISOLATION, not an oversight
+    to be optimised away. `_READ_CACHE` keeps the parsed rows keyed by
+    (mtime, size), so every caller after the first would otherwise be handed
+    the SAME dict objects — and one caller setting a field would rewrite
+    what a later, unrelated caller reads, silently and only on the second
+    read. `latest_only()`, `fresh_only()` and `pick_source()` all filter
+    without copying, so those aliases run deep.
+
+    It is not free and the number is known: measured 2026-08-24 over one sim
+    stage, 43 calls across 13 files cost 1.52s, of which about 1.0s is the
+    unavoidable first parse of each file and about 0.5s is this copy —
+    market.csv and lineups.csv are ~85K rows each and read three times
+    apiece, at ~0.067s a copy. A run of that stage under a mutation detector
+    found no caller mutating a handed-out row, so the copy is defensive
+    rather than currently load-bearing; that was ONE stage of ten, which is
+    why it stays. Dropping it needs the same check over the whole pipeline —
+    ingest, crosswalk and sources are where a transform-in-place would
+    plausibly live — not this evidence.
+    """
     path = Path(path)
     try:
         st = path.stat()
