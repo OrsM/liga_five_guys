@@ -410,6 +410,54 @@ def fixture_board(market: list[dict], fixtures: list[dict],
     rating into attack_defense()'s own ATTACK half — see
     XG_CLUB_PSEUDO_MATCHES's own note on why that weight is a judgment call.
     """
+    ratings = _difficulty_ratings(market, elo_rows, xw, results,
+                                  understat_rows)
+    teams = ratings.teams
+    board: dict[str, Match] = {}
+
+    for r in fixtures:
+        when = kickoff_stamp(r.get("kickoff"))
+        if not when or when <= now:
+            continue
+        for side, other, sid, oid, home in (
+                (r.get("home"), r.get("away"), r.get("home_id"),
+                 r.get("away_id"), True),
+                (r.get("away"), r.get("home"), r.get("away_id"),
+                 r.get("home_id"), False)):
+            team = ratings.by_af.get((sid or "").strip()) or match_team(
+                side or "", teams)
+            if not team:
+                continue
+            prev = board.get(team)
+            if prev and prev.kickoff <= when:
+                continue
+            opp = ratings.by_af.get((oid or "").strip()) or match_team(
+                other or "", teams)
+            board[team] = _match_for(ratings, team, opp, other or "?",
+                                     home, when)
+    return board
+
+
+class _Ratings(NamedTuple):
+    """One league's worth of opponent strength, fitted once and read for
+    every fixture — fixture_board() and season_board() share this rather
+    than each re-fitting attack_defense()/elo_strength() per call, which
+    (season_board() especially, one call covering every remaining jornada
+    rather than one) would refit the SAME season's ratings hundreds of
+    times over for an answer that cannot have changed between them."""
+    teams: list
+    elo: dict | None
+    diff: dict
+    basis: str
+    ad_by_slug: dict
+    slug_of: dict
+    by_af: dict
+
+
+def _difficulty_ratings(market: list[dict], elo_rows=None, xw=None,
+                        results=None, understat_rows=None) -> _Ratings:
+    """The shared setup fixture_board() and season_board() both need — see
+    fixture_board()'s own docstring for what each piece answers."""
     value = team_strength(market)
     teams = list(value)
     # results_history.csv IS KEYED ON ff_slug ("real-madrid"), not the
@@ -430,7 +478,9 @@ def fixture_board(market: list[dict], fixtures: list[dict],
     # means "Celta" and "Celta Vigo" stop being a substring puzzle that can
     # return two candidates and answer with neither. The name match stays for
     # a club the table has not learned yet, and for the fixtures recorded
-    # before the id was extracted.
+    # before the id was extracted. matches.csv (season_board()'s own input)
+    # carries no club id at all, so this is always a name-match miss there —
+    # exactly the fallback path this repo already trusts.
     by_af = {}
     if xw is not None:
         for c in xw.clubs.values():
@@ -442,50 +492,85 @@ def fixture_board(market: list[dict], fixtures: list[dict],
     strength = elo if elo is not None else value
     basis = "elo" if elo is not None else "value"
     diff = difficulty(strength)
-    board: dict[str, Match] = {}
+    return _Ratings(teams=teams, elo=elo, diff=diff, basis=basis,
+                    ad_by_slug=ad_by_slug, slug_of=slug_of, by_af=by_af)
 
-    for r in fixtures:
-        when = kickoff_stamp(r.get("kickoff"))
-        if not when or when <= now:
+
+def _match_for(ratings: "_Ratings", team: str, opp: str, opp_name: str,
+              home: bool, when: datetime) -> Match:
+    """One Match — the shared per-fixture arithmetic fixture_board() and
+    season_board() both run, opponent-strength lookups already fitted in
+    `ratings`. Kept as one function for the reason every duplicate in this
+    module is: a fixture's difficulty computed two ways is how the "next
+    match" board and a season one come to disagree about the same fixture."""
+    base, rank = ratings.diff.get(opp, (1.0, 0)) if opp else (1.0, 0)
+    edge = (1.0 + HOME_EDGE) if home else (1.0 - HOME_EDGE)
+    gap = (ratings.elo[team] - ratings.elo[opp]
+          if ratings.elo is not None and opp in ratings.elo else None)
+    # FITTED WHERE THE DATA SUPPORTS IT, the rank-based base otherwise —
+    # per opponent, not all-or-nothing (see attack_defense()'s own note on
+    # why that is safe here and not for Elo). def_factor answers to the
+    # opponent's ATTACK (harder to keep a clean sheet against a side that
+    # scores a lot); atk_factor to the opponent's DEFENSE (easier to score
+    # against a side that concedes a lot).
+    opp_ad = ratings.ad_by_slug.get(ratings.slug_of.get(opp)) if opp else None
+    if opp_ad is not None:
+        atk_base, def_base = opp_ad[1], 1.0 / opp_ad[0]
+        row_basis = "attack_defense"
+    else:
+        atk_base = def_base = base
+        row_basis = ratings.basis if opp else "none"
+    return Match(opponent=opp_name, home=home, kickoff=when,
+                atk_factor=atk_base * edge, def_factor=def_base * edge,
+                rank=rank, of=len(ratings.teams), basis=row_basis, gap=gap)
+
+
+def season_board(market: list[dict], matches: list[dict], jornadas,
+                 now: datetime, elo_rows=None, xw=None,
+                 results=None, understat_rows=None
+                 ) -> dict[int, dict[str, Match]]:
+    """{jornada: {market team: its Match that jornada}}, for every jornada
+    in `jornadas` — fixture_board() answers "who do I face next"; this
+    answers "who do I face EVERY remaining week", because the schedule is
+    not a secret. `matches` (ffcore.tidy.load_matches or an equivalent
+    already latest_only()'d — a whole season is republished every sweep,
+    so the newest snapshot alone is the whole fixture list, not a partial
+    one) carries every jornada's home/away pairing whether or not it has
+    been played; this does not filter on score, because a played match's
+    OPPONENT is still the fact a later jornada needs, only the outcome is
+    already banked (see rounds_left(), which is what actually decides a
+    played jornada drops out of the simulation, not this function).
+
+    NO CLUB ID HERE — matches.csv (unlike fixtures.csv) carries no
+    home_id/away_id, so every join is match_team()'s name fallback. That
+    fallback is a path this repo already trusts (fixture_board() falls
+    back to it for every fixture recorded before the id was extracted),
+    not a new risk.
+
+    Ratings fitted ONCE for the whole call — attack_defense()/
+    elo_strength() cannot answer differently for jornada 4 than jornada
+    30 within the same call, so fitting them per jornada would be the
+    same cost as fixture_board() paid per fixture, for a season instead
+    of one week.
+    """
+    ratings = _difficulty_ratings(market, elo_rows, xw, results,
+                                  understat_rows)
+    teams = ratings.teams
+    want = set(jornadas)
+    board: dict[int, dict[str, Match]] = {j: {} for j in want}
+    for r in matches:
+        j = r.get("jornada") or ""
+        if not j.isdigit() or int(j) not in want:
             continue
-        for side, other, sid, oid, home in (
-                (r.get("home"), r.get("away"), r.get("home_id"),
-                 r.get("away_id"), True),
-                (r.get("away"), r.get("home"), r.get("away_id"),
-                 r.get("home_id"), False)):
-            team = by_af.get((sid or "").strip()) or match_team(side or "",
-                                                                teams)
-            if not team:
+        j = int(j)
+        for side, other, home in ((r.get("home"), r.get("away"), True),
+                                  (r.get("away"), r.get("home"), False)):
+            team = match_team(side or "", teams)
+            if not team or team in board[j]:
                 continue
-            prev = board.get(team)
-            if prev and prev.kickoff <= when:
-                continue
-            opp = by_af.get((oid or "").strip()) or match_team(other or "",
-                                                               teams)
-            base, rank = diff.get(opp, (1.0, 0)) if opp else (1.0, 0)
-            edge = (1.0 + HOME_EDGE) if home else (1.0 - HOME_EDGE)
-            gap = (elo[team] - elo[opp]
-                   if elo is not None and opp in elo else None)
-            # FITTED WHERE THE DATA SUPPORTS IT, the rank-based base
-            # otherwise — per opponent, not all-or-nothing (see
-            # attack_defense()'s own note on why that is safe here and not
-            # for Elo). def_factor answers to the opponent's ATTACK (harder
-            # to keep a clean sheet against a side that scores a lot);
-            # atk_factor to the opponent's DEFENSE (easier to score against
-            # a side that concedes a lot).
-            opp_ad = ad_by_slug.get(slug_of.get(opp)) if opp else None
-            if opp_ad is not None:
-                atk_base, def_base = opp_ad[1], 1.0 / opp_ad[0]
-                row_basis = "attack_defense"
-            else:
-                atk_base = def_base = base
-                row_basis = basis if opp else "none"
-            board[team] = Match(opponent=other or "?", home=home,
-                                kickoff=when,
-                                atk_factor=atk_base * edge,
-                                def_factor=def_base * edge,
-                                rank=rank, of=len(teams),
-                                basis=row_basis, gap=gap)
+            opp = match_team(other or "", teams)
+            board[j][team] = _match_for(ratings, team, opp, other or "?",
+                                        home, now)
     return board
 
 
@@ -799,7 +884,56 @@ def _selftest() -> None:
     assert fixture_board(mk, fx, now, None) == board
     assert fixture_board(mk, fx, now, []) == board
 
-    print("ffcore.fixture self-test OK (70 cases)")
+    # -- season_board: the WHOLE remaining schedule, not just next --------
+    # matches.csv's own shape — jornada, home/away, an optional score, no
+    # club id and no kickoff. A played row (J1) still names an opponent;
+    # season_board() does not care that it is finished, only fixture_board's
+    # "next" concept does.
+    ms = [{"jornada": "1", "home": "Rich", "away": "Poor", "score": "2-0"},
+         {"jornada": "2", "home": "Mid", "away": "Rich", "score": ""},
+         {"jornada": "2", "home": "Poor", "away": "?", "score": ""},
+         {"jornada": "3", "home": "Rich", "away": "Mid", "score": ""}]
+    sb = season_board(mk, ms, [1, 2, 3], now)
+    assert set(sb) == {1, 2, 3}, sb
+    # J1's played score changes nothing about who Rich faced.
+    assert sb[1]["Rich"].opponent == "Poor" and sb[1]["Rich"].home
+    assert sb[1]["Poor"].opponent == "Rich" and not sb[1]["Poor"].home
+    # J2: Mid at home to Rich — the SAME arithmetic fixture_board() runs for
+    # the identical fixture, not a second implementation of it.
+    assert sb[2]["Mid"].opponent == "Rich" and sb[2]["Mid"].home
+    same_fixture = fixture_board(
+        mk, [{"kickoff": "2026-08-20T19:00:00+00:00",
+             "home": "Mid", "away": "Rich"}], now)
+    assert sb[2]["Mid"].atk_factor == same_fixture["Mid"].atk_factor
+    assert sb[2]["Mid"].def_factor == same_fixture["Mid"].def_factor
+    assert sb[2]["Mid"].rank == same_fixture["Mid"].rank
+    # An unjoinable opponent ("?" is nobody's club) still gives Poor a Match
+    # — the opponent side is simply unrated, not the whole row dropped.
+    assert sb[2]["Poor"].opponent == "?" and sb[2]["Poor"].rank == 0
+    # J3 is a THIRD, DIFFERENT fixture for Rich (home to Mid) — this is the
+    # whole point: fixture_board() could only ever answer for one of J1-J3
+    # at a time, off whichever the earliest-kickoff row was.
+    assert sb[3]["Rich"].opponent == "Mid" and sb[3]["Rich"].home
+    assert sb[1]["Rich"] != sb[3]["Rich"]
+
+    # A jornada nobody asked for is not in the answer, even if the rows
+    # exist for it — `jornadas` is the caller's own "still to come" list
+    # (ffcore.decide.rounds_left()'s `rem`), and a finished jornada that
+    # nonetheless has rows in `matches` must not leak back in.
+    assert 4 not in season_board(mk, ms, [1, 2, 3], now)
+    assert season_board(mk, [], [1, 2], now) == {1: {}, 2: {}}
+
+    # Elo, when it covers the league, moves season_board() exactly the way
+    # it already moves fixture_board() — one ratings fit, read by both.
+    sb_elo = season_board(mk, ms, [2], now, elo)
+    assert sb_elo[2]["Mid"].basis == "elo", sb_elo[2]["Mid"]
+    same_elo = fixture_board(
+        mk, [{"kickoff": "2026-08-20T19:00:00+00:00",
+             "home": "Mid", "away": "Rich"}], now, elo)
+    assert sb_elo[2]["Mid"].rank == same_elo["Mid"].rank
+    assert sb_elo[2]["Mid"].gap == same_elo["Mid"].gap
+
+    print("ffcore.fixture self-test OK (76 cases)")
 
 
 if __name__ == "__main__":

@@ -804,6 +804,44 @@ def next_then_rest(base: dict, base_rest: dict, rem: list[int],
     return out
 
 
+def apply_fixtures(per_jornada: dict[int, dict], sboard: dict[int, dict],
+                   club: dict[str, str], pos: dict[str, str],
+                   ppm_of: dict[str, float]) -> dict[int, dict]:
+    """`per_jornada`, with the POINTS half repriced against THAT jornada's
+    real opponent — ffcore.fixture.season_board()'s own answer to "who do
+    you face in jornada 20", not the single next-fixture factor `base`/
+    `base_rest` were built with. THE SCHEDULE IS PUBLISHED for the whole
+    season, so a forecast that prices jornada 20 off jornada 3's opponent
+    is not a modelling limit, it is not having asked — see season_board()'s
+    own docstring for why fitting the difficulty ratings once and reading
+    them for every jornada is the same cost this repo already pays once.
+
+    P(start) — the tuple's OTHER half — is untouched here: season_board()
+    answers "who do you face", not "will you play", a different question
+    next_then_rest() already answers as well as this repo's data allows
+    (no future-dated editorial P(start) exists, only next week's).
+
+    A player season_board() has no Match for in that jornada (an
+    unjoinable club, or a jornada the schedule join missed) keeps whatever
+    pts `per_jornada` already carried for him — the frozen, next-fixture
+    number, worse than a real one and far better than zero.
+    """
+    out: dict[int, dict] = {}
+    for j, layer in per_jornada.items():
+        board_j = sboard.get(j, {})
+        new_layer = {}
+        for k, (pts, p) in layer.items():
+            m = board_j.get(club.get(k, ""))
+            if m is None or k not in ppm_of:
+                new_layer[k] = (pts, p)
+                continue
+            fix = (m.def_factor if pos.get(k) in ("POR", "DEF")
+                  else m.atk_factor)
+            new_layer[k] = (max(0.0, ppm_of[k] * fix), p)
+        out[j] = new_layer
+    return out
+
+
 def club_key(raw, teams, xw=None) -> str:
     """One club, one key, whichever page spelled it — or "" if it will not
     place.
@@ -1022,8 +1060,9 @@ def load(trials_pool=None) -> Universe:
     # canonical side); results_history.csv, and so club_volatility(), is
     # keyed on ff_slug — the exact mismatch fixture_board() already had to
     # be fixed for once, translated the same way, through ffcore.crosswalk.
-    from ffcore.fixture import club_volatility
-    from ffcore.tidy import load_results_history
+    from ffcore.fixture import club_volatility, season_board
+    from ffcore.tidy import load_elo, load_results_history, \
+        load_understat_players
     # norm(c.market), not c.market raw: club_key()'s fallback path (used
     # above to build `club`) always returns norm(match_team(...)) — a
     # second mismatch of the same kind fixture_board() had, caught the
@@ -1032,8 +1071,31 @@ def load(trials_pool=None) -> Universe:
     slug_of = {norm(c.market): c.ff_slug for c in lg.xw.clubs.values()
               if c.market and c.ff_slug} if lg.xw is not None else {}
     club_of_slug = {k: slug_of[v] for k, v in club.items() if v in slug_of}
-    club_rel = club_volatility(load_results_history(), list(slug_of.values()))
-    fc = Bootstrap(next_then_rest(base, base_rest, rem, played, club),
+    # ONE READ OF results_history.csv, not two — club_volatility() and
+    # season_board() both want it and it cannot have changed between them.
+    results_hist = load_results_history()
+    club_rel = club_volatility(results_hist, list(slug_of.values()))
+    # THE WHOLE REMAINING SCHEDULE, not just next — ratings fitted once
+    # for `rem`, the exact jornadas about to be simulated. Same market,
+    # xw, results and understat inputs ffcore.score.build() already fit
+    # the "next fixture" board from, so a player's jornada-3 factor here
+    # and his `s.fix` above (season_board()'s own `board_j` for rem[0])
+    # agree rather than being two answers from two fits.
+    # NORMALISED KEYS, matching `club`'s own convention (club_key() always
+    # returns norm(...)) — season_board() itself is keyed on the market's
+    # raw spelling ("Atlético"), the same as fixture_board()'s board, and
+    # without this every lookup below misses silently: club_key() never
+    # returns an accented, title-cased string, so `club.get(k) in board_j`
+    # was false for every player, every jornada.
+    sboard = {j: {norm(team): m for team, m in layer.items()}
+             for j, layer in season_board(
+                 _m.market, m, rem, now, load_elo(), xw=lg.xw,
+                 results=results_hist,
+                 understat_rows=load_understat_players("2025")).items()}
+    ppm_of = {k: s.ppm for k, s in scored.items() if s}
+    fc = Bootstrap(apply_fixtures(
+                       next_then_rest(base, base_rest, rem, played, club),
+                       sboard, club, pos, ppm_of),
                   pool=pool, matches=matches,
                   club_of=club_of_slug, club_rel=club_rel)
 
@@ -1500,6 +1562,36 @@ def _selftest() -> None:
     pj2 = next_then_rest(base2, rest2, [1, 2], {}, {})
     assert pj2[1] == base2 and pj2[2] == rest2, pj2
 
+    # -- apply_fixtures: the REAL opponent, per jornada, not the frozen one -
+    from ffcore.fixture import Match as _M
+
+    easy_m = _M(opponent="Easy", home=True, kickoff=None,
+               atk_factor=1.2, def_factor=1.1, rank=3, of=3)
+    hard_m = _M(opponent="Hard", home=False, kickoff=None,
+               atk_factor=0.8, def_factor=0.7, rank=1, of=3)
+    pj3 = {1: {"del": (10.0, 0.9), "por": (5.0, 0.9), "ghost": (3.0, 0.5)},
+          2: {"del": (10.0, 0.9), "por": (5.0, 0.9)}}
+    board = {1: {"myclub": easy_m}, 2: {"myclub": hard_m}}
+    club3 = {"del": "myclub", "por": "myclub", "ghost": "unjoinable"}
+    pos3 = {"del": "DEL", "por": "POR"}
+    ppm3 = {"del": 8.0, "por": 4.0}
+    out = apply_fixtures(pj3, board, club3, pos3, ppm3)
+    # A DELANTERO prices off the opponent's DEFENSE (atk_factor); a PORTERO
+    # off the opponent's ATTACK (def_factor) — the same split score.py's
+    # own fix_factor already makes, read here for a jornada rather than
+    # for today.
+    assert out[1]["del"] == (8.0 * 1.2, 0.9), out[1]["del"]
+    assert out[1]["por"] == (4.0 * 1.1, 0.9), out[1]["por"]
+    # A genuinely different fixture the following jornada gives a
+    # genuinely different price — the whole point.
+    assert out[2]["del"] == (8.0 * 0.8, 0.9), out[2]["del"]
+    assert out[1]["del"] != out[2]["del"], (out[1]["del"], out[2]["del"])
+    # P(start) is NEVER touched by this — same 0.9 before and after.
+    assert out[1]["del"][1] == pj3[1]["del"][1] == 0.9
+    # No Match for his club that jornada: the ORIGINAL (frozen) pts survive
+    # rather than being zeroed or dropped.
+    assert out[1]["ghost"] == (3.0, 0.5), out[1]["ghost"]
+
     # -- value_rate: the shared primitive, on its own -----------------------
     assert value_rate(120.0, 14.13e6) is not None
     assert abs(value_rate(120.0, 14.13e6) - 120.0 / 14.13) < 1e-9
@@ -1508,7 +1600,7 @@ def _selftest() -> None:
     assert value_rate(None, 5e6) is None
     assert value_rate(0.0, 5e6) == 0.0           # a real price, zero return: 0, not None
 
-    print("decide self-test OK (84 cases)")
+    print("decide self-test OK (90 cases)")
 
 
 if __name__ == "__main__":
