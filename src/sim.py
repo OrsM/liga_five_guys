@@ -424,6 +424,63 @@ def band_acts(u) -> list:
     return acts
 
 
+def cover_rows(u, bands) -> list[dict]:
+    """decide.offer_combos()'s own bands, pulled out of the SAME pass
+    ladder_rows() reads, as data — the second and only other reader of
+    it, keyed apart by the "OFFERS:" prefix decide.offer_combos() gives
+    them so this never collides with a held player's own key.
+
+    `[]` whenever there is nothing to cover (cash is not negative, or no
+    combination was asked about) — the caller renders that as no section
+    at all, not an empty one.
+
+    Ranked cheapest-in-points first: with every combo already a MINIMAL
+    cover (decide.offer_combos()'s own guarantee), the real choice left
+    is which one costs the season the least, and that is a straight sort
+    on the same paired figure every other row in this report is banded
+    by — no separate metric invented for this one question.
+    """
+    deficit = -u.cash
+    out = []
+    for k, (pts, lo, hi, action) in (bands or {}).items():
+        if not k.startswith("OFFERS:"):
+            continue
+        raised = action.proceeds
+        out.append({
+            "who": [title_name(u.name.get(p, p)) for p in action.sell],
+            "raised": raised, "surplus": raised - deficit,
+            "pts": pts, "pts_lo": lo, "pts_hi": hi,
+            # Points lost per million RAISED, not spent — there is no
+            # cost side to this move, only proceeds, so value_rate()'s
+            # own "genuine positive cost" contract does not apply here.
+            "rate": pts / (raised / 1e6) if raised else None,
+        })
+    out.sort(key=lambda r: -r["pts"])
+    return out
+
+
+def cover_md(u, data: list[dict]) -> list[str]:
+    """`cover_rows()`'s own table, as markdown. `[]` when `data` is —
+    see its own docstring for when that is.
+    """
+    if not data:
+        return []
+    out = ["_Balance is **%s** — accepting %s clears it. Every combination "
+          "below is a real pending offer (or offers), never a market "
+          "guess, and each alone raises enough — there is no case for "
+          "taking more than one. Cheapest in season points first._"
+          % (fmt_money(u.cash), fmt_money(-u.cash)), "",
+          "| Accept | Raises | Season | pts/M€ |", "|---|--:|--:|--:|"]
+    for r in data:
+        season = ("—" if r["pts"] is None else
+                  "%+.0f (%+.0f–%+.0f)" % (r["pts"], r["pts_lo"], r["pts_hi"]))
+        rate = "%.1f" % r["rate"] if r["rate"] is not None else "—"
+        out.append("| %s | %s (+%.2fM spare) | %s | %s |"
+                   % (" + ".join(r["who"]), fmt_money(r["raised"]),
+                      r["surplus"] / 1e6, season, rate))
+    return out
+
+
 def ladder(u, rows, base, data=None) -> list[str]:
     """EVERY PLAYER YOU COULD HOLD, GROUPED BY WHAT TO DO WITH HIM.
 
@@ -1102,7 +1159,7 @@ def _rival_best(u) -> dict:
 
 
 def payload(u, rows, base, rivals, locks_h=None, n_actions: int = 0,
-            offers=None, ladder_data=None) -> dict:
+            offers=None, ladder_data=None, cover_data=None) -> dict:
     """The report as data, for the phone to draw.
 
     Same rows as the markdown, so the two cannot disagree about order or
@@ -1174,6 +1231,10 @@ def payload(u, rows, base, rivals, locks_h=None, n_actions: int = 0,
                   "raises": got} for k, got in dead_weight(u)],
         "ladder": (ladder_data if ladder_data is not None
                   else ladder_rows(u, rows)),
+        # `[]` and "nothing to cover" look the same here — see render()'s
+        # matching note on why cover_data has no recompute-from-scratch
+        # fallback the way ladder_data does.
+        "cover": cover_data or [],
         "bar": _bar(u),
         "xi_total": _xi_total(u, u.me),
         "shape": _shape_now(u),
@@ -1313,7 +1374,8 @@ def placeholder(why: str) -> list[str]:
 
 
 def render(u, rows, base, stamp: str, rivals, n_actions: int = 0,
-           locks_h=None, offers=None, ladder_data=None) -> list[str]:
+           locks_h=None, offers=None, ladder_data=None,
+           cover_data=None) -> list[str]:
     # EVERYTHING UNDER A HEADING, including the preamble. digest.py drops a
     # source's H1 when it stitches the appendix and keeps what follows, so a
     # preamble above the first `## ` arrives in the middle of the report
@@ -1336,6 +1398,14 @@ def render(u, rows, base, stamp: str, rivals, n_actions: int = 0,
     # it is a contradiction rather than a second opinion.
     out += ["## Every player you could hold", ""]
     out += ladder(u, rows, base, ladder_data)
+
+    # No `bands` reaches render() to recompute this from, unlike
+    # ladder_data's `None` fallback — a caller with nothing to cover (an
+    # ordinary run) and a caller that never asked look the same here,
+    # and both render no section, which is the right answer for either.
+    cover = cover_md(u, cover_data or [])
+    if cover:
+        out += ["## Covering the deficit — offers to accept", ""] + cover
 
     wait = waiting(u, offers)
     if wait:
@@ -1897,6 +1967,39 @@ def _selftest() -> None:
     rows2, _b2, _l2, bands2 = decide.rank(ub, [buy_cand], extra=asked)
     assert [r for r in rows2 if r["action"].buy == "cand"], rows2
     assert "cand" not in bands2, sorted(bands2)
+
+    # -- cover_rows/cover_md: the OFFERS combos, end to end -----------------
+    # SAME SQUAD, overdrawn, with real offers on two men. "star" is the
+    # nailed starter (see above, costs 20+ points sold pure); "dead" never
+    # plays, so his sale is close to free — the cheaper cover by a mile,
+    # and cover_rows() should rank it first without being told which is
+    # which.
+    from dataclasses import replace as _replace
+
+    uo = _replace(ub, cash=-2e6,
+                  received_offers={"star": 4e6, "dead": 3e6})
+    askedo = band_acts(uo) + decide.offer_combos(uo)
+    assert any(k.startswith("OFFERS:") for k, _a in askedo), askedo
+    _ro, _bo, _lo, bandso = decide.rank(uo, [], extra=askedo)
+    data = cover_rows(uo, bandso)
+    assert data, bandso
+    assert {tuple(sorted(r["who"])) for r in data} == \
+          {("Dead",), ("Star",)}, data
+    # CHEAPEST FIRST: dead weight sold outright costs far less than a
+    # nailed starter, and the sort has to find that from the numbers,
+    # not from the label.
+    assert data[0]["who"] == ["Dead"], data
+    assert data[0]["pts"] > data[1]["pts"], data
+    for r in data:
+        assert r["surplus"] >= 0, r          # every combo really covers
+        assert r["rate"] == r["pts"] / (r["raised"] / 1e6)
+    md = cover_md(uo, data)
+    assert "Dead" in md[-2] and "Star" in md[-1], md
+    assert "Balance is" in md[0] and fmt_money(uo.cash) in md[0], md[0]
+
+    # Nothing to cover — cash is not negative — renders nothing at all.
+    assert cover_rows(ub, bands2) == []
+    assert cover_md(ub, []) == []
     assert set(bands2) == set(sqb), sorted(bands2)
 
     print("sim self-test OK (135 cases)")
@@ -1942,8 +2045,12 @@ def main() -> None:
     # one-man questions and rank() answers them in the pass it was already
     # running — see its own note on why a second pass re-drew identical
     # seasons for nothing.
-    rows, base, measured, bands = decide.rank(u, acts, price=smoothed,
-                                              extra=band_acts(u))
+    # ONE PASS, SAME PRINCIPLE AS band_acts(): offer_combos() is empty
+    # whenever cash is not negative, so this costs nothing on an ordinary
+    # run and rides along in the pass already happening on the day it
+    # matters.
+    rows, base, measured, bands = decide.rank(
+        u, acts, price=smoothed, extra=band_acts(u) + decide.offer_combos(u))
     log_cash_price(measured)
     u.cash_note = _price_note(smoothed, measured)
     rivals = [m for m in u.state.squads if m != u.me]
@@ -1955,9 +2062,12 @@ def main() -> None:
     # (and every other group) with a real band, so the separate median-only
     # pass is retired rather than kept as a second source for the same fact.
     ladder_data = ladder_rows(u, rows, bands)
+    # cover_rows() reads the SAME bands dict ladder_data was built from —
+    # decide.offer_combos()'s own rows, not a second simulation.
+    cover_data = cover_rows(u, bands)
     write_lines(PARTS / OUT,
                 render(u, rows, base, stamp, rivals, len(acts), locks_h,
-                       market_model(u), ladder_data))
+                       market_model(u), ladder_data, cover_data))
     print("wrote %s (%d moves, %d simulated in full)"
           % (PARTS / OUT, len(acts), len(rows)))
 
@@ -1965,7 +2075,8 @@ def main() -> None:
         "generated_at": run_now()
                           .strftime("%Y-%m-%dT%H:%MZ"),
         **payload(u, rows, base, rivals, locks_h, len(acts),
-                  market_model(u), ladder_data=ladder_data),
+                  market_model(u), ladder_data=ladder_data,
+                  cover_data=cover_data),
     }, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
     print("wrote %s" % (REPORTS / "decisions.json"))
 

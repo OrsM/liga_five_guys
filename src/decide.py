@@ -39,9 +39,10 @@ from __future__ import annotations
 
 import csv
 import datetime as dt
+import itertools
 import os
 import sys
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
@@ -1033,6 +1034,56 @@ def pending_received(offers: list[dict], pt_to_key: dict[str, str]
     return out
 
 
+def offer_combos(u: Universe) -> list[tuple[str, Action]]:
+    """The minimal combinations of real pending offers that clear an
+    overdraft, as `extra` for rank() — sim.band_acts()'s own question,
+    only for the balance rather than for one man.
+
+    ONLY WHEN CASH IS ACTUALLY NEGATIVE. A real offer already floors
+    `proceeds` for anyone holding one (see received_offers's own note) —
+    that is priced in whether or not you accept. What a real number
+    cannot decide for you is whether accepting one *now*, ahead of the
+    market, is worth it, and that question only has a forcing answer
+    when the balance itself is overdrawn: the jornada will not lock with
+    it negative (ffcore.league's own note), so something must be
+    accepted, and this asks which.
+
+    MINIMAL COVERS ONLY, in the subset-sum sense: a combination that
+    clears the deficit with room to spare when a smaller one already
+    does adds a second sale for nothing, so it never appears — every
+    combo returned drops below the deficit with any one player removed
+    from it. `itertools.combinations` over a HANDFUL of offers (this is
+    never the whole squad, only the men with a real bid pending) so the
+    2**n scan this runs is over single digits, not the market.
+
+    A pure sell — no replacement bought — because the question here is
+    "does this clear the overdraft", not "what should I buy with it";
+    a combo that also priced a rebuy would be answering both at once
+    and conflating them is exactly what Action's own `net` was built to
+    keep apart. Keyed "OFFERS:a|b" rather than by player, since no
+    single held player's key can stand for a combination.
+    """
+    mine = u.state.squads.get(u.me, {})
+    offers = {k: v for k, v in u.received_offers.items()
+             if k in mine and v > 0}
+    deficit = -u.cash
+    if deficit <= 0 or not offers:
+        return []
+    names = sorted(offers)
+    covers: list[tuple[str, ...]] = []
+    for r in range(1, len(names) + 1):
+        for combo in itertools.combinations(names, r):
+            cs = set(combo)
+            if any(set(c) <= cs for c in covers):
+                continue
+            if sum(offers[k] for k in combo) >= deficit:
+                covers.append(combo)
+    return [("OFFERS:" + "|".join(combo),
+            Action("sell", sell=combo,
+                  proceeds=sum(offers[k] for k in combo)))
+           for combo in covers]
+
+
 def load(trials_pool=None) -> Universe:
     """Assemble the universe from the store. The only IO in this module."""
     # The run's one model — the same League and the same Scorer report.py
@@ -1416,6 +1467,43 @@ def _selftest() -> None:
     assert got == {"me_a": 6795815.0}, got     # pt2's only offer was accepted
     assert pending_received([], p2k) == {}
     assert pending_received(offers, {}) == {}   # nothing to join to
+
+    # -- offer_combos: minimal covers of a negative balance ------------------
+    uoc = Universe(state=LeagueState({"me": {"a": "MED", "b": "MED",
+                                             "c": "MED", "d": "MED"}},
+                                     jornadas=[1], me="me", carried={}),
+                  forecaster=None, pos={}, price={}, proceeds={}, owner={},
+                  cash=-10_000_000.0, me="me",
+                  received_offers={"a": 4_000_000.0, "b": 4_000_000.0,
+                                   "c": 9_000_000.0, "d": 3_000_000.0})
+    got = {k: a.sell for k, a in offer_combos(uoc)}
+    # No single man clears 10M alone (c, the biggest, is 9M). Every pair
+    # with c does (a+c=13M, b+c=13M, c+d=12M); a+b (8M) and a/b+d (7M)
+    # do not, so the one triple that does — a+b+d=11M — is ALSO minimal:
+    # no two of {a,b,d} covers on their own, so it is not a superset of
+    # any cover already found. a+b+c, a+c+d, b+c+d are real covers too,
+    # but each is a superset of a pair already found — dropped, not a
+    # false choice.
+    assert set(got.values()) == {("a", "c"), ("b", "c"), ("c", "d"),
+                                 ("a", "b", "d")}, got
+    # A held player with an offer, funding NOTHING else — apply() already
+    # proves a pure sell is legal; this proves the Action built here is one.
+    for a in dict(offer_combos(uoc)).values():
+        assert a.buy == "" and a.kind == "sell"
+    assert sum(a.proceeds for a in dict(offer_combos(uoc)).values()
+              if a.sell == ("c", "d")) == 12_000_000.0
+    # A non-negative balance has nothing to cover, offers or not.
+    upos = replace(uoc, cash=0.0)
+    assert offer_combos(upos) == []
+    # A real deficit but no real offers — nothing to accept, only to sell.
+    uno = replace(uoc, received_offers={})
+    assert offer_combos(uno) == []
+    # An offer on a player who left the squad since (sold, or a stale
+    # join) prices nothing — only a HELD man's offer counts.
+    ugone = replace(uoc, received_offers={**uoc.received_offers,
+                                          "gone": 50_000_000.0})
+    assert "gone" not in {p for a in dict(offer_combos(ugone)).values()
+                          for p in a.sell}
 
     # -- funding a move with MORE THAN ONE sale ----------------------------
     # The table silently omitted every move that needed two. A target you
