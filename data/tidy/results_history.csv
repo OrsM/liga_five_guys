@@ -1156,3 +1156,5 @@ observed_at,source,season,date,home_name,away_name,home,away,home_goals,away_goa
 2026-08-24T2326Z,football-data,2627,2026-08-23,Elche,Barcelona,elche,barcelona,0,5,0.7,4.38,7,11,2,7,3,1
 2026-08-24T2326Z,football-data,2627,2026-08-24,Osasuna,Levante,osasuna,levante,0,0,0.67,1.31,12,11,7,1,9,4
 2026-08-24T2326Z,football-data,2627,2026-08-24,Malaga,La Coruna,malaga,,1,1,1.97,1.11,13,6,2,4,7,4
+2026-08-25T1359Z,football-data,2627,2026-08-19,Ath Madrid,Malaga,atletico,malaga,2,0,0.93,0.15,15,5,6,1,6,1
+2026-08-25T1359Z,football-data,2627,2026-08-20,Vallecano,Alaves,rayo-vallecano,alaves,1,1,0.42,2,8,15,3,3,9,7

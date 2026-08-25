@@ -68,7 +68,7 @@ player_id,name,club_id,ff_slug,af_slug,app_id,understat_id,app_names
 11680,isaac romero,sevilla,isaac-romero,,2456,12305,Isaac
 11683,jon gorrotxategi,real sociedad,jon-gorrotxategi,,2621,13936,Gorrotxa
 11684,mikel goti,real sociedad,mikel-goti,,,13580,
-11688,adama boiro,athletic,adama-boiro,,2545,12724,Adama
+11688,adama boiro,athletic,adama-boiro,336998,2545,12724,Adama
 11706,pau cubarsi,barcelona,pau-cubarsi,396623,,12005,
 11709,fermin lopez,barcelona,fermin-lopez,,,11822,
 11714,jorge benito,getafe,,,,,
@@ -345,7 +345,7 @@ player_id,name,club_id,ff_slug,af_slug,app_id,understat_id,app_names
 18028,marc santos,levante,marc-santos,,,14702,
 18029,alberto calatrava,levante,,,3168,,Alberto Calatrava
 18030,bright ede,deportivo,bright-ede,497393,,14707,
-18031,ryunosuke sato,valencia,ryunosuke-sato,,,14801,
+18031,ryunosuke sato,valencia,ryunosuke-sato,410840,,14801,
 18039,cheikh thiam,villarreal,cheikh-thiam,,,,
 18041,nizar el jmili,villarreal,,,,,
 18048,marco roman,rayo,,,3179,,Marco Román

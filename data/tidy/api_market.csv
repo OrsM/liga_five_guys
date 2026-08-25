@@ -2957,3 +2957,25 @@ observed_at,source,market_id,player_id,player_name,player_name_full,position_id,
 2026-08-25T0424Z,laliga,16873147,1031,Comesaña,Santiago Comesaña,3,30413980,28838321,1,marketPlayerTeam,on_sale,ok,false,2026-08-25T21:14:54+02:00
 2026-08-25T0424Z,laliga,18807368,2386,Nteka,Randy Nteka,4,1302066,1302066,0,marketPlayerTeam,on_sale,ok,false,2026-08-27T22:27:08+02:00
 2026-08-25T0424Z,laliga,18807459,2746,Miguel Sierra,Miguel Sierra,4,991388,991388,0,marketPlayerTeam,on_sale,ok,false,2026-08-27T22:27:12+02:00
+2026-08-25T1359Z,laliga,93798802,3093,Mourinho,José Mário dos Santos Mourinho Félix,5,10590604,10252091,0,marketPlayerLeague,on_sale,ok,,2026-08-25T22:24:00+02:00
+2026-08-25T1359Z,laliga,93798803,3169,Bauza,Rafel Bauzà,3,766085,750634,0,marketPlayerLeague,on_sale,ok,,2026-08-25T22:24:00+02:00
+2026-08-25T1359Z,laliga,93798805,2622,Urko,Urko González,3,5266211,5333566,0,marketPlayerLeague,on_sale,ok,,2026-08-25T22:24:00+02:00
+2026-08-25T1359Z,laliga,93798807,2362,M. Casadó,Marc Casadó,3,1522979,1490979,0,marketPlayerLeague,on_sale,ok,,2026-08-25T22:24:00+02:00
+2026-08-25T1359Z,laliga,93798809,3185,Gerenabarrena,Beñat Gerenabarrena,3,1165236,1159143,0,marketPlayerLeague,on_sale,ok,,2026-08-25T22:24:00+02:00
+2026-08-25T1359Z,laliga,93798812,3164,Bardeli,Enzo Bardeli,3,3355940,3265810,0,marketPlayerLeague,on_sale,ok,,2026-08-25T22:24:00+02:00
+2026-08-25T1359Z,laliga,93798814,2645,Rego,Alejandro Rego,2,4099763,3974237,0,marketPlayerLeague,on_sale,ok,,2026-08-25T22:24:00+02:00
+2026-08-25T1359Z,laliga,93798816,2543,Natan,Natan Bernardo de Souza,2,37109744,37492727,0,marketPlayerLeague,on_sale,ok,,2026-08-25T22:24:00+02:00
+2026-08-25T1359Z,laliga,93798819,1614,Cardona,Sergi Cardona,2,4021050,3915921,0,marketPlayerLeague,on_sale,ok,,2026-08-25T22:24:00+02:00
+2026-08-25T1359Z,laliga,93798821,1730,Iker Muñoz,Iker Muñoz,3,1187249,1167798,0,marketPlayerLeague,on_sale,ok,,2026-08-25T22:24:00+02:00
+2026-08-25T1359Z,laliga,93798823,2456,Isaac,Isaac Romero,4,5948966,6235031,1,marketPlayerLeague,on_sale,ok,,2026-08-25T22:24:00+02:00
+2026-08-25T1359Z,laliga,93798826,3105,Cala,Álex Calatrava Torrado,4,4306367,4503739,1,marketPlayerLeague,on_sale,ok,,2026-08-25T22:24:00+02:00
+2026-08-25T1359Z,laliga,93798827,3191,Á. Padilla,Álvaro Padilla,4,995013,970405,0,marketPlayerLeague,on_sale,ok,,2026-08-25T22:24:00+02:00
+2026-08-25T1359Z,laliga,11943633,637,Moncayola,Jon Moncayola,3,6767492,6611859,1,marketPlayerTeam,on_sale,ok,false,2026-08-26T13:59:54+02:00
+2026-08-25T1359Z,laliga,14186254,2474,Denis Suárez,Denis Suárez,3,2423936,2500796,1,marketPlayerTeam,on_sale,ok,false,2026-08-26T07:00:30+02:00
+2026-08-25T1359Z,laliga,14243525,2480,Johnny,Johnny Cardoso,3,4829184,4698688,0,marketPlayerTeam,on_sale,ok,false,2026-08-27T23:42:48+02:00
+2026-08-25T1359Z,laliga,14293583,265,Zubeldia,Igor Zubeldia,2,10248552,9992122,1,marketPlayerTeam,on_sale,ok,false,2026-08-26T14:00:09+02:00
+2026-08-25T1359Z,laliga,16235820,3037,C. Puga,Carlos Puga,2,4910779,4910779,1,marketPlayerTeam,on_sale,ok,false,2026-08-28T07:48:08+02:00
+2026-08-25T1359Z,laliga,16872949,2455,Peque,Gerard Fernández Castellano,4,2378686,2628990,1,marketPlayerTeam,on_sale,ok,false,2026-08-25T21:14:41+02:00
+2026-08-25T1359Z,laliga,16873147,1031,Comesaña,Santiago Comesaña,3,30413980,28223299,1,marketPlayerTeam,on_sale,ok,false,2026-08-25T21:14:54+02:00
+2026-08-25T1359Z,laliga,18807368,2386,Nteka,Randy Nteka,4,1302066,1321328,0,marketPlayerTeam,on_sale,ok,false,2026-08-27T22:27:08+02:00
+2026-08-25T1359Z,laliga,18807459,2746,Miguel Sierra,Miguel Sierra,4,991388,1040931,0,marketPlayerTeam,on_sale,ok,false,2026-08-27T22:27:12+02:00
