@@ -67,11 +67,13 @@ from pathlib import Path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from ffcore.auth import API_BASE                    # noqa: E402
+from ffcore.league import load_config                # noqa: E402
 from ffcore.tidy import ROOT, SEASON, TIDY, append_csv  # noqa: E402
 from sources import (API_LEAGUES_KEY, CAL_KEY, MATCH_KEY_RE,  # noqa: E402
-                     ROW_TABLE, STORE_ONCE, league_sources, parse_points,
-                     parser_sig, played_sources, player_sources,
-                     season_label, source_for, sources)
+                     ROW_TABLE, STORE_ONCE, league_sources, offer_sources,
+                     parse_api_leagues, parse_points, parser_sig,
+                     played_sources, player_sources, season_label,
+                     source_for, sources)
 
 RAW = ROOT / "raw"
 
@@ -407,6 +409,12 @@ def fetch() -> Path:
         # has been read. Everything else about the sweep is unchanged — same
         # spacing, same backoff, same manifest.
         queue = list(sources())
+        # Captured off api_leagues the moment it answers, exactly like the
+        # league id league_sources() already bakes into the market/teams/
+        # activity URLs it queues — offer_sources() needs the same id and
+        # api_teams carries none, so it is read here rather than re-derived.
+        league_id = None
+        me = load_config().me
         while queue:
             src = queue.pop(0)
             if not due(src, prev, stamp):
@@ -475,6 +483,16 @@ def fetch() -> Path:
                 # discovers its own work rather than reading an id out of a
                 # config file that could go stale.
                 queue += league_sources(r.text)
+                leagues = parse_api_leagues(r.text, stamp)
+                if leagues:
+                    league_id = leagues[0]["league_id"]
+            if src.key == "api_teams" and league_id:
+                # RECEIVED offers, one lookup per player YOU hold.
+                # offer_sources() itself filters to `me`'s roster — querying
+                # a rival's playerTeamId 403s (see its own note), and a 403
+                # anywhere in this sweep is fatal, below. `league_id` here is
+                # only ever missing if api_leagues itself came back empty.
+                queue += offer_sources(r.text, me, league_id)
 
             sig = src.sign(r.text)
             was = prev.get(src.key, {})

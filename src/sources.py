@@ -90,7 +90,9 @@ __all__ = ["BASE", "SOURCE", "MARKET_URL", "POINTS_URL", "TEAM_URL", "TEAMS",
            "parse_api_teams", "sign_api_leagues", "sign_api_market",
            "sign_api_activity", "sign_api_teams", "league_sources",
            "API_PLAYER_URL", "parse_api_player", "sign_api_player",
-           "player_source", "player_sources"]
+           "player_source", "player_sources",
+           "API_OFFER_URL", "API_OFFER_KEY_RE", "parse_api_offer",
+           "sign_api_offer", "offer_source", "offer_sources"]
 
 BASE = "https://www.futbolfantasy.com"
 # The `source` column on every lineups row from this site. It exists so a
@@ -1755,6 +1757,17 @@ def parse_api_market(text: str, observed_at: str,
                               is None else
                         str((it["playerTeam"]["isShielded"])).lower(),
             "expires_at": it.get("expirationDate") or "",
+            # A BID YOU HAVE ALREADY MADE rides along on the listing itself
+            # — the app hands it back embedded, no separate call, and the
+            # Electron client leans on exactly this to know its own pending
+            # bids without a second endpoint (Externoak/LaLigaApp
+            # BidFlow.js: "This is a bid made by the current user, since it
+            # appears in their market data"). Empty means no bid of yours is
+            # in on this listing, not "unknown" — the field is always
+            # present in the response, absent means absent.
+            "bid_id": str((it.get("bid") or {}).get("id") or ""),
+            "bid_money": str((it.get("bid") or {}).get("money") or ""),
+            "bid_status": (it.get("bid") or {}).get("status") or "",
         })
     return rows
 
@@ -1763,7 +1776,11 @@ def sign_api_market(text: str) -> str | None:
     # The slate turns over on a clock and prices move; both belong in the
     # signature, and expirationDate deliberately does NOT — it ticks down
     # continuously and would store a fresh archive every single sweep.
-    return _digest(["%s@%s/%s" % (r["player_id"], r["sale_price"], r["bids"])
+    # bid_status is in too: a bid of yours going pending -> accepted/rejected
+    # does not always move the count or the price on the listing it happened
+    # on, and that transition is the one this exists to notice.
+    return _digest(["%s@%s/%s/%s" % (r["player_id"], r["sale_price"],
+                                     r["bids"], r["bid_status"])
                     for r in parse_api_market(text, "")])
 
 
@@ -1900,6 +1917,15 @@ def parse_api_teams(text: str, observed_at: str,
                 # them and not blended into them — nothing here has been
                 # graded against a played jornada. Empty is NOT STATED.
                 "player_status": pm.get("playerStatus") or "",
+                # THIS OWNERSHIP RECORD'S OWN ID, distinct from the player's.
+                # Nothing else here needed it — buyout and its lock already
+                # ride on this same row — until offers: the API answers
+                # who-wants-to-buy-him keyed on THIS id, not the player id,
+                # and only for a playerTeamId your own account holds (see
+                # parse_api_offer). Not stored on api_market's
+                # marketPlayerTeam rows for the same reason: this repo only
+                # ever needs it for players still in a squad.
+                "player_team_id": str(p.get("playerTeamId") or ""),
             })
             rows += _stat_rows(pm, observed_at)
     return rows
@@ -2094,6 +2120,117 @@ def player_sources(activity_json: str, observed_at: str = "") -> list[Source]:
     return out
 
 
+# ---------------------------------------------------------------------------
+# offers — who wants to buy a player you have listed
+# ---------------------------------------------------------------------------
+# ONE ENDPOINT, ONE DIRECTION. `GET .../playerTeam/{id}/offer` answers for a
+# playerTeamId you hold and 403s for one you do not — verified live,
+# 2026-08-25, against a rival's own player. The app's own client never calls
+# it the other way (Externoak/LaLigaApp teamService.js: "Don't make API
+# calls for players we don't own - this causes 403 errors"), so this is
+# RECEIVED offers only: what somebody else is bidding for a player YOU have
+# listed. What YOU have bid on somebody else's listing rides along in
+# api_market's own `bid` field instead (see parse_api_market) — the same
+# asymmetry the app's own client relies on, not a gap in what this reads.
+API_OFFER_URL = ("{base}/v1/competition/1/league/{league}/playerTeam/{ptid}"
+                 "/offer?x-lang=es")
+API_OFFER_KEY_RE = re.compile(r"^api_offer_(\d+)$")
+
+
+def parse_api_offer(text: str, observed_at: str,
+                    key: str = "api_offer_0") -> list[dict]:
+    """Every pending bid on one of your own listed players.
+
+    The playerTeamId comes from the KEY, exactly as api_player's player id
+    does — the id in each item is the OFFER's, not the player's, and the
+    endpoint's URL is the only place the playerTeamId being answered for
+    is ever stated.
+    """
+    d = _j(text)
+    if not isinstance(d, list):
+        return []
+    m = API_OFFER_KEY_RE.match(key or "")
+    ptid = m.group(1) if m else ""
+    if not ptid:
+        return []
+    out = []
+    for it in d:
+        if not it.get("id"):
+            continue
+        out.append({
+            "observed_at": observed_at, "source": LFG_SOURCE,
+            "player_team_id": ptid,
+            "offer_id": str(it["id"]),
+            "money": str(it.get("money") or ""),
+            "status": it.get("status") or "",
+            "created_at": it.get("createdAt") or "",
+            "expires_at": it.get("expirationDate") or "",
+            # True for a bid against a market listing, per every offer seen
+            # live so far. Stored rather than assumed: a direct clause offer
+            # (made on a player never listed) would carry the same shape
+            # without it, and nothing here has observed one yet to check.
+            "from_market": "" if it.get("isFromMarket") is None else
+                           str(it["isFromMarket"]).lower(),
+        })
+    if out:
+        return out
+    # CHECKED AND EMPTY IS ITSELF THE READING, and it has to be a row. One
+    # dedicated call per player means "nothing pending" contributes no row
+    # at all otherwise — and load_api_offers() gates on the table's newest
+    # stamp, exactly as every other API table does, so a sweep that adds no
+    # row would silently leave a stale accepted-or-expired offer from days
+    # ago looking like today's answer. A placeholder, stamped now, is what
+    # keeps that gate honest for a table this sparse.
+    return [{"observed_at": observed_at, "source": LFG_SOURCE,
+             "player_team_id": ptid, "offer_id": "", "money": "",
+             "status": "", "created_at": "", "expires_at": "",
+             "from_market": ""}]
+
+
+def sign_api_offer(text: str) -> str | None:
+    rows = parse_api_offer(text, "", key="api_offer_0")
+    return _digest(["%s@%s/%s" % (r["offer_id"], r["money"], r["status"])
+                    for r in rows])
+
+
+def offer_source(key: str) -> Source | None:
+    """The entry for one owned player's received-offers lookup, rebuilt from
+    its key alone. No league id needed to rebuild it: parsing a stored page
+    never fetches, so the URL stays a template, exactly as api_lineup_'s own
+    rebuild in api_source() below leaves {team} and {week} unfilled.
+    """
+    m = API_OFFER_KEY_RE.match(key or "")
+    if not m:
+        return None
+    return Source(key, "api_offers", API_OFFER_URL, parse_api_offer,
+                  sign_api_offer, auth=True)
+
+
+def offer_sources(teams_json: str, me: str, league: str,
+                  observed_at: str = "") -> list[Source]:
+    """One lookup per player YOU hold, never a rival's — see API_OFFER_URL's
+    own note on the 403 that answers for the rest.
+
+    Queued the moment api_teams comes back, the same shape as
+    player_sources() off the activity feed — but EVERY RUN, not "once": a
+    player you still hold can pick up or lose a pending offer between one
+    sweep and the next in a way his name never does.
+    """
+    out, seen = [], set()
+    for r in parse_api_teams(teams_json, observed_at):
+        if r.get(ROW_TABLE) != "api_teams" or r.get("manager") != me:
+            continue
+        ptid = r.get("player_team_id")
+        if not ptid or ptid in seen:
+            continue
+        seen.add(ptid)
+        out.append(Source(
+            "api_offer_%s" % ptid, "api_offers",
+            API_OFFER_URL.format(base="{base}", league=league, ptid=ptid),
+            parse_api_offer, sign_api_offer, auth=True))
+    return out
+
+
 def api_source(key: str) -> Source | None:
     """The entry for a stored API page, rebuilt from its key alone.
 
@@ -2272,7 +2409,8 @@ def source_for(key: str) -> Source | None:
     # Match pages and the API's discovered pages are built from their key
     # rather than listed, so a stored one resolves here whether the calendar
     # or the league still mentions it or not.
-    return match_source(key) or api_source(key) or player_source(key)
+    return (match_source(key) or api_source(key) or player_source(key)
+            or offer_source(key))
 
 
 # ---------------------------------------------------------------------------
@@ -2506,8 +2644,10 @@ _API_LEAGUES_FIXTURE = """[{"id":"017998544","access":"private",
          "teamPoints":17,"playersNumber":14}}]"""
 
 _API_MARKET_FIXTURE = """[
- {"id":"m1","salePrice":5552694,"numberOfBids":0,"status":"on_sale",
+ {"id":"m1","salePrice":5552694,"numberOfBids":1,"status":"on_sale",
   "discr":"marketPlayerLeague","expirationDate":"2026-08-18T22:00:00+02:00",
+  "bid":{"id":"b1","money":5600000,"status":"pending",
+         "createdAt":"2026-08-25T16:06:17+02:00"},
   "playerMaster":{"id":"2621","nickname":"Simeone","positionId":5,
                   "name":"Giuliano Simeone","playerStatus":"ok",
                   "marketValue":5552694}},
@@ -2541,7 +2681,7 @@ _API_TEAMS_FIXTURE = """[
   "fixturePoints":17,"teamValue":236374060,"banned":false,"startingWeek":"1",
   "teamMoney":23596582,
   "manager":{"id":"11881989","managerName":"miguel_autentico"},
-  "players":[{"buyoutClause":47000000,
+  "players":[{"buyoutClause":47000000,"playerTeamId":"24338726",
     "buyoutClauseLockedEndTime":"2026-08-25T14:07:38+02:00",
     "playerMarket":{"id":"14186511","numberOfOffers":2,"directOffer":false,
                     "expirationDate":"2026-08-21T22:46:38+02:00"},
@@ -2562,6 +2702,13 @@ _API_TEAMS_FIXTURE = """[
                               "positionId":5,"marketValue":5552694,
                               "points":1}},
              {"playerMaster":{}}]}]"""
+
+# One real pending bid on a listed player of mine, captured live 2026-08-25
+# against Moncayola — the shape parse_api_offer reads.
+_API_OFFER_FIXTURE = """[
+ {"id":"49892747","money":6795815,"status":"pending",
+  "createdAt":"2026-08-24T22:24:30+02:00","updatedAt":"2026-08-24T22:24:30+02:00",
+  "isFromMarket":true,"expirationDate":"2026-08-25T22:24:00+02:00"}]"""
 
 
 # The calendar, one link per case it has to get right: a played LaLiga match, an
@@ -3059,7 +3206,7 @@ def _selftest() -> None:
 
     mk = parse_api_market(_API_MARKET_FIXTURE, "t")
     assert len(mk) == 2, mk                 # the id-less third row is dropped
-    assert mk[0]["bids"] == "0" and mk[0]["seller"] == "marketPlayerLeague"
+    assert mk[0]["bids"] == "1" and mk[0]["seller"] == "marketPlayerLeague"
     # THE TWO KINDS COUNT THEIR BIDDERS UNDER DIFFERENT NAMES, and reading
     # only one of them left the count blank for the larger half. The app deals
     # a free agent and calls it `numberOfBids`; a manager lists one of his own
@@ -3096,8 +3243,18 @@ def _selftest() -> None:
         _API_MARKET_FIXTURE.replace("2026-08-18T22", "2026-08-20T22"))
     # A price move or a new bid must.
     assert sign_api_market(_API_MARKET_FIXTURE) != sign_api_market(
-        _API_MARKET_FIXTURE.replace("5552694,\"numberOfBids\":0",
+        _API_MARKET_FIXTURE.replace("5552694,\"numberOfBids\":1",
                                     "5552694,\"numberOfBids\":3"))
+    # YOUR OWN BID, embedded on the listing rather than a second call — see
+    # the module note on why nothing else can supply this.
+    assert mk[0]["bid_id"] == "b1" and mk[0]["bid_money"] == "5600000"
+    assert mk[0]["bid_status"] == "pending"
+    assert mk[1]["bid_id"] == "" and mk[1]["bid_money"] == ""    # no bid here
+    # A bid changing status must sign differently even when nothing else on
+    # the listing does — the transition this field exists to notice.
+    assert sign_api_market(_API_MARKET_FIXTURE) != sign_api_market(
+        _API_MARKET_FIXTURE.replace('"status":"pending"',
+                                    '"status":"accepted"'))
 
     ac = parse_api_activity(_API_ACTIVITY_FIXTURE, "t")
     # Three known verbs kept, the unknown 77 dropped rather than guessed at.
@@ -3129,6 +3286,10 @@ def _selftest() -> None:
     assert tm[0]["player_name"] == "Fornals", tm[0]
     assert tm[0]["player_name_full"] == "Pablo Fornals Malla", tm[0]
     assert tm[1]["player_name_full"] == "Giuliano Simeone", tm[1]
+    # THIS OWNERSHIP RECORD'S OWN ID — what offer_sources() keys the
+    # received-offers lookup on, distinct from the player id above.
+    assert tm[0]["player_team_id"] == "24338726", tm[0]
+    assert tm[1]["player_team_id"] == "", tm[1]     # not stated for this one
 
     # -- the league table is a fact about a TEAM ----------------------------
     # It was carried on every player row: five managers' positions, points and
@@ -3269,6 +3430,53 @@ def _selftest() -> None:
     # And the public sources must NOT be marked auth — a bearer sent to
     # futbolfantasy is a credential leaked to a third party.
     assert not any(s.auth for s in sources() if not s.key.startswith("api_"))
+
+    # -- offers: what somebody else is bidding for a player you have listed -
+    off = parse_api_offer(_API_OFFER_FIXTURE, "t", "api_offer_24338726")
+    assert len(off) == 1, off
+    assert off[0]["player_team_id"] == "24338726", off
+    assert off[0]["offer_id"] == "49892747" and off[0]["money"] == "6795815"
+    assert off[0]["status"] == "pending", off
+    assert off[0]["from_market"] == "true", off
+    assert off[0]["expires_at"] == "2026-08-25T22:24:00+02:00", off
+    # The id comes from the KEY, exactly as api_player's does, because the
+    # body never states which player is being answered for. NO OFFERS IS
+    # STILL A ROW: one call per player means silence would otherwise leave
+    # the table's newest stamp behind, and load_api_offers()'s freshness
+    # gate would then serve a stale accepted-or-expired offer as current.
+    empty = parse_api_offer("[]", "t", "api_offer_24338726")
+    assert len(empty) == 1 and empty[0]["status"] == "", empty
+    assert empty[0]["player_team_id"] == "24338726", empty
+    assert empty[0]["offer_id"] == "", empty
+    # A key that fails the regex has no playerTeamId to stamp a row with —
+    # there is nothing honest to say, so nothing is said.
+    assert parse_api_offer(_API_OFFER_FIXTURE, "t", "not-a-key") == []
+    assert sign_api_offer(_API_OFFER_FIXTURE) is not None
+    # "No offers" is a real, signable reading too, not the rotted-page None —
+    # that stays reserved for a body that isn't even a list.
+    assert sign_api_offer("[]") is not None
+    assert sign_api_offer("[]") != sign_api_offer(_API_OFFER_FIXTURE)
+    assert sign_api_offer("not json") is None
+    # A status change must sign differently even though nothing else moved —
+    # accepted/rejected is exactly the transition this exists to notice.
+    assert sign_api_offer(_API_OFFER_FIXTURE) != sign_api_offer(
+        _API_OFFER_FIXTURE.replace('"pending"', '"accepted"'))
+
+    # NEVER a rival's — see API_OFFER_URL's own note on the 403 that answers
+    # for the rest. Fornals (mine) yields a lookup; Simeone (BurtonGM89's)
+    # does not, even though both carry a buyout clause.
+    osrc = offer_sources(_API_TEAMS_FIXTURE, "miguel_autentico", "017998544")
+    assert [s.key for s in osrc] == ["api_offer_24338726"], osrc
+    assert osrc[0].table == "api_offers" and osrc[0].auth
+    assert osrc[0].cadence == "every_run", osrc[0]        # not "once": offers move
+    assert "017998544" in osrc[0].url and "24338726" in osrc[0].url, osrc[0]
+    # A manager not in the league yields nothing rather than a KeyError.
+    assert offer_sources(_API_TEAMS_FIXTURE, "nobody", "017998544") == []
+    # Resolvable by key alone, long after the offer has come and gone —
+    # exactly what a stored snapshot needs, since re-parsing never re-fetches.
+    assert source_for("api_offer_24338726").parse is parse_api_offer
+    assert source_for("api_offer_24338726").table == "api_offers"
+    assert offer_source("not-an-offer-key") is None
 
     # -- the calendar: which matches happened ------------------------------
     cal = parse_calendar(_CAL_FIXTURE, "2026-01-01T0000Z")

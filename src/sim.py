@@ -1157,6 +1157,11 @@ def payload(u, rows, base, rivals, locks_h=None, n_actions: int = 0,
     return {
         "locks_in_h": locks_h,
         "cash": u.cash,
+        # WHAT `cash` ALREADY HAS SUBTRACTED — a bid of yours still pending,
+        # summed (decide.pending_sent). `cash` itself is what decides reach
+        # and is correct on its own; this is only so the phone can say WHY
+        # it is short of the raw balance instead of leaving that a mystery.
+        "cash_locked": u.locked_cash,
         "squad_value": squad_value(u),
         "jornadas_left": len(u.state.jornadas),
         "acquirable": len(u.price),
@@ -1549,6 +1554,10 @@ def _selftest() -> None:
     assert d["expected_finish"] == 1.5 and d["p_win"] == 0.5, d
     assert d["band"] == [1000.0, 1600.0], d
     assert d["locks_in_h"] == 41.1 and d["cash"] == 23.6e6
+    assert d["cash_locked"] == 0.0, d          # nothing pending, nothing to say
+    u.locked_cash = 2.1e6
+    assert payload(u, rows, st, ["riv"])["cash_locked"] == 2.1e6
+    u.locked_cash = 0.0
     m = d["moves"][0]
     assert m["label"] == "clause Yuri Berchiche from riv · sell Benat Turrientes"
     assert m["buy"] == "Yuri Berchiche" and m["sell"] == "Benat Turrientes"

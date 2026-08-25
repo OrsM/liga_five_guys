@@ -54,10 +54,11 @@ from ffcore.season import (LeagueState, best_xi,  # noqa: E402
                            simulate_many)
 from ffcore.tidy import (run_now,  # noqa: E402
                          TIDY, SEASON, latest_only, load_api_market,  # noqa: E402
-                         last_api_standings, load_api_teams,
+                         last_api_standings, load_api_offers, load_api_teams,
                          load_players)
 
-__all__ = ["Action", "candidates", "rank", "Universe"]
+__all__ = ["Action", "candidates", "rank", "Universe",
+          "pending_sent", "pending_received"]
 
 # Screening runs at a fraction of the final trial count. With common random
 # numbers the RANKING settles long before the levels do, so this buys an order
@@ -192,6 +193,18 @@ class Universe:
     # What a million euros has been worth in places, and how that was arrived
     # at. Set by the report, printed by it — see sim.cash_price_history().
     cash_note: str = ""
+    # WHAT `cash` ABOVE ALREADY HAS SUBTRACTED — a pending bid of yours,
+    # summed. Not read by anything that decides reach (that already
+    # happened, in `cash` itself); carried so the report can say WHY cash
+    # is short of the raw balance instead of leaving the reader to wonder.
+    locked_cash: float = 0.0
+    # A player YOU HOLD with a real pending offer on him, and the larger of
+    # what he might raise. NOT read by anything that prices a sale — that
+    # already happened, in `proceeds` — this is for the one thing a real
+    # number cannot decide for you: whether accepting is worth doing. See
+    # sim.ladder_rows()'s SAVE branch, the one reader that needs to know a
+    # gap was closed by money you do not have yet, not money you do.
+    received_offers: dict[str, float] = field(default_factory=dict)
 
 
 def choosable(u) -> int:
@@ -980,6 +993,46 @@ def market_routes(mkt: list[dict], key_of) -> tuple[dict[str, float],
     return price, route, bids
 
 
+def pending_sent(mkt: list[dict]) -> float:
+    """Money already gone against a bid of yours still pending, summed.
+
+    The app holds it against the bid until it is accepted, rejected or
+    withdrawn — it is not free to spend again on something else today,
+    however the raw balance reads. Read off the same `bid` field a sent
+    offer is shown from (see sources.parse_api_market's own note on why
+    that field is always YOUR bid, never anyone else's) — one field, one
+    reading, so the number here and the one on screen cannot disagree.
+    """
+    return sum(float(r["bid_money"]) for r in mkt
+              if (r.get("bid_status") or "") == "pending" and r.get("bid_money"))
+
+
+def pending_received(offers: list[dict], pt_to_key: dict[str, str]
+                     ) -> dict[str, float]:
+    """{player you hold: the largest pending offer on him}, or {}.
+
+    A REAL PENDING OFFER BEATS A GUESS. What load() otherwise prices a sale
+    at is the market's own valuation — an estimate nothing has tested — and
+    a real bid sitting on a player you have actually listed is ground truth
+    for at least that much. The caller applies it as a FLOOR on `proceeds`,
+    never an overwrite: another bidder could still beat it before you act.
+
+    `pt_to_key` joins the API's own ownership-record id to this repo's key
+    — see load()'s own note on why that join is built once, off api_teams,
+    and handed in rather than re-derived here.
+    """
+    out: dict[str, float] = {}
+    for r in offers:
+        if (r.get("status") or "") != "pending":
+            continue
+        k = pt_to_key.get(r.get("player_team_id") or "")
+        money = float(r.get("money") or 0)
+        if not k or not money:
+            continue
+        out[k] = max(out.get(k, 0.0), money)
+    return out
+
+
 def load(trials_pool=None) -> Universe:
     """Assemble the universe from the store. The only IO in this module."""
     # The run's one model — the same League and the same Scorer report.py
@@ -1029,11 +1082,19 @@ def load(trials_pool=None) -> Universe:
                                index, r.get("market_value")))
     now = run_now()
     clause_until: dict = {}
+    # THE APP'S OWN OWNERSHIP-RECORD ID -> this repo's key. Built here
+    # because this is already the one loop that resolves a key for every
+    # api_teams row; offers.py's join needs nothing api_key() does not
+    # already do, and a second resolution of the same rows for one more
+    # field is the mistake ffcore.league.owner_from_api was written to stop.
+    pt_to_key: dict[str, str] = {}
     for r in teams:
         k = api_key(r["player_name"], r["manager"], lg.market, owner, index,
                     r.get("market_value"))
         if not k:
             continue
+        if r.get("player_team_id"):
+            pt_to_key[r["player_team_id"]] = k
         raw = (r.get("buyout_until") or "").strip()
         if raw:
             try:
@@ -1053,6 +1114,11 @@ def load(trials_pool=None) -> Universe:
 
     proceeds = {k: float((players[k] or {}).get("value") or 0)
                 for k in squads.get(me, {})}
+    # A REAL PENDING OFFER BEATS A GUESS — see received_offers()'s own note.
+    received_offers = pending_received(load_api_offers(), pt_to_key)
+    for k, money in received_offers.items():
+        if k in proceeds:
+            proceeds[k] = max(proceeds[k], money)
     # EVERY clause, mine included. The app publishes the whole league's, and a
     # rival cannot answer back without them.
     clause: dict[str, float] = {}
@@ -1191,7 +1257,9 @@ def load(trials_pool=None) -> Universe:
     # three-day-old balance from a feed everything else had refused. The
     # estimator also accrues the daily allowance since the anchor, which the
     # raw balance cannot, and states its own confidence.
-    cash = lg[me].cash.value or 0.0
+    raw_cash = lg[me].cash.value or 0.0
+    locked_cash = pending_sent(mkt)
+    cash = raw_cash - locked_cash
 
     return Universe(
         state=LeagueState(squads, rem, me, carried), forecaster=fc, pos=pos,
@@ -1201,7 +1269,8 @@ def load(trials_pool=None) -> Universe:
         rival_cash=rival_cash,
         clause_until=clause_until, bids=bids,
         part_played=played, name=name, start_note=_calibrated()[0].note(),
-        unjoined=list(unjoined_clubs) + list(lg.api_unjoined))
+        unjoined=list(unjoined_clubs) + list(lg.api_unjoined),
+        locked_cash=locked_cash, received_offers=received_offers)
 
 
 def _selftest() -> None:
@@ -1315,6 +1384,38 @@ def _selftest() -> None:
                        "seller": "something_new"}]
     _, r2, _ = market_routes(unknown_seller, lambda r: "free_agent")
     assert r2 == {"free_agent": "free"}, r2
+
+    # -- pending_sent: a bid of yours is money already gone -----------------
+    mkt_bids = [
+        {"bid_status": "pending", "bid_money": "5600000"},
+        {"bid_status": "pending", "bid_money": "6795815"},
+        {"bid_status": "", "bid_money": ""},                # no bid here
+        {"bid_status": "accepted", "bid_money": "2000000"}, # settled, not held
+        {"bid_status": "pending", "bid_money": ""},         # unreachable shape
+    ]
+    assert pending_sent(mkt_bids) == 5600000.0 + 6795815.0, pending_sent(mkt_bids)
+    assert pending_sent([]) == 0.0
+
+    # -- pending_received: a real offer beats a guess, and only as a floor --
+    p2k = {"pt1": "me_a", "pt2": "me_b"}
+    offers = [
+        {"player_team_id": "pt1", "status": "pending", "money": "6795815"},
+        # A second, smaller pending offer on the SAME player: the larger
+        # one is what he could actually raise, not the first one seen.
+        {"player_team_id": "pt1", "status": "pending", "money": "1000000"},
+        {"player_team_id": "pt2", "status": "accepted", "money": "9000000"},
+        # No offer at all — the placeholder row parse_api_offer emits so the
+        # table stays stamped. Not pending, so it prices nothing.
+        {"player_team_id": "pt2", "status": "", "money": ""},
+        # A playerTeamId nothing in the squad joins to (sold since, or a
+        # rival's — should never happen, given offer_sources() only ever
+        # asks for your own, but a join failing silently beats a KeyError).
+        {"player_team_id": "unknown", "status": "pending", "money": "1"},
+    ]
+    got = pending_received(offers, p2k)
+    assert got == {"me_a": 6795815.0}, got     # pt2's only offer was accepted
+    assert pending_received([], p2k) == {}
+    assert pending_received(offers, {}) == {}   # nothing to join to
 
     # -- funding a move with MORE THAN ONE sale ----------------------------
     # The table silently omitted every move that needed two. A target you

@@ -452,7 +452,7 @@ def load_elo(now=None) -> list[dict]:
 # once, because both the refusal and the sentence that explains it have to be
 # about the same set of feeds.
 GATED_API = ("api_teams", "api_market", "api_standings",
-             "api_lineup")
+             "api_lineup", "api_offers")
 
 
 def age_phrase(days: float) -> str:
@@ -610,6 +610,22 @@ def load_api_lineup(now=None) -> list[dict]:
     return fresh_only(latest_only(read_csv(TIDY / "api_lineup.csv")),
                       EVERY_RUN_FRESH_DAYS, now)
 
+
+def load_api_offers(now=None) -> list[dict]:
+    """Who wants to buy a player you have listed, right now, or [].
+
+    One row per player YOU HOLD, even when nothing is pending for him — see
+    sources.parse_api_offer's own note on why a placeholder row is what
+    keeps this gate meaningful for a table this sparse. A row with an empty
+    `status` is that placeholder, not an offer; callers filtering for
+    `status == "pending"` never need to know the difference exists.
+
+    Gated exactly like the other API tables: an offer read three days ago
+    is not an offer today, and treating it as one would show a shortfall
+    closed by money that may have already been withdrawn or accepted.
+    """
+    return fresh_only(latest_only(read_csv(TIDY / "api_offers.csv")),
+                      EVERY_RUN_FRESH_DAYS, now)
 
 
 
@@ -1299,6 +1315,7 @@ def _selftest() -> None:
     assert load_api_teams(now=stale) == []
     assert load_api_market(now=stale) == []
     assert load_api_standings(now=stale) == []
+    assert load_api_offers(now=stale) == []
 
     # A gated feed that has gone quiet must be SAYABLE, not merely refused.
     # Refusing it in silence turns "I cannot see the market" into "there is
