@@ -1,308 +1,213 @@
-# liga_five_guys — handoff, 2026-08-21 (late night)
+# liga_five_guys — handoff, 2026-08-25 (overnight)
 
-Private repo `OrsM/liga_five_guys`, working tree clean, **pushed** at `7ceb67b`,
-30 suites pass.
+Two repos touched tonight: `liga_five_guys` (the model/pipeline) and
+`~/claude_projects/website` (the phone-facing renderer, a *separate*
+codebase — `src/pages/Fantasy.jsx`). Both pushed and deployed. Working tree
+clean in both (test-run artifacts in `data/decisions/`, `reports/METHOD.md`
+and `reports/decisions.json` are expected to show as modified after any
+local suite check — see "Standing method" below). 30/30 suites pass in
+`liga_five_guys`; 140/140 in `website`.
 
-## Start here, and do not open with an audit
-
-**This file is the map.** Read it, run the one command below, then start on
-item 1 of "What to do next." Everything up to here is committed, deployed and
-verified.
+## Start here
 
     cd ~/claude_projects/liga_five_guys && \
       LFG_NO_FETCH=1 LFG_NO_COMMIT=1 ~/.local/bin/lfg-run 2>&1 | tail -4
 
-If that says `30 suites pass` and publishes 2 files, nothing has rotted.
+Should say `30 suites pass`. Real numbers as of the last live run
+(`reports/decisions.json`, committed at `0551bb0`, 2026-08-25T0052Z, a real
+fetch, not stale): cash **5.04M**, squad value **241.08M**, expected finish
+**1.83**, `p_win` **0.48** — moved a lot tonight (was 1.36 / 0.73 before the
+fixture fix below), and the move is real, not a regression; see Thread 2.
 
-**Outside the repo:** no `~/.local/bin/lfg-run` edits were needed this
-session — `sources.py`, `points.py` and `ingest.py` were already in its
-`TESTS=(...)` list before today.
+## What tonight was, compressed
 
-## What last session was, compressed
+Ran across one long session, each thread starting from a specific challenge
+to a specific number the report showed, not from a self-directed audit.
 
-Two threads, run back to back on direct instruction: finish unifying player
-identity (last session's priority #1), then a long, mostly-research pass on
-forecasting quality that kept getting redirected by pointed pushback — twice
-told "you're assuming the current approach is right without evidence," and
-both times that was fair.
+### Thread 1: the ladder's own bands were a second simulation
 
-### Thread 1: player identity, actually finished this time
+`sim.player_bands()` re-ran the whole Monte Carlo a second time at
+`FINAL_TRIALS`, against the same seed and the same seasons `decide.rank()`'s
+own final pass had already drawn. The draw does not depend on the squad —
+measured, ~1.2s of drawing plus ~0.03s per squad scored — so the second pass
+paid the 1.2s again for nothing. `rank()` now takes `extra`, Actions to
+price riding along in the pass it was already running; `sim.band_acts()`
+(what's left of `player_bands()`) only names the questions. Three
+simulation passes per report became two, `sim.main()` 8.07s → 6.80s,
+byte-identical numbers verified before trusting the speedup. Also unified
+the band formula itself (`decide.paired()`/`decide.band()` — one
+definition, `rank()` and the ladder both used to hand-roll the same
+sorted-diff quantile).
 
-1. **`Crosswalk.resolve()` built** — the one join six separate resolvers
-   (`Crosswalk.player`, `Market.key_for`/`candidates`, `text.resolve`,
-   `api_key`, `identify`, `_roster_key`) had each been re-deriving their own
-   way. `_roster_key()` and `slate.py`'s `slate_from_api()` now call it
-   directly.
-2. **Ids promoted above ALL fuzzy name/team/price logic, everywhere** — a
-   real design reversal, confirmed directly with Miguel: an id involves no
-   derivation (it's a raw fact off a row); only the id→key MAPPING is
-   learned, and `Crosswalk.merge()`'s stale-id displacement is the safety
-   net for that now, not per-call name priority. `api_key()`'s "an exact
-   name is never overridden by an id" test was deliberately flipped to
-   assert the opposite. `slate.py` was found joining `api_market.csv` on
-   name alone despite every row carrying the app's own `player_id` — fixed.
-3. **Real duplication found and fixed on request** ("there must be
-   duplication with six functions for this"): `VALUE_TOLERANCE` was defined
-   twice (tidy.py and league.py, same value, unlinked); the price-tolerance
-   comparison itself was hand-rolled twice with subtly different formulas,
-   unified into `ffcore.tidy.price_agrees()`; `League.__init__` was
-   re-reading and re-parsing `players.csv` a SECOND time
-   (`app_ids_known()`) despite `self.xw` already holding the same data in
-   memory — factored into `_app_ids_of(xw)`.
-4. **`api_key()` NOT fully migrated onto `resolve()`** — noted as an
-   explicit TODO in its own docstring. It still hand-rolls id-then-name
-   because it needs to apply price-validation differently per step
-   (unconditional on the id, validated on the two name guesses) and
-   `resolve()`'s single return value doesn't say which step answered.
-   Left alone rather than forced.
+### Thread 2: two "frozen for the season" bugs, both live in production
 
-Verified throughout: `League.owner` byte-identical against real data before/
-after every change in this thread.
+Told directly: *"you're telling me to sell him which I think is wrong so
+pls check into this situation and find an overall fix."* Checked rather
+than defended: `decide.load()` scored each player ONCE per run and handed
+`Bootstrap` the identical `(points, p_start)` tuple for all 38 remaining
+jornadas.
 
-### Thread 2: forecasting — real findings, most of it NOT code changes
+**P(start).** Robin Le Normand — suspended one match, 91.7% of this
+season's real minutes otherwise — was priced at 27% to start EVERY
+remaining jornada, including the 35 after his suspension ends, and
+`dead_weight()` correctly (given that input) listed him as sellable for
+zero points in a REAL published report. Fixed: `ffcore.score.Scored`
+gained `pct_rest` (his season-standing rate, shrunk toward `NEUTRAL_START`,
+not toward this week's status) alongside `pct_used` (unchanged, still
+status-aware, but now scoped to only the immediate jornada).
+`decide.next_then_rest()` builds Bootstrap's per-jornada dict from the two,
+per player.
 
-Miguel's core objection, stated directly and worth re-reading in his own
-words if this comes up again: *"you keep assuming the current average
-forecasts are correct, I don't see much evidence for that... I want to
-apply some sort of bayesian approach where stale information gets less and
-less relevance, widening the error bars, and the averages for this year
-also drift... how will we detect errors and correct over time?"*
+**Fixture difficulty**, same shape one layer down, found while explaining
+the first fix and directly challenged: *"why not simulate them with the
+best info we have instead of patching."* The schedule is published in
+full — `matches.csv` already has every remaining jornada's matchup — so
+this was not a data gap. `ffcore.fixture.season_board()` now answers "who
+do you face, every remaining week" the way `fixture_board()` only ever
+answered "who do you face next", sharing one Match-building core so the two
+can't disagree about an identical fixture. **Verified centred** (factors
+average 0.988/1.030 across 720 real pairs, matching the "centred on 1.0 by
+construction" contract the underlying rating functions already claim) before
+trusting the direction of a real, large swing: `expected_finish` 1.36 →
+1.71 that run, `p_win` 73% → 54% — my own squad's clubs had mostly had an
+easier-than-average jornada 3 (Betis 1.19 vs. a 0.98 season average),
+which is exactly why the frozen model had been reading optimistic.
 
-**What was already there, corrected on the record after undersold in an
-earlier answer:** two-stage empirical Bayes shrinkage (`Scorer.rate()`,
-K=8), sample-size-aware uncertainty widening (`Bootstrap.rate_rel`,
-`~1/sqrt(matches+K)`), club-correlated season variance (last session's Step
-3), and a forecast-vs-actual diagnostic (`methodology.py`) that measures
-the gap but does not act on it — detection without correction.
+`sim.md`'s own "Not modelled" table said "P(start) is today's, held flat
+over every remaining jornada" for as long as that was true — updated to
+say what's actually still not modelled (an unannounced FUTURE absence, not
+a known current one).
 
-**Step 4 shipped:** `Calibration.fit()` (P(start)) now grades against real
-per-match minutes (`ffcore.tidy.minutes_played()`) instead of binary
-played/didn't. Verified on real data: beta 2.2x→1.8x, AF blend 60%→40%,
-titular worth 90%→84%, all moving the direction expected once partial
-involvement stops scoring as full credit. **Caught a real bug**: the fit's
-on-disk cache (`startcal.json`) was keyed on data shape alone, not code
-version — this exact change would have been silently ignored forever.
-Added `startprob.METHOD_VERSION`, folded into the cache key.
+### Thread 3: a held player's own Season figure was a pure sale
 
-**Step 1 shipped, but is provably inert today:** the current-season rate
-is now recency-weighted, gated on real out-of-sample evidence via
-walk-forward validation (deliberately NOT leave-one-out — an early version
-let future jornadas leak into predictions for earlier ones and hid a real
-trend from the grid because a flat mean of two bracketing points equals a
-linear trend's midpoint). Required an upstream fix first:
-`points.py`'s per-jornada diff rows had no jornada number (its own
-docstring had called that "a join for model code to do later, against a
-calendar that doesn't exist in this repo yet" — that calendar,
-`data/tidy/matches.csv`, exists now). **Two real bugs caught before
-shipping**, both on real data: summing `points_delta` undercounts a player
-whose points started accumulating before this file's own tracking began
-(fixed by anchoring on `points_total` instead); an early version silently
-added 90 real players (real minutes, zero points-page rows) at pts=0,
-conflating "scored nothing" with "this page doesn't say" — scoped back out.
-**With 1 jornada played, `_fit_decay` has nothing to walk forward through
-and correctly returns decay=1.0** — verified byte-identical against the
-pre-change output, 159 shared players, zero mismatches. Will start
-weighting recent form the moment jornada 2 exists to validate against.
+Directly challenged again: *"why would I keep players with net negative
+season value... this doesn't consider the relative money I could get from
+them."* The KEEP/SELL rows priced "sell him, buy nothing" — a real number
+(negative there already meant "selling costs you points," the argument FOR
+keeping) but not the reinvestment-aware question a BUY row already answers.
+`decide.best_swap_for(u, k, expected)`: the best target `k`'s own proceeds
+plus cash reach, same cheap screen `candidates()` uses, scoped to one
+funding player (`candidates()`'s own swap search dedupes to one funding
+source per target, which crowds out every player who wasn't the winner —
+cannot answer for every held player individually).
 
-**K validation attempted, genuinely blocked — not more work available,
-just needs more matches played:**
-  * Tested K against 86 real players (prior-season rate ≥10 matches, real
-    current-season minutes). MSE decreases monotonically all the way to
-    K→∞ ("ignore the player, predict the population average"). This is
-    NOT evidence K=8 is wrong — it's proof that testing shrinkage against
-    ONE match's outcome always favours infinite shrinkage, because a
-    single match's variance (measured elsewhere in this repo: sd 3.69
-    around mean 3.44) completely swamps any skill signal. Needs a current-
-    season sample of ~10+ matches per player to mean anything.
-  * Tried the standard sabermetric fix (bucket players by games-played,
-    regress rate-variance against 1/games) using last season's full totals.
-    Contaminated: players with more games are systematically BETTER
-    players (selection bias — bad players get benched), not a random
-    sample at larger n. Season-total data (no per-match log) can't
-    separate those two effects. This season's own accumulating per-jornada
-    data (now captured, thanks to Step 1's plumbing) WILL support a clean
-    within-player split once enough jornadas exist.
-  * Checked whether `Bootstrap`'s assumed per-match shape (`SEED_POOL`)
-    matches reality so far: real pool (n=159, still below the model's own
-    MIN_POOL=200 threshold) has mean 3.93/sd 3.28 vs. the seed's mean
-    3.44/sd 3.69 — reasonably close, if anything the seed's variance looks
-    slightly wide, not narrow. Not proof of anything either way at this n.
+**Two real bugs caught by checking live data before shipping:**
+  * The "already answered by a real row" skip started checking both the
+    buy AND sell side of `rank()`'s survivors — dropped a squad member's
+    own band whenever he happened to fund an unrelated top-ranked move (an
+    XI "TAKE OFF" row went blank for exactly this). Reverted to buy-side
+    only; a held player's key can never collide with a real row's buy
+    side, so the broader check bought nothing.
+  * `best_swap_for()` first compared `expected()` across EVERY position —
+    put the one rostered goalkeeper on three different midfielders' bands.
+    Real, honestly negative numbers (a broken squad shape costs points in
+    the simulation), attached to a swap no manager would make. Fixed:
+    same slot only.
 
-**Understat added as a source, real xG/xA, NOT wired into scoring.**
-Confirmed real, free, player-level sources exist (Understat, FBref) —
-correcting an earlier wrong claim that only team-level xG was available.
-Chose Understat (one page = whole season, vs. FBref's per-team
-pagination). Verified directly rather than trusted from an old write-up:
-the well-known "playersData embedded in a script tag" scraping pattern is
-gone from the 2026 page; the real mechanism (curled and confirmed) is
-`POST main/getPlayersStats/` with `{league, season}` form data — the GET
-form of the same URL answers an error. **This needed a real infra
-change**: every other source in the registry is GET, and `ingest.py`'s
-fetch loop was hard-coded to `c.get`. Added `Source.body` (`None` = GET,
-unchanged for every existing source — verified that holds; a dict = POST
-it) and one conditional branch. Verified end to end with a REAL
-`ingest.py fetch && ingest.py parse` run (not a synthetic write):
-`data/tidy/understat_players.csv` now holds 600 prior-season + 192
-live-season real players. Deliberately not wired into `Scorer.rate()` —
-same discipline as last session's minutes/fitness captures: how xG should
-enter the formula is its own design decision.
+### Thread 4: website (`~/claude_projects/website`, separate repo)
 
-## THE THING THAT ACTUALLY MATTERS — priorities for next session
+  * Dropped the warnings box by request — real, freshly recomputed data
+    every run, but the same 2-3 sentences for weeks at a stretch since
+    squad composition rarely changes; read as static even though it
+    wasn't. `decisions.json` still carries the field, only the phone
+    stopped drawing it.
+  * Ladder/Standings tables had no `overflowX` on their wrapper — a
+    6-column table on a 390px phone pushed the whole page wide (the
+    "sliding right", mismatched header sizes Miguel screenshotted) instead
+    of scrolling sideways. Same fix the markdown view's own `post` style
+    already used.
+  * KEEP/SELL rows now show a "vs X" note when the band prices a real swap
+    (Thread 3) rather than a pure sale — the number alone doesn't say
+    which question it's answering.
 
-Miguel has NOT yet said which of these he wants next. Ask, don't assume —
-this session's two biggest course-corrections both happened because an
-assumption went unquestioned.
+## Priorities for next session
 
-### 1. How should xG/xA actually change the rating formula?
+Ask before assuming any of these — every thread tonight started from Miguel
+challenging a specific number, not from a self-picked priority.
 
-The data exists and is verified (`ffcore.tidy.load_understat_players()`).
-The design question is open and real, not a small one:
+### 1. Fixture-difficulty coverage on the schedule join
 
-  * Does xG **replace** the points-based prior for attacking output, or
-    **blend** with it (and at what weight, chosen how — the same
-    leave-one-out-beats-baseline discipline as everything else, or
-    something else)?
-  * xG/xA only speaks to ATTACKING output. Defenders/goalkeepers' fantasy
-    points lean heavily on clean sheets and appearance points, which xG
-    says little about directly — does this only touch forwards/midfielders,
-    or is there an xGA-side signal (Understat's team-level `getLeagueData`,
-    already GET-accessible, gives xGA per match) worth pulling in for the
-    defensive side too?
-  * Understat's own numeric player id is a FOURTH identity space
-    (`understat_id` on every row) the crosswalk does not yet bridge to the
-    other three (ff_slug/af_slug/app_id). First join will need name+team
-    matching (same bootstrap every other id space went through); worth
-    deciding whether `Crosswalk.Player` gains an `understat_id` field
-    before or after the first real join is attempted.
-  * Only one season of Understat history exists in the store today
-    (2025-26 + the live 2026-27 season). Validating "does xG actually
-    predict points better than raw history" needs the same real,
-    measured, beats-the-baseline check as everything else in this repo —
-    not an assumption that xG helps just because the literature says so
-    in general.
+`season_board()` joins `matches.csv`'s home/away names against the market's
+club list via `match_team()` — no club id available in that file, unlike
+`fixtures.csv`. Not measured tonight: how much of the 38-jornada schedule
+actually joins for every player, vs. quietly falling back to the frozen
+"next fixture" number for an unjoinable club. Worth a real coverage check
+before assuming it's complete everywhere.
 
-### 2. Revisit K, the skill/noise split, and SEED_POOL once more jornadas exist
+### 2. `best_swap_for()`'s reach vs. `candidates()`'s multi-sale funding
 
-Nothing to build right now — this is genuinely blocked on time, not
-effort. Worth checking back in after several more jornadas: does
-`_fit_decay` (Step 1) start finding real signal? Does a proper walk-forward
-K validation (same shape as `_fit_decay`, but for the shrinkage constant
-itself) become possible? Has the real per-match pool crossed
-`MIN_POOL=200` and started diverging from `SEED_POOL`?
+`best_swap_for()` funds a swap from `k`'s own proceeds plus cash only — it
+does not consider funding a bigger upgrade with `k` plus additional
+dead-weight sales the way `candidates()`'s multi-sale path does. Is a
+single-player-funded swap the right scope for "what is HE worth", or should
+a held player's band also explore "sell him AND some dead weight, buy
+someone better"? Not obviously wrong as scoped (the question is specifically
+about him), but worth asking rather than assuming.
 
-### 3. The frozen-roster assumption — still completely untouched
+### 3. Warnings — the underlying computation is still there, unused
 
-Called "THE THING THAT ACTUALLY MATTERS" two sessions ago, deprioritised
-again last session for precision work, untouched again this session.
-Miguel said "it's ok to assume the others won't improve their teams" three
-sessions ago — worth checking directly whether that still stands before
-either building it or leaving it alone again, the same way this session's
-other assumptions got checked.
+`report.py`'s warning-generation (`SLOT_MIN` thin-slot check, unmodelled
+players, stale feed) still runs and writes to `decisions.json`, just no
+longer drawn. If it's genuinely dead weight now, it could be trimmed from
+`report.py`/`sim.py` too — deliberately NOT done tonight, scope was "remove
+the display."
 
-### 4. Value-for-money — not started at all this session
+### 4. Everything still open from the 2026-08-21 handoff
 
-Was priority #3 in last session's handoff; this session never reached it.
-The plan from two sessions ago still stands: `sim.py` already computes a
-Δ-expected-position per candidate move against one fixed simulated season;
-normalise that by net cost (`Δ / |net €|`) rather than reviving the old,
-deliberately-killed λ metric (points-per-million against a moving
-baseline). Confirm the ranking is stable as YOUR squad changes between two
-runs before trusting it — the same check that caught λ's flaw originally.
+xG/xA formula design questions, K/shrinkage revalidation once more jornadas
+exist, the frozen-roster assumption, "game script" correlation — none of
+these were touched tonight. See git history (`HANDOFF.md` before this
+commit) if picking one of these up; this file replaced that one rather than
+carrying its detail forward, since tonight's threads were unrelated to all
+of them.
 
-### 5. "Game script" — named, not started, not urgent
+## Standing method (tonight's version)
 
-A shared per-match draw correlating playing time and scoring for every
-player in that match (a team concedes early, subs off an attacker, one
-event reduces his minutes AND his teammates' output from the same cause).
-Confirmed as real, industry-standard DFS practice via research last
-session. Bigger than Step 3's per-trial club shock (correlates
-match-to-match noise, not just season-long rate). Worth naming as the next
-tier up from Step 1/K work, not worth starting cold.
-
-## Standing method (reinforced hard this session — read this before assuming anything is settled)
-
-  * **A claim needs a number, not a citation.** Twice this session an
-    assumption went unquestioned until Miguel pushed on it directly, and
-    both times the honest answer was "we don't actually know, let's
-    measure." The literature search on xG/skill-noise decomposition was
-    valuable BECAUSE it was followed immediately by trying to measure the
-    same thing on this repo's own real data — and the measurement failed
-    informatively (K test: infinite shrinkage wins on n=1; bucket
-    regression: contaminated by selection bias) rather than being skipped.
-  * **A test against the wrong quantity looks like a real result and
-    isn't.** The K-vs-single-match test's monotonic "shrink to infinity"
-    result LOOKED like a finding. It wasn't a finding about K; it was a
-    finding about test power. Before trusting a validation result, check
-    what would have to be true for the test to be ABLE to show a
-    difference, not just whether it did.
-  * **Don't assume a decade-old scraping write-up still describes the live
-    page.** Understat's "playersData in a script tag" pattern, described
-    in numerous guides, is gone from the 2026 page. Curled the real page,
-    read the real JS, found the real endpoint. Would have shipped a
-    parser against nothing otherwise.
-  * **Verify a % probe before designing around an absence** — extended
-    this session: don't just vary the request path, vary the REQUEST
-    METHOD too. The GET form of Understat's stats endpoint answers a
-    generic error that could easily have been misread as "this data isn't
-    really available here."
-  * **Deliberately not wired in ≠ untested.** Both this session's new
-    captures (Understat xG, and last session's minutes/fitness) were
-    verified against real data before being left unwired — the discipline
-    is "prove it works," not "wire it in only once trusted."
+  * **A number the user pushes back on is worth checking, not defending.**
+    Every one of tonight's three real fixes started with a direct
+    challenge to a specific figure the report showed, not a self-directed
+    audit — "check into this and find an overall fix," "why would I keep
+    a player with negative value," "why not simulate with the best info we
+    have instead of patching."
+  * **Check the mechanism before trusting the direction of a big diff.**
+    The fixture fix moved `p_win` by 19 points in one run. Before shipping
+    it: confirmed the fixture factors are centred at ~1.0 across 720 real
+    pairs (no systematic bias), then confirmed MY specific squad's clubs
+    had an unusually easy jornada 3 relative to their season average —
+    which is what explains the direction, not a coincidence or a bug.
+  * **A broadened "already answered" check needs the same scrutiny as a
+    narrowed one.** Checking both sides of an Action instead of one looked
+    strictly more correct and silently dropped a real row's number. Ran
+    the real report and read the diff before deciding a change was safe.
+  * **One points scale does not mean one comparable pool.** `expected()`
+    puts every position on the same number for `best_xi()`'s formation-slot
+    purposes; a SQUAD-slot swap (`best_swap_for()`) needed same-slot
+    filtering on top, which `candidates()`'s own cheap screen apparently
+    also doesn't do explicitly — worth checking whether that's a live gap
+    there too, not assumed clean because it wasn't today's bug.
+  * **Avoid manual polling wait-loops on top of a harness that already
+    notifies on completion.** Chained `until pgrep ...; sleep; done` loops
+    around backgrounded commands tonight and it read to Miguel as one very
+    long unclosing command. Just wait for the completion notification.
   * **`git push` and deploy by default** once a fix is committed and
-    verified — do not ask. `LFG_NO_COMMIT=1`/`LFG_NO_FETCH=1` for a quick
-    local suite check; a real fetch is not a special/risky action here —
-    the timer already runs one unattended every ~11 hours.
-  * **Revert pipeline-run noise before committing.** Running the suite
-    check (even with `LFG_NO_COMMIT=1`) still writes fresh timestamped
-    rows to `data/decisions/*.csv` and `reports/*`. `git checkout --
-    data/decisions/ reports/METHOD.md reports/decisions.json` before every
-    commit unless the run was a genuine, intentional real fetch.
+    verified — do not ask, including across repos and including a real
+    live fetch (`LFG_PUSH=1 ~/.local/bin/lfg-run`, no `LFG_NO_FETCH`): the
+    timer already runs one unattended every night, a manual one is not a
+    special risk.
+  * **Revert pipeline-run noise before committing** — `git stash push -u
+    -m "..." -- data/decisions reports/METHOD.md reports/decisions.json`
+    around a `git pull --rebase`/push, then `git stash pop`, is the
+    pattern used tonight to keep local test-run artifacts out of the
+    commit without discarding them.
 
-## Traps that cost real time this session
+## Also open, untouched, lower priority
 
-  * **A monotonically "improving" metric across an entire grid, including
-    degenerate endpoints, is a red flag, not a result.** MSE improving all
-    the way to K→∞ should have been the first clue the test itself was
-    underpowered, not that infinite shrinkage is secretly correct.
-  * **A symmetric leave-one-out split can make a real trend invisible.**
-    Holding out jornada 3 while training on jornadas 1 AND 5 lets future
-    data leak into a "prediction," and for a linear trend the flat mean of
-    two bracketing points equals the held-out point exactly — a perfect
-    score for the WRONG reason. Time-ordered data needs walk-forward
-    validation, not arbitrary leave-one-out.
-  * **A file's "the output is disposable, full rebuild from raw every run"
-    guarantee is worth checking, not assuming, before hand-writing to
-    it.** Manually wrote `data/tidy/understat_players.csv` once to verify
-    the loader — correctly caught before committing that this bypassed the
-    raw-archive pipeline and would not survive the next real `ingest.py
-    parse`. Deleted it, ran the real fetch+parse instead.
-  * **`csv.DictWriter` silently drops any key not in `fieldnames`** —
-    still true, still worth checking on any new writer (not tripped this
-    session, but `points.py`'s `DIFF_FIELDS` needed the new `jornada`
-    column added explicitly, same class of bug as last session's
-    `ff_id`-dropping one).
+Carried forward unverified from 2026-08-21 — not re-checked tonight, threads
+were unrelated:
 
-## Where the league stands right now
-
-Cash **~19.28M** (known), expected finish **~1.13**, `p_win` **~0.89**
-(from `reports/decisions.json`, committed at `584c421`, 2026-08-21T0612Z —
-already stale by the time this is read; re-run the report for current
-numbers). Standings unchanged in shape; nothing this session touched
-squad decisions directly.
-
-## Also open, untouched, lower priority than the above
-
-  * **`api_key()`'s remaining migration onto `Crosswalk.resolve()`** — see
-    Thread 1 above. Documented as a TODO in its own docstring with the
-    specific blocker (per-step price-validation policy `resolve()`
-    doesn't expose).
-  * **`Crosswalk.merge()`'s O(n²) identifier scan** — measured, consciously
-    left alone as of last session (73ms at n=654, ~6% of crosswalk's
-    runtime). Revisit only if crosswalk's coverage grows meaningfully.
-  * **`FIX_BAND`/`HOME_EDGE`/`MIN_POOL`** — still blocked on match volume.
-    `MIN_POOL` needs 200 real per-match observations; the real pool was at
-    159 as of this session's Understat verification run. Close.
-  * **Pedro Diaz / Tete Morente ledger gap** — small, confirmed-stale,
-    self-resolves on a future fetch, not worth chasing (unchanged from two
-    sessions ago).
+  * `api_key()`'s remaining migration onto `Crosswalk.resolve()`.
+  * `Crosswalk.merge()`'s O(n²) identifier scan (was 73ms at n=654 as of
+    2026-08-21).
+  * `FIX_BAND`/`HOME_EDGE`/`MIN_POOL` — still guesses/blocked on match
+    volume as of 2026-08-21 (real pool was at 159 of 200 needed then).
+  * Pedro Diaz / Tete Morente ledger gap — small, self-resolving.

@@ -1156,3 +1156,112 @@ Constants and the flow live in `ffcore/auth.py`; `docs/design.md` §3 keeps the
 older recipe. futbolfantasy's values still match the app to the euro, so the
 API is not needed for pricing — it is needed for the things no page publishes,
 and for one of them, the exact join key.
+
+## A jornada's forecast was every jornada's forecast, 2026-08-25
+
+Two separate instances of the same shape of bug, both real and both live in
+production before being caught: `decide.load()` scored each player ONCE, off
+one snapshot, and handed `Bootstrap` the identical `(points, p_start)` tuple
+for all 38 remaining jornadas — a season that never varies week to week.
+
+**P(start), fixed first.** A suspension or a knock is a dated fact about the
+very next match; holding it flat for the rest of the season reads "he cannot
+play Sunday" as "he is a rotation risk until May". Concretely: Robin Le
+Normand, suspended one match, 91.7% of this season's real minutes otherwise,
+was priced at 27% to start EVERY remaining jornada — including the 35 after
+his suspension ends — and `decide.dead_weight()` correctly, given that input,
+listed him as sellable for zero points in a real published report.
+`ffcore.score.Scored` gained `pct_rest` alongside `pct_used`: `pct_used`
+still answers for the immediate jornada; `pct_rest` is his own recency-
+weighted standing rate, shrunk toward `NEUTRAL_START` (not toward this
+week's status-tainted reading) by the same `SHRINK_K` already trusted for
+the points side. `decide.next_then_rest()` builds Bootstrap's per-jornada
+dict from the two, per player rather than per jornada — his first remaining
+jornada gets `pct_used`, every one after gets `pct_rest`.
+
+**Fixture difficulty, the same bug one layer down.** The schedule is
+published in full — `matches.csv` already carries every remaining jornada's
+matchup — so this was not a data gap, it was not asking. `ffcore.fixture.
+season_board()` answers "who do you face, every remaining week" the way
+`fixture_board()` only ever answered "who do you face next"; the two now
+share one Match-building core (`_match_for()`, off one `_difficulty_ratings()`
+fit) so a fixture priced through either path is the same arithmetic.
+Verified centred: fixture factors average 0.988 (attack) / 1.030 (defense)
+across 720 real (club, jornada) pairs, matching the "centred on 1.0 by
+construction" contract `attack_defense()`/`difficulty()` already carry — no
+systematic bias introduced. My own squad's clubs mostly had an
+easier-than-average jornada 3 (Betis 1.19 vs. a 0.98 season average, Racing
+1.17 vs 0.98), which is exactly why the frozen model read optimistic: it had
+been assuming every future week looked like this one. Real correction on a
+live report: `expected_finish` 1.36 → 1.71, `p_win` 73% → 54% — checked by
+verifying the mechanism (are the factors centred? which direction did MY
+fixtures skew?) rather than by trusting the direction of the diff.
+
+**A held player's own "Season" figure was a pure sale, never a real
+alternative.** The KEEP/SELL ladder rows priced "sell him, buy nothing" —
+a real number (negative there already meant "selling him costs you points,"
+the argument FOR keeping), but not the reinvestment-aware question a BUY row
+already answers. `decide.best_swap_for(u, k, expected)` finds the best
+target `k`'s own sale proceeds plus cash actually reach — same cheap
+expected-points screen `candidates()` uses, scoped to one funding player
+instead of the whole squad, because `candidates()`'s own swap search dedupes
+to one funding source per target and crowds out every player who was not the
+winning source. Two real bugs caught by checking against live data before
+shipping, not by trusting a diff that looked done:
+  * The "already answered by a real ranked row" skip started checking BOTH
+    the buy and the sell side of `rank()`'s survivors, which dropped a squad
+    member's own band whenever he happened to fund an unrelated top-ranked
+    move — an XI "TAKE OFF" row went blank for exactly this. Reverted to the
+    buy side only; a held player's own key can never collide with a real
+    row's buy side (`candidates()` never buys someone already owned), so the
+    broader check bought nothing and cost a real row its number.
+  * `best_swap_for()` first compared `expected()` across EVERY position —
+    the one scale `best_xi()` uses to fill a FORMATION slot, not what a
+    SQUAD slot swap needs. Put the one rostered goalkeeper on three
+    different midfielders' bands, each a real, honestly negative number (a
+    broken squad shape really does cost points in the simulation) attached
+    to a swap no manager would ever make. Fixed: same slot only.
+
+None of these were found by re-reading the code. All three came from a
+direct challenge to a specific number the report showed — "you're telling me
+to sell him, which I think is wrong" for the first, "why would I keep a
+player with negative season value" for the third — checked against live
+data each time rather than defended on priors.
+
+`sim.md`'s own "Not modelled" table said "P(start) is today's, held flat over
+every remaining jornada" for as long as that was true; it now says what
+actually still isn't modelled (an unannounced FUTURE absence, not a known
+current one) rather than a caveat the fix already closed.
+
+30 suites pass throughout, including new coverage for `season_board()`,
+`apply_fixtures()`, and `best_swap_for()` (a real upgrade found and priced,
+none when nothing beats him, a clause target tagged the same way
+`candidates()` tags one, same-slot enforced).
+
+**Earlier the same night: the ladder's own bands were a second simulation.**
+`sim.player_bands()` re-ran the whole Monte Carlo a second time at
+`FINAL_TRIALS`, against the same seed and the same seasons `decide.rank()`'s
+own final pass had already drawn — the draw does not depend on the squad
+(measured: ~1.2s of drawing plus ~0.03s per squad scored), so the second
+pass paid the 1.2s again to score squads the first pass could have carried.
+`rank()` now takes `extra` — Actions to price, riding along in the pass it
+was already running — and `sim.band_acts()` (what is left of
+`player_bands()`) only names the questions. Three simulation passes per
+report became two; `sim.main()`'s wall clock: 8.07s → 6.80s, unchanged
+numbers, verified byte-for-byte against a pre-change snapshot of
+`decisions.json` before trusting the speedup.
+
+**The phone-side renderer (`~/claude_projects/website`, a separate repo —
+`src/pages/Fantasy.jsx`) needed its own changes, same night.** The KEEP/SELL
+Season figure now carries a "vs X" note when it prices a real swap rather
+than a pure sale, both in the markdown and on the phone — a bare number does
+not say which question it is answering, the note does. The warnings box
+("Only 1 portero", "1 unmodelled player") was real, freshly recomputed data
+every run, but the same 2-3 sentences for weeks at a stretch since squad
+composition rarely changes day to day — read as static even though it
+wasn't, dropped by request rather than redesigned; `decisions.json` still
+carries the field, only the phone stopped drawing it. The Ladder and
+Standings tables had no `overflowX` on their wrapper, so a 6-column table on
+a 390px phone pushed the whole page wide instead of scrolling sideways —
+the same fix the markdown view's own `post` style already used, just never
+applied to the live board.

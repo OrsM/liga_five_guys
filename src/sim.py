@@ -1008,8 +1008,10 @@ def caveats(u) -> list[str]:
                    "missing from the simulation entirely |"
                    % ", ".join("`%s`" % n for n in u.unjoined))
     out += [
-        "| P(start) is today's, held flat over every remaining jornada | "
-        "nothing here knows who will be injured in March |",
+        "| Beyond the next jornada, P(start) reverts to his own season-"
+        "standing rate | a suspension or a knock is dated to the match it "
+        "was announced for — nothing here predicts a FUTURE one not yet "
+        "known, e.g. who gets injured in March |",
         "| Rivals never transfer | a steal that guts a squad assumes its "
         "manager does not simply buy someone back — flatters the steal |",
         "| Teammates score independently, MATCH TO MATCH | two defenders of "
