@@ -1553,3 +1553,17 @@ observed_at,hours_to_lock,formation,index_total,player,pos,slot,start_pct,start_
 2026-08-25T2026Z,22.6,4-5-1,52.64,Miguel Roman,mediocampista,MED,60,read,ok,0,5191190,4.000,1,4.990,1.079,Osasuna,1,1,3.706,attack_defense,35.0,13808
 2026-08-25T2026Z,22.6,4-5-1,52.64,Guido Rodriguez,mediocampista,MED,100,read,ok,0,24042382,5.868,1,5.577,1.075,Deportivo La Coruna,0,1,5.458,elo,90.3,7676
 2026-08-25T2026Z,22.6,4-5-1,52.64,Natan,defensa,DEF,0,read,ok,0,37492727,1.608,0,5.123,1.060,Levante,0,1,1.516,attack_defense,101.6,11813
+2026-08-25T2241Z,20.3,4-5-1,52.64,Iñigo Vicente,delantero,DEL,90,read,ok,1,21210070,4.166,1,3.612,1.226,Elche,1,2,3.397,attack_defense,-10.4,6442
+2026-08-25T2241Z,20.3,4-5-1,52.64,Pepelu,mediocampista,MED,100,read,ok,0,8507184,4.729,1,4.708,1.075,Deportivo La Coruna,0,1,4.399,elo,90.3,2715
+2026-08-25T2241Z,20.3,4-5-1,52.64,Jon Moncayola,mediocampista,MED,80,read,ok,0,6671779,4.218,1,4.648,1.021,Celta Vigo,0,1,4.129,attack_defense,-35.0,7204
+2026-08-25T2241Z,20.3,4-5-1,52.64,Carl Starfelt,defensa,DEF,50,read,ok,0,12652367,3.256,1,5.122,1.156,Osasuna,1,0,2.817,attack_defense,35.0,9612
+2026-08-25T2241Z,20.3,4-5-1,52.64,Robin Le Normand,defensa,DEF,0,read,suspended,0,12865910,0.000,0,4.368,1.072,Sevilla,0,2,0.000,attack_defense,176.0,6002
+2026-08-25T2241Z,20.3,4-5-1,52.64,Igor Zubeldia,defensa,DEF,70,read,ok,0,9852526,1.638,1,3.405,0.607,Real Madrid,0,1,2.697,attack_defense,-198.0,2802
+2026-08-25T2241Z,20.3,4-5-1,52.64,Omar El Hilali,defensa,DEF,80,read,ok,0,11699383,2.908,1,3.223,1.003,Real Sociedad,0,2,2.900,attack_defense,-66.3,10220
+2026-08-25T2241Z,20.3,4-5-1,52.64,Lucien Agoume,mediocampista,MED,90,read,ok,0,6066565,3.148,0,4.154,0.806,Atletico Madrid,1,2,3.907,attack_defense,-176.0,7249
+2026-08-25T2241Z,20.3,4-5-1,52.64,Ionut Radu,portero,POR,90,read,ok,0,35752569,7.694,1,6.871,1.156,Osasuna,1,1,6.655,attack_defense,35.0,5978
+2026-08-25T2241Z,20.3,4-5-1,52.64,Pablo Fornals,mediocampista,MED,100,read,ok,0,59300203,8.092,1,7.127,1.160,Levante,0,1,6.975,attack_defense,101.6,2632
+2026-08-25T2241Z,20.3,4-5-1,52.64,Marcos Alonso,defensa,DEF,70,read,ok,0,29028122,6.067,1,6.295,1.156,Osasuna,1,1,5.248,attack_defense,35.0,4397
+2026-08-25T2241Z,20.3,4-5-1,52.64,Miguel Roman,mediocampista,MED,60,read,ok,0,5291848,4.000,1,4.990,1.079,Osasuna,1,1,3.706,attack_defense,35.0,13808
+2026-08-25T2241Z,20.3,4-5-1,52.64,Guido Rodriguez,mediocampista,MED,100,read,ok,0,24520433,5.868,1,5.577,1.075,Deportivo La Coruna,0,1,5.458,elo,90.3,7676
+2026-08-25T2241Z,20.3,4-5-1,52.64,Natan,defensa,DEF,0,read,ok,0,37735206,1.608,0,5.123,1.060,Levante,0,1,1.516,attack_defense,101.6,11813

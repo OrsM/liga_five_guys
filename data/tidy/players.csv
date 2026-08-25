@@ -107,7 +107,7 @@ player_id,name,club_id,ff_slug,af_slug,app_id,understat_id,app_names
 12539,joselu perez,getafe,,,,13790,
 12566,aron yaakobishvili,barcelona,,,,,
 12590,ibrahima sow,sevilla,ibrahima-sow,,3176,,Ibra
-12594,david otorbi,valencia,david-otorbi,,,,
+12594,david otorbi,valencia,david-otorbi,,,12297,
 12596,joaquin oso,sevilla,joaquin-oso,,,13615,
 12598,dani requena,levante,dani-requena,,,,
 12604,aingeru olabarrieta,athletic,aingeru-olabarrieta,,,,
@@ -548,6 +548,7 @@ player_id,name,club_id,ff_slug,af_slug,app_id,understat_id,app_names
 7542,eric garcia,barcelona,eric-garcia,619,,8045,
 7554,diego conde,betis,diego-conde,,,,
 7570,dani cardenas,rayo,dani-cardenas,,,,
+7589,troy parrott,betis,troy-parrott,,,8145,
 7595,anthony gordon,barcelona,anthony-gordon,,,8150,
 7614,pablo martinez,malaga,pablo-martinez,,,,
 7629,ivan romero,levante,ivan-romero,192032,,9275,

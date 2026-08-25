@@ -1,9 +1,9 @@
 {
- "generated_at": "2026-08-25T20:28Z",
- "locks_in_h": 22.525482767777778,
- "cash": -26651795.400421295,
+ "generated_at": "2026-08-25T22:41Z",
+ "locks_in_h": 20.304536000833334,
+ "cash": -26651916.455559026,
  "cash_locked": 0,
- "squad_value": 279508574.0,
+ "squad_value": 281835066.0,
  "jornadas_left": 37,
  "acquirable": 53,
  "considered": 76,
@@ -16,20 +16,6 @@
  "moves": [],
  "sell": [],
  "ladder": [
-  {
-   "name": "Natan",
-   "pos": "DEF",
-   "start": 0.296,
-   "xpts": 3.499821899794777,
-   "group": "in",
-   "where": "bench",
-   "money": null,
-   "pts": -33.637608088634806,
-   "pts_lo": -102.9726937372966,
-   "pts_hi": 24.04515150479301,
-   "note": "",
-   "value": null
-  },
   {
    "name": "Pepelu",
    "pos": "MED",
@@ -45,20 +31,6 @@
    "value": null
   },
   {
-   "name": "Igor Zubeldia",
-   "pos": "DEF",
-   "start": 0.792056707457148,
-   "xpts": 2.638068013021339,
-   "group": "out",
-   "where": "yours",
-   "money": null,
-   "pts": -6.487625671847127,
-   "pts_lo": -41.51709544847358,
-   "pts_hi": 24.337274955348676,
-   "note": "",
-   "value": null
-  },
-  {
    "name": "Jon Moncayola",
    "pos": "MED",
    "start": 0.8883922974808651,
@@ -69,6 +41,20 @@
    "pts": -19.45206711363403,
    "pts_lo": -71.7671424485045,
    "pts_hi": 27.97371474758347,
+   "note": "",
+   "value": null
+  },
+  {
+   "name": "Igor Zubeldia",
+   "pos": "DEF",
+   "start": 0.792056707457148,
+   "xpts": 2.638068013021339,
+   "group": "keep",
+   "where": "yours",
+   "money": null,
+   "pts": -6.487625671847127,
+   "pts_lo": -41.51709544847358,
+   "pts_hi": 24.337274955348676,
    "note": "",
    "value": null
   },
@@ -93,12 +79,12 @@
    "xpts": 5.319428900993551,
    "group": "save",
    "where": "Albert Laporta",
-   "money": -37856616.40042129,
+   "money": -37856737.45555903,
    "pts": 7.678838322596221,
    "pts_lo": -32.98901045370667,
    "pts_hi": 53.81949170548023,
    "note": "short",
-   "value": 0.2028400594858965
+   "value": 0.20283941086076426
   },
   {
    "name": "Toni Martinez",
@@ -107,12 +93,12 @@
    "xpts": 5.220342840222036,
    "group": "save",
    "where": "free agent",
-   "money": -54566351.40042129,
+   "money": -54566472.45555903,
    "pts": 56.89501693228567,
    "pts_lo": -16.172630863098675,
    "pts_hi": 128.278137428357,
    "note": "short",
-   "value": 1.042675851914233
+   "value": 1.0426735387489652
   },
   {
    "name": "Carlos Romero",
@@ -121,12 +107,12 @@
    "xpts": 5.001672988825483,
    "group": "save",
    "where": "BurtonGM89",
-   "money": -72390795.40042129,
+   "money": -72390916.45555903,
    "pts": 25.73270538393058,
    "pts_lo": -33.36473126337046,
    "pts_hi": 88.64633214589571,
    "note": "short",
-   "value": 0.355469300227924
+   "value": 0.35546870579719697
   },
   {
    "name": "Diego Javier Llorente",
@@ -135,12 +121,12 @@
    "xpts": 4.8760765632938625,
    "group": "save",
    "where": "Albert Laporta",
-   "money": -47438315.40042129,
+   "money": -47438436.45555903,
    "pts": 70.10223147690817,
    "pts_lo": -6.237252206251696,
    "pts_hi": 168.01952711603326,
    "note": "short",
-   "value": 1.477755499645875
+   "value": 1.4777517286553257
   },
   {
    "name": "Antony",
@@ -149,12 +135,12 @@
    "xpts": 4.7427292353365464,
    "group": "save",
    "where": "free agent",
-   "money": -91842818.40042129,
+   "money": -91842939.45555903,
    "pts": 69.71898520101126,
    "pts_lo": -6.414084579076189,
    "pts_hi": 155.31343941492764,
    "note": "short",
-   "value": 0.7591119960740605
+   "value": 0.7591109955136713
   },
   {
    "name": "Antonio Blanco",
@@ -163,12 +149,12 @@
    "xpts": 4.618496417111799,
    "group": "save",
    "where": "BurtonGM89",
-   "money": -41577167.40042129,
+   "money": -41577288.45555903,
    "pts": 12.509850078057752,
    "pts_lo": -31.19354081476081,
    "pts_hi": 58.72380162597983,
    "note": "short",
-   "value": 0.3008826925985101
+   "value": 0.3008818165578362
   },
   {
    "name": "Odysseas Vlachodimos",
@@ -177,12 +163,12 @@
    "xpts": 4.2906847166378395,
    "group": "save",
    "where": "free agent",
-   "money": -49552575.40042129,
+   "money": -49552696.45555903,
    "pts": 8.872919904579476,
    "pts_lo": -27.417326816610966,
    "pts_hi": 50.58542367731661,
    "note": "short",
-   "value": 0.1790607215241539
+   "value": 0.17906028408639857
   },
   {
    "name": "Andres Martin",
@@ -191,12 +177,12 @@
    "xpts": 4.050359524947426,
    "group": "save",
    "where": "SusoGattuso",
-   "money": -59438005.40042129,
+   "money": -59438126.45555903,
    "pts": -2.8879990943376015,
    "pts_lo": -34.18065302445643,
    "pts_hi": 40.75885406453472,
    "note": "short",
-   "value": -0.04858842545071561
+   "value": -0.048588326492708576
   },
   {
    "name": "Carlos Espi",
@@ -205,12 +191,12 @@
    "xpts": 3.5805739592386296,
    "group": "save",
    "where": "SusoGattuso",
-   "money": -40086146.40042129,
+   "money": -40086267.45555903,
    "pts": 26.530179151550783,
    "pts_lo": -42.14602978086077,
    "pts_hi": 103.71137154835469,
    "note": "short",
-   "value": 0.6618291238708832
+   "value": 0.6618271252359182
   },
   {
    "name": "Alfonso Herrero",
@@ -219,12 +205,12 @@
    "xpts": 3.5305186011903653,
    "group": "save",
    "where": "Magic Mike 333",
-   "money": -39119213.40042129,
+   "money": -39119334.45555903,
    "pts": -2.411359055580533,
    "pts_lo": -60.573758100673786,
    "pts_hi": 104.79491975010023,
    "note": "short",
-   "value": -0.06164129710119795
+   "value": -0.06164110635164113
   },
   {
    "name": "Marc Roca",
@@ -233,12 +219,12 @@
    "xpts": 3.512804801301988,
    "group": "save",
    "where": "Albert Laporta",
-   "money": -35128931.40042129,
+   "money": -35129052.45555903,
    "pts": 5.607259982746655,
    "pts_lo": -37.14371887503967,
    "pts_hi": 52.0302324770696,
    "note": "short",
-   "value": 0.15961942931971473
+   "value": 0.15961887926923943
   },
   {
    "name": "Gustavo Puerta",
@@ -247,12 +233,12 @@
    "xpts": 3.4361295568492234,
    "group": "save",
    "where": "Magic Mike 333",
-   "money": -45980888.40042129,
+   "money": -45981009.45555903,
    "pts": 0.5701204124138712,
    "pts_lo": -6.067281083143371,
    "pts_hi": 6.760038301430086,
    "note": "short",
-   "value": 0.012399073446537574
+   "value": 0.012399040803245014
   },
   {
    "name": "Santi Comesaña",
@@ -261,12 +247,12 @@
    "xpts": 3.377752456980211,
    "group": "save",
    "where": "BurtonGM89",
-   "money": -54867122.40042129,
+   "money": -54867243.45555903,
    "pts": 4.484141915879718,
    "pts_lo": -33.69543809331526,
    "pts_hi": 46.72931065553894,
    "note": "short",
-   "value": 0.08172730261219763
+   "value": 0.08172712229495821
   },
   {
    "name": "Lorenzo Amatucci",
@@ -275,12 +261,12 @@
    "xpts": 3.3287931502916703,
    "group": "save",
    "where": "SusoGattuso",
-   "money": -46729448.40042129,
+   "money": -46729569.45555903,
    "pts": -0.4222064636851428,
    "pts_lo": -14.930475594655036,
    "pts_hi": 16.57836602565817,
    "note": "short",
-   "value": -0.009035126202802266
+   "value": -0.009035102796884777
   },
   {
    "name": "Cesar Tarrega",
@@ -289,12 +275,12 @@
    "xpts": 3.2225659259259256,
    "group": "save",
    "where": "SusoGattuso",
-   "money": -41469955.40042129,
+   "money": -41470076.45555903,
    "pts": 19.350859397690783,
    "pts_lo": -32.76848848715804,
    "pts_hi": 79.90145639339767,
    "note": "short",
-   "value": 0.46662358835076534
+   "value": 0.4666222262316764
   },
   {
    "name": "Jose Gaya",
@@ -303,12 +289,12 @@
    "xpts": 3.0668020304568526,
    "group": "save",
    "where": "Magic Mike 333",
-   "money": -45686828.40042129,
+   "money": -45686949.45555903,
    "pts": 10.832521029417421,
    "pts_lo": -41.68827340735652,
    "pts_hi": 68.45264232316185,
    "note": "short",
-   "value": 0.23710380888066923
+   "value": 0.23710318063486635
   },
   {
    "name": "Kike Salas",
@@ -317,12 +303,12 @@
    "xpts": 3.054726318501187,
    "group": "save",
    "where": "Magic Mike 333",
-   "money": -46016336.40042129,
+   "money": -46016457.45555903,
    "pts": 42.7130815150299,
    "pts_lo": -14.733680303083247,
    "pts_hi": 116.75458013358843,
    "note": "short",
-   "value": 0.9282156046355495
+   "value": 0.9282131627859574
   },
   {
    "name": "Lucas Noubi",
@@ -331,12 +317,12 @@
    "xpts": 3.005354782301148,
    "group": "save",
    "where": "Magic Mike 333",
-   "money": -45341670.40042129,
+   "money": -45341791.45555903,
    "pts": -0.6741630800545408,
    "pts_lo": -14.944263097641851,
    "pts_hi": 14.987593516032803,
    "note": "short",
-   "value": -0.01486851000637764
+   "value": -0.01486847030989744
   },
   {
    "name": "Alex Berenguer",
@@ -345,12 +331,197 @@
    "xpts": 2.9568566274209602,
    "group": "save",
    "where": "SusoGattuso",
-   "money": -42161990.40042129,
+   "money": -42162111.45555903,
    "pts": 26.30176815519235,
    "pts_lo": -35.84734922602411,
    "pts_hi": 83.30883326356116,
    "note": "short",
-   "value": 0.623826529663304
+   "value": 0.6238247385431758
+  }
+ ],
+ "cover": [
+  {
+   "who": [
+    "Igor Zubeldia",
+    "Robin Le Normand",
+    "Jon Moncayola"
+   ],
+   "raised": 29653032.0,
+   "surplus": 3001115.5444409736,
+   "pts": -60.47716687826551,
+   "pts_lo": -147.3610051781436,
+   "pts_hi": 14.469382855766298,
+   "rate": -2.0394935289674767
+  },
+  {
+   "who": [
+    "Pepelu",
+    "Igor Zubeldia",
+    "Robin Le Normand"
+   ],
+   "raised": 31318057.0,
+   "surplus": 4666140.544440974,
+   "pts": -62.50882207674999,
+   "pts_lo": -155.1902729154276,
+   "pts_hi": 22.623468877806317,
+   "rate": -1.9959355101994352
+  },
+  {
+   "who": [
+    "Pepelu",
+    "Igor Zubeldia",
+    "Carl Starfelt"
+   ],
+   "raised": 30748247.0,
+   "surplus": 4096330.5444409736,
+   "pts": -64.6995425584978,
+   "pts_lo": -163.66956694473652,
+   "pts_hi": 16.99510727713846,
+   "rate": -2.1041701193078683
+  },
+  {
+   "who": [
+    "Igor Zubeldia",
+    "Jon Moncayola",
+    "Carl Starfelt"
+   ],
+   "raised": 29083222.0,
+   "surplus": 2431305.5444409736,
+   "pts": -64.71788096328396,
+   "pts_lo": -154.87055759667487,
+   "pts_hi": 13.023100370701968,
+   "rate": -2.2252651705262902
+  },
+  {
+   "who": [
+    "Miguel Roman",
+    "Igor Zubeldia",
+    "Robin Le Normand"
+   ],
+   "raised": 28219171.0,
+   "surplus": 1567254.5444409736,
+   "pts": -68.4518146452665,
+   "pts_lo": -168.4232495176118,
+   "pts_hi": 15.679603623193998,
+   "rate": -2.425720253981469
+  },
+  {
+   "who": [
+    "Miguel Roman",
+    "Igor Zubeldia",
+    "Carl Starfelt"
+   ],
+   "raised": 27649361.0,
+   "surplus": 997444.5444409736,
+   "pts": -72.66542576303505,
+   "pts_lo": -178.271560489703,
+   "pts_hi": 14.989327433359449,
+   "rate": -2.6281050677097038
+  },
+  {
+   "who": [
+    "Robin Le Normand",
+    "Jon Moncayola",
+    "Carl Starfelt"
+   ],
+   "raised": 32474686.0,
+   "surplus": 5822769.544440974,
+   "pts": -80.57037194610803,
+   "pts_lo": -190.24307301758154,
+   "pts_hi": 5.069836696256743,
+   "rate": -2.4810208156010507
+  },
+  {
+   "who": [
+    "Pepelu",
+    "Robin Le Normand",
+    "Carl Starfelt"
+   ],
+   "raised": 34139711.0,
+   "surplus": 7487794.544440974,
+   "pts": -84.14889268354204,
+   "pts_lo": -191.62609534730427,
+   "pts_hi": 10.916216331737814,
+   "rate": -2.464839045753552
+  },
+  {
+   "who": [
+    "Pepelu",
+    "Robin Le Normand",
+    "Jon Moncayola"
+   ],
+   "raised": 28545799.0,
+   "surplus": 1893882.5444409736,
+   "pts": -86.75170193207714,
+   "pts_lo": -186.67954823097193,
+   "pts_hi": 0.9961913143574748,
+   "rate": -3.039035689001984
+  },
+  {
+   "who": [
+    "Pepelu",
+    "Jon Moncayola",
+    "Carl Starfelt"
+   ],
+   "raised": 27975989.0,
+   "surplus": 1324072.5444409736,
+   "pts": -89.02073788124108,
+   "pts_lo": -196.00791265675753,
+   "pts_hi": -3.1127424352121125,
+   "rate": -3.182040780801032
+  },
+  {
+   "who": [
+    "Miguel Roman",
+    "Robin Le Normand",
+    "Carl Starfelt"
+   ],
+   "raised": 31040825.0,
+   "surplus": 4388908.544440974,
+   "pts": -90.42135016698694,
+   "pts_lo": -207.334694298695,
+   "pts_hi": 9.991760353740347,
+   "rate": -2.912981538570155
+  },
+  {
+   "who": [
+    "Miguel Roman",
+    "Pepelu",
+    "Robin Le Normand"
+   ],
+   "raised": 27111938.0,
+   "surplus": 460021.54444097355,
+   "pts": -97.21598505541988,
+   "pts_lo": -202.96491367118028,
+   "pts_hi": 5.219503588510406,
+   "rate": -3.5857261496916926
+  },
+  {
+   "who": [
+    "Igor Zubeldia",
+    "Robin Le Normand",
+    "Carl Starfelt"
+   ],
+   "raised": 35246944.0,
+   "surplus": 8595027.544440974,
+   "pts": -1409.636020065771,
+   "pts_lo": -1644.2863887399894,
+   "pts_hi": -1206.8740783090623,
+   "rate": -39.993141534930544
+  },
+  {
+   "who": [
+    "Miguel Roman",
+    "Pepelu",
+    "Igor Zubeldia",
+    "Jon Moncayola"
+   ],
+   "raised": 30626158.0,
+   "surplus": 3974241.5444409736,
+   "pts": -1409.636020065771,
+   "pts_lo": -1644.2863887399894,
+   "pts_hi": -1206.8740783090623,
+   "rate": -46.02719087604037
   }
  ],
  "bar": 2.7896820508070865,
@@ -383,11 +554,6 @@
    "beats_now": 0.18181818181818182,
    "n_band": 11,
    "by_position": {
-    "MED": {
-     "n": 11,
-     "now_best": 1.8288143663047123,
-     "beats_now": 0.2727272727272727
-    },
     "DEF": {
      "n": 10,
      "now_best": 2.2119909380183964,
@@ -397,6 +563,11 @@
      "n": 11,
      "now_best": 4.4127246914074485,
      "beats_now": 0.0
+    },
+    "MED": {
+     "n": 11,
+     "now_best": 1.8288143663047123,
+     "beats_now": 0.2727272727272727
     },
     "POR": {
      "n": 4,
@@ -417,8 +588,8 @@
     }
    },
    "helpful": 112,
-   "pool": 597,
-   "note": "the market is modelled from 197 offers over 11 cycles, weighted by value^0.15, and only just — value^0.10 fits within 16.9% of it, so read the exponent as roughly this, not exactly this"
+   "pool": 598,
+   "note": "the market is modelled from 197 offers over 11 cycles, weighted by value^0.15, and only just — value^0.20 fits within 15.1% of it, so read the exponent as roughly this, not exactly this"
   },
   {
    "route": "watch",
@@ -432,22 +603,22 @@
     {
      "name": "Kylian Mbappe",
      "gain": 5.696785678141679,
-     "wait": 12.137752748317626
+     "wait": 12.156574198711168
     },
     {
      "name": "Joan Garcia",
      "gain": 5.518342032648081,
-     "wait": 13.307805050957429
+     "wait": 13.325372639151558
     },
     {
      "name": "Lamine Yamal",
      "gain": 5.230113571380325,
-     "wait": 12.17918259102046
+     "wait": 12.208092172707914
     },
     {
      "name": "Alvaro Valles",
      "gain": 4.83971742997598,
-     "wait": 14.770658656322361
+     "wait": 14.745609800336853
     }
    ]
   },
@@ -461,7 +632,7 @@
    "hi": null,
    "beats_now": null,
    "helpful": 15,
-   "days": 0.997346504212963,
+   "days": 0.9048070555902779,
    "opens": "26 Aug"
   }
  ],
@@ -483,7 +654,7 @@
    "mean": 1510.568768451506,
    "lo": 1296.0505784036868,
    "hi": 1733.6536353626188,
-   "cash": -26651795.400421295,
+   "cash": -26651916.455559026,
    "cash_known": true,
    "p_above": null
   },
