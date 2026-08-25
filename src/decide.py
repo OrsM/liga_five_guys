@@ -541,13 +541,64 @@ def band(pairs) -> tuple[float, float, float]:
             pairs[int(0.9 * len(pairs))])
 
 
-def band_key(a: Action) -> str:
-    """The player an Action is ABOUT — the buy, or the man being sold.
+def best_swap_for(u: Universe, k: str, expected: dict[str, float]
+                  ) -> Action | None:
+    """The best real upgrade `k`'s OWN sale funds — sell him, buy the
+    highest-expected target his proceeds (plus your cash) can reach.
+    None when nothing does: the honest answer for a man with no
+    affordable upgrade is "keep him", not a swap that does not exist.
 
-    A band is looked up by player, not by Action, and a pure sale
-    (`buy == ""`) is about the one name in `sell`.
+    THIS IS THE QUESTION A HELD PLAYER'S BAND SHOULD ANSWER and a pure
+    sale (sell him, buy nothing) is not it — see sim.band_acts()'s own
+    note on why "what does losing him cost, with no plan for the money"
+    understated a bench player who funds a real replacement. It is a
+    DIFFERENT question from candidates()'s own swap search, which asks
+    "what is the single best move on the whole board" and dedupes to one
+    funding source per target — that crowds out every player who was not
+    the WINNING funding source for whichever target won, so reusing its
+    output cannot answer for every held player individually, only for
+    the lucky few. Same cheap, deterministic screening candidates() uses
+    (expected points, not a simulation — see its own docstring for why
+    that is enough for a screen), scoped to one funding player instead
+    of the whole squad.
+
+    Ties break toward the cheaper target — cash left over is worth
+    something a simulation run today cannot price, the same reasoning
+    rank()'s own dedup step uses.
+
+    SAME SLOT ONLY. `expected()` puts every position on one points scale
+    — that is what lets best_xi() compare a keeper against a forward when
+    it fills a formation, and candidates()'s own screen already trusts it
+    that way for "would this new man even make the eleven". But a SQUAD
+    slot is not a formation slot: replacing a MED with a POR does not
+    field an extra keeper, it leaves the squad short a midfielder, and
+    the real simulation prices that shape correctly — found 2026-08-25
+    when three different bench players' "best real alternative" all came
+    back as the one goalkeeper on the board, each one a real, honestly
+    negative number (the simulation ballast for a broken squad shape is
+    real) attached to a swap no manager would ever make. The band was
+    right; the swap it was pointing at was not a question worth asking.
     """
-    return a.buy or (a.sell[0] if a.sell else "")
+    mine = u.state.squads.get(u.me, {})
+    budget = u.cash + u.proceeds.get(k, 0.0)
+    my_exp = expected.get(k, 0.0)
+    slot = u.pos.get(k)
+    best_c, best_exp, best_price = None, my_exp, None
+    for c, price in u.price.items():
+        if c == k or c in mine or price > budget or u.pos.get(c) != slot:
+            continue
+        e = expected.get(c, 0.0)
+        if e > best_exp or (e == best_exp and best_c is not None
+                            and price < best_price):
+            best_c, best_exp, best_price = c, e, price
+    if best_c is None:
+        return None
+    victim = u.owner.get(best_c, "")
+    raid = bool(victim and victim != u.me
+               and u.route.get(best_c, "market") == "clause")
+    return Action("clause-swap" if raid else "swap", buy=best_c, sell=k,
+                 cost=best_price, proceeds=u.proceeds.get(k, 0.0),
+                 victim=victim if raid else "")
 
 
 def value_rate(pts, cost) -> float | None:
@@ -566,7 +617,7 @@ def value_rate(pts, cost) -> float | None:
 
 
 def rank(u: Universe, acts: list[Action], seed: int = 1,
-         price=None, extra: list[Action] = ()) -> tuple:
+         price=None, extra: list[tuple[str, Action]] = ()) -> tuple:
     """Screen wide and cheap, then re-run the survivors properly.
 
     Returns `(rows, base, measured, bands)`.
@@ -575,20 +626,28 @@ def rank(u: Universe, acts: list[Action], seed: int = 1,
     P(above) each rival — the second is what you act on when one rival is the
     one you are actually racing.
 
-    `extra` is scored IN THE SAME FINAL PASS and comes back as `bands`,
-    `{player: (median, lo, hi)}` — the ladder's own "what would this one man
-    alone be worth" question (see sim.band_acts()). It rides along rather
-    than running second because THE DRAW DOES NOT DEPEND ON THE SQUAD: at
-    3000 trials the pass costs about 1.2s of drawing plus 0.03s per squad
-    scored (measured 2026-08-24), so a second pass paid the 1.2s again for
-    nothing. Same seed, same trials, so the numbers are the numbers a
-    separate pass gave.
+    `extra` is `[(key, Action), ...]`, scored IN THE SAME FINAL PASS and
+    come back as `bands`, `{key: (median, lo, hi, action)}` — the ladder's
+    own "what is this one man really worth" question (see
+    sim.band_acts()), `key` given explicitly rather than read off the
+    Action because the two disagree exactly when the answer matters most:
+    `key` for a held player's OWN swap (sell him, buy his best reachable
+    upgrade — see best_swap_for()) is the man SOLD, not the one bought,
+    and an Action alone cannot say which side a caller meant. It rides
+    along rather than running second because THE DRAW DOES NOT DEPEND ON
+    THE SQUAD: at 3000 trials the pass costs about 1.2s of drawing plus
+    0.03s per squad scored (measured 2026-08-24), so a second pass paid
+    the 1.2s again for nothing. Same seed, same trials, so the numbers
+    are the numbers a separate pass gave.
 
-    An `extra` about a player rank() is ALREADY returning a row for is
-    dropped: that row's own pts_lo/pts_hi answer the question better, off the
-    squad the victim's response leaves behind rather than a bare purchase.
-    The caller cannot make that cut itself — which moves survive screening is
-    this function's own answer — which is why `extra` is handed over whole.
+    A `key` rank() is ALREADY returning a real BUY row for is dropped:
+    that row's own pts_lo/pts_hi answer the question better, off the
+    squad the victim's response leaves behind rather than a bare swap.
+    The buy side ONLY — see the skip's own note on why checking the sell
+    side too once dropped a held player's band for a reason that had
+    nothing to do with his own row. The caller cannot make that cut
+    itself — which moves survive screening is this function's own
+    answer — which is why `extra` is handed over whole.
 
     `acts` may contain moves you CANNOT afford today. They are screened and
     then dropped, and the reason is that screening them is how the price of
@@ -649,15 +708,29 @@ def rank(u: Universe, acts: list[Action], seed: int = 1,
         answers.append(ans)
         afters.append(after)
     # RIDING ALONG IN THE SAME PASS — see the docstring. Anything `extra`
-    # asks about a player already kept is dropped here, where `keep` is
-    # known, rather than by a caller guessing at it.
-    won = {a.buy for a in keep if a.buy}
-    rest = [a for a in extra if band_key(a) not in won]
+    # asks about a player ALREADY ANSWERED by a real ranked row is dropped
+    # here, where `keep` is known, rather than by a caller guessing at it.
+    #
+    # THE BUY SIDE ONLY, DELIBERATELY — not `a.sell` too. A held player
+    # can turn up as the SELL side of some unrelated top-ranked money move
+    # (he funds somebody else's swap) without that move answering the
+    # question his OWN ladder row is asking: "what does the season cost
+    # if HE specifically changes" (comes off the XI, gets sold, gets kept)
+    # is a different question from "is this the single best move on the
+    # board", and conflating them dropped a real player's own band for no
+    # reason connected to his row — found 2026-08-25 when Jon Moncayola's
+    # OUT row went blank because he happened to fund the top-ranked clause
+    # move. `a.buy`, by construction, can never collide with a HELD
+    # player's own key (candidates() never buys someone already owned),
+    # so this only ever fires for the case it was built for: a CANDIDATE
+    # already shown as a real BUY row.
+    answered = {a.buy for a in keep if a.buy}
+    rest = [(k, a) for k, a in extra if k not in answered]
     final = _score_many(u, [u.state.squads] + afters
-                        + [apply(u, a) for a in rest], FINAL_TRIALS, seed)
+                        + [apply(u, a) for _k, a in rest], FINAL_TRIALS, seed)
     base, scored = final[0], final[1:len(afters) + 1]
-    bands = {band_key(a): band(paired(r, base, u.me))
-             for a, r in zip(rest, final[len(afters) + 1:])}
+    bands = {k: (*band(paired(r, base, u.me)), a)
+            for (k, a), r in zip(rest, final[len(afters) + 1:])}
     rivals = [m for m in u.state.squads if m != u.me]
     out = []
     for a, ans, r in zip(keep, answers, scored):
@@ -1592,6 +1665,69 @@ def _selftest() -> None:
     # rather than being zeroed or dropped.
     assert out[1]["ghost"] == (3.0, 0.5), out[1]["ghost"]
 
+    # -- best_swap_for: a held player's REAL value, not a pure sale ---------
+    from ffcore.forecast import Bootstrap as B2
+
+    per_sw = {1: {"me_k": (2.0, 1.0), "me_star": (12.0, 1.0),
+                  "cheap_up": (5.0, 1.0), "rich_up": (5.0, 1.0),
+                  "too_rich": (20.0, 1.0), "worse": (1.0, 1.0),
+                  "riv_up": (6.0, 1.0)}}
+    u_sw = Universe(
+        state=LeagueState({"me": {"me_k": "MED", "me_star": "MED"},
+                           "riv": {"riv_up": "MED"}}, [1], "me"),
+        forecaster=B2(per_sw),
+        pos={"me_k": "MED", "me_star": "MED", "cheap_up": "MED",
+            "rich_up": "MED", "too_rich": "MED", "worse": "MED",
+            "riv_up": "MED"},
+        price={"cheap_up": 3e6, "rich_up": 3e6, "too_rich": 50e6,
+              "worse": 1e6, "riv_up": 6e6},
+        route={"riv_up": "clause"}, owner={"riv_up": "riv"},
+        proceeds={"me_k": 2e6}, cash=3e6, me="me")
+    exp_sw = u_sw.forecaster.expected(1)
+
+    # me_k (exp 2.0) has a real, affordable upgrade: cheap_up and rich_up
+    # tie at exp 5.0, price 3e6 each, budget cash(3e6)+proceeds(2e6)=5e6 —
+    # TIE BREAKS TOWARD THE CHEAPER ONE, but both cost the same here, so
+    # either is a legal answer; what matters is it is NOT "worse" (below
+    # his own exp) and NOT "too_rich" (unaffordable) and NOT "riv_up"
+    # (exp 6.0 would win outright if affordable, but 4e6 > his 5e6 budget).
+    got = best_swap_for(u_sw, "me_k", exp_sw)
+    assert got is not None and got.buy in ("cheap_up", "rich_up"), got
+    assert got.sell == ("me_k",) and got.cost <= 5e6, got
+    assert got.proceeds == 2e6, got
+    assert got.kind == "swap", got
+
+    # me_star (exp 12.0) already beats everything on the board — no swap,
+    # not a swap to something worse.
+    assert best_swap_for(u_sw, "me_star", exp_sw) is None
+
+    # A CLAUSE TARGET IS TAGGED, same as candidates()'s own raid logic —
+    # give me_k a bigger budget so riv_up (exp 6.0, the best on the board)
+    # becomes reachable and wins outright.
+    u_sw2 = Universe(
+        state=u_sw.state, forecaster=u_sw.forecaster, pos=u_sw.pos,
+        price=u_sw.price, route=u_sw.route, owner=u_sw.owner,
+        proceeds={"me_k": 2e6}, cash=10e6, me="me")
+    raided = best_swap_for(u_sw2, "me_k", exp_sw)
+    assert raided.buy == "riv_up" and raided.kind == "clause-swap", raided
+    assert raided.victim == "riv", raided
+
+    # SAME SLOT ONLY — a cheap, high-expected DEL is not a real answer to
+    # "what should me_k (MED) become", the same "one points scale, one
+    # formation, but a squad SLOT is not a formation slot" case that put
+    # a goalkeeper on three different midfielders' bands on 2026-08-25.
+    per_slot = dict(per_sw)
+    per_slot[1] = {**per_sw[1], "wrong_slot": (50.0, 1.0)}
+    u_sw3 = Universe(
+        state=u_sw.state, forecaster=B2(per_slot),
+        pos={**u_sw.pos, "wrong_slot": "DEL"},
+        price={**u_sw.price, "wrong_slot": 1e6},
+        route=u_sw.route, owner=u_sw.owner,
+        proceeds={"me_k": 2e6}, cash=10e6, me="me")
+    exp_slot = u_sw3.forecaster.expected(1)
+    got3 = best_swap_for(u_sw3, "me_k", exp_slot)
+    assert got3.buy == "riv_up", got3     # not "wrong_slot", despite exp 50
+
     # -- value_rate: the shared primitive, on its own -----------------------
     assert value_rate(120.0, 14.13e6) is not None
     assert abs(value_rate(120.0, 14.13e6) - 120.0 / 14.13) < 1e-9
@@ -1600,7 +1736,7 @@ def _selftest() -> None:
     assert value_rate(None, 5e6) is None
     assert value_rate(0.0, 5e6) == 0.0           # a real price, zero return: 0, not None
 
-    print("decide self-test OK (90 cases)")
+    print("decide self-test OK (100 cases)")
 
 
 if __name__ == "__main__":

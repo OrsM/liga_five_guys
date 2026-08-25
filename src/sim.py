@@ -286,7 +286,20 @@ def ladder_rows(u, rows, bands=None) -> list[dict]:
     def cell(k, group, where, money, pts, note="", value=None,
             lo=None, hi=None):
         if k in bands:
-            pts, lo, hi = bands[k]
+            pts, lo, hi, action = bands[k]
+            # A SWAP OF *HIM*, NOT A PURE SALE: the band answers "sell him,
+            # buy the best his own money reaches" (best_swap_for()), so
+            # the row says which player that was — the number alone does
+            # not distinguish "worth keeping, no upgrade affordable" from
+            # "worth keeping even against his best real alternative".
+            # `action.buy != k` excludes a CANDIDATE's own band (his
+            # Action buys HIM, funded by dead weight — "vs himself" would
+            # be nonsense) without needing to know which group a row is
+            # in; every group a held player's swap band can land in
+            # (in/out/field/keep/sell) gets the same explanation.
+            if action.buy and action.sell and action.buy != k:
+                note = "vs %s" % title_name(u.name.get(action.buy,
+                                                        action.buy))
         return {"name": title_name(u.name.get(k, k)),
                 "pos": u.pos.get(k, ""), "start": u.start.get(k, 0.0),
                 "xpts": exp.get(k, 0.0), "group": group, "where": where,
@@ -340,12 +353,25 @@ def ladder_rows(u, rows, bands=None) -> list[dict]:
 
 
 def band_acts(u) -> list:
-    """The one-man questions the ladder needs a season band for, as Actions.
+    """The one-man questions the ladder needs a season band for, as
+    `[(key, Action), ...]`.
 
-    For EVERY player the ladder shows, not just the ones already ranked as a
-    move: a squad member's OWN marginal contribution (what selling him alone
-    would cost, no replacement bought), and a reachable candidate's (what
-    buying him alone would gain).
+    For EVERY player the ladder shows, not just the ones already ranked as
+    a move: a squad member's OWN real value — sell him, buy the best
+    upgrade his own proceeds reach (decide.best_swap_for()), or a pure
+    sale when nothing does — and a reachable candidate's (what buying him
+    alone would gain).
+
+    A PURE SALE UNDERSTATES A BENCH PLAYER: "what selling him costs, no
+    replacement bought" is not the question a KEEP row is actually
+    answering, which is "is he worth more than what his own money could
+    buy instead" — see best_swap_for()'s own note on why this is a
+    different question from candidates()'s swap search, and why reusing
+    that search's output cannot answer it for every held player. Found
+    2026-08-25: the pure-sale framing had every KEEP row read as a net
+    cost with no context for why keeping was still right — true (selling
+    for nothing is never good), but not the comparison a reader actually
+    wants next to a KEEP chip.
 
     COMPUTES NOTHING — it names the questions and decide.rank() answers them
     in the final pass it was already running, handing them back as its
@@ -388,12 +414,13 @@ def band_acts(u) -> list:
     # THE SAME POOL ladder_rows() ranks — every man you hold, and everyone
     # you do not who beats the weakest man in your eleven. One derivation of
     # "who is on the ladder", read there for rendering and here for pricing.
-    acts = [decide.Action("sell", sell=(k,), proceeds=u.proceeds.get(k, 0.0))
-            for k in mine]
-    acts += [decide.Action("buy", buy=k, sell=dead,
-                           cost=u.price.get(k, 0.0), proceeds=got)
-             for k in u.price
-             if k not in mine and exp.get(k, 0.0) > bar]
+    acts = [(k, decide.best_swap_for(u, k, exp)
+            or decide.Action("sell", sell=(k,), proceeds=u.proceeds.get(k, 0.0)))
+           for k in mine]
+    acts += [(k, decide.Action("buy", buy=k, sell=dead,
+                               cost=u.price.get(k, 0.0), proceeds=got))
+            for k in u.price
+            if k not in mine and exp.get(k, 0.0) > bar]
     return acts
 
 
@@ -444,6 +471,11 @@ def ladder(u, rows, base, data=None) -> list[str]:
             season = ("—" if r["pts"] is None else
                       "%+.0f (%+.0f–%+.0f)" % (r["pts"], r["pts_lo"], r["pts_hi"])
                       if r["pts_lo"] is not None else "%+.0f" % r["pts"])
+            # "vs X" — best_swap_for()'s own note, see ladder_rows()'s
+            # cell(). "short" is the save branch's own word above and
+            # never reaches this one.
+            if r["note"]:
+                season += " " + r["note"]
             money = ("%+.2fM" % (r["money"] / 1e6)) if r["money"] else "—"
         return ("| %s | %s | %.0f%% | %.2f | %s | %s | %s | %s |"
                 % (r["name"], r["pos"] or "—", 100 * r["start"], r["xpts"],
@@ -1808,11 +1840,19 @@ def _selftest() -> None:
            pos={**{k: v for k, v in sqb.items()}, "cand": "MED"},
            price={"cand": 5e6}, proceeds={"dead": 1e6, "star": 20e6},
            owner={}, cash=10e6, me="me")
-    # EVERY MAN YOU HOLD gets a sell, everyone above the bar you do not hold
-    # gets a buy. "cand" is the only priced non-squad key here.
+    # EVERY MAN YOU HOLD gets a key, either his own best swap or a pure
+    # sell if nothing affordable beats him; everyone above the bar you do
+    # not hold gets a buy. "cand" (exp 4.0) beats every regular squad
+    # member's (2.7) and "dead"'s (0.15), so band_acts() should offer
+    # each of them a SWAP to "cand" rather than a pure sale — "star"
+    # (exp 5.4) beats "cand" outright, so his stays a pure sell.
     asked = band_acts(ub)
-    assert {decide.band_key(a) for a in asked} == {*sqb, "cand"}, asked
-    assert [a for a in asked if a.buy == "cand"], asked
+    keys = {k for k, _a in asked}
+    assert keys == {*sqb, "cand"}, keys
+    by_key = dict(asked)
+    assert by_key["dead"].buy == "cand" and by_key["dead"].sell == ("dead",)
+    assert by_key["star"].buy == "" and by_key["star"].sell == ("star",)
+    assert by_key["cand"].buy == "cand", by_key["cand"]
 
     # ...and rank() answers them in its own final pass. No `acts`, so no move
     # survives screening and nothing is dropped from `extra` — the bands are
@@ -1820,29 +1860,35 @@ def _selftest() -> None:
     _rows, baseb, _lam, bands = decide.rank(ub, [], extra=asked)
     assert set(bands) == {*sqb, "cand"}, sorted(bands)
     for key in bands:
-        med, lo, hi = bands[key]
+        med, lo, hi, _act = bands[key]
         assert lo <= med <= hi, (key, bands[key])
-    # SELLING YOUR NAILED STARTER COSTS YOU POINTS — a real, clearly
-    # negative median, not a snapshot of one jornada.
+    # SELLING YOUR NAILED STARTER COSTS YOU POINTS, with no affordable
+    # upgrade to offset it — a real, clearly negative median, not a
+    # snapshot of one jornada.
     assert bands["star"][0] < -20, bands["star"]
-    # SELLING DEAD WEIGHT IS NEAR FREE — small in magnitude, unlike star's.
-    assert abs(bands["dead"][0]) < abs(bands["star"][0]) / 2, bands
+    # SELLING DEAD WEIGHT TO BUY A REAL UPGRADE GAINS POINTS — the whole
+    # feature: a pure sale would have priced this near zero (nothing lost
+    # fielding him), but the swap into "cand" (rated well above the bar)
+    # is a real, positive gain, not a wash.
+    assert bands["dead"][0] > 0, bands["dead"]
+    assert bands["dead"][3].buy == "cand", bands["dead"]
     # BUYING A GOOD CANDIDATE GAINS POINTS — positive median.
     assert bands["cand"][0] > 0, bands["cand"]
     # Nothing asked for at all: no extra squads scored, not an error.
     assert decide.rank(ub, [], extra=[])[3] == {}
 
-    # THE BAND RIDES THE SAME SEASONS AS THE MOVES. A move rank() ranks is
-    # NOT banded twice — its own row's pts_lo/pts_hi is the answer, off the
-    # squad the victim's response leaves behind, so "cand" drops out of
-    # `bands` the moment it is affordable enough to survive screening.
+    # THE BAND RIDES THE SAME SEASONS AS THE MOVES. A key rank() ranks a
+    # real row for — buy OR sell side — is NOT banded twice: its own
+    # row's pts_lo/pts_hi is the answer, off the squad the victim's
+    # response leaves behind, so "cand" drops out of `bands` the moment
+    # it is affordable enough to survive screening as a real move.
     buy_cand = decide.Action("buy", buy="cand", cost=5e6)
     rows2, _b2, _l2, bands2 = decide.rank(ub, [buy_cand], extra=asked)
     assert [r for r in rows2 if r["action"].buy == "cand"], rows2
     assert "cand" not in bands2, sorted(bands2)
     assert set(bands2) == set(sqb), sorted(bands2)
 
-    print("sim self-test OK (131 cases)")
+    print("sim self-test OK (135 cases)")
 
 
 def main() -> None:
