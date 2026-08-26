@@ -28,6 +28,7 @@ of the shell loop that ran all of them.
 
 from __future__ import annotations
 
+import gc
 import sys
 import time
 import traceback
@@ -84,6 +85,18 @@ def main(argv: list[str]) -> int:
             print("  FAILED: %s" % name)
             return 1
         times.append((time.time() - t0, name))
+        # `parse` alone builds and discards thousands of lxml trees, whose
+        # elements hold C-level parent/child references CPython's refcounter
+        # can't unwind on its own -- they need a real cycle collection, not
+        # just the object going out of scope. In the old one-stage-per-process
+        # design that garbage died with the process; here everything shares
+        # one interpreter for ten stages, so leaving it for Python's own
+        # generational thresholds to eventually notice let dead lxml trees
+        # sit resident through the rest of the run. One collection between
+        # stages is cheap next to a stage (10-4000ms) and measured to cut
+        # peak RSS roughly in half on a full run (sampled with
+        # `/usr/bin/time -v`; see the 2026-08-26 commit message).
+        gc.collect()
 
     print("  %s" % "  ".join("%s %.1fs" % (n, t) for t, n in times))
     print("  %d stages in %.1fs" % (len(times), time.time() - started))
