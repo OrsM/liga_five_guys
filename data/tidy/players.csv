@@ -136,7 +136,7 @@ player_id,name,club_id,ff_slug,af_slug,app_id,understat_id,app_names
 12990,nordin al lal,elche,nordin-al-lal,,,,
 12993,alvaro garcia,villarreal,,,,,
 13007,vicent abril,valencia,,,,,
-13035,javi rueda,celta,javi-rueda,,2714,,Javi Rueda
+13035,javi rueda,celta,javi-rueda,179955,2714,,Javi Rueda
 13036,yoel lago,celta,yoel-lago,329722,,12642,
 13040,jon balda,real sociedad,jon-balda,,,,
 13119,vanja drkusic,espanyol,vanja-drkusic,,,10449,
@@ -362,9 +362,11 @@ player_id,name,club_id,ff_slug,af_slug,app_id,understat_id,app_names
 18268,jordi pesquer,barcelona,jordi-pesquer,,,,
 18279,jaume dura,valencia,jaume-dura,,,,
 18282,yassir zabiri,racing,yassir-zabiri,,,14459,
+18294,yanis musuayi,levante,yanis-musuayi,,,,
 18309,umaru konare,elche,umaru-konare,,,14717,
 18314,robbie ure,sevilla,robbie-ure,327536,,14683,
 18378,joseph otu,malaga,joseph-otu,,,,
+18406,ifeanyi ndukwe,levante,ifeanyi-ndukwe,,,,
 18411,curro burgos,getafe,,,,,
 18412,oscar lopez,getafe,oscar-lopez,,,,
 1859,josan ferrandez,elche,josan,,,8893,
