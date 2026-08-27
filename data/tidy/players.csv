@@ -117,7 +117,7 @@ player_id,name,club_id,ff_slug,af_slug,app_id,understat_id,app_names
 12634,willy kambwala,villarreal,willy-kambwala,,,12275,
 12639,raul asencio,real madrid,raul-asencio-1,,2146,13201,Asencio
 12641,gerard martin,barcelona,gerard-martin,181701,2757,12821,Gerard Martín
-12647,johnny cardoso,atletico,johnny-cardoso,,2480,12323,Johnny
+12647,johnny cardoso,atletico,johnny-cardoso,133185,2480,12323,Johnny
 12651,augusto batalla,rayo,augusto-batalla,,,12298,
 12694,iñaki ruperez,real sociedad,inaki-ruperez,,,12354,
 12695,djordjije medenica,getafe,,,,,
@@ -418,7 +418,7 @@ player_id,name,club_id,ff_slug,af_slug,app_id,understat_id,app_names
 3427,thomas lemar,atletico,thomas-lemar,,,,
 3429,kylian mbappe,real madrid,kylian-mbappe,278,,,
 3431,bernardo silva,real madrid,bernardo-silva,636,,3635,
-3589,dominik livakovic,barcelona,,,,,
+3589,dominik livakovic,barcelona,dominik-livakovic,,,,
 3605,angeliño,deportivo,angelino,,3142,,Angeliño
 3607,mouctar diakhaby,valencia,mouctar-diakhaby,,,5666,
 3612,alvaro fernandez,deportivo,alvaro-fernandez,,2975,,A. Ferllo
@@ -528,7 +528,7 @@ player_id,name,club_id,ff_slug,af_slug,app_id,understat_id,app_names
 6973,alfonso herrero,malaga,alfonso-herrero,46843,3040,14724,A. Herrero
 698,german parreño,deportivo,german-parreno,,,,
 7006,oihan sancet,athletic,oihan-sancet,128398,,7779,
-7027,raul garcia,osasuna,raul-garcia-1,,,8042,
+7027,raul garcia,osasuna,raul-garcia-1,146751,,8042,
 707,diego javier llorente,betis,diego-javier-llorente,,2415,2163,Llorente
 7081,fernando niño,elche,fernando-nino,,3147,8271,Fer Niño
 7082,jorge herrando,osasuna,jorge-herrando,182592,,10858,
