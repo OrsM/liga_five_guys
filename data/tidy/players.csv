@@ -90,7 +90,7 @@ player_id,name,club_id,ff_slug,af_slug,app_id,understat_id,app_names
 11916,andres garcia,getafe,andres-garcia,388013,,13392,
 11983,alvaro djalo,athletic,lvaro-djalo,,,13001,
 12025,filip ugrinic,valencia,filip-ugrinic,48465,,13761,
-12042,chidera ejuke,sevilla,chidera-ejuke,,,8694,
+12042,chidera ejuke,sevilla,chidera-ejuke,39121,,8694,
 12079,gustavo puerta,racing,gustavo-puerta,324034,3028,11869,G. Puerta
 12139,georges mikautadze,villarreal,georges-mikautadze,,2771,8187,Mikautadze
 12354,logan costa,villarreal,logan-costa,,,8200,
@@ -647,7 +647,7 @@ player_id,name,club_id,ff_slug,af_slug,app_id,understat_id,app_names
 9762,cesar tarrega,valencia,cesar-tarrega,333672,1991,10107,Tárrega
 9763,ilias akhomach,villarreal,ilias-akhomach,,,10121,
 9772,luismi cruz,deportivo,luismi-cruz,188445,,10163,
-9779,bryan zaragoza,espanyol,,,,,
+9779,bryan zaragoza,espanyol,bryan-zaragoza,,,,
 9796,ruben iranzo,valencia,ruben-iranzo,,,10155,
 9823,marc pubill,atletico,marc-pubill,295793,2562,10189,Marc Pubill
 9847,charlie patino,deportivo,charlie-patino,284466,,,
