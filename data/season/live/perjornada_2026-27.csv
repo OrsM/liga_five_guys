@@ -503,3 +503,35 @@ from_stamp,to_stamp,season,ff_id,player_name,player_name_full,team,points_delta,
 2026-08-24T2326Z,2026-08-26T0423Z,2026-27,15928,Dieng,Aliou Dieng,Valencia,1,1,2,2,2
 2026-08-24T2326Z,2026-08-26T0423Z,2026-27,18031,Sato,Ryunosuke Sato,Valencia,2,1,2,2,2
 2026-08-24T2326Z,2026-08-26T0423Z,2026-27,6665,Rioja,Luis Rioja,Valencia,3,1,3,1,2
+2026-08-26T0423Z,2026-08-27T0505Z,2026-27,59,Courtois,Thibaut Courtois,Real Madrid,4,1,10,2,1
+2026-08-26T0423Z,2026-08-27T0505Z,2026-27,3429,Mbappé,Kylian Mbappé,Real Madrid,22,1,27,2,1
+2026-08-26T0423Z,2026-08-27T0505Z,2026-27,3431,Bernardo Silva,Bernardo Silva,Real Madrid,4,1,8,2,1
+2026-08-26T0423Z,2026-08-27T0505Z,2026-27,3758,Valverde,Federico Valverde,Real Madrid,9,1,15,2,1
+2026-08-26T0423Z,2026-08-27T0505Z,2026-27,4884,Konaté,Ibrahima Konaté,Real Madrid,3,1,10,2,1
+2026-08-26T0423Z,2026-08-27T0505Z,2026-27,5013,Cucurella,Marc Cucurella,Real Madrid,3,1,5,2,1
+2026-08-26T0423Z,2026-08-27T0505Z,2026-27,5035,Brahim,Brahim Díaz,Real Madrid,2,1,2,1,1
+2026-08-26T0423Z,2026-08-27T0505Z,2026-27,5565,Vinicius,Vinicius Junior,Real Madrid,14,1,16,2,1
+2026-08-26T0423Z,2026-08-27T0505Z,2026-27,6055,Dumfries,Denzel Dumfries,Real Madrid,3,1,5,2,1
+2026-08-26T0423Z,2026-08-27T0505Z,2026-27,8386,Bellingham,Jude Bellingham,Real Madrid,15,1,28,2,1
+2026-08-26T0423Z,2026-08-27T0505Z,2026-27,8479,Camavinga,Eduardo Camavinga,Real Madrid,0,1,2,2,1
+2026-08-26T0423Z,2026-08-27T0505Z,2026-27,10176,A. F. Carreras,Álvaro F. Carreras,Real Madrid,1,1,6,2,1
+2026-08-26T0423Z,2026-08-27T0505Z,2026-27,11439,Güler,Arda Güler,Real Madrid,7,1,18,2,1
+2026-08-26T0423Z,2026-08-27T0505Z,2026-27,11830,Huijsen,Dean Huijsen,Real Madrid,8,1,13,2,1
+2026-08-26T0423Z,2026-08-27T0505Z,2026-27,12870,Carlos Espí,Carlos Espí,Real Madrid,1,1,9,2,1
+2026-08-26T0423Z,2026-08-27T0505Z,2026-27,15342,Y. Diomande,Yan Diomande,Real Madrid,2,1,4,2,1
+2026-08-26T0423Z,2026-08-27T0505Z,2026-27,1975,Remiro,Álex Remiro,Real Sociedad,4,1,12,2,1
+2026-08-26T0423Z,2026-08-27T0505Z,2026-27,2675,Oyarzabal,Mikel Oyarzabal,Real Sociedad,2,1,4,2,1
+2026-08-26T0423Z,2026-08-27T0505Z,2026-27,2799,Carlos Soler,Carlos Soler,Real Sociedad,1,1,6,2,1
+2026-08-26T0423Z,2026-08-27T0505Z,2026-27,2802,Zubeldia,Igor Zubeldia,Real Sociedad,-1,1,0,2,1
+2026-08-26T0423Z,2026-08-27T0505Z,2026-27,6180,Sergio Gómez,Sergio Gómez,Real Sociedad,-1,1,1,2,1
+2026-08-26T0423Z,2026-08-27T0505Z,2026-27,6363,Barrenetxea,Ander Barrenetxea,Real Sociedad,0,1,0,2,1
+2026-08-26T0423Z,2026-08-27T0505Z,2026-27,6446,Herrera,Yangel Herrera,Real Sociedad,0,1,6,2,1
+2026-08-26T0423Z,2026-08-27T0505Z,2026-27,7091,Kubo,Takefusa Kubo,Real Sociedad,1,1,5,2,1
+2026-08-26T0423Z,2026-08-27T0505Z,2026-27,8392,L. Sucic,Luka Sucic,Real Sociedad,7,1,11,2,1
+2026-08-26T0423Z,2026-08-27T0505Z,2026-27,8651,Turrientes,Beñat Turrientes,Real Sociedad,2,1,4,2,1
+2026-08-26T0423Z,2026-08-27T0505Z,2026-27,10660,Óskarsson,Orri Steinn Óskarsson,Real Sociedad,0,1,1,2,1
+2026-08-26T0423Z,2026-08-27T0505Z,2026-27,11792,Jon Martín,Jon Martín,Real Sociedad,-2,1,-2,2,1
+2026-08-26T0423Z,2026-08-27T0505Z,2026-27,12538,Aramburu,Jon Aramburu,Real Sociedad,-1,1,2,2,1
+2026-08-26T0423Z,2026-08-27T0505Z,2026-27,14021,Ochieng,Job Ochieng,Real Sociedad,1,1,1,1,1
+2026-08-26T0423Z,2026-08-27T0505Z,2026-27,15273,Beitia,Luken Beitia,Real Sociedad,-2,1,-2,1,1
+2026-08-26T0423Z,2026-08-27T0505Z,2026-27,2242,Guedes,Gonçalo Guedes,Real Sociedad,2,1,2,1,1
