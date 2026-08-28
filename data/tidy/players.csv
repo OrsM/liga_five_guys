@@ -83,6 +83,7 @@ player_id,name,club_id,ff_slug,af_slug,app_id,understat_id,app_names
 11813,natan,betis,natan,195100,2543,11890,Natan
 11816,aitor fraga,real sociedad,,,,,
 11830,dean huijsen,real madrid,dean-huijsen,361497,2530,11943,Huijsen
+11857,matteo prati,racing,matteo-prati,,,,
 11861,dani martinez,atletico,dani-martinez,386869,2881,14233,D. Martínez
 11863,alex calatrava,espanyol,lex-calatrava,,3105,14700,Cala
 11886,manuel angel,real madrid,manuel-ngel,,,14502,
@@ -362,6 +363,7 @@ player_id,name,club_id,ff_slug,af_slug,app_id,understat_id,app_names
 18268,jordi pesquer,barcelona,jordi-pesquer,,,,
 18279,jaume dura,valencia,jaume-dura,,,,
 18282,yassir zabiri,racing,yassir-zabiri,,,14459,
+18283,kayne van oevelen,valencia,kayne-van-oevelen,,,,
 18294,yanis musuayi,levante,yanis-musuayi,,,,
 18309,umaru konare,elche,umaru-konare,,,14717,
 18314,robbie ure,sevilla,robbie-ure,327536,,14683,
@@ -369,9 +371,10 @@ player_id,name,club_id,ff_slug,af_slug,app_id,understat_id,app_names
 18406,ifeanyi ndukwe,levante,ifeanyi-ndukwe,,,,
 18411,curro burgos,getafe,,,,,
 18412,oscar lopez,getafe,oscar-lopez,,,,
+18418,alvaro de pablo,betis,,,,,
 1859,josan ferrandez,elche,josan,,,8893,
 1881,unai lopez,rayo,unai-lopez,47285,2384,4091,Unai Lopez
-1882,joao cancelo,barcelona,joao-cancelo,,,2379,
+1882,joao cancelo,barcelona,joao-cancelo,855,,2379,
 189,jonny castro,alaves,jonny-castro,,2552,2280,Jonny Otto
 1919,david soria,getafe,david-soria,47247,184,2415,David Soria
 1927,pere milla,espanyol,pere-milla,47398,2400,4175,Pere Milla
@@ -574,7 +577,7 @@ player_id,name,club_id,ff_slug,af_slug,app_id,understat_id,app_names
 7920,nico serrano,athletic,nico-serrano,,2501,,Nico Serrano
 7995,francho serrano,getafe,francho-serrano,162249,3200,14893,Francho
 8080,miguel rodriguez,alaves,miguel-rodriguez-1,,3153,,Miguel Rodríguez
-8082,ilaix moriba,celta,ilaix-moriba,,2607,9243,Ilaix Moriba
+8082,ilaix moriba,celta,ilaix-moriba,162123,2607,9243,Ilaix Moriba
 8088,oriol rey,levante,oriol-rey,106727,,8764,
 8228,urko gonzalez de zarate,espanyol,urko-gonzalez-de-zarate,,2622,8861,Urko
 8250,jose salinas,malaga,jose-salinas,184407,,8902,
