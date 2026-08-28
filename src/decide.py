@@ -49,7 +49,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from ffcore.forecast import Bootstrap, pool_from_perjornada  # noqa: E402
 from ffcore.league import api_key  # noqa: E402
 from ffcore.parse import fmt_money  # noqa: E402
-from ffcore.score import SLOT, _calibrated  # noqa: E402
+from ffcore.score import SLOT, SLOT_MIN, _calibrated  # noqa: E402
 from ffcore.text import norm  # noqa: E402
 from ffcore.season import (LeagueState, best_xi,  # noqa: E402
                            simulate_many)
@@ -260,6 +260,49 @@ def xi_bar(exp: dict[str, float], xi) -> float:
     return min((exp.get(k, 0.0) for k in xi), default=0.0)
 
 
+def _squad_depth(mine_squad: dict[str, str]) -> dict[str, int]:
+    """How many of each slot the squad currently carries."""
+    depth: dict[str, int] = {}
+    for slot in mine_squad.values():
+        depth[slot] = depth.get(slot, 0) + 1
+    return depth
+
+
+def _safe_to_sell(u: Universe, k: str, depth: dict[str, int]) -> bool:
+    """Would selling `k` still leave a legal shape fieldable?
+
+    SLOT_MIN is a hard floor per position — one keeper, at least three
+    defenders and three midfielders, at least one forward — not a
+    threshold to tune. Below it `best_xi()` cannot complete ANY shape
+    (season.py:97), so the simulation would correctly price the result as
+    ruinous, but there is no reason to spend a screening pass finding
+    that out. `depth` is checked against the CURRENT squad, mutated by
+    the caller as sales are chosen, so a chain that would sell two men
+    from an already-thin position is caught even when either alone is
+    safe.
+    """
+    slot = u.pos.get(k, "MED")
+    return depth.get(slot, 0) - 1 >= SLOT_MIN.get(slot, 0)
+
+
+def _weak_starters(u: Universe, xi: set[str], bar_exp: dict[str, float],
+                    depth: dict[str, int], exclude: str = ""
+                    ) -> list[tuple[str, float]]:
+    """Fielded players, weakest first, whose sale wouldn't break a shape.
+
+    DEAD WEIGHT ISN'T THE ONLY THING WORTH SELLING. It is the only thing
+    that costs nothing to sell — a starter's sale costs real points on the
+    pitch, which is exactly why these are tried only after dead weight
+    runs out (see candidates()) or not at all until dead weight plus cash
+    both fall short (see best_swap_for()). Whether a given starter is
+    actually worth selling is the simulation's call, not this function's —
+    this only says which sales are LEGAL to propose.
+    """
+    out = [(k, u.proceeds.get(k, 0.0)) for k in xi
+           if k != exclude and _safe_to_sell(u, k, depth)]
+    return sorted(out, key=lambda kv: bar_exp.get(kv[0], 0.0))
+
+
 def candidates(u: Universe, expected: dict[str, float],
                budget: float | None = None) -> list[Action]:
     """Every affordable move, pruned to the ones that could plausibly help.
@@ -270,7 +313,8 @@ def candidates(u: Universe, expected: dict[str, float],
     eleven on expectation will not make it on a draw either.
     """
     cash = u.cash if budget is None else budget
-    mine = set(u.state.squads.get(u.me, {}))
+    mine_squad = u.state.squads.get(u.me, {})
+    mine = set(mine_squad)
     # The eleven the signing has to beat is one you can still pick — see
     # choosable(), which current_xi() already calls. `expected` may be any
     # round; the BAR never comes off a locked one, so a choosable() that
@@ -281,13 +325,21 @@ def candidates(u: Universe, expected: dict[str, float],
         bar_exp = expected
         xi = set(best_xi(u.state.squads[u.me], bar_exp))
     bar = xi_bar(bar_exp, xi)
-    spare = sorted((k for k in mine if k not in xi),
+    # FUNDING IS NOT JUST BENCH ANY MORE. A starter is a legal sale too, and
+    # the only reason to leave him out of the pool is if the squad cannot
+    # spare him (SLOT_MIN) — whether he is WORTH selling is what the
+    # simulation this feeds is for. Weakest expected contributor first,
+    # whichever regime (bench or XI) he happens to be in.
+    depth0 = _squad_depth(mine_squad)
+    spare = sorted((k for k in mine if _safe_to_sell(u, k, depth0)),
                    key=lambda k: bar_exp.get(k, 0.0))
-    # DEAD WEIGHT PAYS FOR THINGS. These never make the eleven, so selling
-    # them costs nothing on the pitch and the only question is what the money
-    # then buys. Biggest first, so the greedy below never sells four men to do
-    # the work of three.
-    free = sorted(dead_weight(u), key=lambda kv: -kv[1])
+    # DEAD WEIGHT PAYS FOR THINGS FIRST. These never make the eleven, so
+    # selling them costs nothing on the pitch — tried before any starter
+    # sale, which does cost something. Biggest first, so the greedy below
+    # never sells four men to do the work of three. Weak starters (SLOT_MIN-
+    # safe, weakest first) fill in only once dead weight runs out.
+    free = sorted(dead_weight(u), key=lambda kv: -kv[1]) \
+        + _weak_starters(u, xi, bar_exp, dict(depth0))
 
     out: list[Action] = []
     for c, price in sorted(u.price.items(), key=lambda kv: kv[1]):
@@ -306,32 +358,41 @@ def candidates(u: Universe, expected: dict[str, float],
         if price <= cash:
             out.append(Action(kind, buy=c, cost=price,
                               victim=victim if raid else ""))
-        # Funded by a sale: only the cheapest few spares are worth trying,
-        # because selling a man you field to buy one you also field is a swap
-        # the simulation will price at roughly nothing.
-        for s in spare[:4]:
+        # Funded by a sale: only the cheapest few spares are worth trying —
+        # bench or a weak starter, now — because selling a man you field to
+        # buy one you also field is a swap the simulation will price at
+        # roughly nothing. Six, not four: the pool is bigger than bench-only
+        # was, so a couple more are worth a look.
+        for s in spare[:6]:
             got = u.proceeds.get(s, 0.0)
             if price <= cash + got:
                 out.append(Action(swap, buy=c, sell=s, cost=price,
                                   proceeds=got,
                                   victim=victim if raid else ""))
         # Out of reach on cash plus any ONE spare, but not out of reach: the
-        # fewest dead-weight sales that cover it. One combination per target
-        # rather than every subset — they are all worth the same on the pitch,
-        # so the only thing to choose between them is how few men leave.
+        # fewest sales that cover it, dead weight first, weak starters after.
+        # One combination per target rather than every subset — they are all
+        # worth the same on the pitch, so the only thing to choose between
+        # them is how few men leave. Depth is tracked and re-checked as sales
+        # are chosen — two starters from the same thin position can each be
+        # individually safe and still not be safe TOGETHER.
         # THE TRIGGER IS THE REAL BALANCE, not the budget. `budget` widens
         # what gets EMITTED, so the frontier can be measured off targets you
-        # cannot afford; whether one sale is enough to reach a man is a fact
-        # about the money you actually have. Keyed to the budget instead, an
-        # unlimited one made every target reachable on cash alone and the
-        # multi-sale moves stopped being generated at all — which silently
-        # removed the best move on the board.
+        # cannot afford; whether the sales on hand are enough to reach a man
+        # is a fact about the money you actually have. Keyed to the budget
+        # instead, an unlimited one made every target reachable on cash alone
+        # and the multi-sale moves stopped being generated at all — which
+        # silently removed the best move on the board.
         if price > u.cash + max((u.proceeds.get(s, 0.0) for s in spare),
                                 default=0.0):
             sold, got = [], 0.0
+            depth = dict(depth0)
             for k, raises in free:
                 if price <= u.cash + got:
                     break
+                if not _safe_to_sell(u, k, depth):
+                    continue
+                depth[u.pos.get(k, "MED")] -= 1
                 sold.append(k)
                 got += raises
             if sold and price <= cash + got:
@@ -557,10 +618,20 @@ def band(pairs) -> tuple[float, float, float]:
 
 def best_swap_for(u: Universe, k: str, expected: dict[str, float]
                   ) -> Action | None:
-    """The best real upgrade `k`'s OWN sale funds — sell him, buy the
-    highest-expected target his proceeds (plus your cash) can reach.
-    None when nothing does: the honest answer for a man with no
-    affordable upgrade is "keep him", not a swap that does not exist.
+    """The best real upgrade `k`'s sale funds — sell him, buy the
+    highest-expected target his proceeds, your cash, AND (if that still
+    falls short) the same dead-weight-then-weak-starters chain
+    candidates() draws on can reach. None when nothing does: the honest
+    answer for a man with no affordable upgrade is "keep him", not a
+    swap that does not exist.
+
+    WIDENED FUNDING, 2026-08-29. Used to stop at k's own proceeds plus
+    cash — a real gap, flagged the night before: it answered "what is he
+    worth alone" when the question this exists for is "what would it
+    take", the same one candidates() answers for the rest of the board.
+    Extra sales (never k himself, SLOT_MIN-safe, see _weak_starters())
+    only get proposed once his own sale plus cash isn't enough — a target
+    reachable on his own is never funded by more men than it needs to be.
 
     THIS IS THE QUESTION A HELD PLAYER'S BAND SHOULD ANSWER and a pure
     sale (sell him, buy nothing) is not it — see sim.band_acts()'s own
@@ -594,24 +665,63 @@ def best_swap_for(u: Universe, k: str, expected: dict[str, float]
     right; the swap it was pointing at was not a question worth asking.
     """
     mine = u.state.squads.get(u.me, {})
-    budget = u.cash + u.proceeds.get(k, 0.0)
+    base_budget = u.cash + u.proceeds.get(k, 0.0)
     my_exp = expected.get(k, 0.0)
     slot = u.pos.get(k)
-    best_c, best_exp, best_price = None, my_exp, None
+
+    # THE EXTRA CHAIN: dead weight first (free on the pitch), then other
+    # weak starters, SLOT_MIN-safe, k already counted as gone. Built once,
+    # walked once — `extra_names[i]`/`extra_running[i]` is "sell the first
+    # i+1 of these, raise this much", so any target's minimal extra sale
+    # is a lookup, not a fresh walk.
+    depth = _squad_depth(mine)
+    if slot in depth:
+        depth[slot] -= 1
+    xi_now = set(best_xi(mine, expected))
+    # k HIMSELF NEVER RIDES IN THIS CHAIN — he is already the primary sale,
+    # accounted for in base_budget, and dead_weight() does not know to
+    # exclude him (it tags anyone never in ANY choosable XI, which k can be
+    # if he is bench).
+    chain = [(p, r) for p, r in sorted(dead_weight(u), key=lambda kv: -kv[1])
+            if p != k] + _weak_starters(u, xi_now, expected, dict(depth),
+                                        exclude=k)
+    extra_names: list[str] = []
+    extra_running: list[float] = []
+    got = 0.0
+    for s, raises in chain:
+        if not _safe_to_sell(u, s, depth):
+            continue
+        depth[u.pos.get(s, "MED")] -= 1
+        got += raises
+        extra_names.append(s)
+        extra_running.append(got)
+    max_budget = base_budget + got
+
+    best_c, best_exp, best_price, best_sell, best_proceeds = \
+        None, my_exp, None, (k,), u.proceeds.get(k, 0.0)
     for c, price in u.price.items():
-        if c == k or c in mine or price > budget or u.pos.get(c) != slot:
+        if c == k or c in mine or u.pos.get(c) != slot or price > max_budget:
             continue
         e = expected.get(c, 0.0)
-        if e > best_exp or (e == best_exp and best_c is not None
-                            and price < best_price):
-            best_c, best_exp, best_price = c, e, price
+        if not (e > best_exp or (e == best_exp and best_c is not None
+                                 and price < best_price)):
+            continue
+        if price <= base_budget:
+            sell, proceeds = (k,), u.proceeds.get(k, 0.0)
+        else:
+            n = next(i for i, g in enumerate(extra_running)
+                    if g >= price - base_budget) + 1
+            sell = tuple(sorted((k, *extra_names[:n])))
+            proceeds = u.proceeds.get(k, 0.0) + extra_running[n - 1]
+        best_c, best_exp, best_price = c, e, price
+        best_sell, best_proceeds = sell, proceeds
     if best_c is None:
         return None
     victim = u.owner.get(best_c, "")
     raid = bool(victim and victim != u.me
                and u.route.get(best_c, "market") == "clause")
-    return Action("clause-swap" if raid else "swap", buy=best_c, sell=k,
-                 cost=best_price, proceeds=u.proceeds.get(k, 0.0),
+    return Action("clause-swap" if raid else "swap", buy=best_c,
+                 sell=best_sell, cost=best_price, proceeds=best_proceeds,
                  victim=victim if raid else "")
 
 
@@ -1916,6 +2026,100 @@ def _selftest() -> None:
     exp_slot = u_sw3.forecaster.expected(1)
     got3 = best_swap_for(u_sw3, "me_k", exp_slot)
     assert got3.buy == "riv_up", got3     # not "wrong_slot", despite exp 50
+
+    # -- funding widened to include starters, not just bench dead weight
+    # (2026-08-29) -----------------------------------------------------------
+    from ffcore.forecast import Bootstrap as B3
+
+    sq3 = {"me_k": "POR", "me_d1": "DEF", "me_d2": "DEF", "me_d3": "DEF",
+          "me_d4": "DEF", "me_m1": "MED", "me_m2": "MED", "me_m3": "MED",
+          "me_m4": "MED", "me_m5": "MED", "me_f1": "DEL"}
+    per3 = {1: {k: (3.0, 1.0) for k in sq3}}
+    # k and f1 sit at the SLOT_MIN floor (1 keeper, 1 forward) — given the
+    # LOWEST expected points here on purpose, so the widened pool's own
+    # ascending sort would try them FIRST if the SLOT_MIN guard were not
+    # there. d1/m1/m2 are the next-weakest, safely above their own floors
+    # (DEF depth 4 > min 3, MED depth 5 > min 3).
+    per3[1]["me_k"] = (0.1, 1.0)
+    per3[1]["me_f1"] = (0.2, 1.0)
+    per3[1]["me_d1"] = (2.5, 1.0)
+    per3[1]["me_m1"] = (2.6, 1.0)
+    per3[1]["me_m2"] = (2.7, 1.0)
+    per3[1]["mid_up"] = (6.0, 1.0)
+    per3[1]["mid_big"] = (8.0, 1.0)
+    u3 = Universe(
+        state=LeagueState({"me": dict(sq3)}, [1], "me"),
+        forecaster=B3(per3),
+        pos={**sq3, "mid_up": "MED", "mid_big": "DEL"},
+        price={"mid_up": 14e6, "mid_big": 19e6},
+        proceeds={"me_d1": 5e6, "me_m1": 4e6, "me_m2": 4e6},
+        owner={}, cash=10e6, me="me")
+    exp3 = u3.forecaster.expected(1)
+
+    assert dead_weight(u3) == [], dead_weight(u3)   # no bench: nothing free
+
+    acts3 = candidates(u3, exp3)
+    # SLOT_MIN GUARD: the sole keeper and sole forward are never offered as
+    # a seller, even though they were deliberately given the lowest exp of
+    # anyone — selling either would leave no legal shape at all.
+    assert not any("me_k" in a.sell for a in acts3), \
+        [a for a in acts3 if "me_k" in a.sell]
+    assert not any("me_f1" in a.sell for a in acts3), \
+        [a for a in acts3 if "me_f1" in a.sell]
+
+    # mid_up (14M): out of reach on cash (10M) alone, in reach on cash plus
+    # ONE weak starter (me_d1, 5M) — the widened spare pool, not dead
+    # weight (there is none), funds it.
+    up_rows = [a for a in acts3 if a.buy == "mid_up"]
+    assert up_rows, acts3
+    assert any(a.sell == ("me_d1",) for a in up_rows), up_rows
+    assert not any(not a.sell for a in up_rows), up_rows   # not cash-alone
+
+    # mid_big (19M): out of reach on cash plus ANY single spare (best single
+    # is me_d1 at 15M) — needs two, and the widened multi-sale chain (no
+    # dead weight to draw on here) reaches for weak starters instead of
+    # giving up.
+    big_rows = [a for a in acts3 if a.buy == "mid_big"]
+    assert big_rows, acts3
+    combo = next((a for a in big_rows if len(a.sell) >= 2), None)
+    assert combo is not None, big_rows
+    assert set(combo.sell) <= {"me_d1", "me_m1", "me_m2"}, combo
+    assert combo.proceeds >= 9e6, combo   # d1+m1 = 9M, exactly what 19M needs
+    assert "me_k" not in combo.sell and "me_f1" not in combo.sell, combo
+
+    # -- best_swap_for(): the same widened chain, so a held player's own
+    # band stops answering a narrower question than the main table --------
+    per3b = dict(per3[1])
+    per3b["riv_target"] = (7.0, 1.0)
+    u3b = Universe(
+        state=u3.state, forecaster=B3({1: per3b}),
+        pos={**u3.pos, "riv_target": "DEF"},
+        price={**u3.price, "riv_target": 14e6},
+        proceeds=u3.proceeds, owner={}, cash=4e6, me="me")
+    exp3b = u3b.forecaster.expected(1)
+    # me_d2's own sale (no proceeds set -> 0.0) plus cash (4M) alone, and
+    # the ONLY other extra funding available (me_m1/me_m2, 4M each — me_d1
+    # is guarded off once me_d2 himself leaves, DEF drops to the SLOT_MIN
+    # floor) tops out at 12M — still short of 14M. The OLD best_swap_for,
+    # scoped to k's own proceeds + cash only, would ALSO have said None
+    # here, so this is the honest "no answer" floor, not a regression.
+    assert best_swap_for(u3b, "me_d2", exp3b) is None
+
+    # Give him a real proceeds figure — still short of 14M with cash alone,
+    # and even his own sale plus BOTH weak midfielders is needed to reach it.
+    u3c = Universe(
+        state=u3.state, forecaster=B3({1: per3b}),
+        pos={**u3.pos, "riv_target": "DEF"},
+        price={**u3.price, "riv_target": 14e6},
+        proceeds={**u3.proceeds, "me_d2": 3e6}, owner={}, cash=4e6, me="me")
+    exp3c = u3c.forecaster.expected(1)
+    got3c = best_swap_for(u3c, "me_d2", exp3c)
+    assert got3c is not None and got3c.buy == "riv_target", got3c
+    assert "me_d2" in got3c.sell, got3c
+    assert len(got3c.sell) > 1, got3c        # his own sale alone isn't enough
+    assert "me_k" not in got3c.sell and "me_f1" not in got3c.sell, got3c
+    assert got3c.proceeds == sum(u3c.proceeds.get(p, 0.0)
+                                 for p in got3c.sell), got3c
 
     # -- value_rate: the shared primitive, on its own -----------------------
     assert value_rate(120.0, 14.13e6) is not None
