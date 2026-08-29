@@ -89,6 +89,19 @@ def best_xi(squad: dict[str, str], value: dict[str, float]) -> list[str]:
     for slot in by_slot:
         by_slot[slot].sort(key=lambda k: -value.get(k, 0.0))
 
+    # PREFIX SUMS, ONCE PER SLOT. Every shape only ever wants a slot's best-N
+    # players, so summing that prefix fresh per shape (SHAPES is 7 long, so
+    # this used to run up to 7x per call) repeated the same partial sums.
+    # `prefix[slot][n]` is the value of that slot's best n players — a plain
+    # running total, computed once here and looked up O(1) below.
+    prefix: dict[str, list[float]] = {}
+    for slot, have in by_slot.items():
+        acc, ps = 0.0, [0.0]
+        for k in have:
+            acc += value.get(k, 0.0)
+            ps.append(acc)
+        prefix[slot] = ps
+
     best, best_total = [], None
     for shape in SHAPES:
         picked, total, ok = [], 0.0, True
@@ -98,7 +111,7 @@ def best_xi(squad: dict[str, str], value: dict[str, float]) -> list[str]:
                 ok = False
                 break
             picked += have[:n]
-            total += sum(value.get(k, 0.0) for k in have[:n])
+            total += prefix[slot][n]
         if ok and (best_total is None or total > best_total):
             best, best_total = picked, total
     return best

@@ -32,6 +32,7 @@ import os
 import re
 import sys
 from datetime import datetime, timedelta, timezone
+from functools import lru_cache
 from pathlib import Path
 from typing import NamedTuple
 
@@ -160,9 +161,19 @@ def read_csv(path) -> list[dict]:
     hit = _READ_CACHE.get(str(path))
     if hit is None or hit[0] != (st.st_mtime_ns, st.st_size):
         with path.open(encoding="utf-8") as fh:
-            rows = [{k: sys.intern(v) if type(v) is str else v
-                     for k, v in row.items()}
-                    for row in csv.DictReader(fh)]
+            # csv.reader + zip(fieldnames, ...) instead of DictReader: same
+            # rows (verified byte-for-byte equal on every tidy CSV in the
+            # store 2026-08-29), DictReader's own per-row restkey/restval
+            # bookkeeping is dead weight here because ff_ingest never writes
+            # a ragged row. ~25% faster parsing market.csv (0.53s -> 0.40s).
+            r = csv.reader(fh)
+            try:
+                fieldnames = next(r)
+            except StopIteration:
+                fieldnames = []
+            intern = sys.intern
+            rows = [dict(zip(fieldnames, map(intern, row)))
+                    for row in r if row]
         hit = ((st.st_mtime_ns, st.st_size), rows)
         _READ_CACHE[str(path)] = hit
     return [dict(r) for r in hit[1]]
@@ -276,7 +287,16 @@ def write_lines(path, lines) -> None:
 # time
 # ---------------------------------------------------------------------------
 
+@lru_cache(maxsize=4096)
 def _digits_to_dt(s: str, tz):
+    # CACHED: a snapshot log's observed_at column is a few hundred distinct
+    # stamps repeated over tens of thousands of rows (market.csv: 149 distinct
+    # values across 96,362 rows) — Market.__init__ alone calls this once per
+    # row. tz is always one of two module-level singletons (UTC, MADRID), so
+    # (s, tz) is a small, stable cache key; s comes from interned CSV cells
+    # (see read_csv), so repeats hit the same string object, not just an
+    # equal one. Measured 2026-08-29: cut ffcore.model.session()'s snapshot_stamp
+    # time from 0.67s to effectively zero.
     digits = re.sub(r"\D", "", s or "")
     if len(digits) < 8:
         return None
@@ -352,9 +372,21 @@ def latest_snapshot(path, keep=None) -> list[dict]:
     except OSError:
         return []
     with fh:
+        r = csv.reader(fh)
+        try:
+            fieldnames = next(r)
+        except StopIteration:
+            fieldnames = []
         newest = ""
         kept: list[dict] = []
-        for row in csv.DictReader(fh):
+        # Raw csv.reader + zip, not DictReader — same reasoning as read_csv:
+        # this still has to walk the WHOLE file to find the newest stamp, so
+        # DictReader's per-row overhead is not optional here the way the
+        # memory saving is.
+        for raw in r:
+            if not raw:
+                continue
+            row = dict(zip(fieldnames, raw))
             if keep is not None and not keep(row):
                 continue
             stamp = row.get("observed_at", "")
@@ -752,6 +784,9 @@ def load_results_history() -> list[dict]:
     return read_csv(TIDY / "results_history.csv")
 
 
+_UNDERSTAT_CACHE: dict[tuple, tuple] = {}
+
+
 def load_understat_players(season: str = "") -> list[dict]:
     """Player-level xG/xA (sources.parse_understat_players), the newest
     reading for each (season, understat_id) pair.
@@ -765,16 +800,33 @@ def load_understat_players(season: str = "") -> list[dict]:
     `season` filters to one Understat season label ("2026" for 2026/2027);
     "" (default) returns every season on record — a caller comparing a
     player's prior-season xG rate to his current one wants both at once.
+
+    CACHED PER SEASON, keyed on the file's own (mtime, size) — the same
+    invalidation read_csv() uses, because nothing in this pipeline writes
+    understat_players.csv mid-run (it is ingest's, not run.py's). Without
+    this, score.build() calls in with "2026"/"2025" five times in one
+    session() — a full re-filter + re-sort of 39,606 rows each time — for an
+    answer that cannot have changed since the last call in the same run.
     """
-    rows = read_csv(TIDY / "understat_players.csv")
-    if season:
-        rows = [r for r in rows if r.get("season") == season]
-    latest: dict[tuple, dict] = {}
-    for r in sorted(rows, key=lambda r: r.get("observed_at", "")):
-        key = (r.get("season"), r.get("understat_id"))
-        if key[1]:
-            latest[key] = r
-    return list(latest.values())
+    path = TIDY / "understat_players.csv"
+    try:
+        st = path.stat()
+    except OSError:
+        return []
+    key = (season, st.st_mtime_ns, st.st_size)
+    hit = _UNDERSTAT_CACHE.get(key)
+    if hit is None:
+        rows = read_csv(path)
+        if season:
+            rows = [r for r in rows if r.get("season") == season]
+        latest: dict[tuple, dict] = {}
+        for r in sorted(rows, key=lambda r: r.get("observed_at", "")):
+            k = (r.get("season"), r.get("understat_id"))
+            if k[1]:
+                latest[k] = r
+        hit = tuple(latest.values())
+        _UNDERSTAT_CACHE[key] = hit
+    return [dict(r) for r in hit]
 
 
 # Approximated, not measured: stoppage time is not on the page a starter's
