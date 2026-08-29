@@ -568,7 +568,7 @@ player_id,name,club_id,ff_slug,af_slug,app_id,understat_id,app_names
 7725,jon pacheco,real sociedad,jon-pacheco,,,,
 7737,unai vencedor,athletic,unai-vencedor,,,,
 775,jose maria gimenez,atletico,jose-maria-gimenez,,,,
-7786,giorgi kochorashvili,sevilla,giorgi-kochorashvili-1,,,,
+7786,giorgi kochorashvili,sevilla,giorgi-kochorashvili-1,,,8425,
 7842,ferran jutgla,celta,ferran-jutgla,122734,2603,8549,Ferran Jutglà
 7870,raul moro,osasuna,raul-moro,264470,2923,8584,Raúl Moro
 7902,hugo novoa,alaves,hugo-novoa,,,,
@@ -605,7 +605,7 @@ player_id,name,club_id,ff_slug,af_slug,app_id,understat_id,app_names
 8686,juan iglesias,sevilla,juan-iglesias,119742,,9218,
 8693,nico williams,athletic,nico-williams,183799,,9211,
 8695,boyomo,osasuna,boyomo,279822,,,
-8703,alfonso gonzalez,sevilla,alfonso-gonzalez,,2754,,Alfon
+8703,alfonso gonzalez,sevilla,alfonso-gonzalez,,2754,9241,Alfon
 8712,mario soriano,deportivo,mario-soriano,161965,2995,9247,Mario Soriano
 8737,antonio blanco,alaves,antonio-blanco,162686,3069,9280,Blanco
 8780,david larrubia,malaga,david-larrubia,190253,,14730,
