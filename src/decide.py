@@ -68,6 +68,22 @@ SCREEN_TRIALS = 250
 FINAL_TRIALS = 3000
 KEEP = 12          # how many survive screening and get the full count
 
+# A RELIABLE FLOOR, ON TOP OF KEEP, NOT INSTEAD OF IT. Checked against this
+# league's real transaction history 2026-08-29 (data/tidy/transactions.csv):
+# 108 recorded transactions, all 108 "from the app" — zero manager-to-manager
+# sales, ever. A "listed" candidate (Universe.route: a rival's own sale, who
+# can simply not sell) screens on the same raw gain as a "free"/"clause" one
+# that is actually guaranteed to go through, and on this box's real data
+# listed candidates filled 10 of KEEP's 12 slots — a free-agent move outside
+# the raw top 12 never reached the full FINAL_TRIALS pass at all, not even to
+# be shown with a real band in the report table, because listed candidates
+# that will likely never happen crowded it out of the SAMPLE, not just out of
+# the final recommendation. This tops up `keep` with the best-screened
+# reliable candidates not already in it, until at least this many are in the
+# final pass — added on top of the natural top-KEEP, never displacing
+# anything from it, so a real listed opportunity stays fully visible too.
+KEEP_RELIABLE_MIN = 6
+
 
 @dataclass(frozen=True)
 class Action:
@@ -815,7 +831,23 @@ def rank(u: Universe, acts: list[Action], seed: int = 1,
     screened = sorted(pick.values(), key=lambda t: (-t[0], t[1].net))
 
     # ...and one for the survivors, at the full count.
-    keep = [a for _, a in screened[:KEEP]]
+    top = screened[:KEEP]
+    # TOP UP WITH RELIABLE CANDIDATES, ON TOP OF `top` — see KEEP_RELIABLE_MIN's
+    # own note. A "listed" target (a rival's own sale) screens on the same raw
+    # gain as a guaranteed free/clause one, so the natural top-KEEP can end up
+    # almost entirely listed; this adds the best-screened reliable candidates
+    # NOT already in `top`, so they reach the full-precision pass too, without
+    # removing a single listed one that made it there honestly.
+    reliable = lambda a: u.route.get(a.buy, "free") != "listed"           # noqa: E731
+    n_reliable = sum(1 for _, a in top if reliable(a))
+    if n_reliable < KEEP_RELIABLE_MIN:
+        # NOT NAMED `extra` — that is this function's own parameter (the
+        # ladder/offer rows), and shadowing it here silently dropped every
+        # band the caller asked for, found immediately by decide.py's own
+        # self-test failing on an unrelated assertion (2026-08-29).
+        topped_up = [t for t in screened[KEEP:] if reliable(t[1])]
+        top = top + topped_up[:KEEP_RELIABLE_MIN - n_reliable]
+    keep = [a for _, a in top]
     answers, afters = [], []
     for a in keep:
         after = apply(u, a)
@@ -1717,6 +1749,38 @@ def _selftest() -> None:
     by = {r["action"].buy: r["d_pos"] for r in got}
     assert by["th_m1"] > by["free_x"], by
 
+    # -- KEEP_RELIABLE_MIN: a wall of "listed" candidates that screen well
+    # does not crowd a smaller but reliable one out of the full-precision
+    # pass ------------------------------------------------------------
+    per5 = {1: dict(per[1])}
+    acts5 = []
+    for i in range(15):     # all bigger than any reliable candidate below
+        key = "listed%d" % i
+        per5[1][key] = (10.0 - i * 0.1, 1.0)
+        acts5.append(Action("buy", buy=key, cost=1e6))
+    for i in range(3):      # smaller than every listed one — no raw top-12
+        key = "reliable%d" % i
+        per5[1][key] = (2.0, 1.0)
+        acts5.append(Action("buy", buy=key, cost=1e6))
+    route5 = {"listed%d" % i: "listed" for i in range(15)}
+    route5.update({"reliable%d" % i: "free" for i in range(3)})
+    u5 = Universe(
+        state=LeagueState({"me": dict(mine), "riv": dict(theirs)}, [1], "me"),
+        forecaster=B(per5),
+        pos={**u.pos, **{a.buy: "MED" for a in acts5}},
+        price={a.buy: 1e6 for a in acts5}, route=route5,
+        proceeds={}, owner={}, cash=100e6, me="me")
+    rows5, *_ = rank(u5, acts5)
+    kept5 = {r["action"].buy for r in rows5}
+    # All 15 "listed" candidates screen ahead of all 3 reliable ones, so the
+    # natural top-KEEP=12 is entirely "listed" — the 3 reliable ones only
+    # get in because KEEP_RELIABLE_MIN tops the pass up, ON TOP of the 12,
+    # not instead of any of them: 18 candidates in, 15 kept (12 + 3), none
+    # of the top-12 listed ones dropped to make room.
+    assert all(("reliable%d" % i) in kept5 for i in range(3)), kept5
+    assert len(kept5) == 15, kept5
+    assert sum(1 for k in kept5 if k.startswith("listed")) == 12, kept5
+
     # -- what a clause burns, and what that is worth in places -------------
     # A free agent asks about what he is worth, so buying one destroys
     # nothing: you hold an asset you could sell back for the money. A buyout
@@ -2129,7 +2193,7 @@ def _selftest() -> None:
     assert value_rate(None, 5e6) is None
     assert value_rate(0.0, 5e6) == 0.0           # a real price, zero return: 0, not None
 
-    print("decide self-test OK (100 cases)")
+    print("decide self-test OK (103 cases)")
 
 
 if __name__ == "__main__":
