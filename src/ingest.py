@@ -590,8 +590,20 @@ def parse() -> None:
     distinct CONTENT and the rows are re-stamped for every snapshot that
     carried it, which is the same output by construction: `observed_at` is the
     only field any parser takes from the stamp, and the self-test holds that.
+
+    MATERIALISED ONE TABLE AT A TIME, NOT ALL SEVENTEEN AT ONCE. Every row of
+    every table used to be re-stamped into `tables[table]` (route()'s own
+    dict(r) copy) DURING the walk below, so by the time the first line got
+    written to disk this held a second, restamped copy of the entire tidy
+    store — market.csv and lineups.csv alone are ~55MB of that. `pending`
+    below holds (stamp, row) instead, where `row` is a REFERENCE into `cache`
+    (already resident — it is the parse cache, unavoidable) rather than a
+    copy; the per-stamp dict() copy route() always needed still happens, just
+    deferred to the write loop, table by table, so only the table currently
+    being written is materialised. Measured 2026-08-29: ingest.parse()'s own
+    peak RSS roughly halved on this box's real tidy store.
     """
-    tables: dict[str, list[dict]] = {}
+    pending: dict[str, list[tuple[str, dict]]] = {}
     cache, fresh = _parse_cache(), {}
     walk = doc_keys()
     keys = _Sigs()
@@ -628,17 +640,44 @@ def parse() -> None:
             rows = cache.get(pk, [])
             hits += 1
             fresh[pk] = rows
-            route(tables, rows, src.table, stamp)
+            for r in rows:
+                table = r.get(ROW_TABLE) or src.table
+                pending.setdefault(table, []).append((stamp, r))
     hits -= misses
     _save_parse_cache(fresh)
     print("  parsed %d documents, reused %d" % (misses, hits))
 
     TIDY.mkdir(parents=True, exist_ok=True)
-    # One file per table, named by the table. This used to be three hardcoded
-    # lines, so a new source in the registry was still half-wired here — the
-    # rows were collected and then never written. A registry entry is now the
-    # whole change.
-    for table, rows in sorted(tables.items()):
+    # probable_xi.csv was this file before it grew a `source` column. Tidy is
+    # disposable and rebuilt whole every run, so the old copy is deleted rather
+    # than left to be read by mistake.
+    (TIDY / "probable_xi.csv").unlink(missing_ok=True)
+
+    market_count = 0
+    xi_count = 0
+    tally: dict[str, int] = {}
+    per_source: dict[str, int] = {}
+    fixture_count = 0
+    played: set = set()
+    starters_count = 0
+    starters_matches: set = set()
+
+    # One file per table, named by the table, ONE TABLE'S ROWS MATERIALISED
+    # AT A TIME — see this function's own docstring. This used to be three
+    # hardcoded lines, so a new source in the registry was still half-wired
+    # here — the rows were collected and then never written. A registry
+    # entry is now the whole change.
+    for table in sorted(pending):
+        rows = []
+        for stamp, r in pending.pop(table):
+            # dict(r) + pop + set, not a filtered comprehension unioned with
+            # a second dict — same result, one dict allocation instead of
+            # two. Same fix as route()'s own (2026-08-29), inlined here
+            # because this loop replaces route() as parse()'s hot path.
+            d = dict(r)
+            d.pop(ROW_TABLE, None)
+            d["observed_at"] = stamp
+            rows.append(d)
         # A table of immutable facts keeps the first sighting of each and
         # nothing else — see sources.STORE_ONCE. Applied here, once, at the
         # only place tidy files are written, so a new such table is one
@@ -646,41 +685,45 @@ def parse() -> None:
         if table in STORE_ONCE:
             rows = first_seen(rows, STORE_ONCE[table])
         _write_csv(TIDY / f"{table}.csv", rows)
-    market_rows = tables.get("market", [])
-    xi_rows = tables.get("lineups", [])
-    fixture_rows = tables.get("fixtures", [])
-    # probable_xi.csv was this file before it grew a `source` column. Tidy is
-    # disposable and rebuilt whole every run, so the old copy is deleted rather
-    # than left to be read by mistake.
-    (TIDY / "probable_xi.csv").unlink(missing_ok=True)
+        # The report below only ever needed SUMMARIES of five of these
+        # seventeen tables, never the rows themselves past this point — so
+        # they are taken here, while `rows` is still alive for its one
+        # table's write, instead of keeping every table's rows around
+        # afterwards the way tables.get("market", []) etc. used to.
+        if table == "market":
+            market_count = len(rows)
+        elif table == "lineups":
+            xi_count = len(rows)
+            for r in rows:
+                tally[r["status"]] = tally.get(r["status"], 0) + 1
+                per_source[r["source"]] = per_source.get(r["source"], 0) + 1
+        elif table == "fixtures":
+            fixture_count = len(rows)
+        elif table == "matches":
+            played = {r["match_id"] for r in rows if r["score"]}
+        elif table == "starters":
+            starters_count = len(rows)
+            starters_matches = {r["match_id"] for r in rows}
 
     # Fail loudly on an empty parse: a silently-empty probable XI would set
     # every start probability to zero and quietly bench your best players.
-    if not market_rows:
+    if not market_count:
         sys.exit("ERROR: market parse produced 0 rows — the markup changed.")
 
     # Print the status breakdown every run. The injury column sat on 'ok' for
     # 14,765 rows without anything noticing; a count in the log is what makes
     # that visible the next time the markup moves.
-    tally: dict[str, int] = {}
-    per_source: dict[str, int] = {}
-    for r in xi_rows:
-        tally[r["status"]] = tally.get(r["status"], 0) + 1
-        per_source[r["source"]] = per_source.get(r["source"], 0) + 1
     # "" is a real status meaning "this page said nothing about fitness", and
     # it needs a printable name or it renders as a blank in the run log.
     flags = ", ".join("%s %d" % (k or "not stated", v)
                       for k, v in sorted(tally.items()) if k != "ok")
     by_src = ", ".join("%s %d" % (k, v) for k, v in sorted(per_source.items()))
-    played = {r["match_id"] for r in tables.get("matches", []) if r["score"]}
-    starters = tables.get("starters", [])
-    print(f"market {len(market_rows)} rows, lineups {len(xi_rows)} rows "
-          f"({by_src}), fixtures {len(fixture_rows)} rows")
+    print(f"market {market_count} rows, lineups {xi_count} rows "
+          f"({by_src}), fixtures {fixture_count} rows")
     # The realised elevens are what grades every probable-XI source, so a match
     # played and never read has to be visible rather than merely absent.
     print("  played %d matches, starters %d rows for %d of them"
-          % (len(played), len(starters),
-             len({r["match_id"] for r in starters})))
+          % (len(played), starters_count, len(starters_matches)))
     print("  status: ok %d%s" % (tally.get("ok", 0),
                                  (", " + flags) if flags else ""))
     if not flags:
