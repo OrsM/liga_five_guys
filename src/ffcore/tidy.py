@@ -30,6 +30,7 @@ from __future__ import annotations
 import csv
 import os
 import re
+import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import NamedTuple
@@ -137,6 +138,19 @@ def read_csv(path) -> list[dict]:
     why it stays. Dropping it needs the same check over the whole pipeline —
     ingest, crosswalk and sources are where a transform-in-place would
     plausibly live — not this evidence.
+
+    CELL VALUES ARE INTERNED. market.csv/lineups.csv are a snapshot log —
+    ~94k/~75k rows behind a few hundred distinct players and ~20 clubs — so
+    csv.DictReader handing back a FRESH "Athletic Club" string object on
+    every one of a club's ~4,700 rows is almost pure duplication, not real
+    data. sys.intern() collapses each repeated cell to the one string object
+    already seen, at parse time, before it ever reaches `_READ_CACHE`.
+    Measured 2026-08-28: market.csv's 94,353 rows hold 849,177 cells behind
+    only 32,465 distinct strings; parsing it this way took peak RSS from 80MB
+    to 39MB. Safe everywhere read_csv is safe — an interned string is an
+    ordinary, immutable str, indistinguishable to any caller from one that
+    isn't; this changes nothing about the copy-on-return contract above,
+    which is about the DICT each row lives in, never about its values.
     """
     path = Path(path)
     try:
@@ -146,7 +160,10 @@ def read_csv(path) -> list[dict]:
     hit = _READ_CACHE.get(str(path))
     if hit is None or hit[0] != (st.st_mtime_ns, st.st_size):
         with path.open(encoding="utf-8") as fh:
-            hit = ((st.st_mtime_ns, st.st_size), list(csv.DictReader(fh)))
+            rows = [{k: sys.intern(v) if type(v) is str else v
+                     for k, v in row.items()}
+                    for row in csv.DictReader(fh)]
+        hit = ((st.st_mtime_ns, st.st_size), rows)
         _READ_CACHE[str(path)] = hit
     return [dict(r) for r in hit[1]]
 
@@ -302,6 +319,52 @@ def latest_only(rows: list[dict]) -> list[dict]:
     return [r for r in rows if r.get("observed_at") == newest]
 
 
+def latest_snapshot(path, keep=None) -> list[dict]:
+    """`latest_only(read_csv(path))`, without ever holding the whole file in
+    memory to get there.
+
+    market.csv and lineups.csv are every snapshot ever taken (~94k and ~75k
+    rows) so that Market and rivals.py can answer historical questions
+    (see this module's docstring) — but a caller that only wants "now", like
+    ffcore.model.session() or methodology.latest_market(), was paying to
+    materialise and then copy all of that just to keep the <1% that share the
+    newest observed_at. Measured 2026-08-28: ffcore/model.py's self-test
+    alone peaked at 380MB RSS, the largest single contributor to lfg-run's
+    parallel self-test phase (~680MB combined) by a wide margin over every
+    other stage (next highest ~70MB) — almost all of it this.
+
+    One forward pass. `kept` only ever holds rows from the current-newest
+    block seen so far, so peak memory is bounded by ONE snapshot's worth of
+    rows, not the whole history — correct regardless of file order (a stamp
+    equal to the running newest extends `kept`, a newer one replaces it, an
+    older one is dropped), matching `latest_only()`'s "max over all rows"
+    semantics exactly. Deliberately bypasses `_READ_CACHE`: caching a filtered
+    slice under the whole file's cache key would hand a later full-history
+    reader (Market, decide.py) a wrong answer.
+
+    `keep(row)`, if given, filters BEFORE the newest-stamp comparison — needed
+    for load_lineups_latest(), where "newest" must mean newest row FROM ONE
+    SOURCE, not newest across every probable-XI site in the file.
+    """
+    path = Path(path)
+    try:
+        fh = path.open(encoding="utf-8")
+    except OSError:
+        return []
+    with fh:
+        newest = ""
+        kept: list[dict] = []
+        for row in csv.DictReader(fh):
+            if keep is not None and not keep(row):
+                continue
+            stamp = row.get("observed_at", "")
+            if stamp > newest:
+                newest, kept = stamp, [row]
+            elif stamp == newest:
+                kept.append(row)
+        return kept
+
+
 # How long a DAILY feed may go unanswered before its last reading stops being
 # today's. The sweep runs twice a day, so missing both of a day's sweeps is not
 # a cadence — it is a feed that has stopped. src/methodology.py prints "stale"
@@ -384,6 +447,12 @@ def load_market() -> list[dict]:
     return read_csv(TIDY / "market.csv")
 
 
+def load_market_latest() -> list[dict]:
+    """`latest_only(load_market())`, in the low-memory way — see
+    latest_snapshot()."""
+    return latest_snapshot(TIDY / "market.csv")
+
+
 # Which probable-XI site the reports are built on. The lineups table can hold
 # several; every reader gets exactly one, chosen here, because two sites that
 # disagree about a starter must not be silently averaged or racing on file
@@ -400,6 +469,15 @@ def load_lineups(source: str = LINEUP_SOURCE) -> list[dict]:
     comparing sources, which is the one job that wants them all.
     """
     return pick_source(read_csv(TIDY / "lineups.csv"), source)
+
+
+def load_lineups_latest(source: str = LINEUP_SOURCE) -> list[dict]:
+    """`latest_only(load_lineups(source))`, in the low-memory way — see
+    latest_snapshot(). The source filter runs BEFORE the newest-stamp
+    comparison, so "newest" means newest row from this one source, same as
+    `latest_only(pick_source(...))` would answer."""
+    keep = (lambda r: r.get("source") == source) if source else None
+    return latest_snapshot(TIDY / "lineups.csv", keep=keep)
 
 
 def pick_source(rows: list[dict], source: str) -> list[dict]:
@@ -816,7 +894,7 @@ def load_players() -> dict[str, dict]:
     agreed on all 655 current players and differed only by five departed
     ones, none of which reached any report.
     """
-    market, xi = latest_only(load_market()), latest_only(load_lineups())
+    market, xi = load_market_latest(), latest_snapshot(TIDY / "lineups.csv")
     if not market and not xi:
         raise SystemExit("no rows in %s — run `ingest.py parse` first" % TIDY)
     shared = shared_names(market)

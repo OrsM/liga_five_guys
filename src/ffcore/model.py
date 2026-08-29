@@ -37,8 +37,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from ffcore.league import League          # noqa: E402
 from ffcore.score import build            # noqa: E402
-from ffcore.tidy import (latest_only, load_lineups,  # noqa: E402
-                         load_market, run_now)
+from ffcore.tidy import load_market_latest, load_lineups_latest, run_now  # noqa: E402
 
 __all__ = ["Session", "session", "reset"]
 
@@ -60,8 +59,8 @@ _CACHE: list = []
 def session() -> Session:
     """The run's model. Built on first ask, handed back after that."""
     if not _CACHE:
-        market = latest_only(load_market())
-        xi_rows = latest_only(load_lineups())
+        market = load_market_latest()
+        xi_rows = load_lineups_latest()
         lg = League.load()
         sc, (hist, cur) = build(market, xi_rows, run_now(),
                                 shrink_k=lg.cfg.shrink_k if lg else 8.0)

@@ -44,7 +44,7 @@ from ffcore.tidy import (run_now,  # noqa: E402
                          DAILY_FRESH_DAYS, EVERY_RUN_FRESH_DAYS,
                          SEASON, TIDY, age_phrase, load_elo,
                          stale_feeds,
-                         load_lineups, load_market,
+                         load_lineups,
                          read_csv, snapshot_stamp, write_lines)
 
 LIVE = SEASON / "live"
@@ -844,9 +844,9 @@ def elo_basis() -> str:
 
 def latest_market() -> list[dict]:
     """The newest market snapshot. Read here only to list the league's clubs."""
-    from ffcore.tidy import latest_only
+    from ffcore.tidy import load_market_latest
 
-    return latest_only(load_market())
+    return load_market_latest()
 
 
 def formula_lines() -> list[str]:

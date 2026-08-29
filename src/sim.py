@@ -1786,7 +1786,15 @@ def _selftest() -> None:
     # spending now was the worse option on days the headline said act today.
     r = [{"route": "act", "best": 1.0, "pts": 10.0},
          {"route": "market", "best": 2.0, "pts": 20.0, "beats_now": 0.38}]
-    line = market_percentile(r)
+    # quiet={} throughout this section pins the feeds to "all fresh" — these
+    # calls are testing the formatting logic, not the staleness gate (that
+    # gets its own case below with an explicit quiet=). Without it, this
+    # defaults to the REAL stale_feeds() reading the box's live tidy store,
+    # so the test's pass/fail depended on how long ago the last successful
+    # fetch was — and since this self-test runs BEFORE the fetch stage,
+    # every run saw yesterday's fetch timestamp, already past
+    # EVERY_RUN_FRESH_DAYS by the time the once-a-day timer fired again.
+    line = market_percentile(r, quiet={})
     assert "62nd percentile" in line, line
     assert "38% of weeks" in line, line
     assert "ordinary week" in line, line
@@ -1795,10 +1803,10 @@ def _selftest() -> None:
     # another thing on the page that could disagree with the table.
     assert "." not in line.replace("62nd", "").replace("38%", ""), line
     assert "75th percentile" in market_percentile(
-        [{"route": "market", "beats_now": 0.25}])
+        [{"route": "market", "beats_now": 0.25}], quiet={})
     assert "unusually good" in market_percentile(
-        [{"route": "market", "beats_now": 0.25}])
-    assert market_percentile([]) == ""
+        [{"route": "market", "beats_now": 0.25}], quiet={})
+    assert market_percentile([], quiet={}) == ""
     # A QUIET FEED IS NOT A POOR MARKET. With api_market gated on freshness,
     # nothing is buyable, now_best is 0, every simulated offer beats it, and
     # this line said "0th percentile · a poor week · better in 100% of weeks"
@@ -1819,20 +1827,20 @@ def _selftest() -> None:
     # 2026-08-21: n_band=400, so the finest percentile it can name is
     # 1/400 = 0.25%, rounding to 1. ------------------------------------------
     extreme = market_percentile(
-        [{"route": "market", "beats_now": 1.0, "n_band": 400}])
+        [{"route": "market", "beats_now": 1.0, "n_band": 400}], quiet={})
     assert "under the 1st percentile" in extreme, extreme
     assert "unusually poor" in extreme, extreme
     assert "over 99%" in extreme, extreme
     assert "0th" not in extreme and "100%" not in extreme, extreme
     # The mirror case: NOTHING beat today, an unusually good market.
     best_ever = market_percentile(
-        [{"route": "market", "beats_now": 0.0, "n_band": 400}])
+        [{"route": "market", "beats_now": 0.0, "n_band": 400}], quiet={})
     assert "over the 99th percentile" in best_ever, best_ever
     assert "unusually good" in best_ever, best_ever
     assert "under 1%" in best_ever, best_ever
     # A smaller sample has a coarser floor — n=50 can only resolve to 2%.
     coarse = market_percentile(
-        [{"route": "market", "beats_now": 1.0, "n_band": 50}])
+        [{"route": "market", "beats_now": 1.0, "n_band": 50}], quiet={})
     assert "under the 2nd percentile" in coarse, coarse
 
     # -- overdrawn is not a ranking question -------------------------------
