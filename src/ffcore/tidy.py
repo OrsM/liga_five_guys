@@ -63,7 +63,13 @@ DECISIONS = ROOT / "decisions"
 # those two, while a fifth was the same content as the board in another
 # rendering. A directory called "reports" that holds four things nobody reads
 # is four more places a number can appear and disagree with itself.
-REPORTS = Path("reports")
+#
+# LFG_REPORTS, same pattern as FF_ROOT/LFG_PARTS below, added 2026-08-29 so a
+# run done to test or profile the pipeline (not to publish a report) can
+# point every writable path — this one included — at a scratch directory
+# instead of leaving reports/METHOD.md and reports/decisions.json modified
+# in the tracked tree for someone to stash before their next real commit.
+REPORTS = Path(os.environ.get("LFG_REPORTS", "reports"))
 
 # The render fragments the appendix is stitched from. Build artifacts, under
 # .runtime/ with the rest of them, untracked and unpublished — they are how
