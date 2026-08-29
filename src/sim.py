@@ -1120,6 +1120,17 @@ def caveats(u) -> list[str]:
 # move, full stop, whatever it costs).
 VALUE_TOLERANCE = 0.90
 
+# THE FLOOR HALF OF "BAR, THEN RATIO" — VALUE_TOLERANCE above answers a
+# different question (how much of the SINGLE BEST move's gain a cheaper
+# alternative may give up and still BE the recommendation). This answers a
+# looser question for the whole table, not one headline pick: what counts
+# as worth ranking by efficiency at all. Without a floor, pure
+# points-per-euro sorting hits the fractional-knapsack trap — a near-zero
+# gain at an even smaller cost divides out to an enormous ratio and would
+# win a table nobody would act on. Judgment call, not measured; tune
+# against real reports if it buries a real move or promotes a trivial one.
+MOVES_VALUE_FLOOR = 0.25
+
 
 def _best(u, rows, rivals):
     """(the top move, or None; whether it needs a rival's own cooperation).
@@ -1140,8 +1151,11 @@ def _best(u, rows, rivals):
     gets pushed as THE move.
 
     VALUE FOR MONEY, NOT JUST THE BIGGEST GAIN, within whichever pool (reliable
-    or, on a day nothing reliable helps, the full list) is in play. `rows`
-    arrives sorted by raw d_pos (decide.rank()'s own order), so the single
+    or, on a day nothing reliable helps, the full list) is in play. Finds the
+    biggest raw d_pos in `pool` directly (does NOT assume `rows` arrives
+    sorted — `decide.rank()`'s own row order is an internal screening detail,
+    and `payload()` independently resorts its own copy for the report table;
+    a caller handing this any order gets the same answer) — the single
     biggest season-long standings gain used to win this outright, however
     much it cost — a move netting +0.31 places for -40M beat one netting
     +0.29 for -2M, spending 20x the cash for 7% more gain and leaving
@@ -1156,7 +1170,7 @@ def _best(u, rows, rivals):
     reliable = [r for r in candidates
                if u.route.get(r["action"].buy, "free") != "listed"]
     pool, uncertain = (reliable, False) if reliable else (candidates, True)
-    best = pool[0]
+    best = max(pool, key=lambda r: r["d_pos"])
     # ONLY COMPARED FOR A GENUINE SPEND (net > 0) on a move that actually
     # improves expected position (d_pos > 0) — the same guard value_rate()
     # itself uses, and for the same reason: a move that raises more than it
@@ -1259,7 +1273,30 @@ def payload(u, rows, base, rivals, locks_h=None, n_actions: int = 0,
     names = {k: title_name(v) for k, v in u.name.items()}
     lo, hi = base.band(u.me)
     moves = []
-    for r in sorted(rows, key=lambda r: (-r["d_win"], -r["d_pos"])):
+    # BAR ON GAIN, THEN RANK BY VALUE — see MOVES_VALUE_FLOOR's own note.
+    # A d_win-driven move still leads outright (unchanged: win-probability
+    # is a different axis than points-per-euro, no principled ratio between
+    # them). Among d_pos-driven moves, anything clearing the floor is
+    # ranked by `value` (points per euro, already computed by rank() and
+    # None-guarded by value_rate() — no re-derivation of that guard here);
+    # a move with no ratio (a self-funding sale, net <= 0) that clears the
+    # floor wins outright, same "free beats a rate" logic _best() already
+    # uses. Below the floor: pushed to the bottom, in raw-gain order, never
+    # hidden — just not competing on efficiency terms too small a gain
+    # cannot make meaningful.
+    best_pos = max((r["d_pos"] for r in rows), default=0.0)
+    floor = MOVES_VALUE_FLOOR * best_pos
+
+    def _move_key(r):
+        if r["d_win"] > 0:
+            return (0, -r["d_win"], -r["d_pos"])
+        if r["d_pos"] >= floor and r["d_pos"] > 0:
+            value = r.get("value")
+            return (1, -value if value is not None else float("-inf"),
+                    -r["d_pos"])
+        return (2, 0.0, -r["d_pos"])
+
+    for r in sorted(rows, key=_move_key):
         a = r["action"]
         who = max(rivals, key=lambda v: r["d_beat"].get(v, 0.0)) \
             if rivals else ""
@@ -1285,6 +1322,12 @@ def payload(u, rows, base, rivals, locks_h=None, n_actions: int = 0,
             # a recalibration and these moved six.
             "d_pts": r.get("d_pts", 0.0), "helps": r.get("helps", 0.0),
             "pts_lo": r.get("pts_lo", 0.0), "pts_hi": r.get("pts_hi", 0.0),
+            # Points per euro — computed by rank() for every row and
+            # already what THIS function's own sort now ranks by, but
+            # never reached the payload before: the ladder's markdown table
+            # showed it, the phone's moves list did not, same "drifting
+            # apart" gap "left"/"answer" below already existed to close.
+            "value": r.get("value"),
             # What you are on afterwards, and what he does about it. Both are
             # in the markdown table; the phone could not draw them because
             # they were never in the payload, which is the two renderers
@@ -1752,6 +1795,29 @@ def _selftest() -> None:
     assert d["standings"][0]["me"] is True
     assert d["standings"][1]["p_above"] == 0.5
 
+    # -- payload()'s `moves` order: bar on d_pos, THEN rank by value ---------
+    # Not pure points-per-euro (the fractional-knapsack trap this whole
+    # change exists to avoid): C's near-zero gain divides out to a huge
+    # ratio and must NOT leapfrog real moves on that alone.
+    row_a = {"action": Action("buy", buy="A", cost=40e6), "d_pos": 0.40,
+             "d_win": 0.0, "d_beat": {}, "value": 2.0}       # big, poor value
+    row_b = {"action": Action("buy", buy="B", cost=1e6), "d_pos": 0.15,
+             "d_win": 0.0, "d_beat": {}, "value": 50.0}      # clears the
+    # floor (0.25 * 0.40 = 0.10 <= 0.15), excellent value
+    row_c = {"action": Action("buy", buy="C", cost=1e4), "d_pos": 0.02,
+             "d_win": 0.0, "d_beat": {}, "value": 500.0}     # below the
+    # floor, spuriously huge ratio
+    order = [m["buy"] for m in payload(u, [row_a, row_b, row_c], st,
+                                       ["riv"])["moves"]]
+    assert order == ["B", "A", "C"], order
+    # A d_win-driven move still leads regardless of value — unchanged
+    # behaviour, not something this change touches.
+    row_win = {"action": Action("buy", buy="W", cost=40e6), "d_pos": 0.05,
+              "d_win": 0.10, "d_beat": {}, "value": 1.0}
+    order_win = [m["buy"] for m in payload(u, [row_a, row_win, row_b], st,
+                                           ["riv"])["moves"]]
+    assert order_win == ["W", "B", "A"], order_win
+
     # -- the notification surface ------------------------------------------
     # What is worth interrupting somebody for: the best move, and nothing
     # about the twelve that lost. A move that gains nothing says nothing.
@@ -1804,6 +1870,20 @@ def _selftest() -> None:
     # because listed_big is "listed" and rows[0] is not.
     assert _best(u, [listed_big, rows[0]], ["riv"]) == (rows[0], False), \
         "a reliable move beats a bigger listed one outright"
+
+    # -- _best() does not depend on `rows` arriving sorted by d_pos — the
+    # SAME fixtures above, handed in deliberately REVERSED/shuffled order,
+    # must pick the SAME winners. (Written first against the old `pool[0]`
+    # implementation to confirm it fails — order was silently load-bearing
+    # even though nothing in `_best()`'s actual logic needs it to be.)
+    assert _best(u, [cheap_ok, rows[0]], ["riv"]) == (cheap_ok, False), \
+        "order must not change the value-for-money winner"
+    assert _best(u, [cheap_bad, rows[0]], ["riv"]) == (rows[0], False), \
+        "order must not change which move keeps too little of the gain"
+    assert _best(u, [free, rows[0]], ["riv"]) == (free, False), \
+        "order must not change a self-funding winner"
+    assert _best(u, [rows[0], listed_big], ["riv"]) == (rows[0], False), \
+        "order must not change reliable-beats-listed"
     del u.route["listed_target"]
 
     # -- real_cycle_bests: real single-day bests, not a resampled fiction --

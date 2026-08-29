@@ -84,6 +84,22 @@ KEEP = 12          # how many survive screening and get the full count
 # anything from it, so a real listed opportunity stays fully visible too.
 KEEP_RELIABLE_MIN = 6
 
+# AN EFFICIENT BUT MODEST CANDIDATE, VIA THE SAME MECHANISM AS
+# KEEP_RELIABLE_MIN (_top_up(), below) — `screened` is sorted by raw gain,
+# so `top = screened[:KEEP]` structurally cannot contain a candidate that
+# gains little but costs almost nothing: on a day the top-12 are all
+# €5-20M moves for 0.1-0.3 places, a €200k move worth 0.05 places never
+# reaches the FINAL_TRIALS pass at all, so nothing downstream — not the
+# report table, not sim._best()'s own value-for-money re-pick — can ever
+# find it. It is not ranked low; it is not scored. This tops up `top` with
+# the best-screened-by-efficiency candidates not already in it, same
+# non-destructive shape as KEEP_RELIABLE_MIN: on top, never displacing a
+# naturally-kept row. Efficiency here is the cheap screening pass's own
+# `d` (expected-position delta, not season points) per net euro — a proxy
+# for the real `value` FINAL_TRIALS computes later, good enough to decide
+# who earns the expensive pass.
+KEEP_VALUE_MIN = 4
+
 
 @dataclass(frozen=True)
 class Action:
@@ -741,6 +757,34 @@ def best_swap_for(u: Universe, k: str, expected: dict[str, float]
                  victim=victim if raid else "")
 
 
+def _top_up(top: list[tuple], screened: list[tuple], ok, rank_key,
+           minimum: int) -> list[tuple]:
+    """Ensure at least `minimum` of `top` satisfy `ok(d, a)`, adding more
+    from `screened` (best-`rank_key`-first) on top of `top` — never
+    displacing anything already there, never adding a key `top` already
+    holds. `ok` takes `(d, a)` — the screened gain alongside the action —
+    because a qualifying condition may need the gain (KEEP_VALUE_MIN's
+    "genuine gain") as well as the action itself (KEEP_RELIABLE_MIN's
+    route lookup, which ignores `d`).
+
+    THE SHARED SHAPE BEHIND EVERY "raw screening alone can crowd a real
+    axis out" RULE. KEEP_RELIABLE_MIN (guaranteed-to-go-through candidates
+    losing to bigger-but-unreliable ones on raw gain) and KEEP_VALUE_MIN
+    (efficient-but-modest candidates losing to expensive-but-bigger ones)
+    are the same mechanic with a different `ok`/`rank_key` — this owns only
+    the "top up, don't replace, don't duplicate" bookkeeping; each caller
+    decides what qualifies and how to rank the qualifiers.
+    """
+    kept = {a.buy or a.sell for _, a in top}
+    have = sum(1 for d, a in top if ok(d, a))
+    if have >= minimum:
+        return top
+    more = sorted((t for t in screened
+                   if (t[1].buy or t[1].sell) not in kept and ok(*t)),
+                  key=rank_key)
+    return top + more[:minimum - have]
+
+
 def value_rate(pts, cost) -> float | None:
     """Season points per million of a GENUINE positive cost, or None.
 
@@ -832,21 +876,37 @@ def rank(u: Universe, acts: list[Action], seed: int = 1,
 
     # ...and one for the survivors, at the full count.
     top = screened[:KEEP]
-    # TOP UP WITH RELIABLE CANDIDATES, ON TOP OF `top` — see KEEP_RELIABLE_MIN's
-    # own note. A "listed" target (a rival's own sale) screens on the same raw
-    # gain as a guaranteed free/clause one, so the natural top-KEEP can end up
-    # almost entirely listed; this adds the best-screened reliable candidates
-    # NOT already in `top`, so they reach the full-precision pass too, without
+    # TOP UP WITH RELIABLE CANDIDATES, ON TOP OF `top`, via _top_up() — see
+    # its own docstring and KEEP_RELIABLE_MIN's. A "listed" target (a
+    # rival's own sale) screens on the same raw gain as a guaranteed
+    # free/clause one, so the natural top-KEEP can end up almost entirely
+    # listed; this adds the best-screened reliable candidates NOT already
+    # in `top`, so they reach the full-precision pass too, without
     # removing a single listed one that made it there honestly.
-    reliable = lambda a: u.route.get(a.buy, "free") != "listed"           # noqa: E731
-    n_reliable = sum(1 for _, a in top if reliable(a))
-    if n_reliable < KEEP_RELIABLE_MIN:
-        # NOT NAMED `extra` — that is this function's own parameter (the
-        # ladder/offer rows), and shadowing it here silently dropped every
-        # band the caller asked for, found immediately by decide.py's own
-        # self-test failing on an unrelated assertion (2026-08-29).
-        topped_up = [t for t in screened[KEEP:] if reliable(t[1])]
-        top = top + topped_up[:KEEP_RELIABLE_MIN - n_reliable]
+    top = _top_up(top, screened,
+                 ok=lambda d, a: u.route.get(a.buy, "free") != "listed",
+                 rank_key=lambda t: -t[0], minimum=KEEP_RELIABLE_MIN)
+    # TOP UP WITH THE MOST EFFICIENT CANDIDATES, ALSO VIA _top_up() — see
+    # KEEP_VALUE_MIN's own note. Independent of the reliability top-up just
+    # above: a candidate can be both listed AND efficient, or reliable AND
+    # inefficient — the two ask different questions and both add, neither
+    # replacing the other's picks nor the natural top-KEEP's.
+    #
+    # `ok` CANNOT BE "d > 0 and a.net > 0" — nearly every ordinary buy
+    # candidate satisfies that (found while writing this: `have` came out
+    # >= KEEP_VALUE_MIN from the natural top-KEEP alone, every time, making
+    # the top-up a silent no-op regardless of how inefficient the top-KEEP
+    # actually was). "Efficient" is inherently RELATIVE — the best few by
+    # ratio among everything screened, genuine-gain-and-spend candidates
+    # only — so that set is computed once, up front, and `ok` just asks
+    # membership in it.
+    ratio = lambda t: t[0] / (t[1].net / 1e6)                    # noqa: E731
+    best_value = {a.buy or a.sell for _, a in
+                 sorted((t for t in screened if t[0] > 0 and t[1].net > 0),
+                        key=lambda t: -ratio(t))[:KEEP_VALUE_MIN]}
+    top = _top_up(top, screened,
+                 ok=lambda d, a: (a.buy or a.sell) in best_value,
+                 rank_key=lambda t: -ratio(t), minimum=KEEP_VALUE_MIN)
     keep = [a for _, a in top]
     answers, afters = [], []
     for a in keep:
@@ -1749,6 +1809,44 @@ def _selftest() -> None:
     by = {r["action"].buy: r["d_pos"] for r in got}
     assert by["th_m1"] > by["free_x"], by
 
+    # -- _top_up: the shared "ensure at least N satisfy `ok`, on top, never
+    # displacing" mechanic, tested on its own before any caller wires it in
+    # ------------------------------------------------------------------
+    top_a = [(9.0, Action("buy", buy="a", cost=1e6)),
+             (8.0, Action("buy", buy="b", cost=1e6))]
+    screened_a = top_a + [(7.0, Action("buy", buy="c", cost=1e6)),
+                          (1.0, Action("buy", buy="ok1", cost=1e6)),
+                          (0.5, Action("buy", buy="ok2", cost=1e6)),
+                          (0.1, Action("buy", buy="bad", cost=1e6))]
+    ok = lambda d, a: a.buy in ("ok1", "ok2", "bad")             # noqa: E731
+    topped = _top_up(top_a, screened_a, ok,
+                     rank_key=lambda t: -t[0], minimum=2)
+    keys = [a.buy for _, a in topped]
+    # both already-kept rows survive untouched, in place, and exactly the
+    # two best `ok` rows (by rank_key, not screening order) get added ON
+    # TOP — "bad" (also `ok`) is left out once the minimum is met.
+    assert keys == ["a", "b", "ok1", "ok2"], keys
+    # already at the minimum: no-op, returns `top` as-is (same objects,
+    # nothing appended even if `screened` has other `ok` rows available).
+    already_enough = _top_up(top_a, screened_a, lambda d, a: True,
+                             rank_key=lambda t: -t[0], minimum=2)
+    assert already_enough == top_a, already_enough
+    # a row already in `top` is never duplicated by the top-up even if it
+    # also satisfies `ok`.
+    dup_check = _top_up([(9.0, Action("buy", buy="a", cost=1e6))],
+                        [(9.0, Action("buy", buy="a", cost=1e6)),
+                         (5.0, Action("buy", buy="b", cost=1e6))],
+                        lambda d, a: True, rank_key=lambda t: -t[0],
+                        minimum=2)
+    assert [a.buy for _, a in dup_check] == ["a", "b"], dup_check
+    # `ok` sees the screened gain `d`, not just the action — needed by a
+    # caller like KEEP_VALUE_MIN's "genuine gain" check, which the action
+    # alone cannot answer (gain lives in `d`, not on the Action).
+    gain_aware = _top_up([], screened_a, lambda d, a: d > 0.5,
+                         rank_key=lambda t: -t[0], minimum=10)
+    assert [a.buy for _, a in gain_aware] == ["a", "b", "c", "ok1"], \
+        gain_aware
+
     # -- KEEP_RELIABLE_MIN: a wall of "listed" candidates that screen well
     # does not crowd a smaller but reliable one out of the full-precision
     # pass ------------------------------------------------------------
@@ -1780,6 +1878,45 @@ def _selftest() -> None:
     assert all(("reliable%d" % i) in kept5 for i in range(3)), kept5
     assert len(kept5) == 15, kept5
     assert sum(1 for k in kept5 if k.startswith("listed")) == 12, kept5
+
+    # -- KEEP_VALUE_MIN: a wall of expensive-but-big candidates does not
+    # crowd cheap-but-efficient ones out of the full-precision pass ------
+    per6 = {1: dict(per[1])}
+    acts6 = []
+    for i in range(15):     # big raw gain, but €20M each — poor ratio
+        key = "big%d" % i
+        per6[1][key] = (10.0 - i * 0.1, 1.0)
+        acts6.append(Action("buy", buy=key, cost=20e6))
+    for i in range(3):      # a clear, unambiguous gain, but €10k — excellent
+        key = "eff%d" % i   # ratio. Rate 6.0 (not e.g. 3.2, barely above the
+        per6[1][key] = (6.0, 1.0)   # ~3.0 bar): too thin a margin made this
+        acts6.append(Action("buy", buy=key, cost=1e4))  # flaky across
+        # backends — screening's Monte Carlo noise put one candidate's `d`
+        # on either side of zero depending on which RNG ran it (numpy vs.
+        # the pure-Python fallback used when numpy is absent), found by
+        # running under this repo's real `uv run --frozen python` (which
+        # has numpy) after `python3` alone (which does not) had passed
+        # every time — same seed, different backend, different answer on a
+        # genuinely borderline margin. A wide, unambiguous gain removes the
+        # ambiguity instead of chasing a specific backend's numbers.
+    # a candidate below the current XI bar: no genuine gain, so however
+    # tiny its cost, it must never be topped up on "ratio" alone.
+    per6[1]["sham"] = (0.1, 1.0)
+    acts6.append(Action("buy", buy="sham", cost=1e3))
+    u6 = Universe(
+        state=LeagueState({"me": dict(mine), "riv": dict(theirs)}, [1], "me"),
+        forecaster=B(per6),
+        pos={**u.pos, **{a.buy: "MED" for a in acts6}},
+        price={a.buy: a.cost for a in acts6}, route={},
+        proceeds={}, owner={}, cash=1000e6, me="me")
+    rows6, *_ = rank(u6, acts6)
+    kept6 = {r["action"].buy for r in rows6}
+    # natural top-KEEP=12 is entirely "big" (raw gain 10.0..8.7 all beat
+    # 3.2), the 3 "eff" candidates only get in via KEEP_VALUE_MIN's top-up,
+    # on top of the 12 — none of the top-12 "big" ones displaced.
+    assert all(("eff%d" % i) in kept6 for i in range(3)), kept6
+    assert sum(1 for k in kept6 if k.startswith("big")) == 12, kept6
+    assert "sham" not in kept6, kept6
 
     # -- what a clause burns, and what that is worth in places -------------
     # A free agent asks about what he is worth, so buying one destroys
