@@ -1702,3 +1702,14 @@ observed_at,hours_to_lock,formation,index_total,player,pos,slot,start_pct,start_
 2026-08-29T1159Z,3.0,4-5-1,38.25,Miguel Roman,mediocampista,MED,70,read,ok,0,5707698,2.947,1,4.001,0.873,Athletic Club,1,2,3.374,attack_defense,12.8,13808
 2026-08-29T1159Z,3.0,4-5-1,38.25,Guido Rodriguez,mediocampista,MED,0,read,injured,0,25156951,0.000,1,5.691,1.063,Deportivo La Coruna,0,2,0.000,elo,82.0,7676
 2026-08-29T1159Z,3.0,4-5-1,38.25,Natan,defensa,DEF,80,read,ok,0,37657284,4.670,1,5.132,1.060,Levante,0,1,4.405,attack_defense,105.2,11813
+2026-08-29T1308Z,1.9,4-5-1,38.25,Iñigo Vicente,delantero,DEL,90,read,ok,1,22196901,3.443,1,4.319,0.874,Rayo Vallecano,0,2,3.940,attack_defense,-51.9,6442
+2026-08-29T1308Z,1.9,4-5-1,38.25,Pepelu,mediocampista,MED,90,read,ok,0,9437611,5.013,1,4.869,1.063,Deportivo La Coruna,0,2,4.715,elo,82.0,2715
+2026-08-29T1308Z,1.9,4-5-1,38.25,Carl Starfelt,defensa,DEF,60,read,ok,0,11878334,3.145,1,5.056,1.003,Athletic Club,1,0,3.136,attack_defense,12.8,9612
+2026-08-29T1308Z,1.9,4-5-1,38.25,Omar El Hilali,defensa,DEF,80,read,ok,0,12024108,2.703,1,3.006,1.005,Real Sociedad,0,2,2.690,attack_defense,-63.0,10220
+2026-08-29T1308Z,1.9,4-5-1,38.25,Lucien Agoume,mediocampista,MED,90,read,ok,0,6642561,3.403,1,4.353,0.806,Atletico Madrid,1,2,4.224,attack_defense,-176.5,7249
+2026-08-29T1308Z,1.9,4-5-1,38.25,Ionut Radu,portero,POR,90,read,ok,0,35471662,5.751,1,5.910,1.003,Athletic Club,1,2,5.735,attack_defense,12.8,5978
+2026-08-29T1308Z,1.9,4-5-1,38.25,Pablo Fornals,mediocampista,MED,70,read,ok,0,60851617,7.177,1,7.405,1.160,Levante,0,1,6.187,attack_defense,105.2,2632
+2026-08-29T1308Z,1.9,4-5-1,38.25,Marcos Alonso,defensa,DEF,0,read,suspended,0,29396494,0.000,1,5.469,1.003,Athletic Club,1,1,0.000,attack_defense,12.8,4397
+2026-08-29T1308Z,1.9,4-5-1,38.25,Miguel Roman,mediocampista,MED,70,read,ok,0,5707698,2.947,1,4.001,0.873,Athletic Club,1,2,3.374,attack_defense,12.8,13808
+2026-08-29T1308Z,1.9,4-5-1,38.25,Guido Rodriguez,mediocampista,MED,0,read,injured,0,25156951,0.000,1,5.691,1.063,Deportivo La Coruna,0,2,0.000,elo,82.0,7676
+2026-08-29T1308Z,1.9,4-5-1,38.25,Natan,defensa,DEF,80,read,ok,0,37657284,4.670,1,5.132,1.060,Levante,0,1,4.405,attack_defense,105.2,11813
