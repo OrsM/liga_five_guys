@@ -1107,34 +1107,55 @@ def caveats(u) -> list[str]:
 VALUE_TOLERANCE = 0.90
 
 
-def _best(rows, rivals):
-    """The top move, or None when nothing on offer is worth anything.
+def _best(u, rows, rivals):
+    """(the top move, or None; whether it needs a rival's own cooperation).
 
-    VALUE FOR MONEY, NOT JUST THE BIGGEST GAIN. `rows` arrives sorted by raw
-    d_pos (decide.rank()'s own order), so the single biggest season-long
-    standings gain used to win this outright, however much it cost — a move
-    netting +0.31 places for -40M beat one netting +0.29 for -2M, spending
-    20x the cash for 7% more gain and leaving nothing for whatever comes up
-    later in the season. `d_pts`/`value` (points per net £M) were already
-    computed by rank() for every row and shown in the report's own table;
-    this is the first place that number changes what gets RECOMMENDED,
-    not just what gets displayed.
+    RELIABLE ROUTES FIRST. A candidate's `buy` reaches you one of three ways
+    — Universe.route's own docstring: "free" (the app deals him, nobody can
+    refuse), "clause" (his buyout, instant, also cannot be refused), or
+    "listed" (a rival has put him up for sale, and simply not selling, or
+    somebody else outbidding you, are both real outs for them). Checked
+    against this league's own recorded history 2026-08-29
+    (data/tidy/transactions.csv, ledger.py's own rebuild of the app's
+    activity feed): 108 transactions, every one of them "from the app" —
+    zero have ever been a manager-to-manager sale. That is not "rare", it is
+    the entire sample, so a "listed" move is not a slightly-riskier version
+    of a real one; it is not what gets recommended automatically unless
+    nothing reliable clears the bar at all — the ordinary shopping list
+    still shows it (ladder()'s own "pts/M€" column), this only changes what
+    gets pushed as THE move.
+
+    VALUE FOR MONEY, NOT JUST THE BIGGEST GAIN, within whichever pool (reliable
+    or, on a day nothing reliable helps, the full list) is in play. `rows`
+    arrives sorted by raw d_pos (decide.rank()'s own order), so the single
+    biggest season-long standings gain used to win this outright, however
+    much it cost — a move netting +0.31 places for -40M beat one netting
+    +0.29 for -2M, spending 20x the cash for 7% more gain and leaving
+    nothing for whatever comes up later in the season. `d_pts`/`value`
+    (points per net £M) were already computed by rank() for every row and
+    shown in the report's own table; this is the first place that number
+    changes what gets RECOMMENDED, not just what gets displayed.
     """
     candidates = [r for r in rows if r["d_pos"] > 0 or r["d_win"] > 0]
     if not candidates:
-        return None
-    best = candidates[0]
+        return None, False
+    reliable = [r for r in candidates
+               if u.route.get(r["action"].buy, "free") != "listed"]
+    pool, uncertain = (reliable, False) if reliable else (candidates, True)
+    best = pool[0]
     # ONLY COMPARED FOR A GENUINE SPEND (net > 0) on a move that actually
     # improves expected position (d_pos > 0) — the same guard value_rate()
     # itself uses, and for the same reason: a move that raises more than it
     # costs, or one whose whole gain is win-probability rather than
     # position, has no "cash saved by going cheaper" to weigh against.
     if best["d_pos"] <= 0 or best["action"].net <= 0:
-        return best
+        return best, uncertain
     floor = VALUE_TOLERANCE * best["d_pos"]
-    cheaper = [r for r in candidates
+    cheaper = [r for r in pool
               if r["d_pos"] >= floor and r["action"].net < best["action"].net]
-    return min(cheaper, key=lambda r: r["action"].net) if cheaper else best
+    if cheaper:
+        best = min(cheaper, key=lambda r: r["action"].net)
+    return best, uncertain
 
 
 def alert_lines(u, rows, rivals) -> list[str]:
@@ -1147,7 +1168,7 @@ def alert_lines(u, rows, rivals) -> list[str]:
     news. A move that gains nothing is not news either, and returns [] so the
     caller can send NOTHING rather than "all quiet" twice a day.
     """
-    best = _best(rows, rivals)
+    best, uncertain = _best(u, rows, rivals)
     if best is None:
         return []
     a = best["action"]
@@ -1162,6 +1183,10 @@ def alert_lines(u, rows, rivals) -> list[str]:
         cost = "+€%.1fM raised" % (-net / 1e6)
     else:
         cost = "free"
+    if uncertain:
+        # Said outright, not left for Miguel to notice on his own — this is
+        # the one case where "Do this" is not actually guaranteed to happen.
+        cost += " · needs the seller to accept, not guaranteed"
     return ["**Do this** — %s (%+.2f places, %+.0f%% to win, %s)"
             % (a.label({k: title_name(v) for k, v in u.name.items()}),
                best["d_pos"], 100 * best["d_win"], cost)]
@@ -1722,23 +1747,42 @@ def _selftest() -> None:
     cheap_ok = {**rows[0],
                 "action": Action("buy", buy="cheap", cost=2e6, proceeds=0.0),
                 "d_pos": 0.40, "d_win": 0.30}     # 92% of 0.433, 1/7th the cost
-    assert _best([rows[0], cheap_ok], ["riv"]) is cheap_ok, \
+    assert _best(u, [rows[0], cheap_ok], ["riv"]) == (cheap_ok, False), \
         "a move keeping 90%+ of the best gain for a fraction of the cost wins"
     cheap_bad = {**rows[0],
                  "action": Action("buy", buy="cheap", cost=2e6, proceeds=0.0),
                  "d_pos": 0.30, "d_win": 0.20}    # 69% of 0.433 — below the floor
-    assert _best([rows[0], cheap_bad], ["riv"]) is rows[0], \
+    assert _best(u, [rows[0], cheap_bad], ["riv"]) == (rows[0], False), \
         "a cheaper move that gives up too much of the gain does not win"
     free = {**rows[0],
             "action": Action("sell", sell=("dead",), cost=0.0, proceeds=1e6),
             "d_pos": 0.40, "d_win": 0.30}
-    assert _best([rows[0], free], ["riv"]) is free, \
+    assert _best(u, [rows[0], free], ["riv"]) == (free, False), \
         "a self-funding move within reach of the best gain wins outright"
     # A pure-win-probability gain (d_pos <= 0) has no "% of the best gain"
     # to compare against — the cost guard is skipped, not divided by zero.
     winonly = {**rows[0], "action": Action("buy", buy="x", cost=1e6),
               "d_pos": 0.0, "d_win": 0.05}
-    assert _best([winonly], ["riv"]) is winonly
+    assert _best(u, [winonly], ["riv"]) == (winonly, False)
+
+    # -- reliable routes first: a "listed" move (a rival's own sale, which
+    # this league's real history says has never once gone through — see
+    # _best()'s own docstring) is not the automatic pick while a free/clause
+    # move is on the table, even a smaller one -----------------------------
+    listed_big = {**rows[0],
+                  "action": Action("buy", buy="listed_target", cost=30e6),
+                  "d_pos": 0.50, "d_win": 0.40}
+    u.route["listed_target"] = "listed"
+    # A "listed" move is the ONLY candidate — nothing reliable to prefer it
+    # over, so it is still the pick, just flagged uncertain.
+    assert _best(u, [listed_big], ["riv"]) == (listed_big, True)
+    # rows[0] (yuri, a CLAUSE — always reliable, kind="clause") is far
+    # smaller (d_pos=0.433 vs 0.50, well under VALUE_TOLERANCE of it) and
+    # would lose to listed_big on value-for-money alone. It still wins,
+    # because listed_big is "listed" and rows[0] is not.
+    assert _best(u, [listed_big, rows[0]], ["riv"]) == (rows[0], False), \
+        "a reliable move beats a bigger listed one outright"
+    del u.route["listed_target"]
 
     # -- real_cycle_bests: real single-day bests, not a resampled fiction --
     # market_percentile() used to compare today's real best against a band
@@ -2081,7 +2125,7 @@ def _selftest() -> None:
     assert cover_md(ub, []) == []
     assert set(bands2) == set(sqb), sorted(bands2)
 
-    print("sim self-test OK (140 cases)")
+    print("sim self-test OK (141 cases)")
 
 
 def main() -> None:
