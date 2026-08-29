@@ -63,7 +63,7 @@ from ffcore.tidy import (load_crosswalk,  # noqa: E402
                          run_now,  # noqa: E402
                          Market, input_path, ledger_stamp,
                          load_api_standings, load_api_teams,
-                         load_market, price_agrees, read_ledger,
+                         load_market_frozen, price_agrees, read_ledger,
                          snapshot_stamp)
 
 __all__ = ["MARKET", "Config", "load_config", "read_rosters", "identify",
@@ -999,7 +999,7 @@ class League:
     @classmethod
     def load(cls, with_market: bool = True) -> "League":
         cfg = load_config()
-        market = Market(load_market()) if with_market else None
+        market = Market(load_market_frozen()) if with_market else None
         # load_api_teams() is [] until the API has been swept, which is the
         # state every caller already handles: the ledger takes over.
         return cls(cfg, read_rosters(), read_ledger(), market,

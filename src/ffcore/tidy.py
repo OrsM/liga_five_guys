@@ -34,6 +34,7 @@ import sys
 from datetime import datetime, timedelta, timezone
 from functools import lru_cache
 from pathlib import Path
+from types import MappingProxyType
 from typing import NamedTuple
 
 from ffcore.parse import money, pct100
@@ -43,7 +44,7 @@ __all__ = ["ROOT", "TIDY", "SEASON", "DECISIONS", "REPORTS", "PARTS", "MADRID",
            "input_path", "read_csv", "write_csv", "append_csv", "widen_csv",
            "write_lines", "snapshot_stamp", "ledger_stamp", "latest_only", "snapshots",
            "Market", "Valuation", "VALUE_TOLERANCE", "price_agrees",
-           "load_market", "load_lineups",
+           "load_market", "load_market_frozen", "load_lineups",
            "shared_names", "row_key", "run_now", "load_crosswalk",
            "load_players", "read_ledger", "LEDGER", "load_deadline", "LINEUP_SOURCE",
            "pick_source", "load_fixtures", "next_kickoff", "kickoff_stamp",
@@ -177,6 +178,42 @@ def read_csv(path) -> list[dict]:
         hit = ((st.st_mtime_ns, st.st_size), rows)
         _READ_CACHE[str(path)] = hit
     return [dict(r) for r in hit[1]]
+
+
+def read_csv_frozen(path) -> list:
+    """Like read_csv(), but hands back the CACHED rows themselves — each
+    wrapped in MappingProxyType, not copied — for a caller that holds the
+    result for the rest of the process and is verified never to write to a
+    row.
+
+    read_csv()'s copy-on-return is the right default (see its own docstring)
+    precisely because most callers are one function's local variable, live
+    briefly, and were never individually audited. Market is the opposite
+    shape: built once in League.load(), held in ffcore.model's one process-
+    wide Session for the rest of the run, and read by exactly three modules
+    (ffcore.league, crosswalk.py, decide.py) — checked 2026-08-29, all of
+    them only iterate or `.get()` a row, never assign into one. For that
+    caller the copy was pure standing cost: market.csv's ~96k rows held
+    twice (once in `_READ_CACHE`, once in `Market.rows`) for the life of the
+    run, just to guard against a mutation nothing does.
+
+    MappingProxyType, not a raw reference to the cached dict, so the guard
+    stays real: a future caller that tries `row["x"] = y` gets a loud
+    TypeError at the write, the same silent-corruption bug read_csv()'s
+    docstring warns about turned into a crash instead of a wrong answer
+    seven modules away. Building 96k proxies costs about half what copying
+    96k dicts did — this is faster AND lighter, not a speed/memory trade.
+    """
+    path = Path(path)
+    try:
+        st = path.stat()
+    except OSError:
+        return []
+    hit = _READ_CACHE.get(str(path))
+    if hit is None or hit[0] != (st.st_mtime_ns, st.st_size):
+        read_csv(path)
+        hit = _READ_CACHE[str(path)]
+    return [MappingProxyType(r) for r in hit[1]]
 
 
 def write_csv(path, rows, fieldnames=None) -> None:
@@ -477,6 +514,12 @@ def snapshots(rows: list[dict]) -> list[str]:
 
 def load_market() -> list[dict]:
     return read_csv(TIDY / "market.csv")
+
+
+def load_market_frozen() -> list:
+    """`load_market()`, uncopied — see read_csv_frozen(). For Market's own
+    constructor, the one caller verified never to write into a row."""
+    return read_csv_frozen(TIDY / "market.csv")
 
 
 def load_market_latest() -> list[dict]:
