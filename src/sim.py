@@ -201,8 +201,22 @@ def header(u, base, n_actions: int, locks_h=None) -> list[str]:
     # Over budget mid-window is allowed and over it at the lock is not, so a
     # minus sign here is the one fact that outranks the table — as a NUMBER,
     # not as a paragraph explaining itself.
-    ctx += ["squad %s" % fmt_money(val),
-            ("**cash %s**" if u.cash < 0 else "cash %s") % fmt_money(u.cash),
+    cash_txt = ("**cash %s**" if u.cash < 0 else "cash %s") % fmt_money(u.cash)
+    # BOTH NUMBERS, NOT JUST THE ONE THAT LOOKS WRONG. `u.cash` is what you can
+    # actually spend — the app's raw balance minus a bid of yours still
+    # pending, held until it is accepted, rejected or withdrawn — and it is
+    # the number every decision in this report is made against, so it stays
+    # the headline. But a reader checking this against the app's own balance
+    # screen sees a bigger, positive number and no explanation for the gap
+    # (found 2026-08-29: balance read +3.30M, this line read -2.64M, and
+    # nothing on the page said the 5.94M difference was three real pending
+    # bids, not an error). Said here as the same two numbers the phone
+    # already shows, not a new one to reconcile by hand.
+    if u.locked_cash:
+        cash_txt += (" (balance %s − %s locked)"
+                    % (fmt_money(u.cash + u.locked_cash),
+                       fmt_money(u.locked_cash)))
+    ctx += ["squad %s" % fmt_money(val), cash_txt,
             "total %s" % fmt_money(val + u.cash)]
 
     want = _shape_now(u)
@@ -1565,6 +1579,14 @@ def _selftest() -> None:
     assert "**cash -133K**" in " ".join(header(u, st, 1, locks_h=2.0))
     u.cash = 23.6e6
     assert "**cash" not in " ".join(header(u, st, 1, locks_h=2.0))
+    # BOTH NUMBERS when a bid of yours is locking part of the balance — a
+    # reader checking the app's own screen sees the bigger, positive number
+    # and needs the gap explained right here, not left to look like an error.
+    u.cash, u.locked_cash = -2637643.0, 5938860.0
+    hh = " ".join(header(u, st, 1, locks_h=2.0))
+    assert "**cash -2.64M** (balance 3.30M − 5.94M locked)" in hh, hh
+    u.cash, u.locked_cash = 23.6e6, 0.0
+    assert "locked" not in " ".join(header(u, st, 1, locks_h=2.0))
     assert "1.50" in h, h                    # expected finish
     assert "50%" in h, h                     # P(win)
     assert "1,000" in h and "1,600" in h, h  # the 10-90 band, in points
@@ -2125,7 +2147,7 @@ def _selftest() -> None:
     assert cover_md(ub, []) == []
     assert set(bands2) == set(sqb), sorted(bands2)
 
-    print("sim self-test OK (141 cases)")
+    print("sim self-test OK (143 cases)")
 
 
 def main() -> None:
