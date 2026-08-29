@@ -1095,12 +1095,46 @@ def caveats(u) -> list[str]:
     return out
 
 
+# How much of the best available move's season gain a materially cheaper
+# alternative may give up and still be the one recommended. Real judgment,
+# not measured, but not arbitrary either: the cash spent this week does not
+# come back this season (rank()'s own net-cost accounting), so a move that
+# keeps 90%+ of the best gain for meaningfully less money leaves next week's
+# options open in a way the last 10% does not buy back. Not 1.0 (that is
+# today's old behaviour, biggest gain wins outright regardless of cost) and
+# not much lower (a move worth noticeably less of the season is a worse
+# move, full stop, whatever it costs).
+VALUE_TOLERANCE = 0.90
+
+
 def _best(rows, rivals):
-    """The top move, or None when nothing on offer is worth anything."""
-    for r in rows:
-        if r["d_pos"] > 0 or r["d_win"] > 0:
-            return r
-    return None
+    """The top move, or None when nothing on offer is worth anything.
+
+    VALUE FOR MONEY, NOT JUST THE BIGGEST GAIN. `rows` arrives sorted by raw
+    d_pos (decide.rank()'s own order), so the single biggest season-long
+    standings gain used to win this outright, however much it cost — a move
+    netting +0.31 places for -40M beat one netting +0.29 for -2M, spending
+    20x the cash for 7% more gain and leaving nothing for whatever comes up
+    later in the season. `d_pts`/`value` (points per net £M) were already
+    computed by rank() for every row and shown in the report's own table;
+    this is the first place that number changes what gets RECOMMENDED,
+    not just what gets displayed.
+    """
+    candidates = [r for r in rows if r["d_pos"] > 0 or r["d_win"] > 0]
+    if not candidates:
+        return None
+    best = candidates[0]
+    # ONLY COMPARED FOR A GENUINE SPEND (net > 0) on a move that actually
+    # improves expected position (d_pos > 0) — the same guard value_rate()
+    # itself uses, and for the same reason: a move that raises more than it
+    # costs, or one whose whole gain is win-probability rather than
+    # position, has no "cash saved by going cheaper" to weigh against.
+    if best["d_pos"] <= 0 or best["action"].net <= 0:
+        return best
+    floor = VALUE_TOLERANCE * best["d_pos"]
+    cheaper = [r for r in candidates
+              if r["d_pos"] >= floor and r["action"].net < best["action"].net]
+    return min(cheaper, key=lambda r: r["action"].net) if cheaper else best
 
 
 def alert_lines(u, rows, rivals) -> list[str]:
@@ -1117,9 +1151,20 @@ def alert_lines(u, rows, rivals) -> list[str]:
     if best is None:
         return []
     a = best["action"]
-    return ["**Do this** — %s (%+.2f places, %+.0f%% to win)"
+    net = a.net
+    # Action.net = cost - proceeds, so net<0 means the sale side raised MORE
+    # than the buy side cost — a move that pays you, not one that is merely
+    # "free". Said plainly rather than folded into "free" either way, which
+    # would undersell a move that hands back real cash for the season ahead.
+    if net > 0:
+        cost = "-€%.1fM" % (net / 1e6)
+    elif net < 0:
+        cost = "+€%.1fM raised" % (-net / 1e6)
+    else:
+        cost = "free"
+    return ["**Do this** — %s (%+.2f places, %+.0f%% to win, %s)"
             % (a.label({k: title_name(v) for k, v in u.name.items()}),
-               best["d_pos"], 100 * best["d_win"])]
+               best["d_pos"], 100 * best["d_win"], cost)]
 
 
 def shape(u, keys) -> str:
@@ -1665,9 +1710,35 @@ def _selftest() -> None:
     # about the twelve that lost. A move that gains nothing says nothing.
     al = alert_lines(u, rows, ["riv"])
     assert len(al) == 1 and "Yuri Berchiche" in al[0] and "+36%" in al[0], al
+    assert "€14.1M" in al[0], al       # net cost travels with the headline
     assert alert_lines(u, [], ["riv"]) == []
     flat = [{**rows[0], "d_pos": 0.0, "d_win": 0.0}]
     assert alert_lines(u, flat, ["riv"]) == [], "a move worth nothing is not news"
+
+    # -- value for money: a materially cheaper near-match beats the
+    # biggest raw gain, but only when it keeps enough of it -----------
+    # rows[0]: d_pos=0.433, net=14.13M — the "biggest gain, whatever it
+    # costs" pick under the old rule.
+    cheap_ok = {**rows[0],
+                "action": Action("buy", buy="cheap", cost=2e6, proceeds=0.0),
+                "d_pos": 0.40, "d_win": 0.30}     # 92% of 0.433, 1/7th the cost
+    assert _best([rows[0], cheap_ok], ["riv"]) is cheap_ok, \
+        "a move keeping 90%+ of the best gain for a fraction of the cost wins"
+    cheap_bad = {**rows[0],
+                 "action": Action("buy", buy="cheap", cost=2e6, proceeds=0.0),
+                 "d_pos": 0.30, "d_win": 0.20}    # 69% of 0.433 — below the floor
+    assert _best([rows[0], cheap_bad], ["riv"]) is rows[0], \
+        "a cheaper move that gives up too much of the gain does not win"
+    free = {**rows[0],
+            "action": Action("sell", sell=("dead",), cost=0.0, proceeds=1e6),
+            "d_pos": 0.40, "d_win": 0.30}
+    assert _best([rows[0], free], ["riv"]) is free, \
+        "a self-funding move within reach of the best gain wins outright"
+    # A pure-win-probability gain (d_pos <= 0) has no "% of the best gain"
+    # to compare against — the cost guard is skipped, not divided by zero.
+    winonly = {**rows[0], "action": Action("buy", buy="x", cost=1e6),
+              "d_pos": 0.0, "d_win": 0.05}
+    assert _best([winonly], ["riv"]) is winonly
 
     # -- real_cycle_bests: real single-day bests, not a resampled fiction --
     # market_percentile() used to compare today's real best against a band
@@ -2010,7 +2081,7 @@ def _selftest() -> None:
     assert cover_md(ub, []) == []
     assert set(bands2) == set(sqb), sorted(bands2)
 
-    print("sim self-test OK (135 cases)")
+    print("sim self-test OK (140 cases)")
 
 
 def main() -> None:
