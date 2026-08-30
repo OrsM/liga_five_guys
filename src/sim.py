@@ -902,7 +902,25 @@ def wait_routes(u, offers=None, rng=None) -> list[dict]:
         # old test fixture) falls back to `band` exactly as before, not a
         # crash.
         real = getattr(offers, "real_cycles", None)
-        hist = (real_cycle_bests(real, approx_gain).get("", []) if real else None)
+        real_routes = getattr(offers, "real_routes", {})
+        # A LISTED CYCLE IS NOT EVIDENCE OF A GOOD WEEK TO WAIT. This pooled
+        # history used to count a rival's own contested listing exactly like
+        # a real free-agent offer — decide.py's own finding (9b25510: 108
+        # real transactions in this league, zero of them manager-to-manager)
+        # is that a "listed" cycle is not a real opportunity at all, so a
+        # week whose only good offer was three rivals listing their stars
+        # (who will almost certainly never actually sell) scored as "a great
+        # week to wait" off zero real opportunities. `group_of` returning
+        # `None` for a listed player drops him from the cycle's own best —
+        # the same silence-not-a-guessed-zero rule real_cycle_bests() already
+        # applies to a cycle with nothing of a group in it — so a cycle whose
+        # ONLY offer was listed contributes nothing to `hist` at all, exactly
+        # as if that week had no market. `by_route`'s own "listed" bucket
+        # below is untouched — grading a listed offer against listed history
+        # is still the right question, just not the HEADLINE one.
+        reliable_only = lambda k: None if real_routes.get(k) == "listed" else ""
+        hist = (real_cycle_bests(real, approx_gain, reliable_only).get("", [])
+               if real else None)
         beats_now = (sum(1 for x in hist if x > now_best) / len(hist)
                     if hist else
                     sum(1 for x in band if x > now_best) / len(band))
@@ -935,7 +953,6 @@ def wait_routes(u, offers=None, rng=None) -> list[dict]:
                    for grp, vals in hist_by_group.items()
                    if vals and grp in now_by_group}
 
-        real_routes = getattr(offers, "real_routes", {})
         # SAME FIX AS beats_now, ONE LEVEL UP: "best" (the median), "lo"
         # and "hi" used to read straight off best_over()'s resampled band
         # too — the exact reason a live check the day this was fixed found
@@ -2344,18 +2361,20 @@ def _selftest() -> None:
     off.real_routes = {"hist_def": "listed", "hist_med": "free"}
     routes = wait_routes(uw, off, random.Random(1))
     mkt = next(r for r in routes if r["route"] == "market")
-    # GRADED AGAINST THE 2 REAL CYCLES, not best_over()'s resampled band —
-    # n_band says so directly, and it is nowhere near best_over's own
-    # trial count (400 by default).
-    assert mkt["n_band"] == 2, mkt["n_band"]
-    # "best" (really the median) and the 10/90 band GRADED FROM THE SAME
-    # REAL HISTORY, not best_over()'s resample — real per-cycle bests here
-    # are gain(hist_def)=3.0 in c1, max(gain(hist_def), gain(hist_med))=3.0
-    # in c2, so the honest median of two real, equal observations is
-    # exactly 3.0, not whatever random.Random(1) drew from best_over()'s
-    # much wider hypothetical band.
-    assert mkt["best"] == 3.0, mkt["best"]
-    assert mkt["lo"] == 3.0 and mkt["hi"] == 3.0, (mkt["lo"], mkt["hi"])
+    # THE HEADLINE POOL IS RELIABLE CYCLES ONLY — see wait_routes()'s own
+    # note. c1 offered nothing but hist_def, a LISTED rival player (route
+    # data below), so it now contributes NOTHING to the headline: n_band=1,
+    # not 2, and the single surviving observation is c2's real free agent
+    # (hist_med) alone. Before this fix n_band read 2 and best/lo/hi read
+    # 3.0 — hist_def's contested listing, which per decide.py's own finding
+    # (9b25510) has converted zero times in 108 real transactions, counted
+    # as a full real cycle of evidence that "this is a good week to wait."
+    assert mkt["n_band"] == 1, mkt["n_band"]
+    # "best" (really the median) and the 10/90 band GRADED FROM RELIABLE
+    # REAL HISTORY ONLY — the sole surviving observation is gain(hist_med)
+    # in c2, so the "median" of one real number is that number.
+    assert mkt["best"] == 2.0, mkt["best"]
+    assert mkt["lo"] == 2.0 and mkt["hi"] == 2.0, (mkt["lo"], mkt["hi"])
     assert "DEF" in mkt["by_position"], mkt["by_position"]
     # hist_def (gain 6.0) beat today's own DEF best (free_def, gain ~2.0
     # after the bar) in BOTH real cycles — beats_now must read 1.0, not
@@ -2377,6 +2396,22 @@ def _selftest() -> None:
     # "today" for the listed side to grade, same silence-not-a-guess rule
     # as MED above. hist_def's real history (2 cycles, all "listed")
     # exists but has nothing of TODAY to compare against.
+
+    # A REAL HISTORY THAT IS ENTIRELY LISTED falls back to best_over()'s
+    # band too, exactly like no real history at all — the whole point of
+    # the fix above. Two real cycles, both offering hist_def and nothing
+    # else, hist_def LISTED throughout: every cycle's own best is filtered
+    # to None, so `hist` ends up genuinely empty (not a guessed zero), and
+    # n_band reads best_over's own trial count rather than claiming two
+    # cycles of evidence for a market that offered zero real opportunities.
+    off_all_listed = Offers.fit({"free_def": 4e6, "hist_def": 6e6},
+                                [4e6, 6e6], per_cycle=1, cycles=2)
+    off_all_listed.real_cycles = {"c1": {"hist_def"}, "c2": {"hist_def"}}
+    off_all_listed.real_routes = {"hist_def": "listed"}
+    all_listed_routes = wait_routes(uw, off_all_listed, random.Random(1))
+    all_listed_mkt = next(r for r in all_listed_routes
+                          if r["route"] == "market")
+    assert all_listed_mkt["n_band"] > 2, all_listed_mkt["n_band"]
 
     # A market_model()-shaped offers with NO real_cycles attached (an old
     # fixture, or a caller not wired to it) falls back to best_over()'s
@@ -2618,7 +2653,7 @@ def _selftest() -> None:
     assert cover_md(ub, []) == []
     assert set(bands2) == set(sqb), sorted(bands2)
 
-    print("sim self-test OK (167 cases)")
+    print("sim self-test OK (168 cases)")
 
 
 def main() -> None:
