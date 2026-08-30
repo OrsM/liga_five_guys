@@ -343,7 +343,9 @@ def ladder_rows(u, rows, bands=None) -> list[dict]:
         out.append(cell(k, "keep", "yours", None, None))
     for k in sorted(dead, key=lambda k: -exp.get(k, 0.0)):
         out.append(cell(k, "sell", "yours", u.proceeds.get(k, 0.0), None))
-    for k in sorted((k for k in rest if k in won), key=lambda k: -exp.get(k, 0.0)):
+    buy_floor = _moves_floor(rows)
+    for k in sorted((k for k in rest if k in won),
+                    key=lambda k: _move_rank_key(won[k], buy_floor)):
         r = won[k]
         out.append(cell(k, "buy", u.owner.get(k) or "free agent",
                         -r["action"].net, r["d_pts"], value=r.get("value"),
@@ -1132,6 +1134,43 @@ VALUE_TOLERANCE = 0.90
 MOVES_VALUE_FLOOR = 0.25
 
 
+def _moves_floor(rows) -> float:
+    """MOVES_VALUE_FLOOR's own cutoff for THIS batch of rows.
+
+    Shared by payload()'s `moves` resort and ladder_rows()'s BUY group, so
+    the phone's JSON and the markdown table rank the same candidates in
+    the same order — see _move_rank_key()'s own note on why they used to
+    not.
+    """
+    return MOVES_VALUE_FLOOR * max((r["d_pos"] for r in rows), default=0.0)
+
+
+def _move_rank_key(r, floor):
+    """BAR ON GAIN, THEN RANK BY VALUE — see MOVES_VALUE_FLOOR's own note.
+    A d_win-driven move still leads outright (win-probability is a
+    different axis than points-per-euro, no principled ratio between
+    them). Among d_pos-driven moves, anything clearing `floor` is ranked
+    by `value` (points per euro); below the floor, pushed to the bottom in
+    raw-gain order, never hidden.
+
+    SHARED KEY, not two independent sorts: before this, payload()'s
+    `moves` ranked by value-for-money (shipped 24d2a8b, 2026-08-29) but
+    ladder_rows()'s BUY group — the markdown table a reader actually
+    scrolls top to bottom — still sorted by raw `exp` (projected points
+    per jornada, price-blind), so a genuine bargain (high pts/M€) could
+    sit near the bottom while a big, poor-value, even NEGATIVE-season-
+    impact name led the list. The two renderings disagreeing on order is
+    exactly the duplication ladder()'s own docstring warns about.
+    """
+    if r["d_win"] > 0:
+        return (0, -r["d_win"], -r["d_pos"])
+    if r["d_pos"] >= floor and r["d_pos"] > 0:
+        value = r.get("value")
+        return (1, -value if value is not None else float("-inf"),
+                -r["d_pos"])
+    return (2, 0.0, -r["d_pos"])
+
+
 def _best(u, rows, rivals):
     """(the top move, or None; whether it needs a rival's own cooperation).
 
@@ -1284,19 +1323,9 @@ def payload(u, rows, base, rivals, locks_h=None, n_actions: int = 0,
     # uses. Below the floor: pushed to the bottom, in raw-gain order, never
     # hidden — just not competing on efficiency terms too small a gain
     # cannot make meaningful.
-    best_pos = max((r["d_pos"] for r in rows), default=0.0)
-    floor = MOVES_VALUE_FLOOR * best_pos
+    floor = _moves_floor(rows)
 
-    def _move_key(r):
-        if r["d_win"] > 0:
-            return (0, -r["d_win"], -r["d_pos"])
-        if r["d_pos"] >= floor and r["d_pos"] > 0:
-            value = r.get("value")
-            return (1, -value if value is not None else float("-inf"),
-                    -r["d_pos"])
-        return (2, 0.0, -r["d_pos"])
-
-    for r in sorted(rows, key=_move_key):
+    for r in sorted(rows, key=lambda r: _move_rank_key(r, floor)):
         a = r["action"]
         who = max(rivals, key=lambda v: r["d_beat"].get(v, 0.0)) \
             if rivals else ""
