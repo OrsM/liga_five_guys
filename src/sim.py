@@ -268,7 +268,7 @@ def _bar(u) -> float:
     return decide.xi_bar(exp, xi)
 
 
-def ladder_rows(u, rows, bands=None) -> list[dict]:
+def ladder_rows(u, rows, bands=None, base=None) -> list[dict]:
     """The grouped plan as data, so the phone draws the same one table.
 
     Same groups, same order, same numbers. Two renderers drawing different
@@ -283,6 +283,13 @@ def ladder_rows(u, rows, bands=None) -> list[dict]:
     of them — see band_acts()'s own note on why that understates a bench
     player's real range. `bands=None` (an old caller, or the self-test) is
     the unpriced table, not a crash.
+
+    `base`, when given, is the run's own baseline Standings — the ONE
+    thing chase_keys() needs in order to know whether the account is
+    trailing (see trailing()). Given one, 1-2 BUY rows may come back in a
+    "chase" group instead; `base=None` is the table exactly as it was
+    before trailing mode existed, which is what an old caller and the
+    self-test want.
     """
     import decide
 
@@ -344,12 +351,26 @@ def ladder_rows(u, rows, bands=None) -> list[dict]:
     for k in sorted(dead, key=lambda k: -exp.get(k, 0.0)):
         out.append(cell(k, "sell", "yours", u.proceeds.get(k, 0.0), None))
     buy_floor = _moves_floor(rows)
-    for k in sorted((k for k in rest if k in won),
-                    key=lambda k: _move_rank_key(won[k], buy_floor, u)):
+    # THE CHASE GROUP IS A SEPARATE GROUP, NOT A RE-SORT OF THIS ONE — see
+    # chase_keys(). Empty on any run where trailing() is silent, which
+    # leaves the BUY group byte-identical to what it was. Emitted ahead of
+    # BUY and in CEILING order (chase[k], 1 then 2) rather than in
+    # _move_rank_key order, because that is the order the group is being
+    # read in: widest band first is the whole point of it.
+    chase = chase_keys(u, rows, base) if base is not None else {}
+
+    def buy_cell(k, group):
         r = won[k]
-        out.append(cell(k, "buy", u.owner.get(k) or "free agent",
-                        -r["action"].net, r["d_pts"], value=r.get("value"),
-                        lo=r.get("pts_lo"), hi=r.get("pts_hi")))
+        return cell(k, group, u.owner.get(k) or "free agent",
+                    -r["action"].net, r["d_pts"], value=r.get("value"),
+                    lo=r.get("pts_lo"), hi=r.get("pts_hi"))
+
+    buys = [k for k in rest if k in won]
+    for k in sorted((k for k in buys if k in chase), key=lambda k: chase[k]):
+        out.append(buy_cell(k, "chase"))
+    for k in sorted((k for k in buys if k not in chase),
+                    key=lambda k: _move_rank_key(won[k], buy_floor, u)):
+        out.append(buy_cell(k, "buy"))
     for k in sorted((k for k in rest if k not in won
                      and u.price[k] > u.cash + spare),
                     key=lambda k: -exp.get(k, 0.0)):
@@ -529,7 +550,7 @@ def ladder(u, rows, base, data=None) -> list[str]:
     import decide
 
     exp, xi = decide.current_xi(u)
-    data = data if data is not None else ladder_rows(u, rows)
+    data = data if data is not None else ladder_rows(u, rows, base=base)
     by_group: dict[str, list[dict]] = {}
     for r in data:
         by_group.setdefault(r["group"], []).append(r)
@@ -592,6 +613,21 @@ def ladder(u, rows, base, data=None) -> list[str]:
         out.append("| **SELL — never start** | | | | | | | |")
         out += [row_md(r) for r in by_group["sell"]]
 
+    # ABOVE BUY, AND ONLY WHEN TRAILING — see trailing()/chase_keys(). The
+    # heading names the manager the model says is winning, because that is
+    # the whole justification for the section: a reader who is level or
+    # ahead should never see it, and a reader who is behind should be told
+    # why he is being shown a worse-on-average move.
+    if by_group.get("chase"):
+        t = trailing(u, base)
+        out.append("| **CHASE — %s wins %.0f%% of the simulated seasons to "
+                   "your %.0f%%, and you finish above him in only %.0f%% — "
+                   "these are the widest bands on the board, worse on "
+                   "average** | | | | | | | |"
+                   % (t.get("leader", ""), 100 * t.get("leader_p_win", 0.0),
+                      100 * t.get("p_win", 0.0), 100 * t.get("p_above", 0.0)))
+        out += [row_md(r) for r in by_group["chase"]]
+
     if by_group.get("buy"):
         out.append("| **BUY — with the proceeds** | | | | | | | |")
         out += [row_md(r) for r in by_group["buy"]]
@@ -642,6 +678,26 @@ def ladder(u, rows, base, data=None) -> list[str]:
             "move. The rate says how CHEAPLY a gain arrived, not how BIG "
             "it is — check Season first._"
             % len(u.state.jornadas), ""]
+    # ONLY WHEN THE SECTION IS THERE. A paragraph explaining a table that
+    # is not on the page is the kind of standing prose this repo has
+    # already had to delete once for reading as static.
+    if by_group.get("chase"):
+        out += ["_**CHASE** is the one place this report does NOT rank by "
+                "value for money, and it appears only while the simulation "
+                "says another manager is winning the league. A trailing "
+                "manager's objective is not the most expected points per "
+                "euro — it is P(win), and those stop being the same "
+                "question the moment somebody is ahead of you: the move "
+                "with the best average leaves you second more reliably. "
+                "So these are the 1-2 candidates with the widest Season "
+                "band — the biggest number on the RIGHT of the range — "
+                "even though each is worse on average than the BUY rows "
+                "under it. One or two and no more is the finding, not a "
+                "setting: the returns to a high-variance pick diminish and "
+                "then reverse past two, which is why the rest of the board "
+                "is still ranked the ordinary way. Every number in the row "
+                "is the same simulated number a BUY row carries; only the "
+                "reason for showing it is different._", ""]
     return out
 
 
@@ -1205,6 +1261,143 @@ def _move_rank_key(r, floor, u):
     return (2, reliable, 0.0, -r["d_pos"])
 
 
+# HOW MANY HIGH-CEILING PICKS A TRAILING MANAGER IS SHOWN. Not a tuning
+# knob and not this repo's own measurement — it is the cited finding it
+# implements. Frontier Economics' fantasy-football analysis of exactly this
+# situation (a team trailing the leader, small league, winner-take-most)
+# found P(win) is maximised by fielding ONE OR TWO high-variance,
+# high-ceiling "maverick" picks, with the returns diminishing and then
+# REVERSING past two — the same shape as a short stack seeking variance in
+# tournament poker (gambler's ruin / ICM), where "expected points" is not
+# the objective the payout structure actually rewards. Two is therefore a
+# ceiling, not a target: chase_keys() returns fewer whenever fewer qualify,
+# and nothing here manufactures a second pick to fill the quota.
+#
+# The reason a number is needed at all, rather than "rank everything by
+# ceiling": variance is not free. Every chase pick is bought with expected
+# points, so a table sorted by ceiling would be a strictly worse table for
+# a manager who is level or ahead — and past two picks it is a worse table
+# even for one who is behind. That is why the whole mode is gated on
+# trailing() rather than being a column beside `value`.
+CHASE_PICKS = 2
+
+
+def trailing(u, base) -> dict:
+    """Is the model saying somebody else wins this league? `{}` if not.
+
+    `{"leader", "p_win", "leader_p_win", "p_above"}` when it is.
+
+    THE TRIGGER, AND WHY IT IS THIS ONE. Both halves must hold:
+
+      1. Some rival's P(win) is higher than mine — the model's own most
+         likely champion is not me.
+      2. I finish above THAT manager in fewer than half the simulated
+         seasons (`Standings.beat`, the report's own "P(I finish above)"
+         column).
+
+    NO NEW THRESHOLD, and deliberately so: every number here is one the
+    simulation already computes and the report already prints, and the two
+    comparison points are 0.5 and "more than mine" — the definitions of
+    "more likely behind than ahead" and "not the favourite", not levels
+    anybody picked. Contrast the alternatives considered and rejected:
+    `p_win < 1/N` (an at-parity share) reads a five-manager league as
+    at-parity at 20% even when one manager is on 60% and the rest split
+    the remainder; `expected_finish > (N+1)/2` has the same problem one
+    statistic further out; and SQUAD VALUE rank — the thing that actually
+    caused this situation — is an INPUT to the model, not its verdict, so
+    triggering on it would make the report act on a number it does not
+    itself believe is decisive.
+
+    BOTH HALVES rather than either. A rival can hold the highest P(win)
+    while STILL losing to me head to head, when a third manager takes the
+    seasons I win. The gambler's-ruin argument is about the man ahead of
+    ME, so a "leader" I beat more often than not is not one I need to take
+    risk against — and the self-test carries that exact three-manager
+    shape, because it is the case one half alone gets wrong.
+
+    ON THE BOUNDARY, both readings are Monte Carlo estimates and will
+    flicker between runs at 50/50. No margin is added for it: 50/50 IS the
+    at-parity case, both answers describe it honestly, and the mode is
+    purely ADDITIVE (it labels 1-2 extra rows and hides nothing), so a
+    flicker there costs a reader nothing. A threshold that removed rows
+    would need one.
+
+    It is a STATE, not a move: nothing here is charged for, ranked, or
+    subtracted from a gain. It only decides whether chase_keys() below is
+    allowed to speak at all, and when it is silent the report is exactly
+    the report it was before this existed.
+    """
+    rivals = [m for m in u.state.squads if m != u.me]
+    if not rivals:
+        return {}
+    mine = base.position().get(1, 0.0)
+    leader = max(rivals, key=lambda m: base.position(m).get(1, 0.0))
+    theirs = base.position(leader).get(1, 0.0)
+    above = base.beat(leader)
+    if theirs <= mine or above >= 0.5:
+        return {}
+    return {"leader": leader, "p_win": mine, "leader_p_win": theirs,
+            "p_above": above}
+
+
+def chase_keys(u, rows, base) -> dict[str, int]:
+    """`{buy key: 1 or 2}` — the trailing-mode high-ceiling picks, widest
+    band first. `{}` whenever trailing() is silent, which is most days.
+
+    THE CEILING IS ALREADY SIMULATED, so this runs no simulation of its
+    own. `rank()` gives every row a full paired band — `pts_lo`/`pts_hi`,
+    the 10th and 90th percentiles of the season-points difference over the
+    SAME simulated seasons with the move and without it (decide.band()) —
+    so "what is this move's upside" is a lookup. That is the same rule the
+    ladder's own bands were fixed to obey (see ladder()'s docstring): one
+    computation, read by every renderer that wants it, never a second pass
+    recomputing a number the first pass already has.
+
+    WHAT COUNTS AS A CHASE PICK, in one line: a candidate whose ceiling
+    beats the ceiling of the move the ordinary ranking ALREADY puts first.
+
+    That definition does the work three separate guards would otherwise
+    have to. It is inherently relative, so there is no absolute variance
+    threshold to tune — the bar moves with the board. It cannot return the
+    recommendation you are being given anyway (`ranked[0]` is excluded by
+    construction), because relabelling the top of the list as a gamble
+    would be noise rather than a second option. And it silently excludes
+    the squad-breaking rows that sit at the bottom of a real report — a
+    move that guts the shape has a CEILING of several hundred points
+    NEGATIVE, nowhere near the leader's — so no separate "never propose
+    something catastrophic" rule is needed on top of it.
+
+    RELIABLE ROUTES ONLY, with no fallback — unlike _best(), which must
+    name something and so falls back to a "listed" move on a day nothing
+    reliable clears the bar. 9b25510's own evidence: 108 real transactions
+    in this league, zero of them manager-to-manager, so a seller who can
+    simply refuse is not a variance play, it is a wish. This signal is
+    ADDITIVE, so staying silent costs the reader nothing — which is
+    exactly the licence _best() does not have.
+
+    NOT A RE-SORT of the ranking it rides on. The value-for-money order
+    (b499df7) is untouched and still correct: for a manager who is level
+    or ahead it is the whole answer, and for one who is behind it is still
+    what to do with the rest of the money. This only labels 1-2 rows the
+    reader would otherwise have no reason to look twice at.
+    """
+    if not trailing(u, base):
+        return {}
+    floor = _moves_floor(rows)
+    ranked = sorted(rows, key=lambda r: _move_rank_key(r, floor, u))
+    if not ranked or ranked[0].get("pts_hi") is None:
+        return {}
+    ceiling = ranked[0]["pts_hi"]
+    wide = sorted((r for r in ranked[1:]
+                   if r["action"].buy
+                   and u.route.get(r["action"].buy, "free") != "listed"
+                   and r.get("pts_hi") is not None
+                   and r["pts_hi"] > ceiling),
+                  key=lambda r: -r["pts_hi"])
+    return {r["action"].buy: i + 1
+            for i, r in enumerate(wide[:CHASE_PICKS])}
+
+
 def _best(u, rows, rivals):
     """(the top move, or None; whether it needs a rival's own cooperation).
 
@@ -1358,6 +1551,13 @@ def payload(u, rows, base, rivals, locks_h=None, n_actions: int = 0,
     # hidden — just not competing on efficiency terms too small a gain
     # cannot make meaningful.
     floor = _moves_floor(rows)
+    # A FLAG ON THE EXISTING ROWS, NOT A REORDER OF THEM — see chase_keys().
+    # The value-for-money order below is unchanged whether or not the mode
+    # fires; a chase pick is marked where it already sits. The markdown
+    # ladder promotes the same picks into their own section (ladder_rows()'s
+    # "chase" group, carried in `ladder` below), so both renderers read the
+    # one chase_keys() answer rather than each deciding for itself.
+    chase = chase_keys(u, rows, base)
 
     for r in sorted(rows, key=lambda r: _move_rank_key(r, floor, u)):
         a = r["action"]
@@ -1391,6 +1591,12 @@ def payload(u, rows, base, rivals, locks_h=None, n_actions: int = 0,
             # showed it, the phone's moves list did not, same "drifting
             # apart" gap "left"/"answer" below already existed to close.
             "value": r.get("value"),
+            # 1 or 2 on a trailing-mode high-ceiling pick, None otherwise
+            # (which is every row on a run where trailing() is silent) —
+            # the phone's own half of the markdown's CHASE section, so the
+            # board can mark the row instead of the reader having to spot a
+            # wide band by eye. See chase_keys().
+            "chase": chase.get(a.buy) if a.buy else None,
             # What you are on afterwards, and what he does about it. Both are
             # in the markdown table; the phone could not draw them because
             # they were never in the payload, which is the two renderers
@@ -1419,8 +1625,15 @@ def payload(u, rows, base, rivals, locks_h=None, n_actions: int = 0,
         "moves": moves,
         "sell": [{"name": names.get(k, k), "pos": u.pos.get(k, ""),
                   "raises": got} for k, got in dead_weight(u)],
+        # WHO THE MODEL SAYS IS WINNING, and the two readings that say so —
+        # None on any run where it is me, which is the state this whole
+        # mode is defined against. The phone needs it to caption the chase
+        # rows for the same reason the markdown heading carries it: a
+        # worse-on-average recommendation with no stated reason is worse
+        # than no recommendation. See trailing().
+        "trailing": trailing(u, base) or None,
         "ladder": (ladder_data if ladder_data is not None
-                  else ladder_rows(u, rows)),
+                  else ladder_rows(u, rows, base=base)),
         # `[]` and "nothing to cover" look the same here — see render()'s
         # matching note on why cover_data has no recompute-from-scratch
         # fallback the way ladder_data does.
@@ -1949,6 +2162,121 @@ def _selftest() -> None:
         "order must not change reliable-beats-listed"
     del u.route["listed_target"]
 
+    # -- trailing mode: 1-2 high-ceiling "chase" picks, and ONLY when the
+    # model itself says somebody else is winning this league ---------------
+    # THE CASE THIS EXISTS FOR: the value-for-money ranking (b499df7) is
+    # right for a leading or at-parity manager and answers "most points per
+    # euro". A manager the model says is LOSING does not want the most
+    # points per euro, he wants the widest band — see trailing()'s and
+    # CHASE_PICKS's own notes. `maverick` below is exactly the candidate the
+    # existing ranking buries and the trailing case wants: worst d_pos of
+    # the three, worst value of the three, and by far the widest band.
+    # Checked against the pre-change code before implementing: this fixture
+    # ranks steady, dud, maverick — the highest ceiling on the board sits
+    # DEAD LAST, in both renderers.
+    lead_row = {"action": Action("buy", buy="steady", cost=5e6),
+                "d_pos": 0.40, "d_win": 0.0, "d_beat": {}, "value": 8.0,
+                "d_pts": 40.0, "pts_lo": 10.0, "pts_hi": 70.0, "helps": 0.80}
+    maverick = {"action": Action("buy", buy="maverick", cost=5e6),
+                "d_pos": 0.05, "d_win": 0.0, "d_beat": {}, "value": 1.0,
+                "d_pts": 5.0, "pts_lo": -120.0, "pts_hi": 260.0,
+                "helps": 0.45}
+    dud = {"action": Action("buy", buy="dud", cost=5e6),
+           "d_pos": 0.20, "d_win": 0.0, "d_beat": {}, "value": 4.0,
+           "d_pts": 20.0, "pts_lo": 0.0, "pts_hi": 45.0, "helps": 0.70}
+    ch_rows = [lead_row, maverick, dud]
+    # `st` is a dead heat — both managers win 2 of 4 simulated seasons — so
+    # the mode must not fire at all. The report is already correct there.
+    assert trailing(u, st) == {}, trailing(u, st)
+    assert chase_keys(u, ch_rows, st) == {}
+    # Behind: riv takes 3 of the 4 simulated seasons, and I finish above him
+    # in only 1. Both of the trigger's halves, not one.
+    st_lo = Standings(totals={"me": [1000.0, 1100.0, 1200.0, 1300.0],
+                              "riv": [1500.0, 1400.0, 1350.0, 1250.0]},
+                      me="me")
+    t = trailing(u, st_lo)
+    assert t and t["leader"] == "riv", t
+    assert t["p_above"] == 0.25 and t["p_win"] == 0.25, t
+    assert t["leader_p_win"] == 0.75, t
+    # A LEADER I NONETHELESS BEAT HEAD TO HEAD is not "trailing". riv takes
+    # the league 50% to my 25% (half 1 fires) — but I OUTSCORE him in half
+    # the seasons, and the two he loses to me are two `third` steals. The
+    # gambler's-ruin argument is about the man ahead of ME, so half 2 does
+    # not fire and neither does the mode. (Written against an
+    # implementation with half 1 only, to confirm it fires there.)
+    st_odd = Standings(totals={"me": [1000.0, 1000.0, 1000.0, 1000.0],
+                               "riv": [900.0, 900.0, 1500.0, 1500.0],
+                               "third": [800.0, 1200.0, 700.0, 700.0]},
+                       me="me")
+    u_third = Universe(state=LeagueState({"me": {}, "riv": {}, "third": {}},
+                                         [1, 2], "me"),
+                       forecaster=Bootstrap({}, pool=[1, 2, 3]), pos={},
+                       price={}, proceeds={}, owner={}, cash=0.0, me="me")
+    assert st_odd.position("riv").get(1) == 0.5, "fixture: riv leads on p_win"
+    assert st_odd.beat("riv") == 0.5, "fixture: but I am not behind him"
+    assert trailing(u_third, st_odd) == {}, trailing(u_third, st_odd)
+    # The value ranking's own winner leads the shopping list and is NOT a
+    # chase pick — a chase pick is by construction something the existing
+    # ranking did not already put first. The low-EV, wide-band candidate is.
+    assert chase_keys(u, ch_rows, st_lo) == {"maverick": 1}, \
+        chase_keys(u, ch_rows, st_lo)
+    # 1-2, NEVER MORE — the research's own finding. A third genuinely
+    # wide-band candidate is still scored and still shown, just not as a
+    # chase pick.
+    wide2 = {**maverick, "action": Action("buy", buy="wide2", cost=5e6),
+             "pts_hi": 200.0}
+    wide3 = {**maverick, "action": Action("buy", buy="wide3", cost=5e6),
+             "pts_hi": 150.0}
+    assert chase_keys(u, ch_rows + [wide2, wide3], st_lo) == \
+        {"maverick": 1, "wide2": 2}, "1-2 picks, diminishing past two"
+    # A LISTED ROUTE IS NOT A CHASE. 9b25510's own finding — 108 real
+    # transactions in this league, zero manager-to-manager — so a candidate
+    # whose seller can simply refuse is not a variance play, it is a wish.
+    # No fallback either, unlike _best(): silence is a fine answer here.
+    u.route["maverick"] = "listed"
+    assert chase_keys(u, ch_rows, st_lo) == {}, \
+        "a listed candidate cannot be a chase pick"
+    del u.route["maverick"]
+
+    # -- ...and it reaches BOTH renderers off that ONE computation ----------
+    # "two renderings of one answer is how they come to disagree" — the same
+    # rule b499df7 extracted _move_rank_key for. The markdown ladder and the
+    # phone's JSON both read chase_keys(); neither re-derives it.
+    uc = Universe(state=LeagueState({"me": {}, "riv": {}}, [1, 2], "me"),
+                  forecaster=Bootstrap(
+                      {j: {"steady": (5.0, 1.0), "maverick": (4.0, 1.0),
+                           "dud": (3.0, 1.0)} for j in (1, 2)}),
+                  pos={"steady": "MED", "maverick": "MED", "dud": "MED"},
+                  price={"steady": 5e6, "maverick": 5e6, "dud": 5e6},
+                  proceeds={}, owner={}, cash=10e6, me="me",
+                  name={"steady": "steady", "maverick": "maverick",
+                        "dud": "dud"})
+    lad = ladder_rows(uc, ch_rows, base=st_lo)
+    assert [r["group"] for r in lad] == ["chase", "buy", "buy"], lad
+    assert lad[0]["name"].lower() == "maverick", lad[0]
+    # The chase row keeps its real numbers — this is a LABEL on a genuine
+    # ranked move, not a second opinion with arithmetic of its own.
+    assert lad[0]["pts_hi"] == 260.0 and lad[0]["pts"] == 5.0, lad[0]
+    # Not trailing: every row is an ordinary BUY, ranked by value as before.
+    flat_lad = ladder_rows(uc, ch_rows, base=st)
+    assert [r["group"] for r in flat_lad] == ["buy"] * 3, flat_lad
+    assert ladder_rows(uc, ch_rows) == flat_lad, "no base, no chase"
+    md = "\n".join(ladder(uc, ch_rows, st_lo))
+    assert "CHASE" in md and "riv" in md, md
+    assert "CHASE" not in "\n".join(ladder(uc, ch_rows, st))
+    pl = payload(uc, ch_rows, st_lo, ["riv"])
+    assert pl["trailing"]["leader"] == "riv", pl["trailing"]
+    assert {m["buy"].lower(): m["chase"] for m in pl["moves"]} == \
+        {"maverick": 1, "steady": None, "dud": None}, pl["moves"]
+    # The JSON's ladder IS the markdown's ladder, chase group included.
+    assert [r["group"] for r in pl["ladder"]] == [r["group"] for r in lad]
+    flat = payload(uc, ch_rows, st, ["riv"])
+    # ...and the existing value ranking of the moves list is untouched by
+    # any of this: an ADDITIONAL signal, not a re-sort.
+    assert [m["buy"] for m in pl["moves"]] == [m["buy"] for m in flat["moves"]]
+    assert flat["trailing"] is None, flat["trailing"]
+    assert all(m["chase"] is None for m in flat["moves"]), flat["moves"]
+
     # -- real_cycle_bests: real single-day bests, not a resampled fiction --
     # market_percentile() used to compare today's real best against a band
     # RESAMPLED from the whole unowned pool every simulated trial — which
@@ -2349,7 +2677,12 @@ def main() -> None:
     # docstring now names directly. ladder_rows() already covers "save"
     # (and every other group) with a real band, so the separate median-only
     # pass is retired rather than kept as a second source for the same fact.
-    ladder_data = ladder_rows(u, rows, bands)
+    # `base` so the ladder can carry the trailing-mode CHASE group — see
+    # chase_keys(). Computed HERE, once, exactly like the bands beside it:
+    # render() and payload() both draw this one list, so the markdown's
+    # CHASE section and the phone's `chase` flags cannot disagree about
+    # which 1-2 rows they are.
+    ladder_data = ladder_rows(u, rows, bands, base)
     # cover_rows() reads the SAME bands dict ladder_data was built from —
     # decide.offer_combos()'s own rows, not a second simulation.
     cover_data = cover_rows(u, bands)
