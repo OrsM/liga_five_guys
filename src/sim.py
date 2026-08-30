@@ -2618,7 +2618,7 @@ def _selftest() -> None:
     assert cover_md(ub, []) == []
     assert set(bands2) == set(sqb), sorted(bands2)
 
-    print("sim self-test OK (143 cases)")
+    print("sim self-test OK (167 cases)")
 
 
 def main() -> None:
