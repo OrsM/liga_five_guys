@@ -47,7 +47,7 @@ from dataclasses import dataclass, field, replace
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from ffcore.forecast import Bootstrap, pool_from_perjornada  # noqa: E402
-from ffcore.league import api_key  # noqa: E402
+from ffcore.league import MARKET, api_key  # noqa: E402
 from ffcore.parse import fmt_money  # noqa: E402
 from ffcore.score import SLOT, SLOT_MIN, _calibrated  # noqa: E402
 from ffcore.text import norm  # noqa: E402
@@ -71,7 +71,33 @@ KEEP = 12          # how many survive screening and get the full count
 # A RELIABLE FLOOR, ON TOP OF KEEP, NOT INSTEAD OF IT. Checked against this
 # league's real transaction history 2026-08-29 (data/tidy/transactions.csv):
 # 108 recorded transactions, all 108 "from the app" — zero manager-to-manager
-# sales, ever. A "listed" candidate (Universe.route: a rival's own sale, who
+# sales, ever. Re-checked 2026-08-31 at 119 rows and it still holds, this time
+# PROVEN rather than read off the ledger's own `from`/`to` columns, which
+# cannot show a counterparty at all (ledger.py's own note: the feed names one
+# manager per row, so every deal is written against the pool by construction —
+# reading "0 manager-to-manager" off those columns would be reading the
+# writer's own lossiness back as a finding). The real check replays ownership
+# from inputs/rosters_initial.txt forward over every api_activity row: 119
+# deals, zero buys of a player somebody already held, zero sells by anybody
+# but the holder, and the two sell→buy pairs on the same player are 4 and 10
+# days apart — sold to the app, later re-bought from it, not a transfer.
+#
+# AND IT IS THE SAME FOR ALL FOUR RIVALS, which is a real negative result and
+# is why there is no per-rival version of this constant. Attributing every
+# `marketPlayerTeam` row in api_market.csv to whoever owned that player at
+# that moment gives each rival's own listing history: Albert Laporta 20
+# players listed, BurtonGM89 19, SusoGattuso 18, Magic Mike 333 zero, ever.
+# Of those listings 44–55% did eventually leave the squad — but every one of
+# them left TO THE APP, so the conversion rate that matters here (a listing
+# that becomes a sale TO ANOTHER MANAGER) is 0/57 pooled and 0 for each rival
+# individually. There is nothing to split them on: the three who list are
+# within binomial noise of each other on the rate that CAN be measured
+# (±11pp at n≈20), and the fourth has never given the question a data point.
+# So the league-wide prior below stays league-wide. What IS differentiated per
+# rival is how fast each can raise money — see rival_tempo() and
+# days_to_afford(), which is where the per-rival read went instead.
+#
+# A "listed" candidate (Universe.route: a rival's own sale, who
 # can simply not sell) screens on the same raw gain as a "free"/"clause" one
 # that is actually guaranteed to go through, and on this box's real data
 # listed candidates filled 10 of KEEP's 12 slots — a free-agent move outside
@@ -211,6 +237,18 @@ class Universe:
     # the response was modelled every one of them was overdrawn and could not
     # buy a soul until I paid one of their clauses.
     rival_cash: dict[str, float] = field(default_factory=dict)
+    # The app's own daily allowance, `daily_bonus` in inputs/league.ini — the
+    # one income every manager has that the activity feed cannot see (it
+    # records deals, not gifts). Already inside `rival_cash` as an accrual
+    # from each anchor (ffcore.league._estimate_cash); carried here as the
+    # RATE, which is the thing a forward estimate needs and a level cannot
+    # give — see days_to_afford().
+    daily_bonus: float = 0.0
+    # Each manager's own realised transaction behaviour, from the real
+    # ledger. See rival_tempo(): this is the per-rival read that the
+    # league-wide "listed never converts" prior (KEEP_RELIABLE_MIN) turned
+    # out not to support, and that money DOES support.
+    tempo: dict[str, dict] = field(default_factory=dict)
     # Provenance, for the report to print rather than for anything to act on:
     # a round part-played and how much of it is left, and any club or player
     # the app names in a way nothing else could join.
@@ -575,6 +613,168 @@ def respond(u, a: Action, after: dict) -> Action | None:
             best, gain = Action("steal", buy=k, cost=price,
                                 victim=holder), got
     return best
+
+
+def rival_tempo(txns, now=None) -> dict[str, dict]:
+    """Each manager's OWN realised transaction behaviour, from the real ledger.
+
+    `{handle: {"buys", "sells", "bought", "sold", "days", "sell_rate",
+    "idle"}}` — counts, euros, the span of the ledger in days, gross sale
+    proceeds per day, and days since that manager's last deal of any kind.
+
+    WHY GROSS PROCEEDS PER DAY AND NOT NET CASH FLOW. Net is negative for
+    every manager in this league (measured 2026-08-31: −4.5M to −8.2M a day
+    each) because they are all still deploying a starting budget that only
+    gets spent once, so extrapolating it forward predicts everyone going
+    infinitely broke — a rate that cannot continue is not a trajectory. The
+    question days_to_afford() actually asks is "how fast has this manager
+    demonstrated he can PUT MONEY TOGETHER", and gross sale proceeds per day
+    is exactly that, measured, with no assumption about what he then does
+    with it.
+
+    ONE SIDE OF EVERY ROW IS THE POOL, by construction — see ledger.py's own
+    header. That costs nothing here: a manager's own buys and sells are
+    exactly the rows naming him, and who the counterparty was does not
+    change how much money moved.
+
+    `days` is the span of the WHOLE ledger, not each manager's own first-to-
+    last: a manager who has done nothing for a week has a real rate of
+    nearly zero and dividing by his own shorter span would hide that. It is
+    the same denominator for everyone, which is what makes the four numbers
+    comparable at all.
+    """
+    from ffcore.tidy import ledger_stamp
+
+    rows = [(ledger_stamp(t.get("date", "")), t) for t in txns]
+    stamps = [s for s, _ in rows if s]
+    if not stamps:
+        return {}
+    span = max((max(stamps) - min(stamps)).total_seconds() / 86400.0, 1.0)
+    end = now or max(stamps)
+    out: dict[str, dict] = {}
+
+    def rec(h):
+        return out.setdefault(h, {"buys": 0, "sells": 0, "bought": 0.0,
+                                  "sold": 0.0, "days": span,
+                                  "sell_rate": 0.0, "idle": None,
+                                  "last": None})
+    for when, t in rows:
+        price = float(t.get("price") or 0)
+        src = (t.get("from") or "").strip()
+        dst = (t.get("to") or "").strip()
+        for h, side in ((dst, "buy"), (src, "sell")):
+            if not h or h == MARKET:
+                continue
+            r = rec(h)
+            if side == "buy":
+                r["buys"] += 1
+                r["bought"] += price
+            else:
+                r["sells"] += 1
+                r["sold"] += price
+            if when and (r["last"] is None or when > r["last"]):
+                r["last"] = when
+    for r in out.values():
+        r["sell_rate"] = r["sold"] / span
+        if r["last"] is not None:
+            r["idle"] = max(0.0, (end - r["last"]).total_seconds() / 86400.0)
+    return out
+
+
+def days_to_afford(cash, price: float, daily_bonus: float,
+                   sell_rate: float = 0.0, ceiling=None) -> int | None:
+    """Roughly how many days until a manager on `cash` could put `price`
+    together. 0 if he already can; None if nothing says he ever could.
+
+    WHAT IS MEASURED AND WHAT IS GUESSED, stated the way DRIFT_FRAC's own
+    comment states it, because this is an estimate and reads like a fact:
+
+      * `cash` — MEASURED for me (the app states `teamMoney` for the account
+        that asks), ESTIMATED for a rival: the starting budget less every
+        ledger row plus the accrued allowance. It carries a `~` everywhere it
+        is printed and it can be a whole unseen sale wrong.
+      * `daily_bonus` — a CONFIGURED FACT off inputs/league.ini (100K here),
+        the one income the activity feed cannot see.
+      * `sell_rate` — MEASURED, per rival, off that rival's own realised
+        gross sale proceeds per day (rival_tempo()). It is a rate he has
+        actually run, not a capacity anybody has assumed for him.
+      * The COMBINATION — that he keeps raising money at his own past rate
+        while the allowance accrues — is the GUESS, and it is the whole
+        model. There is no attempt to say whether he WANTS this player.
+        ffcore.bid.demand_summary() already answers that, as a snapshot of
+        who can pay TODAY; this answers the orthogonal question it cannot,
+        which is when the ones who cannot pay today start being able to.
+
+    ALLOWANCE-ONLY WAS TRIED FIRST AND IS WRONG HERE, which is why
+    `sell_rate` exists at all. On the allowance alone, Albert Laporta
+    (−45.02M on 2026-08-31) needs 450 days to reach a zero balance and would
+    be reported as no threat to anything for over a year — while the ledger
+    shows him raising 86.9M across six sales in the preceding seven days. A
+    bound nobody can act on, printed as a number, is worse than no number.
+
+    `ceiling` is a hard cap on what he could ever reach — his cash plus what
+    his whole squad is worth. Past it the answer is None (never), not a very
+    large number of days: a manager cannot sell more than he holds, and the
+    rate above would otherwise extrapolate straight through that wall.
+    """
+    if cash is None:
+        return None
+    if cash >= price:
+        return 0
+    if ceiling is not None and price > ceiling:
+        return None
+    rate = max(0.0, daily_bonus) + max(0.0, sell_rate)
+    if rate <= 0:
+        return None
+    return int(-(-(price - cash) // rate))          # ceil, without math
+
+
+def contest(u, key: str) -> list[tuple[str, int]]:
+    """`[(manager, days), ...]` — who else could pay `key`'s own price, and
+    how soon, soonest first. `[]` when nobody ever could.
+
+    THE RACE, WHICH THE BOARD OTHERWISE DOES NOT PRICE. A clause is instant
+    and cannot be refused — by me OR by anybody else — so a target sitting
+    at a payable clause is not a thing I own the option on, it is a thing
+    the first solvent manager takes. That changes what to do with a target
+    in opposite directions depending on one number nothing here printed
+    before: if the nearest rival is a month away there is no race and the
+    money is better kept for a cycle this simulation cannot value (see
+    "Cash scores zero"), and if he is two days away then waiting IS the
+    decision, made by default.
+
+    CLAUSE TARGETS ONLY, deliberately. A clause price is published, applies
+    to everybody alike, and cannot be refused, so "can he pay it" is the
+    whole of "can he take him". A free-agent or listed row is a BID that can
+    lose, and what it costs to win one is a fact about behaviour this
+    function has no model of — `Universe.bids` (the app's own
+    `numberOfBids`) is the real observed contest signal there, and it is
+    already carried.
+
+    THE OWNER IS NOT A CONTENDER for his own player and neither am I: this
+    is who else could take him out from under me, which is a question about
+    the other three.
+    """
+    if u.route.get(key) != "clause":
+        return []
+    price = u.price.get(key)
+    if price is None:
+        return []
+    owner = u.owner.get(key, "")
+    out = []
+    for m in u.state.squads:
+        if m == u.me or m == owner:
+            continue
+        tempo = u.tempo.get(m, {})
+        # HIS WHOLE SQUAD IS THE WALL — see days_to_afford()'s `ceiling`.
+        # Market value, not clause value: what a sale pays out at.
+        ceiling = u.rival_cash.get(m, 0.0) + sum(
+            u.value.get(k, 0.0) for k in u.state.squads.get(m, {}))
+        d = days_to_afford(u.rival_cash.get(m), price, u.daily_bonus,
+                           tempo.get("sell_rate", 0.0), ceiling)
+        if d is not None:
+            out.append((m, d))
+    return sorted(out, key=lambda t: (t[1], t[0]))
 
 
 def dead_weight(u) -> list[tuple[str, float]]:
@@ -1567,6 +1767,11 @@ def load(trials_pool=None) -> Universe:
         value=value, market_exp=market_exp, start=start, clause=clause,
         route=route,
         rival_cash=rival_cash,
+        # THE RATE AND THE BEHAVIOUR, beside the level `rival_cash` already
+        # holds — see days_to_afford(). `lg.txns` is the replayed ledger the
+        # balances above were built from, so the two cannot describe two
+        # different transaction histories.
+        daily_bonus=lg.cfg.daily_bonus, tempo=rival_tempo(lg.txns),
         clause_until=clause_until, bids=bids,
         part_played=played, name=name, start_note=_calibrated()[0].note(),
         unjoined=list(unjoined_clubs) + list(lg.api_unjoined),
@@ -2449,7 +2654,106 @@ def _selftest() -> None:
     assert value_rate(None, 5e6) is None
     assert value_rate(0.0, 5e6) == 0.0           # a real price, zero return: 0, not None
 
-    print("decide self-test OK (115 cases)")
+    # -- rival_tempo: each manager's OWN realised behaviour ----------------
+    # A SYNTHETIC LEDGER IN THE REAL FILE'S SHAPE — one side of every row is
+    # the pool, exactly as ledger.py writes it. Two rivals with deliberately
+    # different behaviour over the same ten days: `busy` sells four times for
+    # 40M, `hoarder` sells once for 1M and has not moved since day one. This
+    # is the distinction the league-wide prior cannot make and this can.
+    txns_t = [
+        {"date": "2026-08-01T10:00", "from": "market", "to": "hoarder",
+         "price": "5000000"},
+        {"date": "2026-08-01T11:00", "from": "hoarder", "to": "market",
+         "price": "1000000"},
+        {"date": "2026-08-02T10:00", "from": "busy", "to": "market",
+         "price": "10000000"},
+        {"date": "2026-08-04T10:00", "from": "busy", "to": "market",
+         "price": "10000000"},
+        {"date": "2026-08-07T10:00", "from": "busy", "to": "market",
+         "price": "10000000"},
+        {"date": "2026-08-11T10:00", "from": "busy", "to": "market",
+         "price": "10000000"},
+        {"date": "2026-08-11T10:00", "from": "market", "to": "busy",
+         "price": "30000000"},
+    ]
+    tp = rival_tempo(txns_t)
+    assert set(tp) == {"hoarder", "busy"}, tp     # "market" is never a manager
+    assert tp["busy"]["sells"] == 4 and tp["busy"]["buys"] == 1, tp["busy"]
+    assert tp["busy"]["sold"] == 40e6, tp["busy"]
+    assert tp["hoarder"]["sells"] == 1 and tp["hoarder"]["buys"] == 1
+    # ONE DENOMINATOR FOR EVERYONE — the whole ledger's span (10 days), not
+    # each manager's own first-to-last. Scored on his own span the hoarder's
+    # single sale would read as 1M/day over one hour, i.e. faster than the
+    # rival who actually raised 40M.
+    assert tp["busy"]["days"] == tp["hoarder"]["days"] == 10.0, tp
+    assert abs(tp["busy"]["sell_rate"] - 4e6) < 1e-6, tp["busy"]
+    assert abs(tp["hoarder"]["sell_rate"] - 0.1e6) < 1e-6, tp["hoarder"]
+    assert tp["busy"]["sell_rate"] > 10 * tp["hoarder"]["sell_rate"]
+    # Idle: days since that manager's own last deal, off the ledger's end.
+    assert tp["busy"]["idle"] == 0.0, tp["busy"]
+    assert abs(tp["hoarder"]["idle"] - 9.958333) < 1e-4, tp["hoarder"]
+    assert rival_tempo([]) == {}                  # no ledger, no claims
+
+    # -- days_to_afford: the forward estimate, and its edges ----------------
+    # Already solvent for the price: today, not "0.0 days from now".
+    assert days_to_afford(30e6, 20e6, 1e5, 1e6) == 0
+    # On the allowance alone: 10M short at 100K a day is 100 days.
+    assert days_to_afford(0.0, 10e6, 1e5, 0.0) == 100
+    # THE SAME MANAGER WITH A MEASURED SALE RATE IS AN ORDER OF MAGNITUDE
+    # NEARER — this is the whole reason sell_rate is in the model, and the
+    # real reading it was built from (Albert Laporta: 450 days on the
+    # allowance, 8 days on his own realised rate) has exactly this shape.
+    assert days_to_afford(0.0, 10e6, 1e5, 4e6) == 3
+    # Overdrawn is a real state, not unknown — the arithmetic just starts
+    # further back.
+    assert days_to_afford(-45e6, 10e6, 1e5, 11.9e6) == 5
+    # Ceiling: he cannot sell more than he holds, so past the wall the
+    # answer is "never", not an enormous number of days.
+    assert days_to_afford(0.0, 500e6, 1e5, 4e6, ceiling=100e6) is None
+    assert days_to_afford(0.0, 50e6, 1e5, 4e6, ceiling=100e6) == 13
+    # No rate at all and short: never. Not zero, not a division by zero.
+    assert days_to_afford(0.0, 10e6, 0.0, 0.0) is None
+    # Unknown cash stays unknown — never silently read as broke.
+    assert days_to_afford(None, 10e6, 1e5, 4e6) is None
+
+    # -- contest(): who else can take him, and when ------------------------
+    # rich can pay today; slow needs to sell for it; broke's whole squad
+    # plus his cash cannot reach the price at all, so he is never a threat.
+    per_c = {1: {k: (3.0, 1.0) for k in
+                 ("me_a", "prize", "slow_a", "rich_a", "broke_a")}}
+    u_c = Universe(
+        state=LeagueState({"me": {"me_a": "MED"}, "own": {"prize": "MED"},
+                           "slow": {"slow_a": "MED"},
+                           "rich": {"rich_a": "MED"},
+                           "broke": {"broke_a": "MED"}}, [1], "me"),
+        forecaster=B3(per_c),
+        pos={"prize": "MED"}, proceeds={},
+        price={"prize": 20e6, "listed_one": 20e6},
+        route={"prize": "clause", "listed_one": "listed"},
+        owner={"prize": "own"}, cash=50e6, me="me",
+        value={"slow_a": 30e6, "rich_a": 30e6, "broke_a": 1e6},
+        daily_bonus=1e5,
+        # `own` IS DELIBERATELY RICH ENOUGH TO PAY TODAY, so his absence
+        # below is the exclusion doing work rather than him failing the
+        # arithmetic anyway.
+        rival_cash={"own": 25e6, "slow": 0.0, "rich": 25e6, "broke": 0.0},
+        tempo={"own": {"sell_rate": 2e6}, "slow": {"sell_rate": 2e6},
+               "rich": {"sell_rate": 2e6}, "broke": {"sell_rate": 2e6}})
+    got_c = contest(u_c, "prize")
+    # THE OWNER IS NOT A CONTENDER FOR HIS OWN PLAYER, and neither am I.
+    assert "own" not in dict(got_c) and "me" not in dict(got_c), got_c
+    # broke's ceiling is 0 + 1M < 20M: never, so he is absent entirely
+    # rather than carried as a very large number of days.
+    assert "broke" not in dict(got_c), got_c
+    assert dict(got_c)["rich"] == 0, got_c        # 25M in hand, today
+    assert dict(got_c)["slow"] == 10, got_c       # 20M at 2.1M a day
+    assert got_c[0][0] == "rich", got_c           # soonest first
+    # CLAUSE TARGETS ONLY — a listed row is a bid that can lose and this
+    # function has no model of that; Universe.bids is the signal there.
+    assert contest(u_c, "listed_one") == [], contest(u_c, "listed_one")
+    assert contest(u_c, "nobody") == []
+
+    print("decide self-test OK (145 cases)")
 
 
 if __name__ == "__main__":

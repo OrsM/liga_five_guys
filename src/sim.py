@@ -268,6 +268,38 @@ def _bar(u) -> float:
     return decide.xi_bar(exp, xi)
 
 
+def race(u, key: str) -> list[dict]:
+    """`decide.contest()` for one target, as the shape BOTH renderers draw.
+
+    ONE ANSWER, TWO RENDERINGS — the markdown's own cell (race_cell()) and
+    the phone's `contest` field are two drawings of this list, never two
+    computations of it. That is the same rule ladder()/ladder_rows() and
+    _move_rank_key() were each pulled out to enforce, applied to the newest
+    number on the board rather than learned again the day the two disagree.
+
+    `[]` for everything that is not a payable clause, which is most rows —
+    see decide.contest()'s own note on why a bid that can lose is a
+    different question with a different signal (`Universe.bids`).
+    """
+    import decide
+    return [{"manager": m, "days": d} for m, d in decide.contest(u, key)]
+
+
+def race_cell(u, r: list[dict]) -> str:
+    """race()'s own list in one short phrase, or "" for nothing to say.
+
+    Only the SOONEST rival is named. The board is already a wide table on a
+    390px phone and the second-soonest changes no decision — what a reader
+    acts on is whether anybody is close, and who.
+    """
+    if not r:
+        return ""
+    who, days = r[0]["manager"], r[0]["days"]
+    when = ("can pay today" if days <= 0
+            else "can pay in ~%d day%s" % (days, "" if days == 1 else "s"))
+    return "%s %s" % (who.split()[0], when)
+
+
 def ladder_rows(u, rows, bands=None, base=None) -> list[dict]:
     """The grouped plan as data, so the phone draws the same one table.
 
@@ -305,7 +337,7 @@ def ladder_rows(u, rows, bands=None, base=None) -> list[dict]:
     bands = {k: v for k, v in (bands or {}).items() if k not in won}
 
     def cell(k, group, where, money, pts, note="", value=None,
-            lo=None, hi=None):
+            lo=None, hi=None, contest=()):
         if k in bands:
             pts, lo, hi, action = bands[k]
             # A SWAP OF *HIM*, NOT A PURE SALE: the band answers "sell him,
@@ -325,7 +357,11 @@ def ladder_rows(u, rows, bands=None, base=None) -> list[dict]:
                 "pos": u.pos.get(k, ""), "start": u.start.get(k, 0.0),
                 "xpts": exp.get(k, 0.0), "group": group, "where": where,
                 "money": money, "pts": pts,
-                "pts_lo": lo, "pts_hi": hi, "note": note, "value": value}
+                "pts_lo": lo, "pts_hi": hi, "note": note, "value": value,
+                # WHO ELSE COULD TAKE HIM, AND WHEN — see race(). `[]` on
+                # every row that is not a payable clause, which is every
+                # row you already own and every free/listed target.
+                "contest": list(contest)}
 
     out = []
     # WHAT TO CHANGE, not what to have. When the marks are a legal eleven the
@@ -363,7 +399,8 @@ def ladder_rows(u, rows, bands=None, base=None) -> list[dict]:
         r = won[k]
         return cell(k, group, u.owner.get(k) or "free agent",
                     -r["action"].net, r["d_pts"], value=r.get("value"),
-                    lo=r.get("pts_lo"), hi=r.get("pts_hi"))
+                    lo=r.get("pts_lo"), hi=r.get("pts_hi"),
+                    contest=race(u, k))
 
     buys = [k for k in rest if k in won]
     for k in sorted((k for k in buys if k in chase), key=lambda k: chase[k]):
@@ -376,9 +413,15 @@ def ladder_rows(u, rows, bands=None, base=None) -> list[dict]:
                     key=lambda k: -exp.get(k, 0.0)):
         short_by = u.price[k] - u.cash - spare
         save_pts = bands[k][0] if k in bands else None
+        # THE SAVE GROUP IS WHERE THE RACE MATTERS MOST, and it is the one
+        # place this used to be silent: a clause target you are saving
+        # toward is the exact case where "somebody else can pay it in two
+        # days" turns a plan into a dead plan, and "nobody for a month"
+        # turns a shortfall into a real option.
         out.append(cell(k, "save", u.owner.get(k) or "free agent",
                         -short_by, save_pts, "short",
-                        value=value_rate(save_pts, short_by)))
+                        value=value_rate(save_pts, short_by),
+                        contest=race(u, k)))
     for k in sorted((k for k in rest if k not in won
                      and u.price[k] <= u.cash + spare),
                     key=lambda k: -exp.get(k, 0.0)):
@@ -571,9 +614,19 @@ def ladder(u, rows, base, data=None) -> list[str]:
             if r["note"]:
                 season += " " + r["note"]
             money = ("%+.2fM" % (r["money"] / 1e6)) if r["money"] else "—"
+        # THE RACE, IN THE `Where` COLUMN — beside the manager who holds
+        # him, which is the only place it reads as one fact: "he is
+        # BurtonGM89's, and SusoGattuso can pay his clause in 3 days." A
+        # column of its own would be an eighth column on a phone for a cell
+        # that is empty on most rows. `race_cell()` renders `contest`, it
+        # does not recompute it — see race().
+        where = r["where"]
+        held = race_cell(u, r.get("contest") or [])
+        if held:
+            where += " · " + held
         return ("| %s | %s | %.0f%% | %.2f | %s | %s | %s | %s |"
                 % (r["name"], r["pos"] or "—", 100 * r["start"], r["xpts"],
-                   r["where"], money, season,
+                   where, money, season,
                    ("%.1f" % r["value"]) if r["value"] is not None else "—"))
 
     out = ["| Player | Pos | Start | xPts/j | Where | € | Season | pts/M€ |",
@@ -660,7 +713,17 @@ def ladder(u, rows, base, data=None) -> list[str]:
             "buy costs) — there is no price to divide by, and Season "
             "already says whether it is worth doing. On a SAVE row it is "
             "the shortfall's own rate, which nobody can act on yet, only "
-            "plan toward. This is "
+            "plan toward. **Where** names who holds him, and on a target "
+            "whose buyout is payable today it also names the rival who "
+            "could pay that same buyout soonest, and when — a clause "
+            "cannot be refused by ME or by THEM, so a man at a payable "
+            "clause is not an option you hold, he is the first solvent "
+            "manager's. `can pay today` means the race is already on; a "
+            "number of days is an ESTIMATE off their balance (`~`, "
+            "reconstructed), the app's 100K daily allowance, and the "
+            "rate that manager has actually raised money at this season — "
+            "see the caveat below for what it does and does not assume. "
+            "This is "
             "NOT the old λ (retired 2026-08-17): λ was measured against "
             "your OWN current eleven off a ladder of the whole unowned "
             "pool, so the same player was worth a different λ on "
@@ -1145,6 +1208,31 @@ def _drift_frac_now() -> float:
     return forecast.DRIFT_FRAC
 
 
+def _tempo_note(u) -> str:
+    """The four rivals' own measured money-raising rates, in one phrase.
+
+    READ OFF THE DATA, NOT REMEMBERED — the same rule every other line in
+    caveats() follows. The rates are what makes the "days" figure above a
+    per-rival number rather than one league-wide constant, so the reader
+    gets to see the spread between them and judge the estimate himself; a
+    caveat that says "measured per rival" without showing the measurement
+    is asking to be believed.
+    """
+    have = [(m, u.tempo.get(m, {})) for m in sorted(u.state.squads)
+            if m != u.me and u.tempo.get(m)]
+    if not have:
+        return ("nothing is on the ledger yet to measure that rate from, so "
+                "it is the allowance alone")
+    bits = ["%s %.1fM/day off %d sale%s"
+            % (m.split()[0], t.get("sell_rate", 0.0) / 1e6,
+               t.get("sells", 0), "" if t.get("sells") == 1 else "s")
+            for m, t in have]
+    return ("measured over the ledger's own %.0f days: %s. They differ by "
+            "an order of magnitude, which is the whole reason this is per "
+            "rival and not one number"
+            % (have[0][1].get("days", 0.0), ", ".join(bits)))
+
+
 def caveats(u) -> list[str]:
     """What the numbers above cannot see. Read off the data, not remembered.
 
@@ -1175,6 +1263,19 @@ def caveats(u) -> list[str]:
         "known, e.g. who gets injured in March |",
         "| Rivals never transfer | a steal that guts a squad assumes its "
         "manager does not simply buy someone back — flatters the steal |",
+        "| \"X can pay in ~N days\" is an estimate, and says what it "
+        "assumes | it is their reconstructed balance (`~`: the app states "
+        "`teamMoney` for your account alone, so a rival's can be a whole "
+        "unseen sale wrong), plus the %s daily allowance, plus the rate "
+        "that manager has ACTUALLY raised money at across the ledger — "
+        "%s. Capped at what his squad is worth, since nobody can sell "
+        "more than he holds. What it does NOT model is whether he WANTS "
+        "the player, only whether he could pay: read it as how long the "
+        "door stays open, never as a prediction that he walks through it. "
+        "An allowance-only version was tried first and rejected as "
+        "unactionable — it put the manager who raised 86.9M in six sales "
+        "last week 450 days away from affording anything |"
+        % (fmt_money(u.daily_bonus), _tempo_note(u)),
         "| Teammates score independently, MATCH TO MATCH | two defenders of "
         "one club still land on opposite ends of the per-match pool in the "
         "same round — only their SEASON-LONG rating (club_rel) is shared, "
@@ -1614,6 +1715,14 @@ def payload(u, rows, base, rivals, locks_h=None, n_actions: int = 0,
             # board can mark the row instead of the reader having to spot a
             # wide band by eye. See chase_keys().
             "chase": chase.get(a.buy) if a.buy else None,
+            # WHO ELSE COULD TAKE HIM, AND WHEN — `[{"manager", "days"}]`,
+            # soonest first, `[]` on everything that is not a payable
+            # clause. Same race() the markdown ladder's `Where` cell draws,
+            # so the phone and the appendix cannot disagree about who is
+            # racing me for a man; the phone gets the whole list rather
+            # than the markdown's one-name summary because it has the room
+            # to draw more of it. See decide.contest().
+            "contest": race(u, a.buy) if a.buy else [],
             # What you are on afterwards, and what he does about it. Both are
             # in the markdown table; the phone could not draw them because
             # they were never in the payload, which is the two renderers
@@ -2653,7 +2762,94 @@ def _selftest() -> None:
     assert cover_md(ub, []) == []
     assert set(bands2) == set(sqb), sorted(bands2)
 
-    print("sim self-test OK (168 cases)")
+    # -- the race: who else can pay this clause, and when -------------------
+    # THE CASE THE LEAGUE-WIDE PRIOR CANNOT MAKE. Two rivals, identical
+    # balances (both flat broke) and identical squads, differing ONLY in the
+    # rate each has actually raised money at this season — `quick` sells
+    # 4M/day, `slow` 0.1M/day. Under one league-wide constant they would be
+    # the same threat; measured per rival they are 5 days apart on the same
+    # 20M clause, which is the difference between racing a target and
+    # letting it go.
+    ur = Universe(
+        state=LeagueState({"me": {"me_a": "MED"}, "own": {"prize": "MED"},
+                           "quick": {"q_a": "MED"}, "slow": {"s_a": "MED"}},
+                          [1, 2], "me"),
+        forecaster=Bootstrap({j: {k: (5.0, 1.0) for k in
+                                  ("me_a", "prize", "q_a", "s_a")}
+                             for j in (1, 2)}),
+        pos={"prize": "MED", "me_a": "MED", "q_a": "MED", "s_a": "MED"},
+        price={"prize": 20e6}, proceeds={}, cash=1e6, me="me",
+        route={"prize": "clause"}, owner={"prize": "own"},
+        value={"q_a": 60e6, "s_a": 60e6, "prize": 20e6},
+        name={"prize": "prize"}, daily_bonus=1e5,
+        rival_cash={"own": 0.0, "quick": 0.0, "slow": 0.0},
+        tempo={"quick": {"sell_rate": 4e6, "sells": 8, "days": 20.0},
+               "slow": {"sell_rate": 0.1e6, "sells": 1, "days": 20.0}})
+    r_race = race(ur, "prize")
+    assert [x["manager"] for x in r_race] == ["quick", "slow"], r_race
+    assert r_race[0]["days"] == 5 and r_race[1]["days"] == 100, r_race
+    # SAME BALANCE, SAME SQUAD, 20x THE WAIT — the distinction is the
+    # measured rate and nothing else.
+    assert r_race[1]["days"] == 20 * r_race[0]["days"], r_race
+    assert race_cell(ur, r_race) == "quick can pay in ~5 days", \
+        race_cell(ur, r_race)
+    assert race_cell(ur, []) == ""                # nothing to say, say it
+    assert race_cell(ur, [{"manager": "quick", "days": 0}]) == \
+        "quick can pay today"
+    assert race_cell(ur, [{"manager": "quick", "days": 1}]) == \
+        "quick can pay in ~1 day"                 # not "1 days"
+
+    # -- ...and it reaches BOTH renderers off that ONE computation ----------
+    # Same rule as the chase block above: one race(), two drawings of it.
+    race_rows = [{"action": decide.Action("clause", buy="prize", cost=20e6,
+                                          victim="own"),
+                  "d_pos": 0.5, "d_win": 0.0, "d_pts": 40.0, "value": 2.0,
+                  "pts_lo": 10.0, "pts_hi": 70.0, "helps": 0.9,
+                  "d_beat": {"own": 0.1}, "answer": None}]
+    lad_r = ladder_rows(ur, race_rows)
+    got_r = next(r for r in lad_r if r["name"].lower() == "prize")
+    assert got_r["contest"] == r_race, got_r
+    md_r = "\n".join(ladder(ur, race_rows, st))
+    assert "quick can pay in ~5 days" in md_r, md_r
+    # Beside the owner in the SAME cell, not a new column — the table still
+    # has exactly its eight.
+    assert "own · quick can pay in ~5 days" in md_r, md_r
+    assert md_r.splitlines()[0].count("|") == 9, md_r.splitlines()[0]
+    pl_r = payload(ur, race_rows, st, ["own", "quick", "slow"])
+    assert next(m for m in pl_r["moves"]
+               if m["buy"].lower() == "prize")["contest"] == r_race, \
+        pl_r["moves"]
+    # The JSON's ladder IS the markdown's ladder, race included.
+    assert [r["contest"] for r in pl_r["ladder"]] == \
+          [r["contest"] for r in lad_r], pl_r["ladder"]
+    # A row that is not a payable clause carries an empty race in BOTH, and
+    # renders nothing — no "nobody can pay this" noise on every free agent.
+    ur.route["prize"] = "free"
+    assert race(ur, "prize") == []
+    # (The legend below the table explains the phrase and so contains it;
+    # what must vanish is the NAMED rival on the row itself.)
+    assert "quick can pay" not in "\n".join(ladder(ur, race_rows, st))
+    ur.route["prize"] = "clause"
+
+    # -- the caveat shows the measurement rather than asserting it ---------
+    cav = "\n".join(caveats(ur))
+    assert "can pay in ~N days" in cav, cav
+    assert "quick 4.0M/day off 8 sales" in cav, cav
+    assert "slow 0.1M/day off 1 sale" in cav, cav      # not "1 sales"
+    assert fmt_money(ur.daily_bonus) in cav, cav
+    # No ledger at all: the caveat says so instead of printing a rate it
+    # does not have.
+    ur.tempo = {}
+    assert "nothing is on the ledger yet" in "\n".join(caveats(ur))
+    # ...and with no measured rate the estimate DEGRADES to the allowance
+    # alone (20M at 100K a day = 200 days for both) rather than inventing a
+    # rate or going silent. Both rivals collapse onto the same number,
+    # which is exactly the undifferentiated answer this commit replaced —
+    # correct as a fallback, and visibly the weaker reading.
+    assert [x["days"] for x in race(ur, "prize")] == [200, 200], \
+        race(ur, "prize")
+
+    print("sim self-test OK (192 cases)")
 
 
 def main() -> None:

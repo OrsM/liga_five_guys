@@ -220,6 +220,50 @@ from 57% to 16%. A market purchase gets no response at all, and that asymmetry
 is the point: money paid to the app leaves the league, money paid for a clause
 changes sides.
 
+**A CLAUSE IS ALSO A RACE, AND THE OTHER RUNNERS ARE NOT INTERCHANGEABLE.** A
+buyout cannot be refused by me *or by them*, so a rival player sitting at a
+payable clause is not an option I hold — he is the first solvent manager's.
+Every row for such a target now names the rival who could pay that same clause
+soonest, and when: *"SusoGattuso · BurtonGM89 can pay in ~3 days"*, in the
+`Where` column of the markdown ladder and as a `contest` list on the phone,
+both drawn from one `decide.contest()`.
+
+The estimate is a balance (`~`, reconstructed — the app states `teamMoney` for
+one account only), the app's 100K daily allowance, and **the rate that manager
+has actually raised money at**, measured off his own ledger rows. That last
+term is what makes it per-rival rather than one number, and the four are an
+order of magnitude apart: over the ledger's own 19 days, BurtonGM89 14.9M/day
+across 19 sales, Albert Laporta 11.9M, SusoGattuso 6.1M, Magic Mike 333 **1.0M
+across two sales, and nothing at all in the last week**. It is capped at what
+each squad is worth, because nobody can sell more than he holds, and it says
+only whether he *could* pay — never that he wants to.
+
+An **allowance-only** version was built first and rejected as unactionable: on
+100K a day, Albert Laporta at −45.02M is 450 days from affording anything,
+while the ledger has him raising 86.9M across six sales in the preceding week.
+A bound nobody can act on, printed as a number, is worse than no number.
+
+**THE OTHER HALF OF THE PER-RIVAL IDEA WAS CHECKED AND SHIPPED AS NOTHING.**
+The obvious companion — rank a "listed" candidate by *whose* listing it is,
+since four rivals are fully observable rather than a statistic — has no
+evidence under it, and this is the measurement rather than a shrug. The
+league-wide "listed never converts" prior was re-checked at 119 transactions
+and now rests on a real ownership replay (starting rosters forward over every
+activity row) rather than on the ledger's own `from`/`to` columns, which name
+the pool by construction and so could never have shown a counterparty at all:
+zero buys of a player somebody already held, zero sells by anybody but the
+holder, and the only two sell→buy pairs on one player are 4 and 10 days apart —
+sold to the app, later re-bought from it. Attributing every `marketPlayerTeam`
+row to whoever owned that player at that moment gives each rival's own listing
+history: Albert Laporta 20 players listed, BurtonGM89 19, SusoGattuso 18,
+**Magic Mike 333 none, ever**. 44–55% of those listings did eventually leave
+the squad — and every one of them left *to the app*, so the conversion that
+matters is 0 for each rival separately as well as 0/119 pooled. Three rivals
+within binomial noise of each other on the only rate that can be measured
+(±11pp at n≈20) and a fourth with no data points is not a distinction; it is
+the same prior four times. So `KEEP_RELIABLE_MIN` and `_move_rank_key` stay
+league-wide, and the per-rival read went into the money instead.
+
 **Confirmed against the app on 2026-08-18**, and it cannot be confirmed here:
 no clause purchase has ever happened in this league — 58 activity rows, all
 market buys and sells, no manager-to-manager pair — so the feed has never had
@@ -1043,6 +1087,14 @@ differently-keyed ownership map is worse than none.
   so without it every estimate drifts further under the truth each day and a
   rival looks less able to answer a clause than he is. Added only to
   ESTIMATED balances: an observed one already contains every bonus paid.
+- **"X can pay in ~N days" prices ABILITY, never intent.** It is the only
+  forward-looking number on the board and the one most likely to be read as a
+  prediction. It says how long a target's door stays open, on a rate a rival
+  has actually run; it has no model of whether he wants that player at all.
+  `ffcore.bid.demand_summary()` answers the demand half as a snapshot (who
+  can pay *today*, who is broke) and the two have never been joined — doing
+  so needs a rival's own XI gain per candidate priced against his cash
+  trajectory, which is a second simulation, not a second column.
 - **A 200,000 gap in the cash arithmetic, unexplained.** Rebuilding the balance
   from the feed lands 200,000 under what the app reports — exactly round, which
   smells like an app credit rather than a deal. It is 0.8% and changes no
