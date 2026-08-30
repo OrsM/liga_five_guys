@@ -65,6 +65,23 @@ __all__ = ["Action", "candidates", "rank", "Universe",
 # numbers the RANKING settles long before the levels do, so this buys an order
 # of magnitude of speed and costs only precision on options that lose anyway.
 SCREEN_TRIALS = 250
+# CHECKED WHETHER 3000 IS FALSE PRECISION (2026-08-31), asked directly by
+# Miguel. It is not, and the two numbers this question conflates move in
+# OPPOSITE directions with trial count. Ran the real board at N in {100,
+# 250, 500, 1000, 1500, 3000}, same seed each time (the common-random-
+# numbers claim above, tested rather than assumed): the TOP move (a paired
+# comparison, "with the move vs. without it" over the SAME simulated
+# seasons) was "buy Lucas Boye" at every single N, from 100 to 3000 — the
+# ranking claim holds all the way down. `p_win`/`expected_finish` (levels,
+# not paired differences) did not: 0.1930-0.2600 across that same run,
+# a 7-point swing on a figure the report prints as a single number. Cutting
+# FINAL_TRIALS would speed up an already-cheap stage (7.0s at 3000, 2.9s at
+# 1000, most of the difference is the trial-proportional cost — the rest is
+# fixed overhead that does not shrink further below ~1000) in exchange for
+# MORE noise on exactly the number sim.trailing() now thresholds at 0.5 —
+# a swing this size can flip whether that mode fires on a genuinely
+# borderline day. Kept at 3000; the intuition was reasonable but backwards
+# once measured, same shape as SHRINK_K's/DRIFT_FRAC's own 2026-08-31 checks.
 FINAL_TRIALS = 3000
 KEEP = 12          # how many survive screening and get the full count
 
