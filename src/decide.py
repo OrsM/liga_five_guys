@@ -288,6 +288,29 @@ def xi_bar(exp: dict[str, float], xi) -> float:
     before this existed, which is how "min(..., default=0.0)" is exactly
     the kind of detail that drifts silently if one copy is edited and the
     others are not.
+
+    ONE FLAT NUMBER ACROSS ALL FOUR SLOTS, AND THAT IS THE CORRECT SCREEN
+    RATHER THAN A MISSING FEATURE. Value-over-replacement theory says the
+    bar ought to be position-specific — the worst starting defender is not
+    the worst starting forward — and on the real board those bars are
+    genuinely far apart (measured 2026-08-31: POR 5.82, DEF 2.69, MED
+    2.54, DEL 3.62). A per-position bar would still be WRONG here, and the
+    reason is the one season.py's best_xi() docstring already gives: YOU
+    CAN CHANGE YOUR LAYOUT. A candidate below his own slot's bar enters
+    the eleven by pushing that slot's count up and some other slot's down,
+    so he helps the moment he beats the worst starter ANYWHERE — which is
+    exactly this minimum. Screening him against his own slot's bar drops a
+    man who would have played. The self-test carries the exact shape: a
+    1-5-4-1 with a weak fifth defender, where a midfielder at 2.0 is below
+    MED's own replacement level of 4.0 and still gains a point on the
+    pitch by reshaping to 1-4-5-1 and taking that defender out.
+
+    So the flat bar is the LOOSEST SOUND screen, and it errs the safe way.
+    It lets through candidates who cannot actually help — 4 of 19 real
+    targets on 2026-08-31, two of them keepers, since you only ever field
+    one — and the simulation behind candidates() then prices those at
+    roughly nothing (the day's keeper clause: -0.54 season points). That
+    is a few wasted screening slots. The other error would be a lost move.
     """
     return min((exp.get(k, 0.0) for k in xi), default=0.0)
 
@@ -1002,6 +1025,30 @@ def rank(u: Universe, acts: list[Action], seed: int = 1,
             # and obviously not if d_pts < 0, and dividing by a near-zero
             # or negative net would either blow up or invert the sign
             # into something that reads backwards.
+            #
+            # AND IT IS ALREADY POINTS OVER POSITION REPLACEMENT LEVEL, so
+            # there is no second `value_vor` beside it and there should not
+            # be one (asked again 2026-08-31). `d_pts` is a PAIRED MARGINAL
+            # — the same simulated seasons with the move and without it —
+            # and the "with" side re-picks best_xi() over every legal
+            # shape. A signing is therefore already scored against exactly
+            # the man he displaces at his own position, in the formation
+            # you would actually field once he arrives: replacement level
+            # COMPUTED, not assumed, and re-derived per candidate rather
+            # than fixed per slot. Measured in the self-test below: two
+            # candidates on the SAME expected points and the SAME price,
+            # one into a thin slot and one into a deep one, come out 3.2x
+            # apart in `d_pts` and so in `value`.
+            #
+            # A static per-position baseline would be strictly WORSE than
+            # this, not merely redundant, because it cannot see the reshape
+            # (xi_bar()'s own note carries the counterexample) and because
+            # it reintroduces the one thing decide.py exists to remove: a
+            # rate standing in for the question, with its own baseline to
+            # drift. Both module docstrings already retired "value over
+            # replacement" by name for that reason. Nothing here is
+            # scarcity-blind; `value` is a ratio of a scarcity-aware
+            # numerator to the price actually paid.
             "value": value_rate(d_pts, a.net),
         })
     rows = sorted(out, key=lambda d: (-d["d_pos"], d["action"].net))
@@ -1789,6 +1836,78 @@ def _selftest() -> None:
     if sale is not None:
         assert sale["value"] is None, sale
 
+    # -- `value` IS ALREADY POINTS OVER POSITION REPLACEMENT LEVEL ---------
+    # The standing proposal this pins down (raised again 2026-08-31): add a
+    # second `value_vor` = points over the position's replacement level,
+    # per euro, because `value` supposedly compares a candidate in
+    # isolation and cannot tell that a cheap defender is scarce and a cheap
+    # forward is not. It can. `d_pts` is a paired marginal off a re-picked
+    # best_xi(), so the replacement is computed per candidate rather than
+    # assumed per slot. Two candidates on IDENTICAL expected points and an
+    # IDENTICAL price, one into a thin slot and one into a deep one, must
+    # therefore NOT come out equal — which also means the fixture that
+    # proposal wants ("same `value`, different scarcity") cannot be built:
+    # equal `value` here IS the simulation saying they are worth the same.
+    vsq = {"me_k": "POR",
+           **{"me_d%d" % i: "DEF" for i in range(1, 6)},
+           **{"me_m%d" % i: "MED" for i in range(1, 7)},
+           "me_f1": "DEL"}
+    vth = {"th_" + k[3:]: v for k, v in vsq.items()}
+    vrate = {k: (5.0 if v == "MED" else 3.0) for k, v in vsq.items()}
+    vrate["me_f1"] = 1.0                 # the only forward, and a weak one
+    vrate.update({k: 3.0 for k in vth})
+    vper = {1: {k: (r, 1.0) for k, r in vrate.items()}}
+    vper[1]["thin_del"] = (8.0, 1.0)     # 8.0 into a slot replacing 1.0
+    vper[1]["deep_med"] = (8.0, 1.0)     # 8.0 into a slot replacing 5.0
+    uvor = Universe(
+        state=LeagueState({"me": dict(vsq), "riv": dict(vth)}, [1], "me"),
+        forecaster=B(vper),
+        pos={**vsq, **vth, "thin_del": "DEL", "deep_med": "MED"},
+        price={"thin_del": 5e6, "deep_med": 5e6},
+        route={"thin_del": "free", "deep_med": "free"},
+        proceeds={}, owner={}, cash=6e6, me="me")
+    vexp, vxi = current_xi(uvor)
+    # The fixture is what it claims: ONE flat bar, set by the weak forward,
+    # while the two slots' own replacement levels are 1.0 and 5.0 — the
+    # position-specific spread VORP exists to notice.
+    assert xi_bar(vexp, vxi) == 1.0, xi_bar(vexp, vxi)
+    assert min(vexp[k] for k in vxi if uvor.pos[k] == "DEL") == 1.0, vxi
+    assert min(vexp[k] for k in vxi if uvor.pos[k] == "MED") == 5.0, vxi
+    vrows, _vb, _vl, _vbd = rank(
+        uvor, [Action("buy", buy="thin_del", cost=5e6),
+               Action("buy", buy="deep_med", cost=5e6)])
+    vby = {r["action"].buy: r for r in vrows}
+    assert vby["thin_del"]["action"].net == vby["deep_med"]["action"].net
+    # Same points, same price, and the thin slot is worth MULTIPLES of the
+    # deep one. Measured 3.2x; asserted at 2x so the numpy and numpy-less
+    # RNG paths both hold it, the margin 24d2a8b's own value fixture needed.
+    assert vby["thin_del"]["d_pts"] > 2 * vby["deep_med"]["d_pts"] > 0, vby
+    assert vby["thin_del"]["value"] > 2 * vby["deep_med"]["value"] > 0, vby
+
+    # ...and a PER-POSITION bar would be UNSOUND as a screen, which is why
+    # xi_bar() stays flat — see its own note. 1-5-4-1 with a weak fifth
+    # defender: a midfielder at 2.0 sits below MED's own replacement level
+    # of 4.0, so a position-specific screen drops him, and he starts
+    # anyway by reshaping to 1-4-5-1. Pure best_xi(), no Monte Carlo, so
+    # this one is exact under both runtimes.
+    bsq = {"me_k": "POR", "me_d1": "DEF", "me_d2": "DEF", "me_d3": "DEF",
+           "me_d4": "DEF", "me_d5": "DEF", "me_m1": "MED", "me_m2": "MED",
+           "me_m3": "MED", "me_m4": "MED", "me_f1": "DEL"}
+    bexp = {"me_k": 3.0, "me_d1": 3.0, "me_d2": 3.0, "me_d3": 3.0,
+            "me_d4": 3.0, "me_d5": 1.0, "me_m1": 4.0, "me_m2": 4.0,
+            "me_m3": 4.0, "me_m4": 4.0, "me_f1": 3.0, "cand": 2.0}
+    bxi = set(best_xi(bsq, bexp))
+    assert bxi == set(bsq), bxi                    # eleven men, all field
+    assert xi_bar(bexp, bxi) == 1.0                # the weak fifth defender
+    assert min(bexp[k] for k in bxi if bsq[k] == "MED") == 4.0
+    bsq2 = {**bsq, "cand": "MED"}
+    bxi2 = set(best_xi(bsq2, bexp))
+    # Clears the flat bar (2.0 > 1.0), fails his own slot's (2.0 < 4.0),
+    # and plays — the fifth defender is the man who comes out for him.
+    assert "cand" in bxi2 and "me_d5" not in bxi2, bxi2
+    assert sum(1 for k in bxi2 if bsq2[k] == "DEF") == 4, bxi2
+    assert sum(bexp[k] for k in bxi2) - sum(bexp[k] for k in bxi) == 1.0
+
     # THE STEAL IS WORTH MORE THAN THE SAME PLAYER FROM THE POOL. Compared
     # like for like — same points, same price, same funding — taking him off a
     # rival beats buying an equivalent free agent, because it moves both
@@ -2330,7 +2449,7 @@ def _selftest() -> None:
     assert value_rate(None, 5e6) is None
     assert value_rate(0.0, 5e6) == 0.0           # a real price, zero return: 0, not None
 
-    print("decide self-test OK (103 cases)")
+    print("decide self-test OK (115 cases)")
 
 
 if __name__ == "__main__":
