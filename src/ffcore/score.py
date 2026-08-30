@@ -98,16 +98,57 @@ FREE_FORMATIONS = [(5, 4, 1), (5, 3, 2), (4, 5, 1), (4, 4, 2), (4, 3, 3),
 # Premium subscription: these shapes, the captain boost and the coach slot.
 PREMIUM_FORMATIONS = [(5, 2, 3), (4, 6, 0), (4, 2, 4), (3, 6, 1), (3, 3, 4)]
 
-# Matches of prior weight. UNFIT, same as ffcore.forecast.DRIFT_FRAC — a
-# round number, not measured against this repo's own reliability data.
-# This matters more than it looks: checked what published win-probability
-# models actually rely on for "how much should an early lead be trusted"
-# (FiveThirtyEight's NBA/NHL/MLB methodology, 2026-08-21) and it is THIS
-# mechanism — a one-time, measured revert-to-mean fraction on the prior —
-# not a forward drift term. See DRIFT_FRAC's own note for the full
-# reasoning. Blocked the same way: needs real reliability data this repo
-# does not have enough of yet (MIN_POOL=200 observed matches, 159 as of
-# 2026-08-21) to fit properly rather than guess.
+# Matches of prior weight — the pseudo-count in reliability = n/(n+K), used
+# at BOTH shrink stages in Scorer.rate() (last season toward the positional
+# median, then this season toward that). It matters more than it looks:
+# checked what published win-probability models actually rely on for "how
+# much should an early lead be trusted" (FiveThirtyEight's NBA/NHL/MLB
+# methodology, 2026-08-21) and it is THIS mechanism — a one-time, measured
+# revert-to-mean fraction on the prior — not a forward drift term.
+#
+# NO LONGER A GUESS: FITTED 2026-08-31 AGAINST REAL DATA, AND LEFT AT 8.0
+# BECAUSE THE FIT CANNOT TELL 8 APART FROM ANYTHING NEAR IT. This note used
+# to say the fit was blocked on MIN_POOL=200 observed matches (159 as of
+# 2026-08-21). That bar cleared over a week ago — 729 observed matches in
+# data/season/live/perjornada_2026-27.csv — so the fit was actually run,
+# two ways, both out of sample, on the same store the scorer itself reads:
+#
+#   A. CROSS-SEASON. Predict each of the 534 real 2026-27 per-match scores
+#      belonging to a player with a 2025-26 record, from his K-shrunk
+#      last-season rate (stage one, exactly as rate() computes it). The
+#      training and scored samples are DIFFERENT SEASONS, so nothing leaks.
+#   B. WALK-FORWARD WITHIN 2026-27. Both stages, one shared K, predicting
+#      each jornada from that player's earlier ones only (n=271).
+#      Walk-forward and not leave-one-out, for the reason _fit_decay()
+#      below already gives: leave-one-out lets a later jornada leak into a
+#      "prediction" for an earlier one.
+#
+#      K        A: MSE      B: MSE
+#      0        15.514      26.264
+#      4        15.287      16.597
+#      6        15.279  <-  16.382
+#      8        15.285  ship 16.296  ship
+#      16       15.365      16.237  <-
+#      32       15.555      16.326
+#      infinite 16.572      17.122     (the prior alone, no player record)
+#
+# BOTH TESTS AGREE THAT SHRINKING HELPS A LOT AND DISAGREE ON HOW MUCH, IN
+# OPPOSITE DIRECTIONS: A's optimum is K=6, B's is K=16, and they straddle
+# the shipped 8. The basin is flat enough that the disagreement costs
+# almost nothing — running 8.0 rather than each test's own optimum is
+# +0.04% MSE on A and +0.37% on B. A cluster bootstrap over PLAYERS (4000
+# resamples, whole players resampled because one player's matches are not
+# independent of each other) puts 90% of A's argmin between K=1 and K=20,
+# and 90% of B's between K=5 and K=48. 8.0 sits comfortably inside both.
+#
+# SO THE NUMBER DOES NOT MOVE AND ITS DESCRIPTION DOES. This is no longer
+# "a round number nobody checked"; it is a value this repo's own 729 real
+# matches cannot distinguish from the out-of-sample optimum, which is a
+# different and much weaker claim than "fitted to 8.0". What would actually
+# move it is SPLITTING the two stages — A and B genuinely want different
+# Ks and are forced to share one here — but that is a second constant
+# rather than a better value for this one, and B's n=271 is far too thin
+# to justify introducing it today. Revisit at a completed season.
 SHRINK_K = 8.0
 NEUTRAL_START = 60.0      # listed on the XI page but no percentage given
 ABSENT_START = 15.0       # not on the XI page at all — not in the picture

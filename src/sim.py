@@ -1116,9 +1116,13 @@ def caveats(u) -> list[str]:
         "argues narrower), but every published win-probability model "
         "checked (538's NBA/NHL/MLB) is far more humble than 70%%+ about a "
         "full season this early regardless — that floor doesn't need the "
-        "two anchors resolved. Tighten only once the Forecast vs actual "
-        "table above (the real, realised-error check) has enough rows "
-        "(n=15-20+) to say the model is already well-calibrated |"
+        "two anchors resolved. This caveat used to say to tighten it once "
+        "the Forecast vs actual table above had enough rows — it has them "
+        "now, and the check (2026-08-31) found that table can never grade "
+        "this constant at ANY row count: every pair in it is one jornada "
+        "out, and this constant only acts across longer horizons. It is "
+        "not waiting on more data, it is waiting on a different "
+        "measurement |"
         % _drift_frac_now(),
         "| Shape prior | %s |" % u.forecaster.pool_note(),
         "| P(start) fit | %s |" % u.start_note.rstrip("."),

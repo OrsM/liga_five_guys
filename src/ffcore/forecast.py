@@ -148,11 +148,66 @@ SHRINK_MATCHES = 8.0
 # citing the pre-revert value for over a week after this line changed
 # back — fixed 2026-08-31 to read this module's live value instead.
 #
-# Revisit downward only once reports/METHOD.md's own "Forecast vs
-# actual" table (the real, realised-error check, n=5 and growing as of
-# 2026-08-21, n=39 as of 2026-08-30 — the n=15-20+ bar this comment set
-# has been cleared) has enough rows to say the model is well-calibrated
-# at a tighter spread — not from another correlation analogy.
+# THE RE-TUNING BAR THIS COMMENT SET IS THE WRONG BAR — CHECKED
+# 2026-08-31, ONCE IT HAD BEEN CLEARED. This note used to end "revisit
+# downward once reports/METHOD.md's own 'Forecast vs actual' table has
+# enough rows (n=15-20+)". It has them (n=39). The check was run anyway,
+# and that table cannot grade this constant AT ANY ROW COUNT — for a
+# structural reason, not a thin-sample one:
+#
+#   * DRIFT_FRAC is entirely about how uncertainty GROWS WITH HORIZON. It
+#     adds cum_var = (DRIFT_FRAC * rate_rel)^2 per jornada that passes and
+#     nothing whatsoever at horizon zero. Every pair that table can ever
+#     hold is at horizon ONE: points.py's per-jornada diff only emits
+#     games_delta of 0 or 1 (checked on the real file: 729 ones, 29
+#     zeros, nothing else) and methodology.pair() drops the zeros. The
+#     sample has no horizon variation in it to fit a growth rate to, and
+#     more jornadas add more rows at the same single horizon.
+#
+#   * At horizon one the drift term is buried anyway. The real pool's own
+#     coefficient of variation is 0.973 (729 matches) against rate_rel's
+#     median +-17%, so one jornada of walk at DRIFT_FRAC=1.0 is 2.7% of a
+#     player-match's predictive VARIANCE and 1.4% of its RMSE. An RMSE
+#     estimated on n pairs is good to about 1/sqrt(2n) — +-11% at n=39.
+#     Separating 1.0 from 0.0 on this evidence needs roughly 5,200 pairs
+#     (~350 jornadas, nine seasons); separating 1.0 from 2.0 needs ~680
+#     (~45 jornadas, more than one). That is not a wait, it is a dead end.
+#
+# WHAT THE TABLE DOES SAY, recorded rather than leaned on: realised RMSE
+# 3.95 points per player-match, against a modelled 3.68 at DRIFT_FRAC=1.0
+# (3.58 at 0.0, 3.96 at 2.0). If anything the model is slightly NARROW at
+# one jornada, which argues against tightening — but that is 7% on a
+# measurement good to 11%, so it is a direction, not a finding.
+#
+# THE SWEEP TABLE ABOVE IS FROM A SEASON THAT NO LONGER EXISTS. Re-run on
+# real data 2026-08-31 (3 jornadas played, 36 left, 729 observed matches,
+# same baseline-squads-only pass):
+#
+#   DRIFT_FRAC   10-90 width   p_win   E[finish]
+#     0.00           312       0.196     2.38
+#     0.50           329       0.202     2.39
+#     1.00           403       0.222     2.39   <- shipped
+#     1.50           544       0.252     2.35
+#     2.00           728       0.266     2.32
+#     3.00          1027       0.287     2.25
+#
+# AND THE SIGN HAS FLIPPED, which anyone re-reading the 2026-08-21
+# argument above needs to know. Then, this manager's squad was AHEAD, so
+# widening pulled p_win DOWN toward a coin flip (0.895 -> 0.485) and the
+# whole "be more humble" case read as "lower p_win". He is now behind, and
+# widening pushes p_win UP toward the same coin flip (0.196 -> 0.287). The
+# mechanism does the same thing in both worlds; the DIRECTION of the
+# original argument was an artifact of the standings on the day, and it
+# should not be read as "wider means less confident".
+#
+# STILL 1.0, DELIBERATELY. Nothing measured here moves it: the only
+# real-data check this repo can run on it is structurally blind to it, and
+# the correction the 2026-08-21 note argued for — don't claim 70%+ this
+# early — is already satisfied at 1.0 from where the table actually
+# stands. What would unblock a real fit is a horizon ladder: predictions
+# logged h jornadas out and graded at several different h. That is a
+# change to what data/decisions/squad_log.csv records, not a matter of
+# waiting for rows to accumulate.
 DRIFT_FRAC = 1.0
 
 
