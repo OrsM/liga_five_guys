@@ -1,6 +1,6 @@
 # LaLiga Fantasy Oficial — a data-driven decision system
 
-**Context:** private league "Some Guys", 3 managers, ~100.4M budget, season 26/27 starting J1 on 15/08.
+**Context:** private league, 5 managers, 100M budget, season 26/27 starting J1 on 15/08.
 **Goal:** a reproducible pipeline that produces, every day, a ranked list of *buy / sell / bid-how-much / start-who* decisions from expected points and expected price movement — free to run, on hardware you already have.
 
 ---

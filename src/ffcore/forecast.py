@@ -136,11 +136,23 @@ SHRINK_MATCHES = 8.0
 # landing near a coin flip while still giving a small, real nod to the
 # measured squad-value gap rather than erasing it outright (that would
 # be DRIFT_FRAC ~3.0, p_win 0.476, which claims MORE certainty of no
-# edge than the data supports either). Revisit downward only once
-# reports/METHOD.md's own "Forecast vs actual" table (the real,
-# realised-error check, n=5 and growing as of 2026-08-21) has enough
-# rows to say the model is well-calibrated at a tighter spread — not
-# from another correlation analogy.
+# edge than the data supports either).
+#
+# REVERTED TO 1.0 THE NEXT DAY (6cefe65, 2026-08-22): the season-long
+# win-probability debate above turned out to be mostly orthogonal to the
+# actual decision engine (decide.rank() is a paired comparison against
+# the SAME simulated seasons, so absolute uncertainty mostly cancels
+# there) — it only ever affected the standings section's own headline
+# number. `sim.py`'s own caveat about this constant used to hardcode the
+# string "DRIFT_FRAC=2.0" regardless of what actually ran, so it kept
+# citing the pre-revert value for over a week after this line changed
+# back — fixed 2026-08-31 to read this module's live value instead.
+#
+# Revisit downward only once reports/METHOD.md's own "Forecast vs
+# actual" table (the real, realised-error check, n=5 and growing as of
+# 2026-08-21, n=39 as of 2026-08-30 — the n=15-20+ bar this comment set
+# has been cleared) has enough rows to say the model is well-calibrated
+# at a tighter spread — not from another correlation analogy.
 DRIFT_FRAC = 1.0
 
 
