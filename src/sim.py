@@ -1730,7 +1730,9 @@ def payload(u, rows, base, rivals, locks_h=None, n_actions: int = 0,
             "left": u.cash - a.net,
             "answer": (None if r.get("answer") is None
                        else names.get(r["answer"].buy, r["answer"].buy)),
-            "p_win_after": base.position().get(1, 0.0) + r["d_win"],
+            # Rounded to 3dp — see "p_win"'s own note below on why a level
+            # (not a paired difference) should not print false precision.
+            "p_win_after": round(base.position().get(1, 0.0) + r["d_win"], 3),
             "vs": who, "vs_gain": r["d_beat"].get(who, 0.0) if who else None,
         })
     return {
@@ -1745,8 +1747,18 @@ def payload(u, rows, base, rivals, locks_h=None, n_actions: int = 0,
         "jornadas_left": len(u.state.jornadas),
         "acquirable": len(u.price),
         "considered": n_actions,
-        "expected_finish": base.expected_position(),
-        "p_win": base.position().get(1, 0.0),
+        # ROUNDED, NOT RAW — checked 2026-08-31 (Miguel asked directly
+        # whether FINAL_TRIALS itself was false precision; see its own
+        # comment in decide.py for the fuller answer). These two are
+        # LEVELS, not the paired differences the ranking runs on, so they
+        # carry real Monte Carlo noise — a few points either way across a
+        # realistic trial-count range — and the raw float (previously
+        # something like 0.22233333333333335) implied precision the sample
+        # does not have. 2dp on expected_finish matches the markdown's own
+        # "%.2f" (header()); 3dp on p_win is finer than the markdown's
+        # "%.0f%%" but nowhere near the 17-digit noise this replaces.
+        "expected_finish": round(base.expected_position(), 2),
+        "p_win": round(base.position().get(1, 0.0), 3),
         "band": [lo, hi],
         "moves": moves,
         "sell": [{"name": names.get(k, k), "pos": u.pos.get(k, ""),
@@ -1756,8 +1768,14 @@ def payload(u, rows, base, rivals, locks_h=None, n_actions: int = 0,
         # mode is defined against. The phone needs it to caption the chase
         # rows for the same reason the markdown heading carries it: a
         # worse-on-average recommendation with no stated reason is worse
-        # than no recommendation. See trailing().
-        "trailing": trailing(u, base) or None,
+        # than no recommendation. See trailing(). Rounded here rather than
+        # in trailing() itself — same "p_win" false-precision note above —
+        # so trailing()'s own return value stays exact for its 0.5 trigger
+        # comparison and for anything else that reads it directly.
+        "trailing": ({**t, "p_win": round(t["p_win"], 3),
+                     "leader_p_win": round(t["leader_p_win"], 3),
+                     "p_above": round(t["p_above"], 3)}
+                    if (t := trailing(u, base)) else None),
         "ladder": (ladder_data if ladder_data is not None
                   else ladder_rows(u, rows, base=base)),
         # `[]` and "nothing to cover" look the same here — see render()'s
@@ -2159,6 +2177,16 @@ def _selftest() -> None:
     # the rows the markdown was built from, so the two cannot disagree.
     d = payload(u, rows, st, ["riv"], locks_h=41.1, n_actions=132)
     assert d["expected_finish"] == 1.5 and d["p_win"] == 0.5, d
+    # ROUNDED, NOT RAW — a level (not a paired difference) genuinely carries
+    # Monte Carlo noise a 17-digit float misrepresents as precision the
+    # sample does not have. 3 seasons, "me" wins 1 -> p_win = 1/3 exactly,
+    # a repeating binary fraction if left unrounded (Python's own float
+    # would print 0.3333333333333333). Confirms round(), not luck.
+    st3 = Standings(totals={"me": [1000.0, 1200.0, 1000.0],
+                            "riv": [1500.0, 900.0, 1500.0]}, me="me")
+    d3 = payload(u, rows, st3, ["riv"])
+    assert d3["p_win"] == round(1 / 3, 3) == 0.333, d3["p_win"]
+    assert len(str(d3["p_win"]).split(".")[-1]) <= 3, d3["p_win"]
     assert d["band"] == [1000.0, 1600.0], d
     assert d["locks_in_h"] == 41.1 and d["cash"] == 23.6e6
     assert d["cash_locked"] == 0.0, d          # nothing pending, nothing to say
@@ -2849,7 +2877,7 @@ def _selftest() -> None:
     assert [x["days"] for x in race(ur, "prize")] == [200, 200], \
         race(ur, "prize")
 
-    print("sim self-test OK (192 cases)")
+    print("sim self-test OK (194 cases)")
 
 
 def main() -> None:
