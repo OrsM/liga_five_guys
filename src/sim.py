@@ -345,7 +345,7 @@ def ladder_rows(u, rows, bands=None) -> list[dict]:
         out.append(cell(k, "sell", "yours", u.proceeds.get(k, 0.0), None))
     buy_floor = _moves_floor(rows)
     for k in sorted((k for k in rest if k in won),
-                    key=lambda k: _move_rank_key(won[k], buy_floor)):
+                    key=lambda k: _move_rank_key(won[k], buy_floor, u)):
         r = won[k]
         out.append(cell(k, "buy", u.owner.get(k) or "free agent",
                         -r["action"].net, r["d_pts"], value=r.get("value"),
@@ -1145,7 +1145,7 @@ def _moves_floor(rows) -> float:
     return MOVES_VALUE_FLOOR * max((r["d_pos"] for r in rows), default=0.0)
 
 
-def _move_rank_key(r, floor):
+def _move_rank_key(r, floor, u):
     """BAR ON GAIN, THEN RANK BY VALUE — see MOVES_VALUE_FLOOR's own note.
     A d_win-driven move still leads outright (win-probability is a
     different axis than points-per-euro, no principled ratio between
@@ -1161,14 +1161,29 @@ def _move_rank_key(r, floor):
     sit near the bottom while a big, poor-value, even NEGATIVE-season-
     impact name led the list. The two renderings disagreeing on order is
     exactly the duplication ladder()'s own docstring warns about.
+
+    RELIABLE ROUTES FIRST, WITHIN EVERY TIER — the same rule _best() has
+    always used for the single headline pick (decide.py's own note, 108
+    real transactions checked 2026-08-29, zero of them manager-to-manager):
+    a "listed" candidate (Universe.route — a rival's own sale, who can
+    simply not sell, or get outbid) is not a slightly-riskier version of a
+    free-agent or clause buy, it is a route that has never once actually
+    gone through in this league. `_best()` already refuses to push one as
+    THE move unless nothing reliable clears the bar at all, but that
+    demotion never reached the ordinary list — a listed target competed on
+    equal footing with a guaranteed one everywhere the reliable-vs-listed
+    split was not the single headline. Demoted here, not removed: a real
+    listed opportunity — the rare one that might actually be worth a bid —
+    stays fully visible, just under the routes that cannot be refused.
     """
+    reliable = 0 if u.route.get(r["action"].buy, "free") != "listed" else 1
     if r["d_win"] > 0:
-        return (0, -r["d_win"], -r["d_pos"])
+        return (0, reliable, -r["d_win"], -r["d_pos"])
     if r["d_pos"] >= floor and r["d_pos"] > 0:
         value = r.get("value")
-        return (1, -value if value is not None else float("-inf"),
+        return (1, reliable, -value if value is not None else float("-inf"),
                 -r["d_pos"])
-    return (2, 0.0, -r["d_pos"])
+    return (2, reliable, 0.0, -r["d_pos"])
 
 
 def _best(u, rows, rivals):
@@ -1325,7 +1340,7 @@ def payload(u, rows, base, rivals, locks_h=None, n_actions: int = 0,
     # cannot make meaningful.
     floor = _moves_floor(rows)
 
-    for r in sorted(rows, key=lambda r: _move_rank_key(r, floor)):
+    for r in sorted(rows, key=lambda r: _move_rank_key(r, floor, u)):
         a = r["action"]
         who = max(rivals, key=lambda v: r["d_beat"].get(v, 0.0)) \
             if rivals else ""
