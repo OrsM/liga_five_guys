@@ -1,7 +1,7 @@
 {
- "generated_at": "2026-08-31T05:25Z",
- "locks_in_h": 12.070613502777778,
- "cash": 11950361.888182871,
+ "generated_at": "2026-08-31T06:35Z",
+ "locks_in_h": 10.90249148888889,
+ "cash": 11950229.06324074,
  "cash_locked": 11947651.0,
  "squad_value": 236091592.0,
  "jornadas_left": 36,
@@ -32,7 +32,7 @@
    "value": 4.366702979223418,
    "chase": null,
    "contest": [],
-   "left": 2300936.888182871,
+   "left": 2300804.0632407404,
    "answer": null,
    "p_win_after": 0.32,
    "vs": "BurtonGM89",
@@ -69,7 +69,7 @@
      "days": 5
     }
    ],
-   "left": 4062306.888182871,
+   "left": 4062174.0632407404,
    "answer": "Marc Bernal",
    "p_win_after": 0.299,
    "vs": "SusoGattuso",
@@ -106,7 +106,7 @@
      "days": 1
     }
    ],
-   "left": 3473225.888182871,
+   "left": 3473093.0632407404,
    "answer": null,
    "p_win_after": 0.29,
    "vs": "SusoGattuso",
@@ -143,7 +143,7 @@
      "days": 33
     }
    ],
-   "left": 3842724.888182871,
+   "left": 3842592.0632407404,
    "answer": "Marc Bernal",
    "p_win_after": 0.28,
    "vs": "SusoGattuso",
@@ -180,7 +180,7 @@
      "days": 2
     }
    ],
-   "left": 745540.888182871,
+   "left": 745408.0632407404,
    "answer": null,
    "p_win_after": 0.267,
    "vs": "BurtonGM89",
@@ -217,7 +217,7 @@
      "days": 5
     }
    ],
-   "left": 1681169.888182871,
+   "left": 1681037.0632407404,
    "answer": "Matias Dituro",
    "p_win_after": 0.265,
    "vs": "Magic Mike 333",
@@ -241,7 +241,7 @@
    "value": 5.720669583000295,
    "chase": null,
    "contest": [],
-   "left": 8137862.888182871,
+   "left": 8137730.06324074,
    "answer": null,
    "p_win_after": 0.333,
    "vs": "BurtonGM89",
@@ -265,7 +265,7 @@
    "value": null,
    "chase": null,
    "contest": [],
-   "left": 12397223.888182871,
+   "left": 12397091.06324074,
    "answer": null,
    "p_win_after": 0.326,
    "vs": "BurtonGM89",
@@ -289,7 +289,7 @@
    "value": 7.314238585091453,
    "chase": null,
    "contest": [],
-   "left": 6922061.888182871,
+   "left": 6921929.06324074,
    "answer": null,
    "p_win_after": 0.315,
    "vs": "SusoGattuso",
@@ -313,7 +313,7 @@
    "value": 1.8324470571833944,
    "chase": null,
    "contest": [],
-   "left": 6859341.888182871,
+   "left": 6859209.06324074,
    "answer": null,
    "p_win_after": 0.309,
    "vs": "BurtonGM89",
@@ -337,7 +337,7 @@
    "value": 2.1480670392135375,
    "chase": null,
    "contest": [],
-   "left": 6985294.888182871,
+   "left": 6985162.06324074,
    "answer": null,
    "p_win_after": 0.302,
    "vs": "BurtonGM89",
@@ -361,7 +361,7 @@
    "value": null,
    "chase": null,
    "contest": [],
-   "left": 13327062.888182871,
+   "left": 13326930.06324074,
    "answer": null,
    "p_win_after": 0.279,
    "vs": "SusoGattuso",
@@ -658,12 +658,12 @@
    "xpts": 5.970681063642666,
    "group": "save",
    "where": "Magic Mike 333",
-   "money": -99115572.11181712,
+   "money": -99115704.93675926,
    "pts": 143.93733397368283,
    "pts_lo": 40.633833540738124,
    "pts_hi": 282.2803544755809,
    "note": "short",
-   "value": 1.452217153237032,
+   "value": 1.4522152071210308,
    "contest": [
     {
      "manager": "BurtonGM89",
@@ -686,12 +686,12 @@
    "xpts": 4.570286983442812,
    "group": "save",
    "where": "Albert Laporta",
-   "money": -45676956.11181713,
+   "money": -45677088.93675926,
    "pts": 37.19722484806766,
    "pts_lo": -26.327960709746776,
    "pts_hi": 106.06100413010904,
    "note": "short",
-   "value": 0.8143542830877107,
+   "value": 0.8143519150173488,
    "contest": []
   },
   {
@@ -701,12 +701,12 @@
    "xpts": 4.35542439153591,
    "group": "save",
    "where": "Magic Mike 333",
-   "money": -7414179.111817129,
+   "money": -7414311.93675926,
    "pts": 27.02339695924752,
    "pts_lo": -23.523130913937166,
    "pts_hi": 81.47355114837751,
    "note": "short",
-   "value": 3.6448265616049302,
+   "value": 3.6447612657445387,
    "contest": [
     {
      "manager": "SusoGattuso",
@@ -729,12 +729,12 @@
    "xpts": 3.769814486486487,
    "group": "save",
    "where": "free agent",
-   "money": -6522395.111817129,
+   "money": -6522527.93675926,
    "pts": 34.361255184140646,
    "pts_lo": -22.928288428318865,
    "pts_hi": 100.4104214269421,
    "note": "short",
-   "value": 5.268195899675825,
+   "value": 5.268088617986534,
    "contest": []
   },
   {
@@ -744,12 +744,12 @@
    "xpts": 3.567632485448917,
    "group": "save",
    "where": "SusoGattuso",
-   "money": -17356448.11181713,
+   "money": -17356580.93675926,
    "pts": 30.768725075648035,
    "pts_lo": -24.706252807721057,
    "pts_hi": 95.73004626495731,
    "note": "short",
-   "value": 1.7727547063445062,
+   "value": 1.772741139960543,
    "contest": [
     {
      "manager": "BurtonGM89",
@@ -772,12 +772,12 @@
    "xpts": 3.55069364354314,
    "group": "save",
    "where": "SusoGattuso",
-   "money": -8127291.111817129,
+   "money": -8127423.93675926,
    "pts": 2.94500761116592,
    "pts_lo": -36.68212421397652,
    "pts_hi": 65.02178032253278,
    "note": "short",
-   "value": 0.362360295779717,
+   "value": 0.3623543737943879,
    "contest": [
     {
      "manager": "BurtonGM89",
@@ -800,12 +800,12 @@
    "xpts": 2.9086530484132966,
    "group": "save",
    "where": "free agent",
-   "money": -55133124.11181713,
+   "money": -55133256.93675926,
    "pts": 15.69140637471287,
    "pts_lo": -48.336733277846406,
    "pts_hi": 122.18043233278604,
    "note": "short",
-   "value": 0.2846094181582865,
+   "value": 0.2846087324881194,
    "contest": []
   },
   {
@@ -815,12 +815,12 @@
    "xpts": 2.701853680691278,
    "group": "save",
    "where": "Albert Laporta",
-   "money": -11967072.111817129,
+   "money": -11967204.93675926,
    "pts": 19.073940226966442,
    "pts_lo": -30.473170515256243,
    "pts_hi": 74.84849411024811,
    "note": "short",
-   "value": 1.5938685794440473,
+   "value": 1.5938508889722165,
    "contest": []
   },
   {
@@ -922,15 +922,15 @@
     }
    },
    "by_route": {
-    "listed": {
-     "n": 16,
-     "now_best": 2.2393744325726206,
-     "beats_now": 0.4375
-    },
     "free": {
      "n": 14,
      "now_best": 2.095365953066526,
      "beats_now": 0.6428571428571429
+    },
+    "listed": {
+     "n": 16,
+     "now_best": 2.2393744325726206,
+     "beats_now": 0.4375
     }
    },
    "helpful": 131,
@@ -978,7 +978,7 @@
    "hi": null,
    "beats_now": null,
    "helpful": 17,
-   "days": 0.6239838959490741,
+   "days": 0.5753121453703705,
    "opens": "31 Aug"
   }
  ],
@@ -1011,7 +1011,7 @@
    "mean": 1416.7625032904205,
    "lo": 1213.5440117227026,
    "hi": 1631.4901030899061,
-   "cash": 11950361.888182871,
+   "cash": 11950229.06324074,
    "cash_known": true,
    "p_above": null
   },
