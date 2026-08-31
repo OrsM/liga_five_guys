@@ -33,6 +33,7 @@ player_id,name,club_id,ff_slug,af_slug,app_id,understat_id,app_names
 10473,giacomo quagliata,deportivo,giacomo-quagliata,,2963,10940,Quagliata
 10476,abde rebbach,alaves,abde-rebbach,183751,,,
 10478,miguel loureiro,deportivo,miguel-loureiro,47190,,14714,
+10495,stefan bajcetic,celta,,,,,
 10533,andre almeida,valencia,andre-almeida-1,,,11057,
 10564,yvan neyou,getafe,yvan-neyou,,,8689,
 1059,antonio sivera,alaves,antonio-sivera,,988,6075,Sivera
@@ -199,6 +200,7 @@ player_id,name,club_id,ff_slug,af_slug,app_id,understat_id,app_names
 14135,manu gonzalez,betis,manu-gonzalez,,,,
 14155,maguette gueye,racing,maguette-gueye,334014,3012,14689,Maguette
 14177,andres cespedes,malaga,,,,,
+14183,adam aznou,malaga,adam-aznou,,,,
 14210,zaid romero,getafe,zaid-romero,180927,,14387,
 14700,david jimenez,real madrid,,,,13113,
 14766,aitor crespo,racing,,,,,
