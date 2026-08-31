@@ -984,9 +984,28 @@ def wait_routes(u, offers=None, rng=None) -> list[dict]:
         reliable_only = lambda k: None if real_routes.get(k) == "listed" else ""
         hist = (real_cycle_bests(real, approx_gain, reliable_only).get("", [])
                if real else None)
-        beats_now = (sum(1 for x in hist if x > now_best) / len(hist)
+        # GRADED AGAINST THE SAME POOL THE HISTORY IS DRAWN FROM. `hist`
+        # (and `band`, resampled from `offers.pool` — market_model()'s own
+        # pool is already unowned-players-only) is real FREE-AGENT market
+        # history, "listed" dropped above. `now_best` a few lines up is the
+        # best of the WHOLE acquirable board — clause raids included, which
+        # `api_market.csv` (what `hist`/`band` are fitted from) never
+        # observes at all. Comparing that mixed "best of anything" against
+        # a free-agent-only history meant a single big clause opportunity
+        # today — nothing to do with whether the free/listed market is
+        # actually good this week — could alone push "market Nth
+        # percentile" to an extreme. Found 2026-08-31 (Miguel questioning a
+        # "93rd percentile · unusually good week" reading that was really
+        # just today's best clause target, Nahuel Tenaglia, being large).
+        # Restricted to the same routes `hist` represents so the two sides
+        # of the comparison are asking about the same market.
+        market_now_best = max(
+            (approx_gain(k) for k in u.price if k not in mine
+             and u.route.get(k, "market") not in ("clause", "listed")),
+            default=0.0)
+        beats_now = (sum(1 for x in hist if x > market_now_best) / len(hist)
                     if hist else
-                    sum(1 for x in band if x > now_best) / len(band))
+                    sum(1 for x in band if x > market_now_best) / len(band))
         n_band = len(hist) if hist else len(band)
 
         def graded_by(group_of, real_group_of):
@@ -1370,7 +1389,27 @@ def _move_rank_key(r, floor, u):
     stays fully visible, just under the routes that cannot be refused.
     """
     reliable = 0 if u.route.get(r["action"].buy, "free") != "listed" else 1
-    if r["d_win"] > 0:
+    # D_WIN ALONE USED TO WIN TIER 0 OUTRIGHT, UNCHARGED. `d_win` (the
+    # season's win-probability swing) is computed straight off the
+    # simulated squads, before rank()'s own lam*burn() premium charge —
+    # the same charge `d_pos` already carries (`d_pos = gross - charge`,
+    # see rank()'s own note). A clause costing well over its market value
+    # could still lead the whole table on win-probability alone even when
+    # PAYING that premium left `d_pos` negative — the model's own honest
+    # answer that the move is a net loss in expected finish once the
+    # premium is paid, silently overruled by an axis that never saw the
+    # premium at all. Found 2026-08-31 (Miguel: "why would having a
+    # clause, which means you pay above market rates, be a good thing?").
+    # Requiring `d_pos > 0` too does not invent a win-probability-to-money
+    # exchange rate (this repo's own principled objection to charging
+    # `d_win` directly, still correct) — it only refuses to let a move
+    # lead purely on `d_win` once its OWN priced d_pos says the premium
+    # already lost more than the pitch gained. `trailing()`/`chase_keys()`
+    # is the one place this repo already accepts an average-case loss for
+    # a title shot — deliberately, gated on actually trailing, and labelled
+    # "worse on average" — not the ordinary tier every ranked buy passes
+    # through unlabelled.
+    if r["d_win"] > 0 and r["d_pos"] > 0:
         return (0, reliable, -r["d_win"], -r["d_pos"])
     if r["d_pos"] >= floor and r["d_pos"] > 0:
         value = r.get("value")

@@ -969,26 +969,47 @@ def best_swap_for(u: Universe, k: str, expected: dict[str, float]
         extra_running.append(got)
     max_budget = base_budget + got
 
-    best_c, best_exp, best_price, best_sell, best_proceeds = \
-        None, my_exp, None, (k,), u.proceeds.get(k, 0.0)
-    for c, price in u.price.items():
-        if c == k or c in mine or u.pos.get(c) != slot or price > max_budget:
-            continue
-        e = expected.get(c, 0.0)
-        if not (e > best_exp or (e == best_exp and best_c is not None
-                                 and price < best_price)):
-            continue
-        if price <= base_budget:
-            sell, proceeds = (k,), u.proceeds.get(k, 0.0)
-        else:
-            n = next(i for i, g in enumerate(extra_running)
-                    if g >= price - base_budget) + 1
-            sell = tuple(sorted((k, *extra_names[:n])))
-            proceeds = u.proceeds.get(k, 0.0) + extra_running[n - 1]
-        best_c, best_exp, best_price = c, e, price
-        best_sell, best_proceeds = sell, proceeds
+    # EVERY AFFORDABLE UPGRADE, NOT JUST A RUNNING MAX — collected first so
+    # the pick below can weigh cost, not just take whichever came out
+    # highest on raw `expected`. Before this (found 2026-08-31, Miguel:
+    # "why would having a clause... be a good thing?"), this loop always
+    # took the single highest-`expected` target the budget reached, price-
+    # blind — so a KEEP row's "vs X" note could name a heavily marked-up
+    # clause raid over a materially cheaper target giving up almost none
+    # of the gain, the exact price-blindness `sim._move_rank_key()` was
+    # already fixed to reject for the ordinary BUY ranking (24d2a8b). Two
+    # unreconciled definitions of "best real alternative" is how a KEEP
+    # row and a BUY row 2 lines below it ended up naming different targets
+    # for the same seller's money.
+    candidates_found = [(expected.get(c, 0.0), price, c)
+                        for c, price in u.price.items()
+                        if c != k and c not in mine and u.pos.get(c) == slot
+                        and price <= max_budget
+                        and expected.get(c, 0.0) > my_exp]
+    best_c, best_exp, best_price = None, my_exp, None
+    if candidates_found:
+        # SAME TOLERANCE sim.VALUE_TOLERANCE APPLIES TO THE HEADLINE PICK
+        # (sim._best()) — not re-measured here, just the same judgment
+        # call: the single biggest upgrade does not win outright if a
+        # materially cheaper target gives up under 10% of the gain. Kept
+        # as a local literal, not a cross-module import, to avoid a
+        # decide<->sim import cycle (sim.py already imports decide at
+        # module load) — see sim.VALUE_TOLERANCE's own note if the two
+        # ever need to diverge on purpose.
+        best_gain = max(e for e, _, _ in candidates_found) - my_exp
+        floor = 0.90 * best_gain
+        near_best = [t for t in candidates_found if t[0] - my_exp >= floor]
+        best_exp, best_price, best_c = min(near_best, key=lambda t: t[1])
     if best_c is None:
         return None
+    if best_price <= base_budget:
+        sell, proceeds = (k,), u.proceeds.get(k, 0.0)
+    else:
+        n = next(i for i, g in enumerate(extra_running)
+                if g >= best_price - base_budget) + 1
+        sell = tuple(sorted((k, *extra_names[:n])))
+        proceeds = u.proceeds.get(k, 0.0) + extra_running[n - 1]
+    best_sell, best_proceeds = sell, proceeds
     victim = u.owner.get(best_c, "")
     raid = bool(victim and victim != u.me
                and u.route.get(best_c, "market") == "clause")
