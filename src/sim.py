@@ -1369,24 +1369,33 @@ def caveats(u) -> list[str]:
         "unactionable — it put the manager who raised 86.9M in six sales "
         "last week 450 days away from affording anything |"
         % (fmt_money(u.daily_bonus), _tempo_note(u)),
-        # SEASON/VALUE ASSUME THE MOVE HAPPENS, RACE OR NO RACE — a clause
-        # row's Season/pts-per-M€ figure is priced as if you are the one
-        # who pays it; the "Where" column's own race note ("SusoGattuso can
-        # pay today") says nothing about how likely that actually is, and
-        # nothing downstream discounts Season/value for it. A row racing a
-        # fast rival and a row with nobody else in reach can carry an
-        # identical Season figure with very different odds of ever being
-        # the one you get — found 2026-09-01, swarm review. Not folded into
-        # the number itself: this repo has no measured "who wins a live
-        # race" rate to price it with (only whether a listed sale ever
-        # converts at all, a different question — see "108 real
-        # transactions, zero manager-to-manager" elsewhere in this repo),
-        # and a fabricated rate would be worse than none.
-        "| A clause race's Season/pts-per-M€ do not discount for LOSING "
-        "the race | they price the move as if you get there first — the "
-        "\"can pay in ~N days\" column above is the only signal for how "
-        "contested that actually is, read it beside Season, not instead "
-        "of it |",
+        # SEASON/VALUE PRICE THE MOVE AS IF YOU WIN THE RACE, DELIBERATELY —
+        # not a gap left unpriced, a genuine "N-player preemption game"
+        # (real-options economics: several agents racing an indivisible,
+        # irreversible payoff — patent races, first-mover investment races
+        # are the standard examples). That literature's own answer to "how
+        # much does losing cost" is the reason this is not folded into a
+        # fabricated win-probability discount: THE LOSER'S CAPITAL IS NOT
+        # DESTROYED, only the option on this one target is — the cash still
+        # buys whatever is next-best. Losing this race does not cost the
+        # gap between Season and zero, it costs the difference between this
+        # row and the NEXT row on this same table, which is already ranked,
+        # already priced, and does not need a guessed rate to read. (Found
+        # 2026-09-01, swarm review; the literature check is 2026-09-01 too
+        # — Miguel asked whether anyone else modelling this kind of race
+        # had already worked out how to price it. The equilibrium result in
+        # that literature is also worth knowing: a genuinely CONTESTED race
+        # trends toward roughly even odds at the point either side actually
+        # pulls the trigger — a reason to read "can pay today" as real
+        # 50/50-territory risk, not sharpenable further without bidding
+        # data this repo does not have.)
+        "| A clause race's Season/pts-per-M€ price the move as if you win "
+        "it | losing does not cost you that figure — it costs you the NEXT "
+        "row on this table instead, because the cash is not lost, only "
+        "this one target is. \"Can pay today\" in the Where column is real "
+        "contested-race risk, roughly even odds at the moment it's worth "
+        "racing at all — there is no sharper number to give it without "
+        "real bidding data |",
         "| Teammates score independently, MATCH TO MATCH | two defenders of "
         "one club still land on opposite ends of the per-match pool in the "
         "same round — only their SEASON-LONG rating (club_rel) is shared, "
