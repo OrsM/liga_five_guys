@@ -1385,6 +1385,61 @@ def _tempo_note(u) -> str:
             % (have[0][1].get("days", 0.0), ", ".join(bits)))
 
 
+def illegal_squads(u) -> list[tuple[str, list[str]]]:
+    """[(manager, ["2/3 defensas", ...])] for every squad — mine included
+    — best_xi() cannot fill from, sorted by manager.
+
+    CALLS best_xi() ITSELF, does not re-derive its own notion of
+    "legal" — see this repo's own day of finding "two independent
+    authorities that only agree by luck" (season.legal_shapes() vs
+    score.formations(), fixed 2026-09-01) for why a SECOND, simplified
+    legality check here would be exactly that mistake again. A squad
+    can fail to fill any of the 7 real formations even meeting every
+    position's SLOT_MIN individually — SLOT_MIN/MAX_SLOT bound the
+    RANGE each formation allows, not which exact combinations exist
+    among the 7 (e.g. no formation pairs DEF=3 with MED=3) — so only
+    best_xi()'s own real search is the ground truth. The value dict
+    passed to it does not matter for LEGALITY (only for which players
+    among a legal shape's choices are picked), so a flat 1.0 per player
+    is enough here — this function only asks "does anything come back",
+    never "what does it score".
+
+    WHY THIS MATTERS: best_xi() returning [] freezes a manager's
+    simulated season at exactly what he has already scored, every
+    remaining jornada adding zero with zero variance — indistinguishable
+    in the standings table from "the model is very confident this
+    manager is finished", when the real fact is "his data says he
+    cannot field a squad at all", a completely different claim. Found
+    2026-09-01 (Miguel: "the forecast for Albert is absolutely
+    unsustainable") — his standings row read a flat 32-32 band with no
+    signal anywhere pointing at why: 2 defensas against SLOT_MIN's 3.
+
+    report.py already warns when MY OWN squad is thin (`have <= n`, a
+    softer "one injury away" threshold) — that check has no reach into a
+    RIVAL's squad, which is the gap this closes.
+    """
+    from ffcore.score import SLOT_LABEL, SLOT_MIN
+    from ffcore.season import XI_SIZE, best_xi
+
+    out = []
+    for m, sq in sorted(u.state.squads.items()):
+        if len(best_xi(sq, {k: 1.0 for k in sq})) >= XI_SIZE:
+            continue
+        counts: dict[str, int] = {}
+        for slot in sq.values():
+            counts[slot] = counts.get(slot, 0) + 1
+        short = [
+            "%d/%d %s%s" % (counts.get(s, 0), n, SLOT_LABEL[s],
+                            "" if counts.get(s, 0) == 1 else "s")
+            for s, n in SLOT_MIN.items() if counts.get(s, 0) < n]
+        # SHORT NAMES THE CAUSE WHEN THERE IS ONE BELOW THE FLOOR; A
+        # SQUAD CAN STILL FAIL WITH EVERY POSITION AT OR ABOVE SLOT_MIN
+        # (the DEF=3-with-MED=3 case above) — named plainly instead of
+        # leaving that case silent.
+        out.append((m, short or ["not enough for any legal formation"]))
+    return out
+
+
 def caveats(u) -> list[str]:
     """What the numbers above cannot see. Read off the data, not remembered.
 
@@ -1393,6 +1448,16 @@ def caveats(u) -> list[str]:
     nobody opens on a phone.
     """
     out = ["| Not modelled | Which way it bends the answer |", "|---|---|"]
+    for m, short in illegal_squads(u):
+        out.append("| **%s cannot field a legal eleven** (%s) | his "
+                   "simulated season is FROZEN at what he has already "
+                   "scored — best_xi() finds no legal shape to fill, so "
+                   "every remaining jornada adds exactly zero, with zero "
+                   "variance. Not a forecast of a weak season, a squad "
+                   "genuinely short a position right now — his real "
+                   "threat is understated, which flatters everyone else's "
+                   "standing, mine included |"
+                   % (m, ", ".join(short)))
     for j, clubs in sorted(u.part_played.items()):
         out.append("| Jornada %d is half played — %d clubs are done | their "
                    "points are already in `now`, so only the rest of the "
@@ -2401,6 +2466,50 @@ def _selftest() -> None:
     u.part_played, u.unjoined, u.cash_note = {}, [], ""
     clean = "\n".join(caveats(u))
     assert "A. Ferllo" not in clean and "jornada 1" not in clean.lower(), clean
+
+    # -- illegal_squads(): a squad short a position freezes his season,
+    # silently, unless flagged here -- 2026-09-01, Miguel: "the forecast
+    # for Albert is absolutely unsustainable" -------------------------
+    # A REAL FORMATION (4, 4, 2): 1 POR, 4 DEF, 4 MED, 2 DEL = 11 —
+    # picked over the (3, 3, x) shape SLOT_MIN alone would suggest,
+    # because no such shape exists among the 7 real ones (illegal_squads()
+    # calls best_xi() itself rather than re-deriving legality, exactly to
+    # avoid a fixture — or the function — assuming one does).
+    legal_sq = {"k": "POR", **{f"d{i}": "DEF" for i in range(1, 5)},
+               **{f"m{i}": "MED" for i in range(1, 5)},
+               "f1": "DEL", "f2": "DEL"}
+    short_sq = {k: v for k, v in legal_sq.items() if k not in ("d3", "d4")}
+    u_ill = Universe(
+        state=LeagueState({"me": legal_sq, "riv": short_sq}, [1], "me"),
+        forecaster=Bootstrap({}), pos={}, price={}, proceeds={}, owner={},
+        cash=0.0, me="me")
+    assert illegal_squads(u_ill) == [("riv", ["2/3 defensas"])], \
+        illegal_squads(u_ill)
+    # A LEGAL SQUAD NEVER APPEARS.
+    assert "me" not in dict(illegal_squads(u_ill))
+    ill_cav = "\n".join(caveats(u_ill))
+    assert "riv cannot field a legal eleven" in ill_cav, ill_cav
+    assert "2/3 defensas" in ill_cav, ill_cav
+    assert "FROZEN" in ill_cav, ill_cav
+    # A clean league (everyone legal) prints nothing about it.
+    u_ok = Universe(
+        state=LeagueState({"me": legal_sq, "riv": legal_sq}, [1], "me"),
+        forecaster=Bootstrap({}), pos={}, price={}, proceeds={}, owner={},
+        cash=0.0, me="me")
+    assert illegal_squads(u_ok) == []
+    assert "cannot field a legal eleven" not in "\n".join(caveats(u_ok))
+    # SLOT_MIN ALONE IS NOT SUFFICIENT — a squad meeting every position's
+    # bare minimum can still have no matching real formation (no shape
+    # pairs DEF=3 with MED=3): named plainly rather than left silent.
+    no_shape_sq = {"k": "POR", "d1": "DEF", "d2": "DEF", "d3": "DEF",
+                   "m1": "MED", "m2": "MED", "m3": "MED", "f1": "DEL"}
+    u_noshape = Universe(
+        state=LeagueState({"me": no_shape_sq}, [1], "me"),
+        forecaster=Bootstrap({}), pos={}, price={}, proceeds={}, owner={},
+        cash=0.0, me="me")
+    assert illegal_squads(u_noshape) == \
+        [("me", ["not enough for any legal formation"])], \
+        illegal_squads(u_noshape)
 
     # -- the phone ---------------------------------------------------------
     # The same numbers as data, because markdown cannot right-align a column
