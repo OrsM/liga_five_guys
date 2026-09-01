@@ -189,6 +189,16 @@ class Offers:
         was written that was Ruben Garcia, sold in error and then described as
         "buyable for less than you sold him for", which was simply untrue.
         """
+        # A WITH-REPLACEMENT APPROXIMATION OF A WITHOUT-REPLACEMENT DRAW.
+        # `per_cycle * w_i / total` is each player's exact inclusion
+        # probability only if a cycle's `per_cycle` offers were drawn WITH
+        # replacement; the app deals distinct players per cycle, so the
+        # true marginal is slightly lower (drawing the same weight twice
+        # is impossible). Flagged in a swarm review (2026-09-01): at
+        # `per_cycle` ~12 against a pool of ~570-600, the drawn fraction
+        # is small enough (~2%) that the error is negligible here — this
+        # file caveats every other approximation it makes, so this one
+        # gets the same note rather than reading as an oversight.
         total = sum(self._w)
         if not total or key not in self.pool:
             return 0.0

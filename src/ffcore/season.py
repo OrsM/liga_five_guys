@@ -41,7 +41,7 @@ import os
 import random
 from dataclasses import dataclass, field
 
-from ffcore.score import MAX_SLOT, SLOT_MIN
+from ffcore.score import MAX_SLOT, formations
 
 __all__ = ["LeagueState", "Standings", "simulate",
            "simulate_many", "best_xi"]
@@ -50,20 +50,27 @@ XI_SIZE = 11
 
 
 def legal_shapes() -> list[dict[str, int]]:
-    """Every formation the app allows, as counts per position.
+    """Every FREE-tier formation the app allows, as counts per position.
 
-    Derived from the same SLOT_MIN/MAX_SLOT the scorer uses rather than typed
-    out again: one keeper, and defenders/midfielders/forwards inside their
-    bounds adding to eleven. A shape list that disagreed with the scorer's
-    would let the simulator field an XI the app would refuse.
+    ffcore.score.formations()'s OWN LIST, converted to dicts — not
+    re-derived from SLOT_MIN/MAX_SLOT bounds the way this used to work.
+    Found 2026-09-01 (swarm review of the forecasting engine): bounds-
+    derivation correctly reproduces the 7 free-tier shapes (verified: the
+    two agree exactly there), but score.py's own 5 PREMIUM_FORMATIONS
+    VIOLATE those same bounds — e.g. (4, 6, 0) fields 6 midfielders,
+    over MAX_SLOT["MED"]=5, and 0 forwards, under SLOT_MIN["DEL"]=1.
+    SLOT_MIN/MAX_SLOT describe the free tier only; a bounds-derived shape
+    list could never have produced premium's real shape set even if this
+    function were extended to try, which is exactly the "two independent
+    authorities that can only ever agree by coincidence" pattern this
+    repo keeps finding and fixing elsewhere. One authority
+    (score.formations()) instead. Premium itself is NOT wired up here —
+    nothing in this codebase currently calls with premium=True anywhere
+    (checked) — this only removes the divergence risk between the two
+    existing lists, it does not add the feature.
     """
-    out = []
-    for d in range(SLOT_MIN["DEF"], MAX_SLOT["DEF"] + 1):
-        for m in range(SLOT_MIN["MED"], MAX_SLOT["MED"] + 1):
-            f = XI_SIZE - 1 - d - m
-            if SLOT_MIN["DEL"] <= f <= MAX_SLOT["DEL"]:
-                out.append({"POR": 1, "DEF": d, "MED": m, "DEL": f})
-    return out
+    return [{"POR": 1, "DEF": d, "MED": m, "DEL": f}
+           for d, m, f in formations()]
 
 
 SHAPES = legal_shapes()
