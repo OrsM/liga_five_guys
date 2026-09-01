@@ -386,12 +386,37 @@ class Bootstrap:
             return out
         eps0 = {k: max(0.0, 1.0 + rng.gauss(0.0, self.rate_rel[k]))
                for k in sorted(self.rate_rel)}
+        # THE WALK'S POSITION, ACCUMULATED — NOT REDRAWN FROM ITS OWN
+        # CUMULATIVE VARIANCE EACH JORNADA. Found 2026-09-01 (swarm review
+        # of the forecasting engine): this used to draw `drift = rng.gauss
+        # (0, sqrt(cum_var[k]))` fresh every jornada, which gives EACH
+        # jornada the correct MARGINAL spread (a sum of independent steps
+        # has that variance) but ZERO correlation between adjacent
+        # jornadas within the same trial — jornada 12 and jornada 13's
+        # drift were independently redrawn, sharing none of the same
+        # walk. A real random walk does not do that: consecutive
+        # positions share almost all of their history, differing by one
+        # step. This function's own docstring above already states the
+        # intended shape correctly ("an INDEPENDENT STEP per jornada")
+        # — a STEP, meant to accumulate — the implementation just was not
+        # doing that. The effect: summing a trial's points over a season,
+        # independent per-jornada noise partially cancels under the CLT,
+        # UNDERSTATING exactly the persistent, compounding variance this
+        # whole feature exists to add (its own docstring: "wrong in the
+        # same direction all season... cannot be averaged away"). Scoped
+        # impact: decide.rank()'s BUY ranking runs PAIRED trials (with the
+        # move, without it, same draws) so this mostly cancels there —
+        # the standings section's p_win/expected_finish/band is what
+        # actually widens once this is fixed.
+        walk = {k: 0.0 for k in self.rate_rel}
         cum_var = {k: 0.0 for k in self.rate_rel}
         out = {}
         for j in sorted(jornadas):
             per_j = {}
             for k in sorted(self.rate_rel):
-                cum_var[k] += (DRIFT_FRAC * self.rate_rel[k]) ** 2
+                step_var = (DRIFT_FRAC * self.rate_rel[k]) ** 2
+                walk[k] += rng.gauss(0.0, math.sqrt(step_var))
+                cum_var[k] += step_var
                 # LOG-NORMAL, NOT clip(1+drift, 0): the walk's cumulative sd
                 # can grow past 1.0 over enough jornadas, and clipping a
                 # WIDE gaussian at zero is not symmetric — the negative
@@ -399,13 +424,12 @@ class Bootstrap:
                 # unbounded, which biases the MEAN upward the wider the
                 # walk gets (measured while tuning DRIFT_FRAC: mean
                 # inflated from ~1780 to ~3150 points at a wide setting,
-                # nothing to do with real uncertainty). exp(drift -
-                # var/2) has E[.]=1 for ANY variance — the standard
+                # nothing to do with real uncertainty). exp(walk -
+                # cum_var/2) has E[.]=1 for ANY cum_var — the standard
                 # mean-preserving form for multiplicative noise that must
                 # stay positive — so growing the walk widens the spread
                 # without dragging the point estimate up with it.
-                drift = rng.gauss(0.0, math.sqrt(cum_var[k]))
-                walked = math.exp(drift - cum_var[k] / 2.0)
+                walked = math.exp(walk[k] - cum_var[k] / 2.0)
                 shared = club_shock.get(self.club_of.get(k, ""), 1.0)
                 per_j[k] = eps0[k] * walked * shared
             out[j] = per_j
@@ -430,14 +454,18 @@ class Bootstrap:
                    for k in sorted(self.start_rel)}
         eps0 = {k: rng.gauss(0.0, self.start_rel[k])
                for k in sorted(self.start_rel)}
-        cum_var = {k: 0.0 for k in self.start_rel}
+        # ACCUMULATED, NOT REDRAWN FROM CUMULATIVE VARIANCE EACH JORNADA —
+        # same fix, same reason, as rate_draw()'s own note above. A logit
+        # shift is additive and mean-zero already, so accumulating the walk
+        # here also drops the separate `cum_var`/mean-correction bookkeeping
+        # rate_draw() still needs for its log-normal form.
+        walk = {k: 0.0 for k in self.start_rel}
         out = {}
         for j in sorted(jornadas):
             per_j = {}
             for k in sorted(self.start_rel):
-                cum_var[k] += (DRIFT_FRAC * self.start_rel[k]) ** 2
-                drift = rng.gauss(0.0, math.sqrt(cum_var[k]))
-                per_j[k] = eps0[k] + drift
+                walk[k] += rng.gauss(0.0, DRIFT_FRAC * self.start_rel[k])
+                per_j[k] = eps0[k] + walk[k]
             out[j] = per_j
         return out
 
@@ -536,6 +564,25 @@ def _selftest() -> None:
     # than jornada 1 (1 step out) — this is the mechanism that used to be
     # entirely missing (see DRIFT_FRAC's own note on why).
     assert far > near, (near, far)
+    # THE WALK IS AN ACTUAL PATH, NOT INDEPENDENT PER-JORNADA REDRAWS.
+    # Bug found and fixed 2026-09-01 (swarm review of the forecasting
+    # engine): `drift` used to be redrawn fresh each jornada from its own
+    # cumulative variance, which gave each jornada the right MARGINAL
+    # spread but left adjacent jornadas within one trial UNCORRELATED —
+    # this assertion is the one the old code would have failed. Two
+    # adjacent jornadas (1, 2) share almost their entire walk history (one
+    # step apart out of the walk's full length here) and must therefore be
+    # strongly, positively correlated within a trial; a real random walk
+    # gives that "for free" — independent per-jornada redraws do not.
+    adjacent_corr = statistics.correlation(
+        [t[1]["kid"] for t in walk], [t[2]["kid"] for t in walk])
+    assert adjacent_corr > 0.7, adjacent_corr
+    # AND IT SHOULD WEAKEN WITH DISTANCE — jornada 1 vs jornada 22 (21
+    # steps apart) shares much less of its walk than jornada 1 vs 2 does,
+    # so the correlation should be real but clearly smaller.
+    distant_corr = statistics.correlation(
+        [t[1]["kid"] for t in walk], [t[22]["kid"] for t in walk])
+    assert 0.0 < distant_corr < adjacent_corr, (distant_corr, adjacent_corr)
     # LOG-NORMAL, NOT A BIASED CLIP: however wide the walk gets, its mean
     # stays ~1.0 — checked at jornada 22, the widest point in this walk,
     # which is exactly where a clip(1+drift, 0) formulation would have

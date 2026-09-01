@@ -298,7 +298,7 @@ def _run_np(states: list, forecaster, trials: int, seed: int):
     club_rel = getattr(forecaster, "club_rel", None) or {}
     all_keys = sorted({k for ks in order.values() for k in ks} & set(rel)) \
         if rel else []
-    eps0 = shared = drng = cum_var = None
+    eps0 = shared = drng = cum_var = walk = None
     if all_keys:
         from ffcore.forecast import DRIFT_FRAC
 
@@ -329,6 +329,15 @@ def _run_np(states: list, forecaster, trials: int, seed: int):
         drng = np.random.default_rng([seed, 7921])
         step_sd = DRIFT_FRAC * sd
         cum_var = np.zeros(len(all_keys))
+        # THE WALK'S OWN ACCUMULATED POSITION — see the jornada loop below
+        # for why this is separate from `cum_var`. Fixed alongside
+        # ffcore.forecast.Bootstrap.rate_draw()'s identical bug, 2026-09-01.
+        # PER TRIAL, NOT JUST PER KEY: each trial draws its OWN walk
+        # realization, so the accumulated position needs the full
+        # (trials, keys) shape `eps0`/the draws already use — cum_var
+        # above stays 1D (per key) because the variance schedule is the
+        # same across trials, only the realized PATH differs per trial.
+        walk = np.zeros((trials, len(all_keys)))
 
     # P(START)'S OWN ERROR, the same shape as the rate's above but on a
     # SEPARATE stream (seed component 7927+, not 7919+) and ADDITIVE on
@@ -339,7 +348,7 @@ def _run_np(states: list, forecaster, trials: int, seed: int):
     srel = getattr(forecaster, "start_rel", None) or {}
     all_start_keys = sorted(
         {k for ks in order.values() for k in ks} & set(srel)) if srel else []
-    seps0 = sdrng = cum_var_s = None
+    seps0 = sdrng = None
     if all_start_keys:
         from ffcore.forecast import DRIFT_FRAC as _DF
 
@@ -348,7 +357,11 @@ def _run_np(states: list, forecaster, trials: int, seed: int):
         seps0 = srrng.standard_normal((trials, len(all_start_keys))) * ssd
         sdrng = np.random.default_rng([seed, 7928])
         step_sd_s = _DF * ssd
-        cum_var_s = np.zeros(len(all_start_keys))
+        # NO cum_var_s: a logit shift is additive and mean-zero already —
+        # unlike the log-normal rate walk above, there is nothing here that
+        # needs the running variance for a mean-correction term, only the
+        # accumulated walk position itself.
+        walk_s = np.zeros((trials, len(all_start_keys)))  # per trial too
 
     managers = [list(st.squads) for st in states]
     totals = [{m: np.full(trials, float(st.carried.get(m, 0.0)))
@@ -395,18 +408,29 @@ def _run_np(states: list, forecaster, trials: int, seed: int):
         # front: a random walk's steps must be independent draws taken IN
         # ORDER, not sliced out of one big array.
         if all_keys:
-            cum_var += (step_sd ** 2)
+            # THE WALK'S POSITION, ACCUMULATED — NOT REDRAWN FROM ITS OWN
+            # CUMULATIVE VARIANCE EACH JORNADA. Found 2026-09-01 (swarm
+            # review): this used to draw `drift` fresh every jornada from
+            # `sqrt(cum_var)`, which gives each jornada the right MARGINAL
+            # spread but zero correlation between adjacent jornadas within
+            # a trial — see ffcore.forecast.Bootstrap.rate_draw()'s own
+            # note (fixed alongside this one, same bug, independently
+            # reimplemented here) for the full reasoning and the scoped
+            # impact (BUY ranking mostly unaffected — paired trials cancel
+            # it — the standings section's band/p_win is what widens).
+            step_var = step_sd ** 2
+            walk += drng.standard_normal((trials, len(all_keys))) \
+                * step_sd
+            cum_var += step_var
             # LOG-NORMAL, NOT clip(1+drift, 0) — see
             # ffcore.forecast.Bootstrap.rate_draw()'s matching note. A wide
             # walk clipped at zero is not symmetric (the negative tail
             # floors, the positive tail does not), which biased the MEAN
             # upward the wider it got — measured while tuning DRIFT_FRAC,
-            # not a rounding error. exp(drift - var/2) has E[.]=1 for any
-            # variance, so the walk widens the spread without dragging the
-            # point estimate up with it.
-            drift = drng.standard_normal((trials, len(all_keys))) \
-                * np.sqrt(cum_var)
-            walked = np.exp(drift - cum_var / 2.0)
+            # not a rounding error. exp(walk - cum_var/2) has E[.]=1 for
+            # any cum_var, so the walk widens the spread without dragging
+            # the point estimate up with it.
+            walked = np.exp(walk - cum_var / 2.0)
             individual = eps0 * walked
             m = individual * shared if shared is not None else individual
             rate_mult = {k: m[:, i] for i, k in enumerate(all_keys)}
@@ -416,11 +440,13 @@ def _run_np(states: list, forecaster, trials: int, seed: int):
         # also the trial where he starts more.
         start_shift = {}
         if all_start_keys:
-            cum_var_s += (step_sd_s ** 2)
-            drift_s = sdrng.standard_normal((trials, len(all_start_keys))) \
-                * np.sqrt(cum_var_s)
-            walk_s = seps0 + drift_s
-            start_shift = {k: walk_s[:, i]
+            # ACCUMULATED, SAME FIX AS ABOVE — additive and mean-zero
+            # already, so no separate cum_var/mean-correction needed here,
+            # matching Bootstrap.start_draw()'s own simplification.
+            walk_s += sdrng.standard_normal((trials, len(all_start_keys))) \
+                * step_sd_s
+            shifted = seps0 + walk_s
+            start_shift = {k: shifted[:, i]
                            for i, k in enumerate(all_start_keys)}
         keys = order.get(j, [])
         if not keys:
