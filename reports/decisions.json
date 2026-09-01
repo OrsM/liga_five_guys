@@ -1,7 +1,7 @@
 {
- "generated_at": "2026-09-01T20:41Z",
- "locks_in_h": 46.30802675472222,
- "cash": 27997995.88852199,
+ "generated_at": "2026-09-01T21:07Z",
+ "locks_in_h": 45.88024722694444,
+ "cash": 27997903.303221066,
  "cash_locked": 0,
  "squad_value": 234457609.0,
  "jornadas_left": 35,
@@ -45,7 +45,7 @@
      "days": 13
     }
    ],
-   "left": 3458889.8885219917,
+   "left": 3458797.3032210656,
    "answer": "Kike Salas",
    "p_win_after": 0.38,
    "vs": "BurtonGM89",
@@ -82,7 +82,7 @@
      "days": 12
     }
    ],
-   "left": 4451582.888521992,
+   "left": 4451490.303221066,
    "answer": "Kike Salas",
    "p_win_after": 0.319,
    "vs": "Magic Mike 333",
@@ -119,7 +119,7 @@
      "days": 2
     }
    ],
-   "left": 19104254.88852199,
+   "left": 19104162.303221066,
    "answer": "Lucien Agoume",
    "p_win_after": 0.296,
    "vs": "SusoGattuso",
@@ -143,7 +143,7 @@
    "value": -1.2257506106497371,
    "chase": null,
    "contest": [],
-   "left": 22548705.88852199,
+   "left": 22548613.303221066,
    "answer": null,
    "p_win_after": 0.321,
    "vs": "BurtonGM89",
@@ -167,7 +167,7 @@
    "value": null,
    "chase": null,
    "contest": [],
-   "left": 28763275.88852199,
+   "left": 28763183.303221066,
    "answer": null,
    "p_win_after": 0.316,
    "vs": "SusoGattuso",
@@ -191,7 +191,7 @@
    "value": 3.1569233704320006,
    "chase": null,
    "contest": [],
-   "left": 22358274.88852199,
+   "left": 22358182.303221066,
    "answer": null,
    "p_win_after": 0.309,
    "vs": "SusoGattuso",
@@ -228,7 +228,7 @@
      "days": 3
     }
    ],
-   "left": 17666122.88852199,
+   "left": 17666030.303221066,
    "answer": "Matias Dituro",
    "p_win_after": 0.273,
    "vs": "SusoGattuso",
@@ -265,7 +265,7 @@
      "days": 7
     }
    ],
-   "left": 9507147.888521992,
+   "left": 9507055.303221066,
    "answer": "Lucien Agoume",
    "p_win_after": 0.25,
    "vs": "Albert Laporta",
@@ -302,7 +302,7 @@
      "days": 2
     }
    ],
-   "left": 21656404.88852199,
+   "left": 21656312.303221066,
    "answer": "Aitor Paredes",
    "p_win_after": 0.29,
    "vs": "BurtonGM89",
@@ -339,7 +339,7 @@
      "days": 4
     }
    ],
-   "left": 8633454.888521992,
+   "left": 8633362.303221066,
    "answer": "Marcos Alonso",
    "p_win_after": 0.25,
    "vs": "Albert Laporta",
@@ -376,7 +376,7 @@
      "days": 16
     }
    ],
-   "left": 826730.8885219917,
+   "left": 826638.3032210656,
    "answer": "Marcos Alonso",
    "p_win_after": 0.239,
    "vs": "Albert Laporta",
@@ -413,7 +413,7 @@
      "days": 32
     }
    ],
-   "left": 19168637.88852199,
+   "left": 19168545.303221066,
    "answer": "Marcos Alonso",
    "p_win_after": 0.225,
    "vs": "Albert Laporta",
@@ -429,16 +429,16 @@
  },
  "ladder": [
   {
-   "name": "Moi Gomez",
-   "pos": "MED",
-   "start": 0.7376134967846941,
-   "xpts": 3.446725012291252,
+   "name": "Alvaro Mantilla",
+   "pos": "DEF",
+   "start": 0.9743398777014756,
+   "xpts": 2.8551187045224053,
    "group": "in",
    "where": "bench",
    "money": null,
-   "pts": 14.243926077410151,
-   "pts_lo": -108.18625458745896,
-   "pts_hi": 135.25298464096682,
+   "pts": 63.65355445107059,
+   "pts_lo": -20.810166533674646,
+   "pts_hi": 200.40497829913738,
    "note": "",
    "value": null,
    "contest": []
@@ -478,7 +478,7 @@
    "pos": "DEF",
    "start": 0.9743398777014756,
    "xpts": 6.908583882469319,
-   "group": "buy",
+   "group": "raid",
    "where": "BurtonGM89",
    "money": -24539106.0,
    "pts": 63.27066751826578,
@@ -506,7 +506,7 @@
    "pos": "MED",
    "start": 0.9743398777014756,
    "xpts": 4.869630697628997,
-   "group": "buy",
+   "group": "raid",
    "where": "BurtonGM89",
    "money": -23546413.0,
    "pts": 19.093868182036204,
@@ -534,7 +534,7 @@
    "pos": "MED",
    "start": 0.6501164688225073,
    "xpts": 3.260567572240772,
-   "group": "buy",
+   "group": "raid",
    "where": "Magic Mike 333",
    "money": -8893741.0,
    "pts": 3.295468473040046,
@@ -558,56 +558,11 @@
    ]
   },
   {
-   "name": "Alex Calatrava",
-   "pos": "DEL",
-   "start": 0.785420134384131,
-   "xpts": 4.333109035377946,
-   "group": "buy",
-   "where": "BurtonGM89",
-   "money": -5449290.0,
-   "pts": -6.679470545107506,
-   "pts_lo": -72.87880968808565,
-   "pts_hi": 160.85448397451978,
-   "note": "",
-   "value": -1.2257506106497371,
-   "contest": []
-  },
-  {
-   "name": "Iñigo Arguibide",
-   "pos": "DEF",
-   "start": 0.8197635687275655,
-   "xpts": 4.22126030876665,
-   "group": "buy",
-   "where": "SusoGattuso",
-   "money": 765280.0,
-   "pts": 13.310286788537496,
-   "pts_lo": -47.58354933727446,
-   "pts_hi": 134.22922328498055,
-   "note": "",
-   "value": null,
-   "contest": []
-  },
-  {
-   "name": "Unai Nuñez",
-   "pos": "DEF",
-   "start": 0.9743398777014756,
-   "xpts": 4.958811961797853,
-   "group": "buy",
-   "where": "SusoGattuso",
-   "money": -5639721.0,
-   "pts": 17.80416702761613,
-   "pts_lo": -54.27401079654487,
-   "pts_hi": 147.1063892601751,
-   "note": "",
-   "value": 3.1569233704320006,
-   "contest": []
-  },
-  {
    "name": "Alfonso Herrero",
    "pos": "POR",
    "start": 0.9743398777014756,
    "xpts": 4.502981504213365,
-   "group": "buy",
+   "group": "raid",
    "where": "Magic Mike 333",
    "money": -10331873.0,
    "pts": -0.6613510783879519,
@@ -635,7 +590,7 @@
    "pos": "MED",
    "start": 0.9679248471268442,
    "xpts": 3.528471519272626,
-   "group": "buy",
+   "group": "raid",
    "where": "SusoGattuso",
    "money": -18490848.0,
    "pts": -27.406317844667456,
@@ -663,7 +618,7 @@
    "pos": "MED",
    "start": 0.8117961704723239,
    "xpts": 2.8910038270975424,
-   "group": "buy",
+   "group": "raid",
    "where": "Albert Laporta",
    "money": -6341591.0,
    "pts": 13.558592007068455,
@@ -691,7 +646,7 @@
    "pos": "DEF",
    "start": 0.9684405321382897,
    "xpts": 4.379043720940786,
-   "group": "buy",
+   "group": "raid",
    "where": "Magic Mike 333",
    "money": -19364541.0,
    "pts": -28.76781565535589,
@@ -719,7 +674,7 @@
    "pos": "MED",
    "start": 0.7541070030709999,
    "xpts": 4.318850561354555,
-   "group": "buy",
+   "group": "raid",
    "where": "SusoGattuso",
    "money": -27171265.0,
    "pts": -51.55884819464268,
@@ -747,7 +702,7 @@
    "pos": "DEL",
    "start": 0.8521189504641421,
    "xpts": 3.924587288543616,
-   "group": "buy",
+   "group": "raid",
    "where": "SusoGattuso",
    "money": -8829358.0,
    "pts": -62.068629433325896,
@@ -771,18 +726,63 @@
    ]
   },
   {
+   "name": "Alex Calatrava",
+   "pos": "DEL",
+   "start": 0.785420134384131,
+   "xpts": 4.333109035377946,
+   "group": "listed",
+   "where": "BurtonGM89",
+   "money": -5449290.0,
+   "pts": -6.679470545107506,
+   "pts_lo": -72.87880968808565,
+   "pts_hi": 160.85448397451978,
+   "note": "",
+   "value": -1.2257506106497371,
+   "contest": []
+  },
+  {
+   "name": "Iñigo Arguibide",
+   "pos": "DEF",
+   "start": 0.8197635687275655,
+   "xpts": 4.22126030876665,
+   "group": "listed",
+   "where": "SusoGattuso",
+   "money": 765280.0,
+   "pts": 13.310286788537496,
+   "pts_lo": -47.58354933727446,
+   "pts_hi": 134.22922328498055,
+   "note": "",
+   "value": null,
+   "contest": []
+  },
+  {
+   "name": "Unai Nuñez",
+   "pos": "DEF",
+   "start": 0.9743398777014756,
+   "xpts": 4.958811961797853,
+   "group": "listed",
+   "where": "SusoGattuso",
+   "money": -5639721.0,
+   "pts": 17.80416702761613,
+   "pts_lo": -54.27401079654487,
+   "pts_hi": 147.1063892601751,
+   "note": "",
+   "value": 3.1569233704320006,
+   "contest": []
+  },
+  {
    "name": "Raphinha",
    "pos": "DEL",
    "start": 0.929895433257031,
    "xpts": 9.83161733338818,
    "group": "save",
    "where": "Magic Mike 333",
-   "money": -88475991.111478,
+   "money": -88476083.69677894,
    "pts": 131.24989130218069,
    "pts_lo": 11.250513541214787,
    "pts_hi": 400.88283549863445,
    "note": "short",
-   "value": 1.48345206030875,
+   "value": 1.4834505079586717,
    "contest": [
     {
      "manager": "Albert Laporta",
@@ -805,12 +805,12 @@
    "xpts": 5.554965387087269,
    "group": "save",
    "where": "free agent",
-   "money": -3455585.1114780083,
+   "money": -3455677.6967789344,
    "pts": 21.62452041875622,
    "pts_lo": -49.02668709050863,
    "pts_hi": 132.76515536183956,
    "note": "short",
-   "value": 6.257846275274369,
+   "value": 6.257678613637091,
    "contest": []
   },
   {
@@ -820,12 +820,12 @@
    "xpts": 4.054788458092655,
    "group": "save",
    "where": "BurtonGM89",
-   "money": -18372720.11147801,
+   "money": -18372812.696778934,
    "pts": 22.72175409833426,
    "pts_lo": -41.204752765075,
    "pts_hi": 133.6094516482451,
    "note": "short",
-   "value": 1.236711491845961,
+   "value": 1.2367052597405388,
    "contest": []
   },
   {
@@ -906,11 +906,6 @@
    "beats_now": 0.5625,
    "n_band": 16,
    "by_position": {
-    "MED": {
-     "n": 15,
-     "now_best": 2.497177961974615,
-     "beats_now": 0.0
-    },
     "DEL": {
      "n": 16,
      "now_best": 6.976498628865775,
@@ -921,6 +916,11 @@
      "now_best": 4.053465177946913,
      "beats_now": 0.0
     },
+    "MED": {
+     "n": 15,
+     "now_best": 2.497177961974615,
+     "beats_now": 0.0
+    },
     "POR": {
      "n": 7,
      "now_best": 2.4413652228504046,
@@ -928,15 +928,15 @@
     }
    },
    "by_route": {
-    "free": {
-     "n": 16,
-     "now_best": 2.497177961974615,
-     "beats_now": 0.5625
-    },
     "listed": {
      "n": 17,
      "now_best": 2.1036932572754474,
      "beats_now": 0.4117647058823529
+    },
+    "free": {
+     "n": 16,
+     "now_best": 2.497177961974615,
+     "beats_now": 0.5625
     }
    },
    "helpful": 115,
@@ -984,12 +984,12 @@
    "hi": null,
    "beats_now": null,
    "helpful": 17,
-   "days": 0.9880080592245372,
+   "days": 0.9701839122337963,
    "opens": "02 Sep"
   }
  ],
  "market_pct": "market **44th percentile** · an ordinary week · better in 56% of weeks",
- "shape_now": "5-4-1",
+ "shape_now": "4-5-1",
  "xi_note": "",
  "warnings": [
   "**Only 1 portero** — one knock and you can't field a legal XI.",
@@ -1015,7 +1015,7 @@
    "mean": 1438.6133294412941,
    "lo": 1081.050074475776,
    "hi": 1825.3905162287174,
-   "cash": 27997995.88852199,
+   "cash": 27997903.303221066,
    "cash_known": true,
    "p_above": null
   },
