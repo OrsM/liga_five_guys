@@ -347,12 +347,39 @@ def ladder_rows(u, rows, bands=None, base=None) -> list[dict]:
             # "worth keeping even against his best real alternative".
             # `action.buy != k` excludes a CANDIDATE's own band (his
             # Action buys HIM, funded by dead weight — "vs himself" would
-            # be nonsense) without needing to know which group a row is
-            # in; every group a held player's swap band can land in
-            # (in/out/field/keep/sell) gets the same explanation.
-            if action.buy and action.sell and action.buy != k:
+            # be nonsense).
+            #
+            # NOT ON "in"/"out" — xi_change()'s own diff, a free lineup
+            # change (bench <-> start a man ALREADY ON YOUR SQUAD), never a
+            # transfer. This band still answers a real question about him
+            # (is he worth more than his own money elsewhere), but "vs X"
+            # reads as "sell him for X" on a row that costs nothing and
+            # sells nobody — found 2026-09-01 in a swarm review.
+            if (action.buy and action.sell and action.buy != k
+                    and group not in ("in", "out")):
                 note = "vs %s" % title_name(u.name.get(action.buy,
                                                         action.buy))
+                # THE SAME TARGET CAN ALSO BE A REAL, ALREADY-RANKED BUY ROW
+                # a few lines below, funded by somebody ELSE's sale —
+                # best_swap_for() asks "what THIS man's own money reaches",
+                # a different question from candidates()/rank()'s one
+                # winning funder per target (see best_swap_for()'s own
+                # docstring), so the two can legitimately disagree on who
+                # pays. Left unsaid, a reader sees the same name twice at
+                # two different prices with nothing connecting them — found
+                # 2026-09-01 (swarm review): Ali Houary's row named Antonio
+                # Blanco while the real Antonio Blanco BUY row was funded by
+                # Moi Gomez. Named here, once, rather than left for the
+                # reader to notice the coincidence and wonder which plan is
+                # real (both are — they are just two different players'
+                # money reaching the same man).
+                funder = won.get(action.buy)
+                if funder and funder["action"].sell != action.sell:
+                    sellers = funder["action"].sell
+                    if sellers:
+                        note += (" — BUY row below reaches him via %s instead"
+                                % ", ".join(title_name(u.name.get(s, s))
+                                           for s in sellers))
         return {"name": title_name(u.name.get(k, k)),
                 "pos": u.pos.get(k, ""), "start": u.start.get(k, 0.0),
                 "xpts": exp.get(k, 0.0), "group": group, "where": where,
@@ -1106,25 +1133,37 @@ def wait_routes(u, offers=None, rng=None) -> list[dict]:
     return out
 
 
-def waiting(u, offers=None, rng=None) -> list[str]:
-    """The routes in full — for the APPENDIX, not the report.
+def waiting(u, offers=None, rng=None, routes=None) -> list[str]:
+    """The three routes, priced against each other.
 
-    The report carries one line: where this week's market sits against the
-    market's own history. Everything under it — the three routes, the players
-    nobody is selling and how long they take to appear — is how that line was
-    arrived at, which is a different question from what to do.
+    `routes`, when given, is a caller's own `wait_routes()` result — the
+    SAME list `market_percentile()` already read, computed once (see
+    render()'s own note on why this used to run wait_routes() twice per
+    report, once here and once for the percentile line above it).
+    `routes=None` (an old caller, or the self-test) computes it fresh.
     """
-    routes = wait_routes(u, offers, rng)
+    routes = routes if routes is not None else wait_routes(u, offers, rng)
     if len(routes) < 2:
         return []
     mkt = next((r for r in routes if r["route"] == "market"), None)
     cl = next((r for r in routes if r["route"] == "clauses"), None)
 
-    # Season points, so the routes can be compared with the move table rather
-    # than sitting in their own unit. Waiting pays for the delay: a jornada of
-    # the best thing you can buy today is forgone before the better one
-    # arrives. These are estimates from a rate; the move table's are simulated.
-    out = ["| Route | What it offers | Season pts | Beats acting today |",
+    # "ROUGH PTS", NOT "SEASON PTS" — this used to carry the SAME header
+    # text as the move table's own "Season" column two sections above,
+    # which IS the real paired Monte Carlo simulation (rank()'s `d_pts`).
+    # This one is `season()`'s flat `rate * jornadas_left`, off a single
+    # today's-best snapshot with no re-picked XI, no start-probability
+    # decay, nothing simulated at all — and it can overstate the real
+    # number by 3x or more (a live case, 2026-09-01: "Act today" read
+    # +244 off the same player the move table two sections below priced,
+    # correctly, at +74). Identical labels on two differently-computed
+    # numbers is how a reader ends up comparing a real figure against a
+    # rough one without knowing it — found in a swarm review.
+    out = ["_Rough — a flat rate times jornadas left, not the paired "
+          "simulation the move table above runs; only a guide to which "
+          "route is in the right ballpark, not a number to weigh a real "
+          "move against._", "",
+          "| Route | What it offers | Rough pts | Beats acting today |",
            "|---|---|--:|--:|"]
     for r in routes:
         if r["route"] == "watch":
@@ -1276,6 +1315,13 @@ def caveats(u) -> list[str]:
                    "missing from the simulation entirely |"
                    % ", ".join("`%s`" % n for n in u.unjoined))
     out += [
+        "| \"Your eleven\" (top of the ladder) compares only the NEXT "
+        "jornada, off real confirmed lineups/injuries | the standings "
+        "table below simulates the other %d jornadas too, where nobody has "
+        "lineup news yet and squad value dominates — the two can point "
+        "opposite ways (this week's confirmed news vs. the season's "
+        "average squad quality) without either being wrong |"
+        % max(0, len(u.state.jornadas) - 1),
         "| Beyond the next jornada, P(start) reverts to his own season-"
         "standing rate | a suspension or a knock is dated to the match it "
         "was announced for — nothing here predicts a FUTURE one not yet "
@@ -1295,6 +1341,24 @@ def caveats(u) -> list[str]:
         "unactionable — it put the manager who raised 86.9M in six sales "
         "last week 450 days away from affording anything |"
         % (fmt_money(u.daily_bonus), _tempo_note(u)),
+        # SEASON/VALUE ASSUME THE MOVE HAPPENS, RACE OR NO RACE — a clause
+        # row's Season/pts-per-M€ figure is priced as if you are the one
+        # who pays it; the "Where" column's own race note ("SusoGattuso can
+        # pay today") says nothing about how likely that actually is, and
+        # nothing downstream discounts Season/value for it. A row racing a
+        # fast rival and a row with nobody else in reach can carry an
+        # identical Season figure with very different odds of ever being
+        # the one you get — found 2026-09-01, swarm review. Not folded into
+        # the number itself: this repo has no measured "who wins a live
+        # race" rate to price it with (only whether a listed sale ever
+        # converts at all, a different question — see "108 real
+        # transactions, zero manager-to-manager" elsewhere in this repo),
+        # and a fabricated rate would be worse than none.
+        "| A clause race's Season/pts-per-M€ do not discount for LOSING "
+        "the race | they price the move as if you get there first — the "
+        "\"can pay in ~N days\" column above is the only signal for how "
+        "contested that actually is, read it beside Season, not instead "
+        "of it |",
         "| Teammates score independently, MATCH TO MATCH | two defenders of "
         "one club still land on opposite ends of the per-match pool in the "
         "same round — only their SEASON-LONG rating (club_rel) is shared, "
@@ -1695,6 +1759,14 @@ def payload(u, rows, base, rivals, locks_h=None, n_actions: int = 0,
     """
     names = {k: title_name(v) for k, v in u.name.items()}
     lo, hi = base.band(u.me)
+    # ONE wait_routes() CALL, READ THREE TIMES — this used to call it fresh
+    # for "wait", again for "verdict" (now retired, see below), and again
+    # for "market_pct", resampling the same real market history three times
+    # over for facts that cannot differ between them. Found 2026-09-01,
+    # alongside the same duplication in render() (one direct call, plus a
+    # second inside waiting(), also fixed) — five resamples per report,
+    # total, for one fact.
+    wait = wait_routes(u, offers)
     moves = []
     # BAR ON GAIN, THEN RANK BY VALUE — see MOVES_VALUE_FLOOR's own note.
     # A d_win-driven move still leads outright (unchanged: win-probability
@@ -1825,9 +1897,19 @@ def payload(u, rows, base, rivals, locks_h=None, n_actions: int = 0,
         "xi_total": _xi_total(u, u.me),
         "shape": _shape_now(u),
         "rival_best": _rival_best(u),
-        "wait": wait_routes(u, offers),
-        "verdict": verdict(wait_routes(u, offers))[0],
-        "market_pct": market_percentile(wait_routes(u, offers)),
+        "wait": wait,
+        # "verdict"/"hold" RETIRED 2026-09-01. render()'s own comment
+        # ("NO SENTENCES ABOVE THE TABLE") explains why verdict()'s prose
+        # was deliberately dropped from the markdown report: a headline
+        # sentence next to a table is one more thing that can disagree
+        # with the table. This function kept computing and shipping that
+        # same sentence to the phone anyway (Fantasy.jsx does not read
+        # either field — checked before removing) — the exact fix-lands-
+        # in-one-renderer-not-its-sibling shape this repo keeps finding,
+        # just with the roles reversed (removed from markdown, missed in
+        # JSON). verdict()/the "act"/"hold" prose stays defined for
+        # whatever else reads it directly, only no longer surfaced here.
+        "market_pct": market_percentile(wait),
         "shape_now": fielded_shape(u),
         "xi_note": xi_note(u),
         # Written by report.py minutes earlier in the same run — the board
@@ -1835,7 +1917,6 @@ def payload(u, rows, base, rivals, locks_h=None, n_actions: int = 0,
         # reaches the phone instead of living in a markdown file nobody opens
         # when the board is right there.
         "warnings": _warnings(),
-        "hold": verdict(wait_routes(u, offers))[1],
         "standings": [
             {"manager": m, "me": m == u.me,
              "now": u.state.carried.get(m, 0.0), "mean": base.mean(m),
@@ -1967,13 +2048,21 @@ def render(u, rows, base, stamp: str, rivals, n_actions: int = 0,
     # preamble above the first `## ` arrives in the middle of the report
     # reading as the tail of whatever section came before it — which here is
     # the board's warnings.
+    #
+    # ONE wait_routes() CALL FOR THE WHOLE REPORT, not three. Before this
+    # (found 2026-09-01, swarm review) this ran here, again inside
+    # waiting() a few lines below, and twice more in payload() for the
+    # phone — four resamples of the same real market history per report
+    # for a fact that does not change between them.
     routes = wait_routes(u, offers)
-    call, hold = verdict(routes)
-    # NO SENTENCES ABOVE THE TABLE. The call, the overdraft paragraph and the
-    # three-route panel were each added to explain a contradiction rather than
-    # to remove one, and each became another thing on the page that could
-    # disagree with the table under it. What is left is the position, the
-    # formation, and where this week's market sits — all of it data.
+    # NO SENTENCES ABOVE THE TABLE. verdict() (and the overdraft paragraph
+    # and the three-route panel it once introduced) was added to explain a
+    # contradiction rather than to remove one, and each became another
+    # thing on the page that could disagree with the table under it. What
+    # is left is the position, the formation, and where this week's market
+    # sits — all of it data. verdict() itself is retired below (it was
+    # still being computed here and thrown away, and shipped unused to the
+    # phone's JSON from payload() — see payload()'s own note).
     out = ["# The simulation — %s" % stamp, "", "## Now", ""]
     out += header(u, base, n_actions or len(rows), locks_h)
     pctl = market_percentile(routes)
@@ -1993,7 +2082,7 @@ def render(u, rows, base, stamp: str, rivals, n_actions: int = 0,
     if cover:
         out += ["## Covering the deficit — offers to accept", ""] + cover
 
-    wait = waiting(u, offers)
+    wait = waiting(u, offers, routes=routes)
     if wait:
         out += ["## Act now or wait — the workings", ""] + wait
     out += ["## Where the league stands", ""]
@@ -2984,9 +3073,16 @@ def main() -> None:
     # cover_rows() reads the SAME bands dict ladder_data was built from —
     # decide.offer_combos()'s own rows, not a second simulation.
     cover_data = cover_rows(u, bands)
+    # ONE market_model() CALL FOR THE WHOLE REPORT, not two — it fits an
+    # Offers distribution off api_market.csv from scratch (a real CSV read
+    # plus statistics.median() over every cycle), and render() and
+    # payload() used to each trigger that fit independently for the exact
+    # same market. Same principle as `ladder_data`/`bands` a few lines up:
+    # computed here, once, and handed to both. Found 2026-09-01.
+    offers = market_model(u)
     write_lines(PARTS / OUT,
                 render(u, rows, base, stamp, rivals, len(acts), locks_h,
-                       market_model(u), ladder_data, cover_data))
+                       offers, ladder_data, cover_data))
     print("wrote %s (%d moves, %d simulated in full)"
           % (PARTS / OUT, len(acts), len(rows)))
 
@@ -2994,7 +3090,7 @@ def main() -> None:
         "generated_at": run_now()
                           .strftime("%Y-%m-%dT%H:%MZ"),
         **payload(u, rows, base, rivals, locks_h, len(acts),
-                  market_model(u), ladder_data=ladder_data,
+                  offers, ladder_data=ladder_data,
                   cover_data=cover_data),
     }, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
     print("wrote %s" % (REPORTS / "decisions.json"))
