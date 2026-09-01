@@ -921,7 +921,7 @@ def verdict(routes) -> tuple:
                gap), True)
 
 
-def wait_routes(u, offers=None, rng=None) -> list[dict]:
+def wait_routes(u, offers=None, rng=None, rows=None) -> list[dict]:
     """The three ways to get a better eleven, as data both renderers read.
 
     ACT NOW, WAIT FOR THE MARKET, OR WAIT FOR THE CLAUSES. Every move in the
@@ -930,6 +930,21 @@ def wait_routes(u, offers=None, rng=None) -> list[dict]:
     anything positive beats it by construction. This is the correction, and it
     is computed ONCE: the markdown table and the phone drew different things
     twice before this was a function.
+
+    `rows`, when given, is decide.rank()'s own scored candidates — the SAME
+    ones the BUY table ranks. Before this (found 2026-09-01, swarm review),
+    "Act today"'s own figure was ALWAYS `season(now_best)` — a cheap linear
+    stand-in (today's best single-jornada margin times jornadas left, no
+    re-picked XI, no simulation) — sharing its column header ("Season pts")
+    with the BUY table's real simulated figure two sections above while
+    being a genuinely cruder number under it: a live case read "Act today
+    +244" off the same player the BUY table correctly priced, simulated,
+    at +74. `rows` only ever holds moves already affordable today (rank()'s
+    own screen: `cost <= cash + proceeds`) — exactly what "Act today"
+    means — so the best of THEIR real `d_pts` (and its own season band) IS
+    the number the BUY table's top row already carries, not a second
+    estimate of it. `rows=None` (an old caller, or the self-test) keeps the
+    estimate — there is nothing real to fall back to without it.
     """
     import random
     import statistics
@@ -971,10 +986,16 @@ def wait_routes(u, offers=None, rng=None) -> list[dict]:
         """
         return rate * max(0, left - delay) - now_best * delay
 
+    # THE REAL FIGURE, WHEN THERE IS ONE — see this function's own note.
+    best_row = max(rows, key=lambda r: r["d_pts"], default=None) if rows \
+        else None
     out = [{"route": "act", "label": "Act today",
             "what": "%d players you can buy now" % len(u.price),
-            "best": now_best, "pts": season(now_best),
-            "lo": None, "hi": None, "beats_now": None}]
+            "best": now_best,
+            "pts": best_row["d_pts"] if best_row else season(now_best),
+            "lo": best_row["pts_lo"] if best_row else None,
+            "hi": best_row["pts_hi"] if best_row else None,
+            "simulated": best_row is not None, "beats_now": None}]
 
     if offers is not None:
         band = offers.best_over(7, approx_gain, rng or random.Random(3))
@@ -1148,30 +1169,37 @@ def waiting(u, offers=None, rng=None, routes=None) -> list[str]:
     mkt = next((r for r in routes if r["route"] == "market"), None)
     cl = next((r for r in routes if r["route"] == "clauses"), None)
 
-    # "ROUGH PTS", NOT "SEASON PTS" — this used to carry the SAME header
-    # text as the move table's own "Season" column two sections above,
-    # which IS the real paired Monte Carlo simulation (rank()'s `d_pts`).
-    # This one is `season()`'s flat `rate * jornadas_left`, off a single
-    # today's-best snapshot with no re-picked XI, no start-probability
-    # decay, nothing simulated at all — and it can overstate the real
-    # number by 3x or more (a live case, 2026-09-01: "Act today" read
-    # +244 off the same player the move table two sections below priced,
-    # correctly, at +74). Identical labels on two differently-computed
-    # numbers is how a reader ends up comparing a real figure against a
-    # rough one without knowing it — found in a swarm review.
-    out = ["_Rough — a flat rate times jornadas left, not the paired "
-          "simulation the move table above runs; only a guide to which "
-          "route is in the right ballpark, not a number to weigh a real "
-          "move against._", "",
-          "| Route | What it offers | Rough pts | Beats acting today |",
+    # SEASON PTS, MARKED WHERE IT ISN'T REAL. "Act today" carries a REAL
+    # `d_pts` when `wait_routes()` was given `rows` — the same paired
+    # Monte Carlo the move table above runs, off the same affordable
+    # candidates, not a second estimate of them. "Wait for the market"/
+    # "the clauses" cannot be: those players are not a concrete, known
+    # offer yet, only a rate this repo has measured real history for, so
+    # they stay `season()`'s flat `rate * jornadas_left` extrapolation —
+    # marked `~` so the two kinds of number are never read as the same
+    # kind. Before this (found 2026-09-01, swarm review) EVERY row here
+    # used the estimate, "Act today" included, sharing its header with the
+    # move table's real "Season" column while overstating it — a live
+    # case read "Act today +244" off the same player the move table two
+    # sections below priced, correctly, at +74.
+    out = ["_`~` marks an estimate — a rate times jornadas left, not a "
+          "simulation — for a route whose players are not a known, "
+          "concrete offer yet. \"Act today\" is real when it can be: the "
+          "same simulated best gain the move table above shows._", "",
+          "| Route | What it offers | Season pts | Beats acting today |",
            "|---|---|--:|--:|"]
     for r in routes:
         if r["route"] == "watch":
             continue
         name = ("**%s**" % r["label"] if r["route"] == "act" else r["label"])
         beats = r.get("beats_now")
-        out.append("| %s | %s | %+.0f | %s |"
-                   % (name, r["what"], r.get("pts", 0.0),
+        real = bool(r.get("simulated"))
+        pts_txt = ("%+.0f (%+.0f–%+.0f)" % (r["pts"], r["lo"], r["hi"])
+                  if real and r.get("lo") is not None
+                  else ("%+.0f" % r.get("pts", 0.0) if real
+                        else "~%+.0f" % r.get("pts", 0.0)))
+        out.append("| %s | %s | %s | %s |"
+                   % (name, r["what"], pts_txt,
                       "—" if beats is None else "%.0f%%" % (100 * beats)))
     out.append("")
 
@@ -1766,7 +1794,7 @@ def payload(u, rows, base, rivals, locks_h=None, n_actions: int = 0,
     # alongside the same duplication in render() (one direct call, plus a
     # second inside waiting(), also fixed) — five resamples per report,
     # total, for one fact.
-    wait = wait_routes(u, offers)
+    wait = wait_routes(u, offers, rows=rows)
     moves = []
     # BAR ON GAIN, THEN RANK BY VALUE — see MOVES_VALUE_FLOOR's own note.
     # A d_win-driven move still leads outright (unchanged: win-probability
@@ -2054,7 +2082,7 @@ def render(u, rows, base, stamp: str, rivals, n_actions: int = 0,
     # waiting() a few lines below, and twice more in payload() for the
     # phone — four resamples of the same real market history per report
     # for a fact that does not change between them.
-    routes = wait_routes(u, offers)
+    routes = wait_routes(u, offers, rows=rows)
     # NO SENTENCES ABOVE THE TABLE. verdict() (and the overdraft paragraph
     # and the three-route panel it once introduced) was added to explain a
     # contradiction rather than to remove one, and each became another
@@ -2687,6 +2715,26 @@ def _selftest() -> None:
     assert plain_mkt["by_position"] == {}, plain_mkt["by_position"]
     assert plain_mkt["by_route"] == {}, plain_mkt["by_route"]
     assert plain_mkt["n_band"] > 2, plain_mkt["n_band"]   # best_over's trials
+
+    # -- "Act today" is the REAL simulated figure when `rows` is given -----
+    # Before this (found 2026-09-01, swarm review), "Act today" was ALWAYS
+    # season()'s cheap linear estimate — sharing the move table's own
+    # "Season" column header two sections above while being a genuinely
+    # cruder number under it (a live case overstated the real figure by
+    # more than 3x). No caller in this file passed `rows` before this test
+    # was added, so the branch that uses it had never actually run.
+    plain_act = next(r for r in plain_routes if r["route"] == "act")
+    assert not plain_act.get("simulated"), plain_act
+    fake_rows = [{"d_pts": 12.0, "pts_lo": -5.0, "pts_hi": 40.0},
+                {"d_pts": 55.0, "pts_lo": 3.0, "pts_hi": 120.0}]
+    real_routes = wait_routes(uw, off_plain, random.Random(1),
+                              rows=fake_rows)
+    real_act = next(r for r in real_routes if r["route"] == "act")
+    assert real_act["simulated"] is True, real_act
+    # THE BEST OF `rows`, NOT THE FIRST OR AN AVERAGE — "Act today" means
+    # the single best thing reachable right now.
+    assert (real_act["pts"], real_act["lo"], real_act["hi"]) \
+        == (55.0, 3.0, 120.0), real_act
 
     # -- one line instead of a panel ---------------------------------------
     # The panel sat outside the one table, compared three routes in a table of
