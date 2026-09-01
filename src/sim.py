@@ -432,37 +432,48 @@ def ladder_rows(u, rows, bands=None, base=None) -> list[dict]:
     buys = [k for k in rest if k in won]
     for k in sorted((k for k in buys if k in chase), key=lambda k: chase[k]):
         out.append(buy_cell(k, "chase"))
-    # FREE AGENTS FIRST, A RIVAL'S OWN PLAYER SECOND — SAME ORDER, TWO
-    # HEADINGS, NOTHING DROPPED. Before this (Miguel, 2026-09-01: "I want
-    # to know if any free players are worth buying honestly") every BUY
-    # row sorted together — value_rate()'s own ranking has no reason to
-    # prefer a free pickup over a clause raid that pays for its premium in
-    # points, so a real report could (and did) show nothing but rival-
-    # owned targets at the top, with a reader unable to tell "there are no
-    # good free options today" from "free options exist but a bigger
-    # clause raid outranked them" without reading every row. ONE sorted
-    # list, filtered twice rather than sorted twice — `non_chase` keeps
-    # _move_rank_key()'s own order, split only on who owns the target, so
-    # neither group is a second, independently-ranked list that could
-    # disagree with the other about relative order. Nothing is hidden: a
-    # genuinely great clause raid is still a real, visible option — see
-    # the RAID heading's own text — just never the only thing shown, and
-    # never mixed with the free-agent answer the report leads with.
+    # FREE AGENTS, THEN A REAL RAID, THEN A WISH — SAME ORDER THROUGHOUT,
+    # THREE HEADINGS, NOTHING DROPPED. Before this (Miguel, 2026-09-01:
+    # "I want to know if any free players are worth buying honestly")
+    # every BUY row sorted together — value_rate()'s own ranking has no
+    # reason to prefer a free pickup over a clause raid that pays for its
+    # premium in points, so a real report could (and did) show nothing
+    # but rival-owned targets at the top, with a reader unable to tell
+    # "no good free options today" from "free options exist but a bigger
+    # raid outranked them" without reading every row.
+    #
+    # A RIVAL'S OWN PLAYER IS NOT ONE THING. A clause CANNOT be refused —
+    # pay it and he is yours, the same certainty as a free pickup. A
+    # LISTED target is the owner's own choice to sell, and this repo's
+    # own measurement (decide.py's own note, re-derived and PROVEN
+    # 2026-08-31 by replaying ownership forward over the real ledger, not
+    # just read off its columns) is that in 119 real deals this league
+    # has ever recorded, ZERO were manager-to-manager — not rare, the
+    # entire sample. Grouping a listed target under "RAID" implied a
+    # rival choosing to sell to Miguel is a live option the same way a
+    # clause is; it is not (Miguel: "no way they're selling willingly to
+    # me") — found 2026-09-01, the same day the two-way split shipped,
+    # while checking it against a real report where three of the rows
+    # under "RAID" turned out to be exactly this: listed, not clause.
+    #
+    # ONE SORTED LIST, FILTERED THREE TIMES, NOT THREE SEPARATELY RANKED
+    # ONES — `non_chase` keeps _move_rank_key()'s own order throughout,
+    # split only on ownership and (for owned targets) route, so no
+    # section can disagree with another about relative order. Nothing is
+    # dropped: a genuinely great clause raid, or even a listed one, stays
+    # a real, visible option — just never mixed with a stronger claim
+    # than it can actually make.
     non_chase = sorted((k for k in buys if k not in chase),
                        key=lambda k: _move_rank_key(won[k], buy_floor, u))
-    # OWNERSHIP, THE SAME TEST buy_cell()'s OWN "Where" COLUMN ALREADY
-    # USES (`u.owner.get(k) or "free agent"`) — not a second, route-based
-    # signal for the same fact. `u.route` distinguishes free/listed/clause
-    # for RELIABILITY (a listed sale rarely converts, a clause always
-    # does if paid); ownership is the simpler, already-trusted fact this
-    # split actually needs: is there a specific manager whose player this
-    # is, or not.
     for k in non_chase:
         if not u.owner.get(k):
             out.append(buy_cell(k, "buy"))
     for k in non_chase:
-        if u.owner.get(k):
+        if u.owner.get(k) and u.route.get(k, "market") == "clause":
             out.append(buy_cell(k, "raid"))
+    for k in non_chase:
+        if u.owner.get(k) and u.route.get(k, "market") != "clause":
+            out.append(buy_cell(k, "listed"))
     for k in sorted((k for k in rest if k not in won
                      and u.price[k] > u.cash + spare),
                     key=lambda k: -exp.get(k, 0.0)):
@@ -747,14 +758,25 @@ def ladder(u, rows, base, data=None) -> list[str]:
     if by_group.get("buy"):
         out.append("| **BUY — free agents** | | | | | | | |")
         out += [row_md(r) for r in by_group["buy"]]
-    elif by_group.get("raid"):
+    elif by_group.get("raid") or by_group.get("listed"):
         out.append("| **BUY — free agents — none clear the bar today** | | "
                    "| | | | | |")
 
     if by_group.get("raid"):
-        out.append("| **RAID — a rival's own player, at a real premium** "
+        out.append("| **RAID — a clause, cannot be refused** "
                    "| | | | | | | |")
         out += [row_md(r) for r in by_group["raid"]]
+
+    # SEPARATE FROM RAID, ON PURPOSE — see ladder_rows()'s own note. A
+    # listed target is the OWNER'S CHOICE, and 119 real deals in this
+    # league have never once been that choice made in Miguel's favour —
+    # shown here, not folded into RAID, so the heading itself carries the
+    # honest odds rather than implying a clause's certainty.
+    if by_group.get("listed"):
+        out.append("| **LISTED — his own choice to sell, and in 119 real "
+                   "deals this league has recorded, that has happened "
+                   "zero times** | | | | | | | |")
+        out += [row_md(r) for r in by_group["listed"]]
 
     if by_group.get("save"):
         out.append("| **SAVE — better than yours, out of reach** | | | | | | | |")
@@ -2625,39 +2647,53 @@ def _selftest() -> None:
     assert [r["group"] for r in flat_lad] == ["buy"] * 3, flat_lad
     assert ladder_rows(uc, ch_rows) == flat_lad, "no base, no chase"
 
-    # -- BUY/RAID split: free agents in their own section, a rival's own
-    # player in a separate one, same relative order preserved in each --
-    # 2026-09-01, Miguel: "I want to know if any free players are worth
-    # buying honestly" — a mixed list could not answer that without
-    # reading every row.
+    # -- BUY/RAID/LISTED split: free agents, a clause (cannot be
+    # refused), and a listed target (the owner's own choice, which this
+    # league's own real history says essentially never goes Miguel's way)
+    # — three sections, same relative order preserved in each. 2026-09-01,
+    # Miguel: "I want to know if any free players are worth buying
+    # honestly", then "the raid should focus on the clause impacted
+    # ones... no way they're selling willingly to me" once a real report
+    # showed listed targets sitting under RAID as if a clause's certainty
+    # applied to them too.
     riv_row = {"action": Action("clause", buy="rivals", cost=5e6),
               "d_pos": 0.60, "d_win": 0.0, "d_beat": {}, "value": 12.0,
               "d_pts": 60.0, "pts_lo": 20.0, "pts_hi": 90.0, "helps": 0.90}
+    wish_row = {"action": Action("buy", buy="wished", cost=5e6),
+               "d_pos": 0.50, "d_win": 0.0, "d_beat": {}, "value": 10.0,
+               "d_pts": 50.0, "pts_lo": 15.0, "pts_hi": 80.0, "helps": 0.85}
     uc_owned = Universe(
         state=LeagueState({"me": {}, "riv": {}}, [1, 2], "me"),
         forecaster=Bootstrap(
             {j: {"steady": (5.0, 1.0), "maverick": (4.0, 1.0),
-                "dud": (3.0, 1.0), "rivals": (7.0, 1.0)} for j in (1, 2)}),
+                "dud": (3.0, 1.0), "rivals": (7.0, 1.0),
+                "wished": (6.5, 1.0)} for j in (1, 2)}),
         pos={"steady": "MED", "maverick": "MED", "dud": "MED",
-            "rivals": "MED"},
-        price={"steady": 5e6, "maverick": 5e6, "dud": 5e6, "rivals": 5e6},
-        proceeds={}, owner={"rivals": "riv"}, cash=10e6, me="me",
-        route={"rivals": "clause"},
+            "rivals": "MED", "wished": "MED"},
+        price={"steady": 5e6, "maverick": 5e6, "dud": 5e6, "rivals": 5e6,
+              "wished": 5e6},
+        proceeds={}, owner={"rivals": "riv", "wished": "riv"}, cash=10e6,
+        me="me", route={"rivals": "clause", "wished": "listed"},
         name={"steady": "steady", "maverick": "maverick", "dud": "dud",
-             "rivals": "rivals"})
-    owned_lad = ladder_rows(uc_owned, ch_rows + [riv_row], base=st)
-    # STILL ONE SORTED LIST, FILTERED, NOT TWO SEPARATELY RANKED ONES: the
-    # highest-value real candidate overall ("rivals", value 12.0) leads
-    # the whole ranking, and lands in "raid" — not promoted to "buy" for
-    # being the best, and not silently dropped either.
+             "rivals": "rivals", "wished": "wished"})
+    all_rows = ch_rows + [riv_row, wish_row]
+    owned_lad = ladder_rows(uc_owned, all_rows, base=st)
+    # STILL ONE SORTED LIST, FILTERED, NOT THREE SEPARATELY RANKED ONES:
+    # the two highest-value real candidates overall ("rivals" 12.0,
+    # "wished" 10.0) lead the whole ranking and land in RAID/LISTED
+    # respectively — neither promoted to BUY for being the best, neither
+    # silently dropped, and "wished" specifically does NOT land in RAID
+    # despite outranking every free-agent row on value.
     by_group = {}
     for r in owned_lad:
         by_group.setdefault(r["group"], []).append(r["name"].lower())
     assert by_group["buy"] == ["steady", "dud", "maverick"], by_group
     assert by_group["raid"] == ["rivals"], by_group
-    md_owned = "\n".join(ladder(uc_owned, ch_rows + [riv_row], st))
+    assert by_group["listed"] == ["wished"], by_group
+    md_owned = "\n".join(ladder(uc_owned, all_rows, st))
     assert "BUY — free agents" in md_owned, md_owned
-    assert "RAID — a rival's own player" in md_owned, md_owned
+    assert "RAID — a clause, cannot be refused" in md_owned, md_owned
+    assert "LISTED — his own choice to sell" in md_owned, md_owned
     # BOTH SECTIONS PRESENT even when free-agent buys is empty: the
     # explicit "none clear the bar" line, not silence that could be
     # mistaken for "no candidates were even screened".
