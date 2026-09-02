@@ -1416,6 +1416,89 @@ def apply_fixtures(per_jornada: dict[int, dict], sboard: dict[int, dict],
     return out
 
 
+def phantom_fill(squads: dict[str, dict[str, str]], per_jornada: dict[int, dict],
+                 pos: dict[str, str]
+                 ) -> tuple[dict[str, dict[str, str]], dict[int, dict]]:
+    """Squads and per_jornada, with one AVERAGE-PLAYER-AT-THE-POSITION
+    phantom added per position any manager is short of SLOT_MIN in.
+
+    WHY THIS EXISTS: best_xi() (ffcore.season) needs SLOT_MIN of every
+    position to fill ANY of the 7 real formations — a squad short in
+    even one returns [], and an empty eleven scores ZERO, every
+    remaining jornada, with ZERO variance to draw from. That is not a
+    forecast of a weak season, it is the simulation being structurally
+    unable to score him at all — found 2026-09-01 (Miguel: "the forecast
+    for Albert is absolutely unsustainable... that's not possible unless
+    he never again connects to the app"). Real managers fix a squad this
+    broken; assuming he never will (implicitly, by freezing him at what
+    he has already scored) is a much stronger and much less plausible
+    claim than assuming any other rival makes some discretionary
+    improvement, which this repo's OWN "Rivals never transfer" caveat
+    already, deliberately, refuses to assume — so a special-cased "he'll
+    upgrade a weak spot" assumption for Albert alone would be
+    inconsistent. Filling the ONE gap that keeps him from fielding a
+    team at all is a different, much safer claim: every manager clears
+    that bar to participate, or the game is not being played.
+
+    THE AVERAGE, NOT A SPECIFIC PLAYER, NOT AN INVENTED NUMBER. A real
+    player's own key would need to disappear from the BUY/candidates
+    list while "borrowed" (he is not actually Albert's) and would drift
+    day to day with whichever specific player happens to be cheapest —
+    noise that has nothing to do with the real uncertainty being priced.
+    Averaged straight off the SAME real per_jornada data — points AND
+    p_start — every other player at that position already carries, per
+    jornada (so a hard fixture week lowers the phantom the same way it
+    lowers everyone else's real number that week) — nothing here is a
+    guess independent of the data the rest of the model already trusts.
+
+    NO `matches` ENTRY, DELIBERATELY: Bootstrap's own rate_rel/start_rel
+    (the season-long persistent-error walk) are only computed for a key
+    present in `matches` — the SAME "no evidence, no widening" rule this
+    repo already applies to a brand-new player with zero real history
+    (see forecast.py's own self-test). A genuinely unknown phantom gets
+    the conservative reading, not a fabricated magnitude of uncertainty
+    this repo has no basis to assign.
+
+    Keyed `__phantom_<manager>_<slot>_<n>`, a form no real player id can
+    take — never appears in `u.price`/`u.owner`/`u.name`, so it cannot be
+    bought, cannot be mistaken for a real man Albert owns anywhere else
+    in the report, and drops out of `illegal_squads()` once it makes his
+    squad legal again.
+    """
+    from ffcore.score import SLOT_MIN
+
+    squads = {m: dict(sq) for m, sq in squads.items()}
+    per_jornada = {j: dict(layer) for j, layer in per_jornada.items()}
+    # ONE AVERAGE PER (jornada, position), computed once off every REAL
+    # scored player at that position — not per manager, so five managers
+    # all short the same position share the identical, real, jornada-
+    # varying number, exactly as if a league-average man had filled in.
+    avg: dict[int, dict[str, tuple[float, float]]] = {}
+    for j, layer in per_jornada.items():
+        by_pos: dict[str, list[tuple[float, float]]] = {}
+        for k, (pts, p) in layer.items():
+            s = pos.get(k)
+            if s:
+                by_pos.setdefault(s, []).append((pts, p))
+        avg[j] = {s: (sum(v[0] for v in vs) / len(vs),
+                     sum(v[1] for v in vs) / len(vs))
+                 for s, vs in by_pos.items() if vs}
+
+    for m, sq in squads.items():
+        counts: dict[str, int] = {}
+        for slot in sq.values():
+            counts[slot] = counts.get(slot, 0) + 1
+        for s, n in SLOT_MIN.items():
+            short = n - counts.get(s, 0)
+            for i in range(short):
+                key = "__phantom_%s_%s_%d" % (m, s, i)
+                sq[key] = s
+                for j in per_jornada:
+                    if s in avg.get(j, {}):
+                        per_jornada[j][key] = avg[j][s]
+    return squads, per_jornada
+
+
 def club_key(raw, teams, xw=None) -> str:
     """One club, one key, whichever page spelled it — or "" if it will not
     place.
@@ -1770,10 +1853,17 @@ def load(trials_pool=None) -> Universe:
                  results=results_hist,
                  understat_rows=load_understat_players("2025")).items()}
     ppm_of = {k: s.ppm for k, s in scored.items() if s}
-    fc = Bootstrap(apply_fixtures(
-                       next_then_rest(base, base_rest, rem, played, club),
-                       sboard, club, pos, ppm_of),
-                  pool=pool, matches=matches,
+    per_j = apply_fixtures(
+        next_then_rest(base, base_rest, rem, played, club),
+        sboard, club, pos, ppm_of)
+    # A SQUAD SHORT A POSITION CANNOT BE SIMULATED, NOT SIMULATED
+    # PESSIMISTICALLY — see phantom_fill()'s own note. Every downstream
+    # consumer of `squads`/the forecaster (rank()'s screen and final
+    # passes, band_acts(), offer_combos(), sim._rival_best(), standings)
+    # reads from THESE two, patched once here, so nothing downstream
+    # needs its own copy of this fix.
+    squads, per_j = phantom_fill(squads, per_j, pos)
+    fc = Bootstrap(per_j, pool=pool, matches=matches,
                   club_of=club_of_slug, club_rel=club_rel)
 
     # What everybody has already scored, off the league table — five rows at
@@ -1818,6 +1908,37 @@ def load(trials_pool=None) -> Universe:
 
 def _selftest() -> None:
     from ffcore.forecast import Bootstrap as B
+
+    # -- phantom_fill(): a squad short a position gets ONE average-player
+    # stand-in per missing slot, not frozen at zero for the rest of the
+    # season -- 2026-09-01, Miguel: "the forecast for Albert is
+    # absolutely unsustainable... that's not possible unless he never
+    # again connects to the app" ------------------------------------
+    ph_sq = {"m": {"d1": "DEF", "d2": "DEF", "x1": "MED", "x2": "MED",
+                   "x3": "MED", "p1": "POR", "f1": "DEL"}}   # 2 DEF, short 1
+    ph_pos = {"d1": "DEF", "d2": "DEF", "other_def": "DEF",
+              "x1": "MED", "x2": "MED", "x3": "MED", "p1": "POR", "f1": "DEL"}
+    ph_per = {1: {"d1": (4.0, 1.0), "d2": (2.0, 0.5),
+                  "other_def": (6.0, 0.5), "x1": (3.0, 1.0)}}
+    new_sq, new_per = phantom_fill(ph_sq, ph_per, ph_pos)
+    phantom_keys = [k for k in new_sq["m"] if k.startswith("__phantom_")]
+    assert len(phantom_keys) == 1, phantom_keys          # short exactly 1 DEF
+    pk = phantom_keys[0]
+    assert new_sq["m"][pk] == "DEF", new_sq["m"]
+    # THE AVERAGE, NOT A GUESS: every REAL scored DEF's own real jornada-1
+    # (points, p_start), averaged — (4.0+2.0+6.0)/3 pts,
+    # (1.0+0.5+0.5)/3 p_start.
+    assert new_per[1][pk] == (4.0, (1.0 + 0.5 + 0.5) / 3), new_per[1][pk]
+    # RETURNS COPIES — a caller still holding the originals sees them
+    # untouched, so "was he short before the patch" stays answerable.
+    assert "__phantom_m_DEF_0" not in ph_sq["m"], ph_sq
+    assert pk not in ph_per[1], ph_per[1]
+    # A LEGAL SQUAD COMES BACK UNCHANGED — no phantom invented where
+    # nothing is missing.
+    legal_sq = {"m2": {"p1": "POR", "d1": "DEF", "d2": "DEF", "d3": "DEF",
+                       "x1": "MED", "x2": "MED", "x3": "MED", "f1": "DEL"}}
+    same_sq, _ = phantom_fill(legal_sq, ph_per, ph_pos)
+    assert same_sq == legal_sq, same_sq
 
     sq = {"k": "POR", **{f"d{i}": "DEF" for i in range(1, 5)},
           **{f"m{i}": "MED" for i in range(1, 6)}, "f1": "DEL", "bench": "MED"}

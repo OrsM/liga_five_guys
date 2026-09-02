@@ -1417,6 +1417,15 @@ def illegal_squads(u) -> list[tuple[str, list[str]]]:
     report.py already warns when MY OWN squad is thin (`have <= n`, a
     softer "one injury away" threshold) — that check has no reach into a
     RIVAL's squad, which is the gap this closes.
+
+    SHOULD NEVER FIRE IN PRODUCTION AS OF decide.phantom_fill()
+    (2026-09-01, same day): every squad `decide.load()` returns is
+    already patched with an average-player stand-in per missing
+    position before anything reaches here — see phantom_filled() below
+    for the caveat that replaced this one. Kept, not deleted: a real
+    safety net — if phantom_fill() ever regresses, THIS starts firing
+    again instead of the report silently going back to freezing someone
+    at zero with no signal anywhere.
     """
     from ffcore.score import SLOT_LABEL, SLOT_MIN
     from ffcore.season import XI_SIZE, best_xi
@@ -1440,6 +1449,33 @@ def illegal_squads(u) -> list[tuple[str, list[str]]]:
     return out
 
 
+def phantom_filled(u) -> list[tuple[str, list[str]]]:
+    """[(manager, ["1 defensa", ...])] for every squad — mine included —
+    decide.phantom_fill() patched with an average-player stand-in.
+
+    Detected off the phantom keys THEMSELVES
+    (`__phantom_<manager>_<slot>_<n>`, phantom_fill()'s own format), not
+    by re-checking best_xi() against SLOT_MIN — after phantom_fill(),
+    every squad IS legal by construction, so asking best_xi() again
+    would report nothing found, which answers a different question
+    ("is this squad legal now") than the one this caveat exists to
+    answer ("was a real gap patched to get there").
+    """
+    from ffcore.score import SLOT_LABEL
+
+    out = []
+    for m, sq in sorted(u.state.squads.items()):
+        counts: dict[str, int] = {}
+        for k, slot in sq.items():
+            if k.startswith("__phantom_%s_" % m):
+                counts[slot] = counts.get(slot, 0) + 1
+        if counts:
+            out.append((m, ["%d %s%s" % (n, SLOT_LABEL[s],
+                                        "" if n == 1 else "s")
+                           for s, n in sorted(counts.items())]))
+    return out
+
+
 def caveats(u) -> list[str]:
     """What the numbers above cannot see. Read off the data, not remembered.
 
@@ -1448,16 +1484,25 @@ def caveats(u) -> list[str]:
     nobody opens on a phone.
     """
     out = ["| Not modelled | Which way it bends the answer |", "|---|---|"]
+    for m, filled in phantom_filled(u):
+        out.append("| **%s's squad is short a position** (%s) | his real "
+                   "squad cannot field a legal eleven, so the SIMULATION "
+                   "stands in a league-average player at that spot — the "
+                   "same real per-jornada data every other player's "
+                   "number comes from, not an invented figure or a "
+                   "presumption he never fixes it (assuming he never "
+                   "would is the much stronger, much less plausible "
+                   "claim). His true squad may be stronger or weaker than "
+                   "an average man there once he actually buys one |"
+                   % (m, ", ".join(filled)))
+    # A SAFETY NET, NOT A SECOND CAVEAT — decide.phantom_fill() should
+    # make this structurally impossible; see illegal_squads()'s own note.
     for m, short in illegal_squads(u):
-        out.append("| **%s cannot field a legal eleven** (%s) | his "
-                   "simulated season is FROZEN at what he has already "
-                   "scored — best_xi() finds no legal shape to fill, so "
-                   "every remaining jornada adds exactly zero, with zero "
-                   "variance. Not a forecast of a weak season, a squad "
-                   "genuinely short a position right now — his real "
-                   "threat is understated, which flatters everyone else's "
-                   "standing, mine included |"
-                   % (m, ", ".join(short)))
+        out.append("| **%s cannot field a legal eleven** (%s) | this "
+                   "should not be possible — decide.phantom_fill() is "
+                   "meant to patch exactly this before it reaches here. "
+                   "His simulated season is FROZEN at what he has already "
+                   "scored until it is fixed |" % (m, ", ".join(short)))
     for j, clubs in sorted(u.part_played.items()):
         out.append("| Jornada %d is half played — %d clubs are done | their "
                    "points are already in `now`, so only the rest of the "
@@ -2510,6 +2555,30 @@ def _selftest() -> None:
     assert illegal_squads(u_noshape) == \
         [("me", ["not enough for any legal formation"])], \
         illegal_squads(u_noshape)
+
+    # -- phantom_filled(): detected off the phantom KEYS, not by re-
+    # running best_xi() -- 2026-09-01, Miguel: "the forecast for Albert
+    # is absolutely unsustainable" -------------------------------------
+    # 1 phantom + 2 real DEF, 5 MED, 2 DEL, 1 POR = 11, matching the real
+    # (3, 5, 2) formation exactly — not just meeting SLOT_MIN in isolation.
+    ph_sq = {"__phantom_riv_DEF_0": "DEF", "d1": "DEF", "d2": "DEF",
+            "m1": "MED", "m2": "MED", "m3": "MED", "m4": "MED", "m5": "MED",
+            "p1": "POR", "f1": "DEL", "f2": "DEL"}
+    u_phantom = Universe(
+        state=LeagueState({"me": legal_sq, "riv": ph_sq}, [1], "me"),
+        forecaster=Bootstrap({}), pos={}, price={}, proceeds={}, owner={},
+        cash=0.0, me="me")
+    assert phantom_filled(u_phantom) == [("riv", ["1 defensa"])], \
+        phantom_filled(u_phantom)
+    # ILLEGAL_SQUADS() DOES NOT FIRE HERE — the phantom key already makes
+    # this squad legal (3 DEF total), the exact "safety net stays quiet
+    # once the real fix is in place" property caveats() relies on.
+    assert illegal_squads(u_phantom) == [], illegal_squads(u_phantom)
+    assert "me" not in dict(phantom_filled(u_phantom))
+    ph_cav = "\n".join(caveats(u_phantom))
+    assert "riv's squad is short a position" in ph_cav, ph_cav
+    assert "1 defensa" in ph_cav, ph_cav
+    assert "this should not be possible" not in ph_cav, ph_cav
 
     # -- the phone ---------------------------------------------------------
     # The same numbers as data, because markdown cannot right-align a column
