@@ -1,7 +1,7 @@
 {
- "generated_at": "2026-09-02T15:08Z",
- "locks_in_h": 27.854351940555553,
- "cash": 28797872.311358795,
+ "generated_at": "2026-09-02T16:26Z",
+ "locks_in_h": 26.559783554444444,
+ "cash": 28797849.67963426,
  "cash_locked": 0,
  "squad_value": 232465156.0,
  "jornadas_left": 35,
@@ -45,7 +45,7 @@
      "days": 1
     }
    ],
-   "left": 17593051.311358795,
+   "left": 17593028.67963426,
    "answer": "Alfonso Herrero",
    "p_win_after": 0.317,
    "vs": "Magic Mike 333",
@@ -82,7 +82,7 @@
      "days": 1
     }
    ],
-   "left": 16330454.311358795,
+   "left": 16330431.679634258,
    "answer": "Matias Dituro",
    "p_win_after": 0.306,
    "vs": "Albert Laporta",
@@ -119,7 +119,7 @@
      "days": 12
     }
    ],
-   "left": 5219628.311358795,
+   "left": 5219605.679634258,
    "answer": "Kike Salas",
    "p_win_after": 0.3,
    "vs": "Magic Mike 333",
@@ -156,7 +156,7 @@
      "days": 14
     }
    ],
-   "left": 2985629.3113587946,
+   "left": 2985606.679634258,
    "answer": "Marcos Alonso",
    "p_win_after": 0.29,
    "vs": "BurtonGM89",
@@ -180,7 +180,7 @@
    "value": 0.5167858929254555,
    "chase": 2,
    "contest": [],
-   "left": 4307908.311358795,
+   "left": 4307885.679634258,
    "answer": null,
    "p_win_after": 0.287,
    "vs": "SusoGattuso",
@@ -217,7 +217,7 @@
      "days": 16
     }
    ],
-   "left": 1046036.3113587946,
+   "left": 1046013.6796342582,
    "answer": "Marcos Alonso",
    "p_win_after": 0.238,
    "vs": "SusoGattuso",
@@ -254,7 +254,7 @@
      "days": 2
     }
    ],
-   "left": 10988305.311358795,
+   "left": 10988282.679634258,
    "answer": "Marcos Alonso",
    "p_win_after": 0.234,
    "vs": "Albert Laporta",
@@ -291,7 +291,7 @@
      "days": 31
     }
    ],
-   "left": 19197909.311358795,
+   "left": 19197886.67963426,
    "answer": "Marcos Alonso",
    "p_win_after": 0.235,
    "vs": "Albert Laporta",
@@ -328,7 +328,7 @@
      "days": 7
     }
    ],
-   "left": 8720219.311358795,
+   "left": 8720196.679634258,
    "answer": "Marcos Alonso",
    "p_win_after": 0.223,
    "vs": "Albert Laporta",
@@ -352,7 +352,7 @@
    "value": 0.14255666078031703,
    "chase": null,
    "contest": [],
-   "left": 19976622.311358795,
+   "left": 19976599.67963426,
    "answer": null,
    "p_win_after": 0.269,
    "vs": "Magic Mike 333",
@@ -658,12 +658,12 @@
    "xpts": 9.83161733338818,
    "group": "save",
    "where": "Magic",
-   "money": -90834027.6886412,
+   "money": -90834050.32036574,
    "pts": 126.11282018266934,
    "pts_lo": 4.3159484290242744,
    "pts_hi": 404.90774455045675,
    "note": "short",
-   "value": 1.3883874071394915,
+   "value": 1.3883870612163356,
    "contest": [
     {
      "manager": "Albert Laporta",
@@ -734,15 +734,15 @@
     }
    },
    "by_route": {
-    "listed": {
-     "n": 17,
-     "now_best": 0.16796542625407085,
-     "beats_now": 0.9411764705882353
-    },
     "free": {
      "n": 16,
      "now_best": 2.0594320084950604,
      "beats_now": 0.5625
+    },
+    "listed": {
+     "n": 17,
+     "now_best": 0.16796542625407085,
+     "beats_now": 0.9411764705882353
     }
    },
    "helpful": 92,
@@ -790,7 +790,7 @@
    "hi": null,
    "beats_now": null,
    "helpful": 16,
-   "days": 0.2191049419675926,
+   "days": 0.16516459254629628,
    "opens": "02 Sep"
   }
  ],
@@ -821,7 +821,7 @@
    "mean": 1473.5897468801961,
    "lo": 1103.6919258283579,
    "hi": 1890.4804763054594,
-   "cash": 28797872.311358795,
+   "cash": 28797849.67963426,
    "cash_known": true,
    "p_above": null
   },
