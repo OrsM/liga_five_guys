@@ -285,6 +285,20 @@ def race(u, key: str) -> list[dict]:
     return [{"manager": m, "days": d} for m, d in decide.contest(u, key)]
 
 
+def short_manager(m: str) -> str:
+    """One manager's first name/word only — "Magic Mike 333" -> "Magic",
+    "SusoGattuso" unchanged (no space to split on).
+
+    THE SAME SHORTENING FOR EVERY MANAGER NAME ON THE LADDER, not just
+    race_cell()'s own rival — before this (Miguel, 2026-09-01: "the width
+    still not working"), the OWNER'S name in the Where column was printed
+    in full while only the rival racing him was shortened, so a row could
+    still read "Magic Mike 333 · Suso ~1d" — half-fixed. One function, so
+    the two never drift apart on how much to cut.
+    """
+    return m.split()[0] if m else m
+
+
 def race_cell(u, r: list[dict]) -> str:
     """race()'s own list in one short phrase, or "" for nothing to say.
 
@@ -295,9 +309,12 @@ def race_cell(u, r: list[dict]) -> str:
     if not r:
         return ""
     who, days = r[0]["manager"], r[0]["days"]
-    when = ("can pay today" if days <= 0
-            else "can pay in ~%d day%s" % (days, "" if days == 1 else "s"))
-    return "%s %s" % (who.split()[0], when)
+    # "today"/"~Nd", NOT "can pay today"/"can pay in ~N days" — the words
+    # "can pay" already sit in this file's own caveat table explaining the
+    # column; repeating them on every single row was most of this cell's
+    # own width (Miguel, 2026-09-01, the same complaint twice).
+    when = "today" if days <= 0 else "~%dd" % days
+    return "%s %s" % (short_manager(who), when)
 
 
 def ladder_rows(u, rows, bands=None, base=None) -> list[dict]:
@@ -374,16 +391,19 @@ def ladder_rows(u, rows, bands=None, base=None) -> list[dict]:
                 # real (both are — they are just two different players'
                 # money reaching the same man).
                 funder = won.get(action.buy)
-                if funder and funder["action"].sell != action.sell:
-                    sellers = funder["action"].sell
-                    if sellers:
-                        # SHORT, ON PURPOSE — the long form ("BUY row below
-                        # reaches him via X instead") broke the table's
-                        # width on a phone (Miguel, 2026-09-01). Same fact,
-                        # said in fewer words: who really pays for him.
-                        note += (" (real funder: %s)"
-                                % ", ".join(title_name(u.name.get(s, s))
-                                           for s in sellers))
+                if (funder and funder["action"].sell != action.sell
+                        and funder["action"].sell):
+                    # A SINGLE CHARACTER, NOT A CLAUSE — naming the real
+                    # funder inline ("BUY row below reaches him via X
+                    # instead", then "(real funder: X)") kept breaking the
+                    # table's width on a phone (Miguel, 2026-09-01, twice).
+                    # The fact still needs FLAGGING per row (a reader
+                    # cannot otherwise tell which "vs X" names match the
+                    # BUY list below and which don't), just not SPELLED
+                    # OUT per row — ladder()'s own closing paragraph
+                    # explains the asterisk once, in prose, where length
+                    # costs nothing.
+                    note += "*"
         return {"name": title_name(u.name.get(k, k)),
                 "pos": u.pos.get(k, ""), "start": u.start.get(k, 0.0),
                 "xpts": exp.get(k, 0.0), "group": group, "where": where,
@@ -428,7 +448,7 @@ def ladder_rows(u, rows, bands=None, base=None) -> list[dict]:
 
     def buy_cell(k, group):
         r = won[k]
-        return cell(k, group, u.owner.get(k) or "free agent",
+        return cell(k, group, short_manager(u.owner.get(k)) or "free agent",
                     -r["action"].net, r["d_pts"], value=r.get("value"),
                     lo=r.get("pts_lo"), hi=r.get("pts_hi"),
                     contest=race(u, k))
@@ -488,14 +508,14 @@ def ladder_rows(u, rows, bands=None, base=None) -> list[dict]:
         # toward is the exact case where "somebody else can pay it in two
         # days" turns a plan into a dead plan, and "nobody for a month"
         # turns a shortfall into a real option.
-        out.append(cell(k, "save", u.owner.get(k) or "free agent",
+        out.append(cell(k, "save", short_manager(u.owner.get(k)) or "free agent",
                         -short_by, save_pts, "short",
                         value=value_rate(save_pts, short_by),
                         contest=race(u, k)))
     for k in sorted((k for k in rest if k not in won
                      and u.price[k] <= u.cash + spare),
                     key=lambda k: -exp.get(k, 0.0)):
-        out.append(cell(k, "pass", u.owner.get(k) or "free agent",
+        out.append(cell(k, "pass", short_manager(u.owner.get(k)) or "free agent",
                         -u.price[k], None))
     return out
 
@@ -800,7 +820,12 @@ def ladder(u, rows, base, data=None) -> list[str]:
             "already applied. **€** is the cash you END UP with for doing that row, funding included — a SELL row is what it raises, a BUY row is that money minus what he costs — and "
             "on a SAVE row it is how far short you are. **Season** is "
             "simulated: extra points over the %d jornadas left, measured in "
-            "the same seasons with and without the move. **pts/M€** is "
+            "the same seasons with and without the move. A KEEP/SELL row's "
+            "\"vs X\" is that player's OWN best real alternative, which can "
+            "legitimately be funded by a DIFFERENT seller than the one "
+            "shown for X's own row further down — a `*` after the name "
+            "means exactly that, not an error: two different players' "
+            "money reaching the same man. **pts/M€** is "
             "Season points per million the move actually costs — not just "
             "whether it helps, but whether the price is worth it, so a big "
             "gain at a steep price and a small gain that is nearly free "
@@ -815,7 +840,10 @@ def ladder(u, rows, base, data=None) -> list[str]:
             "could pay that same buyout soonest, and when — a clause "
             "cannot be refused by ME or by THEM, so a man at a payable "
             "clause is not an option you hold, he is the first solvent "
-            "manager's. `can pay today` means the race is already on; a "
+            "manager's, shortened to his first name and `today`/`~Nd` — "
+            "the table is already wide on a phone, so this reads "
+            "\"Magic ~2d\", not \"Magic Mike 333 can pay in ~2 days\". "
+            "`today` means the race is already on; a "
             "number of days is an ESTIMATE off their balance (`~`, "
             "reconstructed), the app's 100K daily allowance, and the "
             "rate that manager has actually raised money at this season — "
@@ -3307,13 +3335,15 @@ def _selftest() -> None:
     # SAME BALANCE, SAME SQUAD, 20x THE WAIT — the distinction is the
     # measured rate and nothing else.
     assert r_race[1]["days"] == 20 * r_race[0]["days"], r_race
-    assert race_cell(ur, r_race) == "quick can pay in ~5 days", \
-        race_cell(ur, r_race)
+    assert race_cell(ur, r_race) == "quick ~5d", race_cell(ur, r_race)
     assert race_cell(ur, []) == ""                # nothing to say, say it
-    assert race_cell(ur, [{"manager": "quick", "days": 0}]) == \
-        "quick can pay today"
-    assert race_cell(ur, [{"manager": "quick", "days": 1}]) == \
-        "quick can pay in ~1 day"                 # not "1 days"
+    assert race_cell(ur, [{"manager": "quick", "days": 0}]) == "quick today"
+    assert race_cell(ur, [{"manager": "quick", "days": 1}]) == "quick ~1d"
+    # THE OWNER'S OWN NAME IS SHORTENED THE SAME WAY — short_manager(),
+    # not a second convention race_cell() alone follows.
+    assert short_manager("Magic Mike 333") == "Magic"
+    assert short_manager("SusoGattuso") == "SusoGattuso"   # no space to cut
+    assert short_manager("") == "" and short_manager(None) is None
 
     # -- ...and it reaches BOTH renderers off that ONE computation ----------
     # Same rule as the chase block above: one race(), two drawings of it.
@@ -3326,10 +3356,10 @@ def _selftest() -> None:
     got_r = next(r for r in lad_r if r["name"].lower() == "prize")
     assert got_r["contest"] == r_race, got_r
     md_r = "\n".join(ladder(ur, race_rows, st))
-    assert "quick can pay in ~5 days" in md_r, md_r
+    assert "quick ~5d" in md_r, md_r
     # Beside the owner in the SAME cell, not a new column — the table still
     # has exactly its eight.
-    assert "own · quick can pay in ~5 days" in md_r, md_r
+    assert "own · quick ~5d" in md_r, md_r
     assert md_r.splitlines()[0].count("|") == 9, md_r.splitlines()[0]
     pl_r = payload(ur, race_rows, st, ["own", "quick", "slow"])
     assert next(m for m in pl_r["moves"]
