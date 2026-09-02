@@ -1,7 +1,7 @@
 {
- "generated_at": "2026-09-02T09:43Z",
- "locks_in_h": 33.27170529638889,
- "cash": 28797869.450153936,
+ "generated_at": "2026-09-02T10:58Z",
+ "locks_in_h": 32.026921701944445,
+ "cash": 28797847.715130787,
  "cash_locked": 0,
  "squad_value": 232465156.0,
  "jornadas_left": 35,
@@ -45,7 +45,7 @@
      "days": 1
     }
    ],
-   "left": 17593048.450153936,
+   "left": 17593026.715130787,
    "answer": "Alfonso Herrero",
    "p_win_after": 0.317,
    "vs": "Magic Mike 333",
@@ -82,7 +82,7 @@
      "days": 1
     }
    ],
-   "left": 16330451.450153936,
+   "left": 16330429.715130787,
    "answer": "Matias Dituro",
    "p_win_after": 0.307,
    "vs": "Albert Laporta",
@@ -119,7 +119,7 @@
      "days": 12
     }
    ],
-   "left": 3664651.4501539357,
+   "left": 3664629.7151307873,
    "answer": "Kike Salas",
    "p_win_after": 0.299,
    "vs": "Magic Mike 333",
@@ -156,7 +156,7 @@
      "days": 14
     }
    ],
-   "left": 2985626.4501539357,
+   "left": 2985604.7151307873,
    "answer": "Marcos Alonso",
    "p_win_after": 0.288,
    "vs": "BurtonGM89",
@@ -180,7 +180,7 @@
    "value": 0.5167858929254555,
    "chase": 2,
    "contest": [],
-   "left": 4307905.450153936,
+   "left": 4307883.715130787,
    "answer": null,
    "p_win_after": 0.288,
    "vs": "SusoGattuso",
@@ -204,7 +204,7 @@
    "value": -0.1685197879982042,
    "chase": null,
    "contest": [],
-   "left": 18421645.450153936,
+   "left": 18421623.715130787,
    "answer": null,
    "p_win_after": 0.272,
    "vs": "BurtonGM89",
@@ -241,7 +241,7 @@
      "days": 16
     }
    ],
-   "left": 1046033.4501539357,
+   "left": 1046011.7151307873,
    "answer": "Marcos Alonso",
    "p_win_after": 0.238,
    "vs": "SusoGattuso",
@@ -278,7 +278,7 @@
      "days": 2
     }
    ],
-   "left": 10988302.450153936,
+   "left": 10988280.715130787,
    "answer": "Marcos Alonso",
    "p_win_after": 0.234,
    "vs": "Albert Laporta",
@@ -315,7 +315,7 @@
      "days": 31
     }
    ],
-   "left": 19197906.450153936,
+   "left": 19197884.715130787,
    "answer": "Marcos Alonso",
    "p_win_after": 0.234,
    "vs": "Albert Laporta",
@@ -352,7 +352,7 @@
      "days": 7
     }
    ],
-   "left": 8720216.450153936,
+   "left": 8720194.715130787,
    "answer": "Marcos Alonso",
    "p_win_after": 0.224,
    "vs": "Magic Mike 333",
@@ -378,7 +378,7 @@
    "pts": 33.05464302592463,
    "pts_lo": -80.44520777120852,
    "pts_hi": 177.64028298946323,
-   "note": "vs Nahuel Tenaglia — BUY row below reaches him via Ali Houary instead",
+   "note": "vs Nahuel Tenaglia (real funder: Ali Houary)",
    "value": null,
    "contest": []
   },
@@ -390,10 +390,10 @@
    "group": "keep",
    "where": "yours",
    "money": null,
-   "pts": -1282.0005737568051,
-   "pts_lo": -1755.0056748270688,
-   "pts_hi": -968.4691731189948,
-   "note": "vs Giuliano Simeone — BUY row below reaches him via Natan instead",
+   "pts": 24.296021167695017,
+   "pts_lo": -44.267523786197216,
+   "pts_hi": 136.3073394565631,
+   "note": "vs Alex Berenguer",
    "value": null,
    "contest": []
   },
@@ -658,12 +658,12 @@
    "xpts": 9.83161733338818,
    "group": "save",
    "where": "Magic Mike 333",
-   "money": -90834030.54984607,
+   "money": -90834052.28486921,
    "pts": 126.11282018266934,
    "pts_lo": 4.3159484290242744,
    "pts_hi": 404.90774455045675,
    "note": "short",
-   "value": 1.3883873634063137,
+   "value": 1.388387031189147,
    "contest": [
     {
      "manager": "Albert Laporta",
@@ -746,8 +746,8 @@
     }
    },
    "helpful": 91,
-   "pool": 597,
-   "note": "the market is modelled from 332 offers over 17 cycles, weighted by value^0.30, and only just — value^0.20 fits within 4.0% of it, so read the exponent as roughly this, not exactly this"
+   "pool": 596,
+   "note": "the market is modelled from 332 offers over 17 cycles, weighted by value^0.30, and only just — value^0.25 fits within 8.6% of it, so read the exponent as roughly this, not exactly this"
   },
   {
    "route": "watch",
@@ -761,22 +761,22 @@
     {
      "name": "Kylian Mbappe",
      "gain": 5.98147737847237,
-     "wait": 7.168912748503911
+     "wait": 7.158916464784909
     },
     {
      "name": "Joan Garcia",
      "gain": 5.636300489223659,
-     "wait": 8.688839533145185
+     "wait": 8.67682739867584
     },
     {
      "name": "Lamine Yamal",
      "gain": 5.424182631567167,
-     "wait": 7.384402928299331
+     "wait": 7.374120913544942
     },
     {
      "name": "Nicolas Pepe",
      "gain": 4.160091003783874,
-     "wait": 8.944176656563407
+     "wait": 8.93182578091227
     }
    ]
   },
@@ -790,7 +790,7 @@
    "hi": null,
    "beats_now": null,
    "helpful": 15,
-   "days": 0.44482799846064813,
+   "days": 0.39296201535879627,
    "opens": "02 Sep"
   }
  ],
@@ -821,7 +821,7 @@
    "mean": 1473.5116262113909,
    "lo": 1103.6919258283579,
    "hi": 1890.2185025790295,
-   "cash": 28797869.450153936,
+   "cash": 28797847.715130787,
    "cash_known": true,
    "p_above": null
   },
