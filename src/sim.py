@@ -377,7 +377,11 @@ def ladder_rows(u, rows, bands=None, base=None) -> list[dict]:
                 if funder and funder["action"].sell != action.sell:
                     sellers = funder["action"].sell
                     if sellers:
-                        note += (" — BUY row below reaches him via %s instead"
+                        # SHORT, ON PURPOSE — the long form ("BUY row below
+                        # reaches him via X instead") broke the table's
+                        # width on a phone (Miguel, 2026-09-01). Same fact,
+                        # said in fewer words: who really pays for him.
+                        note += (" (real funder: %s)"
                                 % ", ".join(title_name(u.name.get(s, s))
                                            for s in sellers))
         return {"name": title_name(u.name.get(k, k)),

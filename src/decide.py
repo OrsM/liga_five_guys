@@ -51,7 +51,7 @@ from ffcore.league import MARKET, api_key  # noqa: E402
 from ffcore.parse import fmt_money  # noqa: E402
 from ffcore.score import SLOT, SLOT_MIN, _calibrated  # noqa: E402
 from ffcore.text import norm  # noqa: E402
-from ffcore.season import (LeagueState, best_xi,  # noqa: E402
+from ffcore.season import (LeagueState, XI_SIZE, best_xi,  # noqa: E402
                            simulate_many)
 from ffcore.tidy import (run_now,  # noqa: E402
                          TIDY, SEASON, latest_only, load_api_market,  # noqa: E402
@@ -390,8 +390,44 @@ def _safe_to_sell(u: Universe, k: str, depth: dict[str, int]) -> bool:
     the caller as sales are chosen, so a chain that would sell two men
     from an already-thin position is caught even when either alone is
     safe.
+
+    PER-POSITION MINIMUMS ARE NOT ENOUGH ON THEIR OWN — SLOT_MIN's four
+    floors sum to 8 (1+3+3+1), but XI_SIZE is 11: a squad can clear
+    every position's own minimum individually and still not have enough
+    PLAYERS, TOTAL, to fill any of the 7 real formations, every one of
+    which uses more than the bare minimum somewhere. Confirmed live,
+    2026-09-01 (Miguel: "something wrong in the report"): best_swap_for()
+    chained four sales to fund one purchase — the result cleared DEF/MED/
+    POR/DEL's own SLOT_MIN individually (4/3/1/2) but totalled only 10
+    players, one short, and best_xi() correctly returned [] — scored as
+    a paired d_pts of roughly the ENTIRE season (-1282), the same
+    "meets every bound, matches no real formation" pathology already
+    found and fixed once today for a RIVAL's squad (illegal_squads(),
+    9ee9fdf) — this is the same bug reappearing on a HYPOTHETICAL sale
+    chain on Miguel's own squad, which `sum(depth.values())` (still
+    just `depth`, no new state) now also guards against here, catching
+    the actual failure mode observed. Does NOT catch the narrower case
+    illegal_squads()'s own self-test found (a squad at exactly 11 that
+    matches no real formation, e.g. DEF=3 paired with MED=3) — a full
+    fix would call best_xi() itself rather than count bounds at all, the
+    same principle applied there; not done here because this function is
+    called once per CANDIDATE sale inside a tight chain-building loop
+    (candidates()/best_swap_for()), and a real best_xi() search per
+    candidate is a cost worth avoiding for a case this narrow. If that
+    edge case is ever hit here too, that is the fix to reach for.
+
+    THE THRESHOLD IS `XI_SIZE`, NOT `XI_SIZE - 1` — every caller's own
+    chain ends in exactly ONE buy that restores a player, so the total
+    that matters is `depth` BEFORE this sale (what selling `k` would
+    leave, plus the one player still to come back). Got this wrong on
+    the first pass at this fix (used `depth - 1 < XI_SIZE`, effectively
+    demanding 12, not 11) and it broke an ordinary single-swap candidate
+    at a squad of exactly 11 — caught immediately by the existing
+    self-test for exactly that case.
     """
     slot = u.pos.get(k, "MED")
+    if sum(depth.values()) < XI_SIZE:
+        return False
     return depth.get(slot, 0) - 1 >= SLOT_MIN.get(slot, 0)
 
 
@@ -500,6 +536,16 @@ def candidates(u: Universe, expected: dict[str, float],
             for k, raises in free:
                 if price <= u.cash + got:
                     break
+                # A SALE THAT RAISES NOTHING SPENDS LEGALITY BUDGET FOR NO
+                # REASON — harmless before _safe_to_sell()'s own total-
+                # count guard (2026-09-01), since an extra sale cost
+                # nothing but itself; now every accepted sale narrows how
+                # many MORE the squad can safely afford to make, so one
+                # that raises $0 (an unpriced player — `u.proceeds`
+                # defaults to 0.0 when his value is unknown) must not be
+                # spent for nothing.
+                if raises <= 0:
+                    continue
                 if not _safe_to_sell(u, k, depth):
                     continue
                 depth[u.pos.get(k, "MED")] -= 1
@@ -961,6 +1007,11 @@ def best_swap_for(u: Universe, k: str, expected: dict[str, float]
     extra_running: list[float] = []
     got = 0.0
     for s, raises in chain:
+        # SAME GUARD AS candidates()'s OWN CHAIN, same reason — a sale
+        # raising $0 spends legality budget (_safe_to_sell()'s total-
+        # count guard) for nothing.
+        if raises <= 0:
+            continue
         if not _safe_to_sell(u, s, depth):
             continue
         depth[u.pos.get(s, "MED")] -= 1
@@ -2760,26 +2811,60 @@ def _selftest() -> None:
     assert not any(not a.sell for a in up_rows), up_rows   # not cash-alone
 
     # mid_big (19M): out of reach on cash plus ANY single spare (best single
-    # is me_d1 at 15M) — needs two, and the widened multi-sale chain (no
-    # dead weight to draw on here) reaches for weak starters instead of
-    # giving up.
-    big_rows = [a for a in acts3 if a.buy == "mid_big"]
-    assert big_rows, acts3
+    # is me_d1 at 15M) — needs two REAL sales. A SEPARATE, PADDED squad
+    # (sq3 plus one spare DEF) for this one check only — sq3 itself stays
+    # at exactly 11 (T0=11 can NEVER survive 2 sales for 1 buy: 11-2+1=10,
+    # under XI_SIZE — see _safe_to_sell()'s own note) and the
+    # best_swap_for() test right after this one depends on sq3's own
+    # DEF-at-the-floor arithmetic, which extra padding here would have
+    # thrown off if done in place.
+    sq3_pad = {**sq3, "me_pad": "DEF"}
+    per3_pad = {1: {**per3[1], "me_pad": (0.05, 1.0)}}   # weakest on the
+    # board, $0 proceeds — real dead weight (`dead_weight()` below), but
+    # SKIPPED outright by the funding chain for raising nothing
+    # (2026-09-01), so it spends none of the one extra body's legality
+    # headroom — the combo below is exactly the two REAL sales that close
+    # the 9M gap, not a wasted "free" one riding in front of them.
+    u3_pad = Universe(
+        state=LeagueState({"me": dict(sq3_pad)}, [1], "me"),
+        forecaster=B3(per3_pad),
+        pos={**sq3_pad, "mid_up": "MED", "mid_big": "DEL"},
+        price={"mid_up": 14e6, "mid_big": 19e6},
+        proceeds={"me_d1": 5e6, "me_m1": 4e6, "me_m2": 4e6},
+        owner={}, cash=10e6, me="me")
+    assert dead_weight(u3_pad) == [("me_pad", 0.0)], dead_weight(u3_pad)
+    big_rows = [a for a in candidates(u3_pad, u3_pad.forecaster.expected(1))
+               if a.buy == "mid_big"]
+    assert big_rows, big_rows
     combo = next((a for a in big_rows if len(a.sell) >= 2), None)
     assert combo is not None, big_rows
     assert set(combo.sell) <= {"me_d1", "me_m1", "me_m2"}, combo
     assert combo.proceeds >= 9e6, combo   # d1+m1 = 9M, exactly what 19M needs
     assert "me_k" not in combo.sell and "me_f1" not in combo.sell, combo
+    assert "me_pad" not in combo.sell, combo
 
     # -- best_swap_for(): the same widened chain, so a held player's own
     # band stops answering a narrower question than the main table --------
-    per3b = dict(per3[1])
-    per3b["riv_target"] = (7.0, 1.0)
+    # A SEPARATE, PADDED squad again (two extra MED this time, not DEF —
+    # the whole point of this test is DEF landing EXACTLY at its floor
+    # once me_d2 leaves, so padding DEF here would blunt the very guard
+    # being tested). me_d2's own sale plus BOTH weak midfielders (3 sells,
+    # 1 buy) needs T0 >= 13 to stay legal (11 - 3 + 1 = 9, under XI_SIZE
+    # otherwise) — sq3 itself (T0=11) stays untouched, same reasoning as
+    # the mid_big block above. Both padding players are skipped outright
+    # by the chain (raise $0), so each contributes pure headroom without
+    # ever being sold itself, and without changing which REAL players
+    # fund the purchase.
+    sq3b = {**sq3, "me_pad2": "MED", "me_pad3": "MED"}
+    per3b = {**per3[1], "riv_target": (7.0, 1.0),
+            "me_pad2": (0.05, 1.0), "me_pad3": (0.05, 1.0)}
+    state3b = LeagueState({"me": dict(sq3b)}, [1], "me")
     u3b = Universe(
-        state=u3.state, forecaster=B3({1: per3b}),
-        pos={**u3.pos, "riv_target": "DEF"},
-        price={**u3.price, "riv_target": 14e6},
-        proceeds=u3.proceeds, owner={}, cash=4e6, me="me")
+        state=state3b, forecaster=B3({1: per3b}),
+        pos={**sq3b, "riv_target": "DEF"},
+        price={"riv_target": 14e6},
+        proceeds={"me_d1": 5e6, "me_m1": 4e6, "me_m2": 4e6},
+        owner={}, cash=4e6, me="me")
     exp3b = u3b.forecaster.expected(1)
     # me_d2's own sale (no proceeds set -> 0.0) plus cash (4M) alone, and
     # the ONLY other extra funding available (me_m1/me_m2, 4M each — me_d1
@@ -2792,16 +2877,19 @@ def _selftest() -> None:
     # Give him a real proceeds figure — still short of 14M with cash alone,
     # and even his own sale plus BOTH weak midfielders is needed to reach it.
     u3c = Universe(
-        state=u3.state, forecaster=B3({1: per3b}),
-        pos={**u3.pos, "riv_target": "DEF"},
-        price={**u3.price, "riv_target": 14e6},
-        proceeds={**u3.proceeds, "me_d2": 3e6}, owner={}, cash=4e6, me="me")
+        state=state3b, forecaster=B3({1: per3b}),
+        pos={**sq3b, "riv_target": "DEF"},
+        price={"riv_target": 14e6},
+        proceeds={"me_d1": 5e6, "me_m1": 4e6, "me_m2": 4e6, "me_d2": 3e6},
+        owner={}, cash=4e6, me="me")
     exp3c = u3c.forecaster.expected(1)
     got3c = best_swap_for(u3c, "me_d2", exp3c)
     assert got3c is not None and got3c.buy == "riv_target", got3c
     assert "me_d2" in got3c.sell, got3c
     assert len(got3c.sell) > 1, got3c        # his own sale alone isn't enough
     assert "me_k" not in got3c.sell and "me_f1" not in got3c.sell, got3c
+    assert "me_pad2" not in got3c.sell, got3c   # $0, skipped outright
+    assert "me_pad3" not in got3c.sell, got3c
     assert got3c.proceeds == sum(u3c.proceeds.get(p, 0.0)
                                  for p in got3c.sell), got3c
 
