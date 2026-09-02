@@ -907,6 +907,52 @@ def column_guide_lines() -> list[str]:
 
     return [
         "### How to read the tables", "",
+        # THE LADDER AND THE LEAGUE TABLE, ADDED HERE 2026-09-01 — the two
+        # tables the board (decisions.json) and the site actually draw now,
+        # and the ONLY explanation of them that existed anywhere was two
+        # independent, hand-written copies that had already drifted apart:
+        # sim.py's own ladder() carried the full version in markdown nobody
+        # published reads, and src/pages/Fantasy.jsx on the site carried its
+        # own shorter, separately-worded rewrite of the same facts — the
+        # exact "two renderings of one answer" duplication this file's own
+        # column_guide_lines() was built on 2026-08-22 to stop, just never
+        # extended to the tables that replaced "Field these eleven"/"What
+        # to bid" as the actual daily board. One copy now; both renderers
+        # point here instead of carrying their own (Miguel: "do we need
+        # all that long long text? shouldn't it go somewhere else?").
+        "**The ladder** — one table, read top to bottom: a plan, not a "
+        "menu. The funding is implicit — sell the SELL rows and the BUY "
+        "rows are what the money reaches. `Start` is the probable-XI "
+        "read, recalibrated and blended, the same figure the forecast "
+        "multiplies by. `xPts/j` already has that applied. `€` is what "
+        "you end up with for doing that row, funding included — a SELL "
+        "row is what it raises, a BUY row is that money minus what he "
+        "costs, a SAVE row is how far short you are. `Season` is "
+        "simulated: extra points over the jornadas left, the same "
+        "seasons with and without the move — on a KEEP or SELL row, "
+        "\"without\" is his best REAL replacement, not nothing, so a "
+        "negative number there can still mean keep him: his own best "
+        "alternative costs more than he does, not that he scores less "
+        "than zero. A `*` on a KEEP/SELL row's \"vs X\" name means the "
+        "BUY list's own row for X is funded by somebody ELSE's sale, "
+        "not his — two different players' money legitimately reaching "
+        "the same man, not an error to reconcile. `pts/M€` is Season "
+        "per million actually spent — how CHEAPLY a gain arrived, not "
+        "how big it is, so read Season first: there are only eleven "
+        "starting shirts, and a tiny gain at a tiny price can still "
+        "carry a flattering rate. A dash means the move is net "
+        "cash-neutral-or-positive (nothing to divide by) or, on a SAVE "
+        "row, a shortfall nobody can act on yet. `Where` names who "
+        "holds him, and on a payable clause also the rival closest to "
+        "affording it — a first name and `today`/`~Nd`, an ESTIMATE "
+        "off their reconstructed balance, the app's daily allowance, "
+        "and how fast that manager has actually raised money this "
+        "season, never a prediction he actually wants the player.", "",
+        "**The league table** — `Pts` is the real league total today. "
+        "`Season` is the simulated total and its 10-90 band — a mean "
+        "with no band beside it reads as a prediction it is not. "
+        "`P(above)` is how often the simulation has you finish above "
+        "them.", "",
         "**Field these eleven** — `pts/m` is points per match, last "
         "season shrunk toward the average and blended with this season as "
         "it accrues (`~` = no record at all, the baseline is assumed). "
@@ -1356,8 +1402,15 @@ def _selftest() -> None:
     # -- column_guide_lines: the full explanation, moved here 2026-08-22 ---
     guide = "\n".join(column_guide_lines())
     for heading in ("Field these eleven", "What to bid", "Fitness",
-                   "Starting"):
+                   "Starting", "The ladder", "The league table"):
         assert heading in guide, heading
+    # THE CURRENT COLUMNS ACTUALLY NAMED, not just the section headings —
+    # 2026-09-01: two independent copies of this text (sim.py's ladder(),
+    # the site's Fantasy.jsx) had already drifted before this single copy
+    # replaced both; a test that only checked the heading existed would
+    # not have caught that.
+    for term in ("pts/M€", "vs X", "P(above)"):
+        assert term in guide, term
     # The live NEUTRAL_START/ABSENT_START numbers, not hand-typed duplicates
     # of them — this drifting from ffcore.score silently is exactly the
     # class of bug formula_lines() already guards against for the other

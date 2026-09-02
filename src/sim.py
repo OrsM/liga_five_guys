@@ -810,62 +810,20 @@ def ladder(u, rows, base, data=None) -> list[str]:
         out.append("| **PASS** | | | | | | | |")
         out += [row_md(r) for r in by_group["pass"]]
 
+    # ONE LINE, POINTING AT THE ONE COPY — this used to carry the full
+    # column-by-column explanation here, in markdown nothing publishes
+    # (digest.py's own docstring: these fragments are build artifacts,
+    # "nothing reads them, nothing publishes them"), while
+    # src/pages/Fantasy.jsx on the site carried its OWN separately-worded
+    # rewrite of the same facts — two copies, already drifted, for a
+    # document a reader could not even reach from here. Moved into
+    # methodology.py's column_guide_lines() 2026-09-01 (Miguel: "do we
+    # need all that long long text? shouldn't it go somewhere else?"),
+    # the one place both the markdown appendix (METHOD.md) and the site
+    # (linked from it) can point at instead of each carrying its own.
     out += ["",
-            "_Read it top to bottom: it is a plan, not a menu. The funding is "
-            "implicit — sell the SELL rows and the BUY rows are what the money "
-            "reaches. **Start** is one number, futbolfantasy recalibrated "
-            "against confirmed line-ups and blended with analiticafantasy "
-            "where it has an opinion, and it is the same figure the forecast "
-            "multiplies by. **xPts/j** is what he scores a jornada with that "
-            "already applied. **€** is the cash you END UP with for doing that row, funding included — a SELL row is what it raises, a BUY row is that money minus what he costs — and "
-            "on a SAVE row it is how far short you are. **Season** is "
-            "simulated: extra points over the %d jornadas left, measured in "
-            "the same seasons with and without the move. A KEEP/SELL row's "
-            "\"vs X\" is that player's OWN best real alternative, which can "
-            "legitimately be funded by a DIFFERENT seller than the one "
-            "shown for X's own row further down — a `*` after the name "
-            "means exactly that, not an error: two different players' "
-            "money reaching the same man. **pts/M€** is "
-            "Season points per million the move actually costs — not just "
-            "whether it helps, but whether the price is worth it, so a big "
-            "gain at a steep price and a small gain that is nearly free "
-            "read against each other rather than only against themselves. "
-            "`—` on a BUY row means the move is net cash-NEUTRAL-OR-"
-            "POSITIVE (the funding sales raise at least as much as the "
-            "buy costs) — there is no price to divide by, and Season "
-            "already says whether it is worth doing. On a SAVE row it is "
-            "the shortfall's own rate, which nobody can act on yet, only "
-            "plan toward. **Where** names who holds him, and on a target "
-            "whose buyout is payable today it also names the rival who "
-            "could pay that same buyout soonest, and when — a clause "
-            "cannot be refused by ME or by THEM, so a man at a payable "
-            "clause is not an option you hold, he is the first solvent "
-            "manager's, shortened to his first name and `today`/`~Nd` — "
-            "the table is already wide on a phone, so this reads "
-            "\"Magic ~2d\", not \"Magic Mike 333 can pay in ~2 days\". "
-            "`today` means the race is already on; a "
-            "number of days is an ESTIMATE off their balance (`~`, "
-            "reconstructed), the app's 100K daily allowance, and the "
-            "rate that manager has actually raised money at this season — "
-            "see the caveat below for what it does and does not assume. "
-            "This is "
-            "NOT the old λ (retired 2026-08-17): λ was measured against "
-            "your OWN current eleven off a ladder of the whole unowned "
-            "pool, so the same player was worth a different λ on "
-            "different days for reasons that had nothing to do with him. "
-            "This divides the SAME paired Season figure in the column "
-            "beside it — the same simulated seasons, with the move and "
-            "without it — so it only moves when the real trade-off does. "
-            "READ IT BESIDE SEASON, NEVER ALONE: there are only eleven "
-            "starting shirts, so a rate on its own cannot say whether a "
-            "move earns one. Season already prices that in — it is the "
-            "REAL simulated gain, picking the actual best eleven every "
-            "jornada, so a player who cannot break in shows up there as a "
-            "small or a zero, and a small Season figure at a tiny price "
-            "can still carry a flattering rate despite being a marginal "
-            "move. The rate says how CHEAPLY a gain arrived, not how BIG "
-            "it is — check Season first._"
-            % len(u.state.jornadas), ""]
+            "_How to read this table: **How to read the tables** in "
+            "METHOD.md._", ""]
     # ONLY WHEN THE SECTION IS THERE. A paragraph explaining a table that
     # is not on the page is the kind of standing prose this repo has
     # already had to delete once for reading as static.
