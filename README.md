@@ -1154,6 +1154,35 @@ differently-keyed ownership map is worse than none.
   (one exists today). DEFENSE stays real-goals-only — no bottom-up xG-
   against signal exists, that would need real opponent identity per
   match rather than summed player output.
+- **A clause race's priced Season/pts-per-M€ does not discount for
+  LOSING the race (2026-09-01, deliberately).** A row racing a fast
+  rival and a row nobody else can reach carry an identical Season
+  figure with very different odds of ever being the one you get — the
+  "can pay in ~N days" column is the only live signal for that. Not
+  folded into the number: researched first (Miguel asked whether
+  anyone modelling this kind of thing had already solved it) rather
+  than guessed — it maps onto **N-player preemption games** in
+  real-options economics, whose own answer is that losing costs the
+  NEXT-ranked row, not a fabricated win-probability, so there is
+  nothing to price that isn't already on the board. Would need real
+  bidding/race-outcome data (a logged case of losing a live race) to
+  ever sharpen further, not a rate this repo could invent.
+- **Constructing or checking a hypothetical squad composition has now
+  produced the same bug three times independently** — a squad (real
+  or hypothetical) can clear every position's own `SLOT_MIN` and still
+  not field any of the 7 real formations, because the minimums sum to
+  8 while `XI_SIZE` is 11 and not every bounds-legal combination is
+  one of the 7 (no formation pairs DEF=3 with MED=3). Hit for
+  `season.legal_shapes()` vs `score.formations()` (two independently-
+  derived authorities), for a rival's real squad going illegal
+  (`decide.illegal_squads()`), and for `best_swap_for()`'s own funding
+  chain selling enough of the squad to make ITSELF illegal
+  (`decide._safe_to_sell()`). Fixed each time it was actually hit;
+  `_safe_to_sell()`'s own narrower residual case (bounds-legal, right
+  total, still no matching formation) is knowingly unguarded — see its
+  own docstring. The standing rule: any new code answering "is this
+  squad legal" must call `season.best_xi()` itself, never re-derive a
+  bounds/count approximation, even for a check that looks simple.
 
 ## Roadmap
 

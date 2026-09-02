@@ -1,198 +1,279 @@
-# liga_five_guys — handoff, 2026-08-29
+# liga_five_guys — handoff, 2026-09-02
 
-One repo touched today: `liga_five_guys` (the model/pipeline). The phone
-renderer (`~/claude_projects/website`, `src/pages/Fantasy.jsx`) was not
-touched. Working tree clean (test-run artifacts in `data/decisions/`,
-`reports/METHOD.md` and `reports/decisions.json` are expected to show as
-modified after any local suite check — restore them the same way as ever,
-see "Standing method"). 103/103 `decide.py` self-test cases, 143/143
-`sim.py` — pushed at `24d2a8b`.
+Two repos touched: `liga_five_guys` (the model/pipeline, 13 commits) and
+`~/claude_projects/website` (the phone renderer, `src/pages/Fantasy.jsx`,
+3 commits, deployed live via `./deploy.sh`). Working tree clean (test-run
+artifacts in `data/decisions/`, `reports/METHOD.md` and
+`reports/decisions.json` are expected to show as modified after any local
+suite check — `git checkout --` those same paths, see "Standing method").
+145/145 `decide.py` self-test cases, 194/194 `sim.py`, plus
+`ffcore.{forecast,season,score,market}` and `methodology.py`/`digest.py`
+all green — pushed at `379a604` (liga_five_guys) / `7591928` (website).
 
 ## Start here
 
     cd ~/claude_projects/liga_five_guys && \
-      python src/decide.py --selftest && python src/sim.py --selftest
+      uv run --frozen python src/decide.py --selftest && \
+      uv run --frozen python src/sim.py --selftest
 
 Real numbers as of the last live run (`reports/decisions.json`, committed
-at `3f0c22d`, 2026-08-29T1400Z): cash **-2.64M** (balance 3.30M − 5.94M
-locked in 3 pending bids, all expiring tonight 22:24), squad value
-**256.42M**, expected finish **2.26**, `p_win` **0.30**. Verdict that run:
-**wait for the clauses** — 21 players' release clauses open today, worth
-+194 season points against +189 for the best buy available right now.
+at `f0b3041`, 2026-09-02T1825Z): cash **28.80M**. BUY was empty this run
+("free agents — none clear the bar today"); every real opportunity on the
+board was a rival's own player, correctly split between RAID (clause,
+real) and LISTED (his own choice, 0/119 ever).
+
+| Manager | now | simulated | 10–90 | P(above) |
+|---|--:|--:|--:|--:|
+| BurtonGM89 | 125 | 1,482 | 1,103–1,919 | 49% |
+| **miguel_autentico** | 135 | 1,474 | 1,104–1,890 | — |
+| SusoGattuso | 126 | 1,420 | 1,078–1,812 | 55% |
+| Magic Mike 333 | 132 | 1,283 | 909–1,725 | 69% |
+| Albert Laporta | 53 | 1,233 | 876–1,632 | 73% |
+
+Albert's row is real now, not a frozen 32-32 — see Thread 4.
 
 ## What today was, compressed
 
-Two threads, both starting from Miguel pushing back on what the report
-was actually doing, not from a self-directed audit.
+Every thread started from Miguel reading actual numbers on his phone and
+asking why they looked wrong, or from a swarm review he asked for
+directly — nothing here was self-directed audit for its own sake.
 
-### Thread 1: multi-sale funding (shipped 2026-08-28) is real but idle
+### Thread 1: the report/ranking layer, swarmed and fixed (`831911a`…`78d5eb7`)
 
-Miguel: *"I feel like this report is not going in the direction we
-discussed... we were looking at options where I say what if I sold these
-players to buy this other one etc. and I don't feel that this is being
-captured."* Checked rather than defended: `decide.candidates()`'s
-multi-sale funding (`b74accb`, yesterday) is live and correct — re-ran it
-against real data, 109 candidates, 0 needing more than one sale. Traced
-why: today's most expensive realistic target is ~€11.4M, and selling Omar
-El Hilali alone covers it. The feature works; today's market just doesn't
-need it. Not a bug, but genuinely surfaced by asking rather than assuming
-green tests meant the feature was doing anything on a given day.
+Miguel: *"the raid should focus on the clause impacted ones... I want to
+know if any free players are worth buying honestly"* plus *"why would
+having a clause... be a good thing?"* led to a 4-fork parallel review of
+`sim.py`/`decide.py`, then fixes:
 
-### Thread 2: ranking never optimized for value-for-money
+  * **`best_swap_for()`, `market_percentile()`, `_move_rank_key()` were
+    all price-blind in different ways** (`831911a`) — a KEEP row's "vs X"
+    picked by raw points not value; the market-quality percentile mixed
+    clause-route opportunities into a free-agent-only historical
+    baseline; a `d_win > 0` move could lead the whole BUY table on
+    win-probability alone even when its OWN premium-charged `d_pos` said
+    it was a net loss after the clause markup. Fixed by requiring
+    `d_pos > 0` alongside `d_win > 0` for the top tier, and by
+    route-matching both sides of the percentile comparison.
+  * **The phone's JSON still carried a `verdict` sentence deliberately
+    cut from the markdown** (`2c35cb1`) — the same "fix lands in one
+    renderer, not its sibling" shape this repo keeps finding. Dropped.
+    Also collapsed `wait_routes()` from 5 calls/report to 2 and
+    `market_model()` from 2 to 1.
+  * **"Act today" was a cheap linear estimate wearing the same column
+    header as the BUY table's real simulated number** (`fddb41b`) — now
+    reuses `rank()`'s own top real `d_pts`/band directly.
+  * **Clause-race risk research, not a guess** (`78d5eb7`) — Miguel
+    described the race's real mechanics unprompted (denial value, the
+    loser keeps his cash) and asked whether anyone modelling this kind of
+    thing had already worked it out. It maps onto **N-player preemption
+    games** in real-options economics: the loser's capital isn't
+    destroyed, only the option is, so losing a race costs the NEXT row on
+    the table, not the row's own figure — a fact already computed, no
+    fabricated win-probability needed. Caveat rewritten to say this.
 
-Miguel, pressed further: *"we make no effort to optimize value per
-euro."* Checked and found it half-true: `sim._best()` already re-picks the
-single "Do this" headline by value-for-money (`VALUE_TOLERANCE`), but (a)
-`decide.rank()`'s screening (`KEEP=12` + yesterday's `KEEP_RELIABLE_MIN`)
-is keyed purely on raw gain, so an efficient-but-modest candidate could be
-screened out before the expensive pass ever scores it, and (b)
-`sim.payload()`'s `moves` table — what the phone actually shows — sorted
-by raw gain only, with zero use of the already-computed `value` field.
-Researched best practice before building (fractional-knapsack: pure
-ratio-greedy alone is a known trap; fantasy-sports value-based drafting:
-screen on value-over-replacement, THEN rank survivors by efficiency) —
-Miguel confirmed "bar on gain, then rank by value," explicitly not pure
-ratio and explicitly not the status quo.
+### Thread 2: the forecasting engine, swarmed — the most consequential bug of the day (`ff64aa9`, `e762901`)
 
-**Shipped** (`24d2a8b`, test-driven — every new fixture confirmed to fail
-before its fix landed):
-  * `decide._top_up()` — one shared "ensure N candidates satisfying X reach
-    the final pass, on top, never displacing" helper, replacing
-    `KEEP_RELIABLE_MIN`'s bespoke inline block (refactored, verified
-    behavior-preserving against its own pre-existing test) and used again
-    for the new `KEEP_VALUE_MIN`.
-  * `KEEP_VALUE_MIN = 4` — tops up the screening survivors with the
-    best-by-efficiency candidates (genuine gain, genuine spend), computed
-    as a precomputed top-N-by-ratio SET, not a loose predicate — a first
-    draft used `d > 0 and net > 0` as `ok`, which is satisfied by nearly
-    every ordinary buy candidate and made the top-up a silent no-op.
-  * `sim.payload()`'s `moves` sort — bar at `MOVES_VALUE_FLOOR` (25% of
-    this run's best `d_pos`), rank above it by `value` (points/€M),
-    preserve the win-probability tier unchanged. Also exposed `value` in
-    the JSON itself — computed by `rank()` for every row since 2026-08-21
-    but never reaching the phone report before now.
-  * `sim._best()`: `pool[0]` → `max(pool, key=d_pos)` — it implicitly
-    assumed `rows` arrived sorted by raw gain, true only by accident.
+Same pattern, one layer down: a direct request to swarm-review the layer
+underneath the report led to a 4-fork review of
+`forecast.py`/`score.py`/`startprob.py`/`season.py`/`market.py`.
 
-**A false unification caught before shipping:** planned to merge
-`value_rate()`'s "genuine spend" guard with the new top-up's "genuine gain
-AND spend" check into one shared predicate. Would have broken an existing,
-correct test (`value_rate(0.0, 5e6) == 0.0` — `value_rate`'s only real
-guard is `cost <= 0`, gain sign is irrelevant to it). Dropped the forced
-merge rather than "fix" a passing test to match a wrong assumption.
+  * **The drift "random walk" was redrawing its position from cumulative
+    variance every jornada, not accumulating steps** (`ff64aa9`) — each
+    jornada got the right MARGINAL spread but ZERO correlation with the
+    jornada before it, undercutting the entire point of the feature
+    (persistent bias should compound, not partially cancel under the
+    CLT). Bug existed independently in BOTH `Bootstrap.rate_draw()` (pure
+    Python) and `season._run_np()` (the numpy path, the ACTUAL production
+    one). Fixed in both, verified with a new self-test that provably
+    discriminates old-vs-fixed behavior (adjacent-jornada correlation
+    >0.7 required; the old formula gave 0.41). Standings band visibly
+    widened after the fix.
+  * **Two independent formation-generators had diverged**
+    (`season.legal_shapes()` vs `score.formations()`) — the free-tier
+    case agreed by coincidence; `score.py`'s 5 premium formations violate
+    the bounds `legal_shapes()` derives from. Dormant (nothing requests
+    premium yet) but the exact "two authorities, kept in sync by luck"
+    pattern this repo keeps finding. One authority now.
 
-**A real test flakiness, found by verifying against the actual production
-runtime, not just the dev shell:** the `KEEP_VALUE_MIN` fixture passed
-every time under plain `python3` (no `numpy` installed on this box —
-falls back to a different RNG path) and failed under `uv run --frozen
-python` (this repo's real runtime, `numpy` 2.5.2 present) — same seed,
-different backend, a genuinely borderline gain margin landing on
-different sides of zero. Fixed by widening the margin, not by chasing one
-backend's numbers. **Lesson: `python3 script.py --selftest` alone is not
-sufficient verification for a change with any Monte Carlo sensitivity —
-run it through the actual `lfg-run`/`uv` path too before trusting green.**
+### Thread 3: free agents vs. a rival's own player — a real, separate ask (`a4e6d85`, `c250b80`)
 
-**Verified against real cached data** (`LFG_NO_FETCH=1 LFG_NO_COMMIT=1
-lfg-run`): headline, `expected_finish`, `p_win` all byte-identical to
-before the change. Every real candidate today is self-funding (net ≤ 0,
-selling Omar El Hilali raises more than any real target costs), so
-`value` is `None` throughout and there was nothing for the new ranking to
-differentiate — same "the mechanism is real, today's data doesn't
-exercise it" shape as Thread 1.
+Miguel: *"I want to know if any free players are worth buying honestly"*
+— the BUY section mixed free-agent and rival-owned targets in one
+value-ranked list with no way to tell "nothing free today" from "free
+options exist, a bigger raid outranked them." Split into three sections,
+same underlying sort, filtered not re-ranked: **BUY** (free agents, with
+an explicit "none clear the bar today" when empty), **RAID** (a clause —
+cannot be refused), **LISTED** (the owner's own choice — 0/119 real
+deals in this league have ever gone that way, stated in the heading
+itself). Checked against a real report mid-flight and caught that 3 RAID
+rows were actually LISTED — fixed the same day.
+
+### Thread 4: a degenerate squad silently froze its own forecast (`9ee9fdf`, `59076d6`)
+
+Miguel: *"the forecast for Albert is absolutely unsustainable"* — his
+standings row was a flat 32-32, 100% P(I finish above him). Root cause:
+Albert's real squad has 2 DEF against `SLOT_MIN`'s 3 — `best_xi()`
+correctly returns `[]`, scoring him zero forever. First fix (`9ee9fdf`)
+just flagged it. Miguel pushed back: *"you're saying he's going to make
+30 points and the rest are going to be worth a thousand... that's not
+possible."* Proper fix (`59076d6`, his own proposed shape — "assume he'll
+field the average player"): `decide.phantom_fill()`, called once in
+`load()`, patches any squad short of `SLOT_MIN` with one synthetic
+per-missing-slot entry valued at that position's real, per-jornada
+AVERAGE across every actual scored player there — not an invented
+number, not a specific real player (which would need hiding from the BUY
+list). `illegal_squads()` kept as a safety net that should never fire now
+— if it does, that's the real signal `phantom_fill()` itself broke.
+
+### Thread 5: a funding chain could make itself illegal (`1ef018d`)
+
+Miguel: *"something wrong in the report"* — Ali Houary's own KEEP-row
+band read Season **-1282**, nearly an entire season. `best_swap_for()`'s
+chain sold 4 players to fund one purchase; the result met every
+position's own `SLOT_MIN` individually but totalled 10 players, one
+short of `XI_SIZE` — the SAME "meets every bound, matches no real
+formation" pathology as Thread 2/4, this time on a HYPOTHETICAL sale
+chain. `_safe_to_sell()`'s docstring already claimed to guard this; it
+only checked per-position counts. Fixed by also requiring the squad's
+own running total stay ≥ `XI_SIZE`. Got the arithmetic wrong on the
+first pass (demanded one player too many) — caught immediately by an
+existing test for an ordinary single-swap. Also fixed a related
+inefficiency: both funding chains used to spend "legality budget" on
+$0-proceeds dead weight for no reason; both now skip it.
+
+### Thread 6 (website repo): the report didn't fit a phone, in three different ways
+
+Miguel: *"the report formatting is weird, table no longer fits in a
+single screen width"* — three separate causes, found by actually
+measuring in a headless browser at a real 390px viewport (Playwright,
+installed ad hoc from cached browser binaries — no project skill existed
+for this yet, worth building one) instead of guessing from character
+counts:
+
+  1. Markdown-side note text was verbose (`vs X — BUY row below reaches
+     him via Y instead`) — shortened twice, ending at a single `*`
+     marker with the explanation moved to prose.
+  2. The "Where" column's race text (`"Magic Mike 333 · SusoGattuso can
+     pay in ~1 day"`) was the REAL dominant width driver on ordinary
+     rows, pre-dating that day entirely — `short_manager()` added,
+     applied to both halves of the column; phrasing tightened to
+     `today`/`~Nd`.
+  3. The website's OWN font-size fix (Miguel's idea — "what if we make
+     the pix smaller") revealed a THIRD bug once actually screenshotted:
+     the browser's auto table-layout let the Season column's long note
+     steal width from Player, wrapping "Ali Houary"/"Your eleven" to two
+     lines. Fixed with `table-layout: fixed` and explicit column
+     percentages, checked with a script scanning every element's
+     `scrollWidth` against `clientWidth` — not just the table's own outer
+     width, which is what let the wrapped-name bug slip through the
+     first "looks fixed" report.
+
+### Thread 7: one column glossary, not two drifted copies (`379a604`, website `7591928`)
+
+Miguel, looking at the live page: *"do we need all that long long text?
+shouldn't it go somewhere else?"* Checking surfaced real duplication:
+`sim.py`'s `ladder()` carried the full column explanation in markdown
+nothing publishes; the website's `Fantasy.jsx` carried its own
+independently-worded rewrite, already drifted. `methodology.py`'s
+`column_guide_lines()` already existed for exactly this (built
+2026-08-22) but was never extended past the retired report.py-era tables
+it was built for. Added "The ladder"/"The league table" sections there;
+both renderers now link to it instead of carrying their own text.
+Verified the link actually navigates and the linked content renders, not
+just that the `<a>` tag exists.
 
 ## Priorities for next session
 
-### 1. The interactive what-if picker
+### 1. Clause-race risk still isn't priced into the ranking, deliberately
 
-The actual next ask, raised directly by Miguel after Thread 1/2: *"what
-would it look like"* to name specific players to sell and ask what that
-unlocks, rather than only ever seeing combos the system already decided
-to try automatically. Explicitly out of scope for today's change (kept it
-scoped to the ranking fix). Not yet designed in detail — a real planning
-session (Explore + Plan agents, like today's) should happen before writing
-code, but the shape discussed:
+Thread 1's research (preemption games) explains why NOT to fabricate a
+win-probability discount — but if real bidding/race-outcome data ever
+becomes available (a rival visibly losing a race, logged), revisit
+whether the caveat should become a real number.
 
-  * `decide.candidates(u, expected, budget=...)` already accepts an
-    explicit budget override — the hook this needs already exists. A
-    what-if query is: apply the named sale(s) to a COPY of the squad
-    (same shape as `apply()` does for a real `Action`), recompute
-    `cash + proceeds` as the budget, recompute `current_xi()`/`bar` off
-    the resulting squad (selling a starter changes who's in the XI, not
-    just the cash), then run `candidates()`/`rank()` fresh against that
-    hypothetical `Universe`.
-  * **Form factor is the open question, not the logic.** Miguel's entire
-    workflow is on his phone, checking the same static, precomputed
-    `decisions.json` twice a day — a CLI flag (`decide.py --what-if
-    "sell X, sell Y"`) is cheap to build (new entry point over existing
-    machinery, no new infra) but only usable at a terminal. A phone-side
-    picker matches where he'd actually use it, but the phone app currently
-    renders a STATIC precomputed JSON — no live backend to query on
-    demand — so that path needs actual new infrastructure (an endpoint
-    that runs `candidates()`/`rank()` on request), not just a new
-    rendering of existing data. Ask Miguel which matters more before
-    designing further: something usable today from wherever he is, or
-    getting the core query logic right first and deciding where to expose
-    it after.
-  * Whatever ships, it needs the SAME rigor as today's change:
-    test-driven, verified against real cached data via the actual `uv`
-    runtime (not just `python3`), and any Monte Carlo-sensitive fixture
-    given a wide enough margin to not flake across backends.
+### 2. `_safe_to_sell()`'s narrower residual gap
 
-### 2. Everything still open from the 2026-08-25 handoff
+Documented in its own docstring: a squad can clear every position's
+`SLOT_MIN` AND have `XI_SIZE` total players and STILL match no real
+formation (no formation pairs DEF=3 with MED=3, for instance).
+Deliberately not fixed — this function is called once per candidate
+inside a tight chain-building loop, and a real `best_xi()` search per
+candidate was judged not worth the cost for a case this narrow. If it is
+ever actually hit (a funding chain producing a real report anomaly the
+way Thread 5's did), that is the fix to reach for: call `best_xi()`
+itself, the same principle `illegal_squads()`/`phantom_fill()` already
+use.
 
-Fixture-difficulty coverage on the schedule join, `best_swap_for()`'s
-funding-chain reach (partially addressed by `b74accb`'s widened funding —
-worth re-checking whether the gap that priority named is now closed or
-just narrowed), the orphaned warnings computation, and everything still
-open from 2026-08-21 (xG/xA formula design, K/shrinkage revalidation,
-frozen-roster assumption, game-script correlation) — none touched this
-session, see git history for detail if picking one up.
+### 3. The `chromium-cli`/Playwright pattern for this box has no project skill yet
+
+Thread 6 needed a real browser to find real bugs (character-count math
+was actively misleading twice). Playwright installed ad hoc from
+`~/.cache/ms-playwright`'s cached binaries, driven with a
+`--host-resolver-rules` trick to satisfy `Fantasy.jsx`'s hostname gate
+and a temporary (reverted) `vite.config.js` `allowedHosts` edit to get
+past Vite's own host check. Worth writing up as a proper
+`/run-skill-generator` skill for this repo pair so the next session
+doesn't rediscover it.
+
+### 4. Everything still open from the 2026-08-29 handoff
+
+The interactive what-if picker (raised then, not touched since — still
+genuinely open, form factor still undecided: CLI flag vs. a live
+phone-side endpoint). `api_key()`'s migration onto `Crosswalk.resolve()`,
+`Crosswalk.merge()`'s O(n²) scan, `FIX_BAND`/`HOME_EDGE`/`MIN_POOL` still
+guessed, Pedro Diaz/Tete Morente ledger gap — none touched, see git
+history if picking one up.
 
 ## Standing method (carried forward + today's additions)
 
-  * **A number Miguel pushes back on is worth checking, not defending** —
-    both of today's threads started this way, same as every fix in the
-    2026-08-25 handoff.
-  * **Verify a Monte Carlo-sensitive change against the REAL runtime, not
-    just whichever Python happens to be on PATH.** This box's plain
-    `python3` lacks `numpy` and silently takes a different RNG fallback
-    than `uv run --frozen python` (the actual production path, `numpy`
-    2.5.2). A fixture that passes under one and not the other is not
-    "flaky" — it's under-margined; widen it rather than chase a specific
-    backend's numbers, and confirm stability under BOTH before trusting a
-    fixture, not just the one that happened to be handy while writing it.
-  * **A "shared guard" is only real if the tests agree it's the same
-    guard.** Before merging two conditions into one shared predicate,
-    check what each one is ACTUALLY tested to do — `value_rate()`'s
-    guard turned out to be spend-only (`value_rate(0.0, 5e6) == 0.0` is a
-    real, intentional, tested case), not gain-and-spend, and forcing them
-    together would have silently broken a correct test to satisfy an
-    assumption made before reading the test.
-  * **A predicate that's "true for almost everything" makes a top-up a
-    no-op, even with correct code.** `KEEP_VALUE_MIN`'s first draft
-    (`d > 0 and net > 0`) was logically defensible but practically always
-    satisfied by the natural top-KEEP already, so `have >= minimum` from
-    the start, every time — caught by writing the integration test before
-    trusting the mechanism, not by the unit test of `_top_up()` alone
-    (which only tests the bookkeeping, not whether a given `ok` is a
-    useful bookkeeping input).
-  * Everything from 2026-08-25's list still holds: check the mechanism
-    before trusting a big diff's direction; a broadened "already answered"
-    check needs the same scrutiny as a narrowed one; one points scale does
-    not imply one comparable pool; no manual polling wait-loops on top of
-    a harness that already notifies; `git push` by default once verified;
-    `git stash push -u -m "..." -- data/decisions reports/METHOD.md
-    reports/decisions.json` (stash, work, pop) or `git checkout --` those
-    same paths (used today, simpler when nothing else needs the working
-    copy in between) to keep pipeline-run noise out of a commit.
+  * **A number Miguel pushes back on is worth checking, not defending —
+    even (especially) the second time on the same area.** Most of
+    today's threads were a direct response to something Miguel read and
+    said looked wrong; the swarm reviews (Threads 1, 2) were the only
+    self-directed ones, and both were requested outright, not assumed.
+  * **Cosmetic fixes and structural fixes are not the same claim, and
+    Miguel will catch the difference.** Caught directly this session,
+    twice: relabeling/adding a caveat around an unchanged number is not
+    the same as fixing the number, and a caveat is sometimes still the
+    right call (no data to calibrate a real fix) — but say which one you
+    did, explicitly, per item, rather than let a batch report imply they
+    were all the same kind of fix.
+  * **"Meets every individual bound, matches no real combination" is now
+    a THREE-TIME-CONFIRMED failure class in this codebase** (formation
+    legality, twice independently, plus the funding-chain total-count
+    gap) — see `illegal_squads()`'s and `_safe_to_sell()`'s own
+    docstrings. Any new code constructing or evaluating a hypothetical
+    squad composition should call `best_xi()` itself, never re-derive a
+    bounds/count approximation of legality, even for a "simple" check.
+  * **When Miguel narrates the MECHANICS of a problem unprompted — not
+    "what should I do" but "here's how this actually works" — he is
+    usually pointing at a known class of problem worth researching, not
+    asking for an invented heuristic.** Confirmed twice this session
+    (clause-race → preemption games; "assume the average player" was
+    already the right shape for the phantom-fill design, simpler than
+    the specific-real-player alternative first considered).
+  * **A "looks fixed" report needs the SAME rigor as the original bug
+    report — re-measure, don't re-eyeball.** The Thread 6 width fix was
+    declared done twice before it actually was; both times the mistake
+    was checking the table's own outer `scrollWidth` (or a screenshot
+    glance) instead of scanning every element inside it. The fix that
+    actually held was a script checking `scrollWidth > clientWidth` on
+    every element, run again after every subsequent change.
+  * Everything from 2026-08-25/2026-08-29's lists still holds: check the
+    mechanism before trusting a big diff's direction; verify a Monte
+    Carlo-sensitive change against `uv run --frozen python`, never plain
+    `python3` (no `numpy`, silently different RNG fallback); `git push`
+    by default once verified; `git checkout -- data/decisions
+    reports/METHOD.md reports/decisions.json` (or `git stash push -u`)
+    to keep pipeline-run noise out of a commit.
 
 ## Also open, untouched, lower priority
 
 Carried forward unverified — not re-checked this session:
 
   * `api_key()`'s remaining migration onto `Crosswalk.resolve()`.
-  * `Crosswalk.merge()`'s O(n²) identifier scan (was 73ms at n=654 as of
-    2026-08-21).
-  * `FIX_BAND`/`HOME_EDGE`/`MIN_POOL` — still guesses/blocked on match
-    volume as of 2026-08-21.
-  * Pedro Diaz / Tete Morente ledger gap — small, self-resolving.
+  * `Crosswalk.merge()`'s O(n²) identifier scan.
+  * `FIX_BAND`/`HOME_EDGE`/`MIN_POOL` — still guesses/blocked on match volume.
+  * Pedro Diaz / Tete Morente / Abde Ezzalzouli ledger gaps — small,
+    self-resolving, unrelated to Thread 4 (checked: none of the three are
+    defenders, so none explain Albert's real squad gap).
