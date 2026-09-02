@@ -2074,3 +2074,16 @@ observed_at,hours_to_lock,formation,index_total,player,pos,slot,start_pct,start_
 2026-09-02T1824Z,24.6,4-5-1,45.74,Moi Gomez,mediocampista,MED,70,read,ok,0,2318343,3.608,1,5.023,0.930,Alaves,0,2,3.878,attack_defense,17.8,841
 2026-09-02T1824Z,24.6,4-5-1,45.74,Alvaro Mantilla,defensa,DEF,90,read,ok,1,2109275,3.967,1,3.195,1.274,Rayo Vallecano,0,3,3.113,attack_defense,-45.6,10336
 2026-09-02T1824Z,24.6,4-5-1,45.74,Ali Houary,delantero,DEL,40,read,ok,0,1539192,1.622,0,3.119,1.017,Real Sociedad,1,2,1.595,attack_defense,-75.8,14118
+2026-09-02T2243Z,20.3,4-5-1,45.74,Iñigo Vicente,delantero,DEL,90,read,ok,1,25498996,4.486,1,5.470,0.894,Rayo Vallecano,0,3,5.020,attack_defense,-45.6,6442
+2026-09-02T2243Z,20.3,4-5-1,45.74,Pepelu,mediocampista,MED,80,read,ok,0,9943249,3.294,1,4.530,0.809,Barcelona,1,3,4.071,attack_defense,-259.4,2715
+2026-09-02T2243Z,20.3,4-5-1,45.74,Carl Starfelt,defensa,DEF,50,read,ok,0,10543326,2.726,1,4.794,1.003,Real Sociedad,0,1,2.717,attack_defense,-22.0,9612
+2026-09-02T2243Z,20.3,4-5-1,45.74,Omar El Hilali,defensa,DEF,80,read,ok,0,12497662,3.509,1,3.308,1.167,Sevilla,1,3,3.006,attack_defense,-13.4,10220
+2026-09-02T2243Z,20.3,4-5-1,45.74,Lucien Agoume,mediocampista,MED,80,read,ok,0,7026183,3.694,1,3.962,1.006,Espanyol,0,3,3.672,attack_defense,13.4,7249
+2026-09-02T2243Z,20.3,4-5-1,45.74,Ionut Radu,portero,POR,90,read,ok,0,34749017,6.385,1,6.531,1.003,Real Sociedad,0,3,6.363,attack_defense,-22.0,5978
+2026-09-02T2243Z,20.3,4-5-1,45.74,Pablo Fornals,mediocampista,MED,80,read,ok,0,56480683,3.972,1,6.851,0.675,Real Madrid,1,2,5.880,attack_defense,-178.5,2632
+2026-09-02T2243Z,20.3,4-5-1,45.74,Marcos Alonso,defensa,DEF,90,read,ok,0,26655881,5.534,1,5.947,1.003,Real Sociedad,0,2,5.515,attack_defense,-22.0,4397
+2026-09-02T2243Z,20.3,4-5-1,45.74,Miguel Roman,mediocampista,MED,80,read,ok,0,7182033,4.567,1,5.522,0.938,Real Sociedad,0,2,4.867,attack_defense,-22.0,13808
+2026-09-02T2243Z,20.3,4-5-1,45.74,Natan,defensa,DEF,80,read,ok,0,34301615,2.681,0,4.927,0.651,Real Madrid,1,2,4.119,attack_defense,-178.5,11813
+2026-09-02T2243Z,20.3,4-5-1,45.74,Moi Gomez,mediocampista,MED,70,read,ok,0,2521782,3.609,1,5.024,0.930,Alaves,0,2,3.879,attack_defense,17.8,841
+2026-09-02T2243Z,20.3,4-5-1,45.74,Alvaro Mantilla,defensa,DEF,90,read,ok,1,2078023,3.967,1,3.195,1.274,Rayo Vallecano,0,3,3.113,attack_defense,-45.6,10336
+2026-09-02T2243Z,20.3,4-5-1,45.74,Ali Houary,delantero,DEL,40,read,ok,0,1493297,1.622,0,3.119,1.017,Real Sociedad,1,2,1.595,attack_defense,-75.8,14118
