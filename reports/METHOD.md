@@ -1,4 +1,4 @@
-# Liga Five Guys — how the numbers are made — 2026-09-03 22:44 UTC
+# Liga Five Guys — how the numbers are made — 2026-09-04 05:08 UTC
 
 
 
@@ -9,31 +9,31 @@ _`~` marks an estimate — a rate times jornadas left, not a simulation — for 
 
 | Route | What it offers | Season pts | Beats acting today |
 |---|---|--:|--:|
-| **Act today** | 54 players you can buy now | +52 (-26–+179) | — |
-| Wait for the market | a week of new offers | ~+100 | 33% |
-| Wait for the clauses | 20 players on 04 Sep | ~+100 | — |
+| **Act today** | 53 players you can buy now | +42 (-52–+171) | — |
+| Wait for the market | a week of new offers | ~+95 | 33% |
+| Wait for the clauses | 20 players on 04 Sep | ~+95 | — |
 
 | The workings | |
 |---|--:|
-| Unowned players who would improve your eleven | 130 of 607 |
-| Tenth percentile of a week's waiting | +0.65 |
+| Unowned players who would improve your eleven | 116 of 607 |
+| Tenth percentile of a week's waiting | +0.77 |
 | Market model | the market is modelled from 376 offers over 20 cycles, weighted by value^0.35, and only just — value^0.30 fits within 10.1% of it, so read the exponent as roughly this, not exactly this |
-| Locked players who would improve your eleven | 16 |
+| Locked players who would improve your eleven | 15 |
 | Their clauses open | 04 Sep, in about 1 days |
 
 | Nobody is offering | Would add | Likely wait |
 |---|--:|--:|
-| Joan Garcia | +6.71 | 8 days |
-| Kylian Mbappe | +6.60 | 7 days |
-| Lamine Yamal | +6.07 | 7 days |
-| Nicolas Pepe | +4.77 | 9 days |
+| Joan Garcia | +6.54 | 8 days |
+| Kylian Mbappe | +6.44 | 7 days |
+| Lamine Yamal | +5.90 | 7 days |
+| Nicolas Pepe | +4.61 | 9 days |
 
 
 ## What the simulation cannot see
 
 | Not modelled | Which way it bends the answer |
 |---|---|
-| A buyout premium is charged at **0.000 places per million**, the median of every run that has measured it — today's own reading is 0.000 | a clause runs a median 1.52× market value here and the app pays back only the value, so the premium is gone for good. It is charged against the move, but priced off what more money would buy you today — most days, very little |
+| A buyout premium is charged at **0.000 places per million**, the median of every run that has measured it — today's own reading is 0.001 | a clause runs a median 1.52× market value here and the app pays back only the value, so the premium is gone for good. It is charged against the move, but priced off what more money would buy you today — most days, very little |
 | "Your eleven" (top of the ladder) compares only the NEXT jornada, off real confirmed lineups/injuries | the standings table below simulates the other 34 jornadas too, where nobody has lineup news yet and squad value dominates — the two can point opposite ways (this week's confirmed news vs. the season's average squad quality) without either being wrong |
 | Beyond the next jornada, P(start) reverts to his own season-standing rate | a suspension or a knock is dated to the match it was announced for — nothing here predicts a FUTURE one not yet known, e.g. who gets injured in March |
 | Rivals never transfer | a steal that guts a squad assumes its manager does not simply buy someone back — flatters the steal |
@@ -54,23 +54,23 @@ _`~` marks an estimate — a rate times jornadas left, not a simulation — for 
 
 | | Table | What it is used for | Fetched from | Rows | Newest row | Fetching |
 |---|---|---|---|--:|---|---|
-| 🟢 | api_activity | every transfer, which is what the ledger replays — one row per deal, so the newest is the last deal and not the last sweep | LaLiga Fantasy API | 138 | 03 Sep 22:06 | fetched 1 minute ago |
-| 🟢 | api_leagues | your cash and the league's id | LaLiga Fantasy API | 148 | 03 Sep 22:43 | fetched 1 minute ago |
-| 🟢 | api_lineup | the eleven you have actually fielded, and the formation the app says you are playing | LaLiga Fantasy API | 1,375 | 03 Sep 22:43 | fetched 1 minute ago |
-| 🟢 | api_market | what is on offer, and the bids on it | LaLiga Fantasy API | 4,457 | 03 Sep 22:43 | fetched 1 minute ago |
-| 🟢 | api_players | names for players nobody owns any more — one row per player, first sighting kept | LaLiga Fantasy API | 106 | 03 Sep 22:06 | fetched 38 minutes ago |
-| 🟢 | api_standings | the league table — position, points, squad value, and your balance | LaLiga Fantasy API | 740 | 03 Sep 22:43 | fetched 1 minute ago |
-| 🟢 | api_stats | what the app scored each player, broken into what he did — one row per player per week per stat, a correction being a later row rather than an overwrite | LaLiga Fantasy API | 5,598 | 03 Sep 22:06 | fetched 1 minute ago |
-| 🟢 | api_teams | all five squads | LaLiga Fantasy API | 10,450 | 03 Sep 22:43 | fetched 1 minute ago |
+| 🟢 | api_activity | every transfer, which is what the ledger replays — one row per deal, so the newest is the last deal and not the last sweep | LaLiga Fantasy API | 138 | 03 Sep 22:06 | fetched 2 minutes ago |
+| 🟢 | api_leagues | your cash and the league's id | LaLiga Fantasy API | 149 | 04 Sep 05:06 | fetched 2 minutes ago |
+| 🟢 | api_lineup | the eleven you have actually fielded, and the formation the app says you are playing | LaLiga Fantasy API | 1,386 | 04 Sep 05:06 | fetched 2 minutes ago |
+| 🟢 | api_market | what is on offer, and the bids on it | LaLiga Fantasy API | 4,483 | 04 Sep 05:06 | fetched 2 minutes ago |
+| 🟢 | api_players | names for players nobody owns any more — one row per player, first sighting kept | LaLiga Fantasy API | 106 | 03 Sep 22:06 | fetched 7 hours ago |
+| 🟢 | api_standings | the league table — position, points, squad value, and your balance | LaLiga Fantasy API | 745 | 04 Sep 05:06 | fetched 2 minutes ago |
+| 🟢 | api_stats | what the app scored each player, broken into what he did — one row per player per week per stat, a correction being a later row rather than an overwrite | LaLiga Fantasy API | 5,598 | 03 Sep 22:06 | fetched 2 minutes ago |
+| 🟢 | api_teams | all five squads | LaLiga Fantasy API | 10,518 | 04 Sep 05:06 | fetched 2 minutes ago |
 | ⚪ | clubs | the same, for clubs | src/crosswalk.py | 20 | — | rebuilt every run from the tables above |
-| 🟢 | elo | team strength, which ranks the fixture term | clubelo.com | 2,600 | 03 Sep 22:43 | fetched 12 hours ago |
-| 🟢 | fixtures | who plays whom next, for the fixture term | analiticafantasy.com | 2,086 | 03 Sep 22:43 | fetched 12 hours ago |
-| 🟢 | lineups | probable XI percentages, both sources | analiticafantasy.com, futbolfantasy.com ×40 | 121,597 | 03 Sep 22:43 | fetched 4 hours ago |
-| 🟢 | market | price, value, position, fitness — every player in the game | futbolfantasy.com | 120,359 | 03 Sep 22:43 | fetched 1 minute ago |
-| 🟢 | matches | fixtures, kickoffs, results | futbolfantasy.com | 57,380 | 03 Sep 22:43 | fetched 12 hours ago |
+| 🟢 | elo | team strength, which ranks the fixture term | clubelo.com | 2,620 | 04 Sep 05:06 | fetched 2 minutes ago |
+| 🟢 | fixtures | who plays whom next, for the fixture term | analiticafantasy.com | 2,096 | 04 Sep 05:06 | fetched 2 minutes ago |
+| 🟢 | lineups | probable XI percentages, both sources | analiticafantasy.com, futbolfantasy.com ×40 | 122,287 | 04 Sep 05:06 | fetched 2 minutes ago |
+| 🟢 | market | price, value, position, fitness — every player in the game | futbolfantasy.com | 121,032 | 04 Sep 05:06 | fetched 2 minutes ago |
+| 🟢 | matches | fixtures, kickoffs, results | futbolfantasy.com | 57,760 | 04 Sep 05:06 | fetched 2 minutes ago |
 | ⚪ | players | the crosswalk: one key per player across all four spellings | src/crosswalk.py | 717 | — | rebuilt every run from the tables above |
-| 🟢 | points | realised points per jornada, the actuals in every table below | futbolfantasy.com | 914 | 01 Sep 07:30 | fetched 1 minute ago |
-| 🟢 | starters | confirmed elevens, which is what P(start) is graded on | futbolfantasy.com | 88,545 | 03 Sep 22:43 | fetched 3 days ago |
+| 🟢 | points | realised points per jornada, the actuals in every table below | futbolfantasy.com | 914 | 01 Sep 07:30 | fetched 2 minutes ago |
+| 🟢 | starters | confirmed elevens, which is what P(start) is graded on | futbolfantasy.com | 89,936 | 04 Sep 05:06 | fetched 3 days ago |
 
 ### The model, as configured right now
 
