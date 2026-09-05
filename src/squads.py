@@ -17,9 +17,9 @@ Writes:
 watchlist.md went on 2026-08-18, with the board. It re-listed the slate with
 a value and two probable-XI columns, under a heading that promised "everyone
 unowned, ranked" — and after the cutover the ranking of everyone acquirable,
-free agents and rivals' players alike, is the one table on the board. What was
-genuinely only there is the FF/AF disagreement, which is now a column of the
-bid table in latest.md, next to the player it would change your mind about.
+free agents and rivals' players alike, is sim.py's BUY/RAID/LISTED table.
+report.py's own bid table (the FF/AF disagreement column) was deleted
+2026-09-05 once it was confirmed nothing read the file it wrote.
 
 Run via workflow_dispatch. No arguments.
 

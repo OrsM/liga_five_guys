@@ -82,14 +82,17 @@ def table(me: str | None = None) -> list[dict]:
     """One real row per player you own. `me` picks the manager; the
     league's own config default is used when it is omitted."""
     import decide
-    from ffcore.league import League
+    from ffcore.model import session
 
     u = decide.load()
     me = me or u.me
     players = load_players()
     last = _last_season()
     cur = _this_season()
-    min_start = League.load(with_market=False).cfg.min_start
+    # ONE League PER RUN — see ffcore/model.py. u = decide.load() has
+    # already warmed the same session(); a second League.load() here
+    # rebuilt a duplicate model just to read one config field.
+    min_start = session().lg.cfg.min_start
 
     rows = []
     for key in u.state.squads.get(me, {}):

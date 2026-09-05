@@ -259,8 +259,7 @@ def suggest(value, prem: Premiums | None, cash=None,
     return Advice(low, high, why)
 
 
-def gain(pool: dict, candidate: dict, base_total: float,
-         premium: bool = False):
+def gain(pool: dict, candidate: dict, base_total: float):
     """XI index gained by owning `candidate`, or None if he can never start.
 
     Negative is a real answer: it means the best XI containing him is worse
@@ -274,7 +273,7 @@ def gain(pool: dict, candidate: dict, base_total: float,
     trial = {k: list(v) for k, v in pool.items()}
     trial.setdefault(slot, []).append(candidate)
     trial[slot].sort(key=lambda p: p["score"], reverse=True)
-    best = pick_xi(trial, force=candidate, premium=premium)
+    best = pick_xi(trial, force=candidate)
     return None if best is None else best[0] - base_total
 
 

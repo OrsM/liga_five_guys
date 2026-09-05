@@ -1,86 +1,35 @@
 """
-report.py — daily decision report, written as markdown into the repo.
-
-Renders in the GitHub mobile app, so it's readable anywhere with no hosting.
-Run after ingest.py parse.
+report.py — the squad's own bookkeeping: warnings, the recommendation log,
+and the notification surface. Run after ingest.py parse.
 
     python src/report.py
 
-ONE TABLE, ONE METRIC. The board is the report: every asset you could hold —
-your players, today's slate, and the cash — gets one row, priced in points of
-index above REPLACEMENT LEVEL per million euros, and sorted. The cash row is
-dropped in at the rate idle money can actually earn today, and that position is
-the line: above it an asset beats the money, below it the money beats the asset.
+NOT A REPORT ANY MORE. This used to render a markdown board — one table,
+one metric, points above replacement per million — plus five sections of
+workings under it (field these eleven, buy today, fitness, starting splits).
+sim.py's simulated ladder replaced all of that on 2026-08-18/08-22: it prices
+every real move against the actual rest of the season instead of a static
+replacement level, so the board here became a second, weaker answer to the
+same question, computed and written to `.runtime/parts/latest.md` every run
+for nobody — digest.py stopped stitching it into the appendix on 2026-08-22,
+and the phone has only ever read sim.py's decisions.json. Deleted 2026-09-05
+once that was confirmed (grepped every reader; there were none).
 
-Everything else is the workings, and every one of them is a presentation of the
-board's rows rather than a second opinion about them:
+What is left, and genuinely still runs every day:
 
-    1. Field these eleven          your marks against the model's, and the swaps
-    2. Buy today                   the board's buy rows, plus what to bid
-    3. What you give up            the basket the line was measured off
-    4. Sell these                  the board's bench rows, plus what a sale pays
-    5. Exceptions                  fitness, and where the two XI sources split
+  * WARNINGS — a stale feed, a thin position, an unmodelled player, a
+    crosswalk clash, an unrecorded cash balance. Written to
+    `.runtime/warnings.json`, which sim.py's own _warnings() folds into
+    decisions.json — this is the ONLY place these facts are produced.
+  * ALERTS — the same warnings, filtered to what is worth interrupting
+    someone for, plus a login nudge when the league token is expiring.
+  * squad_log.csv — one row per player per snapshot, so a scorer can later
+    ask what the model's own pick would have cost you, once jornadas exist
+    to grade it against.
 
-THIS REPLACED λ. λ was points per million measured against YOUR CURRENT ELEVEN,
-off a ladder built from the whole unowned pool. Two things were wrong with it,
-and both are the same thing: the baseline moved. The same player was worth
-different amounts on consecutive days for reasons that had nothing to do with
-him, and the ladder priced a market you cannot shop in — which is how the report
-came to hold a man on the board and sell him three tables later, in the same
-unit. Replacement level is fixed by the rules (five squads, and the shapes each
-can legally field), so it cannot move when your eleven does. Before λ, the buy
-rule was `gain > 0` — which bought any upgrade at any price — and there was no
-sell rule at all, only a €/pt column with no threshold under it.
-
-A VERDICT NEEDS A COUNTERPARTY. Being worse than the baseline is not a reason to
-sell, because the free pool is not a shop you can walk into. A Sell means either
-the man can never reach your eleven, or someone ON OFFER TODAY at his position
-is better and his proceeds plus your cash pay for him.
-
-THE SLATE IS THE REPORT — read live from the league's own market feed, not
-pasted. The app deals a limited market, so a ranked list of everyone unowned
-is mostly players you cannot buy. sec_slate() answers the only live question
-— of the players on offer right now, which improve my XI, what should I bid,
-and who else wants them — using ffcore.bid: the XI index gained by owning
-him, and the floor plus
-the premium this league has actually paid over it. How many purchases went at
-the floor is counted from the ledger on every run rather than stated here,
-because the sentence that stated it went stale inside a fortnight (issue #23).
-
-SCORING lives in ffcore/score.py now, shared with sim.py so that your squad
-and every rival's are ranked by the same arithmetic — one builder, build(),
-one session (ffcore/model.py) — so the report and the simulation cannot
-drift apart:
-
-    score = shrunk points-per-match  x  fixture  x  P(start)
-
-It is a RANKING INDEX, not a points forecast, and it cannot know four
-things — all flagged in the report rather than hidden: promoted-side players
-carry an assumed baseline, absence from the probable-XI page is not the same
-as a blank percentage there, the fixture band is a guess nothing has graded
-yet, and none of it has been checked against reality. Every snapshot appends the
-whole squad, XI and bench, with the inputs that produced each score, to
-data/decisions/squad_log.csv, and the line every verdict was judged against to
-data/decisions/line_log.csv, so that once jornadas exist you can ask what the
-ranking cost you and whether the line was set anywhere near right.
-data/decisions/lambda_log.csv is the same record for λ, frozen on the day λ was
-retired and kept: it is the only evidence that will ever exist for whether
-replacing it helped.
-
-MIGRATED onto ffcore. Four things changed in substance:
-
-  * fold(), num(), eur(), read_csv(), latest_only(), parse_stamp() and
-    input_path() are gone — they were local copies. norm() in particular
-    now matches the rest of the repo, so a name with an apostrophe or an
-    initial joins the same way here as it does in squads.py.
-  * The scorer is imported, not defined. Tuning SHRINK_K used to require
-    editing two files that could silently disagree.
-  * Cash comes from ffcore.league, which also reads rival balances and
-    understands a time-of-day on the anchor. The old regex read the first
-    number in the file and assumed midnight.
-  * Your squad comes from the ledger via ffcore.league. inputs/squad.txt is
-    still generated by squads.py and still works as a fallback, but it is no
-    longer the source of truth.
+SCORING lives in ffcore/score.py, shared with sim.py — one builder,
+build(), one session (ffcore/model.py) — so this file's warnings and the
+simulation's ladder are read off the same squad, never two.
 """
 
 from __future__ import annotations
@@ -90,41 +39,22 @@ import os
 import re
 import sys
 from pathlib import Path
-from collections import Counter
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-# WHAT IS LEFT OF ffcore/bid.py's SURFACE HERE is the bid: `suggest`, the
-# premiums behind it, and the demand summary. basket(), cost_of() and
-# ratio_of() went with the board on 2026-08-18, as vor() and replacement() did
-# — they priced points per million above replacement, which was a proxy for
-# "does this move me up the table", and sim.py answers that directly. bid.py
-# itself stays: squads.py reads its premiums, and what it costs to WIN a
-# market row is a fact about this league that no simulation of the pitch can
-# supply.
-#
-# λ went the same way a fortnight earlier, for the same reason one layer down:
-# it measured points per million against YOUR CURRENT ELEVEN, so the baseline
-# moved under it. `lambda_log.csv` and `line_log.csv` are both kept — they
-# hold what the old rules said, which is the only evidence that will ever
-# exist for whether replacing them helped. git remembers the code.
-from ffcore.bid import (deals, demand_summary, low_priced_buys,  # noqa: E402
-                        premiums, suggest, xi_snapshots)
-from ffcore.fixture import FIX_BAND, HOME_EDGE  # noqa: E402
+# WHAT IS LEFT OF ffcore/bid.py's SURFACE HERE is low_priced_buys() — a real
+# warning (a purchase priced below the floor, worth a by-hand check) — and
+# deals(), which feeds it. suggest(), demand_summary(), premiums() and
+# xi_snapshots() went with sec_slate() (2026-09-05): they priced a live bid,
+# which nothing here still shows.
+from ffcore.bid import deals, low_priced_buys  # noqa: E402
 from ffcore.render import title_name  # noqa: E402
-from ffcore.second import (SECOND_SOURCE,  # noqa: E402
-                           af_cell, second_cells)
-from ffcore.score import (ABSENT_START, NEUTRAL_START,  # noqa: E402
-                          SLOT_LABEL, SLOT_MIN, formations,
-                          pick_xi, squad_pool)
-from ffcore.league import app_fielded  # noqa: E402
-from ffcore.attributes import Fitness, resolve_fitness  # noqa: E402
+from ffcore.score import SLOT_LABEL, SLOT_MIN, pick_xi, squad_pool  # noqa: E402
 from ffcore.tidy import (run_now,  # noqa: E402
-                         DECISIONS, PARTS,  # noqa: E402
-                         age_phrase, append_csv, load_api_teams,
-                         load_crosswalk, load_deadline, read_csv,
+                         DECISIONS,  # noqa: E402
+                         age_phrase, append_csv, load_crosswalk,
+                         load_deadline, read_csv,
                          snapshot_stamp, stale_feeds, widen_csv, write_lines)
-from slate import read_slate  # noqa: E402
 
 # reports/history/ held a copy of the workings per day. Git already holds
 # every version of every generated file with the run that produced it, so the
@@ -138,20 +68,6 @@ ALERTS = Path(os.environ.get("LFG_ALERTS", ".runtime/alerts.md"))
 WARNINGS = Path(os.environ.get("LFG_WARNINGS", ".runtime/warnings.json"))
 
 STALE_HOURS = 14.0
-MOVER_PCT = 1.0           # squad price moves worth printing
-
-# Words dropped when a club name has to fit in a table cell.
-TEAM_NOISE = {"real", "club", "cf", "fc", "ud", "cd", "rc", "rcd", "sd",
-              "de", "deportivo"}
-
-# A fixture is worth marking on a purchase row from this much swing up. Under
-# it the draw is not the reason to buy or not buy.
-FIX_MARK = 0.05
-
-# How many unowned players the board prints who are NOT on offer today. They
-# are what to watch for, not decisions, so the list is short; the full ranking
-# is watchlist.md's job.
-BOARD_TAIL = 4
 
 # data/decisions/squad_log.csv, in order. One list, so the migration and the
 # write cannot disagree about what the file holds.
@@ -173,204 +89,6 @@ LOG_COLS = ["observed_at", "hours_to_lock", "formation", "index_total",
             "ppm", "fix", "opp", "home", "cur_pj", "flat",
             "fix_basis", "elo_gap"]
 
-# How many unowned players per position the board ranks behind today's slate.
-# The app deals twelve random free agents a cycle, so most of the market is not
-# for sale on any given day; these are the Watch rows — a rate worth having that
-# nobody is selling. Trimmed per slot because only the best few in each can ever
-# reach an eleven. It used to be λ's ladder depth, and the number that made it a
-# reservation rate against a market you cannot shop in.
-POOL_DEPTH = 8
-
-
-def eur(v) -> str:
-    if v is None:
-        return "—"
-    v = float(v)
-    if abs(v) >= 1_000_000:
-        return f"{v/1_000_000:.2f}M"
-    if abs(v) >= 1_000:
-        return f"{v/1_000:.0f}K"
-    return f"{v:.0f}"
-
-
-def short_team(name: str) -> str:
-    """A team name that fits in a phone-width cell.
-
-    Drops the noise words clubs share — `Real`, `Club`, `CF`, `UD` — and keeps
-    the part that identifies them, so `Real Sociedad` and `Real Madrid` stay
-    distinct while both get shorter. If stripping would leave nothing, the
-    original survives: a cell that says `Real` for two different clubs is
-    worse than a long one.
-    """
-    words = [w for w in (name or "").split()
-             if w.lower() not in TEAM_NOISE]
-    if not words:
-        return (name or "").strip()
-    kept = " ".join(words)
-    # Still too wide for a cell: keep the FIRST word, not the last. Last would
-    # turn Atlético Madrid into Madrid, which is another club.
-    return words[0] if len(kept) > 11 and len(words) > 1 else kept
-
-
-def vs_cell(p, star: bool = False) -> str:
-    """Who he faces next, and whether that is a break. `—` = no fixture known.
-
-    `star` is for the purchase rows: their xPts figure deliberately IGNORES
-    the fixture (you own a player for months, not for one round), so the
-    marker is how this round's draw shows up at all.
-    """
-    if not p.get("opp"):
-        return "—"
-    cell = "%s %s" % (short_team(p["opp"]), "H" if p.get("home") else "A")
-    if star:
-        fix = p.get("fix") or 1.0
-        if fix >= 1.0 + FIX_MARK:
-            cell += " ★"
-        elif fix <= 1.0 - FIX_MARK:
-            cell += " ↓"
-    return cell
-
-
-def fix_cell(p) -> str:
-    """The fixture factor as a percentage swing. `=` is a median opponent,
-    `—` means no fixture is known and the score was left unadjusted."""
-    if not p.get("opp"):
-        return "—"
-    pct = ((p.get("fix") or 1.0) - 1.0) * 100
-    return "=" if abs(pct) < 0.5 else "%+.0f%%" % pct
-
-
-def slate_candidates(sc, by_key, slate, owner) -> list[dict]:
-    """Scored rows for everything on today's slate you do not already own.
-
-    One list, two tables: question 1 asks what a purchase would add to the
-    eleven, question 4 prices the same names. They were scored twice before,
-    which is one refactor away from the two tables disagreeing.
-    """
-    out = []
-    for k in slate[0]:
-        if k in owner:
-            continue
-        rec = by_key.get(k)
-        if not rec:
-            continue
-        cand = sc.score(rec).as_row()
-        cand["name"] = title_name(cand["name"])
-        out.append(cand)
-    return out
-
-
-def flat_gains(players, cands) -> dict[str, float]:
-    """{candidate key: xPts/j the eleven gains by owning him, fixture-neutral}.
-
-    The fielding question is one round, so `score` carries the opponent. The
-    buying question is months, so this re-runs the same arithmetic on `flat`,
-    which does not. A defender who only looks like an upgrade because his club
-    happens to host the bottom side next Saturday is not an upgrade.
-    """
-    from ffcore.bid import gain
-
-    neutral = squad_pool([{**p, "score": p["flat"]} for p in players])
-    base = pick_xi(neutral)
-    if base is None:
-        return {}
-    out = {}
-    for c in cands:
-        g = gain(neutral, {**c, "score": c["flat"]}, base[0])
-        if g is not None:
-            out[c["key"]] = g
-    return out
-
-
-# ---------------------------------------------------------------------------
-# The buying scale
-#
-# Every judgement in this report — field, buy, hold, sell — is priced in one
-# unit: index points above replacement level per million euros. It is measured
-# FIXTURE-NEUTRAL, because you own a player for months and not for one round,
-# which is why the market pool below re-scores everyone off `flat`.
-# ---------------------------------------------------------------------------
-
-
-def fix_basis_label(players) -> str:
-    """What ranked the opponents, said out loud in the notes.
-
-    One label for the whole board, because ffcore.fixture refuses a mixture:
-    Club Elo covers every team or none of them.
-    """
-    kinds = {p.get("fix_basis") for p in players if p.get("opp")}
-    if "elo" in kinds:
-        return "Club Elo rating"
-    if "value" in kinds:
-        return ("summed squad value — Club Elo did not cover the league, so "
-                "the wallet is standing in for the pitch")
-    return "nothing: no fixture is known for anyone in your squad"
-
-
-def as_fielded(players):
-    """(total, xi, bench, illegal, warnings) for the XI YOU ARE FIELDING.
-
-    FROM THE APP, which publishes it — see ffcore.league.app_fielded. None
-    when it will not say, and then the comparison is skipped rather than faked
-    from the recommendation or from a file somebody last ticked.
-
-    What this used to read was inputs/lineup.txt, a hand-ticked checklist that
-    lost a mark every time a fielded player was sold. Measured 2026-08-19:
-    with the app answering, deleting that file changed both reports by
-    nothing; with the app quiet it produced "not a legal eleven — 10 players,
-    4-4-1" about a team playing a perfectly legal 4-5-1. A fallback that is
-    only ever consulted when it is wrong is not a fallback.
-
-    `illegal` stays because the shape is still checked. Off the app it should
-    never fire, and if it does the reading is not about a fielded eleven.
-    """
-    from ffcore.text import norm
-
-    by_key = {p.get("key"): p for p in players if p.get("key")}
-    on = app_fielded(list(by_key), {k: p["name"] for k, p in by_key.items()})
-    if not on:
-        return None
-    fielded = {norm(by_key[k]["name"]) for k in on}
-    xi = [p for p in players if norm(p["name"]) in fielded]
-    bench = [p for p in players if norm(p["name"]) not in fielded]
-    warnings = []
-
-    counts = Counter(p["slot"] for p in xi if p["slot"])
-    shape = (counts.get("DEF", 0), counts.get("MED", 0), counts.get("DEL", 0))
-    illegal = None
-    if len(xi) != 11 or counts.get("POR", 0) != 1 or shape not in set(
-            formations()):
-        illegal = "%d players, %d-%d-%d" % ((len(xi),) + shape)
-    return sum(p["score"] for p in xi), xi, bench, illegal, warnings
-
-
-def swaps(fielded_xi, best):
-    """[(out, in)] — who to bench for whom, paired within a position.
-
-    Only same-slot pairs are offered. A cross-slot difference is a change of
-    formation, not a substitution, and printing it as one would suggest an
-    illegal move.
-
-    `best` is a list of scored player dicts — the eleven, not
-    ffcore.season.best_xi (the function that picks one). Named apart from
-    it on purpose: this module never imports that function, but a
-    parameter sharing its name read like it might be shadowing it.
-    """
-    from ffcore.text import norm
-
-    best_keys = {norm(p["name"]) for p in best}
-    out_ = [p for p in fielded_xi if norm(p["name"]) not in best_keys]
-    have = {norm(p["name"]) for p in fielded_xi}
-    in_ = [p for p in best if norm(p["name"]) not in have]
-    pairs = []
-    for o in sorted(out_, key=lambda p: p["score"]):
-        cand = [i for i in in_ if i["slot"] == o["slot"]]
-        if cand:
-            best_in = max(cand, key=lambda p: p["score"])
-            in_.remove(best_in)
-            pairs.append((o, best_in))
-    return pairs
-
 
 def squad_names(lg) -> tuple[list[str], str]:
     """Your roster, and where it came from.
@@ -391,144 +109,6 @@ def squad_names(lg) -> tuple[list[str], str]:
             # keys on the site's own id, the name no longer resolves at all.
             return (list(mine.players), "ledger")
     return [], "nothing"
-
-
-def rival_ceiling(lg) -> float | None:
-    """Largest bid any rival could still make, or None if any cash is unknown.
-
-    An unknown balance is not a zero. Returning None where one rival's cash
-    cannot be reconstructed is what stops suggest() telling you to bid the
-    floor against someone who can outspend you.
-    """
-    bids = [m.max_bid for m in lg if m.handle != lg.cfg.me]
-    if not bids or any(b is None for b in bids):
-        return None
-    return max(bids)
-
-
-def sec_slate(lg, by_key, cands, pool, slate, prem, cash_value,
-              rival_max, snaps, second=None) -> tuple[list[str], int, int]:
-    """Today's slate: WHAT TO BID, and who else wants him.
-
-    THE ONE QUESTION THE SIMULATION CANNOT ANSWER. sim.py says whether a
-    player is worth having — it prices the squad you would hold, which is the
-    whole decision — but it prices every acquisition at a clause, because a
-    clause is instant and cannot be refused. A market row is a bid that can
-    lose, and what it costs to win one is a fact about this league's
-    behaviour, not about the player: the floor, plus what these five managers
-    have actually paid over it.
-
-    IT RATES NOBODY, and no longer carries a verdict. It used to print the
-    board's own columns — above repl, pts/M, at the line — beside each name,
-    which made it a second copy of a ranking rather than the one thing it
-    knows. Whether to buy him is in the table above; this is what to type.
-    """
-    on_offer, unresolved = slate
-    out: list[str] = []
-
-    owned = {k: lg.owner[k] for k in on_offer if k in lg.owner}
-
-    rows = []
-    for cand in cands:
-        adv = suggest(cand["value"], prem, cash_value, rival_max)
-        # Whether you can field a legal eleven in his position at all. This is
-        # the rules, not a threshold: SLOT_MIN is what the app will accept.
-        slot = cand.get("slot")
-        short_by = (max(0, SLOT_MIN[slot] - len(pool.get(slot, [])))
-                    if slot in SLOT_MIN else 0)
-        rows.append((cand, adv, short_by))
-
-    # Cover first — a body you cannot field an eleven without is not ranked
-    # against anything, it is required — then dearest first, because the bid
-    # is the decision here and the big ones are the ones to think about.
-    # Name last, so the order is TOTAL. Without it every row on an unpriced
-    # slate ties at (0, 0) and the table comes out in a different order on
-    # every run — stable sort, unstable input — which makes a diff between two
-    # reports unreadable and looks like the slate changed when it did not.
-    rows.sort(key=lambda r: (-r[2], -(r[1].low or 0), r[0]["name"]))
-    covers = sum(1 for c, a, sb in rows if sb > 0 and a.low is not None)
-
-    out += ["## 2. What to bid", ""]
-    head = ("| Player — %d on offer%s | Pos | Bid | XI | Competition | Note |"
-            % (len(rows),
-               ", %d covering a position you cannot field without" % covers
-               if covers else ""))
-    if not rows:
-        out += ["_Every name you pasted is either already owned or missing "
-                "from the market data._", ""]
-    else:
-        out += [head, "|---|---|--:|--:|---|---|"]
-        for cand, adv, short_by in rows:
-            band = ("—" if adv.low is None
-                    else eur(adv.low) if abs(adv.high - adv.low) < 1_000
-                    else "%s–%s" % (eur(adv.low), eur(adv.high)))
-            # FF's reading and AF's, side by side and never blended. This is
-            # the one thing watchlist.md held that nothing else did, and it
-            # belongs against the man it would change your mind about rather
-            # than in a file of its own listing everybody. Two sources that
-            # disagree about whether he starts is the signal; the forecast
-            # uses the first and prints the second so you can see it is a
-            # guess.
-            out.append(
-                "| %s | %s | %s | %s | %s | %s |"
-                % (cand["name"], (cand["pos"] or "—")[:3], band,
-                   "%s/%s" % (pct_cell(cand),
-                              af_cell((second or {}).get(cand["key"]))),
-                   demand_summary(cand, lg, snaps),
-                   "cover — you are %d short at %s" % (short_by, cand["slot"])
-                   if short_by > 0 else ""))
-        # ONE LINE, THE LIVE NUMBERS ONLY — what each column means, in
-        # general, is static and belongs in METHOD.md's own column guide
-        # (methodology.py), not re-explained here every run. What stays here
-        # is what actually changes run to run: the real premium this league
-        # has paid, and how many bids went at the floor.
-        out += ["",
-               "_**Bid** floor + %s%s · **XI** FF/AF, never blended · "
-               "**Competition** rivals whose XI improves, strongest first. "
-               "Full column guide in METHOD.md._"
-               % (prem.label() if prem else "no priced purchase yet",
-                  (" (%d/%d at the floor)" % (prem.at_floor, prem.n)
-                   if prem else "")), ""]
-        # EVERY BID IS PRICED AS IF IT WERE THE ONLY ONE. Each row asks "is
-        # this better than the going rate", and several rows can answer yes to
-        # more money than you hold — the app settles them all at once, so the
-        # arithmetic has to be stated rather than left to the reader.
-        bidding = [(c, a) for c, a, sb in rows if a.low is not None]
-        wanted = sum(a.low for _, a in bidding)
-        if len(bidding) > 1 and cash_value is not None and wanted > cash_value:
-            out += ["**⚠ %d bids at %s is more than the %s you hold.** Each row "
-                    "above is priced as though it were your only purchase, and "
-                    "the app settles them together — take them best rate "
-                    "first: %s."
-                    % (len(bidding), eur(wanted), eur(cash_value),
-                       ", ".join(c["name"] for c, _ in bidding)), ""]
-        if rival_max is None:
-            out += ["_At least one rival's cash is an estimate, so no bid here "
-                    "assumes you are unopposed._", ""]
-        if cash_value is None:
-            out += ["_Your own balance is not a recorded number, so no bid is "
-                    "capped by what you actually have. Put it in "
-                    "`inputs/cash.txt`._", ""]
-
-    if owned:
-        out += ["| Already owned, so not a purchase | Held by |", "|---|---|"]
-        out += ["| %s | %s |" % (by_key.get(k, {}).get("name", k),
-                                 "you" if h == lg.cfg.me else h)
-                for k, h in sorted(owned.items())]
-        out += [""]
-
-    if unresolved:
-        # There is no ambiguity list any more and no "placed by ownership"
-        # list: the feed states who is on offer, so nothing is guessed between
-        # candidates and nothing needs the ledger to break a tie. What is left
-        # is the one honest failure — the app names a player the market pages
-        # do not, so he cannot be priced and is missing from the table.
-        out += ["## On offer but unpriced", "",
-                "The app is offering these and no market row matches the "
-                "name, so they carry no rating here:", ""]
-        out += ["- **%s**" % u for u in unresolved]
-        out.append("")
-    return out, len(rows), covers
 
 
 def log_squad(observed, players, chosen, formation, total, deadline,
@@ -668,287 +248,6 @@ def alerts(warnings, token_days) -> list[str]:
     return out
 
 
-STATE_LABEL = {
-    "injured": "🔴 injured",
-    "suspended": "🔴 suspended",
-    "unavailable": "🔴 unavailable",
-    "doubt": "🟡 doubt",
-    "ok": "fit",
-}
-
-
-def sec_eleven(marked, best, players, second=None, buys=None) -> list[str]:
-    """## 1. Field these eleven"""
-    out = ["## 1. Field these eleven", ""]
-
-    if not players:
-        return out + ["_No roster. Check `inputs/rosters_initial.txt` and "
-                      "`data/tidy/transactions.csv`._", ""]
-    if marked is None:
-        return out + ["_The app has not said which eleven you are fielding "
-                      "— its lineup feed is quiet, so there is nothing to "
-                      "compare the best eleven against._", ""]
-
-    mtot, mxi, mbench, illegal, mwarn = marked
-    counts = Counter(p["slot"] for p in mxi if p["slot"])
-    shape = "%d-%d-%d" % (counts.get("DEF", 0), counts.get("MED", 0),
-                          counts.get("DEL", 0))
-
-    if illegal:
-        out += [f"**⚠ Not a legal eleven — {illegal}.** The app will fill the "
-                "gaps for you, and not with your choice.", ""]
-    else:
-        # NOT "≈N points": the index is an uncalibrated ranking number, and
-        # printing it with a points unit on it invited exactly the comparison
-        # it cannot support — against a rival's realised score, against last
-        # jornada. It is only ever worth reading as a difference.
-        out += [f"**Your XI: {shape} · index {mtot:.1f}** (a ranking number, "
-                "not a points forecast — only differences mean anything)", ""]
-
-    # One table for both halves of the same decision: the eleven you are
-    # fielding, then the players on today's slate who would improve it. They
-    # used to be four sections apart, which made "would this signing get into
-    # my team" a question you answered by scrolling.
-    #
-    # Each factor gets its own column instead of one blended number. Only
-    # pts/m is shared between the two sources — points per match is a record,
-    # and both sites read the same one — so blending is only ever tempting for
-    # the two start columns, and that is exactly where it would hide a
-    # disagreement worth seeing. State has moved to question 2.
-    cells = second or {}
-    out += ["| | Your XI | vs | pts/m | Fix | FF | AF | xPts/j |",
-            "|---|---|---|--:|--:|--:|--:|--:|"]
-    for slot in ("POR", "DEF", "MED", "DEL"):
-        for p in [x for x in mxi if x["slot"] == slot]:
-            flag = " ⚠" if (p["status"] or "ok") != "ok" else ""
-            out.append(f"| {slot} | {p['name']}{flag} | {vs_cell(p)} | "
-                       f"{ppm_cell(p)} | {fix_cell(p)} | {pct_cell(p)} | "
-                       f"{af_cell(cells.get(p['key']))} | "
-                       f"{p['score']:.1f} |")
-
-    # Purchase rows, in the same columns and the same units, so the comparison
-    # is a glance down one column rather than arithmetic between two tables.
-    up = sorted(((c, g) for c, g in (buys or []) if g > 0.05),
-                key=lambda t: -t[1])
-    passed = len(buys or []) - len(up)
-    for cand, g in up:
-        out.append(f"| +{cand['slot']} | _{cand['name']}_ | "
-                   f"{vs_cell(cand, star=True)} | {ppm_cell(cand)} | "
-                   f"{fix_cell(cand)} | {pct_cell(cand)} | "
-                   f"{af_cell(cells.get(cand['key']))} | **{g:+.1f}** |")
-
-    out += ["",
-            "_**pts/m** points/match, shrunk toward the average · **Fix** "
-            "next-opponent adjustment (`=` median, `—` unknown) · **FF**/"
-            "**AF** probable-XI reads, never blended · **xPts/j** = pts/m × "
-            "Fix × FF · `⚠` = Fitness or Starting has something on him. "
-            "Full column guide in METHOD.md._", ""]
-    if up:
-        out += ["_`+SLOT` rows are today's slate: xPts/j is the change to "
-                "the WHOLE eleven, fixture left out. `★`/`↓` mark this "
-                "round's draw as kind/unkind, not counted in the number. "
-                "What he'd cost is question 2._"
-                + ("" if not passed else
-                   " _%d other%s on the slate would not improve this eleven, "
-                   "so they are priced there and not here._"
-                   % (passed, "" if passed == 1 else "s")), ""]
-
-    if best is None:
-        return out + ["_No legal XI available from this squad, so there is "
-                      "nothing to compare against._", ""]
-
-    btot, (d, m, f), bxi = best
-    gap = btot - mtot
-    if gap <= 0.05:
-        out += [f"**Nothing to change.** The model's best legal XI is the same "
-                f"eleven ({d}-{m}-{f}, index {btot:.1f}).", ""]
-        return out
-
-    pairs = swaps(mxi, bxi)
-    out += [f"**The model's eleven is {gap:.1f} better** (index {btot:.1f}, "
-            f"shape {d}-{m}-{f}).", ""]
-    if not pairs:
-        out += ["_The difference is a change of formation, not a substitution, "
-                "so there is no like-for-like swap to offer._", ""]
-        return out
-
-    out += ["| Bench this | For this | Worth |", "|---|---|--:|"]
-    for o, i in pairs:
-        out.append(f"| {o['name']} ({o['score']:.1f}) | "
-                   f"{i['name']} ({i['score']:.1f}) | "
-                   f"{i['score'] - o['score']:+.1f} |")
-    out += ["", "_Swaps are same-position only: a cross-slot difference is a "
-                "change of formation, not a substitution. Your own marks are "
-                "the row above — this table is advice._", ""]
-
-    for w in mwarn:
-        out.append(f"- ⚠ {w}")
-    if mwarn:
-        out.append("")
-    return out
-
-
-def sec_fitness(players, fitness=None) -> list[str]:
-    """### Fitness — who is not available
-
-    Every squad member gets a row, including the ones nothing is known about.
-    Silence and fitness must not look the same: an empty section used to be
-    indistinguishable from a clean bill of health, and for the whole life of
-    this repo that is exactly what it was — the status column was dead.
-
-    A SUBSECTION now, not question 2. Fitness and the start splits do not price
-    anything — they are the two ways the numbers above can be wrong about
-    a player, which makes them exceptions to check, not decisions to take.
-
-    `fitness` is {key: ffcore.attributes.Fitness} — FF's editorial panel
-    cross-checked against the app's OWN operator-stated availability, which
-    used to be parsed and read by nothing. Optional so a caller with no
-    crosswalk (a cold start, or the self-test) still gets FF's reading alone.
-    """
-    out = ["### Fitness", ""]
-    if not players:
-        return out + ["_No roster to check._", ""]
-    fitness = fitness or {}
-
-    flagged = [p for p in players if p["status"] and p["status"] != "ok"]
-    nodata = [p for p in players if not p["on_page"]]
-    fit = [p for p in players
-           if p["on_page"] and (not p["status"] or p["status"] == "ok")]
-    # THE APP FLAGS HIM, FF's PANEL DOES NOT — the case player_status existed
-    # to catch and nothing was checking for. Drawn from `fit`, not `flagged`:
-    # a player already flagged by FF has his row below either way.
-    _no_read = Fitness(None, True, None)
-    app_only = [p for p in fit
-               if not fitness.get(p["key"], _no_read).agree]
-
-    out += ["| Fitness | Players |", "|---|---|",
-            "| flagged | **%d** of %d |" % (len(flagged), len(players)),
-            "| app disagrees, FF's panel does not | **%d** |" % len(app_only),
-            "| listed, no flag | %d%s |"
-            % (len(fit), (" — " + ", ".join(
-                p["name"] for p in sorted(fit, key=lambda x: x["name"])))
-               if fit else ""),
-            "| no entry on their team page — unknown, not fit | %d |"
-            % len(nodata), ""]
-
-    # Rows for what is wrong or unknown; one line for what is fine. Every
-    # player is still accounted for — the guarantee above is that silence and
-    # fitness must not look the same, and they do not: a no-data player keeps
-    # his own row and the fit ones are named, not merely counted. What is gone
-    # is fifteen table rows reading "fit | listed, no flag" on a phone screen.
-    if flagged or nodata or app_only:
-        out += ["| Player | State | What the page says | App |",
-                "|---|---|---|---|"]
-        order = {"injured": 0, "suspended": 1, "unavailable": 2, "doubt": 3}
-        for p in sorted(flagged, key=lambda x: order.get(x["status"], 9)):
-            f = fitness.get(p["key"])
-            app = ("⚠ " + f.app_state if f and not f.agree and f.app_state
-                  else (f.app_state or "—") if f else "—")
-            out.append(f"| {p['name']} | "
-                       f"{STATE_LABEL.get(p['status'], p['status'])}"
-                       f" | {p['note'] or '—'} | {app} |")
-        for p in sorted(app_only, key=lambda x: x["name"]):
-            f = fitness[p["key"]]
-            out.append(f"| {p['name']} | ok (FF) | — | ⚠ {f.app_state} |")
-        for p in sorted(nodata, key=lambda x: x["name"]):
-            out.append(f"| {p['name']} | ⚪ no data | not listed on his team "
-                       "page — unknown, not fit | — |")
-        out.append("")
-    out += ["_FF's read (`Tocado` folds into doubt); 'App' shown only when "
-            "it disagrees. Full column guide in METHOD.md._", ""]
-    return out
-
-
-def pct_cell(p) -> str:
-    """Start percentage, marked when it is an assumption rather than a
-    reading. `~` = listed with no figure, `!` = not on the page at all."""
-    if p["pct"] is not None:
-        return f"{p['pct']:.0f}%"
-    return ("~" if p["on_page"] else "!") + \
-        f"{NEUTRAL_START if p['on_page'] else ABSENT_START:.0f}%"
-
-
-def ppm_cell(p) -> str:
-    """Points per match. `~` marks a player with no top-flight record, whose
-    baseline is assumed rather than earned.
-
-    NOT the board's pts/M — that was points above replacement per million
-    euros and it went with the board. This is the raw per-match rate the
-    eleven table has always shown, and it prices nothing.
-    """
-    return ("~" if p["assumed"] else "") + f"{p['ppm']:.1f}"
-
-
-def disagrees(p, row, min_start: float) -> str:
-    """Why the two sources conflict for this player, or ''.
-
-    Only a conflict that would change the decision counts: one source putting
-    him in the eleven while the other does not.
-    """
-    if not row:
-        return ""
-    likely = p["pct_used"] >= min_start
-    named = (row.get("role") == "starter"
-             or (row.get("start_pct") not in (None, "")
-                 and float(row["start_pct"]) >= min_start))
-    if likely and not named:
-        return f"futbolfantasy {pct_cell(p)}, {SECOND_SOURCE} {af_cell(row)}"
-    if named and not likely:
-        return f"{SECOND_SOURCE} {af_cell(row)}, futbolfantasy {pct_cell(p)}"
-    return ""
-
-
-def sec_starting(marked, min_start, second=None,
-                 unclear=None) -> list[str]:
-    """### Starting — where the two sources disagree
-
-    EXCEPTIONS ONLY. This used to print all fifteen players with a Reading
-    column, and on a normal day fourteen of those rows read "published" — a
-    column of the same word, pushing the one row that mattered off a phone
-    screen. Every start figure is now in question 1's table, so what belongs
-    here is only what question 1 cannot show: who is under the threshold, and
-    where the two sources contradict each other.
-    """
-    out = ["### Starting", ""]
-    if marked is None:
-        return out + ["_No marks to read — see question 1._", ""]
-
-    cells = second or {}
-    _, mxi, mbench, _, _ = marked
-    low = [p for p in mxi if p["pct_used"] < min_start]
-    split = [(p, lab, why) for lab, group in (("XI", mxi), ("bench", mbench))
-             for p in group
-             for why in [disagrees(p, cells.get(p["key"]), min_start)] if why]
-
-    if not low and not split and not unclear:
-        out += [f"**Nothing to check.** Every marked player is at "
-                f"{min_start:.0f}% or above on futbolfantasy, and "
-                f"analiticafantasy does not contradict any of them.", ""]
-    if low:
-        out += ["| Your XI under %.0f%% | Reading |" % min_start,
-                "|---|--:|"]
-        out += ["| %s | %s |" % (p["name"], pct_cell(p)) for p in low]
-        out += [""]
-    if split:
-        # One source has him in the eleven and the other does not. Neither has
-        # a track record here yet, so this is a prompt to open the app, not a
-        # verdict — which is what "the split" as a column says.
-        out += ["| | Player | The two sources disagree |", "|---|---|---|"]
-        for p, lab, why in split:
-            out.append(f"| {lab} | {p['name']} | {why} |")
-        out.append("")
-    if unclear:
-        out += [f"_{len(unclear)} name(s) could not be matched to "
-                f"analiticafantasy without guessing, so they carry no AF cell: "
-                + "; ".join(f"**{n}** → {', '.join(c)}" for n, c in unclear)
-                + ". A wrong player is worse than a blank one._", ""]
-
-    out += [f"_Editorial reads, not live probabilities. `~`=assumed "
-            f"{NEUTRAL_START:.0f}%, `!`=assumed {ABSENT_START:.0f}%. "
-            "Full column guide in METHOD.md._", ""]
-    return out
-
-
 def main() -> None:
     # ONE MODEL PER RUN — see ffcore/model.py. This built its own League and
     # its own Scorer while decide.load() built a second pair from different
@@ -958,14 +257,8 @@ def main() -> None:
     m = session()
     market = m.market
 
-    PARTS.mkdir(parents=True, exist_ok=True)
-
     if not market:
-        write_lines(PARTS / "latest.md", [
-            "# Fantasy report", "",
-            "No market data in `data/tidy/market.csv`. "
-            "Did `ingest.py parse` run?"])
-        print("no market data; wrote placeholder report")
+        print("no market data; nothing to warn about")
         return
 
     # No try/except. A League that will not load means rosters_initial.txt is
@@ -974,8 +267,7 @@ def main() -> None:
     # outcome: the run stops, systemd records it, and nothing publishes a
     # report that looks fine and is not.
     lg = m.lg
-    sc, hist_label, cur_label = m.sc, m.hist_label, m.cur_label
-    shrink_k = lg.cfg.shrink_k if lg else 8.0
+    sc = m.sc
 
     observed = market[0]["observed_at"]
     obs_dt = snapshot_stamp(observed)
@@ -983,7 +275,7 @@ def main() -> None:
     age_h = (now - obs_dt).total_seconds() / 3600 if obs_dt else None
 
     # --- build squad records ---------------------------------------------
-    squad, squad_src = squad_names(lg)
+    squad, _squad_src = squad_names(lg)
     scored, missing = sc.score_squad(squad)
     players = []
     for s in scored:
@@ -991,109 +283,21 @@ def main() -> None:
         row["name"] = title_name(row["name"])
         players.append(row)
 
-    # ONE CROSSWALK LOAD for the run, not two — the identifier table used to
-    # resolve fitness below is the same one the clash warning reads further
-    # down.
     xw = load_crosswalk()
-    # THE APP'S OWN FITNESS READ, resolved against FF's editorial one instead
-    # of sitting parsed and unread. See ffcore.attributes: player_status was
-    # captured in api_teams.csv and read by nothing downstream until now.
-    player_status_by_key = {}
-    if xw is not None:
-        for r in load_api_teams():
-            pid = (r.get("player_id") or "").strip()
-            st = r.get("player_status")
-            if not pid or st is None:
-                continue
-            key = xw.player(app_id=pid)
-            if key:
-                player_status_by_key[key] = st
-    fitness = resolve_fitness({p["key"]: p["status"] for p in players},
-                              player_status_by_key)
-
     pool = squad_pool(players)
     best = pick_xi(pool) if players else None
-    chosen = {id(p) for p in best[2]} if best else set()
 
-    # --- today's slate ----------------------------------------------------
-    # Built before the header because the count belongs in the alerts: when a
-    # slate has been pasted, it is the decision, and the rest of the report is
-    # the position it is being made from.
     cash = lg[lg.cfg.me].cash if lg and lg.cfg.me in lg.managers else None
-    cash_value = cash.value if cash and cash.confidence == "known" else None
-    by_key = lg.market.latest() if lg and lg.market else {}
-    slate = read_slate(lg.market, xw=lg.xw) if by_key else (set(), [])
     dl = deals(lg, lg.market) if lg and lg.market else []
-    buy_prem = premiums(dl)
-    # Scored once, read twice: question 1 asks what they add to the eleven,
-    # question 2 asks what they cost.
-    cands = (slate_candidates(sc, by_key, slate, lg.owner)
-            if lg and by_key else [])
-    fg = flat_gains(players, cands) if cands and players else {}
-    buys = [(c, fg[c["key"]]) for c in cands if c["key"] in fg]
-
-    # The second opinion, joined once and printed in every table below.
-    # Candidates are joined too, or their AF cell would always read `—` and
-    # look like a source that has nothing on them.
-    second, unclear = second_cells(
-        [(p["key"], p["name"]) for p in players]
-        + [(c["key"], c["name"]) for c in cands
-           if c["key"] not in {p["key"] for p in players}])
-    marked = as_fielded(players) if players else None
-    min_start = lg.cfg.min_start if lg else 60.0
-
-    # THE BOARD IS GONE, and with it pts/M, above-replacement, the line, the
-    # basket and every verdict string. They were each a proxy for "does this
-    # move me up the table", which sim.py now answers directly by simulating
-    # the rest of the season. What is left here is the WORKINGS: the eleven,
-    # what to bid for a man on today's slate, who is unfit, and where the two
-    # probable-XI sources disagree — none of which the simulation produces.
-    slate_lines, n_slate, n_better = [], 0, 0
-    if any(slate):
-        # Built once, read by every candidate's Competition cell below —
-        # xi_snapshots() is O(managers), not O(managers x candidates).
-        snaps = xi_snapshots(lg, sc, by_key)
-        slate_lines, n_slate, n_better = sec_slate(
-            lg, by_key, cands, pool, slate,
-            buy_prem, cash_value, rival_ceiling(lg), snaps, second=second)
-
-    # --- assemble ---------------------------------------------------------
-    # ONE FILE. `board.md` existed to hold the board and, for one afternoon
-    # after the board went, to hold two warnings — eight lines with a heading
-    # and a stamp on top, published to the phone as a report of its own. The
-    # warnings live at the foot of the workings now, which is where every
-    # other fact about the position already was.
 
     # Still read here, because log_squad records it against every snapshot: a
     # forecast is graded by how long before the lock it was made.
     deadline, _dl_src = load_deadline(with_source=True)
-
-    # The workings open by naming what they are working out, and link back
-    # rather than reprinting the decision above them.
-    out: list[str] = [f"# The workings — {observed}", "",
-                      "_What the one table on the board was "
-                      "built from: the eleven it assumes you field, what a "
-                      "man on today's slate should cost, and the two ways any "
-                      "of it can be wrong about a player._", ""]
-    out += sec_eleven(marked, best, players, second, buys)
-    out += (slate_lines if slate_lines else
-            ["## 2. Buy today", "",
-             "_The league's own market feed has nothing on offer right now — "
-             "not a missing input, just an empty market._", ""])
-    # The two ways every number above can be wrong about a player: he is not
-    # fit, or the two probable-XI sources disagree that he plays. Neither
-    # prices anything, so neither is a decision — both are prompts to open the
-    # app, and that is what the tables under here say without a preamble.
-    out += ["## 3. Exceptions", ""]
-    out += sec_fitness(players, fitness)
-    out += sec_starting(marked, min_start, second, unclear)
-
-    out += ["---", ""]
     if players and best:
-        log_squad(observed, players, chosen, best[1], best[0], deadline,
-                  obs_dt)
+        log_squad(observed, players, {id(p) for p in best[2]}, best[1],
+                  best[0], deadline, obs_dt)
 
-    # --- below the fold ---------------------------------------------------
+    # --- the warnings themselves -------------------------------------------
     warnings: list[str] = stale_feed_warnings()
     if age_h is not None and age_h > STALE_HOURS:
         warnings.append(f"**Data is {age_h:.0f}h old** — the ingest workflow "
@@ -1155,53 +359,6 @@ def main() -> None:
     elif not cash or cash.value is None:
         warnings.append("No cash figure — add `inputs/cash.txt`.")
 
-    out += ["## Warnings", ""]
-    out += ([f"- {w}" for w in warnings] if warnings
-            else ["_Nothing flagged._"])
-    out += ["", "_Compare squad value with the app; a mismatch means a name "
-                f"matched the wrong player. Roster read from the "
-                f"{squad_src}._", ""]
-
-    # --- your movers ------------------------------------------------------
-    movers = sorted((p for p in players if abs(p["delta_pct"]) >= MOVER_PCT),
-                    key=lambda p: p["delta_pct"], reverse=True)
-    out += [f"## Your movers (24h, over {MOVER_PCT:.0f}%)", ""]
-    if not movers:
-        out += ["_Nothing in your squad moved much._", ""]
-    else:
-        out += ["| Player | Value | 24h | % |", "|---|--:|--:|--:|"]
-        for p in movers:
-            out.append(f"| {p['name']} | {eur(p['value'])} | "
-                       f"{eur(p['delta_1d'])} | {p['delta_pct']:+.2f}% |")
-        out.append("")
-
-    out += [
-        "## Notes",
-        "",
-        "| | |",
-        "|---|---|",
-        f"| Players tracked | {len(market)}, {len(sc.start_pct)} with a "
-        "probable-XI reading |",
-        "| xPts/j | expected points per jornada = shrunk pts/match "
-        f"(K={shrink_k:.0f}"
-        + (f", {hist_label}" if hist_label else ", **no points baseline**")
-        + (f" + {cur_label}" if cur_label else "")
-        + ") × fixture × P(start), from `ffcore/score.py` — the same scorer "
-          "sim.py scores every rival with |",
-        "| Zeroed | injured, suspended, unavailable; a doubt is halved |",
-        "| Fixture term | ±%.0f%% across the opponents ranked by %s, plus "
-        "±%.0f%% for home advantage — both widths guesses, unfitted, and "
-        "small enough that a wrong one costs a fraction of a point |"
-        % (FIX_BAND * 100, fix_basis_label(players), HOME_EDGE * 100),
-        "",
-        f"_Generated {now:%Y-%m-%d %H:%M} UTC._",
-    ]
-
-    # decisions.json is sim.py's now. It is the same file the phone reads and
-    # it carries moves rather than assets, because that is what the report
-    # says; two writers would race, and the loser would be whichever ran first.
-    write_lines(PARTS / "latest.md", out)
-
     # --- the notification surface -----------------------------------------
     # Written every run, and DELETED when there is nothing to say, so a
     # notifier can simply test for the file rather than parse it to find out
@@ -1244,162 +401,10 @@ def _selftest() -> None:
     assert "api_teams" in w[0] and "api_market" in w[0], w
     assert stale_feed_warnings({}) == []
 
-    def pl(pct=None, on_page=True, used=None, ppm=4.0, assumed=False):
-        return {"pct": pct, "on_page": on_page, "ppm": ppm, "assumed": assumed,
-                "pct_used": pct if used is None else used}
-
-    # --- AF's two shapes, kept in their own units ---
-    assert af_cell(None) == "—"                     # not joined at all
-    assert af_cell({"role": "starter", "start_pct": ""}) == "titular"
-    # A named starter is NOT rendered as a percentage: doing so would mean
-    # inventing the yes→probability constant, and nothing exists to fit it.
-    assert "%" not in af_cell({"role": "starter", "start_pct": ""})
-    assert af_cell({"role": "starter", "start_pct": "100.0"}) == "100%"
-    assert af_cell({"role": "doubt", "start_pct": "66.7"}) == "67%"
-    assert af_cell({"role": "doubt", "start_pct": ""}) == "?"
-
-    # --- FF's cell, and the marks that say "assumed", not "read" ---
-    assert pct_cell(pl(pct=80.0)) == "80%"
-    assert pct_cell(pl(on_page=True)).startswith("~")
-    assert pct_cell(pl(on_page=False)).startswith("!")
-
-    # --- the disagreement that changes a decision, and the ones that don't ---
-    starter = {"role": "starter", "start_pct": ""}
-    out = {"role": "doubt", "start_pct": "33.3"}
-    assert disagrees(pl(pct=90.0), starter, 60.0) == ""    # both say yes
-    assert disagrees(pl(pct=10.0), out, 60.0) == ""        # both say no
-    # FF has him starting, AF has him a third likely: that is the split.
-    assert "33%" in disagrees(pl(pct=90.0), out, 60.0)
-    assert "futbolfantasy 90%" in disagrees(pl(pct=90.0), out, 60.0)
-    # And the reverse reads the other way round, AF first.
-    rev = disagrees(pl(pct=10.0), starter, 60.0)
-    assert rev.startswith(SECOND_SOURCE) and "titular" in rev
-    # No second-source row is not a disagreement — it is silence.
-    assert disagrees(pl(pct=90.0), None, 60.0) == ""
-
     # --- names ---
     # A particle stays lowercase inside a name, but not as its first word.
     # title_name itself is tested in ffcore/render.py, where it lives now.
     assert title_name("nico van gaal") == "Nico van Gaal"
-
-    # --- teams, shortened without merging two clubs into one ---
-    assert short_team("Real Madrid") == "Madrid"
-    assert short_team("Real Sociedad") == "Sociedad"
-    assert short_team("Atletico Madrid") == "Atletico"   # never "Madrid"
-    assert short_team("Deportivo Alavés") == "Alavés"
-    assert short_team("Real") == "Real"          # stripping to nothing: keep it
-    assert short_team("") == ""
-
-    # --- the fixture cells ---
-    def fx(fix=1.0, opp="Elche", home=True):
-        return {"fix": fix, "opp": opp, "home": home}
-
-    assert vs_cell(fx(opp="")) == "—"            # no fixture is not a neutral
-    assert fix_cell(fx(opp="")) == "—"
-    assert vs_cell(fx(opp="Rayo Vallecano", home=False)) == "Rayo A"
-    assert fix_cell(fx(1.0)) == "="              # median opponent
-    assert fix_cell(fx(1.12)) == "+12%"
-    assert fix_cell(fx(0.89)) == "-11%"
-    # The star is a purchase-row marker only, because only those rows exclude
-    # the fixture from their number.
-    assert "★" not in vs_cell(fx(1.12))
-    assert vs_cell(fx(1.12), star=True).endswith("★")
-    assert vs_cell(fx(0.88), star=True).endswith("↓")
-    assert vs_cell(fx(1.02), star=True) == "Elche H"     # too small to mark
-
-    # --- a purchase is judged fixture-NEUTRAL ---
-    def sq(name, flat, score, slot="DEL"):
-        return {"name": name, "key": name, "slot": slot, "flat": flat,
-                "score": score, "pos": slot}
-
-    # Weak on merit, but he happens to face the bottom side: `score` says
-    # upgrade, `flat` says no. flat_gains must follow flat.
-    squad = [sq("mine", 5.0, 5.0, s) for s in ("POR",)] \
-        + [sq("d%d" % i, 5.0, 5.0, "DEF") for i in range(5)] \
-        + [sq("m%d" % i, 5.0, 5.0, "MED") for i in range(5)] \
-        + [sq("f0", 5.0, 5.0, "DEL")]
-    cheat = sq("cheat", 4.0, 9.0)
-    real = sq("real", 6.0, 6.0)
-    g = flat_gains(squad, [cheat, real])
-    assert g["cheat"] < 0, g          # the easy fixture buys him nothing here
-    assert abs(g["real"] - 1.0) < 1e-9, g
-    # A player with no slot can never start, so he has no gain to report.
-    assert flat_gains(squad, [sq("nopos", 9.0, 9.0, "")]) == {}
-
-    # --- bid ceilings survive an overdrawn rival --------------------------
-    # An overdrawn manager is a zero, not an unknown, so the ceiling is still
-    # a number. When it was None, every bid in question 4 had to assume the
-    # whole league could outspend you.
-    class _M:
-        def __init__(self, handle, bid):
-            self.handle, self.max_bid = handle, bid
-
-    class _LG(list):
-        cfg = type("C", (), {"me": "me"})()
-
-    lg = _LG([_M("me", 50e6), _M("broke", 0.0), _M("rich", 30e6)])
-    assert rival_ceiling(lg) == 30e6, rival_ceiling(lg)
-    # Genuinely unknown still suppresses it, which is the case it exists for.
-    assert rival_ceiling(_LG([_M("me", 50e6), _M("who", None)])) is None
-
-    # --- which scale ranked the opponents, said out loud ------------------
-    assert fix_basis_label([{"opp": "Elche", "fix_basis": "elo"}]) \
-        == "Club Elo rating"
-    # One Elo row is enough to name it, because the board refuses a mixture.
-    assert fix_basis_label([{"opp": "A", "fix_basis": "value"},
-                            {"opp": "B", "fix_basis": "elo"}]) \
-        == "Club Elo rating"
-    assert "wallet" in fix_basis_label([{"opp": "A", "fix_basis": "value"}])
-    # A squad with no fixtures at all is not "ranked by value" — it is unranked.
-    assert "no fixture is known" in fix_basis_label(
-        [{"opp": "", "fix_basis": "none"}])
-
-    # --- what to bid, which is all this section still claims to know -------
-    from ffcore.bid import Premiums
-
-    # It used to reprint the board's columns and its verdict beside every
-    # name, which made it a second copy of a ranking. Whether to buy him is
-    # the one table on the board now; this is what to type into the app.
-    class _Mgr:
-        handle, max_bid = "rival", 5e6
-
-    class _LG:
-        owner = {}
-        cfg = type("C", (), {"me": "me"})()
-
-        def __iter__(self):
-            return iter([_Mgr()])
-
-    cand = {"name": "Target", "key": "target", "pos": "Defensa",
-            "slot": "DEF", "value": 10e6, "flat": 4.0, "score": 4.0,
-            "pct": 90.0, "on_page": True}
-    body, n, covers = sec_slate(
-        _LG(), {}, [cand], {"DEF": [1, 2, 3, 4]}, ({"target"}, []),
-        Premiums(12, 1.2, 0.0, 8.0), 40e6, 5e6,
-        {"rival": {"best": None, "short": set(), "pool": {}}},
-        second={"target": {"start_pct": 67.0}})
-    txt = "\n".join(body)
-    assert n == 1 and covers == 0, (n, covers)
-    assert "| Target |" in txt, txt
-    # THE COLUMNS THAT WENT WITH THE BOARD. Every one of these was a proxy for
-    # a question the simulation now answers, and printing them here made this
-    # table a place the two could disagree.
-    for gone in ("pts/M", "above repl", "At the line", "Verdict"):
-        assert gone not in txt, gone
-    assert "Bid" in txt and "Competition" in txt
-    # THE ONE THING watchlist.md HELD THAT NOTHING ELSE DID: the two
-    # probable-XI sources side by side, against the man they disagree about
-    # rather than in a file of its own listing everybody.
-    assert "| 90%/67% |" in txt, txt
-
-    # A position you cannot legally field without him is not a rate at all.
-    # SLOT_MIN is the rules; THIN was a tuned threshold and is not a rule.
-    _b, _n, cov = sec_slate(
-        _LG(), {}, [cand], {"DEF": []}, ({"target"}, []),
-        Premiums(12, 1.2, 0.0, 8.0), 40e6, 5e6,
-        {"rival": {"best": None, "short": set(), "pool": {}}})
-    assert cov == 1, cov
-    assert "cover" in "\n".join(_b)
 
     # -- alerts: the short list worth interrupting somebody for -------------
     # This replaced watch.py, which diffed market values and emitted every
@@ -1419,28 +424,7 @@ def _selftest() -> None:
     assert any("Log in again" in ln for ln in alerts([], token_days=9))
     assert alerts([], token_days=60) == []
 
-    # -- sec_fitness: the app's read surfaces, not just FF's -----------------
-    from ffcore.attributes import resolve_fitness
-
-    def sp(key, name, status, on_page=True):
-        return {"key": key, "name": name, "status": status, "note": "",
-                "on_page": on_page}
-
-    players = [sp("a", "Clean", ""), sp("b", "Flagged", "doubt"),
-              sp("c", "AppOnly", "")]
-    fit = resolve_fitness({p["key"]: p["status"] for p in players},
-                          {"c": "injured"})
-    sec = "\n".join(sec_fitness(players, fit))
-    # A player FF's panel calls fine, that the app calls injured, gets his
-    # own row and his own count — this is the whole point of resolving both
-    # sources instead of reading one and ignoring the other.
-    assert "app disagrees, FF's panel does not | **1**" in sec, sec
-    assert "AppOnly" in sec and "injured" in sec, sec
-    # No fitness map at all still renders — a cold start or a caller with no
-    # crosswalk must not crash.
-    assert "Flagged" in "\n".join(sec_fitness(players))
-
-    print("report self-test OK (%d cases)" % 80)
+    print("report self-test OK (%d cases)" % 10)
 
 
 if __name__ == "__main__":

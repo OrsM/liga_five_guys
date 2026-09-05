@@ -71,7 +71,7 @@ from ffcore.text import norm
 from ffcore.tidy import minutes_played
 
 __all__ = ["SLOT", "SLOT_LABEL", "SLOT_MIN", "MAX_SLOT", "THIN",
-           "FREE_FORMATIONS", "PREMIUM_FORMATIONS", "formations",
+           "FREE_FORMATIONS", "formations",
            "Rating", "Scorer", "pick_xi", "squad_pool",
            "replacement", "vor",
            "load_points", "build", "load_understat_current"]
@@ -95,8 +95,6 @@ THIN = {"POR": 2, "DEF": 4, "MED": 4, "DEL": 2}
 # Confirmed against the app's formation picker.
 FREE_FORMATIONS = [(5, 4, 1), (5, 3, 2), (4, 5, 1), (4, 4, 2), (4, 3, 3),
                    (3, 5, 2), (3, 4, 3)]
-# Premium subscription: these shapes, the captain boost and the coach slot.
-PREMIUM_FORMATIONS = [(5, 2, 3), (4, 6, 0), (4, 2, 4), (3, 6, 1), (3, 3, 4)]
 
 # Matches of prior weight — the pseudo-count in reliability = n/(n+K), used
 # at BOTH shrink stages in Scorer.rate() (last season toward the positional
@@ -917,10 +915,16 @@ def _calibrated():
     return _CAL_CACHE[0]
 
 
-def formations(premium: bool = False) -> list[tuple]:
-    """Legal shapes. Rivals may hold a premium subscription even if you
-    don't, so this is a parameter rather than a module constant."""
-    return FREE_FORMATIONS + (PREMIUM_FORMATIONS if premium else [])
+def formations() -> list[tuple]:
+    """Legal shapes — the free tier, confirmed against the app's picker.
+
+    A `premium: bool` parameter (and PREMIUM_FORMATIONS, and pick_xi()'s own
+    matching parameter) used to exist for the rare rival on a paid
+    subscription, but nothing anywhere ever called it with premium=True —
+    deleted 2026-09-05 as dead plumbing, not as a feature decision. Add it
+    back the same way if a caller genuinely needs it.
+    """
+    return list(FREE_FORMATIONS)
 
 
 class Rating(NamedTuple):
@@ -1319,7 +1323,7 @@ def squad_pool(scored) -> dict[str, list[dict]]:
 
 
 
-def pick_xi(pool: dict, force: dict | None = None, premium: bool = False):
+def pick_xi(pool: dict, force: dict | None = None):
     """Best legal XI by total score, or None if no legal shape fits.
 
     force pins one player into his slot. Exact, not heuristic: the only
@@ -1330,7 +1334,7 @@ def pick_xi(pool: dict, force: dict | None = None, premium: bool = False):
     itself a finding — it means they cannot field a legal XI today.
     """
     best = None
-    for d, m, f in formations(premium):
+    for d, m, f in formations():
         need = {"POR": 1, "DEF": d, "MED": m, "DEL": f}
         if force is not None:
             slot = force["slot"]

@@ -885,97 +885,6 @@ def real_cycle_bests(cycles: dict[str, set], gain, group_of=None
     return out
 
 
-def market_percentile(routes, quiet=None) -> str:
-    """Where this week's market sits against the market's own history.
-
-    ONE LINE INSTEAD OF A PANEL. The panel compared three routes in a table of
-    its own, outside the one table, and its prose was unconditional — it went
-    on saying "spending now buys the worse of two options" on days when the
-    headline said act today. What is actually worth knowing is whether what is
-    on offer THIS week is good or bad by the standards of what gets dealt, and
-    that is a percentile.
-    """
-    quiet = stale_feeds() if quiet is None else quiet
-    # A QUIET FEED IS NOT A POOR MARKET, and this line is where the two get
-    # confused. Gate api_market on freshness and nothing is buyable, so
-    # now_best is 0, every simulated week beats it, and this printed "0th
-    # percentile · a poor week" — a claim about the market with no market in
-    # front of it. Say which it is.
-    if "api_market" in quiet:
-        return ("the app's market feed is **%s stale** — what is on offer now "
-                "is unknown, not empty" % age_phrase(quiet["api_market"]))
-    mkt = next((r for r in routes if r["route"] == "market"), None)
-    if mkt is None or mkt.get("beats_now") is None:
-        return ""
-    beats = mkt["beats_now"]
-    # AT THE EDGE OF WHAT THE SAMPLE CAN RESOLVE. beats_now is a count out
-    # of `n_band` simulated weeks (ffcore.market.Offers.best_over(),
-    # default trials=400) — if EVERY one of them beat today, or NONE did,
-    # the true percentile could be anywhere inside the smallest gap that
-    # many trials can tell apart, not exactly 0 or 100. Reporting a bare
-    # "0th percentile · better in 100% of weeks" claims a precision the
-    # sample does not have. Real case, 2026-08-21: today's actual
-    # 33-player market topped out at a gain of 4.03; the sim draws from
-    # the full ~600-player unowned pool (weighted toward value) and its
-    # single BEST trial alone reached 7.11 — every one of 400 draws beat
-    # today's number, which is a real, extreme, thin-listing day, not a
-    # bug, but "0th percentile" overstated how precisely that is known.
-    n = mkt.get("n_band", 400)
-    if n and (beats <= 0.0 or beats >= 1.0):
-        floor = max(1, round(100 / n))
-        if beats >= 1.0:
-            return ("market **under the %d%s percentile** · an unusually "
-                    "poor week · better in over %d%% of weeks"
-                    % (floor, _ord(floor), 100 - floor))
-        return ("market **over the %d%s percentile** · an unusually "
-                "good week · better in under %d%% of weeks"
-                % (100 - floor, _ord(100 - floor), floor))
-    pct = round(100 * (1 - beats))
-    how = ("an unusually good week" if pct >= 75
-           else "a poor week" if pct <= 25 else "an ordinary week")
-    return ("market **%d%s percentile** · %s · better in %d%% of weeks"
-            % (pct, _ord(pct), how, 100 - pct))
-
-
-def _ord(n: int) -> str:
-    return "th" if 11 <= n % 100 <= 13 else \
-        {1: "st", 2: "nd", 3: "rd"}.get(n % 10, "th")
-
-
-
-
-def verdict(routes) -> tuple:
-    """(headline, whether waiting wins). ONE ANSWER, AT THE TOP.
-
-    The report has twice shown a ranked list of moves reading as "do this"
-    directly above a section saying "waiting beats all of these". Two things
-    on one screen pointing opposite ways is not extra information, it is a
-    contradiction the reader has to arbitrate — and this repo has form: the
-    board it replaced once held a man and sold him three tables later, in the
-    same unit. It cost a real sale.
-
-    So the verdict is computed once, it leads, and everything below it is
-    explicitly subordinate to it.
-    """
-    if len(routes) < 2:
-        return "", False
-    act = next((r for r in routes if r["route"] == "act"), None)
-    # The watch list is not a route you can take — it is what you cannot buy.
-    best = max((r for r in routes if r["route"] != "watch"),
-               key=lambda r: r.get("pts", 0.0), default=None)
-    if best is None:
-        return "", False
-    if act is None or best["route"] == "act":
-        return ("**Act today.** Nothing you can wait for beats what is on "
-                "offer now.", False)
-    gap = best.get("pts", 0.0) - act.get("pts", 0.0)
-    return ("**Don't spend yet.** %s is worth about %+.0f points over the rest "
-            "of the season against %+.0f for the best thing you can buy today "
-            "— %.0f better even after paying a jornada for the delay, and the "
-            "balance is what buys the choice."
-            % (best["label"], best.get("pts", 0.0), act.get("pts", 0.0),
-               gap), True)
-
 
 def wait_routes(u, offers=None, rng=None, rows=None) -> list[dict]:
     """The three ways to get a better eleven, as data both renderers read.
@@ -1213,11 +1122,10 @@ def wait_routes(u, offers=None, rng=None, rows=None) -> list[dict]:
 def waiting(u, offers=None, rng=None, routes=None) -> list[str]:
     """The three routes, priced against each other.
 
-    `routes`, when given, is a caller's own `wait_routes()` result — the
-    SAME list `market_percentile()` already read, computed once (see
-    render()'s own note on why this used to run wait_routes() twice per
-    report, once here and once for the percentile line above it).
-    `routes=None` (an old caller, or the self-test) computes it fresh.
+    `routes`, when given, is a caller's own `wait_routes()` result, computed
+    once (see render()'s own note on why this used to run wait_routes()
+    twice per report). `routes=None` (an old caller, or the self-test)
+    computes it fresh.
     """
     routes = routes if routes is not None else wait_routes(u, offers, rng)
     if len(routes) < 2:
@@ -2101,18 +2009,6 @@ def payload(u, rows, base, rivals, locks_h=None, n_actions: int = 0,
         "shape": _shape_now(u),
         "rival_best": _rival_best(u),
         "wait": wait,
-        # "verdict"/"hold" RETIRED 2026-09-01. render()'s own comment
-        # ("NO SENTENCES ABOVE THE TABLE") explains why verdict()'s prose
-        # was deliberately dropped from the markdown report: a headline
-        # sentence next to a table is one more thing that can disagree
-        # with the table. This function kept computing and shipping that
-        # same sentence to the phone anyway (Fantasy.jsx does not read
-        # either field — checked before removing) — the exact fix-lands-
-        # in-one-renderer-not-its-sibling shape this repo keeps finding,
-        # just with the roles reversed (removed from markdown, missed in
-        # JSON). verdict()/the "act"/"hold" prose stays defined for
-        # whatever else reads it directly, only no longer surfaced here.
-        "market_pct": market_percentile(wait),
         "shape_now": fielded_shape(u),
         "xi_note": xi_note(u),
         # Written by report.py minutes earlier in the same run — the board
@@ -2258,19 +2154,17 @@ def render(u, rows, base, stamp: str, rivals, n_actions: int = 0,
     # phone — four resamples of the same real market history per report
     # for a fact that does not change between them.
     routes = wait_routes(u, offers, rows=rows)
-    # NO SENTENCES ABOVE THE TABLE. verdict() (and the overdraft paragraph
-    # and the three-route panel it once introduced) was added to explain a
-    # contradiction rather than to remove one, and each became another
-    # thing on the page that could disagree with the table under it. What
-    # is left is the position, the formation, and where this week's market
-    # sits — all of it data. verdict() itself is retired below (it was
-    # still being computed here and thrown away, and shipped unused to the
-    # phone's JSON from payload() — see payload()'s own note).
+    # NO SENTENCES ABOVE THE TABLE. verdict() and market_percentile() (and
+    # the overdraft paragraph and the three-route panel before them) were
+    # each added to explain a contradiction rather than to remove one, and
+    # each became another thing on the page that could disagree with the
+    # table under it — market_percentile()'s own headline ("an unusually
+    # good week") once claimed exactly that while every BUY row failed the
+    # real bar below it. Both are retired for the same reason. What is
+    # left is the position, the formation, and the ranked table itself —
+    # all of it data, none of it a separate claim about it.
     out = ["# The simulation — %s" % stamp, "", "## Now", ""]
     out += header(u, base, n_actions or len(rows), locks_h)
-    pctl = market_percentile(routes)
-    if pctl:
-        out += ["_" + pctl + "_", ""]
     # THE RANKING IS SUBORDINATE TO THE CALL, and says so in its own heading.
     # Presented as "what to do" directly above a section saying "do nothing",
     # it is a contradiction rather than a second opinion.
@@ -3034,69 +2928,6 @@ def _selftest() -> None:
     assert (real_act["pts"], real_act["lo"], real_act["hi"]) \
         == (55.0, 3.0, 120.0), real_act
 
-    # -- one line instead of a panel ---------------------------------------
-    # The panel sat outside the one table, compared three routes in a table of
-    # its own, and carried prose that was unconditional — it went on saying
-    # spending now was the worse option on days the headline said act today.
-    r = [{"route": "act", "best": 1.0, "pts": 10.0},
-         {"route": "market", "best": 2.0, "pts": 20.0, "beats_now": 0.38}]
-    # quiet={} throughout this section pins the feeds to "all fresh" — these
-    # calls are testing the formatting logic, not the staleness gate (that
-    # gets its own case below with an explicit quiet=). Without it, this
-    # defaults to the REAL stale_feeds() reading the box's live tidy store,
-    # so the test's pass/fail depended on how long ago the last successful
-    # fetch was — and since this self-test runs BEFORE the fetch stage,
-    # every run saw yesterday's fetch timestamp, already past
-    # EVERY_RUN_FRESH_DAYS by the time the once-a-day timer fired again.
-    line = market_percentile(r, quiet={})
-    assert "62nd percentile" in line, line
-    assert "38% of weeks" in line, line
-    assert "ordinary week" in line, line
-    # A LINE OF DATA, NOT A SENTENCE. Every sentence added above the table was
-    # added to explain a contradiction rather than remove one, and each became
-    # another thing on the page that could disagree with the table.
-    assert "." not in line.replace("62nd", "").replace("38%", ""), line
-    assert "75th percentile" in market_percentile(
-        [{"route": "market", "beats_now": 0.25}], quiet={})
-    assert "unusually good" in market_percentile(
-        [{"route": "market", "beats_now": 0.25}], quiet={})
-    assert market_percentile([], quiet={}) == ""
-    # A QUIET FEED IS NOT A POOR MARKET. With api_market gated on freshness,
-    # nothing is buyable, now_best is 0, every simulated offer beats it, and
-    # this line said "0th percentile · a poor week · better in 100% of weeks"
-    # — the report's headline claim about the market, made with no market in
-    # front of it. Measured by ageing the store three days and generating.
-    blind = market_percentile(r, quiet={"api_market": 3.1})
-    assert "percentile" not in blind, blind
-    assert "3 days stale" in blind, blind
-    assert "unknown" in blind, blind
-    # ...and a fresh feed is unaffected, whatever else has gone quiet.
-    assert "62nd percentile" in market_percentile(
-        r, quiet={"api_teams": 3.1}), r
-
-    # -- EVERY simulated week beating today is a REAL result (a thin day's
-    # actual listings vs. the full pool a typical week draws from, not a
-    # stale/empty feed) — but reporting it as an exact "0th percentile" and
-    # "100%" overclaims what n_band trials can resolve. Real case,
-    # 2026-08-21: n_band=400, so the finest percentile it can name is
-    # 1/400 = 0.25%, rounding to 1. ------------------------------------------
-    extreme = market_percentile(
-        [{"route": "market", "beats_now": 1.0, "n_band": 400}], quiet={})
-    assert "under the 1st percentile" in extreme, extreme
-    assert "unusually poor" in extreme, extreme
-    assert "over 99%" in extreme, extreme
-    assert "0th" not in extreme and "100%" not in extreme, extreme
-    # The mirror case: NOTHING beat today, an unusually good market.
-    best_ever = market_percentile(
-        [{"route": "market", "beats_now": 0.0, "n_band": 400}], quiet={})
-    assert "over the 99th percentile" in best_ever, best_ever
-    assert "unusually good" in best_ever, best_ever
-    assert "under 1%" in best_ever, best_ever
-    # A smaller sample has a coarser floor — n=50 can only resolve to 2%.
-    coarse = market_percentile(
-        [{"route": "market", "beats_now": 1.0, "n_band": 50}], quiet={})
-    assert "under the 2nd percentile" in coarse, coarse
-
     # -- overdrawn is not a ranking question -------------------------------
     # -- a team sheet reads keeper first ------------------------------------
     # Ranked purely by points, an eleven puts the keeper between two
@@ -3133,21 +2964,9 @@ def _selftest() -> None:
     # -- ONE ANSWER, AND EVERYTHING ELSE UNDER IT --------------------------
     # A ranked list reading "do this" above a section reading "wait" is a
     # contradiction the reader has to arbitrate, and this report has done it
-    # twice. The verdict leads and the ranking says what it is.
-    acting = [{"route": "act", "label": "Act today", "what": "x", "best": 9.0},
-              {"route": "market", "label": "Wait", "what": "y", "best": 1.0}]
-    call, hold = verdict([{**acting[0], "pts": 300.0},
-                          {**acting[1], "pts": 10.0}])
-    assert "Act today" in call and hold is False, (call, hold)
-    waitwin = [{"route": "act", "label": "Act today", "what": "x", "best": 1.0},
-               {"route": "market", "label": "Wait for the market",
-                "what": "y", "best": 5.0}]
-    call, hold = verdict([{**waitwin[0], "pts": 40.0},
-                          {**waitwin[1], "pts": 200.0}])
-    assert "Don't spend yet" in call and hold is True, (call, hold)
-    assert "160 better" in call, call
-    # Nothing to compare against is no verdict, rather than a made-up one.
-    assert verdict([]) == ("", False)
+    # twice. Nothing above the table claims a verdict the table itself can
+    # disagree with — verdict() and market_percentile() were both retired
+    # for exactly this (see their own removal notes in git history).
     for banned in ("## Do this", "## The board", "## Warnings"):
         assert banned not in heads, heads
 
