@@ -1,93 +1,19 @@
 {
- "generated_at": "2026-09-05T20:30Z",
- "locks_in_h": 17.74960290027778,
- "cash": 7486704.09902662,
+ "generated_at": "2026-09-05T22:45Z",
+ "locks_in_h": 15.494048154722222,
+ "cash": 7486657.799355324,
  "cash_locked": 0,
- "squad_value": 250754800.0,
+ "squad_value": 252565220.0,
  "jornadas_left": 35,
- "acquirable": 59,
- "considered": 163,
- "expected_finish": 2.62,
- "p_win": 0.229,
+ "acquirable": 58,
+ "considered": 175,
+ "expected_finish": 2.65,
+ "p_win": 0.233,
  "band": [
-  1154.8583567208448,
-  1850.78211838492
+  1147.3175389548776,
+  1858.3034911990694
  ],
  "moves": [
-  {
-   "label": "clause Alex Berenguer from SusoGattuso · sell Carl Starfelt",
-   "kind": "clause",
-   "buy": "Alex Berenguer",
-   "sell": "Carl Starfelt",
-   "sell_n": 1,
-   "victim": "SusoGattuso",
-   "owner": "SusoGattuso",
-   "d_pos": 0.09733333333333327,
-   "d_win": 0.03666666666666668,
-   "net": -5282270.0,
-   "d_pts": 21.662251117553524,
-   "helps": 0.6196666666666667,
-   "pts_lo": -93.12329001458829,
-   "pts_hi": 145.9156750227894,
-   "value": 4.100935983498292,
-   "chase": null,
-   "contest": [
-    {
-     "manager": "Magic Mike 333",
-     "days": 2
-    },
-    {
-     "manager": "Albert Laporta",
-     "days": 3
-    },
-    {
-     "manager": "BurtonGM89",
-     "days": 4
-    }
-   ],
-   "left": 2204434.0990266204,
-   "answer": "Antonio Blanco",
-   "p_win_after": 0.266,
-   "vs": "BurtonGM89",
-   "vs_gain": 0.056333333333333346
-  },
-  {
-   "label": "clause Cesar Tarrega from SusoGattuso · sell Omar El Hilali",
-   "kind": "clause",
-   "buy": "Cesar Tarrega",
-   "sell": "Omar El Hilali",
-   "sell_n": 1,
-   "victim": "SusoGattuso",
-   "owner": "SusoGattuso",
-   "d_pos": 0.10566666666666658,
-   "d_win": 0.02300000000000002,
-   "net": -2090496.0,
-   "d_pts": 12.836403221695718,
-   "helps": 0.5736666666666667,
-   "pts_lo": -70.00593718423943,
-   "pts_hi": 118.1191142216162,
-   "value": 6.140362488947943,
-   "chase": null,
-   "contest": [
-    {
-     "manager": "Magic Mike 333",
-     "days": 1
-    },
-    {
-     "manager": "Albert Laporta",
-     "days": 3
-    },
-    {
-     "manager": "BurtonGM89",
-     "days": 4
-    }
-   ],
-   "left": 5396208.09902662,
-   "answer": "Kike Salas",
-   "p_win_after": 0.252,
-   "vs": "Magic Mike 333",
-   "vs_gain": 0.06266666666666665
-  },
   {
    "label": "buy Yuri Berchiche · sell Omar El Hilali",
    "kind": "buy",
@@ -96,21 +22,58 @@
    "sell_n": 1,
    "victim": "",
    "owner": "",
-   "d_pos": 0.07933333333333348,
-   "d_win": 0.015999999999999986,
-   "net": 2021214.0,
-   "d_pts": 15.757613965726478,
-   "helps": 0.602,
-   "pts_lo": -72.21413502234395,
-   "pts_hi": 123.0543003958021,
+   "d_pos": 0.10133333333333328,
+   "d_win": 0.01899999999999999,
+   "net": 2087209.0,
+   "d_pts": 22.08417285009932,
+   "helps": 0.6423333333333333,
+   "pts_lo": -64.61957413228106,
+   "pts_hi": 132.52072368630388,
    "value": null,
    "chase": null,
    "contest": [],
-   "left": 9507918.09902662,
+   "left": 9573866.799355324,
    "answer": null,
-   "p_win_after": 0.245,
-   "vs": "Magic Mike 333",
-   "vs_gain": 0.021333333333333315
+   "p_win_after": 0.252,
+   "vs": "SusoGattuso",
+   "vs_gain": 0.02966666666666662
+  },
+  {
+   "label": "clause Alex Berenguer from SusoGattuso · sell Carl Starfelt",
+   "kind": "clause",
+   "buy": "Alex Berenguer",
+   "sell": "Carl Starfelt",
+   "sell_n": 1,
+   "victim": "SusoGattuso",
+   "owner": "SusoGattuso",
+   "d_pos": 0.09166666666666679,
+   "d_win": 0.017999999999999988,
+   "net": -5539743.0,
+   "d_pts": 22.945646186228714,
+   "helps": 0.62,
+   "pts_lo": -94.70458406311855,
+   "pts_hi": 142.71274654980016,
+   "value": 4.142005538204338,
+   "chase": 2,
+   "contest": [
+    {
+     "manager": "Albert Laporta",
+     "days": 0
+    },
+    {
+     "manager": "Magic Mike 333",
+     "days": 2
+    },
+    {
+     "manager": "BurtonGM89",
+     "days": 4
+    }
+   ],
+   "left": 1946914.7993553244,
+   "answer": "Antonio Blanco",
+   "p_win_after": 0.251,
+   "vs": "BurtonGM89",
+   "vs_gain": 0.04966666666666664
   },
   {
    "label": "clause David Soria from BurtonGM89 · sell Natan",
@@ -120,95 +83,71 @@
    "sell_n": 1,
    "victim": "BurtonGM89",
    "owner": "BurtonGM89",
-   "d_pos": 0.18766666666666687,
-   "d_win": 0.013333333333333336,
-   "net": -175658.0,
-   "d_pts": -35.34927726478486,
-   "helps": 0.26,
-   "pts_lo": -140.10111745761492,
-   "pts_hi": 41.68766414568563,
-   "value": -201.23921065243175,
+   "d_pos": 0.23533333333333317,
+   "d_win": 0.013333333333333308,
+   "net": -1224143.0,
+   "d_pts": -36.88145879597846,
+   "helps": 0.258,
+   "pts_lo": -146.3842983594609,
+   "pts_hi": 38.89088671126365,
+   "value": -30.128390879152565,
    "chase": null,
    "contest": [
     {
      "manager": "Albert Laporta",
-     "days": 4
+     "days": 0
     },
     {
      "manager": "SusoGattuso",
-     "days": 4
+     "days": 5
     },
     {
      "manager": "Magic Mike 333",
-     "days": 22
+     "days": 23
     }
    ],
-   "left": 7311046.09902662,
+   "left": 6262514.799355324,
    "answer": "Matias Dituro",
-   "p_win_after": 0.243,
+   "p_win_after": 0.246,
    "vs": "Albert Laporta",
-   "vs_gain": 0.2843333333333333
+   "vs_gain": 0.33133333333333337
   },
   {
-   "label": "clause Alfonso Herrero from Magic Mike 333 · sell Omar El Hilali",
+   "label": "clause Cesar Tarrega from SusoGattuso · sell Omar El Hilali",
    "kind": "clause",
-   "buy": "Alfonso Herrero",
+   "buy": "Cesar Tarrega",
    "sell": "Omar El Hilali",
    "sell_n": 1,
-   "victim": "Magic Mike 333",
-   "owner": "Magic Mike 333",
-   "d_pos": 0.17899999999999983,
-   "d_win": 0.013000000000000012,
-   "net": 260246.0,
-   "d_pts": -25.236235226056806,
-   "helps": 0.2743333333333333,
-   "pts_lo": -96.1871007807299,
-   "pts_hi": 36.30906850569477,
-   "value": null,
+   "victim": "SusoGattuso",
+   "owner": "SusoGattuso",
+   "d_pos": 0.12400000000000011,
+   "d_win": 0.013333333333333308,
+   "net": -2024501.0,
+   "d_pts": 12.690275312796302,
+   "helps": 0.589,
+   "pts_lo": -70.97691045501278,
+   "pts_hi": 117.5486450022263,
+   "value": 6.2683472681892,
    "chase": null,
    "contest": [
     {
-     "manager": "SusoGattuso",
-     "days": 1
+     "manager": "Albert Laporta",
+     "days": 0
     },
     {
-     "manager": "Albert Laporta",
-     "days": 2
+     "manager": "Magic Mike 333",
+     "days": 1
     },
     {
      "manager": "BurtonGM89",
      "days": 4
     }
    ],
-   "left": 7746950.09902662,
-   "answer": "Matias Dituro",
-   "p_win_after": 0.242,
-   "vs": "Albert Laporta",
-   "vs_gain": 0.2843333333333333
-  },
-  {
-   "label": "buy Robin Le Normand · sell Omar El Hilali",
-   "kind": "buy",
-   "buy": "Robin Le Normand",
-   "sell": "Omar El Hilali",
-   "sell_n": 1,
-   "victim": "",
-   "owner": "",
-   "d_pos": 0.05566666666666675,
-   "d_win": 0.013000000000000012,
-   "net": 1263023.0,
-   "d_pts": 10.860478914769374,
-   "helps": 0.576,
-   "pts_lo": -73.27542017527139,
-   "pts_hi": 119.83512622484454,
-   "value": null,
-   "chase": null,
-   "contest": [],
-   "left": 8749727.09902662,
-   "answer": null,
-   "p_win_after": 0.242,
+   "left": 5462156.799355324,
+   "answer": "Kike Salas",
+   "p_win_after": 0.246,
    "vs": "Magic Mike 333",
-   "vs_gain": 0.01633333333333331
+   "vs_gain": 0.06700000000000006
   },
   {
    "label": "clause Jonny Castro from SusoGattuso · sell Omar El Hilali",
@@ -218,95 +157,95 @@
    "sell_n": 1,
    "victim": "SusoGattuso",
    "owner": "SusoGattuso",
-   "d_pos": 0.09699999999999998,
-   "d_win": 0.011333333333333334,
-   "net": 2641383.0,
-   "d_pts": 11.833173124598943,
-   "helps": 0.5813333333333334,
-   "pts_lo": -69.75452153932883,
-   "pts_hi": 103.54933889116273,
+   "d_pos": 0.10633333333333317,
+   "d_win": 0.012999999999999984,
+   "net": 2328814.0,
+   "d_pts": 11.036970082762991,
+   "helps": 0.5853333333333334,
+   "pts_lo": -68.97657260006235,
+   "pts_hi": 101.4655406839056,
    "value": null,
    "chase": null,
    "contest": [
     {
-     "manager": "Magic Mike 333",
+     "manager": "Albert Laporta",
      "days": 0
     },
     {
-     "manager": "Albert Laporta",
-     "days": 2
+     "manager": "Magic Mike 333",
+     "days": 0
     },
     {
      "manager": "BurtonGM89",
      "days": 4
     }
    ],
-   "left": 10128087.09902662,
+   "left": 9815471.799355324,
    "answer": "Kike Salas",
-   "p_win_after": 0.241,
+   "p_win_after": 0.246,
    "vs": "Magic Mike 333",
-   "vs_gain": 0.06233333333333324
+   "vs_gain": 0.06400000000000006
   },
   {
-   "label": "buy Joao Cancelo · sell Natan",
-   "kind": "buy",
-   "buy": "Joao Cancelo",
-   "sell": "Natan",
-   "sell_n": 1,
-   "victim": "",
-   "owner": "",
-   "d_pos": 0.013333333333333641,
-   "d_win": 0.005666666666666653,
-   "net": -4296593.0,
-   "d_pts": -7.938314729050035,
-   "helps": 0.44666666666666666,
-   "pts_lo": -114.27184132542811,
-   "pts_hi": 149.16799369378077,
-   "value": -1.8475835921740866,
-   "chase": 1,
-   "contest": [],
-   "left": 3190111.0990266204,
-   "answer": null,
-   "p_win_after": 0.235,
-   "vs": "BurtonGM89",
-   "vs_gain": 0.009000000000000008
-  },
-  {
-   "label": "clause Marc Roca from Albert Laporta · sell Alvaro Mantilla",
+   "label": "clause Alfonso Herrero from Magic Mike 333 · sell Omar El Hilali",
    "kind": "clause",
-   "buy": "Marc Roca",
-   "sell": "Alvaro Mantilla",
+   "buy": "Alfonso Herrero",
+   "sell": "Omar El Hilali",
    "sell_n": 1,
-   "victim": "Albert Laporta",
-   "owner": "Albert Laporta",
-   "d_pos": 0.006000000000000227,
-   "d_win": -0.002333333333333326,
-   "net": -6440256.0,
-   "d_pts": -2.298759018077135,
-   "helps": 0.48966666666666664,
-   "pts_lo": -100.56687661870706,
-   "pts_hi": 105.7976787398452,
-   "value": -0.35693596932748245,
+   "victim": "Magic Mike 333",
+   "owner": "Magic Mike 333",
+   "d_pos": 0.23033333333333328,
+   "d_win": 0.01266666666666666,
+   "net": 326241.0,
+   "d_pts": -24.430203595988814,
+   "helps": 0.2743333333333333,
+   "pts_lo": -94.27524083627463,
+   "pts_hi": 36.0635645185946,
+   "value": null,
    "chase": null,
    "contest": [
     {
-     "manager": "Magic Mike 333",
+     "manager": "Albert Laporta",
      "days": 0
     },
     {
      "manager": "SusoGattuso",
-     "days": 0
+     "days": 1
     },
     {
      "manager": "BurtonGM89",
-     "days": 3
+     "days": 4
     }
    ],
-   "left": 1046448.0990266204,
-   "answer": "Lucien Agoume",
-   "p_win_after": 0.227,
-   "vs": "Magic Mike 333",
-   "vs_gain": 0.008333333333333304
+   "left": 7812898.799355324,
+   "answer": "Matias Dituro",
+   "p_win_after": 0.246,
+   "vs": "Albert Laporta",
+   "vs_gain": 0.33133333333333337
+  },
+  {
+   "label": "buy Robin Le Normand · sell Carl Starfelt",
+   "kind": "buy",
+   "buy": "Robin Le Normand",
+   "sell": "Carl Starfelt",
+   "sell_n": 1,
+   "victim": "",
+   "owner": "",
+   "d_pos": 0.05500000000000016,
+   "d_win": 0.009333333333333332,
+   "net": -1494189.0,
+   "d_pts": 17.402963629785745,
+   "helps": 0.61,
+   "pts_lo": -80.86701951727491,
+   "pts_hi": 121.64936593469997,
+   "value": 11.647096605439971,
+   "chase": null,
+   "contest": [],
+   "left": 5992468.799355324,
+   "answer": null,
+   "p_win_after": 0.242,
+   "vs": "SusoGattuso",
+   "vs_gain": 0.01633333333333331
   },
   {
    "label": "clause Nahuel Tenaglia from BurtonGM89 · sell Natan",
@@ -316,19 +255,19 @@
    "sell_n": 1,
    "victim": "BurtonGM89",
    "owner": "BurtonGM89",
-   "d_pos": -0.1556666666666664,
-   "d_win": -0.030333333333333323,
-   "net": 2809495.0,
-   "d_pts": -39.06821070415094,
-   "helps": 0.374,
-   "pts_lo": -228.13361629649125,
-   "pts_hi": 137.3288926259238,
+   "d_pos": -0.14900000000000002,
+   "d_win": -0.032,
+   "net": 1481235.0,
+   "d_pts": -39.13937263107391,
+   "helps": 0.37933333333333336,
+   "pts_lo": -219.51725192394997,
+   "pts_hi": 143.91381237886412,
    "value": null,
-   "chase": null,
+   "chase": 1,
    "contest": [
     {
      "manager": "Albert Laporta",
-     "days": 4
+     "days": 0
     },
     {
      "manager": "SusoGattuso",
@@ -336,14 +275,51 @@
     },
     {
      "manager": "Magic Mike 333",
-     "days": 19
+     "days": 20
     }
    ],
-   "left": 10296199.09902662,
+   "left": 8967892.799355324,
    "answer": "Marcos Alonso",
-   "p_win_after": 0.199,
+   "p_win_after": 0.201,
+   "vs": "Albert Laporta",
+   "vs_gain": -0.027666666666666617
+  },
+  {
+   "label": "clause Marc Roca from Albert Laporta · sell Alvaro Mantilla",
+   "kind": "clause",
+   "buy": "Marc Roca",
+   "sell": "Alvaro Mantilla",
+   "sell_n": 1,
+   "victim": "Albert Laporta",
+   "owner": "Albert Laporta",
+   "d_pos": -0.31899999999999995,
+   "d_win": -0.05733333333333335,
+   "net": -6898812.0,
+   "d_pts": -70.85120572245137,
+   "helps": 0.23633333333333334,
+   "pts_lo": -223.6285876006907,
+   "pts_hi": 71.60473866176449,
+   "value": -10.270058920644797,
+   "chase": null,
+   "contest": [
+    {
+     "manager": "Magic Mike 333",
+     "days": 0
+    },
+    {
+     "manager": "SusoGattuso",
+     "days": 0
+    },
+    {
+     "manager": "BurtonGM89",
+     "days": 3
+    }
+   ],
+   "left": 587845.7993553244,
+   "answer": "Marcos Alonso",
+   "p_win_after": 0.176,
    "vs": "BurtonGM89",
-   "vs_gain": -0.03199999999999997
+   "vs_gain": -0.06266666666666665
   },
   {
    "label": "clause Kike Salas from Magic Mike 333 · sell Omar El Hilali",
@@ -353,79 +329,116 @@
    "sell_n": 1,
    "victim": "Magic Mike 333",
    "owner": "Magic Mike 333",
-   "d_pos": -0.33766666666666634,
-   "d_win": -0.06133333333333332,
-   "net": -6636877.0,
-   "d_pts": -68.59886202047278,
-   "helps": 0.24866666666666667,
-   "pts_lo": -237.2738056092553,
-   "pts_hi": 70.43268088171612,
-   "value": -10.336015270506412,
+   "d_pos": -0.3253333333333335,
+   "d_win": -0.060000000000000026,
+   "net": -6570882.0,
+   "d_pts": -70.75168004754778,
+   "helps": 0.24666666666666667,
+   "pts_lo": -239.1747850938891,
+   "pts_hi": 70.73944591079476,
+   "value": -10.76745557864953,
    "chase": null,
    "contest": [
+    {
+     "manager": "Albert Laporta",
+     "days": 0
+    },
     {
      "manager": "SusoGattuso",
      "days": 2
     },
     {
-     "manager": "Albert Laporta",
-     "days": 3
-    },
-    {
      "manager": "BurtonGM89",
      "days": 4
     }
    ],
-   "left": 849827.0990266204,
+   "left": 915775.7993553244,
    "answer": "Marcos Alonso",
-   "p_win_after": 0.168,
+   "p_win_after": 0.173,
    "vs": "Albert Laporta",
-   "vs_gain": -0.06433333333333335
+   "vs_gain": -0.06233333333333335
   },
   {
-   "label": "clause Marc Bernal from Magic Mike 333 · sell Omar El Hilali",
+   "label": "clause Marc Bernal from Magic Mike 333 · sell Carl Starfelt",
    "kind": "clause",
    "buy": "Marc Bernal",
-   "sell": "Omar El Hilali",
+   "sell": "Carl Starfelt",
    "sell_n": 1,
    "victim": "Magic Mike 333",
    "owner": "Magic Mike 333",
-   "d_pos": -0.41866666666666674,
-   "d_win": -0.07133333333333333,
-   "net": -2007971.0,
-   "d_pts": -97.48830686526117,
-   "helps": 0.224,
-   "pts_lo": -279.0180244728638,
-   "pts_hi": 94.30987008698935,
-   "value": -48.55065479793342,
+   "d_pos": -0.40600000000000014,
+   "d_win": -0.07,
+   "net": -5694544.0,
+   "d_pts": -94.56592841880047,
+   "helps": 0.23,
+   "pts_lo": -287.5811763847987,
+   "pts_hi": 96.56406546764788,
+   "value": -16.60640929612634,
    "chase": null,
    "contest": [
+    {
+     "manager": "Albert Laporta",
+     "days": 0
+    },
     {
      "manager": "SusoGattuso",
      "days": 1
     },
     {
+     "manager": "BurtonGM89",
+     "days": 4
+    }
+   ],
+   "left": 1792113.7993553244,
+   "answer": "Marcos Alonso",
+   "p_win_after": 0.163,
+   "vs": "Albert Laporta",
+   "vs_gain": -0.08233333333333326
+  },
+  {
+   "label": "clause Jose Gaya from Magic Mike 333 · sell Omar El Hilali",
+   "kind": "clause",
+   "buy": "Jose Gaya",
+   "sell": "Omar El Hilali",
+   "sell_n": 1,
+   "victim": "Magic Mike 333",
+   "owner": "Magic Mike 333",
+   "d_pos": -0.4116666666666666,
+   "d_win": -0.07233333333333333,
+   "net": -6241374.0,
+   "d_pts": -83.51322751747557,
+   "helps": 0.20333333333333334,
+   "pts_lo": -249.30804998979306,
+   "pts_hi": 51.511821004211924,
+   "value": -13.380583749263474,
+   "chase": null,
+   "contest": [
+    {
      "manager": "Albert Laporta",
-     "days": 3
+     "days": 0
+    },
+    {
+     "manager": "SusoGattuso",
+     "days": 2
     },
     {
      "manager": "BurtonGM89",
      "days": 4
     }
    ],
-   "left": 5478733.09902662,
+   "left": 1245283.7993553244,
    "answer": "Marcos Alonso",
-   "p_win_after": 0.158,
-   "vs": "BurtonGM89",
-   "vs_gain": -0.09266666666666667
+   "p_win_after": 0.161,
+   "vs": "Albert Laporta",
+   "vs_gain": -0.07333333333333325
   }
  ],
  "sell": [],
  "trailing": {
   "leader": "BurtonGM89",
-  "p_win": 0.229,
-  "leader_p_win": 0.373,
-  "p_above": 0.398
+  "p_win": 0.233,
+  "leader_p_win": 0.365,
+  "p_above": 0.401
  },
  "ladder": [
   {
@@ -436,9 +449,9 @@
    "group": "in",
    "where": "bench",
    "money": null,
-   "pts": 37.0860488996359,
-   "pts_lo": -104.43047138746533,
-   "pts_hi": 188.9417310192921,
+   "pts": -9.647165915454025,
+   "pts_lo": -194.5629593773299,
+   "pts_hi": 187.11388623923813,
    "note": "",
    "value": null,
    "contest": []
@@ -446,14 +459,14 @@
   {
    "name": "Alvaro Mantilla",
    "pos": "DEF",
-   "start": 0.9825454545454545,
-   "xpts": 2.1099735758681373,
+   "start": 0.9006666666666666,
+   "xpts": 2.0876458131605378,
    "group": "out",
    "where": "yours",
    "money": null,
-   "pts": -1286.2218402378123,
-   "pts_lo": -1700.4388721958496,
-   "pts_hi": -1004.7234201668712,
+   "pts": -1.4832523057336857,
+   "pts_lo": -16.818626930699565,
+   "pts_hi": 10.775651875829453,
    "note": "",
    "value": null,
    "contest": []
@@ -466,9 +479,9 @@
    "group": "keep",
    "where": "yours",
    "money": null,
-   "pts": -33.99972418825814,
-   "pts_lo": -160.45602980621834,
-   "pts_hi": 85.45771146234574,
+   "pts": -33.73471535099543,
+   "pts_lo": -158.1982387611073,
+   "pts_hi": 81.90529340443413,
    "note": "vs David Soria*",
    "value": null,
    "contest": []
@@ -481,39 +494,80 @@
    "group": "keep",
    "where": "yours",
    "money": null,
-   "pts": 1.0003077153326103,
-   "pts_lo": -150.04410385681945,
-   "pts_hi": 181.0327128460251,
+   "pts": -3.071227205769219,
+   "pts_lo": -159.5462029985515,
+   "pts_hi": 171.52601968897534,
    "note": "vs Ante Budimir",
    "value": null,
    "contest": []
   },
   {
-   "name": "Joao Cancelo",
+   "name": "Nahuel Tenaglia",
    "pos": "DEF",
-   "start": 0.3706585858585859,
-   "xpts": 3.086674539579198,
+   "start": 0.9743398777014756,
+   "xpts": 4.571604132796304,
    "group": "chase",
-   "where": "free agent",
-   "money": -4296593.0,
-   "pts": -7.938314729050035,
-   "pts_lo": -114.27184132542811,
-   "pts_hi": 149.16799369378077,
+   "where": "BurtonGM89",
+   "money": 1481235.0,
+   "pts": -39.13937263107391,
+   "pts_lo": -219.51725192394997,
+   "pts_hi": 143.91381237886412,
    "note": "",
-   "value": -1.8475835921740866,
-   "contest": []
+   "value": null,
+   "contest": [
+    {
+     "manager": "Albert Laporta",
+     "days": 0
+    },
+    {
+     "manager": "SusoGattuso",
+     "days": 4
+    },
+    {
+     "manager": "Magic Mike 333",
+     "days": 20
+    }
+   ]
+  },
+  {
+   "name": "Alex Berenguer",
+   "pos": "DEL",
+   "start": 0.421652496171961,
+   "xpts": 3.9910134030550757,
+   "group": "chase",
+   "where": "SusoGattuso",
+   "money": -5539743.0,
+   "pts": 22.945646186228714,
+   "pts_lo": -94.70458406311855,
+   "pts_hi": 142.71274654980016,
+   "note": "",
+   "value": 4.142005538204338,
+   "contest": [
+    {
+     "manager": "Albert Laporta",
+     "days": 0
+    },
+    {
+     "manager": "Magic Mike 333",
+     "days": 2
+    },
+    {
+     "manager": "BurtonGM89",
+     "days": 4
+    }
+   ]
   },
   {
    "name": "Yuri Berchiche",
    "pos": "DEF",
-   "start": 0.8106641788438896,
-   "xpts": 3.2860712319844034,
+   "start": 0.736967435312627,
+   "xpts": 3.504305651368917,
    "group": "buy",
    "where": "free agent",
-   "money": 2021214.0,
-   "pts": 15.757613965726478,
-   "pts_lo": -72.21413502234395,
-   "pts_hi": 123.0543003958021,
+   "money": 2087209.0,
+   "pts": 22.08417285009932,
+   "pts_lo": -64.61957413228106,
+   "pts_hi": 132.52072368630388,
    "note": "",
    "value": null,
    "contest": []
@@ -525,39 +579,39 @@
    "xpts": 2.9410715915951475,
    "group": "buy",
    "where": "free agent",
-   "money": 1263023.0,
-   "pts": 10.860478914769374,
-   "pts_lo": -73.27542017527139,
-   "pts_hi": 119.83512622484454,
+   "money": -1494189.0,
+   "pts": 17.402963629785745,
+   "pts_lo": -80.86701951727491,
+   "pts_hi": 121.64936593469997,
    "note": "",
-   "value": null,
+   "value": 11.647096605439971,
    "contest": []
   },
   {
-   "name": "Alex Berenguer",
-   "pos": "DEL",
-   "start": 0.45998454127850286,
-   "xpts": 4.1969485208571,
+   "name": "David Soria",
+   "pos": "POR",
+   "start": 0.9825454545454545,
+   "xpts": 5.565610750437981,
    "group": "raid",
-   "where": "SusoGattuso",
-   "money": -5282270.0,
-   "pts": 21.662251117553524,
-   "pts_lo": -93.12329001458829,
-   "pts_hi": 145.9156750227894,
+   "where": "BurtonGM89",
+   "money": -1224143.0,
+   "pts": -36.88145879597846,
+   "pts_lo": -146.3842983594609,
+   "pts_hi": 38.89088671126365,
    "note": "",
-   "value": 4.100935983498292,
+   "value": -30.128390879152565,
    "contest": [
     {
-     "manager": "Magic Mike 333",
-     "days": 2
-    },
-    {
      "manager": "Albert Laporta",
-     "days": 3
+     "days": 0
     },
     {
-     "manager": "BurtonGM89",
-     "days": 4
+     "manager": "SusoGattuso",
+     "days": 5
+    },
+    {
+     "manager": "Magic Mike 333",
+     "days": 23
     }
    ]
   },
@@ -568,76 +622,20 @@
    "xpts": 3.2637352968810487,
    "group": "raid",
    "where": "SusoGattuso",
-   "money": -2090496.0,
-   "pts": 12.836403221695718,
-   "pts_lo": -70.00593718423943,
-   "pts_hi": 118.1191142216162,
+   "money": -2024501.0,
+   "pts": 12.690275312796302,
+   "pts_lo": -70.97691045501278,
+   "pts_hi": 117.5486450022263,
    "note": "",
-   "value": 6.140362488947943,
+   "value": 6.2683472681892,
    "contest": [
+    {
+     "manager": "Albert Laporta",
+     "days": 0
+    },
     {
      "manager": "Magic Mike 333",
      "days": 1
-    },
-    {
-     "manager": "Albert Laporta",
-     "days": 3
-    },
-    {
-     "manager": "BurtonGM89",
-     "days": 4
-    }
-   ]
-  },
-  {
-   "name": "David Soria",
-   "pos": "POR",
-   "start": 0.9825454545454545,
-   "xpts": 5.565610750437981,
-   "group": "raid",
-   "where": "BurtonGM89",
-   "money": -175658.0,
-   "pts": -35.34927726478486,
-   "pts_lo": -140.10111745761492,
-   "pts_hi": 41.68766414568563,
-   "note": "",
-   "value": -201.23921065243175,
-   "contest": [
-    {
-     "manager": "Albert Laporta",
-     "days": 4
-    },
-    {
-     "manager": "SusoGattuso",
-     "days": 4
-    },
-    {
-     "manager": "Magic Mike 333",
-     "days": 22
-    }
-   ]
-  },
-  {
-   "name": "Alfonso Herrero",
-   "pos": "POR",
-   "start": 0.9743398777014756,
-   "xpts": 2.8705453549942677,
-   "group": "raid",
-   "where": "Magic",
-   "money": 260246.0,
-   "pts": -25.236235226056806,
-   "pts_lo": -96.1871007807299,
-   "pts_hi": 36.30906850569477,
-   "note": "",
-   "value": null,
-   "contest": [
-    {
-     "manager": "SusoGattuso",
-     "days": 1
-    },
-    {
-     "manager": "Albert Laporta",
-     "days": 2
     },
     {
      "manager": "BurtonGM89",
@@ -652,20 +650,48 @@
    "xpts": 3.0489166505181777,
    "group": "raid",
    "where": "SusoGattuso",
-   "money": 2641383.0,
-   "pts": 11.833173124598943,
-   "pts_lo": -69.75452153932883,
-   "pts_hi": 103.54933889116273,
+   "money": 2328814.0,
+   "pts": 11.036970082762991,
+   "pts_lo": -68.97657260006235,
+   "pts_hi": 101.4655406839056,
    "note": "",
    "value": null,
    "contest": [
+    {
+     "manager": "Albert Laporta",
+     "days": 0
+    },
     {
      "manager": "Magic Mike 333",
      "days": 0
     },
     {
+     "manager": "BurtonGM89",
+     "days": 4
+    }
+   ]
+  },
+  {
+   "name": "Alfonso Herrero",
+   "pos": "POR",
+   "start": 0.9743398777014756,
+   "xpts": 2.8705453549942677,
+   "group": "raid",
+   "where": "Magic",
+   "money": 326241.0,
+   "pts": -24.430203595988814,
+   "pts_lo": -94.27524083627463,
+   "pts_hi": 36.0635645185946,
+   "note": "",
+   "value": null,
+   "contest": [
+    {
      "manager": "Albert Laporta",
-     "days": 2
+     "days": 0
+    },
+    {
+     "manager": "SusoGattuso",
+     "days": 1
     },
     {
      "manager": "BurtonGM89",
@@ -680,12 +706,12 @@
    "xpts": 3.918279700583699,
    "group": "raid",
    "where": "Albert",
-   "money": -6440256.0,
-   "pts": -2.298759018077135,
-   "pts_lo": -100.56687661870706,
-   "pts_hi": 105.7976787398452,
+   "money": -6898812.0,
+   "pts": -70.85120572245137,
+   "pts_lo": -223.6285876006907,
+   "pts_hi": 71.60473866176449,
    "note": "",
-   "value": -0.35693596932748245,
+   "value": -10.270058920644797,
    "contest": [
     {
      "manager": "Magic Mike 333",
@@ -702,54 +728,26 @@
    ]
   },
   {
-   "name": "Nahuel Tenaglia",
-   "pos": "DEF",
-   "start": 0.9743398777014756,
-   "xpts": 4.571604132796304,
-   "group": "raid",
-   "where": "BurtonGM89",
-   "money": 2809495.0,
-   "pts": -39.06821070415094,
-   "pts_lo": -228.13361629649125,
-   "pts_hi": 137.3288926259238,
-   "note": "",
-   "value": null,
-   "contest": [
-    {
-     "manager": "Albert Laporta",
-     "days": 4
-    },
-    {
-     "manager": "SusoGattuso",
-     "days": 4
-    },
-    {
-     "manager": "Magic Mike 333",
-     "days": 19
-    }
-   ]
-  },
-  {
    "name": "Kike Salas",
    "pos": "DEF",
    "start": 0.9684405321382897,
    "xpts": 3.3999303332932858,
    "group": "raid",
    "where": "Magic",
-   "money": -6636877.0,
-   "pts": -68.59886202047278,
-   "pts_lo": -237.2738056092553,
-   "pts_hi": 70.43268088171612,
+   "money": -6570882.0,
+   "pts": -70.75168004754778,
+   "pts_lo": -239.1747850938891,
+   "pts_hi": 70.73944591079476,
    "note": "",
-   "value": -10.336015270506412,
+   "value": -10.76745557864953,
    "contest": [
+    {
+     "manager": "Albert Laporta",
+     "days": 0
+    },
     {
      "manager": "SusoGattuso",
      "days": 2
-    },
-    {
-     "manager": "Albert Laporta",
-     "days": 3
     },
     {
      "manager": "BurtonGM89",
@@ -764,20 +762,48 @@
    "xpts": 3.8486478507211928,
    "group": "raid",
    "where": "Magic",
-   "money": -2007971.0,
-   "pts": -97.48830686526117,
-   "pts_lo": -279.0180244728638,
-   "pts_hi": 94.30987008698935,
+   "money": -5694544.0,
+   "pts": -94.56592841880047,
+   "pts_lo": -287.5811763847987,
+   "pts_hi": 96.56406546764788,
    "note": "",
-   "value": -48.55065479793342,
+   "value": -16.60640929612634,
    "contest": [
+    {
+     "manager": "Albert Laporta",
+     "days": 0
+    },
     {
      "manager": "SusoGattuso",
      "days": 1
     },
     {
+     "manager": "BurtonGM89",
+     "days": 4
+    }
+   ]
+  },
+  {
+   "name": "Jose Gaya",
+   "pos": "DEF",
+   "start": 0.4566141414141415,
+   "xpts": 2.523054101719056,
+   "group": "raid",
+   "where": "Magic",
+   "money": -6241374.0,
+   "pts": -83.51322751747557,
+   "pts_lo": -249.30804998979306,
+   "pts_hi": 51.511821004211924,
+   "note": "",
+   "value": -13.380583749263474,
+   "contest": [
+    {
      "manager": "Albert Laporta",
-     "days": 3
+     "days": 0
+    },
+    {
+     "manager": "SusoGattuso",
+     "days": 2
     },
     {
      "manager": "BurtonGM89",
@@ -789,19 +815,19 @@
    "name": "Raphinha",
    "pos": "DEL",
    "start": 0.929895433257031,
-   "xpts": 8.384879282495211,
+   "xpts": 8.383330272471827,
    "group": "save",
    "where": "Magic",
-   "money": -118189822.90097338,
-   "pts": 137.96177647978448,
-   "pts_lo": 13.264494009331656,
-   "pts_hi": 393.8405921438705,
+   "money": -119849430.20064467,
+   "pts": 136.03530084576414,
+   "pts_lo": 14.019459839329556,
+   "pts_hi": 398.84714752005766,
    "note": "short",
-   "value": 1.167289814753147,
+   "value": 1.1350517112849186,
    "contest": [
     {
      "manager": "Albert Laporta",
-     "days": 12
+     "days": 5
     },
     {
      "manager": "BurtonGM89",
@@ -817,15 +843,15 @@
    "name": "Ante Budimir",
    "pos": "DEL",
    "start": 0.9056530090146068,
-   "xpts": 4.836360060413113,
+   "xpts": 4.835378039010185,
    "group": "save",
    "where": "BurtonGM89",
-   "money": -43688065.90097338,
-   "pts": 67.21958186848224,
-   "pts_lo": -17.13523773895804,
-   "pts_hi": 200.1901313952851,
+   "money": -44921556.20064467,
+   "pts": 64.73352611424889,
+   "pts_lo": -17.437683881874364,
+   "pts_hi": 197.76763368964794,
    "note": "short",
-   "value": 1.538625720370573,
+   "value": 1.4410348079909105,
    "contest": []
   },
   {
@@ -835,46 +861,61 @@
    "xpts": 4.507329122860414,
    "group": "save",
    "where": "free agent",
-   "money": -13322421.90097338,
-   "pts": -0.5318376703639842,
-   "pts_lo": -24.188717228005544,
-   "pts_hi": 26.19677673788101,
+   "money": -13322468.200644676,
+   "pts": -0.8146158179065424,
+   "pts_lo": -26.41490831980468,
+   "pts_hi": 27.10395224618287,
    "note": "short",
-   "value": -0.03992049451047083,
+   "value": -0.06114601330908961,
+   "contest": []
+  },
+  {
+   "name": "Federico Valverde",
+   "pos": "MED",
+   "start": 0.5957264957264957,
+   "xpts": 3.932830396851276,
+   "group": "save",
+   "where": "BurtonGM89",
+   "money": -66304413.20064467,
+   "pts": 48.06391955238155,
+   "pts_lo": -35.79426813080863,
+   "pts_hi": 203.4232315533834,
+   "note": "short",
+   "value": 0.724897744090347,
    "contest": []
   },
   {
    "name": "Roberto Fernandez",
    "pos": "DEL",
    "start": 0.9598440390460361,
-   "xpts": 3.9255241861413657,
+   "xpts": 3.9235799446948096,
    "group": "save",
    "where": "BurtonGM89",
-   "money": -13686075.90097338,
-   "pts": 58.005914319002386,
-   "pts_lo": -19.755971206448066,
-   "pts_hi": 172.44265004168278,
+   "money": -13686122.200644676,
+   "pts": 56.77404181143356,
+   "pts_lo": -25.086096971865572,
+   "pts_hi": 182.89207584818723,
    "note": "short",
-   "value": 4.238315989090554,
+   "value": 4.148292772715362,
    "contest": []
   },
   {
    "name": "Pablo Barrios",
    "pos": "MED",
-   "start": 0.8612911199672731,
-   "xpts": 3.7622745649495344,
+   "start": 0.7895168599700004,
+   "xpts": 3.715954637438334,
    "group": "save",
    "where": "BurtonGM89",
-   "money": -45754306.90097338,
-   "pts": 32.47474773891145,
-   "pts_lo": -43.28435069796819,
-   "pts_hi": 183.0013662253275,
+   "money": -46374012.20064467,
+   "pts": 32.43836865546746,
+   "pts_lo": -48.26942550283161,
+   "pts_hi": 191.42462226090333,
    "note": "short",
-   "value": 0.7097637345746914,
+   "value": 0.6994945469699193,
    "contest": [
     {
      "manager": "Albert Laporta",
-     "days": 6
+     "days": 0
     },
     {
      "manager": "SusoGattuso",
@@ -889,35 +930,121 @@
   {
    "name": "Aitor Paredes",
    "pos": "DEF",
-   "start": 0.5039919191919193,
-   "xpts": 3.743990170596438,
+   "start": 0.4619925925925926,
+   "xpts": 3.6780865211772484,
    "group": "save",
    "where": "BurtonGM89",
-   "money": -1245867.9009733796,
-   "pts": 31.050374001272075,
-   "pts_lo": -39.587894714678896,
-   "pts_hi": 170.78036392027389,
+   "money": -2088510.2006446756,
+   "pts": 27.880848672497677,
+   "pts_lo": -44.42209504647349,
+   "pts_hi": 169.7306057715557,
    "note": "short",
-   "value": 24.922685604960883,
+   "value": 13.349634904292778,
+   "contest": []
+  },
+  {
+   "name": "Pierre-Emerick Aubameyang",
+   "pos": "DEL",
+   "start": 0.8911111111111113,
+   "xpts": 3.520765502862136,
+   "group": "save",
+   "where": "Albert",
+   "money": -64133395.20064467,
+   "pts": 19.255058952013542,
+   "pts_lo": -60.06386750191905,
+   "pts_hi": 239.51017553661927,
+   "note": "short",
+   "value": 0.300234517317742,
+   "contest": [
+    {
+     "manager": "BurtonGM89",
+     "days": 8
+    },
+    {
+     "manager": "SusoGattuso",
+     "days": 11
+    },
+    {
+     "manager": "Magic Mike 333",
+     "days": 67
+    }
+   ]
+  },
+  {
+   "name": "Antonio Blanco",
+   "pos": "MED",
+   "start": 0.9743398777014756,
+   "xpts": 3.5053919718387765,
+   "group": "save",
+   "where": "BurtonGM89",
+   "money": -17646560.200644676,
+   "pts": 22.634877263600856,
+   "pts_lo": -45.02258569121909,
+   "pts_hi": 120.17651082919997,
+   "note": "short",
+   "value": 1.2826792874213493,
+   "contest": [
+    {
+     "manager": "Albert Laporta",
+     "days": 0
+    },
+    {
+     "manager": "SusoGattuso",
+     "days": 3
+    },
+    {
+     "manager": "Magic Mike 333",
+     "days": 13
+    }
+   ]
+  },
+  {
+   "name": "Matias Dituro",
+   "pos": "POR",
+   "start": 0.926947685623839,
+   "xpts": 3.446888813346505,
+   "group": "save",
+   "where": "Albert",
+   "money": -1627962.2006446756,
+   "pts": 0.0,
+   "pts_lo": -12.498669969653065,
+   "pts_hi": 13.121345987231962,
+   "note": "short",
+   "value": 0.0,
+   "contest": []
+  },
+  {
+   "name": "Aleix Febas",
+   "pos": "MED",
+   "start": 0.35222146825027084,
+   "xpts": 3.319415583863182,
+   "group": "save",
+   "where": "Albert",
+   "money": -12781122.200644676,
+   "pts": 6.637933077026446,
+   "pts_lo": -50.37373851560233,
+   "pts_hi": 88.48881735399391,
+   "note": "short",
+   "value": 0.5193544802107933,
    "contest": []
   },
   {
    "name": "Giuliano Simeone",
    "pos": "DEL",
-   "start": 0.7732989222629191,
-   "xpts": 3.5141387860885174,
+   "start": 0.7088573454076759,
+   "xpts": 3.2749672976418682,
    "group": "save",
    "where": "SusoGattuso",
-   "money": -37165597.90097338,
-   "pts": 45.8752732157559,
-   "pts_lo": -33.38740985658774,
-   "pts_hi": 178.138272226887,
+   "money": -37165644.20064467,
+   "pts": 40.444033466141946,
+   "pts_lo": -37.17499115986129,
+   "pts_hi": 165.94405742748427,
    "note": "short",
-   "value": 1.2343477787708188,
+   "value": 1.0882102096172037,
    "contest": [
     {
      "manager": "Albert Laporta",
-     "days": 5
+     "days": 0
     },
     {
      "manager": "BurtonGM89",
@@ -930,129 +1057,26 @@
    ]
   },
   {
-   "name": "Antonio Blanco",
-   "pos": "MED",
-   "start": 0.9743398777014756,
-   "xpts": 3.5053919718387765,
-   "group": "save",
-   "where": "BurtonGM89",
-   "money": -9509367.90097338,
-   "pts": 25.49579033512032,
-   "pts_lo": -41.510176675921,
-   "pts_hi": 124.26151549068959,
-   "note": "short",
-   "value": 2.681123561589258,
-   "contest": []
-  },
-  {
-   "name": "Matias Dituro",
-   "pos": "POR",
-   "start": 0.926947685623839,
-   "xpts": 3.446888813346505,
-   "group": "save",
-   "where": "Albert",
-   "money": -1627915.9009733796,
-   "pts": 0.0,
-   "pts_lo": -12.566947651725286,
-   "pts_hi": 13.105006462485562,
-   "note": "short",
-   "value": 0.0,
-   "contest": []
-  },
-  {
-   "name": "Aleix Febas",
-   "pos": "MED",
-   "start": 0.35222146825027084,
-   "xpts": 3.319415583863182,
-   "group": "save",
-   "where": "Albert",
-   "money": -12781075.90097338,
-   "pts": 5.8551695727642254,
-   "pts_lo": -47.41870662853762,
-   "pts_hi": 89.08769874746054,
-   "note": "short",
-   "value": 0.458112416992869,
-   "contest": []
-  },
-  {
-   "name": "Juan Foyth",
-   "pos": "DEF",
-   "start": 0.424,
-   "xpts": 3.262655135016,
-   "group": "save",
-   "where": "SusoGattuso",
-   "money": -11624357.90097338,
-   "pts": 24.014883172745613,
-   "pts_lo": -47.191813898525425,
-   "pts_hi": 170.62294284543032,
-   "note": "short",
-   "value": 2.065910511128937,
-   "contest": []
-  },
-  {
-   "name": "Enes Unal",
-   "pos": "DEL",
-   "start": 0.8484706071467605,
-   "xpts": 3.2481763837731608,
-   "group": "save",
-   "where": "SusoGattuso",
-   "money": -10312437.90097338,
-   "pts": -0.8656554947033328,
-   "pts_lo": -56.6491452129012,
-   "pts_hi": 117.61995264260918,
-   "note": "short",
-   "value": -0.08394285648223147,
-   "contest": []
-  },
-  {
-   "name": "Pierre-Emerick Aubameyang",
-   "pos": "DEL",
-   "start": 0.9721212121212123,
-   "xpts": 3.1874698730007434,
-   "group": "save",
-   "where": "Albert",
-   "money": -61774255.90097338,
-   "pts": 12.94339792585265,
-   "pts_lo": -63.68505460473784,
-   "pts_hi": 200.3230393807653,
-   "note": "short",
-   "value": 0.20952737895542503,
-   "contest": [
-    {
-     "manager": "BurtonGM89",
-     "days": 8
-    },
-    {
-     "manager": "SusoGattuso",
-     "days": 11
-    },
-    {
-     "manager": "Magic Mike 333",
-     "days": 64
-    }
-   ]
-  },
-  {
    "name": "Lucas Noubi",
    "pos": "DEF",
-   "start": 0.9825454545454545,
-   "xpts": 3.174126312914935,
+   "start": 0.9006666666666666,
+   "xpts": 3.15759440503517,
    "group": "save",
    "where": "Magic",
-   "money": -11203170.90097338,
-   "pts": -3.782049732938731,
-   "pts_lo": -47.67979173685944,
-   "pts_hi": 78.16808016752793,
+   "money": -11203217.200644676,
+   "pts": -3.746496031346851,
+   "pts_lo": -48.313612999349516,
+   "pts_hi": 90.76173869433728,
    "note": "short",
-   "value": -0.33758743541171277,
+   "value": -0.3344125142134407,
    "contest": [
+    {
+     "manager": "Albert Laporta",
+     "days": 0
+    },
     {
      "manager": "SusoGattuso",
      "days": 2
-    },
-    {
-     "manager": "Albert Laporta",
-     "days": 3
     },
     {
      "manager": "BurtonGM89",
@@ -1061,68 +1085,98 @@
    ]
   },
   {
-   "name": "Kang-In Lee",
-   "pos": "MED",
-   "start": 0.6080808080808081,
-   "xpts": 3.0263176529700675,
+   "name": "Joao Cancelo",
+   "pos": "DEF",
+   "start": 0.3706585858585859,
+   "xpts": 3.086674539579198,
    "group": "save",
-   "where": "Albert",
-   "money": -58437015.90097338,
-   "pts": -16.165821215545066,
-   "pts_lo": -75.78595981813532,
-   "pts_hi": 136.22862254589268,
+   "where": "free agent",
+   "money": -29805534.200644676,
+   "pts": 14.269738651096759,
+   "pts_lo": -51.31067533567534,
+   "pts_hi": 165.94606908053174,
    "note": "short",
-   "value": -0.2766366654132281,
+   "value": 0.47876137884447356,
    "contest": []
-  },
-  {
-   "name": "Gorka Guruzeta",
-   "pos": "DEL",
-   "start": 0.33478188581788904,
-   "xpts": 2.999091671439199,
-   "group": "save",
-   "where": "Magic",
-   "money": -13816121.90097338,
-   "pts": 11.284222124817916,
-   "pts_lo": -45.0364695127339,
-   "pts_hi": 77.05019074056713,
-   "note": "short",
-   "value": 0.8167430922872007,
-   "contest": [
-    {
-     "manager": "SusoGattuso",
-     "days": 2
-    },
-    {
-     "manager": "Albert Laporta",
-     "days": 3
-    },
-    {
-     "manager": "BurtonGM89",
-     "days": 4
-    }
-   ]
   },
   {
    "name": "Williot Swedberg",
    "pos": "MED",
    "start": 0.355957469407139,
-   "xpts": 2.9440346149916428,
+   "xpts": 2.944843938782387,
    "group": "save",
    "where": "Magic",
-   "money": -6391376.90097338,
-   "pts": -0.24271575597754236,
-   "pts_lo": -41.908308931021566,
-   "pts_hi": 63.16112248471131,
+   "money": -6391423.200644676,
+   "pts": -0.5174897676315595,
+   "pts_lo": -43.11743493939548,
+   "pts_hi": 62.624644542592705,
    "note": "short",
-   "value": -0.037975503516398446,
+   "value": -0.0809662811217637,
    "contest": [
+    {
+     "manager": "Albert Laporta",
+     "days": 0
+    },
     {
      "manager": "SusoGattuso",
      "days": 1
     },
     {
+     "manager": "BurtonGM89",
+     "days": 4
+    }
+   ]
+  },
+  {
+   "name": "Andres Garcia",
+   "pos": "MED",
+   "start": 0.6666666666666667,
+   "xpts": 2.90006630290129,
+   "group": "save",
+   "where": "free agent",
+   "money": -575510.2006446756,
+   "pts": -9.623125699960383,
+   "pts_lo": -54.5035422569847,
+   "pts_hi": 81.23324464104007,
+   "note": "short",
+   "value": -16.721034117519967,
+   "contest": []
+  },
+  {
+   "name": "Koke Resurreccion",
+   "pos": "MED",
+   "start": 0.4824074074074074,
+   "xpts": 2.839985760703289,
+   "group": "save",
+   "where": "free agent",
+   "money": -11731395.200644676,
+   "pts": 8.949129800620312,
+   "pts_lo": -50.5325233665767,
+   "pts_hi": 99.35175674920572,
+   "note": "short",
+   "value": 0.762835932773668,
+   "contest": []
+  },
+  {
+   "name": "Gorka Guruzeta",
+   "pos": "DEL",
+   "start": 0.3068833953330649,
+   "xpts": 2.7979895967517967,
+   "group": "save",
+   "where": "Magic",
+   "money": -13816168.200644676,
+   "pts": 8.600850861995696,
+   "pts_lo": -38.61916040141341,
+   "pts_hi": 69.86653519200536,
+   "note": "short",
+   "value": 0.6225207117552587,
+   "contest": [
+    {
      "manager": "Albert Laporta",
+     "days": 0
+    },
+    {
+     "manager": "SusoGattuso",
      "days": 2
     },
     {
@@ -1132,112 +1186,52 @@
    ]
   },
   {
-   "name": "Koke Resurreccion",
-   "pos": "MED",
-   "start": 0.5262626262626263,
-   "xpts": 2.927219022142712,
-   "group": "save",
-   "where": "free agent",
-   "money": -11731348.90097338,
-   "pts": 14.379914822717183,
-   "pts_lo": -44.48387462964865,
-   "pts_hi": 109.75517096864439,
-   "note": "short",
-   "value": 1.2257682338238227,
-   "contest": []
-  },
-  {
-   "name": "Andres Garcia",
-   "pos": "MED",
-   "start": 0.6666666666666667,
-   "xpts": 2.8959123752199285,
-   "group": "save",
-   "where": "free agent",
-   "money": -575463.9009733796,
-   "pts": -11.234137236867127,
-   "pts_lo": -53.24957327069956,
-   "pts_hi": 74.81897276949735,
-   "note": "short",
-   "value": -19.521880030815012,
-   "contest": []
-  },
-  {
    "name": "Aimar Oroz",
    "pos": "MED",
    "start": 0.43307803390683647,
-   "xpts": 2.6686371447163695,
+   "xpts": 2.671358881751729,
    "group": "save",
    "where": "SusoGattuso",
-   "money": -6341999.90097338,
-   "pts": 3.075379427736266,
-   "pts_lo": -27.624739219451612,
-   "pts_hi": 49.64389159190284,
+   "money": -18135298.200644676,
+   "pts": 3.093261158861651,
+   "pts_lo": -30.989023100384202,
+   "pts_hi": 49.291313559762784,
    "note": "short",
-   "value": 0.4849226546446732,
-   "contest": []
-  },
-  {
-   "name": "Fran Garcia",
-   "pos": "DEF",
-   "start": 0.7583356807113093,
-   "xpts": 2.6274463528078655,
-   "group": "save",
-   "where": "SusoGattuso",
-   "money": -9735842.90097338,
-   "pts": 19.000773434644543,
-   "pts_lo": -46.64473596883454,
-   "pts_hi": 144.36715383882552,
-   "note": "short",
-   "value": 1.951631063474213,
-   "contest": []
-  },
-  {
-   "name": "Jose Gaya",
-   "pos": "DEF",
-   "start": 0.4566141414141415,
-   "xpts": 2.523054101719056,
-   "group": "save",
-   "where": "Magic",
-   "money": -11548328.90097338,
-   "pts": 8.226105223547165,
-   "pts_lo": -36.800828073452976,
-   "pts_hi": 77.47726090773176,
-   "note": "short",
-   "value": 0.7123199637008787,
+   "value": 0.1705657731479536,
    "contest": [
     {
-     "manager": "SusoGattuso",
-     "days": 2
-    },
-    {
      "manager": "Albert Laporta",
-     "days": 3
+     "days": 0
     },
     {
      "manager": "BurtonGM89",
-     "days": 4
+     "days": 5
+    },
+    {
+     "manager": "Magic Mike 333",
+     "days": 14
     }
    ]
   }
  ],
  "cover": [],
  "bar": 2.499879198282928,
- "xi_total": 41.50767214247157,
+ "xi_total": 41.425091871874685,
  "shape": "4-5-1",
  "rival_best": {
   "manager": "BurtonGM89",
-  "xi": 42.19758747136182,
-  "gap": -0.6899153288902511
+  "xi": 42.082437631581946,
+  "gap": -0.6573457597072618
  },
  "wait": [
   {
    "route": "act",
    "label": "Act today",
-   "what": "59 players you can buy now",
-   "best": 7.341396005297103,
-   "pts": 21.662251117553524,
-   "lo": -93.12329001458829,
-   "hi": 145.9156750227894,
+   "what": "58 players you can buy now",
+   "best": 7.3395779428754935,
+   "pts": 22.945646186228714,
+   "lo": -94.70458406311855,
+   "hi": 142.71274654980016,
    "simulated": true,
    "beats_now": null
   },
@@ -1245,9 +1239,9 @@
    "route": "market",
    "label": "Wait for the market",
    "what": "a week of new offers",
-   "best": 2.4231649995611626,
-   "pts": 75.04621397978244,
-   "lo": 1.5006680935886525,
+   "best": 2.4259583385851045,
+   "pts": 75.14300556901806,
+   "lo": 1.30030291527504,
    "hi": 5.649251080966577,
    "beats_now": 0.7,
    "n_band": 20,
@@ -1259,7 +1253,7 @@
     },
     "MED": {
      "n": 17,
-     "now_best": 2.908179826778949,
+     "now_best": 2.841597524585774,
      "beats_now": 0.0
     },
     "POR": {
@@ -1269,25 +1263,25 @@
     },
     "DEL": {
      "n": 15,
-     "now_best": 7.341396005297103,
+     "now_best": 7.3395779428754935,
      "beats_now": 0.0
     }
    },
    "by_route": {
-    "free": {
-     "n": 20,
-     "now_best": 1.613323509844153,
-     "beats_now": 0.7
-    },
     "listed": {
      "n": 22,
-     "now_best": 3.8723044525603747,
+     "now_best": 3.8691484247354087,
      "beats_now": 0.2727272727272727
+    },
+    "free": {
+     "n": 20,
+     "now_best": 1.8864893487589862,
+     "beats_now": 0.7
     }
    },
-   "helpful": 154,
-   "pool": 602,
-   "note": "the market is modelled from 410 offers over 22 cycles, weighted by value^0.30, and only just — value^0.25 fits within 11.7% of it, so read the exponent as roughly this, not exactly this"
+   "helpful": 152,
+   "pool": 603,
+   "note": "the market is modelled from 419 offers over 22 cycles, weighted by value^0.30, and only just — value^0.25 fits within 3.5% of it, so read the exponent as roughly this, not exactly this"
   },
   {
    "route": "watch",
@@ -1301,36 +1295,36 @@
     {
      "name": "Joan Garcia",
      "gain": 6.885828233122254,
-     "wait": 9.311205549652849
+     "wait": 9.341684260358429
     },
     {
      "name": "Kylian Mbappe",
      "gain": 6.205736199489287,
-     "wait": 7.6198553383315994
+     "wait": 7.627618720584878
     },
     {
      "name": "Thibaut Courtois",
      "gain": 5.649251080966577,
-     "wait": 9.7297931621715
+     "wait": 9.756390937835574
     },
     {
      "name": "Marko Dmitrovic",
      "gain": 4.8972624244372485,
-     "wait": 11.199787428458071
+     "wait": 11.243720595105081
     }
    ]
   },
   {
    "route": "clauses",
    "label": "Wait for the clauses",
-   "what": "23 players on 06 Sep",
-   "best": 3.8723044525603747,
-   "pts": 124.31695538175563,
+   "what": "22 players on 06 Sep",
+   "best": 3.8691484247354087,
+   "pts": 124.21146849812841,
    "lo": null,
    "hi": null,
    "beats_now": null,
-   "helpful": 21,
-   "days": 0.9961177134375,
+   "helpful": 20,
+   "days": 0.9021362657060186,
    "opens": "06 Sep"
   }
  ],
@@ -1345,56 +1339,56 @@
    "manager": "BurtonGM89",
    "me": false,
    "now": 138.0,
-   "mean": 1589.2132804285272,
-   "lo": 1225.8584556762503,
-   "hi": 2006.632580063227,
+   "mean": 1584.8398660507992,
+   "lo": 1217.3829670393802,
+   "hi": 1996.2007276077597,
    "cash": -32127777.0,
    "cash_known": false,
-   "p_above": 0.3983333333333333
+   "p_above": 0.40066666666666667
   },
   {
    "manager": "miguel_autentico",
    "me": true,
    "now": 150.0,
-   "mean": 1484.042535540564,
-   "lo": 1154.8583567208448,
-   "hi": 1850.78211838492,
-   "cash": 7486704.09902662,
+   "mean": 1488.09145376735,
+   "lo": 1147.3175389548776,
+   "hi": 1858.3034911990694,
+   "cash": 7486657.799355324,
    "cash_known": true,
    "p_above": null
   },
   {
    "manager": "SusoGattuso",
    "me": false,
-   "now": 133.0,
-   "mean": 1437.2694305214243,
-   "lo": 1110.697421508871,
-   "hi": 1806.8760358452107,
+   "now": 135.0,
+   "mean": 1432.8428780369604,
+   "lo": 1092.8125142094118,
+   "hi": 1820.52000933809,
    "cash": 10152646.0,
    "cash_known": false,
-   "p_above": 0.5476666666666666
+   "p_above": 0.558
   },
   {
    "manager": "Albert Laporta",
    "me": false,
-   "now": 89.0,
-   "mean": 1280.5959043716446,
-   "lo": 925.9106566295582,
-   "hi": 1688.0478140491964,
-   "cash": -8957919.0,
+   "now": 102.0,
+   "mean": 1313.6943922496855,
+   "lo": 961.6199899323833,
+   "hi": 1720.4959387602612,
+   "cash": 60045755.0,
    "cash_known": false,
-   "p_above": 0.7156666666666667
+   "p_above": 0.6686666666666666
   },
   {
    "manager": "Magic Mike 333",
    "me": false,
-   "now": 134.0,
-   "mean": 1272.4979911497694,
-   "lo": 907.5992139534384,
-   "hi": 1684.5535517480723,
+   "now": 136.0,
+   "mean": 1268.3614987276346,
+   "lo": 894.0131848839976,
+   "hi": 1691.0039069451445,
    "cash": 14182988.0,
    "cash_known": false,
-   "p_above": 0.7223333333333334
+   "p_above": 0.723
   }
  ]
 }
