@@ -440,8 +440,21 @@ def ladder_rows(u, rows, bands=None, base=None) -> list[dict]:
                         -short_by, save_pts, "short",
                         value=value_rate(save_pts, short_by),
                         contest=race(u, k)))
+    # FREE AGENTS ONLY. PASS draws from `rest`, a raw price-list pool
+    # independent of candidates()/rank(), so the candidates()-level fix
+    # (never PROPOSE a listed target as a move) doesn't reach it on its
+    # own — a rival-owned player who "clears the bar" still fell through
+    # here with a price, looking exactly like a buyable one. A first pass
+    # at this kept clause-raidable rivals (real raid candidates that
+    # simply didn't rank high enough for RAID), but PASS renders them
+    # identically to a free-agent miss, no clause marker — reads as the
+    # same emphasis-on-a-competitor's-player problem, just relocated.
+    # Miguel's rule: no rival-owned player anywhere in the report unless
+    # the proposal IS the clause raid, on its own row, in RAID.
+    # Why: docs/notes/sim.md#ladder_rows--pass-is-free-agents-only
     for k in sorted((k for k in rest if k not in won
-                     and u.price[k] <= u.cash + spare),
+                     and u.price[k] <= u.cash + spare
+                     and not u.owner.get(k)),
                     key=lambda k: -exp.get(k, 0.0)):
         out.append(cell(k, "pass", short_manager(u.owner.get(k)) or "free agent",
                         -u.price[k], None))
