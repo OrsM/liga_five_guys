@@ -413,11 +413,11 @@ def ladder_rows(u, rows, bands=None, base=None) -> list[dict]:
     buys = [k for k in rest if k in won]
     for k in sorted((k for k in buys if k in chase), key=lambda k: chase[k]):
         out.append(buy_cell(k, "chase"))
-    # Free agents, then a real raid (clause, can't be refused), then a
-    # listed wish (owner's own choice — 0/119 real deals ever converted) —
-    # one sorted list (_move_rank_key order), filtered three times, never
-    # three separately ranked lists.
-    # Why: docs/notes/sim.md#ladder_rows--buy--raid--listed-split
+    # Free agents, then a real raid (clause, can't be refused) — a listed
+    # target (a rival's own choice to sell, 0/119 real deals ever
+    # converted) is never a candidate at all, filtered out at the source
+    # in decide.candidates(), not demoted here.
+    # Why: docs/notes/sim.md#ladder_rows--buy--raid-split
     non_chase = sorted((k for k in buys if k not in chase),
                        key=lambda k: _move_rank_key(won[k], buy_floor, u))
     for k in non_chase:
@@ -426,9 +426,6 @@ def ladder_rows(u, rows, bands=None, base=None) -> list[dict]:
     for k in non_chase:
         if u.owner.get(k) and u.route.get(k, "market") == "clause":
             out.append(buy_cell(k, "raid"))
-    for k in non_chase:
-        if u.owner.get(k) and u.route.get(k, "market") != "clause":
-            out.append(buy_cell(k, "listed"))
     for k in sorted((k for k in rest if k not in won
                      and u.price[k] > u.cash + spare),
                     key=lambda k: -exp.get(k, 0.0)):
@@ -700,13 +697,13 @@ def ladder(u, rows, base, data=None) -> list[str]:
         out += [row_md(r) for r in by_group["chase"]]
 
     # Free agents on their own; an explicit "none clear the bar" line once
-    # RAID/LISTED exist, since silence could now mean either "no candidates"
-    # or "candidates exist, all rival-owned."
+    # RAID exists, since silence could now mean either "no candidates" or
+    # "candidates exist, all a clause raid."
     # Why: docs/notes/sim.md#ladder--buy-section-none-clear-the-bar-today
     if by_group.get("buy"):
         out.append("| **BUY — free agents** | | | | | | | |")
         out += [row_md(r) for r in by_group["buy"]]
-    elif by_group.get("raid") or by_group.get("listed"):
+    elif by_group.get("raid"):
         out.append("| **BUY — free agents — none clear the bar today** | | "
                    "| | | | | |")
 
@@ -714,17 +711,6 @@ def ladder(u, rows, base, data=None) -> list[str]:
         out.append("| **RAID — a clause, cannot be refused** "
                    "| | | | | | | |")
         out += [row_md(r) for r in by_group["raid"]]
-
-    # SEPARATE FROM RAID, ON PURPOSE — see ladder_rows()'s own note. A
-    # listed target is the OWNER'S CHOICE, and 119 real deals in this
-    # league have never once been that choice made in Miguel's favour —
-    # shown here, not folded into RAID, so the heading itself carries the
-    # honest odds rather than implying a clause's certainty.
-    if by_group.get("listed"):
-        out.append("| **LISTED — his own choice to sell, and in 119 real "
-                   "deals this league has recorded, that has happened "
-                   "zero times** | | | | | | | |")
-        out += [row_md(r) for r in by_group["listed"]]
 
     if by_group.get("save"):
         out.append("| **SAVE — better than yours, out of reach** | | | | | | | |")
@@ -2489,22 +2475,24 @@ def _selftest() -> None:
              "rivals": "rivals", "wished": "wished"})
     all_rows = ch_rows + [riv_row, wish_row]
     owned_lad = ladder_rows(uc_owned, all_rows, base=st)
-    # STILL ONE SORTED LIST, FILTERED, NOT THREE SEPARATELY RANKED ONES:
-    # the two highest-value real candidates overall ("rivals" 12.0,
-    # "wished" 10.0) lead the whole ranking and land in RAID/LISTED
-    # respectively — neither promoted to BUY for being the best, neither
-    # silently dropped, and "wished" specifically does NOT land in RAID
-    # despite outranking every free-agent row on value.
+    # ONE SORTED LIST, FILTERED, NOT SEPARATELY RANKED GROUPS: "rivals"
+    # (a clause, cannot be refused) lands in RAID despite everything else
+    # in BUY; "wished" (owned by a rival, NOT a clause — his own choice to
+    # sell) is dropped from every group outright, even though it outranks
+    # every free-agent row on value — Miguel's own repeated instruction:
+    # never emphasize a rival-owned player unless the proposal is a raid.
     by_group = {}
     for r in owned_lad:
         by_group.setdefault(r["group"], []).append(r["name"].lower())
     assert by_group["buy"] == ["steady", "dud", "maverick"], by_group
     assert by_group["raid"] == ["rivals"], by_group
-    assert by_group["listed"] == ["wished"], by_group
+    assert "wished" not in [n for names in by_group.values() for n in names], \
+        by_group
     md_owned = "\n".join(ladder(uc_owned, all_rows, st))
     assert "BUY — free agents" in md_owned, md_owned
     assert "RAID — a clause, cannot be refused" in md_owned, md_owned
-    assert "LISTED — his own choice to sell" in md_owned, md_owned
+    assert "LISTED" not in md_owned, md_owned
+    assert "wished" not in md_owned.lower(), md_owned
     # BOTH SECTIONS PRESENT even when free-agent buys is empty: the
     # explicit "none clear the bar" line, not silence that could be
     # mistaken for "no candidates were even screened".

@@ -357,6 +357,14 @@ def candidates(u: Universe, expected: dict[str, float],
         # purchase — measured denial value of a listing is zero.
         raid = bool(victim and victim != u.me
                     and u.route.get(c, "market") == "clause")
+        # Rival-owned, not a clause (listed): Miguel's own repeated
+        # instruction — never propose a rival's player as a move unless
+        # it's a raid he cannot refuse (0/119 real deals have ever been a
+        # rival's own choice to sell to a manager). Not screened, ranked,
+        # or shown anywhere, rather than shown and demoted.
+        # Why: docs/notes/decide.md#candidates--listed-targets-are-never-proposed
+        if victim and victim != u.me and not raid:
+            continue
         kind = "clause" if raid else "buy"
         swap = kind + "-swap" if raid else "swap"
         if price <= cash:
@@ -1524,18 +1532,19 @@ def _selftest() -> None:
     assert "dud" not in names, names
     assert "star" in names, names
     # A rival's player reachable ONLY through his clause is marked a raid;
-    # one he has LISTED himself is an ordinary purchase, whoever owns him,
-    # because taking him denies nobody anything they were not already selling.
+    # one he has LISTED himself is never proposed at all — 0/119 real deals
+    # in this league have ever been a rival's own choice to sell to a
+    # manager, and Miguel has repeatedly asked that the report never
+    # emphasize a rival-owned player unless it's a raid he cannot refuse.
+    # Why: docs/notes/decide.md#candidates--listed-targets-are-never-proposed
     u.route["th_m1"] = "clause"
     acts = candidates(u, exp)
     assert any(a.kind.startswith("clause") and a.buy == "th_m1"
                for a in acts), [a.kind for a in acts]
     u.route["th_m1"] = "listed"
     listed = candidates(u, exp)
-    got = [a for a in listed if a.buy == "th_m1"]
-    assert got and all(a.kind.startswith("buy") or a.kind == "swap"
-                       for a in got), [a.kind for a in got]
-    assert all(not a.victim for a in got), got
+    assert not any(a.buy == "th_m1" for a in listed), \
+        [a.kind for a in listed if a.buy == "th_m1"]
     u.route["th_m1"] = "clause"
     acts = candidates(u, exp)
     assert all(a.cost <= u.cash + a.proceeds for a in acts), acts
