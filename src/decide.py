@@ -386,10 +386,29 @@ def candidates(u: Universe, expected: dict[str, float],
         if price > u.cash + max((u.proceeds.get(s, 0.0) for s in spare),
                                 default=0.0):
             sold, got = [], 0.0
+            # Only meaningful once the squad is real-sized — see
+            # best_swap_for()'s own note on why a squad short of XI_SIZE
+            # skips this (phantom_fill() is what guarantees a real one
+            # never is, at load time).
+            legal = len(mine_squad) < XI_SIZE
             depth = dict(depth0)
             for k, raises in free:
-                if price <= u.cash + got:
-                    break
+                # THE REAL CHECK, not another bounds approximation — see
+                # best_swap_for()'s own note on this exact failure class
+                # (a squad can clear every position's SLOT_MIN at every
+                # step and still be unfieldable, e.g. two goalkeepers left
+                # in an exactly-XI_SIZE squad). Re-checked each time the
+                # money threshold is newly cleared rather than once at the
+                # end, so a multi-sale chain keeps growing past "enough
+                # cash" if the shape it leaves behind still isn't legal.
+                # Why: docs/notes/decide.md#candidates--the-real-fieldability-check
+                if not legal and price <= u.cash + got:
+                    hyp = {p: s for p, s in mine_squad.items()
+                          if p not in sold}
+                    hyp[c] = u.pos.get(c, "MED")
+                    legal = bool(best_xi(hyp, expected))
+                    if legal:
+                        break
                 # A sale raising $0 spends legality budget for nothing.
                 if raises <= 0:
                     continue
@@ -398,7 +417,11 @@ def candidates(u: Universe, expected: dict[str, float],
                 depth[u.pos.get(k, "MED")] -= 1
                 sold.append(k)
                 got += raises
-            if sold and price <= cash + got:
+            if sold and price <= cash + got and not legal:
+                hyp = {p: s for p, s in mine_squad.items() if p not in sold}
+                hyp[c] = u.pos.get(c, "MED")
+                legal = bool(best_xi(hyp, expected))
+            if sold and price <= cash + got and legal:
                 out.append(Action(swap, buy=c, sell=tuple(sorted(sold)),
                                   cost=price, proceeds=got,
                                   victim=victim if raid else ""))
@@ -794,10 +817,43 @@ def best_swap_for(u: Universe, k: str, expected: dict[str, float]
     if best_c is None:
         return None
     if best_price <= base_budget:
-        sell, proceeds = (k,), u.proceeds.get(k, 0.0)
+        sell, proceeds, n = (k,), u.proceeds.get(k, 0.0), 0
     else:
         n = next(i for i, g in enumerate(extra_running)
                 if g >= best_price - base_budget) + 1
+        sell = tuple(sorted((k, *extra_names[:n])))
+        proceeds = u.proceeds.get(k, 0.0) + extra_running[n - 1]
+    # THE REAL CHECK, not another bounds approximation — _safe_to_sell()
+    # only ever vets the ONE slot being sold against its own floor, so it
+    # cannot see a position it never touches sitting in EXCESS: a squad
+    # left holding two goalkeepers with exactly XI_SIZE players total has
+    # nowhere to field the second one (no real formation fields two),
+    # even though every position's SLOT_MIN was clear at every step of
+    # the chain. This is the same "meets bounds, fails a real formation"
+    # failure class as illegal_squads()/phantom_fill() (2026-09-01,
+    # rival squads) and _safe_to_sell()'s own XI_SIZE fix (same day, this
+    # exact chain) — caught this time only because best_c's POSITION
+    # wasn't known until now, which is exactly what a bounds check inside
+    # the chain-building loop above can never see either. Verified the
+    # only way this repo trusts: applying the real resulting squad
+    # through best_xi(), growing the sale (one more from the same
+    # ordered chain) if the minimal one leaves no legal shape, since a
+    # different, larger sale set can raise the same money without
+    # leaving this exact stuck position behind.
+    # Only meaningful once the squad is actually real-sized — a squad
+    # short of XI_SIZE can never field a legal shape at all regardless of
+    # this swap (phantom_fill() is what handles that, at load time, for
+    # every real squad this repo ever runs against), so this only guards
+    # a squad that WAS fieldable before the swap and might not be after.
+    # Why: docs/notes/decide.md#best_swap_for--the-real-fieldability-check
+    while len(mine) >= XI_SIZE:
+        hyp = {p: s for p, s in mine.items() if p not in sell}
+        hyp[best_c] = u.pos.get(best_c, "MED")
+        if best_xi(hyp, expected):
+            break
+        if n >= len(extra_names):
+            return None
+        n += 1
         sell = tuple(sorted((k, *extra_names[:n])))
         proceeds = u.proceeds.get(k, 0.0) + extra_running[n - 1]
     best_sell, best_proceeds = sell, proceeds
@@ -2402,6 +2458,46 @@ def _selftest() -> None:
     assert "me_pad3" not in got3c.sell, got3c
     assert got3c.proceeds == sum(u3c.proceeds.get(p, 0.0)
                                  for p in got3c.sell), got3c
+
+    # -- best_swap_for()/candidates(): the funding chain must never leave a
+    # squad that MEETS EVERY SLOT_MIN AND XI_SIZE BUT STILL HAS NO LEGAL
+    # SHAPE — a backup goalkeeper never counted against by either bound,
+    # 2026-09-05's real report, Alvaro Mantilla's own KEEP row read Season
+    # -1286 (best_xi() -> [], zero every remaining jornada) after this
+    # exact chain sold him alongside 3 others to fund a clause, leaving
+    # POR:2/DEF:4/MED:4/DEL:1 (11 total) — no real formation fields two
+    # goalkeepers, but the old `_safe_to_sell()` only ever checked the ONE
+    # slot being sold, never a position (POR here) it never touched. -----
+    sq4 = {"me_k1": "POR", "me_k2": "POR",
+          "me_d1": "DEF", "me_d2": "DEF", "me_d3": "DEF", "me_d4": "DEF",
+          "me_d5": "DEF", "me_m1": "MED", "me_m2": "MED", "me_m3": "MED",
+          "me_m4": "MED", "me_f_old": "DEL"}
+    # 12 total, legal at rest via (5,4,1): DEF5/MED4/DEL1, POR's second
+    # keeper along for the ride same as any real squad's backup.
+    per4 = {1: {k: (3.0, 1.0) for k in sq4}}
+    per4[1]["me_k2"] = (8.0, 1.0)      # starts; me_k1 is the bench keeper
+    per4[1]["me_d5"] = (0.1, 1.0)      # weakest DEF — dead weight, sold
+    # first by the funding chain, same as me_pad above
+    per4[1]["me_f_old"] = (1.0, 1.0)   # the swap target itself
+    per4[1]["new_f"] = (9.0, 1.0)      # his same-slot upgrade
+    u4 = Universe(
+        state=LeagueState({"me": dict(sq4)}, [1], "me"),
+        forecaster=B3(per4), pos={**sq4, "new_f": "DEL"},
+        price={"new_f": 9e6}, proceeds={"me_f_old": 0.0, "me_d5": 2e6},
+        owner={}, cash=8e6, me="me")   # short of 9M on cash (8M) + f_old's
+    # own (0) sale — needs me_d5's proceeds too, which is exactly the
+    # "meets every bound, still illegal" chain
+    exp4 = u4.forecaster.expected(1)
+    got4 = best_swap_for(u4, "me_f_old", exp4)
+    # The OLD bug: got4 would have been (sell=("me_f_old","me_d5"),
+    # buy="new_f") — legal by every bound (DEF 5->4 >= floor 3, total
+    # 12 >= XI_SIZE), but POR:2/DEF:4/MED:4/DEL:1 has no real formation.
+    # The fix must either find a DIFFERENT, larger sale set that IS
+    # fieldable, or refuse outright — never ship the illegal one.
+    if got4 is not None:
+        hyp4 = {p: s for p, s in sq4.items() if p not in got4.sell}
+        hyp4[got4.buy] = u4.pos.get(got4.buy, "MED")
+        assert best_xi(hyp4, exp4), (got4, hyp4)
 
     # -- value_rate: the shared primitive, on its own -----------------------
     assert value_rate(120.0, 14.13e6) is not None
