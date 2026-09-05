@@ -2204,3 +2204,17 @@ observed_at,hours_to_lock,formation,index_total,player,pos,slot,start_pct,start_
 2026-09-05T1806Z,0.9,4-5-1,49.90,Moi Gomez,mediocampista,MED,70,read,ok,0,2956561,3.614,1,5.028,0.931,Alaves,0,2,3.881,attack_defense,17.8,841
 2026-09-05T1806Z,0.9,4-5-1,49.90,Alvaro Mantilla,defensa,DEF,100,read,ok,1,2036880,2.251,0,2.291,1.000,,,3,2.251,none,,10336
 2026-09-05T1806Z,0.9,4-5-1,49.90,Ali Houary,delantero,DEL,40,read,ok,0,1407991,1.613,0,3.119,1.009,Real Sociedad,1,2,1.599,attack_defense,-75.8,14118
+2026-09-05T2029Z,17.8,4-5-1,49.90,Iñigo Vicente,delantero,DEL,100,read,ok,1,26827059,4.171,1,4.498,1.000,,,3,4.171,none,,6442
+2026-09-05T2029Z,17.8,4-5-1,49.90,Pepelu,mediocampista,MED,80,read,ok,0,10044218,3.299,1,4.533,0.810,Barcelona,1,3,4.073,attack_defense,-259.4,2715
+2026-09-05T2029Z,17.8,4-5-1,49.90,Carl Starfelt,defensa,DEF,40,read,ok,0,10227925,2.989,1,4.794,1.399,Getafe,0,1,2.137,attack_defense,48.3,9612
+2026-09-05T2029Z,17.8,4-5-1,49.90,Omar El Hilali,defensa,DEF,80,read,ok,0,12727664,3.506,1,3.308,1.166,Sevilla,1,3,3.006,attack_defense,-13.4,10220
+2026-09-05T2029Z,17.8,4-5-1,49.90,Lucien Agoume,mediocampista,MED,90,read,ok,0,7153734,3.888,1,3.964,1.007,Espanyol,0,3,3.863,attack_defense,13.4,7249
+2026-09-05T2029Z,17.8,4-5-1,49.90,Ionut Radu,portero,POR,90,read,ok,0,34972491,9.218,1,7.070,1.399,Getafe,0,4,6.590,attack_defense,48.3,5978
+2026-09-05T2029Z,17.8,4-5-1,49.90,Pablo Fornals,mediocampista,MED,70,read,ok,0,54358399,5.175,1,6.689,1.032,Villarreal,0,3,5.015,attack_defense,-9.7,2632
+2026-09-05T2029Z,17.8,4-5-1,49.90,Marcos Alonso,defensa,DEF,80,read,ok,0,26711531,7.534,1,6.426,1.399,Getafe,0,3,5.386,attack_defense,48.3,4397
+2026-09-05T2029Z,17.8,4-5-1,49.90,Miguel Roman,mediocampista,MED,70,read,ok,0,7933560,3.750,1,5.393,0.834,Getafe,0,4,4.496,attack_defense,48.3,13808
+2026-09-05T2029Z,17.8,4-5-1,49.90,Natan,defensa,DEF,80,read,ok,0,32995599,2.751,1,4.934,0.711,Villarreal,0,3,3.870,attack_defense,-9.7,11813
+2026-09-05T2029Z,17.8,4-5-1,49.90,Moi Gomez,mediocampista,MED,70,read,ok,0,2956561,3.614,1,5.028,0.931,Alaves,0,2,3.881,attack_defense,17.8,841
+2026-09-05T2029Z,17.8,4-5-1,49.90,Alvaro Mantilla,defensa,DEF,100,read,ok,1,2036880,2.251,0,2.291,1.000,,,3,2.251,none,,10336
+2026-09-05T2029Z,17.8,4-5-1,49.90,Ali Houary,delantero,DEL,40,read,ok,0,1407991,1.613,0,3.119,1.009,Real Sociedad,1,2,1.599,attack_defense,-75.8,14118
+2026-09-05T2029Z,17.8,4-5-1,49.90,Mathew Ryan,portero,POR,95,read,ok,0,20401188,7.366,0,6.972,1.075,Malaga,0,3,6.851,elo,39.3,1743
