@@ -247,17 +247,13 @@ def simulate_many(states: list, forecaster, trials: int = 2000,
 def _run_np(states: list, forecaster, trials: int, seed: int):
     """The same seasons, drawn as arrays. None if numpy is not installed.
 
-    THE DRAW IS THE WHOLE COST and it is embarrassingly rectangular: for one
-    jornada it is a coin per player per trial and a resample per player per
-    trial. In Python that is twenty million calls; as two arrays it is one.
-
-    The generator is seeded from (seed, jornada), so a jornada's matrix is the
-    same however the work is divided — which is what lets the process pool go
-    away entirely rather than being made to agree with itself.
-
-    NOT the same numbers as the Python path: a different generator draws a
-    different sample from the same distributions. Statistically equivalent,
-    not identical, and the report says so where it matters.
+    A SEPARATE, hand-synced mirror of ffcore.forecast.Bootstrap's draw
+    logic (not a caller of it) — vectorizing collapses ~20M Python calls
+    per run into a couple of numpy calls. NOT the same numbers as the
+    Python path (a different generator, statistically equivalent only).
+    The generator is seeded from (seed, jornada), so a jornada's matrix is
+    the same however the work is divided across processes.
+    Full design notes + the rng stream layout: docs/notes/season.md#_run_np-the-vectorized-mirror-kept-in-sync-by-hand
     """
     try:
         import numpy as np
@@ -272,27 +268,10 @@ def _run_np(states: list, forecaster, trials: int, seed: int):
         return None
 
     pool_a = np.asarray(pool, dtype=float)
-    # THE RATE'S OWN ERROR, drawn once per trial (eps0 below) plus a RANDOM
-    # WALK that grows with how far out a jornada is — see
-    # ffcore.forecast.Bootstrap.rate_draw's own docstring and DRIFT_FRAC's
-    # note for why a flat-for-the-whole-season error understated how much a
-    # rating this far out could ALSO have drifted since. Seeded off the
-    # trial (eps0) and off (trial, walk-step) for the drift, never off the
-    # jornada number alone, so redrawing is reproducible regardless of how
-    # the trial range is split across processes.
+    # rate_rel/club_rel/etc mirror ffcore.forecast.Bootstrap's own fields —
+    # see docs/notes/season.md#_run_np-the-vectorized-mirror-kept-in-sync-by-hand
+    # for the rng stream layout and why the club shock does not drift.
     rel = getattr(forecaster, "rate_rel", None) or {}
-    # CLUB-CORRELATED, THE SAME FEATURE Bootstrap.rate_draw() HAS — but
-    # this NUMPY path is a SEPARATE implementation of the same draw, not a
-    # caller of that one (see _run_np's own docstring: "statistically
-    # equivalent, not identical" is already the accepted relationship
-    # between the two paths). Building rate_draw()'s club correlation and
-    # stopping there would have made it inert in production: this is the
-    # path _run_np() actually takes whenever numpy is installed, which it
-    # is here — verified by comparing p_win before/after on the same
-    # pinned data and finding it bit-for-bit unchanged, which a real
-    # widening of the bands cannot produce by chance across thousands of
-    # trials. THE CLUB SHOCK ITSELF DOES NOT DRIFT — one per trial, same
-    # reasoning as rate_draw()'s own note on why.
     club_of = getattr(forecaster, "club_of", None) or {}
     club_rel = getattr(forecaster, "club_rel", None) or {}
     all_keys = sorted({k for ks in order.values() for k in ks} & set(rel)) \
@@ -308,9 +287,8 @@ def _run_np(states: list, forecaster, trials: int, seed: int):
             0.0, None)
         clubs = sorted(club_rel)
         if clubs:
-            # A SEPARATE rng STREAM (a different second seed component) so
-            # the club draw and the individual draw are independent sources
-            # of "wrong", not the same bits reused twice.
+            # Own rng stream (seed component 7920): independent of the
+            # individual draw, not the same bits reused twice.
             crng = np.random.default_rng([seed, 7920])
             csd = np.array([club_rel[c] for c in clubs], dtype=float)
             shock = np.clip(
@@ -321,29 +299,20 @@ def _run_np(states: list, forecaster, trials: int, seed: int):
             shared = np.stack(
                 [shock_of.get(club_of.get(k, ""), ones) for k in all_keys],
                 axis=1)
-        # A THIRD, SEPARATE STREAM for the walk's per-jornada steps — drawn
-        # incrementally inside the jornada loop below, one call per
-        # jornada, since a random walk's steps must be independent draws in
+        # Own stream (7921), drawn incrementally inside the jornada loop
+        # below — a random walk's steps must be independent draws IN
         # ORDER, not one big draw sliced afterward.
         drng = np.random.default_rng([seed, 7921])
         step_sd = DRIFT_FRAC * sd
+        # cum_var stays 1D (per key, the variance SCHEDULE is the same
+        # across trials); walk is (trials, keys) — each trial realizes
+        # its own path. See docs/notes/season.md for the accumulation fix.
         cum_var = np.zeros(len(all_keys))
-        # THE WALK'S OWN ACCUMULATED POSITION — see the jornada loop below
-        # for why this is separate from `cum_var`. Fixed alongside
-        # ffcore.forecast.Bootstrap.rate_draw()'s identical bug, 2026-09-01.
-        # PER TRIAL, NOT JUST PER KEY: each trial draws its OWN walk
-        # realization, so the accumulated position needs the full
-        # (trials, keys) shape `eps0`/the draws already use — cum_var
-        # above stays 1D (per key) because the variance schedule is the
-        # same across trials, only the realized PATH differs per trial.
         walk = np.zeros((trials, len(all_keys)))
 
-    # P(START)'S OWN ERROR, the same shape as the rate's above but on a
-    # SEPARATE stream (seed component 7927+, not 7919+) and ADDITIVE on
-    # logit(p) rather than multiplicative on a rate — see
-    # ffcore.forecast.Bootstrap.start_draw's own docstring for why a
-    # proportion needs a different shape of shock than a rate does. No
-    # club term here, same reason start_draw() has none.
+    # start_rel's own error: same shape as the rate's, own stream
+    # (7927+, additive on logit(p) not multiplicative on a rate). No club
+    # term here, same reason start_draw() has none.
     srel = getattr(forecaster, "start_rel", None) or {}
     all_start_keys = sorted(
         {k for ks in order.values() for k in ks} & set(srel)) if srel else []
@@ -356,10 +325,8 @@ def _run_np(states: list, forecaster, trials: int, seed: int):
         seps0 = srrng.standard_normal((trials, len(all_start_keys))) * ssd
         sdrng = np.random.default_rng([seed, 7928])
         step_sd_s = _DF * ssd
-        # NO cum_var_s: a logit shift is additive and mean-zero already —
-        # unlike the log-normal rate walk above, there is nothing here that
-        # needs the running variance for a mean-correction term, only the
-        # accumulated walk position itself.
+        # No cum_var_s: additive and mean-zero already, unlike the
+        # log-normal rate walk above — just the accumulated position.
         walk_s = np.zeros((trials, len(all_start_keys)))  # per trial too
 
     managers = [list(st.squads) for st in states]
@@ -396,52 +363,25 @@ def _run_np(states: list, forecaster, trials: int, seed: int):
 
     rate_mult = {}
     for j in states[0].jornadas:
-        # ONE MORE RANDOM-WALK STEP, taken every jornada in the remaining
-        # calendar — BEFORE the "nothing to score" skip below, and matching
-        # ffcore.forecast.Bootstrap.rate_draw()'s own walk (which knows
-        # nothing of `order`/keys and advances for every jornada handed to
-        # it). A jornada with no keys still elapses; skipping its step here
-        # would make the walk depend on which weeks happen to have zero
-        # scoring rows, an artifact of the calendar rather than real time
-        # passing. Recomputed each iteration rather than drawn once up
-        # front: a random walk's steps must be independent draws taken IN
-        # ORDER, not sliced out of one big array.
+        # One walk step per jornada in the remaining calendar, taken BEFORE
+        # the "nothing to score" skip below (a jornada with no keys still
+        # elapses — skipping its step would tie the walk's width to which
+        # weeks happen to have zero scoring rows). Accumulated in place,
+        # not redrawn from cum_var — see docs/notes/season.md for the bug
+        # this fixed and why the log-normal form avoids a mean-inflating
+        # clip.
         if all_keys:
-            # THE WALK'S POSITION, ACCUMULATED — NOT REDRAWN FROM ITS OWN
-            # CUMULATIVE VARIANCE EACH JORNADA. Found 2026-09-01 (swarm
-            # review): this used to draw `drift` fresh every jornada from
-            # `sqrt(cum_var)`, which gives each jornada the right MARGINAL
-            # spread but zero correlation between adjacent jornadas within
-            # a trial — see ffcore.forecast.Bootstrap.rate_draw()'s own
-            # note (fixed alongside this one, same bug, independently
-            # reimplemented here) for the full reasoning and the scoped
-            # impact (BUY ranking mostly unaffected — paired trials cancel
-            # it — the standings section's band/p_win is what widens).
             step_var = step_sd ** 2
             walk += drng.standard_normal((trials, len(all_keys))) \
                 * step_sd
             cum_var += step_var
-            # LOG-NORMAL, NOT clip(1+drift, 0) — see
-            # ffcore.forecast.Bootstrap.rate_draw()'s matching note. A wide
-            # walk clipped at zero is not symmetric (the negative tail
-            # floors, the positive tail does not), which biased the MEAN
-            # upward the wider it got — measured while tuning DRIFT_FRAC,
-            # not a rounding error. exp(walk - cum_var/2) has E[.]=1 for
-            # any cum_var, so the walk widens the spread without dragging
-            # the point estimate up with it.
             walked = np.exp(walk - cum_var / 2.0)
             individual = eps0 * walked
             m = individual * shared if shared is not None else individual
             rate_mult = {k: m[:, i] for i, k in enumerate(all_keys)}
-        # SAME WALK, ON P(START) — logit-additive rather than log-normal
-        # multiplicative, and on its own stream (7927/7928, never 7919-21),
-        # so a trial where the scoring rate ran hot is not, for no reason,
-        # also the trial where he starts more.
+        # Same walk, on P(start) — logit-additive, own stream (7927/7928).
         start_shift = {}
         if all_start_keys:
-            # ACCUMULATED, SAME FIX AS ABOVE — additive and mean-zero
-            # already, so no separate cum_var/mean-correction needed here,
-            # matching Bootstrap.start_draw()'s own simplification.
             walk_s += sdrng.standard_normal((trials, len(all_start_keys))) \
                 * step_sd_s
             shifted = seps0 + walk_s

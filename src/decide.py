@@ -65,82 +65,24 @@ __all__ = ["Action", "candidates", "rank", "Universe",
 # numbers the RANKING settles long before the levels do, so this buys an order
 # of magnitude of speed and costs only precision on options that lose anyway.
 SCREEN_TRIALS = 250
-# CHECKED WHETHER 3000 IS FALSE PRECISION (2026-08-31), asked directly by
-# Miguel. It is not, and the two numbers this question conflates move in
-# OPPOSITE directions with trial count. Ran the real board at N in {100,
-# 250, 500, 1000, 1500, 3000}, same seed each time (the common-random-
-# numbers claim above, tested rather than assumed): the TOP move (a paired
-# comparison, "with the move vs. without it" over the SAME simulated
-# seasons) was "buy Lucas Boye" at every single N, from 100 to 3000 — the
-# ranking claim holds all the way down. `p_win`/`expected_finish` (levels,
-# not paired differences) did not: 0.1930-0.2600 across that same run,
-# a 7-point swing on a figure the report prints as a single number. Cutting
-# FINAL_TRIALS would speed up an already-cheap stage (7.0s at 3000, 2.9s at
-# 1000, most of the difference is the trial-proportional cost — the rest is
-# fixed overhead that does not shrink further below ~1000) in exchange for
-# MORE noise on exactly the number sim.trailing() now thresholds at 0.5 —
-# a swing this size can flip whether that mode fires on a genuinely
-# borderline day. Kept at 3000; the intuition was reasonable but backwards
-# once measured, same shape as SHRINK_K's/DRIFT_FRAC's own 2026-08-31 checks.
+# 3000 checked against 100-1500 for false precision — ranking (paired) is
+# stable across all of them; p_win/expected_finish (levels) are not, and
+# sim.trailing() thresholds those at 0.5. Do not lower without re-checking.
+# Why: docs/notes/decide.md#trial-counts-screen_trials--final_trials
 FINAL_TRIALS = 3000
 KEEP = 12          # how many survive screening and get the full count
 
-# A RELIABLE FLOOR, ON TOP OF KEEP, NOT INSTEAD OF IT. Checked against this
-# league's real transaction history 2026-08-29 (data/tidy/transactions.csv):
-# 108 recorded transactions, all 108 "from the app" — zero manager-to-manager
-# sales, ever. Re-checked 2026-08-31 at 119 rows and it still holds, this time
-# PROVEN rather than read off the ledger's own `from`/`to` columns, which
-# cannot show a counterparty at all (ledger.py's own note: the feed names one
-# manager per row, so every deal is written against the pool by construction —
-# reading "0 manager-to-manager" off those columns would be reading the
-# writer's own lossiness back as a finding). The real check replays ownership
-# from inputs/rosters_initial.txt forward over every api_activity row: 119
-# deals, zero buys of a player somebody already held, zero sells by anybody
-# but the holder, and the two sell→buy pairs on the same player are 4 and 10
-# days apart — sold to the app, later re-bought from it, not a transfer.
-#
-# AND IT IS THE SAME FOR ALL FOUR RIVALS, which is a real negative result and
-# is why there is no per-rival version of this constant. Attributing every
-# `marketPlayerTeam` row in api_market.csv to whoever owned that player at
-# that moment gives each rival's own listing history: Albert Laporta 20
-# players listed, BurtonGM89 19, SusoGattuso 18, Magic Mike 333 zero, ever.
-# Of those listings 44–55% did eventually leave the squad — but every one of
-# them left TO THE APP, so the conversion rate that matters here (a listing
-# that becomes a sale TO ANOTHER MANAGER) is 0/57 pooled and 0 for each rival
-# individually. There is nothing to split them on: the three who list are
-# within binomial noise of each other on the rate that CAN be measured
-# (±11pp at n≈20), and the fourth has never given the question a data point.
-# So the league-wide prior below stays league-wide. What IS differentiated per
-# rival is how fast each can raise money — see rival_tempo() and
-# days_to_afford(), which is where the per-rival read went instead.
-#
-# A "listed" candidate (Universe.route: a rival's own sale, who
-# can simply not sell) screens on the same raw gain as a "free"/"clause" one
-# that is actually guaranteed to go through, and on this box's real data
-# listed candidates filled 10 of KEEP's 12 slots — a free-agent move outside
-# the raw top 12 never reached the full FINAL_TRIALS pass at all, not even to
-# be shown with a real band in the report table, because listed candidates
-# that will likely never happen crowded it out of the SAMPLE, not just out of
-# the final recommendation. This tops up `keep` with the best-screened
-# reliable candidates not already in it, until at least this many are in the
-# final pass — added on top of the natural top-KEEP, never displacing
-# anything from it, so a real listed opportunity stays fully visible too.
+# A RELIABLE FLOOR ON TOP OF KEEP, NOT INSTEAD OF IT — 0/119 real deals in
+# this league have ever been manager-to-manager, so an unreliable "listed"
+# candidate must not crowd every reliable one out of the raw-gain-screened
+# sample. _top_up() enforces this, additive, never displacing anything.
+# Why: docs/notes/decide.md#keep_reliable_min--reliable-candidates-always-reach-the-full-pass
 KEEP_RELIABLE_MIN = 6
 
-# AN EFFICIENT BUT MODEST CANDIDATE, VIA THE SAME MECHANISM AS
-# KEEP_RELIABLE_MIN (_top_up(), below) — `screened` is sorted by raw gain,
-# so `top = screened[:KEEP]` structurally cannot contain a candidate that
-# gains little but costs almost nothing: on a day the top-12 are all
-# €5-20M moves for 0.1-0.3 places, a €200k move worth 0.05 places never
-# reaches the FINAL_TRIALS pass at all, so nothing downstream — not the
-# report table, not sim._best()'s own value-for-money re-pick — can ever
-# find it. It is not ranked low; it is not scored. This tops up `top` with
-# the best-screened-by-efficiency candidates not already in it, same
-# non-destructive shape as KEEP_RELIABLE_MIN: on top, never displacing a
-# naturally-kept row. Efficiency here is the cheap screening pass's own
-# `d` (expected-position delta, not season points) per net euro — a proxy
-# for the real `value` FINAL_TRIALS computes later, good enough to decide
-# who earns the expensive pass.
+# SAME MECHANISM, DIFFERENT AXIS: an efficient-but-modest candidate (small
+# gain, tiny cost) can't win top-KEEP's raw-gain sort either, so it would
+# never reach the full simulation at all. Topped up the same additive way.
+# Why: docs/notes/decide.md#keep_value_min--efficient-but-modest-candidates-also-reach-the-full-pass
 KEEP_VALUE_MIN = 4
 
 
@@ -211,12 +153,9 @@ class Universe:
     # difference between the two is money that never comes back.
     value: dict[str, float] = field(default_factory=dict)
     # Expected points for EVERY player the market prices, not only the 89 the
-    # simulation needs. The simulation scores who could be in a squad; asking
-    # what the market might deal you next is a question about the other five
-    # hundred, and `expected()` returning 0.0 for a player it was never given
-    # is indistinguishable from him being worthless. That is not hypothetical:
-    # it made Lamine Yamal and Vinicius Junior score zero, and produced the
-    # finding that four players in the whole league could improve the eleven.
+    # simulation needs — expected() returning 0.0 for an unscored player is
+    # indistinguishable from worthless, and once scored Lamine Yamal that way.
+    # Why: docs/notes/decide.md#universe-fields
     market_exp: dict[str, float] = field(default_factory=dict)
     # P(he starts) as ONE number — futbolfantasy's reading recalibrated
     # against confirmed line-ups and blended with analiticafantasy where it
@@ -232,19 +171,10 @@ class Universe:
     # the whole league. What it costs ANYBODY to take ANYBODY, which is what a
     # rival needs to be able to answer back.
     clause: dict[str, float] = field(default_factory=dict)
-    # HOW you would get each player: "free" if a free agent the app itself is
-    # dealing, "listed" if he is owned and a manager has put him up for sale
-    # (a real owner who can simply not sell, and other managers may already
-    # be bidding — see market_routes()), "clause" if the only route is
-    # paying his buyout. Three different transactions and only "clause" is a
-    # raid in the sense that pays the owner — calling a market purchase a
-    # steal implies a denial benefit that, measured, is zero, and it is what
-    # made a table of ordinary buys read as a raiding plan. On 2026-08-18
-    # every acquirable player was route "market" (this field's old,
-    # undifferentiated third value) and not one clause was payable; "free"
-    # vs "listed" split out 2026-08-22, once it was measured that MOST of a
-    # day's "market" rows are usually a rival's own listing, not a free
-    # agent (28 of 41 the day the feed's own seller field was first read).
+    # HOW you would get each player: "free" (app dealing a free agent),
+    # "listed" (owner's own sale, can refuse — see market_routes()), or
+    # "clause" (only route is his buyout; the only one that's a real raid).
+    # Why: docs/notes/decide.md#universe-fields
     route: dict[str, str] = field(default_factory=dict)
     # How many other managers are already bidding on a "listed" row — 0 for
     # a "free"/"clause" entry, since neither is a contest. What makes a
@@ -315,20 +245,11 @@ def current_xi(u, who: str | None = None) -> tuple[dict[str, float], set[str]]:
     """(exp, xi) — this round's expected points and the best legal eleven
     `who` (default u.me) could field from them, right now.
 
-    THE ONE COMPUTATION EVERY "what is my/a rival's current best eleven
-    worth" QUESTION IN THIS REPO USED TO REBUILD BY HAND — found duplicated
-    across xi_note(), fielded_shape(), ladder_rows(), wait_routes(),
-    _xi_total(), _shape_now() (all sim.py) and candidates() (this module),
-    each with its own `exp = u.forecaster.expected(choosable(u)); xi =
-    best_xi(squad, exp)` pair. All deterministic — no randomness, so no
-    trial-to-trial drift risk the way ladder()'s old duplicate band
-    simulation had — but still the same "no single owner"
-    shape: seven implementations of one fact, kept in sync by hand rather
-    than by construction, is exactly the mess a future change to best_xi()'s
-    tie-breaking (or choosable()'s own jornada pick) would fall through.
-    `exp` is the SAME dict regardless of `who` — only the squad it is read
-    against differs — so a caller wanting several managers' bands calls
-    this once per manager, not once for `exp` and again per squad.
+    THE ONE COMPUTATION of "what is my/a rival's current best eleven worth" —
+    seven call sites across sim.py and this module used to rebuild this pair
+    by hand. `exp` is the SAME dict regardless of `who`; only the squad it's
+    read against differs.
+    Why: docs/notes/decide.md#current_xi--one-computation-seven-old-copies
     """
     exp = u.forecaster.expected(choosable(u))
     xi = set(best_xi(u.state.squads.get(who or u.me, {}), exp))
@@ -338,34 +259,14 @@ def current_xi(u, who: str | None = None) -> tuple[dict[str, float], set[str]]:
 def xi_bar(exp: dict[str, float], xi) -> float:
     """The weakest man in an eleven — the number a signing has to clear.
 
-    One line, but the same line was hand-written at every current_xi()
-    call site that needed it (candidates(), wait_routes(), ladder_rows())
-    before this existed, which is how "min(..., default=0.0)" is exactly
-    the kind of detail that drifts silently if one copy is edited and the
-    others are not.
-
-    ONE FLAT NUMBER ACROSS ALL FOUR SLOTS, AND THAT IS THE CORRECT SCREEN
-    RATHER THAN A MISSING FEATURE. Value-over-replacement theory says the
-    bar ought to be position-specific — the worst starting defender is not
-    the worst starting forward — and on the real board those bars are
-    genuinely far apart (measured 2026-08-31: POR 5.82, DEF 2.69, MED
-    2.54, DEL 3.62). A per-position bar would still be WRONG here, and the
-    reason is the one season.py's best_xi() docstring already gives: YOU
-    CAN CHANGE YOUR LAYOUT. A candidate below his own slot's bar enters
-    the eleven by pushing that slot's count up and some other slot's down,
-    so he helps the moment he beats the worst starter ANYWHERE — which is
-    exactly this minimum. Screening him against his own slot's bar drops a
-    man who would have played. The self-test carries the exact shape: a
-    1-5-4-1 with a weak fifth defender, where a midfielder at 2.0 is below
-    MED's own replacement level of 4.0 and still gains a point on the
-    pitch by reshaping to 1-4-5-1 and taking that defender out.
-
-    So the flat bar is the LOOSEST SOUND screen, and it errs the safe way.
-    It lets through candidates who cannot actually help — 4 of 19 real
-    targets on 2026-08-31, two of them keepers, since you only ever field
-    one — and the simulation behind candidates() then prices those at
-    roughly nothing (the day's keeper clause: -0.54 season points). That
-    is a few wasted screening slots. The other error would be a lost move.
+    ONE FLAT NUMBER ACROSS ALL FOUR SLOTS — deliberately, not a missing
+    per-position feature. A per-position bar would drop a candidate who
+    helps by RESHAPING the XI (pushing one slot's count up, another's
+    down) rather than beating his own slot's replacement level. This is
+    the loosest SOUND screen — it lets a few uphelpful candidates through
+    to the simulation (which then correctly prices them near-zero), but
+    a stricter per-position bar would silently drop a real move instead.
+    Why: docs/notes/decide.md#xi_bar--why-the-bar-is-flat-across-all-four-slots
     """
     return min((exp.get(k, 0.0) for k in xi), default=0.0)
 
@@ -381,49 +282,15 @@ def _squad_depth(mine_squad: dict[str, str]) -> dict[str, int]:
 def _safe_to_sell(u: Universe, k: str, depth: dict[str, int]) -> bool:
     """Would selling `k` still leave a legal shape fieldable?
 
-    SLOT_MIN is a hard floor per position — one keeper, at least three
-    defenders and three midfielders, at least one forward — not a
-    threshold to tune. Below it `best_xi()` cannot complete ANY shape
-    (season.py:97), so the simulation would correctly price the result as
-    ruinous, but there is no reason to spend a screening pass finding
-    that out. `depth` is checked against the CURRENT squad, mutated by
-    the caller as sales are chosen, so a chain that would sell two men
-    from an already-thin position is caught even when either alone is
-    safe.
-
-    PER-POSITION MINIMUMS ARE NOT ENOUGH ON THEIR OWN — SLOT_MIN's four
-    floors sum to 8 (1+3+3+1), but XI_SIZE is 11: a squad can clear
-    every position's own minimum individually and still not have enough
-    PLAYERS, TOTAL, to fill any of the 7 real formations, every one of
-    which uses more than the bare minimum somewhere. Confirmed live,
-    2026-09-01 (Miguel: "something wrong in the report"): best_swap_for()
-    chained four sales to fund one purchase — the result cleared DEF/MED/
-    POR/DEL's own SLOT_MIN individually (4/3/1/2) but totalled only 10
-    players, one short, and best_xi() correctly returned [] — scored as
-    a paired d_pts of roughly the ENTIRE season (-1282), the same
-    "meets every bound, matches no real formation" pathology already
-    found and fixed once today for a RIVAL's squad (illegal_squads(),
-    9ee9fdf) — this is the same bug reappearing on a HYPOTHETICAL sale
-    chain on Miguel's own squad, which `sum(depth.values())` (still
-    just `depth`, no new state) now also guards against here, catching
-    the actual failure mode observed. Does NOT catch the narrower case
-    illegal_squads()'s own self-test found (a squad at exactly 11 that
-    matches no real formation, e.g. DEF=3 paired with MED=3) — a full
-    fix would call best_xi() itself rather than count bounds at all, the
-    same principle applied there; not done here because this function is
-    called once per CANDIDATE sale inside a tight chain-building loop
-    (candidates()/best_swap_for()), and a real best_xi() search per
-    candidate is a cost worth avoiding for a case this narrow. If that
-    edge case is ever hit here too, that is the fix to reach for.
-
-    THE THRESHOLD IS `XI_SIZE`, NOT `XI_SIZE - 1` — every caller's own
-    chain ends in exactly ONE buy that restores a player, so the total
-    that matters is `depth` BEFORE this sale (what selling `k` would
-    leave, plus the one player still to come back). Got this wrong on
-    the first pass at this fix (used `depth - 1 < XI_SIZE`, effectively
-    demanding 12, not 11) and it broke an ordinary single-swap candidate
-    at a squad of exactly 11 — caught immediately by the existing
-    self-test for exactly that case.
+    SLOT_MIN is a hard per-position floor, checked against the CURRENT
+    squad (`depth`, mutated by the caller as sales are chosen). NOT ENOUGH
+    ON ITS OWN, though: SLOT_MIN's floors sum to 8 but XI_SIZE is 11, so a
+    squad can clear every position's minimum individually and still lack
+    enough PLAYERS, TOTAL, to fill any real formation — `sum(depth.values())
+    < XI_SIZE` catches that. Threshold is `XI_SIZE`, not `XI_SIZE - 1`:
+    every caller's chain ends in exactly one buy that restores a player, so
+    what matters is depth BEFORE this sale.
+    Why: docs/notes/decide.md#_safe_to_sell--per-position-minimums-arent-enough-on-their-own
     """
     slot = u.pos.get(k, "MED")
     if sum(depth.values()) < XI_SIZE:
@@ -471,19 +338,13 @@ def candidates(u: Universe, expected: dict[str, float],
         bar_exp = expected
         xi = set(best_xi(u.state.squads[u.me], bar_exp))
     bar = xi_bar(bar_exp, xi)
-    # FUNDING IS NOT JUST BENCH ANY MORE. A starter is a legal sale too, and
-    # the only reason to leave him out of the pool is if the squad cannot
-    # spare him (SLOT_MIN) — whether he is WORTH selling is what the
-    # simulation this feeds is for. Weakest expected contributor first,
-    # whichever regime (bench or XI) he happens to be in.
+    # Funding is not just bench: a starter is a legal sale too if SLOT_MIN
+    # allows it (whether he's WORTH selling is the simulation's call).
     depth0 = _squad_depth(mine_squad)
     spare = sorted((k for k in mine if _safe_to_sell(u, k, depth0)),
                    key=lambda k: bar_exp.get(k, 0.0))
-    # DEAD WEIGHT PAYS FOR THINGS FIRST. These never make the eleven, so
-    # selling them costs nothing on the pitch — tried before any starter
-    # sale, which does cost something. Biggest first, so the greedy below
-    # never sells four men to do the work of three. Weak starters (SLOT_MIN-
-    # safe, weakest first) fill in only once dead weight runs out.
+    # Dead weight (never starts, costs nothing to sell) tried first, biggest
+    # first; weak starters (SLOT_MIN-safe) fill in once dead weight runs out.
     free = sorted(dead_weight(u), key=lambda kv: -kv[1]) \
         + _weak_starters(u, xi, bar_exp, dict(depth0))
 
@@ -492,11 +353,8 @@ def candidates(u: Universe, expected: dict[str, float],
         if c in mine or bar_exp.get(c, 0.0) <= bar:
             continue
         victim = u.owner.get(c, "")
-        # A RAID IS PAYING A CLAUSE. Buying a man off the market is a
-        # purchase, whoever happens to own him — and the measured denial value
-        # of doing so was zero, because the managers listing players are not
-        # the one being raced. Labelling those "steal" implied a benefit that
-        # is not there and made an ordinary shopping list read as a raid.
+        # A raid is paying a clause; buying off a listing is an ordinary
+        # purchase — measured denial value of a listing is zero.
         raid = bool(victim and victim != u.me
                     and u.route.get(c, "market") == "clause")
         kind = "clause" if raid else "buy"
@@ -504,31 +362,19 @@ def candidates(u: Universe, expected: dict[str, float],
         if price <= cash:
             out.append(Action(kind, buy=c, cost=price,
                               victim=victim if raid else ""))
-        # Funded by a sale: only the cheapest few spares are worth trying —
-        # bench or a weak starter, now — because selling a man you field to
-        # buy one you also field is a swap the simulation will price at
-        # roughly nothing. Six, not four: the pool is bigger than bench-only
-        # was, so a couple more are worth a look.
+        # Funded by a sale: only the cheapest few spares are worth trying.
         for s in spare[:6]:
             got = u.proceeds.get(s, 0.0)
             if price <= cash + got:
                 out.append(Action(swap, buy=c, sell=s, cost=price,
                                   proceeds=got,
                                   victim=victim if raid else ""))
-        # Out of reach on cash plus any ONE spare, but not out of reach: the
-        # fewest sales that cover it, dead weight first, weak starters after.
-        # One combination per target rather than every subset — they are all
-        # worth the same on the pitch, so the only thing to choose between
-        # them is how few men leave. Depth is tracked and re-checked as sales
-        # are chosen — two starters from the same thin position can each be
-        # individually safe and still not be safe TOGETHER.
-        # THE TRIGGER IS THE REAL BALANCE, not the budget. `budget` widens
-        # what gets EMITTED, so the frontier can be measured off targets you
-        # cannot afford; whether the sales on hand are enough to reach a man
-        # is a fact about the money you actually have. Keyed to the budget
-        # instead, an unlimited one made every target reachable on cash alone
-        # and the multi-sale moves stopped being generated at all — which
-        # silently removed the best move on the board.
+        # Out of reach on cash + any ONE spare: the fewest sales that cover
+        # it, dead weight then weak starters, depth re-checked as chosen.
+        # Triggered on the REAL cash, not `budget` (which only widens what's
+        # EMITTED) — keying the trigger to an unlimited budget once made
+        # every target look cash-reachable and silently dropped every
+        # multi-sale move.
         if price > u.cash + max((u.proceeds.get(s, 0.0) for s in spare),
                                 default=0.0):
             sold, got = [], 0.0
@@ -536,14 +382,7 @@ def candidates(u: Universe, expected: dict[str, float],
             for k, raises in free:
                 if price <= u.cash + got:
                     break
-                # A SALE THAT RAISES NOTHING SPENDS LEGALITY BUDGET FOR NO
-                # REASON — harmless before _safe_to_sell()'s own total-
-                # count guard (2026-09-01), since an extra sale cost
-                # nothing but itself; now every accepted sale narrows how
-                # many MORE the squad can safely afford to make, so one
-                # that raises $0 (an unpriced player — `u.proceeds`
-                # defaults to 0.0 when his value is unknown) must not be
-                # spent for nothing.
+                # A sale raising $0 spends legality budget for nothing.
                 if raises <= 0:
                     continue
                 if not _safe_to_sell(u, k, depth):
@@ -682,29 +521,15 @@ def rival_tempo(txns, now=None) -> dict[str, dict]:
     """Each manager's OWN realised transaction behaviour, from the real ledger.
 
     `{handle: {"buys", "sells", "bought", "sold", "days", "sell_rate",
-    "idle"}}` — counts, euros, the span of the ledger in days, gross sale
-    proceeds per day, and days since that manager's last deal of any kind.
+    "idle"}}` — counts, euros, ledger span in days, gross sale proceeds per
+    day, days since that manager's last deal.
 
-    WHY GROSS PROCEEDS PER DAY AND NOT NET CASH FLOW. Net is negative for
-    every manager in this league (measured 2026-08-31: −4.5M to −8.2M a day
-    each) because they are all still deploying a starting budget that only
-    gets spent once, so extrapolating it forward predicts everyone going
-    infinitely broke — a rate that cannot continue is not a trajectory. The
-    question days_to_afford() actually asks is "how fast has this manager
-    demonstrated he can PUT MONEY TOGETHER", and gross sale proceeds per day
-    is exactly that, measured, with no assumption about what he then does
-    with it.
-
-    ONE SIDE OF EVERY ROW IS THE POOL, by construction — see ledger.py's own
-    header. That costs nothing here: a manager's own buys and sells are
-    exactly the rows naming him, and who the counterparty was does not
-    change how much money moved.
-
-    `days` is the span of the WHOLE ledger, not each manager's own first-to-
-    last: a manager who has done nothing for a week has a real rate of
-    nearly zero and dividing by his own shorter span would hide that. It is
-    the same denominator for everyone, which is what makes the four numbers
-    comparable at all.
+    GROSS proceeds per day, not net cash flow — net is negative for every
+    manager here (they're all still deploying a starting budget spent once),
+    so it would predict everyone going infinitely broke. `days` is the span
+    of the WHOLE ledger, not each manager's own first-to-last, so an idle
+    manager's near-zero rate isn't hidden behind a shorter denominator.
+    Why: docs/notes/decide.md#rival_tempo--gross-proceeds-per-day-not-net-cash-flow
     """
     from ffcore.tidy import ledger_stamp
 
@@ -749,36 +574,16 @@ def days_to_afford(cash, price: float, daily_bonus: float,
     """Roughly how many days until a manager on `cash` could put `price`
     together. 0 if he already can; None if nothing says he ever could.
 
-    WHAT IS MEASURED AND WHAT IS GUESSED, stated the way DRIFT_FRAC's own
-    comment states it, because this is an estimate and reads like a fact:
-
-      * `cash` — MEASURED for me (the app states `teamMoney` for the account
-        that asks), ESTIMATED for a rival: the starting budget less every
-        ledger row plus the accrued allowance. It carries a `~` everywhere it
-        is printed and it can be a whole unseen sale wrong.
-      * `daily_bonus` — a CONFIGURED FACT off inputs/league.ini (100K here),
-        the one income the activity feed cannot see.
-      * `sell_rate` — MEASURED, per rival, off that rival's own realised
-        gross sale proceeds per day (rival_tempo()). It is a rate he has
-        actually run, not a capacity anybody has assumed for him.
-      * The COMBINATION — that he keeps raising money at his own past rate
-        while the allowance accrues — is the GUESS, and it is the whole
-        model. There is no attempt to say whether he WANTS this player.
-        ffcore.bid.demand_summary() already answers that, as a snapshot of
-        who can pay TODAY; this answers the orthogonal question it cannot,
-        which is when the ones who cannot pay today start being able to.
-
-    ALLOWANCE-ONLY WAS TRIED FIRST AND IS WRONG HERE, which is why
-    `sell_rate` exists at all. On the allowance alone, Albert Laporta
-    (−45.02M on 2026-08-31) needs 450 days to reach a zero balance and would
-    be reported as no threat to anything for over a year — while the ledger
-    shows him raising 86.9M across six sales in the preceding seven days. A
-    bound nobody can act on, printed as a number, is worse than no number.
-
-    `ceiling` is a hard cap on what he could ever reach — his cash plus what
-    his whole squad is worth. Past it the answer is None (never), not a very
-    large number of days: a manager cannot sell more than he holds, and the
-    rate above would otherwise extrapolate straight through that wall.
+    `cash` is measured for me, estimated for a rival. `daily_bonus` is a
+    configured fact (inputs/league.ini). `sell_rate` is measured, per rival,
+    off his own realised gross sale proceeds (rival_tempo()). The
+    COMBINATION — that he keeps raising money at his past rate while the
+    allowance accrues — is the one guess this makes; it says nothing about
+    whether he WANTS this player (see ffcore.bid.demand_summary() for that).
+    Allowance-only was tried first and understates badly for a manager who's
+    been actively selling. `ceiling` (his cash + his whole squad's value)
+    caps the answer at None past it — he can't sell more than he holds.
+    Why: docs/notes/decide.md#days_to_afford--measured-vs-guessed
     """
     if cash is None:
         return None
@@ -796,27 +601,13 @@ def contest(u, key: str) -> list[tuple[str, int]]:
     """`[(manager, days), ...]` — who else could pay `key`'s own price, and
     how soon, soonest first. `[]` when nobody ever could.
 
-    THE RACE, WHICH THE BOARD OTHERWISE DOES NOT PRICE. A clause is instant
-    and cannot be refused — by me OR by anybody else — so a target sitting
-    at a payable clause is not a thing I own the option on, it is a thing
-    the first solvent manager takes. That changes what to do with a target
-    in opposite directions depending on one number nothing here printed
-    before: if the nearest rival is a month away there is no race and the
-    money is better kept for a cycle this simulation cannot value (see
-    "Cash scores zero"), and if he is two days away then waiting IS the
-    decision, made by default.
-
-    CLAUSE TARGETS ONLY, deliberately. A clause price is published, applies
-    to everybody alike, and cannot be refused, so "can he pay it" is the
-    whole of "can he take him". A free-agent or listed row is a BID that can
-    lose, and what it costs to win one is a fact about behaviour this
-    function has no model of — `Universe.bids` (the app's own
-    `numberOfBids`) is the real observed contest signal there, and it is
-    already carried.
-
-    THE OWNER IS NOT A CONTENDER for his own player and neither am I: this
-    is who else could take him out from under me, which is a question about
-    the other three.
+    A clause is instant and cannot be refused by anybody — so a target
+    sitting at a payable clause isn't an option Miguel owns, it's a thing
+    the first solvent manager takes. Clause targets only, deliberately: a
+    free-agent or listed row is a BID that can lose, and `Universe.bids`
+    (the app's own numberOfBids) is the real contest signal there. The
+    owner is not a contender for his own player and neither am I.
+    Why: docs/notes/decide.md#contest--clause-targets-only-deliberately
     """
     if u.route.get(key) != "clause":
         return []
@@ -844,25 +635,15 @@ def dead_weight(u) -> list[tuple[str, float]]:
     """[(player, what he raises)] for everyone in my squad who never starts.
 
     A man who makes none of the remaining elevens contributes nothing on the
-    pitch whatever else happens, so selling him costs nothing and any offer is
-    a gain. It is the one verdict this system still makes, and the only one
-    reachable without valuing cash — every other Buy/Sell/Hold/Watch string
-    was a proxy for "does this move me up the table", which is now a column.
+    pitch, so selling him costs nothing and any offer is a gain — the one
+    verdict reachable without valuing cash.
 
-    Checked against every jornada you can still PICK, which is not the same as
-    every jornada left. A round already in progress has its eleven locked, and
-    it fields a different one from the rest because the players whose clubs
-    have kicked off are out of it — so a man who starts only there is not
-    being fielded by any decision still open to you. On the day this was
-    written that was Dani Lorenzo, in one jornada of thirty-eight, and the old
-    board had him right: sixth midfielder, spare for the rest of the season.
-    If NO choosable round is left, the locked one is all there is and second-
-    guessing it helps nobody.
-
-    What it deliberately does NOT do is rank them against each other or say
-    what to hold out for. That needs the option value of cash, and nothing
-    here models next cycle's market — but it DOES fund things: see
-    candidates(), where these pay for the moves nothing else can reach.
+    Checked against every jornada you can still PICK, not every jornada
+    left: a round already in progress has its eleven locked to a smaller
+    pool (clubs that have kicked off drop out), so a man who only starts
+    THERE isn't being fielded by any decision still open to you. Does not
+    rank these against each other or say what to hold out for — see
+    candidates(), where they pay for moves nothing else can reach.
     """
     mine = u.state.squads.get(u.me, {})
     choosable = [j for j in u.state.jornadas if j not in u.part_played] \
@@ -939,67 +720,32 @@ def best_swap_for(u: Universe, k: str, expected: dict[str, float]
     """The best real upgrade `k`'s sale funds — sell him, buy the
     highest-expected target his proceeds, your cash, AND (if that still
     falls short) the same dead-weight-then-weak-starters chain
-    candidates() draws on can reach. None when nothing does: the honest
-    answer for a man with no affordable upgrade is "keep him", not a
-    swap that does not exist.
+    candidates() draws on can reach. None when nothing does.
 
-    WIDENED FUNDING, 2026-08-29. Used to stop at k's own proceeds plus
-    cash — a real gap, flagged the night before: it answered "what is he
-    worth alone" when the question this exists for is "what would it
-    take", the same one candidates() answers for the rest of the board.
-    Extra sales (never k himself, SLOT_MIN-safe, see _weak_starters())
-    only get proposed once his own sale plus cash isn't enough — a target
-    reachable on his own is never funded by more men than it needs to be.
-
-    THIS IS THE QUESTION A HELD PLAYER'S BAND SHOULD ANSWER and a pure
-    sale (sell him, buy nothing) is not it — see sim.band_acts()'s own
-    note on why "what does losing him cost, with no plan for the money"
-    understated a bench player who funds a real replacement. It is a
-    DIFFERENT question from candidates()'s own swap search, which asks
-    "what is the single best move on the whole board" and dedupes to one
-    funding source per target — that crowds out every player who was not
-    the WINNING funding source for whichever target won, so reusing its
-    output cannot answer for every held player individually, only for
-    the lucky few. Same cheap, deterministic screening candidates() uses
-    (expected points, not a simulation — see its own docstring for why
-    that is enough for a screen), scoped to one funding player instead
-    of the whole squad.
-
-    Ties break toward the cheaper target — cash left over is worth
-    something a simulation run today cannot price, the same reasoning
-    rank()'s own dedup step uses.
-
-    SAME SLOT ONLY. `expected()` puts every position on one points scale
-    — that is what lets best_xi() compare a keeper against a forward when
-    it fills a formation, and candidates()'s own screen already trusts it
-    that way for "would this new man even make the eleven". But a SQUAD
-    slot is not a formation slot: replacing a MED with a POR does not
-    field an extra keeper, it leaves the squad short a midfielder, and
-    the real simulation prices that shape correctly — found 2026-08-25
-    when three different bench players' "best real alternative" all came
-    back as the one goalkeeper on the board, each one a real, honestly
-    negative number (the simulation ballast for a broken squad shape is
-    real) attached to a swap no manager would ever make. The band was
-    right; the swap it was pointing at was not a question worth asking.
+    A DIFFERENT QUESTION from candidates()'s own swap search, which dedupes
+    to one funding source per target and so can't answer for every held
+    player individually — this asks "what would it take" scoped to ONE
+    funding player. SAME SLOT ONLY: `expected()` puts every position on one
+    points scale, but a SQUAD slot funding a swap is not a FORMATION slot —
+    found 2026-08-25 when this once suggested selling bench players for the
+    board's one goalkeeper, a real but meaningless number.
+    Why: docs/notes/decide.md#best_swap_for--vs-ranks-own-funder-and-the-same-slot-fix
     """
     mine = u.state.squads.get(u.me, {})
     base_budget = u.cash + u.proceeds.get(k, 0.0)
     my_exp = expected.get(k, 0.0)
     slot = u.pos.get(k)
 
-    # THE EXTRA CHAIN: dead weight first (free on the pitch), then other
-    # weak starters, SLOT_MIN-safe, k already counted as gone. Built once,
-    # walked once — `extra_names[i]`/`extra_running[i]` is "sell the first
-    # i+1 of these, raise this much", so any target's minimal extra sale
-    # is a lookup, not a fresh walk.
+    # The extra chain: dead weight first, then weak starters, SLOT_MIN-safe,
+    # k already counted as gone (never rides in this chain — see below).
+    # Built once, walked once: extra_names[i]/extra_running[i] is "sell the
+    # first i+1 of these, raise this much", a lookup not a fresh walk.
     depth = _squad_depth(mine)
     if slot in depth:
         depth[slot] -= 1
     xi_now = set(best_xi(mine, expected))
-    # k HIMSELF NEVER RIDES IN THIS CHAIN — he is already the primary sale,
-    # accounted for in base_budget, and dead_weight() does not know to
-    # exclude him (it tags anyone never in ANY choosable XI, which k can be
-    # if he is bench).
+    # k is already the primary sale (in base_budget); dead_weight() doesn't
+    # know to exclude him since he can be bench (never in any choosable XI).
     chain = [(p, r) for p, r in sorted(dead_weight(u), key=lambda kv: -kv[1])
             if p != k] + _weak_starters(u, xi_now, expected, dict(depth),
                                         exclude=k)
@@ -1007,9 +753,7 @@ def best_swap_for(u: Universe, k: str, expected: dict[str, float]
     extra_running: list[float] = []
     got = 0.0
     for s, raises in chain:
-        # SAME GUARD AS candidates()'s OWN CHAIN, same reason — a sale
-        # raising $0 spends legality budget (_safe_to_sell()'s total-
-        # count guard) for nothing.
+        # Same guard as candidates()'s own chain: a $0 sale spends nothing.
         if raises <= 0:
             continue
         if not _safe_to_sell(u, s, depth):
@@ -1020,18 +764,12 @@ def best_swap_for(u: Universe, k: str, expected: dict[str, float]
         extra_running.append(got)
     max_budget = base_budget + got
 
-    # EVERY AFFORDABLE UPGRADE, NOT JUST A RUNNING MAX — collected first so
-    # the pick below can weigh cost, not just take whichever came out
-    # highest on raw `expected`. Before this (found 2026-08-31, Miguel:
-    # "why would having a clause... be a good thing?"), this loop always
-    # took the single highest-`expected` target the budget reached, price-
-    # blind — so a KEEP row's "vs X" note could name a heavily marked-up
-    # clause raid over a materially cheaper target giving up almost none
-    # of the gain, the exact price-blindness `sim._move_rank_key()` was
-    # already fixed to reject for the ordinary BUY ranking (24d2a8b). Two
-    # unreconciled definitions of "best real alternative" is how a KEEP
-    # row and a BUY row 2 lines below it ended up naming different targets
-    # for the same seller's money.
+    # Every affordable upgrade, not just a running max — collected first so
+    # the pick below can weigh cost, not just grab the highest raw expected.
+    # Before this (2026-08-31), the highest-expected target the budget
+    # reached could be a heavily marked-up clause raid over a materially
+    # cheaper target giving up almost none of the gain — the same
+    # price-blindness sim._move_rank_key() already rejects for BUY rows.
     candidates_found = [(expected.get(c, 0.0), price, c)
                         for c, price in u.price.items()
                         if c != k and c not in mine and u.pos.get(c) == slot
@@ -1039,14 +777,8 @@ def best_swap_for(u: Universe, k: str, expected: dict[str, float]
                         and expected.get(c, 0.0) > my_exp]
     best_c, best_exp, best_price = None, my_exp, None
     if candidates_found:
-        # SAME TOLERANCE sim.VALUE_TOLERANCE APPLIES TO THE HEADLINE PICK
-        # (sim._best()) — not re-measured here, just the same judgment
-        # call: the single biggest upgrade does not win outright if a
-        # materially cheaper target gives up under 10% of the gain. Kept
-        # as a local literal, not a cross-module import, to avoid a
-        # decide<->sim import cycle (sim.py already imports decide at
-        # module load) — see sim.VALUE_TOLERANCE's own note if the two
-        # ever need to diverge on purpose.
+        # Same tolerance as sim.VALUE_TOLERANCE (kept as a local literal to
+        # avoid a decide<->sim import cycle — sim.py imports decide already).
         best_gain = max(e for e, _, _ in candidates_found) - my_exp
         floor = 0.90 * best_gain
         near_best = [t for t in candidates_found if t[0] - my_exp >= floor]
@@ -1074,18 +806,8 @@ def _top_up(top: list[tuple], screened: list[tuple], ok, rank_key,
     """Ensure at least `minimum` of `top` satisfy `ok(d, a)`, adding more
     from `screened` (best-`rank_key`-first) on top of `top` — never
     displacing anything already there, never adding a key `top` already
-    holds. `ok` takes `(d, a)` — the screened gain alongside the action —
-    because a qualifying condition may need the gain (KEEP_VALUE_MIN's
-    "genuine gain") as well as the action itself (KEEP_RELIABLE_MIN's
-    route lookup, which ignores `d`).
-
-    THE SHARED SHAPE BEHIND EVERY "raw screening alone can crowd a real
-    axis out" RULE. KEEP_RELIABLE_MIN (guaranteed-to-go-through candidates
-    losing to bigger-but-unreliable ones on raw gain) and KEEP_VALUE_MIN
-    (efficient-but-modest candidates losing to expensive-but-bigger ones)
-    are the same mechanic with a different `ok`/`rank_key` — this owns only
-    the "top up, don't replace, don't duplicate" bookkeeping; each caller
-    decides what qualifies and how to rank the qualifiers.
+    holds. Shared bookkeeping behind both KEEP_RELIABLE_MIN and
+    KEEP_VALUE_MIN, which differ only in `ok`/`rank_key`.
     """
     kept = {a.buy or a.sell for _, a in top}
     have = sum(1 for d, a in top if ok(d, a))
@@ -1116,50 +838,28 @@ def rank(u: Universe, acts: list[Action], seed: int = 1,
          price=None, extra: list[tuple[str, Action]] = ()) -> tuple:
     """Screen wide and cheap, then re-run the survivors properly.
 
-    Returns `(rows, base, measured, bands)`.
+    Returns `(rows, base, measured, bands)`. Rows carry the change in
+    expected finishing position and in P(above) each rival.
 
-    Returned rows carry the change in expected finishing position and in
-    P(above) each rival — the second is what you act on when one rival is the
-    one you are actually racing.
+    `extra` is `[(key, Action), ...]`, scored in the SAME final pass (the
+    draw doesn't depend on the squad, so a second pass would pay the
+    ~1.2s of drawing again for nothing) and come back as `bands`,
+    `{key: (median, lo, hi, action)}` — `key` given explicitly because a
+    held player's own swap (see best_swap_for()) sells him, not the man
+    bought, and an Action alone can't say which side a caller meant. A
+    `key` already answered by a real BUY row is dropped from `extra` — its
+    own band, off the squad the victim's response leaves behind, answers
+    better than a bare swap would.
 
-    `extra` is `[(key, Action), ...]`, scored IN THE SAME FINAL PASS and
-    come back as `bands`, `{key: (median, lo, hi, action)}` — the ladder's
-    own "what is this one man really worth" question (see
-    sim.band_acts()), `key` given explicitly rather than read off the
-    Action because the two disagree exactly when the answer matters most:
-    `key` for a held player's OWN swap (sell him, buy his best reachable
-    upgrade — see best_swap_for()) is the man SOLD, not the one bought,
-    and an Action alone cannot say which side a caller meant. It rides
-    along rather than running second because THE DRAW DOES NOT DEPEND ON
-    THE SQUAD: at 3000 trials the pass costs about 1.2s of drawing plus
-    0.03s per squad scored (measured 2026-08-24), so a second pass paid
-    the 1.2s again for nothing. Same seed, same trials, so the numbers
-    are the numbers a separate pass gave.
+    `acts` may contain moves you CANNOT afford today — screening them is
+    how the price of cash gets measured (see cash_price()).
 
-    A `key` rank() is ALREADY returning a real BUY row for is dropped:
-    that row's own pts_lo/pts_hi answer the question better, off the
-    squad the victim's response leaves behind rather than a bare swap.
-    The buy side ONLY — see the skip's own note on why checking the sell
-    side too once dropped a held player's band for a reason that had
-    nothing to do with his own row. The caller cannot make that cut
-    itself — which moves survive screening is this function's own
-    answer — which is why `extra` is handed over whole.
-
-    `acts` may contain moves you CANNOT afford today. They are screened and
-    then dropped, and the reason is that screening them is how the price of
-    cash gets measured: the frontier of "best Δpos reachable for this much
-    extra" is exactly the question "what is a million worth", and it falls out
-    of a pass that was happening anyway. See cash_price().
-
-    `price` is places per million, smoothed across runs by the caller. Given
-    one, every move is CHARGED for the wealth its clause destroys — that
-    premium is money that never comes back, and a table ranked on points alone
-    treats it as free. Without one, today's own measurement is used.
+    `price` is places per million; given one, every move is CHARGED for the
+    wealth its clause destroys. Without one, today's own measurement is used.
+    Why: docs/notes/decide.md#rank--screening-top-up-and-value
     """
-    # ONE DRAW PASS FOR THE WHOLE SCREEN. Every option is scored against the
-    # same seed, so simulate() was redrawing an identical season for each of
-    # them and throwing it away — eight million draws where a hundred thousand
-    # do. See ffcore.season.simulate_many; the numbers are unchanged.
+    # ONE DRAW PASS FOR THE WHOLE SCREEN, same seed for every option — see
+    # ffcore.season.simulate_many; the ranked numbers are unchanged.
     screen = _score_many(u, [u.state.squads] + [apply(u, a) for a in acts],
                          SCREEN_TRIALS, seed)
     base_s, rest = screen[0], screen[1:]
@@ -1172,12 +872,9 @@ def rank(u: Universe, acts: list[Action], seed: int = 1,
     measured = cash_price(reach)
     lam = price if price is not None else measured
 
-    # ONE ROW PER TARGET, chosen here rather than after the expensive pass.
-    # Four funding variants of one signing screen identically — selling a man
-    # who never makes the eleven changes nothing on the pitch, only in the
-    # balance — so keeping all four wastes the final budget on duplicates and
-    # crowds out genuinely different options. Ties break toward spending
-    # less: same outcome, more cash left for a cycle this cannot value.
+    # One row per target: 4 funding variants of one signing screen
+    # identically (selling dead weight changes nothing on the pitch), so
+    # keeping all 4 wastes the final pass. Ties break toward spending less.
     pick: dict[str, tuple] = {}
     for d, a in screened:
         k = a.buy or a.sell
@@ -1188,30 +885,16 @@ def rank(u: Universe, acts: list[Action], seed: int = 1,
 
     # ...and one for the survivors, at the full count.
     top = screened[:KEEP]
-    # TOP UP WITH RELIABLE CANDIDATES, ON TOP OF `top`, via _top_up() — see
-    # its own docstring and KEEP_RELIABLE_MIN's. A "listed" target (a
-    # rival's own sale) screens on the same raw gain as a guaranteed
-    # free/clause one, so the natural top-KEEP can end up almost entirely
-    # listed; this adds the best-screened reliable candidates NOT already
-    # in `top`, so they reach the full-precision pass too, without
-    # removing a single listed one that made it there honestly.
+    # Top up with reliable candidates (KEEP_RELIABLE_MIN) — additive, never
+    # displacing a listed candidate that made top-KEEP honestly.
     top = _top_up(top, screened,
                  ok=lambda d, a: u.route.get(a.buy, "free") != "listed",
                  rank_key=lambda t: -t[0], minimum=KEEP_RELIABLE_MIN)
-    # TOP UP WITH THE MOST EFFICIENT CANDIDATES, ALSO VIA _top_up() — see
-    # KEEP_VALUE_MIN's own note. Independent of the reliability top-up just
-    # above: a candidate can be both listed AND efficient, or reliable AND
-    # inefficient — the two ask different questions and both add, neither
-    # replacing the other's picks nor the natural top-KEEP's.
-    #
-    # `ok` CANNOT BE "d > 0 and a.net > 0" — nearly every ordinary buy
-    # candidate satisfies that (found while writing this: `have` came out
-    # >= KEEP_VALUE_MIN from the natural top-KEEP alone, every time, making
-    # the top-up a silent no-op regardless of how inefficient the top-KEEP
-    # actually was). "Efficient" is inherently RELATIVE — the best few by
-    # ratio among everything screened, genuine-gain-and-spend candidates
-    # only — so that set is computed once, up front, and `ok` just asks
-    # membership in it.
+    # Top up with the most efficient candidates (KEEP_VALUE_MIN), same
+    # additive shape, independent axis. "Efficient" is RELATIVE — the best
+    # few by ratio among genuine-gain-and-spend candidates, computed once,
+    # up front, rather than "d>0 and net>0" (which top-KEEP already
+    # satisfies for nearly every candidate, making the top-up a no-op).
     ratio = lambda t: t[0] / (t[1].net / 1e6)                    # noqa: E731
     best_value = {a.buy or a.sell for _, a in
                  sorted((t for t in screened if t[0] > 0 and t[1].net > 0),
@@ -1223,10 +906,8 @@ def rank(u: Universe, acts: list[Action], seed: int = 1,
     answers, afters = [], []
     for a in keep:
         after = apply(u, a)
-        # HE ANSWERS BEFORE THE SEASON IS PLAYED. Scoring the position the
-        # instant after my move prices a duel as an execution — and a clause
-        # pays the owner, so the move that looks most like subtraction is the
-        # one that funds the subtraction back.
+        # He answers before the season is played — a clause pays the owner,
+        # who can respond with that money, so this isn't a pure subtraction.
         ans = respond(u, a, after)
         if ans is not None:
             after = {m: dict(sq) for m, sq in after.items()}
@@ -1235,23 +916,10 @@ def rank(u: Universe, acts: list[Action], seed: int = 1,
             after[a.victim][ans.buy] = u.pos.get(ans.buy, "MED")
         answers.append(ans)
         afters.append(after)
-    # RIDING ALONG IN THE SAME PASS — see the docstring. Anything `extra`
-    # asks about a player ALREADY ANSWERED by a real ranked row is dropped
-    # here, where `keep` is known, rather than by a caller guessing at it.
-    #
-    # THE BUY SIDE ONLY, DELIBERATELY — not `a.sell` too. A held player
-    # can turn up as the SELL side of some unrelated top-ranked money move
-    # (he funds somebody else's swap) without that move answering the
-    # question his OWN ladder row is asking: "what does the season cost
-    # if HE specifically changes" (comes off the XI, gets sold, gets kept)
-    # is a different question from "is this the single best move on the
-    # board", and conflating them dropped a real player's own band for no
-    # reason connected to his row — found 2026-08-25 when Jon Moncayola's
-    # OUT row went blank because he happened to fund the top-ranked clause
-    # move. `a.buy`, by construction, can never collide with a HELD
-    # player's own key (candidates() never buys someone already owned),
-    # so this only ever fires for the case it was built for: a CANDIDATE
-    # already shown as a real BUY row.
+    # Anything `extra` asks about a player already answered by a real ranked
+    # row is dropped here. Buy side ONLY, deliberately — checking the sell
+    # side too once dropped Jon Moncayola's own OUT-row band for the
+    # unrelated reason that he happened to fund somebody else's top move.
     answered = {a.buy for a in keep if a.buy}
     rest = [(k, a) for k, a in extra if k not in answered]
     final = _score_many(u, [u.state.squads] + afters
@@ -1285,59 +953,17 @@ def rank(u: Universe, acts: list[Action], seed: int = 1,
             "d_win": r.position().get(1, 0.0) - base.position().get(1, 0.0),
             "d_beat": {v: r.beat(v) - base.beat(v) for v in rivals},
             "mean": r.mean(u.me),
-            # VALUE FOR MONEY: season points gained per million ACTUALLY
-            # PAID — the question this table never answered before,
-            # "can I pay the price for the incremental points, or is the
-            # price too high for what it buys". `d_pts`, NOT `d_pos`: the
-            # table's own primary unit is season points, and the reader
-            # asking this question is asking about points, not the more
-            # abstract position statistic screening uses internally.
-            #
-            # NOT THE OLD λ, on purpose — λ (retired 2026-08-17, c8c4032)
-            # measured points-of-XI-index per million against YOUR CURRENT
-            # ELEVEN off a ladder built from the whole unowned pool: the
-            # baseline moved (the same player was worth a different λ on
-            # consecutive days for reasons that had nothing to do with
-            # him), and the ladder priced a market nobody could actually
-            # shop in. This is neither: `d_pts` comes from `rank()`'s own
-            # paired Monte Carlo — the SAME simulated seasons, with the
-            # move and without it — which is what "PAIRED, WITHIN THE SAME
-            # SEASONS" a few lines up already exists to make robust to a
-            # changing model. Normalising an already-grounded number by
-            # its cost is not the same mistake as normalising by an
-            # ungrounded one.
-            #
-            # ONLY DEFINED FOR A GENUINE SPEND (net > 0). A sale that
-            # raises MORE than it costs (net <= 0) is not "how many points
-            # per million" — it is free money plus points, which needs no
-            # rate to justify: it is obviously worth doing if d_pts > 0
-            # and obviously not if d_pts < 0, and dividing by a near-zero
-            # or negative net would either blow up or invert the sign
-            # into something that reads backwards.
-            #
-            # AND IT IS ALREADY POINTS OVER POSITION REPLACEMENT LEVEL, so
-            # there is no second `value_vor` beside it and there should not
-            # be one (asked again 2026-08-31). `d_pts` is a PAIRED MARGINAL
-            # — the same simulated seasons with the move and without it —
-            # and the "with" side re-picks best_xi() over every legal
-            # shape. A signing is therefore already scored against exactly
-            # the man he displaces at his own position, in the formation
-            # you would actually field once he arrives: replacement level
-            # COMPUTED, not assumed, and re-derived per candidate rather
-            # than fixed per slot. Measured in the self-test below: two
-            # candidates on the SAME expected points and the SAME price,
-            # one into a thin slot and one into a deep one, come out 3.2x
-            # apart in `d_pts` and so in `value`.
-            #
-            # A static per-position baseline would be strictly WORSE than
-            # this, not merely redundant, because it cannot see the reshape
-            # (xi_bar()'s own note carries the counterexample) and because
-            # it reintroduces the one thing decide.py exists to remove: a
-            # rate standing in for the question, with its own baseline to
-            # drift. Both module docstrings already retired "value over
-            # replacement" by name for that reason. Nothing here is
-            # scarcity-blind; `value` is a ratio of a scarcity-aware
-            # numerator to the price actually paid.
+            # VALUE FOR MONEY: season points per million actually paid.
+            # `d_pts`, not `d_pos` — the table's own unit is season points.
+            # Only defined for a genuine spend (net > 0): a sale raising
+            # more than it costs needs no rate, it's just obviously worth
+            # doing. Already points-over-replacement (no second `value_vor`
+            # needed) because `d_pts` is a paired marginal whose "with"
+            # side re-picks best_xi() over every legal shape — replacement
+            # level computed per candidate, not assumed per slot. NOT the
+            # old λ (retired 2026-08-17), which measured against a fixed
+            # current-eleven baseline that moved under it.
+            # Why: docs/notes/decide.md#rank--screening-top-up-and-value
             "value": value_rate(d_pts, a.net),
         })
     rows = sorted(out, key=lambda d: (-d["d_pos"], d["action"].net))
@@ -1347,29 +973,13 @@ def rank(u: Universe, acts: list[Action], seed: int = 1,
 def rounds_left(matches, teams) -> tuple[list[int], dict[int, set[str]], list]:
     """(jornadas still to come, who has already played one, unjoined clubs).
 
-    A jornada with every score in is finished and is not simulated. A jornada
-    with SOME scores in is the August case, and it is the one that pays twice:
-    it is still ahead, so the simulator plays it — while the app has already
-    banked the played matches into the carried total. Simulating those clubs
-    again credits their points a second time, and NOT equally: on the day this
-    was found, four of ten J1 matches were in, and it was handing BurtonGM89
-    20.3 phantom points a round against my 7.8.
-
-    So the round stays, and the clubs inside it that are done drop out. Their
-    real points are already carried; what is left of the round is what has not
-    kicked off.
-
-    `teams` is the MARKET's list of clubs and the clubs come back as
-    `club_key` keys, which is what the players are keyed by too — see the note
-    there about the club with two spellings. A club that will not join comes
-    back in `unjoined` rather than being assumed unplayed, because assumed-
-    unplayed is exactly the double count this exists to remove, wearing a
-    different name.
-
-    What it still does not model: the eleven for a round in progress is
-    ALREADY LOCKED, and the simulator re-picks it from whoever is left. That
-    flatters everybody by letting them field a team they can no longer field,
-    for one round out of thirty-eight.
+    A jornada with every score in is finished and isn't simulated. One with
+    SOME scores in (the August case) pays twice if simulated whole — see
+    docs/notes/decide.md#rounds_left--a-jornada-with-some-scores-in-still-counts.
+    So the round stays and the clubs inside it that are done drop out.
+    `teams` is the market's own club spellings (see club_key()). Still
+    doesn't model: the eleven for a round in progress is already LOCKED,
+    and the simulator re-picks it from whoever's left.
     """
     js = {r["jornada"] for r in matches if (r.get("jornada") or "").isdigit()}
     finished = {j for j in js
@@ -1398,19 +1008,13 @@ def next_then_rest(base: dict, base_rest: dict, rem: list[int],
     """Bootstrap's own `per_jornada` — `base` for a player's FIRST
     remaining jornada, `base_rest` for every one after it.
 
-    THE ONLY MATCH THIS WEEK'S STATUS FLAG CAN ACTUALLY SPEAK FOR. `base`
-    carries this week's editorial reading (a suspension, a knock) blended
-    in — real news about the one game it was published for. Handing that
-    SAME reading to every remaining jornada of the season, which is what
-    this repo did before, was reading a "he plays Sunday" answer as also
-    "he plays in March" — see ffcore.score.Scored.pct_rest's own note for
-    the case that found this, and cost.
-
-    "First remaining jornada" is PER PLAYER, not one global jornada: a
-    partial round mid-sweep drops a player from `rem[0]` once his own club
-    has already played it (see rounds_left()'s own note on why), so his
-    true next jornada is wherever he first appears here — which `played`
-    already answers, one club at a time.
+    `base` carries this week's editorial reading (a suspension, a knock) —
+    real news about the one game it was published for, not "he plays in
+    March" too. "First remaining jornada" is PER PLAYER: a partial round
+    mid-sweep drops a player from `rem[0]` once his own club has played it
+    (see rounds_left()), so his true next jornada is wherever `played`
+    first shows his club clear.
+    Why: docs/notes/decide.md#next_then_rest--apply_fixtures
     """
     first_seen: set[str] = set()
     out: dict[int, dict] = {}
@@ -1433,23 +1037,13 @@ def apply_fixtures(per_jornada: dict[int, dict], sboard: dict[int, dict],
                    club: dict[str, str], pos: dict[str, str],
                    ppm_of: dict[str, float]) -> dict[int, dict]:
     """`per_jornada`, with the POINTS half repriced against THAT jornada's
-    real opponent — ffcore.fixture.season_board()'s own answer to "who do
-    you face in jornada 20", not the single next-fixture factor `base`/
-    `base_rest` were built with. THE SCHEDULE IS PUBLISHED for the whole
-    season, so a forecast that prices jornada 20 off jornada 3's opponent
-    is not a modelling limit, it is not having asked — see season_board()'s
-    own docstring for why fitting the difficulty ratings once and reading
-    them for every jornada is the same cost this repo already pays once.
-
-    P(start) — the tuple's OTHER half — is untouched here: season_board()
-    answers "who do you face", not "will you play", a different question
-    next_then_rest() already answers as well as this repo's data allows
-    (no future-dated editorial P(start) exists, only next week's).
-
-    A player season_board() has no Match for in that jornada (an
-    unjoinable club, or a jornada the schedule join missed) keeps whatever
-    pts `per_jornada` already carried for him — the frozen, next-fixture
-    number, worse than a real one and far better than zero.
+    real opponent (season_board()) instead of the single next-fixture
+    factor `base`/`base_rest` were built with — the schedule is published
+    for the whole season, so pricing jornada 20 off jornada 3's opponent
+    was just not having asked. P(start) is untouched — a different
+    question next_then_rest() already answers. A player season_board()
+    has no Match for keeps his frozen next-fixture number.
+    Why: docs/notes/decide.md#next_then_rest--apply_fixtures
     """
     out: dict[int, dict] = {}
     for j, layer in per_jornada.items():
@@ -1473,48 +1067,16 @@ def phantom_fill(squads: dict[str, dict[str, str]], per_jornada: dict[int, dict]
     """Squads and per_jornada, with one AVERAGE-PLAYER-AT-THE-POSITION
     phantom added per position any manager is short of SLOT_MIN in.
 
-    WHY THIS EXISTS: best_xi() (ffcore.season) needs SLOT_MIN of every
-    position to fill ANY of the 7 real formations — a squad short in
-    even one returns [], and an empty eleven scores ZERO, every
-    remaining jornada, with ZERO variance to draw from. That is not a
-    forecast of a weak season, it is the simulation being structurally
-    unable to score him at all — found 2026-09-01 (Miguel: "the forecast
-    for Albert is absolutely unsustainable... that's not possible unless
-    he never again connects to the app"). Real managers fix a squad this
-    broken; assuming he never will (implicitly, by freezing him at what
-    he has already scored) is a much stronger and much less plausible
-    claim than assuming any other rival makes some discretionary
-    improvement, which this repo's OWN "Rivals never transfer" caveat
-    already, deliberately, refuses to assume — so a special-cased "he'll
-    upgrade a weak spot" assumption for Albert alone would be
-    inconsistent. Filling the ONE gap that keeps him from fielding a
-    team at all is a different, much safer claim: every manager clears
-    that bar to participate, or the game is not being played.
-
-    THE AVERAGE, NOT A SPECIFIC PLAYER, NOT AN INVENTED NUMBER. A real
-    player's own key would need to disappear from the BUY/candidates
-    list while "borrowed" (he is not actually Albert's) and would drift
-    day to day with whichever specific player happens to be cheapest —
-    noise that has nothing to do with the real uncertainty being priced.
-    Averaged straight off the SAME real per_jornada data — points AND
-    p_start — every other player at that position already carries, per
-    jornada (so a hard fixture week lowers the phantom the same way it
-    lowers everyone else's real number that week) — nothing here is a
-    guess independent of the data the rest of the model already trusts.
-
-    NO `matches` ENTRY, DELIBERATELY: Bootstrap's own rate_rel/start_rel
-    (the season-long persistent-error walk) are only computed for a key
-    present in `matches` — the SAME "no evidence, no widening" rule this
-    repo already applies to a brand-new player with zero real history
-    (see forecast.py's own self-test). A genuinely unknown phantom gets
-    the conservative reading, not a fabricated magnitude of uncertainty
-    this repo has no basis to assign.
-
-    Keyed `__phantom_<manager>_<slot>_<n>`, a form no real player id can
-    take — never appears in `u.price`/`u.owner`/`u.name`, so it cannot be
-    bought, cannot be mistaken for a real man Albert owns anywhere else
-    in the report, and drops out of `illegal_squads()` once it makes his
-    squad legal again.
+    Without this, a squad short one SLOT_MIN position can't fill ANY legal
+    formation — best_xi() returns [], scoring zero every remaining jornada
+    with zero variance. The phantom is an AVERAGE, not a specific player or
+    invented number — a real player's key would drift day to day and could
+    double as a real candidate — computed off the same real per-jornada
+    data (points and P(start)) every other player at that position already
+    carries. No `matches` entry (the same "no evidence, no widening" rule
+    applied to a brand-new player). Keyed `__phantom_<manager>_<slot>_<n>`,
+    a form no real player id can take.
+    Why: docs/notes/decide.md#phantom_fill--why-a-short-squad-gets-a-phantom-and-why-its-an-average
     """
     from ffcore.score import SLOT_MIN
 
@@ -1588,19 +1150,12 @@ def market_routes(mkt: list[dict], key_of) -> tuple[dict[str, float],
                                                     dict[str, int]]:
     """(price, route, bids) from api_market.csv's own rows.
 
-    `seller` HAS ALWAYS SAID WHICH IS WHICH — `marketPlayerLeague` is the app
-    dealing a free agent, `marketPlayerTeam` is a manager listing one of
-    theirs (slate.py has documented this since the feed was added) — but
-    every row here used to be labelled "market" regardless, collapsing "the
-    app deals him, nobody can refuse" into the same bucket as "an owner who
-    might simply not sell, and other managers may already be bidding
-    (`numberOfBids`)." Those are not the same transaction, the same reason a
-    clause and an ordinary buy are not: only one of them has a real owner
-    who can say no.
-
-    `key_of(row)` resolves a raw market row to this repo's own player key —
-    the same join `load()` used inline before this was pulled out, handed in
-    rather than imported so this stays testable on synthetic rows.
+    `seller` has always said which is which: `marketPlayerLeague` is the app
+    dealing a free agent, `marketPlayerTeam` is a manager's own listing —
+    not the same transaction, the same reason a clause and an ordinary buy
+    aren't (only one has a real owner who can say no).
+    `key_of(row)` is handed in (not imported) so this stays testable on
+    synthetic rows.
     """
     price: dict[str, float] = {}
     route: dict[str, str] = {}
@@ -1657,32 +1212,12 @@ def pending_received(offers: list[dict], pt_to_key: dict[str, str]
 
 def offer_combos(u: Universe) -> list[tuple[str, Action]]:
     """The minimal combinations of real pending offers that clear an
-    overdraft, as `extra` for rank() — sim.band_acts()'s own question,
-    only for the balance rather than for one man.
-
-    ONLY WHEN CASH IS ACTUALLY NEGATIVE. A real offer already floors
-    `proceeds` for anyone holding one (see received_offers's own note) —
-    that is priced in whether or not you accept. What a real number
-    cannot decide for you is whether accepting one *now*, ahead of the
-    market, is worth it, and that question only has a forcing answer
-    when the balance itself is overdrawn: the jornada will not lock with
-    it negative (ffcore.league's own note), so something must be
-    accepted, and this asks which.
-
-    MINIMAL COVERS ONLY, in the subset-sum sense: a combination that
-    clears the deficit with room to spare when a smaller one already
-    does adds a second sale for nothing, so it never appears — every
-    combo returned drops below the deficit with any one player removed
-    from it. `itertools.combinations` over a HANDFUL of offers (this is
-    never the whole squad, only the men with a real bid pending) so the
-    2**n scan this runs is over single digits, not the market.
-
-    A pure sell — no replacement bought — because the question here is
-    "does this clear the overdraft", not "what should I buy with it";
-    a combo that also priced a rebuy would be answering both at once
-    and conflating them is exactly what Action's own `net` was built to
-    keep apart. Keyed "OFFERS:a|b" rather than by player, since no
-    single held player's key can stand for a combination.
+    overdraft, as `extra` for rank() — only fires when cash is actually
+    negative (the jornada won't lock overdrawn, so something must be
+    accepted). MINIMAL covers only, subset-sum sense: a combo with room to
+    spare when a smaller one already clears it never appears. Pure sell,
+    no rebuy priced — conflating the two is what Action's own `net` keeps
+    apart. Keyed "OFFERS:a|b" since no single key can stand for a combo.
     """
     mine = u.state.squads.get(u.me, {})
     offers = {k: v for k, v in u.received_offers.items()
@@ -1725,10 +1260,8 @@ def load(trials_pool=None) -> Universe:
 
     teams = load_api_teams()
     mkt = load_api_market()
-    # OWNERSHIP IS League's, NOT RE-DERIVED HERE. It has already resolved the
-    # app's own spelling three ways (ffcore.league.api_key), and a second,
-    # weaker join in this module is not a second opinion — it is five rival
-    # players who cannot be stolen because nothing knows whose they are.
+    # Ownership is League's, not re-derived — a second, weaker join here
+    # would mean rival players nobody can be recognized as owning.
     owner = dict(lg.owner)
     me = lg.cfg.me
 
@@ -1738,27 +1271,19 @@ def load(trials_pool=None) -> Universe:
                     and (players[k].get("pos") or "").lower() in SLOT}
               for mgr in lg.managers}
 
-    # What it costs ME. A clause is instant and cannot be refused; a market
-    # row is a bid that can lose, and that difference is not priced here —
-    # see the module docstring. WITHIN "market", see market_routes()'s own
-    # docstring for the further split it draws between a free agent and a
-    # rival's own player put up for sale.
-    #
-    # Both sides join through ffcore.league.api_key, keyed on the market's
-    # spelling like everything else. The clause is ON the api_teams row, so a
-    # name that will not resolve is not a missing price — it is a rival's
-    # player who silently cannot be bought at all.
+    # What it costs ME — see market_routes() for the free/listed/clause
+    # split. Both sides join through ffcore.league.api_key on the market's
+    # spelling; a clause on an unresolvable name is a rival's player who
+    # silently cannot be bought at all.
     index = latest_only(lg.market.rows) if lg.market is not None else []
     price, route, bids = market_routes(
         mkt, lambda r: api_key(r["player_name"], "", lg.market, owner,
                                index, r.get("market_value")))
     now = run_now()
     clause_until: dict = {}
-    # THE APP'S OWN OWNERSHIP-RECORD ID -> this repo's key. Built here
-    # because this is already the one loop that resolves a key for every
-    # api_teams row; offers.py's join needs nothing api_key() does not
-    # already do, and a second resolution of the same rows for one more
-    # field is the mistake ffcore.league.owner_from_api was written to stop.
+    # The app's own ownership-record id -> this repo's key, built in the
+    # one loop that already resolves a key for every api_teams row rather
+    # than re-resolving the same rows a second time for one more field.
     pt_to_key: dict[str, str] = {}
     for r in teams:
         k = api_key(r["player_name"], r["manager"], lg.market, owner, index,
@@ -1773,9 +1298,7 @@ def load(trials_pool=None) -> Universe:
                 clause_until[k] = dt.datetime.fromisoformat(raw)
             except ValueError:
                 pass
-        # A CLAUSE YOU CANNOT PAY IS NOT A PRICE. He is not cheap-but-risky or
-        # worth ranking lower; the app will refuse the transaction outright, so
-        # he does not belong in the set of things you could do today.
+        # A clause you cannot pay is not a price — the app refuses outright.
         if r["manager"] == me or not (r.get("buyout") or "").strip():
             continue
         if locked(clause_until, k, now):
@@ -1786,13 +1309,11 @@ def load(trials_pool=None) -> Universe:
 
     proceeds = {k: float((players[k] or {}).get("value") or 0)
                 for k in squads.get(me, {})}
-    # A REAL PENDING OFFER BEATS A GUESS — see received_offers()'s own note.
     received_offers = pending_received(load_api_offers(), pt_to_key)
     for k, money in received_offers.items():
         if k in proceeds:
             proceeds[k] = max(proceeds[k], money)
-    # EVERY clause, mine included. The app publishes the whole league's, and a
-    # rival cannot answer back without them.
+    # Every clause, mine included — a rival can't answer back without them.
     clause: dict[str, float] = {}
     for r in teams:
         if not (r.get("buyout") or "").strip():
@@ -1803,23 +1324,17 @@ def load(trials_pool=None) -> Universe:
             clause.setdefault(k, float(r["buyout"]))
     rival_cash = {h: (lg[h].cash.value or 0.0) for h in lg.managers
                   if h != me}
-    # What the app says everyone is worth. The market's own figure, which is
-    # the one a sale pays out at — see burn(), where the gap between this and
-    # a buyout clause is the wealth a steal destroys.
+    # What the app says everyone is worth — the figure a sale pays out at,
+    # see burn() for the gap between this and a buyout clause.
     value = {k: float((v or {}).get("value") or 0) for k, v in players.items()
              if (v or {}).get("value")}
 
     pos, base, base_rest = {}, {}, {}
-    # A DISPLAY NAME FOR EVERY PLAYER THE INDEX KNOWS, not just the ones in
-    # the universe. Keys are the site's ids now, so a key that reaches the
-    # renderer without a name in this map is printed as a number — which is
-    # what "best players nobody is offering" did: those players are by
-    # definition neither owned nor priced, so the universe never held them.
+    # A display name for every player the index knows, not just those in
+    # the universe — a key with no name here prints as a raw number.
     name = {k: (rec.get("name") or k) for k, rec in players.items()}
     universe = set(price) | {k for s in squads.values() for k in s}
-    # SCORED ONCE PER PLAYER, kept rather than re-derived a few lines down
-    # for `matches` — sc.score(row) was being called a second time for the
-    # same row to read one more field off the same Scored.
+    # Scored once per player, kept rather than re-derived for `matches`.
     scored: dict[str, object] = {}
     for k in universe:
         rec = players.get(k)
@@ -1831,18 +1346,15 @@ def load(trials_pool=None) -> Universe:
         scored[k] = s
         base[k] = ((max(0.0, s.ppm * s.fix), min(1.0, (s.pct_used or 0) / 100))
                    if s else (2.0, 0.5))
-        # THE SAME PAIR, ONE JORNADA LATER — see ffcore.score.Scored.pct_rest
-        # for why this cannot just be `base` again. Only the START side
-        # differs; a rate this thin has no more evidence about jornada 10
-        # than about jornada 3, but P(start) does, once he has any
-        # current-season minutes at all — see that field's own note.
+        # Same pair, one jornada later — only the START side differs (a
+        # rate this thin has no more evidence by jornada 10 than jornada 3,
+        # but P(start) does once he has current-season minutes).
         base_rest[k] = ((max(0.0, s.ppm * s.fix),
                         min(1.0, (s.pct_rest or 0) / 100))
                        if s else (2.0, 0.5))
 
-    # Everyone the market prices, scored the same way — for the question of
-    # what might come up later, which is about the players NOT in the
-    # simulation's universe.
+    # Everyone the market prices, scored the same way — about the players
+    # NOT in the simulation's universe (what might come up later).
     market_exp: dict[str, float] = {}
     start: dict[str, float] = {}
     for k, rec in players.items():
@@ -1854,50 +1366,34 @@ def load(trials_pool=None) -> Universe:
 
     pool = pool_from_perjornada(
         csv.DictReader(open(SEASON / "live" / "perjornada_2026-27.csv")))
-    # A round in progress carries only the players who have not played it yet.
-    # Everyone else scored their real points hours ago and they are in
-    # `carried` — see rounds_left().
+    # A round in progress carries only players who haven't played it yet —
+    # everyone else's real points are already in `carried` (rounds_left()).
     club = {k: club_key(players[k].get("team"), mkt_teams)
             for k in base if k in players}
-    # HOW MANY MATCHES EACH RATE RESTS ON, handed to the forecaster so a
-    # thin record widens the season it draws instead of passing as a fact.
+    # How many matches each rate rests on, so a thin record widens the
+    # season the forecaster draws instead of passing as a fact.
     matches = {}
     for k in base:
         s_ = scored.get(k)
         if s_ is not None:
             matches[k] = s_.pj
-    # CLUB-CORRELATED SEASON UNCERTAINTY — ffcore.fixture.club_volatility().
-    # `club` above is keyed on the MARKET's own spelling (club_key's
-    # canonical side); results_history.csv, and so club_volatility(), is
-    # keyed on ff_slug — the exact mismatch fixture_board() already had to
-    # be fixed for once, translated the same way, through ffcore.crosswalk.
+    # Club-correlated season uncertainty (club_volatility()). `club` is
+    # keyed on the market's spelling; results_history.csv is keyed on
+    # ff_slug, translated through ffcore.crosswalk — norm(c.market), not
+    # raw, to match club_key()'s own fallback convention.
     from ffcore.fixture import club_volatility, season_board
     from ffcore.tidy import load_elo, load_results_history, \
         load_understat_players
-    # norm(c.market), not c.market raw: club_key()'s fallback path (used
-    # above to build `club`) always returns norm(match_team(...)) — a
-    # second mismatch of the same kind fixture_board() had, caught the
-    # same way, by checking the real join actually landed on real data
-    # rather than trusting that passing an xw through was enough.
     slug_of = {norm(c.market): c.ff_slug for c in lg.xw.clubs.values()
               if c.market and c.ff_slug} if lg.xw is not None else {}
     club_of_slug = {k: slug_of[v] for k, v in club.items() if v in slug_of}
-    # ONE READ OF results_history.csv, not two — club_volatility() and
-    # season_board() both want it and it cannot have changed between them.
+    # One read of results_history.csv — club_volatility() and season_board()
+    # both want it and it can't have changed between them.
     results_hist = load_results_history()
     club_rel = club_volatility(results_hist, list(slug_of.values()))
-    # THE WHOLE REMAINING SCHEDULE, not just next — ratings fitted once
-    # for `rem`, the exact jornadas about to be simulated. Same market,
-    # xw, results and understat inputs ffcore.score.build() already fit
-    # the "next fixture" board from, so a player's jornada-3 factor here
-    # and his `s.fix` above (season_board()'s own `board_j` for rem[0])
-    # agree rather than being two answers from two fits.
-    # NORMALISED KEYS, matching `club`'s own convention (club_key() always
-    # returns norm(...)) — season_board() itself is keyed on the market's
-    # raw spelling ("Atlético"), the same as fixture_board()'s board, and
-    # without this every lookup below misses silently: club_key() never
-    # returns an accented, title-cased string, so `club.get(k) in board_j`
-    # was false for every player, every jornada.
+    # The whole remaining schedule, fitted once for `rem`. Keys normalised
+    # to match `club`'s own convention (club_key() always returns norm(...))
+    # — season_board() itself is keyed on the market's raw spelling.
     sboard = {j: {norm(team): m for team, m in layer.items()}
              for j, layer in season_board(
                  _m.market, m, rem, now, load_elo(), xw=lg.xw,
@@ -1907,35 +1403,23 @@ def load(trials_pool=None) -> Universe:
     per_j = apply_fixtures(
         next_then_rest(base, base_rest, rem, played, club),
         sboard, club, pos, ppm_of)
-    # A SQUAD SHORT A POSITION CANNOT BE SIMULATED, NOT SIMULATED
-    # PESSIMISTICALLY — see phantom_fill()'s own note. Every downstream
-    # consumer of `squads`/the forecaster (rank()'s screen and final
-    # passes, band_acts(), offer_combos(), sim._rival_best(), standings)
-    # reads from THESE two, patched once here, so nothing downstream
-    # needs its own copy of this fix.
+    # A squad short a position can't be simulated at all (see phantom_fill())
+    # — patched once here so every downstream reader gets the same fix.
     squads, per_j = phantom_fill(squads, per_j, pos)
     fc = Bootstrap(per_j, pool=pool, matches=matches,
                   club_of=club_of_slug, club_rel=club_rel)
 
-    # What everybody has already scored, off the league table — five rows at
-    # the grain the fact belongs to, rather than the first of each manager's
-    # fourteen player rows.
-    # NOT the gated reader: what everyone has already scored is a history,
-    # and the last reading of it is incomplete rather than wrong. The gate
-    # belongs on the balance beside it, which read_api_balances applies.
+    # What everybody has already scored, off the league table — not the
+    # gated reader: this is history, incomplete rather than wrong; the gate
+    # belongs on the balance beside it (read_api_balances applies it).
     carried = {}
     for r in last_api_standings():
         if r.get("manager"):
             carried.setdefault(r["manager"], float(r.get("team_points") or 0))
-    # THE SAME CASH AS EVERY OTHER MANAGER'S, out of the same estimator that
-    # writes league.md — rival_cash three hundred lines up already reads it
-    # this way. This used to be a second, independent read of the raw
-    # api_leagues balance, and two copies of one fact in two places is how a
-    # number gets corrected in one and not the other: the gate on the API
-    # tables moved league.md's cash and left the headline quoting a
-    # three-day-old balance from a feed everything else had refused. The
-    # estimator also accrues the daily allowance since the anchor, which the
-    # raw balance cannot, and states its own confidence.
+    # Same cash estimator league.md and rival_cash already use — a second,
+    # independent read of the raw balance once left the headline quoting a
+    # stale figure from a feed everything else had refused.
+    # Why: docs/notes/decide.md#load--misc-join-notes
     raw_cash = lg[me].cash.value or 0.0
     locked_cash = pending_sent(mkt)
     cash = raw_cash - locked_cash
@@ -1946,10 +1430,8 @@ def load(trials_pool=None) -> Universe:
         value=value, market_exp=market_exp, start=start, clause=clause,
         route=route,
         rival_cash=rival_cash,
-        # THE RATE AND THE BEHAVIOUR, beside the level `rival_cash` already
-        # holds — see days_to_afford(). `lg.txns` is the replayed ledger the
-        # balances above were built from, so the two cannot describe two
-        # different transaction histories.
+        # The rate and the behaviour beside the level rival_cash already
+        # holds — see days_to_afford().
         daily_bonus=lg.cfg.daily_bonus, tempo=rival_tempo(lg.txns),
         clause_until=clause_until, bids=bids,
         part_played=played, name=name, start_note=_calibrated()[0].note(),

@@ -1,28 +1,18 @@
 """
 ffcore.tidy — reading what ff_ingest wrote, and asking it about the past.
 
-Paths, CSV IO and timestamp parsing were copy-pasted across report.py,
-offers.py, find_slug.py and history.py. They are here once.
-
-The part that matters is Market: an index over EVERY snapshot in
-market.csv, not just the newest one. Three of the five things rivals.py
-needs are questions about the past —
+Paths, CSV IO and timestamp parsing, consolidated out of report.py/offers.py/
+find_slug.py/history.py. `Market` is the part that matters: an index over
+EVERY snapshot in market.csv, not just the newest, answering questions
+`latest_only()` cannot —
 
     what was this player worth when that transaction happened?   at()
     what did his value do in the fortnight after?                series()
     how stale is the reading I just used?                        Valuation.lag_h
 
-— and none of them can be answered from latest_only(), which is all the
-current code ever looks at.
-
-TIMEZONES, the trap this module exists to close. ff_ingest stamps snapshots
-in UTC ("2026-08-12T2100Z"). The app's Activity feed, and therefore every
-date in the ledger, is Europe/Madrid wall-clock with no offset
-written down ("2026-08-12T21:24"). In August that is two hours apart. Compare
-them naively and a purchase gets matched to a snapshot taken two hours after
-it, which is exactly the direction that makes an overpay look like a bargain.
-Ledger strings go through ledger_stamp(); snapshot strings through
-snapshot_stamp(); both come back as aware UTC.
+TIMEZONES: ledger dates are Madrid wall-clock, snapshot stamps are UTC, two
+hours apart in summer — `ledger_stamp()`/`snapshot_stamp()` both return
+aware UTC. Why: docs/notes/tidy.md
 """
 
 from __future__ import annotations
@@ -99,24 +89,9 @@ def input_path(name: str) -> Path:
     return p if p.exists() else Path(name)
 
 
-# One parse per file per process, keyed on what the file IS rather than on
-# what it is called.
-#
-# The chain runs in one interpreter now (src/run.py), and in that interpreter
-# market.csv was parsed sixteen times and lineups.csv eleven — 2.9 of ten
-# seconds spent turning the same 2.8 MB into the same 32,515 dicts, because
-# every stage that wants a player asks for the whole table.
-#
-# CALLERS GET THEIR OWN DICTS. Handing back the cached rows would be faster
-# again and would be a silent-corruption bug waiting for the first caller that
-# writes to a row: this file has sixty-one read sites and auditing them all is
-# exactly the kind of proof that goes stale the next time somebody adds one.
-# The copy costs a sixth of the parse, so safety here is nearly free.
-#
-# Invalidated two ways, deliberately overlapping: the key carries the file's
-# mtime and size, and every writer below drops its own path. The key alone
-# would be enough except in the case nobody thinks about — a rewrite inside
-# one clock tick that happens to land on the same length.
+# One parse per file per process, keyed on (mtime, size) — see read_csv()'s
+# own docstring for why callers still get a fresh copy each call, and
+# docs/notes/tidy.md for the measured numbers behind both calls.
 _READ_CACHE: dict[str, tuple] = {}
 
 
@@ -128,37 +103,13 @@ def read_csv(path) -> list[dict]:
     """Rows as dicts. Missing file is empty, not an error — a report that
     hasn't been fed yet should say so, not crash.
 
-    THE COPY ON THE WAY OUT IS THE CACHE'S ONLY ISOLATION, not an oversight
-    to be optimised away. `_READ_CACHE` keeps the parsed rows keyed by
-    (mtime, size), so every caller after the first would otherwise be handed
-    the SAME dict objects — and one caller setting a field would rewrite
-    what a later, unrelated caller reads, silently and only on the second
-    read. `latest_only()`, `fresh_only()` and `pick_source()` all filter
-    without copying, so those aliases run deep.
-
-    It is not free and the number is known: measured 2026-08-24 over one sim
-    stage, 43 calls across 13 files cost 1.52s, of which about 1.0s is the
-    unavoidable first parse of each file and about 0.5s is this copy —
-    market.csv and lineups.csv are ~85K rows each and read three times
-    apiece, at ~0.067s a copy. A run of that stage under a mutation detector
-    found no caller mutating a handed-out row, so the copy is defensive
-    rather than currently load-bearing; that was ONE stage of ten, which is
-    why it stays. Dropping it needs the same check over the whole pipeline —
-    ingest, crosswalk and sources are where a transform-in-place would
-    plausibly live — not this evidence.
-
-    CELL VALUES ARE INTERNED. market.csv/lineups.csv are a snapshot log —
-    ~94k/~75k rows behind a few hundred distinct players and ~20 clubs — so
-    csv.DictReader handing back a FRESH "Athletic Club" string object on
-    every one of a club's ~4,700 rows is almost pure duplication, not real
-    data. sys.intern() collapses each repeated cell to the one string object
-    already seen, at parse time, before it ever reaches `_READ_CACHE`.
-    Measured 2026-08-28: market.csv's 94,353 rows hold 849,177 cells behind
-    only 32,465 distinct strings; parsing it this way took peak RSS from 80MB
-    to 39MB. Safe everywhere read_csv is safe — an interned string is an
-    ordinary, immutable str, indistinguishable to any caller from one that
-    isn't; this changes nothing about the copy-on-return contract above,
-    which is about the DICT each row lives in, never about its values.
+    Cached per (mtime, size); callers get their OWN dicts each call (a
+    mutation-detector check found the copy currently unneeded but cheap
+    enough to keep as a guard — see the doc). Cell VALUES are interned at
+    parse time (halves peak RSS on market.csv). Uses csv.reader+zip rather
+    than DictReader (~25% faster, no ragged-row bookkeeping needed here).
+    Why (measured costs, the interning numbers, the invalidation edge case):
+    docs/notes/tidy.md#read_csv--the-parse-cache-its-isolation-and-interning
     """
     path = Path(path)
     try:
@@ -190,25 +141,10 @@ def read_csv_frozen(path) -> list:
     """Like read_csv(), but hands back the CACHED rows themselves — each
     wrapped in MappingProxyType, not copied — for a caller that holds the
     result for the rest of the process and is verified never to write to a
-    row.
-
-    read_csv()'s copy-on-return is the right default (see its own docstring)
-    precisely because most callers are one function's local variable, live
-    briefly, and were never individually audited. Market is the opposite
-    shape: built once in League.load(), held in ffcore.model's one process-
-    wide Session for the rest of the run, and read by exactly three modules
-    (ffcore.league, crosswalk.py, decide.py) — checked 2026-08-29, all of
-    them only iterate or `.get()` a row, never assign into one. For that
-    caller the copy was pure standing cost: market.csv's ~96k rows held
-    twice (once in `_READ_CACHE`, once in `Market.rows`) for the life of the
-    run, just to guard against a mutation nothing does.
-
-    MappingProxyType, not a raw reference to the cached dict, so the guard
-    stays real: a future caller that tries `row["x"] = y` gets a loud
-    TypeError at the write, the same silent-corruption bug read_csv()'s
-    docstring warns about turned into a crash instead of a wrong answer
-    seven modules away. Building 96k proxies costs about half what copying
-    96k dicts did — this is faster AND lighter, not a speed/memory trade.
+    row (today: Market, via League.load(), held in ffcore.model's Session).
+    MappingProxyType rather than a raw dict keeps the guard real: a write
+    attempt is a loud TypeError, not a silent wrong answer elsewhere. Why
+    (the specific callers checked, the RSS numbers): docs/notes/tidy.md#read_csv_frozen--the-uncopied-path-for-one-long-lived-caller
     """
     path = Path(path)
     try:
@@ -295,24 +231,13 @@ def append_csv(path, rows, fieldnames=None) -> None:
 def load_deadline(with_source: bool = False):
     """The next lock as aware UTC, or None — always the next kickoff.
 
-    Shared rather than copied: report.py stamps hours_to_lock into
-    squad_log.csv and xi.py stamps it into xi_fielded.csv, and two readings of
-    the same deadline that disagree would silently mis-order the two logs
-    against each other.
-
-    The next kickoff in data/tidy/fixtures.csv IS the whole deadline, not a
-    floor: the app locks the lineup once per jornada, so a player whose own
-    match is on Sunday is already frozen at Friday's kickoff (verified in-app,
-    2026-08-16, issue #28).
-
-    THE TYPED FALLBACK IS GONE. inputs/deadline.txt was read when no fixture
-    was available, and it was wrong the moment it expired and stayed wrong
-    until somebody noticed — which is exactly what happened: the file held a
-    lapsed date and the report read it as "deadline passed". A fixture list
-    that cannot answer should say None, and the report should say it does not
-    know, rather than substitute a number that is wrong in a way nothing can
-    detect. `with_source=True` still returns (when, "fixtures"|"none") so the
-    report can say so.
+    The next kickoff in fixtures.csv IS the whole deadline, not a floor —
+    the app locks per jornada, so Sunday's own player is already frozen at
+    Friday's kickoff. No typed fallback: a fixture list that cannot answer
+    says None, never a substitute number wrong in an undetectable way (a
+    lapsed inputs/deadline.txt once did exactly that). `with_source=True`
+    returns (when, "fixtures"|"none"). Why:
+    docs/notes/tidy.md#load_deadline--the-fixture-list-is-the-deadline-no-typed-fallback
     """
     when = next_kickoff()
     return (when, "fixtures" if when else "none") if with_source else when
@@ -386,28 +311,16 @@ def latest_snapshot(path, keep=None) -> list[dict]:
     """`latest_only(read_csv(path))`, without ever holding the whole file in
     memory to get there.
 
-    market.csv and lineups.csv are every snapshot ever taken (~94k and ~75k
-    rows) so that Market and rivals.py can answer historical questions
-    (see this module's docstring) — but a caller that only wants "now", like
-    ffcore.model.session() or methodology.latest_market(), was paying to
-    materialise and then copy all of that just to keep the <1% that share the
-    newest observed_at. Measured 2026-08-28: ffcore/model.py's self-test
-    alone peaked at 380MB RSS, the largest single contributor to lfg-run's
-    parallel self-test phase (~680MB combined) by a wide margin over every
-    other stage (next highest ~70MB) — almost all of it this.
-
-    One forward pass. `kept` only ever holds rows from the current-newest
-    block seen so far, so peak memory is bounded by ONE snapshot's worth of
-    rows, not the whole history — correct regardless of file order (a stamp
-    equal to the running newest extends `kept`, a newer one replaces it, an
-    older one is dropped), matching `latest_only()`'s "max over all rows"
-    semantics exactly. Deliberately bypasses `_READ_CACHE`: caching a filtered
-    slice under the whole file's cache key would hand a later full-history
-    reader (Market, decide.py) a wrong answer.
-
-    `keep(row)`, if given, filters BEFORE the newest-stamp comparison — needed
-    for load_lineups_latest(), where "newest" must mean newest row FROM ONE
-    SOURCE, not newest across every probable-XI site in the file.
+    One forward pass, bounded to one snapshot's worth of rows regardless of
+    file order — a caller that only wants "now" was paying to materialise
+    and copy the whole multi-decade history (measured 380MB RSS in one
+    self-test) just to keep the <1% sharing the newest observed_at.
+    Deliberately bypasses the read cache (a filtered slice under the whole
+    file's cache key would mislead a later full-history reader). `keep(row)`
+    filters BEFORE the newest-stamp comparison — needed when "newest" must
+    mean newest row from ONE source, not across all of them. Why (the RSS
+    measurement, the file-order argument in full):
+    docs/notes/tidy.md#latest_snapshot--one-forward-pass-bounded-memory
     """
     path = Path(path)
     try:
@@ -446,12 +359,9 @@ def latest_snapshot(path, keep=None) -> list[dict]:
 # off this same number, so the table and the refusal below cannot disagree.
 DAILY_FRESH_DAYS = 1.05
 
-# The same bound for a feed swept EVERY RUN. It is not half a day, however
-# obvious that looks: lfg.timer fires at 00:40 and 11:40 local, so the two
-# legs are 11h and 13h, and RandomizedDelaySec puts another 5 minutes on
-# either. A feed answering every single sweep is 13h10m old at its oldest, and
-# 0.5 would have called that a dead feed every night. 0.6 clears the longest
-# healthy leg by an hour and still catches a missed sweep well inside the day.
+# Not 0.5, however obvious that looks — lfg.timer's two legs run 11h/13h
+# apart, so a healthy feed is 13h10m old at its oldest. Why:
+# docs/notes/tidy.md#gated-api-feeds--one-shared-reason-not-five-copies-of-it
 EVERY_RUN_FRESH_DAYS = 0.6
 
 
@@ -459,30 +369,13 @@ _NOW: list = []
 
 
 def run_now() -> datetime:
-    """The instant this RUN is describing. Sampled once per process.
-
-    NOT named `now`: fresh_only and stale_feeds both take a `now` argument,
-    and a module function of that name is shadowed exactly where it is most
-    needed.
-
-    Twenty-five call sites asked the clock themselves, so one report could
-    stamp 23:52 while the document explaining it stamped 23:53, and the cash
-    a rival was credited grew between the stage that scored him and the stage
-    that printed him. None of that was ever a wrong answer, but it made the
-    outputs undiffable: re-running unchanged code moved nine fields, so
-    "nothing moved" could not be asserted about a change, only eyeballed
-    around the noise. run.py executes every reporting stage in ONE
-    interpreter, so one sample here is one instant for the whole report.
-
-    NOT for the sweep. ingest.py fetches over minutes and observed_at must be
-    when a page was actually asked for — it keeps the live clock, and it runs
-    in its own process anyway.
-
-    LFG_NOW pins it, which is what makes an output diff mean something: run
-    the pipeline twice over one store with the clock held and the two reports
-    are byte-identical, so anything that moves is the change under test and
-    not the eleven seconds between runs. It is a measuring tool — the timer
-    and every real run leave it unset.
+    """The instant this RUN is describing. Sampled once per process, so
+    every stage stamps the same instant (was 25 call sites asking the clock
+    separately, which made two runs of unchanged code produce undiffable
+    output). Not named `now` — that's shadowed by fresh_only/stale_feeds'
+    own `now` parameter. Not for the sweep (ingest.py keeps the live clock).
+    `LFG_NOW` pins it for a byte-identical before/after diff — a measuring
+    tool, unset in every real run. Why: docs/notes/tidy.md#run_now--one-clock-per-run
     """
     if not _NOW:
         pinned = os.environ.get("LFG_NOW", "").strip()
@@ -633,15 +526,11 @@ def age_phrase(days: float) -> str:
 def stale_feeds(now=None, names=GATED_API) -> dict[str, float]:
     """{table: how many days old} for each gated feed that has gone quiet.
 
-    THE REFUSAL IS NOT THE WHOLE JOB. A gate hands the reader [], and []
-    reads as "nothing there": with the market feed three days old the report
-    said "market 0th percentile, a poor week" and printed no BUY list at all
-    — an emptiness presented as a finding. Measured, by ageing the store three
-    days and generating. So the reason has to be sayable, and this says it.
-
-    A table that has NEVER been written is absent from the result. It has not
-    gone quiet; it has never spoken, and the callers already have a sentence
-    for that ("add a token", "the ledger takes over").
+    The refusal ([] from a gated loader) isn't the whole job — [] reads
+    downstream as "nothing there", not "this feed went quiet", so this
+    names WHICH feed and how old. A table never written is absent, not
+    "quiet" (callers already have a sentence for that). Why:
+    docs/notes/tidy.md#gated-api-feeds--one-shared-reason-not-five-copies-of-it
     """
     now = now or run_now()
     out = {}
@@ -840,22 +729,12 @@ def load_understat_players(season: str = "") -> list[dict]:
     """Player-level xG/xA (sources.parse_understat_players), the newest
     reading for each (season, understat_id) pair.
 
-    NOT wired into forecasting yet — captured deliberately unused, the same
-    shape starters.csv's per-match minutes and ffcore.attributes.
-    resolve_fitness() were the session they were added: verified against
-    real data before anything downstream depends on it, not the same day
-    it starts flowing.
-
-    `season` filters to one Understat season label ("2026" for 2026/2027);
-    "" (default) returns every season on record — a caller comparing a
-    player's prior-season xG rate to his current one wants both at once.
-
-    CACHED PER SEASON, keyed on the file's own (mtime, size) — the same
-    invalidation read_csv() uses, because nothing in this pipeline writes
-    understat_players.csv mid-run (it is ingest's, not run.py's). Without
-    this, score.build() calls in with "2026"/"2025" five times in one
-    session() — a full re-filter + re-sort of 39,606 rows each time — for an
-    answer that cannot have changed since the last call in the same run.
+    Not wired into forecasting yet — captured deliberately unused, verified
+    against real data first. `season` filters to one label ("2026" for
+    2026/2027); "" returns every season (for prior-vs-current comparisons).
+    Cached per (season, mtime, size) — score.build() otherwise re-filters/
+    re-sorts 39,606 rows up to 5x per session for an unchanged answer. Why:
+    docs/notes/tidy.md#load_understat_players--per-season-cache
     """
     path = TIDY / "understat_players.csv"
     try:
@@ -889,16 +768,10 @@ MATCH_LEN = 90.0
 def minutes_played(role: str, raw_minute, match_len: float = MATCH_LEN) -> float:
     """One player's minutes in one match, from starters.csv's own columns.
 
-    THE SAME COLUMN READ IN OPPOSITE DIRECTIONS, and that is the whole rule.
-    A STARTER's `minute` is when he came OFF — blank means he played the
-    whole match. A SUB's `minute` is when he came ON — blank means he never
-    did. `ffcore.score._per_jornada_current` (this season's rate, keyed
-    through the crosswalk) and `ffcore.startprob.observations` (a graded
-    per-match label for P(start)'s own fit) both need exactly this, and
-    used to each carry their own copy of it.
-
-    0.0 for any other role (a coach row, say) — not an error, just nobody
-    on the pitch.
+    The same column read in opposite directions: a STARTER's `minute` is
+    when he came OFF (blank = whole match); a SUB's is when he came ON
+    (blank = never). 0.0 for any other role. Why:
+    docs/notes/tidy.md#minutes_played--one-column-read-in-opposite-directions
     """
     raw = (raw_minute or "").strip()
     if role == "starter":
@@ -1076,15 +949,10 @@ VALUE_TOLERANCE = 0.05
 def price_agrees(a, b, tolerance: float = VALUE_TOLERANCE) -> bool:
     """Are these two euro figures close enough to be the same player's price?
 
-    THE ONE PLACE THIS REPO DECIDES TWO PRICES ARE THE SAME PRICE — reused
-    by `Market._by_price` (picking among several candidates who share a
-    name) and by `ffcore.league._priced_like` (checking a name join against
-    the app's own stated figure), which used to each carry a separate
-    implementation of this same comparison.
-
-    False on a missing or zero figure: an absent number is not evidence
-    either way, and callers that want "silent means agree" say so
-    themselves rather than this function guessing it for them.
+    The one place this repo decides two prices are the same price — reused
+    by Market._by_price and ffcore.league._priced_like, which used to each
+    carry a separate copy. False (not a guess) on a missing or zero figure.
+    Why (the tolerance evidence): docs/notes/tidy.md#price_agrees--shared_names--row_key--one-tolerance-one-id
     """
     if not a or not b:
         return False
@@ -1099,16 +967,10 @@ def _club(row: dict) -> str:
 def shared_names(rows) -> set:
     """The names in these market rows that belong to more than one player.
 
-    THREE INDEXES KEY THE SAME ROWS — Market here, the Scorer's lookup, and
-    the crosswalk — and they have to agree about this or a squad key from one
-    misses in the next. Three of 651 names on 2026-08-19.
-
-    Decided by TODAY'S market, whatever you hand it: latest_only is applied
-    here rather than trusted from the caller. It used to be the caller's job
-    and the callers did not agree — Market and the crosswalk filtered, and
-    decide.py passed the whole history, which shares a name between a man who
-    left and a man who arrived. latest_only is idempotent, so a caller that
-    already filtered pays one max() for the guarantee.
+    Three indexes key the same rows (Market, the Scorer, the crosswalk) and
+    must agree, so `latest_only` is applied HERE rather than trusted from
+    the caller — callers used to disagree about it. Why:
+    docs/notes/tidy.md#price_agrees--shared_names--row_key--one-tolerance-one-id
     """
     clubs: dict[str, set] = {}
     for r in latest_only(rows):
@@ -1121,15 +983,11 @@ def shared_names(rows) -> set:
 def row_key(row: dict, shared: set) -> str:
     """The key one market row belongs under: the site's id for him.
 
-    THE SOURCE PUBLISHES ONE AND IT WAS NOT BEING READ. Every player element
-    on the market page carries data-id; the parser took data-nombre and
-    derived a slug from the anchor, so the repo keyed players by name and
-    then had to invent name@club for the three that two men share. On the
-    44,912 rows of market history data-id is present on every one and gives
-    666 distinct players — including 16975 and 11362, the two Iker Muñoz.
-
-    Falls back to the name for a row with no id, which is what a
-    hand-written fixture and the oldest snapshots look like.
+    The source publishes an id (data-id) on every row — present and unique
+    across all 44,912 rows of market history — so it's used ahead of the
+    old name/name@club scheme. Falls back to the name for a row with none
+    (a hand-written fixture, or the oldest snapshots). Why:
+    docs/notes/tidy.md#price_agrees--shared_names--row_key--one-tolerance-one-id
     """
     fid = (row.get("ff_id") or "").strip()
     if fid:
@@ -1151,28 +1009,17 @@ class Market:
         self.rows = rows
         self._latest: list | None = None
         self._name_idx: dict | None = None
-        # The fuzzy answers, kept. The same handful of unresolvable spellings
-        # are asked about again and again — once per feed row, per run.
+        # The fuzzy answers, kept — the same unresolvable spellings are
+        # asked about once per feed row, per run.
         self._resolved: dict[str, str | None] = {}
         self._by_key: dict[str, list[tuple[datetime, dict]]] = {}
-        # A NAME IS NOT A PLAYER. Two men called Álvaro García, one at Rayo
-        # worth 20.23M and one at Villarreal worth 0.50M, shared a key and
-        # therefore shared a price history — and a lookup got whichever the
-        # index happened to hand back. The name alone stays the key for the
-        # 648 players who have it to themselves; the three who do not get the
-        # club welded on, so the two histories cannot mix.
-        # WHO IS SHARED IS DECIDED BY TODAY'S MARKET, not by all of history.
-        # The other two indexes — load_players and the Scorer — see only the
-        # newest snapshot, and a key one of them splits while another merges
-        # is a lookup that silently misses. Over history five names were ever
-        # shared; three of them are two players today, and the other two are
-        # one player and a man who has left.
+        # A name is not a player (two Álvaro Garcías, one key, one shared
+        # price history) — shared names get the club welded on, decided by
+        # TODAY's market so every index (this one, load_players, the Scorer)
+        # agrees. Why: docs/notes/tidy.md#marketkey_for--candidates--the-shared-name-refusal-and-why
         latest = latest_only(rows)
-        # name -> the KEYS that answer to it. Two men of one name are two
-        # keys, and there is nothing to invent: the site's id already tells
-        # them apart. This used to be name -> clubs, so that "name@club"
-        # could be assembled as a key of its own — a key the source never
-        # issued, existing only because the id beside the name went unread.
+        # name -> the KEYS that answer to it (the site's own ids, not an
+        # invented name@club).
         self._by_name: dict[str, list] = {}
         for r in latest:
             n = norm(r.get("name"))
@@ -1267,18 +1114,10 @@ class Market:
     def candidates(self, name) -> tuple:
         """(key, []) resolved · (None, [keys]) ambiguous · (None, []) no match.
 
-        THE ONE PRODUCER OF MARKET CANDIDATES, and it answers in this index's
-        own keys. Callers with evidence of their own — who held him, which
-        way the deal went, what was paid — prune the list and must not have
-        to reconstruct a key to do it.
-
-        It exists because they were calling ffcore.text.resolve() over a raw
-        list of rows instead. That list's exact-name index holds ONE row per
-        name, so the two Álvaro Garcías arrived as a confident single match
-        rather than as the ambiguity they are, and the answer was then keyed
-        norm(name) — "alvaro garcia", which this index does not contain,
-        because a shared name is keyed on club. A guess and an unusable key
-        in one step.
+        The one producer of market candidates, in this index's own keys —
+        so a caller with its own evidence (who held him, what was paid) can
+        prune without reconstructing a key. Why (the raw-resolve() bug this
+        replaced): docs/notes/tidy.md#marketkey_for--candidates--the-shared-name-refusal-and-why
         """
         k = norm(name)
         if k in self._shared:

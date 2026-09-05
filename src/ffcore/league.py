@@ -11,38 +11,14 @@ it is a hard ceiling on what they can bid tomorrow.
     lg.owner[norm("raphinha")]        -> "Magic Mike 333"
     lg["Magic Mike 333"].cash.value   -> ~12.7M, with a confidence label
 
-HOW CASH IS ESTIMATED, and why it is a range and not a number.
-
-The app publishes no balances, so this reconstructs them:
+Cash is reconstructed (the app publishes no balances), not read:
 
     cash = anchor_balance - buys_since_anchor + sales_since_anchor
 
-An anchor is a balance somebody observed: the app's own `teamMoney` on this
-sweep for you, or a line typed into inputs/cash.txt. For rivals there usually
-is none — the API states `teamMoney` for the account that asks and null for
-everyone else — so the fallback anchor is the whole starting budget, because
-the draft deals the starting squad free.
-
-`budget - (market value of the initial roster)` was tried and was WRONG: it
-charged every manager for players they were given and put all four rivals tens
-of millions under water. Nothing computes it any more; the method that did was
-carried, uncalled, until 2026-08-19.
-
-Confidence is one of:
-    known      anchored on a balance somebody saw, plus exact ledger arithmetic
-    estimated  anchored on the starting budget
-    unknown    no budget configured, or no ledger coverage — value is None
-
-Treat "estimated" as a ceiling rather than a balance: it ignores whatever
-income the app has paid out and any deal that never appeared in the feed.
-
-A balance can be NEGATIVE, and that is a position rather than an error. The
-app lets a manager commit past the balance while the window is open; the
-constraint is being solvent when the jornada locks. So an overdrawn manager
-gets the negative number, the arithmetic that produced it in `basis`, and a
-max_bid of zero — they must sell before they can buy again. Only a missing
-budget produces "unknown", which is the one state that means "could outspend
-you" and suppresses every bid ceiling downstream.
+Confidence is `known` (anchored on an observed balance), `estimated`
+(anchored on the starting budget), or `unknown` (no budget/no ledger
+coverage — value is None). A NEGATIVE balance is a real, overdrawn position,
+not an error. Why: docs/notes/league.md#cash-estimation-model
 """
 
 from __future__ import annotations
@@ -237,14 +213,9 @@ def read_api_balances(rows=None) -> dict[str, tuple[float, str]]:
             value = float(raw)
         except ValueError:
             continue
-        # THE WHOLE MOMENT, not the day, and parsed as UTC. This balance is
-        # the app's answer as of the sweep, so every deal up to then is
-        # already inside it. Truncating to a date makes every deal later the
-        # same day look like it happened after the observation and subtracts
-        # it from a number that already counted it — 23.60M reported as
-        # 41.92M. And it must be snapshot_stamp, not ledger_stamp: the sweep
-        # stamp ends in Z and means UTC, while ledger_stamp reads the ledger's
-        # local wall-clock, so the wrong one is two hours out in summer.
+        # The whole moment (UTC), not the day — else a same-day deal after
+        # the sweep double-subtracts. snapshot_stamp, not ledger_stamp: the
+        # sweep stamp is UTC, the ledger's is local wall-clock.
         out[handle] = (value, snapshot_stamp(r.get("observed_at") or ""))
     return out
 
@@ -252,23 +223,10 @@ def read_api_balances(rows=None) -> dict[str, tuple[float, str]]:
 def flat_income(observed, budget: float, bought: float, sold: float):
     """What the app has paid the account beyond its transfers, or None.
 
-    ONE ACCOUNT STATES A BALANCE and every other is a replay, so the only
-    place the app's payouts can be MEASURED is your own row: whatever your
-    balance holds that the budget and the transfer feed do not explain is
-    what the app has handed you since the season began. Measured 2026-08-19:
-    1.27M, against the 0.80M that eight days of the configured daily bonus
-    came to — so every rival's ceiling was half a million light, and a rival
-    who can outbid you by 0.4M is exactly the kind of thing that is worth
-    knowing.
-
-    It is credited to rivals on the assumption the app pays everyone alike,
-    which is what the one clean observation says: a day with no deal in it
-    moved the balance by exactly +100,000. If it ever turns out to pay by
-    position or by points, this is the number that will stop reconciling.
-
-    Never negative. A balance BELOW what the ledger explains is a ledger that
-    has missed a purchase, and spreading that across four rivals as a negative
-    award would turn one bad row into five.
+    Measured on your own row (the one account with an observed balance) and
+    credited to rivals equally, on the assumption the app pays everyone
+    alike. Never negative — see docs/notes/league.md#rival-cash-income-measurement-flat_income
+    for why (a real balance-vs-ledger gap and the number it corrected).
     """
     if observed is None:
         return None
@@ -278,17 +236,9 @@ def flat_income(observed, budget: float, bought: float, sold: float):
 def allowance(since, now, daily_bonus: float) -> tuple[float, float]:
     """(euros the app has paid out since `since`, days it covers).
 
-    THE ANCHOR IS THE START, WHATEVER LABELLED IT. This used to be applied
-    only to ESTIMATED balances, on the reasoning that an observed balance
-    already contains every bonus paid — true of the moment it was read, and
-    false of every day after. The app's own reading is seconds old so it is
-    owed ~0 either way; a line typed into cash.txt four days ago is owed four
-    days, and without them it came back 0.40M light while still calling
-    itself "known".
-
-    No anchor is (0, 0) rather than a guess: the caller decides what to
-    measure from. A `since` in the future pays nothing — a clock a little out
-    is not a windfall.
+    Applies to EVERY anchor by age, not just estimated ones — an observed
+    balance is only current the moment it's read. `(0, 0)` with no anchor,
+    never a guess. Why: docs/notes/league.md#the-daily-allowance-backfill-allowance
     """
     if since is None or now is None:
         return 0.0, 0.0
@@ -299,19 +249,9 @@ def allowance(since, now, daily_bonus: float) -> tuple[float, float]:
 def _by_exact_value(raw_value, market) -> str | None:
     """The one market player who has ever been worth exactly this, or None.
 
-    EXACT, with no tolerance, on purpose. The join is only trustworthy because
-    futbolfantasy publishes the same euro figure the app does; allow a euro of
-    slack and it becomes a fuzzy match over a dense number line where several
-    players sit within a rounding error of each other.
-
-    ACROSS ALL OF HISTORY, though, not just the newest snapshot. api_teams is
-    swept once a day and market.csv every run, so hours later the app's figure
-    is one the market has already moved on from. Searching only the latest
-    reading made this join work for half an hour and then quietly stop.
-
-    Uniqueness is per PLAYER, not per row: the same player at the same value
-    in thirty snapshots is one candidate, while two different players who have
-    each been worth 500 at some point are two, and two is no answer.
+    Exact match (no tolerance), searched across all recorded history (not
+    just the newest snapshot), unique per PLAYER not per row. Why:
+    docs/notes/league.md#exact-value-join-as-a-last-resort-_by_exact_value
     """
     try:
         want = float(raw_value)
@@ -349,24 +289,12 @@ def _app_ids_of(xw) -> dict:
 def app_ids_known() -> dict:
     """{the app's player id: this repo's key}, from the crosswalk, or {}.
 
-    THE TABLE ALREADY KNEW. players.csv is the merged answer of every join
-    ever made — "IT MERGES, IT DOES NOT REBUILD" — so a player the app named
-    once in a market row is nameable for ever afterwards, while the ownership
-    join re-derives him from today's row alone and can fail. Reading it back
-    here is the difference between resolving Jonny Otto once and resolving him
-    every run.
-
-    THE CYCLE IS DELIBERATE AND ONE-WAY. crosswalk.py builds players.csv using
-    api_key, and api_key now reads players.csv — but it reads the file on
-    disk, which is the PREVIOUS run's answer, and the map is only ever added
-    to a join that would otherwise have failed. No file is not an error: on a
-    cold start this is {} and every caller behaves exactly as it did before
-    the table existed.
-
-    FOR A CALLER WITH NO CROSSWALK ALREADY IN MEMORY. `League.__init__` has
-    one (`self.xw`) and calls `_app_ids_of(self.xw)` directly rather than
-    this — this function's own disk read would otherwise duplicate one
-    `League.load()` had already done moments earlier.
+    A deliberate one-way cache: players.csv (built by api_key/crosswalk.py)
+    is read back here so an id resolved once stays resolved, instead of every
+    run re-deriving it from scratch and sometimes failing. {} on a cold start
+    is not an error. For a caller with no Crosswalk already in memory —
+    League.__init__ calls `_app_ids_of(self.xw)` directly to avoid a second
+    disk read. Why: docs/notes/league.md#the-app_ids-table--a-one-way-additive-cache
     """
     from ffcore.crosswalk import Crosswalk
     from ffcore.tidy import TIDY
@@ -378,37 +306,14 @@ def owner_from_api(rows: list[dict], market, ledger_owner: dict | None = None,
                    app_ids: dict | None = None) -> tuple[dict, list]:
     """({player key: manager}, unjoined names) from the app's own squads.
 
-    Ownership WITHOUT a replay. `replay()` reconstructs who owns whom by
-    reading a starting roster and applying every transaction ever typed, so it
-    inherits every gap in that file; this is the app answering the question
-    directly. No accumulation, so no accumulated drift.
-
-    Keyed through `market.key_for`, which is the same resolution every other
-    reader in this repo uses, because a key nothing else recognises is a
-    player who quietly vanishes from the watchlist and the board. Unjoined
-    names come back to be printed, never dropped — dropping one marks an owned
-    player as a free agent, which is how you end up bidding for somebody a
-    rival already has.
-
-    `market` may be None (the `with_market=False` path), in which case the
-    app's own spelling is used and the caller is on its own for joins.
-
-    The row's `player_name_full` is passed through, because the app publishes
-    two names per player and neither joins alone. See `api_key`.
-
-    `ledger_owner` breaks the one tie the app creates for us. The app lists
-    some players by surname alone — "Cardoso" with a Fabio and a Johnny in the
-    market, "Llorente" with a Marcos and a Diego Javier — and `key_for`
-    refuses to pick, correctly. But the ledger identified those players at
-    purchase time, price check and all, so when exactly ONE candidate is
-    already recorded against the SAME manager, the two sources agree and there
-    is nothing left to guess. Disagreement, or two candidates on the same
-    manager, stays unresolved.
-
-    The join itself is `api_key()`. This is a loop over it that keeps only the
-    manager; a caller who needs anything else off the row — the buyout clause,
-    the app's points — calls that directly rather than re-deriving a weaker
-    join of its own.
+    Ownership WITHOUT a replay (no accumulated drift — the app answers
+    directly). Keyed through `market.key_for`, the same resolution every
+    reader uses. Unjoined names are reported, never dropped. `market=None`
+    (with_market=False) falls back to the app's own spelling. `ledger_owner`
+    breaks the one tie the app creates (a surname two players share) using
+    the ledger's own purchase-time record. Loop over `api_key()` — see its
+    docstring for the join order. Why:
+    docs/notes/league.md#ownership-from-the-app-api-owner_from_api
     """
     from ffcore.tidy import latest_only
     out, unjoined = {}, []
@@ -431,23 +336,11 @@ def owner_from_api(rows: list[dict], market, ledger_owner: dict | None = None,
 def _priced_like(key: str, raw: str, market_value, index) -> bool:
     """Does the market price this player roughly the way the app does?
 
-    THE PRICE CHECKS A GUESS, NEVER AN EXACT MATCH. `key_for` answers two
-    quite different questions with one string: sometimes the market carries
-    that very name, and sometimes it resolved an abbreviation to the only
-    plausible candidate. The first is the strongest evidence there is and the
-    money must not be allowed to argue with it — a name the market spells the
-    same way is that player. The second is a guess, and the app states his
-    price on the same row: "C. Romero" resolved to ISAAC Romero, at 6.15M
-    against the 43.24M the app had just quoted for him.
-
-    `price_agrees()` (ffcore.tidy) is the same tolerance check `Market.
-    _by_price` uses to disambiguate candidates — this used to be a second,
-    separately-tuned copy of it (its own VALUE_TOLERANCE, its own formula).
-
-    True when either side is silent, because an absent number disproves
-    nothing — `price_agrees` itself is stricter (False on a missing figure,
-    since it also serves candidate-picking, where silence must not count as
-    a match), so silence is handled here, before it is ever called.
+    Checks a GUESS from key_for, never an exact name match (an exact name is
+    trusted outright). Reuses tidy.price_agrees()'s tolerance rather than a
+    second copy of it. True whenever either side is silent — an absent
+    number disproves nothing. Why:
+    docs/notes/league.md#price-as-a-name-join-sanity-check-_priced_like
     """
     if not key or key == norm(raw):
         return True                       # the market carries this very name
@@ -467,22 +360,11 @@ def _priced_like(key: str, raw: str, market_value, index) -> bool:
 def app_fielded(squad, names: dict, rows=None, ids=None) -> list[str]:
     """The eleven the APP says you are fielding, as this repo's keys, or [].
 
-    THE APP PUBLISHES IT. /v1/competition/1/teams/{team}/lineup/week/{n}
-    returns the formation you have set — found 2026-08-19, after a season of
-    believing it did not exist because every guess had been made under the
-    LEAGUE path. What it replaces is inputs/lineup.txt, a checklist ticked by
-    hand that went one short whenever a fielded player was sold, and a report
-    that read the hole as a formation change.
-
-    ALL OR NOTHING. The result is about to be diffed against the best eleven,
-    and a man who fails to resolve does not go missing quietly: he drops out
-    of "what you are fielding" and comes back as "put him on" — advice to make
-    a change you have already made. One unresolved row and this returns [] so
-    the caller falls back to the marks instead.
-
-    The app's own player id is tried first because it is exact; the nickname
-    and the birth name are the fallbacks, which is the same pair of strings
-    every other API reader joins on.
+    Reads /v1/competition/1/teams/{team}/lineup/week/{n} — replaces the old
+    hand-ticked inputs/lineup.txt checklist. ALL OR NOTHING: one unresolved
+    row returns [] so the caller falls back to the marks, rather than one man
+    silently reading as "put him on" (advice to redo a change already made).
+    Why: docs/notes/league.md#app_fielded--the-apps-own-lineup
     """
     from ffcore.tidy import load_api_lineup
 
@@ -510,51 +392,15 @@ def api_key(raw: str, handle: str, market, ledger_owner: dict | None = None,
             app_id: str = "") -> str | None:
     """One API row's player, as a key the rest of the repo recognises.
 
-    AN ID FIRST, ALWAYS — reordered 2026-08-21. This used to run two name
-    joins ahead of the app's own id, specifically to protect against a
-    stale crosswalk mapping (app_id 2614 was once written onto the wrong
-    Romero by a bad name join). That protection is `Crosswalk.merge()`'s
-    job now — a corrected join displaces a stale id off whoever wrongly
-    holds it, on every rebuild, which runs every pipeline run — and the id
-    itself involves no derivation at all: it is a raw fact straight off
-    the app's row. See `Crosswalk.resolve()`'s docstring, which makes the
-    same argument once for every caller; this function still hand-rolls
-    its own chain rather than calling it because `app_ids` here is a flat
-    {app id: key} dict, not a `Crosswalk`, and this function's ledger
-    tie-break and exact-value fallback are domain-specific to a squad row
-    rather than generic identity.
-
-    TODO: steps 1-3 below still duplicate what `Crosswalk.resolve()` now
-    does. Not migrated yet because `_priced_like` needs to apply
-    differently per step (unconditional trust on the id, price-validated
-    on the two name guesses) and `resolve()`'s single return value doesn't
-    say which step answered — merging them cleanly needs `resolve()` to
-    expose that, or this function to accept an `xw: Crosswalk` alongside
-    `app_ids` and call the id/name pieces separately. Left alone rather
-    than force a fit.
-
-      1. the app's player id, looked up in `app_ids` ({app id: this
-         repo's key}, from data/tidy/players.csv — built BY this function,
-         so it is absent on a cold start and must stay additive: no table
-         means exactly the behaviour there was before it existed).
-      2. `market.key_for` on the app's nickname.
-      3. `market.key_for` again on the app's FULL name. The app publishes
-         both, the shortened one is the nickname, and "Cardoso" spelled
-         out is "Fábio Rafael Rodrigues Cardoso" — tried second because
-         the nickname is the better single guess: of 76 owned players,
-         twelve join ONLY on it, their full name being a birth name
-         nothing else uses ("Pepelu" is "José Luis García Vayá").
-      4. the ledger breaking a tie, when the app gave a surname the market
-         has two of and exactly one of them is already recorded against THIS
-         manager.
-      5. an EXACT market value, searched across all of history.
-
-    None means unresolved, and unresolved must stay visible: a dropped row is
-    an owned player reading as a free agent, or a rival's man who cannot be
-    bought because nothing knows his clause belongs to anybody.
-
-    `index` is the latest market snapshot, passed in when a caller is looping
-    so it is not rebuilt per row; omit it and it is derived here.
+    Five-step chain, id first always: (1) app_ids lookup, (2) key_for on the
+    app's nickname, (3) key_for on the full name, (4) the ledger breaking a
+    surname tie, (5) an exact market-value match. `index` is the latest
+    market snapshot (derived here if omitted, passed in when a caller is
+    looping). None means unresolved — must stay visible, never guessed.
+    TODO: steps 1-3 still duplicate Crosswalk.resolve(); not merged yet, see
+    the note at the link below for why. Why (join order, the TODO, the
+    concrete cases each step exists for):
+    docs/notes/league.md#api_key--the-resolution-order-and-why
     """
     from ffcore.tidy import latest_only
     raw = (raw or "").strip()
@@ -571,16 +417,9 @@ def api_key(raw: str, handle: str, market, ledger_owner: dict | None = None,
         # true (never blocking) whenever the row is silent about it.
         if not _priced_like(key, "", market_value, index):
             key = None
-    # Each NAME join is checked against the price the app puts on the row: a
-    # name that resolves to somebody the market values differently has found a
-    # different player, and falling through to the next join is better than
-    # confidently seating him in a rival's squad.
-    # THE PRICE ALSO SAYS WHICH OF TWO MEN OF ONE NAME. Two Álvaro Garcías
-    # play in this league, at Rayo and at Villarreal, 20.23M and 0.50M — and
-    # the market index now refuses that name outright unless something says
-    # which. The app states the value on the very row being joined, so it is
-    # handed in rather than checked afterwards: without it the join fails and
-    # a rival's best defender reads as a 0.50M reserve.
+    # Each NAME join is price-checked (see _priced_like) — a wrong-value
+    # match falls through rather than confidently seating the wrong man in a
+    # rival's squad (real case: two Álvaro Garcías, 20.23M vs 0.50M).
     if not key:
         key = market.key_for(raw, value=market_value)
         if not _priced_like(key, raw, market_value, index):
@@ -608,24 +447,13 @@ def ledger_from_api(activity: list[dict], users: dict,
                     names: dict) -> list[dict]:
     """The transaction ledger, derived from the app's activity feed.
 
-    The ledger was typed by hand after every deal, which made
-    it the one input that could silently fall behind — and on 2026-08-17 it
-    was three days behind, which is what made the report offer a 63.29M budget
-    against a real 23.60M. A feed cannot forget.
-
-    ONE THING THE FEED CANNOT SAY: who the counterparty was. Every row names
-    `user1Id` and nobody else, and a manager-to-manager transfer does NOT
-    appear as a paired buy and sell — checked against all 57 rows, and no two
-    share a player and a moment. So a buy is written as coming from the pool
-    and a sale as going to it, which is right for ownership and right for
-    every premium (those need the price and the buyer, both of which are
-    here), and wrong only for the narrative of who dealt with whom. The
-    hand-typed file's `from`/`to` columns are kept in git history, where that
-    detail survives for the rows that had it.
-
-    A row whose player or manager cannot be named is DROPPED rather than
-    written blank: a ledger row with no player joins to no market value, and
-    would quietly distort the premium medians built on it.
+    Replaces hand-typing (which fell behind — a real 3-day gap once cost a
+    report 40M of accuracy). The feed cannot say who the counterparty was
+    (every row names one user only, and no manager-to-manager transfer ever
+    pairs a buy+sell in it), so a buy is written as from-the-pool and a sale
+    as to-the-pool — right for ownership and premiums, silent only on who
+    dealt with whom. A row with no nameable player/manager is DROPPED, not
+    blanked. Why: docs/notes/league.md#ledger-reconstruction-from-the-apps-activity-feed-ledger_from_api
     """
     out = []
     for r in sorted(activity, key=lambda x: x.get("at") or ""):
@@ -641,13 +469,9 @@ def ledger_from_api(activity: list[dict], users: dict,
             # this and nothing wider.
             "date": (r.get("at") or "")[:16],
             "player": player,
-            # THE APP'S OWN ID FOR HIM, CARRIED RATHER THAN THROWN AWAY.
-            # This row arrives identified. Writing only the display name and
-            # matching it back against the market is how "C. Romero" became
-            # Isaac Romero: a unique id spent on a fuzzy string. All 58
-            # distinct ids in this ledger resolve through the crosswalk, and
-            # none disagrees with the app's own full name; the names resolve
-            # 60 of 66 rows.
+            # Carried, not thrown away — a display-name-only row re-derives
+            # identity by fuzzy match later, which is how "C. Romero" once
+            # became the wrong Romero.
             "player_id": str(r.get("player_id") or ""),
             "from": MARKET if kind == "buy" else who,
             "to": who if kind == "buy" else MARKET,
@@ -695,26 +519,13 @@ def owner_drift(ledger: dict, api: dict, names=None) -> list[str]:
 def identify(t: dict, owner: dict, market=None, xw=None) -> tuple[str, str]:
     """(player key, why) for one ledger row — issue #26.
 
-    The counterparty is evidence about who the player is. A sale names someone
-    that manager was holding; a purchase from the market names someone nobody
-    held. Either one prunes a candidate list that the name alone leaves
-    ambiguous, which is the manual step the ledger's own notes record: "price
-    confirms Fabio not Johnny".
-
-    Three prunes, applied to the candidates Market.candidates() hands back
-    rather than replacing it — an exact name is returned untouched and is never
-    second-guessed:
-
-      1. Sold by a manager -> he was in that manager's squad at the time.
-      2. Bought from the market -> nobody in the league held him.
-      3. Priced -> the price has to be within a factor of PLAUSIBLE of his
-         value at the time. Two players who share a surname rarely share a
-         price bracket.
-
-    Returns (norm(raw), "") unless exactly one candidate survives, so an
-    unresolved name still lands in unmatched() and a wrong player is never
-    invented. `why` is non-empty only when a substitution was made, and every
-    caller is expected to report it: this guesses, so it has to say so.
+    Three prunes on Market.candidates()'s own list (never replacing it — an
+    exact name is never second-guessed): (1) sold -> was in that manager's
+    squad, (2) bought from market -> nobody held him, (3) priced -> within a
+    factor of PLAUSIBLE of his value then. Returns (norm(raw), "") unless
+    exactly one candidate survives. `why` non-empty only when a substitution
+    was made — every caller must report it. Why:
+    docs/notes/league.md#identify--counterparty-pruning-for-a-ledger-row-issue-26
     """
     key = norm(t["player"])
     # AN IDENTIFIER FIRST, AND THEN IT IS NOT A GUESS AT ALL. Everything
@@ -774,23 +585,12 @@ def identify(t: dict, owner: dict, market=None, xw=None) -> tuple[str, str]:
 def _roster_key(raw: str, market, xw=None) -> str:
     """The canonical key for one rosters_initial.txt line.
 
-    A THIN WRAPPER OVER `Crosswalk.resolve()` now — the first of the six
-    call-site-specific identity resolvers to be migrated onto the one join
-    function, per the 2026-08-21 handoff. Behaviour is unchanged: same fast
-    path for an id-per-line entry, same market join, same crosswalk
-    app_name fallback for a name the market has since moved past. Only the
-    resolution logic itself moved; read `Crosswalk.resolve()`'s docstring
-    for why each step is ordered the way it is.
-
-    read_rosters() folds "alvaro garcia (Rayo)" into "alvaro garcia@rayo"
-    for a shared name — split back apart here so the club reaches
-    resolve()'s `hint_club`, the same signal Market._pick() already knows
-    how to use.
-
-    Falls back to norm(raw) when resolve() has nothing (no crosswalk given,
-    or neither path can place him — never yet seen anywhere, or still
-    ambiguous), which resolve() itself cannot do: it has no crosswalk to
-    fall back to without one.
+    A thin wrapper over Crosswalk.resolve() (see its own docstring for the
+    step order) — read_rosters() folds "alvaro garcia (Rayo)" into
+    "alvaro garcia@rayo", split back apart here so the club reaches
+    resolve()'s hint_club. Falls back to norm(raw) when resolve() has
+    nothing (no crosswalk, or genuinely unplaceable). Why:
+    docs/notes/league.md#_roster_key--migrating-onto-crosswalkresolve
     """
     stripped = raw.strip()
     if stripped.isdigit():
@@ -936,33 +736,20 @@ class League:
         self.owner, self.warnings, self.resolved = replay(rosters, txns,
                                                           market, xw)
 
-        # THE APP OVERRULES THE LEDGER. `replay()` accumulates typed
-        # transactions over a starting roster, so it inherits every row nobody
-        # typed; the API states ownership outright. The replay still runs — it
-        # produces the prices and premiums — but its ownership is superseded.
-        #
-        # An EMPTY feed changes nothing, and that is the case that matters: a
-        # token expiring mid-season must degrade to the ledger, never announce
-        # that nobody owns anybody.
+        # The app overrules the ledger's replay (superseding, not discarding
+        # it — replay still produces prices/premiums). An empty feed changes
+        # nothing (degrade to the ledger, never claim nobody owns anybody).
+        # Why: docs/notes/league.md#replay-and-leagueinit--the-app-overrules-the-ledger
         self.api_unjoined: list[str] = []
         self._api_teams = api_teams
-        # The balances live at the grain of a team now. None means "read the
-        # store"; [] means the sweep genuinely returned no table, which is the
-        # case that must degrade to cash.txt rather than to zeroes.
+        # None means "read the store"; [] means the sweep returned no table
+        # — must degrade to cash.txt, not to zeroes.
         self._standings = standings
-        # No market, no override. The join needs `Market.key_for` to produce
-        # keys the rest of the repo recognises; without one the app's own
-        # spelling becomes the key and the squad silently stops matching the
-        # checklist, the watchlist and the board. The cash anchor below is
-        # unaffected — a balance needs no name.
+        # No market, no override — Market.key_for is what makes the app's
+        # ownership keys match the rest of the repo's.
         if api_teams and market is None:
             api_teams = None
         if api_teams:
-            # Keyed through Market.key_for — the same resolution every other
-            # reader uses. Keying on the app's own spelling looks right and is
-            # not: the two sets never meet and every owned player reads as a
-            # free agent, with the player COUNTS still correct, which is what
-            # makes it convincing.
             api_owner, self.api_unjoined = owner_from_api(
                 api_teams, market, ledger_owner=self.owner,
                 app_ids=_app_ids_of(self.xw))
@@ -1038,22 +825,17 @@ class League:
         me_balance = balances.pop("__me__", None)
         if me_balance:
             balances.setdefault(self.cfg.me, me_balance)
-        # The app's own number wins over anything typed. It is still an
-        # OBSERVED balance — the same kind cash.txt holds — just observed by
-        # machine, to the euro, on every sweep, so it can never be the thing
-        # that went stale. On 2026-08-17 the typed anchor was two days old and
-        # the report offered 63.29M against a real 23.60M.
-        #
-        # Rivals are not in here: the API states `teamMoney` for the account
-        # that asks and null for everyone else, so their estimate is untouched
-        # and the `~` on it stays honest.
+        # The app's own reading wins over anything typed — it's an observed
+        # balance too, just never stale (unlike a typed anchor). Rivals
+        # aren't here: the API states teamMoney for you only. Why:
+        # docs/notes/league.md#_estimate_cash--anchor--arithmetic-shown-in-full
         for handle, (value, when) in read_api_balances(
                 self._standings).items():
             balances[handle] = (value, when)
 
-        # WHAT THE APP HAS PAID, measured rather than assumed — see
-        # flat_income(). Computed once, from the one account that states a
-        # balance, and credited to every manager who has none.
+        # What the app has paid beyond transfers — see flat_income() — from
+        # the one account that states a balance, credited to every manager
+        # with none.
         paid = None
         me_anchor = balances.get(self.cfg.me)
         if me_anchor and isinstance(me_anchor[1], datetime) and self.cfg.budget:
@@ -1067,18 +849,15 @@ class League:
             paid = flat_income(me_anchor[0], self.cfg.budget, b, sd)
 
         for handle, mgr in self.managers.items():
-            # ONE BUDGET, because everyone in this league started with the
-            # same one. The [budget] section that overrode it per manager was
-            # in league.ini for a year and never held a value; a knob that has
-            # never been turned buys nothing and can still go wrong.
+            # One budget for everyone — a per-manager override sat unused in
+            # league.ini for a year and was removed.
             budget = self.cfg.budget
             anchor = balances.get(handle)
 
             if anchor:
                 base, since_s = anchor
-                # cash.txt hands us a typed date (local wall-clock);
-                # read_api_balances hands us an already-parsed UTC moment.
-                # Both are legitimate anchors and only the parsing differs.
+                # cash.txt: a typed local date. read_api_balances: an
+                # already-parsed UTC moment. Same anchor, different parsing.
                 if isinstance(since_s, datetime):
                     since, from_app = since_s, True
                 else:
@@ -1096,8 +875,7 @@ class League:
                                     "configured", "")
                     continue
                 # The starting roster is dealt free, so the whole budget is
-                # the anchor. Charging it against roster value put every
-                # rival tens of millions under water.
+                # the anchor (not budget-minus-roster-value — see the doc).
                 base, since, conf = budget, None, "estimated"
                 basis = "%.0fM starting budget" % (budget / 1e6)
 
@@ -1117,21 +895,12 @@ class League:
                     sold += price
                     counted += 1
 
-            # THE DAILY ALLOWANCE, from the anchor to now. The feed cannot
-            # see it, so without this a balance falls behind by the bonus
-            # every day and a manager looks poorer — and therefore less able
-            # to answer a clause — than he is. Only ever ADDS.
-            #
-            # EVERY ANCHOR, not only the estimated ones. An observed balance
-            # contains every bonus paid up to the moment it was READ and none
-            # of the ones paid since, so what matters is the anchor's age and
-            # not its label. The app's own reading is seconds old and collects
-            # nothing; the typed anchor in cash.txt was four days old and was
-            # 0.40M light for exactly this reason, while calling itself known.
+            # The daily allowance, by the anchor's AGE not its label (every
+            # anchor is owed it, only ADDS). Why:
+            # docs/notes/league.md#the-daily-allowance-backfill-allowance
             if since is None and paid is not None:
-                # A rival, and we can do better than a guess at how long the
-                # app has been paying: your own balance says how much it has
-                # paid YOU since the same season started, and it pays alike.
+                # A rival with no anchor: your own measured `paid` (flat_income)
+                # is a better estimate than guessing how long the app has paid.
                 bonus, days = paid, None
             else:
                 start = since or min(
@@ -1141,10 +910,8 @@ class League:
                                         self.cfg.daily_bonus)
 
             value = base + sold - bought + bonus
-            # The arithmetic, not just the answer. Every term is here so a
-            # balance that looks wrong can be checked against the ledger
-            # without re-deriving it, and so an overdrawn manager's position
-            # can be sized at a glance.
+            # Every term, not just the answer — checkable against the ledger
+            # without re-deriving it.
             math = ("%s − %.2fM bought + %.2fM sold across %d ledger row(s)"
                     "%s = %.2fM"
                     % (basis, bought / 1e6, sold / 1e6, counted,
@@ -1155,11 +922,8 @@ class League:
                        if bonus else "",
                        value / 1e6))
             if value < 0:
-                # NOT an input error. Committing past the balance is allowed
-                # while the window is open; the constraint is being solvent
-                # when the jornada locks. This used to be reported as
-                # "unknown" plus a warning, which threw away a real number and
-                # made every rival's ceiling unreadable through rival_ceiling.
+                # A real, overdrawn position, not an input error — see the
+                # module docstring.
                 self.warnings.append(
                     "%s is %.2fM overdrawn: %s. Going over the budget "
                     "mid-window is allowed; being overdrawn when the jornada "

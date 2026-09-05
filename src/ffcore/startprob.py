@@ -5,39 +5,16 @@ ffcore.startprob — P(he starts), from two sources that disagree, fitted.
     cal.p(ff_pct=80.0, af=af_row)     -> 0.94
     cal.note()                        -> what it fitted, on how much
 
-TWO SOURCES, AND THEY ARE NOT EQUALS. futbolfantasy publishes a percentage for
-most of the league; analiticafantasy publishes on far fewer players, and on the
-first jornada that has actually been played it was much the better of the two
-where it spoke — Brier 0.089 against 0.195, on the 28 players both covered.
+Two sources, not equals: futbolfantasy (FF, wide coverage) vs
+analiticafantasy (AF, narrow but sharper where it speaks — and it speaks
+selectively, about obvious starters). Both fit parameters are learned from
+confirmed line-ups every run and used ONLY if they beat the raw source out
+of sample (leave-one-out) — no minimum-sample constant needed, `note()`
+reports which happened.
 
-But it speaks SELECTIVELY, and that is the thing to hold on to: 82% of the
-players AF covered actually started, against a base rate of 48%. It publishes
-about obvious starters. So it cannot replace the wider source, only sharpen it
-where it has an opinion, and a blend has to fall back rather than go blank.
-
-FF's OWN PROBLEM IS CALIBRATION, NOT IGNORANCE, and it may be the bigger half.
-Measured against the same four matches, everything it called at 70% or above
-started every single time, and its 50% bucket started 62% of the time. Its
-numbers are editorial buckets rather than probabilities — the README has said
-so for a fortnight — so the fix is not to trust them less, it is to learn what
-they mean.
-
-NOTHING HERE IS A CONSTANT SOMEBODY CHOSE. Both parameters are fitted from
-confirmed line-ups every run and both are reported, and the fit is only used if
-it beats the raw source OUT OF SAMPLE, leave-one-out. That is the guard, and it
-needs no minimum-sample number to be picked: with too little data the fitted
-model loses to the identity on held-out points and is not used. `note()` prints
-which happened, so the report can never imply a fit that did not take.
-
-THE BASELINE IT HAS TO BEAT IS WHAT THE SYSTEM ACTUALLY DOES, fallbacks and
-all: a player the wider source lists without a number is scored at
-NEUTRAL_START, one it does not list at all at ABSENT_START. The first version
-of this compared against a baseline that predicted ZERO for anyone unlisted —
-and since the narrow source covers mostly obvious starters, the baseline was
-marked wrong on players it never had an opinion about. It reported the fit
-improving Brier by 0.306 against a raw score of about 0.19: an improvement
-larger than the thing being improved, which is the shape of a rigged
-comparison rather than of a good model.
+Full rationale (measured Brier scores, why the baseline has to include
+NEUTRAL_START/ABSENT_START fallbacks, a rigged-comparison bug this once
+had): docs/notes/startprob.md
 """
 
 from __future__ import annotations
@@ -47,59 +24,35 @@ import math
 __all__ = ["Obs", "Calibration", "observations", "af_prob", "METHOD_VERSION"]
 
 # Bumped whenever fit()/observations() changes what it optimises, not what
-# data it sees. score.py's on-disk cache (startcal.json) keys itself on this
-# alongside the data fingerprint — REAL BUG, CAUGHT BEFORE IT SHIPPED: the
-# fingerprint used to be (len(truth), cut) alone, so switching Step 4's
-# Brier target from binary played/didn't to minutes-graded changed nothing
-# about the DATA, and the stale binary-fitted coefficients would have kept
-# being read from disk forever, silently, until starters.csv's row count or
-# earliest observed_at happened to move. A methodology change with no data
-# change is exactly the case a data-only fingerprint cannot catch.
+# data it sees — a methodology change with no data change is what a
+# data-only fingerprint can't catch (score.py's startcal.json cache keys
+# on this). Why: docs/notes/startprob.md#method_version
 METHOD_VERSION = 2
 
-# The exponent grid for FF's recalibration and the weight grid for AF. Coarse
-# on purpose: the data cannot resolve finer, and a grid is auditable where a
-# solver's answer is not.
-# PLATT SCALING: logit(p') = A + B*logit(p). Two parameters, because one is
-# not enough. A single sharpening exponent can only steepen the curve about
-# its middle, and the shape the data actually has is steep AND shifted — the
-# wider source's 30% bucket started 12% of the time and its 70% bucket 96%.
-# Fitted with the exponent alone, 30% was driven to 0.01 to buy accuracy at
-# the top, understating a rotation player by a factor of twelve. The intercept
-# is what lets the curve move without being forced through the middle.
+# The exponent grid for FF's recalibration and the weight grid for AF.
+# Coarse on purpose: the data can't resolve finer, a grid is auditable
+# where a solver's answer isn't. Two Platt params, not one — a single
+# exponent can only steepen the curve about its middle, and the data's
+# shape is steep AND shifted. Why: docs/notes/startprob.md#platt-scaling--why-two-parameters-not-one
 INTERCEPT = [round(-3.0 + 0.5 * i, 1) for i in range(13)]   # -3.0 .. 3.0
 SLOPE = [round(0.2 + 0.4 * i, 1) for i in range(15)]        # 0.2 .. 5.8
 WEIGHTS = [round(0.1 * i, 1) for i in range(11)]            # 0.0 .. 1.0
 
-# NOTHING IS CERTAIN, and a Bernoulli at 0 or 1 says otherwise. Left alone the
-# fit drives the confident buckets to a flat 1.00, because on four matches
-# everything called at 80% did start — while the wider source's OWN 100%
-# bucket started 80% of the time. A player who cannot miss costs the simulator
-# nothing when he does, so the sampled season stops containing the thing that
-# actually decides leagues. The clamp is on the output only; the fit is free
-# to want more than this and simply does not get it.
+# Nothing is certain, and a Bernoulli at 0 or 1 says otherwise — clamp on
+# the output only, the fit is free to want more than this.
+# Why: docs/notes/startprob.md#floorceil-clamp
 FLOOR, CEIL = 0.01, 0.97
 
 
 class Obs(tuple):
     """(ff probability, af probability or None, minutes-graded outcome, team).
 
-    `ff` is what the scorer WOULD USE — the published percentage, or the
-    neutral/absent fallback — never None, so the baseline this is measured
-    against is the live behaviour rather than a strawman.
-
-    `started` IS GRADED ON MINUTES NOW, not binary played/didn't (Step 4,
-    2026-08-21) — `minutes_played(role, minute) / MATCH_LEN`, clamped to
-    [0, 1] by construction (a starter tops out at 1.0, an unused sub sits
-    at 0.0). P(start) is used downstream as a straight multiplier on
-    points-per-minute (`Scorer.score`: `flat = rating.ppm * pct_used /
-    100.0`), so the quantity actually being predicted was always closer to
-    "how much of the match will he play" than to "was he in the printed
-    eleven" — a starter hooked at half-time and one who plays the full 90
-    used to score identically against the fit, discarding exactly the
-    signal that determines whether the multiplier is right. The name stays
-    `started` because it is still true at the extremes and every existing
-    reader already expects a value in [0, 1].
+    `ff` is what the scorer WOULD USE (published percentage or the
+    neutral/absent fallback) — never None. `started` is graded on MINUTES
+    (`minutes_played(role, minute) / MATCH_LEN`, clamped [0, 1]), not
+    binary played/didn't — the quantity predicted is "how much of the
+    match will he play", the same thing `Scorer.score` multiplies by.
+    Why: docs/notes/startprob.md#obsstarted--graded-on-minutes-step-4-2026-08-21
     """
     __slots__ = ()
 
@@ -204,22 +157,12 @@ class Calibration:
     def fit(cls, obs) -> "Calibration":
         """Fit both parameters, and USE THEM ONLY IF THEY EARN IT.
 
-        Leave-one-TEAM-SHEET-out: every observation is predicted by a model
-        fitted without the whole line-up it belongs to, and the fitted family
-        has to beat the raw source on that held-out score. This is the whole
-        guard. It replaces the "at least N observations" constant that would
-        otherwise have to be chosen, and it fails in the right direction —
-        with too little data the fit does not generalise, loses, and is not
-        used.
-
-        THE GROUP IS THE POINT. Held out one player at a time, the model gets
-        to see the other twenty-one names on the same sheet, which is most of
-        the answer: a manager picks eleven, so knowing who else started is
-        knowing who did not. That version reported a fit improving Brier by
-        0.031 out of sample and drove the confident buckets to a near-
-        threshold classifier off four matches. Holding out the sheet asks the
-        question that is actually being asked of it in the week ahead — a
-        line-up it has never seen.
+        Leave-one-TEAM-SHEET-out (not one player — a manager picks eleven
+        as ONE decision): every observation is predicted by a model fitted
+        without the whole line-up it belongs to, and has to beat the raw
+        source on that held-out score. Replaces an "at least N
+        observations" constant; fails in the right direction.
+        Why: docs/notes/startprob.md#calibrationfit--leave-one-team-sheet-out
         """
         obs = [o for o in obs if o.ff is not None or o.af is not None]
         if len(obs) < 3:
@@ -294,25 +237,13 @@ def observations(lineups, starters, cut: str, roster=None,
                  xw=None) -> list[Obs]:
     """Predictions made before `cut`, joined to who actually started.
 
-    Only the clubs a confirmed line-up exists for: everyone else has not
-    played, and scoring a prediction against a match that has not happened is
-    how a grader flatters itself.
-
-    THE JOIN IS THE CROSSWALK'S when one is passed, and that is the whole
-    point of having one: every feed's key for a player resolves to the same id
-    without this module doing any guessing. Without it, confirmed line-ups and
-    the wider source share a slug (169 of 182 match) while the narrow source
-    shares nothing with anybody and falls back to a folded name at 66% — the
-    join this repo warns about everywhere.
-
-    THE UNIVERSE IS THE WIDER SOURCE'S OWN LIST, plus anyone who turned out to
-    play. Not the matchday eighteen — that drops everyone left out of the
-    squad, who are exactly the players the absent fallback is RIGHT about, and
-    grading without them made ABSENT_START look far too low and flattened
-    every confident call to compensate. Not the market's roster either: those
-    names come from a third site and the join loses most of them, which
-    silently doubles a player up as one prediction that started and one that
-    did not.
+    Only the clubs a confirmed line-up exists for — scoring against a match
+    that hasn't happened flatters the grader. The join is the crosswalk's
+    when one is passed (169/182 slugs match without it; the narrow source
+    matches nothing and falls back to a folded name at 66%). The universe
+    is the wider source's own list plus anyone who turned out to play —
+    not the matchday eighteen, not the market's roster.
+    Why: docs/notes/startprob.md#observations--the-join-and-the-universe
     """
     from ffcore.text import norm
 

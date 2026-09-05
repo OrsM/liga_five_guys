@@ -5,29 +5,18 @@ ffcore.market — what the app is likely to offer you next, and what it is worth
     m.draw(rng)                  -> the keys of one cycle's offers
     m.best_over(days, gain, rng) -> distribution of the best upgrade you'd see
 
-THE QUESTION THIS EXISTS FOR IS "SPEND NOW OR SPEND LATER". Every move the
-simulation ranks is scored against doing nothing for the rest of the season,
-which is not the alternative on offer: the alternative is doing something
-better in a few days, with the balance intact, against a market that deals a
-fresh dozen players every cycle. Waiting therefore scored exactly zero and any
-move with a positive number beat it BY CONSTRUCTION — which is how a report
-comes to recommend spending everything you have on the first thing that clears
-a low bar.
+Every move the simulation ranks is scored against doing nothing for the rest
+of the season, which is not the real alternative — waiting a few days for a
+better offer is. `Offers` models that market: sampled weighted by value (not
+uniformly — real cycles deal players ~5.5x the unowned pool's median), fitted
+against observed offers rather than assumed. What it cannot see (a rival
+buying the man you're waiting for, a pool/values that don't stand still) all
+bias the same direction, toward making waiting look better than it is — the
+report always prints the band and sample size beside the number as the
+counterweight.
 
-THE MARKET IS NOT A RANDOM DRAW, and assuming it was would have been worse
-than not modelling it at all. Measured across every cycle on record, the
-players actually offered are about five and a half times more valuable than
-the unowned pool they come from — median 9.58M against 1.72M — while the
-POSITION mix is close to proportional. So the sampler is weighted by value,
-with the exponent fitted to reproduce the observed quantiles rather than
-chosen: uniform would offer you journeymen and flatter waiting, proportional
-would offer you Raphinha every cycle and flatter it far more.
-
-WHAT IT CANNOT DO. It has one league's worth of cycles behind it, it assumes
-the pool and the values stand still, and it knows nothing about a rival buying
-the man you were waiting for. Every one of those makes waiting look better
-than it is, which is the opposite of the bias it was built to correct — so the
-report prints the band and the sample size beside the number, always.
+Why "spend now or later" is the right question, why value-weighted rather
+than uniform, and what the model can't see: docs/notes/market.md.
 """
 
 from __future__ import annotations
@@ -162,15 +151,10 @@ class Offers:
         matrix. None when numpy is missing.
 
         Weighted sampling WITHOUT replacement, vectorised by the exponential
-        race (Efraimidis-Spirakis): give every player a clock that ticks at his
-        own weight, Exp(1)/w, and deal the n that ring first. That is not an
-        approximation of the loop below — it is the same distribution, which is
-        the only reason it is allowed to replace it.
-
-        The loop it replaces cost 10 of the 14 seconds the report took: 25,200
-        cycles, each one copying a 570-entry list twice and then calling
-        random.choices twelve times over the whole of it. Same answer, drawn
-        in one array operation instead of 302,400 scalar ones.
+        race (Efraimidis-Spirakis) — the same distribution as `_draw_idx()`'s
+        loop, not an approximation of it (checked in the self-test). Why this
+        replaces the loop (a 10-of-14-second hot spot): docs/notes/market.md
+        #draw-np-vectorization.
         """
         if np is None or not self._keys:
             return None
@@ -182,23 +166,12 @@ class Offers:
     def chance(self, key) -> float:
         """Probability this particular player is offered in one cycle.
 
-        UNOWNED IS NOT AVAILABLE, and the difference is most of a season. The
-        app deals about a dozen players out of five hundred, and you cannot
-        ask for one — so a man you want who is not on the market today is not
-        something you can go and buy, however unowned he is. On the day this
-        was written that was Ruben Garcia, sold in error and then described as
-        "buyable for less than you sold him for", which was simply untrue.
+        Unowned is not available — see docs/notes/market.md
+        #unowned-is-not-available.
         """
-        # A WITH-REPLACEMENT APPROXIMATION OF A WITHOUT-REPLACEMENT DRAW.
-        # `per_cycle * w_i / total` is each player's exact inclusion
-        # probability only if a cycle's `per_cycle` offers were drawn WITH
-        # replacement; the app deals distinct players per cycle, so the
-        # true marginal is slightly lower (drawing the same weight twice
-        # is impossible). Flagged in a swarm review (2026-09-01): at
-        # `per_cycle` ~12 against a pool of ~570-600, the drawn fraction
-        # is small enough (~2%) that the error is negligible here — this
-        # file caveats every other approximation it makes, so this one
-        # gets the same note rather than reading as an oversight.
+        # A with-replacement approximation of a without-replacement draw;
+        # negligible here (~2% drawn fraction). Why: docs/notes/market.md
+        # #chance-with-replacement-approximation.
         total = sum(self._w)
         if not total or key not in self.pool:
             return 0.0
