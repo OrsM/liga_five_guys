@@ -353,6 +353,36 @@ def latest_snapshot(path, keep=None) -> list[dict]:
         return kept
 
 
+# CACHES THE RESULT, NOT THE FILE — latest_snapshot() itself stays a bounded-
+# memory forward pass (see its own docstring on why it bypasses read_csv's
+# cache). But load_market_latest()/load_lineups_latest() are each called
+# several times over one run.py process (load_players() alone, plus every
+# stage that wants "the market as of now") and, with no cache of their own,
+# each call re-walked the ENTIRE multi-decade file again for an answer that
+# cannot change mid-run — measured 6-8 calls to the same file on a real
+# report. `cache_key` disambiguates callers like load_lineups_latest(source=)
+# that pass a fresh `keep` lambda every call (so keying on `keep` itself would
+# never hit); same mtime+size invalidation and same copy-on-return guarantee
+# as read_csv()'s cache, for the same reason.
+# Why: docs/notes/tidy.md#_cached_latest_snapshot--cache-the-small-result-not-the-whole-file
+_LATEST_SNAPSHOT_CACHE: dict[tuple, tuple] = {}
+
+
+def _cached_latest_snapshot(path, keep=None, cache_key=None) -> list[dict]:
+    path = Path(path)
+    try:
+        st = path.stat()
+    except OSError:
+        return []
+    stamp = (st.st_mtime_ns, st.st_size)
+    key = (str(path), cache_key)
+    hit = _LATEST_SNAPSHOT_CACHE.get(key)
+    if hit is None or hit[0] != stamp:
+        hit = (stamp, latest_snapshot(path, keep=keep))
+        _LATEST_SNAPSHOT_CACHE[key] = hit
+    return [dict(r) for r in hit[1]]
+
+
 # How long a DAILY feed may go unanswered before its last reading stops being
 # today's. The sweep runs twice a day, so missing both of a day's sweeps is not
 # a cadence — it is a feed that has stopped. src/methodology.py prints "stale"
@@ -424,7 +454,7 @@ def load_market_frozen() -> list:
 def load_market_latest() -> list[dict]:
     """`latest_only(load_market())`, in the low-memory way — see
     latest_snapshot()."""
-    return latest_snapshot(TIDY / "market.csv")
+    return _cached_latest_snapshot(TIDY / "market.csv")
 
 
 # Which probable-XI site the reports are built on. The lineups table can hold
@@ -451,7 +481,8 @@ def load_lineups_latest(source: str = LINEUP_SOURCE) -> list[dict]:
     comparison, so "newest" means newest row from this one source, same as
     `latest_only(pick_source(...))` would answer."""
     keep = (lambda r: r.get("source") == source) if source else None
-    return latest_snapshot(TIDY / "lineups.csv", keep=keep)
+    return _cached_latest_snapshot(TIDY / "lineups.csv", keep=keep,
+                                   cache_key=source)
 
 
 def pick_source(rows: list[dict], source: str) -> list[dict]:
@@ -868,7 +899,7 @@ def load_players() -> dict[str, dict]:
     agreed on all 655 current players and differed only by five departed
     ones, none of which reached any report.
     """
-    market, xi = load_market_latest(), latest_snapshot(TIDY / "lineups.csv")
+    market, xi = load_market_latest(), _cached_latest_snapshot(TIDY / "lineups.csv")
     if not market and not xi:
         raise SystemExit("no rows in %s — run `ingest.py parse` first" % TIDY)
     shared = shared_names(market)

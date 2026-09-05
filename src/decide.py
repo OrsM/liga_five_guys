@@ -1248,8 +1248,26 @@ def offer_combos(u: Universe) -> list[tuple[str, Action]]:
            for combo in covers]
 
 
+_LOAD_CACHE: Universe | None = None
+
+
 def load(trials_pool=None) -> Universe:
-    """Assemble the universe from the store. The only IO in this module."""
+    """Assemble the universe from the store. The only IO in this module.
+
+    MEMOIZED FOR THE PROCESS. Pure w.r.t. the tidy store (no argument here
+    changes the result — `trials_pool` is accepted but unused), and
+    run.py's single-interpreter design (see its own docstring) means
+    methodology's stage and sim's stage used to each pay for their own
+    fresh call — methodology's own `_fc()` helper called it twice by
+    itself. Measured 2.4s per call; caching cut it from 3 calls to 1 on a
+    real report. Same shape as `wait_routes`/`market_model` being hoisted
+    to one call in sim.py — a store read, not a fact that could change
+    mid-run, so nothing needs invalidating within one process.
+    Why: docs/notes/decide.md#load--memoized-for-the-process
+    """
+    global _LOAD_CACHE
+    if _LOAD_CACHE is not None:
+        return _LOAD_CACHE
     # The run's one model — the same League and the same Scorer report.py
     # describes. See ffcore/model.py.
     from ffcore.model import session
@@ -1432,7 +1450,7 @@ def load(trials_pool=None) -> Universe:
     locked_cash = pending_sent(mkt)
     cash = raw_cash - locked_cash
 
-    return Universe(
+    _LOAD_CACHE = Universe(
         state=LeagueState(squads, rem, me, carried), forecaster=fc, pos=pos,
         price=price, proceeds=proceeds, owner=owner, cash=cash, me=me,
         value=value, market_exp=market_exp, start=start, clause=clause,
@@ -1445,6 +1463,7 @@ def load(trials_pool=None) -> Universe:
         part_played=played, name=name, start_note=_calibrated()[0].note(),
         unjoined=list(unjoined_clubs) + list(lg.api_unjoined),
         locked_cash=locked_cash, received_offers=received_offers)
+    return _LOAD_CACHE
 
 
 def _selftest() -> None:
