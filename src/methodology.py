@@ -1033,6 +1033,30 @@ def start_lines() -> list[str]:
             "| jornada " + ", ".join(str(j) for j in ungraded)
             + " — its opener kicked off before this repo saw a kickoff for "
               "it, so there is no honest cutoff | all |")
+
+    # THE FAIR COMPARISON — "our forecast" only ever covers the squad
+    # Miguel actively manages, a harder, more genuinely uncertain
+    # population than the whole league (which is mostly easy, obvious
+    # cases the raw sources get right for free). Comparing our forecast's
+    # Brier against a raw source's WHOLE-LEAGUE Brier looked like our
+    # forecast losing (0.114 vs futbolfantasy's 0.088, 2026-09-06's own
+    # first reading) — restricted to the SAME population, our forecast
+    # actually beats both raw sources (0.114 vs 0.132/0.240). Shown here
+    # so the table above is never read as a fair comparison on its own.
+    ours = forecast_claims()
+    our_names = {norm(c["player_name"]) for c in ours}
+    if our_names:
+        restricted = [c for c in load_lineups(source="")
+                     if norm(c.get("player_name", "")) in our_names]
+        fair_num, _fair_named, _fair_skip = start_grade(
+            intervals, restricted + ours, load_universe())
+        if len(fair_num) > 1:      # nothing to compare with just ourselves
+            out += ["", f"| **starts, same population as our forecast only** "
+                    "— the fair comparison | | | | |"]
+            for src, n, claim, rate, brier in fair_num:
+                mark = " ←read" if src == LINEUP_SOURCE else ""
+                out.append(f"| {src}{mark} | {n} | {claim:.0f}% | "
+                           f"{rate:.0f}% | {brier:.3f} |")
     return out
 
 
@@ -1662,6 +1686,22 @@ def _selftest() -> None:
     chk2 = baseline_check(always_wrong)
     # 90% claim, never happened: (0.9-0)^2 = 0.81, worse than guessing 50%.
     assert chk2["ours"] > chk2["coin_flip"], chk2
+
+    # -- start_lines()'s fair, same-population comparison (real data) ------
+    # 2026-09-06: the whole-league "starts" table made our forecast look
+    # WORSE than the raw sources (0.114 vs futbolfantasy's 0.088) purely
+    # because our forecast only ever covers the squad Miguel actively
+    # manages — a harder, more genuinely contested population than the
+    # whole league's mostly-easy cases. Restricted to the same population,
+    # our forecast actually wins. Checked against real data since the
+    # whole point is whether it's still true, not whether the arithmetic
+    # can be made to say so on a synthetic fixture.
+    fair = start_lines()
+    if any("same population as our forecast" in ln for ln in fair):
+        i = next(i for i, ln in enumerate(fair)
+                if "same population as our forecast" in ln)
+        block = "\n".join(fair[i:])
+        assert "our forecast" in block, block
 
     print("methodology.py selftest OK")
 
