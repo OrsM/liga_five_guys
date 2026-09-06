@@ -305,14 +305,23 @@ def ladder_rows(u, rows, bands=None) -> list[dict]:
     bands = {k: v for k, v in (bands or {}).items() if k not in won}
 
     def cell(k, group, where, money, pts, note="", value=None,
-            lo=None, hi=None):
+            lo=None, hi=None, market=None, premium=None):
         if k in bands:
             pts, lo, hi, _action = bands[k]
         return {"name": title_name(u.name.get(k, k)),
                 "pos": u.pos.get(k, ""), "start": u.start.get(k, 0.0),
                 "xpts": exp.get(k, 0.0), "group": group, "where": where,
                 "money": money, "pts": pts,
-                "pts_lo": lo, "pts_hi": hi, "note": note, "value": value}
+                "pts_lo": lo, "pts_hi": hi, "note": note, "value": value,
+                # THREE PLAIN FACTS, no blended score — Miguel's own
+                # framing (2026-09-06): what he's really worth, what
+                # extra you pay to force the sale, what it's worth in
+                # points. `market` is None for a target with no known
+                # value (rare); `premium` is 0.0 for a free agent (no
+                # clause to pay above value) and decide.burn()'s own
+                # number for a raid — already computed by rank(), not a
+                # new calculation.
+                "market": market, "premium": premium}
 
     out = []
     # WHAT TO CHANGE, not what to have. When the marks are a legal eleven the
@@ -343,7 +352,8 @@ def ladder_rows(u, rows, bands=None) -> list[dict]:
         r = won[k]
         return cell(k, group, short_manager(u.owner.get(k)) or "free agent",
                     -r["action"].net, r["d_pts"], value=r.get("value"),
-                    lo=r.get("pts_lo"), hi=r.get("pts_hi"))
+                    lo=r.get("pts_lo"), hi=r.get("pts_hi"),
+                    market=u.value.get(k), premium=r.get("burn") or 0.0)
 
     buys = [k for k in rest if k in won]
     # Free agents, then a real raid (clause, can't be refused) — a listed
@@ -468,7 +478,17 @@ def ladder(u, rows, base, data=None) -> list[str]:
                       if r["pts_lo"] is not None else "%+.0f" % r["pts"])
             if r["note"]:
                 season += " " + r["note"]
-            money = ("%+.2fM" % (r["money"] / 1e6)) if r["money"] else "—"
+            # MARKET PRICE + THE EXTRA CLAUSE PREMIUM, not net cost —
+            # Miguel's own framing (2026-09-06): what he's really worth,
+            # what extra you pay to force the sale, no blended score.
+            # BUY/RAID only (both carry `market`); every other group
+            # keeps the plain net-cost figure it always has.
+            if r["group"] in ("buy", "raid") and r["market"] is not None:
+                money = "%.2fM" % (r["market"] / 1e6)
+                if r["premium"]:
+                    money += " +%.2fM" % (r["premium"] / 1e6)
+            else:
+                money = ("%+.2fM" % (r["money"] / 1e6)) if r["money"] else "—"
         return ("| %s | %s | %.0f%% | %.2f | %s | %s | %s | %s |"
                 % (r["name"], r["pos"] or "—", 100 * r["start"], r["xpts"],
                    r["where"], money, season,
@@ -1604,7 +1624,8 @@ def _selftest() -> None:
                    "helps": 0.55}
     riv_row = {"action": Action("clause", buy="rivals", cost=5e6),
               "d_pos": 0.60, "d_win": 0.0, "d_beat": {}, "value": 12.0,
-              "d_pts": 60.0, "pts_lo": 20.0, "pts_hi": 90.0, "helps": 0.90}
+              "d_pts": 60.0, "pts_lo": 20.0, "pts_hi": 90.0, "helps": 0.90,
+              "burn": 1.2e6}   # the clause's real premium over market value
     wish_row = {"action": Action("buy", buy="wished", cost=5e6),
                "d_pos": 0.50, "d_win": 0.0, "d_beat": {}, "value": 10.0,
                "d_pts": 50.0, "pts_lo": 15.0, "pts_hi": 80.0, "helps": 0.85}
@@ -1620,6 +1641,7 @@ def _selftest() -> None:
               "wished": 5e6},
         proceeds={}, owner={"rivals": "riv", "wished": "riv"}, cash=10e6,
         me="me", route={"rivals": "clause", "wished": "listed"},
+        value={"steady": 5e6, "rivals": 3.8e6},
         name={"steady": "steady", "maverick": "maverick", "dud": "dud",
              "rivals": "rivals", "wished": "wished"})
     all_rows = [steady_row, dud_row, maverick_row, riv_row, wish_row]
@@ -1648,6 +1670,22 @@ def _selftest() -> None:
     no_free_lad = "\n".join(ladder(uc_owned, [riv_row], st))
     assert "none clear the bar today" in no_free_lad, no_free_lad
     assert "RAID" in no_free_lad, no_free_lad
+
+    # -- BUY/RAID show market price + extra clause premium, not net cost --
+    # Miguel's own framing (2026-09-06): three plain facts (what he's
+    # worth, what extra the clause costs, the point swing), no blended
+    # score. "steady" (a free agent, no clause) shows just his market
+    # price; "rivals" (a raid) shows market price PLUS the real premium
+    # decide.burn() already computed for rank()'s own charge — not a new
+    # number, just finally shown.
+    steady_cell = next(r for r in owned_lad if r["name"].lower() == "steady")
+    assert steady_cell["market"] == 5e6 and not steady_cell["premium"], \
+        steady_cell
+    rivals_cell = next(r for r in owned_lad if r["name"].lower() == "rivals")
+    assert rivals_cell["market"] == 3.8e6, rivals_cell
+    assert rivals_cell["premium"] == 1.2e6, rivals_cell
+    assert "5.00M" in md_owned, md_owned            # steady's plain price
+    assert "3.80M +1.20M" in md_owned, md_owned      # rivals' price + premium
 
     # -- overdrawn is not a ranking question -------------------------------
     # -- a team sheet reads keeper first ------------------------------------
