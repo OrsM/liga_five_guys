@@ -41,7 +41,7 @@ import json  # noqa: E402
 import os as _os  # noqa: E402
 from pathlib import Path  # noqa: E402
 
-from decide import dead_weight, value_rate  # noqa: E402,F401
+from decide import dead_weight, route_kind, value_rate  # noqa: E402,F401
 from ffcore.parse import fmt_money  # noqa: E402
 from ffcore.league import app_fielded  # noqa: E402
 from ffcore.render import title_name  # noqa: E402
@@ -421,10 +421,10 @@ def ladder_rows(u, rows, bands=None, base=None) -> list[dict]:
     non_chase = sorted((k for k in buys if k not in chase),
                        key=lambda k: _move_rank_key(won[k], buy_floor, u))
     for k in non_chase:
-        if not u.owner.get(k):
+        if route_kind(u, k) == "free":
             out.append(buy_cell(k, "buy"))
     for k in non_chase:
-        if u.owner.get(k) and u.route.get(k, "market") == "clause":
+        if route_kind(u, k) == "raid":
             out.append(buy_cell(k, "raid"))
     for k in sorted((k for k in rest if k not in won
                      and u.price[k] > u.cash + spare),
@@ -440,21 +440,21 @@ def ladder_rows(u, rows, bands=None, base=None) -> list[dict]:
                         -short_by, save_pts, "short",
                         value=value_rate(save_pts, short_by),
                         contest=race(u, k)))
-    # FREE AGENTS ONLY. PASS draws from `rest`, a raw price-list pool
-    # independent of candidates()/rank(), so the candidates()-level fix
-    # (never PROPOSE a listed target as a move) doesn't reach it on its
-    # own — a rival-owned player who "clears the bar" still fell through
-    # here with a price, looking exactly like a buyable one. A first pass
-    # at this kept clause-raidable rivals (real raid candidates that
-    # simply didn't rank high enough for RAID), but PASS renders them
-    # identically to a free-agent miss, no clause marker — reads as the
-    # same emphasis-on-a-competitor's-player problem, just relocated.
-    # Miguel's rule: no rival-owned player anywhere in the report unless
-    # the proposal IS the clause raid, on its own row, in RAID.
+    # FREE AGENTS ONLY, via route_kind() — the ONE classifier, so this
+    # can't drift from BUY/RAID above again. PASS draws from `rest`, a raw
+    # price-list pool independent of candidates()/rank(), which is why
+    # candidates()'s own "never propose a listed target" fix never
+    # reached it before route_kind() existed: a rival-owned player who
+    # "clears the bar" fell through here with a price, looking exactly
+    # like a buyable one. A clause-raidable rival who simply didn't rank
+    # high enough for RAID was tried here too, but PASS renders every row
+    # identically with no clause marker — Miguel's rule: no rival-owned
+    # player anywhere in the report unless the proposal IS the clause
+    # raid, on its own row, in RAID.
     # Why: docs/notes/sim.md#ladder_rows--pass-is-free-agents-only
     for k in sorted((k for k in rest if k not in won
                      and u.price[k] <= u.cash + spare
-                     and not u.owner.get(k)),
+                     and route_kind(u, k) == "free"),
                     key=lambda k: -exp.get(k, 0.0)):
         out.append(cell(k, "pass", short_manager(u.owner.get(k)) or "free agent",
                         -u.price[k], None))
@@ -897,7 +897,7 @@ def wait_routes(u, offers=None, rng=None, rows=None) -> list[dict]:
         # Why: docs/notes/sim.md#wait_routes--beats_now-graded-against-real-cycles-not-the-resampled-band
         market_now_best = max(
             (approx_gain(k) for k in u.price if k not in mine
-             and u.route.get(k, "market") not in ("clause", "listed")),
+             and route_kind(u, k) == "free"),
             default=0.0)
         beats_now = (sum(1 for x in hist if x > market_now_best) / len(hist)
                     if hist else

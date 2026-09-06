@@ -271,6 +271,31 @@ def xi_bar(exp: dict[str, float], xi) -> float:
     return min((exp.get(k, 0.0) for k in xi), default=0.0)
 
 
+def route_kind(u: Universe, k: str) -> str:
+    """"mine" | "free" | "raid" | "listed" — purely `u.owner`/`u.route`,
+    no simulation involved.
+
+    THE ONE PLACE THIS GETS DECIDED. Before this it was re-derived by
+    hand at four call sites (candidates(), best_swap_for(), and two
+    separate loops in sim.ladder_rows()) as the same three-line boolean
+    expression, plus `not u.owner.get(k)` rewritten inline three more
+    times for "free agent" — no single function owned the answer. That is
+    exactly how a rival-owned, non-clause target kept leaking back into
+    the report after three earlier fixes each patched one of those sites
+    and missed the others (2026-09-05's PASS-section bug was the third).
+    Miguel's own framing: this was never a simulated fact, it is a report
+    FILTER — fully decided by two fields already on Universe, with no
+    computation in between.
+    Why: docs/notes/decide.md#route_kind--the-one-place-ownership-is-classified
+    """
+    if k in u.state.squads.get(u.me, {}):
+        return "mine"
+    owner = u.owner.get(k)
+    if not owner or owner == u.me:
+        return "free"
+    return "raid" if u.route.get(k, "market") == "clause" else "listed"
+
+
 def _squad_depth(mine_squad: dict[str, str]) -> dict[str, int]:
     """How many of each slot the squad currently carries."""
     depth: dict[str, int] = {}
@@ -352,31 +377,25 @@ def candidates(u: Universe, expected: dict[str, float],
     for c, price in sorted(u.price.items(), key=lambda kv: kv[1]):
         if c in mine or bar_exp.get(c, 0.0) <= bar:
             continue
-        victim = u.owner.get(c, "")
-        # A raid is paying a clause; buying off a listing is an ordinary
-        # purchase — measured denial value of a listing is zero.
-        raid = bool(victim and victim != u.me
-                    and u.route.get(c, "market") == "clause")
-        # Rival-owned, not a clause (listed): Miguel's own repeated
-        # instruction — never propose a rival's player as a move unless
-        # it's a raid he cannot refuse (0/119 real deals have ever been a
-        # rival's own choice to sell to a manager). Not screened, ranked,
-        # or shown anywhere, rather than shown and demoted.
-        # Why: docs/notes/decide.md#candidates--listed-targets-are-never-proposed
-        if victim and victim != u.me and not raid:
+        # Never propose a listed target (owned, not a clause) as a move —
+        # 0/119 real deals in this league have ever been a rival's own
+        # choice to sell to a manager. route_kind() is the one place this
+        # gets decided.
+        kind_ = route_kind(u, c)
+        if kind_ == "listed":
             continue
+        raid = kind_ == "raid"
+        victim = u.owner.get(c, "") if raid else ""
         kind = "clause" if raid else "buy"
         swap = kind + "-swap" if raid else "swap"
         if price <= cash:
-            out.append(Action(kind, buy=c, cost=price,
-                              victim=victim if raid else ""))
+            out.append(Action(kind, buy=c, cost=price, victim=victim))
         # Funded by a sale: only the cheapest few spares are worth trying.
         for s in spare[:6]:
             got = u.proceeds.get(s, 0.0)
             if price <= cash + got:
                 out.append(Action(swap, buy=c, sell=s, cost=price,
-                                  proceeds=got,
-                                  victim=victim if raid else ""))
+                                  proceeds=got, victim=victim))
         # Out of reach on cash + any ONE spare: the fewest sales that cover
         # it, dead weight then weak starters, depth re-checked as chosen.
         # Triggered on the REAL cash, not `budget` (which only widens what's
@@ -801,11 +820,18 @@ def best_swap_for(u: Universe, k: str, expected: dict[str, float]
     # reached could be a heavily marked-up clause raid over a materially
     # cheaper target giving up almost none of the gain — the same
     # price-blindness sim._move_rank_key() already rejects for BUY rows.
+    # `route_kind() != "listed"` — this search had never excluded a listed
+    # target at all (only candidates()'s OWN search did), so the "vs X"
+    # name on a KEEP row could suggest a rival's non-clause player as the
+    # upgrade — the same "never propose a listed target" rule, missed
+    # here because it was re-derived per call site instead of owned by
+    # one function. Why: docs/notes/decide.md#route_kind--the-one-place-ownership-is-classified
     candidates_found = [(expected.get(c, 0.0), price, c)
                         for c, price in u.price.items()
                         if c != k and c not in mine and u.pos.get(c) == slot
                         and price <= max_budget
-                        and expected.get(c, 0.0) > my_exp]
+                        and expected.get(c, 0.0) > my_exp
+                        and route_kind(u, c) != "listed"]
     best_c, best_exp, best_price = None, my_exp, None
     if candidates_found:
         # Same tolerance as sim.VALUE_TOLERANCE (kept as a local literal to
@@ -857,12 +883,11 @@ def best_swap_for(u: Universe, k: str, expected: dict[str, float]
         sell = tuple(sorted((k, *extra_names[:n])))
         proceeds = u.proceeds.get(k, 0.0) + extra_running[n - 1]
     best_sell, best_proceeds = sell, proceeds
-    victim = u.owner.get(best_c, "")
-    raid = bool(victim and victim != u.me
-               and u.route.get(best_c, "market") == "clause")
+    raid = route_kind(u, best_c) == "raid"
+    victim = u.owner.get(best_c, "") if raid else ""
     return Action("clause-swap" if raid else "swap", buy=best_c,
                  sell=best_sell, cost=best_price, proceeds=best_proceeds,
-                 victim=victim if raid else "")
+                 victim=victim)
 
 
 def _top_up(top: list[tuple], screened: list[tuple], ok, rank_key,
@@ -2311,6 +2336,22 @@ def _selftest() -> None:
     raided = best_swap_for(u_sw2, "me_k", exp_sw)
     assert raided.buy == "riv_up" and raided.kind == "clause-swap", raided
     assert raided.victim == "riv", raided
+
+    # A LISTED TARGET IS NEVER SUGGESTED, not even as the "vs X" name on a
+    # KEEP row — this search never excluded one before route_kind()
+    # existed (only candidates()'s own, separate search did), even though
+    # riv_listed's exp (100.0) towers over every other candidate here.
+    u_sw2b = Universe(
+        state=u_sw.state, forecaster=B2({1: {**per_sw[1],
+                                             "riv_listed": (100.0, 1.0)}}),
+        pos={**u_sw.pos, "riv_listed": "MED"},
+        price={**u_sw.price, "riv_listed": 1e6},
+        route=u_sw.route, owner={**u_sw.owner, "riv_listed": "riv"},
+        proceeds={"me_k": 2e6}, cash=10e6, me="me")
+    exp_sw2b = u_sw2b.forecaster.expected(1)
+    not_listed = best_swap_for(u_sw2b, "me_k", exp_sw2b)
+    assert not_listed.buy != "riv_listed", not_listed
+    assert not_listed.buy == "riv_up", not_listed   # falls back to the raid
 
     # SAME SLOT ONLY — a cheap, high-expected DEL is not a real answer to
     # "what should me_k (MED) become", the same "one points scale, one
