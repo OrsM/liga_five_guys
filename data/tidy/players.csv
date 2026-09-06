@@ -75,7 +75,7 @@ player_id,name,club_id,ff_slug,af_slug,app_id,understat_id,app_names
 11706,pau cubarsi,barcelona,pau-cubarsi,396623,,12005,
 11709,fermin lopez,barcelona,fermin-lopez,,,11822,
 11714,jorge benito,getafe,,,,,
-11719,selu diallo,alaves,,,,,
+11719,selu diallo,alaves,selu-diallo,,,,
 11758,alemao,rayo,alemo,,,14059,
 11766,alex sancris,getafe,lex-sancris,,,14086,
 11767,alvaro nuñez,celta,lvaro-nunez,182661,2346,13836,Álvaro Núñez
@@ -192,7 +192,7 @@ player_id,name,club_id,ff_slug,af_slug,app_id,understat_id,app_names
 14021,job ochieng,real sociedad,job-ochieng,,2955,14364,Ochieng
 14022,alassane diatta,villarreal,alassane-diatta,,2902,13229,Diatta
 14024,javier hernandez,espanyol,javier-hernandez,388495,,14074,
-14034,iker cordoba,valencia,iker-cordoba,,,,
+14034,iker cordoba,valencia,iker-cordoba,,,13002,
 14036,joan martinez,real madrid,,,,,
 14045,facundo garces,alaves,facundo-garces,,,13319,
 14096,chupete,malaga,chupete,,,14732,
@@ -314,11 +314,11 @@ player_id,name,club_id,ff_slug,af_slug,app_id,understat_id,app_names
 16873,angel arcos,celta,,,,,
 16874,joel fontanet,valencia,,,,,
 16917,jorge montes,getafe,,,,14202,
-16920,izei hernandez,alaves,,,,,
+16920,izei hernandez,alaves,izei-hernandez,,,,
 16922,gorka carrera,real sociedad,gorka-carrera-1,,,14208,
 16923,tomas marques,barcelona,,,,14205,
 16924,huseini nakoha,levante,,,,,
-16931,xanet olaiz,alaves,xanet-olaiz,,,,
+16931,xanet olaiz,alaves,xanet-olaiz,,,14260,
 16933,pablo roson,levante,,,,,
 16938,carlos macia,villarreal,carlos-macia,548734,2868,14221,Carlos Macià
 16940,aleksa puric,atletico,,,2883,14224,Purić
@@ -365,7 +365,7 @@ player_id,name,club_id,ff_slug,af_slug,app_id,understat_id,app_names
 18039,cheikh thiam,villarreal,cheikh-thiam,,,,
 18041,nizar el jmili,villarreal,nizar-el-jmili,,,,
 18048,marco roman,rayo,marco-roman,,3179,,Marco Román
-18053,asier bonel,osasuna,,,,,
+18053,asier bonel,osasuna,asier-bonel,,,,
 18201,kike ribes,,laliga-26-27,,,,
 18214,jorge castillo,atletico,jorge-castillo,,,,
 18218,andres vallecillo,racing,andres-vallecillo,,,,
@@ -382,10 +382,10 @@ player_id,name,club_id,ff_slug,af_slug,app_id,understat_id,app_names
 18279,jaume dura,valencia,jaume-dura,,,,
 18282,yassir zabiri,racing,yassir-zabiri,,,14459,
 18283,kayne van oevelen,valencia,kayne-van-oevelen,,,,
-18294,yanis musuayi,levante,yanis-musuayi,482302,3229,,Yanis Musuayi
+18294,yanis musuayi,levante,yanis-musuayi,482302,3229,14983,Yanis Musuayi
 18309,umaru konare,elche,umaru-konare,,,14717,
 18314,robbie ure,sevilla,robbie-ure,327536,,14683,
-18316,rockson yeboah,osasuna,rockson-yeboah,,,,
+18316,rockson yeboah,osasuna,rockson-yeboah,,,15026,
 18378,joseph otu,malaga,joseph-otu,,,,
 18406,ifeanyi ndukwe,levante,ifeanyi-ndukwe,,,,
 18411,curro burgos,getafe,,,,,
@@ -450,7 +450,7 @@ player_id,name,club_id,ff_slug,af_slug,app_id,understat_id,app_names
 3686,alvaro valles,betis,alvaro-valles,46990,,11740,
 3693,unai simon,athletic,unai-simon,47270,,5185,
 3717,giovani lo celso,betis,giovani-lo-celso,,,5681,
-3724,gabriel jesus,barcelona,gabriel-jesus,,,,
+3724,gabriel jesus,barcelona,gabriel-jesus,,,5543,
 3732,daniel raba,valencia,daniel-raba,,2560,5199,Raba
 3736,jon guridi,sevilla,jon-guridi,104821,,5179,
 3738,edu exposito,espanyol,edu-exposito,46799,,5081,
@@ -533,7 +533,7 @@ player_id,name,club_id,ff_slug,af_slug,app_id,understat_id,app_names
 6560,andrei ratiu,rayo,andrei-florin,1703,3081,7515,Ratiu
 6562,sergio camello,rayo,sergio-camello,52,,7528,
 6563,ivan martin,racing,ivan-martin,1700,3205,7529,Iván Martín
-6580,harvey elliott,valencia,harvey-elliott,,,,
+6580,harvey elliott,valencia,harvey-elliott,,,7546,
 660,ruben garcia,osasuna,ruben-garcia,46658,652,2183,Rubén García
 6605,manu sanchez,levante,manu-sanchez,64309,2624,,Manu Sánchez
 6606,carles perez,celta,carles-perez,,,,
@@ -601,7 +601,7 @@ player_id,name,club_id,ff_slug,af_slug,app_id,understat_id,app_names
 7917,beñat prados,athletic,benat-prados,,1787,9505,Prados
 7920,nico serrano,athletic,nico-serrano,,2501,,Nico Serrano
 7995,francho serrano,getafe,francho-serrano,162249,3200,14893,Francho
-8080,miguel rodriguez,alaves,miguel-rodriguez-1,,3153,,Miguel Rodríguez
+8080,miguel rodriguez,alaves,miguel-rodriguez-1,,3153,8712,Miguel Rodríguez
 8082,ilaix moriba,celta,ilaix-moriba,162123,2607,9243,Ilaix Moriba
 8088,oriol rey,levante,oriol-rey,106727,,8764,
 8091,felix correia,sevilla,felix-correia,135749,3262,,Félix Correia
