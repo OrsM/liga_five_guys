@@ -1089,6 +1089,74 @@ def forecast_claims() -> list[dict]:
     return out
 
 
+def golden_rows() -> list[dict]:
+    """One row per (player, jornada): the rate side and the start side,
+    finally on the same table instead of two separate grading passes that
+    never talk to each other. Stage 2 of the forecast-first rebuild plan.
+
+    THE JOIN KEY: jornada number. The rate side (pair(), via
+    load_actuals()) is naturally keyed by arbitrary diff-snapshot
+    timestamps; the start side (forecast_claims(), via start_grade()'s
+    own jornada-locked intervals) is naturally keyed by kickoff-lock
+    times. Neither clock means anything to the other, which is why this
+    didn't exist before now — `load_actuals()`/`pair()` carry a real
+    jornada number since b0fface, and `jornada_locks()` (already used
+    inside `start_intervals()`, never exposed) is inverted here
+    (lock time -> jornada) to put the start side on the same key.
+
+    A row's rate fields are None when nothing matched — a player with a
+    real start-probability claim but no rate prediction/actual for that
+    exact jornada (a common, honest case: he might not have played) is
+    still worth keeping for the start-calibration half of the question.
+    Why: docs/notes/methodology.md#golden_rows--the-player-jornada-join
+    """
+    actuals, _label = load_actuals()
+    rate_by_key: dict[tuple[str, int], dict] = {}
+    for p in pair(actuals, load_predictions()):
+        if p.get("jornada") is not None:
+            rate_by_key[(norm(p["name"]), p["jornada"])] = p
+
+    matches = read_csv(TIDY / "matches.csv")
+    fixtures = read_csv(TIDY / "fixtures.csv")
+    jornada_of_lock = {when: jor
+                       for jor, when in jornada_locks(matches, fixtures).items()}
+
+    intervals, _graded, _ungraded = load_starts()
+    per: dict[str, list[tuple[dt.datetime, dict]]] = {}
+    for c in forecast_claims():
+        key = norm(c.get("player_name", ""))
+        when = snapshot_stamp(c.get("observed_at", ""))
+        if key and when is not None:
+            per.setdefault(key, []).append((when, c))
+    for v in per.values():
+        v.sort(key=lambda t: t[0])
+
+    out = []
+    for lock, played, teams in intervals:
+        jor = jornada_of_lock.get(lock)
+        if jor is None:
+            continue
+        for key, hist in per.items():
+            row = latest_before(hist, lock)
+            if row is None:
+                continue
+            if teams is not None \
+                    and (row.get("team_slug") or "").strip() not in teams:
+                continue
+            golden = {"player": row["player_name"], "jornada": jor,
+                      "predicted_start_pct": row["start_pct"],
+                      "actual_started": key in played,
+                      "predicted_rate": None, "actual_points": None,
+                      "rate_err": None}
+            rp = rate_by_key.get((key, jor))
+            if rp is not None:
+                golden["predicted_rate"] = rp["per_match"]
+                golden["actual_points"] = rp["actual"]
+                golden["rate_err"] = rp["err"]
+            out.append(golden)
+    return out
+
+
 def source_lines(actuals: list[dict]) -> list[str]:
     """The gate for LINEUP_SOURCE: which site's eleven was right more often.
 
@@ -1520,6 +1588,25 @@ def _selftest() -> None:
                 {"some-other-club"})]
     num_other, _, _ = start_grade(iv_other, claims)
     assert not any(r[0] == "our forecast" for r in num_other), num_other
+
+    # -- golden_rows(): the player-jornada join, checked against REAL data -
+    # No synthetic fixture here on purpose — mocking matches/fixtures/
+    # starters/market/perjornada well enough to prove the jornada-lock
+    # inversion is real would just rebuild load_starts()'s own already-
+    # tested fixture. Instead: a real, cheap invariant that only holds if
+    # the join is actually correct — a row where the start side says he
+    # never appeared must show zero points on the rate side, wherever
+    # both sides exist. Getting the join wrong (matching a claim to the
+    # wrong jornada, the exact failure mode jornada_locks() inversion
+    # exists to prevent) would break this on real data immediately.
+    golden = golden_rows()
+    checked = [r for r in golden if r["predicted_rate"] is not None]
+    assert checked, "golden_rows() must find at least one fully-joined row"
+    for r in checked:
+        if not r["actual_started"]:
+            assert r["actual_points"] == 0.0, r
+    print(f"  golden_rows(): {len(golden)} rows, {len(checked)} fully "
+         "joined, consistency held")
 
     print("methodology.py selftest OK")
 
