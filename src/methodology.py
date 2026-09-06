@@ -994,8 +994,12 @@ def start_lines() -> list[str]:
                   "before the round locked | all |")
         return out
 
-    numbered, named, skipped = start_grade(intervals, load_lineups(source=""),
-                                           load_universe())
+    # OUR OWN FORECAST, GRADED ON THE SAME REAL JORNADA-LOCKED BOUNDARIES —
+    # see forecast_claims()'s own note on why "starts" (not "appearances")
+    # is the table that actually answers this.
+    numbered, named, skipped = start_grade(
+        intervals, load_lineups(source="") + forecast_claims(),
+        load_universe())
     if not numbered and not named:
         return out
 
@@ -1025,16 +1029,26 @@ def forecast_claims() -> list[dict]:
     blended, recency-weighted number that actually feeds the season
     simulation) had never once been checked against a real outcome —
     only the two RAW lineup sources were graded here, never our own
-    number after blending them. start_grade()'s own ground truth
-    (appearances(), fed by points.py's mover-only diff) already treats
-    "never showed up as a mover" as the real negative it is; this just
-    hands our own claim through the same machine instead of a second one.
-    2026-09-06: found while checking whether the start-probability
-    forecast could be trusted at all — it turned out nothing had ever
-    tested it, only the rate forecast conditional on a player having
-    played.
+    number after blending them.
+
+    TEAM_SLUG, RESOLVED THROUGH THE CROSSWALK — squad_log.csv never
+    carried one, which silently drops every one of these claims from
+    start_grade()'s TEAM-SCOPED "starts" table (its `teams` population
+    filter skips a claim with no team_slug outright, never an error, just
+    quietly ungraded). Without this, the only place these claims could
+    land was the "appearances" table's raw-snapshot-timestamp intervals,
+    which turned out to have their own real bug — see the 2026-09-06
+    session notes: a points-correction row (games moved by 0) creates its
+    own near-empty interval, unrelated to any real jornada boundary, that
+    a claim can get matched against instead of the interval covering its
+    actual match. "starts" doesn't have this problem (real jornada locks,
+    real confirmed elevens) — resolving team_slug is what lets our claims
+    reach the table that was actually built to answer this question.
     Why: docs/notes/methodology.md#forecast_claims--our-own-number-graded-the-same-way
     """
+    from ffcore.crosswalk import Crosswalk
+
+    xw = Crosswalk.read(TIDY / "players.csv", TIDY / "clubs.csv")
     out = []
     for r in read_csv(DECISIONS / "squad_log.csv"):
         try:
@@ -1043,8 +1057,21 @@ def forecast_claims() -> list[dict]:
             continue
         if not r.get("player") or not r.get("observed_at"):
             continue
+        # "ff_id" is squad_log.csv's own historical misnomer — report.py
+        # writes `p["key"]` under that name, which is already this repo's
+        # crosswalk key (Scored.key, row_key()'s own market key or a
+        # normalised name), not an external id to look up. Confirmed by
+        # measurement: treating it as an app_id resolved a team_slug for
+        # 5% of claims; treating it as the key directly should resolve
+        # nearly all of them.
+        team_slug = ""
+        p = xw.players.get((r.get("ff_id") or "").strip())
+        if p:
+            club = xw.clubs.get(p.club_id)
+            team_slug = club.ff_slug if club else ""
         out.append({"source": "our forecast", "player_name": r["player"],
-                    "observed_at": r["observed_at"], "start_pct": pct})
+                    "observed_at": r["observed_at"], "start_pct": pct,
+                    "team_slug": team_slug})
     return out
 
 
@@ -1416,41 +1443,69 @@ def _selftest() -> None:
     # exists to be scored against that absence. forecast_claims() is that
     # claim, built straight from squad_log.csv.
     import tempfile
-    global DECISIONS
-    real_decisions = DECISIONS
+    global DECISIONS, TIDY
+    real_decisions, real_tidy = DECISIONS, TIDY
     tmp = tempfile.mkdtemp()
     try:
         DECISIONS = __import__("pathlib").Path(tmp)
+        TIDY = DECISIONS
         write_csv(DECISIONS / "squad_log.csv", [
             {"observed_at": "2026-08-10T1200Z", "player": "Nailed",
-             "start_pct": "90"},
+             "start_pct": "90", "ff_id": "nailed"},
             # PREDICTED TO START, NEVER PLAYED — the exact case that used
             # to vanish before it ever reached a grader.
             {"observed_at": "2026-08-10T1200Z", "player": "Benched",
-             "start_pct": "85"},
+             "start_pct": "85", "ff_id": "benched"},
             {"observed_at": "2026-08-10T1200Z", "player": "NoNumber",
-             "start_pct": ""},   # unparseable — skipped, not a crash
-            {"observed_at": "", "player": "NoStamp", "start_pct": "50"},
-        ], ["observed_at", "player", "start_pct"])
+             "start_pct": "", "ff_id": "nonumber"},  # unparseable, skipped
+            {"observed_at": "", "player": "NoStamp", "start_pct": "50",
+             "ff_id": "nostamp"},
+        ], ["observed_at", "player", "start_pct", "ff_id"])
+        # `ff_id` is squad_log.csv's misnomer for the repo's own crosswalk
+        # key (see forecast_claims()'s own note) — players.csv/clubs.csv
+        # here stand in for the real crosswalk so team_slug resolution is
+        # tested against the SAME join, not assumed to work.
+        write_csv(TIDY / "players.csv",
+                 [{"player_id": "nailed", "name": "Nailed", "club_id": "fc"},
+                  {"player_id": "benched", "name": "Benched", "club_id": "fc"}],
+                 ["player_id", "name", "club_id", "ff_slug", "af_slug",
+                  "app_id", "understat_id", "app_names"])
+        write_csv(TIDY / "clubs.csv",
+                 [{"club_id": "fc", "market": "FC", "ff_slug": "fc-slug"}],
+                 ["club_id", "market", "ff_slug", "elo", "market_id",
+                  "af_id", "aliases"])
         claims = forecast_claims()
     finally:
-        DECISIONS = real_decisions
+        DECISIONS, TIDY = real_decisions, real_tidy
     assert {c["player_name"] for c in claims} == {"Nailed", "Benched"}, claims
     got = {c["player_name"]: c["start_pct"] for c in claims}
     assert got == {"Nailed": 90.0, "Benched": 85.0}, got
     assert all(c["source"] == "our forecast" for c in claims), claims
+    # THE FIX (2026-09-06): "ff_id" resolved as an app_id found a team_slug
+    # for ~5% of real claims; resolved as the crosswalk key directly (what
+    # it actually is), both of these do.
+    assert {c["player_name"]: c["team_slug"] for c in claims} == \
+        {"Nailed": "fc-slug", "Benched": "fc-slug"}, claims
 
     # ...and start_grade() correctly scores "predicted 85%, never a mover"
-    # as a real miss, not a dropped row — appearances() already treats
-    # absence as the ground truth, so wiring our claim through it is the
-    # whole fix.
-    iv_f = [(snapshot_stamp("2026-08-10T1800Z"), {"nailed"})]
+    # as a real miss, not a dropped row, INCLUDING on a team-scoped
+    # interval (a 3-tuple, `starts`' own shape) — this is the table that
+    # was silently dropping every one of these claims before team_slug
+    # existed on them at all.
+    iv_f = [(snapshot_stamp("2026-08-10T1800Z"), {"nailed"}, {"fc-slug"})]
     numf, _namf, _skipf = start_grade(iv_f, claims)
     row = next(r for r in numf if r[0] == "our forecast")
     _src, n_f, claim_pct, hit_pct, brier = row
     assert n_f == 2, row
     assert hit_pct == 50.0, row           # 1 of 2 actually appeared
     assert brier > 0.0, row               # a real, nonzero miss on Benched
+    # A DIFFERENT team population excludes both outright — same as the
+    # real bug this closes: no team_slug meant no claim ever reached a
+    # team-scoped interval, whatever the population.
+    iv_other = [(snapshot_stamp("2026-08-10T1800Z"), {"nailed"},
+                {"some-other-club"})]
+    num_other, _, _ = start_grade(iv_other, claims)
+    assert not any(r[0] == "our forecast" for r in num_other), num_other
 
     print("methodology.py selftest OK")
 
