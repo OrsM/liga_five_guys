@@ -38,7 +38,8 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 __all__ = ["commit_as_of", "csv_as_of", "commits_touching",
-          "replay_recommendations"]
+          "replay_recommendations", "replay_percentile_rank",
+          "replay_ladder_percentile"]
 
 # The repo root — git commands run from here regardless of the caller's
 # own working directory, the same reason run.py sets PYTHONPATH=src rather
@@ -273,13 +274,19 @@ def _actuals_index():
 
 
 def _pick_episodes(commits, pick) -> list[dict]:
-    """One episode per distinct (buy, sell) pair `pick(moves)` returns,
-    counted at the FIRST day that pair appeared — see
-    `replay_recommendations()`'s own note on why per-commit would drown
-    real signal in the same advice repeated across many runs.
+    """One episode per distinct (buy, sell) pair at each RANK SLOT
+    `pick(moves)` returns (a LIST, slot 0 = the top pick, slot 1 = the
+    second, and so on) — one dedup stream PER SLOT, tracked independently,
+    since slot 2's advice changing has nothing to do with whether slot 1's
+    advice changed the same day. `replay_recommendations()`/
+    `replay_percentile_rank()` call this with a single-element list (just
+    the headline pick); `replay_ladder_percentile()` uses the same
+    machinery for the whole top-N ladder, at Miguel's own prompt
+    (2026-09-06: "the whole ladder should follow same logic why wouldn't
+    it?") — one function, not two similar ones that could drift apart.
     """
     episodes = []
-    last_pair = None
+    last_pair_by_slot: dict[int, tuple] = {}
     for sha, when in commits:
         text = _show(sha, "reports/decisions.json")
         if text is None:
@@ -291,18 +298,17 @@ def _pick_episodes(commits, pick) -> list[dict]:
         moves = data.get("moves") or []
         if not moves:
             continue
-        chosen = pick(moves)
-        if chosen is None:
-            continue
-        buy, sell = chosen.get("buy"), chosen.get("sell")
-        if not buy or not sell:
-            continue
-        pair = (buy, sell)
-        if pair == last_pair:
-            continue
-        last_pair = pair
-        episodes.append({"when": when, "buy": buy, "sell": sell,
-                         "kind": chosen.get("kind"), "label": chosen.get("label")})
+        for slot, chosen in enumerate(pick(moves)):
+            buy, sell = chosen.get("buy"), chosen.get("sell")
+            if not buy or not sell:
+                continue
+            pair = (buy, sell)
+            if last_pair_by_slot.get(slot) == pair:
+                continue
+            last_pair_by_slot[slot] = pair
+            episodes.append({"when": when, "buy": buy, "sell": sell,
+                             "kind": chosen.get("kind"),
+                             "label": chosen.get("label"), "slot": slot})
     return episodes
 
 
@@ -364,7 +370,7 @@ def replay_recommendations(min_days: float = 3.0) -> dict | None:
     real_points_since, now = _actuals_index()
     if now is None:
         return None
-    episodes = _pick_episodes(commits, lambda moves: moves[0])
+    episodes = _pick_episodes(commits, lambda moves: moves[:1])
     return _grade_episodes(episodes, real_points_since, now, min_days)
 
 
@@ -406,10 +412,50 @@ def replay_percentile_rank(min_days: float = 3.0) -> dict | None:
     def pick_by_ptslo(moves):
         candidates = [m for m in moves if m.get("pts_lo") is not None
                      and m.get("buy") and m.get("sell")]
-        return max(candidates, key=lambda m: m["pts_lo"]) if candidates else None
+        return [max(candidates, key=lambda m: m["pts_lo"])] if candidates else []
 
     episodes = _pick_episodes(commits, pick_by_ptslo)
     return _grade_episodes(episodes, real_points_since, now, min_days)
+
+
+def replay_ladder_percentile(topn: int = 3, min_days: float = 3.0) -> dict:
+    """Does re-sorting the WHOLE ladder by `pts_lo` — not just the single
+    headline pick `replay_percentile_rank()` already validated — hold up
+    too? Miguel, 2026-09-06: "the whole ladder should follow same logic
+    why wouldn't it?" — a fair challenge to the earlier hedge ("a separate,
+    larger, not-yet-validated question"). This is that validation, not
+    just an assumption that consistency is automatically fine.
+
+    TWO ARMS, SAME REAL HISTORY: "current" replays each day's REAL top-N
+    (`moves[:topn]`, exactly what the live system actually ranked and
+    showed, tiers and all — not a synthetic "pure mean" reconstruction);
+    "percentile" replays the top-N by `pts_lo` among that SAME day's
+    candidate pool. Both graded through the identical machinery
+    (`_pick_episodes`/`_grade_episodes`), one independent dedup stream per
+    rank slot (see `_pick_episodes`'s own note on why per-slot, not
+    pooled).
+
+    Returns `{"current": <summary or None>, "percentile": <summary or
+    None>}` — never a bare None itself, so a caller can always report
+    which arm (if either) had enough real history to grade.
+    """
+    commits = commits_touching("reports/decisions.json")
+    real_points_since, now = _actuals_index()
+    if not commits or now is None:
+        return {"current": None, "percentile": None}
+
+    def pick_current(moves):
+        return [m for m in moves[:topn] if m.get("buy") and m.get("sell")]
+
+    def pick_pctile(moves):
+        candidates = [m for m in moves if m.get("pts_lo") is not None
+                     and m.get("buy") and m.get("sell")]
+        return sorted(candidates, key=lambda m: -m["pts_lo"])[:topn]
+
+    cur_eps = _pick_episodes(commits, pick_current)
+    pct_eps = _pick_episodes(commits, pick_pctile)
+    return {"current": _grade_episodes(cur_eps, real_points_since, now, min_days),
+           "percentile": _grade_episodes(pct_eps, real_points_since, now, min_days)}
 
 
 def _selftest() -> None:
@@ -525,6 +571,23 @@ def _selftest() -> None:
                 else "TIES"
             print(f"  -> percentile-rank {better} mean-rank on real history "
                  f"({prec['total_net']:+.1f} vs {rec['total_net']:+.1f} pts)")
+
+    # -- replay_ladder_percentile(): does the WHOLE ladder benefit, not just
+    # the single headline pick? Miguel: "the whole ladder should follow
+    # same logic why wouldn't it?" -------------------------------------
+    empty = replay_ladder_percentile(topn=3, min_days=1e9)
+    assert empty == {"current": None, "percentile": None}, empty
+    ladder = replay_ladder_percentile(topn=3)
+    assert set(ladder) == {"current", "percentile"}, ladder
+    cur, pct = ladder["current"], ladder["percentile"]
+    if cur is not None and pct is not None:
+        assert cur["n"] > 0 and pct["n"] > 0, ladder
+        better = "BEATS" if pct["total_net"] > cur["total_net"] \
+            else "LOSES TO" if pct["total_net"] < cur["total_net"] \
+            else "TIES"
+        print(f"  replay_ladder_percentile(top3): current {cur['n']} eps "
+             f"net {cur['total_net']:+.1f} vs percentile {pct['n']} eps "
+             f"net {pct['total_net']:+.1f} -> percentile {better} current")
 
     print("backtest.py selftest OK")
 
