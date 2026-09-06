@@ -45,7 +45,7 @@ from ffcore.tidy import (run_now,  # noqa: E402
                          SEASON, TIDY, age_phrase, load_elo,
                          stale_feeds,
                          load_lineups,
-                         read_csv, snapshot_stamp, write_lines)
+                         read_csv, snapshot_stamp, write_csv, write_lines)
 
 LIVE = SEASON / "live"
 WINDOW_DAYS = 21
@@ -1018,6 +1018,36 @@ def start_lines() -> list[str]:
     return out
 
 
+def forecast_claims() -> list[dict]:
+    """Our own start-probability forecast, in start_grade()'s claim shape.
+
+    THE BLIND SPOT THIS CLOSES: squad_log.csv's own `start_pct` (the
+    blended, recency-weighted number that actually feeds the season
+    simulation) had never once been checked against a real outcome —
+    only the two RAW lineup sources were graded here, never our own
+    number after blending them. start_grade()'s own ground truth
+    (appearances(), fed by points.py's mover-only diff) already treats
+    "never showed up as a mover" as the real negative it is; this just
+    hands our own claim through the same machine instead of a second one.
+    2026-09-06: found while checking whether the start-probability
+    forecast could be trusted at all — it turned out nothing had ever
+    tested it, only the rate forecast conditional on a player having
+    played.
+    Why: docs/notes/methodology.md#forecast_claims--our-own-number-graded-the-same-way
+    """
+    out = []
+    for r in read_csv(DECISIONS / "squad_log.csv"):
+        try:
+            pct = float(r["start_pct"])
+        except (KeyError, ValueError, TypeError):
+            continue
+        if not r.get("player") or not r.get("observed_at"):
+            continue
+        out.append({"source": "our forecast", "player_name": r["player"],
+                    "observed_at": r["observed_at"], "start_pct": pct})
+    return out
+
+
 def source_lines(actuals: list[dict]) -> list[str]:
     """The gate for LINEUP_SOURCE: which site's eleven was right more often.
 
@@ -1036,8 +1066,12 @@ def source_lines(actuals: list[dict]) -> list[str]:
     rows = list(starts)
 
     intervals = appearances(actuals)
+    # OUR OWN FORECAST, GRADED THE SAME WAY — see forecast_claims()'s own
+    # note. Concatenated with the raw sources so it's one more row in the
+    # same table, not a second table nobody reads.
     numbered, named, skipped = ([], [], 0) if not intervals else start_grade(
-        intervals, load_lineups(source=""), load_universe())
+        intervals, load_lineups(source="") + forecast_claims(),
+        load_universe())
     if numbered or named:
         rows.append("| **appearances** — the wider, blunter sample; a "
                     "20-minute substitute counts | | | | |")
@@ -1373,6 +1407,50 @@ def _selftest() -> None:
     # constants.
     assert f"{NEUTRAL_START:.0f}%" in guide
     assert f"{ABSENT_START:.0f}%" in guide
+
+    # -- forecast_claims(): our OWN start_pct, graded the same way ----------
+    # THE BLIND SPOT (2026-09-06): a player predicted to start who then
+    # didn't play was never graded at all — points.py's diff() only emits
+    # movers (see appearances()'s own note), so "he didn't play" had no row
+    # anywhere for start_grade() to see UNLESS a real claim about him
+    # exists to be scored against that absence. forecast_claims() is that
+    # claim, built straight from squad_log.csv.
+    import tempfile
+    global DECISIONS
+    real_decisions = DECISIONS
+    tmp = tempfile.mkdtemp()
+    try:
+        DECISIONS = __import__("pathlib").Path(tmp)
+        write_csv(DECISIONS / "squad_log.csv", [
+            {"observed_at": "2026-08-10T1200Z", "player": "Nailed",
+             "start_pct": "90"},
+            # PREDICTED TO START, NEVER PLAYED — the exact case that used
+            # to vanish before it ever reached a grader.
+            {"observed_at": "2026-08-10T1200Z", "player": "Benched",
+             "start_pct": "85"},
+            {"observed_at": "2026-08-10T1200Z", "player": "NoNumber",
+             "start_pct": ""},   # unparseable — skipped, not a crash
+            {"observed_at": "", "player": "NoStamp", "start_pct": "50"},
+        ], ["observed_at", "player", "start_pct"])
+        claims = forecast_claims()
+    finally:
+        DECISIONS = real_decisions
+    assert {c["player_name"] for c in claims} == {"Nailed", "Benched"}, claims
+    got = {c["player_name"]: c["start_pct"] for c in claims}
+    assert got == {"Nailed": 90.0, "Benched": 85.0}, got
+    assert all(c["source"] == "our forecast" for c in claims), claims
+
+    # ...and start_grade() correctly scores "predicted 85%, never a mover"
+    # as a real miss, not a dropped row — appearances() already treats
+    # absence as the ground truth, so wiring our claim through it is the
+    # whole fix.
+    iv_f = [(snapshot_stamp("2026-08-10T1800Z"), {"nailed"})]
+    numf, _namf, _skipf = start_grade(iv_f, claims)
+    row = next(r for r in numf if r[0] == "our forecast")
+    _src, n_f, claim_pct, hit_pct, brier = row
+    assert n_f == 2, row
+    assert hit_pct == 50.0, row           # 1 of 2 actually appeared
+    assert brier > 0.0, row               # a real, nonzero miss on Benched
 
     print("methodology.py selftest OK")
 
