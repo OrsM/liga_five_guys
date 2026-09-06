@@ -90,6 +90,64 @@ def csv_as_of(when: dt.datetime, path: str) -> list[dict]:
     return rows
 
 
+def naive_value_baseline(golden: list[dict]) -> dict | None:
+    """Does the rate forecast beat a REAL, historically-reconstructed
+    alternate approach — not just a flat constant (rate_baseline_check()'s
+    own, weaker question)?
+
+    Stage 3's first genuine "candidate approach" comparison: a naive
+    predictor built from a player's REAL market value as of just before
+    the jornada locked (`csv_as_of()`, no hindsight — the value used is
+    exactly what a manager could have seen at that moment, never a later
+    reading). Scaled by one fitted constant (mean actual / mean value
+    over the same sample) so it's compared in the same units as points,
+    the same one-parameter-fit idea `rate_baseline_check()`'s own
+    constant-mean guess already uses — a genuinely different predictor
+    (market value, not our own rate model), not the same number under a
+    new name.
+
+    `golden` is `methodology.golden_rows()`'s own output — only rows with
+    a real rate outcome (`predicted_rate` is not None) are used. `None`
+    when there's nothing to compare (mirrors baseline_check()'s own
+    contract).
+    """
+    import methodology as M
+    from ffcore.text import norm
+
+    checked = [r for r in golden if r.get("predicted_rate") is not None]
+    if not checked:
+        return None
+    matches = M.read_csv(M.TIDY / "matches.csv")
+    fixtures = M.read_csv(M.TIDY / "fixtures.csv")
+    locks = M.jornada_locks(matches, fixtures)
+
+    resolved = []
+    for r in checked:
+        lock = locks.get(r["jornada"])
+        if lock is None:
+            continue
+        hist_market = csv_as_of(lock, "data/tidy/market.csv")
+        row = next((m for m in hist_market
+                   if norm(m.get("name", "")) == norm(r["player"])), None)
+        if row is None:
+            continue
+        try:
+            val = float(row["value"])
+        except (KeyError, ValueError):
+            continue
+        resolved.append((val, r["actual_points"], r["predicted_rate"]))
+
+    if not resolved:
+        return None
+    n = len(resolved)
+    mean_val = sum(v for v, _, _ in resolved) / n
+    mean_act = sum(a for _, a, _ in resolved) / n
+    k = mean_act / mean_val if mean_val else 0.0
+    naive_mae = sum(abs(k * v - a) for v, a, _ in resolved) / n
+    ours_mae = sum(abs(p - a) for _, a, p in resolved) / n
+    return {"n": n, "k": k, "naive_mae": naive_mae, "ours_mae": ours_mae}
+
+
 def _selftest() -> None:
     # -- commit_as_of: a real path in this real repo, checked against git's
     # own log rather than assumed --------------------------------------
@@ -126,6 +184,24 @@ def _selftest() -> None:
     # A genuinely nonexistent path: [] not an exception — read_csv()'s own
     # "missing is empty" contract, matched here on purpose.
     assert csv_as_of(later, "data/tidy/nope_never_existed.csv") == []
+
+    # -- naive_value_baseline(): the real thing Stage 3 was for — does the
+    # rate forecast beat a GENUINELY DIFFERENT, historically-reconstructed
+    # predictor, not just a flat constant. Real data only (the whole point
+    # is whether this repo's own git history actually resolves real
+    # historical market values for real golden rows) -----------------------
+    import methodology as M
+    assert naive_value_baseline([]) is None
+    golden = M.golden_rows()
+    result = naive_value_baseline(golden)
+    checked = [r for r in golden if r.get("predicted_rate") is not None]
+    if checked:
+        assert result is not None, "expected real historical values to resolve"
+        assert result["n"] > 0, result
+        assert result["k"] > 0, result        # value and points both positive
+        print(f"  naive_value_baseline(): n={result['n']}, ours "
+             f"{result['ours_mae']:.2f} MAE vs market-value-scaled "
+             f"{result['naive_mae']:.2f} MAE")
 
     print("backtest.py selftest OK")
 
