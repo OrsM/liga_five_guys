@@ -1277,6 +1277,27 @@ def source_lines(actuals: list[dict]) -> list[str]:
     return out
 
 
+def rate_baseline_check(pairs: list[dict]) -> dict | None:
+    """Does the scoring-RATE forecast beat a trivial constant guess?
+
+    Same question baseline_check() asks for start-probability, asked of
+    the other half of the forecast — Stage 3's first slice extended to
+    both halves, not just the one that got checked first. The naive
+    guess is the sample's own mean per-match rate: no player identity,
+    no form, no fixture, just "everyone scores about the average."
+    `None` when there's nothing to check (mirrors baseline_check()).
+    """
+    if not pairs:
+        return None
+    n = len(pairs)
+    actual_rates = [p["actual"] / p["matches"] for p in pairs]
+    mean_rate = sum(actual_rates) / n
+    ours = sum(abs(p["predicted"] / p["matches"] - a)
+              for p, a in zip(pairs, actual_rates)) / n
+    naive = sum(abs(mean_rate - a) for a in actual_rates) / n
+    return {"n": n, "mean_rate": mean_rate, "ours": ours, "naive": naive}
+
+
 def comparison_lines() -> list[str]:
     out = [f"### Forecast vs actual — last {WINDOW_DAYS} days", ""]
     actuals, label = load_actuals()
@@ -1310,6 +1331,20 @@ def comparison_lines() -> list[str]:
         "Only predictions logged before an interval are scored, so hindsight "
         "is excluded by construction; the sample is your own squad and grows "
         "about 15 pairs a jornada._", "",
+    ]
+    # DOES THIS BEAT A TRIVIAL GUESS? Same question baseline_check() asks
+    # of the start-probability side, asked here of the rate side — Stage 3
+    # of the forecast-first rebuild plan.
+    rbc = rate_baseline_check(pairs)
+    if rbc is not None:
+        beats = rbc["ours"] < rbc["naive"]
+        out += [f"_vs. a trivial guess (everyone scores the sample's own "
+                f"mean, {rbc['mean_rate']:.1f} pts/match, no player identity "
+                f"at all): ours {rbc['ours']:.2f} MAE, that guess "
+                f"{rbc['naive']:.2f} MAE — "
+                + ("beats it, adding real information." if beats else
+                   "does NOT clearly beat it yet.") + "_", ""]
+    out += [
         "| Forecast bucket | n | Mean forecast | Mean actual |",
         "|---|--:|--:|--:|",
     ]
@@ -1702,6 +1737,21 @@ def _selftest() -> None:
                 if "same population as our forecast" in ln)
         block = "\n".join(fair[i:])
         assert "our forecast" in block, block
+
+    # -- rate_baseline_check(): the rate-side twin of baseline_check(), a
+    # known-answer synthetic case ------------------------------------------
+    assert rate_baseline_check([]) is None
+    perfect_rate = [{"predicted": 6.0, "actual": 6.0, "matches": 1.0}] * 4
+    rchk = rate_baseline_check(perfect_rate)
+    assert rchk["ours"] == 0.0, rchk               # exact every time
+    assert rchk["naive"] == 0.0, rchk              # no variance to miss either
+    # A forecast that's ALWAYS off by the same fixed amount is worse than
+    # guessing the sample's own mean, which is exactly right on a constant
+    # sample — the naive guess wins here BY CONSTRUCTION, the point being
+    # the comparison can go either way, not that ours always wins.
+    always_off = [{"predicted": 9.0, "actual": 6.0, "matches": 1.0}] * 4
+    rchk2 = rate_baseline_check(always_off)
+    assert rchk2["ours"] > rchk2["naive"] == 0.0, rchk2
 
     print("methodology.py selftest OK")
 
