@@ -346,7 +346,6 @@ def ladder_rows(u, rows, bands=None) -> list[dict]:
         out.append(cell(k, "keep", "yours", None, None))
     for k in sorted(dead, key=lambda k: -exp.get(k, 0.0)):
         out.append(cell(k, "sell", "yours", u.proceeds.get(k, 0.0), None))
-    buy_floor = _moves_floor(rows)
 
     def buy_cell(k, group):
         r = won[k]
@@ -361,7 +360,7 @@ def ladder_rows(u, rows, bands=None) -> list[dict]:
     # converted) is never a candidate at all, filtered out at the source
     # in decide.candidates(), not demoted here.
     # Why: docs/notes/sim.md#ladder_rows--buy--raid-split
-    ranked = sorted(buys, key=lambda k: _move_rank_key(won[k], buy_floor, u))
+    ranked = sorted(buys, key=lambda k: _move_rank_key(won[k], u))
     for k in ranked:
         if route_kind(u, k) == "free":
             out.append(buy_cell(k, "buy"))
@@ -804,71 +803,57 @@ def caveats(u) -> list[str]:
 
 
 # How much of the best move's season gain a cheaper alternative may give
-# up and still be recommended. Not 1.0 (biggest gain wins regardless of
-# cost) and not much lower (a materially worse move is worse, full stop).
-# Why: docs/notes/sim.md#value_tolerance-090-and-moves_value_floor-025
+# up and still be recommended, in _best()'s own value-for-money
+# refinement (the single headline pick only — see _move_rank_key()'s own
+# note on why the wider ladder now uses a flat pts_lo sort with no
+# floor/tolerance concept at all). Not 1.0 (biggest gain wins regardless
+# of cost) and not much lower (a materially worse move is worse, full
+# stop). MOVES_VALUE_FLOOR, its old ladder-side counterpart, retired
+# 2026-09-06 — docs/notes/sim.md#value_tolerance-090-and-moves_value_floor-025
 VALUE_TOLERANCE = 0.90
 
-# The floor half of "bar, then ratio" — what counts as worth ranking by
-# efficiency at all, guarding against the fractional-knapsack trap.
-# Why: docs/notes/sim.md#value_tolerance-090-and-moves_value_floor-025
-MOVES_VALUE_FLOOR = 0.25
+def _move_rank_key(r, u):
+    """RELIABLE ROUTES FIRST, THEN BY `pts_lo` (10th percentile of the
+    move's own paired trial distribution) — ONE metric, the same one
+    `_best()` uses for the single headline pick, now for the WHOLE ladder
+    too. Miguel, 2026-09-06: "the whole ladder should follow same logic
+    why wouldn't it?" — a fair challenge to an earlier hedge that this was
+    "separate, larger, not-yet-validated." Checked, not assumed:
+    `backtest.replay_ladder_percentile()` replayed 200+ real historical
+    top-3 ladders and found the tiered scheme this replaced was net
+    NEGATIVE on real outcomes (-94 points) where a flat `pts_lo` sort over
+    the same real candidates was net POSITIVE (+90 points).
 
+    RETIRED, ON THAT EVIDENCE: the value-floor/win-probability tiering
+    (`MOVES_VALUE_FLOOR`, `VALUE_TOLERANCE`'s ladder use, d_win leading
+    outright) that used to sit here. `pts_lo` already reflects the SAME
+    Monte Carlo draws `d_win` is read off, at a quantile that measurably
+    ranks better on real history than treating win-probability as an
+    unrelated axis needing its own escape hatch — a simpler rule beating
+    the accumulated special-casing, same lesson as this session's earlier
+    "the book" simplification pass. Full history of the retired scheme:
+    docs/notes/sim.md#_move_rank_key--pts_lo-not-mean-d_pos-or-value-2026-09-06
 
-def _moves_floor(rows) -> float:
-    """MOVES_VALUE_FLOOR's own cutoff for THIS batch of rows.
+    SHARED KEY, not two independent sorts — `ladder_rows()`'s BUY group
+    (the markdown table a reader scrolls top to bottom) and `payload()`'s
+    `moves` (the phone's JSON) both call this, so they cannot rank the
+    same candidates in two different orders.
 
-    Shared by payload()'s `moves` resort and ladder_rows()'s BUY group, so
-    the phone's JSON and the markdown table rank the same candidates in
-    the same order — see _move_rank_key()'s own note on why they used to
-    not.
-    """
-    return MOVES_VALUE_FLOOR * max((r["d_pos"] for r in rows), default=0.0)
-
-
-def _move_rank_key(r, floor, u):
-    """BAR ON GAIN, THEN RANK BY VALUE — see MOVES_VALUE_FLOOR's own note.
-    A d_win-driven move still leads outright (win-probability is a
-    different axis than points-per-euro, no principled ratio between
-    them). Among d_pos-driven moves, anything clearing `floor` is ranked
-    by `value` (points per euro); below the floor, pushed to the bottom in
-    raw-gain order, never hidden.
-
-    SHARED KEY, not two independent sorts: before this, payload()'s
-    `moves` ranked by value-for-money (shipped 24d2a8b, 2026-08-29) but
-    ladder_rows()'s BUY group — the markdown table a reader actually
-    scrolls top to bottom — still sorted by raw `exp` (projected points
-    per jornada, price-blind), so a genuine bargain (high pts/M€) could
-    sit near the bottom while a big, poor-value, even NEGATIVE-season-
-    impact name led the list. The two renderings disagreeing on order is
-    exactly the duplication ladder()'s own docstring warns about.
-
-    RELIABLE ROUTES FIRST, WITHIN EVERY TIER — the same rule _best() has
-    always used for the single headline pick (decide.py's own note, 108
-    real transactions checked 2026-08-29, zero of them manager-to-manager):
-    a "listed" candidate (Universe.route — a rival's own sale, who can
+    RELIABLE ROUTES FIRST, WITHIN EVERY TIER — the same rule `_best()`
+    uses for the single headline pick (decide.py's own note, 108 real
+    transactions checked 2026-08-29, zero of them manager-to-manager): a
+    "listed" candidate (Universe.route — a rival's own sale, who can
     simply not sell, or get outbid) is not a slightly-riskier version of a
     free-agent or clause buy, it is a route that has never once actually
-    gone through in this league. `_best()` already refuses to push one as
-    THE move unless nothing reliable clears the bar at all, but that
-    demotion never reached the ordinary list — a listed target competed on
-    equal footing with a guaranteed one everywhere the reliable-vs-listed
-    split was not the single headline. Demoted here, not removed: a real
-    listed opportunity — the rare one that might actually be worth a bid —
-    stays fully visible, just under the routes that cannot be refused.
+    gone through in this league. Demoted here, not removed: a real listed
+    opportunity stays fully visible, just under routes that cannot be
+    refused. A row with no `pts_lo` at all (shouldn't happen off a real
+    `rank()` row, but a hand-built one might lack it) sorts last within
+    its reliability tier rather than crashing or guessing a value.
     """
     reliable = 0 if u.route.get(r["action"].buy, "free") != "listed" else 1
-    # Tier 0 requires d_pos > 0 too, not just d_win > 0 — d_win is computed
-    # before rank()'s own premium charge, so an overpriced clause could
-    # otherwise lead on win-probability alone even at a net loss.
-    # Why: docs/notes/sim.md#_move_rank_key--d_win-alone-no-longer-wins-tier-0-outright
-    if r["d_win"] > 0 and r["d_pos"] > 0:
-        return (0, reliable, -r["d_win"], -r["d_pos"])
-    if r["d_pos"] >= floor and r["d_pos"] > 0:
-        value = r.get("value")
-        return (1, reliable, -value if value is not None else float("-inf"),
-                -r["d_pos"])
-    return (2, reliable, 0.0, -r["d_pos"])
+    lo = r.get("pts_lo")
+    return (reliable, -lo if lo is not None else float("inf"))
 
 def _best(u, rows, rivals):
     """(the top move, or None; whether it needs a rival's own cooperation).
@@ -1038,11 +1023,9 @@ def payload(u, rows, base, rivals, locks_h=None, n_actions: int = 0,
     names = {k: title_name(v) for k, v in u.name.items()}
     lo, hi = base.band(u.me)
     moves = []
-    # Same bar-then-value sort as ladder_rows()'s BUY group.
-    # Why: docs/notes/sim.md#payload--moves-sorted-by-the-same-bar-then-value-rule-as-the-ladder
-    floor = _moves_floor(rows)
-
-    for r in sorted(rows, key=lambda r: _move_rank_key(r, floor, u)):
+    # Same pts_lo sort as ladder_rows()'s BUY group — see _move_rank_key()'s
+    # own note. Why: docs/notes/sim.md#payload--moves-sorted-by-the-same-rule-as-the-ladder
+    for r in sorted(rows, key=lambda r: _move_rank_key(r, u)):
         a = r["action"]
         who = max(rivals, key=lambda v: r["d_beat"].get(v, 0.0)) \
             if rivals else ""
@@ -1540,28 +1523,29 @@ def _selftest() -> None:
     assert d["standings"][0]["me"] is True
     assert d["standings"][1]["p_above"] == 0.5
 
-    # -- payload()'s `moves` order: bar on d_pos, THEN rank by value ---------
-    # Not pure points-per-euro (the fractional-knapsack trap this whole
-    # change exists to avoid): C's near-zero gain divides out to a huge
-    # ratio and must NOT leapfrog real moves on that alone.
+    # -- payload()'s `moves` order: by pts_lo, not mean d_pos/value/d_win --
+    # (2026-09-06, replacing the retired bar-then-value/d_win-leads tiering
+    # — see _move_rank_key()'s own note on the real-history validation).
+    # A is the biggest MEAN gain but the widest, riskiest downside; B is a
+    # smaller mean but a genuinely safer floor; C is tiny everywhere. Order
+    # is by pts_lo alone: B (safest) leads, A second, C last.
     row_a = {"action": Action("buy", buy="A", cost=40e6), "d_pos": 0.40,
-             "d_win": 0.0, "d_beat": {}, "value": 2.0}       # big, poor value
+             "d_win": 0.0, "d_beat": {}, "value": 2.0, "pts_lo": -30.0}
     row_b = {"action": Action("buy", buy="B", cost=1e6), "d_pos": 0.15,
-             "d_win": 0.0, "d_beat": {}, "value": 50.0}      # clears the
-    # floor (0.25 * 0.40 = 0.10 <= 0.15), excellent value
+             "d_win": 0.0, "d_beat": {}, "value": 50.0, "pts_lo": 10.0}
     row_c = {"action": Action("buy", buy="C", cost=1e4), "d_pos": 0.02,
-             "d_win": 0.0, "d_beat": {}, "value": 500.0}     # below the
-    # floor, spuriously huge ratio
+             "d_win": 0.0, "d_beat": {}, "value": 500.0, "pts_lo": -80.0}
     order = [m["buy"] for m in payload(u, [row_a, row_b, row_c], st,
                                        ["riv"])["moves"]]
     assert order == ["B", "A", "C"], order
-    # A d_win-driven move still leads regardless of value — unchanged
-    # behaviour, not something this change touches.
+    # A HIGH d_win no longer buys outright priority — RETIRED behaviour,
+    # on purpose: W's win-probability is the biggest of the three, but its
+    # pts_lo is the worst, and pts_lo alone now decides.
     row_win = {"action": Action("buy", buy="W", cost=40e6), "d_pos": 0.05,
-              "d_win": 0.10, "d_beat": {}, "value": 1.0}
+              "d_win": 0.10, "d_beat": {}, "value": 1.0, "pts_lo": -50.0}
     order_win = [m["buy"] for m in payload(u, [row_a, row_win, row_b], st,
                                            ["riv"])["moves"]]
-    assert order_win == ["W", "B", "A"], order_win
+    assert order_win == ["B", "A", "W"], order_win
 
     # -- the notification surface ------------------------------------------
     # What is worth interrupting somebody for: the best move, and nothing
