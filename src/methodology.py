@@ -32,6 +32,7 @@ from __future__ import annotations
 
 import datetime as dt
 import os
+import statistics
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -113,6 +114,110 @@ def pair(actuals: list[dict],
             "jornada": a.get("jornada"),
         })
     return out
+
+
+def lock_order(locks: dict[int, dt.datetime]) -> list[int]:
+    """Jornadas ordered by when they actually locked, not by their own
+    number — a rescheduled fixture can lock jornada 6 before jornada 4
+    (real, seen 2026-09: jornada 6 locked 09-03, jornada 4 locks 09-04).
+    `rate_draw()`'s own walk accumulates one step per ENTRY of the real
+    remaining schedule (see forecast.fit_drift_frac's own note) — this is
+    that same real order, so a "3 steps back" lookup means what it says.
+    """
+    return [j for j, _ in sorted(locks.items(), key=lambda kv: kv[1])]
+
+
+def lagged_pair(actuals: list[dict],
+                preds: dict[str, list[tuple[dt.datetime, dict]]],
+                locks: dict[int, dt.datetime], lag: int) -> list[dict]:
+    """`pair()`, generalised to a prediction made `lag` LOCKED JORNADAS
+    before the one being graded, instead of always the freshest one.
+
+    WHY THIS ANSWERS "why can't you use the scrapes you already have":
+    squad_log.csv has been logging a fresh prediction on most days since
+    2026-08-12 — it already holds several real predictions for the SAME
+    future outcome, made at different amounts of lead time. `pair()`
+    (lag=0) always grades the freshest one; this picks an OLDER one on
+    purpose, which is a real, already-elapsed multi-jornada-ahead
+    forecast test — no need to wait for a new column (`score_h3`) or new
+    jornadas to play out, only for `lag` locked jornadas to have already
+    happened before the one being scored, which several already have.
+
+    A jornada with fewer than `lag` earlier LOCKED jornadas (e.g. the
+    season's first `lag` rounds) has nothing to test at that lag and is
+    skipped, same "not enough evidence yet" honesty as everywhere else in
+    this module.
+    """
+    order = lock_order(locks)
+    pos = {j: i for i, j in enumerate(order)}
+    out = []
+    for a in actuals:
+        if a["games_delta"] < 1:
+            continue
+        j = a.get("jornada")
+        i = pos.get(j)
+        if i is None or i - lag < 0:
+            continue
+        cutoff = locks[order[i - lag]]
+        fac = None
+        for k in a["keys"]:
+            hits = preds.get(k)
+            if hits:
+                fac = latest_before(hits, cutoff)
+            if fac is not None:
+                break
+        if fac is None:
+            continue
+        predicted = fac["score"] * a["games_delta"]
+        out.append({"name": a["name"], "predicted": predicted,
+                    "actual": a["points_delta"], "per_match": fac["score"],
+                    "matches": a["games_delta"],
+                    "err": predicted - a["points_delta"],
+                    "jornada": j})
+    return out
+
+
+def drift_frac_from_history(lag1: int = 1, lag3: int = 3) -> tuple[float, str]:
+    """Fits DRIFT_FRAC off REAL, already-elapsed multi-jornada-ahead
+    forecasts, per `lagged_pair()`'s own note — no waiting required, since
+    this repo has already logged predictions at different lead times for
+    outcomes that have already happened.
+
+    RATE_REL: ideally per-player (as `Bootstrap.rate_rel` already is
+    live), but no per-row rate_rel is logged in squad_log.csv today, so
+    this uses one POOLED, empirically-measured scale instead — the real
+    dispersion of (actual/predicted) at lag1, the closest-to-live sample
+    available. A disclosed simplification, not an invented number: every
+    pair is normalised by the SAME real, measured constant, so the
+    two-horizon variance comparison `fit_drift_frac` needs still holds,
+    just without per-player weighting. Logging a real per-row rate_rel at
+    prediction time would sharpen this; not done here to avoid inventing
+    a new squad_log column speculatively before this estimator has even
+    run once against real numbers.
+    Why: docs/notes/methodology.md#drift_frac_from_history--why-lag-not-a-new-column
+    """
+    from ffcore.forecast import fit_drift_frac
+
+    matches = read_csv(TIDY / "matches.csv")
+    fixtures = read_csv(TIDY / "fixtures.csv")
+    locks = jornada_locks(matches, fixtures)
+    actuals, _label = load_actuals()
+    preds = load_predictions()
+
+    h1 = lagged_pair(actuals, preds, locks, lag1)
+    h3 = lagged_pair(actuals, preds, locks, lag3)
+    if not h1:
+        return 1.0, "no lag-%d pairs available yet" % lag1
+    ratios = [p["actual"] / p["predicted"] for p in h1 if p["predicted"] > 0]
+    if len(ratios) < 5:
+        return 1.0, "too few lag-%d pairs to measure a pooled rate_rel (n=%d)" \
+            % (lag1, len(ratios))
+    pooled_rel = statistics.pstdev(ratios)
+    if pooled_rel <= 0:
+        return 1.0, "pooled rate_rel measured as 0 — can't normalise"
+    h1_pairs = [(p["predicted"], p["actual"], pooled_rel) for p in h1]
+    h3_pairs = [(p["predicted"], p["actual"], pooled_rel) for p in h3]
+    return fit_drift_frac(h1_pairs, h3_pairs)
 
 
 BUCKETS = [(-1e9, 2, "under 2"), (2, 3, "2–3"), (3, 4, "3–4"), (4, 1e9, "4+")]
@@ -1463,6 +1568,44 @@ def _selftest() -> None:
                  "points_delta": 4.0, "games_delta": 1.0}], preds)
     fx2, no_fix2 = fixture_rows(old)
     assert fx2 == [] and no_fix2 == 1, (fx2, no_fix2)
+
+    # -- lagged_pair()/lock_order(): a REAL multi-jornada-ahead test off
+    # data already sitting in squad_log.csv, no waiting for a new column or
+    # new jornadas (Miguel, 2026-09-06: "you have all the previous scrapes
+    # with timestamps, why can't you use that?") -----------------------------
+    # Jornada 3 locks BEFORE jornada 1 here — a real rescheduling case
+    # (2026-09: jornada 6 really did lock before jornada 4) — lock_order()
+    # must sort by the actual lock time, not the jornada label.
+    locks3 = {1: t(20), 2: t(14), 3: t(10)}
+    assert lock_order(locks3) == [3, 2, 1], lock_order(locks3)
+
+    # Jornada 1 is THIRD in real lock order (index 2) — two locked jornadas
+    # (3, then 2) already sit behind it, so it's the one that can test
+    # lag=0/1/2 all at once. Five snapshots of the same prediction, far
+    # enough apart that each lag's cutoff lands on a different one.
+    preds3 = {"eli": [(t(9), f(1.0)), (t(11), f(2.0)), (t(15), f(3.0)),
+                      (t(19), f(4.0)), (t(21), f(9.9))]}
+    actuals3 = [{"name": "Eli", "keys": ["eli"], "from_dt": t(20, 1),
+                "points_delta": 3.0, "games_delta": 1.0, "jornada": 1}]
+    # lag=0: cutoff is jornada 1's OWN lock (t20) -> freshest before it, t19
+    # (4.0) — not t21's 9.9, which is hindsight (logged after jornada 1
+    # itself locked) and must never be reachable at any lag.
+    lag0 = lagged_pair(actuals3, preds3, locks3, 0)
+    assert len(lag0) == 1 and lag0[0]["predicted"] == 4.0, lag0
+    # lag=1: cutoff steps back to jornada 2's lock (t14) -> t11 (2.0).
+    lag1 = lagged_pair(actuals3, preds3, locks3, 1)
+    assert len(lag1) == 1 and lag1[0]["predicted"] == 2.0, lag1
+    # lag=2: cutoff steps back to jornada 3's lock (t10) -> t9 (1.0).
+    lag2 = lagged_pair(actuals3, preds3, locks3, 2)
+    assert len(lag2) == 1 and lag2[0]["predicted"] == 1.0, lag2
+    # lag=3: only 3 jornadas exist at all, jornada 1 is 2 steps in — a
+    # third step back has nothing behind it, skipped rather than guessed.
+    assert lagged_pair(actuals3, preds3, locks3, 3) == []
+
+    # -- drift_frac_from_history(): honest refusal on too little real data,
+    # same discipline as fit_drift_frac() itself ----------------------------
+    fitted, why = drift_frac_from_history()
+    assert fitted == 1.0 and isinstance(why, str) and why, (fitted, why)
 
     # -- grading the probable-XI sources ------------------------------------
     # Ane and Bo played in the interval opening on the 15th; Cai did not, and
