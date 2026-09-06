@@ -22,7 +22,14 @@ thin for weeks: a jornada gives ~15 pairs. The section says so rather than
 hiding it, and fills itself in as the season runs. No jornada yet means the
 section states that and stops; an empty comparison is a fact, not an error.
 
-Nothing else imports this. Deps: stdlib only.
+Deps: stdlib only. `decide.py` imports `drift_frac_from_history()` (only
+that one function, at Bootstrap-construction time) to point the live
+season simulation at a real fitted DRIFT_FRAC instead of a hardcoded
+constant — the one intentional exception to this module otherwise being
+a leaf nothing else needs at import time. `_fc()` below already imports
+decide.py back, lazily, for the opposite direction (asking the live
+forecaster a question) — the two do not import each other at module top
+level, so this stays acyclic in practice.
 
     python src/methodology.py             # writes .runtime/parts/methodology.md
     python src/methodology.py --selftest  # pure join logic, no IO
@@ -1481,12 +1488,31 @@ def comparison_lines() -> list[str]:
     return out
 
 
+def drift_lines() -> list[str]:
+    """Is the season simulation's drift term (DRIFT_FRAC) still a bare
+    guess, or has it actually been fit off real data this run? Miguel
+    (2026-09-06): "I do not want a hardcoded drift" — this is where that
+    promise is checked, every report, not just claimed once in a commit
+    message. See forecast.fit_drift_frac()/drift_frac_from_history() for
+    the estimator itself.
+    """
+    fitted, why = drift_frac_from_history()
+    from ffcore.forecast import DRIFT_FRAC as _DEFAULT
+    out = ["### Season-long drift", ""]
+    if fitted == _DEFAULT and "not enough" in why:
+        out += [f"Still the unfitted default ({_DEFAULT:.2f}) — {why}.", ""]
+    else:
+        out += [f"**Fit from real data this run: {fitted:.2f}** ({why}).", ""]
+    return out
+
+
 def main() -> None:
     out = ["# How the forecast works — and how it's doing", ""]
     out += feed_lines()
     out += formula_lines()
     out += column_guide_lines()
     out += comparison_lines()
+    out += drift_lines()
     out += source_lines(load_actuals()[0])
     PARTS.mkdir(parents=True, exist_ok=True)
     write_lines(PARTS / "methodology.md", out)

@@ -46,7 +46,9 @@ from dataclasses import dataclass, field, replace
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
+from ffcore import forecast as _forecast  # noqa: E402
 from ffcore.forecast import Bootstrap, pool_from_perjornada  # noqa: E402
+import methodology as _methodology  # noqa: E402
 from ffcore.league import MARKET, api_key  # noqa: E402
 from ffcore.parse import fmt_money  # noqa: E402
 from ffcore.score import SLOT, SLOT_MIN, _calibrated  # noqa: E402
@@ -1200,6 +1202,17 @@ def load(trials_pool=None) -> Universe:
     # A squad short a position can't be simulated at all (see phantom_fill())
     # — patched once here so every downstream reader gets the same fix.
     squads, per_j = phantom_fill(squads, per_j, pos)
+    # THE ACTUAL LIVE EFFECT of fit_drift_frac()/drift_frac_from_history()
+    # (ffcore/forecast.py, methodology.py) — Miguel, 2026-09-06: "I do not
+    # want a hardcoded drift." Fitting it and reporting the result
+    # (methodology.drift_lines()) without ever pointing the SIMULATION at
+    # the fitted value would be the same "relabeled, not real" fix this
+    # repo has been burned by before; this line is what makes it real.
+    # Mutates the module attribute (not a local variable) because
+    # rate_draw()/start_draw() re-import DRIFT_FRAC fresh from the module
+    # on every call — same mechanism season.py's own self-test already
+    # relies on to swap it for a test value and restore it after.
+    _forecast.DRIFT_FRAC, _drift_why = _methodology.drift_frac_from_history()
     fc = Bootstrap(per_j, pool=pool, matches=matches,
                   club_of=club_of_slug, club_rel=club_rel)
 
