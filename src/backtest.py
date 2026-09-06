@@ -30,13 +30,15 @@ from __future__ import annotations
 import csv
 import datetime as dt
 import io
+import json
 import os
 import subprocess
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-__all__ = ["commit_as_of", "csv_as_of"]
+__all__ = ["commit_as_of", "csv_as_of", "commits_touching",
+          "replay_recommendations"]
 
 # The repo root — git commands run from here regardless of the caller's
 # own working directory, the same reason run.py sets PYTHONPATH=src rather
@@ -62,6 +64,17 @@ def commit_as_of(when: dt.datetime, path: str) -> str | None:
     return sha or None
 
 
+def _show(sha: str, path: str) -> str | None:
+    """`git show <sha>:<path>`'s raw text, or None — the one place both
+    `csv_as_of()` and `replay_recommendations()` reach into git's object
+    store, so there is exactly one subprocess incantation to get right.
+    """
+    out = subprocess.run(["git", "show", f"{sha}:{path}"],
+                         cwd=_ROOT, capture_output=True, text=True,
+                         check=False)
+    return out.stdout if out.returncode == 0 else None
+
+
 def csv_as_of(when: dt.datetime, path: str) -> list[dict]:
     """`read_csv(path)`'s own rows, but as they stood at `when` — [] when
     the path didn't exist yet at that point, the same "missing is empty,
@@ -81,13 +94,27 @@ def csv_as_of(when: dt.datetime, path: str) -> list[dict]:
     sha = commit_as_of(when, path)
     if sha is None:
         return []
-    out = subprocess.run(["git", "show", f"{sha}:{path}"],
-                         cwd=_ROOT, capture_output=True, text=True,
-                         check=False)
-    if out.returncode != 0:
-        return []
-    rows = list(csv.DictReader(io.StringIO(out.stdout)))
-    return rows
+    text = _show(sha, path)
+    return list(csv.DictReader(io.StringIO(text))) if text is not None else []
+
+
+def commits_touching(path: str) -> list[tuple[str, dt.datetime]]:
+    """[(sha, commit time)] for every commit that touched `path`, OLDEST
+    FIRST — `--follow` so a rename in the file's history (this repo's own
+    `reports/decisions.json` predecessor was a different name before
+    `cc61b84`) doesn't silently truncate the record.
+    """
+    out = subprocess.run(
+        ["git", "log", "--format=%H|%cI", "--follow", "--reverse", "--", path],
+        cwd=_ROOT, capture_output=True, text=True, check=False)
+    commits = []
+    for line in out.stdout.splitlines():
+        sha, _, when = line.partition("|")
+        try:
+            commits.append((sha, dt.datetime.fromisoformat(when)))
+        except ValueError:
+            continue
+    return commits
 
 
 def naive_value_baseline(golden: list[dict]) -> dict | None:
@@ -218,6 +245,107 @@ def recency_only_baseline(golden: list[dict], window: int = 3) -> dict | None:
            "ours_mae": ours_mae}
 
 
+def replay_recommendations(min_days: float = 3.0) -> dict | None:
+    """Did following the DECISION LAYER's own real recommendations, on the
+    real days it made them, actually gain real points — not "is the
+    forecast accurate" (everything else in this file), but "would the
+    advice have won."
+
+    Miguel, 2026-09-06, after two forecast-accuracy backtests and a
+    DRIFT_FRAC fit already both showed nothing to change: "we have all the
+    historical data and the outputs from the previous model, let's compare
+    and do a better version to win this league, enough waiting." This is
+    that comparison — no more forecast-ingredient tests, the actual
+    top-ranked "buy X, sell Y" call, replayed against what really happened.
+
+    THE SOURCE: `reports/decisions.json`'s own `moves[0]` — the single
+    highest-ranked recommendation, exactly what a manager reading the
+    report that day would have acted on — across all 200+ real commits
+    since 2026-08-18 (`commits_touching()`, oldest first, real dates, no
+    hindsight: each day's advice is graded only on points scored AFTER
+    that day, never before).
+
+    ONE EPISODE PER DISTINCT (buy, sell) PAIR, not one per commit — the
+    same advice repeats across many runs until the market moves or it gets
+    acted on; grading it once a run would count the same call 5-10 times
+    over and drown out everything else. An episode is counted at the FIRST
+    day that exact pair was recommended (the earliest a manager could have
+    acted on it), and again once the pair changes.
+
+    `min_days`: an episode needs real runway to say anything — one
+    recommended yesterday has barely had a chance to be right or wrong yet.
+    Excluded, not scored as a loss; the summary states how many were too
+    fresh to grade.
+
+    Returns None when there's nothing to replay at all (no commit history,
+    or no episode has cleared `min_days` yet).
+    """
+    import methodology as M
+    from ffcore.text import norm
+
+    commits = commits_touching("reports/decisions.json")
+    if not commits:
+        return None
+
+    actuals, _label = M.load_actuals(window_days=None)
+    if not actuals:
+        return None
+    now = max(a["from_dt"] for a in actuals)
+    by_player: dict[str, list[tuple[dt.datetime, float]]] = {}
+    for a in actuals:
+        if a["games_delta"] < 1:
+            continue
+        for k in a["keys"]:
+            by_player.setdefault(k, []).append((a["from_dt"], a["points_delta"]))
+
+    def real_points_since(name: str, since: dt.datetime) -> float:
+        return sum(p for when, p in by_player.get(norm(name), [])
+                   if when >= since)
+
+    episodes = []
+    last_pair = None
+    for sha, when in commits:
+        text = _show(sha, "reports/decisions.json")
+        if text is None:
+            continue
+        try:
+            data = json.loads(text)
+        except (ValueError, TypeError):
+            continue
+        moves = data.get("moves") or []
+        if not moves:
+            continue
+        top = moves[0]
+        buy, sell = top.get("buy"), top.get("sell")
+        if not buy or not sell:
+            continue
+        pair = (buy, sell)
+        if pair == last_pair:
+            continue
+        last_pair = pair
+        episodes.append({"when": when, "buy": buy, "sell": sell,
+                         "kind": top.get("kind"), "label": top.get("label")})
+
+    resolved = []
+    for ep in episodes:
+        if (now - ep["when"]).days < min_days:
+            continue
+        buy_pts = real_points_since(ep["buy"], ep["when"])
+        sell_pts = sum(real_points_since(nm.strip(), ep["when"])
+                      for nm in ep["sell"].split(" + "))
+        resolved.append({**ep, "buy_pts": buy_pts, "sell_pts": sell_pts,
+                         "net": buy_pts - sell_pts})
+
+    if not resolved:
+        return None
+    n = len(resolved)
+    total_net = sum(r["net"] for r in resolved)
+    wins = sum(1 for r in resolved if r["net"] > 0)
+    return {"n": n, "total_episodes": len(episodes),
+           "too_fresh": len(episodes) - n, "total_net": total_net,
+           "mean_net": total_net / n, "wins": wins, "resolved": resolved}
+
+
 def _selftest() -> None:
     # -- commit_as_of: a real path in this real repo, checked against git's
     # own log rather than assumed --------------------------------------
@@ -291,6 +419,26 @@ def _selftest() -> None:
         else:
             print("  recency_only_baseline(): no player yet has a prior "
                  "played jornada to build a recency estimate from")
+
+    # -- commits_touching(): oldest-first, real commit times -----------------
+    ct = commits_touching("reports/decisions.json")
+    assert ct, "expected real decisions.json history"
+    times = [w for _, w in ct]
+    assert times == sorted(times), "must be oldest-first"
+    assert commits_touching("nope/never/existed.json") == []
+
+    # -- replay_recommendations(): the real question Miguel actually asked —
+    # not "is the forecast accurate", "would following the advice have won" —
+    assert replay_recommendations(min_days=1e9) is None    # nothing that stale
+    rec = replay_recommendations()
+    if rec is not None:
+        assert rec["n"] > 0, rec
+        assert rec["n"] + rec["too_fresh"] == rec["total_episodes"], rec
+        assert 0 <= rec["wins"] <= rec["n"], rec
+        print(f"  replay_recommendations(): {rec['n']} graded episodes "
+             f"({rec['too_fresh']} too fresh to grade yet), {rec['wins']}/"
+             f"{rec['n']} net positive, total net {rec['total_net']:+.1f} "
+             f"real pts, mean {rec['mean_net']:+.1f} pts/episode")
 
     print("backtest.py selftest OK")
 

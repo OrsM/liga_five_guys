@@ -537,14 +537,22 @@ def start_intervals(matches: list[dict], starters: list[dict],
 # loading
 # ---------------------------------------------------------------------------
 
-def load_actuals() -> tuple[list[dict], str]:
-    """Per-jornada rows from the newest season's file, parsed and windowed."""
+def load_actuals(window_days: int | None = WINDOW_DAYS) -> tuple[list[dict], str]:
+    """Per-jornada rows from the newest season's file, parsed and windowed.
+
+    `window_days=None` returns the WHOLE season's history unwindowed — for
+    a report section this would be the wrong default (a stale row reading
+    as current), but a real caller replaying the whole season's history
+    (`backtest.replay_recommendations()`) needs every jornada, not just
+    the last `WINDOW_DAYS`.
+    """
     files = sorted(LIVE.glob("perjornada_*.csv")) if LIVE.exists() else []
     if not files:
         return [], ""
     label = files[-1].stem.replace("perjornada_", "")
-    cutoff = (run_now()
-              - dt.timedelta(days=WINDOW_DAYS))
+    cutoff = (run_now() - dt.timedelta(days=window_days)
+             if window_days is not None else dt.datetime.min.replace(
+                 tzinfo=dt.timezone.utc))
     rows = []
     for r in read_csv(files[-1]):
         try:
