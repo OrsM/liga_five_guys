@@ -1175,7 +1175,14 @@ def log_cash_price(measured) -> None:
                ["measured_at", "places_per_million"])
 
 
-def _price_note(smoothed, measured) -> str:
+def _price_note(smoothed, measured, idle_cash: float = 0.0) -> str:
+    """`idle_cash` > 0 means: real spare cash, AND nothing cleared the bar
+    today (`rank()`'s own `rows` came back empty) — see main()'s own note.
+    Miguel, 2026-09-06: "the cash is not only when overdrawn, I can
+    probably put it to work more" — cash sitting there with a real,
+    measured, positive price and nothing to spend it on is worth saying
+    plainly, not just implied by an empty ladder.
+    """
     if smoothed is None and measured is None:
         return ("Nothing is charged for a buyout premium yet: no run has been "
                 "able to measure what a million euros is worth")
@@ -1186,7 +1193,12 @@ def _price_note(smoothed, measured) -> str:
                     % smoothed)
     if measured is not None:
         bits.append("today's own reading is %.3f" % measured)
-    return " — ".join(bits)
+    note = " — ".join(bits)
+    if idle_cash > 0 and measured is not None and measured > 0:
+        note += (". Nothing clears the bar today: %s sitting idle would be "
+                "worth **~%.2f places** at today's reading, if something "
+                "does" % (fmt_money(idle_cash), measured * idle_cash / 1e6))
+    return note
 
 
 def placeholder(why: str) -> list[str]:
@@ -1604,6 +1616,22 @@ def _selftest() -> None:
     flat = [{**rows[0], "d_pos": 0.0, "d_win": 0.0}]
     assert alert_lines(u, flat, ["riv"]) == [], "a move worth nothing is not news"
 
+    # -- _price_note()'s idle-cash line (2026-09-06, Miguel: "the cash is
+    # not only when overdrawn, I can probably put it to work more") -------
+    # No idle_cash given at all: unchanged from before this existed.
+    assert "idle" not in _price_note(0.05, 0.03)
+    # idle_cash=0 (the normal case: something DID clear the bar, or there's
+    # no spare cash) — same, no idle-cash line.
+    assert "idle" not in _price_note(0.05, 0.03, 0.0)
+    # Real idle cash, real positive measured rate: says what it's worth.
+    note = _price_note(0.05, 0.02, 10e6)
+    assert "idle" in note and fmt_money(10e6) in note, note
+    assert "~0.20 places" in note, note      # 0.02 * 10e6 / 1e6
+    # A measured rate of exactly 0 means "more money buys nothing" — a
+    # real, common answer, not a reason to claim idle cash is worth
+    # anything.
+    assert "idle" not in _price_note(0.05, 0.0, 10e6)
+
     # -- value for money: a materially cheaper near-match beats the
     # biggest raw gain, but only when it keeps enough of it -----------
     # rows[0]: d_pos=0.433, net=14.13M — the "biggest gain, whatever it
@@ -1893,7 +1921,7 @@ def _selftest() -> None:
     assert [r for r in rows2 if r["action"].buy == "cand"], rows2
     assert "cand" not in bands2, sorted(bands2)
 
-    print("sim self-test OK (204 cases)")
+    print("sim self-test OK (209 cases)")
 
 
 def main() -> None:
@@ -1939,7 +1967,10 @@ def main() -> None:
     rows, base, measured, bands = decide.rank(
         u, acts, price=smoothed, extra=band_acts(u))
     log_cash_price(measured)
-    u.cash_note = _price_note(smoothed, measured)
+    # Real idle cash ONLY when genuinely nothing cleared the bar (`rows`
+    # empty) AND there's cash to speak of — see _price_note()'s own note.
+    idle = u.cash if (not rows and u.cash > 0) else 0.0
+    u.cash_note = _price_note(smoothed, measured, idle)
     rivals = [m for m in u.state.squads if m != u.me]
     # ONE COMPUTATION, READ BY BOTH RENDERERS — render() and payload() both
     # draw this one list, so the two cannot disagree about groups or order.
