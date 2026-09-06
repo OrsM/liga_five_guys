@@ -148,6 +148,76 @@ def naive_value_baseline(golden: list[dict]) -> dict | None:
     return {"n": n, "k": k, "naive_mae": naive_mae, "ours_mae": ours_mae}
 
 
+def recency_only_baseline(golden: list[dict], window: int = 3) -> dict | None:
+    """Does the rate forecast beat a SECOND, genuinely different real
+    candidate — recent on-field form, no shrinkage, no market value, no
+    fixture — the "recency-only" approach the forecast-first rebuild plan
+    named as still untested after `naive_value_baseline()`.
+
+    THE PREDICTOR: a player's own mean per-match rate over his last
+    `window` real, ALREADY-PLAYED jornadas — ordered by real lock time
+    (`methodology.lock_order()`, the same fix `lagged_pair()` needed for
+    the same reason: a rescheduled fixture can lock jornada 6 before
+    jornada 4) — using ONLY jornadas strictly before the one being
+    predicted. No git history needed here (unlike `naive_value_baseline()`
+    and its market-value read): `methodology.load_actuals()` already
+    carries the player's own real per-jornada points, in order, for free.
+
+    A player with fewer than 1 prior played jornada has no recency
+    estimate at all yet (a true cold start) and is skipped — same "not
+    enough evidence" honesty as everywhere else in this codebase, not a
+    guessed rate.
+
+    `golden` is `methodology.golden_rows()`'s own output, same contract as
+    `naive_value_baseline()`: only rows with a real rate outcome are used,
+    `None` when there's nothing to compare.
+    """
+    import methodology as M
+    from ffcore.text import norm
+
+    checked = [r for r in golden if r.get("predicted_rate") is not None]
+    if not checked:
+        return None
+    matches = M.read_csv(M.TIDY / "matches.csv")
+    fixtures = M.read_csv(M.TIDY / "fixtures.csv")
+    locks = M.jornada_locks(matches, fixtures)
+    order = M.lock_order(locks)
+    pos = {j: i for i, j in enumerate(order)}
+
+    actuals, _label = M.load_actuals()
+    # {norm name: {lock-order position: real per-match rate that jornada}}
+    by_player: dict[str, dict[int, float]] = {}
+    for a in actuals:
+        if a["games_delta"] < 1:
+            continue
+        i = pos.get(a.get("jornada"))
+        if i is None:
+            continue
+        by_player.setdefault(norm(a["name"]), {})[i] = \
+            a["points_delta"] / a["games_delta"]
+
+    resolved = []
+    for r in checked:
+        i = pos.get(r["jornada"])
+        if i is None:
+            continue
+        hist = by_player.get(norm(r["player"]), {})
+        prior = sorted((idx, rate) for idx, rate in hist.items() if idx < i)
+        if not prior:
+            continue
+        recent = [rate for _, rate in prior[-window:]]
+        pred = sum(recent) / len(recent)
+        resolved.append((pred, r["actual_points"], r["predicted_rate"]))
+
+    if not resolved:
+        return None
+    n = len(resolved)
+    naive_mae = sum(abs(p - a) for p, a, _ in resolved) / n
+    ours_mae = sum(abs(o - a) for _, a, o in resolved) / n
+    return {"n": n, "window": window, "naive_mae": naive_mae,
+           "ours_mae": ours_mae}
+
+
 def _selftest() -> None:
     # -- commit_as_of: a real path in this real repo, checked against git's
     # own log rather than assumed --------------------------------------
@@ -202,6 +272,25 @@ def _selftest() -> None:
         print(f"  naive_value_baseline(): n={result['n']}, ours "
              f"{result['ours_mae']:.2f} MAE vs market-value-scaled "
              f"{result['naive_mae']:.2f} MAE")
+
+    # -- recency_only_baseline(): the SECOND candidate approach the plan
+    # named as still untested — recent on-field form, no shrinkage, no
+    # market value at all. Real data only, same reasoning as above --------
+    assert recency_only_baseline([]) is None
+    rresult = recency_only_baseline(golden)
+    if checked:
+        # Not asserted non-None: a real cold-start season (every checked
+        # player's own FIRST played jornada) could legitimately resolve
+        # nothing yet — that's the honest "not enough history" case, not
+        # a bug, so only check the shape when it did resolve.
+        if rresult is not None:
+            assert rresult["n"] > 0, rresult
+            print(f"  recency_only_baseline(): n={rresult['n']}, ours "
+                 f"{rresult['ours_mae']:.2f} MAE vs last-{rresult['window']} "
+                 f"recency {rresult['naive_mae']:.2f} MAE")
+        else:
+            print("  recency_only_baseline(): no player yet has a prior "
+                 "played jornada to build a recency estimate from")
 
     print("backtest.py selftest OK")
 
