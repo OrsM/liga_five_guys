@@ -108,6 +108,9 @@ def pair(actuals: list[dict],
             "matches": a["games_delta"],
             "err": predicted - a["points_delta"],
             "fix": fac.get("fix"),
+            # See load_actuals()'s own note — carried through for the same
+            # future join, not read by anything here yet.
+            "jornada": a.get("jornada"),
         })
     return out
 
@@ -444,9 +447,20 @@ def load_actuals() -> tuple[list[dict], str]:
         full = r.get("player_name_full", "")
         short = r.get("player_name", "")
         keys = [k for k in {norm(full), norm(short)} if k]
+        # points.py's diff() already stamps a jornada per row (jornada_asof,
+        # off the calendar) — dropped here before now. Carried through so a
+        # rate-side row (this one) and a start-side row (start_grade()'s,
+        # keyed by jornada_locks()'s own lock time) can eventually be joined
+        # on the one number both sides already compute, instead of on
+        # timestamps that live in two different clocks (a diff snapshot vs.
+        # a kickoff lock). The join itself isn't built yet — this is the key
+        # it needs.
+        # Why: docs/notes/methodology.md#load_actuals--jornada-carried-through-for-a-future-join
+        jor = r.get("jornada", "")
         rows.append({"name": full or short, "keys": keys,
                      "from_dt": from_dt, "points_delta": pd_,
-                     "games_delta": gd})
+                     "games_delta": gd,
+                     "jornada": int(jor) if jor else None})
     return rows, label
 
 
