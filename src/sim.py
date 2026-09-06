@@ -41,7 +41,7 @@ import json  # noqa: E402
 import os as _os  # noqa: E402
 from pathlib import Path  # noqa: E402
 
-from decide import dead_weight, route_kind, value_rate  # noqa: E402,F401
+from decide import dead_weight, overdraft_fix, route_kind, value_rate  # noqa: E402,F401
 from ffcore.parse import fmt_money  # noqa: E402
 from ffcore.league import app_fielded  # noqa: E402
 from ffcore.render import title_name  # noqa: E402
@@ -945,7 +945,32 @@ def alert_lines(u, rows, rivals) -> list[str]:
     is one best move; the other hundred and thirty-one lost to it and are not
     news. A move that gains nothing is not news either, and returns [] so the
     caller can send NOTHING rather than "all quiet" twice a day.
+
+    BEING OVERDRAWN IS ALSO NEWS — Miguel, 2026-09-06: the model correctly
+    proposes zero buys while overdrawn (nothing is affordable), but used
+    to say NOTHING about what to sell to fix it, which is worse than
+    silence: the jornada locks overdrawn otherwise. Checked first, before
+    the ordinary best-move search — an unresolved overdraft is more
+    urgent than any buy could be, and the two states cannot coexist
+    (candidates() cannot propose anything real while overdrawn anyway).
     """
+    if u.cash < 0:
+        sells, short = overdraft_fix(u)
+        if not sells:
+            return ["**Overdrawn %s** — no safe dead-weight sale covers it; "
+                    "needs a manual look before the jornada locks."
+                    % fmt_money(-u.cash)]
+        names = ", ".join("%s (+€%.1fM)" % (title_name(u.name.get(k, k)),
+                                            p / 1e6) for k, p in sells)
+        if short > 0:
+            return ["**Overdrawn %s** — sell %s clears most of it, still "
+                    "€%.1fM short (no further safe dead-weight sale)."
+                    % (fmt_money(-u.cash), names, short / 1e6)]
+        return ["**Overdrawn %s** — sell %s to clear it before the jornada "
+                "locks (zero points cost: %s never start your eleven)."
+                % (fmt_money(-u.cash), names,
+                   "he doesn't" if len(sells) == 1 else "they don't")]
+
     best, uncertain = _best(u, rows, rivals)
     if best is None:
         return []
@@ -1340,6 +1365,28 @@ def _selftest() -> None:
     from ffcore.season import best_xi as _bx
     left = {k: v for k, v in sq.items() if k not in dict(dead)}
     assert len(_bx(left, val)) == 11, left
+
+    # -- overdrawn: alert_lines() says what to sell, not silence
+    # (2026-09-06, Miguel: cash management going silent while overdrawn) --
+    from dataclasses import replace as _dc_replace
+    # Small overdraft: the bigger dead-weight sale (spare_m, 7.45M) alone
+    # covers it, with room to spare — spare_k is never touched.
+    u_over = _dc_replace(u2, cash=-5e6)
+    al_over = alert_lines(u_over, [], ["riv"])
+    assert len(al_over) == 1, al_over
+    assert "Overdrawn" in al_over[0] and "Benat Turrientes" in al_over[0], \
+        al_over
+    assert "Alvaro Fernandez" not in al_over[0], al_over
+    # Bigger than either dead-weight sale alone, smaller than both together:
+    # BOTH get sold, still short, said honestly — never reaches for d1 (a
+    # real starter) to close the rest.
+    u_over_big = _dc_replace(u2, cash=-15e6)
+    al_big = alert_lines(u_over_big, [], ["riv"])
+    assert len(al_big) == 1, al_big
+    assert "Benat Turrientes" in al_big[0] and "Alvaro Fernandez" in al_big[0], \
+        al_big
+    assert "still" in al_big[0] and "short" in al_big[0], al_big
+    assert "d1" not in al_big[0]
 
     # A ROUND ALREADY IN PROGRESS DOES NOT COUNT. Its eleven is locked, so a
     # man who starts only there is not being fielded by any decision you can
@@ -1846,7 +1893,7 @@ def _selftest() -> None:
     assert [r for r in rows2 if r["action"].buy == "cand"], rows2
     assert "cand" not in bands2, sorted(bands2)
 
-    print("sim self-test OK (197 cases)")
+    print("sim self-test OK (204 cases)")
 
 
 def main() -> None:

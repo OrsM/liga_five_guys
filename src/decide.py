@@ -520,6 +520,51 @@ def dead_weight(u) -> list[tuple[str, float]]:
                   key=lambda kv: -kv[1])
 
 
+def overdraft_fix(u: Universe) -> tuple[list[tuple[str, float]], float]:
+    """([(player, proceeds)] to sell, still-short amount) to clear an
+    overdraft — [], 0.0 when not overdrawn at all.
+
+    Miguel, 2026-09-06: being overdrawn is a real gap this report used to
+    go silent about — `candidates()` correctly proposes nothing (nothing
+    is affordable), but nothing said what to sell to fix it either.
+
+    DEAD WEIGHT ONLY, DELIBERATELY — never a real starter, however small
+    the impact looks. `candidates()`'s own docstring already refuses
+    multi-sale funding chains outright: "a move that needs 2+ sales to
+    afford was the source of both catastrophic squad-legality bugs...
+    cut rather than re-patched." A fix that reaches for real starters
+    across several sales is exactly that pattern, one call site over. So
+    this reaches ONLY into `dead_weight()` (proceeds with zero points
+    cost, by definition — nobody here starts any remaining eleven), and
+    even then re-checks `_fieldable()` on the CUMULATIVE result after
+    every single sale, not just the first — the exact discipline that
+    closed the Ali Houary/Alvaro Mantilla bugs ("meets every position's
+    own floor individually, fails the real formation check"). Stops
+    extending, rather than pushing an unsafe sale through, the moment a
+    further one would break it.
+
+    A shortfall dead weight alone can't cover is returned honestly (the
+    second element, > 0) rather than reached for by selling a real
+    starter — "the book" says stop, not get clever.
+    """
+    if u.cash >= 0:
+        return [], 0.0
+    need = -u.cash
+    mine = dict(u.state.squads.get(u.me, {}))
+    picked: list[tuple[str, float]] = []
+    raised = 0.0
+    for k, proceeds in dead_weight(u):
+        if raised >= need:
+            break
+        trial = {p: s for p, s in mine.items() if p != k}
+        if not _fieldable(trial):
+            continue
+        mine = trial
+        picked.append((k, proceeds))
+        raised += proceeds
+    return picked, max(0.0, need - raised)
+
+
 def apply(u: Universe, a: Action) -> dict[str, dict[str, str]]:
     """The squads as they would be after `a`. Pure — nothing is mutated."""
     sq = {m: dict(s) for m, s in u.state.squads.items()}
@@ -1328,6 +1373,24 @@ def _selftest() -> None:
     # A player worse than the weakest man you field is not a candidate.
     assert "dud" not in names, names
     assert "star" in names, names
+
+    # -- overdraft_fix(): dead weight only, never a multi-sale chain into
+    # real starters — the exact bug class candidates() itself already
+    # refuses (2026-09-06, Miguel: cash management going silent while
+    # overdrawn) ------------------------------------------------------
+    assert overdraft_fix(u) == ([], 0.0), "not overdrawn: nothing to fix"
+    # me_bench (proceeds 8e6) is real dead weight in THIS fixture — never
+    # in cxi, confirmed above. A small overdraft it alone covers:
+    u_small = replace(u, cash=-3e6)
+    sells, short = overdraft_fix(u_small)
+    assert sells == [("me_bench", 8e6)] and short == 0.0, (sells, short)
+    # A bigger overdraft than any dead weight raises: covers what it can,
+    # says honestly how much is still short — never reaches for a real
+    # starter to close the gap.
+    u_big = replace(u, cash=-50e6)
+    sells2, short2 = overdraft_fix(u_big)
+    assert sells2 == [("me_bench", 8e6)], sells2
+    assert short2 == 50e6 - 8e6, short2
     # A rival's player reachable ONLY through his clause is marked a raid;
     # one he has LISTED himself is never proposed at all — 0/119 real deals
     # in this league have ever been a rival's own choice to sell to a
@@ -2030,7 +2093,7 @@ def _selftest() -> None:
     assert value_rate(0.0, 5e6) == 0.0           # a real price, zero return: 0, not None
 
 
-    print("decide self-test OK (145 cases)")
+    print("decide self-test OK (149 cases)")
 
 
 if __name__ == "__main__":
