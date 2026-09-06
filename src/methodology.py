@@ -1157,6 +1157,34 @@ def golden_rows() -> list[dict]:
     return out
 
 
+def baseline_check(golden: list[dict]) -> dict | None:
+    """Does our start-probability forecast actually beat trivial baselines?
+
+    Stage 3 of the forecast-first rebuild plan, its honest first slice —
+    the FULL version (replay history, compare against alternate
+    forecasting APPROACHES re-run on past snapshots) is real, unbuilt
+    work; this is the cheap, real thing achievable straight off
+    golden_rows(): is our claim actually informative, or would a constant
+    have done as well? A model whose Brier score doesn't clear a naive
+    baseline is not adding anything, however plausible its own logic
+    reads.
+
+    `None` when there are no rows to check — not zero, which would read
+    as "beats nothing by a mile."
+    """
+    if not golden:
+        return None
+    n = len(golden)
+    mean_claim = sum(r["predicted_start_pct"] for r in golden) / n
+    ours = sum((r["predicted_start_pct"] / 100 - r["actual_started"]) ** 2
+              for r in golden) / n
+    coin_flip = sum((0.5 - r["actual_started"]) ** 2 for r in golden) / n
+    constant = sum((mean_claim / 100 - r["actual_started"]) ** 2
+                  for r in golden) / n
+    return {"n": n, "mean_claim": mean_claim, "ours": ours,
+           "coin_flip": coin_flip, "constant": constant}
+
+
 def source_lines(actuals: list[dict]) -> list[str]:
     """The gate for LINEUP_SOURCE: which site's eleven was right more often.
 
@@ -1208,6 +1236,20 @@ def source_lines(actuals: list[dict]) -> list[str]:
             "round's first kickoff. Lower Brier **on starts** earns "
             "`LINEUP_SOURCE` in ffcore/tidy.py; appearances break ties only._",
             ""]
+    # DOES OUR OWN FORECAST BEAT A TRIVIAL BASELINE? Stage 3's first real
+    # slice (forecast-first rebuild plan) — checked against the SAME
+    # jornada-joined rows every report, not a one-off script.
+    check = baseline_check(golden_rows())
+    if check is not None:
+        out += [f"_Our forecast vs. trivial baselines, n={check['n']}: "
+                f"ours {check['ours']:.3f}, a flat 50% guess "
+                f"{check['coin_flip']:.3f}, a constant "
+                f"{check['mean_claim']:.0f}% guess {check['constant']:.3f} "
+                "(Brier, lower is better) — "
+                + ("beats both, adding real information." if
+                   check['ours'] < check['coin_flip']
+                   and check['ours'] < check['constant'] else
+                   "does NOT clearly beat a trivial guess yet.") + "_", ""]
     return out
 
 
@@ -1607,6 +1649,19 @@ def _selftest() -> None:
             assert r["actual_points"] == 0.0, r
     print(f"  golden_rows(): {len(golden)} rows, {len(checked)} fully "
          "joined, consistency held")
+
+    # -- baseline_check(): a synthetic case where the "right" answer is
+    # known by construction, since real data can only show what today's
+    # forecast happens to score, not prove the arithmetic is right -------
+    assert baseline_check([]) is None            # nothing to check, not 0
+    perfect = [{"predicted_start_pct": 100.0, "actual_started": True}] * 5
+    chk = baseline_check(perfect)
+    assert chk["ours"] == 0.0, chk                # perfect claims, zero Brier
+    assert chk["coin_flip"] == 0.25, chk           # every 50%-guess case
+    always_wrong = [{"predicted_start_pct": 90.0, "actual_started": False}] * 3
+    chk2 = baseline_check(always_wrong)
+    # 90% claim, never happened: (0.9-0)^2 = 0.81, worse than guessing 50%.
+    assert chk2["ours"] > chk2["coin_flip"], chk2
 
     print("methodology.py selftest OK")
 
