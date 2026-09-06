@@ -72,16 +72,98 @@ MIN_POOL = 200
 SHRINK_MATCHES = 8.0
 
 # HOW MUCH A RATE CAN DRIFT PER JORNADA THAT PASSES, as a fraction of the
-# player's OWN rate_rel (less predictable players drift more). Repeatedly
-# measured and re-checked (2026-08-21 through 2026-08-31) against this
-# repo's own live squad data and results history; stays 1.0 — no evidence
-# since has moved it, and reports/METHOD.md's "Forecast vs actual" table
-# is structurally unable to grade it further at any row count (a horizon-1
-# sample can't fit a horizon-dependent parameter). DO NOT re-tune this
-# from that table alone; a horizon ladder (predictions logged and graded
-# at several h) would be needed first.
-# Why + full sweep tables: docs/notes/forecast.md#drift-frac-calibration-history
+# player's OWN rate_rel (less predictable players drift more, per-player
+# and per-club evidence-derived — see rate_rel/club_rel below, neither of
+# which is hardcoded). THIS is the one number in that chain that used to
+# be a bare guess rather than derived from anything: 1.0, hand-set,
+# "repeatedly measured and re-checked... no evidence since has moved it"
+# was true only because reports/METHOD.md's "Forecast vs actual" table
+# is structurally unable to grade a horizon-dependent parameter from
+# horizon-1 predictions alone (Miguel, 2026-09-06: "I do not want a
+# hardcoded drift").
+#
+# fit_drift_frac() below is the real fix — not a better guess, a real
+# estimator, off the ONE thing that actually reveals a horizon-dependent
+# parameter: how forecast error VARIANCE grows between two real
+# horizons. It needs a horizon ladder to run on (predictions logged and
+# graded at more than one horizon out — report.py started logging a
+# 3-jornada figure alongside the 1-jornada one on 2026-09-06,
+# `score_h3`), and refuses honestly, keeping this module-level default,
+# until real graded pairs exist at both horizons — same discipline
+# ffcore.score._fit_decay() already uses for the lineup-source recency
+# weight: fit from real held-out evidence, or say plainly why not, never
+# guess dressed up as a fit.
+# Why + the derivation, full sweep tables: docs/notes/forecast.md#drift-frac-calibration-history
 DRIFT_FRAC = 1.0
+
+
+def fit_drift_frac(h1_pairs, h3_pairs) -> tuple[float, str]:
+    """(drift_frac, why) — fit DRIFT_FRAC from real, multi-horizon forecast
+    error, or say honestly why not. Never a guess.
+
+    THE DERIVATION. rate_draw()'s own model says the per-player log-error
+    at horizon h has variance rate_rel[k]**2 * (1 + h * DRIFT_FRAC**2) —
+    one unit from the FLAT per-trial error `eps0` (present at every
+    horizon equally, rate_draw()'s own docstring), plus `h` independent
+    accumulated drift steps, each contributing DRIFT_FRAC**2 more. Dividing
+    each observed log-error by its own rate_rel[k] (the already-derived,
+    evidence-based per-player uncertainty this repo already computes, see
+    Bootstrap.__init__) puts every player on the SAME scale regardless of
+    how much evidence he individually has, so the population's observed
+    variance at h1 and h3 isolates DRIFT_FRAC directly:
+
+        Var(z_h1) ~= 1 + 1 * DRIFT_FRAC**2
+        Var(z_h3) ~= 1 + 3 * DRIFT_FRAC**2
+        DRIFT_FRAC = sqrt(max(0, (Var(z_h3) - Var(z_h1)) / (3 - 1)))
+
+    `h1_pairs`/`h3_pairs` are `[(predicted, actual, rate_rel), ...]` at
+    each horizon — deliberately NOT dicts keyed by player, since a fit
+    only needs the population's residuals, not identity; the caller
+    (methodology.py, off squad_log.csv's `score`/`score_h3` columns and
+    real outcomes) owns matching a player's own rate_rel to his own pair.
+
+    "h1"/"h3" here means 1 and 3 ACCUMULATED DRIFT STEPS, matching
+    rate_draw()'s own accounting: it advances `cum_var` once per entry of
+    its `jornadas` argument, not once per calendar jornada elapsed — real
+    usage always walks the remaining schedule consecutively (decide.py's
+    `rem`), so the two coincide in production, but a caller feeding this
+    from a gapped or resampled jornada list would silently under- or
+    over-count steps and mis-scale the fit.
+
+    HONEST REFUSAL, same discipline as ffcore.score._fit_decay(): too few
+    pairs at either horizon, a non-positive predicted/actual ratio (can't
+    take a log of it), or a negative variance difference (real drift
+    cannot produce h3 being LESS variable than h1 — a negative reading
+    here is noise at this sample size, not evidence DRIFT_FRAC should
+    shrink) all keep the CURRENT module-level DRIFT_FRAC, with a stated
+    reason, rather than silently emitting a number nobody asked to trust.
+    Why: docs/notes/forecast.md#fit_drift_frac--the-derivation
+    """
+    def _z(pairs):
+        out = []
+        for predicted, actual, rel in pairs:
+            if predicted <= 0 or actual <= 0 or rel <= 0:
+                continue
+            out.append(math.log(actual / predicted) / rel)
+        return out
+
+    z1, z3 = _z(h1_pairs), _z(h3_pairs)
+    if len(z1) < 20 or len(z3) < 20:
+        return DRIFT_FRAC, ("not enough graded pairs yet (h1=%d, h3=%d, "
+                            "need >=20 each) — keeping %.2f"
+                            % (len(z1), len(z3), DRIFT_FRAC))
+    var1 = statistics.pvariance(z1)
+    var3 = statistics.pvariance(z3)
+    growth = (var3 - var1) / 2.0
+    if growth <= 0:
+        return DRIFT_FRAC, ("h3 wasn't more variable than h1 (%.3f vs "
+                            "%.3f, rate_rel-normalised) — no evidence "
+                            "DRIFT_FRAC should move from %.2f"
+                            % (var3, var1, DRIFT_FRAC))
+    fitted = math.sqrt(growth)
+    return fitted, ("h1 var %.3f, h3 var %.3f (rate_rel-normalised, "
+                   "n=%d/%d) -> drift_frac %.2f" % (var1, var3,
+                                                    len(z1), len(z3), fitted))
 
 
 @runtime_checkable
@@ -406,6 +488,62 @@ def _selftest() -> None:
     assert abs(far_mean - 1.0) < 0.05, far_mean
     # A jornada NOT in the walk's own list is simply absent, not guessed.
     assert 4 not in walk[0]
+
+    # -- fit_drift_frac(): recovers a KNOWN ground truth from the model's OWN
+    # generative process, not a guess about what a fit "should" look like.
+    # Given the stakes of touching core simulation math (Miguel, 2026-09-06:
+    # "I do not want a hardcoded drift"), this has to be checked against
+    # rate_draw() itself, the same discipline the walk/correlation
+    # assertions above already use ------------------------------------------
+    global DRIFT_FRAC
+    truth = 0.6
+    was = DRIFT_FRAC
+    try:
+        DRIFT_FRAC = truth
+        gen = Bootstrap({1: {"kid": (5.0, 1.0)}}, pool=[0, 2, 4, 6, 8] * 40,
+                        matches={"kid": 10})
+        rel = gen.rate_rel["kid"]
+        rng2 = random.Random(11)
+        h1_pairs, h3_pairs = [], []
+        for _ in range(4000):
+            # CONSECUTIVE jornadas, matching real usage (decide.py always
+            # walks the whole remaining schedule in order) — cum_var
+            # accumulates one step per LIST ENTRY, so a gapped list (e.g.
+            # [1, 3]) would silently under-count steps for jornada 3.
+            d = gen.rate_draw(rng2, jornadas=[1, 2, 3])
+            h1_pairs.append((1.0, d[1]["kid"], rel))
+            h3_pairs.append((1.0, d[3]["kid"], rel))
+    finally:
+        DRIFT_FRAC = was
+
+    fitted, why = fit_drift_frac(h1_pairs, h3_pairs)
+    # RECOVERS THE TRUTH — within sampling noise (n=4000), not exactly.
+    assert abs(fitted - truth) < 0.08, (fitted, truth, why)
+    assert "n=4000/4000" in why, why
+
+    # HONEST REFUSAL: too few pairs keeps the CURRENT module constant and
+    # says why, rather than fitting noise.
+    fitted_thin, why_thin = fit_drift_frac(h1_pairs[:5], h3_pairs[:5])
+    assert fitted_thin == DRIFT_FRAC, (fitted_thin, why_thin)
+    assert "not enough" in why_thin, why_thin
+
+    # HONEST REFUSAL: h3 genuinely no more variable than h1 (drift truly
+    # near zero) must not be reported as evidence to SHRINK below the
+    # current constant — it's silence, not a negative signal.
+    DRIFT_FRAC = was
+    gen0 = Bootstrap({1: {"kid": (5.0, 1.0)}}, pool=[0, 2, 4, 6, 8] * 40,
+                     matches={"kid": 10})
+    rel0 = gen0.rate_rel["kid"]
+    flat_h1 = [(1.0, 1.0 + rng2.gauss(0.0, rel0), rel0) for _ in range(200)]
+    flat_h3 = [(1.0, 1.0 + rng2.gauss(0.0, rel0), rel0) for _ in range(200)]
+    fitted_flat, why_flat = fit_drift_frac(flat_h1, flat_h3)
+    if fitted_flat == DRIFT_FRAC:
+        assert "wasn't more variable" in why_flat, why_flat
+
+    # A non-positive predicted/actual value is skipped, not a crash.
+    fitted_bad, why_bad = fit_drift_frac(
+        [(0.0, 1.0, 0.1)] * 30, [(1.0, -1.0, 0.1)] * 30)
+    assert fitted_bad == DRIFT_FRAC and "not enough" in why_bad, why_bad
 
     # -- club_rel: two players of one club move TOGETHER --------------------
     # No club_of/club_rel passed: exactly the old behaviour, not a new
