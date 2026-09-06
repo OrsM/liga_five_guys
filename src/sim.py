@@ -259,23 +259,6 @@ def _bar(u) -> float:
     return decide.xi_bar(exp, xi)
 
 
-def race(u, key: str) -> list[dict]:
-    """`decide.contest()` for one target, as the shape BOTH renderers draw.
-
-    ONE ANSWER, TWO RENDERINGS — the markdown's own cell (race_cell()) and
-    the phone's `contest` field are two drawings of this list, never two
-    computations of it. That is the same rule ladder()/ladder_rows() and
-    _move_rank_key() were each pulled out to enforce, applied to the newest
-    number on the board rather than learned again the day the two disagree.
-
-    `[]` for everything that is not a payable clause, which is most rows —
-    see decide.contest()'s own note on why a bid that can lose is a
-    different question with a different signal (`Universe.bids`).
-    """
-    import decide
-    return [{"manager": m, "days": d} for m, d in decide.contest(u, key)]
-
-
 def short_manager(m: str) -> str:
     """One manager's first name/word only — "Magic Mike 333" -> "Magic",
     "SusoGattuso" unchanged (no space to split on).
@@ -290,25 +273,8 @@ def short_manager(m: str) -> str:
     return m.split()[0] if m else m
 
 
-def race_cell(u, r: list[dict]) -> str:
-    """race()'s own list in one short phrase, or "" for nothing to say.
 
-    Only the SOONEST rival is named. The board is already a wide table on a
-    390px phone and the second-soonest changes no decision — what a reader
-    acts on is whether anybody is close, and who.
-    """
-    if not r:
-        return ""
-    who, days = r[0]["manager"], r[0]["days"]
-    # "today"/"~Nd", NOT "can pay today"/"can pay in ~N days" — the words
-    # "can pay" already sit in this file's own caveat table explaining the
-    # column; repeating them on every single row was most of this cell's
-    # own width (Miguel, 2026-09-01, the same complaint twice).
-    when = "today" if days <= 0 else "~%dd" % days
-    return "%s %s" % (short_manager(who), when)
-
-
-def ladder_rows(u, rows, bands=None, base=None) -> list[dict]:
+def ladder_rows(u, rows, bands=None) -> list[dict]:
     """The grouped plan as data, so the phone draws the same one table.
 
     Same groups, same order, same numbers. Two renderers drawing different
@@ -317,19 +283,13 @@ def ladder_rows(u, rows, bands=None, base=None) -> list[dict]:
 
     `bands`, when given, is decide.rank()'s own `bands` — a real season band
     (pts_lo/pts_hi) for EVERY row, not just the point estimate xpts already
-    carried. Before this, only "buy" rows (already ranked as a move) had
-    one; a squad member's own row showed a bare xPts/j snapshot with no
-    uncertainty at all, which is a single jornada's P(start), not a season
-    of them — see band_acts()'s own note on why that understates a bench
-    player's real range. `bands=None` (an old caller, or the self-test) is
-    the unpriced table, not a crash.
+    carried. `bands=None` (an old caller, or the self-test) is the unpriced
+    table, not a crash.
 
-    `base`, when given, is the run's own baseline Standings — the ONE
-    thing chase_keys() needs in order to know whether the account is
-    trailing (see trailing()). Given one, 1-2 BUY rows may come back in a
-    "chase" group instead; `base=None` is the table exactly as it was
-    before trailing mode existed, which is what an old caller and the
-    self-test want.
+    NO CHASE MODE, NO CLAUSE-RACE TIMING (2026-09-06) — both cut as bolt-on
+    insight layers, not because either was wrong, but because "the book"
+    direction favours one plain value-ranked list over several ranking
+    modes each with its own edge cases.
     """
     import decide
 
@@ -345,34 +305,14 @@ def ladder_rows(u, rows, bands=None, base=None) -> list[dict]:
     bands = {k: v for k, v in (bands or {}).items() if k not in won}
 
     def cell(k, group, where, money, pts, note="", value=None,
-            lo=None, hi=None, contest=()):
+            lo=None, hi=None):
         if k in bands:
-            pts, lo, hi, action = bands[k]
-            # "vs X" band note: excludes a candidate's own band (`buy==k`)
-            # and the in/out free-lineup groups (no transfer happening).
-            # Why: docs/notes/sim.md#ladder_rows--vs-x-band-notes
-            if (action.buy and action.sell and action.buy != k
-                    and group not in ("in", "out")):
-                note = "vs %s" % title_name(u.name.get(action.buy,
-                                                        action.buy))
-                # A different funder can win the SAME target's real BUY row
-                # below (best_swap_for() asks a different question than
-                # rank()'s one-funder-per-target) — flagged with `*`, not
-                # spelled out per row (breaks phone width).
-                # Why: docs/notes/sim.md#ladder_rows--vs-x-band-notes
-                funder = won.get(action.buy)
-                if (funder and funder["action"].sell != action.sell
-                        and funder["action"].sell):
-                    note += "*"
+            pts, lo, hi, _action = bands[k]
         return {"name": title_name(u.name.get(k, k)),
                 "pos": u.pos.get(k, ""), "start": u.start.get(k, 0.0),
                 "xpts": exp.get(k, 0.0), "group": group, "where": where,
                 "money": money, "pts": pts,
-                "pts_lo": lo, "pts_hi": hi, "note": note, "value": value,
-                # WHO ELSE COULD TAKE HIM, AND WHEN — see race(). `[]` on
-                # every row that is not a payable clause, which is every
-                # row you already own and every free/listed target.
-                "contest": list(contest)}
+                "pts_lo": lo, "pts_hi": hi, "note": note, "value": value}
 
     out = []
     # WHAT TO CHANGE, not what to have. When the marks are a legal eleven the
@@ -398,32 +338,24 @@ def ladder_rows(u, rows, bands=None, base=None) -> list[dict]:
     for k in sorted(dead, key=lambda k: -exp.get(k, 0.0)):
         out.append(cell(k, "sell", "yours", u.proceeds.get(k, 0.0), None))
     buy_floor = _moves_floor(rows)
-    # CHASE is a separate group (see chase_keys()), not a re-sort of BUY —
-    # emitted first, in ceiling order (widest band first).
-    # Why: docs/notes/sim.md#ladder_rows--chase-is-a-separate-group-not-a-re-sort
-    chase = chase_keys(u, rows, base) if base is not None else {}
 
     def buy_cell(k, group):
         r = won[k]
         return cell(k, group, short_manager(u.owner.get(k)) or "free agent",
                     -r["action"].net, r["d_pts"], value=r.get("value"),
-                    lo=r.get("pts_lo"), hi=r.get("pts_hi"),
-                    contest=race(u, k))
+                    lo=r.get("pts_lo"), hi=r.get("pts_hi"))
 
     buys = [k for k in rest if k in won]
-    for k in sorted((k for k in buys if k in chase), key=lambda k: chase[k]):
-        out.append(buy_cell(k, "chase"))
     # Free agents, then a real raid (clause, can't be refused) — a listed
     # target (a rival's own choice to sell, 0/119 real deals ever
     # converted) is never a candidate at all, filtered out at the source
     # in decide.candidates(), not demoted here.
     # Why: docs/notes/sim.md#ladder_rows--buy--raid-split
-    non_chase = sorted((k for k in buys if k not in chase),
-                       key=lambda k: _move_rank_key(won[k], buy_floor, u))
-    for k in non_chase:
+    ranked = sorted(buys, key=lambda k: _move_rank_key(won[k], buy_floor, u))
+    for k in ranked:
         if route_kind(u, k) == "free":
             out.append(buy_cell(k, "buy"))
-    for k in non_chase:
+    for k in ranked:
         if route_kind(u, k) == "raid":
             out.append(buy_cell(k, "raid"))
     for k in sorted((k for k in rest if k not in won
@@ -431,15 +363,9 @@ def ladder_rows(u, rows, bands=None, base=None) -> list[dict]:
                     key=lambda k: -exp.get(k, 0.0)):
         short_by = u.price[k] - u.cash - spare
         save_pts = bands[k][0] if k in bands else None
-        # THE SAVE GROUP IS WHERE THE RACE MATTERS MOST, and it is the one
-        # place this used to be silent: a clause target you are saving
-        # toward is the exact case where "somebody else can pay it in two
-        # days" turns a plan into a dead plan, and "nobody for a month"
-        # turns a shortfall into a real option.
         out.append(cell(k, "save", short_manager(u.owner.get(k)) or "free agent",
                         -short_by, save_pts, "short",
-                        value=value_rate(save_pts, short_by),
-                        contest=race(u, k)))
+                        value=value_rate(save_pts, short_by)))
     # FREE AGENTS ONLY, via route_kind() — the ONE classifier, so this
     # can't drift from BUY/RAID above again. PASS draws from `rest`, a raw
     # price-list pool independent of candidates()/rank(), which is why
@@ -465,131 +391,32 @@ def ladder_rows(u, rows, bands=None, base=None) -> list[dict]:
 
 def band_acts(u) -> list:
     """The one-man questions the ladder needs a season band for, as
-    `[(key, Action), ...]`.
+    `[(key, Action), ...]`: a pure sale for every held player, an outright
+    buy (no sale funding it) for everyone else who beats the current bar.
 
-    For EVERY player the ladder shows, not just the ones already ranked as
-    a move: a squad member's OWN real value — sell him, buy the best
-    upgrade his own proceeds reach (decide.best_swap_for()), or a pure
-    sale when nothing does — and a reachable candidate's (what buying him
-    alone would gain).
+    COMPUTES NOTHING — it names the questions and decide.rank() answers
+    them in the final pass it was already running, handing them back as
+    its `bands`.
 
-    A PURE SALE UNDERSTATES A BENCH PLAYER: "what selling him costs, no
-    replacement bought" is not the question a KEEP row is actually
-    answering, which is "is he worth more than what his own money could
-    buy instead" — see best_swap_for()'s own note on why this is a
-    different question from candidates()'s swap search, and why reusing
-    that search's output cannot answer it for every held player. Found
-    2026-08-25: the pure-sale framing had every KEEP row read as a net
-    cost with no context for why keeping was still right — true (selling
-    for nothing is never good), but not the comparison a reader actually
-    wants next to a KEEP chip.
-
-    COMPUTES NOTHING — it names the questions and decide.rank() answers them
-    in the final pass it was already running, handing them back as its
-    `bands`. This used to be player_bands(), a SECOND simulation at
-    FINAL_TRIALS against the same seed and the same seasons: the draw does
-    not depend on the squad, so that pass re-drew about 1.2s of identical
-    seasons to score squads the first pass could have scored for 0.03s each
-    (measured 2026-08-24). Retired price_saves() before it (2026-08-22),
-    which did the same for the SAVE group alone — see ladder()'s and
-    ladder_rows()'s own notes on the duplication that was.
-
-    Deliberately does NOT drop the players rank() ends up ranking as moves.
-    Which moves survive screening is rank()'s own answer and is not known
-    here; rank() makes that cut itself, where it is known.
-
-    WHY THIS MATTERS MORE THAN IT LOOKS: dead_weight() decides who counts
-    as sellable by checking best_xi() against forecaster.expected(j) for
-    every remaining jornada — but expected() returns a FLAT p_start for
-    every jornada (per_jornada[j][key][1] never varies by j), so looping
-    over twenty jornadas re-checks the identical frozen number twenty
-    times. The only place a jornada's DISTANCE actually widens anything is
-    inside the stochastic trials these Actions are scored in
-    (Bootstrap.start_draw, wired into rate_draw's own DRIFT_FRAC-style
-    walk) — so a player who
-    reads as safely dead weight on today's snapshot can still show a real,
-    wide pts_hi here if the season has enough jornadas left for his rate
-    to plausibly recover. The classification (dead_weight) stays the cheap
-    heuristic gate; the BAND shown for him is the real answer.
-
-    A pure sell (buy="") is a legal Action — apply() already handles
-    a.buy == "" as a no-op purchase, only removing a.sell.
+    A PURE SALE, NOT A FUNDED UPGRADE — the funding-chain narrative this
+    used to carry ("what selling him could afford instead") was cut with
+    `decide.best_swap_for()` (2026-09-06): it was the direct cause of two
+    catastrophic squad-legality bugs, and named a rival's non-clause
+    player as an upgrade at least once before that was caught. This is a
+    plainer, honest question: what does this man's own sale cost you.
     """
     import decide
 
     exp, xi = decide.current_xi(u)
     mine = u.state.squads.get(u.me, {})
     bar = decide.xi_bar(exp, xi)
-    dead = tuple(sorted(k for k, _ in decide_dead(u)))
-    got = sum(v for _k, v in decide_dead(u))
-    # THE SAME POOL ladder_rows() ranks — every man you hold, and everyone
-    # you do not who beats the weakest man in your eleven. One derivation of
-    # "who is on the ladder", read there for rendering and here for pricing.
-    acts = [(k, decide.best_swap_for(u, k, exp)
-            or decide.Action("sell", sell=(k,), proceeds=u.proceeds.get(k, 0.0)))
+    acts = [(k, decide.Action("sell", sell=(k,),
+                              proceeds=u.proceeds.get(k, 0.0)))
            for k in mine]
-    acts += [(k, decide.Action("buy", buy=k, sell=dead,
-                               cost=u.price.get(k, 0.0), proceeds=got))
+    acts += [(k, decide.Action("buy", buy=k, cost=u.price.get(k, 0.0)))
             for k in u.price
             if k not in mine and exp.get(k, 0.0) > bar]
     return acts
-
-
-def cover_rows(u, bands) -> list[dict]:
-    """decide.offer_combos()'s own bands, pulled out of the SAME pass
-    ladder_rows() reads, as data — the second and only other reader of
-    it, keyed apart by the "OFFERS:" prefix decide.offer_combos() gives
-    them so this never collides with a held player's own key.
-
-    `[]` whenever there is nothing to cover (cash is not negative, or no
-    combination was asked about) — the caller renders that as no section
-    at all, not an empty one.
-
-    Ranked cheapest-in-points first: with every combo already a MINIMAL
-    cover (decide.offer_combos()'s own guarantee), the real choice left
-    is which one costs the season the least, and that is a straight sort
-    on the same paired figure every other row in this report is banded
-    by — no separate metric invented for this one question.
-    """
-    deficit = -u.cash
-    out = []
-    for k, (pts, lo, hi, action) in (bands or {}).items():
-        if not k.startswith("OFFERS:"):
-            continue
-        raised = action.proceeds
-        out.append({
-            "who": [title_name(u.name.get(p, p)) for p in action.sell],
-            "raised": raised, "surplus": raised - deficit,
-            "pts": pts, "pts_lo": lo, "pts_hi": hi,
-            # Points lost per million RAISED, not spent — there is no
-            # cost side to this move, only proceeds, so value_rate()'s
-            # own "genuine positive cost" contract does not apply here.
-            "rate": pts / (raised / 1e6) if raised else None,
-        })
-    out.sort(key=lambda r: -r["pts"])
-    return out
-
-
-def cover_md(u, data: list[dict]) -> list[str]:
-    """`cover_rows()`'s own table, as markdown. `[]` when `data` is —
-    see its own docstring for when that is.
-    """
-    if not data:
-        return []
-    out = ["_Balance is **%s** — accepting %s clears it. Every combination "
-          "below is a real pending offer (or offers), never a market "
-          "guess, and each alone raises enough — there is no case for "
-          "taking more than one. Cheapest in season points first._"
-          % (fmt_money(u.cash), fmt_money(-u.cash)), "",
-          "| Accept | Raises | Season | pts/M€ |", "|---|--:|--:|--:|"]
-    for r in data:
-        season = ("—" if r["pts"] is None else
-                  "%+.0f (%+.0f–%+.0f)" % (r["pts"], r["pts_lo"], r["pts_hi"]))
-        rate = "%.1f" % r["rate"] if r["rate"] is not None else "—"
-        out.append("| %s | %s (+%.2fM spare) | %s | %s |"
-                   % (" + ".join(r["who"]), fmt_money(r["raised"]),
-                      r["surplus"] / 1e6, season, rate))
-    return out
 
 
 def ladder(u, rows, base, data=None) -> list[str]:
@@ -624,7 +451,7 @@ def ladder(u, rows, base, data=None) -> list[str]:
     import decide
 
     exp, xi = decide.current_xi(u)
-    data = data if data is not None else ladder_rows(u, rows, base=base)
+    data = data if data is not None else ladder_rows(u, rows)
     by_group: dict[str, list[dict]] = {}
     for r in data:
         by_group.setdefault(r["group"], []).append(r)
@@ -639,22 +466,12 @@ def ladder(u, rows, base, data=None) -> list[str]:
             season = ("—" if r["pts"] is None else
                       "%+.0f (%+.0f–%+.0f)" % (r["pts"], r["pts_lo"], r["pts_hi"])
                       if r["pts_lo"] is not None else "%+.0f" % r["pts"])
-            # "vs X" — best_swap_for()'s own note, see ladder_rows()'s
-            # cell(). "short" is the save branch's own word above and
-            # never reaches this one.
             if r["note"]:
                 season += " " + r["note"]
             money = ("%+.2fM" % (r["money"] / 1e6)) if r["money"] else "—"
-        # The race shows in Where, beside the owner — not its own column
-        # (an eighth, empty on most rows). race_cell() renders, not recomputes.
-        # Why: docs/notes/sim.md#ladder--the-race-in-the-where-column
-        where = r["where"]
-        held = race_cell(u, r.get("contest") or [])
-        if held:
-            where += " · " + held
         return ("| %s | %s | %.0f%% | %.2f | %s | %s | %s | %s |"
                 % (r["name"], r["pos"] or "—", 100 * r["start"], r["xpts"],
-                   where, money, season,
+                   r["where"], money, season,
                    ("%.1f" % r["value"]) if r["value"] is not None else "—"))
 
     out = ["| Player | Pos | Start | xPts/j | Where | € | Season | pts/M€ |",
@@ -694,21 +511,6 @@ def ladder(u, rows, base, data=None) -> list[str]:
         out.append("| **SELL — never start** | | | | | | | |")
         out += [row_md(r) for r in by_group["sell"]]
 
-    # ABOVE BUY, AND ONLY WHEN TRAILING — see trailing()/chase_keys(). The
-    # heading names the manager the model says is winning, because that is
-    # the whole justification for the section: a reader who is level or
-    # ahead should never see it, and a reader who is behind should be told
-    # why he is being shown a worse-on-average move.
-    if by_group.get("chase"):
-        t = trailing(u, base)
-        out.append("| **CHASE — %s wins %.0f%% of the simulated seasons to "
-                   "your %.0f%%, and you finish above him in only %.0f%% — "
-                   "these are the widest bands on the board, worse on "
-                   "average** | | | | | | | |"
-                   % (t.get("leader", ""), 100 * t.get("leader_p_win", 0.0),
-                      100 * t.get("p_win", 0.0), 100 * t.get("p_above", 0.0)))
-        out += [row_md(r) for r in by_group["chase"]]
-
     # Free agents on their own; an explicit "none clear the bar" line once
     # RAID exists, since silence could now mean either "no candidates" or
     # "candidates exist, all a clause raid."
@@ -740,322 +542,12 @@ def ladder(u, rows, base, data=None) -> list[str]:
     out += ["",
             "_How to read this table: **How to read the tables** in "
             "METHOD.md._", ""]
-    # ONLY WHEN THE SECTION IS THERE. A paragraph explaining a table that
-    # is not on the page is the kind of standing prose this repo has
-    # already had to delete once for reading as static.
-    if by_group.get("chase"):
-        out += ["_**CHASE** is the one place this report does NOT rank by "
-                "value for money, and it appears only while the simulation "
-                "says another manager is winning the league. A trailing "
-                "manager's objective is not the most expected points per "
-                "euro — it is P(win), and those stop being the same "
-                "question the moment somebody is ahead of you: the move "
-                "with the best average leaves you second more reliably. "
-                "So these are the 1-2 candidates with the widest Season "
-                "band — the biggest number on the RIGHT of the range — "
-                "even though each is worse on average than the BUY rows "
-                "under it. One or two and no more is the finding, not a "
-                "setting: the returns to a high-variance pick diminish and "
-                "then reverse past two, which is why the rest of the board "
-                "is still ranked the ordinary way. Every number in the row "
-                "is the same simulated number a BUY row carries; only the "
-                "reason for showing it is different._", ""]
     return out
 
 
 def decide_dead(u):
     from decide import dead_weight
     return dead_weight(u)
-
-
-def real_cycle_bests(cycles: dict[str, set], gain, group_of=None
-                     ) -> dict[str, list[float]]:
-    """{group: [best gain() seen, one number per REAL cycle that offered a
-    player of that group]} — from `cycles` (market_model()'s own {label:
-    {player keys offered that cycle}}), not a resampled hypothetical.
-
-    ONE NUMBER PER CYCLE, not one per player: a cycle offering three duds
-    and one gem is a single real observation of "what a cycle can produce,"
-    and counting all four would let a crowded cycle drown out a thin one
-    that happened to offer exactly the right man.
-
-    `group_of(key)`, when given, buckets each cycle's own best by group
-    (position, route, whatever the caller wants graded separately) — a
-    cycle with no entry for a group contributes NOTHING to that group's
-    list, silence rather than a guessed zero, same rule this repo already
-    applies to a jornada nobody has a row for. `group_of=None` puts
-    everything in one bucket, keyed "".
-    """
-    out: dict[str, list[float]] = {}
-    for keys in cycles.values():
-        best_by_group: dict[str, float] = {}
-        for k in keys:
-            g = float(gain(k))
-            grp = group_of(k) if group_of else ""
-            if grp is None:
-                continue
-            if g > best_by_group.get(grp, float("-inf")):
-                best_by_group[grp] = g
-        for grp, best in best_by_group.items():
-            out.setdefault(grp, []).append(best)
-    return out
-
-
-
-def wait_routes(u, offers=None, rng=None, rows=None) -> list[dict]:
-    """The three ways to get a better eleven, as data both renderers read.
-
-    ACT NOW, WAIT FOR THE MARKET, OR WAIT FOR THE CLAUSES. Every move in the
-    ranking is scored against doing nothing for thirty-eight jornadas, which
-    is not the alternative on offer — so waiting scores zero there and
-    anything positive beats it by construction. This is the correction, and it
-    is computed ONCE: the markdown table and the phone drew different things
-    twice before this was a function.
-
-    `rows`, when given, is decide.rank()'s own scored candidates — the SAME
-    ones the BUY table ranks. Before this (found 2026-09-01, swarm review),
-    "Act today"'s own figure was ALWAYS `season(now_best)` — a cheap linear
-    stand-in (today's best single-jornada margin times jornadas left, no
-    re-picked XI, no simulation) — sharing its column header ("Season pts")
-    with the BUY table's real simulated figure two sections above while
-    being a genuinely cruder number under it: a live case read "Act today
-    +244" off the same player the BUY table correctly priced, simulated,
-    at +74. `rows` only ever holds moves already affordable today (rank()'s
-    own screen: `cost <= cash + proceeds`) — exactly what "Act today"
-    means — so the best of THEIR real `d_pts` (and its own season band) IS
-    the number the BUY table's top row already carries, not a second
-    estimate of it. `rows=None` (an old caller, or the self-test) keeps the
-    estimate — there is nothing real to fall back to without it.
-    """
-    import random
-    import statistics
-    import decide
-
-    now = run_now()
-    exp, eleven = decide.current_xi(u)
-    if not eleven:
-        return []
-    bar = decide.xi_bar(exp, eleven)
-    mine = set(u.state.squads.get(u.me, {}))
-
-    def approx_gain(k):
-        # Cheap linear stand-in, not ffcore.bid.gain() (too expensive per
-        # MC trial) — named apart so the two are never confused.
-        # market_exp, not expected(): expected() only knows the ~89 players
-        # who could be in a squad; a player it was never given reads as
-        # 0.0, indistinguishable from worthless (once scored Lamine Yamal
-        # at nothing).
-        # Why: docs/notes/sim.md#wait_routes--approx_gain-is-a-deliberate-cheap-stand-in
-        return max(0.0, u.market_exp.get(k, exp.get(k, 0.0)) - bar)
-
-    left = len(u.state.jornadas)
-    now_best = max((approx_gain(k) for k in u.price if k not in mine),
-                  default=0.0)
-
-    def season(rate, delay=0):
-        """A per-jornada upgrade as points over the rest of the season.
-
-        WITH THE DELAY PAID FOR. Waiting a week forgoes a jornada of the best
-        thing you can buy today, and a comparison that ignores that is a
-        comparison of rates dressed up as a comparison of outcomes. It is also
-        the only way this is in the same unit as the move table, which was the
-        whole problem: +3.69 against +110 is not a choice anybody can make.
-        """
-        return rate * max(0, left - delay) - now_best * delay
-
-    # THE REAL FIGURE, WHEN THERE IS ONE — see this function's own note.
-    best_row = max(rows, key=lambda r: r["d_pts"], default=None) if rows \
-        else None
-    out = [{"route": "act", "label": "Act today",
-            "what": "%d players you can buy now" % len(u.price),
-            "best": now_best,
-            "pts": best_row["d_pts"] if best_row else season(now_best),
-            "lo": best_row["pts_lo"] if best_row else None,
-            "hi": best_row["pts_hi"] if best_row else None,
-            "simulated": best_row is not None, "beats_now": None}]
-
-    if offers is not None:
-        band = offers.best_over(7, approx_gain, rng or random.Random(3))
-        # beats_now grades against REAL single cycles (real_cycle_bests()),
-        # not the resampled `band` above, which beats one real day almost
-        # by construction. `real_cycles`/`real_routes` optional (getattr);
-        # falls back to `band` when absent (old fixture / no market_model()).
-        # A listed cycle (a rival's own contested sale) is dropped from the
-        # history entirely — not a real opportunity (0/108 manager-to-
-        # manager deals, per decide.py) — so it can't fake "a good week."
-        # Why: docs/notes/sim.md#wait_routes--beats_now-graded-against-real-cycles-not-the-resampled-band
-        real = getattr(offers, "real_cycles", None)
-        real_routes = getattr(offers, "real_routes", {})
-        reliable_only = lambda k: None if real_routes.get(k) == "listed" else ""
-        hist = (real_cycle_bests(real, approx_gain, reliable_only).get("", [])
-               if real else None)
-        # market_now_best restricted to the same routes `hist` represents
-        # (free/market only, no clause/listed) — a mixed "best of anything"
-        # vs. a free-agent-only history let one big clause target alone
-        # push the reading to an extreme (found 2026-08-31, Nahuel
-        # Tenaglia case: a false "93rd percentile · unusually good week").
-        # Why: docs/notes/sim.md#wait_routes--beats_now-graded-against-real-cycles-not-the-resampled-band
-        market_now_best = max(
-            (approx_gain(k) for k in u.price if k not in mine
-             and route_kind(u, k) == "free"),
-            default=0.0)
-        beats_now = (sum(1 for x in hist if x > market_now_best) / len(hist)
-                    if hist else
-                    sum(1 for x in band if x > market_now_best) / len(band))
-        n_band = len(hist) if hist else len(band)
-
-        def graded_by(group_of, real_group_of):
-            """{group: {n, now_best, beats_now}} — TODAY'S OWN best per
-            group (never the single best offer of ANY group compared
-            against one group's history), graded against that same
-            group's real cycle history. A group with no real cycles behind
-            it, or nothing of it live today, is silently absent — the same
-            rule real_cycle_bests() already applies one level up.
-            """
-            now_by_group: dict[str, float] = {}
-            for k in u.price:
-                if k in mine:
-                    continue
-                grp = group_of(k)
-                if grp is None:
-                    continue
-                g = approx_gain(k)
-                if g > now_by_group.get(grp, 0.0):
-                    now_by_group[grp] = g
-            hist_by_group = (real_cycle_bests(real, approx_gain, real_group_of)
-                             if real else {})
-            return {grp: {"n": len(vals), "now_best": now_by_group[grp],
-                         "beats_now": sum(1 for x in vals
-                                          if x > now_by_group[grp])
-                                     / len(vals)}
-                   for grp, vals in hist_by_group.items()
-                   if vals and grp in now_by_group}
-
-        # best/lo/hi: real history first, resampled band only as fallback.
-        # Why: docs/notes/sim.md#wait_routes--beats_now-graded-against-real-cycles-not-the-resampled-band
-        pool_stats = sorted(hist) if hist else sorted(band)
-        best = statistics.median(pool_stats)
-        lo = pool_stats[int(0.1 * len(pool_stats))]
-        hi = pool_stats[int(0.9 * len(pool_stats))]
-        out.append({
-            "route": "market", "label": "Wait for the market",
-            "what": "a week of new offers",
-            "best": best,
-            "pts": season(best, delay=1),
-            "lo": lo,
-            "hi": hi,
-            "beats_now": beats_now,
-            "n_band": n_band,
-            "by_position": graded_by(lambda k: u.pos.get(k),
-                                    lambda k: u.pos.get(k)),
-            # Free-pickup vs contested-bid, graded separately, not blended.
-            # Why: docs/notes/sim.md#wait_routes--by_route-grades-free-pickup-vs-contested-bid-separately
-            "by_route": graded_by(lambda k: u.route.get(k),
-                                 lambda k: real_routes.get(k)),
-            "helpful": sum(1 for k in offers.pool if approx_gain(k) > 0),
-            "pool": len(offers.pool), "note": offers.note()})
-
-    # "Not for sale" != "not worth having" — named with how long a deal
-    # would take, not left to read as a shopping list.
-    # Why: docs/notes/sim.md#wait_routes--not-for-sale-is-not-the-same-as-not-worth-having
-    if offers is not None:
-        watch = sorted(((approx_gain(k), k) for k in offers.pool
-                        if approx_gain(k) > 0 and k not in u.price), reverse=True)
-        out.append({"route": "watch", "label": "Not for sale",
-                    "what": "best players nobody is offering",
-                    "best": watch[0][0] if watch else 0.0,
-                    "lo": None, "hi": None, "beats_now": None,
-                    "players": [
-                        {"name": title_name(u.name.get(k, k)), "gain": g,
-                         "wait": offers.median_wait(k)}
-                        for g, k in watch[:4]]})
-
-    shut = {k: w for k, w in u.clause_until.items()
-            if w > now and k not in mine}
-    if shut:
-        opens = min(shut.values())
-        out.append({
-            "route": "clauses", "label": "Wait for the clauses",
-            "what": "%d players on %s" % (len(shut), opens.strftime("%d %b")),
-            "best": max((approx_gain(k) for k in shut), default=0.0),
-            "pts": season(max((approx_gain(k) for k in shut), default=0.0), delay=1),
-            "lo": None, "hi": None, "beats_now": None,
-            "helpful": sum(1 for k in shut if approx_gain(k) > 0),
-            "days": max(0.0, (opens - now).total_seconds() / 86400.0),
-            "opens": opens.strftime("%d %b")})
-    return out
-
-
-def waiting(u, offers=None, rng=None, routes=None) -> list[str]:
-    """The three routes, priced against each other.
-
-    `routes`, when given, is a caller's own `wait_routes()` result, computed
-    once (see render()'s own note on why this used to run wait_routes()
-    twice per report). `routes=None` (an old caller, or the self-test)
-    computes it fresh.
-    """
-    routes = routes if routes is not None else wait_routes(u, offers, rng)
-    if len(routes) < 2:
-        return []
-    mkt = next((r for r in routes if r["route"] == "market"), None)
-    cl = next((r for r in routes if r["route"] == "clauses"), None)
-
-    # "Act today" carries the real d_pts (see wait_routes()); "Wait for
-    # the market"/"the clauses" stay season()'s flat rate estimate, marked
-    # `~` so the two kinds of number are never read as the same kind.
-    # Why: docs/notes/sim.md#wait_routes--act-today-uses-rows-real-d_pts-when-given
-    out = ["_`~` marks an estimate — a rate times jornadas left, not a "
-          "simulation — for a route whose players are not a known, "
-          "concrete offer yet. \"Act today\" is real when it can be: the "
-          "same simulated best gain the move table above shows._", "",
-          "| Route | What it offers | Season pts | Beats acting today |",
-           "|---|---|--:|--:|"]
-    for r in routes:
-        if r["route"] == "watch":
-            continue
-        name = ("**%s**" % r["label"] if r["route"] == "act" else r["label"])
-        beats = r.get("beats_now")
-        real = bool(r.get("simulated"))
-        pts_txt = ("%+.0f (%+.0f–%+.0f)" % (r["pts"], r["lo"], r["hi"])
-                  if real and r.get("lo") is not None
-                  else ("%+.0f" % r.get("pts", 0.0) if real
-                        else "~%+.0f" % r.get("pts", 0.0)))
-        out.append("| %s | %s | %s | %s |"
-                   % (name, r["what"], pts_txt,
-                      "—" if beats is None else "%.0f%%" % (100 * beats)))
-    out.append("")
-
-    facts = []
-    if mkt:
-        facts += [
-            "| Unowned players who would improve your eleven | %d of %d |"
-            % (mkt["helpful"], mkt["pool"]),
-            "| Tenth percentile of a week's waiting | %+.2f |" % mkt["lo"],
-            "| Market model | %s |" % mkt["note"]]
-    if cl:
-        facts += [
-            "| Locked players who would improve your eleven | %d |"
-            % cl["helpful"],
-            "| Their clauses open | %s, in about %.0f days"
-            % (cl["opens"], cl["days"]) + " |"]
-    if facts:
-        out += ["| The workings | |", "|---|--:|"] + facts + [""]
-
-    # UNOWNED IS NOT AVAILABLE. The app deals about a dozen players a cycle
-    # out of five hundred and you cannot ask for one, so a man who is merely
-    # unowned is not a man you can go and buy. Leaving that implicit cost a
-    # sale once; the wait column is what says it.
-    wat = next((r for r in routes if r["route"] == "watch"), None)
-    if wat and wat.get("players"):
-        out += ["| Nobody is offering | Would add | Likely wait |",
-                "|---|--:|--:|"]
-        for pl in wat["players"]:
-            out.append("| %s | %+.2f | %s |"
-                       % (pl["name"], pl["gain"],
-                          "%.0f days" % pl["wait"] if pl["wait"]
-                          else "essentially never"))
-        out.append("")
-    return out + [""]
 
 
 def decide_choosable(u):
@@ -1114,31 +606,6 @@ def _drift_frac_now() -> float:
     """
     import ffcore.forecast as forecast
     return forecast.DRIFT_FRAC
-
-
-def _tempo_note(u) -> str:
-    """The four rivals' own measured money-raising rates, in one phrase.
-
-    READ OFF THE DATA, NOT REMEMBERED — the same rule every other line in
-    caveats() follows. The rates are what makes the "days" figure above a
-    per-rival number rather than one league-wide constant, so the reader
-    gets to see the spread between them and judge the estimate himself; a
-    caveat that says "measured per rival" without showing the measurement
-    is asking to be believed.
-    """
-    have = [(m, u.tempo.get(m, {})) for m in sorted(u.state.squads)
-            if m != u.me and u.tempo.get(m)]
-    if not have:
-        return ("nothing is on the ledger yet to measure that rate from, so "
-                "it is the allowance alone")
-    bits = ["%s %.1fM/day off %d sale%s"
-            % (m.split()[0], t.get("sell_rate", 0.0) / 1e6,
-               t.get("sells", 0), "" if t.get("sells") == 1 else "s")
-            for m, t in have]
-    return ("measured over the ledger's own %.0f days: %s. They differ by "
-            "an order of magnitude, which is the whole reason this is per "
-            "rival and not one number"
-            % (have[0][1].get("days", 0.0), ", ".join(bits)))
 
 
 def illegal_squads(u) -> list[tuple[str, list[str]]]:
@@ -1288,30 +755,6 @@ def caveats(u) -> list[str]:
         "known, e.g. who gets injured in March |",
         "| Rivals never transfer | a steal that guts a squad assumes its "
         "manager does not simply buy someone back — flatters the steal |",
-        "| \"X can pay in ~N days\" is an estimate, and says what it "
-        "assumes | it is their reconstructed balance (`~`: the app states "
-        "`teamMoney` for your account alone, so a rival's can be a whole "
-        "unseen sale wrong), plus the %s daily allowance, plus the rate "
-        "that manager has ACTUALLY raised money at across the ledger — "
-        "%s. Capped at what his squad is worth, since nobody can sell "
-        "more than he holds. What it does NOT model is whether he WANTS "
-        "the player, only whether he could pay: read it as how long the "
-        "door stays open, never as a prediction that he walks through it. "
-        "An allowance-only version was tried first and rejected as "
-        "unactionable — it put the manager who raised 86.9M in six sales "
-        "last week 450 days away from affording anything |"
-        % (fmt_money(u.daily_bonus), _tempo_note(u)),
-        # Season/€ prices the move as if you win the race, deliberately —
-        # an N-player preemption game (real-options economics); losing
-        # costs the NEXT row on this table, not the gap to zero.
-        # Why: docs/notes/sim.md#caveats--a-clause-races-seasonvalue-price-prices-winning-deliberately
-        "| A clause race's Season/pts-per-M€ price the move as if you win "
-        "it | losing does not cost you that figure — it costs you the NEXT "
-        "row on this table instead, because the cash is not lost, only "
-        "this one target is. \"Can pay today\" in the Where column is real "
-        "contested-race risk, roughly even odds at the moment it's worth "
-        "racing at all — there is no sharper number to give it without "
-        "real bidding data |",
         "| Teammates score independently, MATCH TO MATCH | two defenders of "
         "one club still land on opposite ends of the per-match pool in the "
         "same round — only their SEASON-LONG rating (club_rel) is shared, "
@@ -1406,130 +849,6 @@ def _move_rank_key(r, floor, u):
         return (1, reliable, -value if value is not None else float("-inf"),
                 -r["d_pos"])
     return (2, reliable, 0.0, -r["d_pos"])
-
-
-# How many high-ceiling picks a trailing manager is shown — the cited
-# Frontier Economics finding (P(win) maximised at 1-2 maverick picks,
-# reversing past two), not a tuning knob. Ceiling, not target.
-# Why: docs/notes/sim.md#chase_picks-2--the-frontier-economics-citation
-CHASE_PICKS = 2
-
-
-def trailing(u, base) -> dict:
-    """Is the model saying somebody else wins this league? `{}` if not.
-
-    `{"leader", "p_win", "leader_p_win", "p_above"}` when it is.
-
-    THE TRIGGER, AND WHY IT IS THIS ONE. Both halves must hold:
-
-      1. Some rival's P(win) is higher than mine — the model's own most
-         likely champion is not me.
-      2. I finish above THAT manager in fewer than half the simulated
-         seasons (`Standings.beat`, the report's own "P(I finish above)"
-         column).
-
-    NO NEW THRESHOLD, and deliberately so: every number here is one the
-    simulation already computes and the report already prints, and the two
-    comparison points are 0.5 and "more than mine" — the definitions of
-    "more likely behind than ahead" and "not the favourite", not levels
-    anybody picked. Contrast the alternatives considered and rejected:
-    `p_win < 1/N` (an at-parity share) reads a five-manager league as
-    at-parity at 20% even when one manager is on 60% and the rest split
-    the remainder; `expected_finish > (N+1)/2` has the same problem one
-    statistic further out; and SQUAD VALUE rank — the thing that actually
-    caused this situation — is an INPUT to the model, not its verdict, so
-    triggering on it would make the report act on a number it does not
-    itself believe is decisive.
-
-    BOTH HALVES rather than either. A rival can hold the highest P(win)
-    while STILL losing to me head to head, when a third manager takes the
-    seasons I win. The gambler's-ruin argument is about the man ahead of
-    ME, so a "leader" I beat more often than not is not one I need to take
-    risk against — and the self-test carries that exact three-manager
-    shape, because it is the case one half alone gets wrong.
-
-    ON THE BOUNDARY, both readings are Monte Carlo estimates and will
-    flicker between runs at 50/50. No margin is added for it: 50/50 IS the
-    at-parity case, both answers describe it honestly, and the mode is
-    purely ADDITIVE (it labels 1-2 extra rows and hides nothing), so a
-    flicker there costs a reader nothing. A threshold that removed rows
-    would need one.
-
-    It is a STATE, not a move: nothing here is charged for, ranked, or
-    subtracted from a gain. It only decides whether chase_keys() below is
-    allowed to speak at all, and when it is silent the report is exactly
-    the report it was before this existed.
-    """
-    rivals = [m for m in u.state.squads if m != u.me]
-    if not rivals:
-        return {}
-    mine = base.position().get(1, 0.0)
-    leader = max(rivals, key=lambda m: base.position(m).get(1, 0.0))
-    theirs = base.position(leader).get(1, 0.0)
-    above = base.beat(leader)
-    if theirs <= mine or above >= 0.5:
-        return {}
-    return {"leader": leader, "p_win": mine, "leader_p_win": theirs,
-            "p_above": above}
-
-
-def chase_keys(u, rows, base) -> dict[str, int]:
-    """`{buy key: 1 or 2}` — the trailing-mode high-ceiling picks, widest
-    band first. `{}` whenever trailing() is silent, which is most days.
-
-    THE CEILING IS ALREADY SIMULATED, so this runs no simulation of its
-    own. `rank()` gives every row a full paired band — `pts_lo`/`pts_hi`,
-    the 10th and 90th percentiles of the season-points difference over the
-    SAME simulated seasons with the move and without it (decide.band()) —
-    so "what is this move's upside" is a lookup. That is the same rule the
-    ladder's own bands were fixed to obey (see ladder()'s docstring): one
-    computation, read by every renderer that wants it, never a second pass
-    recomputing a number the first pass already has.
-
-    WHAT COUNTS AS A CHASE PICK, in one line: a candidate whose ceiling
-    beats the ceiling of the move the ordinary ranking ALREADY puts first.
-
-    That definition does the work three separate guards would otherwise
-    have to. It is inherently relative, so there is no absolute variance
-    threshold to tune — the bar moves with the board. It cannot return the
-    recommendation you are being given anyway (`ranked[0]` is excluded by
-    construction), because relabelling the top of the list as a gamble
-    would be noise rather than a second option. And it silently excludes
-    the squad-breaking rows that sit at the bottom of a real report — a
-    move that guts the shape has a CEILING of several hundred points
-    NEGATIVE, nowhere near the leader's — so no separate "never propose
-    something catastrophic" rule is needed on top of it.
-
-    RELIABLE ROUTES ONLY, with no fallback — unlike _best(), which must
-    name something and so falls back to a "listed" move on a day nothing
-    reliable clears the bar. 9b25510's own evidence: 108 real transactions
-    in this league, zero of them manager-to-manager, so a seller who can
-    simply refuse is not a variance play, it is a wish. This signal is
-    ADDITIVE, so staying silent costs the reader nothing — which is
-    exactly the licence _best() does not have.
-
-    NOT A RE-SORT of the ranking it rides on. The value-for-money order
-    (b499df7) is untouched and still correct: for a manager who is level
-    or ahead it is the whole answer, and for one who is behind it is still
-    what to do with the rest of the money. This only labels 1-2 rows the
-    reader would otherwise have no reason to look twice at.
-    """
-    if not trailing(u, base):
-        return {}
-    floor = _moves_floor(rows)
-    ranked = sorted(rows, key=lambda r: _move_rank_key(r, floor, u))
-    if not ranked or ranked[0].get("pts_hi") is None:
-        return {}
-    ceiling = ranked[0]["pts_hi"]
-    wide = sorted((r for r in ranked[1:]
-                   if r["action"].buy
-                   and u.route.get(r["action"].buy, "free") != "listed"
-                   and r.get("pts_hi") is not None
-                   and r["pts_hi"] > ceiling),
-                  key=lambda r: -r["pts_hi"])
-    return {r["action"].buy: i + 1
-            for i, r in enumerate(wide[:CHASE_PICKS])}
-
 
 def _best(u, rows, rivals):
     """(the top move, or None; whether it needs a rival's own cooperation).
@@ -1656,7 +975,7 @@ def _rival_best(u) -> dict:
 
 
 def payload(u, rows, base, rivals, locks_h=None, n_actions: int = 0,
-            offers=None, ladder_data=None, cover_data=None) -> dict:
+            ladder_data=None) -> dict:
     """The report as data, for the phone to draw.
 
     Same rows as the markdown, so the two cannot disagree about order or
@@ -1671,15 +990,10 @@ def payload(u, rows, base, rivals, locks_h=None, n_actions: int = 0,
     """
     names = {k: title_name(v) for k, v in u.name.items()}
     lo, hi = base.band(u.me)
-    # One wait_routes() call, read by every field below (was five resamples).
-    # Why: docs/notes/sim.md#payload--one-wait_routes-call-read-by-everything
-    wait = wait_routes(u, offers, rows=rows)
     moves = []
     # Same bar-then-value sort as ladder_rows()'s BUY group.
     # Why: docs/notes/sim.md#payload--moves-sorted-by-the-same-bar-then-value-rule-as-the-ladder
     floor = _moves_floor(rows)
-    # A flag on existing rows, not a reorder — see chase_keys().
-    chase = chase_keys(u, rows, base)
 
     for r in sorted(rows, key=lambda r: _move_rank_key(r, floor, u)):
         a = r["action"]
@@ -1713,16 +1027,6 @@ def payload(u, rows, base, rivals, locks_h=None, n_actions: int = 0,
             # showed it, the phone's moves list did not, same "drifting
             # apart" gap "left"/"answer" below already existed to close.
             "value": r.get("value"),
-            # 1 or 2 on a trailing-mode high-ceiling pick, None otherwise
-            # (which is every row on a run where trailing() is silent) —
-            # the phone's own half of the markdown's CHASE section, so the
-            # board can mark the row instead of the reader having to spot a
-            # wide band by eye. See chase_keys().
-            "chase": chase.get(a.buy) if a.buy else None,
-            # [{"manager","days"}], soonest first — same race() the ladder's
-            # Where cell draws, full list (markdown shows one name only).
-            # Why: docs/notes/sim.md#payload--several-fields-exist-only-because-the-phone-used-to-drift-from-the-markdown
-            "contest": race(u, a.buy) if a.buy else [],
             "left": u.cash - a.net,
             "answer": (None if r.get("answer") is None
                        else names.get(r["answer"].buy, r["answer"].buy)),
@@ -1750,25 +1054,12 @@ def payload(u, rows, base, rivals, locks_h=None, n_actions: int = 0,
         "moves": moves,
         "sell": [{"name": names.get(k, k), "pos": u.pos.get(k, ""),
                   "raises": got} for k, got in dead_weight(u)],
-        # Captions CHASE rows with who the model says is winning; None
-        # when it's you. Rounded here, not in trailing() (keeps its 0.5
-        # trigger comparison exact).
-        # Why: docs/notes/sim.md#payload--several-fields-exist-only-because-the-phone-used-to-drift-from-the-markdown
-        "trailing": ({**t, "p_win": round(t["p_win"], 3),
-                     "leader_p_win": round(t["leader_p_win"], 3),
-                     "p_above": round(t["p_above"], 3)}
-                    if (t := trailing(u, base)) else None),
         "ladder": (ladder_data if ladder_data is not None
-                  else ladder_rows(u, rows, base=base)),
-        # `[]` and "nothing to cover" look the same here — see render()'s
-        # matching note on why cover_data has no recompute-from-scratch
-        # fallback the way ladder_data does.
-        "cover": cover_data or [],
+                  else ladder_rows(u, rows)),
         "bar": _bar(u),
         "xi_total": _xi_total(u, u.me),
         "shape": _shape_now(u),
         "rival_best": _rival_best(u),
-        "wait": wait,
         "shape_now": fielded_shape(u),
         "xi_note": xi_note(u),
         # Written by report.py minutes earlier in the same run — the board
@@ -1786,52 +1077,6 @@ def payload(u, rows, base, rivals, locks_h=None, n_actions: int = 0,
             for m in sorted(u.state.squads, key=lambda m: -base.mean(m))],
     }
 
-
-def market_model(u):
-    """The free market as it has actually behaved, fitted from every cycle.
-
-    None when nothing has been recorded — the caller then prints no line about
-    it at all, rather than a simulated number with no evidence under it.
-    """
-    import collections
-    import statistics
-    from ffcore.crosswalk import Crosswalk
-    from ffcore.market import Offers
-    from ffcore.tidy import TIDY, read_csv
-
-    from decide import LISTED_SELLER
-
-    xw = Crosswalk.read(TIDY / "players.csv", TIDY / "clubs.csv")
-    cycles = collections.defaultdict(set)
-    # LAST ROW SEEN WINS, same as decide.market_routes() — a player's route
-    # rarely flips inside the observed window, so "his most recently seen
-    # listing type" is the reading used for every cycle he appeared in,
-    # not a per-cycle-exact one the feed does not cheaply support here.
-    route_of: dict[str, str] = {}
-    for r in read_csv(TIDY / "api_market.csv"):
-        k = xw.player(app_id=r.get("player_id"),
-                      app_name=r.get("player_name"))
-        if k and k in u.value:
-            cycles[(r.get("expires_at") or "")[:10]].add(k)
-            route_of[k] = ("listed" if r.get("seller") == LISTED_SELLER
-                           else "free")
-    if not cycles:
-        return None
-    seen = [u.value[k] for s in cycles.values() for k in s]
-    owned = {k for sq in u.state.squads.values() for k in sq}
-    # Priced AND scored: a player the scorer knows nothing about cannot be
-    # weighed as an opportunity, and leaving him in the pool at an implied
-    # zero is how the free market came to look empty.
-    pool = {k: v for k, v in u.value.items()
-            if k not in owned and k in u.market_exp}
-    per = int(statistics.median(len(v) for v in cycles.values())) or 1
-    off = Offers.fit(pool, seen, per_cycle=per, cycles=len(cycles))
-    # Attached, not returned separately — callers that just want the
-    # fitted sampler are unaffected; wait_routes() reads it via getattr.
-    # Why: docs/notes/sim.md#market_model--real_cyclesreal_routes-attached-not-returned-separately
-    off.real_cycles = dict(cycles)
-    off.real_routes = route_of
-    return off
 
 
 PRICE_LOG = "cash_price_log.csv"
@@ -1895,20 +1140,13 @@ def placeholder(why: str) -> list[str]:
 
 
 def render(u, rows, base, stamp: str, rivals, n_actions: int = 0,
-           locks_h=None, offers=None, ladder_data=None,
-           cover_data=None) -> list[str]:
+           locks_h=None, ladder_data=None) -> list[str]:
     # EVERYTHING UNDER A HEADING, including the preamble. digest.py drops a
     # source's H1 when it stitches the appendix and keeps what follows, so a
     # preamble above the first `## ` arrives in the middle of the report
     # reading as the tail of whatever section came before it — which here is
     # the board's warnings.
     #
-    # ONE wait_routes() CALL FOR THE WHOLE REPORT, not three. Before this
-    # (found 2026-09-01, swarm review) this ran here, again inside
-    # waiting() a few lines below, and twice more in payload() for the
-    # phone — four resamples of the same real market history per report
-    # for a fact that does not change between them.
-    routes = wait_routes(u, offers, rows=rows)
     # No sentences above the table — verdict()/market_percentile() retired.
     # Why: docs/notes/sim.md#render--no-sentences-above-the-table
     out = ["# The simulation — %s" % stamp, "", "## Now", ""]
@@ -1918,18 +1156,6 @@ def render(u, rows, base, stamp: str, rivals, n_actions: int = 0,
     # it is a contradiction rather than a second opinion.
     out += ["## Every player you could hold", ""]
     out += ladder(u, rows, base, ladder_data)
-
-    # No `bands` reaches render() to recompute this from, unlike
-    # ladder_data's `None` fallback — a caller with nothing to cover (an
-    # ordinary run) and a caller that never asked look the same here,
-    # and both render no section, which is the right answer for either.
-    cover = cover_md(u, cover_data or [])
-    if cover:
-        out += ["## Covering the deficit — offers to accept", ""] + cover
-
-    wait = waiting(u, offers, routes=routes)
-    if wait:
-        out += ["## Act now or wait — the workings", ""] + wait
     out += ["## Where the league stands", ""]
     out += standings(u, base)
     out += ["## What the simulation cannot see", ""]
@@ -2357,106 +1583,6 @@ def _selftest() -> None:
         "order must not change reliable-beats-listed"
     del u.route["listed_target"]
 
-    # -- trailing mode: 1-2 high-ceiling "chase" picks, and ONLY when the
-    # model itself says somebody else is winning this league ---------------
-    # THE CASE THIS EXISTS FOR: the value-for-money ranking (b499df7) is
-    # right for a leading or at-parity manager and answers "most points per
-    # euro". A manager the model says is LOSING does not want the most
-    # points per euro, he wants the widest band — see trailing()'s and
-    # CHASE_PICKS's own notes. `maverick` below is exactly the candidate the
-    # existing ranking buries and the trailing case wants: worst d_pos of
-    # the three, worst value of the three, and by far the widest band.
-    # Checked against the pre-change code before implementing: this fixture
-    # ranks steady, dud, maverick — the highest ceiling on the board sits
-    # DEAD LAST, in both renderers.
-    lead_row = {"action": Action("buy", buy="steady", cost=5e6),
-                "d_pos": 0.40, "d_win": 0.0, "d_beat": {}, "value": 8.0,
-                "d_pts": 40.0, "pts_lo": 10.0, "pts_hi": 70.0, "helps": 0.80}
-    maverick = {"action": Action("buy", buy="maverick", cost=5e6),
-                "d_pos": 0.05, "d_win": 0.0, "d_beat": {}, "value": 1.0,
-                "d_pts": 5.0, "pts_lo": -120.0, "pts_hi": 260.0,
-                "helps": 0.45}
-    dud = {"action": Action("buy", buy="dud", cost=5e6),
-           "d_pos": 0.20, "d_win": 0.0, "d_beat": {}, "value": 4.0,
-           "d_pts": 20.0, "pts_lo": 0.0, "pts_hi": 45.0, "helps": 0.70}
-    ch_rows = [lead_row, maverick, dud]
-    # `st` is a dead heat — both managers win 2 of 4 simulated seasons — so
-    # the mode must not fire at all. The report is already correct there.
-    assert trailing(u, st) == {}, trailing(u, st)
-    assert chase_keys(u, ch_rows, st) == {}
-    # Behind: riv takes 3 of the 4 simulated seasons, and I finish above him
-    # in only 1. Both of the trigger's halves, not one.
-    st_lo = Standings(totals={"me": [1000.0, 1100.0, 1200.0, 1300.0],
-                              "riv": [1500.0, 1400.0, 1350.0, 1250.0]},
-                      me="me")
-    t = trailing(u, st_lo)
-    assert t and t["leader"] == "riv", t
-    assert t["p_above"] == 0.25 and t["p_win"] == 0.25, t
-    assert t["leader_p_win"] == 0.75, t
-    # A LEADER I NONETHELESS BEAT HEAD TO HEAD is not "trailing". riv takes
-    # the league 50% to my 25% (half 1 fires) — but I OUTSCORE him in half
-    # the seasons, and the two he loses to me are two `third` steals. The
-    # gambler's-ruin argument is about the man ahead of ME, so half 2 does
-    # not fire and neither does the mode. (Written against an
-    # implementation with half 1 only, to confirm it fires there.)
-    st_odd = Standings(totals={"me": [1000.0, 1000.0, 1000.0, 1000.0],
-                               "riv": [900.0, 900.0, 1500.0, 1500.0],
-                               "third": [800.0, 1200.0, 700.0, 700.0]},
-                       me="me")
-    u_third = Universe(state=LeagueState({"me": {}, "riv": {}, "third": {}},
-                                         [1, 2], "me"),
-                       forecaster=Bootstrap({}, pool=[1, 2, 3]), pos={},
-                       price={}, proceeds={}, owner={}, cash=0.0, me="me")
-    assert st_odd.position("riv").get(1) == 0.5, "fixture: riv leads on p_win"
-    assert st_odd.beat("riv") == 0.5, "fixture: but I am not behind him"
-    assert trailing(u_third, st_odd) == {}, trailing(u_third, st_odd)
-    # The value ranking's own winner leads the shopping list and is NOT a
-    # chase pick — a chase pick is by construction something the existing
-    # ranking did not already put first. The low-EV, wide-band candidate is.
-    assert chase_keys(u, ch_rows, st_lo) == {"maverick": 1}, \
-        chase_keys(u, ch_rows, st_lo)
-    # 1-2, NEVER MORE — the research's own finding. A third genuinely
-    # wide-band candidate is still scored and still shown, just not as a
-    # chase pick.
-    wide2 = {**maverick, "action": Action("buy", buy="wide2", cost=5e6),
-             "pts_hi": 200.0}
-    wide3 = {**maverick, "action": Action("buy", buy="wide3", cost=5e6),
-             "pts_hi": 150.0}
-    assert chase_keys(u, ch_rows + [wide2, wide3], st_lo) == \
-        {"maverick": 1, "wide2": 2}, "1-2 picks, diminishing past two"
-    # A LISTED ROUTE IS NOT A CHASE. 9b25510's own finding — 108 real
-    # transactions in this league, zero manager-to-manager — so a candidate
-    # whose seller can simply refuse is not a variance play, it is a wish.
-    # No fallback either, unlike _best(): silence is a fine answer here.
-    u.route["maverick"] = "listed"
-    assert chase_keys(u, ch_rows, st_lo) == {}, \
-        "a listed candidate cannot be a chase pick"
-    del u.route["maverick"]
-
-    # -- ...and it reaches BOTH renderers off that ONE computation ----------
-    # "two renderings of one answer is how they come to disagree" — the same
-    # rule b499df7 extracted _move_rank_key for. The markdown ladder and the
-    # phone's JSON both read chase_keys(); neither re-derives it.
-    uc = Universe(state=LeagueState({"me": {}, "riv": {}}, [1, 2], "me"),
-                  forecaster=Bootstrap(
-                      {j: {"steady": (5.0, 1.0), "maverick": (4.0, 1.0),
-                           "dud": (3.0, 1.0)} for j in (1, 2)}),
-                  pos={"steady": "MED", "maverick": "MED", "dud": "MED"},
-                  price={"steady": 5e6, "maverick": 5e6, "dud": 5e6},
-                  proceeds={}, owner={}, cash=10e6, me="me",
-                  name={"steady": "steady", "maverick": "maverick",
-                        "dud": "dud"})
-    lad = ladder_rows(uc, ch_rows, base=st_lo)
-    assert [r["group"] for r in lad] == ["chase", "buy", "buy"], lad
-    assert lad[0]["name"].lower() == "maverick", lad[0]
-    # The chase row keeps its real numbers — this is a LABEL on a genuine
-    # ranked move, not a second opinion with arithmetic of its own.
-    assert lad[0]["pts_hi"] == 260.0 and lad[0]["pts"] == 5.0, lad[0]
-    # Not trailing: every row is an ordinary BUY, ranked by value as before.
-    flat_lad = ladder_rows(uc, ch_rows, base=st)
-    assert [r["group"] for r in flat_lad] == ["buy"] * 3, flat_lad
-    assert ladder_rows(uc, ch_rows) == flat_lad, "no base, no chase"
-
     # -- BUY/RAID/LISTED split: free agents, a clause (cannot be
     # refused), and a listed target (the owner's own choice, which this
     # league's own real history says essentially never goes Miguel's way)
@@ -2466,6 +1592,16 @@ def _selftest() -> None:
     # ones... no way they're selling willingly to me" once a real report
     # showed listed targets sitting under RAID as if a clause's certainty
     # applied to them too.
+    steady_row = {"action": Action("buy", buy="steady", cost=5e6),
+                 "d_pos": 0.40, "d_win": 0.0, "d_beat": {}, "value": 8.0,
+                 "d_pts": 40.0, "pts_lo": 10.0, "pts_hi": 70.0, "helps": 0.80}
+    dud_row = {"action": Action("buy", buy="dud", cost=5e6),
+              "d_pos": 0.20, "d_win": 0.0, "d_beat": {}, "value": 4.0,
+              "d_pts": 20.0, "pts_lo": 5.0, "pts_hi": 35.0, "helps": 0.60}
+    maverick_row = {"action": Action("buy", buy="maverick", cost=5e6),
+                   "d_pos": 0.10, "d_win": 0.0, "d_beat": {}, "value": 2.0,
+                   "d_pts": 10.0, "pts_lo": -50.0, "pts_hi": 260.0,
+                   "helps": 0.55}
     riv_row = {"action": Action("clause", buy="rivals", cost=5e6),
               "d_pos": 0.60, "d_win": 0.0, "d_beat": {}, "value": 12.0,
               "d_pts": 60.0, "pts_lo": 20.0, "pts_hi": 90.0, "helps": 0.90}
@@ -2486,8 +1622,8 @@ def _selftest() -> None:
         me="me", route={"rivals": "clause", "wished": "listed"},
         name={"steady": "steady", "maverick": "maverick", "dud": "dud",
              "rivals": "rivals", "wished": "wished"})
-    all_rows = ch_rows + [riv_row, wish_row]
-    owned_lad = ladder_rows(uc_owned, all_rows, base=st)
+    all_rows = [steady_row, dud_row, maverick_row, riv_row, wish_row]
+    owned_lad = ladder_rows(uc_owned, all_rows)
     # ONE SORTED LIST, FILTERED, NOT SEPARATELY RANKED GROUPS: "rivals"
     # (a clause, cannot be refused) lands in RAID despite everything else
     # in BUY; "wished" (owned by a rival, NOT a clause — his own choice to
@@ -2512,171 +1648,6 @@ def _selftest() -> None:
     no_free_lad = "\n".join(ladder(uc_owned, [riv_row], st))
     assert "none clear the bar today" in no_free_lad, no_free_lad
     assert "RAID" in no_free_lad, no_free_lad
-
-    md = "\n".join(ladder(uc, ch_rows, st_lo))
-    assert "CHASE" in md and "riv" in md, md
-    assert "CHASE" not in "\n".join(ladder(uc, ch_rows, st))
-    pl = payload(uc, ch_rows, st_lo, ["riv"])
-    assert pl["trailing"]["leader"] == "riv", pl["trailing"]
-    assert {m["buy"].lower(): m["chase"] for m in pl["moves"]} == \
-        {"maverick": 1, "steady": None, "dud": None}, pl["moves"]
-    # The JSON's ladder IS the markdown's ladder, chase group included.
-    assert [r["group"] for r in pl["ladder"]] == [r["group"] for r in lad]
-    flat = payload(uc, ch_rows, st, ["riv"])
-    # ...and the existing value ranking of the moves list is untouched by
-    # any of this: an ADDITIONAL signal, not a re-sort.
-    assert [m["buy"] for m in pl["moves"]] == [m["buy"] for m in flat["moves"]]
-    assert flat["trailing"] is None, flat["trailing"]
-    assert all(m["chase"] is None for m in flat["moves"]), flat["moves"]
-
-    # -- real_cycle_bests: real single-day bests, not a resampled fiction --
-    # market_percentile() used to compare today's real best against a band
-    # RESAMPLED from the whole unowned pool every simulated trial — which
-    # beats a real day's actual listing almost by construction (a maximum
-    # over many independent draws vs. one real day's), and read "under the
-    # 1st percentile" on 15 real days running regardless of whether the
-    # market was actually good or bad that day. This asks the fair question:
-    # how does today's real best compare to the OTHER real days this repo
-    # has actually observed.
-    cyc = {"2026-08-15": {"def1", "med1"}, "2026-08-16": {"def2", "del1"},
-          "2026-08-17": {"med2"}}
-    posn = {"def1": "DEF", "def2": "DEF", "med1": "MED", "med2": "MED",
-           "del1": "DEL"}.get
-    gains = {"def1": 1.0, "def2": 3.0, "med1": 2.0, "med2": 0.5,
-            "del1": 5.0}.get
-    # One bucket, unstratified (group_of=None): the best PER CYCLE, not
-    # every player's own gain — a cycle offering three duds and one gem is
-    # one real observation of "what a cycle can produce," not four.
-    flat_hist = real_cycle_bests(cyc, gains)
-    assert flat_hist == {"": [2.0, 5.0, 0.5]}, flat_hist
-    # STRATIFIED: DEF's own history only has two real cycles with a DEF row
-    # in them at all — the third cycle (med2 only) contributes nothing to
-    # DEF's bucket, silence rather than a guessed zero.
-    by_pos = real_cycle_bests(cyc, gains, posn)
-    assert by_pos == {"DEF": [1.0, 3.0], "MED": [2.0, 0.5], "DEL": [5.0]}, \
-        by_pos
-    assert real_cycle_bests({}, gains) == {}
-
-    # -- wait_routes()'s "market" branch actually reads real_cycles --------
-    # THIS WAS NEVER EXERCISED BEFORE — no test in this file constructed a
-    # real `offers` and called wait_routes with it, so the whole `if offers
-    # is not None:` branch (everything above) could have been silently
-    # broken and every suite would still have read green. Built here rather
-    # than left green-by-omission.
-    import random
-    from ffcore.market import Offers
-    from ffcore.season import LeagueState as LS
-
-    sqw = {"k": "POR", **{f"d{i}": "DEF" for i in range(1, 5)},
-          **{f"m{i}": "MED" for i in range(1, 6)}, "f1": "DEL"}
-    perw = {1: {f"me_{k}": (3.0, 1.0) for k in sqw}}
-    uw = Universe(
-        state=LS({"me": {f"me_{k}": v for k, v in sqw.items()}}, [1], "me"),
-        forecaster=Bootstrap(perw), pos={"free_def": "DEF", "hist_def": "DEF",
-                                         "hist_med": "MED"},
-        price={"free_def": 1e6}, proceeds={}, owner={}, cash=99e6, me="me",
-        route={"free_def": "free"},
-        market_exp={"free_def": 4.0, "hist_def": 6.0, "hist_med": 5.0,
-                   "phantom_star": 23.0})
-    # today's only DEF offer (free_def) gains 4.0 - bar; two real past
-    # cycles each offered ONE better DEF (hist_def, gain 6.0) — a real,
-    # thin, but genuine history to grade against. phantom_star is in the
-    # SIMULATED pool (value-weighted, so best_over() draws him often) but
-    # has NEVER actually been observed in a real cycle — the exact Lamine
-    # Yamal pattern that made best_over()'s own median 7.37 against a real
-    # median of 4.15 on live data. If "best"/"lo"/"hi" still read from
-    # best_over() he shows up in them; if they read from real_cycles he
-    # cannot, because he is not in it.
-    off = Offers.fit({"free_def": 4e6, "hist_def": 6e6, "hist_med": 5e6,
-                      "phantom_star": 200e6},
-                     [4e6, 6e6], per_cycle=2, cycles=2)
-    off.real_cycles = {"c1": {"hist_def"}, "c2": {"hist_def", "hist_med"}}
-    # hist_def has always been a rival's own LISTED player (contested,
-    # per Step 1); hist_med has always been a true free agent.
-    off.real_routes = {"hist_def": "listed", "hist_med": "free"}
-    routes = wait_routes(uw, off, random.Random(1))
-    mkt = next(r for r in routes if r["route"] == "market")
-    # THE HEADLINE POOL IS RELIABLE CYCLES ONLY — see wait_routes()'s own
-    # note. c1 offered nothing but hist_def, a LISTED rival player (route
-    # data below), so it now contributes NOTHING to the headline: n_band=1,
-    # not 2, and the single surviving observation is c2's real free agent
-    # (hist_med) alone. Before this fix n_band read 2 and best/lo/hi read
-    # 3.0 — hist_def's contested listing, which per decide.py's own finding
-    # (9b25510) has converted zero times in 108 real transactions, counted
-    # as a full real cycle of evidence that "this is a good week to wait."
-    assert mkt["n_band"] == 1, mkt["n_band"]
-    # "best" (really the median) and the 10/90 band GRADED FROM RELIABLE
-    # REAL HISTORY ONLY — the sole surviving observation is gain(hist_med)
-    # in c2, so the "median" of one real number is that number.
-    assert mkt["best"] == 2.0, mkt["best"]
-    assert mkt["lo"] == 2.0 and mkt["hi"] == 2.0, (mkt["lo"], mkt["hi"])
-    assert "DEF" in mkt["by_position"], mkt["by_position"]
-    # hist_def (gain 6.0) beat today's own DEF best (free_def, gain ~2.0
-    # after the bar) in BOTH real cycles — beats_now must read 1.0, not
-    # some fraction only best_over()'s hypothetical band could produce.
-    assert mkt["by_position"]["DEF"]["beats_now"] == 1.0, mkt["by_position"]
-    assert mkt["by_position"]["DEF"]["n"] == 2
-    # MED has real history (one cycle, c2) but NOTHING of that position is
-    # actually offered today — "how does today's MED market compare" has
-    # no today to grade, so it is correctly absent, not padded to zero.
-    assert "MED" not in mkt["by_position"], mkt["by_position"]
-
-    # -- by_route: a free pickup graded against real free history, a
-    # contested rival listing against real listed history — never blended,
-    # the whole reason Step 1 split "market" into "free"/"listed" at all.
-    assert mkt["by_route"]["free"]["n"] == 1, mkt["by_route"]     # hist_med
-    assert "listed" not in mkt["by_route"], mkt["by_route"]
-    # WHY "listed" IS ABSENT: today's only real offer (free_def) is
-    # route="free" — nothing LISTED is on offer today, so there is no
-    # "today" for the listed side to grade, same silence-not-a-guess rule
-    # as MED above. hist_def's real history (2 cycles, all "listed")
-    # exists but has nothing of TODAY to compare against.
-
-    # A REAL HISTORY THAT IS ENTIRELY LISTED falls back to best_over()'s
-    # band too, exactly like no real history at all — the whole point of
-    # the fix above. Two real cycles, both offering hist_def and nothing
-    # else, hist_def LISTED throughout: every cycle's own best is filtered
-    # to None, so `hist` ends up genuinely empty (not a guessed zero), and
-    # n_band reads best_over's own trial count rather than claiming two
-    # cycles of evidence for a market that offered zero real opportunities.
-    off_all_listed = Offers.fit({"free_def": 4e6, "hist_def": 6e6},
-                                [4e6, 6e6], per_cycle=1, cycles=2)
-    off_all_listed.real_cycles = {"c1": {"hist_def"}, "c2": {"hist_def"}}
-    off_all_listed.real_routes = {"hist_def": "listed"}
-    all_listed_routes = wait_routes(uw, off_all_listed, random.Random(1))
-    all_listed_mkt = next(r for r in all_listed_routes
-                          if r["route"] == "market")
-    assert all_listed_mkt["n_band"] > 2, all_listed_mkt["n_band"]
-
-    # A market_model()-shaped offers with NO real_cycles attached (an old
-    # fixture, or a caller not wired to it) falls back to best_over()'s
-    # band exactly as before — not a crash, not an empty report.
-    off_plain = Offers.fit({"free_def": 4e6}, [4e6], per_cycle=1, cycles=1)
-    plain_routes = wait_routes(uw, off_plain, random.Random(1))
-    plain_mkt = next(r for r in plain_routes if r["route"] == "market")
-    assert plain_mkt["by_position"] == {}, plain_mkt["by_position"]
-    assert plain_mkt["by_route"] == {}, plain_mkt["by_route"]
-    assert plain_mkt["n_band"] > 2, plain_mkt["n_band"]   # best_over's trials
-
-    # -- "Act today" is the REAL simulated figure when `rows` is given -----
-    # Before this (found 2026-09-01, swarm review), "Act today" was ALWAYS
-    # season()'s cheap linear estimate — sharing the move table's own
-    # "Season" column header two sections above while being a genuinely
-    # cruder number under it (a live case overstated the real figure by
-    # more than 3x). No caller in this file passed `rows` before this test
-    # was added, so the branch that uses it had never actually run.
-    plain_act = next(r for r in plain_routes if r["route"] == "act")
-    assert not plain_act.get("simulated"), plain_act
-    fake_rows = [{"d_pts": 12.0, "pts_lo": -5.0, "pts_hi": 40.0},
-                {"d_pts": 55.0, "pts_lo": 3.0, "pts_hi": 120.0}]
-    real_routes = wait_routes(uw, off_plain, random.Random(1),
-                              rows=fake_rows)
-    real_act = next(r for r in real_routes if r["route"] == "act")
-    assert real_act["simulated"] is True, real_act
-    # THE BEST OF `rows`, NOT THE FIRST OR AN AVERAGE — "Act today" means
-    # the single best thing reachable right now.
-    assert (real_act["pts"], real_act["lo"], real_act["hi"]) \
-        == (55.0, 3.0, 120.0), real_act
 
     # -- overdrawn is not a ranking question -------------------------------
     # -- a team sheet reads keeper first ------------------------------------
@@ -2752,19 +1723,18 @@ def _selftest() -> None:
            pos={**{k: v for k, v in sqb.items()}, "cand": "MED"},
            price={"cand": 5e6}, proceeds={"dead": 1e6, "star": 20e6},
            owner={}, cash=10e6, me="me")
-    # EVERY MAN YOU HOLD gets a key, either his own best swap or a pure
-    # sell if nothing affordable beats him; everyone above the bar you do
-    # not hold gets a buy. "cand" (exp 4.0) beats every regular squad
-    # member's (2.7) and "dead"'s (0.15), so band_acts() should offer
-    # each of them a SWAP to "cand" rather than a pure sale — "star"
-    # (exp 5.4) beats "cand" outright, so his stays a pure sell.
+    # EVERY MAN YOU HOLD gets a PURE SELL (2026-09-06: no funded-upgrade
+    # narrative, cut with best_swap_for — the direct cause of two
+    # catastrophic squad-legality bugs); everyone above the bar you do
+    # not hold gets an outright buy, no sale funding it.
     asked = band_acts(ub)
     keys = {k for k, _a in asked}
     assert keys == {*sqb, "cand"}, keys
     by_key = dict(asked)
-    assert by_key["dead"].buy == "cand" and by_key["dead"].sell == ("dead",)
-    assert by_key["star"].buy == "" and by_key["star"].sell == ("star",)
-    assert by_key["cand"].buy == "cand", by_key["cand"]
+    for k in sqb:
+        assert by_key[k].buy == "" and by_key[k].sell == (k,), by_key[k]
+    assert by_key["cand"].buy == "cand" and by_key["cand"].sell == (), \
+        by_key["cand"]
 
     # ...and rank() answers them in its own final pass. No `acts`, so no move
     # survives screening and nothing is dropped from `extra` — the bands are
@@ -2778,12 +1748,10 @@ def _selftest() -> None:
     # upgrade to offset it — a real, clearly negative median, not a
     # snapshot of one jornada.
     assert bands["star"][0] < -20, bands["star"]
-    # SELLING DEAD WEIGHT TO BUY A REAL UPGRADE GAINS POINTS — the whole
-    # feature: a pure sale would have priced this near zero (nothing lost
-    # fielding him), but the swap into "cand" (rated well above the bar)
-    # is a real, positive gain, not a wash.
-    assert bands["dead"][0] > 0, bands["dead"]
-    assert bands["dead"][3].buy == "cand", bands["dead"]
+    # SELLING DEAD WEIGHT COSTS NOTHING — a pure sale prices him near
+    # zero, since nothing is lost fielding a man who never starts anyway.
+    assert -5 < bands["dead"][0] < 5, bands["dead"]
+    assert bands["dead"][3].buy == "" and bands["dead"][3].sell == ("dead",)
     # BUYING A GOOD CANDIDATE GAINS POINTS — positive median.
     assert bands["cand"][0] > 0, bands["cand"]
     # Nothing asked for at all: no extra squads scored, not an error.
@@ -2798,129 +1766,6 @@ def _selftest() -> None:
     rows2, _b2, _l2, bands2 = decide.rank(ub, [buy_cand], extra=asked)
     assert [r for r in rows2 if r["action"].buy == "cand"], rows2
     assert "cand" not in bands2, sorted(bands2)
-
-    # -- cover_rows/cover_md: the OFFERS combos, end to end -----------------
-    # SAME SQUAD, overdrawn, with real offers on two men. "star" is the
-    # nailed starter (see above, costs 20+ points sold pure); "dead" never
-    # plays, so his sale is close to free — the cheaper cover by a mile,
-    # and cover_rows() should rank it first without being told which is
-    # which.
-    from dataclasses import replace as _replace
-
-    uo = _replace(ub, cash=-2e6,
-                  received_offers={"star": 4e6, "dead": 3e6})
-    askedo = band_acts(uo) + decide.offer_combos(uo)
-    assert any(k.startswith("OFFERS:") for k, _a in askedo), askedo
-    _ro, _bo, _lo, bandso = decide.rank(uo, [], extra=askedo)
-    data = cover_rows(uo, bandso)
-    assert data, bandso
-    assert {tuple(sorted(r["who"])) for r in data} == \
-          {("Dead",), ("Star",)}, data
-    # CHEAPEST FIRST: dead weight sold outright costs far less than a
-    # nailed starter, and the sort has to find that from the numbers,
-    # not from the label.
-    assert data[0]["who"] == ["Dead"], data
-    assert data[0]["pts"] > data[1]["pts"], data
-    for r in data:
-        assert r["surplus"] >= 0, r          # every combo really covers
-        assert r["rate"] == r["pts"] / (r["raised"] / 1e6)
-    md = cover_md(uo, data)
-    assert "Dead" in md[-2] and "Star" in md[-1], md
-    assert "Balance is" in md[0] and fmt_money(uo.cash) in md[0], md[0]
-
-    # Nothing to cover — cash is not negative — renders nothing at all.
-    assert cover_rows(ub, bands2) == []
-    assert cover_md(ub, []) == []
-    assert set(bands2) == set(sqb), sorted(bands2)
-
-    # -- the race: who else can pay this clause, and when -------------------
-    # THE CASE THE LEAGUE-WIDE PRIOR CANNOT MAKE. Two rivals, identical
-    # balances (both flat broke) and identical squads, differing ONLY in the
-    # rate each has actually raised money at this season — `quick` sells
-    # 4M/day, `slow` 0.1M/day. Under one league-wide constant they would be
-    # the same threat; measured per rival they are 5 days apart on the same
-    # 20M clause, which is the difference between racing a target and
-    # letting it go.
-    ur = Universe(
-        state=LeagueState({"me": {"me_a": "MED"}, "own": {"prize": "MED"},
-                           "quick": {"q_a": "MED"}, "slow": {"s_a": "MED"}},
-                          [1, 2], "me"),
-        forecaster=Bootstrap({j: {k: (5.0, 1.0) for k in
-                                  ("me_a", "prize", "q_a", "s_a")}
-                             for j in (1, 2)}),
-        pos={"prize": "MED", "me_a": "MED", "q_a": "MED", "s_a": "MED"},
-        price={"prize": 20e6}, proceeds={}, cash=1e6, me="me",
-        route={"prize": "clause"}, owner={"prize": "own"},
-        value={"q_a": 60e6, "s_a": 60e6, "prize": 20e6},
-        name={"prize": "prize"}, daily_bonus=1e5,
-        rival_cash={"own": 0.0, "quick": 0.0, "slow": 0.0},
-        tempo={"quick": {"sell_rate": 4e6, "sells": 8, "days": 20.0},
-               "slow": {"sell_rate": 0.1e6, "sells": 1, "days": 20.0}})
-    r_race = race(ur, "prize")
-    assert [x["manager"] for x in r_race] == ["quick", "slow"], r_race
-    assert r_race[0]["days"] == 5 and r_race[1]["days"] == 100, r_race
-    # SAME BALANCE, SAME SQUAD, 20x THE WAIT — the distinction is the
-    # measured rate and nothing else.
-    assert r_race[1]["days"] == 20 * r_race[0]["days"], r_race
-    assert race_cell(ur, r_race) == "quick ~5d", race_cell(ur, r_race)
-    assert race_cell(ur, []) == ""                # nothing to say, say it
-    assert race_cell(ur, [{"manager": "quick", "days": 0}]) == "quick today"
-    assert race_cell(ur, [{"manager": "quick", "days": 1}]) == "quick ~1d"
-    # THE OWNER'S OWN NAME IS SHORTENED THE SAME WAY — short_manager(),
-    # not a second convention race_cell() alone follows.
-    assert short_manager("Magic Mike 333") == "Magic"
-    assert short_manager("SusoGattuso") == "SusoGattuso"   # no space to cut
-    assert short_manager("") == "" and short_manager(None) is None
-
-    # -- ...and it reaches BOTH renderers off that ONE computation ----------
-    # Same rule as the chase block above: one race(), two drawings of it.
-    race_rows = [{"action": decide.Action("clause", buy="prize", cost=20e6,
-                                          victim="own"),
-                  "d_pos": 0.5, "d_win": 0.0, "d_pts": 40.0, "value": 2.0,
-                  "pts_lo": 10.0, "pts_hi": 70.0, "helps": 0.9,
-                  "d_beat": {"own": 0.1}, "answer": None}]
-    lad_r = ladder_rows(ur, race_rows)
-    got_r = next(r for r in lad_r if r["name"].lower() == "prize")
-    assert got_r["contest"] == r_race, got_r
-    md_r = "\n".join(ladder(ur, race_rows, st))
-    assert "quick ~5d" in md_r, md_r
-    # Beside the owner in the SAME cell, not a new column — the table still
-    # has exactly its eight.
-    assert "own · quick ~5d" in md_r, md_r
-    assert md_r.splitlines()[0].count("|") == 9, md_r.splitlines()[0]
-    pl_r = payload(ur, race_rows, st, ["own", "quick", "slow"])
-    assert next(m for m in pl_r["moves"]
-               if m["buy"].lower() == "prize")["contest"] == r_race, \
-        pl_r["moves"]
-    # The JSON's ladder IS the markdown's ladder, race included.
-    assert [r["contest"] for r in pl_r["ladder"]] == \
-          [r["contest"] for r in lad_r], pl_r["ladder"]
-    # A row that is not a payable clause carries an empty race in BOTH, and
-    # renders nothing — no "nobody can pay this" noise on every free agent.
-    ur.route["prize"] = "free"
-    assert race(ur, "prize") == []
-    # (The legend below the table explains the phrase and so contains it;
-    # what must vanish is the NAMED rival on the row itself.)
-    assert "quick can pay" not in "\n".join(ladder(ur, race_rows, st))
-    ur.route["prize"] = "clause"
-
-    # -- the caveat shows the measurement rather than asserting it ---------
-    cav = "\n".join(caveats(ur))
-    assert "can pay in ~N days" in cav, cav
-    assert "quick 4.0M/day off 8 sales" in cav, cav
-    assert "slow 0.1M/day off 1 sale" in cav, cav      # not "1 sales"
-    assert fmt_money(ur.daily_bonus) in cav, cav
-    # No ledger at all: the caveat says so instead of printing a rate it
-    # does not have.
-    ur.tempo = {}
-    assert "nothing is on the ledger yet" in "\n".join(caveats(ur))
-    # ...and with no measured rate the estimate DEGRADES to the allowance
-    # alone (20M at 100K a day = 200 days for both) rather than inventing a
-    # rate or going silent. Both rivals collapse onto the same number,
-    # which is exactly the undifferentiated answer this commit replaced —
-    # correct as a fallback, and visibly the weaker reading.
-    assert [x["days"] for x in race(ur, "prize")] == [200, 200], \
-        race(ur, "prize")
 
     print("sim self-test OK (194 cases)")
 
@@ -2965,41 +1810,17 @@ def main() -> None:
     # one-man questions and rank() answers them in the pass it was already
     # running — see its own note on why a second pass re-drew identical
     # seasons for nothing.
-    # ONE PASS, SAME PRINCIPLE AS band_acts(): offer_combos() is empty
-    # whenever cash is not negative, so this costs nothing on an ordinary
-    # run and rides along in the pass already happening on the day it
-    # matters.
     rows, base, measured, bands = decide.rank(
-        u, acts, price=smoothed, extra=band_acts(u) + decide.offer_combos(u))
+        u, acts, price=smoothed, extra=band_acts(u))
     log_cash_price(measured)
     u.cash_note = _price_note(smoothed, measured)
     rivals = [m for m in u.state.squads if m != u.me]
-    # ONE COMPUTATION, READ BY BOTH RENDERERS. This used to be two: a
-    # separate price_saves() call here feeding the markdown's SAVE section
-    # a median with no band, and a second banded pass for the same players —
-    # the exact "two renderings of one answer" duplication ladder()'s own
-    # docstring now names directly. ladder_rows() already covers "save"
-    # (and every other group) with a real band, so the separate median-only
-    # pass is retired rather than kept as a second source for the same fact.
-    # `base` so the ladder can carry the trailing-mode CHASE group — see
-    # chase_keys(). Computed HERE, once, exactly like the bands beside it:
-    # render() and payload() both draw this one list, so the markdown's
-    # CHASE section and the phone's `chase` flags cannot disagree about
-    # which 1-2 rows they are.
-    ladder_data = ladder_rows(u, rows, bands, base)
-    # cover_rows() reads the SAME bands dict ladder_data was built from —
-    # decide.offer_combos()'s own rows, not a second simulation.
-    cover_data = cover_rows(u, bands)
-    # ONE market_model() CALL FOR THE WHOLE REPORT, not two — it fits an
-    # Offers distribution off api_market.csv from scratch (a real CSV read
-    # plus statistics.median() over every cycle), and render() and
-    # payload() used to each trigger that fit independently for the exact
-    # same market. Same principle as `ladder_data`/`bands` a few lines up:
-    # computed here, once, and handed to both. Found 2026-09-01.
-    offers = market_model(u)
+    # ONE COMPUTATION, READ BY BOTH RENDERERS — render() and payload() both
+    # draw this one list, so the two cannot disagree about groups or order.
+    ladder_data = ladder_rows(u, rows, bands)
     write_lines(PARTS / OUT,
                 render(u, rows, base, stamp, rivals, len(acts), locks_h,
-                       offers, ladder_data, cover_data))
+                       ladder_data))
     print("wrote %s (%d moves, %d simulated in full)"
           % (PARTS / OUT, len(acts), len(rows)))
 
@@ -3007,8 +1828,7 @@ def main() -> None:
         "generated_at": run_now()
                           .strftime("%Y-%m-%dT%H:%MZ"),
         **payload(u, rows, base, rivals, locks_h, len(acts),
-                  offers, ladder_data=ladder_data,
-                  cover_data=cover_data),
+                  ladder_data=ladder_data),
     }, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
     print("wrote %s" % (REPORTS / "decisions.json"))
 

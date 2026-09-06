@@ -184,18 +184,6 @@ class Universe:
     # the response was modelled every one of them was overdrawn and could not
     # buy a soul until I paid one of their clauses.
     rival_cash: dict[str, float] = field(default_factory=dict)
-    # The app's own daily allowance, `daily_bonus` in inputs/league.ini — the
-    # one income every manager has that the activity feed cannot see (it
-    # records deals, not gifts). Already inside `rival_cash` as an accrual
-    # from each anchor (ffcore.league._estimate_cash); carried here as the
-    # RATE, which is the thing a forward estimate needs and a level cannot
-    # give — see days_to_afford().
-    daily_bonus: float = 0.0
-    # Each manager's own realised transaction behaviour, from the real
-    # ledger. See rival_tempo(): this is the per-rival read that the
-    # league-wide "listed never converts" prior (KEEP_RELIABLE_MIN) turned
-    # out not to support, and that money DOES support.
-    tempo: dict[str, dict] = field(default_factory=dict)
     # Provenance, for the report to print rather than for anything to act on:
     # a round part-played and how much of it is left, and any club or player
     # the app names in a way nothing else could join.
@@ -296,49 +284,32 @@ def route_kind(u: Universe, k: str) -> str:
     return "raid" if u.route.get(k, "market") == "clause" else "listed"
 
 
-def _squad_depth(mine_squad: dict[str, str]) -> dict[str, int]:
-    """How many of each slot the squad currently carries."""
+def _fieldable(squad: dict[str, str]) -> bool:
+    """Could SOME real formation be fielded from this squad's shape?
+
+    COUNTS ONLY — no player identities, no simulation, not even `best_xi()`.
+    A real formation is (1 POR, d DEF, m MED, l DEL) for one of
+    `ffcore.score.formations()`'s 7 tuples; this squad can field one of
+    them exactly when it holds at least that many of each. THE ONE PLACE
+    "is this squad shape legal" gets decided — it replaces `_safe_to_sell`,
+    a bounds heuristic (per-position floor + total count) that missed the
+    exact failure it existed to catch: a squad can clear every position's
+    SLOT_MIN individually, and total XI_SIZE, and still have no real
+    formation that fits it (e.g. two goalkeepers left in an
+    exactly-11-player squad — no formation ever fields two). That shape
+    hit this report as two catastrophic bugs (Ali Houary's KEEP row
+    reading Season -1282, Alvaro Mantilla's -1286) before this replaced
+    the heuristic with the actual existence check.
+    Why: docs/notes/decide.md#_fieldable--the-one-squad-legality-check
+    """
+    from ffcore.score import formations
     depth: dict[str, int] = {}
-    for slot in mine_squad.values():
+    for slot in squad.values():
         depth[slot] = depth.get(slot, 0) + 1
-    return depth
-
-
-def _safe_to_sell(u: Universe, k: str, depth: dict[str, int]) -> bool:
-    """Would selling `k` still leave a legal shape fieldable?
-
-    SLOT_MIN is a hard per-position floor, checked against the CURRENT
-    squad (`depth`, mutated by the caller as sales are chosen). NOT ENOUGH
-    ON ITS OWN, though: SLOT_MIN's floors sum to 8 but XI_SIZE is 11, so a
-    squad can clear every position's minimum individually and still lack
-    enough PLAYERS, TOTAL, to fill any real formation — `sum(depth.values())
-    < XI_SIZE` catches that. Threshold is `XI_SIZE`, not `XI_SIZE - 1`:
-    every caller's chain ends in exactly one buy that restores a player, so
-    what matters is depth BEFORE this sale.
-    Why: docs/notes/decide.md#_safe_to_sell--per-position-minimums-arent-enough-on-their-own
-    """
-    slot = u.pos.get(k, "MED")
-    if sum(depth.values()) < XI_SIZE:
+    if depth.get("POR", 0) < 1:
         return False
-    return depth.get(slot, 0) - 1 >= SLOT_MIN.get(slot, 0)
-
-
-def _weak_starters(u: Universe, xi: set[str], bar_exp: dict[str, float],
-                    depth: dict[str, int], exclude: str = ""
-                    ) -> list[tuple[str, float]]:
-    """Fielded players, weakest first, whose sale wouldn't break a shape.
-
-    DEAD WEIGHT ISN'T THE ONLY THING WORTH SELLING. It is the only thing
-    that costs nothing to sell — a starter's sale costs real points on the
-    pitch, which is exactly why these are tried only after dead weight
-    runs out (see candidates()) or not at all until dead weight plus cash
-    both fall short (see best_swap_for()). Whether a given starter is
-    actually worth selling is the simulation's call, not this function's —
-    this only says which sales are LEGAL to propose.
-    """
-    out = [(k, u.proceeds.get(k, 0.0)) for k in xi
-           if k != exclude and _safe_to_sell(u, k, depth)]
-    return sorted(out, key=lambda kv: bar_exp.get(kv[0], 0.0))
+    return any(depth.get("DEF", 0) >= d and depth.get("MED", 0) >= m
+              and depth.get("DEL", 0) >= n for d, m, n in formations())
 
 
 def candidates(u: Universe, expected: dict[str, float],
@@ -349,6 +320,12 @@ def candidates(u: Universe, expected: dict[str, float],
     what to simulate, so it only has to be roughly right, and it turns
     thousands of combinations into dozens. A candidate who would not make your
     eleven on expectation will not make it on a draw either.
+
+    FUNDED BY CASH, OR BY SELLING EXACTLY ONE SPARE PLAYER — deliberately
+    not a multi-sale chain. A move that needs 2+ sales to afford was the
+    source of both catastrophic squad-legality bugs above; cut rather than
+    re-patched, per Miguel's "the book" direction (2026-09-06) — a
+    genuinely 2-sale-only move stops appearing, which is the honest trade.
     """
     cash = u.cash if budget is None else budget
     mine_squad = u.state.squads.get(u.me, {})
@@ -363,15 +340,12 @@ def candidates(u: Universe, expected: dict[str, float],
         bar_exp = expected
         xi = set(best_xi(u.state.squads[u.me], bar_exp))
     bar = xi_bar(bar_exp, xi)
-    # Funding is not just bench: a starter is a legal sale too if SLOT_MIN
-    # allows it (whether he's WORTH selling is the simulation's call).
-    depth0 = _squad_depth(mine_squad)
-    spare = sorted((k for k in mine if _safe_to_sell(u, k, depth0)),
-                   key=lambda k: bar_exp.get(k, 0.0))
-    # Dead weight (never starts, costs nothing to sell) tried first, biggest
-    # first; weak starters (SLOT_MIN-safe) fill in once dead weight runs out.
-    free = sorted(dead_weight(u), key=lambda kv: -kv[1]) \
-        + _weak_starters(u, xi, bar_exp, dict(depth0))
+    # A spare: selling him ALONE still leaves a fieldable shape. Cheapest
+    # (by expected points) first, so the funder is the least you give up.
+    spare = sorted(
+        (k for k in mine
+         if _fieldable({p: s for p, s in mine_squad.items() if p != k})),
+        key=lambda k: bar_exp.get(k, 0.0))
 
     out: list[Action] = []
     for c, price in sorted(u.price.items(), key=lambda kv: kv[1]):
@@ -396,54 +370,6 @@ def candidates(u: Universe, expected: dict[str, float],
             if price <= cash + got:
                 out.append(Action(swap, buy=c, sell=s, cost=price,
                                   proceeds=got, victim=victim))
-        # Out of reach on cash + any ONE spare: the fewest sales that cover
-        # it, dead weight then weak starters, depth re-checked as chosen.
-        # Triggered on the REAL cash, not `budget` (which only widens what's
-        # EMITTED) — keying the trigger to an unlimited budget once made
-        # every target look cash-reachable and silently dropped every
-        # multi-sale move.
-        if price > u.cash + max((u.proceeds.get(s, 0.0) for s in spare),
-                                default=0.0):
-            sold, got = [], 0.0
-            # Only meaningful once the squad is real-sized — see
-            # best_swap_for()'s own note on why a squad short of XI_SIZE
-            # skips this (phantom_fill() is what guarantees a real one
-            # never is, at load time).
-            legal = len(mine_squad) < XI_SIZE
-            depth = dict(depth0)
-            for k, raises in free:
-                # THE REAL CHECK, not another bounds approximation — see
-                # best_swap_for()'s own note on this exact failure class
-                # (a squad can clear every position's SLOT_MIN at every
-                # step and still be unfieldable, e.g. two goalkeepers left
-                # in an exactly-XI_SIZE squad). Re-checked each time the
-                # money threshold is newly cleared rather than once at the
-                # end, so a multi-sale chain keeps growing past "enough
-                # cash" if the shape it leaves behind still isn't legal.
-                # Why: docs/notes/decide.md#candidates--the-real-fieldability-check
-                if not legal and price <= u.cash + got:
-                    hyp = {p: s for p, s in mine_squad.items()
-                          if p not in sold}
-                    hyp[c] = u.pos.get(c, "MED")
-                    legal = bool(best_xi(hyp, expected))
-                    if legal:
-                        break
-                # A sale raising $0 spends legality budget for nothing.
-                if raises <= 0:
-                    continue
-                if not _safe_to_sell(u, k, depth):
-                    continue
-                depth[u.pos.get(k, "MED")] -= 1
-                sold.append(k)
-                got += raises
-            if sold and price <= cash + got and not legal:
-                hyp = {p: s for p, s in mine_squad.items() if p not in sold}
-                hyp[c] = u.pos.get(c, "MED")
-                legal = bool(best_xi(hyp, expected))
-            if sold and price <= cash + got and legal:
-                out.append(Action(swap, buy=c, sell=tuple(sorted(sold)),
-                                  cost=price, proceeds=got,
-                                  victim=victim if raid else ""))
     return out
 
 
@@ -567,120 +493,6 @@ def respond(u, a: Action, after: dict) -> Action | None:
     return best
 
 
-def rival_tempo(txns, now=None) -> dict[str, dict]:
-    """Each manager's OWN realised transaction behaviour, from the real ledger.
-
-    `{handle: {"buys", "sells", "bought", "sold", "days", "sell_rate",
-    "idle"}}` — counts, euros, ledger span in days, gross sale proceeds per
-    day, days since that manager's last deal.
-
-    GROSS proceeds per day, not net cash flow — net is negative for every
-    manager here (they're all still deploying a starting budget spent once),
-    so it would predict everyone going infinitely broke. `days` is the span
-    of the WHOLE ledger, not each manager's own first-to-last, so an idle
-    manager's near-zero rate isn't hidden behind a shorter denominator.
-    Why: docs/notes/decide.md#rival_tempo--gross-proceeds-per-day-not-net-cash-flow
-    """
-    from ffcore.tidy import ledger_stamp
-
-    rows = [(ledger_stamp(t.get("date", "")), t) for t in txns]
-    stamps = [s for s, _ in rows if s]
-    if not stamps:
-        return {}
-    span = max((max(stamps) - min(stamps)).total_seconds() / 86400.0, 1.0)
-    end = now or max(stamps)
-    out: dict[str, dict] = {}
-
-    def rec(h):
-        return out.setdefault(h, {"buys": 0, "sells": 0, "bought": 0.0,
-                                  "sold": 0.0, "days": span,
-                                  "sell_rate": 0.0, "idle": None,
-                                  "last": None})
-    for when, t in rows:
-        price = float(t.get("price") or 0)
-        src = (t.get("from") or "").strip()
-        dst = (t.get("to") or "").strip()
-        for h, side in ((dst, "buy"), (src, "sell")):
-            if not h or h == MARKET:
-                continue
-            r = rec(h)
-            if side == "buy":
-                r["buys"] += 1
-                r["bought"] += price
-            else:
-                r["sells"] += 1
-                r["sold"] += price
-            if when and (r["last"] is None or when > r["last"]):
-                r["last"] = when
-    for r in out.values():
-        r["sell_rate"] = r["sold"] / span
-        if r["last"] is not None:
-            r["idle"] = max(0.0, (end - r["last"]).total_seconds() / 86400.0)
-    return out
-
-
-def days_to_afford(cash, price: float, daily_bonus: float,
-                   sell_rate: float = 0.0, ceiling=None) -> int | None:
-    """Roughly how many days until a manager on `cash` could put `price`
-    together. 0 if he already can; None if nothing says he ever could.
-
-    `cash` is measured for me, estimated for a rival. `daily_bonus` is a
-    configured fact (inputs/league.ini). `sell_rate` is measured, per rival,
-    off his own realised gross sale proceeds (rival_tempo()). The
-    COMBINATION — that he keeps raising money at his past rate while the
-    allowance accrues — is the one guess this makes; it says nothing about
-    whether he WANTS this player (see ffcore.bid.demand_summary() for that).
-    Allowance-only was tried first and understates badly for a manager who's
-    been actively selling. `ceiling` (his cash + his whole squad's value)
-    caps the answer at None past it — he can't sell more than he holds.
-    Why: docs/notes/decide.md#days_to_afford--measured-vs-guessed
-    """
-    if cash is None:
-        return None
-    if cash >= price:
-        return 0
-    if ceiling is not None and price > ceiling:
-        return None
-    rate = max(0.0, daily_bonus) + max(0.0, sell_rate)
-    if rate <= 0:
-        return None
-    return int(-(-(price - cash) // rate))          # ceil, without math
-
-
-def contest(u, key: str) -> list[tuple[str, int]]:
-    """`[(manager, days), ...]` — who else could pay `key`'s own price, and
-    how soon, soonest first. `[]` when nobody ever could.
-
-    A clause is instant and cannot be refused by anybody — so a target
-    sitting at a payable clause isn't an option Miguel owns, it's a thing
-    the first solvent manager takes. Clause targets only, deliberately: a
-    free-agent or listed row is a BID that can lose, and `Universe.bids`
-    (the app's own numberOfBids) is the real contest signal there. The
-    owner is not a contender for his own player and neither am I.
-    Why: docs/notes/decide.md#contest--clause-targets-only-deliberately
-    """
-    if u.route.get(key) != "clause":
-        return []
-    price = u.price.get(key)
-    if price is None:
-        return []
-    owner = u.owner.get(key, "")
-    out = []
-    for m in u.state.squads:
-        if m == u.me or m == owner:
-            continue
-        tempo = u.tempo.get(m, {})
-        # HIS WHOLE SQUAD IS THE WALL — see days_to_afford()'s `ceiling`.
-        # Market value, not clause value: what a sale pays out at.
-        ceiling = u.rival_cash.get(m, 0.0) + sum(
-            u.value.get(k, 0.0) for k in u.state.squads.get(m, {}))
-        d = days_to_afford(u.rival_cash.get(m), price, u.daily_bonus,
-                           tempo.get("sell_rate", 0.0), ceiling)
-        if d is not None:
-            out.append((m, d))
-    return sorted(out, key=lambda t: (t[1], t[0]))
-
-
 def dead_weight(u) -> list[tuple[str, float]]:
     """[(player, what he raises)] for everyone in my squad who never starts.
 
@@ -763,131 +575,6 @@ def band(pairs) -> tuple[float, float, float]:
         return (0.0, 0.0, 0.0)
     return (pairs[len(pairs) // 2], pairs[int(0.1 * len(pairs))],
             pairs[int(0.9 * len(pairs))])
-
-
-def best_swap_for(u: Universe, k: str, expected: dict[str, float]
-                  ) -> Action | None:
-    """The best real upgrade `k`'s sale funds — sell him, buy the
-    highest-expected target his proceeds, your cash, AND (if that still
-    falls short) the same dead-weight-then-weak-starters chain
-    candidates() draws on can reach. None when nothing does.
-
-    A DIFFERENT QUESTION from candidates()'s own swap search, which dedupes
-    to one funding source per target and so can't answer for every held
-    player individually — this asks "what would it take" scoped to ONE
-    funding player. SAME SLOT ONLY: `expected()` puts every position on one
-    points scale, but a SQUAD slot funding a swap is not a FORMATION slot —
-    found 2026-08-25 when this once suggested selling bench players for the
-    board's one goalkeeper, a real but meaningless number.
-    Why: docs/notes/decide.md#best_swap_for--vs-ranks-own-funder-and-the-same-slot-fix
-    """
-    mine = u.state.squads.get(u.me, {})
-    base_budget = u.cash + u.proceeds.get(k, 0.0)
-    my_exp = expected.get(k, 0.0)
-    slot = u.pos.get(k)
-
-    # The extra chain: dead weight first, then weak starters, SLOT_MIN-safe,
-    # k already counted as gone (never rides in this chain — see below).
-    # Built once, walked once: extra_names[i]/extra_running[i] is "sell the
-    # first i+1 of these, raise this much", a lookup not a fresh walk.
-    depth = _squad_depth(mine)
-    if slot in depth:
-        depth[slot] -= 1
-    xi_now = set(best_xi(mine, expected))
-    # k is already the primary sale (in base_budget); dead_weight() doesn't
-    # know to exclude him since he can be bench (never in any choosable XI).
-    chain = [(p, r) for p, r in sorted(dead_weight(u), key=lambda kv: -kv[1])
-            if p != k] + _weak_starters(u, xi_now, expected, dict(depth),
-                                        exclude=k)
-    extra_names: list[str] = []
-    extra_running: list[float] = []
-    got = 0.0
-    for s, raises in chain:
-        # Same guard as candidates()'s own chain: a $0 sale spends nothing.
-        if raises <= 0:
-            continue
-        if not _safe_to_sell(u, s, depth):
-            continue
-        depth[u.pos.get(s, "MED")] -= 1
-        got += raises
-        extra_names.append(s)
-        extra_running.append(got)
-    max_budget = base_budget + got
-
-    # Every affordable upgrade, not just a running max — collected first so
-    # the pick below can weigh cost, not just grab the highest raw expected.
-    # Before this (2026-08-31), the highest-expected target the budget
-    # reached could be a heavily marked-up clause raid over a materially
-    # cheaper target giving up almost none of the gain — the same
-    # price-blindness sim._move_rank_key() already rejects for BUY rows.
-    # `route_kind() != "listed"` — this search had never excluded a listed
-    # target at all (only candidates()'s OWN search did), so the "vs X"
-    # name on a KEEP row could suggest a rival's non-clause player as the
-    # upgrade — the same "never propose a listed target" rule, missed
-    # here because it was re-derived per call site instead of owned by
-    # one function. Why: docs/notes/decide.md#route_kind--the-one-place-ownership-is-classified
-    candidates_found = [(expected.get(c, 0.0), price, c)
-                        for c, price in u.price.items()
-                        if c != k and c not in mine and u.pos.get(c) == slot
-                        and price <= max_budget
-                        and expected.get(c, 0.0) > my_exp
-                        and route_kind(u, c) != "listed"]
-    best_c, best_exp, best_price = None, my_exp, None
-    if candidates_found:
-        # Same tolerance as sim.VALUE_TOLERANCE (kept as a local literal to
-        # avoid a decide<->sim import cycle — sim.py imports decide already).
-        best_gain = max(e for e, _, _ in candidates_found) - my_exp
-        floor = 0.90 * best_gain
-        near_best = [t for t in candidates_found if t[0] - my_exp >= floor]
-        best_exp, best_price, best_c = min(near_best, key=lambda t: t[1])
-    if best_c is None:
-        return None
-    if best_price <= base_budget:
-        sell, proceeds, n = (k,), u.proceeds.get(k, 0.0), 0
-    else:
-        n = next(i for i, g in enumerate(extra_running)
-                if g >= best_price - base_budget) + 1
-        sell = tuple(sorted((k, *extra_names[:n])))
-        proceeds = u.proceeds.get(k, 0.0) + extra_running[n - 1]
-    # THE REAL CHECK, not another bounds approximation — _safe_to_sell()
-    # only ever vets the ONE slot being sold against its own floor, so it
-    # cannot see a position it never touches sitting in EXCESS: a squad
-    # left holding two goalkeepers with exactly XI_SIZE players total has
-    # nowhere to field the second one (no real formation fields two),
-    # even though every position's SLOT_MIN was clear at every step of
-    # the chain. This is the same "meets bounds, fails a real formation"
-    # failure class as illegal_squads()/phantom_fill() (2026-09-01,
-    # rival squads) and _safe_to_sell()'s own XI_SIZE fix (same day, this
-    # exact chain) — caught this time only because best_c's POSITION
-    # wasn't known until now, which is exactly what a bounds check inside
-    # the chain-building loop above can never see either. Verified the
-    # only way this repo trusts: applying the real resulting squad
-    # through best_xi(), growing the sale (one more from the same
-    # ordered chain) if the minimal one leaves no legal shape, since a
-    # different, larger sale set can raise the same money without
-    # leaving this exact stuck position behind.
-    # Only meaningful once the squad is actually real-sized — a squad
-    # short of XI_SIZE can never field a legal shape at all regardless of
-    # this swap (phantom_fill() is what handles that, at load time, for
-    # every real squad this repo ever runs against), so this only guards
-    # a squad that WAS fieldable before the swap and might not be after.
-    # Why: docs/notes/decide.md#best_swap_for--the-real-fieldability-check
-    while len(mine) >= XI_SIZE:
-        hyp = {p: s for p, s in mine.items() if p not in sell}
-        hyp[best_c] = u.pos.get(best_c, "MED")
-        if best_xi(hyp, expected):
-            break
-        if n >= len(extra_names):
-            return None
-        n += 1
-        sell = tuple(sorted((k, *extra_names[:n])))
-        proceeds = u.proceeds.get(k, 0.0) + extra_running[n - 1]
-    best_sell, best_proceeds = sell, proceeds
-    raid = route_kind(u, best_c) == "raid"
-    victim = u.owner.get(best_c, "") if raid else ""
-    return Action("clause-swap" if raid else "swap", buy=best_c,
-                 sell=best_sell, cost=best_price, proceeds=best_proceeds,
-                 victim=victim)
 
 
 def _top_up(top: list[tuple], screened: list[tuple], ok, rank_key,
@@ -1537,9 +1224,6 @@ def load(trials_pool=None) -> Universe:
         value=value, market_exp=market_exp, start=start, clause=clause,
         route=route,
         rival_cash=rival_cash,
-        # The rate and the behaviour beside the level rival_cash already
-        # holds — see days_to_afford().
-        daily_bonus=lg.cfg.daily_bonus, tempo=rival_tempo(lg.txns),
         clause_until=clause_until, bids=bids,
         part_played=played, name=name, start_note=_calibrated()[0].note(),
         unjoined=list(unjoined_clubs) + list(lg.api_unjoined),
@@ -1760,20 +1444,17 @@ def _selftest() -> None:
     assert "gone" not in {p for a in dict(offer_combos(ugone)).values()
                           for p in a.sell}
 
-    # -- funding a move with MORE THAN ONE sale ----------------------------
-    # The table silently omitted every move that needed two. A target you
-    # cannot reach on cash plus one spare is not unaffordable — it is
-    # affordable by selling the men who never play, and those cost nothing on
-    # the pitch by construction. This is the staircase in the value of cash,
-    # expressed as rows rather than as a second table about money: on the day
-    # it was written, three dead-weight sales raised 21.16M, which cleared
-    # Giuliano Simeone's 44.65M clause by 109K.
+    # -- a move needing TWO OR MORE sales never appears (2026-09-06) -------
+    # Funding chains (2+ sales for one buy) were cut outright, not
+    # re-patched, after being the direct cause of two catastrophic squad-
+    # legality bugs (`_fieldable`'s own docstring). A target only reachable
+    # by selling more than one man simply does not appear on the table —
+    # the honest cost of the simpler, safer design — checked here so a
+    # future change can't quietly bring the chain back.
     u3 = Universe(
         state=LeagueState({"me": dict(mine), "riv": dict(theirs)}, [1], "me"),
         forecaster=B(per), pos={**u.pos, "dear": "MED"},
         price={"dear": 20e6},
-        # Three spares, none of whom ever start: the sixth midfielder, the
-        # seventh, and a second keeper.
         proceeds={"me_bench": 8e6, "me_spare2": 5e6, "me_spare3": 4e6},
         owner={}, cash=4e6, me="me")
     u3.state.squads["me"]["me_spare2"] = "MED"
@@ -1783,31 +1464,12 @@ def _selftest() -> None:
                     "me_spare3": (0.3, 1.0)})
     u3.forecaster = B(per3)
     acts3 = candidates(u3, u3.forecaster.expected(1))
-    multi = [a for a in acts3 if a.buy == "dear" and len(a.sell) > 1]
-    assert multi, "a move needing two sales must still be on the table"
-    # ...AND STILL ON IT WHEN THE BUDGET IS LIFTED to measure the frontier. A
-    # budget that also decided whether a target needs more than one sale made
-    # every target look reachable on cash alone, and the multi-sale moves —
-    # including the best one on the board — stopped being generated.
-    wide = candidates(u3, u3.forecaster.expected(1), budget=float("inf"))
-    assert any(a.buy == "dear" and len(a.sell) > 1 for a in wide), wide
-    a3 = min(multi, key=lambda a: len(a.sell))
-    # Sell the FEWEST men that cover it: 4 + 8 + 5 = 17 is short of 20, so all
-    # three go; the greedy takes the biggest first so it never sells four to
-    # do the job of three.
-    assert set(a3.sell) == {"me_bench", "me_spare2", "me_spare3"}, a3.sell
-    assert a3.proceeds == 17e6 and a3.cost == 20e6
-    assert a3.net == 3e6
-    # Never a man who plays: the eleven is the point of the exercise.
-    assert not any(k.startswith("me_d") or k.startswith("me_m")
-                   for k in a3.sell if k != "me_bench")
-    # apply() drops every one of them.
-    after3 = apply(u3, a3)
-    assert not (set(a3.sell) & set(after3["me"])), after3["me"]
-    assert "dear" in after3["me"]
-    # ...and it reads as one sentence, not three rows.
-    assert a3.label() == "buy dear · sell me_bench + me_spare2 + me_spare3", \
-        a3.label()
+    assert not any(a.buy == "dear" and len(a.sell) > 1 for a in acts3), \
+        [a for a in acts3 if a.buy == "dear"]
+    # Not reachable on cash (4M) + any ONE spare (best is 8M) either —
+    # 20M needs at least two, so "dear" is simply absent, not present
+    # with a wrong sale count.
+    assert not any(a.buy == "dear" for a in acts3), acts3
 
     # A swap removes the sold man and adds the bought one.
     sw = next(x for x in acts if x.buy == "star" and x.sell == ("me_bench",))
@@ -2290,255 +1952,61 @@ def _selftest() -> None:
     # rather than being zeroed or dropped.
     assert out[1]["ghost"] == (3.0, 0.5), out[1]["ghost"]
 
-    # -- best_swap_for: a held player's REAL value, not a pure sale ---------
-    from ffcore.forecast import Bootstrap as B2
+    # -- _fieldable: the one squad-legality check, counts only -------------
+    # A real 4-4-2 shape: POR1/DEF4/MED4/DEL2.
+    ok_squad = {"k": "POR", "d1": "DEF", "d2": "DEF", "d3": "DEF",
+               "d4": "DEF", "m1": "MED", "m2": "MED", "m3": "MED",
+               "m4": "MED", "f1": "DEL", "f2": "DEL"}
+    assert _fieldable(ok_squad), ok_squad
+    # No goalkeeper at all: illegal regardless of everything else.
+    assert not _fieldable({k: v for k, v in ok_squad.items() if k != "k"})
+    # THE EXACT BUG: two goalkeepers, POR2/DEF4/MED4/DEL1 (11 total) — every
+    # position clears SLOT_MIN, total is XI_SIZE, and it's still illegal —
+    # no real formation fields two keepers. This is the shape that read
+    # Season -1282 (Ali Houary) and -1286 (Alvaro Mantilla) on real reports
+    # before `_fieldable()` replaced `_safe_to_sell()`'s bounds heuristic.
+    two_keepers = {k: v for k, v in ok_squad.items() if k != "f2"}
+    two_keepers["k2"] = "POR"
+    assert not _fieldable(two_keepers), two_keepers
+    # Extra bench depth doesn't matter — legality only asks whether ENOUGH
+    # exists per position, never "too much".
+    assert _fieldable({**ok_squad, "d5": "DEF", "m5": "MED"})
 
-    per_sw = {1: {"me_k": (2.0, 1.0), "me_star": (12.0, 1.0),
-                  "cheap_up": (5.0, 1.0), "rich_up": (5.0, 1.0),
-                  "too_rich": (20.0, 1.0), "worse": (1.0, 1.0),
-                  "riv_up": (6.0, 1.0)}}
-    u_sw = Universe(
-        state=LeagueState({"me": {"me_k": "MED", "me_star": "MED"},
-                           "riv": {"riv_up": "MED"}}, [1], "me"),
-        forecaster=B2(per_sw),
-        pos={"me_k": "MED", "me_star": "MED", "cheap_up": "MED",
-            "rich_up": "MED", "too_rich": "MED", "worse": "MED",
-            "riv_up": "MED"},
-        price={"cheap_up": 3e6, "rich_up": 3e6, "too_rich": 50e6,
-              "worse": 1e6, "riv_up": 6e6},
-        route={"riv_up": "clause"}, owner={"riv_up": "riv"},
-        proceeds={"me_k": 2e6}, cash=3e6, me="me")
-    exp_sw = u_sw.forecaster.expected(1)
-
-    # me_k (exp 2.0) has a real, affordable upgrade: cheap_up and rich_up
-    # tie at exp 5.0, price 3e6 each, budget cash(3e6)+proceeds(2e6)=5e6 —
-    # TIE BREAKS TOWARD THE CHEAPER ONE, but both cost the same here, so
-    # either is a legal answer; what matters is it is NOT "worse" (below
-    # his own exp) and NOT "too_rich" (unaffordable) and NOT "riv_up"
-    # (exp 6.0 would win outright if affordable, but 4e6 > his 5e6 budget).
-    got = best_swap_for(u_sw, "me_k", exp_sw)
-    assert got is not None and got.buy in ("cheap_up", "rich_up"), got
-    assert got.sell == ("me_k",) and got.cost <= 5e6, got
-    assert got.proceeds == 2e6, got
-    assert got.kind == "swap", got
-
-    # me_star (exp 12.0) already beats everything on the board — no swap,
-    # not a swap to something worse.
-    assert best_swap_for(u_sw, "me_star", exp_sw) is None
-
-    # A CLAUSE TARGET IS TAGGED, same as candidates()'s own raid logic —
-    # give me_k a bigger budget so riv_up (exp 6.0, the best on the board)
-    # becomes reachable and wins outright.
-    u_sw2 = Universe(
-        state=u_sw.state, forecaster=u_sw.forecaster, pos=u_sw.pos,
-        price=u_sw.price, route=u_sw.route, owner=u_sw.owner,
-        proceeds={"me_k": 2e6}, cash=10e6, me="me")
-    raided = best_swap_for(u_sw2, "me_k", exp_sw)
-    assert raided.buy == "riv_up" and raided.kind == "clause-swap", raided
-    assert raided.victim == "riv", raided
-
-    # A LISTED TARGET IS NEVER SUGGESTED, not even as the "vs X" name on a
-    # KEEP row — this search never excluded one before route_kind()
-    # existed (only candidates()'s own, separate search did), even though
-    # riv_listed's exp (100.0) towers over every other candidate here.
-    u_sw2b = Universe(
-        state=u_sw.state, forecaster=B2({1: {**per_sw[1],
-                                             "riv_listed": (100.0, 1.0)}}),
-        pos={**u_sw.pos, "riv_listed": "MED"},
-        price={**u_sw.price, "riv_listed": 1e6},
-        route=u_sw.route, owner={**u_sw.owner, "riv_listed": "riv"},
-        proceeds={"me_k": 2e6}, cash=10e6, me="me")
-    exp_sw2b = u_sw2b.forecaster.expected(1)
-    not_listed = best_swap_for(u_sw2b, "me_k", exp_sw2b)
-    assert not_listed.buy != "riv_listed", not_listed
-    assert not_listed.buy == "riv_up", not_listed   # falls back to the raid
-
-    # SAME SLOT ONLY — a cheap, high-expected DEL is not a real answer to
-    # "what should me_k (MED) become", the same "one points scale, one
-    # formation, but a squad SLOT is not a formation slot" case that put
-    # a goalkeeper on three different midfielders' bands on 2026-08-25.
-    per_slot = dict(per_sw)
-    per_slot[1] = {**per_sw[1], "wrong_slot": (50.0, 1.0)}
-    u_sw3 = Universe(
-        state=u_sw.state, forecaster=B2(per_slot),
-        pos={**u_sw.pos, "wrong_slot": "DEL"},
-        price={**u_sw.price, "wrong_slot": 1e6},
-        route=u_sw.route, owner=u_sw.owner,
-        proceeds={"me_k": 2e6}, cash=10e6, me="me")
-    exp_slot = u_sw3.forecaster.expected(1)
-    got3 = best_swap_for(u_sw3, "me_k", exp_slot)
-    assert got3.buy == "riv_up", got3     # not "wrong_slot", despite exp 50
-
-    # -- funding widened to include starters, not just bench dead weight
-    # (2026-08-29) -----------------------------------------------------------
-    from ffcore.forecast import Bootstrap as B3
-
-    sq3 = {"me_k": "POR", "me_d1": "DEF", "me_d2": "DEF", "me_d3": "DEF",
-          "me_d4": "DEF", "me_m1": "MED", "me_m2": "MED", "me_m3": "MED",
-          "me_m4": "MED", "me_m5": "MED", "me_f1": "DEL"}
-    per3 = {1: {k: (3.0, 1.0) for k in sq3}}
-    # k and f1 sit at the SLOT_MIN floor (1 keeper, 1 forward) — given the
-    # LOWEST expected points here on purpose, so the widened pool's own
-    # ascending sort would try them FIRST if the SLOT_MIN guard were not
-    # there. d1/m1/m2 are the next-weakest, safely above their own floors
-    # (DEF depth 4 > min 3, MED depth 5 > min 3).
-    per3[1]["me_k"] = (0.1, 1.0)
-    per3[1]["me_f1"] = (0.2, 1.0)
-    per3[1]["me_d1"] = (2.5, 1.0)
-    per3[1]["me_m1"] = (2.6, 1.0)
-    per3[1]["me_m2"] = (2.7, 1.0)
-    per3[1]["mid_up"] = (6.0, 1.0)
-    per3[1]["mid_big"] = (8.0, 1.0)
-    u3 = Universe(
-        state=LeagueState({"me": dict(sq3)}, [1], "me"),
-        forecaster=B3(per3),
-        pos={**sq3, "mid_up": "MED", "mid_big": "DEL"},
-        price={"mid_up": 14e6, "mid_big": 19e6},
-        proceeds={"me_d1": 5e6, "me_m1": 4e6, "me_m2": 4e6},
-        owner={}, cash=10e6, me="me")
-    exp3 = u3.forecaster.expected(1)
-
-    assert dead_weight(u3) == [], dead_weight(u3)   # no bench: nothing free
-
-    acts3 = candidates(u3, exp3)
-    # SLOT_MIN GUARD: the sole keeper and sole forward are never offered as
-    # a seller, even though they were deliberately given the lowest exp of
-    # anyone — selling either would leave no legal shape at all.
-    assert not any("me_k" in a.sell for a in acts3), \
-        [a for a in acts3 if "me_k" in a.sell]
-    assert not any("me_f1" in a.sell for a in acts3), \
-        [a for a in acts3 if "me_f1" in a.sell]
-
-    # mid_up (14M): out of reach on cash (10M) alone, in reach on cash plus
-    # ONE weak starter (me_d1, 5M) — the widened spare pool, not dead
-    # weight (there is none), funds it.
-    up_rows = [a for a in acts3 if a.buy == "mid_up"]
-    assert up_rows, acts3
-    assert any(a.sell == ("me_d1",) for a in up_rows), up_rows
-    assert not any(not a.sell for a in up_rows), up_rows   # not cash-alone
-
-    # mid_big (19M): out of reach on cash plus ANY single spare (best single
-    # is me_d1 at 15M) — needs two REAL sales. A SEPARATE, PADDED squad
-    # (sq3 plus one spare DEF) for this one check only — sq3 itself stays
-    # at exactly 11 (T0=11 can NEVER survive 2 sales for 1 buy: 11-2+1=10,
-    # under XI_SIZE — see _safe_to_sell()'s own note) and the
-    # best_swap_for() test right after this one depends on sq3's own
-    # DEF-at-the-floor arithmetic, which extra padding here would have
-    # thrown off if done in place.
-    sq3_pad = {**sq3, "me_pad": "DEF"}
-    per3_pad = {1: {**per3[1], "me_pad": (0.05, 1.0)}}   # weakest on the
-    # board, $0 proceeds — real dead weight (`dead_weight()` below), but
-    # SKIPPED outright by the funding chain for raising nothing
-    # (2026-09-01), so it spends none of the one extra body's legality
-    # headroom — the combo below is exactly the two REAL sales that close
-    # the 9M gap, not a wasted "free" one riding in front of them.
-    u3_pad = Universe(
-        state=LeagueState({"me": dict(sq3_pad)}, [1], "me"),
-        forecaster=B3(per3_pad),
-        pos={**sq3_pad, "mid_up": "MED", "mid_big": "DEL"},
-        price={"mid_up": 14e6, "mid_big": 19e6},
-        proceeds={"me_d1": 5e6, "me_m1": 4e6, "me_m2": 4e6},
-        owner={}, cash=10e6, me="me")
-    assert dead_weight(u3_pad) == [("me_pad", 0.0)], dead_weight(u3_pad)
-    big_rows = [a for a in candidates(u3_pad, u3_pad.forecaster.expected(1))
-               if a.buy == "mid_big"]
-    assert big_rows, big_rows
-    combo = next((a for a in big_rows if len(a.sell) >= 2), None)
-    assert combo is not None, big_rows
-    assert set(combo.sell) <= {"me_d1", "me_m1", "me_m2"}, combo
-    assert combo.proceeds >= 9e6, combo   # d1+m1 = 9M, exactly what 19M needs
-    assert "me_k" not in combo.sell and "me_f1" not in combo.sell, combo
-    assert "me_pad" not in combo.sell, combo
-
-    # -- best_swap_for(): the same widened chain, so a held player's own
-    # band stops answering a narrower question than the main table --------
-    # A SEPARATE, PADDED squad again (two extra MED this time, not DEF —
-    # the whole point of this test is DEF landing EXACTLY at its floor
-    # once me_d2 leaves, so padding DEF here would blunt the very guard
-    # being tested). me_d2's own sale plus BOTH weak midfielders (3 sells,
-    # 1 buy) needs T0 >= 13 to stay legal (11 - 3 + 1 = 9, under XI_SIZE
-    # otherwise) — sq3 itself (T0=11) stays untouched, same reasoning as
-    # the mid_big block above. Both padding players are skipped outright
-    # by the chain (raise $0), so each contributes pure headroom without
-    # ever being sold itself, and without changing which REAL players
-    # fund the purchase.
-    sq3b = {**sq3, "me_pad2": "MED", "me_pad3": "MED"}
-    per3b = {**per3[1], "riv_target": (7.0, 1.0),
-            "me_pad2": (0.05, 1.0), "me_pad3": (0.05, 1.0)}
-    state3b = LeagueState({"me": dict(sq3b)}, [1], "me")
-    u3b = Universe(
-        state=state3b, forecaster=B3({1: per3b}),
-        pos={**sq3b, "riv_target": "DEF"},
-        price={"riv_target": 14e6},
-        proceeds={"me_d1": 5e6, "me_m1": 4e6, "me_m2": 4e6},
-        owner={}, cash=4e6, me="me")
-    exp3b = u3b.forecaster.expected(1)
-    # me_d2's own sale (no proceeds set -> 0.0) plus cash (4M) alone, and
-    # the ONLY other extra funding available (me_m1/me_m2, 4M each — me_d1
-    # is guarded off once me_d2 himself leaves, DEF drops to the SLOT_MIN
-    # floor) tops out at 12M — still short of 14M. The OLD best_swap_for,
-    # scoped to k's own proceeds + cash only, would ALSO have said None
-    # here, so this is the honest "no answer" floor, not a regression.
-    assert best_swap_for(u3b, "me_d2", exp3b) is None
-
-    # Give him a real proceeds figure — still short of 14M with cash alone,
-    # and even his own sale plus BOTH weak midfielders is needed to reach it.
-    u3c = Universe(
-        state=state3b, forecaster=B3({1: per3b}),
-        pos={**sq3b, "riv_target": "DEF"},
-        price={"riv_target": 14e6},
-        proceeds={"me_d1": 5e6, "me_m1": 4e6, "me_m2": 4e6, "me_d2": 3e6},
-        owner={}, cash=4e6, me="me")
-    exp3c = u3c.forecaster.expected(1)
-    got3c = best_swap_for(u3c, "me_d2", exp3c)
-    assert got3c is not None and got3c.buy == "riv_target", got3c
-    assert "me_d2" in got3c.sell, got3c
-    assert len(got3c.sell) > 1, got3c        # his own sale alone isn't enough
-    assert "me_k" not in got3c.sell and "me_f1" not in got3c.sell, got3c
-    assert "me_pad2" not in got3c.sell, got3c   # $0, skipped outright
-    assert "me_pad3" not in got3c.sell, got3c
-    assert got3c.proceeds == sum(u3c.proceeds.get(p, 0.0)
-                                 for p in got3c.sell), got3c
-
-    # -- best_swap_for()/candidates(): the funding chain must never leave a
-    # squad that MEETS EVERY SLOT_MIN AND XI_SIZE BUT STILL HAS NO LEGAL
-    # SHAPE — a backup goalkeeper never counted against by either bound,
-    # 2026-09-05's real report, Alvaro Mantilla's own KEEP row read Season
-    # -1286 (best_xi() -> [], zero every remaining jornada) after this
-    # exact chain sold him alongside 3 others to fund a clause, leaving
-    # POR:2/DEF:4/MED:4/DEL:1 (11 total) — no real formation fields two
-    # goalkeepers, but the old `_safe_to_sell()` only ever checked the ONE
-    # slot being sold, never a position (POR here) it never touched. -----
-    sq4 = {"me_k1": "POR", "me_k2": "POR",
-          "me_d1": "DEF", "me_d2": "DEF", "me_d3": "DEF", "me_d4": "DEF",
-          "me_d5": "DEF", "me_m1": "MED", "me_m2": "MED", "me_m3": "MED",
-          "me_m4": "MED", "me_f_old": "DEL"}
-    # 12 total, legal at rest via (5,4,1): DEF5/MED4/DEL1, POR's second
-    # keeper along for the ride same as any real squad's backup.
-    per4 = {1: {k: (3.0, 1.0) for k in sq4}}
-    per4[1]["me_k2"] = (8.0, 1.0)      # starts; me_k1 is the bench keeper
-    per4[1]["me_d5"] = (0.1, 1.0)      # weakest DEF — dead weight, sold
-    # first by the funding chain, same as me_pad above
-    per4[1]["me_f_old"] = (1.0, 1.0)   # the swap target itself
-    per4[1]["new_f"] = (9.0, 1.0)      # his same-slot upgrade
-    u4 = Universe(
-        state=LeagueState({"me": dict(sq4)}, [1], "me"),
-        forecaster=B3(per4), pos={**sq4, "new_f": "DEL"},
-        price={"new_f": 9e6}, proceeds={"me_f_old": 0.0, "me_d5": 2e6},
-        owner={}, cash=8e6, me="me")   # short of 9M on cash (8M) + f_old's
-    # own (0) sale — needs me_d5's proceeds too, which is exactly the
-    # "meets every bound, still illegal" chain
-    exp4 = u4.forecaster.expected(1)
-    got4 = best_swap_for(u4, "me_f_old", exp4)
-    # The OLD bug: got4 would have been (sell=("me_f_old","me_d5"),
-    # buy="new_f") — legal by every bound (DEF 5->4 >= floor 3, total
-    # 12 >= XI_SIZE), but POR:2/DEF:4/MED:4/DEL:1 has no real formation.
-    # The fix must either find a DIFFERENT, larger sale set that IS
-    # fieldable, or refuse outright — never ship the illegal one.
-    if got4 is not None:
-        hyp4 = {p: s for p, s in sq4.items() if p not in got4.sell}
-        hyp4[got4.buy] = u4.pos.get(got4.buy, "MED")
-        assert best_xi(hyp4, exp4), (got4, hyp4)
+    # -- candidates(): funded by cash or exactly ONE sale, never a chain ---
+    # A REAL-SIZED squad (12: 1 spare beyond the 11 a 4-4-2 needs) — selling
+    # anyone from an exactly-11 squad drops it below XI_SIZE, illegal by
+    # construction, so a genuine spare needs headroom above 11 to exist at
+    # all (the same fact phantom_fill()/load() guarantee for a real report).
+    per_cd = {1: {"me_k": (2.0, 1.0), "me_d1": (3.0, 1.0), "me_d2": (3.0, 1.0),
+                "me_d3": (3.0, 1.0), "me_d4": (3.0, 1.0),
+                "me_m1": (3.0, 1.0), "me_m2": (3.0, 1.0), "me_m3": (3.0, 1.0),
+                "me_m4": (3.0, 1.0), "me_f1": (5.0, 1.0), "me_f2": (4.0, 1.0),
+                "me_f3": (0.1, 1.0),   # weakest DEL, the real spare
+                "target": (9.0, 1.0)}}
+    sq_cd = {"me_k": "POR", "me_d1": "DEF", "me_d2": "DEF", "me_d3": "DEF",
+           "me_d4": "DEF", "me_m1": "MED", "me_m2": "MED", "me_m3": "MED",
+           "me_m4": "MED", "me_f1": "DEL", "me_f2": "DEL", "me_f3": "DEL"}
+    from ffcore.forecast import Bootstrap as BCD
+    u_cd = Universe(
+        state=LeagueState({"me": dict(sq_cd)}, [1], "me"),
+        forecaster=BCD(per_cd), pos={**sq_cd, "target": "DEL"},
+        price={"target": 5e6}, proceeds={"me_f3": 5e6}, owner={},
+        cash=0.0, me="me")
+    exp_cd = u_cd.forecaster.expected(1)
+    acts_cd = candidates(u_cd, exp_cd)
+    # Reachable by selling the one real spare (me_f3, 5M) alone — the
+    # squad holds 12, one more than a 4-4-2's 11, so this sale still
+    # leaves a legal shape.
+    assert any(a.buy == "target" and a.sell == ("me_f3",) for a in acts_cd), \
+        acts_cd
+    # me_k (the only POR) is never offered as a spare — selling him leaves
+    # no goalkeeper at all, illegal on its own, no chain needed to see it.
+    # Neither is any starting DEF/MED — selling one drops that position
+    # below what a 4-4-2/4-3-3/etc. needs alongside the other three.
+    assert not any(k in a.sell for a in acts_cd
+                  for k in ("me_k", "me_d1", "me_d2", "me_d3", "me_d4",
+                           "me_m1", "me_m2", "me_m3", "me_m4")), \
+        [a for a in acts_cd if a.sell]
 
     # -- value_rate: the shared primitive, on its own -----------------------
     assert value_rate(120.0, 14.13e6) is not None
@@ -2548,104 +2016,6 @@ def _selftest() -> None:
     assert value_rate(None, 5e6) is None
     assert value_rate(0.0, 5e6) == 0.0           # a real price, zero return: 0, not None
 
-    # -- rival_tempo: each manager's OWN realised behaviour ----------------
-    # A SYNTHETIC LEDGER IN THE REAL FILE'S SHAPE — one side of every row is
-    # the pool, exactly as ledger.py writes it. Two rivals with deliberately
-    # different behaviour over the same ten days: `busy` sells four times for
-    # 40M, `hoarder` sells once for 1M and has not moved since day one. This
-    # is the distinction the league-wide prior cannot make and this can.
-    txns_t = [
-        {"date": "2026-08-01T10:00", "from": "market", "to": "hoarder",
-         "price": "5000000"},
-        {"date": "2026-08-01T11:00", "from": "hoarder", "to": "market",
-         "price": "1000000"},
-        {"date": "2026-08-02T10:00", "from": "busy", "to": "market",
-         "price": "10000000"},
-        {"date": "2026-08-04T10:00", "from": "busy", "to": "market",
-         "price": "10000000"},
-        {"date": "2026-08-07T10:00", "from": "busy", "to": "market",
-         "price": "10000000"},
-        {"date": "2026-08-11T10:00", "from": "busy", "to": "market",
-         "price": "10000000"},
-        {"date": "2026-08-11T10:00", "from": "market", "to": "busy",
-         "price": "30000000"},
-    ]
-    tp = rival_tempo(txns_t)
-    assert set(tp) == {"hoarder", "busy"}, tp     # "market" is never a manager
-    assert tp["busy"]["sells"] == 4 and tp["busy"]["buys"] == 1, tp["busy"]
-    assert tp["busy"]["sold"] == 40e6, tp["busy"]
-    assert tp["hoarder"]["sells"] == 1 and tp["hoarder"]["buys"] == 1
-    # ONE DENOMINATOR FOR EVERYONE — the whole ledger's span (10 days), not
-    # each manager's own first-to-last. Scored on his own span the hoarder's
-    # single sale would read as 1M/day over one hour, i.e. faster than the
-    # rival who actually raised 40M.
-    assert tp["busy"]["days"] == tp["hoarder"]["days"] == 10.0, tp
-    assert abs(tp["busy"]["sell_rate"] - 4e6) < 1e-6, tp["busy"]
-    assert abs(tp["hoarder"]["sell_rate"] - 0.1e6) < 1e-6, tp["hoarder"]
-    assert tp["busy"]["sell_rate"] > 10 * tp["hoarder"]["sell_rate"]
-    # Idle: days since that manager's own last deal, off the ledger's end.
-    assert tp["busy"]["idle"] == 0.0, tp["busy"]
-    assert abs(tp["hoarder"]["idle"] - 9.958333) < 1e-4, tp["hoarder"]
-    assert rival_tempo([]) == {}                  # no ledger, no claims
-
-    # -- days_to_afford: the forward estimate, and its edges ----------------
-    # Already solvent for the price: today, not "0.0 days from now".
-    assert days_to_afford(30e6, 20e6, 1e5, 1e6) == 0
-    # On the allowance alone: 10M short at 100K a day is 100 days.
-    assert days_to_afford(0.0, 10e6, 1e5, 0.0) == 100
-    # THE SAME MANAGER WITH A MEASURED SALE RATE IS AN ORDER OF MAGNITUDE
-    # NEARER — this is the whole reason sell_rate is in the model, and the
-    # real reading it was built from (Albert Laporta: 450 days on the
-    # allowance, 8 days on his own realised rate) has exactly this shape.
-    assert days_to_afford(0.0, 10e6, 1e5, 4e6) == 3
-    # Overdrawn is a real state, not unknown — the arithmetic just starts
-    # further back.
-    assert days_to_afford(-45e6, 10e6, 1e5, 11.9e6) == 5
-    # Ceiling: he cannot sell more than he holds, so past the wall the
-    # answer is "never", not an enormous number of days.
-    assert days_to_afford(0.0, 500e6, 1e5, 4e6, ceiling=100e6) is None
-    assert days_to_afford(0.0, 50e6, 1e5, 4e6, ceiling=100e6) == 13
-    # No rate at all and short: never. Not zero, not a division by zero.
-    assert days_to_afford(0.0, 10e6, 0.0, 0.0) is None
-    # Unknown cash stays unknown — never silently read as broke.
-    assert days_to_afford(None, 10e6, 1e5, 4e6) is None
-
-    # -- contest(): who else can take him, and when ------------------------
-    # rich can pay today; slow needs to sell for it; broke's whole squad
-    # plus his cash cannot reach the price at all, so he is never a threat.
-    per_c = {1: {k: (3.0, 1.0) for k in
-                 ("me_a", "prize", "slow_a", "rich_a", "broke_a")}}
-    u_c = Universe(
-        state=LeagueState({"me": {"me_a": "MED"}, "own": {"prize": "MED"},
-                           "slow": {"slow_a": "MED"},
-                           "rich": {"rich_a": "MED"},
-                           "broke": {"broke_a": "MED"}}, [1], "me"),
-        forecaster=B3(per_c),
-        pos={"prize": "MED"}, proceeds={},
-        price={"prize": 20e6, "listed_one": 20e6},
-        route={"prize": "clause", "listed_one": "listed"},
-        owner={"prize": "own"}, cash=50e6, me="me",
-        value={"slow_a": 30e6, "rich_a": 30e6, "broke_a": 1e6},
-        daily_bonus=1e5,
-        # `own` IS DELIBERATELY RICH ENOUGH TO PAY TODAY, so his absence
-        # below is the exclusion doing work rather than him failing the
-        # arithmetic anyway.
-        rival_cash={"own": 25e6, "slow": 0.0, "rich": 25e6, "broke": 0.0},
-        tempo={"own": {"sell_rate": 2e6}, "slow": {"sell_rate": 2e6},
-               "rich": {"sell_rate": 2e6}, "broke": {"sell_rate": 2e6}})
-    got_c = contest(u_c, "prize")
-    # THE OWNER IS NOT A CONTENDER FOR HIS OWN PLAYER, and neither am I.
-    assert "own" not in dict(got_c) and "me" not in dict(got_c), got_c
-    # broke's ceiling is 0 + 1M < 20M: never, so he is absent entirely
-    # rather than carried as a very large number of days.
-    assert "broke" not in dict(got_c), got_c
-    assert dict(got_c)["rich"] == 0, got_c        # 25M in hand, today
-    assert dict(got_c)["slow"] == 10, got_c       # 20M at 2.1M a day
-    assert got_c[0][0] == "rich", got_c           # soonest first
-    # CLAUSE TARGETS ONLY — a listed row is a bid that can lose and this
-    # function has no model of that; Universe.bids is the signal there.
-    assert contest(u_c, "listed_one") == [], contest(u_c, "listed_one")
-    assert contest(u_c, "nobody") == []
 
     print("decide self-test OK (145 cases)")
 
