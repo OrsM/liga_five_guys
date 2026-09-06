@@ -245,6 +245,90 @@ def recency_only_baseline(golden: list[dict], window: int = 3) -> dict | None:
            "ours_mae": ours_mae}
 
 
+def _actuals_index():
+    """(real_points_since(name, since), now) — the real per-jornada points
+    ledger every replay function below grades against, built once so
+    comparing two picking rules never risks reading two different slices
+    of history by accident.
+    """
+    import methodology as M
+    from ffcore.text import norm
+
+    actuals, _label = M.load_actuals(window_days=None)
+    if not actuals:
+        return None, None
+    now = max(a["from_dt"] for a in actuals)
+    by_player: dict[str, list[tuple[dt.datetime, float]]] = {}
+    for a in actuals:
+        if a["games_delta"] < 1:
+            continue
+        for k in a["keys"]:
+            by_player.setdefault(k, []).append((a["from_dt"], a["points_delta"]))
+
+    def real_points_since(name: str, since: dt.datetime) -> float:
+        return sum(p for when, p in by_player.get(norm(name), [])
+                   if when >= since)
+
+    return real_points_since, now
+
+
+def _pick_episodes(commits, pick) -> list[dict]:
+    """One episode per distinct (buy, sell) pair `pick(moves)` returns,
+    counted at the FIRST day that pair appeared — see
+    `replay_recommendations()`'s own note on why per-commit would drown
+    real signal in the same advice repeated across many runs.
+    """
+    episodes = []
+    last_pair = None
+    for sha, when in commits:
+        text = _show(sha, "reports/decisions.json")
+        if text is None:
+            continue
+        try:
+            data = json.loads(text)
+        except (ValueError, TypeError):
+            continue
+        moves = data.get("moves") or []
+        if not moves:
+            continue
+        chosen = pick(moves)
+        if chosen is None:
+            continue
+        buy, sell = chosen.get("buy"), chosen.get("sell")
+        if not buy or not sell:
+            continue
+        pair = (buy, sell)
+        if pair == last_pair:
+            continue
+        last_pair = pair
+        episodes.append({"when": when, "buy": buy, "sell": sell,
+                         "kind": chosen.get("kind"), "label": chosen.get("label")})
+    return episodes
+
+
+def _grade_episodes(episodes, real_points_since, now, min_days) -> dict | None:
+    """`episodes` -> the same summary shape every replay function returns,
+    graded on real points scored strictly after each episode's own day.
+    """
+    resolved = []
+    for ep in episodes:
+        if (now - ep["when"]).days < min_days:
+            continue
+        buy_pts = real_points_since(ep["buy"], ep["when"])
+        sell_pts = sum(real_points_since(nm.strip(), ep["when"])
+                      for nm in ep["sell"].split(" + "))
+        resolved.append({**ep, "buy_pts": buy_pts, "sell_pts": sell_pts,
+                         "net": buy_pts - sell_pts})
+    if not resolved:
+        return None
+    n = len(resolved)
+    total_net = sum(r["net"] for r in resolved)
+    wins = sum(1 for r in resolved if r["net"] > 0)
+    return {"n": n, "total_episodes": len(episodes),
+           "too_fresh": len(episodes) - n, "total_net": total_net,
+           "mean_net": total_net / n, "wins": wins, "resolved": resolved}
+
+
 def replay_recommendations(min_days: float = 3.0) -> dict | None:
     """Did following the DECISION LAYER's own real recommendations, on the
     real days it made them, actually gain real points — not "is the
@@ -259,18 +343,12 @@ def replay_recommendations(min_days: float = 3.0) -> dict | None:
     top-ranked "buy X, sell Y" call, replayed against what really happened.
 
     THE SOURCE: `reports/decisions.json`'s own `moves[0]` — the single
-    highest-ranked recommendation, exactly what a manager reading the
-    report that day would have acted on — across all 200+ real commits
-    since 2026-08-18 (`commits_touching()`, oldest first, real dates, no
-    hindsight: each day's advice is graded only on points scored AFTER
-    that day, never before).
-
-    ONE EPISODE PER DISTINCT (buy, sell) PAIR, not one per commit — the
-    same advice repeats across many runs until the market moves or it gets
-    acted on; grading it once a run would count the same call 5-10 times
-    over and drown out everything else. An episode is counted at the FIRST
-    day that exact pair was recommended (the earliest a manager could have
-    acted on it), and again once the pair changes.
+    highest-ranked recommendation BY MEAN d_pos, exactly what a manager
+    reading the report that day would have acted on — across all 200+ real
+    commits since 2026-08-18 (`commits_touching()`, oldest first, real
+    dates, no hindsight: each day's advice is graded only on points scored
+    AFTER that day, never before). See `replay_percentile_rank()` for the
+    same replay with a DIFFERENT picking rule, off the same commit history.
 
     `min_days`: an episode needs real runway to say anything — one
     recommended yesterday has barely had a chance to be right or wrong yet.
@@ -278,72 +356,60 @@ def replay_recommendations(min_days: float = 3.0) -> dict | None:
     fresh to grade.
 
     Returns None when there's nothing to replay at all (no commit history,
-    or no episode has cleared `min_days` yet).
+    real points history, or no episode has cleared `min_days` yet).
     """
-    import methodology as M
-    from ffcore.text import norm
-
     commits = commits_touching("reports/decisions.json")
     if not commits:
         return None
-
-    actuals, _label = M.load_actuals(window_days=None)
-    if not actuals:
+    real_points_since, now = _actuals_index()
+    if now is None:
         return None
-    now = max(a["from_dt"] for a in actuals)
-    by_player: dict[str, list[tuple[dt.datetime, float]]] = {}
-    for a in actuals:
-        if a["games_delta"] < 1:
-            continue
-        for k in a["keys"]:
-            by_player.setdefault(k, []).append((a["from_dt"], a["points_delta"]))
+    episodes = _pick_episodes(commits, lambda moves: moves[0])
+    return _grade_episodes(episodes, real_points_since, now, min_days)
 
-    def real_points_since(name: str, since: dt.datetime) -> float:
-        return sum(p for when, p in by_player.get(norm(name), [])
-                   if when >= since)
 
-    episodes = []
-    last_pair = None
-    for sha, when in commits:
-        text = _show(sha, "reports/decisions.json")
-        if text is None:
-            continue
-        try:
-            data = json.loads(text)
-        except (ValueError, TypeError):
-            continue
-        moves = data.get("moves") or []
-        if not moves:
-            continue
-        top = moves[0]
-        buy, sell = top.get("buy"), top.get("sell")
-        if not buy or not sell:
-            continue
-        pair = (buy, sell)
-        if pair == last_pair:
-            continue
-        last_pair = pair
-        episodes.append({"when": when, "buy": buy, "sell": sell,
-                         "kind": top.get("kind"), "label": top.get("label")})
+def replay_percentile_rank(min_days: float = 3.0) -> dict | None:
+    """The SAME replay as `replay_recommendations()`, one thing changed:
+    the picking rule. Instead of the mean-ranked `moves[0]`, pick whichever
+    ALREADY-SCREENED candidate in that same day's `moves` list has the best
+    `pts_lo` — the 10th percentile of its own paired trial distribution
+    (`ffcore.season.band()`'s own definition), already computed and
+    already sitting in every historical `reports/decisions.json`, no new
+    simulation needed.
 
-    resolved = []
-    for ep in episodes:
-        if (now - ep["when"]).days < min_days:
-            continue
-        buy_pts = real_points_since(ep["buy"], ep["when"])
-        sell_pts = sum(real_points_since(nm.strip(), ep["when"])
-                      for nm in ep["sell"].split(" + "))
-        resolved.append({**ep, "buy_pts": buy_pts, "sell_pts": sell_pts,
-                         "net": buy_pts - sell_pts})
+    WHY THIS ANSWERS "would ranking by a safer quantile have done better,
+    up til now" (Miguel, 2026-09-06) WITHOUT waiting or rebuilding
+    anything: `pts_lo` is naturally lower for a move whose case leans on
+    distant, DRIFT_FRAC-widened jornadas than for one whose case is mostly
+    near-term and solid, even at an identical mean — exactly the "prefer
+    safer, nearer-term-loaded gains" instinct behind the question, with no
+    invented time-discount constant, reusing uncertainty machinery already
+    validated this session (rate_rel, club_rel, DRIFT_FRAC).
 
-    if not resolved:
+    A REAL, DISCLOSED LIMIT: this can only ever pick among candidates the
+    OLD mean-based screen already let through into that day's `moves` list
+    — it cannot resurrect a candidate the old screen discarded outright for
+    a poor mean despite a possibly-strong pts_lo. A genuinely fair test of
+    percentile-first screening (not just percentile-first RE-ranking of an
+    already mean-screened shortlist) would need the full historical
+    Universe reconstruction Stage 3's plan flagged as still unbuilt. This
+    is the honest, immediately-available partial answer, not the complete
+    one.
+    """
+    commits = commits_touching("reports/decisions.json")
+    if not commits:
         return None
-    n = len(resolved)
-    total_net = sum(r["net"] for r in resolved)
-    wins = sum(1 for r in resolved if r["net"] > 0)
-    return {"n": n, "total_episodes": len(episodes),
-           "too_fresh": len(episodes) - n, "total_net": total_net,
-           "mean_net": total_net / n, "wins": wins, "resolved": resolved}
+    real_points_since, now = _actuals_index()
+    if now is None:
+        return None
+
+    def pick_by_ptslo(moves):
+        candidates = [m for m in moves if m.get("pts_lo") is not None
+                     and m.get("buy") and m.get("sell")]
+        return max(candidates, key=lambda m: m["pts_lo"]) if candidates else None
+
+    episodes = _pick_episodes(commits, pick_by_ptslo)
+    return _grade_episodes(episodes, real_points_since, now, min_days)
 
 
 def _selftest() -> None:
@@ -439,6 +505,26 @@ def _selftest() -> None:
              f"({rec['too_fresh']} too fresh to grade yet), {rec['wins']}/"
              f"{rec['n']} net positive, total net {rec['total_net']:+.1f} "
              f"real pts, mean {rec['mean_net']:+.1f} pts/episode")
+
+    # -- replay_percentile_rank(): the SAME replay, one picking rule changed
+    # -- does ranking by pts_lo (10th pctile) instead of moves[0] (mean)
+    # actually do better against real history? -----------------------------
+    assert replay_percentile_rank(min_days=1e9) is None
+    prec = replay_percentile_rank()
+    if prec is not None:
+        assert prec["n"] > 0, prec
+        assert prec["n"] + prec["too_fresh"] == prec["total_episodes"], prec
+        assert 0 <= prec["wins"] <= prec["n"], prec
+        print(f"  replay_percentile_rank(): {prec['n']} graded episodes "
+             f"({prec['too_fresh']} too fresh), {prec['wins']}/{prec['n']} "
+             f"net positive, total net {prec['total_net']:+.1f} real pts, "
+             f"mean {prec['mean_net']:+.1f} pts/episode")
+        if rec is not None:
+            better = "BEATS" if prec["total_net"] > rec["total_net"] \
+                else "LOSES TO" if prec["total_net"] < rec["total_net"] \
+                else "TIES"
+            print(f"  -> percentile-rank {better} mean-rank on real history "
+                 f"({prec['total_net']:+.1f} vs {rec['total_net']:+.1f} pts)")
 
     print("backtest.py selftest OK")
 
