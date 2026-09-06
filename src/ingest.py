@@ -361,6 +361,31 @@ def carry_matches(rows: list[dict], prev: dict) -> list[dict]:
                    if MATCH_KEY_RE.match(page) and page not in have]
 
 
+def _odds_api_key() -> str | None:
+    """The Odds API credential, or None — never in source, never committed.
+
+    Read from `.odds_api_key` at the REPO root (gitignored — see
+    .gitignore's own note) — deliberately NOT `ffcore.tidy.ROOT`, which
+    despite the name is the DATA root (`./data` by default, `FF_ROOT`
+    overridable), a different directory this credential file has nothing
+    to do with. A fresh checkout or a CI box simply has no key rather than
+    a broken one; `ODDS_API_KEY` in the environment is checked first for a
+    box that prefers that route instead (this repo's own `LFG_TOKEN`/
+    `LFG_NO_FETCH` already read env vars for exactly this kind of per-box
+    override).
+    """
+    env = os.environ.get("ODDS_API_KEY")
+    if env:
+        return env.strip()
+    repo_root = Path(__file__).resolve().parent.parent
+    path = repo_root / ".odds_api_key"
+    try:
+        key = path.read_text().strip()
+    except FileNotFoundError:
+        return None
+    return key or None
+
+
 def fetch() -> Path:
     import httpx
 
@@ -402,6 +427,14 @@ def fetch() -> Path:
     except Exception as e:                              # noqa: BLE001
         print(f"  warn: league token unusable ({e}); API sources skipped.")
 
+    # Same "missing credential degrades to no fetch" shape as the league
+    # bearer above, for a different credential — see _odds_api_key()'s own
+    # note on where this is read from.
+    odds_key = _odds_api_key()
+    if odds_key is None:
+        print("  note: no Odds API key (.odds_api_key or ODDS_API_KEY); "
+              "the odds source will be skipped.")
+
     with httpx.Client(headers=HEADERS, timeout=TIMEOUT,
                       follow_redirects=True) as c:
         # A queue rather than a loop over the registry, because the calendar
@@ -422,11 +455,20 @@ def fetch() -> Path:
                     rows.append(dict(prev[src.key]))     # carried, not fetched
                 skipped += 1
                 continue
+            # A missing Odds API key means this ONE source has nothing to
+            # ask for — skip it here, before a request with a blank
+            # apiKey= goes out and wastes a slot in the sweep on a
+            # guaranteed 401. Every other source is unaffected.
+            if src.key == "odds" and odds_key is None:
+                skipped += 1
+                continue
             # {date} is filled for the one source whose URL carries the day it
             # is asking about (Club Elo); {base} for the league API, whose host
-            # lives next to the token that opens it. Every other URL has no
-            # placeholder in it, so this is a no-op for them.
-            url = src.url.format(date=stamp[:10], base=API_BASE)
+            # lives next to the token that opens it; {odds_key} for the odds
+            # source alone (see ODDS_URL's own note) — a no-op .format() slot
+            # for every other URL, none of which contain that placeholder.
+            url = src.url.format(date=stamp[:10], base=API_BASE,
+                                 odds_key=odds_key or "")
             # The bearer goes ONLY on entries that asked for it. Sending it
             # with a futbolfantasy request would hand a third party the
             # credential to the league account, so this is a per-request

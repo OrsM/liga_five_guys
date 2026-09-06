@@ -6,6 +6,10 @@ __pycache__/
 .venv/
 .env
 
+# The Odds API key (the-odds-api.com) -- a real credential, never committed.
+# Read once at fetch time by ingest.py's odds source.
+.odds_api_key
+
 # Quarto renders of reports/latest.md. Every workflow does `git add -A reports`,
 # so without this a local render gets committed by the next bot run.
 reports/latest.html

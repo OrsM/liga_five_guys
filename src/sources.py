@@ -1434,6 +1434,125 @@ def sign_fd_results(text: str) -> str | None:
                                         r.get("FTAG")) for r in rows])
 
 
+# BOOKMAKER-IMPLIED MATCH ODDS — team-level, logged now so a real history
+# accumulates before the forecast-first rebuild plan's Stage 3 backtest
+# tests whether it beats the current Elo/squad-value fixture proxy. NOT
+# WIRED INTO SCORING YET — season_board() still reads only Elo/value, on
+# purpose (docs/notes/forecast.md#odds-parked-log-dont-integrate-yet). This
+# is the "log now, don't build the integration until the backtest earns
+# it" half of that plan, same discipline market/team pages already follow.
+#
+# {odds_key} IS A CREDENTIAL PLACEHOLDER, not a URL parameter like {date}/
+# {base} — ingest.py fills it from a file never committed to this repo
+# (.odds_api_key, gitignored) and skips this source entirely, loudly once,
+# when that file is missing — the same "a missing credential degrades to
+# no fetch, never a broken request" rule the league bearer token already
+# follows for auth=True sources.
+#
+# COST: the-odds-api.com's free tier is 500 credits/month; one call here
+# costs a handful (measured live 2026-09-06: 6, one `regions`x`markets`
+# combination, covers every upcoming La Liga match in that one request
+# regardless of match count) — the exact number moves with how many
+# regions/markets are requested, not with how many matches come back.
+# "daily"
+# cadence, like Elo — odds move throughout a matchday but a forecasting
+# input that isn't wired into any live number yet doesn't need finer than
+# that, and it keeps monthly usage far under budget even with reruns.
+ODDS_URL = ("https://api.the-odds-api.com/v4/sports/soccer_spain_la_liga"
+           "/odds/?apiKey={odds_key}&regions=eu&markets=h2h"
+           "&oddsFormat=decimal")
+ODDS_SOURCE = "odds_api"
+
+
+def _median(xs: list[float]) -> float | None:
+    xs = sorted(xs)
+    n = len(xs)
+    if n == 0:
+        return None
+    mid = n // 2
+    return xs[mid] if n % 2 else (xs[mid - 1] + xs[mid]) / 2.0
+
+
+def parse_odds(text: str, observed_at: str,
+              key: str = "odds_api") -> list[dict]:
+    """One row per upcoming match: the MEDIAN bookmaker price per outcome
+    (robust to one outlying book, cheaper than a trimmed mean to reason
+    about), converted to an overround-free implied probability.
+
+    MEDIAN, NOT MEAN — a single mispriced book (seen live: a 2.5 next to a
+    dozen books all at 2.3) should not move the estimate as much as it
+    would move an average. Overround removed by normalising the three
+    outcomes' raw implied probabilities (1/price) to sum to 1 — a
+    bookmaker's own three prices always imply MORE than 100% (their
+    margin), so an unnormalised reading would systematically understate
+    every outcome.
+
+    Teams resolved to this repo's own slugs via `_fd_match_team()` (the
+    same small name-matching rule football-data's results already use,
+    not a new one) — unresolved sides keep their raw odds-API name rather
+    than being dropped, so a genuinely new/renamed club still leaves a
+    row worth having once resolved by hand later.
+    """
+    try:
+        events = json.loads(text) if text else []
+    except (ValueError, TypeError):
+        return []
+    rows = []
+    for ev in events:
+        home_name = (ev.get("home_team") or "").strip()
+        away_name = (ev.get("away_team") or "").strip()
+        if not home_name or not away_name:
+            continue
+        prices: dict[str, list[float]] = {"home": [], "away": [], "draw": []}
+        n_books = 0
+        for bk in ev.get("bookmakers") or []:
+            h2h = next((m for m in bk.get("markets") or []
+                       if m.get("key") == "h2h"), None)
+            if h2h is None:
+                continue
+            outcomes = {o.get("name"): o.get("price")
+                       for o in h2h.get("outcomes") or []}
+            try:
+                prices["home"].append(float(outcomes[home_name]))
+                prices["away"].append(float(outcomes[away_name]))
+                prices["draw"].append(float(outcomes["Draw"]))
+            except (KeyError, TypeError, ValueError):
+                continue
+            n_books += 1
+        if n_books == 0:
+            continue
+        med = {k: _median(v) for k, v in prices.items()}
+        implied = {k: (1.0 / p if p else 0.0) for k, p in med.items()}
+        total = sum(implied.values())
+        if total <= 0:
+            continue
+        rows.append({
+            "observed_at": observed_at, "source": ODDS_SOURCE,
+            "kickoff": (ev.get("commence_time") or "").strip(),
+            "home_name": home_name, "away_name": away_name,
+            "home": _fd_slug(home_name), "away": _fd_slug(away_name),
+            "n_bookmakers": n_books,
+            "p_home": implied["home"] / total,
+            "p_draw": implied["draw"] / total,
+            "p_away": implied["away"] / total,
+        })
+    return rows
+
+
+def sign_odds(text: str) -> str | None:
+    """One digest over each match's resolved teams and MEDIAN implied
+    probabilities, rounded to 3dp — real line movement (the whole reason
+    to log this at all) changes the signature; per-millisecond `last_update`
+    stamp churn on an unmoved line does not.
+    """
+    rows = parse_odds(text, "")
+    if not rows:
+        return None
+    return _digest(["%s|%s|%.3f|%.3f|%.3f" % (
+        r["home"] or r["home_name"], r["away"] or r["away_name"],
+        r["p_home"], r["p_draw"], r["p_away"]) for r in rows])
+
+
 # PLAYER-LEVEL xG/xA — the "skill" side of the signal/noise split raw points
 # cannot give on its own: a shot on target scores or doesn't on a coin a
 # player's own quality only partly loads, while xG scores the CHANCE, not
@@ -2386,6 +2505,12 @@ def sources(enabled_only: bool = True) -> list[Source]:
     out += fd_sources()
     # Player-level xG/xA — see understat_sources()'s own docstring.
     out += understat_sources()
+    # Bookmaker-implied match odds — see ODDS_URL's own note. `{odds_key}`
+    # is filled by ingest.py from a never-committed credential file; a
+    # missing key skips this one source, loudly, once — same shape as a
+    # missing league token for auth=True sources, different mechanism.
+    out += [Source("odds", "odds", ODDS_URL, parse_odds, sign_odds,
+                   cadence="daily", timeout=15.0)]
     # The whole season's results in one page. It is what tells the starters
     # sweep which match pages exist and which are worth asking for.
     out += [Source(CAL_KEY, "matches", FF_CAL_URL, parse_calendar,
@@ -3120,6 +3245,88 @@ def _selftest() -> None:
     assert all(s.table == "results_history" for s in fs)
     assert source_for("fd_2627").parse is parse_fd_results
 
+    # -- odds: bookmaker-implied match odds ---------------------------------
+    # Real payload, pulled live 2026-09-06 from the-odds-api.com's own
+    # v4 soccer_spain_la_liga odds endpoint, trimmed to 3 bookmakers
+    # (h2h_lay from betfair_ex_eu dropped — not the market this reads).
+    _ODDS_LIVE = json.dumps([{
+        "id": "823ef5c97dc93ff1e8fd7dbafb90c9d5",
+        "sport_key": "soccer_spain_la_liga", "sport_title": "La Liga - Spain",
+        "commence_time": "2026-09-06T19:00:00Z",
+        "home_team": "Espanyol", "away_team": "Sevilla",
+        "bookmakers": [
+            {"key": "betsson", "title": "Betsson",
+             "last_update": "2026-09-06T19:21:00Z",
+             "markets": [{"key": "h2h", "last_update": "2026-09-06T19:21:00Z",
+                         "outcomes": [{"name": "Espanyol", "price": 2.3},
+                                     {"name": "Sevilla", "price": 3.2},
+                                     {"name": "Draw", "price": 2.78}]}]},
+            {"key": "betfair_ex_eu", "title": "Betfair",
+             "last_update": "2026-09-06T19:20:59Z",
+             "markets": [{"key": "h2h",
+                         "last_update": "2026-09-06T19:20:59Z",
+                         "outcomes": [{"name": "Espanyol", "price": 2.5},
+                                     {"name": "Sevilla", "price": 3.55},
+                                     {"name": "Draw", "price": 3.05}]}]},
+            {"key": "betclic_fr", "title": "Betclic (FR)",
+             "last_update": "2026-09-06T19:17:33Z",
+             "markets": [{"key": "h2h",
+                         "last_update": "2026-09-06T19:17:33Z",
+                         "outcomes": [{"name": "Espanyol", "price": 2.35},
+                                     {"name": "Sevilla", "price": 3.0},
+                                     {"name": "Draw", "price": 2.9}]}]},
+        ],
+    }])
+    odds = parse_odds(_ODDS_LIVE, "2026-09-06T1930Z")
+    assert len(odds) == 1, odds
+    o = odds[0]
+    assert o["home"] == "espanyol" and o["away"] == "sevilla", o
+    assert o["kickoff"] == "2026-09-06T19:00:00Z"
+    assert o["n_bookmakers"] == 3, o
+    # MEDIAN price per side: home [2.3, 2.5, 2.35] -> 2.35; away
+    # [3.2, 3.55, 3.0] -> 3.2; draw [2.78, 3.05, 2.9] -> 2.9. Implied
+    # 1/price, normalised to sum to 1 (removes the books' own margin).
+    assert abs(o["p_home"] - 0.393) < 0.005, o
+    assert abs(o["p_away"] - 0.289) < 0.005, o
+    assert abs(o["p_draw"] - 0.318) < 0.005, o
+    assert abs(o["p_home"] + o["p_away"] + o["p_draw"] - 1.0) < 1e-9, o
+
+    assert parse_odds("", "t") == []
+    assert parse_odds("not json", "t") == []
+    # No h2h market on any book: no price to read, row dropped rather than
+    # invented from nothing.
+    assert parse_odds(json.dumps([{"home_team": "Espanyol",
+                                   "away_team": "Sevilla",
+                                   "bookmakers": [{"key": "x",
+                                                   "markets": []}]}]),
+                      "t") == []
+    # A club not in this repo's current twenty: kept, unresolved slug "" —
+    # same "still says something real about the resolved side" rule as
+    # parse_fd_results above.
+    unresolved = parse_odds(json.dumps([{
+        "home_team": "Espanyol", "away_team": "Not A Real Club FC",
+        "bookmakers": [{"key": "x", "markets": [{"key": "h2h",
+                        "outcomes": [{"name": "Espanyol", "price": 2.0},
+                                    {"name": "Not A Real Club FC",
+                                     "price": 2.0},
+                                    {"name": "Draw", "price": 3.0}]}]}]}]),
+        "t")
+    assert len(unresolved) == 1 and unresolved[0]["away"] == "", unresolved
+
+    assert sign_odds(_ODDS_LIVE) is not None
+    assert sign_odds("") is None
+    # A `last_update` timestamp moving with the price unchanged: same
+    # signature — that churn is not real content.
+    assert sign_odds(_ODDS_LIVE) == sign_odds(
+        _ODDS_LIVE.replace("2026-09-06T19:21:00Z", "2026-09-06T19:45:00Z"))
+    # A real price move: different signature.
+    assert sign_odds(_ODDS_LIVE) != sign_odds(
+        _ODDS_LIVE.replace('"price": 2.3', '"price": 4.5'))
+
+    assert source_for("odds").parse is parse_odds
+    assert source_for("odds").table == "odds"
+    assert source_for("odds").cadence == "daily"
+
     # -- understat: player-level xG/xA -------------------------------------
     # Real rows, pulled live 2026-08-21 from a direct POST to
     # understat.com/main/getPlayersStats/ with {league: La_liga,
@@ -3584,14 +3791,14 @@ def _selftest() -> None:
     assert source_for("api_lineup_38").table == "api_lineup"
 
     reg = sources()
-    # 6 standalone pages: market, points, af_fixtures, elo, the calendar, and
-    # the API's discovery page. The three API entries it reveals are not here
-    # — they are queued at run time, like the match pages. Plus
-    # FD_SEASONS_BACK + 1 football-data entries and UNDERSTAT_SEASONS_BACK
-    # + 1 understat entries (both deterministic from today's date, so
-    # listed directly rather than queued).
-    assert len(reg) == (6 + len(TEAMS) + len(AF_TEAMS) + FD_SEASONS_BACK + 1
-                        + UNDERSTAT_SEASONS_BACK + 1) == 52, len(reg)
+    # 7 standalone pages: market, points, af_fixtures, elo, the calendar, the
+    # odds source, and the API's discovery page. The three API entries it
+    # reveals are not here — they are queued at run time, like the match
+    # pages. Plus FD_SEASONS_BACK + 1 football-data entries and
+    # UNDERSTAT_SEASONS_BACK + 1 understat entries (both deterministic from
+    # today's date, so listed directly rather than queued).
+    assert len(reg) == (7 + len(TEAMS) + len(AF_TEAMS) + FD_SEASONS_BACK + 1
+                        + UNDERSTAT_SEASONS_BACK + 1) == 53, len(reg)
     assert set(AF_TEAMS) == set(TEAMS), set(AF_TEAMS) ^ set(TEAMS)
     # Both team sweeps run twice a day — the 11:40 sweep exists because the
     # XIs firm up late morning, and a calendar-day cadence skipped it there.
@@ -3609,7 +3816,7 @@ def _selftest() -> None:
     assert {s.table for s in reg} == {"market", "points", "lineups",
                                       "fixtures", "elo", "matches",
                                       "api_leagues", "results_history",
-                                      "understat_players"}
+                                      "understat_players", "odds"}
     assert source_for("team_celta").parse is parse_team
     assert source_for("gone") is None                     # retired page name
 
@@ -3620,7 +3827,7 @@ def _selftest() -> None:
                "af_fixtures": _AF_HUB_FIXTURE, "elo": _ELO_FIXTURE,
                CAL_KEY: _CAL_FIXTURE, API_LEAGUES_KEY: _API_LEAGUES_FIXTURE,
                "understat_2026": _UNDERSTAT_LIVE,
-               "understat_2025": _UNDERSTAT_PAST}
+               "understat_2025": _UNDERSTAT_PAST, "odds": _ODDS_LIVE}
     # Half the AF teams get each shape, so neither branch can rot unnoticed.
     for i, k in enumerate(sorted(AF_TEAMS)):
         samples[f"af_{k}"] = _AF_FIXTURE if i % 2 else _AF_CONSENSO_FIXTURE
