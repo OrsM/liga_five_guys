@@ -211,7 +211,7 @@ the other source. Including him at pts=0 would shrink a possibly-real
 season toward zero on a guess; leaving him out keeps him on last season's
 rate (matches the pre-2026-08-21 universe exactly).
 
-## `_weighted_totals` / `_weighted_start` — recency weighting
+## `_weighted_totals` / `_weighted_start`: recency weighting
 
 Most recent jornada with a row weighs 1; one back weighs `decay`; two back
 `decay**2`; decay=1.0 collapses to an exact flat sum (today's cumulative
@@ -322,7 +322,7 @@ optimises (binary played/didn't → minutes-graded) touched no confirmed
 line-up and no cut, and the stale binary-fitted coefficients would have
 kept being read off disk forever.
 
-## `Scorer.__init__` — key joins
+## `Scorer.init` — key joins
 
 - **The same key the market index uses.** Keyed on `norm(name)` alone,
   this held one row for the two Álvaro Garcías — a squad correctly naming
