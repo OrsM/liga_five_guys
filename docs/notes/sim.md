@@ -44,16 +44,15 @@ byte-identical). Emitted ahead of BUY, in ceiling order (`chase[k]`, 1 then
 2) rather than `_move_rank_key()` order — widest band first is the point of
 the section.
 
-## ladder_rows() — BUY / RAID / LISTED split
+## ladder_rows() — BUY / RAID split
 
-Free agents, then a real raid, then a listed wish — same order throughout,
-three headings, nothing dropped. Before this (Miguel, 2026-09-01: "I want
-to know if any free players are worth buying honestly"), every BUY row
-sorted together on value-for-money, which has no reason to prefer a free
-pickup over a clause raid that pays for its own premium in points — a real
-report could (and did) show nothing but rival-owned targets at the top,
-with no way to tell "no good free options today" from "free options exist
-but a bigger raid outranked them."
+Free agents, then a real raid — two headings, nothing dropped. Before this
+(Miguel, 2026-09-01: "I want to know if any free players are worth buying
+honestly"), every BUY row sorted together on value-for-money, which has no
+reason to prefer a free pickup over a clause raid that pays for its own
+premium in points — a real report could (and did) show nothing but
+rival-owned targets at the top, with no way to tell "no good free options
+today" from "free options exist but a bigger raid outranked them."
 
 A rival's own player is not one thing. A **clause** cannot be refused — pay
 it and he is yours, the same certainty as a free pickup. A **listed**
@@ -61,15 +60,40 @@ target is the owner's own choice to sell, and this league's own measured
 history (decide.py, re-derived and proven 2026-08-31 by replaying ownership
 forward over the real ledger rather than reading it off ledger columns) is
 that 0 of 119 real deals have ever been manager-to-manager — not rare, the
-entire sample. Grouping listed under RAID implied a rival selling to Miguel
-is a live option; it is not (Miguel: "no way they're selling willingly to
-me") — found 2026-09-01, the same day the two-way split shipped, checking
-it against a real report where 3 of the RAID rows turned out to be listed,
-not clause.
+entire sample. Originally a third heading here (grouping listed separately
+from RAID rather than mixing it into RAID, since a rival selling to Miguel
+is not a live option — "no way they're selling willingly to me," found
+2026-09-01 against a real report where 3 of the RAID rows turned out to be
+listed, not clause). LISTED as a section was later removed entirely
+(2026-09-05, `bf8bf94`): Miguel asked three separate times for rival-owned,
+non-clause players to simply not appear, and the honest end state (asked
+directly, since two prior guesses had already missed) was drop, not
+relabel. `decide.candidates()` now filters a listed target out before it
+ever becomes an `Action`, so it's absent from `rows`/`won` here, not
+demoted to a heading — RAID (clause) is the only rival-owned row that can
+appear.
 
-Implementation: one `_move_rank_key()`-sorted list (`non_chase`), filtered
-three times by ownership/route, never three separately ranked lists — so no
-section can disagree with another about relative order.
+Implementation: one `_move_rank_key()`-sorted list (`ranked`, built from
+`won`), filtered by `route_kind()` for each heading — never separately
+ranked lists, so no section can disagree with another about relative
+order.
+
+## ladder_rows() — PASS is free agents only
+
+`rest` (every acquirable player, not just `candidates()`'s screened pool)
+feeds SAVE and PASS independently of the BUY/RAID list above — a second,
+parallel candidate pool `route_kind()`'s ownership fix could bypass
+entirely. Found 2026-09-05, the SAME day the BUY/RAID work above shipped:
+Miguel, within the hour, "I see a lot of competitor players in pass... I
+really don't know how to explain what I want" — a rival-owned player who
+"cleared the bar" was landing in PASS with a price, indistinguishable from
+a genuine free-agent miss; worse, a clause-raidable rival who simply didn't
+rank high enough for RAID also fell through here, rendered identically,
+with no clause marker at all. Two candidate pools that looked like one
+(`rows`/`won` vs `rest`) is exactly the duplication `route_kind()` existed
+to close, one call site later. Fixed bluntly, Miguel's own end state:
+PASS is free-agent-only, full stop, clause or not — no rival-owned row
+anywhere in PASS, regardless of how close it came to clearing the bar.
 
 ## ladder() — the race, in the Where column
 
@@ -135,21 +159,28 @@ actually pulls the trigger — a reason to read "can pay today" as real
 
 `VALUE_TOLERANCE`: how much of the best available move's season gain a
 materially cheaper alternative may give up and still be the one
-recommended. Real judgment, not measured — the cash spent this week does
-not come back this season (`rank()`'s own net-cost accounting), so a move
-keeping 90%+ of the best gain for meaningfully less money leaves next
-week's options open in a way the last 10% doesn't buy back. Not 1.0
-(today's old behaviour — biggest gain wins outright regardless of cost)
-and not much lower (a move worth noticeably less of the season is a worse
-move, full stop, whatever it costs).
+recommended, in `_best()`'s own value-for-money refinement (the single
+headline pick only). Real judgment, not measured — the cash spent this
+week does not come back this season (`rank()`'s own net-cost
+accounting), so a move keeping 90%+ of the best gain for meaningfully
+less money leaves next week's options open in a way the last 10%
+doesn't buy back. Not 1.0 (biggest gain wins outright regardless of
+cost) and not much lower (a move worth noticeably less of the season is
+a worse move, full stop, whatever it costs). Still live.
 
-`MOVES_VALUE_FLOOR`: the floor half of "bar, then ratio" — a looser
-question for the whole table (not one headline pick): what counts as
-worth ranking by efficiency at all. Without it, pure points-per-euro
-sorting hits the fractional-knapsack trap — a near-zero gain at an even
-smaller cost divides out to an enormous ratio and would win a table
-nobody would act on. Judgment call, not measured; tune against real
-reports if it buries a real move or promotes a trivial one.
+`MOVES_VALUE_FLOOR`: RETIRED 2026-09-06, deleted along with
+`_moves_floor()` — see `_move_rank_key()`'s own note above. It was the
+floor half of "bar, then ratio" for the WHOLE ladder (not the single
+headline pick `VALUE_TOLERANCE` guards): what counted as worth ranking
+by efficiency at all, guarding against the fractional-knapsack trap (a
+near-zero gain at an even smaller cost dividing out to a spuriously
+enormous ratio). Real, judged, never measured against data in its own
+right — and when `backtest.replay_ladder_percentile()` finally checked
+the WHOLE tiered scheme it was part of against 200+ real historical
+ladders, that scheme came out net NEGATIVE where a flat `pts_lo` sort
+(no floor, no tiers at all) was net POSITIVE. Kept here for anyone
+tracing an old `MOVES_VALUE_FLOOR` reference back to why it existed and
+why it's gone, not because the mechanism survived.
 
 ## _move_rank_key() — d_win alone no longer wins tier 0 outright
 
@@ -218,14 +249,62 @@ the same real market history per report, total, for one fact that cannot
 differ between them. Found 2026-09-01, alongside the same duplication in
 `render()`. Now one call, read everywhere.
 
-## payload() — moves sorted by the same bar-then-value rule as the ladder
+## _best() — pts_lo, not mean d_pos (2026-09-06)
 
-Same rule as `_move_rank_key()`/`MOVES_VALUE_FLOOR` (see their own note): a
-d_win-driven move leads outright; among d_pos-driven moves, anything
-clearing the floor ranks by `value` (points per euro); below the floor,
-pushed to the bottom in raw-gain order, never hidden. A chase pick is
+Miguel asked, in a money-management discussion, whether points should be
+discounted so nearer jornadas count more (buying is for the whole
+remaining season, but the far end of it is genuinely less certain). A
+literal time-discount would bias a risk-neutral expected-value objective
+for no principled reason — a point is a point wherever it falls. The real
+version of his intuition: since a squad decision is revisable (you can
+trade again next week), a candidate whose gain leans on distant,
+`DRIFT_FRAC`-widened jornadas is a weaker case FOR ACTING TODAY than one
+with an identical mean but a solid near-term floor, because the distant
+part can be captured later with better information. `_best()`'s own
+Monte Carlo already produces that floor for free — `pts_lo`, the 10th
+percentile of the move's paired trial distribution — so `_best()` was
+changed to pick `max(pool, key=lambda r: r["pts_lo"])` instead of
+`max(pool, key=lambda r: r["d_pos"])`. No new discount constant; the same
+uncertainty machinery (`rate_rel`, `club_rel`, `DRIFT_FRAC`) just read at
+a different quantile. Validated against real history before being wired
+in, not on theory alone: `backtest.replay_percentile_rank()` replayed
+200+ real historical `reports/decisions.json` commits with this exact
+substitution and found it would have beaten mean-ranking on real
+outcomes (+64 vs +31 real points, 14/32 vs 9/24 net-positive calls).
+Everything else in `_best()` — the eligibility gate, reliable-routes-
+first, the `VALUE_TOLERANCE` cheaper-alternative refinement — is
+unchanged; this was one targeted substitution, not a rebuild.
+
+## _move_rank_key() — pts_lo, not mean d_pos or value (2026-09-06)
+
+After `_best()`'s switch above, Miguel: "the whole ladder should follow
+same logic why wouldn't it?" — a fair challenge to leaving
+`_move_rank_key()` (every BUY/RAID row across both the markdown ladder
+and the phone's JSON) on the old d_win/d_pos/value tiering. Checked
+before wiring it in, not assumed: `backtest.replay_ladder_percentile()`
+compared each real historical day's real top-3 (what the tiered scheme
+actually produced) against a flat `pts_lo` sort over the same real
+candidates. The tiered scheme was net NEGATIVE on real history (-94
+points, 98 episodes); the flat sort was net POSITIVE (+90 points, 118
+episodes) — a bigger, clearer margin than the single-pick test.
+`_move_rank_key(r, u)` now returns `(reliable, -pts_lo)`. RETIRED
+entirely, on that evidence: `MOVES_VALUE_FLOOR`, `_moves_floor()`, and
+the "a d_win-driven move leads outright" tier (see this file's earlier,
+now-superseded note on why that tier existed — `VALUE_TOLERANCE`, the
+90% cheaper-alternative-tolerance constant, stays: it's `_best()`'s own
+separate refinement above, untouched). A simpler single-metric rule
+beating the accumulated special-casing lines up with this session's
+earlier "the book" simplification pass — the complexity wasn't earning
+its keep here either.
+
+## payload() — moves sorted by the same rule as the ladder
+
+`ladder_rows()`'s BUY group and `payload()`'s `moves` both call
+`_move_rank_key()` (see its own note above) — one shared key, so the
+markdown table a reader scrolls top to bottom and the phone's JSON
+cannot rank the same candidates in two different orders. A chase pick is
 flagged on its existing row (`chase_keys()`), not re-sorted to the top —
-the value-for-money order is unchanged whether or not chase mode fires.
+the ranking is unchanged whether or not chase mode fires.
 
 ## payload() — several fields exist only because the phone used to drift from the markdown
 

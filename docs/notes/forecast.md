@@ -128,6 +128,69 @@ fit is a horizon ladder — predictions logged h jornadas out and graded at
 several different h — a change to what `data/decisions/squad_log.csv`
 records, not a matter of waiting for rows to accumulate.
 
+## fit_drift_frac() — the derivation
+
+The note above ends "what would unblock a real fit is a horizon
+ladder... a change to what squad_log.csv records, not a matter of
+waiting for rows to accumulate" — this is that change, and the fit it
+unblocks. Miguel: "I do not want a hardcoded drift. uncertainty in the
+estimates for the next game plus uncertainty at team or league level
+should inform the season long uncertainty and upcoming simulated
+matches." Investigation found the inputs were already real —
+`rate_rel` (per-player, `cv/sqrt(matches)`) and `club_rel` (per-club,
+`club_volatility()`) were never hardcoded; `DRIFT_FRAC` alone was the
+bare guess, a single scalar controlling how much of that real
+uncertainty compounds into drift vs. washes out as per-match noise.
+
+`rate_draw()`'s own model says the per-player log-error at horizon h has
+variance `rate_rel[k]**2 * (1 + h * DRIFT_FRAC**2)` — one unit from the
+flat per-trial error `eps0` (present at every horizon equally), plus `h`
+independent accumulated drift steps. Dividing each observed log-error
+by its own `rate_rel[k]` puts every player on the same scale regardless
+of individual evidence, so the population's observed variance at two
+real horizons isolates `DRIFT_FRAC` directly:
+
+    Var(z_h1) ~= 1 + 1 * DRIFT_FRAC**2
+    Var(z_h3) ~= 1 + 3 * DRIFT_FRAC**2
+    DRIFT_FRAC = sqrt(max(0, (Var(z_h3) - Var(z_h1)) / (3 - 1)))
+
+Validated the way this session's highest-stakes changes always were
+before trusting them: synthetic data generated from the real
+`Bootstrap.rate_draw()` with a KNOWN ground-truth drift, confirming the
+estimator recovers it (within sampling noise, n=4000) — not a
+hand-crafted fixture, the model's own generative process.
+
+`fit_drift_frac()` needs real graded pairs at two horizons to run at
+all — `score_h3` (report.py's short-horizon figure) was only added this
+same session and needs 3 real jornadas to grade, a genuine wait
+(Stage 5 of the forecast-first rebuild plan). Rather than wait for that,
+`methodology.drift_frac_from_history()` mines what already exists:
+squad_log.csv has logged a fresh prediction most days since 2026-08-11,
+so several real predictions for the SAME outcome already sit there at
+different lead times (Miguel, catching an overclaim: "you have all the
+previous scrapes with timestamps, why can't you use that?"). See
+methodology.md's own note on `drift_frac_from_history()` for that half.
+Wired live in `decide.load()`, which sets `ffcore.forecast.DRIFT_FRAC`
+from the fitted result before building `Bootstrap` — reported every run
+by `methodology.drift_lines()`, honestly still the unfitted default as
+of 2026-09-06 (too few real pairs at both horizons yet), self-improving
+with zero further code change as more jornadas lock.
+
+## odds: parked, log, don't integrate yet
+
+Bookmaker-implied match odds (the-odds-api.com) are a real, sharper
+team-level signal than the current Elo/squad-value fixture proxy — but
+this repo's own discipline (backtest before building) says don't wire a
+new signal into scoring until a real comparison shows it beats the
+current one, and that comparison needs real accumulated history first.
+`sources.py`'s `odds` table logs the median bookmaker price per outcome
+(robust to one mispriced book) as an overround-free implied probability,
+daily, via a real credential (`.odds_api_key`, gitignored, never
+committed) — nothing reads this table yet. Same "log now, don't build
+the integration until it earns it" shape as `score_h3` above: the
+history has to exist before it can be tested, so accumulating it costs
+nothing to start today and everything to have skipped.
+
 ## The drift-walk rate_draw()/start_draw() bug and fix
 
 Found 2026-09-01 (swarm review of the forecasting engine). `rate_draw()`'s

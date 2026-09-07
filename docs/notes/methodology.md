@@ -80,3 +80,77 @@ renderings of one answer" duplication `column_guide_lines()` was built on
 these eleven"/"What to bid" as the actual daily board. One copy now; both
 renderers point here instead of carrying their own (Miguel: "do we need
 all that long long text? shouldn't it go somewhere else?").
+
+## load_actuals--jornada-carried-through-for-a-future-join
+
+`points.py`'s `diff()` already stamps a jornada per row (off the
+calendar) — dropped here before 2026-09-06's `b0fface`. Carried through
+so a rate-side row (this one, timestamp-keyed off arbitrary diff
+snapshots) and a start-side row (`start_grade()`'s own jornada-locked
+intervals, kickoff-lock-keyed) can eventually be joined on the one
+number both sides already compute, instead of on timestamps that live
+in two different clocks. The join itself is `golden_rows()`, below —
+this was the key it needed, added first because the join couldn't exist
+without it.
+
+## golden_rows--the-player-jornada-join
+
+One row per (player, jornada): the rate side and the start side,
+finally on the same table instead of two separate grading passes that
+never talked to each other (Stage 2 of the forecast-first rebuild
+plan). THE JOIN KEY is the jornada number, not a timestamp — the rate
+side (`pair()`, via `load_actuals()`) is naturally keyed by arbitrary
+diff-snapshot timestamps; the start side (`forecast_claims()`, via
+`start_grade()`'s own jornada-locked intervals) is naturally keyed by
+kickoff-lock times. Neither clock means anything to the other, which is
+why this didn't exist before `load_actuals()`/`pair()` carried a real
+jornada number (see the note above) — `jornada_locks()` (already used
+inside `start_intervals()`, never exposed) is inverted here (lock time
+-> jornada) to put the start side on the same key. A row's rate fields
+are `None` when nothing matched — a player with a real start-probability
+claim but no rate prediction for that exact jornada (he might not have
+played) is still kept for the start-calibration half of the question.
+
+## forecast_claims--our-own-number-graded-the-same-way
+
+Closes the grading blind spot found 2026-09-06: `methodology.pair()`'s
+only check of forecast-vs-reality had literally never graded whether
+OUR OWN start-probability forecast was right — only the rate forecast,
+conditional on a player having played (`points.py`'s `diff()` only
+emits mover rows; a predicted-to-start-but-didn't-play case had no row
+anywhere to grade, not a filtered one). `forecast_claims()` converts
+`squad_log.csv`'s own `start_pct` into `start_grade()`'s existing claim
+shape — reuse, not a new grader, resolving `team_slug` through the
+crosswalk (a real bug here: `ff_id` is this repo's own crosswalk key,
+not an external app_id — `xw.players.get(ff_id)`, not
+`xw.player(app_id=ff_id)`; wrong, resolution held for 5% of claims
+instead of 64%). First result (0.421 Brier, worse than a coin flip)
+looked damning — turned out to be this crosswalk bug plus a
+pre-existing interval-construction bug in `appearances()` (a
+points-correction-only row with `games_delta=0` creates a phantom
+near-empty interval unrelated to any real jornada boundary, hitting
+every source equally). Fixed both, re-measured: our forecast's real
+Brier is 0.114 (n=33), comparable to the best raw source — the scary
+number was a measurement bug, not a finding about the forecast.
+
+## drift_frac_from_history--why-lag-not-a-new-column
+
+Fits `ffcore.forecast.DRIFT_FRAC` (see forecast.md's own note on the
+estimator itself) off REAL, already-elapsed multi-jornada-ahead
+forecasts — no waiting required. Miguel, after an earlier claim that the
+horizon-ladder side was blocked on time: "you have all the previous
+scrapes with timestamps, why can't you use that?" — correct: conflating
+"the NEW `score_h3` column has no history" with "no multi-jornada-ahead
+data exists" was a real reasoning error. `squad_log.csv` has logged a
+fresh prediction most days since 2026-08-11 — several real predictions
+for the SAME outcome already sit there at different lead times.
+`lagged_pair()` picks an OLDER logged prediction (N LOCKED jornadas
+back, via `lock_order()` — real lock-time order, not jornada label,
+since a rescheduled fixture can lock jornada 6 before jornada 4, seen
+for real this season) instead of always grading the freshest one — a
+real, already-elapsed multi-jornada-ahead test, hiding in data already
+being collected. `rate_rel` here is one POOLED, empirically-measured
+scale (the real dispersion of actual/predicted at lag 1), not yet
+per-player — a disclosed simplification: no per-row `rate_rel` is
+logged in `squad_log.csv` today, so every pair is normalised by the same
+real, measured constant rather than an invented one.

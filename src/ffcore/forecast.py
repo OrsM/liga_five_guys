@@ -93,7 +93,7 @@ SHRINK_MATCHES = 8.0
 # ffcore.score._fit_decay() already uses for the lineup-source recency
 # weight: fit from real held-out evidence, or say plainly why not, never
 # guess dressed up as a fit.
-# Why + the derivation, full sweep tables: docs/notes/forecast.md#drift-frac-calibration-history
+# Why + the derivation, full sweep tables: docs/notes/forecast.md#drift_frac-calibration-history
 DRIFT_FRAC = 1.0
 
 
@@ -300,7 +300,7 @@ class Bootstrap:
         (club_rel, ffcore.fixture.club_volatility) that correlates
         teammates' outcomes. Truncated at zero: a rate cannot be negative.
         Design rationale and the walk-accumulation bug this shape fixed:
-        docs/notes/forecast.md#rate_draw-start_draw-two-independent-sources-of-wrong
+        docs/notes/forecast.md#rate_drawstart_draw--two-independent-sources-of-wrong
         """
         club_shock = {c: max(0.0, 1.0 + rng.gauss(0.0, self.club_rel[c]))
                      for c in sorted(self.club_rel)}
@@ -316,7 +316,7 @@ class Bootstrap:
         # ACCUMULATED into a running position — NOT redrawn from cumulative
         # variance each jornada (that bug, found+fixed 2026-09-01, gave
         # each jornada the right marginal spread but zero correlation
-        # between adjacent jornadas). See docs/notes/forecast.md#the-drift-walk-rate_draw-start_draw-bug-and-fix
+        # between adjacent jornadas). See docs/notes/forecast.md#the-drift-walk-rate_drawstart_draw-bug-and-fix
         walk = {k: 0.0 for k in self.rate_rel}
         cum_var = {k: 0.0 for k in self.rate_rel}
         out = {}
@@ -329,8 +329,8 @@ class Bootstrap:
                 # LOG-NORMAL, NOT clip(1+drift, 0) — a clip is asymmetric
                 # (floors the negative tail, leaves the positive unbounded)
                 # and biases the mean upward as the walk widens; exp(walk -
-                # cum_var/2) has E[.]=1 for any cum_var. See docs/notes/
-                # forecast.md#the-drift-walk-rate_draw-start_draw-bug-and-fix
+                # cum_var/2) has E[.]=1 for any cum_var. See
+                # docs/notes/forecast.md#the-drift-walk-rate_drawstart_draw-bug-and-fix
                 walked = math.exp(walk[k] - cum_var[k] / 2.0)
                 shared = club_shock.get(self.club_of.get(k, ""), 1.0)
                 per_j[k] = eps0[k] * walked * shared
@@ -342,8 +342,8 @@ class Bootstrap:
         rate_draw() (flat, or growing with distance), but additive on
         logit(p) rather than multiplicative on a rate, since p must stay
         in (0, 1). No club term (unlike rate_draw()) — deliberately left
-        for later, same reasoning as docs/notes/forecast.md#rate_draw-
-        start_draw-two-independent-sources-of-wrong.
+        for later, same reasoning as
+        docs/notes/forecast.md#rate_drawstart_draw--two-independent-sources-of-wrong.
         """
         if jornadas is None:
             return {k: rng.gauss(0.0, self.start_rel[k])
