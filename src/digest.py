@@ -56,8 +56,7 @@ APPENDIX = "METHOD.md"
 
 APPENDIX_SOURCES = [
     Part("What it cannot see", "sim.md",
-         ["What the simulation cannot see",
-          "Act now or wait — the workings"], nest=False),
+         ["What the simulation cannot see"], nest=False),
     # NOT "The workings" (latest.md's bid table, fitness, notes) ANY MORE —
     # removed 2026-08-22. That was DATA, re-stitched here byte-identical to
     # what the daily report already shows, the exact duplication problem
@@ -66,6 +65,15 @@ APPENDIX_SOURCES = [
     # are made — methodology.md's own column_guide_lines() now carries the
     # column explanations the daily report used to repeat in full every
     # run; the live data stays in the one place it can't drift from itself.
+    #
+    # "Act now or wait — the workings" ALSO removed here, 2026-09-07 — the
+    # heading it pointed at stopped existing the moment Phase 1's
+    # aggressive-simplify pass (`bbf1f2d`) cut the wait-forecast
+    # (wait_routes()/waiting()/market_model()) that produced it, but this
+    # list was never updated to match. Silently broken for the branch's
+    # entire history (every report since carried a "sections missing"
+    # warning in its own appendix) until Miguel asked to actually check a
+    # full report ran properly and the warning got read, not skipped past.
     Part("The forecast, and how it is doing", "methodology.md", None,
          nest=False),
 ]

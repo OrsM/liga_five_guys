@@ -18,7 +18,7 @@ wrapper over `score.formations()`'s own list. (The premium flag itself was
 later deleted outright, 2026-09-05, as unused plumbing — nothing anywhere
 ever called `formations(premium=True)`.)
 
-## `_run_np()` — the vectorized mirror, kept in sync by hand
+## `_run_np()`: the vectorized mirror, kept in sync by hand
 
 `_run_np()` is a SEPARATE, numpy-vectorized reimplementation of
 `ffcore.forecast.Bootstrap.rate_draw()`/`start_draw()`'s draw logic, not a

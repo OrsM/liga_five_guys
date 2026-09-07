@@ -130,114 +130,88 @@ simulation then prices those at roughly nothing (that day's keeper clause:
 -0.54 season points) — a few wasted screening slots, versus the other
 error, a lost move.
 
-## _safe_to_sell() — per-position minimums aren't enough on their own
+## RETIRED 2026-09-06 (`bbf1f2d`, Phase 1 of the aggressive-simplify branch)
 
-SLOT_MIN's four floors sum to 8 (1+3+3+1), but XI_SIZE is 11: a squad can
-clear every position's own minimum individually and still not have enough
-players, total, to fill any of the 7 real formations. Confirmed live,
-2026-09-01 (Miguel: "something wrong in the report") — `best_swap_for()`
-chained four sales to fund one purchase; the result cleared every
-position's own SLOT_MIN individually (4/3/1/2) but totalled only 10
-players, one short, and `best_xi()` correctly returned `[]`, scoring a
-paired `d_pts` of roughly the entire season (-1282). Same "meets every
-bound, matches no real formation" pathology already found and fixed once
-that day for a *rival's* squad (`illegal_squads()`) — reappearing on a
-*hypothetical* sale chain on Miguel's own squad. `sum(depth.values())` now
-guards against it here too.
+The five sections this replaces (`_safe_to_sell()`, `candidates()`'s
+funding-chain notes, `rival_tempo()`, `days_to_afford()`, `contest()`,
+`best_swap_for()`) documented multi-sale funding chains and clause-race
+timing — real, working mechanisms, but the source of BOTH catastrophic
+squad-legality bugs this repo has had (Ali Houary's -1282, Alvaro
+Mantilla's -1286: a chain could clear every position's own SLOT_MIN
+individually while totalling one short of a real formation). Miguel,
+after the second occurrence in one week: "getting too complex... away
+from 'the book' approach" — asked for an audit sorting every mechanism
+into core vs. bolt-on, ranked by bug cost. Funding chains and
+clause-race timing were the two costliest. Cut rather than re-patched a
+third time: `candidates()` now funds a move by cash alone, or by selling
+EXACTLY ONE spare player — never a chain. A genuinely 2-sale-only move
+simply stops appearing; that's the honest trade for never generating
+this bug class again. `_fieldable()` (below) replaced `_safe_to_sell()`'s
+bounds heuristic with the actual existence check that closes the bug
+class for good, not a smarter bound. `rival_tempo()`/`days_to_afford()`/
+`contest()` (per-rival cash-race timing) and `best_swap_for()` (a KEEP
+row's "vs X" note) are gone outright, not replaced — real, working
+code, cut on the same "the book" judgment, not a bug of their own.
 
-Does NOT catch the narrower case `illegal_squads()`'s own self-test found (a
-squad at exactly 11 that matches no real formation, e.g. DEF=3 paired with
-MED=3) — a full fix would call `best_xi()` itself rather than count bounds,
-same principle, but not done here since this runs once per candidate sale
-inside a tight chain-building loop and a real `best_xi()` search per
-candidate is a cost worth avoiding for a case this narrow.
+## _fieldable() — the one squad-legality check
 
-The threshold is `XI_SIZE`, not `XI_SIZE - 1` — every caller's chain ends in
-exactly one buy that restores a player, so what matters is `depth` *before*
-this sale. First attempt got this wrong (`depth - 1 < XI_SIZE`, effectively
-demanding 12), breaking an ordinary single-swap candidate at a squad of
-exactly 11 — caught immediately by the existing self-test.
+Replaces `_safe_to_sell()`'s bounds heuristic (per-position floor +
+total count) with the actual question: does SOME real formation
+(`ffcore.score.formations()`'s 7 tuples) fit this squad's shape? Counts
+only — no player identities, no simulation, not even `best_xi()` — but
+counts against REAL formations, which a bounds check cannot: a squad can
+clear every position's own SLOT_MIN individually, and total XI_SIZE, and
+still have no real formation that fits it (two goalkeepers left in an
+exactly-11-player squad — no formation ever fields two). That exact
+shape produced both catastrophic bugs named above, through two
+DIFFERENT bounds checks (`illegal_squads()` for a rival's squad,
+`_safe_to_sell()` for a hypothetical sale chain) that each added a
+smarter bound without closing the actual failure class. The lesson,
+now load-bearing: whenever checking "is this squad shape legal" ANYWHERE
+in this codebase, call `_fieldable()` (or `best_xi()`/`formations()`
+directly), never re-derive a bounds approximation of it.
 
-## candidates() — funding chain notes
+## route_kind() — the one place ownership is classified
 
-Dead weight (never starts, costs nothing to sell) is tried before any
-starter sale, which does cost something on the pitch; weak starters
-(SLOT_MIN-safe, weakest first) fill in only once dead weight runs out. A
-sale that raises $0 (an unpriced player) is skipped even though it was
-harmless before `_safe_to_sell()`'s total-count guard — now every accepted
-sale narrows how many *more* the squad can safely afford, so a $0 sale
-spends that legality budget for nothing. The multi-sale trigger is keyed to
-the *real* cash balance, not `budget`: keying it to an unlimited budget
-(used to measure the frontier for unaffordable targets) made every target
-reachable on cash alone and silently stopped generating the multi-sale
-moves — removing the best move on the board.
+`"mine" | "free" | "raid" | "listed"`, purely off `u.owner`/`u.route` —
+no simulation. Before this (2026-09-06), the same three-line boolean was
+re-derived by hand at four call sites (`candidates()`, `best_swap_for()`,
+two separate loops in `sim.ladder_rows()`), plus `not u.owner.get(k)`
+rewritten inline three more times for "free agent." That's exactly how a
+rival-owned, non-clause target kept leaking back into the report after
+three earlier targeted fixes each patched one site and missed the
+others (2026-09-05's PASS-section bug was the third). Miguel's own
+framing, once he saw the pattern: this was never a simulated fact, it's
+a report FILTER, fully decided by two fields already on `Universe`, with
+no computation in between — "I always saw it as a report filter."
+Consolidating it surfaced a fifth, previously unreported instance:
+`best_swap_for()`'s own upgrade search had never excluded listed targets
+at all (moot now — `best_swap_for()` is retired, above).
 
-## rival_tempo() — gross proceeds per day, not net cash flow
+## candidates() — listed targets are never proposed
 
-Net cash flow is negative for every manager in this league (measured
-2026-08-31: −4.5M to −8.2M a day each) because they're all still deploying a
-starting budget that only gets spent once — extrapolating net predicts
-everyone going infinitely broke, which isn't a trajectory. The real question
-(`days_to_afford()`) is "how fast has this manager demonstrated he can put
-money together", and gross sale proceeds per day is exactly that, measured,
-with no assumption about what he does with it next. `days` is the span of
-the *whole* ledger, not each manager's own first-to-last, so an idle
-manager's near-zero rate isn't hidden by a shorter personal denominator.
+0 of 119 real transactions in this league have ever been manager-to-
+manager (re-derived and proven 2026-08-31 by replaying ownership forward
+over the real ledger, not read off ledger columns that name only one
+manager per row by construction). A "listed" target — a rival's own
+choice to sell — competes on paper like a real option but essentially
+never converts, so `candidates()` filters it out via `route_kind()`
+before it ever becomes an `Action`, not demoted or flagged downstream.
+Third time this exact complaint recurred (Miguel: "I don't think I'm
+making myself clear... the report does not include it like that") after
+two earlier fixes had only reorganized/relabeled these rows — asked
+directly (rather than guessing a fourth variant) whether to summarize,
+relocate, or drop entirely; he chose drop, no mention anywhere.
 
-## days_to_afford() — measured vs. guessed
+## load() — memoized for the process
 
-`cash` is measured for me, estimated for a rival (starting budget less every
-ledger row plus accrued allowance — can be a whole unseen sale wrong).
-`daily_bonus` is a configured fact (`inputs/league.ini`). `sell_rate` is
-measured, per rival, off his own realised gross sale proceeds per day. The
-*combination* — that he keeps raising money at his own past rate while the
-allowance accrues — is the guess; there's no attempt to say whether he
-*wants* this player (`ffcore.bid.demand_summary()` already answers that, as
-a snapshot of who can pay today).
-
-Allowance-only was tried first and is wrong: on the allowance alone, Albert
-Laporta (−45.02M on 2026-08-31) needs 450 days to reach zero and would be
-reported as no threat for over a year, while the ledger shows him raising
-86.9M across six sales in the preceding seven days. `ceiling` (his cash plus
-his whole squad's value) caps the answer at None past it — a manager can't
-sell more than he holds, and the rate would otherwise extrapolate straight
-through that wall.
-
-## contest() — clause targets only, deliberately
-
-A clause is instant and cannot be refused, by anybody — so a target sitting
-at a payable clause isn't an option Miguel owns, it's a thing the first
-solvent manager takes. If the nearest rival is a month away there's no race
-and the money is better saved; if he's two days away, waiting *is* the
-decision, made by default. A free-agent or listed row is a bid that can
-lose — `Universe.bids` (the app's own `numberOfBids`) is the real observed
-contest signal there, already carried separately.
-
-## best_swap_for() — vs. rank()'s own funder, and the same-slot fix
-
-**Widened funding, 2026-08-29.** Used to stop at k's own proceeds plus cash
-— a real gap: it answered "what is he worth alone" when the real question
-is "what would it take", same as `candidates()` answers for the rest of the
-board. Extra sales (never k himself, SLOT_MIN-safe) only get proposed once
-his own sale plus cash isn't enough.
-
-**A different question from `candidates()`'s own swap search.** That search
-asks "what is the single best move on the whole board" and dedupes to one
-funding source per target — crowding out every player who wasn't the
-winning funder for whichever target won. `best_swap_for()` asks the same
-cheap, deterministic screening question scoped to *one* funding player, so
-it can answer for every held player individually, not just the lucky few
-whose sale happened to fund the board's top pick.
-
-**Same-slot only, found 2026-08-25.** `expected()` puts every position on
-one points scale (needed so `best_xi()` can compare a keeper against a
-forward when filling a formation), but a *squad* slot isn't a *formation*
-slot — replacing a MED with a POR doesn't field an extra keeper, it leaves
-the squad short a midfielder. Three different bench players' "best real
-alternative" all came back as the one goalkeeper on the board — each a real,
-honestly negative number (the simulation ballast for a broken squad shape is
-real) attached to a swap no manager would ever make. The band was right;
-the swap it pointed at wasn't a real question.
+Pure w.r.t. the tidy store (no argument changes the result). `run.py`'s
+single-interpreter design meant `methodology`'s stage and `sim`'s stage
+each paid for their own fresh call — `methodology`'s own `_fc()` helper
+called it twice by itself. Measured 2.4s per call; caching cut it from 3
+calls to 1 on a real report. Same shape as `wait_routes`/`market_model`
+being hoisted to one call in `sim.py` — a store read, not a fact that
+could change mid-run, so nothing needs invalidating within one process.
 
 ## rank() — screening, top-up, and `value`
 

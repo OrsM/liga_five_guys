@@ -102,6 +102,24 @@ comparison — needed for `load_lineups_latest()`, where "newest" must mean
 newest row from ONE probable-XI source, not newest across every source in
 the file.
 
+## `_cached_latest_snapshot` — cache the small result, not the whole file
+
+Caches `load_market_latest()`/`load_lineups_latest()`'s own RESULT (the
+already-filtered "now" slice), not the file `latest_snapshot()` reads —
+`latest_snapshot()` itself stays a bounded-memory forward pass with no
+cache of its own (see its own note above on why: caching a filtered
+slice under the whole file's cache key would hand a later full-history
+reader a wrong answer). But `load_market_latest()`/`load_lineups_latest()`
+are each called several times over one `run.py` process (`load_players()`
+alone, plus every stage that wants "the market as of now") and, with no
+cache of their own, each call re-walked the entire multi-decade file
+again for an answer that cannot change mid-run — measured 6-8 calls to
+the same file on a real report. `cache_key` disambiguates callers like
+`load_lineups_latest(source=)` that pass a fresh `keep` lambda every
+call (so keying on `keep` itself would never hit); same mtime+size
+invalidation and same copy-on-return guarantee as `read_csv()`'s own
+cache, for the same reason.
+
 ## `run_now()` — one clock per run
 
 Twenty-five call sites used to ask the clock themselves, so one report

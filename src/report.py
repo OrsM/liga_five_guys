@@ -87,7 +87,22 @@ LOG_COLS = ["observed_at", "hours_to_lock", "formation", "index_total",
             "ff_id", "player", "pos", "slot", "start_pct", "start_source", "status",
             "assumed", "value", "score", "picked",
             "ppm", "fix", "opp", "home", "cur_pj", "flat",
-            "fix_basis", "elo_gap"]
+            "fix_basis", "elo_gap", "score_h3"]
+
+# THE SHORT-HORIZON FIGURE (forecast-first rebuild plan, Stage 5). A
+# season-long calibration check only resolves once most of the season has
+# played out — far too slow a feedback loop to catch a miscalibration
+# early (see the 95% P(win) episode this session). `score` is jornada+1
+# with a real fixture factor; the next 2 rounds have no fixture drawn yet
+# at log time, so they use `ppm * pct_rest` (the same "rest of season"
+# rate/start blend Scored already carries) with no fixture adjustment —
+# an honest approximation, not a second simulation. Graded 3 jornadas
+# later against the real cumulative points over the same window, once
+# enough real data exists to sum.
+# Why: docs/notes/report.md#score_h3--the-short-horizon-figure
+def _score_h3(p: dict) -> float:
+    rest_rate = p["ppm"] * (p["pct_rest"] / 100.0)
+    return p["score"] + 2 * rest_rate
 
 
 def squad_names(lg) -> tuple[list[str], str]:
@@ -158,6 +173,7 @@ def log_squad(observed, players, chosen, formation, total, deadline,
             "fix_basis": p.get("fix_basis") or "none",
             "elo_gap": ("" if p.get("elo_gap") is None
                         else f"{p['elo_gap']:.1f}"),
+            "score_h3": f"{_score_h3(p):.3f}",
         })
     append_csv(path, rows, LOG_COLS)
 
@@ -424,7 +440,19 @@ def _selftest() -> None:
     assert any("Log in again" in ln for ln in alerts([], token_days=9))
     assert alerts([], token_days=60) == []
 
-    print("report self-test OK (%d cases)" % 10)
+    # -- _score_h3: the short-horizon figure (forecast-first rebuild plan,
+    # Stage 5) --------------------------------------------------------------
+    # jornada+1 is real (a real fixture already drawn); +2/+3 use the
+    # "rest of season" rate/start blend, no fixture factor yet — an honest
+    # approximation, not a second simulation.
+    nailed = {"score": 5.0, "ppm": 4.0, "pct_rest": 100.0}
+    assert _score_h3(nailed) == 5.0 + 2 * 4.0, _score_h3(nailed)
+    # A bench player (pct_rest low) contributes almost nothing to the two
+    # unfixtured rounds, same as he would in the real simulation.
+    bench = {"score": 0.5, "ppm": 4.0, "pct_rest": 10.0}
+    assert abs(_score_h3(bench) - (0.5 + 2 * 0.4)) < 1e-9, _score_h3(bench)
+
+    print("report self-test OK (%d cases)" % 11)
 
 
 if __name__ == "__main__":

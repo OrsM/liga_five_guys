@@ -210,7 +210,7 @@ no crosswalk given, or the name has never been seen anywhere, or is still
 ambiguous — which `resolve()` itself cannot do without a crosswalk to fall
 back to.
 
-## `replay()` and `League.__init__` — the app overrules the ledger
+## `replay()` and `League.init` — the app overrules the ledger
 
 `replay()` accumulates typed transactions over a starting roster, so it
 inherits every row nobody typed. The API states ownership outright, so
