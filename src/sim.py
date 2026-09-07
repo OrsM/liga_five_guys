@@ -627,6 +627,23 @@ def _drift_frac_now() -> float:
     return forecast.DRIFT_FRAC
 
 
+def _drift_status_now() -> str:
+    """A short status phrase for the caveat table — "still the unfitted
+    default" or "fit from real data this run" — the SAME check
+    `methodology.drift_lines()` makes for its own report section, so this
+    caveat and that section can never tell two different stories about
+    the same number. Cheap (local `squad_log.csv`/tidy reads only, no
+    git) to call fresh rather than thread a second value through.
+    """
+    import methodology as M
+    from ffcore.forecast import DRIFT_FRAC as _DEFAULT
+
+    fitted, why = M.drift_frac_from_history()
+    if fitted == _DEFAULT and "not enough" in why:
+        return "still the unfitted default"
+    return "fit from real data this run"
+
+
 def illegal_squads(u) -> list[tuple[str, list[str]]]:
     """[(manager, ["2/3 defensas", ...])] for every squad — mine included
     — best_xi() cannot fill from, sorted by manager.
@@ -781,21 +798,21 @@ def caveats(u) -> list[str]:
         "| Cash scores zero | nothing models the market next cycle, so "
         "holding money looks worthless and a standalone sale can never look "
         "good |",
-        "| p_win's season-long spread rests on one hand-picked constant "
-        "(DRIFT_FRAC=%s), not a fit | two real anchors on this repo's own "
-        "data disagree on the exact magnitude (weak jornada-1-vs-final "
-        "correlation argues wider, strong season-to-season correlation "
-        "argues narrower), but every published win-probability model "
-        "checked (538's NBA/NHL/MLB) is far more humble than 70%%+ about a "
-        "full season this early regardless — that floor doesn't need the "
-        "two anchors resolved. This caveat used to say to tighten it once "
-        "the Forecast vs actual table above had enough rows — it has them "
-        "now, and the check (2026-08-31) found that table can never grade "
-        "this constant at ANY row count: every pair in it is one jornada "
-        "out, and this constant only acts across longer horizons. It is "
-        "not waiting on more data, it is waiting on a different "
-        "measurement |"
-        % _drift_frac_now(),
+        # RETIRED CLAIM, 2026-09-06: this used to say the constant can
+        # never be graded at any row count (true only of the single-
+        # horizon "Forecast vs actual" table). methodology.drift_lines()
+        # (see its own report section) fits it for real now, off REAL
+        # lagged predictions already sitting in squad_log.csv, not a
+        # hand-pick — this caveat states TODAY's actual status rather
+        # than re-describing the mechanism a second, driftable way.
+        # Why: docs/notes/forecast.md#fit_drift_frac--the-derivation
+        "| p_win's season-long spread uses DRIFT_FRAC=%s (%s) | see "
+        "\"Season-long drift\" below for the fit itself — every published "
+        "win-probability model checked (538's NBA/NHL/MLB) is far more "
+        "humble than 70%%+ about a full season this early regardless of "
+        "the exact value, which is what 1.0 as an unfitted default "
+        "already reflects |"
+        % (_drift_frac_now(), _drift_status_now()),
         "| Shape prior | %s |" % u.forecaster.pool_note(),
         "| P(start) fit | %s |" % u.start_note.rstrip("."),
         ""]
