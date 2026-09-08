@@ -63,7 +63,7 @@ player_id,name,club_id,ff_slug,af_slug,app_id,understat_id,app_names
 11520,lamine yamal,barcelona,lamine-yamal,386828,,11527,
 11554,fran gonzalez,sevilla,fran-gonzalez-2,,2579,,Fran González
 11562,yago santiago,elche,yago-santiago,,,,
-11577,hector fort,barcelona,hector-fort,386859,,,
+11577,hector fort,barcelona,hector-fort,386859,,12171,
 11579,arnau ortiz,atletico,arnau-ortiz,183948,3194,14722,Arnau Ortiz
 11676,unai egiluz,athletic,unai-egiluz,,2936,,Egiluz
 11677,hugo rincon,athletic,hugo-rincon,313025,3184,12189,H. Rincón
@@ -208,7 +208,7 @@ player_id,name,club_id,ff_slug,af_slug,app_id,understat_id,app_names
 14183,adam aznou,malaga,adam-aznou,,,,
 14199,couhaib driouech,celta,couhaib-driouech,,,15033,
 14210,zaid romero,getafe,zaid-romero,180927,,14387,
-14377,roy revivo,elche,roy-revivo,,,,
+14377,roy revivo,elche,roy-revivo,,,15066,
 14700,david jimenez,real madrid,,,,13113,
 14766,aitor crespo,racing,,,,,
 14812,ruben gomez,villarreal,ruben-gomez-1,,2696,,Ruben
@@ -254,7 +254,7 @@ player_id,name,club_id,ff_slug,af_slug,app_id,understat_id,app_names
 15696,nelson deossa,betis,nelson-deossa,300885,2626,14001,Deossa
 15736,facundo bernal,betis,facundo-bernal,316519,,14741,
 15928,aliou dieng,valencia,aliou-dieng,4458,3121,14802,Dieng
-15944,mamadou sarr,real sociedad,mamadou-sarr,,,,
+15944,mamadou sarr,real sociedad,mamadou-sarr,,,11253,
 15957,gabriel moscardo,espanyol,gabriel-moscardo,,3127,12994,Moscardo
 15961,jesus fortea,real madrid,,,,,
 16003,manu fernandez,celta,manu-fernandez-1,,2653,,Manuel Fernández
@@ -333,7 +333,7 @@ player_id,name,club_id,ff_slug,af_slug,app_id,understat_id,app_names
 17130,iker luque,racing,iker-luque,,,,
 17145,adrian riquelme,getafe,,,,,
 17148,giorgi guliashvili,racing,giorgi-guliashvili,,,14930,
-17151,abiel osorio,elche,abiel-osorio,,2922,,Osorio
+17151,abiel osorio,elche,abiel-osorio,,2922,14931,Osorio
 17161,sebastian boselli,getafe,sebastian-boselli,,,14389,
 17166,dani mesonero,real madrid,,,,,
 17190,alex sanchez,elche,,,,14366,
@@ -438,7 +438,7 @@ player_id,name,club_id,ff_slug,af_slug,app_id,understat_id,app_names
 336,isco alarcon,betis,isco-alarcon,,3090,2255,Isco
 340,juanmi jimenez,getafe,juanmi-jimenez,,2779,897,Juanmi
 3414,pierre-emerick aubameyang,deportivo,pierre-emerick-aubameyang,,3108,318,Aubameyang
-3427,thomas lemar,atletico,thomas-lemar,,,,
+3427,thomas lemar,atletico,thomas-lemar,,,3425,
 3429,kylian mbappe,real madrid,kylian-mbappe,278,,,
 3431,bernardo silva,real madrid,bernardo-silva,636,3116,3635,Bernardo Silva
 3589,dominik livakovic,barcelona,dominik-livakovic,,,,
