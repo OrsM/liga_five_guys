@@ -373,6 +373,7 @@ player_id,name,club_id,ff_slug,af_slug,app_id,understat_id,app_names
 18222,hugo perez,racing,hugo-perez-2,,3212,,Hugo Pérez
 18224,miguel angel santaella,malaga,,,,,
 18225,juani,malaga,juani,,,,
+18228,rodrigo gamon,valencia,,,,,
 18240,brian fariñas,barcelona,brian-farinas,,,,
 18241,manel usedo,levante,,,3166,,Manel Usedo
 18250,ibrahima danfakha,getafe,,,,,
@@ -411,7 +412,7 @@ player_id,name,club_id,ff_slug,af_slug,app_id,understat_id,app_names
 2153,hector bellerin,betis,hector-bellerin,,,492,
 2242,gonçalo guedes,real sociedad,goncalo-guedes,925,,5682,
 2288,dani olmo,barcelona,dani-olmo,1323,3092,8292,Olmo
-2413,emil audero,rayo,emil-audero,,3267,,Emil Audero
+2413,emil audero,rayo,emil-audero,30441,3267,,Emil Audero
 2417,andreas christensen,barcelona,andreas-christensen,,,200,
 2534,wojciech szczesny,barcelona,wojciech-szczesny,,2783,1244,Szczesny
 2536,antonio rudiger,real madrid,antonio-rudiger,,,1822,
@@ -427,7 +428,7 @@ player_id,name,club_id,ff_slug,af_slug,app_id,understat_id,app_names
 2799,carlos soler,real sociedad,carlos-soler,930,2772,2478,C. Soler
 2802,igor zubeldia,real sociedad,igor-zubeldia,,265,2417,Zubeldia
 2807,alvaro odriozola,real sociedad,alvaro-odriozola,,2442,2418,Odriozola
-3106,peter gulacsi,villarreal,peter-gulacsi,,3130,,Gulácsi
+3106,peter gulacsi,villarreal,peter-gulacsi,1139,3130,,Gulácsi
 3174,einar galilea,malaga,einar-galilea,14470,3042,14726,Einar
 3178,kiko femenia,getafe,kiko-femenia,18794,2774,5043,Kiko F.
 3204,alex berenguer,athletic,alex-berenguer,30510,927,5091,Berenguer
