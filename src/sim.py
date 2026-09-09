@@ -712,13 +712,17 @@ def phantom_filled(u) -> list[tuple[str, list[str]]]:
     """[(manager, ["1 defensa", ...])] for every squad — mine included —
     decide.phantom_fill() patched with an average-player stand-in.
 
-    Detected off the phantom keys THEMSELVES
-    (`__phantom_<manager>_<slot>_<n>`, phantom_fill()'s own format), not
-    by re-checking best_xi() against SLOT_MIN — after phantom_fill(),
-    every squad IS legal by construction, so asking best_xi() again
-    would report nothing found, which answers a different question
-    ("is this squad legal now") than the one this caveat exists to
-    answer ("was a real gap patched to get there").
+    Detected off the phantom keys THEMSELVES (`__phantom_<slot>_<n>`,
+    phantom_fill()'s own format — manager-agnostic since 2026-09-09, was
+    `__phantom_<manager>_<slot>_<n>`: decide.phantom_topup() lets several
+    squads share one, so a key alone no longer says whose it is — squad
+    MEMBERSHIP does, which this already read off `sq` to get `slot`, so
+    dropping the manager from the key needed no new lookup here), not by
+    re-checking best_xi() against SLOT_MIN — after phantom_fill(), every
+    squad IS legal by construction, so asking best_xi() again would report
+    nothing found, which answers a different question ("is this squad legal
+    now") than the one this caveat exists to answer ("was a real gap patched
+    to get there").
     """
     from ffcore.score import SLOT_LABEL
 
@@ -726,7 +730,7 @@ def phantom_filled(u) -> list[tuple[str, list[str]]]:
     for m, sq in sorted(u.state.squads.items()):
         counts: dict[str, int] = {}
         for k, slot in sq.items():
-            if k.startswith("__phantom_%s_" % m):
+            if k.startswith("__phantom_"):
                 counts[slot] = counts.get(slot, 0) + 1
         if counts:
             out.append((m, ["%d %s%s" % (n, SLOT_LABEL[s],
@@ -1526,7 +1530,7 @@ def _selftest() -> None:
     # is absolutely unsustainable" -------------------------------------
     # 1 phantom + 2 real DEF, 5 MED, 2 DEL, 1 POR = 11, matching the real
     # (3, 5, 2) formation exactly — not just meeting SLOT_MIN in isolation.
-    ph_sq = {"__phantom_riv_DEF_0": "DEF", "d1": "DEF", "d2": "DEF",
+    ph_sq = {"__phantom_DEF_0": "DEF", "d1": "DEF", "d2": "DEF",
             "m1": "MED", "m2": "MED", "m3": "MED", "m4": "MED", "m5": "MED",
             "p1": "POR", "f1": "DEL", "f2": "DEL"}
     u_phantom = Universe(

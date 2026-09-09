@@ -551,7 +551,19 @@ def overdraft_fix(u: Universe) -> tuple[list[tuple[str, float]], float]:
 
 
 def apply(u: Universe, a: Action) -> dict[str, dict[str, str]]:
-    """The squads as they would be after `a`. Pure — nothing is mutated."""
+    """The squads as they would be after `a`. Pure — nothing is mutated.
+
+    TOPPED UP TO SLOT_MIN, WHOEVER THE TRADE LEAVES SHORT — not just mine.
+    `candidates()` already refuses to propose a sale of mine that would
+    (`_fieldable()`, checked before a move is ever offered); a raid's real
+    owner gets no such check before this, because `apply()` is the one place
+    that removes a player from somebody who never agreed to sell him. Left
+    short, his simulated season reads as scoring zero every remaining
+    jornada — best_xi() finds no legal formation at all — which is the
+    identical failure phantom_fill() exists to prevent at load time, reached
+    from a later transfer instead. See phantom_topup()'s own docstring for
+    why this can patch it here with no new forecaster data to invent.
+    """
     sq = {m: dict(s) for m, s in u.state.squads.items()}
     for gone in a.sell:
         sq[u.me].pop(gone, None)
@@ -560,7 +572,7 @@ def apply(u: Universe, a: Action) -> dict[str, dict[str, str]]:
         for m in sq:
             sq[m].pop(a.buy, None)
         sq[u.me][a.buy] = u.pos.get(a.buy, "MED")
-    return sq
+    return {m: phantom_topup(s) for m, s in sq.items()}
 
 
 
@@ -877,11 +889,51 @@ def apply_fixtures(per_jornada: dict[int, dict], sboard: dict[int, dict],
     return out
 
 
+def phantom_topup(sq: dict[str, str]) -> dict[str, str]:
+    """`sq`, topped up to SLOT_MIN with generic phantom keys, or `sq` itself
+    unchanged if nothing is short.
+
+    THE SQUAD-SIDE HALF of phantom_fill() — split out 2026-09-09 so `apply()`
+    can call it too. Before this, a squad phantom_fill() had already made
+    legal at report time could still be left short by a LATER transfer:
+    `apply()` moves a real player from a real owner with nothing checking
+    whether that owner still clears SLOT_MIN, and `rank()`'s simulation reads
+    a squad that fails it as scoring zero every remaining jornada, zero
+    variance — the identical failure phantom_fill() exists to prevent,
+    reached from a different door. Caught 2026-09-09 auditing a report: 5 of
+    that day's 119 real candidates would raid a rival's last player at his
+    position minimum. `__phantom_<slot>_<n>` (no manager in the key, unlike
+    before 2026-09-09) is what makes this callable here safely — the SAME
+    keys `phantom_fill()` already registered real per_jornada data for at
+    load time, for every slot, whether anyone needed one yet or not, so this
+    never has to invent new forecaster data mid-run for a manager nobody
+    knew would need it when the season was drawn.
+    """
+    from ffcore.score import SLOT_MIN
+
+    counts: dict[str, int] = {}
+    for slot in sq.values():
+        counts[slot] = counts.get(slot, 0) + 1
+    short = {s: n - counts.get(s, 0) for s, n in SLOT_MIN.items()
+            if n - counts.get(s, 0) > 0}
+    if not short:
+        return sq
+    sq = dict(sq)
+    for s, n in short.items():
+        for i in range(n):
+            sq["__phantom_%s_%d" % (s, i)] = s
+    return sq
+
+
 def phantom_fill(squads: dict[str, dict[str, str]], per_jornada: dict[int, dict],
                  pos: dict[str, str]
                  ) -> tuple[dict[str, dict[str, str]], dict[int, dict]]:
     """Squads and per_jornada, with one AVERAGE-PLAYER-AT-THE-POSITION
-    phantom added per position any manager is short of SLOT_MIN in.
+    phantom added per position any manager is short of SLOT_MIN in — and
+    real per_jornada data registered for EVERY SLOT_MIN slot regardless of
+    who is short today, so a later transfer can reach for one too (see
+    phantom_topup(), which is the only thing that still needed to change
+    for that: this function's own squad-side behaviour is unchanged).
 
     Without this, a squad short one SLOT_MIN position can't fill ANY legal
     formation — best_xi() returns [], scoring zero every remaining jornada
@@ -890,8 +942,12 @@ def phantom_fill(squads: dict[str, dict[str, str]], per_jornada: dict[int, dict]
     double as a real candidate — computed off the same real per-jornada
     data (points and P(start)) every other player at that position already
     carries. No `matches` entry (the same "no evidence, no widening" rule
-    applied to a brand-new player). Keyed `__phantom_<manager>_<slot>_<n>`,
-    a form no real player id can take.
+    applied to a brand-new player). Keyed `__phantom_<slot>_<n>`, a form no
+    real player id can take — manager-agnostic since 2026-09-09 (was
+    `__phantom_<manager>_<slot>_<n>`): a virtual average player has no real
+    ownership to distinguish, and several squads sharing the identical key
+    is exactly the "as if a league-average man had filled in" story this
+    already told, just also true across managers now, not only within one.
     Why: docs/notes/decide.md#phantom_fill--why-a-short-squad-gets-a-phantom-and-why-its-an-average
     """
     from ffcore.score import SLOT_MIN
@@ -913,18 +969,18 @@ def phantom_fill(squads: dict[str, dict[str, str]], per_jornada: dict[int, dict]
                      sum(v[1] for v in vs) / len(vs))
                  for s, vs in by_pos.items() if vs}
 
-    for m, sq in squads.items():
-        counts: dict[str, int] = {}
-        for slot in sq.values():
-            counts[slot] = counts.get(slot, 0) + 1
+    # EVERY SLOT_MIN KEY, EVERY JORNADA, UNCONDITIONALLY — not only for a
+    # manager short today. phantom_topup() can only ever assign a key into a
+    # squad; it cannot invent forecaster data for one, so whatever it might
+    # need has to already be here.
+    for j in per_jornada:
         for s, n in SLOT_MIN.items():
-            short = n - counts.get(s, 0)
-            for i in range(short):
-                key = "__phantom_%s_%s_%d" % (m, s, i)
-                sq[key] = s
-                for j in per_jornada:
-                    if s in avg.get(j, {}):
-                        per_jornada[j][key] = avg[j][s]
+            if s not in avg.get(j, {}):
+                continue
+            for i in range(n):
+                per_jornada[j].setdefault("__phantom_%s_%d" % (s, i), avg[j][s])
+
+    squads = {m: phantom_topup(sq) for m, sq in squads.items()}
     return squads, per_jornada
 
 
@@ -1307,14 +1363,58 @@ def _selftest() -> None:
     assert new_per[1][pk] == (4.0, (1.0 + 0.5 + 0.5) / 3), new_per[1][pk]
     # RETURNS COPIES — a caller still holding the originals sees them
     # untouched, so "was he short before the patch" stays answerable.
-    assert "__phantom_m_DEF_0" not in ph_sq["m"], ph_sq
+    # `__phantom_DEF_0`, not `__phantom_m_DEF_0` — manager-agnostic since
+    # 2026-09-09, see phantom_topup().
+    assert pk == "__phantom_DEF_0", pk
+    assert "__phantom_DEF_0" not in ph_sq["m"], ph_sq
     assert pk not in ph_per[1], ph_per[1]
     # A LEGAL SQUAD COMES BACK UNCHANGED — no phantom invented where
     # nothing is missing.
     legal_sq = {"m2": {"p1": "POR", "d1": "DEF", "d2": "DEF", "d3": "DEF",
                        "x1": "MED", "x2": "MED", "x3": "MED", "f1": "DEL"}}
-    same_sq, _ = phantom_fill(legal_sq, ph_per, ph_pos)
+    same_sq, filled_per = phantom_fill(legal_sq, ph_per, ph_pos)
     assert same_sq == legal_sq, same_sq
+    # ...BUT EVERY SLOT_MIN KEY IS REGISTERED IN per_jornada REGARDLESS —
+    # phantom_topup() (below) needs it there for a manager nobody knew was
+    # short when the season was drawn.
+    assert "__phantom_DEF_0" in filled_per[1], filled_per[1]
+    assert "__phantom_DEF_2" in filled_per[1], filled_per[1]  # SLOT_MIN DEF=3
+
+    # -- phantom_topup(): the same patch, reachable after a REAL transfer --
+    # 2026-09-09, auditing a report recommendation: `apply()` moves a player
+    # off a real owner with nothing checking he still clears SLOT_MIN — 5 of
+    # that day's 119 real raid candidates would have left the victim short.
+    assert phantom_topup(legal_sq["m2"]) == legal_sq["m2"], "already legal"
+    short_one = {"d1": "DEF", "d2": "DEF", "x1": "MED", "x2": "MED",
+                "x3": "MED", "p1": "POR", "f1": "DEL"}
+    topped = phantom_topup(short_one)
+    assert topped != short_one, "must not mutate the caller's dict in place"
+    assert short_one == {"d1": "DEF", "d2": "DEF", "x1": "MED", "x2": "MED",
+                         "x3": "MED", "p1": "POR", "f1": "DEL"}, short_one
+    assert topped.get("__phantom_DEF_0") == "DEF", topped
+    assert sum(1 for k in topped if k.startswith("__phantom_")) == 1, topped
+    # Short TWO of the same slot (POR=0, needs SLOT_MIN=1 — a real case: a
+    # raid on someone's only keeper) gets one phantom per missing man, keyed
+    # 0..n-1, never fewer.
+    short_por = {"d1": "DEF", "d2": "DEF", "d3": "DEF", "x1": "MED",
+                "x2": "MED", "x3": "MED", "f1": "DEL"}   # 0 POR, needs 1
+    assert phantom_topup(short_por).get("__phantom_POR_0") == "POR"
+
+    # -- apply(): the raid's real victim is topped up too, not just mine ---
+    thin_riv = {"d1": "DEF", "d2": "DEF", "star": "DEF",  # exactly SLOT_MIN=3
+               "x1": "MED", "x2": "MED", "x3": "MED", "p1": "POR", "f1": "DEL"}
+    u_thin = Universe(
+        state=LeagueState({"me": {}, "riv": dict(thin_riv)}, [1], "me"),
+        forecaster=B({1: {}}), pos={**ph_pos, "star": "DEF"}, price={},
+        proceeds={}, owner={"star": "riv"}, cash=0.0, me="me")
+    # He has exactly SLOT_MIN=3 DEF; raiding one of them (not his spare) —
+    raided = apply(u_thin, Action("steal", buy="star", cost=1e6,
+                                  victim="riv"))
+    riv_after = raided["riv"]
+    assert "star" not in riv_after, riv_after
+    def_count = sum(1 for s in riv_after.values() if s == "DEF")
+    assert def_count == 3, riv_after           # 2 real + 1 phantom, not 2
+    assert any(k.startswith("__phantom_DEF_") for k in riv_after), riv_after
 
     sq = {"k": "POR", **{f"d{i}": "DEF" for i in range(1, 5)},
           **{f"m{i}": "MED" for i in range(1, 6)}, "f1": "DEL", "bench": "MED"}
