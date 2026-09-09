@@ -440,8 +440,8 @@ def cash_price(reach) -> float | None:
     return max(0.0, (best_any - best_now) / span) if span else None
 
 
-def respond(u, a: Action, after: dict) -> Action | None:
-    """The best single answer the manager you just paid can make, or None.
+def respond(u, a: Action, rate: float | None) -> float:
+    """Season points the manager you just paid buys back, on AVERAGE, or 0.0.
 
     A CLAUSE PAYS THE OWNER — confirmed by Miguel against the app on
     2026-08-18, and not observable here: no clause purchase has ever happened
@@ -453,46 +453,31 @@ def respond(u, a: Action, after: dict) -> Action | None:
     was the only one who could buy anybody. A steal ends both of those facts
     at once, and scoring it without the answer priced a duel as an execution.
 
-    HE PICKS ON EXPECTATION, like every other manager in this simulation: the
-    acquisition that most improves his own eleven, within what he can now
-    spend. One ply, and one move — he is not given a plan, only a reply.
+    THE AVERAGE HE BUYS, NOT THE BEST HE COULD FIND — `rate` is `rank()`'s own
+    `lam`, points per million off the SAME screening pass that already prices
+    everything else this run. This replaces a real search (2026-09-09, Miguel:
+    "why are we considering the impact on competing managers... substitute a
+    virtual average player, considering value above replacement for the money
+    the manager has"): the search picked the single clausable player anywhere
+    in the league that improved him most, with no floor on what it cost a
+    THIRD manager — caught the day it walked off with a rival's own defender,
+    leaving him under the position minimum and his simulated season
+    collapsing from ~1600 to ~171, which then read as the RAIDER's win
+    probability jumping 15 points off a rival's squad breaking, not off
+    anything the raid itself did. An average buys nobody's squad but the two
+    sides of the actual trade are ever touched — the same replacement-level
+    trade `value_rate()` already makes for the buy side, made here for the
+    sell side too.
 
-    None when he still cannot afford anything, which is an answer too: it is
-    what makes a cheap steal genuinely cheap.
-
-    A market purchase gets no response, and the asymmetry is the point. Money
-    paid to the app leaves the league; money paid for a clause changes sides.
+    0.0 when there is nothing to spend (no victim, or a market purchase — the
+    asymmetry is the point, money paid to the app leaves the league, money
+    paid for a clause changes sides) or nothing is known to spend it at
+    (`rate` is None, same as `charge` treats it in rank()).
     """
-    if not a.victim or a.victim == u.me:
-        return None
+    if not a.victim or a.victim == u.me or not rate:
+        return 0.0
     budget = max(0.0, u.rival_cash.get(a.victim, 0.0)) + a.cost
-    squad = after.get(a.victim, {})
-    exp = u.forecaster.expected(u.state.jornadas[0]) if u.state.jornadas else {}
-    base = sum(exp.get(k, 0.0) for k in best_xi(squad, exp))
-
-    now = run_now()
-    best, gain = None, 0.0
-    for k, price in u.clause.items():
-        if locked(u.clause_until, k, now):
-            continue
-        # NOT THE MAN YOU JUST TOOK. Left in, the best answer is nearly always
-        # to buy him straight back at the same price — but a clause is reset
-        # by the transfer that triggers it, and this repo has never observed
-        # one to know at what. Excluding him is the conservative reading: it
-        # makes the response weaker, not stronger, so it cannot manufacture
-        # the conclusion it is here to test.
-        if price > budget or k in squad or k == a.buy:
-            continue
-        holder = next((m for m, sq in after.items() if k in sq), "")
-        if not holder or holder == a.victim:
-            continue
-        trial = dict(squad)
-        trial[k] = u.pos.get(k, "MED")
-        got = sum(exp.get(x, 0.0) for x in best_xi(trial, exp)) - base
-        if got > gain:
-            best, gain = Action("steal", buy=k, cost=price,
-                                victim=holder), got
-    return best
+    return rate * budget / 1e6
 
 
 def dead_weight(u) -> list[tuple[str, float]]:
@@ -668,7 +653,9 @@ def rank(u: Universe, acts: list[Action], seed: int = 1,
     draw doesn't depend on the squad, so a second pass would pay the
     ~1.2s of drawing again for nothing) and come back as `bands`,
     `{key: (median, lo, hi, action)}` — `key` given explicitly because a
-    held player's own swap (see best_swap_for()) sells him, not the man
+    held player's own pure-sale question (see sim.band_acts(), which is what
+    actually builds `extra` now — best_swap_for() named here answered the
+    same "key" problem before it was cut 2026-09-06) sells him, not the man
     bought, and an Action alone can't say which side a caller meant. A
     `key` already answered by a real BUY row is dropped from `extra` — its
     own band, off the squad the victim's response leaves behind, answers
@@ -726,19 +713,15 @@ def rank(u: Universe, acts: list[Action], seed: int = 1,
                  ok=lambda d, a: (a.buy or a.sell) in best_value,
                  rank_key=lambda t: -ratio(t), minimum=KEEP_VALUE_MIN)
     keep = [a for _, a in top]
-    answers, afters = [], []
-    for a in keep:
-        after = apply(u, a)
-        # He answers before the season is played — a clause pays the owner,
-        # who can respond with that money, so this isn't a pure subtraction.
-        ans = respond(u, a, after)
-        if ans is not None:
-            after = {m: dict(sq) for m, sq in after.items()}
-            for m in after:
-                after[m].pop(ans.buy, None)
-            after[a.victim][ans.buy] = u.pos.get(ans.buy, "MED")
-        answers.append(ans)
-        afters.append(after)
+    # He answers before the season is played — a clause pays the owner, who
+    # can respond with that money, so this isn't a pure subtraction. Computed
+    # here (off `lam`, this run's own points-per-million) rather than inside
+    # the per-candidate squad, because respond() no longer picks a player —
+    # see its own docstring for why a real search across the league was cut
+    # 2026-09-09. `afters` therefore never differs from a plain apply(): only
+    # the buyer's and the victim's own squads change, nobody else's.
+    bonuses = [respond(u, a, lam) for a in keep]
+    afters = [apply(u, a) for a in keep]
     # Anything `extra` asks about a player already answered by a real ranked
     # row is dropped here. Buy side ONLY, deliberately — checking the sell
     # side too once dropped Jon Moncayola's own OUT-row band for the
@@ -748,11 +731,18 @@ def rank(u: Universe, acts: list[Action], seed: int = 1,
     final = _score_many(u, [u.state.squads] + afters
                         + [apply(u, a) for _k, a in rest], FINAL_TRIALS, seed)
     base, scored = final[0], final[1:len(afters) + 1]
+    # THE VICTIM'S REPLY LANDS ON HIS OWN TOTAL, AFTER THE DRAW — a flat
+    # points add, same in every trial, standing in for money spent at the
+    # going average rate over the season rather than one simulated transfer.
+    # No squad is touched, so no third manager can be caught in it.
+    for a, r, bonus in zip(keep, scored, bonuses):
+        if bonus and a.victim in r.totals:
+            r.totals[a.victim] = [x + bonus for x in r.totals[a.victim]]
     bands = {k: (*band(paired(r, base, u.me)), a)
             for (k, a), r in zip(rest, final[len(afters) + 1:])}
     rivals = [m for m in u.state.squads if m != u.me]
     out = []
-    for a, ans, r in zip(keep, answers, scored):
+    for a, r in zip(keep, scored):
         b_ = burn(u, a)
         charge = 0.0 if (lam is None or b_ is None) else lam * b_ / 1e6
         gross = base.expected_position() - r.expected_position()
@@ -772,7 +762,10 @@ def rank(u: Universe, acts: list[Action], seed: int = 1,
             "gross": gross,
             "burn": b_,
             "charge": charge,
-            "answer": ans,
+            # No specific reply to name any more — see respond()'s own
+            # docstring. `payload()`/the ladder already treat None as "no
+            # answer to show", which this always is now.
+            "answer": None,
             "d_win": r.position().get(1, 0.0) - base.position().get(1, 0.0),
             "d_beat": {v: r.beat(v) - base.beat(v) for v in rivals},
             "mean": r.mean(u.me),
@@ -1825,53 +1818,36 @@ def _selftest() -> None:
     # all until I paid one. The simulation scored the retaliation at zero,
     # which made a steal look like pure subtraction from a rival who had no
     # way to respond, when it is closer to an exchange on terms he chooses.
-    riv_squad = {f"th_{k}": v for k, v in sq.items()}
-    # One of mine is worth having, so his answer is worth making. Without a
-    # player who would actually improve his eleven there is no response to
-    # test — only a budget he has no use for.
-    per5 = {1: dict(per[1])}
-    per5[1]["me_m1"] = (7.0, 1.0)
+    #
+    # AVERAGE VALUE FOR HIS MONEY, NOT A SEARCH (2026-09-09) — respond() used
+    # to search every clausable player in the league for his single best
+    # reply, with no floor on what it cost whoever he took FROM. Caught the
+    # day it walked off with an unrelated third manager's own defender,
+    # collapsing that manager's simulated season and reading as the RAIDER's
+    # own win probability jumping off a rival's squad breaking, not off
+    # anything the raid itself did. The fixture below is the same shape, at a
+    # scale where the arithmetic can be checked by hand instead of by trawling
+    # a 3000-trial season for the manager it broke.
     u5 = Universe(
-        state=LeagueState({"me": dict(mine), "riv": dict(riv_squad)}, [1],
-                          "me"),
-        forecaster=B(per5), pos={**u.pos, "star": "MED"},
-        price={"th_m1": 10e6}, value={"th_m1": 6e6, "me_m1": 4e6},
-        clause={"me_m1": 6e6, "th_m1": 10e6},
-        # Payable: a clause locked by a recent transfer is no answer at all,
-        # and an absent date counts as locked.
-        clause_until={"me_m1": dt.datetime(2020, 1, 1, tzinfo=dt.timezone.utc),
-                      "th_m1": dt.datetime(2020, 1, 1, tzinfo=dt.timezone.utc)},
-        proceeds={}, owner={"th_m1": "riv"}, cash=12e6, me="me",
-        rival_cash={"riv": 0.0})
+        state=LeagueState({"me": dict(mine), "riv": {}}, [1], "me"),
+        forecaster=B(per), pos=dict(u.pos), price={},
+        proceeds={}, owner={}, cash=12e6, me="me", rival_cash={"riv": 4e6})
     steal = Action("steal", buy="th_m1", cost=10e6, victim="riv")
-    # He was broke; the clause leaves him holding 10M, which reaches a man of
-    # mine priced at 6M — so his best answer is to take one straight back.
-    ans = respond(u5, steal, apply(u5, steal))
-    assert ans is not None, "he can afford an answer and should give one"
-    assert ans.buy == "me_m1" and ans.victim == "me", ans
-    # He does not simply buy back the man just taken. Left available, that is
-    # nearly always his best answer — but the transfer resets a clause and
-    # nothing here has ever observed one to know at what.
-    assert ans.buy != "th_m1", ans
-    # AND HE CANNOT ANSWER WITH A LOCKED CLAUSE EITHER. The rule binds both
-    # ways round, or the response would be free to make moves the app refuses
-    # exactly as the ranking used to.
-    u5.clause_until = {}
-    assert respond(u5, steal, apply(u5, steal)) is None
-    # A move that hands him nothing leaves him where he was: broke.
-    assert respond(u5, Action("buy", buy="star", cost=1e6),
-                   u5.state.squads) is None
-    # ...and so does a steal he cannot do anything with.
-    poor = Universe(
-        state=LeagueState({"me": dict(mine), "riv": dict(riv_squad)}, [1],
-                          "me"),
-        forecaster=B(per5), pos=dict(u5.pos), price={"th_m1": 1e6},
-        value={"th_m1": 1e6}, clause={"me_m1": 90e6}, proceeds={},
-        clause_until={"me_m1": dt.datetime(2020, 1, 1,
-                                           tzinfo=dt.timezone.utc)},
-        owner={"th_m1": "riv"}, cash=12e6, me="me", rival_cash={"riv": 0.0})
-    cheap = Action("steal", buy="th_m1", cost=1e6, victim="riv")
-    assert respond(poor, cheap, apply(poor, cheap)) is None
+    # 3 points per million, from wherever `rank()` measured it today — his
+    # reply is worth that rate against his OWN money: the 4M he already had
+    # plus the 10M clause just paid him, times the rate, in points.
+    assert respond(u5, steal, 3.0) == 3.0 * (4e6 + 10e6) / 1e6
+    # No victim, no reply — a market purchase leaves the league, it does not
+    # change hands, so nobody answers it.
+    assert respond(u5, Action("buy", buy="star", cost=1e6), 3.0) == 0.0
+    # Nothing known about the going rate is not a free reply either — the
+    # same reading `charge` gives `lam is None` in rank() itself.
+    assert respond(u5, steal, None) == 0.0
+    # And a real rate against no money and no payout is genuinely worth
+    # nothing, not an error.
+    broke = replace(u5, rival_cash={"riv": 0.0})
+    assert respond(broke, Action("steal", buy="th_m1", cost=0.0,
+                                 victim="riv"), 3.0) == 0.0
 
     # -- the bar is a round you can still pick -----------------------------
     # THE ELEVEN A SIGNING HAS TO BEAT must be the one you would actually

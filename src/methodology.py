@@ -1015,19 +1015,20 @@ def column_guide_lines() -> list[str]:
         "menu. The funding is implicit — sell the SELL rows and the BUY "
         "rows are what the money reaches. `Start` is the probable-XI "
         "read, recalibrated and blended, the same figure the forecast "
-        "multiplies by. `xPts/j` already has that applied. `€` is what "
-        "you end up with for doing that row, funding included — a SELL "
-        "row is what it raises, a BUY row is that money minus what he "
-        "costs, a SAVE row is how far short you are. `Season` is "
+        "multiplies by. `xPts/j` already has that applied. `€` on a KEEP "
+        "or SELL row is what it raises; on a SAVE row, how far short you "
+        "are. On a BUY or RAID row it is his market price, plus (on a "
+        "RAID) the extra premium a clause forces above it — his real "
+        "worth and what taking him costs, not a net cash figure: a raid "
+        "can leave you holding more cash than it spent, and reading that "
+        "surplus as the price would say the opposite of what happened. "
+        "`Season` is "
         "simulated: extra points over the jornadas left, the same "
         "seasons with and without the move — on a KEEP or SELL row, "
         "\"without\" is his best REAL replacement, not nothing, so a "
         "negative number there can still mean keep him: his own best "
         "alternative costs more than he does, not that he scores less "
-        "than zero. A `*` on a KEEP/SELL row's \"vs X\" name means the "
-        "BUY list's own row for X is funded by somebody ELSE's sale, "
-        "not his — two different players' money legitimately reaching "
-        "the same man, not an error to reconcile. `pts/M€` is Season "
+        "than zero. `pts/M€` is Season "
         "per million actually spent — how CHEAPLY a gain arrived, not "
         "how big it is, so read Season first: there are only eleven "
         "starting shirts, and a tiny gain at a tiny price can still "
@@ -1752,8 +1753,15 @@ def _selftest() -> None:
     # the site's Fantasy.jsx) had already drifted before this single copy
     # replaced both; a test that only checked the heading existed would
     # not have caught that.
-    for term in ("pts/M€", "vs X", "P(above)"):
+    for term in ("pts/M€", "P(above)"):
         assert term in guide, term
+    # THE `€` COLUMN'S BUY/RAID READING, not the KEEP/SELL `vs X` marker
+    # this replaced — that marker described best_swap_for(), cut 2026-09-06,
+    # and asserting it here (2026-09-01's version of this test did) is
+    # exactly how a glossary can describe a feature nobody removed it from.
+    for term in ("market price", "premium"):
+        assert term in guide, term
+    assert "vs X" not in guide, guide
     # RETIRED SECTIONS STAY GONE — report.py's old board ("Field these
     # eleven", "What to bid", "Fitness", "Starting") was cut 2026-09-05;
     # their column-guide paragraphs lived on here describing tables that
