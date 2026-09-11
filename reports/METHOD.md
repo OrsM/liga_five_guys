@@ -1,4 +1,4 @@
-# Liga Five Guys — how the numbers are made — 2026-09-11 08:05 UTC
+# Liga Five Guys — how the numbers are made — 2026-09-11 20:28 UTC
 
 
 
@@ -8,7 +8,7 @@
 | Not modelled | Which way it bends the answer |
 |---|---|
 | Jornada 6 is half played — 2 clubs are done | their points are already in `now`, so only the rest of the round is simulated, and it still re-picks an eleven that is in fact already locked |
-| A buyout premium is charged at **0.000 places per million**, the median of every run that has measured it — today's own reading is 0.002 | a clause runs a median 1.52× market value here and the app pays back only the value, so the premium is gone for good. It is charged against the move, but priced off what more money would buy you today — most days, very little |
+| A buyout premium is charged at **0.000 places per million**, the median of every run that has measured it — today's own reading is 0.003 | a clause runs a median 1.52× market value here and the app pays back only the value, so the premium is gone for good. It is charged against the move, but priced off what more money would buy you today — most days, very little |
 | "Your eleven" (top of the ladder) compares only the NEXT jornada, off real confirmed lineups/injuries | the standings table below simulates the other 33 jornadas too, where nobody has lineup news yet and squad value dominates — the two can point opposite ways (this week's confirmed news vs. the season's average squad quality) without either being wrong |
 | Beyond the next jornada, P(start) reverts to his own season-standing rate | a suspension or a knock is dated to the match it was announced for — nothing here predicts a FUTURE one not yet known, e.g. who gets injured in March |
 | Rivals never transfer | a steal that guts a squad assumes its manager does not simply buy someone back — flatters the steal |
@@ -27,23 +27,23 @@
 
 | | Table | What it is used for | Fetched from | Rows | Newest row | Fetching |
 |---|---|---|---|--:|---|---|
-| 🟢 | api_activity | every transfer, which is what the ledger replays — one row per deal, so the newest is the last deal and not the last sweep | LaLiga Fantasy API | 159 | 10 Sep 21:44 | fetched 1 minute ago |
-| 🟢 | api_leagues | your cash and the league's id | LaLiga Fantasy API | 172 | 11 Sep 08:05 | fetched 1 minute ago |
-| 🟢 | api_lineup | the eleven you have actually fielded, and the formation the app says you are playing | LaLiga Fantasy API | 1,639 | 11 Sep 08:05 | fetched 1 minute ago |
-| 🟢 | api_market | what is on offer, and the bids on it | LaLiga Fantasy API | 5,148 | 11 Sep 08:05 | fetched 1 minute ago |
-| 🟢 | api_players | names for players nobody owns any more — one row per player, first sighting kept | LaLiga Fantasy API | 117 | 10 Sep 21:44 | fetched 10 hours ago |
-| 🟢 | api_standings | the league table — position, points, squad value, and your balance | LaLiga Fantasy API | 860 | 11 Sep 08:05 | fetched 1 minute ago |
-| 🟢 | api_stats | what the app scored each player, broken into what he did — one row per player per week per stat, a correction being a later row rather than an overwrite | LaLiga Fantasy API | 7,982 | 10 Sep 21:44 | fetched 1 minute ago |
-| 🟢 | api_teams | all five squads | LaLiga Fantasy API | 12,158 | 11 Sep 08:05 | fetched 1 minute ago |
+| 🟢 | api_activity | every transfer, which is what the ledger replays — one row per deal, so the newest is the last deal and not the last sweep | LaLiga Fantasy API | 164 | 11 Sep 20:25 | fetched 3 minutes ago |
+| 🟢 | api_leagues | your cash and the league's id | LaLiga Fantasy API | 173 | 11 Sep 20:25 | fetched 3 minutes ago |
+| 🟢 | api_lineup | the eleven you have actually fielded, and the formation the app says you are playing | LaLiga Fantasy API | 1,650 | 11 Sep 20:25 | fetched 3 minutes ago |
+| 🟢 | api_market | what is on offer, and the bids on it | LaLiga Fantasy API | 5,182 | 11 Sep 20:25 | fetched 3 minutes ago |
+| 🟢 | api_players | names for players nobody owns any more — one row per player, first sighting kept | LaLiga Fantasy API | 122 | 11 Sep 20:25 | fetched 3 minutes ago |
+| 🟢 | api_standings | the league table — position, points, squad value, and your balance | LaLiga Fantasy API | 865 | 11 Sep 20:25 | fetched 3 minutes ago |
+| 🟢 | api_stats | what the app scored each player, broken into what he did — one row per player per week per stat, a correction being a later row rather than an overwrite | LaLiga Fantasy API | 8,528 | 11 Sep 20:25 | fetched 3 minutes ago |
+| 🟢 | api_teams | all five squads | LaLiga Fantasy API | 12,234 | 11 Sep 20:25 | fetched 3 minutes ago |
 | ⚪ | clubs | the same, for clubs | src/crosswalk.py | 20 | — | rebuilt every run from the tables above |
-| 🟢 | elo | team strength, which ranks the fixture term | clubelo.com | 3,080 | 11 Sep 08:05 | fetched 12 minutes ago |
-| 🟢 | fixtures | who plays whom next, for the fixture term | analiticafantasy.com | 2,318 | 11 Sep 08:05 | fetched 12 minutes ago |
-| 🟢 | lineups | probable XI percentages, both sources | analiticafantasy.com, futbolfantasy.com ×40 | 136,320 | 11 Sep 08:05 | fetched 12 minutes ago |
-| 🟢 | market | price, value, position, fitness — every player in the game | futbolfantasy.com | 136,473 | 11 Sep 08:05 | fetched 1 minute ago |
-| 🟢 | matches | fixtures, kickoffs, results | futbolfantasy.com | 66,500 | 11 Sep 08:05 | fetched 12 minutes ago |
+| 🟢 | elo | team strength, which ranks the fixture term | clubelo.com | 3,100 | 11 Sep 20:25 | fetched 13 hours ago |
+| 🟢 | fixtures | who plays whom next, for the fixture term | analiticafantasy.com | 2,328 | 11 Sep 20:25 | fetched 13 hours ago |
+| 🟢 | lineups | probable XI percentages, both sources | analiticafantasy.com, futbolfantasy.com ×40 | 136,993 | 11 Sep 20:25 | fetched 3 minutes ago |
+| 🟢 | market | price, value, position, fitness — every player in the game | futbolfantasy.com | 137,132 | 11 Sep 20:25 | fetched 3 minutes ago |
+| 🟢 | matches | fixtures, kickoffs, results | futbolfantasy.com | 66,880 | 11 Sep 20:25 | fetched 13 hours ago |
 | ⚪ | players | the crosswalk: one key per player across all four spellings | src/crosswalk.py | 722 | — | rebuilt every run from the tables above |
-| 🟢 | points | realised points per jornada, the actuals in every table below | futbolfantasy.com | 1,266 | 08 Sep 05:59 | fetched 1 minute ago |
-| 🟢 | starters | confirmed elevens, which is what P(start) is graded on | futbolfantasy.com | 130,637 | 11 Sep 08:05 | fetched 3 days ago |
+| 🟢 | points | realised points per jornada, the actuals in every table below | futbolfantasy.com | 1,267 | 11 Sep 20:25 | fetched 3 minutes ago |
+| 🟢 | starters | confirmed elevens, which is what P(start) is graded on | futbolfantasy.com | 132,543 | 11 Sep 20:25 | fetched 4 days ago |
 
 ### The model, as configured right now
 
@@ -117,20 +117,20 @@ Still the unfitted default (1.00) — not enough graded pairs yet (h1=41, h3=15,
 | analitica — named, no number | 99 | — | 67% | — |
 
 | **starts, same population as our forecast only** — the fair comparison | | | | |
-| analitica | 60 | 93% | 77% | 0.211 |
-| futbolfantasy ←read | 102 | 68% | 74% | 0.118 |
+| analitica | 65 | 91% | 75% | 0.218 |
+| futbolfantasy ←read | 106 | 68% | 74% | 0.124 |
 | our forecast | 48 | 71% | 79% | 0.094 |
 | **appearances** — the wider, blunter sample; a 20-minute substitute counts | | | | |
-| analitica | 2227 | 79% | 22% | 0.558 |
-| futbolfantasy ←read | 7696 | 36% | 11% | 0.237 |
-| our forecast | 298 | 64% | 20% | 0.402 |
-| analitica — named, no number | 703 | — | 8% | — |
+| analitica | 2428 | 79% | 20% | 0.571 |
+| futbolfantasy ←read | 8250 | 36% | 10% | 0.238 |
+| our forecast | 322 | 64% | 19% | 0.412 |
+| analitica — named, no number | 724 | — | 8% | — |
 | futbolfantasy — named, no number | 2 | — | 0% | — |
 
 | Not graded | Calls |
 |---|--:|
 | within 10 points of 50%, on starts | 399 |
-| within 10 points of 50%, on appearances | 1538 |
+| within 10 points of 50%, on appearances | 1632 |
 
 _Brier: mean squared error of the probability, 0 perfect and 0.25 a coin flip. Claims are scored as last published before the round's first kickoff. Lower Brier **on starts** earns `LINEUP_SOURCE` in ffcore/tidy.py; appearances break ties only._
 
