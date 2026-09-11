@@ -78,3 +78,69 @@ per-episode nets, exposed via `compare_arms()` — "BEATS" now means the 90%
 CI on the gap excludes zero, not just that one number was bigger than
 another at whatever n and noise level happened to be sitting there that
 day.
+
+## screen_audit — full historical checkout, not per-file reconstruction
+
+Every OTHER function in this file (`replay_recommendations()` and its
+siblings) can only re-rank candidates a historical `reports/decisions.json`
+already contains — none check whether `decide.candidates()`'s own
+expected-points prune (`decide.py`, the `bar_exp.get(c, 0.0) <= bar: continue`
+line) ever discarded something better BEFORE it reached `rank()`. This is
+the "full historical Universe reconstruction" this repo's project notes
+flagged repeatedly as real, unbuilt, larger work.
+
+It turned out simpler than that framing implied. `decide.load()`'s only
+inputs are git-tracked (`data/tidy/*`, `inputs/cash.txt`,
+`reports/decisions.json` — one `lfg-run` commit bundles all of them
+atomically), and `ffcore.tidy.ROOT`/`TIDY`/`DECISIONS` all resolve relative
+to `cwd`, not a hardcoded path. So instead of patching `csv_as_of()`
+reconstruction through `ffcore.model.session()`'s whole object graph (not
+threadable cleanly — checked, `model.session()`/`load_market_latest()` etc.
+take no "as of" argument), `screen_audit_episode()` does a real `git
+worktree add --detach` checkout of the historical commit, then runs a small
+script via `sys.executable` (this interpreter's own venv, no per-sample
+`uv sync`) with `cwd` set to the worktree — that commit's OWN `decide.py`/
+`ffcore`, unmodified, reading that commit's OWN data, in a fresh subprocess
+(required: `decide.load()` memoizes per-process, so each historical sample
+needs its own).
+
+**What it currently checks, and the real limitation found running it
+(2026-09-12):** a "near miss" is a candidate `candidates()` excluded that
+day (expected points below the live XI bar) but not by much, AND
+affordable by CASH ALONE (`price <= u.cash`, no swap/sale funding) — a
+deliberate simplification to avoid re-implementing `candidates()`'s own
+spare-selling funding-chain logic. Sampling every 10th of 235 real
+`reports/decisions.json` commits found: the first ~15 predate `current_xi()`
+existing at all (script fails cleanly, `"error": "..."`, doesn't kill the
+run — the API itself hadn't stabilized yet that early), and every one of
+the 9 samples that DID run clean (2026-08-24 onward) found **zero**
+cash-affordable near-misses — even re-checked at `near_miss_frac=0.0` (ANY
+excluded candidate, however far below the bar) on one real day, still
+zero. That is NOT strong evidence the screen never misses a winner — this
+project's own real reports show cash is typically thin relative to any
+real candidate's price (most real BUY/RAID rows are funded by a sale, not
+outright cash), so "cash-affordable" alone is close to an empty set on a
+typical day almost BY CONSTRUCTION, independent of whether the screen's
+bar is well-placed. The honest reading of today's run: infrastructure
+works, is safe (git worktree cleaned up in `finally` even under
+`subprocess.TimeoutExpired`; verified with a real OOM-kill mid-run this
+session — no dangling worktree survived, `git worktree list` came back
+clean once `git worktree remove --force` was re-run by hand), but the
+CURRENT near-miss definition is too narrow to say much yet.
+
+**The real next step, not yet built:** extend the near-miss set to
+swap-funded candidates too (reusing `candidates()`'s own
+`spare[:6]`-cheapest-first funding logic, not a new invention) before
+treating "zero near-misses" as a real finding about screen quality rather
+than an artifact of only checking the rarer cash-only case. `NEAR_MISS_FRAC`
+(0.85) itself was NOT the limiting factor — re-run at 0.0 on a real day
+still found nothing, so the funding restriction is the actual bottleneck,
+not the score-closeness threshold.
+
+**Memory note for this box specifically:** a full 24-sample run OOM-killed
+once on this machine's ~3.7GB RAM (`free -h` showed under 1GB free even at
+idle) — `replay_screen_misses()`'s in-memory loop is fine on a bigger box,
+but here a checkpointed, resumable driver (append each result to a JSONL
+file, skip already-done shas on restart) was needed to survive a kill
+without losing progress. Worth keeping in mind before re-running a large
+sample on this same machine.

@@ -32,8 +32,10 @@ import datetime as dt
 import io
 import json
 import os
+import shutil
 import subprocess
 import sys
+import tempfile
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
@@ -41,7 +43,8 @@ import stats  # noqa: E402
 
 __all__ = ["commit_as_of", "csv_as_of", "commits_touching",
           "replay_recommendations", "replay_percentile_rank",
-          "replay_ladder_percentile", "compare_arms"]
+          "replay_ladder_percentile", "compare_arms",
+          "screen_audit_episode", "replay_screen_misses"]
 
 # The repo root — git commands run from here regardless of the caller's
 # own working directory, the same reason run.py sets PYTHONPATH=src rather
@@ -118,6 +121,160 @@ def commits_touching(path: str) -> list[tuple[str, dt.datetime]]:
         except ValueError:
             continue
     return commits
+
+
+# ---------------------------------------------------------------------------
+# screen_audit — did decide.candidates()'s expected-points prune ever
+# discard a real winner, not just re-rank what it already let through
+#
+# Every OTHER backtest in this file can only re-rank candidates a historical
+# reports/decisions.json's `moves` list already contains — none of them
+# check whether candidates() itself threw away something better BEFORE it
+# ever reached rank(). This is the one piece of "full historical Universe
+# reconstruction" (flagged, unbuilt, in this repo's project notes) that's
+# actually cheap: a full CHECKOUT of the historical repo tree (not a
+# per-file csv_as_of() reconstruction) gives decide.load() everything it
+# reads (data/tidy/*, inputs/cash.txt, reports/decisions.json — all real
+# git-tracked state, bundled atomically by the same lfg-run commit) for
+# free, using that commit's OWN code, in a fresh subprocess (decide.load()
+# memoizes per-process, and TIDY/DECISIONS resolve relative to cwd — one
+# subprocess per historical sample is what makes that safe, not a
+# shortcut around it).
+# Why: docs/notes/backtest.md#screen_audit--full-historical-checkout-not-per-file-reconstruction
+# ---------------------------------------------------------------------------
+
+NEAR_MISS_FRAC = 0.85
+# A "near miss" is a candidate candidates() excluded (expected points below
+# the live XI bar) but not by much — within this fraction of the bar. Not
+# "everything the screen ever touched": most exclusions are nowhere close
+# and simulating them would just burn time restating the obvious.
+
+_SCREEN_AUDIT_SCRIPT = """
+import json, sys
+sys.path.insert(0, "src")
+import decide
+
+u = decide.load()
+bar_exp, xi = decide.current_xi(u)
+if not bar_exp:
+    print(json.dumps({{"error": "no xi"}}))
+    sys.exit(0)
+bar = decide.xi_bar(bar_exp, xi)
+mine = set(u.state.squads.get(u.me, {{}}))
+near = []
+for c, price in u.price.items():
+    if c in mine or price > u.cash:
+        continue
+    exp = bar_exp.get(c, 0.0)
+    if exp <= bar and exp >= bar * {frac} and decide.route_kind(u, c) != "listed":
+        near.append((c, price, exp))
+
+if not near:
+    print(json.dumps({{"near_miss_count": 0}}))
+    sys.exit(0)
+
+acts = [decide.Action("buy", buy=c, cost=price) for c, price, _exp in near]
+rows, base, measured, bands = decide.rank(u, acts)
+best = None
+for r in rows:
+    if best is None or r["pts_lo"] > best["pts_lo"]:
+        best = {{"buy": r["action"].buy, "pts_lo": r["pts_lo"],
+                "d_pos": r["d_pos"]}}
+print(json.dumps({{"near_miss_count": len(near), "best": best}}))
+"""
+
+
+def screen_audit_episode(sha: str, when: str, near_miss_frac: float = NEAR_MISS_FRAC,
+                         timeout: float = 90.0) -> dict:
+    """One real historical check: among candidates() excluded that day for
+    scoring within `near_miss_frac` of the live bar (cash-affordable,
+    non-listed — a deliberately narrower slice than every exclusion, see
+    module note above), does any of them simulate a REAL pts_lo beating
+    the day's actual top recommendation?
+
+    Runs a fresh `git worktree` checkout of `sha` (read-only — always
+    removed in `finally`, never touches the real working tree) and a
+    subprocess using THIS interpreter (`sys.executable` — the venv already
+    resolved, no per-sample `uv sync`) against that worktree's own,
+    historical `decide.py`/`ffcore` code and data.
+
+    Returns `{"error": ...}` on any failure (bad worktree, script crash,
+    unparseable output) rather than raising — one bad historical commit
+    should not kill a whole sampled run. Otherwise `{"sha", "when",
+    "near_miss_count", "near_miss_best": {...} | None, "actual_best_pts_lo",
+    "beat_actual": bool | None}` — `beat_actual` is None when there was
+    nothing to compare (no near-miss, or that day's own commit had no
+    graded pts_lo to compare against).
+    """
+    tmp = tempfile.mkdtemp(prefix="lfg_screen_audit_")
+    try:
+        wt = subprocess.run(
+            ["git", "worktree", "add", "--detach", "--force", tmp, sha],
+            cwd=_ROOT, capture_output=True, text=True, check=False)
+        if wt.returncode != 0:
+            return {"sha": sha, "error": "worktree add failed",
+                   "detail": wt.stderr.strip()[-500:]}
+        script = _SCREEN_AUDIT_SCRIPT.format(frac=near_miss_frac)
+        try:
+            proc = subprocess.run([sys.executable, "-c", script], cwd=tmp,
+                                  capture_output=True, text=True,
+                                  timeout=timeout, check=False)
+        except subprocess.TimeoutExpired:
+            return {"sha": sha, "error": "audit script timed out"}
+        if proc.returncode != 0:
+            return {"sha": sha, "error": "audit script failed",
+                   "detail": proc.stderr.strip()[-500:]}
+        try:
+            result = json.loads(proc.stdout.strip().splitlines()[-1])
+        except (ValueError, IndexError):
+            return {"sha": sha, "error": "bad script output",
+                   "detail": proc.stdout.strip()[-500:]}
+        if result.get("error"):
+            return {"sha": sha, "error": result["error"]}
+        n = result.get("near_miss_count", 0)
+        if not n or not result.get("best"):
+            return {"sha": sha, "when": when, "near_miss_count": n,
+                   "near_miss_best": None, "actual_best_pts_lo": None,
+                   "beat_actual": None}
+        actual_pts_lo = None
+        text = _show(sha, "reports/decisions.json")
+        if text:
+            try:
+                moves = json.loads(text).get("moves") or []
+                if moves and moves[0].get("pts_lo") is not None:
+                    actual_pts_lo = moves[0]["pts_lo"]
+            except (ValueError, TypeError):
+                pass
+        beat = (actual_pts_lo is not None
+               and result["best"]["pts_lo"] > actual_pts_lo)
+        return {"sha": sha, "when": when, "near_miss_count": n,
+               "near_miss_best": result["best"],
+               "actual_best_pts_lo": actual_pts_lo, "beat_actual": beat}
+    finally:
+        subprocess.run(["git", "worktree", "remove", "--force", tmp],
+                       cwd=_ROOT, capture_output=True, text=True, check=False)
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+def replay_screen_misses(sample_every: int = 10,
+                         near_miss_frac: float = NEAR_MISS_FRAC) -> dict:
+    """Sample every `sample_every`-th real `reports/decisions.json` commit
+    and run `screen_audit_episode()` on each — the bounded first slice of
+    "did the screen ever discard a winner," not a claim about every
+    historical moment. Returns {"sampled", "valid", "errors", "beats",
+    "results"} — `results` is every sample's own dict, so a caller can see
+    exactly which (if any) historical day had a real near-miss that would
+    have out-simulated what was actually shown.
+    """
+    commits = commits_touching("reports/decisions.json")
+    sampled = commits[::max(1, sample_every)]
+    results = [screen_audit_episode(sha, when.isoformat(), near_miss_frac)
+              for sha, when in sampled]
+    valid = [r for r in results if "error" not in r]
+    beats = [r for r in valid if r.get("beat_actual")]
+    return {"sampled": len(sampled), "valid": len(valid),
+           "errors": len(results) - len(valid), "beats": len(beats),
+           "results": results}
 
 
 def naive_value_baseline(golden: list[dict]) -> dict | None:
