@@ -349,8 +349,15 @@ def ladder_rows(u, rows, bands=None) -> list[dict]:
 
     def buy_cell(k, group):
         r = won[k]
+        sold = r["action"].sell
+        # The market/premium cell shows sticker price, not net cost (2026-09-06,
+        # Miguel: no blended score) — so a real purchase can look unaffordable
+        # (e.g. 11.5M) next to spare cash that doesn't cover it. `sold` names
+        # whoever actually funds the gap, the same fact "with the proceeds"
+        # promises in the group header but the row itself never used to state.
+        note = ("sell " + " + ".join(short(s, u) for s in sold)) if sold else ""
         return cell(k, group, short_manager(u.owner.get(k)) or "free agent",
-                    -r["action"].net, r["d_pts"], value=r.get("value"),
+                    -r["action"].net, r["d_pts"], note, value=r.get("value"),
                     lo=r.get("pts_lo"), hi=r.get("pts_hi"),
                     market=u.value.get(k), premium=r.get("burn") or 0.0)
 
