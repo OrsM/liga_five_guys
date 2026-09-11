@@ -37,9 +37,11 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
+import stats  # noqa: E402
+
 __all__ = ["commit_as_of", "csv_as_of", "commits_touching",
           "replay_recommendations", "replay_percentile_rank",
-          "replay_ladder_percentile"]
+          "replay_ladder_percentile", "compare_arms"]
 
 # The repo root — git commands run from here regardless of the caller's
 # own working directory, the same reason run.py sets PYTHONPATH=src rather
@@ -247,10 +249,10 @@ def recency_only_baseline(golden: list[dict], window: int = 3) -> dict | None:
 
 
 def _actuals_index():
-    """(real_points_since(name, since), now) — the real per-jornada points
-    ledger every replay function below grades against, built once so
+    """(points_between(name, since, until), now) — the real per-jornada
+    points ledger every replay function below grades against, built once so
     comparing two picking rules never risks reading two different slices
-    of history by accident.
+    of history by accident. `until=None` means "no upper bound" (to `now`).
     """
     import methodology as M
     from ffcore.text import norm
@@ -266,11 +268,12 @@ def _actuals_index():
         for k in a["keys"]:
             by_player.setdefault(k, []).append((a["from_dt"], a["points_delta"]))
 
-    def real_points_since(name: str, since: dt.datetime) -> float:
+    def points_between(name: str, since: dt.datetime,
+                       until: dt.datetime | None = None) -> float:
         return sum(p for when, p in by_player.get(norm(name), [])
-                   if when >= since)
+                   if when >= since and (until is None or when <= until))
 
-    return real_points_since, now
+    return points_between, now
 
 
 def _pick_episodes(commits, pick) -> list[dict]:
@@ -312,27 +315,85 @@ def _pick_episodes(commits, pick) -> list[dict]:
     return episodes
 
 
-def _grade_episodes(episodes, real_points_since, now, min_days) -> dict | None:
+HORIZON_DAYS = 10.0
+# A FIXED FORWARD WINDOW, not "from the episode's day to now" (the original
+# design, 2026-09-06 to 2026-09-11). That let two real problems in: (1) an
+# episode from early in the replay scored every jornada since, one from last
+# week barely any, so total_net compared exposure/luck-of-timing, not skill;
+# (2) once a slot's pick changed, the OLD episode kept scoring to "now" too
+# — two episodes for the same slot silently double-counted the same real
+# jornadas. Bounding every episode to the same HORIZON_DAYS window removes
+# both: episodes become comparable regardless of when they fired, and an
+# episode's own window ends before the next one for that slot could even
+# start double-counting it. Chosen empirically (2026-09-12): at ~5 real days
+# between jornada locks so far, 10 days is ~2 jornadas of real runway and
+# still lets most of this repo's commit history clear it (193 of 235 commits
+# at 10 days vs 123 of 235 at 21 days) — revisit as more jornadas lock and
+# the choice can afford to widen without starving every arm's n.
+# Why: docs/notes/backtest.md#horizon_days--fixed-window-not-episode-to-now
+
+
+def _grade_episodes(episodes, points_between, now, min_days=None,
+                    horizon_days: float = HORIZON_DAYS) -> dict | None:
     """`episodes` -> the same summary shape every replay function returns,
-    graded on real points scored strictly after each episode's own day.
+    graded on real points scored in the FIXED [when, when+horizon_days]
+    window after each episode's own day — never open-ended to `now`, so an
+    arm firing more episodes, or firing earlier, can't out-accumulate
+    another purely on exposure. `min_days`, when given, additionally
+    requires that much runway on top of `horizon_days` (used by callers
+    that want to compare against the OLD open-ended semantics in tests);
+    the real gate for "has this episode had its full say yet" is always
+    `horizon_days`.
     """
+    need = max(horizon_days, min_days or 0)
     resolved = []
     for ep in episodes:
-        if (now - ep["when"]).days < min_days:
+        if (now - ep["when"]).days < need:
             continue
-        buy_pts = real_points_since(ep["buy"], ep["when"])
-        sell_pts = sum(real_points_since(nm.strip(), ep["when"])
+        until = ep["when"] + dt.timedelta(days=horizon_days)
+        buy_pts = points_between(ep["buy"], ep["when"], until)
+        sell_pts = sum(points_between(nm.strip(), ep["when"], until)
                       for nm in ep["sell"].split(" + "))
         resolved.append({**ep, "buy_pts": buy_pts, "sell_pts": sell_pts,
                          "net": buy_pts - sell_pts})
     if not resolved:
         return None
     n = len(resolved)
-    total_net = sum(r["net"] for r in resolved)
+    nets = [r["net"] for r in resolved]
+    total_net = sum(nets)
     wins = sum(1 for r in resolved if r["net"] > 0)
     return {"n": n, "total_episodes": len(episodes),
            "too_fresh": len(episodes) - n, "total_net": total_net,
-           "mean_net": total_net / n, "wins": wins, "resolved": resolved}
+           "mean_net": total_net / n, "wins": wins, "resolved": resolved,
+           "nets": nets, "horizon_days": horizon_days}
+
+
+def compare_arms(a: dict, b: dict, a_name: str, b_name: str) -> str:
+    """`a_name` vs `b_name`, on per-episode net (fixed horizon, so comparable
+    regardless of how many episodes each arm fired or when) — replaces the
+    old bare `total_net > total_net` verdict, which conflated an arm firing
+    more episodes with an arm making better calls. Uses `stats.bootstrap_gap`
+    on the two arms' `nets` lists; only claims a real beat when the 90% CI
+    on the gap excludes zero. Both arms' own mean net per episode are always
+    shown too — a losing comparison and a losing NUMBER are different
+    findings (2026-09-11 audit: the shipped ladder's own historical net can
+    be negative even when framed only as "loses to X")."""
+    gap = stats.bootstrap_gap(a["nets"], b["nets"])
+    lines = [f"{a_name}: {a['n']} eps, mean {a['mean_net']:+.1f} pts/ep "
+             f"(total {a['total_net']:+.1f})",
+             f"{b_name}: {b['n']} eps, mean {b['mean_net']:+.1f} pts/ep "
+             f"(total {b['total_net']:+.1f})"]
+    if gap is None:
+        lines.append("-> not enough data on one side to compare")
+    elif gap["beats"]:
+        lines.append(f"-> {a_name} BEATS {b_name} (90% CI on the per-episode "
+                     f"gap: {gap['lo']:+.1f} to {gap['hi']:+.1f} pts, "
+                     "excludes zero)")
+    else:
+        lines.append(f"-> no significant difference (90% CI on the "
+                     f"per-episode gap: {gap['lo']:+.1f} to {gap['hi']:+.1f} "
+                     "pts, straddles zero)")
+    return "\n  ".join(lines)
 
 
 def replay_recommendations(min_days: float = 3.0) -> dict | None:
@@ -350,11 +411,18 @@ def replay_recommendations(min_days: float = 3.0) -> dict | None:
 
     THE SOURCE: `reports/decisions.json`'s own `moves[0]` — the single
     highest-ranked recommendation BY MEAN d_pos, exactly what a manager
-    reading the report that day would have acted on — across all 200+ real
-    commits since 2026-08-18 (`commits_touching()`, oldest first, real
+    reading the report that day would have acted on — read off the real
+    commit stream since 2026-08-18 (`commits_touching()`, oldest first, real
     dates, no hindsight: each day's advice is graded only on points scored
-    AFTER that day, never before). See `replay_percentile_rank()` for the
-    same replay with a DIFFERENT picking rule, off the same commit history.
+    AFTER that day, never before). The commit stream itself runs 200+ real
+    commits, but after per-slot dedup (`_pick_episodes()` — a pick that
+    hasn't changed isn't a new episode) and requiring a full HORIZON_DAYS of
+    real runway, the GRADED episode count this actually validates on is far
+    smaller — read `n` off the result, not the size of the underlying
+    commit stream (2026-09-11 audit finding: "200+ commits" had been
+    quietly standing in for "200+ graded episodes" in prose elsewhere).
+    See `replay_percentile_rank()` for the same replay with a DIFFERENT
+    picking rule, off the same commit history.
 
     `min_days`: an episode needs real runway to say anything — one
     recommended yesterday has barely had a chance to be right or wrong yet.
@@ -367,11 +435,11 @@ def replay_recommendations(min_days: float = 3.0) -> dict | None:
     commits = commits_touching("reports/decisions.json")
     if not commits:
         return None
-    real_points_since, now = _actuals_index()
+    points_between, now = _actuals_index()
     if now is None:
         return None
     episodes = _pick_episodes(commits, lambda moves: moves[:1])
-    return _grade_episodes(episodes, real_points_since, now, min_days)
+    return _grade_episodes(episodes, points_between, now, min_days)
 
 
 def replay_percentile_rank(min_days: float = 3.0) -> dict | None:
@@ -405,7 +473,7 @@ def replay_percentile_rank(min_days: float = 3.0) -> dict | None:
     commits = commits_touching("reports/decisions.json")
     if not commits:
         return None
-    real_points_since, now = _actuals_index()
+    points_between, now = _actuals_index()
     if now is None:
         return None
 
@@ -415,7 +483,7 @@ def replay_percentile_rank(min_days: float = 3.0) -> dict | None:
         return [max(candidates, key=lambda m: m["pts_lo"])] if candidates else []
 
     episodes = _pick_episodes(commits, pick_by_ptslo)
-    return _grade_episodes(episodes, real_points_since, now, min_days)
+    return _grade_episodes(episodes, points_between, now, min_days)
 
 
 def replay_ladder_percentile(topn: int = 3, min_days: float = 3.0) -> dict:
@@ -440,7 +508,7 @@ def replay_ladder_percentile(topn: int = 3, min_days: float = 3.0) -> dict:
     which arm (if either) had enough real history to grade.
     """
     commits = commits_touching("reports/decisions.json")
-    real_points_since, now = _actuals_index()
+    points_between, now = _actuals_index()
     if not commits or now is None:
         return {"current": None, "percentile": None}
 
@@ -454,8 +522,8 @@ def replay_ladder_percentile(topn: int = 3, min_days: float = 3.0) -> dict:
 
     cur_eps = _pick_episodes(commits, pick_current)
     pct_eps = _pick_episodes(commits, pick_pctile)
-    return {"current": _grade_episodes(cur_eps, real_points_since, now, min_days),
-           "percentile": _grade_episodes(pct_eps, real_points_since, now, min_days)}
+    return {"current": _grade_episodes(cur_eps, points_between, now, min_days),
+           "percentile": _grade_episodes(pct_eps, points_between, now, min_days)}
 
 
 def _selftest() -> None:
@@ -566,11 +634,8 @@ def _selftest() -> None:
              f"net positive, total net {prec['total_net']:+.1f} real pts, "
              f"mean {prec['mean_net']:+.1f} pts/episode")
         if rec is not None:
-            better = "BEATS" if prec["total_net"] > rec["total_net"] \
-                else "LOSES TO" if prec["total_net"] < rec["total_net"] \
-                else "TIES"
-            print(f"  -> percentile-rank {better} mean-rank on real history "
-                 f"({prec['total_net']:+.1f} vs {rec['total_net']:+.1f} pts)")
+            print("  " + compare_arms(prec, rec, "percentile-rank",
+                                      "mean-rank"))
 
     # -- replay_ladder_percentile(): does the WHOLE ladder benefit, not just
     # the single headline pick? Miguel: "the whole ladder should follow
@@ -582,12 +647,17 @@ def _selftest() -> None:
     cur, pct = ladder["current"], ladder["percentile"]
     if cur is not None and pct is not None:
         assert cur["n"] > 0 and pct["n"] > 0, ladder
-        better = "BEATS" if pct["total_net"] > cur["total_net"] \
-            else "LOSES TO" if pct["total_net"] < cur["total_net"] \
-            else "TIES"
-        print(f"  replay_ladder_percentile(top3): current {cur['n']} eps "
-             f"net {cur['total_net']:+.1f} vs percentile {pct['n']} eps "
-             f"net {pct['total_net']:+.1f} -> percentile {better} current")
+        # THE SHIPPED ARM'S OWN NET IS A HEADLINE FINDING ON ITS OWN, not
+        # only the losing side of a comparison (2026-09-11 audit: a
+        # negative "current" net used to be visible only as the smaller
+        # number in a BEATS/LOSES TO line).
+        if cur["total_net"] < 0:
+            print(f"  ** the SHIPPED top-{3} ladder's own real historical "
+                 f"net is NEGATIVE: {cur['total_net']:+.1f} pts over "
+                 f"{cur['n']} episodes (mean {cur['mean_net']:+.1f}/ep) **")
+        print(f"  replay_ladder_percentile(top3), horizon="
+             f"{cur['horizon_days']:.0f}d:")
+        print("  " + compare_arms(pct, cur, "percentile", "current"))
 
     print("backtest.py selftest OK")
 

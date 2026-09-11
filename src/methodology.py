@@ -44,6 +44,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
+import stats  # noqa: E402
 from ffcore.fixture import FIX_BAND, HOME_EDGE  # noqa: E402
 from ffcore.score import SHRINK_K  # noqa: E402
 from ffcore.text import norm, resolve  # noqa: E402
@@ -229,6 +230,12 @@ def drift_frac_from_history(lag1: int = 1, lag3: int = 3) -> tuple[float, str]:
 
 BUCKETS = [(-1e9, 2, "under 2"), (2, 3, "2–3"), (3, 4, "3–4"), (4, 1e9, "4+")]
 
+# Below this, a bucket's own mean-forecast/mean-actual gap is as likely to be
+# noise as a real miscalibration — print "not enough data" instead of a
+# table a reader could over-read (2026-09-11 audit finding: the smallest
+# buckets ran 8-18).
+MIN_BUCKET_N = 20
+
 # Where a fixture stops being a median one, for grading purposes only. Wide
 # enough that a home game against an average side lands in "neutral".
 FIX_EDGE = 0.03
@@ -305,7 +312,7 @@ def appearances(actuals: list[dict]) -> list[tuple[dt.datetime, set]]:
     return sorted(by_start.items())
 
 
-def start_grade(intervals, claims, universe=None):
+def start_grade(intervals, claims, universe=None, instances=None):
     """Per source: did the players it called actually appear?
 
     Returns (numbered, named, skipped):
@@ -317,6 +324,16 @@ def start_grade(intervals, claims, universe=None):
                 analiticafantasy's `titular` is a final answer, not a 100%,
                 and turning it into one would invent the missing constant.
       skipped   how many claims fell in the undecided middle band.
+
+    `instances`, when given, is a set of (player key, interval start) pairs —
+    every source is graded ONLY on those exact instances, not merely
+    restricted to the same pool of players. Without it, "the same
+    population" can still silently compare different (player, jornada)
+    claim counts per source (one source simply had a claim logged ahead of
+    more intervals than another) — real gap found in the 2026-09-11 audit,
+    one layer past the population-only restriction fixed 2026-09-06. See
+    `_start_instances()` for how the target set is built.
+    Why: docs/notes/methodology.md#start_grade--same-instance-not-just-same-population
 
     Whoever wins this table earns tidy.LINEUP_SOURCE. Nothing here changes
     which source is read — that is a decision to take once the n is real.
@@ -346,6 +363,8 @@ def start_grade(intervals, claims, universe=None):
         teams = interval[2] if len(interval) > 2 else None
         for src, byname in per.items():
             for key, hist in byname.items():
+                if instances is not None and (key, start) not in instances:
+                    continue
                 row = latest_before(hist, start)
                 if row is None:
                     continue
@@ -383,6 +402,47 @@ def start_grade(intervals, claims, universe=None):
     named = [(src, len(v), 100.0 * sum(v) / len(v))
              for src, v in sorted(nam.items())]
     return numbered, named, skipped
+
+
+def _start_instances(intervals, claims, src, universe=None) -> set:
+    """(player key, interval start) pairs where `src` had a gradeable
+    (non-skipped, numeric) claim — the target instance set a genuinely fair
+    cross-source comparison must restrict every OTHER source to as well.
+    Mirrors start_grade()'s own per-interval lookup for a single source so
+    the two can never silently diverge on what counts as "graded"."""
+    per: dict[str, list] = {}
+    for r in claims:
+        if (r.get("source") or "").strip() != src:
+            continue
+        key = norm(r.get("player_name", ""))
+        when = snapshot_stamp(r.get("observed_at", ""))
+        if not key or when is None:
+            continue
+        if universe is not None and key not in universe:
+            continue
+        per.setdefault(key, []).append((when, r))
+    for v in per.values():
+        v.sort(key=lambda t: t[0])
+
+    out = set()
+    for interval in intervals:
+        start = interval[0]
+        teams = interval[2] if len(interval) > 2 else None
+        for key, hist in per.items():
+            row = latest_before(hist, start)
+            if row is None:
+                continue
+            if teams is not None \
+                    and (row.get("team_slug") or "").strip() not in teams:
+                continue
+            try:
+                pct = float(row.get("start_pct"))
+            except (TypeError, ValueError):
+                pct = None
+            if pct is None or abs(pct - 50.0) < START_EDGE:
+                continue
+            out.add((key, start))
+    return out
 
 
 # ---------------------------------------------------------------------------
@@ -1130,20 +1190,90 @@ def start_lines() -> list[str]:
     # first reading) — restricted to the SAME population, our forecast
     # actually beats both raw sources (0.114 vs 0.132/0.240). Shown here
     # so the table above is never read as a fair comparison on its own.
+    #
+    # SAME INSTANCE, NOT JUST SAME POPULATION (2026-09-11 fix): the
+    # population-only restriction still let each source rack up a
+    # different n here (65/106/48 in a table literally named "the fair
+    # comparison") since a source with a claim logged ahead of more
+    # intervals gets graded more often. `our_instances` pins every source
+    # to the EXACT (player, jornada-lock) pairs our own forecast was
+    # itself graded on — a source's own n can only ever be <= that, never
+    # inflated by intervals our forecast never had an opinion on either.
     ours = forecast_claims()
+    universe = load_universe()
+    our_instances = _start_instances(intervals, ours, "our forecast", universe)
     our_names = {norm(c["player_name"]) for c in ours}
-    if our_names:
+    if our_names and our_instances:
         restricted = [c for c in load_lineups(source="")
                      if norm(c.get("player_name", "")) in our_names]
         fair_num, _fair_named, _fair_skip = start_grade(
-            intervals, restricted + ours, load_universe())
+            intervals, restricted + ours, universe, instances=our_instances)
         if len(fair_num) > 1:      # nothing to compare with just ourselves
-            out += ["", f"| **starts, same population as our forecast only** "
-                    "— the fair comparison | | | | |"]
+            out += ["", f"| **starts, same population AND same instances as "
+                    "our forecast only** — the real fair comparison "
+                    f"(n={len(our_instances)} claims) | | | | |"]
             for src, n, claim, rate, brier in fair_num:
                 mark = " ←read" if src == LINEUP_SOURCE else ""
                 out.append(f"| {src}{mark} | {n} | {claim:.0f}% | "
                            f"{rate:.0f}% | {brier:.3f} |")
+            ours_row = next((r for r in fair_num if r[0] == "our forecast"),
+                            None)
+            if ours_row is not None:
+                our_briers = _instance_briers(intervals, restricted + ours,
+                                              "our forecast", our_instances)
+                for src, *_rest in fair_num:
+                    if src == "our forecast":
+                        continue
+                    rival_briers = _instance_briers(
+                        intervals, restricted + ours, src, our_instances)
+                    gap = stats.bootstrap_gap(our_briers, rival_briers)
+                    if gap is None:
+                        continue
+                    verdict = ("beats it" if gap["beats"]
+                              else "no significant difference")
+                    out.append(f"_vs {src}: 90% CI on the Brier gap "
+                              f"{gap['lo']:+.3f} to {gap['hi']:+.3f} — "
+                              f"{verdict}._")
+                out.append("")
+    out.append(f"_Every Brier above excludes claims within {START_EDGE:.0f} "
+              "points of 50% — a source's hardest, most genuinely uncertain "
+              "calls, which never enter any number shown here._")
+    out.append("")
+    return out
+
+
+def _instance_briers(intervals, claims, src, instances) -> list[float]:
+    """Per-instance squared Brier terms for one source, restricted to
+    `instances` — the raw per-claim values `stats.bootstrap_gap()` needs to
+    test whether a Brier gap between two sources is real or noise (the
+    aggregate Brier alone can't be bootstrapped, only its ingredients can)."""
+    per: dict[str, list] = {}
+    for r in claims:
+        if (r.get("source") or "").strip() != src:
+            continue
+        key = norm(r.get("player_name", ""))
+        when = snapshot_stamp(r.get("observed_at", ""))
+        if key and when is not None:
+            per.setdefault(key, []).append((when, r))
+    for v in per.values():
+        v.sort(key=lambda t: t[0])
+
+    out = []
+    for interval in intervals:
+        start, played = interval[0], interval[1]
+        for key, hist in per.items():
+            if (key, start) not in instances:
+                continue
+            row = latest_before(hist, start)
+            if row is None:
+                continue
+            try:
+                pct = float(row.get("start_pct"))
+            except (TypeError, ValueError):
+                continue
+            slug = (row.get("player_slug") or "").strip()
+            hit = 1.0 if key in played or (slug and slug in played) else 0.0
+            out.append((pct / 100.0 - hit) ** 2)
     return out
 
 
@@ -1287,13 +1417,16 @@ def baseline_check(golden: list[dict]) -> dict | None:
         return None
     n = len(golden)
     mean_claim = sum(r["predicted_start_pct"] for r in golden) / n
-    ours = sum((r["predicted_start_pct"] / 100 - r["actual_started"]) ** 2
-              for r in golden) / n
-    coin_flip = sum((0.5 - r["actual_started"]) ** 2 for r in golden) / n
-    constant = sum((mean_claim / 100 - r["actual_started"]) ** 2
-                  for r in golden) / n
-    return {"n": n, "mean_claim": mean_claim, "ours": ours,
-           "coin_flip": coin_flip, "constant": constant}
+    ours_terms = [(r["predicted_start_pct"] / 100 - r["actual_started"]) ** 2
+                 for r in golden]
+    coin_terms = [(0.5 - r["actual_started"]) ** 2 for r in golden]
+    const_terms = [(mean_claim / 100 - r["actual_started"]) ** 2
+                  for r in golden]
+    return {"n": n, "mean_claim": mean_claim,
+           "ours": sum(ours_terms) / n, "coin_flip": sum(coin_terms) / n,
+           "constant": sum(const_terms) / n,
+           "vs_coin": stats.bootstrap_gap(ours_terms, coin_terms),
+           "vs_constant": stats.bootstrap_gap(ours_terms, const_terms)}
 
 
 def source_lines(actuals: list[dict]) -> list[str]:
@@ -1352,15 +1485,24 @@ def source_lines(actuals: list[dict]) -> list[str]:
     # jornada-joined rows every report, not a one-off script.
     check = baseline_check(golden_rows())
     if check is not None:
-        out += [f"_Our forecast vs. trivial baselines, n={check['n']}: "
-                f"ours {check['ours']:.3f}, a flat 50% guess "
+        vs_coin, vs_const = check["vs_coin"], check["vs_constant"]
+        beats_coin = vs_coin is not None and vs_coin["beats"]
+        beats_const = vs_const is not None and vs_const["beats"]
+        if beats_coin and beats_const:
+            verdict = "beats both, adding real information."
+        elif not beats_coin and not beats_const:
+            verdict = "does not clearly beat either trivial guess yet."
+        else:
+            verdict = ("beats one of the two trivial guesses but not the "
+                      "other — a real, if partial, edge.")
+        out += [f"_Our forecast vs. trivial baselines, n={check['n']} — a "
+                "DIFFERENT sample than the tables above (this one joins the "
+                "rate and start sides on jornada via golden_rows(), no "
+                f"{START_EDGE:.0f}-point undecided-band exclusion): ours "
+                f"{check['ours']:.3f}, a flat 50% guess "
                 f"{check['coin_flip']:.3f}, a constant "
                 f"{check['mean_claim']:.0f}% guess {check['constant']:.3f} "
-                "(Brier, lower is better) — "
-                + ("beats both, adding real information." if
-                   check['ours'] < check['coin_flip']
-                   and check['ours'] < check['constant'] else
-                   "does NOT clearly beat a trivial guess yet.") + "_", ""]
+                "(Brier, lower is better) — " + verdict + "_", ""]
     return out
 
 
@@ -1373,16 +1515,38 @@ def rate_baseline_check(pairs: list[dict]) -> dict | None:
     guess is the sample's own mean per-match rate: no player identity,
     no form, no fixture, just "everyone scores about the average."
     `None` when there's nothing to check (mirrors baseline_check()).
+
+    `ours`/`naive` here are PER-PAIR per-match errors (one number per
+    interval, matches already divided out) — the right unit for
+    `stats.bootstrap_gap()`'s resampling, which treats each entry as one
+    independent draw. The genuinely match-weighted headline MAE (an
+    interval spanning 3 matches should count 3x a 1-match interval, not
+    equally) is `weighted_mae()` below — this function no longer doubles
+    as that number, since the two questions ("is a match-error typical
+    of one interval smaller than another" vs "what's the true average
+    per-match error across every match played") need different units.
     """
     if not pairs:
         return None
     n = len(pairs)
     actual_rates = [p["actual"] / p["matches"] for p in pairs]
     mean_rate = sum(actual_rates) / n
-    ours = sum(abs(p["predicted"] / p["matches"] - a)
-              for p, a in zip(pairs, actual_rates)) / n
-    naive = sum(abs(mean_rate - a) for a in actual_rates) / n
-    return {"n": n, "mean_rate": mean_rate, "ours": ours, "naive": naive}
+    ours = [abs(p["predicted"] / p["matches"] - a)
+           for p, a in zip(pairs, actual_rates)]
+    naive = [abs(mean_rate - a) for a in actual_rates]
+    gap = stats.bootstrap_gap(ours, naive)
+    return {"n": n, "mean_rate": mean_rate,
+           "ours": sum(ours) / n, "naive": sum(naive) / n, "gap": gap}
+
+
+def weighted_mae(pairs: list[dict]) -> float:
+    """The true per-match MAE: total absolute error over total matches
+    played, not an average of already-averaged per-interval errors (which
+    counts a 3-match interval's per-match error the same as a 1-match
+    interval's, understating how much a long interval's error really
+    reflects)."""
+    total_matches = sum(p["matches"] for p in pairs)
+    return sum(abs(p["err"]) for p in pairs) / total_matches
 
 
 def comparison_lines() -> list[str]:
@@ -1405,39 +1569,60 @@ def comparison_lines() -> list[str]:
     n = len(pairs)
     tp = sum(p["predicted"] for p in pairs)
     ta = sum(p["actual"] for p in pairs)
-    mae = sum(abs(p["err"]) / p["matches"] for p in pairs) / n
+    mae = weighted_mae(pairs)
     fx, no_fix = fixture_rows(pairs)
+    over = sum(1 for p in pairs if p["err"] > 0)
+    under = sum(1 for p in pairs if p["err"] < 0)
+    mean_signed = sum(p["err"] for p in pairs) / n
     out += [
         "| Measure | Value |", "|---|--:|",
         f"| Player-intervals scored ({label}) | {n} |",
         f"| Predicted, total | {tp:.0f} pts |",
         f"| Actual, total | {ta:.0f} pts |",
-        f"| **Mean absolute error** | **{mae:.1f} pts per player-match** |",
+        f"| **Mean absolute error (per match played)** | **{mae:.1f} pts** |",
         f"| Pairs predating the fixture term | {no_fix} of {n} |", "",
         "_Read every xPts/j in this report as ± the error above, at least. "
         "Only predictions logged before an interval are scored, so hindsight "
         "is excluded by construction; the sample is your own squad and grows "
         "about 15 pairs a jornada._", "",
+        f"_{over} of {n} intervals overpredicted, {under} underpredicted "
+        f"(mean signed error {mean_signed:+.1f} pts) — the \"Biggest miss\" "
+        "table below is the tail, not the whole picture._", "",
     ]
     # DOES THIS BEAT A TRIVIAL GUESS? Same question baseline_check() asks
     # of the start-probability side, asked here of the rate side — Stage 3
-    # of the forecast-first rebuild plan.
+    # of the forecast-first rebuild plan. `gap` is a bootstrap CI
+    # (stats.bootstrap_gap()) on ours-vs-naive per-match error, not a bare
+    # point-estimate comparison — a real margin only claims "beats" when
+    # the CI excludes zero, so a close call at n=60 reads as close.
     rbc = rate_baseline_check(pairs)
     if rbc is not None:
-        beats = rbc["ours"] < rbc["naive"]
+        gap = rbc["gap"]
+        if gap is not None and gap["beats"]:
+            verdict = "beats it, adding real information."
+        elif gap is not None:
+            verdict = (f"does not clearly beat it yet (90% CI on the gap: "
+                      f"{gap['lo']:+.2f} to {gap['hi']:+.2f} pts, straddles "
+                      "zero).")
+        else:
+            verdict = "not enough data to say."
         out += [f"_vs. a trivial guess (everyone scores the sample's own "
                 f"mean, {rbc['mean_rate']:.1f} pts/match, no player identity "
                 f"at all): ours {rbc['ours']:.2f} MAE, that guess "
-                f"{rbc['naive']:.2f} MAE — "
-                + ("beats it, adding real information." if beats else
-                   "does NOT clearly beat it yet.") + "_", ""]
-    out += [
-        "| Forecast bucket | n | Mean forecast | Mean actual |",
-        "|---|--:|--:|--:|",
-    ]
-    for label_, cnt, mp, ma in bucket_rows(pairs):
-        out.append(f"| {label_} | {cnt} | {mp:.1f} | {ma:.1f} |")
-    out.append("")
+                f"{rbc['naive']:.2f} MAE — " + verdict + "_", ""]
+    buckets = bucket_rows(pairs)
+    if buckets and min(cnt for _, cnt, _, _ in buckets) >= MIN_BUCKET_N:
+        out += [
+            "| Forecast bucket | n | Mean forecast | Mean actual |",
+            "|---|--:|--:|--:|",
+        ]
+        for label_, cnt, mp, ma in buckets:
+            out.append(f"| {label_} | {cnt} | {mp:.1f} | {ma:.1f} |")
+        out.append("")
+    else:
+        out += [f"_Not enough data yet to break out by scoring band (needs "
+                f"{MIN_BUCKET_N}+ per bucket) — will start showing once more "
+                "jornadas have locked._", ""]
 
     # Attribution: not "how wrong", but "wrong about WHAT". One factor at a
     # time, starting with the newest and least-justified one — this is the

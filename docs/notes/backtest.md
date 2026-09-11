@@ -45,3 +45,36 @@ minutes after the moment being asked about cannot appear — the same
 property a live forecast has for free, and a naive replay (running
 today's code against `git show HEAD:...` and pretending that was "the
 data as of last month") would lose without ever noticing.
+
+## horizon_days — fixed window, not "episode to now"
+
+`_grade_episodes()` originally scored every episode from its own day to
+`now`, open-ended. Found broken by a 2026-09-11 swarm audit (Miguel wanted
+"3 good proven tests, not a bunch of iffy ones"): an arm firing more
+episodes, or firing earlier in the replay window, racked up more total
+points independent of call quality, and once a rank slot's pick changed the
+OLD episode kept scoring to `now` too — two episodes for the same slot
+silently double-counting the same real jornadas. This was the actual
+mechanism behind both `-94 vs +90` (`replay_ladder_percentile()`,
+2026-09-06) and `+64 vs +31` (`replay_percentile_rank()`, same day) —
+neither was a clean measurement. See `docs/notes/sim.md#ladder_rows--pts_lo-ranking-re-audited-2026-09-11`
+for what changed once it was re-run correctly.
+
+Fixed: every episode is now graded over `[when, when + HORIZON_DAYS]`, a
+window every arm gets the same length of, regardless of when in the season
+it fired or how many other episodes the same arm has fired since.
+`HORIZON_DAYS=10.0` was picked empirically (2026-09-11): at ~5 real days
+between jornada locks so far this season, 10 days is about 2 jornadas of
+real runway, and still lets 193 of 235 real `reports/decisions.json`
+commits clear it, versus 123 of 235 at a 21-day (~4 jornada) horizon. A
+longer horizon is more "complete" per episode but starves every arm's n
+given how little of the season has actually happened yet — revisit this
+tradeoff as more jornadas lock and a wider window stops being so costly in
+sample size.
+
+`stats.bootstrap_gap()` (new, `src/stats.py`) replaced the bare
+`total_net > total_net` verdict with a bootstrap CI on the two arms'
+per-episode nets, exposed via `compare_arms()` — "BEATS" now means the 90%
+CI on the gap excludes zero, not just that one number was bigger than
+another at whatever n and noise level happened to be sitting there that
+day.

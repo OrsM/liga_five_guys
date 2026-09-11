@@ -410,3 +410,41 @@ today (`rank()`'s own screen: `cost <= cash + proceeds`) — exactly what
 number the BUY table's top row already carries, not a second estimate.
 `rows=None` (an old caller, or the self-test) keeps the cheap estimate —
 nothing real to fall back to without it.
+
+## ladder_rows() — pts_lo ranking re-audited, 2026-09-11
+
+A swarm audit of this repo's forecast/backtest validation (Miguel: "3 good
+proven tests, not a bunch of iffy ones") found `backtest._grade_episodes()`
+scored every episode open-ended, from its own day to "now" — an arm firing
+more episodes, or firing earlier in the replay window, racked up more total
+points independent of call quality, and a superseded episode kept scoring
+to "now" too (two episodes for the same rank slot silently double-counting
+the same real jornadas). This was the actual mechanism behind both
+`replay_ladder_percentile()`'s original "-94 vs +90" reading (2026-09-06,
+cited when `pts_lo` replaced the tiered value-floor/win-probability scheme)
+and `replay_percentile_rank()`'s "+64 vs +31" reading (same day, cited when
+`_best()`'s single headline pick switched to `pts_lo`) — not a clean result
+either time.
+
+Fixed: `_grade_episodes()` now scores a FIXED forward window
+(`HORIZON_DAYS=10.0`, chosen so most of the real commit history clears it at
+today's still-short season) instead of open-ended-to-now, and
+`backtest.compare_arms()` runs a real bootstrap significance test
+(`stats.bootstrap_gap()`) on the two arms' per-episode nets rather than a
+bare `total_net` comparison. Re-run on real history (2026-09-11): pts_lo vs
+mean-rank is NOT significantly different (19 vs 16 graded episodes, 90% CI
+on the gap straddles zero); pts_lo vs the retired tiered scheme is ALSO not
+significantly different (78 vs 72 graded episodes) — and the "current"
+(shipped) arm's own real net is now +178 (positive), not the -94 once
+reported.
+
+**This does not mean pts_lo was a bad choice** — it means the backtest
+evidence FOR it was itself broken, and at today's n the honest backtest
+answer is "no significant difference either way," not "confirmed" or
+"refuted." `pts_lo` stays the live ranking on the structural argument
+`ladder_rows()`'s own docstring gives (shares d_win's Monte Carlo draws, a
+real quantile, no invented constant) — a different, independent kind of
+support than a backtest win, and one this fix didn't touch. Re-run
+`backtest.py --selftest` again once more jornadas have locked (n grows a
+handful of episodes per jornada) before treating either reading — "no
+difference" or a future "beats" — as settled.

@@ -826,6 +826,16 @@ def caveats(u) -> list[str]:
         % (_drift_frac_now(), _drift_status_now()),
         "| Shape prior | %s |" % u.forecaster.pool_note(),
         "| P(start) fit | %s |" % u.start_note.rstrip("."),
+        # Measured 2026-08-31 (same seed, N=100->3000): p_win/expected_finish
+        # (levels, not the paired move-ranking that stays stable at every N)
+        # swung 0.1930-0.2600 — a real ~7-point Monte Carlo noise band on
+        # exactly the number trailing() thresholds at 0.5, known and measured
+        # but never shown next to the figure itself until now.
+        # Why: docs/notes/decide.md#trial-counts-screen_trials--final_trials
+        "| win % and finish are single simulated draws | at this trial "
+        "count the same real inputs have been measured to swing roughly "
+        "±7 points (e.g. 19% to 26% on one real board) run to run — read "
+        "the headline number as a band that wide, not a precise reading |",
         ""]
     return out
 
@@ -847,16 +857,31 @@ def _move_rank_key(r, u):
     too. Miguel, 2026-09-06: "the whole ladder should follow same logic
     why wouldn't it?" — a fair challenge to an earlier hedge that this was
     "separate, larger, not-yet-validated." Checked, not assumed:
-    `backtest.replay_ladder_percentile()` replayed 200+ real historical
-    top-3 ladders and found the tiered scheme this replaced was net
-    NEGATIVE on real outcomes (-94 points) where a flat `pts_lo` sort over
-    the same real candidates was net POSITIVE (+90 points).
+    `backtest.replay_ladder_percentile()` replays real historical top-3
+    ladders against real outcomes, though a 2026-09-11 audit found the
+    ORIGINAL version of this check (open-ended "score every jornada from
+    the episode's day to now") let an arm's episode turnover rate inflate
+    or deflate its apparent total — the "-94 vs +90" reading this docstring
+    used to cite was itself a measurement artifact, not a clean result.
+    Re-run on a fixed-horizon harness (`HORIZON_DAYS`, `stats.bootstrap_gap`
+    for a real significance test): at today's still-small n (72-78 graded
+    episodes per arm), pts_lo and the tiered scheme it replaced are NOT
+    significantly different (90% CI on the per-episode gap straddles
+    zero), and the shipped arm's own real net is positive, not the
+    negative figure once reported. This is an open question again, not a
+    closed one — kept as the live ranking on the OTHER reasoning below
+    (pts_lo already shares d_win's own Monte Carlo draws, at a quantile
+    that structurally penalises a distant, DRIFT_FRAC-widened case the
+    same way a real risk-averse read would), not because history has
+    settled it either way yet.
+    Why: docs/notes/sim.md#ladder_rows--pts_lo-ranking-re-audited-2026-09-11
 
-    RETIRED, ON THAT EVIDENCE: the value-floor/win-probability tiering
+    RETIRED, ON THE ORIGINAL REASONING (still the live design, evidence
+    permitting): the value-floor/win-probability tiering
     (`MOVES_VALUE_FLOOR`, `VALUE_TOLERANCE`'s ladder use, d_win leading
     outright) that used to sit here. `pts_lo` already reflects the SAME
-    Monte Carlo draws `d_win` is read off, at a quantile that measurably
-    ranks better on real history than treating win-probability as an
+    Monte Carlo draws `d_win` is read off, at a quantile that structurally
+    penalises risk the same way treating win-probability as an
     unrelated axis needing its own escape hatch — a simpler rule beating
     the accumulated special-casing, same lesson as this session's earlier
     "the book" simplification pass. Full history of the retired scheme:
@@ -924,14 +949,21 @@ def _best(u, rows, rivals):
     second, at an IDENTICAL mean, with no invented time-discount constant:
     it's the same uncertainty machinery (rate_rel, club_rel, DRIFT_FRAC)
     already validated this session, just read at a different quantile.
-    Validated against real history before being wired in here, not on
-    theory alone: `backtest.replay_percentile_rank()` replayed 200+ real
-    past reports/decisions.json commits with this exact substitution and
-    found it would have beaten mean-ranking on real outcomes (+64 vs +31
-    real points, 14/32 vs 9/24 net-positive calls) — see that function's
-    own docstring for the one disclosed limit (it can only re-rank
-    candidates `candidates`/`pool` below ALREADY admit, same as here; it
-    cannot rescue one `d_pos > 0 or d_win > 0` already excludes).
+    Checked against real history before being wired in here, not on theory
+    alone: `backtest.replay_percentile_rank()` replays real past
+    reports/decisions.json commits with this exact substitution. The
+    original reading (+64 vs +31 real points) came from an open-ended
+    scoring window a 2026-09-11 audit found let episode turnover distort
+    the comparison — re-run on a fixed-horizon harness with a real
+    bootstrap significance test, the two rules are currently NOT
+    significantly different at this still-small n (19 vs 16 graded
+    episodes). Kept on the structural argument above (same uncertainty
+    machinery as d_win, a real quantile not an invented constant), not
+    because history has decided it yet — see that function's own docstring
+    for the one disclosed limit (it can only re-rank candidates
+    `candidates`/`pool` below ALREADY admit, same as here; it cannot
+    rescue one `d_pos > 0 or d_win > 0` already excludes).
+    Why: docs/notes/sim.md#ladder_rows--pts_lo-ranking-re-audited-2026-09-11
     NOT changed: `candidates`'s own eligibility gate (still `d_pos`/
     `d_win`), the reliable-routes-first split, and the VALUE_TOLERANCE
     cheaper-alternative refinement below — this is a single, targeted
