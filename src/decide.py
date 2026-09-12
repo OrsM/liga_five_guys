@@ -51,6 +51,7 @@ from ffcore.forecast import Bootstrap, pool_from_perjornada  # noqa: E402
 import methodology as _methodology  # noqa: E402
 from ffcore.league import MARKET, api_key  # noqa: E402
 from ffcore.parse import fmt_money  # noqa: E402
+from ffcore.profile import PlayerProfile, build_profiles  # noqa: E402
 from ffcore.score import SLOT, SLOT_MIN, _calibrated  # noqa: E402
 from ffcore.text import norm  # noqa: E402
 from ffcore.season import (LeagueState, XI_SIZE, best_xi,  # noqa: E402
@@ -154,6 +155,14 @@ class Universe:
     # about his value, a buyout clause runs a median 1.52x it, and the
     # difference between the two is money that never comes back.
     value: dict[str, float] = field(default_factory=dict)
+    # The full-pool player record (ffcore.profile) — identity, current
+    # snapshot, history, and derived forecast, for every player
+    # load_players() knows, not just the 89-player simulation universe.
+    # The dicts above (pos/price/market_exp/start/etc.) are kept as the
+    # existing read interface every consumer already uses; this is the
+    # single source those are derived FROM, for anything new that wants
+    # the richer shape (history, points-above-replacement).
+    players: dict[str, PlayerProfile] = field(default_factory=dict)
     # Expected points for EVERY player the market prices, not only the 89 the
     # simulation needs — expected() returning 0.0 for an unscored player is
     # indistinguishable from worthless, and once scored Lamine Yamal that way.
@@ -1219,20 +1228,44 @@ def load(trials_pool=None) -> Universe:
     value = {k: float((v or {}).get("value") or 0) for k, v in players.items()
              if (v or {}).get("value")}
 
-    pos, base, base_rest = {}, {}, {}
     # A display name for every player the index knows, not just those in
     # the universe — a key with no name here prints as a raw number.
     name = {k: (rec.get("name") or k) for k, rec in players.items()}
     universe = set(price) | {k for s in squads.values() for k in s}
+
+    # ONE profile per player, the full pool, no market/ownership gate at
+    # all (ffcore.profile) — replaces this function's own separate
+    # "scored for the 89-player universe" loop and "scored for everyone
+    # else, about players not in the universe" loop with a single pass.
+    # `market_keyed` carries the market/ownership facts already computed
+    # above (market_routes(), lg.owner) so build_profiles() doesn't
+    # re-derive them.
+    perjornada_rows = list(csv.DictReader(
+        open(SEASON / "live" / "perjornada_2026-27.csv")))
+    market_keyed = {k: {"listed": True, "price": v, "owner": owner.get(k)}
+                    for k, v in price.items()}
+    for k, o in owner.items():
+        market_keyed.setdefault(k, {"listed": False, "price": None,
+                                    "owner": o})
+    profiles = build_profiles(players, sc, perjornada_rows, xw=lg.xw,
+                              market_keyed=market_keyed)
+
+    pos = {k: SLOT.get(p.current.pos.lower(), "MED")
+          for k, p in profiles.items()}
+    # Everyone the market prices, scored the same way — market_exp/start
+    # cover the full pool (not just the 89-player simulation universe),
+    # about players who might come up later.
+    market_exp = {k: p.derived.market_exp for k, p in profiles.items()
+                 if p.derived.market_exp is not None}
+    start = {k: p.derived.start_p for k, p in profiles.items()
+            if p.derived.start_p is not None}
+
+    base, base_rest = {}, {}
     # Scored once per player, kept rather than re-derived for `matches`.
     scored: dict[str, object] = {}
     for k in universe:
-        rec = players.get(k)
-        if not rec:
-            continue
-        pos[k] = SLOT.get((rec.get("pos") or "").lower(), "MED")
-        row = sc.row_for(k)
-        s = sc.score(row) if row else None
+        p = profiles.get(k)
+        s = p.derived.scored if p else None
         scored[k] = s
         base[k] = ((max(0.0, s.ppm * s.fix), min(1.0, (s.pct_used or 0) / 100))
                    if s else (2.0, 0.5))
@@ -1243,19 +1276,7 @@ def load(trials_pool=None) -> Universe:
                         min(1.0, (s.pct_rest or 0) / 100))
                        if s else (2.0, 0.5))
 
-    # Everyone the market prices, scored the same way — about the players
-    # NOT in the simulation's universe (what might come up later).
-    market_exp: dict[str, float] = {}
-    start: dict[str, float] = {}
-    for k, rec in players.items():
-        row = sc.row_for(k)
-        sc_ = sc.score(row) if row else None
-        if sc_ is not None:
-            start[k] = min(1.0, (sc_.pct_used or 0) / 100)
-            market_exp[k] = max(0.0, sc_.ppm * sc_.fix) * start[k]
-
-    pool = pool_from_perjornada(
-        csv.DictReader(open(SEASON / "live" / "perjornada_2026-27.csv")))
+    pool = pool_from_perjornada(perjornada_rows)
     # A round in progress carries only players who haven't played it yet —
     # everyone else's real points are already in `carried` (rounds_left()).
     club = {k: club_key(players[k].get("team"), mkt_teams)
@@ -1334,7 +1355,8 @@ def load(trials_pool=None) -> Universe:
         clause_until=clause_until, bids=bids,
         part_played=played, name=name, start_note=_calibrated()[0].note(),
         unjoined=list(unjoined_clubs) + list(lg.api_unjoined),
-        locked_cash=locked_cash, received_offers=received_offers)
+        locked_cash=locked_cash, received_offers=received_offers,
+        players=profiles)
     return _LOAD_CACHE
 
 
