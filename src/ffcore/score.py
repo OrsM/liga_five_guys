@@ -344,9 +344,9 @@ def backtest_predictor(feature_by_key_jornada: dict[str, dict[int, float]],
                        actual_by_key_jornada: dict[str, dict[int, float]],
                        min_pairs: int = 10) -> dict | None:
     """Does FEATURE (through a player's second-to-last shared jornada)
-    predict his LAST shared jornada's real outcome better than his own
-    outcome-so-far average does — leave-one-player-out, real
-    significance test, no invented split.
+    predict his LAST shared jornada's real outcome better than the POOLED
+    sample mean does — leave-one-player-out, real significance test, no
+    invented split.
 
     THE REUSABLE SHAPE _shots_points_fit()'s own validation was, before
     this: hand-written, one-off, a single arbitrary weeks-1-3-vs-4-6 split
@@ -357,25 +357,41 @@ def backtest_predictor(feature_by_key_jornada: dict[str, dict[int, float]],
     two {key: {jornada: value}} dicts (shots, ball_recovery, marca_points,
     whatever's sitting in api_stats.csv next) and get a real answer.
 
+    THE BASELINE IS THE POOLED SAMPLE MEAN, NOT EACH PLAYER'S OWN
+    AVERAGE — a real bug in this function's first version, caught the
+    same day by testing it against PURE RANDOM NOISE (same discipline
+    the self-test below now pins down): with only 1-3 prior jornadas per
+    player this early in a season, an individual's own average is a tiny,
+    noisy estimate, and ANY fitted line — even one fit on random numbers
+    — beats it purely by pooling across players (regression to the grand
+    mean), the exact effect SHRINK_K's own shrinkage exists to correct
+    for elsewhere in this module. Comparing a pooled fit against an
+    unpooled individual baseline made every candidate "work", including
+    nonsense ones (yellow_card predicting defenders' points). Matched
+    instead to rate_baseline_check()'s own already-correct convention:
+    "everyone scores the sample's own mean, no player identity at all."
+    Both sides are now genuinely pooled, so only the FEATURE's own
+    information content can separate them.
+
     ONE TEST POINT PER PLAYER — his own last shared jornada, features
-    from every jornada before it summed into a rate, baseline his own
-    mean actual over those same earlier jornadas. Both sides are then
-    graded LEAVE-ONE-PLAYER-OUT: the fit predicting player P's held-out
-    point is trained on every OTHER player only, never on P himself — the
-    same discipline Calibration.fit() already uses (leave-one-team-sheet-
-    out), so a feature cannot flatter itself by fitting the very point
-    it's judged against, the exact failure mode a single in-sample split
-    can't rule out.
+    from every jornada before it summed into a rate. Graded LEAVE-ONE-
+    PLAYER-OUT: the fit (and the pooled-mean baseline) predicting player
+    P's held-out point are computed from every OTHER player only, never
+    from P himself — the same discipline Calibration.fit() already uses
+    (leave-one-team-sheet-out), so a feature cannot flatter itself by
+    fitting, or averaging in, the very point it's judged against.
 
     Returns {"n", "mae_feature", "mae_baseline", "gap"} — `gap` is
     stats.bootstrap_gap() on the two paired MAE series, not a bare
     number; `beats` in it is the answer to "is this real." None below
     `min_pairs` players with at least 2 shared jornadas.
-    Why: docs/notes/score.md#backtest_predictor--the-reusable-hypothesis-test
+    Why: docs/notes/score.md#backtest_predictor--the-pooled-baseline-fix
     """
+    import statistics as _statistics
+
     from stats import bootstrap_gap
 
-    triples = []
+    pairs = []
     for key, jd_feat in feature_by_key_jornada.items():
         jd_actual = actual_by_key_jornada.get(key, {})
         common = sorted(set(jd_feat) & set(jd_actual))
@@ -383,20 +399,19 @@ def backtest_predictor(feature_by_key_jornada: dict[str, dict[int, float]],
             continue
         prior, last = common[:-1], common[-1]
         x = sum(jd_feat[j] for j in prior) / len(prior)
-        baseline = sum(jd_actual[j] for j in prior) / len(prior)
-        triples.append((x, baseline, jd_actual[last]))
-    n = len(triples)
+        pairs.append((x, jd_actual[last]))
+    n = len(pairs)
     if n < min_pairs:
         return None
 
     feature_err, baseline_err = [], []
     for i in range(n):
-        train = triples[:i] + triples[i + 1:]
-        slope, intercept = _linreg([t[0] for t in train],
-                                   [t[2] for t in train])
-        x_i, baseline_i, y_i = triples[i]
+        train = pairs[:i] + pairs[i + 1:]
+        train_ys = [t[1] for t in train]
+        slope, intercept = _linreg([t[0] for t in train], train_ys)
+        x_i, y_i = pairs[i]
         feature_err.append(abs((slope * x_i + intercept) - y_i))
-        baseline_err.append(abs(baseline_i - y_i))
+        baseline_err.append(abs(_statistics.mean(train_ys) - y_i))
     return {"n": n, "mae_feature": sum(feature_err) / n,
            "mae_baseline": sum(baseline_err) / n,
            "gap": bootstrap_gap(feature_err, baseline_err)}
@@ -414,19 +429,28 @@ def _shots_points_fit(xw, players=None) -> tuple[float, float, int]:
     conversion against. Fits on each forward's own history instead: shot
     volume through jornada N-1 predicting jornada N's own points.
 
-    VALIDATED WITH backtest_predictor() (leave-one-player-out, real
-    significance test), NOT the one-off weeks-1-3-vs-4-6 split first used
-    to justify this (that read MAE 3.25 vs 4.12 and no CI at all). Re-run
-    properly the same day once the reusable harness existed: MAE 2.99 vs
-    4.48 — a LARGER effect, same direction — but n=25's bootstrap CI on
-    the gap is -3.01 to +0.09, straddling zero. Real, promising, NOT yet
-    statistically proven. Kept live anyway (Scorer.rate() only applies it
-    above the 10-pair floor, same guard as before) on the same basis
-    DRIFT_FRAC's own unfitted default and the pts_lo-vs-mean ranking
-    question were both kept or decided: a real structural argument (shots
-    are the more stable underlying skill for a position whose points are
-    goal-driven and streaky) plus a directionally consistent, sizeable
-    reading — not proof, and not pretended to be one. Re-check with
+    VALIDATED WITH backtest_predictor() (leave-one-player-out against the
+    POOLED SAMPLE MEAN, real significance test), NOT the one-off
+    weeks-1-3-vs-4-6 split first used to justify this (that read MAE 3.25
+    vs 4.12 and no CI at all). backtest_predictor()'s own first version
+    read MAE 2.99 vs 4.48 here — since corrected (2026-09-12, same day:
+    checking OTHER candidate stats with it made literally every one of
+    them "beat" the baseline for defenders, including yellow_card, which
+    is not a football signal — the baseline was each player's own 1-2-
+    jornada average, noisy enough that any fitted line beat it by pooling
+    alone, the exact effect SHRINK_K exists to correct for). Re-run
+    against the corrected, pooled-mean baseline: MAE 2.99 vs 3.76 — a
+    real, smaller effect than first read, same direction — n=25's
+    bootstrap CI on the gap is -2.38 to +0.87, straddling zero. Real,
+    promising, NOT yet statistically proven — and now checked against a
+    baseline strong enough that nonsense features don't also pass. Kept
+    live anyway (Scorer.rate() only applies it above the 10-pair floor,
+    same guard as before) on the same basis DRIFT_FRAC's own unfitted
+    default and the pts_lo-vs-mean ranking question were both kept or
+    decided: a real structural argument (shots are the more stable
+    underlying skill for a position whose points are goal-driven and
+    streaky) plus a directionally consistent reading — not proof, and not
+    pretended to be one. Re-check with
     backtest_predictor() as more jornadas accumulate; revisit if the gap
     doesn't tighten toward significance or reverses.
     Below 10 paired players this refuses (slope 0.0, intercept 0.0)
@@ -1712,6 +1736,28 @@ def _selftest() -> None:
     noisy = backtest_predictor(noise_feat, noise_act, min_pairs=10)
     assert noisy is not None and not noisy["gap"]["beats"], noisy
 
+    # REGRESSION CASE FOR THE POOLED-BASELINE FIX ITSELF (2026-09-12): the
+    # bug this replaced only showed up when players' own actual LEVELS
+    # vary a lot across players (real data) with just 1-2 prior jornadas
+    # each — an unpooled "his own average" baseline is then so noisy that
+    # a fitted line beats it on pure random noise, purely by pooling.
+    # Caught by testing against real defender data directly; pinned down
+    # here with a small synthetic version so it can't come back silently.
+    _rng_reg = _random_bp.Random(11)
+    varied_levels = {str(i): 2.0 + i * 3.0 for i in range(1, 21)}  # 5..62
+    noise_feat2 = {k: {1: _rng_reg.random(), 2: _rng_reg.random()}
+                  for k in varied_levels}
+    # Each player's actual hovers near HIS OWN level (real football: some
+    # players just score more than others) with real match-to-match noise
+    # on top — exactly the shape "his own 1-2-jornada average" struggles
+    # with and a pooled mean, or a genuinely fitted line, does not.
+    noise_act2 = {k: {1: lvl + _rng_reg.uniform(-1, 1),
+                      2: lvl + _rng_reg.uniform(-1, 1),
+                      3: lvl + _rng_reg.uniform(-1, 1)}
+                 for k, lvl in varied_levels.items()}
+    noisy2 = backtest_predictor(noise_feat2, noise_act2, min_pairs=10)
+    assert noisy2 is not None and not noisy2["gap"]["beats"], noisy2
+
     # -- _shots_by_jornada / _shots_points_fit / load_shots_current: the
     # real join through api_stats.csv, gated to forwards, checked against
     # a real (small) fixture rather than assumed from the arithmetic above
@@ -1821,7 +1867,7 @@ def _selftest() -> None:
         finally:
             _tidy3.TIDY, _tidy3.SEASON = _real_tidy3, _real_season3
 
-    print("ffcore.score self-test OK (71 cases)")
+    print("ffcore.score self-test OK (72 cases)")
 
 
 if __name__ == "__main__":
