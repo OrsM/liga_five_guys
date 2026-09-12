@@ -305,6 +305,147 @@ def _xg_stickiness_boost() -> tuple[float, str]:
                    % (len(pairs), r_raw, r_xg, boost))
 
 
+def _shots_by_jornada(xw) -> dict[str, dict[int, float]]:
+    """{crosswalk key: {jornada: total_scoring_att that jornada}} — LaLiga's
+    own per-match box score (data/tidy/api_stats.csv), joined through the
+    crosswalk's app_id (the same 91%-coverage join this session's earlier
+    crosswalk work already resolves).
+
+    `week` IS THE API'S OWN PER-MATCH FIELD, not inferred from round-
+    completion timing the way points.py's jornada_asof() is (see
+    match_locks()'s own docstring for that fragility, found this session)
+    — if anything, a more reliable jornada label than the points side it
+    gets joined against in _shots_points_fit().
+    """
+    from ffcore.tidy import TIDY, read_csv
+
+    if xw is None:
+        return {}
+    path = TIDY / "api_stats.csv"
+    if not path.exists():
+        return {}
+    out: dict[str, dict[int, float]] = {}
+    for r in read_csv(path):
+        if r.get("stat") != "total_scoring_att":
+            continue
+        key = xw.player(app_id=(r.get("player_id") or "").strip())
+        if not key:
+            continue
+        try:
+            wk = int(r.get("week"))
+            val = float(r.get("value") or 0)
+        except (TypeError, ValueError):
+            continue
+        out.setdefault(key, {})[wk] = val
+    return out
+
+
+def _shots_points_fit(xw, players=None) -> tuple[float, float, int]:
+    """(slope, intercept, n) — this season's real points in a jornada as a
+    linear function of a forward's OWN shot volume (total_scoring_att per
+    90) in every jornada BEFORE it — forwards only.
+
+    IN-SEASON, NOT PRIOR-SEASON (unlike _xg_points_fit): api_stats.csv
+    only began being collected 2026-08 (turned up this session chasing
+    "why does the model bench Omar El Hilali" into "what's sitting in the
+    tidy store unused") — there is no earlier season of it to fit a units
+    conversion against. Fits on each forward's own history instead: shot
+    volume through jornada N-1 predicting jornada N's own points. Checked
+    before being wired in, not assumed: this exact split (weeks 1-3
+    predicting weeks 4-6) beat the forward's own points-so-far at
+    predicting his next points — MAE 3.25 vs 4.12, forwards only, n=20,
+    2026-09-12. Below 10 paired players this refuses (slope 0.0,
+    intercept 0.0) rather than fit a line through noise — same floor
+    _xg_points_fit() uses, for the same reason; Scorer.rate() also checks
+    this count explicitly before trusting the term at all.
+
+    `players`, when given, is load_players()'s own output — INJECTABLE
+    rather than always re-loaded: that function needs a live market/
+    lineups snapshot to run at all (raises SystemExit on neither), which
+    a caller checking this fit against a small fixture cannot cheaply
+    fake. `None` (every real caller) loads it for real.
+    Why: docs/notes/score.md#_shots_points_fit--in-season-not-prior-season
+    """
+    from ffcore.tidy import TIDY, SEASON, read_csv, load_players
+
+    if xw is None:
+        return 0.0, 0.0, 0
+    live = SEASON / "live"
+    files = sorted(live.glob("perjornada_*.csv")) if live.exists() else []
+    if not files:
+        return 0.0, 0.0, 0
+    by_key = _per_jornada_current(
+        read_csv(TIDY / "starters.csv"), read_csv(files[-1]),
+        read_csv(TIDY / "matches.csv"), xw)
+    shots_by_key = _shots_by_jornada(xw)
+    players = players if players is not None else load_players()
+
+    xs, ys = [], []
+    for key, jd_shots in shots_by_key.items():
+        if (players.get(key) or {}).get("pos", "").lower() != "delantero":
+            continue
+        jd_points = by_key.get(key, {})
+        common = sorted(set(jd_shots) & set(jd_points))
+        if len(common) < 2:
+            continue
+        prior, last = common[:-1], common[-1]
+        total_min = sum(jd_points[j][1] for j in prior)
+        if total_min <= 0:
+            continue
+        shots90 = sum(jd_shots[j] for j in prior) / total_min * 90
+        last_pts, last_min = jd_points[last]
+        if last_min <= 0:
+            continue
+        xs.append(shots90)
+        ys.append(last_pts)
+    if len(xs) < 10:
+        return 0.0, 0.0, len(xs)
+    slope, intercept = _linreg(xs, ys)
+    return slope, intercept, len(xs)
+
+
+def load_shots_current(xw=None, players=None) -> dict[str, dict]:
+    """{norm(market name): {"shots90": shots per 90 minutes THIS season,
+    "minutes": total minutes}} — forwards only (the position gate
+    _shots_points_fit() also uses), from LaLiga's own per-match box score.
+    Same shape as load_understat_current(), so Scorer.rate() blends it
+    the same way. `players`: see _shots_points_fit()'s own note — injectable
+    for the same reason, `None` (every real caller) loads it for real.
+    """
+    from ffcore.tidy import (TIDY, SEASON, read_csv, load_crosswalk,
+                             load_players)
+
+    xw = xw if xw is not None else load_crosswalk()
+    if xw is None:
+        return {}
+    players = players if players is not None else load_players()
+    shots_by_key = _shots_by_jornada(xw)
+    live = SEASON / "live"
+    files = sorted(live.glob("perjornada_*.csv")) if live.exists() else []
+    minutes_by_key: dict[str, dict[int, float]] = {}
+    if files:
+        by_key = _per_jornada_current(
+            read_csv(TIDY / "starters.csv"), read_csv(files[-1]),
+            read_csv(TIDY / "matches.csv"), xw)
+        minutes_by_key = {k: {j: mins for j, (_pts, mins) in jd.items()}
+                          for k, jd in by_key.items()}
+    out = {}
+    for key, jd_shots in shots_by_key.items():
+        if (players.get(key) or {}).get("pos", "").lower() != "delantero":
+            continue
+        player = xw.players.get(key)
+        if not player or not player.name:
+            continue
+        mins_jd = minutes_by_key.get(key, {})
+        total_min = sum(mins_jd.get(j, 0.0) for j in jd_shots)
+        if total_min <= 0:
+            continue
+        total_shots = sum(jd_shots.values())
+        out[norm(player.name)] = {"shots90": total_shots / total_min * 90,
+                                  "minutes": total_min}
+    return out
+
+
 def _per_jornada_current(starters_rows, perjornada_rows, matches_rows,
                          xw) -> dict[str, dict[int, tuple[float, float]]]:
     """{crosswalk key: {jornada: (points, minutes)}} for the live season.
@@ -595,10 +736,17 @@ def build(market: list[dict], xi_rows: list[dict], now,
     xg_cur = load_understat_current(xw)
     xg_slope, xg_intercept, xg_n = _xg_points_fit(xw)
     xg_boost, xg_why = _xg_stickiness_boost()
+    # Shot volume, forwards only — see Scorer.__init__'s own note and
+    # _shots_points_fit() for the real, forward-validated case (this
+    # session, 2026-09-12).
+    shots_cur = load_shots_current(xw)
+    shots_slope, shots_intercept, shots_n = _shots_points_fit(xw)
     sc = Scorer(market, xi_rows, prior, shrink_k=shrink_k,
                 current=cur, board=board, cal=cal, second=second,
                 xg=xg_cur, xg_slope=xg_slope, xg_intercept=xg_intercept,
-                xg_n=xg_n, xg_boost=xg_boost, xg_why=xg_why)
+                xg_n=xg_n, xg_boost=xg_boost, xg_why=xg_why,
+                shots=shots_cur, shots_slope=shots_slope,
+                shots_intercept=shots_intercept, shots_n=shots_n)
     return sc, (prior_label, cur_label)
 
 
@@ -732,7 +880,9 @@ class Scorer:
                  current: dict | None = None, board: dict | None = None, cal=None, second=None,
                  xg: dict | None = None, xg_slope: float = 0.0,
                  xg_intercept: float = 0.0, xg_n: int = 0,
-                 xg_boost: float = 1.0, xg_why: str = ""):
+                 xg_boost: float = 1.0, xg_why: str = "",
+                 shots: dict | None = None, shots_slope: float = 0.0,
+                 shots_intercept: float = 0.0, shots_n: int = 0):
         self.market = market
         self.history = history or {}
         self.shrink_k = shrink_k
@@ -751,6 +901,18 @@ class Scorer:
         self.xg_n = xg_n            # how many (player, xG, ppm) pairs fit the slope
         self.xg_boost = xg_boost    # pseudo-matches an xG match is worth vs a raw one
         self.xg_why = xg_why        # printed by callers that want the provenance
+        # SHOT VOLUME — see _shots_points_fit()'s own docstring for why this
+        # is a real, forward-validated signal (MAE 3.25 vs 4.12 predicting a
+        # forward's own next points, n=20, 2026-09-12) and why it has no
+        # xg_boost equivalent (no prior season of this feed exists yet to
+        # calibrate one against — 1 raw match per informed match, honestly,
+        # not invented). {key: {"shots90":..., "minutes":...}}, forwards
+        # only (same gate xg uses for attacking mids too, narrower here
+        # because that's what was actually validated).
+        self.shots = shots or {}
+        self.shots_slope = shots_slope
+        self.shots_intercept = shots_intercept
+        self.shots_n = shots_n
 
         # Same key the market index uses, not norm(name) alone (that held
         # one row for the two Álvaro Garcías). See docs/notes/score.md#scorerinit--key-joins
@@ -873,6 +1035,21 @@ class Scorer:
             xg_rate = self.xg_slope * xg["xg90"] + self.xg_intercept
             terms.append((xg_matches, xg_rate))
             xg_note = " + xg %.2f/%.1fj" % (xg_rate, xg["minutes"] / 90.0)
+        # SHOT VOLUME, forwards only — see Scorer.__init__'s own note and
+        # _shots_points_fit() for the real, forward-validated case this is
+        # based on. GATED ON shots_n >= 10 explicitly (not left implicit
+        # the way the xG term is) — an untrained fit would otherwise add a
+        # real-weight, zero-rate term and silently drag a thin-evidence
+        # player toward zero.
+        shots = self.shots.get(key)
+        shots_note = ""
+        if shots and shots["minutes"] > 0 and self.shots_n >= 10:
+            shots_matches = shots["minutes"] / 90.0
+            shots_rate = (self.shots_slope * shots["shots90"]
+                          + self.shots_intercept)
+            terms.append((shots_matches, shots_rate))
+            shots_note = (" + shots %.2f/%.1fj"
+                         % (shots_rate, shots["minutes"] / 90.0))
         if len(terms) == 1:
             return Rating(base, why, assumed, 0.0, prior_pj)
         w_sum = sum(w for w, _ in terms)
@@ -880,7 +1057,7 @@ class Scorer:
         why_now = why
         if cur_pj > 0:
             why_now += " + %.0fp/%.0fj now" % (c["pts"], cur_pj)
-        why_now += xg_note
+        why_now += xg_note + shots_note
         return Rating(blended, why_now, assumed and cur_pj < k, cur_pj,
                      prior_pj + cur_pj)
 
@@ -1411,7 +1588,137 @@ def _selftest() -> None:
     sc_noxg = Scorer(market_xg, xi_xg, hist_xg, xg={})
     assert sc_noxg.rate(mk("Attacker", pos="delantero")) == plain
 
-    print("ffcore.score self-test OK (58 cases)")
+    # -- Scorer.rate(): the shots term, gated on shots_n >= 10 EXPLICITLY —
+    # unlike xG, an untrained fit (shots_n < 10) must not add a real-
+    # weight, zero-rate term that drags a thin-evidence forward down ------
+    sc_shots_untrained = Scorer(
+        market_xg, xi_xg, hist_xg,
+        shots={"attacker": {"shots90": 3.0, "minutes": 180.0}},
+        shots_slope=0.0, shots_intercept=0.0, shots_n=3)   # below the floor
+    assert sc_shots_untrained.rate(mk("Attacker", pos="delantero")) == plain
+
+    sc_shots = Scorer(
+        market_xg, xi_xg, hist_xg,
+        shots={"attacker": {"shots90": 2.0, "minutes": 180.0}},
+        shots_slope=5.0, shots_intercept=0.0, shots_n=10)
+    with_shots = sc_shots.rate(mk("Attacker", pos="delantero"))
+    # 2 matches worth (180 minutes), shots-implied rate 5.0*2.0=10.0 —
+    # same blend arithmetic the xG term already uses, just a second term.
+    expect_shots = (SHRINK_K * plain.ppm + 2.0 * 10.0) / (SHRINK_K + 2.0)
+    assert abs(with_shots.ppm - expect_shots) < 1e-9, \
+        (with_shots.ppm, expect_shots)
+    assert "shots" in with_shots.why
+
+    # -- _shots_by_jornada / _shots_points_fit / load_shots_current: the
+    # real join through api_stats.csv, gated to forwards, checked against
+    # a real (small) fixture rather than assumed from the arithmetic above
+    import csv as _csv3
+    import os as _os3
+    import tempfile as _tempfile3
+    from ffcore import tidy as _tidy3
+
+    # Keys are norm(full name) — the SAME convention the earlier
+    # _per_jornada_current fixture (xw2, above) relies on: a perjornada
+    # row's own ff_id ("900") is not a crosswalk key here, so its join
+    # falls back to xw.player(name=...), which only resolves when
+    # norm(name) is itself a real key.
+    xw3 = Crosswalk({
+        "fwd guy": Player("fwd guy", "Fwd Guy", ff_slug="fwd-guy",
+                          app_id="900"),
+        "def guy": Player("def guy", "Def Guy", ff_slug="def-guy",
+                          app_id="901"),
+    }, {})
+    matches3 = [{"match_id": "m1", "jornada": "1"},
+               {"match_id": "m2", "jornada": "2"},
+               {"match_id": "m3", "jornada": "3"}]
+    starters3 = [
+        {"player_name": "Fwd Guy", "player_slug": "fwd-guy", "role": "starter",
+         "minute": "", "match_id": "m1"},
+        {"player_name": "Fwd Guy", "player_slug": "fwd-guy", "role": "starter",
+         "minute": "", "match_id": "m2"},
+        {"player_name": "Fwd Guy", "player_slug": "fwd-guy", "role": "starter",
+         "minute": "", "match_id": "m3"},
+    ]
+    perjornada3 = [
+        {"ff_id": "900", "player_name_full": "Fwd Guy",
+         "points_total": "2", "jornada": "1"},
+        {"ff_id": "900", "player_name_full": "Fwd Guy",
+         "points_total": "6", "jornada": "2"},   # +4 that jornada
+        {"ff_id": "900", "player_name_full": "Fwd Guy",
+         "points_total": "16", "jornada": "3"},  # +10 that jornada
+    ]
+    with _tempfile3.TemporaryDirectory() as _d3:
+        _os3.makedirs(_os3.path.join(_d3, "season", "live"))
+        with open(_os3.path.join(_d3, "api_stats.csv"), "w", newline="",
+                 encoding="utf-8") as fh:
+            w = _csv3.DictWriter(fh, fieldnames=[
+                "observed_at", "source", "player_id", "week", "stat",
+                "value", "points"])
+            w.writeheader()
+            # Fwd Guy: rising shot volume, jornadas 1-2 (the "prior" side).
+            for wk, val in ((1, "1"), (2, "3")):
+                w.writerow({"observed_at": "2026-08-%02dT0000Z" % (15+wk*7),
+                           "source": "laliga", "player_id": "900",
+                           "week": str(wk), "stat": "total_scoring_att",
+                           "value": val, "points": "0"})
+            # A non-forward with real shot data too — must be excluded by
+            # the position gate, same discipline load_understat_current()
+            # already enforces for xG.
+            w.writerow({"observed_at": "2026-08-22T0000Z", "source": "laliga",
+                       "player_id": "901", "week": "1",
+                       "stat": "total_scoring_att", "value": "5",
+                       "points": "0"})
+        fake_players3 = {"fwd guy": {"pos": "delantero"},
+                        "def guy": {"pos": "defensa"}}
+        with open(_os3.path.join(_d3, "starters.csv"), "w", newline="",
+                 encoding="utf-8") as fh:
+            w = _csv3.DictWriter(fh, fieldnames=[
+                "player_name", "player_slug", "role", "minute", "match_id"])
+            w.writeheader()
+            for r in starters3:
+                w.writerow(r)
+        with open(_os3.path.join(_d3, "matches.csv"), "w", newline="",
+                 encoding="utf-8") as fh:
+            w = _csv3.DictWriter(fh, fieldnames=["match_id", "jornada"])
+            w.writeheader()
+            for r in matches3:
+                w.writerow(r)
+        with open(_os3.path.join(_d3, "season", "live",
+                                "perjornada_2026-27.csv"),
+                 "w", newline="", encoding="utf-8") as fh:
+            w = _csv3.DictWriter(fh, fieldnames=[
+                "ff_id", "player_name_full", "points_total", "jornada"])
+            w.writeheader()
+            for r in perjornada3:
+                w.writerow(r)
+        _real_tidy3, _real_season3 = _tidy3.TIDY, _tidy3.SEASON
+        _tidy3.TIDY = __import__("pathlib").Path(_d3)
+        _tidy3.SEASON = __import__("pathlib").Path(_d3) / "season"
+        try:
+            sbj = _shots_by_jornada(xw3)
+            # NOT position-gated here — a raw join, same shape for every
+            # player api_stats.csv covers. The position gate lives in the
+            # two callers below (_shots_points_fit/load_shots_current),
+            # same split load_understat_current()/_xg_points_fit() use.
+            assert sbj == {"fwd guy": {1: 1.0, 2: 3.0},
+                          "def guy": {1: 5.0}}, sbj
+            fit_slope, fit_intercept, fit_n = _shots_points_fit(
+                xw3, players=fake_players3)
+            # Only ONE forward in this tiny fixture — below the 10-pair
+            # floor, so it must refuse rather than fit a line through one
+            # point, same discipline _xg_points_fit() already has.
+            assert (fit_slope, fit_intercept, fit_n) == (0.0, 0.0, 1), \
+                (fit_slope, fit_intercept, fit_n)
+            lsc = load_shots_current(xw3, players=fake_players3)
+            # 2 jornadas' worth of minutes (90 each, from starters3's
+            # m1/m2), 1.0+3.0=4.0 shots total -> 4.0/180*90 = 2.0 per 90.
+            assert set(lsc) == {"fwd guy"}, lsc
+            assert abs(lsc["fwd guy"]["shots90"] - 2.0) < 1e-9, lsc
+            assert lsc["fwd guy"]["minutes"] == 180.0, lsc
+        finally:
+            _tidy3.TIDY, _tidy3.SEASON = _real_tidy3, _real_season3
+
+    print("ffcore.score self-test OK (66 cases)")
 
 
 if __name__ == "__main__":
