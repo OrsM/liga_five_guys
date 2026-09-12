@@ -77,7 +77,7 @@ player_id,name,club_id,ff_slug,af_slug,app_id,understat_id,app_names
 11714,jorge benito,getafe,,,2557,,I. Benito|J. Benito
 11719,selu diallo,alaves,selu-diallo,,3257,,Diallo
 11758,alemao,rayo,alemo,,2798,14059,Alemâo
-11766,alex sancris,getafe,lex-sancris,,,14086,
+11766,alex sancris,getafe,lex-sancris,,2778,14086,
 11767,alvaro nuñez,celta,lvaro-nunez,182661,2346,13836,Álvaro Núñez
 11790,mario gonzalez,valencia,,,,,
 11792,jon martin,real sociedad,jon-martin,405073,2656,12353,Jon Martin
@@ -89,7 +89,7 @@ player_id,name,club_id,ff_slug,af_slug,app_id,understat_id,app_names
 11857,matteo prati,racing,matteo-prati,,3234,11959,Matteo Prati
 11861,dani martinez,atletico,dani-martinez,386869,2881,14233,D. Martínez
 11863,alex calatrava,espanyol,lex-calatrava,,3105,14700,Cala
-11886,manuel angel,real madrid,manuel-ngel,,,14502,
+11886,manuel angel,real madrid,manuel-ngel,,2907,14502,
 11905,saba sazonov,getafe,saba-sazonov,,3134,9381,Saba Sazonov
 11916,andres garcia,getafe,andres-garcia,388013,3135,13392,Andrés Garcia
 11983,alvaro djalo,athletic,lvaro-djalo,,3122,13001,Alvaro J.|Djalo
@@ -126,7 +126,7 @@ player_id,name,club_id,ff_slug,af_slug,app_id,understat_id,app_names
 12651,augusto batalla,rayo,augusto-batalla,,2519,12298,A. Batalla
 12694,iñaki ruperez,real sociedad,inaki-ruperez,,,12354,
 12695,djordjije medenica,getafe,,,,,
-12715,xavi grande,levante,,,,,
+12715,xavi grande,levante,,,3248,,
 12823,iñigo arguibide,osasuna,inigo-arguibide,,2846,12472,Arguibide|Vilaplana
 12860,pau navarro,villarreal,pau-navarro,435552,2698,12914,Pau Navarro
 12870,carlos espi,real madrid,carlos-espi,,3129,13769,Carlos Espí
@@ -151,7 +151,7 @@ player_id,name,club_id,ff_slug,af_slug,app_id,understat_id,app_names
 13440,tani oluwaseyi,villarreal,tani-oluwaseyi,,2761,13996,Oluwaseyi
 13564,endrick,real madrid,endrick,,3112,12884,Endrick
 13608,sebastian caceres,celta,sebastian-caceres,,3259,,Cáceres
-13748,martin krug,levante,,,,,
+13748,martin krug,levante,,,2741,,
 13780,christantus uche,getafe,chrisantus-uche,,3126,12726,Uche
 13801,pelayo fernandez,rayo,pelayo-fernandez,,3157,12864,Pelayo
 13808,miguel roman,celta,miguel-roman,333502,2639,13620,M. Román
@@ -161,8 +161,8 @@ player_id,name,club_id,ff_slug,af_slug,app_id,understat_id,app_names
 13814,marco de la sias,rayo,marco-de-la-sias,,,,
 13822,pablo garcia,betis,pablo-garcia-1,443163,2712,13376,Pablo García
 13830,maroan sannadi,athletic,maroan-sannadi,,2319,13417,Maroan
-13859,guille fernandez,barcelona,,,,,
-13860,toni fernandez,barcelona,,,,13110,
+13859,guille fernandez,barcelona,,,2649,,
+13860,toni fernandez,barcelona,,,2650,13110,
 13864,marc bernal,barcelona,marc-bernal,433396,2784,12820,Marc Bernal
 13865,nico guillen,sevilla,nico-guillen,,3175,14607,Guillén
 13871,taufik seidu,atletico,,,2810,14080,Taufik Seidu
@@ -172,7 +172,7 @@ player_id,name,club_id,ff_slug,af_slug,app_id,understat_id,app_names
 13877,jiri letacek,getafe,jiri-letacek,,2363,,Letacek
 13883,martim neto,elche,martim-neto,,2601,13840,Martim Neto
 13888,andres castrin,sevilla,andres-castrin,338902,2680,13600,A. Castrín
-13968,eric puerto,deportivo,eric-puerto,,,,
+13968,eric puerto,deportivo,eric-puerto,,2983,,
 13970,dani barcia,deportivo,dani-barcia,,2989,,Dani Barcia
 13972,diego villares,deportivo,diego-villares,,2991,14712,D. Villares
 13973,ruben lopez,deportivo,ruben-lopez,,2829,,Bachmann|I.vidal|Ibon Sánchez|Rubén López
@@ -226,7 +226,7 @@ player_id,name,club_id,ff_slug,af_slug,app_id,understat_id,app_names
 14928,jose angel lopez,espanyol,jose-angel-lopez,,3172,,Jose Angel
 14935,youssef enriquez,alaves,youssef-enriquez,,2568,,Youssef
 14962,mario solorzano,racing,,,3033,,M. Solorzano
-14967,juanpe gil,rayo,,,,,
+14967,juanpe gil,rayo,,,2744,,
 14979,nicolas valentini,alaves,nicolas-valentini,,3156,13313,Valentini
 14980,jones el-abdellaoui,celta,jones-el-abdellaoui,,2654,13361,El Abdellaoui
 15000,pablo lopez,valencia,,,,,
@@ -280,7 +280,7 @@ player_id,name,club_id,ff_slug,af_slug,app_id,understat_id,app_names
 16203,valentin gomez,betis,valentin-gomez,,2609,13845,Valentín Gómez
 16217,kazunari kita,real sociedad,,,,,
 16229,johaneko louis-jean,athletic,johaneko-louis-jean,,3213,10352,Johaneko
-16235,alex costa,sevilla,,,,,
+16235,alex costa,sevilla,,,2788,,
 16236,miguel sierra,sevilla,miguel-sierra,546798,2746,13823,Miguel Sierra|Sierra
 16237,thiago pitarch,real madrid,thiago-pitarch,,2735,13848,Thiago Pitarch
 16247,lander astiazaran,,,,2899,,Astiazaran
@@ -407,7 +407,7 @@ player_id,name,club_id,ff_slug,af_slug,app_id,understat_id,app_names
 1972,yeray alvarez,athletic,yeray-alvarez,,77,5062,Yeray
 1975,alex remiro,real sociedad,alex-remiro,47269,274,2555,Remiro
 1980,jose angel jurado,deportivo,jose-angel-jurado,,,,
-1981,javi muñoz,getafe,javi-munoz,,,4168,
+1981,javi muñoz,getafe,javi-munoz,,2775,4168,
 1989,borja mayoral,getafe,borja-mayoral,,2488,2252,B. Mayoral
 2153,hector bellerin,betis,hector-bellerin,,2414,492,Bellerín
 2242,gonçalo guedes,real sociedad,goncalo-guedes,925,3085,5682,Guedes
@@ -660,7 +660,7 @@ player_id,name,club_id,ff_slug,af_slug,app_id,understat_id,app_names
 9273,pablo gavi,barcelona,pablo-gavi,,1221,9804,Gavi
 9276,giuliano simeone,atletico,giuliano-simeone,,1210,9796,Giuliano
 9304,diego lopez,valencia,diego-lopez-1,,1260,9694,Diego López
-9314,javi serrano,atletico,,,,,
+9314,javi serrano,atletico,,,2812,,
 9316,alejandro balde,barcelona,alejandro-balde,,1218,,Álex Balde
 9317,jose angel carmona,sevilla,jose-ngel-carmona,,1251,9809,Carmona
 9321,haitam abaida,malaga,haitam-abaida,,3055,14736,Haitam
@@ -680,7 +680,7 @@ player_id,name,club_id,ff_slug,af_slug,app_id,understat_id,app_names
 9740,hugo alvarez,celta,hugo-lvarez-,329720,2078,10078,Hugo Alvarez
 9744,hugo gonzalez,celta,hugo-gonzalez,161875,2850,10082,H. González
 9750,abde ezzalzouli,betis,abde-ezzalzouli,,3089,,Ez Abde
-9755,carlos martin,atletico,carlos-martin,324750,,10101,
+9755,carlos martin,atletico,carlos-martin,324750,2331,10101,
 9759,alejandro iturbe,elche,alejandro-iturbe,,2715,,A. Iturbe
 9762,cesar tarrega,valencia,cesar-tarrega,333672,1991,10107,Tárrega
 9763,ilias akhomach,villarreal,ilias-akhomach,,2477,10121,I. Akhomach

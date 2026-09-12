@@ -215,6 +215,17 @@ def build_players(market, lineups, starters, api_rows, lg, clubs) -> dict:
                       known, r.get("player_id") or "")
         p = out.get(key) if key else None
         if p is None:
+            # api_key()'s market.key_for() only searches the LIVE market
+            # snapshot (latest_rows()) — a player who has simply gone quiet
+            # there (no longer listed, not renamed, not ambiguous) comes
+            # back None even though his name is a clean match in THIS
+            # function's own `out`, built from the full market history.
+            # Real case, found 2026-09-12: Álex Sancris, off market.csv
+            # since 08-25, resolvable by name here the whole time. Same
+            # by_name() the lineup rows above already use — one more
+            # caller, not a new resolver.
+            p = by_name(raw)
+        if p is None:
             continue
         # The app's display name belongs to the player the app hangs it on,
         # for the same reason its id does. Isaac Romero kept the alias
@@ -239,6 +250,43 @@ def build_players(market, lineups, starters, api_rows, lg, clubs) -> dict:
                 other.app_id = ""
         p.app_id = pid
     return out
+
+
+def attach_bulk_app_ids(rows, players: dict) -> int:
+    """Fill app_id from the bulk player list onto an EXISTING crosswalk
+    entry, by name — no market-freshness gate at all.
+
+    build_players()'s own app_id join needs the player in THAT run's
+    `market` argument (main() passes latest_only(market.csv)), so a player
+    who has dropped off the market entirely — not misspelled, not
+    ambiguous, just quiet — never gets a Player in `out` to attach onto in
+    the first place. He still lives on in the crosswalk (this table
+    merges, it does not rebuild), just with no app_id, because the bulk
+    list did not exist on whichever past run last saw him fresh. The bulk
+    list names every player in the competition regardless of recent
+    activity, so it needs no such gate — this runs straight against the
+    merged, kept crosswalk. Real case, found 2026-09-12: Álex Sancris
+    (ff_id 11766), off market.csv since 08-25, still resolvable by name.
+
+    Only ever WRITES a blank, same as build_understat_ids, and the same
+    refuse-on-ambiguity: a name two players share is left for the market
+    join (which has a price to break the tie) rather than guessed here.
+    """
+    by_name: dict[str, list] = {}
+    for p in players.values():
+        by_name.setdefault(norm(p.name), []).append(p)
+    matched = 0
+    for r in rows:
+        name = (r.get("player_name") or "").strip()
+        pid = (r.get("player_id") or "").strip()
+        if not name or not pid:
+            continue
+        hits = by_name.get(norm(name)) or []
+        if len(hits) != 1 or hits[0].app_id:
+            continue
+        hits[0].app_id = pid
+        matched += 1
+    return matched
 
 
 def build_understat_ids(rows, players: dict, clubs: dict) -> int:
@@ -384,6 +432,15 @@ def main() -> None:
             target.app_names |= pl.app_names
         dropped_ghosts.append(k)
         del kept.players[k]
+
+    # Every player in the competition, not just today's market — closes the
+    # app_id gap for anyone who has gone quiet on the market since whichever
+    # past run last saw him fresh (build_players()'s own join needs him in
+    # THIS run's market argument, which is latest-only). Why:
+    # docs/notes/league.md#the-bulk-player-list-and-app_id-with-no-manager
+    bulk_matched = attach_bulk_app_ids(
+        read_csv(TIDY / "api_players_all.csv"), kept.players)
+
     kept._reindex()
     kept.write(TIDY / PLAYERS, TIDY / CLUBS)
     if dropped_ghosts:
@@ -397,10 +454,11 @@ def main() -> None:
         print("  dropped %d key(s) that two players answered to: %s"
               % (len(dropped), ", ".join(sorted(dropped))))
     print("%d players, %d clubs — %.0f%% carry a probable-XI slug, "
-          "%.0f%% the second source's, %.0f%% an app id, %.0f%% an "
-          "understat id (%d newly matched this run)"
+          "%.0f%% the second source's, %.0f%% an app id (%d off-market "
+          "this run), %.0f%% an understat id (%d newly matched this run)"
           % (c["players"], c["clubs"], 100 * c["ff"], 100 * c["af"],
-             100 * c["app"], 100 * c["understat"], understat_matched))
+             100 * c["app"], bulk_matched, 100 * c["understat"],
+             understat_matched))
     # A SHARED NAME IS NO LONGER A PROBLEM — the site issues an id per player
     # and this table keys on it, so the two Álvaro Garcías are two rows and
     # always were two players. Printed as a fact rather than a warning.
@@ -503,6 +561,63 @@ def _selftest() -> None:
           "player_id": "99999999"}],   # no "manager" key at all
         bulk_lg, bulk_clubs)
     assert bulk_players["hugo duro"].app_id == "99999999", bulk_players
+
+    # -- a player stale on the live market still resolves by name ----------
+    # Real case, found 2026-09-12 while measuring the bulk list's coverage:
+    # Álex Sancris (ff_id 11766) has not appeared in market.csv since
+    # 2026-08-25 — Market.key_for() only searches latest_rows(), so a
+    # player who has simply gone quiet on the market (not renamed, not
+    # ambiguous, just stale) comes back None from api_key() even though his
+    # name is a clean, unique match in THIS function's own `out` — built
+    # from the full market history, not just the live snapshot. by_name()
+    # already exists for exactly this lookup (lineups use it above); this
+    # is that same fallback, one more time, for api_rows.
+    stale_market_rows = [{"name": "Alex Sancris", "slug": "alex-sancris",
+                          "team": "Getafe"}]
+    stale_clubs = build_clubs(stale_market_rows, [], [])
+    # lg.market deliberately does NOT carry this player — simulates him
+    # having dropped out of the live/latest market index.
+    stale_lg = League(Config(me="nobody", budget=100e6), {}, [],
+                      _RealMarket([{"name": "Someone Else", "team": "Getafe",
+                                   "value": "500000",
+                                   "observed_at": "2026-08-01T0000Z"}]))
+    stale_players = build_players(
+        stale_market_rows, [], [],
+        [{"player_name": "Alex Sancris", "market_value": "551012",
+          "player_id": "11766"}],
+        stale_lg, stale_clubs)
+    assert stale_players["alex sancris"].app_id == "11766", stale_players
+
+    # -- attach_bulk_app_ids: by name, independent of market freshness -----
+    # The above (`by_name` inside build_players()) still needs the player
+    # in THIS run's `market` argument at all — and main() passes it
+    # latest_only(market.csv), so a player who has dropped off the market
+    # entirely (not stale-but-listed, gone) never gets a `Player` in `out`
+    # in the first place. He still lives on in `kept.players` (this table
+    # merges, it does not rebuild — a player once seen stays), just with
+    # no app_id, because the bulk source did not exist on whichever past
+    # run last saw him fresh. This attaches straight onto the KEPT crosswalk,
+    # with no market/freshness gate at all — the bulk list needs none.
+    ghost = Player("11766", "Alex Sancris", "getafe")
+    ghost_players = {"11766": ghost}
+    n = attach_bulk_app_ids(
+        [{"player_name": "Álex Sancris", "player_id": "2778"}],
+        ghost_players)
+    assert n == 1, n
+    assert ghost.app_id == "2778", ghost
+    # Never overwrites an app_id a real transaction already resolved.
+    ghost.app_id = "already-known"
+    assert attach_bulk_app_ids(
+        [{"player_name": "Álex Sancris", "player_id": "2778"}],
+        ghost_players) == 0
+    assert ghost.app_id == "already-known", ghost
+    # Two players sharing a name is left alone, not guessed at.
+    twin_a, twin_b = Player("a", "Pablo Fornals", "betis"), \
+                     Player("b", "Pablo Fornals", "villarreal")
+    twins = {"a": twin_a, "b": twin_b}
+    assert attach_bulk_app_ids(
+        [{"player_name": "Pablo Fornals", "player_id": "999"}], twins) == 0
+    assert twin_a.app_id == "" and twin_b.app_id == "", (twin_a, twin_b)
 
     # -- build_understat_ids: name+team, the same bootstrap every other feed
     # went through, and the same refuse-rather-than-guess on ambiguity -------
