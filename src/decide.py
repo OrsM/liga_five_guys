@@ -664,6 +664,65 @@ def value_rate(pts, cost) -> float | None:
     return pts / (cost / 1e6)
 
 
+def player_forecasts(u: Universe) -> dict[str, dict]:
+    """{key: {"season_pts", "next_pts", "par", "pj"}} for every player in
+    u.players — the full pool, not gated on being listed on the market
+    (see slate.py for the market-restricted report view).
+
+    TWO-TIER, not one, because u.forecaster (Bootstrap) is only actually
+    simulated for the 89-player universe (the five squads plus market
+    candidates) — re-running the full Monte Carlo simulation for all
+    ~722 players nobody can act on today would be real, needless cost.
+    For a player IN that universe, season_pts sums forecaster.expected(j)
+    across every remaining jornada — genuinely fixture-adjusted, jornada
+    by jornada. For everyone else, it's u.market_exp[k] (already a
+    full-pool computation, see ffcore.profile) held flat across the same
+    number of remaining jornadas — a cruder approximation, and this
+    function says so via a boolean rather than presenting both the same
+    way.
+
+    "par" (points above replacement) is relative to MY OWN squad's
+    weakest current option in that slot — the same paired-simulation
+    spirit rank()'s own d_pts already uses (see market_routes()'s
+    neighbourhood), made a standing per-player property instead of
+    computed ad hoc per candidate action.
+    """
+    jornadas = u.state.jornadas
+    n_rem = len(jornadas)
+    sim_season: dict[str, float] = {}
+    sim_next: dict[str, float] = {}
+    for i, j in enumerate(jornadas):
+        exp = u.forecaster.expected(j)
+        for k, pts in exp.items():
+            sim_season[k] = sim_season.get(k, 0.0) + pts
+        if i == 0:
+            sim_next = exp
+
+    my_squad = u.state.squads.get(u.me, {})
+    replacement: dict[str, float] = {}
+    for k, slot in my_squad.items():
+        v = (sim_season[k] if k in sim_season
+            else u.market_exp.get(k, 0.0) * n_rem)
+        if slot not in replacement or v < replacement[slot]:
+            replacement[slot] = v
+
+    out = {}
+    for k, p in u.players.items():
+        in_sim = k in sim_season
+        season_pts = sim_season.get(k) if in_sim \
+            else u.market_exp.get(k, 0.0) * n_rem
+        next_pts = sim_next.get(k) if in_sim else u.market_exp.get(k, 0.0)
+        slot = u.pos.get(k)
+        out[k] = {
+            "season_pts": season_pts,
+            "next_pts": next_pts,
+            "par": season_pts - replacement.get(slot, 0.0),
+            "pj": p.derived.pj,
+            "simulated": in_sim,
+        }
+    return out
+
+
 def rank(u: Universe, acts: list[Action], seed: int = 1,
          price=None, extra: list[tuple[str, Action]] = ()) -> tuple:
     """Screen wide and cheap, then re-run the survivors properly.
@@ -2199,8 +2258,62 @@ def _selftest() -> None:
     assert value_rate(None, 5e6) is None
     assert value_rate(0.0, 5e6) == 0.0           # a real price, zero return: 0, not None
 
+    # -- player_forecasts: full pool, two-tier, replacement-relative --------
+    from ffcore.profile import (PlayerProfile, PlayerIdentity,
+                                PlayerCurrent, PlayerHistory, PlayerDerived)
 
-    print("decide self-test OK (149 cases)")
+    def mk_profile(pj, pos="MED"):
+        return PlayerProfile(
+            identity=PlayerIdentity(key="x"), current=PlayerCurrent(pos=pos),
+            history=PlayerHistory(), derived=PlayerDerived(pj=pj))
+
+    # "me" holds two MED: me_a (weak, replacement baseline) and me_b
+    # (strong). "cand" is a market candidate, simulated. "unsimmed" is a
+    # full-pool-only player nobody's squad holds and nothing has listed —
+    # exactly the case market_exp has to carry alone.
+    pf_sq = {"me": {"me_a": "MED", "me_b": "MED"}}
+    pf_per = {1: {"me_a": (2.0, 1.0), "me_b": (5.0, 1.0), "cand": (4.0, 1.0)},
+             2: {"me_a": (2.0, 1.0), "me_b": (5.0, 1.0), "cand": (4.0, 1.0)}}
+    pf_u = Universe(
+        state=LeagueState(pf_sq, [1, 2], "me"),
+        forecaster=Bootstrap(pf_per), pos={"me_a": "MED", "me_b": "MED",
+                                           "cand": "MED", "unsimmed": "DEL"},
+        price={}, proceeds={}, owner={}, cash=0.0, me="me",
+        market_exp={"unsimmed": 3.0},
+        players={"me_a": mk_profile(20.0), "me_b": mk_profile(15.0),
+                "cand": mk_profile(8.0), "unsimmed": mk_profile(1.0, "DEL")})
+    fc_out = player_forecasts(pf_u)
+
+    # me_a and me_b: simulated, season = 2 jornadas summed.
+    assert fc_out["me_a"]["season_pts"] == 4.0, fc_out["me_a"]
+    assert fc_out["me_a"]["next_pts"] == 2.0, fc_out["me_a"]
+    assert fc_out["me_a"]["simulated"] is True
+    assert fc_out["me_b"]["season_pts"] == 10.0, fc_out["me_b"]
+
+    # Replacement at MED = the WEAKER of me's two MEDs (me_a, 4.0 season
+    # pts) — cand's PAR is his own season total minus that baseline.
+    assert fc_out["cand"]["season_pts"] == 8.0, fc_out["cand"]
+    assert fc_out["cand"]["par"] == 8.0 - 4.0, fc_out["cand"]
+    # me_a against himself: PAR is 0, he IS the baseline he'd replace.
+    assert fc_out["me_a"]["par"] == 0.0, fc_out["me_a"]
+    # me_b's PAR uses the SAME baseline (me_a) — a squad's replacement
+    # level does not move just because you are asking about its own star.
+    assert fc_out["me_b"]["par"] == 10.0 - 4.0, fc_out["me_b"]
+
+    # "unsimmed": not in u.forecaster at all — falls back to
+    # market_exp * n_remaining_jornadas (3.0 * 2), flagged un-simulated.
+    assert fc_out["unsimmed"]["season_pts"] == 6.0, fc_out["unsimmed"]
+    assert fc_out["unsimmed"]["next_pts"] == 3.0, fc_out["unsimmed"]
+    assert fc_out["unsimmed"]["simulated"] is False
+    # DEL replacement: no DEL in my squad at all -> baseline 0.0, so PAR
+    # is just his own season total.
+    assert fc_out["unsimmed"]["par"] == 6.0, fc_out["unsimmed"]
+
+    # pj passes straight through from derived — the existing SE-shrinkage
+    # evidence count, not a new statistic.
+    assert fc_out["cand"]["pj"] == 8.0, fc_out["cand"]
+
+    print("decide self-test OK (159 cases)")
 
 
 if __name__ == "__main__":
