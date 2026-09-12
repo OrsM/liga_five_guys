@@ -1593,6 +1593,53 @@ def weighted_mae(pairs: list[dict]) -> float:
     return sum(abs(p["err"]) for p in pairs) / total_matches
 
 
+ACCURACY_LOG = "forecast_accuracy_log.csv"
+
+
+def log_forecast_accuracy(n: int, mae: float, naive_mae: float) -> None:
+    """Append today's rate-forecast accuracy reading. Never overwrites —
+    the series IS the record, same append-only discipline sim.py's
+    log_cash_price()/cash_price_log.csv already uses.
+
+    WHY THIS EXISTS: rate_baseline_check() computed this exact number
+    fresh every run already, printed once into comparison_lines()'s own
+    report section, and thrown away — nothing recorded whether a real
+    model change (the shots blend, 2026-09-12) actually moved this number
+    over the following days, or whether a LATER change quietly made it
+    worse. Miguel, 2026-09-12: "shouldn't we have a function and log to
+    track metrics and our experiments/improvements impact on it?"
+    Why: docs/notes/methodology.md#log_forecast_accuracy--why-this-exists
+    """
+    from ffcore.tidy import DECISIONS, append_csv
+
+    DECISIONS.mkdir(parents=True, exist_ok=True)
+    append_csv(DECISIONS / ACCURACY_LOG,
+              [{"observed_at": run_now().strftime("%Y-%m-%dT%H%MZ"),
+                "n": n, "mae": "%.4f" % mae, "naive_mae": "%.4f" % naive_mae}],
+              ["observed_at", "n", "mae", "naive_mae"])
+
+
+def forecast_accuracy_history() -> list[dict]:
+    """[{observed_at, n, mae, naive_mae}], oldest first — the persisted
+    series log_forecast_accuracy() has been writing, for a caller that
+    wants to plot or compare readings across real, dated runs rather than
+    just today's single number. [] before the log has its first row.
+    """
+    from ffcore.tidy import DECISIONS, read_csv
+
+    path = DECISIONS / ACCURACY_LOG
+    if not path.exists():
+        return []
+    out = []
+    for r in read_csv(path):
+        try:
+            out.append({"observed_at": r["observed_at"], "n": int(r["n"]),
+                       "mae": float(r["mae"]), "naive_mae": float(r["naive_mae"])})
+        except (KeyError, ValueError, TypeError):
+            continue
+    return out
+
+
 def comparison_lines() -> list[str]:
     out = [f"### Forecast vs actual — last {WINDOW_DAYS} days", ""]
     actuals, label = load_actuals()
@@ -1654,6 +1701,7 @@ def comparison_lines() -> list[str]:
                 f"mean, {rbc['mean_rate']:.1f} pts/match, no player identity "
                 f"at all): ours {rbc['ours']:.2f} MAE, that guess "
                 f"{rbc['naive']:.2f} MAE — " + verdict + "_", ""]
+        log_forecast_accuracy(n, rbc["ours"], rbc["naive"])
     buckets = bucket_rows(pairs)
     if buckets and min(cnt for _, cnt, _, _ in buckets) >= MIN_BUCKET_N:
         out += [
@@ -2160,6 +2208,29 @@ def _selftest() -> None:
     always_off = [{"predicted": 9.0, "actual": 6.0, "matches": 1.0}] * 4
     rchk2 = rate_baseline_check(always_off)
     assert rchk2["ours"] > rchk2["naive"] == 0.0, rchk2
+
+    # -- log_forecast_accuracy / forecast_accuracy_history: append-only,
+    # real dated rows, not a single overwritten reading — same discipline
+    # sim.py's cash_price_log.csv already uses ------------------------
+    import tempfile as _tempfile4
+    from ffcore import tidy as _tidy4
+
+    with _tempfile4.TemporaryDirectory() as _d4:
+        _real_decisions4 = _tidy4.DECISIONS
+        _tidy4.DECISIONS = __import__("pathlib").Path(_d4)
+        try:
+            assert forecast_accuracy_history() == []   # nothing logged yet
+            log_forecast_accuracy(12, 3.25, 4.12)
+            log_forecast_accuracy(14, 3.10, 4.05)       # a later, real run
+            hist = forecast_accuracy_history()
+            assert [h["n"] for h in hist] == [12, 14], hist
+            assert abs(hist[0]["mae"] - 3.25) < 1e-9, hist
+            assert abs(hist[1]["naive_mae"] - 4.05) < 1e-9, hist
+            # NEVER OVERWRITES — the file has two real rows, not the
+            # latest reading clobbering the first.
+            assert len(hist) == 2, hist
+        finally:
+            _tidy4.DECISIONS = _real_decisions4
 
     print("methodology.py selftest OK")
 
