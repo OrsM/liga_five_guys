@@ -60,8 +60,89 @@ from ffcore.tidy import kickoff_stamp  # noqa: E402
 
 # +/- this much from a median opponent, hardest to easiest. A guess. See above.
 FIX_BAND = 0.12
-# Home is worth this much on top, away the same off it. Also a guess.
+# Home is worth this much on top, away the same off it. THE UNFITTED
+# DEFAULT — kept as the fallback fit_home_edge() returns below its own
+# real-results floor, not because 0.04 is believed correct. Real matches
+# say otherwise: pooled results_history.csv (4 seasons, 1184 matches) +
+# this season's own matches.csv (42 more, as of 2026-09-13) read home
+# 1.52 goals/match vs away 1.15 — a ratio of 1.31, which is what
+# fit_home_edge() solves down to a real edge of ~0.136, not this. Left
+# as the constant here (fit_home_edge() is what actually gets used, see
+# its own docstring for the wiring) so a caller that can't run the fit
+# still gets a number in the right units, same role DRIFT_FRAC's own
+# module-level default plays for forecast.py.
 HOME_EDGE = 0.04
+# Matches of real, pooled home/away goals before fit_home_edge() trusts
+# its own ratio over the guess above — the guess is one number away from
+# the fitted one being wrong in a way that would move every player's
+# score, so this floor is deliberately not tiny.
+MIN_HOME_EDGE_MATCHES = 50
+
+
+def fit_home_edge(results_history: list[dict],
+                  matches: list[dict] = ()) -> tuple[float, str]:
+    """(edge, why) — HOME_EDGE, fit from real goals instead of guessed.
+
+    Miguel, 2026-09-13, on being shown HOME_EDGE/FIX_BAND were both
+    self-labelled guesses in this file's own comments: "shouldn't you...
+    improve on the approach?" This is that, for the one of the two with
+    a direct, obvious real-data fit and outsized reach (it scales every
+    player's atk_factor/def_factor, not just the rank-based fallback
+    FIX_BAND is limited to).
+
+    POOLED ACROSS EVERY REAL RESULT AVAILABLE — results_history.csv's
+    multi-season history (the same file club_volatility()/season_board()
+    already read) plus this season's own matches.csv, on the same
+    reasoning: more real matches, one real number, not a guess in the
+    same order of magnitude as this repo's other pseudo-match constants.
+    `matches` rows are deduplicated on (match_id, jornada) first — the
+    tidy store carries one row per observed snapshot, the same repeat-
+    counting bug _per_jornada_current()'s own docstring found once
+    already (57 copies of one match's row).
+
+    THE EDGE IS SOLVED FROM THE GOAL RATIO, matching exactly how
+    _match_for() applies it: home scores at atk_base*(1+e), away at
+    atk_base*(1-e), so home_goals/away_goals = (1+e)/(1-e) pooled across
+    otherwise-equal matchups, solved for e = (r-1)/(r+1).
+
+    Below MIN_HOME_EDGE_MATCHES real, scored matches this refuses (the
+    HOME_EDGE default, "not enough real results yet") rather than fit a
+    ratio off a handful of matches — same discipline every other fit in
+    this repo uses (_xg_points_fit(), fit_drift_frac()).
+    Why: docs/notes/fixture.md#fit_home_edge--why-a-fit-not-a-guess
+    """
+    home_g = away_g = n = 0
+    for r in results_history:
+        try:
+            hg, ag = int(r["home_goals"]), int(r["away_goals"])
+        except (KeyError, ValueError, TypeError):
+            continue
+        home_g += hg
+        away_g += ag
+        n += 1
+    seen = set()
+    for r in matches:
+        score = (r.get("score") or "").strip()
+        mid, jor = r.get("match_id"), r.get("jornada")
+        if not score or (mid, jor) in seen:
+            continue
+        seen.add((mid, jor))
+        try:
+            hs, aws = (int(x) for x in score.split("-"))
+        except ValueError:
+            continue
+        home_g += hs
+        away_g += aws
+        n += 1
+    if n < MIN_HOME_EDGE_MATCHES or away_g <= 0:
+        return HOME_EDGE, ("only %d real scored matches (need %d) — "
+                          "keeping the %.2f default"
+                          % (n, MIN_HOME_EDGE_MATCHES, HOME_EDGE))
+    ratio = home_g / away_g
+    edge = (ratio - 1) / (ratio + 1)
+    return edge, ("fit from %d real matches (home %.2f, away %.2f "
+                 "goals/match, ratio %.3f)" % (n, home_g / n, away_g / n,
+                                               ratio))
 
 
 class Match(NamedTuple):
@@ -594,6 +675,27 @@ def _selftest() -> None:
     # One team alone is neutral, not divide-by-zero.
     assert difficulty({"Only": 1.0})["Only"] == (1.0, 1)
 
+    # -- fit_home_edge: a real edge from real goals, not the guess --------
+    hist_rows = [{"home_goals": "2", "away_goals": "1"}] * 60
+    edge, why = fit_home_edge(hist_rows)
+    assert abs(edge - (1 / 3)) < 1e-9, (edge, why)   # (2-1)/(2+1)
+    assert "fit from 60 real matches" in why, why
+
+    # matches.csv rows repeat across observed_at snapshots — the exact
+    # repeat-counting bug _per_jornada_current()'s own docstring already
+    # found once (57 copies of one match's row). Deduplicated on
+    # (match_id, jornada), so 5 copies of the SAME match count once.
+    dup_matches = [{"match_id": "m1", "jornada": "1", "score": "2-1"}] * 5
+    edge2, why2 = fit_home_edge(hist_rows[:49], dup_matches)  # 49 + 1 = 50
+    assert abs(edge2 - (1 / 3)) < 1e-9, (edge2, why2)
+    assert "50 real matches" in why2, why2
+
+    # Below the floor: keeps the original guess, says why rather than
+    # fitting a ratio off a handful of matches.
+    small_edge, small_why = fit_home_edge(hist_rows[:10])
+    assert small_edge == HOME_EDGE, (small_edge, small_why)
+    assert "keeping the" in small_why, small_why
+
     # -- attack_defense -------------------------------------------------
     # A tiny 3-team league, MIN_AD_MATCHES results each for Strong and Weak,
     # one short for Thin — Strong scores a lot and concedes little, Weak the
@@ -933,7 +1035,7 @@ def _selftest() -> None:
     assert sb_elo[2]["Mid"].rank == same_elo["Mid"].rank
     assert sb_elo[2]["Mid"].gap == same_elo["Mid"].gap
 
-    print("ffcore.fixture self-test OK (76 cases)")
+    print("ffcore.fixture self-test OK (81 cases)")
 
 
 if __name__ == "__main__":

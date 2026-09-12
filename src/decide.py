@@ -1421,7 +1421,8 @@ def load(trials_pool=None) -> Universe:
     # keyed on the market's spelling; results_history.csv is keyed on
     # ff_slug, translated through ffcore.crosswalk — norm(c.market), not
     # raw, to match club_key()'s own fallback convention.
-    from ffcore.fixture import club_volatility, season_board
+    from ffcore import fixture as _fixture
+    from ffcore.fixture import club_volatility, fit_home_edge, season_board
     from ffcore.tidy import load_elo, load_results_history, \
         load_understat_players
     slug_of = {norm(c.market): c.ff_slug for c in lg.xw.clubs.values()
@@ -1431,6 +1432,13 @@ def load(trials_pool=None) -> Universe:
     # both want it and it can't have changed between them.
     results_hist = load_results_history()
     club_rel = club_volatility(results_hist, list(slug_of.values()))
+    # THE ACTUAL LIVE EFFECT of fit_home_edge() — same discipline
+    # DRIFT_FRAC's own wiring below already established: fitting a
+    # constant and only ever printing the result nobody acts on is not a
+    # fix. Mutates the module attribute BEFORE season_board() builds this
+    # run's Match objects — _match_for() reads HOME_EDGE live off the
+    # module each call, so this has to land before the board, not after.
+    _fixture.HOME_EDGE, _home_edge_why = fit_home_edge(results_hist, m)
     # The whole remaining schedule, fitted once for `rem`. Keys normalised
     # to match `club`'s own convention (club_key() always returns norm(...))
     # — season_board() itself is keyed on the market's raw spelling.
