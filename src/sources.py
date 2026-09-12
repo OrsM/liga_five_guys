@@ -84,7 +84,8 @@ __all__ = ["BASE", "SOURCE", "MARKET_URL", "POINTS_URL", "TEAM_URL", "TEAMS",
            "sign_starters", "match_source", "played_sources",
            "LFG_SOURCE", "API_LEAGUES_KEY", "API_LEAGUES_URL",
            "API_MARKET_URL", "API_ACTIVITY_URL", "API_TEAMS_URL",
-           "ACT_KIND", "ACT_JOINED", "ACT_BUY", "ACT_SELL", "STORE_ONCE",
+           "ACT_KIND", "ACT_JOINED", "ACT_BUY", "ACT_SELL", "ACT_BONUS",
+           "ACT_BONUS_ZERO", "STORE_ONCE",
            "ROW_TABLE", "parser_sig", "parser_deps", "top_level",
            "parse_api_leagues", "parse_api_market", "parse_api_activity",
            "parse_api_teams", "sign_api_leagues", "sign_api_market",
@@ -1768,7 +1769,17 @@ STORE_ONCE = {"api_activity": ("activity_id",),
 ROW_TABLE = "table"
 
 ACT_JOINED, ACT_BUY, ACT_SELL = 9, 31, 33
-ACT_KIND = {ACT_JOINED: "joined", ACT_BUY: "buy", ACT_SELL: "sell"}
+# The per-jornada performance prize — confirmed empirically (2026-09-12) at
+# a flat 100,000/point, same rate for every manager regardless of standing.
+# ACT_BONUS_ZERO is the same event shape with the `amount` key dropped
+# instead of set to 0, for a jornada where the manager scored zero points.
+# NOT the same thing as the daily "watch a video" bonus, which is a private,
+# per-manager habit this feed carries no trace of at all — seen or not, it
+# stays outside this reconstruction. Why:
+# docs/notes/league.md#the-weekly-performance-bonus-vs-the-video-bonus
+ACT_BONUS, ACT_BONUS_ZERO = 6, 7
+ACT_KIND = {ACT_JOINED: "joined", ACT_BUY: "buy", ACT_SELL: "sell",
+           ACT_BONUS: "bonus", ACT_BONUS_ZERO: "bonus"}
 
 
 def _j(text: str):
@@ -1915,6 +1926,11 @@ def parse_api_activity(text: str, observed_at: str,
     Rows are stamped with the kind rather than the raw id, because 31 and 33
     are meaningless three months from now and the mapping was established
     empirically (see ACT_KIND).
+
+    A "bonus" row (kind == "bonus") is the weekly performance prize, not a
+    transfer — it carries no `player_id` and instead names the jornada in
+    `week`, so a reader must branch on `kind` rather than assume every row
+    describes a buy or sell.
     """
     d = _j(text)
     if not isinstance(d, list):
@@ -1932,6 +1948,7 @@ def parse_api_activity(text: str, observed_at: str,
             "user_id": str(a.get("user1Id") or ""),
             "player_id": str(a.get("playerMasterId") or ""),
             "amount": str(a.get("amount") or ""),
+            "week": str(a.get("weekNumber") or ""),
         })
     return rows
 
@@ -2799,7 +2816,11 @@ _API_ACTIVITY_FIXTURE = """[
  {"id":"a3","activityTypeId":9,"amount":0,"playerMasterId":null,
   "user1Id":3480702,"createdAt":"2026-08-10T22:24:00+02:00"},
  {"id":"a4","activityTypeId":77,"amount":1,"playerMasterId":1,"user1Id":1,
-  "createdAt":"2026-08-10T22:24:00+02:00"}]"""
+  "createdAt":"2026-08-10T22:24:00+02:00"},
+ {"id":"a5","activityTypeId":6,"amount":2200000,"weekNumber":2,
+  "user1Id":3480702,"createdAt":"2026-08-25T04:28:22+02:00"},
+ {"id":"a6","activityTypeId":7,"weekNumber":3,
+  "user1Id":3480702,"createdAt":"2026-09-01T04:34:11+02:00"}]"""
 
 _API_TEAMS_FIXTURE = """[
  {"id":"38091967","position":3,"previousPosition":5,"teamPoints":17,
@@ -3464,9 +3485,14 @@ def _selftest() -> None:
                                     '"status":"accepted"'))
 
     ac = parse_api_activity(_API_ACTIVITY_FIXTURE, "t")
-    # Three known verbs kept, the unknown 77 dropped rather than guessed at.
-    assert [r["kind"] for r in ac] == ["buy", "sell", "joined"], ac
+    # Known verbs kept, the unknown 77 dropped rather than guessed at.
+    assert ([r["kind"] for r in ac] ==
+            ["buy", "sell", "joined", "bonus", "bonus"]), ac
     assert ac[0]["amount"] == "58220110" and ac[0]["user_id"] == "11881989"
+    # The bonus rows: a paid week and 7's zero-amount variant, both "bonus",
+    # both carrying the jornada in `week` instead of a `player_id`.
+    assert ac[3]["week"] == "2" and ac[3]["amount"] == "2200000", ac[3]
+    assert ac[4]["week"] == "3" and ac[4]["amount"] == "", ac[4]
     assert sign_api_activity(_API_ACTIVITY_FIXTURE) is not None
     # Reordering the feed is not a change; a new row is.
     import json as _json

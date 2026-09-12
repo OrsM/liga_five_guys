@@ -38,13 +38,13 @@ from ffcore.text import norm
 from ffcore.tidy import (load_crosswalk,  # noqa: E402
                          run_now,  # noqa: E402
                          Market, input_path, ledger_stamp,
-                         load_api_standings, load_api_teams,
+                         load_api_activity, load_api_standings, load_api_teams,
                          load_market_frozen, price_agrees, read_ledger,
                          snapshot_stamp)
 
 __all__ = ["MARKET", "Config", "load_config", "read_rosters", "identify",
            "read_api_balances", "owner_from_api", "api_key", "owner_drift",
-           "app_ids_known", "app_fielded", "flat_income",
+           "app_ids_known", "app_fielded", "flat_income", "bonus_income",
            "allowance",
            "replay", "Cash", "Manager", "League"]
 
@@ -223,14 +223,41 @@ def read_api_balances(rows=None) -> dict[str, tuple[float, str]]:
 def flat_income(observed, budget: float, bought: float, sold: float):
     """What the app has paid the account beyond its transfers, or None.
 
-    Measured on your own row (the one account with an observed balance) and
-    credited to rivals equally, on the assumption the app pays everyone
-    alike. Never negative — see docs/notes/league.md#rival-cash-income-measurement-flat_income
-    for why (a real balance-vs-ledger gap and the number it corrected).
+    Measured on your own row (the one account with an observed balance).
+    USED TO be credited to rivals equally too, on the assumption the app
+    pays everyone alike — wrong (2026-09-12): it bundles two things, a
+    per-manager jornada performance prize (see bonus_income, now the real
+    source for a rival) and a private "watch a video" daily bonus that
+    stays a genuine per-manager unknown. This is now only the fallback for
+    a manager bonus_income has no rows for at all. Never negative — see
+    docs/notes/league.md#rival-cash-income-measurement-flat_income for why
+    (a real balance-vs-ledger gap and the number it corrected).
     """
     if observed is None:
         return None
     return max(0.0, observed - (budget + sold - bought))
+
+
+def bonus_income(activity: list[dict], users: dict) -> dict[str, float]:
+    """Each manager's own weekly performance-prize total, by handle.
+
+    Summed from `kind == "bonus"` rows (sources.ACT_BONUS/ACT_BONUS_ZERO) —
+    the flat 100,000/point-scored jornada prize, confirmed empirically
+    2026-09-12 to be the SAME rate for everyone, not a flat total everyone
+    receives alike (that was flat_income's wrong assumption). A manager
+    absent here has no bonus activity in the feed at all, not necessarily
+    zero income — the caller falls back to flat_income for them. Why:
+    docs/notes/league.md#the-weekly-performance-bonus-vs-the-video-bonus
+    """
+    out: dict[str, float] = {}
+    for r in activity:
+        if r.get("kind") != "bonus":
+            continue
+        who = users.get(str(r.get("user_id") or ""))
+        if not who:
+            continue
+        out[who] = out.get(who, 0.0) + (money(r.get("amount")) or 0.0)
+    return out
 
 
 def allowance(since, now, daily_bonus: float) -> tuple[float, float]:
@@ -848,6 +875,20 @@ class League:
                     sd += price
             paid = flat_income(me_anchor[0], self.cfg.budget, b, sd)
 
+        # Each manager's OWN weekly performance prize (bonus_income), not
+        # your `paid` copied onto them — confirmed 2026-09-12 that the prize
+        # rate is flat (100,000/point) but the POINTS are not, so the total
+        # differs sharply per manager and grows every jornada. `paid` above
+        # stays the fallback for a manager the feed has no bonus rows for at
+        # all (a fresh join, a gap in retention) and for your own row when
+        # you have no anchor. Why:
+        # docs/notes/league.md#the-weekly-performance-bonus-vs-the-video-bonus
+        users = {r.get("user_id"): r.get("manager")
+                 for r in (self._standings if self._standings is not None
+                          else load_api_standings())
+                 if r.get("user_id") and r.get("manager")}
+        own_bonus = bonus_income(load_api_activity(), users)
+
         for handle, mgr in self.managers.items():
             # One budget for everyone — a per-manager override sat unused in
             # league.ini for a year and was removed.
@@ -898,16 +939,32 @@ class League:
             # The daily allowance, by the anchor's AGE not its label (every
             # anchor is owed it, only ADDS). Why:
             # docs/notes/league.md#the-daily-allowance-backfill-allowance
-            if since is None and paid is not None:
-                # A rival with no anchor: your own measured `paid` (flat_income)
-                # is a better estimate than guessing how long the app has paid.
+            bonus_note = None
+            if since is None and handle in own_bonus:
+                # A rival with no anchor: THEIR OWN recorded weekly prize,
+                # not yours — see bonus_income().
+                bonus, days = own_bonus[handle], None
+                bonus_note = ("%.2fM of their own weekly performance bonus, "
+                              "recorded in the app's activity feed"
+                              % (bonus / 1e6))
+            elif since is None and paid is not None:
+                # No bonus rows for them at all (fresh join, feed gap): your
+                # own measured `paid` (flat_income) is a better estimate than
+                # guessing how long the app has paid, but it is a fallback,
+                # not the preferred source — see flat_income()'s docstring.
                 bonus, days = paid, None
+                bonus_note = ("%.2fM the app has paid you since the season "
+                              "began (no bonus activity found for them, so "
+                              "yours stands in)" % (bonus / 1e6))
             else:
                 start = since or min(
                     (ledger_stamp(t.get("date", "")) for t in self.txns
                      if ledger_stamp(t.get("date", ""))), default=None)
                 bonus, days = allowance(start, run_now(),
                                         self.cfg.daily_bonus)
+                if days is not None:
+                    bonus_note = ("%.2fM of daily allowance over %.0f days"
+                                  % (bonus / 1e6, days))
 
             value = base + sold - bought + bonus
             # Every term, not just the answer — checkable against the ledger
@@ -915,11 +972,7 @@ class League:
             math = ("%s − %.2fM bought + %.2fM sold across %d ledger row(s)"
                     "%s = %.2fM"
                     % (basis, bought / 1e6, sold / 1e6, counted,
-                       ((" + %.2fM of daily allowance over %.0f days"
-                         % (bonus / 1e6, days)) if days is not None
-                        else (" + %.2fM the app has paid you since the season "
-                              "began, which it pays everyone" % (bonus / 1e6)))
-                       if bonus else "",
+                       ((" + " + bonus_note) if bonus_note else ""),
                        value / 1e6))
             if value < 0:
                 # A real, overdrawn position, not an input error — see the
