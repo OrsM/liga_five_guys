@@ -149,10 +149,15 @@ class Standings:
 
     def band(self, manager: str, lo=0.1, hi=0.9) -> tuple[float, float]:
         """Central interval. The number people actually need, because a mean
-        with no spread beside it reads as a prediction."""
-        v = sorted(self.totals.get(manager) or [0.0])
-        n = len(v)
-        return v[max(0, int(lo * n))], v[min(n - 1, int(hi * n))]
+        with no spread beside it reads as a prediction.
+
+        Via stats.percentile() (statistics.quantiles), not a hand-indexed
+        sorted list — the same tested percentile math decide.band() and
+        stats.bootstrap_gap() use, not a third near-identical spelling of it.
+        """
+        from stats import percentile
+        v = self.totals.get(manager) or [0.0]
+        return percentile(v, lo * 100), percentile(v, hi * 100)
 
     def beat(self, rival: str, manager: str = "") -> float:
         """P(manager finishes strictly above rival). Ties count as halves —

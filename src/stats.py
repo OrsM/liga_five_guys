@@ -15,6 +15,23 @@ Monte Carlo trials at scale, not for a small-n stat like this.
 """
 
 import random
+import statistics
+
+
+def percentile(data: list[float], p: float) -> float:
+    """The p-th percentile (0-100) of `data`, via `statistics.quantiles` —
+    the stdlib's own tested percentile math, not each caller hand-indexing
+    a sorted list (`v[int(p/100 * len(v))]`, three near-identical spellings
+    of this across decide.py/season.py/stats.py itself before 2026-09-12).
+
+    < 2 points has no distribution to cut, so the single value (or 0.0 for
+    none) stands in for every percentile of it — the same degenerate case
+    bootstrap_gap() already documents for a 1-element list.
+    """
+    if len(data) < 2:
+        return float(data[0]) if data else 0.0
+    cuts = statistics.quantiles(sorted(data), n=100, method="inclusive")
+    return cuts[min(max(round(p), 1), 99) - 1]
 
 
 def bootstrap_gap(a: list[float], b: list[float], n_boot: int = 2000,
@@ -37,10 +54,9 @@ def bootstrap_gap(a: list[float], b: list[float], n_boot: int = 2000,
         ra = rng.choices(a, k=len(a))
         rb = rng.choices(b, k=len(b))
         diffs.append(sum(ra) / len(ra) - sum(rb) / len(rb))
-    diffs.sort()
     tail = (1 - ci) / 2
-    lo = diffs[int(tail * n_boot)]
-    hi = diffs[int((1 - tail) * n_boot) - 1]
+    lo = percentile(diffs, tail * 100)
+    hi = percentile(diffs, (1 - tail) * 100)
     return {"n_a": len(a), "n_b": len(b), "diff": diff, "lo": lo, "hi": hi,
            "beats": hi < 0}
 
@@ -60,7 +76,18 @@ def _selftest() -> None:
     # Empty input never crashes.
     assert bootstrap_gap([], [1.0]) is None
     assert bootstrap_gap([1.0], []) is None
-    print("stats self-test OK (3 cases)")
+
+    data = list(range(1, 101))  # 1..100 — the p-th percentile is ~p
+    # (interpolated, so not exactly integer-equal — statistics.quantiles'
+    # own inclusive method, not a hand-rolled index, decides the exact
+    # figure; this just pins it to the right neighbourhood.)
+    assert abs(percentile(data, 10) - 10) < 1.5, percentile(data, 10)
+    assert abs(percentile(data, 50) - 50) < 1.5, percentile(data, 50)
+    assert abs(percentile(data, 90) - 90) < 1.5, percentile(data, 90)
+    assert percentile(data, 10) < percentile(data, 50) < percentile(data, 90)
+    assert percentile([], 50) == 0.0
+    assert percentile([7.0], 10) == percentile([7.0], 90) == 7.0
+    print("stats self-test OK (4 cases)")
 
 
 if __name__ == "__main__":

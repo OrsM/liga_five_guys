@@ -868,40 +868,20 @@ def caveats(u) -> list[str]:
 VALUE_TOLERANCE = 0.90
 
 def _move_rank_key(r, u):
-    """RELIABLE ROUTES FIRST, THEN BY `pts_lo` (10th percentile of the
-    move's own paired trial distribution) — ONE metric, the same one
-    `_best()` uses for the single headline pick, now for the WHOLE ladder
-    too. Miguel, 2026-09-06: "the whole ladder should follow same logic
-    why wouldn't it?" — a fair challenge to an earlier hedge that this was
-    "separate, larger, not-yet-validated." Checked, not assumed:
-    `backtest.replay_ladder_percentile()` replays real historical top-3
-    ladders against real outcomes, though a 2026-09-11 audit found the
-    ORIGINAL version of this check (open-ended "score every jornada from
-    the episode's day to now") let an arm's episode turnover rate inflate
-    or deflate its apparent total — the "-94 vs +90" reading this docstring
-    used to cite was itself a measurement artifact, not a clean result.
-    Re-run on a fixed-horizon harness (`HORIZON_DAYS`, `stats.bootstrap_gap`
-    for a real significance test): at today's still-small n (72-78 graded
-    episodes per arm), pts_lo and the tiered scheme it replaced are NOT
-    significantly different (90% CI on the per-episode gap straddles
-    zero), and the shipped arm's own real net is positive, not the
-    negative figure once reported. This is an open question again, not a
-    closed one — kept as the live ranking on the OTHER reasoning below
-    (pts_lo already shares d_win's own Monte Carlo draws, at a quantile
-    that structurally penalises a distant, DRIFT_FRAC-widened case the
-    same way a real risk-averse read would), not because history has
-    settled it either way yet.
-    Why: docs/notes/sim.md#ladder_rows--pts_lo-ranking-re-audited-2026-09-11
+    """RELIABLE ROUTES FIRST, THEN BY `d_pts` (season points gained) — ONE
+    metric, the same one `_best()` uses for the single headline pick, and
+    the same one decide.rank() itself now screens and orders by.
 
-    RETIRED, ON THE ORIGINAL REASONING (still the live design, evidence
-    permitting): the value-floor/win-probability tiering
-    (`MOVES_VALUE_FLOOR`, `VALUE_TOLERANCE`'s ladder use, d_win leading
-    outright) that used to sit here. `pts_lo` already reflects the SAME
-    Monte Carlo draws `d_win` is read off, at a quantile that structurally
-    penalises risk the same way treating win-probability as an
-    unrelated axis needing its own escape hatch — a simpler rule beating
-    the accumulated special-casing, same lesson as this session's earlier
-    "the book" simplification pass. Full history of the retired scheme:
+    RANKS BY POINTS, NOT `pts_lo` (10th percentile of the move's own paired
+    trial distribution) — reversed 2026-09-12. `pts_lo`'s own prior
+    backtest (`backtest.replay_ladder_percentile()`, fixed-horizon,
+    `stats.bootstrap_gap` for real significance) never showed it beating a
+    simpler scheme: at 72-78 graded episodes per arm, the 90% CI on the
+    per-episode gap straddled zero. Miguel, 2026-09-12, on being shown that
+    result: "it doesn't sound clearly better than ranking by incr points or
+    any other metric" — asked directly and chose points. `pts_lo`/`pts_hi`
+    still ride on every row as the error bar a reader sees; they no longer
+    decide the order. Full history of the retired quantile-ranking scheme:
     docs/notes/sim.md#_move_rank_key--pts_lo-not-mean-d_pos-or-value-2026-09-06
 
     SHARED KEY, not two independent sorts — `ladder_rows()`'s BUY group
@@ -917,13 +897,13 @@ def _move_rank_key(r, u):
     free-agent or clause buy, it is a route that has never once actually
     gone through in this league. Demoted here, not removed: a real listed
     opportunity stays fully visible, just under routes that cannot be
-    refused. A row with no `pts_lo` at all (shouldn't happen off a real
+    refused. A row with no `d_pts` at all (shouldn't happen off a real
     `rank()` row, but a hand-built one might lack it) sorts last within
     its reliability tier rather than crashing or guessing a value.
     """
     reliable = 0 if u.route.get(r["action"].buy, "free") != "listed" else 1
-    lo = r.get("pts_lo")
-    return (reliable, -lo if lo is not None else float("inf"))
+    d = r.get("d_pts")
+    return (reliable, -d if d is not None else float("inf"))
 
 def _best(u, rows, rivals):
     """(the top move, or None; whether it needs a rival's own cooperation).
@@ -945,69 +925,45 @@ def _best(u, rows, rivals):
 
     VALUE FOR MONEY, NOT JUST THE BIGGEST GAIN, within whichever pool (reliable
     or, on a day nothing reliable helps, the full list) is in play. Finds the
-    biggest raw d_pos in `pool` directly (does NOT assume `rows` arrives
+    biggest `d_pts` in `pool` directly (does NOT assume `rows` arrives
     sorted — `decide.rank()`'s own row order is an internal screening detail,
     and `payload()` independently resorts its own copy for the report table;
-    a caller handing this any order gets the same answer) — the single
-    biggest season-long standings gain used to win this outright, however
-    much it cost — a move netting +0.31 places for -40M beat one netting
-    +0.29 for -2M, spending 20x the cash for 7% more gain and leaving
-    nothing for whatever comes up later in the season. `d_pts`/`value`
-    (points per net £M) were already computed by rank() for every row and
-    shown in the report's own table; this is the first place that number
-    changes what gets RECOMMENDED, not just what gets displayed.
+    a caller handing this any order gets the same answer).
 
-    PICKS BY `pts_lo` (10th percentile of the move's own paired trial
-    distribution), NOT MEAN `d_pos` — Miguel, 2026-09-06: "we buy for the
-    whole season... let's end up with a single metric." Two equal-mean
-    candidates are not equally good if one's gain leans on distant,
-    DRIFT_FRAC-widened jornadas and the other's is mostly near-term and
-    solid — `pts_lo` is naturally lower for the first, higher for the
-    second, at an IDENTICAL mean, with no invented time-discount constant:
-    it's the same uncertainty machinery (rate_rel, club_rel, DRIFT_FRAC)
-    already validated this session, just read at a different quantile.
-    Checked against real history before being wired in here, not on theory
-    alone: `backtest.replay_percentile_rank()` replays real past
-    reports/decisions.json commits with this exact substitution. The
-    original reading (+64 vs +31 real points) came from an open-ended
-    scoring window a 2026-09-11 audit found let episode turnover distort
-    the comparison — re-run on a fixed-horizon harness with a real
-    bootstrap significance test, the two rules are currently NOT
-    significantly different at this still-small n (19 vs 16 graded
-    episodes). Kept on the structural argument above (same uncertainty
-    machinery as d_win, a real quantile not an invented constant), not
-    because history has decided it yet — see that function's own docstring
-    for the one disclosed limit (it can only re-rank candidates
-    `candidates`/`pool` below ALREADY admit, same as here; it cannot
-    rescue one `d_pos > 0 or d_win > 0` already excludes).
-    Why: docs/notes/sim.md#ladder_rows--pts_lo-ranking-re-audited-2026-09-11
-    NOT changed: `candidates`'s own eligibility gate (still `d_pos`/
-    `d_win`), the reliable-routes-first split, and the VALUE_TOLERANCE
-    cheaper-alternative refinement below — this is a single, targeted
-    substitution of WHICH admitted candidate wins, not a rebuild of the
-    screen around it. `_move_rank_key()`'s own ordering of the wider
-    ladder (every BUY/RAID row, not just this single headline pick) is a
-    separate, larger, not-yet-validated question — left as mean-`d_pos`
-    for now.
+    PICKS BY `d_pts` (season points gained, the paired trial mean/median) —
+    reversed 2026-09-12 from the `pts_lo` quantile this used before. That
+    substitution was itself checked against real history
+    (`backtest.replay_percentile_rank()`) and never showed a real edge: at
+    19-vs-16 graded episodes the two rules were not significantly different,
+    and the ORIGINAL open-ended-window reading that motivated the switch was
+    later found to be a measurement artifact (episode-turnover-inflated),
+    not a clean result — see `_move_rank_key()`'s own docstring for that
+    full history. Miguel, 2026-09-12, on being shown this: ranking on an
+    unproven risk-adjusted quantile instead of the point estimate itself
+    "doesn't sound clearly better" — chosen back to points, the metric this
+    whole pipeline is meant to be about.
     Why: docs/notes/sim.md#_best--pts_lo-not-mean-d_pos-2026-09-06
+
+    NOT changed: `candidates`'s own eligibility gate (now `d_pts > 0`, the
+    same points-only reasoning), the reliable-routes-first split, and the
+    VALUE_TOLERANCE cheaper-alternative refinement below.
     """
-    candidates = [r for r in rows if r["d_pos"] > 0 or r["d_win"] > 0]
+    candidates = [r for r in rows if r["d_pts"] > 0]
     if not candidates:
         return None, False
     reliable = [r for r in candidates
                if u.route.get(r["action"].buy, "free") != "listed"]
     pool, uncertain = (reliable, False) if reliable else (candidates, True)
-    best = max(pool, key=lambda r: r["pts_lo"])
+    best = max(pool, key=lambda r: r["d_pts"])
     # ONLY COMPARED FOR A GENUINE SPEND (net > 0) on a move that actually
-    # improves expected position (d_pos > 0) — the same guard value_rate()
-    # itself uses, and for the same reason: a move that raises more than it
-    # costs, or one whose whole gain is win-probability rather than
-    # position, has no "cash saved by going cheaper" to weigh against.
-    if best["d_pos"] <= 0 or best["action"].net <= 0:
+    # gains season points (d_pts > 0) — the same guard value_rate() itself
+    # uses, and for the same reason: a move that raises more than it costs
+    # has no "cash saved by going cheaper" to weigh against.
+    if best["d_pts"] <= 0 or best["action"].net <= 0:
         return best, uncertain
-    floor = VALUE_TOLERANCE * best["d_pos"]
+    floor = VALUE_TOLERANCE * best["d_pts"]
     cheaper = [r for r in pool
-              if r["d_pos"] >= floor and r["action"].net < best["action"].net]
+              if r["d_pts"] >= floor and r["action"].net < best["action"].net]
     if cheaper:
         best = min(cheaper, key=lambda r: r["action"].net)
     return best, uncertain
@@ -1067,9 +1023,9 @@ def alert_lines(u, rows, rivals) -> list[str]:
         # Said outright, not left for Miguel to notice on his own — this is
         # the one case where "Do this" is not actually guaranteed to happen.
         cost += " · needs the seller to accept, not guaranteed"
-    return ["**Do this** — %s (%+.2f places, %+.0f%% to win, %s)"
+    return ["**Do this** — %s (%+.0f season pts, %+.0f%% to win, %s)"
             % (a.label({k: title_name(v) for k, v in u.name.items()}),
-               best["d_pos"], 100 * best["d_win"], cost)]
+               best["d_pts"], 100 * best["d_win"], cost)]
 
 
 def shape(u, keys) -> str:
@@ -1147,7 +1103,7 @@ def payload(u, rows, base, rivals, locks_h=None, n_actions: int = 0,
             # Who holds him, which is not the same as a victim: a man bought
             # off the market was not taken off anybody.
             "owner": u.owner.get(a.buy, "") if a.buy else "",
-            "d_pos": r["d_pos"], "d_win": r["d_win"], "net": -a.net,
+            "net_pts": r["net_pts"], "d_win": r["d_win"], "net": -a.net,
             # The paired pair — how many more points, and how often. These are
             # what the phone should draw: a per-row P(win) moved 48 points on
             # a recalibration and these moved six.
@@ -1379,8 +1335,8 @@ def _selftest() -> None:
     # NO SENTENCES. The header is a data line, and a negative balance is a
     # bold number rather than a paragraph about being overdrawn.
     assert "." not in h.replace("1.50", "").replace("41.1", "") \
-        .replace("0.00", "").replace("23.60M", "").replace("1,000", "") \
-        .replace("1,600", "") or True
+        .replace("0.00", "").replace("23.60M", "").replace("1,060", "") \
+        .replace("1,540", "") or True
     u.cash = -133023.0
     assert "**cash -133K**" in " ".join(header(u, st, 1, locks_h=2.0))
     u.cash = 23.6e6
@@ -1395,7 +1351,10 @@ def _selftest() -> None:
     assert "locked" not in " ".join(header(u, st, 1, locks_h=2.0))
     assert "1.50" in h, h                    # expected finish
     assert "50%" in h, h                     # P(win)
-    assert "1,000" in h and "1,600" in h, h  # the 10-90 band, in points
+    # 10-90 band, in points — via stats.percentile()'s real interpolation
+    # (statistics.quantiles), not the old hand-indexed [v[0], v[-1]] which
+    # happened to land on the raw extremes for this 4-point fixture.
+    assert "1,060" in h and "1,540" in h, h
     # The metadata that used to sit here — jornadas left, players acquirable,
     # moves simulated — is about the RUN, not the position, and moved to the
     # appendix with the rest of the workings.
@@ -1414,7 +1373,7 @@ def _selftest() -> None:
     # render() below are still real callers and still need one.
     rows = [{"action": Action("clause", buy="yuri", sell="benat",
                               cost=20e6, proceeds=5.87e6, victim="riv"),
-             "d_pos": 0.433, "d_win": 0.364, "d_beat": {"riv": 0.37},
+             "net_pts": 0.433, "d_win": 0.364, "d_beat": {"riv": 0.37},
              "d_pts": 120.0, "pts_lo": 43.3, "pts_hi": 210.0,
              "helps": 0.90, "mean": 1510.0,
              "value": 120.0 / (14.13e6 / 1e6)}]
@@ -1621,7 +1580,7 @@ def _selftest() -> None:
     d3 = payload(u, rows, st3, ["riv"])
     assert d3["p_win"] == round(1 / 3, 3) == 0.333, d3["p_win"]
     assert len(str(d3["p_win"]).split(".")[-1]) <= 3, d3["p_win"]
-    assert d["band"] == [1000.0, 1600.0], d
+    assert d["band"] == [1060.0, 1540.0], d
     assert d["locks_in_h"] == 41.1 and d["cash"] == 23.6e6
     assert d["cash_locked"] == 0.0, d          # nothing pending, nothing to say
     u.locked_cash = 2.1e6
@@ -1639,7 +1598,7 @@ def _selftest() -> None:
     assert two["sell"] == "Benat Turrientes + Yuri Berchiche", two
     assert two["sell_n"] == 2 and m["sell_n"] == 1, (two, m)
     assert m["victim"] == "riv" and m["kind"] == "clause"
-    assert m["d_pos"] == 0.433 and m["d_win"] == 0.364
+    assert m["net_pts"] == 0.433 and m["d_win"] == 0.364
     # The phone draws the destination too, so it is computed once here rather
     # than added to a base figure by every renderer that wants it.
     assert abs(m["p_win_after"] - (0.5 + 0.364)) < 1e-9, m
@@ -1659,29 +1618,35 @@ def _selftest() -> None:
     assert d["standings"][0]["me"] is True
     assert d["standings"][1]["p_above"] == 0.5
 
-    # -- payload()'s `moves` order: by pts_lo, not mean d_pos/value/d_win --
-    # (2026-09-06, replacing the retired bar-then-value/d_win-leads tiering
-    # — see _move_rank_key()'s own note on the real-history validation).
-    # A is the biggest MEAN gain but the widest, riskiest downside; B is a
-    # smaller mean but a genuinely safer floor; C is tiny everywhere. Order
-    # is by pts_lo alone: B (safest) leads, A second, C last.
-    row_a = {"action": Action("buy", buy="A", cost=40e6), "d_pos": 0.40,
-             "d_win": 0.0, "d_beat": {}, "value": 2.0, "pts_lo": -30.0}
-    row_b = {"action": Action("buy", buy="B", cost=1e6), "d_pos": 0.15,
-             "d_win": 0.0, "d_beat": {}, "value": 50.0, "pts_lo": 10.0}
-    row_c = {"action": Action("buy", buy="C", cost=1e4), "d_pos": 0.02,
-             "d_win": 0.0, "d_beat": {}, "value": 500.0, "pts_lo": -80.0}
+    # -- payload()'s `moves` order: by d_pts, not pts_lo/value/d_win --------
+    # (2026-09-12, reversing the 2026-09-06 pts_lo substitution — see
+    # _move_rank_key()'s own note on the real-history validation that never
+    # showed pts_lo beating this). A has the biggest season-points gain but
+    # the widest, riskiest downside (worst pts_lo); B is a smaller gain but
+    # a genuinely safer floor; C is tiny everywhere. Order is by d_pts
+    # alone: A (biggest gain) leads, B second, C last — pts_lo no longer
+    # overturns it.
+    row_a = {"action": Action("buy", buy="A", cost=40e6), "net_pts": 0.40,
+             "d_win": 0.0, "d_beat": {}, "value": 2.0,
+             "d_pts": 40.0, "pts_lo": -30.0}
+    row_b = {"action": Action("buy", buy="B", cost=1e6), "net_pts": 0.15,
+             "d_win": 0.0, "d_beat": {}, "value": 50.0,
+             "d_pts": 15.0, "pts_lo": 10.0}
+    row_c = {"action": Action("buy", buy="C", cost=1e4), "net_pts": 0.02,
+             "d_win": 0.0, "d_beat": {}, "value": 500.0,
+             "d_pts": 2.0, "pts_lo": -80.0}
     order = [m["buy"] for m in payload(u, [row_a, row_b, row_c], st,
                                        ["riv"])["moves"]]
-    assert order == ["B", "A", "C"], order
+    assert order == ["A", "B", "C"], order
     # A HIGH d_win no longer buys outright priority — RETIRED behaviour,
     # on purpose: W's win-probability is the biggest of the three, but its
-    # pts_lo is the worst, and pts_lo alone now decides.
-    row_win = {"action": Action("buy", buy="W", cost=40e6), "d_pos": 0.05,
-              "d_win": 0.10, "d_beat": {}, "value": 1.0, "pts_lo": -50.0}
+    # d_pts is the smallest, and d_pts alone now decides.
+    row_win = {"action": Action("buy", buy="W", cost=40e6), "net_pts": 0.05,
+              "d_win": 0.10, "d_beat": {}, "value": 1.0,
+              "d_pts": 5.0, "pts_lo": -50.0}
     order_win = [m["buy"] for m in payload(u, [row_a, row_win, row_b], st,
                                            ["riv"])["moves"]]
-    assert order_win == ["B", "A", "W"], order_win
+    assert order_win == ["A", "B", "W"], order_win
 
     # -- the notification surface ------------------------------------------
     # What is worth interrupting somebody for: the best move, and nothing
@@ -1690,7 +1655,7 @@ def _selftest() -> None:
     assert len(al) == 1 and "Yuri Berchiche" in al[0] and "+36%" in al[0], al
     assert "€14.1M" in al[0], al       # net cost travels with the headline
     assert alert_lines(u, [], ["riv"]) == []
-    flat = [{**rows[0], "d_pos": 0.0, "d_win": 0.0}]
+    flat = [{**rows[0], "net_pts": 0.0, "d_win": 0.0, "d_pts": 0.0}]
     assert alert_lines(u, flat, ["riv"]) == [], "a move worth nothing is not news"
 
     # -- _price_note()'s idle-cash line (2026-09-06, Miguel: "the cash is
@@ -1711,57 +1676,56 @@ def _selftest() -> None:
 
     # -- value for money: a materially cheaper near-match beats the
     # biggest raw gain, but only when it keeps enough of it -----------
-    # rows[0]: d_pos=0.433, net=14.13M — the "biggest gain, whatever it
-    # costs" pick under the old rule.
-    # pts_lo scaled with d_pos (d_pos * 100) for every fixture below, so
-    # these EXISTING value-for-money assertions keep exercising exactly the
-    # logic they always did (same relative ordering as the retired
-    # d_pos-based initial pick) — the dedicated "equal mean, safer downside
-    # wins" cases further down are what actually exercises the NEW pts_lo
-    # substitution itself.
+    # rows[0]: d_pts=120.0, net=14.13M — the "biggest gain, whatever it
+    # costs" pick.
     cheap_ok = {**rows[0],
                 "action": Action("buy", buy="cheap", cost=2e6, proceeds=0.0),
-                "d_pos": 0.40, "d_win": 0.30, "pts_lo": 40.0}
-    # 92% of 0.433, 1/7th the cost
+                "net_pts": 0.40, "d_win": 0.30, "d_pts": 110.4, "pts_lo": 40.0}
+    # 92% of 120.0, 1/7th the cost
     assert _best(u, [rows[0], cheap_ok], ["riv"]) == (cheap_ok, False), \
         "a move keeping 90%+ of the best gain for a fraction of the cost wins"
     cheap_bad = {**rows[0],
                  "action": Action("buy", buy="cheap", cost=2e6, proceeds=0.0),
-                 "d_pos": 0.30, "d_win": 0.20, "pts_lo": 30.0}
-    # 69% of 0.433 — below the floor
+                 "net_pts": 0.30, "d_win": 0.20, "d_pts": 82.8, "pts_lo": 30.0}
+    # 69% of 120.0 — below the floor
     assert _best(u, [rows[0], cheap_bad], ["riv"]) == (rows[0], False), \
         "a cheaper move that gives up too much of the gain does not win"
     free = {**rows[0],
             "action": Action("sell", sell=("dead",), cost=0.0, proceeds=1e6),
-            "d_pos": 0.40, "d_win": 0.30, "pts_lo": 40.0}
+            "net_pts": 0.40, "d_win": 0.30, "d_pts": 110.4, "pts_lo": 40.0}
     assert _best(u, [rows[0], free], ["riv"]) == (free, False), \
         "a self-funding move within reach of the best gain wins outright"
-    # A pure-win-probability gain (d_pos <= 0) has no "% of the best gain"
-    # to compare against — the cost guard is skipped, not divided by zero.
+    # A ZERO season-points gain is not eligible at all, even with a real
+    # win-probability move alongside it — POINTS ONLY, no OR-with-d_win
+    # escape hatch. Miguel, 2026-09-12: "P_win is an output of points, we
+    # should focus on points" — a pure win-probability "gain" with no
+    # points behind it is not a candidate any more.
     winonly = {**rows[0], "action": Action("buy", buy="x", cost=1e6),
-              "d_pos": 0.0, "d_win": 0.05, "pts_lo": 0.0}
-    assert _best(u, [winonly], ["riv"]) == (winonly, False)
+              "net_pts": 0.0, "d_win": 0.05, "d_pts": 0.0, "pts_lo": 0.0}
+    assert _best(u, [winonly], ["riv"]) == (None, False)
 
-    # -- the NEW substitution itself: equal mean d_pos and equal cost, only
-    # the downside (pts_lo) differs — Miguel, 2026-09-06: "let's end up
-    # with a single metric" that folds in "upcoming matches are worth
-    # more" WITHOUT an invented time-discount (see _best()'s own docstring
-    # for the reasoning and the real-history validation this was checked
-    # against before being wired in) --------------------------------------
+    # -- pts_lo is no longer decision-driving: two candidates tied on
+    # d_pts (season points) pick the same winner however different their
+    # pts_lo is, and however they're ordered — reversed 2026-09-12 from the
+    # 2026-09-06 substitution this used to test (see _best()'s own
+    # docstring for why: the backtest that motivated it never showed a real
+    # edge, and Miguel asked to go back to ranking on points) ------------
     safer = {**rows[0],
              "action": Action("clause", buy="safer", sell="benat",
                               cost=20e6, proceeds=5.87e6, victim="riv"),
-             "pts_lo": 80.0}      # same d_pos/net as rows[0], safer downside
-    assert _best(u, [rows[0], safer], ["riv"]) == (safer, False), \
-        "equal mean, safer downside (higher pts_lo) wins the initial pick"
-    assert _best(u, [safer, rows[0]], ["riv"]) == (safer, False), \
-        "order must not change it either"
+             "pts_lo": 80.0}      # same d_pts/net as rows[0], different pts_lo
     riskier = {**rows[0],
                "action": Action("clause", buy="riskier", sell="benat",
                                 cost=20e6, proceeds=5.87e6, victim="riv"),
-               "pts_lo": -10.0}   # same mean, WORSE downside than rows[0]
-    assert _best(u, [riskier, rows[0]], ["riv"]) == (rows[0], False), \
-        "equal mean, riskier downside loses even though it came first"
+               "pts_lo": -10.0}   # same d_pts, WORSE pts_lo
+    # Tied on d_pts, so `max()`'s own first-occurrence tie-break decides —
+    # NOT pts_lo. Under the old rule "riskier" (much worse pts_lo) always
+    # lost, even coming first; now it WINS when it comes first, proving
+    # pts_lo no longer overrides the tie.
+    best1, _ = _best(u, [safer, riskier], ["riv"])
+    assert best1["action"].buy == "safer", best1
+    best2, _ = _best(u, [riskier, safer], ["riv"])
+    assert best2["action"].buy == "riskier", best2
 
     # -- reliable routes first: a "listed" move (a rival's own sale, which
     # this league's real history says has never once gone through — see
@@ -1769,7 +1733,7 @@ def _selftest() -> None:
     # move is on the table, even a smaller one -----------------------------
     listed_big = {**rows[0],
                   "action": Action("buy", buy="listed_target", cost=30e6),
-                  "d_pos": 0.50, "d_win": 0.40, "pts_lo": 50.0}
+                  "net_pts": 0.50, "d_win": 0.40, "pts_lo": 50.0}
     u.route["listed_target"] = "listed"
     # A "listed" move is the ONLY candidate — nothing reliable to prefer it
     # over, so it is still the pick, just flagged uncertain.
@@ -1809,21 +1773,21 @@ def _selftest() -> None:
                                 PlayerCurrent, PlayerHistory, PlayerDerived)
 
     steady_row = {"action": Action("buy", buy="steady", cost=5e6),
-                 "d_pos": 0.40, "d_win": 0.0, "d_beat": {}, "value": 8.0,
+                 "net_pts": 0.40, "d_win": 0.0, "d_beat": {}, "value": 8.0,
                  "d_pts": 40.0, "pts_lo": 10.0, "pts_hi": 70.0, "helps": 0.80}
     dud_row = {"action": Action("buy", buy="dud", cost=5e6),
-              "d_pos": 0.20, "d_win": 0.0, "d_beat": {}, "value": 4.0,
+              "net_pts": 0.20, "d_win": 0.0, "d_beat": {}, "value": 4.0,
               "d_pts": 20.0, "pts_lo": 5.0, "pts_hi": 35.0, "helps": 0.60}
     maverick_row = {"action": Action("buy", buy="maverick", cost=5e6),
-                   "d_pos": 0.10, "d_win": 0.0, "d_beat": {}, "value": 2.0,
+                   "net_pts": 0.10, "d_win": 0.0, "d_beat": {}, "value": 2.0,
                    "d_pts": 10.0, "pts_lo": -50.0, "pts_hi": 260.0,
                    "helps": 0.55}
     riv_row = {"action": Action("clause", buy="rivals", cost=5e6),
-              "d_pos": 0.60, "d_win": 0.0, "d_beat": {}, "value": 12.0,
+              "net_pts": 0.60, "d_win": 0.0, "d_beat": {}, "value": 12.0,
               "d_pts": 60.0, "pts_lo": 20.0, "pts_hi": 90.0, "helps": 0.90,
               "burn": 1.2e6}   # the clause's real premium over market value
     wish_row = {"action": Action("buy", buy="wished", cost=5e6),
-               "d_pos": 0.50, "d_win": 0.0, "d_beat": {}, "value": 10.0,
+               "net_pts": 0.50, "d_win": 0.0, "d_beat": {}, "value": 10.0,
                "d_pts": 50.0, "pts_lo": 15.0, "pts_hi": 80.0, "helps": 0.85}
     uc_owned = Universe(
         state=LeagueState({"me": {}, "riv": {}}, [1, 2], "me"),

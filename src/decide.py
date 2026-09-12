@@ -49,6 +49,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from ffcore import forecast as _forecast  # noqa: E402
 from ffcore.forecast import Bootstrap, pool_from_perjornada  # noqa: E402
 import methodology as _methodology  # noqa: E402
+from stats import percentile  # noqa: E402
 from ffcore.league import MARKET, api_key  # noqa: E402
 from ffcore.parse import fmt_money  # noqa: E402
 from ffcore.profile import (PlayerProfile, UNSCORED_DEFAULT,  # noqa: E402
@@ -622,13 +623,18 @@ def band(pairs) -> tuple[float, float, float]:
     from its own copy of these three index expressions. Two spellings of one
     quantile is how they come to disagree about what "the band" means.
 
+    Reads stats.percentile() (statistics.quantiles under it) rather than
+    hand-indexing the sorted list itself, same reason bootstrap_gap() and
+    season.Standings.band() do — one tested percentile implementation, not
+    three near-identical ones.
+
     (0, 0, 0) for no pairs: nothing was simulated, so there is no spread to
     report, and every caller renders that as the no-change row it is.
     """
     if not pairs:
         return (0.0, 0.0, 0.0)
-    return (pairs[len(pairs) // 2], pairs[int(0.1 * len(pairs))],
-            pairs[int(0.9 * len(pairs))])
+    return (percentile(pairs, 50), percentile(pairs, 10),
+            percentile(pairs, 90))
 
 
 def _top_up(top: list[tuple], screened: list[tuple], ok, rank_key,
@@ -756,7 +762,14 @@ def rank(u: Universe, acts: list[Action], seed: int = 1,
     base_s, rest = screen[0], screen[1:]
     screened, reach = [], []
     for a, r in zip(acts, rest):
-        d = base_s.expected_position() - r.expected_position()
+        # POINTS, not expected-position swing — same screening draw, just
+        # reading `.totals` (already there) instead of paying for
+        # `.expected_position()`'s extra per-trial rival comparison for a
+        # number ranking no longer uses. Miguel, 2026-09-12: ranking by a
+        # position/win-probability proxy instead of points directly was
+        # never shown to be better and wasn't what he asked this pipeline
+        # to optimise for.
+        d, _lo, _hi = band(paired(r, base_s, u.me))
         reach.append((a.cost - a.proceeds - u.cash, d))
         if a.cost <= u.cash + a.proceeds:
             screened.append((d, a))
@@ -826,7 +839,6 @@ def rank(u: Universe, acts: list[Action], seed: int = 1,
     for a, r in zip(keep, scored):
         b_ = burn(u, a)
         charge = 0.0 if (lam is None or b_ is None) else lam * b_ / 1e6
-        gross = base.expected_position() - r.expected_position()
         # PAIRED, WITHIN THE SAME SEASONS — see paired()'s own docstring,
         # which is where this used to be spelled out and where the band
         # quantiles below used to be spelled a second time.
@@ -839,8 +851,15 @@ def rank(u: Universe, acts: list[Action], seed: int = 1,
             "d_pts": d_pts,
             "pts_lo": lo,
             "pts_hi": hi,
-            "d_pos": gross - charge,
-            "gross": gross,
+            # THE ONE headline number now: season points, net of what the
+            # cash burned could otherwise have bought (`charge`, itself in
+            # points per rank()'s own `lam` — see cash_price()). Used to be
+            # expected-position swing (`d_pos`/`gross`, via
+            # Standings.expected_position()) — dropped 2026-09-12, Miguel:
+            # "P_win is an output of points, we should focus on points."
+            # Position/win swings are still shown (`d_win`/`d_beat` below)
+            # but no longer decide the order or the eligibility bar.
+            "net_pts": d_pts - charge,
             "burn": b_,
             "charge": charge,
             # No specific reply to name any more — see respond()'s own
@@ -851,7 +870,6 @@ def rank(u: Universe, acts: list[Action], seed: int = 1,
             "d_beat": {v: r.beat(v) - base.beat(v) for v in rivals},
             "mean": r.mean(u.me),
             # VALUE FOR MONEY: season points per million actually paid.
-            # `d_pts`, not `d_pos` — the table's own unit is season points.
             # Only defined for a genuine spend (net > 0): a sale raising
             # more than it costs needs no rate, it's just obviously worth
             # doing. Already points-over-replacement (no second `value_vor`
@@ -863,7 +881,7 @@ def rank(u: Universe, acts: list[Action], seed: int = 1,
             # Why: docs/notes/decide.md#rank--screening-top-up-and-value
             "value": value_rate(d_pts, a.net),
         })
-    rows = sorted(out, key=lambda d: (-d["d_pos"], d["action"].net))
+    rows = sorted(out, key=lambda d: (-d["net_pts"], d["action"].net))
     return rows, base, measured, bands
 
 
@@ -1744,11 +1762,11 @@ def _selftest() -> None:
     assert 0.5 < top["helps"] <= 1.0, top["helps"]
     assert top["d_pts"] > 0, top["d_pts"]
     assert top["pts_lo"] <= top["d_pts"] <= top["pts_hi"]
-    # Signing a 12-point player into an eleven of 3s must improve your
-    # position, and the table must be sorted by that.
-    assert top["d_pos"] > 0, top
-    assert [r["d_pos"] for r in rows] == sorted(
-        (r["d_pos"] for r in rows), reverse=True)
+    # Signing a 12-point player into an eleven of 3s must gain season points,
+    # and the table must be sorted by that.
+    assert top["net_pts"] > 0, top
+    assert [r["net_pts"] for r in rows] == sorted(
+        (r["net_pts"] for r in rows), reverse=True)
     assert set(top["d_beat"]) == {"riv"}
 
     # VALUE FOR MONEY: points per million ACTUALLY PAID, only for a genuine
@@ -1835,10 +1853,14 @@ def _selftest() -> None:
     assert sum(1 for k in bxi2 if bsq2[k] == "DEF") == 4, bxi2
     assert sum(bexp[k] for k in bxi2) - sum(bexp[k] for k in bxi) == 1.0
 
-    # THE STEAL IS WORTH MORE THAN THE SAME PLAYER FROM THE POOL. Compared
-    # like for like — same points, same price, same funding — taking him off a
-    # rival beats buying an equivalent free agent, because it moves both
-    # totals. This is the property no per-player rate can represent.
+    # A STEAL AND AN EQUIVALENT FREE AGENT NOW TIE ON net_pts, DELIBERATELY.
+    # Ranking used to favour the clause buy here because it moved a RIVAL's
+    # total too (expected_position() is a competitive, all-managers metric);
+    # net_pts only ever reads `me`'s own paired total (see paired()), so a
+    # steal's rival-denial value no longer earns a ranking bonus. Miguel,
+    # 2026-09-12, asked directly and chose this: "drop it — points only."
+    # d_win/d_beat still SHOW the rival-denial effect on the row: it's
+    # visible, just not part of what decides order any more.
     per2 = {1: dict(per[1])}
     per2[1]["free_x"] = (9.0, 1.0)
     per2[1]["th_m1"] = (9.0, 1.0)
@@ -1852,8 +1874,12 @@ def _selftest() -> None:
     got, _, _, _ = rank(u2, [Action("buy", buy="free_x", cost=5e6),
                           Action("clause", buy="th_m1", cost=5e6,
                                  victim="riv")])
-    by = {r["action"].buy: r["d_pos"] for r in got}
-    assert by["th_m1"] > by["free_x"], by
+    by = {r["action"].buy: r["net_pts"] for r in got}
+    assert abs(by["th_m1"] - by["free_x"]) < 1e-9, by
+    # But the rival-denial effect is still THERE, just not decisive: only
+    # the clause buy moves a rival's own beat-probability.
+    d_beat = {r["action"].buy: r["d_beat"]["riv"] for r in got}
+    assert d_beat["th_m1"] > d_beat["free_x"] > 0.0, d_beat
 
     # -- _top_up: the shared "ensure at least N satisfy `ok`, on top, never
     # displacing" mechanic, tested on its own before any caller wires it in
@@ -2330,11 +2356,11 @@ if __name__ == "__main__":
     print("\nnow: expected position %.2f · P(win) %.0f%%"
           % (base.expected_position(), 100 * base.position().get(1, 0)))
     rivals = [m for m in u.state.squads if m != u.me]
-    print("\n%-52s %6s %7s %10s   %s"
-          % ("do this", "Δpos", "Δwin", "net €", "biggest gain vs"))
+    print("\n%-52s %7s %7s %10s   %s"
+          % ("do this", "net pts", "Δwin", "net €", "biggest gain vs"))
     for r in rows[:8]:
         a = r["action"]
         who = max(rivals, key=lambda v: r["d_beat"][v])
-        print("%-52s %+6.3f %+6.1f%% %10s   %s %+.0f%%"
-              % (a.label()[:52], r["d_pos"], 100 * r["d_win"],
+        print("%-52s %+7.1f %+6.1f%% %10s   %s %+.0f%%"
+              % (a.label()[:52], r["net_pts"], 100 * r["d_win"],
                  fmt_money(-a.net), who[:16], 100 * r["d_beat"][who]))
