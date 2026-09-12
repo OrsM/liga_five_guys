@@ -237,7 +237,7 @@ player_id,name,club_id,ff_slug,af_slug,app_id,understat_id,app_names
 15135,pol fortuny,real madrid,,,,,
 15164,zakaria eddahchouri,deportivo,zakaria-eddahchouri,,,14709,
 15227,mario rivas,real madrid,mario-rivas,,,,
-15273,luken beitia,real sociedad,luken-beitia,,2834,13482,Beitia
+15273,luken beitia,real sociedad,luken-beitia,349063,2834,13482,Beitia
 15315,pablo arriaza,malaga,pablo-arriaza,,,,
 15316,roger hinojo,espanyol,roger-hinojo,450716,,13533,
 15336,rafa rodriguez,malaga,rafa-rodriguez,335221,,14735,
@@ -403,7 +403,7 @@ player_id,name,club_id,ff_slug,af_slug,app_id,understat_id,app_names
 1928,lucas torro,osasuna,lucas-torro,1825,,7050,
 1931,marcos llorente,atletico,marcos-llorente,753,,2518,
 1934,iñaki williams,athletic,inaki-williams,47294,,2399,
-1945,borja iglesias,celta,borja-iglesias,,3071,2543,B. Iglesias
+1945,borja iglesias,celta,borja-iglesias,47348,3071,2543,B. Iglesias
 1972,yeray alvarez,athletic,yeray-alvarez,,77,5062,Yeray
 1975,alex remiro,real sociedad,alex-remiro,47269,274,2555,Remiro
 1980,jose angel jurado,deportivo,jose-angel-jurado,,,,
