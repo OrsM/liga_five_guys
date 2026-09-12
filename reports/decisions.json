@@ -1,7 +1,7 @@
 {
- "generated_at": "2026-09-12T20:23Z",
- "locks_in_h": 15.614656014722222,
- "cash": -36894229.17783912,
+ "generated_at": "2026-09-12T20:37Z",
+ "locks_in_h": 15.381257115277778,
+ "cash": -36893256.68242477,
  "cash_locked": 40161042.0,
  "squad_value": 273897967.0,
  "jornadas_left": 34,
@@ -31,7 +31,8 @@
    "note": "",
    "value": null,
    "market": null,
-   "premium": null
+   "premium": null,
+   "bought": null
   },
   {
    "name": "Sergio Carreira",
@@ -48,7 +49,8 @@
    "note": "",
    "value": null,
    "market": null,
-   "premium": null
+   "premium": null,
+   "bought": null
   },
   {
    "name": "Omar El Hilali",
@@ -65,7 +67,8 @@
    "note": "",
    "value": null,
    "market": null,
-   "premium": null
+   "premium": null,
+   "bought": null
   },
   {
    "name": "Alvaro Mantilla",
@@ -82,7 +85,8 @@
    "note": "",
    "value": null,
    "market": null,
-   "premium": null
+   "premium": null,
+   "bought": null
   },
   {
    "name": "Mathew Ryan",
@@ -99,7 +103,8 @@
    "note": "",
    "value": null,
    "market": null,
-   "premium": null
+   "premium": null,
+   "bought": null
   },
   {
    "name": "Ali Houary",
@@ -116,7 +121,8 @@
    "note": "",
    "value": null,
    "market": null,
-   "premium": null
+   "premium": null,
+   "bought": null
   },
   {
    "name": "Raphinha",
@@ -125,15 +131,16 @@
    "xpts": 7.82591775123436,
    "group": "save",
    "where": "Magic",
-   "money": -171806034.17783913,
+   "money": -171805061.68242478,
    "pts": 119.39932733369142,
    "par": 191.3572668492915,
    "pts_lo": 6.700834716938175,
    "pts_hi": 364.46958105741595,
    "note": "short",
-   "value": 0.6949658544012447,
+   "value": 0.6949697882265925,
    "market": null,
-   "premium": null
+   "premium": null,
+   "bought": null
   },
   {
    "name": "Alfonso Herrero",
@@ -142,15 +149,16 @@
    "xpts": 6.150265545634743,
    "group": "save",
    "where": "Magic",
-   "money": -51347761.17783912,
+   "money": -51346788.68242477,
    "pts": -4.528191248782491,
    "par": -9.79172445026046,
    "pts_lo": -32.4168266738973,
    "pts_hi": 34.505876608847664,
    "note": "short",
-   "value": -0.08818673190247653,
+   "value": -0.08818840213725816,
    "market": null,
-   "premium": null
+   "premium": null,
+   "bought": null
   },
   {
    "name": "David Soria",
@@ -159,15 +167,16 @@
    "xpts": 5.692326956521739,
    "group": "save",
    "where": "BurtonGM89",
-   "money": -72599640.17783913,
+   "money": -72598667.68242477,
    "pts": 2.1733762036965345,
    "par": 0.9622020583858841,
    "pts_lo": -39.67782360868348,
    "pts_hi": 45.805292746459784,
    "note": "short",
-   "value": 0.02993645971760549,
+   "value": 0.02993686073143573,
    "market": null,
-   "premium": null
+   "premium": null,
+   "bought": null
   },
   {
    "name": "Zaid Romero",
@@ -176,15 +185,16 @@
    "xpts": 5.288845322793147,
    "group": "save",
    "where": "free agent",
-   "money": -65556346.17783912,
+   "money": -65555373.68242477,
    "pts": 31.138812078447245,
    "par": 78.69915699321267,
    "pts_lo": -48.93373888317215,
    "pts_hi": 204.01957619309533,
    "note": "short",
-   "value": 0.47499309973705506,
+   "value": 0.47500014612525165,
    "market": null,
-   "premium": null
+   "premium": null,
+   "bought": null
   },
   {
    "name": "Edu Exposito",
@@ -193,15 +203,16 @@
    "xpts": 5.055234484812789,
    "group": "save",
    "where": "Albert",
-   "money": -65550969.17783912,
+   "money": -65549996.68242477,
    "pts": 42.24799994544128,
    "par": 35.545982942037085,
    "pts_lo": -29.550794788962527,
    "pts_hi": 167.33153758921534,
    "note": "short",
-   "value": 0.6445061068559167,
+   "value": 0.6445156687058811,
    "market": null,
-   "premium": null
+   "premium": null,
+   "bought": null
   },
   {
    "name": "Ante Budimir",
@@ -210,15 +221,16 @@
    "xpts": 5.0180822335981,
    "group": "save",
    "where": "BurtonGM89",
-   "money": -97394229.17783913,
+   "money": -97393256.68242477,
    "pts": 70.51327665077247,
    "par": 115.30965587351423,
    "pts_lo": -15.641132379259602,
    "pts_hi": 219.59075936762747,
    "note": "short",
-   "value": 0.7239985083922909,
+   "value": 0.7240057376939223,
    "market": null,
-   "premium": null
+   "premium": null,
+   "bought": null
   },
   {
    "name": "Roberto Fernandez",
@@ -227,15 +239,16 @@
    "xpts": 4.9174877874915355,
    "group": "save",
    "where": "BurtonGM89",
-   "money": -62894229.17783912,
+   "money": -62893256.68242477,
    "pts": 36.22485115044435,
    "par": 71.5133095425766,
    "pts_lo": -32.97797936165962,
    "pts_hi": 154.97167811465124,
    "note": "short",
-   "value": 0.5759646254351144,
+   "value": 0.5759735313653621,
    "market": null,
-   "premium": null
+   "premium": null,
+   "bought": null
   },
   {
    "name": "Pierre-Emerick Aubameyang",
@@ -244,15 +257,16 @@
    "xpts": 4.127160040326504,
    "group": "save",
    "where": "Albert",
-   "money": -125540053.17783913,
+   "money": -125539080.68242477,
    "pts": 7.750864508769155,
    "par": 80.66495023364249,
    "pts_lo": -63.906265611476194,
    "pts_hi": 213.9579686220469,
    "note": "short",
-   "value": 0.06174017226031708,
+   "value": 0.061740650533967635,
    "market": null,
-   "premium": null
+   "premium": null,
+   "bought": null
   },
   {
    "name": "Matias Dituro",
@@ -261,7 +275,7 @@
    "xpts": 4.088169586201745,
    "group": "save",
    "where": "Albert",
-   "money": -46013359.17783912,
+   "money": -46012386.68242477,
    "pts": 0.0,
    "par": -36.08298934752264,
    "pts_lo": -12.471893918609089,
@@ -269,7 +283,8 @@
    "note": "short",
    "value": 0.0,
    "market": null,
-   "premium": null
+   "premium": null,
+   "bought": null
   },
   {
    "name": "Aitor Paredes",
@@ -278,15 +293,16 @@
    "xpts": 4.0142933251925434,
    "group": "save",
    "where": "BurtonGM89",
-   "money": -48894664.17783912,
+   "money": -48893691.68242477,
    "pts": 13.691565485853289,
    "par": 40.038604780950465,
    "pts_lo": -54.83532815125616,
    "pts_hi": 137.6059220192561,
    "note": "short",
-   "value": 0.28002166935955386,
+   "value": 0.28002723898990906,
    "market": null,
-   "premium": null
+   "premium": null,
+   "bought": null
   },
   {
    "name": "Yuri Berchiche",
@@ -295,15 +311,16 @@
    "xpts": 3.90965254979258,
    "group": "save",
    "where": "BurtonGM89",
-   "money": -50233119.17783912,
+   "money": -50232146.68242477,
    "pts": 18.27416105028999,
    "par": 38.36745318828741,
    "pts_lo": -45.12514384992066,
    "pts_hi": 119.37604845971106,
    "note": "short",
-   "value": 0.36378710598468733,
+   "value": 0.3637941489106966,
    "market": null,
-   "premium": null
+   "premium": null,
+   "bought": null
   },
   {
    "name": "Nahuel Tenaglia",
@@ -312,15 +329,16 @@
    "xpts": 3.844501456735143,
    "group": "save",
    "where": "BurtonGM89",
-   "money": -70380828.17783913,
+   "money": -70379855.68242477,
    "pts": 43.69441308357465,
    "par": 71.04127184871582,
    "pts_lo": -36.54670480674192,
    "pts_hi": 170.13604414717372,
    "note": "short",
-   "value": 0.6208283450880555,
+   "value": 0.6208369235756476,
    "market": null,
-   "premium": null
+   "premium": null,
+   "bought": null
   },
   {
    "name": "Unai Lopez",
@@ -329,15 +347,16 @@
    "xpts": 3.7672218604544074,
    "group": "save",
    "where": "Albert",
-   "money": -49874068.17783912,
+   "money": -49873095.68242477,
    "pts": 31.849398792070247,
    "par": 28.701820517703283,
    "pts_lo": -40.8424051986136,
    "pts_hi": 157.67008908328322,
    "note": "short",
-   "value": 0.6385963679261701,
+   "value": 0.6386088201718335,
    "market": null,
-   "premium": null
+   "premium": null,
+   "bought": null
   },
   {
    "name": "Iñigo Arguibide",
@@ -346,15 +365,16 @@
    "xpts": 3.6956440231171235,
    "group": "save",
    "where": "SusoGattuso",
-   "money": -39931119.17783912,
+   "money": -39930146.68242477,
    "pts": 1.2528463362688171,
    "par": 20.368573423271542,
    "pts_lo": -49.03311031771334,
    "pts_hi": 88.97550649072282,
    "note": "short",
-   "value": 0.031375187123833956,
+   "value": 0.03137595126391701,
    "market": null,
-   "premium": null
+   "premium": null,
+   "bought": null
   },
   {
    "name": "Abel Bretones",
@@ -363,15 +383,16 @@
    "xpts": 3.618026219491286,
    "group": "save",
    "where": "BurtonGM89",
-   "money": -46366074.17783912,
+   "money": -46365101.68242477,
    "pts": 9.296176356283354,
    "par": 18.040662610429763,
    "pts_lo": -36.92677963971819,
    "pts_hi": 72.16376330306757,
    "note": "short",
-   "value": 0.20049522244707324,
+   "value": 0.20049942777990665,
    "market": null,
-   "premium": null
+   "premium": null,
+   "bought": null
   },
   {
    "name": "Jorge Herrando",
@@ -380,15 +401,16 @@
    "xpts": 3.575625048284536,
    "group": "save",
    "where": "free agent",
-   "money": -38601007.17783912,
+   "money": -38600034.68242477,
    "pts": 4.869830221205689,
    "par": 15.008152076217101,
    "pts_lo": -38.46799370790918,
    "pts_hi": 67.33604680479603,
    "note": "short",
-   "value": 0.12615811288990053,
+   "value": 0.12616129133746615,
    "market": null,
-   "premium": null
+   "premium": null,
+   "bought": null
   },
   {
    "name": "Marc Bernal",
@@ -397,15 +419,16 @@
    "xpts": 3.472739222788924,
    "group": "save",
    "where": "Magic",
-   "money": -57267596.17783912,
+   "money": -57266623.68242477,
    "pts": 15.140506607482621,
    "par": 12.34900104920051,
    "pts_lo": -46.01553332858598,
    "pts_hi": 121.91448539228449,
    "note": "short",
-   "value": 0.2643817379808505,
+   "value": 0.26438622768202885,
    "market": null,
-   "premium": null
+   "premium": null,
+   "bought": null
   },
   {
    "name": "Unai Nuñez",
@@ -414,15 +437,16 @@
    "xpts": 3.3069054246983245,
    "group": "save",
    "where": "SusoGattuso",
-   "money": -47316227.17783912,
+   "money": -47315254.68242477,
    "pts": 7.497621308741941,
    "par": 33.68664868946104,
    "pts_lo": -54.468969238552454,
    "pts_hi": 108.76557004998878,
    "note": "short",
-   "value": 0.1584577164312353,
+   "value": 0.15846097329635486,
    "market": null,
-   "premium": null
+   "premium": null,
+   "bought": null
   },
   {
    "name": "Enes Unal",
@@ -431,15 +455,16 @@
    "xpts": 3.232988538354491,
    "group": "save",
    "where": "SusoGattuso",
-   "money": -55719170.17783912,
+   "money": -55718197.68242477,
    "pts": -10.978058484886674,
    "par": 34.890072273922236,
    "pts_lo": -58.9302465197172,
    "pts_hi": 98.10373241545557,
    "note": "short",
-   "value": -0.1970248022331983,
+   "value": -0.19702824106870728,
    "market": null,
-   "premium": null
+   "premium": null,
+   "bought": null
   },
   {
    "name": "Marc Roca",
@@ -448,15 +473,16 @@
    "xpts": 3.217428860468493,
    "group": "save",
    "where": "Albert",
-   "money": -48575148.17783912,
+   "money": -48574175.68242477,
    "pts": 13.05036925889408,
    "par": 6.623296164990322,
    "pts_lo": -46.70784294935232,
    "pts_hi": 117.47120888403624,
    "note": "short",
-   "value": 0.26866349869104256,
+   "value": 0.26866887755783364,
    "market": null,
-   "premium": null
+   "premium": null,
+   "bought": null
   },
   {
    "name": "Fran Garcia",
@@ -465,15 +491,16 @@
    "xpts": 3.176016695574337,
    "group": "save",
    "where": "SusoGattuso",
-   "money": -63600436.17783912,
+   "money": -63599463.68242477,
    "pts": 5.577440595242365,
    "par": 35.47531917989427,
    "pts_lo": -58.5586005741346,
    "pts_hi": 128.45482030930188,
    "note": "short",
-   "value": 0.08769500541862264,
+   "value": 0.08769634635745598,
    "market": null,
-   "premium": null
+   "premium": null,
+   "bought": null
   },
   {
    "name": "Orri Steinn Oskarsson",
@@ -482,15 +509,16 @@
    "xpts": 3.164892331677169,
    "group": "save",
    "where": "Albert",
-   "money": -44481407.17783912,
+   "money": -44480434.68242477,
    "pts": 10.831826218719243,
    "par": 44.696861315235076,
    "pts_lo": -55.18557521703324,
    "pts_hi": 128.7486113179072,
    "note": "short",
-   "value": 0.24351356906073146,
+   "value": 0.24351889310558253,
    "market": null,
-   "premium": null
+   "premium": null,
+   "bought": null
   },
   {
    "name": "Cesar Tarrega",
@@ -499,15 +527,16 @@
    "xpts": 3.0326470399226846,
    "group": "save",
    "where": "SusoGattuso",
-   "money": -51712389.17783912,
+   "money": -51711416.68242477,
    "pts": 8.06151419997434,
    "par": 21.617156759674614,
    "pts_lo": -44.14694131658891,
    "pts_hi": 84.87955557585283,
    "note": "short",
-   "value": 0.15589135076027447,
+   "value": 0.15589428248470744,
    "market": null,
-   "premium": null
+   "premium": null,
+   "bought": null
   },
   {
    "name": "Alex Berenguer",
@@ -516,15 +545,16 @@
    "xpts": 3.0155209567311485,
    "group": "save",
    "where": "SusoGattuso",
-   "money": -46810245.17783912,
+   "money": -46809272.68242477,
    "pts": 10.312065757677601,
    "par": 42.33033943118185,
    "pts_lo": -46.578994227876365,
    "pts_hi": 111.20904935606788,
    "note": "short",
-   "value": 0.2202950597353319,
+   "value": 0.22029963651944154,
    "market": null,
-   "premium": null
+   "premium": null,
+   "bought": null
   },
   {
    "name": "Leandro Cabrera",
@@ -533,15 +563,16 @@
    "xpts": 3.0088492877217448,
    "group": "save",
    "where": "Albert",
-   "money": -54394231.17783912,
+   "money": -54393258.68242477,
    "pts": 9.573932712109581,
    "par": 24.43613650071545,
    "pts_lo": -47.34698572920626,
    "pts_hi": 87.50088807385053,
    "note": "short",
-   "value": 0.17601007505388033,
+   "value": 0.17601322193264832,
    "market": null,
-   "premium": null
+   "premium": null,
+   "bought": null
   },
   {
    "name": "Alvaro Garcia",
@@ -550,15 +581,16 @@
    "xpts": 2.943476784887249,
    "group": "save",
    "where": "SusoGattuso",
-   "money": -66201039.17783912,
+   "money": -66200066.68242477,
    "pts": 10.435932564141353,
    "par": 0.6268334155619755,
    "pts_lo": -43.9331844675407,
    "pts_hi": 102.16492994269356,
    "note": "short",
-   "value": 0.1576400113011337,
+   "value": 0.1576423270720353,
    "market": null,
-   "premium": null
+   "premium": null,
+   "bought": null
   },
   {
    "name": "Toni Martinez",
@@ -567,15 +599,16 @@
    "xpts": 2.8885138073566536,
    "group": "save",
    "where": "SusoGattuso",
-   "money": -57198292.17783912,
+   "money": -57197319.68242477,
    "pts": 25.45083205541289,
    "par": 62.22483701011631,
    "pts_lo": -42.27452999402931,
    "pts_hi": 141.652331026712,
    "note": "short",
-   "value": 0.44495790147513437,
+   "value": 0.4449654668561901,
    "market": null,
-   "premium": null
+   "premium": null,
+   "bought": null
   },
   {
    "name": "Jon Moncayola",
@@ -584,15 +617,16 @@
    "xpts": 2.7985485579027736,
    "group": "save",
    "where": "BurtonGM89",
-   "money": -44894229.17783912,
+   "money": -44893256.68242477,
    "pts": 14.495250649630407,
    "par": -1.6796067324533084,
    "pts_lo": -36.070406539939015,
    "pts_hi": 91.11373450745842,
    "note": "short",
-   "value": 0.32287558813428996,
+   "value": 0.3228825823924942,
    "market": null,
-   "premium": null
+   "premium": null,
+   "bought": null
   },
   {
    "name": "Antonio Blanco",
@@ -601,15 +635,16 @@
    "xpts": 2.7331162271271503,
    "group": "save",
    "where": "BurtonGM89",
-   "money": -56440982.17783912,
+   "money": -56440009.68242477,
    "pts": 28.54006653714123,
    "par": 19.091469857090658,
    "pts_lo": -36.68494456704732,
    "pts_hi": 127.13426136991568,
    "note": "short",
-   "value": 0.5056621170626464,
+   "value": 0.5056708299259649,
    "market": null,
-   "premium": null
+   "premium": null,
+   "bought": null
   }
  ],
  "bar": 2.7220467385696567,
@@ -645,7 +680,7 @@
    "mean": 1547.406945421664,
    "lo": 1209.71147508424,
    "hi": 1914.1845509893883,
-   "cash": -36894229.17783912,
+   "cash": -36893256.68242477,
    "cash_known": true,
    "p_above": null
   },

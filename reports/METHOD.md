@@ -1,4 +1,4 @@
-# Liga Five Guys — how the numbers are made — 2026-09-12 20:23 UTC
+# Liga Five Guys — how the numbers are made — 2026-09-12 20:37 UTC
 
 
 
@@ -40,7 +40,7 @@
 | ⚪ | clubs | the same, for clubs | src/crosswalk.py | 20 | — | rebuilt every run from the tables above |
 | 🟢 | elo | team strength, which ranks the fixture term | clubelo.com | 3,180 | 12 Sep 15:43 | fetched 14 hours ago |
 | 🟢 | fixtures | who plays whom next, for the fixture term | analiticafantasy.com | 2,364 | 12 Sep 15:43 | fetched 14 hours ago |
-| 🟢 | lineups | probable XI percentages, both sources | analiticafantasy.com, futbolfantasy.com ×40 | 139,663 | 12 Sep 15:43 | fetched 7 hours ago |
+| 🟢 | lineups | probable XI percentages, both sources | analiticafantasy.com, futbolfantasy.com ×40 | 139,663 | 12 Sep 15:43 | fetched 8 hours ago |
 | 🟢 | market | price, value, position, fitness — every player in the game | futbolfantasy.com | 139,768 | 12 Sep 15:43 | fetched 5 hours ago |
 | 🟢 | matches | fixtures, kickoffs, results | futbolfantasy.com | 68,400 | 12 Sep 15:43 | fetched 14 hours ago |
 | ⚪ | players | the crosswalk: one key per player across all four spellings | src/crosswalk.py | 722 | — | rebuilt every run from the tables above |
