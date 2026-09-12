@@ -50,7 +50,11 @@ class PlayerIdentity:
     """Changes essentially never. Write once, read forever."""
     key: str                    # crosswalk player_id — the join key everything else uses
     app_id: str = ""            # LaLiga's own id
-    ff_id: str = ""             # futbolfantasy's id (market.csv)
+    # `key` itself IS futbolfantasy's numeric id whenever a player's market
+    # row ever carried one (row_key()'s own convention) — there is no
+    # separate numeric field to hold; ff_slug is the distinct, genuinely
+    # separate piece of identity futbolfantasy actually adds.
+    ff_slug: str = ""
     understat_id: str = ""
     name: str = ""
     full_name: str = ""
@@ -137,6 +141,7 @@ def _perjornada_history(rows) -> dict[str, PlayerHistory]:
 
 
 def build_profiles(players: dict, sc, perjornada_rows,
+                   xw=None,
                    market_keyed: dict | None = None) -> dict[str, "PlayerProfile"]:
     """{player key: PlayerProfile} for every player `load_players()` knows —
     the full pool, no market/ownership gate at all.
@@ -147,6 +152,15 @@ def build_profiles(players: dict, sc, perjornada_rows,
     typed record instead of three parallel dicts (`pos`, `market_exp`,
     `start`).
 
+    `players` is `ffcore.tidy.load_players()`'s own dict shape —
+    {key: {name, team, pos, value, delta_1d, start, status}} — which does
+    NOT carry app_id/understat_id/club_id despite the similar name to the
+    crosswalk. Those identity fields come from `xw` (ffcore.crosswalk's
+    Crosswalk, e.g. `lg.xw`), keyed the same way (`xw.players[key]`).
+    `xw=None` degrades to blank identity fields rather than guessing or
+    crashing — a player load_players() knows about that the crosswalk
+    hasn't resolved yet still gets a profile.
+
     `market_keyed`, if given, is {key: {"listed":, "price":, "owner":}} —
     the market/ownership facts decide.load() already computes elsewhere
     (market_routes(), lg.owner). Optional so this stays testable without
@@ -155,17 +169,18 @@ def build_profiles(players: dict, sc, perjornada_rows,
     histories = _perjornada_history(perjornada_rows)
     out: dict[str, PlayerProfile] = {}
     for k, rec in players.items():
+        xp = xw.players.get(k) if xw is not None else None
         ident = PlayerIdentity(
             key=k,
-            app_id=rec.get("app_id") or "",
-            ff_id=rec.get("player_id") or "",
-            understat_id=rec.get("understat_id") or "",
-            name=rec.get("name") or k,
-            full_name=rec.get("name") or k,
+            app_id=(xp.app_id if xp else "") or "",
+            ff_slug=(xp.ff_slug if xp else "") or "",
+            understat_id=(xp.understat_id if xp else "") or "",
+            name=rec.get("name") or (xp.name if xp else "") or k,
+            full_name=rec.get("name") or (xp.name if xp else "") or k,
         )
         mk = (market_keyed or {}).get(k, {})
         cur = PlayerCurrent(
-            club=rec.get("club_id") or "",
+            club=(xp.club_id if xp else "") or rec.get("team") or "",
             pos=(rec.get("pos") or "").upper(),
             market_value=None,
             listed=bool(mk.get("listed")),
@@ -184,8 +199,13 @@ def build_profiles(players: dict, sc, perjornada_rows,
         )
         if s is not None:
             cur.status = s.status
-        hist = histories.get(rec.get("player_id") or "") or \
-            histories.get(norm(ident.name)) or PlayerHistory()
+        # perjornada.csv's `ff_id` is futbolfantasy's own numeric id — a
+        # DIFFERENT space from ident.app_id (LaLiga's own). row_key()'s own
+        # convention makes the crosswalk key `k` itself that numeric id
+        # whenever a player's market row carried one, so `k` is the right
+        # lookup, not app_id.
+        hist = histories.get(k) or histories.get(norm(ident.name)) \
+            or PlayerHistory()
         out[k] = PlayerProfile(identity=ident, current=cur,
                               history=hist, derived=der)
     return out
@@ -200,17 +220,29 @@ def _selftest() -> None:
 
     class _FakeScorer:
         def row_for(self, k):
-            return {"key": k} if k == "known" else None
+            return {"key": k} if k == "999" else None
 
         def score(self, row):
             return _FakeScored(ppm=6.0, pj=12.0, pct_used=80.0, fix=1.1,
                                status="ok") if row else None
 
-    players = {"known": {"name": "Known Player", "pos": "DEL",
-                         "club_id": "betis", "player_id": "999",
-                         "app_id": "999"},
+    # `load_players()`'s REAL shape — {name, team, pos, value, delta_1d,
+    # start, status} — carries NO app_id/understat_id/club identity at all;
+    # that's what `xw` supplies, keyed the same way. Key "999" for the
+    # known player because row_key()'s own convention makes the crosswalk
+    # key itself the numeric ff_id whenever a market row carried one — the
+    # same key perjornada.csv's `ff_id` column uses, and the thing this
+    # test is specifically checking gets joined correctly.
+    from ffcore.crosswalk import Player
+
+    players = {"999": {"name": "Known Player", "pos": "DEL", "team": "betis"},
               "unknown": {"name": "Unknown Player", "pos": "MED",
-                          "club_id": "celta"}}
+                          "team": "celta"}}
+
+    class _FakeXW:
+        players = {"999": Player("999", "Known Player", club_id="betis",
+                                 app_id="app-999", understat_id="us-999")}
+
     perjornada = [
         {"ff_id": "999", "player_name": "Known Player", "jornada": "1",
          "points_delta": "5", "games_delta": "1"},
@@ -218,13 +250,16 @@ def _selftest() -> None:
          "points_delta": "3", "games_delta": "1"},
     ]
     profiles = build_profiles(players, _FakeScorer(), perjornada,
-                              market_keyed={"known": {"listed": True,
-                                                       "price": 5e6,
-                                                       "owner": "alice"}})
+                              xw=_FakeXW(),
+                              market_keyed={"999": {"listed": True,
+                                                     "price": 5e6,
+                                                     "owner": "alice"}})
 
-    assert set(profiles) == {"known", "unknown"}, profiles
-    k = profiles["known"]
-    assert k.identity.app_id == "999" and k.identity.name == "Known Player"
+    assert set(profiles) == {"999", "unknown"}, profiles
+    k = profiles["999"]
+    assert k.identity.app_id == "app-999", k.identity
+    assert k.identity.understat_id == "us-999", k.identity
+    assert k.identity.name == "Known Player"
     assert k.current.club == "betis" and k.current.listed is True
     assert k.current.price == 5e6 and k.current.owner == "alice"
     assert k.current.status == "ok"
