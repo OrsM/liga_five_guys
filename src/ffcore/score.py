@@ -417,6 +417,50 @@ def backtest_predictor(feature_by_key_jornada: dict[str, dict[int, float]],
            "gap": bootstrap_gap(feature_err, baseline_err)}
 
 
+EXPERIMENT_LOG = "experiment_log.csv"
+
+
+def log_experiment(feature: str, position: str, result: dict | None,
+                   verdict: str, notes: str = "") -> None:
+    """Append one row per DELIBERATE hypothesis test — distinct from
+    methodology.log_forecast_accuracy() (one row per RUN, the live
+    forecast's own trend). This is the other half of what Miguel asked
+    for 2026-09-12: "a function and log to track... our experiments/
+    improvements impact." A negative result is a real row too — "team
+    defense adds nothing beyond fix_factor" is exactly as worth keeping
+    as "shots helps forwards", the whole point being a later session
+    doesn't have to re-run a test that already has an answer.
+
+    `result` is backtest_predictor()'s own dict, or None when nothing
+    cleared min_pairs — logged as empty MAE fields, not skipped, so a
+    "not enough data yet" reading is itself part of the record.
+    """
+    from ffcore.tidy import DECISIONS, append_csv, run_now
+
+    DECISIONS.mkdir(parents=True, exist_ok=True)
+    row = {"observed_at": run_now().strftime("%Y-%m-%dT%H%MZ"),
+          "feature": feature, "position": position,
+          "n": result["n"] if result else "",
+          "mae_feature": "%.4f" % result["mae_feature"] if result else "",
+          "mae_baseline": "%.4f" % result["mae_baseline"] if result else "",
+          "beats": (result["gap"]["beats"]
+                   if result and result.get("gap") else ""),
+          "verdict": verdict, "notes": notes}
+    append_csv(DECISIONS / EXPERIMENT_LOG, [row],
+              ["observed_at", "feature", "position", "n", "mae_feature",
+               "mae_baseline", "beats", "verdict", "notes"])
+
+
+def experiment_history() -> list[dict]:
+    """Every logged experiment, oldest first — read log_experiment()'s
+    own file back, for a caller (or a future session) that wants to check
+    "has this already been tried" before re-running it."""
+    from ffcore.tidy import DECISIONS, read_csv
+
+    path = DECISIONS / EXPERIMENT_LOG
+    return read_csv(path) if path.exists() else []
+
+
 def _shots_points_fit(xw, players=None) -> tuple[float, float, int]:
     """(slope, intercept, n) — this season's real points in a jornada as a
     linear function of a forward's OWN shot volume (total_scoring_att per
@@ -1758,6 +1802,27 @@ def _selftest() -> None:
     noisy2 = backtest_predictor(noise_feat2, noise_act2, min_pairs=10)
     assert noisy2 is not None and not noisy2["gap"]["beats"], noisy2
 
+    # -- log_experiment / experiment_history: append-only, a negative
+    # result logged same as a positive one ----------------------------
+    import tempfile as _tempfile5
+    from ffcore import tidy as _tidy5
+
+    with _tempfile5.TemporaryDirectory() as _d5:
+        _real_decisions5 = _tidy5.DECISIONS
+        _tidy5.DECISIONS = __import__("pathlib").Path(_d5)
+        try:
+            assert experiment_history() == []
+            log_experiment("shots", "delantero", exact, "kept",
+                          "synthetic exact-fit case")
+            log_experiment("team_defense", "defensa", None, "no effect",
+                          "not enough data")
+            hist = experiment_history()
+            assert len(hist) == 2, hist
+            assert hist[0]["feature"] == "shots" and hist[0]["verdict"] == "kept"
+            assert hist[1]["n"] == "", hist[1]   # None result -> blank, not 0
+        finally:
+            _tidy5.DECISIONS = _real_decisions5
+
     # -- _shots_by_jornada / _shots_points_fit / load_shots_current: the
     # real join through api_stats.csv, gated to forwards, checked against
     # a real (small) fixture rather than assumed from the arithmetic above
@@ -1867,7 +1932,7 @@ def _selftest() -> None:
         finally:
             _tidy3.TIDY, _tidy3.SEASON = _real_tidy3, _real_season3
 
-    print("ffcore.score self-test OK (72 cases)")
+    print("ffcore.score self-test OK (76 cases)")
 
 
 if __name__ == "__main__":
