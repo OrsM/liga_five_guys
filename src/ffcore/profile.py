@@ -139,6 +139,44 @@ class PlayerProfile:
                (pts, min(1.0, (s.pct_rest or 0) / 100)))
 
 
+def _match_stats_history(rows) -> dict[str, dict[int, dict]]:
+    """{app_id: {week: {stat: (value, points)}}} from api_stats.csv's own
+    rows — real per-match data (mins played, goals, cards, marca_points),
+    currently 118 players / weeks 1-6, real but PARTIAL pool: it comes from
+    api_teams's embedded lastStats, which only ever carries a player who
+    has been on one of this league's 5 squads, the same limited-coverage
+    shape the bulk /players fix solved for identity — not solved here,
+    since api_stats has no bulk equivalent. Honest partial data, not full
+    pool, not silently claimed to be.
+
+    Keyed by `player_id` as api_stats.csv itself stores it — LaLiga's own
+    app_id (from playerMaster.id, sources.py's _stat_rows()), NOT the
+    futbolfantasy ff_id _perjornada_history() keys on. Two genuinely
+    different id spaces; build_profiles() joins each against the field
+    that actually matches it (PlayerIdentity.app_id here, not the
+    crosswalk key `k`).
+    """
+    out: dict[str, dict[int, dict]] = {}
+    for r in rows:
+        pid = (r.get("player_id") or "").strip()
+        if not pid:
+            continue
+        try:
+            week = int(r["week"])
+        except (KeyError, TypeError, ValueError):
+            continue
+        stat = (r.get("stat") or "").strip()
+        if not stat:
+            continue
+        try:
+            value = float(r.get("value") or 0)
+            points = float(r.get("points") or 0)
+        except (TypeError, ValueError):
+            continue
+        out.setdefault(pid, {}).setdefault(week, {})[stat] = (value, points)
+    return out
+
+
 def _perjornada_history(rows) -> dict[str, PlayerHistory]:
     """{key: PlayerHistory} from perjornada_2026-27.csv's own rows.
 
@@ -167,7 +205,7 @@ def _perjornada_history(rows) -> dict[str, PlayerHistory]:
 
 
 def build_profiles(players: dict, sc, perjornada_rows,
-                   xw=None,
+                   xw=None, match_stats_rows=None,
                    market_keyed: dict | None = None) -> dict[str, "PlayerProfile"]:
     """{player key: PlayerProfile} for every player `load_players()` knows —
     the full pool, no market/ownership gate at all.
@@ -191,8 +229,15 @@ def build_profiles(players: dict, sc, perjornada_rows,
     the market/ownership facts decide.load() already computes elsewhere
     (market_routes(), lg.owner). Optional so this stays testable without
     constructing a full League/market for every case.
+
+    `match_stats_rows`, if given, is api_stats.csv's own rows — real
+    per-match data (mins played, goals, cards) for whichever 118-ish
+    players have been on one of this league's squads, keyed by LaLiga's
+    own app_id (see _match_stats_history()), not the ff_id
+    perjornada_rows joins on.
     """
     histories = _perjornada_history(perjornada_rows)
+    match_stats = _match_stats_history(match_stats_rows or [])
     out: dict[str, PlayerProfile] = {}
     for k, rec in players.items():
         xp = xw.players.get(k) if xw is not None else None
@@ -232,6 +277,8 @@ def build_profiles(players: dict, sc, perjornada_rows,
         # lookup, not app_id.
         hist = histories.get(k) or histories.get(norm(ident.name)) \
             or PlayerHistory()
+        if ident.app_id in match_stats:
+            hist.match_stats_by_jornada = match_stats[ident.app_id]
         out[k] = PlayerProfile(identity=ident, current=cur,
                               history=hist, derived=der)
     return out
@@ -276,8 +323,17 @@ def _selftest() -> None:
         {"ff_id": "999", "player_name": "Known Player", "jornada": "2",
          "points_delta": "3", "games_delta": "1"},
     ]
+    # api_stats.csv is keyed by LaLiga's app_id ("app-999"), a DIFFERENT
+    # space from perjornada's ff_id ("999") — this is specifically testing
+    # that build_profiles() joins each source against the right field.
+    match_stats = [
+        {"player_id": "app-999", "week": "1", "stat": "goals",
+         "value": "1", "points": "4"},
+        {"player_id": "app-999", "week": "1", "stat": "mins_played",
+         "value": "90", "points": "2"},
+    ]
     profiles = build_profiles(players, _FakeScorer(), perjornada,
-                              xw=_FakeXW(),
+                              xw=_FakeXW(), match_stats_rows=match_stats,
                               market_keyed={"999": {"listed": True,
                                                      "price": 5e6,
                                                      "owner": "alice"}})
@@ -296,6 +352,9 @@ def _selftest() -> None:
     assert abs(k.derived.market_exp - 5.28) < 1e-9
     assert k.history.points_by_jornada == {1: 5.0, 2: 3.0}
     assert k.history.started_by_jornada == {1: True, 2: True}
+    assert k.history.match_stats_by_jornada == {
+        1: {"goals": (1.0, 4.0), "mins_played": (90.0, 2.0)}}, \
+        k.history.match_stats_by_jornada
 
     # to_bootstrap_input(): (this jornada, rest of season) — same points
     # side (ppm*fix = 6.0*1.1 = 6.6) both times, only the start side
@@ -328,7 +387,17 @@ def _selftest() -> None:
            "points_delta": "1", "games_delta": "1"}]
     assert _perjornada_history(bad) == {}
 
-    print("ffcore.profile self-test OK (12 cases)")
+    # -- _match_stats_history: bad rows skipped, blank id/stat ignored -----
+    ms_bad = [{"player_id": "", "week": "1", "stat": "goals",
+              "value": "1", "points": "4"},
+             {"player_id": "5", "week": "x", "stat": "goals",
+              "value": "1", "points": "4"},
+             {"player_id": "5", "week": "1", "stat": "",
+              "value": "1", "points": "4"}]
+    assert _match_stats_history(ms_bad) == {}
+    assert _match_stats_history([]) == {}
+
+    print("ffcore.profile self-test OK (14 cases)")
 
 
 if __name__ == "__main__":

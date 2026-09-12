@@ -1243,12 +1243,20 @@ def load(trials_pool=None) -> Universe:
     # re-derive them.
     perjornada_rows = list(csv.DictReader(
         open(SEASON / "live" / "perjornada_2026-27.csv")))
+    # Real per-match data (mins played, goals, cards) for whichever ~118
+    # players have been on one of this league's 5 squads — api_teams's
+    # embedded lastStats, not a full-pool source (see
+    # ffcore.profile._match_stats_history's own docstring for why not).
+    stats_path = TIDY / "api_stats.csv"
+    match_stats_rows = (list(csv.DictReader(open(stats_path)))
+                        if stats_path.exists() else [])
     market_keyed = {k: {"listed": True, "price": v, "owner": owner.get(k)}
                     for k, v in price.items()}
     for k, o in owner.items():
         market_keyed.setdefault(k, {"listed": False, "price": None,
                                     "owner": o})
     profiles = build_profiles(players, sc, perjornada_rows, xw=lg.xw,
+                              match_stats_rows=match_stats_rows,
                               market_keyed=market_keyed)
 
     pos = {k: SLOT.get(p.current.pos.lower(), "MED")
