@@ -340,6 +340,68 @@ def _shots_by_jornada(xw) -> dict[str, dict[int, float]]:
     return out
 
 
+def backtest_predictor(feature_by_key_jornada: dict[str, dict[int, float]],
+                       actual_by_key_jornada: dict[str, dict[int, float]],
+                       min_pairs: int = 10) -> dict | None:
+    """Does FEATURE (through a player's second-to-last shared jornada)
+    predict his LAST shared jornada's real outcome better than his own
+    outcome-so-far average does — leave-one-player-out, real
+    significance test, no invented split.
+
+    THE REUSABLE SHAPE _shots_points_fit()'s own validation was, before
+    this: hand-written, one-off, a single arbitrary weeks-1-3-vs-4-6 split
+    that wasted every player's earlier jornadas and could not be reused
+    for the next candidate signal without rewriting the same script.
+    Miguel, 2026-09-12: "you should be able to test jornada n with
+    jornada n-1 info right?" — this is that, generalised: pass in ANY
+    two {key: {jornada: value}} dicts (shots, ball_recovery, marca_points,
+    whatever's sitting in api_stats.csv next) and get a real answer.
+
+    ONE TEST POINT PER PLAYER — his own last shared jornada, features
+    from every jornada before it summed into a rate, baseline his own
+    mean actual over those same earlier jornadas. Both sides are then
+    graded LEAVE-ONE-PLAYER-OUT: the fit predicting player P's held-out
+    point is trained on every OTHER player only, never on P himself — the
+    same discipline Calibration.fit() already uses (leave-one-team-sheet-
+    out), so a feature cannot flatter itself by fitting the very point
+    it's judged against, the exact failure mode a single in-sample split
+    can't rule out.
+
+    Returns {"n", "mae_feature", "mae_baseline", "gap"} — `gap` is
+    stats.bootstrap_gap() on the two paired MAE series, not a bare
+    number; `beats` in it is the answer to "is this real." None below
+    `min_pairs` players with at least 2 shared jornadas.
+    Why: docs/notes/score.md#backtest_predictor--the-reusable-hypothesis-test
+    """
+    from stats import bootstrap_gap
+
+    triples = []
+    for key, jd_feat in feature_by_key_jornada.items():
+        jd_actual = actual_by_key_jornada.get(key, {})
+        common = sorted(set(jd_feat) & set(jd_actual))
+        if len(common) < 2:
+            continue
+        prior, last = common[:-1], common[-1]
+        x = sum(jd_feat[j] for j in prior) / len(prior)
+        baseline = sum(jd_actual[j] for j in prior) / len(prior)
+        triples.append((x, baseline, jd_actual[last]))
+    n = len(triples)
+    if n < min_pairs:
+        return None
+
+    feature_err, baseline_err = [], []
+    for i in range(n):
+        train = triples[:i] + triples[i + 1:]
+        slope, intercept = _linreg([t[0] for t in train],
+                                   [t[2] for t in train])
+        x_i, baseline_i, y_i = triples[i]
+        feature_err.append(abs((slope * x_i + intercept) - y_i))
+        baseline_err.append(abs(baseline_i - y_i))
+    return {"n": n, "mae_feature": sum(feature_err) / n,
+           "mae_baseline": sum(baseline_err) / n,
+           "gap": bootstrap_gap(feature_err, baseline_err)}
+
+
 def _shots_points_fit(xw, players=None) -> tuple[float, float, int]:
     """(slope, intercept, n) — this season's real points in a jornada as a
     linear function of a forward's OWN shot volume (total_scoring_att per
@@ -350,14 +412,27 @@ def _shots_points_fit(xw, players=None) -> tuple[float, float, int]:
     "why does the model bench Omar El Hilali" into "what's sitting in the
     tidy store unused") — there is no earlier season of it to fit a units
     conversion against. Fits on each forward's own history instead: shot
-    volume through jornada N-1 predicting jornada N's own points. Checked
-    before being wired in, not assumed: this exact split (weeks 1-3
-    predicting weeks 4-6) beat the forward's own points-so-far at
-    predicting his next points — MAE 3.25 vs 4.12, forwards only, n=20,
-    2026-09-12. Below 10 paired players this refuses (slope 0.0,
-    intercept 0.0) rather than fit a line through noise — same floor
-    _xg_points_fit() uses, for the same reason; Scorer.rate() also checks
-    this count explicitly before trusting the term at all.
+    volume through jornada N-1 predicting jornada N's own points.
+
+    VALIDATED WITH backtest_predictor() (leave-one-player-out, real
+    significance test), NOT the one-off weeks-1-3-vs-4-6 split first used
+    to justify this (that read MAE 3.25 vs 4.12 and no CI at all). Re-run
+    properly the same day once the reusable harness existed: MAE 2.99 vs
+    4.48 — a LARGER effect, same direction — but n=25's bootstrap CI on
+    the gap is -3.01 to +0.09, straddling zero. Real, promising, NOT yet
+    statistically proven. Kept live anyway (Scorer.rate() only applies it
+    above the 10-pair floor, same guard as before) on the same basis
+    DRIFT_FRAC's own unfitted default and the pts_lo-vs-mean ranking
+    question were both kept or decided: a real structural argument (shots
+    are the more stable underlying skill for a position whose points are
+    goal-driven and streaky) plus a directionally consistent, sizeable
+    reading — not proof, and not pretended to be one. Re-check with
+    backtest_predictor() as more jornadas accumulate; revisit if the gap
+    doesn't tighten toward significance or reverses.
+    Below 10 paired players this refuses (slope 0.0, intercept 0.0)
+    rather than fit a line through noise — same floor _xg_points_fit()
+    uses, for the same reason; Scorer.rate() also checks this count
+    explicitly before trusting the term at all.
 
     `players`, when given, is load_players()'s own output — INJECTABLE
     rather than always re-loaded: that function needs a live market/
@@ -901,13 +976,14 @@ class Scorer:
         self.xg_n = xg_n            # how many (player, xG, ppm) pairs fit the slope
         self.xg_boost = xg_boost    # pseudo-matches an xG match is worth vs a raw one
         self.xg_why = xg_why        # printed by callers that want the provenance
-        # SHOT VOLUME — see _shots_points_fit()'s own docstring for why this
-        # is a real, forward-validated signal (MAE 3.25 vs 4.12 predicting a
-        # forward's own next points, n=20, 2026-09-12) and why it has no
-        # xg_boost equivalent (no prior season of this feed exists yet to
-        # calibrate one against — 1 raw match per informed match, honestly,
-        # not invented). {key: {"shots90":..., "minutes":...}}, forwards
-        # only (same gate xg uses for attacking mids too, narrower here
+        # SHOT VOLUME — see _shots_points_fit()'s own docstring for the
+        # real, backtest_predictor()-checked case (a large, directionally
+        # real effect, NOT yet statistically proven at n=25 — read that
+        # docstring before citing a number from this comment) and why it
+        # has no xg_boost equivalent (no prior season of this feed exists
+        # yet to calibrate one against — 1 raw match per informed match,
+        # honestly, not invented). {key: {"shots90":..., "minutes":...}},
+        # forwards only (same gate xg uses for attacking mids too, narrower here
         # because that's what was actually validated).
         self.shots = shots or {}
         self.shots_slope = shots_slope
@@ -1609,6 +1685,33 @@ def _selftest() -> None:
         (with_shots.ppm, expect_shots)
     assert "shots" in with_shots.why
 
+    # -- backtest_predictor: the reusable hypothesis-test harness, checked
+    # with a known-answer synthetic case before trusting it on real data -
+    assert backtest_predictor({}, {}, min_pairs=1) is None    # nothing to test
+    # A feature that's an EXACT linear function of next-jornada's actual
+    # (y = 2x, no noise) must beat a flat "his own average so far"
+    # baseline whenever the trend actually moves — 12 players, feature
+    # rising 1..12 across two prior jornadas, last-jornada actual doubles
+    # the mean feature exactly.
+    exact_feat = {str(i): {1: float(i), 2: float(i)} for i in range(1, 13)}
+    exact_act = {str(i): {1: float(i) - 1, 2: float(i) + 1, 3: float(i) * 2}
+                for i in range(1, 13)}
+    exact = backtest_predictor(exact_feat, exact_act, min_pairs=10)
+    assert exact is not None and exact["n"] == 12, exact
+    assert exact["mae_feature"] < exact["mae_baseline"], exact
+    assert exact["gap"]["beats"], exact          # real, not a coin flip
+    # PURE NOISE, no real relationship: a fitted line must not reliably
+    # beat the baseline just because it's fitted — same discipline
+    # rate_baseline_check()'s own "always_off" case checks the other way.
+    import random as _random_bp
+    _rng_bp = _random_bp.Random(7)
+    noise_feat = {str(i): {1: _rng_bp.random(), 2: _rng_bp.random()}
+                 for i in range(1, 13)}
+    noise_act = {str(i): {1: 5.0, 2: 5.0, 3: 5.0 + _rng_bp.uniform(-0.5, 0.5)}
+                for i in range(1, 13)}
+    noisy = backtest_predictor(noise_feat, noise_act, min_pairs=10)
+    assert noisy is not None and not noisy["gap"]["beats"], noisy
+
     # -- _shots_by_jornada / _shots_points_fit / load_shots_current: the
     # real join through api_stats.csv, gated to forwards, checked against
     # a real (small) fixture rather than assumed from the arithmetic above
@@ -1718,7 +1821,7 @@ def _selftest() -> None:
         finally:
             _tidy3.TIDY, _tidy3.SEASON = _real_tidy3, _real_season3
 
-    print("ffcore.score self-test OK (66 cases)")
+    print("ffcore.score self-test OK (71 cases)")
 
 
 if __name__ == "__main__":
