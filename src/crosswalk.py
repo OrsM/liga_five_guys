@@ -319,7 +319,16 @@ def main() -> None:
     # row would say anyway.
     api_rows = (latest_only(read_csv(TIDY / "api_teams.csv"))
                 + latest_only(read_csv(TIDY / "api_market.csv"))
-                + latest_only(read_csv(TIDY / "api_players.csv")))
+                + latest_only(read_csv(TIDY / "api_players.csv"))
+                # Every player in the competition, not just the ones this
+                # league has transacted — closes the app_id gap for a
+                # player nobody here has ever bought or sold. No "manager"
+                # field at all (it isn't anyone's squad), which api_key()
+                # already tolerates: only its ledger-tie-break step needs
+                # one, and that step is a fallback tried after name+value
+                # already succeed. Why:
+                # docs/notes/league.md#the-bulk-player-list-and-app_id-with-no-manager
+                + latest_only(read_csv(TIDY / "api_players_all.csv")))
     elo_rows = read_csv(TIDY / "elo.csv")
     lg = League.load()
 
@@ -462,6 +471,38 @@ def _selftest() -> None:
 
     # An unlisted feed leaves a gap rather than a wrong answer.
     assert xw.player(app_id="9999") is None
+
+    # -- the bulk player-list feeds app_id too, with no manager at all -----
+    # api_player_N/api_teams/api_activity rows all carry a manager, because
+    # they only ever name a player THIS league happened to transact — the
+    # bulk list names every player in the competition and has no manager to
+    # name, since it isn't anyone's squad. api_key()'s ledger-tie-break step
+    # is the only one that needs a handle, and it is a fallback tried after
+    # name+value already succeed, so an empty handle must resolve exactly
+    # the same as a normal transaction row would. Why:
+    # docs/notes/league.md#the-bulk-player-list-and-app_id-with-no-manager
+    from ffcore.league import Config, League
+    from ffcore.tidy import Market as _RealMarket
+
+    bulk_mkt = _RealMarket([{"name": "Hugo Duro", "team": "Espanyol",
+                             "value": "8534068",
+                             "observed_at": "2026-08-01T0000Z"}])
+    bulk_lg = League(Config(me="nobody", budget=100e6), {}, [], bulk_mkt)
+    bulk_market_rows = [{"name": "Hugo Duro", "slug": "hugo-duro",
+                        "team": "Espanyol"}]
+    bulk_clubs = build_clubs(bulk_market_rows, [], [])
+    # A made-up id, deliberately not a real one — app_ids_known() reads the
+    # actual players.csv off disk, and a real id already claimed by some
+    # other real player there would resolve to THAT player first (step 1 of
+    # api_key(), checked ahead of the name join), which is correct behaviour
+    # but makes a real id a trap for a fixture that wants a clean first-time
+    # resolution.
+    bulk_players = build_players(
+        bulk_market_rows, [], [],
+        [{"player_name": "Hugo Duro", "market_value": "8534068",
+          "player_id": "99999999"}],   # no "manager" key at all
+        bulk_lg, bulk_clubs)
+    assert bulk_players["hugo duro"].app_id == "99999999", bulk_players
 
     # -- build_understat_ids: name+team, the same bootstrap every other feed
     # went through, and the same refuse-rather-than-guess on ambiguity -------

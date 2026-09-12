@@ -2228,6 +2228,44 @@ def sign_api_player(text: str) -> str | None:
     return _digest([rows[0]["player_name"]]) if rows else None
 
 
+API_PLAYERS_ALL_URL = "{base}/v1/competition/1/players?x-lang=es"
+
+
+def parse_api_players_all(text: str, observed_at: str,
+                          key: str = "api_players_all") -> list[dict]:
+    """Every player in the competition, one row each — not just the ones
+    this league happens to have transacted.
+
+    `api_player_{id}` only ever gets queued for an id the activity feed
+    mentioned (player_sources(), below), so a player nobody in a small
+    private league has bought or sold stays unnamed forever. This is the
+    one call that names all of them, including the reserve goalkeeper
+    nobody has ever put up for sale — closing the crosswalk's app_id gap
+    for players this specific league simply has no other way to observe.
+    """
+    d = _j(text)
+    if not isinstance(d, list):
+        return []
+    return [{
+        "observed_at": observed_at, "source": LFG_SOURCE,
+        "player_id": str(p.get("id") or ""),
+        "player_name": p.get("nickname") or "",
+        "position_id": str(p.get("positionId") or ""),
+        "team_id": str(p.get("teamId") or ""),
+        "market_value": str(p.get("marketValue") or ""),
+        "player_status": p.get("playerStatus") or "",
+    } for p in d if p.get("id")]
+
+
+def sign_api_players_all(text: str) -> str | None:
+    rows = parse_api_players_all(text, "")
+    if not rows:
+        return None
+    return _digest(sorted("%s@%s/%s" % (r["player_id"], r["player_status"],
+                                        r["market_value"])
+                          for r in rows))
+
+
 def player_source(key: str) -> Source | None:
     """The entry for one player lookup, rebuilt from its key."""
     m = API_PLAYER_KEY_RE.match(key or "")
@@ -2538,6 +2576,13 @@ def sources(enabled_only: bool = True) -> list[Source]:
     # league_sources() — the same shape as the calendar and its match pages.
     out += [Source(API_LEAGUES_KEY, "api_leagues", API_LEAGUES_URL,
                    parse_api_leagues, sign_api_leagues, auth=True)]
+    # Identity/position/team barely move; market_value/points/status do,
+    # but both already update daily via api_teams and the per-player
+    # lookups anyway — same cadence already used for elo/af_fixtures/the
+    # calendar, all similarly slow-changing.
+    out += [Source("api_players_all", "api_players_all", API_PLAYERS_ALL_URL,
+                   parse_api_players_all, sign_api_players_all,
+                   cadence="daily", auth=True)]
     return [s for s in out if s.enabled or not enabled_only]
 
 
@@ -2807,6 +2852,12 @@ _API_MARKET_FIXTURE = """[
 _API_PLAYER_FIXTURE = """{"id":"1191","name":"Hugo Duro Perales",
  "nickname":"Hugo Duro","positionId":4,"marketValue":8534068,
  "teamId":"12","points":0}"""
+
+_API_PLAYERS_ALL_FIXTURE = """[
+ {"id":"1191","positionId":"3","nickname":"Hugo Duro","playerStatus":"ok",
+  "marketValue":"8534068","points":12,"teamId":"12"},
+ {"id":"68","positionId":"1","nickname":"Unai Simón","playerStatus":"ok",
+  "marketValue":"49195828","points":34,"teamId":"3"}]"""
 
 _API_ACTIVITY_FIXTURE = """[
  {"id":"a1","activityTypeId":31,"amount":58220110,"playerMasterId":1337,
@@ -3664,6 +3715,32 @@ def _selftest() -> None:
     # futbolfantasy is a credential leaked to a third party.
     assert not any(s.auth for s in sources() if not s.key.startswith("api_"))
 
+    # -- the bulk player list: every player, one call, no per-id lookup ----
+    # api_player_N only ever names a player THIS league has transacted
+    # (queued from the activity feed) — the bulk list names every player in
+    # the competition regardless of whether anyone here has ever bought him,
+    # which is what closes the crosswalk's app_id gap for players nobody in
+    # a small private league has happened to trade yet.
+    pa = parse_api_players_all(_API_PLAYERS_ALL_FIXTURE, "t")
+    assert len(pa) == 2, pa
+    assert pa[0]["player_id"] == "1191", pa
+    assert pa[0]["player_name"] == "Hugo Duro", pa
+    assert pa[0]["position_id"] == "3", pa
+    assert pa[0]["team_id"] == "12", pa
+    assert pa[0]["market_value"] == "8534068", pa
+    assert pa[0]["player_status"] == "ok", pa
+    assert pa[1]["player_id"] == "68" and pa[1]["player_name"] == "Unai Simón", pa
+    assert parse_api_players_all("<html>", "t") == []
+    assert sign_api_players_all(_API_PLAYERS_ALL_FIXTURE) is not None
+    # Reordering the list is not a change; a different player is.
+    _rev = _json.dumps(list(reversed(_json.loads(_API_PLAYERS_ALL_FIXTURE))))
+    assert (sign_api_players_all(_rev) ==
+            sign_api_players_all(_API_PLAYERS_ALL_FIXTURE))
+    assert source_for("api_players_all").parse is parse_api_players_all
+    assert source_for("api_players_all").table == "api_players_all"
+    assert source_for("api_players_all").cadence == "daily"
+    assert source_for("api_players_all").auth is True
+
     # -- offers: what somebody else is bidding for a player you have listed -
     off = parse_api_offer(_API_OFFER_FIXTURE, "t", "api_offer_24338726")
     assert len(off) == 1, off
@@ -3817,14 +3894,17 @@ def _selftest() -> None:
     assert source_for("api_lineup_38").table == "api_lineup"
 
     reg = sources()
-    # 7 standalone pages: market, points, af_fixtures, elo, the calendar, the
-    # odds source, and the API's discovery page. The three API entries it
-    # reveals are not here — they are queued at run time, like the match
-    # pages. Plus FD_SEASONS_BACK + 1 football-data entries and
-    # UNDERSTAT_SEASONS_BACK + 1 understat entries (both deterministic from
-    # today's date, so listed directly rather than queued).
-    assert len(reg) == (7 + len(TEAMS) + len(AF_TEAMS) + FD_SEASONS_BACK + 1
-                        + UNDERSTAT_SEASONS_BACK + 1) == 53, len(reg)
+    # 8 standalone pages: market, points, af_fixtures, elo, the calendar, the
+    # odds source, the API's discovery page, and the bulk player list (the
+    # one API entry that needs no league id, so it is listed directly here
+    # rather than queued once the discovery page reveals a league). The
+    # three PER-LEAGUE API entries the discovery page reveals are not here —
+    # they are queued at run time, like the match pages. Plus
+    # FD_SEASONS_BACK + 1 football-data entries and UNDERSTAT_SEASONS_BACK +
+    # 1 understat entries (both deterministic from today's date, so listed
+    # directly rather than queued).
+    assert len(reg) == (8 + len(TEAMS) + len(AF_TEAMS) + FD_SEASONS_BACK + 1
+                        + UNDERSTAT_SEASONS_BACK + 1) == 54, len(reg)
     assert set(AF_TEAMS) == set(TEAMS), set(AF_TEAMS) ^ set(TEAMS)
     # Both team sweeps run twice a day — the 11:40 sweep exists because the
     # XIs firm up late morning, and a calendar-day cadence skipped it there.
@@ -3842,7 +3922,8 @@ def _selftest() -> None:
     assert {s.table for s in reg} == {"market", "points", "lineups",
                                       "fixtures", "elo", "matches",
                                       "api_leagues", "results_history",
-                                      "understat_players", "odds"}
+                                      "understat_players", "odds",
+                                      "api_players_all"}
     assert source_for("team_celta").parse is parse_team
     assert source_for("gone") is None                     # retired page name
 
@@ -3853,7 +3934,8 @@ def _selftest() -> None:
                "af_fixtures": _AF_HUB_FIXTURE, "elo": _ELO_FIXTURE,
                CAL_KEY: _CAL_FIXTURE, API_LEAGUES_KEY: _API_LEAGUES_FIXTURE,
                "understat_2026": _UNDERSTAT_LIVE,
-               "understat_2025": _UNDERSTAT_PAST, "odds": _ODDS_LIVE}
+               "understat_2025": _UNDERSTAT_PAST, "odds": _ODDS_LIVE,
+               "api_players_all": _API_PLAYERS_ALL_FIXTURE}
     # Half the AF teams get each shape, so neither branch can rot unnoticed.
     for i, k in enumerate(sorted(AF_TEAMS)):
         samples[f"af_{k}"] = _AF_FIXTURE if i % 2 else _AF_CONSENSO_FIXTURE
