@@ -21,7 +21,8 @@ from __future__ import annotations
 
 import math
 
-__all__ = ["Obs", "Calibration", "observations", "af_prob", "METHOD_VERSION"]
+__all__ = ["Obs", "Calibration", "observations", "af_prob", "METHOD_VERSION",
+          "fit_start_fallbacks"]
 
 # Bumped whenever fit()/observations() changes what it optimises, not what
 # data it sees — a methodology change with no data change is what a
@@ -309,6 +310,58 @@ def observations(lineups, starters, cut: str, roster=None,
     return out
 
 
+def fit_start_fallbacks(lineups, starters, cut: str,
+                        neutral_default: float = 60.0,
+                        absent_default: float = 15.0, k: float = 8.0,
+                        xw=None) -> tuple[float, float, str]:
+    """(neutral_pct, absent_pct, why) — score.py's NEUTRAL_START/
+    ABSENT_START, shrunk toward their own real historical accuracy
+    instead of held at a guess forever.
+
+    Miguel, 2026-09-13: "shouldn't you include all these in your list and
+    improve on the approach?" — these two sat in score.py with no fitting
+    evidence at all, the same status HOME_EDGE had before being fit this
+    same session. Real, checked: `observations()`'s own `Obs.ff` is
+    EXACTLY `neutral_default/100` or `absent_default/100` whenever a row
+    used one of these fallbacks (see that function's own "fp = ..."
+    logic) — a free, exact way to bucket real historical observations by
+    which fallback the live scorer would have used, no new join needed.
+
+    2026-09-13 reading: of 12 real historical cases where a player was
+    NOT on the probable-XI page at all (the ABSENT_START case), ZERO
+    started at all — the 15% guess overstates it by a lot. Of 25 cases
+    ON the page with no percentage given (NEUTRAL_START), the real
+    started rate was 51%, somewhat below the 60% guess.
+
+    SHRUNK, NOT TAKEN RAW — n=12/n=25 is real but thin. Blended toward
+    the ORIGINAL guess with pseudo-count `k` (the same shrinkage shape
+    SHRINK_K already uses elsewhere in this repo, not a new invented
+    one): fitted = (k*default + n*observed) / (k+n). A genuinely wrong
+    guess (ABSENT_START) still moves a lot even shrunk this way; a small
+    real sample does not get to overturn the prior outright.
+    Why: docs/notes/startprob.md#fit_start_fallbacks--why-a-fit-not-a-guess
+    """
+    obs = observations(lineups, starters, cut, neutral=neutral_default,
+                       absent=absent_default, xw=xw)
+
+    def shrink(default_pct, bucket):
+        n = len(bucket)
+        if n == 0:
+            return default_pct, "no real observations yet, keeping %.0f%%" \
+                % default_pct
+        rate = sum(o.started for o in bucket) / n
+        fitted = (k * default_pct / 100.0 + n * rate) / (k + n) * 100.0
+        return fitted, ("%d real observations, %.0f%% actually started -> "
+                       "%.1f%%" % (n, 100 * rate, fitted))
+
+    neutral_bucket = [o for o in obs if abs(o.ff - neutral_default / 100) < 1e-9]
+    absent_bucket = [o for o in obs if abs(o.ff - absent_default / 100) < 1e-9]
+    neutral_pct, neutral_why = shrink(neutral_default, neutral_bucket)
+    absent_pct, absent_why = shrink(absent_default, absent_bucket)
+    return neutral_pct, absent_pct, ("neutral: %s; absent: %s"
+                                    % (neutral_why, absent_why))
+
+
 def _selftest() -> None:
     # -- the shape ---------------------------------------------------------
     assert abs(_platt(0.5, 0.0, 1.0) - 0.5) < 1e-6
@@ -439,6 +492,21 @@ def _selftest() -> None:
                for o in got), got
     assert observations(lineups, [], cut="M") == []
 
+    # -- fit_start_fallbacks: shrunk toward the real historical rate, not
+    # taken raw off one or two observations -------------------------------
+    # This fixture's neutral bucket (vague-man) has n=1, rate=0%; its
+    # absent bucket (surprise-man) has n=1, rate=100% — both shrunk with
+    # k=8 toward the 60/15 defaults, not replaced outright.
+    npct, apct, why = fit_start_fallbacks(lineups, starters, cut="M")
+    assert abs(npct - (8 * 60 + 1 * 0) / 9) < 1e-9, (npct, why)
+    assert abs(apct - (8 * 15 + 1 * 100) / 9) < 1e-9, (apct, why)
+    assert "1 real observations" in why, why
+    # No real observations at all for either bucket: keeps the defaults,
+    # says so rather than guessing.
+    npct0, apct0, why0 = fit_start_fallbacks([], [], cut="M")
+    assert npct0 == 60.0 and apct0 == 15.0, (npct0, apct0)
+    assert "no real observations" in why0, why0
+
     # THE CROSSWALK MAKES THE NARROW SOURCE'S JOIN EXACT. It shares no slug
     # with anybody, so without one it is matched on a folded name at 66% — and
     # the third of it that misses is a source silently having no opinion.
@@ -487,7 +555,7 @@ def _selftest() -> None:
     assert abs(graded[0.9] - 0.5) < 1e-9, graded    # 45 of 90 minutes
     assert abs(graded[0.1] - 0.5) < 1e-9, graded    # on at 45', 45 minutes
 
-    print("ffcore.startprob self-test OK (50 cases)")
+    print("ffcore.startprob self-test OK (54 cases)")
 
 
 if __name__ == "__main__":

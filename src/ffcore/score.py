@@ -909,7 +909,8 @@ def _calibrated():
         return _CAL_CACHE[0]
     import json
     from ffcore.crosswalk import Crosswalk
-    from ffcore.startprob import Calibration, METHOD_VERSION, observations
+    from ffcore.startprob import (Calibration, METHOD_VERSION, observations,
+                                  fit_start_fallbacks)
     from ffcore.tidy import load_lineups, read_csv, TIDY
     from ffcore.second import SECOND_SOURCE
 
@@ -919,6 +920,22 @@ def _calibrated():
     # The crosswalk is what lets the narrow source be joined exactly rather
     # than on a folded name: it shares no slug with anything else.
     xw = Crosswalk.read(TIDY / "players.csv", TIDY / "clubs.csv")
+    # THE ACTUAL LIVE EFFECT of fit_start_fallbacks() — same discipline
+    # DRIFT_FRAC/HOME_EDGE's own wiring already established this session:
+    # fitting a constant and only ever printing the result nobody acts on
+    # is not a fix. Mutates the module globals (Scorer.score() reads
+    # NEUTRAL_START/ABSENT_START live off this module, same mechanism
+    # HOME_EDGE's own live reads use) BEFORE any Scorer built this run
+    # calls .score() on a real player. Unconditional (not gated behind
+    # the cache check below) — cheap (one pass over already-loaded
+    # observations), and the fallback-fit and the Calibration fit are two
+    # independent questions off the same underlying data.
+    global NEUTRAL_START, ABSENT_START
+    if cut:
+        NEUTRAL_START, ABSENT_START, _fallback_why = fit_start_fallbacks(
+            load_lineups() + second, truth, cut,
+            neutral_default=NEUTRAL_START, absent_default=ABSENT_START,
+            xw=xw)
     # On disk, keyed by what it was fitted on — the fit costs ~6s in every
     # process, and a changed fingerprint refits; nothing else does.
     # METHOD_VERSION is part of that evidence, not just the data.
