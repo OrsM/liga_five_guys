@@ -51,7 +51,8 @@ from ffcore.forecast import Bootstrap, pool_from_perjornada  # noqa: E402
 import methodology as _methodology  # noqa: E402
 from ffcore.league import MARKET, api_key  # noqa: E402
 from ffcore.parse import fmt_money  # noqa: E402
-from ffcore.profile import PlayerProfile, build_profiles  # noqa: E402
+from ffcore.profile import (PlayerProfile, UNSCORED_DEFAULT,  # noqa: E402
+                            build_profiles)
 from ffcore.score import SLOT, SLOT_MIN, _calibrated  # noqa: E402
 from ffcore.text import norm  # noqa: E402
 from ffcore.season import (LeagueState, XI_SIZE, best_xi,  # noqa: E402
@@ -1265,16 +1266,15 @@ def load(trials_pool=None) -> Universe:
     scored: dict[str, object] = {}
     for k in universe:
         p = profiles.get(k)
-        s = p.derived.scored if p else None
-        scored[k] = s
-        base[k] = ((max(0.0, s.ppm * s.fix), min(1.0, (s.pct_used or 0) / 100))
-                   if s else (2.0, 0.5))
-        # Same pair, one jornada later — only the START side differs (a
+        scored[k] = p.derived.scored if p else None
+        # to_bootstrap_input() owns the (pts, p_start) reshaping — same
+        # points side both jornada views, only the start side differs (a
         # rate this thin has no more evidence by jornada 10 than jornada 3,
-        # but P(start) does once he has current-season minutes).
-        base_rest[k] = ((max(0.0, s.ppm * s.fix),
-                        min(1.0, (s.pct_rest or 0) / 100))
-                       if s else (2.0, 0.5))
+        # but P(start) does once he has current-season minutes) — and the
+        # neutral (2.0, 0.5) default for an unscored player, in one place
+        # instead of duplicated inline here.
+        base[k], base_rest[k] = (p.to_bootstrap_input() if p
+                                 else (UNSCORED_DEFAULT, UNSCORED_DEFAULT))
 
     pool = pool_from_perjornada(perjornada_rows)
     # A round in progress carries only players who haven't played it yet —

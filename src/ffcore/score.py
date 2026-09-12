@@ -694,12 +694,8 @@ class Scored(NamedTuple):
     pct_rest: float
     on_page: bool
     status: str
-    note: str               # diagnosis / expected return, when published
     assumed: bool
-    why: str
     value: float
-    delta_1d: float
-    delta_pct: float
     fix: float = 1.0        # fixture factor, 1.0 = neutral or unknown
     opp: str = ""           # who he faces next, "" if no fixture is known
     home: bool = True
@@ -792,7 +788,6 @@ class Scorer:
         self.start_pct: dict[str, float] = {}
         self.listed: set[str] = set()
         self.status: dict[str, str] = {}
-        self.notes: dict[str, str] = {}
         for r in xi or []:
             # The slug first: it is an identifier, the name is not.
             key = self._by_ff_slug.get(norm(r.get("player_slug") or ""))
@@ -807,8 +802,6 @@ class Scorer:
                 self.start_pct[key] = max(self.start_pct.get(key, 0.0), p)
             if r.get("status") and r["status"] != "ok":
                 self.status[key] = r["status"]
-                if r.get("note"):
-                    self.notes[key] = r["note"]
 
         self.promoted = self._detect_promoted()
         self.priors, self.global_prior = self._priors()
@@ -953,12 +946,9 @@ class Scorer:
             elo_gap=m.gap if m else None,
             cur_pj=rating.cur_pj, pj=rating.pj,
             ppm=rating.ppm, pct=pct, pct_used=pct_used, pct_rest=pct_rest,
-            on_page=on_page, status=st, note=self.notes.get(key, ""),
+            on_page=on_page, status=st,
             assumed=rating.assumed,
-            why=rating.why,
             value=money(rec.get("value")) or 0.0,
-            delta_1d=ratio(rec.get("delta_1d")) or 0.0,
-            delta_pct=ratio(rec.get("delta_pct_1d")) or 0.0,
         )
 
     def score_squad(self, names) -> tuple[list[Scored], list[str]]:

@@ -105,12 +105,38 @@ class PlayerDerived:
     scored: object = None          # the cached score.py Scored NamedTuple
 
 
+# The neutral guess for a player Scorer has no row for at all — 2.0 points,
+# 50% to start. Not a real estimate, a deliberately unopinionated default so
+# an unscored player still has a legal (pts, p_start) pair to feed
+# Bootstrap, rather than being silently dropped from the simulation.
+# Matches the literal decide.load() already used before this module existed.
+UNSCORED_DEFAULT = (2.0, 0.5)
+
+
 @dataclass
 class PlayerProfile:
     identity: PlayerIdentity
     current: PlayerCurrent
     history: PlayerHistory
     derived: PlayerDerived
+
+    def to_bootstrap_input(self) -> tuple[tuple[float, float],
+                                          tuple[float, float]]:
+        """((pts, p_start) this jornada, (pts, p_start) every jornada
+        after) — the shape decide.py's base/base_rest dicts feed Bootstrap.
+
+        Both share the same points side (ppm*fix — a rate this thin has no
+        more evidence by jornada 10 than jornada 3); only the START side
+        differs, because P(start) firms up once a player has current-
+        season minutes even when his points rate doesn't. Replaces the
+        manual field-picking that used to live inline in decide.load().
+        """
+        s = self.derived.scored
+        if s is None:
+            return UNSCORED_DEFAULT, UNSCORED_DEFAULT
+        pts = max(0.0, s.ppm * s.fix)
+        return ((pts, min(1.0, (s.pct_used or 0) / 100)),
+               (pts, min(1.0, (s.pct_rest or 0) / 100)))
 
 
 def _perjornada_history(rows) -> dict[str, PlayerHistory]:
@@ -214,9 +240,10 @@ def build_profiles(players: dict, sc, perjornada_rows,
 def _selftest() -> None:
     # -- identity/current/derived, from a minimal fake Scorer ---------------
     class _FakeScored:
-        def __init__(self, ppm, pj, pct_used, fix, status):
+        def __init__(self, ppm, pj, pct_used, fix, status, pct_rest=None):
             self.ppm, self.pj, self.pct_used = ppm, pj, pct_used
             self.fix, self.status = fix, status
+            self.pct_rest = pct_used if pct_rest is None else pct_rest
 
     class _FakeScorer:
         def row_for(self, k):
@@ -224,7 +251,7 @@ def _selftest() -> None:
 
         def score(self, row):
             return _FakeScored(ppm=6.0, pj=12.0, pct_used=80.0, fix=1.1,
-                               status="ok") if row else None
+                               status="ok", pct_rest=60.0) if row else None
 
     # `load_players()`'s REAL shape — {name, team, pos, value, delta_1d,
     # start, status} — carries NO app_id/understat_id/club identity at all;
@@ -270,6 +297,13 @@ def _selftest() -> None:
     assert k.history.points_by_jornada == {1: 5.0, 2: 3.0}
     assert k.history.started_by_jornada == {1: True, 2: True}
 
+    # to_bootstrap_input(): (this jornada, rest of season) — same points
+    # side (ppm*fix = 6.0*1.1 = 6.6) both times, only the start side
+    # differs (pct_used=80% now, pct_rest=60% fitted this run).
+    this_j, rest = k.to_bootstrap_input()
+    assert abs(this_j[0] - 6.6) < 1e-9 and abs(this_j[1] - 0.8) < 1e-9, this_j
+    assert abs(rest[0] - 6.6) < 1e-9 and abs(rest[1] - 0.6) < 1e-9, rest
+
     # A player the Scorer has no row for at all: not scored, not dropped —
     # still gets a profile, just with empty derived/history. This IS the
     # full-pool guarantee: nobody vanishes for lack of a market row.
@@ -278,6 +312,9 @@ def _selftest() -> None:
     assert u.derived.ppm is None and u.derived.market_exp is None
     assert u.current.listed is False and u.current.price is None
     assert u.history.points_by_jornada == {}
+    # No Scored at all -> the same neutral default decide.load() always
+    # used for an unscored player, both jornada views identical.
+    assert u.to_bootstrap_input() == (UNSCORED_DEFAULT, UNSCORED_DEFAULT)
 
     # -- _perjornada_history: falls back to norm(name) with no ff_id -------
     rows2 = [{"ff_id": "", "player_name": "No Id Here", "jornada": "3",
