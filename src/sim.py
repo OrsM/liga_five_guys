@@ -316,7 +316,7 @@ def ladder_rows(u, rows, bands=None) -> list[dict]:
     par = {k: v["par"] for k, v in decide.player_forecasts(u).items()}
 
     def cell(k, group, where, money, pts, note="", value=None,
-            lo=None, hi=None, market=None, premium=None):
+            lo=None, hi=None, market=None, premium=None, bought=None):
         if k in bands:
             pts, lo, hi, _action = bands[k]
         return {"name": title_name(u.name.get(k, k)),
@@ -332,7 +332,14 @@ def ladder_rows(u, rows, bands=None) -> list[dict]:
                 # clause to pay above value) and decide.burn()'s own
                 # number for a raid — already computed by rank(), not a
                 # new calculation.
-                "market": market, "premium": premium}
+                "market": market, "premium": premium,
+                # SELL rows only — decide.bought_price()'s own reading,
+                # None for a player never transacted in this league's
+                # recorded ledger (came with the draft, or predates it).
+                # Miguel, 2026-09-12: "when proposed to sell someone, what
+                # was the price I bought them at" — this is that number,
+                # not a second guess at it.
+                "bought": bought}
 
     out = []
     # WHAT TO CHANGE, not what to have. When the marks are a legal eleven the
@@ -356,7 +363,8 @@ def ladder_rows(u, rows, bands=None) -> list[dict]:
     for k in by_slot(u, benched):
         out.append(cell(k, "keep", "yours", None, None))
     for k in sorted(dead, key=lambda k: -exp.get(k, 0.0)):
-        out.append(cell(k, "sell", "yours", u.proceeds.get(k, 0.0), None))
+        out.append(cell(k, "sell", "yours", u.proceeds.get(k, 0.0), None,
+                        bought=u.bought.get(k)))
 
     def buy_cell(k, group):
         r = won[k]
@@ -506,6 +514,17 @@ def ladder(u, rows, base, data=None) -> list[str]:
                     money += " +%.2fM" % (r["premium"] / 1e6)
             else:
                 money = ("%+.2fM" % (r["money"] / 1e6)) if r["money"] else "—"
+                # SELL: what he raises now, next to what he cost — the
+                # profit-or-loss question a "sell" row exists to answer.
+                # Missing (never transacted in this league's own ledger)
+                # says so rather than guessing at a figure.
+                if r["group"] == "sell":
+                    if r.get("bought") is not None:
+                        gain = (r["money"] or 0.0) - r["bought"]
+                        money += (" (bought %.2fM, %+.2fM)"
+                                 % (r["bought"] / 1e6, gain / 1e6))
+                    else:
+                        money += " (bought: unknown)"
         return ("| %s | %s | %.0f%% | %.2f | %s | %s | %s | %s | %s |"
                 % (r["name"], r["pos"] or "—", 100 * r["start"], r["xpts"],
                    r["where"], money, season,
@@ -1140,8 +1159,11 @@ def payload(u, rows, base, rivals, locks_h=None, n_actions: int = 0,
         "p_win": round(base.position().get(1, 0.0), 3),
         "band": [lo, hi],
         "moves": moves,
+        # `bought` is decide.bought_price()'s own reading, None for a
+        # player never transacted in this league's recorded ledger.
         "sell": [{"name": names.get(k, k), "pos": u.pos.get(k, ""),
-                  "raises": got} for k, got in dead_weight(u)],
+                  "raises": got, "bought": u.bought.get(k)}
+                 for k, got in dead_weight(u)],
         "ladder": (ladder_data if ladder_data is not None
                   else ladder_rows(u, rows)),
         "bar": _bar(u),
@@ -1935,7 +1957,12 @@ def _selftest() -> None:
                                                (*sqb, *riv, "cand")}),
            pos={**{k: v for k, v in sqb.items()}, "cand": "MED"},
            price={"cand": 5e6}, proceeds={"dead": 1e6, "star": 20e6},
-           owner={}, cash=10e6, me="me")
+           owner={}, cash=10e6, me="me",
+           # "dead" was bought for less than he raises now (a real gain);
+           # "star" was never transacted in this league's own ledger
+           # (came with the draft) — both real cases a SELL row must
+           # tell apart, not silently treat the same.
+           bought={"dead": 0.8e6})
     # EVERY MAN YOU HOLD gets a PURE SELL (2026-09-06: no funded-upgrade
     # narrative, cut with best_swap_for — the direct cause of two
     # catastrophic squad-legality bugs); everyone above the bar you do
@@ -1970,6 +1997,30 @@ def _selftest() -> None:
     # Nothing asked for at all: no extra squads scored, not an error.
     assert decide.rank(ub, [], extra=[])[3] == {}
 
+    # -- SELL rows show what he cost, next to what he raises now — Miguel,
+    # 2026-09-12: "when proposed to sell someone, what was the price I
+    # bought them at" ------------------------------------------------
+    sell_lad = "\n".join(ladder(ub, [], baseb))
+    dead_line = next(l for l in sell_lad.splitlines()
+                     if l.lower().startswith("| dead"))
+    # proceeds 1.00M, bought 0.80M -> a real +0.20M gain, not just the
+    # raw proceeds figure.
+    assert "1.00M (bought 0.80M, +0.20M)" in dead_line, dead_line
+    # A player with no known bought price (never transacted in this
+    # league's own ledger) says so outright rather than a bare number
+    # that looks like a real answer.
+    ub_unknown = _dc_replace(ub, bought={})
+    unk_lad = "\n".join(ladder(ub_unknown, [], baseb))
+    unk_line = next(l for l in unk_lad.splitlines()
+                    if l.lower().startswith("| dead"))
+    assert "1.00M (bought: unknown)" in unk_line, unk_line
+    # Same fact, same source, in the phone's JSON — payload()'s own "sell"
+    # list, not a second guess at it.
+    sell_json = payload(ub, [], baseb, ["riv"])["sell"]
+    by_name = {r["name"]: r for r in sell_json}
+    assert by_name["dead"]["bought"] == 0.8e6, by_name["dead"]
+    assert "star" not in by_name, by_name          # a nailed starter, not dead weight
+
     # THE BAND RIDES THE SAME SEASONS AS THE MOVES. A key rank() ranks a
     # real row for — buy OR sell side — is NOT banded twice: its own
     # row's pts_lo/pts_hi is the answer, off the squad the victim's
@@ -1980,7 +2031,7 @@ def _selftest() -> None:
     assert [r for r in rows2 if r["action"].buy == "cand"], rows2
     assert "cand" not in bands2, sorted(bands2)
 
-    print("sim self-test OK (209 cases)")
+    print("sim self-test OK (213 cases)")
 
 
 def main() -> None:

@@ -152,6 +152,13 @@ class Universe:
     owner: dict[str, str]
     cash: float
     me: str
+    # What his CURRENT owner actually paid to get him, from the ledger —
+    # missing for a player never transacted in this league's recorded
+    # history (came with the initial draft, or the ledger doesn't reach
+    # back that far). Distinct from `proceeds` (what a sale raises NOW,
+    # the market's own reading) and `value` (the app's stated worth) —
+    # this is the one number that answers "am I selling at a profit."
+    bought: dict[str, float] = field(default_factory=dict)
     # What the app says he is WORTH, for everyone in the universe. Distinct
     # from `price`, which is what it costs ME to get him: a free agent asks
     # about his value, a buyout clause runs a median 1.52x it, and the
@@ -1143,6 +1150,42 @@ def pending_sent(mkt: list[dict]) -> float:
               if (r.get("bid_status") or "") == "pending" and r.get("bid_money"))
 
 
+def bought_price(txns: list[dict], xw) -> dict[str, float]:
+    """{key: what his CURRENT owner actually paid for him}, from the ledger.
+
+    REPLAYED OLDEST FIRST (read_ledger()'s own order, `txns` handed in
+    exactly as League already loaded it — no second read) — a player sold
+    and later re-bought gets the LATER price, matching whoever holds him
+    now rather than his first-ever transaction. `to` == "market" (a sale
+    back to the app) is not an acquisition and is skipped, not recorded as
+    a price of zero.
+
+    JOINED THROUGH THE CROSSWALK'S app_id — transactions.csv carries the
+    ledger's own player_id, which is the LaLiga id (ledger.py's rebuild of
+    the app's activity feed), the same id space the crosswalk's 91%-
+    coverage app_id join (this session) already resolves. A player the
+    crosswalk can't place is skipped, not guessed — the same discipline
+    Crosswalk.player() itself documents.
+    """
+    out: dict[str, float] = {}
+    for t in txns:
+        to = (t.get("to") or "").strip()
+        if not to or to == "market":
+            continue
+        price = (t.get("price") or "").strip()
+        if not price:
+            continue
+        key = xw.player(app_id=(t.get("player_id") or "").strip()) if xw \
+            else None
+        if not key:
+            continue
+        try:
+            out[key] = float(price)
+        except ValueError:
+            continue
+    return out
+
+
 def pending_received(offers: list[dict], pt_to_key: dict[str, str]
                      ) -> dict[str, float]:
     """{player you hold: the largest pending offer on him}, or {}.
@@ -1442,7 +1485,7 @@ def load(trials_pool=None) -> Universe:
         part_played=played, name=name, start_note=_calibrated()[0].note(),
         unjoined=list(unjoined_clubs) + list(lg.api_unjoined),
         locked_cash=locked_cash, received_offers=received_offers,
-        players=profiles)
+        players=profiles, bought=bought_price(lg.txns, lg.xw))
     return _LOAD_CACHE
 
 
@@ -1683,6 +1726,35 @@ def _selftest() -> None:
     assert got == {"me_a": 6795815.0}, got     # pt2's only offer was accepted
     assert pending_received([], p2k) == {}
     assert pending_received(offers, {}) == {}   # nothing to join to
+
+    # -- bought_price: what the CURRENT owner actually paid, from the ledger -
+    from ffcore.crosswalk import Crosswalk, Player
+    bp_xw = Crosswalk(players={
+        "steady": Player(player_id="steady", app_id="101"),
+        "flip": Player(player_id="flip", app_id="102"),
+    })
+    bp_txns = [
+        {"date": "2026-08-11", "player": "Steady", "player_id": "101",
+         "from": "market", "to": "me", "price": "5000000"},
+        {"date": "2026-08-12", "player": "Flip", "player_id": "102",
+         "from": "market", "to": "riv", "price": "3000000"},
+        # Sold back to the app, then re-bought by ME at a different price —
+        # the LATER price wins, matching who holds him now.
+        {"date": "2026-08-20", "player": "Flip", "player_id": "102",
+         "from": "riv", "to": "market", "price": "4000000"},
+        {"date": "2026-08-21", "player": "Flip", "player_id": "102",
+         "from": "market", "to": "me", "price": "4500000"},
+        # No crosswalk entry for this app_id — skipped, not guessed.
+        {"date": "2026-08-13", "player": "Nobody", "player_id": "999",
+         "from": "market", "to": "me", "price": "1"},
+        # A blank price (a stray row) skips rather than crashing on float().
+        {"date": "2026-08-14", "player": "Steady", "player_id": "101",
+         "from": "market", "to": "me", "price": ""},
+    ]
+    bp = bought_price(bp_txns, bp_xw)
+    assert bp == {"steady": 5000000.0, "flip": 4500000.0}, bp
+    assert bought_price([], bp_xw) == {}
+    assert bought_price(bp_txns, None) == {}    # no crosswalk, nothing to join
 
     # -- offer_combos: minimal covers of a negative balance ------------------
     uoc = Universe(state=LeagueState({"me": {"a": "MED", "b": "MED",
@@ -2339,7 +2411,7 @@ def _selftest() -> None:
     # evidence count, not a new statistic.
     assert fc_out["cand"]["pj"] == 8.0, fc_out["cand"]
 
-    print("decide self-test OK (159 cases)")
+    print("decide self-test OK (162 cases)")
 
 
 if __name__ == "__main__":
