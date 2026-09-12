@@ -79,11 +79,22 @@ class PlayerHistory:
     """Time-indexed sequences — the source of truth. A future forecasting
     variable reads from here, not from a fresh tidy-CSV round trip.
 
-    match_stats_by_jornada and opponent_by_jornada are real fields with a
-    real, currently-empty default: the data sources they need
-    (api_player_{id}'s playerStats array; a materialized fixtures/odds/elo
-    join) are not tidied/built yet. Documented as the concrete next step,
-    not silently dropped — see docs/notes/profile.md once written.
+    match_stats_by_jornada: real per-match data (mins played, goals,
+    cards), joined from api_stats.csv — PARTIAL pool (~118 players who
+    have been on one of this league's 5 squads; api_stats has no bulk
+    equivalent the way identity did).
+
+    opponent_by_jornada: (opponent_club, is_home) per jornada, from
+    matches.csv — FULL pool (every club's whole schedule). Difficulty is
+    NOT included yet: elo.csv keys clubs by proper-case name
+    ("Real Madrid"), matches.csv/club_id by lowercase slug
+    ("real-madrid"), and decide.py already solves that exact mismatch for
+    its own forward-looking fixture difficulty (season_board(),
+    club_key()) — reusing that properly is the next step, not reinvented
+    here without being able to verify the join is right.
+
+    market_value_series and understat_season remain real fields with a
+    real, currently-empty default: not wired to a data source yet.
     """
     points_by_jornada: dict[int, float] = field(default_factory=dict)
     started_by_jornada: dict[int, bool] = field(default_factory=dict)
@@ -177,6 +188,33 @@ def _match_stats_history(rows) -> dict[str, dict[int, dict]]:
     return out
 
 
+def _opponent_history(match_rows) -> dict[str, dict[int, tuple]]:
+    """{club: {jornada: (opponent_club, is_home)}} from matches.csv's own
+    rows — no date-matching needed, matches.csv already carries jornada,
+    home, and away directly.
+
+    Difficulty is NOT included here yet — that needs an elo-gap number,
+    and elo.csv keys clubs by their proper-case name ("Real Madrid"),
+    while matches.csv/the crosswalk's club_id use the lowercase slug
+    ("real-madrid"). decide.py already solves that exact mismatch for its
+    own forward-looking fixture difficulty (season_board(), club_key()) —
+    reusing that properly is the next step, not reinvented here without
+    being able to verify the join is right.
+    """
+    out: dict[str, dict[int, tuple]] = {}
+    for r in match_rows:
+        home, away = (r.get("home") or "").strip(), (r.get("away") or "").strip()
+        if not home or not away:
+            continue
+        try:
+            j = int(r["jornada"])
+        except (KeyError, TypeError, ValueError):
+            continue
+        out.setdefault(home, {})[j] = (away, True)
+        out.setdefault(away, {})[j] = (home, False)
+    return out
+
+
 def _perjornada_history(rows) -> dict[str, PlayerHistory]:
     """{key: PlayerHistory} from perjornada_2026-27.csv's own rows.
 
@@ -205,7 +243,7 @@ def _perjornada_history(rows) -> dict[str, PlayerHistory]:
 
 
 def build_profiles(players: dict, sc, perjornada_rows,
-                   xw=None, match_stats_rows=None,
+                   xw=None, match_stats_rows=None, match_rows=None,
                    market_keyed: dict | None = None) -> dict[str, "PlayerProfile"]:
     """{player key: PlayerProfile} for every player `load_players()` knows —
     the full pool, no market/ownership gate at all.
@@ -238,6 +276,7 @@ def build_profiles(players: dict, sc, perjornada_rows,
     """
     histories = _perjornada_history(perjornada_rows)
     match_stats = _match_stats_history(match_stats_rows or [])
+    opponents = _opponent_history(match_rows or [])
     out: dict[str, PlayerProfile] = {}
     for k, rec in players.items():
         xp = xw.players.get(k) if xw is not None else None
@@ -279,6 +318,8 @@ def build_profiles(players: dict, sc, perjornada_rows,
             or PlayerHistory()
         if ident.app_id in match_stats:
             hist.match_stats_by_jornada = match_stats[ident.app_id]
+        if cur.club in opponents:
+            hist.opponent_by_jornada = opponents[cur.club]
         out[k] = PlayerProfile(identity=ident, current=cur,
                               history=hist, derived=der)
     return out
@@ -332,8 +373,11 @@ def _selftest() -> None:
         {"player_id": "app-999", "week": "1", "stat": "mins_played",
          "value": "90", "points": "2"},
     ]
+    matches = [{"home": "betis", "away": "sevilla", "jornada": "1"},
+              {"home": "celta", "away": "betis", "jornada": "2"}]
     profiles = build_profiles(players, _FakeScorer(), perjornada,
                               xw=_FakeXW(), match_stats_rows=match_stats,
+                              match_rows=matches,
                               market_keyed={"999": {"listed": True,
                                                      "price": 5e6,
                                                      "owner": "alice"}})
@@ -355,6 +399,10 @@ def _selftest() -> None:
     assert k.history.match_stats_by_jornada == {
         1: {"goals": (1.0, 4.0), "mins_played": (90.0, 2.0)}}, \
         k.history.match_stats_by_jornada
+    # Betis (his club, home j1 vs sevilla, away j2 at celta).
+    assert k.history.opponent_by_jornada == {
+        1: ("sevilla", True), 2: ("celta", False)}, \
+        k.history.opponent_by_jornada
 
     # to_bootstrap_input(): (this jornada, rest of season) — same points
     # side (ppm*fix = 6.0*1.1 = 6.6) both times, only the start side
@@ -397,7 +445,12 @@ def _selftest() -> None:
     assert _match_stats_history(ms_bad) == {}
     assert _match_stats_history([]) == {}
 
-    print("ffcore.profile self-test OK (14 cases)")
+    # -- _opponent_history: bad jornada skipped, blank club skipped --------
+    op = _opponent_history([{"home": "betis", "away": "", "jornada": "1"},
+                            {"home": "a", "away": "b", "jornada": "x"}])
+    assert op == {}
+
+    print("ffcore.profile self-test OK (16 cases)")
 
 
 if __name__ == "__main__":

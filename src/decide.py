@@ -1257,6 +1257,7 @@ def load(trials_pool=None) -> Universe:
                                     "owner": o})
     profiles = build_profiles(players, sc, perjornada_rows, xw=lg.xw,
                               match_stats_rows=match_stats_rows,
+                              match_rows=m,
                               market_keyed=market_keyed)
 
     pos = {k: SLOT.get(p.current.pos.lower(), "MED")
