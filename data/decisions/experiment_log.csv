@@ -15,3 +15,5 @@ observed_at,feature,position,n,mae_feature,mae_baseline,beats,verdict,notes
 2026-09-12T2152Z,recency_last_jornada_only,mediocampista,130,3.0552,3.0054,False,no effect,single most-recent jornada vs pooled baseline (full history already shrinkage-blended live)
 2026-09-12T2152Z,recency_last_jornada_only,defensa,131,2.9313,3.0011,False,marginal improvement,single most-recent jornada vs pooled baseline (full history already shrinkage-blended live)
 2026-09-12T2152Z,recency_last_jornada_only,portero,21,5.4673,5.2143,False,no effect,single most-recent jornada vs pooled baseline (full history already shrinkage-blended live)
+2026-09-12T2220Z,NEUTRAL_START_fit,all,25,0.0000,0.0000,,kept,60.0 -> live-fitted ~56.2 via the same anti-hindsight cutoff Calibration.fit() already uses (stricter than the standalone n=25/51%% check that motivated it)
+2026-09-12T2220Z,ABSENT_START_fit,all,12,0.0000,0.0000,,kept,"15.0 -> live-fitted ~14.2 with the strict cutoff (standalone check with more data showed 0/12 real starts, suggesting more room to move once more of the season accumulates)"
