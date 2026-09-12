@@ -889,19 +889,24 @@ class League:
                  if r.get("user_id") and r.get("manager")}
         own_bonus = bonus_income(load_api_activity(), users)
 
-        # The one component that stays a genuine unknown even for a rival
-        # with full bonus data: the private, opt-in "watch a video" daily
-        # bonus, which never shows up as its own activityTypeId (checked
-        # 2026-09-12 across the whole league's history — none exists) and
-        # so cannot be measured per rival at all. Assuming they get NONE of
-        # it is not a neutral default, it is a specific (and probably
-        # wrong) guess — "they watch it as often as you do" is the better
-        # one absent any other signal. Isolated as your OWN measured `paid`
-        # minus the two components already accounted for elsewhere (the
-        # flat daily allowance and your own jornada prize), spread evenly
-        # over the days it accrued over, then applied at that same daily
+        # What's left over even for a rival with full bonus data: checked
+        # 2026-09-12 against your own account (the one with a real, known
+        # balance) and even after the daily allowance AND your own jornada
+        # prize are both subtracted out, ~975k/31 days still doesn't
+        # reconcile. Candidates ruled out or left open: the "watch a video"
+        # daily bonus (never its own activityTypeId, unmeasurable per rival
+        # — see docs/notes/league.md#the-weekly-performance-bonus-vs-the-
+        # video-bonus), an "ideal XI" per-player reward the league config
+        # hints at but does not confirm is active here, or something this
+        # scraper has never queried at all. Whatever it is, assuming rivals
+        # get NONE of it is not a neutral default — it's the specific (and
+        # probably wrong) assumption that they experience zero of whatever
+        # unmeasured income you do. "They get it at your own measured rate"
+        # is the better guess absent any other signal: isolated as your OWN
+        # `paid` minus the two components already accounted for elsewhere,
+        # spread over the days it accrued over, applied at that same daily
         # rate to each rival over their own tracked days.
-        video_rate = 0.0
+        unmeasured_rate = 0.0
         me_txns = [t for t in self.txns
                   if (t.get("to") or "").strip() == self.cfg.me
                   or (t.get("from") or "").strip() == self.cfg.me]
@@ -910,10 +915,10 @@ class League:
         if paid is not None:
             me_daily, me_days = allowance(me_start, run_now(),
                                           self.cfg.daily_bonus)
-            me_video = max(0.0, paid - me_daily
-                          - own_bonus.get(self.cfg.me, 0.0))
+            me_unmeasured = max(0.0, paid - me_daily
+                                - own_bonus.get(self.cfg.me, 0.0))
             if me_days:
-                video_rate = me_video / me_days
+                unmeasured_rate = me_unmeasured / me_days
 
         for handle, mgr in self.managers.items():
             # One budget for everyone — a per-manager override sat unused in
@@ -984,18 +989,19 @@ class League:
                  if ledger_stamp(t.get("date", ""))), default=None)
             daily, days = allowance(start, run_now(), self.cfg.daily_bonus)
             if since is None and handle in own_bonus:
-                video = video_rate * days if days else 0.0
-                bonus = daily + own_bonus[handle] + video
+                unmeasured = unmeasured_rate * days if days else 0.0
+                bonus = daily + own_bonus[handle] + unmeasured
                 if daily:
                     notes.append("%.2fM of daily allowance over %.0f days"
                                  % (daily / 1e6, days))
                 notes.append("%.2fM of their own weekly performance bonus, "
                              "recorded in the app's activity feed"
                              % (own_bonus[handle] / 1e6))
-                if video:
-                    notes.append("%.2fM assuming they watch the daily "
-                                 "bonus video as often as you do"
-                                 % (video / 1e6))
+                if unmeasured:
+                    notes.append("%.2fM assuming they earn unmeasured "
+                                 "income (video bonus, ideal XI, or "
+                                 "unknown) at your own measured rate"
+                                 % (unmeasured / 1e6))
             elif since is None and paid is not None:
                 # No bonus rows for them at all (fresh join, feed gap): your
                 # own measured `paid` (flat_income) is a better estimate than
