@@ -1,0 +1,17 @@
+observed_at,feature,position,n,mae_feature,mae_baseline,beats,verdict,notes
+2026-09-12T2151Z,team_clean_sheet_rate,defensa+portero,157,3.0175,2.9933,False,no effect,binary clean-sheet history vs pooled baseline; likely redundant with existing Elo fix_factor
+2026-09-12T2151Z,team_goals_conceded,defensa,135,2.6344,2.6590,False,no effect,"continuous version, still ~flat (2.634 vs 2.659)"
+2026-09-12T2151Z,team_goals_conceded,portero,22,5.2773,5.0519,False,no effect,worse than baseline
+2026-09-12T2151Z,team_goals_scored,delantero,107,2.9557,2.8868,False,no effect,worse than pooled baseline both positions; redundant with existing Elo atk_factor
+2026-09-12T2151Z,team_goals_scored,mediocampista,137,2.8628,2.7533,False,no effect,worse than pooled baseline both positions; redundant with existing Elo atk_factor
+2026-09-12T2152Z,set_piece_taker_flag,all,,,,,not testable,"no data source identifies penalty/corner TAKERS specifically — only team-level corner counts (sources.py home_corners/away_corners) and outcome stats (penalty_won/saved/failed, which credit who drew/saved/missed a penalty, not who is the designated taker). Would need a new scrape target; not attempted this session."
+2026-09-12T2152Z,home_away_flag,all,409,2.9080,2.8764,False,no effect,binary home indicator vs pooled baseline
+2026-09-12T2152Z,home_away_flag,delantero,107,2.9456,2.8868,False,no effect,binary home indicator vs pooled baseline
+2026-09-12T2152Z,home_away_flag,mediocampista,137,2.7745,2.7533,False,no effect,binary home indicator vs pooled baseline
+2026-09-12T2152Z,home_away_flag,defensa,135,2.6600,2.6590,False,no effect,binary home indicator vs pooled baseline
+2026-09-12T2152Z,home_away_flag,portero,22,5.1595,5.0519,False,no effect,binary home indicator vs pooled baseline
+2026-09-12T2152Z,recency_last_jornada_only,all,388,3.3716,3.3627,False,no effect,single most-recent jornada vs pooled baseline (full history already shrinkage-blended live)
+2026-09-12T2152Z,recency_last_jornada_only,delantero,100,3.6263,3.7770,False,marginal improvement,single most-recent jornada vs pooled baseline (full history already shrinkage-blended live)
+2026-09-12T2152Z,recency_last_jornada_only,mediocampista,130,3.0552,3.0054,False,no effect,single most-recent jornada vs pooled baseline (full history already shrinkage-blended live)
+2026-09-12T2152Z,recency_last_jornada_only,defensa,131,2.9313,3.0011,False,marginal improvement,single most-recent jornada vs pooled baseline (full history already shrinkage-blended live)
+2026-09-12T2152Z,recency_last_jornada_only,portero,21,5.4673,5.2143,False,no effect,single most-recent jornada vs pooled baseline (full history already shrinkage-blended live)

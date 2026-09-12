@@ -1,4 +1,4 @@
-# Liga Five Guys — how the numbers are made — 2026-09-12 21:35 UTC
+# Liga Five Guys — how the numbers are made — 2026-09-12 21:54 UTC
 
 
 
@@ -38,14 +38,14 @@
 | 🟢 | api_stats | what the app scored each player, broken into what he did — one row per player per week per stat, a correction being a later row rather than an overwrite | LaLiga Fantasy API | 8,559 | 12 Sep 06:17 | fetched 6 hours ago |
 | 🟢 | api_teams | all five squads | LaLiga Fantasy API | 12,538 | 12 Sep 15:43 | fetched 6 hours ago |
 | ⚪ | clubs | the same, for clubs | src/crosswalk.py | 20 | — | rebuilt every run from the tables above |
-| 🟢 | elo | team strength, which ranks the fixture term | clubelo.com | 3,180 | 12 Sep 15:43 | fetched 15 hours ago |
-| 🟢 | fixtures | who plays whom next, for the fixture term | analiticafantasy.com | 2,364 | 12 Sep 15:43 | fetched 15 hours ago |
+| 🟢 | elo | team strength, which ranks the fixture term | clubelo.com | 3,180 | 12 Sep 15:43 | fetched 16 hours ago |
+| 🟢 | fixtures | who plays whom next, for the fixture term | analiticafantasy.com | 2,364 | 12 Sep 15:43 | fetched 16 hours ago |
 | 🟢 | lineups | probable XI percentages, both sources | analiticafantasy.com, futbolfantasy.com ×40 | 139,663 | 12 Sep 15:43 | fetched 9 hours ago |
 | 🟢 | market | price, value, position, fitness — every player in the game | futbolfantasy.com | 139,768 | 12 Sep 15:43 | fetched 6 hours ago |
-| 🟢 | matches | fixtures, kickoffs, results | futbolfantasy.com | 68,400 | 12 Sep 15:43 | fetched 15 hours ago |
+| 🟢 | matches | fixtures, kickoffs, results | futbolfantasy.com | 68,400 | 12 Sep 15:43 | fetched 16 hours ago |
 | ⚪ | players | the crosswalk: one key per player across all four spellings | src/crosswalk.py | 722 | — | rebuilt every run from the tables above |
 | 🟢 | points | realised points per jornada, the actuals in every table below | futbolfantasy.com | 1,299 | 12 Sep 12:55 | fetched 6 hours ago |
-| 🟢 | starters | confirmed elevens, which is what P(start) is graded on | futbolfantasy.com | 140,359 | 12 Sep 15:43 | fetched 15 hours ago |
+| 🟢 | starters | confirmed elevens, which is what P(start) is graded on | futbolfantasy.com | 140,359 | 12 Sep 15:43 | fetched 16 hours ago |
 
 ### The model, as configured right now
 
