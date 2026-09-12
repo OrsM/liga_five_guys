@@ -303,6 +303,17 @@ def ladder_rows(u, rows, bands=None) -> list[dict]:
     # A won row carries rank()'s own band, off the squad the victim's
     # response leaves behind — which is why rank() never bands them twice.
     bands = {k: v for k, v in (bands or {}).items() if k not in won}
+    # Points above replacement — a STANDING per-player property (season
+    # total minus my own squad's weakest current option in his slot),
+    # not the paired-simulation band above (which is the marginal gain
+    # of one specific ACTION, run once per candidate — genuinely
+    # different questions, genuinely different cost to compute). No
+    # error band on this one: a real one needs the same paired Monte
+    # Carlo trials pts_lo/pts_hi already pay for per-candidate, and
+    # extending that to the full pool here would be silently
+    # reintroducing that cost rather than reusing the cheap number
+    # ffcore.profile/player_forecasts() actually offers.
+    par = {k: v["par"] for k, v in decide.player_forecasts(u).items()}
 
     def cell(k, group, where, money, pts, note="", value=None,
             lo=None, hi=None, market=None, premium=None):
@@ -311,7 +322,7 @@ def ladder_rows(u, rows, bands=None) -> list[dict]:
         return {"name": title_name(u.name.get(k, k)),
                 "pos": u.pos.get(k, ""), "start": u.start.get(k, 0.0),
                 "xpts": exp.get(k, 0.0), "group": group, "where": where,
-                "money": money, "pts": pts,
+                "money": money, "pts": pts, "par": par.get(k),
                 "pts_lo": lo, "pts_hi": hi, "note": note, "value": value,
                 # THREE PLAIN FACTS, no blended score — Miguel's own
                 # framing (2026-09-06): what he's really worth, what
@@ -495,29 +506,35 @@ def ladder(u, rows, base, data=None) -> list[str]:
                     money += " +%.2fM" % (r["premium"] / 1e6)
             else:
                 money = ("%+.2fM" % (r["money"] / 1e6)) if r["money"] else "—"
-        return ("| %s | %s | %.0f%% | %.2f | %s | %s | %s | %s |"
+        return ("| %s | %s | %.0f%% | %.2f | %s | %s | %s | %s | %s |"
                 % (r["name"], r["pos"] or "—", 100 * r["start"], r["xpts"],
                    r["where"], money, season,
+                   ("%+.0f" % r["par"]) if r.get("par") is not None else "—",
                    ("%.1f" % r["value"]) if r["value"] is not None else "—"))
 
-    out = ["| Player | Pos | Start | xPts/j | Where | € | Season | pts/M€ |",
-           "|---|---|--:|--:|---|--:|--:|--:|"]
+    # PAR (points above replacement) — season total minus my own squad's
+    # weakest current option in his slot, no error band (see the note
+    # above par's own assignment for why not). Different question from
+    # "Season" (the marginal gain of THIS row's specific action).
+    out = ["| Player | Pos | Start | xPts/j | Where | € | Season | PAR | "
+          "pts/M€ |",
+           "|---|---|--:|--:|---|--:|--:|--:|--:|"]
 
     if by_group.get("field"):
         # No trustworthy marks to diff against, so the whole sheet — and a
         # line saying why you are being asked to read one.
         out.append("| **FIELD — your eleven — the app has not said what you "
-                   "are playing** | | | | | | | |")
+                   "are playing** | | | | | | | | |")
         out += [row_md(r) for r in by_group["field"]]
     elif not by_group.get("in") and not by_group.get("out"):
         out.append("| **XI — no change, you are fielding the best eleven** "
-                   "| | | | | | | |")
+                   "| | | | | | | | |")
     else:
         if by_group.get("in"):
-            out.append("| **PUT ON** | | | | | | | |")
+            out.append("| **PUT ON** | | | | | | | | |")
             out += [row_md(r) for r in by_group["in"]]
         if by_group.get("out"):
-            out.append("| **TAKE OFF** | | | | | | | |")
+            out.append("| **TAKE OFF** | | | | | | | | |")
             out += [row_md(r) for r in by_group["out"]]
     tot = sum(exp.get(k, 0.0) for k in xi)
     # _rival_best(u), not a second re-derivation of it — this used to
@@ -530,11 +547,11 @@ def ladder(u, rows, base, data=None) -> list[str]:
                % (shape(u, xi), tot, riv_who, riv_total, tot - riv_total))
 
     if by_group.get("keep"):
-        out.append("| **KEEP — bench** | | | | | | | |")
+        out.append("| **KEEP — bench** | | | | | | | | |")
         out += [row_md(r) for r in by_group["keep"]]
 
     if by_group.get("sell"):
-        out.append("| **SELL — never start** | | | | | | | |")
+        out.append("| **SELL — never start** | | | | | | | | |")
         out += [row_md(r) for r in by_group["sell"]]
 
     # Free agents on their own; an explicit "none clear the bar" line once
@@ -542,7 +559,7 @@ def ladder(u, rows, base, data=None) -> list[str]:
     # "candidates exist, all a clause raid."
     # Why: docs/notes/sim.md#ladder--buy-section-none-clear-the-bar-today
     if by_group.get("buy"):
-        out.append("| **BUY — free agents** | | | | | | | |")
+        out.append("| **BUY — free agents** | | | | | | | | |")
         out += [row_md(r) for r in by_group["buy"]]
     elif by_group.get("raid"):
         out.append("| **BUY — free agents — none clear the bar today** | | "
@@ -550,15 +567,15 @@ def ladder(u, rows, base, data=None) -> list[str]:
 
     if by_group.get("raid"):
         out.append("| **RAID — a clause, cannot be refused** "
-                   "| | | | | | | |")
+                   "| | | | | | | | |")
         out += [row_md(r) for r in by_group["raid"]]
 
     if by_group.get("save"):
-        out.append("| **SAVE — better than yours, out of reach** | | | | | | | |")
+        out.append("| **SAVE — better than yours, out of reach** | | | | | | | | |")
         out += [row_md(r) for r in by_group["save"]]
 
     if by_group.get("pass"):
-        out.append("| **PASS** | | | | | | | |")
+        out.append("| **PASS** | | | | | | | | |")
         out += [row_md(r) for r in by_group["pass"]]
 
     # One line pointing at methodology.py's column_guide_lines(), the one
@@ -1788,6 +1805,9 @@ def _selftest() -> None:
     # ones... no way they're selling willingly to me" once a real report
     # showed listed targets sitting under RAID as if a clause's certainty
     # applied to them too.
+    from ffcore.profile import (PlayerProfile, PlayerIdentity,
+                                PlayerCurrent, PlayerHistory, PlayerDerived)
+
     steady_row = {"action": Action("buy", buy="steady", cost=5e6),
                  "d_pos": 0.40, "d_win": 0.0, "d_beat": {}, "value": 8.0,
                  "d_pts": 40.0, "pts_lo": 10.0, "pts_hi": 70.0, "helps": 0.80}
@@ -1819,9 +1839,19 @@ def _selftest() -> None:
         me="me", route={"rivals": "clause", "wished": "listed"},
         value={"steady": 5e6, "rivals": 3.8e6},
         name={"steady": "steady", "maverick": "maverick", "dud": "dud",
-             "rivals": "rivals", "wished": "wished"})
+             "rivals": "rivals", "wished": "wished"},
+        # PAR (ladder_rows() calls decide.player_forecasts(u), which reads
+        # u.players) — "me" fields no squad here, so replacement is 0.0
+        # and PAR is just each candidate's raw season total: steady
+        # 5.0*1.0 over jornadas [1,2] = 10.0.
+        players={k: PlayerProfile(
+            identity=PlayerIdentity(key=k), current=PlayerCurrent(pos="MED"),
+            history=PlayerHistory(), derived=PlayerDerived(pj=5.0))
+            for k in ("steady", "dud", "maverick", "rivals", "wished")})
     all_rows = [steady_row, dud_row, maverick_row, riv_row, wish_row]
     owned_lad = ladder_rows(uc_owned, all_rows)
+    steady_cell = next(r for r in owned_lad if r["name"].lower() == "steady")
+    assert steady_cell["par"] == 10.0, steady_cell
     # ONE SORTED LIST, FILTERED, NOT SEPARATELY RANKED GROUPS: "rivals"
     # (a clause, cannot be refused) lands in RAID despite everything else
     # in BUY; "wished" (owned by a rival, NOT a clause — his own choice to
@@ -1836,6 +1866,11 @@ def _selftest() -> None:
     assert "wished" not in [n for names in by_group.values() for n in names], \
         by_group
     md_owned = "\n".join(ladder(uc_owned, all_rows, st))
+    assert "| PAR |" in md_owned, md_owned
+    # steady's row: PAR +10 rendered, not silently dropped or blank.
+    steady_line = next(l for l in md_owned.splitlines()
+                       if l.lower().startswith("| steady"))
+    assert "+10" in steady_line, steady_line
     assert "BUY — free agents" in md_owned, md_owned
     assert "RAID — a clause, cannot be refused" in md_owned, md_owned
     assert "LISTED" not in md_owned, md_owned
