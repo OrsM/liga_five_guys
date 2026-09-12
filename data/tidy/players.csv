@@ -412,7 +412,7 @@ player_id,name,club_id,ff_slug,af_slug,app_id,understat_id,app_names
 2153,hector bellerin,betis,hector-bellerin,,2414,492,Bellerín
 2242,gonçalo guedes,real sociedad,goncalo-guedes,925,3085,5682,Guedes
 2288,dani olmo,barcelona,dani-olmo,1323,3092,8292,Olmo
-2413,emil audero,rayo,emil-audero,30441,3267,,Emil Audero
+2413,emil audero,rayo,emil-audero,30441,3267,1302,Emil Audero
 2417,andreas christensen,barcelona,andreas-christensen,,2353,200,Christensen
 2534,wojciech szczesny,barcelona,wojciech-szczesny,,2783,1244,Szczesny
 2536,antonio rudiger,real madrid,antonio-rudiger,,2428,1822,Rüdiger
@@ -436,7 +436,7 @@ player_id,name,club_id,ff_slug,af_slug,app_id,understat_id,app_names
 3215,marc roca,betis,marc-roca,47341,2418,5086,Marc Roca
 322,marc bartra,betis,marc-bartra,1561,121,2453,Bartra
 3226,mariano diaz,alaves,mariano-diaz,,2600,5110,Mariano
-3235,diego rico,osasuna,diego-rico,,2366,,Diego Rico
+3235,diego rico,osasuna,diego-rico,,2366,5065,Diego Rico
 3246,aaron martin,racing,aaron-martin,,3253,5133,Aaron
 3255,ivan villar,celta,ivan-villar,,140,,Iván Villar
 336,isco alarcon,betis,isco-alarcon,,3090,2255,Isco
@@ -494,7 +494,7 @@ player_id,name,club_id,ff_slug,af_slug,app_id,understat_id,app_names
 5194,grady diangana,elche,grady-diangana,,2780,6651,Grady Diangana
 5220,miguel angel rubio,espanyol,miguel-ngel-rubio,,,6740,
 5227,gonzalo villar,elche,gonzalo-villar,46982,2939,6750,G. Villar|Gonzalo|Rafa Mir
-5228,mujaid sadick,rayo,mujaid-sadick,,3260,,Mujaid Sadick
+5228,mujaid sadick,rayo,mujaid-sadick,,3260,6749,Mujaid Sadick
 5245,dani vivian,athletic,dani-vivian,,2314,6766,Vivian
 5313,matias vecino,celta,matias-vecino,,2945,1423,Vecino
 5526,andriy lunin,real madrid,andriy-lunin,,2423,7194,Lunin
@@ -623,7 +623,7 @@ player_id,name,club_id,ff_slug,af_slug,app_id,understat_id,app_names
 8413,pape gueye,villarreal,pape-gueye,20696,2473,,Gueye
 843,gerard moreno,villarreal,gerard-moreno,1707,356,2120,Gerard
 8479,eduardo camavinga,real madrid,eduardo-camavinga,,1300,7359,Camavinga
-8485,romain del castillo,osasuna,romain-del-castillo,,3252,,Del Castillo
+8485,romain del castillo,osasuna,romain-del-castillo,,3252,3721,Del Castillo
 8496,martin satriano,getafe,martin-satriano,,3137,9001,Satriano
 863,florian lejeune,rayo,florian-lejeune,,3082,5073,Lejeune
 8634,rafael romero,sevilla,rafael-romero,,2677,,Rafa Romero
