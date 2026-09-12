@@ -939,32 +939,49 @@ class League:
             # The daily allowance, by the anchor's AGE not its label (every
             # anchor is owed it, only ADDS). Why:
             # docs/notes/league.md#the-daily-allowance-backfill-allowance
-            bonus_note = None
+            #
+            # own_bonus is PURELY the weekly jornada prize (bonus_income) —
+            # it does not include the separate, flat, independently-measured
+            # 100,000/day allowance (docs/notes/league.md#rival-cash-income-
+            # measurement-flat_income: "a day with no deal in it moved the
+            # balance by exactly +100,000"), so the two ADD. `paid`
+            # (flat_income) is the opposite: it is read off your own real
+            # balance, so it already bundles the daily allowance AND your
+            # jornada prize together — adding the daily allowance again on
+            # top of `paid` would double it. Confirmed 2026-09-12: skipping
+            # the daily allowance for a manager with bonus rows understated
+            # your own reconstructed total by ~3.1M for a ~31-day season —
+            # this is not a rounding difference, it is a full missing term.
+            notes = []
+            start = since or min(
+                (ledger_stamp(t.get("date", "")) for t in self.txns
+                 if ledger_stamp(t.get("date", ""))), default=None)
+            daily, days = allowance(start, run_now(), self.cfg.daily_bonus)
             if since is None and handle in own_bonus:
-                # A rival with no anchor: THEIR OWN recorded weekly prize,
-                # not yours — see bonus_income().
-                bonus, days = own_bonus[handle], None
-                bonus_note = ("%.2fM of their own weekly performance bonus, "
-                              "recorded in the app's activity feed"
-                              % (bonus / 1e6))
+                bonus = daily + own_bonus[handle]
+                if daily:
+                    notes.append("%.2fM of daily allowance over %.0f days"
+                                 % (daily / 1e6, days))
+                notes.append("%.2fM of their own weekly performance bonus, "
+                             "recorded in the app's activity feed"
+                             % (own_bonus[handle] / 1e6))
             elif since is None and paid is not None:
                 # No bonus rows for them at all (fresh join, feed gap): your
                 # own measured `paid` (flat_income) is a better estimate than
                 # guessing how long the app has paid, but it is a fallback,
                 # not the preferred source — see flat_income()'s docstring.
-                bonus, days = paid, None
-                bonus_note = ("%.2fM the app has paid you since the season "
-                              "began (no bonus activity found for them, so "
-                              "yours stands in)" % (bonus / 1e6))
+                # It already includes the daily allowance, so `daily` above
+                # is NOT added here.
+                bonus = paid
+                notes.append("%.2fM the app has paid you since the season "
+                             "began (no bonus activity found for them, so "
+                             "yours stands in)" % (bonus / 1e6))
             else:
-                start = since or min(
-                    (ledger_stamp(t.get("date", "")) for t in self.txns
-                     if ledger_stamp(t.get("date", ""))), default=None)
-                bonus, days = allowance(start, run_now(),
-                                        self.cfg.daily_bonus)
-                if days is not None:
-                    bonus_note = ("%.2fM of daily allowance over %.0f days"
-                                  % (bonus / 1e6, days))
+                bonus = daily
+                if days is not None and daily:
+                    notes.append("%.2fM of daily allowance over %.0f days"
+                                 % (daily / 1e6, days))
+            bonus_note = " and ".join(notes) if notes else None
 
             value = base + sold - bought + bonus
             # Every term, not just the answer — checkable against the ledger
