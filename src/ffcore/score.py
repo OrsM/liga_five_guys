@@ -192,13 +192,17 @@ def load_understat_current(xw=None) -> dict[str, dict]:
 
 
 def _linreg(xs, ys) -> tuple[float, float]:
-    """(slope, intercept) of the least-squares line through (xs, ys)."""
-    n = len(xs)
-    mx, my = sum(xs) / n, sum(ys) / n
-    sxx = sum((x - mx) ** 2 for x in xs)
-    sxy = sum((x - mx) * (y - my) for x, y in zip(xs, ys))
-    slope = sxy / sxx if sxx else 0.0
-    return slope, my - slope * mx
+    """(slope, intercept) of the least-squares line through (xs, ys), via
+    statistics.linear_regression — a hand-rolled sum-of-squares version of
+    this raised the same "is x constant" question statistics.StatisticsError
+    already answers; a flat line (0.0, mean(ys)) for that case, same
+    fallback the hand-rolled version returned, not a crash.
+    """
+    try:
+        r = statistics.linear_regression(xs, ys)
+        return r.slope, r.intercept
+    except statistics.StatisticsError:
+        return 0.0, statistics.fmean(ys)
 
 
 def _xg_points_fit(xw) -> tuple[float, float, int]:
@@ -281,12 +285,13 @@ def _xg_stickiness_boost() -> tuple[float, str]:
                      "accumulate" % len(pairs))
 
     def corr(xs, ys):
-        n = len(xs)
-        mx, my = sum(xs) / n, sum(ys) / n
-        cov = sum((x - mx) * (y - my) for x, y in zip(xs, ys))
-        sx = sum((x - mx) ** 2 for x in xs) ** 0.5
-        sy = sum((y - my) ** 2 for y in ys) ** 0.5
-        return cov / (sx * sy) if sx and sy else 0.0
+        # statistics.correlation — a constant series has no correlation to
+        # report, 0.0 same as the hand-rolled version's sx/sy guard, not a
+        # crash.
+        try:
+            return statistics.correlation(xs, ys)
+        except statistics.StatisticsError:
+            return 0.0
 
     r_raw = max(0.02, min(0.9, corr([p[0] for p in pairs],
                                     [p[1] for p in pairs])))
