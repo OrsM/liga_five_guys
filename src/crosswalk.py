@@ -99,7 +99,7 @@ def namesakes(market) -> list[tuple[str, list]]:
 
 def build_players(market, lineups, starters, api_rows, lg, clubs) -> dict:
     """{player_id: Player} — every feed's key for every player it names."""
-    from ffcore.league import api_key, app_ids_known
+    from ffcore.league import api_key
 
     by_club = {c.ff_slug: c.club_id for c in clubs.values() if c.ff_slug}
     # ff_slug -> the club key the market index uses, so a probable-XI row
@@ -170,8 +170,8 @@ def build_players(market, lineups, starters, api_rows, lg, clubs) -> dict:
     # exact market value across history).
     index = latest_only(lg.market.rows) if lg and lg.market is not None else []
     # An id resolved on a past sweep stays resolved (merge, not rebuild).
-    # {} on the first ever run.
-    known = app_ids_known()
+    # Empty on the first ever run — players.csv doesn't exist yet.
+    known = Crosswalk.read(TIDY / "players.csv", TIDY / "clubs.csv")
     for r in api_rows:
         raw = (r.get("player_name") or "").strip()
         if not raw:
@@ -462,7 +462,7 @@ def _selftest() -> None:
     bulk_market_rows = [{"name": "Hugo Duro", "slug": "hugo-duro",
                         "team": "Espanyol"}]
     bulk_clubs = build_clubs(bulk_market_rows, [], [])
-    # A made-up id, deliberately not a real one — app_ids_known() reads the
+    # A made-up id, deliberately not a real one — build_players() reads the
     # actual players.csv off disk, and a real id already claimed by some
     # other real player there would resolve to THAT player first (step 1 of
     # api_key(), checked ahead of the name join), which is correct behaviour

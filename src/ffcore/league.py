@@ -325,7 +325,7 @@ def app_ids_known() -> dict:
 
 
 def owner_from_api(rows: list[dict], market, ledger_owner: dict | None = None,
-                   app_ids: dict | None = None) -> tuple[dict, list]:
+                   xw=None) -> tuple[dict, list]:
     """({player key: manager}, unjoined names) from the app's own squads.
 
     Ownership WITHOUT a replay (no accumulated drift — the app answers
@@ -347,7 +347,7 @@ def owner_from_api(rows: list[dict], market, ledger_owner: dict | None = None,
             continue
         key = api_key(raw, handle, market, ledger_owner, index,
                       r.get("market_value"), r.get("player_name_full") or "",
-                      app_ids, r.get("player_id") or "")
+                      xw, r.get("player_id") or "")
         if key:
             out[key] = handle
         else:
@@ -410,18 +410,21 @@ def app_fielded(squad, names: dict, rows=None, ids=None) -> list[str]:
 
 def api_key(raw: str, handle: str, market, ledger_owner: dict | None = None,
             index: list | None = None, market_value=None,
-            full: str = "", app_ids: dict | None = None,
+            full: str = "", xw=None,
             app_id: str = "") -> str | None:
     """One API row's player, as a key the rest of the repo recognises.
 
-    Five-step chain, id first always: (1) app_ids lookup, (2) key_for on the
-    app's nickname, (3) key_for on the full name, (4) the ledger breaking a
-    surname tie, (5) an exact market-value match. `index` is the latest
-    market snapshot (derived here if omitted, passed in when a caller is
-    looping). None means unresolved — must stay visible, never guessed.
-    TODO: steps 1-3 still duplicate Crosswalk.resolve(); not merged yet, see
-    the note at the link below for why. Why (join order, the TODO, the
-    concrete cases each step exists for):
+    Five-step chain, id first always: (1) `xw.player(app_id=...)`, (2)
+    key_for on the app's nickname, (3) key_for on the full name, (4) the
+    ledger breaking a surname tie, (5) an exact market-value match. `index`
+    is the latest market snapshot (derived here if omitted, passed in when a
+    caller is looping). None means unresolved — must stay visible, never
+    guessed. Steps 2-5 aren't `Crosswalk.resolve()` calls because
+    `_priced_like` applies differently per step (unconditional trust on the
+    id, price-validated on the two name guesses) and `resolve()`'s single
+    return value doesn't say which step answered; step 1 uses the
+    crosswalk's own id index directly instead of a second copy of it.
+    Why (join order, the concrete cases each step exists for):
     docs/notes/league.md#api_key--the-resolution-order-and-why
     """
     from ffcore.tidy import latest_only
@@ -433,8 +436,8 @@ def api_key(raw: str, handle: str, market, ledger_owner: dict | None = None,
     if index is None:
         index = latest_only(market.rows)
     key = None
-    if app_ids and (app_id or "").strip():
-        key = app_ids.get(app_id.strip())
+    if xw is not None and (app_id or "").strip():
+        key = xw.player(app_id=app_id.strip())
         # Still checked against the price when one is stated: cheap, and
         # true (never blocking) whenever the row is silent about it.
         if not _priced_like(key, "", market_value, index):
@@ -772,8 +775,7 @@ class League:
             api_teams = None
         if api_teams:
             api_owner, self.api_unjoined = owner_from_api(
-                api_teams, market, ledger_owner=self.owner,
-                app_ids=_app_ids_of(self.xw))
+                api_teams, market, ledger_owner=self.owner, xw=self.xw)
             if api_owner:
                 self.warnings += owner_drift(
                     self.owner, api_owner,
@@ -1247,30 +1249,35 @@ def _selftest_api_owner() -> None:
     # re-derivation; Crosswalk.merge()'s stale-id displacement protects it.
     lone = Market([{"name": "Jonny Castro", "value": "5602302",
                     "observed_at": at, "position": "DEF"}])
+    from ffcore.crosswalk import Crosswalk, Player
+
+    def _xw_of(app_id, key):
+        return Crosswalk({key: Player(player_id=key, app_id=app_id)})
+
     assert api_key("Jonny Otto", "SusoGattuso", lone) is None
     assert api_key("Jonny Otto", "SusoGattuso", lone,
-                   app_ids={"2552": norm("Jonny Castro")},
+                   xw=_xw_of("2552", norm("Jonny Castro")),
                    app_id="2552") == norm("Jonny Castro")
     # An id the table has never seen changes nothing.
     assert api_key("Jonny Otto", "SusoGattuso", lone,
-                   app_ids={"9999": "somebody"}, app_id="2552") is None
+                   xw=_xw_of("9999", "somebody"), app_id="2552") is None
     # NO TABLE IS NOT A FAILURE. players.csv is built BY this join, so on a
     # cold start it does not exist and every caller must degrade to what it
     # did before — additive only, never a dependency.
     assert api_key("Fornals", "miguel_autentico", players,
-                   app_ids=None) == norm("Pablo Fornals")
+                   xw=None) == norm("Pablo Fornals")
     # AND THE ID NOW WINS OVER A NAME THAT WOULD OTHERWISE JOIN CLEANLY —
     # an intentional reversal (2026-08-21) of the priority this docstring
     # used to describe. The app row states an id; the id involves no
     # guessing, so it is trusted over the name outright, the same call
     # Crosswalk.resolve() makes for every caller.
     assert api_key("Jonny Castro", "SusoGattuso", lone,
-                   app_ids={"2552": "someone else"},
+                   xw=_xw_of("2552", "someone else"),
                    app_id="2552") == "someone else"
     # And the loop passes the row's id through.
     owner, unjoined = owner_from_api(
         [{"manager": "SusoGattuso", "player_name": "Jonny Otto",
-          "player_id": "2552"}], lone, app_ids={"2552": norm("Jonny Castro")})
+          "player_id": "2552"}], lone, xw=_xw_of("2552", norm("Jonny Castro")))
     assert owner == {norm("Jonny Castro"): "SusoGattuso"}, owner
     assert unjoined == [], unjoined
 

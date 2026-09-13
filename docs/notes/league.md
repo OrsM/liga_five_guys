@@ -144,8 +144,11 @@ displaces a stale id off whoever wrongly holds it, on every rebuild — and
 the id itself involves no derivation: it is a raw fact off the app's row.
 
 The five-step chain:
-1. the app's player id, in `app_ids` (from `players.csv`, built BY this
-   function — absent on a cold start, must stay additive).
+1. `xw.player(app_id=...)` — the app's player id, looked up straight off
+   the crosswalk's own index (2026-09-13: this used to be a second dict,
+   `app_ids`, built by re-deriving the same `_by_app` index `Crosswalk`
+   already keeps; `player()` is called directly now, so there is exactly
+   one id index in the repo, not two kept in sync by hand).
 2. `market.key_for` on the app's nickname.
 3. `market.key_for` again on the app's FULL name — tried second because the
    nickname is the better single guess: of 76 owned players, twelve join
@@ -156,13 +159,12 @@ The five-step chain:
    manager.
 5. an EXACT market value, searched across all of history.
 
-TODO: steps 1-3 still duplicate what `Crosswalk.resolve()` now does. Not
-migrated because `_priced_like` needs to apply differently per step
-(unconditional trust on the id, price-validated on the two name guesses)
-and `resolve()`'s single return value doesn't say which step answered —
-merging cleanly needs `resolve()` to expose that, or this function to
-accept an `xw: Crosswalk` and call the id/name pieces separately. Left
-alone rather than force a fit.
+Steps 2-5 are still this function's own chain, not `Crosswalk.resolve()`
+calls: `_priced_like` applies differently per step (unconditional trust on
+the id, price-validated on the two name guesses) and `resolve()`'s single
+return value doesn't say which step answered. Both steps 2-3 and
+`resolve()` bottom out in the same `market.key_for()`, so the name-matching
+logic itself is not duplicated — only the orchestration around it differs.
 
 None means unresolved, and unresolved must stay visible: a dropped row
 reads as an owned player turned free agent, or a rival's clause-holder

@@ -1,4 +1,4 @@
-# Liga Five Guys — how the numbers are made — 2026-09-13 13:15 UTC
+# Liga Five Guys — how the numbers are made — 2026-09-13 13:40 UTC
 
 
 
@@ -34,7 +34,7 @@
 | 🟢 | api_leagues | your cash and the league's id | LaLiga Fantasy API | 182 | 13 Sep 08:30 | fetched 5 hours ago |
 | 🟢 | api_lineup | the eleven you have actually fielded, and the formation the app says you are playing | LaLiga Fantasy API | 1,749 | 13 Sep 08:30 | fetched 5 hours ago |
 | 🟢 | api_market | what is on offer, and the bids on it | LaLiga Fantasy API | 5,524 | 13 Sep 08:30 | fetched 5 hours ago |
-| 🟢 | api_players | names for players nobody owns any more — one row per player, first sighting kept | LaLiga Fantasy API | 124 | 12 Sep 22:09 | fetched 15 hours ago |
+| 🟢 | api_players | names for players nobody owns any more — one row per player, first sighting kept | LaLiga Fantasy API | 124 | 12 Sep 22:09 | fetched 16 hours ago |
 | 🟢 | api_standings | the league table — position, points, squad value, and your balance | LaLiga Fantasy API | 910 | 13 Sep 08:30 | fetched 5 hours ago |
 | 🟢 | api_stats | what the app scored each player, broken into what he did — one row per player per week per stat, a correction being a later row rather than an overwrite | LaLiga Fantasy API | 9,399 | 12 Sep 22:09 | fetched 5 hours ago |
 | 🟢 | api_teams | all five squads | LaLiga Fantasy API | 12,928 | 13 Sep 08:30 | fetched 5 hours ago |
