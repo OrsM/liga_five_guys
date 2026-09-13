@@ -69,9 +69,14 @@ def read_slate(market, rows=None, xw=None) -> tuple[set, list]:
 
 
 def comparison_rows(u, bands=None) -> list[dict]:
-    """Every listed player: season points, next-jornada points, and
-    points above replacement (median, with a real season band from
-    `bands` where one was computed).
+    """Every listed player YOU COULD BUY: season points, next-jornada
+    points, and points above replacement (median, with a real season band
+    from `bands` where one was computed).
+
+    NOT your own squad, even a player of yours currently listed for sale —
+    this table answers "is he worth buying", and a man already on your
+    squad is never a buy candidate for you; the ladder's own SELL/KEEP
+    rows are where his own listing belongs.
 
     `bands`, when given, is decide.rank()'s own `bands` dict — pts_lo/
     pts_hi for the same PAR figure decide.player_forecasts() reports as
@@ -81,9 +86,12 @@ def comparison_rows(u, bands=None) -> list[dict]:
     import decide
     from ffcore.render import title_name
 
+    mine = set(u.state.squads.get(u.me, {}))
     fc = decide.player_forecasts(u)
     out = []
     for k, price in u.price.items():
+        if k in mine:
+            continue
         f = fc.get(k, {})
         par, par_lo, par_hi = f.get("par"), None, None
         b = (bands or {}).get(k)
@@ -102,7 +110,16 @@ def comparison_rows(u, bands=None) -> list[dict]:
 
 
 def comparison_table(rows: list[dict]) -> list[str]:
-    """Markdown: every listed player, ranked by PAR per million spent."""
+    """Markdown: listed players actually worth a look, ranked by PAR per
+    million spent — not every listed player.
+
+    PRINTS ONLY par > 0 (genuinely above the league's own replacement
+    level at his slot), then ONE summary line for the rest, rather than
+    a full table trailing off through dozens of 0.0-and-negative rows a
+    reader has to scan past to find the handful that matter. `rows` is
+    already sorted by value_rate descending, so this is a straight cut,
+    not a re-sort.
+    """
     from ffcore.parse import fmt_money
 
     if not rows:
@@ -111,6 +128,9 @@ def comparison_table(rows: list[dict]) -> list[str]:
     def num(v, fmt="%.1f"):
         return fmt % v if v is not None else "—"
 
+    worth_a_look = [r for r in rows if (r["par"] or 0.0) > 0.0]
+    skipped = len(rows) - len(worth_a_look)
+
     out = ["## Every listed player, compared", "",
           "PAR = season points above the LEAGUE's own replacement level at "
           "his slot — the score of the last man the league can start there, "
@@ -118,11 +138,12 @@ def comparison_table(rows: list[dict]) -> list[str]:
           "positions on that basis; a good player can still show a modest "
           "PAR if his position is deep league-wide. Parenthesised range is "
           "a real simulated band where one was run; a plain figure is the "
-          "point estimate.",
+          "point estimate. Only players ABOVE replacement are listed — see "
+          "the note below the table for the rest.",
           "",
           "| Player | Pos | Price | Season | Next | PAR | pts/€M |",
           "|---|---|---:|---:|---:|---:|---:|"]
-    for r in rows:
+    for r in worth_a_look:
         par_cell = num(r["par"])
         if r["par_lo"] is not None:
             par_cell += " (%s–%s)" % (num(r["par_lo"], "%.0f"),
@@ -132,6 +153,12 @@ def comparison_table(rows: list[dict]) -> list[str]:
             num(r["season_pts"]), num(r["next_pts"]), par_cell,
             num(r["value"], "%.2f")))
     out.append("")
+    if skipped:
+        out += [f"_{skipped} more listed player{'s' if skipped != 1 else ''} "
+                "at or below the league's own replacement level at their "
+                "slot, not worth a look today — a free agent nobody wants "
+                "yet, or a rival's clause on a squad player he outgrew._",
+                ""]
     return out
 
 
@@ -222,7 +249,11 @@ def _selftest() -> None:
     by_key = {r["key"]: r for r in rows}
     assert by_key["cheap"]["season_pts"] == 6.0, by_key["cheap"]
     assert by_key["rich"]["season_pts"] == 16.0, by_key["rich"]
-    # Both replace "me_a" (season 4.0) -> PAR 2.0 and 12.0.
+    # LEAGUE-wide replacement, not "my own squad's weakest" — one manager,
+    # one legal MED rung (starters_per_slot()["MED"]=4.0 x 1 squad = 4,
+    # beyond the 3-player pool), so replacement is the pool's OWN worst,
+    # me_a at 4.0 — coincidentally who "my squad's weakest" would also
+    # have been here, since he's my only MED. PAR 2.0 and 12.0 either way.
     assert by_key["cheap"]["par"] == 2.0, by_key["cheap"]
     assert by_key["rich"]["par"] == 12.0, by_key["rich"]
     assert by_key["cheap"]["par_lo"] is None   # no band given
@@ -246,7 +277,27 @@ def _selftest() -> None:
 
     assert comparison_table([]) == []
 
-    print("slate self-test OK (23 cases)")
+    # -- a player of MINE, even one I've listed, is not a buy candidate ----
+    cu_listed = Universe(
+        state=LeagueState(cu_sq, [1, 2], "me"),
+        forecaster=Bootstrap(cu_per), cash=0.0, me="me",
+        players={"me_a": cp(5.0, price=3e6),   # listed for sale -- still mine
+                "cheap": cp(5.0, price=2e6, name="cheap"),
+                "rich": cp(5.0, price=20e6, name="rich")})
+    rows3 = comparison_rows(cu_listed)
+    assert {r["key"] for r in rows3} == {"cheap", "rich"}, rows3
+
+    # -- the long non-competitive tail collapses to one summary line -------
+    dud_rows = [{"key": "dud%d" % i, "name": "Dud %d" % i, "pos": "MED",
+                "price": 1e6, "season_pts": 1.0, "next_pts": 0.5,
+                "par": 0.0, "par_lo": None, "par_hi": None, "value": 0.0}
+               for i in range(3)]
+    md3 = comparison_table([rows[0]] + dud_rows)
+    assert any(l.startswith("| Cheap") for l in md3), md3
+    assert not any(l.startswith("| Dud") for l in md3), md3
+    assert any("3 more listed players" in l for l in md3), md3
+
+    print("slate self-test OK (26 cases)")
 
 
 if __name__ == "__main__":
