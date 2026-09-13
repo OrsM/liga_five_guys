@@ -65,7 +65,22 @@ class PlayerIdentity:
 class PlayerCurrent:
     """The latest observed value of something that drifts — overwritten
     each run, not accumulated. Reading this answers 'what's true right
-    now,' never 'what was true on some past date.'"""
+    now,' never 'what was true on some past date.'
+
+    value/clause/clause_until/route/bids/proceeds joined 2026-09-13:
+    decide.load() computed these once (market_routes(), the ledger, the
+    teams feed) but never fed them onto PlayerProfile — Universe kept its
+    own dozen parallel dicts as the only home for them, exactly the shape
+    the original redesign plan called "be aggressive here, not
+    incremental... replace the dozen parallel dicts" and then didn't
+    finish. Not a correctness bug like status_adjusted()'s (nothing here
+    was ever computed twice — it just never had a second reader), but
+    real unfinished migration scope. decide.load() still does the one
+    join each of these needs (market context PlayerProfile doesn't have);
+    it now ALSO writes the result here, and Universe's own fields become
+    genuine reads of this, matching pos/market_exp/start_p's existing
+    shape rather than sitting beside it as an unrelated second copy.
+    """
     club: str = ""
     pos: str = ""
     status: str = ""              # LaLiga's own playerStatus, latest
@@ -73,6 +88,12 @@ class PlayerCurrent:
     listed: bool = False          # True only if in api_market.csv's live rows
     price: float | None = None    # current market price, only if listed
     owner: str | None = None      # current squad owner, if any
+    value: float | None = None    # what the app says he's worth (sale payout)
+    clause: float | None = None   # his buyout clause, whoever holds him
+    clause_until: object = None   # datetime a locked clause reopens, if locked
+    route: str | None = None      # "free" / "listed" / "clause" / None (not on the market)
+    bids: int | None = None       # rival bids on a "listed" row; 0 if none, None if not listed
+    proceeds: float | None = None  # what selling him raises, ME only
 
 
 @dataclass
@@ -319,10 +340,14 @@ def build_profiles(players: dict, sc, perjornada_rows,
     crashing — a player load_players() knows about that the crosswalk
     hasn't resolved yet still gets a profile.
 
-    `market_keyed`, if given, is {key: {"listed":, "price":, "owner":}} —
-    the market/ownership facts decide.load() already computes elsewhere
-    (market_routes(), lg.owner). Optional so this stays testable without
-    constructing a full League/market for every case.
+    `market_keyed`, if given, is {key: {"listed":, "price":, "owner":,
+    "value":, "clause":, "clause_until":, "route":, "bids":, "proceeds":}}
+    — the market/ownership/ledger facts decide.load() already computes
+    elsewhere (market_routes(), lg.owner, the teams/ledger feeds). Every
+    key but "listed" is optional per-entry; a missing one leaves the
+    matching PlayerCurrent field at its default (None). Optional as a
+    whole, too, so this stays testable without constructing a full
+    League/market for every case.
 
     `match_stats_rows`, if given, is api_stats.csv's own rows — real
     per-match data (mins played, goals, cards) for whichever 118-ish
@@ -352,6 +377,12 @@ def build_profiles(players: dict, sc, perjornada_rows,
             listed=bool(mk.get("listed")),
             price=mk.get("price"),
             owner=mk.get("owner"),
+            value=mk.get("value"),
+            clause=mk.get("clause"),
+            clause_until=mk.get("clause_until"),
+            route=mk.get("route"),
+            bids=mk.get("bids"),
+            proceeds=mk.get("proceeds"),
         )
         row = sc.row_for(k)
         s = sc.score(row) if row else None

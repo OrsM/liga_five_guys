@@ -1405,9 +1405,14 @@ def load(trials_pool=None) -> Universe:
     # all (ffcore.profile) — replaces this function's own separate
     # "scored for the 89-player universe" loop and "scored for everyone
     # else, about players not in the universe" loop with a single pass.
-    # `market_keyed` carries the market/ownership facts already computed
-    # above (market_routes(), lg.owner) so build_profiles() doesn't
-    # re-derive them.
+    # `market_keyed` carries EVERY market/ownership/ledger fact already
+    # computed above (market_routes(), lg.owner, the teams/ledger feeds)
+    # so build_profiles() doesn't re-derive any of it — PlayerCurrent
+    # becomes the one place that HOLDS the result, not a second place
+    # that recomputes it. 2026-09-13: these seven used to feed Universe's
+    # own dicts directly and go nowhere near PlayerProfile at all — real
+    # migration debt (see PlayerCurrent's own docstring), not a live
+    # divergence risk, since there was only ever one computation.
     perjornada_rows = list(csv.DictReader(
         open(SEASON / "live" / "perjornada_2026-27.csv")))
     # Real per-match data (mins played, goals, cards) for whichever ~118
@@ -1417,15 +1422,46 @@ def load(trials_pool=None) -> Universe:
     stats_path = TIDY / "api_stats.csv"
     match_stats_rows = (list(csv.DictReader(open(stats_path)))
                         if stats_path.exists() else [])
-    market_keyed = {k: {"listed": True, "price": v, "owner": owner.get(k)}
-                    for k, v in price.items()}
-    for k, o in owner.items():
-        market_keyed.setdefault(k, {"listed": False, "price": None,
-                                    "owner": o})
+    mk_keys = (set(price) | set(owner) | set(value) | set(clause)
+              | set(clause_until) | set(route) | set(bids) | set(proceeds))
+    market_keyed = {k: {"listed": k in price, "price": price.get(k),
+                        "owner": owner.get(k), "value": value.get(k),
+                        "clause": clause.get(k),
+                        "clause_until": clause_until.get(k),
+                        "route": route.get(k), "bids": bids.get(k),
+                        "proceeds": proceeds.get(k)}
+                    for k in mk_keys}
     profiles = build_profiles(players, sc, perjornada_rows, xw=lg.xw,
                               match_stats_rows=match_stats_rows,
                               match_rows=m,
                               market_keyed=market_keyed)
+
+    # price/proceeds/owner/value/clause/clause_until/route/bids/name, READ
+    # BACK from PlayerCurrent rather than left as the standalone locals
+    # above — same shape as pos/market_exp/start below. Falls back to the
+    # pre-profile local for a key with no profile at all (build_profiles()
+    # only covers `players`' own keys; a market/ledger key outside that
+    # pool — should not happen, but is not this function's place to
+    # silently drop a real price over) so this is a pure redirection, not
+    # a behaviour change.
+    def _through(orig: dict, field: str) -> dict:
+        out = dict(orig)
+        for k, p in profiles.items():
+            v = getattr(p.current, field)
+            if v is not None:
+                out[k] = v
+        return out
+
+    price = _through(price, "price")
+    owner = _through(owner, "owner")
+    value = _through(value, "value")
+    clause = _through(clause, "clause")
+    clause_until = _through(clause_until, "clause_until")
+    route = _through(route, "route")
+    bids = _through(bids, "bids")
+    proceeds = _through(proceeds, "proceeds")
+    name = {k: p.identity.name for k, p in profiles.items()} | {
+        k: v for k, v in name.items() if k not in profiles}
 
     pos = {k: SLOT.get(p.current.pos.lower(), "MED")
           for k, p in profiles.items()}
