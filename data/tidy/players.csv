@@ -104,7 +104,7 @@ player_id,name,club_id,ff_slug,af_slug,app_id,understat_id,app_names
 12420,abdoulaye faye,celta,abdoulaye-faye,,3195,13904,Faye
 12441,pablo busto,betis,,,,,
 12453,asier osambela,osasuna,asier-osambela,,2721,12537,A. Osambela
-12475,adrian niño,malaga,adrian-nino,,3045,,Niño
+12475,adrian niño,malaga,adrian-nino,,3045,12115,Niño
 12479,ruben montero,alaves,,,3043,,Montero
 12484,javier boñar,atletico,javier-bonar,,,14225,
 12534,javi rodriguez,celta,javi-rodriguez,384135,2074,,Javi Rodríguez|Rodríguez
@@ -151,7 +151,7 @@ player_id,name,club_id,ff_slug,af_slug,app_id,understat_id,app_names
 132,sergio canales,racing,sergio-canales,,3125,2571,Canales
 13440,tani oluwaseyi,villarreal,tani-oluwaseyi,,2761,13996,Oluwaseyi
 13564,endrick,real madrid,endrick,,3112,12884,Endrick
-13608,sebastian caceres,celta,sebastian-caceres,,3259,,Cáceres
+13608,sebastian caceres,celta,sebastian-caceres,,3259,15064,Cáceres
 13748,martin krug,levante,,,2741,,
 13780,christantus uche,getafe,chrisantus-uche,,3126,12726,Uche
 13801,pelayo fernandez,rayo,pelayo-fernandez,,3157,12864,Pelayo
@@ -504,7 +504,7 @@ player_id,name,club_id,ff_slug,af_slug,app_id,understat_id,app_names
 5553,fernando calero,malaga,fernando-calero,47478,2398,,F. Calero
 5565,vinicius junior,real madrid,vinicius-junior,,3102,7008,Vini Jr.
 5587,adria pedrosa,sevilla,adria-pedrosa,,1056,7174,Pedrosa
-5671,juan berrocal,getafe,juan-berrocal,,3132,,J. Berrocal
+5671,juan berrocal,getafe,juan-berrocal,,3132,7186,J. Berrocal
 5705,luiz felipe,rayo,luiz-felipe,,2550,6177,Luiz Felipe
 5718,miguel angel morro,rayo,,,,,
 582,leandro cabrera,espanyol,leandro-cabrera,,3068,6168,Cabrera
