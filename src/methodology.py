@@ -45,7 +45,7 @@ from ffcore.tidy import (run_now,  # noqa: E402
                          stale_feeds,
                          load_lineups,
                          read_csv, snapshot_stamp, write_csv, write_lines,
-                         team_slug_of, match_locks, jornada_locks, lock_order)
+                         team_slug_of, lock_order, JornadaClock)
 
 LIVE = SEASON / "live"
 WINDOW_DAYS = 21
@@ -168,7 +168,7 @@ def drift_frac_from_history(lag1: int = 1, lag3: int = 3) -> tuple[float, str]:
 
     matches = read_csv(TIDY / "matches.csv")
     fixtures = read_csv(TIDY / "fixtures.csv")
-    locks = jornada_locks(matches, fixtures)
+    locks = JornadaClock(matches, fixtures).round_locks
     actuals, _label = load_actuals()
     preds = load_predictions()
 
@@ -452,8 +452,8 @@ def start_intervals(matches: list[dict], starters: list[dict],
             continue
     # PER-TEAM, not per-round — a deferred fixture must lock its own two
     # teams at its own real kickoff, not the round's earliest one (see
-    # match_locks()'s own docstring for the real case this fixes).
-    locks = match_locks(matches, fixtures)
+    # JornadaClock's own docstring for the real case this fixes).
+    locks = JornadaClock(matches, fixtures).team_locks
     squads = market_names(market, {r.get("team_slug") for r in starters})
 
     seen, by_round, teams, ungraded = set(), {}, {}, set()
@@ -1197,8 +1197,8 @@ def forecast_claims() -> list[dict]:
 
 def golden_rows() -> list[dict]:
     """One row per (player, jornada): the rate side and the start side on
-    the same table, joined on jornada number. Uses match_locks() (each
-    fixture's own kickoff), not jornada_locks() (the round-wide lock) —
+    the same table, joined on jornada number. Uses JornadaClock.team_locks
+    (each fixture's own kickoff), not .round_locks (the round-wide lock) —
     a deferred fixture's real lock differs from its round's.
 
     A row's rate fields are None when nothing matched — a real
@@ -1216,7 +1216,7 @@ def golden_rows() -> list[dict]:
     fixtures = read_csv(TIDY / "fixtures.csv")
     jornada_of_lock = {when: jor
                        for (jor, _team), when
-                       in match_locks(matches, fixtures).items()}
+                       in JornadaClock(matches, fixtures).team_locks.items()}
 
     intervals, _graded, _ungraded = load_starts()
     per: dict[str, list[tuple[dt.datetime, dict]]] = {}
@@ -1727,7 +1727,7 @@ def _selftest() -> None:
         == "racing"
     assert team_slug_of("Real Betis", {"betis", "real-sociedad"}) == "betis"
     assert team_slug_of("Nowhere FC", {"racing"}) is None
-    locks = jornada_locks(matches, fixtures)
+    locks = JornadaClock(matches, fixtures).round_locks
     # The round locks at its EARLIEST kickoff, not each match's own: the app
     # locks the whole lineup once, so Sunday's starter is already frozen.
     assert list(locks) == [1] and locks[1].day == 15, locks
@@ -1744,11 +1744,11 @@ def _selftest() -> None:
           start("9", "Eve", "eve-slug")]        # round 2 has no lock
     # TWO intervals, not one, even inside the same jornada — Alaves-Getafe
     # and Espanyol-Levante kick off six hours apart in this fixture, so
-    # each locks its OWN two teams at its OWN kickoff (match_locks()),
+    # each locks its OWN two teams at its OWN kickoff (JornadaClock.team_lock),
     # not both grouped under the round's single earliest one. Grading
     # Espanyol/Levante as of Friday's kickoff would throw away a real
     # day of team news nobody needed to discard.
-    mlocks = match_locks(matches, fixtures)
+    mlocks = JornadaClock(matches, fixtures).team_locks
     iv2, graded, ungraded = start_intervals(matches, xi, fixtures)
     assert graded == 3, graded                  # Ane, Bo, Cai — Bo once
     assert ungraded == [2], ungraded            # said out loud, not dropped

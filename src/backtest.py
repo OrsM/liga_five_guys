@@ -239,7 +239,7 @@ def naive_value_baseline(golden: list[dict]) -> dict | None:
         return None
     matches = M.read_csv(M.TIDY / "matches.csv")
     fixtures = M.read_csv(M.TIDY / "fixtures.csv")
-    locks = M.jornada_locks(matches, fixtures)
+    locks = M.JornadaClock(matches, fixtures).round_locks
 
     resolved = []
     for r in checked:
@@ -286,8 +286,8 @@ def recency_only_baseline(golden: list[dict], window: int = 3) -> dict | None:
         return None
     matches = M.read_csv(M.TIDY / "matches.csv")
     fixtures = M.read_csv(M.TIDY / "fixtures.csv")
-    locks = M.jornada_locks(matches, fixtures)
-    order = M.lock_order(locks)
+    clock = M.JornadaClock(matches, fixtures)
+    locks, order = clock.round_locks, clock.order
     pos = {j: i for i, j in enumerate(order)}
 
     actuals, _label = M.load_actuals()
