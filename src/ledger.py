@@ -5,19 +5,12 @@ ledger.py — rebuild data/tidy/transactions.csv from the app's activity feed.
     python src/ledger.py --write    # write it
     python src/ledger.py --selftest
 
-The ledger was the one input a human had to remember to update.
-On 2026-08-17 it was three days behind and the report offered a 63.29M budget
-against a real 23.60M. It was never wrong, only late — which for a decision
-system is the same thing.
+The feed names only the manager who acted, not the counterparty, and a
+manager-to-manager transfer doesn't appear as a paired buy/sell — so every
+buy is written as coming from the pool and every sale as going to it: exact
+for ownership, prices and premiums, lossy only for who dealt with whom.
 
-WHAT IS LOST: the feed names one side of a deal (`user1Id`) and nothing else,
-and a manager-to-manager transfer is not a paired buy and sell — verified, no
-two of 57 rows share a player and a moment. So every buy is written as coming
-from the pool and every sale as going to it: exact for ownership, prices and
-premiums; lossy only for who dealt with whom.
-
-Still committed, deliberately — the per-run diff is a better audit trail than
-a file retyped from memory.
+Committed, not hand-edited — the per-run diff is the audit trail.
 """
 
 from __future__ import annotations
@@ -39,14 +32,9 @@ HEADER = """\
 # GENERATED — do not hand-edit. Rebuilt from the app's activity feed by
 # src/ledger.py on every run; anything typed here is overwritten.
 #
-# This was a hand-maintained file until 2026-08-18. It fell three days behind
-# and the report offered a budget 39.69M larger than the real one, so it is
-# derived now. Git history is the audit trail.
-#
-# `from`/`to` name the pool as one side of every deal: the feed reports only
-# the manager who acted, and a manager-to-manager transfer does not appear as
-# a paired buy and sell, so the counterparty genuinely cannot be recovered.
-# Ownership, prices and premiums are unaffected.
+# `from`/`to` name the pool as one side of every deal — the counterparty in
+# a manager-to-manager transfer cannot be recovered from the feed. Ownership,
+# prices and premiums are unaffected.
 """
 
 
@@ -84,13 +72,10 @@ def existing(path=LEDGER) -> list[dict]:
 
 
 def write(rows: list[dict], force: bool = False, path=LEDGER) -> str:
-    """Replace the ledger, or refuse and say why.
-
-    THE GUARD IS THE POINT. An empty feed is indistinguishable from a feed we
-    could not read — an expired token, a 500, a sweep that skipped the API —
-    and writing it would delete the entire transaction history of the season
-    in a file that is then committed. So a build that produces fewer rows than
-    the file already holds is refused unless asked twice.
+    """Replace the ledger, or refuse and say why. An empty or shrinking feed
+    is indistinguishable from a failed fetch (expired token, a 500) — a
+    build with fewer rows than the file already holds is refused unless
+    `force`.
     """
     had = len(existing(path))
     if not rows:
@@ -123,11 +108,7 @@ def _selftest() -> None:
     # '#' lines) sees exactly the same shape it always did.
     assert all(ln.startswith("#") for ln in HEADER.splitlines()), HEADER
 
-    # -- the guard ---------------------------------------------------------
-    # Against a real file in a temp directory, and by ARGUMENT rather than by
-    # monkeypatching the path resolver: the guard is about what is on disk, so
-    # a test that fakes the disk is testing something else. This used to swap
-    # out ffcore.tidy.input_path and set an FF_INPUTS nothing ever read.
+    # -- the guard, against a real file in a temp directory ----------------
     import tempfile
     from pathlib import Path
     with tempfile.TemporaryDirectory() as d:

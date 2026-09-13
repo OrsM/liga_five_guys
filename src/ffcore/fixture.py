@@ -6,39 +6,15 @@ fixture.py — who each team plays next, and how much that should move a forecas
     ppm * m.def_factor * pct/100   # a defender's/keeper's expectation
     ppm * m.atk_factor * pct/100   # a midfielder's/forward's expectation
 
-Until this existed, `pts/m x P(start)` was OPPONENT-BLIND: it valued Celta at
-home to Elche exactly as it valued Celta away at Real Madrid. That was the
-largest structural error left in the model, and it is the one the fixtures
-scrape was added to fix.
+Difficulty is a RANK over squad value (not a ratio — squad value is convex,
+so a raw ratio would swing 3x between easiest/hardest fixture), mapped onto
+a narrow band. attack_defense() splits it per position (clean sheets are
+opponent-attack-driven, goals opponent-defense-driven) from real results in
+data/tidy/results_history.csv; FIX_BAND/rank-based difficulty() is the
+per-club fallback below MIN_AD_MATCHES of real results.
 
-WHAT DIFFICULTY IS MEASURED FROM, and why it is a rank. The only team-level
-signal in this repo is the app's own valuation, summed over each squad. That
-scale is CONVEX: Real Madrid's squad is 4.6x the median squad, Elche's is
-0.46x. Taken as a ratio — even a square-rooted one — it produces a 3x swing
-between the easiest and hardest fixture, which is nonsense. Facing Real Madrid
-does not halve a defender's points; it costs him something like a fifth of a
-clean sheet. So teams are RANKED by squad value and the rank is mapped onto a
-narrow band. Rank is also robust to the thing value is worst at: one 100M
-signing moving a whole squad's total.
-
-THE TWO CONSTANTS BELOW ARE GUESSES, when they are used at all. They were
-not fitted because nothing had been played yet — the same reason the two
-probable-XI sources are printed side by side instead of blended — and are
-deliberately small, so a wrong guess costs a fraction of a point rather
-than reordering an eleven.
-
-PER-POSITION SENSITIVITY, ADDED: a clean sheet is opponent-ATTACK-driven, a
-goal opponent-DEFENSE-driven, and attack_defense() now says so from real
-match results (data/tidy/results_history.csv, football-data.co.uk) instead
-of a single squad-value rank applied to every position alike. FIX_BAND and
-the rank-based `difficulty()` are still what a club falls back to when it
-has fewer than MIN_AD_MATCHES of real results (freshly promoted, most
-often) — a per-CLUB fallback, not per-league, so one thin-history side does
-not send the whole board back to the guess the way one Elo gap would.
-
-A team with no fixture ahead — or a player with no team — gets both factors
-at 1.0 and says so. Never a guess: a missing fixture must not silently
-become an easy one.
+A team with no fixture ahead, or a player with no team, gets both factors
+at 1.0 rather than a guessed easy one.
 
 Run `python src/ffcore/fixture.py` to execute the self-test below.
 """
@@ -58,57 +34,25 @@ from ffcore.parse import money  # noqa: E402
 from ffcore.text import norm  # noqa: E402
 from ffcore.tidy import kickoff_stamp  # noqa: E402
 
-# +/- this much from a median opponent, hardest to easiest. A guess. See above.
+# +/- this much from a median opponent, hardest to easiest. Unfitted guess.
 FIX_BAND = 0.12
-# Home is worth this much on top, away the same off it. THE UNFITTED
-# DEFAULT — kept as the fallback fit_home_edge() returns below its own
-# real-results floor, not because 0.04 is believed correct. Real matches
-# say otherwise: pooled results_history.csv (4 seasons, 1184 matches) +
-# this season's own matches.csv (42 more, as of 2026-09-13) read home
-# 1.52 goals/match vs away 1.15 — a ratio of 1.31, which is what
-# fit_home_edge() solves down to a real edge of ~0.136, not this. Left
-# as the constant here (fit_home_edge() is what actually gets used, see
-# its own docstring for the wiring) so a caller that can't run the fit
-# still gets a number in the right units, same role DRIFT_FRAC's own
-# module-level default plays for forecast.py.
+# Unfitted fallback used only below MIN_HOME_EDGE_MATCHES; fit_home_edge()
+# is what callers actually get once there's enough real data.
 HOME_EDGE = 0.04
-# Matches of real, pooled home/away goals before fit_home_edge() trusts
-# its own ratio over the guess above — the guess is one number away from
-# the fitted one being wrong in a way that would move every player's
-# score, so this floor is deliberately not tiny.
+# Real matches required before fit_home_edge() trusts its ratio over HOME_EDGE.
 MIN_HOME_EDGE_MATCHES = 50
 
 
 def fit_home_edge(results_history: list[dict],
                   matches: list[dict] = ()) -> tuple[float, str]:
-    """(edge, why) — HOME_EDGE, fit from real goals instead of guessed.
+    """(edge, why) — HOME_EDGE fit from real pooled goals, not guessed.
 
-    Miguel, 2026-09-13, on being shown HOME_EDGE/FIX_BAND were both
-    self-labelled guesses in this file's own comments: "shouldn't you...
-    improve on the approach?" This is that, for the one of the two with
-    a direct, obvious real-data fit and outsized reach (it scales every
-    player's atk_factor/def_factor, not just the rank-based fallback
-    FIX_BAND is limited to).
-
-    POOLED ACROSS EVERY REAL RESULT AVAILABLE — results_history.csv's
-    multi-season history (the same file club_volatility()/season_board()
-    already read) plus this season's own matches.csv, on the same
-    reasoning: more real matches, one real number, not a guess in the
-    same order of magnitude as this repo's other pseudo-match constants.
-    `matches` rows are deduplicated on (match_id, jornada) first — the
-    tidy store carries one row per observed snapshot, the same repeat-
-    counting bug _per_jornada_current()'s own docstring found once
-    already (57 copies of one match's row).
-
-    THE EDGE IS SOLVED FROM THE GOAL RATIO, matching exactly how
-    _match_for() applies it: home scores at atk_base*(1+e), away at
-    atk_base*(1-e), so home_goals/away_goals = (1+e)/(1-e) pooled across
-    otherwise-equal matchups, solved for e = (r-1)/(r+1).
-
-    Below MIN_HOME_EDGE_MATCHES real, scored matches this refuses (the
-    HOME_EDGE default, "not enough real results yet") rather than fit a
-    ratio off a handful of matches — same discipline every other fit in
-    this repo uses (_xg_points_fit(), fit_drift_frac()).
+    Pools results_history.csv's multi-season history with this season's
+    matches.csv (deduplicated on (match_id, jornada) — the tidy store can
+    carry repeat snapshots of one match). Solves e from the goal ratio
+    matching _match_for()'s application: home_goals/away_goals = (1+e)/(1-e)
+    => e = (r-1)/(r+1). Below MIN_HOME_EDGE_MATCHES real matches, refuses
+    and returns the HOME_EDGE default instead.
     Why: docs/notes/fixture.md#fit_home_edge--why-a-fit-not-a-guess
     """
     home_g = away_g = n = 0
@@ -149,11 +93,8 @@ class Match(NamedTuple):
     opponent: str          # the opponent, as the fixture page spells it
     home: bool
     kickoff: datetime
-    # TWO FACTORS, NOT ONE: a clean sheet is driven by the opponent's ATTACK,
-    # a goal by the opponent's DEFENSE — the same number priced both until
-    # attack_defense() existed to tell them apart. def_factor is for
-    # POR/DEF, atk_factor for MED/DEL; ffcore.score.Scored.score picks
-    # between them by slot.
+    # def_factor (POR/DEF) driven by opponent attack; atk_factor (MED/DEL)
+    # by opponent defense. ffcore.score.Scored.score picks between them by slot.
     atk_factor: float      # multiply a MED/DEL's pts/match by this
     def_factor: float      # multiply a POR/DEF's pts/match by this
     rank: int              # opponent's rank, 1 = strongest
@@ -162,38 +103,22 @@ class Match(NamedTuple):
     gap: float | None = None   # raw Elo difference, you minus opponent
 
 
-# Club Elo names some Spanish clubs after their CITY where the market names
-# the club: Racing de Santander is "Santander". They share no substring with
-# the market's spelling, so `match_team` cannot bridge them and never should
-# be taught to guess across a gap that wide.
-#
-# This is not cosmetic. `elo_strength` refuses partial coverage on purpose, so
-# these alone sent all twenty clubs back to squad-value rank — Elo was
-# scraped, parsed, stored, and then not used, with the reports saying only
-# that coverage was incomplete. An alias each is the whole fix.
-#
-# "Bilbao" IS KEPT THOUGH NOTHING SERVES IT TODAY. The CSV API spelled Athletic
-# that way; the country page this now reads spells it "Athletic Club", which
-# `match_team` joins on its own. An alias is only consulted after the ordinary
-# join has failed, so a spelling that never arrives costs nothing — and the
-# day one of these sources goes back to the other spelling, twenty clubs do
-# not silently drop to squad value again.
+# Club Elo names some clubs after their city where the market uses the club
+# name (Racing de Santander -> "Santander"); no shared substring for
+# `match_team` to bridge. elo_strength() refuses partial coverage, so a
+# missing alias sends the whole board back to squad value. "Bilbao" is kept
+# even though today's source spells it "Athletic Club" (which joins fine on
+# its own) as a fallback if the source reverts.
 ELO_ALIASES = {"athletic": "Bilbao", "racing": "Santander"}
 
 
 def elo_strength(market_teams, elo_rows) -> dict[str, float] | None:
     """{market team: Elo rating}, or None unless every team joins.
 
-    PARTIAL COVERAGE IS REFUSED. A board where half the teams are ranked by
-    Elo and half by squad value is not a ranking — the two scales have nothing
-    to do with each other, and the mixture would be silently wrong in the
-    middle of the table where most of the league lives. One unjoinable club
-    sends the whole board back to squad value, which is the behaviour that was
-    there before Elo existed.
-
-    `elo_rows` is the latest Elo snapshot: rows with `club` and `elo`. Only
-    Spanish top-flight rows should reach here — the ratings file is worldwide,
-    and Elche ranking above Bayern is not a fixture.
+    Partial coverage is refused: Elo and squad value are incomparable scales,
+    so one unjoinable club sends the whole board back to squad value instead
+    of silently mixing them. `elo_rows` should already be filtered to Spanish
+    top-flight — the ratings file is worldwide.
     """
     have = {}
     for r in elo_rows:
@@ -307,36 +232,19 @@ def attack_defense(results: list[dict], teams,
                    xg_attack: dict[str, float] | None = None,
                    xg_pseudo: float = XG_CLUB_PSEUDO_MATCHES
                    ) -> dict[str, tuple[float, float]]:
-    """{team: (attack, defense)}, from real match results — goals scored and
-    conceded, home and away pooled, relative to the league's own average.
+    """{team: (attack, defense)}, from real goals scored/conceded (home+away
+    pooled), relative to league average. Both centred on 1.0: attack > 1.0
+    scores more than average, defense > 1.0 concedes more (worse defense).
 
-    `xg_attack`, when given (xg_club_attack()'s own output), blends into
-    the ATTACK half only — DEFENSE stays real-goals-only, because nothing
-    here has a bottom-up xG signal for it (that would need real match-
-    level xG-against, not summed player output; see XG_CLUB_PSEUDO_
-    MATCHES's own note). Weighted by real matches played against a fixed
-    pseudo-match count for the xG side, the same shrink-toward-a-prior
-    shape SHRINK_K already uses — so a club with few real matches (near
-    MIN_AD_MATCHES) leans on the xG rating more than an established one
-    with 50+ does.
+    `xg_attack` (xg_club_attack()'s output), when given, blends into the
+    ATTACK half only — defense stays real-goals-only, no bottom-up xG-against
+    signal exists for it. Weighted by real matches played vs. a fixed
+    xg_pseudo count, so low-sample clubs lean more on the xG rating.
 
-    attack > 1.0 scores more than an average team that season; defense > 1.0
-    CONCEDES more than an average team (worse defense), < 1.0 fewer (better).
-    Both centred on 1.0 by construction, the same centring difficulty()'s
-    rank-based factor uses — which is what makes blending the two per team
-    safe below, unlike elo_strength()'s refusal to mix scales.
-
-    PER-TEAM COVERAGE, NOT ALL-OR-NOTHING. elo_strength() refuses the whole
-    board if even one club lacks an Elo rating, because Elo and squad value
-    are two INCOMPARABLE scales and a board mixing them client-team-by-team
-    would be worse than either alone. A club with MIN_AD_MATCHES fewer
-    real results (freshly promoted, most often) simply has no entry here;
-    the caller falls back to the rank-based factor for that one club and
-    nothing else, since both answers already live on the same 1.0-centred
-    scale.
-
-    Only clubs in `teams` are returned — this repo's current twenty, since a
-    club that cannot be anyone's opponent this season is not worth carrying.
+    Per-team coverage, not all-or-nothing like elo_strength(): a club below
+    MIN_AD_MATCHES real results is simply absent, and its caller falls back
+    to the rank-based factor for that club alone (safe because both scales
+    are 1.0-centred). Only clubs in `teams` are returned.
     """
     scored: dict[str, float] = {}
     conceded: dict[str, float] = {}
@@ -377,34 +285,17 @@ def attack_defense(results: list[dict], teams,
 
 
 def club_volatility(results: list[dict], teams) -> dict[str, float]:
-    """{team: rel} — how uncertain THIS CLUB'S OWN attack_defense() rating
-    is, as a fraction, from how much its match-to-match goal involvement
-    (scored + conceded, one number per match) actually varied.
+    """{team: rel} — fractional uncertainty on this club's own
+    attack_defense() rating, from match-to-match spread in goal involvement
+    (scored + conceded, one number per match).
 
-    THE SAME SHAPE ffcore.score._priors()/ffcore.forecast.Bootstrap's
-    rate_rel ALREADY USES for a PLAYER's rate: standard error of a mean
-    over n observations is the per-observation spread over root n, so a
-    rating fit from more matches is trusted more, one that has barely
-    settled is trusted less. Not a new idea, the same one at club scale
-    — un-netted against player-level rate_rel deliberately: there is no
-    clean way to say how much of a player's existing individual
-    uncertainty already reflects his club's shared risk and how much is
-    truly his own, so this is meant to be ADDED as an extra source of
-    correlated uncertainty, not to replace or shrink what already exists.
-    Errs toward wider bands, which is the documented gap this exists to
-    narrow, rather than toward a redistribution that could get the split
-    wrong in either direction.
-
-    GOALS INVOLVEMENT (scored + conceded), NOT SCORED ALONE — a club's bad
-    week usually shows up both ways at once (their attack goes quiet AND
-    their defense leaks), and one number keeps the shared per-trial shock
-    (below) simple: every one of a club's players, attacker or defender,
-    inherits the same "this club had a wild/quiet stretch" draw. Splitting
-    attack-volatility from defense-volatility separately is a real
-    refinement this does not attempt.
-
-    Same MIN_AD_MATCHES threshold and per-team (not all-or-nothing)
-    coverage as attack_defense() — see its own note on why that is safe.
+    Standard-error-of-a-mean shape (spread / sqrt(n)), same as
+    ffcore.score._priors()/Bootstrap's player-level rate_rel, applied at
+    club scale — added as an extra, correlated uncertainty source on top of
+    a player's own rate_rel, not netted against it, so it errs wide rather
+    than risk redistributing uncertainty wrong. Scored+conceded combined
+    (not scored alone) so every player at a club shares one "wild/quiet
+    stretch" draw. Same MIN_AD_MATCHES / per-team coverage as attack_defense().
     """
     involvement: dict[str, list[float]] = {}
     for r in results:

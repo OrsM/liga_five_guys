@@ -1,14 +1,9 @@
 # GENERATED — do not hand-edit. Rebuilt from the app's activity feed by
 # src/ledger.py on every run; anything typed here is overwritten.
 #
-# This was a hand-maintained file until 2026-08-18. It fell three days behind
-# and the report offered a budget 39.69M larger than the real one, so it is
-# derived now. Git history is the audit trail.
-#
-# `from`/`to` name the pool as one side of every deal: the feed reports only
-# the manager who acted, and a manager-to-manager transfer does not appear as
-# a paired buy and sell, so the counterparty genuinely cannot be recovered.
-# Ownership, prices and premiums are unaffected.
+# `from`/`to` name the pool as one side of every deal — the counterparty in
+# a manager-to-manager transfer cannot be recovered from the feed. Ownership,
+# prices and premiums are unaffected.
 date,player,player_id,from,to,price,note
 2026-08-11T22:24,Cardoso,2790,market,Magic Mike 333,949269,from the app
 2026-08-11T22:24,Turrientes,1215,market,miguel_autentico,6892898,from the app

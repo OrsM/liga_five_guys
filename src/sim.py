@@ -261,14 +261,8 @@ def _bar(u) -> float:
 
 def short_manager(m: str) -> str:
     """One manager's first name/word only — "Magic Mike 333" -> "Magic",
-    "SusoGattuso" unchanged (no space to split on).
-
-    THE SAME SHORTENING FOR EVERY MANAGER NAME ON THE LADDER, not just
-    race_cell()'s own rival — before this (Miguel, 2026-09-01: "the width
-    still not working"), the OWNER'S name in the Where column was printed
-    in full while only the rival racing him was shortened, so a row could
-    still read "Magic Mike 333 · Suso ~1d" — half-fixed. One function, so
-    the two never drift apart on how much to cut.
+    "SusoGattuso" unchanged (no space to split on). The one shortener for
+    every manager name on the ladder, owner and rival alike.
     """
     return m.split()[0] if m else m
 
@@ -285,11 +279,6 @@ def ladder_rows(u, rows, bands=None) -> list[dict]:
     (pts_lo/pts_hi) for EVERY row, not just the point estimate xpts already
     carried. `bands=None` (an old caller, or the self-test) is the unpriced
     table, not a crash.
-
-    NO CHASE MODE, NO CLAUSE-RACE TIMING (2026-09-06) — both cut as bolt-on
-    insight layers, not because either was wrong, but because "the book"
-    direction favours one plain value-ranked list over several ranking
-    modes each with its own edge cases.
     """
     import decide
 
@@ -324,21 +313,15 @@ def ladder_rows(u, rows, bands=None) -> list[dict]:
                 "xpts": exp.get(k, 0.0), "group": group, "where": where,
                 "money": money, "pts": pts, "par": par.get(k),
                 "pts_lo": lo, "pts_hi": hi, "note": note, "value": value,
-                # THREE PLAIN FACTS, no blended score — Miguel's own
-                # framing (2026-09-06): what he's really worth, what
-                # extra you pay to force the sale, what it's worth in
-                # points. `market` is None for a target with no known
-                # value (rare); `premium` is 0.0 for a free agent (no
-                # clause to pay above value) and decide.burn()'s own
-                # number for a raid — already computed by rank(), not a
-                # new calculation.
+                # Three plain facts, no blended score: what he's worth,
+                # what extra a raid costs above that, what it's worth in
+                # points. `market` is None with no known value (rare);
+                # `premium` is 0.0 for a free agent, decide.burn()'s own
+                # number for a raid.
                 "market": market, "premium": premium,
                 # SELL rows only — decide.bought_price()'s own reading,
                 # None for a player never transacted in this league's
                 # recorded ledger (came with the draft, or predates it).
-                # Miguel, 2026-09-12: "when proposed to sell someone, what
-                # was the price I bought them at" — this is that number,
-                # not a second guess at it.
                 "bought": bought}
 
     out = []
@@ -369,11 +352,9 @@ def ladder_rows(u, rows, bands=None) -> list[dict]:
     def buy_cell(k, group):
         r = won[k]
         sold = r["action"].sell
-        # The market/premium cell shows sticker price, not net cost (2026-09-06,
-        # Miguel: no blended score) — so a real purchase can look unaffordable
-        # (e.g. 11.5M) next to spare cash that doesn't cover it. `sold` names
-        # whoever actually funds the gap, the same fact "with the proceeds"
-        # promises in the group header but the row itself never used to state.
+        # The market/premium cell shows sticker price, not net cost — so a
+        # real purchase can look unaffordable next to spare cash that
+        # doesn't cover it. `sold` names whoever actually funds the gap.
         note = ("sell " + " + ".join(short(s, u) for s in sold)) if sold else ""
         return cell(k, group, short_manager(u.owner.get(k)) or "free agent",
                     -r["action"].net, r["d_pts"], note, value=r.get("value"),
@@ -409,9 +390,9 @@ def ladder_rows(u, rows, bands=None) -> list[dict]:
     # "clears the bar" fell through here with a price, looking exactly
     # like a buyable one. A clause-raidable rival who simply didn't rank
     # high enough for RAID was tried here too, but PASS renders every row
-    # identically with no clause marker — Miguel's rule: no rival-owned
-    # player anywhere in the report unless the proposal IS the clause
-    # raid, on its own row, in RAID.
+    # identically with no clause marker — no rival-owned player anywhere
+    # in the report unless the proposal IS the clause raid, on its own
+    # row, in RAID.
     # Why: docs/notes/sim.md#ladder_rows--pass-is-free-agents-only
     for k in sorted((k for k in rest if k not in won
                      and u.price[k] <= u.cash + spare
@@ -433,12 +414,9 @@ def band_acts(u) -> list:
     them in the final pass it was already running, handing them back as
     its `bands`.
 
-    A PURE SALE, NOT A FUNDED UPGRADE — the funding-chain narrative this
-    used to carry ("what selling him could afford instead") was cut with
-    `decide.best_swap_for()` (2026-09-06): it was the direct cause of two
-    catastrophic squad-legality bugs, and named a rival's non-clause
-    player as an upgrade at least once before that was caught. This is a
-    plainer, honest question: what does this man's own sale cost you.
+    A PURE SALE, NOT A FUNDED UPGRADE — no "what selling him could afford
+    instead" narrative. Plainer, honest question: what does this man's
+    own sale cost you.
     """
     import decide
 
@@ -480,14 +458,7 @@ def ladder(u, rows, base, data=None) -> list[str]:
 
     RENDERS ladder_rows()'s OWN OUTPUT, computes nothing of its own beyond
     the aggregate "Your eleven" line (best_xi/expected — deterministic, no
-    simulation, so recomputing it here cannot drift). This used to be a
-    second, independent implementation — its own exp/xi/dead/won/bands,
-    the exact duplication this repo's own design principle warns against
-    ("two renderings of one answer is how they come to disagree"). Fixed
-    2026-08-22: the bands ran twice, once per renderer, before this — real
-    simulated numbers, computed twice, on the strength of "same seed gives
-    the same answer" rather than there being only one computation to give
-    it.
+    simulation, so recomputing it here cannot drift).
 
     `data`, when given, is ladder_rows()'s OWN result, computed once by a
     caller feeding both this and payload() — main() does, so the real
@@ -515,10 +486,9 @@ def ladder(u, rows, base, data=None) -> list[str]:
                       if r["pts_lo"] is not None else "%+.0f" % r["pts"])
             if r["note"]:
                 season += " " + r["note"]
-            # MARKET PRICE + THE EXTRA CLAUSE PREMIUM, not net cost —
-            # Miguel's own framing (2026-09-06): what he's really worth,
-            # what extra you pay to force the sale, no blended score.
-            # BUY/RAID only (both carry `market`); every other group
+            # Market price + the extra clause premium, not net cost: what
+            # he's really worth, what extra a raid costs above that, no
+            # blended score. BUY/RAID only (both carry `market`); every other group
             # keeps the plain net-cost figure it always has.
             if r["group"] in ("buy", "raid") and r["market"] is not None:
                 money = "%.2fM" % (r["market"] / 1e6)
@@ -668,15 +638,10 @@ def standings(u, base) -> list[str]:
 
 
 def _drift_frac_now() -> float:
-    """The live `ffcore.forecast.DRIFT_FRAC`, read off the module rather than
-    imported as a name — season.py's own calibration self-tests temporarily
-    monkeypatch this attribute (`forecast.DRIFT_FRAC = 0.0`, restored after),
-    and a `from ... import DRIFT_FRAC` here would freeze the value this
-    module happened to see at import time instead. Pulled out on its own
-    because the report used to print a literal "DRIFT_FRAC=2.0" in this
-    caveat regardless of what actually ran — stale since 2026-08-22's
-    revert back to 1.0 (`6cefe65`), so the report told Miguel the wrong
-    number for over a week.
+    """The live `ffcore.forecast.DRIFT_FRAC`, read off the module rather
+    than imported as a name — season.py's own calibration self-tests
+    monkeypatch this attribute, and a `from ... import DRIFT_FRAC` here
+    would freeze the value seen at import time instead.
     """
     import ffcore.forecast as forecast
     return forecast.DRIFT_FRAC
@@ -703,43 +668,24 @@ def illegal_squads(u) -> list[tuple[str, list[str]]]:
     """[(manager, ["2/3 defensas", ...])] for every squad — mine included
     — best_xi() cannot fill from, sorted by manager.
 
-    CALLS best_xi() ITSELF, does not re-derive its own notion of
-    "legal" — see this repo's own day of finding "two independent
-    authorities that only agree by luck" (season.legal_shapes() vs
-    score.formations(), fixed 2026-09-01) for why a SECOND, simplified
-    legality check here would be exactly that mistake again. A squad
-    can fail to fill any of the 7 real formations even meeting every
-    position's SLOT_MIN individually — SLOT_MIN/MAX_SLOT bound the
-    RANGE each formation allows, not which exact combinations exist
-    among the 7 (e.g. no formation pairs DEF=3 with MED=3) — so only
-    best_xi()'s own real search is the ground truth. The value dict
-    passed to it does not matter for LEGALITY (only for which players
-    among a legal shape's choices are picked), so a flat 1.0 per player
-    is enough here — this function only asks "does anything come back",
-    never "what does it score".
+    CALLS best_xi() ITSELF rather than re-deriving "legal" — SLOT_MIN/
+    MAX_SLOT bound the range each of the 7 real formations allows, not
+    which exact combinations exist among them (no formation pairs DEF=3
+    with MED=3), so a squad can fail even meeting every position's
+    SLOT_MIN individually. Only best_xi()'s own search is ground truth.
+    A flat 1.0 per player is enough (legality doesn't depend on value).
 
-    WHY THIS MATTERS: best_xi() returning [] freezes a manager's
-    simulated season at exactly what he has already scored, every
-    remaining jornada adding zero with zero variance — indistinguishable
-    in the standings table from "the model is very confident this
-    manager is finished", when the real fact is "his data says he
-    cannot field a squad at all", a completely different claim. Found
-    2026-09-01 (Miguel: "the forecast for Albert is absolutely
-    unsustainable") — his standings row read a flat 32-32 band with no
-    signal anywhere pointing at why: 2 defensas against SLOT_MIN's 3.
+    WHY THIS MATTERS: best_xi() returning [] freezes a manager's season
+    at what he's already scored with zero variance — indistinguishable
+    from "the model is confident he's finished" when the real fact is
+    "his data can't field a squad at all".
 
-    report.py already warns when MY OWN squad is thin (`have <= n`, a
-    softer "one injury away" threshold) — that check has no reach into a
-    RIVAL's squad, which is the gap this closes.
+    report.py warns when MY OWN squad is thin; this covers a RIVAL's.
 
-    SHOULD NEVER FIRE IN PRODUCTION AS OF decide.phantom_fill()
-    (2026-09-01, same day): every squad `decide.load()` returns is
-    already patched with an average-player stand-in per missing
-    position before anything reaches here — see phantom_filled() below
-    for the caveat that replaced this one. Kept, not deleted: a real
-    safety net — if phantom_fill() ever regresses, THIS starts firing
-    again instead of the report silently going back to freezing someone
-    at zero with no signal anywhere.
+    SHOULD NEVER FIRE IN PRODUCTION: decide.phantom_fill() already
+    patches every squad decide.load() returns with an average-player
+    stand-in per missing position before anything reaches here (see
+    phantom_filled() below). Kept as a safety net in case that regresses.
     """
     from ffcore.score import SLOT_LABEL, SLOT_MIN
     from ffcore.season import XI_SIZE, best_xi
@@ -767,17 +713,11 @@ def phantom_filled(u) -> list[tuple[str, list[str]]]:
     """[(manager, ["1 defensa", ...])] for every squad — mine included —
     decide.phantom_fill() patched with an average-player stand-in.
 
-    Detected off the phantom keys THEMSELVES (`__phantom_<slot>_<n>`,
-    phantom_fill()'s own format — manager-agnostic since 2026-09-09, was
-    `__phantom_<manager>_<slot>_<n>`: decide.phantom_topup() lets several
-    squads share one, so a key alone no longer says whose it is — squad
-    MEMBERSHIP does, which this already read off `sq` to get `slot`, so
-    dropping the manager from the key needed no new lookup here), not by
-    re-checking best_xi() against SLOT_MIN — after phantom_fill(), every
-    squad IS legal by construction, so asking best_xi() again would report
-    nothing found, which answers a different question ("is this squad legal
-    now") than the one this caveat exists to answer ("was a real gap patched
-    to get there").
+    Detected off the phantom keys themselves (`__phantom_<slot>_<n>`,
+    manager-agnostic — squad membership already says whose it is), not
+    by re-checking best_xi() against SLOT_MIN: after phantom_fill() every
+    squad IS legal by construction, so that would answer "is this squad
+    legal now" rather than "was a real gap patched to get there".
     """
     from ffcore.score import SLOT_LABEL
 
@@ -857,13 +797,9 @@ def caveats(u) -> list[str]:
         "| Cash scores zero | nothing models the market next cycle, so "
         "holding money looks worthless and a standalone sale can never look "
         "good |",
-        # RETIRED CLAIM, 2026-09-06: this used to say the constant can
-        # never be graded at any row count (true only of the single-
-        # horizon "Forecast vs actual" table). methodology.drift_lines()
-        # (see its own report section) fits it for real now, off REAL
-        # lagged predictions already sitting in squad_log.csv, not a
-        # hand-pick — this caveat states TODAY's actual status rather
-        # than re-describing the mechanism a second, driftable way.
+        # methodology.drift_lines() fits DRIFT_FRAC off real lagged
+        # predictions in squad_log.csv — this caveat states TODAY's
+        # actual status, not a hand-picked constant.
         # Why: docs/notes/forecast.md#fit_drift_frac--the-derivation
         "| p_win's season-long spread uses DRIFT_FRAC=%s (%s) | see "
         "\"Season-long drift\" below for the fit itself — every published "
@@ -874,11 +810,9 @@ def caveats(u) -> list[str]:
         % (_drift_frac_now(), _drift_status_now()),
         "| Shape prior | %s |" % u.forecaster.pool_note(),
         "| P(start) fit | %s |" % u.start_note.rstrip("."),
-        # Measured 2026-08-31 (same seed, N=100->3000): p_win/expected_finish
-        # (levels, not the paired move-ranking that stays stable at every N)
-        # swung 0.1930-0.2600 — a real ~7-point Monte Carlo noise band on
-        # exactly the number trailing() thresholds at 0.5, known and measured
-        # but never shown next to the figure itself until now.
+        # p_win/expected_finish (levels, not the paired move-ranking that
+        # stays stable at every trial count) carry a real Monte Carlo
+        # noise band of roughly ±7 points at this trial count.
         # Why: docs/notes/decide.md#trial-counts-screen_trials--final_trials
         "| win % and finish are single simulated draws | at this trial "
         "count the same real inputs have been measured to swing roughly "
@@ -890,47 +824,26 @@ def caveats(u) -> list[str]:
 
 # How much of the best move's season gain a cheaper alternative may give
 # up and still be recommended, in _best()'s own value-for-money
-# refinement (the single headline pick only — see _move_rank_key()'s own
-# note on why the wider ladder now uses a flat pts_lo sort with no
-# floor/tolerance concept at all). Not 1.0 (biggest gain wins regardless
-# of cost) and not much lower (a materially worse move is worse, full
-# stop). MOVES_VALUE_FLOOR, its old ladder-side counterpart, retired
-# 2026-09-06 — docs/notes/sim.md#value_tolerance-090-and-moves_value_floor-025
+# refinement (the single headline pick only).
+# Why: docs/notes/sim.md#value_tolerance-090-and-moves_value_floor-025
 VALUE_TOLERANCE = 0.90
 
 def _move_rank_key(r, u):
-    """RELIABLE ROUTES FIRST, THEN BY `d_pts` (season points gained) — ONE
-    metric, the same one `_best()` uses for the single headline pick, and
-    the same one decide.rank() itself now screens and orders by.
-
-    RANKS BY POINTS, NOT `pts_lo` (10th percentile of the move's own paired
-    trial distribution) — reversed 2026-09-12. `pts_lo`'s own prior
-    backtest (`backtest.replay_ladder_percentile()`, fixed-horizon,
-    `stats.bootstrap_gap` for real significance) never showed it beating a
-    simpler scheme: at 72-78 graded episodes per arm, the 90% CI on the
-    per-episode gap straddled zero. Miguel, 2026-09-12, on being shown that
-    result: "it doesn't sound clearly better than ranking by incr points or
-    any other metric" — asked directly and chose points. `pts_lo`/`pts_hi`
-    still ride on every row as the error bar a reader sees; they no longer
-    decide the order. Full history of the retired quantile-ranking scheme:
-    docs/notes/sim.md#_move_rank_key--pts_lo-not-mean-d_pos-or-value-2026-09-06
+    """RELIABLE ROUTES FIRST, THEN BY `d_pts` (season points gained) — the
+    same metric `_best()` uses for the headline pick and decide.rank()
+    itself screens and orders by. `pts_lo`/`pts_hi` still ride on every
+    row as the reader's error bar; they don't decide the order.
+    Why: docs/notes/sim.md#_move_rank_key--pts_lo-not-mean-d_pos-or-value-2026-09-06
 
     SHARED KEY, not two independent sorts — `ladder_rows()`'s BUY group
-    (the markdown table a reader scrolls top to bottom) and `payload()`'s
-    `moves` (the phone's JSON) both call this, so they cannot rank the
-    same candidates in two different orders.
+    and `payload()`'s `moves` both call this, so they can't rank the same
+    candidates in two different orders.
 
-    RELIABLE ROUTES FIRST, WITHIN EVERY TIER — the same rule `_best()`
-    uses for the single headline pick (decide.py's own note, 108 real
-    transactions checked 2026-08-29, zero of them manager-to-manager): a
-    "listed" candidate (Universe.route — a rival's own sale, who can
-    simply not sell, or get outbid) is not a slightly-riskier version of a
-    free-agent or clause buy, it is a route that has never once actually
-    gone through in this league. Demoted here, not removed: a real listed
-    opportunity stays fully visible, just under routes that cannot be
-    refused. A row with no `d_pts` at all (shouldn't happen off a real
-    `rank()` row, but a hand-built one might lack it) sorts last within
-    its reliability tier rather than crashing or guessing a value.
+    RELIABLE ROUTES FIRST, WITHIN EVERY TIER — a "listed" candidate
+    (Universe.route — a rival's own sale, refusable or outbiddable) is
+    demoted, not removed: fully visible, just below routes that can't be
+    refused. A row with no `d_pts` sorts last in its tier rather than
+    crashing or guessing.
     """
     reliable = 0 if u.route.get(r["action"].buy, "free") != "listed" else 1
     d = r.get("d_pts")
@@ -939,45 +852,19 @@ def _move_rank_key(r, u):
 def _best(u, rows, rivals):
     """(the top move, or None; whether it needs a rival's own cooperation).
 
-    RELIABLE ROUTES FIRST. A candidate's `buy` reaches you one of three ways
-    — Universe.route's own docstring: "free" (the app deals him, nobody can
-    refuse), "clause" (his buyout, instant, also cannot be refused), or
-    "listed" (a rival has put him up for sale, and simply not selling, or
-    somebody else outbidding you, are both real outs for them). Checked
-    against this league's own recorded history 2026-08-29
-    (data/tidy/transactions.csv, ledger.py's own rebuild of the app's
-    activity feed): 108 transactions, every one of them "from the app" —
-    zero have ever been a manager-to-manager sale. That is not "rare", it is
-    the entire sample, so a "listed" move is not a slightly-riskier version
-    of a real one; it is not what gets recommended automatically unless
-    nothing reliable clears the bar at all — the ordinary shopping list
-    still shows it (ladder()'s own "pts/M€" column), this only changes what
-    gets pushed as THE move.
+    RELIABLE ROUTES FIRST. A candidate's `buy` reaches you "free" (dealt
+    by the app, unrefusable), "clause" (buyout, unrefusable), or "listed"
+    (a rival's own sale — refusable, or outbiddable). Not what gets
+    recommended automatically unless nothing reliable clears the bar —
+    the ordinary shopping list still shows it (ladder()'s "pts/M€"
+    column); this only changes what gets pushed as THE move.
 
-    VALUE FOR MONEY, NOT JUST THE BIGGEST GAIN, within whichever pool (reliable
-    or, on a day nothing reliable helps, the full list) is in play. Finds the
-    biggest `d_pts` in `pool` directly (does NOT assume `rows` arrives
-    sorted — `decide.rank()`'s own row order is an internal screening detail,
-    and `payload()` independently resorts its own copy for the report table;
-    a caller handing this any order gets the same answer).
+    VALUE FOR MONEY, NOT JUST THE BIGGEST GAIN, within whichever pool is
+    in play. Finds the biggest `d_pts` in `pool` directly (does not
+    assume `rows` arrives sorted).
 
-    PICKS BY `d_pts` (season points gained, the paired trial mean/median) —
-    reversed 2026-09-12 from the `pts_lo` quantile this used before. That
-    substitution was itself checked against real history
-    (`backtest.replay_percentile_rank()`) and never showed a real edge: at
-    19-vs-16 graded episodes the two rules were not significantly different,
-    and the ORIGINAL open-ended-window reading that motivated the switch was
-    later found to be a measurement artifact (episode-turnover-inflated),
-    not a clean result — see `_move_rank_key()`'s own docstring for that
-    full history. Miguel, 2026-09-12, on being shown this: ranking on an
-    unproven risk-adjusted quantile instead of the point estimate itself
-    "doesn't sound clearly better" — chosen back to points, the metric this
-    whole pipeline is meant to be about.
+    PICKS BY `d_pts` (season points gained, the paired trial mean/median).
     Why: docs/notes/sim.md#_best--pts_lo-not-mean-d_pos-2026-09-06
-
-    NOT changed: `candidates`'s own eligibility gate (now `d_pts > 0`, the
-    same points-only reasoning), the reliable-routes-first split, and the
-    VALUE_TOLERANCE cheaper-alternative refinement below.
     """
     candidates = [r for r in rows if r["d_pts"] > 0]
     if not candidates:
@@ -1010,13 +897,10 @@ def alert_lines(u, rows, rivals) -> list[str]:
     news. A move that gains nothing is not news either, and returns [] so the
     caller can send NOTHING rather than "all quiet" twice a day.
 
-    BEING OVERDRAWN IS ALSO NEWS — Miguel, 2026-09-06: the model correctly
-    proposes zero buys while overdrawn (nothing is affordable), but used
-    to say NOTHING about what to sell to fix it, which is worse than
-    silence: the jornada locks overdrawn otherwise. Checked first, before
-    the ordinary best-move search — an unresolved overdraft is more
-    urgent than any buy could be, and the two states cannot coexist
-    (candidates() cannot propose anything real while overdrawn anyway).
+    BEING OVERDRAWN IS ALSO NEWS — checked first, before the ordinary
+    best-move search: an unresolved overdraft is more urgent than any buy,
+    and the two states can't coexist (candidates() proposes nothing real
+    while overdrawn anyway).
     """
     if u.cash < 0:
         sells, short = overdraft_fix(u)
@@ -1051,8 +935,7 @@ def alert_lines(u, rows, rivals) -> list[str]:
     else:
         cost = "free"
     if uncertain:
-        # Said outright, not left for Miguel to notice on his own — this is
-        # the one case where "Do this" is not actually guaranteed to happen.
+        # The one case where "Do this" is not actually guaranteed to happen.
         cost += " · needs the seller to accept, not guaranteed"
     return ["**Do this** — %s (%+.0f season pts, %+.0f%% to win, %s)"
             % (a.label({k: title_name(v) for k, v in u.name.items()}),
@@ -1244,11 +1127,8 @@ def log_cash_price(measured) -> None:
 
 def _price_note(smoothed, measured, idle_cash: float = 0.0) -> str:
     """`idle_cash` > 0 means: real spare cash, AND nothing cleared the bar
-    today (`rank()`'s own `rows` came back empty) — see main()'s own note.
-    Miguel, 2026-09-06: "the cash is not only when overdrawn, I can
-    probably put it to work more" — cash sitting there with a real,
-    measured, positive price and nothing to spend it on is worth saying
-    plainly, not just implied by an empty ladder.
+    today (`rank()`'s own `rows` came back empty) — worth saying plainly,
+    not just implied by an empty ladder.
     """
     if smoothed is None and measured is None:
         return ("Nothing is charged for a buyout premium yet: no run has been "
@@ -1399,12 +1279,7 @@ def _selftest() -> None:
     assert "play " in h, h
 
     # -- one row's worth of a real move, shared by every test below --------
-    # table() used to build its own assertions straight off this fixture;
-    # retired 2026-08-22 (dead code, never called outside its own test —
-    # see handoff_2026-08-21_evening.md, which already found this and
-    # redirected the feature into ladder()/ladder_rows() without deleting
-    # the original). The fixture itself stays: payload(), alert_lines() and
-    # render() below are still real callers and still need one.
+    # payload(), alert_lines() and render() below are all real callers.
     rows = [{"action": Action("clause", buy="yuri", sell="benat",
                               cost=20e6, proceeds=5.87e6, victim="riv"),
              "net_pts": 0.433, "d_win": 0.364, "d_beat": {"riv": 0.37},
@@ -1448,8 +1323,7 @@ def _selftest() -> None:
     left = {k: v for k, v in sq.items() if k not in dict(dead)}
     assert len(_bx(left, val)) == 11, left
 
-    # -- overdrawn: alert_lines() says what to sell, not silence
-    # (2026-09-06, Miguel: cash management going silent while overdrawn) --
+    # -- overdrawn: alert_lines() says what to sell, not silence -----------
     from dataclasses import replace as _dc_replace
     # Small overdraft: the bigger dead-weight sale (spare_m, 7.45M) alone
     # covers it, with room to spare — spare_k is never touched.
@@ -1531,8 +1405,7 @@ def _selftest() -> None:
     assert "A. Ferllo" not in clean and "jornada 1" not in clean.lower(), clean
 
     # -- illegal_squads(): a squad short a position freezes his season,
-    # silently, unless flagged here -- 2026-09-01, Miguel: "the forecast
-    # for Albert is absolutely unsustainable" -------------------------
+    # silently, unless flagged here ------------------------------------
     # A REAL FORMATION (4, 4, 2): 1 POR, 4 DEF, 4 MED, 2 DEL = 11 —
     # picked over the (3, 3, x) shape SLOT_MIN alone would suggest,
     # because no such shape exists among the 7 real ones (illegal_squads()
@@ -1575,8 +1448,7 @@ def _selftest() -> None:
         illegal_squads(u_noshape)
 
     # -- phantom_filled(): detected off the phantom KEYS, not by re-
-    # running best_xi() -- 2026-09-01, Miguel: "the forecast for Albert
-    # is absolutely unsustainable" -------------------------------------
+    # running best_xi() -------------------------------------------------
     # 1 phantom + 2 real DEF, 5 MED, 2 DEL, 1 POR = 11, matching the real
     # (3, 5, 2) formation exactly — not just meeting SLOT_MIN in isolation.
     ph_sq = {"__phantom_DEF_0": "DEF", "d1": "DEF", "d2": "DEF",
@@ -1653,9 +1525,7 @@ def _selftest() -> None:
     assert d["standings"][1]["p_above"] == 0.5
 
     # -- payload()'s `moves` order: by d_pts, not pts_lo/value/d_win --------
-    # (2026-09-12, reversing the 2026-09-06 pts_lo substitution — see
-    # _move_rank_key()'s own note on the real-history validation that never
-    # showed pts_lo beating this). A has the biggest season-points gain but
+    # A has the biggest season-points gain but
     # the widest, riskiest downside (worst pts_lo); B is a smaller gain but
     # a genuinely safer floor; C is tiny everywhere. Order is by d_pts
     # alone: A (biggest gain) leads, B second, C last — pts_lo no longer
@@ -1692,8 +1562,7 @@ def _selftest() -> None:
     flat = [{**rows[0], "net_pts": 0.0, "d_win": 0.0, "d_pts": 0.0}]
     assert alert_lines(u, flat, ["riv"]) == [], "a move worth nothing is not news"
 
-    # -- _price_note()'s idle-cash line (2026-09-06, Miguel: "the cash is
-    # not only when overdrawn, I can probably put it to work more") -------
+    # -- _price_note()'s idle-cash line -------------------------------------
     # No idle_cash given at all: unchanged from before this existed.
     assert "idle" not in _price_note(0.05, 0.03)
     # idle_cash=0 (the normal case: something DID clear the bar, or there's
@@ -1731,19 +1600,14 @@ def _selftest() -> None:
         "a self-funding move within reach of the best gain wins outright"
     # A ZERO season-points gain is not eligible at all, even with a real
     # win-probability move alongside it — POINTS ONLY, no OR-with-d_win
-    # escape hatch. Miguel, 2026-09-12: "P_win is an output of points, we
-    # should focus on points" — a pure win-probability "gain" with no
-    # points behind it is not a candidate any more.
+    # escape hatch. A pure win-probability "gain" with no points behind
+    # it is not a candidate.
     winonly = {**rows[0], "action": Action("buy", buy="x", cost=1e6),
               "net_pts": 0.0, "d_win": 0.05, "d_pts": 0.0, "pts_lo": 0.0}
     assert _best(u, [winonly], ["riv"]) == (None, False)
 
     # -- pts_lo is no longer decision-driving: two candidates tied on
-    # d_pts (season points) pick the same winner however different their
-    # pts_lo is, and however they're ordered — reversed 2026-09-12 from the
-    # 2026-09-06 substitution this used to test (see _best()'s own
-    # docstring for why: the backtest that motivated it never showed a real
-    # edge, and Miguel asked to go back to ranking on points) ------------
+    # d_pts (season points) pick by first-occurrence order, not pts_lo ----
     safer = {**rows[0],
              "action": Action("clause", buy="safer", sell="benat",
                               cost=20e6, proceeds=5.87e6, victim="riv"),
@@ -1795,14 +1659,8 @@ def _selftest() -> None:
     del u.route["listed_target"]
 
     # -- BUY/RAID/LISTED split: free agents, a clause (cannot be
-    # refused), and a listed target (the owner's own choice, which this
-    # league's own real history says essentially never goes Miguel's way)
-    # — three sections, same relative order preserved in each. 2026-09-01,
-    # Miguel: "I want to know if any free players are worth buying
-    # honestly", then "the raid should focus on the clause impacted
-    # ones... no way they're selling willingly to me" once a real report
-    # showed listed targets sitting under RAID as if a clause's certainty
-    # applied to them too.
+    # refused), and a listed target (the owner's own choice, essentially
+    # never accepted) — three sections, same relative order in each.
     from ffcore.profile import (PlayerProfile, PlayerIdentity,
                                 PlayerCurrent, PlayerHistory, PlayerDerived)
 
@@ -2010,9 +1868,7 @@ def _selftest() -> None:
     # Nothing asked for at all: no extra squads scored, not an error.
     assert decide.rank(ub, [], extra=[])[3] == {}
 
-    # -- SELL rows show what he cost, next to what he raises now — Miguel,
-    # 2026-09-12: "when proposed to sell someone, what was the price I
-    # bought them at" ------------------------------------------------
+    # SELL rows show what he cost, next to what he raises now.
     sell_lad = "\n".join(ladder(ub, [], baseb))
     dead_line = next(l for l in sell_lad.splitlines()
                      if l.lower().startswith("| dead"))

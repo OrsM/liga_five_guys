@@ -1,23 +1,15 @@
 """
 ffcore/second.py — the second probable-XI source, joined and rendered.
 
-futbolfantasy (**FF**) is the primary. It is what the Scorer reads, so its
-percentage is the P(start) inside every xPts/j in this repo.
-analiticafantasy (**AF**) is a second opinion, printed BESIDE it in every
-table and never blended into it: neither source has been checked against a
-played jornada, so there is no weight to blend them by. Store both, use one,
-compare when outcomes exist.
+futbolfantasy (**FF**) is the primary — its percentage is the P(start)
+inside every xPts/j in this repo. analiticafantasy (**AF**) is a second
+opinion, printed BESIDE it and never blended in: neither source has
+been checked against a played jornada, so there's no weight to blend by.
 
-Three reports now print both columns — report.py (question 1, the slate, the
-bench), rivals.py (three tables) and squads.py (the watchlist) — which is why
-the join and the cell live here instead of in whichever one needed them first.
-A second copy of `af_cell` would eventually round differently from the first.
-
-The join is by NAME, because the two sites number players differently and
-neither publishes the app's slug. Nothing is guessed: a name with several
-candidates is handed back to be printed, not picked between.
-
-Deps: stdlib, plus ffcore.tidy for the CSV read.
+Shared here rather than duplicated per-report so `af_cell` can't drift
+between callers. The join is by NAME (slug first when available) — a
+name with several candidates is handed back to be printed, never
+guessed between.
 
     python src/ffcore/second.py     # selftest: the cell and the join, no IO
 """
@@ -65,18 +57,13 @@ def af_cell(row) -> str:
 
 
 def second_cells(who, source: str = SECOND_SOURCE, rows=None, xw=None):
-    """{market key: the second source's row}, plus the names it could not join.
+    """{market key: the second source's row}, plus the names it could not
+    join. `who` is (key, name) pairs — the key is what the caller looks
+    the answer up under, so it must be passed explicitly rather than
+    re-derived from the name.
 
-    `who` is (key, name) pairs. It used to be names alone, keyed by norm(),
-    and the docstring said a caller could look up p["key"] because key WAS
-    norm(name) "by construction". That construction ended when the market
-    started keying on the site's own id: every caller looked up an id in a
-    dict of names and got nothing, so the second-source column read "—" for
-    all 654 players and no test noticed, because the column is only in
-    METHOD.md and "—" is a legitimate value.
-
-    The join itself goes by slug first — the same identifier ffcore.score
-    uses for the same rows — and falls back to the name.
+    The join goes by slug first (the same identifier ffcore.score uses
+    for the same rows), falling back to the name.
 
     `rows` is for the selftest: pass a list and no CSV is read.
     """

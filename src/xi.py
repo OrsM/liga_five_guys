@@ -4,34 +4,17 @@ xi.py — record the XI you actually fielded.
     python src/xi.py                 # log today's XI
     python src/xi.py --selftest
 
-READ FROM THE APP, which publishes it: ffcore.league.app_fielded resolves
-/v1/competition/1/teams/{team}/lineup/week/{n} to squad keys. Nothing is typed
-and nothing is ticked.
+Read from the app (ffcore.league.app_fielded), never typed or ticked, and
+never logged when the app is quiet — a gap is honest, an invented row is not.
 
-WHAT THIS REPLACED, on 2026-08-19: inputs/lineup.txt, a checklist regenerated
-every run with your marks kept. It was the best answer available while the app
-was believed to publish none, and its failure was structural — sell a man out
-of your eleven, squads.py drops his line, ten marks are left, and this file
-logged those ten as the eleven you fielded. The log is the historical record a
-P(start) grade will be judged against, so a record of what somebody remembered
-to tick was worth less than no record at all.
+hours_to_lock is stamped on every row so a later grade can take the last
+row before kickoff per jornada.
 
-NOTHING IS LOGGED WHEN THE APP IS QUIET. A row invented from a stale file is
-the one failure this must not have; a gap in the log is honest and visible.
+Appends one immutable row per run to data/decisions/xi_fielded.csv — never
+edited, so the latest row for a date is the XI that stood.
 
-ONLY THE ELEVEN AT LOCK MATTERS. hours_to_lock (from the next kickoff, the
-same reading report.py uses) is stamped on every row, so the scorer can take
-the last row before kickoff per jornada instead of guessing which one was
-live. Without a deadline file the column is blank and nothing else changes.
-
-Appends one immutable row per run to data/decisions/xi_fielded.csv. Nothing
-is ever edited: a second run on the same day appends a second row, and the
-latest row for a date is the XI that stood. That is what makes the log
-scoreable later — the app never shows you your own history.
-
-Not xi_log.csv: that file has a different schema (formation, index_total) and
-holds report.py's best-XI *suggestion*. What you were advised and what you
-fielded are two different facts, and scoring needs both kept apart.
+Not xi_log.csv (a different schema, report.py's best-XI *suggestion* —
+what you were advised, not what you fielded).
 """
 
 from __future__ import annotations
@@ -65,22 +48,15 @@ def fielded(squad: list[str]):
     if not xi:
         return [], [], ["the app's lineup feed is quiet — nothing logged"]
     if len(xi) != XI_SIZE:
-        # The app should never say anything but eleven. If it does, the
-        # reading is about something other than a fielded eleven and must not
-        # be recorded as one.
         return [], [], ["%d players for an XI of %d — not logged"
                         % (len(xi), XI_SIZE)]
     return xi, sorted(norm(s) for s in squad if norm(s) not in set(xi)), []
 
 
 def migrate(path, fields) -> None:
-    """Widen an existing log to `fields`, once, filling old rows blank.
-
-    xi_fielded.csv predates hours_to_lock. Appending a wider row to a
-    narrower header would silently shift every column, so the header is
-    reconciled first. Existing values are never rewritten — only the new
-    column is added, empty, which is the truth: those runs did not know the
-    deadline.
+    """Widen an existing log to `fields`, once, filling old rows blank —
+    appending a wider row to a narrower header would silently shift every
+    column.
     """
     rows = read_csv(path)
     if not rows or set(fields) <= set(rows[0]):
@@ -93,15 +69,8 @@ def migrate(path, fields) -> None:
 
 
 def main() -> None:
-    # session().lg, NOT A SECOND League.load() — this file used to build its
-    # own, which is the exact "two models, two answers" shape ffcore/model.py
-    # was built to kill (2026-08-20): report.py/decide.py/sim.py already
-    # share one League+Scorer per run through session(), and this stage runs
-    # in the same process (run.py), so a second load here was a second
-    # opinion about ownership, not a second fact. The market is IN it either
-    # way — session() builds League.load() the same market-aware way this
-    # comment used to justify calling directly, so nothing about the ledger-
-    # replay-fallback risk changes, only that the load now happens once.
+    # session().lg — the one League+Scorer report.py/decide.py/sim.py share
+    # per run, not a second load.
     from ffcore.model import session
 
     lg = session().lg
@@ -160,30 +129,23 @@ def _selftest() -> None:
         keys = {norm(n) for n in squad}
         return app_fielded(keys, {}, rows(names), {})
 
-    # THE APP'S ELEVEN, resolved on the nickname the way every other API
-    # reader does. Accents are the case that separates norm() from .lower():
-    # the squad key is folded, so an unfolded 'ñ' would drop a man out of the
-    # eleven and he would be logged as benched when he played.
+    # Accents matter: the squad key is norm()-folded, so an unfolded 'ñ'
+    # would drop a man from the eleven.
     got = app(eleven)
     assert len(got) == 10, got
     assert norm("Iñigo Vicente") in got, got
     assert norm("Beñat Turrientes") not in got
 
-    # ALL OR NOTHING. One man the squad does not contain means the two
-    # readings disagree, and a half-resolved eleven logged as fielded is worse
-    # than no row at all.
+    # ALL OR NOTHING: one unresolved man means a half-resolved eleven,
+    # logged as nothing rather than as a fielded XI.
     assert app(eleven + ["Somebody Else"]) == []
 
-    # A quiet feed logs NOTHING. This is the whole reason the checklist went:
-    # it always had an answer, and the answer was whatever was last ticked.
     xi, bench, warns = fielded([])
     assert xi == [] and bench == []
     assert any("quiet" in w for w in warns), warns
 
-    # An eleven that is not eleven is not a fielded eleven.
-    # Patched HERE, in this module's globals, because the name was imported
-    # into it — rebinding ffcore.league.app_fielded would leave xi.py holding
-    # the original and the test would pass for the wrong reason.
+    # Patched in this module's globals (the name was imported into it) —
+    # rebinding ffcore.league.app_fielded directly wouldn't reach here.
     real = globals()["app_fielded"]
     try:
         globals()["app_fielded"] = lambda *a, **k: [norm(n) for n in eleven]

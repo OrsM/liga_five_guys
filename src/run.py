@@ -1,26 +1,13 @@
 """
-run — every generator stage, in one interpreter.
+run — every generator stage, in one interpreter, instead of ten separate
+`python src/<stage>.py` processes.
 
-WHY ONE PROCESS. The chain is ten stages and each of them used to be its own
-`uv run python src/<stage>.py`: ten interpreter starts, ten imports of lxml
-and numpy, and — the expensive part — ten independent walks over the same
-tidy store. Nothing here needs isolation from anything else; the stages
-already share a data directory, and running them in one process makes the
-work each of them does once get done once for all of them.
+Caches (ffcore.text.norm, sources._css, the parse caches, ffcore.tidy.
+read_csv) are all keyed on content/mtime, not on a name, so sharing them
+across stages in one process is safe — a stale-path cache would not be.
 
-WHAT IS SHARED, AND WHY THAT IS SAFE. Only memoisation, and every cache is
-keyed on the thing itself rather than on a name: ffcore.text.norm on the
-string, sources._css on the selector, the parse caches on document content,
-and ffcore.tidy.read_csv on the file's mtime and size — with every writer in
-that module dropping its own path as well. That last one is the load-bearing
-case, because ledger rewrites data/tidy/transactions.csv and squads reads it
-back, and points writes data/season/live for methodology to read. A read
-cache keyed on the path alone would turn this file from a speed-up into a
-stale-data bug.
-
-The stages are still runnable one at a time — `python src/sim.py` is
-unchanged, and that is how a failure gets bisected. This only takes the place
-of the shell loop that ran all of them.
+Stages are still runnable one at a time (`python src/sim.py`) for bisecting
+a failure.
 
     python src/run.py                 the full chain
     python src/run.py sim digest      just those, in the order given
@@ -40,9 +27,9 @@ def _ledger() -> None:
     print(ledger.write(ledger.build()))
 
 
-# Order is the dependency chain, the same one lfg-run documents: parse feeds
-# the tidy store, crosswalk resolves names over it, ledger and points derive
-# from it, squads replays ownership, and the generators read all of that.
+# Order is the dependency chain: parse feeds the tidy store, crosswalk
+# resolves names over it, ledger and points derive from it, squads replays
+# ownership, and the generators read all of that.
 STAGES: list[tuple[str, str]] = [
     ("parse", "ingest:parse"),
     ("crosswalk", "crosswalk:main"),
@@ -85,17 +72,10 @@ def main(argv: list[str]) -> int:
             print("  FAILED: %s" % name)
             return 1
         times.append((time.time() - t0, name))
-        # `parse` alone builds and discards thousands of lxml trees, whose
-        # elements hold C-level parent/child references CPython's refcounter
-        # can't unwind on its own -- they need a real cycle collection, not
-        # just the object going out of scope. In the old one-stage-per-process
-        # design that garbage died with the process; here everything shares
-        # one interpreter for ten stages, so leaving it for Python's own
-        # generational thresholds to eventually notice let dead lxml trees
-        # sit resident through the rest of the run. One collection between
-        # stages is cheap next to a stage (10-4000ms) and measured to cut
-        # peak RSS roughly in half on a full run (sampled with
-        # `/usr/bin/time -v`; see the 2026-08-26 commit message).
+        # `parse`'s lxml trees hold C-level parent/child refs the refcounter
+        # can't unwind alone; one collection per stage keeps them from
+        # piling up resident across a shared-interpreter run (measured:
+        # roughly halves peak RSS).
         gc.collect()
 
     print("  %s" % "  ".join("%s %.1fs" % (n, t) for t, n in times))
@@ -105,11 +85,8 @@ def main(argv: list[str]) -> int:
 
 if __name__ == "__main__":
     if "--selftest" in sys.argv:
-        # Every stage named here must be importable and must have the entry
-        # point named. A stage renamed in its own file and not here would
-        # otherwise fail halfway through a run, after it had already written
-        # half the report — the same class of miss as the deleted ppm_cell
-        # that all twenty-three suites passed around.
+        # Every stage's entry point must exist and be importable, or a
+        # renamed function fails mid-run after already writing half a report.
         for _name, _spec in STAGES:
             assert callable(call(_spec)), _name
         assert [n for n, _ in STAGES] == sorted(

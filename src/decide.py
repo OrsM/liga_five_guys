@@ -268,12 +268,10 @@ def _synthetic_profiles(pos=None, price=None, proceeds=None, owner=None,
 def choosable(u) -> int:
     """A jornada whose eleven you can still pick, for judging a signing by.
 
-    NOT the round in progress. Its eleven is locked and the players whose
-    clubs have kicked off are absent from it, so the team it describes is
-    whatever happens to be left — and the weakest man in that team can be a
-    reserve scoring nothing. Anything at all then clears the bar a signing has
-    to beat. Measured on 2026-08-18: the bar off jornada 1 was 0.00 and off
-    jornada 2 was 2.73, and every journeyman in the league sat in between.
+    NOT the round in progress: its eleven is locked and players whose
+    clubs have kicked off are absent from it, so the team it describes
+    can be missing real starters. The weakest man in that thinned XI is
+    still the bar a signing has to beat.
     """
     for j in u.state.jornadas:
         if j not in u.part_played:
@@ -312,20 +310,9 @@ def xi_bar(exp: dict[str, float], xi) -> float:
 
 
 def route_kind(u: Universe, k: str) -> str:
-    """"mine" | "free" | "raid" | "listed" — purely `u.owner`/`u.route`,
-    no simulation involved.
-
-    THE ONE PLACE THIS GETS DECIDED. Before this it was re-derived by
-    hand at four call sites (candidates(), best_swap_for(), and two
-    separate loops in sim.ladder_rows()) as the same three-line boolean
-    expression, plus `not u.owner.get(k)` rewritten inline three more
-    times for "free agent" — no single function owned the answer. That is
-    exactly how a rival-owned, non-clause target kept leaking back into
-    the report after three earlier fixes each patched one of those sites
-    and missed the others (2026-09-05's PASS-section bug was the third).
-    Miguel's own framing: this was never a simulated fact, it is a report
-    FILTER — fully decided by two fields already on Universe, with no
-    computation in between.
+    """"mine" | "free" | "raid" | "listed", from u.owner/u.route alone —
+    no simulation. The one function that classifies ownership; route
+    every caller through it rather than re-deriving the check.
     Why: docs/notes/decide.md#route_kind--the-one-place-ownership-is-classified
     """
     if k in u.state.squads.get(u.me, {}):
@@ -339,19 +326,13 @@ def route_kind(u: Universe, k: str) -> str:
 def _fieldable(squad: dict[str, str]) -> bool:
     """Could SOME real formation be fielded from this squad's shape?
 
-    COUNTS ONLY — no player identities, no simulation, not even `best_xi()`.
-    A real formation is (1 POR, d DEF, m MED, l DEL) for one of
-    `ffcore.score.formations()`'s 7 tuples; this squad can field one of
-    them exactly when it holds at least that many of each. THE ONE PLACE
-    "is this squad shape legal" gets decided — it replaces `_safe_to_sell`,
-    a bounds heuristic (per-position floor + total count) that missed the
-    exact failure it existed to catch: a squad can clear every position's
-    SLOT_MIN individually, and total XI_SIZE, and still have no real
-    formation that fits it (e.g. two goalkeepers left in an
-    exactly-11-player squad — no formation ever fields two). That shape
-    hit this report as two catastrophic bugs (Ali Houary's KEEP row
-    reading Season -1282, Alvaro Mantilla's -1286) before this replaced
-    the heuristic with the actual existence check.
+    COUNTS ONLY — no player identities, no simulation, not even
+    `best_xi()`. A real formation is (1 POR, d DEF, m MED, l DEL) for
+    one of `ffcore.score.formations()`'s 7 tuples; legal when the squad
+    holds at least that many of each. Clearing every position's
+    SLOT_MIN and total XI_SIZE individually is NOT sufficient (e.g. two
+    goalkeepers in an exactly-11 squad clears both counts but fields no
+    formation) — this is the one real existence check.
     Why: docs/notes/decide.md#_fieldable--the-one-squad-legality-check
     """
     from ffcore.score import formations
@@ -374,10 +355,8 @@ def candidates(u: Universe, expected: dict[str, float],
     eleven on expectation will not make it on a draw either.
 
     FUNDED BY CASH, OR BY SELLING EXACTLY ONE SPARE PLAYER — deliberately
-    not a multi-sale chain. A move that needs 2+ sales to afford was the
-    source of both catastrophic squad-legality bugs above; cut rather than
-    re-patched, per Miguel's "the book" direction (2026-09-06) — a
-    genuinely 2-sale-only move stops appearing, which is the honest trade.
+    not a multi-sale chain, which risks leaving the squad short a legal
+    XI. A genuinely 2-sale-only move stops appearing; that's the trade.
     """
     cash = u.cash if budget is None else budget
     mine_squad = u.state.squads.get(u.me, {})
@@ -428,15 +407,10 @@ def candidates(u: Universe, expected: dict[str, float],
 def locked(until: dict, key: str, now) -> bool:
     """Is his clause unpayable right now?
 
-    A TRANSFER LOCKS A CLAUSE. The app publishes the moment it reopens, and
-    until then no amount of money will take him — on 2026-08-18 that was every
-    single rival player in this league, which meant the entire steal half of
-    the report consisted of moves the app would have refused.
-
-    A MISSING DATE COUNTS AS LOCKED. Not stated is not "available": treating
-    an absent field as open is precisely how this was invisible in the first
-    place, and the cost of being wrong is a table full of moves you cannot
-    make. A free agent has no clause and never reaches here.
+    A TRANSFER LOCKS A CLAUSE until the app's own reopen date. A MISSING
+    DATE COUNTS AS LOCKED, not available — an absent field is not
+    evidence a clause is payable. A free agent has no clause and never
+    reaches here.
     """
     when = until.get(key)
     return True if when is None else when > now
@@ -445,15 +419,10 @@ def locked(until: dict, key: str, now) -> bool:
 def burn(u, a: Action) -> float | None:
     """Wealth a move destroys: what it costs, less what you end up holding.
 
-    A FREE AGENT BURNS NOTHING. He asks about his market value, so you swap
-    cash for an asset worth the same and can swap back tomorrow. A BUYOUT
-    CLAUSE BURNS THE PREMIUM: it runs a median 1.52x market value in this
-    league, from 1.00 to 2.65, and the app will only ever pay you the value
-    back. That gap is gone for good.
-
-    Never negative — buying under the odds does not pay you, it just does not
-    charge you — and None when the value is unknown, because assuming no
-    premium is exactly the error this exists to correct.
+    A FREE AGENT BURNS NOTHING — market value in, market value out. A
+    BUYOUT CLAUSE BURNS THE PREMIUM over market value, gone for good.
+    Never negative; None when the value is unknown (never assume zero
+    premium).
     """
     if not a.buy:
         return 0.0
@@ -466,18 +435,15 @@ def burn(u, a: Action) -> float | None:
 def cash_price(reach) -> float | None:
     """Places per million, measured off `reach` = [(extra cash needed, Δpos)].
 
-    THE PRICE OF MONEY IS NOT A CHOICE AND NOT A RATE CARD — it is read off
-    what more money would actually buy you today, which is why every target
-    gets screened and not only the affordable ones. The curve is a STAIRCASE:
-    flat, because the best move you can already afford stays the best move,
-    then a step when the balance clears the price of somebody better, then
-    flat again. Averaged across the reachable range it comes out small, and
-    that is the honest answer rather than a defect — a premium costs you
-    points only if the money had somewhere better to go.
+    Read off what more money would actually buy today, not a rate card —
+    every target is screened, not only the affordable ones. The curve is
+    a STAIRCASE (flat until the balance clears the next better price,
+    then a step), so averaged over the reachable range it comes out
+    small; that's the honest answer, not a defect.
 
-    None when there is nothing to measure against. Never zero for that: zero
-    is a measurement meaning "more money buys nothing", and it is a real and
-    common answer that must not be confused with "unknown".
+    None when there is nothing to measure against. Never zero for that —
+    zero is a real answer ("more money buys nothing"), distinct from
+    unknown.
     """
     pts = sorted((max(0.0, c), d) for c, d in reach)
     if len(pts) < 2 or pts[-1][0] <= 0:
@@ -493,36 +459,22 @@ def cash_price(reach) -> float | None:
 def respond(u, a: Action, rate: float | None) -> float:
     """Season points the manager you just paid buys back, on AVERAGE, or 0.0.
 
-    A CLAUSE PAYS THE OWNER — confirmed by Miguel against the app on
-    2026-08-18, and not observable here: no clause purchase has ever happened
-    in this league, so the activity feed has never had one to record. Paying
-    one does not merely subtract a player from a rival — it hands him the
-    money, and on the day this was written that was
-    the difference between a league where nobody could act and one where the
-    manager I am racing was the richest in it. Every rival was overdrawn; I
-    was the only one who could buy anybody. A steal ends both of those facts
-    at once, and scoring it without the answer priced a duel as an execution.
+    A CLAUSE PAYS THE OWNER, not the app — a steal hands the victim cash
+    he can reinvest, so scoring the steal without crediting that
+    overstates it.
 
-    THE AVERAGE HE BUYS, NOT THE BEST HE COULD FIND — `rate` is `rank()`'s own
-    `lam`, points per million off the SAME screening pass that already prices
-    everything else this run. This replaces a real search (2026-09-09, Miguel:
-    "why are we considering the impact on competing managers... substitute a
-    virtual average player, considering value above replacement for the money
-    the manager has"): the search picked the single clausable player anywhere
-    in the league that improved him most, with no floor on what it cost a
-    THIRD manager — caught the day it walked off with a rival's own defender,
-    leaving him under the position minimum and his simulated season
-    collapsing from ~1600 to ~171, which then read as the RAIDER's win
-    probability jumping 15 points off a rival's squad breaking, not off
-    anything the raid itself did. An average buys nobody's squad but the two
-    sides of the actual trade are ever touched — the same replacement-level
-    trade `value_rate()` already makes for the buy side, made here for the
-    sell side too.
+    THE AVERAGE HE BUYS, NOT THE BEST HE COULD FIND — `rate` is
+    `rank()`'s own `lam` (points per million, same screening pass
+    pricing everything else this run), never a search for the single
+    best clausable replacement: an unbounded search can walk off with a
+    THIRD manager's own player to fund the response, breaking a squad
+    that was never part of the trade. An average touches only the two
+    sides of the actual trade, mirroring `value_rate()`'s own
+    replacement-level logic on the buy side.
 
-    0.0 when there is nothing to spend (no victim, or a market purchase — the
-    asymmetry is the point, money paid to the app leaves the league, money
-    paid for a clause changes sides) or nothing is known to spend it at
-    (`rate` is None, same as `charge` treats it in rank()).
+    0.0 when there is nothing to spend (no victim, or a market purchase
+    — money paid to the app leaves the league, money paid for a clause
+    changes sides) or nothing is known to spend it at (`rate` is None).
     """
     if not a.victim or a.victim == u.me or not rate:
         return 0.0
@@ -559,28 +511,13 @@ def overdraft_fix(u: Universe) -> tuple[list[tuple[str, float]], float]:
     """([(player, proceeds)] to sell, still-short amount) to clear an
     overdraft — [], 0.0 when not overdrawn at all.
 
-    Miguel, 2026-09-06: being overdrawn is a real gap this report used to
-    go silent about — `candidates()` correctly proposes nothing (nothing
-    is affordable), but nothing said what to sell to fix it either.
-
-    DEAD WEIGHT ONLY, DELIBERATELY — never a real starter, however small
-    the impact looks. `candidates()`'s own docstring already refuses
-    multi-sale funding chains outright: "a move that needs 2+ sales to
-    afford was the source of both catastrophic squad-legality bugs...
-    cut rather than re-patched." A fix that reaches for real starters
-    across several sales is exactly that pattern, one call site over. So
-    this reaches ONLY into `dead_weight()` (proceeds with zero points
-    cost, by definition — nobody here starts any remaining eleven), and
-    even then re-checks `_fieldable()` on the CUMULATIVE result after
-    every single sale, not just the first — the exact discipline that
-    closed the Ali Houary/Alvaro Mantilla bugs ("meets every position's
-    own floor individually, fails the real formation check"). Stops
-    extending, rather than pushing an unsafe sale through, the moment a
-    further one would break it.
-
-    A shortfall dead weight alone can't cover is returned honestly (the
-    second element, > 0) rather than reached for by selling a real
-    starter — "the book" says stop, not get clever.
+    DEAD WEIGHT ONLY, DELIBERATELY — never a real starter, matching
+    candidates()'s own refusal of multi-sale funding chains. Reaches
+    only into dead_weight() (proceeds with zero points cost), and
+    re-checks _fieldable() on the cumulative result after every sale,
+    stopping rather than pushing through an unsafe one. A shortfall dead
+    weight alone can't cover is returned honestly (second element > 0),
+    never covered by selling a real starter.
     """
     if u.cash >= 0:
         return [], 0.0
@@ -603,16 +540,11 @@ def overdraft_fix(u: Universe) -> tuple[list[tuple[str, float]], float]:
 def apply(u: Universe, a: Action) -> dict[str, dict[str, str]]:
     """The squads as they would be after `a`. Pure — nothing is mutated.
 
-    TOPPED UP TO SLOT_MIN, WHOEVER THE TRADE LEAVES SHORT — not just mine.
-    `candidates()` already refuses to propose a sale of mine that would
-    (`_fieldable()`, checked before a move is ever offered); a raid's real
-    owner gets no such check before this, because `apply()` is the one place
-    that removes a player from somebody who never agreed to sell him. Left
-    short, his simulated season reads as scoring zero every remaining
-    jornada — best_xi() finds no legal formation at all — which is the
-    identical failure phantom_fill() exists to prevent at load time, reached
-    from a later transfer instead. See phantom_topup()'s own docstring for
-    why this can patch it here with no new forecaster data to invent.
+    TOPPED UP TO SLOT_MIN, WHOEVER THE TRADE LEAVES SHORT — not just
+    mine. A raid's victim never agreed to sell and gets no pre-check;
+    left short, his simulated season scores zero every remaining
+    jornada (no legal XI). See phantom_topup() for how this patches it
+    without inventing new forecaster data.
     """
     sq = {m: dict(s) for m, s in u.state.squads.items()}
     for gone in a.sell:
@@ -638,37 +570,23 @@ def _score_many(u: Universe, many: list, trials: int, seed: int):
 def paired(after, base, me) -> list[float]:
     """The per-trial difference `after` minus `base`, sorted.
 
-    PAIRED, WITHIN THE SAME SEASONS — trial n with the move against trial n
-    without it, so the difference is the squads rather than the weather. See
-    rank()'s own note for what that buys: recalibrating P(start) on
-    2026-08-18 moved a row's P(win) by 48 points and its paired figures by
-    six.
-
-    Sorted because every reader of this is a quantile of it (band() below,
-    and rank()'s "helps", which only counts signs). Empty when the two
-    Standings disagree about how many trials were run, which zip() makes
-    silent — the callers all treat empty as "no answer", not as zero.
+    PAIRED, WITHIN THE SAME SEASONS — trial n with the move against
+    trial n without it, so the difference is the squads, not the
+    weather. Sorted because every reader is a quantile of it (band()
+    below, rank()'s "helps"). Empty when the two Standings disagree on
+    trial count (zip() makes this silent) — callers treat empty as "no
+    answer", not zero.
     """
     return sorted(x - y for x, y in zip(after.totals.get(me, []),
                                         base.totals.get(me, [])))
 
 
 def band(pairs) -> tuple[float, float, float]:
-    """(median, 10th, 90th) of paired()'s output — ONE definition of a band.
-
-    rank() (a ranked move's d_pts/pts_lo/pts_hi) and sim.ladder_rows() (a
-    squad member's or a candidate's own season band) print the same three
-    numbers off the same paired differences, and each used to compute them
-    from its own copy of these three index expressions. Two spellings of one
-    quantile is how they come to disagree about what "the band" means.
-
-    Reads stats.percentile() (statistics.quantiles under it) rather than
-    hand-indexing the sorted list itself, same reason bootstrap_gap() and
-    season.Standings.band() do — one tested percentile implementation, not
-    three near-identical ones.
-
-    (0, 0, 0) for no pairs: nothing was simulated, so there is no spread to
-    report, and every caller renders that as the no-change row it is.
+    """(median, 10th, 90th) of paired()'s output — ONE definition of a
+    band, shared by rank() and sim.ladder_rows() so the two cannot
+    disagree about what "the band" means. Uses stats.percentile()
+    rather than hand-indexing the sorted list. (0, 0, 0) for no pairs —
+    nothing simulated, no spread to report.
     """
     if not pairs:
         return (0.0, 0.0, 0.0)
@@ -711,26 +629,17 @@ def value_rate(pts, cost) -> float | None:
 
 def player_forecasts(u: Universe) -> dict[str, dict]:
     """{key: {"season_pts", "next_pts", "par", "pj"}} for every player in
-    u.players — the full pool, not gated on being listed on the market
-    (see slate.py for the market-restricted report view).
+    u.players — the full pool, not gated on being listed (see slate.py
+    for the market-restricted report view).
 
-    TWO-TIER, not one, because u.forecaster (Bootstrap) is only actually
-    simulated for the 89-player universe (the five squads plus market
-    candidates) — re-running the full Monte Carlo simulation for all
-    ~722 players nobody can act on today would be real, needless cost.
-    For a player IN that universe, season_pts sums forecaster.expected(j)
-    across every remaining jornada — genuinely fixture-adjusted, jornada
-    by jornada. For everyone else, it's u.market_exp[k] (already a
-    full-pool computation, see ffcore.profile) held flat across the same
-    number of remaining jornadas — a cruder approximation, and this
-    function says so via a boolean rather than presenting both the same
-    way.
+    TWO-TIER: u.forecaster is only simulated for the 89-player universe
+    (five squads + market candidates), so season_pts sums
+    forecaster.expected(j) per remaining jornada for those, and falls
+    back to u.market_exp[k] held flat across the same count for
+    everyone else — a cruder approximation, flagged via "simulated".
 
-    "par" (points above replacement) is relative to MY OWN squad's
-    weakest current option in that slot — the same paired-simulation
-    spirit rank()'s own d_pts already uses (see market_routes()'s
-    neighbourhood), made a standing per-player property instead of
-    computed ad hoc per candidate action.
+    "par" is season_pts minus MY squad's weakest current option in that
+    slot — a standing per-player version of rank()'s own d_pts.
     """
     jornadas = u.state.jornadas
     n_rem = len(jornadas)
@@ -775,17 +684,12 @@ def rank(u: Universe, acts: list[Action], seed: int = 1,
     Returns `(rows, base, measured, bands)`. Rows carry the change in
     expected finishing position and in P(above) each rival.
 
-    `extra` is `[(key, Action), ...]`, scored in the SAME final pass (the
-    draw doesn't depend on the squad, so a second pass would pay the
-    ~1.2s of drawing again for nothing) and come back as `bands`,
-    `{key: (median, lo, hi, action)}` — `key` given explicitly because a
-    held player's own pure-sale question (see sim.band_acts(), which is what
-    actually builds `extra` now — best_swap_for() named here answered the
-    same "key" problem before it was cut 2026-09-06) sells him, not the man
-    bought, and an Action alone can't say which side a caller meant. A
-    `key` already answered by a real BUY row is dropped from `extra` — its
-    own band, off the squad the victim's response leaves behind, answers
-    better than a bare swap would.
+    `extra` is `[(key, Action), ...]`, scored in the SAME final pass (a
+    second pass would redraw the same seasons for nothing) and returned
+    as `bands`, `{key: (median, lo, hi, action)}` — `key` given
+    explicitly since a pure-sale Action can't say by itself which side
+    a caller meant. A `key` already answered by a real BUY row is
+    dropped from `extra` — its own band answers better than a bare swap.
 
     `acts` may contain moves you CANNOT afford today — screening them is
     how the price of cash gets measured (see cash_price()).
@@ -801,13 +705,9 @@ def rank(u: Universe, acts: list[Action], seed: int = 1,
     base_s, rest = screen[0], screen[1:]
     screened, reach = [], []
     for a, r in zip(acts, rest):
-        # POINTS, not expected-position swing — same screening draw, just
-        # reading `.totals` (already there) instead of paying for
-        # `.expected_position()`'s extra per-trial rival comparison for a
-        # number ranking no longer uses. Miguel, 2026-09-12: ranking by a
-        # position/win-probability proxy instead of points directly was
-        # never shown to be better and wasn't what he asked this pipeline
-        # to optimise for.
+        # POINTS, not an expected-position swing — reads `.totals`
+        # directly rather than paying for expected_position()'s extra
+        # per-trial rival comparison.
         d, _lo, _hi = band(paired(r, base_s, u.me))
         reach.append((a.cost - a.proceeds - u.cash, d))
         if a.cost <= u.cash + a.proceeds:
@@ -846,19 +746,14 @@ def rank(u: Universe, acts: list[Action], seed: int = 1,
                  ok=lambda d, a: (a.buy or a.sell) in best_value,
                  rank_key=lambda t: -ratio(t), minimum=KEEP_VALUE_MIN)
     keep = [a for _, a in top]
-    # He answers before the season is played — a clause pays the owner, who
-    # can respond with that money, so this isn't a pure subtraction. Computed
-    # here (off `lam`, this run's own points-per-million) rather than inside
-    # the per-candidate squad, because respond() no longer picks a player —
-    # see its own docstring for why a real search across the league was cut
-    # 2026-09-09. `afters` therefore never differs from a plain apply(): only
-    # the buyer's and the victim's own squads change, nobody else's.
+    # A clause pays the owner, who can respond with that money — not a
+    # pure subtraction. Computed off `lam` rather than inside the
+    # per-candidate squad; `afters` never differs from a plain apply().
     bonuses = [respond(u, a, lam) for a in keep]
     afters = [apply(u, a) for a in keep]
-    # Anything `extra` asks about a player already answered by a real ranked
-    # row is dropped here. Buy side ONLY, deliberately — checking the sell
-    # side too once dropped Jon Moncayola's own OUT-row band for the
-    # unrelated reason that he happened to fund somebody else's top move.
+    # Anything `extra` asks about a player already answered by a real
+    # ranked row is dropped. Buy side only, deliberately — the sell side
+    # can be the funder of an unrelated top move.
     answered = {a.buy for a in keep if a.buy}
     rest = [(k, a) for k, a in extra if k not in answered]
     final = _score_many(u, [u.state.squads] + afters
@@ -901,22 +796,16 @@ def rank(u: Universe, acts: list[Action], seed: int = 1,
             "net_pts": d_pts - charge,
             "burn": b_,
             "charge": charge,
-            # No specific reply to name any more — see respond()'s own
-            # docstring. `payload()`/the ladder already treat None as "no
-            # answer to show", which this always is now.
+            # No specific reply to name — payload()/the ladder treat
+            # None as "no answer to show".
             "answer": None,
             "d_win": r.position().get(1, 0.0) - base.position().get(1, 0.0),
             "d_beat": {v: r.beat(v) - base.beat(v) for v in rivals},
             "mean": r.mean(u.me),
-            # VALUE FOR MONEY: season points per million actually paid.
-            # Only defined for a genuine spend (net > 0): a sale raising
-            # more than it costs needs no rate, it's just obviously worth
-            # doing. Already points-over-replacement (no second `value_vor`
-            # needed) because `d_pts` is a paired marginal whose "with"
-            # side re-picks best_xi() over every legal shape — replacement
-            # level computed per candidate, not assumed per slot. NOT the
-            # old λ (retired 2026-08-17), which measured against a fixed
-            # current-eleven baseline that moved under it.
+            # Season points per million actually paid, only defined for
+            # a genuine spend (net > 0). Already points-over-replacement
+            # since `d_pts` is a paired marginal whose "with" side
+            # re-picks best_xi() over every legal shape.
             # Why: docs/notes/decide.md#rank--screening-top-up-and-value
             "value": value_rate(d_pts, a.net),
         })
@@ -927,13 +816,12 @@ def rank(u: Universe, acts: list[Action], seed: int = 1,
 def rounds_left(matches, teams) -> tuple[list[int], dict[int, set[str]], list]:
     """(jornadas still to come, who has already played one, unjoined clubs).
 
-    A jornada with every score in is finished and isn't simulated. One with
-    SOME scores in (the August case) pays twice if simulated whole — see
-    docs/notes/decide.md#rounds_left--a-jornada-with-some-scores-in-still-counts.
-    So the round stays and the clubs inside it that are done drop out.
-    `teams` is the market's own club spellings (see club_key()). Still
-    doesn't model: the eleven for a round in progress is already LOCKED,
-    and the simulator re-picks it from whoever's left.
+    A jornada with every score in is finished, not simulated. A
+    partially-played one stays in `rem`, with its finished clubs
+    dropped from `played`. `teams` is the market's own club spellings
+    (club_key()). Not modelled: a round in progress has its XI already
+    LOCKED, but the simulator re-picks it from whoever's left.
+    Why: docs/notes/decide.md#rounds_left--a-jornada-with-some-scores-in-still-counts
     """
     js = {r["jornada"] for r in matches if (r.get("jornada") or "").isdigit()}
     finished = {j for j in js
@@ -962,12 +850,12 @@ def next_then_rest(base: dict, base_rest: dict, rem: list[int],
     """Bootstrap's own `per_jornada` — `base` for a player's FIRST
     remaining jornada, `base_rest` for every one after it.
 
-    `base` carries this week's editorial reading (a suspension, a knock) —
-    real news about the one game it was published for, not "he plays in
-    March" too. "First remaining jornada" is PER PLAYER: a partial round
-    mid-sweep drops a player from `rem[0]` once his own club has played it
-    (see rounds_left()), so his true next jornada is wherever `played`
-    first shows his club clear.
+    `base` carries this week's editorial reading (a suspension, a
+    knock) — real news for the one game it was published for, not for
+    every future one. "First remaining jornada" is PER PLAYER: a
+    partial round drops a player once his own club has played it (see
+    rounds_left()), so his true next jornada is wherever `played` first
+    shows his club clear.
     Why: docs/notes/decide.md#next_then_rest--apply_fixtures
     """
     first_seen: set[str] = set()
@@ -991,15 +879,10 @@ def first_jornada_per_player(base: dict, rem: list[int],
                              played: dict[int, set[str]],
                              club: dict[str, str]) -> dict[str, int]:
     """{key: the first jornada in `rem` that is genuinely HIS next one} —
-    the exact per-player tracking next_then_rest() already does
-    internally (a partial round drops a player once his own club has
-    played it, see that function's own docstring), pulled out so
-    apply_fixtures() can also ask "is THIS the one jornada his status
-    override belongs to" without a second copy of next_then_rest()'s own
-    scheduling logic. A DELIBERATE, small parallel computation rather
-    than a refactor of next_then_rest() itself: that function has its
-    own callers and tests already trusting its exact current shape, and
-    the risk of a subtle regression there outweighs the few lines saved.
+    the same per-player tracking next_then_rest() does internally,
+    pulled out so apply_fixtures() can ask "is THIS his status
+    override's jornada" without duplicating next_then_rest()'s
+    scheduling logic inline.
     """
     first_seen: set[str] = set()
     out: dict[str, int] = {}
@@ -1017,25 +900,17 @@ def apply_fixtures(per_jornada: dict[int, dict], sboard: dict[int, dict],
                    club: dict[str, str], pos: dict[str, str],
                    ppm_of: dict[str, float], status_of: dict = None,
                    first_jornada_of: dict = None) -> dict[int, dict]:
-    """`per_jornada`, with the POINTS half repriced against THAT jornada's
-    real opponent (season_board()) instead of the single next-fixture
-    factor `base`/`base_rest` were built with — the schedule is published
-    for the whole season, so pricing jornada 20 off jornada 3's opponent
-    was just not having asked. P(start) is untouched — a different
-    question next_then_rest() already answers. A player season_board()
-    has no Match for keeps his frozen next-fixture number.
+    """`per_jornada`, with the POINTS half repriced against THAT
+    jornada's real opponent (season_board()) instead of the single
+    next-fixture factor `base`/`base_rest` were built with. P(start) is
+    untouched — next_then_rest() already answers that question. A
+    player season_board() has no Match for keeps his frozen
+    next-fixture number.
 
-    `status_of`/`first_jornada_of` (both optional, default {}): real bug,
-    2026-09-13 (Miguel: "no booked player is playing so shouldn't they
-    have 0% end odds to play next game?", then "are you ensuring all
-    decision making metrics can be sourced to our single pipeline?").
-    Repricing from raw ppm*fix here silently discarded whatever status
-    override to_bootstrap_input() had already applied to THIS player's
-    OWN next jornada — a FOURTH independent rebuild of the same derived
-    fact (see ffcore.profile.status_adjusted()'s own docstring for the
-    first three). Applied ONLY at first_jornada_of[k] — a suspension or
-    a knock does not follow a player to jornada 20, the same reasoning
-    next_then_rest() itself already uses base vs base_rest for.
+    `status_of`/`first_jornada_of` (both optional, default {}): applies
+    ffcore.profile.status_adjusted() at exactly first_jornada_of[k] — a
+    suspension or knock doesn't follow a player to jornada 20, the same
+    reasoning next_then_rest() uses for base vs base_rest.
     Why: docs/notes/decide.md#next_then_rest--apply_fixtures
     """
     from ffcore.profile import status_adjusted
@@ -1063,24 +938,17 @@ def apply_fixtures(per_jornada: dict[int, dict], sboard: dict[int, dict],
 
 
 def phantom_topup(sq: dict[str, str]) -> dict[str, str]:
-    """`sq`, topped up to SLOT_MIN with generic phantom keys, or `sq` itself
-    unchanged if nothing is short.
+    """`sq`, topped up to SLOT_MIN with generic phantom keys, or `sq`
+    itself unchanged if nothing is short.
 
-    THE SQUAD-SIDE HALF of phantom_fill() — split out 2026-09-09 so `apply()`
-    can call it too. Before this, a squad phantom_fill() had already made
-    legal at report time could still be left short by a LATER transfer:
-    `apply()` moves a real player from a real owner with nothing checking
-    whether that owner still clears SLOT_MIN, and `rank()`'s simulation reads
-    a squad that fails it as scoring zero every remaining jornada, zero
-    variance — the identical failure phantom_fill() exists to prevent,
-    reached from a different door. Caught 2026-09-09 auditing a report: 5 of
-    that day's 119 real candidates would raid a rival's last player at his
-    position minimum. `__phantom_<slot>_<n>` (no manager in the key, unlike
-    before 2026-09-09) is what makes this callable here safely — the SAME
-    keys `phantom_fill()` already registered real per_jornada data for at
-    load time, for every slot, whether anyone needed one yet or not, so this
-    never has to invent new forecaster data mid-run for a manager nobody
-    knew would need it when the season was drawn.
+    THE SQUAD-SIDE HALF of phantom_fill() — `apply()` calls this too, since
+    a squad legal at report time can be left short by a LATER transfer
+    (a raid takes a rival's last player at his position minimum) with
+    nothing else re-checking SLOT_MIN; a squad that fails it scores zero
+    every remaining jornada in rank()'s simulation. `__phantom_<slot>_<n>`
+    keys are the SAME ones phantom_fill() already registered real
+    per_jornada data for at load time, so this never has to invent new
+    forecaster data mid-run.
     """
     from ffcore.score import SLOT_MIN
 
@@ -1102,35 +970,28 @@ def phantom_fill(squads: dict[str, dict[str, str]], per_jornada: dict[int, dict]
                  pos: dict[str, str]
                  ) -> tuple[dict[str, dict[str, str]], dict[int, dict]]:
     """Squads and per_jornada, with one AVERAGE-PLAYER-AT-THE-POSITION
-    phantom added per position any manager is short of SLOT_MIN in — and
-    real per_jornada data registered for EVERY SLOT_MIN slot regardless of
-    who is short today, so a later transfer can reach for one too (see
-    phantom_topup(), which is the only thing that still needed to change
-    for that: this function's own squad-side behaviour is unchanged).
+    phantom added per position any manager is short of SLOT_MIN in —
+    and real per_jornada data registered for EVERY SLOT_MIN slot
+    regardless of who is short today, so a later transfer (via
+    phantom_topup()) can reach for one too.
 
-    Without this, a squad short one SLOT_MIN position can't fill ANY legal
-    formation — best_xi() returns [], scoring zero every remaining jornada
-    with zero variance. The phantom is an AVERAGE, not a specific player or
-    invented number — a real player's key would drift day to day and could
-    double as a real candidate — computed off the same real per-jornada
-    data (points and P(start)) every other player at that position already
-    carries. No `matches` entry (the same "no evidence, no widening" rule
-    applied to a brand-new player). Keyed `__phantom_<slot>_<n>`, a form no
-    real player id can take — manager-agnostic since 2026-09-09 (was
-    `__phantom_<manager>_<slot>_<n>`): a virtual average player has no real
-    ownership to distinguish, and several squads sharing the identical key
-    is exactly the "as if a league-average man had filled in" story this
-    already told, just also true across managers now, not only within one.
+    Without this, a squad short one SLOT_MIN position can't fill ANY
+    legal formation — best_xi() returns [], scoring zero every
+    remaining jornada with zero variance. The phantom is an AVERAGE,
+    not a specific player, computed off the same real per-jornada data
+    every other player at that position carries; no `matches` entry, as
+    for a brand-new player. Keyed `__phantom_<slot>_<n>` (no manager in
+    the key) — a virtual average player has no real ownership to
+    distinguish, so every squad short the same position shares it.
     Why: docs/notes/decide.md#phantom_fill--why-a-short-squad-gets-a-phantom-and-why-its-an-average
     """
     from ffcore.score import SLOT_MIN
 
     squads = {m: dict(sq) for m, sq in squads.items()}
     per_jornada = {j: dict(layer) for j, layer in per_jornada.items()}
-    # ONE AVERAGE PER (jornada, position), computed once off every REAL
-    # scored player at that position — not per manager, so five managers
-    # all short the same position share the identical, real, jornada-
-    # varying number, exactly as if a league-average man had filled in.
+    # ONE AVERAGE PER (jornada, position) off every REAL scored player
+    # at that position — not per manager, so every squad short the same
+    # position shares the identical, real, jornada-varying number.
     avg: dict[int, dict[str, tuple[float, float]]] = {}
     for j, layer in per_jornada.items():
         by_pos: dict[str, list[tuple[float, float]]] = {}
@@ -1142,10 +1003,9 @@ def phantom_fill(squads: dict[str, dict[str, str]], per_jornada: dict[int, dict]
                      sum(v[1] for v in vs) / len(vs))
                  for s, vs in by_pos.items() if vs}
 
-    # EVERY SLOT_MIN KEY, EVERY JORNADA, UNCONDITIONALLY — not only for a
-    # manager short today. phantom_topup() can only ever assign a key into a
-    # squad; it cannot invent forecaster data for one, so whatever it might
-    # need has to already be here.
+    # EVERY SLOT_MIN KEY, EVERY JORNADA, UNCONDITIONALLY — phantom_topup()
+    # can only assign a key into a squad, not invent forecaster data,
+    # so whatever it might need has to already be here.
     for j in per_jornada:
         for s, n in SLOT_MIN.items():
             if s not in avg.get(j, {}):
@@ -1158,21 +1018,14 @@ def phantom_fill(squads: dict[str, dict[str, str]], per_jornada: dict[int, dict]
 
 
 def club_key(raw, teams, xw=None) -> str:
-    """One club, one key, whichever page spelled it — or "" if it will not
-    place.
+    """One club, one key, whichever page spelled it — or "" if it will
+    not place.
 
-    Three sources name clubs three ways: the market says "Rayo", the fixture
-    page "rayo-vallecano", and the probable-XI page files most players under
-    the first and a handful under the second. Folding the case and the
-    punctuation is not enough, because "rayo" and "rayo vallecano" are still
-    two strings.
-
-    THE CROSSWALK ANSWERS THIS when there is one — clubs.csv holds every
-    spelling against one id, resolved once. Without it, the fallback is the
-    same `match_team` the fixture board uses, against the market's list.
-
-    "" for a name nothing can place, and "" is never equal to a club: an
-    unplaceable club must not accidentally compare equal to another one.
+    Three sources name clubs three ways ("Rayo", "rayo-vallecano",
+    etc.) — folding case/punctuation alone isn't enough. THE CROSSWALK
+    ANSWERS THIS when there is one (clubs.csv, resolved once); the
+    fallback is `match_team` against the market's list. "" for an
+    unplaceable name, never equal to a real club.
     """
     if xw is not None:
         hit = xw.club(ff_slug=raw, name=raw)
@@ -1218,12 +1071,9 @@ def market_routes(mkt: list[dict], key_of) -> tuple[dict[str, float],
 def pending_sent(mkt: list[dict]) -> float:
     """Money already gone against a bid of yours still pending, summed.
 
-    The app holds it against the bid until it is accepted, rejected or
-    withdrawn — it is not free to spend again on something else today,
-    however the raw balance reads. Read off the same `bid` field a sent
-    offer is shown from (see sources.parse_api_market's own note on why
-    that field is always YOUR bid, never anyone else's) — one field, one
-    reading, so the number here and the one on screen cannot disagree.
+    The app holds it against the bid until accepted, rejected or
+    withdrawn — not free to spend today, however the raw balance reads.
+    Reads the same `bid_money` field a sent offer displays from.
     """
     return sum(float(r["bid_money"]) for r in mkt
               if (r.get("bid_status") or "") == "pending" and r.get("bid_money"))
@@ -1232,19 +1082,11 @@ def pending_sent(mkt: list[dict]) -> float:
 def bought_price(txns: list[dict], xw) -> dict[str, float]:
     """{key: what his CURRENT owner actually paid for him}, from the ledger.
 
-    REPLAYED OLDEST FIRST (read_ledger()'s own order, `txns` handed in
-    exactly as League already loaded it — no second read) — a player sold
-    and later re-bought gets the LATER price, matching whoever holds him
-    now rather than his first-ever transaction. `to` == "market" (a sale
-    back to the app) is not an acquisition and is skipped, not recorded as
-    a price of zero.
-
-    JOINED THROUGH THE CROSSWALK'S app_id — transactions.csv carries the
-    ledger's own player_id, which is the LaLiga id (ledger.py's rebuild of
-    the app's activity feed), the same id space the crosswalk's 91%-
-    coverage app_id join (this session) already resolves. A player the
-    crosswalk can't place is skipped, not guessed — the same discipline
-    Crosswalk.player() itself documents.
+    REPLAYED OLDEST FIRST — a player sold and re-bought gets the LATER
+    price. `to == "market"` (a sale back to the app) is skipped, not
+    recorded as a price of zero. Joined through the crosswalk's app_id
+    (transactions.csv carries the ledger's LaLiga id); unplaced players
+    are skipped, not guessed.
     """
     out: dict[str, float] = {}
     for t in txns:
@@ -1327,15 +1169,9 @@ _LOAD_CACHE: Universe | None = None
 def load(trials_pool=None) -> Universe:
     """Assemble the universe from the store. The only IO in this module.
 
-    MEMOIZED FOR THE PROCESS. Pure w.r.t. the tidy store (no argument here
-    changes the result — `trials_pool` is accepted but unused), and
-    run.py's single-interpreter design (see its own docstring) means
-    methodology's stage and sim's stage used to each pay for their own
-    fresh call — methodology's own `_fc()` helper called it twice by
-    itself. Measured 2.4s per call; caching cut it from 3 calls to 1 on a
-    real report. Same shape as `wait_routes`/`market_model` being hoisted
-    to one call in sim.py — a store read, not a fact that could change
-    mid-run, so nothing needs invalidating within one process.
+    MEMOIZED FOR THE PROCESS — pure w.r.t. the tidy store (`trials_pool`
+    is accepted but unused), and a store read can't change mid-run, so
+    every stage in run.py's single-interpreter chain shares one call.
     Why: docs/notes/decide.md#load--memoized-for-the-process
     """
     global _LOAD_CACHE
@@ -1433,18 +1269,10 @@ def load(trials_pool=None) -> Universe:
     name = {k: (rec.get("name") or k) for k, rec in players.items()}
     universe = set(price) | {k for s in squads.values() for k in s}
 
-    # ONE profile per player, the full pool, no market/ownership gate at
-    # all (ffcore.profile) — replaces this function's own separate
-    # "scored for the 89-player universe" loop and "scored for everyone
-    # else, about players not in the universe" loop with a single pass.
-    # `market_keyed` carries EVERY market/ownership/ledger fact already
-    # computed above (market_routes(), lg.owner, the teams/ledger feeds)
-    # so build_profiles() doesn't re-derive any of it — PlayerCurrent
-    # becomes the one place that HOLDS the result, not a second place
-    # that recomputes it. 2026-09-13: these seven used to feed Universe's
-    # own dicts directly and go nowhere near PlayerProfile at all — real
-    # migration debt (see PlayerCurrent's own docstring), not a live
-    # divergence risk, since there was only ever one computation.
+    # ONE profile per player, the full pool, no market/ownership gate.
+    # `market_keyed` carries every market/ownership/ledger fact already
+    # computed above so build_profiles() doesn't re-derive any of it —
+    # PlayerCurrent is the one place that holds the result.
     perjornada_rows = list(csv.DictReader(
         open(SEASON / "live" / "perjornada_2026-27.csv")))
     # Real per-match data (mins played, goals, cards) for whichever ~118
@@ -1514,12 +1342,9 @@ def load(trials_pool=None) -> Universe:
     # both want it and it can't have changed between them.
     results_hist = load_results_history()
     club_rel = club_volatility(results_hist, list(slug_of.values()))
-    # THE ACTUAL LIVE EFFECT of fit_home_edge() — same discipline
-    # DRIFT_FRAC's own wiring below already established: fitting a
-    # constant and only ever printing the result nobody acts on is not a
-    # fix. Mutates the module attribute BEFORE season_board() builds this
+    # Mutates the module attribute BEFORE season_board() builds this
     # run's Match objects — _match_for() reads HOME_EDGE live off the
-    # module each call, so this has to land before the board, not after.
+    # module each call, so this must land before the board, not after.
     _fixture.HOME_EDGE, _home_edge_why = fit_home_edge(results_hist, m)
     # The whole remaining schedule, fitted once for `rem`. Keys normalised
     # to match `club`'s own convention (club_key() always returns norm(...))
@@ -1538,16 +1363,8 @@ def load(trials_pool=None) -> Universe:
     # A squad short a position can't be simulated at all (see phantom_fill())
     # — patched once here so every downstream reader gets the same fix.
     squads, per_j = phantom_fill(squads, per_j, pos)
-    # THE ACTUAL LIVE EFFECT of fit_drift_frac()/drift_frac_from_history()
-    # (ffcore/forecast.py, methodology.py) — Miguel, 2026-09-06: "I do not
-    # want a hardcoded drift." Fitting it and reporting the result
-    # (methodology.drift_lines()) without ever pointing the SIMULATION at
-    # the fitted value would be the same "relabeled, not real" fix this
-    # repo has been burned by before; this line is what makes it real.
-    # Mutates the module attribute (not a local variable) because
-    # rate_draw()/start_draw() re-import DRIFT_FRAC fresh from the module
-    # on every call — same mechanism season.py's own self-test already
-    # relies on to swap it for a test value and restore it after.
+    # Mutates the module attribute, not a local — rate_draw()/start_draw()
+    # re-import DRIFT_FRAC fresh from the module on every call.
     _forecast.DRIFT_FRAC, _drift_why = _methodology.drift_frac_from_history()
     fc = Bootstrap(per_j, pool=pool, matches=matches,
                   club_of=club_of_slug, club_rel=club_rel)
@@ -1583,9 +1400,7 @@ def _selftest() -> None:
 
     # -- phantom_fill(): a squad short a position gets ONE average-player
     # stand-in per missing slot, not frozen at zero for the rest of the
-    # season -- 2026-09-01, Miguel: "the forecast for Albert is
-    # absolutely unsustainable... that's not possible unless he never
-    # again connects to the app" ------------------------------------
+    # season -----------------------------------------------------------
     ph_sq = {"m": {"d1": "DEF", "d2": "DEF", "x1": "MED", "x2": "MED",
                    "x3": "MED", "p1": "POR", "f1": "DEL"}}   # 2 DEF, short 1
     ph_pos = {"d1": "DEF", "d2": "DEF", "other_def": "DEF",

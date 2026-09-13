@@ -1,55 +1,18 @@
 """
-points.py — this season's points, from the snapshots you already take.
+points.py — this season's points, from the snapshots already taken.
 
-ingest saves the points page in every twice-daily snapshot, and has since
-day one. Nothing read them until now. This turns every one of them into one
-file per season label:
-
-    data/season/live/perjornada_<label>.csv  what changed between kept snapshots
-
-Like ingest.parse, it is a full rebuild from raw on every run: fix the
-parser and every past snapshot is repaired. The output is disposable.
-
-It used to write `running_<label>.csv` beside it — every kept snapshot's
-cumulative totals. Nothing ever read it, and with one kept snapshot it was a
-byte-for-byte second copy of `data/season/points_<label>.csv`. The totals are
-still in raw and `points_total` is on every per-jornada row, so the file was
-storage without a reader. Deleted rather than kept "just in case": a second
-copy of the truth is how the two of them drifted in the first place.
-
-**Kept** means the totals actually moved. Points only change after matches,
-so of ~14 snapshots a week perhaps two carry news; the rest are identical and
-are dropped rather than written. That keeps the running file at roughly one
-row per player per jornada rather than fourteen.
-
-The per-jornada file is the diff between consecutive kept snapshots. When a
-player's games went up by exactly 1, `points_delta` is what he scored in that
-match — the training row Phase 1 needs. A player who first appears mid-season
-diffs against zero, which is correct: whatever he has, he earned since the
-last kept snapshot.
+Writes data/season/live/perjornada_<label>.csv — the diff between
+consecutive KEPT snapshots (ones whose totals actually moved). A full
+rebuild from raw on every run, output disposable.
 
 Two deliberate limits:
-
-  * No jornada numbers. The interval between two kept stamps identifies the
-    matches involved; mapping stamps to jornada ids is a join for model code
-    to do later, against a calendar that doesn't exist in this repo yet.
-    Guessing here would just be a second copy of that logic to keep honest.
-  * report.py does NOT read data/season/live/ — deliberately, and this module
-    keeps it that way. The Scorer does now blend this season into pts/match,
-    but it does so from data/season/points_<label>.csv and through the same
-    shrinkage the prior gets, so a two-jornada sample moves a rating by very
-    little instead of replacing it (ffcore/score.py, load_points). That was a
-    deliberate change with its own self-tests; reading the per-jornada diffs
-    here would be a second, unshrunk path to the same number.
-
-The season label comes from each snapshot's own HTML (the page's season
-selector), so the day futbolfantasy flips the default from 2025/26 to the new
-season, the new label simply starts its own pair of files. The pre-flip
-snapshots all collapse into one kept row of last season's final totals —
-harmless, and a nice check that dedupe works.
-
-Nothing else imports this. Deps: lxml (via sources.parse_points), stdlib
-otherwise.
+  * No jornada numbers here beyond what match_jornadas() infers from
+    matches.csv's own score-appeared timeline — there's no kickoff-date
+    calendar in this repo to join against otherwise.
+  * report.py does not read this folder. ffcore/score.py's Scorer blends
+    this season into pts/match through the same shrinkage the prior gets
+    (from data/season/points_<label>.csv); reading the raw per-jornada
+    diffs here too would be a second, unshrunk path to the same number.
 
     python src/points.py              # rebuild data/season/live/ from raw
     python src/points.py --selftest   # pure-logic checks, no deps, no IO
@@ -82,11 +45,8 @@ EMPTY_MARKS = ("no se encontraron resultados", "sin resultados")
 # ---------------------------------------------------------------------------
 
 def empty_season(html: str) -> bool:
-    """True when the page says it has no results, rather than having lost them.
-
-    August 2026 is exactly this case: futbolfantasy rolled over to 2026-27 and
-    no match has been played, so the points table is served empty. Without
-    this, every run printed a markup-rot warning that was not true.
+    """True when the page says it has no results (a fresh season rollover),
+    as opposed to a parser that broke and lost them.
     """
     low = (html or "").lower()
     return any(m in low for m in EMPTY_MARKS)
@@ -95,21 +55,10 @@ def empty_season(html: str) -> bool:
 def match_jornadas(matches_history: list[dict]) -> list[tuple[str, int]]:
     """[(when this match's result was first seen, jornada)], oldest first.
 
-    THE JORNADA NUMBER A POINTS DIFF ROW BELONGS TO, closed here rather than
-    left "a join for model code to do later" (this module's own opening
-    docstring). data/tidy/matches.csv had no date column and no id space
-    shared with the fixtures feed, so there was no calendar to join a
-    `points_delta` row's `to_stamp` against — but the calendar page IS swept
-    every run and its `score` column goes from blank to filled the moment a
-    match finishes, and that transition IS observed, timestamped, in the
-    tidy store's own history. `matches_history` must be the FULL table, not
-    latest_only() — the first snapshot where a match_id's score is non-empty
-    is this repo's own record of when it learned that match was over, which
-    is the closest thing available to "when this jornada's points became
-    knowable" without a kickoff-date feed in a matching id space.
-
-    ONE ENTRY PER MATCH, first-seen-scored only: a later re-scrape of an
-    already-scored match must not push its jornada later.
+    `matches_history` must be the FULL table, not latest_only() — the first
+    snapshot where a match's score is non-empty is this repo's own record
+    of when that match finished. One entry per match, first-seen-scored
+    only, so a later re-scrape can't push its jornada later.
     """
     first_scored: dict[str, tuple[str, int]] = {}
     for r in sorted(matches_history, key=lambda r: r.get("observed_at", "")):
@@ -140,14 +89,9 @@ def jornada_asof(timeline: list[tuple[str, int]], stamp: str) -> int | None:
 
 
 def player_key(r: dict) -> str:
-    """The one key a points row is filed under.
-
-    THE PAGE'S OWN ID FIRST. It is in the row's click handler rather than a
-    data-* attribute, which is why it went unread and the season's points
-    history was diffed by name — so a player whose display name changed
-    spelling between two sweeps read as one player leaving and another
-    arriving. The name is the fallback for snapshots taken before the id was
-    extracted, which is most of the history and cannot be re-fetched.
+    """The row's own ff_id first (a name that changes spelling between two
+    sweeps must not read as one player leaving and another arriving);
+    normalised name as the fallback for older snapshots with no id.
     """
     return ((r.get("ff_id") or "").strip()
             or norm(r.get("player_name_full") or r.get("player_name") or ""))
@@ -180,16 +124,12 @@ def keep_changed(seq: list[tuple[str, list[dict]]]) -> list[tuple[str, list[dict
 def diff(prev_rows: list[dict], cur_rows: list[dict],
          from_stamp: str, to_stamp: str, season: str,
          jornada_timeline: list[tuple[str, int]] = ()) -> list[dict]:
-    """Per-player deltas between two kept snapshots.
+    """Per-player deltas between two kept snapshots — only players whose
+    points or games moved; absent-before diffs against (0, 0).
 
-    Emits only players whose points or games moved. A player absent from the
-    earlier snapshot diffs against (0, 0).
-
-    `jornada_timeline` (`match_jornadas()`'s output) stamps each row with
-    the jornada most likely responsible for it — `jornada_asof(timeline,
-    to_stamp)`, one lookup per row rather than per player, since every row
-    from the same diff shares one `to_stamp`. Blank ("") when no timeline is
-    given or nothing had finished yet, never a guess.
+    `jornada_timeline` (match_jornadas()'s output) stamps each row via
+    jornada_asof(timeline, to_stamp); blank when no timeline is given or
+    nothing had finished yet, never a guess.
     """
     prev = totals(prev_rows)
     jor = jornada_asof(jornada_timeline, to_stamp)
@@ -235,22 +175,8 @@ def load_snapshots() -> dict[str, list[tuple[str, list[dict]]]]:
     from sources import parse_points, season_label
 
     by_label: dict[str, list[tuple[str, list[dict]]]] = {}
-    # PARSED ONCE PER DOCUMENT, NOT ONCE PER SNAPSHOT, AND ONCE PER SEASON,
-    # NOT ONCE PER RUN. The carry-forward hands the same points page to every
-    # stamp since it last changed, and lxml was running over all forty-seven
-    # of them; the raw archives are then immutable, so the answer it comes to
-    # cannot change unless the parser does, which is what the cache is
-    # fingerprinted on. Between them that was five seconds a run rebuilding
-    # rows that were already correct.
-    #
-    # The label and the empty-season reading are cached beside the rows
-    # because they are the only other things read off the page, and caching
-    # the rows alone would have kept the archive open for them.
-    # A PARSE IS A FUNCTION OF THE PAGE *AND* OF THE PARSER. ingest.parse_key
-    # already knows that; this path keyed on the page alone, so teaching
-    # parse_points to read the player id off the row left every stored
-    # snapshot on the old shape and the id absent from the whole history
-    # until the cache was deleted by hand. Same closure, same guarantee.
+    # Cached per document (raw archives are immutable), fingerprinted on
+    # the parser too — a parse is a function of page AND parser.
     _psig = parser_sig("parse_points")
     cache, fresh, walk = _parse_cache(_CACHE), {}, doc_keys()
 
@@ -281,11 +207,6 @@ def load_snapshots() -> dict[str, list[tuple[str, list[dict]]]]:
             continue
         fresh[ck] = got
         if not got["rows"]:
-            # An EMPTY season is not a broken parser. Between the rollover and
-            # the first whistle the site serves the table with "no results"
-            # in it, and calling that markup rot would print a false alarm on
-            # every run for a fortnight — which is how a real one gets
-            # ignored. The two states are told apart by the site's own words.
             print(f"  note: {stamp}/points has no rows yet — the season has "
                   "not started." if got["empty"] else
                   f"  warn: {stamp}/points parsed to 0 rows — markup "
@@ -302,9 +223,7 @@ def main() -> None:
         sys.exit("no points page found in any snapshot under data/raw/ — "
                  "run ingest.py fetch first")
 
-    # THE FULL HISTORY, NOT latest_only() — see match_jornadas()'s own
-    # docstring for why a snapshot table's whole past is what answers "when
-    # did this match's score first appear" at all.
+    # Full history, not latest_only() — see match_jornadas()'s docstring.
     timeline = match_jornadas(read_csv(TIDY / "matches.csv"))
 
     for label, seq in sorted(by_label.items()):

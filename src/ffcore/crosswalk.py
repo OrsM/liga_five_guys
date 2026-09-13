@@ -6,36 +6,15 @@ ffcore.crosswalk — one player is one player, whatever a feed calls him.
     xw.player(app_name="A. Ferllo")          -> "alvaro fernandez"
     xw.club(ff_slug="rayo-vallecano")        -> "rayo"
 
-FOUR FEEDS, FOUR IDENTITY SPACES, AND NAMES AS THE ONLY BRIDGE. The market
-publishes its own slugs, futbolfantasy publishes different ones, analiticafan-
-tasy different ones again, and the league's API has integer ids and its own
-abbreviated spellings. Measured across the store on 2026-08-18, not one pair
-of slug spaces overlapped at all — market to futbolfantasy, 0 of 553 — and the
-name joins that had to carry the load ran anywhere from 25% to 93%:
+Four feeds (market, futbolfantasy, analiticafantasy, the league API) use
+four different id spaces with almost no slug overlap; names are the only
+bridge, and every consumer used to re-derive that join independently.
+This is the one join every caller should reach for instead.
 
-    starters -> futbolfantasy  by slug   93%
-    starters -> market         by name   25%
-    api_teams -> market        by name   25%
-    analitica -> futbolfantasy by slug    0%
-
-So every consumer re-derived the join, and each did it slightly differently.
-That is not a theoretical tidiness complaint: decide.py's own weaker version
-hid five rival players who could not then be bought, and a grader joining
-confirmed line-ups to market rows matched a quarter of them and fitted a model
-on the wreckage. Seven functions in this repo exist to paper over it — norm,
-resolve, key_for, api_key, _by_exact_value, match_team, club_key.
-
-WHAT THIS IS, AND WHAT IT IS NOT. It is a crosswalk, not a renumbering. The id
-stays `norm(market name)`, which is what every dict in the repo is already
-keyed by, so adopting this is additive: a caller that has a futbolfantasy slug
-and wants the repo's key can finally ask, and a caller that already has the
-key carries on unchanged.
-
-IT IS WRITTEN DOWN, AND THAT IS THE POINT. Resolution runs against whatever
-the store holds today, and the store grows: a player the API named once and
-never again is nameable forever after the run that saw it. Merging into the
-file rather than rebuilding it means a mapping once learned is never lost, and
-coverage only goes up. A mapping is dropped only when a feed contradicts it.
+The id stays `norm(market name)` — every dict in the repo already keys
+on it, so adopting this crosswalk is additive. Persisted to disk: a
+mapping learned once stays known, and coverage only grows (a mapping is
+dropped only when a later feed contradicts it).
 """
 
 from __future__ import annotations
@@ -83,12 +62,8 @@ class Player:
                 "app_names": _join(self.app_names)}
 
     def absorb(self, other: "Player") -> None:
-        """Take anything `other` knows that this row does not.
-
-        NEVER OVERWRITES a key with a blank. A feed that skipped a run must not
-        erase what an earlier run learned from it — that is the difference
-        between a crosswalk that improves and one that flickers.
-        """
+        """Take anything `other` knows that this row does not. Never
+        overwrites a filled field with a blank."""
         for f in ("name", "club_id", "ff_slug", "af_slug",
                   "app_id", "understat_id"):
             if not getattr(self, f) and getattr(other, f):
@@ -103,12 +78,9 @@ class Club:
     ff_slug: str = ""
     elo: str = ""
     aliases: set = field(default_factory=set)
-    # THE IDS THE SOURCES PUBLISH. market_id is futbolfantasy's data-equipo,
-    # on every market row; af_id is analiticafantasy's data-af-team, on both
-    # crests of every match anchor. Neither was read, so clubs were joined by
-    # spelling — "Celta" against "Celta Vigo", "Betis" against "Real Betis" —
-    # through a substring matcher that could return two candidates and then
-    # answer with neither.
+    # The ids the sources publish (market_id: futbolfantasy's data-equipo;
+    # af_id: analiticafantasy's data-af-team) — avoids joining clubs by
+    # spelling ("Celta" vs "Celta Vigo").
     market_id: str = ""
     af_id: str = ""
 
@@ -131,12 +103,8 @@ class Crosswalk:
         self._by_ff, self._by_af, self._by_app = {}, {}, {}
         self._by_understat = {}
         self._by_app_name = {}
-        # AN IDENTIFIER TWO PLAYERS CLAIM IDENTIFIES NEITHER. These indexes
-        # were plain assignment, so the second writer won and the answer
-        # depended on dict order. That is the worst failure available here: a
-        # unique id is trusted precisely BECAUSE it does not guess, and a
-        # silent coin toss wearing an id's clothes is trusted the same way.
-        # A clash is recorded, refused, and reported by clashes().
+        # An id two players claim identifies neither — recorded, refused,
+        # reported by clashes(), rather than resolved by dict order.
         self._clash: dict[str, set] = {}
         for p in self.players.values():
             for idx, key, label in (
@@ -173,23 +141,13 @@ class Crosswalk:
 
     # -- asking ------------------------------------------------------------
     def clashes(self) -> dict:
-        """{index: [ids two or more players claim]} — empty when all is well.
-
-        Surfaced rather than swallowed: a clash means one of the joins that
-        wrote an id down was wrong, and the row it wrote is still in the
-        table. The report says so instead of the index quietly picking one.
-        """
+        """{index: [ids two or more players claim]} — empty when clean."""
         return {k: sorted(v) for k, v in sorted(self._clash.items()) if v}
 
     def player(self, *, name=None, ff_slug=None, af_slug=None, app_id=None,
                understat_id=None, app_name=None) -> str | None:
-        """The repo's key for a player, from whatever key you happen to hold.
-
-        Exact lookups only. Nothing here guesses: the guessing happened once,
-        when the table was built, with every feed in front of it — and the
-        answer was written down. A caller that gets None has found a genuine
-        gap, and a gap that stays visible is one that gets fixed.
-        """
+        """The repo's key for a player, from whatever id you hold. Exact
+        lookups only — None means a genuine gap, never a guess."""
         for key, idx in ((ff_slug, self._by_ff), (af_slug, self._by_af),
                          (app_id, self._by_app),
                          (understat_id, self._by_understat)):
@@ -210,61 +168,27 @@ class Crosswalk:
     def resolve(self, raw="", *, hint_app_id="", hint_ff_slug="",
                 hint_af_slug="", hint_club="", hint_price=None,
                 hint_full="", market=None) -> str | None:
-        """The repo's one join: given whatever a source calls a player, his key.
+        """The repo's one join: given whatever a source calls a player,
+        his key. Replaces `player()`/`Market.key_for`/`text.resolve`/
+        league.py's `api_key` each re-deriving the same answer.
 
-        THE FIRST STEP OF UNWINDING SIX RESOLVERS INTO ONE. `player()` above,
-        `Market.key_for`/`candidates`, `text.resolve`, and league.py's
-        `api_key`/`identify`/`_roster_key` each grew their own answer to this
-        question, at different times, against different assumptions about
-        what a "key" looks like — and every identity bug found in the
-        2026-08-20/21 session was two of them disagreeing about it. This is
-        not everything those six do (api_key's ledger tie-break and
-        identify's counterparty pruning are domain-specific to a ledger row,
-        not to identity, and stay where they are) — it is the join itself,
-        meant to be the one thing every caller reaches for instead of
-        re-deriving it.
-
-        AN ID BEATS A NAME, ALWAYS — asked directly, and right: none of
-        `hint_app_id`/`hint_ff_slug`/`hint_af_slug` involves any derivation
-        or guessing on the identifier itself, each is a raw fact straight
-        off its source's own row. The one thing that IS derived is the
-        MAPPING from that id to this repo's key, learned once by some
-        earlier join and stored in the crosswalk — and that is where the
-        one historical bug lived (app_id 2614, written onto the wrong
-        Romero by a bad name join, once). `Crosswalk.merge()` now
-        self-heals exactly that: a corrected join displaces a stale id off
-        whoever wrongly holds it on every rebuild, which runs every
-        pipeline run. That is the safety net now, not per-call name
-        priority, so a name match no longer needs to outrank an id to
-        protect against a stale one.
-
-        Order of trust, in the order it is checked:
-          1. `raw` is already a bare digit string — this repo's own key IS
-             numeric for the overwhelming majority of players today
-             (`row_key()`: 44,912 rows checked, `ff_id` on every one), so a
-             source that already hands one over needs no resolution at
-             all. This is `_roster_key()`'s fast path, generalised.
-          2. `self.player(app_id=hint_app_id, ff_slug=hint_ff_slug,
-             af_slug=hint_af_slug)` — any id a source hands in, translated
-             through the crosswalk's own table. Checked before any name is
-             touched at all, per the above.
-          3. `market.key_for(raw, ...)` — the market's CURRENT spelling,
-             disambiguated by `hint_club`/`hint_price` when two players
-             share the name. This IS the fuzzy/team/money machinery, run
-             only once no id was offered or none of the offered ids
-             resolved.
-          4. The same, against `hint_full` — a longer alternate spelling
-             (birth name vs. nickname), tried only once `raw` alone misses.
+        Order of trust:
+          1. `raw` already a bare digit string — this repo's key is
+             numeric for most players, no resolution needed.
+          2. An id hint (`hint_app_id`/`hint_ff_slug`/`hint_af_slug`),
+             translated through the crosswalk's own table — an id never
+             needs guessing, only the id-to-key mapping is learned, and
+             `Crosswalk.merge()` displaces a stale one on every rebuild.
+          3. `market.key_for(raw, ...)` — the market's current spelling,
+             disambiguated by `hint_club`/`hint_price`.
+          4. The same against `hint_full`, a longer alternate spelling.
           5. `self.player(app_name=raw)` then `self.player(name=raw)` —
-             the crosswalk's own memory, last resort before refusing. This
-             is what catches a source whose current spelling the market
-             has moved past (`Manuel Fernández` -> `Manu Fernandez`,
-             mid-season) but whose OLD spelling the crosswalk still holds.
+             the crosswalk's own memory, for a spelling the market has
+             since moved past.
 
-        None means genuinely unresolved — never a guess, and never a
-        candidate list picked for you; a caller that wants to prune an
-        ambiguous market name by its own evidence (ledger counterparty,
-        purchase price) still goes to `market.candidates()` directly.
+        None means genuinely unresolved, never a guess or a candidate
+        list — an ambiguous name a caller wants to prune by its own
+        evidence goes to `market.candidates()` directly.
         """
         raw = (raw or "").strip()
         if raw.isdigit():
@@ -299,11 +223,7 @@ class Crosswalk:
         return None
 
     def coverage(self) -> dict:
-        """How much of each feed's namespace the table can answer for.
-
-        Printed by the report. A crosswalk nobody measures is a crosswalk that
-        quietly stops covering a feed the day its format changes.
-        """
+        """How much of each feed's namespace the table can answer for."""
         n = len(self.players) or 1
         return {"players": len(self.players),
                 "ff": sum(1 for p in self.players.values() if p.ff_slug) / n,
@@ -344,26 +264,15 @@ class Crosswalk:
                                         key=lambda c: c.club_id)])
 
     def merge(self, other: "Crosswalk") -> "Crosswalk":
-        """This table, plus anything `other` learned.
-
-        Never subtracts, WITH ONE EXCEPTION: a unique id that `other` gives
-        to a different player is taken off the player holding it here. Never
-        subtracting is right for a feed that skipped a sweep and wrong for an
-        identifier — app_id 2614 was written onto Isaac Romero by a name join
-        that has since been fixed, and absorb() kept it there for every
-        rebuild afterwards, so the corrected table and the stale one both
-        claimed it. A fix that cannot displace what the bug wrote down is not
-        a fix.
+        """This table, plus anything `other` learned. Never subtracts,
+        with one exception: a unique id `other` assigns to a player is
+        taken off anyone else here holding it — a fix that can't displace
+        a stale id from a past bad join isn't a fix.
         """
         for pid, p in other.players.items():
-            # EVERY UNIQUE IDENTIFIER THE INCOMING TABLE ASSIGNS IS TAKEN OFF
-            # WHOEVER ELSE HOLDS IT. app_id showed why: a name join wrote
-            # 2614 onto Isaac Romero, the join was fixed, and absorb() kept
-            # the wrong row alive through every rebuild. The slugs had the
-            # same disease from a different cause — when shared_names stopped
-            # splitting `moussa diarra`, the old `moussa diarra@malaga` row
-            # stayed behind still holding his ff_slug, so one player held
-            # one identifier under two keys.
+            # Every unique identifier the incoming table assigns is taken
+            # off whoever else holds it (a name join can leave one id on
+            # two players across a rebuild otherwise).
             for f in ("app_id", "ff_slug", "af_slug", "understat_id"):
                 val = getattr(p, f)
                 if not val:
@@ -371,10 +280,8 @@ class Crosswalk:
                 for cur in self.players.values():
                     if cur.player_id != pid and getattr(cur, f) == val:
                         setattr(cur, f, "")
-            # An alias the incoming table hangs on THIS player comes off
-            # everyone else, for the reason above: app_name is a key
-            # sim.py's market model looks players up by, and two holders
-            # make it answer by dict order or not at all.
+            # Same for an app_name alias: sim.py looks players up by it,
+            # and two holders make it answer by dict order.
             if p.app_names:
                 fresh = {norm(n) for n in p.app_names}
                 for cur in self.players.values():
@@ -432,23 +339,15 @@ def _selftest() -> None:
                {"af_slug": "af-alvaro"}, {"app_id": "2101"},
                {"app_name": "A. Ferllo"}):
         assert xw.player(**kw) == "alvaro fernandez", kw
-    # THE ONE THAT USED TO COST MONEY: the app's abbreviation resolves, so a
-    # rival's player carrying a buyout clause is buyable rather than invisible.
+    # The app's abbreviation resolves, so a rival's clause-carrying player
+    # is buyable rather than invisible.
     assert xw.player(app_name="Jonny Otto") == "jonny castro"
     # An accented or punctuated spelling folds, because the id is norm()'d.
     assert xw.player(name="Álvaro Fernández") == "alvaro fernandez"
-    # A key nothing knows is None, never a guess. The guessing happened once,
-    # when the table was built, with every feed in front of it.
     assert xw.player(ff_slug="who-is-this") is None
     assert xw.player() is None
 
-    # -- A UNIQUE ID BELONGS TO ONE PLAYER, AND A CLASH IS NOT AN ANSWER ---
-    # REAL, AND IT OUTLIVED THE BUG THAT MADE IT. app_id 2614 is the app's
-    # own id for Carlos Romero. A name join that read the app's abbreviated
-    # "C. Romero" as Isaac Romero wrote 2614 onto Isaac; the join was fixed,
-    # Carlos correctly took 2614 too, and NOTHING TOOK IT OFF ISAAC. Two
-    # players then claimed one id and the index answered with whichever it
-    # reindexed last — a coin toss wearing an identifier's clothes.
+    # -- a unique id belongs to one player; a clash is not an answer -------
     clash = Crosswalk({
         "carlos romero": Player("carlos romero", app_id="2614"),
         "isaac romero": Player("isaac romero", app_id="2614")})
@@ -460,17 +359,14 @@ def _selftest() -> None:
     assert solo.player(app_id="2614") == "carlos romero"
     assert solo.clashes() == {}
 
-    # A CORRECTED ID DISPLACES A STALE ONE ACROSS A MERGE. Never-subtracts
-    # is right for a feed that skipped a sweep; for an identifier it would
-    # keep the wrong answer alive forever.
+    # A corrected id displaces a stale one across a merge.
     stale = Crosswalk({"isaac romero": Player("isaac romero", app_id="2614"),
                        "carlos romero": Player("carlos romero")})
     fixed = Crosswalk({"carlos romero": Player("carlos romero",
                                                app_id="2614")})
     stale.merge(fixed)
     assert stale.players["isaac romero"].app_id == ""
-    # The same for a slug, which went stale for a different reason: a key
-    # that changed shape left a ghost row still holding the identifiers.
+    # The same for a slug on a ghost row a key-shape change left behind.
     ghost = Crosswalk({
         "moussa diarra@malaga": Player("moussa diarra@malaga",
                                        ff_slug="moussa-diarra"),
@@ -495,16 +391,12 @@ def _selftest() -> None:
     assert xw.club(ff_slug="rayo-vallecano") == "rayo"
     assert xw.club(name="Rayo") == "rayo"
     assert xw.club(name="Rayo Vallecano") == "rayo"      # the Elo spelling
-    # Club Elo names two Spanish clubs after their city; the alias lives in
-    # the table now rather than in a constant inside the fixture module.
+    # A city name (Club Elo's convention) resolves via the alias table.
     assert xw.club(name="Bilbao") == "athletic"
     assert xw.club(name="Athletic Club") == "athletic"
     assert xw.club(name="Nowhere FC") is None
 
     # -- merging never subtracts -------------------------------------------
-    # A feed that skipped a run must not erase what an earlier run learned
-    # from it. This is the difference between a table that improves and one
-    # that flickers with whatever the last sweep happened to fetch.
     thin = Crosswalk({"alvaro fernandez": Player("alvaro fernandez")})
     thin.merge(xw)
     assert thin.player(app_id="2101") == "alvaro fernandez"
@@ -526,20 +418,17 @@ def _selftest() -> None:
         assert again.player(ff_slug="jonny-castro") == "jonny castro"
         assert again.club(name="Bilbao") == "athletic"
         assert set(again.players) == set(xw.players)
-        # Reading a table that does not exist yet is an empty one, not a crash:
-        # the first run has to be able to build it.
+        # A table that doesn't exist yet reads as empty, not a crash.
         assert Crosswalk.read(os.path.join(d, "nope.csv"), cc).players == {}
 
     cov = xw.coverage()
     assert cov["players"] == 3 and cov["clubs"] == 2
     assert 0.0 < cov["ff"] < 1.0
 
-    # -- resolve(): the one join, against the same real scenarios that broke
-    # the six it is replacing ------------------------------------------------
+    # -- resolve(): the one join ---------------------------------------------
     from ffcore.tidy import Market
 
-    # A bare digit is already this repo's key — no lookup at all, the fast
-    # path _roster_key() relies on for a migrated rosters_initial.txt line.
+    # A bare digit is already this repo's key — no lookup needed.
     assert xw.resolve("2101") == "2101"
 
     # Two men share a name; the market refuses without a discriminator, and
@@ -554,9 +443,7 @@ def _selftest() -> None:
     assert xw.resolve("Álvaro García", hint_price=501929, market=ag) \
         == "12993"
 
-    # An abbreviated surname three players share, settled by price only —
-    # the +635% premium bug (C. Romero -> Isaac Romero) this repo already
-    # fixed once, checked again here so resolve() cannot reintroduce it.
+    # An abbreviated surname three players share, settled by price only.
     rm = Market([
         {"ff_id": "1", "name": "Isaac Romero", "team": "Sevilla",
          "value": "6023939", "observed_at": "2026-08-19T1639Z"},
@@ -567,18 +454,15 @@ def _selftest() -> None:
     assert xw.resolve("C. Romero", market=rm) is None
     assert xw.resolve("C. Romero", hint_price=45739000, market=rm) == "2"
 
-    # A full name reaches a player the abbreviated nickname alone cannot —
-    # api_key's own reason for trying hint_full second, not first.
+    # A full name reaches a player the abbreviated nickname alone cannot.
     nick = Market([{"ff_id": "9", "name": "Pepelu", "team": "Valencia",
                     "value": "7669774", "observed_at": "2026-08-19T1639Z"}])
     assert xw.resolve("nobody knows this nickname", market=nick) is None
     assert xw.resolve("nobody knows this nickname",
                       hint_full="Pepelu", market=nick) == "9"
 
-    # THE MEASURED CASE: a roster line typed against a spelling the market
-    # has since moved past. The market no longer has "Manuel Fernández" at
-    # all — only the crosswalk's app_name memory does — so market.key_for()
-    # must miss and the crosswalk fallback must catch it.
+    # A roster line typed against a spelling the market has since moved
+    # past — only the crosswalk's app_name memory still has it.
     moved = Crosswalk({"manu fernandez": Player(
         "manu fernandez", "Manu Fernandez", app_names={"Manuel Fernández"})})
     empty_market = Market([])
@@ -590,13 +474,7 @@ def _selftest() -> None:
     assert xw.resolve("Absolutely Nobody") is None
     assert xw.resolve("") is None
 
-    # AN ID BEATS A NAME, EVEN ONE THAT WOULD OTHERWISE RESOLVE CLEANLY.
-    # "Jonny Castro" matches the market exactly, and app_id "9" is (for this
-    # test only) mapped to a different player entirely — resolve() must
-    # still answer with the id, because the id involves no derivation and
-    # Crosswalk.merge()'s stale-id displacement is the safety net now, not
-    # per-call name priority. This is an intentional reversal of the
-    # priority league.api_key() used to hard-code (see its migration).
+    # An id beats a name, even one that would otherwise resolve cleanly.
     jc = Market([{"ff_id": "77", "name": "Jonny Castro", "team": "Alaves",
                  "value": "5602302", "observed_at": "2026-08-19T1639Z"}])
     elsewhere = Crosswalk({"someone else": Player("someone else", app_id="9")})
@@ -616,8 +494,7 @@ def _selftest() -> None:
     assert slugged.resolve("Alvaro Fernandez",
                            hint_ff_slug="no-such-slug") == "alvaro fernandez"
 
-    # -- understat_id: a fourth identity space, joined and displaced the
-    # same way as the other three -------------------------------------------
+    # -- understat_id: a fourth identity space, same join/displace rules --
     us = Crosswalk({"alvaro fernandez": Player(
         "alvaro fernandez", "Alvaro Fernandez", understat_id="555")})
     assert us.player(understat_id="555") == "alvaro fernandez"

@@ -1,16 +1,11 @@
 """
 ffcore.render — turning keys back into something a person reads.
 
-The join key is lossy on purpose (see ffcore.text): it folds accents, drops
-apostrophes and lowercases everything, because that is what makes "N'Diaye"
-and "NDiaye" the same player. Every report then has to undo as much of that as
-it can before printing, and until this module existed report.py was the only
-one that could — the rest either printed raw keys or imported a 2,300-line
-report generator to borrow one function.
-
-Display only. Nothing here is ever a key, and nothing here is reversible: a
-name that came back from norm() has already lost its accents and no amount of
-casing will bring them back.
+The join key is lossy on purpose (see ffcore.text): it folds accents,
+drops apostrophes and lowercases everything, so "N'Diaye" and "NDiaye"
+join as the same player. This module undoes as much of that as it can
+before printing — display only, never a key, and not reversible (a name
+that came back from norm() has already lost its accents for good).
 """
 
 from __future__ import annotations

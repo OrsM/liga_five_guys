@@ -1,30 +1,15 @@
 """
-ffcore/model.py — the model, built once per run.
-
-WHY THIS EXISTS. report.py built a League and a Scorer; decide.load() built
-another League and another Scorer; both then described the same squad on two
-surfaces. They were not even given the same input — report scored today's
-market, decide scored every snapshot ever recorded — so the two could reach
-different answers about the same player, and on 2026-08-20 they did: a bug in
-the Scorer's name index could only be true for one of them.
-
-Two model passes is not redundancy, it is two models. One of them is wrong
-whenever they differ and nothing says which. So there is one, memoised for
-the life of the process, and run.py executes every stage in one process.
+ffcore/model.py — one League and one Scorer, built once per run, built
+from TODAY's market only (not the full snapshot history — an older
+snapshot can list a player no longer in the game as buyable).
 
     from ffcore.model import session
     m = session()
     m.lg, m.sc, m.market, m.xi_rows
 
-The full market history bought the model nothing — measured on 2026-08-20,
-of the 70 players owned across the league, zero needed a snapshot older than
-today's to resolve. It cost 41,642 rows of lookup building on every call.
-
-What it DID do was put 12 players back in the buyable pool who are not in
-the game any more: Ferran Torres last listed 2026-08-14, Nahuel Molina
-2026-08-12, and a stale id for Moussa Diarra, who is in today's market under
-a different one. A player the market does not list cannot be bought, so
-scoring him as a candidate is not extra coverage, it is a wrong answer.
+Memoised for the life of the process so every stage describes the same
+squad — two independent builds could (and once did) disagree about the
+same player with nothing to say which one was right.
 """
 
 from __future__ import annotations

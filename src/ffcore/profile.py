@@ -1,38 +1,17 @@
 """
-ffcore.profile — one record per player, shaped by how its data actually
-changes.
+ffcore.profile — one record per player, keyed by how its data changes:
 
-FOUR TIERS, NOT ONE FLAT RECORD, because the fields change on genuinely
-different rhythms and collapsing them into one scalar-per-field record
-either loses information a future forecasting variable will need (market
-value's daily TREND, not just its latest number) or forces every consumer
-to guess whether a field is a live current value or a stale historical one.
-
-    identity  — changes essentially never (ids, names)
-    current   — the latest observed value of something that drifts
-                (club, status, price) — overwritten each run, not accumulated
-    history   — time-indexed sequences, the source of truth for anything a
-                NEW forecasting variable needs. Adding a candidate variable
-                should mean adding a field here once, not touching every
-                downstream consumer.
-    derived   — pre-aggregated, cached, and ALWAYS reproducible from
+    identity  — immutable ids/names
+    current   — latest observed value of a drifting fact (club, status,
+                price) — overwritten each run, not accumulated
+    history   — time-indexed sequences; add a new forecasting variable
+                here once, not at every consumer
+    derived   — pre-aggregated, cached, always reproducible from
                 history + current. Never a second source of truth.
 
-FORECAST EVERYONE, SHOW ONLY WHAT'S ACTIONABLE. This module has no market
-gate at all — build_profiles() covers every player load_players() knows,
-listed or not, owned or not. The market-restriction rule ("only show me
-players I can buy") is a REPORT rule, not a data rule: see slate.py for
-where it actually applies. decide.py already computed market_exp/start for
-this same full pool before this module existed (the "Everyone the market
-prices, scored the same way" loop in load()) — this formalizes that, it
-does not invent scoring-everyone as a new idea.
-
-NOT a rerun of reports/watchlist.md (deleted 2026-08-18, and Universe's own
-docstring says why: "pretending [an unactionable player matters today] is
-most of why this repo grew a watchlist nobody read"). The difference: the
-full pool computed here never gets its own report surface. It only ever
-feeds calibration and the numbers behind whichever players slate.py's
-market gate actually lets through.
+build_profiles() covers every player load_players() knows, listed or
+not, owned or not — no market gate. The market-restriction rule ("only
+show me players I can buy") is a report rule, applied in slate.py.
 """
 
 from __future__ import annotations
@@ -63,23 +42,11 @@ class PlayerIdentity:
 
 @dataclass
 class PlayerCurrent:
-    """The latest observed value of something that drifts — overwritten
-    each run, not accumulated. Reading this answers 'what's true right
-    now,' never 'what was true on some past date.'
-
-    value/clause/clause_until/route/bids/proceeds joined 2026-09-13:
-    decide.load() computed these once (market_routes(), the ledger, the
-    teams feed) but never fed them onto PlayerProfile — Universe kept its
-    own dozen parallel dicts as the only home for them, exactly the shape
-    the original redesign plan called "be aggressive here, not
-    incremental... replace the dozen parallel dicts" and then didn't
-    finish. Not a correctness bug like status_adjusted()'s (nothing here
-    was ever computed twice — it just never had a second reader), but
-    real unfinished migration scope. decide.load() still does the one
-    join each of these needs (market context PlayerProfile doesn't have);
-    it now ALSO writes the result here, and Universe's own fields become
-    genuine reads of this, matching pos/market_exp/start_p's existing
-    shape rather than sitting beside it as an unrelated second copy.
+    """Latest observed value of a drifting fact — overwritten each run,
+    not accumulated. decide.load() computes value/clause/clause_until/
+    route/bids/proceeds (needs market/ledger context this module doesn't
+    have) and writes the result here; Universe's own fields are reads of
+    this, not a second computation.
     """
     club: str = ""
     pos: str = ""
@@ -98,25 +65,16 @@ class PlayerCurrent:
 
 @dataclass
 class PlayerHistory:
-    """Time-indexed sequences — the source of truth. A future forecasting
-    variable reads from here, not from a fresh tidy-CSV round trip.
+    """Time-indexed sequences — the source of truth for forecasting
+    variables; add a new one here rather than a fresh tidy-CSV read.
 
-    match_stats_by_jornada: real per-match data (mins played, goals,
-    cards), joined from api_stats.csv — PARTIAL pool (~118 players who
-    have been on one of this league's 5 squads; api_stats has no bulk
-    equivalent the way identity did).
-
-    opponent_by_jornada: (opponent_club, is_home) per jornada, from
-    matches.csv — FULL pool (every club's whole schedule). Difficulty is
-    NOT included yet: elo.csv keys clubs by proper-case name
-    ("Real Madrid"), matches.csv/club_id by lowercase slug
-    ("real-madrid"), and decide.py already solves that exact mismatch for
-    its own forward-looking fixture difficulty (season_board(),
-    club_key()) — reusing that properly is the next step, not reinvented
-    here without being able to verify the join is right.
-
-    market_value_series and understat_season remain real fields with a
-    real, currently-empty default: not wired to a data source yet.
+    match_stats_by_jornada: from api_stats.csv, PARTIAL pool (~118
+    players who've been on one of this league's 5 squads).
+    opponent_by_jornada: (opponent_club, is_home) per jornada, FULL pool,
+    from matches.csv. No difficulty yet — needs the elo.csv/club_id
+    case-mismatch join decide.py's season_board()/club_key() already do.
+    market_value_series/understat_season: real fields, not wired to a
+    source yet.
     """
     points_by_jornada: dict[int, float] = field(default_factory=dict)
     started_by_jornada: dict[int, bool] = field(default_factory=dict)
@@ -128,22 +86,11 @@ class PlayerHistory:
 
 def status_adjusted(pts: float, p_start: float, status: str
                      ) -> tuple[float, float]:
-    """(pts, p_start), carrying the SAME status override Scorer.score()
-    already applies to score/flat — OUT_STATUSES forces p_start to 0 (he
-    is not playing this match, full stop, whatever his usual rate), a
-    "doubt" status halves pts (Scorer.score()'s own DOUBT_FACTOR).
-
-    WHY THIS HAS TO BE ITS OWN FUNCTION, not inlined per caller: real
-    bug, found 2026-09-13 (Miguel: "no booked player is playing so
-    shouldn't they have 0% end odds to play next game?" — Zaid Romero,
-    suspended, was reading a real start% and a real xPts/j for his next
-    match). Scorer.score() zeroes/halves `score`/`flat`, but leaves
-    `Scored.pct_used`/`ppm` themselves untouched by design (a display/
-    audit trail of what the raw sources said). Both build_profiles()'s
-    own market_exp/start_p AND PlayerProfile.to_bootstrap_input()
-    independently rebuild (pts, p_start) from those raw fields — and
-    each one silently skipped the override, TWICE, before this was
-    pulled out into one place both call.
+    """(pts, p_start) with Scorer.score()'s own status override applied:
+    OUT_STATUSES forces p_start to 0, "doubt" halves pts. Scorer.score()
+    already applies this to score/flat but leaves Scored.pct_used/ppm
+    untouched by design — every other reader of (pts, p_start) must call
+    this rather than rebuild the pair from raw fields.
     """
     from ffcore.score import OUT_STATUSES, DOUBT_FACTOR
 
@@ -163,15 +110,9 @@ class PlayerDerived:
     pj: float = 0.0                # evidence count behind ppm
     start_p: float | None = None   # P(start), next jornada — status-adjusted
     market_exp: float | None = None  # expected points, next jornada = pts_now*start_p
-    # THE STATUS-ADJUSTED points-if-he-plays for the NEXT jornada only —
-    # ppm*fix with status_adjusted() already applied. Computed ONCE here,
-    # by build_profiles(); the ONLY other reader (to_bootstrap_input())
-    # reads this field directly rather than recomputing it — real
-    # elimination, not just tracking, of the duplicate that let a
-    # suspended player's override go missing in one of two independent
-    # copies (Miguel, 2026-09-13: "map which functions... produce which
-    # outputs and... just eliminat[e] those and rout[e] them through the
-    # standard function" — this field IS that route).
+    # Status-adjusted points-if-he-plays, next jornada only. Computed
+    # once here by build_profiles(); to_bootstrap_input() reads this
+    # field rather than recomputing it.
     pts_now: float | None = None
     scored: object = None          # the cached score.py Scored NamedTuple
 
@@ -194,29 +135,16 @@ class PlayerProfile:
     def to_bootstrap_input(self) -> tuple[tuple[float, float],
                                           tuple[float, float]]:
         """((pts, p_start) this jornada, (pts, p_start) every jornada
-        after) — the shape decide.py's base/base_rest dicts feed Bootstrap.
+        after) — the shape decide.py's base/base_rest dicts feed
+        Bootstrap.
 
-        THIS JORNADA READS derived.pts_now/derived.start_p DIRECTLY — a
-        real elimination, not just a fix: this function and
-        build_profiles()'s own market_exp/start_p used to each
-        independently rebuild the same status-adjusted (pts, p_start)
-        pair from raw ppm/fix/pct_used, and one of the two silently
-        skipped the override (Zaid Romero, suspended, kept reading his
-        full healthy rate here — see status_adjusted()'s own docstring
-        for the real case). Miguel, 2026-09-13, after the fix: "map which
-        functions... produce which outputs and... just eliminat[e] those
-        and rout[e] them through the standard function" — build_profiles()
-        is now the ONLY place that computes this; this function reads the
-        answer, it does not compute a second one.
+        This jornada reads derived.pts_now/derived.start_p directly —
+        build_profiles() is the only place that computes the
+        status-adjusted pair; do not recompute it here.
 
-        "REST OF SEASON" IS A GENUINELY DIFFERENT, NOT DUPLICATED, FACT —
-        computed here, nowhere else: ppm*fix with NO status override (a
-        one-match suspension clears; jornada 8 is not jornada 7) and
-        pct_rest instead of pct_used (P(start) shrunk toward neutral
-        rather than this week's status-tainted reading). Nothing else in
-        this repo needs this number, so there is nothing to eliminate —
-        only THIS JORNADA was ever computed twice.
-        Why: docs/notes/profile.md#to_bootstrap_input--reads-pts_now-does-not-recompute-it
+        Rest-of-season is a separate, deliberately unadjusted figure:
+        ppm*fix with no status override (a one-match ban doesn't carry
+        to jornada 8) and pct_rest instead of pct_used.
         """
         s = self.derived.scored
         if s is None:
@@ -228,21 +156,12 @@ class PlayerProfile:
 
 
 def _match_stats_history(rows) -> dict[str, dict[int, dict]]:
-    """{app_id: {week: {stat: (value, points)}}} from api_stats.csv's own
-    rows — real per-match data (mins played, goals, cards, marca_points),
-    currently 118 players / weeks 1-6, real but PARTIAL pool: it comes from
-    api_teams's embedded lastStats, which only ever carries a player who
-    has been on one of this league's 5 squads, the same limited-coverage
-    shape the bulk /players fix solved for identity — not solved here,
-    since api_stats has no bulk equivalent. Honest partial data, not full
-    pool, not silently claimed to be.
-
-    Keyed by `player_id` as api_stats.csv itself stores it — LaLiga's own
-    app_id (from playerMaster.id, sources.py's _stat_rows()), NOT the
-    futbolfantasy ff_id _perjornada_history() keys on. Two genuinely
-    different id spaces; build_profiles() joins each against the field
-    that actually matches it (PlayerIdentity.app_id here, not the
-    crosswalk key `k`).
+    """{app_id: {week: {stat: (value, points)}}} from api_stats.csv —
+    mins played/goals/cards/marca_points, PARTIAL pool (only players
+    who've been on one of this league's 5 squads; api_stats has no bulk
+    equivalent). Keyed by LaLiga's own app_id (playerMaster.id), NOT the
+    futbolfantasy ff_id _perjornada_history() uses — build_profiles()
+    joins each against PlayerIdentity.app_id, not the crosswalk key.
     """
     out: dict[str, dict[int, dict]] = {}
     for r in rows:
@@ -267,16 +186,9 @@ def _match_stats_history(rows) -> dict[str, dict[int, dict]]:
 
 def _opponent_history(match_rows) -> dict[str, dict[int, tuple]]:
     """{club: {jornada: (opponent_club, is_home)}} from matches.csv's own
-    rows — no date-matching needed, matches.csv already carries jornada,
-    home, and away directly.
-
-    Difficulty is NOT included here yet — that needs an elo-gap number,
-    and elo.csv keys clubs by their proper-case name ("Real Madrid"),
-    while matches.csv/the crosswalk's club_id use the lowercase slug
-    ("real-madrid"). decide.py already solves that exact mismatch for its
-    own forward-looking fixture difficulty (season_board(), club_key()) —
-    reusing that properly is the next step, not reinvented here without
-    being able to verify the join is right.
+    jornada/home/away columns. No difficulty yet — needs the elo.csv
+    proper-case-vs-slug join decide.py's season_board()/club_key()
+    already solve.
     """
     out: dict[str, dict[int, tuple]] = {}
     for r in match_rows:
@@ -322,37 +234,23 @@ def _perjornada_history(rows) -> dict[str, PlayerHistory]:
 def build_profiles(players: dict, sc, perjornada_rows,
                    xw=None, match_stats_rows=None, match_rows=None,
                    market_keyed: dict | None = None) -> dict[str, "PlayerProfile"]:
-    """{player key: PlayerProfile} for every player `load_players()` knows —
-    the full pool, no market/ownership gate at all.
+    """{player key: PlayerProfile} for every player `load_players()`
+    knows — the full pool, no market/ownership gate.
 
-    `sc.score(sc.row_for(k))` is the SAME call decide.load()'s own
-    "Everyone the market prices, scored the same way" loop already makes —
-    this does not add new scoring, it formalizes the existing one into a
-    typed record instead of three parallel dicts (`pos`, `market_exp`,
-    `start`).
+    `players` is ffcore.tidy.load_players()'s shape — {key: {name, team,
+    pos, value, delta_1d, start, status}}, no app_id/understat_id/
+    club_id. Those come from `xw` (a Crosswalk, e.g. lg.xw), keyed the
+    same way; `xw=None` degrades to blank identity fields rather than
+    guessing.
 
-    `players` is `ffcore.tidy.load_players()`'s own dict shape —
-    {key: {name, team, pos, value, delta_1d, start, status}} — which does
-    NOT carry app_id/understat_id/club_id despite the similar name to the
-    crosswalk. Those identity fields come from `xw` (ffcore.crosswalk's
-    Crosswalk, e.g. `lg.xw`), keyed the same way (`xw.players[key]`).
-    `xw=None` degrades to blank identity fields rather than guessing or
-    crashing — a player load_players() knows about that the crosswalk
-    hasn't resolved yet still gets a profile.
-
-    `market_keyed`, if given, is {key: {"listed":, "price":, "owner":,
+    `market_keyed`, if given: {key: {"listed":, "price":, "owner":,
     "value":, "clause":, "clause_until":, "route":, "bids":, "proceeds":}}
-    — the market/ownership/ledger facts decide.load() already computes
-    elsewhere (market_routes(), lg.owner, the teams/ledger feeds). Every
-    key but "listed" is optional per-entry; a missing one leaves the
-    matching PlayerCurrent field at its default (None). Optional as a
-    whole, too, so this stays testable without constructing a full
-    League/market for every case.
+    — decide.load()'s own market/ownership/ledger facts. Every key but
+    "listed" is optional; a missing one leaves the matching PlayerCurrent
+    field at its default (None).
 
-    `match_stats_rows`, if given, is api_stats.csv's own rows — real
-    per-match data (mins played, goals, cards) for whichever 118-ish
-    players have been on one of this league's squads, keyed by LaLiga's
-    own app_id (see _match_stats_history()), not the ff_id
+    `match_stats_rows`, if given, is api_stats.csv's rows, keyed by
+    LaLiga's app_id (see _match_stats_history()) — not the ff_id
     perjornada_rows joins on.
     """
     histories = _perjornada_history(perjornada_rows)
@@ -402,11 +300,8 @@ def build_profiles(players: dict, sc, perjornada_rows,
         )
         if s is not None:
             cur.status = s.status
-        # perjornada.csv's `ff_id` is futbolfantasy's own numeric id — a
-        # DIFFERENT space from ident.app_id (LaLiga's own). row_key()'s own
-        # convention makes the crosswalk key `k` itself that numeric id
-        # whenever a player's market row carried one, so `k` is the right
-        # lookup, not app_id.
+        # perjornada.csv's ff_id is a different id space from
+        # ident.app_id; `k` (row_key()'s convention) is the right lookup.
         hist = histories.get(k) or histories.get(norm(ident.name)) \
             or PlayerHistory()
         if ident.app_id in match_stats:
@@ -434,13 +329,8 @@ def _selftest() -> None:
             return _FakeScored(ppm=6.0, pj=12.0, pct_used=80.0, fix=1.1,
                                status="ok", pct_rest=60.0) if row else None
 
-    # `load_players()`'s REAL shape — {name, team, pos, value, delta_1d,
-    # start, status} — carries NO app_id/understat_id/club identity at all;
-    # that's what `xw` supplies, keyed the same way. Key "999" for the
-    # known player because row_key()'s own convention makes the crosswalk
-    # key itself the numeric ff_id whenever a market row carried one — the
-    # same key perjornada.csv's `ff_id` column uses, and the thing this
-    # test is specifically checking gets joined correctly.
+    # load_players()'s shape carries no identity fields; xw supplies
+    # those. "999" doubles as the ff_id perjornada.csv's own column uses.
     from ffcore.crosswalk import Player
 
     players = {"999": {"name": "Known Player", "pos": "DEL", "team": "betis"},
@@ -457,9 +347,8 @@ def _selftest() -> None:
         {"ff_id": "999", "player_name": "Known Player", "jornada": "2",
          "points_delta": "3", "games_delta": "1"},
     ]
-    # api_stats.csv is keyed by LaLiga's app_id ("app-999"), a DIFFERENT
-    # space from perjornada's ff_id ("999") — this is specifically testing
-    # that build_profiles() joins each source against the right field.
+    # api_stats.csv's app_id ("app-999") is a different space from
+    # perjornada's ff_id ("999") — checks each source joins its own field.
     match_stats = [
         {"player_id": "app-999", "week": "1", "stat": "goals",
          "value": "1", "points": "4"},
@@ -504,17 +393,8 @@ def _selftest() -> None:
     assert abs(this_j[0] - 6.6) < 1e-9 and abs(this_j[1] - 0.8) < 1e-9, this_j
     assert abs(rest[0] - 6.6) < 1e-9 and abs(rest[1] - 0.6) < 1e-9, rest
 
-    # SUSPENDED/INJURED/UNAVAILABLE and DOUBT: real bug, 2026-09-13
-    # (Miguel: "no booked player is playing so shouldn't they have 0% end
-    # odds to play next game?") — Zaid Romero, suspended, was reading a
-    # real start% and a real xPts/j for his NEXT match because
-    # to_bootstrap_input() used to independently rebuild pts from raw
-    # ppm*fix, silently ignoring the status Scorer.score() had already
-    # zeroed. Tested ONCE, here, through the real pipeline
-    # (build_profiles() -> to_bootstrap_input()) rather than twice against
-    # a hand-built PlayerProfile and again against build_profiles() — two
-    # near-identical fixtures were themselves the same duplication this
-    # session's fix eliminated in the code; one real path, one test of it.
+    # Suspended/injured/unavailable and doubt, through the real pipeline
+    # (build_profiles() -> to_bootstrap_input()).
     from ffcore.score import DOUBT_FACTOR
 
     class _StatusScorer(_FakeScorer):

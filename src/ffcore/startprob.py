@@ -314,31 +314,15 @@ def fit_start_fallbacks(lineups, starters, cut: str,
                         neutral_default: float = 60.0,
                         absent_default: float = 15.0, k: float = 8.0,
                         xw=None) -> tuple[float, float, str]:
-    """(neutral_pct, absent_pct, why) — score.py's NEUTRAL_START/
-    ABSENT_START, shrunk toward their own real historical accuracy
-    instead of held at a guess forever.
+    """(neutral_pct, absent_pct, why) — score.py's NEUTRAL_START/ABSENT_START,
+    shrunk toward real historical accuracy instead of held at a fixed guess.
 
-    Miguel, 2026-09-13: "shouldn't you include all these in your list and
-    improve on the approach?" — these two sat in score.py with no fitting
-    evidence at all, the same status HOME_EDGE had before being fit this
-    same session. Real, checked: `observations()`'s own `Obs.ff` is
-    EXACTLY `neutral_default/100` or `absent_default/100` whenever a row
-    used one of these fallbacks (see that function's own "fp = ..."
-    logic) — a free, exact way to bucket real historical observations by
-    which fallback the live scorer would have used, no new join needed.
-
-    2026-09-13 reading: of 12 real historical cases where a player was
-    NOT on the probable-XI page at all (the ABSENT_START case), ZERO
-    started at all — the 15% guess overstates it by a lot. Of 25 cases
-    ON the page with no percentage given (NEUTRAL_START), the real
-    started rate was 51%, somewhat below the 60% guess.
-
-    SHRUNK, NOT TAKEN RAW — n=12/n=25 is real but thin. Blended toward
-    the ORIGINAL guess with pseudo-count `k` (the same shrinkage shape
-    SHRINK_K already uses elsewhere in this repo, not a new invented
-    one): fitted = (k*default + n*observed) / (k+n). A genuinely wrong
-    guess (ABSENT_START) still moves a lot even shrunk this way; a small
-    real sample does not get to overturn the prior outright.
+    Buckets historical Obs by which fallback the live scorer would have
+    used (Obs.ff == neutral_default/100 or absent_default/100 exactly), then
+    blends the observed rate toward the original guess with pseudo-count
+    `k`: fitted = (k*default + n*observed) / (k+n) — same shrinkage shape as
+    SHRINK_K elsewhere in this repo, so a thin real sample can't overturn
+    the prior outright.
     Why: docs/notes/startprob.md#fit_start_fallbacks--why-a-fit-not-a-guess
     """
     obs = observations(lineups, starters, cut, neutral=neutral_default,

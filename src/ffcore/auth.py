@@ -1,27 +1,19 @@
 """
-auth.py — the bearer token for LaLiga's own API, and the one thing that can
-lose it.
+auth.py — the bearer token for LaLiga's own API, the only credential
+this repo holds (everything else reads public pages anonymously).
 
-The only module in this repo that holds a credential: everything else reads
-public pages anonymously.
+THE ROTATION TRAP: B2C issues a refresh token good for 90 days and
+ROTATES IT ON EVERY EXCHANGE — spend one and it dies, replacement in
+the response. Lose that and re-authenticating needs a human at a
+browser. So: the write is atomic (temp file, fsync, rename — a half-
+written token file is indistinguishable from no token file); the new
+token is written BEFORE the caller is handed anything, so a crash in
+the caller can't lose it; the file is 0600 and lives outside the repo
+(a credential must never be one `git add -A` away from a push).
 
-THE ROTATION TRAP is why this file is careful. B2C issues a refresh token good
-for 90 days and ROTATES IT ON EVERY EXCHANGE — spend one and it dies, with the
-replacement in the response. Lose that and re-authenticating needs a human at
-a browser. So:
-
-  * the write is atomic — temp file, fsync, rename — because a half-written
-    token file is indistinguishable from no token file, and costs a re-login;
-  * the new token is written BEFORE the caller is handed anything, so a crash
-    in the caller cannot lose it;
-  * the file is 0600 and lives outside the repo, because `git add -A data` is
-    in the daily job and a credential must never be one glob away from a push.
-
-The first token needs an interactive Facebook login, so it is a human job,
-once: `python -m ffcore.auth --login`.
-
-httpx is imported inside the fetching functions, so the test job can import
-this module without a network client.
+First token needs an interactive login, once: `python -m ffcore.auth
+--login`. httpx is imported inside the fetching functions so this
+module imports without a network client.
 """
 
 from __future__ import annotations
@@ -35,10 +27,9 @@ __all__ = ["TokenStore", "authorize_url", "TENANT",
            "CLIENT_ID", "SIGNIN_POLICY", "REDIRECT_URI", "API_BASE"]
 
 # --- the tenant -----------------------------------------------------------
-# Lifted from Externoak/LaLigaApp (GPL-3.0) src/services/authService.js and
-# then verified against the live tenant on 2026-08-18. Recorded here rather
-# than in a config file because they are not tuning knobs: change any one of
-# them and you are talking to a different product.
+# Not tuning knobs — change any one of these and you're talking to a
+# different product. Recorded here rather than in a config file for that
+# reason. Sourced from Externoak/LaLigaApp (GPL-3.0), verified live.
 TENANT = ("https://login.laliga.es/laligadspprob2c.onmicrosoft.com"
           "/oauth2/v2.0")
 CLIENT_ID = "af88bcff-1157-40a0-b579-030728aacf0b"   # public client, no secret

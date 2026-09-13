@@ -1,57 +1,29 @@
 """
-sources.py — what we collect, and how to read it. No network, no filesystem.
-
-This is the registry. One entry per page we fetch, and everything that entry
-needs to be useful lives on the entry itself:
+sources.py — the fetch registry: what we collect and how to parse it.
+No network, no filesystem; parsing only (fetching/files live in ingest.py).
 
     Source(key, table, url, parse, sign, cadence)
 
-    key      the page's filename inside a snapshot: "market", "team_celta"
-    table    which tidy table its rows land in
+    key      page filename inside a snapshot: "market", "team_celta"
+    table    tidy table its rows land in
     url      where to get it
     parse    (html, observed_at, key) -> list[dict]
     sign     (html) -> str | None   content signature; see below
-    cadence  "every_run" or "daily" — how often ingest sweeps it
+    cadence  "every_run" or "daily"
 
-Adding a source is one entry plus one parse function plus self-test cases. It
-is not a new script, a new workflow input, or a new output file to wire into
-the report. That is the point: the second probable-XI source is meant to cost
-one entry, and the third likewise.
+Adding a source is one entry, one parse function, self-test cases — not a
+new script or a new report wiring.
 
-WHY THIS FILE EXISTS. Three modules used to fetch and parse this site —
-ff_ingest.py, history.py and points.py — and two of them fetched the *same*
-points page ff_ingest already snapshots twice a day. They carried four
-different number parsers between them. history.py also imported httpx at
-module level, which is the one thing the test job cannot install, so importing
-it broke a machine that never intended to fetch anything. Parsing is pure and
-now lives here; fetching and files live in ingest.py; nothing here imports a
-network client, so the self-test runs with lxml alone.
+SIGNATURES: ingest stores a page only when its signature changed since last
+seen. `sign` hashes the PARSER'S INPUT SURFACE (every string a selector can
+reach: text, `href`, `img alt`) rather than the whole page (misses ~32% of
+real changes — noise like tickers and cache-busted URLs dominates) or only
+today's extracted fields (drops the ability to backfill a field added
+later, since an unextracted change would look like no change at all).
 
-SIGNATURES, and why they hash what they hash. ingest stores a page only when
-its signature changed since the last time we saw it, which is how a season of
-snapshots fits in a repo (see ingest.py). The signature is deliberately the
-PARSER'S INPUT SURFACE — every string the selectors below can reach: text,
-`href`, and `img alt`. Nothing else.
-
-Two rejected alternatives, both measured:
-
-  * Hashing the whole page drops 32% of fetches. The pages carry a news
-    ticker, transfer rumours, cache-busted asset URLs and forum comment
-    usernames, so 638 stored pages were byte-distinct — every one of them.
-  * Hashing only the fields we extract today drops 87%, and is wrong. Raw is
-    kept forever precisely so that a field we did not extract can be
-    recovered by fixing `parse` and re-running over history. Key on extracted
-    fields and that promise quietly becomes false: the page that first
-    carried the new field was thrown away for looking unchanged.
-
-The input surface drops 59%, which is the honest middle. It preserves any
-change to content the selectors reach whether we read it yet or not, and
-ignores only what no parser can ever see.
-
-`sign` returns None when its selectors match NOTHING. That is the selector-rot
-case, and it is the one time deduplication must not happen — a rotted page
-looks identical to the last rotted page. ingest stores those unconditionally
-and warns.
+`sign` returns None when its selectors match nothing at all (selector rot).
+That page is stored unconditionally and ingest warns — a rotted page looks
+identical to the last rotted page, so dedup must not apply.
 """
 
 from __future__ import annotations
@@ -219,25 +191,20 @@ def _name_from_blob(text: str) -> tuple[str | None, int | None]:
     return (head or None), None
 
 
-# CLASSES LIE HERE. `elemento lesionado elemento_jugador` is the generic class
-# on every tile of the pitch graphic — the containers are literally called
-# `jugadores-titulares-22421 mod lesionados`, and Barcelona alone carries 40 of
-# them. Reading it as an injury marker flags the whole squad.
-#
-# The real signal is the "Estado físico de la plantilla" panel, and the STATE
-# comes from the icon's alt text, not from any class:
+# CLASSES LIE HERE. `elemento lesionado elemento_jugador` is the generic
+# class on every pitch-graphic tile (e.g. `jugadores-titulares-22421 mod
+# lesionados`) — reading it as an injury marker flags the whole squad. The
+# real signal is the "Estado físico de la plantilla" panel's icon alt text:
 #
 #   .lesionados_wrapper section.mod.lesionados > .elemento   alt=Lesionado
 #                                                            alt=Duda
 #                                                            alt=Tocado
 #
-# Suspensions live in `section.mod.sancionados`, but that class is reused by a
-# transfer-listing box (`.mercado-box`) holding 214 elements league-wide, none
-# of them suspended. Excluding it is not optional.
+# Suspensions live in `section.mod.sancionados`, but that class is also used
+# by an unrelated transfer-listing box (`.mercado-box`) — must be excluded.
 #
-# `Tocado` is a knock the site still lists as available. It is folded into
-# `doubt` rather than given a state of its own: the decision it should drive —
-# think twice before fielding him — is the same one.
+# `Tocado` (knock, still listed as available) folds into `doubt`: both call
+# for the same "think twice before fielding him" decision.
 
 FITNESS_ALT = {
     "lesionado": "injured",
@@ -467,21 +434,14 @@ def _points_id(tr) -> str:
 def parse_points(html: str, observed_at: str = "", key: str = "points") -> list[dict]:
     """Total points, matches played and average per player.
 
-    The table has no position column — positions come from market.csv at
-    report time. The player cell holds two names, the full one and the short
-    display form; both are kept, for display and for the rows that predate
-    the id.
+    No position column here — positions come from market.csv at report
+    time. The player cell holds a full name and a short display form; both
+    are kept.
 
-    THE ID IS ON THE ROW, in the click handler rather than a data-* attribute:
-    onclick="openPlayerPointsStats(63, 'Koke Resurrección', ...)". It is the
-    same namespace as the market page's data-id — on the 2026-08-20 sweep 266
-    of 274 ids appear in the market and every one agrees about the name — so
-    the season's points history joins on an identifier instead of on "the
-    only join key this site gives us", which it was not.
-
-    Numbers go through ffcore.parse.ratio, imported lazily so this module
-    stays importable from anywhere: it used to have a fourth private copy of
-    a float parser.
+    The id is in the row's onclick handler, not a data-* attribute:
+    onclick="openPlayerPointsStats(63, 'Koke Resurrección', ...)" — the
+    same id space as the market page's data-id, so points history joins on
+    a real identifier rather than on name alone.
     """
     from ffcore.parse import ratio
 
@@ -558,22 +518,15 @@ MARKET_SURFACE_RE = re.compile(
 # what a parser is made of — so a cache only dies when its own parser changes
 # ---------------------------------------------------------------------------
 #
-# ingest keeps every document's parsed rows between runs, keyed on the content
-# of the page, and threw the WHOLE cache away whenever this file changed. That
-# is correct and far too broad: touching one parser re-parses four hundred
-# documents through the other twenty, and a rebuild is forty seconds. Editing
-# a fixture string did it too.
+# ingest caches parsed rows per document, keyed on the page content. Keying
+# the invalidation on "this whole file changed" would re-parse every source
+# whenever any one parser (or fixture) did. Instead a document's cache key
+# carries the fingerprint of just the parser it needs: that function's
+# source plus every top-level name it references, transitively (helpers,
+# constants, regexes). This module imports nothing from the repo, so that
+# closure is the whole of what a parse can depend on.
 #
-# So a document's cache key carries the fingerprint of the parser that will
-# read it, and nothing else in this file can invalidate it. The fingerprint is
-# the function's own source plus the source of every top-level name it reaches,
-# transitively — its helpers, its constants, its regexes. This module imports
-# nothing from the repo (see the header: it self-tests with lxml alone), so
-# that closure is the whole of what a parse can depend on here, and the
-# exposure to a change in lxml itself is exactly what it was before.
-#
-# A name that cannot be found is not a reason to guess: `parser_sig` falls
-# back to the digest of the entire file, which is what it always used.
+# A name `parser_sig` can't find falls back to hashing the whole file.
 
 
 _DEFS: dict[int, dict] = {}
@@ -582,10 +535,9 @@ _DEFS: dict[int, dict] = {}
 def _defs(source: str) -> dict[str, tuple[str, set]]:
     """{top-level name: (its source text, the top-level names it references)}.
 
-    ONE PASS AND ONE MEMO. This file is 2,400 lines and every parser in the
-    registry wants the same map; building it per parser, and re-parsing each
-    definition to walk it, put six seconds into a run that has one second of
-    parsing to do.
+    Built once and memoised — every parser in the registry wants this map,
+    and rebuilding it per parser is real, avoidable cost over a file this
+    size.
     """
     import ast
 
@@ -593,9 +545,8 @@ def _defs(source: str) -> dict[str, tuple[str, set]]:
     if hit is not None:
         return hit
     tree = ast.parse(source)
-    # Sliced off a list split ONCE. ast.get_source_segment re-splits the whole
-    # file per node, which over 2,400 lines and two hundred definitions was
-    # most of the cost of building this map.
+    # Line-sliced once rather than via ast.get_source_segment (which
+    # re-splits the whole file per node) — real cost at this file's size.
     lines = source.splitlines()
     bodies: dict[str, list] = {}
     text: dict[str, str] = {}
@@ -936,24 +887,20 @@ def sign_points(html: str) -> str | None:
 # who actually started — the outcome every probable-XI source is guessing at
 # ---------------------------------------------------------------------------
 #
-# The ground truth that grades both probable-XI sources: the calendar says
-# which matches were played, each played match page carries the confirmed
-# elevens.
+# Ground truth for grading both probable-XI sources: the calendar says which
+# matches were played; each played match page carries the confirmed elevens.
 #
-# THIS SITE AND NOT FBref, because the outcome rows carry the same
-# /jugadores/<slug> ids as the probable-XI pages, so the join needs no name
-# resolution — the step that would have dropped exactly the hard spellings
-# ("U. Núñez", "El Hilali"). FBref is also behind a Cloudflare challenge.
-# robots.txt checked 2026-08-16: "User-agent: *", empty Disallow.
+# THIS SITE, NOT FBref: outcome rows carry the same /jugadores/<slug> ids as
+# the probable-XI pages, so the join needs no name resolution. FBref sits
+# behind a Cloudflare challenge; robots.txt here allows all.
 #
-# PAGE SHAPE: .stats-local / .stats-visitante, each one table.tablestats whose
-# tbody alternates a player row (tr.plegado.plegable, name in td.name) with a
-# detail row (tr.desglose) holding the only link to the player. A tr.header
-# "Suplentes" splits eleven from bench. An UNPLAYED match has no table at all,
-# which is why the calendar's score is the gate: no score, no request.
+# PAGE SHAPE: .stats-local / .stats-visitante, each one table.tablestats
+# whose tbody alternates a player row (tr.plegado.plegable, name in
+# td.name) with a detail row (tr.desglose, the only link to the player). A
+# tr.header "Suplentes" splits eleven from bench. An unplayed match has no
+# table at all — the calendar's score is the fetch gate.
 #
-# Fetched ONCE ever. A confirmed eleven does not change after kickoff, and
-# re-reading it for live stats we do not parse would cost 380 requests a day.
+# Fetched once ever: a confirmed eleven never changes after kickoff.
 
 CAL_KEY = "calendario"
 FF_CAL_URL = f"{BASE}/laliga/calendario"
@@ -973,23 +920,16 @@ MATCH_SIDES = (".stats-local", ".stats-visitante")   # home, away, in that order
 MATCH_SUBS_HEADER = "Suplentes"
 # The minute a player left the pitch, printed in the same cell as his name.
 MATCH_MINUTE_RE = re.compile(r"\s*\d+\s*'\s*$")
-# The same marker, captured rather than deleted. What it MEANS depends on
-# `role`, and nothing in this module interprets that — it only carries the
-# number off the page: on a starter's row it is the minute he was
-# substituted OFF (blank means he played the whole match); on a sub's row it
-# is the minute he came ON (blank means an unused substitute, zero minutes).
-# Checked against a raw snapshot (match_22422-atletico-malaga,
-# 2026-08-20T0651Z) rather than assumed: every starter or sub missing the
-# marker was exactly the one who played start-to-finish or not at all.
+# Captured, not just stripped — meaning depends on `role`: on a starter's
+# row it's the minute subbed OFF (blank = played full match); on a sub's
+# row it's the minute he came ON (blank = unused, zero minutes).
 MATCH_MINUTE_CAPTURE_RE = re.compile(r"(\d+)\s*'\s*$")
-# The match paths shorten exactly one club: /partidos/…-rayo-…, whose team page
-# is /laliga/equipos/rayo-vallecano. Without this alias his 38 matches — a
-# tenth of the season — split into nothing and vanish. Every other club spells
-# the same in both places, checked against the whole 2026-27 calendar.
+# Match paths shorten one club: /partidos/…-rayo-… vs. team page
+# /laliga/equipos/rayo-vallecano. Every other club spells the same both
+# places.
 MATCH_ALIASES = {"rayo": "rayo-vallecano"}
-# A confirmed eleven is eleven. Fewer means the page was caught half-rendered
-# or the markup moved, and a nine-man "eleven" would quietly bias every hit
-# rate computed from it downwards.
+# Fewer than 11 means the page was caught half-rendered or markup moved —
+# not a real confirmed eleven.
 XI_SIZE = 11
 
 
@@ -1159,40 +1099,28 @@ def played_sources(cal_html: str, observed_at: str = "") -> list[Source]:
 # Club Elo — how strong a team actually is, rather than how expensive
 # ---------------------------------------------------------------------------
 #
-# The fixture term used summed squad value, a poor proxy twice over: a
-# promoted side that spends is not thereby good, and one 100M signing moves
-# the whole total. Elo is fitted on results, free, and published daily.
+# Squad value is a poor strength proxy (a promoted side that spends isn't
+# thereby good; one signing moves the whole total). Elo is fitted on
+# results, free, published daily.
 #
-# NOT AN HTML TABLE, so nothing lxml-shaped may touch it — the country page
-# embeds its ranking chart as a Vega-Lite spec, and the clubs are records in
-# that spec's `datasets` with their federation and division on the record.
-# That is a structured read, not a scrape of the rendered table beside it:
-# a moved column cannot silently become a rating, and a renamed key yields
-# nothing, which is the rot signal.
+# NOT AN HTML TABLE: the country page embeds its ranking chart as a
+# Vega-Lite spec; clubs are records in that spec's `datasets`. A structured
+# read, not a scrape of the rendered table — a moved column can't silently
+# become a rating, and a renamed key yields nothing (the rot signal).
 #
-# ROBOTS: clubelo.com serves none (the path 302s away). One request a day.
+# ROBOTS: clubelo.com allows all. One request a day.
 #
-# THE CSV API DIED WITH ITS HOST, 2026-08-17. `api.clubelo.com` still resolves
-# to 37.128.134.74 and answers on neither 80 nor 443, from a home network and
-# from a GitHub runner alike, while the SITE moved to a new one — clubelo.com
-# now resolves into Cloudflare in front of an ondigitalocean.app, serves
-# current ratings, and 302s `/API`, `/api/<date>` and `/<date>` to its
-# homepage. There is no CSV endpoint on the new host to move to, so this reads
-# the country page the site does publish. It cost two days of a fixture board
-# ranked on pre-jornada ratings to notice, because a failed fetch leaves the
-# last rows in place and every one of them still joins — see load_elo(), which
-# now refuses a reading older than the cadence allows.
+# THE CSV API IS DEAD (api.clubelo.com resolves but answers on neither port);
+# the site moved to a new host with no CSV endpoint, so this reads the
+# country page instead. load_elo() refuses a reading older than the cadence
+# allows, since a failed fetch otherwise leaves stale rows that still join.
 ELO_SOURCE = "clubelo"
 ELO_URL = "https://clubelo.com/ESP"
 ELO_COUNTRY = "ESP"
 ELO_LEVEL = "1"
-# The record shape, checked rather than assumed. `FedURL` and not `Federation`
-# because it is the same three-letter code the old CSV filtered on, and a code
-# does not get translated.
 ELO_COLS = ("Name", "Elo", "FedURL", "Level")
-# What the chart data is assigned to. The page carries exactly one of these;
-# every one found is read, so a second chart is a second source of clubs and
-# not a reason for the first to be missed.
+# What the chart data is assigned to — every match read, so a second chart
+# adds clubs rather than replacing the first.
 ELO_MARK = "var vegaJson ="
 
 
@@ -1260,35 +1188,23 @@ def sign_elo(text: str) -> str | None:
 # football-data.co.uk — real match results, team-level, free
 # ---------------------------------------------------------------------------
 #
-# WHAT THIS ADDS. Every strength signal in this repo so far is either squad
-# value (a wealth proxy) or Club Elo (one scalar, and its historical archive
-# died with its host on 2026-08-17 — see the note above ELO_SOURCE). Neither
-# can say a clean sheet is opponent-DEFENSE-driven while a goal is opponent-
-# DEFENSE-driven the other way; fixture.py has wanted that split since it was
-# written. football-data.co.uk publishes real match results — goals, shots,
-# shots on target, corners — for every La Liga season back to 1993-94, as
-# one flat CSV per season, free, no auth, no scraping fragility (it is a
-# file download, not a page to parse for structure). THIS SEASON'S file
-# also carries HxG/AxG (expected goals) — checked live, 2026-08-20: new to
-# the site with 2026-27, not backfilled onto 2025-26's completed file.
+# Neither squad value nor Club Elo (one scalar) can split a clean sheet
+# (opponent-attack-driven) from a goal (opponent-defense-driven).
+# football-data.co.uk publishes real results — goals, shots, shots on
+# target, corners — per season since 1993-94 as one flat CSV, free, no
+# scraping fragility. The current season's file also carries HxG/AxG
+# (expected goals); not backfilled onto completed seasons.
 #
-# TWENTY NAMES, NOT SIX HUNDRED. This is team-level, not player-level: the
-# whole join is twenty club spellings against this repo's own twenty slugs,
-# solved the same way ELO_ALIASES already is two sections up — match_team()
-# first, a named alias only when that ordinary join fails.
+# Team-level, twenty names: the join is twenty club spellings against this
+# repo's own twenty slugs, same pattern as ELO_ALIASES — match_team() first,
+# a named alias only when that ordinary join fails.
 FD_BASE = "https://www.football-data.co.uk"
 FD_URL = FD_BASE + "/mmz4281/{season}/SP1.csv"
 FD_SOURCE = "football-data"
 
-# Consulted only after match_team()'s ordinary join has failed, same rule as
-# ELO_ALIASES — an alias must never shadow a name that matched on its own —
-# but the OPPOSITE direction: ELO_ALIASES goes from this repo's own name to
-# the other site's spelling, because elo_strength() starts from OUR teams.
-# Here the input is football-data's name (from its own CSV row) and the
-# answer has to be OUR slug, so this is keyed by THEIRS, normalised.
-# Checked against a live pull of the 2025-26 season (20 of 20 clubs) plus
-# 2026-27's first weeks, 2026-08-20 — every current-season club resolves via
-# one of the two.
+# Consulted only after match_team()'s ordinary join fails. Keyed by THEIR
+# name (opposite direction from ELO_ALIASES, which starts from our teams),
+# since the input here is football-data's own CSV spelling.
 FD_ALIASES = {
     "ath bilbao": "athletic", "ath madrid": "atletico",
     "espanol": "espanyol", "sociedad": "real-sociedad",
@@ -1296,17 +1212,12 @@ FD_ALIASES = {
     "santander": "racing",
 }
 
-# How many COMPLETED seasons behind the current one to backfill, once. Not a
-# promise every one of this season's clubs played top flight in all of them
-# — a promoted side's earlier seasons here are simply absent, a fact about
-# its history rather than a join failure.
+# Completed seasons to backfill, once. A promoted side's earlier seasons
+# here are simply absent — a fact about its history, not a join failure.
 FD_SEASONS_BACK = 3
 
-# The columns this repo reads. Checked live, 2026-08-20: HxG/AxG (expected
-# goals) exist on the CURRENT season's file (2026-27) only — 2025-26's
-# completed-season file has no such column at all, so this is new to the
-# site rather than backfilled. A season without it gets "" rather than a
-# guess — nothing here estimates a number the page does not state.
+# HxG/AxG exist only on the current season's file, not completed ones. A
+# season without them gets "" — never a guess.
 FD_FIELDS = ("FTHG", "FTAG", "HxG", "AxG", "HS", "AS", "HST", "AST",
             "HC", "AC")
 
@@ -1364,11 +1275,9 @@ def _fd_date(raw: str) -> str:
 def _fd_match_team(side: str, teams) -> str | None:
     """Exact then substring, over this repo's own twenty slugs.
 
-    A SMALL COPY of ffcore.fixture.match_team's rule, not an import of it:
-    that module pulls in ffcore.tidy, and sources.py stays pure so it can
-    self-test with lxml and nothing else — the same reason ffcore.auth's
-    credential handling stays out of it. Two functions, one small rule; see
-    ffcore.fixture.match_team's own docstring for the rule itself.
+    A small copy of ffcore.fixture.match_team's rule, not an import — that
+    module pulls in ffcore.tidy, and this file stays dependency-free so it
+    self-tests with lxml alone.
     """
     q = norm(side)
     if not q:
@@ -1450,15 +1359,10 @@ def sign_fd_results(text: str) -> str | None:
 # no fetch, never a broken request" rule the league bearer token already
 # follows for auth=True sources.
 #
-# COST: the-odds-api.com's free tier is 500 credits/month; one call here
-# costs a handful (measured live 2026-09-06: 6, one `regions`x`markets`
-# combination, covers every upcoming La Liga match in that one request
-# regardless of match count) — the exact number moves with how many
-# regions/markets are requested, not with how many matches come back.
-# "daily"
-# cadence, like Elo — odds move throughout a matchday but a forecasting
-# input that isn't wired into any live number yet doesn't need finer than
-# that, and it keeps monthly usage far under budget even with reruns.
+# COST: the-odds-api.com's free tier is 500 credits/month; one call covers
+# every upcoming match regardless of match count, cost scaling with
+# regions/markets requested, not matches returned. "daily" cadence, like
+# Elo — not wired into any live number yet, so finer isn't needed.
 ODDS_URL = ("https://api.the-odds-api.com/v4/sports/soccer_spain_la_liga"
            "/odds/?apiKey={odds_key}&regions=eu&markets=h2h"
            "&oddsFormat=decimal")
@@ -1554,23 +1458,15 @@ def sign_odds(text: str) -> str | None:
         r["p_home"], r["p_draw"], r["p_away"]) for r in rows])
 
 
-# PLAYER-LEVEL xG/xA — the "skill" side of the signal/noise split raw points
-# cannot give on its own: a shot on target scores or doesn't on a coin a
-# player's own quality only partly loads, while xG scores the CHANCE, not
-# whether it went in. Team-level xG already exists here (football-data.co.uk,
-# above) for fixture strength; this is the same idea at the grain a rating
-# actually needs it.
+# PLAYER-LEVEL xG/xA — the "skill" side of what raw points can't separate
+# from luck: xG scores the chance, not whether it went in. Team-level xG
+# already exists here (football-data.co.uk, above) for fixture strength;
+# this is the same idea at player grain.
 #
-# VERIFIED DIRECTLY, NOT ASSUMED FROM AN OLD SCRAPING WRITE-UP. The
-# well-known "playersData embedded in a <script> tag" pattern other guides
-# describe is gone from the page as served in 2026 — this repo's own fetch
-# of the league page confirmed no such variable exists any more. What the
-# page's own JS actually calls (league.min.js) is
-# POST main/getPlayersStats/ with {league, season} form data, confirmed by
-# curling that exact endpoint and reading real rows back (600 players for a
-# completed season, id/name/games/time/goals/xG/assists/xA/npxG among them).
-# The GET form of the same URL was tried too and answers an error — this is
-# the one source in this repo that needs `Source.body` at all.
+# The documented "playersData in a <script> tag" scrape pattern no longer
+# exists on the page. The real endpoint (confirmed live) is POST
+# main/getPlayersStats/ with {league, season} form data — GET on the same
+# URL errors. This is the one source that needs `Source.body`.
 UNDERSTAT_URL = "https://understat.com/main/getPlayersStats/"
 UNDERSTAT_SOURCE = "understat"
 UNDERSTAT_LEAGUE = "La_liga"
@@ -1618,18 +1514,13 @@ def parse_understat_players(text: str, observed_at: str,
                             key: str = "understat_2026") -> list[dict]:
     """One row per player, this source's own season totals.
 
-    THE CLUB RESOLVED TO THIS REPO'S OWN SLUG, same matcher football-data.co.
-    uk's team names already go through (`_fd_match_team`) — not a second
-    aliasing scheme for a third source to drift out of step with the other
-    two. Unresolved is kept, not dropped: a team_title this repo cannot
-    place still says something real about the player, the way an
-    unresolved football-data.co.uk side does.
+    Club resolved to this repo's own slug via the same `_fd_match_team`
+    matcher football-data.co.uk's team names use — unresolved is kept, not
+    dropped, since a team_title this repo can't place still says something
+    real about the player.
 
-    Understat's OWN numeric id is carried through as `understat_id` — a
-    fourth identity space this repo's crosswalk does not yet bridge to the
-    other three. Deliberately not resolved here: `sources.py` stays pure,
-    with no crosswalk import, the same reason `_fd_match_team` is a small
-    copy of `ffcore.fixture.match_team`'s rule rather than an import of it.
+    Understat's own numeric id passes through as `understat_id`, unresolved
+    against the crosswalk (this file stays dependency-free).
     """
     m = re.match(r"^understat_(\d{4})$", key)
     season = m.group(1) if m else ""
@@ -1698,35 +1589,22 @@ API_MARKET_URL = "{base}/v1/competition/1/league/{league}/market?x-lang=es"
 API_ACTIVITY_URL = ("{base}/v1/competition/1/leagues/{league}"
                     "/activity/{page}?x-lang=es")
 API_TEAMS_URL = "{base}/v1/competition/1/leagues/{league}/teams?x-lang=es"
-# THE ELEVEN YOU HAVE ACTUALLY FIELDED, which this repo believed the app did
-# not publish. It does, and the belief cost a whole hand-maintained file: a
-# checklist in inputs/lineup.txt that goes one short every time you sell
-# somebody out of your eleven, and a report that read the hole as a formation
-# change. Found 2026-08-19 by asking for it in the right shape — note it hangs
-# off /teams/{team}, NOT /leagues/{league}/teams/{team}, which is why ten
-# guesses under the league path all came back 404.
+# THE ELEVEN YOU'VE ACTUALLY FIELDED. Hangs off /teams/{team}, NOT
+# /leagues/{league}/teams/{team}.
 API_LINEUP_URL = ("{base}/v1/competition/1/teams/{team}"
                   "/lineup/week/{week}?x-lang=es")
-# THE LAST ROUND OF THE SEASON, and asking for it is deliberate. Any round
-# not yet played answers with the lineup standing NOW — verified 2026-08-19,
-# weeks 2, 5 and 38 returned byte-identical elevens and the same
-# teamSnapshotTookOn, while 39 is a 404. So asking for 38 needs no idea of
-# which round is current, and cannot quietly start reading a PAST lineup the
-# way a derived week can when a calendar page lags. On the final round it is
-# the current round, which is still the right answer.
+# The last round of the season — deliberate. Any unplayed round answers
+# with the CURRENT lineup (verified: weeks 2, 5, 38 were byte-identical),
+# so this needs no idea which round is current and can't read a stale one.
 LINEUP_WEEK = 38
 
-# The feed's verbs, decoded 2026-08-18 by checking each against the squad it
-# should have produced: of five type-31 rows, four were still in the squad
-# (the fifth was later sold); of five type-33, NONE were. A 9 is a manager
-# joining — there were exactly five, one per manager.
-# Tables whose rows are IMMUTABLE FACTS, keyed by an id that never changes.
-#
-# Most tidy tables are time series: a market value, a buyout clause and a bid
-# count all move, and a row per sweep is the point of them. These two are not.
-# A transfer that happened on 15 August is the same row in every sweep since,
-# and a player id has one name for ever — so the feed hands back its whole
-# history every time we ask, and the store was keeping every copy of it.
+# The feed's verbs, decoded by checking each against the squad it should
+# have produced: type-31 is a squad member (checked against current
+# ownership), type-33 isn't, 9 is a manager joining.
+# Tables whose rows are IMMUTABLE FACTS, keyed by an id that never changes
+# — unlike most tidy tables (time series: value/clause/bids all move), a
+# transfer or a player id never does, so the feed's whole history is kept
+# rather than one row per sweep.
 #
 # That is quadratic, not merely untidy. Each sweep rewrites the file with one
 # more copy of everything and the run commits it: api_activity.csv went from
@@ -1769,14 +1647,11 @@ STORE_ONCE = {"api_activity": ("activity_id",),
 ROW_TABLE = "table"
 
 ACT_JOINED, ACT_BUY, ACT_SELL = 9, 31, 33
-# The per-jornada performance prize — confirmed empirically (2026-09-12) at
-# a flat 100,000/point, same rate for every manager regardless of standing.
-# ACT_BONUS_ZERO is the same event shape with the `amount` key dropped
-# instead of set to 0, for a jornada where the manager scored zero points.
-# NOT the same thing as the daily "watch a video" bonus, which is a private,
-# per-manager habit this feed carries no trace of at all — seen or not, it
-# stays outside this reconstruction. Why:
-# docs/notes/league.md#the-weekly-performance-bonus-vs-the-video-bonus
+# The per-jornada performance prize, flat 100,000/point for every manager.
+# ACT_BONUS_ZERO is the same event with `amount` dropped rather than 0, for
+# a zero-point jornada. NOT the daily "watch a video" bonus, which this
+# feed carries no trace of at all.
+# Why: docs/notes/league.md#the-weekly-performance-bonus-vs-the-video-bonus
 ACT_BONUS, ACT_BONUS_ZERO = 6, 7
 ACT_KIND = {ACT_JOINED: "joined", ACT_BUY: "buy", ACT_SELL: "sell",
            ACT_BONUS: "bonus", ACT_BONUS_ZERO: "bonus"}
@@ -1834,14 +1709,9 @@ def parse_api_market(text: str, observed_at: str,
                      key: str = "api_market") -> list[dict]:
     """Everything on offer in this league right now.
 
-    Two kinds of row, and the difference matters: `marketPlayerLeague` is the
-    app dealing a free agent, `marketPlayerTeam` is a manager listing one of
-    his own. The OCR slate only ever saw the first kind and only as many as
-    fitted on a screenshot — the live feed carried 41 rows the day this was
-    written, 13 of them app-dealt and 28 listed by managers.
-
-    `numberOfBids` is the genuinely new thing. Nothing else in this repo can
-    see how many people are already bidding on a player.
+    Two kinds of row: `marketPlayerLeague` (app dealing a free agent) vs.
+    `marketPlayerTeam` (a manager listing his own) — the difference matters
+    downstream (route_kind()).
     """
     d = _j(text)
     if not isinstance(d, list):
@@ -1863,38 +1733,26 @@ def parse_api_market(text: str, observed_at: str,
             "position_id": str(pm.get("positionId") or ""),
             "sale_price": str(it.get("salePrice") or ""),
             "market_value": str(pm.get("marketValue") or ""),
-            # HOW MANY PEOPLE ARE ALREADY BIDDING — under whichever name this
-            # kind of row uses for it. The app dealing a free agent calls it
-            # `numberOfBids`; a manager listing one of his own calls it
-            # `numberOfOffers` and carries no numberOfBids at all. Reading
-            # only the first left 28 of 41 rows saying "nobody knows" about
-            # the one number this feed exists to supply. Empty still means NOT
-            # STATED; "0" means listed with nobody bidding, a different fact.
+            # Bid count uses different keys per row kind: app-dealt uses
+            # numberOfBids, manager-listed uses numberOfOffers (no
+            # numberOfBids at all). Empty = not stated; "0" = listed, no bids.
             "bids": next((str(it[k]) for k in ("numberOfBids", "numberOfOffers")
                           if it.get(k) is not None), ""),
             "seller": it.get("discr") or "",
             "status": it.get("status") or "",
-            # The app's own fitness, as on the squad rows. `status` above is
-            # the LISTING's state (on_sale); this is the player's.
+            # The player's own fitness — `status` above is the LISTING's
+            # state (on_sale), this is the player's.
             "player_status": pm.get("playerStatus") or "",
-            # SHIELDED MEANS THE CLAUSE CANNOT BE PAID. The lock already
-            # taught this repo that a clause you cannot pay is not a price and
-            # cost a whole report of unbuyable recommendations; this is the
-            # other way it can be unpayable. Only manager-listed rows carry
-            # it, and every one seen so far is false — so it is stored, and
-            # nothing acts on it until a true has actually been observed.
+            # A clause the player's own team has shielded (unpayable),
+            # separate from a time-locked one. Only manager-listed rows
+            # carry it.
             "shielded": "" if (it.get("playerTeam") or {}).get("isShielded")
                               is None else
                         str((it["playerTeam"]["isShielded"])).lower(),
             "expires_at": it.get("expirationDate") or "",
-            # A BID YOU HAVE ALREADY MADE rides along on the listing itself
-            # — the app hands it back embedded, no separate call, and the
-            # Electron client leans on exactly this to know its own pending
-            # bids without a second endpoint (Externoak/LaLigaApp
-            # BidFlow.js: "This is a bid made by the current user, since it
-            # appears in their market data"). Empty means no bid of yours is
-            # in on this listing, not "unknown" — the field is always
-            # present in the response, absent means absent.
+            # A bid you've already made rides on the listing itself, no
+            # separate call — empty means no bid of yours on this listing,
+            # not "unknown" (the field is always present).
             "bid_id": str((it.get("bid") or {}).get("id") or ""),
             "bid_money": str((it.get("bid") or {}).get("money") or ""),
             "bid_status": (it.get("bid") or {}).get("status") or "",
@@ -1903,12 +1761,9 @@ def parse_api_market(text: str, observed_at: str,
 
 
 def sign_api_market(text: str) -> str | None:
-    # The slate turns over on a clock and prices move; both belong in the
-    # signature, and expirationDate deliberately does NOT — it ticks down
-    # continuously and would store a fresh archive every single sweep.
-    # bid_status is in too: a bid of yours going pending -> accepted/rejected
-    # does not always move the count or the price on the listing it happened
-    # on, and that transition is the one this exists to notice.
+    # expirationDate deliberately excluded — it ticks down continuously and
+    # would store a fresh archive every sweep. bid_status is included: a
+    # bid going pending -> accepted/rejected doesn't always move price/bids.
     return _digest(["%s@%s/%s/%s" % (r["player_id"], r["sale_price"],
                                      r["bids"], r["bid_status"])
                     for r in parse_api_market(text, "")])
@@ -1965,13 +1820,11 @@ def parse_api_teams(text: str, observed_at: str,
                     key: str = "api_teams") -> list[dict]:
     """Every squad in the league, as the app holds it — one row per player.
 
-    This is ownership without a replay: no ledger, no starting roster, no
-    accumulated drift. It also carries each manager's points and position.
+    Ownership without a replay: no ledger, no starting roster, no
+    accumulated drift. Also carries each manager's points and position.
 
-    ONE THING IT WILL NOT TELL YOU: `teamMoney` is null for everyone but you.
-    Rivals' cash stays an estimate and `inputs/cash.txt` keeps its job — the
-    `~` in the reports is still honest. Verified 2026-08-18: of five teams,
-    only the account's own carried a balance.
+    `teamMoney` is null for everyone but the account's own — rivals' cash
+    stays an estimate.
     """
     d = _j(text)
     if not isinstance(d, list):
@@ -1979,12 +1832,8 @@ def parse_api_teams(text: str, observed_at: str,
     rows = []
     for t in d:
         m = t.get("manager") or {}
-        # THE LEAGUE TABLE IS A FACT ABOUT A TEAM, and it used to ride on
-        # every player row: five managers' position, points and balance
-        # repeated 76 times a sweep, 27% of the bytes in the file. Wrong grain
-        # as much as wasteful — a season of standings was buried in a
-        # player-grain table and could not be read without deduplicating it.
-        # A team with no players is still a row here.
+        # The league table is a fact about a TEAM, not repeated per player —
+        # a team with no players is still a row here.
         if t.get("id"):
             rows.append({
                 "observed_at": observed_at, "source": LFG_SOURCE,
@@ -1998,13 +1847,12 @@ def parse_api_teams(text: str, observed_at: str,
                 "previous_position": str(t.get("previousPosition") or ""),
                 "team_points": str(t.get("teamPoints") or ""),
                 "fixture_points": str(t.get("fixturePoints") or ""),
-                # The app's own valuation of the squad, against the one this
-                # repo sums out of market prices. Two answers to one question
-                # is a check, as long as nobody quietly averages them.
+                # The app's own squad valuation, vs. this repo's own sum of
+                # market prices — a check, not something to average with it.
                 "team_value": str(t.get("teamValue") or ""),
-                # Empty for everyone but you: `teamMoney` is null for other
-                # accounts. Empty means NOT STATED, never zero — a zero reads
-                # as broke and wrongly zeroes every bid ceiling built on it.
+                # Null for every account but your own. Empty = not stated,
+                # never zero (a zero would wrongly zero every bid ceiling
+                # built on it).
                 "team_money": str(t.get("teamMoney") or ""),
                 "banned": "" if t.get("banned") is None
                           else str(t["banned"]).lower(),
@@ -2017,23 +1865,16 @@ def parse_api_teams(text: str, observed_at: str,
             rows.append({
                 "observed_at": observed_at, "source": LFG_SOURCE,
                 ROW_TABLE: "api_teams",
-                # What is true of a PLAYER, plus the manager who owns him —
-                # which is the grain of the row and not a repeated fact. The
-                # team's position, points and balance moved to api_standings.
+                # A fact about a PLAYER plus his owning manager; team-level
+                # facts (position/points/balance) live on api_standings.
                 "team_id": str(t.get("id") or ""),
                 "manager": m.get("managerName") or "",
                 "player_id": str(pm["id"]),
-                # TWO NAMES, AND BOTH ARE NEEDED. The app publishes a
-                # nickname and a full name and neither joins the market on
-                # its own: of the 76 owned players on 2026-08-19, twelve join
-                # only on the nickname ("Raphinha", "Pepelu", "Gavi") and
-                # three only on the full name — "Aimar" is Aimar Oroz,
-                # "Brahim" is Brahim Díaz, and "Llorente" is one of the two
-                # the market carries. Keeping the nickname alone is what left
-                # ffcore.league.api_key with a ledger tie-breaker to build.
-                # The nickname stays `player_name` because it is the better
-                # single guess; the full name rides beside it, and is empty
-                # rather than duplicated when there is only one name.
+                # Neither nickname nor full name joins the market alone
+                # (each resolves a different subset of real players) — the
+                # nickname is the better single guess and stays
+                # `player_name`; the full name rides beside it, empty when
+                # there's only one name.
                 "player_name": pm.get("nickname") or pm.get("name") or "",
                 "player_name_full": (pm.get("name") or "")
                                     if pm.get("nickname") else "",
@@ -2041,40 +1882,27 @@ def parse_api_teams(text: str, observed_at: str,
                 "market_value": str(pm.get("marketValue") or ""),
                 "points": str(pm.get("points") or ""),
                 "buyout": str(p.get("buyoutClause") or ""),
-                # WHEN THE CLAUSE CAN ACTUALLY BE PAID. A transfer locks it
-                # for about a week, and on 2026-08-18 every one of the 76
-                # rival players in this league was locked — the whole steal
-                # side of the report was recommending moves the app would
-                # refuse. Empty means NOT STATED, never "available now".
+                # When the clause can actually be paid — a transfer locks it
+                # for about a week. Empty means NOT STATED, never "now".
                 "buyout_until": str(p.get("buyoutClauseLockedEndTime") or ""),
-                # THE OPERATOR'S OWN FITNESS. Both probable-XI columns in
-                # every report are editorial reads off two websites; this is
-                # the game itself saying whether he can play. Stored beside
-                # them and not blended into them — nothing here has been
-                # graded against a played jornada. Empty is NOT STATED.
+                # The game's OWN fitness call, distinct from the two
+                # probable-XI website reads — stored beside them, not
+                # blended in. Empty is NOT STATED.
                 "player_status": pm.get("playerStatus") or "",
-                # THIS OWNERSHIP RECORD'S OWN ID, distinct from the player's.
-                # Nothing else here needed it — buyout and its lock already
-                # ride on this same row — until offers: the API answers
-                # who-wants-to-buy-him keyed on THIS id, not the player id,
-                # and only for a playerTeamId your own account holds (see
-                # parse_api_offer). Not stored on api_market's
-                # marketPlayerTeam rows for the same reason: this repo only
-                # ever needs it for players still in a squad.
+                # This ownership record's own id (distinct from the
+                # player's) — needed for offers, which key on it rather
+                # than the player id, only for a playerTeamId this account
+                # holds.
                 "player_team_id": str(p.get("playerTeamId") or ""),
             })
             rows += _stat_rows(pm, observed_at)
     return rows
 
 
-# What the app scored him, broken into what he actually did. LONG and not
-# wide: each stat carries TWO numbers — the count and the points it earned —
-# so a wide table would be 42 columns and a new stat would widen it. Long, a
-# new stat is a new row and every reader keeps working.
-#
-# The week total is DERIVED, not stored: sum(points) == totalPoints held for
-# all 32 stat lines in the store on 2026-08-19. If that stops being true the
-# shape has moved, and the raw archive is what re-reads it.
+# What the app scored him, broken into what he actually did. Long, not
+# wide: each stat carries two numbers (count, points earned), so a new stat
+# is a new row rather than a new column. Week total is derived
+# (sum(points) == totalPoints), not stored.
 def _stat_rows(pm: dict, observed_at: str) -> list[dict]:
     out = []
     for line in (pm.get("lastStats") or []):
@@ -2297,15 +2125,9 @@ def player_sources(activity_json: str, observed_at: str = "") -> list[Source]:
 # ---------------------------------------------------------------------------
 # offers — who wants to buy a player you have listed
 # ---------------------------------------------------------------------------
-# ONE ENDPOINT, ONE DIRECTION. `GET .../playerTeam/{id}/offer` answers for a
-# playerTeamId you hold and 403s for one you do not — verified live,
-# 2026-08-25, against a rival's own player. The app's own client never calls
-# it the other way (Externoak/LaLigaApp teamService.js: "Don't make API
-# calls for players we don't own - this causes 403 errors"), so this is
-# RECEIVED offers only: what somebody else is bidding for a player YOU have
-# listed. What YOU have bid on somebody else's listing rides along in
-# api_market's own `bid` field instead (see parse_api_market) — the same
-# asymmetry the app's own client relies on, not a gap in what this reads.
+# `GET .../playerTeam/{id}/offer` answers for a playerTeamId you hold and
+# 403s for one you don't — RECEIVED offers only. What you've bid on
+# somebody else's listing rides on api_market's own `bid` field instead.
 API_OFFER_URL = ("{base}/v1/competition/1/league/{league}/playerTeam/{ptid}"
                  "/offer?x-lang=es")
 API_OFFER_KEY_RE = re.compile(r"^api_offer_(\d+)$")

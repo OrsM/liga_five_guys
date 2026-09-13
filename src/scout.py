@@ -1,13 +1,10 @@
 """
 scout — the tidy facts about your squad, no model in between.
 
-Nothing here shrinks a rate, blends a prior, or simulates a season. Every
-column is a real number read straight off a tidy CSV this repo already
-parses: last season's real points/match, this season jornada by jornada
-(not lumped into one average), market price, probable-XI%, fitness.
-`ffcore.score.Scorer` exists to turn these into ONE blended estimate for
-ranking transfers; this exists for the opposite job — looking at the raw
-ingredients yourself before trusting anyone's blend of them, mine included.
+Every column is a real number read straight off a tidy CSV: last season's
+points/match, this season jornada by jornada, market price, probable-XI%,
+fitness. `ffcore.score.Scorer` blends these into one estimate for ranking
+transfers; this shows the raw ingredients instead.
 
     python src/scout.py            your current squad, sorted by position
 """
@@ -30,12 +27,8 @@ SLOT = {"portero": "por", "defensa": "def", "mediocampista": "med",
 
 
 def _last_season() -> dict[str, tuple[float, float]]:
-    """{ff_id: (points, games)}, last season's REAL total. No shrink.
-
-    Keyed on ff_id, the SAME id the market (and squad ownership) key on —
-    row_key() in ffcore.tidy prefers it over a name for exactly this
-    reason: a display name a season is free to move on from is not a
-    stable join key, an id is.
+    """{ff_id: (points, games)}, last season's real total, unshrunk.
+    Keyed on ff_id — the same stable id the market/ownership join uses.
     """
     files = sorted(SEASON.glob("points_*.csv"))
     if not files:
@@ -49,11 +42,9 @@ def _last_season() -> dict[str, tuple[float, float]]:
 
 
 def _this_season() -> dict[str, dict[int, float]]:
-    """{ff_id: {jornada: points}}, read straight off the real per-jornada
-    log — one row per jornada, not lumped into a season average. Form
-    this early is a trend across a handful of real matches, not a mean;
-    an average of one jornada IS that jornada, so the shape only starts
-    to matter once there are several to look at side by side."""
+    """{ff_id: {jornada: points}}, one row per jornada — a trend, not a
+    season average.
+    """
     path = SEASON / "live" / "perjornada_2026-27.csv"
     if not path.exists():
         return {}
@@ -68,9 +59,9 @@ def _this_season() -> dict[str, dict[int, float]]:
 
 
 def _play(status: str, xi_pct: float | None, min_start: float) -> str:
-    """A direct read of two real facts, not a model: OUT_STATUSES and
-    min_start are the same ones the rest of this repo already uses to
-    call a player a probable starter — reused here, not re-derived."""
+    """Play status from two facts, not a model — OUT_STATUSES and
+    min_start match the rest of this repo's own "probable starter" read.
+    """
     if status in OUT_STATUSES:
         return "OUT (%s)" % status
     if xi_pct is None:
@@ -89,9 +80,7 @@ def table(me: str | None = None) -> list[dict]:
     players = load_players()
     last = _last_season()
     cur = _this_season()
-    # ONE League PER RUN — see ffcore/model.py. u = decide.load() has
-    # already warmed the same session(); a second League.load() here
-    # rebuilt a duplicate model just to read one config field.
+    # decide.load() already warmed session() — reuse it for one config field.
     min_start = session().lg.cfg.min_start
 
     rows = []
@@ -120,9 +109,9 @@ def table(me: str | None = None) -> list[dict]:
 
 
 def _form(by_jornada: dict[int, float], n: int = 5) -> str:
-    """Last `n` real jornadas, most recent first — a trend, not an
-    average. '-' for a jornada with no row at all (did not play), so a
-    blank week is never confused with a zero he actually scored."""
+    """Last `n` jornadas, most recent first. '-' for no row at all (did
+    not play), never confused with a real zero.
+    """
     if not by_jornada:
         return "-"
     latest = max(by_jornada)

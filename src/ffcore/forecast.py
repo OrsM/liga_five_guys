@@ -71,28 +71,10 @@ MIN_POOL = 200
 # keep this module free of that import; the self-test holds the two equal.
 SHRINK_MATCHES = 8.0
 
-# HOW MUCH A RATE CAN DRIFT PER JORNADA THAT PASSES, as a fraction of the
-# player's OWN rate_rel (less predictable players drift more, per-player
-# and per-club evidence-derived — see rate_rel/club_rel below, neither of
-# which is hardcoded). THIS is the one number in that chain that used to
-# be a bare guess rather than derived from anything: 1.0, hand-set,
-# "repeatedly measured and re-checked... no evidence since has moved it"
-# was true only because reports/METHOD.md's "Forecast vs actual" table
-# is structurally unable to grade a horizon-dependent parameter from
-# horizon-1 predictions alone (Miguel, 2026-09-06: "I do not want a
-# hardcoded drift").
-#
-# fit_drift_frac() below is the real fix — not a better guess, a real
-# estimator, off the ONE thing that actually reveals a horizon-dependent
-# parameter: how forecast error VARIANCE grows between two real
-# horizons. It needs a horizon ladder to run on (predictions logged and
-# graded at more than one horizon out — report.py started logging a
-# 3-jornada figure alongside the 1-jornada one on 2026-09-06,
-# `score_h3`), and refuses honestly, keeping this module-level default,
-# until real graded pairs exist at both horizons — same discipline
-# ffcore.score._fit_decay() already uses for the lineup-source recency
-# weight: fit from real held-out evidence, or say plainly why not, never
-# guess dressed up as a fit.
+# How much a rate can drift per jornada that passes, as a fraction of the
+# player's own rate_rel. Module-level default, used until fit_drift_frac()
+# below has real graded pairs at more than one horizon (report.py's score_h3)
+# to fit against; refuses to guess otherwise.
 # Why + the derivation, full sweep tables: docs/notes/forecast.md#drift_frac-calibration-history
 DRIFT_FRAC = 1.0
 
@@ -489,12 +471,8 @@ def _selftest() -> None:
     # A jornada NOT in the walk's own list is simply absent, not guessed.
     assert 4 not in walk[0]
 
-    # -- fit_drift_frac(): recovers a KNOWN ground truth from the model's OWN
-    # generative process, not a guess about what a fit "should" look like.
-    # Given the stakes of touching core simulation math (Miguel, 2026-09-06:
-    # "I do not want a hardcoded drift"), this has to be checked against
-    # rate_draw() itself, the same discipline the walk/correlation
-    # assertions above already use ------------------------------------------
+    # fit_drift_frac(): recovers a known ground truth from rate_draw()'s own
+    # generative process.
     global DRIFT_FRAC
     truth = 0.6
     was = DRIFT_FRAC

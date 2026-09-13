@@ -3,22 +3,14 @@ digest.py — the render fragments, stitched into the appendix.
 
     python src/digest.py            # writes reports/METHOD.md
 
-THE REPORT IS THE BOARD. decisions.json carries the position, the change list,
-the ladder, the league table and the warnings, and the phone draws it with
-colour and alignment that markdown on a phone cannot manage. This file used to
-build a second rendering of exactly that — REPORT.md — and two renderings of
-one answer is how they come to disagree, which happened twice in one evening.
-So there is one document now, and it is the one thing the board does not say:
-how every number is made and every way it is known to be wrong.
+decisions.json (the board) carries the position, ladder, league table and
+warnings; this file builds the ONE other document — how every number is
+made and every way it's known to be wrong — rather than a second
+rendering of the same answer.
 
-Its sources are fragments under .runtime/parts/, one per generator. They are
-build artifacts rather than reports: nothing reads them, nothing publishes
-them, and reports/ holds exactly what the site gets.
-
-It reads those fragments rather than importing the generators, so nothing
-upstream has to change and a missing one is a skipped section, not a crash.
-
-Run `python src/digest.py --selftest` to execute the self-test below.
+Sources are build-artifact fragments under .runtime/parts/, one per
+generator, read as text rather than imported: a missing one is a skipped
+section, not a crash.
 """
 
 from __future__ import annotations
@@ -41,39 +33,14 @@ class Part(NamedTuple):
     nest: bool = True          # False = keep own heading levels and preamble
 
 
-# THE ONE DOCUMENT THIS BUILDS. There were two: REPORT.md, which was the
-# board's content rendered as markdown, and this. The board draws Now, the
-# ladder, the league table and — since 2026-08-20 — the warnings, in a
-# renderer that can colour a verdict and align a column; a second rendering of
-# one answer is how two of them come to disagree, which this repo has managed
-# twice. So the report is the board, and the only document is the appendix.
-#
-# THE APPENDIX. Everything true about HOW the numbers are made, so the report
-# can be the numbers. It is a second stitched file rather than a tail on the
-# first because the caveats are long, they change rarely, and they were
-# sitting between the table you act on and the league table you check.
+# The appendix: everything true about HOW the numbers are made, kept
+# separate from the report (the numbers themselves) because the caveats
+# are long and change rarely.
 APPENDIX = "METHOD.md"
 
 APPENDIX_SOURCES = [
     Part("What it cannot see", "sim.md",
          ["What the simulation cannot see"], nest=False),
-    # NOT "The workings" (latest.md's bid table, fitness, notes) ANY MORE —
-    # removed 2026-08-22. That was DATA, re-stitched here byte-identical to
-    # what the daily report already shows, the exact duplication problem
-    # this module's own docstring says the appendix exists to avoid ("two
-    # renderings of one answer"). What belongs here is HOW those numbers
-    # are made — methodology.md's own column_guide_lines() now carries the
-    # column explanations the daily report used to repeat in full every
-    # run; the live data stays in the one place it can't drift from itself.
-    #
-    # "Act now or wait — the workings" ALSO removed here, 2026-09-07 — the
-    # heading it pointed at stopped existing the moment Phase 1's
-    # aggressive-simplify pass (`bbf1f2d`) cut the wait-forecast
-    # (wait_routes()/waiting()/market_model()) that produced it, but this
-    # list was never updated to match. Silently broken for the branch's
-    # entire history (every report since carried a "sections missing"
-    # warning in its own appendix) until Miguel asked to actually check a
-    # full report ran properly and the warning got read, not skipped past.
     Part("The forecast, and how it is doing", "methodology.md", None,
          nest=False),
 ]
@@ -143,9 +110,8 @@ def digest(read, sources=APPENDIX_SOURCES, stamp: str = "",
                 # latest.md's H1 becomes this report's H1, so drop it here.
                 lines = [ln for ln in lines if not ln.startswith("# ")]
             body += [ln for ln in lines]
-        # A section named here but absent from the file is a heading that was
-        # renamed upstream. Silently dropping it would quietly shorten the one
-        # report you rely on, so it is named in the output instead.
+        # A named section absent from the file means a heading was renamed
+        # upstream — reported, not silently dropped.
         lost += ["%s → %s" % (name, w) for w in (wanted or [])
                  if _key(w) not in found]
         body.append("")
@@ -158,8 +124,6 @@ def digest(read, sources=APPENDIX_SOURCES, stamp: str = "",
         body.append("")
 
     if links:
-        # No blurb. These are links; a sentence saying they are links was
-        # the last piece of prose on the page.
         body += ["## Reference", ""]
         for title, name in links:
             missing = "" if read(name) else "  _(not generated yet)_"
@@ -171,8 +135,6 @@ def digest(read, sources=APPENDIX_SOURCES, stamp: str = "",
 
 def main() -> None:
     def read(name):
-        # The fragments, not reports/: these are how the appendix is made and
-        # are build artifacts under .runtime/, alongside every other one.
         p = PARTS / name
         return p.read_text(encoding="utf-8") if p.exists() else None
 
@@ -180,8 +142,6 @@ def main() -> None:
     REPORTS.mkdir(exist_ok=True)
     write_lines(REPORTS / APPENDIX,
                 digest(read, APPENDIX_SOURCES, stamp=stamp, links=None,
-                       # NO LEAD. It was a sentence restating the title,
-                       # sitting above the first table on a phone screen.
                        title="Liga Five Guys — how the numbers are made"))
 
 
@@ -218,10 +178,8 @@ def _selftest() -> None:
     assert "2. What they pay over value" not in text, text
     assert "| long | table |" not in text, text
 
-    # THE DUPLICATION FIX: a section already printed is not printed again,
-    # whichever file it came from. 'Warnings' in latest.md and 'Ledger
-    # warnings' in rivals.md are different keys, so both survive — but the
-    # body line they share appears once per section, not once per file.
+    # A section already printed isn't printed again — 'Warnings' and 'Ledger
+    # warnings' are different keys, so both survive once each.
     assert text.count("- Burton overdraws") == 2, text
     # ...and an identical heading really is dropped.
     lines2 = digest(lambda n: files.get(n),
@@ -233,9 +191,7 @@ def _selftest() -> None:
     # The second ask found nothing, and says so rather than going quiet.
     assert "Sections missing" in text2 and "rivals.md → Ledger" in text2
 
-    # A section can be SKIPPED rather than cherry-picked, which is how one
-    # source feeds both the report and the appendix without either of them
-    # naming every heading the other wants.
+    # A section can be SKIPPED rather than cherry-picked.
     both = digest(lambda n: files.get(n),
                   [Part("D", "latest.md", None, nest=False)],
                   links=None, skip={"warnings"})

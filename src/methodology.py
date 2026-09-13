@@ -1,35 +1,25 @@
 """
 methodology.py — how the forecast works, and how it is doing against reality.
 
-Writes .runtime/parts/methodology.md, which digest.py stitches in as the LAST
-section of the appendix. Two halves:
+Writes .runtime/parts/methodology.md (digest.py's last appendix section).
+Two halves:
 
-  1. The formula, in words — pulled together from ffcore/score.py's
-     constants so the text cannot drift from the code silently.
-  2. Forecast vs actual — every prediction in data/decisions/squad_log.csv
-     joined against realised match points in data/season/live/perjornada_*
-     (written by points.py), over the last WINDOW_DAYS days.
+  1. The formula, in words — pulled from ffcore/score.py's own constants
+     so the text can't drift from the code.
+  2. Forecast vs actual — squad_log.csv predictions joined against
+     realised points in data/season/live/perjornada_* (points.py), over
+     the last WINDOW_DAYS days.
 
-The join, precisely: for each per-jornada row where a player's games went up,
-take the LAST prediction logged strictly BEFORE the interval began. Nothing
-predicted after the fact is ever scored — a forecast you could only have made
-with hindsight is not a forecast. Predicted points for the interval are
-score × games_delta, since the score is per match.
+Join rule: for each per-jornada row where games went up, use the LAST
+prediction logged strictly before the interval began (never hindsight).
+Predicted points = score × games_delta.
 
-The sample is your own squad only — squad_log records the players the scorer
-actually rated for you, which is also the sample you care about. It will be
-thin for weeks: a jornada gives ~15 pairs. The section says so rather than
-hiding it, and fills itself in as the season runs. No jornada yet means the
-section states that and stops; an empty comparison is a fact, not an error.
+Sample is your own squad only (squad_log's own scope) — thin for weeks;
+an empty comparison prints as a fact, not an error.
 
-Deps: stdlib only. `decide.py` imports `drift_frac_from_history()` (only
-that one function, at Bootstrap-construction time) to point the live
-season simulation at a real fitted DRIFT_FRAC instead of a hardcoded
-constant — the one intentional exception to this module otherwise being
-a leaf nothing else needs at import time. `_fc()` below already imports
-decide.py back, lazily, for the opposite direction (asking the live
-forecaster a question) — the two do not import each other at module top
-level, so this stays acyclic in practice.
+Deps: stdlib only, except decide.py imports drift_frac_from_history()
+at Bootstrap-construction time, and _fc() below lazily imports decide.py
+back — the two never import each other at module top level.
 
     python src/methodology.py             # writes .runtime/parts/methodology.md
     python src/methodology.py --selftest  # pure join logic, no IO
@@ -125,12 +115,8 @@ def pair(actuals: list[dict],
 
 
 def lock_order(locks: dict[int, dt.datetime]) -> list[int]:
-    """Jornadas ordered by when they actually locked, not by their own
-    number — a rescheduled fixture can lock jornada 6 before jornada 4
-    (real, seen 2026-09: jornada 6 locked 09-03, jornada 4 locks 09-04).
-    `rate_draw()`'s own walk accumulates one step per ENTRY of the real
-    remaining schedule (see forecast.fit_drift_frac's own note) — this is
-    that same real order, so a "3 steps back" lookup means what it says.
+    """Jornadas ordered by when they actually locked, not by number — a
+    rescheduled fixture can lock jornada 6 before jornada 4.
     """
     return [j for j, _ in sorted(locks.items(), key=lambda kv: kv[1])]
 
@@ -139,22 +125,11 @@ def lagged_pair(actuals: list[dict],
                 preds: dict[str, list[tuple[dt.datetime, dict]]],
                 locks: dict[int, dt.datetime], lag: int) -> list[dict]:
     """`pair()`, generalised to a prediction made `lag` LOCKED JORNADAS
-    before the one being graded, instead of always the freshest one.
-
-    WHY THIS ANSWERS "why can't you use the scrapes you already have":
-    squad_log.csv has been logging a fresh prediction on most days since
-    2026-08-12 — it already holds several real predictions for the SAME
-    future outcome, made at different amounts of lead time. `pair()`
-    (lag=0) always grades the freshest one; this picks an OLDER one on
-    purpose, which is a real, already-elapsed multi-jornada-ahead
-    forecast test — no need to wait for a new column (`score_h3`) or new
-    jornadas to play out, only for `lag` locked jornadas to have already
-    happened before the one being scored, which several already have.
-
-    A jornada with fewer than `lag` earlier LOCKED jornadas (e.g. the
-    season's first `lag` rounds) has nothing to test at that lag and is
-    skipped, same "not enough evidence yet" honesty as everywhere else in
-    this module.
+    before the one being graded, instead of always the freshest one —
+    squad_log.csv already holds predictions at several lead times for
+    the same outcome, so this tests a real multi-jornada-ahead forecast
+    without waiting for new data. A jornada with fewer than `lag` earlier
+    locked jornadas is skipped.
     """
     order = lock_order(locks)
     pos = {j: i for i, j in enumerate(order)}
@@ -186,22 +161,13 @@ def lagged_pair(actuals: list[dict],
 
 
 def drift_frac_from_history(lag1: int = 1, lag3: int = 3) -> tuple[float, str]:
-    """Fits DRIFT_FRAC off REAL, already-elapsed multi-jornada-ahead
-    forecasts, per `lagged_pair()`'s own note — no waiting required, since
-    this repo has already logged predictions at different lead times for
-    outcomes that have already happened.
+    """Fits DRIFT_FRAC off real, already-elapsed multi-jornada-ahead
+    forecasts (lagged_pair()), rather than waiting for new data.
 
-    RATE_REL: ideally per-player (as `Bootstrap.rate_rel` already is
-    live), but no per-row rate_rel is logged in squad_log.csv today, so
-    this uses one POOLED, empirically-measured scale instead — the real
-    dispersion of (actual/predicted) at lag1, the closest-to-live sample
-    available. A disclosed simplification, not an invented number: every
-    pair is normalised by the SAME real, measured constant, so the
-    two-horizon variance comparison `fit_drift_frac` needs still holds,
-    just without per-player weighting. Logging a real per-row rate_rel at
-    prediction time would sharpen this; not done here to avoid inventing
-    a new squad_log column speculatively before this estimator has even
-    run once against real numbers.
+    Uses one pooled rate_rel (dispersion of actual/predicted at lag1)
+    instead of Bootstrap's real per-player rate_rel, since squad_log.csv
+    logs no per-row rate_rel today — a disclosed simplification, not an
+    invented number.
     Why: docs/notes/methodology.md#drift_frac_from_history--why-lag-not-a-new-column
     """
     from ffcore.forecast import fit_drift_frac
@@ -230,10 +196,9 @@ def drift_frac_from_history(lag1: int = 1, lag3: int = 3) -> tuple[float, str]:
 
 BUCKETS = [(-1e9, 2, "under 2"), (2, 3, "2–3"), (3, 4, "3–4"), (4, 1e9, "4+")]
 
-# Below this, a bucket's own mean-forecast/mean-actual gap is as likely to be
-# noise as a real miscalibration — print "not enough data" instead of a
-# table a reader could over-read (2026-09-11 audit finding: the smallest
-# buckets ran 8-18).
+# Below this, a bucket's mean-forecast/mean-actual gap is as likely noise
+# as real miscalibration — print "not enough data" instead of a table a
+# reader could over-read.
 MIN_BUCKET_N = 20
 
 # Where a fixture stops being a median one, for grading purposes only. Wide
@@ -247,14 +212,9 @@ FIX_BUCKETS = [(-1e9, 1.0 - FIX_EDGE, "harder"),
 
 def fixture_rows(pairs: list[dict]) -> tuple[list[tuple], int]:
     """[(label, n, mean forecast/match, mean actual/match, mean err/match)],
-    plus how many pairs carried no fixture factor at all.
-
-    This is what grades FIX_BAND. If the model's fixture term is too WIDE, the
-    easier bucket over-forecasts and the harder one under-forecasts — a
-    positive mean error against an easy draw and a negative one against a hard
-    one. Too NARROW and the signs reverse. Both are only readable once each
-    bucket has a real n; the report prints n so a two-row bucket cannot be
-    mistaken for a verdict.
+    plus how many pairs carried no fixture factor at all. Grades
+    FIX_BAND: a too-wide fixture term over-forecasts easy games and
+    under-forecasts hard ones; too narrow reverses the signs.
     """
     known = [p for p in pairs if p.get("fix") is not None]
     out = []
@@ -285,12 +245,9 @@ def bucket_rows(pairs: list[dict]) -> list[tuple[str, int, float, float]]:
 # ---------------------------------------------------------------------------
 # grading the probable-XI sources — the gate for LINEUP_SOURCE
 #
-# Grades P(APPEAR) against points.py's per-jornada `games` diff, not P(start)
-# — a 20-minute substitute counts, which flatters both sources equally so the
-# COMPARISON stays valid even though the level doesn't. Why appearance (not
-# starters.csv) is the ground truth here, and why the graded universe is
-# market-priced players only: docs/notes/methodology.md
-# #start-grade-appearance-vs-real-starters.
+# Grades P(APPEAR) against points.py's per-jornada `games` diff, not
+# P(start) — flatters both sources equally, so the comparison stays valid.
+# Why: docs/notes/methodology.md#start-grade-appearance-vs-real-starters
 # ---------------------------------------------------------------------------
 
 # A claim inside this band of the middle is not a call either way, and neither
@@ -317,26 +274,21 @@ def start_grade(intervals, claims, universe=None, instances=None):
 
     Returns (numbered, named, skipped):
 
-      numbered  (source, n, mean claim %, appeared %, Brier) for claims that
-                carry a percentage. Brier is the mean squared error of the
-                probability, so lower is better and 0.25 is a coin flip.
-      named     (source, n, appeared %) for calls with no number on them —
-                analiticafantasy's `titular` is a final answer, not a 100%,
-                and turning it into one would invent the missing constant.
-      skipped   how many claims fell in the undecided middle band.
+      numbered  (source, n, mean claim %, appeared %, Brier) for claims
+                carrying a percentage; Brier's mean squared prob error,
+                0.25 = coin flip.
+      named     (source, n, appeared %) for calls with no number (a
+                final answer, not a 100% — turning it into one would
+                invent the missing constant).
+      skipped   claims in the undecided middle band.
 
-    `instances`, when given, is a set of (player key, interval start) pairs —
-    every source is graded ONLY on those exact instances, not merely
-    restricted to the same pool of players. Without it, "the same
-    population" can still silently compare different (player, jornada)
-    claim counts per source (one source simply had a claim logged ahead of
-    more intervals than another) — real gap found in the 2026-09-11 audit,
-    one layer past the population-only restriction fixed 2026-09-06. See
-    `_start_instances()` for how the target set is built.
+    `instances`, when given, restricts every source to the exact same
+    (player, interval) set (see _start_instances()) rather than just the
+    same population, so one source can't out-count another by having
+    more claims logged.
     Why: docs/notes/methodology.md#start_grade--same-instance-not-just-same-population
 
-    Whoever wins this table earns tidy.LINEUP_SOURCE. Nothing here changes
-    which source is read — that is a decision to take once the n is real.
+    Whoever wins this table earns tidy.LINEUP_SOURCE.
     """
     per: dict[str, dict[str, list]] = {}
     for r in claims:
@@ -406,10 +358,8 @@ def start_grade(intervals, claims, universe=None, instances=None):
 
 def _start_instances(intervals, claims, src, universe=None) -> set:
     """(player key, interval start) pairs where `src` had a gradeable
-    (non-skipped, numeric) claim — the target instance set a genuinely fair
-    cross-source comparison must restrict every OTHER source to as well.
-    Mirrors start_grade()'s own per-interval lookup for a single source so
-    the two can never silently diverge on what counts as "graded"."""
+    (non-skipped, numeric) claim — mirrors start_grade()'s own per-
+    interval lookup so the two definitions of "graded" can't diverge."""
     per: dict[str, list] = {}
     for r in claims:
         if (r.get("source") or "").strip() != src:
@@ -448,11 +398,10 @@ def _start_instances(intervals, claims, src, universe=None) -> set:
 # ---------------------------------------------------------------------------
 # grading against who ACTUALLY started
 #
-# starters.csv (confirmed elevens, not the appearance proxy above) graded
-# against the JORNADA LOCK — the earliest kickoff observed that round, not
-# each match's own — so a source is never credited with information it
-# couldn't have used. A round with no observed lock is ungraded, not
-# assumed. Why: docs/notes/methodology.md#start-grade-appearance-vs-real-starters.
+# starters.csv graded against the JORNADA LOCK (earliest kickoff observed
+# that round), not each match's own, so a source is never credited with
+# information it couldn't have used. An unlocked round is ungraded.
+# Why: docs/notes/methodology.md#start-grade-appearance-vs-real-starters
 # ---------------------------------------------------------------------------
 
 def team_slug_of(side: str, slugs) -> str | None:
@@ -474,16 +423,10 @@ def match_locks(matches: list[dict],
                 fixtures: list[dict]) -> dict[tuple[int, str], dt.datetime]:
     """{(jornada, team_slug): that TEAM's own kickoff in that jornada}.
 
-    Jornada membership is fixed at the fixture list (matches.csv's own
-    `jornada` column) and never changes; kickoff date is not, and the two
-    can diverge by days for exactly one match in a round — a TV
-    reschedule or a European-competition clash defers ONE fixture while
-    the other nine in its jornada play on the normal weekend. Real case,
-    2026-09-12: Getafe-Celta is jornada 4, same as the other nine games
-    that jornada, but kicks off 2026-09-07 while the round's earliest
-    jornada-4 kickoff (some other match) is 2026-09-04 — three days
-    earlier. A caller that needs "when did THIS PLAYER's team's match
-    lock" must key on his own team, not the round.
+    Jornada membership (matches.csv) is fixed; kickoff date isn't, and a
+    TV reschedule can defer one fixture days past its round's other
+    kickoffs. A caller needing "when did THIS PLAYER's match lock" must
+    key on his own team, not the round.
     Why: docs/notes/methodology.md#match_locks--one-fixture-can-be-deferred-out-of-its-own-jornada
     """
     from ffcore.tidy import kickoff_stamp
@@ -566,22 +509,13 @@ def start_intervals(matches: list[dict], starters: list[dict],
                     fixtures: list[dict], market: list[dict] = ()):
     """([(lock, {keys who started}, {teams captured})], graded, no-lock rounds).
 
-    Keys are both the normalised name and the player slug, so a claim can be
-    matched on whichever it carries. Rows repeat across snapshots — a match page
-    is stored once and carried forward into every later manifest — so they are
-    deduplicated on (match, player) before anything is counted.
-
-    A match page prints the short name — "Abqar", "Blanco" — where the other
-    source publishes "Abdel Abqar". So each starter is also resolved to his
-    market name against his own club's squad, and that name goes in the key set
-    too. Ambiguity inside a squad ("Romero", of whom Sevilla have two) resolves
-    to nothing rather than to a guess: that call goes ungraded for the source
-    that has no slug on it, which is the honest outcome.
-
-    The team set is the interval's population. Absence from the key set only
-    means "did not start" for a club whose eleven we actually hold; for the rest
-    of the round it means nothing, and grading them would score a source down
-    for matches we never read.
+    Keys are both normalised name and player slug; rows are deduplicated
+    on (match, player) since a match page repeats across snapshots. A
+    starter's short match-page name is also resolved to his market name
+    (an ambiguous squad match, e.g. two Romeros, resolves to nothing
+    rather than a guess). The team set is the interval's population —
+    absence from the key set means "did not start" only for a club whose
+    eleven we hold, not for the rest of the round.
     """
     jornada_of = {}
     for m in matches:
@@ -663,15 +597,9 @@ def load_actuals(window_days: int | None = WINDOW_DAYS) -> tuple[list[dict], str
         full = r.get("player_name_full", "")
         short = r.get("player_name", "")
         keys = [k for k in {norm(full), norm(short)} if k]
-        # points.py's diff() already stamps a jornada per row (jornada_asof,
-        # off the calendar) — dropped here before now. Carried through so a
-        # rate-side row (this one) and a start-side row (start_grade()'s,
-        # keyed by jornada_locks()'s own lock time) can eventually be joined
-        # on the one number both sides already compute, instead of on
-        # timestamps that live in two different clocks (a diff snapshot vs.
-        # a kickoff lock). The join itself isn't built yet — this is the key
-        # it needs.
-        # Why: docs/notes/methodology.md#load_actuals--jornada-carried-through-for-a-future-join
+        # Carried through to let a rate-side row (this one) and a
+        # start-side row (start_grade()'s) join on jornada number rather
+        # than on two different clocks (diff snapshot vs. kickoff lock).
         jor = r.get("jornada", "")
         rows.append({"name": full or short, "keys": keys,
                      "from_dt": from_dt, "points_delta": pd_,
@@ -746,31 +674,15 @@ def load_predictions() -> dict[str, list[tuple[dt.datetime, dict]]]:
 
 def golden_dataset() -> dict[int, dict[str, dict]]:
     """{jornada: {key: {score, fix, ppm, flat, start_pct, cur_pj, home,
-    pos, status, actual, games}}} — the ONE canonical join between
-    historically logged predictions and real graded outcomes, for
-    walk_forward_compare()/backtest_predictor() to build any hypothesis
-    on, instead of a fresh ad hoc join per candidate.
+    pos, status, actual, games}}} — the one canonical join between
+    logged predictions and real outcomes, for walk_forward_compare()/
+    backtest_predictor() to build any hypothesis on, instead of a fresh
+    ad hoc join per candidate. Reuses pair()'s own matching, unnarrowed
+    (a counterfactual needs the raw ppm/fix/flat/home/status/pos, not
+    just the collapsed "score").
 
-    Miguel, 2026-09-13: "improve the back test process to ensure it's
-    working for 80% of the tests we run at least, to make it cheaper to
-    run these things over time." Direct cause: the HOME_EDGE walk-forward
-    check (this session) reused pair()'s exact matching and reached 48
-    real pairs; the very next test (shots-for-forwards, full-pipeline
-    version) hand-rolled a DIFFERENT, worse join and reached 3. Same
-    underlying data, same season, same players — the gap was entirely a
-    bad join, not thin data. This is pair()'s own matching (a real
-    outcome's every name-form, checked against load_predictions()'s key,
-    latest reading strictly before the outcome's own from_dt) — not a
-    new join, the SAME one, just not narrowed down to "score"/"fix" the
-    way pair()'s own output is, because a counterfactual (what WOULD the
-    score have been under a different constant) needs the raw ppm/fix/
-    flat/home/status/pos a final "score" number has already collapsed.
-
-    A caller wanting "every forward, every jornada" or "every home game"
-    filters this dict directly (`{j: {k: r for k, r in d.items() if
-    r["pos"]=="delantero"} for j, d in golden_dataset().items()}`) —
-    this function's only job is the join, not any one hypothesis's own
-    slicing of it.
+    A caller wanting a subset (e.g. one position) filters this dict
+    directly rather than asking this function to slice it.
     Why: docs/notes/methodology.md#golden_dataset--the-shared-join
     """
     preds = load_predictions()
@@ -1012,13 +924,9 @@ CADENCE_WORD = {"every_run": "sweep", "twice_daily": "6 hours",
 
 
 def feed_lines() -> list[str]:
-    """The data flow, and which parts of it have stopped answering.
-
-    THIS IS THE TABLE THE ELO BUG NEEDED. A fetch that fails leaves the last
-    good rows in the tidy store and every reader downstream treats them as
-    today's — the fixture board ranked twenty clubs by a rating from before
-    the jornada for two days, and nothing anywhere said so. Age is the only
-    honest thing to print about an input, so it is a column.
+    """The data flow, and which parts of it have stopped answering. A
+    failed fetch leaves stale rows that every downstream reader treats as
+    current, so age is printed as a column rather than assumed fresh.
     """
     now = run_now()
     reg, feeds = _hosts(), _feed_state()
@@ -1065,12 +973,8 @@ def feed_lines() -> list[str]:
 
 
 def elo_basis() -> str:
-    """What actually ranked the opponents in today's run.
-
-    Asked of the same two functions the scorer uses, rather than described from
-    memory: this sentence was wrong about the model for as long as it was a
-    sentence, and a claim in the methodology that the code does not make is the
-    one kind of error this file exists to prevent.
+    """What actually ranked the opponents in today's run — asked of the
+    same functions the scorer uses, never described from memory.
     """
     from ffcore.fixture import elo_strength, team_strength
 
@@ -1090,11 +994,7 @@ def elo_basis() -> str:
         return ("summed squad value — Club Elo was scraped but did not cover "
                 "every club in the market, and half a league ranked by Elo is "
                 "not a ranking")
-    # AGE LIVES IN THE FEEDS TABLE, not here. A fetch that fails leaves the
-    # last reading in place and everything downstream carries on as though it
-    # were today's — Club Elo went two days without answering and the board
-    # was still ranked by it. That is a fact about a feed, so it is a column
-    # in the feed table rather than a sentence in this one.
+    # Age is a feed-table column, not restated here.
     return "**Club Elo rating**, a result-based rating with no transfer fees in it"
 
 
@@ -1106,19 +1006,9 @@ def latest_market() -> list[dict]:
 
 
 def formula_lines() -> list[str]:
-    """The live constants, and a pointer to where they are explained.
-
-    THIS USED TO BE THE ESSAY. Thirty paragraphs restating the formula, the
-    shrinkage, the fixture band, what the index is not, and why λ was retired
-    — roughly 300 lines of string literals, and every word of it already in
-    the README. Two copies of an explanation drift, and the generated one wins
-    arguments it should not: it looks authoritative because a program printed
-    it, while the README is where somebody actually maintains the reasoning.
-
-    What generating it DID buy was that the numbers could not drift from the
-    code. That is worth keeping and costs a table, not an essay: the constants
-    below are read from the modules that use them, so a changed K or a changed
-    band shows up here on the next run.
+    """The live constants, read from the modules that use them (never
+    restated by hand) so a changed value shows up here on the next run.
+    The reasoning behind them lives in the README, not duplicated here.
     """
     return [
         "### The model, as configured right now", "",
@@ -1148,19 +1038,7 @@ def formula_lines() -> list[str]:
 
 def column_guide_lines() -> list[str]:
     """The full explanation of every table column the daily report only
-    footnotes in one line now.
-
-    MOVED HERE 2026-08-22, not deleted, for the tables that existed then —
-    a paragraph each for the bid table, the XI table, fitness, starting.
-    Those tables (report.py's old board: "Field these eleven", "What to
-    bid", "Fitness", "Starting") were themselves cut on 2026-09-05 (a
-    real dead-code finding: `.runtime/parts/latest.md`, unread by
-    anything since `digest.py` stopped stitching it in 2026-08-22) —
-    their four paragraphs here went with them, on 2026-09-07, when they
-    were found still describing columns ("pts/m", "Bid", "XI",
-    "min_start") that no longer appear anywhere in a real report. Only
-    "the ladder" and "the league table" (2026-09-01's addition, the two
-    tables that replaced the old board) are documented here now.
+    footnotes in one line: the ladder and the league table.
     """
     return [
         "### How to read the tables", "",
@@ -1217,11 +1095,8 @@ _RATE_NOTE: list = []
 
 
 def _rate_note() -> str:
-    """How wide the rate uncertainty came out, in this run's own numbers.
-
-    THE ROW HAS TO BE ABLE TO BE WRONG. Printing "cv over root n" without the
-    number it produced would be a formula nobody can check against the bands
-    it widened — 10-90 went from 259 points to 365 the day this went in.
+    """How wide the rate uncertainty came out, in this run's own numbers —
+    a formula alone can't be checked against the bands it widens.
     """
     if _RATE_NOTE:
         return _RATE_NOTE[0]
@@ -1277,24 +1152,12 @@ def start_lines() -> list[str]:
             + " — its opener kicked off before this repo saw a kickoff for "
               "it, so there is no honest cutoff | all |")
 
-    # THE FAIR COMPARISON — "our forecast" only ever covers the squad
-    # Miguel actively manages, a harder, more genuinely uncertain
-    # population than the whole league (which is mostly easy, obvious
-    # cases the raw sources get right for free). Comparing our forecast's
-    # Brier against a raw source's WHOLE-LEAGUE Brier looked like our
-    # forecast losing (0.114 vs futbolfantasy's 0.088, 2026-09-06's own
-    # first reading) — restricted to the SAME population, our forecast
-    # actually beats both raw sources (0.114 vs 0.132/0.240). Shown here
-    # so the table above is never read as a fair comparison on its own.
-    #
-    # SAME INSTANCE, NOT JUST SAME POPULATION (2026-09-11 fix): the
-    # population-only restriction still let each source rack up a
-    # different n here (65/106/48 in a table literally named "the fair
-    # comparison") since a source with a claim logged ahead of more
-    # intervals gets graded more often. `our_instances` pins every source
-    # to the EXACT (player, jornada-lock) pairs our own forecast was
-    # itself graded on — a source's own n can only ever be <= that, never
-    # inflated by intervals our forecast never had an opinion on either.
+    # "our forecast" only covers the actively-managed squad — a harder,
+    # more uncertain population than the whole league, so comparing its
+    # Brier against a raw source's whole-league Brier is unfair to us.
+    # `our_instances` pins every source to the exact (player, jornada-lock)
+    # pairs our own forecast was graded on, not just the same population,
+    # so no source's n can be inflated by intervals we had no opinion on.
     ours = forecast_claims()
     universe = load_universe()
     our_instances = _start_instances(intervals, ours, "our forecast", universe)
@@ -1374,27 +1237,11 @@ def _instance_briers(intervals, claims, src, instances) -> list[float]:
 
 
 def forecast_claims() -> list[dict]:
-    """Our own start-probability forecast, in start_grade()'s claim shape.
-
-    THE BLIND SPOT THIS CLOSES: squad_log.csv's own `start_pct` (the
-    blended, recency-weighted number that actually feeds the season
-    simulation) had never once been checked against a real outcome —
-    only the two RAW lineup sources were graded here, never our own
-    number after blending them.
-
-    TEAM_SLUG, RESOLVED THROUGH THE CROSSWALK — squad_log.csv never
-    carried one, which silently drops every one of these claims from
-    start_grade()'s TEAM-SCOPED "starts" table (its `teams` population
-    filter skips a claim with no team_slug outright, never an error, just
-    quietly ungraded). Without this, the only place these claims could
-    land was the "appearances" table's raw-snapshot-timestamp intervals,
-    which turned out to have their own real bug — see the 2026-09-06
-    session notes: a points-correction row (games moved by 0) creates its
-    own near-empty interval, unrelated to any real jornada boundary, that
-    a claim can get matched against instead of the interval covering its
-    actual match. "starts" doesn't have this problem (real jornada locks,
-    real confirmed elevens) — resolving team_slug is what lets our claims
-    reach the table that was actually built to answer this question.
+    """Our own start-probability forecast (squad_log.csv's `start_pct`,
+    the blended number that actually feeds the simulation), in
+    start_grade()'s claim shape — resolves team_slug through the
+    crosswalk so these claims reach the team-scoped "starts" table
+    rather than only the looser "appearances" one.
     Why: docs/notes/methodology.md#forecast_claims--our-own-number-graded-the-same-way
     """
     from ffcore.crosswalk import Crosswalk
@@ -1408,13 +1255,8 @@ def forecast_claims() -> list[dict]:
             continue
         if not r.get("player") or not r.get("observed_at"):
             continue
-        # "ff_id" is squad_log.csv's own historical misnomer — report.py
-        # writes `p["key"]` under that name, which is already this repo's
-        # crosswalk key (Scored.key, row_key()'s own market key or a
-        # normalised name), not an external id to look up. Confirmed by
-        # measurement: treating it as an app_id resolved a team_slug for
-        # 5% of claims; treating it as the key directly should resolve
-        # nearly all of them.
+        # "ff_id" is squad_log.csv's historical misnomer for the crosswalk
+        # key (report.py writes p["key"] under that name), not an app_id.
         team_slug = ""
         p = xw.players.get((r.get("ff_id") or "").strip())
         if p:
@@ -1427,31 +1269,14 @@ def forecast_claims() -> list[dict]:
 
 
 def golden_rows() -> list[dict]:
-    """One row per (player, jornada): the rate side and the start side,
-    finally on the same table instead of two separate grading passes that
-    never talk to each other. Stage 2 of the forecast-first rebuild plan.
+    """One row per (player, jornada): the rate side and the start side on
+    the same table, joined on jornada number. Uses match_locks() (each
+    fixture's own kickoff), not jornada_locks() (the round-wide lock) —
+    a deferred fixture's real lock differs from its round's.
 
-    THE JOIN KEY: jornada number. The rate side (pair(), via
-    load_actuals()) is naturally keyed by arbitrary diff-snapshot
-    timestamps; the start side (forecast_claims(), via start_grade()'s
-    own jornada-locked intervals) is naturally keyed by kickoff-lock
-    times. Neither clock means anything to the other, which is why this
-    didn't exist before now — `load_actuals()`/`pair()` carry a real
-    jornada number since b0fface, and `match_locks()` (already used
-    inside `start_intervals()`, never exposed) is inverted here
-    (lock time -> jornada) to put the start side on the same key.
-
-    MATCH_LOCKS, NOT JORNADA_LOCKS — a deferred fixture's interval (see
-    match_locks()'s own docstring) locks at its own real kickoff, which
-    does not equal its jornada's round-wide lock time; inverting the
-    round-wide dict here would fail every `jornada_of_lock.get(lock)`
-    lookup for that fixture's players and silently drop them from this
-    whole table (2026-09-12: exactly what was happening before this).
-
-    A row's rate fields are None when nothing matched — a player with a
-    real start-probability claim but no rate prediction/actual for that
-    exact jornada (a common, honest case: he might not have played) is
-    still worth keeping for the start-calibration half of the question.
+    A row's rate fields are None when nothing matched — a real
+    start-probability claim with no rate prediction for that jornada
+    (he might not have played) is still kept for start-calibration.
     Why: docs/notes/methodology.md#golden_rows--the-player-jornada-join
     """
     actuals, _label = load_actuals()
@@ -1503,19 +1328,9 @@ def golden_rows() -> list[dict]:
 
 
 def baseline_check(golden: list[dict]) -> dict | None:
-    """Does our start-probability forecast actually beat trivial baselines?
-
-    Stage 3 of the forecast-first rebuild plan, its honest first slice —
-    the FULL version (replay history, compare against alternate
-    forecasting APPROACHES re-run on past snapshots) is real, unbuilt
-    work; this is the cheap, real thing achievable straight off
-    golden_rows(): is our claim actually informative, or would a constant
-    have done as well? A model whose Brier score doesn't clear a naive
-    baseline is not adding anything, however plausible its own logic
-    reads.
-
-    `None` when there are no rows to check — not zero, which would read
-    as "beats nothing by a mile."
+    """Does our start-probability forecast beat a naive constant
+    baseline, by Brier score? `None` when there are no rows to check —
+    not zero, which would read as "beats nothing by a mile."
     """
     if not golden:
         return None
@@ -1584,9 +1399,6 @@ def source_lines(actuals: list[dict]) -> list[str]:
             "round's first kickoff. Lower Brier **on starts** earns "
             "`LINEUP_SOURCE` in ffcore/tidy.py; appearances break ties only._",
             ""]
-    # DOES OUR OWN FORECAST BEAT A TRIVIAL BASELINE? Stage 3's first real
-    # slice (forecast-first rebuild plan) — checked against the SAME
-    # jornada-joined rows every report, not a one-off script.
     check = baseline_check(golden_rows())
     if check is not None:
         vs_coin, vs_const = check["vs_coin"], check["vs_constant"]
@@ -1611,24 +1423,14 @@ def source_lines(actuals: list[dict]) -> list[str]:
 
 
 def rate_baseline_check(pairs: list[dict]) -> dict | None:
-    """Does the scoring-RATE forecast beat a trivial constant guess?
+    """Does the scoring-RATE forecast beat a trivial constant guess (the
+    sample's own mean per-match rate)? `None` when there's nothing to
+    check.
 
-    Same question baseline_check() asks for start-probability, asked of
-    the other half of the forecast — Stage 3's first slice extended to
-    both halves, not just the one that got checked first. The naive
-    guess is the sample's own mean per-match rate: no player identity,
-    no form, no fixture, just "everyone scores about the average."
-    `None` when there's nothing to check (mirrors baseline_check()).
-
-    `ours`/`naive` here are PER-PAIR per-match errors (one number per
-    interval, matches already divided out) — the right unit for
-    `stats.bootstrap_gap()`'s resampling, which treats each entry as one
-    independent draw. The genuinely match-weighted headline MAE (an
-    interval spanning 3 matches should count 3x a 1-match interval, not
-    equally) is `weighted_mae()` below — this function no longer doubles
-    as that number, since the two questions ("is a match-error typical
-    of one interval smaller than another" vs "what's the true average
-    per-match error across every match played") need different units.
+    `ours`/`naive` are per-pair per-match errors — the unit
+    stats.bootstrap_gap() needs, treating each entry as one independent
+    draw. The match-weighted headline MAE is weighted_mae() below, a
+    different question with a different unit.
     """
     if not pairs:
         return None
@@ -1644,11 +1446,9 @@ def rate_baseline_check(pairs: list[dict]) -> dict | None:
 
 
 def weighted_mae(pairs: list[dict]) -> float:
-    """The true per-match MAE: total absolute error over total matches
-    played, not an average of already-averaged per-interval errors (which
-    counts a 3-match interval's per-match error the same as a 1-match
-    interval's, understating how much a long interval's error really
-    reflects)."""
+    """Total absolute error over total matches played — not an average
+    of already-averaged per-interval errors, which would weight a
+    3-match interval the same as a 1-match one."""
     total_matches = sum(p["matches"] for p in pairs)
     return sum(abs(p["err"]) for p in pairs) / total_matches
 
@@ -1658,16 +1458,8 @@ ACCURACY_LOG = "forecast_accuracy_log.csv"
 
 def log_forecast_accuracy(n: int, mae: float, naive_mae: float) -> None:
     """Append today's rate-forecast accuracy reading. Never overwrites —
-    the series IS the record, same append-only discipline sim.py's
-    log_cash_price()/cash_price_log.csv already uses.
-
-    WHY THIS EXISTS: rate_baseline_check() computed this exact number
-    fresh every run already, printed once into comparison_lines()'s own
-    report section, and thrown away — nothing recorded whether a real
-    model change (the shots blend, 2026-09-12) actually moved this number
-    over the following days, or whether a LATER change quietly made it
-    worse. Miguel, 2026-09-12: "shouldn't we have a function and log to
-    track metrics and our experiments/improvements impact on it?"
+    the series is the record, same append-only discipline as
+    sim.log_cash_price()/cash_price_log.csv.
     Why: docs/notes/methodology.md#log_forecast_accuracy--why-this-exists
     """
     from ffcore.tidy import DECISIONS, append_csv
@@ -1680,10 +1472,8 @@ def log_forecast_accuracy(n: int, mae: float, naive_mae: float) -> None:
 
 
 def forecast_accuracy_history() -> list[dict]:
-    """[{observed_at, n, mae, naive_mae}], oldest first — the persisted
-    series log_forecast_accuracy() has been writing, for a caller that
-    wants to plot or compare readings across real, dated runs rather than
-    just today's single number. [] before the log has its first row.
+    """[{observed_at, n, mae, naive_mae}], oldest first, from
+    log_forecast_accuracy()'s own log. [] before its first row.
     """
     from ffcore.tidy import DECISIONS, read_csv
 
@@ -1740,12 +1530,8 @@ def comparison_lines() -> list[str]:
         f"(mean signed error {mean_signed:+.1f} pts) — the \"Biggest miss\" "
         "table below is the tail, not the whole picture._", "",
     ]
-    # DOES THIS BEAT A TRIVIAL GUESS? Same question baseline_check() asks
-    # of the start-probability side, asked here of the rate side — Stage 3
-    # of the forecast-first rebuild plan. `gap` is a bootstrap CI
-    # (stats.bootstrap_gap()) on ours-vs-naive per-match error, not a bare
-    # point-estimate comparison — a real margin only claims "beats" when
-    # the CI excludes zero, so a close call at n=60 reads as close.
+    # `gap` is a bootstrap CI on ours-vs-naive error, not a bare point
+    # estimate — "beats" only claims a real margin when the CI excludes zero.
     rbc = rate_baseline_check(pairs)
     if rbc is not None:
         gap = rbc["gap"]
@@ -1776,9 +1562,8 @@ def comparison_lines() -> list[str]:
                 f"{MIN_BUCKET_N}+ per bucket) — will start showing once more "
                 "jornadas have locked._", ""]
 
-    # Attribution: not "how wrong", but "wrong about WHAT". One factor at a
-    # time, starting with the newest and least-justified one — this is the
-    # table that decides whether the fixture band is kept, widened or deleted.
+    # Attribution: not "how wrong", but "wrong about WHAT" — decides
+    # whether the fixture band is kept, widened or deleted.
     if fx:
         out += [f"| Next fixture (±{FIX_BAND*100:.0f}%, unfitted) | n | Mean "
                 "forecast | Mean actual | Error |",
@@ -1801,12 +1586,8 @@ def comparison_lines() -> list[str]:
 
 
 def drift_lines() -> list[str]:
-    """Is the season simulation's drift term (DRIFT_FRAC) still a bare
-    guess, or has it actually been fit off real data this run? Miguel
-    (2026-09-06): "I do not want a hardcoded drift" — this is where that
-    promise is checked, every report, not just claimed once in a commit
-    message. See forecast.fit_drift_frac()/drift_frac_from_history() for
-    the estimator itself.
+    """Is DRIFT_FRAC still the bare default, or fit off real data this
+    run? See forecast.fit_drift_frac()/drift_frac_from_history().
     """
     fitted, why = drift_frac_from_history()
     from ffcore.forecast import DRIFT_FRAC as _DEFAULT
@@ -1907,13 +1688,10 @@ def _selftest() -> None:
     fx2, no_fix2 = fixture_rows(old)
     assert fx2 == [] and no_fix2 == 1, (fx2, no_fix2)
 
-    # -- lagged_pair()/lock_order(): a REAL multi-jornada-ahead test off
-    # data already sitting in squad_log.csv, no waiting for a new column or
-    # new jornadas (Miguel, 2026-09-06: "you have all the previous scrapes
-    # with timestamps, why can't you use that?") -----------------------------
-    # Jornada 3 locks BEFORE jornada 1 here — a real rescheduling case
-    # (2026-09: jornada 6 really did lock before jornada 4) — lock_order()
-    # must sort by the actual lock time, not the jornada label.
+    # -- lagged_pair()/lock_order(): multi-jornada-ahead test off data
+    # already in squad_log.csv --------------------------------------------
+    # Jornada 3 locks before jornada 1 (a real rescheduling case) —
+    # lock_order() must sort by actual lock time, not jornada label.
     locks3 = {1: t(20), 2: t(14), 3: t(10)}
     assert lock_order(locks3) == [3, 2, 1], lock_order(locks3)
 
@@ -2093,40 +1871,21 @@ def _selftest() -> None:
     # Nothing played, nothing claimed: still not a zero score for anyone.
     assert start_intervals([], [], []) == ([], 0, [])
 
-    # -- column_guide_lines: the full explanation, moved here 2026-08-22,
-    # trimmed 2026-09-07 to only the tables a real report still renders --
     guide = "\n".join(column_guide_lines())
     for heading in ("The ladder", "The league table"):
         assert heading in guide, heading
-    # THE CURRENT COLUMNS ACTUALLY NAMED, not just the section headings —
-    # 2026-09-01: two independent copies of this text (sim.py's ladder(),
-    # the site's Fantasy.jsx) had already drifted before this single copy
-    # replaced both; a test that only checked the heading existed would
-    # not have caught that.
+    # The current columns actually named, not just the section headings.
     for term in ("pts/M€", "P(above)"):
         assert term in guide, term
-    # THE `€` COLUMN'S BUY/RAID READING, not the KEEP/SELL `vs X` marker
-    # this replaced — that marker described best_swap_for(), cut 2026-09-06,
-    # and asserting it here (2026-09-01's version of this test did) is
-    # exactly how a glossary can describe a feature nobody removed it from.
     for term in ("market price", "premium"):
         assert term in guide, term
     assert "vs X" not in guide, guide
-    # RETIRED SECTIONS STAY GONE — report.py's old board ("Field these
-    # eleven", "What to bid", "Fitness", "Starting") was cut 2026-09-05;
-    # their column-guide paragraphs lived on here describing tables that
-    # no longer exist in any real report until 2026-09-07 caught it.
+    # Retired sections stay gone.
     for heading in ("Field these eleven", "What to bid", "Fitness",
                    "Starting"):
         assert heading not in guide, heading
 
-    # -- forecast_claims(): our OWN start_pct, graded the same way ----------
-    # THE BLIND SPOT (2026-09-06): a player predicted to start who then
-    # didn't play was never graded at all — points.py's diff() only emits
-    # movers (see appearances()'s own note), so "he didn't play" had no row
-    # anywhere for start_grade() to see UNLESS a real claim about him
-    # exists to be scored against that absence. forecast_claims() is that
-    # claim, built straight from squad_log.csv.
+    # -- forecast_claims(): our own start_pct, graded the same way ----------
     import tempfile
     global DECISIONS, TIDY
     real_decisions, real_tidy = DECISIONS, TIDY
@@ -2137,8 +1896,7 @@ def _selftest() -> None:
         write_csv(DECISIONS / "squad_log.csv", [
             {"observed_at": "2026-08-10T1200Z", "player": "Nailed",
              "start_pct": "90", "ff_id": "nailed"},
-            # PREDICTED TO START, NEVER PLAYED — the exact case that used
-            # to vanish before it ever reached a grader.
+            # Predicted to start, never played.
             {"observed_at": "2026-08-10T1200Z", "player": "Benched",
              "start_pct": "85", "ff_id": "benched"},
             {"observed_at": "2026-08-10T1200Z", "player": "NoNumber",
@@ -2146,10 +1904,6 @@ def _selftest() -> None:
             {"observed_at": "", "player": "NoStamp", "start_pct": "50",
              "ff_id": "nostamp"},
         ], ["observed_at", "player", "start_pct", "ff_id"])
-        # `ff_id` is squad_log.csv's misnomer for the repo's own crosswalk
-        # key (see forecast_claims()'s own note) — players.csv/clubs.csv
-        # here stand in for the real crosswalk so team_slug resolution is
-        # tested against the SAME join, not assumed to work.
         write_csv(TIDY / "players.csv",
                  [{"player_id": "nailed", "name": "Nailed", "club_id": "fc"},
                   {"player_id": "benched", "name": "Benched", "club_id": "fc"}],
@@ -2166,17 +1920,11 @@ def _selftest() -> None:
     got = {c["player_name"]: c["start_pct"] for c in claims}
     assert got == {"Nailed": 90.0, "Benched": 85.0}, got
     assert all(c["source"] == "our forecast" for c in claims), claims
-    # THE FIX (2026-09-06): "ff_id" resolved as an app_id found a team_slug
-    # for ~5% of real claims; resolved as the crosswalk key directly (what
-    # it actually is), both of these do.
     assert {c["player_name"]: c["team_slug"] for c in claims} == \
         {"Nailed": "fc-slug", "Benched": "fc-slug"}, claims
 
-    # ...and start_grade() correctly scores "predicted 85%, never a mover"
-    # as a real miss, not a dropped row, INCLUDING on a team-scoped
-    # interval (a 3-tuple, `starts`' own shape) — this is the table that
-    # was silently dropping every one of these claims before team_slug
-    # existed on them at all.
+    # start_grade() scores "predicted 85%, never a mover" as a real miss,
+    # including on a team-scoped interval.
     iv_f = [(snapshot_stamp("2026-08-10T1800Z"), {"nailed"}, {"fc-slug"})]
     numf, _namf, _skipf = start_grade(iv_f, claims)
     row = next(r for r in numf if r[0] == "our forecast")
@@ -2184,41 +1932,22 @@ def _selftest() -> None:
     assert n_f == 2, row
     assert hit_pct == 50.0, row           # 1 of 2 actually appeared
     assert brier > 0.0, row               # a real, nonzero miss on Benched
-    # A DIFFERENT team population excludes both outright — same as the
-    # real bug this closes: no team_slug meant no claim ever reached a
-    # team-scoped interval, whatever the population.
+    # A different team population excludes both outright.
     iv_other = [(snapshot_stamp("2026-08-10T1800Z"), {"nailed"},
                 {"some-other-club"})]
     num_other, _, _ = start_grade(iv_other, claims)
     assert not any(r[0] == "our forecast" for r in num_other), num_other
 
-    # -- golden_rows(): the player-jornada join, checked against REAL data -
-    # No synthetic fixture here on purpose — mocking matches/fixtures/
-    # starters/market/perjornada well enough to prove the jornada-lock
-    # inversion is real would just rebuild load_starts()'s own already-
-    # tested fixture. Instead: a real, cheap invariant that only holds if
-    # the join is actually correct — a row where the start side says he
-    # never appeared must show zero points on the rate side, wherever
-    # both sides exist. Getting the join wrong (matching a claim to the
-    # wrong jornada, the exact failure mode jornada_locks() inversion
-    # exists to prevent) would break this on real data immediately.
+    # -- golden_rows(): the player-jornada join, checked against real data -
+    # A real, cheap invariant: a row where the start side says he never
+    # appeared must show zero points on the rate side, wherever both
+    # sides exist.
     golden = golden_rows()
     checked = [r for r in golden if r["predicted_rate"] is not None]
     assert checked, "golden_rows() must find at least one fully-joined row"
-    # KNOWN, TRACKED EXCEPTION, not a silent tolerance: points.py's
-    # jornada_asof() labels a points delta by "the most recently
-    # CONFIRMED-COMPLETE jornada" as of its timestamp, which is the same
-    # fragile assumption match_locks() exists to avoid on the start side —
-    # a jornada with one deferred match can't be marked complete until
-    # that straggler finishes, days late, so a delta earned earlier gets
-    # mislabeled onto an earlier jornada instead. Real case, 2026-09-12:
-    # Zubeldia and Starfelt both show a nonzero rate-side delta on a
-    # jornada the start side correctly says they never appeared in — both
-    # land on jornada 1, both real players, not a join bug here. Fixing
-    # points.py itself (read the jornada straight off matches.csv per
-    # delta, same fix pattern as match_locks()) is real, separate,
-    # deferred work — not done here, so this stays a bounded, named
-    # exception rather than a loosened check.
+    # Known, tracked exception: points.py's jornada_asof() can mislabel a
+    # delta onto an earlier jornada for a round with a deferred match —
+    # a separate, deferred fix, not a join bug here.
     bad = [r for r in checked
           if not r["actual_started"] and r["actual_points"] != 0.0]
     assert len(bad) <= 2, bad
@@ -2226,10 +1955,7 @@ def _selftest() -> None:
          f"joined, {len(bad)} known points.py-mislabel exception(s)")
 
     # -- golden_dataset(): the shared join every walk-forward hypothesis
-    # test should build on — checked against real data for the thing that
-    # actually broke a real test this session (2026-09-13, the shots
-    # walk-forward check reaching n=3 on a hand-rolled join where the
-    # SAME join this function uses reaches dozens) ------------------------
+    # test should build on ------------------------------------------------
     gd = golden_dataset()
     total_rows = sum(len(v) for v in gd.values())
     assert total_rows >= 30, (

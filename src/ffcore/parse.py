@@ -1,31 +1,17 @@
 """
 ffcore.parse — numbers, parsed by what the field MEANS.
 
-A dot is a thousands separator in the app ("2.050.000" is two million) and a
-decimal point on futbolfantasy ("2.37" is two point three seven). No parser
-can tell those apart from the string alone, so this module does not try:
-you choose money() or ratio() by which field you are reading, and the caller
-records that choice once, at the point it names the column.
+A dot is a thousands separator in the app ("2.050.000" is two million)
+and a decimal point on futbolfantasy ("2.37" is two point three seven).
+No parser can tell those apart from the string alone: choose money() or
+ratio() by which field you're reading.
 
-fmt_money() and fmt_pct() are the way back out, for report tables. They live
-here so a euro prints the same in every report — rivals.py carried its own
-byte-identical copy of fmt_money before this.
+fmt_money()/fmt_pct() are the way back out, shared so a euro prints the
+same in every report.
 
-The four parsers that existed before this module all got a case wrong:
-
-    "2.050.000"   common._num -> None        (every ledger price!)
-    "2.37"        bids.num    -> 237.0
-    "700.000"     offers.num  -> ValueError -> 0.0
-    "1.5M"        report.num  -> 0.0
-
-    money("2.050.000") -> 2050000.0     ratio("2.37") -> 2.37
-
-Known ambiguity, left deliberately: money("44.550") is 44550, not 44.55.
-Three-digit groups after a dot are read as thousands. That is right for every
-euro field in this repo; it is wrong for futbolfantasy's "valor/punto" column,
-which is a ratio — so parse that one with ratio() if you ever ingest it.
-
-Run `python src/ffcore/parse.py` to execute the self-test below.
+Known ambiguity, deliberate: money("44.550") is 44550, not 44.55—
+three-digit dot groups read as thousands, right for every euro field
+here, wrong for a ratio column (use ratio() for those).
 """
 
 from __future__ import annotations

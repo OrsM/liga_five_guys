@@ -4,32 +4,20 @@ and the notification surface. Run after ingest.py parse.
 
     python src/report.py
 
-NOT A REPORT ANY MORE. This used to render a markdown board — one table,
-one metric, points above replacement per million — plus five sections of
-workings under it (field these eleven, buy today, fitness, starting splits).
-sim.py's simulated ladder replaced all of that on 2026-08-18/08-22: it prices
-every real move against the actual rest of the season instead of a static
-replacement level, so the board here became a second, weaker answer to the
-same question, computed and written to `.runtime/parts/latest.md` every run
-for nobody — digest.py stopped stitching it into the appendix on 2026-08-22,
-and the phone has only ever read sim.py's decisions.json. Deleted 2026-09-05
-once that was confirmed (grepped every reader; there were none).
-
-What is left, and genuinely still runs every day:
+Not a rendered report any more — sim.py's simulated ladder replaced the
+old markdown board. What's left, and runs every day:
 
   * WARNINGS — a stale feed, a thin position, an unmodelled player, a
     crosswalk clash, an unrecorded cash balance. Written to
-    `.runtime/warnings.json`, which sim.py's own _warnings() folds into
-    decisions.json — this is the ONLY place these facts are produced.
-  * ALERTS — the same warnings, filtered to what is worth interrupting
+    `.runtime/warnings.json`, which sim.py folds into decisions.json —
+    the ONLY place these facts are produced.
+  * ALERTS — the same warnings, filtered to what's worth interrupting
     someone for, plus a login nudge when the league token is expiring.
-  * squad_log.csv — one row per player per snapshot, so a scorer can later
-    ask what the model's own pick would have cost you, once jornadas exist
-    to grade it against.
+  * squad_log.csv — one row per player per snapshot, to grade the
+    model's own pick later.
 
-SCORING lives in ffcore/score.py, shared with sim.py — one builder,
-build(), one session (ffcore/model.py) — so this file's warnings and the
-simulation's ladder are read off the same squad, never two.
+Scoring lives in ffcore/score.py, shared with sim.py through one session
+(ffcore/model.py) — warnings and the ladder read off the same squad.
 """
 
 from __future__ import annotations

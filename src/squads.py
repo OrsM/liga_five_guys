@@ -8,27 +8,11 @@ Reads:
   data/tidy/*.csv             values, 24h moves, start probabilities
 
 Writes:
-  reports/league.md       every squad in the league, what they paid, what
-                          they can still spend. Named for what it holds:
-                          wrote behaviour.md, which sent you to the wrong
-                          file every time.
+  reports/league.md             every squad, what they paid, what's left
   data/decisions/slate_log.csv  append-only: which players were on offer when
 
-watchlist.md went on 2026-08-18, with the board. It re-listed the slate with
-a value and two probable-XI columns, under a heading that promised "everyone
-unowned, ranked" — and after the cutover the ranking of everyone acquirable,
-free agents and rivals' players alike, is sim.py's BUY/RAID/LISTED table.
-report.py's own bid table (the FF/AF disagreement column) was deleted
-2026-09-05 once it was confirmed nothing read the file it wrote.
-
-Run via workflow_dispatch. No arguments.
-
-MIGRATED: read_initial() and apply_transactions() now live in
-ffcore.league, so every reader replays the ledger the same way rather than
-forking a second copy. The tuning constants that used to sit at the top of
-this file moved to inputs/league.ini — several were stale after the league
-grew from three managers to five, which is the argument for having them in
-one place.
+read_initial()/apply_transactions() live in ffcore.league, replayed the
+same way by every reader. Run via workflow_dispatch; no arguments.
 """
 
 import os
@@ -83,16 +67,8 @@ def row(rec, cells=None):
 
 
 def log_slate(on_offer, players, stamp):
-    """Append-only record of every slate you paste.
-
-    A player who sat on the slate and was never bought is one nobody would pay
-    the floor for, which is the ceiling evidence issue #21 asked about — and it
-    arrives for free, as a by-product of the paste you already do, rather than
-    from a field you have to come back and update. Join it to
-    the ledger to ask what went unsold.
-
-    Nothing reads this yet. A fortnight of slates is not a base rate, and
-    saying so is cheaper than a section that pretends otherwise.
+    """Append-only record of every slate seen — join against the ledger
+    later to ask what went unsold. Nothing reads this yet.
     """
     if not on_offer:
         return
@@ -101,18 +77,14 @@ def log_slate(on_offer, players, stamp):
         rec = players.get(k, {})
         rows.append({
             "observed_at": stamp,
-            # The key IS the site's id now — logged as its own column so a
-            # later grade joins on it rather than on the display name beside
-            # it. See report.LOG_COLS.
-            "ff_id": k,
+            "ff_id": k,   # the join key a later grade uses, not the display name
             "player": rec.get("name", k),
             "value": "" if rec.get("value") is None else "%.0f" % rec["value"],
             "start_pct": ("" if rec.get("start") is None
                           else "%.0f" % rec["start"]),
         })
-    # Before appending, not after: append_csv lets the FILE's header win, so
-    # a new column is silently dropped rather than misaligned. Same migration
-    # report.log_squad does for squad_log.
+    # Widen before appending: append_csv lets the file's own header win, so
+    # a new column would otherwise be silently dropped rather than misaligned.
     path = DECISIONS / "slate_log.csv"
     widen_csv(path, SLATE_LOG)
     append_csv(path, rows, SLATE_LOG)
@@ -155,9 +127,6 @@ def sec_premium(lg, dl) -> list[str]:
 
     all_prem = premiums(dl)
     if all_prem:
-        # Computed, never asserted. This paragraph used to state that the floor
-        # had never won, which was true of the first ten buys and false by the
-        # fifteenth while still printing as fact (issue #23).
         won = all_prem.at_floor
         if won:
             head = ("**The floor sometimes wins.** %d of the %d priced "
@@ -313,11 +282,8 @@ def write_league(lg, players, stamp, second=None,
     if lg.resolved:
         out += ["## Names the ledger did not spell exactly", "",
                 "Placed by who the counterparty was, or by what the price "
-                "implies — a player sold by a manager was in that manager's "
-                "squad, and a player bought from the market was in nobody's "
-                "(issue #26). The ledger itself is generated and editing it "
-                "does nothing, so a wrong player here is fixed in "
-                "`inputs/rosters_initial.txt`.", ""]
+                "implies. The ledger is generated — a wrong player here is "
+                "fixed in `inputs/rosters_initial.txt`.", ""]
         out += ["- " + r for r in lg.resolved] + [""]
 
     unmatched = lg.unmatched(players)
@@ -329,12 +295,6 @@ def write_league(lg, players, stamp, second=None,
                 ""]
         out += ["- " + u for u in unmatched] + [""]
 
-    # The empirical bid data, folded in from the old rivals.py. It lived in a
-    # second 15KB file that also reprinted this file's cash table, this file's
-    # ledger warnings and a second view of the same squads — two reports over
-    # the same facts, and the other one had 21 lines of tests behind 497 lines
-    # of code. What it uniquely knew is these two tables, and they belong
-    # beside the squads they describe.
     if dl:
         out += sec_premium(lg, dl)
         if market is not None:
@@ -348,12 +308,8 @@ def main():
     now = run_now()
     stamp = now.strftime("%Y-%m-%d %H:%M UTC")
     players = load_players()
-    # session().lg, not a second League.load() — this stage runs before
-    # report/decide/sim in run.py's own order, so it is the FIRST caller
-    # to build the run's one League+Scorer now, not a second, independent
-    # one describing the same squad on a second surface. See
-    # ffcore/model.py's own docstring for the bug two separate loads in
-    # one run already caused once (2026-08-20).
+    # First caller of session() in run.py's order — builds the run's one
+    # League+Scorer, not a second independent load.
     from ffcore.model import session
 
     lg = session().lg

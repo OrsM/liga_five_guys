@@ -8,10 +8,9 @@ ingest.py — the only thing that touches the network or the raw store.
     python src/ingest.py prune --apply
     python src/ingest.py --selftest
 
-Fetch and parse stay separate for the reason they always did: scrapers rot.
-When the markup changes, or when you realise you want a field you never
-extracted, you fix `sources.py` and re-run `parse` over the whole history. Keep
-only the parsed output and that option is gone.
+Fetch and parse stay separate: when markup changes, fix sources.py and
+re-run parse over the whole history — only possible because parsed
+output isn't the only thing kept.
 
 WHAT IS IN A SNAPSHOT. One xz-compressed tar per sweep:
 
@@ -20,30 +19,19 @@ WHAT IS IN A SNAPSHOT. One xz-compressed tar per sweep:
         team_celta.html        only if its content changed
         MANIFEST.csv           page, sig, stored, seen — ALWAYS, for every page
 
-`stored` names the snapshot whose archive actually holds those bytes, so a
-page whose content did not change is listed but not written again. `parse`
-carries it forward. Two consequences worth being explicit about:
+The manifest, not the file listing, defines what a snapshot observed —
+a page absent from it was not fetched. `stored` names the archive whose
+bytes actually hold a page's content, carried forward by later
+snapshots; the store is append-only, so deleting one archive corrupts
+every later snapshot that carries a page forward from it.
 
-  * The manifest, not the file listing, defines what a snapshot observed. A
-    page absent from the manifest was not fetched — a 403, or a cadence skip —
-    and parse emits no rows for it, exactly as before.
-  * Deleting one archive corrupts every later snapshot that carries a page
-    forward from it. This store is append-only. It always was; now it matters.
+xz + one tar per sweep (not gzip-per-page): halves storage over
+per-page gzip and lets pages across a sweep share dictionary — 60MB/29
+snapshots to 8MB, keeping a season's projection under GitHub's push
+limit.
 
-WHY tar.xz AND NOT gzip-PER-PAGE. Measured on the first 29 snapshots: 638
-pages, 60 MB, and every single file byte-distinct thanks to ad ids and cache
-busters. Deduplicating on content signature drops 59% of them. xz instead of
-gzip halves what is left, and tarring the pages of one sweep together halves
-it again, because twenty team pages share almost all of their boilerplate and
-a solid archive can see across them. 60 MB becomes 8 MB, and a season's
-projection falls from ~4.4 GB — past the point GitHub blocks a push — to
-~0.2 GB. Both codecs are stdlib, so the test job still installs only lxml and
-cssselect. The cost is that you can no longer open one page in the GitHub web
-UI, which is a fair trade because `parse` reads whole snapshots anyway.
-
-httpx is imported inside fetch(), never at module level. The test job installs
-no network client, and history.py's module-level import is precisely what used
-to break `--selftest` on a machine that never intended to fetch anything.
+httpx is imported inside fetch(), never at module level, so --selftest
+runs on a box with no network client installed.
 """
 
 from __future__ import annotations
@@ -112,11 +100,9 @@ def snapshots() -> list[Path]:
 def _read(path: Path, only: set | None = None) -> dict[str, str]:
     """{member name: text} for one snapshot, whichever layout it is in.
 
-    `only` is the set of members worth decoding, MANIFEST.csv aside — a reader
-    that wants one page out of forty (points.py wants exactly that) pays for
-    the archive's decompression either way, but not for turning twenty team
-    pages it will throw away into str. The manifest is always kept because
-    that is what says which pages the snapshot claims to hold.
+    `only` is the set of members worth decoding, MANIFEST.csv aside — a
+    reader that wants one page of forty pays for the archive's
+    decompression either way, but not for decoding pages it will discard.
     """
     want = None if only is None else set(only) | {MANIFEST}
     if path.is_dir():
@@ -131,11 +117,9 @@ def _read(path: Path, only: set | None = None) -> dict[str, str]:
 
 
 def _write(path: Path, members: dict[str, str]) -> None:
-    """One tar.xz, byte-reproducible: same content in, same bytes out.
-
-    mtime and ownership are zeroed because git stores whatever we hand it, and
-    a timestamp inside the archive would make an otherwise identical snapshot a
-    new blob.
+    """One tar.xz, byte-reproducible: same content in, same bytes out —
+    mtime/ownership are zeroed so an unchanged snapshot never becomes a
+    new git blob.
     """
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(".tmp")
@@ -170,11 +154,7 @@ def _manifest_csv(rows: list[dict]) -> str:
 
 
 def state() -> dict[str, dict]:
-    """{page: manifest row} as of the newest snapshot — what fetch compares to.
-
-    Read from the newest manifest alone rather than by walking history,
-    because the manifest carries the full picture at that moment by design.
-    """
+    """{page: manifest row} as of the newest snapshot — what fetch compares to."""
     snaps = snapshots()
     if not snaps:
         return {}
@@ -182,13 +162,9 @@ def state() -> dict[str, dict]:
 
 
 def pages(only: set | None = None):
-    """(stamp, {page: html}) per snapshot, oldest first, carrying forward.
-
-    The carry-forward is what makes deduplication invisible downstream: a
-    snapshot that stored no new market page still yields the market page that
-    was current at the time, so market.csv has the same rows it always had.
-
-    `only` narrows it to the pages named, for a caller that wants one of them.
+    """(stamp, {page: html}) per snapshot, oldest first, carrying a page
+    forward across snapshots that didn't re-store it. `only` narrows to
+    the pages named.
     """
     keep = None if only is None else {"%s.html" % p for p in only}
     carried: dict[str, str] = {}
@@ -228,20 +204,10 @@ def doc_keys():
     """[(stamp, {page: (content key, the stamp that stored it)})], oldest
     first — the same sequence pages() yields, named rather than read.
 
-    THE ARCHIVES ARE IMMUTABLE, so which document each stamp carried is a fact
-    that only has to be established once. Establishing it every run meant
-    decompressing thirteen megabytes and decoding two thousand documents to
-    rediscover a mapping that had not changed since the season started, and
-    that cost grows with the season — four of parse's seven seconds by the
-    time this was written, on the way to a minute by May.
-
-    The index is written next to the parse cache and validated by file size,
-    so an archive that was rewritten is re-read rather than trusted. A stamp
-    that is not in the index is read normally, which makes the usual case —
-    a run with one new snapshot in it — cost one archive rather than fifty.
-
-    Callers get keys, not text, and fetch the text only for a document whose
-    parse they do not already have; `document()` is how.
+    Cached in data/tidy/snapindex.json and validated by file size, so a
+    run with one new snapshot costs one archive read, not the whole
+    history re-decoded. Callers get keys, not text; documents() reads
+    text only for a document whose parse isn't already cached.
     """
     idx, out, carried, keys = _index_load(), [], {}, _Sigs()
     fresh, opened = {}, 0
@@ -272,13 +238,8 @@ def doc_keys():
 
 def documents(need: dict[str, set]):
     """Yield (stamp, page, html) for the documents named in {stamp: {page}}.
-
-    BATCHED, because the caller's misses are correlated: a cold parse cache
-    wants every document there is, and fetching them one at a time meant a
-    scan of the snapshot list and an archive open per document — 2,500 opens
-    of 53 archives, which turned a rebuild from forty seconds into seventy.
-    A parser change is exactly when a rebuild happens, and exactly when you
-    are iterating and cannot wait a minute for each attempt.
+    Batched per snapshot so a cold cache doesn't reopen the same archive
+    once per document.
     """
     for snap in snapshots():
         stamp = _stamp_of(snap)
@@ -294,33 +255,19 @@ def documents(need: dict[str, set]):
 # fetch
 # ---------------------------------------------------------------------------
 
-# How long a "twice_daily" page may go unasked. Six hours, so both scheduled
-# sweeps get their own reading — 00:40 and 11:40 are eleven hours apart — while
-# a rerun pressed from the phone an hour later re-uses what is already stored
-# instead of asking forty sites again.
+# How long a "twice_daily" page may go unasked, so both scheduled sweeps
+# (~11h apart) each get their own reading.
 TWICE_DAILY_HOURS = 6.0
 
 
 def due(src, prev: dict, now: str) -> bool:
     """Should this sweep request `src`? `now` is this sweep's stamp.
 
-    Cadence "daily" says no when we already requested the page today. A page
-    not due is carried into this snapshot's manifest with its previous `seen`,
-    so it is due again tomorrow and `parse` still sees it today.
-
-    Cadence "twice_daily" says no until TWICE_DAILY_HOURS have passed since it
-    was last asked. THE CALENDAR IS THE WRONG BOUND FOR A PAGE THAT MOVES
-    DURING THE DAY: the probable-XI pages were "daily", so the 11:40 sweep —
-    the run that exists because the XIs have firmed up by late morning, which
-    is what lfg.timer says about itself — skipped them and reported the reading
-    from 00:13. Forcing the sweep at 17:50 on 2026-08-19 measured what that
-    costs: futbolfantasy moved 23 of 512 rows, analitica 70 of 197, and four
-    rows of the fielded squad. Hours rather than a second calendar rule,
-    because a rerun at five past midnight must not re-ask forty pages.
-
-    Cadence "once" says no as soon as we have the page at all. That is the
-    match pages: a confirmed eleven does not change after kickoff, so asking
-    again buys the live stats we do not parse, 380 times a season.
+    "daily": no if already requested today. "twice_daily": no until
+    TWICE_DAILY_HOURS have passed since it was last asked — bounded by
+    elapsed hours, not the calendar, since a page can move mid-day and a
+    date change alone shouldn't gate it. "once": no once we have it at
+    all (e.g. a confirmed lineup, unchanged after kickoff).
     """
     if src.cadence == "once":
         return src.key not in prev
@@ -334,10 +281,9 @@ def due(src, prev: dict, now: str) -> bool:
 
 
 def _hours_between(then: str, now: str) -> float | None:
-    """Hours from one sweep stamp to another, or None if either is unreadable.
-
-    None means "ask": a stamp we cannot read is not evidence that the page is
-    current, and one extra fetch is cheaper than a day of not noticing.
+    """Hours from one sweep stamp to another, or None if either is
+    unreadable — treated as "ask", since one extra fetch is cheaper than
+    missing a day.
     """
     from ffcore.tidy import snapshot_stamp
 
@@ -348,13 +294,9 @@ def _hours_between(then: str, now: str) -> float | None:
 
 
 def carry_matches(rows: list[dict], prev: dict) -> list[dict]:
-    """`rows` plus every match page the last manifest knew and this one missed.
-
-    Match pages are fetched once ever, so they have to be carried into each new
-    manifest by hand: state() reads the newest manifest alone, and a page that
-    fell out of it would look unfetched and be requested again every run for the
-    rest of the season. The calendar is only swept once a day, so on the second
-    run of a day no match page is even in the queue to be carried the usual way.
+    """`rows` plus every match page the last manifest knew and this one
+    missed — match pages are fetched once ever, so a manifest that
+    dropped one would re-request it for the rest of the season.
     """
     have = {r["page"] for r in rows}
     return rows + [dict(r) for page, r in prev.items()
@@ -362,17 +304,9 @@ def carry_matches(rows: list[dict], prev: dict) -> list[dict]:
 
 
 def _odds_api_key() -> str | None:
-    """The Odds API credential, or None — never in source, never committed.
-
-    Read from `.odds_api_key` at the REPO root (gitignored — see
-    .gitignore's own note) — deliberately NOT `ffcore.tidy.ROOT`, which
-    despite the name is the DATA root (`./data` by default, `FF_ROOT`
-    overridable), a different directory this credential file has nothing
-    to do with. A fresh checkout or a CI box simply has no key rather than
-    a broken one; `ODDS_API_KEY` in the environment is checked first for a
-    box that prefers that route instead (this repo's own `LFG_TOKEN`/
-    `LFG_NO_FETCH` already read env vars for exactly this kind of per-box
-    override).
+    """The Odds API credential, or None — never in source, never
+    committed. `ODDS_API_KEY` env var first, else `.odds_api_key` at the
+    repo root (gitignored).
     """
     env = os.environ.get("ODDS_API_KEY")
     if env:
@@ -400,19 +334,13 @@ def fetch() -> Path:
     store: dict[str, str] = {}
     rows: list[dict] = []
     unchanged = skipped = rotted = 0
-    # WHICH PAGES COST THE TIME, AND WHICH ARE ROTTING. The sweep is the
-    # longest step in the run by a distance and nothing said where it went —
-    # forty pages fetched in a queue with one line of output for the lot. A
-    # source that times out every day is a source to drop; without this the
-    # only evidence was a warn line scrolling past in a journal.
+    # Per-request timing, so a slow or failing source is visible in the log.
     timing: list[tuple] = []
     fails: dict[str, str] = {}
 
-    # One token for the whole sweep, fetched before the first request so a
-    # login that has expired fails here — loudly, once — rather than four
-    # times in the middle of a queue. A missing token is NOT fatal: the public
-    # scrapers are the older half of this repo and still work without it, so
-    # the sweep degrades to what it always did rather than producing nothing.
+    # One token for the whole sweep, fetched up front so an expired login
+    # fails loudly once rather than mid-queue. Not fatal: public scrapers
+    # still work without it.
     bearer = None
     try:
         from ffcore.auth import TokenStore
@@ -428,8 +356,7 @@ def fetch() -> Path:
         print(f"  warn: league token unusable ({e}); API sources skipped.")
 
     # Same "missing credential degrades to no fetch" shape as the league
-    # bearer above, for a different credential — see _odds_api_key()'s own
-    # note on where this is read from.
+    # bearer above, for the odds source.
     odds_key = _odds_api_key()
     if odds_key is None:
         print("  note: no Odds API key (.odds_api_key or ODDS_API_KEY); "
@@ -437,15 +364,11 @@ def fetch() -> Path:
 
     with httpx.Client(headers=HEADERS, timeout=TIMEOUT,
                       follow_redirects=True) as c:
-        # A queue rather than a loop over the registry, because the calendar
-        # adds work to it: the match pages it lists are not knowable until it
-        # has been read. Everything else about the sweep is unchanged — same
-        # spacing, same backoff, same manifest.
+        # A queue, not a fixed loop: the calendar adds match pages to it that
+        # aren't knowable until it's been read.
         queue = list(sources())
-        # Captured off api_leagues the moment it answers, exactly like the
-        # league id league_sources() already bakes into the market/teams/
-        # activity URLs it queues — offer_sources() needs the same id and
-        # api_teams carries none, so it is read here rather than re-derived.
+        # Captured off api_leagues the moment it answers — offer_sources()
+        # needs the league id and api_teams carries none.
         league_id = None
         me = load_config().me
         while queue:
@@ -455,24 +378,17 @@ def fetch() -> Path:
                     rows.append(dict(prev[src.key]))     # carried, not fetched
                 skipped += 1
                 continue
-            # A missing Odds API key means this ONE source has nothing to
-            # ask for — skip it here, before a request with a blank
-            # apiKey= goes out and wastes a slot in the sweep on a
-            # guaranteed 401. Every other source is unaffected.
+            # No key -> nothing to ask for; skip before a blank apiKey=
+            # wastes a slot on a guaranteed 401.
             if src.key == "odds" and odds_key is None:
                 skipped += 1
                 continue
-            # {date} is filled for the one source whose URL carries the day it
-            # is asking about (Club Elo); {base} for the league API, whose host
-            # lives next to the token that opens it; {odds_key} for the odds
-            # source alone (see ODDS_URL's own note) — a no-op .format() slot
-            # for every other URL, none of which contain that placeholder.
+            # {date}/{base}/{odds_key} are filled for the sources whose URL
+            # needs them; a no-op slot for every other URL.
             url = src.url.format(date=stamp[:10], base=API_BASE,
                                  odds_key=odds_key or "")
-            # The bearer goes ONLY on entries that asked for it. Sending it
-            # with a futbolfantasy request would hand a third party the
-            # credential to the league account, so this is a per-request
-            # header and never a client-wide one.
+            # The bearer goes ONLY on entries that asked for it — sending it
+            # to a third party would leak the league account's credential.
             extra = {}
             if src.auth:
                 if bearer is None:
@@ -486,19 +402,13 @@ def fetch() -> Path:
             if src.timeout is not None:
                 kw["timeout"] = src.timeout
             try:
-                # BODY MEANS POST, ITS ONLY JOB. Every source before
-                # Understat left this None and got exactly the GET this
-                # loop always sent; a source that sets it is asking for
-                # its own player-stats endpoint, which answers a GET with
-                # an error rather than the data (verified directly).
+                # A source with a body wants its own POST endpoint (e.g.
+                # Understat's player-stats); everything else is a GET.
                 r = (c.post(url, data=src.body, **kw) if src.body is not None
                     else c.get(url, **kw))
             except httpx.RequestError as e:
                 timing.append((time.monotonic() - t0, src.key, "FAILED"))
                 fails[src.key] = type(e).__name__
-                # A host that refuses the connection or never answers is one
-                # missing page, not a reason to lose the sweep. Same treatment
-                # as a non-200: warn, skip, keep going.
                 print(f"  warn: {type(e).__name__} on {src.key}, skipping")
                 continue
             timing.append((time.monotonic() - t0, src.key, r.status_code))
@@ -510,38 +420,29 @@ def fetch() -> Path:
                 print(f"  warn: {r.status_code} on {src.key}, skipping")
                 continue
             if src.key == CAL_KEY:
-                # Only matches the calendar shows a score for: an unplayed
-                # match page has no lineup on it to read.
+                # Only matches the calendar shows a score for have a lineup.
                 queue += played_sources(r.text)
             if src.table == "api_activity":
-                # The feed names players only by id, and half of them belong
-                # to players since sold — neither in a squad nor on the
-                # market, so nothing else in the store can name them. One
-                # lookup each, once ever, deduplicated by the "once" cadence.
+                # Names players only by id, half of them since sold — one
+                # lookup each, deduplicated by the "once" cadence.
                 queue += player_sources(r.text)
             if src.key == API_LEAGUES_KEY:
-                # Same trick: the market, squad and activity URLs all carry a
-                # league id that this page is what tells us, so the sweep
-                # discovers its own work rather than reading an id out of a
-                # config file that could go stale.
+                # This page carries the league id the market/squad/activity
+                # URLs need, discovered here rather than read from config.
                 queue += league_sources(r.text)
                 leagues = parse_api_leagues(r.text, stamp)
                 if leagues:
                     league_id = leagues[0]["league_id"]
             if src.key == "api_teams" and league_id:
-                # RECEIVED offers, one lookup per player YOU hold.
-                # offer_sources() itself filters to `me`'s roster — querying
-                # a rival's playerTeamId 403s (see its own note), and a 403
-                # anywhere in this sweep is fatal, below. `league_id` here is
-                # only ever missing if api_leagues itself came back empty.
+                # Received offers, one lookup per player YOU hold — filtered
+                # to `me`'s roster (a rival's playerTeamId 403s).
                 queue += offer_sources(r.text, me, league_id)
 
             sig = src.sign(r.text)
             was = prev.get(src.key, {})
             if sig is None:
-                # Selectors matched nothing. Never deduplicate this: every
-                # rotted page looks like the last one, and dropping it would
-                # throw away the evidence of the rot.
+                # Selectors matched nothing — store unconditionally, never
+                # dedup, so the rot itself stays visible.
                 print(f"  warn: {src.key} matched no known markup — stored "
                       f"unconditionally. Check the selectors.")
                 rotted += 1
@@ -557,13 +458,9 @@ def fetch() -> Path:
                 rows.append({"page": src.key, "sig": sig, "stored": stamp,
                              "seen": stamp})
                 print(f"  {src.key}: {len(r.text) // 1024}KB")
-            # THE GAP IS FOR THE SCRAPED SITES, and only for them. It is
-            # there because someone maintains futbolfantasy for free; the
-            # league's own API is this account asking the app about itself,
-            # over an authenticated connection, and pausing two seconds
-            # between those requests is politeness aimed at nobody. Keyed on
-            # `auth` because that is exactly the line: the bearer marks a
-            # first-party call.
+            # The gap is for the scraped sites only (keyed on `auth`) —
+            # someone maintains futbolfantasy for free; the league's own API
+            # is this account asking about itself and needs no politeness pause.
             if not src.auth:
                 time.sleep(random.uniform(*DELAY))
 
@@ -597,17 +494,9 @@ FEED_FIELDS = ["observed_at", "page", "status", "seconds"]
 
 
 def _log_feeds(stamp: str, timing: list, fails: dict) -> None:
-    """One row per request per sweep, appended.
-
-    A SOURCE THAT STOPS ANSWERING DOES NOT LOOK BROKEN ANYWHERE. Club Elo had
-    been timing out for two days and the fixture board carried on ranking
-    twenty clubs by a rating from before the jornada, because a failed fetch
-    leaves the last good rows in the tidy store and every reader downstream
-    treats them as today's. The warn line scrolls past in a journal nobody
-    reads.
-
-    This is the record that lets the appendix print how old each feed's last
-    answer is, which is the only form of that fact anyone will see.
+    """One row per request per sweep, appended — lets the report show how
+    stale each feed's last real answer is, since a failed fetch otherwise
+    leaves the last good rows looking current to every downstream reader.
     """
     if not timing:
         return
@@ -625,34 +514,19 @@ def _log_feeds(stamp: str, timing: list, fails: dict) -> None:
 def parse() -> None:
     """Every snapshot ever taken -> data/tidy/*.csv. Full rebuild each run.
 
-    PARSED ONCE PER DOCUMENT, NOT ONCE PER SNAPSHOT. The carry-forward hands
-    the same market page to forty-seven consecutive stamps when it changed
-    twice, and every one of them was being run through lxml again — a hundred
-    seconds a run, growing with the season. A page is now parsed once per
-    distinct CONTENT and the rows are re-stamped for every snapshot that
-    carried it, which is the same output by construction: `observed_at` is the
-    only field any parser takes from the stamp, and the self-test holds that.
-
-    MATERIALISED ONE TABLE AT A TIME, NOT ALL SEVENTEEN AT ONCE. Every row of
-    every table used to be re-stamped into `tables[table]` (route()'s own
-    dict(r) copy) DURING the walk below, so by the time the first line got
-    written to disk this held a second, restamped copy of the entire tidy
-    store — market.csv and lineups.csv alone are ~55MB of that. `pending`
-    below holds (stamp, row) instead, where `row` is a REFERENCE into `cache`
-    (already resident — it is the parse cache, unavoidable) rather than a
-    copy; the per-stamp dict() copy route() always needed still happens, just
-    deferred to the write loop, table by table, so only the table currently
-    being written is materialised. Measured 2026-08-29: ingest.parse()'s own
-    peak RSS roughly halved on this box's real tidy store.
+    Parsed once per distinct document CONTENT, not once per snapshot — a
+    carried-forward page is re-stamped for every snapshot it appears in
+    rather than re-parsed. Written one table at a time so only the table
+    currently being written is fully materialised in memory.
     """
     pending: dict[str, list[tuple[str, dict]]] = {}
     cache, fresh = _parse_cache(), {}
     walk = doc_keys()
     keys = _Sigs()
 
-    # What has to be read off disk: the documents this run needs a parse of
-    # and does not already have one for. Gathered first so the archives can be
-    # opened once each rather than once per document.
+    # What has to be read off disk: documents this run needs a parse of
+    # and doesn't already have one for. Gathered first so each archive
+    # opens once rather than once per document.
     need: dict[str, set] = {}
     for stamp, docs in walk:
         for key, (ck, origin) in docs.items():
@@ -690,9 +564,9 @@ def parse() -> None:
     print("  parsed %d documents, reused %d" % (misses, hits))
 
     TIDY.mkdir(parents=True, exist_ok=True)
-    # probable_xi.csv was this file before it grew a `source` column. Tidy is
-    # disposable and rebuilt whole every run, so the old copy is deleted rather
-    # than left to be read by mistake.
+    # probable_xi.csv was this file before it grew a `source` column —
+    # tidy is disposable, so the old copy is deleted rather than read by
+    # mistake.
     (TIDY / "probable_xi.csv").unlink(missing_ok=True)
 
     market_count = 0
@@ -704,34 +578,20 @@ def parse() -> None:
     starters_count = 0
     starters_matches: set = set()
 
-    # One file per table, named by the table, ONE TABLE'S ROWS MATERIALISED
-    # AT A TIME — see this function's own docstring. This used to be three
-    # hardcoded lines, so a new source in the registry was still half-wired
-    # here — the rows were collected and then never written. A registry
-    # entry is now the whole change.
+    # One file per table, named by the table — a registry entry is the
+    # whole change needed to wire in a new source.
     for table in sorted(pending):
         rows = []
         for stamp, r in pending.pop(table):
-            # dict(r) + pop + set, not a filtered comprehension unioned with
-            # a second dict — same result, one dict allocation instead of
-            # two. Same fix as route()'s own (2026-08-29), inlined here
-            # because this loop replaces route() as parse()'s hot path.
             d = dict(r)
             d.pop(ROW_TABLE, None)
             d["observed_at"] = stamp
             rows.append(d)
-        # A table of immutable facts keeps the first sighting of each and
-        # nothing else — see sources.STORE_ONCE. Applied here, once, at the
-        # only place tidy files are written, so a new such table is one
-        # registry line rather than a special case in a writer.
+        # An immutable-facts table (sources.STORE_ONCE) keeps only the
+        # first sighting of each key.
         if table in STORE_ONCE:
             rows = first_seen(rows, STORE_ONCE[table])
         _write_csv(TIDY / f"{table}.csv", rows)
-        # The report below only ever needed SUMMARIES of five of these
-        # seventeen tables, never the rows themselves past this point — so
-        # they are taken here, while `rows` is still alive for its one
-        # table's write, instead of keeping every table's rows around
-        # afterwards the way tables.get("market", []) etc. used to.
         if table == "market":
             market_count = len(rows)
         elif table == "lineups":
@@ -752,18 +612,12 @@ def parse() -> None:
     if not market_count:
         sys.exit("ERROR: market parse produced 0 rows — the markup changed.")
 
-    # Print the status breakdown every run. The injury column sat on 'ok' for
-    # 14,765 rows without anything noticing; a count in the log is what makes
-    # that visible the next time the markup moves.
-    # "" is a real status meaning "this page said nothing about fitness", and
-    # it needs a printable name or it renders as a blank in the run log.
+    # "" is a real status meaning "this page said nothing about fitness".
     flags = ", ".join("%s %d" % (k or "not stated", v)
                       for k, v in sorted(tally.items()) if k != "ok")
     by_src = ", ".join("%s %d" % (k, v) for k, v in sorted(per_source.items()))
     print(f"market {market_count} rows, lineups {xi_count} rows "
           f"({by_src}), fixtures {fixture_count} rows")
-    # The realised elevens are what grades every probable-XI source, so a match
-    # played and never read has to be visible rather than merely absent.
     print("  played %d matches, starters %d rows for %d of them"
           % (len(played), starters_count, len(starters_matches)))
     print("  status: ok %d%s" % (tally.get("ok", 0),
@@ -773,34 +627,18 @@ def parse() -> None:
               "shows injuries, the fitness selectors have rotted.")
 
 
-# Parsed rows, kept between runs and keyed by the CONTENT of the page.
-#
-# lxml over three hundred and eighty documents is twelve seconds, every run,
-# for documents that have not changed since the last one — the raw archives
-# are immutable, so the parse of a given page can only change when the PARSER
-# changes. The fingerprint is the parser source: touch sources.py and the
-# whole cache is discarded, which is the only event that can invalidate it.
-#
-# Content-hashed rather than stamp-ranged, so the carry-forward needs no
-# special case and a re-fetched identical page costs nothing.
+# Parsed rows, kept between runs, keyed by the CONTENT of the page and the
+# parser's own signature — a raw archive is immutable, so a page's parse
+# can only change when the parser does; touching sources.py invalidates
+# only the parsers it actually changed.
 _CACHE = "parsed.json"
 
 
 class _Sigs:
-    """Cache key per document, computed once per DISTINCT document.
-
-    The carry-forward hands the same market page to every stamp since it last
-    changed, and it hands back the same str OBJECT each time — so hashing it
-    per stamp was hashing 2.4 GB of html to get a few hundred distinct
-    digests. Two seconds of every run, spent proving that a string equals
-    itself.
-
-    Memoised on (page, len, hash) rather than on the text, because CPython
-    stores a str's hash on the object the first time it is asked for: the
-    carried-forward copies are the same object, so every lookup after the
-    first is free and nothing has to be held onto. Holding onto them was the
-    first attempt and it ran the box out of memory — a quarter of a gigabyte
-    of pinned html to save two seconds is not a trade.
+    """Cache key per document, computed once per DISTINCT document —
+    memoised on (page, len, hash) rather than the text itself, since a
+    carried-forward page is the same str object every time and CPython
+    caches its hash on first use.
     """
 
     def __init__(self) -> None:
@@ -819,18 +657,9 @@ _SIG_CACHE: dict[str, str] = {}
 
 
 def parse_key(content_key: str, src) -> str:
-    """The cache key for one document read by one parser.
-
-    THE CONTENT KEY IS NOT ENOUGH. A parse is a function OF the page and of
-    the code that reads it, and this cache used to carry only the page: a
-    single fingerprint over the whole of sources.py gated the lot, so touching
-    any parser — or a fixture string, or a comment — discarded four hundred
-    documents' worth of work and cost a forty-second rebuild.
-
-    Keyed per parser instead, on the closure of everything in sources.py that
-    parser can reach. A changed parser misses its own entries and re-parses
-    only its own pages; everybody else's stay. Stale entries need no eviction
-    because _save_parse_cache writes back only what this run actually used.
+    """The cache key for one document read by one parser — keyed per
+    parser (not one signature over all of sources.py), so a changed
+    parser only misses its own entries.
     """
     name = getattr(src.parse, "__name__", "")
     sig = _SIG_CACHE.get(name)
@@ -848,9 +677,7 @@ def _parse_cache(name: str = _CACHE) -> dict:
 
 
 def _save_parse_cache(docs: dict, name: str = _CACHE) -> None:
-    """Only what THIS run used, so the file cannot grow without bound: a page
-    nobody carried forward any more is a page nobody will ask about again —
-    and neither is a parser nobody has any more."""
+    """Only what THIS run used, so the file can't grow without bound."""
     TIDY.mkdir(parents=True, exist_ok=True)
     try:
         (TIDY / name).write_text(json.dumps({"docs": docs}), encoding="utf-8")
@@ -859,23 +686,13 @@ def _save_parse_cache(docs: dict, name: str = _CACHE) -> None:
 
 
 def route(tables: dict, rows: list[dict], default: str, stamp: str) -> None:
-    """File each row under the table it names, or the source's if it names
-    none, stamped with the snapshot it was observed in.
-
-    A ROW MAY NAME ITS OWN TABLE, and almost none do: a source has one table
-    and its rows go there. The exception is a document carrying two grains —
-    the squad feed answers with a squad (one row per player) and with each
-    player's match history (one row per player per week per stat), and
-    fetching it twice to separate them would be absurd. See sources.ROW_TABLE.
-
-    The marker is consumed here rather than written out: how a row was routed
-    is not a fact about the row.
+    """File each row under the table it names, or the source's if it
+    names none, stamped with the snapshot it was observed in. A row
+    names its own table only when one document carries two grains (e.g.
+    the squad feed's per-player match history) — see sources.ROW_TABLE.
     """
     for r in rows:
         table = r.get(ROW_TABLE) or default
-        # dict(r) + pop + set, not a filtered comprehension unioned with a
-        # second dict — same result, one dict allocation instead of two.
-        # Measured 2026-08-29: 2.7x faster per row.
         d = dict(r)
         d.pop(ROW_TABLE, None)
         d["observed_at"] = stamp
@@ -883,16 +700,10 @@ def route(tables: dict, rows: list[dict], default: str, stamp: str) -> None:
 
 
 def first_seen(rows: list[dict], key: tuple) -> list[dict]:
-    """`rows` with every repeat of a key after its first sighting dropped.
-
-    For the tables in sources.STORE_ONCE, which the feed republishes whole on
-    every sweep. The FIRST copy is the one kept, so `observed_at` records when
-    a fact entered the store and never moves again — which also means the file
-    only ever gains lines, and git only ever stores the difference.
-
-    A row with an empty key is not collapsed. Two unlabelled rows are two
-    facts we cannot tell apart, and throwing one away because neither carries
-    an id is worse than keeping both.
+    """`rows` with every repeat of a key after its first sighting dropped
+    — for tables the feed republishes whole every sweep, so `observed_at`
+    records when a fact first entered the store. A row with an empty key
+    is kept, not collapsed with every other unlabelled row.
     """
     out, seen = [], set()
     for r in rows:
@@ -906,17 +717,9 @@ def first_seen(rows: list[dict], key: tuple) -> list[dict]:
 
 
 def _write_csv(path: Path, rows: list[dict]) -> None:
-    """LF, matching ffcore.tidy.write_csv. These two files were CRLF for their
-    whole life because that is csv.DictWriter's default; the reshape that added
-    the `source` column rewrote every row anyway, so the split ended here.
-
-    csv.writer + a manual row-list, not DictWriter — same "extra key"
-    ValueError DictWriter itself raises (route() feeds one table from
-    several sources, so rows[0]'s shape is not a given for every row; that
-    check stays, just done as a set-difference here instead of a fresh
-    generator inside DictWriter's own per-row _dict_to_list()). Missing keys
-    still default to "" — same as DictWriter's own restval. Measured
-    2026-08-29: 24% faster over market.csv's 96,361 rows (0.36s -> 0.28s).
+    """LF line endings, matching ffcore.tidy.write_csv. Raises the same
+    "extra key" error DictWriter would if a row carries a field outside
+    the first row's shape.
     """
     if not rows:
         return
@@ -939,13 +742,9 @@ def _write_csv(path: Path, rows: list[dict]) -> None:
 # ---------------------------------------------------------------------------
 
 def baseline(url: str = "", label: str = "") -> None:
-    """Last season's points table -> data/season/points_<label>.csv.
-
-    The one thing history.py did that the daily sweep does not. Both read the
-    same page and the same parser, but the sweep only ever sees whichever
-    season the selector defaults to. Once that flips to the new season, the
-    completed season is reachable only by asking for it, which is what --url
-    is for. Run it once a season.
+    """Last season's points table -> data/season/points_<label>.csv. Run
+    once a season, once the live sweep's selector has moved on to the new
+    one and the completed season is reachable only via --url.
     """
     import httpx
 
@@ -960,8 +759,8 @@ def baseline(url: str = "", label: str = "") -> None:
 
     label = re.sub(r"[^0-9A-Za-z._-]", "", label or season_label(html)) or "unknown"
 
-    # Raw first, and unconditionally. If the parse below fails, the page that
-    # broke it is the only thing that can tell you why.
+    # Raw first, and unconditionally — if the parse below fails, the page
+    # that broke it is the only thing that can say why.
     _write(RAW / f"season={label}.tar.xz",
            {"points.html": html,
             MANIFEST: _manifest_csv([{"page": "points", "sig": "",
@@ -976,14 +775,9 @@ def baseline(url: str = "", label: str = "") -> None:
     _write_points_csv(rows, label, url)
 
 
-# The fields written to data/season/points_<label>.csv. ff_id WAS MISSING —
-# parse_points() already extracts it (the same id every other reader in this
-# repo joins on), but this writer's own fieldnames list did not name it, so
-# csv.DictWriter silently dropped it from every row before it ever reached
-# disk. That made the PRIOR season — a name-keyed, never-updated snapshot,
-# exactly the shape rosters_initial.txt was — the one place left where a
-# player whose display name moved on between seasons would silently lose
-# his shrinkage prior rather than being found by id.
+# ff_id was previously missing from this list despite parse_points()
+# already extracting it — DictWriter silently drops any field not named
+# here.
 POINTS_FIELDS = ["player_name", "player_name_full", "team", "points",
                  "games", "avg", "ff_id", "season", "observed_at",
                  "source_url"]
@@ -1013,12 +807,10 @@ def _write_points_csv(rows: list[dict], label: str, url: str) -> None:
 def prune(apply: bool = False) -> None:
     """Rewrite data/raw as deduplicated archives. Dry run unless --apply.
 
-    Two jobs in one pass, because they are the same pass: turn pre-migration
-    directories into archives, and drop pages whose signature never changed.
-    Signatures come from the CURRENT sources.py, so re-running this after
-    changing a selector would re-decide what to keep from a smaller set of
-    pages than the original fetch saw. Don't. Migrate once; after that, fetch
-    does the deduplicating as it goes.
+    Migrates pre-migration directories into archives and drops pages
+    whose signature never changed, in one pass. Signatures come from the
+    CURRENT sources.py, so re-run this only right after a fetch, not
+    after changing a selector.
     """
     snaps = snapshots()
     if not snaps:
@@ -1115,11 +907,8 @@ def _selftest() -> None:
         assert p.read_bytes() == q.read_bytes(), "archive not reproducible"
 
     # -- the snapshot index answers the same walk without reading disk -----
-    # This is the load-bearing claim of doc_keys: that the second run of a
-    # season sees exactly what the first one did, having opened no archives.
-    # If it ever drifts, every tidy CSV is quietly built from a stale picture
-    # of which snapshot carried which page — the worst failure in the repo,
-    # because nothing downstream would look wrong.
+    # Load-bearing claim of doc_keys: a second run sees exactly what the
+    # first one did, having opened no archives.
     import io as _io
     import contextlib
 
@@ -1133,8 +922,7 @@ def _selftest() -> None:
         _write(RAW / "dt=2026-01-01T0000Z.tar.xz",
                {"market.html": "<html>a</html>", MANIFEST: man("market")})
         # The second snapshot stores nothing new: market is CARRIED into it,
-        # which is the case the index has to reproduce and the reason it
-        # records the stamp that stored each document rather than just its key.
+        # which is why the index records the stamp that stored each document.
         _write(RAW / "dt=2026-01-02T0000Z.tar.xz", {MANIFEST: man("market")})
 
         cold = doc_keys()
@@ -1149,8 +937,8 @@ def _selftest() -> None:
         assert warm == cold, (warm, cold)
         assert "read" not in buf.getvalue(), "archives re-read on a warm index"
 
-        # A rewritten archive is a different size, and a different size is the
-        # only thing standing between the index and trusting itself blindly.
+        # A rewritten archive is a different size, which is what the index
+        # checks rather than trusting itself blindly.
         _write(RAW / "dt=2026-01-02T0000Z.tar.xz",
                {"market.html": "<html>bb</html>", MANIFEST: man("market")})
         buf = _io.StringIO()
@@ -1173,29 +961,17 @@ def _selftest() -> None:
     assert [r["page"] for r in legacy] == ["market", "team_celta"], legacy
 
     # -- an immutable fact is stored once, not once per sweep ---------------
-    # THE FEED REPEATS ITSELF ON EVERY SWEEP and the store was keeping every
-    # copy. A transfer that happened on 15 August is the same row in all
-    # twenty snapshots that have seen it since: on 2026-08-19 api_activity.csv
-    # held 1,225 rows carrying 63 distinct events, api_players.csv 1,020 rows
-    # carrying 55 names. Worse than untidy — it is QUADRATIC. Every sweep
-    # rewrites the whole file with one more copy of everything, and every run
-    # commits it: 14.5 KB to 77 KB in thirty-six hours, and the increment
-    # itself grows. A season of it is hundreds of megabytes of git history
-    # saying the same thing.
     ev = [{"activity_id": "a1", "at": "2026-08-15T22:24", "observed_at": "t1"},
           {"activity_id": "a2", "at": "2026-08-16T09:00", "observed_at": "t1"},
           {"activity_id": "a1", "at": "2026-08-15T22:24", "observed_at": "t2"},
           {"activity_id": "a3", "at": "2026-08-17T11:00", "observed_at": "t2"}]
     once_only = first_seen(ev, ("activity_id",))
     assert [r["activity_id"] for r in once_only] == ["a1", "a2", "a3"], once_only
-    # THE FIRST SIGHTING WINS, so observed_at means "when this entered the
-    # store" and stays put. Keeping the last would rewrite the whole file
-    # every sweep and lose the one fact the column carries here.
+    # First sighting wins: observed_at means "when this entered the store".
     assert once_only[0]["observed_at"] == "t1", once_only[0]
-    # Order is the order things were first seen, because the file is a log.
     assert [r["observed_at"] for r in once_only] == ["t1", "t1", "t2"]
-    # A row missing the key is kept rather than collapsed onto every other
-    # row missing it — dropping a fact because it is unlabelled is worse.
+    # A row missing the key is kept rather than collapsed with every other
+    # row missing it.
     odd = first_seen([{"activity_id": "", "at": "x", "observed_at": "t1"},
                       {"activity_id": "", "at": "y", "observed_at": "t2"}],
                      ("activity_id",))
@@ -1205,15 +981,13 @@ def _selftest() -> None:
                         {"a": "1", "b": "1"}], ("a", "b"))
     assert len(pairs) == 2, pairs
     assert first_seen([], ("activity_id",)) == []
-    # Only the tables that ARE immutable. api_teams and api_market are time
-    # series — a value, a clause and a bid count all move — and collapsing
-    # those would throw away the history the market model is fitted on.
+    # Only tables that ARE immutable — api_teams/market are time series and
+    # collapsing them would lose the history the market model fits on.
     assert set(STORE_ONCE) == {"api_activity", "api_players",
                               "api_stats", "results_history"}, STORE_ONCE
     assert "api_teams" not in STORE_ONCE and "market" not in STORE_ONCE
-    # A CORRECTED STAT IS A NEW FACT, not a repeat: the key carries the value,
-    # so an unchanged line is stored once and a rescored one arrives as a
-    # second row with a later observed_at rather than overwriting the first.
+    # A corrected stat is a new fact, not a repeat: the key carries the
+    # value, so a rescored line arrives as a second row.
     line = {"player_id": "1337", "week": "1", "stat": "goals",
             "value": "1", "points": "4", "observed_at": "t1"}
     again = dict(line, observed_at="t2")
@@ -1222,22 +996,15 @@ def _selftest() -> None:
     assert [r["observed_at"] for r in kept] == ["t1", "t3"], kept
 
     # -- one document, two grains ------------------------------------------
-    # The squad feed carries a squad and each player's match history in one
-    # payload. A row names its own table and the assembler routes on it, so
-    # neither grain is fetched twice or split by guessing at its shape.
     out: dict[str, list] = {}
     route(out, [{"a": "1"}, {ROW_TABLE: "api_stats", "stat": "goals"}],
           "api_teams", "t1")
     assert set(out) == {"api_teams", "api_stats"}, list(out)
-    # The stamp is written onto every row wherever it lands.
     assert out["api_teams"][0] == {"a": "1", "observed_at": "t1"}
     assert out["api_stats"][0]["observed_at"] == "t1"
-    # A row that names no table belongs to its source's, and a row that names
-    # its source's own table is not a special case.
     route(out, [{ROW_TABLE: "api_teams", "b": "2"}], "api_teams", "t2")
     assert len(out["api_teams"]) == 2, out["api_teams"]
-    # The marker itself is not a column in the file it routed to: it is how
-    # the row got there, not something anybody would read afterwards.
+    # The marker is consumed by route(), not written to the output table.
     assert all(ROW_TABLE not in r for rs in out.values() for r in rs), out
 
     # -- cadence ----------------------------------------------------------
@@ -1250,22 +1017,15 @@ def _selftest() -> None:
     assert due(daily, seen_today, "2026-08-16")      # new day
     assert due(daily, {}, "2026-08-15")              # never swept
 
-    # TWICE A DAY, BOUNDED BY HOURS AND NOT BY THE CALENDAR. The probable-XI
-    # pages were "daily", which the 11:40 sweep read as "already done at
-    # 00:13" — so the run whose whole reason is that the XIs have firmed up
-    # was reading XIs from just after midnight. Measured on 2026-08-19 by
-    # forcing the sweep at 17:50: futbolfantasy moved 23 of 512 rows since
-    # 00:13 and analitica 70 of 197, four of them in the fielded squad.
+    # Twice a day, bounded by hours elapsed rather than the calendar.
     twice = Source("m", "market", "u", parse_market, sign_market, "twice_daily")
     assert not due(twice, {"m": {"seen": "2026-08-15T0940Z"}},
                    "2026-08-15T1200Z")               # 2.3h ago — not yet
     assert due(twice, {"m": {"seen": "2026-08-15T0940Z"}},
                "2026-08-15T1600Z")                   # 6.3h ago — due
     assert due(twice, {}, "2026-08-15T0000Z")        # never swept
-    # The hours are what bound it, so a rerun at 00:05 does not refetch forty
-    # pages just because the date changed.
     assert not due(twice, {"m": {"seen": "2026-08-15T2340Z"}},
-                   "2026-08-16T0005Z")
+                   "2026-08-16T0005Z")                # a date change alone
 
     # A match page is fetched once, ever, whatever day it is asked about.
     from sources import match_source
@@ -1281,10 +1041,7 @@ def _selftest() -> None:
     carried = carry_matches(
         [{"page": "market", "sig": "s2", "stored": "t1", "seen": "t1"}], prev)
     assert [r["page"] for r in carried] == ["market", once.key], carried
-    # The bytes stay in the archive that first held them, and market — fetched
-    # this run — is not overwritten by the older row.
     assert carried[1]["stored"] == "t0" and carried[0]["sig"] == "s2"
-    # A page already in this manifest is not carried twice.
     assert len(carry_matches(carried, prev)) == 2
 
     # -- stamps read out of either layout ---------------------------------

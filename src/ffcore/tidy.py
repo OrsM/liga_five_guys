@@ -48,22 +48,13 @@ ROOT = Path(os.environ.get("FF_ROOT", "./data"))
 TIDY = ROOT / "tidy"
 SEASON = ROOT / "season"
 DECISIONS = ROOT / "decisions"
-# WHAT THE SITE GETS, and nothing else. reports/ held six markdown files and a
-# JSON; two of them were published and four existed only to be stitched into
-# those two, while a fifth was the same content as the board in another
-# rendering. A directory called "reports" that holds four things nobody reads
-# is four more places a number can appear and disagree with itself.
-#
-# LFG_REPORTS, same pattern as FF_ROOT/LFG_PARTS below, added 2026-08-29 so a
-# run done to test or profile the pipeline (not to publish a report) can
-# point every writable path — this one included — at a scratch directory
-# instead of leaving reports/METHOD.md and reports/decisions.json modified
-# in the tracked tree for someone to stash before their next real commit.
+# WHAT THE SITE GETS, and nothing else — reports/ holds only what's published.
+# LFG_REPORTS (like FF_ROOT/LFG_PARTS below) lets a test/profiling run point
+# every writable path at a scratch directory instead of the tracked tree.
 REPORTS = Path(os.environ.get("LFG_REPORTS", "reports"))
 
-# The render fragments the appendix is stitched from. Build artifacts, under
-# .runtime/ with the rest of them, untracked and unpublished — they are how
-# METHOD.md is made, not something to read.
+# Render fragments the appendix is stitched from — build artifacts under
+# .runtime/, untracked and unpublished.
 PARTS = Path(os.environ.get("LFG_PARTS", ".runtime/parts"))
 
 
@@ -89,9 +80,8 @@ def input_path(name: str) -> Path:
     return p if p.exists() else Path(name)
 
 
-# One parse per file per process, keyed on (mtime, size) — see read_csv()'s
-# own docstring for why callers still get a fresh copy each call, and
-# docs/notes/tidy.md for the measured numbers behind both calls.
+# One parse per file per process, keyed on (mtime, size).
+# Why: docs/notes/tidy.md
 _READ_CACHE: dict[str, tuple] = {}
 
 
@@ -100,16 +90,12 @@ def _forget(path) -> None:
 
 
 def read_csv(path) -> list[dict]:
-    """Rows as dicts. Missing file is empty, not an error — a report that
-    hasn't been fed yet should say so, not crash.
+    """Rows as dicts. Missing file is empty, not an error.
 
-    Cached per (mtime, size); callers get their OWN dicts each call (a
-    mutation-detector check found the copy currently unneeded but cheap
-    enough to keep as a guard — see the doc). Cell VALUES are interned at
-    parse time (halves peak RSS on market.csv). Uses csv.reader+zip rather
-    than DictReader (~25% faster, no ragged-row bookkeeping needed here).
-    Why (measured costs, the interning numbers, the invalidation edge case):
-    docs/notes/tidy.md#read_csv--the-parse-cache-its-isolation-and-interning
+    Cached per (mtime, size); callers get their own dict copy each call.
+    Cell values are interned at parse time. Uses csv.reader+zip rather
+    than DictReader (faster; no ragged-row handling needed here).
+    Why: docs/notes/tidy.md#read_csv--the-parse-cache-its-isolation-and-interning
     """
     path = Path(path)
     try:
@@ -119,11 +105,6 @@ def read_csv(path) -> list[dict]:
     hit = _READ_CACHE.get(str(path))
     if hit is None or hit[0] != (st.st_mtime_ns, st.st_size):
         with path.open(encoding="utf-8") as fh:
-            # csv.reader + zip(fieldnames, ...) instead of DictReader: same
-            # rows (verified byte-for-byte equal on every tidy CSV in the
-            # store 2026-08-29), DictReader's own per-row restkey/restval
-            # bookkeeping is dead weight here because ff_ingest never writes
-            # a ragged row. ~25% faster parsing market.csv (0.53s -> 0.40s).
             r = csv.reader(fh)
             try:
                 fieldnames = next(r)
@@ -138,13 +119,11 @@ def read_csv(path) -> list[dict]:
 
 
 def read_csv_frozen(path) -> list:
-    """Like read_csv(), but hands back the CACHED rows themselves — each
-    wrapped in MappingProxyType, not copied — for a caller that holds the
-    result for the rest of the process and is verified never to write to a
-    row (today: Market, via League.load(), held in ffcore.model's Session).
-    MappingProxyType rather than a raw dict keeps the guard real: a write
-    attempt is a loud TypeError, not a silent wrong answer elsewhere. Why
-    (the specific callers checked, the RSS numbers): docs/notes/tidy.md#read_csv_frozen--the-uncopied-path-for-one-long-lived-caller
+    """Like read_csv(), but hands back the cached rows themselves, each
+    wrapped in MappingProxyType rather than copied — for a caller (Market,
+    via ffcore.model's Session) that holds the result for the rest of the
+    process and never writes to a row. A write attempt is a loud TypeError.
+    Why: docs/notes/tidy.md#read_csv_frozen--the-uncopied-path-for-one-long-lived-caller
     """
     path = Path(path)
     try:
@@ -173,17 +152,11 @@ def write_csv(path, rows, fieldnames=None) -> None:
 
 
 def widen_csv(path, fieldnames) -> bool:
-    """Add columns to an existing log, in place. True if the file was rewritten.
-
-    append_csv writes the header once, so a caller that grows its column list
-    would otherwise append rows WIDER than the header. csv.DictReader silently
-    drops the overflow, which means the new columns would look empty forever
-    instead of failing. This rewrites the old rows with the new header and an
-    empty string for what was never recorded — history keeps its own shape, and
-    a blank cell honestly says "this run did not measure that".
-
-    Only ever widens. A column that disappeared from `fieldnames` is kept, so
-    an old reader still works and no recorded number is ever destroyed.
+    """Add columns to an existing log, in place. True if the file was
+    rewritten. Rewrites old rows with the new header and "" for what was
+    never recorded, so a grown column list doesn't append rows wider than
+    the header (which DictReader would silently truncate). Only ever
+    widens — a column dropped from `fieldnames` is kept.
     """
     path = Path(path)
     if not path.exists():
@@ -200,11 +173,9 @@ def widen_csv(path, fieldnames) -> bool:
 
 
 def append_csv(path, rows, fieldnames=None) -> None:
-    """Append, writing the header only when creating the file.
-
-    For the decision logs — squad_log.csv, and rival_log.csv when rivals.py
-    lands. Estimates made today are not reconstructable later, which is the
-    whole reason they get written down as they are made.
+    """Append, writing the header only when creating the file — for
+    decision logs (squad_log.csv, etc.) whose estimates can't be
+    reconstructed later.
     """
     path = Path(path)
     _forget(path)
@@ -213,10 +184,9 @@ def append_csv(path, rows, fieldnames=None) -> None:
     fieldnames = fieldnames or list(rows[0])
     fresh = not path.exists()
     if not fresh:
-        # The FILE's header wins, not the caller's list. Appending in a
-        # different order than the header would misalign every value in the
-        # row, and nothing downstream would notice. Use widen_csv() first to
-        # add a column; a key not in the header is dropped, not shifted in.
+        # The file's header wins, not the caller's — appending out of
+        # order would misalign values with nothing to notice. Use
+        # widen_csv() first to add a column.
         with path.open(encoding="utf-8") as fh:
             fieldnames = list(csv.DictReader(fh).fieldnames or fieldnames)
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -229,15 +199,12 @@ def append_csv(path, rows, fieldnames=None) -> None:
 
 
 def load_deadline(with_source: bool = False):
-    """The next lock as aware UTC, or None — always the next kickoff.
-
-    The next kickoff in fixtures.csv IS the whole deadline, not a floor —
-    the app locks per jornada, so Sunday's own player is already frozen at
-    Friday's kickoff. No typed fallback: a fixture list that cannot answer
-    says None, never a substitute number wrong in an undetectable way (a
-    lapsed inputs/deadline.txt once did exactly that). `with_source=True`
-    returns (when, "fixtures"|"none"). Why:
-    docs/notes/tidy.md#load_deadline--the-fixture-list-is-the-deadline-no-typed-fallback
+    """The next lock as aware UTC, or None — the next kickoff in
+    fixtures.csv, since the app locks per jornada (Sunday's player is
+    already frozen at Friday's kickoff). No typed fallback: an
+    unanswerable fixture list says None, never a wrong substitute.
+    `with_source=True` returns (when, "fixtures"|"none").
+    Why: docs/notes/tidy.md#load_deadline--the-fixture-list-is-the-deadline-no-typed-fallback
     """
     when = next_kickoff()
     return (when, "fixtures" if when else "none") if with_source else when
@@ -257,14 +224,8 @@ def write_lines(path, lines) -> None:
 
 @lru_cache(maxsize=4096)
 def _digits_to_dt(s: str, tz):
-    # CACHED: a snapshot log's observed_at column is a few hundred distinct
-    # stamps repeated over tens of thousands of rows (market.csv: 149 distinct
-    # values across 96,362 rows) — Market.__init__ alone calls this once per
-    # row. tz is always one of two module-level singletons (UTC, MADRID), so
-    # (s, tz) is a small, stable cache key; s comes from interned CSV cells
-    # (see read_csv), so repeats hit the same string object, not just an
-    # equal one. Measured 2026-08-29: cut ffcore.model.session()'s snapshot_stamp
-    # time from 0.67s to effectively zero.
+    # Cached: a snapshot log's observed_at column is a few hundred distinct
+    # stamps repeated over tens of thousands of rows.
     digits = re.sub(r"\D", "", s or "")
     if len(digits) < 8:
         return None
@@ -308,19 +269,14 @@ def latest_only(rows: list[dict]) -> list[dict]:
 
 
 def latest_snapshot(path, keep=None) -> list[dict]:
-    """`latest_only(read_csv(path))`, without ever holding the whole file in
-    memory to get there.
-
-    One forward pass, bounded to one snapshot's worth of rows regardless of
-    file order — a caller that only wants "now" was paying to materialise
-    and copy the whole multi-decade history (measured 380MB RSS in one
-    self-test) just to keep the <1% sharing the newest observed_at.
-    Deliberately bypasses the read cache (a filtered slice under the whole
-    file's cache key would mislead a later full-history reader). `keep(row)`
-    filters BEFORE the newest-stamp comparison — needed when "newest" must
-    mean newest row from ONE source, not across all of them. Why (the RSS
-    measurement, the file-order argument in full):
-    docs/notes/tidy.md#latest_snapshot--one-forward-pass-bounded-memory
+    """`latest_only(read_csv(path))`, in one bounded-memory forward pass —
+    a caller that only wants "now" shouldn't materialise the whole
+    multi-decade history to get it. Bypasses the read cache deliberately
+    (a filtered slice under the whole file's cache key would mislead a
+    later full-history reader). `keep(row)` filters BEFORE the
+    newest-stamp comparison, for "newest from one source" rather than
+    across all of them.
+    Why: docs/notes/tidy.md#latest_snapshot--one-forward-pass-bounded-memory
     """
     path = Path(path)
     try:
@@ -335,10 +291,9 @@ def latest_snapshot(path, keep=None) -> list[dict]:
             fieldnames = []
         newest = ""
         kept: list[dict] = []
-        # Raw csv.reader + zip, not DictReader — same reasoning as read_csv:
-        # this still has to walk the WHOLE file to find the newest stamp, so
-        # DictReader's per-row overhead is not optional here the way the
-        # memory saving is.
+        # Raw csv.reader + zip, not DictReader — still has to walk the
+        # whole file to find the newest stamp, so per-row overhead matters
+        # even though memory is what's being saved.
         for raw in r:
             if not raw:
                 continue

@@ -224,14 +224,11 @@ def flat_income(observed, budget: float, bought: float, sold: float):
     """What the app has paid the account beyond its transfers, or None.
 
     Measured on your own row (the one account with an observed balance).
-    USED TO be credited to rivals equally too, on the assumption the app
-    pays everyone alike — wrong (2026-09-12): it bundles two things, a
-    per-manager jornada performance prize (see bonus_income, now the real
-    source for a rival) and a private "watch a video" daily bonus that
-    stays a genuine per-manager unknown. This is now only the fallback for
-    a manager bonus_income has no rows for at all. Never negative — see
-    docs/notes/league.md#rival-cash-income-measurement-flat_income for why
-    (a real balance-vs-ledger gap and the number it corrected).
+    Fallback only, for a manager bonus_income() has no rows for — it
+    bundles the jornada performance prize with a private per-manager
+    "watch a video" bonus, so it overcredits anyone bonus_income() can
+    already measure directly. Never negative.
+    Why: docs/notes/league.md#rival-cash-income-measurement-flat_income
     """
     if observed is None:
         return None
@@ -242,12 +239,10 @@ def bonus_income(activity: list[dict], users: dict) -> dict[str, float]:
     """Each manager's own weekly performance-prize total, by handle.
 
     Summed from `kind == "bonus"` rows (sources.ACT_BONUS/ACT_BONUS_ZERO) —
-    the flat 100,000/point-scored jornada prize, confirmed empirically
-    2026-09-12 to be the SAME rate for everyone, not a flat total everyone
-    receives alike (that was flat_income's wrong assumption). A manager
-    absent here has no bonus activity in the feed at all, not necessarily
-    zero income — the caller falls back to flat_income for them. Why:
-    docs/notes/league.md#the-weekly-performance-bonus-vs-the-video-bonus
+    the same rate per point scored for every manager. Absent here means no
+    bonus activity in the feed at all, not zero income — the caller falls
+    back to flat_income() for them.
+    Why: docs/notes/league.md#the-weekly-performance-bonus-vs-the-video-bonus
     """
     out: dict[str, float] = {}
     for r in activity:
@@ -474,13 +469,12 @@ def ledger_from_api(activity: list[dict], users: dict,
                     names: dict) -> list[dict]:
     """The transaction ledger, derived from the app's activity feed.
 
-    Replaces hand-typing (which fell behind — a real 3-day gap once cost a
-    report 40M of accuracy). The feed cannot say who the counterparty was
-    (every row names one user only, and no manager-to-manager transfer ever
-    pairs a buy+sell in it), so a buy is written as from-the-pool and a sale
-    as to-the-pool — right for ownership and premiums, silent only on who
-    dealt with whom. A row with no nameable player/manager is DROPPED, not
-    blanked. Why: docs/notes/league.md#ledger-reconstruction-from-the-apps-activity-feed-ledger_from_api
+    The feed cannot say who the counterparty was (every row names one user
+    only, no buy+sell ever pairs up), so a buy is written as from-the-pool
+    and a sale as to-the-pool — right for ownership and premiums, silent
+    only on who dealt with whom. A row with no nameable player/manager is
+    DROPPED, not blanked.
+    Why: docs/notes/league.md#ledger-reconstruction-from-the-apps-activity-feed-ledger_from_api
     """
     out = []
     for r in sorted(activity, key=lambda x: x.get("at") or ""):
@@ -876,36 +870,25 @@ class League:
             paid = flat_income(me_anchor[0], self.cfg.budget, b, sd)
 
         # Each manager's OWN weekly performance prize (bonus_income), not
-        # your `paid` copied onto them — confirmed 2026-09-12 that the prize
-        # rate is flat (100,000/point) but the POINTS are not, so the total
-        # differs sharply per manager and grows every jornada. `paid` above
-        # stays the fallback for a manager the feed has no bonus rows for at
-        # all (a fresh join, a gap in retention) and for your own row when
-        # you have no anchor. Why:
-        # docs/notes/league.md#the-weekly-performance-bonus-vs-the-video-bonus
+        # your `paid` copied onto them — the rate is flat but the points
+        # aren't, so the total differs per manager. `paid` above stays the
+        # fallback for a manager with no bonus rows (a fresh join, a feed
+        # gap) and for your own row when you have no anchor.
+        # Why: docs/notes/league.md#the-weekly-performance-bonus-vs-the-video-bonus
         users = {r.get("user_id"): r.get("manager")
                  for r in (self._standings if self._standings is not None
                           else load_api_standings())
                  if r.get("user_id") and r.get("manager")}
         own_bonus = bonus_income(load_api_activity(), users)
 
-        # What's left over even for a rival with full bonus data: checked
-        # 2026-09-12 against your own account (the one with a real, known
-        # balance) and even after the daily allowance AND your own jornada
-        # prize are both subtracted out, ~975k/31 days still doesn't
-        # reconcile. Candidates ruled out or left open: the "watch a video"
-        # daily bonus (never its own activityTypeId, unmeasurable per rival
-        # — see docs/notes/league.md#the-weekly-performance-bonus-vs-the-
-        # video-bonus), an "ideal XI" per-player reward the league config
-        # hints at but does not confirm is active here, or something this
-        # scraper has never queried at all. Whatever it is, assuming rivals
-        # get NONE of it is not a neutral default — it's the specific (and
-        # probably wrong) assumption that they experience zero of whatever
-        # unmeasured income you do. "They get it at your own measured rate"
-        # is the better guess absent any other signal: isolated as your OWN
-        # `paid` minus the two components already accounted for elsewhere,
-        # spread over the days it accrued over, applied at that same daily
-        # rate to each rival over their own tracked days.
+        # What's left over even after the daily allowance AND jornada prize
+        # are subtracted from your own known balance — unidentified income
+        # (a "watch a video" bonus with no activityTypeId to measure per
+        # rival, an "ideal XI" reward, or something unscraped). Assuming
+        # rivals get NONE of it is not neutral, it's the specific assumption
+        # they earn none of what you do; applying your own measured rate to
+        # their own tracked days is the better default absent other signal.
+        # Why: docs/notes/league.md#the-weekly-performance-bonus-vs-the-video-bonus
         unmeasured_rate = 0.0
         me_txns = [t for t in self.txns
                   if (t.get("to") or "").strip() == self.cfg.me
@@ -968,21 +951,14 @@ class League:
                     counted += 1
 
             # The daily allowance, by the anchor's AGE not its label (every
-            # anchor is owed it, only ADDS). Why:
-            # docs/notes/league.md#the-daily-allowance-backfill-allowance
+            # anchor is owed it, only ADDS).
+            # Why: docs/notes/league.md#the-daily-allowance-backfill-allowance
             #
-            # own_bonus is PURELY the weekly jornada prize (bonus_income) —
-            # it does not include the separate, flat, independently-measured
-            # 100,000/day allowance (docs/notes/league.md#rival-cash-income-
-            # measurement-flat_income: "a day with no deal in it moved the
-            # balance by exactly +100,000"), so the two ADD. `paid`
-            # (flat_income) is the opposite: it is read off your own real
-            # balance, so it already bundles the daily allowance AND your
-            # jornada prize together — adding the daily allowance again on
-            # top of `paid` would double it. Confirmed 2026-09-12: skipping
-            # the daily allowance for a manager with bonus rows understated
-            # your own reconstructed total by ~3.1M for a ~31-day season —
-            # this is not a rounding difference, it is a full missing term.
+            # own_bonus is PURELY the jornada prize (bonus_income) — it
+            # excludes the separate, flat daily allowance, so the two ADD.
+            # `paid` (flat_income) is the opposite: read off your real
+            # balance, it already bundles both, so adding the allowance
+            # again on top of it would double it.
             notes = []
             start = since or min(
                 (ledger_stamp(t.get("date", "")) for t in self.txns

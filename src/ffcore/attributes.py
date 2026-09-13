@@ -1,33 +1,21 @@
 """
-ffcore.attributes — one resolved fact per player, from however many sources
-speak to it.
+ffcore.attributes — one resolved fact per player, from however many
+sources speak to it.
 
     fit = resolve_fitness(status_by_key, player_status_by_key)
     fit["isaac romero"].state    -> "doubt"
     fit["isaac romero"].agree    -> False
     fit["isaac romero"].app_state -> "ok"
 
-PILOT: fitness. Two independent readers exist for the same fact and, until
-now, only one was used. `status` (futbolfantasy's editorial "Estado
-físico"/"Sancionados"/"No disponibles" panels) drove report.py's whole
-Fitness section. `player_status` — the app's OWN operator-stated
-availability, from api_market/api_teams — was parsed, written to two CSVs,
-and read by nothing. Not blended, not cross-checked: if the two disagreed,
-nothing would have noticed.
+The general shape for an attribute with more than one reader: one
+function takes every source's reading and returns one resolved fact per
+player, with disagreement KEPT rather than picked — a caller that wants
+to flag a mismatch can, one that just wants the best answer still gets
+one. Adding a new source means extending this function, not re-deriving
+the join at every call site.
 
-WHY A RESOLVER AND NOT A THIRD COLUMN. Bolting `player_status` onto the
-report as a second, separate line would still leave every caller comparing
-the two by hand. This is the general shape instead: each attribute has ONE
-function that takes every source's reading and returns ONE resolved fact per
-player, with disagreement KEPT rather than picked — a caller that wants to
-flag a mismatch can, and a caller that just wants the best single answer
-still gets one. Adding a third fitness source later means adding it to this
-one function, not re-deriving the join everywhere the fact is used.
-
-THE VOCABULARY IS FF's, not a merged one. It is the finer of the two — the
-app has no "unavailable" state of its own — and unifying on the coarser
-vocabulary would silently drop a distinction FF's readers can make and the
-app's cannot.
+Vocabulary is FF's (the finer of the two — the app has no "unavailable"
+state of its own), not a merged one.
 """
 
 from __future__ import annotations
@@ -50,14 +38,12 @@ class Fitness(NamedTuple):
     ffcore.score.Scored.status already uses, so callers do not need a
     translation step.
 
-    `agree` is False exactly when the app HAS a reading and it does not
-    match, once both are on one vocabulary. True when the app has no
-    reading at all — silence is not disagreement, it is coverage the app
-    does not have (it does not cover every player FF's panel does).
+    `agree` is False only when the app HAS a reading and it doesn't match
+    (both aligned to one vocabulary first). Silence from the app is not
+    disagreement — True — since app coverage isn't exhaustive.
 
-    `app_state` is what the app said, RAW and unaligned, kept even on
-    agreement so a caller that wants the app's own word for it (rather than
-    FF's) still has it. None means the app has no reading for him.
+    `app_state` is the app's raw, unaligned word, kept even on agreement.
+    None means the app has no reading for him.
     """
     state: str
     agree: bool

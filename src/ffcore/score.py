@@ -1,63 +1,29 @@
 """
 ffcore.score — the ranking index, and the legal-XI picker that consumes it.
 
-Lifted out of report.py so rivals.py scores rival squads with the SAME
-function. A comparison between your squad and theirs is meaningless if the
-two sides were scored by two copies of the arithmetic that have drifted
-apart, and copies always drift.
+Shared by report.py and rivals.py, so both sides of a comparison are always
+scored by the same arithmetic.
 
     score = shrunk points-per-match  x  fixture factor  x  P(start)
 
-Points-per-match comes from data/season/points_*.csv. A raw average is
-untrustworthy on few appearances, so it is pulled toward the median for that
-position:
+Points-per-match is shrunk twice, toward the position's median then toward
+last season's own shrunk figure:
 
     shrunk = (total_points + K * prior) / (matches + K)      K = 8 matches
-
-THIS SEASON is a second stage of the same shrinkage — last season's shrunk
-figure becomes the prior that this season's points are pulled toward, with
-the same K:
-
     ppm = (points_now + K * shrunk_last_season) / (matches_now + K)
 
-So one jornada moves a rating by about a ninth of the gap between the two,
-and by the twentieth it is almost entirely this season. No new constant, and
-with no current-season data — the state before J1 finishes, and the state
-this collapsed to for the whole of 2026-08-16 to 2026-08-20 while nothing
-read data/season/live/perjornada_*.csv, which already had it — it collapses
-EXACTLY to the line above. This is the fix for the model's most concrete
-error, which is not the formula but the input: last season's average cannot
-know that a player changed club, aged, or lost his place.
+`matches_now` is minutes/90, not an appearance count. `score` includes the
+fixture factor (for fielding this round); `flat` omits it (for buying, which
+spans months).
 
-"matches_now" IS MINUTES, NOT AN APPEARANCE COUNT — see
-_current_from_perjornada(). A 10-minute cameo and a full 90 were being
-weighted identically otherwise, which is the same distortion the shrinkage
-above already exists to correct for on the PRIOR side and was silently
-reintroducing on the live one.
+A RANKING INDEX, not a points forecast: promoted-side players fall back to
+the positional prior and are marked `assumed`; a player absent from the
+probable-XI page (ABSENT_START) is scored differently from one listed with
+no percentage (NEUTRAL_START).
 
-THE FIXTURE FACTOR comes from ffcore.fixture and is the opponent the player
-actually faces next, home or away. `score` carries it; `flat` is the same
-arithmetic without it. Both are returned because they answer different
-questions: you FIELD for one round, so the fixture belongs in that decision,
-and you BUY for months, so it does not belong in that one. A bid sized on a
-kind fixture is a bid for a fixture, not for a player.
-
-The result is a RANKING INDEX, not a points forecast. Three things it cannot
-know, each surfaced rather than hidden:
-
-  * Promoted-side players have no top-flight record, so they fall back to the
-    positional prior — the median top-flight starter, which flatters them.
-    Their ratings are marked `assumed` and discounted. Promotion is detected
-    from the data, not hardcoded, so it keeps working next season.
-  * A player absent from the probable-XI page is not the same as one listed
-    with no percentage. The first gets ABSENT_START, the second NEUTRAL_START.
-  * Nothing here has been checked against reality yet. Log the inputs
-    alongside every recommendation and score them once jornadas exist.
-
-Scoring a rival's squad carries one extra caveat over scoring your own: you
-know your roster exactly, while theirs comes from replaying the ledger, so
-any name still unmatched in data/tidy is silently missing from their total.
-Report the unmatched count next to the total or the comparison flatters you.
+Scoring a rival's squad: their roster comes from replaying the ledger, so an
+unmatched name is silently missing from their total — report the unmatched
+count alongside it.
 """
 
 from __future__ import annotations
@@ -96,11 +62,8 @@ THIN = {"POR": 2, "DEF": 4, "MED": 4, "DEL": 2}
 FREE_FORMATIONS = [(5, 4, 1), (5, 3, 2), (4, 5, 1), (4, 4, 2), (4, 3, 3),
                    (3, 5, 2), (3, 4, 3)]
 
-# Pseudo-count in reliability = n/(n+K), used at BOTH shrink stages in
-# Scorer.rate(). Fitted 2026-08-31 against 729 real matches (two
-# out-of-sample tests, K=6 and K=16 respectively) — 8.0 sits inside both
-# tests' 90% bootstrap interval and the basin is flat enough that neither
-# test's own optimum beats it by more than 0.4% MSE. Not a guess.
+# Pseudo-count in reliability = n/(n+K), used at both shrink stages in
+# Scorer.rate(). Fitted against real matches, not a guess.
 # Why: docs/notes/score.md#shrink_k-calibration
 SHRINK_K = 8.0
 NEUTRAL_START = 60.0      # listed on the XI page but no percentage given
@@ -115,32 +78,20 @@ PROMOTED_DISCOUNT = 0.70  # the LaLiga median overstates a promoted squad
 
 
 # Candidate half-lives for the current-season rate's recency weighting, in
-# jornadas — 1.0 is "no decay at all" (this season's flat average, today's
-# behaviour), included so the grid can validly choose it. Coarse, like
-# startprob's grids: the data cannot resolve finer, and a grid is auditable
-# where a solver's answer is not.
+# jornadas — 1.0 means no decay. Coarse grid: the data can't resolve finer.
 DECAY_GRID = (1.0, 0.85, 0.7, 0.55, 0.4)
 
 
-# xG/xA — Tango/Lichtman/Dolphin's precision-weighted blend (The Book,
-# ch.4's clutch-skill estimate), folded into Scorer.rate() as a third
-# weighted term alongside the prior and current season. Position-gated to
-# forwards/attacking mids (measured: xG carries no signal, wrong sign,
-# for any other position) and both fit parameters (_xg_points_fit's units
-# conversion, _xg_stickiness_boost's reliability ratio) are derived from
-# this repo's own real data, never hand-picked.
+# xG/xA: a precision-weighted blend folded into Scorer.rate() as a third
+# weighted term. Position-gated to forwards/attacking mids (xG carries no
+# signal elsewhere); both fit parameters are derived from real data.
 # Why: docs/notes/score.md#xgxa-precision-weighted-blend
-# ---------------------------------------------------------------------------
 
 
 def _precision_blend(estimates) -> tuple[float, float] | None:
-    """(mean, variance) — independent estimates of ONE quantity, combined
-    by inverse variance.
-
-    `estimates` is [(mean, variance), ...]. An estimate with variance <= 0
-    is skipped rather than trusted absolutely; None back means nothing
-    usable was offered, never a fabricated answer.
-
+    """(mean, variance) combining independent estimates [(mean, var), ...]
+    of one quantity by inverse variance. Skips var<=0; None if nothing
+    usable was offered.
     Why: docs/notes/score.md#_precision_blend--the-books-worked-example
     """
     w_sum = m_sum = 0.0
@@ -157,12 +108,8 @@ def _precision_blend(estimates) -> tuple[float, float] | None:
 
 def load_understat_current(xw=None) -> dict[str, dict]:
     """{norm(market name): {"xg90": xG+xA per 90, "minutes": minutes}} for
-    THIS season, forwards and attacking mids only.
-
-    Keyed by norm(market name), same as `history`/`current` — the same
-    translation `_current_from_perjornada()` uses, because that's what
-    `Scorer.rate()` actually looks `self.xg` up by; keying by the
-    crosswalk id instead would silently miss every lookup rate() makes.
+    THIS season, forwards and attacking mids only. Keyed by norm(market
+    name) — the same key Scorer.rate() looks `self.xg` up by.
     Position gate: docs/notes/score.md#xgxa-precision-weighted-blend
     """
     from ffcore.tidy import load_understat_players, load_crosswalk
@@ -192,11 +139,8 @@ def load_understat_current(xw=None) -> dict[str, dict]:
 
 
 def _linreg(xs, ys) -> tuple[float, float]:
-    """(slope, intercept) of the least-squares line through (xs, ys), via
-    statistics.linear_regression — a hand-rolled sum-of-squares version of
-    this raised the same "is x constant" question statistics.StatisticsError
-    already answers; a flat line (0.0, mean(ys)) for that case, same
-    fallback the hand-rolled version returned, not a crash.
+    """(slope, intercept) of the least-squares line through (xs, ys).
+    Flat line (0.0, mean(ys)) if xs is constant, not a crash.
     """
     try:
         r = statistics.linear_regression(xs, ys)
@@ -206,14 +150,9 @@ def _linreg(xs, ys) -> tuple[float, float]:
 
 
 def _xg_points_fit(xw) -> tuple[float, float, int]:
-    """(slope, intercept, n) — last season's real points-per-match as a
-    linear function of last season's xG+xA per 90, forwards/attacking mids
-    only (the position gate load_understat_current() also uses).
-
-    The units conversion xG-implied output needs before joining a
-    points-per-match blend, fit fresh from this repo's own real data.
-    Below 10 paired players this refuses (slope 0.0, intercept 0.0) rather
-    than fit a line through noise.
+    """(slope, intercept, n) — last season's points-per-match as a linear
+    function of last season's xG+xA per 90, forwards/attacking mids only.
+    Refuses (0.0, 0.0, n) below 10 paired players rather than fit noise.
     Why: docs/notes/score.md#_xg_points_fit--units-conversion
     """
     from ffcore.tidy import load_understat_players, SEASON, read_csv
@@ -252,12 +191,9 @@ def _xg_points_fit(xw) -> tuple[float, float, int]:
 
 def _xg_stickiness_boost() -> tuple[float, str]:
     """(boost, why) — how many raw current-season matches one xG-informed
-    match is worth, derived from measured year-over-year stability.
-
-    No crosswalk needed (both seasons carry Understat's own understat_id).
-    Self-correcting, not frozen: recomputed from whatever
-    understat_players.csv holds when called, no cache. Below 30 paired
-    players this refuses and returns (1.0, why). Clipped to [0.5, 3.0].
+    match is worth, from measured year-over-year stability. Recomputed
+    fresh each call, no cache. Refuses (1.0, why) below 30 paired players.
+    Clipped to [0.5, 3.0].
     Why: docs/notes/score.md#_xg_stickiness_boost--year-over-year-reliability
     """
     from ffcore.tidy import load_understat_players
@@ -285,9 +221,7 @@ def _xg_stickiness_boost() -> tuple[float, str]:
                      "accumulate" % len(pairs))
 
     def corr(xs, ys):
-        # statistics.correlation — a constant series has no correlation to
-        # report, 0.0 same as the hand-rolled version's sx/sy guard, not a
-        # crash.
+        # 0.0 for a constant series (no correlation to report), not a crash.
         try:
             return statistics.correlation(xs, ys)
         except statistics.StatisticsError:
@@ -307,15 +241,9 @@ def _xg_stickiness_boost() -> tuple[float, str]:
 
 def _shots_by_jornada(xw) -> dict[str, dict[int, float]]:
     """{crosswalk key: {jornada: total_scoring_att that jornada}} — LaLiga's
-    own per-match box score (data/tidy/api_stats.csv), joined through the
-    crosswalk's app_id (the same 91%-coverage join this session's earlier
-    crosswalk work already resolves).
-
-    `week` IS THE API'S OWN PER-MATCH FIELD, not inferred from round-
-    completion timing the way points.py's jornada_asof() is (see
-    match_locks()'s own docstring for that fragility, found this session)
-    — if anything, a more reliable jornada label than the points side it
-    gets joined against in _shots_points_fit().
+    per-match box score (data/tidy/api_stats.csv), joined through the
+    crosswalk's app_id. `week` is the API's own per-match field, not
+    inferred from round-completion timing.
     """
     from ffcore.tidy import TIDY, read_csv
 
@@ -344,47 +272,23 @@ def backtest_predictor(feature_by_key_jornada: dict[str, dict[int, float]],
                        actual_by_key_jornada: dict[str, dict[int, float]],
                        min_pairs: int = 10) -> dict | None:
     """Does FEATURE (through a player's second-to-last shared jornada)
-    predict his LAST shared jornada's real outcome better than the POOLED
-    sample mean does — leave-one-player-out, real significance test, no
-    invented split.
+    predict his LAST shared jornada's real outcome better than the pooled
+    sample mean — a general, reusable leave-one-player-out significance
+    test. Pass in any two {key: {jornada: value}} dicts.
 
-    THE REUSABLE SHAPE _shots_points_fit()'s own validation was, before
-    this: hand-written, one-off, a single arbitrary weeks-1-3-vs-4-6 split
-    that wasted every player's earlier jornadas and could not be reused
-    for the next candidate signal without rewriting the same script.
-    Miguel, 2026-09-12: "you should be able to test jornada n with
-    jornada n-1 info right?" — this is that, generalised: pass in ANY
-    two {key: {jornada: value}} dicts (shots, ball_recovery, marca_points,
-    whatever's sitting in api_stats.csv next) and get a real answer.
+    BASELINE IS THE POOLED SAMPLE MEAN, NOT EACH PLAYER'S OWN AVERAGE —
+    with only 1-3 prior jornadas per player, an unpooled individual
+    average is noisy enough that any fitted line beats it purely by
+    pooling (regression to the mean), making every candidate feature look
+    like it "works." Matches rate_baseline_check()'s convention.
 
-    THE BASELINE IS THE POOLED SAMPLE MEAN, NOT EACH PLAYER'S OWN
-    AVERAGE — a real bug in this function's first version, caught the
-    same day by testing it against PURE RANDOM NOISE (same discipline
-    the self-test below now pins down): with only 1-3 prior jornadas per
-    player this early in a season, an individual's own average is a tiny,
-    noisy estimate, and ANY fitted line — even one fit on random numbers
-    — beats it purely by pooling across players (regression to the grand
-    mean), the exact effect SHRINK_K's own shrinkage exists to correct
-    for elsewhere in this module. Comparing a pooled fit against an
-    unpooled individual baseline made every candidate "work", including
-    nonsense ones (yellow_card predicting defenders' points). Matched
-    instead to rate_baseline_check()'s own already-correct convention:
-    "everyone scores the sample's own mean, no player identity at all."
-    Both sides are now genuinely pooled, so only the FEATURE's own
-    information content can separate them.
+    One test point per player (his own last shared jornada), graded
+    leave-one-player-out: the fit and baseline for player P never see P's
+    own held-out point.
 
-    ONE TEST POINT PER PLAYER — his own last shared jornada, features
-    from every jornada before it summed into a rate. Graded LEAVE-ONE-
-    PLAYER-OUT: the fit (and the pooled-mean baseline) predicting player
-    P's held-out point are computed from every OTHER player only, never
-    from P himself — the same discipline Calibration.fit() already uses
-    (leave-one-team-sheet-out), so a feature cannot flatter itself by
-    fitting, or averaging in, the very point it's judged against.
-
-    Returns {"n", "mae_feature", "mae_baseline", "gap"} — `gap` is
-    stats.bootstrap_gap() on the two paired MAE series, not a bare
-    number; `beats` in it is the answer to "is this real." None below
-    `min_pairs` players with at least 2 shared jornadas.
+    Returns {"n", "mae_feature", "mae_baseline", "gap"} (gap is
+    stats.bootstrap_gap() on the paired MAE series). None below
+    `min_pairs` players with >=2 shared jornadas.
     Why: docs/notes/score.md#backtest_predictor--the-pooled-baseline-fix
     """
     import statistics as _statistics
@@ -420,50 +324,26 @@ def backtest_predictor(feature_by_key_jornada: dict[str, dict[int, float]],
 def walk_forward_compare(jornadas: list[int], fit_new, predict_new,
                          predict_old, actual, min_history: int = 1
                          ) -> dict | None:
-    """Does a NEWLY-FITTED approach beat the PREVIOUS one, tested the only
-    honest way: at every jornada, fit using ONLY the jornadas before it,
-    predict that one jornada, and never let it see anything from after.
-
-    THE GENERAL TOOL Miguel asked for 2026-09-13, after watching the
-    HOME_EDGE decision get checked three different ways in one
-    conversation — a one-off script fit on everything then tested
-    against a scattered sample (leakage), then a hand-written walk-
-    forward version, each written fresh for that one case. His own
-    words: "the approach that we're using to making these decisions
-    applies broadly and automatically" — this is that, for ANY
-    hypothesis (a constant, a blend, a whole new feature), not just
-    HOME_EDGE. Wire a new candidate in by writing four small callables;
-    never write the jornada-by-jornada loop again.
+    """Does a newly-fitted approach beat the previous one, walk-forward:
+    at every jornada, fit using only jornadas before it, predict that one
+    jornada, never look ahead. General tool — wire in a new candidate by
+    writing four small callables, not a new jornada-by-jornada loop.
 
     `jornadas`: every jornada with a real graded outcome, in order.
-    `fit_new(cutoff)`: fit the NEW approach's parameters using ONLY data
-        from jornadas strictly before `cutoff` — enforcing that is the
-        caller's job (this function just calls it once per jornada,
-        so `fit_new` deciding to peek at the wrong data is a caller bug,
-        not something this function can catch for you).
-    `predict_new(params, jornada)`: {key: predicted value} for that
-        jornada, using `fit_new`'s output.
-    `predict_old(jornada)`: {key: predicted value} for that jornada
-        under the PREVIOUS approach (a hardcoded constant, an earlier
-        fit, whatever was live before) — no fitting call, since "old"
-        by definition doesn't change.
-    `actual(jornada)`: {key: real outcome} for that jornada.
+    `fit_new(cutoff)`: fit params using only data strictly before cutoff
+        (enforcing that is the caller's job).
+    `predict_new(params, jornada)` / `predict_old(jornada)`: {key: value}
+        under the new/previous approach. `predict_old` takes no fit call
+        since "old" doesn't change.
+    `actual(jornada)`: {key: real outcome}.
 
-    Only keys common to all three dicts for a jornada are scored — a
-    player either side has no opinion on is not a comparison. Jornadas
-    before `min_history` are skipped (nothing meaningful to fit
-    yet, e.g. jornada 1 with no prior season in view).
+    Only keys common to all three dicts for a jornada are scored.
+    Jornadas before `min_history` are skipped.
 
-    Returns {"per_jornada": [...], "n", "mae_old", "mae_new", "gap"} —
-    `gap` is stats.bootstrap_gap() on the two paired error series, real
-    significance, not a bare comparison. Deliberately does NOT decide
-    "keep" or "revert" for you: Miguel, same message, "it's fine for
-    this methodology to do a little bit worse... I'm not concerned about
-    that" — a fresh, principled, always-recalculated fit some jornadas
-    read slightly worse than a frozen constant on is not a bug in the
-    fit, so this reports the honest numbers and leaves the call to the
-    caller, exactly like backtest_predictor()'s own `beats` does.
-    None if no jornada produced a scoreable overlap.
+    Returns {"per_jornada", "n", "mae_old", "mae_new", "gap"} (gap is
+    stats.bootstrap_gap()). Does NOT decide keep/revert — reports the
+    numbers, same discipline as backtest_predictor()'s `beats`. None if
+    no jornada produced a scoreable overlap.
     Why: docs/notes/score.md#walk_forward_compare--the-general-tool
     """
     from stats import bootstrap_gap
@@ -500,18 +380,13 @@ EXPERIMENT_LOG = "experiment_log.csv"
 
 def log_experiment(feature: str, position: str, result: dict | None,
                    verdict: str, notes: str = "") -> None:
-    """Append one row per DELIBERATE hypothesis test — distinct from
-    methodology.log_forecast_accuracy() (one row per RUN, the live
-    forecast's own trend). This is the other half of what Miguel asked
-    for 2026-09-12: "a function and log to track... our experiments/
-    improvements impact." A negative result is a real row too — "team
-    defense adds nothing beyond fix_factor" is exactly as worth keeping
-    as "shots helps forwards", the whole point being a later session
-    doesn't have to re-run a test that already has an answer.
+    """Append one row per deliberate hypothesis test — distinct from
+    methodology.log_forecast_accuracy() (one row per run, the live
+    forecast's own trend). A negative result is logged too, so a later
+    session doesn't re-run a test that already has an answer.
 
     `result` is backtest_predictor()'s own dict, or None when nothing
-    cleared min_pairs — logged as empty MAE fields, not skipped, so a
-    "not enough data yet" reading is itself part of the record.
+    cleared min_pairs — logged as empty MAE fields, not skipped.
     """
     from ffcore.tidy import DECISIONS, append_csv, run_now
 
@@ -540,51 +415,24 @@ def experiment_history() -> list[dict]:
 
 
 def _shots_points_fit(xw, players=None) -> tuple[float, float, int]:
-    """(slope, intercept, n) — this season's real points in a jornada as a
-    linear function of a forward's OWN shot volume (total_scoring_att per
-    90) in every jornada BEFORE it — forwards only.
+    """(slope, intercept, n) — this season's points in a jornada as a
+    linear function of a forward's own shot volume (total_scoring_att/90)
+    in every jornada before it — forwards only.
 
-    IN-SEASON, NOT PRIOR-SEASON (unlike _xg_points_fit): api_stats.csv
-    only began being collected 2026-08 (turned up this session chasing
-    "why does the model bench Omar El Hilali" into "what's sitting in the
-    tidy store unused") — there is no earlier season of it to fit a units
-    conversion against. Fits on each forward's own history instead: shot
-    volume through jornada N-1 predicting jornada N's own points.
+    IN-SEASON, NOT PRIOR-SEASON (unlike _xg_points_fit): api_stats.csv has
+    no earlier season to fit a units conversion against, so this fits on
+    each forward's own history instead.
 
     VALIDATED WITH backtest_predictor() (leave-one-player-out against the
-    POOLED SAMPLE MEAN, real significance test), NOT the one-off
-    weeks-1-3-vs-4-6 split first used to justify this (that read MAE 3.25
-    vs 4.12 and no CI at all). backtest_predictor()'s own first version
-    read MAE 2.99 vs 4.48 here — since corrected (2026-09-12, same day:
-    checking OTHER candidate stats with it made literally every one of
-    them "beat" the baseline for defenders, including yellow_card, which
-    is not a football signal — the baseline was each player's own 1-2-
-    jornada average, noisy enough that any fitted line beat it by pooling
-    alone, the exact effect SHRINK_K exists to correct for). Re-run
-    against the corrected, pooled-mean baseline: MAE 2.99 vs 3.76 — a
-    real, smaller effect than first read, same direction — n=25's
-    bootstrap CI on the gap is -2.38 to +0.87, straddling zero. Real,
-    promising, NOT yet statistically proven — and now checked against a
-    baseline strong enough that nonsense features don't also pass. Kept
-    live anyway (Scorer.rate() only applies it above the 10-pair floor,
-    same guard as before) on the same basis DRIFT_FRAC's own unfitted
-    default and the pts_lo-vs-mean ranking question were both kept or
-    decided: a real structural argument (shots are the more stable
-    underlying skill for a position whose points are goal-driven and
-    streaky) plus a directionally consistent reading — not proof, and not
-    pretended to be one. Re-check with
-    backtest_predictor() as more jornadas accumulate; revisit if the gap
-    doesn't tighten toward significance or reverses.
-    Below 10 paired players this refuses (slope 0.0, intercept 0.0)
-    rather than fit a line through noise — same floor _xg_points_fit()
-    uses, for the same reason; Scorer.rate() also checks this count
-    explicitly before trusting the term at all.
+    pooled sample mean): MAE 2.99 vs 3.76, n=25, bootstrap CI on the gap
+    straddles zero — real and promising, not yet statistically proven.
+    Kept live above the 10-pair floor on a structural argument (shots are
+    the more stable underlying skill for a goal-driven position) plus a
+    directionally consistent reading. Re-check with backtest_predictor()
+    as more jornadas accumulate.
 
-    `players`, when given, is load_players()'s own output — INJECTABLE
-    rather than always re-loaded: that function needs a live market/
-    lineups snapshot to run at all (raises SystemExit on neither), which
-    a caller checking this fit against a small fixture cannot cheaply
-    fake. `None` (every real caller) loads it for real.
+    `players`, when given, is load_players()'s own output — injectable so
+    a caller can fake a small fixture; `None` loads it for real.
     Why: docs/notes/score.md#_shots_points_fit--in-season-not-prior-season
     """
     from ffcore.tidy import TIDY, SEASON, read_csv, load_players
@@ -627,11 +475,9 @@ def _shots_points_fit(xw, players=None) -> tuple[float, float, int]:
 
 def load_shots_current(xw=None, players=None) -> dict[str, dict]:
     """{norm(market name): {"shots90": shots per 90 minutes THIS season,
-    "minutes": total minutes}} — forwards only (the position gate
-    _shots_points_fit() also uses), from LaLiga's own per-match box score.
-    Same shape as load_understat_current(), so Scorer.rate() blends it
-    the same way. `players`: see _shots_points_fit()'s own note — injectable
-    for the same reason, `None` (every real caller) loads it for real.
+    "minutes": total minutes}} — forwards only, from LaLiga's per-match
+    box score. Same shape as load_understat_current(). `players`: see
+    _shots_points_fit()'s note — injectable, `None` loads for real.
     """
     from ffcore.tidy import (TIDY, SEASON, read_csv, load_crosswalk,
                              load_players)
@@ -672,9 +518,8 @@ def _per_jornada_current(starters_rows, perjornada_rows, matches_rows,
     """{crosswalk key: {jornada: (points, minutes)}} for the live season.
 
     Joins starters.csv's minutes (keyed by match_id) to perjornada.csv's
-    points (keyed by its own `jornada` column) via matches.csv's
-    match_id -> jornada map. A jornada absent from either side is dropped
-    rather than guessed.
+    points (keyed by `jornada`) via matches.csv's match_id -> jornada
+    map. A jornada absent from either side is dropped, not guessed.
     Why: docs/notes/score.md#_per_jornada_current--the-join-and-the-points_total-anchor
     """
     jornada_of_match: dict[str, int] = {}
@@ -706,9 +551,8 @@ def _per_jornada_current(starters_rows, perjornada_rows, matches_rows,
                                                          r.get("minute"))
 
     # Anchored on points_total, not summed from points_delta — the delta
-    # is missing whatever a player had on the board before this file's
-    # own history started (points.py's diff() has no row to diff the
-    # very first snapshot against). Why: docs/notes/score.md#_per_jornada_current--the-join-and-the-points_total-anchor
+    # is missing whatever a player had before this file's own history
+    # started. Why: docs/notes/score.md#_per_jornada_current--the-join-and-the-points_total-anchor
     end_total: dict[str, dict[int, float]] = {}
     for r in perjornada_rows:
         raw_jor = (r.get("jornada") or "").strip()
@@ -736,9 +580,8 @@ def _per_jornada_current(starters_rows, perjornada_rows, matches_rows,
             points_by_jor.setdefault(key, {})[jor] = totals[jor] - prev
             prev = totals[jor]
 
-    # The universe is the points-page's own, not everyone starters.csv
-    # names — 90 players with real minutes carry no points-page row at
-    # all, and are left out entirely rather than entered at pts=0.
+    # The universe is the points-page's own — a player with real minutes
+    # but no points-page row is left out entirely, not entered at pts=0.
     # Why: docs/notes/score.md#_per_jornada_current--the-join-and-the-points_total-anchor
     out: dict[str, dict[int, tuple[float, float]]] = {}
     for key, points_jd in points_by_jor.items():
@@ -751,10 +594,9 @@ def _per_jornada_current(starters_rows, perjornada_rows, matches_rows,
 
 def _weighted_totals(per_jornada: dict[int, tuple[float, float]],
                      decay: float) -> tuple[float, float]:
-    """(weighted points, weighted matches) for one player.
-
-    Most recent jornada weighs 1, one back `decay`, two back `decay**2`;
-    decay=1.0 is an exact flat sum (no special case).
+    """(weighted points, weighted matches) for one player. Most recent
+    jornada weighs 1, one back `decay`, two back `decay**2`; decay=1.0 is
+    an exact flat sum.
     Why: docs/notes/score.md#_weighted_totals--_weighted_start-recency-weighting
     """
     if not per_jornada:
@@ -770,11 +612,8 @@ def _weighted_totals(per_jornada: dict[int, tuple[float, float]],
 
 def _weighted_start(per_jornada: dict[int, tuple[float, float]],
                     decay: float) -> tuple[float, float]:
-    """(recency-weighted participation rate, weighted jornada count).
-
-    Same per_jornada/decay as _weighted_totals, but a decayed RATE in its
-    own right (Σ(w·min(1, minutes/90)) / Σw) — lives in [0, 1], stands in
-    for a start probability directly.
+    """(recency-weighted participation rate, weighted jornada count) —
+    Σ(w·min(1, minutes/90)) / Σw, in [0, 1], a start probability directly.
     Why: docs/notes/score.md#_weighted_totals--_weighted_start-recency-weighting
     """
     if not per_jornada:
@@ -789,13 +628,10 @@ def _weighted_start(per_jornada: dict[int, tuple[float, float]],
 
 
 def _fit_decay(by_key: dict[str, dict[int, tuple[float, float]]]) -> tuple[float, str]:
-    """(decay, why) — the recency weighting earns its use ONLY if it beats
-    the flat average out of sample, same discipline
-    `ffcore.startprob.Calibration.fit()` uses for P(start).
-
-    Walk-forward, not leave-one-out (deliberately not Calibration.fit()'s
-    pattern — jornadas have a time-order that matters, sheets don't).
-    Jornada J is only ever predicted from jornadas strictly before it.
+    """(decay, why) — the recency weighting earns its use only if it beats
+    the flat average out of sample. Walk-forward (not leave-one-out:
+    jornadas have a time-order that matters) — jornada J is only ever
+    predicted from jornadas strictly before it.
     Why: docs/notes/score.md#_fit_decay--walk-forward-validation
     """
     def walk_error(decay: float) -> tuple[float, int]:
@@ -832,20 +668,15 @@ def _fit_decay(by_key: dict[str, dict[int, tuple[float, float]]]) -> tuple[float
 
 
 def _current_from_perjornada() -> tuple[dict, str]:
-    """{norm(market name): {"pts": season-to-date points, "pj": minutes / 90,
+    """{norm(market name): {"pts": season-to-date points, "pj": minutes/90,
     "start_rate": recency-weighted share of a jornada started,
     "start_n": weighted jornada count behind that rate}} from this
     season's per-jornada tracker, or ({}, "") before it exists.
 
-    Not data/season/points_<season>.csv (load_points()'s other source) —
-    that snapshots the points PAGE, which reads empty until J1 is fully
-    played; perjornada_*.csv is the real live source. Keyed through the
-    crosswalk twice (ff_id -> canonical player -> norm(market name), the
-    key Scorer.rate() actually uses). "pj" is minutes, not an appearance
-    count. Recency-weighted via `_fit_decay`'s walk-forward validation,
-    not a flat average — with only one jornada on record (this repo's
-    state at time of writing) this collapses to the old flat-sum behaviour
-    exactly.
+    Not points_<season>.csv (that snapshots the points PAGE, empty until
+    J1 is fully played). Keyed through the crosswalk to norm(market
+    name), the key Scorer.rate() uses. "pj" is minutes, not appearances.
+    Recency-weighted via `_fit_decay`'s walk-forward validation.
     Why: docs/notes/score.md#_current_from_perjornada--why-not-points_csv
     """
     from ffcore.tidy import SEASON, TIDY, load_crosswalk, read_csv
@@ -878,13 +709,10 @@ def _current_from_perjornada() -> tuple[dict, str]:
 def load_points() -> tuple[dict, str, dict, str]:
     """(prior, prior_label, current, current_label) from data/season/.
 
-    PRIOR: the newest data/season/points_*.csv (last season's completed
-    totals). CURRENT: this season's live per-jornada tracker (see
-    _current_from_perjornada()). Two files, not one, on the PRIOR side —
-    reading only the newest points_*.csv (what report.py/rivals.py each
-    did before this module existed) is a bug waiting for the season to
-    roll over: the moment points_2026-27.csv appears as a completed
-    snapshot, the actual prior would vanish.
+    PRIOR: the newest points_*.csv (last season's completed totals).
+    CURRENT: this season's live per-jornada tracker. Reading only the
+    single newest points_*.csv would lose the actual prior the moment a
+    new season's own snapshot appears.
     Why: docs/notes/score.md#load_points--the-two-file-prior
     """
     from ffcore.tidy import SEASON, load_crosswalk, read_csv
@@ -897,10 +725,8 @@ def load_points() -> tuple[dict, str, dict, str]:
         for r in read_csv(path):
             rec = {"pts": ratio(r.get("points")) or 0.0,
                    "pj": ratio(r.get("games")) or 0.0}
-            # The id first, under the market's CURRENT name — a completed
-            # snapshot is frozen at whatever names were true when written.
-            # Falls back to name-only for a file predating ff_id (added
-            # 2026-08-21) rather than losing older rows.
+            # The id first, under the market's current name; falls back to
+            # name-only for a file predating ff_id, rather than losing rows.
             pid = (r.get("ff_id") or "").strip()
             player = xw.players.get(pid) if pid and xw is not None else None
             if player and player.name:
@@ -927,12 +753,10 @@ def load_points() -> tuple[dict, str, dict, str]:
 
 def build(market: list[dict], xi_rows: list[dict], now,
           shrink_k: float = SHRINK_K, calibrate: bool = True) -> tuple:
-    """(Scorer, labels) wired to every input the model has.
-
-    ONE builder — report.py and rivals.py must score with identical
-    arithmetic, the whole reason this module was lifted out of report.py.
-    `calibrate` fits P(start) against confirmed line-ups and turns itself
-    off with nothing played, or a fit that loses on unseen line-ups.
+    """(Scorer, labels) wired to every input the model has — the one
+    builder report.py and rivals.py both use, so they score identically.
+    `calibrate` fits P(start) against confirmed line-ups, or turns itself
+    off with nothing played or a fit that loses on unseen line-ups.
     Why: docs/notes/score.md#build--one-model-per-run
     """
     from ffcore.fixture import fixture_board
@@ -942,24 +766,20 @@ def build(market: list[dict], xi_rows: list[dict], now,
     cal, second = None, None
     if calibrate:
         cal, second = _calibrated()
-    # Club Elo ranks the opponents when it covers all of them and squad value
-    # ranks them otherwise, per club that real results (below) don't reach —
-    # wired HERE, in the one builder, so your squad and a rival's can never
-    # be scored off two different difficulty scales.
+    # Club Elo ranks opponents when it covers all of them, squad value
+    # otherwise — wired here so your squad and a rival's never score off
+    # two different difficulty scales.
     from ffcore.tidy import (load_crosswalk, load_results_history,
                              load_understat_players)
     xw = load_crosswalk()
     board = fixture_board(market, load_fixtures(), now, load_elo(),
                           xw=xw, results=load_results_history(),
                           understat_rows=load_understat_players("2025"))
-    # xG/xA — see this module's own section above for the mechanism and why
-    # both numbers are fit fresh from real data rather than hand-picked.
     xg_cur = load_understat_current(xw)
     xg_slope, xg_intercept, xg_n = _xg_points_fit(xw)
     xg_boost, xg_why = _xg_stickiness_boost()
-    # Shot volume, forwards only — see Scorer.__init__'s own note and
-    # _shots_points_fit() for the real, forward-validated case (this
-    # session, 2026-09-12).
+    # Shot volume, forwards only — see Scorer.__init__ and
+    # _shots_points_fit() for the validated case.
     shots_cur = load_shots_current(xw)
     shots_slope, shots_intercept, shots_n = _shots_points_fit(xw)
     sc = Scorer(market, xi_rows, prior, shrink_k=shrink_k,
@@ -975,12 +795,10 @@ _CAL_CACHE: list = []
 
 
 def _calibrated():
-    """(Calibration, second-source rows), fitted once per process.
-
-    Cached: the fit cross-validates over every team sheet on record. The
-    cut is the first confirmed line-up seen — anything published after
-    may already be the team sheet, and grading a forecast against itself
-    is how a model marks its own homework.
+    """(Calibration, second-source rows), fitted once per process and
+    cached. `cut` is the first confirmed line-up seen — anything
+    published after may already be the team sheet, and grading a
+    forecast against itself is marking its own homework.
     Why: docs/notes/score.md#_calibrated--caching-and-the-fingerprint-bug
     """
     if _CAL_CACHE:
@@ -998,25 +816,18 @@ def _calibrated():
     # The crosswalk is what lets the narrow source be joined exactly rather
     # than on a folded name: it shares no slug with anything else.
     xw = Crosswalk.read(TIDY / "players.csv", TIDY / "clubs.csv")
-    # THE ACTUAL LIVE EFFECT of fit_start_fallbacks() — same discipline
-    # DRIFT_FRAC/HOME_EDGE's own wiring already established this session:
-    # fitting a constant and only ever printing the result nobody acts on
-    # is not a fix. Mutates the module globals (Scorer.score() reads
-    # NEUTRAL_START/ABSENT_START live off this module, same mechanism
-    # HOME_EDGE's own live reads use) BEFORE any Scorer built this run
-    # calls .score() on a real player. Unconditional (not gated behind
-    # the cache check below) — cheap (one pass over already-loaded
-    # observations), and the fallback-fit and the Calibration fit are two
-    # independent questions off the same underlying data.
+    # Mutates the module globals — Scorer.score() reads NEUTRAL_START/
+    # ABSENT_START live off this module — before any Scorer built this
+    # run calls .score(). Unconditional (not gated behind the cache check
+    # below): cheap, and independent of the Calibration fit.
     global NEUTRAL_START, ABSENT_START
     if cut:
         NEUTRAL_START, ABSENT_START, _fallback_why = fit_start_fallbacks(
             load_lineups() + second, truth, cut,
             neutral_default=NEUTRAL_START, absent_default=ABSENT_START,
             xw=xw)
-    # On disk, keyed by what it was fitted on — the fit costs ~6s in every
-    # process, and a changed fingerprint refits; nothing else does.
-    # METHOD_VERSION is part of that evidence, not just the data.
+    # On disk, keyed by what it was fitted on — the fit costs ~6s; a
+    # changed fingerprint (METHOD_VERSION included) refits.
     # Why: docs/notes/score.md#_calibrated--caching-and-the-fingerprint-bug
     stamp = "%d:%d:%s" % (METHOD_VERSION, len(truth), cut)
     path = TIDY / "startcal.json"
@@ -1046,14 +857,7 @@ def _calibrated():
 
 
 def formations() -> list[tuple]:
-    """Legal shapes — the free tier, confirmed against the app's picker.
-
-    A `premium: bool` parameter (and PREMIUM_FORMATIONS, and pick_xi()'s own
-    matching parameter) used to exist for the rare rival on a paid
-    subscription, but nothing anywhere ever called it with premium=True —
-    deleted 2026-09-05 as dead plumbing, not as a feature decision. Add it
-    back the same way if a caller genuinely needs it.
-    """
+    """Legal shapes — the free tier, confirmed against the app's picker."""
     return list(FREE_FORMATIONS)
 
 
@@ -1131,23 +935,17 @@ class Scorer:
         # next fixture, and gets factor 1.0 with the reason printed — never a
         # silently average opponent.
         self.board = board or {}
-        # xG/xA — see this module's own section above `_precision_blend`.
-        # {key: {"xg90":..., "minutes":...}}, forwards/attacking mids only.
+        # xG/xA — see _precision_blend above. {key: {"xg90", "minutes"}},
+        # forwards/attacking mids only.
         self.xg = xg or {}
         self.xg_slope = xg_slope
         self.xg_intercept = xg_intercept
         self.xg_n = xg_n            # how many (player, xG, ppm) pairs fit the slope
         self.xg_boost = xg_boost    # pseudo-matches an xG match is worth vs a raw one
         self.xg_why = xg_why        # printed by callers that want the provenance
-        # SHOT VOLUME — see _shots_points_fit()'s own docstring for the
-        # real, backtest_predictor()-checked case (a large, directionally
-        # real effect, NOT yet statistically proven at n=25 — read that
-        # docstring before citing a number from this comment) and why it
-        # has no xg_boost equivalent (no prior season of this feed exists
-        # yet to calibrate one against — 1 raw match per informed match,
-        # honestly, not invented). {key: {"shots90":..., "minutes":...}},
-        # forwards only (same gate xg uses for attacking mids too, narrower here
-        # because that's what was actually validated).
+        # Shot volume, forwards only — see _shots_points_fit(). No
+        # xg_boost equivalent: no prior season of this feed exists to
+        # calibrate one against, so 1 raw match = 1 informed match.
         self.shots = shots or {}
         self.shots_slope = shots_slope
         self.shots_intercept = shots_intercept
@@ -1274,12 +1072,10 @@ class Scorer:
             xg_rate = self.xg_slope * xg["xg90"] + self.xg_intercept
             terms.append((xg_matches, xg_rate))
             xg_note = " + xg %.2f/%.1fj" % (xg_rate, xg["minutes"] / 90.0)
-        # SHOT VOLUME, forwards only — see Scorer.__init__'s own note and
-        # _shots_points_fit() for the real, forward-validated case this is
-        # based on. GATED ON shots_n >= 10 explicitly (not left implicit
-        # the way the xG term is) — an untrained fit would otherwise add a
-        # real-weight, zero-rate term and silently drag a thin-evidence
-        # player toward zero.
+        # Shot volume, forwards only. Gated on shots_n >= 10 explicitly
+        # (unlike the xG term) — an untrained fit would otherwise add a
+        # real-weight, zero-rate term and drag a thin-evidence player
+        # toward zero.
         shots = self.shots.get(key)
         shots_note = ""
         if shots and shots["minutes"] > 0 and self.shots_n >= 10:
@@ -1315,10 +1111,9 @@ class Scorer:
         on_page = key in self.listed
         rating = self.rate(rec)
 
-        # Scaling by P(start) prices a non-start at zero — right because
-        # the free tier has no auto-substitution (verified in-app,
-        # 2026-08-16, issue #28). `pct_used` is the source's figure GRADED
-        # against confirmed line-ups (identity until a jornada is played).
+        # Scaling by P(start) prices a non-start at zero — the free tier
+        # has no auto-substitution. `pct_used` is graded against confirmed
+        # line-ups (identity until a jornada is played).
         # Why: docs/notes/score.md#scorerscore--the-pstart-blend
         raw = pct if pct is not None else (
             NEUTRAL_START if on_page else ABSENT_START)
@@ -1447,12 +1242,8 @@ def pick_xi(pool: dict, force: dict | None = None):
 
 
 def _selftest() -> None:
-    """The two stages of the blend, and the fixture that only fielding uses.
-
-    score.py had no self-test: it was covered sideways through bid.py and
-    report.py, which is coverage of the callers, not of the arithmetic. These
-    are the cases the arithmetic owns.
-    """
+    """The two shrink stages, and the fixture factor that only fielding
+    uses."""
     from ffcore.fixture import Match
 
     def mk(name, pos="defensa", team="Mid", value="10.00M"):
@@ -1489,21 +1280,17 @@ def _selftest() -> None:
     assert full.ppm < blended.ppm < 10.0
     assert "now" in blended.why and "3j" in blended.why
 
-    # AN EMPTY CURRENT SEASON IS A NO-OP. This is today's live state: the
-    # points page reads "No se encontraron resultados" until J1 finishes, and
-    # that must not reset anybody.
+    # An empty current season is a no-op.
     assert Scorer(market, xi, hist, current={}).rate(mk("p0")) == full
     assert Scorer(market, xi, hist,
                   current={"p0": {"pts": 0.0, "pj": 0.0}}).rate(mk("p0")) \
         == full
 
-    # THE FIXTURE SPLITS THE TWO DECISIONS. Same player, same inputs; the
-    # fielding number moves with the opponent and the buying number does not.
+    # The fixture splits the two decisions: fielding moves with the
+    # opponent, buying does not.
     when = __import__("datetime").datetime.fromisoformat(
         "2026-08-20T19:00:00+00:00")
-    # atk_factor and def_factor DIFFER here on purpose — p0 is a defensa
-    # (mk()'s default), so score() must reach for def_factor (1.10), not
-    # atk_factor (1.30).
+    # p0 is a defensa (mk()'s default) -> def_factor, not atk_factor.
     easy = Match("Elche", True, when, atk_factor=1.30, def_factor=1.10,
                 rank=20, of=20)
     sc3 = Scorer(market, xi, hist, board={"Mid": easy})
@@ -1534,48 +1321,33 @@ def _selftest() -> None:
     # meant to reach, and as_row() carries the new fields to the renderers.
     assert "fix" in s.as_row() and "flat" in s.as_row()
 
-    # -- P(start) blended against real recent minutes, same stage as pts ---
-    # Editorial says 100%; he has actually started nothing lately. The
-    # blend must pull pct_used DOWN from 100, not leave it as the whole
-    # answer — the actual behaviour "does a player go out of rotation"
-    # needs, ahead of the editorial page catching up.
+    # -- P(start) blended against real recent minutes -----------------
+    # Editorial says 100%; he has started nothing lately. pct_used must
+    # pull down from 100, not stay the whole answer.
     benched_cur = {"p0": {"pts": 30.0, "pj": 3.0,
                           "start_rate": 0.0, "start_n": 6.0}}
     sc4 = Scorer(market, xi, hist, current=benched_cur, board={"Mid": easy})
     benched_s = sc4.score(mk("p0"))
     assert benched_s.pct_used < 100.0, benched_s.pct_used
-    # SHRUNK, NOT OVERWRITTEN: 6 weighted jornadas of real zero against
-    # shrink_k=8 pseudo-matches of editorial 100% is still a blend, and the
-    # formula is exact — (8*100 + 6*0) / (8+6).
+    # Shrunk, not overwritten: (8*100 + 6*0) / (8+6).
     assert abs(benched_s.pct_used - 800.0 / 14.0) < 1e-9, benched_s.pct_used
 
-    # NO CURRENT-SEASON EVIDENCE IS A NO-OP, same discipline as the points
-    # blend above — an editorial 100% with nothing to weigh it against
-    # stays 100%.
+    # No current-season evidence is a no-op — editorial 100% stays 100%.
     untouched = Scorer(market, xi, hist, current={}, board={"Mid": easy}
                        ).score(mk("p0"))
     assert untouched.pct_used == 100.0, untouched.pct_used
-    # ...and pct_rest, with no season evidence to differ on, is the same
-    # number — nothing else to answer jornada 10 with either.
     assert untouched.pct_rest == 100.0, untouched.pct_rest
 
-    # -- pct_rest: a REGULAR STARTER'S standing rate survives ONE bad
-    # week's editorial reading; pct_used, which answers for the very next
-    # jornada, does not have to. A card suspension (editorial 0%, thin
-    # season sample — 2 weighted jornadas, the actual shape a real
-    # suspended defender's own current-season record has) should read as
-    # "out this week" (pct_used pulled toward 0), not "a rotation risk all
-    # season" (pct_rest should stay well above it — anchored at NEUTRAL_
-    # START, not at this week's 0%).
+    # -- pct_rest: a regular starter's standing rate survives one bad
+    # week's editorial reading (a suspension), while pct_used does not —
+    # "out this week" should not read as "a rotation risk all season."
     starter_cur = {"p0": {"pts": 30.0, "pj": 2.0,
                           "start_rate": 0.9, "start_n": 2.0}}
     susp = [{"player_name": "p0", "start_pct": "0", "status": "suspended"}]
     sc5 = Scorer(market, susp, hist, current=starter_cur, board={"Mid": easy})
     susp_s = sc5.score(mk("p0"))
-    # THE FORMULAS ARE EXACT, same shrink_k=8 pseudo-matches both blends
-    # already trust — pct_used anchored on this week's editorial 0%,
-    # pct_rest on NEUTRAL_START, and only NEUTRAL_START's anchor never
-    # sees the suspension.
+    # pct_used anchored on this week's editorial 0%, pct_rest on
+    # NEUTRAL_START — only NEUTRAL_START's anchor never sees the suspension.
     assert abs(susp_s.pct_used - (8 * 0.0 + 2 * 90.0) / 10) < 1e-9, susp_s
     assert abs(susp_s.pct_rest - (8 * NEUTRAL_START + 2 * 90.0) / 10) < 1e-9, \
         susp_s
@@ -1598,12 +1370,8 @@ def _selftest() -> None:
         {"match_id": "m1", "jornada": "1"},
     ]
     starters_rows = [
-        # starters.csv's SHORT form ("Blanco") must still resolve to the
-        # market's full name's crosswalk key — this is the actual bug: a
-        # first version matched on the raw name string, matched 10 of 42
-        # real players against api_stats' ground-truth minutes, and
-        # silently scored the other 32 (Antonio Blanco among them, 89
-        # real minutes) as zero.
+        # starters.csv's short form ("Blanco") must resolve to the
+        # market's full-name crosswalk key.
         {"player_name": "Blanco", "player_slug": "blanco",
          "role": "starter", "minute": "", "match_id": "m1"},
         # Came on at 70: the REMAINING 20, not a full match.
@@ -1622,22 +1390,15 @@ def _selftest() -> None:
         # No slug at all does not resolve — skipped, not guessed.
         {"player_name": "Nobody", "player_slug": "", "role": "starter",
          "minute": "", "match_id": "m1"},
-        # THE SAME MATCH, CARRIED FORWARD into 56 more snapshots — exactly
-        # what starters.csv's raw table actually holds, measured: one
-        # player's row for one match appeared 57 times, and summing all of
-        # them credited him 5,130 minutes in a season that had played one
-        # jornada. Must count once, not 57 times.
+        # The same match, repeated 56 more times (starters.csv's raw
+        # table really does this) — must count once, not 57 times.
         *({"player_name": "Blanco", "player_slug": "blanco",
            "role": "starter", "minute": "", "match_id": "m1"}
           for _ in range(56)),
     ]
     perjornada_rows = [
-        # THE UNDIFFED-BASELINE CASE, REAL AND MEASURED: this repo's own
-        # points_delta once read 7 for a player whose points_total said
-        # 11 — the missing 4 being whatever he had on the board before
-        # this file's own history started. Anchoring on points_total
-        # rather than summing points_delta is what recovers the true 8
-        # here despite a delta that only claims 3.
+        # Anchoring on points_total (not summing points_delta) recovers
+        # the true 8 here despite a delta that only claims 3.
         {"ff_id": "1", "player_name_full": "Antonio Blanco",
          "points_delta": "3", "points_total": "8", "jornada": "1"},
         {"ff_id": "1", "player_name_full": "Antonio Blanco",
@@ -1651,20 +1412,14 @@ def _selftest() -> None:
                                   matches_rows, xw2)
     assert by_key["antonio blanco"] == {1: (8.0, 90.0), 2: (5.0, 45.0)}, \
         by_key["antonio blanco"]
-    # REAL, MEASURED GAP: "Came On" and "Unused Sub" have starters.csv
-    # minutes but no row on the points page at all — 90 such players on
-    # this repo's own store. Left OUT of the universe entirely rather than
-    # entered at pts=0: that would guess "he scored nothing" where the
-    # honest reading is "this page does not say," the same distinction
-    # NEUTRAL_START/ABSENT_START already draws for the other source.
+    # "Came On"/"Unused Sub" have minutes but no points-page row at all —
+    # left out of the universe entirely rather than entered at pts=0.
     assert "came on" not in by_key, by_key
     assert "unused sub" not in by_key, by_key
     assert _per_jornada_current([], [], [], xw2) == {}
 
-    # A CORRECTION WITHIN ONE JORNADA (bonus points posted after the fact,
-    # the exact case that produced a second row for one match in this
-    # repo's own store) must OVERWRITE that jornada's running total, not
-    # add another jornada's worth on top of it.
+    # A correction within one jornada (bonus points posted after the fact)
+    # must overwrite that jornada's running total, not add to it.
     corrected = _per_jornada_current(
         starters_rows,
         [{"ff_id": "1", "player_name_full": "Antonio Blanco",
@@ -1686,27 +1441,22 @@ def _selftest() -> None:
     assert abs(wpts - 9.0) < 1e-9, wpts
     assert _weighted_totals({}, 0.5) == (0.0, 0.0)
 
-    # ONLY ONE JORNADA ON RECORD: nobody has a second one to walk forward
-    # to, so the fit must refuse and hand back decay=1.0 — this is where
-    # this repo's own live data stands at the time of writing, and it
-    # must be provably inert.
+    # Only one jornada on record: nobody has a second to walk forward to,
+    # so the fit must refuse and hand back decay=1.0.
     one_jornada = {"a": {1: (4.0, 90.0)}, "b": {1: (2.0, 45.0)}}
     decay, why = _fit_decay(one_jornada)
     assert decay == 1.0 and "second jornada" in why, (decay, why)
     assert _fit_decay({}) == (1.0, "no player has a second jornada to "
                               "predict yet")
-    # TWO JORNADAS total is STILL not enough: walking forward to jornada 2
-    # trains on exactly one jornada, and decay cannot differ from flat
-    # with only one training point to weight.
+    # Two jornadas is still not enough: walking forward to jornada 2 trains
+    # on exactly one point, so decay cannot differ from flat.
     decay0, _ = _fit_decay(
         {p: {1: (1.0, 90.0), 2: (9.0, 90.0)} for p in "ab"})
     assert decay0 == 1.0, decay0
 
-    # THREE JORNADAS, A REAL RECENCY SIGNAL: a steady rise, predicted from
-    # jornada 3 with two training points (1 and 2) to weight differently —
-    # decay can only show an edge once there is more than one training
-    # point, which is exactly why this needs 3 jornadas and not 2.
-    # Synthetic, but it proves the grid can actually win when the evidence
+    # Three jornadas: a steady rise, predicted from jornada 3 with two
+    # training points to weight differently. Synthetic, but it proves the
+    # grid can win when the evidence
     # favours it, and hand back a note that says so.
     trending = {p: {1: (1.0, 90.0), 2: (5.0, 90.0), 3: (9.0, 90.0)}
                for p in ("p%d" % i for i in range(8))}
@@ -1773,16 +1523,11 @@ def _selftest() -> None:
         _tidy.TIDY = __import__("pathlib").Path(_d)
         try:
             us_cur = load_understat_current(xw_us)
-            # -- _xg_stickiness_boost: this file has ONLY season-2026 rows,
-            # so no player pairs across two seasons at all — far below the
-            # 30-pair floor, and it must refuse rather than trust a ratio
-            # measured on nothing.
+            # Only season-2026 rows here, so no cross-season pairs at all —
+            # far below the 30-pair floor, must refuse.
             boost_thin, why_thin = _xg_stickiness_boost()
         finally:
             _tidy.TIDY = _real_tidy
-    # Keyed by norm(market name) — "striker sam" — not the crosswalk id,
-    # the same translation _current_from_perjornada() does, because that
-    # is what Scorer.rate() actually looks self.xg up by.
     assert set(us_cur) == {"striker sam"}, us_cur      # the defender is excluded
     assert abs(us_cur["striker sam"]["xg90"] - 0.8) < 1e-9
     assert boost_thin == 1.0 and "30" in why_thin, (boost_thin, why_thin)
@@ -1793,18 +1538,16 @@ def _selftest() -> None:
     slope0, intercept0 = _linreg([1.0, 1.0, 1.0], [5.0, 5.0, 5.0])
     assert slope0 == 0.0 and abs(intercept0 - 5.0) < 1e-9  # no x-variance: flat
 
-    # -- Scorer.rate(): the xG term folds in as a THIRD weighted source, and
-    # the two-term formula it generalises is reproduced exactly when no xG
-    # reading exists for a player --------------------------------------------
+    # -- Scorer.rate(): the xG term as a third weighted source, exactly
+    # reproducing the two-term formula when no xG reading exists ----------
     market_xg = [mk("Attacker", pos="delantero")]
     hist_xg = {"attacker": {"pts": 100.0, "pj": 34.0}}
     xi_xg = [{"player_name": "Attacker", "start_pct": "100"}]
     sc_plain = Scorer(market_xg, xi_xg, hist_xg)
     plain = sc_plain.rate(mk("Attacker", pos="delantero"))
 
-    # Same inputs, an xG reading added: 2 matches worth at boost 1.0, xG-
-    # implied rate of 10.0. The blend must land strictly between the
-    # no-xG rate and the xG-implied rate, and match the explicit formula.
+    # 2 matches worth at boost 1.0, xG-implied rate 10.0 — must land
+    # strictly between the no-xG rate and the xG-implied rate.
     sc_xg = Scorer(market_xg, xi_xg, hist_xg,
                   xg={"attacker": {"xg90": 1.0, "minutes": 180.0}},
                   xg_slope=10.0, xg_intercept=0.0, xg_boost=1.0)
@@ -1813,23 +1556,18 @@ def _selftest() -> None:
     assert abs(with_xg.ppm - expect) < 1e-9, (with_xg.ppm, expect)
     assert min(plain.ppm, 10.0) < with_xg.ppm < max(plain.ppm, 10.0)
     assert "xg" in with_xg.why
-    # cur_pj/pj stay based on REAL matches only — the xG term sharpens the
-    # point estimate, it does not manufacture evidence for the uncertainty
-    # ffcore.forecast widens around it.
+    # cur_pj/pj stay based on real matches only — xG sharpens the point
+    # estimate, it doesn't manufacture evidence for the uncertainty.
     assert with_xg.cur_pj == 0.0 and with_xg.pj == 34.0
 
-    # A defender gets no xG term even if one is (wrongly) supplied — rate()
-    # only ever looks self.xg up by the SAME key the market row resolves
-    # to, so a caller that built self.xg correctly (load_understat_current's
-    # own position gate) never reaches this path for a non-attacker; this
-    # just confirms the blend arithmetic itself has no position logic of
-    # its own baked in — that gate lives entirely in load_understat_current.
+    # No xG data supplied -> no xG term, confirming the blend arithmetic
+    # has no position logic of its own (that gate lives in
+    # load_understat_current).
     sc_noxg = Scorer(market_xg, xi_xg, hist_xg, xg={})
     assert sc_noxg.rate(mk("Attacker", pos="delantero")) == plain
 
-    # -- Scorer.rate(): the shots term, gated on shots_n >= 10 EXPLICITLY —
-    # unlike xG, an untrained fit (shots_n < 10) must not add a real-
-    # weight, zero-rate term that drags a thin-evidence forward down ------
+    # -- Scorer.rate(): the shots term, gated on shots_n >= 10 explicitly —
+    # an untrained fit must not drag a thin-evidence forward down --------
     sc_shots_untrained = Scorer(
         market_xg, xi_xg, hist_xg,
         shots={"attacker": {"shots90": 3.0, "minutes": 180.0}},
@@ -1841,21 +1579,16 @@ def _selftest() -> None:
         shots={"attacker": {"shots90": 2.0, "minutes": 180.0}},
         shots_slope=5.0, shots_intercept=0.0, shots_n=10)
     with_shots = sc_shots.rate(mk("Attacker", pos="delantero"))
-    # 2 matches worth (180 minutes), shots-implied rate 5.0*2.0=10.0 —
-    # same blend arithmetic the xG term already uses, just a second term.
+    # 2 matches worth, shots-implied rate 5.0*2.0=10.0 — same arithmetic.
     expect_shots = (SHRINK_K * plain.ppm + 2.0 * 10.0) / (SHRINK_K + 2.0)
     assert abs(with_shots.ppm - expect_shots) < 1e-9, \
         (with_shots.ppm, expect_shots)
     assert "shots" in with_shots.why
 
-    # -- backtest_predictor: the reusable hypothesis-test harness, checked
-    # with a known-answer synthetic case before trusting it on real data -
+    # -- backtest_predictor: known-answer synthetic cases first ----------
     assert backtest_predictor({}, {}, min_pairs=1) is None    # nothing to test
-    # A feature that's an EXACT linear function of next-jornada's actual
-    # (y = 2x, no noise) must beat a flat "his own average so far"
-    # baseline whenever the trend actually moves — 12 players, feature
-    # rising 1..12 across two prior jornadas, last-jornada actual doubles
-    # the mean feature exactly.
+    # An exact linear function of the actual (y=2x, no noise) must beat
+    # the baseline: 12 players, feature rising 1..12, actual doubles it.
     exact_feat = {str(i): {1: float(i), 2: float(i)} for i in range(1, 13)}
     exact_act = {str(i): {1: float(i) - 1, 2: float(i) + 1, 3: float(i) * 2}
                 for i in range(1, 13)}
@@ -1863,9 +1596,8 @@ def _selftest() -> None:
     assert exact is not None and exact["n"] == 12, exact
     assert exact["mae_feature"] < exact["mae_baseline"], exact
     assert exact["gap"]["beats"], exact          # real, not a coin flip
-    # PURE NOISE, no real relationship: a fitted line must not reliably
-    # beat the baseline just because it's fitted — same discipline
-    # rate_baseline_check()'s own "always_off" case checks the other way.
+    # Pure noise: a fitted line must not reliably beat the baseline just
+    # because it's fitted.
     import random as _random_bp
     _rng_bp = _random_bp.Random(7)
     noise_feat = {str(i): {1: _rng_bp.random(), 2: _rng_bp.random()}
@@ -1875,21 +1607,15 @@ def _selftest() -> None:
     noisy = backtest_predictor(noise_feat, noise_act, min_pairs=10)
     assert noisy is not None and not noisy["gap"]["beats"], noisy
 
-    # REGRESSION CASE FOR THE POOLED-BASELINE FIX ITSELF (2026-09-12): the
-    # bug this replaced only showed up when players' own actual LEVELS
-    # vary a lot across players (real data) with just 1-2 prior jornadas
-    # each — an unpooled "his own average" baseline is then so noisy that
-    # a fitted line beats it on pure random noise, purely by pooling.
-    # Caught by testing against real defender data directly; pinned down
-    # here with a small synthetic version so it can't come back silently.
+    # Regression case for the pooled-baseline fix: players' actual levels
+    # vary a lot with just 1-2 prior jornadas each — an unpooled "his own
+    # average" baseline is noisy enough that a fitted line beats it on
+    # pure random noise, purely by pooling. Pinned down synthetically so
+    # it can't come back silently.
     _rng_reg = _random_bp.Random(11)
     varied_levels = {str(i): 2.0 + i * 3.0 for i in range(1, 21)}  # 5..62
     noise_feat2 = {k: {1: _rng_reg.random(), 2: _rng_reg.random()}
                   for k in varied_levels}
-    # Each player's actual hovers near HIS OWN level (real football: some
-    # players just score more than others) with real match-to-match noise
-    # on top — exactly the shape "his own 1-2-jornada average" struggles
-    # with and a pooled mean, or a genuinely fitted line, does not.
     noise_act2 = {k: {1: lvl + _rng_reg.uniform(-1, 1),
                       2: lvl + _rng_reg.uniform(-1, 1),
                       3: lvl + _rng_reg.uniform(-1, 1)}
@@ -1897,11 +1623,9 @@ def _selftest() -> None:
     noisy2 = backtest_predictor(noise_feat2, noise_act2, min_pairs=10)
     assert noisy2 is not None and not noisy2["gap"]["beats"], noisy2
 
-    # -- walk_forward_compare: the general "does the newly-fitted approach
-    # beat the previous one" tool, checked with known-answer cases first -
+    # -- walk_forward_compare: known-answer cases first -------------------
     jornadas_wf = [1, 2, 3, 4, 5]
-    # ACTUAL: player "p1" always scores exactly 10.0, "p2" always 4.0 —
-    # a fixed, known truth every jornada.
+    # p1 always scores 10.0, p2 always 4.0 — a fixed, known truth.
     actual_map = {1: {"p1": 10.0, "p2": 4.0}, 2: {"p1": 10.0, "p2": 4.0},
                  3: {"p1": 10.0, "p2": 4.0}, 4: {"p1": 10.0, "p2": 4.0},
                  5: {"p1": 10.0, "p2": 4.0}}
@@ -1909,14 +1633,12 @@ def _selftest() -> None:
     def actual_wf(j):
         return actual_map[j]
 
-    # OLD approach: always predicts a fixed 7.0 for everyone — wrong by a
-    # constant 3.0 for p1 and -3.0 for p2, forever.
+    # Old approach: a fixed 7.0 for everyone, always wrong by a constant.
     def predict_old_flat(j):
         return {"p1": 7.0, "p2": 7.0}
 
-    # NEW approach: "fits" by averaging every PRIOR jornada's true value —
-    # exact after jornada 2 (mean of a constant IS the constant), so it
-    # must clearly beat the flat-7.0 old approach once it has any history.
+    # New approach: averages every prior jornada's true value — exact
+    # after jornada 2, so it must clearly beat the flat-7.0 old approach.
     def fit_mean(cutoff):
         prior = [actual_map[j] for j in jornadas_wf if j < cutoff]
         if not prior:
@@ -1959,8 +1681,8 @@ def _selftest() -> None:
         jornadas_wf, lambda c: {}, lambda p, j: {},
         lambda j: {"nobody": 1.0}, actual_wf, min_history=1) is None
 
-    # -- log_experiment / experiment_history: append-only, a negative
-    # result logged same as a positive one ----------------------------
+    # -- log_experiment / experiment_history: a negative result logs the
+    # same as a positive one ----------------------------------------
     import tempfile as _tempfile5
     from ffcore import tidy as _tidy5
 
@@ -1981,18 +1703,12 @@ def _selftest() -> None:
             _tidy5.DECISIONS = _real_decisions5
 
     # -- _shots_by_jornada / _shots_points_fit / load_shots_current: the
-    # real join through api_stats.csv, gated to forwards, checked against
-    # a real (small) fixture rather than assumed from the arithmetic above
+    # real join through api_stats.csv, gated to forwards -----------------
     import csv as _csv3
     import os as _os3
     import tempfile as _tempfile3
     from ffcore import tidy as _tidy3
 
-    # Keys are norm(full name) — the SAME convention the earlier
-    # _per_jornada_current fixture (xw2, above) relies on: a perjornada
-    # row's own ff_id ("900") is not a crosswalk key here, so its join
-    # falls back to xw.player(name=...), which only resolves when
-    # norm(name) is itself a real key.
     xw3 = Crosswalk({
         "fwd guy": Player("fwd guy", "Fwd Guy", ff_slug="fwd-guy",
                           app_id="900"),
@@ -2032,9 +1748,7 @@ def _selftest() -> None:
                            "source": "laliga", "player_id": "900",
                            "week": str(wk), "stat": "total_scoring_att",
                            "value": val, "points": "0"})
-            # A non-forward with real shot data too — must be excluded by
-            # the position gate, same discipline load_understat_current()
-            # already enforces for xG.
+            # A non-forward with real shot data too — must be excluded.
             w.writerow({"observed_at": "2026-08-22T0000Z", "source": "laliga",
                        "player_id": "901", "week": "1",
                        "stat": "total_scoring_att", "value": "5",

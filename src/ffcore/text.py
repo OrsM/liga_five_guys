@@ -1,28 +1,16 @@
 """
 ffcore.text — the join key, and nothing else.
 
-Name is the only join this project has: the app, futbolfantasy's market page,
-its points page and your own ledger all spell players differently, and none of
-them carry an id you can rely on across sources.
-
-Before this module there were two normalisers. common.norm() stripped dots,
-hyphens and apostrophes; the old fold() in report/offers/bids stripped only
-accents. So:
-
-    "N'Diaye"       norm -> ndiaye        fold -> n'diaye
-    "C. Dominguez"  norm -> c dominguez   fold -> c. dominguez
-
-squads.py keyed ownership with the first and offers.py matched with the
-second, which means any name carrying an apostrophe or an initial silently
-failed to join between the two halves of the repo. There is now one function.
+Name is the only join this project has: sources spell players
+differently and none carry an id reliable across all of them.
 
     norm()     the key. Use it for every dict keyed by player.
     tokens()   norm() split into words worth matching on.
     resolve()  the shared fuzzy lookup: exact, then substring, then tokens.
 
-norm() is lossy on purpose — it folds ñ to n and drops apostrophes. It is a
-key, never a display string: keep the original text for anything a human
-reads.
+norm() is lossy on purpose — folds ñ to n, drops apostrophes. It's a
+key, never a display string; keep the original text for anything a
+human reads.
 """
 
 from __future__ import annotations
@@ -41,16 +29,10 @@ _DELETE = str.maketrans({"'": "", "\u2019": "", "`": "", "\u00b4": ""})
 _WS = re.compile(r"\s+")
 
 
-# Memoised because this is the hottest function in the repo by an order of
-# magnitude and it is a pure function of a string. One report calls it 813,488
-# times on roughly 1,500 distinct names — the same squad, the same market, the
-# same five spellings of Álvaro Fernández, re-decomposed character by character
-# for every join in every stage. Caching it is not a micro-optimisation; it was
-# 45% of squads.py and 40% of the crosswalk.
-#
-# Unbounded on purpose. The key space is names, which is bounded by the league,
-# so an LRU ceiling would only add a wall nothing reaches. The cache lives for
-# the life of the process and every process here is a batch job.
+# Memoised: this is the hottest function in the repo (a pure function of
+# a string, called hundreds of thousands of times per report on a few
+# thousand distinct names). Unbounded on purpose — the key space is
+# names, bounded by the league, and every process here is a batch job.
 @lru_cache(maxsize=None)
 def _norm(s: str) -> str:
     s = unicodedata.normalize("NFKD", s)
@@ -106,11 +88,9 @@ def resolve(query, rows, key="name", index=None):
     subset. Nothing here guesses between candidates; ambiguity is handed back
     for a human to settle, because a wrong player silently costs money.
 
-    `index`, if given, is `index_by(rows, key)` computed ONCE by a caller that
-    calls resolve() on the SAME rows repeatedly — a caller rebuilding it every
-    call was 81% of crosswalk's runtime, rebuilding an identical dict off the
-    same 654-row market on every one of 5,146 lookups. Must be exactly
-    `index_by(rows, key)` for these rows; nothing here checks that.
+    `index`, if given, must be exactly `index_by(rows, key)` for these
+    rows — pass it when calling resolve() on the same rows repeatedly, to
+    avoid rebuilding an identical dict every call. Not checked here.
     """
     q = norm(query)
     if not q:
@@ -153,17 +133,13 @@ def _selftest() -> None:
     # A surname on its own is a substring match, and one man has it.
     assert resolve("Yamal", rows)[0]["name"] == "Lamine Yamal"
 
-    # THE SUBSTRING PASS MUST NOT MATCH ACROSS A WORD BOUNDARY. "c romero" is
-    # inside "isaa|c romero|", so the app's abbreviated "C. Romero" resolved
-    # to Isaac Romero with no ambiguity reported — a 45.7M purchase priced
-    # against a 6.2M player, +635% premium, and it set the top of every bid
-    # band in METHOD.md. The initial is dropped by tokens() as noise, so the
-    # honest answer is the two men it could be, handed back for a caller with
-    # a club or a price to settle.
-    # tokens() then drops the initial as noise, so all three Romeros come
-    # back as candidates and NOTHING is returned. Refusing is the right
-    # answer here — a caller holding the price can settle it, and key_for
-    # does exactly that.
+    # THE SUBSTRING PASS MUST NOT MATCH ACROSS A WORD BOUNDARY — "c romero"
+    # is inside "isaa|c romero|", which once resolved the app's abbreviated
+    # "C. Romero" straight to Isaac Romero with no ambiguity reported (a
+    # real, costly mispriced purchase). tokens() drops the initial as
+    # noise, so all three Romeros come back as candidates and nothing is
+    # returned — refusing is correct here; a caller holding the price or
+    # club can settle it.
     row, cands = resolve("C. Romero", rows)
     assert row is None, row
     assert sorted(r["name"] for r in cands) == ["Carlos Romero",

@@ -5,15 +5,14 @@ ffcore.market — what the app is likely to offer you next, and what it is worth
     m.draw(rng)                  -> the keys of one cycle's offers
     m.best_over(days, gain, rng) -> distribution of the best upgrade you'd see
 
-Every move the simulation ranks is scored against doing nothing for the rest
-of the season, which is not the real alternative — waiting a few days for a
-better offer is. `Offers` models that market: sampled weighted by value (not
-uniformly — real cycles deal players ~5.5x the unowned pool's median), fitted
-against observed offers rather than assumed. What it cannot see (a rival
-buying the man you're waiting for, a pool/values that don't stand still) all
-bias the same direction, toward making waiting look better than it is — the
-report always prints the band and sample size beside the number as the
-counterweight.
+Every move the simulation ranks is scored against doing nothing, which
+isn't the real alternative — waiting a few days for a better offer is.
+`Offers` models that market: sampled weighted by value, not uniformly
+(real cycles deal players ~5.5x the unowned pool's median), fitted
+against observed offers rather than assumed. What it can't see (a rival
+buying the man you're waiting for, a pool that doesn't stand still) all
+biases toward making waiting look better than it is — reported bands
+and sample sizes are the counterweight.
 
 Why "spend now or later" is the right question, why value-weighted rather
 than uniform, and what the model can't see: docs/notes/market.md.
@@ -150,11 +149,10 @@ class Offers:
         """`cycles` cycles' worth of offers at once, as a (cycles, n) index
         matrix. None when numpy is missing.
 
-        Weighted sampling WITHOUT replacement, vectorised by the exponential
-        race (Efraimidis-Spirakis) — the same distribution as `_draw_idx()`'s
-        loop, not an approximation of it (checked in the self-test). Why this
-        replaces the loop (a 10-of-14-second hot spot): docs/notes/market.md
-        #draw-np-vectorization.
+        Weighted sampling without replacement, vectorised via the
+        exponential race (Efraimidis-Spirakis) — the same distribution
+        as `_draw_idx()`'s loop, checked in the self-test, not assumed.
+        Why: docs/notes/market.md#draw-np-vectorization.
         """
         if np is None or not self._keys:
             return None
@@ -220,12 +218,9 @@ class Offers:
 
 
 def _selftest() -> None:
-    # -- the vectorised draw IS the scalar draw ----------------------------
-    # The exponential race replaced a sequential weighted-without-replacement
-    # loop, and "it is the same distribution" is a claim, not a comment. This
-    # is what checks it: the same pool, the same exponent, selection rates
-    # per player from each path. Spread over three orders of magnitude of
-    # weight, so a path that quietly went proportional or uniform fails here.
+    # -- the vectorised draw IS the scalar draw: same pool/exponent, per-
+    # player selection rate from each path, weights spanning three orders
+    # of magnitude so a path that went proportional or uniform fails here.
     if np is not None:
         from collections import Counter
 
@@ -247,13 +242,10 @@ def _selftest() -> None:
 
     pool = {"cheap%d" % i: 1e6 for i in range(200)}
     pool.update({"dear%d" % i: 50e6 for i in range(20)})
-    # HOW SHARP IS THE FIT? A fitted exponent with a runner-up a whisker
-    # behind is a range wearing a point estimate's clothes, and on the live
-    # pool it is exactly that: two players of 584 entering the pool moved the
-    # argmin from ^0.30 to ^0.15 and the wait estimate from 9.8 to 16.3 days.
-    # Not seed noise — the argmin is stable across seeds — a flat curve. So
-    # the note says how close the next one came instead of asserting a
-    # precision the 90 observed offers do not support.
+    # A fitted exponent with a runner-up a whisker behind is a range
+    # wearing a point estimate's clothes — the note says how close the
+    # next one came rather than asserting a precision the data can't
+    # support.
     flat = Offers.fit({"a": 1e6, "b": 2e6, "c": 30e6}, [1e6, 2e6], cycles=1)
     assert flat.runner and 0.0 <= flat.runner[1], flat.runner
     assert "within" in flat.note() and "roughly" in flat.note(), flat.note()
@@ -291,10 +283,8 @@ def _selftest() -> None:
     assert len(Offers({"only": 1e6}, per_cycle=12).draw(rng)) == 1
     assert Offers({}, per_cycle=12).draw(rng) == []
 
-    # -- what waiting is worth --------------------------------------------
-    # THE POINT OF ALL OF IT. One man in the pool is worth having; the longer
-    # you wait, the likelier you are to be offered him, and the answer is a
-    # distribution rather than a number.
+    # -- what waiting is worth: the longer you wait, the likelier you are
+    # to be offered him, and the answer is a distribution, not a number.
     def gain(k):
         return 5.0 if k == "dear0" else 0.0
 
