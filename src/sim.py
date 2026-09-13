@@ -1811,27 +1811,28 @@ def _selftest() -> None:
     wish_row = {"action": Action("buy", buy="wished", cost=5e6),
                "net_pts": 0.50, "d_win": 0.0, "d_beat": {}, "value": 10.0,
                "d_pts": 50.0, "pts_lo": 15.0, "pts_hi": 80.0, "helps": 0.85}
+    uc_price = {"steady": 5e6, "maverick": 5e6, "dud": 5e6, "rivals": 5e6,
+               "wished": 5e6}
+    uc_owner = {"rivals": "riv", "wished": "riv"}
+    uc_route = {"rivals": "clause", "wished": "listed"}
+    uc_value = {"steady": 5e6, "rivals": 3.8e6}
+    # PAR (ladder_rows() calls decide.player_forecasts(u), which reads
+    # u.players) — "me" fields no squad here, so replacement is 0.0
+    # and PAR is just each candidate's raw season total: steady
+    # 5.0*1.0 over jornadas [1,2] = 10.0.
     uc_owned = Universe(
         state=LeagueState({"me": {}, "riv": {}}, [1, 2], "me"),
         forecaster=Bootstrap(
             {j: {"steady": (5.0, 1.0), "maverick": (4.0, 1.0),
                 "dud": (3.0, 1.0), "rivals": (7.0, 1.0),
                 "wished": (6.5, 1.0)} for j in (1, 2)}),
-        pos={"steady": "MED", "maverick": "MED", "dud": "MED",
-            "rivals": "MED", "wished": "MED"},
-        price={"steady": 5e6, "maverick": 5e6, "dud": 5e6, "rivals": 5e6,
-              "wished": 5e6},
-        proceeds={}, owner={"rivals": "riv", "wished": "riv"}, cash=10e6,
-        me="me", route={"rivals": "clause", "wished": "listed"},
-        value={"steady": 5e6, "rivals": 3.8e6},
-        name={"steady": "steady", "maverick": "maverick", "dud": "dud",
-             "rivals": "rivals", "wished": "wished"},
-        # PAR (ladder_rows() calls decide.player_forecasts(u), which reads
-        # u.players) — "me" fields no squad here, so replacement is 0.0
-        # and PAR is just each candidate's raw season total: steady
-        # 5.0*1.0 over jornadas [1,2] = 10.0.
+        cash=10e6, me="me",
         players={k: PlayerProfile(
-            identity=PlayerIdentity(key=k), current=PlayerCurrent(pos="MED"),
+            identity=PlayerIdentity(key=k, name=k),
+            current=PlayerCurrent(
+                pos="MED", price=uc_price.get(k), owner=uc_owner.get(k),
+                route=uc_route.get(k), value=uc_value.get(k),
+                listed=k in uc_price),
             history=PlayerHistory(), derived=PlayerDerived(pj=5.0))
             for k in ("steady", "dud", "maverick", "rivals", "wished")})
     all_rows = [steady_row, dud_row, maverick_row, riv_row, wish_row]
@@ -2018,7 +2019,7 @@ def _selftest() -> None:
     # list, not a second guess at it.
     sell_json = payload(ub, [], baseb, ["riv"])["sell"]
     by_name = {r["name"]: r for r in sell_json}
-    assert by_name["dead"]["bought"] == 0.8e6, by_name["dead"]
+    assert by_name["Dead"]["bought"] == 0.8e6, by_name["Dead"]
     assert "star" not in by_name, by_name          # a nailed starter, not dead weight
 
     # THE BAND RIDES THE SAME SEASONS AS THE MOVES. A key rank() ranks a

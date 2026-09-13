@@ -42,7 +42,7 @@ import datetime as dt
 import itertools
 import os
 import sys
-from dataclasses import dataclass, field, replace
+from dataclasses import InitVar, dataclass, field, replace
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
@@ -139,98 +139,130 @@ class Action:
 class Universe:
     """Everything the decision needs, and nothing else.
 
-    89 players get scored, not 643: the five squads plus the free agents on
-    offer. A player nobody can field and nobody can buy cannot change a
-    decision today, and pretending otherwise is most of why this repo grew a
-    watchlist nobody read.
+    Per-player facts (pos, price, proceeds, owner, value, market_exp,
+    start, clause, clause_until, route, bids, name) live on `players`
+    only — a dict[str, PlayerProfile] built by ffcore.profile — and are
+    exposed below as read-only attributes computed from it in
+    __post_init__. There is exactly one place each fact is stored.
+
+    pos/price/proceeds/owner/... may also be passed directly to the
+    constructor (a flat dict per fact, as before) for callers that don't
+    have PlayerProfile objects on hand; when `players` isn't given, these
+    are used to synthesize one. decide.load() always passes `players=`.
     """
     state: LeagueState
     forecaster: Bootstrap
-    pos: dict[str, str]
-    price: dict[str, float]      # what it costs ME to acquire him
-    proceeds: dict[str, float]   # what selling him raises
-    owner: dict[str, str]
     cash: float
     me: str
-    # What his CURRENT owner actually paid to get him, from the ledger —
-    # missing for a player never transacted in this league's recorded
-    # history (came with the initial draft, or the ledger doesn't reach
-    # back that far). Distinct from `proceeds` (what a sale raises NOW,
-    # the market's own reading) and `value` (the app's stated worth) —
-    # this is the one number that answers "am I selling at a profit."
-    bought: dict[str, float] = field(default_factory=dict)
-    # What the app says he is WORTH, for everyone in the universe. Distinct
-    # from `price`, which is what it costs ME to get him: a free agent asks
-    # about his value, a buyout clause runs a median 1.52x it, and the
-    # difference between the two is money that never comes back.
-    value: dict[str, float] = field(default_factory=dict)
-    # The full-pool player record (ffcore.profile) — identity, current
-    # snapshot, history, and derived forecast, for every player
-    # load_players() knows, not just the 89-player simulation universe.
-    # The dicts above (pos/price/market_exp/start/etc.) are kept as the
-    # existing read interface every consumer already uses; this is the
-    # single source those are derived FROM, for anything new that wants
-    # the richer shape (history, points-above-replacement).
     players: dict[str, PlayerProfile] = field(default_factory=dict)
-    # Expected points for EVERY player the market prices, not only the 89 the
-    # simulation needs — expected() returning 0.0 for an unscored player is
-    # indistinguishable from worthless, and once scored Lamine Yamal that way.
-    # Why: docs/notes/decide.md#universe-fields
-    market_exp: dict[str, float] = field(default_factory=dict)
-    # P(he starts) as ONE number — futbolfantasy's reading recalibrated
-    # against confirmed line-ups and blended with analiticafantasy where it
-    # has an opinion (ffcore.startprob). Printing "80/100" made the reader do
-    # the weighting; the weighting is fitted, so it should be done once and
-    # the answer shown. It is the same figure the forecast already multiplies
-    # by, so the table and the simulation cannot disagree about him.
-    start: dict[str, float] = field(default_factory=dict)
-    # When each clause becomes payable again. A transfer locks it for about a
-    # week and the app says until when; absent means locked, never open.
-    clause_until: dict = field(default_factory=dict)
-    # Every player's buyout clause, mine included — the app publishes them for
-    # the whole league. What it costs ANYBODY to take ANYBODY, which is what a
-    # rival needs to be able to answer back.
-    clause: dict[str, float] = field(default_factory=dict)
-    # HOW you would get each player: "free" (app dealing a free agent),
-    # "listed" (owner's own sale, can refuse — see market_routes()), or
-    # "clause" (only route is his buyout; the only one that's a real raid).
-    # Why: docs/notes/decide.md#universe-fields
-    route: dict[str, str] = field(default_factory=dict)
-    # How many other managers are already bidding on a "listed" row — 0 for
-    # a "free"/"clause" entry, since neither is a contest. What makes a
-    # "listed" price a real number to plan around rather than a done deal.
-    bids: dict[str, int] = field(default_factory=dict)
-    # What each rival could spend. Estimates, and mostly negative: on the day
-    # the response was modelled every one of them was overdrawn and could not
-    # buy a soul until I paid one of their clauses.
+    bought: dict[str, float] = field(default_factory=dict)
     rival_cash: dict[str, float] = field(default_factory=dict)
-    # Provenance, for the report to print rather than for anything to act on:
-    # a round part-played and how much of it is left, and any club or player
-    # the app names in a way nothing else could join.
     part_played: dict[int, set[str]] = field(default_factory=dict)
     unjoined: list[str] = field(default_factory=list)
-    # The source's own spelling, for display. Never a key: the keys are what
-    # every dict here is keyed by, and they have already lost their accents.
-    name: dict[str, str] = field(default_factory=dict)
-    # How P(start) was arrived at — fitted against confirmed line-ups, or the
-    # source's own figure. Printed, never inferred: it is the input everything
-    # here rests on, and it does not look any different when it changes.
     start_note: str = ""
-    # What a million euros has been worth in places, and how that was arrived
-    # at. Set by the report, printed by it — see sim.cash_price_history().
     cash_note: str = ""
-    # WHAT `cash` ABOVE ALREADY HAS SUBTRACTED — a pending bid of yours,
-    # summed. Not read by anything that decides reach (that already
-    # happened, in `cash` itself); carried so the report can say WHY cash
-    # is short of the raw balance instead of leaving the reader to wonder.
     locked_cash: float = 0.0
-    # A player YOU HOLD with a real pending offer on him, and the larger of
-    # what he might raise. NOT read by anything that prices a sale — that
-    # already happened, in `proceeds` — this is for the one thing a real
-    # number cannot decide for you: whether accepting is worth doing. See
-    # sim.ladder_rows()'s SAVE branch, the one reader that needs to know a
-    # gap was closed by money you do not have yet, not money you do.
     received_offers: dict[str, float] = field(default_factory=dict)
+
+    pos: InitVar[dict | None] = None
+    price: InitVar[dict | None] = None
+    proceeds: InitVar[dict | None] = None
+    owner: InitVar[dict | None] = None
+    value: InitVar[dict | None] = None
+    market_exp: InitVar[dict | None] = None
+    start: InitVar[dict | None] = None
+    clause: InitVar[dict | None] = None
+    clause_until: InitVar[dict | None] = None
+    route: InitVar[dict | None] = None
+    bids: InitVar[dict | None] = None
+    name: InitVar[dict | None] = None
+
+    def __post_init__(self, pos, price, proceeds, owner, value, market_exp,
+                      start, clause, clause_until, route, bids, name):
+        if not self.players and any(x is not None for x in
+                (pos, price, proceeds, owner, value, market_exp, start,
+                 clause, clause_until, route, bids, name)):
+            self.players = _synthetic_profiles(
+                pos=pos, price=price, proceeds=proceeds, owner=owner,
+                value=value, market_exp=market_exp, start=start,
+                clause=clause, clause_until=clause_until, route=route,
+                bids=bids, name=name)
+        self.pos = {k: _pos_of(p.current.pos) for k, p in self.players.items()
+                   if p.current.pos}
+        self.price = {k: p.current.price for k, p in self.players.items()
+                     if p.current.price is not None}
+        self.proceeds = {k: p.current.proceeds for k, p in self.players.items()
+                         if p.current.proceeds is not None}
+        self.owner = {k: p.current.owner for k, p in self.players.items()
+                     if p.current.owner}
+        self.value = {k: p.current.value for k, p in self.players.items()
+                     if p.current.value is not None}
+        self.market_exp = {k: p.derived.market_exp
+                           for k, p in self.players.items()
+                           if p.derived.market_exp is not None}
+        self.start = {k: p.derived.start_p for k, p in self.players.items()
+                     if p.derived.start_p is not None}
+        self.clause = {k: p.current.clause for k, p in self.players.items()
+                      if p.current.clause is not None}
+        self.clause_until = {k: p.current.clause_until
+                             for k, p in self.players.items()
+                             if p.current.clause_until is not None}
+        self.route = {k: p.current.route for k, p in self.players.items()
+                     if p.current.route}
+        self.bids = {k: p.current.bids for k, p in self.players.items()
+                    if p.current.bids is not None}
+        self.name = {k: p.identity.name for k, p in self.players.items()}
+
+
+def _pos_of(raw: str) -> str:
+    """SLOT abbreviation (DEL/MED/DEF/POR) for a PlayerCurrent.pos value.
+
+    Accepts either the raw source word (e.g. "DELANTERO") or an
+    already-abbreviated value (passed straight through) — "MED" if
+    neither matches.
+    """
+    mapped = SLOT.get(raw.lower())
+    if mapped:
+        return mapped
+    return raw if raw in ("POR", "DEF", "MED", "DEL") else "MED"
+
+
+def _synthetic_profiles(pos=None, price=None, proceeds=None, owner=None,
+                        value=None, market_exp=None, start=None, clause=None,
+                        clause_until=None, route=None, bids=None, name=None
+                        ) -> dict[str, PlayerProfile]:
+    """PlayerProfile per key across the given flat dicts, for constructing
+    a Universe without a real ffcore.profile.build_profiles() pass.
+    """
+    from ffcore.profile import (PlayerIdentity, PlayerCurrent, PlayerHistory,
+                                PlayerDerived, PlayerProfile as _PP)
+    keys = (set(pos or {}) | set(price or {}) | set(proceeds or {})
+           | set(owner or {}) | set(value or {}) | set(market_exp or {})
+           | set(start or {}) | set(clause or {}) | set(clause_until or {})
+           | set(route or {}) | set(bids or {}) | set(name or {}))
+    out = {}
+    for k in keys:
+        out[k] = _PP(
+            identity=PlayerIdentity(key=k, name=(name or {}).get(k, k)),
+            current=PlayerCurrent(
+                pos=(pos or {}).get(k, ""),
+                listed=k in (price or {}),
+                price=(price or {}).get(k),
+                proceeds=(proceeds or {}).get(k),
+                owner=(owner or {}).get(k),
+                value=(value or {}).get(k),
+                clause=(clause or {}).get(k),
+                clause_until=(clause_until or {}).get(k),
+                route=(route or {}).get(k),
+                bids=(bids or {}).get(k),
+            ),
+            history=PlayerHistory(),
+            derived=PlayerDerived(
+                market_exp=(market_exp or {}).get(k),
+                start_p=(start or {}).get(k),
+            ),
+        )
+    return out
 
 
 def choosable(u) -> int:
@@ -1436,42 +1468,9 @@ def load(trials_pool=None) -> Universe:
                               match_rows=m,
                               market_keyed=market_keyed)
 
-    # price/proceeds/owner/value/clause/clause_until/route/bids/name, READ
-    # BACK from PlayerCurrent rather than left as the standalone locals
-    # above — same shape as pos/market_exp/start below. Falls back to the
-    # pre-profile local for a key with no profile at all (build_profiles()
-    # only covers `players`' own keys; a market/ledger key outside that
-    # pool — should not happen, but is not this function's place to
-    # silently drop a real price over) so this is a pure redirection, not
-    # a behaviour change.
-    def _through(orig: dict, field: str) -> dict:
-        out = dict(orig)
-        for k, p in profiles.items():
-            v = getattr(p.current, field)
-            if v is not None:
-                out[k] = v
-        return out
-
-    price = _through(price, "price")
-    owner = _through(owner, "owner")
-    value = _through(value, "value")
-    clause = _through(clause, "clause")
-    clause_until = _through(clause_until, "clause_until")
-    route = _through(route, "route")
-    bids = _through(bids, "bids")
-    proceeds = _through(proceeds, "proceeds")
-    name = {k: p.identity.name for k, p in profiles.items()} | {
-        k: v for k, v in name.items() if k not in profiles}
-
-    pos = {k: SLOT.get(p.current.pos.lower(), "MED")
-          for k, p in profiles.items()}
-    # Everyone the market prices, scored the same way — market_exp/start
-    # cover the full pool (not just the 89-player simulation universe),
-    # about players who might come up later.
-    market_exp = {k: p.derived.market_exp for k, p in profiles.items()
-                 if p.derived.market_exp is not None}
-    start = {k: p.derived.start_p for k, p in profiles.items()
-            if p.derived.start_p is not None}
+    # apply_fixtures() below needs `pos` as a plain arg; Universe computes
+    # its own copy from `players=profiles` (see _pos_of()).
+    pos = {k: _pos_of(p.current.pos) for k, p in profiles.items()}
 
     base, base_rest = {}, {}
     # Scored once per player, kept rather than re-derived for `matches`.
@@ -1569,16 +1568,13 @@ def load(trials_pool=None) -> Universe:
     cash = raw_cash - locked_cash
 
     _LOAD_CACHE = Universe(
-        state=LeagueState(squads, rem, me, carried), forecaster=fc, pos=pos,
-        price=price, proceeds=proceeds, owner=owner, cash=cash, me=me,
-        value=value, market_exp=market_exp, start=start, clause=clause,
-        route=route,
+        state=LeagueState(squads, rem, me, carried), forecaster=fc,
+        cash=cash, me=me, players=profiles,
         rival_cash=rival_cash,
-        clause_until=clause_until, bids=bids,
-        part_played=played, name=name, start_note=_calibrated()[0].note(),
+        part_played=played, start_note=_calibrated()[0].note(),
         unjoined=list(unjoined_clubs) + list(lg.api_unjoined),
         locked_cash=locked_cash, received_offers=received_offers,
-        players=profiles, bought=bought_price(lg.txns, lg.xw))
+        bought=bought_price(lg.txns, lg.xw))
     return _LOAD_CACHE
 
 
@@ -2496,10 +2492,11 @@ def _selftest() -> None:
     from ffcore.profile import (PlayerProfile, PlayerIdentity,
                                 PlayerCurrent, PlayerHistory, PlayerDerived)
 
-    def mk_profile(pj, pos="MED"):
+    def mk_profile(pj, pos="MED", market_exp=None):
         return PlayerProfile(
             identity=PlayerIdentity(key="x"), current=PlayerCurrent(pos=pos),
-            history=PlayerHistory(), derived=PlayerDerived(pj=pj))
+            history=PlayerHistory(),
+            derived=PlayerDerived(pj=pj, market_exp=market_exp))
 
     # "me" holds two MED: me_a (weak, replacement baseline) and me_b
     # (strong). "cand" is a market candidate, simulated. "unsimmed" is a
@@ -2510,12 +2507,10 @@ def _selftest() -> None:
              2: {"me_a": (2.0, 1.0), "me_b": (5.0, 1.0), "cand": (4.0, 1.0)}}
     pf_u = Universe(
         state=LeagueState(pf_sq, [1, 2], "me"),
-        forecaster=Bootstrap(pf_per), pos={"me_a": "MED", "me_b": "MED",
-                                           "cand": "MED", "unsimmed": "DEL"},
-        price={}, proceeds={}, owner={}, cash=0.0, me="me",
-        market_exp={"unsimmed": 3.0},
+        forecaster=Bootstrap(pf_per), cash=0.0, me="me",
         players={"me_a": mk_profile(20.0), "me_b": mk_profile(15.0),
-                "cand": mk_profile(8.0), "unsimmed": mk_profile(1.0, "DEL")})
+                "cand": mk_profile(8.0),
+                "unsimmed": mk_profile(1.0, "DEL", market_exp=3.0)})
     fc_out = player_forecasts(pf_u)
 
     # me_a and me_b: simulated, season = 2 jornadas summed.
