@@ -55,7 +55,7 @@ from ffcore.league import MARKET  # noqa: E402
 from ffcore.parse import fmt_money  # noqa: E402
 from ffcore.profile import (PlayerProfile, UNSCORED_DEFAULT,  # noqa: E402
                             build_profiles)
-from ffcore.score import SLOT, SLOT_MIN, MAX_SLOT, _calibrated  # noqa: E402
+from ffcore.score import SLOT, SLOT_MIN, _calibrated  # noqa: E402
 from ffcore.text import norm  # noqa: E402
 from ffcore.season import (LeagueState, XI_SIZE, best_xi,  # noqa: E402
                            simulate_many)
@@ -379,12 +379,23 @@ def candidates(u: Universe, expected: dict[str, float],
         bar_exp = expected
         xi = set(best_xi(u.state.squads[u.me], bar_exp))
     bar = xi_bar(bar_exp, xi)
-    # A spare: selling him ALONE still leaves a fieldable shape. Ranked by
-    # value above LEAGUE replacement PER EURO he'd raise (player_forecasts()'s
-    # own PAR, a fixed league-wide baseline, over value_rate()'s cost
-    # normalisation) — not raw expected points, and not PAR against my own
-    # squad's weakest (a good player can be genuinely worth plenty above
-    # league replacement and still be the wrong one of two to keep).
+    # EVERY spare: selling him ALONE still leaves a fieldable shape — tried
+    # as a funder for every target, not just a cheap-by-some-metric top few.
+    # An earlier cut to the "best" 6 by raw points, then by value-per-euro,
+    # each missed the same real case a different way: a good player who is
+    # genuinely redundant (a second keeper, MAX_SLOT["POR"]=1) can rank
+    # above enough of the squad by ANY single-number heuristic to fall
+    # outside a fixed-size cut, however that heuristic is defined — the cut
+    # itself was the bug, not which ranking fed it. Measured: trying every
+    # spare against every target costs ~0.5s more per report (candidates()
+    # generating a few hundred more Actions for rank()'s already-cheap
+    # SCREEN_TRIALS pass to discard) — not the thousands-of-combinations
+    # explosion a cap was guarding against.
+    # Ordered by value above LEAGUE replacement PER EURO he'd raise
+    # (player_forecasts()'s own PAR, a fixed league-wide baseline, over
+    # value_rate()'s cost normalisation) purely so a reader scanning
+    # generated Actions sees the most plausible funders first; every one
+    # of them still reaches rank()'s real simulation regardless of order.
     fieldable_spare = [k for k in mine if _fieldable(
         {p: s for p, s in mine_squad.items() if p != k})]
     par_of = {k: v["par"] for k, v in player_forecasts(u).items()}
@@ -395,22 +406,7 @@ def candidates(u: Universe, expected: dict[str, float],
         # he's worth keeping — ranks last, never first.
         return (vr is None, vr if vr is not None else 0.0)
 
-    spare = sorted(fieldable_spare, key=_spare_rank)[:6]
-    # A SECOND SLOT-1 PLAYER BELONGS IN THE POOL REGARDLESS OF RANK. Real
-    # case: two good keepers, one blocking the other — even ranked by the
-    # correct per-euro metric above, a genuinely good-but-redundant player
-    # can still sit outside the cheapest-6 cut once enough truly poor bench
-    # players (correctly) rank worse. Only ever matters for MAX_SLOT==1
-    # positions (POR): nothing beyond the single slot can ever start
-    # regardless of the rest of the squad, so both must reach candidates()
-    # for rank()'s real simulation to judge between them.
-    by_slot_count: dict[str, list[str]] = {}
-    for k, s in mine_squad.items():
-        by_slot_count.setdefault(s, []).append(k)
-    for s, ks in by_slot_count.items():
-        if MAX_SLOT.get(s) == 1 and len(ks) > 1:
-            spare += [k for k in ks
-                     if k in fieldable_spare and k not in spare]
+    spare = sorted(fieldable_spare, key=_spare_rank)
 
     out: list[Action] = []
     for c, price in sorted(u.price.items(), key=lambda kv: kv[1]):
@@ -429,8 +425,8 @@ def candidates(u: Universe, expected: dict[str, float],
         swap = kind + "-swap" if raid else "swap"
         if price <= cash:
             out.append(Action(kind, buy=c, cost=price, victim=victim))
-        # Funded by a sale: only the worst-value-per-euro few spares are
-        # worth trying (spare's own docstring above).
+        # Funded by a sale: every spare is tried (spare's own docstring
+        # above), worst-value-per-euro first.
         for s in spare:
             got = u.proceeds.get(s, 0.0)
             if price <= cash + got:

@@ -744,6 +744,8 @@ def caveats(u) -> list[str]:
     reason they are printed under the table rather than in a design document
     nobody opens on a phone.
     """
+    import decide
+
     out = ["| Not modelled | Which way it bends the answer |", "|---|---|"]
     for m, filled in phantom_filled(u):
         out.append("| **%s's squad is short a position** (%s) | his real "
@@ -815,12 +817,22 @@ def caveats(u) -> list[str]:
         "| P(start) fit | %s |" % u.start_note.rstrip("."),
         # p_win/expected_finish (levels, not the paired move-ranking that
         # stays stable at every trial count) carry a real Monte Carlo
-        # noise band of roughly ±7 points at this trial count.
+        # noise band of roughly ±7 points, MEASURED ONCE (2026-08-31) at
+        # FINAL_TRIALS=3000 — a number that can't re-measure itself every
+        # report (it needs several full reruns at different trial counts
+        # just to see the swing), so it's checked against TODAY's live
+        # FINAL_TRIALS instead: still the same count it says by name once
+        # the caveat prints it — no chance of quietly citing an old
+        # measurement against a trial count that has since changed.
         # Why: docs/notes/decide.md#trial-counts-screen_trials--final_trials
-        "| win % and finish are single simulated draws | at this trial "
-        "count the same real inputs have been measured to swing roughly "
-        "±7 points (e.g. 19% to 26% on one real board) run to run — read "
-        "the headline number as a band that wide, not a precise reading |",
+        "| win %% and finish are single simulated draws | at FINAL_TRIALS="
+        "%d, the same real inputs have been measured (2026-08-31%s) to "
+        "swing roughly ±7 points (e.g. 19%% to 26%% on one real board) run "
+        "to run — read the headline number as a band that wide, not a "
+        "precise reading |"
+        % (decide.FINAL_TRIALS,
+           "" if decide.FINAL_TRIALS == 3000 else
+           ", at FINAL_TRIALS=3000 — since changed, re-check this figure"),
         ""]
     return out
 

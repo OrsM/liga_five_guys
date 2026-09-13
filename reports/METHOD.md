@@ -1,4 +1,4 @@
-# Liga Five Guys — how the numbers are made — 2026-09-13 16:22 UTC
+# Liga Five Guys — how the numbers are made — 2026-09-13 16:40 UTC
 
 
 
@@ -18,7 +18,7 @@
 | p_win's season-long spread uses DRIFT_FRAC=1.0 (fit from real data this run) | see "Season-long drift" below for the fit itself — every published win-probability model checked (538's NBA/NHL/MLB) is far more humble than 70%+ about a full season this early regardless of the exact value, which is what 1.0 as an unfitted default already reflects |
 | Shape prior | shape from 1389 observed matches |
 | P(start) fit | P(start) fitted on 652 confirmed starts across 20 team sheets: futbolfantasy recalibrated (logit +0.0 +1.0x), blended 10% with analiticafantasy where it has an opinion (a named starter counts 72%). Brier improves 0.000 on line-ups the fit had not seen |
-| win % and finish are single simulated draws | at this trial count the same real inputs have been measured to swing roughly ±7 points (e.g. 19% to 26% on one real board) run to run — read the headline number as a band that wide, not a precise reading |
+| win % and finish are single simulated draws | at FINAL_TRIALS=3000, the same real inputs have been measured (2026-08-31) to swing roughly ±7 points (e.g. 19% to 26% on one real board) run to run — read the headline number as a band that wide, not a precise reading |
 
 
 
@@ -34,14 +34,14 @@
 | 🟢 | api_leagues | your cash and the league's id | LaLiga Fantasy API | 184 | 13 Sep 15:18 | fetched 1 hour ago |
 | 🟢 | api_lineup | the eleven you have actually fielded, and the formation the app says you are playing | LaLiga Fantasy API | 1,771 | 13 Sep 15:18 | fetched 1 hour ago |
 | 🟢 | api_market | what is on offer, and the bids on it | LaLiga Fantasy API | 5,604 | 13 Sep 15:18 | fetched 1 hour ago |
-| 🟢 | api_players | names for players nobody owns any more — one row per player, first sighting kept | LaLiga Fantasy API | 124 | 12 Sep 22:09 | fetched 18 hours ago |
+| 🟢 | api_players | names for players nobody owns any more — one row per player, first sighting kept | LaLiga Fantasy API | 124 | 12 Sep 22:09 | fetched 19 hours ago |
 | 🟢 | api_standings | the league table — position, points, squad value, and your balance | LaLiga Fantasy API | 920 | 13 Sep 15:18 | fetched 1 hour ago |
 | 🟢 | api_stats | what the app scored each player, broken into what he did — one row per player per week per stat, a correction being a later row rather than an overwrite | LaLiga Fantasy API | 9,672 | 13 Sep 14:58 | fetched 1 hour ago |
 | 🟢 | api_teams | all five squads | LaLiga Fantasy API | 13,084 | 13 Sep 15:18 | fetched 1 hour ago |
 | ⚪ | clubs | the same, for clubs | src/crosswalk.py | 20 | — | rebuilt every run from the tables above |
 | 🟢 | elo | team strength, which ranks the fixture term | clubelo.com | 3,320 | 13 Sep 15:18 | fetched 12 hours ago |
 | 🟢 | fixtures | who plays whom next, for the fixture term | analiticafantasy.com | 2,415 | 13 Sep 15:18 | fetched 12 hours ago |
-| 🟢 | lineups | probable XI percentages, both sources | analiticafantasy.com, futbolfantasy.com ×40 | 143,872 | 13 Sep 15:18 | fetched 1 hour ago |
+| 🟢 | lineups | probable XI percentages, both sources | analiticafantasy.com, futbolfantasy.com ×40 | 143,872 | 13 Sep 15:18 | fetched 2 hours ago |
 | 🟢 | market | price, value, position, fitness — every player in the game | futbolfantasy.com | 144,387 | 13 Sep 15:18 | fetched 1 hour ago |
 | 🟢 | matches | fixtures, kickoffs, results | futbolfantasy.com | 71,060 | 13 Sep 15:18 | fetched 12 hours ago |
 | ⚪ | players | the crosswalk: one key per player across all four spellings | src/crosswalk.py | 723 | — | rebuilt every run from the tables above |
