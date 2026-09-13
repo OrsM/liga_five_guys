@@ -140,8 +140,18 @@ class PlayerDerived:
     Derived field; recompute and compare against History when in doubt."""
     ppm: float | None = None      # score.py's shrunk points-per-match
     pj: float = 0.0                # evidence count behind ppm
-    start_p: float | None = None   # P(start), next jornada
-    market_exp: float | None = None  # expected points, next jornada = ppm*fix*start_p
+    start_p: float | None = None   # P(start), next jornada — status-adjusted
+    market_exp: float | None = None  # expected points, next jornada = pts_now*start_p
+    # THE STATUS-ADJUSTED points-if-he-plays for the NEXT jornada only —
+    # ppm*fix with status_adjusted() already applied. Computed ONCE here,
+    # by build_profiles(); the ONLY other reader (to_bootstrap_input())
+    # reads this field directly rather than recomputing it — real
+    # elimination, not just tracking, of the duplicate that let a
+    # suspended player's override go missing in one of two independent
+    # copies (Miguel, 2026-09-13: "map which functions... produce which
+    # outputs and... just eliminat[e] those and rout[e] them through the
+    # standard function" — this field IS that route).
+    pts_now: float | None = None
     scored: object = None          # the cached score.py Scored NamedTuple
 
 
@@ -165,37 +175,35 @@ class PlayerProfile:
         """((pts, p_start) this jornada, (pts, p_start) every jornada
         after) — the shape decide.py's base/base_rest dicts feed Bootstrap.
 
-        Both share the same points side (ppm*fix — a rate this thin has no
-        more evidence by jornada 10 than jornada 3); only the START side
-        differs, because P(start) firms up once a player has current-
-        season minutes even when his points rate doesn't. Replaces the
-        manual field-picking that used to live inline in decide.load().
+        THIS JORNADA READS derived.pts_now/derived.start_p DIRECTLY — a
+        real elimination, not just a fix: this function and
+        build_profiles()'s own market_exp/start_p used to each
+        independently rebuild the same status-adjusted (pts, p_start)
+        pair from raw ppm/fix/pct_used, and one of the two silently
+        skipped the override (Zaid Romero, suspended, kept reading his
+        full healthy rate here — see status_adjusted()'s own docstring
+        for the real case). Miguel, 2026-09-13, after the fix: "map which
+        functions... produce which outputs and... just eliminat[e] those
+        and rout[e] them through the standard function" — build_profiles()
+        is now the ONLY place that computes this; this function reads the
+        answer, it does not compute a second one.
 
-        THIS JORNADA'S STATUS OVERRIDE, via the shared status_adjusted()
-        — real bug, caught 2026-09-13 (Miguel: "no booked player is
-        playing so shouldn't they have 0% end odds to play next game?"):
-        this function used to rebuild pts/p_start from raw ppm/fix/
-        pct_used with no status check at all, silently ignoring the
-        override Scorer.score() already applies to score/flat. A
-        suspended defender's NEXT match kept showing his full healthy
-        rate at his real start% instead of 0/0%. See status_adjusted()'s
-        own docstring for the real case (Zaid Romero) and why
-        build_profiles() had the identical bug independently.
-        NOT applied to the "rest of season" side — a one-match suspension
-        clears; treating jornada 8 as equally hopeless because jornada 7
-        was would be the exact "does not distinguish a one-match
-        suspension from a season-ending injury" mistake this repo has
-        already been burned by once (its own status handling docs).
-        Why: docs/notes/profile.md#to_bootstrap_input--the-status-override-must-repeat
+        "REST OF SEASON" IS A GENUINELY DIFFERENT, NOT DUPLICATED, FACT —
+        computed here, nowhere else: ppm*fix with NO status override (a
+        one-match suspension clears; jornada 8 is not jornada 7) and
+        pct_rest instead of pct_used (P(start) shrunk toward neutral
+        rather than this week's status-tainted reading). Nothing else in
+        this repo needs this number, so there is nothing to eliminate —
+        only THIS JORNADA was ever computed twice.
+        Why: docs/notes/profile.md#to_bootstrap_input--reads-pts_now-does-not-recompute-it
         """
         s = self.derived.scored
         if s is None:
             return UNSCORED_DEFAULT, UNSCORED_DEFAULT
-        pts = max(0.0, s.ppm * s.fix)
+        pts_rest = max(0.0, s.ppm * s.fix)
         p_rest = min(1.0, (s.pct_rest or 0) / 100)
-        pts_now, p_now = status_adjusted(
-            pts, min(1.0, (s.pct_used or 0) / 100), s.status)
-        return ((pts_now, p_now), (pts, p_rest))
+        return ((self.derived.pts_now, self.derived.start_p),
+               (pts_rest, p_rest))
 
 
 def _match_stats_history(rows) -> dict[str, dict[int, dict]]:
@@ -358,6 +366,7 @@ def build_profiles(players: dict, sc, perjornada_rows,
             pj=s.pj if s else 0.0,
             start_p=p_start_adj,
             market_exp=(pts_adj * p_start_adj) if s else None,
+            pts_now=pts_adj,
             scored=s,
         )
         if s is not None:
@@ -464,50 +473,31 @@ def _selftest() -> None:
     assert abs(this_j[0] - 6.6) < 1e-9 and abs(this_j[1] - 0.8) < 1e-9, this_j
     assert abs(rest[0] - 6.6) < 1e-9 and abs(rest[1] - 0.6) < 1e-9, rest
 
-    # SUSPENDED/INJURED/UNAVAILABLE: real bug, 2026-09-13 (Miguel: "no
-    # booked player is playing so shouldn't they have 0% end odds to play
-    # next game?") — Zaid Romero, suspended, was reading a real start% and
-    # a real xPts/j for his NEXT match because this function used to
-    # rebuild pts from raw ppm*fix, silently ignoring the status
-    # Scorer.score() had already zeroed. THIS jornada must read 0% to
-    # start; the "rest of season" side must NOT be touched — a one-match
-    # ban clears, jornada 8 is not jornada 7.
-    susp = PlayerProfile(
-        identity=k.identity, current=k.current, history=k.history,
-        derived=PlayerDerived(
-            ppm=6.0, pj=12.0, start_p=0.8, market_exp=0.0,
-            scored=_FakeScored(ppm=6.0, pj=12.0, pct_used=80.0, fix=1.1,
-                               status="suspended", pct_rest=60.0)))
-    susp_this, susp_rest = susp.to_bootstrap_input()
-    assert abs(susp_this[0] - 6.6) < 1e-9 and susp_this[1] == 0.0, susp_this
-    assert abs(susp_rest[0] - 6.6) < 1e-9 \
-        and abs(susp_rest[1] - 0.6) < 1e-9, susp_rest  # untouched
-
-    # DOUBT: halves the POINTS side for this jornada only (the same
-    # multiplier Scorer.score() applies to flat/score), not the start
-    # side — a 50-50 knock is a real chance to play, not a zero.
+    # SUSPENDED/INJURED/UNAVAILABLE and DOUBT: real bug, 2026-09-13
+    # (Miguel: "no booked player is playing so shouldn't they have 0% end
+    # odds to play next game?") — Zaid Romero, suspended, was reading a
+    # real start% and a real xPts/j for his NEXT match because
+    # to_bootstrap_input() used to independently rebuild pts from raw
+    # ppm*fix, silently ignoring the status Scorer.score() had already
+    # zeroed. Tested ONCE, here, through the real pipeline
+    # (build_profiles() -> to_bootstrap_input()) rather than twice against
+    # a hand-built PlayerProfile and again against build_profiles() — two
+    # near-identical fixtures were themselves the same duplication this
+    # session's fix eliminated in the code; one real path, one test of it.
     from ffcore.score import DOUBT_FACTOR
-    doubt = PlayerProfile(
-        identity=k.identity, current=k.current, history=k.history,
-        derived=PlayerDerived(
-            ppm=6.0, pj=12.0, start_p=0.8, market_exp=0.0,
-            scored=_FakeScored(ppm=6.0, pj=12.0, pct_used=80.0, fix=1.1,
-                               status="doubt", pct_rest=60.0)))
-    doubt_this, doubt_rest = doubt.to_bootstrap_input()
-    assert abs(doubt_this[0] - 6.6 * DOUBT_FACTOR) < 1e-9, doubt_this
-    assert abs(doubt_this[1] - 0.8) < 1e-9, doubt_this  # start% unaffected
-    assert abs(doubt_rest[0] - 6.6) < 1e-9, doubt_rest  # untouched
 
-    # build_profiles() ITSELF has the identical bug independently fixed —
-    # its own market_exp/start_p, not just to_bootstrap_input()'s copy.
-    class _SuspendedScorer(_FakeScorer):
+    class _StatusScorer(_FakeScorer):
+        def __init__(self, status):
+            self.status = status
+
         def score(self, row):
             return _FakeScored(ppm=6.0, pj=12.0, pct_used=80.0, fix=1.1,
-                               status="suspended", pct_rest=60.0) \
+                               status=self.status, pct_rest=60.0) \
                 if row else None
 
-    susp_profiles = build_profiles(players, _SuspendedScorer(), perjornada,
-                                   xw=_FakeXW(), match_stats_rows=match_stats,
+    susp_profiles = build_profiles(players, _StatusScorer("suspended"),
+                                   perjornada, xw=_FakeXW(),
+                                   match_stats_rows=match_stats,
                                    match_rows=matches,
                                    market_keyed={"999": {"listed": True,
                                                           "price": 5e6,
@@ -516,6 +506,29 @@ def _selftest() -> None:
     assert ks.derived.start_p == 0.0, ks.derived.start_p
     assert ks.derived.market_exp == 0.0, ks.derived.market_exp
     assert ks.derived.ppm == 6.0   # the raw rate itself is untouched
+    susp_this, susp_rest = ks.to_bootstrap_input()
+    assert abs(susp_this[0] - 6.6) < 1e-9 and susp_this[1] == 0.0, susp_this
+    assert abs(susp_rest[0] - 6.6) < 1e-9 \
+        and abs(susp_rest[1] - 0.6) < 1e-9, susp_rest  # untouched
+
+    # DOUBT: halves the POINTS side for this jornada only (the same
+    # multiplier Scorer.score() applies to flat/score), not the start
+    # side — a 50-50 knock is a real chance to play, not a zero.
+    doubt_profiles = build_profiles(players, _StatusScorer("doubt"),
+                                    perjornada, xw=_FakeXW(),
+                                    match_stats_rows=match_stats,
+                                    match_rows=matches,
+                                    market_keyed={"999": {"listed": True,
+                                                           "price": 5e6,
+                                                           "owner": "alice"}})
+    kd = doubt_profiles["999"]
+    assert abs(kd.derived.pts_now - 6.6 * DOUBT_FACTOR) < 1e-9, \
+        kd.derived.pts_now
+    assert kd.derived.start_p == 0.8, kd.derived.start_p  # unaffected
+    doubt_this, doubt_rest = kd.to_bootstrap_input()
+    assert abs(doubt_this[0] - 6.6 * DOUBT_FACTOR) < 1e-9, doubt_this
+    assert abs(doubt_this[1] - 0.8) < 1e-9, doubt_this  # start% unaffected
+    assert abs(doubt_rest[0] - 6.6) < 1e-9, doubt_rest  # untouched
 
     # A player the Scorer has no row for at all: not scored, not dropped —
     # still gets a profile, just with empty derived/history. This IS the
