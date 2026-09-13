@@ -454,6 +454,18 @@ def band_acts(u) -> list:
     return acts
 
 
+def market_candidates(u) -> list:
+    """A buy Action for every listed player, no bar filter — the full
+    market, as `[(key, Action), ...]`, for a real season band on all of
+    it rather than only the plausibly-helpful subset band_acts() ranks.
+    """
+    import decide
+
+    mine = u.state.squads.get(u.me, {})
+    return [(k, decide.Action("buy", buy=k, cost=u.price.get(k, 0.0)))
+           for k in u.price if k not in mine]
+
+
 def ladder(u, rows, base, data=None) -> list[str]:
     """EVERY PLAYER YOU COULD HOLD, GROUPED BY WHAT TO DO WITH HIM.
 
@@ -2071,12 +2083,17 @@ def main() -> None:
     # gets measured, off a pass that was happening anyway.
     acts = decide.candidates(u, exp, budget=float("inf"))
     smoothed = cash_price_history()
-    # ONE SIMULATION AT FINAL_TRIALS, not two. band_acts() names the ladder's
-    # one-man questions and rank() answers them in the pass it was already
-    # running — see its own note on why a second pass re-drew identical
-    # seasons for nothing.
+    # ONE SIMULATION AT FINAL_TRIALS, not two. band_acts() names the
+    # ladder's one-man questions; market_candidates() adds a real season
+    # band for every OTHER listed player too (no bar filter) — a real
+    # comparison, not just the plausibly-helpful subset — and rank()
+    # answers all of it in the pass it was already running.
+    bar_acts = band_acts(u)
+    bar_keys = {k for k, _ in bar_acts}
+    extra_acts = bar_acts + [t for t in market_candidates(u)
+                             if t[0] not in bar_keys]
     rows, base, measured, bands = decide.rank(
-        u, acts, price=smoothed, extra=band_acts(u))
+        u, acts, price=smoothed, extra=extra_acts)
     log_cash_price(measured)
     # Real idle cash ONLY when genuinely nothing cleared the bar (`rows`
     # empty) AND there's cash to speak of — see _price_note()'s own note.
@@ -2086,9 +2103,11 @@ def main() -> None:
     # ONE COMPUTATION, READ BY BOTH RENDERERS — render() and payload() both
     # draw this one list, so the two cannot disagree about groups or order.
     ladder_data = ladder_rows(u, rows, bands)
+    from slate import comparison_rows, comparison_table
+    cmp_rows = comparison_rows(u, bands)
     write_lines(PARTS / OUT,
                 render(u, rows, base, stamp, rivals, len(acts), locks_h,
-                       ladder_data))
+                       ladder_data) + comparison_table(cmp_rows))
     print("wrote %s (%d moves, %d simulated in full)"
           % (PARTS / OUT, len(acts), len(rows)))
 
@@ -2097,6 +2116,7 @@ def main() -> None:
                           .strftime("%Y-%m-%dT%H:%MZ"),
         **payload(u, rows, base, rivals, locks_h, len(acts),
                   ladder_data=ladder_data),
+        "market": cmp_rows,
     }, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
     print("wrote %s" % (REPORTS / "decisions.json"))
 

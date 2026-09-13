@@ -19,7 +19,8 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from ffcore.text import norm  # noqa: E402
 
-__all__ = ["read_slate", "slate_from_api"]
+__all__ = ["read_slate", "slate_from_api", "comparison_rows",
+          "comparison_table"]
 
 
 def slate_from_api(rows: list[dict], market, xw=None) -> tuple[set, list]:
@@ -65,6 +66,69 @@ def read_slate(market, rows=None, xw=None) -> tuple[set, list]:
         from ffcore.tidy import load_api_market
         rows = load_api_market()
     return slate_from_api(rows, market, xw)
+
+
+def comparison_rows(u, bands=None) -> list[dict]:
+    """Every listed player: season points, next-jornada points, and
+    points above replacement (median, with a real season band from
+    `bands` where one was computed).
+
+    `bands`, when given, is decide.rank()'s own `bands` dict — pts_lo/
+    pts_hi for the same PAR figure decide.player_forecasts() reports as
+    a point estimate. A key not in `bands` gets `par_lo`/`par_hi` = None,
+    not a fabricated band.
+    """
+    import decide
+    from ffcore.render import title_name
+
+    fc = decide.player_forecasts(u)
+    out = []
+    for k, price in u.price.items():
+        f = fc.get(k, {})
+        par, par_lo, par_hi = f.get("par"), None, None
+        b = (bands or {}).get(k)
+        if b is not None:
+            par, par_lo, par_hi, _act = b
+        out.append({
+            "key": k, "name": title_name(u.name.get(k, k)),
+            "pos": u.pos.get(k, ""), "price": price,
+            "season_pts": f.get("season_pts"), "next_pts": f.get("next_pts"),
+            "par": par, "par_lo": par_lo, "par_hi": par_hi,
+            "value": decide.value_rate(par, price),
+            "simulated": b is not None,
+        })
+    out.sort(key=lambda r: (r["value"] is None, -(r["value"] or 0.0)))
+    return out
+
+
+def comparison_table(rows: list[dict]) -> list[str]:
+    """Markdown: every listed player, ranked by PAR per million spent."""
+    from ffcore.parse import fmt_money
+
+    if not rows:
+        return []
+
+    def num(v, fmt="%.1f"):
+        return fmt % v if v is not None else "—"
+
+    out = ["## Every listed player, compared", "",
+          "PAR = season points above your own squad's current weakest "
+          "option in his slot. Parenthesised range is a real simulated "
+          "band where one was run; a plain figure is the point estimate.",
+          "",
+          "| Player | Pos | Price | Season | Next | PAR | pts/€M |",
+          "|---|---|---:|---:|---:|---:|---:|"]
+    for r in rows:
+        par_cell = num(r["par"])
+        if r["par_lo"] is not None:
+            par_cell += " (%s–%s)" % (num(r["par_lo"], "%.0f"),
+                                          num(r["par_hi"], "%.0f"))
+        out.append("| %s | %s | %s | %s | %s | %s | %s |" % (
+            r["name"], r["pos"], fmt_money(r["price"]),
+            num(r["season_pts"]), num(r["next_pts"]), par_cell,
+            num(r["value"], "%.2f")))
+    out.append("")
+    return out
 
 
 def _selftest() -> None:
@@ -124,7 +188,60 @@ def _selftest() -> None:
         [{"player_name": "Fornals", "player_id": "9999"}], market, xw=xw)
     assert keys == {norm("Pablo Fornals")} and unres == [], (keys, unres)
 
-    print("slate self-test OK (15 cases)")
+    # -- comparison_rows/comparison_table: every listed player, ranked by
+    # PAR per million ----------------------------------------------------
+    from decide import Universe, Action
+    from ffcore.forecast import Bootstrap
+    from ffcore.season import LeagueState
+    from ffcore.profile import (PlayerProfile, PlayerIdentity, PlayerCurrent,
+                                PlayerHistory, PlayerDerived)
+
+    def cp(pj, pos="MED", price=5e6, name=""):
+        return PlayerProfile(
+            identity=PlayerIdentity(key="x", name=name),
+            current=PlayerCurrent(pos=pos, price=price, listed=price is not None),
+            history=PlayerHistory(), derived=PlayerDerived(pj=pj))
+
+    cu_sq = {"me": {"me_a": "MED"}}
+    cu_per = {1: {"me_a": (2.0, 1.0), "cheap": (3.0, 1.0), "rich": (8.0, 1.0)},
+             2: {"me_a": (2.0, 1.0), "cheap": (3.0, 1.0), "rich": (8.0, 1.0)}}
+    cu = Universe(
+        state=LeagueState(cu_sq, [1, 2], "me"),
+        forecaster=Bootstrap(cu_per), cash=0.0, me="me",
+        players={"me_a": cp(5.0, price=None),
+                "cheap": cp(5.0, price=2e6, name="cheap"),
+                "rich": cp(5.0, price=20e6, name="rich")})
+    rows = comparison_rows(cu)
+    keys = {r["key"] for r in rows}
+    assert keys == {"cheap", "rich"}, keys   # "me_a" isn't listed at all
+    by_key = {r["key"]: r for r in rows}
+    assert by_key["cheap"]["season_pts"] == 6.0, by_key["cheap"]
+    assert by_key["rich"]["season_pts"] == 16.0, by_key["rich"]
+    # Both replace "me_a" (season 4.0) -> PAR 2.0 and 12.0.
+    assert by_key["cheap"]["par"] == 2.0, by_key["cheap"]
+    assert by_key["rich"]["par"] == 12.0, by_key["rich"]
+    assert by_key["cheap"]["par_lo"] is None   # no band given
+    # "cheap" wins on points-per-million despite the smaller PAR: 2/2 = 1.0
+    # against rich's 12/20 = 0.6.
+    assert rows[0]["key"] == "cheap", rows
+
+    md = comparison_table(rows)
+    assert any(l.startswith("| Cheap") for l in md), md
+
+    # A real band, from decide.rank(), overrides the point estimate and
+    # carries its own range — a key with no band keeps the plain figure.
+    b = {"cheap": (2.5, 1.0, 4.0, Action("buy", buy="cheap", cost=2e6))}
+    rows2 = comparison_rows(cu, bands=b)
+    by_key2 = {r["key"]: r for r in rows2}
+    assert (by_key2["cheap"]["par"], by_key2["cheap"]["par_lo"],
+           by_key2["cheap"]["par_hi"]) == (2.5, 1.0, 4.0), by_key2["cheap"]
+    assert by_key2["rich"]["par_lo"] is None, by_key2["rich"]
+    md2 = comparison_table(rows2)
+    assert any("1–4" in l for l in md2), md2
+
+    assert comparison_table([]) == []
+
+    print("slate self-test OK (23 cases)")
 
 
 if __name__ == "__main__":
