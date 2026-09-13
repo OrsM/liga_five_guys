@@ -719,11 +719,19 @@ def load_predictions() -> dict[str, list[tuple[dt.datetime, dict]]]:
             fac = {"score": float(r["score"])}
         except (KeyError, ValueError, TypeError):
             continue
-        for col in ("fix", "ppm", "flat", "start_pct"):
+        for col in ("fix", "ppm", "flat", "start_pct", "cur_pj"):
             try:
                 fac[col] = float(r[col])
             except (KeyError, ValueError, TypeError):
                 fac[col] = None
+        # NOT numeric — carried through as-is for golden_dataset()'s own
+        # counterfactual reconstructions (home/away, position gates,
+        # status overrides), same reasoning the docstring above already
+        # gives for carrying the whole row: grading which FACTOR was
+        # wrong needs these, not just the final score.
+        fac["home"] = r.get("home") == "1"
+        fac["pos"] = (r.get("pos") or "").lower()
+        fac["status"] = r.get("status") or ""
         # THE ID THE ROW WAS LOGGED WITH, and the name for the rows written
         # before the column existed. Both sides of the grade have to agree
         # about who a prediction was about, and the confirmed-starts side
@@ -734,6 +742,58 @@ def load_predictions() -> dict[str, list[tuple[dt.datetime, dict]]]:
     for v in preds.values():
         v.sort(key=lambda t: t[0])
     return preds
+
+
+def golden_dataset() -> dict[int, dict[str, dict]]:
+    """{jornada: {key: {score, fix, ppm, flat, start_pct, cur_pj, home,
+    pos, status, actual, games}}} — the ONE canonical join between
+    historically logged predictions and real graded outcomes, for
+    walk_forward_compare()/backtest_predictor() to build any hypothesis
+    on, instead of a fresh ad hoc join per candidate.
+
+    Miguel, 2026-09-13: "improve the back test process to ensure it's
+    working for 80% of the tests we run at least, to make it cheaper to
+    run these things over time." Direct cause: the HOME_EDGE walk-forward
+    check (this session) reused pair()'s exact matching and reached 48
+    real pairs; the very next test (shots-for-forwards, full-pipeline
+    version) hand-rolled a DIFFERENT, worse join and reached 3. Same
+    underlying data, same season, same players — the gap was entirely a
+    bad join, not thin data. This is pair()'s own matching (a real
+    outcome's every name-form, checked against load_predictions()'s key,
+    latest reading strictly before the outcome's own from_dt) — not a
+    new join, the SAME one, just not narrowed down to "score"/"fix" the
+    way pair()'s own output is, because a counterfactual (what WOULD the
+    score have been under a different constant) needs the raw ppm/fix/
+    flat/home/status/pos a final "score" number has already collapsed.
+
+    A caller wanting "every forward, every jornada" or "every home game"
+    filters this dict directly (`{j: {k: r for k, r in d.items() if
+    r["pos"]=="delantero"} for j, d in golden_dataset().items()}`) —
+    this function's only job is the join, not any one hypothesis's own
+    slicing of it.
+    Why: docs/notes/methodology.md#golden_dataset--the-shared-join
+    """
+    preds = load_predictions()
+    actuals, _label = load_actuals()
+    out: dict[int, dict[str, dict]] = {}
+    for a in actuals:
+        if a["games_delta"] < 1 or a.get("jornada") is None:
+            continue
+        fac = matched_key = None
+        for k in a["keys"]:
+            hits = preds.get(k)
+            if hits:
+                fac = latest_before(hits, a["from_dt"])
+            if fac is not None:
+                matched_key = k
+                break
+        if fac is None:
+            continue
+        row = dict(fac)
+        row["actual"] = a["points_delta"]
+        row["games"] = a["games_delta"]
+        out.setdefault(a["jornada"], {})[matched_key] = row
+    return out
 
 
 # ---------------------------------------------------------------------------
@@ -2164,6 +2224,25 @@ def _selftest() -> None:
     assert len(bad) <= 2, bad
     print(f"  golden_rows(): {len(golden)} rows, {len(checked)} fully "
          f"joined, {len(bad)} known points.py-mislabel exception(s)")
+
+    # -- golden_dataset(): the shared join every walk-forward hypothesis
+    # test should build on — checked against real data for the thing that
+    # actually broke a real test this session (2026-09-13, the shots
+    # walk-forward check reaching n=3 on a hand-rolled join where the
+    # SAME join this function uses reaches dozens) ------------------------
+    gd = golden_dataset()
+    total_rows = sum(len(v) for v in gd.values())
+    assert total_rows >= 30, (
+        "golden_dataset() should reach the same order of magnitude as "
+        "pair()'s own real-data join (40-60 rows this season as of "
+        "2026-09) — a much smaller number means the shared join itself "
+        "broke, not that a hypothesis's own data is thin: %d" % total_rows)
+    assert len(gd) >= 3, gd   # spans several real jornadas, not one
+    sample_row = next(iter(next(iter(gd.values())).values()))
+    for field in ("score", "fix", "ppm", "flat", "home", "pos", "status",
+                 "actual", "games"):
+        assert field in sample_row, (field, sample_row)
+    print(f"  golden_dataset(): {total_rows} rows across {len(gd)} jornadas")
 
     # -- baseline_check(): a synthetic case where the "right" answer is
     # known by construction, since real data can only show what today's
