@@ -1757,18 +1757,10 @@ def _selftest() -> None:
     if sale is not None:
         assert sale["value"] is None, sale
 
-    # -- `value` IS ALREADY POINTS OVER POSITION REPLACEMENT LEVEL ---------
-    # The standing proposal this pins down (raised again 2026-08-31): add a
-    # second `value_vor` = points over the position's replacement level,
-    # per euro, because `value` supposedly compares a candidate in
-    # isolation and cannot tell that a cheap defender is scarce and a cheap
-    # forward is not. It can. `d_pts` is a paired marginal off a re-picked
-    # best_xi(), so the replacement is computed per candidate rather than
-    # assumed per slot. Two candidates on IDENTICAL expected points and an
-    # IDENTICAL price, one into a thin slot and one into a deep one, must
-    # therefore NOT come out equal — which also means the fixture that
-    # proposal wants ("same `value`, different scarcity") cannot be built:
-    # equal `value` here IS the simulation saying they are worth the same.
+    # `value` is already points over position replacement level: `d_pts` is a
+    # paired marginal off a re-picked best_xi(), so two candidates on
+    # identical expected points and price, one into a thin slot and one into
+    # a deep one, do NOT come out equal — no separate value_vor needed.
     vsq = {"me_k": "POR",
            **{"me_d%d" % i: "DEF" for i in range(1, 6)},
            **{"me_m%d" % i: "MED" for i in range(1, 7)},
@@ -1936,17 +1928,10 @@ def _selftest() -> None:
         per6[1][key] = (10.0 - i * 0.1, 1.0)
         acts6.append(Action("buy", buy=key, cost=20e6))
     for i in range(3):      # a clear, unambiguous gain, but €10k — excellent
-        key = "eff%d" % i   # ratio. Rate 6.0 (not e.g. 3.2, barely above the
-        per6[1][key] = (6.0, 1.0)   # ~3.0 bar): too thin a margin made this
-        acts6.append(Action("buy", buy=key, cost=1e4))  # flaky across
-        # backends — screening's Monte Carlo noise put one candidate's `d`
-        # on either side of zero depending on which RNG ran it (numpy vs.
-        # the pure-Python fallback used when numpy is absent), found by
-        # running under this repo's real `uv run --frozen python` (which
-        # has numpy) after `python3` alone (which does not) had passed
-        # every time — same seed, different backend, different answer on a
-        # genuinely borderline margin. A wide, unambiguous gain removes the
-        # ambiguity instead of chasing a specific backend's numbers.
+        key = "eff%d" % i   # ratio. Rate 6.0, well clear of the ~3.0 bar —
+        per6[1][key] = (6.0, 1.0)   # a thin margin here is flaky across RNG
+        acts6.append(Action("buy", buy=key, cost=1e4))  # backends (numpy vs.
+        # pure-Python fallback), so this stays wide and unambiguous.
     # a candidate below the current XI bar: no genuine gain, so however
     # tiny its cost, it must never be topped up on "ratio" alone.
     per6[1]["sham"] = (0.1, 1.0)
@@ -2004,22 +1989,13 @@ def _selftest() -> None:
     assert cash_price([]) is None and cash_price([(0.0, 0.4)]) is None
 
     # -- the rival answers back --------------------------------------------
-    # A CLAUSE PAYS THE OWNER. That is not a detail: it means a steal hands
-    # the manager you are racing the money to retaliate with, and on the day
-    # this was written every rival was overdrawn and could not buy anybody at
-    # all until I paid one. The simulation scored the retaliation at zero,
-    # which made a steal look like pure subtraction from a rival who had no
-    # way to respond, when it is closer to an exchange on terms he chooses.
+    # A clause pays the owner, so a steal hands the victim money to retaliate
+    # with — not pure subtraction from a rival who can't respond.
     #
-    # AVERAGE VALUE FOR HIS MONEY, NOT A SEARCH (2026-09-09) — respond() used
-    # to search every clausable player in the league for his single best
-    # reply, with no floor on what it cost whoever he took FROM. Caught the
-    # day it walked off with an unrelated third manager's own defender,
-    # collapsing that manager's simulated season and reading as the RAIDER's
-    # own win probability jumping off a rival's squad breaking, not off
-    # anything the raid itself did. The fixture below is the same shape, at a
-    # scale where the arithmetic can be checked by hand instead of by trawling
-    # a 3000-trial season for the manager it broke.
+    # respond() uses average value for his money, not a search for his single
+    # best reply — a search has no floor on what it costs whoever he takes
+    # FROM, and can walk off with an unrelated third manager's own player,
+    # collapsing that manager's season instead of anything the raid itself did.
     u5 = Universe(
         state=LeagueState({"me": dict(mine), "riv": {}}, [1], "me"),
         forecaster=B(per), pos=dict(u.pos), price={},

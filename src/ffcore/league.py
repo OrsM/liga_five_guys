@@ -1233,34 +1233,18 @@ def _selftest_api_owner() -> None:
     # read minutes apart and drift a little, so it is not zero.
     assert api_key("Isaac Romero", "BurtonGM89", twins,
                    market_value="6160000") == norm("Isaac Romero")
-    # AND THE NICKNAME ALONE IS NOW ENOUGH, without the full name beside it.
-    # This asserted None until 2026-08-20, and the None was a limitation
-    # being written down as an intention: resolve() would answer ISAAC on a
-    # substring that crossed a word boundary, _priced_like would reject him,
-    # and with no full name, no app id and no ledger owner there was nothing
-    # left to try. The boundary fix makes resolve() refuse instead of
-    # guessing, and key_for then asks the price which of the candidates it
-    # is — the same evidence this function already hands in, for this exact
-    # reason. Carlos at 43.24M against a stated 43.24M; Isaac at 6.15M is not
-    # close. Note what has NOT changed: nobody picks the cheaper of two
-    # strangers, and a price agreeing with two of them still resolves to
-    # neither.
+    # The nickname alone is enough, without the full name beside it: resolve()
+    # refuses an ambiguous substring rather than guessing, so key_for asks the
+    # price which candidate it is (Carlos at 43.24M matches; Isaac at 6.15M
+    # doesn't). A price agreeing with two candidates still resolves to neither.
     assert api_key("C. Romero", "BurtonGM89", twins,
                    market_value="43244323") == norm("Carlos Romero")
 
     # -- the id the crosswalk already resolved, once, and wrote down -------
-    # REAL, AND STILL COSTING A PLAYER. The app calls Jonny Castro "Jonny
-    # Otto" and his full name "Jonathan Castro Otto"; no spelling joins, and
-    # the value tier finds nothing because the app's figure for him appears
-    # nowhere in futbolfantasy's history — so the claim that the two match to
-    # the euro does not hold for every player. Meanwhile players.csv HAS had
-    # him since some earlier sweep resolved a market row: app_id 2552 ->
-    # jonny castro. This join re-derived that from scratch every run and
-    # failed, while the table that solved it sat unread beside it.
-    #
-    # It is an EXACT id, checked FIRST now: no derivation on the id itself,
-    # only on the table's app_id -> key mapping, and Crosswalk.merge()'s
-    # stale-id displacement is what protects that now, not join order here.
+    # "Jonny Otto" (app nickname) vs. "Jonathan Castro Otto" (full name): no
+    # spelling join, no price match — but players.csv already has app_id 2552
+    # -> jonny castro from an earlier sweep. Checked as an exact id first, no
+    # re-derivation; Crosswalk.merge()'s stale-id displacement protects it.
     lone = Market([{"name": "Jonny Castro", "value": "5602302",
                     "observed_at": at, "position": "DEF"}])
     assert api_key("Jonny Otto", "SusoGattuso", lone) is None

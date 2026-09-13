@@ -308,17 +308,10 @@ def latest_snapshot(path, keep=None) -> list[dict]:
         return kept
 
 
-# CACHES THE RESULT, NOT THE FILE — latest_snapshot() itself stays a bounded-
-# memory forward pass (see its own docstring on why it bypasses read_csv's
-# cache). But load_market_latest()/load_lineups_latest() are each called
-# several times over one run.py process (load_players() alone, plus every
-# stage that wants "the market as of now") and, with no cache of their own,
-# each call re-walked the ENTIRE multi-decade file again for an answer that
-# cannot change mid-run — measured 6-8 calls to the same file on a real
-# report. `cache_key` disambiguates callers like load_lineups_latest(source=)
-# that pass a fresh `keep` lambda every call (so keying on `keep` itself would
-# never hit); same mtime+size invalidation and same copy-on-return guarantee
-# as read_csv()'s cache, for the same reason.
+# Caches the result, not the file — load_market_latest()/load_lineups_latest()
+# are each called several times per run.py process for an answer that can't
+# change mid-run. `cache_key` disambiguates callers that pass a fresh `keep`
+# lambda every call; same mtime+size invalidation as read_csv()'s cache.
 # Why: docs/notes/tidy.md#_cached_latest_snapshot--cache-the-small-result-not-the-whole-file
 _LATEST_SNAPSHOT_CACHE: dict[tuple, tuple] = {}
 
@@ -1248,17 +1241,13 @@ def _selftest() -> None:
     assert snapshots(rows) == ["t1", "t2"]
 
     # -- a reading that is too old is not a reading -------------------------
-    # THE BUG THIS EXISTS FOR: a feed that stops answering leaves its last
-    # rows in the tidy store, and every reader downstream treats them as
-    # today's. Club Elo died on 2026-08-17 and the fixture board went on
-    # ranking twenty clubs by ratings from before the jornada for two days,
-    # because all twenty still joined. Age is the only thing that says so.
+    # A feed that stops answering leaves its last rows in the tidy store;
+    # every reader downstream must treat them as stale, not today's.
     now = datetime(2026, 8, 19, 12, 0, tzinfo=timezone.utc)
     day_old = [{"observed_at": "2026-08-18T2246Z", "club": "Barcelona"}]
     two_days = [{"observed_at": "2026-08-17T2246Z", "club": "Barcelona"}]
-    # ...and the functions that DEFAULT a `now` take the run's instant too.
-    # These read `now = now or <clock>`, so left to themselves they each
-    # sampled again — the freshness gate could disagree with the timestamp
+    # Functions that default `now` must read `now or <clock>` once, not
+    # re-sample per call, or the gate could disagree with a timestamp
     # printed beside it in the same document.
     import inspect as _inspect
     for _fn in (fresh_only, stale_feeds):
@@ -1321,34 +1310,18 @@ def _selftest() -> None:
     assert load_api_standings(now=stale) == []
     assert load_api_offers(now=stale) == []
 
-    # A gated feed that has gone quiet must be SAYABLE, not merely refused.
-    # Refusing it in silence turns "I cannot see the market" into "there is
-    # nothing to buy, a poor week" — measured, on the store aged three days.
-    # POINTS ALREADY SCORED ARE NOT A SNAPSHOT. The gate above throws away
-    # the whole standings row when the feed goes quiet, and the row carries
-    # two different kinds of fact: a balance, which must be today's, and a
-    # season-to-date total, which only grows. Gating both zeroed every
-    # manager's points and simulated the rest of the season from 0 — a wrong
-    # number where a slightly old one was available.
+    # points already scored are not a snapshot: standings carries a balance
+    # (must be today's) and a season-to-date total (only grows) — gating
+    # both on a quiet feed would zero every manager's points.
     assert last_api_standings() != [] or read_csv(TIDY / "api_standings.csv") == []
 
     quiet = stale_feeds(now=stale)
     assert set(quiet) == set(GATED_API), quiet
     assert min(quiet.values()) > 365 * 70
-    # A table nothing has ever written is not "stale" — it never answered,
-    # and the caller that degrades to the ledger says so differently.
+    # A table nothing has ever written is not "stale" — it never answered.
     assert "api_nothing" not in stale_feeds(now=stale, names=("api_nothing",))
 
-    # -- a name is not a player ---------------------------------------------
-    # THE OLDEST KNOWN WRONG NUMBER IN THE REPO. The key was a normalised
-    # name, and LaLiga fields an Álvaro García at Villarreal worth 0.50M and
-    # another at Rayo worth 20.23M. To this index they were ONE player with
-    # one price history built out of both, and whichever row a lookup reached
-    # first decided what a squad was worth. One of the three collisions on
-    # 2026-08-19 was a player somebody owned.
-    # THE SITE ISSUES AN ID PER PLAYER and always did — data-id, in the same
-    # element as data-nombre. Reading it is what makes the two of them two,
-    # so the fixture carries it exactly as the page does.
+    # -- a name is not a player: two same-named players, two ids ------------
     tw = [{"ff_id": "867", "name": "Álvaro García", "team": "Rayo",
            "value": "20233300", "observed_at": "2026-08-19T1639Z"},
           {"ff_id": "12993", "name": "Álvaro García", "team": "Villarreal",
@@ -1409,13 +1382,9 @@ def _selftest() -> None:
     assert shared_names(latest_only(gone)) == shared_names(gone)
     assert row_key(gone[-1], shared_names(gone)) == norm("Iker Munoz")
 
-    # A GUESS IS SETTLED BY THE PRICE; AN EXACT NAME IS NEVER OVERRULED.
-    # The app writes "C. Romero" and the market holds three Romeros, so
-    # resolve() rightly refuses. The caller holding the 45.74M that was paid
-    # can do better than refuse: one of the three agrees with it and the
-    # others are nowhere near. Same evidence and same tolerance _pick already
-    # trusts for two men of one name — applied only where the alternative is
-    # no answer at all.
+    # An ambiguous abbreviated name ("C. Romero" vs. three Romeros) can be
+    # settled by a price that agrees with only one candidate; an exact name
+    # is never overruled by price.
     rom = [{"name": "Isaac Romero", "team": "Sevilla", "value": "6023939",
             "observed_at": "2026-08-19T1639Z"},
            {"name": "Cristian Romero", "team": "Atletico", "value": "47546565",

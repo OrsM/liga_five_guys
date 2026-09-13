@@ -197,18 +197,11 @@ class Bootstrap:
         # averages zero would send every scaled draw to zero or to infinity.
         self._pool_mean = mean if abs(mean) > 1e-9 else 1.0
         sd = statistics.pstdev(self.pool) if len(self.pool) > 1 else 0.0
-        # HOW WRONG THE RATE ITSELF CAN BE. Everything above draws a season
-        # around a rate taken as given, and a rate is an average of a handful
-        # of matches: 34 of them for a regular, four for a man who came up in
-        # January. The two are not the same claim and were being simulated as
-        # if they were, which is most of why a 74% chance of winning could sit
-        # under a table showing third place.
-        #
-        # sd of a mean over n matches is the per-match sd over root n; the
-        # per-match sd scales with the player's own level (the draw is
-        # multiplicative), so as a FRACTION of his rate it is the pool's
-        # coefficient of variation over root n. n counts the shrinkage's
-        # pseudo-matches, because a shrunk rate really is anchored by them.
+        # Uncertainty in the rate itself, not just the season drawn around it:
+        # sd of a mean over n matches is per-match sd / sqrt(n); since the
+        # draw is multiplicative, per-match sd scales with the player's own
+        # level, so as a fraction of rate it's the pool's coefficient of
+        # variation / sqrt(n). n counts the shrinkage's pseudo-matches.
         self._cv = (sd / self._pool_mean) if self._pool_mean else 0.0
         self.rate_rel = {}
         for k, n in (matches or {}).items():
@@ -220,26 +213,12 @@ class Bootstrap:
         self.club_of = dict(club_of or {})
         self.club_rel = dict(club_rel or {})
 
-        # HOW WRONG P(START) ITSELF CAN BE — the same fact as rate_rel
-        # above, about the OTHER number this class draws. A start
-        # percentage is also a rate estimated from a handful of matches
-        # (see ffcore.startprob's own fit), and holding it flat for every
-        # remaining jornada makes the same mistake rate_rel exists to fix,
-        # just on the "does he play at all" side rather than "how well".
-        #
-        # NOT THE SAME cv: rate_rel's cv comes from the POINTS POOL, and
-        # is roughly constant across players because Bootstrap rescales
-        # the pool multiplicatively — a fixed shape stretched to each
-        # player's own level. A start rate has no such rescaling; it is a
-        # proportion, and a proportion's own sampling variance depends on
-        # p itself (tightest near 0 or 1, widest near 0.5 — a coin you've
-        # never seen come up tails is a very different claim from one
-        # you've seen split 50/50 twenty times). sqrt((1-p)/p) is that
-        # shape for a rate expressed as odds rather than a share; it
-        # reproduces the usual sqrt(p(1-p))/p Bernoulli coefficient of
-        # variation up to a constant absorbed into SHRINK_MATCHES, which
-        # this repo already trusts to be the right pseudo-count from
-        # rate_rel's own use of it.
+        # Same idea as rate_rel but for P(start), which has no fixed-shape
+        # rescaling like the points pool — it's a proportion, whose sampling
+        # variance depends on p itself (tightest near 0/1, widest near 0.5).
+        # sqrt((1-p)/p) is that shape expressed as odds; reproduces the usual
+        # Bernoulli sqrt(p(1-p))/p coefficient of variation up to a constant
+        # absorbed into SHRINK_MATCHES.
         p0 = {}
         for j in sorted(per_jornada):
             for k, (_pts, p) in per_jornada[j].items():
@@ -438,34 +417,21 @@ def _selftest() -> None:
            for i in range(3000)]
     near = statistics.pstdev(t[1]["kid"] for t in walk)
     far = statistics.pstdev(t[22]["kid"] for t in walk)
-    # THE ACTUAL CLAIM: jornada 22 (20 steps out) is genuinely less certain
-    # than jornada 1 (1 step out) — this is the mechanism that used to be
-    # entirely missing (see DRIFT_FRAC's own note on why).
+    # jornada 22 (20 steps out) is genuinely less certain than jornada 1.
     assert far > near, (near, far)
-    # THE WALK IS AN ACTUAL PATH, NOT INDEPENDENT PER-JORNADA REDRAWS.
-    # Bug found and fixed 2026-09-01 (swarm review of the forecasting
-    # engine): `drift` used to be redrawn fresh each jornada from its own
-    # cumulative variance, which gave each jornada the right MARGINAL
-    # spread but left adjacent jornadas within one trial UNCORRELATED —
-    # this assertion is the one the old code would have failed. Two
-    # adjacent jornadas (1, 2) share almost their entire walk history (one
-    # step apart out of the walk's full length here) and must therefore be
-    # strongly, positively correlated within a trial; a real random walk
-    # gives that "for free" — independent per-jornada redraws do not.
+    # The walk is an actual path, not independent per-jornada redraws:
+    # adjacent jornadas (1, 2) share almost their entire walk history and
+    # must be strongly, positively correlated within a trial.
     adjacent_corr = statistics.correlation(
         [t[1]["kid"] for t in walk], [t[2]["kid"] for t in walk])
     assert adjacent_corr > 0.7, adjacent_corr
-    # AND IT SHOULD WEAKEN WITH DISTANCE — jornada 1 vs jornada 22 (21
-    # steps apart) shares much less of its walk than jornada 1 vs 2 does,
-    # so the correlation should be real but clearly smaller.
+    # Correlation should weaken with distance — jornada 1 vs 22 shares much
+    # less walk history than jornada 1 vs 2.
     distant_corr = statistics.correlation(
         [t[1]["kid"] for t in walk], [t[22]["kid"] for t in walk])
     assert 0.0 < distant_corr < adjacent_corr, (distant_corr, adjacent_corr)
-    # LOG-NORMAL, NOT A BIASED CLIP: however wide the walk gets, its mean
-    # stays ~1.0 — checked at jornada 22, the widest point in this walk,
-    # which is exactly where a clip(1+drift, 0) formulation would have
-    # inflated the mean (measured while tuning DRIFT_FRAC: ~1780 points
-    # became ~3150 at a wide setting, nothing to do with real uncertainty).
+    # Log-normal, not a biased clip: however wide the walk gets, its mean
+    # stays ~1.0, checked at jornada 22 (the widest point).
     far_mean = statistics.mean(t[22]["kid"] for t in walk)
     assert abs(far_mean - 1.0) < 0.05, far_mean
     # A jornada NOT in the walk's own list is simply absent, not guessed.

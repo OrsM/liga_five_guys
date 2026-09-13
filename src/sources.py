@@ -1344,25 +1344,17 @@ def sign_fd_results(text: str) -> str | None:
                                         r.get("FTAG")) for r in rows])
 
 
-# BOOKMAKER-IMPLIED MATCH ODDS — team-level, logged now so a real history
-# accumulates before the forecast-first rebuild plan's Stage 3 backtest
-# tests whether it beats the current Elo/squad-value fixture proxy. NOT
-# WIRED INTO SCORING YET — season_board() still reads only Elo/value, on
-# purpose (docs/notes/forecast.md#odds-parked-log-dont-integrate-yet). This
-# is the "log now, don't build the integration until the backtest earns
-# it" half of that plan, same discipline market/team pages already follow.
+# Bookmaker-implied match odds — team-level, logged now to accumulate real
+# history for a future backtest. Not wired into scoring yet — season_board()
+# still reads only Elo/value, on purpose.
+# Why: docs/notes/forecast.md#odds-parked-log-dont-integrate-yet
 #
-# {odds_key} IS A CREDENTIAL PLACEHOLDER, not a URL parameter like {date}/
-# {base} — ingest.py fills it from a file never committed to this repo
-# (.odds_api_key, gitignored) and skips this source entirely, loudly once,
-# when that file is missing — the same "a missing credential degrades to
-# no fetch, never a broken request" rule the league bearer token already
-# follows for auth=True sources.
+# {odds_key} is a credential placeholder, not a URL param like {date}/{base}:
+# ingest.py fills it from a gitignored file and skips this source (loudly,
+# once) when that file is missing, same as the league bearer token.
 #
-# COST: the-odds-api.com's free tier is 500 credits/month; one call covers
-# every upcoming match regardless of match count, cost scaling with
-# regions/markets requested, not matches returned. "daily" cadence, like
-# Elo — not wired into any live number yet, so finer isn't needed.
+# Free tier is 500 credits/month; one call covers every upcoming match
+# regardless of match count. Daily cadence, like Elo.
 ODDS_URL = ("https://api.the-odds-api.com/v4/sports/soccer_spain_la_liga"
            "/odds/?apiKey={odds_key}&regions=eu&markets=h2h"
            "&oddsFormat=decimal")
@@ -1598,43 +1590,22 @@ API_LINEUP_URL = ("{base}/v1/competition/1/teams/{team}"
 # so this needs no idea which round is current and can't read a stale one.
 LINEUP_WEEK = 38
 
-# The feed's verbs, decoded by checking each against the squad it should
-# have produced: type-31 is a squad member (checked against current
-# ownership), type-33 isn't, 9 is a manager joining.
-# Tables whose rows are IMMUTABLE FACTS, keyed by an id that never changes
-# — unlike most tidy tables (time series: value/clause/bids all move), a
-# transfer or a player id never does, so the feed's whole history is kept
-# rather than one row per sweep.
-#
-# That is quadratic, not merely untidy. Each sweep rewrites the file with one
-# more copy of everything and the run commits it: api_activity.csv went from
-# 14.5 KB to 77 KB in thirty-six hours, and the increment grows with the
-# history. A season of it is hundreds of megabytes of git saying the same
-# thing, and `latest_only` on such a table would then be reading a full copy
-# to answer a question about one event.
-#
-# The value is the KEY, not the columns: ingest keeps the first sighting of
-# each and drops the rest, so `observed_at` on these two means "when this
-# entered the store" rather than "when it was last true".
+# Tables whose rows are immutable facts, keyed by an id that never changes
+# (unlike most tidy tables, which are time series). Kept as full history,
+# not one row per sweep — else each sweep rewrites the whole file with one
+# more copy of everything, growing quadratically (api_activity.csv: 14.5KB
+# -> 77KB in 36h before this existed). `observed_at` here means "when this
+# entered the store", not "when it was last true": the value is the key, so
+# ingest keeps the first sighting of each and drops the rest.
 STORE_ONCE = {"api_activity": ("activity_id",),
               "api_players": ("player_id",),
-              # A stat line is a corrigible fact, so the key carries the VALUE
-              # as well as the identity: an unchanged line is stored once, and
-              # a correction arrives as a second row with a later observed_at
-              # rather than overwriting what was published first. Bounded
-              # either way — without this it is 76 players x 21 stats x every
-              # week x every sweep.
+              # Key includes the value: a stat line is corrigible, so an
+              # unchanged line is stored once and a correction arrives as a
+              # new row rather than overwriting the first.
               "api_stats": ("player_id", "week", "stat", "value", "points"),
-              # The CURRENT season's file (fd_sources()'s back==0 entry) is
-              # cadence="every_run" — it has to be, new results appear as
-              # the season is played — and every run re-parses the WHOLE
-              # file, republishing every match already seen. Without this,
-              # results_history.csv gained one more copy of the same five
-              # matches on every run: 5 rows became 20 in four runs.
-              # Corrigible the same way a stat line is (VAR, a corrected
-              # scoreline), so the score is part of the key: an unchanged
-              # result collapses to one row, a genuine correction is a new
-              # one rather than overwriting what was first published.
+              # The current season's file is cadence="every_run" and
+              # re-parses the whole file every time, so this dedupes it the
+              # same way (score included, since a scoreline can be corrected).
               "results_history": ("season", "date", "home_name", "away_name",
                                   "home_goals", "away_goals")}
 
@@ -2366,13 +2337,9 @@ def sources(enabled_only: bool = True) -> list[Source]:
     out += [Source("af_fixtures", "fixtures", AF_HUB_URL,
                    parse_af_fixtures, sign_af_fixtures, cadence="daily")]
     # A rating changes when matches are played, so once a day is generous.
-    # EIGHT SECONDS, NOT THIRTY. Club Elo is the one source nothing depends
-    # on — a missing rating sends the fixture board back to squad value, which
-    # is where it was before Elo existed — and while the dead API host was
-    # still in this slot it timed out on every sweep, costing thirty of the
-    # thirty-two seconds a sweep took. The new host answers in a third of a
-    # second; the short timeout stays, because the reason it is short is what
-    # this source is worth, not who was hosting it.
+    # Short timeout deliberately: Club Elo is the one source nothing depends
+    # on (a missing rating just falls back to squad value), so it should
+    # never be allowed to eat much of a sweep's time budget.
     out += [Source("elo", "elo", ELO_URL, parse_elo, sign_elo,
                    cadence="daily", timeout=8.0)]
     # Real match results, team-level. Deterministic from today's date alone

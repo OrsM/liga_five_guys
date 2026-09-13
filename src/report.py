@@ -4,13 +4,10 @@ and the notification surface. Run after ingest.py parse.
 
     python src/report.py
 
-Not a rendered report any more — sim.py's simulated ladder replaced the
-old markdown board. What's left, and runs every day:
-
   * WARNINGS — a stale feed, a thin position, an unmodelled player, a
     crosswalk clash, an unrecorded cash balance. Written to
     `.runtime/warnings.json`, which sim.py folds into decisions.json —
-    the ONLY place these facts are produced.
+    the only place these facts are produced.
   * ALERTS — the same warnings, filtered to what's worth interrupting
     someone for, plus a login nudge when the league token is expiring.
   * squad_log.csv — one row per player per snapshot, to grade the
@@ -30,11 +27,6 @@ from pathlib import Path
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-# WHAT IS LEFT OF ffcore/bid.py's SURFACE HERE is low_priced_buys() — a real
-# warning (a purchase priced below the floor, worth a by-hand check) — and
-# deals(), which feeds it. suggest(), demand_summary(), premiums() and
-# xi_snapshots() went with sec_slate() (2026-09-05): they priced a live bid,
-# which nothing here still shows.
 from ffcore.bid import deals, low_priced_buys  # noqa: E402
 from ffcore.render import title_name  # noqa: E402
 from ffcore.score import SLOT_LABEL, SLOT_MIN, pick_xi, squad_pool  # noqa: E402
@@ -44,49 +36,34 @@ from ffcore.tidy import (run_now,  # noqa: E402
                          load_deadline, read_csv,
                          snapshot_stamp, stale_feeds, widen_csv, write_lines)
 
-# reports/history/ held a copy of the workings per day. Git already holds
-# every version of every generated file with the run that produced it, so the
-# archive was a second copy of one, and it was the only thing in reports/ that
-# grew without bound. Dropped 2026-08-20.
-# In .runtime/ (gitignored): this file is a signal for a notifier, not a
-# document. Under reports/ or data/ the run would commit a "you have a Buy"
-# note that stops being true within the hour.
+# In .runtime/ (gitignored): a signal for a notifier, not a document — under
+# reports/ or data/ the run would commit a "you have a Buy" note that stops
+# being true within the hour.
 ALERTS = Path(os.environ.get("LFG_ALERTS", ".runtime/alerts.md"))
 # The same warnings as data, for the renderers that are not markdown.
 WARNINGS = Path(os.environ.get("LFG_WARNINGS", ".runtime/warnings.json"))
 
 STALE_HOURS = 14.0
 
-# data/decisions/squad_log.csv, in order. One list, so the migration and the
-# write cannot disagree about what the file holds.
+# data/decisions/squad_log.csv columns, in order — one list, so the migration
+# and the write cannot disagree about what the file holds.
 #
-# The last six arrived with the fixture term and the current-season blend, and
-# each is a SEPARATE column rather than folded into `score`: grading a forecast
-# means attributing its error to one factor at a time. Was the eleven wrong
-# about who starts, about the opponent, or about the player? A single number
-# cannot answer that, and the two fixture constants are guesses waiting to be
-# graded. Rows written before they existed keep an empty cell, which honestly
-# says "not measured" rather than "average".
-# `player` is a display name and stays one, for reading. `ff_id` is what a
-# later grade will actually join on: a log keyed on a spelling is a log that
-# stops matching the moment the source changes how it writes somebody's name,
-# and this file exists to be graded months from now.
+# The last six are separate columns rather than folded into `score`, so a
+# forecast error can be attributed to one factor (start, opponent, player)
+# at a time. Rows written before they existed keep an empty cell ("not
+# measured", not "average"). `ff_id` is the join key for later grading —
+# `player` is display-only and can't be relied on to stay unique/stable.
 LOG_COLS = ["observed_at", "hours_to_lock", "formation", "index_total",
             "ff_id", "player", "pos", "slot", "start_pct", "start_source", "status",
             "assumed", "value", "score", "picked",
             "ppm", "fix", "opp", "home", "cur_pj", "flat",
             "fix_basis", "elo_gap", "score_h3"]
 
-# THE SHORT-HORIZON FIGURE (forecast-first rebuild plan, Stage 5). A
-# season-long calibration check only resolves once most of the season has
-# played out — far too slow a feedback loop to catch a miscalibration
-# early (see the 95% P(win) episode this session). `score` is jornada+1
-# with a real fixture factor; the next 2 rounds have no fixture drawn yet
-# at log time, so they use `ppm * pct_rest` (the same "rest of season"
-# rate/start blend Scored already carries) with no fixture adjustment —
-# an honest approximation, not a second simulation. Graded 3 jornadas
-# later against the real cumulative points over the same window, once
-# enough real data exists to sum.
+# THE SHORT-HORIZON FIGURE. `score` is jornada+1 with a real fixture factor;
+# the next 2 rounds have no fixture drawn yet at log time, so they use
+# `ppm * pct_rest` (Scored's own "rest of season" rate/start blend) with no
+# fixture adjustment — an honest approximation, not a second simulation.
+# Graded 3 jornadas later against real cumulative points over that window.
 # Why: docs/notes/report.md#score_h3--the-short-horizon-figure
 def _score_h3(p: dict) -> float:
     rest_rate = p["ppm"] * (p["pct_rest"] / 100.0)
@@ -94,22 +71,13 @@ def _score_h3(p: dict) -> float:
 
 
 def squad_names(lg) -> tuple[list[str], str]:
-    """Your roster, and where it came from.
-
-    There is no squad.txt fallback any more. It was a generated copy of this
-    same list, read only when League failed to load — but squads.py is what
-    wrote it and squads.py needs League too, so a fresh one could never exist
-    at the moment it was wanted. All the fallback could ever do was serve a
-    stale squad, silently, in the one situation where you most needed to be
-    told something was wrong.
-    """
+    """Your roster, and where it came from. No fallback: a League that fails
+    to load returns nothing rather than serve a stale squad silently."""
     if lg is not None:
         mine = lg.managers.get(lg.cfg.me)
         if mine and mine.players:
-            # THE KEYS, NOT THEIR NAMES. Turning a key back into a name so
-            # the scorer can match the name is a round trip through the one
-            # thing that does not identify anybody — and since the market
-            # keys on the site's own id, the name no longer resolves at all.
+            # Keys, not names — the market keys on the site's own id, and a
+            # name round-tripped back from a key no longer resolves at all.
             return (list(mine.players), "ledger")
     return [], "nothing"
 
@@ -118,19 +86,15 @@ def log_squad(observed, players, chosen, formation, total, deadline,
               obs_dt) -> None:
     """Append-only record of every recommendation, for scoring later.
 
-    One row per player per snapshot — long format, so a scorer can group by
-    snapshot without parsing packed strings. hours_to_lock is stored rather
-    than an at-lock flag, because a run cannot know whether a later snapshot
-    will still beat the deadline: the scorer picks, per jornada, the row with
-    the smallest non-negative value.
-
-    The bench is logged too. Without it "what did the ranking cost me" is
-    unanswerable after the fact, and that is the whole point of keeping this.
+    One row per player per snapshot (bench included), long format, so a
+    scorer can group by snapshot without parsing packed strings.
+    hours_to_lock is stored rather than an at-lock flag: a run can't know
+    whether a later snapshot will still beat the deadline, so the scorer
+    picks, per jornada, the row with the smallest non-negative value.
     """
     path = DECISIONS / "squad_log.csv"
-    # Before the dedup check, not after: a run that has nothing new to log
-    # still has to carry the migration, or the columns would only appear on
-    # whichever run happens to see a fresh snapshot first.
+    # Before the dedup check: a no-op run still has to carry the migration,
+    # or new columns only appear on whichever run next sees a fresh snapshot.
     widen_csv(path, LOG_COLS)
     if observed in {r.get("observed_at") for r in read_csv(path)}:
         return
@@ -166,55 +130,14 @@ def log_squad(observed, players, chosen, formation, total, deadline,
     append_csv(path, rows, LOG_COLS)
 
 
-# ---------------------------------------------------------------------------
-# The five tables
-#
-# Field these eleven, buy today, what you give up by spending now, sell these,
-# and the exceptions. In that order, because that is the order the decisions get
-# made in. NONE OF THEM DECIDES ANYTHING: questions 2, 3 and 4 are presentations
-# of board_rows(), so the columns they share with the board are the same numbers
-# and not a second measurement of them. What each one adds is the market — a bid
-# band, who else wants him, what a sale pays — which is the part a single ranked
-# table has no room for. Everything else — premium curves, drift, full rosters,
-# deal history, methodology — is reference and lives below the fold or in its
-# own file.
-#
-# Question 1 leads with WHAT YOU ARE FIELDING, not with what the model would
-# field. The app's own lineup is a fact; the recommendation is advice, and
-# printing advice as though it were the team is how the old report managed to
-# show two different benches under the same word.
-# ---------------------------------------------------------------------------
-
-# ---------------------------------------------------------------------------
-# The board — one row per asset, one rate, one order
-#
-# The five sections each answered their own question and left the joining-up
-# to the reader, which is how the report told you to field a man in question 1
-# and sell him in question 4. This table is the join, and the source: the five
-# read it. Every asset you could hold — owned, buyable, and the cash — gets one
-# row priced in ONE unit, points above replacement per million.
-#
-# CASH IS A ROW, not a footnote about opportunity cost: a competing asset with
-# a rate of its own, so the line it sits on IS the decision. Hold above, sell
-# below, buy above, pass below — four verdicts from one comparison instead of
-# four rules that can disagree.
-#
-# Replacement level is fixed by the rules, so a row is a decision rather than a
-# snapshot of a search. That is what λ, measured against your current eleven,
-# could not be.
-# ---------------------------------------------------------------------------
 
 
 def stale_feed_warnings(quiet=None) -> list[str]:
     """The app's feed has gone quiet — said once, or [].
 
-    A GATE THAT ONLY REFUSES IS HALF A FIX. ffcore.tidy hands every reader []
-    once the league's API stops answering, which is the honest thing to do
-    with a three-day-old squad; but [] arrives downstream as "nobody owns
-    anybody and nothing is for sale". Aged three days, the store still
-    produced a full report: squads silently fell back to the ledger, all five
-    managers' points read 0, and the only word about it was one row in
-    METHOD.md's appendix. This is the sentence that belongs next to the
+    ffcore.tidy hands every reader [] once the league's API stops answering,
+    which downstream reads as "nobody owns anybody, nothing is for sale"
+    rather than "stale data" — this is the sentence that belongs next to the
     numbers it explains.
     """
     quiet = stale_feeds() if quiet is None else quiet
@@ -227,23 +150,12 @@ def stale_feed_warnings(quiet=None) -> list[str]:
 
 
 def alerts(warnings, token_days) -> list[str]:
-    """What is worth interrupting somebody for ABOUT THE SQUAD, or [].
+    """What is worth interrupting somebody for about the squad, or [].
 
-    This is half the notification surface; sim.py writes the other half and
-    puts the decision above these, because a move is news and a shortage is
-    the context for it.
-
-    The whole design is what it LEAVES OUT. It replaced watch.py, which
-    diffed market values and emitted every player who moved 2% in a day —
-    thirty-odd rows, league-wide, not one of them a decision. Nobody read that
-    file, which is the only reason it was harmless; pushed to a phone it would
-    be spam, and spam is how you learn to swipe away the one that mattered.
-    The verdict scan that used to run here went the same way with the board:
-    it fired on every Buy and every Sell in a twenty-row table.
-
-    Returns [] when there is nothing to say, and the caller must send NOTHING
-    rather than "no news" — a twice-daily "all quiet" is the same spam by
-    another route.
+    Half the notification surface; sim.py writes the other half (a move) and
+    puts it above this (the shortage that is context for it). Deliberately
+    narrow — must return [] rather than a "no news" line when there is
+    nothing to say, since the caller sends nothing on an empty list.
     """
     out = ["**Squad** — %s" % w for w in warnings]
     if token_days is not None and token_days < 14:
@@ -253,10 +165,8 @@ def alerts(warnings, token_days) -> list[str]:
 
 
 def main() -> None:
-    # ONE MODEL PER RUN — see ffcore/model.py. This built its own League and
-    # its own Scorer while decide.load() built a second pair from different
-    # rows, so the two surfaces could describe two different models and
-    # nothing said which was right.
+    # One model per run — see ffcore/model.py — so this and decide.load()
+    # can't build two Scorers off different rows and disagree silently.
     from ffcore.model import session
     m = session()
     market = m.market
@@ -265,11 +175,8 @@ def main() -> None:
         print("no market data; nothing to warn about")
         return
 
-    # No try/except. A League that will not load means rosters_initial.txt is
-    # missing, and the only thing the old fallback could produce was a report
-    # built on a stale generated copy of the squad. Failing here is the honest
-    # outcome: the run stops, systemd records it, and nothing publishes a
-    # report that looks fine and is not.
+    # No try/except: a League that won't load should stop the run, not fall
+    # back to a stale generated squad that looks fine and is not.
     lg = m.lg
     sc = m.sc
 
@@ -307,11 +214,9 @@ def main() -> None:
         warnings.append(f"**Data is {age_h:.0f}h old** — the ingest workflow "
                         "may have failed. Everything above is that snapshot.")
     if best:
-        # NOT A DECISION RULE ANY MORE. THIN used to gate whether a sale was
-        # allowed; what a shortage actually is, is a fact about the squad —
-        # you cannot field a legal eleven if one of these gets hurt — and the
-        # simulation prices the squad you would hold rather than consulting a
-        # threshold about it.
+        # A shortage is a fact about the squad (can't field a legal eleven
+        # if one gets hurt), not a decision rule — sim.py prices the squad
+        # you'd hold instead of consulting a threshold.
         for k, n in SLOT_MIN.items():
             have = len(pool.get(k, []))
             if have <= n:
@@ -339,12 +244,9 @@ def main() -> None:
                           for d in below_floor)))
     clashes = xw.clashes() if xw else {}
     if clashes:
-        # A clash means an identifier two players claim, which identifies
-        # neither — crosswalk.py refuses it rather than guessing, so nothing
-        # crashes, but it silently costs a join everywhere that id was the
-        # only bridge. This ran unattended and printed to a log nobody reads
-        # (2026-08-20) until surfaced here; the identity bug it would have
-        # caught (app_id 2614 held by two players) predates this warning.
+        # An identifier two players claim identifies neither — crosswalk.py
+        # refuses it rather than guessing, silently costing a join everywhere
+        # that id was the only bridge.
         warnings.append(
             "**Crosswalk identifier clash:** %s — an id two players claim, "
             "refused rather than guessed at. Run `python src/crosswalk.py` "
@@ -364,20 +266,14 @@ def main() -> None:
         warnings.append("No cash figure — add `inputs/cash.txt`.")
 
     # --- the notification surface -----------------------------------------
-    # Written every run, and DELETED when there is nothing to say, so a
-    # notifier can simply test for the file rather than parse it to find out
-    # whether it matters. An empty alerts file that has to be read to discover
-    # it is empty is how "no news" gets pushed to a phone twice a day.
+    # Deleted (not left empty) when there's nothing to say, so a notifier can
+    # test for the file's existence rather than parse it.
     try:
         from ffcore.auth import TokenStore
         token_days = TokenStore().expiry_days()
     except Exception:                                       # noqa: BLE001
         token_days = None
-    # THE WARNINGS BELONG ON THE PAGE THAT IS READ, and the page that is read
-    # is the board on the phone. They were only ever in REPORT.md, which is
-    # the same content the board draws — so the one section the board did NOT
-    # have was the one telling you something is wrong. Handed over as data;
-    # sim.py folds it into decisions.json a moment later.
+    # Handed over as data; sim.py folds it into decisions.json a moment later.
     WARNINGS.parent.mkdir(parents=True, exist_ok=True)
     WARNINGS.write_text(json.dumps(warnings, ensure_ascii=False),
                         encoding="utf-8")
@@ -394,12 +290,7 @@ def main() -> None:
 def _selftest() -> None:
     """The cells that carry a judgement. main() needs a repo to run against;
     these do not, so they are the part CI can hold still."""
-    # -- a feed that has gone quiet is a warning, not a silence ------------
-    # The gate in ffcore.tidy hands every reader [] when the app's feed goes
-    # stale, and [] reads downstream as "you own nothing, nothing is for
-    # sale". Measured on the store aged three days: the squad table quietly
-    # became the ledger's, five managers' points all read 0, and nothing on
-    # the page said why.
+    # -- a feed that has gone quiet is a warning, not a silence -------------
     w = stale_feed_warnings({"api_teams": 3.1, "api_market": 3.1})
     assert len(w) == 1 and "3 days" in w[0], w
     assert "api_teams" in w[0] and "api_market" in w[0], w
@@ -411,13 +302,6 @@ def _selftest() -> None:
     assert title_name("nico van gaal") == "Nico van Gaal"
 
     # -- alerts: the short list worth interrupting somebody for -------------
-    # This replaced watch.py, which diffed market values and emitted every
-    # player who moved 2% in a day — thirty-odd rows, league-wide, none of them
-    # a decision. As a file nobody read that was harmless; as a notification it
-    # would be spam, and spam trains you to ignore the one that mattered. The
-    # verdict scan that used to run here went with the board, for the same
-    # reason: it fired on every Buy and Sell in a twenty-row table. What is
-    # left is the squad, and sim.py puts the decision above it.
     body = "\n".join(alerts(["Only 1 delantero"], token_days=None))
     assert "delantero" in body, body
     # Nothing to say means NO alert, not an empty one. A notification that
@@ -428,11 +312,7 @@ def _selftest() -> None:
     assert any("Log in again" in ln for ln in alerts([], token_days=9))
     assert alerts([], token_days=60) == []
 
-    # -- _score_h3: the short-horizon figure (forecast-first rebuild plan,
-    # Stage 5) --------------------------------------------------------------
-    # jornada+1 is real (a real fixture already drawn); +2/+3 use the
-    # "rest of season" rate/start blend, no fixture factor yet — an honest
-    # approximation, not a second simulation.
+    # -- _score_h3: the short-horizon figure ---------------------------------
     nailed = {"score": 5.0, "ppm": 4.0, "pct_rest": 100.0}
     assert _score_h3(nailed) == 5.0 + 2 * 4.0, _score_h3(nailed)
     # A bench player (pct_rest low) contributes almost nothing to the two
