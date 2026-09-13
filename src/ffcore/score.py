@@ -1215,41 +1215,93 @@ def squad_pool(scored) -> dict[str, list[dict]]:
 
 
 
-def pick_xi(pool: dict, force: dict | None = None):
-    """Best legal XI by total score, or None if no legal shape fits.
+def _xi_search(by_slot: dict[str, list], shapes, force=None):
+    """(total, shape, picked) — top-N-per-slot over every legal shape, the
+    one search ffcore.season.best_xi() and pick_xi() both need. Exact, not
+    heuristic: the only coupling between players is the per-slot count, so
+    top-N per slot within each shape is optimal, and the best shape is
+    whichever legal one that top-N adds up to most for.
 
-    force pins one player into his slot. Exact, not heuristic: the only
-    coupling between players is the per-slot count, so top-N per slot within
-    each legal shape is optimal.
+    `by_slot[slot]` is `[(item, value), ...]`, ALREADY SORTED best-value-
+    first (both callers' pools already are, for their own reasons). `force`,
+    when given, is `(item, slot, value)`, pinned into the XI ahead of rank
+    in that slot — the "if I already held/bought him" question pick_xi()'s
+    caller asks.
 
-    Returns (total, (d, m, f), picked). A None return for a rival squad is
-    itself a finding — it means they cannot field a legal XI today.
+    No `force`: uses one prefix-sum pass per slot, since every shape only
+    ever wants a slot's best-N (season.py's inner-loop path — this runs
+    per trial per jornada, so re-summing per shape mattered). `force`
+    breaks that shortcut (a pinned player can bump someone else off the
+    slot's top-N), so that path re-sums per shape instead; it is called
+    rarely enough (report/bid time, not simulation) that this is fine.
     """
+    if force is None:
+        prefix: dict[str, list[float]] = {}
+        for slot, items in by_slot.items():
+            acc, ps = 0.0, [0.0]
+            for _, v in items:
+                acc += v
+                ps.append(acc)
+            prefix[slot] = ps
+
+        best = None
+        for shape in shapes:
+            picked, total, ok = [], 0.0, True
+            for slot, n in shape.items():
+                items = by_slot.get(slot, [])
+                if len(items) < n:
+                    ok = False
+                    break
+                picked += [it for it, _ in items[:n]]
+                total += prefix[slot][n]
+            if ok and (best is None or total > best[0]):
+                best = (total, shape, picked)
+        return best
+
+    f_item, f_slot, f_val = force
     best = None
-    for d, m, f in formations():
-        need = {"POR": 1, "DEF": d, "MED": m, "DEL": f}
-        if force is not None:
-            slot = force["slot"]
-            if not slot or need.get(slot, 0) < 1:
-                continue
+    for shape in shapes:
+        if not f_slot or shape.get(f_slot, 0) < 1:
+            continue
         picked, ok = [], True
-        for k, n in need.items():
-            avail = pool.get(k, [])
-            if force is not None and force["slot"] == k:
-                rest = [p for p in avail if p is not force][:n - 1]
-                take = [force] + rest
+        for slot, n in shape.items():
+            items = by_slot.get(slot, [])
+            if slot == f_slot:
+                rest = [it for it in items if it[0] is not f_item][:n - 1]
+                take = [(f_item, f_val)] + rest
             else:
-                take = avail[:n]
+                take = items[:n]
             if len(take) < n:
                 ok = False
                 break
             picked += take
         if not ok:
             continue
-        tot = sum(p["score"] for p in picked)
-        if best is None or tot > best[0]:
-            best = (tot, (d, m, f), picked)
+        total = sum(v for _, v in picked)
+        if best is None or total > best[0]:
+            best = (total, shape, [it for it, _ in picked])
     return best
+
+
+def pick_xi(pool: dict, force: dict | None = None):
+    """Best legal XI by total score, or None if no legal shape fits.
+
+    force pins one player into his slot — see _xi_search()'s own docstring
+    for the exactness argument shared with ffcore.season.best_xi().
+
+    Returns (total, (d, m, f), picked). A None return for a rival squad is
+    itself a finding — it means they cannot field a legal XI today.
+    """
+    by_slot = {slot: [(p, p["score"]) for p in rows]
+              for slot, rows in pool.items()}
+    shapes = [{"POR": 1, "DEF": d, "MED": m, "DEL": f}
+             for d, m, f in formations()]
+    f = (force, force["slot"], force["score"]) if force is not None else None
+    got = _xi_search(by_slot, shapes, f)
+    if got is None:
+        return None
+    total, shape, picked = got
+    return total, (shape["DEF"], shape["MED"], shape["DEL"]), picked
 
 
 def _selftest() -> None:

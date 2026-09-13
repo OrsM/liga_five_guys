@@ -41,7 +41,7 @@ import os
 import random
 from dataclasses import dataclass, field
 
-from ffcore.score import MAX_SLOT, formations
+from ffcore.score import MAX_SLOT, formations, _xi_search
 
 __all__ = ["LeagueState", "Standings", "simulate",
            "simulate_many", "best_xi"]
@@ -74,7 +74,9 @@ def best_xi(squad: dict[str, str], value: dict[str, float]) -> list[str]:
     `squad` is {player key: position}. Greedy within a shape is exact, because
     positions do not interact once the shape is fixed: take the best N of each
     slot. So this is a search over shapes, not over players, and there are
-    only a few dozen shapes.
+    only a few dozen shapes — the same search ffcore.score.pick_xi() runs
+    over its own row-dict pool, shared as _xi_search() rather than kept as
+    two hand-synced copies of one prefix-sum loop.
 
     THIS IS WHERE "you can change your layout" LIVES. A squad with four good
     forwards and three good midfielders is worth what its best shape is worth,
@@ -82,38 +84,14 @@ def best_xi(squad: dict[str, str], value: dict[str, float]) -> list[str]:
     costs you exactly the difference between the shapes you can and cannot
     field, with no threshold to configure.
     """
-    by_slot: dict[str, list[str]] = {}
+    by_slot: dict[str, list[tuple]] = {}
     for k, slot in squad.items():
-        by_slot.setdefault(slot, []).append(k)
+        by_slot.setdefault(slot, []).append((k, value.get(k, 0.0)))
     for slot in by_slot:
-        by_slot[slot].sort(key=lambda k: -value.get(k, 0.0))
+        by_slot[slot].sort(key=lambda kv: -kv[1])
 
-    # PREFIX SUMS, ONCE PER SLOT. Every shape only ever wants a slot's best-N
-    # players, so summing that prefix fresh per shape (SHAPES is 7 long, so
-    # this used to run up to 7x per call) repeated the same partial sums.
-    # `prefix[slot][n]` is the value of that slot's best n players — a plain
-    # running total, computed once here and looked up O(1) below.
-    prefix: dict[str, list[float]] = {}
-    for slot, have in by_slot.items():
-        acc, ps = 0.0, [0.0]
-        for k in have:
-            acc += value.get(k, 0.0)
-            ps.append(acc)
-        prefix[slot] = ps
-
-    best, best_total = [], None
-    for shape in SHAPES:
-        picked, total, ok = [], 0.0, True
-        for slot, n in shape.items():
-            have = by_slot.get(slot, [])
-            if len(have) < n:
-                ok = False
-                break
-            picked += have[:n]
-            total += prefix[slot][n]
-        if ok and (best_total is None or total > best_total):
-            best, best_total = picked, total
-    return best
+    got = _xi_search(by_slot, SHAPES)
+    return got[2] if got else []
 
 
 @dataclass
