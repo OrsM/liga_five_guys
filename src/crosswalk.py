@@ -99,7 +99,6 @@ def namesakes(market) -> list[tuple[str, list]]:
 
 def build_players(market, lineups, starters, api_rows, lg, clubs) -> dict:
     """{player_id: Player} — every feed's key for every player it names."""
-    from ffcore.league import api_key
 
     by_club = {c.ff_slug: c.club_id for c in clubs.values() if c.ff_slug}
     # ff_slug -> the club key the market index uses, so a probable-XI row
@@ -166,8 +165,8 @@ def build_players(market, lineups, starters, api_rows, lg, clubs) -> dict:
             p.ff_slug = slug
 
     # The app: integer ids and its own abbreviations, resolved through
-    # ffcore.league's three-step join (market key, ledger tie-break,
-    # exact market value across history).
+    # Crosswalk.resolve_api()'s five-step join (id, market key, full name,
+    # ledger tie-break, exact market value across history).
     index = latest_only(lg.market.rows) if lg and lg.market is not None else []
     # An id resolved on a past sweep stays resolved (merge, not rebuild).
     # Empty on the first ever run — players.csv doesn't exist yet.
@@ -176,14 +175,15 @@ def build_players(market, lineups, starters, api_rows, lg, clubs) -> dict:
         raw = (r.get("player_name") or "").strip()
         if not raw:
             continue
-        key = api_key(raw, (r.get("manager") or "").strip(),
-                      lg.market if lg else None, lg.owner if lg else None,
-                      index, r.get("market_value"),
-                      r.get("player_name_full") or "",
-                      known, r.get("player_id") or "")
+        key = known.resolve_api(raw, (r.get("manager") or "").strip(),
+                                lg.market if lg else None,
+                                lg.owner if lg else None,
+                                index, r.get("market_value"),
+                                r.get("player_name_full") or "",
+                                r.get("player_id") or "")
         p = out.get(key) if key else None
         if p is None:
-            # api_key()'s market.key_for() only searches the live market
+            # resolve_api()'s market.key_for() only searches the live market
             # snapshot — a player merely gone quiet there still resolves
             # by name in this function's own `out` (built from full
             # market history). Same by_name() the lineups above use.
@@ -296,7 +296,7 @@ def main() -> None:
                 + latest_only(read_csv(TIDY / "api_market.csv"))
                 + latest_only(read_csv(TIDY / "api_players.csv"))
                 # Every competition player, not just ones this league has
-                # transacted — no "manager" field, which api_key() tolerates.
+                # transacted — no "manager" field, which resolve_api() tolerates.
                 # Why: docs/notes/league.md#the-bulk-player-list-and-app_id-with-no-manager
                 + latest_only(read_csv(TIDY / "api_players_all.csv")))
     elo_rows = read_csv(TIDY / "elo.csv")
@@ -447,7 +447,7 @@ def _selftest() -> None:
     # api_player_N/api_teams/api_activity rows all carry a manager, because
     # they only ever name a player THIS league happened to transact — the
     # bulk list names every player in the competition and has no manager to
-    # name, since it isn't anyone's squad. api_key()'s ledger-tie-break step
+    # name, since it isn't anyone's squad. resolve_api()'s ledger-tie-break step
     # is the only one that needs a handle, and it is a fallback tried after
     # name+value already succeed, so an empty handle must resolve exactly
     # the same as a normal transaction row would. Why:
@@ -465,7 +465,7 @@ def _selftest() -> None:
     # A made-up id, deliberately not a real one — build_players() reads the
     # actual players.csv off disk, and a real id already claimed by some
     # other real player there would resolve to THAT player first (step 1 of
-    # api_key(), checked ahead of the name join), which is correct behaviour
+    # resolve_api(), checked ahead of the name join), which is correct behaviour
     # but makes a real id a trap for a fixture that wants a clean first-time
     # resolution.
     bulk_players = build_players(
@@ -480,7 +480,7 @@ def _selftest() -> None:
     # Álex Sancris (ff_id 11766) has not appeared in market.csv since
     # 2026-08-25 — Market.key_for() only searches latest_rows(), so a
     # player who has simply gone quiet on the market (not renamed, not
-    # ambiguous, just stale) comes back None from api_key() even though his
+    # ambiguous, just stale) comes back None from resolve_api() even though his
     # name is a clean, unique match in THIS function's own `out` — built
     # from the full market history, not just the live snapshot. by_name()
     # already exists for exactly this lookup (lineups use it above); this

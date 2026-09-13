@@ -134,7 +134,16 @@ result is `[]`, so the caller falls back to the marks — a man who fails to
 resolve must not silently drop out of "what you are fielding" and come back
 as "put him on" (advice to make a change you've already made).
 
-## `api_key` — the resolution order, and why
+## `api_key` — the resolution order, and why (now `Crosswalk.resolve_api()`)
+
+2026-09-13: moved bodily to `ffcore/crosswalk.py` as `Crosswalk.resolve_api()`,
+alongside `_priced_like()`/`_by_exact_value()`. `league.py` now calls
+`(xw or Crosswalk()).resolve_api(...)` instead of a module-level `api_key()`
+— one resolution chain living where the identity memory (`self.player()`,
+step 1 below) already lives, instead of a `league.py` function reaching into
+a `Crosswalk` instance from outside it. `owner_from_api()`/`app_fielded()`
+and the `app_ids` one-way cache below are unaffected and stay in league.py —
+they are about ownership/fielding, not identity resolution.
 
 AN ID FIRST, ALWAYS — reordered 2026-08-21. This used to run two name joins
 ahead of the app's own id, to protect against a stale crosswalk mapping

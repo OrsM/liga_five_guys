@@ -50,8 +50,8 @@ from ffcore import forecast as _forecast  # noqa: E402
 from ffcore.forecast import Bootstrap, pool_from_perjornada  # noqa: E402
 import methodology as _methodology  # noqa: E402
 from stats import percentile  # noqa: E402
-from ffcore.crosswalk import club_key  # noqa: E402
-from ffcore.league import MARKET, api_key  # noqa: E402
+from ffcore.crosswalk import club_key, Crosswalk  # noqa: E402
+from ffcore.league import MARKET  # noqa: E402
 from ffcore.parse import fmt_money  # noqa: E402
 from ffcore.profile import (PlayerProfile, UNSCORED_DEFAULT,  # noqa: E402
                             build_profiles)
@@ -1098,13 +1098,14 @@ def load(trials_pool=None) -> Universe:
               for mgr in lg.managers}
 
     # What it costs ME — see market_routes() for the free/listed/clause
-    # split. Both sides join through ffcore.league.api_key on the market's
+    # split. Both sides join through Crosswalk.resolve_api() on the market's
     # spelling; a clause on an unresolvable name is a rival's player who
     # silently cannot be bought at all.
+    xw = lg.xw or Crosswalk()
     index = latest_only(lg.market.rows) if lg.market is not None else []
     price, route, bids = market_routes(
-        mkt, lambda r: api_key(r["player_name"], "", lg.market, owner,
-                               index, r.get("market_value")))
+        mkt, lambda r: xw.resolve_api(r["player_name"], "", lg.market, owner,
+                                      index, r.get("market_value")))
     now = run_now()
     clause_until: dict = {}
     # The app's own ownership-record id -> this repo's key, built in the
@@ -1112,8 +1113,8 @@ def load(trials_pool=None) -> Universe:
     # than re-resolving the same rows a second time for one more field.
     pt_to_key: dict[str, str] = {}
     for r in teams:
-        k = api_key(r["player_name"], r["manager"], lg.market, owner, index,
-                    r.get("market_value"))
+        k = xw.resolve_api(r["player_name"], r["manager"], lg.market, owner,
+                           index, r.get("market_value"))
         if not k:
             continue
         if r.get("player_team_id"):
@@ -1144,8 +1145,8 @@ def load(trials_pool=None) -> Universe:
     for r in teams:
         if not (r.get("buyout") or "").strip():
             continue
-        k = api_key(r["player_name"], r["manager"], lg.market, owner, index,
-                    r.get("market_value"))
+        k = xw.resolve_api(r["player_name"], r["manager"], lg.market, owner,
+                           index, r.get("market_value"))
         if k:
             clause.setdefault(k, float(r["buyout"]))
     rival_cash = {h: (lg[h].cash.value or 0.0) for h in lg.managers

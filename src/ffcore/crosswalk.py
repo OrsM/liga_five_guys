@@ -23,7 +23,9 @@ import csv
 import os
 from dataclasses import dataclass, field
 
+from ffcore.parse import money
 from ffcore.text import norm
+from ffcore.tidy import price_agrees
 
 __all__ = ["Player", "Club", "Crosswalk", "PLAYER_COLS", "CLUB_COLS",
           "club_key"]
@@ -215,6 +217,69 @@ class Crosswalk:
             return self.player(app_name=raw) or self.player(name=raw)
         return None
 
+    def resolve_api(self, raw: str, handle: str, market,
+                    ledger_owner: dict | None = None, index: list | None = None,
+                    market_value=None, full: str = "", app_id: str = ""
+                    ) -> str | None:
+        """One API row's player, as a key the rest of the repo recognises.
+
+        Five-step chain, id first always: (1) `self.player(app_id=...)`,
+        (2) `market.key_for` on the app's nickname, (3) `market.key_for`
+        on the full name, (4) the ledger breaking a surname tie, (5) an
+        exact market-value match. `index` is the latest market snapshot
+        (derived here if omitted, passed in when a caller is looping).
+        None means unresolved — must stay visible, never guessed.
+
+        NOT `resolve()`: steps 2-5 aren't `resolve()` calls because
+        `_priced_like` applies differently per step (unconditional trust
+        on the id, price-validated on the two name guesses) and
+        `resolve()`'s single return value doesn't say which step
+        answered — the two are shaped for different callers, not a
+        duplicate of each other.
+        Why (join order, the concrete cases each step exists for):
+        docs/notes/league.md#api_key--the-resolution-order-and-why
+        """
+        from ffcore.tidy import latest_only
+
+        raw = (raw or "").strip()
+        if not raw:
+            return None
+        if market is None:
+            return norm(raw) or None
+        if index is None:
+            index = latest_only(market.rows)
+        key = None
+        if (app_id or "").strip():
+            key = self.player(app_id=app_id.strip())
+            # Still checked against the price when one is stated: cheap, and
+            # true (never blocking) whenever the row is silent about it.
+            if not _priced_like(key, "", market_value, index):
+                key = None
+        # Each NAME join is price-checked (see _priced_like) — a wrong-value
+        # match falls through rather than confidently seating the wrong man in
+        # a rival's squad (real case: two Álvaro Garcías, 20.23M vs 0.50M).
+        if not key:
+            key = market.key_for(raw, value=market_value)
+            if not _priced_like(key, raw, market_value, index):
+                key = None
+        if not key and (full or "").strip():
+            key = market.key_for(full.strip(), value=market_value)
+            if not _priced_like(key, full, market_value, index):
+                key = None
+        if not key and ledger_owner:
+            # Same producer, same keys — the ledger's owner map is keyed the
+            # way the market keys players, so a candidate must be too.
+            _got, cands = market.candidates(raw)
+            agreed = [c for c in cands if ledger_owner.get(c) == handle]
+            if len(agreed) == 1:
+                key = agreed[0]
+        if not key:
+            # Last resort, and the strongest key of the three: an EXACT
+            # market value, anywhere in the recorded history. Only when it
+            # identifies exactly one player.
+            key = _by_exact_value(market_value, market)
+        return key or None
+
     def club(self, *, ff_slug=None, name=None) -> str | None:
         if ff_slug and ff_slug in self._club_ff:
             return self._club_ff[ff_slug]
@@ -325,6 +390,58 @@ def club_key(raw, teams, xw=None) -> str:
     from ffcore.fixture import match_team
     hit = match_team(raw or "", teams)
     return norm(hit) if hit else ""
+
+
+def _priced_like(key: str, raw: str, market_value, index) -> bool:
+    """Does the market price this player roughly the way the app does?
+
+    Checks a GUESS from key_for, never an exact name match (an exact name is
+    trusted outright). Reuses tidy.price_agrees()'s tolerance rather than a
+    second copy of it. True whenever either side is silent — an absent
+    number disproves nothing. Why:
+    docs/notes/league.md#price-as-a-name-join-sanity-check-_priced_like
+    """
+    if not key or key == norm(raw):
+        return True                       # the market carries this very name
+    if market_value in (None, ""):
+        return True
+    try:
+        theirs = float(str(market_value).strip())
+    except (TypeError, ValueError):
+        return True
+    ours = next((money(r.get("value")) for r in (index or [])
+                 if norm(r.get("name")) == key), None)
+    if not ours:
+        return True
+    return price_agrees(theirs, ours)
+
+
+def _by_exact_value(raw_value, market) -> str | None:
+    """The one market player who has ever been worth exactly this, or None.
+
+    Exact match (no tolerance), searched across all recorded history (not
+    just the newest snapshot), unique per PLAYER not per row. Why:
+    docs/notes/league.md#exact-value-join-as-a-last-resort-_by_exact_value
+    """
+    try:
+        want = float(raw_value)
+    except (TypeError, ValueError):
+        return None
+    if not want:
+        return None
+    # IN THE MARKET'S OWN KEYS. This answered norm(name), which was the key
+    # only for as long as the market keyed on names — and a key the index
+    # does not contain resolves nowhere, which reads downstream as a player
+    # nobody owns rather than as a join that missed.
+    hits = set()
+    for row in market.rows:
+        try:
+            if float(row.get("value")) == want:
+                hits.add(market.key_of(row))
+        except (TypeError, ValueError):
+            continue
+    hits.discard("")
+    return hits.pop() if len(hits) == 1 else None
 
 
 def _rows(path) -> list[dict]:

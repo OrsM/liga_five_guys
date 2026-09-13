@@ -39,11 +39,11 @@ from ffcore.tidy import (load_crosswalk,  # noqa: E402
                          run_now,  # noqa: E402
                          Market, input_path, ledger_stamp,
                          load_api_activity, load_api_standings, load_api_teams,
-                         load_market_frozen, price_agrees, read_ledger,
+                         load_market_frozen, read_ledger,
                          snapshot_stamp)
 
 __all__ = ["MARKET", "Config", "load_config", "read_rosters", "identify",
-           "read_api_balances", "owner_from_api", "api_key", "owner_drift",
+           "read_api_balances", "owner_from_api", "owner_drift",
            "app_ids_known", "app_fielded", "flat_income", "bonus_income",
            "allowance",
            "replay", "Cash", "Manager", "League"]
@@ -268,34 +268,6 @@ def allowance(since, now, daily_bonus: float) -> tuple[float, float]:
     return days * (daily_bonus or 0.0), days
 
 
-def _by_exact_value(raw_value, market) -> str | None:
-    """The one market player who has ever been worth exactly this, or None.
-
-    Exact match (no tolerance), searched across all recorded history (not
-    just the newest snapshot), unique per PLAYER not per row. Why:
-    docs/notes/league.md#exact-value-join-as-a-last-resort-_by_exact_value
-    """
-    try:
-        want = float(raw_value)
-    except (TypeError, ValueError):
-        return None
-    if not want:
-        return None
-    # IN THE MARKET'S OWN KEYS. This answered norm(name), which was the key
-    # only for as long as the market keyed on names — and a key the index
-    # does not contain resolves nowhere, which reads downstream as a player
-    # nobody owns rather than as a join that missed.
-    hits = set()
-    for row in market.rows:
-        try:
-            if float(row.get("value")) == want:
-                hits.add(market.key_of(row))
-        except (TypeError, ValueError):
-            continue
-    hits.discard("")
-    return hits.pop() if len(hits) == 1 else None
-
-
 def _app_ids_of(xw) -> dict:
     """{the app's player id: this repo's key}, read off an already-loaded
     Crosswalk. The one place this dict is ever built, shared by
@@ -311,9 +283,9 @@ def _app_ids_of(xw) -> dict:
 def app_ids_known() -> dict:
     """{the app's player id: this repo's key}, from the crosswalk, or {}.
 
-    A deliberate one-way cache: players.csv (built by api_key/crosswalk.py)
-    is read back here so an id resolved once stays resolved, instead of every
-    run re-deriving it from scratch and sometimes failing. {} on a cold start
+    A deliberate one-way cache: players.csv (built by crosswalk.py) is read
+    back here so an id resolved once stays resolved, instead of every run
+    re-deriving it from scratch and sometimes failing. {} on a cold start
     is not an error. For a caller with no Crosswalk already in memory —
     League.__init__ calls `_app_ids_of(self.xw)` directly to avoid a second
     disk read. Why: docs/notes/league.md#the-app_ids-table--a-one-way-additive-cache
@@ -333,50 +305,28 @@ def owner_from_api(rows: list[dict], market, ledger_owner: dict | None = None,
     reader uses. Unjoined names are reported, never dropped. `market=None`
     (with_market=False) falls back to the app's own spelling. `ledger_owner`
     breaks the one tie the app creates (a surname two players share) using
-    the ledger's own purchase-time record. Loop over `api_key()` — see its
-    docstring for the join order. Why:
+    the ledger's own purchase-time record. Loop over `Crosswalk.resolve_api()`
+    — see its docstring for the join order. Why:
     docs/notes/league.md#ownership-from-the-app-api-owner_from_api
     """
+    from ffcore.crosswalk import Crosswalk
     from ffcore.tidy import latest_only
     out, unjoined = {}, []
     index = latest_only(market.rows) if market is not None else []
+    resolve = (xw or Crosswalk()).resolve_api
     for r in rows:
         handle = (r.get("manager") or "").strip()
         raw = (r.get("player_name") or "").strip()
         if not handle or not raw:
             continue
-        key = api_key(raw, handle, market, ledger_owner, index,
+        key = resolve(raw, handle, market, ledger_owner, index,
                       r.get("market_value"), r.get("player_name_full") or "",
-                      xw, r.get("player_id") or "")
+                      r.get("player_id") or "")
         if key:
             out[key] = handle
         else:
             unjoined.append(raw)
     return out, unjoined
-
-
-def _priced_like(key: str, raw: str, market_value, index) -> bool:
-    """Does the market price this player roughly the way the app does?
-
-    Checks a GUESS from key_for, never an exact name match (an exact name is
-    trusted outright). Reuses tidy.price_agrees()'s tolerance rather than a
-    second copy of it. True whenever either side is silent — an absent
-    number disproves nothing. Why:
-    docs/notes/league.md#price-as-a-name-join-sanity-check-_priced_like
-    """
-    if not key or key == norm(raw):
-        return True                       # the market carries this very name
-    if market_value in (None, ""):
-        return True
-    try:
-        theirs = float(str(market_value).strip())
-    except (TypeError, ValueError):
-        return True
-    ours = next((money(r.get("value")) for r in (index or [])
-                 if norm(r.get("name")) == key), None)
-    if not ours:
-        return True
-    return price_agrees(theirs, ours)
 
 
 def app_fielded(squad, names: dict, rows=None, ids=None) -> list[str]:
@@ -406,66 +356,6 @@ def app_fielded(squad, names: dict, rows=None, ids=None) -> list[str]:
             return []
         out.append(key)
     return out
-
-
-def api_key(raw: str, handle: str, market, ledger_owner: dict | None = None,
-            index: list | None = None, market_value=None,
-            full: str = "", xw=None,
-            app_id: str = "") -> str | None:
-    """One API row's player, as a key the rest of the repo recognises.
-
-    Five-step chain, id first always: (1) `xw.player(app_id=...)`, (2)
-    key_for on the app's nickname, (3) key_for on the full name, (4) the
-    ledger breaking a surname tie, (5) an exact market-value match. `index`
-    is the latest market snapshot (derived here if omitted, passed in when a
-    caller is looping). None means unresolved — must stay visible, never
-    guessed. Steps 2-5 aren't `Crosswalk.resolve()` calls because
-    `_priced_like` applies differently per step (unconditional trust on the
-    id, price-validated on the two name guesses) and `resolve()`'s single
-    return value doesn't say which step answered; step 1 uses the
-    crosswalk's own id index directly instead of a second copy of it.
-    Why (join order, the concrete cases each step exists for):
-    docs/notes/league.md#api_key--the-resolution-order-and-why
-    """
-    from ffcore.tidy import latest_only
-    raw = (raw or "").strip()
-    if not raw:
-        return None
-    if market is None:
-        return norm(raw) or None
-    if index is None:
-        index = latest_only(market.rows)
-    key = None
-    if xw is not None and (app_id or "").strip():
-        key = xw.player(app_id=app_id.strip())
-        # Still checked against the price when one is stated: cheap, and
-        # true (never blocking) whenever the row is silent about it.
-        if not _priced_like(key, "", market_value, index):
-            key = None
-    # Each NAME join is price-checked (see _priced_like) — a wrong-value
-    # match falls through rather than confidently seating the wrong man in a
-    # rival's squad (real case: two Álvaro Garcías, 20.23M vs 0.50M).
-    if not key:
-        key = market.key_for(raw, value=market_value)
-        if not _priced_like(key, raw, market_value, index):
-            key = None
-    if not key and (full or "").strip():
-        key = market.key_for(full.strip(), value=market_value)
-        if not _priced_like(key, full, market_value, index):
-            key = None
-    if not key and ledger_owner:
-        # Same producer, same keys — the ledger's owner map is keyed the way
-        # the market keys players, so a candidate must be too.
-        _got, cands = market.candidates(raw)
-        agreed = [c for c in cands if ledger_owner.get(c) == handle]
-        if len(agreed) == 1:
-            key = agreed[0]
-    if not key:
-        # Last resort, and the strongest key of the three: an EXACT market
-        # value, anywhere in the recorded history. Only when it identifies
-        # exactly one player.
-        key = _by_exact_value(market_value, market)
-    return key or None
 
 
 def ledger_from_api(activity: list[dict], users: dict,
@@ -1142,13 +1032,18 @@ def _selftest_api_owner() -> None:
     # everything on the row except the manager, and the buyout clause is on
     # that row: a caller who needs the price a rival's player can be taken at
     # has to resolve his name the same three ways or it silently prices a
-    # different player. api_key() is that resolution, and owner_from_api is
-    # a loop over it.
+    # different player. Crosswalk.resolve_api() is that resolution, and
+    # owner_from_api is a loop over it.
+    from ffcore.crosswalk import Crosswalk
+
+    xw0 = Crosswalk()
     led = {norm("Fabio Cardoso"): "Magic Mike 333"}
-    assert api_key("Cardoso", "Magic Mike 333", two, led) == norm("Fabio Cardoso")
-    assert api_key("Cardoso", "Magic Mike 333", two) is None
-    assert api_key("Fabio Cardoso", "Magic Mike 333", two) == norm("Fabio Cardoso")
-    assert api_key("", "Magic Mike 333", two) is None
+    assert xw0.resolve_api("Cardoso", "Magic Mike 333", two, led) \
+        == norm("Fabio Cardoso")
+    assert xw0.resolve_api("Cardoso", "Magic Mike 333", two) is None
+    assert xw0.resolve_api("Fabio Cardoso", "Magic Mike 333", two) \
+        == norm("Fabio Cardoso")
+    assert xw0.resolve_api("", "Magic Mike 333", two) is None
 
     # THE FULL NAME SETTLES IT WITHOUT ANY OF THAT, when the app sends one.
     # It publishes `nickname` AND `name`, and the shortened one is the
@@ -1156,22 +1051,24 @@ def _selftest_api_owner() -> None:
     # "Aimar Oroz", "Brahim" is "Brahim Díaz". This is a second pass through
     # the SAME key_for, so it ranks above both fallbacks below — it is the
     # market's own resolution given a better string, not a new kind of guess.
-    assert api_key("Cardoso", "Magic Mike 333", two,
-                   full="Fabio Cardoso") == norm("Fabio Cardoso")
+    assert xw0.resolve_api("Cardoso", "Magic Mike 333", two,
+                          full="Fabio Cardoso") == norm("Fabio Cardoso")
     # And it must not override a nickname that already joined: twelve of the
     # 76 owned players join ONLY on the nickname, because the full name is a
     # birth name nothing else uses ("Pepelu" is "José Luis García Vayá").
-    assert api_key("Fabio Cardoso", "Magic Mike 333", two,
-                   full="Somebody Entirely Different") == norm("Fabio Cardoso")
+    assert xw0.resolve_api("Fabio Cardoso", "Magic Mike 333", two,
+                          full="Somebody Entirely Different") \
+        == norm("Fabio Cardoso")
     # An absent full name changes nothing at all.
-    assert api_key("Cardoso", "Magic Mike 333", two, full="") is None
+    assert xw0.resolve_api("Cardoso", "Magic Mike 333", two, full="") is None
     owner, unjoined = owner_from_api(
         [{"manager": "Magic Mike 333", "player_name": "Cardoso",
           "player_name_full": "Fabio Cardoso"}], two)
     assert owner == {norm("Fabio Cardoso"): "Magic Mike 333"}, owner
     assert unjoined == [], unjoined
     # A full name that is ITSELF ambiguous resolves nothing, same rule.
-    assert api_key("Cardoso", "Magic Mike 333", two, full="Cardoso") is None
+    assert xw0.resolve_api("Cardoso", "Magic Mike 333", two,
+                          full="Cardoso") is None
 
     # With no ledger to lean on it stays unresolved — never a coin flip.
     owner, unjoined = owner_from_api(ambiguous_row, two)
@@ -1215,32 +1112,33 @@ def _selftest_api_owner() -> None:
     # Left to the name alone this picks one of them and cannot say which.
     # With the price on the row it can: the nickname's answer is checked, and
     # rejected, and the full name is tried and agrees.
-    assert api_key("C. Romero", "BurtonGM89", twins,
-                   market_value="43244323",
-                   full="Carlos Romero") == norm("Carlos Romero")
+    assert xw0.resolve_api("C. Romero", "BurtonGM89", twins,
+                          market_value="43244323",
+                          full="Carlos Romero") == norm("Carlos Romero")
     # A join nothing contradicts stands: no value stated, no check possible.
-    assert api_key("Isaac Romero", "BurtonGM89", twins) == norm("Isaac Romero")
-    assert api_key("Isaac Romero", "BurtonGM89", twins,
-                   market_value="6150000") == norm("Isaac Romero")
+    assert xw0.resolve_api("Isaac Romero", "BurtonGM89", twins) \
+        == norm("Isaac Romero")
+    assert xw0.resolve_api("Isaac Romero", "BurtonGM89", twins,
+                          market_value="6150000") == norm("Isaac Romero")
     # AND AN EXACT NAME IS NEVER OVERRULED BY THE MONEY. The market carrying
     # that very spelling is the strongest evidence there is; if the app's
     # price disagrees, something else is wrong and quietly reassigning the
     # player is the worst available answer.
-    assert api_key("Isaac Romero", "BurtonGM89", twins,
-                   market_value="43244323") == norm("Isaac Romero")
+    assert xw0.resolve_api("Isaac Romero", "BurtonGM89", twins,
+                          market_value="43244323") == norm("Isaac Romero")
     # THE TOLERANCE IS NOT A TUNED NUMBER. Across the 70 owned players that
     # joined on 2026-08-19 the two sources agreed to within 0.2% in every
     # case, and the one wrong join was out by 603% — three thousand times the
     # worst true disagreement. Anything between the two works; the prices are
     # read minutes apart and drift a little, so it is not zero.
-    assert api_key("Isaac Romero", "BurtonGM89", twins,
-                   market_value="6160000") == norm("Isaac Romero")
+    assert xw0.resolve_api("Isaac Romero", "BurtonGM89", twins,
+                          market_value="6160000") == norm("Isaac Romero")
     # The nickname alone is enough, without the full name beside it: resolve()
     # refuses an ambiguous substring rather than guessing, so key_for asks the
     # price which candidate it is (Carlos at 43.24M matches; Isaac at 6.15M
     # doesn't). A price agreeing with two candidates still resolves to neither.
-    assert api_key("C. Romero", "BurtonGM89", twins,
-                   market_value="43244323") == norm("Carlos Romero")
+    assert xw0.resolve_api("C. Romero", "BurtonGM89", twins,
+                          market_value="43244323") == norm("Carlos Romero")
 
     # -- the id the crosswalk already resolved, once, and wrote down -------
     # "Jonny Otto" (app nickname) vs. "Jonathan Castro Otto" (full name): no
@@ -1249,31 +1147,31 @@ def _selftest_api_owner() -> None:
     # re-derivation; Crosswalk.merge()'s stale-id displacement protects it.
     lone = Market([{"name": "Jonny Castro", "value": "5602302",
                     "observed_at": at, "position": "DEF"}])
-    from ffcore.crosswalk import Crosswalk, Player
+    from ffcore.crosswalk import Player
 
     def _xw_of(app_id, key):
         return Crosswalk({key: Player(player_id=key, app_id=app_id)})
 
-    assert api_key("Jonny Otto", "SusoGattuso", lone) is None
-    assert api_key("Jonny Otto", "SusoGattuso", lone,
-                   xw=_xw_of("2552", norm("Jonny Castro")),
-                   app_id="2552") == norm("Jonny Castro")
+    assert xw0.resolve_api("Jonny Otto", "SusoGattuso", lone) is None
+    assert _xw_of("2552", norm("Jonny Castro")).resolve_api(
+        "Jonny Otto", "SusoGattuso", lone,
+        app_id="2552") == norm("Jonny Castro")
     # An id the table has never seen changes nothing.
-    assert api_key("Jonny Otto", "SusoGattuso", lone,
-                   xw=_xw_of("9999", "somebody"), app_id="2552") is None
+    assert _xw_of("9999", "somebody").resolve_api(
+        "Jonny Otto", "SusoGattuso", lone, app_id="2552") is None
     # NO TABLE IS NOT A FAILURE. players.csv is built BY this join, so on a
     # cold start it does not exist and every caller must degrade to what it
     # did before — additive only, never a dependency.
-    assert api_key("Fornals", "miguel_autentico", players,
-                   xw=None) == norm("Pablo Fornals")
+    assert xw0.resolve_api("Fornals", "miguel_autentico", players) \
+        == norm("Pablo Fornals")
     # AND THE ID NOW WINS OVER A NAME THAT WOULD OTHERWISE JOIN CLEANLY —
     # an intentional reversal (2026-08-21) of the priority this docstring
     # used to describe. The app row states an id; the id involves no
     # guessing, so it is trusted over the name outright, the same call
     # Crosswalk.resolve() makes for every caller.
-    assert api_key("Jonny Castro", "SusoGattuso", lone,
-                   xw=_xw_of("2552", "someone else"),
-                   app_id="2552") == "someone else"
+    assert _xw_of("2552", "someone else").resolve_api(
+        "Jonny Castro", "SusoGattuso", lone,
+        app_id="2552") == "someone else"
     # And the loop passes the row's id through.
     owner, unjoined = owner_from_api(
         [{"manager": "SusoGattuso", "player_name": "Jonny Otto",
@@ -1766,8 +1664,8 @@ def _selftest_identify() -> None:
         for n in names:
             id_owner[_roster_key(n, id_mkt)] = mgr
     # NOT "raul moro" — the market's own numeric id, the same key everything
-    # else in this repo (identify(), the crosswalk, api_key()) resolves him
-    # to. A plain norm() key here is exactly what left him permanently
+    # else in this repo (identify(), the crosswalk, resolve_api()) resolves
+    # him to. A plain norm() key here is exactly what left him permanently
     # unreconciled and reading as unowned the moment the app feed a report
     # relies on for the OVERWRITE (League.__init__) is down.
     assert id_owner == {"7870": "laporta"}, id_owner
