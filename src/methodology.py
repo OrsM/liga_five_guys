@@ -77,6 +77,25 @@ def latest_before(preds: list[tuple[dt.datetime, dict]],
     return best
 
 
+def match_claim(candidate_keys, store: dict[str, list[tuple[dt.datetime, dict]]],
+                cutoff: dt.datetime) -> tuple[str, dict] | None:
+    """(matched_key, claim) — the last claim logged strictly before
+    `cutoff` for whichever of `candidate_keys` has one, first hit wins.
+    None if none of them do. The one lookup pair(), lagged_pair(),
+    golden_dataset() and friends each independently re-implemented as
+    "for k in keys: hits = store.get(k); fac = latest_before(hits,
+    cutoff)". `store` is {key: [(when, claim), ...]}, latest_before()'s
+    own sorted-ascending shape.
+    """
+    for k in candidate_keys:
+        hits = store.get(k)
+        if hits:
+            fac = latest_before(hits, cutoff)
+            if fac is not None:
+                return k, fac
+    return None
+
+
 def pair(actuals: list[dict],
          preds: dict[str, list[tuple[dt.datetime, dict]]]) -> list[dict]:
     """Join realised per-jornada rows with the prediction that preceded them.
@@ -90,15 +109,10 @@ def pair(actuals: list[dict],
     for a in actuals:
         if a["games_delta"] < 1:
             continue
-        fac = None
-        for k in a["keys"]:
-            hits = preds.get(k)
-            if hits:
-                fac = latest_before(hits, a["from_dt"])
-            if fac is not None:
-                break
-        if fac is None:
+        got = match_claim(a["keys"], preds, a["from_dt"])
+        if got is None:
             continue
+        _key, fac = got
         predicted = fac["score"] * a["games_delta"]
         out.append({
             "name": a["name"],
@@ -136,15 +150,10 @@ def lagged_pair(actuals: list[dict],
         if i is None or i - lag < 0:
             continue
         cutoff = locks[order[i - lag]]
-        fac = None
-        for k in a["keys"]:
-            hits = preds.get(k)
-            if hits:
-                fac = latest_before(hits, cutoff)
-            if fac is not None:
-                break
-        if fac is None:
+        got = match_claim(a["keys"], preds, cutoff)
+        if got is None:
             continue
+        _key, fac = got
         predicted = fac["score"] * a["games_delta"]
         out.append({"name": a["name"], "predicted": predicted,
                     "actual": a["points_delta"], "per_match": fac["score"],
@@ -263,6 +272,38 @@ def appearances(actuals: list[dict]) -> list[tuple[dt.datetime, set]]:
     return sorted(by_start.items())
 
 
+def _matched_start_row(hist, start, teams):
+    """The claim in `hist` (one source's history for one player) active at
+    `start`, or None if there isn't one or it's outside the interval's own
+    team population — the row-level lookup start_grade() and
+    _start_instances() both need before classifying it."""
+    row = latest_before(hist, start)
+    if row is None:
+        return None
+    if teams is not None and (row.get("team_slug") or "").strip() not in teams:
+        return None
+    return row
+
+
+def _start_classify(row):
+    """(kind, pct) for a matched row: "numeric" with a real start
+    percentage, "named" for a numberless starter call, or None for the
+    undecided middle band or an unusable non-starter claim with no
+    number — the one place start_grade() and _start_instances() both
+    decide what "gradeable" means, so the two can't quietly diverge (which
+    _start_instances()'s own docstring used to have to promise by hand
+    instead)."""
+    try:
+        pct = float(row.get("start_pct"))
+    except (TypeError, ValueError):
+        pct = None
+    if pct is None:
+        return ("named", None) if (row.get("role") or "") == "starter" else None
+    if abs(pct - 50.0) < START_EDGE:
+        return None
+    return ("numeric", pct)
+
+
 def start_grade(intervals, claims, universe=None, instances=None):
     """Per source: did the players it called actually appear?
 
@@ -311,11 +352,8 @@ def start_grade(intervals, claims, universe=None, instances=None):
             for key, hist in byname.items():
                 if instances is not None and (key, start) not in instances:
                     continue
-                row = latest_before(hist, start)
+                row = _matched_start_row(hist, start, teams)
                 if row is None:
-                    continue
-                if teams is not None \
-                        and (row.get("team_slug") or "").strip() not in teams:
                     continue
                 # The slug is tried as well as the name because one truth set —
                 # the realised starters off the match pages — carries the same
@@ -323,17 +361,11 @@ def start_grade(intervals, claims, universe=None, instances=None):
                 # where the name join is merely usually right.
                 slug = (row.get("player_slug") or "").strip()
                 hit = 1.0 if key in played or (slug and slug in played) else 0.0
-                try:
-                    pct = float(row.get("start_pct"))
-                except (TypeError, ValueError):
-                    pct = None
-                if pct is None:
-                    if (row.get("role") or "") == "starter":
-                        nam.setdefault(src, []).append(hit)
-                    else:
-                        skipped += 1
-                elif abs(pct - 50.0) < START_EDGE:
+                kind, pct = _start_classify(row) or (None, None)
+                if kind is None:
                     skipped += 1
+                elif kind == "named":
+                    nam.setdefault(src, []).append(hit)
                 else:
                     num.setdefault(src, []).append((pct, hit))
 
@@ -352,8 +384,9 @@ def start_grade(intervals, claims, universe=None, instances=None):
 
 def _start_instances(intervals, claims, src, universe=None) -> set:
     """(player key, interval start) pairs where `src` had a gradeable
-    (non-skipped, numeric) claim — mirrors start_grade()'s own per-
-    interval lookup so the two definitions of "graded" can't diverge."""
+    (non-skipped, numeric) claim — uses _matched_start_row()/
+    _start_classify(), the same pair start_grade() itself calls, so the
+    two definitions of "graded" can't diverge."""
     per: dict[str, list] = {}
     for r in claims:
         if (r.get("source") or "").strip() != src:
@@ -373,19 +406,12 @@ def _start_instances(intervals, claims, src, universe=None) -> set:
         start = interval[0]
         teams = interval[2] if len(interval) > 2 else None
         for key, hist in per.items():
-            row = latest_before(hist, start)
+            row = _matched_start_row(hist, start, teams)
             if row is None:
                 continue
-            if teams is not None \
-                    and (row.get("team_slug") or "").strip() not in teams:
-                continue
-            try:
-                pct = float(row.get("start_pct"))
-            except (TypeError, ValueError):
-                pct = None
-            if pct is None or abs(pct - 50.0) < START_EDGE:
-                continue
-            out.add((key, start))
+            kind, _pct = _start_classify(row) or (None, None)
+            if kind == "numeric":
+                out.add((key, start))
     return out
 
 
@@ -618,16 +644,10 @@ def golden_dataset() -> dict[int, dict[str, dict]]:
     for a in actuals:
         if a["games_delta"] < 1 or a.get("jornada") is None:
             continue
-        fac = matched_key = None
-        for k in a["keys"]:
-            hits = preds.get(k)
-            if hits:
-                fac = latest_before(hits, a["from_dt"])
-            if fac is not None:
-                matched_key = k
-                break
-        if fac is None:
+        got = match_claim(a["keys"], preds, a["from_dt"])
+        if got is None:
             continue
+        matched_key, fac = got
         row = dict(fac)
         row["actual"] = a["points_delta"]
         row["games"] = a["games_delta"]
@@ -1234,11 +1254,8 @@ def golden_rows() -> list[dict]:
         if jor is None:
             continue
         for key, hist in per.items():
-            row = latest_before(hist, lock)
+            row = _matched_start_row(hist, lock, teams)
             if row is None:
-                continue
-            if teams is not None \
-                    and (row.get("team_slug") or "").strip() not in teams:
                 continue
             golden = {"player": row["player_name"], "jornada": jor,
                       "predicted_start_pct": row["start_pct"],
