@@ -109,6 +109,20 @@ risk), but still seven implementations of one fact kept in sync by hand.
 `exp` is the same dict regardless of `who` — only the squad it's read
 against differs.
 
+2026-09-13: `choosable()` itself removed. It picked one shared jornada
+("the first nobody has played yet") for every player, which is right for
+pricing a signing but wrong for deciding who to field THIS week when the
+round in progress locks some clubs before others — a suspended player's
+own next match can fall in an earlier, partially-played jornada that
+`choosable()` skips straight past, pricing him as if the suspension had
+already been served (real case: a suspended defender recommended for the
+XI at 0% start). `current_xi()` now reads `u.first_jornada_of` — each
+player's own next jornada, the same mapping `apply_fixtures()` already
+used for status-override timing — via `Bootstrap.expected_own()`, and
+falls back to the old shared-jornada reading only when no per-player
+schedule was given at all (a synthetic Universe in a test, not a second
+real policy).
+
 ## xi_bar() — why the bar is flat across all four slots
 
 Value-over-replacement theory says the bar ought to be position-specific —

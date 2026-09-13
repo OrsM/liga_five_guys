@@ -157,6 +157,12 @@ class Forecaster(Protocol):
         and for the XI a manager would pick, which must be chosen on what is
         knowable rather than on the sampled outcome."""
 
+    def expected_own(self, first_jornada_of: dict[str, int]) -> dict[str, float]:
+        """Mean points per player, each read at HIS OWN next jornada rather
+        than one shared jornada for everyone — the right question for "who
+        should I field right now" when the round in progress means players
+        aren't all waiting on the same next match."""
+
     def draw(self, jornada: int, rng: random.Random) -> dict[str, float]:
         """One sampled outcome for every player in that jornada."""
 
@@ -244,6 +250,14 @@ class Bootstrap:
     def expected(self, jornada: int) -> dict[str, float]:
         return {k: pts * p
                 for k, (pts, p) in self.per_jornada.get(jornada, {}).items()}
+
+    def expected_own(self, first_jornada_of: dict[str, int]) -> dict[str, float]:
+        out = {}
+        for k, j in first_jornada_of.items():
+            rec = self.per_jornada.get(j, {}).get(k)
+            if rec:
+                out[k] = rec[0] * rec[1]
+        return out
 
     def rate_draw(self, rng: random.Random, jornadas=None):
         """A multiplier per player, for one whole SEASON — flat (one dict)
@@ -546,6 +560,13 @@ def _selftest() -> None:
     assert e == {"nailed": 5.0, "rota": 2.5, "out": 0.0}, e
     assert fc.expected(99) == {}, "a jornada nobody plays is empty, not an error"
 
+    # expected_own(): each player at HIS OWN jornada, not one shared jornada.
+    fc2 = Bootstrap({1: {"early": (4.0, 1.0)}, 2: {"late": (6.0, 0.5)}})
+    assert fc2.expected_own({"early": 1, "late": 2}) == {"early": 4.0,
+                                                          "late": 3.0}
+    # No record at that jornada for him: simply absent, not zero.
+    assert fc2.expected_own({"early": 2}) == {}
+
     # A man who cannot play scores nothing, every single time.
     assert all(fc.draw(1, rng)["out"] == 0.0 for _ in range(200))
 
@@ -661,7 +682,7 @@ def _selftest() -> None:
     b = pinned.draw(1, random.Random(11), starts={"nailed": 0.0})
     assert a == b, (a, b)
 
-    print("ffcore.forecast self-test OK (38 cases)")
+    print("ffcore.forecast self-test OK (40 cases)")
 
 
 if __name__ == "__main__":

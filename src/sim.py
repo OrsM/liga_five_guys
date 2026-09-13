@@ -239,15 +239,22 @@ def short(key, u) -> str:
 SLOT_ORDER = {"POR": 0, "DEF": 1, "MED": 2, "DEL": 3}
 
 
-def by_slot(u, keys):
+def by_slot(u, keys, exp=None):
     """Keeper, defence, midfield, attack — then best first inside each.
 
     An eleven ranked purely by expected points interleaves a keeper between
     two midfielders, which is not how anybody reads a team sheet or how the
     app lays one out. Ranking still decides who is IN it; position decides the
     order you check them off in.
+
+    `exp`, when given, is the caller's own current_xi()-derived reading —
+    the same one driving the rest of its table, not a second, independently
+    computed number that could read a different jornada for the same player.
     """
-    exp = u.forecaster.expected(decide_choosable(u))
+    import decide
+
+    if exp is None:
+        exp, _ = decide.current_xi(u)
     return sorted(keys, key=lambda k: (SLOT_ORDER.get(u.pos.get(k, ""), 9),
                                        -exp.get(k, 0.0)))
 
@@ -331,19 +338,19 @@ def ladder_rows(u, rows, bands=None) -> list[dict]:
     # marks cannot be trusted to diff against.
     chg = xi_change(fielded_keys(u), xi)
     if chg["legal"]:
-        for k in by_slot(u, chg["in"]):
+        for k in by_slot(u, chg["in"], exp):
             out.append(cell(k, "in", "bench", None, None))
-        for k in by_slot(u, chg["out"]):
+        for k in by_slot(u, chg["out"], exp):
             out.append(cell(k, "out", "yours", None, None))
     else:
-        for k in by_slot(u, xi):
+        for k in by_slot(u, xi, exp):
             out.append(cell(k, "field", "yours", None, None))
     # A man named in the diff is not named again as bench furniture: the OUT
     # row already says where he is going.
     moving = set(chg["in"]) | set(chg["out"])
     benched = [k for k in mine if k not in xi and k not in dead
                and k not in moving]
-    for k in by_slot(u, benched):
+    for k in by_slot(u, benched, exp):
         out.append(cell(k, "keep", "yours", None, None))
     for k in sorted(dead, key=lambda k: -exp.get(k, 0.0)):
         out.append(cell(k, "sell", "yours", u.proceeds.get(k, 0.0), None,
@@ -592,11 +599,6 @@ def ladder(u, rows, base, data=None) -> list[str]:
 def decide_dead(u):
     from decide import dead_weight
     return dead_weight(u)
-
-
-def decide_choosable(u):
-    from decide import choosable
-    return choosable(u)
 
 
 def _cash_cell(u, manager: str) -> str:

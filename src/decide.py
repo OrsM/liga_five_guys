@@ -160,6 +160,12 @@ class Universe:
     bought: dict[str, float] = field(default_factory=dict)
     rival_cash: dict[str, float] = field(default_factory=dict)
     part_played: dict[int, set[str]] = field(default_factory=dict)
+    # {key: his own first jornada still ahead of him}, the same mapping
+    # apply_fixtures() uses to place a status override — current_xi() reuses
+    # it rather than a second, coarser "one jornada for everyone" guess.
+    # Empty (a caller with no per-player schedule to hand) degrades to that
+    # coarser reading, never an error.
+    first_jornada_of: dict[str, int] = field(default_factory=dict)
     unjoined: list[str] = field(default_factory=list)
     start_note: str = ""
     cash_note: str = ""
@@ -267,23 +273,19 @@ def _synthetic_profiles(pos=None, price=None, proceeds=None, owner=None,
     return out
 
 
-def choosable(u) -> int:
-    """A jornada whose eleven you can still pick, for judging a signing by.
-
-    NOT the round in progress: its eleven is locked and players whose
-    clubs have kicked off are absent from it, so the team it describes
-    can be missing real starters. The weakest man in that thinned XI is
-    still the bar a signing has to beat.
-    """
-    for j in u.state.jornadas:
-        if j not in u.part_played:
-            return j
-    return u.state.jornadas[0] if u.state.jornadas else 0
-
-
 def current_xi(u, who: str | None = None) -> tuple[dict[str, float], set[str]]:
-    """(exp, xi) — this round's expected points and the best legal eleven
-    `who` (default u.me) could field from them, right now.
+    """(exp, xi) — expected points and the best legal eleven `who` (default
+    u.me) could field from them, right now.
+
+    Each player is read at HIS OWN next jornada (u.first_jornada_of), not
+    one shared jornada picked for everyone — a round in progress locks some
+    clubs before others, and pricing everyone off the one round where
+    NOBODY has played yet would either thin the XI with players whose real
+    match already happened, or (the bug this replaced) skip a suspended
+    man's own next match entirely and price him as if he'd already served it.
+    Falls back to the first jornada nobody has played at all when no
+    per-player schedule was given (u.first_jornada_of empty) — a synthetic
+    Universe with no part_played to reason about, not a second real policy.
 
     THE ONE COMPUTATION of "what is my/a rival's current best eleven worth" —
     seven call sites across sim.py and this module used to rebuild this pair
@@ -291,7 +293,12 @@ def current_xi(u, who: str | None = None) -> tuple[dict[str, float], set[str]]:
     read against differs.
     Why: docs/notes/decide.md#current_xi--one-computation-seven-old-copies
     """
-    exp = u.forecaster.expected(choosable(u))
+    if u.first_jornada_of:
+        exp = u.forecaster.expected_own(u.first_jornada_of)
+    else:
+        j = next((j for j in u.state.jornadas if j not in u.part_played),
+                 u.state.jornadas[0] if u.state.jornadas else 0)
+        exp = u.forecaster.expected(j)
     xi = set(best_xi(u.state.squads.get(who or u.me, {}), exp))
     return exp, xi
 
@@ -363,10 +370,8 @@ def candidates(u: Universe, expected: dict[str, float],
     cash = u.cash if budget is None else budget
     mine_squad = u.state.squads.get(u.me, {})
     mine = set(mine_squad)
-    # The eleven the signing has to beat is one you can still pick — see
-    # choosable(), which current_xi() already calls. `expected` may be any
-    # round; the BAR never comes off a locked one, so a choosable() that
-    # comes back with nothing (no jornada left to pick at all) falls back
+    # The eleven the signing has to beat is current_xi()'s own reading — a
+    # bar that comes back empty (no jornada left to pick at all) falls back
     # to the round passed in rather than a bar of zero that clears nothing.
     bar_exp, xi = current_xi(u)
     if not bar_exp:
@@ -1242,13 +1247,22 @@ def load(trials_pool=None) -> Universe:
                  understat_rows=load_understat_players("2025")).items()}
     ppm_of = {k: s.ppm for k, s in scored.items() if s}
     status_of = {k: s.status for k, s in scored.items() if s}
+    first_jornada_of = first_jornada_per_player(base, rem, played, club)
     per_j = apply_fixtures(
         next_then_rest(base, base_rest, rem, played, club),
         sboard, club, pos, ppm_of, status_of=status_of,
-        first_jornada_of=first_jornada_per_player(base, rem, played, club))
+        first_jornada_of=first_jornada_of)
     # A squad short a position can't be simulated at all (see phantom_fill())
     # — patched once here so every downstream reader gets the same fix.
     squads, per_j = phantom_fill(squads, per_j, pos)
+    # Phantoms are synthetic averages with no real fixture of their own —
+    # available from the first remaining jornada, same as current_xi()'s
+    # fallback reading for a player nothing else says otherwise about.
+    if rem:
+        phantom_keys = {k for layer in per_j.values() for k in layer
+                        if k.startswith("__phantom_")}
+        for k in phantom_keys:
+            first_jornada_of.setdefault(k, rem[0])
     # Mutates the module attribute, not a local — rate_draw()/start_draw()
     # re-import DRIFT_FRAC fresh from the module on every call.
     _forecast.DRIFT_FRAC, _drift_why = _methodology.drift_frac_from_history()
@@ -1274,7 +1288,8 @@ def load(trials_pool=None) -> Universe:
         state=LeagueState(squads, rem, me, carried), forecaster=fc,
         cash=cash, me=me, players=profiles,
         rival_cash=rival_cash,
-        part_played=played, start_note=_calibrated()[0].note(),
+        part_played=played, first_jornada_of=first_jornada_of,
+        start_note=_calibrated()[0].note(),
         unjoined=list(unjoined_clubs) + list(lg.api_unjoined),
         locked_cash=locked_cash, received_offers=received_offers,
         bought=bought_price(lg.txns, lg.xw))
@@ -1382,7 +1397,11 @@ def _selftest() -> None:
     # -- current_xi / xi_bar: the one computation seven call sites used to
     # each rebuild by hand ---------------------------------------------
     cxi_exp, cxi = current_xi(u)
-    assert cxi_exp == u.forecaster.expected(choosable(u)), cxi_exp
+    # No per-player schedule given: falls back to the first jornada nobody
+    # has played at all.
+    fallback_j = next((j for j in u.state.jornadas if j not in u.part_played),
+                      u.state.jornadas[0] if u.state.jornadas else 0)
+    assert cxi_exp == u.forecaster.expected(fallback_j), cxi_exp
     # me_bench (rate 0.5) is the weakest of the 12 — never picked over the
     # other 11 real starters, so it must not be in the eleven.
     assert "me_bench" not in cxi, cxi
