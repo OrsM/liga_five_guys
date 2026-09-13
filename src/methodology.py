@@ -44,7 +44,8 @@ from ffcore.tidy import (run_now,  # noqa: E402
                          SEASON, TIDY, age_phrase, load_elo,
                          stale_feeds,
                          load_lineups,
-                         read_csv, snapshot_stamp, write_csv, write_lines)
+                         read_csv, snapshot_stamp, write_csv, write_lines,
+                         team_slug_of, match_locks, jornada_locks, lock_order)
 
 LIVE = SEASON / "live"
 WINDOW_DAYS = 21
@@ -112,13 +113,6 @@ def pair(actuals: list[dict],
             "jornada": a.get("jornada"),
         })
     return out
-
-
-def lock_order(locks: dict[int, dt.datetime]) -> list[int]:
-    """Jornadas ordered by when they actually locked, not by number — a
-    rescheduled fixture can lock jornada 6 before jornada 4.
-    """
-    return [j for j, _ in sorted(locks.items(), key=lambda kv: kv[1])]
 
 
 def lagged_pair(actuals: list[dict],
@@ -403,73 +397,6 @@ def _start_instances(intervals, claims, src, universe=None) -> set:
 # information it couldn't have used. An unlocked round is ungraded.
 # Why: docs/notes/methodology.md#start-grade-appearance-vs-real-starters
 # ---------------------------------------------------------------------------
-
-def team_slug_of(side: str, slugs) -> str | None:
-    """Our team slug for a fixture-page side name, or None.
-
-    "Racing Santander" -> "racing", "Real Betis" -> "betis". The two sites
-    spell clubs differently and neither publishes an id the other uses, so this
-    is the same exact-then-substring, two-candidates-is-nothing rule the
-    fixture board joins on — reused rather than reimplemented.
-    """
-    from ffcore.fixture import match_team
-
-    spelled = {s.replace("-", " "): s for s in slugs}
-    hit = match_team(side, list(spelled))
-    return spelled.get(hit) if hit else None
-
-
-def match_locks(matches: list[dict],
-                fixtures: list[dict]) -> dict[tuple[int, str], dt.datetime]:
-    """{(jornada, team_slug): that TEAM's own kickoff in that jornada}.
-
-    Jornada membership (matches.csv) is fixed; kickoff date isn't, and a
-    TV reschedule can defer one fixture days past its round's other
-    kickoffs. A caller needing "when did THIS PLAYER's match lock" must
-    key on his own team, not the round.
-    Why: docs/notes/methodology.md#match_locks--one-fixture-can-be-deferred-out-of-its-own-jornada
-    """
-    from ffcore.tidy import kickoff_stamp
-
-    jornada_of: dict[tuple[str, str], int] = {}
-    for m in matches:
-        try:
-            jornada_of[(m["home"], m["away"])] = int(m["jornada"])
-        except (KeyError, ValueError, TypeError):
-            continue
-    slugs = {s for pair_ in jornada_of for s in pair_}
-
-    locks: dict[tuple[int, str], dt.datetime] = {}
-    for f in fixtures:
-        when = kickoff_stamp(f.get("kickoff"))
-        home = team_slug_of(f.get("home") or "", slugs)
-        away = team_slug_of(f.get("away") or "", slugs)
-        jor = jornada_of.get((home, away))
-        if when is None or jor is None:
-            continue
-        for team in (home, away):
-            key = (jor, team)
-            if key not in locks or when < locks[key]:
-                locks[key] = when
-    return locks
-
-
-def jornada_locks(matches: list[dict],
-                  fixtures: list[dict]) -> dict[int, dt.datetime]:
-    """{jornada: earliest kickoff observed in it} — the ROUND's own lock,
-    for callers that genuinely want an ordinal "roughly when did this
-    jornada happen" (lock_order()'s lag sequencing) rather than one
-    player's own cutoff. A player-level cutoff must use match_locks()
-    instead — see that function's own docstring for why the two differ.
-    Derived from match_locks() (the min across that jornada's teams), not
-    a second independent join over the same fixtures.
-    """
-    locks: dict[int, dt.datetime] = {}
-    for (jor, _team), when in match_locks(matches, fixtures).items():
-        if jor not in locks or when < locks[jor]:
-            locks[jor] = when
-    return locks
-
 
 def market_names(market: list[dict], slugs) -> dict[str, list[dict]]:
     """{team slug: [one row per player the market prices for that club]}.

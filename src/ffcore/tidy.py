@@ -43,7 +43,8 @@ __all__ = ["ROOT", "TIDY", "SEASON", "DECISIONS", "REPORTS", "PARTS", "MADRID",
            "EVERY_RUN_FRESH_DAYS", "stale_feeds",
            "GATED_API", "age_phrase", "last_api_standings",
            "load_api_lineup", "market_routes", "pending_sent", "bought_price",
-           "pending_received", "LISTED_SELLER"]
+           "pending_received", "LISTED_SELLER", "team_slug_of", "match_locks",
+           "jornada_locks", "lock_order"]
 
 ROOT = Path(os.environ.get("FF_ROOT", "./data"))
 TIDY = ROOT / "tidy"
@@ -200,14 +201,26 @@ def append_csv(path, rows, fieldnames=None) -> None:
 
 
 def load_deadline(with_source: bool = False):
-    """The next lock as aware UTC, or None — the next kickoff in
-    fixtures.csv, since the app locks per jornada (Sunday's player is
-    already frozen at Friday's kickoff). No typed fallback: an
-    unanswerable fixture list says None, never a wrong substitute.
-    `with_source=True` returns (when, "fixtures"|"none").
+    """The next JORNADA lock as aware UTC, or None — the earliest still-ahead
+    entry in jornada_locks(), since the app locks the whole round at its
+    first kickoff (Sunday's player is already frozen at Friday's kickoff).
+
+    NOT next_kickoff(): a round already under way can still have its own
+    later matches listed in fixtures.csv, staggered days apart (a TV
+    reschedule, or a jornada whose matches simply spread over a long
+    weekend) — those are leftovers of an already-locked round, not a fresh
+    deadline. Using next_kickoff() here reported a lock minutes away for a
+    match that was really just one of jornada 5's remaining fixtures, days
+    after jornada 5 itself had locked (2026-09-13).
+
+    No typed fallback: an unanswerable fixture/match list says None, never a
+    wrong substitute. `with_source=True` returns (when, "fixtures"|"none").
     Why: docs/notes/tidy.md#load_deadline--the-fixture-list-is-the-deadline-no-typed-fallback
     """
-    when = next_kickoff()
+    now = run_now()
+    locks = jornada_locks(read_csv(TIDY / "matches.csv"), load_fixtures())
+    ahead = [t for t in locks.values() if t > now]
+    when = min(ahead) if ahead else None
     return (when, "fixtures" if when else "none") if with_source else when
 
 
@@ -764,7 +777,10 @@ def minutes_played(role: str, raw_minute, match_len: float = MATCH_LEN) -> float
 
 
 def next_kickoff(now=None):
-    """The first kickoff still ahead of us, or None if we cannot tell.
+    """The first kickoff of ANY listed match still ahead of us, or None if we
+    cannot tell — NOT the transfer deadline (see jornada_locks() for that):
+    a jornada that has already started can still have later matches of its
+    own listed here, staggered days apart.
 
     None covers three cases that must all fall back rather than guess: no
     fixtures file yet, an unparseable kickoff, and every listed match already
@@ -775,6 +791,79 @@ def next_kickoff(now=None):
     ahead = [k for k in (kickoff_stamp(r.get("kickoff"))
                          for r in load_fixtures()) if k and k > now]
     return min(ahead) if ahead else None
+
+
+def team_slug_of(side: str, slugs) -> str | None:
+    """Our team slug for a fixture-page side name, or None.
+
+    "Racing Santander" -> "racing", "Real Betis" -> "betis". The two sites
+    spell clubs differently and neither publishes an id the other uses, so this
+    is the same exact-then-substring, two-candidates-is-nothing rule the
+    fixture board joins on — reused rather than reimplemented.
+    """
+    from ffcore.fixture import match_team
+
+    spelled = {s.replace("-", " "): s for s in slugs}
+    hit = match_team(side, list(spelled))
+    return spelled.get(hit) if hit else None
+
+
+def match_locks(matches: list[dict],
+                fixtures: list[dict]) -> dict[tuple[int, str], datetime]:
+    """{(jornada, team_slug): that TEAM's own kickoff in that jornada}.
+
+    Jornada membership (matches.csv) is fixed; kickoff date isn't, and a
+    TV reschedule can defer one fixture days past its round's other
+    kickoffs. A caller needing "when did THIS PLAYER's match lock" must
+    key on his own team, not the round.
+    Why: docs/notes/methodology.md#match_locks--one-fixture-can-be-deferred-out-of-its-own-jornada
+    """
+    jornada_of: dict[tuple[str, str], int] = {}
+    for m in matches:
+        try:
+            jornada_of[(m["home"], m["away"])] = int(m["jornada"])
+        except (KeyError, ValueError, TypeError):
+            continue
+    slugs = {s for pair_ in jornada_of for s in pair_}
+
+    locks: dict[tuple[int, str], datetime] = {}
+    for f in fixtures:
+        when = kickoff_stamp(f.get("kickoff"))
+        home = team_slug_of(f.get("home") or "", slugs)
+        away = team_slug_of(f.get("away") or "", slugs)
+        jor = jornada_of.get((home, away))
+        if when is None or jor is None:
+            continue
+        for team in (home, away):
+            key = (jor, team)
+            if key not in locks or when < locks[key]:
+                locks[key] = when
+    return locks
+
+
+def jornada_locks(matches: list[dict],
+                  fixtures: list[dict]) -> dict[int, datetime]:
+    """{jornada: earliest kickoff observed in it} — the ROUND's own lock:
+    the app locks the whole lineup once per jornada, at its first kickoff,
+    however much later a TV reschedule pushes some of its other matches
+    (verified in-app — see ffcore.fixture.fixture_board()'s own docstring).
+    A player-level cutoff for GRADING how much team news was available
+    must use match_locks() instead, keyed on his own team's later kickoff.
+    Derived from match_locks() (the min across that jornada's teams), not
+    a second independent join over the same fixtures.
+    """
+    locks: dict[int, datetime] = {}
+    for (jor, _team), when in match_locks(matches, fixtures).items():
+        if jor not in locks or when < locks[jor]:
+            locks[jor] = when
+    return locks
+
+
+def lock_order(locks: dict[int, datetime]) -> list[int]:
+    """Jornadas ordered by when they actually locked, not by number — a
+    rescheduled fixture can lock jornada 6 before jornada 4.
+    """
+    return [j for j, _ in sorted(locks.items(), key=lambda kv: kv[1])]
 
 
 # Which tidy column feeds which report field, and how to read it. Named
@@ -1703,7 +1792,43 @@ def _selftest() -> None:
     assert bought_price([], bp_xw) == {}
     assert bought_price(bp_txns, None) == {}    # no crosswalk, nothing to join
 
-    print("ffcore.tidy self-test OK (57 cases)")
+    # -- jornada_locks: the ROUND's lock, not the next kickoff of anything --
+    # A round already under way can still list its own later, staggered
+    # matches in fixtures.csv — those are leftovers of an already-locked
+    # jornada, not a fresh deadline (see load_deadline()'s own docstring
+    # for the real case this fixes: a 2026-09-13 report read a jornada-5
+    # leftover kickoff minutes away as "the deadline" days after jornada 5
+    # itself had actually locked).
+    jl_matches = [{"match_id": "1", "jornada": "1", "home": "alaves",
+                  "away": "getafe", "score": "3-0"},
+                 {"match_id": "2", "jornada": "1", "home": "espanyol",
+                  "away": "levante", "score": "1-0"},
+                 {"match_id": "9", "jornada": "2", "home": "rayo-vallecano",
+                  "away": "alaves", "score": "2-2"}]
+    jl_fixtures = [{"kickoff": "2026-08-16T17:00:00+00:00", "home": "Espanyol",
+                   "away": "Levante"},
+                  {"kickoff": "2026-08-15T19:30:00+00:00", "home": "Alaves",
+                   "away": "Getafe"}]
+    assert team_slug_of("Racing Santander", {"racing", "real-madrid"}) \
+        == "racing"
+    assert team_slug_of("Real Betis", {"betis", "real-sociedad"}) == "betis"
+    assert team_slug_of("Nowhere FC", {"racing"}) is None
+    jl = jornada_locks(jl_matches, jl_fixtures)
+    # The round locks at its EARLIEST kickoff, not each match's own: the app
+    # locks the whole lineup once, so Sunday's starter is already frozen.
+    assert list(jl) == [1] and jl[1].day == 15, jl
+    assert 2 not in jl                           # no kickoff observed for it
+    # match_locks() disagrees on purpose: each fixture locks its OWN two
+    # teams at its OWN kickoff, not both grouped under the round's earliest.
+    ml = match_locks(jl_matches, jl_fixtures)
+    assert ml[(1, "alaves")] == jl[1]             # alaves was the earliest
+    assert ml[(1, "espanyol")] > jl[1]            # levante/espanyol, later
+    assert lock_order({3: datetime(2026, 9, 3, tzinfo=timezone.utc),
+                       1: datetime(2026, 8, 15, tzinfo=timezone.utc),
+                       2: datetime(2026, 8, 20, tzinfo=timezone.utc)}) \
+        == [1, 2, 3]
+
+    print("ffcore.tidy self-test OK (65 cases)")
 
 
 if __name__ == "__main__":
