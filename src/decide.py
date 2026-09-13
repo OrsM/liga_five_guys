@@ -1301,6 +1301,15 @@ def load(trials_pool=None) -> Universe:
     # A squad short a position can't be simulated at all (see phantom_fill())
     # — patched once here so every downstream reader gets the same fix.
     squads, per_j = phantom_fill(squads, per_j, pos)
+    # phantom_fill() clears every position's SLOT_MIN, which is NOT the
+    # same guarantee as a real formation existing (two keepers in an
+    # exactly-11 squad clears both counts, fields nothing — _fieldable()'s
+    # own docstring) — asserted, not warned: this is a hard invariant of
+    # phantom_fill() itself, not a real-world state (a rival's squad) we
+    # optimize around or warn the user about.
+    # Why: docs/notes/decide.md#optimize-for-competent-play-warn-dont-model-for-incompetent-play
+    for _m, _sq in squads.items():
+        assert _fieldable(_sq), (_m, _sq)
     # Phantoms are synthetic averages with no real fixture of their own —
     # available from the first remaining jornada, same as current_xi()'s
     # fallback reading for a player nothing else says otherwise about.

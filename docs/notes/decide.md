@@ -19,10 +19,25 @@ ad hoc rather than falling out of the design.
    squad** — an illegal XI, an overdrawn balance at lock, a missing plane.
    These get a WARNING (report.py's alerts, sim.py's caveats), because
    they're actionable: I can still do something about my own squad before
-   the jornada locks. This is a safety net, cheap and rare-firing by
-   construction — `illegal_squads()`'s own docstring says outright it
-   "SHOULD NEVER FIRE IN PRODUCTION", kept only in case an earlier patch
-   (`phantom_fill()`) regresses.
+   the jornada locks.
+
+   A DIFFERENT invariant — phantom_fill() actually succeeding at fielding
+   EVERY squad, rivals included — is not this kind of warning at all: it's
+   an internal guarantee of our own code, not a real-world state a manager
+   could be in. This repo used to carry a whole function for it
+   (`sim.illegal_squads()`: its own docstring said outright it "SHOULD
+   NEVER FIRE IN PRODUCTION", plus a caveat-table row, plus ~40 lines of
+   its own self-test) — asked directly why a function that should never
+   fire needs to exist at all (2026-09-13), and it didn't: it was ALSO a
+   second implementation of `_fieldable()`'s exact legality check, just
+   via the heavier `best_xi()` instead of `_fieldable()`'s cheap count.
+   Replaced with one `assert _fieldable(sq)` per squad, right after
+   `phantom_fill()` in `load()` — a hard invariant of OUR code should
+   crash loudly and immediately if it's ever wrong, the same "fail loudly
+   rather than serve a report that looks fine and isn't" instinct
+   `League.__init__`'s own no-try/except already uses — not a quiet
+   caveat row a user could miss, and not a second legality check to keep
+   in sync with `_fieldable()` by hand.
 
 2. **Optimize assuming everyone — me AND every rival — plays competently.**
    The forecasting and decision layer should never be built around the
@@ -374,8 +389,8 @@ every other player at that position already carries.
 is only computed for a key present in `matches`, the same "no evidence, no
 widening" rule already applied to a brand-new player with zero real
 history. Keyed `__phantom_<manager>_<slot>_<n>`, a form no real player id
-can take, so it can't be bought or mistaken for a real man, and drops out of
-`illegal_squads()` once it makes the squad legal again.
+can take, so it can't be bought or mistaken for a real man, and satisfies
+`load()`'s own `_fieldable()` assert once it makes the squad legal again.
 
 Confirmed live: Albert's standings row moved from a flat 32-32 band (100%
 P(above him)) to a real 1,228 (867-1,631) band, 72%.
