@@ -77,6 +77,19 @@ OUT_STATUSES = frozenset({"injured", "suspended", "unavailable"})
 PROMOTED_DISCOUNT = 0.70  # the LaLiga median overstates a promoted squad
 
 
+def status_multiplier(status: str) -> float:
+    """0.0 for OUT_STATUSES, DOUBT_FACTOR for "doubt", else 1.0 — the one
+    table mapping a status to how much it costs, shared by Scorer.score()
+    (applies it to score/flat) and ffcore.profile.status_adjusted() (applies
+    it to whichever of pts/p_start it needs zeroed, a different projection
+    of the same policy — see that function's own docstring for why)."""
+    if status in OUT_STATUSES:
+        return 0.0
+    if status == "doubt":
+        return DOUBT_FACTOR
+    return 1.0
+
+
 # Candidate half-lives for the current-season rate's recency weighting, in
 # jornadas — 1.0 means no decay. Coarse grid: the data can't resolve finer.
 DECAY_GRID = (1.0, 0.85, 0.7, 0.55, 0.4)
@@ -1146,11 +1159,9 @@ class Scorer:
                      else m.atk_factor) if m else 1.0
         flat = rating.ppm * pct_used / 100.0
         score = flat * fix_factor
-        if st in OUT_STATUSES:
-            score = flat = 0.0
-        elif st == "doubt":
-            score *= DOUBT_FACTOR
-            flat *= DOUBT_FACTOR
+        mult = status_multiplier(st)
+        score *= mult
+        flat *= mult
 
         return Scored(
             name=rec.get("name", key), key=key,

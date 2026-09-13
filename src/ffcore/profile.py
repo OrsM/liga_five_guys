@@ -86,19 +86,22 @@ class PlayerHistory:
 
 def status_adjusted(pts: float, p_start: float, status: str
                      ) -> tuple[float, float]:
-    """(pts, p_start) with Scorer.score()'s own status override applied:
-    OUT_STATUSES forces p_start to 0, "doubt" halves pts. Scorer.score()
-    already applies this to score/flat but leaves Scored.pct_used/ppm
-    untouched by design — every other reader of (pts, p_start) must call
-    this rather than rebuild the pair from raw fields.
+    """(pts, p_start) with Scorer.score()'s own status override applied, via
+    ffcore.score.status_multiplier() (the one status->cost table both this
+    and Scorer.score() read). OUT_STATUSES lands on p_start (forced to 0),
+    "doubt" lands on pts (halved) — a different projection of the same
+    multiplier than Scorer.score()'s score/flat, because this pair keeps
+    the rate-if-he-plays separate from P(he plays), by design. Scorer.score()
+    already applies the override to score/flat but leaves Scored.pct_used/
+    ppm untouched — every other reader of (pts, p_start) must call this
+    rather than rebuild the pair from raw fields.
     """
-    from ffcore.score import OUT_STATUSES, DOUBT_FACTOR
+    from ffcore.score import OUT_STATUSES, status_multiplier
 
+    mult = status_multiplier(status)
     if status in OUT_STATUSES:
-        return pts, 0.0
-    if status == "doubt":
-        return pts * DOUBT_FACTOR, p_start
-    return pts, p_start
+        return pts, p_start * mult
+    return pts * mult, p_start
 
 
 @dataclass
