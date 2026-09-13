@@ -300,8 +300,9 @@ def ladder_rows(u, rows, bands=None) -> list[dict]:
     # response leaves behind — which is why rank() never bands them twice.
     bands = {k: v for k, v in (bands or {}).items() if k not in won}
     # Points above replacement — a STANDING per-player property (season
-    # total minus my own squad's weakest current option in his slot),
-    # not the paired-simulation band above (which is the marginal gain
+    # total above the LEAGUE's own replacement level at his slot, pooled
+    # across every squad — ffcore.score.replacement()/vor()), not the
+    # paired-simulation band above (which is the marginal gain
     # of one specific ACTION, run once per candidate — genuinely
     # different questions, genuinely different cost to compute). No
     # error band on this one: a real one needs the same paired Monte
@@ -520,9 +521,9 @@ def ladder(u, rows, base, data=None) -> list[str]:
                    ("%+.0f" % r["par"]) if r.get("par") is not None else "—",
                    ("%.1f" % r["value"]) if r["value"] is not None else "—"))
 
-    # PAR (points above replacement) — season total minus my own squad's
-    # weakest current option in his slot, no error band (see the note
-    # above par's own assignment for why not). Different question from
+    # PAR (points above replacement) — season total above the LEAGUE's own
+    # replacement level at his slot, no error band (see the note above
+    # par's own assignment for why not). Different question from
     # "Season" (the marginal gain of THIS row's specific action).
     out = ["| Player | Pos | Start | xPts/j | Where | € | Season | PAR | "
           "pts/M€ |",
@@ -1690,9 +1691,12 @@ def _selftest() -> None:
     uc_route = {"rivals": "clause", "wished": "listed"}
     uc_value = {"steady": 5e6, "rivals": 3.8e6}
     # PAR (ladder_rows() calls decide.player_forecasts(u), which reads
-    # u.players) — "me" fields no squad here, so replacement is 0.0
-    # and PAR is just each candidate's raw season total: steady
-    # 5.0*1.0 over jornadas [1,2] = 10.0.
+    # u.players) — LEAGUE-wide replacement now (ffcore.score.replacement/
+    # vor), pooled across every candidate here (all MED): season totals
+    # rivals 14.0, wished 13.0, steady 10.0, maverick 8.0, dud 6.0 over 5
+    # players; 2 squads x starters_per_slot()["MED"]=4.0 wants a rung of
+    # 8, beyond the pool's 5, so replacement is the worst of them (dud,
+    # 6.0) — steady's PAR is 10.0 - 6.0 = 4.0, not his raw season total.
     uc_owned = Universe(
         state=LeagueState({"me": {}, "riv": {}}, [1, 2], "me"),
         forecaster=Bootstrap(
@@ -1711,7 +1715,7 @@ def _selftest() -> None:
     all_rows = [steady_row, dud_row, maverick_row, riv_row, wish_row]
     owned_lad = ladder_rows(uc_owned, all_rows)
     steady_cell = next(r for r in owned_lad if r["name"].lower() == "steady")
-    assert steady_cell["par"] == 10.0, steady_cell
+    assert steady_cell["par"] == 4.0, steady_cell
     # ONE SORTED LIST, FILTERED, NOT SEPARATELY RANKED GROUPS: "rivals"
     # (a clause, cannot be refused) lands in RAID despite everything else
     # in BUY; "wished" (owned by a rival, NOT a clause — his own choice to

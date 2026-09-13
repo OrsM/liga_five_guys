@@ -112,9 +112,13 @@ def comparison_table(rows: list[dict]) -> list[str]:
         return fmt % v if v is not None else "—"
 
     out = ["## Every listed player, compared", "",
-          "PAR = season points above your own squad's current weakest "
-          "option in his slot. Parenthesised range is a real simulated "
-          "band where one was run; a plain figure is the point estimate.",
+          "PAR = season points above the LEAGUE's own replacement level at "
+          "his slot — the score of the last man the league can start there, "
+          "pooled across every squad, not just yours. Comparable across "
+          "positions on that basis; a good player can still show a modest "
+          "PAR if his position is deep league-wide. Parenthesised range is "
+          "a real simulated band where one was run; a plain figure is the "
+          "point estimate.",
           "",
           "| Player | Pos | Price | Season | Next | PAR | pts/€M |",
           "|---|---|---:|---:|---:|---:|---:|"]

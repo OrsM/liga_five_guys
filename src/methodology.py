@@ -1045,7 +1045,13 @@ def column_guide_lines() -> list[str]:
         "affording it — a first name and `today`/`~Nd`, an ESTIMATE "
         "off their reconstructed balance, the app's daily allowance, "
         "and how fast that manager has actually raised money this "
-        "season, never a prediction he actually wants the player.", "",
+        "season, never a prediction he actually wants the player. "
+        "`PAR` is season points above the LEAGUE's own replacement "
+        "level at his slot (the score of the last man the league can "
+        "start there, pooled across every squad) — comparable across "
+        "positions on that basis, and a different question from "
+        "`Season`: a good player in a deep position can show a modest "
+        "PAR while still being the right one to keep.", "",
         "**The league table** — `Pts` is the real league total today. "
         "`Season` is the simulated total and its 10-90 band — a mean "
         "with no band beside it reads as a prediction it is not. "

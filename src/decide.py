@@ -55,7 +55,7 @@ from ffcore.league import MARKET  # noqa: E402
 from ffcore.parse import fmt_money  # noqa: E402
 from ffcore.profile import (PlayerProfile, UNSCORED_DEFAULT,  # noqa: E402
                             build_profiles)
-from ffcore.score import SLOT, SLOT_MIN, _calibrated  # noqa: E402
+from ffcore.score import SLOT, SLOT_MIN, MAX_SLOT, _calibrated  # noqa: E402
 from ffcore.text import norm  # noqa: E402
 from ffcore.season import (LeagueState, XI_SIZE, best_xi,  # noqa: E402
                            simulate_many)
@@ -380,15 +380,11 @@ def candidates(u: Universe, expected: dict[str, float],
         xi = set(best_xi(u.state.squads[u.me], bar_exp))
     bar = xi_bar(bar_exp, xi)
     # A spare: selling him ALONE still leaves a fieldable shape. Ranked by
-    # value above replacement PER EURO he'd raise (player_forecasts()'s own
-    # PAR over value_rate()'s own cost normalisation) — not raw expected
-    # points. A raw-points ranking missed a real case: a 39.64M keeper who
-    # started fewer of the remaining jornadas than the 27.64M one he was
-    # blocking ranked ABOVE most of the squad on points alone and never
-    # fell into a "cheapest by points" cut, even though his PAR over his
-    # own replacement (the other keeper) was small and his proceeds were
-    # the squad's largest — exactly what points-above-replacement-per-cost
-    # exists to catch.
+    # value above LEAGUE replacement PER EURO he'd raise (player_forecasts()'s
+    # own PAR, a fixed league-wide baseline, over value_rate()'s cost
+    # normalisation) — not raw expected points, and not PAR against my own
+    # squad's weakest (a good player can be genuinely worth plenty above
+    # league replacement and still be the wrong one of two to keep).
     fieldable_spare = [k for k in mine if _fieldable(
         {p: s for p, s in mine_squad.items() if p != k})]
     par_of = {k: v["par"] for k, v in player_forecasts(u).items()}
@@ -400,6 +396,21 @@ def candidates(u: Universe, expected: dict[str, float],
         return (vr is None, vr if vr is not None else 0.0)
 
     spare = sorted(fieldable_spare, key=_spare_rank)[:6]
+    # A SECOND SLOT-1 PLAYER BELONGS IN THE POOL REGARDLESS OF RANK. Real
+    # case: two good keepers, one blocking the other — even ranked by the
+    # correct per-euro metric above, a genuinely good-but-redundant player
+    # can still sit outside the cheapest-6 cut once enough truly poor bench
+    # players (correctly) rank worse. Only ever matters for MAX_SLOT==1
+    # positions (POR): nothing beyond the single slot can ever start
+    # regardless of the rest of the squad, so both must reach candidates()
+    # for rank()'s real simulation to judge between them.
+    by_slot_count: dict[str, list[str]] = {}
+    for k, s in mine_squad.items():
+        by_slot_count.setdefault(s, []).append(k)
+    for s, ks in by_slot_count.items():
+        if MAX_SLOT.get(s) == 1 and len(ks) > 1:
+            spare += [k for k in ks
+                     if k in fieldable_spare and k not in spare]
 
     out: list[Action] = []
     for c, price in sorted(u.price.items(), key=lambda kv: kv[1]):
@@ -662,9 +673,19 @@ def player_forecasts(u: Universe) -> dict[str, dict]:
     back to u.market_exp[k] held flat across the same count for
     everyone else — a cruder approximation, flagged via "simulated".
 
-    "par" is season_pts minus MY squad's weakest current option in that
-    slot — a standing per-player version of rank()'s own d_pts.
+    "par" is ffcore.score.vor() against the LEAGUE's own replacement level
+    (the score of the last man the league can start at that slot, pooled
+    across every squad plus market candidates) — not "MY squad's weakest
+    option", which answers "does he play Saturday" and goes stale the
+    moment a transfer changes what my own weakest option is. Restored
+    2026-09-13: this used to be exactly that squad-relative stand-in,
+    which score.py's own replacement()/vor() (a fixed, league-wide
+    baseline) were built to replace but got deleted with an old report
+    format on 2026-08-19 and never re-wired here.
+    Why: docs/notes/score.md#replacement-level--why-not-λ
     """
+    from ffcore.score import replacement as _replacement, squad_pool, vor
+
     jornadas = u.state.jornadas
     n_rem = len(jornadas)
     sim_season: dict[str, float] = {}
@@ -676,13 +697,14 @@ def player_forecasts(u: Universe) -> dict[str, dict]:
         if i == 0:
             sim_next = exp
 
-    my_squad = u.state.squads.get(u.me, {})
-    replacement: dict[str, float] = {}
-    for k, slot in my_squad.items():
-        v = (sim_season[k] if k in sim_season
-            else u.market_exp.get(k, 0.0) * n_rem)
-        if slot not in replacement or v < replacement[slot]:
-            replacement[slot] = v
+    # Pooled across every squad plus market candidates — a rival's player
+    # still occupies one of the league's starting slots, which is exactly
+    # what makes a position scarce.
+    wide_pool = squad_pool(
+        {"key": k, "slot": u.pos.get(k, ""), "score": pts}
+        for k, pts in sim_season.items() if u.pos.get(k))
+    repl = _replacement(wide_pool, len(u.state.squads)) if u.state.squads \
+        else {}
 
     out = {}
     for k, p in u.players.items():
@@ -694,7 +716,7 @@ def player_forecasts(u: Universe) -> dict[str, dict]:
         out[k] = {
             "season_pts": season_pts,
             "next_pts": next_pts,
-            "par": season_pts - replacement.get(slot, 0.0),
+            "par": vor({"slot": slot, "score": season_pts}, repl),
             "pj": p.derived.pj,
             "simulated": in_sim,
         }

@@ -37,7 +37,7 @@ from ffcore.text import norm
 from ffcore.tidy import minutes_played
 
 __all__ = ["SLOT", "SLOT_LABEL", "SLOT_MIN", "MAX_SLOT", "THIN",
-           "FREE_FORMATIONS", "formations",
+           "FREE_FORMATIONS", "formations", "starters_per_slot",
            "Rating", "Scorer", "pick_xi", "squad_pool",
            "replacement", "vor",
            "load_points", "build", "load_understat_current"]
@@ -1214,6 +1214,55 @@ def squad_pool(scored) -> dict[str, list[dict]]:
 # ---------------------------------------------------------------------------
 
 
+def starters_per_slot() -> dict[str, float]:
+    """{slot: how many the league starts there}, averaged over legal shapes.
+
+    3-4-3 and 5-4-1 start a different number of defenders, so no single
+    count is "the" number — averaged so the eleven still adds to eleven.
+    """
+    shapes = formations()
+    n = len(shapes)
+    tot = {"POR": float(n), "DEF": 0.0, "MED": 0.0, "DEL": 0.0}
+    for d, m, f in shapes:
+        tot["DEF"] += d
+        tot["MED"] += m
+        tot["DEL"] += f
+    return {k: v / n for k, v in tot.items()}
+
+
+def replacement(pool: dict, squads: int) -> dict[str, float]:
+    """{slot: the score of the last man the league can start there}.
+
+    `pool` is squad_pool() over everyone the market prices — owned or not,
+    because a player a rival holds still occupies one of the league's
+    starting slots, which is exactly what makes the position scarce.
+
+    A position with fewer players than the rung replaces at its own last
+    man: that is the worst anyone can be replaced with, and inventing a
+    lower number would price a thin position as though it were deep.
+    """
+    per = starters_per_slot()
+    out = {}
+    for slot, rows in pool.items():
+        if not rows:
+            continue
+        rung = max(1, round(squads * per.get(slot, 0.0)))
+        out[slot] = rows[min(rung, len(rows)) - 1]["score"]
+    return out
+
+
+def vor(row: dict, repl: dict) -> float:
+    """Score above replacement at this player's slot.
+
+    Negative is meaningful and is not clipped: it says the league can
+    field someone better at that position without paying for him.
+    """
+    slot = row.get("slot")
+    if not slot:
+        return 0.0                      # never startable: worth no more than 0
+    return row.get("score", 0.0) - repl.get(slot, 0.0)
+
+
 
 def _xi_search(by_slot: dict[str, list], shapes, force=None):
     """(total, shape, picked) — top-N-per-slot over every legal shape, the
@@ -1383,6 +1432,28 @@ def _selftest() -> None:
     # pick_xi still ranks on `score`, so the fixture reaches the eleven it is
     # meant to reach, and as_row() carries the new fields to the renderers.
     assert "fix" in s.as_row() and "flat" in s.as_row()
+
+    # -- replacement level: the score of the last man the LEAGUE can start
+    # there, not what MY eleven loses without him -- restored 2026-09-13,
+    # deleted 2026-08-19 as dead code when the old board report went, then
+    # missed when player_forecasts()'s PAR was built later as its own,
+    # squad-relative stand-in (see docs/notes/score.md's own note on why
+    # "what YOUR eleven loses" is wrong for anything but "does he play
+    # Saturday") -----------------------------------------------------------
+    per = starters_per_slot()
+    assert per == {"POR": 1.0, "DEF": 4.0, "MED": 4.0, "DEL": 2.0}, per
+    assert abs(sum(per.values()) - 11.0) < 1e-9
+    # 5 managers x 1 keeper/DEL-2 each -> the 5th/10th best in the league
+    # is the rung; a thin position (fewer players than the rung) replaces
+    # at its own worst rather than inventing a lower number.
+    pool = {"POR": [{"score": s_} for s_ in (9.0, 8.0, 7.0, 6.0, 5.0, 4.0)],
+           "DEL": [{"score": s_} for s_ in (9.0, 8.0)]}
+    repl = replacement(pool, squads=5)
+    assert repl["POR"] == 5.0, repl        # 5th best of 6
+    assert repl["DEL"] == 8.0, repl        # only 2 exist; the worse of them
+    assert vor({"slot": "POR", "score": 9.0}, repl) == 4.0
+    assert vor({"slot": "DEL", "score": 6.0}, repl) == -2.0  # below replacement
+    assert vor({"slot": ""}, repl) == 0.0                   # unstartable, not negative-infinity
 
     # -- P(start) blended against real recent minutes -----------------
     # Editorial says 100%; he has started nothing lately. pct_used must
