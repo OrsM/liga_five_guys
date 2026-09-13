@@ -35,7 +35,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import stats  # noqa: E402
-from ffcore.fixture import FIX_BAND, HOME_EDGE  # noqa: E402
+from ffcore.fixture import FIX_BAND  # noqa: E402
 from ffcore.score import SHRINK_K  # noqa: E402
 from ffcore.text import norm, resolve  # noqa: E402
 from ffcore.tidy import (run_now,  # noqa: E402
@@ -956,7 +956,33 @@ def formula_lines() -> list[str]:
     """The live constants, read from the modules that use them (never
     restated by hand) so a changed value shows up here on the next run.
     The reasoning behind them lives in the README, not duplicated here.
+
+    HOME_EDGE and the fixture-band coverage are re-derived HERE, not read
+    off `ffcore.fixture`'s module attribute or the `HOME_EDGE` name this
+    file imported at load time — decide.load() overwrites the module
+    attribute in place once it runs, so a `from ffcore.fixture import
+    HOME_EDGE` taken earlier (or a report run before decide.load() ever
+    has) is a stale, frozen 0.04 while every real score already uses the
+    fitted ~0.14. Found 2026-09-13: the report was calling a live-fitted
+    figure "a guess" and understating it by 3.4x.
     """
+    from ffcore.fixture import attack_defense, fit_home_edge
+    from ffcore.tidy import latest_only, load_crosswalk, load_results_history
+
+    results_hist = load_results_history()
+    matches = latest_only(read_csv(TIDY / "matches.csv"))
+    home_edge, home_edge_why = fit_home_edge(results_hist, matches)
+    teams = sorted({r.get("team") for r in latest_market() if r.get("team")})
+    xw = load_crosswalk()
+    slug_of = {c.market: c.ff_slug for c in xw.clubs.values()
+              if c.market and c.ff_slug} if xw is not None else {}
+    ad = attack_defense(results_hist, list(slug_of.values())) if slug_of \
+        else {}
+    fixture_line = (
+        f"| Fixture factor | per-club attack/defense fitted from real "
+        f"goals ({len(ad)} of {len(teams)} clubs; the rest fall back to "
+        f"±{FIX_BAND * 100:.0f}% by squad-value rank, MIN_AD_MATCHES not "
+        f"yet met) | yes, for {len(ad)} of {len(teams)} |")
     return [
         "### The model, as configured right now", "",
         "| Term | Setting | Fitted? |",
@@ -965,9 +991,8 @@ def formula_lines() -> list[str]:
         "— |",
         f"| Shrinkage | K = {SHRINK_K:g} matches, applied twice: last season "
         "toward the positional prior, then this season toward that | yes |",
-        f"| Fixture band | ±{FIX_BAND * 100:.0f}% across the opponents by "
-        "rank, not by ratio | **no, a guess** |",
-        f"| Home advantage | +{HOME_EDGE * 100:.0f}% | **no, a guess** |",
+        fixture_line,
+        f"| Home advantage | +{home_edge * 100:.1f}% | yes — {home_edge_why} |",
         f"| Team strength | {elo_basis()} | — |",
         f"| P(start) read from | `{LINEUP_SOURCE}` | see the Brier table |",
         "| Fixture applies to | fielding only — never a buy, a sale or the "
@@ -1509,7 +1534,9 @@ def comparison_lines() -> list[str]:
     # Attribution: not "how wrong", but "wrong about WHAT" — decides
     # whether the fixture band is kept, widened or deleted.
     if fx:
-        out += [f"| Next fixture (±{FIX_BAND*100:.0f}%, unfitted) | n | Mean "
+        out += ["| Next fixture (the blended factor actually applied — "
+                "attack/defense where fitted, else the "
+                f"±{FIX_BAND*100:.0f}% rank fallback) | n | Mean "
                 "forecast | Mean actual | Error |",
                 "|---|--:|--:|--:|--:|"]
         for label_, cnt, mp, ma, me in fx:
