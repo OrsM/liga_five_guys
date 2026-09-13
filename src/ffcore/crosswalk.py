@@ -25,7 +25,8 @@ from dataclasses import dataclass, field
 
 from ffcore.text import norm
 
-__all__ = ["Player", "Club", "Crosswalk", "PLAYER_COLS", "CLUB_COLS"]
+__all__ = ["Player", "Club", "Crosswalk", "PLAYER_COLS", "CLUB_COLS",
+          "club_key"]
 
 PLAYER_COLS = ["player_id", "name", "club_id", "ff_slug",
                "af_slug", "app_id", "understat_id", "app_names"]
@@ -307,6 +308,25 @@ class Crosswalk:
         return self
 
 
+def club_key(raw, teams, xw=None) -> str:
+    """One club, one key, whichever page spelled it — or "" if it will
+    not place.
+
+    Three sources name clubs three ways ("Rayo", "rayo-vallecano",
+    etc.) — folding case/punctuation alone isn't enough. THE CROSSWALK
+    ANSWERS THIS when there is one (clubs.csv, resolved once); the
+    fallback is `match_team` against the market's list. "" for an
+    unplaceable name, never equal to a real club.
+    """
+    if xw is not None:
+        hit = xw.club(ff_slug=raw, name=raw)
+        if hit:
+            return hit
+    from ffcore.fixture import match_team
+    hit = match_team(raw or "", teams)
+    return norm(hit) if hit else ""
+
+
 def _rows(path) -> list[dict]:
     if not path or not os.path.exists(path):
         return []
@@ -518,7 +538,30 @@ def _selftest() -> None:
         again2 = Crosswalk.read(pp, cc)
         assert again2.player(understat_id="555") == "alvaro fernandez"
 
-    print("ffcore.crosswalk self-test OK (44 cases)")
+    # -- club_key: one club, one key, whichever page spelled it -------------
+    # ONE CLUB, TWO SPELLINGS, and this is not hypothetical: the market calls
+    # them "Rayo", the fixture page "rayo-vallecano". Both sides go through
+    # the MARKET's list of clubs, which is the one canonical spelling there is.
+    teams = ["Alavés", "Getafe", "Celta Vigo", "Osasuna", "Rayo"]
+    assert club_key("rayo-vallecano", teams) == "rayo"
+
+    # THE CROSSWALK ANSWERS FIRST when there is one, because it resolved this
+    # once with every feed in front of it instead of guessing per call.
+    class _XW:
+        def club(self, **kw):
+            return "rayo" if "vallecano" in str(kw.values()).lower() else None
+
+    assert club_key("Rayo Vallecano", [], xw=_XW()) == "rayo"
+    # ...and the fallback still works where the table has nothing.
+    assert club_key("celta", teams, xw=_XW()) == "celta vigo"
+    assert club_key("Rayo", teams) == "rayo"
+    assert club_key("celta", teams) == "celta vigo"
+    # No club, or one nothing can place, is not "some club" — it is nothing,
+    # and nothing is never equal to a club that has played.
+    assert club_key("zzz-united", teams) == ""
+    assert club_key("", teams) == ""
+
+    print("ffcore.crosswalk self-test OK (51 cases)")
 
 
 if __name__ == "__main__":

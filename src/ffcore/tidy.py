@@ -42,7 +42,8 @@ __all__ = ["ROOT", "TIDY", "SEASON", "DECISIONS", "REPORTS", "PARTS", "MADRID",
            "MATCH_LEN", "minutes_played", "fresh_only", "DAILY_FRESH_DAYS",
            "EVERY_RUN_FRESH_DAYS", "stale_feeds",
            "GATED_API", "age_phrase", "last_api_standings",
-           "load_api_lineup"]
+           "load_api_lineup", "market_routes", "pending_sent", "bought_price",
+           "pending_received", "LISTED_SELLER"]
 
 ROOT = Path(os.environ.get("FF_ROOT", "./data"))
 TIDY = ROOT / "tidy"
@@ -1195,6 +1196,103 @@ class Market:
         return v - base.value, (v / base.value - 1) * 100.0 if base.value else None
 
 
+# WHICH SELLER VALUE IS A FREE AGENT, so a new one added by the app defaults
+# to the safe reading (the app dealing him) rather than silently starting to
+# treat every row as a contested rival listing — see market_routes()'s own
+# docstring for why the two are not the same transaction.
+LISTED_SELLER = "marketPlayerTeam"
+
+
+def market_routes(mkt: list[dict], key_of) -> tuple[dict[str, float],
+                                                    dict[str, str],
+                                                    dict[str, int]]:
+    """(price, route, bids) from api_market.csv's own rows.
+
+    `seller` has always said which is which: `marketPlayerLeague` is the app
+    dealing a free agent, `marketPlayerTeam` is a manager's own listing —
+    not the same transaction, the same reason a clause and an ordinary buy
+    aren't (only one has a real owner who can say no).
+    `key_of(row)` is handed in (not imported) so this stays testable on
+    synthetic rows.
+    """
+    price: dict[str, float] = {}
+    route: dict[str, str] = {}
+    bids: dict[str, int] = {}
+    for r in mkt:
+        k = key_of(r)
+        if not k or not r.get("sale_price"):
+            continue
+        price[k] = float(r["sale_price"])
+        route[k] = "listed" if r.get("seller") == LISTED_SELLER else "free"
+        bids[k] = int(r.get("bids") or 0)
+    return price, route, bids
+
+
+def pending_sent(mkt: list[dict]) -> float:
+    """Money already gone against a bid of yours still pending, summed.
+
+    The app holds it against the bid until accepted, rejected or
+    withdrawn — not free to spend today, however the raw balance reads.
+    Reads the same `bid_money` field a sent offer displays from.
+    """
+    return sum(float(r["bid_money"]) for r in mkt
+              if (r.get("bid_status") or "") == "pending" and r.get("bid_money"))
+
+
+def bought_price(txns: list[dict], xw) -> dict[str, float]:
+    """{key: what his CURRENT owner actually paid for him}, from the ledger.
+
+    REPLAYED OLDEST FIRST — a player sold and re-bought gets the LATER
+    price. `to == "market"` (a sale back to the app) is skipped, not
+    recorded as a price of zero. Joined through the crosswalk's app_id
+    (transactions.csv carries the ledger's LaLiga id); unplaced players
+    are skipped, not guessed.
+    """
+    out: dict[str, float] = {}
+    for t in txns:
+        to = (t.get("to") or "").strip()
+        if not to or to == "market":
+            continue
+        price = (t.get("price") or "").strip()
+        if not price:
+            continue
+        key = xw.player(app_id=(t.get("player_id") or "").strip()) if xw \
+            else None
+        if not key:
+            continue
+        try:
+            out[key] = float(price)
+        except ValueError:
+            continue
+    return out
+
+
+def pending_received(offers: list[dict], pt_to_key: dict[str, str]
+                     ) -> dict[str, float]:
+    """{player you hold: the largest pending offer on him}, or {}.
+
+    A REAL PENDING OFFER BEATS A GUESS. What a caller otherwise prices a
+    sale at is the market's own valuation — an estimate nothing has
+    tested — and a real bid sitting on a player you have actually listed is
+    ground truth for at least that much. Meant to be applied as a FLOOR on
+    `proceeds`, never an overwrite: another bidder could still beat it
+    before you act.
+
+    `pt_to_key` joins the API's own ownership-record id to this repo's key
+    — built once, off api_teams, and handed in rather than re-derived here.
+    """
+    out: dict[str, float] = {}
+    for r in offers:
+        if (r.get("status") or "") != "pending":
+            continue
+        k = pt_to_key.get(r.get("player_team_id") or "")
+        money = float(r.get("money") or 0)
+        if not k or not money:
+            continue
+        out[k] = max(out.get(k, 0.0), money)
+    return out
+
+
 # ---------------------------------------------------------------------------
 # selftest — the pure parts only: no filesystem, no clock
 # ---------------------------------------------------------------------------
@@ -1511,7 +1609,101 @@ def _selftest() -> None:
     assert minutes_played("coach", "") == 0.0               # nobody on the pitch
     assert minutes_played("starter", "0") == 0.0            # subbed off at kickoff
 
-    print("ffcore.tidy self-test OK (47 cases)")
+    # -- market_routes: a free agent is not a rival's listed player --------
+    # api_market.csv's own `seller` column already says which is which
+    # (marketPlayerLeague = the app dealing a free agent, marketPlayerTeam =
+    # a manager listing one of theirs) — worth telling apart: one nobody can
+    # refuse, the other has a real owner who might not sell.
+    mkt_rows = [
+        {"player_name": "Free Agent", "sale_price": "5000000",
+         "seller": "marketPlayerLeague", "bids": "0"},
+        {"player_name": "Listed Rival", "sale_price": "8000000",
+         "seller": "marketPlayerTeam", "bids": "2"},
+        # No sale_price at all: not on offer, not priced, not routed.
+        {"player_name": "Not Priced", "sale_price": "",
+         "seller": "marketPlayerLeague"},
+        # Resolves to no key: silently skipped, not a crash.
+        {"player_name": "Unjoinable", "sale_price": "1000000",
+         "seller": "marketPlayerTeam"},
+    ]
+    key_of = {"Free Agent": "free_agent", "Listed Rival": "listed_rival",
+             "Not Priced": "not_priced"}.get
+    price, route, bids = market_routes(
+        mkt_rows, lambda r: key_of((r.get("player_name") or "")))
+    assert price == {"free_agent": 5000000.0, "listed_rival": 8000000.0}, price
+    assert route == {"free_agent": "free", "listed_rival": "listed"}, route
+    assert bids == {"free_agent": 0, "listed_rival": 2}, bids
+    assert "not_priced" not in route and "not_priced" not in price
+    # An unrecognised seller value defaults to "free" — the app dealing it
+    # is the ordinary case, and a new discriminator value should not
+    # silently start reading every row as a contested rival listing.
+    unknown_seller = [{"player_name": "Free Agent", "sale_price": "1",
+                       "seller": "something_new"}]
+    _, r2, _ = market_routes(unknown_seller, lambda r: "free_agent")
+    assert r2 == {"free_agent": "free"}, r2
+
+    # -- pending_sent: a bid of yours is money already gone -----------------
+    mkt_bids = [
+        {"bid_status": "pending", "bid_money": "5600000"},
+        {"bid_status": "pending", "bid_money": "6795815"},
+        {"bid_status": "", "bid_money": ""},                # no bid here
+        {"bid_status": "accepted", "bid_money": "2000000"}, # settled, not held
+        {"bid_status": "pending", "bid_money": ""},         # unreachable shape
+    ]
+    assert pending_sent(mkt_bids) == 5600000.0 + 6795815.0, pending_sent(mkt_bids)
+    assert pending_sent([]) == 0.0
+
+    # -- pending_received: a real offer beats a guess, and only as a floor --
+    p2k = {"pt1": "me_a", "pt2": "me_b"}
+    offers = [
+        {"player_team_id": "pt1", "status": "pending", "money": "6795815"},
+        # A second, smaller pending offer on the SAME player: the larger
+        # one is what he could actually raise, not the first one seen.
+        {"player_team_id": "pt1", "status": "pending", "money": "1000000"},
+        {"player_team_id": "pt2", "status": "accepted", "money": "9000000"},
+        # No offer at all — the placeholder row parse_api_offer emits so the
+        # table stays stamped. Not pending, so it prices nothing.
+        {"player_team_id": "pt2", "status": "", "money": ""},
+        # A playerTeamId nothing in the squad joins to (sold since, or a
+        # rival's — should never happen, given offer_sources() only ever
+        # asks for your own, but a join failing silently beats a KeyError).
+        {"player_team_id": "unknown", "status": "pending", "money": "1"},
+    ]
+    got = pending_received(offers, p2k)
+    assert got == {"me_a": 6795815.0}, got     # pt2's only offer was accepted
+    assert pending_received([], p2k) == {}
+    assert pending_received(offers, {}) == {}   # nothing to join to
+
+    # -- bought_price: what the CURRENT owner actually paid, from the ledger -
+    from ffcore.crosswalk import Crosswalk, Player
+    bp_xw = Crosswalk(players={
+        "steady": Player(player_id="steady", app_id="101"),
+        "flip": Player(player_id="flip", app_id="102"),
+    })
+    bp_txns = [
+        {"date": "2026-08-11", "player": "Steady", "player_id": "101",
+         "from": "market", "to": "me", "price": "5000000"},
+        {"date": "2026-08-12", "player": "Flip", "player_id": "102",
+         "from": "market", "to": "riv", "price": "3000000"},
+        # Sold back to the app, then re-bought by ME at a different price —
+        # the LATER price wins, matching who holds him now.
+        {"date": "2026-08-20", "player": "Flip", "player_id": "102",
+         "from": "riv", "to": "market", "price": "4000000"},
+        {"date": "2026-08-21", "player": "Flip", "player_id": "102",
+         "from": "market", "to": "me", "price": "4500000"},
+        # No crosswalk entry for this app_id — skipped, not guessed.
+        {"date": "2026-08-13", "player": "Nobody", "player_id": "999",
+         "from": "market", "to": "me", "price": "1"},
+        # A blank price (a stray row) skips rather than crashing on float().
+        {"date": "2026-08-14", "player": "Steady", "player_id": "101",
+         "from": "market", "to": "me", "price": ""},
+    ]
+    bp = bought_price(bp_txns, bp_xw)
+    assert bp == {"steady": 5000000.0, "flip": 4500000.0}, bp
+    assert bought_price([], bp_xw) == {}
+    assert bought_price(bp_txns, None) == {}    # no crosswalk, nothing to join
+
+    print("ffcore.tidy self-test OK (57 cases)")
 
 
 if __name__ == "__main__":

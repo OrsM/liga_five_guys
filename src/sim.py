@@ -319,7 +319,7 @@ def ladder_rows(u, rows, bands=None) -> list[dict]:
                 # `premium` is 0.0 for a free agent, decide.burn()'s own
                 # number for a raid.
                 "market": market, "premium": premium,
-                # SELL rows only — decide.bought_price()'s own reading,
+                # SELL rows only — ffcore.tidy.bought_price()'s own reading,
                 # None for a player never transacted in this league's
                 # recorded ledger (came with the draft, or predates it).
                 "bought": bought}
@@ -1054,7 +1054,7 @@ def payload(u, rows, base, rivals, locks_h=None, n_actions: int = 0,
         "p_win": round(base.position().get(1, 0.0), 3),
         "band": [lo, hi],
         "moves": moves,
-        # `bought` is decide.bought_price()'s own reading, None for a
+        # `bought` is ffcore.tidy.bought_price()'s own reading, None for a
         # player never transacted in this league's recorded ledger.
         "sell": [{"name": names.get(k, k), "pos": u.pos.get(k, ""),
                   "raises": got, "bought": u.bought.get(k)}
