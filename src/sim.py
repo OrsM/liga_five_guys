@@ -683,12 +683,16 @@ def illegal_squads(u) -> list[tuple[str, list[str]]]:
     from "the model is confident he's finished" when the real fact is
     "his data can't field a squad at all".
 
-    report.py warns when MY OWN squad is thin; this covers a RIVAL's.
+    report.py warns when MY OWN squad is thin; this covers a RIVAL's — a
+    safety net for the simulation's own numbers, never a warning ABOUT a
+    rival shown to the user (not actionable for them, and not ours to
+    check — see the Why: below).
 
     SHOULD NEVER FIRE IN PRODUCTION: decide.phantom_fill() already
     patches every squad decide.load() returns with an average-player
     stand-in per missing position before anything reaches here (see
     phantom_filled() below). Kept as a safety net in case that regresses.
+    Why: docs/notes/decide.md#optimize-for-competent-play-warn-dont-model-for-incompetent-play
     """
     from ffcore.score import SLOT_LABEL, SLOT_MIN
     from ffcore.season import XI_SIZE, best_xi

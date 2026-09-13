@@ -396,6 +396,11 @@ def candidates(u: Universe, expected: dict[str, float],
     # value_rate()'s cost normalisation) purely so a reader scanning
     # generated Actions sees the most plausible funders first; every one
     # of them still reaches rank()'s real simulation regardless of order.
+    # _fieldable() is the one hard constraint (job 1: never propose an
+    # illegal squad); value-per-euro only orders the search (job 2), it
+    # doesn't gate it — see the Why: below for the ad hoc carve-out this
+    # replaced when the two jobs were tangled into one cutoff.
+    # Why: docs/notes/decide.md#optimize-for-competent-play-warn-dont-model-for-incompetent-play
     fieldable_spare = [k for k in mine if _fieldable(
         {p: s for p, s in mine_squad.items() if p != k})]
     par_of = {k: v["par"] for k, v in player_forecasts(u).items()}
@@ -1025,7 +1030,12 @@ def phantom_fill(squads: dict[str, dict[str, str]], per_jornada: dict[int, dict]
     for a brand-new player. Keyed `__phantom_<slot>_<n>` (no manager in
     the key) — a virtual average player has no real ownership to
     distinguish, so every squad short the same position shares it.
+    Applies to every manager, rivals included — not because we check
+    whether a rival is careless, but the opposite: ASSUME he'd competently
+    field or buy someone, so his data gap doesn't crash his simulated
+    score to zero and silently flatter my own win probability.
     Why: docs/notes/decide.md#phantom_fill--why-a-short-squad-gets-a-phantom-and-why-its-an-average
+    Why: docs/notes/decide.md#optimize-for-competent-play-warn-dont-model-for-incompetent-play
     """
     from ffcore.score import SLOT_MIN
 

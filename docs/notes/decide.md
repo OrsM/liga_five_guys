@@ -6,6 +6,56 @@ the full story — who found what, when, what was tried and rejected, and the
 real numbers behind each decision. Read this before changing any of the
 invariants the code states tersely.
 
+## optimize for competent play; warn, don't model, for incompetent play
+
+Miguel, 2026-09-13, after catching an ad hoc `MAX_SLOT==1` carve-out bolted
+onto `candidates()`'s spare-selection heuristic: two different jobs were
+getting tangled into one function, and the tangle is what made the fix feel
+ad hoc rather than falling out of the design.
+
+**The two jobs, kept separate:**
+
+1. **Guard against genuinely stupid, illegal, or broken states of MY OWN
+   squad** — an illegal XI, an overdrawn balance at lock, a missing plane.
+   These get a WARNING (report.py's alerts, sim.py's caveats), because
+   they're actionable: I can still do something about my own squad before
+   the jornada locks. This is a safety net, cheap and rare-firing by
+   construction — `illegal_squads()`'s own docstring says outright it
+   "SHOULD NEVER FIRE IN PRODUCTION", kept only in case an earlier patch
+   (`phantom_fill()`) regresses.
+
+2. **Optimize assuming everyone — me AND every rival — plays competently.**
+   The forecasting and decision layer should never be built around the
+   assumption that a rival might field an illegal XI, run negative, or
+   otherwise blunder, and it should never spend search effort checking
+   whether they have. `phantom_fill()` patching every squad (rivals
+   included) with an average-player stand-in is exactly this: it does NOT
+   check "is this rival being dumb" — it ASSUMES he'd competently field or
+   buy someone, so a data gap doesn't crash his simulated score to zero
+   and silently flatter my own win probability. Nothing here should ever
+   warn ABOUT a rival's illegal squad or overdraft to the user — that
+   isn't actionable for them, it's noise, and "they'll figure it out" is
+   the correct assumption to build the optimizer on even though it will
+   occasionally be false in reality.
+
+**The `MAX_SLOT==1` mistake, concretely:** `_fieldable()` (job 1, a hard
+constraint — never propose a sale that breaks squad legality) got a SECOND,
+separate carve-out bolted on to force a specific optimization case (a
+redundant second keeper) past a search heuristic's cutoff (job 2). The
+cutoff itself — any fixed-size "try only the best N by some metric" cap —
+was the actual bug: it can always exclude a genuinely good candidate once
+enough worse-by-that-metric options exist, whatever the metric. The fix
+was not a better carve-out, it was recognizing the cap didn't need to
+exist at all (measured: trying every legal spare costs ~0.5s more per
+report, nowhere near what the cap was guarding against) — one hard
+constraint, one optimization signal, no patch on top of either.
+
+**Applying this test to a future addition:** before writing anything that
+reasons about a rival's squad state, ask whether it's (a) a filter/patch so
+MY simulation doesn't get corrupted by their data gap — keep it, silent and
+automatic — or (b) a check on whether they made a good decision — don't
+write it, they're assumed competent and it isn't mine to flag.
+
 ## trial counts (SCREEN_TRIALS / FINAL_TRIALS)
 
 Screening runs at a fraction of FINAL_TRIALS. Common random numbers mean the
