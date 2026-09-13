@@ -955,9 +955,36 @@ def next_then_rest(base: dict, base_rest: dict, rem: list[int],
     return out
 
 
+def first_jornada_per_player(base: dict, rem: list[int],
+                             played: dict[int, set[str]],
+                             club: dict[str, str]) -> dict[str, int]:
+    """{key: the first jornada in `rem` that is genuinely HIS next one} —
+    the exact per-player tracking next_then_rest() already does
+    internally (a partial round drops a player once his own club has
+    played it, see that function's own docstring), pulled out so
+    apply_fixtures() can also ask "is THIS the one jornada his status
+    override belongs to" without a second copy of next_then_rest()'s own
+    scheduling logic. A DELIBERATE, small parallel computation rather
+    than a refactor of next_then_rest() itself: that function has its
+    own callers and tests already trusting its exact current shape, and
+    the risk of a subtle regression there outweighs the few lines saved.
+    """
+    first_seen: set[str] = set()
+    out: dict[str, int] = {}
+    for j in rem:
+        this_j = ({k for k in base if club.get(k) not in played[j]}
+                 if j in played else set(base))
+        for k in this_j:
+            if k not in first_seen:
+                first_seen.add(k)
+                out[k] = j
+    return out
+
+
 def apply_fixtures(per_jornada: dict[int, dict], sboard: dict[int, dict],
                    club: dict[str, str], pos: dict[str, str],
-                   ppm_of: dict[str, float]) -> dict[int, dict]:
+                   ppm_of: dict[str, float], status_of: dict = None,
+                   first_jornada_of: dict = None) -> dict[int, dict]:
     """`per_jornada`, with the POINTS half repriced against THAT jornada's
     real opponent (season_board()) instead of the single next-fixture
     factor `base`/`base_rest` were built with — the schedule is published
@@ -965,8 +992,24 @@ def apply_fixtures(per_jornada: dict[int, dict], sboard: dict[int, dict],
     was just not having asked. P(start) is untouched — a different
     question next_then_rest() already answers. A player season_board()
     has no Match for keeps his frozen next-fixture number.
+
+    `status_of`/`first_jornada_of` (both optional, default {}): real bug,
+    2026-09-13 (Miguel: "no booked player is playing so shouldn't they
+    have 0% end odds to play next game?", then "are you ensuring all
+    decision making metrics can be sourced to our single pipeline?").
+    Repricing from raw ppm*fix here silently discarded whatever status
+    override to_bootstrap_input() had already applied to THIS player's
+    OWN next jornada — a FOURTH independent rebuild of the same derived
+    fact (see ffcore.profile.status_adjusted()'s own docstring for the
+    first three). Applied ONLY at first_jornada_of[k] — a suspension or
+    a knock does not follow a player to jornada 20, the same reasoning
+    next_then_rest() itself already uses base vs base_rest for.
     Why: docs/notes/decide.md#next_then_rest--apply_fixtures
     """
+    from ffcore.profile import status_adjusted
+
+    status_of = status_of or {}
+    first_jornada_of = first_jornada_of or {}
     out: dict[int, dict] = {}
     for j, layer in per_jornada.items():
         board_j = sboard.get(j, {})
@@ -978,7 +1021,11 @@ def apply_fixtures(per_jornada: dict[int, dict], sboard: dict[int, dict],
                 continue
             fix = (m.def_factor if pos.get(k) in ("POR", "DEF")
                   else m.atk_factor)
-            new_layer[k] = (max(0.0, ppm_of[k] * fix), p)
+            new_pts, new_p = max(0.0, ppm_of[k] * fix), p
+            if first_jornada_of.get(k) == j:
+                new_pts, new_p = status_adjusted(new_pts, new_p,
+                                                 status_of.get(k, ""))
+            new_layer[k] = (new_pts, new_p)
         out[j] = new_layer
     return out
 
@@ -1448,9 +1495,11 @@ def load(trials_pool=None) -> Universe:
                  results=results_hist,
                  understat_rows=load_understat_players("2025")).items()}
     ppm_of = {k: s.ppm for k, s in scored.items() if s}
+    status_of = {k: s.status for k, s in scored.items() if s}
     per_j = apply_fixtures(
         next_then_rest(base, base_rest, rem, played, club),
-        sboard, club, pos, ppm_of)
+        sboard, club, pos, ppm_of, status_of=status_of,
+        first_jornada_of=first_jornada_per_player(base, rem, played, club))
     # A squad short a position can't be simulated at all (see phantom_fill())
     # — patched once here so every downstream reader gets the same fix.
     squads, per_j = phantom_fill(squads, per_j, pos)
@@ -2300,6 +2349,49 @@ def _selftest() -> None:
     # rather than being zeroed or dropped.
     assert out[1]["ghost"] == (3.0, 0.5), out[1]["ghost"]
 
+    # -- apply_fixtures: the status override survives the repricing, real
+    # bug 2026-09-13 (Miguel: "no booked player is playing so shouldn't
+    # they have 0% end odds to play next game?") — repricing from raw
+    # ppm*fix used to silently discard whatever to_bootstrap_input() had
+    # already done for a suspended/doubtful player's OWN next jornada ---
+    fjo = {"del": 1, "por": 2}   # "del" suspended THIS week, "por" doubt NEXT
+    status_of = {"del": "suspended", "por": "ok"}
+    out_susp = apply_fixtures(pj3, board, club3, pos3, ppm3,
+                              status_of=status_of, first_jornada_of=fjo)
+    # "del" is suspended AT JORNADA 1 (his own first_jornada_of) -> P(start)
+    # forced to 0 THERE, even though the raw repricing still computes a
+    # nonzero rate underneath.
+    assert out_susp[1]["del"][1] == 0.0, out_susp[1]["del"]
+    # Jornada 2 is NOT his own next jornada (that was 1) — untouched,
+    # normal rate, normal P(start). A one-match ban does not follow him.
+    assert out_susp[2]["del"] == (8.0 * 0.8, 0.9), out_susp[2]["del"]
+    # "por" isn't suspended at all — unaffected either jornada.
+    assert out_susp[1]["por"] == (4.0 * 1.1, 0.9), out_susp[1]["por"]
+
+    from ffcore.score import DOUBT_FACTOR
+    status_doubt = {"del": "doubt"}
+    out_doubt = apply_fixtures(pj3, board, club3, pos3, ppm3,
+                               status_of=status_doubt, first_jornada_of=fjo)
+    # DOUBT halves the POINTS side at his own next jornada, leaves
+    # P(start) alone — a real chance to play, not a zero.
+    assert abs(out_doubt[1]["del"][0] - 8.0 * 1.2 * DOUBT_FACTOR) < 1e-9, \
+        out_doubt[1]["del"]
+    assert out_doubt[1]["del"][1] == 0.9, out_doubt[1]["del"]
+
+    # No status_of/first_jornada_of at all (the old call shape): unchanged
+    # behaviour, not a crash — every existing caller before this fix.
+    assert apply_fixtures(pj3, board, club3, pos3, ppm3) == out, out
+
+    # -- first_jornada_per_player: the exact per-player tracking
+    # next_then_rest() does internally, exposed so apply_fixtures() can
+    # ask the same question without a second copy of the scheduling ----
+    fjp = first_jornada_per_player(base2, rem2, played2, club2)
+    # "susp" (getafe) hasn't played jornada 1 (only alaves has) -> his own
+    # first remaining jornada really is 1. "normal" (alaves) HAS played
+    # jornada 1 -> his own first remaining jornada is 2, matching
+    # next_then_rest()'s own pj[2] assignment above.
+    assert fjp == {"susp": 1, "normal": 2}, fjp
+
     # -- _fieldable: the one squad-legality check, counts only -------------
     # A real 4-4-2 shape: POR1/DEF4/MED4/DEL2.
     ok_squad = {"k": "POR", "d1": "DEF", "d2": "DEF", "d3": "DEF",
@@ -2419,7 +2511,7 @@ def _selftest() -> None:
     # evidence count, not a new statistic.
     assert fc_out["cand"]["pj"] == 8.0, fc_out["cand"]
 
-    print("decide self-test OK (162 cases)")
+    print("decide self-test OK (169 cases)")
 
 
 if __name__ == "__main__":
