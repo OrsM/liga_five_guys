@@ -2663,3 +2663,19 @@ observed_at,hours_to_lock,formation,index_total,player,pos,slot,start_pct,start_
 2026-09-13T1458Z,51.0,5-4-1,45.64,Yeray Alvarez,defensa,DEF,100,read,ok,0,6996248,3.401,1,4.140,1.000,,,4,3.401,none,,1972,7.932
 2026-09-13T1458Z,51.0,5-4-1,45.64,Sergio Carreira,defensa,DEF,100,read,ok,0,6903109,3.544,1,3.976,1.000,,,4,3.544,none,,7199,8.284
 2026-09-13T1458Z,51.0,5-4-1,45.64,Zaid Romero,defensa,DEF,0,read,suspended,0,27214554,0.000,0,6.385,1.125,Deportivo La Coruna,1,4,0.000,elo,6.6,14210,8.401
+2026-09-13T1518Z,50.7,5-4-1,45.64,Iñigo Vicente,delantero,DEL,50,read,ok,1,30162123,2.884,1,4.448,1.000,,,5,2.884,none,,6442,8.500
+2026-09-13T1518Z,50.7,5-4-1,45.64,Pepelu,mediocampista,MED,50,read,ok,0,9441997,2.711,1,4.353,0.933,Alaves,0,4,2.906,attack_defense,6.4,2715,8.363
+2026-09-13T1518Z,50.7,5-4-1,45.64,Carl Starfelt,defensa,DEF,0,read,ok,0,10523648,1.317,0,5.293,1.000,,,2,1.317,none,,9612,6.687
+2026-09-13T1518Z,50.7,5-4-1,45.64,Omar El Hilali,defensa,DEF,70,read,ok,0,14179599,3.526,1,4.398,1.000,,,5,3.526,none,,10220,9.604
+2026-09-13T1518Z,50.7,5-4-1,45.64,Lucien Agoume,mediocampista,MED,70,read,ok,0,8852880,3.905,1,4.508,1.039,Deportivo La Coruna,0,5,3.759,elo,26.9,7249,10.259
+2026-09-13T1518Z,50.7,5-4-1,45.64,Ionut Radu,portero,POR,100,read,ok,0,39643612,6.526,0,6.526,1.000,,,5,6.526,none,,5978,15.724
+2026-09-13T1518Z,50.7,5-4-1,45.64,Pablo Fornals,mediocampista,MED,70,read,ok,0,48426103,4.855,1,6.689,1.039,Villarreal,0,3,4.674,attack_defense,16.3,2632,12.476
+2026-09-13T1518Z,50.7,5-4-1,45.64,Marcos Alonso,defensa,DEF,100,read,ok,0,29468528,5.652,1,5.870,1.000,,,4,5.652,none,,4397,13.201
+2026-09-13T1518Z,50.7,5-4-1,45.64,Miguel Roman,mediocampista,MED,100,read,ok,0,10916674,4.771,1,4.962,1.000,,,4,4.771,none,,13808,11.382
+2026-09-13T1518Z,50.7,5-4-1,45.64,Natan,defensa,DEF,80,read,ok,0,30318358,2.584,1,4.934,0.712,Villarreal,0,3,3.628,attack_defense,16.3,11813,8.019
+2026-09-13T1518Z,50.7,5-4-1,45.64,Alvaro Mantilla,defensa,DEF,70,read,ok,1,1789832,2.212,0,2.860,1.000,,,5,2.212,none,,10336,5.950
+2026-09-13T1518Z,50.7,5-4-1,45.64,Ali Houary,delantero,DEL,,absent,ok,0,1140352,1.032,0,3.146,1.000,,,2,1.032,none,,14118,4.309
+2026-09-13T1518Z,50.7,5-4-1,45.64,Mathew Ryan,portero,POR,100,read,ok,0,27644774,7.808,1,7.808,1.000,,,4,7.808,none,,1743,18.428
+2026-09-13T1518Z,50.7,5-4-1,45.64,Yeray Alvarez,defensa,DEF,100,read,ok,0,6996248,3.401,1,4.140,1.000,,,4,3.401,none,,1972,7.932
+2026-09-13T1518Z,50.7,5-4-1,45.64,Sergio Carreira,defensa,DEF,100,read,ok,0,6903109,3.544,1,3.976,1.000,,,4,3.544,none,,7199,8.284
+2026-09-13T1518Z,50.7,5-4-1,45.64,Zaid Romero,defensa,DEF,0,read,suspended,0,27214554,0.000,0,6.385,1.125,Deportivo La Coruna,1,4,0.000,elo,6.6,14210,8.401
