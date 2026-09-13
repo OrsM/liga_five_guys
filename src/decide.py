@@ -242,7 +242,8 @@ def _synthetic_profiles(pos=None, price=None, proceeds=None, owner=None,
     """PlayerProfile per key across the given flat dicts, for constructing
     a Universe without a real ffcore.profile.build_profiles() pass.
     """
-    from ffcore.profile import (PlayerIdentity, PlayerCurrent, PlayerHistory,
+    from ffcore.crosswalk import Player
+    from ffcore.profile import (PlayerCurrent, PlayerHistory,
                                 PlayerDerived, PlayerProfile as _PP)
     keys = (set(pos or {}) | set(price or {}) | set(proceeds or {})
            | set(owner or {}) | set(value or {}) | set(market_exp or {})
@@ -251,7 +252,7 @@ def _synthetic_profiles(pos=None, price=None, proceeds=None, owner=None,
     out = {}
     for k in keys:
         out[k] = _PP(
-            identity=PlayerIdentity(key=k, name=(name or {}).get(k, k)),
+            identity=Player(player_id=k, name=(name or {}).get(k, k)),
             current=PlayerCurrent(
                 pos=(pos or {}).get(k, ""),
                 listed=k in (price or {}),
@@ -2065,12 +2066,13 @@ def _selftest() -> None:
     assert value_rate(0.0, 5e6) == 0.0           # a real price, zero return: 0, not None
 
     # -- player_forecasts: full pool, two-tier, replacement-relative --------
-    from ffcore.profile import (PlayerProfile, PlayerIdentity,
+    from ffcore.crosswalk import Player
+    from ffcore.profile import (PlayerProfile,
                                 PlayerCurrent, PlayerHistory, PlayerDerived)
 
     def mk_profile(pj, pos="MED", market_exp=None):
         return PlayerProfile(
-            identity=PlayerIdentity(key="x"), current=PlayerCurrent(pos=pos),
+            identity=Player(player_id="x"), current=PlayerCurrent(pos=pos),
             history=PlayerHistory(),
             derived=PlayerDerived(pj=pj, market_exp=market_exp))
 

@@ -18,26 +18,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+from ffcore.crosswalk import Player
 from ffcore.text import norm
 
-__all__ = ["PlayerIdentity", "PlayerCurrent", "PlayerHistory",
+__all__ = ["PlayerCurrent", "PlayerHistory",
           "PlayerDerived", "PlayerProfile", "build_profiles",
           "status_adjusted"]
-
-
-@dataclass
-class PlayerIdentity:
-    """Changes essentially never. Write once, read forever."""
-    key: str                    # crosswalk player_id — the join key everything else uses
-    app_id: str = ""            # LaLiga's own id
-    # `key` itself IS futbolfantasy's numeric id whenever a player's market
-    # row ever carried one (row_key()'s own convention) — there is no
-    # separate numeric field to hold; ff_slug is the distinct, genuinely
-    # separate piece of identity futbolfantasy actually adds.
-    ff_slug: str = ""
-    understat_id: str = ""
-    name: str = ""
-    full_name: str = ""
 
 
 @dataclass
@@ -130,7 +116,10 @@ UNSCORED_DEFAULT = (2.0, 0.5)
 
 @dataclass
 class PlayerProfile:
-    identity: PlayerIdentity
+    # The crosswalk's own Player record — not a copy. One identity record
+    # in the repo, not two shaped identically (PlayerIdentity used to
+    # exist solely to hold a clone of these same 5 fields).
+    identity: Player
     current: PlayerCurrent
     history: PlayerHistory
     derived: PlayerDerived
@@ -164,7 +153,7 @@ def _match_stats_history(rows) -> dict[str, dict[int, dict]]:
     who've been on one of this league's 5 squads; api_stats has no bulk
     equivalent). Keyed by LaLiga's own app_id (playerMaster.id), NOT the
     futbolfantasy ff_id _perjornada_history() uses — build_profiles()
-    joins each against PlayerIdentity.app_id, not the crosswalk key.
+    joins each against the identity's own app_id, not the crosswalk key.
     """
     out: dict[str, dict[int, dict]] = {}
     for r in rows:
@@ -262,14 +251,14 @@ def build_profiles(players: dict, sc, perjornada_rows,
     out: dict[str, PlayerProfile] = {}
     for k, rec in players.items():
         xp = xw.players.get(k) if xw is not None else None
-        ident = PlayerIdentity(
-            key=k,
-            app_id=(xp.app_id if xp else "") or "",
-            ff_slug=(xp.ff_slug if xp else "") or "",
-            understat_id=(xp.understat_id if xp else "") or "",
-            name=rec.get("name") or (xp.name if xp else "") or k,
-            full_name=rec.get("name") or (xp.name if xp else "") or k,
-        )
+        # No crosswalk entry for this key: a blank Player, not a guess —
+        # same degrade-to-empty-identity behaviour this always had.
+        ident = xp if xp is not None else Player(player_id=k)
+        # The market's own current spelling wins when it has one; the
+        # crosswalk's stored name only when it doesn't (mutated in place,
+        # so the crosswalk's own copy stays current too — one name, not
+        # two views of it that can drift apart).
+        ident.name = rec.get("name") or ident.name or k
         mk = (market_keyed or {}).get(k, {})
         cur = PlayerCurrent(
             club=(xp.club_id if xp else "") or rec.get("team") or "",
@@ -448,7 +437,7 @@ def _selftest() -> None:
     # still gets a profile, just with empty derived/history. This IS the
     # full-pool guarantee: nobody vanishes for lack of a market row.
     u = profiles["unknown"]
-    assert u.identity.key == "unknown" and u.current.club == "celta"
+    assert u.identity.player_id == "unknown" and u.current.club == "celta"
     assert u.derived.ppm is None and u.derived.market_exp is None
     assert u.current.listed is False and u.current.price is None
     assert u.history.points_by_jornada == {}

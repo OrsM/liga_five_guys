@@ -1663,7 +1663,8 @@ def _selftest() -> None:
     # -- BUY/RAID/LISTED split: free agents, a clause (cannot be
     # refused), and a listed target (the owner's own choice, essentially
     # never accepted) — three sections, same relative order in each.
-    from ffcore.profile import (PlayerProfile, PlayerIdentity,
+    from ffcore.crosswalk import Player
+    from ffcore.profile import (PlayerProfile,
                                 PlayerCurrent, PlayerHistory, PlayerDerived)
 
     steady_row = {"action": Action("buy", buy="steady", cost=5e6),
@@ -1700,7 +1701,7 @@ def _selftest() -> None:
                 "wished": (6.5, 1.0)} for j in (1, 2)}),
         cash=10e6, me="me",
         players={k: PlayerProfile(
-            identity=PlayerIdentity(key=k, name=k),
+            identity=Player(player_id=k, name=k),
             current=PlayerCurrent(
                 pos="MED", price=uc_price.get(k), owner=uc_owner.get(k),
                 route=uc_route.get(k), value=uc_value.get(k),
