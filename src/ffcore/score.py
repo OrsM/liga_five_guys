@@ -417,6 +417,84 @@ def backtest_predictor(feature_by_key_jornada: dict[str, dict[int, float]],
            "gap": bootstrap_gap(feature_err, baseline_err)}
 
 
+def walk_forward_compare(jornadas: list[int], fit_new, predict_new,
+                         predict_old, actual, min_history: int = 1
+                         ) -> dict | None:
+    """Does a NEWLY-FITTED approach beat the PREVIOUS one, tested the only
+    honest way: at every jornada, fit using ONLY the jornadas before it,
+    predict that one jornada, and never let it see anything from after.
+
+    THE GENERAL TOOL Miguel asked for 2026-09-13, after watching the
+    HOME_EDGE decision get checked three different ways in one
+    conversation — a one-off script fit on everything then tested
+    against a scattered sample (leakage), then a hand-written walk-
+    forward version, each written fresh for that one case. His own
+    words: "the approach that we're using to making these decisions
+    applies broadly and automatically" — this is that, for ANY
+    hypothesis (a constant, a blend, a whole new feature), not just
+    HOME_EDGE. Wire a new candidate in by writing four small callables;
+    never write the jornada-by-jornada loop again.
+
+    `jornadas`: every jornada with a real graded outcome, in order.
+    `fit_new(cutoff)`: fit the NEW approach's parameters using ONLY data
+        from jornadas strictly before `cutoff` — enforcing that is the
+        caller's job (this function just calls it once per jornada,
+        so `fit_new` deciding to peek at the wrong data is a caller bug,
+        not something this function can catch for you).
+    `predict_new(params, jornada)`: {key: predicted value} for that
+        jornada, using `fit_new`'s output.
+    `predict_old(jornada)`: {key: predicted value} for that jornada
+        under the PREVIOUS approach (a hardcoded constant, an earlier
+        fit, whatever was live before) — no fitting call, since "old"
+        by definition doesn't change.
+    `actual(jornada)`: {key: real outcome} for that jornada.
+
+    Only keys common to all three dicts for a jornada are scored — a
+    player either side has no opinion on is not a comparison. Jornadas
+    before `min_history` are skipped (nothing meaningful to fit
+    yet, e.g. jornada 1 with no prior season in view).
+
+    Returns {"per_jornada": [...], "n", "mae_old", "mae_new", "gap"} —
+    `gap` is stats.bootstrap_gap() on the two paired error series, real
+    significance, not a bare comparison. Deliberately does NOT decide
+    "keep" or "revert" for you: Miguel, same message, "it's fine for
+    this methodology to do a little bit worse... I'm not concerned about
+    that" — a fresh, principled, always-recalculated fit some jornadas
+    read slightly worse than a frozen constant on is not a bug in the
+    fit, so this reports the honest numbers and leaves the call to the
+    caller, exactly like backtest_predictor()'s own `beats` does.
+    None if no jornada produced a scoreable overlap.
+    Why: docs/notes/score.md#walk_forward_compare--the-general-tool
+    """
+    from stats import bootstrap_gap
+
+    per_jornada = []
+    all_old_err, all_new_err = [], []
+    for i, j in enumerate(jornadas):
+        if i < min_history:
+            continue
+        params = fit_new(j)
+        preds_new = predict_new(params, j)
+        preds_old = predict_old(j)
+        acts = actual(j)
+        common = set(preds_new) & set(preds_old) & set(acts)
+        if not common:
+            continue
+        old_err = [abs(preds_old[k] - acts[k]) for k in common]
+        new_err = [abs(preds_new[k] - acts[k]) for k in common]
+        all_old_err += old_err
+        all_new_err += new_err
+        per_jornada.append({"jornada": j, "n": len(common),
+                            "mae_old": sum(old_err) / len(old_err),
+                            "mae_new": sum(new_err) / len(new_err)})
+    if not all_old_err:
+        return None
+    return {"per_jornada": per_jornada, "n": len(all_old_err),
+           "mae_old": sum(all_old_err) / len(all_old_err),
+           "mae_new": sum(all_new_err) / len(all_new_err),
+           "gap": bootstrap_gap(all_new_err, all_old_err)}
+
+
 EXPERIMENT_LOG = "experiment_log.csv"
 
 
@@ -1819,6 +1897,68 @@ def _selftest() -> None:
     noisy2 = backtest_predictor(noise_feat2, noise_act2, min_pairs=10)
     assert noisy2 is not None and not noisy2["gap"]["beats"], noisy2
 
+    # -- walk_forward_compare: the general "does the newly-fitted approach
+    # beat the previous one" tool, checked with known-answer cases first -
+    jornadas_wf = [1, 2, 3, 4, 5]
+    # ACTUAL: player "p1" always scores exactly 10.0, "p2" always 4.0 —
+    # a fixed, known truth every jornada.
+    actual_map = {1: {"p1": 10.0, "p2": 4.0}, 2: {"p1": 10.0, "p2": 4.0},
+                 3: {"p1": 10.0, "p2": 4.0}, 4: {"p1": 10.0, "p2": 4.0},
+                 5: {"p1": 10.0, "p2": 4.0}}
+
+    def actual_wf(j):
+        return actual_map[j]
+
+    # OLD approach: always predicts a fixed 7.0 for everyone — wrong by a
+    # constant 3.0 for p1 and -3.0 for p2, forever.
+    def predict_old_flat(j):
+        return {"p1": 7.0, "p2": 7.0}
+
+    # NEW approach: "fits" by averaging every PRIOR jornada's true value —
+    # exact after jornada 2 (mean of a constant IS the constant), so it
+    # must clearly beat the flat-7.0 old approach once it has any history.
+    def fit_mean(cutoff):
+        prior = [actual_map[j] for j in jornadas_wf if j < cutoff]
+        if not prior:
+            return {"p1": 7.0, "p2": 7.0}   # no history yet: same as "old"
+        return {k: sum(p[k] for p in prior) / len(prior) for k in ("p1", "p2")}
+
+    def predict_mean(params, j):
+        return dict(params)
+
+    exact_wf = walk_forward_compare(jornadas_wf, fit_mean, predict_mean,
+                                    predict_old_flat, actual_wf,
+                                    min_history=1)
+    assert exact_wf is not None and exact_wf["n"] == 8, exact_wf  # 4 jornadas x 2 players
+    assert exact_wf["mae_new"] < 1e-9 < exact_wf["mae_old"], exact_wf
+    assert exact_wf["gap"]["beats"], exact_wf
+    assert len(exact_wf["per_jornada"]) == 4, exact_wf   # jornada 1 skipped (min_history)
+
+    # min_history skips the right jornadas, not an off-by-one.
+    exact_wf0 = walk_forward_compare(jornadas_wf, fit_mean, predict_mean,
+                                     predict_old_flat, actual_wf,
+                                     min_history=0)
+    assert len(exact_wf0["per_jornada"]) == 5, exact_wf0
+
+    # A candidate that's genuinely WORSE than the old approach reports
+    # that honestly — this function does not flatter its own "new" side.
+    def fit_bad(cutoff):
+        return {"p1": 0.0, "p2": 0.0}
+
+    def predict_bad(params, j):
+        return dict(params)
+
+    worse_wf = walk_forward_compare(jornadas_wf, fit_bad, predict_bad,
+                                    predict_old_flat, actual_wf,
+                                    min_history=1)
+    assert worse_wf["mae_new"] > worse_wf["mae_old"], worse_wf
+
+    # No overlap at all between the two prediction dicts and the actuals:
+    # None, not a crash or a fabricated zero.
+    assert walk_forward_compare(
+        jornadas_wf, lambda c: {}, lambda p, j: {},
+        lambda j: {"nobody": 1.0}, actual_wf, min_history=1) is None
+
     # -- log_experiment / experiment_history: append-only, a negative
     # result logged same as a positive one ----------------------------
     import tempfile as _tempfile5
@@ -1949,7 +2089,7 @@ def _selftest() -> None:
         finally:
             _tidy3.TIDY, _tidy3.SEASON = _real_tidy3, _real_season3
 
-    print("ffcore.score self-test OK (76 cases)")
+    print("ffcore.score self-test OK (82 cases)")
 
 
 if __name__ == "__main__":
