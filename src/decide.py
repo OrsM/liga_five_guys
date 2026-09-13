@@ -379,12 +379,27 @@ def candidates(u: Universe, expected: dict[str, float],
         bar_exp = expected
         xi = set(best_xi(u.state.squads[u.me], bar_exp))
     bar = xi_bar(bar_exp, xi)
-    # A spare: selling him ALONE still leaves a fieldable shape. Cheapest
-    # (by expected points) first, so the funder is the least you give up.
-    spare = sorted(
-        (k for k in mine
-         if _fieldable({p: s for p, s in mine_squad.items() if p != k})),
-        key=lambda k: bar_exp.get(k, 0.0))
+    # A spare: selling him ALONE still leaves a fieldable shape. Ranked by
+    # value above replacement PER EURO he'd raise (player_forecasts()'s own
+    # PAR over value_rate()'s own cost normalisation) — not raw expected
+    # points. A raw-points ranking missed a real case: a 39.64M keeper who
+    # started fewer of the remaining jornadas than the 27.64M one he was
+    # blocking ranked ABOVE most of the squad on points alone and never
+    # fell into a "cheapest by points" cut, even though his PAR over his
+    # own replacement (the other keeper) was small and his proceeds were
+    # the squad's largest — exactly what points-above-replacement-per-cost
+    # exists to catch.
+    fieldable_spare = [k for k in mine if _fieldable(
+        {p: s for p, s in mine_squad.items() if p != k})]
+    par_of = {k: v["par"] for k, v in player_forecasts(u).items()}
+
+    def _spare_rank(k):
+        vr = value_rate(par_of.get(k, 0.0), u.proceeds.get(k, 0.0))
+        # No proceeds means nothing to fund with regardless of how little
+        # he's worth keeping — ranks last, never first.
+        return (vr is None, vr if vr is not None else 0.0)
+
+    spare = sorted(fieldable_spare, key=_spare_rank)[:6]
 
     out: list[Action] = []
     for c, price in sorted(u.price.items(), key=lambda kv: kv[1]):
@@ -403,8 +418,9 @@ def candidates(u: Universe, expected: dict[str, float],
         swap = kind + "-swap" if raid else "swap"
         if price <= cash:
             out.append(Action(kind, buy=c, cost=price, victim=victim))
-        # Funded by a sale: only the cheapest few spares are worth trying.
-        for s in spare[:6]:
+        # Funded by a sale: only the worst-value-per-euro few spares are
+        # worth trying (spare's own docstring above).
+        for s in spare:
             got = u.proceeds.get(s, 0.0)
             if price <= cash + got:
                 out.append(Action(swap, buy=c, sell=s, cost=price,
