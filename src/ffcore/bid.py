@@ -117,6 +117,13 @@ def deals(lg, market) -> list[dict]:
             "key": who,
             "actor": dst if dst != MARKET else src,
             "side": "buy" if dst != MARKET else "sell",
+            # A clause raid, not a free-agent buy — both are "side": "buy"
+            # (unchanged: every existing buy-side reader pools them, and
+            # that pooling is deliberate there), but a raid's premium is a
+            # different real-world question ("what a clause forces above
+            # market value", not "what a free-agent bid won at") — see
+            # ffcore.bid.premiums()'s side="raid".
+            "is_clause": dst != MARKET and src != MARKET,
             "price": price, "when": when,
             "value": v.value if v else None,
             "lag_h": v.lag_h if v else None,

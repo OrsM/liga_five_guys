@@ -46,17 +46,17 @@ from ffcore.parse import fmt_money  # noqa: E402
 from ffcore.league import app_fielded  # noqa: E402
 from ffcore.render import title_name  # noqa: E402
 from ffcore.tidy import (run_now,  # noqa: E402
-                         PARTS, REPORTS, age_phrase,  # noqa: E402
+                         ALERTS, PARTS, REPORTS, age_phrase,  # noqa: E402
                          stale_feeds,
                          write_lines)
 
 OUT = "sim.md"
 
-# Shared with report.py, which writes the squad half of it before this runs.
-# In .runtime/ (gitignored): the file is a signal for a notifier, not a
-# document, and its EXISTENCE is the signal — an empty alerts file that has to
-# be read to discover it is empty is how "no news" gets pushed to a phone.
-ALERTS = Path(_os.environ.get("LFG_ALERTS", ".runtime/alerts.md"))
+# ALERTS: shared with report.py, which writes the squad half of it before
+# this runs. In .runtime/ (gitignored): the file is a signal for a notifier,
+# not a document, and its EXISTENCE is the signal — an empty alerts file
+# that has to be read to discover it is empty is how "no news" gets pushed
+# to a phone.
 
 # How many moves the table prints. The tail is options the simulation has
 # already said are worth less than the ones above them, and a phone screen is
@@ -119,17 +119,22 @@ def _warnings() -> list:
         return []
 
 
-def xi_note(u) -> str:
+def xi_note(u, xi=None) -> str:
     """The one line the change list cannot say by existing, or "".
 
     Two states have no rows to show for them and both matter: the app has not
     told us which eleven you are fielding (so the whole sheet is printed and
     you should know why), or you are already fielding the best one (so there
     is nothing to do, which is an answer and not an empty table).
+
+    `xi`, when given, is the caller's own current_xi()-derived reading —
+    see by_slot()'s docstring for why this matters once one report render
+    calls this fact from several places.
     """
     import decide
 
-    _, xi = decide.current_xi(u)
+    if xi is None:
+        _, xi = decide.current_xi(u)
     chg = xi_change(fielded_keys(u), xi)
     if not chg["legal"]:
         return ("the app has not said which eleven you are fielding, so this "
@@ -164,22 +169,26 @@ def xi_change(marked: list[str], best) -> dict:
             "out": [k for k in marked if k not in want]}
 
 
-def fielded_shape(u) -> str:
+def fielded_shape(u, xi=None) -> str:
     """The formation you are ACTUALLY playing, from the marks at the last log.
 
     Without it "play 4-5-1" is advice you cannot check: you have no way to
     know whether it is what you are already doing. Empty when the marks are
     not an eleven — a shape read off ten men is not a formation anybody is
     playing, and printing it as one is worse than printing nothing.
+
+    `xi`, when given, is the caller's own current_xi()-derived reading —
+    see xi_note()'s docstring.
     """
     import decide
 
-    _, best = decide.current_xi(u)
+    if xi is None:
+        _, xi = decide.current_xi(u)
     keys = fielded_keys(u)
-    return shape(u, keys) if xi_change(keys, best)["legal"] else ""
+    return shape(u, keys) if xi_change(keys, xi)["legal"] else ""
 
 
-def header(u, base, n_actions: int, locks_h=None) -> list[str]:
+def header(u, base, n_actions: int, locks_h=None, xi=None) -> list[str]:
     """The lines above the table: when it locks, then where I finish.
 
     THE DEADLINE LEADS. A decision you have missed is not a decision, and
@@ -189,6 +198,9 @@ def header(u, base, n_actions: int, locks_h=None) -> list[str]:
     league will never produce; the 10-90 interval is the honest form of the
     same statement, and printing the first without the second is how a
     forecast gets read as a fixture.
+
+    `xi`, when given, is the caller's own current_xi()-derived reading —
+    see xi_note()'s docstring.
     """
     lo, hi = base.band(u.me)
     val = squad_value(u)
@@ -210,8 +222,8 @@ def header(u, base, n_actions: int, locks_h=None) -> list[str]:
     ctx += ["squad %s" % fmt_money(val), cash_txt,
             "total %s" % fmt_money(val + u.cash)]
 
-    want = _shape_now(u)
-    now = fielded_shape(u)
+    want = _shape_now(u, xi=xi)
+    now = fielded_shape(u, xi=xi)
     form = ("**play %s** (now %s)" % (want, now)) if now and now != want \
         else "play %s" % want
     return [" · ".join(ctx), "",
@@ -259,10 +271,15 @@ def by_slot(u, keys, exp=None):
                                        -exp.get(k, 0.0)))
 
 
-def _bar(u) -> float:
-    """The weakest man in the eleven you would field — the line on the ladder."""
+def _bar(u, exp=None, xi=None) -> float:
+    """The weakest man in the eleven you would field — the line on the ladder.
+
+    `exp`/`xi`, when given, are the caller's own current_xi()-derived
+    reading — see xi_note()'s docstring.
+    """
     import decide
-    exp, xi = decide.current_xi(u)
+    if exp is None or xi is None:
+        exp, xi = decide.current_xi(u)
     return decide.xi_bar(exp, xi)
 
 
@@ -275,7 +292,7 @@ def short_manager(m: str) -> str:
 
 
 
-def ladder_rows(u, rows, bands=None) -> list[dict]:
+def ladder_rows(u, rows, bands=None, exp=None, xi=None) -> list[dict]:
     """The grouped plan as data, so the phone draws the same one table.
 
     Same groups, same order, same numbers. Two renderers drawing different
@@ -286,15 +303,20 @@ def ladder_rows(u, rows, bands=None) -> list[dict]:
     (pts_lo/pts_hi) for EVERY row, not just the point estimate xpts already
     carried. `bands=None` (an old caller, or the self-test) is the unpriced
     table, not a crash.
+
+    `exp`/`xi`, when given, are the caller's own current_xi()-derived
+    reading — see xi_note()'s docstring.
     """
     import decide
 
-    exp, xi = decide.current_xi(u)
+    if exp is None or xi is None:
+        exp, xi = decide.current_xi(u)
     mine = u.state.squads.get(u.me, {})
-    dead = {k for k, _ in decide_dead(u)}
+    dead_weight = decide.dead_weight(u)
+    dead = {k for k, _ in dead_weight}
     won = {r["action"].buy: r for r in rows if r["action"].buy}
     bar = decide.xi_bar(exp, xi)
-    spare = sum(v for _k, v in decide_dead(u))
+    spare = sum(v for _k, v in dead_weight)
     rest = [k for k in u.price if k not in mine and exp.get(k, 0.0) > bar]
     # A won row carries rank()'s own band, off the squad the victim's
     # response leaves behind — which is why rank() never bands them twice.
@@ -413,7 +435,7 @@ def ladder_rows(u, rows, bands=None) -> list[dict]:
 
 
 
-def band_acts(u) -> list:
+def band_acts(u, exp=None, xi=None) -> list:
     """The one-man questions the ladder needs a season band for, as
     `[(key, Action), ...]`: a pure sale for every held player, an outright
     buy (no sale funding it) for everyone else who beats the current bar.
@@ -425,10 +447,14 @@ def band_acts(u) -> list:
     A PURE SALE, NOT A FUNDED UPGRADE — no "what selling him could afford
     instead" narrative. Plainer, honest question: what does this man's
     own sale cost you.
+
+    `exp`/`xi`, when given, are the caller's own current_xi()-derived
+    reading — see xi_note()'s docstring.
     """
     import decide
 
-    exp, xi = decide.current_xi(u)
+    if exp is None or xi is None:
+        exp, xi = decide.current_xi(u)
     mine = u.state.squads.get(u.me, {})
     bar = decide.xi_bar(exp, xi)
     acts = [(k, decide.Action("sell", sell=(k,),
@@ -452,7 +478,7 @@ def market_candidates(u) -> list:
            for k in u.price if k not in mine]
 
 
-def ladder(u, rows, base, data=None) -> list[str]:
+def ladder(u, rows, base, data=None, exp=None, xi=None) -> list[str]:
     """EVERY PLAYER YOU COULD HOLD, GROUPED BY WHAT TO DO WITH HIM.
 
     Not one long ranking: a plan. The eleven you should field, then the ones
@@ -473,11 +499,15 @@ def ladder(u, rows, base, data=None) -> list[str]:
     simulation behind every band runs ONCE per report, not once per
     renderer. `data=None` (a caller with no JSON side, or the self-test)
     draws the same table with no bands in it, not a crash.
+
+    `exp`/`xi`, when given, are the caller's own current_xi()-derived
+    reading — see xi_note()'s docstring.
     """
     import decide
 
-    exp, xi = decide.current_xi(u)
-    data = data if data is not None else ladder_rows(u, rows)
+    if exp is None or xi is None:
+        exp, xi = decide.current_xi(u)
+    data = data if data is not None else ladder_rows(u, rows, exp=exp, xi=xi)
     by_group: dict[str, list[dict]] = {}
     for r in data:
         by_group.setdefault(r["group"], []).append(r)
@@ -597,11 +627,6 @@ def ladder(u, rows, base, data=None) -> list[str]:
     return out
 
 
-def decide_dead(u):
-    from decide import dead_weight
-    return dead_weight(u)
-
-
 def _cash_cell(u, manager: str) -> str:
     """What one manager can bid with, marked as observed or estimated.
 
@@ -719,11 +744,24 @@ def caveats(u) -> list[str]:
                    "round is simulated, and it still re-picks an eleven that "
                    "is in fact already locked |" % (j, len(clubs)))
     if u.cash_note:
-        out.append("| %s | a clause runs a median 1.52× market value here and "
-                   "the app pays back only the value, so the premium is gone "
-                   "for good. It is charged against the move, but priced off "
-                   "what more money would buy you today — most days, very "
-                   "little |" % u.cash_note)
+        from ffcore.bid import deals as _deals, premiums as _premiums
+        from ffcore.model import session
+        _lg = session().lg
+        _clause_prem = None
+        if _lg and _lg.market:
+            _dl = [d for d in _deals(_lg, _lg.market) if d.get("is_clause")]
+            _clause_prem = _premiums(_dl, "buy")
+        prem_phrase = ("a clause runs a median %.2fx market value here (n=%d "
+                       "real raids)" % (1 + _clause_prem.median / 100.0,
+                                        _clause_prem.n)
+                       if _clause_prem else
+                       "a clause runs above market value here — too few "
+                       "real raids logged yet to median")
+        out.append("| %s | %s and the app pays back only the value, so the "
+                   "premium is gone for good. It is charged against the "
+                   "move, but priced off what more money would buy you "
+                   "today — most days, very little |"
+                   % (u.cash_note, prem_phrase))
     if u.unjoined:
         out.append("| Named by the app in a way nothing else matches: %s | "
                    "missing from the simulation entirely |"
@@ -918,30 +956,48 @@ def shape(u, keys) -> str:
     return "%d-%d-%d" % (n.get("DEF", 0), n.get("MED", 0), n.get("DEL", 0))
 
 
-def _xi_total(u, who) -> float:
+def _xi_total(u, who, exp=None) -> float:
+    """`exp`, when given, is current_xi()'s SAME dict regardless of `who`
+    (see its own docstring) — sharing it here skips re-deriving
+    expected_own() once per manager, only the per-squad XI search differs.
+    """
     import decide
-    exp, xi = decide.current_xi(u, who)
+    from ffcore.season import best_xi
+    if exp is None:
+        exp, _ = decide.current_xi(u)
+    xi = best_xi(u.state.squads.get(who, {}), exp)
     return sum(exp.get(k, 0.0) for k in xi)
 
 
-def _shape_now(u) -> str:
+def _shape_now(u, xi=None) -> str:
+    """`xi`, when given, is the caller's own current_xi()-derived reading —
+    see xi_note()'s docstring."""
     import decide
-    _, xi = decide.current_xi(u)
+    if xi is None:
+        _, xi = decide.current_xi(u)
     return shape(u, xi)
 
 
-def _rival_best(u) -> dict:
+def _rival_best(u, exp=None) -> dict:
     """The strongest eleven anybody else can field — the number you are
-    actually chasing, and the one the ranking never showed."""
-    out = [(_xi_total(u, m), m) for m in u.state.squads if m != u.me]
+    actually chasing, and the one the ranking never showed.
+
+    `exp`, when given, is the caller's own current_xi()-derived reading —
+    see _xi_total()'s docstring for why one dict serves every manager.
+    """
+    import decide
+    if exp is None:
+        exp, _ = decide.current_xi(u)
+    out = [(_xi_total(u, m, exp=exp), m) for m in u.state.squads if m != u.me]
     if not out:
         return {}
     total, who = max(out)
-    return {"manager": who, "xi": total, "gap": _xi_total(u, u.me) - total}
+    return {"manager": who, "xi": total,
+           "gap": _xi_total(u, u.me, exp=exp) - total}
 
 
 def payload(u, rows, base, rivals, locks_h=None, n_actions: int = 0,
-            ladder_data=None) -> dict:
+            ladder_data=None, exp=None, xi=None) -> dict:
     """The report as data, for the phone to draw.
 
     Same rows as the markdown, so the two cannot disagree about order or
@@ -953,7 +1009,16 @@ def payload(u, rows, base, rivals, locks_h=None, n_actions: int = 0,
     `ladder_data`, when given, is ladder_rows()'s own result already
     computed by the caller — see ladder()'s matching note. `None` computes
     it here, exactly as before.
+
+    `exp`/`xi`, when given, are the caller's own current_xi()-derived
+    reading, threaded into every one of this function's own sub-calls that
+    would otherwise each ask decide.current_xi() again — see xi_note()'s
+    docstring.
     """
+    import decide
+
+    if exp is None or xi is None:
+        exp, xi = decide.current_xi(u)
     names = {k: title_name(v) for k, v in u.name.items()}
     lo, hi = base.band(u.me)
     moves = []
@@ -1022,13 +1087,13 @@ def payload(u, rows, base, rivals, locks_h=None, n_actions: int = 0,
                   "raises": got, "bought": u.bought.get(k)}
                  for k, got in dead_weight(u)],
         "ladder": (ladder_data if ladder_data is not None
-                  else ladder_rows(u, rows)),
-        "bar": _bar(u),
-        "xi_total": _xi_total(u, u.me),
-        "shape": _shape_now(u),
-        "rival_best": _rival_best(u),
-        "shape_now": fielded_shape(u),
-        "xi_note": xi_note(u),
+                  else ladder_rows(u, rows, exp=exp, xi=xi)),
+        "bar": _bar(u, exp=exp, xi=xi),
+        "xi_total": _xi_total(u, u.me, exp=exp),
+        "shape": _shape_now(u, xi=xi),
+        "rival_best": _rival_best(u, exp=exp),
+        "shape_now": fielded_shape(u, xi=xi),
+        "xi_note": xi_note(u, xi=xi),
         # Written by report.py minutes earlier in the same run — the board
         # draws them, so "only 1 portero" or "the app's feed is 3 days stale"
         # reaches the phone instead of living in a markdown file nobody opens
@@ -1116,7 +1181,7 @@ def placeholder(why: str) -> list[str]:
 
 
 def render(u, rows, base, stamp: str, rivals, n_actions: int = 0,
-           locks_h=None, ladder_data=None) -> list[str]:
+           locks_h=None, ladder_data=None, exp=None, xi=None) -> list[str]:
     # EVERYTHING UNDER A HEADING, including the preamble. digest.py drops a
     # source's H1 when it stitches the appendix and keeps what follows, so a
     # preamble above the first `## ` arrives in the middle of the report
@@ -1125,13 +1190,17 @@ def render(u, rows, base, stamp: str, rivals, n_actions: int = 0,
     #
     # No sentences above the table — verdict()/market_percentile() retired.
     # Why: docs/notes/sim.md#render--no-sentences-above-the-table
+    import decide
+
+    if exp is None or xi is None:
+        exp, xi = decide.current_xi(u)
     out = ["# The simulation — %s" % stamp, "", "## Now", ""]
-    out += header(u, base, n_actions or len(rows), locks_h)
+    out += header(u, base, n_actions or len(rows), locks_h, xi=xi)
     # THE RANKING IS SUBORDINATE TO THE CALL, and says so in its own heading.
     # Presented as "what to do" directly above a section saying "do nothing",
     # it is a contradiction rather than a second opinion.
     out += ["## Every player you could hold", ""]
-    out += ladder(u, rows, base, ladder_data)
+    out += ladder(u, rows, base, ladder_data, exp=exp, xi=xi)
     out += ["## Where the league stands", ""]
     out += standings(u, base)
     out += ["## What the simulation cannot see", ""]
@@ -1868,7 +1937,14 @@ def main() -> None:
     # band for every OTHER listed player too (no bar filter) — a real
     # comparison, not just the plausibly-helpful subset — and rank()
     # answers all of it in the pass it was already running.
-    bar_acts = band_acts(u)
+    # THE ONE "current best eleven" ANSWER for this whole render — every
+    # sub-call below used to ask decide.current_xi(u) again on its own
+    # (same u, same answer, ~9 redundant rebuilds per report). Named
+    # xi_exp, not exp, to keep it apart from candidates()'s own `exp`
+    # above (one shared jornada for the screening bar — a different
+    # question, see current_xi()'s own docstring on why the two differ).
+    xi_exp, xi = decide.current_xi(u)
+    bar_acts = band_acts(u, exp=xi_exp, xi=xi)
     bar_keys = {k for k, _ in bar_acts}
     extra_acts = bar_acts + [t for t in market_candidates(u)
                              if t[0] not in bar_keys]
@@ -1882,12 +1958,13 @@ def main() -> None:
     rivals = [m for m in u.state.squads if m != u.me]
     # ONE COMPUTATION, READ BY BOTH RENDERERS — render() and payload() both
     # draw this one list, so the two cannot disagree about groups or order.
-    ladder_data = ladder_rows(u, rows, bands)
+    ladder_data = ladder_rows(u, rows, bands, exp=xi_exp, xi=xi)
     from slate import comparison_rows, comparison_table
     cmp_rows = comparison_rows(u, bands)
     write_lines(PARTS / OUT,
                 render(u, rows, base, stamp, rivals, len(acts), locks_h,
-                       ladder_data) + comparison_table(cmp_rows))
+                       ladder_data, exp=xi_exp, xi=xi)
+                + comparison_table(cmp_rows))
     print("wrote %s (%d moves, %d simulated in full)"
           % (PARTS / OUT, len(acts), len(rows)))
 
@@ -1895,7 +1972,7 @@ def main() -> None:
         "generated_at": run_now()
                           .strftime("%Y-%m-%dT%H:%MZ"),
         **payload(u, rows, base, rivals, locks_h, len(acts),
-                  ladder_data=ladder_data),
+                  ladder_data=ladder_data, exp=xi_exp, xi=xi),
         "market": cmp_rows,
     }, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
     print("wrote %s" % (REPORTS / "decisions.json"))
