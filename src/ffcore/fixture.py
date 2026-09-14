@@ -31,7 +31,7 @@ from typing import NamedTuple
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from ffcore.parse import money  # noqa: E402
-from ffcore.text import norm  # noqa: E402
+from ffcore.text import match_one, norm  # noqa: E402
 from ffcore.tidy import kickoff_stamp  # noqa: E402
 
 # +/- this much from a median opponent, hardest to easiest. Unfitted guess.
@@ -343,18 +343,13 @@ def match_team(side: str, teams) -> str | None:
     """The market's name for a fixture-page side, or None.
 
     The two pages spell clubs differently — `Celta` and `Celta Vigo`, `Betis`
-    and `Real Betis` — and neither publishes an id the other uses. Exact
-    first, then substring either way. Two candidates is None, never a pick:
-    the same rule the player join follows.
+    and `Real Betis` — and neither publishes an id the other uses.
+    ffcore.text.match_one() is the shared exact-then-substring rule; also
+    used by sources._fd_match_team for the same question against a
+    different page, so the two cannot drift apart the way a second
+    hand-copy of this rule once risked.
     """
-    q = norm(side)
-    if not q:
-        return None
-    exact = [t for t in teams if norm(t) == q]
-    if exact:
-        return exact[0]
-    hits = [t for t in teams if norm(t) and (norm(t) in q or q in norm(t))]
-    return hits[0] if len(hits) == 1 else None
+    return match_one(side, teams)
 
 
 def fixture_board(market: list[dict], fixtures: list[dict],

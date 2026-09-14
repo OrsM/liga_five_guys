@@ -7,6 +7,9 @@ differently and none carry an id reliable across all of them.
     norm()     the key. Use it for every dict keyed by player.
     tokens()   norm() split into words worth matching on.
     resolve()  the shared fuzzy lookup: exact, then substring, then tokens.
+    match_one() the plainer two-pass version: exact, then unambiguous
+               substring, over a flat list of candidate strings rather
+               than keyed rows — team names, not players.
 
 norm() is lossy on purpose — folds ñ to n, drops apostrophes. It's a
 key, never a display string; keep the original text for anything a
@@ -19,7 +22,7 @@ import re
 import unicodedata
 from functools import lru_cache
 
-__all__ = ["norm", "fold", "tokens", "resolve", "index_by"]
+__all__ = ["norm", "tokens", "resolve", "index_by", "match_one"]
 
 # Punctuation that separates words -> space. Apostrophes are deleted outright
 # rather than spaced, so "N'Diaye" and "NDiaye" land on the same key.
@@ -118,6 +121,31 @@ def resolve(query, rows, key="name", index=None):
     return None, []
 
 
+def match_one(side, candidates) -> str | None:
+    """One of `candidates` for a differently-spelled name, or None.
+
+    Exact first, then an unambiguous substring either way — no token pass,
+    unlike resolve(): team names are short enough that "Betis" inside "Real
+    Betis" is already the whole signal, and a third pass would only invite
+    a false positive. Two candidates is None, never a pick.
+
+    Was duplicated verbatim in two places that each needed a name join
+    without pulling in a heavier module — ffcore.fixture.match_team (teams)
+    and sources._fd_match_team (football-data.co.uk's own short names) —
+    kept in sync only by both being copied from the same original at once.
+    ffcore.text has no ffcore-internal imports, so both can depend on this
+    directly without the dependency either was avoiding.
+    """
+    q = norm(side)
+    if not q:
+        return None
+    exact = [c for c in candidates if norm(c) == q]
+    if exact:
+        return exact[0]
+    hits = [c for c in candidates if norm(c) and (norm(c) in q or q in norm(c))]
+    return hits[0] if len(hits) == 1 else None
+
+
 # ---------------------------------------------------------------------------
 
 def _selftest() -> None:
@@ -159,7 +187,17 @@ def _selftest() -> None:
     assert tokens("C. Romero") == ["romero"]
     assert index_by(rows)["lamine yamal"]["name"] == "Lamine Yamal"
 
-    print("ffcore.text self-test OK (13 cases)")
+    # match_one(): exact wins, an unambiguous substring either way wins,
+    # two candidates refuses.
+    teams = ["Celta Vigo", "Real Betis", "Real Madrid"]
+    assert match_one("Celta Vigo", teams) == "Celta Vigo"
+    assert match_one("Celta", teams) == "Celta Vigo"
+    assert match_one("Betis", teams) == "Real Betis"
+    assert match_one("Real", teams) is None
+    assert match_one("Sevilla", teams) is None
+    assert match_one("", teams) is None
+
+    print("ffcore.text self-test OK (19 cases)")
 
 
 if __name__ == "__main__":

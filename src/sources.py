@@ -37,7 +37,7 @@ from datetime import datetime, timezone
 from functools import lru_cache
 from typing import Callable, NamedTuple
 
-from ffcore.text import norm  # pure stdlib itself; not ffcore.fixture/tidy
+from ffcore.text import match_one, norm  # pure stdlib itself; not ffcore.fixture/tidy
 
 from lxml import html as lh
 
@@ -225,14 +225,6 @@ FITNESS_SELECTORS = [".lesionados_wrapper section.mod.lesionados > .elemento",
                      "section.mod.nodisponibles .elemento"]
 
 
-def _fold(name: str) -> str:
-    """Accent- and case-insensitive key. The two blocks on a team page spell
-    a player the same way, but not always with the same diacritics."""
-    import unicodedata
-    s = unicodedata.normalize("NFD", (name or "").lower())
-    return " ".join("".join(c for c in s if c.isalnum() or c.isspace()).split())
-
-
 def _flagged_name(el) -> tuple[str, str]:
     """(display name, player-page slug) from a fitness block element."""
     a = _css(el, "a.jugador")
@@ -271,7 +263,7 @@ def parse_fitness(doc) -> dict[str, dict]:
     found: dict[str, dict] = {}
 
     def put(name, slug, status, note=""):
-        key = _fold(name)
+        key = norm(name)
         if not key:
             return
         prev = found.get(key)
@@ -324,7 +316,7 @@ def parse_team(html: str, observed_at: str, key: str = "team_test") -> list[dict
         if not name or name.lower() in seen:
             return
         seen.add(name.lower())
-        fit = fitness.get(_fold(name))
+        fit = fitness.get(norm(name))
         href = el.get("href") or ""
         if not href:
             a = el.find(".//a[@href]")
@@ -353,7 +345,7 @@ def parse_team(html: str, observed_at: str, key: str = "team_test") -> list[dict
     # Dropping him would mean the one player the page is shouting about is the
     # one row we do not have.
     for fkey, fit in fitness.items():
-        if fkey in {_fold(r["player_name"]) for r in rows}:
+        if fkey in {norm(r["player_name"]) for r in rows}:
             continue
         rows.append({
             "observed_at": observed_at,
@@ -880,7 +872,16 @@ def sign_af_fixtures(html: str) -> str | None:
 
 
 def sign_points(html: str) -> str | None:
-    return _digest(_surface(lh.fromstring(html).cssselect("table")))
+    """One digest over parse_points()'s own extracted rows, not every table
+    on the page — this page carries unrelated tables (ads, widgets) whose
+    churn used to bump the signature and defeat dedup for no real change.
+    Was `_digest(_surface(...cssselect("table")))`: the one sign_X in the
+    file that scanned the raw page instead of its own parse_X's output."""
+    rows = parse_points(html, "")
+    if not rows:
+        return None
+    return _digest(sorted("%s|%s|%s" % (r["ff_id"], r["points"], r["games"])
+                          for r in rows))
 
 
 # ---------------------------------------------------------------------------
@@ -1069,6 +1070,24 @@ def sign_starters(html: str) -> str | None:
     return _digest(_surface(els))
 
 
+def _rebuild(key: str, pattern, table: str, parse, sign, url_for, **kw):
+    """A Source rebuilt from its key alone, or None if the key doesn't match.
+
+    match_source(), player_source() and offer_source() were three copies of
+    exactly this "match a regex, extract its group, build a Source or bail"
+    shape — one per key family that isn't in the static registry because its
+    URL is only known once a discovery page (the calendar, the activity
+    feed, the team list) has already been read. `api_source()` stays its
+    own function: it dispatches on FOUR different sub-cases with different
+    cadences, not one regex, so folding it into this shape would be the
+    over-abstraction the one-shape-per-real-difference rule warns against.
+    """
+    m = pattern.match(key or "")
+    if not m:
+        return None
+    return Source(key, table, url_for(m), parse, sign, **kw)
+
+
 def match_source(key: str) -> Source | None:
     """The entry for one match page, built from its key.
 
@@ -1077,11 +1096,9 @@ def match_source(key: str) -> Source | None:
     carries the whole path, so this needs no lookup table and an old snapshot
     stays parseable long after the match is forgotten.
     """
-    m = MATCH_KEY_RE.match(key)
-    if not m:
-        return None
-    return Source(key, "starters", MATCH_URL.format(path=m.group(1)),
-                  parse_starters, sign_starters, cadence="once")
+    return _rebuild(key, MATCH_KEY_RE, "starters", parse_starters,
+                    sign_starters, lambda m: MATCH_URL.format(path=m.group(1)),
+                    cadence="once")
 
 
 def played_sources(cal_html: str, observed_at: str = "") -> list[Source]:
@@ -1275,18 +1292,13 @@ def _fd_date(raw: str) -> str:
 def _fd_match_team(side: str, teams) -> str | None:
     """Exact then substring, over this repo's own twenty slugs.
 
-    A small copy of ffcore.fixture.match_team's rule, not an import — that
-    module pulls in ffcore.tidy, and this file stays dependency-free so it
-    self-tests with lxml alone.
+    ffcore.text.match_one() is the shared rule — also used by
+    ffcore.fixture.match_team for the equivalent question against a
+    different page. This file still doesn't need ffcore.fixture (which
+    pulls in ffcore.tidy); ffcore.text has no ffcore-internal imports, so
+    depending on it keeps this file self-testing with lxml alone.
     """
-    q = norm(side)
-    if not q:
-        return None
-    exact = [t for t in teams if norm(t) == q]
-    if exact:
-        return exact[0]
-    hits = [t for t in teams if norm(t) and (norm(t) in q or q in norm(t))]
-    return hits[0] if len(hits) == 1 else None
+    return match_one(side, teams)
 
 
 def _fd_slug(name: str) -> str:
@@ -2067,12 +2079,11 @@ def sign_api_players_all(text: str) -> str | None:
 
 def player_source(key: str) -> Source | None:
     """The entry for one player lookup, rebuilt from its key."""
-    m = API_PLAYER_KEY_RE.match(key or "")
-    if not m:
-        return None
-    return Source(key, "api_players",
-                  API_PLAYER_URL.format(base="{base}", pid=m.group(1)),
-                  parse_api_player, sign_api_player, cadence="once", auth=True)
+    return _rebuild(key, API_PLAYER_KEY_RE, "api_players", parse_api_player,
+                    sign_api_player,
+                    lambda m: API_PLAYER_URL.format(base="{base}",
+                                                    pid=m.group(1)),
+                    cadence="once", auth=True)
 
 
 def player_sources(activity_json: str, observed_at: str = "") -> list[Source]:
@@ -2166,11 +2177,8 @@ def offer_source(key: str) -> Source | None:
     never fetches, so the URL stays a template, exactly as api_lineup_'s own
     rebuild in api_source() below leaves {team} and {week} unfilled.
     """
-    m = API_OFFER_KEY_RE.match(key or "")
-    if not m:
-        return None
-    return Source(key, "api_offers", API_OFFER_URL, parse_api_offer,
-                  sign_api_offer, auth=True)
+    return _rebuild(key, API_OFFER_KEY_RE, "api_offers", parse_api_offer,
+                    sign_api_offer, lambda m: API_OFFER_URL, auth=True)
 
 
 def offer_sources(teams_json: str, me: str, league: str,
@@ -2818,8 +2826,12 @@ def _selftest() -> None:
     assert SEVERITY.index("injured") < SEVERITY.index("doubt")
 
     # Accent folding, so 'Eric García' in one block matches 'Eric Garcia' in
-    # the other.
-    assert _fold("Eric García") == _fold("Eric Garcia") == "eric garcia"
+    # the other — via the shared ffcore.text.norm(), not a second fold. A
+    # locally hand-rolled fold here once disagreed with norm() on apostrophe
+    # names ("N'Diaye" -> "n diaye" vs norm()'s "ndiaye"), silently splitting
+    # one player's starting-XI and fitness rows into two keys.
+    assert norm("Eric García") == norm("Eric Garcia") == "eric garcia"
+    assert norm("N'Diaye") == "ndiaye"
 
     # The team slug comes off the registry key, not a separate argument.
     assert all(r["team_slug"] == "test" for r in rows)
