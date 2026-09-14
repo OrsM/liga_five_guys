@@ -22,7 +22,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from ffcore.crosswalk import Club, Crosswalk, Player  # noqa: E402
 from ffcore.text import norm  # noqa: E402
-from ffcore.tidy import (TIDY, latest_only, read_csv,  # noqa: E402
+from ffcore.tidy import (TIDY, latest_only, narrow_by_club, read_csv,  # noqa: E402
                          row_key, shared_names)
 
 PLAYERS = "players.csv"
@@ -133,10 +133,7 @@ def build_players(market, lineups, starters, api_rows, lg, clubs) -> dict:
         if len(hits) == 1:
             return hits[0]
         want = ff_to_market.get((team_slug or "").strip())
-        if not want:
-            return None
-        found = [p for p in hits if club_of.get(p.player_id) == want]
-        return found[0] if len(found) == 1 else None
+        return narrow_by_club(hits, want, lambda p: club_of.get(p.player_id))
 
     # The two probable-XI feeds share no slug space with the market or
     # each other, so name is the only way in.

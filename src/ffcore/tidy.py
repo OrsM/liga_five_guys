@@ -59,6 +59,11 @@ REPORTS = Path(os.environ.get("LFG_REPORTS", "reports"))
 # .runtime/, untracked and unpublished.
 PARTS = Path(os.environ.get("LFG_PARTS", ".runtime/parts"))
 
+# report.py writes this first each run, sim.py reads it back and rewrites it
+# with the simulation's own warnings folded in — one shared path so the two
+# stages can't silently point at different files.
+ALERTS = Path(os.environ.get("LFG_ALERTS", ".runtime/alerts.md"))
+
 
 def _madrid():
     try:
@@ -1045,6 +1050,22 @@ def _club(row: dict) -> str:
     return norm(row.get("team") or "")
 
 
+def narrow_by_club(candidates, want: str, club_of) -> object | None:
+    """The one candidate at `want`'s club, or None (none, or two).
+
+    A name shared by two+ players is only resolvable by which club a row
+    also names — the same narrowing step, over two different candidate
+    shapes (`Market._pick`'s market keys, `crosswalk.py`'s own `Player`
+    objects at build time), that used to be two hand-written copies of
+    the same three lines. `club_of(candidate) -> str` reads whichever
+    shape the caller holds.
+    """
+    if not want:
+        return None
+    hits = [c for c in candidates if club_of(c) == want]
+    return hits[0] if len(hits) == 1 else None
+
+
 def shared_names(rows) -> set:
     """The names in these market rows that belong to more than one player.
 
@@ -1215,10 +1236,9 @@ class Market:
         """Which of the men sharing this name, by club or by price."""
         keys = [k for k in self._by_name.get(shared, []) if k in self._by_key]
         if team:
-            want = _club({"team": team})
-            hit = [k for k in keys
-                   if _club(self._by_key[k][-1][1]) == want]
-            return hit[0] if len(hit) == 1 else None
+            return narrow_by_club(
+                keys, _club({"team": team}),
+                lambda k: _club(self._by_key[k][-1][1]))
         return self._by_price(
             {k: (self._by_key[k][-1][1]).get("value") for k in keys}, value)
 
