@@ -29,17 +29,16 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from ffcore.bid import deals, low_priced_buys  # noqa: E402
 from ffcore.render import title_name  # noqa: E402
-from ffcore.score import SLOT_LABEL, SLOT_MIN, pick_xi, squad_pool  # noqa: E402
+from ffcore.score import SLOT_LABEL, SLOT_MIN, squad_pool  # noqa: E402
 from ffcore.tidy import (run_now,  # noqa: E402
-                         DECISIONS,  # noqa: E402
+                         ALERTS, DECISIONS,  # noqa: E402
                          age_phrase, append_csv, load_crosswalk,
                          load_deadline, read_csv,
                          snapshot_stamp, stale_feeds, widen_csv, write_lines)
 
-# In .runtime/ (gitignored): a signal for a notifier, not a document — under
-# reports/ or data/ the run would commit a "you have a Buy" note that stops
-# being true within the hour.
-ALERTS = Path(os.environ.get("LFG_ALERTS", ".runtime/alerts.md"))
+# ALERTS: in .runtime/ (gitignored): a signal for a notifier, not a
+# document — under reports/ or data/ the run would commit a "you have a
+# Buy" note that stops being true within the hour.
 # The same warnings as data, for the renderers that are not markdown.
 WARNINGS = Path(os.environ.get("LFG_WARNINGS", ".runtime/warnings.json"))
 
@@ -196,7 +195,24 @@ def main() -> None:
 
     xw = load_crosswalk()
     pool = squad_pool(players)
-    best = pick_xi(pool) if players else None
+
+    # THE ONE "current best eleven" ANSWER — decide.current_xi(), not this
+    # module's own search. decide.load() is memoized per process (see its
+    # own docstring), so this is the same Universe sim.py builds later in
+    # the same run, not a second one: report.py and sim.py used to pick
+    # the XI from two independently-prepared value functions (this
+    # module's single-match Scored.score vs. decide's fitted Bootstrap
+    # forecast) that could name a different eleven for the same squad.
+    # Why: docs/notes/decide.md#current_xi--one-computation-seven-old-copies
+    import decide
+    xi = decide.current_xi(decide.load())[1] if players else set()
+    if players and xi:
+        chosen = [p for p in players if p.get("key") in xi]
+        formation = tuple(sum(1 for p in chosen if p["slot"] == s)
+                          for s in ("DEF", "MED", "DEL"))
+        best = (sum(p["score"] for p in chosen), formation, chosen)
+    else:
+        best = None
 
     cash = lg[lg.cfg.me].cash if lg and lg.cfg.me in lg.managers else None
     dl = deals(lg, lg.market) if lg and lg.market else []
