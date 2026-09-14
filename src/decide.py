@@ -1210,8 +1210,14 @@ def load(trials_pool=None) -> Universe:
     # `market_keyed` carries every market/ownership/ledger fact already
     # computed above so build_profiles() doesn't re-derive any of it —
     # PlayerCurrent is the one place that holds the result.
-    perjornada_rows = list(csv.DictReader(
-        open(SEASON / "live" / "perjornada_2026-27.csv")))
+    # The season's own file, found by globbing rather than a hardcoded
+    # label — a hardcoded "2026-27" here once meant this would silently
+    # start reading nothing (or crash outright) the moment the season
+    # rolled over, the same bug scout.py's own hand-rolled reader had.
+    # methodology.load_actuals() derives the label the same way.
+    _pj_files = sorted((SEASON / "live").glob("perjornada_*.csv"))
+    perjornada_rows = (list(csv.DictReader(open(_pj_files[-1])))
+                       if _pj_files else [])
     # Real per-match data (mins played, goals, cards) for whichever ~118
     # players have been on one of this league's 5 squads — api_teams's
     # embedded lastStats, not a full-pool source (see

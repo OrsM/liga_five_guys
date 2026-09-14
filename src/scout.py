@@ -44,12 +44,17 @@ def _last_season() -> dict[str, tuple[float, float]]:
 def _this_season() -> dict[str, dict[int, float]]:
     """{ff_id: {jornada: points}}, one row per jornada — a trend, not a
     season average.
+
+    Found by globbing, not a hardcoded season label — matching
+    methodology.load_actuals()'s own reasoning: a hardcoded "2026-27" here
+    once meant this would silently start reading nothing the moment the
+    season rolled over and the file became perjornada_2027-28.csv.
     """
-    path = SEASON / "live" / "perjornada_2026-27.csv"
-    if not path.exists():
+    files = sorted((SEASON / "live").glob("perjornada_*.csv"))
+    if not files:
         return {}
     out: dict[str, dict[int, float]] = {}
-    for r in csv.DictReader(open(path, encoding="utf-8")):
+    for r in csv.DictReader(open(files[-1], encoding="utf-8")):
         pid = (r.get("ff_id") or "").strip()
         j = r.get("jornada")
         if not pid or not j:
