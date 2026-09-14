@@ -519,7 +519,7 @@ def parse() -> None:
     rather than re-parsed. Written one table at a time so only the table
     currently being written is fully materialised in memory.
     """
-    pending: dict[str, list[tuple[str, dict]]] = {}
+    pending: dict[str, list[dict]] = {}
     cache, fresh = _parse_cache(), {}
     walk = doc_keys()
     keys = _Sigs()
@@ -556,9 +556,7 @@ def parse() -> None:
             rows = cache.get(pk, [])
             hits += 1
             fresh[pk] = rows
-            for r in rows:
-                table = r.get(ROW_TABLE) or src.table
-                pending.setdefault(table, []).append((stamp, r))
+            route(pending, rows, src.table, stamp)
     hits -= misses
     _save_parse_cache(fresh)
     print("  parsed %d documents, reused %d" % (misses, hits))
@@ -581,12 +579,7 @@ def parse() -> None:
     # One file per table, named by the table — a registry entry is the
     # whole change needed to wire in a new source.
     for table in sorted(pending):
-        rows = []
-        for stamp, r in pending.pop(table):
-            d = dict(r)
-            d.pop(ROW_TABLE, None)
-            d["observed_at"] = stamp
-            rows.append(d)
+        rows = pending.pop(table)
         # An immutable-facts table (sources.STORE_ONCE) keeps only the
         # first sighting of each key.
         if table in STORE_ONCE:
