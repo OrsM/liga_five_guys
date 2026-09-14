@@ -96,6 +96,47 @@ def match_claim(candidate_keys, store: dict[str, list[tuple[dt.datetime, dict]]]
     return None
 
 
+def _group_by_key(rows, key_fn=None, when_fn=None, value_fn=None,
+                  src=None, universe=None) -> dict[str, list[tuple]]:
+    """{key: [(when, value), ...]} ascending by `when` — match_claim()'s
+    OWN store, built the way start_grade(), _start_instances(),
+    _instance_briers(), golden_rows() and load_predictions() each
+    independently hand-rolled it: `per.setdefault(key, []).append((when,
+    value)); ...; v.sort(key=lambda t: t[0])`. The five copies had just
+    enough drift (one filters by universe, one doesn't; one restricts to
+    a source first) that nothing but reading all five side by side would
+    catch a real divergence between them.
+
+    key_fn/when_fn/value_fn default to a claim row's player_name/
+    observed_at/the row itself. A row where any of the three raises (a
+    malformed CSV cell) is skipped, matching every caller's own prior
+    try/except. `src`, given, keeps only rows whose own "source" field
+    equals it. `universe`, given, drops any row whose key isn't in it.
+    Why: docs/notes/methodology.md#_group_by_key--one-store-not-five
+    """
+    key_fn = key_fn or (lambda r: norm(r.get("player_name", "")))
+    when_fn = when_fn or (lambda r: snapshot_stamp(r.get("observed_at", "")))
+    value_fn = value_fn or (lambda r: r)
+    per: dict[str, list] = {}
+    for r in rows:
+        if src is not None and (r.get("source") or "").strip() != src:
+            continue
+        try:
+            key = key_fn(r)
+            when = when_fn(r)
+            value = value_fn(r)
+        except (KeyError, ValueError, TypeError):
+            continue
+        if not key or when is None:
+            continue
+        if universe is not None and key not in universe:
+            continue
+        per.setdefault(key, []).append((when, value))
+    for v in per.values():
+        v.sort(key=lambda t: t[0])
+    return per
+
+
 def pair(actuals: list[dict],
          preds: dict[str, list[tuple[dt.datetime, dict]]]) -> list[dict]:
     """Join realised per-jornada rows with the prediction that preceded them.
@@ -196,6 +237,17 @@ def drift_frac_from_history(lag1: int = 1, lag3: int = 3) -> tuple[float, str]:
     h3_pairs = [(p["predicted"], p["actual"], pooled_rel) for p in h3]
     return fit_drift_frac(h1_pairs, h3_pairs)
 
+
+# The one definition of what PAR means, quoted (not independently
+# reworded) by both column_guide_lines() below and slate.comparison_table()
+# — two separately hand-written captions of the same fact once drifted
+# apart the same way (the ladder column guide vs. Fantasy.jsx), which is
+# why this now has one source rather than two prose copies to keep in sync.
+PAR_DEFINITION = (
+    "season points above the LEAGUE's own replacement level at his slot "
+    "(the score of the last man the league can start there, pooled across "
+    "every squad, not just yours)"
+)
 
 BUCKETS = [(-1e9, 2, "under 2"), (2, 3, "2–3"), (3, 4, "3–4"), (4, 1e9, "4+")]
 
@@ -325,19 +377,9 @@ def start_grade(intervals, claims, universe=None, instances=None):
 
     Whoever wins this table earns tidy.LINEUP_SOURCE.
     """
-    per: dict[str, dict[str, list]] = {}
-    for r in claims:
-        src = (r.get("source") or "").strip()
-        key = norm(r.get("player_name", ""))
-        when = snapshot_stamp(r.get("observed_at", ""))
-        if not src or not key or when is None:
-            continue
-        if universe is not None and key not in universe:
-            continue
-        per.setdefault(src, {}).setdefault(key, []).append((when, r))
-    for byname in per.values():
-        for v in byname.values():
-            v.sort(key=lambda t: t[0])
+    sources = {(r.get("source") or "").strip() for r in claims} - {""}
+    per = {src: g for src in sources
+          if (g := _group_by_key(claims, src=src, universe=universe))}
 
     num: dict[str, list] = {}
     nam: dict[str, list] = {}
@@ -387,19 +429,7 @@ def _start_instances(intervals, claims, src, universe=None) -> set:
     (non-skipped, numeric) claim — uses _matched_start_row()/
     _start_classify(), the same pair start_grade() itself calls, so the
     two definitions of "graded" can't diverge."""
-    per: dict[str, list] = {}
-    for r in claims:
-        if (r.get("source") or "").strip() != src:
-            continue
-        key = norm(r.get("player_name", ""))
-        when = snapshot_stamp(r.get("observed_at", ""))
-        if not key or when is None:
-            continue
-        if universe is not None and key not in universe:
-            continue
-        per.setdefault(key, []).append((when, r))
-    for v in per.values():
-        v.sort(key=lambda t: t[0])
+    per = _group_by_key(claims, src=src, universe=universe)
 
     out = set()
     for interval in intervals:
@@ -593,13 +623,14 @@ def load_predictions() -> dict[str, list[tuple[dt.datetime, dict]]]:
     written before the fixture term existed; those rows still score, they just
     cannot be attributed, and the section says how many.
     """
-    preds: dict[str, list[tuple[dt.datetime, dict]]] = {}
-    for r in read_csv(DECISIONS / "squad_log.csv"):
-        try:
-            when = snapshot_stamp(r["observed_at"])
-            fac = {"score": float(r["score"])}
-        except (KeyError, ValueError, TypeError):
-            continue
+    def _factors(r):
+        # Raising here (a bad observed_at or score) means the row is
+        # skipped entirely, via _group_by_key's own try/except — but the
+        # five OTHER columns are NOT numeric everywhere (score.md's `fix`
+        # note above) and each fails independently without dropping the
+        # row, so they get their own inner try/except instead of joining
+        # the raise.
+        fac = {"score": float(r["score"])}
         for col in ("fix", "ppm", "flat", "start_pct", "cur_pj"):
             try:
                 fac[col] = float(r[col])
@@ -613,16 +644,17 @@ def load_predictions() -> dict[str, list[tuple[dt.datetime, dict]]]:
         fac["home"] = r.get("home") == "1"
         fac["pos"] = (r.get("pos") or "").lower()
         fac["status"] = r.get("status") or ""
-        # THE ID THE ROW WAS LOGGED WITH, and the name for the rows written
-        # before the column existed. Both sides of the grade have to agree
-        # about who a prediction was about, and the confirmed-starts side
-        # carries the id, the slug and the name for the same reason.
-        key = (r.get("ff_id") or "").strip() or norm(r.get("player", ""))
-        if key and when is not None:
-            preds.setdefault(key, []).append((when, fac))
-    for v in preds.values():
-        v.sort(key=lambda t: t[0])
-    return preds
+        return fac
+
+    # THE ID THE ROW WAS LOGGED WITH, and the name for the rows written
+    # before the column existed. Both sides of the grade have to agree
+    # about who a prediction was about, and the confirmed-starts side
+    # carries the id, the slug and the name for the same reason.
+    return _group_by_key(
+        read_csv(DECISIONS / "squad_log.csv"),
+        key_fn=lambda r: (r.get("ff_id") or "").strip() or norm(r.get("player", "")),
+        when_fn=lambda r: snapshot_stamp(r["observed_at"]),
+        value_fn=_factors)
 
 
 def golden_dataset() -> dict[int, dict[str, dict]]:
@@ -880,8 +912,17 @@ def feed_lines() -> list[str]:
     asked, quiet = _fetched(), stale_feeds()
     rows = []
     for name in sorted(FILLS):
-        path = (SEASON / "live" / "perjornada_2026-27.csv") if name == "points" \
-            else (TIDY / f"{name}.csv")
+        if name == "points":
+            # Found by globbing, not a hardcoded season label — the same
+            # fix applied to load_actuals()/decide.load()/scout.py's own
+            # reads of this file, for the same reason: a hardcoded
+            # "2026-27" here would silently read nothing (and report the
+            # points feed as maximally stale) the moment the season
+            # rolled over.
+            files = sorted(LIVE.glob("perjornada_*.csv"))
+            path = files[-1] if files else (LIVE / "perjornada_none.csv")
+        else:
+            path = TIDY / f"{name}.csv"
         got = read_csv(path)
         col = STAMPED.get(name, "observed_at")
         newest = max((r.get(col, "") for r in got), default="")
@@ -1046,9 +1087,7 @@ def column_guide_lines() -> list[str]:
         "off their reconstructed balance, the app's daily allowance, "
         "and how fast that manager has actually raised money this "
         "season, never a prediction he actually wants the player. "
-        "`PAR` is season points above the LEAGUE's own replacement "
-        "level at his slot (the score of the last man the league can "
-        "start there, pooled across every squad) — comparable across "
+        "`PAR` is " + PAR_DEFINITION + " — comparable across "
         "positions on that basis, and a different question from "
         "`Season`: a good player in a deep position can show a modest "
         "PAR while still being the right one to keep.", "",
@@ -1184,16 +1223,7 @@ def _instance_briers(intervals, claims, src, instances) -> list[float]:
     `instances` — the raw per-claim values `stats.bootstrap_gap()` needs to
     test whether a Brier gap between two sources is real or noise (the
     aggregate Brier alone can't be bootstrapped, only its ingredients can)."""
-    per: dict[str, list] = {}
-    for r in claims:
-        if (r.get("source") or "").strip() != src:
-            continue
-        key = norm(r.get("player_name", ""))
-        when = snapshot_stamp(r.get("observed_at", ""))
-        if key and when is not None:
-            per.setdefault(key, []).append((when, r))
-    for v in per.values():
-        v.sort(key=lambda t: t[0])
+    per = _group_by_key(claims, src=src)
 
     out = []
     for interval in intervals:
@@ -1270,14 +1300,7 @@ def golden_rows() -> list[dict]:
                        in JornadaClock(matches, fixtures).team_locks.items()}
 
     intervals, _graded, _ungraded = load_starts()
-    per: dict[str, list[tuple[dt.datetime, dict]]] = {}
-    for c in forecast_claims():
-        key = norm(c.get("player_name", ""))
-        when = snapshot_stamp(c.get("observed_at", ""))
-        if key and when is not None:
-            per.setdefault(key, []).append((when, c))
-    for v in per.values():
-        v.sort(key=lambda t: t[0])
+    per = _group_by_key(forecast_claims())
 
     out = []
     for lock, played, teams in intervals:

@@ -131,10 +131,10 @@ def comparison_table(rows: list[dict]) -> list[str]:
     worth_a_look = [r for r in rows if (r["par"] or 0.0) > 0.0]
     skipped = len(rows) - len(worth_a_look)
 
+    from methodology import PAR_DEFINITION
+
     out = ["## Every listed player, compared", "",
-          "PAR = season points above the LEAGUE's own replacement level at "
-          "his slot — the score of the last man the league can start there, "
-          "pooled across every squad, not just yours. Comparable across "
+          "PAR = " + PAR_DEFINITION + ". Comparable across "
           "positions on that basis; a good player can still show a modest "
           "PAR if his position is deep league-wide. Parenthesised range is "
           "a real simulated band where one was run; a plain figure is the "
