@@ -341,7 +341,7 @@ player_id,name,club_id,ff_slug,af_slug,app_id,understat_id,app_names
 17248,lucas cepeda,elche,lucas-cepeda,318592,2933,14400,Cepeda
 17275,alex freeman,villarreal,alex-freeman,355994,2934,,Freeman
 17284,ville koski,alaves,ville-koski,106759,2938,14519,Koski
-17376,aaron ndive mayol,valencia,aaron-ndive-mayol,,3239,,Mayol
+17376,aaron ndive mayol,valencia,aaron-ndive-mayol,,3239,14452,Mayol
 17406,lamini fati,real madrid,,,2952,,Lamini
 1743,mathew ryan,levante,mat-ryan,2741,2755,2385,Ryan
 17445,adama timera,espanyol,adama-timera,,3170,,Timera
@@ -389,7 +389,7 @@ player_id,name,club_id,ff_slug,af_slug,app_id,understat_id,app_names
 18314,robbie ure,sevilla,robbie-ure,327536,3145,14683,Robbie Ure
 18316,rockson yeboah,osasuna,rockson-yeboah,428586,3243,15026,Rockson
 18378,joseph otu,malaga,joseph-otu,,3203,,Otu Jr
-18406,ifeanyi ndukwe,levante,ifeanyi-ndukwe,,3227,14917,Ifeanyi Ndukwe
+18406,ifeanyi ndukwe,levante,ifeanyi-ndukwe,511971,3227,14917,Ifeanyi Ndukwe
 18411,curro burgos,getafe,,,3218,,Curro
 18412,oscar lopez,getafe,oscar-lopez,,3219,14895,Óscar López
 18418,alvaro de pablo,betis,alvaro-de-pablo-1,,3233,,A. De Pablo
