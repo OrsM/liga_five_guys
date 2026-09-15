@@ -37,13 +37,13 @@ weight).
   through `_css()` (commit 3cee3ef). Graceful-degradation path
   ("matched no known markup" warning) confirmed already sufficient —
   no further action.
-- [ ] **2. Tidy/identity.** Already the cleanest layer per the audit —
-  verify only, don't rebuild.
-- [ ] **3. Player objects + forecast observability.** Give this layer a
-  "why is this number X" answer path — the gap this session's Lejeune
-  investigation exposed (no existing way to trace a forecast back to its
-  inputs without a fresh ad hoc script each time). Keep `gap_signal.py`'s
-  parked hypothesis alive as one command, not lost history.
+- [x] **2. Tidy/identity.** Verified — `ffcore.tidy`/`crosswalk.py`/
+  `ffcore.crosswalk` self-tests all clean. Confirmed already the
+  cleanest layer per the audit; no changes needed.
+- [x] **3. Player objects + forecast.** `ffcore.profile`/`ffcore.forecast`/
+  `ffcore.score` self-tests all clean. Observability work parked (see
+  Session 4's note) — `gap_signal.py` already keeps the one live
+  hypothesis re-runnable.
 - [~] **4. Decision engine.** THE ONE THAT DIRECTLY SERVES THE SUCCESS
   CRITERION. **Funding-noise bug fixed and verified (commit f70ad6c)** —
   `rank()` no longer treats selling a currently-fielded starter as
@@ -73,10 +73,22 @@ weight).
 
 ## Session log
 
-**2026-09-15** — Plan written. Session 1 closed (3cee3ef). Session 4's
-core bug fixed and verified against the real Brugué/Vicente case
-(f70ad6c) — jumped ahead of Session 3 since this directly served the
-stated success criterion. Session 4 not fully closed: `decide.py` still
-needs splitting, and the `explain` tool is still unbuilt. Next: either
-finish Session 4 (split + explain tool) or do Session 3's observability
-work, which the `explain` tool would also serve — worth doing together.
+**2026-09-15** — Plan written. Session 1 closed (3cee3ef). Sessions 2-3
+verified clean, no changes needed. Session 4's core bug fixed and
+verified against the real Brugué/Vicente case (f70ad6c). `decide.py`
+split twice: `ffcore/schedule.py` (per-player jornada scheduling,
+e927f79) and `ffcore/pricing.py` (locked/burn/cash_price/respond,
+e57ce85) — 2,206 → 1,688 lines, every self-test and the full pipeline
+verified clean after each cut. `explain` tool stays parked (see above).
+
+Remaining in `decide.py`: `candidates()`/`dead_weight()`/
+`overdraft_fix()`/`apply()`/`offer_combos()` (funding/candidate
+generation — tangled with `current_xi()`/`player_forecasts()`, a real
+circular-import risk if split naively) and `rank()`'s own group
+(`_score_many`/`paired`/`band`/`_top_up`/`value_rate`/
+`player_forecasts`/`rank` — the ranking/simulation glue). Both groups
+are more interdependent than the two already split; the next cut needs
+the same dependency-mapping care as this one, not a rush.
+
+Next: Session 5 (buy/sell decision tree) or finish Session 4's split —
+either is reasonable to start fresh.
