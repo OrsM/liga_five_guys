@@ -448,3 +448,28 @@ support than a backtest win, and one this fix didn't touch. Re-run
 `backtest.py --selftest` again once more jornadas have locked (n grows a
 handful of episodes per jornada) before treating either reading — "no
 difference" or a future "beats" — as settled.
+
+## _best_raid_per_victim() — one raid per opponent
+
+Found 2026-09-15 (rationalization plan session 6). The RAID group could
+show several candidates targeting the SAME rival at once (a real report:
+three separate raids on SusoGattuso, two on Albert) — every raid was
+ranked purely by `d_pts` (season points gained, my own total only), with
+nothing collapsing multiple candidates on one victim down to the one
+actually worth recommending.
+
+Fixed by ranking same-victim candidates on `d_beat[victim]` instead — the
+simulated shift in P(finish above HIM specifically), not `d_pts`. These
+answer genuinely different questions: the self-test's own case has a raid
+with a SMALLER `d_pts` (5.0) beating one with a LARGER `d_pts` (8.0)
+because it hurts the victim more (`d_beat` 0.20 vs 0.05) — "harms him
+most and makes economic sense" is `d_beat` picking the winner per victim,
+then `_move_rank_key` (unchanged) ranking economic sense among whatever
+survives.
+
+**Applied in both renderers, not just the markdown table** — `payload()`
+(the JSON `decisions.json` moves list, what the phone actually reads) had
+its own independent raid list with no dedup either. Fixing only
+`ladder_rows()` would have created a NEW disagreement between the two
+renderers, the exact failure shape `payload()`'s own docstring exists to
+prevent ("Same rows as the markdown, so the two cannot disagree").

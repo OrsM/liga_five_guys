@@ -411,9 +411,10 @@ def ladder_rows(u, rows, bands=None, exp=None, xi=None) -> list[dict]:
     for k in ranked:
         if route_kind(u, k) == "free":
             out.append(buy_cell(k, "buy"))
-    for k in ranked:
-        if route_kind(u, k) == "raid":
-            out.append(buy_cell(k, "raid"))
+    raid_keys = _best_raid_per_victim(
+        [k for k in ranked if route_kind(u, k) == "raid"], won)
+    for k in sorted(raid_keys, key=lambda k: _move_rank_key(won[k], u)):
+        out.append(buy_cell(k, "raid"))
     for k in sorted((k for k in rest if k not in won
                      and u.price[k] > u.cash + spare),
                     key=lambda k: -exp.get(k, 0.0)):
@@ -838,6 +839,33 @@ def caveats(u) -> list[str]:
 # Why: docs/notes/sim.md#value_tolerance-090-and-moves_value_floor-025
 VALUE_TOLERANCE = 0.90
 
+def _best_raid_per_victim(raid_keys, won) -> list[str]:
+    """`raid_keys`, with every rival reduced to his single worst-hit raid.
+
+    Ranked by `d_beat[victim]` — the simulated shift in YOUR OWN P(finish
+    above him) from taking this specific man off him — not `d_pts` (your
+    season gain alone): the same total gain to you can come from a raid
+    that barely touches him or one that guts him, and `d_beat` is the one
+    number the simulation already computes that answers "how much does
+    THIS raid actually hurt HIM", not just "how much does it help me".
+    "one raid per opponent, whichever harms him most and makes economic
+    sense" is this function; economic sense is `_move_rank_key`'s own
+    job on whatever survives here, unchanged.
+    Why: docs/notes/sim.md#_best_raid_per_victim--one-raid-per-opponent
+    """
+    best: dict[str, tuple[float, str]] = {}
+    for k in raid_keys:
+        r = won[k]
+        victim = r["action"].victim
+        score = r["d_beat"].get(victim)
+        if score is None:
+            score = r.get("d_pts") or 0.0
+        cur = best.get(victim)
+        if cur is None or score > cur[0]:
+            best[victim] = (score, k)
+    return [k for _score, k in best.values()]
+
+
 def _move_rank_key(r, u):
     """RELIABLE ROUTES FIRST, THEN BY `d_pts` (season points gained) — the
     same metric `_best()` uses for the headline pick and decide.rank()
@@ -1032,6 +1060,14 @@ def payload(u, rows, base, rivals, locks_h=None, n_actions: int = 0,
     names = {k: title_name(v) for k, v in u.name.items()}
     lo, hi = base.band(u.me)
     moves = []
+    # ONE RAID PER VICTIM, same rule as ladder_rows()'s RAID group — see
+    # _best_raid_per_victim()'s own note. Applied here too, not just in
+    # the markdown table: this function's whole reason to exist is that
+    # the JSON and the markdown must not show two different move lists.
+    raid_rows = {r["action"].buy: r for r in rows if r["action"].victim}
+    keep_raid = set(_best_raid_per_victim(list(raid_rows), raid_rows))
+    rows = [r for r in rows
+           if not r["action"].victim or r["action"].buy in keep_raid]
     # Same pts_lo sort as ladder_rows()'s BUY group — see _move_rank_key()'s
     # own note. Why: docs/notes/sim.md#payload--moves-sorted-by-the-same-rule-as-the-ladder
     for r in sorted(rows, key=lambda r: _move_rank_key(r, u)):
@@ -1903,7 +1939,29 @@ def _selftest() -> None:
     assert [r for r in rows2 if r["action"].buy == "cand"], rows2
     assert "cand" not in bands2, sorted(bands2)
 
-    print("sim self-test OK (213 cases)")
+    # -- _best_raid_per_victim(): one raid per opponent, ranked by harm --
+    # Two candidates raid "riv" (r1 hurts him more per d_beat, despite a
+    # SMALLER d_pts than r2 — the whole point: economic gain to me and
+    # harm to him are different questions), one raids "riv2" alone.
+    def _raid_row(buy, victim, d_pts, d_beat_victim):
+        return {"action": decide.Action("steal", buy=buy, victim=victim),
+               "d_pts": d_pts, "d_beat": {victim: d_beat_victim}}
+
+    won_raids = {
+        "r1": _raid_row("r1", "riv", d_pts=5.0, d_beat_victim=0.20),
+        "r2": _raid_row("r2", "riv", d_pts=8.0, d_beat_victim=0.05),
+        "r3": _raid_row("r3", "riv2", d_pts=3.0, d_beat_victim=0.10),
+    }
+    kept = _best_raid_per_victim(list(won_raids), won_raids)
+    assert sorted(kept) == ["r1", "r3"], kept   # r1 beats r2 on d_beat, not d_pts
+    # A row with no d_beat entry for its own victim (never happens in a
+    # real simulated row, but a caller could hand one in) falls back to
+    # d_pts rather than crashing on a missing key.
+    fallback = {"x": _raid_row("x", "solo", d_pts=1.0, d_beat_victim=0.0)}
+    fallback["x"]["d_beat"] = {}
+    assert _best_raid_per_victim(["x"], fallback) == ["x"]
+
+    print("sim self-test OK (215 cases)")
 
 
 def main() -> None:
