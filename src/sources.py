@@ -867,8 +867,7 @@ def parse_af_fixtures(html: str, observed_at: str,
 
 
 def sign_af_fixtures(html: str) -> str | None:
-    return _digest(_surface(lh.fromstring(html).cssselect(
-        'a[href*="/partido/"]')))
+    return _digest(_surface(_css(lh.fromstring(html), 'a[href*="/partido/"]')))
 
 
 def sign_points(html: str) -> str | None:
@@ -987,8 +986,7 @@ def parse_calendar(html: str, observed_at: str,
 
 
 def sign_calendar(html: str) -> str | None:
-    return _digest(_surface(lh.fromstring(html).cssselect(
-        'a[href*="/partidos/"]')))
+    return _digest(_surface(_css(lh.fromstring(html), 'a[href*="/partidos/"]')))
 
 
 def _xi_rows(doc, side: str) -> list:
