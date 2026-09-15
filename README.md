@@ -49,6 +49,46 @@ pushing, a job that runs on push is not a schedule. The self-tests run at the
 top of every `lfg-run` instead, and a failure stops the run rather than
 publishing a report built by code that does not pass its own checks.
 
+## The shape of the pipeline
+
+Added 2026-09-16 — "Layout" below is a dictionary (file → what it does);
+this is the map (what feeds what). Five stages, in the order `run.py`
+actually runs them:
+
+1. **Scrape** (`sources.py`, `ingest.py`) — 19 external sites, each still
+   speaking its own format. Nothing here knows what a player IS across
+   sources yet, only what one page said.
+2. **Merge by identity** (`crosswalk.py`, `ffcore/crosswalk.py`,
+   `ffcore/text.py`, `ledger.py`, `points.py`, `squads.py`) — one key per
+   real player however many sources spell him differently
+   (`ffcore.crosswalk.Crosswalk.player()`/`.resolve()` is THE join;
+   anything doing its own name-matching outside this file is either a
+   deliberate, narrower exception — documented as one where it exists —
+   or drift worth checking). Also replays ownership and points history
+   from here on, since both later stages need it.
+3. **Forecast** (`ffcore/forecast.py`, `score.py`, `fixture.py`,
+   `startprob.py`, `season.py`, `methodology.py`) — one point estimate per
+   player per future jornada: fixture difficulty, P(start) calibrated
+   from two sources, shrinkage for thin evidence. The math here is
+   genuinely load-bearing (see `docs/notes/forecast.md`'s "why not a
+   Normal" for what a naive shortcut gets wrong) — check before
+   simplifying, not after.
+4. **Decide** (`decide.py`, `sim.py`, `ffcore/candidates.py`,
+   `ffcore/schedule.py`, `ffcore/par.py`, `ffcore/pricing.py`,
+   `ffcore/bid.py`, `ffcore/action.py`) — the biggest stage, and mostly
+   NOT "the money": legal-XI picking is small and solved
+   (`best_xi()`/`_xi_search()`, ~100 lines); actual cash bookkeeping
+   (`ffcore/pricing.py`) is ~150 more. The bulk is enumerating every
+   affordable move and ranking them by simulated effect on where you
+   finish — a decision-under-uncertainty problem, not a game-theoretic
+   one (rivals are held static in every simulation; see
+   `ffcore/season.py`'s own docstring for why that's disclosed, not
+   hidden).
+5. **Report** (`report.py`, `slate.py`, `scout.py`, `digest.py`,
+   `ffcore/render.py`, `ffcore/second.py`) — computes nothing new, only
+   formats what stages 3–4 already produced. The safest stage to
+   simplify, precisely because it can't silently change a recommendation.
+
 ## The one table
 
 **The phone app is the only thing you need to look at** — rendered from
