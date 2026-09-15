@@ -94,9 +94,17 @@ weight).
   visible/explicit as a named concept a reader could point to — the
   correctness is real now, but "decision tree" is still implicit across
   two files. Lower priority than the correctness fix already landed.
-- [ ] **6. Rival-raid prioritization.** One best raid per opponent, by
-  harm-to-them + economic sense — a scoped new feature on the now-clearer
-  decision engine.
+- [x] **6. Rival-raid prioritization.** Found the report showing 2-3 raid
+  candidates on the SAME rival at once (cb27d7b) — ranked purely by
+  `d_pts` (gain to me), nothing collapsing same-victim candidates.
+  Fixed with `_best_raid_per_victim()`: one raid per opponent, ranked by
+  `d_beat[victim]` (the simulated shift in P(finish above him)
+  specifically — combines harm-to-him and gain-to-me in one already-
+  validated number, no invented formula). Applied to BOTH renderers
+  (`ladder_rows()` markdown and `payload()`'s JSON moves list — each had
+  its own independent, undeduped raid list). Verified against real data:
+  live report went from 2-3 raids/rival to exactly one, matching in both
+  places.
 - [ ] **7. Close-out.** Re-run the duplication audit against the new
   shape. Update docs. Retire this plan doc into the session log below.
 
@@ -124,8 +132,10 @@ invisible in the report (3504e1c). Also fixed a dangling doc reference
 from Session 4's own funding-noise fix (never actually got its promised
 docs/notes/decide.md section until now).
 
-Next: Session 6 (rival-raid prioritization) is the natural next piece —
-Session 5's remaining item (making the 3-branch funding tree an
-explicit, named concept rather than implicit-but-now-correct logic) is
-real but lower priority than a live correctness bug, and reasonable to
-revisit later or skip.
+Session 6: found and fixed the report showing multiple raids on the same
+rival at once — deduped to one per opponent via d_beat[victim], applied
+to both the markdown ladder and the JSON payload (cb27d7b).
+
+Sessions 1, 2, 3, 4, 5, 6 all done or at a well-reasoned stopping point.
+Next: Session 7 (close-out — re-run the duplication audit against the
+new shape, update docs, retire this plan) whenever picked back up.
