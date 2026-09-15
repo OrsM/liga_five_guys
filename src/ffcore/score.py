@@ -567,6 +567,7 @@ def _per_jornada_current(starters_rows, perjornada_rows, matches_rows,
     # is missing whatever a player had before this file's own history
     # started. Why: docs/notes/score.md#_per_jornada_current--the-join-and-the-points_total-anchor
     end_total: dict[str, dict[int, float]] = {}
+    seen_at: dict[str, dict[int, str]] = {}
     for r in perjornada_rows:
         raw_jor = (r.get("jornada") or "").strip()
         if not raw_jor:
@@ -585,11 +586,22 @@ def _per_jornada_current(starters_rows, perjornada_rows, matches_rows,
         # for a jornada already seen must overwrite its running total,
         # not add to it twice.
         end_total.setdefault(key, {})[jor] = total
+        seen_at.setdefault(key, {})[jor] = (r.get("to_stamp")
+                                            or r.get("from_stamp") or "")
 
     points_by_jor: dict[str, dict[int, float]] = {}
     for key, totals in end_total.items():
+        # BY REAL OBSERVATION TIME, not jornada number — a rescheduled
+        # fixture (a club can play jornada 5 after jornada 6) means the
+        # two orders are not the same. Diffing by jornada number would
+        # attribute jornada 6's own points as "since jornada 5" even
+        # though jornada 6 was observed first, inflating the total by
+        # double-counting the gap between them in the wrong direction.
+        # A real case: this produced 6 points from 4 real snapshots that
+        # actually summed to 2.
+        order = sorted(totals, key=lambda j: seen_at[key].get(j, ""))
         prev = 0.0
-        for jor in sorted(totals):
+        for jor in order:
             points_by_jor.setdefault(key, {})[jor] = totals[jor] - prev
             prev = totals[jor]
 
