@@ -56,6 +56,7 @@ from ffcore.parse import fmt_money  # noqa: E402
 from ffcore.schedule import (rounds_left, next_then_rest,  # noqa: E402
                              first_jornada_per_player, apply_fixtures,
                              phantom_topup, phantom_fill)
+from ffcore.pricing import locked, burn, cash_price, respond  # noqa: E402
 from ffcore.profile import (PlayerProfile, UNSCORED_DEFAULT,  # noqa: E402
                             build_profiles)
 from ffcore.score import SLOT, SLOT_MIN, _calibrated  # noqa: E402
@@ -441,84 +442,6 @@ def candidates(u: Universe, expected: dict[str, float],
                 out.append(Action(swap, buy=c, sell=s, cost=price,
                                   proceeds=got, victim=victim))
     return out
-
-
-def locked(until: dict, key: str, now) -> bool:
-    """Is his clause unpayable right now?
-
-    A TRANSFER LOCKS A CLAUSE until the app's own reopen date. A MISSING
-    DATE COUNTS AS LOCKED, not available — an absent field is not
-    evidence a clause is payable. A free agent has no clause and never
-    reaches here.
-    """
-    when = until.get(key)
-    return True if when is None else when > now
-
-
-def burn(u, a: Action) -> float | None:
-    """Wealth a move destroys: what it costs, less what you end up holding.
-
-    A FREE AGENT BURNS NOTHING — market value in, market value out. A
-    BUYOUT CLAUSE BURNS THE PREMIUM over market value, gone for good.
-    Never negative; None when the value is unknown (never assume zero
-    premium).
-    """
-    if not a.buy:
-        return 0.0
-    val = u.value.get(a.buy)
-    if val is None:
-        return None
-    return max(0.0, a.cost - val)
-
-
-def cash_price(reach) -> float | None:
-    """Places per million, measured off `reach` = [(extra cash needed, Δpos)].
-
-    Read off what more money would actually buy today, not a rate card —
-    every target is screened, not only the affordable ones. The curve is
-    a STAIRCASE (flat until the balance clears the next better price,
-    then a step), so averaged over the reachable range it comes out
-    small; that's the honest answer, not a defect.
-
-    None when there is nothing to measure against. Never zero for that —
-    zero is a real answer ("more money buys nothing"), distinct from
-    unknown.
-    """
-    pts = sorted((max(0.0, c), d) for c, d in reach)
-    if len(pts) < 2 or pts[-1][0] <= 0:
-        return None
-    best_now = max((d for c, d in pts if c <= 0.0), default=None)
-    if best_now is None:
-        return None
-    best_any = max(d for _, d in pts)
-    span = max(c for c, _ in pts) / 1e6
-    return max(0.0, (best_any - best_now) / span) if span else None
-
-
-def respond(u, a: Action, rate: float | None) -> float:
-    """Season points the manager you just paid buys back, on AVERAGE, or 0.0.
-
-    A CLAUSE PAYS THE OWNER, not the app — a steal hands the victim cash
-    he can reinvest, so scoring the steal without crediting that
-    overstates it.
-
-    THE AVERAGE HE BUYS, NOT THE BEST HE COULD FIND — `rate` is
-    `rank()`'s own `lam` (points per million, same screening pass
-    pricing everything else this run), never a search for the single
-    best clausable replacement: an unbounded search can walk off with a
-    THIRD manager's own player to fund the response, breaking a squad
-    that was never part of the trade. An average touches only the two
-    sides of the actual trade, mirroring `value_rate()`'s own
-    replacement-level logic on the buy side.
-
-    0.0 when there is nothing to spend (no victim, or a market purchase
-    — money paid to the app leaves the league, money paid for a clause
-    changes sides) or nothing is known to spend it at (`rate` is None).
-    """
-    if not a.victim or a.victim == u.me or not rate:
-        return 0.0
-    budget = max(0.0, u.rival_cash.get(a.victim, 0.0)) + a.cost
-    return rate * budget / 1e6
 
 
 def dead_weight(u) -> list[tuple[str, float]]:
@@ -1583,72 +1506,6 @@ def _selftest() -> None:
     assert sum(1 for k in kept6 if k.startswith("big")) == 12, kept6
     assert "sham" not in kept6, kept6
 
-    # -- what a clause burns, and what that is worth in places -------------
-    # A free agent asks about what he is worth, so buying one destroys
-    # nothing: you hold an asset you could sell back for the money. A buyout
-    # clause runs a median 1.52x market value in this league, and that premium
-    # never comes back — you pay 1.52V for something the app will pay you V
-    # for. The simulation counts the cash leaving and cannot see the wealth
-    # going, because it scores money at zero.
-    u4 = Universe(
-        state=LeagueState({"me": dict(mine), "riv": dict(theirs)}, [1], "me"),
-        forecaster=B(per), pos=dict(u.pos), price={"th_m1": 8e6},
-        value={"th_m1": 5e6}, proceeds={}, owner={"th_m1": "riv"},
-        cash=20e6, me="me")
-    assert burn(u4, Action("steal", buy="th_m1", cost=8e6)) == 3e6
-    # A free agent at his market value burns nothing...
-    u4.value["free"] = 4e6
-    assert burn(u4, Action("buy", buy="free", cost=4e6)) == 0.0
-    # ...and a bargain is not a negative cost, it is zero: the app does not
-    # pay you for buying well, it just does not punish you.
-    assert burn(u4, Action("buy", buy="free", cost=3e6)) == 0.0
-    # A sale burns nothing either — the app pays market value.
-    assert burn(u4, Action("sell", sell="me_bench")) == 0.0
-    # A player nothing knows the value of cannot be priced, and an unknown is
-    # not a zero: assuming no premium is exactly the error being fixed.
-    assert burn(u4, Action("steal", buy="mystery", cost=9e6)) is None
-
-    # THE PRICE OF CASH, measured rather than chosen. Screen every target,
-    # affordable or not, and the frontier of "best Delta pos reachable for
-    # this much extra" gives places per euro. Flat here: the cheap option is
-    # already the best one, so more money buys nothing.
-    flat = [(0.0, 0.40), (5e6, 0.30), (12e6, 0.20)]
-    assert cash_price(flat) == 0.0
-    # A step: 10M more reaches +0.10 that nothing cheaper does.
-    step = [(0.0, 0.40), (10e6, 0.50)]
-    assert abs(cash_price(step) - 0.10 / 10.0) < 1e-12
-    # Nothing to measure is None, never a zero that would silently mean free.
-    assert cash_price([]) is None and cash_price([(0.0, 0.4)]) is None
-
-    # -- the rival answers back --------------------------------------------
-    # A clause pays the owner, so a steal hands the victim money to retaliate
-    # with — not pure subtraction from a rival who can't respond.
-    #
-    # respond() uses average value for his money, not a search for his single
-    # best reply — a search has no floor on what it costs whoever he takes
-    # FROM, and can walk off with an unrelated third manager's own player,
-    # collapsing that manager's season instead of anything the raid itself did.
-    u5 = Universe(
-        state=LeagueState({"me": dict(mine), "riv": {}}, [1], "me"),
-        forecaster=B(per), pos=dict(u.pos), price={},
-        proceeds={}, owner={}, cash=12e6, me="me", rival_cash={"riv": 4e6})
-    steal = Action("steal", buy="th_m1", cost=10e6, victim="riv")
-    # 3 points per million, from wherever `rank()` measured it today — his
-    # reply is worth that rate against his OWN money: the 4M he already had
-    # plus the 10M clause just paid him, times the rate, in points.
-    assert respond(u5, steal, 3.0) == 3.0 * (4e6 + 10e6) / 1e6
-    # No victim, no reply — a market purchase leaves the league, it does not
-    # change hands, so nobody answers it.
-    assert respond(u5, Action("buy", buy="star", cost=1e6), 3.0) == 0.0
-    # Nothing known about the going rate is not a free reply either — the
-    # same reading `charge` gives `lam is None` in rank() itself.
-    assert respond(u5, steal, None) == 0.0
-    # And a real rate against no money and no payout is genuinely worth
-    # nothing, not an error.
-    broke = replace(u5, rival_cash={"riv": 0.0})
-    assert respond(broke, Action("steal", buy="th_m1", cost=0.0,
-                                 victim="riv"), 3.0) == 0.0
-
     # -- the bar is a round you can still pick -----------------------------
     # THE ELEVEN A SIGNING HAS TO BEAT must be the one you would actually
     # field. Measured against a round already in progress it is not: the
@@ -1670,22 +1527,6 @@ def _selftest() -> None:
     assert not any(a.buy == "dud"
                    for a in candidates(half, half.forecaster.expected(2)))
 
-    # -- a clause you cannot pay is not a price ----------------------------
-    # A transfer LOCKS the clause for about a week, and on the day this was
-    # found every one of the 76 rival players in the league was locked. The
-    # whole steal side of the report was ranking moves the app would refuse —
-    # which is exactly what it looked like from the outside, and why it was
-    # queried. A lock is not a discount and not a reason to rank him lower: he
-    # is simply not for sale, and the honest table says when he will be.
-    now = dt.datetime(2026, 8, 18, tzinfo=dt.timezone.utc)
-    soon = dt.datetime(2026, 8, 24, tzinfo=dt.timezone.utc)
-    past = dt.datetime(2026, 8, 1, tzinfo=dt.timezone.utc)
-    assert locked({"th_m1": soon}, "th_m1", now) is True
-    assert locked({"th_m1": past}, "th_m1", now) is False
-    # No date is NOT STATED, and not-stated must not become "buyable": the
-    # feed omitting a field is the case that silently reopens the bug.
-    assert locked({}, "th_m1", now) is True
-    assert locked({"th_m1": None}, "th_m1", now) is True
 
     assert Action("clause", buy="X", victim="R").label() == "clause X from R"
     assert Action("swap", buy="X", sell="Y").label() == "buy X · sell Y"
