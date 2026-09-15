@@ -57,6 +57,9 @@ from ffcore.schedule import (rounds_left, next_then_rest,  # noqa: E402
                              first_jornada_per_player, apply_fixtures,
                              phantom_topup, phantom_fill)
 from ffcore.pricing import locked, burn, cash_price, respond  # noqa: E402
+from ffcore.action import Action  # noqa: E402
+from ffcore.candidates import (candidates, dead_weight,  # noqa: E402
+                               overdraft_fix, apply, offer_combos)
 from ffcore.profile import (PlayerProfile, UNSCORED_DEFAULT,  # noqa: E402
                             build_profiles)
 from ffcore.score import SLOT, SLOT_MIN, _calibrated  # noqa: E402
@@ -95,50 +98,6 @@ KEEP_RELIABLE_MIN = 6
 # never reach the full simulation at all. Topped up the same additive way.
 # Why: docs/notes/decide.md#keep_value_min--efficient-but-modest-candidates-also-reach-the-full-pass
 KEEP_VALUE_MIN = 4
-
-
-@dataclass(frozen=True)
-class Action:
-    """One move. `sell` is empty for a purchase out of the balance.
-
-    `sell` is a TUPLE because funding is not always one man. A target you
-    cannot reach on cash plus one spare is not unaffordable — it is affordable
-    by selling the men who never play, and there is no reason the table should
-    omit that move. Keeping it a single string made the staircase in the value
-    of cash invisible: every step of it needs more than one sale.
-    """
-    kind: str          # "buy" | "steal" | "swap" | "steal-swap" | "sell"
-    buy: str = ""
-    sell: tuple[str, ...] = ()
-    cost: float = 0.0        # what leaves the balance
-    proceeds: float = 0.0    # what a sale raises
-    victim: str = ""         # the rival a steal takes from
-
-    def __post_init__(self):
-        # One man is the common case and callers pass him as a bare string.
-        if isinstance(self.sell, str):
-            object.__setattr__(self, "sell",
-                               (self.sell,) if self.sell else ())
-
-    @property
-    def net(self) -> float:
-        return self.cost - self.proceeds
-
-    def label(self, names: dict[str, str] | None = None) -> str:
-        # "steal X from Y" is reserved for paying a clause, which is the only
-        # transaction that takes a man off somebody against their will. A
-        # market purchase says "buy", however he came to be on the market.
-        """The move in words. `names` swaps join keys for readable names —
-        the report needs that and the terminal does not, and the grammar of a
-        move is written here so there is only one of it."""
-        def show(k):
-            return (names or {}).get(k, k)
-        sold = " + ".join(show(k) for k in self.sell)
-        if self.kind == "sell":
-            return "sell %s" % sold
-        who = "clause %s from %s" % (show(self.buy), self.victim) \
-            if self.victim else "buy %s" % show(self.buy)
-        return who + (" · sell %s" % sold if sold else "")
 
 
 @dataclass
@@ -357,168 +316,6 @@ def _fieldable(squad: dict[str, str]) -> bool:
         return False
     return any(depth.get("DEF", 0) >= d and depth.get("MED", 0) >= m
               and depth.get("DEL", 0) >= n for d, m, n in formations())
-
-
-def candidates(u: Universe, expected: dict[str, float],
-               budget: float | None = None) -> list[Action]:
-    """Every affordable move, pruned to the ones that could plausibly help.
-
-    The prune is on EXPECTED points, not on the simulation: it is a filter for
-    what to simulate, so it only has to be roughly right, and it turns
-    thousands of combinations into dozens. A candidate who would not make your
-    eleven on expectation will not make it on a draw either.
-
-    FUNDED BY CASH, OR BY SELLING EXACTLY ONE SPARE PLAYER — deliberately
-    not a multi-sale chain, which risks leaving the squad short a legal
-    XI. A genuinely 2-sale-only move stops appearing; that's the trade.
-    """
-    cash = u.cash if budget is None else budget
-    mine_squad = u.state.squads.get(u.me, {})
-    mine = set(mine_squad)
-    # The eleven the signing has to beat is current_xi()'s own reading — a
-    # bar that comes back empty (no jornada left to pick at all) falls back
-    # to the round passed in rather than a bar of zero that clears nothing.
-    bar_exp, xi = current_xi(u)
-    if not bar_exp:
-        bar_exp = expected
-        xi = set(best_xi(u.state.squads[u.me], bar_exp))
-    bar = xi_bar(bar_exp, xi)
-    # EVERY spare: selling him ALONE still leaves a fieldable shape — tried
-    # as a funder for every target, not just a cheap-by-some-metric top few.
-    # An earlier cut to the "best" 6 by raw points, then by value-per-euro,
-    # each missed the same real case a different way: a good player who is
-    # genuinely redundant (a second keeper, MAX_SLOT["POR"]=1) can rank
-    # above enough of the squad by ANY single-number heuristic to fall
-    # outside a fixed-size cut, however that heuristic is defined — the cut
-    # itself was the bug, not which ranking fed it. Measured: trying every
-    # spare against every target costs ~0.5s more per report (candidates()
-    # generating a few hundred more Actions for rank()'s already-cheap
-    # SCREEN_TRIALS pass to discard) — not the thousands-of-combinations
-    # explosion a cap was guarding against.
-    # Ordered by value above LEAGUE replacement PER EURO he'd raise
-    # (player_forecasts()'s own PAR, a fixed league-wide baseline, over
-    # value_rate()'s cost normalisation) purely so a reader scanning
-    # generated Actions sees the most plausible funders first; every one
-    # of them still reaches rank()'s real simulation regardless of order.
-    # _fieldable() is the one hard constraint (job 1: never propose an
-    # illegal squad); value-per-euro only orders the search (job 2), it
-    # doesn't gate it — see the Why: below for the ad hoc carve-out this
-    # replaced when the two jobs were tangled into one cutoff.
-    # Why: docs/notes/decide.md#optimize-for-competent-play-warn-dont-model-for-incompetent-play
-    fieldable_spare = [k for k in mine if _fieldable(
-        {p: s for p, s in mine_squad.items() if p != k})]
-    par_of = {k: v["par"] for k, v in player_forecasts(u).items()}
-
-    def _spare_rank(k):
-        vr = value_rate(par_of.get(k, 0.0), u.proceeds.get(k, 0.0))
-        # No proceeds means nothing to fund with regardless of how little
-        # he's worth keeping — ranks last, never first.
-        return (vr is None, vr if vr is not None else 0.0)
-
-    spare = sorted(fieldable_spare, key=_spare_rank)
-
-    out: list[Action] = []
-    for c, price in sorted(u.price.items(), key=lambda kv: kv[1]):
-        if c in mine or bar_exp.get(c, 0.0) <= bar:
-            continue
-        # Never propose a listed target (owned, not a clause) as a move —
-        # 0/119 real deals in this league have ever been a rival's own
-        # choice to sell to a manager. route_kind() is the one place this
-        # gets decided.
-        kind_ = route_kind(u, c)
-        if kind_ == "listed":
-            continue
-        raid = kind_ == "raid"
-        victim = u.owner.get(c, "") if raid else ""
-        kind = "clause" if raid else "buy"
-        swap = kind + "-swap" if raid else "swap"
-        if price <= cash:
-            out.append(Action(kind, buy=c, cost=price, victim=victim))
-        # Funded by a sale: every spare is tried (spare's own docstring
-        # above), worst-value-per-euro first.
-        for s in spare:
-            got = u.proceeds.get(s, 0.0)
-            if price <= cash + got:
-                out.append(Action(swap, buy=c, sell=s, cost=price,
-                                  proceeds=got, victim=victim))
-    return out
-
-
-def dead_weight(u) -> list[tuple[str, float]]:
-    """[(player, what he raises)] for everyone in my squad who never starts.
-
-    A man who makes none of the remaining elevens contributes nothing on the
-    pitch, so selling him costs nothing and any offer is a gain — the one
-    verdict reachable without valuing cash.
-
-    Checked against every jornada you can still PICK, not every jornada
-    left: a round already in progress has its eleven locked to a smaller
-    pool (clubs that have kicked off drop out), so a man who only starts
-    THERE isn't being fielded by any decision still open to you. Does not
-    rank these against each other or say what to hold out for — see
-    candidates(), where they pay for moves nothing else can reach.
-    """
-    mine = u.state.squads.get(u.me, {})
-    choosable = [j for j in u.state.jornadas if j not in u.part_played] \
-        or list(u.state.jornadas)
-    starts: set[str] = set()
-    for j in choosable:
-        starts.update(best_xi(mine, u.forecaster.expected(j)))
-    return sorted(((k, u.proceeds.get(k, 0.0)) for k in mine
-                   if k not in starts),
-                  key=lambda kv: -kv[1])
-
-
-def overdraft_fix(u: Universe) -> tuple[list[tuple[str, float]], float]:
-    """([(player, proceeds)] to sell, still-short amount) to clear an
-    overdraft — [], 0.0 when not overdrawn at all.
-
-    DEAD WEIGHT ONLY, DELIBERATELY — never a real starter, matching
-    candidates()'s own refusal of multi-sale funding chains. Reaches
-    only into dead_weight() (proceeds with zero points cost), and
-    re-checks _fieldable() on the cumulative result after every sale,
-    stopping rather than pushing through an unsafe one. A shortfall dead
-    weight alone can't cover is returned honestly (second element > 0),
-    never covered by selling a real starter.
-    """
-    if u.cash >= 0:
-        return [], 0.0
-    need = -u.cash
-    mine = dict(u.state.squads.get(u.me, {}))
-    picked: list[tuple[str, float]] = []
-    raised = 0.0
-    for k, proceeds in dead_weight(u):
-        if raised >= need:
-            break
-        trial = {p: s for p, s in mine.items() if p != k}
-        if not _fieldable(trial):
-            continue
-        mine = trial
-        picked.append((k, proceeds))
-        raised += proceeds
-    return picked, max(0.0, need - raised)
-
-
-def apply(u: Universe, a: Action) -> dict[str, dict[str, str]]:
-    """The squads as they would be after `a`. Pure — nothing is mutated.
-
-    TOPPED UP TO SLOT_MIN, WHOEVER THE TRADE LEAVES SHORT — not just
-    mine. A raid's victim never agreed to sell and gets no pre-check;
-    left short, his simulated season scores zero every remaining
-    jornada (no legal XI). See phantom_topup() for how this patches it
-    without inventing new forecaster data.
-    """
-    sq = {m: dict(s) for m, s in u.state.squads.items()}
-    for gone in a.sell:
-        sq[u.me].pop(gone, None)
-    if a.buy:
-        # A steal removes him from his owner. This is the whole point.
-        for m in sq:
-            sq[m].pop(a.buy, None)
-        sq[u.me][a.buy] = u.pos.get(a.buy, "MED")
-    return {m: phantom_topup(s) for m, s in sq.items()}
-
-
 
 
 def _score_many(u: Universe, many: list, trials: int, seed: int):
@@ -799,36 +596,6 @@ def rank(u: Universe, acts: list[Action], seed: int = 1,
         })
     rows = sorted(out, key=lambda d: (-d["net_pts"], d["action"].net))
     return rows, base, measured, bands
-
-
-def offer_combos(u: Universe) -> list[tuple[str, Action]]:
-    """The minimal combinations of real pending offers that clear an
-    overdraft, as `extra` for rank() — only fires when cash is actually
-    negative (the jornada won't lock overdrawn, so something must be
-    accepted). MINIMAL covers only, subset-sum sense: a combo with room to
-    spare when a smaller one already clears it never appears. Pure sell,
-    no rebuy priced — conflating the two is what Action's own `net` keeps
-    apart. Keyed "OFFERS:a|b" since no single key can stand for a combo.
-    """
-    mine = u.state.squads.get(u.me, {})
-    offers = {k: v for k, v in u.received_offers.items()
-             if k in mine and v > 0}
-    deficit = -u.cash
-    if deficit <= 0 or not offers:
-        return []
-    names = sorted(offers)
-    covers: list[tuple[str, ...]] = []
-    for r in range(1, len(names) + 1):
-        for combo in itertools.combinations(names, r):
-            cs = set(combo)
-            if any(set(c) <= cs for c in covers):
-                continue
-            if sum(offers[k] for k in combo) >= deficit:
-                covers.append(combo)
-    return [("OFFERS:" + "|".join(combo),
-            Action("sell", sell=combo,
-                  proceeds=sum(offers[k] for k in combo)))
-           for combo in covers]
 
 
 _LOAD_CACHE: Universe | None = None
@@ -1526,21 +1293,6 @@ def _selftest() -> None:
     # round you can still pick it is 5.0 and he does not.
     assert not any(a.buy == "dud"
                    for a in candidates(half, half.forecaster.expected(2)))
-
-
-    assert Action("clause", buy="X", victim="R").label() == "clause X from R"
-    assert Action("swap", buy="X", sell="Y").label() == "buy X · sell Y"
-    # A bare string is still accepted, because one man is the common case.
-    assert Action("swap", buy="X", sell="Y").sell == ("Y",)
-    assert Action("buy", buy="X").sell == ()
-    # The grammar of a move is written once. A report that spelled it out
-    # again to swap the keys for names would be a second place for "steal"
-    # and "sell" to drift apart from each other.
-    assert Action("clause", buy="x", victim="R").label({"x": "Xavi"}) \
-        == "clause Xavi from R"
-    assert Action("sell", sell="y").label({"y": "Yuri"}) == "sell Yuri"
-    assert Action("swap", buy="x", sell="y").label({"x": "Xavi"}) \
-        == "buy Xavi · sell y"
 
     # -- _fieldable: the one squad-legality check, counts only -------------
     # A real 4-4-2 shape: POR1/DEF4/MED4/DEL2.
