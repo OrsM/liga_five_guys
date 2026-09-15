@@ -135,7 +135,7 @@ def xi_note(u, xi=None) -> str:
     import decide
 
     if xi is None:
-        _, xi = decide.current_xi(u)
+        _, xi = u.current_xi
     chg = xi_change(fielded_keys(u), xi)
     if not chg["legal"]:
         return ("the app has not said which eleven you are fielding, so this "
@@ -184,7 +184,7 @@ def fielded_shape(u, xi=None) -> str:
     import decide
 
     if xi is None:
-        _, xi = decide.current_xi(u)
+        _, xi = u.current_xi
     keys = fielded_keys(u)
     return shape(u, keys) if xi_change(keys, xi)["legal"] else ""
 
@@ -267,7 +267,7 @@ def by_slot(u, keys, exp=None):
     import decide
 
     if exp is None:
-        exp, _ = decide.current_xi(u)
+        exp, _ = u.current_xi
     return sorted(keys, key=lambda k: (SLOT_ORDER.get(u.pos.get(k, ""), 9),
                                        -exp.get(k, 0.0)))
 
@@ -280,8 +280,8 @@ def _bar(u, exp=None, xi=None) -> float:
     """
     import decide
     if exp is None or xi is None:
-        exp, xi = decide.current_xi(u)
-    return decide.xi_bar(exp, xi)
+        exp, xi = u.current_xi
+    return u.xi_bar
 
 
 def short_manager(m: str) -> str:
@@ -311,12 +311,12 @@ def ladder_rows(u, rows, bands=None, exp=None, xi=None) -> list[dict]:
     import decide
 
     if exp is None or xi is None:
-        exp, xi = decide.current_xi(u)
+        exp, xi = u.current_xi
     mine = u.state.squads.get(u.me, {})
-    dead_weight = decide.dead_weight(u)
+    dead_weight = u.dead_weight()
     dead = {k for k, _ in dead_weight}
     won = {r["action"].buy: r for r in rows if r["action"].buy}
-    bar = decide.xi_bar(exp, xi)
+    bar = u.xi_bar
     # The most a single sale can raise — matches candidates()'s own
     # funding rule exactly, so nothing looks "reachable" here that
     # candidates() could never actually fund.
@@ -445,9 +445,9 @@ def band_acts(u, exp=None, xi=None) -> list:
     import decide
 
     if exp is None or xi is None:
-        exp, xi = decide.current_xi(u)
+        exp, xi = u.current_xi
     mine = u.state.squads.get(u.me, {})
-    bar = decide.xi_bar(exp, xi)
+    bar = u.xi_bar
     acts = [(k, decide.Action("sell", sell=(k,),
                               proceeds=u.proceeds.get(k, 0.0)))
            for k in mine]
@@ -497,7 +497,7 @@ def ladder(u, rows, base, data=None, exp=None, xi=None) -> list[str]:
     import decide
 
     if exp is None or xi is None:
-        exp, xi = decide.current_xi(u)
+        exp, xi = u.current_xi
     data = data if data is not None else ladder_rows(u, rows, exp=exp, xi=xi)
     by_group: dict[str, list[dict]] = {}
     for r in data:
@@ -1001,7 +1001,7 @@ def _xi_total(u, who, exp=None) -> float:
     import decide
     from ffcore.season import best_xi
     if exp is None:
-        exp, _ = decide.current_xi(u)
+        exp, _ = u.current_xi
     xi = best_xi(u.state.squads.get(who, {}), exp)
     return sum(exp.get(k, 0.0) for k in xi)
 
@@ -1011,7 +1011,7 @@ def _shape_now(u, xi=None) -> str:
     see xi_note()'s docstring."""
     import decide
     if xi is None:
-        _, xi = decide.current_xi(u)
+        _, xi = u.current_xi
     return shape(u, xi)
 
 
@@ -1024,7 +1024,7 @@ def _rival_best(u, exp=None) -> dict:
     """
     import decide
     if exp is None:
-        exp, _ = decide.current_xi(u)
+        exp, _ = u.current_xi
     out = [(_xi_total(u, m, exp=exp), m) for m in u.state.squads if m != u.me]
     if not out:
         return {}
@@ -1055,7 +1055,7 @@ def payload(u, rows, base, rivals, locks_h=None, n_actions: int = 0,
     import decide
 
     if exp is None or xi is None:
-        exp, xi = decide.current_xi(u)
+        exp, xi = u.current_xi
     names = {k: title_name(v) for k, v in u.name.items()}
     lo, hi = base.band(u.me)
     moves = []
@@ -1243,7 +1243,7 @@ def render(u, rows, base, stamp: str, rivals, n_actions: int = 0,
     import decide
 
     if exp is None or xi is None:
-        exp, xi = decide.current_xi(u)
+        exp, xi = u.current_xi
     out = ["# The simulation — %s" % stamp, "", "## Now", ""]
     out += header(u, base, n_actions or len(rows), locks_h, xi=xi)
     # THE RANKING IS SUBORDINATE TO THE CALL, and says so in its own heading.
@@ -2021,14 +2021,14 @@ def main() -> None:
     # EVERY TARGET, not only the ones you can afford. The unaffordable ones
     # are dropped after screening; screening them is how the price of cash
     # gets measured, off a pass that was happening anyway.
-    acts = decide.candidates(u, exp, budget=float("inf"))
+    acts = u.candidates(exp, budget=float("inf"))
     smoothed = cash_price_history()
     # One simulation at FINAL_TRIALS, not two: band_acts() (ladder) and
     # market_candidates() (every other listed player) both answer off the
     # one rank() pass below. xi_exp/xi is the one current-eleven answer for
     # this whole render, not re-asked per sub-call.
     # Why: docs/notes/decide.md#current_xi--one-computation-seven-old-copies
-    xi_exp, xi = decide.current_xi(u)
+    xi_exp, xi = u.current_xi
     bar_acts = band_acts(u, exp=xi_exp, xi=xi)
     bar_keys = {k for k, _ in bar_acts}
     extra_acts = bar_acts + [t for t in market_candidates(u)

@@ -109,18 +109,18 @@ sys.path.insert(0, "src")
 import decide
 
 u = decide.load()
-bar_exp, xi = decide.current_xi(u)
+bar_exp, xi = u.current_xi
 if not bar_exp:
     print(json.dumps({{"error": "no xi"}}))
     sys.exit(0)
-bar = decide.xi_bar(bar_exp, xi)
+bar = u.xi_bar
 mine = set(u.state.squads.get(u.me, {{}}))
 near = []
 for c, price in u.price.items():
     if c in mine or price > u.cash:
         continue
     exp = bar_exp.get(c, 0.0)
-    if exp <= bar and exp >= bar * {frac} and decide.route_kind(u, c) != "listed":
+    if exp <= bar and exp >= bar * {frac} and u.route_kind(c) != "listed":
         near.append((c, price, exp))
 
 if not near:

@@ -205,7 +205,7 @@ def main() -> None:
     # forecast) that could name a different eleven for the same squad.
     # Why: docs/notes/decide.md#current_xi--one-computation-seven-old-copies
     import decide
-    xi = decide.current_xi(decide.load())[1] if players else set()
+    xi = decide.load().current_xi[1] if players else set()
     if players and xi:
         chosen = [p for p in players if p.get("key") in xi]
         formation = tuple(sum(1 for p in chosen if p["slot"] == s)
