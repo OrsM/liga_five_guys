@@ -80,9 +80,20 @@ weight).
   that calls them — a sibling script risks becoming a second,
   independently-drifting implementation, exactly the failure class this
   whole plan exists to remove. Why: session log 2026-09-15.
-- [ ] **5. Buy/sell decision tree.** Formalize the cash-need logic
-  (need cash outright / have spare / need a specific sale to fund X) as
-  explicit, testable branches instead of logic implicit in ranking order.
+- [~] **5. Buy/sell decision tree.** The three real funding paths (cash
+  outright / one spare sale / genuinely unreachable) already existed —
+  `candidates()` generates the first two, `sim.ladder_rows()`'s SAVE/PASS
+  split reports the third. Found and fixed a real disagreement between
+  them (3504e1c): the "unreachable" threshold summed every dead-weight
+  player's proceeds, but `candidates()` only ever funds with ONE spare —
+  a target reachable only by summing bench sales was silently dropped
+  from every group (not shown as buyable, not shown as short). Fixed
+  with one shared `ffcore.candidates.max_spare_proceeds()`/
+  `fieldable_spares()`, proven with a synthetic case before fixing.
+  Still open: nothing currently makes this tree's THREE branches
+  visible/explicit as a named concept a reader could point to — the
+  correctness is real now, but "decision tree" is still implicit across
+  two files. Lower priority than the correctness fix already landed.
 - [ ] **6. Rival-raid prioritization.** One best raid per opponent, by
   harm-to-them + economic sense — a scoped new feature on the now-clearer
   decision engine.
@@ -106,5 +117,15 @@ Session 4 status: DONE. `decide.py`'s remaining content (Universe,
 current_xi/xi_bar/route_kind/_fieldable, load(), rank()) is its real
 core, deliberately not split further.
 
-Next: Session 5 (buy/sell decision tree) or Session 6 (rival-raid
-prioritization) — either is reasonable to start fresh.
+Session 5: found and fixed a real disagreement between candidates()'s
+funding logic and sim.ladder_rows()'s reachability check — a genuinely
+good target reachable only by summing multiple bench sales was silently
+invisible in the report (3504e1c). Also fixed a dangling doc reference
+from Session 4's own funding-noise fix (never actually got its promised
+docs/notes/decide.md section until now).
+
+Next: Session 6 (rival-raid prioritization) is the natural next piece —
+Session 5's remaining item (making the 3-branch funding tree an
+explicit, named concept rather than implicit-but-now-correct logic) is
+real but lower priority than a live correctness bug, and reasonable to
+revisit later or skip.
