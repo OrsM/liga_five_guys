@@ -239,3 +239,103 @@ def offer_combos(u) -> list[tuple[str, Action]]:
             Action("sell", sell=combo,
                   proceeds=sum(offers[k] for k in combo)))
            for combo in covers]
+
+
+def _selftest() -> None:
+    # Lazy import, same reasoning as ffcore/par.py's own self-test: the
+    # real Universe/LeagueState/Bootstrap shapes live in decide.py/
+    # ffcore.season/ffcore.forecast, and importing decide.py at module
+    # load time here would be the exact circular import this split
+    # exists to avoid.
+    from decide import Universe
+    from ffcore.season import LeagueState
+    from ffcore.forecast import Bootstrap
+
+    # A real (4,4,2) plus one extra DEF and one extra DEL beyond it — real
+    # legal shapes are (DEF,MED,DEL) tuples like (5,4,1)/(4,3,3)/etc (see
+    # ffcore.score.formations()), not independently-satisfiable per-slot
+    # minimums, so _fieldable() genuinely needs checking, not predicting
+    # by hand — this test asks it, rather than hard-coding its answer.
+    sq = {"k": "POR", "d1": "DEF", "d2": "DEF", "d3": "DEF", "d4": "DEF",
+         "spare_d": "DEF", "m1": "MED", "m2": "MED", "m3": "MED", "m4": "MED",
+         "f1": "DEL", "dead_f": "DEL"}
+    per = {1: {k: (3.0, 1.0) for k in sq}}
+    per[1]["f1"] = (10.0, 1.0)     # the DEL who actually starts
+    per[1]["dead_f"] = (0.1, 1.0)  # never the pick, but still fieldable to sell
+    u = Universe(
+        state=LeagueState({"me": dict(sq)}, [1], "me"),
+        forecaster=Bootstrap(per), cash=0.0, me="me",
+        pos=dict(sq), proceeds={"spare_d": 4e6, "dead_f": 6e6},
+        owner={}, received_offers={})
+
+    # -- fieldable_spares()/max_spare_proceeds(): the real funding pool --
+    from decide import _fieldable
+
+    mine = u.state.squads["me"]
+    spares = fieldable_spares(u)
+    # Every returned spare, checked directly against _fieldable() rather
+    # than hand-predicted: removing him alone must leave SOME real legal
+    # shape (ffcore.score.formations() — actual (DEF,MED,DEL) tuples, not
+    # independently-satisfiable per-slot minimums).
+    assert spares, spares
+    for s in spares:
+        assert _fieldable({p: pos for p, pos in mine.items() if p != s}), s
+    # The only POR can never be a spare — no real formation fields zero.
+    assert "k" not in spares, spares
+    # _fieldable() counts POSITIONS, not who the forecaster picks to
+    # start — it doesn't know f1 (not dead_f) is the DEL who actually
+    # starts, so BOTH DEL are fieldable spares even though only one ever
+    # plays. dead_weight() (below) is the function that knows the
+    # difference; fieldable_spares() deliberately doesn't.
+    assert "f1" in spares and "dead_f" in spares, spares
+    # THE DEFINITION, tying the two functions together directly — this is
+    # the actual thing this split has to get right, not _fieldable()'s
+    # own legality logic (already exhaustively covered in decide.py's
+    # self-test).
+    assert max_spare_proceeds(u) == max(
+        (u.proceeds.get(s, 0.0) for s in spares), default=0.0), \
+        (max_spare_proceeds(u), spares)
+    assert max_spare_proceeds(u) == 6e6, max_spare_proceeds(u)  # dead_f's proceeds
+    # A squad with no safely-sellable spare at all has nothing to raise.
+    bare = Universe(
+        state=LeagueState({"me": {"k": "POR", "d1": "DEF", "d2": "DEF",
+                                  "d3": "DEF", "m1": "MED", "m2": "MED",
+                                  "m3": "MED", "f1": "DEL"}}, [1], "me"),
+        forecaster=Bootstrap({1: {}}), cash=0.0, me="me",
+        pos={}, proceeds={}, owner={})
+    assert fieldable_spares(bare) == []
+    assert max_spare_proceeds(bare) == 0.0
+
+    # -- dead_weight(): only players who start NO choosable jornada -------
+    dw = dict(dead_weight(u))
+    assert dw == {"dead_f": 6e6}, dw
+
+    # -- apply(): buy tops up whoever it leaves short, sell does not add --
+    after = apply(u, Action("buy", buy="new_por", sell=("spare_d",)))
+    assert "spare_d" not in after["me"], after["me"]
+    assert after["me"]["new_por"] == "MED", after["me"]  # u.pos has no entry -> default
+
+    # -- offer_combos(): minimal covers only, no redundant superset --------
+    u2 = Universe(
+        state=LeagueState({"me": dict(sq)}, [1], "me"),
+        forecaster=Bootstrap(per), cash=-9e6, me="me",
+        pos=dict(sq), proceeds={}, owner={},
+        received_offers={"spare_d": 4e6, "dead_f": 6e6, "f1": 20e6})
+    combos = offer_combos(u2)
+    labels = {c[0] for c in combos}
+    # f1 alone (20M) covers the 9M deficit — any combo also containing him
+    # is a strict superset and must not appear.
+    assert not any("|" in lab and "f1" in lab for lab in labels), labels
+    assert any(lab == "OFFERS:f1" for lab in labels), labels
+    # spare_d+dead_f (10M) also covers it without f1 — kept alongside.
+    assert any(set(lab.split(":")[1].split("|")) == {"spare_d", "dead_f"}
+              for lab in labels if "f1" not in lab), labels
+    assert offer_combos(Universe(
+        state=LeagueState({"me": {}}, [1], "me"), forecaster=Bootstrap({1: {}}),
+        cash=5e6, me="me")) == [], "not overdrawn -> nothing to cover"
+
+    print("ffcore.candidates self-test OK (13 cases)")
+
+
+if __name__ == "__main__":
+    _selftest()
