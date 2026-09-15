@@ -330,7 +330,7 @@ def ladder_rows(u, rows, bands=None, exp=None, xi=None) -> list[dict]:
     # Points above replacement — a standing property, not the same
     # question as the paired-simulation band above.
     # Why: docs/notes/sim.md#ladder_rows--par-vs-the-paired-simulation-band-two-different-questions
-    par = {k: v["par"] for k, v in decide.player_forecasts(u).items()}
+    par = {k: v["par"] for k, v in u.player_forecasts().items()}
 
     def cell(k, group, where, money, pts, note="", value=None,
             lo=None, hi=None, market=None, premium=None, bought=None):
@@ -1072,7 +1072,7 @@ def payload(u, rows, base, rivals, locks_h=None, n_actions: int = 0,
     # in: deterministic given the same u, so this can't drift from the
     # markdown table any more than the raid dedup above can.
     # Why: docs/notes/sim.md#_clears_par_floor--dont-headline-noise-as-a-recommendation
-    par_of = {k: v["par"] for k, v in decide.player_forecasts(u).items()}
+    par_of = {k: v["par"] for k, v in u.player_forecasts().items()}
     mae = current_mae()
     rows = [r for r in rows if not r["action"].buy
            or _clears_par_floor(par_of, mae, r["action"].buy)]
@@ -1736,7 +1736,7 @@ def _selftest() -> None:
     uc_owner = {"rivals": "riv", "wished": "riv"}
     uc_route = {"rivals": "clause", "wished": "listed"}
     uc_value = {"steady": 5e6, "rivals": 3.8e6}
-    # PAR (ladder_rows() calls decide.player_forecasts(u), which reads
+    # PAR (ladder_rows() calls u.player_forecasts(), which reads
     # u.players) — LEAGUE-wide replacement now (ffcore.score.replacement/
     # vor), pooled across every candidate here (all MED): season totals
     # rivals 14.0, wished 13.0, steady 10.0, maverick 8.0, dud 6.0 over 5
@@ -1903,7 +1903,7 @@ def _selftest() -> None:
     # ...and rank() answers them in its own final pass. No `acts`, so no move
     # survives screening and nothing is dropped from `extra` — the bands are
     # the whole answer.
-    _rows, baseb, _lam, bands = decide.rank(ub, [], extra=asked)
+    _rows, baseb, _lam, bands = ub.rank([], extra=asked)
     assert set(bands) == {*sqb, "cand"}, sorted(bands)
     for key in bands:
         med, lo, hi, _act = bands[key]
@@ -1919,7 +1919,7 @@ def _selftest() -> None:
     # BUYING A GOOD CANDIDATE GAINS POINTS — positive median.
     assert bands["cand"][0] > 0, bands["cand"]
     # Nothing asked for at all: no extra squads scored, not an error.
-    assert decide.rank(ub, [], extra=[])[3] == {}
+    assert ub.rank([], extra=[])[3] == {}
 
     # SELL rows show what he cost, next to what he raises now.
     sell_lad = "\n".join(ladder(ub, [], baseb))
@@ -1949,7 +1949,7 @@ def _selftest() -> None:
     # response leaves behind, so "cand" drops out of `bands` the moment
     # it is affordable enough to survive screening as a real move.
     buy_cand = decide.Action("buy", buy="cand", cost=5e6)
-    rows2, _b2, _l2, bands2 = decide.rank(ub, [buy_cand], extra=asked)
+    rows2, _b2, _l2, bands2 = ub.rank([buy_cand], extra=asked)
     assert [r for r in rows2 if r["action"].buy == "cand"], rows2
     assert "cand" not in bands2, sorted(bands2)
 
@@ -2033,8 +2033,8 @@ def main() -> None:
     bar_keys = {k for k, _ in bar_acts}
     extra_acts = bar_acts + [t for t in market_candidates(u)
                              if t[0] not in bar_keys]
-    rows, base, measured, bands = decide.rank(
-        u, acts, price=smoothed, extra=extra_acts)
+    rows, base, measured, bands = u.rank(
+        acts, price=smoothed, extra=extra_acts)
     log_cash_price(measured)
     # Real idle cash ONLY when genuinely nothing cleared the bar (`rows`
     # empty) AND there's cash to speak of — see _price_note()'s own note.

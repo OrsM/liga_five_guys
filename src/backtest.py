@@ -128,7 +128,7 @@ if not near:
     sys.exit(0)
 
 acts = [decide.Action("buy", buy=c, cost=price) for c, price, _exp in near]
-rows, base, measured, bands = decide.rank(u, acts)
+rows, base, measured, bands = u.rank(acts)
 best = None
 for r in rows:
     if best is None or r["pts_lo"] > best["pts_lo"]:

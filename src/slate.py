@@ -87,7 +87,7 @@ def comparison_rows(u, bands=None) -> list[dict]:
     from ffcore.render import title_name
 
     mine = set(u.state.squads.get(u.me, {}))
-    fc = decide.player_forecasts(u)
+    fc = u.player_forecasts()
     out = []
     for k, price in u.price.items():
         if k in mine:

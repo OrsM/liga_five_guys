@@ -216,6 +216,17 @@ class Universe:
         """Every affordable move worth simulating."""
         return candidates(self, expected, budget)
 
+    def player_forecasts(self) -> dict[str, dict]:
+        """{player: {par, ...}} — every priced player's points above
+        replacement and the fields it's built from."""
+        return player_forecasts(self)
+
+    def rank(self, acts: list["Action"], seed: int = 1,
+            price=None, extra=()) -> tuple:
+        """Screen wide and cheap, then re-run the survivors properly.
+        See the module-level rank() for the full contract."""
+        return rank(self, acts, seed=seed, price=price, extra=extra)
+
 
 def _pos_of(raw: str) -> str:
     """SLOT abbreviation (DEL/MED/DEF/POR) for a PlayerCurrent.pos value.
@@ -881,6 +892,8 @@ def _selftest() -> None:
     assert u.dead_weight() == dead_weight(u)
     assert [a.buy for a in u.candidates(exp)] == \
         [a.buy for a in candidates(u, exp)]
+    assert u.player_forecasts() == player_forecasts(u)
+    assert u.rank([]) == rank(u, []), "u.rank must match rank(u, ...)"
 
     # -- current_xi / xi_bar: the one computation seven call sites used to
     # each rebuild by hand ---------------------------------------------
