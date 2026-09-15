@@ -50,9 +50,18 @@ weight).
   interchangeable with selling bench dead weight; confirmed across 5
   seeds that the recommended funding source now varies only among real
   bench players. Still open: split `decide.py` (2,206 lines — candidate
-  generation / funding / ranking tangled together) along its real seams;
-  build `decide.py explain <player>` to trace a real recommendation's
-  numbers in one command instead of a fresh ad hoc script each time.
+  generation / funding / ranking tangled together) along its real seams.
+
+  **`explain` tool: parked, not scheduled.** Deliberately deferred —
+  building an observability feature before the codebase is simplified is
+  itself a step away from simplification, and revisiting it once
+  `decide.py` is actually split makes it cheap (a trace output on
+  already-clean functions, not a new subsystem) rather than something
+  worth designing carefully now. If revisited: build it AS a `trace=`
+  output on `rank()`/`candidates()` themselves, never a separate script
+  that calls them — a sibling script risks becoming a second,
+  independently-drifting implementation, exactly the failure class this
+  whole plan exists to remove. Why: session log 2026-09-15.
 - [ ] **5. Buy/sell decision tree.** Formalize the cash-need logic
   (need cash outright / have spare / need a specific sale to fund X) as
   explicit, testable branches instead of logic implicit in ranking order.
