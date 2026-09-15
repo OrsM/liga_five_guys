@@ -122,3 +122,28 @@ take text either way, as Club Elo's CSV does, so the registry needs no
 new concept. Terms: the app's own API, read with the account's own
 credential for its own league. No robots.txt applies, but the same
 restraint does — ask once a day, cache, never poll.
+
+## `_player_identity()` — one join, five drifted copies
+
+`parse_api_market`/`parse_api_teams`/`parse_api_lineup`/
+`parse_api_players_all`/`parse_api_player` each independently extracted
+the same player-identity fields (`player_id`/`player_name`/
+`player_name_full`/`position_id`/`market_value`) from a `playerMaster`-
+shaped API record — and had drifted while doing it: two silently skipped
+the nickname → legal-name fallback that the other two applied, and one
+used a different output key (`full_name`) for the same fact as
+everywhere else calls `player_name_full`. Found while asked why
+maintaining a second probable-XI source costs the amount of code it
+does — not the same question, but the same shape of bug (one real fact,
+several independently-drifting implementations) as the AF-row join
+`ffcore.second.resolve_second_source()` unified the same day.
+
+Checked against real production data before unifying, not assumed: zero
+rows with an empty `player_name` across 13,468 real `api_players_all`
+rows and 1,859 real `api_lineup` rows either way, so the missing
+fallback wasn't costing anything measurable today — worth fixing anyway,
+since the next endpoint that omits a nickname won't announce itself.
+`parse_api_player`'s `player_id` is a real, deliberate exception (it
+comes from the page's own key, not the body, so a payload that stops
+carrying `id` still names itself) and is set explicitly after the shared
+extraction, not folded into it.

@@ -1550,6 +1550,22 @@ def _pm(item: dict) -> dict:
     return (item or {}).get("playerMaster") or {}
 
 
+def _player_identity(pm: dict) -> dict:
+    """player_id/player_name/player_name_full/position_id/market_value,
+    pulled the same way for every player-shaped API record — 5 call sites
+    had drifted on this before being unified.
+    Why: docs/notes/sources.md#_player_identity--one-join-five-drifted-copies
+    """
+    nick, name = pm.get("nickname") or "", pm.get("name") or ""
+    return {
+        "player_id": str(pm.get("id") or ""),
+        "player_name": nick or name,
+        "player_name_full": name if nick else "",
+        "position_id": str(pm.get("positionId") or ""),
+        "market_value": str(pm.get("marketValue") or ""),
+    }
+
+
 def parse_api_leagues(text: str, observed_at: str,
                       key: str = "api_leagues") -> list[dict]:
     """One row per league this account plays in — normally exactly one.
@@ -1606,14 +1622,8 @@ def parse_api_market(text: str, observed_at: str,
             "observed_at": observed_at, "source": LFG_SOURCE,
             ROW_TABLE: "api_market",
             "market_id": str(it.get("id") or ""),
-            "player_id": str(pm["id"]),
-            "player_name": pm.get("nickname") or pm.get("name") or "",
-            # BOTH, because neither joins alone — see parse_api_teams.
-            "player_name_full": (pm.get("name") or "")
-                                if pm.get("nickname") else "",
-            "position_id": str(pm.get("positionId") or ""),
+            **_player_identity(pm),
             "sale_price": str(it.get("salePrice") or ""),
-            "market_value": str(pm.get("marketValue") or ""),
             # Bid count uses different keys per row kind: app-dealt uses
             # numberOfBids, manager-listed uses numberOfOffers (no
             # numberOfBids at all). Empty = not stated; "0" = listed, no bids.
@@ -1749,17 +1759,7 @@ def parse_api_teams(text: str, observed_at: str,
                 # facts (position/points/balance) live on api_standings.
                 "team_id": str(t.get("id") or ""),
                 "manager": m.get("managerName") or "",
-                "player_id": str(pm["id"]),
-                # Neither nickname nor full name joins the market alone
-                # (each resolves a different subset of real players) — the
-                # nickname is the better single guess and stays
-                # `player_name`; the full name rides beside it, empty when
-                # there's only one name.
-                "player_name": pm.get("nickname") or pm.get("name") or "",
-                "player_name_full": (pm.get("name") or "")
-                                    if pm.get("nickname") else "",
-                "position_id": str(pm.get("positionId") or ""),
-                "market_value": str(pm.get("marketValue") or ""),
+                **_player_identity(pm),
                 "points": str(pm.get("points") or ""),
                 "buyout": str(p.get("buyoutClause") or ""),
                 # When the clause can actually be paid — a transfer locks it
@@ -1861,11 +1861,7 @@ def parse_api_lineup(text: str, observed_at: str,
                 "week": m.group(1) if m else "",
                 "slot": LINEUP_SLOTS[slot],
                 "formation": "-".join(str(n) for n in tactical),
-                "player_id": str(pm.get("id")),
-                "player_name": str(pm.get("nickname") or ""),
-                "player_name_full": str(pm.get("name") or ""),
-                "position_id": str(pm.get("positionId") or ""),
-                "market_value": str(pm.get("marketValue") or ""),
+                **_player_identity(pm),
                 # When YOU last moved it, not when we read it.
                 "snapshot_at": str(d.get("teamSnapshotTookOn") or ""),
                 "points": str(d.get("points") if d.get("points") is not None
@@ -1922,12 +1918,9 @@ def parse_api_player(text: str, observed_at: str,
         return []
     return [{
         "observed_at": observed_at, "source": LFG_SOURCE,
-        "player_id": pid,
-        "player_name": d.get("nickname") or d.get("name") or "",
-        "full_name": d.get("name") or "",
-        "position_id": str(d.get("positionId") or ""),
-        "market_value": str(d.get("marketValue") or ""),
         "team_id": str(d.get("teamId") or ""),
+        **_player_identity(d),
+        "player_id": pid,     # from the KEY, not the body — see above
     }]
 
 
@@ -1956,11 +1949,8 @@ def parse_api_players_all(text: str, observed_at: str,
         return []
     return [{
         "observed_at": observed_at, "source": LFG_SOURCE,
-        "player_id": str(p.get("id") or ""),
-        "player_name": p.get("nickname") or "",
-        "position_id": str(p.get("positionId") or ""),
         "team_id": str(p.get("teamId") or ""),
-        "market_value": str(p.get("marketValue") or ""),
+        **_player_identity(p),
         "player_status": p.get("playerStatus") or "",
     } for p in d if p.get("id")]
 
@@ -3386,7 +3376,7 @@ def _selftest() -> None:
     # The NICKNAME is the market's spelling ("Hugo Duro"), not the full legal
     # name ("Hugo Duro Perales"), and the market is what everything joins on.
     assert pl[0]["player_name"] == "Hugo Duro", pl
-    assert pl[0]["full_name"] == "Hugo Duro Perales", pl
+    assert pl[0]["player_name_full"] == "Hugo Duro Perales", pl
     assert pl[0]["market_value"] == "8534068", pl
     assert parse_api_player("<html>", "t", "api_player_1") == []
 
