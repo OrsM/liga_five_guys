@@ -191,20 +191,9 @@ def _name_from_blob(text: str) -> tuple[str | None, int | None]:
     return (head or None), None
 
 
-# CLASSES LIE HERE. `elemento lesionado elemento_jugador` is the generic
-# class on every pitch-graphic tile (e.g. `jugadores-titulares-22421 mod
-# lesionados`) — reading it as an injury marker flags the whole squad. The
-# real signal is the "Estado físico de la plantilla" panel's icon alt text:
-#
-#   .lesionados_wrapper section.mod.lesionados > .elemento   alt=Lesionado
-#                                                            alt=Duda
-#                                                            alt=Tocado
-#
-# Suspensions live in `section.mod.sancionados`, but that class is also used
-# by an unrelated transfer-listing box (`.mercado-box`) — must be excluded.
-#
-# `Tocado` (knock, still listed as available) folds into `doubt`: both call
-# for the same "think twice before fielding him" decision.
+# Classes lie here (the injury CSS class is on every tile, not just injured
+# ones) — real signal is the fitness panel's icon alt text.
+# Why: docs/notes/sources.md#fitness-classes-lie-in-the-markup
 
 FITNESS_ALT = {
     "lesionado": "injured",
@@ -506,19 +495,9 @@ MARKET_SURFACE_RE = re.compile(
     r'data-(?:nombre|posicion|valor|diferencia1|diferencia-pct1|equipo)="[^"]*"')
 
 
-# ---------------------------------------------------------------------------
-# what a parser is made of — so a cache only dies when its own parser changes
-# ---------------------------------------------------------------------------
-#
-# ingest caches parsed rows per document, keyed on the page content. Keying
-# the invalidation on "this whole file changed" would re-parse every source
-# whenever any one parser (or fixture) did. Instead a document's cache key
-# carries the fingerprint of just the parser it needs: that function's
-# source plus every top-level name it references, transitively (helpers,
-# constants, regexes). This module imports nothing from the repo, so that
-# closure is the whole of what a parse can depend on.
-#
-# A name `parser_sig` can't find falls back to hashing the whole file.
+# What a parser is made of, so ingest's cache dies only when ITS parser
+# changes — not on every edit anywhere in this file.
+# Why: docs/notes/sources.md#parser_sig-cache-key
 
 
 _DEFS: dict[int, dict] = {}
@@ -655,25 +634,9 @@ def sign_team(html: str) -> str | None:
     return _digest(_surface(els))
 
 
-# ---------------------------------------------------------------------------
-# Analítica Fantasy — the second probable-XI source
-# ---------------------------------------------------------------------------
-#
-# TWO PAGE SHAPES, depending on how close the next match is. Try Titulares,
-# fall back to Consenso; neither means rot, which is the correct outcome.
-#
-#   1. Imminent: <ul aria-label="Titulares <Team>"> — their final call, and
-#      binary, with no percentage on the page. `start_pct` stays EMPTY and
-#      `note` says "titular". Never write 100: a confident editorial call is
-#      not a stated probability and the report must tell them apart.
-#   2. Further out: aria-label="Consenso de alineaciones" — three editors
-#      split into Unánimes and Más divididos ("Aitor Paredes2/3 titular").
-#      That fraction is a probability THEY published, so it lands in
-#      `start_pct` as 100·n/d with the raw fraction kept in `note`.
-#
-# NO FITNESS on either shape, so `status` is "" (not stated), never "ok" —
-# silence must not be stored as a clean bill of health. Their position codes
-# are dropped: the app's positions are the ones the scorer uses.
+# Analítica Fantasy — the second probable-XI source. Two page shapes
+# (Titulares vs Consenso) depending on how close the next match is.
+# Why: docs/notes/sources.md#analitica-fantasy-two-page-shapes
 
 AF_BASE = "https://www.analiticafantasy.com"
 AF_SOURCE = "analitica"
@@ -883,24 +846,8 @@ def sign_points(html: str) -> str | None:
                           for r in rows))
 
 
-# ---------------------------------------------------------------------------
-# who actually started — the outcome every probable-XI source is guessing at
-# ---------------------------------------------------------------------------
-#
-# Ground truth for grading both probable-XI sources: the calendar says which
-# matches were played; each played match page carries the confirmed elevens.
-#
-# THIS SITE, NOT FBref: outcome rows carry the same /jugadores/<slug> ids as
-# the probable-XI pages, so the join needs no name resolution. FBref sits
-# behind a Cloudflare challenge; robots.txt here allows all.
-#
-# PAGE SHAPE: .stats-local / .stats-visitante, each one table.tablestats
-# whose tbody alternates a player row (tr.plegado.plegable, name in
-# td.name) with a detail row (tr.desglose, the only link to the player). A
-# tr.header "Suplentes" splits eleven from bench. An unplayed match has no
-# table at all — the calendar's score is the fetch gate.
-#
-# Fetched once ever: a confirmed eleven never changes after kickoff.
+# Who actually started — ground truth for grading both probable-XI sources.
+# Why: docs/notes/sources.md#starters-ground-truth-for-grading-probable-xi
 
 CAL_KEY = "calendario"
 FF_CAL_URL = f"{BASE}/laliga/calendario"
@@ -1110,25 +1057,9 @@ def played_sources(cal_html: str, observed_at: str = "") -> list[Source]:
             for r in parse_calendar(cal_html, observed_at) if r["score"]]
 
 
-# ---------------------------------------------------------------------------
-# Club Elo — how strong a team actually is, rather than how expensive
-# ---------------------------------------------------------------------------
-#
-# Squad value is a poor strength proxy (a promoted side that spends isn't
-# thereby good; one signing moves the whole total). Elo is fitted on
-# results, free, published daily.
-#
-# NOT AN HTML TABLE: the country page embeds its ranking chart as a
-# Vega-Lite spec; clubs are records in that spec's `datasets`. A structured
-# read, not a scrape of the rendered table — a moved column can't silently
-# become a rating, and a renamed key yields nothing (the rot signal).
-#
-# ROBOTS: clubelo.com allows all. One request a day.
-#
-# THE CSV API IS DEAD (api.clubelo.com resolves but answers on neither port);
-# the site moved to a new host with no CSV endpoint, so this reads the
-# country page instead. load_elo() refuses a reading older than the cadence
-# allows, since a failed fetch otherwise leaves stale rows that still join.
+# Club Elo — team strength, not price. Reads the country page's embedded
+# Vega-Lite chart spec, not an HTML table (the CSV API is dead).
+# Why: docs/notes/sources.md#club-elo-strength-not-price
 ELO_SOURCE = "clubelo"
 ELO_URL = "https://clubelo.com/ESP"
 ELO_COUNTRY = "ESP"
@@ -1199,20 +1130,9 @@ def sign_elo(text: str) -> str | None:
                     for r in parse_elo(text, "")])
 
 
-# ---------------------------------------------------------------------------
-# football-data.co.uk — real match results, team-level, free
-# ---------------------------------------------------------------------------
-#
-# Neither squad value nor Club Elo (one scalar) can split a clean sheet
-# (opponent-attack-driven) from a goal (opponent-defense-driven).
-# football-data.co.uk publishes real results — goals, shots, shots on
-# target, corners — per season since 1993-94 as one flat CSV, free, no
-# scraping fragility. The current season's file also carries HxG/AxG
-# (expected goals); not backfilled onto completed seasons.
-#
-# Team-level, twenty names: the join is twenty club spellings against this
-# repo's own twenty slugs, same pattern as ELO_ALIASES — match_team() first,
-# a named alias only when that ordinary join fails.
+# football-data.co.uk — real match results (goals/shots/corners), splitting
+# clean-sheet luck from goal luck in a way one Elo scalar can't.
+# Why: docs/notes/sources.md#football-data-co-uk-real-results
 FD_BASE = "https://www.football-data.co.uk"
 FD_URL = FD_BASE + "/mmz4281/{season}/SP1.csv"
 FD_SOURCE = "football-data"
@@ -1460,15 +1380,10 @@ def sign_odds(text: str) -> str | None:
         r["p_home"], r["p_draw"], r["p_away"]) for r in rows])
 
 
-# PLAYER-LEVEL xG/xA — the "skill" side of what raw points can't separate
-# from luck: xG scores the chance, not whether it went in. Team-level xG
-# already exists here (football-data.co.uk, above) for fixture strength;
-# this is the same idea at player grain.
-#
-# The documented "playersData in a <script> tag" scrape pattern no longer
-# exists on the page. The real endpoint (confirmed live) is POST
-# main/getPlayersStats/ with {league, season} form data — GET on the same
-# URL errors. This is the one source that needs `Source.body`.
+# Player-level xG/xA — the skill side points can't separate from luck.
+# Endpoint is POST main/getPlayersStats/ form data, not the documented
+# <script>-tag scrape (dead) — the one source needing `Source.body`.
+# Why: docs/notes/sources.md#understat-player-level-xg
 UNDERSTAT_URL = "https://understat.com/main/getPlayersStats/"
 UNDERSTAT_SOURCE = "understat"
 UNDERSTAT_LEAGUE = "La_liga"
@@ -1566,22 +1481,9 @@ def sign_understat_players(text: str) -> str | None:
         p.get("assists"), p.get("xG")) for p in rows])
 
 
-# ---------------------------------------------------------------------------
-# the league's own API — the state no public page publishes
-# ---------------------------------------------------------------------------
-#
-# Everything above is a public page read anonymously. These four are LaLiga's
-# own endpoints, behind the token ffcore/auth.py holds, and they carry what no
-# scrape could: the live market (including players managers have listed), every
-# transaction, and the balances. Worth a credential because the hand-typed
-# alternatives went stale — see ledger.py.
-#
-# They return JSON, not HTML; `parse` and `sign` take text either way, as Club
-# Elo's CSV does, so the registry needs no new concept.
-#
-# TERMS: the app's own API, read with the account's own credential for its own
-# league. No robots.txt applies, but the same restraint does — ask once a day,
-# cache, never poll.
+# The league's own API — state no public page publishes (live market,
+# transactions, balances), behind the token ffcore/auth.py holds.
+# Why: docs/notes/sources.md#the-leagues-own-api
 LFG_SOURCE = "laliga"
 API_LEAGUES_KEY = "api_leagues"
 # {base} is filled by ingest from ffcore.auth.API_BASE rather than hardcoded,
