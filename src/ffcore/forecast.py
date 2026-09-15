@@ -279,15 +279,11 @@ class Bootstrap:
         """
         club_shock = {c: max(0.0, 1.0 + rng.gauss(0.0, self.club_rel[c]))
                      for c in sorted(self.club_rel)}
-        if jornadas is None:
-            out = {}
-            for k in sorted(self.rate_rel):
-                individual = max(0.0, 1.0 + rng.gauss(0.0, self.rate_rel[k]))
-                shared = club_shock.get(self.club_of.get(k, ""), 1.0)
-                out[k] = individual * shared
-            return out
         eps0 = {k: max(0.0, 1.0 + rng.gauss(0.0, self.rate_rel[k]))
                for k in sorted(self.rate_rel)}
+        if jornadas is None:
+            return {k: eps0[k] * club_shock.get(self.club_of.get(k, ""), 1.0)
+                   for k in sorted(self.rate_rel)}
         # ACCUMULATED into a running position — NOT redrawn from cumulative
         # variance each jornada (that bug, found+fixed 2026-09-01, gave
         # each jornada the right marginal spread but zero correlation
@@ -320,11 +316,10 @@ class Bootstrap:
         for later, same reasoning as
         docs/notes/forecast.md#rate_drawstart_draw--two-independent-sources-of-wrong.
         """
-        if jornadas is None:
-            return {k: rng.gauss(0.0, self.start_rel[k])
-                   for k in sorted(self.start_rel)}
         eps0 = {k: rng.gauss(0.0, self.start_rel[k])
                for k in sorted(self.start_rel)}
+        if jornadas is None:
+            return eps0
         # ACCUMULATED, NOT REDRAWN FROM CUMULATIVE VARIANCE EACH JORNADA —
         # same fix, same reason, as rate_draw()'s own note above. A logit
         # shift is additive and mean-zero already, so accumulating the walk
