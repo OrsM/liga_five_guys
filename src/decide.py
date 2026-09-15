@@ -763,13 +763,28 @@ def rank(u: Universe, acts: list[Action], seed: int = 1,
     lam = price if price is not None else measured
 
     # One row per target: 4 funding variants of one signing screen
-    # identically (selling dead weight changes nothing on the pitch), so
-    # keeping all 4 wastes the final pass. Ties break toward spending less.
+    # identically ONLY WHEN the sale is real dead weight — "selling dead
+    # weight changes nothing on the pitch" is false the moment the spare
+    # sold is a man in the eleven you'd actually field right now, and
+    # SCREEN_TRIALS is too few draws to trust a close margin between "sell
+    # my starter" and "sell my bench" (measured: the ranking between them
+    # flips run to run at this trial count). A funding variant that keeps
+    # today's XI intact is preferred outright over one that doesn't,
+    # before points are compared at all; ties within a tier still break on
+    # points, then spend. This can't be skipped by spending more trials
+    # here — the fix is not asking the noisy number to settle a question
+    # it was never precise enough to answer.
+    # Why: docs/notes/decide.md#rank--funding-variant-noise
+    _, cur_xi = current_xi(u)
+    def _touches_xi(a) -> bool:
+        return any(s in cur_xi for s in a.sell)
+
     pick: dict[str, tuple] = {}
     for d, a in screened:
         k = a.buy or a.sell
         cur = pick.get(k)
-        if cur is None or (d, -a.net) > (cur[0], -cur[1].net):
+        key = (not _touches_xi(a), d, -a.net)
+        if cur is None or key > (not _touches_xi(cur[1]), cur[0], -cur[1].net):
             pick[k] = (d, a)
     screened = sorted(pick.values(), key=lambda t: (-t[0], t[1].net))
 
