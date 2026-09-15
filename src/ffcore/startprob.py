@@ -239,13 +239,14 @@ def observations(lineups, starters, cut: str, roster=None,
     """Predictions made before `cut`, joined to who actually started.
 
     Only the clubs a confirmed line-up exists for — scoring against a match
-    that hasn't happened flatters the grader. The join is the crosswalk's
-    when one is passed (169/182 slugs match without it; the narrow source
-    matches nothing and falls back to a folded name at 66%). The universe
-    is the wider source's own list plus anyone who turned out to play —
-    not the matchday eighteen, not the market's roster.
+    that hasn't happened flatters the grader. The narrow source's own join
+    is ffcore.second.resolve_second_source() (shared with second_cells(),
+    the display side of this same data). The universe is the wider
+    source's own list plus anyone who turned out to play — not the
+    matchday eighteen, not the market's roster.
     Why: docs/notes/startprob.md#observations--the-join-and-the-universe
     """
+    from ffcore.second import resolve_second_source
     from ffcore.text import norm
 
     from ffcore.tidy import MATCH_LEN, minutes_played
@@ -265,18 +266,8 @@ def observations(lineups, starters, cut: str, roster=None,
     name_of = {r["player_slug"]: r.get("player_name", "") for r in truth}
     team_of = {r["player_slug"]: r.get("team_slug", "") for r in truth}
 
-    def ident(r):
-        """One player, however this feed spells him."""
-        if xw is not None:
-            hit = xw.player(ff_slug=r.get("player_slug"),
-                            af_slug=r.get("player_slug"),
-                            name=r.get("player_name"))
-            if hit:
-                return hit
-        return None
-
     wide: dict[str, dict] = {}
-    narrow: dict[str, dict] = {}
+    narrow_rows = []
     for r in sorted((r for r in lineups
                      if r.get("observed_at", "") <= cut
                      and r.get("team_slug") in teams),
@@ -284,7 +275,10 @@ def observations(lineups, starters, cut: str, roster=None,
         if (r.get("source") or "").startswith("futbol"):
             wide[r.get("player_slug") or norm(r.get("player_name"))] = r
         else:
-            narrow[ident(r) or norm(r.get("player_name"))] = r
+            narrow_rows.append(r)
+    # THE SAME JOIN ffcore.second.second_cells() uses for display — one
+    # identity-resolution step, not two independently drifting ones.
+    narrow = resolve_second_source(narrow_rows, xw)
 
     out = []
     for slug in sorted(set(wide) | set(truth and name_of)):

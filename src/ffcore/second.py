@@ -1,15 +1,17 @@
 """
-ffcore/second.py — the second probable-XI source, joined and rendered.
+ffcore/second.py — the second probable-XI source, joined.
 
 futbolfantasy (**FF**) is the primary — its percentage is the P(start)
 inside every xPts/j in this repo. analiticafantasy (**AF**) is a second
-opinion, printed BESIDE it and never blended in: neither source has
-been checked against a played jornada, so there's no weight to blend by.
+opinion: printed BESIDE FF's own figure in the report (never blended into
+that display), but ffcore.startprob.Calibration DOES fit a weight to
+blend it into the actual forecast where it earns that out of sample — the
+two uses read the same rows and share the identity join below, kept in
+one place after they were found reimplementing it independently (one of
+them, incorrectly: see resolve_second_source()'s own note).
 
-Shared here rather than duplicated per-report so `af_cell` can't drift
-between callers. The join is by NAME (slug first when available) — a
-name with several candidates is handed back to be printed, never
-guessed between.
+The join is by identity (crosswalk first, name second) — a name with
+several candidates is handed back to be printed, never guessed between.
 
     python src/ffcore/second.py     # selftest: the cell and the join, no IO
 """
@@ -19,7 +21,8 @@ from __future__ import annotations
 from ffcore.text import norm, resolve
 from ffcore.tidy import latest_only, load_lineups
 
-__all__ = ["SECOND_SOURCE", "FF_AF_HEAD", "LEGEND", "af_cell", "second_cells"]
+__all__ = ["SECOND_SOURCE", "FF_AF_HEAD", "LEGEND", "af_cell",
+          "second_cells", "resolve_second_source"]
 
 SECOND_SOURCE = "analitica"
 
@@ -27,14 +30,16 @@ SECOND_SOURCE = "analitica"
 # order — primary first, second opinion second.
 FF_AF_HEAD = "FF | AF"
 
-LEGEND = ("**FF** is futbolfantasy's probable-XI percentage, which is the one "
-          "the forecast uses. **AF** is analiticafantasy's read of the same "
-          "eleven, printed beside it and never blended in — `titular` is a "
-          "named starter (a final call, with no number to it), a percentage "
-          "is their editors' consensus, `?` means they list him without "
-          "either, and `—` means they do not have him. Two columns that "
-          "disagree are the signal; that is the whole point of carrying "
-          "both.")
+LEGEND = ("**FF** is futbolfantasy's own probable-XI percentage. **AF** is "
+          "analiticafantasy's read of the same eleven, printed beside it as "
+          "its own column, never merged into FF's figure on this table — "
+          "`titular` is a named starter (a final call, with no number to "
+          "it), a percentage is their editors' consensus, `?` means they "
+          "list him without either, and `—` means they do not have him. "
+          "Two columns that disagree are the signal; that is the whole "
+          "point of carrying both. (The FORECAST itself may still weigh AF "
+          "in — see ffcore.startprob.Calibration — this table just never "
+          "shows a blend.)")
 
 
 def af_cell(row) -> str:
@@ -56,14 +61,39 @@ def af_cell(row) -> str:
     return "titular" if row.get("role") == "starter" else "?"
 
 
+def resolve_second_source(rows, xw=None) -> dict[str, dict]:
+    """AF rows indexed by resolved player identity — the crosswalk key
+    where a row's own slug or name resolves to one, its normalized name
+    otherwise.
+
+    THE SHARED JOIN. second_cells() (this file, for display) and
+    ffcore.startprob.observations() (for calibration fitting) used to
+    each reimplement this independently against the same rows — found
+    2026-09-16 while asked why maintaining a second source costs so much
+    code, not because either caller looked broken. They'd also drifted:
+    second_cells()'s version passed `ff_slug=r.get("player_slug")` to
+    Crosswalk.player() — checking AF's own slug against the FF index,
+    which practically never hits — instead of `af_slug=`, silently
+    falling through to name-matching far more than it needed to.
+    """
+    out: dict[str, dict] = {}
+    for r in rows:
+        pid = xw.player(af_slug=r.get("player_slug"),
+                        name=r.get("player_name")) if xw else None
+        key = pid or norm(r.get("player_name") or r.get("player_slug") or "")
+        if key:
+            out[key] = r
+    return out
+
+
 def second_cells(who, source: str = SECOND_SOURCE, rows=None, xw=None):
     """{market key: the second source's row}, plus the names it could not
     join. `who` is (key, name) pairs — the key is what the caller looks
     the answer up under, so it must be passed explicitly rather than
     re-derived from the name.
 
-    The join goes by slug first (the same identifier ffcore.score uses
-    for the same rows), falling back to the name.
+    The join goes by identity first (resolve_second_source(), crosswalk
+    where it resolves), falling back to the name.
 
     `rows` is for the selftest: pass a list and no CSV is read.
     """
@@ -74,13 +104,7 @@ def second_cells(who, source: str = SECOND_SOURCE, rows=None, xw=None):
         xw = load_crosswalk()
     if xw is False:            # the self-test: no table, name join only
         xw = None
-    by_slug = {}
-    for r in rows:
-        slug = norm(r.get("player_slug") or "")
-        if not slug:
-            continue
-        pid = xw.player(ff_slug=r.get("player_slug")) if xw else None
-        by_slug[slug] = (pid, r)
+    by_identity = resolve_second_source(rows, xw)
     cells: dict = {}
     unclear: list[tuple[str, list[str]]] = []
     seen: set = set()
@@ -88,9 +112,9 @@ def second_cells(who, source: str = SECOND_SOURCE, rows=None, xw=None):
         if not key or key in seen:
             continue
         seen.add(key)
-        hit = [r for s, (k, r) in by_slug.items() if k == key]
-        if hit:
-            cells[key] = hit[0]
+        hit = by_identity.get(key)
+        if hit is not None:
+            cells[key] = hit
             continue
         row, cands = resolve(name, rows, key="player_name")
         if row:
