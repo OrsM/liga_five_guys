@@ -16,6 +16,7 @@ fully imported, by which point `import decide` sees a complete module.
 from __future__ import annotations
 
 from ffcore.action import Action
+from ffcore.par import player_forecasts, value_rate
 from ffcore.schedule import phantom_topup
 from ffcore.season import best_xi
 
@@ -33,8 +34,7 @@ def candidates(u, expected: dict[str, float],
     not a multi-sale chain, which risks leaving the squad short a legal
     XI. A genuinely 2-sale-only move stops appearing; that's the trade.
     """
-    from decide import current_xi, xi_bar, route_kind, _fieldable, \
-        player_forecasts, value_rate
+    from decide import current_xi, xi_bar, route_kind, _fieldable
 
     cash = u.cash if budget is None else budget
     mine_squad = u.state.squads.get(u.me, {})
