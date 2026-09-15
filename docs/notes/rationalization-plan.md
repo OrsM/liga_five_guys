@@ -44,13 +44,31 @@ weight).
   `ffcore.score` self-tests all clean. Observability work parked (see
   Session 4's note) — `gap_signal.py` already keeps the one live
   hypothesis re-runnable.
-- [~] **4. Decision engine.** THE ONE THAT DIRECTLY SERVES THE SUCCESS
-  CRITERION. **Funding-noise bug fixed and verified (commit f70ad6c)** —
+- [x] **4. Decision engine.** THE ONE THAT DIRECTLY SERVES THE SUCCESS
+  CRITERION. **Funding-noise bug fixed and verified (f70ad6c)** —
   `rank()` no longer treats selling a currently-fielded starter as
   interchangeable with selling bench dead weight; confirmed across 5
   seeds that the recommended funding source now varies only among real
-  bench players. Still open: split `decide.py` (2,206 lines — candidate
-  generation / funding / ranking tangled together) along its real seams.
+  bench players.
+
+  **`decide.py` split five ways**, each verified (self-tests + full
+  pipeline) before committing: `ffcore/schedule.py` (per-player jornada
+  scheduling, e927f79), `ffcore/pricing.py` (locked/burn/cash_price/
+  respond, e57ce85), `ffcore/action.py` (the Action dataclass — a
+  dependency-free leaf, needed first to avoid a circular import), `ffcore/
+  candidates.py` (candidates/dead_weight/overdraft_fix/apply/
+  offer_combos — reaches back into decide.py's remaining core via a
+  lazy `from decide import ...` inside the function body, the same
+  precedented pattern methodology.py's `_fc()` already used), and
+  `ffcore/par.py` (value_rate/player_forecasts, no lazy import needed —
+  pure w.r.t. a Universe instance). **decide.py: 2,206 → 1,303 lines
+  (41% smaller).**
+
+  Deliberately NOT split further: `Universe`, `current_xi`/`xi_bar`/
+  `route_kind`/`_fieldable`, `load()`, `rank()` stay — this is decide.py's
+  real core (the data, the queries over it, the ranking engine), not
+  leftover bloat. Fragmenting it further would relocate complexity
+  without separating a genuine concern.
 
   **`explain` tool: parked, not scheduled.** Deliberately deferred —
   building an observability feature before the codebase is simplified is
@@ -74,21 +92,19 @@ weight).
 ## Session log
 
 **2026-09-15** — Plan written. Session 1 closed (3cee3ef). Sessions 2-3
-verified clean, no changes needed. Session 4's core bug fixed and
-verified against the real Brugué/Vicente case (f70ad6c). `decide.py`
-split twice: `ffcore/schedule.py` (per-player jornada scheduling,
-e927f79) and `ffcore/pricing.py` (locked/burn/cash_price/respond,
-e57ce85) — 2,206 → 1,688 lines, every self-test and the full pipeline
-verified clean after each cut. `explain` tool stays parked (see above).
+verified clean, no changes needed. Session 4 fully closed: the funding-
+noise bug fixed and verified against the real Brugué/Vicente case
+(f70ad6c), and `decide.py` split five ways (schedule, pricing, action,
+candidates, par — 2,206 → 1,303 lines, 41% smaller), each cut verified
+with self-tests and the full pipeline before committing. Resolved the
+real circular-import risk flagged at the end of the prior round using a
+precedented lazy-import pattern (methodology.py's `_fc()` already did
+this for decide.load()) rather than avoiding the split. `explain` tool
+stays parked (see above).
 
-Remaining in `decide.py`: `candidates()`/`dead_weight()`/
-`overdraft_fix()`/`apply()`/`offer_combos()` (funding/candidate
-generation — tangled with `current_xi()`/`player_forecasts()`, a real
-circular-import risk if split naively) and `rank()`'s own group
-(`_score_many`/`paired`/`band`/`_top_up`/`value_rate`/
-`player_forecasts`/`rank` — the ranking/simulation glue). Both groups
-are more interdependent than the two already split; the next cut needs
-the same dependency-mapping care as this one, not a rush.
+Session 4 status: DONE. `decide.py`'s remaining content (Universe,
+current_xi/xi_bar/route_kind/_fieldable, load(), rank()) is its real
+core, deliberately not split further.
 
-Next: Session 5 (buy/sell decision tree) or finish Session 4's split —
-either is reasonable to start fresh.
+Next: Session 5 (buy/sell decision tree) or Session 6 (rival-raid
+prioritization) — either is reasonable to start fresh.
