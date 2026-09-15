@@ -43,6 +43,7 @@ import itertools
 import os
 import sys
 from dataclasses import InitVar, dataclass, field, replace
+from functools import cached_property
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
@@ -185,6 +186,15 @@ class Universe:
                     if p.current.bids is not None}
         self.name = {k: p.identity.name for k, p in self.players.items()}
 
+    @cached_property
+    def current_xi(self) -> tuple[dict[str, float], set[str]]:
+        """(exp, xi) — my best legal eleven, right now. Computed once per
+        Universe, not once per caller: ~9 call sites across sim.py/decide.py
+        used to each rebuild this by hand in one report render.
+        Why: docs/notes/decide.md#current_xi--one-computation-seven-old-copies
+        """
+        return _current_xi(self, self.me)
+
 
 def _pos_of(raw: str) -> str:
     """SLOT abbreviation (DEL/MED/DEF/POR) for a PlayerCurrent.pos value.
@@ -238,24 +248,10 @@ def _synthetic_profiles(pos=None, price=None, proceeds=None, owner=None,
     return out
 
 
-def current_xi(u, who: str | None = None) -> tuple[dict[str, float], set[str]]:
-    """(exp, xi) — expected points and the best legal eleven `who` (default
-    u.me) could field from them, right now.
-
-    Each player is read at HIS OWN next jornada (u.first_jornada_of), not
-    one shared jornada picked for everyone — a round in progress locks some
-    clubs before others, and pricing everyone off the one round where
-    NOBODY has played yet would either thin the XI with players whose real
-    match already happened, or (the bug this replaced) skip a suspended
-    man's own next match entirely and price him as if he'd already served it.
-    Falls back to the first jornada nobody has played at all when no
-    per-player schedule was given (u.first_jornada_of empty) — a synthetic
-    Universe with no part_played to reason about, not a second real policy.
-
-    THE ONE COMPUTATION of "what is my/a rival's current best eleven worth" —
-    seven call sites across sim.py and this module used to rebuild this pair
-    by hand. `exp` is the SAME dict regardless of `who`; only the squad it's
-    read against differs.
+def _current_xi(u, who: str) -> tuple[dict[str, float], set[str]]:
+    """(exp, xi) for `who`'s squad, right now. `Universe.current_xi`
+    (cached, for u.me) and the current_xi() compat function below both
+    call this; nothing else should.
     Why: docs/notes/decide.md#current_xi--one-computation-seven-old-copies
     """
     if u.first_jornada_of:
@@ -264,8 +260,24 @@ def current_xi(u, who: str | None = None) -> tuple[dict[str, float], set[str]]:
         j = next((j for j in u.state.jornadas if j not in u.part_played),
                  u.state.jornadas[0] if u.state.jornadas else 0)
         exp = u.forecaster.expected(j)
-    xi = set(best_xi(u.state.squads.get(who or u.me, {}), exp))
+    xi = set(best_xi(u.state.squads.get(who, {}), exp))
     return exp, xi
+
+
+def current_xi(u, who: str | None = None) -> tuple[dict[str, float], set[str]]:
+    """(exp, xi) — expected points and the best legal eleven `who` (default
+    u.me) could field from them, right now. Each player is read at HIS OWN
+    next jornada (u.first_jornada_of), not one shared jornada for everyone.
+
+    COMPATIBILITY WRAPPER — `u.current_xi` is the real, CACHED answer for
+    u.me; call sites still asking `decide.current_xi(u)` (no `who`, or
+    `who=u.me`) get it for free rather than a fresh, uncached recompute.
+    A specific rival's own eleven is never cached (asked at most once per
+    rival per report).
+    """
+    if who is None or who == u.me:
+        return u.current_xi
+    return _current_xi(u, who)
 
 
 def xi_bar(exp: dict[str, float], xi) -> float:
@@ -831,6 +843,13 @@ def _selftest() -> None:
         proceeds={"me_bench": 8e6}, owner={"th_m1": "riv"},
         cash=12e6, me="me")
     exp = u.forecaster.expected(1)
+
+    # -- Universe.current_xi: cached, computed once per instance ----------
+    first = u.current_xi
+    assert u.current_xi is first, "cached_property must not recompute"
+    # decide.current_xi(u) (no `who`, or who=u.me) hands back the SAME
+    # cached object — the compat wrapper doesn't create a second answer.
+    assert current_xi(u) is first, "compat wrapper bypassed the cache"
 
     # -- current_xi / xi_bar: the one computation seven call sites used to
     # each rebuild by hand ---------------------------------------------
