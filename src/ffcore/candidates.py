@@ -21,6 +21,31 @@ from ffcore.schedule import phantom_topup
 from ffcore.season import best_xi
 
 
+def fieldable_spares(u) -> list[str]:
+    """Everyone in my squad whose sale ALONE still leaves a fieldable
+    shape — the real funding pool candidates() draws from, not just
+    dead_weight()'s narrower "never starts at all" subset. Pulled out so
+    sim.ladder_rows()'s "is this target reachable" check can ask the
+    SAME question candidates() actually answers, instead of a cheaper,
+    narrower one that can silently disagree with it.
+    Why: docs/notes/decide.md#rank--funding-variant-noise
+    """
+    from decide import _fieldable
+
+    mine_squad = u.state.squads.get(u.me, {})
+    return [k for k in mine_squad if _fieldable(
+        {p: s for p, s in mine_squad.items() if p != k})]
+
+
+def max_spare_proceeds(u) -> float:
+    """The most a SINGLE spare sale could ever raise — matching exactly
+    what candidates() can fund a buy with (cash, or exactly one spare,
+    never a sale chain). 0.0 with no fieldable spare at all.
+    """
+    return max((u.proceeds.get(k, 0.0) for k in fieldable_spares(u)),
+              default=0.0)
+
+
 def candidates(u, expected: dict[str, float],
                budget: float | None = None) -> list[Action]:
     """Every affordable move, pruned to the ones that could plausibly help.
@@ -34,7 +59,7 @@ def candidates(u, expected: dict[str, float],
     not a multi-sale chain, which risks leaving the squad short a legal
     XI. A genuinely 2-sale-only move stops appearing; that's the trade.
     """
-    from decide import current_xi, xi_bar, route_kind, _fieldable
+    from decide import current_xi, xi_bar, route_kind
 
     cash = u.cash if budget is None else budget
     mine_squad = u.state.squads.get(u.me, {})
@@ -69,8 +94,7 @@ def candidates(u, expected: dict[str, float],
     # doesn't gate it — see the Why: below for the ad hoc carve-out this
     # replaced when the two jobs were tangled into one cutoff.
     # Why: docs/notes/decide.md#optimize-for-competent-play-warn-dont-model-for-incompetent-play
-    fieldable_spare = [k for k in mine if _fieldable(
-        {p: s for p, s in mine_squad.items() if p != k})]
+    fieldable_spare = fieldable_spares(u)
     par_of = {k: v["par"] for k, v in player_forecasts(u).items()}
 
     def _spare_rank(k):

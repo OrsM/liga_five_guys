@@ -318,6 +318,50 @@ for reasons that had nothing to do with him). `d_pts` here comes from
 move and without it — which is robust to a changing model in a way λ's
 ladder never was.
 
+## rank() — funding-variant noise
+
+Found 2026-09-15, investigating a real bad recommendation (buy a cheap,
+low-value free agent, funded by selling a good, currently-STARTING
+forward instead of an obviously worse bench player). The `pick` step
+that chooses which funding variant to keep for a target picked purely by
+`d` — the noisy `SCREEN_TRIALS` (250-draw) score — on the documented
+assumption that every variant "screens identically" because selling dead
+weight changes nothing on the pitch. That assumption is false the moment
+the "spare" being sold is a man in today's actual eleven, and re-running
+the same three variants (cash only / sell the starter / sell a bench
+player) across 5 seeds showed the ranking between them flip every time —
+the specific choice shown was a coin flip, not a considered judgement.
+
+Fixed: a funding variant that leaves the current XI intact is now
+preferred outright over one that doesn't, before points are compared at
+all — `SCREEN_TRIALS` was never precise enough to settle that question on
+its own, and no trial count fixes a false premise.
+
+**A second, related mismatch found the same day, in `sim.ladder_rows()`
+rather than `rank()` itself**: the "is this target reachable at all"
+check (the SAVE/PASS split) summed EVERY dead-weight player's proceeds
+together (`sum(v for _, v in dead_weight)`), but `candidates()` only ever
+funds a buy with cash or exactly ONE spare — never a sale chain. A target
+priced between "cash + best single spare" and "cash + every dead-weight
+player's proceeds combined" was reachable by neither real funding path,
+yet `ladder_rows()`'s threshold said it was — silently dropping a
+genuinely good target from BOTH the buy groups (no Action ever existed
+for it) and the SAVE group (the threshold said it wasn't short). Worse:
+`dead_weight()` is narrower than what `candidates()` actually tries —
+`candidates()` will sell a real, occasionally-starting player at a real
+points cost if that's the only single sale that reaches a target, which
+`dead_weight()`'s "never starts at all" definition misses entirely.
+
+Fixed with one shared function, `ffcore.candidates.max_spare_proceeds()`
+— the most a single sale can ever raise, over the SAME fieldable-spare
+pool `candidates()` itself draws from (`fieldable_spares()`, also
+extracted so the two callers can't drift back apart) — used by both
+`candidates()` (to build the real funding Actions) and `ladder_rows()`
+(to decide SAVE vs PASS). Proven with a synthetic case before fixing:
+two 5M bench players, an 8M target, neither single sale nor cash alone
+reaches it, but the sum (10M) does — `candidates()` generated zero
+Actions for it while the old threshold said it was affordable.
+
 **Only defined for a genuine spend (net > 0).** A sale that raises more than
 it costs is free money plus points — no rate needed to justify it.
 

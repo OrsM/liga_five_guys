@@ -316,7 +316,17 @@ def ladder_rows(u, rows, bands=None, exp=None, xi=None) -> list[dict]:
     dead = {k for k, _ in dead_weight}
     won = {r["action"].buy: r for r in rows if r["action"].buy}
     bar = decide.xi_bar(exp, xi)
-    spare = sum(v for _k, v in dead_weight)
+    # THE MOST A SINGLE SALE CAN RAISE — matching candidates()'s own
+    # funding rule (cash, or exactly one spare, never a chain) exactly.
+    # Summing every dead-weight player's proceeds here once said a target
+    # was "reachable" that candidates() could never actually generate a
+    # move for (no single sale covers it), silently dropping it from
+    # both BUY and SAVE. Also broader than dead_weight() alone: a
+    # currently-fielded spare candidates() would sell at a real points
+    # cost still counts as reachable, since that MOVE genuinely exists.
+    # Why: docs/notes/decide.md#rank--funding-variant-noise
+    from ffcore.candidates import max_spare_proceeds
+    spare = max_spare_proceeds(u)
     rest = [k for k in u.price if k not in mine and exp.get(k, 0.0) > bar]
     # A won row carries rank()'s own band, off the squad the victim's
     # response leaves behind — which is why rank() never bands them twice.
