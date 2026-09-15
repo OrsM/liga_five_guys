@@ -474,6 +474,19 @@ its own independent raid list with no dedup either. Fixing only
 renderers, the exact failure shape `payload()`'s own docstring exists to
 prevent ("Same rows as the markdown, so the two cannot disagree").
 
+## ladder_rows() — par vs the paired-simulation band, two different questions
+
+`par` (points above replacement, `ffcore.score.replacement()`/`vor()`) is
+a STANDING per-player property: season total above the league's own
+replacement level at his slot, pooled across every squad. The `lo`/`hi`
+band on a `cell()` row is something else entirely — the marginal gain of
+one specific ACTION, from a paired Monte Carlo run once per candidate.
+Genuinely different questions at genuinely different cost: `par` has no
+error band here because a real one needs the same paired trials the
+per-candidate band already pays for, and computing that for the whole
+pool would silently reintroduce that cost instead of reusing the cheap
+number `ffcore.profile.player_forecasts()` already offers.
+
 ## _clears_par_floor() — don't headline noise as a recommendation
 
 Found 2026-09-15, user question ("why are you still recommending Roger

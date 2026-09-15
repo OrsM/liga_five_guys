@@ -317,14 +317,9 @@ def ladder_rows(u, rows, bands=None, exp=None, xi=None) -> list[dict]:
     dead = {k for k, _ in dead_weight}
     won = {r["action"].buy: r for r in rows if r["action"].buy}
     bar = decide.xi_bar(exp, xi)
-    # THE MOST A SINGLE SALE CAN RAISE — matching candidates()'s own
-    # funding rule (cash, or exactly one spare, never a chain) exactly.
-    # Summing every dead-weight player's proceeds here once said a target
-    # was "reachable" that candidates() could never actually generate a
-    # move for (no single sale covers it), silently dropping it from
-    # both BUY and SAVE. Also broader than dead_weight() alone: a
-    # currently-fielded spare candidates() would sell at a real points
-    # cost still counts as reachable, since that MOVE genuinely exists.
+    # The most a single sale can raise — matches candidates()'s own
+    # funding rule exactly, so nothing looks "reachable" here that
+    # candidates() could never actually fund.
     # Why: docs/notes/decide.md#rank--funding-variant-noise
     from ffcore.candidates import max_spare_proceeds
     spare = max_spare_proceeds(u)
@@ -332,17 +327,9 @@ def ladder_rows(u, rows, bands=None, exp=None, xi=None) -> list[dict]:
     # A won row carries rank()'s own band, off the squad the victim's
     # response leaves behind — which is why rank() never bands them twice.
     bands = {k: v for k, v in (bands or {}).items() if k not in won}
-    # Points above replacement — a STANDING per-player property (season
-    # total above the LEAGUE's own replacement level at his slot, pooled
-    # across every squad — ffcore.score.replacement()/vor()), not the
-    # paired-simulation band above (which is the marginal gain
-    # of one specific ACTION, run once per candidate — genuinely
-    # different questions, genuinely different cost to compute). No
-    # error band on this one: a real one needs the same paired Monte
-    # Carlo trials pts_lo/pts_hi already pay for per-candidate, and
-    # extending that to the full pool here would be silently
-    # reintroducing that cost rather than reusing the cheap number
-    # ffcore.profile/player_forecasts() actually offers.
+    # Points above replacement — a standing property, not the same
+    # question as the paired-simulation band above.
+    # Why: docs/notes/sim.md#ladder_rows--par-vs-the-paired-simulation-band-two-different-questions
     par = {k: v["par"] for k, v in decide.player_forecasts(u).items()}
 
     def cell(k, group, where, money, pts, note="", value=None,
@@ -426,17 +413,7 @@ def ladder_rows(u, rows, bands=None, exp=None, xi=None) -> list[dict]:
         out.append(cell(k, "save", short_manager(u.owner.get(k)) or "free agent",
                         -short_by, save_pts, "short",
                         value=value_rate(save_pts, short_by)))
-    # FREE AGENTS ONLY, via route_kind() — the ONE classifier, so this
-    # can't drift from BUY/RAID above again. PASS draws from `rest`, a raw
-    # price-list pool independent of candidates()/rank(), which is why
-    # candidates()'s own "never propose a listed target" fix never
-    # reached it before route_kind() existed: a rival-owned player who
-    # "clears the bar" fell through here with a price, looking exactly
-    # like a buyable one. A clause-raidable rival who simply didn't rank
-    # high enough for RAID was tried here too, but PASS renders every row
-    # identically with no clause marker — no rival-owned player anywhere
-    # in the report unless the proposal IS the clause raid, on its own
-    # row, in RAID.
+    # Free agents only, via route_kind() — the one classifier.
     # Why: docs/notes/sim.md#ladder_rows--pass-is-free-agents-only
     for k in sorted((k for k in rest if k not in won
                      and u.price[k] <= u.cash + spare
@@ -822,15 +799,8 @@ def caveats(u) -> list[str]:
         % (_drift_frac_now(), _drift_status_now()),
         "| Shape prior | %s |" % u.forecaster.pool_note(),
         "| P(start) fit | %s |" % u.start_note.rstrip("."),
-        # p_win/expected_finish (levels, not the paired move-ranking that
-        # stays stable at every trial count) carry a real Monte Carlo
-        # noise band of roughly ±7 points, MEASURED ONCE (2026-08-31) at
-        # FINAL_TRIALS=3000 — a number that can't re-measure itself every
-        # report (it needs several full reruns at different trial counts
-        # just to see the swing), so it's checked against TODAY's live
-        # FINAL_TRIALS instead: still the same count it says by name once
-        # the caveat prints it — no chance of quietly citing an old
-        # measurement against a trial count that has since changed.
+        # p_win/expected_finish carry a real ~7-point Monte Carlo noise
+        # band, measured once and checked against today's live trial count.
         # Why: docs/notes/decide.md#trial-counts-screen_trials--final_trials
         "| win %% and finish are single simulated draws | at FINAL_TRIALS="
         "%d, the same real inputs have been measured (2026-08-31%s) to "
@@ -1266,13 +1236,9 @@ def placeholder(why: str) -> list[str]:
 
 def render(u, rows, base, stamp: str, rivals, n_actions: int = 0,
            locks_h=None, ladder_data=None, exp=None, xi=None) -> list[str]:
-    # EVERYTHING UNDER A HEADING, including the preamble. digest.py drops a
-    # source's H1 when it stitches the appendix and keeps what follows, so a
-    # preamble above the first `## ` arrives in the middle of the report
-    # reading as the tail of whatever section came before it — which here is
-    # the board's warnings.
-    #
-    # No sentences above the table — verdict()/market_percentile() retired.
+    # Everything under a heading, including the preamble — a bare preamble
+    # would read as the tail of the prior section once digest.py stitches
+    # this in. No sentences above the table.
     # Why: docs/notes/sim.md#render--no-sentences-above-the-table
     import decide
 
@@ -2057,17 +2023,11 @@ def main() -> None:
     # gets measured, off a pass that was happening anyway.
     acts = decide.candidates(u, exp, budget=float("inf"))
     smoothed = cash_price_history()
-    # ONE SIMULATION AT FINAL_TRIALS, not two. band_acts() names the
-    # ladder's one-man questions; market_candidates() adds a real season
-    # band for every OTHER listed player too (no bar filter) — a real
-    # comparison, not just the plausibly-helpful subset — and rank()
-    # answers all of it in the pass it was already running.
-    # THE ONE "current best eleven" ANSWER for this whole render — every
-    # sub-call below used to ask decide.current_xi(u) again on its own
-    # (same u, same answer, ~9 redundant rebuilds per report). Named
-    # xi_exp, not exp, to keep it apart from candidates()'s own `exp`
-    # above (one shared jornada for the screening bar — a different
-    # question, see current_xi()'s own docstring on why the two differ).
+    # One simulation at FINAL_TRIALS, not two: band_acts() (ladder) and
+    # market_candidates() (every other listed player) both answer off the
+    # one rank() pass below. xi_exp/xi is the one current-eleven answer for
+    # this whole render, not re-asked per sub-call.
+    # Why: docs/notes/decide.md#current_xi--one-computation-seven-old-copies
     xi_exp, xi = decide.current_xi(u)
     bar_acts = band_acts(u, exp=xi_exp, xi=xi)
     bar_keys = {k for k, _ in bar_acts}
