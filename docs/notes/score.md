@@ -211,6 +211,25 @@ the other source. Including him at pts=0 would shrink a possibly-real
 season toward zero on a guess; leaving him out keeps him on last season's
 rate (matches the pre-2026-08-21 universe exactly).
 
+**The running-total diff must go by real observation time, not jornada
+number — found 2026-09-15, real data.** A club can play a later-numbered
+jornada before an earlier one (a postponed fixture made up later); Rayo's
+jornada 5 was observed AFTER jornada 6 this season. Diffing `points_total`
+by `sorted(totals)` (jornada number ascending) attributes a jornada's
+points to whichever total came before it BY NUMBER, not by what was
+actually true first. Measured on Florian Lejeune: 4 real snapshots whose
+own deltas summed to 2 points produced a reconstructed total of 6 when
+diffed in jornada-number order (jornada 6's snapshot, observed first in
+real time, got treated as if it came after jornada 5's, computing a false
++4 instead of the real +1). Checked the blast radius before fixing: 172
+of 444 tracked players (39%) have at least one jornada where the two
+orders disagree — this was not a one-off. Fixed by tracking each
+jornada's own observation timestamp (`to_stamp`/`from_stamp`) alongside
+its total and diffing in that order instead. Same root cause, same
+"jornada number is not chronological order" trap, as the deadline-lock
+bug and `current_xi()`'s Zaid Romero bug — third occurrence of this
+specific failure shape in this codebase.
+
 ## `_weighted_totals` / `_weighted_start`: recency weighting
 
 Most recent jornada with a row weighs 1; one back weighs `decay`; two back
@@ -402,3 +421,49 @@ own matching parameter) used to exist for the rare rival on a paid
 subscription. Deleted 2026-09-05 as dead plumbing — nothing anywhere ever
 called it with `premium=True` — not as a feature decision. Add it back the
 same way if a caller genuinely needs it.
+
+## Unexplained-gap discount: parked, log, don't integrate yet
+
+Checked 2026-09-15, prompted by a real case (Florian Lejeune, Rayo — see
+the jornada-ordering bug above, found while investigating the same
+player). Question: when a player goes from featuring to a genuine
+zero-minute gap (absent from starters.csv entirely, no injury/suspension
+status recorded in lineups.csv's own history AT THE TIME, not just now),
+does his return-match performance undershoot his own pre-gap rate by more
+than noise explains — i.e., is an unexplained bench itself a form signal,
+not just a minutes signal?
+
+**First pass (no historical status control, n=38):** mean pre-gap ppm
+3.30, mean return-match points 2.34, paired diff ‑0.96, 90% bootstrap CI
+[‑1.80, ‑0.14] — excluded zero, looked real.
+
+**Same test, controlling for ACTUAL status at the time of each gap** (not
+current status — `lineups.csv` retains full snapshot history, so this is
+checkable): 1 of 38 cases had a real status flag recorded near the gap and
+was dropped. Remaining n=37: paired diff ‑0.83, 90% CI [‑1.68, +0.09] — now
+includes zero. The first pass's apparent significance was fragile; one
+confounded case was enough to flip it.
+
+**The test that actually matters — does using it reduce forecast error
+out of sample — same bar `_fit_decay()` holds itself to ("earns its use
+only if it beats the flat average out of sample").** Leave-one-out over
+the 37 cases (fit the discount on the other 36, score the held-out case
+with and without it): MAE 2.320 (no adjustment) vs 2.324 (with) — flat to
+slightly worse. MSE 10.457 vs 10.313 — a small improvement, but its own
+90% bootstrap CI is [‑1.53, +1.27] — nowhere near excluding zero.
+
+**Verdict: real, plausible, correctly directional — not validated.**
+Same shape as `_fit_decay`'s own decay=1.0 result (recency-weighting was
+a good story that didn't beat the flat average when actually tested) and
+`DRIFT_FRAC` staying at 1.0 for the same reason: a plausible mechanism
+does not get to skip the same out-of-sample bar every other fitted number
+here already had to clear, no matter how directionally clean the raw
+numbers look. n=37 is genuinely small against ~4-5 points of real
+match-to-match noise (see the report's own "Forecast vs actual" MAE), so
+this could still be real and just underpowered — it is not rejected, only
+parked. Re-test as the tracked-player pool's history grows (the graded
+squad_log sample alone grows ~15 pairs/jornada; this test draws on the
+wider `_per_jornada_current` pool, which grows faster). `python
+src/gap_signal.py` re-runs this exact check against live data — only wire
+a discount into scoring if its leave-one-out MSE gap clears its own CI
+the way `SHRINK_K` and `HOME_EDGE` did.
