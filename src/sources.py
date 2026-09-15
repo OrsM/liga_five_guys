@@ -34,7 +34,7 @@ import io
 import json
 import re
 from datetime import datetime, timezone
-from functools import lru_cache
+from functools import lru_cache, partial
 from typing import Callable, NamedTuple
 
 from ffcore.text import match_one, norm  # pure stdlib itself; not ffcore.fixture/tidy
@@ -605,6 +605,21 @@ def _digest(parts) -> str | None:
     return hashlib.sha1("\x1f".join(parts).encode("utf-8")).hexdigest()[:16]
 
 
+def _sign_rows(text: str, parse, fmt, sort: bool = False) -> str | None:
+    """One digest over `parse(text)`'s own rows, each turned into a string
+    by `fmt` — the shared shape behind most sign_X functions below (built
+    2026-09-16 to replace 10 near-identical one-off definitions). `fmt`
+    IS the domain knowledge (which fields dedup should key on, which drift
+    without meaning anything changed) — this function only owns the loop
+    and the hashing, not what to include.
+    """
+    rows = parse(text)
+    if not rows:
+        return None
+    parts = [fmt(r) for r in rows]
+    return _digest(sorted(parts) if sort else parts)
+
+
 def _surface(elements) -> list[str]:
     """Every string a parser can read out of these elements: text, href, alt.
 
@@ -833,17 +848,13 @@ def sign_af_fixtures(html: str) -> str | None:
     return _digest(_surface(_css(lh.fromstring(html), 'a[href*="/partido/"]')))
 
 
-def sign_points(html: str) -> str | None:
-    """One digest over parse_points()'s own extracted rows, not every table
-    on the page — this page carries unrelated tables (ads, widgets) whose
-    churn used to bump the signature and defeat dedup for no real change.
-    Was `_digest(_surface(...cssselect("table")))`: the one sign_X in the
-    file that scanned the raw page instead of its own parse_X's output."""
-    rows = parse_points(html, "")
-    if not rows:
-        return None
-    return _digest(sorted("%s|%s|%s" % (r["ff_id"], r["points"], r["games"])
-                          for r in rows))
+# Digests parse_points()'s own extracted rows, not every table on the page
+# — this page carries unrelated tables (ads, widgets) whose churn used to
+# bump the signature and defeat dedup for no real change.
+sign_points = partial(
+    _sign_rows, parse=lambda t: parse_points(t, ""),
+    fmt=lambda r: "%s|%s|%s" % (r["ff_id"], r["points"], r["games"]),
+    sort=True)
 
 
 # Who actually started — ground truth for grading both probable-XI sources.
@@ -1125,9 +1136,8 @@ def parse_elo(text: str, observed_at: str, key: str = "elo") -> list[dict]:
     return rows
 
 
-def sign_elo(text: str) -> str | None:
-    return _digest(["%s=%s" % (r["club"], r["elo"])
-                    for r in parse_elo(text, "")])
+sign_elo = partial(_sign_rows, parse=lambda t: parse_elo(t, ""),
+                   fmt=lambda r: "%s=%s" % (r["club"], r["elo"]))
 
 
 # football-data.co.uk — real match results (goals/shots/corners), splitting
@@ -1262,16 +1272,13 @@ def parse_fd_results(text: str, observed_at: str,
     return rows
 
 
-def sign_fd_results(text: str) -> str | None:
-    """One digest per season, over every match RESULT — not the odds
-    columns, which move after publication and would make yesterday's
-    scoreline look like new content."""
-    rows = _fd_rows(text)
-    if not rows:
-        return None
-    return _digest(["%s|%s|%s|%s|%s" % (r.get("Date"), r.get("HomeTeam"),
-                                        r.get("AwayTeam"), r.get("FTHG"),
-                                        r.get("FTAG")) for r in rows])
+# Every match RESULT, not the odds columns — those move after publication
+# and would make yesterday's scoreline look like new content.
+sign_fd_results = partial(
+    _sign_rows, parse=_fd_rows,
+    fmt=lambda r: "%s|%s|%s|%s|%s" % (r.get("Date"), r.get("HomeTeam"),
+                                      r.get("AwayTeam"), r.get("FTHG"),
+                                      r.get("FTAG")))
 
 
 # Bookmaker-implied match odds — team-level, logged now to accumulate real
@@ -1366,18 +1373,14 @@ def parse_odds(text: str, observed_at: str,
     return rows
 
 
-def sign_odds(text: str) -> str | None:
-    """One digest over each match's resolved teams and MEDIAN implied
-    probabilities, rounded to 3dp — real line movement (the whole reason
-    to log this at all) changes the signature; per-millisecond `last_update`
-    stamp churn on an unmoved line does not.
-    """
-    rows = parse_odds(text, "")
-    if not rows:
-        return None
-    return _digest(["%s|%s|%.3f|%.3f|%.3f" % (
+# Resolved teams and MEDIAN implied probabilities, rounded to 3dp — real
+# line movement changes the signature; per-millisecond `last_update` churn
+# on an unmoved line does not.
+sign_odds = partial(
+    _sign_rows, parse=lambda t: parse_odds(t, ""),
+    fmt=lambda r: "%s|%s|%.3f|%.3f|%.3f" % (
         r["home"] or r["home_name"], r["away"] or r["away_name"],
-        r["p_home"], r["p_draw"], r["p_away"]) for r in rows])
+        r["p_home"], r["p_draw"], r["p_away"]))
 
 
 # Player-level xG/xA — the skill side points can't separate from luck.
@@ -1467,18 +1470,13 @@ def parse_understat_players(text: str, observed_at: str,
     return out
 
 
-def sign_understat_players(text: str) -> str | None:
-    """One digest per season, over every player's own counting stats — not
-    xGChain/xGBuildup, which can drift by a thousandth between two reads of
-    the same underlying match data and would make an unchanged page look
-    like new content every run.
-    """
-    rows = _understat_rows(text)
-    if not rows:
-        return None
-    return _digest(["%s|%s|%s|%s|%s|%s" % (
+# Every player's own counting stats — not xGChain/xGBuildup, which can
+# drift by a thousandth between two reads of the same match data.
+sign_understat_players = partial(
+    _sign_rows, parse=_understat_rows,
+    fmt=lambda p: "%s|%s|%s|%s|%s|%s" % (
         p.get("id"), p.get("games"), p.get("time"), p.get("goals"),
-        p.get("assists"), p.get("xG")) for p in rows])
+        p.get("assists"), p.get("xG")))
 
 
 # The league's own API — state no public page publishes (live market,
@@ -1583,9 +1581,9 @@ def parse_api_leagues(text: str, observed_at: str,
     return rows
 
 
-def sign_api_leagues(text: str) -> str | None:
-    return _digest(["%s=%s/%s" % (r["league_id"], r["money"], r["team_value"])
-                    for r in parse_api_leagues(text, "")])
+sign_api_leagues = partial(
+    _sign_rows, parse=lambda t: parse_api_leagues(t, ""),
+    fmt=lambda r: "%s=%s/%s" % (r["league_id"], r["money"], r["team_value"]))
 
 
 def parse_api_market(text: str, observed_at: str,
@@ -1643,13 +1641,13 @@ def parse_api_market(text: str, observed_at: str,
     return rows
 
 
-def sign_api_market(text: str) -> str | None:
-    # expirationDate deliberately excluded — it ticks down continuously and
-    # would store a fresh archive every sweep. bid_status is included: a
-    # bid going pending -> accepted/rejected doesn't always move price/bids.
-    return _digest(["%s@%s/%s/%s" % (r["player_id"], r["sale_price"],
-                                     r["bids"], r["bid_status"])
-                    for r in parse_api_market(text, "")])
+# expirationDate deliberately excluded — it ticks down continuously and
+# would store a fresh archive every sweep. bid_status is included: a bid
+# going pending -> accepted/rejected doesn't always move price/bids.
+sign_api_market = partial(
+    _sign_rows, parse=lambda t: parse_api_market(t, ""),
+    fmt=lambda r: "%s@%s/%s/%s" % (r["player_id"], r["sale_price"],
+                                   r["bids"], r["bid_status"]))
 
 
 def parse_api_activity(text: str, observed_at: str,
@@ -1691,12 +1689,11 @@ def parse_api_activity(text: str, observed_at: str,
     return rows
 
 
-def sign_api_activity(text: str) -> str | None:
-    # Append-only in practice, so the newest id would do — but a feed that
-    # rewrote history would then look unchanged, and this feed is about to
-    # become the ledger. Hash every id.
-    return _digest(sorted(r["activity_id"]
-                          for r in parse_api_activity(text, "")))
+# Append-only in practice, so the newest id would do — but a feed that
+# rewrote history would then look unchanged, and this feed is about to
+# become the ledger. Hash every id.
+sign_api_activity = partial(_sign_rows, parse=lambda t: parse_api_activity(t, ""),
+                            fmt=lambda r: r["activity_id"], sort=True)
 
 
 def parse_api_teams(text: str, observed_at: str,
@@ -1968,13 +1965,11 @@ def parse_api_players_all(text: str, observed_at: str,
     } for p in d if p.get("id")]
 
 
-def sign_api_players_all(text: str) -> str | None:
-    rows = parse_api_players_all(text, "")
-    if not rows:
-        return None
-    return _digest(sorted("%s@%s/%s" % (r["player_id"], r["player_status"],
-                                        r["market_value"])
-                          for r in rows))
+sign_api_players_all = partial(
+    _sign_rows, parse=lambda t: parse_api_players_all(t, ""),
+    fmt=lambda r: "%s@%s/%s" % (r["player_id"], r["player_status"],
+                                r["market_value"]),
+    sort=True)
 
 
 def player_source(key: str) -> Source | None:
@@ -2065,10 +2060,9 @@ def parse_api_offer(text: str, observed_at: str,
              "from_market": ""}]
 
 
-def sign_api_offer(text: str) -> str | None:
-    rows = parse_api_offer(text, "", key="api_offer_0")
-    return _digest(["%s@%s/%s" % (r["offer_id"], r["money"], r["status"])
-                    for r in rows])
+sign_api_offer = partial(
+    _sign_rows, parse=lambda t: parse_api_offer(t, "", key="api_offer_0"),
+    fmt=lambda r: "%s@%s/%s" % (r["offer_id"], r["money"], r["status"]))
 
 
 def offer_source(key: str) -> Source | None:
