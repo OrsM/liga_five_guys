@@ -105,8 +105,23 @@ weight).
   its own independent, undeduped raid list). Verified against real data:
   live report went from 2-3 raids/rival to exactly one, matching in both
   places.
-- [ ] **7. Close-out.** Re-run the duplication audit against the new
-  shape. Update docs. Retire this plan doc into the session log below.
+- [x] **7. Close-out.** Re-ran `docs/notes/duplication-audit-2026-09-14.md`
+  against the current code: every item is resolved except #15 (four
+  `*_source(key)` dispatch functions in sources.py — correctly left as
+  separate, per the audit's own note that the collapse "isn't free") and
+  #14 (three unreconciled fitness/status sources — deliberate by design,
+  not a code fix). Also did the class-based decision-engine work the
+  architecture ideation proposed: `Universe` now carries `current_xi`/
+  `xi_bar` (cached), `route_kind`/`dead_weight`/`candidates`/
+  `player_forecasts`/`rank` as real methods, and every call site across
+  sim.py/report.py/slate.py/backtest.py uses them instead of the old
+  `decide.xxx(u, ...)` free-function spelling — one way to ask each
+  question, not two. Declarative scraping (the other proposal) was
+  considered and rejected after reading sources.py closely: its `sources()`
+  registry is already a data table, and the remaining parse/sign functions
+  each encode real, incident-driven exclusion rules — the same "genuinely
+  intricate, don't collapse for function count" class as the forecasting
+  math, not boilerplate.
 
 ## Session log
 
