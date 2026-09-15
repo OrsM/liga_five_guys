@@ -42,6 +42,7 @@ import os as _os  # noqa: E402
 from pathlib import Path  # noqa: E402
 
 from decide import dead_weight, overdraft_fix, route_kind, value_rate  # noqa: E402,F401
+from methodology import current_mae  # noqa: E402
 from ffcore.parse import fmt_money  # noqa: E402
 from ffcore.league import app_fielded  # noqa: E402
 from ffcore.render import title_name  # noqa: E402
@@ -407,12 +408,14 @@ def ladder_rows(u, rows, bands=None, exp=None, xi=None) -> list[dict]:
     # converted) is never a candidate at all, filtered out at the source
     # in decide.candidates(), not demoted here.
     # Why: docs/notes/sim.md#ladder_rows--buy--raid-split
+    mae = current_mae()
     ranked = sorted(buys, key=lambda k: _move_rank_key(won[k], u))
     for k in ranked:
-        if route_kind(u, k) == "free":
+        if route_kind(u, k) == "free" and _clears_par_floor(par, mae, k):
             out.append(buy_cell(k, "buy"))
     raid_keys = _best_raid_per_victim(
-        [k for k in ranked if route_kind(u, k) == "raid"], won)
+        [k for k in ranked if route_kind(u, k) == "raid"
+         and _clears_par_floor(par, mae, k)], won)
     for k in sorted(raid_keys, key=lambda k: _move_rank_key(won[k], u)):
         out.append(buy_cell(k, "raid"))
     for k in sorted((k for k in rest if k not in won
@@ -619,6 +622,14 @@ def ladder(u, rows, base, data=None, exp=None, xi=None) -> list[str]:
         out.append("| **RAID — a clause, cannot be refused** "
                    "| | | | | | | | |")
         out += [row_md(r) for r in by_group["raid"]]
+    elif not by_group.get("buy"):
+        # BOTH empty — silence here is ambiguous between "no candidates
+        # ever existed" and "candidates exist, none clear the PAR floor",
+        # the same reasoning the buy/raid "none clear the bar" line above
+        # already applies one level up.
+        # Why: docs/notes/sim.md#_clears_par_floor--dont-headline-noise-as-a-recommendation
+        out.append("| **BUY/RAID — nothing clears the bar this week** | | "
+                   "| | | | | |")
 
     if by_group.get("save"):
         out.append("| **SAVE — better than yours, out of reach** | | | | | | | | |")
@@ -838,6 +849,24 @@ def caveats(u) -> list[str]:
 # refinement (the single headline pick only).
 # Why: docs/notes/sim.md#value_tolerance-090-and-moves_value_floor-025
 VALUE_TOLERANCE = 0.90
+
+def _clears_par_floor(par_of: dict, mae, k: str) -> bool:
+    """Is `k` worth HEADLINING as a BUY/RAID, or just technically positive?
+
+    THE FLOOR IS THE MODEL'S OWN MEASURED ERROR (methodology.current_mae()),
+    not a guessed number — a player whose entire season PAR doesn't clear
+    one match's worth of the model's own known mistake-size isn't a real
+    signal. `mae is None` (too early in the season to have graded a
+    jornada yet) never filters anything — an unmeasured floor is not a
+    zero, the same reasoning `ffcore.bid.cash_price()` and friends already
+    use for "nothing to measure against yet".
+    Why: docs/notes/sim.md#_clears_par_floor--dont-headline-noise-as-a-recommendation
+    """
+    if mae is None:
+        return True
+    par = par_of.get(k)
+    return par is not None and par >= mae
+
 
 def _best_raid_per_victim(raid_keys, won) -> list[str]:
     """`raid_keys`, with every rival reduced to his single worst-hit raid.
@@ -1068,6 +1097,15 @@ def payload(u, rows, base, rivals, locks_h=None, n_actions: int = 0,
     keep_raid = set(_best_raid_per_victim(list(raid_rows), raid_rows))
     rows = [r for r in rows
            if not r["action"].victim or r["action"].buy in keep_raid]
+    # DON'T HEADLINE A BUY/RAID THAT DOESN'T CLEAR THE PAR FLOOR — same
+    # rule as ladder_rows()'s own, computed fresh here rather than passed
+    # in: deterministic given the same u, so this can't drift from the
+    # markdown table any more than the raid dedup above can.
+    # Why: docs/notes/sim.md#_clears_par_floor--dont-headline-noise-as-a-recommendation
+    par_of = {k: v["par"] for k, v in decide.player_forecasts(u).items()}
+    mae = current_mae()
+    rows = [r for r in rows if not r["action"].buy
+           or _clears_par_floor(par_of, mae, r["action"].buy)]
     # Same pts_lo sort as ladder_rows()'s BUY group — see _move_rank_key()'s
     # own note. Why: docs/notes/sim.md#payload--moves-sorted-by-the-same-rule-as-the-ladder
     for r in sorted(rows, key=lambda r: _move_rank_key(r, u)):
@@ -1259,6 +1297,16 @@ def _selftest() -> None:
     from ffcore.forecast import Bootstrap
     from ffcore.season import LeagueState, Standings
     from decide import Action, Universe, dead_weight
+
+    # NEVER READ THE REAL forecast_accuracy_log.csv FROM A SELF-TEST — the
+    # whole rest of this test builds synthetic players with no meaningful
+    # PAR, and a real, non-None mae from today's actual project data would
+    # silently filter every one of them, making pass/fail depend on
+    # whichever jornada has locked on disk today. Restored at the end;
+    # _test_par_floor() below overrides it again, briefly, on purpose.
+    global current_mae
+    _real_current_mae = current_mae
+    current_mae = lambda: None  # noqa: E731
 
     # Two managers, a season already scored so the numbers are exact and the
     # renderer is the only thing under test.
@@ -1961,7 +2009,16 @@ def _selftest() -> None:
     fallback["x"]["d_beat"] = {}
     assert _best_raid_per_victim(["x"], fallback) == ["x"]
 
-    print("sim self-test OK (215 cases)")
+    # -- _clears_par_floor(): the model's own measured error, not a guess -
+    par_of = {"good": 5.0, "weak": 1.99, "unknown": None}
+    assert _clears_par_floor(par_of, None, "weak") is True   # ungraded season: nothing filtered
+    assert _clears_par_floor(par_of, 2.9, "good") is True    # 5.0 >= 2.9
+    assert _clears_par_floor(par_of, 2.9, "weak") is False   # 1.99 < 2.9
+    assert _clears_par_floor(par_of, 2.9, "unknown") is False  # no PAR at all is not a pass
+    assert _clears_par_floor(par_of, 2.9, "missing") is False  # not in the dict either
+
+    current_mae = _real_current_mae
+    print("sim self-test OK (220 cases)")
 
 
 def main() -> None:

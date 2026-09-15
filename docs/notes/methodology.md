@@ -154,3 +154,15 @@ scale (the real dispersion of actual/predicted at lag 1), not yet
 per-player — a disclosed simplification: no per-row `rate_rel` is
 logged in `squad_log.csv` today, so every pair is normalised by the same
 real, measured constant rather than an invented one.
+
+## current_mae() — the PAR floor for a headline BUY
+
+Added 2026-09-15 for `sim.py`'s `_clears_par_floor()` — the report used
+to headline whatever move ranked best regardless of how good it actually
+was, so a barely-above-replacement free agent (Roger Brugué, PAR +1.99)
+could get the same "Do this" framing as a genuinely strong signing.
+`current_mae()` just reads `forecast_accuracy_history()`'s latest logged
+row (already written every run, for the "Forecast vs actual" report
+section) — no new measurement, no guessed threshold. `None` before any
+jornada has locked and been graded, read by the caller as "don't filter
+yet" rather than a zero standing in for "unknown".

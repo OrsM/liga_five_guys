@@ -1488,6 +1488,23 @@ def forecast_accuracy_history() -> list[dict]:
     return out
 
 
+def current_mae() -> float | None:
+    """This run's own measured forecast error (per match played), from
+    forecast_accuracy_history()'s latest logged row — None before the
+    first jornada has locked and been graded.
+
+    THE FLOOR FOR "IS THIS RECOMMENDATION WORTH SHOWING", not a guessed
+    threshold: a player whose entire season PAR doesn't even clear one
+    match's worth of the model's own KNOWN error isn't a real signal,
+    he's noise dressed as a recommendation. Same discipline as
+    `_fit_decay()`'s "must beat the flat average" and the gap-signal
+    check's leave-one-out bar — measured against outcomes, not asserted.
+    Why: docs/notes/methodology.md#current_mae--the-par-floor-for-a-headline-buy
+    """
+    hist = forecast_accuracy_history()
+    return hist[-1]["mae"] if hist else None
+
+
 def comparison_lines() -> list[str]:
     out = [f"### Forecast vs actual — last {WINDOW_DAYS} days", ""]
     actuals, label = load_actuals()
@@ -2025,6 +2042,9 @@ def _selftest() -> None:
         _tidy4.DECISIONS = __import__("pathlib").Path(_d4)
         try:
             assert forecast_accuracy_history() == []   # nothing logged yet
+            # current_mae(): None before any jornada has locked and been
+            # graded — not a guessed floor standing in for "unknown".
+            assert current_mae() is None
             log_forecast_accuracy(12, 3.25, 4.12)
             log_forecast_accuracy(14, 3.10, 4.05)       # a later, real run
             hist = forecast_accuracy_history()
@@ -2034,6 +2054,8 @@ def _selftest() -> None:
             # NEVER OVERWRITES — the file has two real rows, not the
             # latest reading clobbering the first.
             assert len(hist) == 2, hist
+            # current_mae() reads the LATEST row, not the first.
+            assert abs(current_mae() - 3.10) < 1e-9, current_mae()
         finally:
             _tidy4.DECISIONS = _real_decisions4
 

@@ -473,3 +473,40 @@ its own independent raid list with no dedup either. Fixing only
 `ladder_rows()` would have created a NEW disagreement between the two
 renderers, the exact failure shape `payload()`'s own docstring exists to
 prevent ("Same rows as the markdown, so the two cannot disagree").
+
+## _clears_par_floor() — don't headline noise as a recommendation
+
+Found 2026-09-15, user question ("why are you still recommending Roger
+Brugué"). Not a bug in his numbers — checked twice, his PAR (+1.99, from
+a real, unmanipulated 29 points over 4 matches) was correctly computed.
+The real issue: the BUY/RAID groups showed the best available move
+regardless of how good it actually was, so a barely-above-replacement
+free agent funded by dumping a bad defender could headline the report
+with the same "Do this" framing as a genuinely strong signing.
+
+Fixed with a real floor, not a guessed number: `methodology.current_mae()`
+— this run's own measured forecast error (per match played), already
+logged every run for the "Forecast vs actual" report section. A player
+whose ENTIRE SEASON PAR doesn't clear one match's worth of the model's
+own known mistake-size isn't a real signal — Brugué's PAR (1.99) sitting
+below a single match's error (2.85 the day this was found) makes the
+point directly: recommending him was asking you to act on something
+smaller than what the model already knows it can be wrong by.
+
+`mae is None` (no jornada graded yet, early season) filters nothing —
+same "unmeasured is not zero" reasoning `ffcore.bid.cash_price()` and
+`drift_frac_from_history()` already use for their own "too early to
+measure" cases. When the floor empties BOTH the BUY and RAID groups, the
+ladder says so explicitly ("nothing clears the bar this week") rather
+than going silent, the same reasoning the pre-existing BUY-only "none
+clear the bar" line already used one level up.
+
+Applied identically in `ladder_rows()` and `payload()` (computed fresh in
+each from the same `u`, deterministic, same reasoning as
+`_best_raid_per_victim()`'s own note above — not passed between them,
+which would risk one going stale relative to the other's inputs).
+
+Does NOT touch `slate.comparison_table()`'s "every listed player,
+compared" table — a different question (every player's standing value,
+not "what should I do this week") with its own already-existing
+`par > 0` threshold, deliberately unrelated to this one.
