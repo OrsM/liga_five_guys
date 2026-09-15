@@ -3,36 +3,16 @@ ffcore.forecast — what a player might score, as a DISTRIBUTION.
 
     fc = Bootstrap.load(players, pool)
     fc.expected(jornada)        -> {key: mean points}
-    fc.draw(jornada, rng)       -> {key: one sampled outcome}
 
-THE INTERFACE IS THE POINT. Everything above this module — the simulator, the
-standings, every decision — consumes `expected` and `draw` and knows nothing
-else. Replacing the model is replacing one class. That matters because the
-point estimate is the binding constraint on this whole system: measured on 386
-logged scores the forecast spread is sd 1.07, while a single match has sd 3.69
-around a mean of 3.44. The model will be wrong for a long time, so the design
-question is not "is it right" but "can it be swapped".
-
-`draw` RETURNS A WHOLE JORNADA, not one player, and that is deliberate. Two
-defenders from the same club share a clean sheet; two forwards share the goals
-they are competing for. Sampling players independently understates the
-variance of a squad that is concentrated in a few clubs, and overstates how
-reliably a differential punt pays off. The interface needs no change for a
-model that wants that correlation, because it is handed the whole round at
-once — that is the one design decision here that would be expensive to get
-wrong.
-
-PARTIALLY DONE, HONESTLY: rate_draw()'s SEASON-LONG multiplier now has a
-per-club shared component (club_rel, from ffcore.fixture.club_volatility) on
-top of each player's own individual uncertainty — two players of the same
-club move together across a WHOLE TRIAL's 38 rounds. What is still
-independent is the PER-MATCH noise inside draw() itself: `rng.choice(pool)`
-draws each player's individual-match luck separately, so two teammates can
-still land on opposite ends of the pool in the SAME round of the SAME trial.
-The season-long piece is the bigger of the two — a club's whole SEASON
-being stronger or weaker than expected compounds over 38 rounds where a
-single round's noise does not — but per-match correlation is real and not
-yet built.
+Bootstrap's own public interface is just that point estimate — the
+sampling that turns it into a season DISTRIBUTION lives in
+ffcore.season._run_np, a numpy-vectorized reader of this class's
+internal fields (per_jornada/pool/rate_rel/club_of/club_rel/start_rel),
+not a caller of a draw() method. That split (removed 2026-09-16) used
+to be a pure-Python sampler here plus a hand-synced numpy mirror there,
+kept in sync by hand for a fallback (`numpy` missing) that
+pyproject.toml's own hard dependency on numpy already rules out.
+Why: docs/notes/forecast.md#draw-rate_draw-start_draw-removed-numpy-only-now
 
 WHY NOT A NORMAL. The obvious sampler is mean plus sd times a standard normal,
 and every fantasy Monte Carlo write-up I could find does exactly that. Real
@@ -40,7 +20,8 @@ per-match scores are mostly 0-2 with an occasional 16, floored near zero and
 sharply right-skewed: of 64 observed matches, 34 scored 3 or less and one
 scored 16. A normal fitted to that mean and sd produces negative scores about
 a fifth of the time and never produces the tail that actually decides a
-league. Shape comes from the data instead.
+league. Shape comes from the data instead — see _run_np for where that
+shape is actually sampled from now.
 """
 
 from __future__ import annotations
@@ -163,9 +144,6 @@ class Forecaster(Protocol):
         should I field right now" when the round in progress means players
         aren't all waiting on the same next match."""
 
-    def draw(self, jornada: int, rng: random.Random) -> dict[str, float]:
-        """One sampled outcome for every player in that jornada."""
-
 
 class Bootstrap:
     """Per-player mean from the scorer; shape resampled from real matches.
@@ -259,114 +237,14 @@ class Bootstrap:
                 out[k] = rec[0] * rec[1]
         return out
 
-    def rate_draw(self, rng: random.Random, jornadas=None):
-        """A multiplier per player, for one whole SEASON — flat (one dict)
-        when `jornadas` is omitted, or GROWING WITH DISTANCE (one dict per
-        jornada, {jornada: {key: multiplier}}) when it is given a sequence
-        of remaining jornadas in order.
-
-        Flat case: the rate is estimated once and wrong in the same
-        direction for every jornada of a trial (unlike match-to-match
-        noise, this can't average away over 38 rounds). Drifting case:
-        also models the rating itself moving over the season (transfers,
-        injuries, form) as a random walk — an initial per-trial error plus
-        an independent step per jornada, sd DRIFT_FRAC * rate_rel. Combined
-        multiplicatively with a separate, non-drifting CLUB-wide shock
-        (club_rel, ffcore.fixture.club_volatility) that correlates
-        teammates' outcomes. Truncated at zero: a rate cannot be negative.
-        Design rationale and the walk-accumulation bug this shape fixed:
-        docs/notes/forecast.md#rate_drawstart_draw--two-independent-sources-of-wrong
-        """
-        club_shock = {c: max(0.0, 1.0 + rng.gauss(0.0, self.club_rel[c]))
-                     for c in sorted(self.club_rel)}
-        eps0 = {k: max(0.0, 1.0 + rng.gauss(0.0, self.rate_rel[k]))
-               for k in sorted(self.rate_rel)}
-        if jornadas is None:
-            return {k: eps0[k] * club_shock.get(self.club_of.get(k, ""), 1.0)
-                   for k in sorted(self.rate_rel)}
-        # ACCUMULATED into a running position — NOT redrawn from cumulative
-        # variance each jornada (that bug, found+fixed 2026-09-01, gave
-        # each jornada the right marginal spread but zero correlation
-        # between adjacent jornadas). See docs/notes/forecast.md#the-drift-walk-rate_drawstart_draw-bug-and-fix
-        walk = {k: 0.0 for k in self.rate_rel}
-        cum_var = {k: 0.0 for k in self.rate_rel}
-        out = {}
-        for j in sorted(jornadas):
-            per_j = {}
-            for k in sorted(self.rate_rel):
-                step_var = (DRIFT_FRAC * self.rate_rel[k]) ** 2
-                walk[k] += rng.gauss(0.0, math.sqrt(step_var))
-                cum_var[k] += step_var
-                # LOG-NORMAL, NOT clip(1+drift, 0) — a clip is asymmetric
-                # (floors the negative tail, leaves the positive unbounded)
-                # and biases the mean upward as the walk widens; exp(walk -
-                # cum_var/2) has E[.]=1 for any cum_var. See
-                # docs/notes/forecast.md#the-drift-walk-rate_drawstart_draw-bug-and-fix
-                walked = math.exp(walk[k] - cum_var[k] / 2.0)
-                shared = club_shock.get(self.club_of.get(k, ""), 1.0)
-                per_j[k] = eps0[k] * walked * shared
-            out[j] = per_j
-        return out
-
-    def start_draw(self, rng: random.Random, jornadas=None):
-        """A LOGIT SHIFT per player, for one whole season — same shape as
-        rate_draw() (flat, or growing with distance), but additive on
-        logit(p) rather than multiplicative on a rate, since p must stay
-        in (0, 1). No club term (unlike rate_draw()) — deliberately left
-        for later, same reasoning as
-        docs/notes/forecast.md#rate_drawstart_draw--two-independent-sources-of-wrong.
-        """
-        eps0 = {k: rng.gauss(0.0, self.start_rel[k])
-               for k in sorted(self.start_rel)}
-        if jornadas is None:
-            return eps0
-        # ACCUMULATED, NOT REDRAWN FROM CUMULATIVE VARIANCE EACH JORNADA —
-        # same fix, same reason, as rate_draw()'s own note above. A logit
-        # shift is additive and mean-zero already, so accumulating the walk
-        # here also drops the separate `cum_var`/mean-correction bookkeeping
-        # rate_draw() still needs for its log-normal form.
-        walk = {k: 0.0 for k in self.start_rel}
-        out = {}
-        for j in sorted(jornadas):
-            per_j = {}
-            for k in sorted(self.start_rel):
-                walk[k] += rng.gauss(0.0, DRIFT_FRAC * self.start_rel[k])
-                per_j[k] = eps0[k] + walk[k]
-            out[j] = per_j
-        return out
-
-    def draw(self, jornada: int, rng: random.Random,
-             rates: dict | None = None,
-             starts: dict | None = None) -> dict[str, float]:
-        per = self.per_jornada.get(jornada, {})
-        out = {}
-        for k in self._order.get(jornada, ()):
-            pts, p = per[k]
-            if starts and k in starts:
-                p = _shift_p(p, starts[k])
-            if p <= 0.0 or rng.random() >= p:
-                out[k] = 0.0
-                continue
-            m = 1.0 if rates is None else rates.get(k, 1.0)
-            out[k] = rng.choice(self.pool) * (pts * m / self._pool_mean)
-        return out
-
-
-def _shift_p(p: float, shift: float) -> float:
-    """p moved by `shift` in logit space, clamped to startprob's own bounds.
-
-    THE SAME BOUNDS P(START) ITSELF ALREADY LIVES WITHIN — ffcore.startprob
-    clamps its fitted calibration to [FLOOR, CEIL] for exactly the reason
-    given there: nothing is certain, and a Bernoulli at 0 or 1 costs the
-    simulator the thing that actually decides a league. A drift that pushed
-    a player outside those bounds would be claiming more certainty than the
-    number it started from is allowed to claim.
-    """
-    from ffcore.startprob import FLOOR, CEIL
-    p = min(1.0 - 1e-6, max(1e-6, p))
-    z = math.log(p / (1.0 - p)) + shift
-    q = 1.0 / (1.0 + math.exp(-max(-40.0, min(40.0, z))))
-    return min(CEIL, max(FLOOR, q))
+    # No sampling methods here (draw()/rate_draw()/start_draw() removed
+    # 2026-09-16): numpy is a hard dependency (pyproject.toml), so
+    # ffcore.season._run_np is always the live path, and it reads
+    # per_jornada/pool/rate_rel/club_of/club_rel/start_rel/_order/
+    # _pool_mean directly as a hand-synced vectorized mirror rather than
+    # calling these per-key methods 20M times. The pure-Python sampler
+    # they fed (ffcore.season._run(), only reachable if numpy were
+    # missing) is gone too. Why: docs/notes/forecast.md#draw-rate_draw-start_draw-removed-numpy-only-now
 
 
 def pool_from_perjornada(rows) -> list[int]:
@@ -408,67 +286,47 @@ def _selftest() -> None:
     # exactly the behaviour there was before this existed.
     assert Bootstrap({1: {"vet": (5.0, 1.0)}}, pool=[1, 2, 3]).rate_rel == {}
 
-    # The multiplier is drawn once per SEASON and averages one, so the mean of
-    # the forecast is untouched and only its spread moves.
-    r = random.Random(3)
-    draws = [thin.rate_draw(r)["kid"] for _ in range(4000)]
-    assert abs(sum(draws) / len(draws) - 1.0) < 0.02, sum(draws) / len(draws)
-    assert min(draws) >= 0.0, "a rate cannot be negative"
-    assert max(draws) > 1.3, "and it has to be able to be wrong"
+    # -- club_of/club_rel: stored as given, no second computation -----------
+    # No club_of/club_rel passed: exactly the old behaviour, not a new
+    # no-op path that happens to look the same. The correlation these
+    # actually produce in a season is verified where it matters — through
+    # a real simulate() call — in ffcore.season's own self-test, not here:
+    # this class no longer draws anything itself for _run_np to duplicate.
+    assert thin.club_of == {} and thin.club_rel == {}
+    same_club = Bootstrap(
+        {1: {"a": (5.0, 1.0), "b": (5.0, 1.0), "c": (5.0, 1.0)}},
+        pool=[0, 2, 4, 6, 8] * 40, matches={"a": 20, "b": 20, "c": 20},
+        club_of={"a": "Rich", "b": "Rich", "c": "Poor"},
+        club_rel={"Rich": 0.20, "Poor": 0.0})
+    assert same_club.club_of == {"a": "Rich", "b": "Rich", "c": "Poor"}
+    assert same_club.club_rel == {"Rich": 0.20, "Poor": 0.0}
 
-    # -- rate_draw with `jornadas`: uncertainty GROWS with distance ---------
-    # Omitting `jornadas` must be untouched — the flat, one-multiplier-for-
-    # the-season path checked above, not a new default that happens to
-    # look the same.
-    assert set(thin.rate_draw(random.Random(1))) == {"vet", "kid"}
-
-    walk = [thin.rate_draw(random.Random(i), jornadas=[1, 2, 3, 20, 21, 22])
-           for i in range(3000)]
-    near = statistics.pstdev(t[1]["kid"] for t in walk)
-    far = statistics.pstdev(t[22]["kid"] for t in walk)
-    # jornada 22 (20 steps out) is genuinely less certain than jornada 1.
-    assert far > near, (near, far)
-    # The walk is an actual path, not independent per-jornada redraws:
-    # adjacent jornadas (1, 2) share almost their entire walk history and
-    # must be strongly, positively correlated within a trial.
-    adjacent_corr = statistics.correlation(
-        [t[1]["kid"] for t in walk], [t[2]["kid"] for t in walk])
-    assert adjacent_corr > 0.7, adjacent_corr
-    # Correlation should weaken with distance — jornada 1 vs 22 shares much
-    # less walk history than jornada 1 vs 2.
-    distant_corr = statistics.correlation(
-        [t[1]["kid"] for t in walk], [t[22]["kid"] for t in walk])
-    assert 0.0 < distant_corr < adjacent_corr, (distant_corr, adjacent_corr)
-    # Log-normal, not a biased clip: however wide the walk gets, its mean
-    # stays ~1.0, checked at jornada 22 (the widest point).
-    far_mean = statistics.mean(t[22]["kid"] for t in walk)
-    assert abs(far_mean - 1.0) < 0.05, far_mean
-    # A jornada NOT in the walk's own list is simply absent, not guessed.
-    assert 4 not in walk[0]
-
-    # fit_drift_frac(): recovers a known ground truth from rate_draw()'s own
-    # generative process.
+    # fit_drift_frac(): recovers a known ground truth from a synthetic
+    # log-normal walk built right here (not via a Bootstrap method — the
+    # class no longer draws anything; this is the same generative process
+    # ffcore.season._run_np now samples from).
     global DRIFT_FRAC
     truth = 0.6
-    was = DRIFT_FRAC
-    try:
-        DRIFT_FRAC = truth
-        gen = Bootstrap({1: {"kid": (5.0, 1.0)}}, pool=[0, 2, 4, 6, 8] * 40,
-                        matches={"kid": 10})
-        rel = gen.rate_rel["kid"]
-        rng2 = random.Random(11)
-        h1_pairs, h3_pairs = [], []
-        for _ in range(4000):
-            # CONSECUTIVE jornadas, matching real usage (decide.py always
-            # walks the whole remaining schedule in order) — cum_var
-            # accumulates one step per LIST ENTRY, so a gapped list (e.g.
-            # [1, 3]) would silently under-count steps for jornada 3.
-            d = gen.rate_draw(rng2, jornadas=[1, 2, 3])
-            h1_pairs.append((1.0, d[1]["kid"], rel))
-            h3_pairs.append((1.0, d[3]["kid"], rel))
-    finally:
-        DRIFT_FRAC = was
+    gen = Bootstrap({1: {"kid": (5.0, 1.0)}}, pool=[0, 2, 4, 6, 8] * 40,
+                    matches={"kid": 10})
+    rel = gen.rate_rel["kid"]
+    rng2 = random.Random(11)
 
+    def _walked(n_steps: int, drift: float) -> float:
+        # CONSECUTIVE steps from jornada 1, matching real usage (decide.py
+        # always walks the remaining schedule in order) — one step per
+        # jornada, log-normal with the same mean-1 correction rate_draw()
+        # used to apply by hand.
+        walk = cum_var = 0.0
+        step_var = (drift * rel) ** 2
+        eps0 = max(0.0, 1.0 + rng2.gauss(0.0, rel))
+        for _ in range(n_steps):
+            walk += rng2.gauss(0.0, step_var ** 0.5)
+            cum_var += step_var
+        return eps0 * math.exp(walk - cum_var / 2.0)
+
+    h1_pairs = [(1.0, _walked(1, truth), rel) for _ in range(4000)]
+    h3_pairs = [(1.0, _walked(3, truth), rel) for _ in range(4000)]
     fitted, why = fit_drift_frac(h1_pairs, h3_pairs)
     # RECOVERS THE TRUTH — within sampling noise (n=4000), not exactly.
     assert abs(fitted - truth) < 0.08, (fitted, truth, why)
@@ -483,12 +341,8 @@ def _selftest() -> None:
     # HONEST REFUSAL: h3 genuinely no more variable than h1 (drift truly
     # near zero) must not be reported as evidence to SHRINK below the
     # current constant — it's silence, not a negative signal.
-    DRIFT_FRAC = was
-    gen0 = Bootstrap({1: {"kid": (5.0, 1.0)}}, pool=[0, 2, 4, 6, 8] * 40,
-                     matches={"kid": 10})
-    rel0 = gen0.rate_rel["kid"]
-    flat_h1 = [(1.0, 1.0 + rng2.gauss(0.0, rel0), rel0) for _ in range(200)]
-    flat_h3 = [(1.0, 1.0 + rng2.gauss(0.0, rel0), rel0) for _ in range(200)]
+    flat_h1 = [(1.0, 1.0 + rng2.gauss(0.0, rel), rel) for _ in range(200)]
+    flat_h3 = [(1.0, 1.0 + rng2.gauss(0.0, rel), rel) for _ in range(200)]
     fitted_flat, why_flat = fit_drift_frac(flat_h1, flat_h3)
     if fitted_flat == DRIFT_FRAC:
         assert "wasn't more variable" in why_flat, why_flat
@@ -498,51 +352,6 @@ def _selftest() -> None:
         [(0.0, 1.0, 0.1)] * 30, [(1.0, -1.0, 0.1)] * 30)
     assert fitted_bad == DRIFT_FRAC and "not enough" in why_bad, why_bad
 
-    # -- club_rel: two players of one club move TOGETHER --------------------
-    # No club_of/club_rel passed: exactly the old behaviour, not a new
-    # no-op path that happens to look the same.
-    assert thin.club_of == {} and thin.club_rel == {}
-
-    same_club = Bootstrap(
-        {1: {"a": (5.0, 1.0), "b": (5.0, 1.0), "c": (5.0, 1.0)}},
-        pool=[0, 2, 4, 6, 8] * 40, matches={"a": 20, "b": 20, "c": 20},
-        club_of={"a": "Rich", "b": "Rich", "c": "Poor"},
-        club_rel={"Rich": 0.20, "Poor": 0.0})
-    # "a" and "b" share Rich's shock; "c" is on Poor, rel 0.0 — his OWN
-    # rate_rel still applies (players still individually wrong), but the
-    # CLUB component is exactly a no-op multiplier for him.
-    trials = [same_club.rate_draw(random.Random(i)) for i in range(500)]
-    # THE ACTUAL CLAIM: a and b are CORRELATED (same club, same shock) far
-    # more than either is with c (different club). Measured as how often
-    # a and b land on the SAME SIDE of 1.0, against how often a and c do.
-    ab_same_side = sum(1 for t in trials
-                       if (t["a"] > 1.0) == (t["b"] > 1.0))
-    ac_same_side = sum(1 for t in trials
-                       if (t["a"] > 1.0) == (t["c"] > 1.0))
-    assert ab_same_side > ac_same_side, (ab_same_side, ac_same_side)
-    # a and b are NOT identical — each still carries his own individual
-    # rate_rel on top of the shared club shock.
-    assert any(t["a"] != t["b"] for t in trials)
-    # The mean is still ~1.0 — an ADDED source of spread, not a bias.
-    a_mean = sum(t["a"] for t in trials) / len(trials)
-    assert abs(a_mean - 1.0) < 0.05, a_mean
-
-    # REPRODUCIBLE, THE SAME STRONGER CLAIM AS draw() BELOW: fixed order
-    # (sorted club names, then sorted player keys), not dict-insertion or
-    # per-process hash-seed order — the exact bug class .draw() already had
-    # to be fixed for once.
-    fwd_clubs = {"a": "Rich", "b": "Rich", "c": "Poor"}
-    rev_clubs = {"c": "Poor", "b": "Rich", "a": "Rich"}
-    fwd_cs = Bootstrap({1: {"a": (5.0, 1.0), "b": (5.0, 1.0), "c": (5.0, 1.0)}},
-                       matches={"a": 20, "b": 20, "c": 20}, club_of=fwd_clubs,
-                       club_rel={"Rich": 0.2, "Poor": 0.1})
-    rev_cs = Bootstrap({1: {"a": (5.0, 1.0), "b": (5.0, 1.0), "c": (5.0, 1.0)}},
-                       matches={"a": 20, "b": 20, "c": 20}, club_of=rev_clubs,
-                       club_rel={"Poor": 0.1, "Rich": 0.2})
-    assert fwd_cs.rate_draw(random.Random(9)) == rev_cs.rate_draw(
-        random.Random(9)), "insertion order must not change the season"
-
-    rng = random.Random(7)
     # One jornada, three players: a nailed-on starter, a rotation risk, and
     # somebody who is not playing at all.
     fc = Bootstrap({1: {"nailed": (5.0, 1.0),
@@ -562,57 +371,14 @@ def _selftest() -> None:
     # No record at that jornada for him: simply absent, not zero.
     assert fc2.expected_own({"early": 2}) == {}
 
-    # A man who cannot play scores nothing, every single time.
-    assert all(fc.draw(1, rng)["out"] == 0.0 for _ in range(200))
-
-    # draw() converges on expected(). 4000 draws of a sd~mean variable puts
-    # the standard error near 1.6%, so 8% is loose enough not to flake and
-    # tight enough to catch a scaling error.
-    n = 4000
-    tot = {"nailed": 0.0, "rota": 0.0}
-    for _ in range(n):
-        d = fc.draw(1, rng)
-        for k in tot:
-            tot[k] += d[k]
-    for k, want in (("nailed", 5.0), ("rota", 2.5)):
-        got = tot[k] / n
-        assert abs(got - want) / want < 0.08, (k, got, want)
-
-    # THE SHAPE SURVIVES. A normal would be symmetric and would go negative
-    # about a fifth of the time; the real thing is skewed right and floored.
-    draws = [fc.draw(1, rng)["nailed"] for _ in range(4000)]
-    below = sum(1 for d in draws if d < 0)
-    assert below / len(draws) < 0.06, below / len(draws)
-    med = statistics.median(draws)
-    assert med < statistics.mean(draws), (med, statistics.mean(draws))
-    assert max(draws) > 3 * statistics.mean(draws), max(draws)
-
-    # Reproducible: the same seed is the same season, which is what makes a
-    # comparison between two candidate squads a comparison and not a coin.
-    a = Bootstrap({1: {"x": (4.0, 0.7)}}).draw(1, random.Random(1))
-    b = Bootstrap({1: {"x": (4.0, 0.7)}}).draw(1, random.Random(1))
-    assert a == b, (a, b)
-
-    # ...AND ACROSS PROCESSES, which is a stronger claim and the one that was
-    # not true. Every player pulls from one rng in dict order, so the SAME
-    # players inserted in a different order get each other's numbers. The
-    # callers build that dict by iterating a set, and set order over strings
-    # moves with Python's per-process hash seed — so the headline P(win) in
-    # the report drifted a point or two between runs on identical data, which
-    # is noise a reader has no way to tell from news.
-    same = {"x": (4.0, 1.0), "y": (2.0, 1.0), "z": (3.0, 1.0)}
-    fwd = Bootstrap({1: {k: same[k] for k in ("x", "y", "z")}})
-    rev = Bootstrap({1: {k: same[k] for k in ("z", "y", "x")}})
-    assert fwd.draw(1, random.Random(3)) == rev.draw(1, random.Random(3)), \
-        "the same season must not depend on dict insertion order"
-
-    # -- the pool ----------------------------------------------------------
+    # -- the pool ------------------------------------------------------------
     assert "seed prior" in Bootstrap({}, pool=[1, 2, 3]).pool_note()
     big = list(range(MIN_POOL))
     assert "observed matches" in Bootstrap({}, pool=big).pool_note()
-    # A pool that averages zero must not divide by zero or zero every draw.
+    # A pool that averages zero must leave _pool_mean guarded, not zero —
+    # _run_np divides by this same field directly.
     z = Bootstrap({1: {"x": (4.0, 1.0)}}, pool=[0] * MIN_POOL)
-    assert z.draw(1, rng)["x"] == 0.0
+    assert z._pool_mean != 0.0, z._pool_mean
 
     rows = [{"games_delta": "1", "points_delta": "4"},
             {"games_delta": "2", "points_delta": "9"},     # two matches
@@ -635,49 +401,7 @@ def _selftest() -> None:
     # no-matches behaviour above.
     assert Bootstrap({1: {"vet": (5.0, 0.9)}}).start_rel == {}
 
-    # -- start_draw: flat case averages to no shift, grows with distance ---
-    r = random.Random(5)
-    sdraws = [sthin.start_draw(r)["kid"] for _ in range(4000)]
-    assert abs(sum(sdraws) / len(sdraws)) < 0.03, sum(sdraws) / len(sdraws)
-
-    swalk = [sthin.start_draw(random.Random(i), jornadas=[1, 2, 3, 20, 21, 22])
-            for i in range(3000)]
-    snear = statistics.pstdev(t[1]["kid"] for t in swalk)
-    sfar = statistics.pstdev(t[22]["kid"] for t in swalk)
-    assert sfar > snear, (snear, sfar)
-    # A player with real evidence (vet) must not drift as wide as one
-    # without (kid), at the same horizon.
-    sfar_vet = statistics.pstdev(t[22]["vet"] for t in swalk)
-    assert sfar_vet < sfar, (sfar_vet, sfar)
-
-    # -- _shift_p: a shift of 0 is the identity; the walk cannot escape
-    # startprob's own [FLOOR, CEIL] bounds no matter how wide it gets.
-    from ffcore.startprob import FLOOR, CEIL
-    assert abs(_shift_p(0.8, 0.0) - 0.8) < 1e-6
-    assert _shift_p(0.8, -50.0) >= FLOOR
-    assert _shift_p(0.8, 50.0) <= CEIL
-
-    # -- draw() with `starts`: a large enough shift moves who plays -------
-    # A wide-enough negative shift can bench a nailed-on man; this is the
-    # actual behaviour change start_draw()'s widening band buys — a player
-    # this repo used to treat as a fact can now, in a trial far enough out,
-    # come up benched.
-    pinned = Bootstrap({1: {"nailed": (5.0, 0.9)}})
-    # -50 in logit space drives p toward startprob's own FLOOR (0.01), not
-    # literally 0 — nothing here claims more certainty than that module
-    # already allows itself, so "almost always benched" is the claim, not
-    # "always".
-    benched = [pinned.draw(1, random.Random(i), starts={"nailed": -50.0})
-              for i in range(2000)]
-    still_played = sum(1 for d in benched if d["nailed"] > 0.0)
-    assert still_played / len(benched) < 0.03, still_played / len(benched)
-    # A shift of exactly 0.0 changes nothing — the no-op case a caller with
-    # no real uncertainty to add (start_rel == {}) will always hit.
-    a = pinned.draw(1, random.Random(11))
-    b = pinned.draw(1, random.Random(11), starts={"nailed": 0.0})
-    assert a == b, (a, b)
-
-    print("ffcore.forecast self-test OK (40 cases)")
+    print("ffcore.forecast self-test OK (24 cases)")
 
 
 if __name__ == "__main__":

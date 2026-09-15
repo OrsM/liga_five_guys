@@ -20,25 +20,27 @@ marginals is therefore only valid for acting on one row, and this repo printed
 four such rows at once. A simulation of the squad you would actually hold
 cannot make that mistake — there is nothing to add up.
 
-MANAGERS PICK ON expected() AND SCORE ON draw(). Choosing the eleven from the
-sampled outcome would hand everyone perfect foresight and make every squad
-look far better than it is; the gap between the two is most of what fantasy
-football actually is.
+MANAGERS PICK ON expected(), SCORED ON A SAMPLED OUTCOME. Choosing the eleven
+from the sampled outcome would hand everyone perfect foresight and make every
+squad look far better than it is; the gap between the two is most of what
+fantasy football actually is. The sampling itself lives in _run_np below, a
+numpy-vectorized reader of ffcore.forecast.Bootstrap's own fields — not a
+call to a method on it (there isn't one to call: see forecast.py's own note
+on why draw()/rate_draw()/start_draw() were removed 2026-09-16).
 
 WHAT IT DOES NOT MODEL, and each of these makes it optimistic:
 
   * Rivals never transfer. They will, and they will improve, so a lead here
     decays slower than in reality.
   * Nobody is injured mid-season beyond what today's P(start) already says.
-  * Teammates score independently. Two defenders of one club share a clean
-    sheet, so a concentrated squad really has more variance than this shows —
-    see the note in ffcore.forecast about why `draw` takes a whole jornada.
+  * Teammates' PER-MATCH luck is independent even at the same club — only
+    the season-long rate (club_rel, see _run_np below and
+    ffcore.fixture.club_volatility) is correlated, not a single round's
+    shared clean sheet or shared goals.
 """
 
 from __future__ import annotations
 
-import os
-import random
 from dataclasses import dataclass, field
 
 from ffcore.score import MAX_SLOT, formations, _xi_search
@@ -164,78 +166,43 @@ class Standings:
         return sum(k * p for k, p in self.position(manager).items())
 
 
-def _chunk(args):
-    """One worker's slice of the trials. Module level, so it can be pickled."""
-    states, forecaster, lo, hi, seed = args
-    return _run(states, forecaster, range(lo, hi), seed)
-
-
 def simulate_many(states: list, forecaster, trials: int = 2000,
-                  seed: int = 0, workers: int | None = None) -> list:
+                  seed: int = 0) -> list:
     """Play one set of seasons and score EVERY candidate squad against it.
 
     THE DRAWS DO NOT DEPEND ON THE SQUADS. Same seed, same forecaster, same
     jornadas — so every call to simulate() was redrawing an identical season
     and throwing it away. Ranking twelve options at three thousand trials over
     thirty-eight jornadas meant eight million draws where a hundred thousand
-    would do, and the draw is the expensive part: a dict of ninety players,
-    two rng calls each.
+    would do.
 
     Drawing once per (trial, jornada) and scoring all the states against it is
     exactly the same arithmetic in a different order, which is why the
     self-test asserts the numbers are IDENTICAL rather than close.
 
-    Returns one Standings per state, in order.
+    Returns one Standings per state, in order. numpy is a hard dependency
+    (pyproject.toml), so this always runs through _run_np — no fallback
+    path, no `workers` parameter (removed 2026-09-16 along with the
+    multiprocess/pure-Python path it split trials across: real callers
+    never passed one, and it existed only for a "numpy missing" case the
+    dependency declaration already rules out).
     """
     if not states:
         return []
-    # ACROSS CORES, AND EXACTLY. Every trial seeds its own rng from the trial
-    # NUMBER, so splitting the range over processes gives the same seasons in
-    # the same order — the self-test asserts the totals are identical, not
-    # close. Only worth the pickling above a few hundred trials.
-    # Arrays first: one vectorised pass beats four processes doing it a
-    # number at a time, and it needs no agreement between them.
-    if workers is None:
-        fast = _run_np(states, forecaster, trials, seed)
-        if fast is not None:
-            return [Standings(totals=tot, me=st.me)
-                    for tot, st in zip(fast, states)]
-
-    n = workers if workers is not None else (os.cpu_count() or 1)
-    if n > 1 and trials >= 400 and len(states) > 1:
-        import concurrent.futures as cf
-
-        edges = [trials * i // n for i in range(n + 1)]
-        jobs = [(states, forecaster, edges[i], edges[i + 1], seed)
-                for i in range(n) if edges[i] < edges[i + 1]]
-        parts = []
-        try:
-            with cf.ProcessPoolExecutor(max_workers=len(jobs)) as ex:
-                parts = list(ex.map(_chunk, jobs))
-        except Exception:                                   # noqa: BLE001
-            # A box that cannot fork is a slow report, not a failed one.
-            parts = []
-        if parts:
-            out = []
-            for i, st in enumerate(states):
-                merged = {m: [v for p in parts for v in p[i][m]]
-                          for m in st.squads}
-                out.append(Standings(totals=merged, me=st.me))
-            return out
+    fast = _run_np(states, forecaster, trials, seed)
     return [Standings(totals=tot, me=st.me)
-            for tot, st in zip(_run(states, forecaster, range(trials), seed),
-                               states)]
+            for tot, st in zip(fast, states)]
 
 
 def _run_np(states: list, forecaster, trials: int, seed: int):
-    """The same seasons, drawn as arrays. None if numpy is not installed.
-
-    A SEPARATE, hand-synced mirror of ffcore.forecast.Bootstrap's draw
-    logic (not a caller of it) — vectorizing collapses ~20M Python calls
-    per run into a couple of numpy calls. NOT the same numbers as the
-    Python path (a different generator, statistically equivalent only).
-    The generator is seeded from (seed, jornada), so a jornada's matrix is
-    the same however the work is divided across processes.
+    """The whole season, drawn as arrays over ffcore.forecast.Bootstrap's
+    own fields (per_jornada/pool/rate_rel/club_of/club_rel/start_rel) —
+    reads them directly rather than calling per-key methods on the
+    instance, collapsing ~20M Python calls per run into a couple of numpy
+    calls. Since 2026-09-16 this IS the sampler, not a mirror of one:
+    Bootstrap has no draw()/rate_draw()/start_draw() of its own to keep in
+    sync with, and numpy is a hard dependency, so there is no fallback to
+    return None for.
     Full design notes + the rng stream layout: docs/notes/season.md#_run_np-the-vectorized-mirror-kept-in-sync-by-hand
     """
     try:
@@ -408,86 +375,6 @@ def _run_np(states: list, forecaster, trials: int, seed: int):
     return [{m: v.tolist() for m, v in tot.items()} for tot in totals]
 
 
-def _run(states: list, forecaster, which, seed: int) -> list:
-    """{manager: [total per trial]} per state, for the trials in `which`."""
-    managers = [list(st.squads) for st in states]
-    idx = list(which)
-    totals = [{m: [float(st.carried.get(m, 0.0))] * len(idx) for m in ms}
-              for st, ms in zip(states, managers)]
-
-    # The eleven each manager fields depends only on expectations, so it is
-    # the same in every trial and is picked once per state rather than
-    # `trials` times.
-    xis = []
-    for st in states:
-        per = {}
-        for j in st.jornadas:
-            exp = forecaster.expected(j)
-            per[j] = {m: best_xi(sq, exp) for m, sq in st.squads.items()}
-        xis.append(per)
-
-    # SCORE THE FIRST STATE, THEN THE DIFFERENCES. A candidate squad is the
-    # base squad with two or three men moved, and every other manager is
-    # untouched — so summing eleven names for five managers for every one of
-    # thirteen states repeats work that cannot have changed. Each state keeps
-    # only who ENTERED and who LEFT each eleven relative to state zero, which
-    # is typically four names against fifty-five.
-    jornadas = states[0].jornadas
-    deltas = []
-    for i in range(1, len(states)):
-        per = {}
-        for j in jornadas:
-            for m in managers[i]:
-                was = set(xis[0][j].get(m, ()))
-                now = set(xis[i][j].get(m, ()))
-                if was != now:
-                    per[(j, m)] = (tuple(now - was), tuple(was - now))
-        deltas.append(per)
-
-    rate_of = getattr(forecaster, "rate_draw", None)
-    start_of = getattr(forecaster, "start_draw", None)
-    for n, t in enumerate(idx):
-        rng = random.Random(seed * 1_000_003 + t)
-        # ONE RATE-DRIFT WALK PER TRIAL, before the jornadas — a rate
-        # estimated wrong is wrong all season, but the FURTHER a jornada is
-        # the more it could ALSO have drifted since (see
-        # ffcore.forecast.Bootstrap.rate_draw's own docstring and
-        # DRIFT_FRAC's note on why). Passing `jornadas` gets one dict PER
-        # jornada rather than one flat dict for the whole season; a
-        # forecaster with no rate_draw at all still runs with no rate
-        # uncertainty. Drawn from its own generator so adding it does not
-        # shift the match-to-match numbers underneath it.
-        rates_by_j = (rate_of(random.Random(seed * 7919 + t), jornadas)
-                     if rate_of else None)
-        # SAME IDEA, A SEPARATE STREAM (seed*7927, not 7919) — start_draw's
-        # own walk must not share bits with rate_draw's, or "the rate was
-        # wrong high" and "he starts more than expected" would move
-        # together for no reason grounded in anything.
-        starts_by_j = (start_of(random.Random(seed * 7927 + t), jornadas)
-                       if start_of else None)
-        for j in jornadas:
-            rates = rates_by_j.get(j) if rates_by_j else None
-            starts = starts_by_j.get(j) if starts_by_j else None
-            drawn = forecaster.draw(j, rng, rates, starts)
-            get = drawn.get
-            base = {}
-            for m in managers[0]:
-                v = sum(get(k, 0.0) for k in xis[0][j][m])
-                base[m] = v
-                totals[0][m][n] += v
-            for i in range(1, len(states)):
-                tot, per = totals[i], deltas[i - 1]
-                for m in managers[i]:
-                    v = base.get(m, 0.0)
-                    ch = per.get((j, m))
-                    if ch is not None:
-                        v += sum(get(k, 0.0) for k in ch[0])
-                        v -= sum(get(k, 0.0) for k in ch[1])
-                    tot[m][n] += v
-
-    return totals
-
-
 def simulate(state: LeagueState, forecaster, trials: int = 2000,
              seed: int = 0) -> Standings:
     """Play the remaining jornadas `trials` times.
@@ -636,15 +523,13 @@ def _selftest() -> None:
     want = simulate(solo, Bootstrap(per), trials=120, seed=3)
     assert got[1].totals == want.totals, "a new manager must be scored fully"
 
-    # ACROSS CORES, AND EXACTLY. Every trial seeds its own rng from the trial
-    # number, so splitting the range over processes must give the same
-    # seasons in the same order — identical, not close.
-    serial = simulate_many([st, alt], Bootstrap(per), trials=500, seed=2,
-                           workers=1)
-    forked = simulate_many([st, alt], Bootstrap(per), trials=500, seed=2,
-                           workers=4)
-    assert [x.totals for x in serial] == [x.totals for x in forked], \
-        "splitting the trials changed the seasons"
+    # SAME CALL TWICE, EXACTLY. No multiprocess split to keep in sync
+    # anymore (removed 2026-09-16 with the pure-Python `_run` path it
+    # existed to parallelize) — just the ordinary reproducibility claim.
+    again1 = simulate_many([st, alt], Bootstrap(per), trials=500, seed=2)
+    again2 = simulate_many([st, alt], Bootstrap(per), trials=500, seed=2)
+    assert [x.totals for x in again1] == [x.totals for x in again2], \
+        "same seed, same seasons"
 
     # -- rate DRIFT actually widens a real season sim, mean unbiased --------
     # Ten jornadas, not one — the walk needs distance to have anything to
