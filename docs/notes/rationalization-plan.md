@@ -33,11 +33,10 @@ weight).
 
 ## Sessions
 
-- [ ] **1. Scrape/ingest.** Close remaining low-priority items from the
-  2026-09-14 audit: `sign_calendar`/`sign_af_fixtures` still bypass the
-  `_css()` cache (consistency nit, not correctness). Verify graceful
-  degradation when a source's HTML shape changes (the "matched no known
-  markup" warning path already exists — confirm it's sufficient).
+- [x] **1. Scrape/ingest.** `sign_calendar`/`sign_af_fixtures` now route
+  through `_css()` (commit 3cee3ef). Graceful-degradation path
+  ("matched no known markup" warning) confirmed already sufficient —
+  no further action.
 - [ ] **2. Tidy/identity.** Already the cleanest layer per the audit —
   verify only, don't rebuild.
 - [ ] **3. Player objects + forecast observability.** Give this layer a
@@ -45,14 +44,15 @@ weight).
   investigation exposed (no existing way to trace a forecast back to its
   inputs without a fresh ad hoc script each time). Keep `gap_signal.py`'s
   parked hypothesis alive as one command, not lost history.
-- [ ] **4. Decision engine.** THE ONE THAT DIRECTLY SERVES THE SUCCESS
-  CRITERION. Split `decide.py` (2,206 lines — candidate generation /
-  funding / ranking tangled together) along its real seams. Fix the
-  funding-noise bug: re-screen near-tied funding variants at real trial
-  counts before picking one to show; don't treat a currently-fielded
-  starter as interchangeable with bench dead weight. Build
-  `decide.py explain <player>` — trace a real recommendation's numbers
-  in one command.
+- [~] **4. Decision engine.** THE ONE THAT DIRECTLY SERVES THE SUCCESS
+  CRITERION. **Funding-noise bug fixed and verified (commit f70ad6c)** —
+  `rank()` no longer treats selling a currently-fielded starter as
+  interchangeable with selling bench dead weight; confirmed across 5
+  seeds that the recommended funding source now varies only among real
+  bench players. Still open: split `decide.py` (2,206 lines — candidate
+  generation / funding / ranking tangled together) along its real seams;
+  build `decide.py explain <player>` to trace a real recommendation's
+  numbers in one command instead of a fresh ad hoc script each time.
 - [ ] **5. Buy/sell decision tree.** Formalize the cash-need logic
   (need cash outright / have spare / need a specific sale to fund X) as
   explicit, testable branches instead of logic implicit in ranking order.
@@ -64,4 +64,10 @@ weight).
 
 ## Session log
 
-**2026-09-15** — Plan written. Starting Session 1.
+**2026-09-15** — Plan written. Session 1 closed (3cee3ef). Session 4's
+core bug fixed and verified against the real Brugué/Vicente case
+(f70ad6c) — jumped ahead of Session 3 since this directly served the
+stated success criterion. Session 4 not fully closed: `decide.py` still
+needs splitting, and the `explain` tool is still unbuilt. Next: either
+finish Session 4 (split + explain tool) or do Session 3's observability
+work, which the `explain` tool would also serve — worth doing together.
