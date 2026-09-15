@@ -195,6 +195,27 @@ class Universe:
         """
         return _current_xi(self, self.me)
 
+    @cached_property
+    def xi_bar(self) -> float:
+        """The weakest man in my current eleven — the line a signing has
+        to clear. Cached alongside current_xi(), the pair it's derived
+        from."""
+        return xi_bar(*self.current_xi)
+
+    def route_kind(self, k: str) -> str:
+        """"mine" | "free" | "raid" | "listed" for player `k`."""
+        return route_kind(self, k)
+
+    def dead_weight(self) -> list[tuple[str, float]]:
+        """[(player, proceeds)] for everyone in my squad who never starts
+        any jornada I could still pick."""
+        return dead_weight(self)
+
+    def candidates(self, expected: dict[str, float],
+                   budget: float | None = None) -> list["Action"]:
+        """Every affordable move worth simulating."""
+        return candidates(self, expected, budget)
+
 
 def _pos_of(raw: str) -> str:
     """SLOT abbreviation (DEL/MED/DEF/POR) for a PlayerCurrent.pos value.
@@ -850,6 +871,16 @@ def _selftest() -> None:
     # decide.current_xi(u) (no `who`, or who=u.me) hands back the SAME
     # cached object — the compat wrapper doesn't create a second answer.
     assert current_xi(u) is first, "compat wrapper bypassed the cache"
+
+    # -- Universe.xi_bar/.route_kind/.dead_weight/.candidates: methods that
+    # delegate to the SAME free functions, not a second implementation ----
+    assert u.xi_bar == xi_bar(*u.current_xi)
+    assert u.xi_bar is u.xi_bar, "cached_property must not recompute"
+    for k in list(u.state.squads.get(u.me, {}))[:1] + ["th_m1"]:
+        assert u.route_kind(k) == route_kind(u, k)
+    assert u.dead_weight() == dead_weight(u)
+    assert [a.buy for a in u.candidates(exp)] == \
+        [a.buy for a in candidates(u, exp)]
 
     # -- current_xi / xi_bar: the one computation seven call sites used to
     # each rebuild by hand ---------------------------------------------
