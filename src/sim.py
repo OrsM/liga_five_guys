@@ -83,7 +83,7 @@ def _pts(v) -> str:
 
 def squad_value(u) -> float:
     """What the squad would raise. `proceeds` is exactly that, per player."""
-    return sum(u.proceeds.values())
+    return sum(u.proceeds_view.values())
 
 
 def fielded_keys(u=None) -> list[str]:
@@ -102,7 +102,7 @@ def fielded_keys(u=None) -> list[str]:
     4-5-1. No answer prints the whole sheet, which is what the report did
     before any of this existed.
     """
-    return app_fielded(u.state.squads.get(u.me, {}), u.name) if u else []
+    return app_fielded(u.state.squads.get(u.me, {}), u.name_view) if u else []
 
 
 def _warnings() -> list:
@@ -241,10 +241,10 @@ def short(key, u) -> str:
     Surnames buy back most of that width — but only where they still identify
     somebody, so the check is against the squad rather than assumed.
     """
-    full = title_name(u.name.get(key, key))
+    full = title_name(u.name_view.get(key, key))
     last = full.split()[-1] if full.split() else full
     clash = sum(1 for k in u.state.squads.get(u.me, {})
-                if title_name(u.name.get(k, k)).split()[-1:] == [last])
+                if title_name(u.name_view.get(k, k)).split()[-1:] == [last])
     return full if clash > 1 else last
 
 
@@ -323,7 +323,7 @@ def ladder_rows(u, rows, bands=None, exp=None, xi=None) -> list[dict]:
     # Why: docs/notes/decide.md#rank--funding-variant-noise
     from ffcore.candidates import max_spare_proceeds
     spare = max_spare_proceeds(u)
-    rest = [k for k in u.price if k not in mine and exp.get(k, 0.0) > bar]
+    rest = [k for k in u.price_view if k not in mine and exp.get(k, 0.0) > bar]
     # A won row carries rank()'s own band, off the squad the victim's
     # response leaves behind — which is why rank() never bands them twice.
     bands = {k: v for k, v in (bands or {}).items() if k not in won}
@@ -336,8 +336,8 @@ def ladder_rows(u, rows, bands=None, exp=None, xi=None) -> list[dict]:
             lo=None, hi=None, market=None, premium=None, bought=None):
         if k in bands:
             pts, lo, hi, _action = bands[k]
-        return {"name": title_name(u.name.get(k, k)),
-                "pos": u.pos.get(k, ""), "start": u.start.get(k, 0.0),
+        return {"name": title_name(u.name_view.get(k, k)),
+                "pos": u.pos.get(k, ""), "start": u.start_view.get(k, 0.0),
                 "xpts": exp.get(k, 0.0), "group": group, "where": where,
                 "money": money, "pts": pts, "par": par.get(k),
                 "pts_lo": lo, "pts_hi": hi, "note": note, "value": value,
@@ -374,7 +374,7 @@ def ladder_rows(u, rows, bands=None, exp=None, xi=None) -> list[dict]:
     for k in by_slot(u, benched, exp):
         out.append(cell(k, "keep", "yours", None, None))
     for k in sorted(dead, key=lambda k: -exp.get(k, 0.0)):
-        out.append(cell(k, "sell", "yours", u.proceeds.get(k, 0.0), None,
+        out.append(cell(k, "sell", "yours", u.proceeds_view.get(k, 0.0), None,
                         bought=u.bought.get(k)))
 
     def buy_cell(k, group):
@@ -384,10 +384,10 @@ def ladder_rows(u, rows, bands=None, exp=None, xi=None) -> list[dict]:
         # real purchase can look unaffordable next to spare cash that
         # doesn't cover it. `sold` names whoever actually funds the gap.
         note = ("sell " + " + ".join(short(s, u) for s in sold)) if sold else ""
-        return cell(k, group, short_manager(u.owner.get(k)) or "free agent",
+        return cell(k, group, short_manager(u.owner_view.get(k)) or "free agent",
                     -r["action"].net, r["d_pts"], note, value=r.get("value"),
                     lo=r.get("pts_lo"), hi=r.get("pts_hi"),
-                    market=u.value.get(k), premium=r.get("burn") or 0.0)
+                    market=u.value_view.get(k), premium=r.get("burn") or 0.0)
 
     buys = [k for k in rest if k in won]
     # Free agents, then a real raid (clause, can't be refused) — a listed
@@ -406,21 +406,21 @@ def ladder_rows(u, rows, bands=None, exp=None, xi=None) -> list[dict]:
     for k in sorted(raid_keys, key=lambda k: _move_rank_key(won[k], u)):
         out.append(buy_cell(k, "raid"))
     for k in sorted((k for k in rest if k not in won
-                     and u.price[k] > u.cash + spare),
+                     and u.price_view[k] > u.cash + spare),
                     key=lambda k: -exp.get(k, 0.0)):
-        short_by = u.price[k] - u.cash - spare
+        short_by = u.price_view[k] - u.cash - spare
         save_pts = bands[k][0] if k in bands else None
-        out.append(cell(k, "save", short_manager(u.owner.get(k)) or "free agent",
+        out.append(cell(k, "save", short_manager(u.owner_view.get(k)) or "free agent",
                         -short_by, save_pts, "short",
                         value=value_rate(save_pts, short_by)))
     # Free agents only, via route_kind() — the one classifier.
     # Why: docs/notes/sim.md#ladder_rows--pass-is-free-agents-only
     for k in sorted((k for k in rest if k not in won
-                     and u.price[k] <= u.cash + spare
+                     and u.price_view[k] <= u.cash + spare
                      and route_kind(u, k) == "free"),
                     key=lambda k: -exp.get(k, 0.0)):
-        out.append(cell(k, "pass", short_manager(u.owner.get(k)) or "free agent",
-                        -u.price[k], None))
+        out.append(cell(k, "pass", short_manager(u.owner_view.get(k)) or "free agent",
+                        -u.price_view[k], None))
     return out
 
 
@@ -449,10 +449,10 @@ def band_acts(u, exp=None, xi=None) -> list:
     mine = u.state.squads.get(u.me, {})
     bar = u.xi_bar
     acts = [(k, decide.Action("sell", sell=(k,),
-                              proceeds=u.proceeds.get(k, 0.0)))
+                              proceeds=u.proceeds_view.get(k, 0.0)))
            for k in mine]
-    acts += [(k, decide.Action("buy", buy=k, cost=u.price.get(k, 0.0)))
-            for k in u.price
+    acts += [(k, decide.Action("buy", buy=k, cost=u.price_view.get(k, 0.0)))
+            for k in u.price_view
             if k not in mine and exp.get(k, 0.0) > bar]
     return acts
 
@@ -465,8 +465,8 @@ def market_candidates(u) -> list:
     import decide
 
     mine = u.state.squads.get(u.me, {})
-    return [(k, decide.Action("buy", buy=k, cost=u.price.get(k, 0.0)))
-           for k in u.price if k not in mine]
+    return [(k, decide.Action("buy", buy=k, cost=u.price_view.get(k, 0.0)))
+           for k in u.price_view if k not in mine]
 
 
 def ladder(u, rows, base, data=None, exp=None, xi=None) -> list[str]:
@@ -945,7 +945,7 @@ def alert_lines(u, rows, rivals) -> list[str]:
             return ["**Overdrawn %s** — no safe dead-weight sale covers it; "
                     "needs a manual look before the jornada locks."
                     % fmt_money(-u.cash)]
-        names = ", ".join("%s (+€%.1fM)" % (title_name(u.name.get(k, k)),
+        names = ", ".join("%s (+€%.1fM)" % (title_name(u.name_view.get(k, k)),
                                             p / 1e6) for k, p in sells)
         if short > 0:
             return ["**Overdrawn %s** — sell %s clears most of it, still "
@@ -975,7 +975,7 @@ def alert_lines(u, rows, rivals) -> list[str]:
         # The one case where "Do this" is not actually guaranteed to happen.
         cost += " · needs the seller to accept, not guaranteed"
     return ["**Do this** — %s (%+.0f season pts, %+.0f%% to win, %s)"
-            % (a.label({k: title_name(v) for k, v in u.name.items()}),
+            % (a.label({k: title_name(v) for k, v in u.name_view.items()}),
                best["d_pts"], 100 * best["d_win"], cost)]
 
 
@@ -1056,7 +1056,7 @@ def payload(u, rows, base, rivals, locks_h=None, n_actions: int = 0,
 
     if exp is None or xi is None:
         exp, xi = u.current_xi
-    names = {k: title_name(v) for k, v in u.name.items()}
+    names = {k: title_name(v) for k, v in u.name_view.items()}
     lo, hi = base.band(u.me)
     moves = []
     # ONE RAID PER VICTIM, same rule as ladder_rows()'s RAID group — see
@@ -1097,7 +1097,7 @@ def payload(u, rows, base, rivals, locks_h=None, n_actions: int = 0,
             "victim": a.victim,
             # Who holds him, which is not the same as a victim: a man bought
             # off the market was not taken off anybody.
-            "owner": u.owner.get(a.buy, "") if a.buy else "",
+            "owner": u.owner_view.get(a.buy, "") if a.buy else "",
             "net_pts": r["net_pts"], "d_win": r["d_win"], "net": -a.net,
             # The paired pair — how many more points, and how often. These are
             # what the phone should draw: a per-row P(win) moved 48 points on
@@ -1126,7 +1126,7 @@ def payload(u, rows, base, rivals, locks_h=None, n_actions: int = 0,
         "cash_locked": u.locked_cash,
         "squad_value": squad_value(u),
         "jornadas_left": len(u.state.jornadas),
-        "acquirable": len(u.price),
+        "acquirable": len(u.price_view),
         "considered": n_actions,
         # Rounded (2dp/3dp), not raw — these are levels, not paired
         # differences, so they carry real MC noise a 17-digit float overclaims.
