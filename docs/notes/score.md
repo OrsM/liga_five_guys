@@ -424,46 +424,11 @@ same way if a caller genuinely needs it.
 
 ## Unexplained-gap discount: parked, log, don't integrate yet
 
-Checked 2026-09-15, prompted by a real case (Florian Lejeune, Rayo — see
-the jornada-ordering bug above, found while investigating the same
-player). Question: when a player goes from featuring to a genuine
-zero-minute gap (absent from starters.csv entirely, no injury/suspension
-status recorded in lineups.csv's own history AT THE TIME, not just now),
-does his return-match performance undershoot his own pre-gap rate by more
-than noise explains — i.e., is an unexplained bench itself a form signal,
-not just a minutes signal?
-
-**First pass (no historical status control, n=38):** mean pre-gap ppm
-3.30, mean return-match points 2.34, paired diff ‑0.96, 90% bootstrap CI
-[‑1.80, ‑0.14] — excluded zero, looked real.
-
-**Same test, controlling for ACTUAL status at the time of each gap** (not
-current status — `lineups.csv` retains full snapshot history, so this is
-checkable): 1 of 38 cases had a real status flag recorded near the gap and
-was dropped. Remaining n=37: paired diff ‑0.83, 90% CI [‑1.68, +0.09] — now
-includes zero. The first pass's apparent significance was fragile; one
-confounded case was enough to flip it.
-
-**The test that actually matters — does using it reduce forecast error
-out of sample — same bar `_fit_decay()` holds itself to ("earns its use
-only if it beats the flat average out of sample").** Leave-one-out over
-the 37 cases (fit the discount on the other 36, score the held-out case
-with and without it): MAE 2.320 (no adjustment) vs 2.324 (with) — flat to
-slightly worse. MSE 10.457 vs 10.313 — a small improvement, but its own
-90% bootstrap CI is [‑1.53, +1.27] — nowhere near excluding zero.
-
-**Verdict: real, plausible, correctly directional — not validated.**
-Same shape as `_fit_decay`'s own decay=1.0 result (recency-weighting was
-a good story that didn't beat the flat average when actually tested) and
-`DRIFT_FRAC` staying at 1.0 for the same reason: a plausible mechanism
-does not get to skip the same out-of-sample bar every other fitted number
-here already had to clear, no matter how directionally clean the raw
-numbers look. n=37 is genuinely small against ~4-5 points of real
-match-to-match noise (see the report's own "Forecast vs actual" MAE), so
-this could still be real and just underpowered — it is not rejected, only
-parked. Re-test as the tracked-player pool's history grows (the graded
-squad_log sample alone grows ~15 pairs/jornada; this test draws on the
-wider `_per_jornada_current` pool, which grows faster). `python
-src/gap_signal.py` re-runs this exact check against live data — only wire
-a discount into scoring if its leave-one-out MSE gap clears its own CI
-the way `SHRINK_K` and `HOME_EDGE` did.
+Checked 2026-09-15 (Florian Lejeune case). Hypothesis: an unexplained
+zero-minute gap (no injury/suspension status at the time) predicts a
+below-rate return. Naive test: 90% CI on the gap excluded zero (looked
+real). Controlled for actual historical status at the time: CI included
+zero. Leave-one-out out-of-sample MSE gap (the bar `_fit_decay()` already
+holds itself to): CI straddles zero — no measured improvement.
+Verdict: plausible, not validated. `python src/gap_signal.py` re-runs it
+as the tracked pool grows; wire in only if that clears.

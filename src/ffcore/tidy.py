@@ -206,20 +206,10 @@ def append_csv(path, rows, fieldnames=None) -> None:
 
 
 def load_deadline(with_source: bool = False):
-    """The next JORNADA lock as aware UTC, or None — JornadaClock's own
-    next_deadline(), since the app locks the whole round at its first
-    kickoff (Sunday's player is already frozen at Friday's kickoff).
-
-    NOT next_kickoff(): a round already under way can still have its own
-    later matches listed in fixtures.csv, staggered days apart (a TV
-    reschedule, or a jornada whose matches simply spread over a long
-    weekend) — those are leftovers of an already-locked round, not a fresh
-    deadline. Using next_kickoff() here reported a lock minutes away for a
-    match that was really just one of jornada 5's remaining fixtures, days
-    after jornada 5 itself had locked (2026-09-13).
-
-    No typed fallback: an unanswerable fixture/match list says None, never a
-    wrong substitute. `with_source=True` returns (when, "fixtures"|"none").
+    """The next JORNADA lock as aware UTC, or None — the app locks the
+    whole round at its FIRST kickoff, not each match's own. No typed
+    fallback: an unanswerable fixture/match list says None, never a wrong
+    substitute. `with_source=True` returns (when, "fixtures"|"none").
     Why: docs/notes/tidy.md#load_deadline--the-fixture-list-is-the-deadline-no-typed-fallback
     """
     clock = JornadaClock(read_csv(TIDY / "matches.csv"), load_fixtures())
@@ -380,17 +370,10 @@ def run_now() -> datetime:
 
 
 def fresh_only(rows: list[dict], max_age_days: float, now=None) -> list[dict]:
-    """`rows` if the newest of them is recent enough, [] if it is not.
-
-    A FEED THAT STOPS ANSWERING DOES NOT LOOK BROKEN ANYWHERE. Its last rows
-    stay in the tidy store, they still parse, they still join, and every
-    reader treats them as current. Nothing but the stamp can tell the
-    difference, so the stamp is checked here rather than trusted by each
-    caller in turn.
-
-    A reading in the future is not stale: a clock a few minutes out is a
-    machine problem, and throwing away good data over it would be worse than
-    the skew.
+    """`rows` if the newest of them is recent enough, [] if it is not — the
+    one shared gate every gated loader calls, checked here rather than
+    trusted by each caller in turn.
+    Why: docs/notes/tidy.md#gated-api-feeds--one-shared-reason-not-five-copies-of-it
     """
     if not rows:
         return []
@@ -477,20 +460,10 @@ def kickoff_stamp(s: str):
 
 
 def load_elo(now=None) -> list[dict]:
-    """The newest Club Elo reading, or [] until one has been fetched — and []
-    again once the newest one is too old to be about today's teams.
-
-    [] is not a failure and callers must not treat it as one: ffcore.fixture
-    falls back to squad value, which is what ranked the teams before this
-    existed.
-
-    THE GATE IS THE POINT. Club Elo's API host died on 2026-08-17 and this
-    returned the same twenty ratings for two days; they covered every club, so
-    `elo_strength` succeeded and the fixture board ranked the league on form
-    from before the jornada. Falling back to the wallet is a worse ranking and
-    an honest one. This is the ONE place ratings are loaded — score.py builds
-    the board for your squad and every rival's from this call — so the gate
-    belongs here and not in the readers.
+    """The newest Club Elo reading, or [] once it's too old to be about
+    today's teams — not a failure, callers must degrade to squad value.
+    The one place ratings are loaded; the gate belongs here, not in readers.
+    Why: docs/notes/tidy.md#gated-api-feeds--one-shared-reason-not-five-copies-of-it
     """
     return fresh_only(latest_only(read_csv(TIDY / "elo.csv")),
                       DAILY_FRESH_DAYS, now)
@@ -543,18 +516,10 @@ def stale_feeds(now=None, names=GATED_API) -> dict[str, float]:
 
 
 def load_api_teams(now=None) -> list[dict]:
-    """The newest squad reading from the league's own API, or [].
-
-    One row per player per squad. [] means the API has not answered recently
-    enough to be about today's squads — never fetched, no token, or the sweep
-    has been failing — and every caller must degrade to the ledger rather than
-    treat it as an empty league.
-
-    GATED, for the reason load_elo is. A dead token does not empty this file;
-    the tidy store keeps the last good reading for ever, so the failure mode
-    is a squad that is three days old, joins perfectly, and prices a market
-    that has moved. That is the stale Elo rating and the stale cash anchor a
-    third time, and three is where it stops being a coincidence.
+    """The newest squad reading from the league's own API, one row per
+    player per squad, or [] once too stale — every caller must degrade to
+    the ledger, never treat [] as an empty league.
+    Why: docs/notes/tidy.md#gated-api-feeds--one-shared-reason-not-five-copies-of-it
     """
     return fresh_only(latest_only(read_csv(TIDY / "api_teams.csv")),
                       EVERY_RUN_FRESH_DAYS, now)
@@ -576,19 +541,9 @@ def _activity_order(r: dict):
 
 
 def load_api_activity() -> list[dict]:
-    """The league's transaction feed, oldest first, or [].
-
-    Sorted by the app's own timestamp rather than by observation, because this
-    is a history: the order that matters is the order the deals happened.
-
-    NOT latest_only, and that is load-bearing. It used to be, and it worked
-    only because the feed republished every event on every sweep and the store
-    kept every copy — so "the newest snapshot" happened to contain the whole
-    season. That storage was quadratic and is gone (sources.STORE_ONCE), which
-    makes this file what it always described itself as: an event log, read
-    whole. Reading only the newest rows here would now hand the ledger the
-    handful of deals done since the last sweep and delete the rest of the
-    season from it.
+    """The league's transaction feed, oldest first, or []. An event log
+    read WHOLE — not latest_only — sorted by the app's own timestamp.
+    Why: docs/notes/tidy.md#load_api_activity--an-event-log-read-whole-not-latest_only
     """
     return sorted(read_csv(TIDY / "api_activity.csv"), key=_activity_order)
 
@@ -605,68 +560,41 @@ def load_api_market(now=None) -> list[dict]:
 
 
 def load_api_standings(now=None) -> list[dict]:
-    """The newest league table from the app, one row per team, or [].
-
-    Gated on freshness: this row carries your BALANCE, and league.py anchors
-    the cash estimate on it in preference to anything typed. An anchor that
-    calls itself observed while being three days old is the exact bug the
-    allowance fix was about, with the app in the typist's chair.
-
-    Position, points, squad value and — for your account alone — the balance.
-    This used to ride on every player row in api_teams: five managers' worth
-    of team facts repeated 76 times a sweep. A fact about a team belongs at
-    the grain of a team, which is also what makes the season's standings
-    readable without deduplicating a player table.
+    """The newest league table from the app — position, points, squad
+    value, and (your account only) the balance — one row per team, or []
+    once too stale. Its own table rather than riding on every api_teams
+    player row, which repeated the same team facts 76 times a sweep.
+    Why: docs/notes/tidy.md#gated-api-feeds--one-shared-reason-not-five-copies-of-it
     """
     return fresh_only(latest_only(read_csv(TIDY / "api_standings.csv")),
                       EVERY_RUN_FRESH_DAYS, now)
 
 
 def last_api_standings() -> list[dict]:
-    """The newest league table there is, however old.
-
-    FOR THE COLUMNS THAT ARE HISTORY, and only those: points scored and
-    position reached only ever grow, so a three-day-old reading of them is
-    incomplete rather than wrong. The balance on the same row is not like
-    that and must come through the gated reader — read_api_balances does.
-
-    This exists because gating the whole row zeroed `carried` and made the
-    season simulation project every manager from nought, which is a worse
-    answer than the stale one it replaced.
+    """The newest league table there is, however old — for the
+    points/position columns only, which only ever grow; the balance on
+    the same row must still come through the gated `load_api_standings()`.
+    Why: docs/notes/tidy.md#gated-api-feeds--one-shared-reason-not-five-copies-of-it
     """
     return latest_only(read_csv(TIDY / "api_standings.csv"))
 
 
 def load_api_lineup(now=None) -> list[dict]:
-    """The eleven you have fielded, as the app holds it, or [].
-
-    ONE ROW PER MAN, with the slot he is in and the formation the app itself
-    states. Gated on freshness like the other snapshots: a lineup from three
-    days ago is a lineup for a round already played, and reading it as
-    "what you are fielding" is how a change list would tell you to take off a
-    man you have already taken off.
-
-    [] means the API has not answered recently enough, and there is no second
-    source: inputs/lineup.txt held this by hand until 2026-08-19 and was
-    deleted, because the only runs that ever read it were runs where a sale
-    had already made it wrong.
+    """The eleven you have fielded, one row per man with his slot and the
+    app's own formation, or [] once too stale — no second source, no typed
+    fallback.
+    Why: docs/notes/tidy.md#gated-api-feeds--one-shared-reason-not-five-copies-of-it
     """
     return fresh_only(latest_only(read_csv(TIDY / "api_lineup.csv")),
                       EVERY_RUN_FRESH_DAYS, now)
 
 
 def load_api_offers(now=None) -> list[dict]:
-    """Who wants to buy a player you have listed, right now, or [].
-
-    One row per player YOU HOLD, even when nothing is pending for him — see
-    sources.parse_api_offer's own note on why a placeholder row is what
-    keeps this gate meaningful for a table this sparse. A row with an empty
-    `status` is that placeholder, not an offer; callers filtering for
-    `status == "pending"` never need to know the difference exists.
-
-    Gated exactly like the other API tables: an offer read three days ago
-    is not an offer today, and treating it as one would show a shortfall
-    closed by money that may have already been withdrawn or accepted.
+    """Who wants to buy a player you have listed, right now, or [] once
+    too stale. One row per player YOU HOLD even with nothing pending (an
+    empty `status` placeholder, not an offer — see sources.parse_api_offer)
+    so this gate stays meaningful for a table this sparse.
+    Why: docs/notes/tidy.md#gated-api-feeds--one-shared-reason-not-five-copies-of-it
     """
     return fresh_only(latest_only(read_csv(TIDY / "api_offers.csv")),
                       EVERY_RUN_FRESH_DAYS, now)
@@ -1390,17 +1318,10 @@ def bought_price(txns: list[dict], xw) -> dict[str, float]:
 
 def pending_received(offers: list[dict], pt_to_key: dict[str, str]
                      ) -> dict[str, float]:
-    """{player you hold: the largest pending offer on him}, or {}.
-
-    A REAL PENDING OFFER BEATS A GUESS. What a caller otherwise prices a
-    sale at is the market's own valuation — an estimate nothing has
-    tested — and a real bid sitting on a player you have actually listed is
-    ground truth for at least that much. Meant to be applied as a FLOOR on
-    `proceeds`, never an overwrite: another bidder could still beat it
-    before you act.
-
-    `pt_to_key` joins the API's own ownership-record id to this repo's key
-    — built once, off api_teams, and handed in rather than re-derived here.
+    """{player you hold: the largest pending offer on him}, or {} — a
+    FLOOR on `proceeds`, never an overwrite. `pt_to_key` joins the API's
+    own ownership-record id to this repo's key, built once off api_teams.
+    Why: docs/notes/tidy.md#pending_received--a-real-bid-is-a-floor-never-an-overwrite
     """
     out: dict[str, float] = {}
     for r in offers:

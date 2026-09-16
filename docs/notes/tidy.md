@@ -165,6 +165,15 @@ undetected until a lapsed date made a report say "deadline passed" for a
 locked-open squad. None means "the report doesn't know", never a
 substitute number wrong in an undetectable way.
 
+`load_deadline()` itself calls `JornadaClock.next_deadline()`, not
+`next_kickoff()` — a round already under way can still have later matches
+listed in fixtures.csv, staggered days apart (a TV reschedule, or a
+weekend spread), and those are leftovers of an already-locked round, not
+a fresh deadline. Using `next_kickoff()` here once reported a lock
+minutes away for a match that was really just one of jornada 5's
+remaining fixtures, days after jornada 5 itself had already locked
+(2026-09-13).
+
 ## gated API feeds — one shared reason, not five copies of it
 
 `stale_feeds()`/`load_elo()`/`load_api_teams()`/`load_api_standings()`/
@@ -177,17 +186,62 @@ an emptiness presented as a finding (measured by ageing the store three
 days and generating). `EVERY_RUN_FRESH_DAYS=0.6`, not 0.5: `lfg.timer`
 fires at 00:40/11:40 local, so the two legs are 11h/13h plus up to 5
 minutes of `RandomizedDelaySec` — a feed answering every sweep is 13h10m
-old at its oldest, which 0.5 would call dead every night. Each gated loader
-has its own concrete incident behind why gating matters for that table
-specifically (a 3-day-stale cash anchor, a 2-day Club-Elo outage, a
-lineup read after a sale already changed it) — see the function's own
-short docstring for its case; the mechanism is one, shared.
+old at its oldest, which 0.5 would call dead every night. `fresh_only()`
+itself is the shared gate mechanism — a stopped feed's last rows still
+parse and still join, so nothing but the observed-at stamp can tell it
+apart from a live one, checked here once rather than trusted by every
+caller. A reading stamped in the FUTURE is not stale: a clock a few
+minutes out is a machine problem, and throwing away good data over it
+would be worse than the skew. Each gated loader also has its own concrete
+incident behind why gating matters for that table specifically:
+
+- **`load_elo()`** — Club Elo's API host died on 2026-08-17 and kept
+  answering with the same twenty ratings for two days; they covered every
+  club, so `elo_strength` succeeded and the fixture board ranked the
+  league on form from before the jornada. Falling back to squad value is
+  a worse ranking and an honest one.
+- **`load_api_teams()`** — a dead token doesn't empty this file; the tidy
+  store keeps the last good reading forever, so the failure mode is a
+  squad three days old that joins perfectly and prices a market that's
+  moved. The stale-Elo failure a second time, with the app in the
+  typist's chair.
+- **`load_api_standings()`** — this row carries the balance;
+  `ffcore.league` anchors the cash estimate on it in preference to
+  anything typed. An anchor calling itself observed while three days old
+  is the exact bug the allowance fix was about.
+- **`load_api_lineup()`** — a lineup read three days late is a lineup for
+  a round already played; `inputs/lineup.txt` held this by hand until
+  2026-08-19 and was deleted because the only runs that ever read it were
+  runs where a sale had already made it wrong.
+- **`load_api_offers()`** — an offer read three days ago isn't an offer
+  today; treating it as one shows a shortfall closed by money that may
+  already be withdrawn or accepted.
 
 `last_api_standings()` and `load_api_players()` are the deliberate
 exceptions: standings' points/position columns only ever grow (a stale
 reading is incomplete, not wrong — the balance on the same row still goes
 through the gated reader), and the player-id lookup only ever grows too
 (a player sold weeks ago is exactly the one the activity feed still names).
+
+## `load_api_activity()` — an event log read whole, not latest_only
+
+Sorted by the app's own timestamp, not by observation: this is a history,
+and the order that matters is the order the deals happened. Used to read
+through `latest_only`, and it worked only by accident — the feed
+republished every event on every sweep and the store kept every copy, so
+"the newest snapshot" happened to contain the whole season, at quadratic
+storage cost. Once that duplicate storage was fixed (`sources.STORE_ONCE`),
+`latest_only` here would have hidden the whole season behind the handful
+of deals done since the last sweep, deleting the rest of it from the
+ledger's view.
+
+## `pending_received()` — a real bid is a floor, never an overwrite
+
+What a caller otherwise prices a sale at is the market's own valuation —
+an estimate nothing has tested. A real pending offer sitting on a player
+you've actually listed is ground truth for at least that much, so it's
+applied as a FLOOR on `proceeds`, never an overwrite (another bidder
+could still beat it before you act).
 
 ## `price_agrees()` / `shared_names()` / `row_key()` — one tolerance, one id
 
