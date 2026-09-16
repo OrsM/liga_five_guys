@@ -20,10 +20,13 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
+from ffcore import schema  # noqa: E402
 from ffcore.crosswalk import Club, Crosswalk, Player  # noqa: E402
 from ffcore.text import norm  # noqa: E402
-from ffcore.tidy import (TIDY, latest_only, narrow_by_club, read_csv,  # noqa: E402
-                         row_key, shared_names)
+from ffcore.tidy import (TIDY, latest_only, load_fixtures,  # noqa: E402
+                         load_lineups_latest, load_market, load_market_latest,
+                         load_starters, narrow_by_club, read_csv, row_key,
+                         shared_names)
 
 PLAYERS = "players.csv"
 CLUBS = "clubs.csv"
@@ -36,19 +39,19 @@ def build_clubs(market, lineups, elo_rows, fixtures=()) -> dict:
     """
     from ffcore.fixture import ELO_ALIASES, match_team
 
-    teams = sorted({(r.get("team") or "").strip() for r in market
-                    if (r.get("team") or "").strip()})
+    teams = sorted({schema.text(r, schema.MARKET.TEAM) for r in market
+                    if schema.text(r, schema.MARKET.TEAM)})
     clubs = {norm(t): Club(norm(t), t) for t in teams}
 
     # futbolfantasy's own club id (data-equipo) is on every market row.
     for r in market:
-        t = (r.get("team") or "").strip()
-        tid = (r.get("team_id") or "").strip()
+        t = schema.text(r, schema.MARKET.TEAM)
+        tid = schema.text(r, schema.MARKET.TEAM_ID)
         if t and tid and norm(t) in clubs:
             clubs[norm(t)].market_id = clubs[norm(t)].market_id or tid
 
-    for slug in sorted({(r.get("team_slug") or "").strip() for r in lineups
-                        if (r.get("team_slug") or "").strip()}):
+    for slug in sorted({schema.text(r, schema.LINEUPS.TEAM_SLUG) for r in lineups
+                        if schema.text(r, schema.LINEUPS.TEAM_SLUG)}):
         hit = match_team(slug, teams)
         if hit:
             clubs[norm(hit)].ff_slug = clubs[norm(hit)].ff_slug or slug
@@ -58,8 +61,8 @@ def build_clubs(market, lineups, elo_rows, fixtures=()) -> dict:
     # once by name, then joined on the id from here on.
     for r in fixtures or []:
         for side, col in (("home", "home_id"), ("away", "away_id")):
-            nm = (r.get(side) or "").strip()
-            aid = (r.get(col) or "").strip()
+            nm = schema.text(r, side)
+            aid = schema.text(r, col)
             if not nm or not aid:
                 continue
             hit = match_team(nm, teams)
@@ -69,7 +72,7 @@ def build_clubs(market, lineups, elo_rows, fixtures=()) -> dict:
                 clubs[norm(hit)].aliases.add(nm)
 
     for r in elo_rows or []:
-        club = (r.get("club") or "").strip()
+        club = schema.text(r, schema.ELO.CLUB)
         if not club:
             continue
         hit = match_team(club, teams)
@@ -93,7 +96,7 @@ def namesakes(market) -> list[tuple[str, list]]:
     for r in market:
         key = norm(r.get("name"))
         if key:
-            seen.setdefault(key, set()).add((r.get("team") or "").strip())
+            seen.setdefault(key, set()).add(schema.text(r, schema.MARKET.TEAM))
     return sorted((k, sorted(v)) for k, v in seen.items() if len(v) > 1)
 
 
@@ -116,7 +119,7 @@ def build_players(market, lineups, starters, api_rows, lg, clubs) -> dict:
         pid = row_key(r, market_shared)
         if not pid:
             continue
-        out[pid] = Player(pid, (r.get("name") or "").strip(),
+        out[pid] = Player(pid, schema.text(r, schema.MARKET.NAME),
                           norm(r.get("team")))
         # Player.club_id gets overwritten with a real club id below; this
         # keeps the market's own spelling for matching a probable-XI row.
@@ -139,10 +142,10 @@ def build_players(market, lineups, starters, api_rows, lg, clubs) -> dict:
     # each other, so name is the only way in.
     for r in lineups:
         pid = by_name(r.get("player_name"), r.get("team_slug"))
-        slug = (r.get("player_slug") or "").strip()
+        slug = schema.text(r, schema.LINEUPS.PLAYER_SLUG)
         if pid is None or not slug:
             continue
-        wide = (r.get("source") or "").startswith("futbol")
+        wide = schema.text(r, schema.LINEUPS.SOURCE).startswith("futbol")
         if wide and not pid.ff_slug:
             pid.ff_slug = slug
         elif not wide and not pid.af_slug:
@@ -154,7 +157,7 @@ def build_players(market, lineups, starters, api_rows, lg, clubs) -> dict:
     # still unmatched is tried on the name.
     ff_index = {p.ff_slug: p for p in out.values() if p.ff_slug}
     for r in starters:
-        slug = (r.get("player_slug") or "").strip()
+        slug = schema.text(r, schema.STARTERS.PLAYER_SLUG)
         if slug in ff_index:
             continue
         p = by_name(r.get("player_name"), r.get("team_slug"))
@@ -169,10 +172,16 @@ def build_players(market, lineups, starters, api_rows, lg, clubs) -> dict:
     # Empty on the first ever run — players.csv doesn't exist yet.
     known = Crosswalk.read(TIDY / "players.csv", TIDY / "clubs.csv")
     for r in api_rows:
-        raw = (r.get("player_name") or "").strip()
+        # api_rows mixes four tables (api_teams/api_market/api_players/
+        # api_players_all); PLAYER_NAME/MANAGER/PLAYER_ID are spelled the
+        # same in each, only api_teams's own class actually documents
+        # MANAGER — the other three simply lack the column, and
+        # schema.text() defaults an absent column to "" exactly like the
+        # `.get(...) or ""` this replaces.
+        raw = schema.text(r, schema.API_TEAMS.PLAYER_NAME)
         if not raw:
             continue
-        key = known.resolve_api(raw, (r.get("manager") or "").strip(),
+        key = known.resolve_api(raw, schema.text(r, schema.API_TEAMS.MANAGER),
                                 lg.market if lg else None,
                                 lg.owner if lg else None,
                                 index, r.get("market_value"),
@@ -193,7 +202,7 @@ def build_players(market, lineups, starters, api_rows, lg, clubs) -> dict:
                 other.app_names = {n for n in other.app_names
                                    if norm(n) != norm(raw)}
         p.app_names.add(raw)
-        pid = str(r.get("player_id") or "").strip()
+        pid = schema.text(r, schema.API_TEAMS.PLAYER_ID)
         if not pid:
             continue
         # The app's own row is the authority for its own id — takes it off
@@ -220,8 +229,8 @@ def attach_bulk_app_ids(rows, players: dict) -> int:
         by_name.setdefault(norm(p.name), []).append(p)
     matched = 0
     for r in rows:
-        name = (r.get("player_name") or "").strip()
-        pid = (r.get("player_id") or "").strip()
+        name = schema.text(r, schema.API_PLAYERS_ALL.PLAYER_NAME)
+        pid = schema.text(r, schema.API_PLAYERS_ALL.PLAYER_ID)
         if not name or not pid:
             continue
         hits = by_name.get(norm(name)) or []
@@ -254,7 +263,7 @@ def build_understat_ids(rows, players: dict, clubs: dict) -> int:
     # and club over last season's (a summer transfer moves him).
     best: dict[str, dict] = {}
     for r in rows:
-        uid = (r.get("understat_id") or "").strip()
+        uid = schema.text(r, schema.UNDERSTAT_PLAYERS.UNDERSTAT_ID)
         if not uid:
             continue
         prev = best.get(uid)
@@ -282,13 +291,35 @@ def build_understat_ids(rows, players: dict, clubs: dict) -> int:
 def main() -> None:
     from ffcore.league import League
 
-    market = latest_only(read_csv(TIDY / "market.csv"))
-    lineups = latest_only(read_csv(TIDY / "lineups.csv"))
-    starters = read_csv(TIDY / "starters.csv")
+    market = load_market_latest()
+    # source="" — every probable-XI source, not just LINEUP_SOURCE
+    # (load_lineups_latest()'s own default): build_players() below tells
+    # the sources apart itself (wide vs narrow slug space, LINEUPS.SOURCE),
+    # so narrowing to one source here would silently drop the other one's
+    # slugs rather than let that per-row distinction run.
+    lineups = load_lineups_latest(source="")
+    # NOT read_csv() any more: load_starters() is latest_only(), which
+    # tidy.py measured (2026-09-16) as safe here — 180,372 raw rows behind
+    # 2,512 real (match, player) keys, and every one of those keys is still
+    # present in the newest snapshot alone. This function only ever uses a
+    # starters row to learn a player_slug/team_slug/player_name, never a
+    # match_id or a count, so losing the ~72x repeated older snapshots
+    # loses no slug this table has ever recorded.
+    starters = load_starters()
     # latest_only PER TABLE, not on the concatenation — api_teams/
     # api_market are swept on different schedules, so a combined-list
     # latest_only would drop every api_teams row not sharing the overall
     # newest stamp.
+    #
+    # NOT tidy.load_api_teams()/load_api_market(): those loaders additionally
+    # apply fresh_only() (EVERY_RUN_FRESH_DAYS) and answer [] once the feed
+    # has gone stale — right for "can I trust this as live data" but wrong
+    # here, where a quiet feed's last reading is still a real past sweep
+    # this merge-not-rebuild table should keep learning identifiers from.
+    # api_players.csv/api_players_all.csv have no fitting loader either:
+    # load_api_players() returns a {id: name} lookup grown from every
+    # snapshot (not the list-of-rows-with-manager/value shape this loop
+    # needs), and api_players_all.csv has no loader at all.
     api_rows = (latest_only(read_csv(TIDY / "api_teams.csv"))
                 + latest_only(read_csv(TIDY / "api_market.csv"))
                 + latest_only(read_csv(TIDY / "api_players.csv"))
@@ -296,16 +327,21 @@ def main() -> None:
                 # transacted — no "manager" field, which resolve_api() tolerates.
                 # Why: docs/notes/league.md#the-bulk-player-list-and-app_id-with-no-manager
                 + latest_only(read_csv(TIDY / "api_players_all.csv")))
+    # NOT tidy.load_elo(): that loader is also fresh_only()-gated and
+    # latest_only()'d, for "is this rating current enough to trust". Here
+    # elo.csv is read purely for club-name aliasing (clubs[...].elo /
+    # .aliases), where an OLDER reading's spelling is still a real alias
+    # worth keeping — narrowing to the latest fresh snapshot would forget
+    # aliases this merge-not-rebuild table has already learned.
     elo_rows = read_csv(TIDY / "elo.csv")
     lg = League.load()
 
     # Every id the market has ever published, not just today's — a player
     # who left the market stays a real row.
-    market_ids = {r["ff_id"] for r in read_csv(TIDY / "market.csv")
-                  if (r.get("ff_id") or "").strip()}
+    market_ids = {schema.text(r, schema.MARKET.FF_ID) for r in load_market()
+                  if schema.text(r, schema.MARKET.FF_ID)}
 
-    clubs = build_clubs(market, lineups, elo_rows,
-                        latest_only(read_csv(TIDY / "fixtures.csv")))
+    clubs = build_clubs(market, lineups, elo_rows, load_fixtures())
     players = build_players(market, lineups, starters, api_rows, lg, clubs)
     understat_matched = build_understat_ids(
         read_csv(TIDY / "understat_players.csv"), players, clubs)

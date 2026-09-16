@@ -33,6 +33,7 @@ from datetime import datetime, timedelta, timezone as dt_timezone
 from pathlib import Path
 from typing import NamedTuple
 
+from ffcore import schema
 from ffcore.parse import money
 from ffcore.text import norm
 from ffcore.tidy import (load_crosswalk,  # noqa: E402
@@ -205,8 +206,8 @@ def read_api_balances(rows=None) -> dict[str, tuple[float, str]]:
     """
     out: dict[str, tuple[float, str]] = {}
     for r in (load_api_standings() if rows is None else rows):
-        handle = (r.get("manager") or "").strip()
-        raw = (r.get("team_money") or "").strip()
+        handle = schema.text(r, schema.API_STANDINGS.MANAGER)
+        raw = schema.text(r, schema.API_STANDINGS.TEAM_MONEY)
         if not handle or not raw:
             continue
         try:
@@ -290,10 +291,10 @@ def app_ids_known() -> dict:
     League.__init__ calls `_app_ids_of(self.xw)` directly to avoid a second
     disk read. Why: docs/notes/league.md#the-app_ids-table--a-one-way-additive-cache
     """
-    from ffcore.crosswalk import Crosswalk
-    from ffcore.tidy import TIDY
-
-    return _app_ids_of(Crosswalk.read(TIDY / "players.csv", TIDY / "clubs.csv"))
+    # load_crosswalk() answers None (no players.csv yet) rather than an
+    # empty Crosswalk; _app_ids_of() already treats both the same way
+    # (returns {}), so this is the same answer, not a second special case.
+    return _app_ids_of(load_crosswalk())
 
 
 def owner_from_api(rows: list[dict], market, ledger_owner: dict | None = None,
@@ -315,8 +316,8 @@ def owner_from_api(rows: list[dict], market, ledger_owner: dict | None = None,
     index = latest_only(market.rows) if market is not None else []
     resolve = (xw or Crosswalk()).resolve_api
     for r in rows:
-        handle = (r.get("manager") or "").strip()
-        raw = (r.get("player_name") or "").strip()
+        handle = schema.text(r, schema.API_TEAMS.MANAGER)
+        raw = schema.text(r, schema.API_TEAMS.PLAYER_NAME)
         if not handle or not raw:
             continue
         key = resolve(raw, handle, market, ledger_owner, index,
@@ -346,7 +347,7 @@ def app_fielded(squad, names: dict, rows=None, ids=None) -> list[str]:
     by_name = {norm(names.get(k, k)): k for k in squad}
     out = []
     for r in rows or []:
-        key = ids.get((r.get("player_id") or "").strip())
+        key = ids.get(schema.text(r, schema.API_LINEUP.PLAYER_ID))
         if key is None:
             for field in ("player_name", "player_name_full"):
                 key = by_name.get(norm(r.get(field) or ""))
@@ -447,7 +448,7 @@ def identify(t: dict, owner: dict, market=None, xw=None) -> tuple[str, str]:
     # this is the app telling you which player the row is about. It is only
     # skipped when the feed did not carry one (the hand-typed rows in git
     # history) or the crosswalk has never seen it.
-    pid = str(t.get("player_id") or "").strip()
+    pid = schema.text(t, schema.TRANSACTIONS.PLAYER_ID)
     if pid and xw is not None:
         got = xw.player(app_id=pid)
         if got:
@@ -465,8 +466,8 @@ def identify(t: dict, owner: dict, market=None, xw=None) -> tuple[str, str]:
     if not cands:
         return key, ""
 
-    src = (t.get("from") or "").strip() or MARKET
-    dst = (t.get("to") or "").strip() or MARKET
+    src = schema.text(t, schema.TRANSACTIONS.FROM_) or MARKET
+    dst = schema.text(t, schema.TRANSACTIONS.TO_) or MARKET
     why = ""
 
     if src != MARKET:
@@ -544,8 +545,8 @@ def replay(rosters: dict[str, list[str]], txns: list[dict], market=None,
         if why:
             resolved.append("%s: %s → %s (%s)" % (
                 t.get("date", "?"), t["player"], key, why))
-        src = (t.get("from") or "").strip() or MARKET
-        dst = (t.get("to") or "").strip() or MARKET
+        src = schema.text(t, schema.TRANSACTIONS.FROM_) or MARKET
+        dst = schema.text(t, schema.TRANSACTIONS.TO_) or MARKET
         if src != MARKET and owner.get(key) not in (src, None):
             warnings.append("%s: %s was not owned by %s" % (
                 t.get("date", "?"), t["player"], src))
@@ -685,8 +686,8 @@ class League:
         for key, mgr in self.owner.items():
             self.managers.setdefault(mgr, Manager(mgr)).players.append(key)
         for t in txns:
-            src = (t.get("from") or "").strip() or MARKET
-            dst = (t.get("to") or "").strip() or MARKET
+            src = schema.text(t, schema.TRANSACTIONS.FROM_) or MARKET
+            dst = schema.text(t, schema.TRANSACTIONS.TO_) or MARKET
             if dst != MARKET:
                 self.managers.setdefault(dst, Manager(dst)).buys.append(t)
             if src != MARKET:
@@ -715,7 +716,7 @@ class League:
         could differ, because only one of them had the counterparty and the
         id to work with.
         """
-        pid = str(t.get("player_id") or "").strip()
+        pid = schema.text(t, schema.TRANSACTIONS.PLAYER_ID)
         if pid and self.xw is not None:
             got = self.xw.player(app_id=pid)
             if got:
@@ -755,9 +756,9 @@ class League:
             b, sd = 0.0, 0.0
             for t in self.txns:
                 price = money(t.get("price")) or 0.0
-                if (t.get("to") or "").strip() == self.cfg.me:
+                if schema.text(t, schema.TRANSACTIONS.TO_) == self.cfg.me:
                     b += price
-                if (t.get("from") or "").strip() == self.cfg.me:
+                if schema.text(t, schema.TRANSACTIONS.FROM_) == self.cfg.me:
                     sd += price
             paid = flat_income(me_anchor[0], self.cfg.budget, b, sd)
 
@@ -783,8 +784,8 @@ class League:
         # Why: docs/notes/league.md#the-weekly-performance-bonus-vs-the-video-bonus
         unmeasured_rate = 0.0
         me_txns = [t for t in self.txns
-                  if (t.get("to") or "").strip() == self.cfg.me
-                  or (t.get("from") or "").strip() == self.cfg.me]
+                  if schema.text(t, schema.TRANSACTIONS.TO_) == self.cfg.me
+                  or schema.text(t, schema.TRANSACTIONS.FROM_) == self.cfg.me]
         me_start = min((ledger_stamp(t.get("date", "")) for t in me_txns
                        if ledger_stamp(t.get("date", ""))), default=None)
         if paid is not None:
@@ -833,8 +834,8 @@ class League:
                 if since and when and when <= since:
                     continue
                 price = money(t.get("price")) or 0.0
-                src = (t.get("from") or "").strip() or MARKET
-                dst = (t.get("to") or "").strip() or MARKET
+                src = schema.text(t, schema.TRANSACTIONS.FROM_) or MARKET
+                dst = schema.text(t, schema.TRANSACTIONS.TO_) or MARKET
                 if dst == handle:
                     bought += price
                     counted += 1
