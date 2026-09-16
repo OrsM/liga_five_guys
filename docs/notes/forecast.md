@@ -185,6 +185,16 @@ should be reconfirmed against the market-wide `squad_log.csv` logging
 (`report.py`, shipped the same day) once it accumulates clean, non-
 reconstructed history rather than resting on this one 4-commit backfill.
 
+**Shipped as `RATE_REL_FLOOR = 0.5` (2026-09-16).** No fitting function
+yet (nothing to walk-forward against until the market-wide squad_log
+logging accumulates its own history) — a stated, measured default, same
+shape as `HOME_EDGE`'s own unfitted-guess-first history. Checked against
+the real board before shipping, same discipline as every DRIFT_FRAC
+change above: p_win 0.574 → 0.52, expected finish 2.17 → 2.63, band width
+~733 → ~1799 points (real, 3000 trials, antithetic). Directionally the
+same "be more humble" pull the DRIFT_FRAC history above already argues
+for, from a different, now-actually-tested mechanism.
+
 ## fit_drift_frac() — the derivation
 
 The note above ends "what would unblock a real fit is a horizon

@@ -52,6 +52,25 @@ MIN_POOL = 200
 # keep this module free of that import; the self-test holds the two equal.
 SHRINK_MATCHES = 8.0
 
+# A FLOOR, not a bigger pseudo-count: 1/sqrt(n+SHRINK_MATCHES) shrinks
+# rate_rel toward zero for a well-established player, treating "we have
+# lots of history" as "we know his week-to-week output precisely" -- but
+# real week-to-week variance (fitness, matchup, tactical role, rotation)
+# doesn't vanish just because a player has a long track record. Measured
+# 2026-09-16 against the market-wide horizon-ladder backfill (not just
+# squad_log.csv's ~30 players): a MINIMUM floor on rate_rel equalises the
+# model's calibration across low/mid/high-evidence players (Var(z)
+# 1.69/1.92/2.36), where a flat multiplicative scale on rate_rel instead
+# leaves them wildly split (0.64/2.13/3.03) because it can't discriminate
+# between a rate_rel that was already small (high n) and one that was
+# already large (low n) -- only a floor does that, which is why a floor
+# and not a scale. n=279 from a 4-commit historical reconstruction, real
+# signal but not yet re-confirmed against the market-wide squad_log.csv
+# logging (report.py, shipped the same day) as it accumulates clean,
+# non-reconstructed history -- revisit once it has.
+# Why: docs/notes/forecast.md#confirmed-2026-09-16-a-floor-not-a-scale
+RATE_REL_FLOOR = 0.5
+
 # How much a rate can drift per jornada that passes, as a fraction of the
 # player's own rate_rel. Module-level default, used until fit_drift_frac()
 # below has real graded pairs at more than one horizon (report.py's score_h3)
@@ -189,8 +208,8 @@ class Bootstrap:
         self._cv = (sd / self._pool_mean) if self._pool_mean else 0.0
         self.rate_rel = {}
         for k, n in (matches or {}).items():
-            self.rate_rel[k] = self._cv / math.sqrt(
-                max(1.0, float(n) + SHRINK_MATCHES))
+            self.rate_rel[k] = max(RATE_REL_FLOOR, self._cv / math.sqrt(
+                max(1.0, float(n) + SHRINK_MATCHES)))
         # {player key: club}, and {club: rel} — ffcore.fixture.club_volatility().
         # ADDED to rate_rel's own individual uncertainty, not netted against
         # it — see rate_draw()'s docstring for why.
@@ -276,12 +295,23 @@ def _selftest() -> None:
     thin = Bootstrap({1: {"vet": (5.0, 1.0), "kid": (5.0, 1.0)}},
                      pool=[0, 2, 4, 6, 8] * 40, matches={"vet": 34, "kid": 0})
     # A rate off 34 matches is a firmer claim than one off none, and the
-    # shrinkage's own pseudo-matches are what stop the second being infinite.
-    assert thin.rate_rel["vet"] < thin.rate_rel["kid"], thin.rate_rel
-    assert 0.05 < thin.rate_rel["vet"] < 0.25, thin.rate_rel
-    # cv of that pool is sd/mean = 2.83/4 = 0.707; over sqrt(34+8) = 6.48.
-    assert abs(thin.rate_rel["vet"] - 0.707 / 42 ** 0.5) < 0.01, thin.rate_rel
-    assert abs(thin.rate_rel["kid"] - 0.707 / 8 ** 0.5) < 0.01, thin.rate_rel
+    # shrinkage's own pseudo-matches are what stop the second being infinite
+    # -- but both land under RATE_REL_FLOOR for this pool's cv (0.707), so
+    # both floor to the same value: the floor is a real minimum, not a
+    # backstop that only bites in extreme cases.
+    assert thin.rate_rel["vet"] == thin.rate_rel["kid"] == RATE_REL_FLOOR, \
+        thin.rate_rel
+
+    # A pool wide enough (cv=2.0) that only the WELL-ESTABLISHED player's
+    # raw estimate falls under the floor -- the thin one's raw uncertainty
+    # is already bigger than the floor and passes through untouched.
+    wide = Bootstrap({1: {"vet": (5.0, 1.0), "kid": (5.0, 1.0)}},
+                     pool=[0, 0, 0, 0, 10] * 40, matches={"vet": 34, "kid": 0})
+    # cv = sd/mean = 4/2 = 2.0; raw vet = 2.0/sqrt(42) = 0.309, floored to 0.5.
+    assert abs(wide.rate_rel["vet"] - RATE_REL_FLOOR) < 1e-9, wide.rate_rel
+    # raw kid = 2.0/sqrt(8) = 0.707, already above the floor -- untouched.
+    assert abs(wide.rate_rel["kid"] - 0.707) < 0.01, wide.rate_rel
+    assert wide.rate_rel["vet"] < wide.rate_rel["kid"], wide.rate_rel
     # No evidence count is no widening — the caller that passes nothing gets
     # exactly the behaviour there was before this existed.
     assert Bootstrap({1: {"vet": (5.0, 1.0)}}, pool=[1, 2, 3]).rate_rel == {}
@@ -328,9 +358,14 @@ def _selftest() -> None:
     h1_pairs = [(1.0, _walked(1, truth), rel) for _ in range(4000)]
     h3_pairs = [(1.0, _walked(3, truth), rel) for _ in range(4000)]
     fitted, why = fit_drift_frac(h1_pairs, h3_pairs)
-    # RECOVERS THE TRUTH — within sampling noise (n=4000), not exactly.
+    # RECOVERS THE TRUTH — within sampling noise (n~=4000), not exactly.
+    # A few of the 4000 draws clip to 0 at eps0 = max(0, 1+gauss(0, rel))
+    # when rel is this wide (RATE_REL_FLOOR=0.5) and fit_drift_frac() drops
+    # non-positive draws rather than fabricate a log of them — real, not a
+    # bug, so the count is checked loosely rather than pinned exactly.
     assert abs(fitted - truth) < 0.08, (fitted, truth, why)
-    assert "n=4000/4000" in why, why
+    n1, n3 = (int(x) for x in why.split("n=")[1].split(")")[0].split("/"))
+    assert n1 > 3900 and n3 > 3900, why
 
     # HONEST REFUSAL: too few pairs keeps the CURRENT module constant and
     # says why, rather than fitting noise.
