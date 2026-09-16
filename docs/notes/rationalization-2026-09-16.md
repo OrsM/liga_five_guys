@@ -299,3 +299,68 @@ into silent no-ops rather than failures.
 The equivalence assertion added in 3A (every `<field>_view` equals its
 flat dict, on a fixture carrying falsy-but-real values) is what makes
 step 3 safe. Verified it fires.
+
+---
+
+## Final accounting — 2026-09-16
+
+**The repo got BIGGER: 26,400 -> 28,096 lines (+1,696), 702 -> 733
+functions.** The stated goal was "much leaner". That was not achieved,
+and the reason is a planning error worth recording.
+
+Each wave was graded on `tools/regress.sh` — byte-identical output. A
+half-migrated concept, old spelling still live beside the new one,
+passes that gate perfectly. So eight concepts got a new home
+(`schema.py` +632, `fixtures.py` +441, `tidy.py` +347) and only ONE had
+its old version actually deleted (the Universe flat dicts). Adding the
+abstraction is the cheap half; removing what it replaced is the half
+that shrinks anything.
+
+`tools/concepts.sh` is the check that was missing. It counts the OLD
+spelling of each unified concept and fails if it rises. Had it existed
+from wave 1, every partial migration would have been visible
+immediately instead of at the end.
+
+### What is genuinely finished
+
+- **Per-player facts: one home.** `PlayerProfile` only. The 12 parallel
+  flat dicts, the `InitVar` block, `__post_init__` and
+  `_synthetic_profiles()` are gone; ratchet budget is 0 and stays 0.
+- **The full-history clock.** `clock_history()` replaced five hand-built
+  copies. `clock()` is documented upcoming-only with a guard, after it
+  shipped as a silent data-loss trap.
+- **`matches.csv`/`starters.csv`** have loaders with the latest_only
+  question settled per table, measured not assumed.
+- **`api_stats.csv`** cannot be "simplified" to `latest_only` without
+  failing a self-test — it would lose 98% of the table's keys.
+
+### What is deliberately NOT unified
+
+- `sources.py`'s 20 field reads: UPSTREAM feed fields (football-data's
+  `HomeTeam`, the odds API's `commence_time`), not our columns.
+- `methodology.start_intervals()`: parametrised, tests feed it synthetic
+  rows. A pure function is the better shape than a memoized global.
+- `score.py`'s `_calibrated()`: needs the EARLIEST snapshot, not the
+  newest.
+- 33 field reads in files no wave reached.
+
+### Honest note on the remaining 8,080 self-test lines
+
+Earlier framed as the big remaining line lever. It is not. 24 of 33
+`Universe` constructions already route through
+`ffcore.fixtures.players_from_flat()`. The rest of the mass is real test
+DATA — `sources.py` 968 lines of HTML fixtures across 19 sites,
+`league.py` 823 lines of ledger scenarios — and shrinking it means
+deleting coverage, not deduplicating.
+
+### If this is picked up again
+
+Wave 5A is the only outstanding item with a real bug in it:
+`sim.ladder_rows()` and `sim.payload()` apply the par floor and the
+one-raid-per-victim rule in OPPOSITE ORDERS, so for a victim whose best
+raid fails the floor, the markdown shows his second-best raid and the
+JSON shows none. Everything else on the original list is tidying that
+would add lines.
+
+Run all three gates: `tools/selftests.sh`, `tools/regress.sh --check`,
+`tools/concepts.sh`.
