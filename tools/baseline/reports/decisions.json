@@ -13,7 +13,52 @@
   703.1971128813468,
   2555.2177973867206
  ],
- "moves": [],
+ "moves": [
+  {
+   "label": "clause Alfonso Herrero from Magic Mike 333 · sell Omar El Hilali",
+   "kind": "clause",
+   "buy": "Alfonso Herrero",
+   "sell": "Omar El Hilali",
+   "sell_n": 1,
+   "victim": "Magic Mike 333",
+   "owner": "Magic Mike 333",
+   "net_pts": 5.972881717279051,
+   "d_win": 0.002333333333333354,
+   "net": 93324.0,
+   "d_pts": 5.972881717279051,
+   "helps": 0.5553333333333333,
+   "pts_lo": -107.80146564536497,
+   "pts_hi": 125.49819590313672,
+   "value": null,
+   "left": 7616842.0,
+   "answer": null,
+   "p_win_after": 0.267,
+   "vs": "BurtonGM89",
+   "vs_gain": 0.009000000000000008
+  },
+  {
+   "label": "clause Fran Garcia from SusoGattuso · sell Natan",
+   "kind": "clause",
+   "buy": "Fran Garcia",
+   "sell": "Natan",
+   "sell_n": 1,
+   "victim": "SusoGattuso",
+   "owner": "SusoGattuso",
+   "net_pts": 3.014988662827534,
+   "d_win": 0.0016666666666667052,
+   "net": 1567.0,
+   "d_pts": 3.014988662827534,
+   "helps": 0.5323333333333333,
+   "pts_lo": -128.1670957815446,
+   "pts_hi": 103.9001517094416,
+   "value": null,
+   "left": 7525085.0,
+   "answer": null,
+   "p_win_after": 0.266,
+   "vs": "SusoGattuso",
+   "vs_gain": 0.0023333333333332984
+  }
+ ],
  "sell": [
   {
    "name": "Ali Houary",

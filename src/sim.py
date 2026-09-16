@@ -196,9 +196,7 @@ def ladder_rows(u, rows, bands=None, exp=None, xi=None) -> list[dict]:
     for k in ranked:
         if route_kind(u, k) == "free" and _clears_par_floor(par, mae, k):
             out.append(buy_cell(k, "buy"))
-    raid_keys = _best_raid_per_victim(
-        [k for k in ranked if route_kind(u, k) == "raid"
-         and _clears_par_floor(par, mae, k)], won)
+    raid_keys = raid_shortlist(u, won.values(), par, mae)
     for k in sorted(raid_keys, key=lambda k: _move_rank_key(won[k], u)):
         out.append(buy_cell(k, "raid"))
     for k in sorted((k for k in rest if k not in won
@@ -507,6 +505,27 @@ def _best_raid_per_victim(raid_keys, won) -> list[str]:
     return [k for _score, k in best.values()]
 
 
+def raid_shortlist(u, rows, par_of, mae) -> set:
+    """The raid keys worth showing: one per victim, chosen among those that
+    clear the par floor.
+
+    ORDER IS THE POINT. Floor FIRST, then one-per-victim. The reverse --
+    pick each victim's best raid, then drop it if it misses the floor --
+    makes a victim vanish entirely even when a second, weaker raid on him
+    would have cleared. ladder_rows() floored first, payload() deduped
+    first, so the markdown could show a victim's second-best raid while
+    the JSON showed him no raid at all, off the same rows in the same run.
+
+    "Raid" is route_kind(u, k) == "raid" everywhere. payload() used to ask
+    action.victim instead, a second definition of the same thing.
+    """
+    raids = {r["action"].buy: r for r in rows
+             if r["action"].buy
+             and route_kind(u, r["action"].buy) == "raid"
+             and _clears_par_floor(par_of, mae, r["action"].buy)}
+    return set(_best_raid_per_victim(list(raids), raids))
+
+
 def _move_rank_key(r, u):
     reliable = 0 if u.route_view.get(r["action"].buy, "free") != "listed" else 1
     d = r.get("d_pts")
@@ -606,14 +625,14 @@ def payload(u, rows, base, rivals, locks_h=None, n_actions: int = 0,
     names = {k: title_name(v) for k, v in u.name_view.items()}
     lo, hi = base.band(u.me)
     moves = []
-    raid_rows = {r["action"].buy: r for r in rows if r["action"].victim}
-    keep_raid = set(_best_raid_per_victim(list(raid_rows), raid_rows))
-    rows = [r for r in rows
-           if not r["action"].victim or r["action"].buy in keep_raid]
     par_of = {k: v["par"] for k, v in u.player_forecasts().items()}
     mae = current_mae()
     rows = [r for r in rows if not r["action"].buy
            or _clears_par_floor(par_of, mae, r["action"].buy)]
+    keep_raid = raid_shortlist(u, rows, par_of, mae)
+    rows = [r for r in rows
+           if route_kind(u, r["action"].buy) != "raid"
+           or r["action"].buy in keep_raid]
     for r in sorted(rows, key=lambda r: _move_rank_key(r, u)):
         a = r["action"]
         who = max(rivals, key=lambda v: r["d_beat"].get(v, 0.0)) \
