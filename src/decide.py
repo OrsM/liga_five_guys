@@ -469,9 +469,13 @@ def route_kind(u: Universe, k: str) -> str:
     """
     if k in u.state.squads.get(u.me, {}):
         return "mine"
-    owner = u.owner.get(k)
+    owner = u.owner_view.get(k)
     if not owner or owner == u.me:
         return "free"
+    # u.route, not u.route_view, deliberately: _selftest mutates u.route
+    # directly (`u.route[k] = "clause"`/`"listed"`) to exercise this exact
+    # branch, and route_view would recompute from `u.players` (untouched by
+    # that mutation) and silently disagree. Wave 3B/later task, not this one.
     return "raid" if u.route.get(k, "market") == "clause" else "listed"
 
 
@@ -629,7 +633,7 @@ def rank(u: Universe, acts: list[Action], seed: int = 1,
     # Top up with reliable candidates (KEEP_RELIABLE_MIN) — additive, never
     # displacing a listed candidate that made top-KEEP honestly.
     top = _top_up(top, screened,
-                 ok=lambda d, a: u.route.get(a.buy, "free") != "listed",
+                 ok=lambda d, a: u.route_view.get(a.buy, "free") != "listed",
                  rank_key=lambda t: -t[0], minimum=KEEP_RELIABLE_MIN)
     # Top up with the most efficient candidates (KEEP_VALUE_MIN), same
     # additive shape, independent axis. "Efficient" is RELATIVE — the best
@@ -1173,7 +1177,7 @@ def _selftest() -> None:
     # future change can't quietly bring the chain back.
     u3 = Universe(
         state=LeagueState({"me": dict(mine), "riv": dict(theirs)}, [1], "me"),
-        forecaster=B(per), pos={**u.pos, "dear": "MED"},
+        forecaster=B(per), pos={**u.pos_view, "dear": "MED"},
         price={"dear": 20e6},
         proceeds={"me_bench": 8e6, "me_spare2": 5e6, "me_spare3": 4e6},
         owner={}, cash=4e6, me="me")
@@ -1251,8 +1255,8 @@ def _selftest() -> None:
     # while the two slots' own replacement levels are 1.0 and 5.0 — the
     # position-specific spread VORP exists to notice.
     assert xi_bar(vexp, vxi) == 1.0, xi_bar(vexp, vxi)
-    assert min(vexp[k] for k in vxi if uvor.pos[k] == "DEL") == 1.0, vxi
-    assert min(vexp[k] for k in vxi if uvor.pos[k] == "MED") == 5.0, vxi
+    assert min(vexp[k] for k in vxi if uvor.pos_view[k] == "DEL") == 1.0, vxi
+    assert min(vexp[k] for k in vxi if uvor.pos_view[k] == "MED") == 5.0, vxi
     vrows, _vb, _vl, _vbd = rank(
         uvor, [Action("buy", buy="thin_del", cost=5e6),
                Action("buy", buy="deep_med", cost=5e6)])
@@ -1302,7 +1306,7 @@ def _selftest() -> None:
     u2 = Universe(
         state=LeagueState({"me": dict(mine), "riv": dict(theirs)}, [1], "me"),
         forecaster=B(per2),
-        pos={**u.pos, "free_x": "MED", "th_m1": "MED"},
+        pos={**u.pos_view, "free_x": "MED", "th_m1": "MED"},
         price={"free_x": 5e6, "th_m1": 5e6}, route={"th_m1": "clause"},
         proceeds={},
         owner={"th_m1": "riv"}, cash=6e6, me="me")
@@ -1372,7 +1376,7 @@ def _selftest() -> None:
     u5 = Universe(
         state=LeagueState({"me": dict(mine), "riv": dict(theirs)}, [1], "me"),
         forecaster=B(per5),
-        pos={**u.pos, **{a.buy: "MED" for a in acts5}},
+        pos={**u.pos_view, **{a.buy: "MED" for a in acts5}},
         price={a.buy: 1e6 for a in acts5}, route=route5,
         proceeds={}, owner={}, cash=100e6, me="me")
     rows5, *_ = rank(u5, acts5)
@@ -1406,7 +1410,7 @@ def _selftest() -> None:
     u6 = Universe(
         state=LeagueState({"me": dict(mine), "riv": dict(theirs)}, [1], "me"),
         forecaster=B(per6),
-        pos={**u.pos, **{a.buy: "MED" for a in acts6}},
+        pos={**u.pos_view, **{a.buy: "MED" for a in acts6}},
         price={a.buy: a.cost for a in acts6}, route={},
         proceeds={}, owner={}, cash=1000e6, me="me")
     rows6, *_ = rank(u6, acts6)
@@ -1431,7 +1435,7 @@ def _selftest() -> None:
                           "me", ),
         forecaster=B({1: {"me_k": (0.1, 1.0), "dud": (1.0, 1.0)},
                       2: {**{k: (5.0, 1.0) for k in mine}, "dud": (1.0, 1.0)}}),
-        pos={**u.pos, "dud": "MED"}, price={"dud": 1e6}, proceeds={},
+        pos={**u.pos_view, "dud": "MED"}, price={"dud": 1e6}, proceeds={},
         owner={}, cash=50e6, me="me")
     half.part_played = {1: {"somewhere"}}
     # Off the locked round the bar is 0.1 and the journeyman clears it; off a
@@ -1574,7 +1578,7 @@ if __name__ == "__main__":
     exp = u.forecaster.expected(u.state.jornadas[0])
     acts = candidates(u, exp, budget=float("inf"))
     print("%d jornadas left · cash %s · %d players acquirable · %d actions"
-          % (len(u.state.jornadas), fmt_money(u.cash), len(u.price), len(acts)))
+          % (len(u.state.jornadas), fmt_money(u.cash), len(u.price_view), len(acts)))
     print(u.forecaster.pool_note())
     rows, base, _lam, _b = rank(u, acts)
     print("\nnow: expected position %.2f · P(win) %.0f%%"
