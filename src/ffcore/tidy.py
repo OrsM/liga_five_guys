@@ -215,8 +215,10 @@ def load_deadline(with_source: bool = False):
     substitute. `with_source=True` returns (when, "fixtures"|"none").
     Why: docs/notes/tidy.md#load_deadline--the-fixture-list-is-the-deadline-no-typed-fallback
     """
-    clock = JornadaClock(read_csv(TIDY / "matches.csv"), load_fixtures())
-    when = clock.next_deadline(run_now())
+    # THE upcoming-only clock, not a second identical parse of the same
+    # two files. See clock() for why upcoming-only is right here and
+    # wrong for grading.
+    when = clock().next_deadline(run_now())
     return (when, "fixtures" if when else "none") if with_source else when
 
 
@@ -955,8 +957,29 @@ _CLOCK: list = []
 
 
 def clock() -> JornadaClock:
-    """The one JornadaClock for this run, built once from
+    """The UPCOMING-ONLY JornadaClock for this run, built once from
     `load_matches()` + `load_fixtures()`.
+
+    NOT A GENERAL-PURPOSE CLOCK, AND NOT SAFE FOR GRADING HISTORY.
+    `load_fixtures()` is `latest_only`, and fixtures.csv's newest sweep
+    lists only matches STILL UPCOMING — the source page drops a fixture
+    once it is underway. Measured 2026-09-16: 2,526 raw rows collapse to
+    8, and this clock then knows locks for jornadas 6-7 where the
+    full-history construction knows 1-7 (16 team locks, not 122).
+
+    That is exactly right for `load_deadline()`, whose question is "when
+    does the next thing lock", and exactly wrong for anything grading a
+    past round, which needs every lock that ever existed. Code that
+    grades history must build its own `JornadaClock` off a RAW
+    fixtures.csv read; methodology.py's four grading sites deliberately
+    still do, and say so.
+
+    Widening this to full fixtures is not the fix: it changes the answer
+    `next_deadline()` gives (measured: 2026-09-16T17:00Z becomes
+    2026-09-19T16:30Z), because a full-history round order is not the
+    upcoming-round order. The two are different questions, not two
+    qualities of one answer.
+    Why: docs/notes/tidy.md#clock--one-jornadaclock-per-process
 
     Built 11 times across 5 files before this loader existed
     (methodology.py alone constructs one at lines 259, 306, 597, 1385,
@@ -1653,6 +1676,19 @@ def _selftest_new_loaders() -> None:
     c1 = clock()
     c2 = clock()
     assert c1 is c2, "clock() must return the SAME object on a second call"
+
+    # UPCOMING-ONLY, BY DESIGN. clock() is built on load_fixtures(), whose
+    # newest sweep lists only matches still ahead -- the source page drops a
+    # fixture once it is underway. A full-history JornadaClock knows strictly
+    # more locks (measured 2026-09-16: 16 team locks vs 122). Asserted so
+    # nobody "fixes" clock() by widening it to a raw fixtures read: that
+    # would silently change load_deadline()'s answer too (17:00Z on the 16th
+    # becomes the 19th), because a full-history round order is not the
+    # upcoming-round order. Two questions, not two qualities of one answer.
+    _full = JornadaClock(load_matches(), read_csv(TIDY / "fixtures.csv"))
+    assert set(c1.team_locks) < set(_full.team_locks), \
+        ("clock() is no longer upcoming-only -- if that was deliberate, "
+         "load_deadline() changed with it; see clock()'s own docstring")
     assert isinstance(c1, JornadaClock)
 
     # -- jornada_of_match(): first-write-wins, matching score.py:538 -----
