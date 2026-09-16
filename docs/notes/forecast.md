@@ -165,9 +165,25 @@ BIGGER for high-evidence players, not smaller — the opposite of what a
 too-generous `SHRINK_MATCHES` for thin-history players would predict —
 pointing at the `1/sqrt(n)` shrinkage SHAPE itself lacking a real
 week-to-week variance floor, not a pseudo-count that needs retuning.
-Real next step, not yet done: check whether `rate_rel` needs a minimum
-floor independent of `n`, rather than touching `SHRINK_MATCHES` or
-`DRIFT_FRAC`.
+
+**Confirmed (2026-09-16): a floor, not a scale.** Tested the two candidate
+fixes directly against the n-tercile pattern above, since either can hit
+the pooled Var(z)~2 target with one free parameter and that alone proves
+nothing. A flat multiplicative scale (`rel * 3.0`) can't discriminate
+between players whose `rel` was already small (high n) or already large
+(low n), and leaves the terciles wildly split (Var 0.64/2.13/3.03 for
+low/mid/high n — worse than before for low-n players). A minimum floor
+(`max(0.50, rel)`) equalises all three into a tight, plausible range
+(1.69/1.92/2.36) — because it specifically lifts the tightly-shrunk
+high-n estimates without over-correcting the already-wide low-n ones,
+exactly the shape the data calls for. `rate_rel` needs a floor
+representing irreducible week-to-week uncertainty (fitness, matchup,
+tactical role) that doesn't shrink to zero with more history — the
+current formula has none. Not yet implemented: would need its own
+walk-forward fit (same discipline as `HOME_EDGE`/`_fit_decay()`), and
+should be reconfirmed against the market-wide `squad_log.csv` logging
+(`report.py`, shipped the same day) once it accumulates clean, non-
+reconstructed history rather than resting on this one 4-commit backfill.
 
 ## fit_drift_frac() — the derivation
 
