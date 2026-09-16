@@ -202,8 +202,12 @@ def main() -> None:
     # pass — every player is already priced for the BUY/RAID scan; this
     # just keeps a record of it instead of throwing it away.
     # Why: docs/notes/report.md#market_wide_log--every-player-gets-a-forecast-on-record
-    all_keys = sorted({r["ff_id"] for r in market if r.get("ff_id")})
-    market_scored, _market_missing = sc.score_squad(all_keys)
+    # sc.lookup's own keys, not re-derived from market rows: row_key()
+    # falls back to name (or name@club) when a row has no ff_id, and
+    # rebuilding that logic here would silently drop exactly those rows
+    # again the way the first version of this fix did with `r["ff_id"]`
+    # alone.
+    market_scored, _market_missing = sc.score_squad(sorted(sc.lookup))
     squad_keys = {p["key"] for p in players}
     market_players = []
     for s in market_scored:
