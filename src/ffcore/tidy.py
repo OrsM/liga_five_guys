@@ -46,7 +46,7 @@ __all__ = ["ROOT", "TIDY", "SEASON", "DECISIONS", "REPORTS", "PARTS", "MADRID",
            "load_api_lineup", "market_routes", "pending_sent", "bought_price",
            "pending_received", "LISTED_SELLER", "team_slug_of", "lock_order",
            "JornadaClock", "load_matches", "load_matches_history",
-           "load_starters", "load_perjornada", "load_api_stats", "clock",
+           "load_starters", "load_perjornada", "load_api_stats", "clock", "clock_history",
            "jornada_of_match"]
 
 ROOT = Path(os.environ.get("FF_ROOT", "./data"))
@@ -954,6 +954,7 @@ class JornadaClock:
 
 # One JornadaClock per process. Why: docs/notes/tidy.md#clock--one-jornadaclock-per-process
 _CLOCK: list = []
+_CLOCK_HISTORY: list = []
 
 
 def clock() -> JornadaClock:
@@ -994,6 +995,30 @@ def clock() -> JornadaClock:
     if not _CLOCK:
         _CLOCK.append(JornadaClock(load_matches(), load_fixtures()))
     return _CLOCK[0]
+
+
+def clock_history() -> JornadaClock:
+    """The FULL-HISTORY JornadaClock — every lock that ever existed.
+
+    `clock()` above is built on `load_fixtures()`, which is the newest
+    sweep only, and fixtures.csv drops a match once it is underway. That
+    is right for "when does the next thing lock" and useless for grading
+    a round already played: measured 2026-09-16, `clock()` knows jornadas
+    6-7 where this one knows 1-7 (16 team locks against 122).
+
+    Six sites hand-built exactly this — `methodology.py`'s four grading
+    functions and `backtest.py`'s two replay baselines — each with its own
+    raw re-read of a 2,526-row file and its own comment explaining why
+    `clock()` would not do. One call, one explanation.
+
+    Memoized like `clock()` and `run_now()`: nothing a run does can change
+    what the store held when it started reading.
+    Why: docs/notes/tidy.md#clock--one-jornadaclock-per-process
+    """
+    if not _CLOCK_HISTORY:
+        _CLOCK_HISTORY.append(
+            JornadaClock(load_matches(), read_csv(TIDY / "fixtures.csv")))
+    return _CLOCK_HISTORY[0]
 
 
 # {match_id: jornada}, first-write-wins. Why: docs/notes/tidy.md#jornada_of_match--first-write-wins-matching-scorepy538-not-methodologypy588
@@ -1685,7 +1710,8 @@ def _selftest_new_loaders() -> None:
     # would silently change load_deadline()'s answer too (17:00Z on the 16th
     # becomes the 19th), because a full-history round order is not the
     # upcoming-round order. Two questions, not two qualities of one answer.
-    _full = JornadaClock(load_matches(), read_csv(TIDY / "fixtures.csv"))
+    _full = clock_history()
+    assert _full is clock_history(), "clock_history() must be memoized too"
     assert set(c1.team_locks) < set(_full.team_locks), \
         ("clock() is no longer upcoming-only -- if that was deliberate, "
          "load_deadline() changed with it; see clock()'s own docstring")

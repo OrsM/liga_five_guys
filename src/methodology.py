@@ -39,7 +39,7 @@ from ffcore import schema  # noqa: E402
 from ffcore.fixture import FIX_BAND  # noqa: E402
 from ffcore.score import SHRINK_K  # noqa: E402
 from ffcore.text import norm, resolve  # noqa: E402
-from ffcore.tidy import (run_now,  # noqa: E402
+from ffcore.tidy import (clock_history, load_starters, run_now,  # noqa: E402
                          DECISIONS, PARTS, LINEUP_SOURCE,  # noqa: E402
                          DAILY_FRESH_DAYS, EVERY_RUN_FRESH_DAYS,
                          SEASON, TIDY, age_phrase, load_elo,
@@ -262,9 +262,7 @@ def fit_rate_rel_floor(pool, min_pairs: int = 30) -> tuple[float, str]:
     # fixtures (8 rows here), which drops every past round's kickoff. This
     # function needs locks across the WHOLE graded history (lagged_pair()
     # below), so fixtures stays the raw multi-snapshot read on purpose.
-    matches = load_matches()
-    fixtures = read_csv(TIDY / "fixtures.csv")
-    locks = JornadaClock(matches, fixtures).round_locks
+    locks = clock_history().round_locks
     actuals, _label = load_actuals()
     preds = load_predictions()
 
@@ -313,9 +311,7 @@ def drift_frac_from_history(lag1: int = 1, lag3: int = 3) -> tuple[float, str]:
     # for the same reason: this also grades the WHOLE lagged history, so
     # fixtures must stay the raw multi-snapshot read, not tidy.clock()'s
     # newest-sweep-only view.
-    matches = load_matches()
-    fixtures = read_csv(TIDY / "fixtures.csv")
-    locks = JornadaClock(matches, fixtures).round_locks
+    locks = clock_history().round_locks
     actuals, _label = load_actuals()
     preds = load_predictions()
 
@@ -727,7 +723,7 @@ def load_starts():
     starters/market were not part of this migration.
     """
     return start_intervals(load_matches(),
-                           read_csv(TIDY / "starters.csv"),
+                           load_starters(),
                            read_csv(TIDY / "fixtures.csv"),
                            read_csv(TIDY / "market.csv"))
 
@@ -1415,11 +1411,8 @@ def golden_rows() -> list[dict]:
     # this joins against load_starts()'s WHOLE-history intervals, so it
     # needs every past round's lock, which tidy.clock()/load_fixtures()
     # (newest sweep only) does not have.
-    matches = load_matches()
-    fixtures = read_csv(TIDY / "fixtures.csv")
-    jornada_of_lock = {when: jor
-                       for (jor, _team), when
-                       in JornadaClock(matches, fixtures).team_locks.items()}
+    jornada_of_lock = {when: jor for (jor, _team), when
+                       in clock_history().team_locks.items()}
 
     intervals, _graded, _ungraded = load_starts()
     per = _group_by_key(forecast_claims())

@@ -243,17 +243,9 @@ def naive_value_baseline(golden: list[dict]) -> dict | None:
     # snapshots of the same match (only its score does), and latest_only
     # keeps every real match (380/380, see load_matches()'s own docstring).
     matches = load_matches()
-    # fixtures.csv is read RAW here, NOT via tidy.clock()/load_fixtures():
-    # load_fixtures() applies latest_only, and fixtures.csv's newest sweep
-    # only lists matches still upcoming (the source page drops a fixture
-    # once it is underway) — measured: 2,526 raw rows -> 8 after
-    # latest_only, round_locks 7 -> 2, team_locks 122 -> 16. This is a
-    # historical replay tool; it needs every past round's lock, not just
-    # what is still ahead. tidy.clock() here would silently lose every
-    # past lock and still pass every gate (backtest.py isn't part of
-    # tools/regress.sh's stage list).
-    fixtures = M.read_csv(M.TIDY / "fixtures.csv")
-    locks = M.JornadaClock(matches, fixtures).round_locks
+    # clock_history(), not clock(): this is a historical replay and needs
+    # every past round's lock. See clock_history()'s own docstring.
+    locks = M.clock_history().round_locks
 
     resolved = []
     for r in checked:
@@ -303,12 +295,8 @@ def recency_only_baseline(golden: list[dict], window: int = 3) -> dict | None:
     # naive_value_baseline() above — only (home, away) -> jornada is read,
     # which is stable across snapshots of the same match.
     matches = load_matches()
-    # fixtures.csv read RAW, not via tidy.clock(): see the same-shaped
-    # comment in naive_value_baseline() above — load_fixtures()'s
-    # latest_only is upcoming-only and would silently drop every past
-    # round's lock, which this historical replay needs.
-    fixtures = M.read_csv(M.TIDY / "fixtures.csv")
-    clock = M.JornadaClock(matches, fixtures)
+    # clock_history(), not clock() -- see naive_value_baseline() above.
+    clock = M.clock_history()
     locks, order = clock.round_locks, clock.order
     pos = {j: i for i, j in enumerate(order)}
 
