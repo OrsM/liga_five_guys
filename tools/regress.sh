@@ -35,7 +35,12 @@ mkdir -p "$reports_dir" "$parts_dir"
 cleanup() {
     rm -rf "$scratch"
     # Undo the decisions-log appends the run just made, whichever mode.
-    git -C "$REPO_ROOT" checkout -- data/ 2>/dev/null || true
+    # ONLY data/decisions/ -- the four log CSVs a run appends to. NOT all of
+    # data/: the tidy store holds legitimately uncommitted work (a fetch
+    # lands new snapshots and parse rewrites the store), and reverting that
+    # silently destroys it and makes the very next --check fail against a
+    # baseline recorded on data the run just threw away.
+    git -C "$REPO_ROOT" checkout -- data/decisions/ 2>/dev/null || true
 }
 trap cleanup EXIT
 
