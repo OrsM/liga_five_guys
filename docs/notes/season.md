@@ -75,3 +75,40 @@ A jornada still advances the walk step even when it has no scoring rows
 (`order` has no keys for it) — skipping the step would make the walk's
 width depend on which weeks happen to have zero scoring rows, an artifact
 of the calendar rather than real time passing.
+
+## `_antithetic_normal()` — variance reduction, not a model change
+
+The standings section's headline p_win/expected-finish was a single
+un-paired Monte Carlo draw, measured 2026-08-31 to swing roughly ±7 points
+run-to-run at `FINAL_TRIALS=3000` — `decide.rank()`'s BUY/RAID ranking
+already avoids this for PAIRED comparisons via `simulate_many`'s
+common-random-numbers trick (one season, every candidate scored against
+it), but nothing did the equivalent for the single, un-paired headline
+number.
+
+Antithetic variates: every Gaussian source in `_run_np()` (`eps0`, the
+club shock, and both per-jornada walk steps — everything drawn via
+`standard_normal`) is mirrored, trial `i` against trial `i + trials//2`
+getting exactly opposite draws. Each trial's own marginal is untouched
+(still standard normal), so this changes nothing about what is being
+modelled — it only makes half the trials cancel the other half's
+first-order noise once summed into a season total, the textbook use case
+for antithetic sampling. The one draw NOT paired is the final per-jornada
+Bernoulli-threshold-plus-pool-index draw (`rng.random`/`rng.integers`) —
+pairing a discrete pool-index draw isn't a straightforward mirror, and
+the persistent, season-long walks were the more promising target since
+they're what compounds across 38 jornadas rather than washing out under
+the CLT the way independent per-jornada noise already does.
+
+Measured on real data (2026-09-16), not assumed: at `FINAL_TRIALS=3000`,
+30 repeated runs each way, p_win's run-to-run sd went 0.0095 -> 0.0069 (a
+27% tightening) and expected-finish's sd went 0.0189 -> 0.0152 (20%), with
+the MEANS unchanged (p_win 0.5642 both ways; finish 2.178 vs 2.174) — a
+real reduction in noise, not a shift in the answer. `_score_many()`
+(`decide.py`, both the screening and final passes) now always requests
+it; `simulate`/`simulate_many`/`_run_np` default to `antithetic=False` so
+every existing self-test's exact-reproducibility assertions
+(`same seed, same season`) are untouched — antithetic pairing is still
+exactly reproducible for a given seed, it draws a DIFFERENT (lower-
+variance) sample from the same distributions, same as the numpy-vs-Python
+path is "statistically equivalent, not identical" above.

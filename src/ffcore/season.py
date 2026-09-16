@@ -166,8 +166,31 @@ class Standings:
         return sum(k * p for k, p in self.position(manager).items())
 
 
+def _antithetic_normal(rng, shape: tuple):
+    """rng.standard_normal(shape), pairwise mirrored: trial i and trial
+    i+trials//2 get exactly opposite draws (z, -z) rather than independent
+    ones. Same per-trial marginal (still standard normal), same shape,
+    same call signature as the draw it replaces — the only difference is
+    that half the trials are now the other half's mirror image, which
+    cancels first-order noise in a season-total SUM without touching the
+    model itself. Odd trial counts get one unmirrored extra draw.
+    Why: docs/notes/season.md#_antithetic_normal--variance-reduction-not-a-model-change
+    """
+    import numpy as np
+
+    trials = shape[0]
+    half = trials // 2
+    if half == 0:
+        return rng.standard_normal(shape)
+    z = rng.standard_normal((half,) + shape[1:])
+    parts = [z, -z]
+    if trials % 2:
+        parts.append(rng.standard_normal((1,) + shape[1:]))
+    return np.concatenate(parts, axis=0)
+
+
 def simulate_many(states: list, forecaster, trials: int = 2000,
-                  seed: int = 0) -> list:
+                  seed: int = 0, antithetic: bool = False) -> list:
     """Play one set of seasons and score EVERY candidate squad against it.
 
     THE DRAWS DO NOT DEPEND ON THE SQUADS. Same seed, same forecaster, same
@@ -189,12 +212,13 @@ def simulate_many(states: list, forecaster, trials: int = 2000,
     """
     if not states:
         return []
-    fast = _run_np(states, forecaster, trials, seed)
+    fast = _run_np(states, forecaster, trials, seed, antithetic)
     return [Standings(totals=tot, me=st.me)
             for tot, st in zip(fast, states)]
 
 
-def _run_np(states: list, forecaster, trials: int, seed: int):
+def _run_np(states: list, forecaster, trials: int, seed: int,
+           antithetic: bool = False):
     """The whole season, drawn as arrays over ffcore.forecast.Bootstrap's
     own fields (per_jornada/pool/rate_rel/club_of/club_rel/start_rel) —
     reads them directly rather than calling per-key methods on the
@@ -226,6 +250,8 @@ def _run_np(states: list, forecaster, trials: int, seed: int):
     club_rel = getattr(forecaster, "club_rel", None) or {}
     all_keys = sorted({k for ks in order.values() for k in ks} & set(rel)) \
         if rel else []
+    draw_normal = _antithetic_normal if antithetic else \
+        (lambda rng, shape: rng.standard_normal(shape))
     eps0 = shared = drng = cum_var = walk = None
     if all_keys:
         from ffcore.forecast import DRIFT_FRAC
@@ -233,7 +259,7 @@ def _run_np(states: list, forecaster, trials: int, seed: int):
         rrng = np.random.default_rng([seed, 7919])
         sd = np.array([rel[k] for k in all_keys], dtype=float)
         eps0 = np.clip(
-            1.0 + rrng.standard_normal((trials, len(all_keys))) * sd,
+            1.0 + draw_normal(rrng, (trials, len(all_keys))) * sd,
             0.0, None)
         clubs = sorted(club_rel)
         if clubs:
@@ -242,7 +268,7 @@ def _run_np(states: list, forecaster, trials: int, seed: int):
             crng = np.random.default_rng([seed, 7920])
             csd = np.array([club_rel[c] for c in clubs], dtype=float)
             shock = np.clip(
-                1.0 + crng.standard_normal((trials, len(clubs))) * csd,
+                1.0 + draw_normal(crng, (trials, len(clubs))) * csd,
                 0.0, None)
             shock_of = {c: shock[:, i] for i, c in enumerate(clubs)}
             ones = np.ones(trials)
@@ -272,7 +298,7 @@ def _run_np(states: list, forecaster, trials: int, seed: int):
 
         srrng = np.random.default_rng([seed, 7927])
         ssd = np.array([srel[k] for k in all_start_keys], dtype=float)
-        seps0 = srrng.standard_normal((trials, len(all_start_keys))) * ssd
+        seps0 = draw_normal(srrng, (trials, len(all_start_keys))) * ssd
         sdrng = np.random.default_rng([seed, 7928])
         step_sd_s = _DF * ssd
         # No cum_var_s: additive and mean-zero already, unlike the
@@ -322,7 +348,7 @@ def _run_np(states: list, forecaster, trials: int, seed: int):
         # clip.
         if all_keys:
             step_var = step_sd ** 2
-            walk += drng.standard_normal((trials, len(all_keys))) \
+            walk += draw_normal(drng, (trials, len(all_keys))) \
                 * step_sd
             cum_var += step_var
             walked = np.exp(walk - cum_var / 2.0)
@@ -332,7 +358,7 @@ def _run_np(states: list, forecaster, trials: int, seed: int):
         # Same walk, on P(start) — logit-additive, own stream (7927/7928).
         start_shift = {}
         if all_start_keys:
-            walk_s += sdrng.standard_normal((trials, len(all_start_keys))) \
+            walk_s += draw_normal(sdrng, (trials, len(all_start_keys))) \
                 * step_sd_s
             shifted = seps0 + walk_s
             start_shift = {k: shifted[:, i]
@@ -376,7 +402,7 @@ def _run_np(states: list, forecaster, trials: int, seed: int):
 
 
 def simulate(state: LeagueState, forecaster, trials: int = 2000,
-             seed: int = 0) -> Standings:
+             seed: int = 0, antithetic: bool = False) -> Standings:
     """Play the remaining jornadas `trials` times.
 
     THE SAME SEED IS THE SAME SEASON for every call, which is what makes two
@@ -387,7 +413,8 @@ def simulate(state: LeagueState, forecaster, trials: int = 2000,
     One state through simulate_many, so the two cannot drift apart: they held
     a copy each of the same loop, and the copies had to be asserted equal.
     """
-    return simulate_many([state], forecaster, trials=trials, seed=seed)[0]
+    return simulate_many([state], forecaster, trials=trials, seed=seed,
+                         antithetic=antithetic)[0]
 
 
 def _selftest() -> None:

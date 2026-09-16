@@ -364,11 +364,21 @@ def _fieldable(squad: dict[str, str]) -> bool:
 
 
 def _score_many(u: Universe, many: list, trials: int, seed: int):
-    """Every candidate squad against ONE set of seasons. Same numbers."""
+    """Every candidate squad against ONE set of seasons. Same numbers.
+
+    antithetic=True: half the trials are the other half's exact mirror
+    draw, which cancels first-order sampling noise in a season-total sum
+    without changing what's being modelled. Measured on real data
+    (2026-09-16, FINAL_TRIALS=3000, n=30 repeats): p_win's run-to-run sd
+    0.0095 -> 0.0069, expected-finish sd 0.0189 -> 0.0152, means unchanged
+    (0.5642 both; 2.178 vs 2.174) — a real, unbiased tightening of the
+    headline standings numbers, not just the paired BUY/RAID comparisons.
+    Why: docs/notes/season.md#_antithetic_normal--variance-reduction-not-a-model-change
+    """
     return simulate_many(
         [LeagueState(squads=sq, jornadas=u.state.jornadas, me=u.me,
                      carried=u.state.carried) for sq in many],
-        u.forecaster, trials=trials, seed=seed)
+        u.forecaster, trials=trials, seed=seed, antithetic=True)
 
 
 def paired(after, base, me) -> list[float]:
