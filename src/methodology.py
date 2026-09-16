@@ -35,6 +35,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import stats  # noqa: E402
+from ffcore import schema  # noqa: E402
 from ffcore.fixture import FIX_BAND  # noqa: E402
 from ffcore.score import SHRINK_K  # noqa: E402
 from ffcore.text import norm, resolve  # noqa: E402
@@ -43,7 +44,7 @@ from ffcore.tidy import (run_now,  # noqa: E402
                          DAILY_FRESH_DAYS, EVERY_RUN_FRESH_DAYS,
                          SEASON, TIDY, age_phrase, load_elo,
                          stale_feeds,
-                         load_lineups,
+                         load_lineups, load_matches,
                          read_csv, snapshot_stamp, write_csv, write_lines,
                          team_slug_of, lock_order, JornadaClock)
 
@@ -119,7 +120,7 @@ def _group_by_key(rows, key_fn=None, when_fn=None, value_fn=None,
     value_fn = value_fn or (lambda r: r)
     per: dict[str, list] = {}
     for r in rows:
-        if src is not None and (r.get("source") or "").strip() != src:
+        if src is not None and schema.text(r, "source") != src:
             continue
         try:
             key = key_fn(r)
@@ -254,7 +255,14 @@ def fit_rate_rel_floor(pool, min_pairs: int = 30) -> tuple[float, str]:
         return _default, "pool mean measured as 0 — can't normalise"
     cv = _stats.pstdev(real) / mean
 
-    matches = read_csv(TIDY / "matches.csv")
+    # matches: load_matches() (latest_only) — verified 2026-09-16 identical
+    # to the raw 75,240-row read for this JornadaClock (every real match
+    # still present in the newest sweep). fixtures: NOT tidy.load_fixtures()
+    # /tidy.clock() — those keep only the newest sweep's still-upcoming
+    # fixtures (8 rows here), which drops every past round's kickoff. This
+    # function needs locks across the WHOLE graded history (lagged_pair()
+    # below), so fixtures stays the raw multi-snapshot read on purpose.
+    matches = load_matches()
     fixtures = read_csv(TIDY / "fixtures.csv")
     locks = JornadaClock(matches, fixtures).round_locks
     actuals, _label = load_actuals()
@@ -301,7 +309,11 @@ def drift_frac_from_history(lag1: int = 1, lag3: int = 3) -> tuple[float, str]:
     """
     from ffcore.forecast import fit_drift_frac
 
-    matches = read_csv(TIDY / "matches.csv")
+    # Same matches/fixtures split as rate_rel_floor_from_history() above,
+    # for the same reason: this also grades the WHOLE lagged history, so
+    # fixtures must stay the raw multi-snapshot read, not tidy.clock()'s
+    # newest-sweep-only view.
+    matches = load_matches()
     fixtures = read_csv(TIDY / "fixtures.csv")
     locks = JornadaClock(matches, fixtures).round_locks
     actuals, _label = load_actuals()
@@ -417,7 +429,7 @@ def _matched_start_row(hist, start, teams):
     row = latest_before(hist, start)
     if row is None:
         return None
-    if teams is not None and (row.get("team_slug") or "").strip() not in teams:
+    if teams is not None and schema.text(row, "team_slug") not in teams:
         return None
     return row
 
@@ -462,7 +474,7 @@ def start_grade(intervals, claims, universe=None, instances=None):
 
     Whoever wins this table earns tidy.LINEUP_SOURCE.
     """
-    sources = {(r.get("source") or "").strip() for r in claims} - {""}
+    sources = {schema.text(r, "source") for r in claims} - {""}
     per = {src: g for src in sources
           if (g := _group_by_key(claims, src=src, universe=universe))}
 
@@ -486,7 +498,7 @@ def start_grade(intervals, claims, universe=None, instances=None):
                 # the realised starters off the match pages — carries the same
                 # /jugadores/ ids as futbolfantasy's claims. That join is exact
                 # where the name join is merely usually right.
-                slug = (row.get("player_slug") or "").strip()
+                slug = schema.text(row, "player_slug")
                 hit = 1.0 if key in played or (slug and slug in played) else 0.0
                 kind, pct = _start_classify(row) or (None, None)
                 if kind is None:
@@ -584,6 +596,19 @@ def start_intervals(matches: list[dict], starters: list[dict],
     rather than a guess). The team set is the interval's population —
     absence from the key set means "did not start" only for a club whose
     eleven we hold, not for the rest of the round.
+
+    This builds its own {match_id: jornada} map, LAST-write-wins (an
+    unconditional overwrite each iteration) — the opposite rule from
+    tidy.jornada_of_match()'s FIRST-write-wins. Checked 2026-09-16 on the
+    real store (75,240-row matches.csv, 380 real matches): the two rules
+    produce byte-identical maps there, so last-write-wins is not currently
+    load-bearing at this site. Left hand-rolled rather than swapped in
+    tidy.jornada_of_match() anyway: that loader is a zero-argument,
+    process-memoized read of the real store, while `matches` here is a
+    parameter this function's own selftest calls with hand-built,
+    non-store rows — wiring in the global loader would silently ignore
+    that argument and break the selftest's isolation from disk. Why:
+    docs/notes/tidy.md#jornada_of_match--first-write-wins-matching-scorepy538-not-methodologypy588
     """
     jornada_of = {}
     for m in matches:
@@ -609,7 +634,7 @@ def start_intervals(matches: list[dict], starters: list[dict],
         if mark in seen:
             continue
         seen.add(mark)
-        team = (r.get("team_slug") or "").strip()
+        team = schema.text(r, "team_slug")
         lock = locks.get((jor, team))
         if lock is None:
             ungraded.add(jor)
@@ -624,7 +649,7 @@ def start_intervals(matches: list[dict], starters: list[dict],
         by_round.setdefault(lock, set()).update(
             k for k in (_market_key(r.get("player_slug")),
                         norm(r.get("player_name", "")),
-                        (r.get("player_slug") or "").strip(),
+                        schema.text(r, "player_slug"),
                         norm(priced["name"]) if priced else "") if k)
         teams.setdefault(lock, set()).add(team)
     out = [(lock, keys, teams[lock]) for lock, keys in sorted(by_round.items())]
@@ -693,8 +718,15 @@ def load_starts():
     Empty everywhere until a jornada has been played AND its opener's kickoff
     was observed before it kicked off. Both conditions are reported by the
     caller rather than collapsed into a silent zero.
+
+    matches: load_matches() (latest_only) — verified identical to the raw
+    read for start_intervals()'s own {match_id: jornada} map (see that
+    function's docstring). fixtures/starters/market stay raw reads:
+    start_intervals()'s JornadaClock needs locks across the WHOLE season's
+    history (not tidy.clock()'s newest-sweep-only fixtures), and
+    starters/market were not part of this migration.
     """
-    return start_intervals(read_csv(TIDY / "matches.csv"),
+    return start_intervals(load_matches(),
                            read_csv(TIDY / "starters.csv"),
                            read_csv(TIDY / "fixtures.csv"),
                            read_csv(TIDY / "market.csv"))
@@ -726,7 +758,7 @@ def load_predictions() -> dict[str, list[tuple[dt.datetime, dict]]]:
         # status overrides), same reasoning the docstring above already
         # gives for carrying the whole row: grading which FACTOR was
         # wrong needs these, not just the final score.
-        fac["home"] = r.get("home") == "1"
+        fac["home"] = schema.flag(r, "home")
         fac["pos"] = (r.get("pos") or "").lower()
         fac["status"] = r.get("status") or ""
         return fac
@@ -737,7 +769,7 @@ def load_predictions() -> dict[str, list[tuple[dt.datetime, dict]]]:
     # carries the id, the slug and the name for the same reason.
     return _group_by_key(
         read_csv(DECISIONS / "squad_log.csv"),
-        key_fn=lambda r: (r.get("ff_id") or "").strip() or norm(r.get("player", "")),
+        key_fn=lambda r: schema.text(r, "ff_id") or norm(r.get("player", "")),
         when_fn=lambda r: snapshot_stamp(r["observed_at"]),
         value_fn=_factors)
 
@@ -1093,10 +1125,10 @@ def formula_lines() -> list[str]:
     figure "a guess" and understating it by 3.4x.
     """
     from ffcore.fixture import attack_defense, fit_home_edge
-    from ffcore.tidy import latest_only, load_crosswalk, load_results_history
+    from ffcore.tidy import load_crosswalk, load_results_history
 
     results_hist = load_results_history()
-    matches = latest_only(read_csv(TIDY / "matches.csv"))
+    matches = load_matches()
     home_edge, home_edge_why = fit_home_edge(results_hist, matches)
     teams = sorted({r.get("team") for r in latest_market() if r.get("team")})
     xw = load_crosswalk()
@@ -1323,7 +1355,7 @@ def _instance_briers(intervals, claims, src, instances) -> list[float]:
                 pct = float(row.get("start_pct"))
             except (TypeError, ValueError):
                 continue
-            slug = (row.get("player_slug") or "").strip()
+            slug = schema.text(row, "player_slug")
             hit = 1.0 if key in played or (slug and slug in played) else 0.0
             out.append((pct / 100.0 - hit) ** 2)
     return out
@@ -1351,7 +1383,7 @@ def forecast_claims() -> list[dict]:
         # "ff_id" is squad_log.csv's historical misnomer for the crosswalk
         # key (report.py writes p["key"] under that name), not an app_id.
         team_slug = ""
-        p = xw.players.get((r.get("ff_id") or "").strip())
+        p = xw.players.get(schema.text(r, "ff_id"))
         if p:
             club = xw.clubs.get(p.club_id)
             team_slug = club.ff_slug if club else ""
@@ -1378,7 +1410,12 @@ def golden_rows() -> list[dict]:
         if p.get("jornada") is not None:
             rate_by_key[(norm(p["name"]), p["jornada"])] = p
 
-    matches = read_csv(TIDY / "matches.csv")
+    # matches: load_matches() — verified identical to the raw read (see
+    # rate_rel_floor_from_history() above). fixtures: raw, on purpose —
+    # this joins against load_starts()'s WHOLE-history intervals, so it
+    # needs every past round's lock, which tidy.clock()/load_fixtures()
+    # (newest sweep only) does not have.
+    matches = load_matches()
     fixtures = read_csv(TIDY / "fixtures.csv")
     jornada_of_lock = {when: jor
                        for (jor, _team), when
