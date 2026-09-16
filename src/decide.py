@@ -275,19 +275,7 @@ class Universe:
                                  for k, p in self.players.items()
                                  if p.derived.start_p is not None})
 
-    @property
-    def clause_view(self) -> Mapping[str, float]:
-        """`p.current.clause`, `is not None` filter."""
-        return MappingProxyType({k: p.current.clause
-                                 for k, p in self.players.items()
-                                 if p.current.clause is not None})
 
-    @property
-    def clause_until_view(self) -> Mapping[str, object]:
-        """`p.current.clause_until`, `is not None` filter."""
-        return MappingProxyType({k: p.current.clause_until
-                                 for k, p in self.players.items()
-                                 if p.current.clause_until is not None})
 
     @property
     def route_view(self) -> Mapping[str, str]:
@@ -297,12 +285,6 @@ class Universe:
                                  for k, p in self.players.items()
                                  if p.current.route})
 
-    @property
-    def bids_view(self) -> Mapping[str, int]:
-        """`p.current.bids`, `is not None` filter."""
-        return MappingProxyType({k: p.current.bids
-                                 for k, p in self.players.items()
-                                 if p.current.bids is not None})
 
     @property
     def name_view(self) -> Mapping[str, str]:
@@ -1439,20 +1421,22 @@ def _selftest() -> None:
     from ffcore.fixtures import tiny_profile as _tiny_p
 
     _FALSY_DROP = ("pos", "owner", "route")
-    _NONE_ONLY_DROP = ("price", "proceeds", "value", "market_exp", "start",
-                       "clause", "clause_until", "bids")
+    # clause/clause_until/bids are PlayerCurrent fields with no reader
+    # anywhere, so they have no view to assert against -- deleted 2026-09-16
+    # rather than kept as a complete-looking API nothing calls. The rule
+    # they shared is still pinned by the five below; re-add a view in five
+    # lines if a caller ever needs one.
+    _NONE_ONLY_DROP = ("price", "proceeds", "value", "market_exp", "start")
 
     falsy_edge = _tiny_p("falsy_edge", pos="", owner="", route="")
     zero_edge = _tiny_p("zero_edge", price=0.0, proceeds=0.0, value=0.0,
-                       market_exp=0.0, start_p=0.0, clause=0.0,
-                       clause_until=0, bids=0)
+                       market_exp=0.0, start_p=0.0)
     # `pos` can't itself be None (PlayerCurrent.pos is a plain str,
     # unlike owner/route which are `str | None`) — its falsy case is
     # covered by falsy_edge's `pos=""` above, not repeated here.
     none_edge = _tiny_p("none_edge", owner=None, route=None, price=None,
                        proceeds=None, value=None, market_exp=None,
-                       start_p=None, clause=None, clause_until=None,
-                       bids=None)
+                       start_p=None)
     u_views = Universe(
         state=LeagueState({"me": {}}, [1], "me"), forecaster=B({}),
         cash=0.0, me="me",
