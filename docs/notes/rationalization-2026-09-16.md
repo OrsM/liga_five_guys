@@ -24,7 +24,7 @@ one home.
 | 4 | The store | `ffcore/tidy.py` | no loader for the 4 most-read tables; `matches.csv` opened at 13 sites, `starters.csv` 7, `api_stats.csv` 2 |
 | 5 | "What is current" | `latest_only`/`latest_snapshot` | decided per call site: of 13 `matches.csv` reads, 2 apply `latest_only`, 10 are silent, 1 documents the choice (`points.py:227`) |
 | 6 | Time / jornada / lock | `tidy.JornadaClock` | built 11x across 5 files (`methodology.py` alone: 259, 306, 597, 1385, 1922, 1943); `match_id -> jornada` written 4x on 3 different keys |
-| 7 | Expected points | (nothing) | 5 formulas — `score.py:1172`, `profile.py:280`, `profile.py:144`, `schedule.py:129`, `methodology.py:263`; graded by a 6th (`methodology.py:173`) |
+| 7 | Expected points | (nothing) | 5 places express it — `score.py:1172`, `profile.py:280`, `profile.py:144`, `schedule.py:129`, `methodology.py:263`; graded by a 6th (`methodology.py:173`). **Corrected 2026-09-16:** the first two do NOT disagree — same four factors, multiplication is commutative; measured max difference 1.78e-15 across 660 rows. Duplicated expression, not divergence. `profile.py:144`'s projection difference IS real and load-bearing, for the pair Bootstrap consumes separately. See `expected-points-audit.md`. |
 | 8 | Fitted parameters | (nothing) | `HOME_EDGE`/`DRIFT_FRAC`/`RATE_REL_FLOOR` as mutated module globals |
 
 Amplifiers: 29% of `src/` (7,651 / 26,400 lines) is `_selftest` with no shared
