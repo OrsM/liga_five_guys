@@ -31,6 +31,7 @@ from __future__ import annotations
 import statistics
 from typing import NamedTuple
 
+from ffcore import schema
 from ffcore.parse import money, pct100, ratio
 from ffcore.startprob import Calibration
 from ffcore.text import norm
@@ -134,7 +135,7 @@ def load_understat_current(xw=None) -> dict[str, dict]:
     for r in load_understat_players("2026"):
         if "F" not in (r.get("position") or ""):
             continue
-        uid = (r.get("understat_id") or "").strip()
+        uid = schema.text(r, schema.UNDERSTAT_PLAYERS.UNDERSTAT_ID)
         if not uid:
             continue
         key = xw.player(understat_id=uid)
@@ -175,7 +176,7 @@ def _xg_points_fit(xw) -> tuple[float, float, int]:
         return 0.0, 0.0, 0
     pts_by_key = {}
     for r in read_csv(pts_files[-1]):
-        pid = (r.get("ff_id") or "").strip()
+        pid = schema.text(r, "ff_id")
         key = pid if pid in xw.players else xw.player(
             name=r.get("player_name_full") or r.get("player_name"))
         if key:
@@ -184,7 +185,7 @@ def _xg_points_fit(xw) -> tuple[float, float, int]:
     for r in load_understat_players("2025"):
         if "F" not in (r.get("position") or ""):
             continue
-        uid = (r.get("understat_id") or "").strip()
+        uid = schema.text(r, schema.UNDERSTAT_PLAYERS.UNDERSTAT_ID)
         key = xw.player(understat_id=uid) if uid else None
         if not key or key not in pts_by_key:
             continue
@@ -258,18 +259,22 @@ def _shots_by_jornada(xw) -> dict[str, dict[int, float]]:
     crosswalk's app_id. `week` is the API's own per-match field, not
     inferred from round-completion timing.
     """
-    from ffcore.tidy import TIDY, read_csv
+    from ffcore.tidy import load_api_stats
 
     if xw is None:
         return {}
-    path = TIDY / "api_stats.csv"
-    if not path.exists():
-        return {}
     out: dict[str, dict[int, float]] = {}
-    for r in read_csv(path):
+    # load_api_stats() is latest-PER-KEY, not latest_only(): a raw read
+    # here was already every row (this table is measured unsafe for
+    # latest_only, see tidy.load_api_stats()'s own docstring), and the
+    # loop below already picked "last write for this (key, week) wins" by
+    # file order, which is the same answer latest_per_key() gives by
+    # observed_at — verified byte-identical against the real store
+    # 2026-09-16.
+    for r in load_api_stats():
         if r.get("stat") != "total_scoring_att":
             continue
-        key = xw.player(app_id=(r.get("player_id") or "").strip())
+        key = xw.player(app_id=schema.text(r, schema.API_STATS.PLAYER_ID))
         if not key:
             continue
         try:
@@ -448,7 +453,8 @@ def _shots_points_fit(xw, players=None) -> tuple[float, float, int]:
     a caller can fake a small fixture; `None` loads it for real.
     Why: docs/notes/score.md#_shots_points_fit--in-season-not-prior-season
     """
-    from ffcore.tidy import TIDY, SEASON, read_csv, load_players
+    from ffcore.tidy import (SEASON, load_players, load_starters,
+                             load_perjornada, jornada_of_match)
 
     if xw is None:
         return 0.0, 0.0, 0
@@ -456,9 +462,8 @@ def _shots_points_fit(xw, players=None) -> tuple[float, float, int]:
     files = sorted(live.glob("perjornada_*.csv")) if live.exists() else []
     if not files:
         return 0.0, 0.0, 0
-    by_key = _per_jornada_current(
-        read_csv(TIDY / "starters.csv"), read_csv(files[-1]),
-        read_csv(TIDY / "matches.csv"), xw)
+    by_key = _per_jornada_current(load_starters(), load_perjornada(),
+                                  jornada_of_match(), xw)
     shots_by_key = _shots_by_jornada(xw)
     players = players if players is not None else load_players()
 
@@ -492,8 +497,8 @@ def load_shots_current(xw=None, players=None) -> dict[str, dict]:
     box score. Same shape as load_understat_current(). `players`: see
     _shots_points_fit()'s note — injectable, `None` loads for real.
     """
-    from ffcore.tidy import (TIDY, SEASON, read_csv, load_crosswalk,
-                             load_players)
+    from ffcore.tidy import (SEASON, load_crosswalk, load_players,
+                             load_starters, load_perjornada, jornada_of_match)
 
     xw = xw if xw is not None else load_crosswalk()
     if xw is None:
@@ -504,9 +509,8 @@ def load_shots_current(xw=None, players=None) -> dict[str, dict]:
     files = sorted(live.glob("perjornada_*.csv")) if live.exists() else []
     minutes_by_key: dict[str, dict[int, float]] = {}
     if files:
-        by_key = _per_jornada_current(
-            read_csv(TIDY / "starters.csv"), read_csv(files[-1]),
-            read_csv(TIDY / "matches.csv"), xw)
+        by_key = _per_jornada_current(load_starters(), load_perjornada(),
+                                      jornada_of_match(), xw)
         minutes_by_key = {k: {j: mins for j, (_pts, mins) in jd.items()}
                           for k, jd in by_key.items()}
     out = {}
@@ -526,29 +530,24 @@ def load_shots_current(xw=None, players=None) -> dict[str, dict]:
     return out
 
 
-def _per_jornada_current(starters_rows, perjornada_rows, matches_rows,
+def _per_jornada_current(starters_rows, perjornada_rows, jornada_of_match,
                          xw) -> dict[str, dict[int, tuple[float, float]]]:
     """{crosswalk key: {jornada: (points, minutes)}} for the live season.
 
     Joins starters.csv's minutes (keyed by match_id) to perjornada.csv's
     points (keyed by `jornada`) via matches.csv's match_id -> jornada
-    map. A jornada absent from either side is dropped, not guessed.
+    map (`jornada_of_match`: production callers pass `tidy.jornada_of_
+    match()`, the process-memoized, first-write-wins {match_id: jornada}
+    map — a rows-in-a-loop signature would force it to be re-parsed here
+    instead of shared with every other reader of the same map). A
+    jornada absent from either side is dropped, not guessed.
     Why: docs/notes/score.md#_per_jornada_current--the-join-and-the-points_total-anchor
     """
-    jornada_of_match: dict[str, int] = {}
-    for r in matches_rows:
-        mid = (r.get("match_id") or "").strip()
-        if mid and mid not in jornada_of_match:
-            try:
-                jornada_of_match[mid] = int(r.get("jornada"))
-            except (TypeError, ValueError):
-                continue
-
     minutes_by_jor: dict[str, dict[int, float]] = {}
     seen: set[tuple[str, str]] = set()
     for r in starters_rows:
-        slug = (r.get("player_slug") or "").strip()
-        mid = (r.get("match_id") or "").strip()
+        slug = schema.text(r, schema.STARTERS.PLAYER_SLUG)
+        mid = schema.text(r, schema.STARTERS.MATCH_ID)
         jor = jornada_of_match.get(mid)
         if not slug or jor is None or r.get("role") not in ("starter", "sub"):
             continue
@@ -569,11 +568,11 @@ def _per_jornada_current(starters_rows, perjornada_rows, matches_rows,
     end_total: dict[str, dict[int, float]] = {}
     seen_at: dict[str, dict[int, str]] = {}
     for r in perjornada_rows:
-        raw_jor = (r.get("jornada") or "").strip()
+        raw_jor = schema.text(r, schema.PERJORNADA.JORNADA)
         if not raw_jor:
             continue
         jor = int(raw_jor)
-        pid = (r.get("ff_id") or "").strip()
+        pid = schema.text(r, schema.PERJORNADA.FF_ID)
         key = pid if pid in xw.players else xw.player(
             name=r.get("player_name_full") or r.get("player_name"))
         if not key:
@@ -704,7 +703,8 @@ def _current_from_perjornada() -> tuple[dict, str]:
     Recency-weighted via `_fit_decay`'s walk-forward validation.
     Why: docs/notes/score.md#_current_from_perjornada--why-not-points_csv
     """
-    from ffcore.tidy import SEASON, TIDY, load_crosswalk, read_csv
+    from ffcore.tidy import (SEASON, load_crosswalk, load_starters,
+                             load_perjornada, jornada_of_match)
 
     live = SEASON / "live"
     files = sorted(live.glob("perjornada_*.csv")) if live.exists() else []
@@ -715,9 +715,8 @@ def _current_from_perjornada() -> tuple[dict, str]:
     if xw is None:
         return {}, ""
 
-    by_key = _per_jornada_current(
-        read_csv(TIDY / "starters.csv"), read_csv(files[-1]),
-        read_csv(TIDY / "matches.csv"), xw)
+    by_key = _per_jornada_current(load_starters(), load_perjornada(),
+                                  jornada_of_match(), xw)
     decay, _why = _fit_decay(by_key)
 
     out = {}
@@ -752,7 +751,7 @@ def load_points() -> tuple[dict, str, dict, str]:
                    "pj": ratio(r.get("games")) or 0.0}
             # The id first, under the market's current name; falls back to
             # name-only for a file predating ff_id, rather than losing rows.
-            pid = (r.get("ff_id") or "").strip()
+            pid = schema.text(r, "ff_id")
             player = xw.players.get(pid) if pid and xw is not None else None
             if player and player.name:
                 out.setdefault(norm(player.name), rec)
@@ -836,6 +835,15 @@ def _calibrated():
     from ffcore.second import SECOND_SOURCE
 
     second = load_lineups(SECOND_SOURCE)
+    # NOT tidy.load_starters(): that applies latest_only(), collapsing
+    # every row to the single newest snapshot's own observed_at. `cut`
+    # below needs the EARLIEST observed_at ever recorded (the first
+    # confirmed line-up this store has ever seen) to draw the line
+    # between "predictions made before a result could leak in" and
+    # everything after — latest_only() would make cut equal the newest
+    # stamp instead, and the fingerprint below (keyed on len(truth) too)
+    # would silently start grading a different, much narrower window.
+    # Left raw; not a migration site.
     truth = read_csv(TIDY / "starters.csv")
     cut = min((r.get("observed_at", "") for r in truth), default="")
     # The crosswalk is what lets the narrow source be joined exactly rather
@@ -1162,7 +1170,7 @@ class Scorer:
                        ) / (k_s + start_n)
         else:
             pct_rest = pct_used
-        m = self.board.get((rec.get("team") or "").strip())
+        m = self.board.get(schema.text(rec, schema.MARKET.TEAM))
         slot = SLOT.get((rec.get("position") or "").lower(), "")
         # A clean sheet is opponent-attack-driven, a goal opponent-defense-
         # driven — why Match carries two factors. An unrecognised slot
@@ -1509,12 +1517,11 @@ def _selftest() -> None:
         "came on": Player("came on", "Came On", ff_slug="came-on"),
         "unused sub": Player("unused sub", "Unused Sub", ff_slug="unused"),
     }, {})
-    matches_rows = [
-        {"match_id": "m1", "jornada": "1"},
-        {"match_id": "m2", "jornada": "2"},
-        # A second sighting of the same match must not change its jornada.
-        {"match_id": "m1", "jornada": "1"},
-    ]
+    # {match_id: jornada} — tidy.jornada_of_match()'s own shape; that
+    # function's first-write-wins behaviour is covered by tidy.py's own
+    # selftest, not re-tested here now that _per_jornada_current() takes
+    # the map itself rather than rebuilding it from matches.csv rows.
+    jornada_map = {"m1": 1, "m2": 2}
     starters_rows = [
         # starters.csv's short form ("Blanco") must resolve to the
         # market's full-name crosswalk key.
@@ -1555,14 +1562,14 @@ def _selftest() -> None:
          "points_delta": "99", "points_total": "112", "jornada": ""},
     ]
     by_key = _per_jornada_current(starters_rows, perjornada_rows,
-                                  matches_rows, xw2)
+                                  jornada_map, xw2)
     assert by_key["antonio blanco"] == {1: (8.0, 90.0), 2: (5.0, 45.0)}, \
         by_key["antonio blanco"]
     # "Came On"/"Unused Sub" have minutes but no points-page row at all —
     # left out of the universe entirely rather than entered at pts=0.
     assert "came on" not in by_key, by_key
     assert "unused sub" not in by_key, by_key
-    assert _per_jornada_current([], [], [], xw2) == {}
+    assert _per_jornada_current([], [], {}, xw2) == {}
 
     # A correction within one jornada (bonus points posted after the fact)
     # must overwrite that jornada's running total, not add to it.
@@ -1572,7 +1579,7 @@ def _selftest() -> None:
           "points_total": "8", "jornada": "1"},
          {"ff_id": "1", "player_name_full": "Antonio Blanco",
           "points_total": "9", "jornada": "1"}],   # +1 bonus point, same jornada
-        matches_rows, xw2)
+        jornada_map, xw2)
     # jornada 2 still carries his minutes (from starters_rows) with 0
     # points, since this fixture's perjornada_rows says nothing about it.
     assert corrected["antonio blanco"] == {1: (9.0, 90.0), 2: (0.0, 45.0)}, \
@@ -1864,13 +1871,22 @@ def _selftest() -> None:
     matches3 = [{"match_id": "m1", "jornada": "1"},
                {"match_id": "m2", "jornada": "2"},
                {"match_id": "m3", "jornada": "3"}]
+    # "observed_at" on every row, matching the real store's shape — this
+    # fixture now goes through tidy.load_starters() (latest_only), which
+    # keys off that column; without it every row's r.get("observed_at")
+    # is None while the newest-stamp comparison defaults missing to "",
+    # so None == "" is False and latest_only() would silently keep zero
+    # rows.
     starters3 = [
-        {"player_name": "Fwd Guy", "player_slug": "fwd-guy", "role": "starter",
-         "minute": "", "match_id": "m1"},
-        {"player_name": "Fwd Guy", "player_slug": "fwd-guy", "role": "starter",
-         "minute": "", "match_id": "m2"},
-        {"player_name": "Fwd Guy", "player_slug": "fwd-guy", "role": "starter",
-         "minute": "", "match_id": "m3"},
+        {"observed_at": "2026-09-01T0000Z", "player_name": "Fwd Guy",
+         "player_slug": "fwd-guy", "role": "starter", "minute": "",
+         "match_id": "m1"},
+        {"observed_at": "2026-09-01T0000Z", "player_name": "Fwd Guy",
+         "player_slug": "fwd-guy", "role": "starter", "minute": "",
+         "match_id": "m2"},
+        {"observed_at": "2026-09-01T0000Z", "player_name": "Fwd Guy",
+         "player_slug": "fwd-guy", "role": "starter", "minute": "",
+         "match_id": "m3"},
     ]
     perjornada3 = [
         {"ff_id": "900", "player_name_full": "Fwd Guy",
@@ -1904,7 +1920,8 @@ def _selftest() -> None:
         with open(_os3.path.join(_d3, "starters.csv"), "w", newline="",
                  encoding="utf-8") as fh:
             w = _csv3.DictWriter(fh, fieldnames=[
-                "player_name", "player_slug", "role", "minute", "match_id"])
+                "observed_at", "player_name", "player_slug", "role",
+                "minute", "match_id"])
             w.writeheader()
             for r in starters3:
                 w.writerow(r)
