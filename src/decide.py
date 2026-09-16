@@ -805,6 +805,10 @@ def load(trials_pool=None) -> Universe:
     # Mutates the module attribute, not a local — rate_draw()/start_draw()
     # re-import DRIFT_FRAC fresh from the module on every call.
     _forecast.DRIFT_FRAC, _drift_why = _methodology.drift_frac_from_history()
+    # Same shape, for RATE_REL_FLOOR — Bootstrap.__init__ reads the module
+    # attribute when it builds rate_rel below, same as DRIFT_FRAC above.
+    _forecast.RATE_REL_FLOOR, _rate_floor_why = \
+        _methodology.fit_rate_rel_floor(pool)
     fc = Bootstrap(per_j, pool=pool, matches=matches,
                   club_of=club_of_slug, club_rel=club_rel)
 

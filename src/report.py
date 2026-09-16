@@ -56,7 +56,13 @@ LOG_COLS = ["observed_at", "hours_to_lock", "formation", "index_total",
             "ff_id", "player", "pos", "slot", "start_pct", "start_source", "status",
             "assumed", "value", "score", "picked",
             "ppm", "fix", "opp", "home", "cur_pj", "flat",
-            "fix_basis", "elo_gap", "score_h3"]
+            "fix_basis", "elo_gap", "score_h3", "pj"]
+# `pj` (added 2026-09-16): ALL-TIME matches behind ppm, prior season
+# included — the exact quantity ffcore.forecast.Bootstrap.rate_rel keys
+# on (`matches[k] = Scored.pj`), and NOT the same as `cur_pj` (this
+# season only) already logged above. Needed to ever fit RATE_REL_FLOOR
+# from real history instead of a stated default — see
+# fit_rate_rel_floor()'s own note.
 
 # THE SHORT-HORIZON FIGURE. `score` is jornada+1 with a real fixture factor;
 # the next 2 rounds have no fixture drawn yet at log time, so they use
@@ -125,6 +131,7 @@ def log_squad(observed, players, chosen, formation, total, deadline,
             "elo_gap": ("" if p.get("elo_gap") is None
                         else f"{p['elo_gap']:.1f}"),
             "score_h3": f"{_score_h3(p):.3f}",
+            "pj": f"{p['pj']:.1f}",
         })
     append_csv(path, rows, LOG_COLS)
 

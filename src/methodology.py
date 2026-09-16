@@ -170,15 +170,28 @@ def pair(actuals: list[dict],
     return out
 
 
+def _default_predicted(fac: dict) -> float:
+    return fac["score"]
+
+
 def lagged_pair(actuals: list[dict],
                 preds: dict[str, list[tuple[dt.datetime, dict]]],
-                locks: dict[int, dt.datetime], lag: int) -> list[dict]:
+                locks: dict[int, dt.datetime], lag: int,
+                predicted_fn=_default_predicted) -> list[dict]:
     """`pair()`, generalised to a prediction made `lag` LOCKED JORNADAS
     before the one being graded, instead of always the freshest one —
     squad_log.csv already holds predictions at several lead times for
     the same outcome, so this tests a real multi-jornada-ahead forecast
     without waiting for new data. A jornada with fewer than `lag` earlier
     locked jornadas is skipped.
+
+    `predicted_fn(fac) -> per-match value`, default `fac["score"]` (the
+    UNCONDITIONAL, P(start)-weighted prediction — exactly what every
+    existing caller already got). A caller grading against outcomes that
+    are themselves CONDITIONAL on having played (`load_actuals()`, which
+    only keeps `games_delta >= 1`) needs `fac["ppm"] * (fac["fix"] or
+    1.0)` instead — see forecast.md's own note on the P(start) artifact
+    this mismatch caused for fit_rate_rel_floor().
     """
     order = lock_order(locks)
     pos = {j: i for i, j in enumerate(order)}
@@ -195,13 +208,85 @@ def lagged_pair(actuals: list[dict],
         if got is None:
             continue
         _key, fac = got
-        predicted = fac["score"] * a["games_delta"]
+        per_match = predicted_fn(fac)
+        predicted = per_match * a["games_delta"]
         out.append({"name": a["name"], "predicted": predicted,
-                    "actual": a["points_delta"], "per_match": fac["score"],
+                    "actual": a["points_delta"], "per_match": per_match,
                     "matches": a["games_delta"],
                     "err": predicted - a["points_delta"],
-                    "jornada": j})
+                    "jornada": j, "pj": fac.get("pj")})
     return out
+
+
+def fit_rate_rel_floor(pool, min_pairs: int = 30) -> tuple[float, str]:
+    """(floor, why) — RATE_REL_FLOOR fit from real graded predictions, or
+    the current shipped default with a stated reason not to move it.
+
+    CONDITIONAL prediction only (`ppm * fix`), never `fac["score"]` — the
+    unconditional, P(start)-weighted prediction mixes P(start)
+    miscalibration into what looks like rate uncertainty, which is what
+    made the first pass at this (a market-wide historical backfill,
+    2026-09-16) look like a DRIFT_FRAC problem before it was corrected.
+    `load_actuals()`'s own rows are themselves conditional on having
+    played (`games_delta >= 1`), so this is the like-for-like comparison.
+
+    Grid search over candidate floors (0.10 to 1.00), each compared
+    against the pooled Var(z) the theory expects at lag 0 for the
+    SHIPPED DRIFT_FRAC (target ~2.0, matching fit_drift_frac()'s own
+    "1 + h*DRIFT_FRAC^2" at h=1) — the closest candidate wins. Refuses
+    below `min_pairs` real, `pj`-logged graded rows: `pj` (ALL-TIME
+    matches behind ppm) is a new squad_log.csv column (2026-09-16),
+    so real history only starts accumulating from when report.py first
+    logged the whole market, not from squad_log's own older rows.
+    Why: docs/notes/forecast.md#confirmed-2026-09-16-a-floor-not-a-scale
+    """
+    import statistics as _stats
+
+    from ffcore.forecast import RATE_REL_FLOOR as _default
+    from ffcore.forecast import SHRINK_MATCHES
+
+    real = [p for p in pool if p is not None]
+    if len(real) < 50:
+        return _default, "too few real matches in the pool (n=%d) to " \
+            "measure cv — keeping %.2f" % (len(real), _default)
+    mean = _stats.mean(real)
+    if abs(mean) < 1e-9:
+        return _default, "pool mean measured as 0 — can't normalise"
+    cv = _stats.pstdev(real) / mean
+
+    matches = read_csv(TIDY / "matches.csv")
+    fixtures = read_csv(TIDY / "fixtures.csv")
+    locks = JornadaClock(matches, fixtures).round_locks
+    actuals, _label = load_actuals()
+    preds = load_predictions()
+
+    def _conditional(fac):
+        return (fac.get("ppm") or 0.0) * (fac.get("fix") or 1.0)
+
+    graded = lagged_pair(actuals, preds, locks, 0, predicted_fn=_conditional)
+    rels = []
+    for g in graded:
+        pj = g.get("pj")
+        if pj is None or g["predicted"] <= 0 or g["actual"] <= 0:
+            continue
+        rel = cv / (max(1.0, pj + SHRINK_MATCHES)) ** 0.5
+        rels.append((rel, g["predicted"], g["actual"]))
+    if len(rels) < min_pairs:
+        return _default, "too few graded pairs with a logged pj (n=%d, " \
+            "need >=%d) — keeping %.2f" % (len(rels), min_pairs, _default)
+
+    import math
+
+    def _var_at(floor):
+        zs = [math.log(a / p) / max(floor, rel) for rel, p, a in rels]
+        return _stats.pvariance(zs)
+
+    grid = [0.10 + 0.05 * i for i in range(19)]   # 0.10 .. 1.00
+    best_floor = min(grid, key=lambda f: abs(_var_at(f) - 2.0))
+    return best_floor, ("Var(z)=%.2f at the shipped floor %.2f -> best-fit "
+                        "%.2f (n=%d real graded pairs, cv=%.3f)"
+                        % (_var_at(_default), _default, best_floor,
+                           len(rels), cv))
 
 
 def drift_frac_from_history(lag1: int = 1, lag3: int = 3) -> tuple[float, str]:
@@ -631,7 +716,7 @@ def load_predictions() -> dict[str, list[tuple[dt.datetime, dict]]]:
         # row, so they get their own inner try/except instead of joining
         # the raise.
         fac = {"score": float(r["score"])}
-        for col in ("fix", "ppm", "flat", "start_pct", "cur_pj"):
+        for col in ("fix", "ppm", "flat", "start_pct", "cur_pj", "pj"):
             try:
                 fac[col] = float(r[col])
             except (KeyError, ValueError, TypeError):
@@ -1616,6 +1701,20 @@ def drift_lines() -> list[str]:
     return out
 
 
+def rate_rel_floor_lines(pool) -> list[str]:
+    """Is RATE_REL_FLOOR still the stated default, or fit off real
+    market-wide history this run? See fit_rate_rel_floor()'s own note.
+    """
+    fitted, why = fit_rate_rel_floor(pool)
+    from ffcore.forecast import RATE_REL_FLOOR as _DEFAULT
+    out = ["### Rate uncertainty floor", ""]
+    if fitted == _DEFAULT and ("too few" in why or "0 " in why):
+        out += [f"Still the stated default ({_DEFAULT:.2f}) — {why}.", ""]
+    else:
+        out += [f"**Fit from real data this run: {fitted:.2f}** ({why}).", ""]
+    return out
+
+
 def main() -> None:
     out = ["# How the forecast works — and how it's doing", ""]
     out += feed_lines()
@@ -1623,6 +1722,9 @@ def main() -> None:
     out += column_guide_lines()
     out += comparison_lines()
     out += drift_lines()
+    fc = _fc()
+    if fc is not None:
+        out += rate_rel_floor_lines(fc.pool)
     out += source_lines(load_actuals()[0])
     PARTS.mkdir(parents=True, exist_ok=True)
     write_lines(PARTS / "methodology.md", out)
