@@ -37,7 +37,6 @@ WHAT IT CANNOT SEE, and each makes a hold look worse than it is:
 
 from __future__ import annotations
 
-import csv
 import datetime as dt
 import itertools
 import os
@@ -69,10 +68,13 @@ from ffcore.text import norm  # noqa: E402
 from ffcore.season import (LeagueState, XI_SIZE, best_xi,  # noqa: E402
                            simulate_many)
 from ffcore.tidy import (run_now,  # noqa: E402
-                         TIDY, SEASON, latest_only, load_api_market,  # noqa: E402
+                         latest_only, load_api_market,  # noqa: E402
+                         load_api_stats, load_matches, load_perjornada,
                          last_api_standings, load_api_offers, load_api_teams,
                          load_players, market_routes, pending_sent,
                          bought_price, pending_received)
+from ffcore.schema import text, num, API_TEAMS, API_STANDINGS  # noqa: E402
+from ffcore.schema import MARKET as MARKET_TBL  # noqa: E402
 
 __all__ = ["Action", "candidates", "rank", "Universe",
           "pending_sent", "pending_received"]
@@ -598,13 +600,15 @@ def load(trials_pool=None) -> Universe:
     lg, sc = _m.lg, _m.sc
     players = load_players()
 
-    m = latest_only(list(csv.DictReader(open(TIDY / "matches.csv"))))
+    # load_matches() already applies latest_only() internally — see its
+    # own docstring (matches.csv measured safe: 380/380 real matches kept).
+    m = load_matches()
     # The market's spelling of every club, and only the market's: it is the
     # canonical side of the join in club_key().
-    mkt_teams = sorted({(r.get("team") or "").strip()
+    mkt_teams = sorted({text(r, MARKET_TBL.TEAM)
                         for r in (lg.market.latest().values()
                                   if lg.market is not None else [])
-                        if (r.get("team") or "").strip()})
+                        if text(r, MARKET_TBL.TEAM)})
     rem, played, unjoined_clubs = rounds_left(m, mkt_teams)
 
     teams = load_api_teams()
@@ -635,21 +639,31 @@ def load(trials_pool=None) -> Universe:
     # one loop that already resolves a key for every api_teams row rather
     # than re-resolving the same rows a second time for one more field.
     pt_to_key: dict[str, str] = {}
+    # Every clause, mine included — a rival can't answer back without them.
+    # Collected in the same pass as pt_to_key/clause_until/price/route
+    # below rather than a second loop over `teams` re-resolving the same
+    # rows: resolve_api() is pure (no side effects), so one resolution per
+    # row serves both this dict's unfiltered collection and price/route's
+    # filtered one.
+    clause: dict[str, float] = {}
     for r in teams:
         k = xw.resolve_api(r["player_name"], r["manager"], lg.market, owner,
                            index, r.get("market_value"))
+        buyout = text(r, API_TEAMS.BUYOUT)
         if not k:
             continue
         if r.get("player_team_id"):
             pt_to_key[r["player_team_id"]] = k
-        raw = (r.get("buyout_until") or "").strip()
+        raw = text(r, API_TEAMS.BUYOUT_UNTIL)
         if raw:
             try:
                 clause_until[k] = dt.datetime.fromisoformat(raw)
             except ValueError:
                 pass
+        if buyout:
+            clause.setdefault(k, float(r["buyout"]))
         # A clause you cannot pay is not a price — the app refuses outright.
-        if r["manager"] == me or not (r.get("buyout") or "").strip():
+        if r["manager"] == me or not buyout:
             continue
         if locked(clause_until, k, now):
             continue
@@ -663,15 +677,6 @@ def load(trials_pool=None) -> Universe:
     for k, money in received_offers.items():
         if k in proceeds:
             proceeds[k] = max(proceeds[k], money)
-    # Every clause, mine included — a rival can't answer back without them.
-    clause: dict[str, float] = {}
-    for r in teams:
-        if not (r.get("buyout") or "").strip():
-            continue
-        k = xw.resolve_api(r["player_name"], r["manager"], lg.market, owner,
-                           index, r.get("market_value"))
-        if k:
-            clause.setdefault(k, float(r["buyout"]))
     rival_cash = {h: (lg[h].cash.value or 0.0) for h in lg.managers
                   if h != me}
     # What the app says everyone is worth — the figure a sale pays out at,
@@ -693,16 +698,21 @@ def load(trials_pool=None) -> Universe:
     # start reading nothing (or crash outright) the moment the season
     # rolled over, the same bug scout.py's own hand-rolled reader had.
     # methodology.load_actuals() derives the label the same way.
-    _pj_files = sorted((SEASON / "live").glob("perjornada_*.csv"))
-    perjornada_rows = (list(csv.DictReader(open(_pj_files[-1])))
-                       if _pj_files else [])
+    # load_perjornada() globs the same folder for the same reason and
+    # reads the newest file's rows whole — a real consolidation, not a
+    # sixth slightly-different copy.
+    perjornada_rows = load_perjornada()
     # Real per-match data (mins played, goals, cards) for whichever ~118
     # players have been on one of this league's 5 squads — api_teams's
     # embedded lastStats, not a full-pool source (see
     # ffcore.profile._match_stats_history's own docstring for why not).
-    stats_path = TIDY / "api_stats.csv"
-    match_stats_rows = (list(csv.DictReader(open(stats_path)))
-                        if stats_path.exists() else [])
+    # load_api_stats() is latest-PER-KEY, not latest-snapshot — api_stats.csv's
+    # newest sweep alone only covers 2% of its (player_id, week, stat) keys
+    # (see its own docstring); _match_stats_history() below already
+    # collapses duplicate keys itself via last-write-wins, so this narrows
+    # row COUNT (11,190 -> 10,857) but not the resulting per-key value,
+    # verified equal.
+    match_stats_rows = load_api_stats()
     mk_keys = (set(price) | set(owner) | set(value) | set(clause)
               | set(clause_until) | set(route) | set(bids) | set(proceeds))
     market_keyed = {k: {"listed": k in price, "price": price.get(k),
@@ -818,7 +828,8 @@ def load(trials_pool=None) -> Universe:
     carried = {}
     for r in last_api_standings():
         if r.get("manager"):
-            carried.setdefault(r["manager"], float(r.get("team_points") or 0))
+            carried.setdefault(r["manager"],
+                              num(r, API_STANDINGS.TEAM_POINTS, default=0.0))
     # Same cash estimator league.md and rival_cash already use — a second,
     # independent read of the raw balance once left the headline quoting a
     # stale figure from a feed everything else had refused.
