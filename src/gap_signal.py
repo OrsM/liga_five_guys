@@ -30,7 +30,8 @@ import sys
 
 sys.path.insert(0, __file__.rsplit("/", 1)[0])
 
-from ffcore.tidy import read_csv, TIDY, SEASON, load_crosswalk  # noqa: E402
+from ffcore.tidy import (read_csv, TIDY, SEASON, load_crosswalk,  # noqa: E402
+                         load_matches, load_starters, load_perjornada)
 from ffcore.score import _per_jornada_current  # noqa: E402
 from stats import percentile  # noqa: E402
 
@@ -160,14 +161,27 @@ def leave_one_out(cases: list[tuple[str, float, float]]) -> dict:
 
 def run() -> None:
     xw = load_crosswalk()
-    starters = read_csv(TIDY / "starters.csv")
-    matches = read_csv(TIDY / "matches.csv")
+    # load_starters() (latest_only): safe — every real (match, player) key
+    # survives (2,512/2,512, see load_starters()'s docstring), and the join
+    # below already dedups per (match_id, key) so a duplicated snapshot row
+    # was never counted twice even before this migration.
+    starters = load_starters()
+    # load_matches() (latest_only): safe — only match_id -> jornada is read
+    # (directly here, and inside ffcore.score._per_jornada_current), which
+    # does not change between snapshots of the same match.
+    matches = load_matches()
+    # lineups.csv is read RAW, on purpose: _status_history() below needs the
+    # full snapshot history (its own docstring), across every source — the
+    # only lineups loaders in ffcore.tidy either give the latest snapshot
+    # (load_lineups_latest) or filter to one source (load_lineups), and
+    # narrowing to one source here could silently drop a real status flag
+    # from the other. Left alone.
     lineups = read_csv(TIDY / "lineups.csv")
     files = sorted((SEASON / "live").glob("perjornada_*.csv"))
     if not files or xw is None:
         print("no data yet")
         return
-    perj = read_csv(files[-1])
+    perj = load_perjornada()
 
     by_key = _per_jornada_current(starters, perj, matches, xw)
     jornada_dates = _jornada_dates(matches, starters)

@@ -18,7 +18,7 @@ from pathlib import Path
 sys.path.insert(0, "src")
 
 from ffcore.score import OUT_STATUSES  # noqa: E402
-from ffcore.tidy import load_players  # noqa: E402
+from ffcore.tidy import load_players, load_perjornada  # noqa: E402
 
 SEASON = Path("data/season")
 POS_ORDER = {"por": 0, "def": 1, "med": 2, "del": 3}
@@ -54,7 +54,7 @@ def _this_season() -> dict[str, dict[int, float]]:
     if not files:
         return {}
     out: dict[str, dict[int, float]] = {}
-    for r in csv.DictReader(open(files[-1], encoding="utf-8")):
+    for r in load_perjornada():
         pid = (r.get("ff_id") or "").strip()
         j = r.get("jornada")
         if not pid or not j:

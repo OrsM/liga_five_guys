@@ -26,7 +26,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from ffcore.text import norm  # noqa: E402
-from ffcore.tidy import SEASON, TIDY, read_csv, write_csv  # noqa: E402
+from ffcore.tidy import SEASON, load_matches_history, write_csv  # noqa: E402
 
 LIVE = SEASON / "live"
 
@@ -224,7 +224,7 @@ def main() -> None:
                  "run ingest.py fetch first")
 
     # Full history, not latest_only() — see match_jornadas()'s docstring.
-    timeline = match_jornadas(read_csv(TIDY / "matches.csv"))
+    timeline = match_jornadas(load_matches_history())
 
     for label, seq in sorted(by_label.items()):
         kept = keep_changed(seq)
