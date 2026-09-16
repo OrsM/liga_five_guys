@@ -19,14 +19,12 @@ what you were advised, not what you fielded).
 
 from __future__ import annotations
 
-import os
 import sys
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from ffcore.league import app_fielded  # noqa: E402
-from ffcore.text import norm  # noqa: E402
-from ffcore.tidy import (run_now,  # noqa: E402
+from ffcore.league import app_fielded
+from ffcore.text import norm
+from ffcore.tidy import (run_now,
                          DECISIONS, append_csv, load_deadline, read_csv, write_csv)
 
 FIELDS = ["logged_at", "hours_to_lock", "n_xi", "xi", "bench",

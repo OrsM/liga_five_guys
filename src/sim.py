@@ -32,24 +32,20 @@ file stays exactly as it is instead of being cut out of a 2,300-line module.
 
 from __future__ import annotations
 
-import os
 import sys
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-import json  # noqa: E402
-import os as _os  # noqa: E402
-from pathlib import Path  # noqa: E402
+import json
+import os as _os
+from pathlib import Path
 
 from decide import dead_weight, overdraft_fix, route_kind, value_rate  # noqa: E402,F401
-from methodology import current_mae  # noqa: E402
-from ffcore.parse import fmt_money  # noqa: E402
-from ffcore.league import app_fielded  # noqa: E402
-from ffcore.render import title_name  # noqa: E402
-from ffcore.tidy import (run_now,  # noqa: E402
-                         ALERTS, PARTS, REPORTS, age_phrase,  # noqa: E402
-                         stale_feeds,
-                         write_lines)
+from methodology import current_mae
+from ffcore.parse import fmt_money
+from ffcore.league import app_fielded
+from ffcore.render import title_name
+from ffcore.tidy import (run_now,
+                         ALERTS, PARTS, REPORTS, write_lines)
 
 OUT = "sim.md"
 
@@ -132,7 +128,6 @@ def xi_note(u, xi=None) -> str:
     see by_slot()'s docstring for why this matters once one report render
     calls this fact from several places.
     """
-    import decide
 
     if xi is None:
         _, xi = u.current_xi
@@ -181,7 +176,6 @@ def fielded_shape(u, xi=None) -> str:
     `xi`, when given, is the caller's own current_xi()-derived reading —
     see xi_note()'s docstring.
     """
-    import decide
 
     if xi is None:
         _, xi = u.current_xi
@@ -264,7 +258,6 @@ def by_slot(u, keys, exp=None):
     the same one driving the rest of its table, not a second, independently
     computed number that could read a different jornada for the same player.
     """
-    import decide
 
     if exp is None:
         exp, _ = u.current_xi
@@ -278,7 +271,6 @@ def _bar(u, exp=None, xi=None) -> float:
     `exp`/`xi`, when given, are the caller's own current_xi()-derived
     reading — see xi_note()'s docstring.
     """
-    import decide
     if exp is None or xi is None:
         exp, xi = u.current_xi
     return u.xi_bar
@@ -308,7 +300,6 @@ def ladder_rows(u, rows, bands=None, exp=None, xi=None) -> list[dict]:
     `exp`/`xi`, when given, are the caller's own current_xi()-derived
     reading — see xi_note()'s docstring.
     """
-    import decide
 
     if exp is None or xi is None:
         exp, xi = u.current_xi
@@ -494,7 +485,6 @@ def ladder(u, rows, base, data=None, exp=None, xi=None) -> list[str]:
     `exp`/`xi`, when given, are the caller's own current_xi()-derived
     reading — see xi_note()'s docstring.
     """
-    import decide
 
     if exp is None or xi is None:
         exp, xi = u.current_xi
@@ -998,7 +988,6 @@ def _xi_total(u, who, exp=None) -> float:
     (see its own docstring) — sharing it here skips re-deriving
     expected_own() once per manager, only the per-squad XI search differs.
     """
-    import decide
     from ffcore.season import best_xi
     if exp is None:
         exp, _ = u.current_xi
@@ -1009,7 +998,6 @@ def _xi_total(u, who, exp=None) -> float:
 def _shape_now(u, xi=None) -> str:
     """`xi`, when given, is the caller's own current_xi()-derived reading —
     see xi_note()'s docstring."""
-    import decide
     if xi is None:
         _, xi = u.current_xi
     return shape(u, xi)
@@ -1022,7 +1010,6 @@ def _rival_best(u, exp=None) -> dict:
     `exp`, when given, is the caller's own current_xi()-derived reading —
     see _xi_total()'s docstring for why one dict serves every manager.
     """
-    import decide
     if exp is None:
         exp, _ = u.current_xi
     out = [(_xi_total(u, m, exp=exp), m) for m in u.state.squads if m != u.me]
@@ -1052,7 +1039,6 @@ def payload(u, rows, base, rivals, locks_h=None, n_actions: int = 0,
     would otherwise each ask decide.current_xi() again — see xi_note()'s
     docstring.
     """
-    import decide
 
     if exp is None or xi is None:
         exp, xi = u.current_xi
@@ -1240,7 +1226,6 @@ def render(u, rows, base, stamp: str, rivals, n_actions: int = 0,
     # would read as the tail of the prior section once digest.py stitches
     # this in. No sentences above the table.
     # Why: docs/notes/sim.md#render--no-sentences-above-the-table
-    import decide
 
     if exp is None or xi is None:
         exp, xi = u.current_xi

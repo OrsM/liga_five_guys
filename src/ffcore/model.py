@@ -14,15 +14,12 @@ same player with nothing to say which one was right.
 
 from __future__ import annotations
 
-import os
-import sys
 from dataclasses import dataclass
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from ffcore.league import League          # noqa: E402
-from ffcore.score import build            # noqa: E402
-from ffcore.tidy import load_market_latest, load_lineups_latest, run_now  # noqa: E402
+from ffcore.league import League
+from ffcore.score import build
+from ffcore.tidy import load_market_latest, load_lineups_latest, run_now
 
 __all__ = ["Session", "session", "reset"]
 

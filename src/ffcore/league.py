@@ -36,8 +36,8 @@ from typing import NamedTuple
 from ffcore import schema
 from ffcore.parse import money
 from ffcore.text import norm
-from ffcore.tidy import (load_crosswalk,  # noqa: E402
-                         run_now,  # noqa: E402
+from ffcore.tidy import (load_crosswalk,
+                         run_now,
                          Market, input_path, ledger_stamp,
                          load_api_activity, load_api_standings, load_api_teams,
                          load_market_frozen, read_ledger,

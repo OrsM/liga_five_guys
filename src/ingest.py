@@ -52,12 +52,11 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from ffcore.auth import API_BASE                    # noqa: E402
-from ffcore.league import load_config                # noqa: E402
-from ffcore.tidy import ROOT, SEASON, TIDY, append_csv  # noqa: E402
-from sources import (API_LEAGUES_KEY, CAL_KEY, MATCH_KEY_RE,  # noqa: E402
+from ffcore.auth import API_BASE
+from ffcore.league import load_config
+from ffcore.tidy import ROOT, SEASON, TIDY, append_csv
+from sources import (API_LEAGUES_KEY, CAL_KEY, MATCH_KEY_RE,
                      ROW_TABLE, STORE_ONCE, league_sources, offer_sources,
                      parse_api_leagues, parse_points, parser_sig,
                      played_sources, player_sources, season_label,

@@ -9,7 +9,6 @@ none of them.
 Scripts reach it via:
 
     import os, sys
-    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 ffcore.tidy is imported lazily, not re-exported here: it touches the
 filesystem at import time to resolve FF_ROOT, and ffcore.text/parse must

@@ -1641,7 +1641,9 @@ def _selftest() -> None:
     # understat_players.csv shape, not a reimplementation of it ------------
     from ffcore.crosswalk import Crosswalk as _CW, Player as _P
     import ffcore.tidy as _tidy
-    import tempfile as _tempfile, os as _os, csv as _csv
+    import tempfile as _tempfile
+    import os as _os
+    import csv as _csv
 
     xw_us = _CW({
         "striker": _P("striker", "Striker Sam", understat_id="10"),

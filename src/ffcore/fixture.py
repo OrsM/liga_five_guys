@@ -22,17 +22,14 @@ Run `python src/ffcore/fixture.py` to execute the self-test below.
 from __future__ import annotations
 
 import math
-import os
 import statistics
-import sys
 from datetime import datetime
 from typing import NamedTuple
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from ffcore.parse import money  # noqa: E402
-from ffcore.text import match_one, norm  # noqa: E402
-from ffcore.tidy import kickoff_stamp  # noqa: E402
+from ffcore.parse import money
+from ffcore.text import match_one, norm
+from ffcore.tidy import kickoff_stamp
 
 # +/- this much from a median opponent, hardest to easiest. Unfitted guess.
 FIX_BAND = 0.12

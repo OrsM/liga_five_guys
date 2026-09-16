@@ -17,13 +17,11 @@ from __future__ import annotations
 
 import csv
 import io
-import os
 import sys
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from ffcore.league import ledger_from_api  # noqa: E402
-from ffcore.tidy import (LEDGER, load_api_activity,  # noqa: E402
+from ffcore.league import ledger_from_api
+from ffcore.tidy import (LEDGER, load_api_activity,
                          load_api_players, load_api_standings)
 
 FIELDS = ["date", "player", "player_id", "from", "to", "price", "note"]

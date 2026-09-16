@@ -38,45 +38,41 @@ WHAT IT CANNOT SEE, and each makes a hold look worse than it is:
 from __future__ import annotations
 
 import datetime as dt
-import itertools
-import os
 import sys
 from dataclasses import dataclass, field, replace
 from functools import cached_property
 from types import MappingProxyType
 from typing import Mapping
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from ffcore import forecast as _forecast  # noqa: E402
-from ffcore.forecast import Bootstrap, pool_from_perjornada  # noqa: E402
-import methodology as _methodology  # noqa: E402
-from stats import percentile  # noqa: E402
-from ffcore.crosswalk import club_key, Crosswalk  # noqa: E402
-from ffcore.league import MARKET  # noqa: E402
-from ffcore.parse import fmt_money  # noqa: E402
-from ffcore.schedule import (rounds_left, next_then_rest,  # noqa: E402
+from ffcore import forecast as _forecast
+from ffcore.forecast import Bootstrap, pool_from_perjornada
+import methodology as _methodology
+from stats import percentile
+from ffcore.crosswalk import club_key, Crosswalk
+from ffcore.parse import fmt_money
+from ffcore.schedule import (rounds_left, next_then_rest,
                              first_jornada_per_player, apply_fixtures,
-                             phantom_topup, phantom_fill)
-from ffcore.pricing import locked, burn, cash_price, respond  # noqa: E402
-from ffcore.action import Action  # noqa: E402
-from ffcore.candidates import (candidates, dead_weight,  # noqa: E402
+                             phantom_fill)
+from ffcore.pricing import locked, burn, cash_price, respond
+from ffcore.action import Action
+from ffcore.candidates import (candidates, dead_weight,
                                overdraft_fix, apply, offer_combos)
-from ffcore.par import value_rate, player_forecasts  # noqa: E402
-from ffcore.profile import (PlayerProfile, UNSCORED_DEFAULT,  # noqa: E402
+from ffcore.par import value_rate, player_forecasts
+from ffcore.profile import (PlayerProfile, UNSCORED_DEFAULT,
                             build_profiles)
-from ffcore.score import SLOT, SLOT_MIN, _calibrated  # noqa: E402
-from ffcore.text import norm  # noqa: E402
-from ffcore.season import (LeagueState, XI_SIZE, best_xi,  # noqa: E402
+from ffcore.score import SLOT, _calibrated
+from ffcore.text import norm
+from ffcore.season import (LeagueState, best_xi,
                            simulate_many)
-from ffcore.tidy import (run_now,  # noqa: E402
-                         latest_only, load_api_market,  # noqa: E402
+from ffcore.tidy import (run_now,
+                         latest_only, load_api_market,
                          load_api_stats, load_matches, load_perjornada,
                          last_api_standings, load_api_offers, load_api_teams,
                          load_players, market_routes, pending_sent,
                          bought_price, pending_received)
-from ffcore.schema import text, num, API_TEAMS, API_STANDINGS  # noqa: E402
-from ffcore.schema import MARKET as MARKET_TBL  # noqa: E402
+from ffcore.schema import text, num, API_TEAMS, API_STANDINGS
+from ffcore.schema import MARKET as MARKET_TBL
 
 __all__ = ["Action", "candidates", "rank", "Universe",
           "pending_sent", "pending_received"]
