@@ -12,12 +12,10 @@ fallback was deleted rather than kept.
 
 from __future__ import annotations
 
-import os
 import sys
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from ffcore.text import norm  # noqa: E402
+from ffcore.text import norm
 
 __all__ = ["read_slate", "slate_from_api", "comparison_rows",
           "comparison_table"]

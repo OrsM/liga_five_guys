@@ -24,9 +24,8 @@ import subprocess
 import sys
 import tempfile
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-import stats  # noqa: E402
+import stats
 
 __all__ = ["commit_as_of", "csv_as_of", "commits_touching",
           "replay_recommendations", "replay_percentile_rank",
@@ -105,7 +104,6 @@ NEAR_MISS_FRAC = 0.85
 
 _SCREEN_AUDIT_SCRIPT = """
 import json, sys
-sys.path.insert(0, "src")
 import decide
 
 u = decide.load()

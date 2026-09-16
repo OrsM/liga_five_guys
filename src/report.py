@@ -25,13 +25,12 @@ import re
 import sys
 from pathlib import Path
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from ffcore.bid import deals, low_priced_buys  # noqa: E402
-from ffcore.render import title_name  # noqa: E402
-from ffcore.score import SLOT_LABEL, SLOT_MIN, squad_pool  # noqa: E402
-from ffcore.tidy import (run_now,  # noqa: E402
-                         ALERTS, DECISIONS,  # noqa: E402
+from ffcore.bid import deals, low_priced_buys
+from ffcore.render import title_name
+from ffcore.score import SLOT_LABEL, SLOT_MIN, squad_pool
+from ffcore.tidy import (run_now,
+                         ALERTS, DECISIONS,
                          age_phrase, append_csv, load_crosswalk,
                          load_deadline, read_csv,
                          snapshot_stamp, stale_feeds, widen_csv, write_lines)

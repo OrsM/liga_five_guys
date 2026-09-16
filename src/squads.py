@@ -15,20 +15,17 @@ read_initial()/apply_transactions() live in ffcore.league, replayed the
 same way by every reader. Run via workflow_dispatch; no arguments.
 """
 
-import os
-import sys
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from ffcore.bid import (HORIZONS, MAX_LAG_H, deals,  # noqa: E402
+from ffcore.bid import (HORIZONS, MAX_LAG_H, deals,
                         premiums, usable)
-from ffcore.parse import fmt_money, fmt_pct  # noqa: E402
-from ffcore.second import LEGEND, af_cell, second_cells  # noqa: E402
-from ffcore.text import norm  # noqa: E402
-from ffcore.tidy import (run_now,  # noqa: E402
-                         DECISIONS, PARTS, append_csv,  # noqa: E402
+from ffcore.parse import fmt_money, fmt_pct
+from ffcore.second import LEGEND, af_cell, second_cells
+from ffcore.text import norm
+from ffcore.tidy import (run_now,
+                         DECISIONS, PARTS, append_csv,
                          load_players, widen_csv, write_lines)
-from slate import read_slate  # noqa: E402
+from slate import read_slate
 
 # Both probable-XI sources, side by side, in every table this module writes.
 # One unlabelled Start% column hid which site said it, and the two disagree

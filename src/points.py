@@ -20,13 +20,11 @@ Two deliberate limits:
 
 from __future__ import annotations
 
-import os
 import sys
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from ffcore.text import norm  # noqa: E402
-from ffcore.tidy import SEASON, load_matches_history, write_csv  # noqa: E402
+from ffcore.text import norm
+from ffcore.tidy import SEASON, load_matches_history, write_csv
 
 LIVE = SEASON / "live"
 

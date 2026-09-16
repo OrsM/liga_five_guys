@@ -15,10 +15,9 @@ import csv
 import sys
 from pathlib import Path
 
-sys.path.insert(0, "src")
 
-from ffcore.score import OUT_STATUSES  # noqa: E402
-from ffcore.tidy import load_players, load_perjornada  # noqa: E402
+from ffcore.score import OUT_STATUSES
+from ffcore.tidy import load_players, load_perjornada
 
 SEASON = Path("data/season")
 POS_ORDER = {"por": 0, "def": 1, "med": 2, "del": 3}

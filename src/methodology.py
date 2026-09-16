@@ -28,19 +28,17 @@ back — the two never import each other at module top level.
 from __future__ import annotations
 
 import datetime as dt
-import os
 import statistics
 import sys
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-import stats  # noqa: E402
-from ffcore import schema  # noqa: E402
-from ffcore.fixture import FIX_BAND  # noqa: E402
-from ffcore.score import SHRINK_K  # noqa: E402
-from ffcore.text import norm, resolve  # noqa: E402
-from ffcore.tidy import (clock_history, load_starters, run_now,  # noqa: E402
-                         DECISIONS, PARTS, LINEUP_SOURCE,  # noqa: E402
+import stats
+from ffcore import schema
+from ffcore.fixture import FIX_BAND
+from ffcore.score import SHRINK_K
+from ffcore.text import norm, resolve
+from ffcore.tidy import (clock_history, load_starters, run_now,
+                         DECISIONS, PARTS, LINEUP_SOURCE,
                          DAILY_FRESH_DAYS, EVERY_RUN_FRESH_DAYS,
                          SEASON, TIDY, age_phrase, load_elo,
                          stale_feeds,
@@ -1141,7 +1139,7 @@ def formula_lines() -> list[str]:
         "### The model, as configured right now", "",
         "| Term | Setting | Fitted? |",
         "|---|---|---|",
-        f"| Formula | `xPts/j = shrunk pts-per-match × fixture × P(start)` | "
+        "| Formula | `xPts/j = shrunk pts-per-match × fixture × P(start)` | "
         "— |",
         f"| Shrinkage | K = {SHRINK_K:g} matches, applied twice: last season "
         "toward the positional prior, then this season toward that | yes |",

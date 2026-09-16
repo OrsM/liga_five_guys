@@ -28,12 +28,11 @@ from __future__ import annotations
 import random
 import sys
 
-sys.path.insert(0, __file__.rsplit("/", 1)[0])
 
-from ffcore.tidy import (read_csv, TIDY, SEASON, load_crosswalk,  # noqa: E402
+from ffcore.tidy import (read_csv, TIDY, SEASON, load_crosswalk,
                          load_matches, load_starters, load_perjornada)
-from ffcore.score import _per_jornada_current  # noqa: E402
-from stats import percentile  # noqa: E402
+from ffcore.score import _per_jornada_current
+from stats import percentile
 
 
 def _jornada_dates(matches: list[dict], starters: list[dict]) -> dict[int, str]:

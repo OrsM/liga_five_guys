@@ -56,14 +56,11 @@ inside the function body. Followed here rather than re-litigated.
 
 from __future__ import annotations
 
-import os
-import sys
 
 # Run directly (`python src/ffcore/fixtures.py`), sys.path[0] is
 # src/ffcore/ itself, so the lazy `from decide import ...` below can't
 # find `decide` — same problem ffcore/model.py and ffcore/fixture.py
 # already solved; same fix, not a new one.
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 __all__ = ["tiny_profile", "tiny_state", "tiny_bootstrap", "tiny_universe",
           "tiny_market_universe", "players_from_flat"]

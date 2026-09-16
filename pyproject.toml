@@ -27,3 +27,19 @@ dependencies = [
 
 [tool.ruff.lint]
 select = ["E4", "E7", "E9", "F"]
+
+# src/ holds one package (ffcore) plus the top-level stage modules.
+# Declaring it here is what lets `import ffcore` work from anywhere --
+# 18 files used to insert src/ onto sys.path by hand at import time and
+# then silence the linter for the import-not-at-top that caused, 89
+# times. The package is the fix; the noqa was the symptom.
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+packages = ["ffcore"]
+py-modules = ["decide", "sim", "report", "methodology", "slate", "squads",
+              "points", "ledger", "crosswalk", "ingest", "sources", "digest",
+              "scout", "backtest", "gap_signal", "stats", "xi", "run"]

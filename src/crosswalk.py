@@ -15,15 +15,13 @@ feed that skips a sweep erases nothing.
 
 from __future__ import annotations
 
-import os
 import sys
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from ffcore import schema  # noqa: E402
-from ffcore.crosswalk import Club, Crosswalk, Player  # noqa: E402
-from ffcore.text import norm  # noqa: E402
-from ffcore.tidy import (TIDY, latest_only, load_fixtures,  # noqa: E402
+from ffcore import schema
+from ffcore.crosswalk import Club, Crosswalk, Player
+from ffcore.text import norm
+from ffcore.tidy import (TIDY, latest_only, load_fixtures,
                          load_lineups_latest, load_market, load_market_latest,
                          load_starters, narrow_by_club, read_csv, row_key,
                          shared_names)

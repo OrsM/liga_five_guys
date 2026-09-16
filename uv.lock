@@ -82,7 +82,7 @@ wheels = [
 [[package]]
 name = "liga-five-guys"
 version = "0.1.0"
-source = { virtual = "." }
+source = { editable = "." }
 dependencies = [
     { name = "cssselect" },
     { name = "httpx" },
