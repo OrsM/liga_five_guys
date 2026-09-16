@@ -66,7 +66,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 __all__ = ["tiny_profile", "tiny_state", "tiny_bootstrap", "tiny_universe",
-          "tiny_market_universe"]
+          "tiny_market_universe", "players_from_flat"]
 
 
 # The one squad shape every default in this module agrees on: exactly
@@ -131,6 +131,62 @@ def tiny_profile(key: str, **overrides) -> "PlayerProfile":
         history=PlayerHistory(),
         derived=PlayerDerived(**derived_kwargs),
     )
+
+
+def players_from_flat(pos=None, price=None, proceeds=None, owner=None,
+                      value=None, market_exp=None, start=None, clause=None,
+                      clause_until=None, route=None, bids=None, name=None
+                      ) -> dict[str, "PlayerProfile"]:
+    """One PlayerProfile per key across the given per-field flat dicts —
+    a bridge for the many hand-built `Universe(pos={...}, price={...},
+    ...)` fixtures across this repo's `_selftest`s onto the `players=`
+    constructor path.
+
+    WAVE 3F: this is decide.py's own `_synthetic_profiles()`, moved here
+    verbatim (same field-by-field construction, same defaults) rather
+    than reimplemented, when `Universe.__post_init__` and its 12
+    `InitVar` flat-dict params were deleted — every fixture that used to
+    lean on that constructor-time synthesis for convenience now calls
+    this explicitly and passes `players=players_from_flat(...)` instead.
+
+    NOT `tiny_profile()`. `tiny_profile()` builds ONE fully-populated,
+    legal-looking player from keyword overrides; this builds MANY
+    sparse ones straight from parallel per-field dicts, matching
+    whatever subset of fields the caller happens to have on hand (most
+    fields default to "" / None / 0, not tiny_profile()'s populated
+    defaults) — the shape a fixture ported from the old flat-dict
+    constructor actually has.
+    """
+    from ffcore.crosswalk import Player
+    from ffcore.profile import (PlayerCurrent, PlayerHistory,
+                                PlayerDerived, PlayerProfile as _PP)
+    keys = (set(pos or {}) | set(price or {}) | set(proceeds or {})
+           | set(owner or {}) | set(value or {}) | set(market_exp or {})
+           | set(start or {}) | set(clause or {}) | set(clause_until or {})
+           | set(route or {}) | set(bids or {}) | set(name or {}))
+    out = {}
+    for k in keys:
+        out[k] = _PP(
+            identity=Player(player_id=k, name=(name or {}).get(k, k)),
+            current=PlayerCurrent(
+                pos=(pos or {}).get(k, ""),
+                listed=k in (price or {}),
+                price=(price or {}).get(k),
+                proceeds=(proceeds or {}).get(k),
+                owner=(owner or {}).get(k),
+                value=(value or {}).get(k),
+                clause=(clause or {}).get(k),
+                clause_until=(clause_until or {}).get(k),
+                route=(route or {}).get(k),
+                bids=(bids or {}).get(k),
+            ),
+            history=PlayerHistory(),
+            derived=PlayerDerived(
+                market_exp=(market_exp or {}).get(k),
+                start_p=(start or {}).get(k),
+            ),
+        )
+    return out
 
 
 def tiny_state(**overrides) -> "LeagueState":
@@ -357,7 +413,28 @@ def _selftest() -> None:
     assert rows, "rank() must return at least one row for a real market"
     assert any(r["action"].buy == "cand_free" for r in rows), rows
 
-    print("ffcore.fixtures self-test OK (17 cases)")
+    # -- players_from_flat(): the bridge Wave 3F's own hand-built
+    # `Universe(pos={...}, price={...}, ...)` fixtures now go through,
+    # in place of the constructor-time synthesis `Universe.__post_init__`
+    # used to do — same per-field inclusion rules, since it's the same
+    # code, moved rather than reimplemented.
+    flat_players = players_from_flat(
+        pos={"a": "DEF", "b": "MED"}, price={"a": 5e6},
+        owner={"b": "riv"}, name={"a": "Alpha"})
+    assert set(flat_players) == {"a", "b"}, flat_players
+    assert flat_players["a"].current.pos == "DEF"
+    assert flat_players["a"].current.price == 5e6
+    assert flat_players["a"].current.listed is True     # key in `price`
+    assert flat_players["b"].current.listed is False    # not in `price`
+    assert flat_players["b"].current.owner == "riv"
+    assert flat_players["a"].identity.name == "Alpha"   # given explicitly
+    assert flat_players["b"].identity.name == "b"       # falls back to the key
+    # A field never mentioned by any flat dict: not a KeyError, just an
+    # empty result — the whole point of a "bridge for callers without a
+    # real PlayerProfile" existing at all.
+    assert players_from_flat() == {}
+
+    print("ffcore.fixtures self-test OK (24 cases)")
 
 
 if __name__ == "__main__":
