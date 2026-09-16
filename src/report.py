@@ -193,6 +193,26 @@ def main() -> None:
         row["name"] = title_name(row["name"])
         players.append(row)
 
+    # The WHOLE market, not just this squad — squad_log.csv is the only
+    # record of what the model predicted for a player, and every fit that
+    # grades our own past predictions (DRIFT_FRAC, current_mae(), the
+    # start-probability Brier table) can only ever see players who show up
+    # here. `sc` is the one shared Scorer for this whole run (same session
+    # decide.py's candidate scan reads), so this is not a second pricing
+    # pass — every player is already priced for the BUY/RAID scan; this
+    # just keeps a record of it instead of throwing it away.
+    # Why: docs/notes/report.md#market_wide_log--every-player-gets-a-forecast-on-record
+    all_keys = sorted({r["ff_id"] for r in market if r.get("ff_id")})
+    market_scored, _market_missing = sc.score_squad(all_keys)
+    squad_keys = {p["key"] for p in players}
+    market_players = []
+    for s in market_scored:
+        row = s.as_row()
+        if row["key"] in squad_keys:
+            continue                          # already logged via `players`
+        row["name"] = title_name(row["name"])
+        market_players.append(row)
+
     xw = load_crosswalk()
     pool = squad_pool(players)
 
@@ -221,7 +241,8 @@ def main() -> None:
     # forecast is graded by how long before the lock it was made.
     deadline, _dl_src = load_deadline(with_source=True)
     if players and best:
-        log_squad(observed, players, {id(p) for p in best[2]}, best[1],
+        log_squad(observed, players + market_players,
+                  {id(p) for p in best[2]}, best[1],
                   best[0], deadline, obs_dt)
 
     # --- the warnings themselves -------------------------------------------
