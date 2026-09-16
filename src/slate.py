@@ -89,7 +89,7 @@ def comparison_rows(u, bands=None) -> list[dict]:
     mine = set(u.state.squads.get(u.me, {}))
     fc = u.player_forecasts()
     out = []
-    for k, price in u.price.items():
+    for k, price in u.price_view.items():
         if k in mine:
             continue
         f = fc.get(k, {})
@@ -98,8 +98,8 @@ def comparison_rows(u, bands=None) -> list[dict]:
         if b is not None:
             par, par_lo, par_hi, _act = b
         out.append({
-            "key": k, "name": title_name(u.name.get(k, k)),
-            "pos": u.pos.get(k, ""), "price": price,
+            "key": k, "name": title_name(u.name_view.get(k, k)),
+            "pos": u.pos_view.get(k, ""), "price": price,
             "season_pts": f.get("season_pts"), "next_pts": f.get("next_pts"),
             "par": par, "par_lo": par_lo, "par_hi": par_hi,
             "value": decide.value_rate(par, price),

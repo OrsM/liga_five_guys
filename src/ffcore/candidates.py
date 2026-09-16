@@ -42,7 +42,7 @@ def max_spare_proceeds(u) -> float:
     what candidates() can fund a buy with (cash, or exactly one spare,
     never a sale chain). 0.0 with no fieldable spare at all.
     """
-    return max((u.proceeds.get(k, 0.0) for k in fieldable_spares(u)),
+    return max((u.proceeds_view.get(k, 0.0) for k in fieldable_spares(u)),
               default=0.0)
 
 
@@ -98,7 +98,7 @@ def candidates(u, expected: dict[str, float],
     par_of = {k: v["par"] for k, v in player_forecasts(u).items()}
 
     def _spare_rank(k):
-        vr = value_rate(par_of.get(k, 0.0), u.proceeds.get(k, 0.0))
+        vr = value_rate(par_of.get(k, 0.0), u.proceeds_view.get(k, 0.0))
         # No proceeds means nothing to fund with regardless of how little
         # he's worth keeping — ranks last, never first.
         return (vr is None, vr if vr is not None else 0.0)
@@ -106,7 +106,7 @@ def candidates(u, expected: dict[str, float],
     spare = sorted(fieldable_spare, key=_spare_rank)
 
     out: list[Action] = []
-    for c, price in sorted(u.price.items(), key=lambda kv: kv[1]):
+    for c, price in sorted(u.price_view.items(), key=lambda kv: kv[1]):
         if c in mine or bar_exp.get(c, 0.0) <= bar:
             continue
         # Never propose a listed target (owned, not a clause) as a move —
@@ -117,7 +117,7 @@ def candidates(u, expected: dict[str, float],
         if kind_ == "listed":
             continue
         raid = kind_ == "raid"
-        victim = u.owner.get(c, "") if raid else ""
+        victim = u.owner_view.get(c, "") if raid else ""
         kind = "clause" if raid else "buy"
         swap = kind + "-swap" if raid else "swap"
         if price <= cash:
@@ -125,7 +125,7 @@ def candidates(u, expected: dict[str, float],
         # Funded by a sale: every spare is tried (spare's own docstring
         # above), worst-value-per-euro first.
         for s in spare:
-            got = u.proceeds.get(s, 0.0)
+            got = u.proceeds_view.get(s, 0.0)
             if price <= cash + got:
                 out.append(Action(swap, buy=c, sell=s, cost=price,
                                   proceeds=got, victim=victim))
@@ -152,7 +152,7 @@ def dead_weight(u) -> list[tuple[str, float]]:
     starts: set[str] = set()
     for j in choosable:
         starts.update(best_xi(mine, u.forecaster.expected(j)))
-    return sorted(((k, u.proceeds.get(k, 0.0)) for k in mine
+    return sorted(((k, u.proceeds_view.get(k, 0.0)) for k in mine
                    if k not in starts),
                   key=lambda kv: -kv[1])
 
@@ -205,7 +205,7 @@ def apply(u, a: Action) -> dict[str, dict[str, str]]:
         # A steal removes him from his owner. This is the whole point.
         for m in sq:
             sq[m].pop(a.buy, None)
-        sq[u.me][a.buy] = u.pos.get(a.buy, "MED")
+        sq[u.me][a.buy] = u.pos_view.get(a.buy, "MED")
     return {m: phantom_topup(s) for m, s in sq.items()}
 
 
@@ -293,7 +293,7 @@ def _selftest() -> None:
     # own legality logic (already exhaustively covered in decide.py's
     # self-test).
     assert max_spare_proceeds(u) == max(
-        (u.proceeds.get(s, 0.0) for s in spares), default=0.0), \
+        (u.proceeds_view.get(s, 0.0) for s in spares), default=0.0), \
         (max_spare_proceeds(u), spares)
     assert max_spare_proceeds(u) == 6e6, max_spare_proceeds(u)  # dead_f's proceeds
     # A squad with no safely-sellable spare at all has nothing to raise.

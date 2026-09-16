@@ -36,7 +36,7 @@ def burn(u, a) -> float | None:
     """
     if not a.buy:
         return 0.0
-    val = u.value.get(a.buy)
+    val = u.value_view.get(a.buy)
     if val is None:
         return None
     return max(0.0, a.cost - val)
@@ -105,7 +105,7 @@ def _selftest() -> None:
 
     @dataclass
     class _FakeUniverse:
-        value: dict = field(default_factory=dict)
+        value_view: dict = field(default_factory=dict)
         rival_cash: dict = field(default_factory=dict)
         me: str = "me"
 
@@ -120,7 +120,7 @@ def _selftest() -> None:
     assert locked({"x": None}, "x", now) is True
 
     # -- burn(): a clause burns the premium, a free agent burns nothing ----
-    u = _FakeUniverse(value={"star": 5e6, "free": 4e6})
+    u = _FakeUniverse(value_view={"star": 5e6, "free": 4e6})
     assert burn(u, _FakeAction(buy="star", cost=8e6)) == 3e6
     assert burn(u, _FakeAction(buy="free", cost=4e6)) == 0.0
     assert burn(u, _FakeAction(buy="free", cost=3e6)) == 0.0  # a bargain, not negative
