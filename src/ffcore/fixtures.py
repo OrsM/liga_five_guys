@@ -286,7 +286,7 @@ def _selftest() -> None:
     # Every squad member has a matching PlayerProfile, positioned the
     # same way LeagueState itself says he is.
     assert set(u.players) == set(DEFAULT_SQUAD), u.players
-    assert u.pos == DEFAULT_SQUAD, u.pos
+    assert u.pos_view == DEFAULT_SQUAD, u.pos_view
 
     # -- tiny_bootstrap(): can answer every jornada tiny_state() promises
     boot = tiny_bootstrap()
