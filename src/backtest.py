@@ -1,16 +1,3 @@
-"""
-backtest.py — reconstructs the tidy store's state at a past point in time,
-from git history rather than re-parsing raw sweeps.
-
-    python src/backtest.py --selftest
-
-Uses `data/tidy/*.csv`'s own git history (committed after every real run)
-via `git show <commit>:<path>` — no re-parsing, no re-joining.
-
-NO HINDSIGHT, BY CONSTRUCTION: `commit_as_of(when, path)` only looks at
-commits at or before `when`, so a query can never see data that arrived
-after the moment it asks about.
-"""
 
 from __future__ import annotations
 
@@ -32,15 +19,10 @@ __all__ = ["commit_as_of", "csv_as_of", "commits_touching",
           "replay_ladder_percentile", "compare_arms",
           "screen_audit_episode", "replay_screen_misses"]
 
-# The repo root — git commands run from here regardless of the caller's cwd.
 _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
 def commit_as_of(when: dt.datetime, path: str) -> str | None:
-    """Most recent commit touching `path` at or before `when`, or None.
-    Uses git's own `--before` comparison rather than filtering timestamps
-    in Python.
-    """
     out = subprocess.run(
         ["git", "log", "--format=%H", "--before", when.isoformat(), "-1",
          "--", path],
@@ -50,7 +32,6 @@ def commit_as_of(when: dt.datetime, path: str) -> str | None:
 
 
 def _show(sha: str, path: str) -> str | None:
-    """`git show <sha>:<path>`'s raw text, or None on failure."""
     out = subprocess.run(["git", "show", f"{sha}:{path}"],
                          cwd=_ROOT, capture_output=True, text=True,
                          check=False)
@@ -58,13 +39,6 @@ def _show(sha: str, path: str) -> str | None:
 
 
 def csv_as_of(when: dt.datetime, path: str) -> list[dict]:
-    """`read_csv(path)`'s rows as they stood at `when` — [] if the path
-    didn't exist yet at that point.
-
-    Deliberately NOT read_csv()'s own cache (keyed on the file's current
-    mtime/size, which a historical git blob doesn't have).
-    Why: docs/notes/backtest.md#csv_as_of--not-read_csvs-cache-a-deliberately-separate-path
-    """
     sha = commit_as_of(when, path)
     if sha is None:
         return []
@@ -73,10 +47,6 @@ def csv_as_of(when: dt.datetime, path: str) -> list[dict]:
 
 
 def commits_touching(path: str) -> list[tuple[str, dt.datetime]]:
-    """[(sha, commit time)] for every commit touching `path`, oldest
-    first. Uses `--follow` so a rename in the file's history isn't
-    silently truncated.
-    """
     out = subprocess.run(
         ["git", "log", "--format=%H|%cI", "--follow", "--reverse", "--", path],
         cwd=_ROOT, capture_output=True, text=True, check=False)
@@ -90,17 +60,8 @@ def commits_touching(path: str) -> list[tuple[str, dt.datetime]]:
     return commits
 
 
-# ---------------------------------------------------------------------------
-# screen_audit — did decide.candidates()'s expected-points prune ever
-# discard a real winner? Uses a full historical `git worktree` checkout
-# (not per-file reconstruction) so decide.load() reads real, git-tracked
-# historical state via that commit's own code.
-# Why: docs/notes/backtest.md#screen_audit--full-historical-checkout-not-per-file-reconstruction
-# ---------------------------------------------------------------------------
 
 NEAR_MISS_FRAC = 0.85
-# A "near miss": excluded by candidates() but within this fraction of the
-# live XI bar — not every exclusion, most of which are nowhere close.
 
 _SCREEN_AUDIT_SCRIPT = """
 import json, sys
@@ -138,18 +99,6 @@ print(json.dumps({{"near_miss_count": len(near), "best": best}}))
 
 def screen_audit_episode(sha: str, when: str, near_miss_frac: float = NEAR_MISS_FRAC,
                          timeout: float = 90.0) -> dict:
-    """One historical check: among candidates() exclusions that day
-    within `near_miss_frac` of the live bar (cash-affordable, non-listed),
-    does any simulate a real pts_lo beating that day's actual top pick?
-
-    Runs a read-only `git worktree` checkout of `sha` (always removed)
-    and a subprocess against that worktree's own historical code/data.
-
-    Returns `{"error": ...}` on failure rather than raising. Otherwise
-    `{"sha", "when", "near_miss_count", "near_miss_best",
-    "actual_best_pts_lo", "beat_actual"}` — `beat_actual` is None when
-    there's nothing to compare.
-    """
     tmp = tempfile.mkdtemp(prefix="lfg_screen_audit_")
     try:
         wt = subprocess.run(
@@ -202,12 +151,6 @@ def screen_audit_episode(sha: str, when: str, near_miss_frac: float = NEAR_MISS_
 
 def replay_screen_misses(sample_every: int = 10,
                          near_miss_frac: float = NEAR_MISS_FRAC) -> dict:
-    """Samples every `sample_every`-th real reports/decisions.json commit
-    and runs `screen_audit_episode()` on each.
-
-    Returns {"sampled", "valid", "errors", "beats", "results"} —
-    `results` is every sample's own dict.
-    """
     commits = commits_touching("reports/decisions.json")
     sampled = commits[::max(1, sample_every)]
     results = [screen_audit_episode(sha, when.isoformat(), near_miss_frac)
@@ -220,15 +163,6 @@ def replay_screen_misses(sample_every: int = 10,
 
 
 def naive_value_baseline(golden: list[dict]) -> dict | None:
-    """Does the rate forecast beat a naive predictor built from a
-    player's real market value just before the jornada locked
-    (`csv_as_of()`, no hindsight), scaled by one fitted constant (mean
-    actual / mean value over the same sample)?
-
-    `golden` is `methodology.golden_rows()`'s own output; only rows with
-    a real rate outcome (`predicted_rate` not None) are used. None when
-    there's nothing to compare.
-    """
     import methodology as M
     from ffcore.text import norm
     from ffcore.tidy import load_matches
@@ -236,13 +170,7 @@ def naive_value_baseline(golden: list[dict]) -> dict | None:
     checked = [r for r in golden if r.get("predicted_rate") is not None]
     if not checked:
         return None
-    # load_matches() (latest_only): safe here — JornadaClock only reads
-    # each match's (home, away) -> jornada, which does not change between
-    # snapshots of the same match (only its score does), and latest_only
-    # keeps every real match (380/380, see load_matches()'s own docstring).
     matches = load_matches()
-    # clock_history(), not clock(): this is a historical replay and needs
-    # every past round's lock. See clock_history()'s own docstring.
     locks = M.clock_history().round_locks
 
     resolved = []
@@ -273,15 +201,6 @@ def naive_value_baseline(golden: list[dict]) -> dict | None:
 
 
 def recency_only_baseline(golden: list[dict], window: int = 3) -> dict | None:
-    """Does the rate forecast beat a player's own mean per-match rate over
-    his last `window` played jornadas — no shrinkage, no market value, no
-    fixture — ordered by real lock time and using only jornadas strictly
-    before the one being predicted?
-
-    A player with no prior played jornada (a true cold start) is skipped.
-    `golden` is `methodology.golden_rows()`'s own output, same contract
-    as `naive_value_baseline()`. None when there's nothing to compare.
-    """
     import methodology as M
     from ffcore.text import norm
     from ffcore.tidy import load_matches
@@ -289,17 +208,12 @@ def recency_only_baseline(golden: list[dict], window: int = 3) -> dict | None:
     checked = [r for r in golden if r.get("predicted_rate") is not None]
     if not checked:
         return None
-    # load_matches() (latest_only): same safety argument as
-    # naive_value_baseline() above — only (home, away) -> jornada is read,
-    # which is stable across snapshots of the same match.
     matches = load_matches()
-    # clock_history(), not clock() -- see naive_value_baseline() above.
     clock = M.clock_history()
     locks, order = clock.round_locks, clock.order
     pos = {j: i for i, j in enumerate(order)}
 
     actuals, _label = M.load_actuals()
-    # {norm name: {lock-order position: real per-match rate that jornada}}
     by_player: dict[str, dict[int, float]] = {}
     for a in actuals:
         if a["games_delta"] < 1:
@@ -333,11 +247,6 @@ def recency_only_baseline(golden: list[dict], window: int = 3) -> dict | None:
 
 
 def _actuals_index():
-    """(points_between(name, since, until), now) — the real per-jornada
-    points ledger every replay function below grades against, built once
-    so two comparisons never read different slices of history.
-    `until=None` means no upper bound (to `now`).
-    """
     import methodology as M
     from ffcore.text import norm
 
@@ -361,11 +270,6 @@ def _actuals_index():
 
 
 def _pick_episodes(commits, pick) -> list[dict]:
-    """One episode per distinct (buy, sell) pair at each rank slot
-    `pick(moves)` returns (a list; slot 0 = top pick, slot 1 = second,
-    etc.) — deduped independently per slot, since one slot's advice
-    changing is unrelated to another's.
-    """
     episodes = []
     last_pair_by_slot: dict[int, tuple] = {}
     for sha, when in commits:
@@ -394,20 +298,10 @@ def _pick_episodes(commits, pick) -> list[dict]:
 
 
 HORIZON_DAYS = 10.0
-# A FIXED forward window, not "episode day to now": prevents an early
-# episode from scoring every jornada since while a recent one barely
-# scores any, and prevents a superseded episode from double-counting
-# jornadas a newer one at the same slot already claims.
-# Why: docs/notes/backtest.md#horizon_days--fixed-window-not-episode-to-now
 
 
 def _grade_episodes(episodes, points_between, now, min_days=None,
                     horizon_days: float = HORIZON_DAYS) -> dict | None:
-    """`episodes` -> the summary shape every replay function returns,
-    graded on real points scored in the fixed [when, when+horizon_days]
-    window after each episode's own day. `min_days`, when given, requires
-    that much extra runway on top of `horizon_days`.
-    """
     need = max(horizon_days, min_days or 0)
     resolved = []
     for ep in episodes:
@@ -432,12 +326,6 @@ def _grade_episodes(episodes, points_between, now, min_days=None,
 
 
 def compare_arms(a: dict, b: dict, a_name: str, b_name: str) -> str:
-    """`a_name` vs `b_name` on per-episode net (fixed horizon, so
-    comparable regardless of episode count or timing). Uses
-    `stats.bootstrap_gap` on the two arms' `nets`; only claims a real
-    beat when the 90% CI on the gap excludes zero. Both arms' own mean
-    net per episode are always shown.
-    """
     gap = stats.bootstrap_gap(a["nets"], b["nets"])
     lines = [f"{a_name}: {a['n']} eps, mean {a['mean_net']:+.1f} pts/ep "
              f"(total {a['total_net']:+.1f})",
@@ -457,21 +345,6 @@ def compare_arms(a: dict, b: dict, a_name: str, b_name: str) -> str:
 
 
 def replay_recommendations(min_days: float = 3.0) -> dict | None:
-    """Did following the decision layer's own real top recommendation, on
-    the day it was made, actually gain points against what happened next
-    — not "is the forecast accurate," but "would the advice have won."
-
-    Source: `reports/decisions.json`'s own `moves[0]`, read off the real
-    commit stream oldest-first (no hindsight — each day graded only on
-    points scored after that day). Deduped per `_pick_episodes()`; only
-    episodes with a full `HORIZON_DAYS` of runway are graded — read `n`
-    off the result, not the size of the underlying commit stream.
-
-    `min_days`: episodes younger than this are excluded, not scored as a
-    loss.
-
-    None when there's nothing to replay yet.
-    """
     commits = commits_touching("reports/decisions.json")
     if not commits:
         return None
@@ -483,17 +356,6 @@ def replay_recommendations(min_days: float = 3.0) -> dict | None:
 
 
 def replay_percentile_rank(min_days: float = 3.0) -> dict | None:
-    """The same replay as `replay_recommendations()`, one thing changed:
-    picks whichever already-screened candidate in that day's `moves` has
-    the best `pts_lo` (the 10th percentile of its own paired trial
-    distribution) instead of the mean-ranked `moves[0]`.
-
-    A REAL LIMIT: can only pick among candidates the old mean-based
-    screen already let through — it cannot resurrect one the screen
-    discarded outright for a poor mean. A genuinely fair test of
-    percentile-first screening would need a full historical Universe
-    reconstruction, not built.
-    """
     commits = commits_touching("reports/decisions.json")
     if not commits:
         return None
@@ -511,18 +373,6 @@ def replay_percentile_rank(min_days: float = 3.0) -> dict | None:
 
 
 def replay_ladder_percentile(topn: int = 3, min_days: float = 3.0) -> dict:
-    """Does re-sorting the WHOLE ladder by `pts_lo` — not just the single
-    headline pick `replay_percentile_rank()` validates — hold up too?
-
-    Two arms, same real history: "current" replays each day's real top-N
-    (`moves[:topn]`, exactly what was actually shown); "percentile"
-    replays the top-N by `pts_lo` from that same day's candidate pool.
-    Both graded through the identical machinery, one independent dedup
-    stream per rank slot.
-
-    Returns `{"current": <summary or None>, "percentile": <summary or
-    None>}`.
-    """
     commits = commits_touching("reports/decisions.json")
     points_between, now = _actuals_index()
     if not commits or now is None:
@@ -543,22 +393,17 @@ def replay_ladder_percentile(topn: int = 3, min_days: float = 3.0) -> dict:
 
 
 def _selftest() -> None:
-    # -- commit_as_of: checked against git's own log, not assumed --------
     recent = commit_as_of(dt.datetime.now(dt.timezone.utc), "data/tidy/market.csv")
     assert recent is not None, "no commit found for market.csv at all"
 
-    # Before this repo existed: no commit, not a crash and not a guess.
     ancient = commit_as_of(dt.datetime(2020, 1, 1, tzinfo=dt.timezone.utc),
                            "data/tidy/market.csv")
     assert ancient is None, ancient
 
-    # A path that has never been committed: also None, same contract.
     never = commit_as_of(dt.datetime.now(dt.timezone.utc),
                          "data/tidy/this_file_does_not_exist.csv")
     assert never is None, never
 
-    # -- csv_as_of: NO HINDSIGHT — a later "as of" query must never come
-    # back with fewer rows for a monotonically-growing snapshot log -----
     early = dt.datetime(2026, 8, 12, tzinfo=dt.timezone.utc)
     later = dt.datetime(2026, 8, 20, tzinfo=dt.timezone.utc)
     rows_early = csv_as_of(early, "data/tidy/market.csv")
@@ -567,10 +412,8 @@ def _selftest() -> None:
     assert rows_later, "expected real market rows by 2026-08-20"
     assert "observed_at" in rows_early[0], rows_early[0]
 
-    # A genuinely nonexistent path: [] not an exception.
     assert csv_as_of(later, "data/tidy/nope_never_existed.csv") == []
 
-    # -- naive_value_baseline(): real historical values only -------------
     import methodology as M
     assert naive_value_baseline([]) is None
     golden = M.golden_rows()
@@ -579,17 +422,14 @@ def _selftest() -> None:
     if checked:
         assert result is not None, "expected real historical values to resolve"
         assert result["n"] > 0, result
-        assert result["k"] > 0, result        # value and points both positive
+        assert result["k"] > 0, result
         print(f"  naive_value_baseline(): n={result['n']}, ours "
              f"{result['ours_mae']:.2f} MAE vs market-value-scaled "
              f"{result['naive_mae']:.2f} MAE")
 
-    # -- recency_only_baseline(): the second candidate approach -----------
     assert recency_only_baseline([]) is None
     rresult = recency_only_baseline(golden)
     if checked:
-        # Not asserted non-None: a real cold-start season could
-        # legitimately resolve nothing yet.
         if rresult is not None:
             assert rresult["n"] > 0, rresult
             print(f"  recency_only_baseline(): n={rresult['n']}, ours "
@@ -599,15 +439,13 @@ def _selftest() -> None:
             print("  recency_only_baseline(): no player yet has a prior "
                  "played jornada to build a recency estimate from")
 
-    # -- commits_touching(): oldest-first, real commit times --------------
     ct = commits_touching("reports/decisions.json")
     assert ct, "expected real decisions.json history"
     times = [w for _, w in ct]
     assert times == sorted(times), "must be oldest-first"
     assert commits_touching("nope/never/existed.json") == []
 
-    # -- replay_recommendations(): would the advice have won -------------
-    assert replay_recommendations(min_days=1e9) is None    # nothing that stale
+    assert replay_recommendations(min_days=1e9) is None
     rec = replay_recommendations()
     if rec is not None:
         assert rec["n"] > 0, rec
@@ -618,7 +456,6 @@ def _selftest() -> None:
              f"{rec['n']} net positive, total net {rec['total_net']:+.1f} "
              f"real pts, mean {rec['mean_net']:+.1f} pts/episode")
 
-    # -- replay_percentile_rank(): same replay, pts_lo instead of mean ----
     assert replay_percentile_rank(min_days=1e9) is None
     prec = replay_percentile_rank()
     if prec is not None:
@@ -633,7 +470,6 @@ def _selftest() -> None:
             print("  " + compare_arms(prec, rec, "percentile-rank",
                                       "mean-rank"))
 
-    # -- replay_ladder_percentile(): does the whole ladder benefit too? ---
     empty = replay_ladder_percentile(topn=3, min_days=1e9)
     assert empty == {"current": None, "percentile": None}, empty
     ladder = replay_ladder_percentile(topn=3)
@@ -641,8 +477,6 @@ def _selftest() -> None:
     cur, pct = ladder["current"], ladder["percentile"]
     if cur is not None and pct is not None:
         assert cur["n"] > 0 and pct["n"] > 0, ladder
-        # The shipped arm's own net is a headline finding on its own, not
-        # only the losing side of a comparison.
         if cur["total_net"] < 0:
             print(f"  ** the SHIPPED top-{3} ladder's own real historical "
                  f"net is NEGATIVE: {cur['total_net']:+.1f} pts over "

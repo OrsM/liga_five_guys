@@ -1,18 +1,3 @@
-"""
-ffcore.parse — numbers, parsed by what the field MEANS.
-
-A dot is a thousands separator in the app ("2.050.000" is two million)
-and a decimal point on futbolfantasy ("2.37" is two point three seven).
-No parser can tell those apart from the string alone: choose money() or
-ratio() by which field you're reading.
-
-fmt_money()/fmt_pct() are the way back out, shared so a euro prints the
-same in every report.
-
-Known ambiguity, deliberate: money("44.550") is 44550, not 44.55—
-three-digit dot groups read as thousands, right for every euro field
-here, wrong for a ratio column (use ratio() for those).
-"""
 
 from __future__ import annotations
 
@@ -20,13 +5,11 @@ import re
 
 __all__ = ["money", "ratio", "pct100", "fmt_money", "fmt_pct"]
 
-# 1.234 / 1.234.567 — dot-grouped thousands, at least one full group of three.
 _DOT_GROUPED = re.compile(r"\d{1,3}(?:\.\d{3})+$")
 _CLEAN = str.maketrans({"\u00a0": "", " ": "", "\u202f": ""})
 
 
 def _strip(v) -> tuple[str, bool]:
-    """Return (bare digits-and-separators, negative?) or ("", False)."""
     if v is None:
         return "", False
     t = str(v).strip().translate(_CLEAN)
@@ -39,12 +22,6 @@ def _strip(v) -> tuple[str, bool]:
 
 
 def _degroup(t: str) -> str:
-    """Normalise separators to a bare float string.
-
-    Both present  -> the rightmost one is the decimal separator.
-    Commas only   -> one comma is a European decimal; several are thousands.
-    Dots only     -> full groups of three are thousands, otherwise a decimal.
-    """
     dot, com = "." in t, "," in t
     if dot and com:
         if t.rfind(",") > t.rfind("."):
@@ -58,12 +35,6 @@ def _degroup(t: str) -> str:
 
 
 def money(v):
-    """Euro amount -> float, or None if it isn't one.
-
-    Handles "49.991.863€", "35.276.000", "6892898", "1.5M", "700K",
-    "-468693", "(468693)". Empty and unparseable both give None, so a missing
-    price never quietly becomes zero.
-    """
     t, neg = _strip(v)
     if not t:
         return None
@@ -79,11 +50,6 @@ def money(v):
 
 
 def ratio(v):
-    """A number whose dot IS a decimal point: averages, percentages, deltas.
-
-    "4,59" -> 4.59, "72%" -> 72.0, "2.37" -> 2.37. Never regroups thousands,
-    which is exactly the mistake bids.num() made on percentages.
-    """
     t, neg = _strip(v)
     if not t:
         return None
@@ -98,13 +64,6 @@ def ratio(v):
 
 
 def pct100(v):
-    """Start probability on a 0-100 scale, whichever scale it arrived on.
-
-    Sources publish either 0-1 or 0-100. Anything in [0, 1] is scaled up,
-    which does misread a genuine 1% as 100% — the same trade the old code
-    made, and the right one: a true 1% starter is indistinguishable from
-    noise anyway, while a 1.0 misread as 1% would bench a nailed-on starter.
-    """
     x = ratio(v)
     if x is None:
         return None
@@ -112,7 +71,6 @@ def pct100(v):
 
 
 def fmt_money(v) -> str:
-    """A euro amount as a report cell. None prints as an em dash, never 0."""
     if v is None:
         return "—"
     if abs(v) >= 1e6:

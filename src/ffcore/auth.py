@@ -1,20 +1,3 @@
-"""
-auth.py — the bearer token for LaLiga's own API, the only credential
-this repo holds (everything else reads public pages anonymously).
-
-THE ROTATION TRAP: B2C issues a refresh token good for 90 days and
-ROTATES IT ON EVERY EXCHANGE — spend one and it dies, replacement in
-the response. Lose that and re-authenticating needs a human at a
-browser. So: the write is atomic (temp file, fsync, rename — a half-
-written token file is indistinguishable from no token file); the new
-token is written BEFORE the caller is handed anything, so a crash in
-the caller can't lose it; the file is 0600 and lives outside the repo
-(a credential must never be one `git add -A` away from a push).
-
-First token needs an interactive login, once: `python -m ffcore.auth
---login`. httpx is imported inside the fetching functions so this
-module imports without a network client.
-"""
 
 from __future__ import annotations
 
@@ -26,42 +9,26 @@ from pathlib import Path
 __all__ = ["TokenStore", "authorize_url", "TENANT",
            "CLIENT_ID", "SIGNIN_POLICY", "REDIRECT_URI", "API_BASE"]
 
-# --- the tenant -----------------------------------------------------------
-# Not tuning knobs — change any one of these and you're talking to a
-# different product. Recorded here rather than in a config file for that
-# reason. Sourced from Externoak/LaLigaApp (GPL-3.0), verified live.
 TENANT = ("https://login.laliga.es/laligadspprob2c.onmicrosoft.com"
           "/oauth2/v2.0")
-CLIENT_ID = "af88bcff-1157-40a0-b579-030728aacf0b"   # public client, no secret
+CLIENT_ID = "af88bcff-1157-40a0-b579-030728aacf0b"
 SIGNIN_POLICY = "B2C_1A_5ULAIP_PARAMETRIZED_SIGNIN"
-# jwt.ms is one of this client's REGISTERED reply URLs — verified: every other
-# value comes back AADB2C90006, and the error is itself delivered to jwt.ms.
-# That is what makes the one-time login a plain browser tab instead of an
-# Electron app registering the authredirect:// scheme.
 REDIRECT_URI = "https://jwt.ms"
 
-# The /api prefix is NOT decoration. Without it every path 404s with a
-# {"code","message"} body that looks exactly like a permissions failure and
-# sends you back to re-check the token you just minted.
 API_BASE = "https://fantasy-api.llt-services.com/api"
 
 TOKEN_PATH = Path(
     os.environ.get("LFG_TOKEN",
                    Path.home() / ".config" / "liga_five_guys" / "token.json"))
 
-# Refresh this many seconds before the access token actually dies. A sweep
-# takes seconds, but a token that expires mid-sweep fails half the sources and
-# looks like site rot.
 SKEW = 300
 
 
 class TokenStore:
-    """The token file, and the only thing allowed to write it."""
 
     def __init__(self, path: Path = TOKEN_PATH):
         self.path = Path(path)
 
-    # -- reading ----------------------------------------------------------
     def load(self) -> dict:
         if not self.path.exists():
             raise FileNotFoundError(
@@ -70,16 +37,7 @@ class TokenStore:
         with open(self.path) as fh:
             return json.load(fh)
 
-    # -- writing, atomically ----------------------------------------------
     def save(self, tokens: dict) -> None:
-        """Replace the token file in one step, or not at all.
-
-        Written to a temp file in the same directory (so rename cannot cross a
-        filesystem), fsynced, then renamed over the target. rename is atomic on
-        POSIX: a reader sees the old file or the new one, never a truncated
-        one. Without the fsync the rename can land before the bytes do, which
-        on a box that loses power is the same as losing the token.
-        """
         self.path.parent.mkdir(parents=True, exist_ok=True)
         os.chmod(self.path.parent, 0o700)
         tmp = self.path.with_suffix(".json.tmp")
@@ -95,13 +53,7 @@ class TokenStore:
         os.replace(tmp, self.path)
         os.chmod(self.path, 0o600)
 
-    # -- the exchange ------------------------------------------------------
     def refresh(self, post=None) -> dict:
-        """Spend the refresh token, persist what comes back, return it.
-
-        `post` is injectable so the self-test can drive the rotation logic
-        without a network or a real credential.
-        """
         cur = self.load()
         rt = cur.get("refresh_token")
         if not rt:
@@ -111,26 +63,18 @@ class TokenStore:
             "grant_type": "refresh_token",
             "client_id": CLIENT_ID,
             "refresh_token": rt,
-            # Asking for the client_id as a scope is B2C's way of saying "and
-            # an access token for that app, please". Without it the response
-            # carries an id_token only. Both are accepted as bearers by this
-            # API today, but relying on that would be relying on an accident.
             "scope": f"openid {CLIENT_ID} offline_access",
         }
         res = (post or _post)(f"{TENANT}/token?p={SIGNIN_POLICY}", form)
         if not res.get("refresh_token"):
-            # Never persist a response that would leave us unable to refresh
-            # again; the old token may still be good.
             raise RuntimeError(
                 "refresh response carried no refresh_token; keeping the old "
                 "one. If this repeats, re-login.")
         res["obtained_at"] = int(time.time())
-        self.save(res)                     # persist BEFORE returning
+        self.save(res)
         return res
 
-    # -- what callers actually want ---------------------------------------
     def bearer(self, post=None) -> str:
-        """A valid access token, refreshing only when the held one is stale."""
         try:
             cur = self.load()
         except FileNotFoundError:
@@ -144,11 +88,6 @@ class TokenStore:
         return fresh.get("access_token") or fresh["id_token"]
 
     def expiry_days(self) -> float | None:
-        """Days until the REFRESH token dies — the one that needs a human.
-
-        None when the file does not say. The report prints this so a login
-        that is about to be needed is visible before it is needed.
-        """
         try:
             cur = self.load()
         except FileNotFoundError:
@@ -166,8 +105,6 @@ def _post(url: str, form: dict) -> dict:
                    headers={"Content-Type":
                             "application/x-www-form-urlencoded"})
     if r.status_code != 200:
-        # The body carries B2C's own error code (AADB2C…), which is the only
-        # thing that distinguishes "expired, re-login" from "wrong client".
         raise RuntimeError(f"token refresh failed {r.status_code}: "
                            f"{r.text[:300]}")
     return r.json()
@@ -176,11 +113,6 @@ def _post(url: str, form: dict) -> dict:
 
 
 def authorize_url(verifier: str | None = None) -> tuple[str, str, str]:
-    """(url, verifier, state) for the one interactive login.
-
-    PKCE S256. The verifier never leaves this machine and is what stops a
-    stolen authorization code from being redeemable by anyone else.
-    """
     import base64
     import hashlib
     import secrets
@@ -201,7 +133,6 @@ def authorize_url(verifier: str | None = None) -> tuple[str, str, str]:
     return f"{TENANT}/authorize?{q}", verifier, state
 
 
-# --------------------------------------------------------------------------
 if __name__ == "__main__":
     import sys
 
@@ -243,14 +174,12 @@ if __name__ == "__main__":
               f"{'unknown age' if d is None else f'{d:.1f} days left'}")
         sys.exit(0)
 
-    # -- self-test: rotation, atomicity, and the refusals ------------------
     import tempfile
 
     with tempfile.TemporaryDirectory() as d:
         p = Path(d) / "token.json"
         s = TokenStore(p)
 
-        # A missing file names the fix rather than raising KeyError somewhere.
         try:
             s.load()
             raise AssertionError("missing token should raise")
@@ -262,7 +191,6 @@ if __name__ == "__main__":
                 "obtained_at": int(time.time())})
         assert oct(p.stat().st_mode)[-3:] == "600", oct(p.stat().st_mode)
 
-        # A live access token is reused; no exchange, so no rotation.
         calls = []
 
         def never(url, form):
@@ -272,8 +200,6 @@ if __name__ == "__main__":
         assert s.bearer(post=never) == "A1"
         assert calls == []
 
-        # An expired one refreshes, and the ROTATED refresh token is what
-        # lands on disk. This is the whole point of the module.
         s.save({"refresh_token": "R1", "access_token": "A1",
                 "expires_in": 3600, "refresh_token_expires_in": 7776000,
                 "obtained_at": int(time.time()) - 4000})
@@ -288,8 +214,6 @@ if __name__ == "__main__":
         assert s.bearer(post=rotate) == "A2"
         assert json.load(open(p))["refresh_token"] == "R2", "did not rotate"
 
-        # A response with no refresh_token must NOT be persisted: the old one
-        # may still work, and overwriting it would force a browser login.
         def no_rt(url, form):
             return {"access_token": "A3", "expires_in": 3600}
 
@@ -302,21 +226,18 @@ if __name__ == "__main__":
             assert "no refresh_token" in str(e), e
         assert json.load(open(p))["refresh_token"] == "R2", "clobbered!"
 
-        # A failed write leaves the previous token intact.
         before = p.read_text()
         try:
-            s.save({"bad": {1, 2}})            # a set is not JSON
+            s.save({"bad": {1, 2}})
         except TypeError:
             pass
         assert p.read_text() == before, "a failed save damaged the token"
         assert not list(Path(d).glob("*.tmp")), "left a temp file behind"
 
-        # expiry_days reads the window a human cares about.
         s.save({"refresh_token": "R", "refresh_token_expires_in": 86400 * 10,
                 "obtained_at": int(time.time())})
         assert 9.9 < s.expiry_days() < 10.1, s.expiry_days()
 
-    # The authorize URL carries a real S256 challenge, not the verifier.
     import base64
     import hashlib
     url, ver, st = authorize_url("v" * 43)

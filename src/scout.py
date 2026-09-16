@@ -1,13 +1,3 @@
-"""
-scout — the tidy facts about your squad, no model in between.
-
-Every column is a real number read straight off a tidy CSV: last season's
-points/match, this season jornada by jornada, market price, probable-XI%,
-fitness. `ffcore.score.Scorer` blends these into one estimate for ranking
-transfers; this shows the raw ingredients instead.
-
-    python src/scout.py            your current squad, sorted by position
-"""
 
 from __future__ import annotations
 
@@ -26,9 +16,6 @@ SLOT = {"portero": "por", "defensa": "def", "mediocampista": "med",
 
 
 def _last_season() -> dict[str, tuple[float, float]]:
-    """{ff_id: (points, games)}, last season's real total, unshrunk.
-    Keyed on ff_id — the same stable id the market/ownership join uses.
-    """
     files = sorted(SEASON.glob("points_*.csv"))
     if not files:
         return {}
@@ -41,14 +28,6 @@ def _last_season() -> dict[str, tuple[float, float]]:
 
 
 def _this_season() -> dict[str, dict[int, float]]:
-    """{ff_id: {jornada: points}}, one row per jornada — a trend, not a
-    season average.
-
-    Found by globbing, not a hardcoded season label — matching
-    methodology.load_actuals()'s own reasoning: a hardcoded "2026-27" here
-    once meant this would silently start reading nothing the moment the
-    season rolled over and the file became perjornada_2027-28.csv.
-    """
     files = sorted((SEASON / "live").glob("perjornada_*.csv"))
     if not files:
         return {}
@@ -63,9 +42,6 @@ def _this_season() -> dict[str, dict[int, float]]:
 
 
 def _play(status: str, xi_pct: float | None, min_start: float) -> str:
-    """Play status from two facts, not a model — OUT_STATUSES and
-    min_start match the rest of this repo's own "probable starter" read.
-    """
     if status in OUT_STATUSES:
         return "OUT (%s)" % status
     if xi_pct is None:
@@ -74,8 +50,6 @@ def _play(status: str, xi_pct: float | None, min_start: float) -> str:
 
 
 def table(me: str | None = None) -> list[dict]:
-    """One real row per player you own. `me` picks the manager; the
-    league's own config default is used when it is omitted."""
     import decide
     from ffcore.model import session
 
@@ -84,7 +58,6 @@ def table(me: str | None = None) -> list[dict]:
     players = load_players()
     last = _last_season()
     cur = _this_season()
-    # decide.load() already warmed session() — reuse it for one config field.
     min_start = session().lg.cfg.min_start
 
     rows = []
@@ -113,9 +86,6 @@ def table(me: str | None = None) -> list[dict]:
 
 
 def _form(by_jornada: dict[int, float], n: int = 5) -> str:
-    """Last `n` jornadas, most recent first. '-' for no row at all (did
-    not play), never confused with a real zero.
-    """
     if not by_jornada:
         return "-"
     latest = max(by_jornada)
@@ -155,18 +125,16 @@ def main() -> None:
 
 
 def _selftest() -> None:
-    # -- _form(): newest first, a gap is "-" not a missing row -------------
     assert _form({}) == "-"
     assert _form({1: 6.0}) == "6"
     assert _form({1: 6.0, 3: 2.0}, n=3) == "2 - 6"
     assert _form({1: 1, 2: 2, 3: 3, 4: 4, 5: 5, 6: 6}) == "6 5 4 3 2"
 
-    # -- _play(): OUT_STATUSES beats any XI%, then a plain threshold read --
     assert _play("injured", 90.0, 60.0) == "OUT (injured)"
     assert _play("ok", None, 60.0) == "?"
     assert _play("ok", 80.0, 60.0) == "likely"
     assert _play("ok", 40.0, 60.0) == "doubt"
-    assert _play("ok", 60.0, 60.0) == "likely"          # the threshold itself
+    assert _play("ok", 60.0, 60.0) == "likely"
 
     rows = [
         {"name": "A", "pos": "def", "team": "X", "price_eur": 5_000_000,

@@ -1,12 +1,3 @@
-"""
-ffcore/schedule.py — each player's OWN remaining-jornada schedule, and
-patching a squad short a legal position.
-
-Split out of decide.py 2026-09-15 (rationalization plan session 4):
-these six functions have zero external call sites outside decide.load()
-and decide.apply() — a self-contained concern, not decide.py's own.
-Why: docs/notes/decide.md#rounds_left--a-jornada-with-some-scores-in-still-counts
-"""
 
 from __future__ import annotations
 
@@ -14,15 +5,6 @@ from ffcore.crosswalk import club_key
 
 
 def rounds_left(matches, teams) -> tuple[list[int], dict[int, set[str]], list]:
-    """(jornadas still to come, who has already played one, unjoined clubs).
-
-    A jornada with every score in is finished, not simulated. A
-    partially-played one stays in `rem`, with its finished clubs
-    dropped from `played`. `teams` is the market's own club spellings
-    (club_key()). Not modelled: a round in progress has its XI already
-    LOCKED, but the simulator re-picks it from whoever's left.
-    Why: docs/notes/decide.md#rounds_left--a-jornada-with-some-scores-in-still-counts
-    """
     js = {r["jornada"] for r in matches if (r.get("jornada") or "").isdigit()}
     finished = {j for j in js
                 if all(r.get("score") for r in matches if r["jornada"] == j)}
@@ -47,17 +29,6 @@ def rounds_left(matches, teams) -> tuple[list[int], dict[int, set[str]], list]:
 def next_then_rest(base: dict, base_rest: dict, rem: list[int],
                    played: dict[int, set[str]], club: dict[str, str]
                    ) -> dict[int, dict]:
-    """Bootstrap's own `per_jornada` — `base` for a player's FIRST
-    remaining jornada, `base_rest` for every one after it.
-
-    `base` carries this week's editorial reading (a suspension, a
-    knock) — real news for the one game it was published for, not for
-    every future one. "First remaining jornada" is PER PLAYER: a
-    partial round drops a player once his own club has played it (see
-    rounds_left()), so his true next jornada is wherever `played` first
-    shows his club clear.
-    Why: docs/notes/decide.md#next_then_rest--apply_fixtures
-    """
     first_seen: set[str] = set()
     out: dict[int, dict] = {}
     for j in rem:
@@ -78,12 +49,6 @@ def next_then_rest(base: dict, base_rest: dict, rem: list[int],
 def first_jornada_per_player(base: dict, rem: list[int],
                              played: dict[int, set[str]],
                              club: dict[str, str]) -> dict[str, int]:
-    """{key: the first jornada in `rem` that is genuinely HIS next one} —
-    the same per-player tracking next_then_rest() does internally,
-    pulled out so apply_fixtures() can ask "is THIS his status
-    override's jornada" without duplicating next_then_rest()'s
-    scheduling logic inline.
-    """
     first_seen: set[str] = set()
     out: dict[str, int] = {}
     for j in rem:
@@ -100,19 +65,6 @@ def apply_fixtures(per_jornada: dict[int, dict], sboard: dict[int, dict],
                    club: dict[str, str], pos: dict[str, str],
                    ppm_of: dict[str, float], status_of: dict = None,
                    first_jornada_of: dict = None) -> dict[int, dict]:
-    """`per_jornada`, with the POINTS half repriced against THAT
-    jornada's real opponent (season_board()) instead of the single
-    next-fixture factor `base`/`base_rest` were built with. P(start) is
-    untouched — next_then_rest() already answers that question. A
-    player season_board() has no Match for keeps his frozen
-    next-fixture number.
-
-    `status_of`/`first_jornada_of` (both optional, default {}): applies
-    ffcore.profile.status_adjusted() at exactly first_jornada_of[k] — a
-    suspension or knock doesn't follow a player to jornada 20, the same
-    reasoning next_then_rest() uses for base vs base_rest.
-    Why: docs/notes/decide.md#next_then_rest--apply_fixtures
-    """
     from ffcore.profile import status_adjusted
 
     status_of = status_of or {}
@@ -138,18 +90,6 @@ def apply_fixtures(per_jornada: dict[int, dict], sboard: dict[int, dict],
 
 
 def phantom_topup(sq: dict[str, str]) -> dict[str, str]:
-    """`sq`, topped up to SLOT_MIN with generic phantom keys, or `sq`
-    itself unchanged if nothing is short.
-
-    THE SQUAD-SIDE HALF of phantom_fill() — `apply()` calls this too, since
-    a squad legal at report time can be left short by a LATER transfer
-    (a raid takes a rival's last player at his position minimum) with
-    nothing else re-checking SLOT_MIN; a squad that fails it scores zero
-    every remaining jornada in rank()'s simulation. `__phantom_<slot>_<n>`
-    keys are the SAME ones phantom_fill() already registered real
-    per_jornada data for at load time, so this never has to invent new
-    forecaster data mid-run.
-    """
     from ffcore.score import SLOT_MIN
 
     counts: dict[str, int] = {}
@@ -169,34 +109,10 @@ def phantom_topup(sq: dict[str, str]) -> dict[str, str]:
 def phantom_fill(squads: dict[str, dict[str, str]], per_jornada: dict[int, dict],
                  pos: dict[str, str]
                  ) -> tuple[dict[str, dict[str, str]], dict[int, dict]]:
-    """Squads and per_jornada, with one AVERAGE-PLAYER-AT-THE-POSITION
-    phantom added per position any manager is short of SLOT_MIN in —
-    and real per_jornada data registered for EVERY SLOT_MIN slot
-    regardless of who is short today, so a later transfer (via
-    phantom_topup()) can reach for one too.
-
-    Without this, a squad short one SLOT_MIN position can't fill ANY
-    legal formation — best_xi() returns [], scoring zero every
-    remaining jornada with zero variance. The phantom is an AVERAGE,
-    not a specific player, computed off the same real per-jornada data
-    every other player at that position carries; no `matches` entry, as
-    for a brand-new player. Keyed `__phantom_<slot>_<n>` (no manager in
-    the key) — a virtual average player has no real ownership to
-    distinguish, so every squad short the same position shares it.
-    Applies to every manager, rivals included — not because we check
-    whether a rival is careless, but the opposite: ASSUME he'd competently
-    field or buy someone, so his data gap doesn't crash his simulated
-    score to zero and silently flatter my own win probability.
-    Why: docs/notes/decide.md#phantom_fill--why-a-short-squad-gets-a-phantom-and-why-its-an-average
-    Why: docs/notes/decide.md#optimize-for-competent-play-warn-dont-model-for-incompetent-play
-    """
     from ffcore.score import SLOT_MIN
 
     squads = {m: dict(sq) for m, sq in squads.items()}
     per_jornada = {j: dict(layer) for j, layer in per_jornada.items()}
-    # ONE AVERAGE PER (jornada, position) off every REAL scored player
-    # at that position — not per manager, so every squad short the same
-    # position shares the identical, real, jornada-varying number.
     avg: dict[int, dict[str, tuple[float, float]]] = {}
     for j, layer in per_jornada.items():
         by_pos: dict[str, list[tuple[float, float]]] = {}
@@ -208,9 +124,6 @@ def phantom_fill(squads: dict[str, dict[str, str]], per_jornada: dict[int, dict]
                      sum(v[1] for v in vs) / len(vs))
                  for s, vs in by_pos.items() if vs}
 
-    # EVERY SLOT_MIN KEY, EVERY JORNADA, UNCONDITIONALLY — phantom_topup()
-    # can only assign a key into a squad, not invent forecaster data,
-    # so whatever it might need has to already be here.
     for j in per_jornada:
         for s, n in SLOT_MIN.items():
             if s not in avg.get(j, {}):
@@ -223,7 +136,6 @@ def phantom_fill(squads: dict[str, dict[str, str]], per_jornada: dict[int, dict]
 
 
 def _selftest() -> None:
-    # -- rounds_left: a round already half played -----------------------
     teams = ["Alavés", "Getafe", "Celta Vigo", "Osasuna", "Rayo"]
     ms = [{"jornada": "1", "home": "alaves", "away": "getafe", "score": "3-0"},
           {"jornada": "1", "home": "celta", "away": "osasuna", "score": ""},
@@ -243,7 +155,6 @@ def _selftest() -> None:
     assert un == ["zzz-united"], un
     assert _d == {1: {"getafe"}}, _d
 
-    # -- next_then_rest: this week's status answers for ONE jornada -----
     rem2, played2 = [1, 2, 3], {1: {"alaves"}}
     base2 = {"susp": (5.0, 0.05), "normal": (4.0, 0.9)}
     rest2 = {"susp": (5.0, 0.9), "normal": (4.0, 0.9)}
@@ -257,7 +168,6 @@ def _selftest() -> None:
     pj2 = next_then_rest(base2, rest2, [1, 2], {}, {})
     assert pj2[1] == base2 and pj2[2] == rest2, pj2
 
-    # -- apply_fixtures: the REAL opponent, per jornada, not the frozen one
     from ffcore.fixture import Match as _M
 
     easy_m = _M(opponent="Easy", home=True, kickoff=None,
@@ -278,9 +188,6 @@ def _selftest() -> None:
     assert out[1]["del"][1] == pj3[1]["del"][1] == 0.9
     assert out[1]["ghost"] == (3.0, 0.5), out[1]["ghost"]
 
-    # -- apply_fixtures: the status override survives the repricing, real
-    # bug 2026-09-13 (Miguel: "no booked player is playing so shouldn't
-    # they have 0% end odds to play next game?") ------------------------
     fjo = {"del": 1, "por": 2}
     status_of = {"del": "suspended", "por": "ok"}
     out_susp = apply_fixtures(pj3, board, club3, pos3, ppm3,
@@ -299,22 +206,18 @@ def _selftest() -> None:
 
     assert apply_fixtures(pj3, board, club3, pos3, ppm3) == out, out
 
-    # -- first_jornada_per_player -----------------------------------------
     fjp = first_jornada_per_player(base2, rem2, played2, club2)
     assert fjp == {"susp": 1, "normal": 2}, fjp
 
-    # -- phantom_fill(): a squad short a position gets ONE average-player
-    # stand-in per missing slot, not frozen at zero for the rest of the
-    # season -----------------------------------------------------------
     ph_sq = {"m": {"d1": "DEF", "d2": "DEF", "x1": "MED", "x2": "MED",
-                   "x3": "MED", "p1": "POR", "f1": "DEL"}}   # 2 DEF, short 1
+                   "x3": "MED", "p1": "POR", "f1": "DEL"}}
     ph_pos = {"d1": "DEF", "d2": "DEF", "other_def": "DEF",
               "x1": "MED", "x2": "MED", "x3": "MED", "p1": "POR", "f1": "DEL"}
     ph_per = {1: {"d1": (4.0, 1.0), "d2": (2.0, 0.5),
                   "other_def": (6.0, 0.5), "x1": (3.0, 1.0)}}
     new_sq, new_per = phantom_fill(ph_sq, ph_per, ph_pos)
     phantom_keys = [k for k in new_sq["m"] if k.startswith("__phantom_")]
-    assert len(phantom_keys) == 1, phantom_keys          # short exactly 1 DEF
+    assert len(phantom_keys) == 1, phantom_keys
     pk = phantom_keys[0]
     assert new_sq["m"][pk] == "DEF", new_sq["m"]
     assert new_per[1][pk] == (4.0, (1.0 + 0.5 + 0.5) / 3), new_per[1][pk]
@@ -326,9 +229,8 @@ def _selftest() -> None:
     same_sq, filled_per = phantom_fill(legal_sq, ph_per, ph_pos)
     assert same_sq == legal_sq, same_sq
     assert "__phantom_DEF_0" in filled_per[1], filled_per[1]
-    assert "__phantom_DEF_2" in filled_per[1], filled_per[1]  # SLOT_MIN DEF=3
+    assert "__phantom_DEF_2" in filled_per[1], filled_per[1]
 
-    # -- phantom_topup(): the same patch, reachable after a REAL transfer --
     assert phantom_topup(legal_sq["m2"]) == legal_sq["m2"], "already legal"
     short_one = {"d1": "DEF", "d2": "DEF", "x1": "MED", "x2": "MED",
                 "x3": "MED", "p1": "POR", "f1": "DEL"}
@@ -339,7 +241,7 @@ def _selftest() -> None:
     assert topped.get("__phantom_DEF_0") == "DEF", topped
     assert sum(1 for k in topped if k.startswith("__phantom_")) == 1, topped
     short_por = {"d1": "DEF", "d2": "DEF", "d3": "DEF", "x1": "MED",
-                "x2": "MED", "x3": "MED", "f1": "DEL"}   # 0 POR, needs 1
+                "x2": "MED", "x3": "MED", "f1": "DEL"}
     assert phantom_topup(short_por).get("__phantom_POR_0") == "POR"
 
     print("ffcore.schedule self-test OK (28 cases)")

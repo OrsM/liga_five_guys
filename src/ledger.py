@@ -1,17 +1,3 @@
-"""
-ledger.py — rebuild data/tidy/transactions.csv from the app's activity feed.
-
-    python src/ledger.py            # show what would change
-    python src/ledger.py --write    # write it
-    python src/ledger.py --selftest
-
-The feed names only the manager who acted, not the counterparty, and a
-manager-to-manager transfer doesn't appear as a paired buy/sell — so every
-buy is written as coming from the pool and every sale as going to it: exact
-for ownership, prices and premiums, lossy only for who dealt with whom.
-
-Committed, not hand-edited — the per-run diff is the audit trail.
-"""
 
 from __future__ import annotations
 
@@ -37,12 +23,6 @@ HEADER = """\
 
 
 def user_map() -> dict:
-    """{app user id: manager handle}, from the league table.
-
-    A team's id is a fact about the team, so it comes off api_standings —
-    five rows — rather than off seventy-six player rows carrying the same
-    five pairs.
-    """
     return {r["user_id"]: r["manager"] for r in load_api_standings()
             if r.get("user_id") and r.get("manager")}
 
@@ -70,11 +50,6 @@ def existing(path=LEDGER) -> list[dict]:
 
 
 def write(rows: list[dict], force: bool = False, path=LEDGER) -> str:
-    """Replace the ledger, or refuse and say why. An empty or shrinking feed
-    is indistinguishable from a failed fetch (expired token, a 500) — a
-    build with fewer rows than the file already holds is refused unless
-    `force`.
-    """
     had = len(existing(path))
     if not rows:
         return "REFUSED: the feed produced no rows at all — nothing written."
@@ -95,39 +70,29 @@ def _selftest() -> None:
     assert body.startswith("# GENERATED"), body[:40]
     assert "date,player,player_id,from,to,price,note" in body, body
     assert "2026-08-15T22:24,Fornals,1337,market,me,1,from the app" in body, body
-    # A row from before the feed carried ids still writes, with the column
-    # blank — git history holds hand-typed rows and they are not rewritten.
     old_row = [{"date": "2026-08-01T10:00", "player": "Someone",
                 "from": "market", "to": "me", "price": "2",
                 "note": "typed"}]
     assert "2026-08-01T10:00,Someone,,market,me,2,typed" in render(old_row)
 
-    # The header must be comment-only, so the existing reader (which strips
-    # '#' lines) sees exactly the same shape it always did.
     assert all(ln.startswith("#") for ln in HEADER.splitlines()), HEADER
 
-    # -- the guard, against a real file in a temp directory ----------------
     import tempfile
     from pathlib import Path
     with tempfile.TemporaryDirectory() as d:
         p = Path(d) / "transactions.csv"
         p.write_text(render(rows * 3))
         assert len(existing(p)) == 3, existing(p)
-        # An empty build never writes, whatever else is true.
         msg = write([], path=p)
         assert msg.startswith("REFUSED") and "no rows" in msg, msg
         assert len(existing(p)) == 3, "an empty build wrote anyway"
-        # A shrink is refused by default…
         msg = write(rows, path=p)
         assert msg.startswith("REFUSED") and "shrink" in msg, msg
         assert len(existing(p)) == 3, "a shrink wrote anyway"
-        # …and allowed when asked twice.
         msg = write(rows, force=True, path=p)
         assert msg.startswith("wrote 1 rows"), msg
         assert len(existing(p)) == 1, existing(p)
-        # Growth is the normal case and needs no flag.
         assert write(rows * 5, path=p).startswith("wrote 5 rows")
-        # A ledger that has never been written is not a shrink.
         fresh = Path(d) / "new" / "transactions.csv"
         assert existing(fresh) == []
         assert write(rows, path=fresh).startswith("wrote 1 rows")

@@ -1,39 +1,3 @@
-"""
-decide.py — every move you could make, ranked by whether it wins the league.
-
-    python src/decide.py             # the table
-    python src/decide.py --selftest
-
-ONE QUESTION, ASKED OF EVERY ACTION: if I did this, how much does P(finishing
-above each rival) move? Buy, sell, swap and steal are the same question with
-different arguments, so there is one ranking and no verdict vocabulary.
-
-WHAT THIS REPLACES. Points per million, value over replacement, the line, the
-basket, Watch/pass/Cover/Hold, MAX_SLOT and THIN were all proxies for that
-question, each with its own threshold, and twice this month two of them
-contradicted each other in the same table. A simulation answers it directly.
-
-THE STEAL IS WHY THIS MATTERS. Every rival player carries a buyout clause, so
-cash can take him outright — and doing so REMOVES HIM FROM THEIR SQUAD. One
-move both raises your total and lowers theirs, which is worth roughly twice
-what the same player is worth from the free pool, and no per-player rate can
-express it because the value depends on whose he is. 62 of the 75 players you
-can buy today are somebody's.
-
-COMMON RANDOM NUMBERS. Every option is simulated against the SAME seed, so the
-seasons are identical and the difference between two options is the squads
-rather than the weather. Without it a one-point edge is invisible under a
-±120-point band and you would need tens of thousands of trials to see it;
-with it, a few hundred will rank correctly.
-
-WHAT IT CANNOT SEE, and each makes a hold look worse than it is:
-
-  * Cash has option value — a better player appears next cycle — and nothing
-    here models future markets, so holding cash scores zero rather than
-    something. A standalone sale can therefore never look good.
-  * Rivals do not respond. A steal that guts BurtonGM89 assumes he does not
-    simply buy someone back.
-"""
 
 from __future__ import annotations
 
@@ -77,55 +41,17 @@ from ffcore.schema import MARKET as MARKET_TBL
 __all__ = ["Action", "candidates", "rank", "Universe",
           "pending_sent", "pending_received"]
 
-# Screening runs at a fraction of the final trial count. With common random
-# numbers the RANKING settles long before the levels do, so this buys an order
-# of magnitude of speed and costs only precision on options that lose anyway.
 SCREEN_TRIALS = 250
-# 3000 checked against 100-1500 for false precision — ranking (paired) is
-# stable across all of them; p_win/expected_finish (levels) are not, and
-# sim.trailing() thresholds those at 0.5. Do not lower without re-checking.
-# Why: docs/notes/decide.md#trial-counts-screen_trials--final_trials
 FINAL_TRIALS = 3000
-KEEP = 12          # how many survive screening and get the full count
+KEEP = 12
 
-# A RELIABLE FLOOR ON TOP OF KEEP, NOT INSTEAD OF IT — 0/119 real deals in
-# this league have ever been manager-to-manager, so an unreliable "listed"
-# candidate must not crowd every reliable one out of the raw-gain-screened
-# sample. _top_up() enforces this, additive, never displacing anything.
-# Why: docs/notes/decide.md#keep_reliable_min--reliable-candidates-always-reach-the-full-pass
 KEEP_RELIABLE_MIN = 6
 
-# SAME MECHANISM, DIFFERENT AXIS: an efficient-but-modest candidate (small
-# gain, tiny cost) can't win top-KEEP's raw-gain sort either, so it would
-# never reach the full simulation at all. Topped up the same additive way.
-# Why: docs/notes/decide.md#keep_value_min--efficient-but-modest-candidates-also-reach-the-full-pass
 KEEP_VALUE_MIN = 4
 
 
 @dataclass
 class Universe:
-    """Everything the decision needs, and nothing else.
-
-    Per-player facts (pos, price, proceeds, owner, value, market_exp,
-    start, clause, clause_until, route, bids, name) live on `players`
-    ONLY — a dict[str, PlayerProfile] built by ffcore.profile — and are
-    read through the `<field>_view` Mapping properties below (`pos_view`,
-    `price_view`, ...), each a live read of `players`, computed fresh on
-    every access rather than stored. There is exactly one place each
-    fact is stored and exactly one way to read it.
-
-    THIS USED TO BE TWO COPIES. Through Wave 3E (rationalization plan,
-    2026-09-16) `Universe` also carried 12 parallel flat dicts — one per
-    fact, snapshotted from `players` in `__post_init__` via 12 `InitVar`
-    constructor params (`pos=`, `price=`, ... `name=`) so callers without
-    a real `PlayerProfile` on hand could still build a Universe. Wave 3F
-    deleted that: every constructor call in this codebase now passes
-    `players=` (ffcore.fixtures.players_from_flat() bridges the old
-    flat-dict shape onto it for test fixtures that don't have real
-    PlayerProfile objects to hand). See
-    docs/notes/rationalization-2026-09-16.md#wave-3-status for why the
-    duplication existed at all and the 6-read migration this depended on.
-    """
     state: LeagueState
     forecaster: Bootstrap
     cash: float
@@ -134,11 +60,6 @@ class Universe:
     bought: dict[str, float] = field(default_factory=dict)
     rival_cash: dict[str, float] = field(default_factory=dict)
     part_played: dict[int, set[str]] = field(default_factory=dict)
-    # {key: his own first jornada still ahead of him}, the same mapping
-    # apply_fixtures() uses to place a status override — current_xi() reuses
-    # it rather than a second, coarser "one jornada for everyone" guess.
-    # Empty (a caller with no per-player schedule to hand) degrades to that
-    # coarser reading, never an error.
     first_jornada_of: dict[str, int] = field(default_factory=dict)
     unjoined: list[str] = field(default_factory=list)
     start_note: str = ""
@@ -148,125 +69,68 @@ class Universe:
 
     @cached_property
     def current_xi(self) -> tuple[dict[str, float], set[str]]:
-        """(exp, xi) — my best legal eleven, right now. Computed once per
-        Universe, not once per caller: ~9 call sites across sim.py/decide.py
-        used to each rebuild this by hand in one report render.
-        Why: docs/notes/decide.md#current_xi--one-computation-seven-old-copies
-        """
         return _current_xi(self, self.me)
 
     @cached_property
     def xi_bar(self) -> float:
-        """The weakest man in my current eleven — the line a signing has
-        to clear. Cached alongside current_xi(), the pair it's derived
-        from."""
         return xi_bar(*self.current_xi)
 
     def route_kind(self, k: str) -> str:
-        """"mine" | "free" | "raid" | "listed" for player `k`."""
         return route_kind(self, k)
 
     def dead_weight(self) -> list[tuple[str, float]]:
-        """[(player, proceeds)] for everyone in my squad who never starts
-        any jornada I could still pick."""
         return dead_weight(self)
 
     def candidates(self, expected: dict[str, float],
                    budget: float | None = None) -> list["Action"]:
-        """Every affordable move worth simulating."""
         return candidates(self, expected, budget)
 
     def player_forecasts(self) -> dict[str, dict]:
-        """{player: {par, ...}} — every priced player's points above
-        replacement and the fields it's built from."""
         return player_forecasts(self)
 
     def rank(self, acts: list["Action"], seed: int = 1,
             price=None, extra=()) -> tuple:
-        """Screen wide and cheap, then re-run the survivors properly.
-        See the module-level rank() for the full contract."""
         return rank(self, acts, seed=seed, price=price, extra=extra)
 
-    # -- read accessors backed by `players` — the ONLY copy of any of these
-    # facts, since Wave 3F deleted the 12 flat dicts these used to mirror.
-    #
-    # WHY A MAPPING VIEW PER FIELD, NOT A METHOD PER QUESTION. Real call
-    # sites (grepped 2026-09-16 across src/) use these shapes: `u.price[k]`
-    # (raises on a missing key), `u.pos_view.get(k, "")`, `u.owner_view.get(k)`
-    # (no default -> None), `k in u.price_view`, `for k in u.price_view`,
-    # `len(u.price_view)`, `u.price_view.items()`/`.values()`. A
-    # `price_of(k, default=...)`-style method per fact would cover the
-    # `.get` shape and nothing else — every iteration/membership/length
-    # call site would need a second accessor anyway. A `Mapping` view
-    # supports all of the above for free.
-    #
-    # NOT CACHED. Each property recomputes its dict comprehension from
-    # `self.players` on every access rather than memoizing (contrast
-    # `current_xi`/`xi_bar` above, which cache on purpose because their
-    # inputs don't change after construction). `players` itself is never
-    # reassigned after construction in this codebase today, so caching
-    # would currently be safe — but a cached view would silently stop
-    # reflecting a future in-place edit to `players` (e.g. a `replace()`
-    # of one player's `.current`), and recomputing is cheap (one
-    # squad-sized dict comprehension), so it is never memoized.
-    #
-    # THE THREE INCLUSION RULES (pinned directly in _selftest below, now
-    # that Wave 3A's flat-dict-vs-view equivalence assertion has nothing
-    # left to compare against): `pos`/`owner`/`route` exclude a FALSY
-    # value (empty string), not just an absent one; `price`/`proceeds`/
-    # `value`/`market_exp`/`start`/`clause`/`clause_until`/`bids` exclude
-    # only `is None` (so a real `0`/`0.0` stays in); `name` excludes
-    # nothing — every player in `self.players` gets an entry.
 
     @property
     def pos_view(self) -> Mapping[str, str]:
-        """SLOT abbreviation via `_pos_of()`, keys with a falsy
-        `p.current.pos` excluded entirely (not mapped to "")."""
         return MappingProxyType({k: _pos_of(p.current.pos)
                                  for k, p in self.players.items()
                                  if p.current.pos})
 
     @property
     def price_view(self) -> Mapping[str, float]:
-        """`p.current.price`, keys excluded only when the price is `None`
-        (a real 0.0 stays in)."""
         return MappingProxyType({k: p.current.price
                                  for k, p in self.players.items()
                                  if p.current.price is not None})
 
     @property
     def proceeds_view(self) -> Mapping[str, float]:
-        """`p.current.proceeds`, `is not None` filter (same shape as
-        `price_view`)."""
         return MappingProxyType({k: p.current.proceeds
                                  for k, p in self.players.items()
                                  if p.current.proceeds is not None})
 
     @property
     def owner_view(self) -> Mapping[str, str]:
-        """`p.current.owner`, keys with a falsy owner (None or "")
-        excluded entirely — same shape as `pos_view`, not `price_view`."""
         return MappingProxyType({k: p.current.owner
                                  for k, p in self.players.items()
                                  if p.current.owner})
 
     @property
     def value_view(self) -> Mapping[str, float]:
-        """`p.current.value`, `is not None` filter."""
         return MappingProxyType({k: p.current.value
                                  for k, p in self.players.items()
                                  if p.current.value is not None})
 
     @property
     def market_exp_view(self) -> Mapping[str, float]:
-        """`p.derived.market_exp`, `is not None` filter."""
         return MappingProxyType({k: p.derived.market_exp
                                  for k, p in self.players.items()
                                  if p.derived.market_exp is not None})
 
     @property
     def start_view(self) -> Mapping[str, float]:
-        """`p.derived.start_p`, `is not None` filter."""
         return MappingProxyType({k: p.derived.start_p
                                  for k, p in self.players.items()
                                  if p.derived.start_p is not None})
@@ -275,8 +139,6 @@ class Universe:
 
     @property
     def route_view(self) -> Mapping[str, str]:
-        """`p.current.route`, keys with a falsy route excluded entirely —
-        same shape as `pos_view`/`owner_view`."""
         return MappingProxyType({k: p.current.route
                                  for k, p in self.players.items()
                                  if p.current.route})
@@ -284,19 +146,11 @@ class Universe:
 
     @property
     def name_view(self) -> Mapping[str, str]:
-        """`p.identity.name` for EVERY key in `self.players` — the one
-        field with no filter at all."""
         return MappingProxyType({k: p.identity.name
                                  for k, p in self.players.items()})
 
 
 def _pos_of(raw: str) -> str:
-    """SLOT abbreviation (DEL/MED/DEF/POR) for a PlayerCurrent.pos value.
-
-    Accepts either the raw source word (e.g. "DELANTERO") or an
-    already-abbreviated value (passed straight through) — "MED" if
-    neither matches.
-    """
     mapped = SLOT.get(raw.lower())
     if mapped:
         return mapped
@@ -304,11 +158,6 @@ def _pos_of(raw: str) -> str:
 
 
 def _current_xi(u, who: str) -> tuple[dict[str, float], set[str]]:
-    """(exp, xi) for `who`'s squad, right now. `Universe.current_xi`
-    (cached, for u.me) and the current_xi() compat function below both
-    call this; nothing else should.
-    Why: docs/notes/decide.md#current_xi--one-computation-seven-old-copies
-    """
     if u.first_jornada_of:
         exp = u.forecaster.expected_own(u.first_jornada_of)
     else:
@@ -320,66 +169,25 @@ def _current_xi(u, who: str) -> tuple[dict[str, float], set[str]]:
 
 
 def current_xi(u, who: str | None = None) -> tuple[dict[str, float], set[str]]:
-    """(exp, xi) — expected points and the best legal eleven `who` (default
-    u.me) could field from them, right now. Each player is read at HIS OWN
-    next jornada (u.first_jornada_of), not one shared jornada for everyone.
-
-    COMPATIBILITY WRAPPER — `u.current_xi` is the real, CACHED answer for
-    u.me; call sites still asking `decide.current_xi(u)` (no `who`, or
-    `who=u.me`) get it for free rather than a fresh, uncached recompute.
-    A specific rival's own eleven is never cached (asked at most once per
-    rival per report).
-    """
     if who is None or who == u.me:
         return u.current_xi
     return _current_xi(u, who)
 
 
 def xi_bar(exp: dict[str, float], xi) -> float:
-    """The weakest man in an eleven — the number a signing has to clear.
-
-    ONE FLAT NUMBER ACROSS ALL FOUR SLOTS — deliberately, not a missing
-    per-position feature. A per-position bar would drop a candidate who
-    helps by RESHAPING the XI (pushing one slot's count up, another's
-    down) rather than beating his own slot's replacement level. This is
-    the loosest SOUND screen — it lets a few uphelpful candidates through
-    to the simulation (which then correctly prices them near-zero), but
-    a stricter per-position bar would silently drop a real move instead.
-    Why: docs/notes/decide.md#xi_bar--why-the-bar-is-flat-across-all-four-slots
-    """
     return min((exp.get(k, 0.0) for k in xi), default=0.0)
 
 
 def route_kind(u: Universe, k: str) -> str:
-    """"mine" | "free" | "raid" | "listed", from u.owner_view/u.route_view
-    alone — no simulation. The one function that classifies ownership;
-    route every caller through it rather than re-deriving the check.
-    Why: docs/notes/decide.md#route_kind--the-one-place-ownership-is-classified
-    """
     if k in u.state.squads.get(u.me, {}):
         return "mine"
     owner = u.owner_view.get(k)
     if not owner or owner == u.me:
         return "free"
-    # Wave 3F: the _selftest that used to mutate u.route directly (to
-    # exercise this exact branch) now builds a separate Universe via
-    # `players=` instead (docs/notes/rationalization-2026-09-16.md#wave-3-status),
-    # so u.route_view — which rebuilds from u.players — agrees with it.
     return "raid" if u.route_view.get(k, "market") == "clause" else "listed"
 
 
 def _fieldable(squad: dict[str, str]) -> bool:
-    """Could SOME real formation be fielded from this squad's shape?
-
-    COUNTS ONLY — no player identities, no simulation, not even
-    `best_xi()`. A real formation is (1 POR, d DEF, m MED, l DEL) for
-    one of `ffcore.score.formations()`'s 7 tuples; legal when the squad
-    holds at least that many of each. Clearing every position's
-    SLOT_MIN and total XI_SIZE individually is NOT sufficient (e.g. two
-    goalkeepers in an exactly-11 squad clears both counts but fields no
-    formation) — this is the one real existence check.
-    Why: docs/notes/decide.md#_fieldable--the-one-squad-legality-check
-    """
     from ffcore.score import formations
     depth: dict[str, int] = {}
     for slot in squad.values():
@@ -391,17 +199,6 @@ def _fieldable(squad: dict[str, str]) -> bool:
 
 
 def _score_many(u: Universe, many: list, trials: int, seed: int):
-    """Every candidate squad against ONE set of seasons. Same numbers.
-
-    antithetic=True: half the trials are the other half's exact mirror
-    draw, which cancels first-order sampling noise in a season-total sum
-    without changing what's being modelled. Measured on real data
-    (2026-09-16, FINAL_TRIALS=3000, n=30 repeats): p_win's run-to-run sd
-    0.0095 -> 0.0069, expected-finish sd 0.0189 -> 0.0152, means unchanged
-    (0.5642 both; 2.178 vs 2.174) — a real, unbiased tightening of the
-    headline standings numbers, not just the paired BUY/RAID comparisons.
-    Why: docs/notes/season.md#_antithetic_normal--variance-reduction-not-a-model-change
-    """
     return simulate_many(
         [LeagueState(squads=sq, jornadas=u.state.jornadas, me=u.me,
                      carried=u.state.carried) for sq in many],
@@ -409,26 +206,11 @@ def _score_many(u: Universe, many: list, trials: int, seed: int):
 
 
 def paired(after, base, me) -> list[float]:
-    """The per-trial difference `after` minus `base`, sorted.
-
-    PAIRED, WITHIN THE SAME SEASONS — trial n with the move against
-    trial n without it, so the difference is the squads, not the
-    weather. Sorted because every reader is a quantile of it (band()
-    below, rank()'s "helps"). Empty when the two Standings disagree on
-    trial count (zip() makes this silent) — callers treat empty as "no
-    answer", not zero.
-    """
     return sorted(x - y for x, y in zip(after.totals.get(me, []),
                                         base.totals.get(me, [])))
 
 
 def band(pairs) -> tuple[float, float, float]:
-    """(median, 10th, 90th) of paired()'s output — ONE definition of a
-    band, shared by rank() and sim.ladder_rows() so the two cannot
-    disagree about what "the band" means. Uses stats.percentile()
-    rather than hand-indexing the sorted list. (0, 0, 0) for no pairs —
-    nothing simulated, no spread to report.
-    """
     if not pairs:
         return (0.0, 0.0, 0.0)
     return (percentile(pairs, 50), percentile(pairs, 10),
@@ -437,12 +219,6 @@ def band(pairs) -> tuple[float, float, float]:
 
 def _top_up(top: list[tuple], screened: list[tuple], ok, rank_key,
            minimum: int) -> list[tuple]:
-    """Ensure at least `minimum` of `top` satisfy `ok(d, a)`, adding more
-    from `screened` (best-`rank_key`-first) on top of `top` — never
-    displacing anything already there, never adding a key `top` already
-    holds. Shared bookkeeping behind both KEEP_RELIABLE_MIN and
-    KEEP_VALUE_MIN, which differ only in `ok`/`rank_key`.
-    """
     kept = {a.buy or a.sell for _, a in top}
     have = sum(1 for d, a in top if ok(d, a))
     if have >= minimum:
@@ -455,35 +231,11 @@ def _top_up(top: list[tuple], screened: list[tuple], ok, rank_key,
 
 def rank(u: Universe, acts: list[Action], seed: int = 1,
          price=None, extra: list[tuple[str, Action]] = ()) -> tuple:
-    """Screen wide and cheap, then re-run the survivors properly.
-
-    Returns `(rows, base, measured, bands)`. Rows carry the change in
-    expected finishing position and in P(above) each rival.
-
-    `extra` is `[(key, Action), ...]`, scored in the SAME final pass (a
-    second pass would redraw the same seasons for nothing) and returned
-    as `bands`, `{key: (median, lo, hi, action)}` — `key` given
-    explicitly since a pure-sale Action can't say by itself which side
-    a caller meant. A `key` already answered by a real BUY row is
-    dropped from `extra` — its own band answers better than a bare swap.
-
-    `acts` may contain moves you CANNOT afford today — screening them is
-    how the price of cash gets measured (see cash_price()).
-
-    `price` is places per million; given one, every move is CHARGED for the
-    wealth its clause destroys. Without one, today's own measurement is used.
-    Why: docs/notes/decide.md#rank--screening-top-up-and-value
-    """
-    # ONE DRAW PASS FOR THE WHOLE SCREEN, same seed for every option — see
-    # ffcore.season.simulate_many; the ranked numbers are unchanged.
     screen = _score_many(u, [u.state.squads] + [apply(u, a) for a in acts],
                          SCREEN_TRIALS, seed)
     base_s, rest = screen[0], screen[1:]
     screened, reach = [], []
     for a, r in zip(acts, rest):
-        # POINTS, not an expected-position swing — reads `.totals`
-        # directly rather than paying for expected_position()'s extra
-        # per-trial rival comparison.
         d, _lo, _hi = band(paired(r, base_s, u.me))
         reach.append((a.cost - a.proceeds - u.cash, d))
         if a.cost <= u.cash + a.proceeds:
@@ -491,19 +243,6 @@ def rank(u: Universe, acts: list[Action], seed: int = 1,
     measured = cash_price(reach)
     lam = price if price is not None else measured
 
-    # One row per target: 4 funding variants of one signing screen
-    # identically ONLY WHEN the sale is real dead weight — "selling dead
-    # weight changes nothing on the pitch" is false the moment the spare
-    # sold is a man in the eleven you'd actually field right now, and
-    # SCREEN_TRIALS is too few draws to trust a close margin between "sell
-    # my starter" and "sell my bench" (measured: the ranking between them
-    # flips run to run at this trial count). A funding variant that keeps
-    # today's XI intact is preferred outright over one that doesn't,
-    # before points are compared at all; ties within a tier still break on
-    # points, then spend. This can't be skipped by spending more trials
-    # here — the fix is not asking the noisy number to settle a question
-    # it was never precise enough to answer.
-    # Why: docs/notes/decide.md#rank--funding-variant-noise
     _, cur_xi = current_xi(u)
     def _touches_xi(a) -> bool:
         return any(s in cur_xi for s in a.sell)
@@ -517,18 +256,10 @@ def rank(u: Universe, acts: list[Action], seed: int = 1,
             pick[k] = (d, a)
     screened = sorted(pick.values(), key=lambda t: (-t[0], t[1].net))
 
-    # ...and one for the survivors, at the full count.
     top = screened[:KEEP]
-    # Top up with reliable candidates (KEEP_RELIABLE_MIN) — additive, never
-    # displacing a listed candidate that made top-KEEP honestly.
     top = _top_up(top, screened,
                  ok=lambda d, a: u.route_view.get(a.buy, "free") != "listed",
                  rank_key=lambda t: -t[0], minimum=KEEP_RELIABLE_MIN)
-    # Top up with the most efficient candidates (KEEP_VALUE_MIN), same
-    # additive shape, independent axis. "Efficient" is RELATIVE — the best
-    # few by ratio among genuine-gain-and-spend candidates, computed once,
-    # up front, rather than "d>0 and net>0" (which top-KEEP already
-    # satisfies for nearly every candidate, making the top-up a no-op).
     ratio = lambda t: t[0] / (t[1].net / 1e6)                    # noqa: E731
     best_value = {a.buy or a.sell for _, a in
                  sorted((t for t in screened if t[0] > 0 and t[1].net > 0),
@@ -537,23 +268,13 @@ def rank(u: Universe, acts: list[Action], seed: int = 1,
                  ok=lambda d, a: (a.buy or a.sell) in best_value,
                  rank_key=lambda t: -ratio(t), minimum=KEEP_VALUE_MIN)
     keep = [a for _, a in top]
-    # A clause pays the owner, who can respond with that money — not a
-    # pure subtraction. Computed off `lam` rather than inside the
-    # per-candidate squad; `afters` never differs from a plain apply().
     bonuses = [respond(u, a, lam) for a in keep]
     afters = [apply(u, a) for a in keep]
-    # Anything `extra` asks about a player already answered by a real
-    # ranked row is dropped. Buy side only, deliberately — the sell side
-    # can be the funder of an unrelated top move.
     answered = {a.buy for a in keep if a.buy}
     rest = [(k, a) for k, a in extra if k not in answered]
     final = _score_many(u, [u.state.squads] + afters
                         + [apply(u, a) for _k, a in rest], FINAL_TRIALS, seed)
     base, scored = final[0], final[1:len(afters) + 1]
-    # THE VICTIM'S REPLY LANDS ON HIS OWN TOTAL, AFTER THE DRAW — a flat
-    # points add, same in every trial, standing in for money spent at the
-    # going average rate over the season rather than one simulated transfer.
-    # No squad is touched, so no third manager can be caught in it.
     for a, r, bonus in zip(keep, scored, bonuses):
         if bonus and a.victim in r.totals:
             r.totals[a.victim] = [x + bonus for x in r.totals[a.victim]]
@@ -564,9 +285,6 @@ def rank(u: Universe, acts: list[Action], seed: int = 1,
     for a, r in zip(keep, scored):
         b_ = burn(u, a)
         charge = 0.0 if (lam is None or b_ is None) else lam * b_ / 1e6
-        # PAIRED, WITHIN THE SAME SEASONS — see paired()'s own docstring,
-        # which is where this used to be spelled out and where the band
-        # quantiles below used to be spelled a second time.
         pairs = paired(r, base, u.me)
         d_pts, lo, hi = band(pairs)
         out.append({
@@ -576,28 +294,13 @@ def rank(u: Universe, acts: list[Action], seed: int = 1,
             "d_pts": d_pts,
             "pts_lo": lo,
             "pts_hi": hi,
-            # THE ONE headline number now: season points, net of what the
-            # cash burned could otherwise have bought (`charge`, itself in
-            # points per rank()'s own `lam` — see cash_price()). Used to be
-            # expected-position swing (`d_pos`/`gross`, via
-            # Standings.expected_position()) — dropped 2026-09-12, Miguel:
-            # "P_win is an output of points, we should focus on points."
-            # Position/win swings are still shown (`d_win`/`d_beat` below)
-            # but no longer decide the order or the eligibility bar.
             "net_pts": d_pts - charge,
             "burn": b_,
             "charge": charge,
-            # No specific reply to name — payload()/the ladder treat
-            # None as "no answer to show".
             "answer": None,
             "d_win": r.position().get(1, 0.0) - base.position().get(1, 0.0),
             "d_beat": {v: r.beat(v) - base.beat(v) for v in rivals},
             "mean": r.mean(u.me),
-            # Season points per million actually paid, only defined for
-            # a genuine spend (net > 0). Already points-over-replacement
-            # since `d_pts` is a paired marginal whose "with" side
-            # re-picks best_xi() over every legal shape.
-            # Why: docs/notes/decide.md#rank--screening-top-up-and-value
             "value": value_rate(d_pts, a.net),
         })
     rows = sorted(out, key=lambda d: (-d["net_pts"], d["action"].net))
@@ -608,28 +311,15 @@ _LOAD_CACHE: Universe | None = None
 
 
 def load(trials_pool=None) -> Universe:
-    """Assemble the universe from the store. The only IO in this module.
-
-    MEMOIZED FOR THE PROCESS — pure w.r.t. the tidy store (`trials_pool`
-    is accepted but unused), and a store read can't change mid-run, so
-    every stage in run.py's single-interpreter chain shares one call.
-    Why: docs/notes/decide.md#load--memoized-for-the-process
-    """
     global _LOAD_CACHE
     if _LOAD_CACHE is not None:
         return _LOAD_CACHE
-    # The run's one model — the same League and the same Scorer report.py
-    # describes. See ffcore/model.py.
     from ffcore.model import session
     _m = session()
     lg, sc = _m.lg, _m.sc
     players = load_players()
 
-    # load_matches() already applies latest_only() internally — see its
-    # own docstring (matches.csv measured safe: 380/380 real matches kept).
     m = load_matches()
-    # The market's spelling of every club, and only the market's: it is the
-    # canonical side of the join in club_key().
     mkt_teams = sorted({text(r, MARKET_TBL.TEAM)
                         for r in (lg.market.latest().values()
                                   if lg.market is not None else [])
@@ -638,8 +328,6 @@ def load(trials_pool=None) -> Universe:
 
     teams = load_api_teams()
     mkt = load_api_market()
-    # Ownership is League's, not re-derived — a second, weaker join here
-    # would mean rival players nobody can be recognized as owning.
     owner = dict(lg.owner)
     me = lg.cfg.me
 
@@ -649,10 +337,6 @@ def load(trials_pool=None) -> Universe:
                     and (players[k].get("pos") or "").lower() in SLOT}
               for mgr in lg.managers}
 
-    # What it costs ME — see market_routes() for the free/listed/clause
-    # split. Both sides join through Crosswalk.resolve_api() on the market's
-    # spelling; a clause on an unresolvable name is a rival's player who
-    # silently cannot be bought at all.
     xw = lg.xw or Crosswalk()
     index = latest_only(lg.market.rows) if lg.market is not None else []
     price, route, bids = market_routes(
@@ -660,16 +344,7 @@ def load(trials_pool=None) -> Universe:
                                       index, r.get("market_value")))
     now = run_now()
     clause_until: dict = {}
-    # The app's own ownership-record id -> this repo's key, built in the
-    # one loop that already resolves a key for every api_teams row rather
-    # than re-resolving the same rows a second time for one more field.
     pt_to_key: dict[str, str] = {}
-    # Every clause, mine included — a rival can't answer back without them.
-    # Collected in the same pass as pt_to_key/clause_until/price/route
-    # below rather than a second loop over `teams` re-resolving the same
-    # rows: resolve_api() is pure (no side effects), so one resolution per
-    # row serves both this dict's unfiltered collection and price/route's
-    # filtered one.
     clause: dict[str, float] = {}
     for r in teams:
         k = xw.resolve_api(r["player_name"], r["manager"], lg.market, owner,
@@ -687,7 +362,6 @@ def load(trials_pool=None) -> Universe:
                 pass
         if buyout:
             clause.setdefault(k, float(r["buyout"]))
-        # A clause you cannot pay is not a price — the app refuses outright.
         if r["manager"] == me or not buyout:
             continue
         if locked(clause_until, k, now):
@@ -704,39 +378,13 @@ def load(trials_pool=None) -> Universe:
             proceeds[k] = max(proceeds[k], money)
     rival_cash = {h: (lg[h].cash.value or 0.0) for h in lg.managers
                   if h != me}
-    # What the app says everyone is worth — the figure a sale pays out at,
-    # see burn() for the gap between this and a buyout clause.
     value = {k: float((v or {}).get("value") or 0) for k, v in players.items()
              if (v or {}).get("value")}
 
-    # A display name for every player the index knows, not just those in
-    # the universe — a key with no name here prints as a raw number.
     name = {k: (rec.get("name") or k) for k, rec in players.items()}
     universe = set(price) | {k for s in squads.values() for k in s}
 
-    # ONE profile per player, the full pool, no market/ownership gate.
-    # `market_keyed` carries every market/ownership/ledger fact already
-    # computed above so build_profiles() doesn't re-derive any of it —
-    # PlayerCurrent is the one place that holds the result.
-    # The season's own file, found by globbing rather than a hardcoded
-    # label — a hardcoded "2026-27" here once meant this would silently
-    # start reading nothing (or crash outright) the moment the season
-    # rolled over, the same bug scout.py's own hand-rolled reader had.
-    # methodology.load_actuals() derives the label the same way.
-    # load_perjornada() globs the same folder for the same reason and
-    # reads the newest file's rows whole — a real consolidation, not a
-    # sixth slightly-different copy.
     perjornada_rows = load_perjornada()
-    # Real per-match data (mins played, goals, cards) for whichever ~118
-    # players have been on one of this league's 5 squads — api_teams's
-    # embedded lastStats, not a full-pool source (see
-    # ffcore.profile._match_stats_history's own docstring for why not).
-    # load_api_stats() is latest-PER-KEY, not latest-snapshot — api_stats.csv's
-    # newest sweep alone only covers 2% of its (player_id, week, stat) keys
-    # (see its own docstring); _match_stats_history() below already
-    # collapses duplicate keys itself via last-write-wins, so this narrows
-    # row COUNT (11,190 -> 10,857) but not the resulting per-key value,
-    # verified equal.
     match_stats_rows = load_api_stats()
     mk_keys = (set(price) | set(owner) | set(value) | set(clause)
               | set(clause_until) | set(route) | set(bids) | set(proceeds))
@@ -752,41 +400,24 @@ def load(trials_pool=None) -> Universe:
                               match_rows=m,
                               market_keyed=market_keyed)
 
-    # apply_fixtures() below needs `pos` as a plain arg; Universe computes
-    # its own copy from `players=profiles` (see _pos_of()).
     pos = {k: _pos_of(p.current.pos) for k, p in profiles.items()}
 
     base, base_rest = {}, {}
-    # Scored once per player, kept rather than re-derived for `matches`.
     scored: dict[str, object] = {}
     for k in universe:
         p = profiles.get(k)
         scored[k] = p.derived.scored if p else None
-        # to_bootstrap_input() owns the (pts, p_start) reshaping — same
-        # points side both jornada views, only the start side differs (a
-        # rate this thin has no more evidence by jornada 10 than jornada 3,
-        # but P(start) does once he has current-season minutes) — and the
-        # neutral (2.0, 0.5) default for an unscored player, in one place
-        # instead of duplicated inline here.
         base[k], base_rest[k] = (p.to_bootstrap_input() if p
                                  else (UNSCORED_DEFAULT, UNSCORED_DEFAULT))
 
     pool = pool_from_perjornada(perjornada_rows)
-    # A round in progress carries only players who haven't played it yet —
-    # everyone else's real points are already in `carried` (rounds_left()).
     club = {k: club_key(players[k].get("team"), mkt_teams)
             for k in base if k in players}
-    # How many matches each rate rests on, so a thin record widens the
-    # season the forecaster draws instead of passing as a fact.
     matches = {}
     for k in base:
         s_ = scored.get(k)
         if s_ is not None:
             matches[k] = s_.pj
-    # Club-correlated season uncertainty (club_volatility()). `club` is
-    # keyed on the market's spelling; results_history.csv is keyed on
-    # ff_slug, translated through ffcore.crosswalk — norm(c.market), not
-    # raw, to match club_key()'s own fallback convention.
     from ffcore import fixture as _fixture
     from ffcore.fixture import club_volatility, fit_home_edge, season_board
     from ffcore.tidy import load_elo, load_results_history, \
@@ -794,17 +425,9 @@ def load(trials_pool=None) -> Universe:
     slug_of = {norm(c.market): c.ff_slug for c in lg.xw.clubs.values()
               if c.market and c.ff_slug} if lg.xw is not None else {}
     club_of_slug = {k: slug_of[v] for k, v in club.items() if v in slug_of}
-    # One read of results_history.csv — club_volatility() and season_board()
-    # both want it and it can't have changed between them.
     results_hist = load_results_history()
     club_rel = club_volatility(results_hist, list(slug_of.values()))
-    # Mutates the module attribute BEFORE season_board() builds this
-    # run's Match objects — _match_for() reads HOME_EDGE live off the
-    # module each call, so this must land before the board, not after.
     _fixture.HOME_EDGE, _home_edge_why = fit_home_edge(results_hist, m)
-    # The whole remaining schedule, fitted once for `rem`. Keys normalised
-    # to match `club`'s own convention (club_key() always returns norm(...))
-    # — season_board() itself is keyed on the market's raw spelling.
     sboard = {j: {norm(team): m for team, m in layer.items()}
              for j, layer in season_board(
                  _m.market, m, rem, now, load_elo(), xw=lg.xw,
@@ -817,48 +440,25 @@ def load(trials_pool=None) -> Universe:
         next_then_rest(base, base_rest, rem, played, club),
         sboard, club, pos, ppm_of, status_of=status_of,
         first_jornada_of=first_jornada_of)
-    # A squad short a position can't be simulated at all (see phantom_fill())
-    # — patched once here so every downstream reader gets the same fix.
     squads, per_j = phantom_fill(squads, per_j, pos)
-    # phantom_fill() clears every position's SLOT_MIN, which is NOT the
-    # same guarantee as a real formation existing (two keepers in an
-    # exactly-11 squad clears both counts, fields nothing — _fieldable()'s
-    # own docstring) — asserted, not warned: this is a hard invariant of
-    # phantom_fill() itself, not a real-world state (a rival's squad) we
-    # optimize around or warn the user about.
-    # Why: docs/notes/decide.md#optimize-for-competent-play-warn-dont-model-for-incompetent-play
     for _m, _sq in squads.items():
         assert _fieldable(_sq), (_m, _sq)
-    # Phantoms are synthetic averages with no real fixture of their own —
-    # available from the first remaining jornada, same as current_xi()'s
-    # fallback reading for a player nothing else says otherwise about.
     if rem:
         phantom_keys = {k for layer in per_j.values() for k in layer
                         if k.startswith("__phantom_")}
         for k in phantom_keys:
             first_jornada_of.setdefault(k, rem[0])
-    # Mutates the module attribute, not a local — rate_draw()/start_draw()
-    # re-import DRIFT_FRAC fresh from the module on every call.
     _forecast.DRIFT_FRAC, _drift_why = _methodology.drift_frac_from_history()
-    # Same shape, for RATE_REL_FLOOR — Bootstrap.__init__ reads the module
-    # attribute when it builds rate_rel below, same as DRIFT_FRAC above.
     _forecast.RATE_REL_FLOOR, _rate_floor_why = \
         _methodology.fit_rate_rel_floor(pool)
     fc = Bootstrap(per_j, pool=pool, matches=matches,
                   club_of=club_of_slug, club_rel=club_rel)
 
-    # What everybody has already scored, off the league table — not the
-    # gated reader: this is history, incomplete rather than wrong; the gate
-    # belongs on the balance beside it (read_api_balances applies it).
     carried = {}
     for r in last_api_standings():
         if r.get("manager"):
             carried.setdefault(r["manager"],
                               num(r, API_STANDINGS.TEAM_POINTS, default=0.0))
-    # Same cash estimator league.md and rival_cash already use — a second,
-    # independent read of the raw balance once left the headline quoting a
-    # stale figure from a feed everything else had refused.
-    # Why: docs/notes/decide.md#load--misc-join-notes
     raw_cash = lg[me].cash.value or 0.0
     locked_cash = pending_sent(mkt)
     cash = raw_cash - locked_cash
@@ -879,31 +479,22 @@ def _selftest() -> None:
     from ffcore.forecast import Bootstrap as B
     from ffcore.fixtures import players_from_flat
 
-    # phantom_fill()/phantom_topup() themselves are ffcore.schedule's own
-    # self-test now (split out 2026-09-15) — this fixture is the minimal
-    # shape `apply()`'s own test below still needs.
     ph_pos = {"d1": "DEF", "d2": "DEF", "other_def": "DEF",
               "x1": "MED", "x2": "MED", "x3": "MED", "p1": "POR", "f1": "DEL"}
 
-    # -- apply(): the raid's real victim is topped up too, not just mine ---
-    # 2026-09-09, auditing a report recommendation: `apply()` moves a
-    # player off a real owner with nothing checking he still clears
-    # SLOT_MIN — 5 of that day's 119 real raid candidates would have left
-    # the victim short.
-    thin_riv = {"d1": "DEF", "d2": "DEF", "star": "DEF",  # exactly SLOT_MIN=3
+    thin_riv = {"d1": "DEF", "d2": "DEF", "star": "DEF",
                "x1": "MED", "x2": "MED", "x3": "MED", "p1": "POR", "f1": "DEL"}
     u_thin = Universe(
         state=LeagueState({"me": {}, "riv": dict(thin_riv)}, [1], "me"),
         forecaster=B({1: {}}), cash=0.0, me="me",
         players=players_from_flat(pos={**ph_pos, "star": "DEF"},
                                   owner={"star": "riv"}))
-    # He has exactly SLOT_MIN=3 DEF; raiding one of them (not his spare) —
     raided = apply(u_thin, Action("steal", buy="star", cost=1e6,
                                   victim="riv"))
     riv_after = raided["riv"]
     assert "star" not in riv_after, riv_after
     def_count = sum(1 for s in riv_after.values() if s == "DEF")
-    assert def_count == 3, riv_after           # 2 real + 1 phantom, not 2
+    assert def_count == 3, riv_after
     assert any(k.startswith("__phantom_DEF_") for k in riv_after), riv_after
 
     sq = {"k": "POR", **{f"d{i}": "DEF" for i in range(1, 5)},
@@ -915,7 +506,7 @@ def _selftest() -> None:
     per[1]["star"] = (12.0, 1.0)
     per[1]["dud"] = (0.2, 1.0)
     per[1]["me_bench"] = (0.5, 1.0)
-    per[1]["th_m1"] = (6.0, 1.0)      # worth taking off a rival
+    per[1]["th_m1"] = (6.0, 1.0)
 
     u = Universe(
         state=LeagueState({"me": dict(mine), "riv": dict(theirs)}, [1], "me"),
@@ -929,15 +520,10 @@ def _selftest() -> None:
             proceeds={"me_bench": 8e6}, owner={"th_m1": "riv"}))
     exp = u.forecaster.expected(1)
 
-    # -- Universe.current_xi: cached, computed once per instance ----------
     first = u.current_xi
     assert u.current_xi is first, "cached_property must not recompute"
-    # decide.current_xi(u) (no `who`, or who=u.me) hands back the SAME
-    # cached object — the compat wrapper doesn't create a second answer.
     assert current_xi(u) is first, "compat wrapper bypassed the cache"
 
-    # -- Universe.xi_bar/.route_kind/.dead_weight/.candidates: methods that
-    # delegate to the SAME free functions, not a second implementation ----
     assert u.xi_bar == xi_bar(*u.current_xi)
     assert u.xi_bar is u.xi_bar, "cached_property must not recompute"
     for k in list(u.state.squads.get(u.me, {}))[:1] + ["th_m1"]:
@@ -948,73 +534,37 @@ def _selftest() -> None:
     assert u.player_forecasts() == player_forecasts(u)
     assert u.rank([]) == rank(u, []), "u.rank must match rank(u, ...)"
 
-    # -- current_xi / xi_bar: the one computation seven call sites used to
-    # each rebuild by hand ---------------------------------------------
     cxi_exp, cxi = current_xi(u)
-    # No per-player schedule given: falls back to the first jornada nobody
-    # has played at all.
     fallback_j = next((j for j in u.state.jornadas if j not in u.part_played),
                       u.state.jornadas[0] if u.state.jornadas else 0)
     assert cxi_exp == u.forecaster.expected(fallback_j), cxi_exp
-    # me_bench (rate 0.5) is the weakest of the 12 — never picked over the
-    # other 11 real starters, so it must not be in the eleven.
     assert "me_bench" not in cxi, cxi
     assert len(cxi) == 11, cxi
-    # A different manager: a DIFFERENT eleven, same exp dict — the whole
-    # reason exp is not recomputed per manager.
     riv_exp, riv_xi = current_xi(u, who="riv")
     assert riv_exp is cxi_exp or riv_exp == cxi_exp, (riv_exp, cxi_exp)
     assert riv_xi != cxi, (riv_xi, cxi)
     assert "th_bench" not in riv_xi, riv_xi
-    # xi_bar: the weakest man IN the eleven, not the weakest man overall —
-    # me_bench (0.5) is weaker than everyone in cxi, but it is not IN cxi,
-    # so it must not set the bar.
     bar = xi_bar(cxi_exp, cxi)
     assert bar == min(cxi_exp.get(k, 0.0) for k in cxi), bar
     assert bar > 0.5, bar
-    # No eleven at all: the bar is 0.0, not a crash.
     assert xi_bar(cxi_exp, set()) == 0.0
 
     acts = candidates(u, exp)
     names = {a.buy for a in acts}
-    # A player worse than the weakest man you field is not a candidate.
     assert "dud" not in names, names
     assert "star" in names, names
 
-    # -- overdraft_fix(): dead weight only, never a multi-sale chain into
-    # real starters — the exact bug class candidates() itself already
-    # refuses (2026-09-06, Miguel: cash management going silent while
-    # overdrawn) ------------------------------------------------------
     assert overdraft_fix(u) == ([], 0.0), "not overdrawn: nothing to fix"
-    # me_bench (proceeds 8e6) is real dead weight in THIS fixture — never
-    # in cxi, confirmed above. A small overdraft it alone covers:
     u_small = replace(u, cash=-3e6)
     sells, short = overdraft_fix(u_small)
     assert sells == [("me_bench", 8e6)] and short == 0.0, (sells, short)
-    # A bigger overdraft than any dead weight raises: covers what it can,
-    # says honestly how much is still short — never reaches for a real
-    # starter to close the gap.
     u_big = replace(u, cash=-50e6)
     sells2, short2 = overdraft_fix(u_big)
     assert sells2 == [("me_bench", 8e6)], sells2
     assert short2 == 50e6 - 8e6, short2
-    # A rival's player reachable ONLY through his clause is marked a raid;
-    # one he has LISTED himself is never proposed at all — 0/119 real deals
-    # in this league have ever been a rival's own choice to sell to a
-    # manager, and Miguel has repeatedly asked that the report never
-    # emphasize a rival-owned player unless it's a raid he cannot refuse.
-    # Why: docs/notes/decide.md#candidates--listed-targets-are-never-proposed
-    # `u` already carries th_m1 on a "clause" route from construction above
-    # (route={"th_m1": "clause"}) — no mutation needed for this half.
     acts = candidates(u, exp)
     assert any(a.kind.startswith("clause") and a.buy == "th_m1"
                for a in acts), [a.kind for a in acts]
-    # A SEPARATE Universe carrying th_m1 on a "listed" route instead —
-    # BUILT via `players=`, not mutated in place on `u`. Wave 3F: a
-    # flat-dict mutation here (the old `u.route["th_m1"] = "listed"`)
-    # would leave `u.route_view` (which rebuilds from `u.players`)
-    # silently disagreeing with `u.route` once the flat dict is gone, so
-    # `u`'s own route stays "clause" for the rest of this test instead.
     listed_current = replace(u.players["th_m1"].current, route="listed")
     u_listed = replace(u, players={**u.players,
                                    "th_m1": replace(u.players["th_m1"],
@@ -1024,14 +574,12 @@ def _selftest() -> None:
         [a.kind for a in listed if a.buy == "th_m1"]
     assert all(a.cost <= u.cash + a.proceeds for a in acts), acts
 
-    # apply() is pure and a steal takes him OFF the rival.
     a = next(x for x in acts if x.buy == "th_m1" and not x.sell)
     after = apply(u, a)
     assert "th_m1" not in after["riv"], after["riv"]
     assert "th_m1" in after["me"]
     assert "th_m1" in u.state.squads["riv"], "apply must not mutate"
 
-    # -- offer_combos: minimal covers of a negative balance ------------------
     uoc = Universe(state=LeagueState({"me": {"a": "MED", "b": "MED",
                                              "c": "MED", "d": "MED"}},
                                      jornadas=[1], me="me", carried={}),
@@ -1040,41 +588,21 @@ def _selftest() -> None:
                   received_offers={"a": 4_000_000.0, "b": 4_000_000.0,
                                    "c": 9_000_000.0, "d": 3_000_000.0})
     got = {k: a.sell for k, a in offer_combos(uoc)}
-    # No single man clears 10M alone (c, the biggest, is 9M). Every pair
-    # with c does (a+c=13M, b+c=13M, c+d=12M); a+b (8M) and a/b+d (7M)
-    # do not, so the one triple that does — a+b+d=11M — is ALSO minimal:
-    # no two of {a,b,d} covers on their own, so it is not a superset of
-    # any cover already found. a+b+c, a+c+d, b+c+d are real covers too,
-    # but each is a superset of a pair already found — dropped, not a
-    # false choice.
     assert set(got.values()) == {("a", "c"), ("b", "c"), ("c", "d"),
                                  ("a", "b", "d")}, got
-    # A held player with an offer, funding NOTHING else — apply() already
-    # proves a pure sell is legal; this proves the Action built here is one.
     for a in dict(offer_combos(uoc)).values():
         assert a.buy == "" and a.kind == "sell"
     assert sum(a.proceeds for a in dict(offer_combos(uoc)).values()
               if a.sell == ("c", "d")) == 12_000_000.0
-    # A non-negative balance has nothing to cover, offers or not.
     upos = replace(uoc, cash=0.0)
     assert offer_combos(upos) == []
-    # A real deficit but no real offers — nothing to accept, only to sell.
     uno = replace(uoc, received_offers={})
     assert offer_combos(uno) == []
-    # An offer on a player who left the squad since (sold, or a stale
-    # join) prices nothing — only a HELD man's offer counts.
     ugone = replace(uoc, received_offers={**uoc.received_offers,
                                           "gone": 50_000_000.0})
     assert "gone" not in {p for a in dict(offer_combos(ugone)).values()
                           for p in a.sell}
 
-    # -- a move needing TWO OR MORE sales never appears (2026-09-06) -------
-    # Funding chains (2+ sales for one buy) were cut outright, not
-    # re-patched, after being the direct cause of two catastrophic squad-
-    # legality bugs (`_fieldable`'s own docstring). A target only reachable
-    # by selling more than one man simply does not appear on the table —
-    # the honest cost of the simpler, safer design — checked here so a
-    # future change can't quietly bring the chain back.
     u3 = Universe(
         state=LeagueState({"me": dict(mine), "riv": dict(theirs)}, [1], "me"),
         forecaster=B(per), cash=4e6, me="me",
@@ -1091,12 +619,8 @@ def _selftest() -> None:
     acts3 = candidates(u3, u3.forecaster.expected(1))
     assert not any(a.buy == "dear" and len(a.sell) > 1 for a in acts3), \
         [a for a in acts3 if a.buy == "dear"]
-    # Not reachable on cash (4M) + any ONE spare (best is 8M) either —
-    # 20M needs at least two, so "dear" is simply absent, not present
-    # with a wrong sale count.
     assert not any(a.buy == "dear" for a in acts3), acts3
 
-    # A swap removes the sold man and adds the bought one.
     sw = next(x for x in acts if x.buy == "star" and x.sell == ("me_bench",))
     af = apply(u, sw)
     assert "me_bench" not in af["me"] and "star" in af["me"]
@@ -1104,46 +628,32 @@ def _selftest() -> None:
     rows, base, _lam, _b = rank(u, acts)
     assert rows, "something should be worth doing"
     top = rows[0]
-    # The paired pair: how often it helps, and by how much, in the same
-    # seasons. A move that adds a twelve-point player to an eleven of threes
-    # helps in nearly all of them.
     assert 0.5 < top["helps"] <= 1.0, top["helps"]
     assert top["d_pts"] > 0, top["d_pts"]
     assert top["pts_lo"] <= top["d_pts"] <= top["pts_hi"]
-    # Signing a 12-point player into an eleven of 3s must gain season points,
-    # and the table must be sorted by that.
     assert top["net_pts"] > 0, top
     assert [r["net_pts"] for r in rows] == sorted(
         (r["net_pts"] for r in rows), reverse=True)
     assert set(top["d_beat"]) == {"riv"}
 
-    # VALUE FOR MONEY: points per million ACTUALLY PAID, only for a genuine
-    # spend (net > 0) — the formula itself, checked against the row it came
-    # from, not just "it exists".
     spend = next(r for r in rows if r["action"].net > 0)
     assert abs(spend["value"] - spend["d_pts"] / (spend["action"].net / 1e6)
               ) < 1e-9, spend
-    # A pure sale (net <= 0) gets no ratio — see rank()'s own note on why
-    # dividing by a non-positive net would blow up or read backwards.
     sale = next((r for r in rows if r["action"].net <= 0), None)
     if sale is not None:
         assert sale["value"] is None, sale
 
-    # `value` is already points over position replacement level: `d_pts` is a
-    # paired marginal off a re-picked best_xi(), so two candidates on
-    # identical expected points and price, one into a thin slot and one into
-    # a deep one, do NOT come out equal — no separate value_vor needed.
     vsq = {"me_k": "POR",
            **{"me_d%d" % i: "DEF" for i in range(1, 6)},
            **{"me_m%d" % i: "MED" for i in range(1, 7)},
            "me_f1": "DEL"}
     vth = {"th_" + k[3:]: v for k, v in vsq.items()}
     vrate = {k: (5.0 if v == "MED" else 3.0) for k, v in vsq.items()}
-    vrate["me_f1"] = 1.0                 # the only forward, and a weak one
+    vrate["me_f1"] = 1.0
     vrate.update({k: 3.0 for k in vth})
     vper = {1: {k: (r, 1.0) for k, r in vrate.items()}}
-    vper[1]["thin_del"] = (8.0, 1.0)     # 8.0 into a slot replacing 1.0
-    vper[1]["deep_med"] = (8.0, 1.0)     # 8.0 into a slot replacing 5.0
+    vper[1]["thin_del"] = (8.0, 1.0)
+    vper[1]["deep_med"] = (8.0, 1.0)
     uvor = Universe(
         state=LeagueState({"me": dict(vsq), "riv": dict(vth)}, [1], "me"),
         forecaster=B(vper), cash=6e6, me="me",
@@ -1152,9 +662,6 @@ def _selftest() -> None:
             price={"thin_del": 5e6, "deep_med": 5e6},
             route={"thin_del": "free", "deep_med": "free"}))
     vexp, vxi = current_xi(uvor)
-    # The fixture is what it claims: ONE flat bar, set by the weak forward,
-    # while the two slots' own replacement levels are 1.0 and 5.0 — the
-    # position-specific spread VORP exists to notice.
     assert xi_bar(vexp, vxi) == 1.0, xi_bar(vexp, vxi)
     assert min(vexp[k] for k in vxi if uvor.pos_view[k] == "DEL") == 1.0, vxi
     assert min(vexp[k] for k in vxi if uvor.pos_view[k] == "MED") == 5.0, vxi
@@ -1163,18 +670,9 @@ def _selftest() -> None:
                Action("buy", buy="deep_med", cost=5e6)])
     vby = {r["action"].buy: r for r in vrows}
     assert vby["thin_del"]["action"].net == vby["deep_med"]["action"].net
-    # Same points, same price, and the thin slot is worth MULTIPLES of the
-    # deep one. Measured 3.2x; asserted at 2x so the numpy and numpy-less
-    # RNG paths both hold it, the margin 24d2a8b's own value fixture needed.
     assert vby["thin_del"]["d_pts"] > 2 * vby["deep_med"]["d_pts"] > 0, vby
     assert vby["thin_del"]["value"] > 2 * vby["deep_med"]["value"] > 0, vby
 
-    # ...and a PER-POSITION bar would be UNSOUND as a screen, which is why
-    # xi_bar() stays flat — see its own note. 1-5-4-1 with a weak fifth
-    # defender: a midfielder at 2.0 sits below MED's own replacement level
-    # of 4.0, so a position-specific screen drops him, and he starts
-    # anyway by reshaping to 1-4-5-1. Pure best_xi(), no Monte Carlo, so
-    # this one is exact under both runtimes.
     bsq = {"me_k": "POR", "me_d1": "DEF", "me_d2": "DEF", "me_d3": "DEF",
            "me_d4": "DEF", "me_d5": "DEF", "me_m1": "MED", "me_m2": "MED",
            "me_m3": "MED", "me_m4": "MED", "me_f1": "DEL"}
@@ -1182,25 +680,15 @@ def _selftest() -> None:
             "me_d4": 3.0, "me_d5": 1.0, "me_m1": 4.0, "me_m2": 4.0,
             "me_m3": 4.0, "me_m4": 4.0, "me_f1": 3.0, "cand": 2.0}
     bxi = set(best_xi(bsq, bexp))
-    assert bxi == set(bsq), bxi                    # eleven men, all field
-    assert xi_bar(bexp, bxi) == 1.0                # the weak fifth defender
+    assert bxi == set(bsq), bxi
+    assert xi_bar(bexp, bxi) == 1.0
     assert min(bexp[k] for k in bxi if bsq[k] == "MED") == 4.0
     bsq2 = {**bsq, "cand": "MED"}
     bxi2 = set(best_xi(bsq2, bexp))
-    # Clears the flat bar (2.0 > 1.0), fails his own slot's (2.0 < 4.0),
-    # and plays — the fifth defender is the man who comes out for him.
     assert "cand" in bxi2 and "me_d5" not in bxi2, bxi2
     assert sum(1 for k in bxi2 if bsq2[k] == "DEF") == 4, bxi2
     assert sum(bexp[k] for k in bxi2) - sum(bexp[k] for k in bxi) == 1.0
 
-    # A STEAL AND AN EQUIVALENT FREE AGENT NOW TIE ON net_pts, DELIBERATELY.
-    # Ranking used to favour the clause buy here because it moved a RIVAL's
-    # total too (expected_position() is a competitive, all-managers metric);
-    # net_pts only ever reads `me`'s own paired total (see paired()), so a
-    # steal's rival-denial value no longer earns a ranking bonus. Miguel,
-    # 2026-09-12, asked directly and chose this: "drop it — points only."
-    # d_win/d_beat still SHOW the rival-denial effect on the row: it's
-    # visible, just not part of what decides order any more.
     per2 = {1: dict(per[1])}
     per2[1]["free_x"] = (9.0, 1.0)
     per2[1]["th_m1"] = (9.0, 1.0)
@@ -1216,14 +704,9 @@ def _selftest() -> None:
                                  victim="riv")])
     by = {r["action"].buy: r["net_pts"] for r in got}
     assert abs(by["th_m1"] - by["free_x"]) < 1e-9, by
-    # But the rival-denial effect is still THERE, just not decisive: only
-    # the clause buy moves a rival's own beat-probability.
     d_beat = {r["action"].buy: r["d_beat"]["riv"] for r in got}
     assert d_beat["th_m1"] > d_beat["free_x"] > 0.0, d_beat
 
-    # -- _top_up: the shared "ensure at least N satisfy `ok`, on top, never
-    # displacing" mechanic, tested on its own before any caller wires it in
-    # ------------------------------------------------------------------
     top_a = [(9.0, Action("buy", buy="a", cost=1e6)),
              (8.0, Action("buy", buy="b", cost=1e6))]
     screened_a = top_a + [(7.0, Action("buy", buy="c", cost=1e6)),
@@ -1234,41 +717,28 @@ def _selftest() -> None:
     topped = _top_up(top_a, screened_a, ok,
                      rank_key=lambda t: -t[0], minimum=2)
     keys = [a.buy for _, a in topped]
-    # both already-kept rows survive untouched, in place, and exactly the
-    # two best `ok` rows (by rank_key, not screening order) get added ON
-    # TOP — "bad" (also `ok`) is left out once the minimum is met.
     assert keys == ["a", "b", "ok1", "ok2"], keys
-    # already at the minimum: no-op, returns `top` as-is (same objects,
-    # nothing appended even if `screened` has other `ok` rows available).
     already_enough = _top_up(top_a, screened_a, lambda d, a: True,
                              rank_key=lambda t: -t[0], minimum=2)
     assert already_enough == top_a, already_enough
-    # a row already in `top` is never duplicated by the top-up even if it
-    # also satisfies `ok`.
     dup_check = _top_up([(9.0, Action("buy", buy="a", cost=1e6))],
                         [(9.0, Action("buy", buy="a", cost=1e6)),
                          (5.0, Action("buy", buy="b", cost=1e6))],
                         lambda d, a: True, rank_key=lambda t: -t[0],
                         minimum=2)
     assert [a.buy for _, a in dup_check] == ["a", "b"], dup_check
-    # `ok` sees the screened gain `d`, not just the action — needed by a
-    # caller like KEEP_VALUE_MIN's "genuine gain" check, which the action
-    # alone cannot answer (gain lives in `d`, not on the Action).
     gain_aware = _top_up([], screened_a, lambda d, a: d > 0.5,
                          rank_key=lambda t: -t[0], minimum=10)
     assert [a.buy for _, a in gain_aware] == ["a", "b", "c", "ok1"], \
         gain_aware
 
-    # -- KEEP_RELIABLE_MIN: a wall of "listed" candidates that screen well
-    # does not crowd a smaller but reliable one out of the full-precision
-    # pass ------------------------------------------------------------
     per5 = {1: dict(per[1])}
     acts5 = []
-    for i in range(15):     # all bigger than any reliable candidate below
+    for i in range(15):
         key = "listed%d" % i
         per5[1][key] = (10.0 - i * 0.1, 1.0)
         acts5.append(Action("buy", buy=key, cost=1e6))
-    for i in range(3):      # smaller than every listed one — no raw top-12
+    for i in range(3):
         key = "reliable%d" % i
         per5[1][key] = (2.0, 1.0)
         acts5.append(Action("buy", buy=key, cost=1e6))
@@ -1282,30 +752,20 @@ def _selftest() -> None:
             price={a.buy: 1e6 for a in acts5}, route=route5))
     rows5, *_ = rank(u5, acts5)
     kept5 = {r["action"].buy for r in rows5}
-    # All 15 "listed" candidates screen ahead of all 3 reliable ones, so the
-    # natural top-KEEP=12 is entirely "listed" — the 3 reliable ones only
-    # get in because KEEP_RELIABLE_MIN tops the pass up, ON TOP of the 12,
-    # not instead of any of them: 18 candidates in, 15 kept (12 + 3), none
-    # of the top-12 listed ones dropped to make room.
     assert all(("reliable%d" % i) in kept5 for i in range(3)), kept5
     assert len(kept5) == 15, kept5
     assert sum(1 for k in kept5 if k.startswith("listed")) == 12, kept5
 
-    # -- KEEP_VALUE_MIN: a wall of expensive-but-big candidates does not
-    # crowd cheap-but-efficient ones out of the full-precision pass ------
     per6 = {1: dict(per[1])}
     acts6 = []
-    for i in range(15):     # big raw gain, but €20M each — poor ratio
+    for i in range(15):
         key = "big%d" % i
         per6[1][key] = (10.0 - i * 0.1, 1.0)
         acts6.append(Action("buy", buy=key, cost=20e6))
-    for i in range(3):      # a clear, unambiguous gain, but €10k — excellent
-        key = "eff%d" % i   # ratio. Rate 6.0, well clear of the ~3.0 bar —
-        per6[1][key] = (6.0, 1.0)   # a thin margin here is flaky across RNG
-        acts6.append(Action("buy", buy=key, cost=1e4))  # backends (numpy vs.
-        # pure-Python fallback), so this stays wide and unambiguous.
-    # a candidate below the current XI bar: no genuine gain, so however
-    # tiny its cost, it must never be topped up on "ratio" alone.
+    for i in range(3):
+        key = "eff%d" % i
+        per6[1][key] = (6.0, 1.0)
+        acts6.append(Action("buy", buy=key, cost=1e4))
     per6[1]["sham"] = (0.1, 1.0)
     acts6.append(Action("buy", buy="sham", cost=1e3))
     u6 = Universe(
@@ -1316,21 +776,10 @@ def _selftest() -> None:
             price={a.buy: a.cost for a in acts6}))
     rows6, *_ = rank(u6, acts6)
     kept6 = {r["action"].buy for r in rows6}
-    # natural top-KEEP=12 is entirely "big" (raw gain 10.0..8.7 all beat
-    # 3.2), the 3 "eff" candidates only get in via KEEP_VALUE_MIN's top-up,
-    # on top of the 12 — none of the top-12 "big" ones displaced.
     assert all(("eff%d" % i) in kept6 for i in range(3)), kept6
     assert sum(1 for k in kept6 if k.startswith("big")) == 12, kept6
     assert "sham" not in kept6, kept6
 
-    # -- the bar is a round you can still pick -----------------------------
-    # THE ELEVEN A SIGNING HAS TO BEAT must be the one you would actually
-    # field. Measured against a round already in progress it is not: the
-    # players whose clubs have kicked off are out of it, so the eleven is
-    # whatever is left, the weakest man in it can be a reserve scoring
-    # nothing, and every journeyman in the league clears the bar. On the day
-    # this was found the bar off jornada 1 was 0.00 and off jornada 2 was
-    # 2.73, and the candidate list was inflated by everyone in between.
     half = Universe(
         state=LeagueState({"me": dict(mine), "riv": dict(theirs)}, [1, 2],
                           "me", ),
@@ -1340,41 +789,24 @@ def _selftest() -> None:
         players=players_from_flat(pos={**u.pos_view, "dud": "MED"},
                                   price={"dud": 1e6}))
     half.part_played = {1: {"somewhere"}}
-    # Off the locked round the bar is 0.1 and the journeyman clears it; off a
-    # round you can still pick it is 5.0 and he does not.
     assert not any(a.buy == "dud"
                    for a in candidates(half, half.forecaster.expected(2)))
 
-    # -- _fieldable: the one squad-legality check, counts only -------------
-    # A real 4-4-2 shape: POR1/DEF4/MED4/DEL2.
     ok_squad = {"k": "POR", "d1": "DEF", "d2": "DEF", "d3": "DEF",
                "d4": "DEF", "m1": "MED", "m2": "MED", "m3": "MED",
                "m4": "MED", "f1": "DEL", "f2": "DEL"}
     assert _fieldable(ok_squad), ok_squad
-    # No goalkeeper at all: illegal regardless of everything else.
     assert not _fieldable({k: v for k, v in ok_squad.items() if k != "k"})
-    # THE EXACT BUG: two goalkeepers, POR2/DEF4/MED4/DEL1 (11 total) — every
-    # position clears SLOT_MIN, total is XI_SIZE, and it's still illegal —
-    # no real formation fields two keepers. This is the shape that read
-    # Season -1282 (Ali Houary) and -1286 (Alvaro Mantilla) on real reports
-    # before `_fieldable()` replaced `_safe_to_sell()`'s bounds heuristic.
     two_keepers = {k: v for k, v in ok_squad.items() if k != "f2"}
     two_keepers["k2"] = "POR"
     assert not _fieldable(two_keepers), two_keepers
-    # Extra bench depth doesn't matter — legality only asks whether ENOUGH
-    # exists per position, never "too much".
     assert _fieldable({**ok_squad, "d5": "DEF", "m5": "MED"})
 
-    # -- candidates(): funded by cash or exactly ONE sale, never a chain ---
-    # A REAL-SIZED squad (12: 1 spare beyond the 11 a 4-4-2 needs) — selling
-    # anyone from an exactly-11 squad drops it below XI_SIZE, illegal by
-    # construction, so a genuine spare needs headroom above 11 to exist at
-    # all (the same fact phantom_fill()/load() guarantee for a real report).
     per_cd = {1: {"me_k": (2.0, 1.0), "me_d1": (3.0, 1.0), "me_d2": (3.0, 1.0),
                 "me_d3": (3.0, 1.0), "me_d4": (3.0, 1.0),
                 "me_m1": (3.0, 1.0), "me_m2": (3.0, 1.0), "me_m3": (3.0, 1.0),
                 "me_m4": (3.0, 1.0), "me_f1": (5.0, 1.0), "me_f2": (4.0, 1.0),
-                "me_f3": (0.1, 1.0),   # weakest DEL, the real spare
+                "me_f3": (0.1, 1.0),
                 "target": (9.0, 1.0)}}
     sq_cd = {"me_k": "POR", "me_d1": "DEF", "me_d2": "DEF", "me_d3": "DEF",
            "me_d4": "DEF", "me_m1": "MED", "me_m2": "MED", "me_m3": "MED",
@@ -1388,48 +820,22 @@ def _selftest() -> None:
                                   proceeds={"me_f3": 5e6}))
     exp_cd = u_cd.forecaster.expected(1)
     acts_cd = candidates(u_cd, exp_cd)
-    # Reachable by selling the one real spare (me_f3, 5M) alone — the
-    # squad holds 12, one more than a 4-4-2's 11, so this sale still
-    # leaves a legal shape.
     assert any(a.buy == "target" and a.sell == ("me_f3",) for a in acts_cd), \
         acts_cd
-    # me_k (the only POR) is never offered as a spare — selling him leaves
-    # no goalkeeper at all, illegal on its own, no chain needed to see it.
-    # Neither is any starting DEF/MED — selling one drops that position
-    # below what a 4-4-2/4-3-3/etc. needs alongside the other three.
     assert not any(k in a.sell for a in acts_cd
                   for k in ("me_k", "me_d1", "me_d2", "me_d3", "me_d4",
                            "me_m1", "me_m2", "me_m3", "me_m4")), \
         [a for a in acts_cd if a.sell]
 
 
-    # -- Universe.*_view accessors: THE THREE INCLUSION RULES, PINNED
-    # DIRECTLY. Through Wave 3E this was an equivalence assertion against
-    # the 12 flat dicts each view mirrored (docs/notes/
-    # rationalization-2026-09-16.md#2, Wave 3A) — the deliverable that let
-    # Wave 3F delete those flat dicts without re-checking every call
-    # site's behaviour by hand. Now that they're gone there is nothing
-    # left to equate a view TO, so this instead pins each field's own
-    # inclusion rule by name: pos/owner/route drop a FALSY value (empty
-    # string) entirely; price/proceeds/value/market_exp/start/clause/
-    # clause_until/bids drop only a value that `is None` (a real 0/0.0
-    # survives); name drops nothing at all.
     from ffcore.fixtures import tiny_profile as _tiny_p
 
     _FALSY_DROP = ("pos", "owner", "route")
-    # clause/clause_until/bids are PlayerCurrent fields with no reader
-    # anywhere, so they have no view to assert against -- deleted 2026-09-16
-    # rather than kept as a complete-looking API nothing calls. The rule
-    # they shared is still pinned by the five below; re-add a view in five
-    # lines if a caller ever needs one.
     _NONE_ONLY_DROP = ("price", "proceeds", "value", "market_exp", "start")
 
     falsy_edge = _tiny_p("falsy_edge", pos="", owner="", route="")
     zero_edge = _tiny_p("zero_edge", price=0.0, proceeds=0.0, value=0.0,
                        market_exp=0.0, start_p=0.0)
-    # `pos` can't itself be None (PlayerCurrent.pos is a plain str,
-    # unlike owner/route which are `str | None`) — its falsy case is
-    # covered by falsy_edge's `pos=""` above, not repeated here.
     none_edge = _tiny_p("none_edge", owner=None, route=None, price=None,
                        proceeds=None, value=None, market_exp=None,
                        start_p=None)
@@ -1439,25 +845,19 @@ def _selftest() -> None:
         players={"falsy_edge": falsy_edge, "zero_edge": zero_edge,
                 "none_edge": none_edge})
 
-    # pos/owner/route: a FALSY value (empty string) is excluded entirely,
-    # not mapped to "" — and `is None` (also falsy) excludes the same way.
     for field_name in _FALSY_DROP:
         view = getattr(u_views, field_name + "_view")
         assert "falsy_edge" not in view, (field_name, dict(view))
-    for field_name in ("owner", "route"):    # pos: see none_edge's note
+    for field_name in ("owner", "route"):
         view = getattr(u_views, field_name + "_view")
         assert "none_edge" not in view, (field_name, dict(view))
 
-    # price/proceeds/value/market_exp/start/clause/clause_until/bids: a
-    # real 0/0.0 SURVIVES — only `is None` drops the key.
     for field_name in _NONE_ONLY_DROP:
         view = getattr(u_views, field_name + "_view")
         assert "zero_edge" in view and not view["zero_edge"], \
             (field_name, dict(view))
         assert "none_edge" not in view, (field_name, dict(view))
 
-    # name: no filter at all — every player in `players` gets an entry,
-    # even one whose every other field is falsy or None.
     assert u_views.name_view["falsy_edge"] == "falsy_edge"
     assert u_views.name_view["zero_edge"] == "zero_edge"
     assert u_views.name_view["none_edge"] == "none_edge"

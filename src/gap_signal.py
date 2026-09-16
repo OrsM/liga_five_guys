@@ -1,27 +1,3 @@
-"""
-gap_signal.py — standing check for the "unexplained bench gap" hypothesis.
-
-    python src/gap_signal.py
-
-Not wired into run.py: this is a diagnostic, re-run by hand as the season
-accumulates more data, not a report stage. Why: docs/notes/score.md
-#unexplained-gap-discount-parked-log-dont-integrate-yet
-
-QUESTION: when a player goes from featuring to a genuine zero-minute gap
-(absent from starters.csv entirely) with no injury/suspension status
-recorded in lineups.csv's OWN HISTORY at the time (not just now), does his
-return-match performance undershoot his own pre-gap rate by more than
-noise explains?
-
-Checked 2026-09-15 on real data (n=37 after controlling for actual
-historical status): the raw gap looked real (90% CI excluded zero) until
-controlled for historical status, then the leave-one-out test that
-actually matters — does using it reduce forecast error out of sample,
-the same bar `ffcore.score._fit_decay()` holds itself to — came back a
-wash (MAE flat, MSE improvement's own CI straddles zero). PARKED, not
-rejected: re-run this as the tracked pool grows, and only wire a discount
-into scoring if the leave-one-out MSE gap clears its own CI.
-"""
 
 from __future__ import annotations
 
@@ -36,10 +12,6 @@ from stats import percentile
 
 
 def _jornada_dates(matches: list[dict], starters: list[dict]) -> dict[int, str]:
-    """{jornada: approx real-world date}, from the earliest starters.csv
-    snapshot seen for any match in that jornada — matches.csv itself
-    carries no date, so this is the closest real-time anchor available.
-    """
     jor_of_match: dict[str, int] = {}
     for m in matches:
         mid = (m.get("match_id") or "").strip()
@@ -62,9 +34,6 @@ def _jornada_dates(matches: list[dict], starters: list[dict]) -> dict[int, str]:
 
 
 def _status_history(lineups: list[dict]) -> dict[str, list[tuple[str, str]]]:
-    """{player_slug: [(observed_at, status), ...] sorted} — the full
-    snapshot history lineups.csv already keeps, not just the latest row.
-    """
     out: dict[str, list[tuple[str, str]]] = {}
     for r in lineups:
         slug = (r.get("player_slug") or "").strip()
@@ -78,10 +47,6 @@ def _status_history(lineups: list[dict]) -> dict[str, list[tuple[str, str]]]:
 
 def _status_around(hist: list[tuple[str, str]], approx_date: str,
                    window: int = 3) -> set[str]:
-    """Every distinct status seen in the `window` snapshots either side of
-    `approx_date` — the check that lets a case be excluded as confounded
-    by a real injury/suspension rather than assumed clean.
-    """
     idx = 0
     for i, (ts, _st) in enumerate(hist):
         if ts <= approx_date:
@@ -92,12 +57,6 @@ def _status_around(hist: list[tuple[str, str]], approx_date: str,
 
 def gap_cases(by_key, jornada_dates, status_hist, slug_of_key
              ) -> tuple[list[tuple[str, float, float]], int, int]:
-    """(cases, excluded_confounded, excluded_no_status_data).
-
-    A case is (key, pre_gap_ppm, return_match_points) for every player who
-    featured, then had a genuine zero-minute jornada, then returned —
-    kept only when every status snapshot near the gap read "ok".
-    """
     cases = []
     excluded_confounded = excluded_no_status = 0
     for key, pj in by_key.items():
@@ -132,10 +91,6 @@ def gap_cases(by_key, jornada_dates, status_hist, slug_of_key
 
 
 def leave_one_out(cases: list[tuple[str, float, float]]) -> dict:
-    """MAE/MSE with vs without the discount, fit on every OTHER case —
-    the same out-of-sample discipline ffcore.score._fit_decay() applies
-    to recency weighting itself.
-    """
     diffs = [pts2 - pre for _key, pre, pts2 in cases]
     n = len(cases)
     if n < 2:
@@ -160,21 +115,8 @@ def leave_one_out(cases: list[tuple[str, float, float]]) -> dict:
 
 def run() -> None:
     xw = load_crosswalk()
-    # load_starters() (latest_only): safe — every real (match, player) key
-    # survives (2,512/2,512, see load_starters()'s docstring), and the join
-    # below already dedups per (match_id, key) so a duplicated snapshot row
-    # was never counted twice even before this migration.
     starters = load_starters()
-    # load_matches() (latest_only): safe — only match_id -> jornada is read
-    # (directly here, and inside ffcore.score._per_jornada_current), which
-    # does not change between snapshots of the same match.
     matches = load_matches()
-    # lineups.csv is read RAW, on purpose: _status_history() below needs the
-    # full snapshot history (its own docstring), across every source — the
-    # only lineups loaders in ffcore.tidy either give the latest snapshot
-    # (load_lineups_latest) or filter to one source (load_lineups), and
-    # narrowing to one source here could silently drop a real status flag
-    # from the other. Left alone.
     lineups = read_csv(TIDY / "lineups.csv")
     files = sorted((SEASON / "live").glob("perjornada_*.csv"))
     if not files or xw is None:
@@ -210,8 +152,6 @@ def run() -> None:
 
 
 def _selftest() -> None:
-    # A tiny synthetic pool: player A featured, had an unexplained gap,
-    # returned worse; player B never gapped, so contributes no case.
     by_key = {
         "A": {1: (6.0, 90.0), 2: (5.0, 90.0), 3: (0.0, 0.0), 4: (2.0, 90.0)},
         "B": {1: (4.0, 90.0), 2: (4.0, 90.0), 3: (4.0, 90.0)},
@@ -227,12 +167,10 @@ def _selftest() -> None:
         by_key, jornada_dates, status_hist, slug_of_key)
     assert len(cases) == 1, cases
     assert cases[0][0] == "A"
-    assert abs(cases[0][1] - 5.5) < 1e-9, cases  # pre-gap ppm: (6+5)/2
+    assert abs(cases[0][1] - 5.5) < 1e-9, cases
     assert cases[0][2] == 2.0, cases
     assert excl_conf == 0 and excl_nodata == 0
 
-    # A real status flag near the gap excludes the case instead of
-    # silently trusting a stale "current status" reading.
     flagged = dict(status_hist)
     flagged["a-slug"] = [("2026-01-01T00Z", "ok"),
                          ("2026-01-15T00Z", "injured")]
@@ -241,7 +179,6 @@ def _selftest() -> None:
     assert cases2 == [], cases2
     assert excl_conf2 == 1
 
-    # leave_one_out needs at least 2 cases to fit anything meaningful.
     assert leave_one_out([("A", 5.0, 2.0)]) == {}
     two = [("A", 5.0, 2.0), ("B", 4.0, 4.5)]
     out = leave_one_out(two)

@@ -1,43 +1,3 @@
-"""
-ffcore.season — play the rest of the league out, many times.
-
-    st  = LeagueState(squads, fixtures_remaining)
-    res = simulate(st, forecaster, trials=2000)
-    res.beat("BurtonGM89")     -> P(I finish above him)
-    res.position("me")         -> {1: 0.08, 2: 0.19, ...}
-
-WHY A SIMULATION AND NOT A RATE. Every metric this repo has tried — points per
-million, value over replacement, an exchange rate for cash — was a proxy for
-one question: does this move me up the table. With five managers and their
-complete squads visible through the API, that question can be answered
-directly instead of approximated, and the answer arrives as a distribution
-rather than a number, which is the only honest form for it.
-
-It also removes a whole class of bug. Marginal values are SUBMODULAR: sell two
-bench midfielders and the pair is worth less than the sum of the two, because
-removing the first raises the second. Any table of independently-computed
-marginals is therefore only valid for acting on one row, and this repo printed
-four such rows at once. A simulation of the squad you would actually hold
-cannot make that mistake — there is nothing to add up.
-
-MANAGERS PICK ON expected(), SCORED ON A SAMPLED OUTCOME. Choosing the eleven
-from the sampled outcome would hand everyone perfect foresight and make every
-squad look far better than it is; the gap between the two is most of what
-fantasy football actually is. The sampling itself lives in _run_np below, a
-numpy-vectorized reader of ffcore.forecast.Bootstrap's own fields — not a
-call to a method on it (there isn't one to call: see forecast.py's own note
-on why draw()/rate_draw()/start_draw() were removed 2026-09-16).
-
-WHAT IT DOES NOT MODEL, and each of these makes it optimistic:
-
-  * Rivals never transfer. They will, and they will improve, so a lead here
-    decays slower than in reality.
-  * Nobody is injured mid-season beyond what today's P(start) already says.
-  * Teammates' PER-MATCH luck is independent even at the same club — only
-    the season-long rate (club_rel, see _run_np below and
-    ffcore.fixture.club_volatility) is correlated, not a single round's
-    shared clean sheet or shared goals.
-"""
 
 from __future__ import annotations
 
@@ -52,17 +12,6 @@ XI_SIZE = 11
 
 
 def legal_shapes() -> list[dict[str, int]]:
-    """Every formation the app allows, as counts per position.
-
-    ffcore.score.formations()'s OWN LIST, converted to dicts — not
-    re-derived from SLOT_MIN/MAX_SLOT bounds the way this used to work.
-    Found 2026-09-01 (swarm review of the forecasting engine): bounds-
-    derivation correctly reproduces these 7 shapes by coincidence, but a
-    now-deleted PREMIUM_FORMATIONS list once violated those same bounds —
-    e.g. (4, 6, 0) fielded 6 midfielders, over MAX_SLOT["MED"]=5. One
-    authority (score.formations()) instead of two that could only ever
-    agree by coincidence.
-    """
     return [{"POR": 1, "DEF": d, "MED": m, "DEL": f}
            for d, m, f in formations()]
 
@@ -71,21 +20,6 @@ SHAPES = legal_shapes()
 
 
 def best_xi(squad: dict[str, str], value: dict[str, float]) -> list[str]:
-    """The eleven worth most under `value`, over every legal shape.
-
-    `squad` is {player key: position}. Greedy within a shape is exact, because
-    positions do not interact once the shape is fixed: take the best N of each
-    slot. So this is a search over shapes, not over players, and there are
-    only a few dozen shapes — the same search ffcore.score.pick_xi() runs
-    over its own row-dict pool, shared as _xi_search() rather than kept as
-    two hand-synced copies of one prefix-sum loop.
-
-    THIS IS WHERE "you can change your layout" LIVES. A squad with four good
-    forwards and three good midfielders is worth what its best shape is worth,
-    not what some default 4-4-2 would be — and a position you are thin in
-    costs you exactly the difference between the shapes you can and cannot
-    field, with no threshold to configure.
-    """
     by_slot: dict[str, list[tuple]] = {}
     for k, slot in squad.items():
         by_slot.setdefault(slot, []).append((k, value.get(k, 0.0)))
@@ -98,24 +32,14 @@ def best_xi(squad: dict[str, str], value: dict[str, float]) -> list[str]:
 
 @dataclass
 class LeagueState:
-    """Who owns whom, and what is left to play.
-
-    squads: {manager: {player key: position}}
-    jornadas: the rounds still to come, in order
-    """
     squads: dict[str, dict[str, str]]
     jornadas: list[int]
     me: str = ""
-    # Points already on the board. The league does not start from zero, and a
-    # rival seven ahead needs seven fewer to beat you — small against a ±120
-    # season band, but it is the difference between simulating this league and
-    # simulating a hypothetical one.
     carried: dict[str, float] = field(default_factory=dict)
 
 
 @dataclass
 class Standings:
-    """Simulated final totals, one row per trial per manager."""
     totals: dict[str, list[float]] = field(default_factory=dict)
     me: str = ""
 
@@ -128,20 +52,11 @@ class Standings:
         return sum(v) / len(v)
 
     def band(self, manager: str, lo=0.1, hi=0.9) -> tuple[float, float]:
-        """Central interval. The number people actually need, because a mean
-        with no spread beside it reads as a prediction.
-
-        Via stats.percentile() (statistics.quantiles), not a hand-indexed
-        sorted list — the same tested percentile math decide.band() and
-        stats.bootstrap_gap() use, not a third near-identical spelling of it.
-        """
         from stats import percentile
         v = self.totals.get(manager) or [0.0]
         return percentile(v, lo * 100), percentile(v, hi * 100)
 
     def beat(self, rival: str, manager: str = "") -> float:
-        """P(manager finishes strictly above rival). Ties count as halves —
-        a dead heat is not a win and pretending otherwise flatters you."""
         me = manager or self.me
         a, b = self.totals.get(me), self.totals.get(rival)
         if not a or not b:
@@ -150,7 +65,6 @@ class Standings:
         return wins / len(a)
 
     def position(self, manager: str = "") -> dict[int, float]:
-        """{final position: probability}."""
         me = manager or self.me
         if me not in self.totals:
             return {}
@@ -167,15 +81,6 @@ class Standings:
 
 
 def _antithetic_normal(rng, shape: tuple):
-    """rng.standard_normal(shape), pairwise mirrored: trial i and trial
-    i+trials//2 get exactly opposite draws (z, -z) rather than independent
-    ones. Same per-trial marginal (still standard normal), same shape,
-    same call signature as the draw it replaces — the only difference is
-    that half the trials are now the other half's mirror image, which
-    cancels first-order noise in a season-total SUM without touching the
-    model itself. Odd trial counts get one unmirrored extra draw.
-    Why: docs/notes/season.md#_antithetic_normal--variance-reduction-not-a-model-change
-    """
     import numpy as np
 
     trials = shape[0]
@@ -191,25 +96,6 @@ def _antithetic_normal(rng, shape: tuple):
 
 def simulate_many(states: list, forecaster, trials: int = 2000,
                   seed: int = 0, antithetic: bool = False) -> list:
-    """Play one set of seasons and score EVERY candidate squad against it.
-
-    THE DRAWS DO NOT DEPEND ON THE SQUADS. Same seed, same forecaster, same
-    jornadas — so every call to simulate() was redrawing an identical season
-    and throwing it away. Ranking twelve options at three thousand trials over
-    thirty-eight jornadas meant eight million draws where a hundred thousand
-    would do.
-
-    Drawing once per (trial, jornada) and scoring all the states against it is
-    exactly the same arithmetic in a different order, which is why the
-    self-test asserts the numbers are IDENTICAL rather than close.
-
-    Returns one Standings per state, in order. numpy is a hard dependency
-    (pyproject.toml), so this always runs through _run_np — no fallback
-    path, no `workers` parameter (removed 2026-09-16 along with the
-    multiprocess/pure-Python path it split trials across: real callers
-    never passed one, and it existed only for a "numpy missing" case the
-    dependency declaration already rules out).
-    """
     if not states:
         return []
     fast = _run_np(states, forecaster, trials, seed, antithetic)
@@ -219,16 +105,6 @@ def simulate_many(states: list, forecaster, trials: int = 2000,
 
 def _run_np(states: list, forecaster, trials: int, seed: int,
            antithetic: bool = False):
-    """The whole season, drawn as arrays over ffcore.forecast.Bootstrap's
-    own fields (per_jornada/pool/rate_rel/club_of/club_rel/start_rel) —
-    reads them directly rather than calling per-key methods on the
-    instance, collapsing ~20M Python calls per run into a couple of numpy
-    calls. Since 2026-09-16 this IS the sampler, not a mirror of one:
-    Bootstrap has no draw()/rate_draw()/start_draw() of its own to keep in
-    sync with, and numpy is a hard dependency, so there is no fallback to
-    return None for.
-    Full design notes + the rng stream layout: docs/notes/season.md#_run_np-the-vectorized-mirror-kept-in-sync-by-hand
-    """
     try:
         import numpy as np
     except ImportError:
@@ -242,9 +118,6 @@ def _run_np(states: list, forecaster, trials: int, seed: int,
         return None
 
     pool_a = np.asarray(pool, dtype=float)
-    # rate_rel/club_rel/etc mirror ffcore.forecast.Bootstrap's own fields —
-    # see docs/notes/season.md#_run_np-the-vectorized-mirror-kept-in-sync-by-hand
-    # for the rng stream layout and why the club shock does not drift.
     rel = getattr(forecaster, "rate_rel", None) or {}
     club_of = getattr(forecaster, "club_of", None) or {}
     club_rel = getattr(forecaster, "club_rel", None) or {}
@@ -263,8 +136,6 @@ def _run_np(states: list, forecaster, trials: int, seed: int,
             0.0, None)
         clubs = sorted(club_rel)
         if clubs:
-            # Own rng stream (seed component 7920): independent of the
-            # individual draw, not the same bits reused twice.
             crng = np.random.default_rng([seed, 7920])
             csd = np.array([club_rel[c] for c in clubs], dtype=float)
             shock = np.clip(
@@ -275,20 +146,11 @@ def _run_np(states: list, forecaster, trials: int, seed: int,
             shared = np.stack(
                 [shock_of.get(club_of.get(k, ""), ones) for k in all_keys],
                 axis=1)
-        # Own stream (7921), drawn incrementally inside the jornada loop
-        # below — a random walk's steps must be independent draws IN
-        # ORDER, not one big draw sliced afterward.
         drng = np.random.default_rng([seed, 7921])
         step_sd = DRIFT_FRAC * sd
-        # cum_var stays 1D (per key, the variance SCHEDULE is the same
-        # across trials); walk is (trials, keys) — each trial realizes
-        # its own path. See docs/notes/season.md for the accumulation fix.
         cum_var = np.zeros(len(all_keys))
         walk = np.zeros((trials, len(all_keys)))
 
-    # start_rel's own error: same shape as the rate's, own stream
-    # (7927+, additive on logit(p) not multiplicative on a rate). No club
-    # term here, same reason start_draw() has none.
     srel = getattr(forecaster, "start_rel", None) or {}
     all_start_keys = sorted(
         {k for ks in order.values() for k in ks} & set(srel)) if srel else []
@@ -301,24 +163,12 @@ def _run_np(states: list, forecaster, trials: int, seed: int,
         seps0 = draw_normal(srrng, (trials, len(all_start_keys))) * ssd
         sdrng = np.random.default_rng([seed, 7928])
         step_sd_s = _DF * ssd
-        # No cum_var_s: additive and mean-zero already, unlike the
-        # log-normal rate walk above — just the accumulated position.
-        walk_s = np.zeros((trials, len(all_start_keys)))  # per trial too
+        walk_s = np.zeros((trials, len(all_start_keys)))
 
     managers = [list(st.squads) for st in states]
     totals = [{m: np.full(trials, float(st.carried.get(m, 0.0)))
                for m in ms} for st, ms in zip(states, managers)]
 
-    # The eleven depends only on expectations, so it is picked once per state
-    # per jornada — not once per state per jornada per pass through the draw.
-    # Left inside the loop it was two and a half thousand shape searches.
-    #
-    # AND ONCE PER SQUAD, not once per state. The candidate options differ by
-    # one squad each: my own, or the one rival a steal takes a player from.
-    # The other four managers' elevens are the same search repeated for every
-    # option on the table — 15,519 shape searches for about 1,900 distinct
-    # questions. Keyed on the squad itself so a state that shares one gets the
-    # answer, which is exactly the condition under which the answer is shared.
     exp_by_j = {}
     xi_memo: dict = {}
     xis = []
@@ -339,13 +189,6 @@ def _run_np(states: list, forecaster, trials: int, seed: int,
 
     rate_mult = {}
     for j in states[0].jornadas:
-        # One walk step per jornada in the remaining calendar, taken BEFORE
-        # the "nothing to score" skip below (a jornada with no keys still
-        # elapses — skipping its step would tie the walk's width to which
-        # weeks happen to have zero scoring rows). Accumulated in place,
-        # not redrawn from cum_var — see docs/notes/season.md for the bug
-        # this fixed and why the log-normal form avoids a mean-inflating
-        # clip.
         if all_keys:
             step_var = step_sd ** 2
             walk += draw_normal(drng, (trials, len(all_keys))) \
@@ -355,7 +198,6 @@ def _run_np(states: list, forecaster, trials: int, seed: int,
             individual = eps0 * walked
             m = individual * shared if shared is not None else individual
             rate_mult = {k: m[:, i] for i, k in enumerate(all_keys)}
-        # Same walk, on P(start) — logit-additive, own stream (7927/7928).
         start_shift = {}
         if all_start_keys:
             walk_s += draw_normal(sdrng, (trials, len(all_start_keys))) \
@@ -371,9 +213,6 @@ def _run_np(states: list, forecaster, trials: int, seed: int,
         pts = np.array([per[k][0] for k in keys], dtype=float)
         p = np.array([per[k][1] for k in keys], dtype=float)
         rng = np.random.default_rng([seed, j])
-        # (trials, players) of rate multipliers, 1.0 where nothing says how
-        # thin the evidence is — same shape as the draw, so it multiplies
-        # into it without a loop.
         scale = np.ones((trials, len(keys))) if not rate_mult else np.stack(
             [rate_mult[k] if k in rate_mult else np.ones(trials)
              for k in keys], axis=1)
@@ -403,16 +242,6 @@ def _run_np(states: list, forecaster, trials: int, seed: int,
 
 def simulate(state: LeagueState, forecaster, trials: int = 2000,
              seed: int = 0, antithetic: bool = False) -> Standings:
-    """Play the remaining jornadas `trials` times.
-
-    THE SAME SEED IS THE SAME SEASON for every call, which is what makes two
-    candidate squads comparable: the difference between them is then the
-    squads, not the weather. Comparing a buy against a hold on independently
-    drawn seasons would bury a one-point edge under a ±75-point spread.
-
-    One state through simulate_many, so the two cannot drift apart: they held
-    a copy each of the same loop, and the copies had to be asserted equal.
-    """
     return simulate_many([state], forecaster, trials=trials, seed=seed,
                          antithetic=antithetic)[0]
 
@@ -422,14 +251,11 @@ def _selftest() -> None:
 
     from ffcore.forecast import Bootstrap
 
-    # -- shapes -------------------------------------------------------------
     assert all(sum(s.values()) == XI_SIZE for s in SHAPES), SHAPES
     assert {"POR": 1, "DEF": 4, "MED": 4, "DEL": 2} in SHAPES
     assert {"POR": 1, "DEF": 5, "MED": 4, "DEL": 1} in SHAPES
-    # 6 defenders is not a formation the app will accept.
     assert not any(s["DEF"] > MAX_SLOT["DEF"] for s in SHAPES)
 
-    # -- best_xi ------------------------------------------------------------
     squad = {"k": "POR", "d1": "DEF", "d2": "DEF", "d3": "DEF", "d4": "DEF",
              "d5": "DEF", "m1": "MED", "m2": "MED", "m3": "MED", "m4": "MED",
              "m5": "MED", "f1": "DEL", "f2": "DEL", "f3": "DEL"}
@@ -437,16 +263,10 @@ def _selftest() -> None:
     val.update({"f1": 9.0, "f2": 9.0, "f3": 9.0})
     xi = best_xi(squad, val)
     assert len(xi) == XI_SIZE, xi
-    # THE SHAPE BENDS TO THE SQUAD: three good forwards means a shape that
-    # starts three, without anybody configuring a preference.
     assert {"f1", "f2", "f3"} <= set(xi), xi
 
-    # Too few keepers and there is no legal eleven at all — reported as empty
-    # rather than as a ten-man team that would silently score less.
     assert best_xi({"d1": "DEF"}, {"d1": 1.0}) == []
 
-    # -- simulate -----------------------------------------------------------
-    # Two managers, identical squads, one jornada: a coin flip by construction.
     sq = {"k": "POR", **{f"d{i}": "DEF" for i in range(1, 6)},
           **{f"m{i}": "MED" for i in range(1, 6)}, "f1": "DEL"}
     a = {f"a_{k}": v for k, v in sq.items()}
@@ -456,10 +276,8 @@ def _selftest() -> None:
     res = simulate(st, Bootstrap(per), trials=600, seed=1)
     assert res.trials == 600
     assert 0.35 < res.beat("B") < 0.65, res.beat("B")
-    # Eleven players at 3.0 each.
     assert abs(res.mean("A") - 33.0) / 33.0 < 0.1, res.mean("A")
 
-    # A strictly better squad wins nearly always, and the band says so.
     per2 = {1: {k: ((9.0 if k.startswith("a_") else 1.0), 1.0)
                 for k in list(a) + list(b)}}
     res2 = simulate(st, Bootstrap(per2), trials=600, seed=1)
@@ -468,41 +286,24 @@ def _selftest() -> None:
     assert lo < res2.mean("A") < hi, (lo, res2.mean("A"), hi)
     assert lo > res2.band("B")[1], "the bands should not overlap here"
 
-    # position() is a distribution and sums to one.
     p = res2.position("A")
     assert abs(sum(p.values()) - 1.0) < 1e-9, p
     assert p.get(1, 0) > 0.95, p
     assert 1.0 <= res2.expected_position("A") < 1.1
 
-    # POINTS ALREADY SCORED COUNT. A rival who cannot be caught should not
-    # come out at 50%.
     far = LeagueState(squads={"A": a, "B": b}, jornadas=[1], me="A",
                       carried={"A": 0.0, "B": 500.0})
     rf = simulate(far, Bootstrap(per), trials=200, seed=1)
     assert rf.beat("B") == 0.0, rf.beat("B")
     assert rf.mean("B") - rf.mean("A") > 400
 
-    # A tie is half a win, not a win.
     tied = Standings(totals={"A": [5.0], "B": [5.0]}, me="A")
     assert tied.beat("B") == 0.5
 
-    # SAME SEED, SAME SEASON — the property that makes two options comparable.
     r1 = simulate(st, Bootstrap(per), trials=200, seed=4)
     r2 = simulate(st, Bootstrap(per), trials=200, seed=4)
     assert r1.totals == r2.totals
 
-    # -- club-correlated variance actually widens a real season sim --------
-    # A squad entirely from ONE club should show MORE season-total spread
-    # once that club's players share a strong correlated shock than when
-    # they draw independently — this is the actual claim ffcore.forecast's
-    # club_rel exists for, checked through simulate() itself (whichever of
-    # _run/_run_np is active), not just at the Bootstrap unit level.
-    # KEYED ON a/b's PREFIXED NAMES ("a_k", "b_d1", ...), not sq's bare
-    # ones — rate_rel is looked up by the SAME key per_jornada uses, and a
-    # mismatch here means an empty intersection in _run_np's `all_keys`,
-    # silently applying NO rate uncertainty to either run and making them
-    # look identical for a reason that has nothing to do with correlation.
-    # Caught exactly that way once already, before fixing it here.
     matches = {k: 20 for k in list(a) + list(b)}
     club_of_a = {f"a_{k}": "OneClub" for k in sq}
     baseline_fc = Bootstrap(per, matches=matches)
@@ -513,25 +314,16 @@ def _selftest() -> None:
     base_sd = statistics.pstdev(base_res.totals["A"])
     corr_sd = statistics.pstdev(corr_res.totals["A"])
     assert corr_sd > base_sd, (base_sd, corr_sd)
-    # The MEAN barely moves — this widens the band, it does not bias it.
     assert abs(statistics.mean(corr_res.totals["A"])
               - statistics.mean(base_res.totals["A"])) < 5.0
-    # Squad B, uncorrelated in both runs, is a control: its own spread
-    # should not have moved just because A's forecaster changed.
     assert abs(statistics.pstdev(base_res.totals["B"])
               - statistics.pstdev(corr_res.totals["B"])) < 1e-6
-    # Reproducible with the feature on, the same as without it.
     corr_res2 = simulate(st, Bootstrap(per, matches=matches,
                                        club_of=club_of_a,
                                        club_rel={"OneClub": 0.6}),
                          trials=1500, seed=11)
     assert corr_res.totals == corr_res2.totals
 
-    # -- one draw, many squads ---------------------------------------------
-    # IDENTICAL, not close. simulate_many is the same arithmetic in a
-    # different order — draw the season once, score every candidate against
-    # it — so anything but an exact match means the reordering changed the
-    # rng stream, which is the one thing it must not do.
     b2 = {f"b_{k}": v for k, v in sq.items()}
     alt = LeagueState(squads={"A": dict(a), "B": dict(b2)}, jornadas=[1],
                       me="A")
@@ -542,26 +334,17 @@ def _selftest() -> None:
     assert both[1].totals == two.totals, "draw order changed"
     assert simulate_many([], Bootstrap(per), trials=10) == []
 
-    # A state with a manager the base does not have is scored from scratch,
-    # not silently given the base's total for a manager that is not there.
     solo = LeagueState(squads={"A": dict(a), "C": dict(b2)}, jornadas=[1],
                        me="A")
     got = simulate_many([st, solo], Bootstrap(per), trials=120, seed=3)
     want = simulate(solo, Bootstrap(per), trials=120, seed=3)
     assert got[1].totals == want.totals, "a new manager must be scored fully"
 
-    # SAME CALL TWICE, EXACTLY. No multiprocess split to keep in sync
-    # anymore (removed 2026-09-16 with the pure-Python `_run` path it
-    # existed to parallelize) — just the ordinary reproducibility claim.
     again1 = simulate_many([st, alt], Bootstrap(per), trials=500, seed=2)
     again2 = simulate_many([st, alt], Bootstrap(per), trials=500, seed=2)
     assert [x.totals for x in again1] == [x.totals for x in again2], \
         "same seed, same seasons"
 
-    # -- rate DRIFT actually widens a real season sim, mean unbiased --------
-    # Ten jornadas, not one — the walk needs distance to have anything to
-    # grow over. Same squads as the club-correlation check above, but no
-    # club_rel here: isolating the drift mechanism on its own.
     import ffcore.forecast as forecast
 
     many_j = list(range(1, 11))
@@ -581,24 +364,11 @@ def _selftest() -> None:
     flat_sd = statistics.pstdev(flat_res.totals["A"])
     drift_sd = statistics.pstdev(drift_res.totals["A"])
     assert drift_sd > flat_sd, (flat_sd, drift_sd)
-    # THE MEAN MUST NOT MOVE — the exact bug caught and fixed while tuning
-    # DRIFT_FRAC (a clip(1+drift, 0) formulation biased it upward the
-    # wider the walk got). A generous tolerance against real Monte Carlo
-    # noise at 1500 trials, not against a systematic shift.
     flat_mean = statistics.mean(flat_res.totals["A"])
     drift_mean = statistics.mean(drift_res.totals["A"])
     assert abs(drift_mean - flat_mean) / flat_mean < 0.03, \
         (flat_mean, drift_mean)
 
-    # -- start_rel DRIFT actually widens a real season sim, isolated from
-    # the points-rate mechanism above -------------------------------------
-    # A CONSTANT pool (cv=0, so rate_rel is 0.0 for everyone regardless of
-    # n) with real_n >= MIN_POOL so it is actually used rather than falling
-    # back to the seed prior — the points side is neutralised without
-    # touching start_rel, which depends on p and n, not on the points pool
-    # at all. p=0.7, not 1.0: start_rel's own guard zeroes it for a
-    # certain reading, so the mechanism needs something to be uncertain
-    # ABOUT.
     from ffcore.forecast import MIN_POOL
 
     per10_s = {j: {k: (3.0, 0.7) for k in list(a) + list(b)} for j in many_j}
@@ -618,11 +388,6 @@ def _selftest() -> None:
     sflat_sd = statistics.pstdev(sflat_res.totals["A"])
     sdrift_sd = statistics.pstdev(sdrift_res.totals["A"])
     assert sdrift_sd > sflat_sd, (sflat_sd, sdrift_sd)
-    # Same mean-preservation claim as the points side: a wider walk on
-    # WHETHER he plays must not, itself, change how often he plays on
-    # average — sigmoid(logit(p) + N(0, sd)) is not mean-preserving in p
-    # the way exp(drift - var/2) is in a rate, so this is a real check,
-    # not a restatement of the formula.
     sflat_mean = statistics.mean(sflat_res.totals["A"])
     sdrift_mean = statistics.mean(sdrift_res.totals["A"])
     assert abs(sdrift_mean - sflat_mean) / sflat_mean < 0.05, \

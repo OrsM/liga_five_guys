@@ -1,17 +1,3 @@
-"""
-run — every generator stage, in one interpreter, instead of ten separate
-`python src/<stage>.py` processes.
-
-Caches (ffcore.text.norm, sources._css, the parse caches, ffcore.tidy.
-read_csv) are all keyed on content/mtime, not on a name, so sharing them
-across stages in one process is safe — a stale-path cache would not be.
-
-Stages are still runnable one at a time (`python src/sim.py`) for bisecting
-a failure.
-
-    python src/run.py                 the full chain
-    python src/run.py sim digest      just those, in the order given
-"""
 
 from __future__ import annotations
 
@@ -27,9 +13,6 @@ def _ledger() -> None:
     print(ledger.write(ledger.build()))
 
 
-# Order is the dependency chain: parse feeds the tidy store, crosswalk
-# resolves names over it, ledger and points derive from it, squads replays
-# ownership, and the generators read all of that.
 STAGES: list[tuple[str, str]] = [
     ("parse", "ingest:parse"),
     ("crosswalk", "crosswalk:main"),
@@ -72,10 +55,6 @@ def main(argv: list[str]) -> int:
             print("  FAILED: %s" % name)
             return 1
         times.append((time.time() - t0, name))
-        # `parse`'s lxml trees hold C-level parent/child refs the refcounter
-        # can't unwind alone; one collection per stage keeps them from
-        # piling up resident across a shared-interpreter run (measured:
-        # roughly halves peak RSS).
         gc.collect()
 
     print("  %s" % "  ".join("%s %.1fs" % (n, t) for t, n in times))
@@ -85,8 +64,6 @@ def main(argv: list[str]) -> int:
 
 if __name__ == "__main__":
     if "--selftest" in sys.argv:
-        # Every stage's entry point must exist and be importable, or a
-        # renamed function fails mid-run after already writing half a report.
         for _name, _spec in STAGES:
             assert callable(call(_spec)), _name
         assert [n for n, _ in STAGES] == sorted(

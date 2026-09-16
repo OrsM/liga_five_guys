@@ -1,17 +1,3 @@
-"""
-crosswalk.py — build the player and club tables, once, for everything else.
-
-    python src/crosswalk.py            # writes data/tidy/players.csv, clubs.csv
-    python src/crosswalk.py --selftest
-
-Resolution happens here, nowhere else: every feed names players/clubs
-differently with no slug overlap between them, so this is the one
-fuzzy-matching pass everything else reads from. Run after `ingest.py
-parse`, a cheap view over the tidy store.
-
-Merges rather than rebuilds — a player named once stays nameable, a
-feed that skips a sweep erases nothing.
-"""
 
 from __future__ import annotations
 
@@ -31,17 +17,12 @@ CLUBS = "clubs.csv"
 
 
 def build_clubs(market, lineups, elo_rows, fixtures=()) -> dict:
-    """{club_id: Club}, keyed on the market's spelling folded — the
-    canonical side, since every price is quoted in it. Fixture slugs and
-    Club Elo's city names hang off it as aliases.
-    """
     from ffcore.fixture import ELO_ALIASES, match_team
 
     teams = sorted({schema.text(r, schema.MARKET.TEAM) for r in market
                     if schema.text(r, schema.MARKET.TEAM)})
     clubs = {norm(t): Club(norm(t), t) for t in teams}
 
-    # futbolfantasy's own club id (data-equipo) is on every market row.
     for r in market:
         t = schema.text(r, schema.MARKET.TEAM)
         tid = schema.text(r, schema.MARKET.TEAM_ID)
@@ -55,8 +36,6 @@ def build_clubs(market, lineups, elo_rows, fixtures=()) -> dict:
             clubs[norm(hit)].ff_slug = clubs[norm(hit)].ff_slug or slug
             clubs[norm(hit)].aliases.add(slug)
 
-    # analiticafantasy's club id, on both crests of every fixture — learned
-    # once by name, then joined on the id from here on.
     for r in fixtures or []:
         for side, col in (("home", "home_id"), ("away", "away_id")):
             nm = schema.text(r, side)
@@ -84,12 +63,6 @@ def build_clubs(market, lineups, elo_rows, fixtures=()) -> dict:
 
 
 def namesakes(market) -> list[tuple[str, list]]:
-    """[(key, [the clubs that share it])] — every normalised name two
-    players share. A shared name is keyed `name@club` (ffcore.tidy.Market
-    and the scorer's lookup use the same rule) so the two never collide;
-    this list is what that rule fired on. The roster file still needs a
-    human to write `alvaro garcia (Rayo)` there to fold the club in.
-    """
     seen: dict[str, set] = {}
     for r in market:
         key = norm(r.get("name"))
@@ -99,28 +72,19 @@ def namesakes(market) -> list[tuple[str, list]]:
 
 
 def build_players(market, lineups, starters, api_rows, lg, clubs) -> dict:
-    """{player_id: Player} — every feed's key for every player it names."""
 
     by_club = {c.ff_slug: c.club_id for c in clubs.values() if c.ff_slug}
-    # ff_slug -> the club key the market index uses, so a probable-XI row
-    # can say which of two men of one name it means.
     ff_to_market = {c.ff_slug: norm(c.market) for c in clubs.values()
                     if c.ff_slug and c.market}
-    # Shared with ffcore.tidy so the market index, player index, scorer,
-    # and this table use one rule for which names belong to two men.
     market_shared = shared_names(market)
     out: dict[str, Player] = {}
     club_of: dict[str, str] = {}
     for r in market:
-        # row_key(), not norm(name) — keying on the name alone would keep
-        # one Player record for two players sharing it.
         pid = row_key(r, market_shared)
         if not pid:
             continue
         out[pid] = Player(pid, schema.text(r, schema.MARKET.NAME),
                           norm(r.get("team")))
-        # Player.club_id gets overwritten with a real club id below; this
-        # keeps the market's own spelling for matching a probable-XI row.
         club_of[pid] = norm(r.get("team"))
 
     shared: dict[str, list] = {}
@@ -128,16 +92,12 @@ def build_players(market, lineups, starters, api_rows, lg, clubs) -> dict:
         shared.setdefault(norm(p.name), []).append(p)
 
     def by_name(name: str, team_slug: str = ""):
-        """The Player a feed row means, or None when the name is two men and
-        the row cannot say which."""
         hits = shared.get(norm(name)) or []
         if len(hits) == 1:
             return hits[0]
         want = ff_to_market.get((team_slug or "").strip())
         return narrow_by_club(hits, want, lambda p: club_of.get(p.player_id))
 
-    # The two probable-XI feeds share no slug space with the market or
-    # each other, so name is the only way in.
     for r in lineups:
         pid = by_name(r.get("player_name"), r.get("team_slug"))
         slug = schema.text(r, schema.LINEUPS.PLAYER_SLUG)
@@ -151,8 +111,6 @@ def build_players(market, lineups, starters, api_rows, lg, clubs) -> dict:
         if not pid.club_id and r.get("team_slug") in by_club:
             pid.club_id = by_club[r["team_slug"]]
 
-    # Confirmed line-ups join the wider probable-XI feed by slug; anyone
-    # still unmatched is tried on the name.
     ff_index = {p.ff_slug: p for p in out.values() if p.ff_slug}
     for r in starters:
         slug = schema.text(r, schema.STARTERS.PLAYER_SLUG)
@@ -162,20 +120,9 @@ def build_players(market, lineups, starters, api_rows, lg, clubs) -> dict:
         if p is not None and slug and not p.ff_slug:
             p.ff_slug = slug
 
-    # The app: integer ids and its own abbreviations, resolved through
-    # Crosswalk.resolve_api()'s five-step join (id, market key, full name,
-    # ledger tie-break, exact market value across history).
     index = latest_only(lg.market.rows) if lg and lg.market is not None else []
-    # An id resolved on a past sweep stays resolved (merge, not rebuild).
-    # Empty on the first ever run — players.csv doesn't exist yet.
     known = Crosswalk.read(TIDY / "players.csv", TIDY / "clubs.csv")
     for r in api_rows:
-        # api_rows mixes four tables (api_teams/api_market/api_players/
-        # api_players_all); PLAYER_NAME/MANAGER/PLAYER_ID are spelled the
-        # same in each, only api_teams's own class actually documents
-        # MANAGER — the other three simply lack the column, and
-        # schema.text() defaults an absent column to "" exactly like the
-        # `.get(...) or ""` this replaces.
         raw = schema.text(r, schema.API_TEAMS.PLAYER_NAME)
         if not raw:
             continue
@@ -187,14 +134,9 @@ def build_players(market, lineups, starters, api_rows, lg, clubs) -> dict:
                                 r.get("player_id") or "")
         p = out.get(key) if key else None
         if p is None:
-            # resolve_api()'s market.key_for() only searches the live market
-            # snapshot — a player merely gone quiet there still resolves
-            # by name in this function's own `out` (built from full
-            # market history). Same by_name() the lineups above use.
             p = by_name(raw)
         if p is None:
             continue
-        # The app's display name moves with the player, same as its id.
         for other in out.values():
             if other is not p:
                 other.app_names = {n for n in other.app_names
@@ -203,9 +145,6 @@ def build_players(market, lineups, starters, api_rows, lg, clubs) -> dict:
         pid = schema.text(r, schema.API_TEAMS.PLAYER_ID)
         if not pid:
             continue
-        # The app's own row is the authority for its own id — takes it off
-        # whoever held it before, not just adds it (`not p.app_id` alone
-        # would leave a stale claim alive after a join gets corrected).
         for other in out.values():
             if other is not p and other.app_id == pid:
                 other.app_id = ""
@@ -214,14 +153,6 @@ def build_players(market, lineups, starters, api_rows, lg, clubs) -> dict:
 
 
 def attach_bulk_app_ids(rows, players: dict) -> int:
-    """Fill app_id from the bulk player list onto an EXISTING crosswalk
-    entry, by name — no market-freshness gate, since the bulk list names
-    every competition player regardless of recent activity (unlike
-    build_players()'s own join, gated on `market`'s live snapshot).
-
-    Only ever writes a blank; a name two players share is left for the
-    market join (which has a price to break the tie), not guessed here.
-    """
     by_name: dict[str, list] = {}
     for p in players.values():
         by_name.setdefault(norm(p.name), []).append(p)
@@ -240,15 +171,6 @@ def attach_bulk_app_ids(rows, players: dict) -> int:
 
 
 def build_understat_ids(rows, players: dict, clubs: dict) -> int:
-    """Join Understat's own numeric id onto the crosswalk by name + team —
-    understat_id shares no namespace with ff_slug/af_slug/app_id. Scoped
-    to one club at a time (a bare name across the whole league would
-    confuse every Fernandez in LaLiga), then ffcore.text.resolve()'s
-    usual three-pass narrowing within that roster.
-
-    Only ever writes a blank; a name collision within one club stays
-    ambiguous rather than picked at random. Returns the count matched.
-    """
     from ffcore.fixture import match_team
     from ffcore.text import resolve as text_resolve
 
@@ -257,8 +179,6 @@ def build_understat_ids(rows, players: dict, clubs: dict) -> int:
     for p in players.values():
         by_club.setdefault(p.club_id, []).append(p)
 
-    # One row per Understat player, preferring the live season's spelling
-    # and club over last season's (a summer transfer moves him).
     best: dict[str, dict] = {}
     for r in rows:
         uid = schema.text(r, schema.UNDERSTAT_PLAYERS.UNDERSTAT_ID)
@@ -276,8 +196,6 @@ def build_understat_ids(rows, players: dict, clubs: dict) -> int:
         candidates = by_club.get(norm(team), [])
         if not candidates:
             continue
-        # text.resolve() wants dict-like rows; wrap rather than duplicate
-        # its three-pass narrowing here as an eighth resolver.
         wrapped = [{"name": p.name, "_p": p} for p in candidates]
         hit, _cands = text_resolve(r.get("player_name") or "", wrapped)
         if hit is not None and not hit["_p"].understat_id:
@@ -290,52 +208,15 @@ def main() -> None:
     from ffcore.league import League
 
     market = load_market_latest()
-    # source="" — every probable-XI source, not just LINEUP_SOURCE
-    # (load_lineups_latest()'s own default): build_players() below tells
-    # the sources apart itself (wide vs narrow slug space, LINEUPS.SOURCE),
-    # so narrowing to one source here would silently drop the other one's
-    # slugs rather than let that per-row distinction run.
     lineups = load_lineups_latest(source="")
-    # NOT read_csv() any more: load_starters() is latest_only(), which
-    # tidy.py measured (2026-09-16) as safe here — 180,372 raw rows behind
-    # 2,512 real (match, player) keys, and every one of those keys is still
-    # present in the newest snapshot alone. This function only ever uses a
-    # starters row to learn a player_slug/team_slug/player_name, never a
-    # match_id or a count, so losing the ~72x repeated older snapshots
-    # loses no slug this table has ever recorded.
     starters = load_starters()
-    # latest_only PER TABLE, not on the concatenation — api_teams/
-    # api_market are swept on different schedules, so a combined-list
-    # latest_only would drop every api_teams row not sharing the overall
-    # newest stamp.
-    #
-    # NOT tidy.load_api_teams()/load_api_market(): those loaders additionally
-    # apply fresh_only() (EVERY_RUN_FRESH_DAYS) and answer [] once the feed
-    # has gone stale — right for "can I trust this as live data" but wrong
-    # here, where a quiet feed's last reading is still a real past sweep
-    # this merge-not-rebuild table should keep learning identifiers from.
-    # api_players.csv/api_players_all.csv have no fitting loader either:
-    # load_api_players() returns a {id: name} lookup grown from every
-    # snapshot (not the list-of-rows-with-manager/value shape this loop
-    # needs), and api_players_all.csv has no loader at all.
     api_rows = (latest_only(read_csv(TIDY / "api_teams.csv"))
                 + latest_only(read_csv(TIDY / "api_market.csv"))
                 + latest_only(read_csv(TIDY / "api_players.csv"))
-                # Every competition player, not just ones this league has
-                # transacted — no "manager" field, which resolve_api() tolerates.
-                # Why: docs/notes/league.md#the-bulk-player-list-and-app_id-with-no-manager
                 + latest_only(read_csv(TIDY / "api_players_all.csv")))
-    # NOT tidy.load_elo(): that loader is also fresh_only()-gated and
-    # latest_only()'d, for "is this rating current enough to trust". Here
-    # elo.csv is read purely for club-name aliasing (clubs[...].elo /
-    # .aliases), where an OLDER reading's spelling is still a real alias
-    # worth keeping — narrowing to the latest fresh snapshot would forget
-    # aliases this merge-not-rebuild table has already learned.
     elo_rows = read_csv(TIDY / "elo.csv")
     lg = League.load()
 
-    # Every id the market has ever published, not just today's — a player
-    # who left the market stays a real row.
     market_ids = {schema.text(r, schema.MARKET.FF_ID) for r in load_market()
                   if schema.text(r, schema.MARKET.FF_ID)}
 
@@ -346,8 +227,6 @@ def main() -> None:
 
     fresh = Crosswalk(players, clubs)
     kept = Crosswalk.read(TIDY / PLAYERS, TIDY / CLUBS)
-    # A key now known to mean two players is dropped — merging alone
-    # would keep a stale bare-name key alive after a split into name@club.
     doubled = {norm(p.name) for p in players.values()
                if "@" in p.player_id}
     dropped = [k for k in list(kept.players) if k in doubled]
@@ -355,10 +234,6 @@ def main() -> None:
         del kept.players[k]
     kept.merge(fresh)
 
-    # One row per player. Merging kept the old name-keyed rows after the
-    # key changed to the site's own id, leaving unreachable ghost rows
-    # that still hold identifiers learned before the change — move those
-    # onto the live row, keyed by the ghost's normalised name, then drop it.
     live = {k: pl for k, pl in kept.players.items() if k in market_ids}
     by_name = {}
     for k, pl in live.items():
@@ -377,11 +252,6 @@ def main() -> None:
         dropped_ghosts.append(k)
         del kept.players[k]
 
-    # Every player in the competition, not just today's market — closes the
-    # app_id gap for anyone who has gone quiet on the market since whichever
-    # past run last saw him fresh (build_players()'s own join needs him in
-    # THIS run's market argument, which is latest-only). Why:
-    # docs/notes/league.md#the-bulk-player-list-and-app_id-with-no-manager
     bulk_matched = attach_bulk_app_ids(
         read_csv(TIDY / "api_players_all.csv"), kept.players)
 
@@ -403,18 +273,11 @@ def main() -> None:
           % (c["players"], c["clubs"], 100 * c["ff"], 100 * c["af"],
              100 * c["app"], bulk_matched, 100 * c["understat"],
              understat_matched))
-    # A SHARED NAME IS NO LONGER A PROBLEM — the site issues an id per player
-    # and this table keys on it, so the two Álvaro Garcías are two rows and
-    # always were two players. Printed as a fact rather than a warning.
     twins = namesakes(market)
     if twins:
         print("  %d name(s) belong to two players; the ids tell them apart: %s"
               % (len(twins), ", ".join(k for k, _ in twins)))
 
-    # WHAT IS ACTUALLY WORTH WARNING ABOUT: two players claiming one
-    # identifier. That means a join that wrote an id down was wrong and its
-    # row is still in the table — the state that had app_id 2614 on both
-    # Carlos and Isaac Romero, answering by whichever was reindexed last.
     clashes = kept.clashes()
     if clashes:
         print("  warn: an identifier two players claim identifies neither, "
@@ -424,19 +287,13 @@ def main() -> None:
 
 
 def _selftest() -> None:
-    # -- one name, two players ---------------------------------------------
-    # The key is a normalised name and a name is not unique: LaLiga fields an
-    # Álvaro García at Villarreal and another at Rayo, worth 0.50M and 19.76M.
-    # This cannot resolve them — it says so, which is the whole point.
     twins = namesakes([{"name": "Álvaro García", "team": "Villarreal"},
                        {"name": "Alvaro Garcia", "team": "Rayo"},
                        {"name": "Pablo Fornals", "team": "Betis"},
                        {"name": "Pablo Fornals", "team": "Betis"}])
     assert twins == [("alvaro garcia", ["Rayo", "Villarreal"])], twins
-    # The same player in the same club twice is a repeated row, not a clash.
     assert namesakes([{"name": "A", "team": "X"}, {"name": "A", "team": "X"}]) == []
     assert namesakes([]) == []
-    # A row with no name cannot collide with anything.
     assert namesakes([{"name": "", "team": "X"}, {"name": "", "team": "Y"}]) == []
 
 
@@ -460,29 +317,14 @@ def _selftest() -> None:
 
     players = build_players(market, lineups, starters, [], None, clubs)
     xw = Crosswalk(players, clubs)
-    # THE ACCENT FOLDS AND THE SLUGS ATTACH. One player, three spellings and
-    # two slug spaces, and every one of them arrives at the same key.
     assert xw.player(name="Alvaro Fernandez") == "alvaro fernandez"
     assert xw.player(ff_slug="alvaro-fdez") == "alvaro fernandez"
     assert xw.player(af_slug="af-alvaro") == "alvaro fernandez"
-    # A confirmed line-up names a player the probable-XI feed never listed, and
-    # his slug is learned from it rather than lost.
     assert xw.player(ff_slug="jonny-castro-ff") == "jonny castro"
-    # The club came off the market row, not off a guess.
     assert players["alvaro fernandez"].club_id == "espanyol"
 
-    # An unlisted feed leaves a gap rather than a wrong answer.
     assert xw.player(app_id="9999") is None
 
-    # -- the bulk player-list feeds app_id too, with no manager at all -----
-    # api_player_N/api_teams/api_activity rows all carry a manager, because
-    # they only ever name a player THIS league happened to transact — the
-    # bulk list names every player in the competition and has no manager to
-    # name, since it isn't anyone's squad. resolve_api()'s ledger-tie-break step
-    # is the only one that needs a handle, and it is a fallback tried after
-    # name+value already succeed, so an empty handle must resolve exactly
-    # the same as a normal transaction row would. Why:
-    # docs/notes/league.md#the-bulk-player-list-and-app_id-with-no-manager
     from ffcore.league import Config, League
     from ffcore.tidy import Market as _RealMarket
 
@@ -493,34 +335,16 @@ def _selftest() -> None:
     bulk_market_rows = [{"name": "Hugo Duro", "slug": "hugo-duro",
                         "team": "Espanyol"}]
     bulk_clubs = build_clubs(bulk_market_rows, [], [])
-    # A made-up id, deliberately not a real one — build_players() reads the
-    # actual players.csv off disk, and a real id already claimed by some
-    # other real player there would resolve to THAT player first (step 1 of
-    # resolve_api(), checked ahead of the name join), which is correct behaviour
-    # but makes a real id a trap for a fixture that wants a clean first-time
-    # resolution.
     bulk_players = build_players(
         bulk_market_rows, [], [],
         [{"player_name": "Hugo Duro", "market_value": "8534068",
-          "player_id": "99999999"}],   # no "manager" key at all
+          "player_id": "99999999"}],
         bulk_lg, bulk_clubs)
     assert bulk_players["hugo duro"].app_id == "99999999", bulk_players
 
-    # -- a player stale on the live market still resolves by name ----------
-    # Real case, found 2026-09-12 while measuring the bulk list's coverage:
-    # Álex Sancris (ff_id 11766) has not appeared in market.csv since
-    # 2026-08-25 — Market.key_for() only searches latest_rows(), so a
-    # player who has simply gone quiet on the market (not renamed, not
-    # ambiguous, just stale) comes back None from resolve_api() even though his
-    # name is a clean, unique match in THIS function's own `out` — built
-    # from the full market history, not just the live snapshot. by_name()
-    # already exists for exactly this lookup (lineups use it above); this
-    # is that same fallback, one more time, for api_rows.
     stale_market_rows = [{"name": "Alex Sancris", "slug": "alex-sancris",
                           "team": "Getafe"}]
     stale_clubs = build_clubs(stale_market_rows, [], [])
-    # lg.market deliberately does NOT carry this player — simulates him
-    # having dropped out of the live/latest market index.
     stale_lg = League(Config(me="nobody", budget=100e6), {}, [],
                       _RealMarket([{"name": "Someone Else", "team": "Getafe",
                                    "value": "500000",
@@ -532,16 +356,6 @@ def _selftest() -> None:
         stale_lg, stale_clubs)
     assert stale_players["alex sancris"].app_id == "11766", stale_players
 
-    # -- attach_bulk_app_ids: by name, independent of market freshness -----
-    # The above (`by_name` inside build_players()) still needs the player
-    # in THIS run's `market` argument at all — and main() passes it
-    # latest_only(market.csv), so a player who has dropped off the market
-    # entirely (not stale-but-listed, gone) never gets a `Player` in `out`
-    # in the first place. He still lives on in `kept.players` (this table
-    # merges, it does not rebuild — a player once seen stays), just with
-    # no app_id, because the bulk source did not exist on whichever past
-    # run last saw him fresh. This attaches straight onto the KEPT crosswalk,
-    # with no market/freshness gate at all — the bulk list needs none.
     ghost = Player("11766", "Alex Sancris", "getafe")
     ghost_players = {"11766": ghost}
     n = attach_bulk_app_ids(
@@ -549,13 +363,11 @@ def _selftest() -> None:
         ghost_players)
     assert n == 1, n
     assert ghost.app_id == "2778", ghost
-    # Never overwrites an app_id a real transaction already resolved.
     ghost.app_id = "already-known"
     assert attach_bulk_app_ids(
         [{"player_name": "Álex Sancris", "player_id": "2778"}],
         ghost_players) == 0
     assert ghost.app_id == "already-known", ghost
-    # Two players sharing a name is left alone, not guessed at.
     twin_a, twin_b = Player("a", "Pablo Fornals", "betis"), \
                      Player("b", "Pablo Fornals", "villarreal")
     twins = {"a": twin_a, "b": twin_b}
@@ -563,23 +375,18 @@ def _selftest() -> None:
         [{"player_name": "Pablo Fornals", "player_id": "999"}], twins) == 0
     assert twin_a.app_id == "" and twin_b.app_id == "", (twin_a, twin_b)
 
-    # -- build_understat_ids: name+team, the same bootstrap every other feed
-    # went through, and the same refuse-rather-than-guess on ambiguity -------
     understat = [
         {"understat_id": "701", "player_name": "Alvaro Fernandez",
          "team_title": "Espanyol", "season": "2025"},
-        # A row for a club this market does not have is skipped, not guessed
-        # onto the nearest name.
         {"understat_id": "999", "player_name": "Nobody Real",
          "team_title": "Nowhere FC", "season": "2025"},
     ]
     matched = build_understat_ids(understat, players, clubs)
     assert matched == 1, matched
     assert players["alvaro fernandez"].understat_id == "701"
-    assert xw.player(understat_id="701") is None  # xw was built before the join
+    assert xw.player(understat_id="701") is None
     assert Crosswalk(players, clubs).player(understat_id="701") \
         == "alvaro fernandez"
-    # A player already joined is never re-guessed on a later sweep.
     matched2 = build_understat_ids(
         [{"understat_id": "999999", "player_name": "Alvaro Fernandez",
           "team_title": "Espanyol", "season": "2025"}], players, clubs)

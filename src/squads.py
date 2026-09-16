@@ -1,19 +1,3 @@
-"""Partition the player universe into owned vs buyable.
-
-Reads:
-  inputs/rosters_initial.txt  starting rosters — write once, never edit
-  data/tidy/transactions.csv  the ledger of every market operation, generated
-  inputs/league.ini           managers, budget, thresholds (all optional)
-  inputs/cash.txt             any balance you have actually seen
-  data/tidy/*.csv             values, 24h moves, start probabilities
-
-Writes:
-  reports/league.md             every squad, what they paid, what's left
-  data/decisions/slate_log.csv  append-only: which players were on offer when
-
-read_initial()/apply_transactions() live in ffcore.league, replayed the
-same way by every reader. Run via workflow_dispatch; no arguments.
-"""
 
 
 
@@ -27,22 +11,17 @@ from ffcore.tidy import (run_now,
                          load_players, widen_csv, write_lines)
 from slate import read_slate
 
-# Both probable-XI sources, side by side, in every table this module writes.
-# One unlabelled Start% column hid which site said it, and the two disagree
-# often enough that the disagreement is the useful part.
 HEAD = ("| Player | Team | Pos | Value | 24h | FF | AF |\n"
         "|---|---|--:|--:|--:|--:|--:|")
 
 SLATE_LOG = ["observed_at", "ff_id", "player", "value", "start_pct"]
 
-# Pitch order, and what counts as fit. Only this module reads them.
 POS_ORDER = ["portero", "defensa", "mediocampista", "delantero", "entrenador"]
 
 OK_STATUS = ("ok", "", "none", "disponible", "available")
 
 
 def flag(rec):
-    """Marker for anything the feed says isn't a clean 'ok'."""
     st = (rec.get("status") or "").strip().lower()
     return "" if st in OK_STATUS else " ⚠︎%s" % st
 
@@ -64,9 +43,6 @@ def row(rec, cells=None):
 
 
 def log_slate(on_offer, players, stamp):
-    """Append-only record of every slate seen — join against the ledger
-    later to ask what went unsold. Nothing reads this yet.
-    """
     if not on_offer:
         return
     rows = []
@@ -74,14 +50,12 @@ def log_slate(on_offer, players, stamp):
         rec = players.get(k, {})
         rows.append({
             "observed_at": stamp,
-            "ff_id": k,   # the join key a later grade uses, not the display name
+            "ff_id": k,
             "player": rec.get("name", k),
             "value": "" if rec.get("value") is None else "%.0f" % rec["value"],
             "start_pct": ("" if rec.get("start") is None
                           else "%.0f" % rec["start"]),
         })
-    # Widen before appending: append_csv lets the file's own header win, so
-    # a new column would otherwise be silently dropped rather than misaligned.
     path = DECISIONS / "slate_log.csv"
     widen_csv(path, SLATE_LOG)
     append_csv(path, rows, SLATE_LOG)
@@ -90,15 +64,10 @@ def log_slate(on_offer, players, stamp):
 
 
 def pct(v) -> str:
-    """Signed, one decimal — a drift, not a level. Deliberately NOT
-    ffcore.parse.fmt_pct, which prints an unsigned whole-number level."""
     return "—" if v is None else "%+.1f%%" % v
 
 
 
-# ---------------------------------------------------------------------------
-# 2. premium curve
-# ---------------------------------------------------------------------------
 
 def sec_premium(lg, dl) -> list[str]:
     out = ["## What they pay over value", ""]
@@ -182,9 +151,6 @@ def sec_premium(lg, dl) -> list[str]:
 
 
 
-# ---------------------------------------------------------------------------
-# 3. post-buy drift
-# ---------------------------------------------------------------------------
 
 def sec_drift(dl, market) -> list[str]:
     out = ["## What a deal did to the price", ""]
@@ -305,8 +271,6 @@ def main():
     now = run_now()
     stamp = now.strftime("%Y-%m-%d %H:%M UTC")
     players = load_players()
-    # First caller of session() in run.py's order — builds the run's one
-    # League+Scorer, not a second independent load.
     from ffcore.model import session
 
     lg = session().lg
@@ -318,7 +282,6 @@ def main():
               % (len(on_offer), len(unresolved)))
     log_slate(on_offer, players, now.strftime("%Y-%m-%dT%H:%MZ"))
 
-    # The second opinion, joined once for every player either file can print.
     second, _unclear = second_cells((k, r.get("name", ""))
                                     for k, r in players.items())
     write_league(lg, players, stamp, second,

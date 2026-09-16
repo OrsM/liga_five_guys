@@ -22,21 +22,6 @@ __all__ = ["read_slate", "slate_from_api", "comparison_rows",
 
 
 def slate_from_api(rows: list[dict], market, xw=None) -> tuple[set, list]:
-    """(player keys on offer, names that would not join).
-
-    THE ROW'S OWN `player_id` FIRST, when a crosswalk is given to translate
-    it — api_market.csv carries the app's own id on every row, and this used
-    to ignore it and join on `player_name` alone, the exact "fuzzy name
-    instead of the id the source already handed us" gap `Crosswalk.resolve()`
-    exists to close. Falls back to `market.key_for` (the resolution every
-    other reader uses) when there is no crosswalk, no id, or the id is one
-    the crosswalk has not learned — a key nothing recognises is a player who
-    vanishes from the board, so an unjoinable name is REPORTED, never
-    dropped, either way.
-
-    No ownership prune. A player being owned is not evidence against his being
-    on offer: that is exactly what `marketPlayerTeam` is.
-    """
     keys, unresolved = set(), []
     for r in rows:
         raw = (r.get("player_name") or "").strip()
@@ -55,11 +40,6 @@ def slate_from_api(rows: list[dict], market, xw=None) -> tuple[set, list]:
 
 
 def read_slate(market, rows=None, xw=None) -> tuple[set, list]:
-    """The live slate: (keys on offer, unjoined names).
-
-    An empty feed is "no slate" — every caller treats that as "do not filter",
-    not "the market is empty".
-    """
     if rows is None:
         from ffcore.tidy import load_api_market
         rows = load_api_market()
@@ -67,20 +47,6 @@ def read_slate(market, rows=None, xw=None) -> tuple[set, list]:
 
 
 def comparison_rows(u, bands=None) -> list[dict]:
-    """Every listed player YOU COULD BUY: season points, next-jornada
-    points, and points above replacement (median, with a real season band
-    from `bands` where one was computed).
-
-    NOT your own squad, even a player of yours currently listed for sale —
-    this table answers "is he worth buying", and a man already on your
-    squad is never a buy candidate for you; the ladder's own SELL/KEEP
-    rows are where his own listing belongs.
-
-    `bands`, when given, is decide.rank()'s own `bands` dict — pts_lo/
-    pts_hi for the same PAR figure decide.player_forecasts() reports as
-    a point estimate. A key not in `bands` gets `par_lo`/`par_hi` = None,
-    not a fabricated band.
-    """
     import decide
     from ffcore.render import title_name
 
@@ -108,16 +74,6 @@ def comparison_rows(u, bands=None) -> list[dict]:
 
 
 def comparison_table(rows: list[dict]) -> list[str]:
-    """Markdown: listed players actually worth a look, ranked by PAR per
-    million spent — not every listed player.
-
-    PRINTS ONLY par > 0 (genuinely above the league's own replacement
-    level at his slot), then ONE summary line for the rest, rather than
-    a full table trailing off through dozens of 0.0-and-negative rows a
-    reader has to scan past to find the handful that matter. `rows` is
-    already sorted by value_rate descending, so this is a straight cut,
-    not a re-sort.
-    """
     from ffcore.parse import fmt_money
 
     if not rows:
@@ -181,30 +137,20 @@ def _selftest() -> None:
     assert keys == {norm("Álvaro Valles"), norm("Stole Dimitrievski")}, keys
     assert unres == [], unres
 
-    # A name the market does not carry is reported, never dropped.
     keys, unres = slate_from_api(
         rows + [{"player_name": "Nobody At All"}], market)
     assert unres == ["Nobody At All"] and len(keys) == 2, (keys, unres)
 
-    # The app's shorter spelling still joins, because key_for resolves it —
-    # this is the whole reason the join does not go through norm() directly.
     keys, unres = slate_from_api([{"player_name": "Fornals"}], market)
     assert keys == {norm("Pablo Fornals")} and unres == [], (keys, unres)
 
-    # A row with no name is skipped rather than becoming an empty key.
     assert slate_from_api([{"player_name": ""}], market) == (set(), [])
 
-    # An owned player his manager has listed is ON OFFER. There is no
-    # ownership prune here and there must not be one.
     assert norm("Stole Dimitrievski") in slate_from_api(rows, market)[0]
 
 
-    # No feed is no slate.
     assert read_slate(market, rows=[]) == (set(), [])
 
-    # THE APP'S OWN player_id, WHEN A CROSSWALK IS GIVEN TO TRANSLATE IT —
-    # api_market.csv carries this on every row and it went unread. Even a
-    # name the market cannot join at all still resolves through the id.
     from ffcore.crosswalk import Crosswalk, Player
     xw = Crosswalk({"pablo fornals": Player("pablo fornals", "Pablo Fornals",
                                             app_id="1337")})
@@ -212,13 +158,10 @@ def _selftest() -> None:
         [{"player_name": "Nickname Nothing Joins On", "player_id": "1337"}],
         market, xw=xw)
     assert keys == {"pablo fornals"} and unres == [], (keys, unres)
-    # An id the crosswalk has never seen falls back to the name join.
     keys, unres = slate_from_api(
         [{"player_name": "Fornals", "player_id": "9999"}], market, xw=xw)
     assert keys == {norm("Pablo Fornals")} and unres == [], (keys, unres)
 
-    # -- comparison_rows/comparison_table: every listed player, ranked by
-    # PAR per million ----------------------------------------------------
     from decide import Universe, Action
     from ffcore.forecast import Bootstrap
     from ffcore.season import LeagueState
@@ -243,27 +186,18 @@ def _selftest() -> None:
                 "rich": cp(5.0, price=20e6, name="rich")})
     rows = comparison_rows(cu)
     keys = {r["key"] for r in rows}
-    assert keys == {"cheap", "rich"}, keys   # "me_a" isn't listed at all
+    assert keys == {"cheap", "rich"}, keys
     by_key = {r["key"]: r for r in rows}
     assert by_key["cheap"]["season_pts"] == 6.0, by_key["cheap"]
     assert by_key["rich"]["season_pts"] == 16.0, by_key["rich"]
-    # LEAGUE-wide replacement, not "my own squad's weakest" — one manager,
-    # one legal MED rung (starters_per_slot()["MED"]=4.0 x 1 squad = 4,
-    # beyond the 3-player pool), so replacement is the pool's OWN worst,
-    # me_a at 4.0 — coincidentally who "my squad's weakest" would also
-    # have been here, since he's my only MED. PAR 2.0 and 12.0 either way.
     assert by_key["cheap"]["par"] == 2.0, by_key["cheap"]
     assert by_key["rich"]["par"] == 12.0, by_key["rich"]
-    assert by_key["cheap"]["par_lo"] is None   # no band given
-    # "cheap" wins on points-per-million despite the smaller PAR: 2/2 = 1.0
-    # against rich's 12/20 = 0.6.
+    assert by_key["cheap"]["par_lo"] is None
     assert rows[0]["key"] == "cheap", rows
 
     md = comparison_table(rows)
     assert any(l.startswith("| Cheap") for l in md), md
 
-    # A real band, from decide.rank(), overrides the point estimate and
-    # carries its own range — a key with no band keeps the plain figure.
     b = {"cheap": (2.5, 1.0, 4.0, Action("buy", buy="cheap", cost=2e6))}
     rows2 = comparison_rows(cu, bands=b)
     by_key2 = {r["key"]: r for r in rows2}
@@ -275,17 +209,15 @@ def _selftest() -> None:
 
     assert comparison_table([]) == []
 
-    # -- a player of MINE, even one I've listed, is not a buy candidate ----
     cu_listed = Universe(
         state=LeagueState(cu_sq, [1, 2], "me"),
         forecaster=Bootstrap(cu_per), cash=0.0, me="me",
-        players={"me_a": cp(5.0, price=3e6),   # listed for sale -- still mine
+        players={"me_a": cp(5.0, price=3e6),
                 "cheap": cp(5.0, price=2e6, name="cheap"),
                 "rich": cp(5.0, price=20e6, name="rich")})
     rows3 = comparison_rows(cu_listed)
     assert {r["key"] for r in rows3} == {"cheap", "rich"}, rows3
 
-    # -- the long non-competitive tail collapses to one summary line -------
     dud_rows = [{"key": "dud%d" % i, "name": "Dud %d" % i, "pos": "MED",
                 "price": 1e6, "season_pts": 1.0, "next_pts": 0.5,
                 "par": 0.0, "par_lo": None, "par_hi": None, "value": 0.0}

@@ -1,21 +1,3 @@
-"""
-ffcore.startprob — P(he starts), from two sources that disagree, fitted.
-
-    cal = Calibration.fit(observations(lineups, starters, cut))
-    cal.p(ff_pct=80.0, af=af_row)     -> 0.94
-    cal.note()                        -> what it fitted, on how much
-
-Two sources, not equals: futbolfantasy (FF, wide coverage) vs
-analiticafantasy (AF, narrow but sharper where it speaks — and it speaks
-selectively, about obvious starters). Both fit parameters are learned from
-confirmed line-ups every run and used ONLY if they beat the raw source out
-of sample (leave-one-out) — no minimum-sample constant needed, `note()`
-reports which happened.
-
-Full rationale (measured Brier scores, why the baseline has to include
-NEUTRAL_START/ABSENT_START fallbacks, a rigged-comparison bug this once
-had): docs/notes/startprob.md
-"""
 
 from __future__ import annotations
 
@@ -24,37 +6,16 @@ import math
 __all__ = ["Obs", "Calibration", "observations", "af_prob", "METHOD_VERSION",
           "fit_start_fallbacks"]
 
-# Bumped whenever fit()/observations() changes what it optimises, not what
-# data it sees — a methodology change with no data change is what a
-# data-only fingerprint can't catch (score.py's startcal.json cache keys
-# on this). Why: docs/notes/startprob.md#method_version
 METHOD_VERSION = 2
 
-# The exponent grid for FF's recalibration and the weight grid for AF.
-# Coarse on purpose: the data can't resolve finer, a grid is auditable
-# where a solver's answer isn't. Two Platt params, not one — a single
-# exponent can only steepen the curve about its middle, and the data's
-# shape is steep AND shifted. Why: docs/notes/startprob.md#platt-scaling--why-two-parameters-not-one
-INTERCEPT = [round(-3.0 + 0.5 * i, 1) for i in range(13)]   # -3.0 .. 3.0
-SLOPE = [round(0.2 + 0.4 * i, 1) for i in range(15)]        # 0.2 .. 5.8
-WEIGHTS = [round(0.1 * i, 1) for i in range(11)]            # 0.0 .. 1.0
+INTERCEPT = [round(-3.0 + 0.5 * i, 1) for i in range(13)]
+SLOPE = [round(0.2 + 0.4 * i, 1) for i in range(15)]
+WEIGHTS = [round(0.1 * i, 1) for i in range(11)]
 
-# Nothing is certain, and a Bernoulli at 0 or 1 says otherwise — clamp on
-# the output only, the fit is free to want more than this.
-# Why: docs/notes/startprob.md#floorceil-clamp
 FLOOR, CEIL = 0.01, 0.97
 
 
 class Obs(tuple):
-    """(ff probability, af probability or None, minutes-graded outcome, team).
-
-    `ff` is what the scorer WOULD USE (published percentage or the
-    neutral/absent fallback) — never None. `started` is graded on MINUTES
-    (`minutes_played(role, minute) / MATCH_LEN`, clamped [0, 1]), not
-    binary played/didn't — the quantity predicted is "how much of the
-    match will he play", the same thing `Scorer.score` multiplies by.
-    Why: docs/notes/startprob.md#obsstarted--graded-on-minutes-step-4-2026-08-21
-    """
     __slots__ = ()
 
     def __new__(cls, ff, af, started, group=""):
@@ -63,23 +24,10 @@ class Obs(tuple):
     ff = property(lambda s: s[0])
     af = property(lambda s: s[1])
     started = property(lambda s: s[2])
-    # WHOSE TEAM SHEET HE WAS ON, and it is the unit of evidence. A manager
-    # picking an eleven is ONE decision, not twenty-two independent ones:
-    # eleven players start because the other eleven do not. Cross-validating
-    # over players counts each sheet twenty-two times and reports a confidence
-    # four matches cannot support.
     group = property(lambda s: s[3])
 
 
 def af_prob(row, titular: float) -> float | None:
-    """AF's read as a probability, or None if it has no opinion.
-
-    It publishes two different things and they are not interchangeable: a
-    percentage, which IS a probability, and a named starting eleven, which is
-    a final call with no number attached. `titular` is what that call has been
-    WORTH historically — fitted, never assumed to be 100%, because a named
-    starter who is rested costs a Bernoulli draw at p=1 everything.
-    """
     if not row:
         return None
     pct = row.get("start_pct")
@@ -92,7 +40,6 @@ def af_prob(row, titular: float) -> float | None:
 
 
 def _platt(p: float, alpha: float, beta: float) -> float:
-    """sigmoid(alpha + beta * logit(p)). (0, 1) is the identity."""
     p = min(1.0 - 1e-6, max(1e-6, p))
     z = alpha + beta * math.log(p / (1.0 - p))
     q = 1.0 / (1.0 + math.exp(-max(-40.0, min(40.0, z))))
@@ -104,7 +51,6 @@ def _brier(model, obs) -> float:
 
 
 class Calibration:
-    """What the two sources are worth, fitted from confirmed line-ups."""
 
     def __init__(self, alpha=0.0, beta=1.0, weight=0.0, titular=0.9, n=0,
                  fitted=False, gain=0.0, why="", groups=0):
@@ -113,17 +59,7 @@ class Calibration:
         self.n, self.fitted, self.gain, self.why = n, fitted, gain, why
         self.groups = groups
 
-    # -- use ---------------------------------------------------------------
     def p(self, ff_pct, af=None) -> float:
-        """P(he starts). `ff_pct` is 0-100, already including the fallback the
-        scorer applies; `af` is AF's raw row, or None."""
-        # IDENTITY PARAMETERS ARE THE EXACT IDENTITY, clamp and all. The
-        # floor and ceiling exist to stop a fitted curve asserting certainty;
-        # applied to an unfitted one they would quietly move every score in
-        # the repo, which is not a calibration, it is a silent edit. The test
-        # is on the PARAMETERS rather than on whether a fit was accepted,
-        # because the grid search scores candidates that have not been
-        # accepted yet and they have to behave like themselves.
         if ff_pct is None:
             base = None
         elif (self.alpha, self.beta) == (0.0, 1.0):
@@ -153,18 +89,8 @@ class Calibration:
                 % (self.n, self.groups, self.alpha, self.beta,
                    100 * self.weight, 100 * self.titular, self.gain))
 
-    # -- fit ---------------------------------------------------------------
     @classmethod
     def fit(cls, obs) -> "Calibration":
-        """Fit both parameters, and USE THEM ONLY IF THEY EARN IT.
-
-        Leave-one-TEAM-SHEET-out (not one player — a manager picks eleven
-        as ONE decision): every observation is predicted by a model fitted
-        without the whole line-up it belongs to, and has to beat the raw
-        source on that held-out score. Replaces an "at least N
-        observations" constant; fails in the right direction.
-        Why: docs/notes/startprob.md#calibrationfit--leave-one-team-sheet-out
-        """
         obs = [o for o in obs if o.ff is not None or o.af is not None]
         if len(obs) < 3:
             return cls(n=len(obs), why="not enough to hold one out")
@@ -219,14 +145,6 @@ def _pct(ff):
 
 
 def _titular_rate(obs) -> float:
-    """How much of the match AF's wordless "named starter" actually played,
-    on average — graded on minutes now (Obs.started), same as everything
-    else `fit()` scores against, so a starter hooked early costs this
-    exactly what he costs the Brier objective he is feeding.
-
-    Falls back to 0.9 rather than 1.0 when nothing has been seen: a call with
-    no evidence behind it must not enter a Bernoulli at certainty.
-    """
     hits = [o for o in obs if o.af is not None and o.af >= 0.999]
     if not hits:
         return 0.9
@@ -236,16 +154,6 @@ def _titular_rate(obs) -> float:
 def observations(lineups, starters, cut: str, roster=None,
                  neutral: float = 60.0, absent: float = 15.0,
                  xw=None) -> list[Obs]:
-    """Predictions made before `cut`, joined to who actually started.
-
-    Only the clubs a confirmed line-up exists for — scoring against a match
-    that hasn't happened flatters the grader. The narrow source's own join
-    is ffcore.second.resolve_second_source() (shared with second_cells(),
-    the display side of this same data). The universe is the wider
-    source's own list plus anyone who turned out to play — not the
-    matchday eighteen, not the market's roster.
-    Why: docs/notes/startprob.md#observations--the-join-and-the-universe
-    """
     from ffcore.second import resolve_second_source
     from ffcore.text import norm
 
@@ -257,10 +165,6 @@ def observations(lineups, starters, cut: str, roster=None,
     last = max(r["observed_at"] for r in truth)
     truth = [r for r in truth if r["observed_at"] == last]
     teams = {r.get("team_slug") for r in truth}
-    # GRADED ON MINUTES, NOT BINARY — see Obs's own docstring. A player not
-    # in `truth` at all (never in the 18) gets 0.0 from the .get() default
-    # below, which is exactly right: silence about him is not a guess, it
-    # is nobody having named him.
     minutes_of = {r["player_slug"]: minutes_played(r["role"], r.get("minute"))
                  for r in truth}
     name_of = {r["player_slug"]: r.get("player_name", "") for r in truth}
@@ -276,14 +180,11 @@ def observations(lineups, starters, cut: str, roster=None,
             wide[r.get("player_slug") or norm(r.get("player_name"))] = r
         else:
             narrow_rows.append(r)
-    # THE SAME JOIN ffcore.second.second_cells() uses for display — one
-    # identity-resolution step, not two independently drifting ones.
     narrow = resolve_second_source(narrow_rows, xw)
 
     out = []
     for slug in sorted(set(wide) | set(truth and name_of)):
         row = wide.get(slug)
-        # Exactly what the scorer would use for him today, fallbacks and all.
         fp = absent / 100.0
         if row is not None:
             fp = neutral / 100.0
@@ -308,17 +209,6 @@ def fit_start_fallbacks(lineups, starters, cut: str,
                         neutral_default: float = 60.0,
                         absent_default: float = 15.0, k: float = 8.0,
                         xw=None) -> tuple[float, float, str]:
-    """(neutral_pct, absent_pct, why) — score.py's NEUTRAL_START/ABSENT_START,
-    shrunk toward real historical accuracy instead of held at a fixed guess.
-
-    Buckets historical Obs by which fallback the live scorer would have
-    used (Obs.ff == neutral_default/100 or absent_default/100 exactly), then
-    blends the observed rate toward the original guess with pseudo-count
-    `k`: fitted = (k*default + n*observed) / (k+n) — same shrinkage shape as
-    SHRINK_K elsewhere in this repo, so a thin real sample can't overturn
-    the prior outright.
-    Why: docs/notes/startprob.md#fit_start_fallbacks--why-a-fit-not-a-guess
-    """
     obs = observations(lineups, starters, cut, neutral=neutral_default,
                        absent=absent_default, xw=xw)
 
@@ -341,48 +231,30 @@ def fit_start_fallbacks(lineups, starters, cut: str,
 
 
 def _selftest() -> None:
-    # -- the shape ---------------------------------------------------------
     assert abs(_platt(0.5, 0.0, 1.0) - 0.5) < 1e-6
-    assert abs(_platt(0.8, 0.0, 1.0) - 0.8) < 1e-6     # (0, 1) is the identity
-    assert _platt(0.8, 0.0, 3.0) > 0.8                 # steeper at the top
-    assert _platt(0.2, 0.0, 3.0) < 0.2                 # ...and at the bottom
-    # THE INTERCEPT IS WHY THERE ARE TWO. A curve that can only steepen about
-    # its middle has to wreck one end to fit the other; this one can move.
+    assert abs(_platt(0.8, 0.0, 1.0) - 0.8) < 1e-6
+    assert _platt(0.8, 0.0, 3.0) > 0.8
+    assert _platt(0.2, 0.0, 3.0) < 0.2
     assert _platt(0.3, 1.5, 3.0) > _platt(0.3, 0.0, 3.0)
-    # NOBODY IS CERTAIN TO PLAY. However hard the fit pushes, the answer stays
-    # inside the interval — a Bernoulli at 1 makes a rested starter cost the
-    # simulator nothing, and the source's own 100% bucket started 80% of the
-    # time on the first jornada that was played.
     assert _platt(0.999, 0.0, 5.8) <= CEIL
     assert _platt(0.001, 0.0, 5.8) >= FLOOR
     assert FLOOR <= _platt(1.0, 3.0, 5.8) <= CEIL
     assert FLOOR <= _platt(0.0, -3.0, 0.2) <= CEIL
 
-    # -- AF's two units, which are not interchangeable ---------------------
     assert af_prob({"start_pct": "75"}, 0.9) == 0.75
-    # A named starter is a call, not a 100%. It is worth what it has been
-    # worth, which is fitted — entering it at certainty makes a rested starter
-    # cost everything.
     assert af_prob({"role": "starter"}, 0.93) == 0.93
-    assert af_prob({"role": "sub"}, 0.9) is None       # no opinion, not zero
+    assert af_prob({"role": "sub"}, 0.9) is None
     assert af_prob(None, 0.9) is None
 
-    # -- a calibration that has fitted nothing is the raw source -----------
     raw = Calibration()
     assert raw.p(80.0) == 0.8
-    # ...including at the ends, where the fitted clamp would otherwise bite.
     assert raw.p(100.0) == 1.0 and raw.p(0.0) == 0.0
-    assert raw.p(80.0, {"start_pct": "20"}) == 0.8     # weight 0 ignores AF
+    assert raw.p(80.0, {"start_pct": "20"}) == 0.8
     assert raw.p(None) == 0.0
     assert "no confirmed line-up" in raw.note()
 
-    # AF alone still answers when the wider source is silent about him.
     assert Calibration(weight=0.5).p(None, {"start_pct": "40"}) == 0.4
 
-    # -- the fit -----------------------------------------------------------
-    # A source that is systematically under-confident: everyone it calls at
-    # 70% or better starts, everyone at 30% or less does not. The fit should
-    # sharpen it, and say so.
     obs = [Obs(p, None, st, "sheet%d" % (i % 6))
            for i, (p, st) in enumerate(
                [(0.8, 1), (0.7, 1), (0.3, 0), (0.2, 0)] * 12)]
@@ -393,34 +265,24 @@ def _selftest() -> None:
     assert "recalibrated" in cal.note() and "48 confirmed" in cal.note()
     assert "6 team sheets" in cal.note(), cal.note()
 
-    # NOISE MUST NOT FIT. Coin flips carry no signal, so the held-out score
-    # cannot improve and the raw source stands — this is the guard that
-    # replaces choosing a minimum sample size.
     noise = [Obs(0.5, None, i % 2, "sheet%d" % (i % 5)) for i in range(20)]
     assert not Calibration.fit(noise).fitted
     assert "did not beat it out of sample" in Calibration.fit(noise).note()
 
-    # Too little to hold anything out is honest about why.
     assert not Calibration.fit([Obs(0.5, None, 1)]).fitted
     assert "hold one out" in Calibration.fit([Obs(0.5, None, 1)]).note()
-    # ONE TEAM SHEET IS ONE OBSERVATION, whatever it holds. Twenty-two names
-    # off a single line-up cannot validate anything, and saying so is the
-    # difference between a guard and a formality.
     one = Calibration.fit([Obs(0.9, None, i < 11, "same") for i in range(22)])
     assert not one.fitted and "1 team sheet" in one.note(), one.note()
 
-    # A second source that is simply right should be leaned on.
     good = [Obs(0.5, float(st), st, "sheet%d" % (i % 5))
             for i, st in enumerate([1, 0] * 15)]
     cg = Calibration.fit(good)
     assert cg.fitted and cg.weight > 0.5, (cg.weight, cg.note())
 
-    # ...and its wordless call is measured, not assumed.
     assert abs(_titular_rate([Obs(0.5, 1.0, 1)] * 9 + [Obs(0.5, 1.0, 0)])
                - 0.9) < 1e-9
-    assert _titular_rate([Obs(0.5, None, 1)]) == 0.9   # nothing seen
+    assert _titular_rate([Obs(0.5, None, 1)]) == 0.9
 
-    # -- the join ----------------------------------------------------------
     lineups = [
         {"observed_at": "A", "source": "futbolfantasy", "team_slug": "t",
          "player_slug": "starter-man", "player_name": "Starter Man",
@@ -431,17 +293,12 @@ def _selftest() -> None:
         {"observed_at": "A", "source": "futbolfantasy", "team_slug": "t",
          "player_slug": "bench-man", "player_name": "Bench Man",
          "start_pct": "20", "role": "sub"},
-        # Listed with no percentage at all: the neutral fallback, which is
-        # what the scorer would give him.
         {"observed_at": "A", "source": "futbolfantasy", "team_slug": "t",
          "player_slug": "vague-man", "player_name": "Vague Man",
          "start_pct": "", "role": "sub"},
-        # After the cut: a prediction made once the teams were out is not a
-        # prediction, and grading against it would flatter the source.
         {"observed_at": "Z", "source": "futbolfantasy", "team_slug": "t",
          "player_slug": "starter-man", "player_name": "Starter Man",
          "start_pct": "99", "role": "starter"},
-        # A club with no confirmed line-up has not played.
         {"observed_at": "A", "source": "futbolfantasy", "team_slug": "other",
          "player_slug": "elsewhere", "player_name": "Elsewhere",
          "start_pct": "90", "role": "starter"},
@@ -451,43 +308,30 @@ def _selftest() -> None:
          "player_name": "Starter Man", "role": "starter"},
         {"observed_at": "K", "team_slug": "t", "player_slug": "bench-man",
          "player_name": "Bench Man", "role": "sub"},
-        # Played, and the wider source never listed him: the absent fallback,
-        # and a real observation rather than one to drop.
         {"observed_at": "K", "team_slug": "t", "player_slug": "surprise-man",
          "player_name": "Surprise Man", "role": "starter"},
     ]
     got = observations(lineups, starters, cut="M")
-    assert all(o.group == "t" for o in got), got   # the sheet he was on
+    assert all(o.group == "t" for o in got), got
     by = {o.ff: o for o in got}
-    assert len(got) == 4, got            # 3 listed + 1 who only turned up
+    assert len(got) == 4, got
     assert by[0.8].started == 1.0 and by[0.2].started == 0.0
-    assert by[0.8].af == 1.0             # the narrow source's named starter
+    assert by[0.8].af == 1.0
     assert by[0.2].af is None
-    assert abs(by[0.6].ff - 0.6) < 1e-9  # listed, no number -> neutral
-    assert by[0.15].started == 1.0       # never listed, and he started
-    # Nothing from a club that has not played, and nothing from after the cut.
+    assert abs(by[0.6].ff - 0.6) < 1e-9
+    assert by[0.15].started == 1.0
     assert all(abs(o.ff - 0.99) > 1e-9 and abs(o.ff - 0.9) > 1e-9
                for o in got), got
     assert observations(lineups, [], cut="M") == []
 
-    # -- fit_start_fallbacks: shrunk toward the real historical rate, not
-    # taken raw off one or two observations -------------------------------
-    # This fixture's neutral bucket (vague-man) has n=1, rate=0%; its
-    # absent bucket (surprise-man) has n=1, rate=100% — both shrunk with
-    # k=8 toward the 60/15 defaults, not replaced outright.
     npct, apct, why = fit_start_fallbacks(lineups, starters, cut="M")
     assert abs(npct - (8 * 60 + 1 * 0) / 9) < 1e-9, (npct, why)
     assert abs(apct - (8 * 15 + 1 * 100) / 9) < 1e-9, (apct, why)
     assert "1 real observations" in why, why
-    # No real observations at all for either bucket: keeps the defaults,
-    # says so rather than guessing.
     npct0, apct0, why0 = fit_start_fallbacks([], [], cut="M")
     assert npct0 == 60.0 and apct0 == 15.0, (npct0, apct0)
     assert "no real observations" in why0, why0
 
-    # THE CROSSWALK MAKES THE NARROW SOURCE'S JOIN EXACT. It shares no slug
-    # with anybody, so without one it is matched on a folded name at 66% — and
-    # the third of it that misses is a source silently having no opinion.
     class _XW:
         def player(self, **kw):
             if kw.get("af_slug") == "af-only-slug":
@@ -500,17 +344,10 @@ def _selftest() -> None:
         {"observed_at": "A", "source": "analitica", "team_slug": "t",
          "player_slug": "af-only-slug", "player_name": "S. Man",
          "start_pct": "75", "role": "starter"}]
-    # The narrow source spells him differently, so the name join finds nothing.
     assert all(o.af is None for o in observations(odd, starters, cut="M"))
-    # Through the crosswalk it lands on the right player.
     got2 = observations(odd, starters, cut="M", xw=_XW())
     assert any(o.af == 0.75 for o in got2), got2
 
-    # -- Step 4: graded on minutes, not binary played/didn't ---------------
-    # A starter hooked early and a sub who plays most of the match used to
-    # score identically against the fit as, respectively, a full 90 and an
-    # unused sub — discarding exactly the involvement P(start) is meant to
-    # predict (it multiplies points-per-minute downstream; see score.py).
     graded_lineups = [
         {"observed_at": "A", "source": "futbolfantasy", "team_slug": "t",
          "player_slug": "hooked-early", "player_name": "Hooked Early",
@@ -520,18 +357,15 @@ def _selftest() -> None:
          "start_pct": "10", "role": "sub"},
     ]
     graded_starters = [
-        # Started, subbed off at the half — half credit, not full.
         {"observed_at": "K", "team_slug": "t", "player_slug": "hooked-early",
          "player_name": "Hooked Early", "role": "starter", "minute": "45"},
-        # Came on at the half and played the rest — half credit too, from
-        # the opposite direction, and it is the SAME half.
         {"observed_at": "K", "team_slug": "t", "player_slug": "heavy-sub",
          "player_name": "Heavy Sub", "role": "sub", "minute": "45"},
     ]
     graded = {o.ff: o.started
              for o in observations(graded_lineups, graded_starters, cut="M")}
-    assert abs(graded[0.9] - 0.5) < 1e-9, graded    # 45 of 90 minutes
-    assert abs(graded[0.1] - 0.5) < 1e-9, graded    # on at 45', 45 minutes
+    assert abs(graded[0.9] - 0.5) < 1e-9, graded
+    assert abs(graded[0.1] - 0.5) < 1e-9, graded
 
     print("ffcore.startprob self-test OK (54 cases)")
 

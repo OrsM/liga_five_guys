@@ -1,16 +1,3 @@
-"""
-ffcore/model.py — one League and one Scorer, built once per run, built
-from TODAY's market only (not the full snapshot history — an older
-snapshot can list a player no longer in the game as buyable).
-
-    from ffcore.model import session
-    m = session()
-    m.lg, m.sc, m.market, m.xi_rows
-
-Memoised for the life of the process so every stage describes the same
-squad — two independent builds could (and once did) disagree about the
-same player with nothing to say which one was right.
-"""
 
 from __future__ import annotations
 
@@ -26,7 +13,6 @@ __all__ = ["Session", "session", "reset"]
 
 @dataclass
 class Session:
-    """One League, one Scorer, and the rows they were built from."""
     lg: League
     sc: object
     market: list
@@ -39,7 +25,6 @@ _CACHE: list = []
 
 
 def session() -> Session:
-    """The run's model. Built on first ask, handed back after that."""
     if not _CACHE:
         market = load_market_latest()
         xi_rows = load_lineups_latest()
@@ -51,18 +36,14 @@ def session() -> Session:
 
 
 def reset() -> None:
-    """Drop the cached model. For self-tests that change the store."""
     _CACHE.clear()
 
 
 def _selftest() -> None:
-    # ONE PASS. Asked twice, the same objects come back — that is the whole
-    # guarantee, and it is what stops two surfaces describing two models.
     a, b = session(), session()
     assert a is b
     assert a.lg is b.lg and a.sc is b.sc
     assert a.market and a.xi_rows
-    # Built on TODAY's market, not on every snapshot ever recorded.
     stamps = {r.get("observed_at") for r in a.market}
     assert len(stamps) == 1, stamps
     reset()

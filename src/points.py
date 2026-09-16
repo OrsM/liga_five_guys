@@ -1,22 +1,3 @@
-"""
-points.py — this season's points, from the snapshots already taken.
-
-Writes data/season/live/perjornada_<label>.csv — the diff between
-consecutive KEPT snapshots (ones whose totals actually moved). A full
-rebuild from raw on every run, output disposable.
-
-Two deliberate limits:
-  * No jornada numbers here beyond what match_jornadas() infers from
-    matches.csv's own score-appeared timeline — there's no kickoff-date
-    calendar in this repo to join against otherwise.
-  * report.py does not read this folder. ffcore/score.py's Scorer blends
-    this season into pts/match through the same shrinkage the prior gets
-    (from data/season/points_<label>.csv); reading the raw per-jornada
-    diffs here too would be a second, unshrunk path to the same number.
-
-    python src/points.py              # rebuild data/season/live/ from raw
-    python src/points.py --selftest   # pure-logic checks, no deps, no IO
-"""
 
 from __future__ import annotations
 
@@ -32,32 +13,16 @@ DIFF_FIELDS = ["from_stamp", "to_stamp", "season", "ff_id", "player_name",
                "player_name_full", "team", "points_delta", "games_delta",
                "points_total", "games_total", "jornada"]
 
-# What the site puts in the table body when the season it is showing has no
-# played matches. Matched as text on the raw page, because the parser cannot
-# tell "nobody has scored yet" from "the columns moved" — both give it 0 rows.
 EMPTY_MARKS = ("no se encontraron resultados", "sin resultados")
 
 
-# ---------------------------------------------------------------------------
-# pure logic — selftested below, no parsing, no IO
-# ---------------------------------------------------------------------------
 
 def empty_season(html: str) -> bool:
-    """True when the page says it has no results (a fresh season rollover),
-    as opposed to a parser that broke and lost them.
-    """
     low = (html or "").lower()
     return any(m in low for m in EMPTY_MARKS)
 
 
 def match_jornadas(matches_history: list[dict]) -> list[tuple[str, int]]:
-    """[(when this match's result was first seen, jornada)], oldest first.
-
-    `matches_history` must be the FULL table, not latest_only() — the first
-    snapshot where a match's score is non-empty is this repo's own record
-    of when that match finished. One entry per match, first-seen-scored
-    only, so a later re-scrape can't push its jornada later.
-    """
     first_scored: dict[str, tuple[str, int]] = {}
     for r in sorted(matches_history, key=lambda r: r.get("observed_at", "")):
         mid = (r.get("match_id") or "").strip()
@@ -73,10 +38,6 @@ def match_jornadas(matches_history: list[dict]) -> list[tuple[str, int]]:
 
 
 def jornada_asof(timeline: list[tuple[str, int]], stamp: str) -> int | None:
-    """The jornada of the most recently confirmed-scored match at or before
-    `stamp`, or None if nothing had finished yet. `timeline` is
-    `match_jornadas()`'s own output — already oldest first.
-    """
     best = None
     for when, jor in timeline:
         if when <= stamp:
@@ -87,16 +48,11 @@ def jornada_asof(timeline: list[tuple[str, int]], stamp: str) -> int | None:
 
 
 def player_key(r: dict) -> str:
-    """The row's own ff_id first (a name that changes spelling between two
-    sweeps must not read as one player leaving and another arriving);
-    normalised name as the fallback for older snapshots with no id.
-    """
     return ((r.get("ff_id") or "").strip()
             or norm(r.get("player_name_full") or r.get("player_name") or ""))
 
 
 def totals(rows: list[dict]) -> dict[str, tuple[float, float]]:
-    """{key: (points, games)} — the comparable core of one snapshot."""
     out = {}
     for r in rows:
         key = player_key(r)
@@ -106,10 +62,6 @@ def totals(rows: list[dict]) -> dict[str, tuple[float, float]]:
 
 
 def keep_changed(seq: list[tuple[str, list[dict]]]) -> list[tuple[str, list[dict]]]:
-    """Drop snapshots whose totals are identical to the previous kept one.
-
-    `seq` is [(stamp, rows)] in time order. The first is always kept.
-    """
     kept, prev = [], None
     for stamp, rows in seq:
         cur = totals(rows)
@@ -122,13 +74,6 @@ def keep_changed(seq: list[tuple[str, list[dict]]]) -> list[tuple[str, list[dict
 def diff(prev_rows: list[dict], cur_rows: list[dict],
          from_stamp: str, to_stamp: str, season: str,
          jornada_timeline: list[tuple[str, int]] = ()) -> list[dict]:
-    """Per-player deltas between two kept snapshots — only players whose
-    points or games moved; absent-before diffs against (0, 0).
-
-    `jornada_timeline` (match_jornadas()'s output) stamps each row via
-    jornada_asof(timeline, to_stamp); blank when no timeline is given or
-    nothing had finished yet, never a guess.
-    """
     prev = totals(prev_rows)
     jor = jornada_asof(jornada_timeline, to_stamp)
     out = []
@@ -155,30 +100,19 @@ def diff(prev_rows: list[dict], cur_rows: list[dict],
     return out
 
 
-# ---------------------------------------------------------------------------
-# rebuild from raw
-# ---------------------------------------------------------------------------
 
 _CACHE = "parsed_points.json"
 
 
 def load_snapshots() -> dict[str, list[tuple[str, list[dict]]]]:
-    """{season label: [(stamp, rows)]} from every snapshot, in order.
-
-    ingest.pages and sources.parse_points are imported lazily so --selftest
-    needs neither lxml nor a raw store.
-    """
     from ingest import (_parse_cache, _save_parse_cache, _Sigs, parser_sig,
                         doc_keys, documents)
     from sources import parse_points, season_label
 
     by_label: dict[str, list[tuple[str, list[dict]]]] = {}
-    # Cached per document (raw archives are immutable), fingerprinted on
-    # the parser too — a parse is a function of page AND parser.
     _psig = parser_sig("parse_points")
     cache, fresh, walk = _parse_cache(_CACHE), {}, doc_keys()
 
-    # Read first, parse second, in one pass per archive — see ingest.documents.
     need: dict[str, set] = {}
     for _stamp, docs in walk:
         if "points" in docs and not isinstance(
@@ -190,7 +124,6 @@ def load_snapshots() -> dict[str, list[tuple[str, list[dict]]]]:
             got = {"rows": rows, "label": season_label(html),
                    "empty": bool(empty_season(html))}
         except Exception as e:
-            # One bad page must not lose the rest of the run.
             print(f"  warn: {origin}/points: {type(e).__name__}: {e}")
             got = {"rows": [], "label": "", "empty": True}
         cache["%s@%s" % (_Sigs().of("points", html), _psig)] = got
@@ -221,7 +154,6 @@ def main() -> None:
         sys.exit("no points page found in any snapshot under data/raw/ — "
                  "run ingest.py fetch first")
 
-    # Full history, not latest_only() — see match_jornadas()'s docstring.
     timeline = match_jornadas(load_matches_history())
 
     for label, seq in sorted(by_label.items()):
@@ -243,9 +175,6 @@ def main() -> None:
     print(f"wrote {LIVE}/ — report.py does not read this folder, on purpose.")
 
 
-# ---------------------------------------------------------------------------
-# selftest — pure logic only
-# ---------------------------------------------------------------------------
 
 def _selftest() -> None:
     def row(full, pts, pj, short=None, team="X"):
@@ -254,10 +183,10 @@ def _selftest() -> None:
                 "avg": ""}
 
     a = [row("Ane Aldea", 0, 0), row("Bo Bidal", 0, 0)]
-    b = [row("Ane Aldea", 0, 0), row("Bo Bidal", 0, 0)]      # identical
-    c = [row("Ane Aldea", 8, 1), row("Bo Bidal", 0, 0)]      # Ane played
-    d = [row("Ane Aldea", 8, 1), row("Bo Bidal", 3, 1),      # Bo played,
-         row("Cai Coro", 5, 1)]                               # Cai appeared
+    b = [row("Ane Aldea", 0, 0), row("Bo Bidal", 0, 0)]
+    c = [row("Ane Aldea", 8, 1), row("Bo Bidal", 0, 0)]
+    d = [row("Ane Aldea", 8, 1), row("Bo Bidal", 3, 1),
+         row("Cai Coro", 5, 1)]
 
     kept = keep_changed([("t0", a), ("t1", b), ("t2", c), ("t3", d)])
     assert [s for s, _ in kept] == ["t0", "t2", "t3"], kept
@@ -268,41 +197,33 @@ def _selftest() -> None:
 
     d2 = diff(c, d, "t2", "t3", "s")
     got = {r["player_name_full"]: r["points_delta"] for r in d2}
-    assert got == {"Bo Bidal": "3", "Cai Coro": "5"}, got   # Ane unchanged
+    assert got == {"Bo Bidal": "3", "Cai Coro": "5"}, got
 
-    # A mid-season first appearance diffs against zero, not an error.
     assert next(r for r in d2 if r["player_name_full"] == "Cai Coro"
                 )["games_delta"] == "1"
 
-    # An empty season and a broken parser both yield 0 rows; only one of them
-    # is a problem, and the page says which.
     assert empty_season("<tbody><tr><td>No se encontraron resultados</td>")
-    assert empty_season("<TD>NO SE ENCONTRARON RESULTADOS</TD>")   # case-blind
+    assert empty_season("<TD>NO SE ENCONTRARON RESULTADOS</TD>")
     assert not empty_season("<tbody><tr><td>Ane Aldea</td>")
     assert not empty_season("")
 
-    # -- jornada, stamped from when a match's score was first seen ---------
     history = [
-        # Two snapshots of the SAME match: unscored, then scored. Only the
-        # FIRST scored sighting counts.
         {"observed_at": "t0", "match_id": "1", "jornada": "1", "score": ""},
         {"observed_at": "t1", "match_id": "1", "jornada": "1", "score": "2-0"},
         {"observed_at": "t2", "match_id": "1", "jornada": "1", "score": "2-0"},
         {"observed_at": "t3", "match_id": "2", "jornada": "2", "score": "1-1"},
-        # A row with no jornada (unparseable) is skipped, not a crash.
         {"observed_at": "t1b", "match_id": "3", "jornada": "", "score": "0-0"},
     ]
     tl = match_jornadas(history)
     assert tl == [("t1", 1), ("t3", 2)], tl
-    assert jornada_asof(tl, "t0") is None       # nothing finished yet
+    assert jornada_asof(tl, "t0") is None
     assert jornada_asof(tl, "t1") == 1
-    assert jornada_asof(tl, "t2") == 1           # between J1 and J2 finishing
+    assert jornada_asof(tl, "t2") == 1
     assert jornada_asof(tl, "t3") == 2
-    assert jornada_asof(tl, "t9") == 2           # still the latest known
+    assert jornada_asof(tl, "t9") == 2
 
     d3 = diff(a, c, "t0", "t2", "s", jornada_timeline=tl)
     assert d3[0]["jornada"] == "1", d3
-    # No timeline at all: blank, never a guess.
     assert diff(a, c, "t0", "t2", "s")[0]["jornada"] == ""
 
     print("points.py selftest OK")

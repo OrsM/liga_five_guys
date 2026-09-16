@@ -1,22 +1,3 @@
-"""
-ffcore.attributes — one resolved fact per player, from however many
-sources speak to it.
-
-    fit = resolve_fitness(status_by_key, player_status_by_key)
-    fit["isaac romero"].state    -> "doubt"
-    fit["isaac romero"].agree    -> False
-    fit["isaac romero"].app_state -> "ok"
-
-The general shape for an attribute with more than one reader: one
-function takes every source's reading and returns one resolved fact per
-player, with disagreement KEPT rather than picked — a caller that wants
-to flag a mismatch can, one that just wants the best answer still gets
-one. Adding a new source means extending this function, not re-deriving
-the join at every call site.
-
-Vocabulary is FF's (the finer of the two — the app has no "unavailable"
-state of its own), not a merged one.
-"""
 
 from __future__ import annotations
 
@@ -24,27 +5,10 @@ from typing import NamedTuple
 
 __all__ = ["Fitness", "resolve_fitness"]
 
-# The app's own words for the states FF's panel also has a word for, so
-# "doubt" (FF) and "doubtful" (app) compare as agreement rather than as a
-# false conflict, and "ok" (app) lines up with "" (FF's fine/not-stated).
 _APP_TO_FF = {"doubtful": "doubt", "ok": ""}
 
 
 class Fitness(NamedTuple):
-    """One player's resolved fitness read.
-
-    `state` is FF's word for it — "" means fine, otherwise one of
-    doubt/injured/suspended/unavailable, the same vocabulary
-    ffcore.score.Scored.status already uses, so callers do not need a
-    translation step.
-
-    `agree` is False only when the app HAS a reading and it doesn't match
-    (both aligned to one vocabulary first). Silence from the app is not
-    disagreement — True — since app coverage isn't exhaustive.
-
-    `app_state` is the app's raw, unaligned word, kept even on agreement.
-    None means the app has no reading for him.
-    """
     state: str
     agree: bool
     app_state: str | None
@@ -52,15 +16,6 @@ class Fitness(NamedTuple):
 
 def resolve_fitness(status_by_key: dict[str, str],
                     player_status_by_key: dict[str, str]) -> dict[str, Fitness]:
-    """{player key: Fitness}, over every key `status_by_key` names.
-
-    `status_by_key` is expected to be exhaustive over its population (every
-    squad member gets an entry, "" for fine, per ffcore.score.Scored.status)
-    — this resolves fitness for THAT population, not for whoever the app
-    happens to also cover. `player_status_by_key` may be missing a player
-    entirely; that reads as "the app has no opinion," never as "the app
-    says fine."
-    """
     out = {}
     for key, ff in status_by_key.items():
         raw = player_status_by_key.get(key)
@@ -71,32 +26,23 @@ def resolve_fitness(status_by_key: dict[str, str],
 
 
 def _selftest() -> None:
-    # -- agreement, on FF's vocabulary and on the app's ---------------------
     fit = resolve_fitness({"a": "", "b": "doubt", "c": "injured"},
                           {"a": "ok", "b": "doubtful", "c": "injured"})
     assert fit["a"] == ("", True, "ok"), fit["a"]
     assert fit["b"] == ("doubt", True, "doubtful"), fit["b"]
     assert fit["c"] == ("injured", True, "injured"), fit["c"]
 
-    # -- a real disagreement, kept rather than picked ------------------------
     fit = resolve_fitness({"d": ""}, {"d": "injured"})
     assert fit["d"] == ("", False, "injured"), fit["d"]
     fit = resolve_fitness({"e": "doubt"}, {"e": "ok"})
     assert fit["e"] == ("doubt", False, "ok"), fit["e"]
 
-    # -- silence is not disagreement -----------------------------------------
-    # The app does not cover every player FF's panel does; a player it says
-    # nothing about must not read as a conflict, or as the app vouching for
-    # him.
     fit = resolve_fitness({"f": "doubt"}, {})
     assert fit["f"] == ("doubt", True, None), fit["f"]
 
-    # -- "unavailable" has no app equivalent, so it can only ever agree by --
-    # -- the app staying silent, never by the app confirming it -------------
     fit = resolve_fitness({"g": "unavailable"}, {"g": "ok"})
     assert fit["g"].agree is False, fit["g"]
 
-    # -- an empty population resolves to nothing, not an error --------------
     assert resolve_fitness({}, {"h": "injured"}) == {}
 
     print("ffcore.attributes self-test OK (%d cases)" % 8)
