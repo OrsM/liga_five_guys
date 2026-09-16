@@ -43,6 +43,8 @@ import os
 import sys
 from dataclasses import InitVar, dataclass, field, replace
 from functools import cached_property
+from types import MappingProxyType
+from typing import Mapping
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
@@ -228,6 +230,136 @@ class Universe:
         """Screen wide and cheap, then re-run the survivors properly.
         See the module-level rank() for the full contract."""
         return rank(self, acts, seed=seed, price=price, extra=extra)
+
+    # -- read accessors backed by `players`, proven equal to the flat -----
+    # dicts above in _selftest ------------------------------------------
+    #
+    # WHY A MAPPING VIEW PER FIELD, NOT A METHOD PER QUESTION. Real call
+    # sites (grepped 2026-09-16 across src/) use these shapes: `u.price[k]`
+    # (raises on a missing key), `u.pos.get(k, "")`, `u.owner.get(k)` (no
+    # default -> None), `k in u.price`, `for k in u.price`, `len(u.price)`,
+    # `u.price.items()`/`.values()`. A `price_of(k, default=...)`-style
+    # method per fact would cover the `.get` shape and nothing else — every
+    # iteration/membership/length call site would need a second accessor
+    # anyway. A `Mapping` view supports all of the above for free and reads
+    # at the call site exactly like the flat dict it replaces (only the
+    # name changes), which is what makes the Wave 3B-3E migration a
+    # mechanical rename rather than a rewrite.
+    #
+    # NOT CACHED. Each property recomputes its dict comprehension from
+    # `self.players` on every access rather than memoizing (contrast
+    # `current_xi`/`xi_bar` above, which cache on purpose because their
+    # inputs don't change after construction). `players` itself is never
+    # reassigned after __post_init__ in this codebase today, so caching
+    # would currently be safe — but these views exist specifically so a
+    # later wave can delete the flat dicts, and a flat dict IS a live,
+    # mutable view (sim.py's own _selftest does `u.route[k] = "clause"`,
+    # `del u.route[k]`, even `u.pos = {...}` wholesale). A cached view
+    # would silently stop reflecting such a mutation the moment the flat
+    # dict it's replacing is deleted. Recomputing is cheap (one squad-sized
+    # dict comprehension) and never wrong.
+    #
+    # EACH FIELD REPRODUCES __post_init__'s FILTER EXACTLY — see the table
+    # in the Wave 3A handback for the inclusion rule per field. In
+    # particular: `owner`/`route`/`pos` exclude a FALSY value (empty
+    # string / None), not just an absent one; `price`/`proceeds`/`value`/
+    # `market_exp`/`start`/`clause`/`clause_until`/`bids` exclude only
+    # `is not None` (so a real `0`/`0.0` stays in); `name` excludes
+    # nothing — every player in `self.players` gets an entry.
+
+    @property
+    def pos_view(self) -> Mapping[str, str]:
+        """Mirrors `self.pos`: SLOT abbreviation via `_pos_of()`, keys with
+        a falsy `p.current.pos` excluded entirely (not mapped to "")."""
+        return MappingProxyType({k: _pos_of(p.current.pos)
+                                 for k, p in self.players.items()
+                                 if p.current.pos})
+
+    @property
+    def price_view(self) -> Mapping[str, float]:
+        """Mirrors `self.price`: `p.current.price`, keys excluded only
+        when the price is `None` (a real 0.0 stays in)."""
+        return MappingProxyType({k: p.current.price
+                                 for k, p in self.players.items()
+                                 if p.current.price is not None})
+
+    @property
+    def proceeds_view(self) -> Mapping[str, float]:
+        """Mirrors `self.proceeds`: `p.current.proceeds`, `is not None`
+        filter (same shape as `price_view`)."""
+        return MappingProxyType({k: p.current.proceeds
+                                 for k, p in self.players.items()
+                                 if p.current.proceeds is not None})
+
+    @property
+    def owner_view(self) -> Mapping[str, str]:
+        """Mirrors `self.owner`: `p.current.owner`, keys with a falsy
+        owner (None or "") excluded entirely — same shape as `pos_view`,
+        not `price_view`."""
+        return MappingProxyType({k: p.current.owner
+                                 for k, p in self.players.items()
+                                 if p.current.owner})
+
+    @property
+    def value_view(self) -> Mapping[str, float]:
+        """Mirrors `self.value`: `p.current.value`, `is not None` filter."""
+        return MappingProxyType({k: p.current.value
+                                 for k, p in self.players.items()
+                                 if p.current.value is not None})
+
+    @property
+    def market_exp_view(self) -> Mapping[str, float]:
+        """Mirrors `self.market_exp`: `p.derived.market_exp`, `is not
+        None` filter."""
+        return MappingProxyType({k: p.derived.market_exp
+                                 for k, p in self.players.items()
+                                 if p.derived.market_exp is not None})
+
+    @property
+    def start_view(self) -> Mapping[str, float]:
+        """Mirrors `self.start`: `p.derived.start_p`, `is not None`
+        filter."""
+        return MappingProxyType({k: p.derived.start_p
+                                 for k, p in self.players.items()
+                                 if p.derived.start_p is not None})
+
+    @property
+    def clause_view(self) -> Mapping[str, float]:
+        """Mirrors `self.clause`: `p.current.clause`, `is not None`
+        filter."""
+        return MappingProxyType({k: p.current.clause
+                                 for k, p in self.players.items()
+                                 if p.current.clause is not None})
+
+    @property
+    def clause_until_view(self) -> Mapping[str, object]:
+        """Mirrors `self.clause_until`: `p.current.clause_until`, `is not
+        None` filter."""
+        return MappingProxyType({k: p.current.clause_until
+                                 for k, p in self.players.items()
+                                 if p.current.clause_until is not None})
+
+    @property
+    def route_view(self) -> Mapping[str, str]:
+        """Mirrors `self.route`: `p.current.route`, keys with a falsy
+        route excluded entirely — same shape as `pos_view`/`owner_view`."""
+        return MappingProxyType({k: p.current.route
+                                 for k, p in self.players.items()
+                                 if p.current.route})
+
+    @property
+    def bids_view(self) -> Mapping[str, int]:
+        """Mirrors `self.bids`: `p.current.bids`, `is not None` filter."""
+        return MappingProxyType({k: p.current.bids
+                                 for k, p in self.players.items()
+                                 if p.current.bids is not None})
+
+    @property
+    def name_view(self) -> Mapping[str, str]:
+        """Mirrors `self.name`: `p.identity.name` for EVERY key in
+        `self.players` — the one field with no filter at all."""
+        return MappingProxyType({k: p.identity.name
+                                 for k, p in self.players.items()})
 
 
 def _pos_of(raw: str) -> str:
@@ -1363,6 +1495,73 @@ def _selftest() -> None:
                            "me_m1", "me_m2", "me_m3", "me_m4")), \
         [a for a in acts_cd if a.sell]
 
+
+    # -- Universe.*_view accessors: EXACT equivalence with the flat dicts --
+    # they stand in for (docs/notes/rationalization-2026-09-16.md#2, Wave
+    # 3A). This is the deliverable: it's what lets a later wave delete the
+    # flat dicts without re-checking every call site's behaviour by hand.
+    # `players` is compared here, not rebuilt — the fixtures already agree
+    # with `_fieldable()` on what a legal squad looks like; a third
+    # hand-built Universe here would just be one more copy to keep in sync.
+    from ffcore.fixtures import tiny_universe as _tiny_u
+    from ffcore.fixtures import tiny_market_universe as _tiny_mu
+    from ffcore.fixtures import tiny_profile as _tiny_p
+
+    _ACCESSORS = (
+        ("pos", "pos_view"), ("price", "price_view"),
+        ("proceeds", "proceeds_view"), ("owner", "owner_view"),
+        ("value", "value_view"), ("market_exp", "market_exp_view"),
+        ("start", "start_view"), ("clause", "clause_view"),
+        ("clause_until", "clause_until_view"), ("route", "route_view"),
+        ("bids", "bids_view"), ("name", "name_view"),
+    )
+    for u_acc in (_tiny_u(), _tiny_mu()):
+        for flat_name, view_name in _ACCESSORS:
+            flat = getattr(u_acc, flat_name)
+            view = getattr(u_acc, view_name)
+            # Same key set, same values —
+            assert dict(view) == flat, (flat_name, dict(view), flat)
+            # — AND same answer for a key outside both (a Mapping could
+            # satisfy `==` while disagreeing on `in`/`.get()` for a key
+            # neither holds; MappingProxyType doesn't, but this is the
+            # assertion that would catch it if the accessor ever stopped
+            # being a plain dict view).
+            for k in set(u_acc.players) | {"nonexistent_key"}:
+                assert (k in flat) == (k in view), (flat_name, k)
+                assert flat.get(k) == view.get(k), (flat_name, k)
+
+    # -- the filters are NOT all the same shape, and the edge case is where
+    # a flat-dict/view mismatch would actually show up: pos/owner/route
+    # drop a FALSY value (empty string) entirely, while price/proceeds/
+    # value/market_exp/start/clause/clause_until/bids drop only `None` —
+    # a real 0/0.0 must survive. One player exercises every one of these
+    # at once, built into the Universe from construction (not mutated in
+    # after the fact — the flat dicts are computed once in __post_init__
+    # and would not see a post-construction mutation to `players`, unlike
+    # the live `*_view` accessors; comparing the two after such a mutation
+    # would test nothing).
+    _edge_players = dict(_tiny_u().players)
+    _edge_players["edge"] = _tiny_p(
+        "edge", pos="", owner="", route="", price=0.0, proceeds=0.0,
+        value=0.0, market_exp=0.0, start_p=0.0, clause=0.0,
+        clause_until=0, bids=0)
+    u_edge = _tiny_u(players=_edge_players)
+    for flat_name, view_name in _ACCESSORS:
+        flat = getattr(u_edge, flat_name)
+        view = getattr(u_edge, view_name)
+        assert dict(view) == flat, (flat_name, dict(view), flat)
+    # falsy-but-present-in-players -> excluded from BOTH:
+    for flat_name in ("pos", "owner", "route"):
+        assert "edge" not in getattr(u_edge, flat_name), flat_name
+        assert "edge" not in getattr(u_edge, flat_name + "_view"), flat_name
+    # 0/0.0-but-not-None -> included in BOTH, value 0/0.0, not dropped:
+    for flat_name in ("price", "proceeds", "value", "market_exp", "start",
+                      "clause", "clause_until", "bids"):
+        assert "edge" in getattr(u_edge, flat_name), flat_name
+        view = getattr(u_edge, flat_name + "_view")
+        assert "edge" in view and not view["edge"], (flat_name, view["edge"])
+    # name has no filter at all:
+    assert u_edge.name["edge"] == "edge" == u_edge.name_view["edge"]
 
     print("decide self-test OK (150 cases)")
 
