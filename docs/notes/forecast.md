@@ -128,6 +128,47 @@ fit is a horizon ladder — predictions logged h jornadas out and graded at
 several different h — a change to what `data/decisions/squad_log.csv`
 records, not a matter of waiting for rows to accumulate.
 
+**The horizon ladder got built (2026-09-16), against the whole market via
+a git-worktree historical backfill, not squad_log.csv** — Miguel: "every
+player should have a forecast and every player's forecast should inform
+our decisions... I can't believe we're uncovering this now" (the report
+already scored everyone; only the LOGGED RECORD of it was squad-scoped —
+see report.md's own note). First pass looked damning: raw
+`fit_drift_frac()` gave 4.58 against the shipped 1.0. It was wrong,
+caught by Miguel pushing on it repeatedly rather than accepting the
+number: `Bootstrap.expected(T)` returns `pts * p_start` (unconditional),
+but the real outcomes graded against it (`load_actuals()`, `games_delta
+>= 1`) are conditional on having played — comparing them mixes P(start)
+miscalibration (worse at longer lags, since a start call made further out
+is less reliable) into what looked like rate DRIFT. Regrading with the
+CONDITIONAL prediction (`pts` alone) instead: variance goes flat across
+lags and the regression slope goes slightly negative — **no real evidence
+DRIFT_FRAC should move from 1.0**, full stop, this data included.
+Full trail (three ruled-out confounds before the real one — outlier
+sensitivity, a per-commit `cv` mismatch, the `SHRINK_MATCHES` pseudo-
+count — plus the resolution): `data/decisions/experiment_log.csv`,
+`drift_frac_market_wide_backfill` through `drift_frac_conditional_fix`.
+
+**What the corrected data DID find, real and still open:** even under the
+correct conditional comparison, pooled Var(z) is ~17.65 against a
+theoretical ~1-2 — `rate_rel` itself (not its growth with horizon) looks
+~3-4x too small for the wider market. This doesn't contradict the
+squad-log measurement above (Var~0.17-0.20) — that method uses an
+EMPIRICALLY-FIT pooled `rel` (the observed spread of actual/predicted
+ratios, which self-normalises h1 near-tautologically), while this test
+used the model's own THEORETICAL `Bootstrap.rate_rel`
+(`cv/sqrt(n+SHRINK_MATCHES)`) — a check the squad-log method structurally
+cannot make, since it can only ask whether h3 looks bigger than h1
+relative to whatever h1 turned out to be, never whether the absolute
+level is right. Stratifying by backed-out `n` found the shortfall is
+BIGGER for high-evidence players, not smaller — the opposite of what a
+too-generous `SHRINK_MATCHES` for thin-history players would predict —
+pointing at the `1/sqrt(n)` shrinkage SHAPE itself lacking a real
+week-to-week variance floor, not a pseudo-count that needs retuning.
+Real next step, not yet done: check whether `rate_rel` needs a minimum
+floor independent of `n`, rather than touching `SHRINK_MATCHES` or
+`DRIFT_FRAC`.
+
 ## fit_drift_frac() — the derivation
 
 The note above ends "what would unblock a real fit is a horizon
