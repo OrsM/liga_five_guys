@@ -32,7 +32,8 @@ from ffcore.text import index_by, norm, resolve
 
 __all__ = ["ROOT", "TIDY", "SEASON", "DECISIONS", "REPORTS", "PARTS", "MADRID",
            "input_path", "read_csv", "write_csv", "append_csv", "widen_csv",
-           "write_lines", "snapshot_stamp", "ledger_stamp", "latest_only", "snapshots",
+           "write_lines", "snapshot_stamp", "ledger_stamp", "latest_only",
+           "latest_per_key", "snapshots",
            "Market", "Valuation", "VALUE_TOLERANCE", "price_agrees",
            "load_market", "load_market_frozen", "load_lineups",
            "shared_names", "row_key", "run_now", "load_crosswalk",
@@ -44,7 +45,9 @@ __all__ = ["ROOT", "TIDY", "SEASON", "DECISIONS", "REPORTS", "PARTS", "MADRID",
            "GATED_API", "age_phrase", "last_api_standings",
            "load_api_lineup", "market_routes", "pending_sent", "bought_price",
            "pending_received", "LISTED_SELLER", "team_slug_of", "lock_order",
-           "JornadaClock"]
+           "JornadaClock", "load_matches", "load_matches_history",
+           "load_starters", "load_perjornada", "load_api_stats", "clock",
+           "jornada_of_match"]
 
 ROOT = Path(os.environ.get("FF_ROOT", "./data"))
 TIDY = ROOT / "tidy"
@@ -275,6 +278,40 @@ def latest_only(rows: list[dict]) -> list[dict]:
     return [r for r in rows if r.get("observed_at") == newest]
 
 
+def latest_per_key(rows: list[dict], key_fn) -> list[dict]:
+    """The newest row for EACH distinct `key_fn(row)`, across every
+    snapshot — not the newest snapshot's rows.
+
+    `latest_only()` answers "what does the newest snapshot say" and is
+    correct whenever one snapshot's worth of rows covers every key that
+    matters (matches.csv, starters.csv: verified, both keep every real
+    key). It is WRONG for a table where one snapshot only ever samples a
+    slice of the keyspace — api_stats.csv is measured at 10,857 distinct
+    (player_id, week, stat) keys across its history, and its single
+    newest snapshot holds 232 of them: `latest_only` would answer with
+    2% of the table and silently call that the truth. `latest_per_key`
+    instead asks, per key, "what is the newest row anyone has ever seen
+    for this", which is what api_stats.csv's callers actually mean by
+    "current" — a past week's stat line does not get revised, it is just
+    not present in every sweep.
+
+    Ties (equal `observed_at` for the same key) keep whichever row is
+    encountered last, matching `latest_only`'s own tie behaviour of
+    keeping every row stamped with the max — the difference here is
+    there is exactly one winner per key rather than every co-newest row.
+    """
+    best: dict = {}
+    for r in rows:
+        k = key_fn(r)
+        if k is None:
+            continue
+        stamp = r.get("observed_at", "")
+        prior = best.get(k)
+        if prior is None or stamp >= prior.get("observed_at", ""):
+            best[k] = r
+    return list(best.values())
+
+
 def latest_snapshot(path, keep=None) -> list[dict]:
     """`latest_only(read_csv(path))`, in one bounded-memory forward pass —
     a caller that only wants "now" shouldn't materialise the whole
@@ -437,6 +474,108 @@ def pick_source(rows: list[dict], source: str) -> list[dict]:
     """One source's rows. An empty `source` means all of them."""
     return rows if not source else [r for r in rows
                                     if r.get("source") == source]
+
+
+# ---------------------------------------------------------------------------
+# matches / starters — measured safe for latest_only, unlike api_stats below
+# ---------------------------------------------------------------------------
+
+def load_matches() -> list[dict]:
+    """The results/fixture-id table, newest snapshot only.
+
+    Measured 2026-09-16: matches.csv holds 75,240 rows behind 380 real
+    matches (198 repeated snapshots each, one per sweep the season's
+    fixture list happened to be re-scraped). `latest_only` keeps 380/380
+    of them — every match is still present in the newest sweep — so this
+    is a pure waste cut, not a behaviour change. Contrast
+    `load_matches_history()`, which some callers genuinely need the full
+    198x for. Why: docs/notes/tidy.md#load_matches--load_starters--measured-safe-for-latest_only
+    """
+    return latest_only(read_csv(TIDY / "matches.csv"))
+
+
+def load_matches_history() -> list[dict]:
+    """Every snapshot of matches.csv, not just the newest — for
+    `points.match_jornadas()`, which needs to know WHEN each match's
+    score first appeared, not just what it says now.
+
+    `points.py:227`'s own comment: "Full history, not latest_only() —
+    see match_jornadas()'s docstring." match_jornadas() walks every
+    snapshot in observed_at order and records the FIRST one where a
+    match's score is non-empty, because that first-scored moment is this
+    repo's only record of when the match actually finished (there is no
+    kickoff-date calendar to join against instead). Collapsing to
+    latest_only() here would answer every match with its LATEST
+    observed_at instead of its EARLIEST scored one — the exact
+    information this loader exists to keep.
+    """
+    return read_csv(TIDY / "matches.csv")
+
+
+def load_starters() -> list[dict]:
+    """The starting-XI/substitution table, newest snapshot only.
+
+    Measured 2026-09-16: starters.csv holds 180,372 rows behind 2,512
+    real (match, player) keys (~72x repeated across snapshots as the
+    same match page is re-scraped sweep after sweep). `latest_only`
+    keeps 2,512/2,512 of them — every (match, player) pair the table has
+    ever recorded is still present in the newest sweep — so this is a
+    pure waste cut. Why: docs/notes/tidy.md#load_matches--load_starters--measured-safe-for-latest_only
+    """
+    return latest_only(read_csv(TIDY / "starters.csv"))
+
+
+# The dedup key api_stats.csv's rows are unique under — one row per stat per
+# player per gameweek, but the SAME (player_id, week, stat) is re-emitted on
+# every sweep as the API keeps re-serving that week's box score. Shared by
+# load_api_stats() and its selftest so the two can't drift apart.
+def _api_stats_key(r: dict):
+    return ((r.get("player_id") or "").strip(), (r.get("week") or "").strip(),
+            (r.get("stat") or "").strip())
+
+
+def load_api_stats() -> list[dict]:
+    """The per-match box score, latest row per (player_id, week, stat) —
+    NOT `latest_only()`.
+
+    Measured 2026-09-16: api_stats.csv holds 11,190 rows behind 10,857
+    distinct (player_id, week, stat) keys — almost no duplication, unlike
+    matches/starters above. That is because each sweep's newest snapshot
+    only ever reports the HANDFUL of weeks the API happens to be serving
+    at that moment (232 keys), not the table's whole history. Applying
+    `latest_only()` here — "just the newest snapshot" — would throw away
+    10,625 of 10,857 keys, 98% of every stat this table has ever
+    recorded, for players and weeks the newest sweep simply didn't ask
+    about again. This is exactly the failure `latest_per_key()` exists to
+    avoid: it answers "what is the newest information for EACH key",
+    which for this table is scattered across many old snapshots, not
+    concentrated in one recent one.
+    Why: docs/notes/tidy.md#load_api_stats--why-latest_only-is-forbidden-here
+    """
+    return latest_per_key(read_csv(TIDY / "api_stats.csv"), _api_stats_key)
+
+
+def load_perjornada() -> list[dict]:
+    """This season's live per-jornada point diffs — the newest
+    `perjornada_*.csv` file under data/season/live/, read whole.
+
+    Globs rather than hardcoding a season label ("perjornada_2026-27.csv")
+    on purpose: points.py names the file after the season label
+    (`perjornada_{label}.csv`, points.py's own DIFF_FIELDS writer), and a
+    hardcoded label here would silently return nothing the day the season
+    rolls over to "2027-28" — a reader that looks like it works right up
+    until the one moment it matters. Every other reader of this folder
+    (decide.py, gap_signal.py, methodology.py, score.py, scout.py) already
+    globs and takes `files[-1]`; this loader does the same thing so it
+    is a real consolidation, not a fifth slightly-different copy.
+
+    Full rows, not latest_only(): each row IS a point-in-time diff
+    (points.py diffs consecutive kept snapshots), so the file's rows
+    accumulate rather than get superseded — there is no "latest" row to
+    prefer, every row is a distinct jornada's worth of movement.
+    """
+    files = sorted((SEASON / "live").glob("perjornada_*.csv"))
+    return read_csv(files[-1]) if files else []
 
 
 # ---------------------------------------------------------------------------
@@ -809,6 +948,69 @@ class JornadaClock:
     def next_deadline(self, now: datetime) -> datetime | None:
         ahead = [t for t in self.round_locks.values() if t > now]
         return min(ahead) if ahead else None
+
+
+# One JornadaClock per process. Why: docs/notes/tidy.md#clock--one-jornadaclock-per-process
+_CLOCK: list = []
+
+
+def clock() -> JornadaClock:
+    """The one JornadaClock for this run, built once from
+    `load_matches()` + `load_fixtures()`.
+
+    Built 11 times across 5 files before this loader existed
+    (methodology.py alone constructs one at lines 259, 306, 597, 1385,
+    1922 and 1943), each its own fresh parse of matches.csv's 75,240
+    rows and fixtures.csv. Same reasoning as `run_now()` above: a run
+    that asks "when does this lock" ten times should get the identical
+    JornadaClock ten times, not ten independent parses of an
+    unchanging answer. Not invalidated mid-process, deliberately — like
+    `run_now()`, nothing a run does can change what the store already
+    held when it started reading.
+    """
+    if not _CLOCK:
+        _CLOCK.append(JornadaClock(load_matches(), load_fixtures()))
+    return _CLOCK[0]
+
+
+# {match_id: jornada}, first-write-wins. Why: docs/notes/tidy.md#jornada_of_match--first-write-wins-matching-scorepy538-not-methodologypy588
+_JORNADA_OF_MATCH: list = []
+
+
+def jornada_of_match() -> dict[str, int]:
+    """{match_id: jornada}, process-memoized, FIRST-WRITE-WINS.
+
+    Matches `score.py`'s own `_per_jornada_current()` (score.py:538):
+    `if mid and mid not in jornada_of_match: jornada_of_match[mid] = ...`
+    — the first jornada value ever seen for a match_id wins, later
+    snapshots of the same match_id cannot overwrite it. Built off the
+    FULL matches.csv history (`load_matches_history()`, not
+    `load_matches()`), same as score.py's own read of it, because a
+    single-write rule is only meaningful with more than one snapshot to
+    choose from.
+
+    `methodology.py`'s `start_intervals()` (methodology.py:588) builds
+    the same-shaped map with the OPPOSITE rule — an unconditional
+    `jornada_of[m["match_id"]] = int(m["jornada"])`, so the LAST
+    snapshot wins there, not the first. That is a real, pre-existing
+    disagreement between two call sites, not a bug this loader silently
+    fixes: this function matches score.py's semantics ONLY. Wiring
+    methodology.py's callers to this one would change their answer
+    wherever a match_id's jornada value actually differs across
+    snapshots, which is a Wave 2 decision, not this one.
+    """
+    if not _JORNADA_OF_MATCH:
+        out: dict[str, int] = {}
+        for m in load_matches_history():
+            mid = (m.get("match_id") or "").strip()
+            if not mid or mid in out:
+                continue
+            try:
+                out[mid] = int(m.get("jornada"))
+            except (TypeError, ValueError):
+                continue
+        _JORNADA_OF_MATCH.append(out)
+    return _JORNADA_OF_MATCH[0]
 
 
 # Which tidy column feeds which report field, and how to read it. Named
@@ -1372,8 +1574,107 @@ def _selftest_cache() -> None:
         assert read_csv(Path(tmp) / "nope.csv") == []
 
 
+def _selftest_new_loaders() -> None:
+    """matches/starters/perjornada/api_stats loaders, clock() and
+    jornada_of_match() — kept separate from `_selftest()`'s giant body
+    because `_selftest()` already shadows the name `clock` with a local
+    JornadaClock instance further down; calling this first avoids that
+    collision entirely rather than working around it.
+    """
+    # -- latest_per_key(): the primitive api_stats.csv needs -----------
+    rows = [{"k": "a", "observed_at": "t1", "v": "old-a"},
+            {"k": "a", "observed_at": "t3", "v": "new-a"},
+            {"k": "a", "observed_at": "t2", "v": "mid-a"},
+            {"k": "b", "observed_at": "t1", "v": "only-b"}]
+    got = latest_per_key(rows, lambda r: r["k"])
+    by_k = {r["k"]: r["v"] for r in got}
+    assert by_k == {"a": "new-a", "b": "only-b"}, by_k
+    # Unlike latest_only(), which would answer with ONE global newest
+    # snapshot ("t3", only key "a"), latest_per_key() keeps a key alive
+    # off an OLDER snapshot when that is the newest reading THAT key
+    # ever got — the exact behaviour api_stats.csv depends on.
+    assert {r["k"] for r in latest_only(rows)} == {"a"}
+    assert {r["k"] for r in got} == {"a", "b"}
+    assert latest_per_key([], lambda r: r["k"]) == []
+    # A key function returning None drops the row rather than colliding
+    # every unkeyable row into one bucket.
+    assert latest_per_key([{"observed_at": "t1"}], lambda r: None) == []
+
+    # -- load_matches()/load_starters(): measured-safe latest_only ------
+    # Verified 2026-09-16 (see docs/notes/tidy.md): both tables keep every
+    # real key under latest_only, so these must equal the real key sets
+    # taken from the FULL file, not merely be non-empty.
+    matches_full = read_csv(TIDY / "matches.csv")
+    if matches_full:
+        real_matches = {r.get("match_id") for r in matches_full
+                        if r.get("match_id")}
+        got_matches = {r.get("match_id") for r in load_matches()}
+        assert got_matches == real_matches, \
+            "load_matches() lost a match latest_only should have kept"
+        # load_matches_history() is the FULL table — points.match_jornadas()
+        # needs every snapshot, not the newest one, to know when each match
+        # was FIRST seen scored.
+        assert load_matches_history() == matches_full
+
+    starters_full = read_csv(TIDY / "starters.csv")
+    if starters_full:
+        real_keys = {(r.get("match_id"), r.get("player_name"))
+                    for r in starters_full}
+        got_keys = {(r.get("match_id"), r.get("player_name"))
+                   for r in load_starters()}
+        assert got_keys == real_keys, \
+            "load_starters() lost a (match, player) key latest_only should keep"
+
+    # -- load_api_stats(): THE GUARD ------------------------------------
+    # If someone "simplifies" this loader back to latest_only(), this is
+    # the assertion that catches it: latest_only keeps only the keys the
+    # single newest snapshot happens to mention (measured 232 of 10,857),
+    # latest_per_key must keep every key the table has ever recorded.
+    stats_all = read_csv(TIDY / "api_stats.csv")
+    if stats_all:
+        all_keys = {_api_stats_key(r) for r in stats_all}
+        naive_keys = {_api_stats_key(r) for r in latest_only(stats_all)}
+        real_keys = {_api_stats_key(r) for r in load_api_stats()}
+        assert real_keys == all_keys, "load_api_stats() must cover every key"
+        assert len(real_keys) > len(naive_keys), (
+            "load_api_stats() returned no more keys than latest_only() "
+            "would — this loader exists ONLY because latest_only() loses "
+            "98% of this table's keys; if this assertion ever fails, "
+            "someone put latest_only() back")
+
+    # -- load_perjornada(): the newest file, full rows -------------------
+    files = sorted((SEASON / "live").glob("perjornada_*.csv"))
+    if files:
+        assert load_perjornada() == read_csv(files[-1])
+    else:
+        assert load_perjornada() == []
+
+    # -- clock(): memoized, one JornadaClock per process ------------------
+    c1 = clock()
+    c2 = clock()
+    assert c1 is c2, "clock() must return the SAME object on a second call"
+    assert isinstance(c1, JornadaClock)
+
+    # -- jornada_of_match(): first-write-wins, matching score.py:538 -----
+    j1 = jornada_of_match()
+    j2 = jornada_of_match()
+    assert j1 is j2, "jornada_of_match() must be memoized"
+    # Cross-check against score.py's own algorithm, independently applied
+    # to the same full history, rather than trusting our own memo.
+    expect: dict[str, int] = {}
+    for m in load_matches_history():
+        mid = (m.get("match_id") or "").strip()
+        if mid and mid not in expect:
+            try:
+                expect[mid] = int(m.get("jornada"))
+            except (TypeError, ValueError):
+                continue
+    assert j1 == expect, "jornada_of_match() must be first-write-wins"
+
+
 def _selftest() -> None:
     _selftest_cache()
+    _selftest_new_loaders()
     rows = [{"observed_at": "t1", "name": "A"}, {"observed_at": "t2",
             "name": "B"}, {"observed_at": "t2", "name": "C"}]
     assert [r["name"] for r in latest_only(rows)] == ["B", "C"]
@@ -1789,7 +2090,7 @@ def _selftest() -> None:
         == [1, 2, 3]
     assert clock.order == [1]
 
-    print("ffcore.tidy self-test OK (68 cases)")
+    print("ffcore.tidy self-test OK (76 cases)")
 
 
 if __name__ == "__main__":
