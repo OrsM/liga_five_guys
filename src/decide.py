@@ -41,7 +41,7 @@ import datetime as dt
 import itertools
 import os
 import sys
-from dataclasses import InitVar, dataclass, field, replace
+from dataclasses import dataclass, field, replace
 from functools import cached_property
 from types import MappingProxyType
 from typing import Mapping
@@ -112,14 +112,23 @@ class Universe:
 
     Per-player facts (pos, price, proceeds, owner, value, market_exp,
     start, clause, clause_until, route, bids, name) live on `players`
-    only — a dict[str, PlayerProfile] built by ffcore.profile — and are
-    exposed below as read-only attributes computed from it in
-    __post_init__. There is exactly one place each fact is stored.
+    ONLY — a dict[str, PlayerProfile] built by ffcore.profile — and are
+    read through the `<field>_view` Mapping properties below (`pos_view`,
+    `price_view`, ...), each a live read of `players`, computed fresh on
+    every access rather than stored. There is exactly one place each
+    fact is stored and exactly one way to read it.
 
-    pos/price/proceeds/owner/... may also be passed directly to the
-    constructor (a flat dict per fact, as before) for callers that don't
-    have PlayerProfile objects on hand; when `players` isn't given, these
-    are used to synthesize one. decide.load() always passes `players=`.
+    THIS USED TO BE TWO COPIES. Through Wave 3E (rationalization plan,
+    2026-09-16) `Universe` also carried 12 parallel flat dicts — one per
+    fact, snapshotted from `players` in `__post_init__` via 12 `InitVar`
+    constructor params (`pos=`, `price=`, ... `name=`) so callers without
+    a real `PlayerProfile` on hand could still build a Universe. Wave 3F
+    deleted that: every constructor call in this codebase now passes
+    `players=` (ffcore.fixtures.players_from_flat() bridges the old
+    flat-dict shape onto it for test fixtures that don't have real
+    PlayerProfile objects to hand). See
+    docs/notes/rationalization-2026-09-16.md#wave-3-status for why the
+    duplication existed at all and the 6-read migration this depended on.
     """
     state: LeagueState
     forecaster: Bootstrap
@@ -140,55 +149,6 @@ class Universe:
     cash_note: str = ""
     locked_cash: float = 0.0
     received_offers: dict[str, float] = field(default_factory=dict)
-
-    pos: InitVar[dict | None] = None
-    price: InitVar[dict | None] = None
-    proceeds: InitVar[dict | None] = None
-    owner: InitVar[dict | None] = None
-    value: InitVar[dict | None] = None
-    market_exp: InitVar[dict | None] = None
-    start: InitVar[dict | None] = None
-    clause: InitVar[dict | None] = None
-    clause_until: InitVar[dict | None] = None
-    route: InitVar[dict | None] = None
-    bids: InitVar[dict | None] = None
-    name: InitVar[dict | None] = None
-
-    def __post_init__(self, pos, price, proceeds, owner, value, market_exp,
-                      start, clause, clause_until, route, bids, name):
-        if not self.players and any(x is not None for x in
-                (pos, price, proceeds, owner, value, market_exp, start,
-                 clause, clause_until, route, bids, name)):
-            self.players = _synthetic_profiles(
-                pos=pos, price=price, proceeds=proceeds, owner=owner,
-                value=value, market_exp=market_exp, start=start,
-                clause=clause, clause_until=clause_until, route=route,
-                bids=bids, name=name)
-        self.pos = {k: _pos_of(p.current.pos) for k, p in self.players.items()
-                   if p.current.pos}
-        self.price = {k: p.current.price for k, p in self.players.items()
-                     if p.current.price is not None}
-        self.proceeds = {k: p.current.proceeds for k, p in self.players.items()
-                         if p.current.proceeds is not None}
-        self.owner = {k: p.current.owner for k, p in self.players.items()
-                     if p.current.owner}
-        self.value = {k: p.current.value for k, p in self.players.items()
-                     if p.current.value is not None}
-        self.market_exp = {k: p.derived.market_exp
-                           for k, p in self.players.items()
-                           if p.derived.market_exp is not None}
-        self.start = {k: p.derived.start_p for k, p in self.players.items()
-                     if p.derived.start_p is not None}
-        self.clause = {k: p.current.clause for k, p in self.players.items()
-                      if p.current.clause is not None}
-        self.clause_until = {k: p.current.clause_until
-                             for k, p in self.players.items()
-                             if p.current.clause_until is not None}
-        self.route = {k: p.current.route for k, p in self.players.items()
-                     if p.current.route}
-        self.bids = {k: p.current.bids for k, p in self.players.items()
-                    if p.current.bids is not None}
-        self.name = {k: p.identity.name for k, p in self.players.items()}
 
     @cached_property
     def current_xi(self) -> tuple[dict[str, float], set[str]]:
@@ -231,133 +191,123 @@ class Universe:
         See the module-level rank() for the full contract."""
         return rank(self, acts, seed=seed, price=price, extra=extra)
 
-    # -- read accessors backed by `players`, proven equal to the flat -----
-    # dicts above in _selftest ------------------------------------------
+    # -- read accessors backed by `players` — the ONLY copy of any of these
+    # facts, since Wave 3F deleted the 12 flat dicts these used to mirror.
     #
     # WHY A MAPPING VIEW PER FIELD, NOT A METHOD PER QUESTION. Real call
     # sites (grepped 2026-09-16 across src/) use these shapes: `u.price[k]`
-    # (raises on a missing key), `u.pos.get(k, "")`, `u.owner.get(k)` (no
-    # default -> None), `k in u.price`, `for k in u.price`, `len(u.price)`,
-    # `u.price.items()`/`.values()`. A `price_of(k, default=...)`-style
-    # method per fact would cover the `.get` shape and nothing else — every
-    # iteration/membership/length call site would need a second accessor
-    # anyway. A `Mapping` view supports all of the above for free and reads
-    # at the call site exactly like the flat dict it replaces (only the
-    # name changes), which is what makes the Wave 3B-3E migration a
-    # mechanical rename rather than a rewrite.
+    # (raises on a missing key), `u.pos_view.get(k, "")`, `u.owner_view.get(k)`
+    # (no default -> None), `k in u.price_view`, `for k in u.price_view`,
+    # `len(u.price_view)`, `u.price_view.items()`/`.values()`. A
+    # `price_of(k, default=...)`-style method per fact would cover the
+    # `.get` shape and nothing else — every iteration/membership/length
+    # call site would need a second accessor anyway. A `Mapping` view
+    # supports all of the above for free.
     #
     # NOT CACHED. Each property recomputes its dict comprehension from
     # `self.players` on every access rather than memoizing (contrast
     # `current_xi`/`xi_bar` above, which cache on purpose because their
     # inputs don't change after construction). `players` itself is never
-    # reassigned after __post_init__ in this codebase today, so caching
-    # would currently be safe — but these views exist specifically so a
-    # later wave can delete the flat dicts, and a flat dict IS a live,
-    # mutable view (sim.py's own _selftest does `u.route[k] = "clause"`,
-    # `del u.route[k]`, even `u.pos = {...}` wholesale). A cached view
-    # would silently stop reflecting such a mutation the moment the flat
-    # dict it's replacing is deleted. Recomputing is cheap (one squad-sized
-    # dict comprehension) and never wrong.
+    # reassigned after construction in this codebase today, so caching
+    # would currently be safe — but a cached view would silently stop
+    # reflecting a future in-place edit to `players` (e.g. a `replace()`
+    # of one player's `.current`), and recomputing is cheap (one
+    # squad-sized dict comprehension), so it is never memoized.
     #
-    # EACH FIELD REPRODUCES __post_init__'s FILTER EXACTLY — see the table
-    # in the Wave 3A handback for the inclusion rule per field. In
-    # particular: `owner`/`route`/`pos` exclude a FALSY value (empty
-    # string / None), not just an absent one; `price`/`proceeds`/`value`/
-    # `market_exp`/`start`/`clause`/`clause_until`/`bids` exclude only
-    # `is not None` (so a real `0`/`0.0` stays in); `name` excludes
+    # THE THREE INCLUSION RULES (pinned directly in _selftest below, now
+    # that Wave 3A's flat-dict-vs-view equivalence assertion has nothing
+    # left to compare against): `pos`/`owner`/`route` exclude a FALSY
+    # value (empty string), not just an absent one; `price`/`proceeds`/
+    # `value`/`market_exp`/`start`/`clause`/`clause_until`/`bids` exclude
+    # only `is None` (so a real `0`/`0.0` stays in); `name` excludes
     # nothing — every player in `self.players` gets an entry.
 
     @property
     def pos_view(self) -> Mapping[str, str]:
-        """Mirrors `self.pos`: SLOT abbreviation via `_pos_of()`, keys with
-        a falsy `p.current.pos` excluded entirely (not mapped to "")."""
+        """SLOT abbreviation via `_pos_of()`, keys with a falsy
+        `p.current.pos` excluded entirely (not mapped to "")."""
         return MappingProxyType({k: _pos_of(p.current.pos)
                                  for k, p in self.players.items()
                                  if p.current.pos})
 
     @property
     def price_view(self) -> Mapping[str, float]:
-        """Mirrors `self.price`: `p.current.price`, keys excluded only
-        when the price is `None` (a real 0.0 stays in)."""
+        """`p.current.price`, keys excluded only when the price is `None`
+        (a real 0.0 stays in)."""
         return MappingProxyType({k: p.current.price
                                  for k, p in self.players.items()
                                  if p.current.price is not None})
 
     @property
     def proceeds_view(self) -> Mapping[str, float]:
-        """Mirrors `self.proceeds`: `p.current.proceeds`, `is not None`
-        filter (same shape as `price_view`)."""
+        """`p.current.proceeds`, `is not None` filter (same shape as
+        `price_view`)."""
         return MappingProxyType({k: p.current.proceeds
                                  for k, p in self.players.items()
                                  if p.current.proceeds is not None})
 
     @property
     def owner_view(self) -> Mapping[str, str]:
-        """Mirrors `self.owner`: `p.current.owner`, keys with a falsy
-        owner (None or "") excluded entirely — same shape as `pos_view`,
-        not `price_view`."""
+        """`p.current.owner`, keys with a falsy owner (None or "")
+        excluded entirely — same shape as `pos_view`, not `price_view`."""
         return MappingProxyType({k: p.current.owner
                                  for k, p in self.players.items()
                                  if p.current.owner})
 
     @property
     def value_view(self) -> Mapping[str, float]:
-        """Mirrors `self.value`: `p.current.value`, `is not None` filter."""
+        """`p.current.value`, `is not None` filter."""
         return MappingProxyType({k: p.current.value
                                  for k, p in self.players.items()
                                  if p.current.value is not None})
 
     @property
     def market_exp_view(self) -> Mapping[str, float]:
-        """Mirrors `self.market_exp`: `p.derived.market_exp`, `is not
-        None` filter."""
+        """`p.derived.market_exp`, `is not None` filter."""
         return MappingProxyType({k: p.derived.market_exp
                                  for k, p in self.players.items()
                                  if p.derived.market_exp is not None})
 
     @property
     def start_view(self) -> Mapping[str, float]:
-        """Mirrors `self.start`: `p.derived.start_p`, `is not None`
-        filter."""
+        """`p.derived.start_p`, `is not None` filter."""
         return MappingProxyType({k: p.derived.start_p
                                  for k, p in self.players.items()
                                  if p.derived.start_p is not None})
 
     @property
     def clause_view(self) -> Mapping[str, float]:
-        """Mirrors `self.clause`: `p.current.clause`, `is not None`
-        filter."""
+        """`p.current.clause`, `is not None` filter."""
         return MappingProxyType({k: p.current.clause
                                  for k, p in self.players.items()
                                  if p.current.clause is not None})
 
     @property
     def clause_until_view(self) -> Mapping[str, object]:
-        """Mirrors `self.clause_until`: `p.current.clause_until`, `is not
-        None` filter."""
+        """`p.current.clause_until`, `is not None` filter."""
         return MappingProxyType({k: p.current.clause_until
                                  for k, p in self.players.items()
                                  if p.current.clause_until is not None})
 
     @property
     def route_view(self) -> Mapping[str, str]:
-        """Mirrors `self.route`: `p.current.route`, keys with a falsy
-        route excluded entirely — same shape as `pos_view`/`owner_view`."""
+        """`p.current.route`, keys with a falsy route excluded entirely —
+        same shape as `pos_view`/`owner_view`."""
         return MappingProxyType({k: p.current.route
                                  for k, p in self.players.items()
                                  if p.current.route})
 
     @property
     def bids_view(self) -> Mapping[str, int]:
-        """Mirrors `self.bids`: `p.current.bids`, `is not None` filter."""
+        """`p.current.bids`, `is not None` filter."""
         return MappingProxyType({k: p.current.bids
                                  for k, p in self.players.items()
                                  if p.current.bids is not None})
 
     @property
     def name_view(self) -> Mapping[str, str]:
-        """Mirrors `self.name`: `p.identity.name` for EVERY key in
-        `self.players` — the one field with no filter at all."""
+        """`p.identity.name` for EVERY key in `self.players` — the one
+        field with no filter at all."""
         return MappingProxyType({k: p.identity.name
                                  for k, p in self.players.items()})
 
@@ -373,45 +323,6 @@ def _pos_of(raw: str) -> str:
     if mapped:
         return mapped
     return raw if raw in ("POR", "DEF", "MED", "DEL") else "MED"
-
-
-def _synthetic_profiles(pos=None, price=None, proceeds=None, owner=None,
-                        value=None, market_exp=None, start=None, clause=None,
-                        clause_until=None, route=None, bids=None, name=None
-                        ) -> dict[str, PlayerProfile]:
-    """PlayerProfile per key across the given flat dicts, for constructing
-    a Universe without a real ffcore.profile.build_profiles() pass.
-    """
-    from ffcore.crosswalk import Player
-    from ffcore.profile import (PlayerCurrent, PlayerHistory,
-                                PlayerDerived, PlayerProfile as _PP)
-    keys = (set(pos or {}) | set(price or {}) | set(proceeds or {})
-           | set(owner or {}) | set(value or {}) | set(market_exp or {})
-           | set(start or {}) | set(clause or {}) | set(clause_until or {})
-           | set(route or {}) | set(bids or {}) | set(name or {}))
-    out = {}
-    for k in keys:
-        out[k] = _PP(
-            identity=Player(player_id=k, name=(name or {}).get(k, k)),
-            current=PlayerCurrent(
-                pos=(pos or {}).get(k, ""),
-                listed=k in (price or {}),
-                price=(price or {}).get(k),
-                proceeds=(proceeds or {}).get(k),
-                owner=(owner or {}).get(k),
-                value=(value or {}).get(k),
-                clause=(clause or {}).get(k),
-                clause_until=(clause_until or {}).get(k),
-                route=(route or {}).get(k),
-                bids=(bids or {}).get(k),
-            ),
-            history=PlayerHistory(),
-            derived=PlayerDerived(
-                market_exp=(market_exp or {}).get(k),
-                start_p=(start or {}).get(k),
-            ),
-        )
-    return out
 
 
 def _current_xi(u, who: str) -> tuple[dict[str, float], set[str]]:
@@ -462,9 +373,9 @@ def xi_bar(exp: dict[str, float], xi) -> float:
 
 
 def route_kind(u: Universe, k: str) -> str:
-    """"mine" | "free" | "raid" | "listed", from u.owner/u.route alone —
-    no simulation. The one function that classifies ownership; route
-    every caller through it rather than re-deriving the check.
+    """"mine" | "free" | "raid" | "listed", from u.owner_view/u.route_view
+    alone — no simulation. The one function that classifies ownership;
+    route every caller through it rather than re-deriving the check.
     Why: docs/notes/decide.md#route_kind--the-one-place-ownership-is-classified
     """
     if k in u.state.squads.get(u.me, {}):
@@ -472,11 +383,11 @@ def route_kind(u: Universe, k: str) -> str:
     owner = u.owner_view.get(k)
     if not owner or owner == u.me:
         return "free"
-    # u.route, not u.route_view, deliberately: _selftest mutates u.route
-    # directly (`u.route[k] = "clause"`/`"listed"`) to exercise this exact
-    # branch, and route_view would recompute from `u.players` (untouched by
-    # that mutation) and silently disagree. Wave 3B/later task, not this one.
-    return "raid" if u.route.get(k, "market") == "clause" else "listed"
+    # Wave 3F: the _selftest that used to mutate u.route directly (to
+    # exercise this exact branch) now builds a separate Universe via
+    # `players=` instead (docs/notes/rationalization-2026-09-16.md#wave-3-status),
+    # so u.route_view — which rebuilds from u.players — agrees with it.
+    return "raid" if u.route_view.get(k, "market") == "clause" else "listed"
 
 
 def _fieldable(squad: dict[str, str]) -> bool:
@@ -988,6 +899,7 @@ def load(trials_pool=None) -> Universe:
 
 def _selftest() -> None:
     from ffcore.forecast import Bootstrap as B
+    from ffcore.fixtures import players_from_flat
 
     # phantom_fill()/phantom_topup() themselves are ffcore.schedule's own
     # self-test now (split out 2026-09-15) — this fixture is the minimal
@@ -1004,8 +916,9 @@ def _selftest() -> None:
                "x1": "MED", "x2": "MED", "x3": "MED", "p1": "POR", "f1": "DEL"}
     u_thin = Universe(
         state=LeagueState({"me": {}, "riv": dict(thin_riv)}, [1], "me"),
-        forecaster=B({1: {}}), pos={**ph_pos, "star": "DEF"}, price={},
-        proceeds={}, owner={"star": "riv"}, cash=0.0, me="me")
+        forecaster=B({1: {}}), cash=0.0, me="me",
+        players=players_from_flat(pos={**ph_pos, "star": "DEF"},
+                                  owner={"star": "riv"}))
     # He has exactly SLOT_MIN=3 DEF; raiding one of them (not his spare) —
     raided = apply(u_thin, Action("steal", buy="star", cost=1e6,
                                   victim="riv"))
@@ -1028,13 +941,14 @@ def _selftest() -> None:
 
     u = Universe(
         state=LeagueState({"me": dict(mine), "riv": dict(theirs)}, [1], "me"),
-        forecaster=B(per), pos={**{k: v for k, v in mine.items()},
-                                **{k: v for k, v in theirs.items()},
-                                "star": "MED", "dud": "MED"},
-        price={"star": 10e6, "dud": 1e6, "th_m1": 5e6},
-        route={"th_m1": "clause"},
-        proceeds={"me_bench": 8e6}, owner={"th_m1": "riv"},
-        cash=12e6, me="me")
+        forecaster=B(per), cash=12e6, me="me",
+        players=players_from_flat(
+            pos={**{k: v for k, v in mine.items()},
+                **{k: v for k, v in theirs.items()},
+                "star": "MED", "dud": "MED"},
+            price={"star": 10e6, "dud": 1e6, "th_m1": 5e6},
+            route={"th_m1": "clause"},
+            proceeds={"me_bench": 8e6}, owner={"th_m1": "riv"}))
     exp = u.forecaster.expected(1)
 
     # -- Universe.current_xi: cached, computed once per instance ----------
@@ -1112,16 +1026,24 @@ def _selftest() -> None:
     # manager, and Miguel has repeatedly asked that the report never
     # emphasize a rival-owned player unless it's a raid he cannot refuse.
     # Why: docs/notes/decide.md#candidates--listed-targets-are-never-proposed
-    u.route["th_m1"] = "clause"
+    # `u` already carries th_m1 on a "clause" route from construction above
+    # (route={"th_m1": "clause"}) — no mutation needed for this half.
     acts = candidates(u, exp)
     assert any(a.kind.startswith("clause") and a.buy == "th_m1"
                for a in acts), [a.kind for a in acts]
-    u.route["th_m1"] = "listed"
-    listed = candidates(u, exp)
+    # A SEPARATE Universe carrying th_m1 on a "listed" route instead —
+    # BUILT via `players=`, not mutated in place on `u`. Wave 3F: a
+    # flat-dict mutation here (the old `u.route["th_m1"] = "listed"`)
+    # would leave `u.route_view` (which rebuilds from `u.players`)
+    # silently disagreeing with `u.route` once the flat dict is gone, so
+    # `u`'s own route stays "clause" for the rest of this test instead.
+    listed_current = replace(u.players["th_m1"].current, route="listed")
+    u_listed = replace(u, players={**u.players,
+                                   "th_m1": replace(u.players["th_m1"],
+                                                    current=listed_current)})
+    listed = candidates(u_listed, exp)
     assert not any(a.buy == "th_m1" for a in listed), \
         [a.kind for a in listed if a.buy == "th_m1"]
-    u.route["th_m1"] = "clause"
-    acts = candidates(u, exp)
     assert all(a.cost <= u.cash + a.proceeds for a in acts), acts
 
     # apply() is pure and a steal takes him OFF the rival.
@@ -1135,7 +1057,7 @@ def _selftest() -> None:
     uoc = Universe(state=LeagueState({"me": {"a": "MED", "b": "MED",
                                              "c": "MED", "d": "MED"}},
                                      jornadas=[1], me="me", carried={}),
-                  forecaster=None, pos={}, price={}, proceeds={}, owner={},
+                  forecaster=None,
                   cash=-10_000_000.0, me="me",
                   received_offers={"a": 4_000_000.0, "b": 4_000_000.0,
                                    "c": 9_000_000.0, "d": 3_000_000.0})
@@ -1177,10 +1099,11 @@ def _selftest() -> None:
     # future change can't quietly bring the chain back.
     u3 = Universe(
         state=LeagueState({"me": dict(mine), "riv": dict(theirs)}, [1], "me"),
-        forecaster=B(per), pos={**u.pos_view, "dear": "MED"},
-        price={"dear": 20e6},
-        proceeds={"me_bench": 8e6, "me_spare2": 5e6, "me_spare3": 4e6},
-        owner={}, cash=4e6, me="me")
+        forecaster=B(per), cash=4e6, me="me",
+        players=players_from_flat(
+            pos={**u.pos_view, "dear": "MED"},
+            price={"dear": 20e6},
+            proceeds={"me_bench": 8e6, "me_spare2": 5e6, "me_spare3": 4e6}))
     u3.state.squads["me"]["me_spare2"] = "MED"
     u3.state.squads["me"]["me_spare3"] = "POR"
     per3 = {1: dict(per[1])}
@@ -1245,11 +1168,11 @@ def _selftest() -> None:
     vper[1]["deep_med"] = (8.0, 1.0)     # 8.0 into a slot replacing 5.0
     uvor = Universe(
         state=LeagueState({"me": dict(vsq), "riv": dict(vth)}, [1], "me"),
-        forecaster=B(vper),
-        pos={**vsq, **vth, "thin_del": "DEL", "deep_med": "MED"},
-        price={"thin_del": 5e6, "deep_med": 5e6},
-        route={"thin_del": "free", "deep_med": "free"},
-        proceeds={}, owner={}, cash=6e6, me="me")
+        forecaster=B(vper), cash=6e6, me="me",
+        players=players_from_flat(
+            pos={**vsq, **vth, "thin_del": "DEL", "deep_med": "MED"},
+            price={"thin_del": 5e6, "deep_med": 5e6},
+            route={"thin_del": "free", "deep_med": "free"}))
     vexp, vxi = current_xi(uvor)
     # The fixture is what it claims: ONE flat bar, set by the weak forward,
     # while the two slots' own replacement levels are 1.0 and 5.0 — the
@@ -1305,11 +1228,11 @@ def _selftest() -> None:
     per2[1]["th_m1"] = (9.0, 1.0)
     u2 = Universe(
         state=LeagueState({"me": dict(mine), "riv": dict(theirs)}, [1], "me"),
-        forecaster=B(per2),
-        pos={**u.pos_view, "free_x": "MED", "th_m1": "MED"},
-        price={"free_x": 5e6, "th_m1": 5e6}, route={"th_m1": "clause"},
-        proceeds={},
-        owner={"th_m1": "riv"}, cash=6e6, me="me")
+        forecaster=B(per2), cash=6e6, me="me",
+        players=players_from_flat(
+            pos={**u.pos_view, "free_x": "MED", "th_m1": "MED"},
+            price={"free_x": 5e6, "th_m1": 5e6}, route={"th_m1": "clause"},
+            owner={"th_m1": "riv"}))
     got, _, _, _ = rank(u2, [Action("buy", buy="free_x", cost=5e6),
                           Action("clause", buy="th_m1", cost=5e6,
                                  victim="riv")])
@@ -1375,10 +1298,10 @@ def _selftest() -> None:
     route5.update({"reliable%d" % i: "free" for i in range(3)})
     u5 = Universe(
         state=LeagueState({"me": dict(mine), "riv": dict(theirs)}, [1], "me"),
-        forecaster=B(per5),
-        pos={**u.pos_view, **{a.buy: "MED" for a in acts5}},
-        price={a.buy: 1e6 for a in acts5}, route=route5,
-        proceeds={}, owner={}, cash=100e6, me="me")
+        forecaster=B(per5), cash=100e6, me="me",
+        players=players_from_flat(
+            pos={**u.pos_view, **{a.buy: "MED" for a in acts5}},
+            price={a.buy: 1e6 for a in acts5}, route=route5))
     rows5, *_ = rank(u5, acts5)
     kept5 = {r["action"].buy for r in rows5}
     # All 15 "listed" candidates screen ahead of all 3 reliable ones, so the
@@ -1409,10 +1332,10 @@ def _selftest() -> None:
     acts6.append(Action("buy", buy="sham", cost=1e3))
     u6 = Universe(
         state=LeagueState({"me": dict(mine), "riv": dict(theirs)}, [1], "me"),
-        forecaster=B(per6),
-        pos={**u.pos_view, **{a.buy: "MED" for a in acts6}},
-        price={a.buy: a.cost for a in acts6}, route={},
-        proceeds={}, owner={}, cash=1000e6, me="me")
+        forecaster=B(per6), cash=1000e6, me="me",
+        players=players_from_flat(
+            pos={**u.pos_view, **{a.buy: "MED" for a in acts6}},
+            price={a.buy: a.cost for a in acts6}))
     rows6, *_ = rank(u6, acts6)
     kept6 = {r["action"].buy for r in rows6}
     # natural top-KEEP=12 is entirely "big" (raw gain 10.0..8.7 all beat
@@ -1435,8 +1358,9 @@ def _selftest() -> None:
                           "me", ),
         forecaster=B({1: {"me_k": (0.1, 1.0), "dud": (1.0, 1.0)},
                       2: {**{k: (5.0, 1.0) for k in mine}, "dud": (1.0, 1.0)}}),
-        pos={**u.pos_view, "dud": "MED"}, price={"dud": 1e6}, proceeds={},
-        owner={}, cash=50e6, me="me")
+        cash=50e6, me="me",
+        players=players_from_flat(pos={**u.pos_view, "dud": "MED"},
+                                  price={"dud": 1e6}))
     half.part_played = {1: {"somewhere"}}
     # Off the locked round the bar is 0.1 and the journeyman clears it; off a
     # round you can still pick it is 5.0 and he does not.
@@ -1480,9 +1404,10 @@ def _selftest() -> None:
     from ffcore.forecast import Bootstrap as BCD
     u_cd = Universe(
         state=LeagueState({"me": dict(sq_cd)}, [1], "me"),
-        forecaster=BCD(per_cd), pos={**sq_cd, "target": "DEL"},
-        price={"target": 5e6}, proceeds={"me_f3": 5e6}, owner={},
-        cash=0.0, me="me")
+        forecaster=BCD(per_cd), cash=0.0, me="me",
+        players=players_from_flat(pos={**sq_cd, "target": "DEL"},
+                                  price={"target": 5e6},
+                                  proceeds={"me_f3": 5e6}))
     exp_cd = u_cd.forecaster.expected(1)
     acts_cd = candidates(u_cd, exp_cd)
     # Reachable by selling the one real spare (me_f3, 5M) alone — the
@@ -1500,72 +1425,62 @@ def _selftest() -> None:
         [a for a in acts_cd if a.sell]
 
 
-    # -- Universe.*_view accessors: EXACT equivalence with the flat dicts --
-    # they stand in for (docs/notes/rationalization-2026-09-16.md#2, Wave
-    # 3A). This is the deliverable: it's what lets a later wave delete the
-    # flat dicts without re-checking every call site's behaviour by hand.
-    # `players` is compared here, not rebuilt — the fixtures already agree
-    # with `_fieldable()` on what a legal squad looks like; a third
-    # hand-built Universe here would just be one more copy to keep in sync.
-    from ffcore.fixtures import tiny_universe as _tiny_u
-    from ffcore.fixtures import tiny_market_universe as _tiny_mu
+    # -- Universe.*_view accessors: THE THREE INCLUSION RULES, PINNED
+    # DIRECTLY. Through Wave 3E this was an equivalence assertion against
+    # the 12 flat dicts each view mirrored (docs/notes/
+    # rationalization-2026-09-16.md#2, Wave 3A) — the deliverable that let
+    # Wave 3F delete those flat dicts without re-checking every call
+    # site's behaviour by hand. Now that they're gone there is nothing
+    # left to equate a view TO, so this instead pins each field's own
+    # inclusion rule by name: pos/owner/route drop a FALSY value (empty
+    # string) entirely; price/proceeds/value/market_exp/start/clause/
+    # clause_until/bids drop only a value that `is None` (a real 0/0.0
+    # survives); name drops nothing at all.
     from ffcore.fixtures import tiny_profile as _tiny_p
 
-    _ACCESSORS = (
-        ("pos", "pos_view"), ("price", "price_view"),
-        ("proceeds", "proceeds_view"), ("owner", "owner_view"),
-        ("value", "value_view"), ("market_exp", "market_exp_view"),
-        ("start", "start_view"), ("clause", "clause_view"),
-        ("clause_until", "clause_until_view"), ("route", "route_view"),
-        ("bids", "bids_view"), ("name", "name_view"),
-    )
-    for u_acc in (_tiny_u(), _tiny_mu()):
-        for flat_name, view_name in _ACCESSORS:
-            flat = getattr(u_acc, flat_name)
-            view = getattr(u_acc, view_name)
-            # Same key set, same values —
-            assert dict(view) == flat, (flat_name, dict(view), flat)
-            # — AND same answer for a key outside both (a Mapping could
-            # satisfy `==` while disagreeing on `in`/`.get()` for a key
-            # neither holds; MappingProxyType doesn't, but this is the
-            # assertion that would catch it if the accessor ever stopped
-            # being a plain dict view).
-            for k in set(u_acc.players) | {"nonexistent_key"}:
-                assert (k in flat) == (k in view), (flat_name, k)
-                assert flat.get(k) == view.get(k), (flat_name, k)
+    _FALSY_DROP = ("pos", "owner", "route")
+    _NONE_ONLY_DROP = ("price", "proceeds", "value", "market_exp", "start",
+                       "clause", "clause_until", "bids")
 
-    # -- the filters are NOT all the same shape, and the edge case is where
-    # a flat-dict/view mismatch would actually show up: pos/owner/route
-    # drop a FALSY value (empty string) entirely, while price/proceeds/
-    # value/market_exp/start/clause/clause_until/bids drop only `None` —
-    # a real 0/0.0 must survive. One player exercises every one of these
-    # at once, built into the Universe from construction (not mutated in
-    # after the fact — the flat dicts are computed once in __post_init__
-    # and would not see a post-construction mutation to `players`, unlike
-    # the live `*_view` accessors; comparing the two after such a mutation
-    # would test nothing).
-    _edge_players = dict(_tiny_u().players)
-    _edge_players["edge"] = _tiny_p(
-        "edge", pos="", owner="", route="", price=0.0, proceeds=0.0,
-        value=0.0, market_exp=0.0, start_p=0.0, clause=0.0,
-        clause_until=0, bids=0)
-    u_edge = _tiny_u(players=_edge_players)
-    for flat_name, view_name in _ACCESSORS:
-        flat = getattr(u_edge, flat_name)
-        view = getattr(u_edge, view_name)
-        assert dict(view) == flat, (flat_name, dict(view), flat)
-    # falsy-but-present-in-players -> excluded from BOTH:
-    for flat_name in ("pos", "owner", "route"):
-        assert "edge" not in getattr(u_edge, flat_name), flat_name
-        assert "edge" not in getattr(u_edge, flat_name + "_view"), flat_name
-    # 0/0.0-but-not-None -> included in BOTH, value 0/0.0, not dropped:
-    for flat_name in ("price", "proceeds", "value", "market_exp", "start",
-                      "clause", "clause_until", "bids"):
-        assert "edge" in getattr(u_edge, flat_name), flat_name
-        view = getattr(u_edge, flat_name + "_view")
-        assert "edge" in view and not view["edge"], (flat_name, view["edge"])
-    # name has no filter at all:
-    assert u_edge.name["edge"] == "edge" == u_edge.name_view["edge"]
+    falsy_edge = _tiny_p("falsy_edge", pos="", owner="", route="")
+    zero_edge = _tiny_p("zero_edge", price=0.0, proceeds=0.0, value=0.0,
+                       market_exp=0.0, start_p=0.0, clause=0.0,
+                       clause_until=0, bids=0)
+    # `pos` can't itself be None (PlayerCurrent.pos is a plain str,
+    # unlike owner/route which are `str | None`) — its falsy case is
+    # covered by falsy_edge's `pos=""` above, not repeated here.
+    none_edge = _tiny_p("none_edge", owner=None, route=None, price=None,
+                       proceeds=None, value=None, market_exp=None,
+                       start_p=None, clause=None, clause_until=None,
+                       bids=None)
+    u_views = Universe(
+        state=LeagueState({"me": {}}, [1], "me"), forecaster=B({}),
+        cash=0.0, me="me",
+        players={"falsy_edge": falsy_edge, "zero_edge": zero_edge,
+                "none_edge": none_edge})
+
+    # pos/owner/route: a FALSY value (empty string) is excluded entirely,
+    # not mapped to "" — and `is None` (also falsy) excludes the same way.
+    for field_name in _FALSY_DROP:
+        view = getattr(u_views, field_name + "_view")
+        assert "falsy_edge" not in view, (field_name, dict(view))
+    for field_name in ("owner", "route"):    # pos: see none_edge's note
+        view = getattr(u_views, field_name + "_view")
+        assert "none_edge" not in view, (field_name, dict(view))
+
+    # price/proceeds/value/market_exp/start/clause/clause_until/bids: a
+    # real 0/0.0 SURVIVES — only `is None` drops the key.
+    for field_name in _NONE_ONLY_DROP:
+        view = getattr(u_views, field_name + "_view")
+        assert "zero_edge" in view and not view["zero_edge"], \
+            (field_name, dict(view))
+        assert "none_edge" not in view, (field_name, dict(view))
+
+    # name: no filter at all — every player in `players` gets an entry,
+    # even one whose every other field is falsy or None.
+    assert u_views.name_view["falsy_edge"] == "falsy_edge"
+    assert u_views.name_view["zero_edge"] == "zero_edge"
+    assert u_views.name_view["none_edge"] == "none_edge"
 
     print("decide self-test OK (150 cases)")
 

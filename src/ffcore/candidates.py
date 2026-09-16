@@ -250,6 +250,7 @@ def _selftest() -> None:
     from decide import Universe
     from ffcore.season import LeagueState
     from ffcore.forecast import Bootstrap
+    from ffcore.fixtures import players_from_flat
 
     # A real (4,4,2) plus one extra DEF and one extra DEL beyond it — real
     # legal shapes are (DEF,MED,DEL) tuples like (5,4,1)/(4,3,3)/etc (see
@@ -265,8 +266,9 @@ def _selftest() -> None:
     u = Universe(
         state=LeagueState({"me": dict(sq)}, [1], "me"),
         forecaster=Bootstrap(per), cash=0.0, me="me",
-        pos=dict(sq), proceeds={"spare_d": 4e6, "dead_f": 6e6},
-        owner={}, received_offers={})
+        players=players_from_flat(pos=dict(sq),
+                                  proceeds={"spare_d": 4e6, "dead_f": 6e6}),
+        received_offers={})
 
     # -- fieldable_spares()/max_spare_proceeds(): the real funding pool --
     from decide import _fieldable
@@ -301,8 +303,7 @@ def _selftest() -> None:
         state=LeagueState({"me": {"k": "POR", "d1": "DEF", "d2": "DEF",
                                   "d3": "DEF", "m1": "MED", "m2": "MED",
                                   "m3": "MED", "f1": "DEL"}}, [1], "me"),
-        forecaster=Bootstrap({1: {}}), cash=0.0, me="me",
-        pos={}, proceeds={}, owner={})
+        forecaster=Bootstrap({1: {}}), cash=0.0, me="me")
     assert fieldable_spares(bare) == []
     assert max_spare_proceeds(bare) == 0.0
 
@@ -319,7 +320,7 @@ def _selftest() -> None:
     u2 = Universe(
         state=LeagueState({"me": dict(sq)}, [1], "me"),
         forecaster=Bootstrap(per), cash=-9e6, me="me",
-        pos=dict(sq), proceeds={}, owner={},
+        players=players_from_flat(pos=dict(sq)),
         received_offers={"spare_d": 4e6, "dead_f": 6e6, "f1": 20e6})
     combos = offer_combos(u2)
     labels = {c[0] for c in combos}

@@ -268,7 +268,7 @@ def by_slot(u, keys, exp=None):
 
     if exp is None:
         exp, _ = u.current_xi
-    return sorted(keys, key=lambda k: (SLOT_ORDER.get(u.pos.get(k, ""), 9),
+    return sorted(keys, key=lambda k: (SLOT_ORDER.get(u.pos_view.get(k, ""), 9),
                                        -exp.get(k, 0.0)))
 
 
@@ -337,7 +337,7 @@ def ladder_rows(u, rows, bands=None, exp=None, xi=None) -> list[dict]:
         if k in bands:
             pts, lo, hi, _action = bands[k]
         return {"name": title_name(u.name_view.get(k, k)),
-                "pos": u.pos.get(k, ""), "start": u.start_view.get(k, 0.0),
+                "pos": u.pos_view.get(k, ""), "start": u.start_view.get(k, 0.0),
                 "xpts": exp.get(k, 0.0), "group": group, "where": where,
                 "money": money, "pts": pts, "par": par.get(k),
                 "pts_lo": lo, "pts_hi": hi, "note": note, "value": value,
@@ -882,7 +882,7 @@ def _move_rank_key(r, u):
     refused. A row with no `d_pts` sorts last in its tier rather than
     crashing or guessing.
     """
-    reliable = 0 if u.route.get(r["action"].buy, "free") != "listed" else 1
+    reliable = 0 if u.route_view.get(r["action"].buy, "free") != "listed" else 1
     d = r.get("d_pts")
     return (reliable, -d if d is not None else float("inf"))
 
@@ -907,7 +907,7 @@ def _best(u, rows, rivals):
     if not candidates:
         return None, False
     reliable = [r for r in candidates
-               if u.route.get(r["action"].buy, "free") != "listed"]
+               if u.route_view.get(r["action"].buy, "free") != "listed"]
     pool, uncertain = (reliable, False) if reliable else (candidates, True)
     best = max(pool, key=lambda r: r["d_pts"])
     # ONLY COMPARED FOR A GENUINE SPEND (net > 0) on a move that actually
@@ -989,7 +989,7 @@ def shape(u, keys) -> str:
     """
     n = {}
     for k in keys:
-        n[u.pos.get(k, "")] = n.get(u.pos.get(k, ""), 0) + 1
+        n[u.pos_view.get(k, "")] = n.get(u.pos_view.get(k, ""), 0) + 1
     return "%d-%d-%d" % (n.get("DEF", 0), n.get("MED", 0), n.get("DEL", 0))
 
 
@@ -1137,7 +1137,7 @@ def payload(u, rows, base, rivals, locks_h=None, n_actions: int = 0,
         "moves": moves,
         # `bought` is ffcore.tidy.bought_price()'s own reading, None for a
         # player never transacted in this league's recorded ledger.
-        "sell": [{"name": names.get(k, k), "pos": u.pos.get(k, ""),
+        "sell": [{"name": names.get(k, k), "pos": u.pos_view.get(k, ""),
                   "raises": got, "bought": u.bought.get(k)}
                  for k, got in dead_weight(u)],
         "ladder": (ladder_data if ladder_data is not None
@@ -1263,6 +1263,7 @@ def _selftest() -> None:
     from ffcore.forecast import Bootstrap
     from ffcore.season import LeagueState, Standings
     from decide import Action, Universe, dead_weight
+    from ffcore.fixtures import tiny_profile, players_from_flat
 
     # NEVER READ THE REAL forecast_accuracy_log.csv FROM A SELF-TEST — the
     # whole rest of this test builds synthetic players with no meaningful
@@ -1280,9 +1281,10 @@ def _selftest() -> None:
                            "riv": [1500.0, 1300.0, 1100.0, 900.0]}, me="me")
     u = Universe(state=LeagueState({"me": {}, "riv": {}}, [1, 2], "me",
                                    carried={"me": 17.0, "riv": 23.0}),
-                 forecaster=Bootstrap({}, pool=[1, 2, 3]), pos={}, price={},
-                 proceeds={}, owner={}, cash=23.6e6, me="me",
-                 name={"yuri": "yuri berchiche", "benat": "benat turrientes"})
+                 forecaster=Bootstrap({}, pool=[1, 2, 3]), cash=23.6e6, me="me",
+                 players=players_from_flat(
+                     name={"yuri": "yuri berchiche",
+                          "benat": "benat turrientes"}))
 
     # -- the eleven comes from the APP, not from a checklist ----------------
     # inputs/lineup.txt was ticked by hand and went one short every time a
@@ -1397,9 +1399,13 @@ def _selftest() -> None:
                                     "me"),
                   forecaster=Bootstrap({1: {k: (v, 1.0) for k, v in val.items()},
                                         2: {k: (v, 1.0) for k, v in val.items()}}),
-                  pos=dict(sq), price={}, owner={}, cash=0.0, me="me",
-                  proceeds={"spare_m": 7.45e6, "spare_k": 4.73e6, "d1": 9e6},
-                  name={"spare_m": "benat turrientes", "spare_k": "alvaro fernandez"})
+                  cash=0.0, me="me",
+                  players=players_from_flat(
+                      pos=dict(sq),
+                      proceeds={"spare_m": 7.45e6, "spare_k": 4.73e6,
+                               "d1": 9e6},
+                      name={"spare_m": "benat turrientes",
+                           "spare_k": "alvaro fernandez"}))
     dead = dead_weight(u2)
     assert [k for k, _ in dead] == ["spare_m", "spare_k"], dead
     # Sorted by what they raise: the choice between them is the money, because
@@ -1510,8 +1516,7 @@ def _selftest() -> None:
             "p1": "POR", "f1": "DEL", "f2": "DEL"}
     u_phantom = Universe(
         state=LeagueState({"me": legal_sq, "riv": ph_sq}, [1], "me"),
-        forecaster=Bootstrap({}), pos={}, price={}, proceeds={}, owner={},
-        cash=0.0, me="me")
+        forecaster=Bootstrap({}), cash=0.0, me="me")
     assert phantom_filled(u_phantom) == [("riv", ["1 defensa"])], \
         phantom_filled(u_phantom)
     assert "me" not in dict(phantom_filled(u_phantom))
@@ -1681,15 +1686,28 @@ def _selftest() -> None:
     listed_big = {**rows[0],
                   "action": Action("buy", buy="listed_target", cost=30e6),
                   "net_pts": 0.50, "d_win": 0.40, "pts_lo": 50.0}
-    u.route["listed_target"] = "listed"
+    # A SEPARATE Universe carrying "listed_target" on a "listed" route,
+    # BUILT via `players=` rather than mutated onto `u`'s flat dict (the
+    # old `u.route["listed_target"] = "listed"` / `del u.route[...]`).
+    # Wave 3F: `u.route_view` rebuilds from `u.players`, which a flat-
+    # dict mutation never touches, so the mutation would silently stop
+    # mattering once the flat dict is gone. `u` itself is never touched
+    # here — "yuri" (rows[0]'s buy) is absent from `u_route.players` too,
+    # so it still resolves to the same "free" (reliable) default it did
+    # via `u`.
+    u_route = Universe(
+        state=LeagueState({"me": {}, "riv": {}}, [1, 2], "me"),
+        forecaster=Bootstrap({}), cash=0.0, me="me",
+        players={"listed_target": tiny_profile("listed_target",
+                                               route="listed")})
     # A "listed" move is the ONLY candidate — nothing reliable to prefer it
     # over, so it is still the pick, just flagged uncertain.
-    assert _best(u, [listed_big], ["riv"]) == (listed_big, True)
+    assert _best(u_route, [listed_big], ["riv"]) == (listed_big, True)
     # rows[0] (yuri, a CLAUSE — always reliable, kind="clause") is far
     # smaller (d_pos=0.433 vs 0.50, well under VALUE_TOLERANCE of it) and
     # would lose to listed_big on value-for-money alone. It still wins,
     # because listed_big is "listed" and rows[0] is not.
-    assert _best(u, [listed_big, rows[0]], ["riv"]) == (rows[0], False), \
+    assert _best(u_route, [listed_big, rows[0]], ["riv"]) == (rows[0], False), \
         "a reliable move beats a bigger listed one outright"
 
     # -- _best() does not depend on `rows` arriving sorted by d_pos — the
@@ -1697,15 +1715,14 @@ def _selftest() -> None:
     # must pick the SAME winners. (Written first against the old `pool[0]`
     # implementation to confirm it fails — order was silently load-bearing
     # even though nothing in `_best()`'s actual logic needs it to be.)
-    assert _best(u, [cheap_ok, rows[0]], ["riv"]) == (cheap_ok, False), \
+    assert _best(u_route, [cheap_ok, rows[0]], ["riv"]) == (cheap_ok, False), \
         "order must not change the value-for-money winner"
-    assert _best(u, [cheap_bad, rows[0]], ["riv"]) == (rows[0], False), \
+    assert _best(u_route, [cheap_bad, rows[0]], ["riv"]) == (rows[0], False), \
         "order must not change which move keeps too little of the gain"
-    assert _best(u, [free, rows[0]], ["riv"]) == (free, False), \
+    assert _best(u_route, [free, rows[0]], ["riv"]) == (free, False), \
         "order must not change a self-funding winner"
-    assert _best(u, [rows[0], listed_big], ["riv"]) == (rows[0], False), \
+    assert _best(u_route, [rows[0], listed_big], ["riv"]) == (rows[0], False), \
         "order must not change reliable-beats-listed"
-    del u.route["listed_target"]
 
     # -- BUY/RAID/LISTED split: free agents, a clause (cannot be
     # refused), and a listed target (the owner's own choice, essentially
@@ -1813,21 +1830,40 @@ def _selftest() -> None:
     # Ranked purely by points, an eleven puts the keeper between two
     # midfielders. Ranking decides who is IN it; position decides the order
     # you check them off in.
-    u.pos = {"k": "POR", "d": "DEF", "m": "MED", "f": "DEL"}
-    u.forecaster = Bootstrap({1: {"k": (1.0, 1.0), "d": (9.0, 1.0),
-                                  "m": (5.0, 1.0), "f": (7.0, 1.0)}})
-    u.state.jornadas = [1]
-    assert by_slot(u, ["m", "f", "k", "d"]) == ["k", "d", "m", "f"]
+    # A SEPARATE Universe, built via `players=` rather than the old
+    # `u.pos = {...}` wholesale reassignment — Wave 3F: `u.pos_view`
+    # rebuilds from `u.players`, which such a mutation never touches, so
+    # a flat-dict-only rewrite here would leave the test passing on a
+    # `u.pos` nothing else agrees with, once the flat dict is gone. `exp`
+    # is passed explicitly so the ordering here tests SLOT_ORDER alone,
+    # not `u.current_xi`'s fallback (each key is a distinct slot, so the
+    # `-exp.get(k, 0.0)` tiebreak was never load-bearing for this fixture
+    # either way — same as before this rewrite).
+    slot_players = {"k": "POR", "d": "DEF", "m": "MED", "f": "DEL"}
+    u_slot = Universe(
+        state=LeagueState({"me": {}}, [1], "me"), forecaster=Bootstrap({}),
+        cash=0.0, me="me",
+        players={key: tiny_profile(key, pos=pos)
+                for key, pos in slot_players.items()})
+    assert by_slot(u_slot, ["m", "f", "k", "d"], exp={}) == \
+        ["k", "d", "m", "f"]
 
     # -- the formation, which is the first thing the app asks for ----------
     # An eleven is not an instruction until you know the shape. best_xi has
     # been choosing one since the first day and the report never said which.
-    u.pos = {"a": "POR", "b": "DEF", "c": "DEF", "d": "DEF", "e": "DEF",
-             "f": "MED", "g": "MED", "h": "MED", "i": "MED", "j": "DEL",
-             "k": "DEL"}
-    assert shape(u, list("abcdefghijk")) == "4-4-2"
-    assert shape(u, ["a", "b", "c", "d", "f", "g"]) == "3-2-0"
-    assert shape(u, []) == "0-0-0"
+    # Same reasoning as u_slot above: a separate Universe via `players=`,
+    # not a `u.pos = {...}` mutation.
+    shape_players = {"a": "POR", "b": "DEF", "c": "DEF", "d": "DEF",
+                     "e": "DEF", "f": "MED", "g": "MED", "h": "MED",
+                     "i": "MED", "j": "DEL", "k": "DEL"}
+    u_shape = Universe(
+        state=LeagueState({"me": {}}, [1], "me"), forecaster=Bootstrap({}),
+        cash=0.0, me="me",
+        players={key: tiny_profile(key, pos=pos)
+                for key, pos in shape_players.items()})
+    assert shape(u_shape, list("abcdefghijk")) == "4-4-2"
+    assert shape(u_shape, ["a", "b", "c", "d", "f", "g"]) == "3-2-0"
+    assert shape(u_shape, []) == "0-0-0"
 
     # -- the whole page ----------------------------------------------------
     page = "\n".join(render(u, rows, st, "2026-08-18T0152Z", ["riv"], 132,
@@ -1879,9 +1915,11 @@ def _selftest() -> None:
     ub = U2(state=LS2({"me": dict(sqb), "riv": dict(riv)}, many_j, "me"),
            forecaster=Bootstrap(perb, matches={k: 30 for k in
                                                (*sqb, *riv, "cand")}),
-           pos={**{k: v for k, v in sqb.items()}, "cand": "MED"},
-           price={"cand": 5e6}, proceeds={"dead": 1e6, "star": 20e6},
-           owner={}, cash=10e6, me="me",
+           cash=10e6, me="me",
+           players=players_from_flat(
+               pos={**{k: v for k, v in sqb.items()}, "cand": "MED"},
+               price={"cand": 5e6},
+               proceeds={"dead": 1e6, "star": 20e6}),
            # "dead" was bought for less than he raises now (a real gain);
            # "star" was never transacted in this league's own ledger
            # (came with the draft) — both real cases a SELL row must
