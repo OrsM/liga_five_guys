@@ -25,3 +25,6 @@ inputs/seen.txt
 # invalidated whole when sources.py changes — nothing here is evidence.
 data/tidy/parsed.json
 data/tidy/startcal.json
+
+# Claude Code worktrees and session state -- never part of the repo.
+.claude/
