@@ -254,3 +254,48 @@ Waves 0-2 alone remove the `matches`/`starters` rescans, give every table one
 loader with a settled currency rule, and retire 116 hand-written field reads
 — at zero behaviour change. That is a complete, shippable outcome if the
 rest is never done.
+
+---
+
+## Wave 3 status — 2026-09-16
+
+**Done and merged:** 3A (views), 3B (sim.py), 3C (decide.py), 3D (the six
+smaller consumers). Both gates green on main, output byte-identical.
+
+**6 reads deliberately NOT migrated.** Not an oversight and not a
+rate-limit casualty: each is read by a function that a `_selftest` calls
+*after mutating the same flat dict*. The views rebuild from `u.players`,
+which a flat-dict mutation never touches, so migrating these would leave
+the test passing while asserting nothing — and neither gate can see it,
+because it is test-only code that does not reach the report.
+
+| read | function | mutated by |
+|---|---|---|
+| `sim.py:271` | `by_slot()` | `sim.py:1816` `u.pos = {...}` |
+| `sim.py:992` | `shape()` | `sim.py:1825` `u.pos = {...}` |
+| `sim.py:885` | `_move_rank_key()` | `sim.py:1684` `u.route[...] = "listed"` |
+| `sim.py:910` | `_best()` | `sim.py:1684`, same test |
+| `sim.py:340` | `ladder_rows()` | same `u.pos` risk, not individually cleared |
+| `sim.py:1140` | `payload()` | same |
+
+`decide.py`'s `route_kind()` keeps its `u.route.get(k, "market")` for the
+same reason (`decide.py:1115-1123` mutates it, then reaches `route_kind()`
+through `candidates()`).
+
+### Wave 3F — the remaining task
+
+1. Rewrite the three mutating tests to BUILD a Universe with the player
+   they need (via `ffcore.fixtures`, `players=`) instead of mutating a
+   flat dict on one they already built. `sim.py:1684/1708`,
+   `sim.py:1816`, `sim.py:1825`, `decide.py:1115-1123`.
+2. Then migrate the 6 reads above plus `decide.py`'s `route_kind()`.
+3. Only then delete the flat dicts, the `InitVar` block and
+   `_synthetic_profiles()` from `decide.py`, and migrate the ~25
+   hand-built `Universe(...)` fixtures to `ffcore.fixtures`.
+
+Order matters: deleting the flat dicts before step 1 turns those tests
+into silent no-ops rather than failures.
+
+The equivalence assertion added in 3A (every `<field>_view` equals its
+flat dict, on a fixture carrying falsy-but-real values) is what makes
+step 3 safe. Verified it fires.
