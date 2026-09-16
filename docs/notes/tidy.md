@@ -274,3 +274,92 @@ index does not contain (a shared name is keyed on club). A guess and an
 unusable key in one step. `_by_price()` never returns a preference between
 two agreeing candidates, only one match or none — the whole point of
 asking is to get one answer or no answer.
+
+## `load_matches()` / `load_starters()` — measured safe for latest_only
+
+Added because the module owned no loader at all for the four most-read
+tables (matches.csv opened by hand at 13 call sites, starters.csv at 7)
+and the question "does this table accumulate snapshots, and do I want only
+the newest" was being decided per call site instead of once. For these two
+tables the answer is settled and safe: measured 2026-09-16, matches.csv
+holds 75,240 rows behind 380 real matches (198x repeated snapshots),
+starters.csv holds 180,372 rows behind 2,512 real (match, player) keys
+(~72x repeated) — `latest_only()` keeps 380/380 and 2,512/2,512
+respectively. Nothing is lost, so `load_matches()`/`load_starters()`
+apply it unconditionally rather than leaving it to the caller.
+
+`load_matches_history()` exists alongside `load_matches()` because not
+every caller of matches.csv can take the latest-only cut: `points.py`'s
+`match_jornadas()` (`points.py:227`) needs the FULL snapshot history to
+find the first time each match's score appeared, which is this repo's
+only record of when it actually finished. Collapsing that read to
+`latest_only()` would silently answer every match with its most recently
+observed timestamp instead of the one that matters. Two loaders, not one
+with a flag, so a caller cannot get the wrong one by leaving an argument
+at its default.
+
+## `load_api_stats()` — why latest_only is forbidden here
+
+The one table where the matches/starters reasoning above does NOT apply,
+which is exactly why it needs saying loudly rather than left to be
+rediscovered. Measured 2026-09-16: api_stats.csv holds 11,190 rows behind
+10,857 distinct `(player_id, week, stat)` keys — almost no duplication,
+because each sweep's newest snapshot only reports the handful of
+gameweeks the API happens to be serving that moment (232 keys), not the
+table's accumulated history. `latest_only()` on this table would keep 232
+of 10,857 keys — 98% of every stat this table has ever recorded would
+silently vanish, and nothing about the code would look wrong: it would
+just quietly know almost nothing about most weeks for most players.
+
+`latest_per_key(rows, key_fn)` is the primitive this needed and
+`latest_only()` could not become without changing what every other caller
+of it means: `latest_only()` answers "what does the single newest
+snapshot say", which is correct exactly when one snapshot covers the
+whole keyspace (matches, starters, lineups, market). `latest_per_key()`
+answers "what is the newest row for EACH key, wherever in the history it
+lives" — the only question that makes sense when a table's coverage is
+scattered thinly across many snapshots instead of concentrated in the
+latest one. `load_api_stats()` is `latest_per_key()` applied to
+`(player_id, week, stat)`; the self-test's guard asserts it returns more
+keys than a `latest_only()` read of the same file would, specifically so
+that "simplifying" this loader back to `latest_only()` fails loudly
+instead of shipping a quiet 98% data loss.
+
+## `clock()` — one JornadaClock per process
+
+Before this, `JornadaClock` was constructed 11 times across 5 files
+(`methodology.py` alone at lines 259, 306, 597, 1385, 1922 and 1943),
+each its own fresh parse of matches.csv (75,240 rows) and fixtures.csv —
+the same reparse of an answer that cannot change mid-run, paid over and
+over. `clock()` follows the same one-value-per-process pattern `run_now()`
+already uses (a module-level list as the memo cell, appended to once,
+never invalidated mid-process): a run that asks "when does this lock"
+ten times gets the identical `JornadaClock` ten times, not ten
+independent parses. Built from `load_matches()` + `load_fixtures()` —
+the `latest_only()` matches read, which is what every existing hand-built
+`JornadaClock` construction site already passes in.
+
+## `jornada_of_match()` — first-write-wins, matching score.py:538, not methodology.py:588
+
+A `{match_id: jornada}` map has been hand-built at least twice with two
+different, disagreeing rules. `ffcore.score._per_jornada_current()`
+(score.py:538) writes it as `if mid and mid not in jornada_of_match:
+jornada_of_match[mid] = ...` — FIRST write wins, so whichever jornada
+value a match_id was first recorded under is the one that sticks across
+every later snapshot. `methodology.start_intervals()` (methodology.py:588)
+writes the same-shaped map unconditionally — LAST write wins instead.
+These are not the same function accidentally spelled two ways; they can
+disagree in practice for a match_id whose jornada value actually changes
+across snapshots (a rescheduled fixture spanning a round boundary, for
+instance), and nothing today reconciles them.
+
+`jornada_of_match()` matches `score.py`'s semantics ONLY, because that is
+the rule this task was told to preserve exactly — it does not attempt to
+settle which of the two pre-existing behaviours is correct, and it must
+not be pointed at as a drop-in replacement for `methodology.py`'s own map
+without checking, call site by call site, that first-write-wins is what
+that caller actually wants. Built off `load_matches_history()` (the full
+snapshot history), not `load_matches()` — a single-write rule is only
+meaningful when there is more than one snapshot per match_id to choose
+from, and score.py's own read of matches.csv for this purpose is
+similarly the unfiltered file, not the latest-only cut.
