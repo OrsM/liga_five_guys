@@ -35,28 +35,6 @@
    "p_win_after": 0.511,
    "vs": "Albert Laporta",
    "vs_gain": 0.18466666666666665
-  },
-  {
-   "label": "clause Alvaro Garcia from SusoGattuso · sell Natan",
-   "kind": "clause",
-   "buy": "Alvaro Garcia",
-   "sell": "Natan",
-   "sell_n": 1,
-   "victim": "SusoGattuso",
-   "owner": "SusoGattuso",
-   "net_pts": -16.63097244736139,
-   "d_win": -0.00666666666666671,
-   "net": 1614023.0,
-   "d_pts": -16.630328949167392,
-   "helps": 0.42866666666666664,
-   "pts_lo": -144.68295269966424,
-   "pts_hi": 98.78806955230421,
-   "value": null,
-   "left": 9237541.0,
-   "answer": null,
-   "p_win_after": 0.452,
-   "vs": "SusoGattuso",
-   "vs_gain": 0.0043333333333333
   }
  ],
  "sell": [],
