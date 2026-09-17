@@ -1,6 +1,14 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from decide import Universe
+    from ffcore.forecast import Bootstrap
+    from ffcore.profile import PlayerProfile
+    from ffcore.season import LeagueState
+
 
 
 __all__ = ["tiny_profile", "tiny_state", "tiny_bootstrap", "tiny_universe",

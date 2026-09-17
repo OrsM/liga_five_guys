@@ -165,12 +165,10 @@ def replay_screen_misses(sample_every: int = 10,
 def naive_value_baseline(golden: list[dict]) -> dict | None:
     import methodology as M
     from ffcore.text import norm
-    from ffcore.tidy import load_matches
 
     checked = [r for r in golden if r.get("predicted_rate") is not None]
     if not checked:
         return None
-    matches = load_matches()
     locks = M.clock_history().round_locks
 
     resolved = []
@@ -203,14 +201,12 @@ def naive_value_baseline(golden: list[dict]) -> dict | None:
 def recency_only_baseline(golden: list[dict], window: int = 3) -> dict | None:
     import methodology as M
     from ffcore.text import norm
-    from ffcore.tidy import load_matches
 
     checked = [r for r in golden if r.get("predicted_rate") is not None]
     if not checked:
         return None
-    matches = load_matches()
     clock = M.clock_history()
-    locks, order = clock.round_locks, clock.order
+    order = clock.order
     pos = {j: i for i, j in enumerate(order)}
 
     actuals, _label = M.load_actuals()

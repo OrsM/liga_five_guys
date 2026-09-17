@@ -381,7 +381,6 @@ def load(trials_pool=None) -> Universe:
     value = {k: float((v or {}).get("value") or 0) for k, v in players.items()
              if (v or {}).get("value")}
 
-    name = {k: (rec.get("name") or k) for k, rec in players.items()}
     universe = set(price) | {k for s in squads.values() for k in s}
 
     perjornada_rows = load_perjornada()

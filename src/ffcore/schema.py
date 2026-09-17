@@ -347,42 +347,75 @@ class RESULTS_HISTORY:
 def _selftest() -> None:
     n = 0
 
-    n += 1; assert text({"name": " Lamine Yamal "}, "name") == "Lamine Yamal"
-    n += 1; assert text({}, "name") == ""
-    n += 1; assert text({"name": None}, "name") == ""
-    n += 1; assert text({"name": "   "}, "name") == ""
-    n += 1; assert text({}, "name", default="?") == "?"
-    n += 1; assert text({"name": None}, "name", default="?") == "?"
-    n += 1; assert text({"name": "   "}, "name", default="?") == "?"
+    n += 1
+    assert text({"name": " Lamine Yamal "}, "name") == "Lamine Yamal"
+    n += 1
+    assert text({}, "name") == ""
+    n += 1
+    assert text({"name": None}, "name") == ""
+    n += 1
+    assert text({"name": "   "}, "name") == ""
+    n += 1
+    assert text({}, "name", default="?") == "?"
+    n += 1
+    assert text({"name": None}, "name", default="?") == "?"
+    n += 1
+    assert text({"name": "   "}, "name", default="?") == "?"
 
-    n += 1; assert num({"points": "4.5"}, "points") == 4.5
-    n += 1; assert num({"points": " 4.5 "}, "points") == 4.5
-    n += 1; assert num({}, "points") is None
-    n += 1; assert num({"points": ""}, "points") is None
-    n += 1; assert num({"points": None}, "points") is None
-    n += 1; assert num({"points": "abc"}, "points") is None
-    n += 1; assert num({}, "points", default=0.0) == 0.0
-    n += 1; assert num({"points": "abc"}, "points", default=-1.0) == -1.0
+    n += 1
+    assert num({"points": "4.5"}, "points") == 4.5
+    n += 1
+    assert num({"points": " 4.5 "}, "points") == 4.5
+    n += 1
+    assert num({}, "points") is None
+    n += 1
+    assert num({"points": ""}, "points") is None
+    n += 1
+    assert num({"points": None}, "points") is None
+    n += 1
+    assert num({"points": "abc"}, "points") is None
+    n += 1
+    assert num({}, "points", default=0.0) == 0.0
+    n += 1
+    assert num({"points": "abc"}, "points", default=-1.0) == -1.0
 
-    n += 1; assert whole({"jornada": "12.0"}, "jornada") == 12
-    n += 1; assert whole({"jornada": "12"}, "jornada") == 12
-    n += 1; assert whole({"jornada": "12.9"}, "jornada") == 12
-    n += 1; assert whole({}, "jornada") is None
-    n += 1; assert whole({"jornada": ""}, "jornada") is None
-    n += 1; assert whole({"jornada": None}, "jornada") is None
-    n += 1; assert whole({"jornada": "abc"}, "jornada") is None
-    n += 1; assert whole({"jornada": "abc"}, "jornada", default=0) == 0
+    n += 1
+    assert whole({"jornada": "12.0"}, "jornada") == 12
+    n += 1
+    assert whole({"jornada": "12"}, "jornada") == 12
+    n += 1
+    assert whole({"jornada": "12.9"}, "jornada") == 12
+    n += 1
+    assert whole({}, "jornada") is None
+    n += 1
+    assert whole({"jornada": ""}, "jornada") is None
+    n += 1
+    assert whole({"jornada": None}, "jornada") is None
+    n += 1
+    assert whole({"jornada": "abc"}, "jornada") is None
+    n += 1
+    assert whole({"jornada": "abc"}, "jornada", default=0) == 0
 
-    n += 1; assert flag({"shielded": "true"}, "shielded") is True
-    n += 1; assert flag({"shielded": "TRUE"}, "shielded") is True
-    n += 1; assert flag({"shielded": "false"}, "shielded") is False
-    n += 1; assert flag({"home": "1"}, "home") is True
-    n += 1; assert flag({"home": "0"}, "home") is False
-    n += 1; assert flag({"shielded": ""}, "shielded") is False
-    n += 1; assert flag({"shielded": ""}, "shielded", default=True) is True
-    n += 1; assert flag({}, "shielded") is False
-    n += 1; assert flag({"shielded": None}, "shielded") is False
-    n += 1; assert flag({"shielded": "yes"}, "shielded") is False
+    n += 1
+    assert flag({"shielded": "true"}, "shielded") is True
+    n += 1
+    assert flag({"shielded": "TRUE"}, "shielded") is True
+    n += 1
+    assert flag({"shielded": "false"}, "shielded") is False
+    n += 1
+    assert flag({"home": "1"}, "home") is True
+    n += 1
+    assert flag({"home": "0"}, "home") is False
+    n += 1
+    assert flag({"shielded": ""}, "shielded") is False
+    n += 1
+    assert flag({"shielded": ""}, "shielded", default=True) is True
+    n += 1
+    assert flag({}, "shielded") is False
+    n += 1
+    assert flag({"shielded": None}, "shielded") is False
+    n += 1
+    assert flag({"shielded": "yes"}, "shielded") is False
 
     root = Path(os.environ.get("FF_ROOT", "./data"))
 
