@@ -464,9 +464,10 @@ def load_odds() -> list[dict]:
     SNAPSHOT only carries whatever was still unplayed when it was taken,
     while every fixture's own newest quote is what a consumer wants.
     """
+    from ffcore import schema
     return latest_per_key(read_csv(TIDY / "odds.csv"),
-                          lambda r: ((r.get("home") or "").strip(),
-                                     (r.get("away") or "").strip()))
+                          lambda r: (schema.text(r, "home"),
+                                     schema.text(r, "away")))
 
 
 def load_results_history() -> list[dict]:
