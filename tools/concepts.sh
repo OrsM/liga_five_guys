@@ -63,11 +63,17 @@ check "Universe flat-dict storage" 0 \
 # Raise the budget only in a commit that says why, in words, and only for
 # work that adds a capability rather than tidies an existing one.
 #
+# 19212 -> 19303 on 2026-09-17: over/under odds collection. A NEW
+# CAPABILITY -- the feed was already being paid for daily and half of
+# what it returns was being thrown away -- so it qualifies under the
+# rule above. Most of the 91 lines are the parser's own explanation and
+# its self-test.
+#
 # 19192 -> 19212 on 2026-09-17: the conditional-predictor correction to
 # drift_frac_from_history(). A forecasting bug fix, not a tidy, and 20 of
 # its lines are the comment recording WHY the two fitters must use the
 # same predictor -- which is the knowledge that was lost the first time.
-check "src/ lines" 19212 \
+check "src/ lines" 19303 \
   "$(find src -name '*.py' | xargs cat | wc -l)"
 
 [ "$fail" -eq 0 ] && echo "concepts: no duplication regained" || echo "concepts: a concept regained a second implementation"

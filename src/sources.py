@@ -925,7 +925,7 @@ sign_fd_results = partial(
 
 
 ODDS_URL = ("https://api.the-odds-api.com/v4/sports/soccer_spain_la_liga"
-           "/odds/?apiKey={odds_key}&regions=eu&markets=h2h"
+           "/odds/?apiKey={odds_key}&regions=eu&markets=h2h,totals"
            "&oddsFormat=decimal")
 ODDS_SOURCE = "odds_api"
 
@@ -974,6 +974,54 @@ def parse_odds(text: str, observed_at: str,
         total = sum(implied.values())
         if total <= 0:
             continue
+        # OVER/UNDER, the half this feed was not asking for until
+        # 2026-09-17. h2h alone says who wins; it cannot say how many
+        # goals, and a clean sheet is the single biggest driver of a
+        # defender's or keeper's points. With p_home/p_draw/p_away and
+        # P(over N) a consumer can solve for each side's expected goals
+        # and read P(clean sheet) off them directly, instead of inferring
+        # it from a goals-conceded rate the way the Elo path does.
+        #
+        # ONE LINE ONLY, the modal one across books (almost always 2.5):
+        # medianing prices quoted at different lines would average
+        # unrelated questions. Books that quote another line are skipped
+        # rather than bent onto this one.
+        #
+        # OPTIONAL. Ten of fourteen books offered totals when this was
+        # written; an event with h2h and no totals still emits its row
+        # with these three fields blank, because losing the h2h data to
+        # gain nothing would be the worse trade.
+        line_prices: dict[float, dict[str, list[float]]] = {}
+        for bk in ev.get("bookmakers") or []:
+            tot = next((m for m in bk.get("markets") or []
+                       if m.get("key") == "totals"), None)
+            if tot is None:
+                continue
+            for o in tot.get("outcomes") or []:
+                try:
+                    pt = float(o.get("point"))
+                    pr = float(o.get("price"))
+                except (TypeError, ValueError):
+                    continue
+                side = (o.get("name") or "").strip().lower()
+                if side not in ("over", "under"):
+                    continue
+                line_prices.setdefault(pt, {"over": [], "under": []})[side].append(pr)
+        total_line = p_over = p_under = ""
+        if line_prices:
+            modal = max(line_prices,
+                       key=lambda pt: len(line_prices[pt]["over"])
+                       + len(line_prices[pt]["under"]))
+            mo = _median(line_prices[modal]["over"])
+            mu = _median(line_prices[modal]["under"])
+            if mo and mu:
+                io, iu = 1.0 / mo, 1.0 / mu
+                tot_imp = io + iu
+                if tot_imp > 0:
+                    total_line = modal
+                    p_over = io / tot_imp
+                    p_under = iu / tot_imp
+
         rows.append({
             "observed_at": observed_at, "source": ODDS_SOURCE,
             "kickoff": (ev.get("commence_time") or "").strip(),
@@ -983,6 +1031,9 @@ def parse_odds(text: str, observed_at: str,
             "p_home": implied["home"] / total,
             "p_draw": implied["draw"] / total,
             "p_away": implied["away"] / total,
+            "total_line": total_line,
+            "p_over": p_over,
+            "p_under": p_under,
         })
     return rows
 
@@ -2159,6 +2210,46 @@ def _selftest() -> None:
                                     {"name": "Draw", "price": 3.0}]}]}]}]),
         "t")
     assert len(unresolved) == 1 and unresolved[0]["away"] == "", unresolved
+
+    # -- totals: the over/under half, added 2026-09-17 ------------------
+    tot = parse_odds(json.dumps([{
+        "home_team": "Espanyol", "away_team": "Elche",
+        "bookmakers": [
+            {"key": "a", "markets": [
+                {"key": "h2h", "outcomes": [
+                    {"name": "Espanyol", "price": 2.0},
+                    {"name": "Elche", "price": 4.0},
+                    {"name": "Draw", "price": 3.5}]},
+                {"key": "totals", "outcomes": [
+                    {"name": "Over", "price": 2.0, "point": 2.5},
+                    {"name": "Under", "price": 2.0, "point": 2.5}]}]},
+            # a book quoting a DIFFERENT line is skipped, not averaged in
+            {"key": "b", "markets": [
+                {"key": "h2h", "outcomes": [
+                    {"name": "Espanyol", "price": 2.0},
+                    {"name": "Elche", "price": 4.0},
+                    {"name": "Draw", "price": 3.5}]},
+                {"key": "totals", "outcomes": [
+                    {"name": "Over", "price": 9.0, "point": 3.5},
+                    {"name": "Under", "price": 1.05, "point": 3.5}]}]},
+        ]}]), "t")
+    assert len(tot) == 1, tot
+    assert tot[0]["total_line"] == 2.5, tot[0]
+    # 2.0/2.0 is an even market: both sides 0.5 once the overround is out,
+    # and the 3.5 book's lopsided prices must not drag it.
+    assert abs(tot[0]["p_over"] - 0.5) < 1e-9, tot[0]
+    assert abs(tot[0]["p_under"] - 0.5) < 1e-9, tot[0]
+
+    # h2h with NO totals still yields its row, with the fields blank --
+    # losing the h2h data to gain nothing would be the worse trade.
+    notot = parse_odds(json.dumps([{
+        "home_team": "Espanyol", "away_team": "Elche",
+        "bookmakers": [{"key": "a", "markets": [{"key": "h2h", "outcomes": [
+            {"name": "Espanyol", "price": 2.0},
+            {"name": "Elche", "price": 4.0},
+            {"name": "Draw", "price": 3.5}]}]}]}]), "t")
+    assert len(notot) == 1 and notot[0]["p_over"] == "", notot
+    assert notot[0]["p_home"] > 0, notot
 
     assert sign_odds(_ODDS_LIVE) is not None
     assert sign_odds("") is None
