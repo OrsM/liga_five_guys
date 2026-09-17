@@ -62,7 +62,12 @@ check "Universe flat-dict storage" 0 \
 #
 # Raise the budget only in a commit that says why, in words, and only for
 # work that adds a capability rather than tidies an existing one.
-check "src/ lines" 19192 \
+#
+# 19192 -> 19212 on 2026-09-17: the conditional-predictor correction to
+# drift_frac_from_history(). A forecasting bug fix, not a tidy, and 20 of
+# its lines are the comment recording WHY the two fitters must use the
+# same predictor -- which is the knowledge that was lost the first time.
+check "src/ lines" 19212 \
   "$(find src -name '*.py' | xargs cat | wc -l)"
 
 [ "$fail" -eq 0 ] && echo "concepts: no duplication regained" || echo "concepts: a concept regained a second implementation"

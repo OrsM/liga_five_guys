@@ -98,6 +98,19 @@ def pair(actuals: list[dict],
     return out
 
 
+def _conditional(fac: dict) -> float:
+    """The prediction CONDITIONAL on the player having played: his rate
+    times the fixture, with no P(start) in it.
+
+    `_default_predicted` below is the unconditional one -- it carries
+    P(start) -- and load_actuals() only ever yields rows for players who
+    DID play. Grade one against the other and P(start) miscalibration
+    reads as rate error. Both fitters here want this one; shared rather
+    than nested inside one of them, which is why the other never got it.
+    """
+    return (fac.get("ppm") or 0.0) * (fac.get("fix") or 1.0)
+
+
 def _default_predicted(fac: dict) -> float:
     return fac["score"]
 
@@ -150,9 +163,6 @@ def fit_rate_rel_floor(pool, min_pairs: int = 30) -> tuple[float, str]:
     actuals, _label = load_actuals()
     preds = load_predictions()
 
-    def _conditional(fac):
-        return (fac.get("ppm") or 0.0) * (fac.get("fix") or 1.0)
-
     graded = lagged_pair(actuals, preds, locks, 0, predicted_fn=_conditional)
     rels = []
     for g in graded:
@@ -186,8 +196,18 @@ def drift_frac_from_history(lag1: int = 1, lag3: int = 3) -> tuple[float, str]:
     actuals, _label = load_actuals()
     preds = load_predictions()
 
-    h1 = lagged_pair(actuals, preds, locks, lag1)
-    h3 = lagged_pair(actuals, preds, locks, lag3)
+    # CONDITIONAL, matching fit_rate_rel_floor() above. Bootstrap's own
+    # prediction is UNCONDITIONAL -- pts * p_start -- while load_actuals()
+    # only yields rows for players who actually played (games_delta >= 1).
+    # Comparing the two mixes P(start) miscalibration into what reads as
+    # RATE drift, and it gets worse at longer lags because P(start)
+    # further out is less accurate. That is experiment_log.csv's
+    # drift_frac_conditional_fix (2026-09-16, n=279), which SUPERSEDED
+    # three earlier entries chasing a drift signal that turned out to be
+    # this artifact. The correction was applied to rate_rel's fit and
+    # never to this one. Measured: rate_rel 1.725 -> 1.196.
+    h1 = lagged_pair(actuals, preds, locks, lag1, predicted_fn=_conditional)
+    h3 = lagged_pair(actuals, preds, locks, lag3, predicted_fn=_conditional)
     if not h1:
         return 1.0, "no lag-%d pairs available yet" % lag1
     ratios = [p["actual"] / p["predicted"] for p in h1 if p["predicted"] > 0]

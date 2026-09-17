@@ -82,7 +82,7 @@ _Per player-match. Positive error on **easier** together with negative on **hard
 
 ### Season-long drift
 
-**Fit from real data this run: 0.18** (h3 no more variable than h1 (0.206 vs 0.212, rate_rel-normalised, n=48/33) — no compounding measurable, so using the most the data cannot rule out (90th pct of bootstrapped growth) -> 0.18).
+**Fit from real data this run: 0.26** (h3 no more variable than h1 (0.430 vs 0.450, rate_rel-normalised, n=43/20) — no compounding measurable, so using the most the data cannot rule out (90th pct of bootstrapped growth) -> 0.26).
 
 ### Rate uncertainty floor
 
