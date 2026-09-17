@@ -93,43 +93,43 @@ class Universe:
         return rank(self, acts, seed=seed, price=price, extra=extra)
 
 
-    @property
+    @cached_property
     def pos_view(self) -> Mapping[str, str]:
         return MappingProxyType({k: _pos_of(p.current.pos)
                                  for k, p in self.players.items()
                                  if p.current.pos})
 
-    @property
+    @cached_property
     def price_view(self) -> Mapping[str, float]:
         return MappingProxyType({k: p.current.price
                                  for k, p in self.players.items()
                                  if p.current.price is not None})
 
-    @property
+    @cached_property
     def proceeds_view(self) -> Mapping[str, float]:
         return MappingProxyType({k: p.current.proceeds
                                  for k, p in self.players.items()
                                  if p.current.proceeds is not None})
 
-    @property
+    @cached_property
     def owner_view(self) -> Mapping[str, str]:
         return MappingProxyType({k: p.current.owner
                                  for k, p in self.players.items()
                                  if p.current.owner})
 
-    @property
+    @cached_property
     def value_view(self) -> Mapping[str, float]:
         return MappingProxyType({k: p.current.value
                                  for k, p in self.players.items()
                                  if p.current.value is not None})
 
-    @property
+    @cached_property
     def market_exp_view(self) -> Mapping[str, float]:
         return MappingProxyType({k: p.derived.market_exp
                                  for k, p in self.players.items()
                                  if p.derived.market_exp is not None})
 
-    @property
+    @cached_property
     def start_view(self) -> Mapping[str, float]:
         return MappingProxyType({k: p.derived.start_p
                                  for k, p in self.players.items()
@@ -137,14 +137,14 @@ class Universe:
 
 
 
-    @property
+    @cached_property
     def route_view(self) -> Mapping[str, str]:
         return MappingProxyType({k: p.current.route
                                  for k, p in self.players.items()
                                  if p.current.route})
 
 
-    @property
+    @cached_property
     def name_view(self) -> Mapping[str, str]:
         return MappingProxyType({k: p.identity.name
                                  for k, p in self.players.items()})

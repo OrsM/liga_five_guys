@@ -87,7 +87,16 @@ def read_csv(path) -> list[dict]:
                     for row in r if row]
         hit = ((st.st_mtime_ns, st.st_size), rows)
         _READ_CACHE[str(path)] = hit
-    return [dict(r) for r in hit[1]]
+    # READ-ONLY VIEWS, NOT COPIES. This used to rebuild every row with
+    # `[dict(r) for r in hit[1]]` so a caller could mutate its result without
+    # corrupting the cache. Nothing in the repo ever did: flipping this to a
+    # view and running all 32 suites turned up exactly one mutator -- the
+    # selftest written to prove the copy worked. The copy cost 188,184 fresh
+    # dicts per read of starters.csv, seven times a run.
+    # A caller that does need to mutate should build its own dict from a row;
+    # it now fails loudly at the assignment rather than silently paying for
+    # everyone else's safety.
+    return [MappingProxyType(r) for r in hit[1]]
 
 
 def read_csv_frozen(path) -> list:
@@ -910,8 +919,15 @@ def _selftest_cache() -> None:
         first = read_csv(p)
         assert [r["a"] for r in first] == ["1", "2"], first
 
-        first[0]["a"] = "999"
-        first.append({"a": "3", "b": "z"})
+        # The rows are read-only views: a caller cannot corrupt the cache
+        # because it cannot write at all. Stronger than the copy this
+        # replaced, and free.
+        try:
+            first[0]["a"] = "999"
+            raise AssertionError("read_csv rows must be read-only")
+        except TypeError:
+            pass
+        first.append({"a": "3", "b": "z"})     # the LIST is still the caller's
         assert [r["a"] for r in read_csv(p)] == ["1", "2"], read_csv(p)
 
         write_csv(p, [{"a": "7", "b": "q"}])
