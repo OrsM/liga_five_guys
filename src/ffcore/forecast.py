@@ -40,10 +40,37 @@ def fit_drift_frac(h1_pairs, h3_pairs) -> tuple[float, str]:
     var3 = statistics.pvariance(z3)
     growth = (var3 - var1) / 2.0
     if growth <= 0:
-        return DRIFT_FRAC, ("h3 wasn't more variable than h1 (%.3f vs "
-                            "%.3f, rate_rel-normalised) — no evidence "
-                            "DRIFT_FRAC should move from %.2f"
-                            % (var3, var1, DRIFT_FRAC))
+        # NO DETECTABLE COMPOUNDING. This used to return DRIFT_FRAC
+        # unchanged, and that was the single biggest number in the report
+        # nobody had chosen: the module default is 1.00, while sqrt() of
+        # any growth this fit could plausibly measure lands under 0.25. So
+        # "no evidence" resolved to roughly five times the largest value
+        # the evidence could support, and it drove about two thirds of the
+        # season band and halved the reported p_win.
+        #
+        # An absence of measured growth is not an absence of information.
+        # Bootstrap the growth statistic and take the high end of its own
+        # interval: the most drift the data CANNOT rule out. Still the
+        # conservative choice -- the widest band the evidence allows --
+        # without being a number the evidence never supported.
+        #
+        # Seeded, because this feeds every simulated band and the report
+        # has to be reproducible run to run.
+        rng = random.Random(20260917)
+        diffs = []
+        for _ in range(1000):
+            b1 = [rng.choice(z1) for _ in z1]
+            b3 = [rng.choice(z3) for _ in z3]
+            diffs.append((statistics.pvariance(b3)
+                          - statistics.pvariance(b1)) / 2.0)
+        diffs.sort()
+        upper = diffs[int(0.90 * len(diffs))]
+        fitted = math.sqrt(max(0.0, upper))
+        return fitted, ("h3 no more variable than h1 (%.3f vs %.3f, "
+                        "rate_rel-normalised, n=%d/%d) — no compounding "
+                        "measurable, so using the most the data cannot "
+                        "rule out (90th pct of bootstrapped growth) "
+                        "-> %.2f" % (var3, var1, len(z1), len(z3), fitted))
     fitted = math.sqrt(growth)
     return fitted, ("h1 var %.3f, h3 var %.3f (rate_rel-normalised, "
                    "n=%d/%d) -> drift_frac %.2f" % (var1, var3,

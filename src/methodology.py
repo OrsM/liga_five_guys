@@ -1310,8 +1310,16 @@ def _selftest() -> None:
     assert len(lag2) == 1 and lag2[0]["predicted"] == 1.0, lag2
     assert lagged_pair(actuals3, preds3, locks3, 3) == []
 
+    # Pins the CONTRACT, not a constant. This asserted `fitted == 1.0`,
+    # which was only ever true because the fitter returned the module
+    # default whenever it could not measure compounding -- the behaviour
+    # that put an unfitted 1.00 into every band. What must hold is that a
+    # real number comes back with a reason attached, and that it lands
+    # inside the range this estimator can actually produce: sqrt() of a
+    # bootstrapped variance growth, which cannot sensibly exceed 1.
     fitted, why = drift_frac_from_history()
-    assert fitted == 1.0 and isinstance(why, str) and why, (fitted, why)
+    assert isinstance(fitted, float) and 0.0 <= fitted <= 1.0, (fitted, why)
+    assert isinstance(why, str) and why, (fitted, why)
 
     played = [{"name": "Ane", "keys": ["ane"], "from_dt": t(15),
                "points_delta": 8.0, "games_delta": 1.0},
