@@ -155768,3 +155768,685 @@ observed_at,source,team_slug,player_name,player_slug,role,start_pct,status,note
 2026-09-17T2128Z,futbolfantasy,villarreal,Mahamoud Barry,mahamoud-barry,sub,0,ok,
 2026-09-17T2128Z,futbolfantasy,villarreal,Douga Fofana,douga-fofana,sub,0,ok,
 2026-09-17T2128Z,futbolfantasy,villarreal,Moussa Diallo,moussa-diallo-1,sub,0,ok,
+2026-09-17T2134Z,analitica,alaves,Sivera,47353,starter,100.0,,consenso unánime
+2026-09-17T2134Z,analitica,alaves,Abde Rebbach,183751,starter,100.0,,consenso unánime
+2026-09-17T2134Z,analitica,alaves,Jonny Otto,18740,starter,100.0,,consenso unánime
+2026-09-17T2134Z,analitica,alaves,Ville Koski,106759,starter,100.0,,consenso unánime
+2026-09-17T2134Z,analitica,alaves,Nahuel Tenaglia,6233,starter,100.0,,consenso unánime
+2026-09-17T2134Z,analitica,alaves,Angel Pérez,331369,starter,100.0,,consenso unánime
+2026-09-17T2134Z,analitica,alaves,Carles Aleñá,143,starter,100.0,,consenso unánime
+2026-09-17T2134Z,analitica,alaves,Antonio Blanco,162686,starter,100.0,,consenso unánime
+2026-09-17T2134Z,analitica,athletic,Unai Simón,47270,starter,100.0,,consenso unánime
+2026-09-17T2134Z,analitica,athletic,Yuri,47273,starter,100.0,,consenso unánime
+2026-09-17T2134Z,analitica,athletic,Laporte,622,starter,100.0,,consenso unánime
+2026-09-17T2134Z,analitica,athletic,Yeray,47271,starter,100.0,,consenso unánime
+2026-09-17T2134Z,analitica,athletic,Jesús Areso,182181,starter,100.0,,consenso unánime
+2026-09-17T2134Z,analitica,athletic,Gerenabarrena,332307,starter,100.0,,consenso unánime
+2026-09-17T2134Z,analitica,athletic,De Galarreta,47007,starter,100.0,,consenso unánime
+2026-09-17T2134Z,analitica,athletic,Nico Williams,183799,starter,100.0,,consenso unánime
+2026-09-17T2134Z,analitica,atletico,Jan Oblak,29,starter,100.0,,consenso unánime
+2026-09-17T2134Z,analitica,atletico,Hancko,30399,starter,100.0,,consenso unánime
+2026-09-17T2134Z,analitica,atletico,C. Romero,30776,starter,100.0,,consenso unánime
+2026-09-17T2134Z,analitica,atletico,Marc Pubill,295793,starter,100.0,,consenso unánime
+2026-09-17T2134Z,analitica,atletico,Marcos Llorente,753,starter,100.0,,consenso unánime
+2026-09-17T2134Z,analitica,atletico,Álex Baena,182219,starter,100.0,,consenso unánime
+2026-09-17T2134Z,analitica,atletico,Koke,50,starter,100.0,,consenso unánime
+2026-09-17T2134Z,analitica,atletico,Hjulmand,7712,starter,100.0,,consenso unánime
+2026-09-17T2134Z,analitica,barcelona,Xavi Espart,568001,starter,100.0,,consenso unánime
+2026-09-17T2134Z,analitica,barcelona,Gerard Martín,181701,starter,100.0,,consenso unánime
+2026-09-17T2134Z,analitica,barcelona,Pau Cubarsí,396623,starter,100.0,,consenso unánime
+2026-09-17T2134Z,analitica,barcelona,Eric García,619,starter,100.0,,consenso unánime
+2026-09-17T2134Z,analitica,barcelona,Rodri,44,starter,100.0,,consenso unánime
+2026-09-17T2134Z,analitica,barcelona,Fermín,340626,starter,100.0,,consenso unánime
+2026-09-17T2134Z,analitica,barcelona,Pedri,133609,starter,100.0,,consenso unánime
+2026-09-17T2134Z,analitica,barcelona,Anthony Gordon,138787,starter,100.0,,consenso unánime
+2026-09-17T2134Z,analitica,barcelona,D. Livakovic,1305,doubt,33.3,,consenso 1/3
+2026-09-17T2134Z,analitica,barcelona,Joan García,182718,doubt,66.7,,consenso 2/3
+2026-09-17T2134Z,analitica,celta,Ionut Radu,30765,starter,100.0,,consenso unánime
+2026-09-17T2134Z,analitica,celta,Javi Galán,47566,starter,100.0,,consenso unánime
+2026-09-17T2134Z,analitica,celta,Marcos Alonso,2278,starter,100.0,,consenso unánime
+2026-09-17T2134Z,analitica,celta,Yoel Lago,329722,starter,100.0,,consenso unánime
+2026-09-17T2134Z,analitica,celta,S. Cáceres,51535,starter,100.0,,consenso unánime
+2026-09-17T2134Z,analitica,celta,Javi Rueda,179955,starter,100.0,,consenso unánime
+2026-09-17T2134Z,analitica,celta,Ilaix Moriba,162123,starter,100.0,,consenso unánime
+2026-09-17T2134Z,analitica,celta,Aleix Febas,46711,starter,100.0,,consenso unánime
+2026-09-17T2134Z,analitica,deportivo,Leo Román,179139,starter,100.0,,consenso unánime
+2026-09-17T2134Z,analitica,deportivo,Quagliata,127025,starter,100.0,,consenso unánime
+2026-09-17T2134Z,analitica,deportivo,J. M. Giménez,31,starter,100.0,,consenso unánime
+2026-09-17T2134Z,analitica,deportivo,Lucas Noubi,319512,starter,100.0,,consenso unánime
+2026-09-17T2134Z,analitica,deportivo,Ximo Navarro,47360,starter,100.0,,consenso unánime
+2026-09-17T2134Z,analitica,deportivo,Marc Casadó,329728,starter,100.0,,consenso unánime
+2026-09-17T2134Z,analitica,deportivo,Amatucci,346865,starter,100.0,,consenso unánime
+2026-09-17T2134Z,analitica,deportivo,Mario Soriano,161965,starter,100.0,,consenso unánime
+2026-09-17T2134Z,analitica,deportivo,Bil Nsongo,574733,doubt,66.7,,consenso 2/3
+2026-09-17T2134Z,analitica,deportivo,Luismi Cruz,188445,doubt,66.7,,consenso 2/3
+2026-09-17T2134Z,analitica,deportivo,Adama Traoré,18753,doubt,33.3,,consenso 1/3
+2026-09-17T2134Z,analitica,deportivo,Yeremay,295880,doubt,33.3,,consenso 1/3
+2026-09-17T2134Z,analitica,elche,Matias Dituro,11346,starter,100.0,,consenso unánime
+2026-09-17T2134Z,analitica,elche,R. Revivo,315127,starter,100.0,,consenso unánime
+2026-09-17T2134Z,analitica,elche,Víctor Chust,162058,starter,100.0,,consenso unánime
+2026-09-17T2134Z,analitica,elche,Fede Redondo,311345,starter,100.0,,consenso unánime
+2026-09-17T2134Z,analitica,elche,Rubén Sánchez,199824,starter,100.0,,consenso unánime
+2026-09-17T2134Z,analitica,elche,Gonzalo Villar,46982,starter,100.0,,consenso unánime
+2026-09-17T2134Z,analitica,elche,Morcillo,548704,starter,100.0,,consenso unánime
+2026-09-17T2134Z,analitica,elche,Germán Valera,161963,starter,100.0,,consenso unánime
+2026-09-17T2134Z,analitica,elche,Tete Morente,47182,doubt,66.7,,consenso 2/3
+2026-09-17T2134Z,analitica,elche,Thomas Lemar,45,doubt,33.3,,consenso 1/3
+2026-09-17T2134Z,analitica,espanyol,Dmitrovic,2813,starter,100.0,,consenso unánime
+2026-09-17T2134Z,analitica,espanyol,Cabrera,47249,starter,100.0,,consenso unánime
+2026-09-17T2134Z,analitica,espanyol,Riedel,282054,starter,100.0,,consenso unánime
+2026-09-17T2134Z,analitica,espanyol,Unai Núñez,47277,starter,100.0,,consenso unánime
+2026-09-17T2134Z,analitica,espanyol,Edu Expósito,46799,starter,100.0,,consenso unánime
+2026-09-17T2134Z,analitica,espanyol,Urko,183699,starter,100.0,,consenso unánime
+2026-09-17T2134Z,analitica,espanyol,Bryan Zaragoza,286639,starter,100.0,,consenso unánime
+2026-09-17T2134Z,analitica,espanyol,Roberto,312990,starter,100.0,,consenso unánime
+2026-09-17T2134Z,analitica,espanyol,Roger Hinojo,450716,doubt,66.7,,consenso 2/3
+2026-09-17T2134Z,analitica,espanyol,Marcos Fernández,347885,doubt,66.7,,consenso 2/3
+2026-09-17T2134Z,analitica,espanyol,Javier Hernandez,388495,doubt,66.7,,consenso 2/3
+2026-09-17T2134Z,analitica,espanyol,Hartman,375915,doubt,33.3,,consenso 1/3
+2026-09-17T2134Z,analitica,espanyol,Calatrava,286038,doubt,33.3,,consenso 1/3
+2026-09-17T2134Z,analitica,levante,Mathew Ryan,2741,starter,100.0,,consenso unánime
+2026-09-17T2134Z,analitica,levante,Manu Sánchez,64309,starter,100.0,,consenso unánime
+2026-09-17T2134Z,analitica,levante,Dela,734,starter,100.0,,consenso unánime
+2026-09-17T2134Z,analitica,levante,Aissa Mandi,1567,starter,100.0,,consenso unánime
+2026-09-17T2134Z,analitica,levante,Nacho Pérez,504605,starter,100.0,,consenso unánime
+2026-09-17T2134Z,analitica,levante,Olasagasti,182603,starter,100.0,,consenso unánime
+2026-09-17T2134Z,analitica,levante,Oriol Rey,106727,starter,100.0,,consenso unánime
+2026-09-17T2134Z,analitica,levante,Bardeli,161893,starter,100.0,,consenso unánime
+2026-09-17T2134Z,analitica,osasuna,Abel Bretones,181259,starter,100.0,,consenso unánime
+2026-09-17T2134Z,analitica,osasuna,Catena,47533,starter,100.0,,consenso unánime
+2026-09-17T2134Z,analitica,osasuna,Arguibide,421044,starter,100.0,,consenso unánime
+2026-09-17T2134Z,analitica,osasuna,Iker Muñoz,182621,starter,100.0,,consenso unánime
+2026-09-17T2134Z,analitica,osasuna,Moncayola,46662,starter,100.0,,consenso unánime
+2026-09-17T2134Z,analitica,osasuna,Kike Barja,46667,starter,100.0,,consenso unánime
+2026-09-17T2134Z,analitica,osasuna,Del Castillo,2214,starter,100.0,,consenso unánime
+2026-09-17T2134Z,analitica,osasuna,Rubén García,46658,starter,100.0,,consenso unánime
+2026-09-17T2134Z,analitica,osasuna,Aitor Fernández,47448,doubt,66.7,,consenso 2/3
+2026-09-17T2134Z,analitica,osasuna,Rockson Yeboah,428586,doubt,66.7,,consenso 2/3
+2026-09-17T2134Z,analitica,osasuna,Sergio Herrera,46646,doubt,33.3,,consenso 1/3
+2026-09-17T2134Z,analitica,osasuna,Boyomo,279822,doubt,33.3,,consenso 1/3
+2026-09-17T2134Z,analitica,racing,Agirrezabala,183848,starter,100.0,,consenso unánime
+2026-09-17T2134Z,analitica,racing,Jorge Salinas,482469,starter,100.0,,consenso unánime
+2026-09-17T2134Z,analitica,racing,J. Belocian,343316,starter,100.0,,consenso unánime
+2026-09-17T2134Z,analitica,racing,Pablo Ramón,46734,starter,100.0,,consenso unánime
+2026-09-17T2134Z,analitica,racing,Álvaro Mantilla,181685,starter,100.0,,consenso unánime
+2026-09-17T2134Z,analitica,racing,M. Prati,309388,starter,100.0,,consenso unánime
+2026-09-17T2134Z,analitica,racing,Iván Martín,1700,starter,100.0,,consenso unánime
+2026-09-17T2134Z,analitica,racing,Iñigo Vicente,47293,starter,100.0,,consenso unánime
+2026-09-17T2134Z,analitica,racing,Canales,1570,doubt,66.7,,consenso 2/3
+2026-09-17T2134Z,analitica,racing,André Almeida,41157,doubt,33.3,,consenso 1/3
+2026-09-17T2134Z,analitica,rayo-vallecano,Emil Audero,30441,starter,100.0,,consenso unánime
+2026-09-17T2134Z,analitica,rayo-vallecano,Pedrosa,47329,starter,100.0,,consenso unánime
+2026-09-17T2134Z,analitica,rayo-vallecano,Pathé Ciss,41552,starter,100.0,,consenso unánime
+2026-09-17T2134Z,analitica,rayo-vallecano,Lejeune,18895,starter,100.0,,consenso unánime
+2026-09-17T2134Z,analitica,rayo-vallecano,Andrei Ratiu,1703,starter,100.0,,consenso unánime
+2026-09-17T2134Z,analitica,rayo-vallecano,Unai López,47285,starter,100.0,,consenso unánime
+2026-09-17T2134Z,analitica,rayo-vallecano,Pedro Díaz,46887,starter,100.0,,consenso unánime
+2026-09-17T2134Z,analitica,rayo-vallecano,Bouare,548809,starter,100.0,,consenso unánime
+2026-09-17T2134Z,analitica,real-madrid,Courtois,730,starter,100.0,,consenso unánime
+2026-09-17T2134Z,analitica,real-madrid,Cucurella,47380,starter,100.0,,consenso unánime
+2026-09-17T2134Z,analitica,real-madrid,Dean Huijsen,361497,starter,100.0,,consenso unánime
+2026-09-17T2134Z,analitica,real-madrid,Konaté,1145,starter,100.0,,consenso unánime
+2026-09-17T2134Z,analitica,real-madrid,Dumfries,226,starter,100.0,,consenso unánime
+2026-09-17T2134Z,analitica,real-madrid,Tchouaméni,1271,starter,100.0,,consenso unánime
+2026-09-17T2134Z,analitica,real-madrid,Bellingham,129718,starter,100.0,,consenso unánime
+2026-09-17T2134Z,analitica,real-madrid,Fede Valverde,756,starter,100.0,,consenso unánime
+2026-09-17T2134Z,analitica,sevilla,Vlachodimos,557,starter,100.0,,consenso unánime
+2026-09-17T2134Z,analitica,sevilla,Gabriel Suazo,11421,starter,100.0,,consenso unánime
+2026-09-17T2134Z,analitica,sevilla,Kike Salas,297311,starter,100.0,,consenso unánime
+2026-09-17T2134Z,analitica,sevilla,Andrés Castrín,338902,starter,100.0,,consenso unánime
+2026-09-17T2134Z,analitica,sevilla,Juan Iglesias,119742,starter,100.0,,consenso unánime
+2026-09-17T2134Z,analitica,sevilla,Lucien Agoumé,21004,starter,100.0,,consenso unánime
+2026-09-17T2134Z,analitica,sevilla,Y. Fofana,22254,starter,100.0,,consenso unánime
+2026-09-17T2134Z,analitica,sevilla,Félix Correia,135749,starter,100.0,,consenso unánime
+2026-09-17T2134Z,analitica,sevilla,Robbie Ure,327536,doubt,33.3,,consenso 1/3
+2026-09-17T2134Z,analitica,sevilla,Lucas Stassin,322560,doubt,66.7,,consenso 2/3
+2026-09-17T2134Z,analitica,valencia,Dimitrievski,47527,starter,100.0,,consenso unánime
+2026-09-17T2134Z,analitica,valencia,José Gayà,918,starter,100.0,,consenso unánime
+2026-09-17T2134Z,analitica,valencia,Justin de Haas,36884,starter,100.0,,consenso unánime
+2026-09-17T2134Z,analitica,valencia,Pepelu,47463,starter,100.0,,consenso unánime
+2026-09-17T2134Z,analitica,valencia,Pablo Maffeo,26302,starter,100.0,,consenso unánime
+2026-09-17T2134Z,analitica,valencia,Aaron Mayol,641317,starter,100.0,,consenso unánime
+2026-09-17T2134Z,analitica,valencia,Guido Rodríguez,2476,starter,100.0,,consenso unánime
+2026-09-17T2134Z,analitica,valencia,Filip Ugrinic,48465,starter,100.0,,consenso unánime
+2026-09-17T2134Z,analitica,valencia,Ryunosuke Sato,410840,doubt,33.3,,consenso 1/3
+2026-09-17T2134Z,analitica,valencia,Arnaut Danjuma,83,doubt,66.7,,consenso 2/3
+2026-09-17T2134Z,futbolfantasy,alaves,Antonio Sivera,antonio-sivera,starter,95,ok,
+2026-09-17T2134Z,futbolfantasy,alaves,Antonio Blanco,antonio-blanco,starter,80,ok,
+2026-09-17T2134Z,futbolfantasy,alaves,Ángel Pérez,angel-perez-1,starter,80,ok,
+2026-09-17T2134Z,futbolfantasy,alaves,Ville Koski,ville-koski,starter,70,ok,
+2026-09-17T2134Z,futbolfantasy,alaves,Jonny Castro,jonny-castro,starter,70,ok,
+2026-09-17T2134Z,futbolfantasy,alaves,Abde Rebbach,abde-rebbach,starter,60,ok,
+2026-09-17T2134Z,futbolfantasy,alaves,Pablo Ibáñez,pablo-ibanez,starter,70,ok,
+2026-09-17T2134Z,futbolfantasy,alaves,Mariano Díaz,mariano-diaz,starter,50,ok,
+2026-09-17T2134Z,futbolfantasy,alaves,Lucas Boyé,lucas-boye,starter,70,ok,
+2026-09-17T2134Z,futbolfantasy,alaves,Carles Aleñá,carles-alena,starter,50,ok,
+2026-09-17T2134Z,futbolfantasy,alaves,Nahuel Tenaglia,nahuel-tenaglia,starter,70,ok,
+2026-09-17T2134Z,futbolfantasy,alaves,Denis Suárez,denis-suarez,sub,50,ok,
+2026-09-17T2134Z,futbolfantasy,alaves,Toni Martinez,antonio-martinez,sub,50,ok,
+2026-09-17T2134Z,futbolfantasy,alaves,Nicolás Valentini,nicolas-valentini,sub,40,ok,
+2026-09-17T2134Z,futbolfantasy,alaves,Youssef Enríquez,youssef-enriquez,sub,40,ok,
+2026-09-17T2134Z,futbolfantasy,alaves,Miguel Rodríguez,miguel-rodriguez-1,sub,30,ok,
+2026-09-17T2134Z,futbolfantasy,alaves,Carlos Benavidez,carlos-benavidez,sub,30,ok,
+2026-09-17T2134Z,futbolfantasy,alaves,Ander Guevara,ander-guevara,sub,30,ok,
+2026-09-17T2134Z,futbolfantasy,alaves,Hugo Novoa,hugo-novoa,sub,20,ok,
+2026-09-17T2134Z,futbolfantasy,alaves,Aitor Mañas,aitor-manas,sub,10,doubt,Traumatismo craneoencefálico Desde 12/09 (5 días) Baja hasta finales de septiembre
+2026-09-17T2134Z,futbolfantasy,alaves,Xanet Oláiz,xanet-olaiz,sub,10,ok,
+2026-09-17T2134Z,futbolfantasy,alaves,Adrián Rodríguez,adrian-rodriguez,sub,5,ok,
+2026-09-17T2134Z,futbolfantasy,alaves,Mikel Rodriguez,mikel-rodriguez,sub,0,injured,Rotura de lig. cruzado anterior Desde 03/09 (14 días) Baja hasta abril
+2026-09-17T2134Z,futbolfantasy,alaves,Facundo Garcés,facundo-garces,sub,0,unavailable,
+2026-09-17T2134Z,futbolfantasy,athletic,Iñaki Williams,inaki-williams,starter,70,ok,
+2026-09-17T2134Z,futbolfantasy,athletic,Robert Navarro,robert-navarro,starter,60,ok,
+2026-09-17T2134Z,futbolfantasy,athletic,Yeray Álvarez,yeray-alvarez,starter,70,ok,
+2026-09-17T2134Z,futbolfantasy,athletic,Aymeric Laporte,aymeric-laporte,starter,80,ok,
+2026-09-17T2134Z,futbolfantasy,athletic,Unai Simón,unai-simon,starter,95,ok,
+2026-09-17T2134Z,futbolfantasy,athletic,Beñat Gerenabarrena,benat-gerenabarrena,starter,80,ok,
+2026-09-17T2134Z,futbolfantasy,athletic,Oihan Sancet,oihan-sancet,starter,90,ok,
+2026-09-17T2134Z,futbolfantasy,athletic,Yuri Berchiche,yuri-berchiche,starter,80,ok,
+2026-09-17T2134Z,futbolfantasy,athletic,Nico Williams,nico-williams,starter,80,ok,
+2026-09-17T2134Z,futbolfantasy,athletic,Íñigo Ruiz de Galarreta,inigo-ruiz-de-galarreta,starter,70,ok,
+2026-09-17T2134Z,futbolfantasy,athletic,Jesús Areso,jesus-areso,starter,70,ok,
+2026-09-17T2134Z,futbolfantasy,athletic,Álex Berenguer,alex-berenguer,sub,50,ok,
+2026-09-17T2134Z,futbolfantasy,athletic,Aitor Paredes,aitor-paredes,sub,50,ok,
+2026-09-17T2134Z,futbolfantasy,athletic,Mikel Jauregizar,mikel-jauregizar,sub,30,ok,
+2026-09-17T2134Z,futbolfantasy,athletic,Maroan Sannadi,maroan-sannadi,sub,30,ok,
+2026-09-17T2134Z,futbolfantasy,athletic,Hugo Rincón,hugo-rincon,sub,30,ok,
+2026-09-17T2134Z,futbolfantasy,athletic,Gorka Guruzeta,gorka-guruzeta,sub,20,ok,
+2026-09-17T2134Z,futbolfantasy,athletic,Johaneko Louis-Jean,johaneko-louis-jean,sub,20,ok,
+2026-09-17T2134Z,futbolfantasy,athletic,Beñat Prados,benat-prados,sub,10,ok,
+2026-09-17T2134Z,futbolfantasy,athletic,Alejandro Rego,alejandro-rego,sub,10,ok,
+2026-09-17T2134Z,futbolfantasy,athletic,Alex Padilla,alex-padilla,sub,5,ok,
+2026-09-17T2134Z,futbolfantasy,athletic,Nico Serrano,nico-serrano,sub,0,ok,
+2026-09-17T2134Z,futbolfantasy,athletic,Peio Canales,peio-canales,sub,0,doubt,Lesión en el sóleo Desde 01/09 (16 días) Disponible para la jornada 7
+2026-09-17T2134Z,futbolfantasy,athletic,Álvaro Djaló,lvaro-djalo,sub,0,ok,
+2026-09-17T2134Z,futbolfantasy,athletic,Unai Egiluz,unai-egiluz,sub,0,injured,Rotura de lig. cruzado anterior Desde 15/05 (125 días) Baja hasta enero 2027
+2026-09-17T2134Z,futbolfantasy,athletic,Dani Vivian,dani-vivian,sub,0,injured,Lesión en el aductor Desde 16/07 (63 días) Baja hsata principios de octubre
+2026-09-17T2134Z,futbolfantasy,atletico,Jonathan David,jonathan-david,starter,70,ok,
+2026-09-17T2134Z,futbolfantasy,atletico,David Hancko,david-hancko,starter,80,ok,
+2026-09-17T2134Z,futbolfantasy,atletico,Giuliano Simeone,giuliano-simeone,starter,80,ok,
+2026-09-17T2134Z,futbolfantasy,atletico,Marc Pubill,marc-pubill,starter,90,ok,
+2026-09-17T2134Z,futbolfantasy,atletico,Álex Grimaldo,alex-grimaldo,starter,60,ok,
+2026-09-17T2134Z,futbolfantasy,atletico,Jan Oblak,jan-oblak,starter,95,ok,
+2026-09-17T2134Z,futbolfantasy,atletico,Marcos Llorente,marcos-llorente,starter,70,ok,
+2026-09-17T2134Z,futbolfantasy,atletico,Kang-In Lee,lee-kang-in,starter,50,ok,
+2026-09-17T2134Z,futbolfantasy,atletico,Morten Hjulmand,morten-hjulmand,starter,60,ok,
+2026-09-17T2134Z,futbolfantasy,atletico,Álex Baena,lex-baena,starter,70,ok,
+2026-09-17T2134Z,futbolfantasy,atletico,Cristian Romero,cristian-romero,starter,70,ok,
+2026-09-17T2134Z,futbolfantasy,atletico,Johnny Cardoso,johnny-cardoso,sub,50,ok,
+2026-09-17T2134Z,futbolfantasy,atletico,Ademola Lookman,ademola-lookman,sub,50,ok,
+2026-09-17T2134Z,futbolfantasy,atletico,Koke Resurrección,koke-resurreccion,sub,50,ok,
+2026-09-17T2134Z,futbolfantasy,atletico,Robin Le Normand,robin-le-normand,sub,40,ok,
+2026-09-17T2134Z,futbolfantasy,atletico,Julián Álvarez,julian-lvarez,sub,30,doubt,Sobrecarga muscular Desde 12/09 (5 días) Duda para la jornada 7
+2026-09-17T2134Z,futbolfantasy,atletico,Rodrigo Mendoza,rodrigo-mendoza,sub,30,ok,
+2026-09-17T2134Z,futbolfantasy,atletico,Arnau Ortiz,arnau-ortiz,sub,20,ok,
+2026-09-17T2134Z,futbolfantasy,atletico,Alexander Sorloth,alexander-sorloth,sub,10,doubt,Contractura muscular Desde 12/08 (36 días) Duda para la jornada 7
+2026-09-17T2134Z,futbolfantasy,atletico,Juan Musso,juan-musso,sub,5,ok,
+2026-09-17T2134Z,futbolfantasy,atletico,Obed Vargas,obed-vargas,sub,0,ok,
+2026-09-17T2134Z,futbolfantasy,atletico,Pablo Barrios,pablo-barrios,sub,0,injured,Lesión en el sóleo Desde 09/09 (8 días) Baja confirmada para la jornada 7
+2026-09-17T2134Z,futbolfantasy,barcelona,Pedri González,pedri-gonzalez,starter,70,ok,
+2026-09-17T2134Z,futbolfantasy,barcelona,Gerard Martín,gerard-martin,starter,80,ok,
+2026-09-17T2134Z,futbolfantasy,barcelona,Eric Garcia,eric-garcia,starter,50,ok,
+2026-09-17T2134Z,futbolfantasy,barcelona,Fermín López,fermin-lopez,starter,70,ok,
+2026-09-17T2134Z,futbolfantasy,barcelona,Raphinha,raphinha,starter,70,ok,
+2026-09-17T2134Z,futbolfantasy,barcelona,Wojciech Szczesny,wojciech-szczesny,starter,50,ok,
+2026-09-17T2134Z,futbolfantasy,barcelona,Anthony Gordon,anthony-gordon,starter,50,ok,
+2026-09-17T2134Z,futbolfantasy,barcelona,Pau Cubarsí,pau-cubarsi,starter,90,ok,
+2026-09-17T2134Z,futbolfantasy,barcelona,Xavi Espart,xavi-espart,starter,70,ok,
+2026-09-17T2134Z,futbolfantasy,barcelona,Lamine Yamal,lamine-yamal,starter,80,ok,
+2026-09-17T2134Z,futbolfantasy,barcelona,Rodri Hernández,rodri-hernandez,starter,70,ok,
+2026-09-17T2134Z,futbolfantasy,barcelona,Jules Koundé,jules-kounde,sub,50,ok,
+2026-09-17T2134Z,futbolfantasy,barcelona,Karim Adeyemi,karim-adeyemi,sub,50,ok,
+2026-09-17T2134Z,futbolfantasy,barcelona,Dominik Livakovic,dominik-livakovic,sub,50,ok,
+2026-09-17T2134Z,futbolfantasy,barcelona,Marc Bernal,marc-bernal,sub,40,ok,
+2026-09-17T2134Z,futbolfantasy,barcelona,Pablo Gavi,pablo-gavi,sub,30,ok,
+2026-09-17T2134Z,futbolfantasy,barcelona,Dani Olmo,dani-olmo,sub,30,ok,
+2026-09-17T2134Z,futbolfantasy,barcelona,Joao Cancelo,joao-cancelo,sub,30,ok,
+2026-09-17T2134Z,futbolfantasy,barcelona,Andreas Christensen,andreas-christensen,sub,30,ok,
+2026-09-17T2134Z,futbolfantasy,barcelona,Gabriel Jesus,gabriel-jesus,sub,20,ok,
+2026-09-17T2134Z,futbolfantasy,barcelona,Alejandro Balde,alejandro-balde,sub,10,ok,
+2026-09-17T2134Z,futbolfantasy,barcelona,Hamza Abdelkarim,hamza-abdelkarim,sub,10,ok,
+2026-09-17T2134Z,futbolfantasy,barcelona,Brian Fariñas,brian-farinas,sub,0,ok,
+2026-09-17T2134Z,futbolfantasy,barcelona,Frenkie de Jong,frenkie-de-jong,sub,0,injured,Lesión de rodilla Desde 04/07 (75 días) Baja hasta principios de octubre
+2026-09-17T2134Z,futbolfantasy,barcelona,Joan Garcia,joan-garcia,sub,0,injured,Molestias en el menisco Desde 16/09 (1 día) Baja confirmada para la jornada 7
+2026-09-17T2134Z,futbolfantasy,barcelona,Roony Bardghji,roony-bardghji,sub,0,injured,Rotura de lig. cruzado anterior Desde 10/08 (38 días) Baja hasta marzo
+2026-09-17T2134Z,futbolfantasy,betis,Antony,antony,starter,100,ok,
+2026-09-17T2134Z,futbolfantasy,betis,Abde Ezzalzouli,abde-ezzalzouli,starter,100,ok,
+2026-09-17T2134Z,futbolfantasy,betis,Valentín Gómez,valentin-gomez,starter,100,ok,
+2026-09-17T2134Z,futbolfantasy,betis,Junior Firpo,junior-firpo,starter,100,ok,
+2026-09-17T2134Z,futbolfantasy,betis,Natan,natan,starter,100,ok,
+2026-09-17T2134Z,futbolfantasy,betis,Nelson Deossa,nelson-deossa,starter,100,ok,
+2026-09-17T2134Z,futbolfantasy,betis,Facundo Bernal,facundo-bernal,starter,100,ok,
+2026-09-17T2134Z,futbolfantasy,betis,Ángel Ortiz,ngel-ortiz,starter,100,ok,
+2026-09-17T2134Z,futbolfantasy,betis,Troy Parrott,troy-parrott,starter,100,ok,
+2026-09-17T2134Z,futbolfantasy,betis,Isco Alarcón,isco-alarcon,starter,100,ok,
+2026-09-17T2134Z,futbolfantasy,betis,Álvaro Valles,alvaro-valles,starter,100,ok,
+2026-09-17T2134Z,futbolfantasy,betis,Héctor Bellerín,hector-bellerin,sub,0,ok,
+2026-09-17T2134Z,futbolfantasy,betis,Dani Ceballos,dani-ceballos,sub,0,ok,
+2026-09-17T2134Z,futbolfantasy,betis,Rodrigo Riquelme,rodrigo-riquelme,sub,0,ok,
+2026-09-17T2134Z,futbolfantasy,betis,Cucho Hernández,cucho-hernandez,sub,0,ok,
+2026-09-17T2134Z,futbolfantasy,betis,Álvaro Fidalgo,lvaro-fidalgo,sub,0,ok,
+2026-09-17T2134Z,futbolfantasy,betis,Manu González,manu-gonzalez,sub,0,ok,
+2026-09-17T2134Z,futbolfantasy,betis,Marc Bartra,marc-bartra,sub,0,ok,
+2026-09-17T2134Z,futbolfantasy,betis,Fran García,fran-garcia,sub,0,ok,
+2026-09-17T2134Z,futbolfantasy,betis,Pablo Fornals,pablo-fornals,sub,0,ok,
+2026-09-17T2134Z,futbolfantasy,betis,Giovani Lo Celso,giovani-lo-celso,sub,0,ok,
+2026-09-17T2134Z,futbolfantasy,betis,Iker Losada,iker-losada,sub,0,ok,
+2026-09-17T2134Z,futbolfantasy,betis,Marc Roca,marc-roca,sub,0,ok,
+2026-09-17T2134Z,futbolfantasy,betis,Diego Javier Llorente,diego-javier-llorente,absent,,injured,Molestias sin determinar Desde 12/09 (5 días) Baja confirmada para la jornada 6
+2026-09-17T2134Z,futbolfantasy,betis,Aitor Ruibal,aitor-ruibal,absent,,injured,Operado del menisco Desde 14/05 (126 días) Baja confirmada para la jornada 6
+2026-09-17T2134Z,futbolfantasy,celta,Aleix Febas,aleix-febas,starter,70,ok,
+2026-09-17T2134Z,futbolfantasy,celta,Hugo González,hugo-gonzalez,starter,70,ok,
+2026-09-17T2134Z,futbolfantasy,celta,Ionut Radu,andrei-radu,starter,90,ok,
+2026-09-17T2134Z,futbolfantasy,celta,Ferran Jutglà,ferran-jutgla,starter,50,ok,
+2026-09-17T2134Z,futbolfantasy,celta,Marcos Alonso,marcos-alonso,starter,60,ok,
+2026-09-17T2134Z,futbolfantasy,celta,Sebastián Cáceres,sebastian-caceres,starter,70,ok,
+2026-09-17T2134Z,futbolfantasy,celta,Yoel Lago,yoel-lago,starter,70,ok,
+2026-09-17T2134Z,futbolfantasy,celta,Ilaix Moriba,ilaix-moriba,starter,50,ok,
+2026-09-17T2134Z,futbolfantasy,celta,Javi Rueda,javi-rueda,starter,70,ok,
+2026-09-17T2134Z,futbolfantasy,celta,Williot Swedberg,williot-swedberg,starter,50,ok,
+2026-09-17T2134Z,futbolfantasy,celta,Javi Galán,javi-galan,starter,70,ok,
+2026-09-17T2134Z,futbolfantasy,celta,Miguel Román,miguel-roman,sub,50,ok,
+2026-09-17T2134Z,futbolfantasy,celta,Hugo Álvarez,hugo-lvarez-,sub,40,ok,
+2026-09-17T2134Z,futbolfantasy,celta,Sergio Carreira,sergio-carreira,sub,30,ok,
+2026-09-17T2134Z,futbolfantasy,celta,Carl Starfelt,carl-starfelt,sub,30,ok,
+2026-09-17T2134Z,futbolfantasy,celta,Hugo Burcio,hugo-burcio,sub,30,ok,
+2026-09-17T2134Z,futbolfantasy,celta,Couhaib Driouech,couhaib-driouech,sub,30,ok,
+2026-09-17T2134Z,futbolfantasy,celta,Javi Rodríguez,javi-rodriguez,sub,30,ok,
+2026-09-17T2134Z,futbolfantasy,celta,Abdoulaye Faye,abdoulaye-faye,sub,30,ok,
+2026-09-17T2134Z,futbolfantasy,celta,Álvaro Núñez,lvaro-nunez,sub,30,ok,
+2026-09-17T2134Z,futbolfantasy,celta,Pablo Durán,pablo-duran,sub,30,ok,
+2026-09-17T2134Z,futbolfantasy,celta,Jones El-Abdellaoui,jones-el-abdellaoui,sub,20,ok,
+2026-09-17T2134Z,futbolfantasy,celta,Borja Iglesias,borja-iglesias,sub,20,ok,
+2026-09-17T2134Z,futbolfantasy,celta,Altay Bayindir,altay-bayindir,sub,10,ok,
+2026-09-17T2134Z,futbolfantasy,celta,Iván Villar,ivan-villar,sub,0,ok,
+2026-09-17T2134Z,futbolfantasy,celta,Andrés Antañón,andres-antanon,sub,0,injured,Esguince de tobillo Desde 12/09 (5 días) Baja hasta finales de septiembre
+2026-09-17T2134Z,futbolfantasy,celta,Iago Aspas,iago-aspas,sub,0,injured,Lesión en el recto anterior Desde 13/09 (4 días) Baja hasta mediados de octubre
+2026-09-17T2134Z,futbolfantasy,deportivo,Ximo Navarro,ximo-navarro,starter,80,ok,
+2026-09-17T2134Z,futbolfantasy,deportivo,José María Giménez,jose-maria-gimenez,starter,60,ok,
+2026-09-17T2134Z,futbolfantasy,deportivo,Pierre-Emerick Aubameyang,pierre-emerick-aubameyang,starter,80,ok,
+2026-09-17T2134Z,futbolfantasy,deportivo,Lorenzo Amatucci,lorenzo-amatucci,starter,70,ok,
+2026-09-17T2134Z,futbolfantasy,deportivo,Luismi Cruz,luismi-cruz,starter,60,ok,
+2026-09-17T2134Z,futbolfantasy,deportivo,Marc Casadó,marc-casado,starter,70,ok,
+2026-09-17T2134Z,futbolfantasy,deportivo,Bil Nsongo,bil-nsongo,starter,50,ok,
+2026-09-17T2134Z,futbolfantasy,deportivo,Lucas Noubi,lucas-noubi,starter,70,ok,
+2026-09-17T2134Z,futbolfantasy,deportivo,Giacomo Quagliata,giacomo-quagliata,starter,90,ok,
+2026-09-17T2134Z,futbolfantasy,deportivo,Mario Soriano,mario-soriano,starter,80,ok,
+2026-09-17T2134Z,futbolfantasy,deportivo,Leo Román,leo-roman,starter,95,ok,
+2026-09-17T2134Z,futbolfantasy,deportivo,Yeremay Hernández,yeremay-hernandez,sub,50,ok,
+2026-09-17T2134Z,futbolfantasy,deportivo,Bright Ede,bright-ede,sub,40,ok,
+2026-09-17T2134Z,futbolfantasy,deportivo,Adama Traoré,adama-traore-cachas,sub,40,ok,
+2026-09-17T2134Z,futbolfantasy,deportivo,Riki Rodríguez,riki-rodriguez,sub,40,ok,
+2026-09-17T2134Z,futbolfantasy,deportivo,Zakaria Eddahchouri,zakaria-eddahchouri,sub,30,ok,
+2026-09-17T2134Z,futbolfantasy,deportivo,Adrià Altimira,adria-altimira,sub,30,ok,
+2026-09-17T2134Z,futbolfantasy,deportivo,David Mella,david-mella,sub,30,ok,
+2026-09-17T2134Z,futbolfantasy,deportivo,Miguel Loureiro,miguel-loureiro,sub,30,ok,
+2026-09-17T2134Z,futbolfantasy,deportivo,Jonathan Asp Jensen,jonathan-asp-jensen,sub,30,ok,
+2026-09-17T2134Z,futbolfantasy,deportivo,Álvaro Fernández,alvaro-fernandez,sub,5,ok,
+2026-09-17T2134Z,futbolfantasy,deportivo,Noé Carrillo,noe-carrillo,sub,0,doubt,Lesión de tobillo Desde 12/08 (36 días) Duda para la jornada 7
+2026-09-17T2134Z,futbolfantasy,deportivo,Diego Villares,diego-villares,sub,0,ok,
+2026-09-17T2134Z,futbolfantasy,deportivo,Dani Barcia,dani-barcia,sub,0,ok,
+2026-09-17T2134Z,futbolfantasy,deportivo,Arnau Comas,arnau-comas,sub,0,ok,
+2026-09-17T2134Z,futbolfantasy,deportivo,Kevin Sánchez,kevin-sanchez,sub,0,ok,
+2026-09-17T2134Z,futbolfantasy,deportivo,Germán Parreño,german-parreno,sub,0,ok,
+2026-09-17T2134Z,futbolfantasy,deportivo,Angeliño,angelino,sub,0,suspended,
+2026-09-17T2134Z,futbolfantasy,elche,Germán Valera,german-valera,starter,70,ok,
+2026-09-17T2134Z,futbolfantasy,elche,Fernando Niño,fernando-nino,starter,60,ok,
+2026-09-17T2134Z,futbolfantasy,elche,Gonzalo Villar,gonzalo-villar,starter,70,ok,
+2026-09-17T2134Z,futbolfantasy,elche,Javi Morcillo,javi-morcillo,starter,50,ok,
+2026-09-17T2134Z,futbolfantasy,elche,Matías Dituro,matias-dituro,starter,50,ok,
+2026-09-17T2134Z,futbolfantasy,elche,Buba Sangaré,buba-sangare,starter,50,ok,
+2026-09-17T2134Z,futbolfantasy,elche,Víctor Chust,victor-chust,starter,70,ok,
+2026-09-17T2134Z,futbolfantasy,elche,Federico Redondo,federico-redondo,starter,70,ok,
+2026-09-17T2134Z,futbolfantasy,elche,Roy Revivo,roy-revivo,starter,70,ok,
+2026-09-17T2134Z,futbolfantasy,elche,Facundo Buonanotte,facundo-buonanotte,starter,60,ok,
+2026-09-17T2134Z,futbolfantasy,elche,Tete Morente,tete-morente,starter,50,ok,
+2026-09-17T2134Z,futbolfantasy,elche,Marc Aguado,marc-aguado,sub,50,ok,
+2026-09-17T2134Z,futbolfantasy,elche,Thomas Lemar,thomas-lemar,sub,50,ok,
+2026-09-17T2134Z,futbolfantasy,elche,Alejandro Iturbe,alejandro-iturbe,sub,50,ok,
+2026-09-17T2134Z,futbolfantasy,elche,Abiel Osorio,abiel-osorio,sub,40,ok,
+2026-09-17T2134Z,futbolfantasy,elche,Rubén Sánchez,ruben-sanchez-1,sub,40,ok,
+2026-09-17T2134Z,futbolfantasy,elche,Pedro Bigas,pedro-bigas,sub,40,ok,
+2026-09-17T2134Z,futbolfantasy,elche,Grady Diangana,grady-diangana,sub,30,ok,
+2026-09-17T2134Z,futbolfantasy,elche,Lucas Cepeda,lucas-cepeda,sub,30,ok,
+2026-09-17T2134Z,futbolfantasy,elche,Martim Neto,martim-neto,sub,30,ok,
+2026-09-17T2134Z,futbolfantasy,elche,Ezequiel Ponce,ezequiel-ponce,sub,20,ok,
+2026-09-17T2134Z,futbolfantasy,elche,Kevin Lomónaco,kevin-lomonaco,sub,20,ok,
+2026-09-17T2134Z,futbolfantasy,elche,Ali Houary,-ali-houary,sub,20,ok,
+2026-09-17T2134Z,futbolfantasy,elche,Josan Ferrández,josan,sub,10,ok,
+2026-09-17T2134Z,futbolfantasy,elche,Adam Boayar,adam-boayar,sub,0,ok,
+2026-09-17T2134Z,futbolfantasy,elche,Bambo Diaby,bambo-diaby,sub,0,ok,
+2026-09-17T2134Z,futbolfantasy,elche,Matia Barzic,matia-barzic,sub,0,ok,
+2026-09-17T2134Z,futbolfantasy,elche,Yago Santiago,yago-santiago,sub,0,injured,Sometido a artroscopia en la rodilla Desde 15/04 (155 días) Baja confirmada para la jornada 7
+2026-09-17T2134Z,futbolfantasy,espanyol,Javier Hernández,javier-hernandez,starter,70,ok,
+2026-09-17T2134Z,futbolfantasy,espanyol,Roberto Fernández,roberto-fernandez-1,starter,80,ok,
+2026-09-17T2134Z,futbolfantasy,espanyol,Marko Dmitrovic,marko-dmitrovic,starter,95,ok,
+2026-09-17T2134Z,futbolfantasy,espanyol,Unai Núñez,unai-nunez,starter,70,ok,
+2026-09-17T2134Z,futbolfantasy,espanyol,Urko González de Zarate,urko-gonzalez-de-zarate,starter,70,ok,
+2026-09-17T2134Z,futbolfantasy,espanyol,Tyrhys Dolan,tyrhys-dolan,starter,50,ok,
+2026-09-17T2134Z,futbolfantasy,espanyol,Bryan Zaragoza,bryan-zaragoza,starter,50,ok,
+2026-09-17T2134Z,futbolfantasy,espanyol,Quilindschy Hartman,quilindschy-hartman,starter,50,ok,
+2026-09-17T2134Z,futbolfantasy,espanyol,Leandro Cabrera,leandro-cabrera,starter,80,ok,
+2026-09-17T2134Z,futbolfantasy,espanyol,Clemens Riedel,clemens-riedel,starter,60,ok,
+2026-09-17T2134Z,futbolfantasy,espanyol,Edu Expósito,edu-exposito,starter,80,ok,
+2026-09-17T2134Z,futbolfantasy,espanyol,Roger Hinojo,roger-hinojo,sub,50,ok,
+2026-09-17T2134Z,futbolfantasy,espanyol,Vanja Drkusic,vanja-drkusic,sub,50,ok,
+2026-09-17T2134Z,futbolfantasy,espanyol,Álex Calatrava,lex-calatrava,sub,40,ok,
+2026-09-17T2134Z,futbolfantasy,espanyol,Gabriel Moscardo,gabriel-moscardo,sub,40,ok,
+2026-09-17T2134Z,futbolfantasy,espanyol,Marcos Fernández,marcos-fernandez-1,sub,40,ok,
+2026-09-17T2134Z,futbolfantasy,espanyol,Pol Lozano,pol-lozano,sub,30,ok,
+2026-09-17T2134Z,futbolfantasy,espanyol,Pere Milla,pere-milla,sub,30,ok,
+2026-09-17T2134Z,futbolfantasy,espanyol,Rafel Bauzà,rafel-bauza,sub,20,ok,
+2026-09-17T2134Z,futbolfantasy,espanyol,Ángel Fortuño,ngel-fortuno,sub,5,ok,
+2026-09-17T2134Z,futbolfantasy,espanyol,Jofre Carreras,jofre-carreras,sub,0,doubt,Molestias en el pubis Desde 14/09 (3 días) Duda para la jornada 7
+2026-09-17T2134Z,futbolfantasy,espanyol,Andoni Gorosabel,andoni-gorosabel,sub,0,doubt,Molestias sin determinar Desde 24/08 (24 días) Duda para la jornada 7
+2026-09-17T2134Z,futbolfantasy,espanyol,Javi Puado,javi-puado,sub,0,injured,Rotura de lig. cruzado anterior Desde 11/01 (249 días) Baja hasta octubre
+2026-09-17T2134Z,futbolfantasy,espanyol,Kike García,kike-garcia,sub,0,injured,Rotura completa del tendón proximal del bíceps femoral Desde 01/08 (47 días) Baja hasta diciembre
+2026-09-17T2134Z,futbolfantasy,espanyol,Omar El Hilali,omar-el-hilali,sub,0,suspended,
+2026-09-17T2134Z,futbolfantasy,getafe,Orel Mangala,orel-mangala,starter,100,ok,
+2026-09-17T2134Z,futbolfantasy,getafe,Nemanja Gudelj,nemanja-gudelj,starter,100,ok,
+2026-09-17T2134Z,futbolfantasy,getafe,Francho Serrano,francho-serrano,starter,100,ok,
+2026-09-17T2134Z,futbolfantasy,getafe,Mario Martín,mario-martin,starter,100,ok,
+2026-09-17T2134Z,futbolfantasy,getafe,David Soria,david-soria,starter,100,ok,
+2026-09-17T2134Z,futbolfantasy,getafe,Andrés García,andres-garcia,starter,100,ok,
+2026-09-17T2134Z,futbolfantasy,getafe,Martín Satriano,martin-satriano,starter,100,ok,
+2026-09-17T2134Z,futbolfantasy,getafe,Zaid Romero,zaid-romero,starter,100,ok,
+2026-09-17T2134Z,futbolfantasy,getafe,Davinchi,davinchi,starter,100,ok,
+2026-09-17T2134Z,futbolfantasy,getafe,Dakonam Djené,dakonam-djene,starter,100,ok,
+2026-09-17T2134Z,futbolfantasy,getafe,Iván Azón,ivan-azon,starter,100,ok,
+2026-09-17T2134Z,futbolfantasy,getafe,Johan Mojica,johan-mojica,sub,0,ok,
+2026-09-17T2134Z,futbolfantasy,getafe,Enes Ünal,enes-unal,sub,0,ok,
+2026-09-17T2134Z,futbolfantasy,getafe,Sebastián Boselli,sebastian-boselli,sub,0,ok,
+2026-09-17T2134Z,futbolfantasy,getafe,Alberto Risco,alberto-risco,sub,0,ok,
+2026-09-17T2134Z,futbolfantasy,getafe,Óscar López,oscar-lopez,sub,0,ok,
+2026-09-17T2134Z,futbolfantasy,getafe,Jiri Letácek,jiri-letacek,sub,0,ok,
+2026-09-17T2134Z,futbolfantasy,getafe,Diego Ferrer,diego-ferrer,sub,0,ok,
+2026-09-17T2134Z,futbolfantasy,getafe,Jean Ives Valou,jean-ives-valou,sub,0,ok,
+2026-09-17T2134Z,futbolfantasy,getafe,Moha Hamdoune,moha-hamdoune,sub,0,ok,
+2026-09-17T2134Z,futbolfantasy,getafe,Saba Sazonov,saba-sazonov,sub,0,ok,
+2026-09-17T2134Z,futbolfantasy,getafe,Joselu Pérez,joselu-perez,sub,0,ok,
+2026-09-17T2134Z,futbolfantasy,getafe,Abdel Abqar,abdel-abqar,absent,,injured,Lesión muscular en el muslo Desde 27/08 (21 días) Baja confirmada para la jornada 6
+2026-09-17T2134Z,futbolfantasy,getafe,Juanmi Jiménez,juanmi-jimenez,absent,,injured,Lesión de rodilla Desde 21/02 (208 días) Baja hasta noviembre
+2026-09-17T2134Z,futbolfantasy,getafe,Borja Mayoral,borja-mayoral,absent,,injured,Molestias sin determinar Desde 16/09 (1 día) Baja confirmada para la jornada 6
+2026-09-17T2134Z,futbolfantasy,getafe,Ramón Terrats,terrats,absent,,injured,Molestias sin determinar Desde 16/09 (1 día) Baja confirmada para la jornada 6
+2026-09-17T2134Z,futbolfantasy,getafe,Kiko Femenia,kiko-femenia,absent,,injured,Lesión en los isquiotibiales Desde 07/09 (10 días) Baja hasta octubre
+2026-09-17T2134Z,futbolfantasy,getafe,Christantus Uche,chrisantus-uche,absent,,injured,Rotura de ligamento cruzado y menisco Desde 06/08 (42 días) Baja hasta mayo 2027
+2026-09-17T2134Z,futbolfantasy,levante,Iván Romero,ivan-romero,starter,70,ok,
+2026-09-17T2134Z,futbolfantasy,levante,Roger Brugué,roger-brugue,starter,70,ok,
+2026-09-17T2134Z,futbolfantasy,levante,Mathew Ryan,mat-ryan,starter,95,ok,
+2026-09-17T2134Z,futbolfantasy,levante,Oriol Rey,oriol-rey,starter,80,ok,
+2026-09-17T2134Z,futbolfantasy,levante,Thiago Fernández,thiago-fernandez,starter,70,ok,
+2026-09-17T2134Z,futbolfantasy,levante,Jon Ander Olasagasti,jon-ander-olasagasti,starter,90,ok,
+2026-09-17T2134Z,futbolfantasy,levante,Adrián de la Fuente,adrian-de-la-fuente,starter,60,ok,
+2026-09-17T2134Z,futbolfantasy,levante,Nacho Pérez,nacho-perez-1,starter,70,ok,
+2026-09-17T2134Z,futbolfantasy,levante,Enzo Bardelli,enzo-bardelli,starter,70,ok,
+2026-09-17T2134Z,futbolfantasy,levante,Manu Sánchez,manu-sanchez,starter,80,ok,
+2026-09-17T2134Z,futbolfantasy,levante,Aissa Mandi,aissa-mandi,starter,80,ok,
+2026-09-17T2134Z,futbolfantasy,levante,Ifeanyi Ndukwe,ifeanyi-ndukwe,sub,50,ok,
+2026-09-17T2134Z,futbolfantasy,levante,Dani Requena,dani-requena,sub,30,ok,
+2026-09-17T2134Z,futbolfantasy,levante,Víctor García,victor-garcia-1,sub,30,ok,
+2026-09-17T2134Z,futbolfantasy,levante,Petar Ratkov,petar-ratkov,sub,30,ok,
+2026-09-17T2134Z,futbolfantasy,levante,Paco Cortés,paco-cortes,sub,30,ok,
+2026-09-17T2134Z,futbolfantasy,levante,Jeremy Toljan,jeremy-toljan,sub,30,ok,
+2026-09-17T2134Z,futbolfantasy,levante,Marc Santos,marc-santos,sub,20,ok,
+2026-09-17T2134Z,futbolfantasy,levante,Yanis Musuayi,yanis-musuayi,sub,20,ok,
+2026-09-17T2134Z,futbolfantasy,levante,Axel Tape,axel-tape,sub,20,ok,
+2026-09-17T2134Z,futbolfantasy,levante,Jorge Cabello,jorge-cabello,sub,10,ok,
+2026-09-17T2134Z,futbolfantasy,levante,Pablo Campos,pablo-campos,sub,5,ok,
+2026-09-17T2134Z,futbolfantasy,levante,Karl Etta Eyong,etta-eyong,sub,0,injured,Lesión en el recto anterior Desde 04/09 (13 días) Baja hasta finales de septiembre
+2026-09-17T2134Z,futbolfantasy,levante,Hugo Sotelo,hugo-sotelo,sub,0,injured,Esguince de rodilla Desde 13/09 (4 días) Baja confirmada para la jornada 7
+2026-09-17T2134Z,futbolfantasy,levante,Alejandro Primo,alejandro-primo,sub,0,injured,Luxación de hombro Desde 26/04 (144 días) Baja confirmada para la jornada 7
+2026-09-17T2134Z,futbolfantasy,malaga,Alfonso Herrero,alfonso-herrero,starter,100,ok,
+2026-09-17T2134Z,futbolfantasy,malaga,Chupete,chupete,starter,100,ok,
+2026-09-17T2134Z,futbolfantasy,malaga,Juan Cruz,juan-cruz-2,starter,100,ok,
+2026-09-17T2134Z,futbolfantasy,malaga,David Larrubia,david-larrubia,starter,100,ok,
+2026-09-17T2134Z,futbolfantasy,malaga,José Salinas,jose-salinas,starter,100,ok,
+2026-09-17T2134Z,futbolfantasy,malaga,Carlos Dotor,carlos-dotor,starter,100,ok,
+2026-09-17T2134Z,futbolfantasy,malaga,Einar Galilea,einar-galilea,starter,100,ok,
+2026-09-17T2134Z,futbolfantasy,malaga,Carlos Puga,carlos-puga,starter,100,ok,
+2026-09-17T2134Z,futbolfantasy,malaga,Pablo Martínez,pablo-martinez,starter,100,ok,
+2026-09-17T2134Z,futbolfantasy,malaga,Izan Merino,izan-merino,starter,100,ok,
+2026-09-17T2134Z,futbolfantasy,malaga,Angel Recio,angel-recio,starter,100,ok,
+2026-09-17T2134Z,futbolfantasy,malaga,Jens Cajuste,jens-cajuste,sub,0,injured,Lesión en el cuádriceps Desde 16/09 (1 día) Baja confirmada para la jornada 6
+2026-09-17T2134Z,futbolfantasy,malaga,Álex Pastor,lex-pastor,sub,0,ok,
+2026-09-17T2134Z,futbolfantasy,malaga,Ramón Enríquez,ramon-enriquez,sub,0,ok,
+2026-09-17T2134Z,futbolfantasy,malaga,Haitam Abaida,haitam-abaida,sub,0,ok,
+2026-09-17T2134Z,futbolfantasy,malaga,Joaquín Muñoz,joaquin-munoz,sub,0,ok,
+2026-09-17T2134Z,futbolfantasy,malaga,Carlos López,carlos-lopez,sub,0,ok,
+2026-09-17T2134Z,futbolfantasy,malaga,Rafa Rodríguez,rafa-rodriguez,sub,0,ok,
+2026-09-17T2134Z,futbolfantasy,malaga,Diego Murillo,diego-murillo,sub,0,injured,Lesión de rodilla Desde 20/06 (89 días) Baja confirmada para la jornada 6
+2026-09-17T2134Z,futbolfantasy,malaga,Eneko Jauregi,eneko-jauregi,sub,0,ok,
+2026-09-17T2134Z,futbolfantasy,malaga,Fernando Calero,fernando-calero,sub,0,doubt,Fractura de costilla(s) Desde 07/08 (41 días) Duda para la jornada 6
+2026-09-17T2134Z,futbolfantasy,malaga,Adrián Niño,adrian-nino,sub,0,ok,
+2026-09-17T2134Z,futbolfantasy,malaga,Dani Lorenzo,dani-lorenzo-1,sub,0,ok,
+2026-09-17T2134Z,futbolfantasy,malaga,Julen Lobete,julen-lobete,sub,0,injured,Rotura de lig. cruzado anterior Desde 04/09 (13 días) Baja hasta abril
+2026-09-17T2134Z,futbolfantasy,malaga,Juan Berrocal,juan-berrocal,sub,0,ok,
+2026-09-17T2134Z,futbolfantasy,malaga,Rafa Garrido,rafa-garrido,sub,0,ok,
+2026-09-17T2134Z,futbolfantasy,malaga,Aarón Ochoa,aaron-ochoa,sub,0,injured,Rotura de menisco Desde 10/08 (38 días) Baja hasta enero
+2026-09-17T2134Z,futbolfantasy,malaga,Adam Aznou,adam-aznou,sub,0,injured,Sobrecarga en el aductor Desde 16/09 (1 día) Baja confirmada para la jornada 6
+2026-09-17T2134Z,futbolfantasy,malaga,Andrés Céspedes,andres-cespedes,sub,0,ok,
+2026-09-17T2134Z,futbolfantasy,malaga,Óscar González,oscar-gonzalez-1,sub,0,ok,
+2026-09-17T2134Z,futbolfantasy,malaga,Moussa Diarra,moussa-diarra,sub,0,injured,Lesión en el sóleo Desde 25/07 (54 días) Baja confirmada para la jornada 6
+2026-09-17T2134Z,futbolfantasy,malaga,Marcos Rosa,marcos-rosa,sub,0,ok,
+2026-09-17T2134Z,futbolfantasy,malaga,Juani,juani,sub,0,ok,
+2026-09-17T2134Z,futbolfantasy,malaga,Adri López,adri-lopez-1,sub,0,ok,
+2026-09-17T2134Z,futbolfantasy,malaga,Miguel Ángel Santaella,miguel-angel-santaella,sub,0,ok,
+2026-09-17T2134Z,futbolfantasy,malaga,Joseph Otu,joseph-otu,sub,0,ok,
+2026-09-17T2134Z,futbolfantasy,osasuna,Sergio Herrera,sergio-herrera,starter,50,ok,
+2026-09-17T2134Z,futbolfantasy,osasuna,Rubén García,ruben-garcia,starter,80,ok,
+2026-09-17T2134Z,futbolfantasy,osasuna,Iñigo Arguibide,inigo-arguibide,starter,70,ok,
+2026-09-17T2134Z,futbolfantasy,osasuna,Iker Muñoz,iker-munoz,starter,80,ok,
+2026-09-17T2134Z,futbolfantasy,osasuna,Abel Bretones,abel-bretones,starter,60,ok,
+2026-09-17T2134Z,futbolfantasy,osasuna,Rockson Yeboah,rockson-yeboah,starter,50,ok,
+2026-09-17T2134Z,futbolfantasy,osasuna,Jon Moncayola,jon-moncayola,starter,90,ok,
+2026-09-17T2134Z,futbolfantasy,osasuna,Romain Del Castillo,romain-del-castillo,starter,50,ok,
+2026-09-17T2134Z,futbolfantasy,osasuna,Ante Budimir,ante-budimir,starter,90,ok,
+2026-09-17T2134Z,futbolfantasy,osasuna,Kike Barja,kike-barja,starter,70,ok,
+2026-09-17T2134Z,futbolfantasy,osasuna,Alejandro Catena,alejandro-catena,starter,70,ok,
+2026-09-17T2134Z,futbolfantasy,osasuna,Boyomo,boyomo,sub,50,ok,
+2026-09-17T2134Z,futbolfantasy,osasuna,Raul Moro,raul-moro,sub,50,ok,
+2026-09-17T2134Z,futbolfantasy,osasuna,Aitor Fernández,aitor-fernandez,sub,50,ok,
+2026-09-17T2134Z,futbolfantasy,osasuna,Diego Rico,diego-rico,sub,40,ok,
+2026-09-17T2134Z,futbolfantasy,osasuna,Lucas Torró,lucas-torro,sub,30,ok,
+2026-09-17T2134Z,futbolfantasy,osasuna,Jonathan Dubasin,jonathan-dubasin,sub,30,ok,
+2026-09-17T2134Z,futbolfantasy,osasuna,Unai Santos,unai-santos,sub,30,ok,
+2026-09-17T2134Z,futbolfantasy,osasuna,Asier Osambela,asier-osambela,sub,30,ok,
+2026-09-17T2134Z,futbolfantasy,osasuna,Raúl García,raul-garcia-1,sub,30,ok,
+2026-09-17T2134Z,futbolfantasy,osasuna,Valentin Rosier,valentin-rosier,sub,0,doubt,Lesión en el bíceps femoral Desde 24/07 (55 días) Duda para la jornada 7
+2026-09-17T2134Z,futbolfantasy,osasuna,Aimar Oroz,aimar-oroz,sub,0,injured,Lesión en el bíceps femoral Desde 31/08 (17 días) Baja hasta finales de septiembre
+2026-09-17T2134Z,futbolfantasy,osasuna,Moi Gómez,moi-gomez,sub,0,injured,Lesión en el bíceps femoral Desde 06/09 (11 días) Baja hasta finales de septiembre
+2026-09-17T2134Z,futbolfantasy,osasuna,Jorge Herrando,jorge-herrando,sub,0,injured,Lesión en el aductor Desde 31/08 (17 días) Baja hasta noviembre
+2026-09-17T2134Z,futbolfantasy,racing,Julen Agirrezabala,julen-agirrezabala,starter,95,ok,
+2026-09-17T2134Z,futbolfantasy,racing,Álvaro Mantilla,lvaro-mantilla,starter,80,ok,
+2026-09-17T2134Z,futbolfantasy,racing,Sergio Canales,sergio-canales,starter,50,ok,
+2026-09-17T2134Z,futbolfantasy,racing,Pablo Ramón,pablo-ramon,starter,90,ok,
+2026-09-17T2134Z,futbolfantasy,racing,Iván Martín,ivan-martin,starter,90,ok,
+2026-09-17T2134Z,futbolfantasy,racing,Yassir Zabiri,yassir-zabiri,starter,80,ok,
+2026-09-17T2134Z,futbolfantasy,racing,Jeanuël Belocian,jeanul-belocian,starter,90,ok,
+2026-09-17T2134Z,futbolfantasy,racing,Jorge Salinas,jorge-salinas,starter,90,ok,
+2026-09-17T2134Z,futbolfantasy,racing,Matteo Prati,matteo-prati,starter,50,ok,
+2026-09-17T2134Z,futbolfantasy,racing,Pablo García,pablo-garcia-1,starter,70,ok,
+2026-09-17T2134Z,futbolfantasy,racing,Iñigo Vicente,inigo-vicente,starter,90,ok,
+2026-09-17T2134Z,futbolfantasy,racing,André Almeida,andre-almeida-1,sub,50,ok,
+2026-09-17T2134Z,futbolfantasy,racing,Maguette Gueye,maguette-gueye,sub,50,ok,
+2026-09-17T2134Z,futbolfantasy,racing,Manu Hernando,manu-hernando,sub,20,ok,
+2026-09-17T2134Z,futbolfantasy,racing,Iker Luque,iker-luque,sub,20,ok,
+2026-09-17T2134Z,futbolfantasy,racing,Giorgi Guliashvili,giorgi-guliashvili,sub,20,ok,
+2026-09-17T2134Z,futbolfantasy,racing,Íñigo Sainz-Maza,nigo-sainz-maza,sub,20,ok,
+2026-09-17T2134Z,futbolfantasy,racing,Aarón Martín,aaron-martin,sub,10,ok,
+2026-09-17T2134Z,futbolfantasy,racing,Facundo González,facundo-gonzalez,sub,10,ok,
+2026-09-17T2134Z,futbolfantasy,racing,Pedro Felipe,pedro-felipe,sub,10,doubt,Lesión en los isquiotibiales Desde 16/09 (1 día) Duda para la jornada 7
+2026-09-17T2134Z,futbolfantasy,racing,Juan Carlos Arana,juan-carlos-arana,sub,10,ok,
+2026-09-17T2134Z,futbolfantasy,racing,Asier Villalibre,asier-villalibre,sub,10,ok,
+2026-09-17T2134Z,futbolfantasy,racing,Laro Gómez,laro-gomez,sub,5,ok,
+2026-09-17T2134Z,futbolfantasy,racing,Simon Eriksson,simon-eriksson,sub,0,doubt,Tendinopatía en el hombro Desde 08/09 (9 días) Duda para la jornada 7
+2026-09-17T2134Z,futbolfantasy,racing,Andrés Martín,andres-martin,sub,0,injured,Esguince de rodilla Desde 28/08 (20 días) Baja hasta mediados de octubre
+2026-09-17T2134Z,futbolfantasy,rayo-vallecano,Florian Lejeune,florian-lejeune,starter,80,ok,
+2026-09-17T2134Z,futbolfantasy,rayo-vallecano,Emil Audero,emil-audero,starter,80,ok,
+2026-09-17T2134Z,futbolfantasy,rayo-vallecano,Pathé Ciss,pathe-ciss,starter,70,ok,
+2026-09-17T2134Z,futbolfantasy,rayo-vallecano,Andrei Ratiu,andrei-florin,starter,70,ok,
+2026-09-17T2134Z,futbolfantasy,rayo-vallecano,Pedro Díaz,pedro-diaz,starter,50,ok,
+2026-09-17T2134Z,futbolfantasy,rayo-vallecano,Gnangoro Bouare,gnangoro-bouare,starter,50,ok,
+2026-09-17T2134Z,futbolfantasy,rayo-vallecano,Adrià Pedrosa,adria-pedrosa,starter,70,ok,
+2026-09-17T2134Z,futbolfantasy,rayo-vallecano,Álvaro García,alvaro-garcia,starter,70,ok,
+2026-09-17T2134Z,futbolfantasy,rayo-vallecano,Jorge de Frutos,jorge-de-frutos,starter,70,ok,
+2026-09-17T2134Z,futbolfantasy,rayo-vallecano,Unai López,unai-lopez,starter,70,ok,
+2026-09-17T2134Z,futbolfantasy,rayo-vallecano,Sergio Camello,sergio-camello,starter,70,ok,
+2026-09-17T2134Z,futbolfantasy,rayo-vallecano,Óscar Valentín,scar-valentin,sub,50,ok,
+2026-09-17T2134Z,futbolfantasy,rayo-vallecano,Mujaid Sadick,mujaid-sadick,sub,50,ok,
+2026-09-17T2134Z,futbolfantasy,rayo-vallecano,Georgiy Tsitaishvili,georgiy-tsitaishvili,sub,40,ok,
+2026-09-17T2134Z,futbolfantasy,rayo-vallecano,Rayane Belaid,rayane-belaid,sub,30,ok,
+2026-09-17T2134Z,futbolfantasy,rayo-vallecano,Iván Balliu,ivan-balliu,sub,30,ok,
+2026-09-17T2134Z,futbolfantasy,rayo-vallecano,Fran Pérez,fran-perez,sub,30,ok,
+2026-09-17T2134Z,futbolfantasy,rayo-vallecano,Alemão,alemo,sub,30,ok,
+2026-09-17T2134Z,futbolfantasy,rayo-vallecano,Marash Kumbulla,marash-kumbulla,sub,30,ok,
+2026-09-17T2134Z,futbolfantasy,rayo-vallecano,Dani Cárdenas,dani-cardenas,sub,20,ok,
+2026-09-17T2134Z,futbolfantasy,rayo-vallecano,Pelayo Fernández,pelayo-fernandez,sub,20,ok,
+2026-09-17T2134Z,futbolfantasy,rayo-vallecano,Randy Nteka,randy-nteka,sub,20,doubt,Molestias musculares Desde 10/09 (7 días) Duda para la jornada 7
+2026-09-17T2134Z,futbolfantasy,rayo-vallecano,Jozhua Vertrouwd,jozhua-vertrouwd,sub,0,doubt,Lesión en los isquiotibiales Desde 31/08 (17 días) Baja hasta finales de septiembre
+2026-09-17T2134Z,futbolfantasy,rayo-vallecano,Raúl De Tomás,raul-de-tomas,sub,0,ok,
+2026-09-17T2134Z,futbolfantasy,rayo-vallecano,Luiz Felipe,luiz-felipe,sub,0,doubt,Rotura en los isquiotibiales Desde 16/04 (154 días) Baja hasta finales de septiembre
+2026-09-17T2134Z,futbolfantasy,rayo-vallecano,Isi Palazón,isi-palazon,sub,0,injured,Lesión en el cuádriceps Desde 20/08 (28 días) Baja confirmada para la jornada 7
+2026-09-17T2134Z,futbolfantasy,rayo-vallecano,Augusto Batalla,augusto-batalla,sub,0,injured,Fractura de tibia Desde 20/08 (28 días) Baja hasta enero
+2026-09-17T2134Z,futbolfantasy,real-madrid,Kylian Mbappé,kylian-mbappe,starter,95,ok,
+2026-09-17T2134Z,futbolfantasy,real-madrid,Arda Güler,arda-gler,starter,70,ok,
+2026-09-17T2134Z,futbolfantasy,real-madrid,Thibaut Courtois,thibaut-courtois,starter,95,ok,
+2026-09-17T2134Z,futbolfantasy,real-madrid,Ibrahima Konaté,ibrahima-konate,starter,50,ok,
+2026-09-17T2134Z,futbolfantasy,real-madrid,Dean Huijsen,dean-huijsen,starter,80,ok,
+2026-09-17T2134Z,futbolfantasy,real-madrid,Jude Bellingham,jude-bellingham,starter,90,ok,
+2026-09-17T2134Z,futbolfantasy,real-madrid,Denzel Dumfries,denzel-dumfries,starter,70,ok,
+2026-09-17T2134Z,futbolfantasy,real-madrid,Marc Cucurella,marc-cucurella,starter,80,ok,
+2026-09-17T2134Z,futbolfantasy,real-madrid,Vinicius Junior,vinicius-junior,starter,95,ok,
+2026-09-17T2134Z,futbolfantasy,real-madrid,Federico Valverde,federico-valverde,starter,95,ok,
+2026-09-17T2134Z,futbolfantasy,real-madrid,Aurélien Tchouaméni,aurelien-tchouameni,starter,50,ok,
+2026-09-17T2134Z,futbolfantasy,real-madrid,Antonio Rüdiger,antonio-rudiger,sub,50,ok,
+2026-09-17T2134Z,futbolfantasy,real-madrid,Bernardo Silva,bernardo-silva,sub,40,ok,
+2026-09-17T2134Z,futbolfantasy,real-madrid,Eduardo Camavinga,eduardo-camavinga,sub,30,ok,
+2026-09-17T2134Z,futbolfantasy,real-madrid,Brahim Díaz,brahim-diaz,sub,30,ok,
+2026-09-17T2134Z,futbolfantasy,real-madrid,Trent Alexander-Arnold,trent-alexander-arnold,sub,30,ok,
+2026-09-17T2134Z,futbolfantasy,real-madrid,Yan Diomande,yan-diomande,sub,30,ok,
+2026-09-17T2134Z,futbolfantasy,real-madrid,Álvaro F. Carreras,lvaro-fernandez-1,sub,20,ok,
+2026-09-17T2134Z,futbolfantasy,real-madrid,Carlos Espí,carlos-espi,sub,10,ok,
+2026-09-17T2134Z,futbolfantasy,real-madrid,Endrick,endrick,sub,5,ok,
+2026-09-17T2134Z,futbolfantasy,real-madrid,Andriy Lunin,andriy-lunin,sub,5,ok,
+2026-09-17T2134Z,futbolfantasy,real-madrid,Raúl Asencio,raul-asencio-1,sub,0,ok,
+2026-09-17T2134Z,futbolfantasy,real-madrid,Thiago Pitarch,thiago-pitarch,sub,0,ok,
+2026-09-17T2134Z,futbolfantasy,real-madrid,Ferland Mendy,ferland-mendy,sub,0,injured,Lesión en el recto femoral Desde 03/05 (137 días) Baja hasta octubre
+2026-09-17T2134Z,futbolfantasy,real-madrid,Éder Militão,der-milito,sub,0,injured,Lesión en el bíceps femoral Desde 21/04 (149 días) Baja hasta finales de septiembre
+2026-09-17T2134Z,futbolfantasy,real-madrid,Rodrygo Goes,rodrygo-goes,sub,0,injured,Rotura de ligamento cruzado y menisco Desde 02/03 (199 días) Baja hasta noviembre-diciembre
+2026-09-17T2134Z,futbolfantasy,real-sociedad,Jon Martín,jon-martin,starter,80,ok,
+2026-09-17T2134Z,futbolfantasy,real-sociedad,Álex Remiro,alex-remiro,starter,70,ok,
+2026-09-17T2134Z,futbolfantasy,real-sociedad,Sergio Gómez,sergio-gomez,starter,70,ok,
+2026-09-17T2134Z,futbolfantasy,real-sociedad,Yangel Herrera,yangel-herrera,starter,70,ok,
+2026-09-17T2134Z,futbolfantasy,real-sociedad,Luka Sucic,luka-sucic,starter,70,ok,
+2026-09-17T2134Z,futbolfantasy,real-sociedad,Gonçalo Guedes,goncalo-guedes,starter,70,ok,
+2026-09-17T2134Z,futbolfantasy,real-sociedad,Mikel Oyarzabal,mikel-oyarzabal,starter,90,ok,
+2026-09-17T2134Z,futbolfantasy,real-sociedad,Mamadou Sarr,mamadou-sarr,starter,50,ok,
+2026-09-17T2134Z,futbolfantasy,real-sociedad,Jon Aramburu,jon-aramburu,starter,90,ok,
+2026-09-17T2134Z,futbolfantasy,real-sociedad,Ander Barrenetxea,ander-barrenetxea,starter,50,ok,
+2026-09-17T2134Z,futbolfantasy,real-sociedad,Carlos Soler,carlos-soler,starter,70,ok,
+2026-09-17T2134Z,futbolfantasy,real-sociedad,Job Ochieng,job-ochieng,sub,50,ok,
+2026-09-17T2134Z,futbolfantasy,real-sociedad,Igor Zubeldia,igor-zubeldia,sub,50,doubt,Molestias sin determinar Desde 12/09 (5 días) Disponible para la jornada 7
+2026-09-17T2134Z,futbolfantasy,real-sociedad,Beñat Turrientes,benat-turrientes,sub,40,ok,
+2026-09-17T2134Z,futbolfantasy,real-sociedad,Orri Steinn Óskarsson,orri-steinn-skarsson,sub,30,ok,
+2026-09-17T2134Z,futbolfantasy,real-sociedad,Takefusa Kubo,takefusa-kubo,sub,30,ok,
+2026-09-17T2134Z,futbolfantasy,real-sociedad,Aihen Muñoz,aihen-munoz,sub,30,ok,
+2026-09-17T2134Z,futbolfantasy,real-sociedad,Unai Marrero,unai-marrero,sub,30,ok,
+2026-09-17T2134Z,futbolfantasy,real-sociedad,Jon Gorrotxategi,jon-gorrotxategi,sub,20,ok,
+2026-09-17T2134Z,futbolfantasy,real-sociedad,Luken Beitia,luken-beitia,sub,20,ok,
+2026-09-17T2134Z,futbolfantasy,real-sociedad,Héctor Fort,hector-fort,sub,10,ok,
+2026-09-17T2134Z,futbolfantasy,real-sociedad,Alex Marchal,alex-marchal,sub,10,ok,
+2026-09-17T2134Z,futbolfantasy,real-sociedad,Arsen Zakharyan,arsen-zakharyan,sub,0,ok,
+2026-09-17T2134Z,futbolfantasy,real-sociedad,Pablo Marín,pablo-marin,sub,0,ok,
+2026-09-17T2134Z,futbolfantasy,real-sociedad,Jon Pacheco,jon-pacheco,sub,0,ok,
+2026-09-17T2134Z,futbolfantasy,real-sociedad,Álvaro Odriozola,alvaro-odriozola,sub,0,injured,Rotura de lig. cruzado anterior Desde 21/02 (208 días) Baja hasta octubre
+2026-09-17T2134Z,futbolfantasy,sevilla,Lucien Agoume,lucien-agoume,starter,70,ok,
+2026-09-17T2134Z,futbolfantasy,sevilla,Kike Salas,kike-salas,starter,50,doubt,Contusión Desde 16/09 (1 día) Duda para la jornada 7
+2026-09-17T2134Z,futbolfantasy,sevilla,Félix Correia,felix-correia,starter,50,ok,
+2026-09-17T2134Z,futbolfantasy,sevilla,Robbie Ure,robbie-ure,starter,50,ok,
+2026-09-17T2134Z,futbolfantasy,sevilla,Youssouf Fofana,youssouf-fofana,starter,70,ok,
+2026-09-17T2134Z,futbolfantasy,sevilla,Juan Iglesias,juan-iglesias,starter,70,ok,
+2026-09-17T2134Z,futbolfantasy,sevilla,Gabriel Suazo,gabriel-suazo,starter,70,ok,
+2026-09-17T2134Z,futbolfantasy,sevilla,Giorgi Kochorashvili,giorgi-kochorashvili-1,starter,60,ok,
+2026-09-17T2134Z,futbolfantasy,sevilla,Miguel Sierra,miguel-sierra,starter,70,ok,
+2026-09-17T2134Z,futbolfantasy,sevilla,Andrés Castrín,andres-castrin,starter,70,ok,
+2026-09-17T2134Z,futbolfantasy,sevilla,Odysseas Vlachodimos,odysseas-vlachodimos,starter,95,ok,
+2026-09-17T2134Z,futbolfantasy,sevilla,Chidera Ejuke,chidera-ejuke,sub,50,ok,
+2026-09-17T2134Z,futbolfantasy,sevilla,Jon Guridi,jon-guridi,sub,40,ok,
+2026-09-17T2134Z,futbolfantasy,sevilla,Peque,peque,sub,30,ok,
+2026-09-17T2134Z,futbolfantasy,sevilla,Iker Muñoz,iker-munoz-1,sub,30,ok,
+2026-09-17T2134Z,futbolfantasy,sevilla,Alfonso González,alfonso-gonzalez,sub,30,ok,
+2026-09-17T2134Z,futbolfantasy,sevilla,Arouna Sangante,arouna-sangante,sub,30,doubt,Esguince de tobillo Desde 08/09 (9 días) Duda para la jornada 7
+2026-09-17T2134Z,futbolfantasy,sevilla,Julio Díaz,julio-diaz,sub,30,ok,
+2026-09-17T2134Z,futbolfantasy,sevilla,José Ángel Carmona,jose-ngel-carmona,sub,30,ok,
+2026-09-17T2134Z,futbolfantasy,sevilla,Isaac Romero,isaac-romero,sub,30,ok,
+2026-09-17T2134Z,futbolfantasy,sevilla,Fran González,fran-gonzalez-2,sub,5,ok,
+2026-09-17T2134Z,futbolfantasy,sevilla,Nico Guillén,nico-guillen,sub,0,ok,
+2026-09-17T2134Z,futbolfantasy,sevilla,Manu Bueno,manu-bueno,sub,0,ok,
+2026-09-17T2134Z,futbolfantasy,sevilla,Marcão,marcao,sub,0,ok,
+2026-09-17T2134Z,futbolfantasy,sevilla,Fábio Cardoso,fabio-cardoso,sub,0,ok,
+2026-09-17T2134Z,futbolfantasy,sevilla,Rubén Vargas,ruben-vargas,sub,0,injured,Parameniscitis en la rodilla Desde 03/09 (14 días) Baja confirmada para la jornada 7
+2026-09-17T2134Z,futbolfantasy,sevilla,Lucas Stassin,lucas-stassin,sub,0,injured,Lesión en el aductor Desde 16/09 (1 día) Baja hasta principios de octubre
+2026-09-17T2134Z,futbolfantasy,valencia,Hugo Duro,hugo-duro,starter,70,ok,
+2026-09-17T2134Z,futbolfantasy,valencia,Ryunosuke Sato,ryunosuke-sato,starter,50,ok,
+2026-09-17T2134Z,futbolfantasy,valencia,Javi Guerra,javi-guerra-1,starter,80,ok,
+2026-09-17T2134Z,futbolfantasy,valencia,Guido Rodríguez,guido-rodriguez,starter,70,doubt,Contusión en el pie Desde 15/09 (2 días) Disponible para la jornada 7
+2026-09-17T2134Z,futbolfantasy,valencia,Pablo Maffeo,pablo-maffeo,starter,50,ok,
+2026-09-17T2134Z,futbolfantasy,valencia,Stole Dimitrievski,stole-dimitrievski,starter,95,ok,
+2026-09-17T2134Z,futbolfantasy,valencia,Pepelu,pepelu,starter,70,ok,
+2026-09-17T2134Z,futbolfantasy,valencia,Justin de Haas,justin-de-haas,starter,70,ok,
+2026-09-17T2134Z,futbolfantasy,valencia,Aaron Ndive Mayol,aaron-ndive-mayol,starter,70,ok,
+2026-09-17T2134Z,futbolfantasy,valencia,José Gayà,jose-gaya,starter,60,doubt,Trabajo al margen Desde 17/09 (1 día) Disponible para la jornada 7
+2026-09-17T2134Z,futbolfantasy,valencia,Filip Ugrinic,filip-ugrinic,starter,60,ok,
+2026-09-17T2134Z,futbolfantasy,valencia,Arnaut Danjuma,arnaut-danjuma,sub,50,doubt,Molestias sin determinar Desde 17/09 (1 día) Duda para la jornada 7
+2026-09-17T2134Z,futbolfantasy,valencia,David Otorbi,david-otorbi,sub,50,ok,
+2026-09-17T2134Z,futbolfantasy,valencia,Arnau Martínez,arnau-martinez,sub,50,ok,
+2026-09-17T2134Z,futbolfantasy,valencia,Jesús Vázquez,jesus-vazquez-1,sub,40,ok,
+2026-09-17T2134Z,futbolfantasy,valencia,Harvey Elliott,harvey-elliott,sub,30,ok,
+2026-09-17T2134Z,futbolfantasy,valencia,Aliou Dieng,aliou-dieng,sub,30,ok,
+2026-09-17T2134Z,futbolfantasy,valencia,Iker Córdoba,iker-cordoba,sub,30,ok,
+2026-09-17T2134Z,futbolfantasy,valencia,Daniel Raba,daniel-raba,sub,30,ok,
+2026-09-17T2134Z,futbolfantasy,valencia,Luis Rioja,luis-rioja,sub,10,doubt,Fractura en el hueso calcáneo Desde 15/09 (2 días) Duda para la jornada 7
+2026-09-17T2134Z,futbolfantasy,valencia,Kayne van Oevelen,kayne-van-oevelen,sub,5,ok,
+2026-09-17T2134Z,futbolfantasy,valencia,Cristian Rivero,cristian-rivero,sub,0,ok,
+2026-09-17T2134Z,futbolfantasy,valencia,Sergi Canós,sergi-canos,sub,0,injured,Rotura de lig. cruzado anterior Desde 13/05 (127 días) Baja hasta diciembre
+2026-09-17T2134Z,futbolfantasy,valencia,Dimitri Foulquier,dimitri-foulquier,sub,0,injured,Lesión en el aductor Desde 05/09 (12 días) Baja hasta octubre
+2026-09-17T2134Z,futbolfantasy,valencia,César Tárrega,cesar-tarrega,sub,0,injured,Lesión en el isquiosural Desde 11/09 (6 días) Baja hasta principios de octubre
+2026-09-17T2134Z,futbolfantasy,valencia,José Manuel Copete,jose-manuel-copete,sub,0,injured,Rotura de menisco Desde 25/02 (204 días) Baja hasta octubre
+2026-09-17T2134Z,futbolfantasy,valencia,Umar Sadiq,umar-sadiq,sub,0,injured,Lesión en los isquiotibiales Desde 30/08 (18 días) Baja hasta mediados de noviembre
+2026-09-17T2134Z,futbolfantasy,valencia,Diego López,diego-lopez-1,sub,0,injured,Rotura de lig. cruzado anterior Desde 23/05 (117 días) Baja hasta diciembre
+2026-09-17T2134Z,futbolfantasy,valencia,Mouctar Diakhaby,mouctar-diakhaby,sub,0,injured,Lesión en el aductor Desde 06/09 (11 días) Baja hasta princpios de octubre
+2026-09-17T2134Z,futbolfantasy,villarreal,Renato Veiga,renato-veiga,starter,100,ok,
+2026-09-17T2134Z,futbolfantasy,villarreal,Nathan-Dylan Saliba,nathan-dylan-saliba,starter,100,ok,
+2026-09-17T2134Z,futbolfantasy,villarreal,Sergi Cardona,sergi-cardona,starter,100,ok,
+2026-09-17T2134Z,futbolfantasy,villarreal,Tajon Buchanan,tajon-buchanan,starter,100,ok,
+2026-09-17T2134Z,futbolfantasy,villarreal,Péter Gulácsi,peter-gulacsi,starter,100,ok,
+2026-09-17T2134Z,futbolfantasy,villarreal,Alberto Moleiro,alberto-moleiro,starter,100,ok,
+2026-09-17T2134Z,futbolfantasy,villarreal,Ayoze Pérez,ayoze-perez,starter,100,ok,
+2026-09-17T2134Z,futbolfantasy,villarreal,Alex Freeman,alex-freeman,starter,100,ok,
+2026-09-17T2134Z,futbolfantasy,villarreal,Ilias Akhomach,ilias-akhomach,starter,100,ok,
+2026-09-17T2134Z,futbolfantasy,villarreal,Santi Comesaña,santi-comesana,starter,100,ok,
+2026-09-17T2134Z,futbolfantasy,villarreal,Pau Navarro,pau-navarro,starter,100,ok,
+2026-09-17T2134Z,futbolfantasy,villarreal,Chukwuma Eze,chukwuma-eze,sub,0,ok,
+2026-09-17T2134Z,futbolfantasy,villarreal,Luiz Junior,luiz-junior,sub,0,ok,
+2026-09-17T2134Z,futbolfantasy,villarreal,Logan Costa,logan-costa,sub,0,ok,
+2026-09-17T2134Z,futbolfantasy,villarreal,Alassane Diatta,alassane-diatta,sub,0,ok,
+2026-09-17T2134Z,futbolfantasy,villarreal,Gerard Moreno,gerard-moreno,sub,0,ok,
+2026-09-17T2134Z,futbolfantasy,villarreal,Juan Foyth,juan-foyth,sub,0,injured,Molestias en el tendón de Aquiles Desde 28/08 (20 días) Baja confirmada para la jornada 6
+2026-09-17T2134Z,futbolfantasy,villarreal,Georges Mikautadze,georges-mikautadze,sub,0,ok,
+2026-09-17T2134Z,futbolfantasy,villarreal,Rubén Gómez,ruben-gomez-1,sub,0,ok,
+2026-09-17T2134Z,futbolfantasy,villarreal,Santiago Mouriño,santiago-mourino,sub,0,ok,
+2026-09-17T2134Z,futbolfantasy,villarreal,Carlos Macià,carlos-macia,sub,0,ok,
+2026-09-17T2134Z,futbolfantasy,villarreal,Pape Gueye,pape-gueye,sub,0,ok,
+2026-09-17T2134Z,futbolfantasy,villarreal,Nicolas Pépé,nicolas-pepe,sub,0,ok,
+2026-09-17T2134Z,futbolfantasy,villarreal,Carlos Romero,carlos-romero,sub,0,ok,
+2026-09-17T2134Z,futbolfantasy,villarreal,Tani Oluwaseyi,tani-oluwaseyi,sub,0,ok,
+2026-09-17T2134Z,futbolfantasy,villarreal,Eneko Ortiz,eneko-ortiz,sub,0,ok,
+2026-09-17T2134Z,futbolfantasy,villarreal,Álvaro García,alvaro-garcia-1,sub,0,ok,
+2026-09-17T2134Z,futbolfantasy,villarreal,Joselillo Gaitán,joselillo-gaitan,sub,0,ok,
+2026-09-17T2134Z,futbolfantasy,villarreal,Cheikh Thiam,cheikh-thiam,sub,0,ok,
+2026-09-17T2134Z,futbolfantasy,villarreal,César Bonafé,cesar-bonafe,sub,0,ok,
+2026-09-17T2134Z,futbolfantasy,villarreal,Alex Quevedo,alex-quevedo,sub,0,ok,
+2026-09-17T2134Z,futbolfantasy,villarreal,Nizar El Jmili,nizar-el-jmili,sub,0,ok,
+2026-09-17T2134Z,futbolfantasy,villarreal,Mahamoud Barry,mahamoud-barry,sub,0,ok,
+2026-09-17T2134Z,futbolfantasy,villarreal,Douga Fofana,douga-fofana,sub,0,ok,
+2026-09-17T2134Z,futbolfantasy,villarreal,Moussa Diallo,moussa-diallo-1,sub,0,ok,
