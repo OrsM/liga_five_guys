@@ -22,7 +22,7 @@ player_id,name,club_id,ff_slug,af_slug,app_id,understat_id,app_names
 10326,karl etta eyong,levante,etta-eyong,,2700,10930,Etta Eyong
 10328,marc domenech,atletico,,,,,
 10336,alvaro mantilla,racing,lvaro-mantilla,181685,2999,14686,Mantilla
-10338,iñigo sainz-maza,racing,nigo-sainz-maza,,3000,,Iñigo
+10338,iñigo sainz-maza,racing,nigo-sainz-maza,,3000,14693,Iñigo
 10341,peque,sevilla,peque,,2455,12742,Peque
 10353,alex pastor,malaga,lex-pastor,,3059,,Pastor
 10357,adria altimira,deportivo,adria-altimira,,1682,11834,A. Alti|Altimira
@@ -326,7 +326,7 @@ player_id,name,club_id,ff_slug,af_slug,app_id,understat_id,app_names
 16948,jorge cestero,real madrid,jorge-cestero,,2888,14246,Cestero
 16975,iker muñoz,sevilla,iker-munoz-1,,2876,,
 16976,noe carrillo,deportivo,noe-carrillo,,2974,,Noé
-16982,unai santos,osasuna,unai-santos,,2873,,Santos
+16982,unai santos,osasuna,unai-santos,,2873,14916,Santos
 17116,thiago fernandez,levante,thiago-fernandez,362750,3230,14393,Thiago
 17119,joselillo gaitan,villarreal,joselillo-gaitan,,2903,,J. Gaitán
 17126,alvaro jimenez,racing,,,,,
@@ -368,10 +368,11 @@ player_id,name,club_id,ff_slug,af_slug,app_id,understat_id,app_names
 18048,marco roman,rayo,marco-roman,,3179,,Marco Román
 18053,asier bonel,osasuna,asier-bonel,,3235,,A. Bonel
 18201,kike ribes,,laliga-26-27,,3241,,Ribes
+18213,jorge dominguez,atletico,jorge-dominguez,,3273,14721,C. Dominguez|J. Dominguez
 18214,jorge castillo,atletico,jorge-castillo,,3201,,Castillo
 18218,andres vallecillo,racing,andres-vallecillo,,3015,,A. Vallecillo
 18221,jorge castellanos,racing,jorge-castellanos,,3163,,Caste
-18222,hugo perez,racing,hugo-perez-2,,3212,,C. Pérez|Hugo Pérez
+18222,hugo perez,racing,hugo-perez-2,,3212,,C. Pérez|D. Pérez|Hugo Pérez
 18224,miguel angel santaella,malaga,,,3063,,M. Santaella
 18225,juani,malaga,juani,,3204,,Javier Gil|Juani|RDT
 18228,rodrigo gamon,valencia,,,3269,,Rodrigo Gamón
@@ -447,7 +448,7 @@ player_id,name,club_id,ff_slug,af_slug,app_id,understat_id,app_names
 3429,kylian mbappe,real madrid,kylian-mbappe,278,3103,,Mbappé
 3431,bernardo silva,real madrid,bernardo-silva,636,3116,3635,Bernardo Silva
 3589,dominik livakovic,barcelona,dominik-livakovic,,3251,,Livakovic
-3605,angeliño,deportivo,angelino,227,3142,,Angeliño
+3605,angeliño,deportivo,angelino,227,3142,1040,Angeliño
 3607,mouctar diakhaby,valencia,mouctar-diakhaby,,2458,5666,Diakhaby
 3612,alvaro fernandez,deportivo,alvaro-fernandez,,2975,,A. Ferllo
 3623,pedro diaz,rayo,pedro-diaz,46887,2385,12863,Pedro Díaz

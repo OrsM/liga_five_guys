@@ -11987,3 +11987,15 @@ observed_at,source,player_id,week,stat,value,points
 2026-09-16T2115Z,laliga,2302,6,poss_lost_all,0,0
 2026-09-16T2115Z,laliga,2302,6,penalty_conceded,0,0
 2026-09-16T2115Z,laliga,2302,6,marca_points,-1,0
+2026-09-17T0607Z,laliga,3002,6,mins_played,31,1
+2026-09-17T0607Z,laliga,3002,6,effective_clearance,0,0
+2026-09-17T0607Z,laliga,3002,6,goals_conceded,3,-1
+2026-09-17T0607Z,laliga,3002,6,poss_lost_all,5,0
+2026-09-17T0607Z,laliga,3002,6,marca_points,-1,1
+2026-09-17T0607Z,laliga,2784,6,mins_played,29,1
+2026-09-17T0607Z,laliga,2784,6,won_contest,1,0
+2026-09-17T0607Z,laliga,2784,6,poss_lost_all,4,0
+2026-09-17T0607Z,laliga,2522,6,mins_played,69,2
+2026-09-17T0607Z,laliga,2522,6,marca_points,-1,4
+2026-09-17T0607Z,laliga,1221,6,mins_played,29,1
+2026-09-17T0607Z,laliga,1221,6,marca_points,-1,1
