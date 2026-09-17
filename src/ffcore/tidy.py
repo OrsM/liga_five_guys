@@ -23,7 +23,7 @@ __all__ = ["ROOT", "TIDY", "SEASON", "DECISIONS", "REPORTS", "PARTS", "MADRID",
            "shared_names", "row_key", "run_now", "load_crosswalk",
            "load_players", "read_ledger", "LEDGER", "load_deadline", "LINEUP_SOURCE",
            "pick_source", "load_fixtures", "next_kickoff", "kickoff_stamp",
-           "load_elo", "load_results_history", "load_understat_players",
+           "load_elo", "load_odds", "load_results_history", "load_understat_players",
            "MATCH_LEN", "minutes_played", "fresh_only", "DAILY_FRESH_DAYS",
            "EVERY_RUN_FRESH_DAYS", "stale_feeds",
            "GATED_API", "age_phrase", "last_api_standings",
@@ -454,6 +454,19 @@ def load_crosswalk():
 def load_fixtures() -> list[dict]:
     rows = latest_only(read_csv(TIDY / "fixtures.csv"))
     return sorted(rows, key=lambda r: r.get("kickoff") or "")
+
+
+def load_odds() -> list[dict]:
+    """Newest bookmaker quote per fixture, from odds.csv.
+
+    latest_per_key on (home, away) rather than latest_only: a fixture is
+    quoted from the moment it is listed until it kicks off, so the newest
+    SNAPSHOT only carries whatever was still unplayed when it was taken,
+    while every fixture's own newest quote is what a consumer wants.
+    """
+    return latest_per_key(read_csv(TIDY / "odds.csv"),
+                          lambda r: ((r.get("home") or "").strip(),
+                                     (r.get("away") or "").strip()))
 
 
 def load_results_history() -> list[dict]:
