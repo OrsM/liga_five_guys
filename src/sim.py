@@ -5,6 +5,7 @@ import sys
 
 
 import json
+import math
 import os as _os
 from pathlib import Path
 
@@ -194,7 +195,8 @@ def ladder_rows(u, rows, bands=None, exp=None, xi=None) -> list[dict]:
     mae = current_mae()
     ranked = sorted(buys, key=lambda k: _move_rank_key(won[k], u))
     for k in ranked:
-        if route_kind(u, k) == "free" and _clears_par_floor(par, mae, k):
+        if route_kind(u, k) == "free" and _clears_par_floor(
+                par, mae, k, len(u.state.jornadas)):
             out.append(buy_cell(k, "buy"))
     raid_keys = raid_shortlist(u, won.values(), par, mae)
     for k in sorted(raid_keys, key=lambda k: _move_rank_key(won[k], u)):
@@ -484,11 +486,27 @@ def caveats(u) -> list[str]:
 
 VALUE_TOLERANCE = 0.90
 
-def _clears_par_floor(par_of: dict, mae, k: str) -> bool:
+def _clears_par_floor(par_of: dict, mae, k: str, horizon: int = 1) -> bool:
+    """Is his edge bigger than our error in measuring it?
+
+    COMPARE LIKE WITH LIKE. `par` is points above replacement across the
+    WHOLE remaining season; `mae` is the model's error on ONE player in
+    ONE jornada. This compared them directly, which is a units mismatch --
+    a season-scale number against a per-round one -- so the floor sat
+    about six times too low and almost everything cleared it. That is how
+    a midfielder whose entire edge rested on 3.3 matches (par 11.2, under
+    0.35 a jornada) came to be headlined as a recommendation.
+
+    Over `horizon` rounds the errors partly cancel rather than accumulate,
+    so the season-scale error is mae*sqrt(horizon), not mae*horizon. On
+    today's data that moves the bar from 3.29 to 18.9 season points, which
+    keeps the thick-evidence moves (par 43 off 33 matches, par 19 off 40)
+    and drops the thin ones (par 14 off 5 matches, par 11 off 3.3).
+    """
     if mae is None:
         return True
     par = par_of.get(k)
-    return par is not None and par >= mae
+    return par is not None and par >= mae * math.sqrt(max(1, horizon))
 
 
 def _best_raid_per_victim(raid_keys, won) -> list[str]:
@@ -522,7 +540,8 @@ def raid_shortlist(u, rows, par_of, mae) -> set:
     raids = {r["action"].buy: r for r in rows
              if r["action"].buy
              and route_kind(u, r["action"].buy) == "raid"
-             and _clears_par_floor(par_of, mae, r["action"].buy)}
+             and _clears_par_floor(par_of, mae, r["action"].buy,
+                                   len(u.state.jornadas))}
     return set(_best_raid_per_victim(list(raids), raids))
 
 
@@ -628,7 +647,8 @@ def payload(u, rows, base, rivals, locks_h=None, n_actions: int = 0,
     par_of = {k: v["par"] for k, v in u.player_forecasts().items()}
     mae = current_mae()
     rows = [r for r in rows if not r["action"].buy
-           or _clears_par_floor(par_of, mae, r["action"].buy)]
+           or _clears_par_floor(par_of, mae, r["action"].buy,
+                                len(u.state.jornadas))]
     keep_raid = raid_shortlist(u, rows, par_of, mae)
     rows = [r for r in rows
            if route_kind(u, r["action"].buy) != "raid"
