@@ -492,8 +492,14 @@ def _selftest() -> None:
                                   victim="riv"))
     riv_after = raided["riv"]
     assert "star" not in riv_after, riv_after
-    def_count = sum(1 for s in riv_after.values() if s == "DEF")
-    assert def_count == 3, riv_after
+    # PINS THE CONTRACT, NOT THE COUNT. This asserted def_count == 3 --
+    # SLOT_MIN's defender minimum -- which only held while phantom_topup
+    # filled to positional minimums. That was the bug: SLOT_MIN sums to 8
+    # and an eleven is eleven, so a raided squad could satisfy every
+    # minimum and still field nobody, which is what crashed the report on
+    # 2026-09-17. What must be true is that the victim can still be
+    # simulated, and _fieldable() is exactly that question.
+    assert _fieldable(riv_after), riv_after
     assert any(k.startswith("__phantom_DEF_") for k in riv_after), riv_after
 
     sq = {"k": "POR", **{f"d{i}": "DEF" for i in range(1, 5)},

@@ -90,17 +90,41 @@ def apply_fixtures(per_jornada: dict[int, dict], sboard: dict[int, dict],
 
 
 def phantom_topup(sq: dict[str, str]) -> dict[str, str]:
-    from ffcore.score import SLOT_MIN
+    from ffcore.score import formations
 
+    # TOP UP TO A REAL FORMATION, NOT TO SLOT_MIN. This used to fill
+    # against SLOT_MIN, which sums to 8 (1 POR, 3 DEF, 3 MED, 1 DEL)
+    # while an eleven is ELEVEN. A squad could clear every positional
+    # minimum and still field nobody, and decide.load()'s own
+    # _fieldable() assert -- a hard invariant, not a warning -- then
+    # killed the whole run.
+    #
+    # It took a real squad to expose it: on 2026-09-17 a rival was down
+    # to ten players (1 POR, 4 DEF, 4 MED, 1 DEL), cleared SLOT_MIN,
+    # got no phantoms, and crashed the report. decide.load()'s comment
+    # had noted for months that clearing SLOT_MIN "is NOT the same
+    # guarantee as a real formation existing" -- the assert was right
+    # and this function was wrong.
+    #
+    # Fills against the CHEAPEST legal shape: whichever of the real
+    # formations this squad is fewest players away from, so a squad
+    # short at the back is not handed forwards.
     counts: dict[str, int] = {}
     for slot in sq.values():
         counts[slot] = counts.get(slot, 0) + 1
-    short = {s: n - counts.get(s, 0) for s, n in SLOT_MIN.items()
-            if n - counts.get(s, 0) > 0}
-    if not short:
+
+    best = None
+    for d, m, f in formations():
+        want = {"POR": 1, "DEF": d, "MED": m, "DEL": f}
+        short = {s: n - counts.get(s, 0) for s, n in want.items()
+                if n - counts.get(s, 0) > 0}
+        cost = sum(short.values())
+        if best is None or cost < best[0]:
+            best = (cost, short)
+    if not best or not best[1]:
         return sq
     sq = dict(sq)
-    for s, n in short.items():
+    for s, n in best[1].items():
         for i in range(n):
             sq["__phantom_%s_%d" % (s, i)] = s
     return sq
@@ -109,7 +133,7 @@ def phantom_topup(sq: dict[str, str]) -> dict[str, str]:
 def phantom_fill(squads: dict[str, dict[str, str]], per_jornada: dict[int, dict],
                  pos: dict[str, str]
                  ) -> tuple[dict[str, dict[str, str]], dict[int, dict]]:
-    from ffcore.score import SLOT_MIN
+    from ffcore.score import MAX_SLOT
 
     squads = {m: dict(sq) for m, sq in squads.items()}
     per_jornada = {j: dict(layer) for j, layer in per_jornada.items()}
@@ -124,8 +148,14 @@ def phantom_fill(squads: dict[str, dict[str, str]], per_jornada: dict[int, dict]
                      sum(v[1] for v in vs) / len(vs))
                  for s, vs in by_pos.items() if vs}
 
+    # REGISTER UP TO MAX_SLOT, NOT SLOT_MIN. phantom_topup() now fills to
+    # a real formation rather than to positional minimums, and a legal
+    # shape can want 5 defenders where SLOT_MIN wants 3 -- so registering
+    # only SLOT_MIN-many left the extra phantoms with no forecaster data
+    # at all. MAX_SLOT is the most any legal shape can ask for, so this
+    # cannot be short again.
     for j in per_jornada:
-        for s, n in SLOT_MIN.items():
+        for s, n in MAX_SLOT.items():
             if s not in avg.get(j, {}):
                 continue
             for i in range(n):

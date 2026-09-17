@@ -1,34 +1,35 @@
-# The simulation — 2026-09-17T1929Z
+# The simulation — 2026-09-17T2040Z
 
 ## Now
 
-**Locks in 29h** · squad 287.86M · cash 7.62M · total 295.48M
+**Locks in 29h** · squad 287.64M · cash 7.62M · total 295.27M
 
-play 5-4-1 · finish 2.06 · win 42% · season 1,352–2,167
+play 5-4-1 · finish 2.06 · win 43% · season 1,366–2,159
 
 ## Every player you could hold
 
 | Player | Pos | Start | xPts/j | Where | € | Season | PAR | pts/M€ |
 |---|---|--:|--:|---|--:|--:|--:|--:|
 | **PUT ON** | | | | | | | | |
-| Yeray Alvarez | DEF | 65% | 2.61 | bench | — | -6 (-62–+34) | +3 | — |
+| Yeray Alvarez | DEF | 65% | 2.61 | bench | — | -6 (-61–+33) | +2 | — |
 | **TAKE OFF** | | | | | | | | |
-| Sergio Carreira | DEF | 50% | 2.53 | yours | — | -1 (-59–+41) | +1 | — |
-| **Your eleven — play 5-4-1** | | | **49.71** | vs BurtonGM89 **44.23** | | **+5.48** | |
+| Sergio Carreira | DEF | 50% | 2.53 | yours | — | -2 (-62–+41) | +1 | — |
+| **Your eleven — play 5-4-1** | | | **49.71** | vs Albert Laporta **44.42** | | **+5.29** | |
 | **KEEP — bench** | | | | | | | | |
-| Carl Starfelt | DEF | 35% | 2.24 | yours | — | -1 (-54–+34) | +0 | — |
+| Carl Starfelt | DEF | 35% | 2.24 | yours | — | -0 (-50–+34) | -1 | — |
 | Alvaro Mantilla | DEF | 81% | 2.12 | yours | — | -0 (-16–+13) | -19 | — |
-| Omar El Hilali | DEF | 0% | 0.00 | yours | — | -8 (-91–+46) | +9 | — |
-| Ali Houary | DEL | 31% | 0.89 | yours | — | +0 (-6–+6) | -41 | — |
-| **BUY — free agents — none clear the bar today** | | | | | | | |
+| Omar El Hilali | DEF | 0% | 0.00 | yours | — | -10 (-91–+43) | +8 | — |
+| Ali Houary | DEL | 31% | 0.89 | yours | — | +0 (-6–+6) | -46 | — |
+| **BUY — free agents** | | | | | | | | |
+| Angel Perez | DEL | 83% | 3.99 | free agent | 21.38M | +33 (-85–+211) sell Hilali | +48 | 6.6 |
+| Yassir Zabiri | DEL | 70% | 4.31 | free agent | 13.28M | +17 (-78–+171) sell Starfelt | +21 | 5.1 |
 | **RAID — a clause, cannot be refused** | | | | | | | | |
-| Unai Lopez | MED | 77% | 3.62 | Albert | 15.21M | +13 (-81–+151) sell Starfelt | +43 | 2.4 |
+| Leandro Cabrera | DEF | 85% | 4.68 | Albert | 11.17M +6.33M | +3 (-91–+101) sell Hilali | +20 | 3.0 |
 | **SAVE — better than yours, out of reach** | | | | | | | | |
-| Raphinha | DEL | 78% | 7.55 | Magic | 86.17M short | +104 (-36–+388) if you could | +133 | 1.2 |
-| Ante Budimir | DEL | 84% | 5.89 | BurtonGM89 | 8.88M short | +29 (-62–+192) if you could | +39 | 3.2 |
-| Pierre-Emerick Aubameyang | DEL | 88% | 5.46 | Albert | 44.07M short | +36 (-57–+193) if you could | +40 | 0.8 |
+| Raphinha | DEL | 78% | 7.55 | Magic | 86.17M short | +107 (-33–+378) if you could | +129 | 1.2 |
+| Ante Budimir | DEL | 84% | 5.89 | BurtonGM89 | 8.88M short | +31 (-61–+195) if you could | +34 | 3.5 |
 | **PASS** | | | | | | | | |
-| Alvaro Valles | POR | 93% | 12.77 | free agent | -51.01M | +28 (-103–+198) | +59 | — |
+| Jose Maria Gimenez | DEF | 56% | 3.18 | free agent | -9.48M | +1 (-50–+85) | +11 | — |
 
 _How to read this table: **How to read the tables** in METHOD.md._
 
@@ -36,18 +37,19 @@ _How to read this table: **How to read the tables** in METHOD.md._
 
 | Manager | now | cash | simulated | 10–90 | P(I finish above) |
 |---|--:|--:|--:|--:|--:|
-| miguel_autentico **(you)** | 291 | 7.62M | 1,741 | 1,352–2,167 | — |
-| BurtonGM89 | 241 | ~3.11M | 1,626 | 1,259–2,027 | 60% |
-| SusoGattuso | 210 | ~-14.50M | 1,483 | 1,169–1,833 | 73% |
-| Albert Laporta | 217 | ~49.47M | 1,415 | 1,060–1,809 | 78% |
-| Magic Mike 333 | 233 | ~19.78M | 1,346 | 995–1,740 | 83% |
+| miguel_autentico **(you)** | 308 | 7.62M | 1,754 | 1,366–2,159 | — |
+| BurtonGM89 | 253 | ~3.11M | 1,638 | 1,265–2,062 | 61% |
+| SusoGattuso | 208 | ~-14.50M | 1,483 | 1,153–1,844 | 74% |
+| Albert Laporta | 217 | ~138.57M | 1,454 | 1,096–1,871 | 75% |
+| Magic Mike 333 | 231 | ~19.78M | 1,345 | 995–1,741 | 84% |
 
 ## What the simulation cannot see
 
 | Not modelled | Which way it bends the answer |
 |---|---|
+| **Albert Laporta's squad is short a position** (1 defensa) | his real squad cannot field a legal eleven, so the SIMULATION stands in a league-average player at that spot — the same real per-jornada data every other player's number comes from, not an invented figure or a presumption he never fixes it (assuming he never would is the much stronger, much less plausible claim). His true squad may be stronger or weaker than an average man there once he actually buys one |
 | Jornada 6 is half played — 14 clubs are done | their points are already in `now`, so only the rest of the round is simulated, and it still re-picks an eleven that is in fact already locked |
-| A buyout premium is charged at **0.000 places per million**, the median of every run that has measured it — today's own reading is 0.671 | a clause runs above market value here — too few real raids logged yet to median and the app pays back only the value, so the premium is gone for good. It is charged against the move, but priced off what more money would buy you today — most days, very little |
+| A buyout premium is charged at **0.000 places per million**, the median of every run that has measured it — today's own reading is 0.590 | a clause runs above market value here — too few real raids logged yet to median and the app pays back only the value, so the premium is gone for good. It is charged against the move, but priced off what more money would buy you today — most days, very little |
 | "Your eleven" (top of the ladder) compares only the NEXT jornada, off real confirmed lineups/injuries | the standings table below simulates the other 32 jornadas too, where nobody has lineup news yet and squad value dominates — the two can point opposite ways (this week's confirmed news vs. the season's average squad quality) without either being wrong |
 | Beyond the next jornada, P(start) reverts to his own season-standing rate | a suspension or a knock is dated to the match it was announced for — nothing here predicts a FUTURE one not yet known, e.g. who gets injured in March |
 | Rivals never transfer | a steal that guts a squad assumes its manager does not simply buy someone back — flatters the steal |
@@ -64,47 +66,47 @@ PAR = season points above the LEAGUE's own replacement level at his slot (the sc
 
 | Player | Pos | Price | Season | Next | PAR | pts/€M |
 |---|---|---:|---:|---:|---:|---:|
-| Unai Lopez | MED | 15.21M | 118.8 | — | 43.4 | 2.85 |
-| Ramon Terrats | MED | 8.56M | 104.5 | 0.0 | 10.8 (-49–103) | 1.26 |
-| Leandro Cabrera | DEF | 17.50M | 108.1 | — | 20.2 | 1.15 |
-| Robert Navarro | MED | 7.86M | 106.8 | 3.4 | 7.8 (-57–120) | 0.99 |
+| Unai Lopez | MED | 15.21M | 118.8 | — | 51.9 | 3.41 |
+| Angel Perez | DEL | 21.38M | 152.3 | — | 47.5 | 2.22 |
+| Yassir Zabiri | DEL | 13.28M | 126.0 | — | 21.3 | 1.60 |
+| Robert Navarro | MED | 7.86M | 106.8 | 3.4 | 9.9 (-58–124) | 1.25 |
+| Ramon Terrats | MED | 8.56M | 104.5 | 0.0 | 10.2 (-45–98) | 1.19 |
+| Leandro Cabrera | DEF | 17.50M | 108.1 | — | 19.5 | 1.12 |
+| Miguel Sierra | DEL | 5.11M | 96.3 | — | 5.7 (-51–89) | 1.11 |
+| Marc Roca | MED | 13.32M | 108.9 | 1.4 | 11.4 (-51–119) | 0.86 |
+| Roberto Fernandez | DEL | 32.50M | 130.8 | — | 27.3 (-61–178) | 0.84 |
 | Alfonso Herrero | POR | 17.16M | 162.2 | 5.2 | 14.2 | 0.83 |
-| Facundo Bernal | MED | 14.42M | 87.4 | 3.6 | 12.0 | 0.83 |
-| Roberto Fernandez | DEL | 32.50M | 130.8 | — | 26.0 (-63–175) | 0.80 |
-| Miguel Sierra | DEL | 5.11M | 96.3 | — | 4.0 (-49–88) | 0.79 |
-| Raphinha | DEL | 139.58M | 233.5 | — | 103.8 (-36–388) | 0.74 |
-| Marc Roca | MED | 13.32M | 108.9 | 1.4 | 9.9 (-53–118) | 0.74 |
-| Xavi Espart | DEF | 28.71M | 134.3 | — | 18.8 (-68–161) | 0.65 |
-| Luka Sucic | MED | 10.32M | 95.0 | — | 6.7 (-39–77) | 0.65 |
-| Kike Salas | DEF | 19.36M | 116.8 | — | 11.1 (-64–115) | 0.57 |
-| Alvaro Valles | POR | 51.01M | 206.5 | 12.8 | 27.8 (-103–198) | 0.55 |
-| David Hancko | DEF | 38.54M | 136.8 | — | 20.4 (-71–172) | 0.53 |
-| Nahuel Tenaglia | DEF | 34.42M | 128.5 | — | 17.8 (-60–142) | 0.52 |
-| Lucas Boye | DEL | 27.95M | 112.7 | — | 12.9 (-54–125) | 0.46 |
-| Ante Budimir | DEL | 62.29M | 138.9 | — | 28.7 (-62–192) | 0.46 |
-| David Soria | POR | 35.80M | 163.3 | 5.3 | 15.5 (-62–111) | 0.43 |
-| Javier Hernandez | MED | 16.08M | 101.9 | — | 6.9 (-53–102) | 0.43 |
-| Juan Foyth | DEF | 18.98M | 115.9 | 0.0 | 7.2 (-67–123) | 0.38 |
-| Pierre-Emerick Aubameyang | DEL | 97.48M | 140.4 | — | 35.8 (-57–193) | 0.37 |
-| Aitor Paredes | DEF | 13.02M | 102.4 | 2.4 | 4.2 (-51–89) | 0.33 |
-| Giuliano Simeone | DEL | 44.65M | 114.4 | — | 12.6 (-64–147) | 0.28 |
-| Odysseas Vlachodimos | POR | 30.03M | 147.9 | — | 8.3 (-60–83) | 0.28 |
-| Marc Bernal | MED | 25.49M | 103.5 | — | 7.0 (-52–109) | 0.27 |
-| Mariano Diaz | DEL | 18.54M | 100.2 | — | 5.0 (-55–107) | 0.27 |
-| Cesar Tarrega | DEF | 8.89M | 89.5 | — | 1.9 (-46–75) | 0.21 |
-| Luismi Cruz | DEL | 9.48M | 89.5 | — | 1.9 (-45–79) | 0.20 |
-| Rodrigo Riquelme | MED | 17.68M | 89.2 | 1.0 | 3.4 (-38–71) | 0.19 |
-| Toni Martinez | DEL | 28.03M | 104.8 | — | 4.5 | 0.16 |
-| Alvaro Garcia | MED | 29.31M | 97.0 | — | 3.9 (-52–90) | 0.13 |
-| Fran Garcia | DEF | 30.33M | 103.4 | 2.4 | 3.6 (-51–87) | 0.12 |
-| Enes Unal | DEL | 17.63M | 86.1 | 1.1 | 1.6 (-44–68) | 0.09 |
-| Unai Nuñez | DEF | 10.33M | 85.9 | — | 0.9 (-32–47) | 0.08 |
-| Jonny Castro | DEF | 14.03M | 88.6 | — | 0.6 | 0.04 |
-| Sergio Herrera | POR | 33.61M | 122.0 | — | 1.1 (-23–32) | 0.03 |
-| Lorenzo Amatucci | MED | 20.08M | 79.6 | — | 0.6 (-29–40) | 0.03 |
-| Jon Aramburu | DEF | 19.60M | 75.1 | — | 0.5 (-22–30) | 0.03 |
-| Abel Bretones | DEF | 10.04M | 80.0 | — | 0.1 (-26–40) | 0.01 |
-| Jose Gaya | DEF | 19.04M | 87.4 | — | 0.2 (-37–60) | 0.01 |
-| Aimar Oroz | MED | 25.62M | 75.6 | — | 0.2 (-30–48) | 0.01 |
+| Raphinha | DEL | 139.58M | 233.5 | — | 107.1 (-33–378) | 0.77 |
+| Xavi Espart | DEF | 28.71M | 134.3 | — | 17.8 (-65–155) | 0.62 |
+| Luka Sucic | MED | 10.32M | 95.0 | — | 6.4 (-38–79) | 0.62 |
+| Williot Swedberg | MED | 13.88M | 75.4 | — | 8.6 | 0.62 |
+| Lucas Boye | DEL | 27.95M | 112.7 | — | 16.0 (-53–142) | 0.57 |
+| Juan Foyth | DEF | 18.98M | 115.9 | 0.0 | 10.5 (-63–119) | 0.55 |
+| David Hancko | DEF | 38.54M | 136.8 | — | 21.0 (-73–169) | 0.54 |
+| Kike Salas | DEF | 19.36M | 116.8 | — | 10.2 (-60–128) | 0.52 |
+| Ante Budimir | DEL | 62.29M | 138.9 | — | 31.4 (-61–195) | 0.50 |
+| Nahuel Tenaglia | DEF | 34.42M | 128.5 | — | 17.3 (-61–139) | 0.50 |
+| Javier Hernandez | MED | 16.08M | 101.9 | — | 7.0 (-53–103) | 0.44 |
+| David Soria | POR | 35.80M | 163.3 | 5.3 | 14.9 (-60–109) | 0.42 |
+| Aitor Paredes | DEF | 13.02M | 102.4 | 2.4 | 5.3 (-49–84) | 0.41 |
+| Luismi Cruz | DEL | 9.48M | 89.5 | — | 3.5 (-45–82) | 0.37 |
+| Toni Martinez | DEL | 28.03M | 104.8 | — | 9.5 (-58–124) | 0.34 |
+| Mariano Diaz | DEL | 18.54M | 100.2 | — | 5.8 (-53–112) | 0.31 |
+| Marc Bernal | MED | 25.49M | 103.5 | — | 7.5 (-48–102) | 0.29 |
+| Giuliano Simeone | DEL | 44.65M | 114.4 | — | 12.6 (-61–141) | 0.28 |
+| Odysseas Vlachodimos | POR | 30.03M | 147.9 | — | 6.7 (-59–85) | 0.22 |
+| Enes Unal | DEL | 17.63M | 86.1 | 1.1 | 3.1 (-38–65) | 0.17 |
+| Rodrigo Riquelme | MED | 17.68M | 89.2 | 1.0 | 3.0 (-37–72) | 0.17 |
+| Jose Maria Gimenez | DEF | 9.48M | 99.2 | — | 1.5 (-50–85) | 0.16 |
+| Alvaro Garcia | MED | 29.31M | 97.0 | — | 4.2 (-51–89) | 0.14 |
+| Unai Nuñez | DEF | 10.33M | 85.9 | — | 1.1 (-33–45) | 0.11 |
+| Fran Garcia | DEF | 30.34M | 103.4 | 2.4 | 3.2 (-49–86) | 0.11 |
+| Abel Bretones | DEF | 10.04M | 80.0 | — | 1.0 (-27–36) | 0.10 |
+| Cesar Tarrega | DEF | 8.89M | 89.5 | — | 0.7 (-45–68) | 0.08 |
+| Lucas Noubi | DEF | 18.69M | 76.1 | — | 0.8 (-16–23) | 0.04 |
+| Jon Aramburu | DEF | 19.60M | 75.1 | — | 0.5 (-22–26) | 0.02 |
+| Lorenzo Amatucci | MED | 20.08M | 79.6 | — | 0.4 (-29–43) | 0.02 |
+| Jose Gaya | DEF | 19.04M | 87.4 | — | 0.2 (-39–55) | 0.01 |
+| Adria Altimira | DEF | 4.39M | 76.6 | — | 0.0 (-18–25) | 0.00 |
 
-_20 more listed players at or below the league's own replacement level at their slot, not worth a look today — a free agent nobody wants yet, or a rival's clause on a squad player he outgrew._
+_19 more listed players at or below the league's own replacement level at their slot, not worth a look today — a free agent nobody wants yet, or a rival's clause on a squad player he outgrew._
