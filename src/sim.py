@@ -653,6 +653,16 @@ def payload(u, rows, base, rivals, locks_h=None, n_actions: int = 0,
     rows = [r for r in rows
            if route_kind(u, r["action"].buy) != "raid"
            or r["action"].buy in keep_raid]
+    # A MOVE HAS TO GAIN POINTS TO BE A MOVE. `rows` is what survived
+    # rank()'s screen, not a verdict: a candidate can clear the screen and
+    # then simulate NEGATIVE once it is run properly. _best() has always
+    # applied this rule (`d_pts > 0`) when it picks the single headline
+    # move; this list did not, so the phone's table showed losing moves
+    # beside winning ones -- one of two on the day this was found, at
+    # -16.63 points. The ladder still lists everything, grouped and with
+    # its Δ shown; this is the recommendations list, and a recommendation
+    # to lose points is not one.
+    rows = [r for r in rows if r.get("d_pts", 0.0) > 0]
     for r in sorted(rows, key=lambda r: _move_rank_key(r, u)):
         a = r["action"]
         who = max(rivals, key=lambda v: r["d_beat"].get(v, 0.0)) \
