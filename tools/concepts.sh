@@ -52,5 +52,18 @@ check "hand-written field read" 54 \
 check "Universe flat-dict storage" 0 \
   "$(grep -c 'InitVar\[' src/decide.py || true)"
 
+# SIZE RATCHET. The concept counts above cannot see the failure this whole
+# exercise actually hit: eight waves that each gave a concept one home,
+# each passing every gate, and together adding 1,696 lines to a codebase
+# the work was meant to shrink. An empirical study of AI agents refactoring
+# (arXiv 2511.04824) reports exactly that as the characteristic failure --
+# agents grow size and complexity where humans shrink it -- and recommends
+# a hard constraint on complexity change before starting. This is it.
+#
+# Raise the budget only in a commit that says why, in words, and only for
+# work that adds a capability rather than tidies an existing one.
+check "src/ lines" 19192 \
+  "$(find src -name '*.py' | xargs cat | wc -l)"
+
 [ "$fail" -eq 0 ] && echo "concepts: no duplication regained" || echo "concepts: a concept regained a second implementation"
 exit "$fail"
