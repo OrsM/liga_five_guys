@@ -89,9 +89,9 @@ def header(u, base, n_actions: int, locks_h=None, xi=None) -> list[str]:
                       else "%.0f days" % (locks_h / 24)))
     cash_txt = ("**cash %s**" if u.cash < 0 else "cash %s") % fmt_money(u.cash)
     if u.locked_cash:
-        cash_txt += (" (balance %s − %s locked)"
-                    % (fmt_money(u.cash + u.locked_cash),
-                       fmt_money(u.locked_cash)))
+        # The bids are NOT held back from this balance -- the app does not
+        # debit them -- so they are shown beside it, not subtracted from it.
+        cash_txt += " (%s already bid)" % fmt_money(u.locked_cash)
     ctx += ["squad %s" % fmt_money(val), cash_txt,
             "total %s" % fmt_money(val + u.cash)]
 
@@ -597,27 +597,85 @@ def _best(u, rows, rivals):
     return best, uncertain
 
 
+def bid_lines(u, rows) -> list[str]:
+    """Your live bids, re-read as what they are: actions already taken.
+
+    The app neither debits them nor stops you bidding past your balance, so
+    nothing else in the system will tell you that the bids standing tonight
+    cost more than you hold. Each run either endorses a bid -- the board
+    still wants that player at that price -- or it does not, and the one
+    free, instant way to raise money is to withdraw the ones it does not.
+    This carries the overdraft warning that cash alone used to carry, back
+    when cash had the bids wrongly netted out of it."""
+    if not u.my_bids:
+        return []
+    name = lambda k: title_name(u.name_view.get(k, k))          # noqa: E731
+
+    # A bid is worth keeping only if the board still wants the man AND the
+    # money is there once the sale that funds him is counted. Endorsement
+    # alone is not enough: the ranking scores one move at a time against
+    # today's squad, so it will happily want two men you can only pay for
+    # one of -- which is the whole reason this warning exists. rows arrive
+    # best-first, so the first move that buys a player is his best price,
+    # and taking them in that order spends the budget the way the board
+    # would spend it.
+    cost_of: dict[str, float] = {}
+    for r in rows:
+        k = r["action"].buy
+        if k in u.my_bids and k not in cost_of:
+            cost_of[k] = r["action"].net
+    keep, drop, spent = [], [], 0.0
+    for k in cost_of:                       # board order, best first
+        if spent + cost_of[k] <= u.cash:
+            keep.append(k)
+            spent += cost_of[k]
+        else:
+            drop.append((k, u.my_bids[k]))
+    drop += [(k, m) for k, m in u.my_bids.items() if k not in cost_of]
+    drop.sort(key=lambda kv: -kv[1])
+    out = []
+    if drop:
+        out.append("**Withdraw %s** — %s. Today's board does not buy %s at "
+                   "that price, or cannot pay for %s alongside what it does "
+                   "buy. Withdrawing frees the money at no points cost."
+                   % (fmt_money(sum(m for _k, m in drop)),
+                      ", ".join("%s %s" % (name(k), fmt_money(m))
+                                for k, m in drop),
+                      "him" if len(drop) == 1 else "them",
+                      "him" if len(drop) == 1 else "them"))
+    free = u.cash - u.locked_cash
+    if free < 0:
+        out.append("**%s bid, %s in hand** — if every live bid lands you are "
+                   "%s short, and the app will let that happen. Withdraw or "
+                   "sell before they resolve."
+                   % (fmt_money(u.locked_cash), fmt_money(u.cash),
+                      fmt_money(-free)))
+    return out
+
+
 def alert_lines(u, rows, rivals) -> list[str]:
+    out = bid_lines(u, rows)
     if u.cash < 0:
         sells, short = overdraft_fix(u)
         if not sells:
-            return ["**Overdrawn %s** — no safe dead-weight sale covers it; "
-                    "needs a manual look before the jornada locks."
-                    % fmt_money(-u.cash)]
+            return out + ["**Overdrawn %s** — no safe dead-weight sale covers "
+                          "it; needs a manual look before the jornada locks."
+                          % fmt_money(-u.cash)]
         names = ", ".join("%s (+€%.1fM)" % (title_name(u.name_view.get(k, k)),
                                             p / 1e6) for k, p in sells)
         if short > 0:
-            return ["**Overdrawn %s** — sell %s clears most of it, still "
-                    "€%.1fM short (no further safe dead-weight sale)."
-                    % (fmt_money(-u.cash), names, short / 1e6)]
-        return ["**Overdrawn %s** — sell %s to clear it before the jornada "
-                "locks (zero points cost: %s never start your eleven)."
-                % (fmt_money(-u.cash), names,
-                   "he doesn't" if len(sells) == 1 else "they don't")]
+            return out + ["**Overdrawn %s** — sell %s clears most of it, "
+                          "still €%.1fM short (no further safe dead-weight "
+                          "sale)." % (fmt_money(-u.cash), names, short / 1e6)]
+        return out + ["**Overdrawn %s** — sell %s to clear it before the "
+                      "jornada locks (zero points cost: %s never start your "
+                      "eleven)."
+                      % (fmt_money(-u.cash), names,
+                         "he doesn't" if len(sells) == 1 else "they don't")]
 
     best, uncertain = _best(u, rows, rivals)
     if best is None:
-        return []
+        return out
     a = best["action"]
     net = a.net
     if net > 0:
@@ -628,9 +686,10 @@ def alert_lines(u, rows, rivals) -> list[str]:
         cost = "free"
     if uncertain:
         cost += " · needs the seller to accept, not guaranteed"
-    return ["**Do this** — %s (%+.0f season pts, %+.0f%% to win, %s)"
-            % (a.label({k: title_name(v) for k, v in u.name_view.items()}),
-               best["d_pts"], 100 * best["d_win"], cost)]
+    return out + ["**Do this** — %s (%+.0f season pts, %+.0f%% to win, %s)"
+                  % (a.label({k: title_name(v)
+                              for k, v in u.name_view.items()}),
+                     best["d_pts"], 100 * best["d_win"], cost)]
 
 
 def shape(u, keys) -> str:
@@ -878,7 +937,7 @@ def _selftest() -> None:
     assert "**cash" not in " ".join(header(u, st, 1, locks_h=2.0))
     u.cash, u.locked_cash = -2637643.0, 5938860.0
     hh = " ".join(header(u, st, 1, locks_h=2.0))
-    assert "**cash -2.64M** (balance 3.30M − 5.94M locked)" in hh, hh
+    assert "**cash -2.64M** (5.94M already bid)" in hh, hh
     u.cash, u.locked_cash = 23.6e6, 0.0
     assert "locked" not in " ".join(header(u, st, 1, locks_h=2.0))
     assert "1.50" in h, h
@@ -936,6 +995,54 @@ def _selftest() -> None:
         al_big
     assert "still" in al_big[0] and "short" in al_big[0], al_big
     assert "d1" not in al_big[0]
+
+    # LIVE BIDS. The board either still wants the man at that price or the
+    # bid should come off the table; and the app neither debits a bid nor
+    # refuses one you cannot cover, so the shortfall has to be said out loud.
+    assert bid_lines(u2, []) == [], "no bids, nothing to say"
+    u_bid = _dc_replace(u2, cash=3e6, my_bids={"yuri": 8e6, "benat": 2e6},
+                        locked_cash=10e6)
+    bl = bid_lines(u_bid, [])
+    assert len(bl) == 2, bl
+    assert bl[0].startswith("**Withdraw 10.00M**"), bl
+    assert "Yuri 8.00M" in bl[0] and "Benat 2.00M" in bl[0], bl
+    assert "them" in bl[0], bl
+    assert "**10.00M bid, 3.00M in hand**" in bl[1], bl
+    assert "7.00M short" in bl[1], bl
+
+    # WANTED AND PAID FOR: the board buys Yuri for a net 1M because it sells
+    # someone to do it, and 1M is inside the 3M held -- so that bid stands.
+    funded = [{"action": Action("swap", buy="yuri", sell=("d1",),
+                                cost=8e6, proceeds=7e6)}]
+    kept = bid_lines(u_bid, funded)
+    assert len(kept) == 2, kept
+    assert "Yuri" not in kept[0], "an endorsed, funded bid is not withdrawn"
+    assert kept[0].startswith("**Withdraw 2.00M**") and "him" in kept[0], kept
+
+    # WANTED AND NOT PAID FOR: same man, no sale behind him, 8M against 3M.
+    # Wanting him is not the test -- affording him is.
+    broke = bid_lines(u_bid, [{"action": Action("buy", buy="yuri", cost=8e6)}])
+    assert broke[0].startswith("**Withdraw 10.00M**"), broke
+    assert "Yuri 8.00M" in broke[0], broke
+
+    covered = _dc_replace(u2, cash=12e6, my_bids={"yuri": 8e6},
+                          locked_cash=8e6)
+    cl = bid_lines(covered, [{"action": Action("buy", buy="yuri", cost=8e6)}])
+    assert cl == [], "endorsed and affordable is not news"
+
+    # TWO bids the board wants and one wallet that covers only the first.
+    pair = _dc_replace(u2, cash=10e6, my_bids={"yuri": 8e6, "benat": 7e6},
+                       locked_cash=15e6)
+    pl = bid_lines(pair, [{"action": Action("buy", buy="yuri", cost=8e6)},
+                          {"action": Action("buy", buy="benat", cost=7e6)}])
+    assert pl[0].startswith("**Withdraw 7.00M**"), pl
+    assert "Benat 7.00M" in pl[0] and "Yuri" not in pl[0], pl
+
+    # bid_lines rides ALONGSIDE the other alerts, never instead of them.
+    both = alert_lines(_dc_replace(u_over, my_bids={"yuri": 8e6},
+                                   locked_cash=8e6), [], ["riv"])
+    assert len(both) == 3, both
+    assert "Withdraw" in both[0] and "Overdrawn" in both[-1], both
 
     u2.part_played = {1: {"alaves"}}
     u2.forecaster = Bootstrap({1: {k: (v, 1.0) for k, v in val.items()},
@@ -1373,7 +1480,15 @@ def main() -> None:
                 (ALERTS.read_text(encoding="utf-8").splitlines()
                  if ALERTS.exists() else [])
                 if ln.startswith("- ")]
-        body = ["- " + ln for ln in lines] + prev
+        # Previous alerts are carried so a warning raised between reports is
+        # not lost -- but carried ONCE. Without this the file grew a fresh
+        # copy of every standing alert on every run, and the noise buried
+        # exactly the time-critical lines the file exists to surface.
+        body, seen = [], set()
+        for ln in ["- " + ln for ln in lines] + prev:
+            if ln not in seen:
+                seen.add(ln)
+                body.append(ln)
         if body:
             ALERTS.parent.mkdir(parents=True, exist_ok=True)
             write_lines(ALERTS, ["# Alerts — %s UTC"

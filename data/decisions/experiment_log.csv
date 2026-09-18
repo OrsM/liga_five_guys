@@ -38,3 +38,4 @@ Separately: pooled conditional Var(z)=17.65 (n=279) is still far above the theor
 2026-09-17T1144Z,forecast_param_audit,all,9,0.0000,0.0000,,"audited all 9 forecasting constants: 4 fitted at runtime, 1 fallback awaiting data, 4 unfitted",
 2026-09-17T1649Z,unused_scraped_data_audit,all,20,0.5489,0.6978,,"odds.csv is scraped every run and read by nothing; has real signal vs flat prior at n=20, still too few to grade against the Elo fixture factor",
 2026-09-18T0619Z,par_floor_evidence_weighted,all,65,0.0000,0.0000,,"par shrunk by pj/(pj+SHRINK_K) before the floor; drops 3.5-match Zabiri, keeps 21-match Perez",
+2026-09-18T1306Z,pending_bids_not_netted_from_cash,all,2,0.0000,0.0000,,"app does not debit a live bid (verified vs its own balance feed: 34.67M bid against 13.24M held); netting them out of cash forced a 45M sale to fund a 21M bid already placed. Top move 12.6 -> 38.2 d_pts, sells a benchwarmer not an XI starter",

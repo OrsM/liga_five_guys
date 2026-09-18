@@ -884,9 +884,22 @@ def market_routes(mkt: list[dict], key_of) -> tuple[dict[str, float],
     return price, route, bids
 
 
-def pending_sent(mkt: list[dict]) -> float:
-    return sum(float(r["bid_money"]) for r in mkt
-              if (r.get("bid_status") or "") == "pending" and r.get("bid_money"))
+def pending_sent(mkt: list[dict], key_of) -> dict[str, float]:
+    """Your own live bids, by player key -- money you have COMMITTED, not
+    money you have SPENT. The app does not debit a bid when it is placed
+    (verified against its own balance feed on 2026-09-18: two bids totalling
+    34.7M stood against a 13.2M balance), so this must never be subtracted
+    from cash. It is a list of actions already taken, to be re-endorsed or
+    withdrawn -- mirror of pending_received()."""
+    out: dict[str, float] = {}
+    for r in mkt:
+        if (r.get("bid_status") or "") != "pending" or not r.get("bid_money"):
+            continue
+        k = key_of(r)
+        if not k:
+            continue
+        out[k] = max(out.get(k, 0.0), float(r["bid_money"]))
+    return out
 
 
 def bought_price(txns: list[dict], xw) -> dict[str, float]:
@@ -1243,14 +1256,21 @@ def _selftest() -> None:
     assert r2 == {"free_agent": "free"}, r2
 
     mkt_bids = [
-        {"bid_status": "pending", "bid_money": "5600000"},
-        {"bid_status": "pending", "bid_money": "6795815"},
-        {"bid_status": "", "bid_money": ""},
-        {"bid_status": "accepted", "bid_money": "2000000"},
-        {"bid_status": "pending", "bid_money": ""},
+        {"player_name": "A", "bid_status": "pending", "bid_money": "5600000"},
+        {"player_name": "B", "bid_status": "pending", "bid_money": "6795815"},
+        {"player_name": "C", "bid_status": "", "bid_money": ""},
+        {"player_name": "D", "bid_status": "accepted", "bid_money": "2000000"},
+        {"player_name": "E", "bid_status": "pending", "bid_money": ""},
+        {"player_name": "A", "bid_status": "pending", "bid_money": "5100000"},
+        {"player_name": "", "bid_status": "pending", "bid_money": "9000000"},
     ]
-    assert pending_sent(mkt_bids) == 5600000.0 + 6795815.0, pending_sent(mkt_bids)
-    assert pending_sent([]) == 0.0
+    sent = pending_sent(mkt_bids, lambda r: r["player_name"])
+    # The SAME player twice keeps the standing bid, not the sum -- two rows
+    # are two snapshots of one commitment, and an unresolvable row is dropped
+    # rather than folded into a total nobody can act on.
+    assert sent == {"A": 5600000.0, "B": 6795815.0}, sent
+    assert sum(sent.values()) == 5600000.0 + 6795815.0
+    assert pending_sent([], lambda r: "x") == {}
 
     p2k = {"pt1": "me_a", "pt2": "me_b"}
     offers = [

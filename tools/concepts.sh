@@ -73,7 +73,18 @@ check "Universe flat-dict storage" 0 \
 # drift_frac_from_history(). A forecasting bug fix, not a tidy, and 20 of
 # its lines are the comment recording WHY the two fitters must use the
 # same predictor -- which is the knowledge that was lost the first time.
-check "src/ lines" 19473 \
+# 19473 -> 19625 on 2026-09-18: live bids became a LIST rather than a
+# total netted out of cash. A NEW CAPABILITY, not a tidy -- the app never
+# debits a bid and never refuses one you cannot cover, so nothing in the
+# system could say "this bid is no longer worth keeping" or "these bids
+# cost more than you hold". Both are now said. Most of the lines are the
+# self-test for bid_lines() and the two comments recording the evidence
+# (the app's own balance feed) that placing a bid does not spend the money.
+# The endorsement rule then had to become budget-aware -- the ranking scores
+# one move at a time, so it wants two men you can pay for one of -- and
+# alerts.md had to stop carrying a second copy of every standing alert,
+# which was burying the new line under its own history.
+check "src/ lines" 19625 \
   "$(find src -name '*.py' | xargs cat | wc -l)"
 
 [ "$fail" -eq 0 ] && echo "concepts: no duplication regained" || echo "concepts: a concept regained a second implementation"
