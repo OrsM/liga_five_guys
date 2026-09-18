@@ -69,7 +69,7 @@ player_id,name,club_id,ff_slug,af_slug,app_id,understat_id,app_names
 11677,hugo rincon,athletic,hugo-rincon,313025,3184,12189,H. Rincón
 11678,santiago mouriño,villarreal,santiago-mourino,311773,1959,13003,Mouriño
 11680,isaac romero,sevilla,isaac-romero,,2456,12305,Isaac
-11683,jon gorrotxategi,real sociedad,jon-gorrotxategi,,2621,13936,Gorrotxa
+11683,jon gorrotxategi,real sociedad,jon-gorrotxategi,287654,2621,13936,Gorrotxa
 11684,mikel goti,real sociedad,mikel-goti,,,13580,
 11688,adama boiro,athletic,adama-boiro,336998,2545,12724,Adama
 11701,antal yaakobishvili,atletico,,,,,
@@ -178,7 +178,7 @@ player_id,name,club_id,ff_slug,af_slug,app_id,understat_id,app_names
 13972,diego villares,deportivo,diego-villares,,2991,14712,D. Villares
 13973,ruben lopez,deportivo,ruben-lopez,,2829,,Bachmann|I.vidal|Ibon Sánchez|Rubén López
 13974,yeremay hernandez,deportivo,yeremay-hernandez,,3076,14924,Yeremay
-13975,david mella,deportivo,david-mella,,2994,14710,Mella
+13975,david mella,deportivo,david-mella,335720,2994,14710,Mella
 13978,carlos lopez,malaga,carlos-lopez,,3057,,Carlos Lopez
 13979,diego murillo,malaga,diego-murillo,,3039,,Murillo
 13980,dani sanchez,malaga,dani-sanchez,,3047,,Dani Sánchez
