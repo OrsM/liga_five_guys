@@ -1,12 +1,12 @@
 {
- "generated_at": "2026-09-18T16:39Z",
- "locks_in_h": 2.3398872419444445,
- "cash": 13223699.025380787,
- "cash_locked": 34665455.0,
+ "generated_at": "2026-09-18T18:28Z",
+ "locks_in_h": 0.5320396705555556,
+ "cash": 13223592.834706018,
+ "cash_locked": 22521028.0,
  "squad_value": 289201172.0,
  "jornadas_left": 33,
- "acquirable": 68,
- "considered": 304,
+ "acquirable": 59,
+ "considered": 368,
  "expected_finish": 2.13,
  "p_win": 0.398,
  "band": [
@@ -30,7 +30,7 @@
    "pts_lo": -66.39678863677733,
    "pts_hi": 223.69864045599712,
    "value": 3.2708841286353705,
-   "left": 1531581.0253807865,
+   "left": 1531474.8347060177,
    "answer": null,
    "p_win_after": 0.455,
    "vs": "BurtonGM89",
@@ -52,7 +52,7 @@
    "pts_lo": -75.56244654065428,
    "pts_hi": 166.72360740347574,
    "value": 2.6636486929798115,
-   "left": 7388793.0253807865,
+   "left": 7388686.834706018,
    "answer": null,
    "p_win_after": 0.441,
    "vs": "Albert Laporta",
@@ -206,19 +206,37 @@
    "bought": null
   },
   {
+   "name": "Nahuel Tenaglia",
+   "pos": "DEF",
+   "start": 0.7928571428571429,
+   "xpts": 3.6476456239551722,
+   "group": "raid",
+   "where": "BurtonGM89",
+   "money": -2559710.0,
+   "pts": -3.903479713778097,
+   "par": 39.437902235471995,
+   "pts_lo": -165.64358549748042,
+   "pts_hi": 150.52953107775562,
+   "note": "sell Natan",
+   "value": -1.524969513647287,
+   "market": 34204372.0,
+   "premium": 0.0,
+   "bought": null
+  },
+  {
    "name": "Raphinha",
    "pos": "DEL",
    "start": 0.7761904761904761,
    "xpts": 7.505117716139439,
    "group": "save",
    "where": "Magic",
-   "money": -83076432.97461921,
+   "money": -83076539.16529398,
    "pts": 107.1224292732853,
    "par": 125.04810114823277,
    "pts_lo": -36.63716449522765,
    "pts_hi": 376.4234726384465,
    "note": "short",
-   "value": 1.2894442555810313,
+   "value": 1.289442607378579,
    "market": null,
    "premium": null,
    "bought": null
@@ -230,13 +248,13 @@
    "xpts": 5.899643437761634,
    "group": "save",
    "where": "BurtonGM89",
-   "money": -3941711.9746192098,
+   "money": -2785553.165293984,
    "pts": 30.614768307293843,
    "par": 30.379517567639823,
    "pts_lo": -58.46527904068636,
    "pts_hi": 196.1711626525048,
    "note": "short",
-   "value": 7.766870969878866,
+   "value": 10.990552500929487,
    "market": null,
    "premium": null,
    "bought": null
@@ -253,6 +271,24 @@
    "par": -20.874695371732287,
    "pts_lo": -43.108353697407985,
    "pts_hi": 71.03237052708162,
+   "note": "",
+   "value": null,
+   "market": null,
+   "premium": null,
+   "bought": null
+  },
+  {
+   "name": "Roger Hinojo",
+   "pos": "DEF",
+   "start": 0.6746031746031745,
+   "xpts": 2.845794336361243,
+   "group": "pass",
+   "where": "free agent",
+   "money": -4900943.0,
+   "pts": 1.3317253759119012,
+   "par": -3.4416942750106756,
+   "pts_lo": -29.85027746044516,
+   "pts_hi": 44.3959242629187,
    "note": "",
    "value": null,
    "market": null,
@@ -283,7 +319,7 @@
    "mean": 1761.8298463696806,
    "lo": 1349.6520771279547,
    "hi": 2209.805713650976,
-   "cash": 13223699.025380787,
+   "cash": 13223592.834706018,
    "cash_known": true,
    "p_above": null
   },
@@ -399,6 +435,19 @@
    "simulated": false
   },
   {
+   "key": "9909",
+   "name": "Nahuel Tenaglia",
+   "pos": "DEF",
+   "price": 34203319.0,
+   "season_pts": 128.44476205047988,
+   "next_pts": null,
+   "par": 39.437902235471995,
+   "par_lo": null,
+   "par_hi": null,
+   "value": 1.1530431369970848,
+   "simulated": false
+  },
+  {
    "key": "775",
    "name": "Jose Maria Gimenez",
    "pos": "DEF",
@@ -425,32 +474,6 @@
    "simulated": true
   },
   {
-   "key": "9987",
-   "name": "Roberto Fernandez",
-   "pos": "DEL",
-   "price": 32501289.0,
-   "season_pts": 139.63728657942426,
-   "next_pts": null,
-   "par": 29.29567584995027,
-   "par_lo": -60.29497847715759,
-   "par_hi": 205.09227014136678,
-   "value": 0.9013696610602204,
-   "simulated": true
-  },
-  {
-   "key": "8944",
-   "name": "Ramon Terrats",
-   "pos": "MED",
-   "price": 8563908.0,
-   "season_pts": 102.1638064726277,
-   "next_pts": null,
-   "par": 7.370368006284593,
-   "par_lo": -48.89095823132731,
-   "par_hi": 98.86785712344926,
-   "value": 0.8606313853773994,
-   "simulated": true
-  },
-  {
    "key": "4288",
    "name": "Raphinha",
    "pos": "DEL",
@@ -464,19 +487,6 @@
    "simulated": true
   },
   {
-   "key": "16236",
-   "name": "Miguel Sierra",
-   "pos": "DEL",
-   "price": 5106665.0,
-   "season_pts": 97.90617258873091,
-   "next_pts": null,
-   "par": 3.8139228664806524,
-   "par_lo": -50.67630346834508,
-   "par_hi": 89.78654277744863,
-   "value": 0.7468519800066487,
-   "simulated": true
-  },
-  {
    "key": "3215",
    "name": "Marc Roca",
    "pos": "MED",
@@ -487,32 +497,6 @@
    "par_lo": -52.405732645654595,
    "par_hi": 116.43176555686944,
    "value": 0.7254162480810455,
-   "simulated": true
-  },
-  {
-   "key": "8392",
-   "name": "Luka Sucic",
-   "pos": "MED",
-   "price": 10324237.0,
-   "season_pts": 94.65662008714843,
-   "next_pts": null,
-   "par": 6.442326496856708,
-   "par_lo": -39.09753637677234,
-   "par_hi": 80.42732808987822,
-   "value": 0.6240002526924467,
-   "simulated": true
-  },
-  {
-   "key": "16765",
-   "name": "Xavi Espart",
-   "pos": "DEF",
-   "price": 28711699.0,
-   "season_pts": 134.57566696762285,
-   "next_pts": null,
-   "par": 17.37184981143173,
-   "par_lo": -65.69116018068249,
-   "par_hi": 156.82843100585382,
-   "value": 0.6050442995878346,
    "simulated": true
   },
   {
@@ -532,26 +516,26 @@
    "key": "1919",
    "name": "David Soria",
    "pos": "POR",
-   "price": 35802943.0,
+   "price": 35824865.0,
    "season_pts": 162.2613390866778,
    "next_pts": null,
    "par": 18.348176318666333,
    "par_lo": -65.03763594424409,
    "par_hi": 127.31486128486081,
-   "value": 0.5124767625573778,
+   "value": 0.5121631670814762,
    "simulated": true
   },
   {
    "key": "6635",
    "name": "Ante Budimir",
    "pos": "DEL",
-   "price": 62291000.0,
+   "price": 61134735.0,
    "season_pts": 139.42680552569166,
    "next_pts": null,
    "par": 30.614768307293843,
    "par_lo": -58.46527904068636,
    "par_hi": 196.1711626525048,
-   "value": 0.49147980137249114,
+   "value": 0.5007753498447952,
    "simulated": true
   },
   {
@@ -568,45 +552,6 @@
    "simulated": true
   },
   {
-   "key": "5995",
-   "name": "David Hancko",
-   "pos": "DEF",
-   "price": 38544264.0,
-   "season_pts": 136.91375584275957,
-   "next_pts": null,
-   "par": 17.31035584780966,
-   "par_lo": -68.63259375305908,
-   "par_hi": 172.40948246452248,
-   "value": 0.44910329194013565,
-   "simulated": true
-  },
-  {
-   "key": "14024",
-   "name": "Javier Hernandez",
-   "pos": "MED",
-   "price": 16075486.0,
-   "season_pts": 108.8954820635141,
-   "next_pts": null,
-   "par": 6.810801816150047,
-   "par_lo": -64.95526944771461,
-   "par_hi": 130.22024124724564,
-   "value": 0.4236762618654295,
-   "simulated": true
-  },
-  {
-   "key": "9909",
-   "name": "Nahuel Tenaglia",
-   "pos": "DEF",
-   "price": 34421938.0,
-   "season_pts": 128.44476205047988,
-   "next_pts": null,
-   "par": 13.931373126603944,
-   "par_lo": -59.24253268436867,
-   "par_hi": 140.7914979302458,
-   "value": 0.40472367147381255,
-   "simulated": true
-  },
-  {
    "key": "5032",
    "name": "Toni Martinez",
    "pos": "DEL",
@@ -617,6 +562,19 @@
    "par_lo": -55.65772044758007,
    "par_hi": 130.04435589411307,
    "value": 0.3607252818232601,
+   "simulated": true
+  },
+  {
+   "key": "3204",
+   "name": "Alex Berenguer",
+   "pos": "DEL",
+   "price": 15510195.0,
+   "season_pts": 98.99478359891783,
+   "next_pts": 2.848264216161819,
+   "par": 5.2709458552566275,
+   "par_lo": -55.66329555359539,
+   "par_hi": 107.32058627866365,
+   "value": 0.33983749754639625,
    "simulated": true
   },
   {
@@ -646,19 +604,6 @@
    "simulated": true
   },
   {
-   "key": "6450",
-   "name": "Rodrigo Riquelme",
-   "pos": "MED",
-   "price": 17677313.0,
-   "season_pts": 94.37629682720858,
-   "next_pts": null,
-   "par": 4.881897256784214,
-   "par_lo": -47.28479571455337,
-   "par_hi": 89.14016591871639,
-   "value": 0.2761673822703831,
-   "simulated": true
-  },
-  {
    "key": "867",
    "name": "Alvaro Garcia",
    "pos": "MED",
@@ -672,16 +617,29 @@
    "simulated": true
   },
   {
+   "key": "15316",
+   "name": "Roger Hinojo",
+   "pos": "DEF",
+   "price": 4900943.0,
+   "season_pts": 85.56516553999721,
+   "next_pts": null,
+   "par": 1.3317253759119012,
+   "par_lo": -29.85027746044516,
+   "par_hi": 44.3959242629187,
+   "value": 0.2717283951092476,
+   "simulated": true
+  },
+  {
    "key": "7916",
    "name": "Aitor Paredes",
    "pos": "DEF",
-   "price": 13017089.0,
+   "price": 12970600.0,
    "season_pts": 102.52749414698171,
    "next_pts": 2.3922132960754316,
    "par": 3.4873293637397182,
    "par_lo": -51.18933477119913,
    "par_hi": 90.70221671936933,
-   "value": 0.26790393487666236,
+   "value": 0.26886415152265264,
    "simulated": true
   },
   {
@@ -708,19 +666,6 @@
    "par_lo": -48.705848047476884,
    "par_hi": 98.97368229650492,
    "value": 0.2363257217328373,
-   "simulated": true
-  },
-  {
-   "key": "3226",
-   "name": "Mariano Diaz",
-   "pos": "DEL",
-   "price": 18539001.0,
-   "season_pts": 100.438608289048,
-   "next_pts": null,
-   "par": 3.782037247974813,
-   "par_lo": -57.8350341005135,
-   "par_hi": 114.74350087109414,
-   "value": 0.20400437153948117,
    "simulated": true
   },
   {
@@ -825,19 +770,6 @@
    "par_lo": -27.968615889133662,
    "par_hi": 39.582896468353624,
    "value": 0.009146743288376427,
-   "simulated": true
-  },
-  {
-   "key": "11230",
-   "name": "Abel Bretones",
-   "pos": "DEF",
-   "price": 10041470.0,
-   "season_pts": 79.92021461464364,
-   "next_pts": null,
-   "par": 0.03532382444586801,
-   "par_lo": -23.19350312877134,
-   "par_hi": 33.29728868646089,
-   "value": 0.0035177941522374725,
    "simulated": true
   },
   {
@@ -1062,19 +994,6 @@
    "simulated": true
   },
   {
-   "key": "3204",
-   "name": "Alex Berenguer",
-   "pos": "DEL",
-   "price": 15510195.0,
-   "season_pts": 98.99478359891783,
-   "next_pts": 2.848264216161819,
-   "par": -10.052504359134005,
-   "par_lo": null,
-   "par_hi": null,
-   "value": -0.6481223710684492,
-   "simulated": false
-  },
-  {
    "key": "16202",
    "name": "Tyrhys Dolan",
    "pos": "DEL",
@@ -1101,19 +1020,6 @@
    "simulated": false
   },
   {
-   "key": "15316",
-   "name": "Roger Hinojo",
-   "pos": "DEF",
-   "price": 4900943.0,
-   "season_pts": 85.56516553999721,
-   "next_pts": null,
-   "par": -3.4416942750106756,
-   "par_lo": null,
-   "par_hi": null,
-   "value": -0.7022514391639886,
-   "simulated": false
-  },
-  {
    "key": "10893",
    "name": "Marcos Fernandez",
    "pos": "DEL",
@@ -1137,6 +1043,19 @@
    "par_lo": null,
    "par_hi": null,
    "value": -1.462517677808691,
+   "simulated": false
+  },
+  {
+   "key": "16236",
+   "name": "Miguel Sierra",
+   "pos": "DEL",
+   "price": 5731172.0,
+   "season_pts": 97.90617258873091,
+   "next_pts": null,
+   "par": -11.141115369320929,
+   "par_lo": null,
+   "par_hi": null,
+   "value": -1.9439506211506004,
    "simulated": false
   }
  ]
