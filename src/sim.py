@@ -197,8 +197,9 @@ def ladder_rows(u, rows, bands=None, exp=None, xi=None) -> list[dict]:
     mae = current_mae()
     ranked = sorted(buys, key=lambda k: _move_rank_key(won[k], u))
     for k in ranked:
-        if route_kind(u, k) == "free" and _clears_par_floor(
-                par, mae, k, len(u.state.jornadas), pj):
+        if (route_kind(u, k) == "free" and _gains(won[k])
+                and _clears_par_floor(par, mae, k,
+                                      len(u.state.jornadas), pj)):
             out.append(buy_cell(k, "buy"))
     raid_keys = raid_shortlist(u, won.values(), par, mae, pj)
     for k in sorted(raid_keys, key=lambda k: _move_rank_key(won[k], u)):
@@ -569,9 +570,31 @@ def raid_shortlist(u, rows, par_of, mae, pj_of=None) -> set:
     raids = {r["action"].buy: r for r in rows
              if r["action"].buy
              and route_kind(u, r["action"].buy) == "raid"
+             and _gains(r)
              and _clears_par_floor(par_of, mae, r["action"].buy,
                                    len(u.state.jornadas), pj_of)}
     return set(_best_raid_per_victim(list(raids), raids))
+
+
+def _gains(r) -> bool:
+    """Does the SIMULATION say this move wins points?
+
+    par and the simulation answer different questions and can disagree. par
+    is a season-long, per-player figure: how far above a replacement at his
+    slot he sits. d_pts is what actually happens to YOUR squad when the sale
+    that funds him goes with him. A man can be excellent and still be a
+    losing trade, because the eleven he joins loses whoever paid for him.
+
+    On 2026-09-18 the ladder offered "BUY Pape Gueye, sell Alonso" at par
+    +56 -- comfortably over the floor -- while the same row carried d_pts
+    -2.0 and the recommendation itself, which has always screened on d_pts,
+    did not include him. Two renderers off one set of rows, disagreeing
+    about the same move. The floor asks whether there is enough evidence to
+    believe the edge; this asks whether there is an edge at all, and a row
+    has to pass both to be offered.
+    """
+    d = r.get("d_pts")
+    return d is not None and d > 0
 
 
 def _move_rank_key(r, u):
@@ -999,6 +1022,17 @@ def _selftest() -> None:
     # LIVE BIDS. The board either still wants the man at that price or the
     # bid should come off the table; and the app neither debits a bid nor
     # refuses one you cannot cover, so the shortfall has to be said out loud.
+    # A MAN CAN BE EXCELLENT AND STILL BE A LOSING TRADE. par is per-player
+    # and season-long; d_pts is what happens to YOUR squad once the sale
+    # that funds him goes too. The ladder offered Pape Gueye at par +56 with
+    # d_pts -2.0 on 2026-09-18 while the recommendation, which screens on
+    # d_pts, left him out -- two renderers disagreeing off one set of rows.
+    assert _gains({"d_pts": 0.1})
+    assert not _gains({"d_pts": -2.0}), "a losing move is not a buy"
+    assert not _gains({"d_pts": 0.0}), "break-even is not worth a transfer"
+    assert not _gains({}), "no simulated figure is not a yes"
+    assert not _gains({"d_pts": None})
+
     assert bid_lines(u2, []) == [], "no bids, nothing to say"
     u_bid = _dc_replace(u2, cash=3e6, my_bids={"yuri": 8e6, "benat": 2e6},
                         locked_cash=10e6)

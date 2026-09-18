@@ -121,7 +121,14 @@ check "Universe flat-dict storage" 0 \
 # full walk then re-parsed all 3,383 documents: 395s where it should be 30s.
 # The fix is the name, the lines are its self-test and the note that says
 # what it looked like (a slow rebuild) rather than what it was.
-check "src/ lines" 20140 \
+# 20140 -> 20175 on 2026-09-18: _gains(). The BUY and RAID sections were
+# gated on the par floor alone, so the ladder offered "buy Pape Gueye, sell
+# Alonso" at par +56 while the SAME row carried d_pts -2.0 and the
+# recommendation, which has always screened on d_pts, left him out. par is
+# per-player and season-long; d_pts is what happens to your squad once the
+# sale that funds him goes too. Both questions now have to be answered yes.
+# Lines are the docstring recording that distinction and the self-test.
+check "src/ lines" 20175 \
   "$(find src -name '*.py' | xargs cat | wc -l)"
 
 [ "$fail" -eq 0 ] && echo "concepts: no duplication regained" || echo "concepts: a concept regained a second implementation"

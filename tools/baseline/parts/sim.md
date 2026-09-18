@@ -1,34 +1,28 @@
-# The simulation — 2026-09-18T1952Z
+# The simulation — 2026-09-18T2056Z
 
 ## Now
 
-**Locks in 2 days** · squad 289.20M · cash 13.22M (22.52M already bid) · total 302.42M
+**Locks in 2 days** · squad 292.75M · cash 13.22M · total 305.97M
 
-play 5-4-1 · finish 2.13 · win 40% · season 1,350–2,210
+play 5-4-1 · finish 2.21 · win 35% · season 1,356–2,219
 
 ## Every player you could hold
 
 | Player | Pos | Start | xPts/j | Where | € | Season | PAR | pts/M€ |
 |---|---|--:|--:|---|--:|--:|--:|--:|
 | **PUT ON** | | | | | | | | |
-| Yeray Alvarez | DEF | 65% | 2.62 | bench | — | -6 (-62–+32) | +2 | — |
+| Yeray Alvarez | DEF | 65% | 2.62 | bench | — | -4 (-62–+34) | +3 | — |
 | **TAKE OFF** | | | | | | | | |
-| Sergio Carreira | DEF | 50% | 2.50 | yours | — | +0 (-57–+45) | +0 | — |
-| **Your eleven — play 5-4-1** | | | **51.31** | vs BurtonGM89 **49.17** | | **+2.14** | |
+| Sergio Carreira | DEF | 50% | 2.50 | yours | — | +0 (-57–+43) | +1 | — |
+| **Your eleven — play 5-4-1** | | | **51.35** | vs BurtonGM89 **50.50** | | **+0.86** | |
 | **KEEP — bench** | | | | | | | | |
-| Carl Starfelt | DEF | 35% | 2.21 | yours | — | +1 (-46–+33) | -1 | — |
-| Alvaro Mantilla | DEF | 81% | 2.12 | yours | — | -1 (-15–+11) | -19 | — |
-| Omar El Hilali | DEF | 0% | 0.00 | yours | — | -7 (-85–+44) | +3 | — |
-| Ali Houary | DEL | 31% | 0.91 | yours | — | +0 (-6–+5) | -49 | — |
-| **BUY — free agents** | | | | | | | | |
-| Angel Perez | DEL | 83% | 3.98 | free agent | 22.52M | +38 (-66–+224) sell Starfelt | +43 | 3.3 |
+| Carl Starfelt | DEF | 35% | 2.21 | yours | — | -0 (-43–+32) | -1 | — |
+| Alvaro Mantilla | DEF | 81% | 2.12 | yours | — | +0 (-14–+12) | -19 | — |
+| Omar El Hilali | DEF | 0% | 0.00 | yours | — | -6 (-78–+45) | +3 | — |
+| Ali Houary | DEL | 31% | 0.92 | yours | — | +0 (-10–+9) | -49 | — |
+| **BUY — free agents — none clear the bar today** | | | | | | | |
 | **RAID — a clause, cannot be refused** | | | | | | | | |
-| Unai Lopez | MED | 77% | 3.89 | Albert | 15.53M | +16 (-76–+167) sell Starfelt | +59 | 2.7 |
-| Nahuel Tenaglia | DEF | 79% | 3.65 | BurtonGM89 | 34.20M | -4 (-166–+151) sell Natan | +39 | -1.5 |
-| **SAVE — better than yours, out of reach** | | | | | | | | |
-| Raphinha | DEL | 78% | 7.51 | Magic | 83.08M short | +107 (-37–+376) if you could | +125 | 1.3 |
-| **PASS** | | | | | | | | |
-| Marcos Fernandez | DEL | 42% | 3.43 | free agent | -1.16M | -2 (-43–+71) | -21 | — |
+| Unai Lopez | MED | 77% | 3.89 | Albert | 15.53M | +20 (-84–+166) sell Carreira | +50 | 2.6 |
 
 _How to read this table: **How to read the tables** in METHOD.md._
 
@@ -36,18 +30,18 @@ _How to read this table: **How to read the tables** in METHOD.md._
 
 | Manager | now | cash | simulated | 10–90 | P(I finish above) |
 |---|--:|--:|--:|--:|--:|
-| miguel_autentico **(you)** | 308 | 13.22M | 1,762 | 1,350–2,210 | — |
-| BurtonGM89 | 253 | ~7.01M | 1,650 | 1,258–2,107 | 60% |
-| Albert Laporta | 217 | ~141.27M | 1,510 | 1,100–1,961 | 70% |
-| SusoGattuso | 211 | ~-11.20M | 1,494 | 1,159–1,874 | 73% |
-| Magic Mike 333 | 232 | ~23.28M | 1,333 | 991–1,728 | 84% |
+| miguel_autentico **(you)** | 308 | 13.22M | 1,763 | 1,356–2,219 | — |
+| BurtonGM89 | 251 | ~-44.11M | 1,709 | 1,332–2,143 | 54% |
+| Albert Laporta | 214 | ~141.27M | 1,677 | 1,239–2,188 | 58% |
+| SusoGattuso | 211 | ~-2.99M | 1,493 | 1,160–1,863 | 74% |
+| Magic Mike 333 | 232 | ~23.28M | 1,148 | 859–1,473 | 94% |
 
 ## What the simulation cannot see
 
 | Not modelled | Which way it bends the answer |
 |---|---|
 | Jornada 6 is half played — 18 clubs are done | their points are already in `now`, so only the rest of the round is simulated, and it still re-picks an eleven that is in fact already locked |
-| A buyout premium is charged at **0.000 places per million**, the median of every run that has measured it — today's own reading is 0.550 | a clause runs above market value here — too few real raids logged yet to median and the app pays back only the value, so the premium is gone for good. It is charged against the move, but priced off what more money would buy you today — most days, very little |
+| A buyout premium is charged at **0.000 places per million**, the median of every run that has measured it — today's own reading is 0.121 | a clause runs above market value here — too few real raids logged yet to median and the app pays back only the value, so the premium is gone for good. It is charged against the move, but priced off what more money would buy you today — most days, very little |
 | "Your eleven" (top of the ladder) compares only the NEXT jornada, off real confirmed lineups/injuries | the standings table below simulates the other 32 jornadas too, where nobody has lineup news yet and squad value dominates — the two can point opposite ways (this week's confirmed news vs. the season's average squad quality) without either being wrong |
 | Beyond the next jornada, P(start) reverts to his own season-standing rate | a suspension or a knock is dated to the match it was announced for — nothing here predicts a FUTURE one not yet known, e.g. who gets injured in March |
 | Rivals never transfer | a steal that guts a squad assumes its manager does not simply buy someone back — flatters the steal |
@@ -64,32 +58,28 @@ PAR = season points above the LEAGUE's own replacement level at his slot (the sc
 
 | Player | Pos | Price | Season | Next | PAR | pts/€M |
 |---|---|---:|---:|---:|---:|---:|
-| Unai Lopez | MED | 15.53M | 125.6 | — | 58.9 | 3.79 |
-| Angel Perez | DEL | 21.38M | 152.1 | — | 43.1 | 2.02 |
-| Leandro Cabrera | DEF | 17.50M | 114.6 | — | 25.6 | 1.46 |
-| Yassir Zabiri | DEL | 13.28M | 125.9 | — | 16.8 | 1.27 |
-| Nahuel Tenaglia | DEF | 34.20M | 128.4 | — | 39.4 | 1.15 |
-| Jose Maria Gimenez | DEF | 9.48M | 99.3 | — | 10.3 | 1.08 |
-| Robert Navarro | MED | 7.86M | 106.6 | 3.4 | 8.1 (-61–124) | 1.03 |
-| Raphinha | DEL | 141.43M | 234.1 | — | 107.1 (-37–376) | 0.76 |
-| Marc Roca | MED | 13.32M | 107.9 | — | 9.7 (-52–116) | 0.73 |
-| Lucas Boye | DEL | 27.95M | 114.2 | — | 14.9 (-54–136) | 0.53 |
-| David Soria | POR | 35.82M | 162.3 | — | 18.3 (-65–127) | 0.51 |
-| Kike Salas | DEF | 19.36M | 117.9 | — | 9.2 (-57–121) | 0.48 |
-| Toni Martinez | DEL | 28.03M | 109.0 | — | 10.1 (-56–130) | 0.36 |
-| Alex Berenguer | DEL | 15.51M | 99.0 | 2.8 | 5.3 (-56–107) | 0.34 |
-| Giuliano Simeone | DEL | 44.65M | 118.1 | — | 14.3 (-60–148) | 0.32 |
-| Juan Foyth | DEF | 18.98M | 113.3 | — | 5.6 (-62–117) | 0.30 |
-| Alvaro Garcia | MED | 29.31M | 108.5 | — | 8.0 (-60–123) | 0.27 |
-| Aitor Paredes | DEF | 12.97M | 102.5 | 2.4 | 3.5 (-51–91) | 0.27 |
-| Odysseas Vlachodimos | POR | 30.35M | 148.0 | — | 7.4 (-58–89) | 0.24 |
-| Marc Bernal | MED | 26.13M | 103.3 | — | 6.2 (-49–99) | 0.24 |
-| Unai Nuñez | DEF | 10.33M | 85.9 | — | 0.5 (-29–42) | 0.05 |
-| Aimar Oroz | MED | 25.62M | 75.2 | — | 0.7 (-27–42) | 0.03 |
-| Cesar Tarrega | DEF | 8.89M | 89.6 | — | 0.2 (-48–70) | 0.02 |
-| Williot Swedberg | MED | 13.88M | 75.4 | — | 0.2 (-25–34) | 0.02 |
-| Iñigo Arguibide | DEF | 3.47M | 74.8 | — | 0.0 (-22–29) | 0.01 |
-| Fran Garcia | DEF | 30.43M | 101.4 | — | 0.3 (-50–82) | 0.01 |
-| Lorenzo Amatucci | MED | 20.08M | 79.1 | — | 0.2 (-28–40) | 0.01 |
+| Unai Lopez | MED | 15.53M | 125.6 | — | 50.2 | 3.23 |
+| Hugo Gonzalez | MED | 1.62M | 80.5 | — | 5.1 | 3.13 |
+| Pape Gueye | MED | 32.51M | 131.8 | — | 56.4 | 1.73 |
+| Leandro Cabrera | DEF | 17.50M | 114.6 | — | 26.0 | 1.49 |
+| Robert Navarro | MED | 7.86M | 106.6 | 3.4 | 6.9 (-61–114) | 0.88 |
+| Marc Roca | MED | 13.32M | 107.9 | — | 10.3 (-51–116) | 0.77 |
+| Kike Salas | DEF | 19.36M | 117.9 | — | 11.2 (-54–121) | 0.58 |
+| David Soria | POR | 35.82M | 162.3 | — | 15.6 (-68–125) | 0.44 |
+| Lucas Boye | DEL | 27.95M | 114.8 | — | 12.1 (-57–140) | 0.43 |
+| Nahuel Tenaglia | DEF | 34.20M | 128.4 | — | 13.4 (-59–144) | 0.39 |
+| Toni Martinez | DEL | 28.03M | 110.0 | — | 10.4 (-59–133) | 0.37 |
+| Giuliano Simeone | DEL | 44.65M | 119.2 | — | 16.4 (-61–154) | 0.37 |
+| Alvaro Garcia | MED | 29.31M | 108.5 | — | 9.4 (-59–122) | 0.32 |
+| Odysseas Vlachodimos | POR | 30.35M | 148.0 | — | 9.3 (-61–88) | 0.31 |
+| Juan Foyth | DEF | 18.98M | 113.3 | — | 5.8 (-64–116) | 0.30 |
+| Aitor Paredes | DEF | 12.97M | 102.5 | 2.4 | 3.1 (-52–87) | 0.24 |
+| Marc Bernal | MED | 26.13M | 103.3 | — | 5.1 (-49–107) | 0.20 |
+| Joaquin Muñoz | DEL | 4.26M | 82.4 | — | 0.7 (-37–60) | 0.16 |
+| Fran Garcia | DEF | 30.43M | 101.4 | — | 2.2 (-50–83) | 0.07 |
+| Aimar Oroz | MED | 25.62M | 75.2 | — | 1.6 (-28–48) | 0.06 |
+| Lorenzo Amatucci | MED | 20.08M | 79.1 | — | 0.7 (-28–41) | 0.03 |
+| Jose Gaya | DEF | 19.04M | 89.0 | — | 0.4 | 0.02 |
+| Gorka Guruzeta | DEL | 21.30M | 70.0 | 1.2 | 0.0 (-21–27) | 0.00 |
 
-_23 more listed players at or below the league's own replacement level at their slot, not worth a look today — a free agent nobody wants yet, or a rival's clause on a squad player he outgrew._
+_24 more listed players at or below the league's own replacement level at their slot, not worth a look today — a free agent nobody wants yet, or a rival's clause on a squad player he outgrew._
