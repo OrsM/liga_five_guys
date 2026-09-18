@@ -29,7 +29,7 @@ __all__ = ["ROOT", "TIDY", "SEASON", "DECISIONS", "REPORTS", "PARTS", "MADRID",
            "GATED_API", "age_phrase", "last_api_standings",
            "load_api_lineup", "market_routes", "pending_sent", "bought_price",
            "pending_received", "LISTED_SELLER", "team_slug_of", "lock_order",
-           "JornadaClock", "shown", "load_matches", "load_matches_history",
+           "JornadaClock", "shown", "newest", "table_stats", "load_matches", "load_matches_history",
            "load_starters", "load_perjornada", "load_api_stats", "clock", "clock_history",
            "jornada_of_match"]
 
@@ -264,6 +264,61 @@ def _cached_latest_snapshot(path, keep=None, cache_key=None) -> list[dict]:
     return [dict(r) for r in hit[1]]
 
 
+def table_stats(path, col: str = "observed_at") -> tuple[int, str]:
+    """How many rows, and the newest value in one column -- WITHOUT keeping
+    the table.
+
+    The freshness table wants exactly this for every tidy file, and it was
+    getting it with read_csv(): five history tables materialised and held
+    for the life of the process, 276MB of cache, to print a row count and a
+    timestamp. If a table is already cached because something genuinely
+    needed its rows, that copy is used and nothing is read twice.
+    """
+    path = Path(path)
+    try:
+        st = path.stat()
+    except OSError:
+        return 0, ""
+    hit = _READ_CACHE.get(str(path))
+    if hit is not None and hit[0] == (st.st_mtime_ns, st.st_size):
+        rows = hit[1]
+        return len(rows), max((r.get(col, "") for r in rows), default="")
+    n, best = 0, ""
+    try:
+        with path.open(encoding="utf-8") as fh:
+            r = csv.reader(fh)
+            try:
+                fieldnames = next(r)
+            except StopIteration:
+                return 0, ""
+            try:
+                i = fieldnames.index(col)
+            except ValueError:
+                i = -1
+            for raw in r:
+                if not raw:
+                    continue
+                n += 1
+                if i >= 0 and i < len(raw) and raw[i] > best:
+                    best = raw[i]
+    except OSError:
+        return 0, ""
+    return n, best
+
+
+def newest(name: str, keep=None, cache_key=None) -> list[dict]:
+    """The newest snapshot of a tidy table, read in ONE PASS.
+
+    latest_only(read_csv(x)) gets the same answer by materialising the whole
+    history first, which for starters.csv is 226,012 rows and 61MB held for
+    the life of the process to keep the ~900 that are current. The streaming
+    reader underneath this was already here and already used by
+    load_market_latest(); thirteen other call sites had each re-derived the
+    expensive version by hand.
+    """
+    return _cached_latest_snapshot(TIDY / name, keep=keep, cache_key=cache_key)
+
+
 DAILY_FRESH_DAYS = 1.05
 
 EVERY_RUN_FRESH_DAYS = 0.6
@@ -342,7 +397,7 @@ def pick_source(rows: list[dict], source: str) -> list[dict]:
 
 
 def load_matches() -> list[dict]:
-    return latest_only(read_csv(TIDY / "matches.csv"))
+    return newest("matches.csv")
 
 
 def load_matches_history() -> list[dict]:
@@ -350,7 +405,7 @@ def load_matches_history() -> list[dict]:
 
 
 def load_starters() -> list[dict]:
-    return latest_only(read_csv(TIDY / "starters.csv"))
+    return newest("starters.csv")
 
 
 def _api_stats_key(r: dict):
@@ -378,7 +433,7 @@ def kickoff_stamp(s: str):
 
 
 def load_elo(now=None) -> list[dict]:
-    return fresh_only(latest_only(read_csv(TIDY / "elo.csv")),
+    return fresh_only(newest("elo.csv"),
                       DAILY_FRESH_DAYS, now)
 
 
@@ -413,7 +468,7 @@ def stale_feeds(now=None, names=GATED_API) -> dict[str, float]:
 
 
 def load_api_teams(now=None) -> list[dict]:
-    return fresh_only(latest_only(read_csv(TIDY / "api_teams.csv")),
+    return fresh_only(newest("api_teams.csv"),
                       EVERY_RUN_FRESH_DAYS, now)
 
 
@@ -427,26 +482,26 @@ def load_api_activity() -> list[dict]:
 
 
 def load_api_market(now=None) -> list[dict]:
-    return fresh_only(latest_only(read_csv(TIDY / "api_market.csv")),
+    return fresh_only(newest("api_market.csv"),
                       EVERY_RUN_FRESH_DAYS, now)
 
 
 def load_api_standings(now=None) -> list[dict]:
-    return fresh_only(latest_only(read_csv(TIDY / "api_standings.csv")),
+    return fresh_only(newest("api_standings.csv"),
                       EVERY_RUN_FRESH_DAYS, now)
 
 
 def last_api_standings() -> list[dict]:
-    return latest_only(read_csv(TIDY / "api_standings.csv"))
+    return newest("api_standings.csv")
 
 
 def load_api_lineup(now=None) -> list[dict]:
-    return fresh_only(latest_only(read_csv(TIDY / "api_lineup.csv")),
+    return fresh_only(newest("api_lineup.csv"),
                       EVERY_RUN_FRESH_DAYS, now)
 
 
 def load_api_offers(now=None) -> list[dict]:
-    return fresh_only(latest_only(read_csv(TIDY / "api_offers.csv")),
+    return fresh_only(newest("api_offers.csv"),
                       EVERY_RUN_FRESH_DAYS, now)
 
 
@@ -468,7 +523,7 @@ def load_crosswalk():
 
 
 def load_fixtures() -> list[dict]:
-    rows = latest_only(read_csv(TIDY / "fixtures.csv"))
+    rows = newest("fixtures.csv")
     return sorted(rows, key=lambda r: r.get("kickoff") or "")
 
 

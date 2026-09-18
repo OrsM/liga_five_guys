@@ -12,6 +12,7 @@ from ffcore.fixture import FIX_BAND
 from ffcore.score import SHRINK_K
 from ffcore.text import norm, resolve
 from ffcore.tidy import (clock_history, load_starters, run_now, shown,
+                         table_stats,
                          DECISIONS, PARTS, LINEUP_SOURCE,
                          DAILY_FRESH_DAYS, EVERY_RUN_FRESH_DAYS,
                          SEASON, TIDY, age_phrase, load_elo,
@@ -668,9 +669,8 @@ def feed_lines() -> list[str]:
             path = files[-1] if files else (LIVE / "perjornada_none.csv")
         else:
             path = TIDY / f"{name}.csv"
-        got = read_csv(path)
         col = STAMPED.get(name, "observed_at")
-        newest = max((r.get(col, "") for r in got), default="")
+        n_rows, newest = table_stats(path, col)
         days, seen = _age(newest, now)
 
         host, cadence, pages = reg.get(name, (None, None, set()))
@@ -690,7 +690,7 @@ def feed_lines() -> list[str]:
         rows.append("| %s | %s | %s | %s | %s | %s | %s |" % (
             light, name, FILLS[name],
             host + (" ×%d" % len(pages) if len(pages) > 1 else ""),
-            "{:,}".format(len(got)), seen, state))
+            "{:,}".format(n_rows), seen, state))
 
     return ["## Where the numbers come from", "",
             "🟢 asked for within its own cadence · 🟡 it has missed a turn and "

@@ -100,7 +100,16 @@ check "Universe flat-dict storage" 0 \
 # plus the docstrings recording why the full walk is worth keeping at all.
 # Measured: full 874MB/11.5s, tail 63MB/1.9s, no-op 53MB/0.4s, tidy tables
 # byte-identical across all three.
-check "src/ lines" 19990 \
+# 19990 -> 20040 on 2026-09-18: newest() and table_stats(). Both REMOVE a
+# duplicated idiom rather than add one -- thirteen call sites had each
+# hand-rolled latest_only(read_csv(x)), materialising a whole history to
+# keep its last snapshot, and the freshness table read five history tables
+# in full to print a row count and a timestamp. The streaming reader they
+# now share was already in this file and already used by
+# load_market_latest(). Measured: pipeline 55.8s -> 29.5s, peak 672MB ->
+# 468MB, and table_stats agrees with len(read_csv())/max across all 23
+# tables on both its cached and its streaming branch.
+check "src/ lines" 20040 \
   "$(find src -name '*.py' | xargs cat | wc -l)"
 
 [ "$fail" -eq 0 ] && echo "concepts: no duplication regained" || echo "concepts: a concept regained a second implementation"
