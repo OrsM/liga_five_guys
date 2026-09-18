@@ -73,7 +73,7 @@ check "Universe flat-dict storage" 0 \
 # drift_frac_from_history(). A forecasting bug fix, not a tidy, and 20 of
 # its lines are the comment recording WHY the two fitters must use the
 # same predictor -- which is the knowledge that was lost the first time.
-check "src/ lines" 19442 \
+check "src/ lines" 19473 \
   "$(find src -name '*.py' | xargs cat | wc -l)"
 
 [ "$fail" -eq 0 ] && echo "concepts: no duplication regained" || echo "concepts: a concept regained a second implementation"

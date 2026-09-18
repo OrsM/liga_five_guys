@@ -149,7 +149,9 @@ def ladder_rows(u, rows, bands=None, exp=None, xi=None) -> list[dict]:
     spare = max_spare_proceeds(u)
     rest = [k for k in u.price_view if k not in mine and exp.get(k, 0.0) > bar]
     bands = {k: v for k, v in (bands or {}).items() if k not in won}
-    par = {k: v["par"] for k, v in u.player_forecasts().items()}
+    _pf = u.player_forecasts()
+    par = {k: v["par"] for k, v in _pf.items()}
+    pj = {k: v["pj"] for k, v in _pf.items()}
 
     def cell(k, group, where, money, pts, note="", value=None,
             lo=None, hi=None, market=None, premium=None, bought=None):
@@ -196,9 +198,9 @@ def ladder_rows(u, rows, bands=None, exp=None, xi=None) -> list[dict]:
     ranked = sorted(buys, key=lambda k: _move_rank_key(won[k], u))
     for k in ranked:
         if route_kind(u, k) == "free" and _clears_par_floor(
-                par, mae, k, len(u.state.jornadas)):
+                par, mae, k, len(u.state.jornadas), pj):
             out.append(buy_cell(k, "buy"))
-    raid_keys = raid_shortlist(u, won.values(), par, mae)
+    raid_keys = raid_shortlist(u, won.values(), par, mae, pj)
     for k in sorted(raid_keys, key=lambda k: _move_rank_key(won[k], u)):
         out.append(buy_cell(k, "raid"))
     for k in sorted((k for k in rest if k not in won
@@ -486,7 +488,8 @@ def caveats(u) -> list[str]:
 
 VALUE_TOLERANCE = 0.90
 
-def _clears_par_floor(par_of: dict, mae, k: str, horizon: int = 1) -> bool:
+def _clears_par_floor(par_of: dict, mae, k: str, horizon: int = 1,
+                      pj_of: dict | None = None) -> bool:
     """Is his edge bigger than our error in measuring it?
 
     COMPARE LIKE WITH LIKE. `par` is points above replacement across the
@@ -506,7 +509,33 @@ def _clears_par_floor(par_of: dict, mae, k: str, horizon: int = 1) -> bool:
     if mae is None:
         return True
     par = par_of.get(k)
-    return par is not None and par >= mae * math.sqrt(max(1, horizon))
+    if par is None:
+        return False
+    # WEIGHT THE EDGE BY THE EVIDENCE UNDER IT. Comparing par against a
+    # season-scale error got the UNITS right (see above) but still had no
+    # view on how much is known: a striker whose rate rests on three
+    # matches cleared the same bar as one with twenty-one, because par is
+    # a point estimate and point estimates say nothing about their own
+    # reliability. Taking a maximum over sixty-five candidates then picks
+    # the thin records preferentially -- they are the ones whose noise had
+    # room to run upward.
+    #
+    # Same shrinkage the rate itself already gets (ffcore.score.SHRINK_K,
+    # Marcel-style regression to the mean, graded at the minimum of a
+    # 2/4/8/16/32 grid on 1,778 outcomes): pull par toward zero by the
+    # evidence behind it. No new constant -- the pseudo-count that decides
+    # how much a thin rate is trusted should decide how much a thin EDGE
+    # is trusted too.
+    #
+    # Screening on the simulated lower band instead was tried first and is
+    # wrong here: every move's pts_lo is negative at current dispersion
+    # (-85 to -66 on 2026-09-18), so it would refuse every recommendation.
+    from ffcore.score import SHRINK_K
+
+    pj = pj_of.get(k) if pj_of else None
+    if pj is not None:
+        par = par * pj / (pj + SHRINK_K)
+    return par >= mae * math.sqrt(max(1, horizon))
 
 
 def _best_raid_per_victim(raid_keys, won) -> list[str]:
@@ -523,7 +552,7 @@ def _best_raid_per_victim(raid_keys, won) -> list[str]:
     return [k for _score, k in best.values()]
 
 
-def raid_shortlist(u, rows, par_of, mae) -> set:
+def raid_shortlist(u, rows, par_of, mae, pj_of=None) -> set:
     """The raid keys worth showing: one per victim, chosen among those that
     clear the par floor.
 
@@ -541,7 +570,7 @@ def raid_shortlist(u, rows, par_of, mae) -> set:
              if r["action"].buy
              and route_kind(u, r["action"].buy) == "raid"
              and _clears_par_floor(par_of, mae, r["action"].buy,
-                                   len(u.state.jornadas))}
+                                   len(u.state.jornadas), pj_of)}
     return set(_best_raid_per_victim(list(raids), raids))
 
 
@@ -644,12 +673,14 @@ def payload(u, rows, base, rivals, locks_h=None, n_actions: int = 0,
     names = {k: title_name(v) for k, v in u.name_view.items()}
     lo, hi = base.band(u.me)
     moves = []
-    par_of = {k: v["par"] for k, v in u.player_forecasts().items()}
+    _pf = u.player_forecasts()
+    par_of = {k: v["par"] for k, v in _pf.items()}
+    pj_of = {k: v["pj"] for k, v in _pf.items()}
     mae = current_mae()
     rows = [r for r in rows if not r["action"].buy
            or _clears_par_floor(par_of, mae, r["action"].buy,
-                                len(u.state.jornadas))]
-    keep_raid = raid_shortlist(u, rows, par_of, mae)
+                                len(u.state.jornadas), pj_of)]
+    keep_raid = raid_shortlist(u, rows, par_of, mae, pj_of)
     rows = [r for r in rows
            if route_kind(u, r["action"].buy) != "raid"
            or r["action"].buy in keep_raid]
