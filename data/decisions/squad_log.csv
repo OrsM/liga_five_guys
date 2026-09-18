@@ -13389,3 +13389,663 @@ observed_at,hours_to_lock,formation,index_total,player,pos,slot,start_pct,start_
 2026-09-18T1929Z,,5-4-1,48.66,Diego Simeone,entrenador,,,absent,ok,1,1980496,0.611,0,4.275,0.682,Real Madrid,1,0,0.896,attack_defense,,e5,2.403,0.0
 2026-09-18T1929Z,,5-4-1,48.66,Luis Garcia,entrenador,,,absent,ok,1,536599,0.727,0,4.275,0.811,Barcelona,1,0,0.896,attack_defense,,e61,2.519,0.0
 2026-09-18T1929Z,,5-4-1,48.66,Manuel Pellegrini,entrenador,,,absent,ok,1,1474958,0.822,0,4.275,0.918,Deportivo La Coruna,0,0,0.896,value,,e72,2.615,0.0
+2026-09-18T1945Z,,5-4-1,48.66,Iñigo Vicente,delantero,DEL,90,read,ok,1,33261862,4.683,1,5.324,1.007,Celta Vigo,0,5,4.652,attack_defense,,6442,12.253,5.0
+2026-09-18T1945Z,,5-4-1,48.66,Pepelu,mediocampista,MED,70,read,ok,0,10227397,3.724,1,4.703,1.019,Real Sociedad,1,5,3.654,attack_defense,,2715,10.576,36.3
+2026-09-18T1945Z,,5-4-1,48.66,Carl Starfelt,defensa,DEF,30,read,ok,0,9691489,2.033,0,5.293,1.112,Racing Santander,1,2,1.827,value,,9612,7.593,21.4
+2026-09-18T1945Z,,5-4-1,48.66,Omar El Hilali,defensa,DEF,0,read,suspended,0,16126209,0.000,0,3.841,1.000,,,6,0.000,none,,10220,5.894,41.9
+2026-09-18T1945Z,,5-4-1,48.66,Lucien Agoume,mediocampista,MED,70,read,ok,0,10776394,3.246,1,4.829,0.811,Barcelona,1,6,4.001,attack_defense,,7249,10.780,40.0
+2026-09-18T1945Z,,5-4-1,48.66,Pablo Fornals,mediocampista,MED,80,read,ok,0,45125589,4.566,1,6.593,0.918,Deportivo La Coruna,0,4,4.976,value,,2632,13.124,41.2
+2026-09-18T1945Z,,5-4-1,48.66,Marcos Alonso,defensa,DEF,60,read,ok,0,30588222,4.707,1,5.880,1.112,Racing Santander,1,5,4.232,value,,4397,13.279,36.6
+2026-09-18T1945Z,,5-4-1,48.66,Miguel Roman,mediocampista,MED,50,read,ok,0,12570509,3.915,1,5.187,1.112,Racing Santander,1,6,3.520,value,,13808,11.636,24.5
+2026-09-18T1945Z,,5-4-1,48.66,Natan,defensa,DEF,70,read,ok,0,31643609,4.104,1,6.523,0.918,Deportivo La Coruna,0,4,4.473,value,,11813,12.416,37.0
+2026-09-18T1945Z,,5-4-1,48.66,Alvaro Mantilla,defensa,DEF,80,read,ok,1,1656339,2.350,0,3.014,0.959,Celta Vigo,0,5,2.452,attack_defense,,10336,6.616,5.0
+2026-09-18T1945Z,,5-4-1,48.66,Ali Houary,delantero,DEL,20,read,ok,0,1013348,1.019,0,3.315,1.000,,,2,1.019,none,,14118,4.891,4.1
+2026-09-18T1945Z,,5-4-1,48.66,Mathew Ryan,portero,POR,95,read,ok,0,30250228,4.926,1,7.130,0.713,Villarreal,0,5,6.911,attack_defense,,1743,15.808,41.0
+2026-09-18T1945Z,,5-4-1,48.66,Yeray Alvarez,defensa,DEF,70,read,ok,0,7198474,3.660,1,4.401,1.280,Alaves,1,4,2.861,attack_defense,,1972,8.954,10.5
+2026-09-18T1945Z,,5-4-1,48.66,Sergio Carreira,defensa,DEF,30,read,ok,0,7668325,2.297,0,4.137,1.112,Racing Santander,1,5,2.065,value,,7199,7.916,38.6
+2026-09-18T1945Z,,5-4-1,48.66,Zaid Romero,defensa,DEF,90,read,ok,0,24771062,6.685,1,6.982,1.139,Malaga,1,4,5.872,value,,14210,15.980,18.7
+2026-09-18T1945Z,,5-4-1,48.66,Dakonam Djene,defensa,DEF,80,read,ok,0,16603906,4.442,1,4.838,1.139,Malaga,1,5,3.901,value,,3881,11.222,38.9
+2026-09-18T1945Z,,5-4-1,48.66,Pablo Barrios,mediocampista,MED,0,read,injured,0,46968726,0.000,0,6.166,0.682,Real Madrid,1,3,0.000,attack_defense,,10005,7.776,26.3
+2026-09-18T1945Z,,5-4-1,48.66,Renato Veiga,defensa,DEF,70,read,ok,0,22690109,3.479,0,4.187,1.098,Levante,1,5,3.170,attack_defense,,10114,9.413,37.0
+2026-09-18T1945Z,,5-4-1,48.66,Alvaro F. Carreras,defensa,DEF,20,read,ok,0,9353287,1.360,0,6.887,0.721,Atletico Madrid,0,2,1.886,attack_defense,,10176,8.398,30.2
+2026-09-18T1945Z,,5-4-1,48.66,Alejandro Primo,portero,POR,0,read,injured,1,1104126,0.000,0,6.227,0.713,Villarreal,0,0,0.000,attack_defense,,10191,0.000,0.0
+2026-09-18T1945Z,,5-4-1,48.66,Carlos Gimenez,defensa,DEF,,absent,ok,1,1718547,0.566,0,4.143,0.652,Real Madrid,1,0,0.868,attack_defense,,10192,2.303,0.0
+2026-09-18T1945Z,,5-4-1,48.66,Williot Swedberg,mediocampista,MED,50,read,ok,0,4452570,2.368,0,4.435,1.112,Racing Santander,1,3,2.129,value,,10207,7.210,31.7
+2026-09-18T1945Z,,5-4-1,48.66,Jonathan Dubasin,delantero,DEL,30,read,ok,1,6670819,1.552,0,4.423,0.985,Rayo Vallecano,1,3,1.576,attack_defense,,10208,6.296,2.6
+2026-09-18T1945Z,,5-4-1,48.66,Facundo Gonzalez,defensa,DEF,10,read,ok,1,1385924,0.792,0,3.274,0.959,Celta Vigo,0,3,0.826,attack_defense,,10209,4.372,2.7
+2026-09-18T1945Z,,5-4-1,48.66,Fran Perez,mediocampista,MED,30,read,ok,0,519087,0.999,0,3.315,1.019,Osasuna,0,1,0.980,attack_defense,,10210,4.245,30.4
+2026-09-18T1945Z,,5-4-1,48.66,Beñat Gerenabarrena,mediocampista,MED,70,read,ok,1,3864224,2.893,0,4.113,1.011,Alaves,1,4,2.863,attack_defense,,10213,8.218,4.1
+2026-09-18T1945Z,,5-4-1,48.66,Alex Padilla,portero,POR,5,read,ok,0,744642,0.333,0,5.202,1.280,Alaves,1,0,0.260,attack_defense,,10214,0.853,1.0
+2026-09-18T1945Z,,5-4-1,48.66,Marc Casado,mediocampista,MED,70,read,ok,0,6425550,2.059,0,3.572,0.967,Real Betis,1,1,2.129,attack_defense,,10217,5.874,25.0
+2026-09-18T1945Z,,5-4-1,48.66,Angel Fortuño,portero,POR,5,read,ok,0,454669,0.316,0,6.313,1.000,,,0,0.316,none,,10219,0.947,1.0
+2026-09-18T1945Z,,5-4-1,48.66,Angel Ortiz,defensa,DEF,30,read,ok,0,971855,0.752,0,3.608,0.918,Deportivo La Coruna,0,1,0.819,value,,10233,3.689,13.8
+2026-09-18T1945Z,,5-4-1,48.66,Rodrigo Mendoza,mediocampista,MED,30,read,ok,0,938042,0.656,0,3.753,0.682,Real Madrid,1,1,0.962,attack_defense,,10237,3.931,25.2
+2026-09-18T1945Z,,5-4-1,48.66,Arnau Sola,defensa,DEF,,absent,ok,1,1640523,0.566,0,4.143,0.652,Real Madrid,1,0,0.868,attack_defense,,10247,2.303,0.0
+2026-09-18T1945Z,,5-4-1,48.66,Pablo Ibañez,mediocampista,MED,70,read,ok,0,11425325,2.766,0,4.442,0.785,Athletic Club,0,6,3.522,attack_defense,,10258,9.379,42.5
+2026-09-18T1945Z,,5-4-1,48.66,Julian Alvarez,delantero,DEL,30,read,doubt,0,43054269,0.598,0,6.366,0.682,Real Madrid,1,1,0.878,attack_defense,,10287,7.027,29.6
+2026-09-18T1945Z,,5-4-1,48.66,Karl Etta Eyong,delantero,DEL,0,read,injured,0,12306496,0.000,0,4.887,1.036,Villarreal,0,1,0.000,attack_defense,,10326,5.013,33.7
+2026-09-18T1945Z,,5-4-1,48.66,Marc Domenech,delantero,DEL,,absent,ok,0,592242,0.522,0,3.655,0.682,Real Madrid,1,0,0.766,attack_defense,,10328,2.055,7.0
+2026-09-18T1945Z,,5-4-1,48.66,Iñigo Sainz-Maza,defensa,DEF,20,read,ok,1,509559,0.629,0,3.743,0.959,Celta Vigo,0,1,0.656,attack_defense,,10338,3.717,0.9
+2026-09-18T1945Z,,5-4-1,48.66,Peque,delantero,DEL,30,read,ok,0,2326271,0.970,0,4.038,0.811,Barcelona,1,2,1.195,attack_defense,,10341,4.815,27.7
+2026-09-18T1945Z,,5-4-1,48.66,Alex Pastor,defensa,DEF,20,read,ok,1,412605,1.172,0,4.143,1.415,Getafe,0,0,0.829,attack_defense,,10353,2.829,0.0
+2026-09-18T1945Z,,5-4-1,48.66,Adria Altimira,defensa,DEF,30,read,ok,0,4321437,1.530,0,4.231,0.968,Real Betis,1,2,1.580,attack_defense,,10357,6.331,3.5
+2026-09-18T1945Z,,5-4-1,48.66,Marc Aguado,mediocampista,MED,50,read,ok,0,3897901,2.077,0,4.256,1.000,,,3,2.077,none,,10358,6.791,37.8
+2026-09-18T1945Z,,5-4-1,48.66,Morten Hjulmand,mediocampista,MED,70,read,ok,1,21746771,2.091,0,4.576,0.682,Real Madrid,1,4,3.069,attack_defense,,10393,7.785,3.8
+2026-09-18T1945Z,,5-4-1,48.66,Carlos Benavidez,mediocampista,MED,30,read,ok,0,1084561,0.551,0,3.148,0.785,Athletic Club,0,1,0.702,attack_defense,,10448,3.089,13.7
+2026-09-18T1945Z,,5-4-1,48.66,Orel Mangala,mediocampista,MED,80,read,ok,1,11412513,3.898,0,4.205,1.139,Malaga,1,5,3.424,value,,10463,9.858,5.1
+2026-09-18T1945Z,,5-4-1,48.66,Giacomo Quagliata,defensa,DEF,90,read,ok,1,3966441,2.613,0,3.015,0.968,Real Betis,1,5,2.699,attack_defense,,10473,7.030,5.3
+2026-09-18T1945Z,,5-4-1,48.66,Abde Rebbach,delantero,DEL,60,read,ok,0,5188201,2.182,0,3.781,0.785,Athletic Club,0,6,2.778,attack_defense,,10476,7.804,35.5
+2026-09-18T1945Z,,5-4-1,48.66,Miguel Loureiro,defensa,DEF,30,read,ok,1,1925278,1.282,0,4.048,0.968,Real Betis,1,2,1.324,attack_defense,,10478,5.386,2.2
+2026-09-18T1945Z,,5-4-1,48.66,Stefan Bajcetic,mediocampista,MED,,absent,ok,1,1157011,0.960,0,4.118,1.112,Racing Santander,1,0,0.863,value,,10495,2.687,0.0
+2026-09-18T1945Z,,5-4-1,48.66,Andre Almeida,mediocampista,MED,50,read,ok,0,1228673,1.384,0,4.043,1.007,Celta Vigo,0,0,1.375,attack_defense,,10533,4.707,22.4
+2026-09-18T1945Z,,5-4-1,48.66,Antonio Sivera,portero,POR,95,read,ok,0,42054930,5.406,0,6.029,0.923,Athletic Club,0,6,5.857,attack_defense,,1059,14.811,44.0
+2026-09-18T1945Z,,5-4-1,48.66,Dani Ceballos,mediocampista,MED,40,read,ok,0,19286505,1.227,0,3.738,0.918,Deportivo La Coruna,0,0,1.337,value,,1062,5.188,16.4
+2026-09-18T1945Z,,5-4-1,48.66,Tajon Buchanan,mediocampista,MED,50,read,ok,0,10993856,2.756,0,4.805,1.268,Levante,1,2,2.174,attack_defense,,10638,7.736,36.3
+2026-09-18T1945Z,,5-4-1,48.66,Roony Bardghji,delantero,DEL,0,read,injured,0,1106944,0.000,0,3.684,1.048,Sevilla,0,0,0.000,attack_defense,,10658,0.000,21.0
+2026-09-18T1945Z,,5-4-1,48.66,Orri Steinn Oskarsson,delantero,DEL,30,read,ok,0,6871530,2.018,0,5.196,0.983,Valencia,0,3,2.053,attack_defense,,10660,7.995,23.1
+2026-09-18T1945Z,,5-4-1,48.66,Sergio Mestre,portero,POR,,absent,ok,1,677860,0.942,0,6.227,0.721,Atletico Madrid,0,0,1.305,attack_defense,,10767,3.552,0.0
+2026-09-18T1945Z,,5-4-1,48.66,Pablo Duran,delantero,DEL,30,read,ok,0,667737,1.284,0,3.488,1.112,Racing Santander,1,2,1.155,value,,10822,4.849,32.2
+2026-09-18T1945Z,,5-4-1,48.66,Juan Cruz,mediocampista,MED,30,read,ok,0,6881161,0.909,0,3.356,0.827,Getafe,0,2,1.100,attack_defense,,10823,4.317,17.2
+2026-09-18T1945Z,,5-4-1,48.66,Pablo Marin,mediocampista,MED,0,read,ok,0,724826,0.000,0,2.546,0.983,Valencia,0,0,0.000,attack_defense,,10830,0.000,34.0
+2026-09-18T1945Z,,5-4-1,48.66,Moussa Diarra,defensa,DEF,,listed_blank,injured,0,401498,0.000,0,3.649,1.415,Getafe,0,0,0.000,attack_defense,,10832,4.489,3.0
+2026-09-18T1945Z,,5-4-1,48.66,Carlos Dotor,mediocampista,MED,70,read,ok,1,4752770,2.385,0,4.131,0.827,Getafe,0,3,2.884,attack_defense,,10860,7.722,3.5
+2026-09-18T1945Z,,5-4-1,48.66,Marcos Fernandez,delantero,DEL,50,read,ok,1,1209075,2.456,0,5.861,1.000,,,2,2.456,none,,10893,8.139,1.9
+2026-09-18T1945Z,,5-4-1,48.66,Carlos Romero,defensa,DEF,70,read,ok,0,21680470,3.489,0,4.305,1.098,Levante,1,4,3.179,attack_defense,,11172,9.398,40.0
+2026-09-18T1945Z,,5-4-1,48.66,Manu Bueno,mediocampista,MED,0,read,ok,0,526230,0.063,0,3.361,0.811,Barcelona,1,0,0.077,attack_defense,,11180,2.580,8.3
+2026-09-18T1945Z,,5-4-1,48.66,Lorenzo Amatucci,mediocampista,MED,50,read,ok,1,17857115,2.273,0,3.290,0.967,Real Betis,1,6,2.350,attack_defense,,11198,7.405,6.0
+2026-09-18T1945Z,,5-4-1,48.66,Mario Martin,mediocampista,MED,0,read,suspended,0,2603627,0.000,0,2.879,1.139,Malaga,1,3,0.000,value,,11202,3.668,37.7
+2026-09-18T1945Z,,5-4-1,48.66,Facundo Buonanotte,mediocampista,MED,60,read,ok,1,3652678,2.372,0,4.605,1.000,,,2,2.372,none,,11214,7.195,2.4
+2026-09-18T1945Z,,5-4-1,48.66,Raul de Tomas,delantero,DEL,0,read,ok,1,3229388,0.000,0,4.354,1.019,Osasuna,0,0,0.000,attack_defense,,1123,0.000,0.0
+2026-09-18T1945Z,,5-4-1,48.66,Abel Bretones,defensa,DEF,60,read,ok,0,10035616,3.359,0,3.369,1.355,Rayo Vallecano,1,6,2.478,attack_defense,,11230,8.374,33.5
+2026-09-18T1945Z,,5-4-1,48.66,Jeanuel Belocian,defensa,DEF,90,read,ok,1,3151323,3.599,0,4.802,0.959,Celta Vigo,0,1,3.755,attack_defense,,11286,9.118,1.4
+2026-09-18T1945Z,,5-4-1,48.66,Iker Muñoz,mediocampista,MED,,absent,ok,0,2004274,1.401,0,3.344,0.985,Rayo Vallecano,1,4,1.422,attack_defense,,11362,5.795,23.3
+2026-09-18T1945Z,,5-4-1,48.66,Arda Guler,mediocampista,MED,70,read,ok,0,95798649,4.683,0,10.047,0.737,Atletico Madrid,0,3,6.355,attack_defense,,11439,16.418,36.3
+2026-09-18T1945Z,,5-4-1,48.66,Quilindschy Hartman,defensa,DEF,50,read,ok,1,3397312,1.521,0,4.212,1.000,,,1,1.521,none,,11467,5.117,1.1
+2026-09-18T1945Z,,5-4-1,48.66,Lamine Yamal,delantero,DEL,80,read,ok,0,144260525,9.496,0,10.715,1.048,Sevilla,0,5,9.057,attack_defense,,11520,25.344,33.4
+2026-09-18T1945Z,,5-4-1,48.66,Fran Gonzalez,portero,POR,5,read,ok,1,495046,0.171,0,6.227,0.550,Barcelona,1,0,0.311,attack_defense,,11554,0.794,0.0
+2026-09-18T1945Z,,5-4-1,48.66,Yago Santiago,mediocampista,MED,0,read,injured,0,454659,0.000,0,3.114,1.000,,,0,0.000,none,,11562,0.000,9.0
+2026-09-18T1945Z,,5-4-1,48.66,Hector Fort,defensa,DEF,10,read,ok,0,3238245,0.407,0,4.198,1.169,Valencia,0,0,0.348,attack_defense,,11577,4.247,14.1
+2026-09-18T1945Z,,5-4-1,48.66,Arnau Ortiz,delantero,DEL,20,read,ok,1,884882,0.770,0,4.845,0.682,Real Madrid,1,2,1.130,attack_defense,,11579,5.329,1.7
+2026-09-18T1945Z,,5-4-1,48.66,Unai Egiluz,defensa,DEF,0,read,injured,1,422193,0.000,0,4.143,1.280,Alaves,1,0,0.000,attack_defense,,11676,0.000,0.0
+2026-09-18T1945Z,,5-4-1,48.66,Hugo Rincon,defensa,DEF,30,read,ok,0,1457006,0.940,0,2.660,1.280,Alaves,1,1,0.734,attack_defense,,11677,3.440,34.2
+2026-09-18T1945Z,,5-4-1,48.66,Santiago Mouriño,defensa,DEF,50,read,ok,0,17370989,2.277,0,3.885,1.098,Levante,1,3,2.075,attack_defense,,11678,6.938,31.5
+2026-09-18T1945Z,,5-4-1,48.66,Isaac Romero,delantero,DEL,30,read,ok,0,5539456,1.102,0,4.216,0.811,Barcelona,1,2,1.358,attack_defense,,11680,5.337,31.1
+2026-09-18T1945Z,,5-4-1,48.66,Jon Gorrotxategi,mediocampista,MED,50,read,ok,0,2639289,1.621,0,4.192,0.983,Valencia,0,1,1.650,attack_defense,,11683,5.564,30.7
+2026-09-18T1945Z,,5-4-1,48.66,Antal Yaakobishvili,defensa,DEF,,absent,ok,1,1722526,0.566,0,4.143,0.652,Real Madrid,1,0,0.868,attack_defense,,11701,2.303,0.0
+2026-09-18T1945Z,,5-4-1,48.66,Pau Cubarsi,defensa,DEF,99,read,ok,0,64171280,5.251,0,5.837,1.086,Sevilla,0,4,4.835,attack_defense,,11706,12.420,34.7
+2026-09-18T1945Z,,5-4-1,48.66,Fermin Lopez,mediocampista,MED,70,read,ok,0,107914040,6.594,0,9.056,1.048,Sevilla,0,4,6.289,attack_defense,,11709,18.292,34.1
+2026-09-18T1945Z,,5-4-1,48.66,Jorge Benito,portero,POR,,absent,ok,1,602319,1.486,0,6.227,1.139,Malaga,1,0,1.305,value,,11714,4.097,0.0
+2026-09-18T1945Z,,5-4-1,48.66,Selu Diallo,mediocampista,MED,,absent,ok,1,574922,0.678,0,4.118,0.785,Athletic Club,0,0,0.863,attack_defense,,11719,2.405,0.0
+2026-09-18T1945Z,,5-4-1,48.66,Alemao,delantero,DEL,30,read,ok,0,1546346,0.896,0,3.433,1.019,Osasuna,0,1,0.880,attack_defense,,11758,3.893,27.2
+2026-09-18T1945Z,,5-4-1,48.66,Alvaro Nuñez,defensa,DEF,30,read,ok,0,2851412,1.707,0,4.972,1.112,Racing Santander,1,2,1.535,value,,11767,6.568,26.9
+2026-09-18T1945Z,,5-4-1,48.66,Mario Gonzalez,mediocampista,MED,,absent,ok,1,760408,0.880,0,4.118,1.019,Real Sociedad,1,0,0.863,attack_defense,,11790,2.606,0.0
+2026-09-18T1945Z,,5-4-1,48.66,Jon Martin,defensa,DEF,80,read,ok,0,24566521,3.692,0,3.836,1.169,Valencia,0,4,3.158,attack_defense,,11792,9.134,29.3
+2026-09-18T1945Z,,5-4-1,48.66,Alex Lebarbier,defensa,DEF,,absent,ok,1,602234,1.016,0,4.143,1.169,Valencia,0,0,0.868,attack_defense,,11793,2.752,0.0
+2026-09-18T1945Z,,5-4-1,48.66,Pablo Campos,portero,POR,5,read,ok,0,597271,0.227,0,6.382,0.713,Villarreal,0,0,0.319,attack_defense,,11807,0.866,2.0
+2026-09-18T1945Z,,5-4-1,48.66,Aitor Fraga,portero,POR,,absent,ok,1,602234,1.526,0,6.227,1.169,Valencia,0,0,1.305,attack_defense,,11816,4.137,0.0
+2026-09-18T1945Z,,5-4-1,48.66,Dean Huijsen,defensa,DEF,80,read,ok,0,55913223,3.385,0,5.763,0.721,Atletico Madrid,0,5,4.693,attack_defense,,11830,11.553,33.0
+2026-09-18T1945Z,,5-4-1,48.66,Matteo Prati,mediocampista,MED,50,read,ok,1,2854225,2.012,0,3.488,1.007,Celta Vigo,0,3,1.999,attack_defense,,11857,6.546,2.9
+2026-09-18T1945Z,,5-4-1,48.66,Dani Martinez,defensa,DEF,,absent,ok,0,510808,0.507,0,4.063,0.652,Real Madrid,1,1,0.777,attack_defense,,11861,3.943,2.0
+2026-09-18T1945Z,,5-4-1,48.66,Alex Calatrava,delantero,DEL,40,read,ok,1,6137343,2.276,0,4.671,1.000,,,4,2.276,none,,11863,7.976,3.6
+2026-09-18T1945Z,,5-4-1,48.66,Saba Sazonov,defensa,DEF,30,read,ok,1,729346,1.339,0,4.260,1.139,Malaga,1,1,1.176,value,,11905,5.342,1.2
+2026-09-18T1945Z,,5-4-1,48.66,Andres Garcia,mediocampista,MED,70,read,ok,1,7541237,3.068,0,3.868,1.139,Malaga,1,3,2.694,value,,11916,8.051,3.5
+2026-09-18T1945Z,,5-4-1,48.66,Alvaro Djalo,delantero,DEL,0,read,ok,1,585492,0.041,0,4.417,1.011,Alaves,1,0,0.041,attack_defense,,11983,3.746,0.1
+2026-09-18T1945Z,,5-4-1,48.66,Petar Ratkov,delantero,DEL,30,read,ok,1,2864267,1.265,0,4.009,1.036,Villarreal,0,1,1.220,attack_defense,,11998,5.726,0.6
+2026-09-18T1945Z,,5-4-1,48.66,Filip Ugrinic,mediocampista,MED,60,read,ok,0,3401307,2.842,0,3.921,1.019,Real Sociedad,1,5,2.789,attack_defense,,12025,8.486,32.2
+2026-09-18T1945Z,,5-4-1,48.66,Chidera Ejuke,delantero,DEL,50,read,ok,0,6169426,1.700,0,4.879,0.811,Barcelona,1,2,2.095,attack_defense,,12042,6.530,29.0
+2026-09-18T1945Z,,5-4-1,48.66,Georges Mikautadze,delantero,DEL,70,read,ok,0,52464847,5.936,0,6.765,1.268,Levante,1,4,4.682,attack_defense,,12139,14.643,36.1
+2026-09-18T1945Z,,5-4-1,48.66,Logan Costa,defensa,DEF,50,read,ok,0,653418,1.327,0,3.447,1.098,Levante,1,1,1.209,attack_defense,,12354,4.198,2.9
+2026-09-18T1945Z,,5-4-1,48.66,Gabriel Suazo,defensa,DEF,70,read,ok,0,5369496,1.774,0,3.892,0.550,Barcelona,1,6,3.225,attack_defense,,12358,7.846,35.0
+2026-09-18T1945Z,,5-4-1,48.66,Abdoulaye Faye,defensa,DEF,30,read,ok,1,1849243,0.997,0,4.017,1.112,Racing Santander,1,0,0.896,value,,12420,4.346,0.5
+2026-09-18T1945Z,,5-4-1,48.66,Asier Osambela,mediocampista,MED,30,read,ok,0,456016,0.937,0,2.868,0.985,Rayo Vallecano,1,2,0.951,attack_defense,,12453,3.873,19.2
+2026-09-18T1945Z,,5-4-1,48.66,Adrian Niño,delantero,DEL,40,read,ok,1,1085583,1.485,0,5.181,0.827,Getafe,0,0,1.796,attack_defense,,12475,6.860,0.3
+2026-09-18T1945Z,,5-4-1,48.66,Ruben Montero,portero,POR,,absent,ok,1,602316,1.205,0,6.227,0.923,Athletic Club,0,0,1.305,attack_defense,,12479,3.816,0.0
+2026-09-18T1945Z,,5-4-1,48.66,Javi Rodriguez,defensa,DEF,30,read,ok,0,8115164,1.616,0,4.086,1.112,Racing Santander,1,3,1.453,value,,12534,5.993,35.6
+2026-09-18T1945Z,,5-4-1,48.66,Jon Aramburu,defensa,DEF,90,read,ok,0,19706046,3.193,0,2.981,1.169,Valencia,0,6,2.730,attack_defense,,12538,7.682,40.6
+2026-09-18T1945Z,,5-4-1,48.66,Joselu Perez,delantero,DEL,,absent,ok,0,514740,0.773,0,3.870,1.139,Malaga,1,0,0.679,value,,12539,4.642,2.1
+2026-09-18T1945Z,,5-4-1,48.66,Ibrahima Sow,delantero,DEL,,absent,ok,1,521314,0.740,0,4.354,0.811,Barcelona,1,0,0.913,attack_defense,,12590,2.566,0.0
+2026-09-18T1945Z,,5-4-1,48.66,David Otorbi,delantero,DEL,50,read,ok,1,608262,1.654,0,3.526,1.019,Real Sociedad,1,2,1.623,attack_defense,,12594,5.364,2.4
+2026-09-18T1945Z,,5-4-1,48.66,Dani Requena,mediocampista,MED,30,read,ok,1,908248,1.119,0,3.749,1.036,Villarreal,0,1,1.079,attack_defense,,12598,4.852,1.1
+2026-09-18T1945Z,,5-4-1,48.66,Mikel Jauregizar,mediocampista,MED,40,read,ok,0,13676297,1.556,0,4.409,1.011,Alaves,1,2,1.540,attack_defense,,12605,5.719,37.7
+2026-09-18T1945Z,,5-4-1,48.66,Rayane Belaid,delantero,DEL,30,read,ok,0,588737,0.982,0,3.976,1.019,Osasuna,0,0,0.964,attack_defense,,12608,4.731,2.3
+2026-09-18T1945Z,,5-4-1,48.66,Raul Asencio,defensa,DEF,0,read,ok,0,1880174,0.000,0,4.585,0.721,Atletico Madrid,0,0,0.000,attack_defense,,12639,0.000,23.0
+2026-09-18T1945Z,,5-4-1,48.66,Gerard Martin,defensa,DEF,80,read,ok,0,50025335,4.859,0,5.746,1.086,Sevilla,0,4,4.474,attack_defense,,12641,12.592,36.5
+2026-09-18T1945Z,,5-4-1,48.66,Johnny Cardoso,mediocampista,MED,50,read,ok,0,2802884,1.265,0,4.706,0.682,Real Madrid,1,2,1.856,attack_defense,,12647,5.596,16.5
+2026-09-18T1945Z,,5-4-1,48.66,Augusto Batalla,portero,POR,0,read,injured,0,16605709,0.000,0,6.531,1.082,Osasuna,0,2,0.000,attack_defense,,12651,8.589,35.7
+2026-09-18T1945Z,,5-4-1,48.66,Iñaki Ruperez,defensa,DEF,,absent,ok,0,1626247,0.903,0,3.683,1.169,Valencia,0,0,0.772,attack_defense,,12694,2.447,1.0
+2026-09-18T1945Z,,5-4-1,48.66,Djordjije Medenica,portero,POR,,absent,ok,1,1560264,1.486,0,6.227,1.139,Malaga,1,0,1.305,value,,12695,4.097,0.0
+2026-09-18T1945Z,,5-4-1,48.66,Iñigo Arguibide,defensa,DEF,70,read,ok,0,3472697,3.381,0,3.220,1.355,Rayo Vallecano,1,5,2.495,attack_defense,,12823,8.058,11.2
+2026-09-18T1945Z,,5-4-1,48.66,Pau Navarro,defensa,DEF,50,read,ok,0,3912532,1.591,0,4.058,1.098,Levante,1,1,1.449,attack_defense,,12860,5.023,24.0
+2026-09-18T1945Z,,5-4-1,48.66,Carlos Espi,delantero,DEL,10,read,ok,0,13764014,0.406,0,6.879,0.737,Atletico Madrid,0,0,0.551,attack_defense,,12870,5.558,25.3
+2026-09-18T1945Z,,5-4-1,48.66,Buba Sangare,defensa,DEF,50,read,ok,0,3725193,1.775,0,2.601,1.000,,,6,1.775,none,,12878,5.668,17.6
+2026-09-18T1945Z,,5-4-1,48.66,Jorge Cabello,defensa,DEF,10,read,ok,0,527517,0.226,0,3.165,0.713,Villarreal,0,0,0.316,attack_defense,,12879,0.859,5.0
+2026-09-18T1945Z,,5-4-1,48.66,Ian Forns,defensa,DEF,,absent,ok,1,500000,0.797,0,4.143,0.918,Deportivo La Coruna,0,0,0.868,value,,12883,2.534,0.0
+2026-09-18T1945Z,,5-4-1,48.66,Llorenç Serred,portero,POR,,absent,ok,1,461088,1.305,0,6.227,1.000,,,0,1.305,none,,12891,3.916,0.0
+2026-09-18T1945Z,,5-4-1,48.66,Alberto Risco,mediocampista,MED,,absent,ok,1,497038,0.918,0,4.313,1.139,Malaga,1,1,0.806,value,,12917,4.862,0.6
+2026-09-18T1945Z,,5-4-1,48.66,Rafel Bauza,mediocampista,MED,20,read,ok,1,551440,0.786,0,3.898,1.000,,,1,0.786,none,,12918,4.206,1.2
+2026-09-18T1945Z,,5-4-1,48.66,Adam Boayar,mediocampista,MED,0,read,ok,0,702711,0.000,0,3.463,1.000,,,0,0.000,none,,12922,0.000,7.0
+2026-09-18T1945Z,,5-4-1,48.66,Aitor Mañas,delantero,DEL,10,read,doubt,0,454217,0.171,0,3.251,0.785,Athletic Club,0,1,0.218,attack_defense,,12925,3.105,9.9
+2026-09-18T1945Z,,5-4-1,48.66,Alvaro Garcia,defensa,DEF,,absent,ok,0,501929,2.545,0,4.927,1.098,Levante,1,5,2.319,attack_defense,,12993,9.465,36.9
+2026-09-18T1945Z,,5-4-1,48.66,Javi Rueda,defensa,DEF,70,read,ok,0,4951553,3.776,0,5.136,1.112,Racing Santander,1,4,3.395,value,,13035,10.068,29.7
+2026-09-18T1945Z,,5-4-1,48.66,Yoel Lago,defensa,DEF,70,read,ok,0,6117506,3.387,0,3.841,1.112,Racing Santander,1,6,3.046,value,,13036,9.106,17.5
+2026-09-18T1945Z,,5-4-1,48.66,Jon Balda,defensa,DEF,,absent,ok,1,1718912,1.016,0,4.143,1.169,Valencia,0,0,0.868,attack_defense,,13040,2.752,0.0
+2026-09-18T1945Z,,5-4-1,48.66,Vanja Drkusic,defensa,DEF,50,read,ok,1,1775168,1.593,0,4.209,1.000,,,1,1.593,none,,13119,5.333,1.3
+2026-09-18T1945Z,,5-4-1,48.66,Paco Cortes,delantero,DEL,30,read,ok,0,526926,0.959,0,3.840,1.036,Villarreal,0,1,0.925,attack_defense,,13145,4.299,12.7
+2026-09-18T1945Z,,5-4-1,48.66,Sergio Canales,mediocampista,MED,50,read,ok,1,29043654,2.912,0,4.360,1.007,Celta Vigo,0,5,2.893,attack_defense,,132,9.271,5.3
+2026-09-18T1945Z,,5-4-1,48.66,Tani Oluwaseyi,delantero,DEL,30,read,ok,0,1206820,1.063,0,3.841,1.268,Levante,1,1,0.838,attack_defense,,13440,4.122,27.7
+2026-09-18T1945Z,,5-4-1,48.66,Endrick,delantero,DEL,5,read,ok,0,3371290,0.141,0,4.188,0.737,Atletico Madrid,0,0,0.191,attack_defense,,13564,4.308,1.1
+2026-09-18T1945Z,,5-4-1,48.66,Sebastian Caceres,defensa,DEF,70,read,ok,1,4962911,2.703,0,3.683,1.112,Racing Santander,1,1,2.430,value,,13608,7.064,1.0
+2026-09-18T1945Z,,5-4-1,48.66,Christantus Uche,delantero,DEL,0,read,injured,0,7144928,0.000,0,4.985,1.139,Malaga,1,0,0.000,value,,13780,0.000,3.0
+2026-09-18T1945Z,,5-4-1,48.66,Pelayo Fernandez,defensa,DEF,20,read,ok,0,625936,0.728,0,4.017,1.082,Osasuna,0,1,0.673,attack_defense,,13801,3.979,1.7
+2026-09-18T1945Z,,5-4-1,48.66,Sergio Jose Lozano,defensa,DEF,,absent,ok,1,491190,0.940,0,4.143,1.082,Osasuna,0,0,0.868,attack_defense,,13812,2.677,0.0
+2026-09-18T1945Z,,5-4-1,48.66,Adrian Molina,portero,POR,,absent,ok,1,514740,1.413,0,6.227,1.082,Osasuna,0,0,1.305,attack_defense,,13813,4.023,0.0
+2026-09-18T1945Z,,5-4-1,48.66,Marco de La Sias,defensa,DEF,,absent,ok,1,470971,0.940,0,4.143,1.082,Osasuna,0,0,0.868,attack_defense,,13814,2.677,0.0
+2026-09-18T1945Z,,5-4-1,48.66,Pablo Garcia,delantero,DEL,,absent,ok,0,7939846,1.210,0,4.232,1.007,Celta Vigo,0,2,1.202,attack_defense,,13822,5.576,17.3
+2026-09-18T1945Z,,5-4-1,48.66,Maroan Sannadi,delantero,DEL,30,read,ok,0,430264,0.749,0,3.346,1.011,Alaves,1,0,0.741,attack_defense,,13830,3.528,10.5
+2026-09-18T1945Z,,5-4-1,48.66,Marc Bernal,mediocampista,MED,40,read,ok,0,26129784,2.733,0,5.701,1.048,Sevilla,0,3,2.606,attack_defense,,13864,9.346,25.2
+2026-09-18T1945Z,,5-4-1,48.66,Nico Guillen,mediocampista,MED,0,read,ok,1,1975472,0.286,0,3.883,0.811,Barcelona,1,1,0.353,attack_defense,,13865,4.466,1.0
+2026-09-18T1945Z,,5-4-1,48.66,Taufik Seidu,mediocampista,MED,,absent,ok,0,602316,0.523,0,3.661,0.682,Real Madrid,1,0,0.767,attack_defense,,13871,2.058,1.0
+2026-09-18T1945Z,,5-4-1,48.66,Diego Ferrer,portero,POR,,absent,ok,1,498449,1.486,0,6.227,1.139,Malaga,1,0,1.305,value,,13876,4.097,0.0
+2026-09-18T1945Z,,5-4-1,48.66,Jiri Letacek,portero,POR,5,read,ok,1,495560,0.354,0,6.227,1.139,Malaga,1,0,0.311,value,,13877,0.977,0.0
+2026-09-18T1945Z,,5-4-1,48.66,Martim Neto,mediocampista,MED,30,read,ok,0,978695,1.445,0,4.831,1.000,,,2,1.445,none,,13883,6.076,26.8
+2026-09-18T1945Z,,5-4-1,48.66,Andres Castrin,defensa,DEF,70,read,ok,0,5160117,2.199,0,5.629,0.550,Barcelona,1,4,3.998,attack_defense,,13888,9.649,23.3
+2026-09-18T1945Z,,5-4-1,48.66,Dani Barcia,defensa,DEF,0,read,ok,1,661678,0.000,0,2.900,0.968,Real Betis,1,0,0.000,attack_defense,,13970,0.000,0.0
+2026-09-18T1945Z,,5-4-1,48.66,Diego Villares,mediocampista,MED,0,read,ok,1,1150022,0.149,0,3.238,0.967,Real Betis,1,1,0.154,attack_defense,,13972,2.733,0.7
+2026-09-18T1945Z,,5-4-1,48.66,Ruben Lopez,mediocampista,MED,,absent,ok,1,501880,0.584,0,2.883,0.967,Real Betis,1,0,0.604,attack_defense,,13973,1.793,0.0
+2026-09-18T1945Z,,5-4-1,48.66,Yeremay Hernandez,delantero,DEL,50,read,ok,1,26335338,1.803,0,4.286,0.967,Real Betis,1,2,1.864,attack_defense,,13974,6.139,1.7
+2026-09-18T1945Z,,5-4-1,48.66,David Mella,mediocampista,MED,30,read,ok,1,1778211,0.620,0,3.050,0.967,Real Betis,1,1,0.641,attack_defense,,13975,3.001,0.5
+2026-09-18T1945Z,,5-4-1,48.66,Carlos Lopez,portero,POR,10,read,ok,1,415057,0.881,0,6.227,1.415,Getafe,0,0,0.623,attack_defense,,13978,2.127,0.0
+2026-09-18T1945Z,,5-4-1,48.66,Diego Murillo,defensa,DEF,0,read,injured,1,852154,0.000,0,4.143,1.415,Getafe,0,0,0.000,attack_defense,,13979,0.000,0.0
+2026-09-18T1945Z,,5-4-1,48.66,Carlos Puga,defensa,DEF,50,read,ok,1,3564497,2.837,0,4.017,1.415,Getafe,0,3,2.005,attack_defense,,13982,7.376,3.0
+2026-09-18T1945Z,,5-4-1,48.66,Izan Merino,mediocampista,MED,50,read,ok,1,3697900,1.847,0,3.919,0.827,Getafe,0,4,2.233,attack_defense,,13983,6.829,4.0
+2026-09-18T1945Z,,5-4-1,48.66,Aaron Ochoa,mediocampista,MED,0,read,injured,1,3513040,0.000,0,4.118,0.827,Getafe,0,0,0.000,attack_defense,,13984,0.000,0.0
+2026-09-18T1945Z,,5-4-1,48.66,Jozhua Vertrouwd,defensa,DEF,0,read,doubt,0,648255,0.204,0,3.092,1.082,Osasuna,0,1,0.189,attack_defense,,14004,3.726,10.3
+2026-09-18T1945Z,,5-4-1,48.66,Mikel Santos,portero,POR,,absent,ok,1,702606,1.670,0,6.227,1.280,Alaves,1,0,1.305,attack_defense,,14016,4.281,0.0
+2026-09-18T1945Z,,5-4-1,48.66,Peio Canales,mediocampista,MED,0,read,doubt,1,6610840,0.367,0,3.494,1.011,Alaves,1,2,0.363,attack_defense,,14017,4.947,2.3
+2026-09-18T1945Z,,5-4-1,48.66,Alexis Ciria,delantero,DEL,,absent,ok,1,599013,0.673,0,4.354,0.737,Atletico Madrid,0,0,0.913,attack_defense,,14019,2.498,0.0
+2026-09-18T1945Z,,5-4-1,48.66,Arkaitz Mariezkurrena,delantero,DEL,,absent,ok,0,677966,0.797,0,3.870,0.983,Valencia,0,0,0.811,attack_defense,,14020,2.420,1.0
+2026-09-18T1945Z,,5-4-1,48.66,Job Ochieng,mediocampista,MED,40,read,ok,0,1228281,1.587,0,4.405,0.983,Valencia,0,2,1.615,attack_defense,,14021,5.900,3.9
+2026-09-18T1945Z,,5-4-1,48.66,Alassane Diatta,mediocampista,MED,0,read,ok,0,458149,0.000,0,4.105,1.268,Levante,1,0,0.000,attack_defense,,14022,0.000,1.0
+2026-09-18T1945Z,,5-4-1,48.66,Javier Hernandez,mediocampista,MED,70,read,ok,1,16984433,3.712,0,4.821,1.000,,,5,3.712,none,,14024,10.666,5.2
+2026-09-18T1945Z,,5-4-1,48.66,Iker Cordoba,defensa,DEF,30,read,ok,1,979106,1.102,0,3.943,1.097,Real Sociedad,1,1,1.004,attack_defense,,14034,4.531,1.2
+2026-09-18T1945Z,,5-4-1,48.66,Joan Martinez,defensa,DEF,,absent,ok,1,702622,0.626,0,4.143,0.721,Atletico Madrid,0,0,0.868,attack_defense,,14036,2.363,0.0
+2026-09-18T1945Z,,5-4-1,48.66,Facundo Garces,defensa,DEF,0,read,unavailable,0,472694,0.000,0,4.230,0.923,Athletic Club,0,0,0.000,attack_defense,,14045,0.000,10.0
+2026-09-18T1945Z,,5-4-1,48.66,Chupete,delantero,DEL,60,read,ok,1,25140930,2.410,0,4.164,0.827,Getafe,0,5,2.915,attack_defense,,14096,8.311,5.0
+2026-09-18T1945Z,,5-4-1,48.66,Pablo Garcia,defensa,DEF,,absent,ok,0,468964,1.148,0,4.175,0.968,Real Betis,1,2,1.186,attack_defense,,14097,5.455,17.3
+2026-09-18T1945Z,,5-4-1,48.66,Raul Jimenez,portero,POR,,absent,ok,1,1561503,1.432,0,6.227,1.097,Real Sociedad,1,0,1.305,attack_defense,,14100,4.043,0.0
+2026-09-18T1945Z,,5-4-1,48.66,Jorge Salinas,defensa,DEF,90,read,ok,1,6978291,3.159,0,3.764,0.959,Celta Vigo,0,5,3.295,attack_defense,,14105,8.523,5.1
+2026-09-18T1945Z,,5-4-1,48.66,Matia Barzic,defensa,DEF,0,read,ok,1,524317,0.000,0,4.143,1.000,,,0,0.000,none,,14115,0.000,0.0
+2026-09-18T1945Z,,5-4-1,48.66,Luiz Junior,portero,POR,30,read,ok,0,24952380,2.823,0,5.626,1.098,Levante,1,4,2.572,attack_defense,,14125,9.993,32.0
+2026-09-18T1945Z,,5-4-1,48.66,Manu Gonzalez,portero,POR,0,read,ok,1,581691,0.000,0,6.227,0.918,Deportivo La Coruna,0,0,0.000,value,,14135,0.000,0.0
+2026-09-18T1945Z,,5-4-1,48.66,Maguette Gueye,mediocampista,MED,50,read,ok,1,1833183,1.813,0,4.432,1.007,Celta Vigo,0,2,1.801,attack_defense,,14155,5.998,1.7
+2026-09-18T1945Z,,5-4-1,48.66,Andres Cespedes,portero,POR,,absent,ok,1,401498,1.847,0,6.227,1.415,Getafe,0,0,1.305,attack_defense,,14177,4.458,0.0
+2026-09-18T1945Z,,5-4-1,48.66,Adam Aznou,defensa,DEF,30,read,doubt,1,1017279,0.879,0,4.143,1.415,Getafe,0,0,0.621,attack_defense,,14183,3.365,0.0
+2026-09-18T1945Z,,5-4-1,48.66,Couhaib Driouech,delantero,DEL,30,read,ok,1,2682896,1.590,0,5.019,1.112,Racing Santander,1,1,1.430,value,,14199,6.749,0.7
+2026-09-18T1945Z,,5-4-1,48.66,Roy Revivo,defensa,DEF,70,read,ok,1,3538021,2.575,0,3.673,1.000,,,2,2.575,none,,14377,7.271,2.1
+2026-09-18T1945Z,,5-4-1,48.66,Aitor Crespo,defensa,DEF,,absent,ok,1,802979,0.833,0,4.143,0.959,Celta Vigo,0,0,0.868,attack_defense,,14766,2.569,0.0
+2026-09-18T1945Z,,5-4-1,48.66,Ruben Gomez,portero,POR,,absent,ok,1,462193,1.433,0,6.227,1.098,Levante,1,0,1.305,attack_defense,,14812,4.044,0.0
+2026-09-18T1945Z,,5-4-1,48.66,Jean Ives Valou,defensa,DEF,30,read,ok,1,470971,0.893,0,3.920,1.139,Malaga,1,0,0.784,value,,14816,3.980,0.2
+2026-09-18T1945Z,,5-4-1,48.66,Albert Niculaesei,defensa,DEF,,absent,ok,1,803099,0.868,0,4.143,1.000,,,0,0.868,none,,14832,2.605,0.0
+2026-09-18T1945Z,,5-4-1,48.66,Samu Fernandez,defensa,DEF,,absent,ok,1,702633,0.589,0,2.900,0.968,Real Betis,1,0,0.608,attack_defense,,14869,1.804,0.0
+2026-09-18T1945Z,,5-4-1,48.66,Kevin Sanchez,delantero,DEL,0,read,ok,1,555448,0.022,0,3.023,0.967,Real Betis,1,0,0.022,attack_defense,,14876,3.371,0.1
+2026-09-18T1945Z,,5-4-1,48.66,Alex Marchal,mediocampista,MED,10,read,ok,1,572229,0.491,0,3.883,0.983,Valencia,0,1,0.499,attack_defense,,14881,3.774,1.0
+2026-09-18T1945Z,,5-4-1,48.66,Diego Aguado,defensa,DEF,,absent,ok,0,774109,0.590,0,3.905,0.721,Atletico Madrid,0,0,0.819,attack_defense,,14886,2.228,1.0
+2026-09-18T1945Z,,5-4-1,48.66,Hugo de Llanos,mediocampista,MED,,absent,ok,1,1622168,0.636,0,4.118,0.737,Atletico Madrid,0,0,0.863,attack_defense,,14903,2.363,0.0
+2026-09-18T1945Z,,5-4-1,48.66,Daniel Yañez,delantero,DEL,,absent,ok,0,702606,0.569,0,3.683,0.737,Atletico Madrid,0,0,0.772,attack_defense,,14904,2.113,2.0
+2026-09-18T1945Z,,5-4-1,48.66,Jose Angel Lopez,defensa,DEF,,absent,ok,1,491190,0.868,0,4.143,1.000,,,0,0.868,none,,14928,2.605,0.0
+2026-09-18T1945Z,,5-4-1,48.66,Youssef Enriquez,defensa,DEF,40,read,ok,0,955885,1.310,0,4.297,0.923,Athletic Club,0,1,1.419,attack_defense,,14935,5.203,26.4
+2026-09-18T1945Z,,5-4-1,48.66,Mario Solorzano,mediocampista,MED,,absent,ok,1,602234,0.869,0,4.118,1.007,Celta Vigo,0,0,0.863,attack_defense,,14962,2.595,0.0
+2026-09-18T1945Z,,5-4-1,48.66,Nicolas Valentini,defensa,DEF,40,read,ok,1,633521,1.227,0,3.860,0.923,Athletic Club,0,2,1.330,attack_defense,,14979,4.835,1.6
+2026-09-18T1945Z,,5-4-1,48.66,Jones El-Abdellaoui,delantero,DEL,20,read,ok,0,819113,0.858,0,3.051,1.112,Racing Santander,1,2,0.772,value,,14980,3.961,23.7
+2026-09-18T1945Z,,5-4-1,48.66,Pablo Lopez,delantero,DEL,,absent,ok,1,441041,0.930,0,4.354,1.019,Real Sociedad,1,0,0.913,attack_defense,,15000,2.755,0.0
+2026-09-18T1945Z,,5-4-1,48.66,Simon Eriksson,portero,POR,0,read,doubt,1,1228525,0.000,0,6.227,0.959,Celta Vigo,0,0,0.000,attack_defense,,15033,0.000,0.0
+2026-09-18T1945Z,,5-4-1,48.66,Axel Tape,defensa,DEF,20,read,ok,1,1813825,0.591,0,4.143,0.713,Villarreal,0,0,0.829,attack_defense,,15089,2.248,0.0
+2026-09-18T1945Z,,5-4-1,48.66,Angel Perez,delantero,DEL,80,read,ok,0,22522785,4.403,0,6.741,0.785,Athletic Club,0,5,5.607,attack_defense,,15127,14.192,21.2
+2026-09-18T1945Z,,5-4-1,48.66,Gregoire Swiderski,portero,POR,,absent,ok,1,471425,1.205,0,6.227,0.923,Athletic Club,0,0,1.305,attack_defense,,15133,3.816,0.0
+2026-09-18T1945Z,,5-4-1,48.66,Pol Fortuny,mediocampista,MED,,absent,ok,1,602234,0.636,0,4.118,0.737,Atletico Madrid,0,0,0.863,attack_defense,,15135,2.363,0.0
+2026-09-18T1945Z,,5-4-1,48.66,Zakaria Eddahchouri,delantero,DEL,30,read,ok,1,939717,0.941,0,4.243,0.967,Real Betis,1,1,0.973,attack_defense,,15164,4.415,0.8
+2026-09-18T1945Z,,5-4-1,48.66,Mario Rivas,defensa,DEF,,absent,ok,1,700000,0.626,0,4.143,0.721,Atletico Madrid,0,0,0.868,attack_defense,,15227,2.363,0.0
+2026-09-18T1945Z,,5-4-1,48.66,Luken Beitia,defensa,DEF,20,read,ok,0,454649,1.014,0,3.131,1.169,Valencia,0,2,0.867,attack_defense,,15273,4.348,4.0
+2026-09-18T1945Z,,5-4-1,48.66,Roger Hinojo,defensa,DEF,50,read,ok,1,4881804,2.416,0,3.581,1.000,,,5,2.416,none,,15316,7.718,5.4
+2026-09-18T1945Z,,5-4-1,48.66,Rafa Rodriguez,mediocampista,MED,30,read,ok,1,2483912,0.834,0,3.897,0.827,Getafe,0,1,1.009,attack_defense,,15336,4.364,1.0
+2026-09-18T1945Z,,5-4-1,48.66,Yan Diomande,delantero,DEL,30,read,ok,1,48906390,1.533,0,5.650,0.737,Atletico Madrid,0,3,2.081,attack_defense,,15342,7.729,2.8
+2026-09-18T1945Z,,5-4-1,48.66,Rafa Garrido,defensa,DEF,70,read,ok,1,7560922,4.523,0,4.331,1.415,Getafe,0,5,3.196,attack_defense,,15344,10.495,4.7
+2026-09-18T1945Z,,5-4-1,48.66,Jonathan Asp Jensen,mediocampista,MED,50,read,ok,1,3846711,1.433,0,3.578,0.967,Real Betis,1,2,1.482,attack_defense,,15351,4.868,1.8
+2026-09-18T1945Z,,5-4-1,48.66,Alejandro Rego,defensa,DEF,10,read,ok,0,1939628,0.353,0,2.761,1.280,Alaves,1,0,0.276,attack_defense,,15409,0.905,29.0
+2026-09-18T1945Z,,5-4-1,48.66,Angel Recio,defensa,DEF,70,read,ok,1,2159844,4.462,0,4.165,1.415,Getafe,0,5,3.153,attack_defense,,15417,10.364,5.0
+2026-09-18T1945Z,,5-4-1,48.66,Salvi Esquivel,portero,POR,,absent,ok,1,523700,0.851,0,6.227,0.652,Real Madrid,1,0,1.305,attack_defense,,15422,3.462,0.0
+2026-09-18T1945Z,,5-4-1,48.66,Lander Pinillos,mediocampista,MED,,absent,ok,0,501929,0.621,0,3.772,0.785,Athletic Club,0,0,0.791,attack_defense,,15423,2.202,1.0
+2026-09-18T1945Z,,5-4-1,48.66,Federico Redondo,mediocampista,MED,70,read,ok,0,1268874,2.345,0,3.591,1.000,,,4,2.345,none,,15505,6.687,14.5
+2026-09-18T1945Z,,5-4-1,48.66,Obed Vargas,mediocampista,MED,0,read,ok,0,531799,0.000,0,3.597,0.682,Real Madrid,1,0,0.000,attack_defense,,15572,0.000,12.0
+2026-09-18T1945Z,,5-4-1,48.66,Aissa Mandi,defensa,DEF,60,read,ok,1,12965167,2.238,0,4.165,0.713,Villarreal,0,5,3.140,attack_defense,,1566,8.594,5.0
+2026-09-18T1945Z,,5-4-1,48.66,Nelson Deossa,mediocampista,MED,40,read,ok,0,3023637,1.921,0,5.735,0.918,Deportivo La Coruna,0,2,2.094,value,,15696,7.518,21.9
+2026-09-18T1945Z,,5-4-1,48.66,Facundo Bernal,mediocampista,MED,30,read,ok,1,14035181,1.844,0,4.966,0.918,Deportivo La Coruna,0,3,2.010,value,,15736,7.652,3.3
+2026-09-18T1945Z,,5-4-1,48.66,Aliou Dieng,mediocampista,MED,30,read,ok,1,2053579,1.468,0,4.069,1.019,Real Sociedad,1,3,1.440,attack_defense,,15928,5.812,2.6
+2026-09-18T1945Z,,5-4-1,48.66,Mamadou Sarr,defensa,DEF,50,read,ok,1,10120862,2.117,0,3.856,1.169,Valencia,0,2,1.810,attack_defense,,15944,6.328,1.6
+2026-09-18T1945Z,,5-4-1,48.66,Gabriel Moscardo,mediocampista,MED,40,read,ok,1,3607481,1.399,0,3.824,1.000,,,2,1.399,none,,15957,5.137,1.9
+2026-09-18T1945Z,,5-4-1,48.66,Jesus Fortea,defensa,DEF,,absent,ok,1,802099,0.626,0,4.143,0.721,Atletico Madrid,0,0,0.868,attack_defense,,15961,2.363,0.0
+2026-09-18T1945Z,,5-4-1,48.66,Davinchi,defensa,DEF,30,read,ok,0,1402051,0.638,0,2.684,1.139,Malaga,1,1,0.560,value,,16004,2.724,14.5
+2026-09-18T1945Z,,5-4-1,48.66,Antonio Martinez Bastida,mediocampista,MED,,absent,ok,1,602324,0.863,0,4.118,1.000,,,0,0.863,none,,16014,2.590,0.0
+2026-09-18T1945Z,,5-4-1,48.66,Alejandro Panach,defensa,DEF,,absent,ok,1,492294,0.953,0,4.143,1.097,Real Sociedad,1,0,0.868,attack_defense,,16017,2.690,0.0
+2026-09-18T1945Z,,5-4-1,48.66,Aimar Blazquez,delantero,DEL,,absent,ok,1,581656,0.930,0,4.354,1.019,Real Sociedad,1,0,0.913,attack_defense,,16018,2.755,0.0
+2026-09-18T1945Z,,5-4-1,48.66,Nacho Perez,defensa,DEF,70,read,ok,0,2250597,2.098,0,4.322,0.713,Villarreal,0,3,2.944,attack_defense,,16020,7.535,6.3
+2026-09-18T1945Z,,5-4-1,48.66,Lucas Noubi,defensa,DEF,70,read,ok,1,15780393,2.436,0,3.323,0.968,Real Betis,1,5,2.516,attack_defense,,16099,7.145,5.0
+2026-09-18T1945Z,,5-4-1,48.66,Samu Becerra,mediocampista,MED,,absent,ok,0,557302,0.737,0,3.450,1.019,Osasuna,0,0,0.723,attack_defense,,16146,2.183,3.0
+2026-09-18T1945Z,,5-4-1,48.66,Ivan Alonso,delantero,DEL,,absent,ok,1,461066,0.930,0,4.354,1.019,Osasuna,0,0,0.913,attack_defense,,16147,2.755,0.0
+2026-09-18T1945Z,,5-4-1,48.66,Moha Hamdoune,mediocampista,MED,,absent,ok,1,800000,0.983,0,4.118,1.139,Malaga,1,0,0.863,value,,16149,2.709,0.0
+2026-09-18T1945Z,,5-4-1,48.66,Theo Folgado,portero,POR,,absent,ok,1,702606,1.526,0,6.227,1.169,Valencia,0,0,1.305,attack_defense,,16155,4.137,0.0
+2026-09-18T1945Z,,5-4-1,48.66,Oscar Marcos,mediocampista,MED,,absent,ok,1,602257,0.960,0,4.118,1.112,Racing Santander,1,0,0.863,value,,16156,2.687,0.0
+2026-09-18T1945Z,,5-4-1,48.66,Mauro Echegoyen,mediocampista,MED,,absent,ok,1,477739,0.850,0,4.118,0.985,Rayo Vallecano,1,0,0.863,attack_defense,,16158,2.577,0.0
+2026-09-18T1945Z,,5-4-1,48.66,Juan Hernandez,mediocampista,MED,,absent,ok,1,581760,0.905,0,4.118,1.048,Sevilla,0,0,0.863,attack_defense,,16171,2.632,0.0
+2026-09-18T1945Z,,5-4-1,48.66,Mikel Rodriguez,mediocampista,MED,0,read,injured,1,1995560,0.000,0,5.179,0.785,Athletic Club,0,2,0.000,attack_defense,,16186,6.181,1.6
+2026-09-18T1945Z,,5-4-1,48.66,Edu Altozano,mediocampista,MED,,absent,ok,1,470971,0.700,0,4.118,0.811,Barcelona,1,0,0.863,attack_defense,,16198,2.427,0.0
+2026-09-18T1945Z,,5-4-1,48.66,Mahamoud Barry,mediocampista,MED,,absent,ok,1,602292,1.095,0,4.118,1.268,Levante,1,0,0.863,attack_defense,,16201,2.821,0.0
+2026-09-18T1945Z,,5-4-1,48.66,Tyrhys Dolan,delantero,DEL,50,read,ok,0,15729487,2.868,0,4.705,1.000,,,5,2.868,none,,16202,9.222,40.5
+2026-09-18T1945Z,,5-4-1,48.66,Valentin Gomez,defensa,DEF,20,read,ok,0,1601408,0.991,0,5.818,0.918,Deportivo La Coruna,0,1,1.081,value,,16203,5.912,29.0
+2026-09-18T1945Z,,5-4-1,48.66,Johaneko Louis-Jean,defensa,DEF,20,read,ok,1,1214512,1.284,0,4.702,1.280,Alaves,1,1,1.004,attack_defense,,16229,5.522,1.4
+2026-09-18T1945Z,,5-4-1,48.66,Miguel Sierra,delantero,DEL,70,read,ok,0,5731769,2.695,0,4.554,0.811,Barcelona,1,5,3.321,attack_defense,,16236,8.895,8.6
+2026-09-18T1945Z,,5-4-1,48.66,Thiago Pitarch,mediocampista,MED,0,read,ok,0,5275277,0.000,0,4.108,0.737,Atletico Madrid,0,0,0.000,attack_defense,,16237,0.000,10.0
+2026-09-18T1945Z,,5-4-1,48.66,Lander Astiazaran,mediocampista,MED,,absent,ok,0,602257,0.767,0,3.661,1.000,,,0,0.767,none,,16247,2.302,1.0
+2026-09-18T1945Z,,5-4-1,48.66,Sergio Martinez,mediocampista,MED,,absent,ok,1,1390736,0.875,0,4.856,0.737,Atletico Madrid,0,1,1.187,attack_defense,,16262,5.873,1.3
+2026-09-18T1945Z,,5-4-1,48.66,Dani Lorenzo,mediocampista,MED,70,read,ok,1,11140000,2.554,0,4.872,0.827,Getafe,0,3,3.089,attack_defense,,16286,8.260,3.3
+2026-09-18T1945Z,,5-4-1,48.66,Ivan Corralejo,mediocampista,MED,,absent,ok,0,602248,0.725,0,3.772,0.918,Deportivo La Coruna,0,0,0.791,value,,16287,2.307,1.0
+2026-09-18T1945Z,,5-4-1,48.66,Clemens Riedel,defensa,DEF,60,read,ok,0,5792665,2.819,0,4.601,1.000,,,4,2.819,none,,16308,8.535,23.8
+2026-09-18T1945Z,,5-4-1,48.66,Marcos Navarro,defensa,DEF,,absent,ok,1,501909,0.953,0,4.143,1.097,Real Sociedad,1,0,0.868,attack_defense,,16317,2.690,0.0
+2026-09-18T1945Z,,5-4-1,48.66,Adrian Perez,delantero,DEL,,absent,ok,1,602257,0.922,0,4.354,1.011,Alaves,1,0,0.913,attack_defense,,16349,2.748,0.0
+2026-09-18T1945Z,,5-4-1,48.66,Iker Monreal,defensa,DEF,,absent,ok,1,574046,1.111,0,4.143,1.280,Alaves,1,0,0.868,attack_defense,,16350,2.848,0.0
+2026-09-18T1945Z,,5-4-1,48.66,Laro Gomez,portero,POR,5,read,ok,1,602234,0.298,0,6.227,0.959,Celta Vigo,0,0,0.311,attack_defense,,16359,0.921,0.0
+2026-09-18T1945Z,,5-4-1,48.66,Eder Aller,portero,POR,,absent,ok,1,702705,1.418,0,6.227,1.086,Sevilla,0,0,1.305,attack_defense,,16723,4.029,0.0
+2026-09-18T1945Z,,5-4-1,48.66,Javi Navarro,portero,POR,,absent,ok,1,702622,0.942,0,6.227,0.721,Atletico Madrid,0,0,1.305,attack_defense,,16735,3.552,0.0
+2026-09-18T1945Z,,5-4-1,48.66,Carlos Ballestero,defensa,DEF,,absent,ok,0,602316,0.734,0,3.794,0.923,Athletic Club,0,0,0.795,attack_defense,,16758,2.325,1.0
+2026-09-18T1945Z,,5-4-1,48.66,Pedro Felipe,defensa,DEF,10,read,ok,1,1062746,0.440,0,3.421,0.959,Celta Vigo,0,1,0.459,attack_defense,,16760,3.708,0.8
+2026-09-18T1945Z,,5-4-1,48.66,Hugo Rios,portero,POR,,absent,ok,1,903386,0.885,0,4.359,0.968,Real Betis,1,0,0.914,attack_defense,,16763,2.712,0.0
+2026-09-18T1945Z,,5-4-1,48.66,Quique Teijo,defensa,DEF,,absent,ok,1,602257,0.589,0,2.900,0.968,Real Betis,1,0,0.608,attack_defense,,16764,1.804,0.0
+2026-09-18T1945Z,,5-4-1,48.66,Xavi Espart,defensa,DEF,70,read,ok,0,33390146,4.698,0,5.780,1.086,Sevilla,0,5,4.326,attack_defense,,16765,12.788,8.9
+2026-09-18T1945Z,,5-4-1,48.66,David Delgado,defensa,DEF,,absent,ok,1,602324,0.868,0,4.143,1.000,,,0,0.868,none,,16767,2.605,0.0
+2026-09-18T1945Z,,5-4-1,48.66,Damian Canedo,defensa,DEF,,absent,ok,1,602257,0.589,0,2.900,0.968,Real Betis,1,0,0.608,attack_defense,,16797,1.804,0.0
+2026-09-18T1945Z,,5-4-1,48.66,Marc Jurado,defensa,DEF,,absent,ok,1,602292,0.953,0,4.143,1.097,Real Sociedad,1,0,0.868,attack_defense,,16798,2.690,0.0
+2026-09-18T1945Z,,5-4-1,48.66,Pablo Meixus,defensa,DEF,,absent,ok,1,485372,0.966,0,4.143,1.112,Racing Santander,1,0,0.868,value,,16801,2.703,0.0
+2026-09-18T1945Z,,5-4-1,48.66,Andres Antañon,mediocampista,MED,0,read,injured,0,557302,0.000,0,3.571,1.112,Racing Santander,1,1,0.000,value,,16802,3.081,2.7
+2026-09-18T1945Z,,5-4-1,48.66,Hugo Burcio,mediocampista,MED,30,read,ok,0,574046,0.736,0,3.576,1.112,Racing Santander,1,0,0.661,value,,16803,3.346,1.2
+2026-09-18T1945Z,,5-4-1,48.66,Ferran Gomez,mediocampista,MED,,absent,ok,1,602248,0.863,0,4.118,1.000,,,0,0.863,none,,16809,2.590,0.0
+2026-09-18T1945Z,,5-4-1,48.66,Selton Sanchez,mediocampista,MED,,absent,ok,0,602257,0.677,0,3.196,1.011,Alaves,1,0,0.670,attack_defense,,16810,2.017,7.0
+2026-09-18T1945Z,,5-4-1,48.66,Asier Hierro,delantero,DEL,,absent,ok,0,602257,0.867,0,4.092,1.011,Alaves,1,0,0.858,attack_defense,,16818,2.583,1.0
+2026-09-18T1945Z,,5-4-1,48.66,Bil Nsongo,delantero,DEL,50,read,ok,1,7661734,2.052,0,3.891,0.967,Real Betis,1,4,2.121,attack_defense,,16863,6.806,3.6
+2026-09-18T1945Z,,5-4-1,48.66,Ibai Aguirre,mediocampista,MED,,absent,ok,0,602257,0.791,0,3.772,1.000,,,0,0.791,none,,16867,2.372,1.0
+2026-09-18T1945Z,,5-4-1,48.66,Angel Arcos,mediocampista,MED,,absent,ok,1,602257,0.960,0,4.118,1.112,Racing Santander,1,0,0.863,value,,16873,2.687,0.0
+2026-09-18T1945Z,,5-4-1,48.66,Joel Fontanet,defensa,DEF,,absent,ok,1,581987,0.953,0,4.143,1.097,Real Sociedad,1,0,0.868,attack_defense,,16874,2.690,0.0
+2026-09-18T1945Z,,5-4-1,48.66,Jorge Montes,defensa,DEF,,absent,ok,0,602319,1.011,0,4.238,1.139,Malaga,1,0,0.888,value,,16917,2.788,1.0
+2026-09-18T1945Z,,5-4-1,48.66,Izei Hernandez,mediocampista,MED,,absent,ok,1,582010,0.678,0,4.118,0.785,Athletic Club,0,0,0.863,attack_defense,,16920,2.405,0.0
+2026-09-18T1945Z,,5-4-1,48.66,Gorka Carrera,delantero,DEL,,absent,ok,0,524026,0.690,0,3.348,0.983,Valencia,0,0,0.702,attack_defense,,16922,2.093,3.0
+2026-09-18T1945Z,,5-4-1,48.66,Huseini Nakoha,defensa,DEF,,absent,ok,1,501874,0.619,0,4.143,0.713,Villarreal,0,0,0.868,attack_defense,,16924,2.356,0.0
+2026-09-18T1945Z,,5-4-1,48.66,Xanet Olaiz,defensa,DEF,10,read,ok,1,472450,0.263,0,4.327,0.923,Athletic Club,0,0,0.285,attack_defense,,16931,3.380,0.1
+2026-09-18T1945Z,,5-4-1,48.66,Pablo Roson,mediocampista,MED,,absent,ok,1,602249,0.895,0,4.118,1.036,Villarreal,0,0,0.863,attack_defense,,16933,2.621,0.0
+2026-09-18T1945Z,,5-4-1,48.66,Carlos Macia,mediocampista,MED,20,read,ok,0,620105,0.743,0,3.868,1.268,Levante,1,1,0.586,attack_defense,,16938,3.751,5.5
+2026-09-18T1945Z,,5-4-1,48.66,Aleksa Puric,defensa,DEF,,absent,ok,0,434872,0.494,0,3.614,0.652,Real Madrid,1,0,0.758,attack_defense,,16940,2.009,2.0
+2026-09-18T1945Z,,5-4-1,48.66,Jorge Cestero,mediocampista,MED,,absent,ok,0,489337,0.540,0,3.495,0.737,Atletico Madrid,0,0,0.733,attack_defense,,16948,2.005,2.0
+2026-09-18T1945Z,,5-4-1,48.66,Iker Muñoz,defensa,DEF,,absent,ok,0,470971,0.784,0,3.349,0.550,Barcelona,1,4,1.424,attack_defense,,16975,5.184,23.3
+2026-09-18T1945Z,,5-4-1,48.66,Noe Carrillo,mediocampista,MED,0,read,doubt,1,702633,0.000,0,2.883,0.967,Real Betis,1,0,0.000,attack_defense,,16976,0.000,0.0
+2026-09-18T1945Z,,5-4-1,48.66,Unai Santos,defensa,DEF,30,read,ok,1,492148,1.266,0,3.571,1.355,Rayo Vallecano,1,1,0.934,attack_defense,,16982,4.519,1.0
+2026-09-18T1945Z,,5-4-1,48.66,Thiago Fernandez,mediocampista,MED,70,read,ok,0,2207012,2.885,0,4.130,1.036,Villarreal,0,2,2.784,attack_defense,,17116,7.985,18.5
+2026-09-18T1945Z,,5-4-1,48.66,Joselillo Gaitan,mediocampista,MED,,absent,ok,1,602292,1.095,0,4.118,1.268,Levante,1,0,0.863,attack_defense,,17119,2.821,0.0
+2026-09-18T1945Z,,5-4-1,48.66,Julio Diaz,defensa,DEF,30,read,ok,0,434577,0.628,0,4.781,0.550,Barcelona,1,1,1.142,attack_defense,,17129,4.634,4.9
+2026-09-18T1945Z,,5-4-1,48.66,Iker Luque,delantero,DEL,20,read,ok,0,1313720,0.782,0,3.623,1.007,Celta Vigo,0,1,0.777,attack_defense,,17130,4.742,1.5
+2026-09-18T1945Z,,5-4-1,48.66,Adrian Riquelme,mediocampista,MED,,absent,ok,1,602324,0.983,0,4.118,1.139,Malaga,1,0,0.863,value,,17145,2.709,0.0
+2026-09-18T1945Z,,5-4-1,48.66,Giorgi Guliashvili,delantero,DEL,20,read,ok,1,846399,0.676,0,4.390,1.007,Celta Vigo,0,0,0.672,attack_defense,,17148,4.262,0.4
+2026-09-18T1945Z,,5-4-1,48.66,Abiel Osorio,delantero,DEL,40,read,ok,1,726982,2.049,0,5.075,1.000,,,2,2.049,none,,17151,7.601,1.6
+2026-09-18T1945Z,,5-4-1,48.66,Sebastian Boselli,defensa,DEF,40,read,ok,0,1153237,1.323,0,3.783,1.139,Malaga,1,1,1.162,value,,17161,4.577,12.1
+2026-09-18T1945Z,,5-4-1,48.66,Dani Mesonero,mediocampista,MED,,absent,ok,1,702606,0.636,0,4.118,0.737,Atletico Madrid,0,0,0.863,attack_defense,,17166,2.363,0.0
+2026-09-18T1945Z,,5-4-1,48.66,Alex Sanchez,mediocampista,MED,,absent,ok,0,602324,0.907,0,4.327,1.000,,,0,0.907,none,,17190,2.721,1.0
+2026-09-18T1945Z,,5-4-1,48.66,Lucas Cepeda,delantero,DEL,30,read,ok,0,1209741,1.596,0,5.600,1.000,,,2,1.596,none,,17248,6.803,11.6
+2026-09-18T1945Z,,5-4-1,48.66,Alex Freeman,defensa,DEF,50,read,ok,0,1269043,1.947,0,4.498,1.098,Levante,1,2,1.774,attack_defense,,17275,6.087,10.5
+2026-09-18T1945Z,,5-4-1,48.66,Ville Koski,defensa,DEF,70,read,ok,0,13126187,4.120,0,5.444,0.923,Athletic Club,0,6,4.463,attack_defense,,17284,12.517,10.9
+2026-09-18T1945Z,,5-4-1,48.66,Aaron Ndive Mayol,mediocampista,MED,70,read,ok,1,681689,2.052,0,3.661,1.019,Real Sociedad,1,1,2.013,attack_defense,,17376,5.663,1.0
+2026-09-18T1945Z,,5-4-1,48.66,Lamini Fati,defensa,DEF,,absent,ok,1,677955,0.626,0,4.143,0.721,Atletico Madrid,0,0,0.868,attack_defense,,17406,2.363,0.0
+2026-09-18T1945Z,,5-4-1,48.66,Adama Timera,defensa,DEF,,absent,ok,1,491190,0.868,0,4.143,1.000,,,0,0.868,none,,17445,2.605,0.0
+2026-09-18T1945Z,,5-4-1,48.66,Javi Morcillo,mediocampista,MED,50,read,ok,0,724472,1.391,0,3.027,1.000,,,2,1.391,none,,17495,4.571,7.4
+2026-09-18T1945Z,,5-4-1,48.66,Iago Aspas,delantero,DEL,0,read,injured,0,5984809,0.000,0,4.786,1.112,Racing Santander,1,2,0.000,value,,175,5.042,34.5
+2026-09-18T1945Z,,5-4-1,48.66,Miguel Cubo,delantero,DEL,,absent,ok,0,479306,0.498,0,3.483,0.682,Real Madrid,1,0,0.730,attack_defense,,17529,1.958,2.0
+2026-09-18T1945Z,,5-4-1,48.66,Hamza Abdelkarim,delantero,DEL,10,read,ok,1,2827312,0.293,0,4.572,1.048,Sevilla,0,0,0.279,attack_defense,,17663,3.543,0.1
+2026-09-18T1945Z,,5-4-1,48.66,Nathan-Dylan Saliba,mediocampista,MED,70,read,ok,1,6680877,3.380,0,4.563,1.268,Levante,1,1,2.666,attack_defense,,17695,8.196,1.4
+2026-09-18T1945Z,,5-4-1,48.66,Denis Suarez,mediocampista,MED,50,read,ok,0,2729252,1.809,0,4.528,0.785,Athletic Club,0,3,2.303,attack_defense,,1778,7.011,33.1
+2026-09-18T1945Z,,5-4-1,48.66,Enzo Bardelli,mediocampista,MED,70,read,ok,1,8383269,3.900,0,5.429,1.036,Villarreal,0,3,3.763,attack_defense,,18006,10.858,3.4
+2026-09-18T1945Z,,5-4-1,48.66,Arouna Sangante,defensa,DEF,30,read,doubt,1,7768574,0.465,0,4.263,0.550,Barcelona,1,2,0.845,attack_defense,,18014,5.634,2.4
+2026-09-18T1945Z,,5-4-1,48.66,Justin de Haas,defensa,DEF,70,read,ok,1,4097149,3.056,0,4.377,1.097,Real Sociedad,1,1,2.785,attack_defense,,18018,8.085,1.4
+2026-09-18T1945Z,,5-4-1,48.66,Alvaro Padilla,delantero,DEL,,absent,ok,1,633944,0.698,0,4.294,1.000,,,0,0.698,none,,18021,4.626,0.1
+2026-09-18T1945Z,,5-4-1,48.66,Manuel Angel Castillo,mediocampista,MED,,absent,ok,1,900000,0.700,0,4.118,0.811,Barcelona,1,0,0.863,attack_defense,,18026,2.427,0.0
+2026-09-18T1945Z,,5-4-1,48.66,Igor Galdin,portero,POR,,absent,ok,1,491275,0.930,0,6.227,0.713,Villarreal,0,0,1.305,attack_defense,,18027,3.541,0.0
+2026-09-18T1945Z,,5-4-1,48.66,Marc Santos,defensa,DEF,20,read,ok,1,551440,0.416,0,3.993,0.713,Villarreal,0,0,0.584,attack_defense,,18028,3.623,0.3
+2026-09-18T1945Z,,5-4-1,48.66,Alberto Calatrava,mediocampista,MED,,absent,ok,1,581561,0.895,0,4.118,1.036,Villarreal,0,0,0.863,attack_defense,,18029,2.621,0.0
+2026-09-18T1945Z,,5-4-1,48.66,Bright Ede,defensa,DEF,40,read,ok,1,3907629,1.324,0,3.553,0.968,Real Betis,1,2,1.368,attack_defense,,18030,4.932,2.2
+2026-09-18T1945Z,,5-4-1,48.66,Ryunosuke Sato,delantero,DEL,50,read,ok,1,6914883,1.918,0,3.620,1.019,Real Sociedad,1,3,1.882,attack_defense,,18031,6.158,3.3
+2026-09-18T1945Z,,5-4-1,48.66,Cheikh Thiam,mediocampista,MED,,absent,ok,1,582846,1.095,0,4.118,1.268,Levante,1,0,0.863,attack_defense,,18039,2.821,0.0
+2026-09-18T1945Z,,5-4-1,48.66,Nizar El Jmili,delantero,DEL,,absent,ok,1,754556,1.157,0,4.354,1.268,Levante,1,0,0.913,attack_defense,,18041,2.983,0.0
+2026-09-18T1945Z,,5-4-1,48.66,Marco Roman,mediocampista,MED,,absent,ok,1,521314,0.879,0,4.118,1.019,Osasuna,0,0,0.863,attack_defense,,18048,2.606,0.0
+2026-09-18T1945Z,,5-4-1,48.66,Asier Bonel,delantero,DEL,,absent,ok,1,656310,0.899,0,4.354,0.985,Rayo Vallecano,1,0,0.913,attack_defense,,18053,2.724,0.0
+2026-09-18T1945Z,,5-4-1,48.66,Kike Ribes,defensa,DEF,,absent,ok,1,600000,0.868,0,4.143,1.000,,,0,0.868,none,,18201,2.605,0.0
+2026-09-18T1945Z,,5-4-1,48.66,Jorge Dominguez,defensa,DEF,,absent,ok,1,2052087,0.395,0,3.899,0.652,Real Madrid,1,0,0.606,attack_defense,,18213,3.415,0.5
+2026-09-18T1945Z,,5-4-1,48.66,Jorge Castillo,mediocampista,MED,,absent,ok,1,1000000,0.588,0,4.118,0.682,Real Madrid,1,0,0.863,attack_defense,,18214,2.315,0.0
+2026-09-18T1945Z,,5-4-1,48.66,Andres Vallecillo,mediocampista,MED,,absent,ok,1,490633,0.869,0,4.118,1.007,Celta Vigo,0,0,0.863,attack_defense,,18218,2.595,0.0
+2026-09-18T1945Z,,5-4-1,48.66,Jorge Castellanos,mediocampista,MED,,absent,ok,1,491190,0.869,0,4.118,1.007,Celta Vigo,0,0,0.863,attack_defense,,18221,2.595,0.0
+2026-09-18T1945Z,,5-4-1,48.66,Hugo Perez,mediocampista,MED,,absent,ok,1,720390,0.869,0,4.118,1.007,Celta Vigo,0,0,0.863,attack_defense,,18222,2.595,0.0
+2026-09-18T1945Z,,5-4-1,48.66,Miguel Angel Santaella,defensa,DEF,,absent,ok,1,401498,1.229,0,4.143,1.415,Getafe,0,0,0.868,attack_defense,,18224,2.966,0.0
+2026-09-18T1945Z,,5-4-1,48.66,Juani,delantero,DEL,,absent,ok,1,1049297,0.755,0,4.354,0.827,Getafe,0,0,0.913,attack_defense,,18225,2.580,0.0
+2026-09-18T1945Z,,5-4-1,48.66,Rodrigo Gamon,defensa,DEF,,absent,ok,1,800000,0.953,0,4.143,1.097,Real Sociedad,1,0,0.868,attack_defense,,18228,2.690,0.0
+2026-09-18T1945Z,,5-4-1,48.66,Brian Fariñas,mediocampista,MED,0,read,ok,1,614683,0.000,0,4.118,1.048,Sevilla,0,0,0.000,attack_defense,,18240,0.000,0.0
+2026-09-18T1945Z,,5-4-1,48.66,Manel Usedo,mediocampista,MED,,absent,ok,1,521314,0.895,0,4.118,1.036,Villarreal,0,0,0.863,attack_defense,,18241,2.621,0.0
+2026-09-18T1945Z,,5-4-1,48.66,Ibrahima Danfakha,delantero,DEL,,absent,ok,1,491190,1.039,0,4.354,1.139,Malaga,1,0,0.913,value,,18250,2.864,0.0
+2026-09-18T1945Z,,5-4-1,48.66,Jan Oblak,portero,POR,95,read,ok,0,45643364,4.357,0,6.877,0.652,Real Madrid,1,6,6.680,attack_defense,,1826,15.085,36.0
+2026-09-18T1945Z,,5-4-1,48.66,Jordi Pesquer,defensa,DEF,,absent,ok,1,600000,0.943,0,4.143,1.086,Sevilla,0,0,0.868,attack_defense,,18268,2.680,0.0
+2026-09-18T1945Z,,5-4-1,48.66,Gnangoro Bouare,mediocampista,MED,50,read,ok,1,864154,1.787,0,3.471,1.019,Osasuna,0,2,1.755,attack_defense,,18273,5.830,2.1
+2026-09-18T1945Z,,5-4-1,48.66,Jaume Dura,mediocampista,MED,,absent,ok,1,754556,0.880,0,4.118,1.019,Real Sociedad,1,0,0.863,attack_defense,,18279,2.606,0.0
+2026-09-18T1945Z,,5-4-1,48.66,Yassir Zabiri,delantero,DEL,80,read,ok,1,14176293,4.763,0,6.714,1.007,Celta Vigo,0,3,4.732,attack_defense,,18282,12.808,3.5
+2026-09-18T1945Z,,5-4-1,48.66,Kayne van Oevelen,portero,POR,5,read,ok,1,1053793,0.342,0,6.227,1.097,Real Sociedad,1,0,0.311,attack_defense,,18283,0.964,0.0
+2026-09-18T1945Z,,5-4-1,48.66,Yanis Musuayi,delantero,DEL,20,read,ok,1,1131274,0.809,0,4.414,1.036,Villarreal,0,0,0.780,attack_defense,,18294,5.034,0.3
+2026-09-18T1945Z,,5-4-1,48.66,Robbie Ure,delantero,DEL,50,read,ok,1,10930053,1.768,0,4.123,0.811,Barcelona,1,3,2.179,attack_defense,,18314,6.669,3.4
+2026-09-18T1945Z,,5-4-1,48.66,Rockson Yeboah,defensa,DEF,50,read,ok,1,846497,2.365,0,3.301,1.355,Rayo Vallecano,1,2,1.745,attack_defense,,18316,6.362,2.3
+2026-09-18T1945Z,,5-4-1,48.66,Joseph Otu,mediocampista,MED,,absent,ok,1,640121,0.714,0,4.118,0.827,Getafe,0,0,0.863,attack_defense,,18378,2.440,0.0
+2026-09-18T1945Z,,5-4-1,48.66,Ifeanyi Ndukwe,defensa,DEF,50,read,ok,1,1404349,1.072,0,4.274,0.713,Villarreal,0,0,1.504,attack_defense,,18406,4.735,0.2
+2026-09-18T1945Z,,5-4-1,48.66,Curro Burgos,defensa,DEF,,absent,ok,1,600000,0.989,0,4.143,1.139,Malaga,1,0,0.868,value,,18411,2.726,0.0
+2026-09-18T1945Z,,5-4-1,48.66,Oscar Lopez,mediocampista,MED,,absent,ok,1,754556,0.605,0,4.118,1.139,Malaga,1,0,0.531,value,,18412,3.722,0.0
+2026-09-18T1945Z,,5-4-1,48.66,Alvaro de Pablo,portero,POR,,absent,ok,1,700000,1.198,0,6.227,0.918,Deportivo La Coruna,0,0,1.305,value,,18418,3.809,0.0
+2026-09-18T1945Z,,5-4-1,48.66,Lucas Stassin,delantero,DEL,0,read,injured,1,17955663,0.000,0,4.291,0.811,Barcelona,1,2,0.000,attack_defense,,18437,5.520,2.2
+2026-09-18T1945Z,,5-4-1,48.66,Kevin Lomonaco,defensa,DEF,20,read,ok,1,5414380,0.829,0,4.143,1.000,,,0,0.829,none,,18438,2.486,0.0
+2026-09-18T1945Z,,5-4-1,48.66,Josan Ferrandez,mediocampista,MED,10,read,ok,0,601457,0.391,0,4.931,1.000,,,0,0.391,none,,1859,4.077,19.3
+2026-09-18T1945Z,,5-4-1,48.66,Unai Lopez,mediocampista,MED,70,read,ok,0,15527215,4.302,0,5.493,1.019,Osasuna,0,5,4.224,attack_defense,,1881,12.217,33.2
+2026-09-18T1945Z,,5-4-1,48.66,Joao Cancelo,defensa,DEF,30,read,ok,0,29271756,1.984,0,6.870,1.086,Sevilla,0,1,1.827,attack_defense,,1882,8.111,17.3
+2026-09-18T1945Z,,5-4-1,48.66,Jonny Castro,defensa,DEF,70,read,ok,0,14215848,2.800,0,4.145,0.923,Athletic Club,0,5,3.033,attack_defense,,189,8.463,38.6
+2026-09-18T1945Z,,5-4-1,48.66,David Soria,portero,POR,95,read,ok,0,35826415,7.328,0,7.151,1.139,Malaga,1,5,6.436,value,,1919,17.463,43.0
+2026-09-18T1945Z,,5-4-1,48.66,Pere Milla,delantero,DEL,30,read,ok,0,4156232,0.978,0,4.740,1.000,,,0,0.978,none,,1927,4.641,33.5
+2026-09-18T1945Z,,5-4-1,48.66,Lucas Torro,mediocampista,MED,30,read,ok,0,1447018,1.080,0,3.243,0.985,Rayo Vallecano,1,2,1.097,attack_defense,,1928,4.441,36.3
+2026-09-18T1945Z,,5-4-1,48.66,Marcos Llorente,defensa,DEF,70,read,ok,0,41350100,2.934,0,6.455,0.652,Real Madrid,1,4,4.498,attack_defense,,1931,11.303,33.2
+2026-09-18T1945Z,,5-4-1,48.66,Iñaki Williams,delantero,DEL,70,read,ok,0,35882789,3.901,0,5.867,1.011,Alaves,1,4,3.860,attack_defense,,1934,11.051,33.6
+2026-09-18T1945Z,,5-4-1,48.66,Borja Iglesias,delantero,DEL,20,read,ok,0,12808041,1.012,0,4.933,1.112,Racing Santander,1,0,0.910,value,,1945,6.107,35.2
+2026-09-18T1945Z,,5-4-1,48.66,Alex Remiro,portero,POR,70,read,ok,0,38004097,4.923,0,5.560,1.169,Valencia,0,5,4.210,attack_defense,,1975,12.802,42.0
+2026-09-18T1945Z,,5-4-1,48.66,Borja Mayoral,delantero,DEL,10,read,doubt,0,1358772,0.180,0,4.745,1.139,Malaga,1,0,0.158,value,,1989,3.820,16.1
+2026-09-18T1945Z,,5-4-1,48.66,Hector Bellerin,defensa,DEF,70,read,ok,0,17158104,2.945,0,4.575,0.918,Deportivo La Coruna,0,4,3.210,value,,2153,8.921,31.2
+2026-09-18T1945Z,,5-4-1,48.66,Gonçalo Guedes,delantero,DEL,70,read,ok,0,17302955,3.396,0,5.930,0.983,Valencia,0,2,3.457,attack_defense,,2242,9.689,34.0
+2026-09-18T1945Z,,5-4-1,48.66,Dani Olmo,mediocampista,MED,30,read,ok,0,47510989,2.955,0,7.652,1.048,Sevilla,0,3,2.818,attack_defense,,2288,11.346,35.8
+2026-09-18T1945Z,,5-4-1,48.66,Emil Audero,portero,POR,80,read,ok,1,5266516,4.778,0,5.782,1.082,Osasuna,0,2,4.415,attack_defense,,2413,12.053,2.0
+2026-09-18T1945Z,,5-4-1,48.66,Andreas Christensen,defensa,DEF,21,read,ok,0,8694266,1.491,0,3.493,1.086,Sevilla,0,4,1.373,attack_defense,,2417,5.853,16.8
+2026-09-18T1945Z,,5-4-1,48.66,Wojciech Szczesny,portero,POR,60,read,ok,0,1215454,2.245,0,5.460,1.086,Sevilla,0,0,2.067,attack_defense,,2534,6.473,8.5
+2026-09-18T1945Z,,5-4-1,48.66,Antonio Rudiger,defensa,DEF,50,read,ok,0,19857110,1.726,0,5.581,0.721,Atletico Madrid,0,2,2.392,attack_defense,,2536,7.243,20.0
+2026-09-18T1945Z,,5-4-1,48.66,Pablo Maffeo,defensa,DEF,50,read,ok,0,6129049,2.282,0,4.062,1.097,Real Sociedad,1,3,2.080,attack_defense,,2663,7.016,33.7
+2026-09-18T1945Z,,5-4-1,48.66,Mikel Oyarzabal,delantero,DEL,70,read,ok,0,53021071,3.783,0,5.273,0.983,Valencia,0,5,3.850,attack_defense,,2675,10.971,38.6
+2026-09-18T1945Z,,5-4-1,48.66,Ezequiel Ponce,delantero,DEL,20,read,ok,1,889847,0.902,0,4.289,1.000,,,1,0.902,none,,2727,4.741,1.3
+2026-09-18T1945Z,,5-4-1,48.66,Rodri Hernandez,mediocampista,MED,70,read,ok,1,67516857,3.587,0,5.198,1.048,Sevilla,0,3,3.421,attack_defense,,2733,9.885,3.0
+2026-09-18T1945Z,,5-4-1,48.66,Kike Garcia,delantero,DEL,0,read,injured,0,1283483,0.000,0,3.863,1.000,,,0,0.000,none,,2751,0.000,37.0
+2026-09-18T1945Z,,5-4-1,48.66,Carles Aleña,mediocampista,MED,50,read,ok,0,2931460,1.477,0,5.032,0.785,Athletic Club,0,1,1.881,attack_defense,,2759,5.901,35.2
+2026-09-18T1945Z,,5-4-1,48.66,Alex Grimaldo,defensa,DEF,60,read,ok,1,34132507,2.529,0,5.578,0.652,Real Madrid,1,5,3.878,attack_defense,,2771,10.381,4.9
+2026-09-18T1945Z,,5-4-1,48.66,Carlos Soler,mediocampista,MED,80,read,ok,0,30519167,4.363,0,5.883,0.983,Valencia,0,4,4.440,attack_defense,,2799,11.999,37.2
+2026-09-18T1945Z,,5-4-1,48.66,Igor Zubeldia,defensa,DEF,50,read,doubt,0,11057597,1.274,0,3.381,1.169,Valencia,0,4,1.090,attack_defense,,2802,6.111,29.4
+2026-09-18T1945Z,,5-4-1,48.66,Alvaro Odriozola,defensa,DEF,0,read,injured,0,468020,0.000,0,4.242,1.169,Valencia,0,0,0.000,attack_defense,,2807,0.000,5.0
+2026-09-18T1945Z,,5-4-1,48.66,Peter Gulacsi,portero,POR,70,read,ok,1,3214535,3.554,0,6.869,1.098,Levante,1,1,3.238,attack_defense,,3106,9.363,1.0
+2026-09-18T1945Z,,5-4-1,48.66,Einar Galilea,defensa,DEF,80,read,ok,1,5743061,4.841,0,4.524,1.415,Getafe,0,4,3.422,attack_defense,,3174,10.728,4.2
+2026-09-18T1945Z,,5-4-1,48.66,Kiko Femenia,defensa,DEF,0,read,injured,0,1928442,0.000,0,4.246,1.139,Malaga,1,2,0.000,value,,3178,4.982,29.5
+2026-09-18T1945Z,,5-4-1,48.66,Alex Berenguer,delantero,DEL,50,read,ok,0,11427883,2.722,0,5.519,1.011,Alaves,1,3,2.694,attack_defense,,3204,8.836,33.8
+2026-09-18T1945Z,,5-4-1,48.66,Kike Barja,delantero,DEL,70,read,ok,0,1544956,2.109,0,3.933,0.985,Rayo Vallecano,1,2,2.141,attack_defense,,3206,6.010,29.0
+2026-09-18T1945Z,,5-4-1,48.66,Marc Roca,mediocampista,MED,80,read,ok,0,14342418,3.643,0,5.486,0.918,Deportivo La Coruna,0,4,3.971,value,,3215,10.425,32.7
+2026-09-18T1945Z,,5-4-1,48.66,Marc Bartra,defensa,DEF,90,read,ok,0,38849206,4.391,0,6.217,0.918,Deportivo La Coruna,0,4,4.786,value,,322,11.938,28.6
+2026-09-18T1945Z,,5-4-1,48.66,Mariano Diaz,delantero,DEL,50,read,ok,0,19517425,2.252,0,5.827,0.785,Athletic Club,0,3,2.867,attack_defense,,3226,8.753,12.9
+2026-09-18T1945Z,,5-4-1,48.66,Diego Rico,defensa,DEF,40,read,ok,0,2193323,0.980,0,2.736,1.355,Rayo Vallecano,1,0,0.723,attack_defense,,3235,3.098,28.5
+2026-09-18T1945Z,,5-4-1,48.66,Aaron Martin,defensa,DEF,10,read,ok,1,2458692,0.563,0,3.567,0.959,Celta Vigo,0,1,0.587,attack_defense,,3246,4.410,1.0
+2026-09-18T1945Z,,5-4-1,48.66,Ivan Villar,portero,POR,0,read,ok,1,568624,0.000,0,6.227,1.112,Racing Santander,1,0,0.000,value,,3255,0.000,0.0
+2026-09-18T1945Z,,5-4-1,48.66,Isco Alarcon,mediocampista,MED,50,read,ok,0,37606039,2.287,0,5.269,0.918,Deportivo La Coruna,0,3,2.493,value,,336,7.965,10.6
+2026-09-18T1945Z,,5-4-1,48.66,Juanmi Jimenez,delantero,DEL,0,read,injured,0,463633,0.000,0,3.302,1.139,Malaga,1,0,0.000,value,,340,0.000,8.0
+2026-09-18T1945Z,,5-4-1,48.66,Pierre-Emerick Aubameyang,delantero,DEL,80,read,ok,1,100846420,5.035,0,5.910,0.967,Real Betis,1,6,5.206,attack_defense,,3414,14.199,5.9
+2026-09-18T1945Z,,5-4-1,48.66,Thomas Lemar,mediocampista,MED,50,read,ok,0,3958563,2.390,0,5.246,1.000,,,1,2.390,none,,3427,8.047,28.0
+2026-09-18T1945Z,,5-4-1,48.66,Kylian Mbappe,delantero,DEL,95,read,ok,0,145387113,7.803,0,10.900,0.737,Atletico Madrid,0,6,10.589,attack_defense,,3429,24.808,37.0
+2026-09-18T1945Z,,5-4-1,48.66,Bernardo Silva,mediocampista,MED,40,read,ok,1,39635968,1.426,0,4.346,0.737,Atletico Madrid,0,3,1.935,attack_defense,,3431,6.363,3.0
+2026-09-18T1945Z,,5-4-1,48.66,Dominik Livakovic,portero,POR,40,read,ok,1,2379176,2.705,0,6.227,1.086,Sevilla,0,0,2.491,attack_defense,,3589,7.687,0.0
+2026-09-18T1945Z,,5-4-1,48.66,Angeliño,defensa,DEF,0,read,suspended,1,7750864,0.000,0,2.337,0.968,Real Betis,1,1,0.000,attack_defense,,3605,1.858,0.6
+2026-09-18T1945Z,,5-4-1,48.66,Mouctar Diakhaby,defensa,DEF,0,read,injured,0,3045633,0.000,0,3.809,1.097,Real Sociedad,1,3,0.000,attack_defense,,3607,5.140,11.2
+2026-09-18T1945Z,,5-4-1,48.66,Alvaro Fernandez,portero,POR,5,read,ok,1,1928557,0.211,0,4.359,0.968,Real Betis,1,0,0.218,attack_defense,,3612,0.647,0.0
+2026-09-18T1945Z,,5-4-1,48.66,Pedro Diaz,mediocampista,MED,50,read,ok,0,1163852,1.873,0,3.549,1.019,Osasuna,0,3,1.839,attack_defense,,3623,6.018,37.3
+2026-09-18T1945Z,,5-4-1,48.66,Asier Villalibre,delantero,DEL,10,read,ok,1,3730914,0.968,0,4.177,1.007,Celta Vigo,0,2,0.961,attack_defense,,3671,5.349,2.4
+2026-09-18T1945Z,,5-4-1,48.66,Alvaro Valles,portero,POR,70,read,ok,0,52155542,6.369,0,9.168,0.918,Deportivo La Coruna,0,5,6.941,value,,3686,19.361,33.0
+2026-09-18T1945Z,,5-4-1,48.66,Unai Simon,portero,POR,95,read,ok,0,49157864,7.474,0,6.490,1.280,Alaves,1,5,5.841,attack_defense,,3693,16.671,42.0
+2026-09-18T1945Z,,5-4-1,48.66,Giovani Lo Celso,mediocampista,MED,20,read,ok,0,14005158,0.847,0,4.950,0.918,Deportivo La Coruna,0,0,0.923,value,,3717,6.345,24.1
+2026-09-18T1945Z,,5-4-1,48.66,Gabriel Jesus,delantero,DEL,20,read,ok,1,25865751,1.022,0,5.485,1.048,Sevilla,0,0,0.975,attack_defense,,3724,6.284,0.4
+2026-09-18T1945Z,,5-4-1,48.66,Daniel Raba,delantero,DEL,30,read,ok,0,743916,0.648,0,3.561,1.019,Real Sociedad,1,0,0.636,attack_defense,,3732,3.201,13.1
+2026-09-18T1945Z,,5-4-1,48.66,Jon Guridi,mediocampista,MED,40,read,ok,0,6675564,1.592,0,3.950,0.811,Barcelona,1,4,1.962,attack_defense,,3736,6.487,31.8
+2026-09-18T1945Z,,5-4-1,48.66,Edu Exposito,mediocampista,MED,80,read,ok,0,32212328,5.002,0,6.060,1.000,,,5,5.002,none,,3738,13.724,41.2
+2026-09-18T1945Z,,5-4-1,48.66,Enes Unal,delantero,DEL,80,read,ok,1,17048783,3.465,0,3.909,1.139,Malaga,1,4,3.043,value,,3751,8.725,4.5
+2026-09-18T1945Z,,5-4-1,48.66,Federico Valverde,mediocampista,MED,95,read,ok,0,64862479,4.340,0,6.419,0.737,Atletico Madrid,0,5,5.889,attack_defense,,3758,13.660,38.2
+2026-09-18T1945Z,,5-4-1,48.66,Marko Dmitrovic,portero,POR,95,read,ok,0,41201855,6.614,0,6.809,1.000,,,6,6.614,none,,3759,17.236,43.0
+2026-09-18T1945Z,,5-4-1,48.66,Unai Nuñez,defensa,DEF,70,read,ok,0,10060197,2.849,0,4.179,1.000,,,4,2.849,none,,3785,8.140,16.9
+2026-09-18T1945Z,,5-4-1,48.66,Andoni Gorosabel,defensa,DEF,30,read,ok,0,1052060,0.873,0,2.911,1.000,,,0,0.873,none,,3799,2.620,24.0
+2026-09-18T1945Z,,5-4-1,48.66,Ander Guevara,mediocampista,MED,40,read,ok,0,606719,0.602,0,3.285,0.785,Athletic Club,0,0,0.767,attack_defense,,3802,2.943,25.1
+2026-09-18T1945Z,,5-4-1,48.66,Javi Puado,mediocampista,MED,0,read,injured,0,2440684,0.000,0,4.164,1.000,,,0,0.000,none,,3807,0.000,10.0
+2026-09-18T1945Z,,5-4-1,48.66,Manu Hernando,defensa,DEF,20,read,ok,1,2351565,1.363,0,3.318,0.959,Celta Vigo,0,4,1.422,attack_defense,,3836,5.781,4.4
+2026-09-18T1945Z,,5-4-1,48.66,Pol Lozano,mediocampista,MED,30,read,ok,0,1029838,0.710,0,3.467,1.000,,,0,0.710,none,,3879,3.378,33.5
+2026-09-18T1945Z,,5-4-1,48.66,Ximo Navarro,defensa,DEF,80,read,ok,1,4752347,2.193,0,2.804,0.968,Real Betis,1,5,2.265,attack_defense,,392,6.131,4.9
+2026-09-18T1945Z,,5-4-1,48.66,Pedro Bigas,defensa,DEF,40,read,ok,0,2162325,1.437,0,4.033,1.000,,,2,1.437,none,,404,5.302,29.8
+2026-09-18T1945Z,,5-4-1,48.66,Marcao,defensa,DEF,0,read,ok,0,478115,0.000,0,3.769,0.550,Barcelona,1,0,0.000,attack_defense,,4208,0.000,13.0
+2026-09-18T1945Z,,5-4-1,48.66,Raphinha,delantero,DEL,70,read,ok,0,141435461,8.308,0,10.208,1.048,Sevilla,0,5,7.924,attack_defense,,4288,23.163,27.3
+2026-09-18T1945Z,,5-4-1,48.66,Iñigo Ruiz de Galarreta,mediocampista,MED,70,read,ok,0,16540590,3.143,0,5.606,1.011,Alaves,1,2,3.110,attack_defense,,44,8.818,36.2
+2026-09-18T1945Z,,5-4-1,48.66,Ademola Lookman,delantero,DEL,50,read,ok,0,47341186,2.135,0,4.971,0.682,Real Madrid,1,5,3.133,attack_defense,,4434,9.053,16.8
+2026-09-18T1945Z,,5-4-1,48.66,Trent Alexander-Arnold,defensa,DEF,30,read,ok,0,21514616,1.405,0,5.709,0.721,Atletico Madrid,0,2,1.948,attack_defense,,4480,7.357,23.4
+2026-09-18T1945Z,,5-4-1,48.66,Ayoze Perez,delantero,DEL,30,read,ok,0,15177499,2.485,0,5.665,1.268,Levante,1,2,1.960,attack_defense,,4511,8.445,27.4
+2026-09-18T1945Z,,5-4-1,48.66,Junior Firpo,defensa,DEF,20,read,ok,0,1482923,0.650,0,4.102,0.918,Deportivo La Coruna,0,1,0.708,value,,4620,4.161,12.6
+2026-09-18T1945Z,,5-4-1,48.66,Juan Foyth,defensa,DEF,30,read,doubt,0,12575768,1.289,0,4.784,1.098,Levante,1,3,1.174,attack_defense,,4705,8.178,16.0
+2026-09-18T1945Z,,5-4-1,48.66,Ibrahima Konate,defensa,DEF,50,read,ok,1,39275152,1.789,0,3.857,0.721,Atletico Madrid,0,5,2.480,attack_defense,,4884,7.255,5.0
+2026-09-18T1945Z,,5-4-1,48.66,Jeremy Toljan,defensa,DEF,30,read,ok,0,1949088,0.717,0,2.997,0.713,Villarreal,0,2,1.007,attack_defense,,4976,3.893,39.0
+2026-09-18T1945Z,,5-4-1,48.66,Marc Cucurella,defensa,DEF,80,read,ok,1,55122937,2.367,0,4.508,0.721,Atletico Madrid,0,4,3.281,attack_defense,,5013,7.975,3.8
+2026-09-18T1945Z,,5-4-1,48.66,Hugo Duro,delantero,DEL,70,read,ok,0,4892112,2.155,0,3.906,1.019,Real Sociedad,1,2,2.114,attack_defense,,5019,6.004,38.0
+2026-09-18T1945Z,,5-4-1,48.66,Bambo Diaby,defensa,DEF,0,read,ok,0,593901,0.000,0,3.012,1.000,,,0,0.000,none,,5022,0.000,4.0
+2026-09-18T1945Z,,5-4-1,48.66,Toni Martinez,delantero,DEL,50,read,ok,0,18238141,2.471,0,5.390,0.785,Athletic Club,0,4,3.147,attack_defense,,5032,9.528,40.6
+2026-09-18T1945Z,,5-4-1,48.66,Brahim Diaz,mediocampista,MED,30,read,ok,0,7697844,0.909,0,4.920,0.737,Atletico Madrid,0,1,1.234,attack_defense,,5035,5.149,31.1
+2026-09-18T1945Z,,5-4-1,48.66,Aitor Ruibal,delantero,DEL,0,read,injured,0,926287,0.000,0,4.652,0.918,Deportivo La Coruna,0,0,0.000,value,,5051,0.000,27.0
+2026-09-18T1945Z,,5-4-1,48.66,Cristian Rivero,portero,POR,0,read,ok,1,441987,0.000,0,6.227,1.097,Real Sociedad,1,0,0.000,attack_defense,,5080,0.000,0.0
+2026-09-18T1945Z,,5-4-1,48.66,Abdel Abqar,defensa,DEF,10,read,doubt,0,3726844,0.387,0,3.775,1.139,Malaga,1,1,0.340,value,,5083,4.856,24.0
+2026-09-18T1945Z,,5-4-1,48.66,Lucas Boye,delantero,DEL,70,read,ok,0,29319793,3.100,0,5.464,0.785,Athletic Club,0,5,3.947,attack_defense,,5124,10.462,33.5
+2026-09-18T1945Z,,5-4-1,48.66,Alexander Sorloth,delantero,DEL,0,read,doubt,0,8982513,0.000,0,4.461,0.682,Real Madrid,1,0,0.000,attack_defense,,5134,0.000,35.0
+2026-09-18T1945Z,,5-4-1,48.66,Grady Diangana,delantero,DEL,30,read,ok,0,620369,0.887,0,2.958,1.000,,,0,0.887,none,,5194,2.662,20.0
+2026-09-18T1945Z,,5-4-1,48.66,Gonzalo Villar,mediocampista,MED,70,read,ok,0,10136727,3.061,0,3.800,1.000,,,6,3.061,none,,5227,8.815,17.7
+2026-09-18T1945Z,,5-4-1,48.66,Mujaid Sadick,defensa,DEF,50,read,ok,1,3461370,2.055,0,4.313,1.082,Osasuna,0,1,1.899,attack_defense,,5228,6.575,0.8
+2026-09-18T1945Z,,5-4-1,48.66,Dani Vivian,defensa,DEF,0,read,injured,0,4068619,0.000,0,4.029,1.280,Alaves,1,0,0.000,attack_defense,,5245,0.000,31.0
+2026-09-18T1945Z,,5-4-1,48.66,Andriy Lunin,portero,POR,5,read,ok,0,1203291,0.229,0,6.344,0.721,Atletico Madrid,0,0,0.317,attack_defense,,5526,0.863,6.0
+2026-09-18T1945Z,,5-4-1,48.66,Cucho Hernandez,delantero,DEL,70,read,ok,0,34575821,3.885,0,6.373,0.918,Deportivo La Coruna,0,4,4.234,value,,5546,11.733,35.7
+2026-09-18T1945Z,,5-4-1,48.66,Santi Comesaña,mediocampista,MED,0,read,injured,0,16043109,0.000,0,4.475,1.268,Levante,1,4,0.000,attack_defense,,5549,5.404,37.5
+2026-09-18T1945Z,,5-4-1,48.66,Fernando Calero,defensa,DEF,10,read,doubt,0,1098960,0.303,0,4.282,1.415,Getafe,0,0,0.214,attack_defense,,5553,1.159,28.0
+2026-09-18T1945Z,,5-4-1,48.66,Vinicius Junior,delantero,DEL,95,read,ok,0,104562268,5.368,0,7.700,0.737,Atletico Madrid,0,6,7.284,attack_defense,,5565,16.989,41.6
+2026-09-18T1945Z,,5-4-1,48.66,Adria Pedrosa,defensa,DEF,70,read,ok,0,2494110,2.569,0,3.157,1.082,Osasuna,0,3,2.374,attack_defense,,5587,6.958,30.4
+2026-09-18T1945Z,,5-4-1,48.66,Juan Berrocal,defensa,DEF,30,read,ok,1,753560,1.468,0,4.244,1.415,Getafe,0,0,1.037,attack_defense,,5671,5.682,0.0
+2026-09-18T1945Z,,5-4-1,48.66,Luiz Felipe,defensa,DEF,0,read,doubt,0,1390280,0.000,0,3.841,1.082,Osasuna,0,0,0.000,attack_defense,,5705,0.000,10.0
+2026-09-18T1945Z,,5-4-1,48.66,Leandro Cabrera,defensa,DEF,80,read,ok,0,11364651,4.171,0,4.881,1.000,,,3,4.171,none,,582,11.200,40.0
+2026-09-18T1945Z,,5-4-1,48.66,Gorka Guruzeta,delantero,DEL,20,read,ok,0,7937860,1.139,0,4.096,1.011,Alaves,1,2,1.127,attack_defense,,5859,5.486,37.0
+2026-09-18T1945Z,,5-4-1,48.66,Thibaut Courtois,portero,POR,95,read,ok,0,61297418,4.473,0,6.383,0.721,Atletico Madrid,0,6,6.201,attack_defense,,59,14.431,38.0
+2026-09-18T1945Z,,5-4-1,48.66,Juan Musso,portero,POR,5,read,ok,0,2006659,0.199,0,6.114,0.652,Real Madrid,1,0,0.306,attack_defense,,5942,0.811,8.0
+2026-09-18T1945Z,,5-4-1,48.66,Ionut Radu,portero,POR,90,read,ok,0,41796629,7.104,0,6.774,1.112,Racing Santander,1,6,6.387,value,,5978,17.672,44.0
+2026-09-18T1945Z,,5-4-1,48.66,David Hancko,defensa,DEF,80,read,ok,0,39156948,3.067,0,5.742,0.652,Real Madrid,1,5,4.703,attack_defense,,5995,11.260,35.1
+2026-09-18T1945Z,,5-4-1,48.66,Robin Le Normand,defensa,DEF,40,read,ok,0,9485770,1.708,0,5.644,0.652,Real Madrid,1,3,2.619,attack_defense,,6002,8.441,30.8
+2026-09-18T1945Z,,5-4-1,48.66,Joaquin Muñoz,delantero,DEL,70,read,ok,1,4262184,2.360,0,4.529,0.827,Getafe,0,3,2.854,attack_defense,,6050,7.629,3.2
+2026-09-18T1945Z,,5-4-1,48.66,Denzel Dumfries,defensa,DEF,70,read,ok,1,32001325,1.926,0,4.072,0.721,Atletico Madrid,0,4,2.669,attack_defense,,6055,6.869,3.6
+2026-09-18T1945Z,,5-4-1,48.66,Eder Militao,defensa,DEF,0,read,injured,0,4963429,0.000,0,5.673,0.721,Atletico Madrid,0,0,0.000,attack_defense,,6062,0.000,16.0
+2026-09-18T1945Z,,5-4-1,48.66,Ferland Mendy,defensa,DEF,0,read,injured,0,504785,0.000,0,3.626,0.721,Atletico Madrid,0,0,0.000,attack_defense,,6158,0.000,5.0
+2026-09-18T1945Z,,5-4-1,48.66,Arnaut Danjuma,delantero,DEL,50,read,ok,0,4482051,2.600,0,4.034,1.019,Real Sociedad,1,5,2.552,attack_defense,,6174,8.234,34.9
+2026-09-18T1945Z,,5-4-1,48.66,Sergio Gomez,defensa,DEF,60,read,ok,0,16724742,3.550,0,4.014,1.169,Valencia,0,6,3.036,attack_defense,,6180,9.692,40.8
+2026-09-18T1945Z,,5-4-1,48.66,Frenkie de Jong,mediocampista,MED,0,read,injured,0,9629276,0.000,0,5.059,1.048,Sevilla,0,0,0.000,attack_defense,,6210,0.000,25.0
+2026-09-18T1945Z,,5-4-1,48.66,Odysseas Vlachodimos,portero,POR,95,read,ok,0,30350168,3.129,0,5.855,0.550,Barcelona,1,6,5.687,attack_defense,,6235,12.262,39.0
+2026-09-18T1945Z,,5-4-1,48.66,Koke Resurreccion,mediocampista,MED,50,read,ok,0,16386572,2.011,0,5.516,0.682,Real Madrid,1,3,2.951,attack_defense,,63,8.637,37.5
+2026-09-18T1945Z,,5-4-1,48.66,Cristian Romero,defensa,DEF,70,read,ok,1,32862771,2.326,0,5.559,0.652,Real Madrid,1,2,3.567,attack_defense,,6310,8.830,2.1
+2026-09-18T1945Z,,5-4-1,48.66,Kang-In Lee,mediocampista,MED,50,read,ok,1,60752207,2.422,0,6.077,0.682,Real Madrid,1,4,3.554,attack_defense,,6337,10.330,4.2
+2026-09-18T1945Z,,5-4-1,48.66,Adrian de La Fuente,defensa,DEF,70,read,ok,0,19490220,2.819,0,4.956,0.713,Villarreal,0,5,3.956,attack_defense,,6346,10.213,37.8
+2026-09-18T1945Z,,5-4-1,48.66,Ander Barrenetxea,mediocampista,MED,30,read,ok,0,20606687,2.084,0,5.324,0.983,Valencia,0,3,2.121,attack_defense,,6363,8.244,33.2
+2026-09-18T1945Z,,5-4-1,48.66,Fran Garcia,defensa,DEF,80,read,ok,0,30432459,3.271,0,4.641,0.918,Deportivo La Coruna,0,4,3.565,value,,6392,9.421,17.4
+2026-09-18T1945Z,,5-4-1,48.66,Alvaro Fidalgo,mediocampista,MED,20,read,ok,0,1206867,0.533,0,4.184,0.918,Deportivo La Coruna,0,0,0.581,value,,6393,3.680,9.3
+2026-09-18T1945Z,,5-4-1,48.66,Aihen Muñoz,defensa,DEF,40,read,ok,0,701921,0.827,0,2.902,1.169,Valencia,0,0,0.707,attack_defense,,6394,2.955,21.2
+2026-09-18T1945Z,,5-4-1,48.66,Yangel Herrera,mediocampista,MED,50,read,ok,0,5044645,1.865,0,3.240,0.983,Valencia,0,4,1.898,attack_defense,,6446,6.086,18.2
+2026-09-18T1945Z,,5-4-1,48.66,Rodrigo Riquelme,mediocampista,MED,50,read,ok,0,18325574,2.427,0,5.240,0.918,Deportivo La Coruna,0,3,2.645,value,,6450,8.405,28.1
+2026-09-18T1945Z,,5-4-1,48.66,Javi Galan,defensa,DEF,70,read,ok,0,7728585,2.843,0,4.549,1.112,Racing Santander,1,2,2.556,value,,6487,7.513,27.3
+2026-09-18T1945Z,,5-4-1,48.66,Alejandro Catena,defensa,DEF,70,read,ok,0,32613572,5.148,0,5.016,1.355,Rayo Vallecano,1,5,3.798,attack_defense,,6493,12.257,40.0
+2026-09-18T1945Z,,5-4-1,48.66,Andrei Ratiu,defensa,DEF,70,read,ok,0,23514668,3.817,0,4.659,1.082,Osasuna,0,5,3.527,attack_defense,,6560,10.419,40.0
+2026-09-18T1945Z,,5-4-1,48.66,Sergio Camello,delantero,DEL,70,read,ok,0,20179398,4.282,0,5.886,1.019,Osasuna,0,4,4.204,attack_defense,,6562,12.118,26.4
+2026-09-18T1945Z,,5-4-1,48.66,Ivan Martin,mediocampista,MED,90,read,ok,0,7768116,3.362,0,4.058,1.007,Celta Vigo,0,4,3.340,attack_defense,,6563,8.618,38.5
+2026-09-18T1945Z,,5-4-1,48.66,Harvey Elliott,mediocampista,MED,30,read,ok,1,12708791,1.161,0,4.001,1.019,Real Sociedad,1,1,1.140,attack_defense,,6580,5.274,0.7
+2026-09-18T1945Z,,5-4-1,48.66,Ruben Garcia,mediocampista,MED,80,read,ok,0,14013623,3.534,0,5.167,0.985,Rayo Vallecano,1,3,3.588,attack_defense,,660,9.618,38.3
+2026-09-18T1945Z,,5-4-1,48.66,Manu Sanchez,defensa,DEF,80,read,ok,0,5426232,2.135,0,3.484,0.713,Villarreal,0,5,2.996,attack_defense,,6605,7.333,37.8
+2026-09-18T1945Z,,5-4-1,48.66,Sergio Herrera,portero,POR,50,read,ok,0,32617497,4.721,0,5.418,1.355,Rayo Vallecano,1,5,3.483,attack_defense,,6611,12.399,42.0
+2026-09-18T1945Z,,5-4-1,48.66,Jose Gaya,defensa,DEF,60,read,ok,0,7498469,2.933,0,4.751,1.097,Real Sociedad,1,3,2.673,attack_defense,,663,8.361,35.1
+2026-09-18T1945Z,,5-4-1,48.66,Rodrygo Goes,delantero,DEL,0,read,injured,0,1589738,0.000,0,4.697,0.737,Atletico Madrid,0,0,0.000,attack_defense,,6631,0.000,19.0
+2026-09-18T1945Z,,5-4-1,48.66,Jorge de Frutos,delantero,DEL,70,read,ok,0,24825545,2.789,0,3.985,1.019,Osasuna,0,3,2.738,attack_defense,,6633,7.849,39.3
+2026-09-18T1945Z,,5-4-1,48.66,Ante Budimir,delantero,DEL,90,read,ok,0,61136303,5.417,0,6.532,0.985,Rayo Vallecano,1,5,5.500,attack_defense,,6635,14.289,41.6
+2026-09-18T1945Z,,5-4-1,48.66,Luis Rioja,mediocampista,MED,10,read,doubt,0,5438919,0.497,0,5.987,1.019,Real Sociedad,1,1,0.488,attack_defense,,6665,6.559,38.2
+2026-09-18T1945Z,,5-4-1,48.66,Jules Kounde,defensa,DEF,50,read,ok,0,27017543,2.521,0,5.476,1.086,Sevilla,0,2,2.321,attack_defense,,6674,7.882,31.9
+2026-09-18T1945Z,,5-4-1,48.66,Eneko Jauregi,delantero,DEL,10,read,ok,1,658606,0.259,0,4.411,0.827,Getafe,0,0,0.313,attack_defense,,6814,3.681,0.1
+2026-09-18T1945Z,,5-4-1,48.66,Randy Nteka,delantero,DEL,20,read,doubt,0,937224,0.560,0,3.984,1.019,Osasuna,0,2,0.550,attack_defense,,6853,4.963,14.7
+2026-09-18T1945Z,,5-4-1,48.66,Tete Morente,delantero,DEL,50,read,ok,0,2529071,2.964,0,5.026,1.000,,,4,2.964,none,,6882,9.553,17.3
+2026-09-18T1945Z,,5-4-1,48.66,Aleix Febas,mediocampista,MED,70,read,ok,0,14224119,3.551,0,4.718,1.112,Racing Santander,1,2,3.193,value,,6885,9.354,37.8
+2026-09-18T1945Z,,5-4-1,48.66,Oscar Valentin,mediocampista,MED,50,read,ok,0,3373233,2.208,0,4.058,1.019,Osasuna,0,3,2.167,attack_defense,,6889,7.076,36.5
+2026-09-18T1945Z,,5-4-1,48.66,Andres Martin,delantero,DEL,0,read,injured,1,12107611,0.000,0,4.987,1.007,Celta Vigo,0,3,0.000,attack_defense,,6890,6.858,2.6
+2026-09-18T1945Z,,5-4-1,48.66,Isi Palazon,delantero,DEL,0,read,injured,0,9258933,0.000,0,4.584,1.019,Osasuna,0,1,0.000,attack_defense,,6957,5.316,31.9
+2026-09-18T1945Z,,5-4-1,48.66,Aymeric Laporte,defensa,DEF,80,read,ok,0,42522760,4.813,0,4.891,1.280,Alaves,1,4,3.762,attack_defense,,697,11.303,29.4
+2026-09-18T1945Z,,5-4-1,48.66,Alfonso Herrero,portero,POR,90,read,ok,1,17632177,7.476,0,6.063,1.415,Getafe,0,5,5.283,attack_defense,,6973,16.068,5.0
+2026-09-18T1945Z,,5-4-1,48.66,German Parreño,portero,POR,0,read,ok,1,468907,0.000,0,4.359,0.968,Real Betis,1,0,0.000,attack_defense,,698,0.000,0.0
+2026-09-18T1945Z,,5-4-1,48.66,Oihan Sancet,mediocampista,MED,90,read,ok,0,44264145,4.201,0,4.885,1.011,Alaves,1,5,4.156,attack_defense,,7006,10.922,32.7
+2026-09-18T1945Z,,5-4-1,48.66,Raul Garcia,delantero,DEL,30,read,ok,0,1499577,1.746,0,4.026,0.985,Rayo Vallecano,1,4,1.773,attack_defense,,7027,6.742,39.8
+2026-09-18T1945Z,,5-4-1,48.66,Nemanja Gudelj,mediocampista,MED,70,read,ok,0,6215411,3.099,0,4.205,1.139,Malaga,1,2,2.722,value,,7028,8.065,36.2
+2026-09-18T1945Z,,5-4-1,48.66,Diego Javier Llorente,defensa,DEF,20,read,doubt,0,8478921,0.580,0,5.434,0.918,Deportivo La Coruna,0,1,0.632,value,,707,5.881,19.4
+2026-09-18T1945Z,,5-4-1,48.66,Fernando Niño,delantero,DEL,60,read,ok,1,12037717,3.444,0,5.173,1.000,,,5,3.444,none,,7081,10.422,4.5
+2026-09-18T1945Z,,5-4-1,48.66,Jorge Herrando,defensa,DEF,0,read,injured,0,1410572,0.000,0,4.213,1.355,Rayo Vallecano,1,2,0.000,attack_defense,,7082,5.343,30.1
+2026-09-18T1945Z,,5-4-1,48.66,Takefusa Kubo,mediocampista,MED,50,read,ok,0,19844958,2.200,0,4.847,0.983,Valencia,0,2,2.239,attack_defense,,7091,7.315,26.5
+2026-09-18T1945Z,,5-4-1,48.66,Marash Kumbulla,defensa,DEF,30,read,ok,0,2036683,0.875,0,2.696,1.082,Osasuna,0,0,0.809,attack_defense,,7100,2.493,8.0
+2026-09-18T1945Z,,5-4-1,48.66,Iker Losada,delantero,DEL,0,read,ok,0,1065806,0.000,0,3.607,0.918,Deportivo La Coruna,0,0,0.000,value,,7201,0.000,23.0
+2026-09-18T1945Z,,5-4-1,48.66,Aimar Oroz,mediocampista,MED,0,read,injured,0,8503884,0.000,0,4.170,0.985,Rayo Vallecano,1,2,0.000,attack_defense,,7203,4.994,32.7
+2026-09-18T1945Z,,5-4-1,48.66,Jon Moncayola,mediocampista,MED,90,read,ok,0,7420906,3.487,0,4.158,0.985,Rayo Vallecano,1,5,3.541,attack_defense,,7204,9.215,40.7
+2026-09-18T1945Z,,5-4-1,48.66,Nicolas Pepe,delantero,DEL,80,read,ok,0,60262889,7.109,0,7.172,1.268,Levante,1,5,5.607,attack_defense,,7209,16.806,40.5
+2026-09-18T1945Z,,5-4-1,48.66,Ivan Balliu,defensa,DEF,30,read,ok,0,615121,0.907,0,2.491,1.082,Osasuna,0,2,0.838,attack_defense,,7251,3.481,16.3
+2026-09-18T1945Z,,5-4-1,48.66,Pedri Gonzalez,mediocampista,MED,70,read,ok,0,94612676,6.001,0,7.881,1.048,Sevilla,0,5,5.723,attack_defense,,7257,16.682,33.6
+2026-09-18T1945Z,,5-4-1,48.66,Joan Garcia,portero,POR,0,read,injured,0,71850893,0.000,0,8.356,1.086,Sevilla,0,6,0.000,attack_defense,,7279,12.438,35.5
+2026-09-18T1945Z,,5-4-1,48.66,Robert Navarro,mediocampista,MED,60,read,ok,0,8918400,3.264,0,6.055,1.011,Alaves,1,3,3.229,attack_defense,,7293,9.826,34.7
+2026-09-18T1945Z,,5-4-1,48.66,Pathe Ciss,mediocampista,MED,70,read,ok,0,25182054,4.144,0,4.910,1.019,Osasuna,0,6,4.069,attack_defense,,7307,11.804,35.0
+2026-09-18T1945Z,,5-4-1,48.66,Riki Rodriguez,mediocampista,MED,40,read,ok,1,576644,1.000,0,2.831,0.967,Real Betis,1,2,1.034,attack_defense,,7309,3.763,1.9
+2026-09-18T1945Z,,5-4-1,48.66,Yuri Berchiche,defensa,DEF,80,read,ok,0,15168228,4.822,0,5.151,1.280,Alaves,1,3,3.768,attack_defense,,735,11.186,35.1
+2026-09-18T1945Z,,5-4-1,48.66,Eric Garcia,defensa,DEF,50,read,ok,0,45627573,3.732,0,5.874,1.086,Sevilla,0,4,3.436,attack_defense,,7542,11.376,38.2
+2026-09-18T1945Z,,5-4-1,48.66,Diego Conde,portero,POR,30,read,ok,1,1258948,1.714,0,6.227,0.918,Deportivo La Coruna,0,0,1.868,value,,7554,5.451,0.0
+2026-09-18T1945Z,,5-4-1,48.66,Dani Cardenas,portero,POR,20,read,ok,0,1295682,1.755,0,5.756,1.082,Osasuna,0,2,1.622,attack_defense,,7570,7.729,6.3
+2026-09-18T1945Z,,5-4-1,48.66,Troy Parrott,delantero,DEL,30,read,ok,1,20777134,1.492,0,6.506,0.918,Deportivo La Coruna,0,1,1.626,value,,7589,7.087,1.1
+2026-09-18T1945Z,,5-4-1,48.66,Anthony Gordon,delantero,DEL,50,read,ok,1,83191303,3.222,0,5.797,1.048,Sevilla,0,3,3.073,attack_defense,,7595,10.130,3.4
+2026-09-18T1945Z,,5-4-1,48.66,Pablo Martinez,mediocampista,MED,50,read,ok,0,4706921,2.195,0,5.618,0.827,Getafe,0,2,2.655,attack_defense,,7614,8.301,29.1
+2026-09-18T1945Z,,5-4-1,48.66,Ivan Romero,delantero,DEL,70,read,ok,0,6121221,4.172,0,5.758,1.036,Villarreal,0,3,4.025,attack_defense,,7629,11.621,35.5
+2026-09-18T1945Z,,5-4-1,48.66,Jesus Areso,defensa,DEF,70,read,ok,0,4270726,3.012,0,3.708,1.280,Alaves,1,3,2.354,attack_defense,,7638,7.361,29.3
+2026-09-18T1945Z,,5-4-1,48.66,Victor Garcia,defensa,DEF,30,read,ok,0,934617,0.869,0,3.456,0.713,Villarreal,0,2,1.220,attack_defense,,7644,4.649,23.2
+2026-09-18T1945Z,,5-4-1,48.66,Alex Baena,mediocampista,MED,70,read,ok,0,63033278,3.017,0,6.268,0.682,Real Madrid,1,4,4.427,attack_defense,,7645,11.263,31.3
+2026-09-18T1945Z,,5-4-1,48.66,German Valera,mediocampista,MED,70,read,ok,0,12991055,3.550,0,4.555,1.000,,,5,3.550,none,,7658,10.207,41.3
+2026-09-18T1945Z,,5-4-1,48.66,Guido Rodriguez,mediocampista,MED,70,read,ok,0,14630954,4.266,0,5.526,1.019,Real Sociedad,1,3,4.187,attack_defense,,7676,11.956,18.7
+2026-09-18T1945Z,,5-4-1,48.66,Julen Lobete,delantero,DEL,0,read,injured,1,515946,0.000,0,4.566,0.827,Getafe,0,0,0.000,attack_defense,,7686,4.140,0.1
+2026-09-18T1945Z,,5-4-1,48.66,Ramon Enriquez,mediocampista,MED,20,read,ok,1,528065,0.682,0,4.438,0.827,Getafe,0,1,0.824,attack_defense,,7703,4.435,1.0
+2026-09-18T1945Z,,5-4-1,48.66,Jon Pacheco,defensa,DEF,0,read,ok,0,1692163,0.085,0,3.737,1.169,Valencia,0,0,0.073,attack_defense,,7725,3.295,22.2
+2026-09-18T1945Z,,5-4-1,48.66,Jose Maria Gimenez,defensa,DEF,60,read,ok,0,9922934,2.933,0,5.407,0.968,Real Betis,1,3,3.029,attack_defense,,775,9.085,19.0
+2026-09-18T1945Z,,5-4-1,48.66,Giorgi Kochorashvili,mediocampista,MED,60,read,ok,1,6601971,1.924,0,5.036,0.811,Barcelona,1,1,2.372,attack_defense,,7786,6.760,1.3
+2026-09-18T1945Z,,5-4-1,48.66,Ferran Jutgla,delantero,DEL,50,read,ok,0,8619777,2.854,0,4.726,1.112,Racing Santander,1,4,2.566,value,,7842,8.606,33.6
+2026-09-18T1945Z,,5-4-1,48.66,Raul Moro,delantero,DEL,50,read,ok,0,7945785,1.741,0,4.465,0.985,Rayo Vallecano,1,2,1.768,attack_defense,,7870,5.864,15.5
+2026-09-18T1945Z,,5-4-1,48.66,Hugo Novoa,defensa,DEF,20,read,ok,1,554184,0.765,0,4.143,0.923,Athletic Club,0,0,0.829,attack_defense,,7902,2.422,0.0
+2026-09-18T1945Z,,5-4-1,48.66,Aitor Paredes,defensa,DEF,50,read,ok,0,12971003,3.345,0,5.798,1.280,Alaves,1,2,2.614,attack_defense,,7916,9.334,21.3
+2026-09-18T1945Z,,5-4-1,48.66,Beñat Prados,mediocampista,MED,10,read,ok,0,704945,0.394,0,3.895,1.011,Alaves,1,0,0.389,attack_defense,,7917,1.172,2.0
+2026-09-18T1945Z,,5-4-1,48.66,Nico Serrano,delantero,DEL,0,read,ok,0,543577,0.000,0,3.326,1.011,Alaves,1,0,0.000,attack_defense,,7920,0.000,16.0
+2026-09-18T1945Z,,5-4-1,48.66,Francho Serrano,mediocampista,MED,70,read,ok,1,2203770,3.241,0,4.495,1.139,Malaga,1,2,2.847,value,,7995,8.425,2.0
+2026-09-18T1945Z,,5-4-1,48.66,Miguel Rodriguez,delantero,DEL,30,read,ok,1,1205232,0.713,0,5.020,0.785,Athletic Club,0,0,0.908,attack_defense,,8080,4.338,0.1
+2026-09-18T1945Z,,5-4-1,48.66,Ilaix Moriba,mediocampista,MED,50,read,ok,0,7793171,2.746,0,4.083,1.112,Racing Santander,1,4,2.469,value,,8082,8.221,40.5
+2026-09-18T1945Z,,5-4-1,48.66,Oriol Rey,mediocampista,MED,80,read,ok,0,2279862,3.320,0,3.879,1.036,Villarreal,0,4,3.203,attack_defense,,8088,8.842,24.3
+2026-09-18T1945Z,,5-4-1,48.66,Felix Correia,delantero,DEL,50,read,ok,1,5560235,1.957,0,4.575,0.811,Barcelona,1,2,2.412,attack_defense,,8091,7.546,1.8
+2026-09-18T1945Z,,5-4-1,48.66,Urko Gonzalez de Zarate,mediocampista,MED,70,read,ok,0,4443462,2.633,0,3.690,1.000,,,4,2.633,none,,8228,7.540,40.4
+2026-09-18T1945Z,,5-4-1,48.66,Jose Salinas,defensa,DEF,50,read,ok,0,939898,1.844,0,2.808,1.415,Getafe,0,2,1.304,attack_defense,,8250,4.821,13.5
+2026-09-18T1945Z,,5-4-1,48.66,Victor Chust,defensa,DEF,70,read,ok,0,4374130,2.337,0,2.821,1.000,,,6,2.337,none,,8273,6.738,37.0
+2026-09-18T1945Z,,5-4-1,48.66,Aitor Fernandez,portero,POR,50,read,ok,0,460454,2.595,0,5.362,1.355,Rayo Vallecano,1,1,1.915,attack_defense,,829,7.130,3.0
+2026-09-18T1945Z,,5-4-1,48.66,Umar Sadiq,delantero,DEL,0,read,injured,0,3096377,0.000,0,4.718,1.019,Real Sociedad,1,2,0.000,attack_defense,,8294,5.746,26.8
+2026-09-18T1945Z,,5-4-1,48.66,Georgiy Tsitaishvili,delantero,DEL,40,read,ok,1,1292643,1.665,0,4.079,1.019,Osasuna,0,2,1.635,attack_defense,,8337,6.014,2.0
+2026-09-18T1945Z,,5-4-1,48.66,Jude Bellingham,mediocampista,MED,90,read,ok,0,121624909,5.739,0,8.978,0.737,Atletico Madrid,0,5,7.788,attack_defense,,8386,18.390,32.9
+2026-09-18T1945Z,,5-4-1,48.66,Luka Sucic,mediocampista,MED,80,read,ok,0,11260420,3.361,0,4.149,0.983,Valencia,0,5,3.421,attack_defense,,8392,9.326,27.1
+2026-09-18T1945Z,,5-4-1,48.66,Karim Adeyemi,delantero,DEL,50,read,ok,1,53236845,4.390,0,8.912,1.048,Sevilla,0,3,4.187,attack_defense,,8395,13.936,2.6
+2026-09-18T1945Z,,5-4-1,48.66,Antony,delantero,DEL,70,read,ok,0,56708181,4.582,0,7.191,0.918,Deportivo La Coruna,0,4,4.993,value,,8405,13.870,36.1
+2026-09-18T1945Z,,5-4-1,48.66,Moi Gomez,mediocampista,MED,0,read,injured,0,3324291,0.000,0,5.470,0.985,Rayo Vallecano,1,3,0.000,attack_defense,,841,6.896,28.6
+2026-09-18T1945Z,,5-4-1,48.66,Pape Gueye,mediocampista,MED,80,read,ok,0,32511138,6.105,0,6.319,1.268,Levante,1,4,4.815,attack_defense,,8413,14.398,34.3
+2026-09-18T1945Z,,5-4-1,48.66,Gerard Moreno,delantero,DEL,70,read,ok,0,38182312,5.783,0,7.406,1.268,Levante,1,3,4.561,attack_defense,,843,14.185,25.0
+2026-09-18T1945Z,,5-4-1,48.66,Eduardo Camavinga,mediocampista,MED,30,read,ok,0,8619432,1.157,0,4.518,0.737,Atletico Madrid,0,2,1.570,attack_defense,,8479,5.925,31.5
+2026-09-18T1945Z,,5-4-1,48.66,Romain del Castillo,delantero,DEL,50,read,ok,1,9362525,1.821,0,4.623,0.985,Rayo Vallecano,1,0,1.849,attack_defense,,8485,6.293,0.4
+2026-09-18T1945Z,,5-4-1,48.66,Martin Satriano,delantero,DEL,70,read,ok,0,19192186,3.893,0,4.735,1.139,Malaga,1,5,3.419,value,,8496,10.272,22.5
+2026-09-18T1945Z,,5-4-1,48.66,Florian Lejeune,defensa,DEF,80,read,ok,0,19933264,3.973,0,4.145,1.082,Osasuna,0,6,3.671,attack_defense,,863,10.439,42.0
+2026-09-18T1945Z,,5-4-1,48.66,Rafael Romero,portero,POR,,absent,ok,1,602257,0.718,0,6.227,0.550,Barcelona,1,0,1.305,attack_defense,,8634,3.329,0.0
+2026-09-18T1945Z,,5-4-1,48.66,Beñat Turrientes,mediocampista,MED,40,read,ok,0,7083565,1.753,0,4.126,0.983,Valencia,0,3,1.785,attack_defense,,8651,6.336,29.9
+2026-09-18T1945Z,,5-4-1,48.66,Alvaro Garcia,mediocampista,MED,,absent,ok,0,18171133,2.361,0,4.926,1.019,Osasuna,0,5,2.318,attack_defense,,867,9.279,36.9
+2026-09-18T1945Z,,5-4-1,48.66,Unai Marrero,portero,POR,30,read,ok,0,797973,1.906,0,6.710,1.169,Valencia,0,1,1.630,attack_defense,,8679,7.581,2.0
+2026-09-18T1945Z,,5-4-1,48.66,Jesus Vazquez,defensa,DEF,40,read,ok,0,1653637,1.685,0,3.081,1.097,Real Sociedad,1,4,1.536,attack_defense,,8684,5.513,27.8
+2026-09-18T1945Z,,5-4-1,48.66,Juan Iglesias,defensa,DEF,70,read,ok,0,14583300,2.231,0,4.894,0.550,Barcelona,1,6,4.055,attack_defense,,8686,9.865,43.0
+2026-09-18T1945Z,,5-4-1,48.66,Nico Williams,delantero,DEL,80,read,ok,0,56447056,4.476,0,6.565,1.011,Alaves,1,3,4.429,attack_defense,,8693,11.945,28.0
+2026-09-18T1945Z,,5-4-1,48.66,Boyomo,defensa,DEF,50,read,ok,0,14285276,2.209,0,3.660,1.355,Rayo Vallecano,1,2,1.629,attack_defense,,8695,5.949,32.2
+2026-09-18T1945Z,,5-4-1,48.66,Alfonso Gonzalez,delantero,DEL,30,read,ok,0,2206633,0.599,0,3.512,0.811,Barcelona,1,0,0.738,attack_defense,,8703,3.550,20.1
+2026-09-18T1945Z,,5-4-1,48.66,Mario Soriano,mediocampista,MED,80,read,ok,1,29452176,3.200,0,4.208,0.967,Real Betis,1,5,3.309,attack_defense,,8712,8.929,4.6
+2026-09-18T1945Z,,5-4-1,48.66,Antonio Blanco,mediocampista,MED,80,read,ok,0,19771168,2.910,0,4.299,0.785,Athletic Club,0,6,3.706,attack_defense,,8737,9.412,41.7
+2026-09-18T1945Z,,5-4-1,48.66,David Larrubia,mediocampista,MED,70,read,ok,1,25507592,2.181,0,3.696,0.827,Getafe,0,4,2.637,attack_defense,,8780,7.096,4.4
+2026-09-18T1945Z,,5-4-1,48.66,Ivan Azon,delantero,DEL,50,read,ok,1,4111513,2.418,0,4.641,1.139,Malaga,1,1,2.124,value,,8782,7.441,1.0
+2026-09-18T1945Z,,5-4-1,48.66,Ramon Terrats,mediocampista,MED,50,read,doubt,0,9078584,1.713,0,4.383,1.139,Malaga,1,5,1.504,value,,8944,8.350,34.0
+2026-09-18T1945Z,,5-4-1,48.66,Jon Ander Olasagasti,mediocampista,MED,90,read,ok,0,9468966,4.186,0,4.453,1.036,Villarreal,0,5,4.038,attack_defense,,8961,10.701,37.6
+2026-09-18T1945Z,,5-4-1,48.66,Pablo Ramon,defensa,DEF,90,read,ok,1,1998853,3.189,0,4.459,0.959,Celta Vigo,0,3,3.327,attack_defense,,8972,8.390,3.2
+2026-09-18T1945Z,,5-4-1,48.66,Eneko Ortiz,defensa,DEF,,absent,ok,1,1718986,0.953,0,4.143,1.098,Levante,1,0,0.868,attack_defense,,8986,2.690,0.0
+2026-09-18T1945Z,,5-4-1,48.66,Hugo Sotelo,mediocampista,MED,0,read,injured,0,824615,0.000,0,4.216,1.036,Villarreal,0,1,0.000,attack_defense,,8988,4.238,21.1
+2026-09-18T1945Z,,5-4-1,48.66,Johan Mojica,defensa,DEF,80,read,ok,0,14937654,3.408,0,4.029,1.139,Malaga,1,4,2.993,value,,899,8.542,39.0
+2026-09-18T1945Z,,5-4-1,48.66,Arsen Zakharyan,mediocampista,MED,0,read,ok,0,581347,0.022,0,2.814,0.983,Valencia,0,0,0.022,attack_defense,,9011,2.044,17.1
+2026-09-18T1945Z,,5-4-1,48.66,Altay Bayindir,portero,POR,10,read,ok,1,1071367,0.693,0,6.227,1.112,Racing Santander,1,0,0.623,value,,9012,1.938,0.0
+2026-09-18T1945Z,,5-4-1,48.66,Ruben Vargas,delantero,DEL,0,read,injured,0,9773599,0.000,0,5.151,0.811,Barcelona,1,0,0.000,attack_defense,,9125,0.000,24.0
+2026-09-18T1945Z,,5-4-1,48.66,Roger Brugue,delantero,DEL,70,read,ok,0,5016968,3.922,0,4.768,1.036,Villarreal,0,4,3.784,attack_defense,,9157,10.949,22.9
+2026-09-18T1945Z,,5-4-1,48.66,Matias Dituro,portero,POR,50,read,ok,0,9312717,3.307,0,4.630,1.000,,,6,3.307,none,,9161,10.530,28.0
+2026-09-18T1945Z,,5-4-1,48.66,Sergi Canos,delantero,DEL,0,read,injured,1,444753,0.000,0,4.354,1.019,Real Sociedad,1,0,0.000,attack_defense,,9201,0.000,0.0
+2026-09-18T1945Z,,5-4-1,48.66,Julen Agirrezabala,portero,POR,95,read,ok,0,20843717,5.875,0,6.309,0.959,Celta Vigo,0,6,6.129,attack_defense,,9213,15.718,24.0
+2026-09-18T1945Z,,5-4-1,48.66,Arnau Martinez,defensa,DEF,50,read,ok,0,9582945,2.488,0,4.075,1.097,Real Sociedad,1,3,2.268,attack_defense,,9218,7.649,37.7
+2026-09-18T1945Z,,5-4-1,48.66,Jose Manuel Copete,defensa,DEF,0,read,injured,0,803219,0.000,0,3.764,1.097,Real Sociedad,1,0,0.000,attack_defense,,9234,0.000,21.0
+2026-09-18T1945Z,,5-4-1,48.66,Pablo Gavi,mediocampista,MED,30,read,ok,0,15019083,1.009,0,3.583,1.048,Sevilla,0,1,0.962,attack_defense,,9273,4.438,11.8
+2026-09-18T1945Z,,5-4-1,48.66,Giuliano Simeone,delantero,DEL,50,read,ok,0,38386889,2.304,0,5.717,0.682,Real Madrid,1,4,3.380,attack_defense,,9276,9.815,35.3
+2026-09-18T1945Z,,5-4-1,48.66,Diego Lopez,delantero,DEL,0,read,injured,0,861545,0.000,0,3.710,1.019,Real Sociedad,1,0,0.000,attack_defense,,9304,0.000,34.0
+2026-09-18T1945Z,,5-4-1,48.66,Alejandro Balde,defensa,DEF,10,read,ok,0,11359603,0.360,0,4.561,1.086,Sevilla,0,0,0.331,attack_defense,,9316,3.913,28.1
+2026-09-18T1945Z,,5-4-1,48.66,Jose Angel Carmona,defensa,DEF,30,read,ok,0,1936698,0.380,0,3.363,0.550,Barcelona,1,0,0.691,attack_defense,,9317,2.974,35.5
+2026-09-18T1945Z,,5-4-1,48.66,Haitam Abaida,delantero,DEL,0,read,ok,1,423447,0.135,0,4.629,0.827,Getafe,0,0,0.164,attack_defense,,9321,4.603,0.4
+2026-09-18T1945Z,,5-4-1,48.66,Leo Roman,portero,POR,95,read,ok,0,36440485,5.168,0,5.494,0.968,Real Betis,1,6,5.337,attack_defense,,9405,13.738,39.0
+2026-09-18T1945Z,,5-4-1,48.66,Dimitri Foulquier,defensa,DEF,0,read,injured,0,930443,0.000,0,3.354,1.097,Real Sociedad,1,0,0.000,attack_defense,,943,0.000,15.0
+2026-09-18T1945Z,,5-4-1,48.66,Fabio Cardoso,defensa,DEF,0,read,ok,0,538348,0.000,0,4.429,0.550,Barcelona,1,0,0.000,attack_defense,,9500,0.000,4.0
+2026-09-18T1945Z,,5-4-1,48.66,Valentin Rosier,defensa,DEF,0,read,doubt,0,2058586,0.000,0,4.337,1.355,Rayo Vallecano,1,0,0.000,attack_defense,,9531,0.000,31.0
+2026-09-18T1945Z,,5-4-1,48.66,Jonathan David,delantero,DEL,70,read,ok,1,31596219,2.774,0,6.693,0.682,Real Madrid,1,1,4.070,attack_defense,,9573,10.086,1.1
+2026-09-18T1945Z,,5-4-1,48.66,Coke Carrillo,portero,POR,,absent,ok,1,1567556,1.452,0,6.227,1.112,Racing Santander,1,0,1.305,value,,9638,4.063,0.0
+2026-09-18T1945Z,,5-4-1,48.66,Aurelien Tchouameni,mediocampista,MED,50,read,ok,0,22155599,1.987,0,5.196,0.737,Atletico Madrid,0,1,2.696,attack_defense,,9669,8.335,34.2
+2026-09-18T1945Z,,5-4-1,48.66,Youssouf Fofana,mediocampista,MED,70,read,ok,1,14995864,2.703,0,4.706,0.811,Barcelona,1,2,3.332,attack_defense,,9670,8.786,2.2
+2026-09-18T1945Z,,5-4-1,48.66,Ruben Sanchez,defensa,DEF,40,read,ok,0,433627,1.169,0,3.550,1.000,,,0,1.169,none,,9695,4.618,21.4
+2026-09-18T1945Z,,5-4-1,48.66,Adama Traore,delantero,DEL,40,read,ok,1,14701927,1.221,0,3.229,0.967,Real Betis,1,1,1.262,attack_defense,,972,4.755,1.1
+2026-09-18T1945Z,,5-4-1,48.66,Hugo Alvarez,mediocampista,MED,40,read,ok,0,1832453,1.753,0,4.163,1.112,Racing Santander,1,2,1.576,value,,9740,5.928,30.1
+2026-09-18T1945Z,,5-4-1,48.66,Hugo Gonzalez,mediocampista,MED,70,read,ok,0,1618921,3.126,0,5.118,1.112,Racing Santander,1,2,2.811,value,,9744,8.250,3.1
+2026-09-18T1945Z,,5-4-1,48.66,Abde Ezzalzouli,delantero,DEL,50,read,ok,0,27916935,3.387,0,8.267,0.918,Deportivo La Coruna,0,1,3.691,value,,9750,12.151,29.9
+2026-09-18T1945Z,,5-4-1,48.66,Alejandro Iturbe,portero,POR,50,read,ok,1,531632,3.114,0,6.227,1.000,,,0,3.114,none,,9759,9.341,0.0
+2026-09-18T1945Z,,5-4-1,48.66,Cesar Tarrega,defensa,DEF,0,read,injured,0,8361736,0.000,0,4.288,1.097,Real Sociedad,1,4,0.000,attack_defense,,9762,5.665,35.7
+2026-09-18T1945Z,,5-4-1,48.66,Ilias Akhomach,delantero,DEL,20,read,ok,0,2373233,1.015,0,5.071,1.268,Levante,1,1,0.801,attack_defense,,9763,5.022,20.6
+2026-09-18T1945Z,,5-4-1,48.66,Luismi Cruz,delantero,DEL,60,read,ok,1,9996593,2.893,0,4.699,0.967,Real Betis,1,4,2.991,attack_defense,,9772,8.956,4.1
+2026-09-18T1945Z,,5-4-1,48.66,Bryan Zaragoza,delantero,DEL,50,read,ok,0,15653657,2.245,0,5.146,1.000,,,1,2.245,none,,9779,7.597,19.8
+2026-09-18T1945Z,,5-4-1,48.66,Marc Pubill,defensa,DEF,90,read,ok,0,42099901,2.849,0,5.470,0.652,Real Madrid,1,4,4.368,attack_defense,,9823,9.802,23.0
+2026-09-18T1945Z,,5-4-1,48.66,Jofre Carreras,delantero,DEL,0,read,injured,0,621366,0.000,0,3.465,1.000,,,0,0.000,none,,9850,2.741,26.2
+2026-09-18T1945Z,,5-4-1,48.66,Arnau Comas,defensa,DEF,0,read,ok,1,498567,0.000,0,2.900,0.968,Real Betis,1,0,0.000,attack_defense,,9854,0.000,0.0
+2026-09-18T1945Z,,5-4-1,48.66,Stole Dimitrievski,portero,POR,95,read,ok,0,20758023,6.315,0,5.925,1.097,Real Sociedad,1,6,5.756,attack_defense,,989,15.558,26.0
+2026-09-18T1945Z,,5-4-1,48.66,Adrian Rodriguez,portero,POR,5,read,ok,1,583623,0.287,0,6.227,0.923,Athletic Club,0,0,0.311,attack_defense,,9897,0.910,0.0
+2026-09-18T1945Z,,5-4-1,48.66,Nahuel Tenaglia,defensa,DEF,70,read,ok,0,34204372,4.038,0,5.517,0.923,Athletic Club,0,6,4.374,attack_defense,,9909,12.250,41.5
+2026-09-18T1945Z,,5-4-1,48.66,Javi Guerra,mediocampista,MED,80,read,ok,0,19417152,4.229,0,4.989,1.019,Real Sociedad,1,5,4.150,attack_defense,,9927,11.474,41.2
+2026-09-18T1945Z,,5-4-1,48.66,Juan Carlos Arana,delantero,DEL,10,read,ok,1,518824,0.449,0,4.191,1.007,Celta Vigo,0,1,0.446,attack_defense,,9930,3.807,0.7
+2026-09-18T1945Z,,5-4-1,48.66,Kike Salas,defensa,DEF,50,read,ok,0,9958892,1.825,0,4.811,0.550,Barcelona,1,5,3.319,attack_defense,,9931,9.144,31.0
+2026-09-18T1945Z,,5-4-1,48.66,Roberto Fernandez,delantero,DEL,80,read,ok,0,35665333,5.059,0,5.811,1.000,,,6,5.059,none,,9987,13.950,43.8
+2026-09-18T1945Z,,5-4-1,48.66,Sergi Cardona,defensa,DEF,30,read,ok,0,2097309,1.067,0,4.003,1.098,Levante,1,1,0.972,attack_defense,,9989,4.453,32.0
+2026-09-18T1945Z,,5-4-1,48.66,Alberto Moleiro,mediocampista,MED,50,read,ok,0,37965180,3.719,0,6.170,1.268,Levante,1,3,2.933,attack_defense,,9990,10.397,39.7
+2026-09-18T1945Z,,5-4-1,48.66,Iñigo Perez,entrenador,,,absent,ok,1,926290,1.136,0,4.275,1.268,Levante,1,0,0.896,attack_defense,,e100,2.929,0.0
+2026-09-18T1945Z,,5-4-1,48.66,Claudio Giraldez,entrenador,,,absent,ok,1,929089,0.997,0,4.275,1.112,Racing Santander,1,0,0.896,value,,e101,2.789,0.0
+2026-09-18T1945Z,,5-4-1,48.66,Hansi Flick,entrenador,,,absent,ok,1,4219224,0.940,0,4.275,1.048,Sevilla,0,0,0.896,attack_defense,,e103,2.732,0.0
+2026-09-18T1945Z,,5-4-1,48.66,Manolo Gonzalez,entrenador,,,absent,ok,1,605290,0.896,0,4.275,1.000,,,0,0.896,none,,e105,2.688,0.0
+2026-09-18T1945Z,,5-4-1,48.66,Quique Sanchez,entrenador,,,absent,ok,1,536599,0.704,0,4.275,0.785,Athletic Club,0,0,0.896,attack_defense,,e11,2.496,0.0
+2026-09-18T1945Z,,5-4-1,48.66,Luis Castro,entrenador,,,absent,ok,1,643171,0.929,0,4.275,1.036,Villarreal,0,0,0.896,attack_defense,,e119,2.721,0.0
+2026-09-18T1945Z,,5-4-1,48.66,Pellegrino Matarazzo,entrenador,,,absent,ok,1,1317852,0.881,0,4.275,0.983,Valencia,0,0,0.896,attack_defense,,e120,2.673,0.0
+2026-09-18T1945Z,,5-4-1,48.66,Luis Miguel Ramis,entrenador,,,absent,ok,1,687291,0.883,0,4.275,0.985,Rayo Vallecano,1,0,0.896,attack_defense,,e123,2.675,0.0
+2026-09-18T1945Z,,5-4-1,48.66,Jose Alberto Lopez,entrenador,,,absent,ok,1,563126,0.902,0,4.275,1.007,Celta Vigo,0,0,0.896,attack_defense,,e168,2.694,0.0
+2026-09-18T1945Z,,5-4-1,48.66,Edin Terzic,entrenador,,,absent,ok,1,2331542,0.906,0,4.275,1.011,Alaves,1,0,0.896,attack_defense,,e169,2.698,0.0
+2026-09-18T1945Z,,5-4-1,48.66,Antonio Hidalgo,entrenador,,,absent,ok,1,738188,0.607,0,2.993,0.967,Real Betis,1,0,0.627,attack_defense,,e170,1.861,0.0
+2026-09-18T1945Z,,5-4-1,48.66,Martin Anselmi,entrenador,,,absent,ok,1,733090,0.896,0,4.275,1.000,,,0,0.896,none,,e171,2.688,0.0
+2026-09-18T1945Z,,5-4-1,48.66,Juan Funes,entrenador,,,absent,ok,1,647110,0.741,0,4.275,0.827,Getafe,0,0,0.896,attack_defense,,e172,2.533,0.0
+2026-09-18T1945Z,,5-4-1,48.66,Beñat San Jose,entrenador,,,absent,ok,1,733090,0.913,0,4.275,1.019,Osasuna,0,0,0.896,attack_defense,,e173,2.705,0.0
+2026-09-18T1945Z,,5-4-1,48.66,Jose Mourinho,entrenador,,,absent,ok,1,4986793,0.660,0,4.275,0.737,Atletico Madrid,0,0,0.896,attack_defense,,e174,2.453,0.0
+2026-09-18T1945Z,,5-4-1,48.66,Pepe Bordalas,entrenador,,,absent,ok,1,11344420,1.020,0,4.275,1.139,Malaga,1,0,0.896,value,,e35,2.813,0.0
+2026-09-18T1945Z,,5-4-1,48.66,Diego Simeone,entrenador,,,absent,ok,1,1980496,0.611,0,4.275,0.682,Real Madrid,1,0,0.896,attack_defense,,e5,2.403,0.0
+2026-09-18T1945Z,,5-4-1,48.66,Luis Garcia,entrenador,,,absent,ok,1,536599,0.727,0,4.275,0.811,Barcelona,1,0,0.896,attack_defense,,e61,2.519,0.0
+2026-09-18T1945Z,,5-4-1,48.66,Manuel Pellegrini,entrenador,,,absent,ok,1,1474958,0.822,0,4.275,0.918,Deportivo La Coruna,0,0,0.896,value,,e72,2.615,0.0
