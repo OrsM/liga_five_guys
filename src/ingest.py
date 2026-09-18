@@ -412,9 +412,137 @@ def _log_feeds(stamp: str, timing: list, fails: dict) -> None:
 
 
 def parse() -> None:
+    """Rebuild the tidy tables from the snapshot archives.
+
+    THE WHOLE HISTORY, EVERY RUN, is the default and it is deliberate: a
+    parser's signature is part of its cache key, so fixing a parser
+    invalidates everything it ever produced and the next run re-derives the
+    season without anyone remembering to backfill. That property is worth
+    real money and it is why this is not simply incremental.
+
+    It is also why it cannot stay unconditional. Measured 2026-09-18 at
+    jornada 6 of 38: the cache alone is 368MB resident and holding every
+    table before writing any of them adds 476MB, for a peak of 872MB against
+    a 900MB MemoryMax -- already throttled on every run, and growing with
+    the archive. So the full walk now runs when it CAN change the answer,
+    and the tail alone when it provably cannot: same parser signatures, same
+    snapshots already folded in, and only new archives at the end. The one
+    case that needs the full walk is exactly the case that is detectable.
+    """
+    walk = doc_keys()
+    sigs_now = _parser_sigs(walk)
+    state = _load_parse_state()
+    stamps = [stamp for stamp, _ in walk]
+    routed = set(state.get("stamps") or ())
+    tail = [stamp for stamp in stamps if stamp not in routed]
+    settled = (routed and routed <= set(stamps)
+               and state.get("sigs") == sigs_now
+               and _tidy_has(state.get("tables") or ()))
+    if settled and not tail:
+        # Same parsers, same archives, and the tables were built from exactly
+        # these -- so a rebuild would reproduce what is already on disk, at
+        # 874MB and ten seconds, to change nothing. A run with no new
+        # snapshot is normally a re-run by hand; the daily path always has
+        # one, because fetch writes an archive every time.
+        print("  nothing new to parse (%d snapshots already folded in)"
+              % len(routed))
+        return
+    if settled and tail:
+        if _parse_tail(walk, tail, sigs_now, stamps, state):
+            return
+        print("  tail append declined — rebuilding in full")
+    _parse_everything(walk, sigs_now, stamps)
+
+
+def _parse_tail(walk, tail, sigs_now, stamps, state) -> bool:
+    """Fold ONLY the new snapshots into the tables that already exist.
+
+    Returns False rather than guessing whenever the append would not be
+    identical to a full rebuild -- an unparsed document, a table that has
+    grown a column, a table the state does not know about. The caller then
+    does the whole thing. A wrong "yes" here corrupts the season quietly,
+    so every doubt resolves to a rebuild.
+    """
+    tail_set = set(tail)
+    want: dict[tuple[str, str], str] = {}
+    keyed: list[tuple[str, str, object]] = []
+    for stamp, docs in walk:
+        if stamp not in tail_set:
+            continue
+        for key, (ck, origin) in sorted(docs.items()):
+            src = source_for(key)
+            if src is None or src.table == "points":
+                continue
+            pk = parse_key(ck, src)
+            keyed.append((stamp, pk, src))
+            want[(origin, key)] = pk
+
+    cache = _cache_lines(set(want.values()))
+    need: dict[str, set] = {}
+    for (origin, key), pk in want.items():
+        if pk not in cache:
+            need.setdefault(origin, set()).add(key)
+
+    fresh: dict = {}
+    keys = _Sigs()
+    for origin, key, html in documents(need):
+        src = source_for(key)
+        try:
+            rows = src.parse(html, origin, key)
+        except Exception as e:
+            print(f"  warn: {origin}/{key}: {type(e).__name__}: {e}")
+            rows = []
+        pk = parse_key(keys.of(key, html), src)
+        cache[pk] = rows
+        fresh[pk] = rows
+
+    pending: dict[str, list[dict]] = {}
+    for stamp, pk, src in keyed:
+        if pk not in cache:
+            return False          # never seen, never parsed -- rebuild
+        route(pending, cache[pk], src.table, stamp)
+
+    known = set(state.get("tables") or ())
+    if not set(pending) <= known:
+        return False              # a table the tables file has never seen
+
+    for table in sorted(pending):
+        if not _append_csv(TIDY / f"{table}.csv", pending[table],
+                           STORE_ONCE.get(table)):
+            return False
+
+    _append_cache_lines(fresh)
+    _save_parse_state({"sigs": sigs_now, "stamps": stamps,
+                       "tables": sorted(known)})
+    print("  tail: %d new snapshot(s), %d document(s) parsed, "
+          "%d row(s) appended"
+          % (len(tail), len(fresh), sum(len(v) for v in pending.values())))
+    return True
+
+
+def _parser_sigs(walk) -> dict[str, str]:
+    """Signature of every parser the archives currently depend on. This is
+    the guard: if one of these moves, the rows it produced are stale and the
+    only honest answer is to derive the lot again."""
+    out: dict[str, str] = {}
+    for _stamp, docs in walk:
+        for key in docs:
+            src = source_for(key)
+            if src is None or src.table == "points":
+                continue
+            name = getattr(src.parse, "__name__", "")
+            if name and name not in out:
+                out[name] = parser_sig(name)
+    return out
+
+
+def _tidy_has(tables) -> bool:
+    return bool(tables) and all((TIDY / f"{t}.csv").exists() for t in tables)
+
+
+def _parse_everything(walk, sigs_now, stamps) -> None:
     pending: dict[str, list[dict]] = {}
     cache, fresh = _parse_cache(), {}
-    walk = doc_keys()
     keys = _Sigs()
 
     need: dict[str, set] = {}
@@ -462,11 +590,13 @@ def parse() -> None:
     starters_count = 0
     starters_matches: set = set()
 
+    written: list[str] = []
     for table in sorted(pending):
         rows = pending.pop(table)
         if table in STORE_ONCE:
             rows = first_seen(rows, STORE_ONCE[table])
         _write_csv(TIDY / f"{table}.csv", rows)
+        written.append(table)
         if table == "market":
             market_count = len(rows)
         elif table == "lineups":
@@ -498,6 +628,11 @@ def parse() -> None:
         print("  warn: no player flagged in any snapshot — if the site still "
               "shows injuries, the fitness selectors have rotted.")
 
+    # LAST, and only on the path that actually derived everything. A state
+    # written before the canary above would let a run that bailed on empty
+    # market rows still licence tomorrow's tail append.
+    _save_parse_state({"sigs": sigs_now, "stamps": stamps, "tables": written})
+
 
 _CACHE = "parsed.json"
 
@@ -527,7 +662,85 @@ def parse_key(content_key: str, src) -> str:
     return "%s@%s" % (content_key, sig)
 
 
+_STATE = "parse_state.json"
+_CACHE_LINES = "parsed.jsonl"
+
+
+def _load_parse_state(name: str = _STATE) -> dict:
+    try:
+        blob = json.loads((TIDY / name).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    return blob if isinstance(blob, dict) else {}
+
+
+def _save_parse_state(state: dict, name: str = _STATE) -> None:
+    TIDY.mkdir(parents=True, exist_ok=True)
+    try:
+        (TIDY / name).write_text(json.dumps(state), encoding="utf-8")
+    except OSError:
+        pass
+
+
+def _cache_lines(keys: set, name: str = _CACHE_LINES) -> dict:
+    """The cached rows for JUST these keys, read a line at a time.
+
+    The point of the line format is that a tail append needs a few hundred
+    documents out of several thousand, and json.load() of the single-blob
+    cache costs 368MB to get them. Streaming keeps only what was asked for.
+    """
+    out: dict = {}
+    try:
+        fh = (TIDY / name).open(encoding="utf-8")
+    except OSError:
+        return out
+    with fh:
+        for line in fh:
+            if not line.strip():
+                continue
+            try:
+                rec = json.loads(line)
+            except ValueError:
+                continue
+            k = rec.get("k")
+            if k in keys:
+                out[k] = rec.get("r") or []
+    return out
+
+
+def _append_cache_lines(docs: dict, name: str = _CACHE_LINES) -> None:
+    if not docs:
+        return
+    TIDY.mkdir(parents=True, exist_ok=True)
+    try:
+        with (TIDY / name).open("a", encoding="utf-8") as fh:
+            for k, rows in docs.items():
+                fh.write(json.dumps({"k": k, "r": rows}) + "\n")
+    except OSError:
+        pass
+
+
 def _parse_cache(name: str = _CACHE) -> dict:
+    """Every cached document. The line file is the live format; the single
+    blob is read once, on the first run after the change, and then replaced
+    by _save_parse_cache below."""
+    lines = TIDY / _CACHE_LINES
+    if lines.exists():
+        out: dict = {}
+        try:
+            with lines.open(encoding="utf-8") as fh:
+                for line in fh:
+                    if not line.strip():
+                        continue
+                    try:
+                        rec = json.loads(line)
+                    except ValueError:
+                        continue
+                    if rec.get("k"):
+                        out[rec["k"]] = rec.get("r") or []
+        except OSError:
+            return {}
+        return out
     try:
         blob = json.loads((TIDY / name).read_text(encoding="utf-8"))
     except (OSError, ValueError):
@@ -536,11 +749,19 @@ def _parse_cache(name: str = _CACHE) -> dict:
 
 
 def _save_parse_cache(docs: dict, name: str = _CACHE) -> None:
+    """Rewrite the whole cache, pruned to what the walk actually used. Only
+    the full path calls this -- a tail append has read a handful of entries
+    and must never write its own view back as though it were the lot."""
     TIDY.mkdir(parents=True, exist_ok=True)
+    tmp = TIDY / (_CACHE_LINES + ".new")
     try:
-        (TIDY / name).write_text(json.dumps({"docs": docs}), encoding="utf-8")
+        with tmp.open("w", encoding="utf-8") as fh:
+            for k, rows in docs.items():
+                fh.write(json.dumps({"k": k, "r": rows}) + "\n")
+        tmp.replace(TIDY / _CACHE_LINES)
+        (TIDY / name).unlink(missing_ok=True)
     except OSError:
-        pass
+        tmp.unlink(missing_ok=True)
 
 
 def route(tables: dict, rows: list[dict], default: str, stamp: str) -> None:
@@ -562,6 +783,72 @@ def first_seen(rows: list[dict], key: tuple) -> list[dict]:
             seen.add(k)
         out.append(r)
     return out
+
+
+def _append_csv(path: Path, rows: list[dict], once_key=None) -> bool:
+    """Append rows to a table that already exists, or say no.
+
+    Refuses on a header that does not match exactly -- a new or missing
+    column means the shape changed, and appending under the old header would
+    silently drop or misalign a field. The caller rebuilds instead.
+
+    STORE_ONCE tables are deduped against what is already on disk, which is
+    the whole point of "as dealt": the same api_stats row is re-reported in
+    every later snapshot. The existing keys are held as 64-bit hashes rather
+    than tuples -- 710,850 rows of api_stats is ~23MB that way against
+    ~230MB of Python tuples, and this exists to save memory.
+    """
+    if not rows:
+        return True
+    if not path.exists():
+        _write_csv(path, rows)
+        return True
+    try:
+        with path.open(newline="", encoding="utf-8") as fh:
+            reader = csv.reader(fh)
+            header = next(reader, None)
+            if header is None:
+                return False
+            seen: set[int] = set()
+            if once_key:
+                try:
+                    idx = [header.index(c) for c in once_key]
+                except ValueError:
+                    return False
+                for row in reader:
+                    k = tuple(row[i] if i < len(row) else "" for i in idx)
+                    if all(k):
+                        seen.add(_key_hash(k))
+    except OSError:
+        return False
+
+    fieldset = set(header)
+    add = []
+    for r in rows:
+        if not set(r) <= fieldset:
+            return False          # shape moved -- a rebuild, not a guess
+        if once_key:
+            k = tuple((r.get(c) or "") for c in once_key)
+            if all(k):
+                h = _key_hash(k)
+                if h in seen:
+                    continue
+                seen.add(h)
+        add.append([r.get(f, "") for f in header])
+    if not add:
+        return True
+    try:
+        with path.open("a", newline="", encoding="utf-8") as fh:
+            csv.writer(fh, lineterminator="\n").writerows(add)
+    except OSError:
+        return False
+    return True
+
+
+def _key_hash(k: tuple) -> int:
+    return int.from_bytes(hashlib.blake2b(
+        "\x00".join(k).encode("utf-8", "replace"), digest_size=8).digest(),
+        "big")
 
 
 def _write_csv(path: Path, rows: list[dict]) -> None:
@@ -789,6 +1076,48 @@ def _selftest() -> None:
     fixed = dict(line, points="6", observed_at="t3")
     kept = first_seen([line, again, fixed], STORE_ONCE["api_stats"])
     assert [r["observed_at"] for r in kept] == ["t1", "t3"], kept
+
+    # APPENDING THE TAIL MUST EQUAL REBUILDING THE LOT, or it is not an
+    # optimisation, it is data loss on a schedule. _append_csv says no rather
+    # than guessing, and every no sends the caller back to the full walk.
+    with tempfile.TemporaryDirectory() as tmp:
+        f = Path(tmp) / "t.csv"
+        _write_csv(f, [{"a": "1", "b": "x"}])
+        assert _append_csv(f, [{"a": "2", "b": "y"}])
+        assert f.read_text(encoding="utf-8") == "a,b\n1,x\n2,y\n", \
+            f.read_text(encoding="utf-8")
+        # A ROW WITH FEWER FIELDS is what _write_csv already tolerates, so
+        # the appender must too -- refusing here would rebuild for ever and
+        # the tail path would never once run.
+        assert _append_csv(f, [{"a": "3"}])
+        assert f.read_text(encoding="utf-8").endswith("3,\n")
+        # A NEW COLUMN is a shape change: appending under the old header
+        # would drop it silently, so this is a refusal, not a best effort.
+        assert not _append_csv(f, [{"a": "4", "b": "z", "c": "new"}])
+        assert _append_csv(f, []), "nothing to add is not a failure"
+        missing = Path(tmp) / "fresh.csv"
+        assert _append_csv(missing, [{"a": "1"}]) and missing.exists(), \
+            "no file yet is a write, not a refusal"
+
+        # STORE_ONCE across the append boundary: the same api_stats line is
+        # re-reported by every later snapshot, so what is already on disk has
+        # to be deduped against, not just what is in this batch.
+        once = Path(tmp) / "api_stats.csv"
+        _write_csv(once, [line])
+        assert _append_csv(once, [again, fixed], STORE_ONCE["api_stats"])
+        body = once.read_text(encoding="utf-8").strip().splitlines()
+        assert len(body) == 3, body            # header + t1 + t3, never t2
+        assert body[-1].endswith("t3"), body
+        assert _append_csv(once, [dict(again)], STORE_ONCE["api_stats"])
+        assert len(once.read_text(encoding="utf-8").strip().splitlines()) == 3
+
+    assert _key_hash(("a", "b")) == _key_hash(("a", "b"))
+    # The separator matters: without it ("ab","c") and ("a","bc") collide,
+    # and a collision here drops a row that should have been kept.
+    assert _key_hash(("ab", "c")) != _key_hash(("a", "bc"))
+
+    assert not _tidy_has(()), "no tables recorded is not a licence to append"
+    assert not _tidy_has(("no_such_table_here",))
 
     out: dict[str, list] = {}
     route(out, [{"a": "1"}, {ROW_TABLE: "api_stats", "stat": "goals"}],

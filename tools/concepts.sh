@@ -90,7 +90,17 @@ check "Universe flat-dict storage" 0 \
 # that each spelled their own strftime now call it, so this REMOVES a
 # duplicated idiom; the added lines are its docstring (why data keeps UTC)
 # and a self-test that pins both sides of the DST change.
-check "src/ lines" 19655 \
+# 19655 -> 19990 on 2026-09-18: parse only walks the whole history when it
+# CAN change the answer. A NEW CAPABILITY, not a tidy -- measured at
+# jornada 6 of 38 the full walk peaked at 874MB against a 900MB MemoryMax
+# and was being throttled on every run, and it grows with the archive.
+# Parser signatures are the guard: if one moves, the rows it produced are
+# stale and the full walk runs exactly as before. Most of the added lines
+# are _append_csv (which refuses rather than guesses) and its self-test,
+# plus the docstrings recording why the full walk is worth keeping at all.
+# Measured: full 874MB/11.5s, tail 63MB/1.9s, no-op 53MB/0.4s, tidy tables
+# byte-identical across all three.
+check "src/ lines" 19990 \
   "$(find src -name '*.py' | xargs cat | wc -l)"
 
 [ "$fail" -eq 0 ] && echo "concepts: no duplication regained" || echo "concepts: a concept regained a second implementation"

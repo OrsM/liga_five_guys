@@ -24,6 +24,13 @@ inputs/seen.txt
 # documents it has not seen. Derived from data/raw, rebuilt on demand, and
 # invalidated whole when sources.py changes — nothing here is evidence.
 data/tidy/parsed.json
+# The parse cache, now line-oriented so a tail append can read a few entries
+# out of it without loading 89MB. Derived from data/raw and rebuilt on
+# demand, so it is ignored exactly as its single-blob predecessor was.
+# parse_state.json is NOT ignored: it records which snapshots and which
+# parser signatures the tracked tidy tables were built from, and it has to
+# travel with them or a clone cannot tell whether they are current.
+data/tidy/parsed.jsonl
 data/tidy/startcal.json
 
 # Claude Code worktrees and session state -- never part of the repo.

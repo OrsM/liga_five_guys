@@ -1,8 +1,8 @@
-# The simulation — 2026-09-18T1637Z
+# The simulation — 2026-09-18T1850Z
 
 ## Now
 
-**Locks in 2 days** · squad 289.20M · cash 13.22M (34.67M already bid) · total 302.42M
+**Locks in 2 days** · squad 289.20M · cash 13.22M (22.52M already bid) · total 302.42M
 
 play 5-4-1 · finish 2.13 · win 40% · season 1,350–2,210
 
@@ -24,9 +24,9 @@ play 5-4-1 · finish 2.13 · win 40% · season 1,350–2,210
 | Angel Perez | DEL | 83% | 3.98 | free agent | 22.52M | +38 (-66–+224) sell Starfelt | +43 | 3.3 |
 | **RAID — a clause, cannot be refused** | | | | | | | | |
 | Unai Lopez | MED | 77% | 3.89 | Albert | 15.53M | +16 (-76–+167) sell Starfelt | +59 | 2.7 |
+| Nahuel Tenaglia | DEF | 79% | 3.65 | BurtonGM89 | 34.20M | -4 (-166–+151) sell Natan | +39 | -1.5 |
 | **SAVE — better than yours, out of reach** | | | | | | | | |
 | Raphinha | DEL | 78% | 7.51 | Magic | 83.08M short | +107 (-37–+376) if you could | +125 | 1.3 |
-| Ante Budimir | DEL | 84% | 5.90 | BurtonGM89 | 3.94M short | +31 (-58–+196) if you could | +30 | 7.8 |
 | **PASS** | | | | | | | | |
 | Marcos Fernandez | DEL | 42% | 3.43 | free agent | -1.16M | -2 (-43–+71) | -21 | — |
 
@@ -68,31 +68,22 @@ PAR = season points above the LEAGUE's own replacement level at his slot (the sc
 | Angel Perez | DEL | 21.38M | 152.1 | — | 43.1 | 2.02 |
 | Leandro Cabrera | DEF | 17.50M | 114.6 | — | 25.6 | 1.46 |
 | Yassir Zabiri | DEL | 13.28M | 125.9 | — | 16.8 | 1.27 |
+| Nahuel Tenaglia | DEF | 34.20M | 128.4 | — | 39.4 | 1.15 |
 | Jose Maria Gimenez | DEF | 9.48M | 99.3 | — | 10.3 | 1.08 |
 | Robert Navarro | MED | 7.86M | 106.6 | 3.4 | 8.1 (-61–124) | 1.03 |
-| Roberto Fernandez | DEL | 32.50M | 139.6 | — | 29.3 (-60–205) | 0.90 |
-| Ramon Terrats | MED | 8.56M | 102.2 | — | 7.4 (-49–99) | 0.86 |
 | Raphinha | DEL | 141.43M | 234.1 | — | 107.1 (-37–376) | 0.76 |
-| Miguel Sierra | DEL | 5.11M | 97.9 | — | 3.8 (-51–90) | 0.75 |
 | Marc Roca | MED | 13.32M | 107.9 | — | 9.7 (-52–116) | 0.73 |
-| Luka Sucic | MED | 10.32M | 94.7 | — | 6.4 (-39–80) | 0.62 |
-| Xavi Espart | DEF | 28.71M | 134.6 | — | 17.4 (-66–157) | 0.61 |
 | Lucas Boye | DEL | 27.95M | 114.2 | — | 14.9 (-54–136) | 0.53 |
-| David Soria | POR | 35.80M | 162.3 | — | 18.3 (-65–127) | 0.51 |
-| Ante Budimir | DEL | 62.29M | 139.4 | — | 30.6 (-58–196) | 0.49 |
+| David Soria | POR | 35.82M | 162.3 | — | 18.3 (-65–127) | 0.51 |
 | Kike Salas | DEF | 19.36M | 117.9 | — | 9.2 (-57–121) | 0.48 |
-| David Hancko | DEF | 38.54M | 136.9 | — | 17.3 (-69–172) | 0.45 |
-| Javier Hernandez | MED | 16.08M | 108.9 | — | 6.8 (-65–130) | 0.42 |
-| Nahuel Tenaglia | DEF | 34.42M | 128.4 | — | 13.9 (-59–141) | 0.40 |
 | Toni Martinez | DEL | 28.03M | 109.0 | — | 10.1 (-56–130) | 0.36 |
+| Alex Berenguer | DEL | 15.51M | 99.0 | 2.8 | 5.3 (-56–107) | 0.34 |
 | Giuliano Simeone | DEL | 44.65M | 118.1 | — | 14.3 (-60–148) | 0.32 |
 | Juan Foyth | DEF | 18.98M | 113.3 | — | 5.6 (-62–117) | 0.30 |
-| Rodrigo Riquelme | MED | 17.68M | 94.4 | — | 4.9 (-47–89) | 0.28 |
 | Alvaro Garcia | MED | 29.31M | 108.5 | — | 8.0 (-60–123) | 0.27 |
-| Aitor Paredes | DEF | 13.02M | 102.5 | 2.4 | 3.5 (-51–91) | 0.27 |
+| Aitor Paredes | DEF | 12.97M | 102.5 | 2.4 | 3.5 (-51–91) | 0.27 |
 | Odysseas Vlachodimos | POR | 30.35M | 148.0 | — | 7.4 (-58–89) | 0.24 |
 | Marc Bernal | MED | 26.13M | 103.3 | — | 6.2 (-49–99) | 0.24 |
-| Mariano Diaz | DEL | 18.54M | 100.4 | — | 3.8 (-58–115) | 0.20 |
 | Unai Nuñez | DEF | 10.33M | 85.9 | — | 0.5 (-29–42) | 0.05 |
 | Aimar Oroz | MED | 25.62M | 75.2 | — | 0.7 (-27–42) | 0.03 |
 | Cesar Tarrega | DEF | 8.89M | 89.6 | — | 0.2 (-48–70) | 0.02 |
@@ -100,6 +91,5 @@ PAR = season points above the LEAGUE's own replacement level at his slot (the sc
 | Iñigo Arguibide | DEF | 3.47M | 74.8 | — | 0.0 (-22–29) | 0.01 |
 | Fran Garcia | DEF | 30.43M | 101.4 | — | 0.3 (-50–82) | 0.01 |
 | Lorenzo Amatucci | MED | 20.08M | 79.1 | — | 0.2 (-28–40) | 0.01 |
-| Abel Bretones | DEF | 10.04M | 79.9 | — | 0.0 (-23–33) | 0.00 |
 
 _23 more listed players at or below the league's own replacement level at their slot, not worth a look today — a free agent nobody wants yet, or a rival's clause on a squad player he outgrew._
