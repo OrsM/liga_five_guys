@@ -128,7 +128,17 @@ check "Universe flat-dict storage" 0 \
 # per-player and season-long; d_pts is what happens to your squad once the
 # sale that funds him goes too. Both questions now have to be answered yes.
 # Lines are the docstring recording that distinction and the self-test.
-check "src/ lines" 20175 \
+# 20175 -> 20300 on 2026-09-18: the clause buyout, and the end of silent
+# drops. parse_api_activity skipped any activityTypeId it had no name for,
+# so type 1 -- one manager taking another's player at his release clause --
+# was scraped from day one of the season and thrown away every run. Two had
+# happened; neither reached the ledger, so Albert Laporta showed 141M he had
+# in fact spent on Raphinha. An unknown type is now KEPT and named
+# (unknown:<id>) rather than discarded, because the allowlist was right and
+# the silence was not. An audit of every snapshot ever taken says type 1 was
+# the only gap, and the same audit run over the lineup feed says
+# tacticalFormation is its only non-slot key and is already read.
+check "src/ lines" 20300 \
   "$(find src -name '*.py' | xargs cat | wc -l)"
 
 [ "$fail" -eq 0 ] && echo "concepts: no duplication regained" || echo "concepts: a concept regained a second implementation"

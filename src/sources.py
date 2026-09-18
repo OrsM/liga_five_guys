@@ -30,6 +30,7 @@ __all__ = ["BASE", "SOURCE", "MARKET_URL", "POINTS_URL", "TEAM_URL", "TEAMS",
            "LFG_SOURCE", "API_LEAGUES_KEY", "API_LEAGUES_URL",
            "API_MARKET_URL", "API_ACTIVITY_URL", "API_TEAMS_URL",
            "ACT_KIND", "ACT_JOINED", "ACT_BUY", "ACT_SELL", "ACT_BONUS",
+           "ACT_CLAUSE",
            "ACT_BONUS_ZERO", "STORE_ONCE",
            "ROW_TABLE", "parser_sig", "parser_deps", "top_level",
            "parse_api_leagues", "parse_api_market", "parse_api_activity",
@@ -1134,8 +1135,24 @@ ROW_TABLE = "table"
 
 ACT_JOINED, ACT_BUY, ACT_SELL = 9, 31, 33
 ACT_BONUS, ACT_BONUS_ZERO = 6, 7
+
+# A CLAUSE BUYOUT -- one manager taking another's player at his release
+# clause, which the app announces as a "Market operation". It was scraped
+# from the first day and thrown away for want of this line: parse_api_activity
+# skips any activityTypeId it has no name for, and 1 was not on the list. Two
+# of them had happened (Luismi Cruz, and Raphinha for 141,425,721 on
+# 2026-09-18) and neither reached the ledger, so the buyer was never debited
+# and the victim never credited -- which is why Albert Laporta appeared to be
+# sitting on 141M he had in fact spent.
+#
+# An allowlist is still right: an unknown event should be dropped rather than
+# guessed at. What was missing is anyone checking what it had dropped. An
+# audit of every snapshot ever taken says type 1 is the only one, 2 events.
+ACT_CLAUSE = 1
+
 ACT_KIND = {ACT_JOINED: "joined", ACT_BUY: "buy", ACT_SELL: "sell",
-           ACT_BONUS: "bonus", ACT_BONUS_ZERO: "bonus"}
+           ACT_BONUS: "bonus", ACT_BONUS_ZERO: "bonus",
+           ACT_CLAUSE: "clause"}
 
 
 def _j(text: str):
@@ -1234,14 +1251,28 @@ def parse_api_activity(text: str, observed_at: str,
     rows = []
     for a in d:
         tid = a.get("activityTypeId")
-        if tid not in ACT_KIND or not a.get("id"):
+        if not a.get("id"):
             continue
+        # NOTHING IS DROPPED SILENTLY ANY MORE. An allowlist is still right --
+        # an event whose meaning is unknown must not be guessed at, and the
+        # ledger below ignores any kind it does not recognise. What was wrong
+        # was that the dropped ones left no trace, so a clause buyout was
+        # discarded from the first day of the season and only surfaced when
+        # Miguel noticed a raid missing from the report six weeks later.
+        # An unknown type is now KEPT, named for what it is, and warned about,
+        # so the next one costs a warning rather than a season of bad rival
+        # cash.
+        kind = ACT_KIND.get(tid) or ("unknown:%s" % tid)
         rows.append({
             "observed_at": observed_at, "source": LFG_SOURCE,
             "activity_id": str(a["id"]),
             "at": a.get("createdAt") or "",
-            "kind": ACT_KIND[tid],
+            "kind": kind,
             "user_id": str(a.get("user1Id") or ""),
+            # THE OTHER SIDE. Only a clause has one -- a buy is from the
+            # market and a sell is to it -- and without it the money has
+            # a payer but no payee.
+            "counterparty": str(a.get("user2Id") or ""),
             "player_id": str(a.get("playerMasterId") or ""),
             "amount": str(a.get("amount") or ""),
             "week": str(a.get("weekNumber") or ""),
@@ -1432,10 +1463,20 @@ def player_source(key: str) -> Source | None:
 
 
 def player_sources(activity_json: str, observed_at: str = "") -> list[Source]:
+    """Which players a detail page is worth fetching for, read off the feed.
+
+    KNOWN KINDS ONLY. The parser keeps an event it has no name for rather
+    than dropping it silently, which is right -- but "keep the record" and
+    "go and fetch against it" are different decisions. A player id read out
+    of an event whose meaning is unknown is a request against a guess, so
+    this stays on the kinds whose shape is understood. A clause counts: its
+    player really did change hands.
+    """
     out, seen = [], set()
     for r in parse_api_activity(activity_json, observed_at):
         pid = r.get("player_id")
-        if not pid or pid in seen:
+        if not pid or pid in seen or (r.get("kind") or "").startswith(
+                "unknown:"):
             continue
         seen.add(pid)
         out.append(player_source("api_player_%s" % pid))
@@ -1841,7 +1882,10 @@ _API_ACTIVITY_FIXTURE = """[
  {"id":"a5","activityTypeId":6,"amount":2200000,"weekNumber":2,
   "user1Id":3480702,"createdAt":"2026-08-25T04:28:22+02:00"},
  {"id":"a6","activityTypeId":7,"weekNumber":3,
-  "user1Id":3480702,"createdAt":"2026-09-01T04:34:11+02:00"}]"""
+  "user1Id":3480702,"createdAt":"2026-09-01T04:34:11+02:00"},
+ {"id":"a7","activityTypeId":1,"amount":141425721,"playerMasterId":2522,
+  "user1Id":3480702,"user2Id":11877808,
+  "createdAt":"2026-09-18T22:25:51+02:00"}]"""
 
 _API_TEAMS_FIXTURE = """[
  {"id":"38091967","position":3,"previousPosition":5,"teamPoints":17,
@@ -2350,11 +2394,46 @@ def _selftest() -> None:
                                     '"status":"accepted"'))
 
     ac = parse_api_activity(_API_ACTIVITY_FIXTURE, "t")
+    # EVERY EVENT SURVIVES THE PARSE, including one this code has no name
+    # for. a4 is activityTypeId 77, which means nothing here; it used to be
+    # dropped without trace, and that silence is what hid the clause buyout
+    # (type 1) for a whole season -- scraped from day one, discarded every
+    # run, and only noticed when a raid went missing from the report. The
+    # ledger still refuses to act on a kind it does not understand; it just
+    # cannot pretend the event never happened.
     assert ([r["kind"] for r in ac] ==
-            ["buy", "sell", "joined", "bonus", "bonus"]), ac
+            ["buy", "sell", "joined", "unknown:77", "bonus", "bonus",
+             "clause"]), ac
     assert ac[0]["amount"] == "58220110" and ac[0]["user_id"] == "11881989"
-    assert ac[3]["week"] == "2" and ac[3]["amount"] == "2200000", ac[3]
-    assert ac[4]["week"] == "3" and ac[4]["amount"] == "", ac[4]
+    assert ac[4]["week"] == "2" and ac[4]["amount"] == "2200000", ac[4]
+    assert ac[5]["week"] == "3" and ac[5]["amount"] == "", ac[5]
+
+    # A CLAUSE CARRIES BOTH SIDES. user2Id is the only place the payee
+    # appears, and without it the money has a payer and no recipient.
+    clause = ac[6]
+    assert clause["kind"] == "clause", clause
+    assert clause["user_id"] == "3480702", clause
+    assert clause["counterparty"] == "11877808", clause
+    assert clause["amount"] == "141425721", clause
+    assert clause["player_id"] == "2522", clause
+    # Nothing else has a counterparty: a buy is from the market, a sell to it.
+    assert all(r["counterparty"] == "" for r in ac if r["kind"] != "clause")
+
+    # A NEW EVENT MUST CHANGE THE SIGNATURE, or its page would be served
+    # from the parse cache and the event never reach the table. It does,
+    # because the signature is the set of activity ids and a new event
+    # carries a new one. NOT COVERED, and worth knowing: an event whose
+    # TYPE the app later corrected in place, keeping its id, would be
+    # served stale -- accepted, because ids here are per-event and the app
+    # has never rewritten one.
+    import json as _aj
+    _one_more = _aj.dumps(_aj.loads(_API_ACTIVITY_FIXTURE) + [
+        {"id": "a8", "activityTypeId": 1, "amount": 5, "playerMasterId": 9,
+         "user1Id": 1, "user2Id": 2,
+         "createdAt": "2026-09-19T10:00:00+02:00"}])
+    assert len(parse_api_activity(_one_more, "t")) == len(ac) + 1
+    assert sign_api_activity(_one_more) != sign_api_activity(
+        _API_ACTIVITY_FIXTURE)
     assert sign_api_activity(_API_ACTIVITY_FIXTURE) is not None
     import json as _json
     _rev = _json.dumps(list(reversed(_json.loads(_API_ACTIVITY_FIXTURE))))
@@ -2441,7 +2520,14 @@ def _selftest() -> None:
                             "api_player_777")[0]["player_id"] == "777"
 
     ps = player_sources(_API_ACTIVITY_FIXTURE)
-    assert [s.key for s in ps] == ["api_player_1337", "api_player_652"], ps
+    # 2522 is there because a CLAUSE moved him: a player who changed hands
+    # is exactly one whose detail page is worth having. The unknown type 77
+    # in the fixture names player 1 and is NOT here -- the event is kept in
+    # the table, but a request built on a meaning we do not know would be a
+    # request built on a guess.
+    assert [s.key for s in ps] == ["api_player_1337", "api_player_652",
+                                   "api_player_2522"], ps
+    assert not any(s.key == "api_player_1" for s in ps), ps
     assert all(s.cadence == "once" and s.auth for s in ps), ps
     assert all(s.table == "api_players" for s in ps), ps
     assert not any("None" in s.key or s.key == "api_player_" for s in ps)

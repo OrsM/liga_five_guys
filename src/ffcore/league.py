@@ -224,18 +224,31 @@ def ledger_from_api(activity: list[dict], users: dict,
     out = []
     for r in sorted(activity, key=lambda x: x.get("at") or ""):
         kind = r.get("kind")
-        if kind not in ("buy", "sell"):
+        if kind not in ("buy", "sell", "clause"):
             continue
         who = users.get(str(r.get("user_id") or ""))
         player = names.get(str(r.get("player_id") or ""))
         if not who or not player:
             continue
+        if kind == "clause":
+            # A CLAUSE IS THE ONLY MANAGER-TO-MANAGER MOVE. A buy comes from
+            # the market and a sell goes to it; this one has a real payee, so
+            # the money leaves one squad's balance and lands in another's.
+            # Dropped entirely until 2026-09-18, which left the buyer looking
+            # richer than he was by exactly what he had paid.
+            victim = users.get(str(r.get("counterparty") or ""))
+            if not victim:
+                continue
+            frm, to = victim, who
+        else:
+            frm = MARKET if kind == "buy" else who
+            to = who if kind == "buy" else MARKET
         out.append({
             "date": (r.get("at") or "")[:16],
             "player": player,
             "player_id": str(r.get("player_id") or ""),
-            "from": MARKET if kind == "buy" else who,
-            "to": who if kind == "buy" else MARKET,
+            "from": frm,
+            "to": to,
             "price": str(r.get("amount") or ""),
             "note": "from the app",
         })
@@ -891,6 +904,33 @@ def _selftest_derived_ledger() -> None:
     assert rows3 == [], rows3
 
     assert ledger_from_api([], users, names) == []
+
+    # A CLAUSE MOVES A PLAYER BETWEEN TWO MANAGERS, and the money with him.
+    # This is the shape the app publishes as a "Market operation" and the one
+    # that was dropped for want of a name: Albert Laporta took Raphinha from
+    # Magic Mike 333 for 141,425,721 on 2026-09-18, and because no row
+    # reached the ledger he still looked like he had the money.
+    clause = ledger_from_api(
+        [{"at": "2026-09-18T22:25:51+02:00", "kind": "clause",
+          "user_id": "11883172", "counterparty": "11881989",
+          "player_id": "1337", "amount": "141425721"}], users, names)
+    assert len(clause) == 1, clause
+    assert clause[0]["from"] == "miguel_autentico", clause[0]
+    assert clause[0]["to"] == "BurtonGM89", clause[0]
+    assert clause[0]["from"] != MARKET and clause[0]["to"] != MARKET, \
+        "a clause is manager to manager, never via the market"
+    assert clause[0]["price"] == "141425721", clause[0]
+
+    # An unknown counterparty is dropped rather than booked against the
+    # market -- crediting the wrong side is worse than crediting nobody.
+    assert ledger_from_api(
+        [{"at": "2026-09-18T22:25:51+02:00", "kind": "clause",
+          "user_id": "11883172", "counterparty": "404",
+          "player_id": "1337", "amount": "1"}], users, names) == []
+    assert ledger_from_api(
+        [{"at": "2026-09-18T22:25:51+02:00", "kind": "clause",
+          "user_id": "11883172", "player_id": "1337",
+          "amount": "1"}], users, names) == [], "no counterparty, no row"
 
     _selftest_anchor_is_current()
 

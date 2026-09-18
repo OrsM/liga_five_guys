@@ -262,6 +262,7 @@ class API_ACTIVITY:
     AT = "at"
     KIND = "kind"
     USER_ID = "user_id"
+    COUNTERPARTY = "counterparty"
     PLAYER_ID = "player_id"
     AMOUNT = "amount"
     WEEK = "week"

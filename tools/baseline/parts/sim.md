@@ -1,4 +1,4 @@
-# The simulation — 2026-09-18T2056Z
+# The simulation — 2026-09-18T2106Z
 
 ## Now
 
@@ -31,17 +31,17 @@ _How to read this table: **How to read the tables** in METHOD.md._
 | Manager | now | cash | simulated | 10–90 | P(I finish above) |
 |---|--:|--:|--:|--:|--:|
 | miguel_autentico **(you)** | 308 | 13.22M | 1,763 | 1,356–2,219 | — |
-| BurtonGM89 | 251 | ~-44.11M | 1,709 | 1,332–2,143 | 54% |
-| Albert Laporta | 214 | ~141.27M | 1,677 | 1,239–2,188 | 58% |
+| BurtonGM89 | 251 | ~-34.12M | 1,709 | 1,332–2,143 | 54% |
+| Albert Laporta | 214 | ~-10.15M | 1,677 | 1,239–2,188 | 58% |
 | SusoGattuso | 211 | ~-2.99M | 1,493 | 1,160–1,863 | 74% |
-| Magic Mike 333 | 232 | ~23.28M | 1,148 | 859–1,473 | 94% |
+| Magic Mike 333 | 232 | ~164.71M | 1,148 | 859–1,473 | 94% |
 
 ## What the simulation cannot see
 
 | Not modelled | Which way it bends the answer |
 |---|---|
 | Jornada 6 is half played — 18 clubs are done | their points are already in `now`, so only the rest of the round is simulated, and it still re-picks an eleven that is in fact already locked |
-| A buyout premium is charged at **0.000 places per million**, the median of every run that has measured it — today's own reading is 0.121 | a clause runs above market value here — too few real raids logged yet to median and the app pays back only the value, so the premium is gone for good. It is charged against the move, but priced off what more money would buy you today — most days, very little |
+| A buyout premium is charged at **0.000 places per million**, the median of every run that has measured it — today's own reading is 0.121 | a clause runs a median 1.00x market value here (n=2 real raids) and the app pays back only the value, so the premium is gone for good. It is charged against the move, but priced off what more money would buy you today — most days, very little |
 | "Your eleven" (top of the ladder) compares only the NEXT jornada, off real confirmed lineups/injuries | the standings table below simulates the other 32 jornadas too, where nobody has lineup news yet and squad value dominates — the two can point opposite ways (this week's confirmed news vs. the season's average squad quality) without either being wrong |
 | Beyond the next jornada, P(start) reverts to his own season-standing rate | a suspension or a knock is dated to the match it was announced for — nothing here predicts a FUTURE one not yet known, e.g. who gets injured in March |
 | Rivals never transfer | a steal that guts a squad assumes its manager does not simply buy someone back — flatters the steal |
