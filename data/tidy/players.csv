@@ -367,7 +367,7 @@ player_id,name,club_id,ff_slug,af_slug,app_id,understat_id,app_names
 18041,nizar el jmili,villarreal,nizar-el-jmili,,3220,,Nizar El Jmili
 18048,marco roman,rayo,marco-roman,,3179,,Marco Román
 18053,asier bonel,osasuna,asier-bonel,,3235,,A. Bonel
-18201,kike ribes,,laliga-26-27,,3241,,Ribes
+18201,kike ribes,,,,3241,,Ribes
 18213,jorge dominguez,atletico,jorge-dominguez,,3273,14721,C. Dominguez|J. Dominguez
 18214,jorge castillo,atletico,jorge-castillo,,3201,,Castillo
 18218,andres vallecillo,racing,andres-vallecillo,,3015,,A. Vallecillo
@@ -505,7 +505,7 @@ player_id,name,club_id,ff_slug,af_slug,app_id,understat_id,app_names
 5553,fernando calero,malaga,fernando-calero,47478,2398,,F. Calero
 5565,vinicius junior,real madrid,vinicius-junior,,3102,7008,Vini Jr.
 5587,adria pedrosa,sevilla,adria-pedrosa,,1056,7174,Pedrosa
-5671,juan berrocal,getafe,juan-berrocal,,3132,7186,J. Berrocal
+5671,juan berrocal,getafe,juan-berrocal,2039,3132,7186,J. Berrocal
 5705,luiz felipe,rayo,luiz-felipe,,2550,6177,Luiz Felipe
 5718,miguel angel morro,rayo,,,,,
 582,leandro cabrera,espanyol,leandro-cabrera,,3068,6168,Cabrera

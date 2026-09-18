@@ -1193,3 +1193,11 @@ observed_at,source,season,date,home_name,away_name,home,away,home_goals,away_goa
 2026-09-15T0543Z,football-data,2627,2026-09-13,Getafe,La Coruna,getafe,,1,1,0.77,0.86,15,10,4,3,3,7
 2026-09-15T0543Z,football-data,2627,2026-09-13,Sociedad,Ath Madrid,real-sociedad,atletico,0,3,0.27,2.05,8,13,3,5,9,3
 2026-09-15T0543Z,football-data,2627,2026-09-14,Villarreal,Betis,villarreal,betis,1,2,1.9,3.52,14,26,8,12,7,4
+2026-09-18T0651Z,football-data,2627,2026-09-15,Vallecano,Espanol,rayo-vallecano,espanyol,2,1,1.71,1.66,16,19,2,5,3,5
+2026-09-18T0651Z,football-data,2627,2026-09-15,Alaves,Valencia,alaves,valencia,0,1,1.05,0.65,15,10,3,3,2,5
+2026-09-18T0651Z,football-data,2627,2026-09-15,Elche,Real Madrid,elche,real-madrid,2,3,0.78,3.62,11,20,3,4,2,5
+2026-09-18T0651Z,football-data,2627,2026-09-16,Ath Madrid,Osasuna,atletico,osasuna,4,0,3.99,0.48,27,3,11,1,8,0
+2026-09-18T0651Z,football-data,2627,2026-09-16,La Coruna,Sevilla,,sevilla,0,1,0.14,0.73,4,11,3,6,4,4
+2026-09-18T0651Z,football-data,2627,2026-09-16,Barcelona,Santander,barcelona,racing,7,2,6.74,1.98,30,5,9,3,18,0
+2026-09-18T0651Z,football-data,2627,2026-09-17,Betis,Getafe,betis,getafe,1,0,1.53,0.32,22,8,8,2,4,3
+2026-09-18T0651Z,football-data,2627,2026-09-17,Malaga,Villarreal,malaga,villarreal,1,3,0.63,3.33,5,16,1,7,4,8
