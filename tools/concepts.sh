@@ -114,7 +114,14 @@ check "Universe flat-dict storage" 0 \
 # 874MB -> 466MB, tidy tables byte-identical across all 23. This is what
 # lets the systemd caps come DOWN rather than up -- the limits exist for a
 # reason and the pipeline has to fit them, not the other way round.
-check "src/ lines" 20120 \
+# 20120 -> 20140 on 2026-09-18: _lines_name(). There are TWO parse caches
+# -- pages and points, points.py passing its own filename to the same
+# helpers -- and the line format ignored the argument, so points read the
+# pages' cache, missed every entry, and wrote its own 88 over the top. Every
+# full walk then re-parsed all 3,383 documents: 395s where it should be 30s.
+# The fix is the name, the lines are its self-test and the note that says
+# what it looked like (a slow rebuild) rather than what it was.
+check "src/ lines" 20140 \
   "$(find src -name '*.py' | xargs cat | wc -l)"
 
 [ "$fail" -eq 0 ] && echo "concepts: no duplication regained" || echo "concepts: a concept regained a second implementation"

@@ -711,7 +711,21 @@ def parse_key(content_key: str, src) -> str:
 
 
 _STATE = "parse_state.json"
-_CACHE_LINES = "parsed.jsonl"
+
+
+def _lines_name(name: str) -> str:
+    """The line-file that stands in for a given blob cache.
+
+    THIS TAKES THE NAME, and that is the whole point of it. There are two
+    caches -- parsed.json for the pages and parsed_points.json for the
+    points, points.py passing its own name to the same helpers -- and the
+    first version of the line format ignored the argument and wrote both to
+    one file. points then read the pages' cache, missed everything, and
+    overwrote it with its own 88 entries, so every full walk re-parsed all
+    3,383 documents: 395s instead of 11s. It looked like a slow rebuild
+    rather than a broken cache, which is how it survived a commit.
+    """
+    return (name[:-5] if name.endswith(".json") else name) + ".jsonl"
 
 
 def _load_parse_state(name: str = _STATE) -> dict:
@@ -730,7 +744,7 @@ def _save_parse_state(state: dict, name: str = _STATE) -> None:
         pass
 
 
-def _cache_lines(keys: set, name: str = _CACHE_LINES) -> dict:
+def _cache_lines(keys: set, name: str = _CACHE) -> dict:
     """The cached rows for JUST these keys, read a line at a time.
 
     The point of the line format is that a tail append needs a few hundred
@@ -739,7 +753,7 @@ def _cache_lines(keys: set, name: str = _CACHE_LINES) -> dict:
     """
     out: dict = {}
     try:
-        fh = (TIDY / name).open(encoding="utf-8")
+        fh = (TIDY / _lines_name(name)).open(encoding="utf-8")
     except OSError:
         return out
     with fh:
@@ -756,12 +770,12 @@ def _cache_lines(keys: set, name: str = _CACHE_LINES) -> dict:
     return out
 
 
-def _append_cache_lines(docs: dict, name: str = _CACHE_LINES) -> None:
+def _append_cache_lines(docs: dict, name: str = _CACHE) -> None:
     if not docs:
         return
     TIDY.mkdir(parents=True, exist_ok=True)
     try:
-        with (TIDY / name).open("a", encoding="utf-8") as fh:
+        with (TIDY / _lines_name(name)).open("a", encoding="utf-8") as fh:
             for k, rows in docs.items():
                 fh.write(json.dumps({"k": k, "r": rows}) + "\n")
     except OSError:
@@ -772,7 +786,7 @@ def _parse_cache(name: str = _CACHE) -> dict:
     """Every cached document. The line file is the live format; the single
     blob is read once, on the first run after the change, and then replaced
     by _save_parse_cache below."""
-    lines = TIDY / _CACHE_LINES
+    lines = TIDY / _lines_name(name)
     if lines.exists():
         out: dict = {}
         try:
@@ -801,12 +815,12 @@ def _save_parse_cache(docs: dict, name: str = _CACHE) -> None:
     the full path calls this -- a tail append has read a handful of entries
     and must never write its own view back as though it were the lot."""
     TIDY.mkdir(parents=True, exist_ok=True)
-    tmp = TIDY / (_CACHE_LINES + ".new")
+    tmp = TIDY / (_lines_name(name) + ".new")
     try:
         with tmp.open("w", encoding="utf-8") as fh:
             for k, rows in docs.items():
                 fh.write(json.dumps({"k": k, "r": rows}) + "\n")
-        tmp.replace(TIDY / _CACHE_LINES)
+        tmp.replace(TIDY / _lines_name(name))
         (TIDY / name).unlink(missing_ok=True)
     except OSError:
         tmp.unlink(missing_ok=True)
@@ -1188,6 +1202,16 @@ def _selftest() -> None:
         assert body[-1].endswith("t3"), body
         assert _append_csv(once, [dict(again)], STORE_ONCE["api_stats"])
         assert len(once.read_text(encoding="utf-8").strip().splitlines()) == 3
+
+    # TWO CACHES, TWO FILES. points.py passes its own name to these same
+    # helpers; a line file that ignored the argument sent both to one path,
+    # so points read the pages' cache, missed every entry and then wrote its
+    # own 88 over the top -- and every full walk re-parsed all 3,383
+    # documents at 395s instead of 11s, looking like slowness rather than a
+    # broken cache.
+    assert _lines_name("parsed.json") == "parsed.jsonl"
+    assert _lines_name("parsed_points.json") == "parsed_points.jsonl"
+    assert _lines_name("parsed.json") != _lines_name("parsed_points.json")
 
     assert _key_hash(("a", "b")) == _key_hash(("a", "b"))
     # The separator matters: without it ("ab","c") and ("a","bc") collide,

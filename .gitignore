@@ -31,6 +31,7 @@ data/tidy/parsed.json
 # parser signatures the tracked tidy tables were built from, and it has to
 # travel with them or a clone cannot tell whether they are current.
 data/tidy/parsed.jsonl
+data/tidy/parsed_points.jsonl
 data/tidy/startcal.json
 
 # Claude Code worktrees and session state -- never part of the repo.
