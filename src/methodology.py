@@ -11,7 +11,7 @@ from ffcore import schema
 from ffcore.fixture import FIX_BAND
 from ffcore.score import SHRINK_K
 from ffcore.text import norm, resolve
-from ffcore.tidy import (clock_history, load_starters, run_now,
+from ffcore.tidy import (clock_history, load_starters, run_now, shown,
                          DECISIONS, PARTS, LINEUP_SOURCE,
                          DAILY_FRESH_DAYS, EVERY_RUN_FRESH_DAYS,
                          SEASON, TIDY, age_phrase, load_elo,
@@ -597,7 +597,7 @@ def _age(stamp: str, now: dt.datetime) -> tuple[float | None, str]:
     if when is None:
         return None, "—"
     days = (now - when).total_seconds() / 86400.0
-    return days, when.strftime("%d %b %H:%M")
+    return days, shown(when, "%d %b %H:%M")
 
 
 API_PAGES = {"match": ("starters",),

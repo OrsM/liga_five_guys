@@ -29,7 +29,7 @@ __all__ = ["ROOT", "TIDY", "SEASON", "DECISIONS", "REPORTS", "PARTS", "MADRID",
            "GATED_API", "age_phrase", "last_api_standings",
            "load_api_lineup", "market_routes", "pending_sent", "bought_price",
            "pending_received", "LISTED_SELLER", "team_slug_of", "lock_order",
-           "JornadaClock", "load_matches", "load_matches_history",
+           "JornadaClock", "shown", "load_matches", "load_matches_history",
            "load_starters", "load_perjornada", "load_api_stats", "clock", "clock_history",
            "jornada_of_match"]
 
@@ -278,6 +278,22 @@ def run_now() -> datetime:
         _NOW.append(snapshot_stamp(pinned) if pinned
                     else datetime.now(timezone.utc))
     return _NOW[0]
+
+
+def shown(t=None, fmt: str = "%Y-%m-%d %H:%M") -> str:
+    """A clock for a PERSON to read: Madrid, where the league plays and where
+    the reader is, labelled with whichever offset is in force (CEST or CET)
+    rather than assumed.
+
+    DATA MUST NOT USE THIS, and the split is the whole point. observed_at,
+    the dt= snapshot names, logged_at and decisions.json's generated_at are
+    KEYS -- they join tables, order snapshots and name files. They stay UTC,
+    where an hour never repeats itself and the October clock change cannot
+    reorder a season or make two snapshots collide on one name. What changes
+    here is only what gets printed for someone to read.
+    """
+    when = run_now() if t is None else t
+    return when.astimezone(MADRID).strftime(fmt + " %Z")
 
 
 def fresh_only(rows: list[dict], max_age_days: float, now=None) -> list[dict]:
@@ -1254,6 +1270,21 @@ def _selftest() -> None:
                        "seller": "something_new"}]
     _, r2, _ = market_routes(unknown_seller, lambda r: "free_agent")
     assert r2 == {"free_agent": "free"}, r2
+
+    # THE CLOCK A PERSON READS vs THE CLOCK THAT KEYS THE DATA.
+    summer = datetime(2026, 9, 18, 16, 40, tzinfo=timezone.utc)
+    winter = datetime(2026, 12, 18, 16, 40, tzinfo=timezone.utc)
+    assert shown(summer) == "2026-09-18 18:40 CEST", shown(summer)
+    # The October change is the reason the offset is read rather than
+    # assumed -- the same UTC hour is 18:40 in September and 17:40 in
+    # December, and a hardcoded "+2" would silently be an hour out all winter.
+    assert shown(winter) == "2026-12-18 17:40 CET", shown(winter)
+    assert shown(summer, "%d %b %H:%M") == "18 Sep 18:40 CEST"
+    # A key must NOT move with the clocks: snapshot_stamp round-trips the
+    # UTC spelling that names files and orders snapshots, untouched by any
+    # of this.
+    assert snapshot_stamp("2026-09-18T1640Z") == summer, \
+        snapshot_stamp("2026-09-18T1640Z")
 
     mkt_bids = [
         {"player_name": "A", "bid_status": "pending", "bid_money": "5600000"},

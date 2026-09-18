@@ -6,7 +6,7 @@ from ffcore.bid import (HORIZONS, MAX_LAG_H, deals,
 from ffcore.parse import fmt_money, fmt_pct
 from ffcore.second import LEGEND, af_cell, second_cells
 from ffcore.text import norm
-from ffcore.tidy import (run_now,
+from ffcore.tidy import (run_now, shown,
                          DECISIONS, PARTS, append_csv,
                          load_players, widen_csv, write_lines)
 from slate import read_slate
@@ -269,7 +269,7 @@ def write_league(lg, players, stamp, second=None,
 
 def main():
     now = run_now()
-    stamp = now.strftime("%Y-%m-%d %H:%M UTC")
+    stamp = shown(now)
     players = load_players()
     from ffcore.model import session
 

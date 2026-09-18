@@ -84,7 +84,13 @@ check "Universe flat-dict storage" 0 \
 # one move at a time, so it wants two men you can pay for one of -- and
 # alerts.md had to stop carrying a second copy of every standing alert,
 # which was burying the new line under its own history.
-check "src/ lines" 19625 \
+# 19625 -> 19655 on 2026-09-18: shown() -- one place that renders a clock
+# for a person, in Madrid, with the offset READ rather than assumed so the
+# October change cannot leave it an hour out all winter. Seven display sites
+# that each spelled their own strftime now call it, so this REMOVES a
+# duplicated idiom; the added lines are its docstring (why data keeps UTC)
+# and a self-test that pins both sides of the DST change.
+check "src/ lines" 19655 \
   "$(find src -name '*.py' | xargs cat | wc -l)"
 
 [ "$fail" -eq 0 ] && echo "concepts: no duplication regained" || echo "concepts: a concept regained a second implementation"

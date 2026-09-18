@@ -13,6 +13,7 @@ from typing import NamedTuple
 
 from ffcore import schema
 from ffcore.parse import money
+from ffcore.tidy import shown
 from ffcore.text import norm
 from ffcore.tidy import (load_crosswalk,
                          run_now,
@@ -536,7 +537,7 @@ class League:
                     from_app = False
                 conf = "known"
                 basis = ("balance the app reported at %s"
-                         % since.strftime("%Y-%m-%d %H:%M UTC")) if from_app \
+                         % shown(since)) if from_app \
                     else ("balance you recorded%s"
                           % (" on " + since_s if since_s else ""))
             else:
@@ -621,7 +622,7 @@ class League:
 
 
 def _now() -> str:
-    return run_now().astimezone().strftime("%Y-%m-%d %H:%M")
+    return shown()
 
 
 def _selftest() -> None:

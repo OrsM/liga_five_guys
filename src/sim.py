@@ -14,7 +14,7 @@ from methodology import current_mae
 from ffcore.parse import fmt_money
 from ffcore.league import app_fielded
 from ffcore.render import title_name
-from ffcore.tidy import (run_now,
+from ffcore.tidy import (run_now, shown,
                          ALERTS, PARTS, REPORTS, write_lines)
 
 OUT = "sim.md"
@@ -1491,9 +1491,7 @@ def main() -> None:
                 body.append(ln)
         if body:
             ALERTS.parent.mkdir(parents=True, exist_ok=True)
-            write_lines(ALERTS, ["# Alerts — %s UTC"
-                                 % run_now()
-                                     .strftime("%Y-%m-%d %H:%M"), ""] + body)
+            write_lines(ALERTS, ["# Alerts — %s" % shown(), ""] + body)
         else:
             ALERTS.unlink(missing_ok=True)
     print("%d alert(s) from the simulation" % len(lines))

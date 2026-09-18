@@ -11,7 +11,7 @@ from pathlib import Path
 from ffcore.bid import deals, low_priced_buys
 from ffcore.render import title_name
 from ffcore.score import SLOT_LABEL, SLOT_MIN, squad_pool
-from ffcore.tidy import (run_now,
+from ffcore.tidy import (run_now, shown,
                          ALERTS, DECISIONS,
                          age_phrase, append_csv, load_crosswalk,
                          load_deadline, read_csv,
@@ -214,7 +214,7 @@ def main() -> None:
 
     lines = alerts(warnings, token_days)
     if lines:
-        write_lines(ALERTS, [f"# Alerts — {now:%Y-%m-%d %H:%M} UTC", ""]
+        write_lines(ALERTS, [f"# Alerts — {shown(now)}", ""]
                     + [f"- {ln}" for ln in lines])
     else:
         Path(ALERTS).unlink(missing_ok=True)

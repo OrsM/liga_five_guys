@@ -6,7 +6,7 @@ import sys
 
 from typing import NamedTuple
 
-from ffcore.tidy import run_now
+from ffcore.tidy import run_now, shown
 from ffcore.tidy import PARTS, REPORTS, write_lines
 
 
@@ -108,7 +108,7 @@ def main() -> None:
         p = PARTS / name
         return p.read_text(encoding="utf-8") if p.exists() else None
 
-    stamp = run_now().strftime("%Y-%m-%d %H:%M UTC")
+    stamp = shown()
     REPORTS.mkdir(exist_ok=True)
     write_lines(REPORTS / APPENDIX,
                 digest(read, APPENDIX_SOURCES, stamp=stamp, links=None,
