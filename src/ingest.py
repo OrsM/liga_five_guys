@@ -563,6 +563,19 @@ def _parse_everything(walk, sigs_now, stamps) -> None:
             rows = []
         cache[parse_key(keys.of(key, html), src)] = rows
 
+    # ROWS GO TO DISK BEFORE THEY CAN GROW INTO THE PROCESS. Holding every
+    # table until the last snapshot was routed cost 476MB on top of the
+    # cache, for a peak of 874MB against a 900MB MemoryMax -- and the limit
+    # is not going up, so the pipeline has to come down. Buffered in memory
+    # up to SPILL_ROWS, appended to a per-table file past it, streamed back
+    # one table at a time below. Same rows, same order, a bounded buffer.
+    spill = TIDY / ".parse_spill"
+    if spill.exists():
+        for f in spill.glob("*.jsonl"):
+            f.unlink()
+    spilled: set[str] = set()
+    buffered = 0
+
     hits = 0
     for stamp, docs in walk:
         for key, (ck, origin) in sorted(docs.items()):
@@ -574,8 +587,13 @@ def _parse_everything(walk, sigs_now, stamps) -> None:
             hits += 1
             fresh[pk] = rows
             route(pending, rows, src.table, stamp)
+            buffered += len(rows)
+        if buffered >= SPILL_ROWS:
+            _spill_out(pending, spill, spilled)
+            buffered = 0
     hits -= misses
     _save_parse_cache(fresh)
+    del cache, fresh
     print("  parsed %d documents, reused %d" % (misses, hits))
 
     TIDY.mkdir(parents=True, exist_ok=True)
@@ -591,26 +609,56 @@ def _parse_everything(walk, sigs_now, stamps) -> None:
     starters_matches: set = set()
 
     written: list[str] = []
-    for table in sorted(pending):
-        rows = pending.pop(table)
-        if table in STORE_ONCE:
-            rows = first_seen(rows, STORE_ONCE[table])
-        _write_csv(TIDY / f"{table}.csv", rows)
-        written.append(table)
-        if table == "market":
-            market_count = len(rows)
-        elif table == "lineups":
-            xi_count = len(rows)
-            for r in rows:
+    for table in sorted(spilled | set(pending)):
+        once = STORE_ONCE.get(table)
+        seen: set[int] = set()
+        w = fh = None
+        fieldnames: list = []
+        fieldset: set = set()
+        n = 0
+        for r in _spilled_rows(spill, table, pending.pop(table, [])):
+            if once:
+                k = tuple((r.get(c) or "") for c in once)
+                if all(k):
+                    h = _key_hash(k)
+                    if h in seen:
+                        continue
+                    seen.add(h)
+            if w is None:
+                fieldnames = list(r)
+                fieldset = set(fieldnames)
+                fh = (TIDY / f"{table}.csv").open(
+                    "w", newline="", encoding="utf-8")
+                w = csv.writer(fh, lineterminator="\n")
+                w.writerow(fieldnames)
+            if not r.keys() <= fieldset:
+                fh.close()
+                raise ValueError("dict contains fields not in fieldnames: "
+                                 + ", ".join(repr(x)
+                                             for x in r.keys() - fieldset))
+            w.writerow([r.get(f, "") for f in fieldnames])
+            n += 1
+            if table == "lineups":
                 tally[r["status"]] = tally.get(r["status"], 0) + 1
                 per_source[r["source"]] = per_source.get(r["source"], 0) + 1
+            elif table == "matches":
+                if r["score"]:
+                    played.add(r["match_id"])
+            elif table == "starters":
+                starters_matches.add(r["match_id"])
+        if fh is not None:
+            fh.close()
+        written.append(table)
+        if table == "market":
+            market_count = n
+        elif table == "lineups":
+            xi_count = n
         elif table == "fixtures":
-            fixture_count = len(rows)
-        elif table == "matches":
-            played = {r["match_id"] for r in rows if r["score"]}
+            fixture_count = n
         elif table == "starters":
-            starters_count = len(rows)
-            starters_matches = {r["match_id"] for r in rows}
+            starters_count = n
+    for f in spill.glob("*.jsonl"):
+        f.unlink()
 
     if not market_count:
         sys.exit("ERROR: market parse produced 0 rows — the markup changed.")
@@ -783,6 +831,36 @@ def first_seen(rows: list[dict], key: tuple) -> list[dict]:
             seen.add(k)
         out.append(r)
     return out
+
+
+SPILL_ROWS = 120_000
+
+
+def _spill_out(pending: dict, root: Path, spilled: set) -> None:
+    """Append what is buffered to per-table files and let go of it."""
+    root.mkdir(parents=True, exist_ok=True)
+    for table, rows in pending.items():
+        if not rows:
+            continue
+        with (root / f"{table}.jsonl").open("a", encoding="utf-8") as fh:
+            for r in rows:
+                fh.write(json.dumps(r) + "\n")
+        spilled.add(table)
+    pending.clear()
+
+
+def _spilled_rows(root: Path, table: str, tail: list):
+    """Everything routed to this table, spilled part first, in walk order --
+    which is the order first_seen() depends on, so "as dealt" still means
+    the first snapshot that carried the row."""
+    path = root / f"{table}.jsonl"
+    if path.exists():
+        with path.open(encoding="utf-8") as fh:
+            for line in fh:
+                if line.strip():
+                    yield json.loads(line)
+    for r in tail:
+        yield r
 
 
 def _append_csv(path: Path, rows: list[dict], once_key=None) -> bool:

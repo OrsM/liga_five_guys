@@ -109,7 +109,12 @@ check "Universe flat-dict storage" 0 \
 # load_market_latest(). Measured: pipeline 55.8s -> 29.5s, peak 672MB ->
 # 468MB, and table_stats agrees with len(read_csv())/max across all 23
 # tables on both its cached and its streaming branch.
-check "src/ lines" 20040 \
+# 20040 -> 20120 on 2026-09-18: the full parse walk spills rows to disk
+# instead of holding every table until the last snapshot. Full rebuild peak
+# 874MB -> 466MB, tidy tables byte-identical across all 23. This is what
+# lets the systemd caps come DOWN rather than up -- the limits exist for a
+# reason and the pipeline has to fit them, not the other way round.
+check "src/ lines" 20120 \
   "$(find src -name '*.py' | xargs cat | wc -l)"
 
 [ "$fail" -eq 0 ] && echo "concepts: no duplication regained" || echo "concepts: a concept regained a second implementation"

@@ -35,3 +35,4 @@ data/tidy/startcal.json
 
 # Claude Code worktrees and session state -- never part of the repo.
 .claude/
+data/tidy/.parse_spill/
