@@ -694,14 +694,19 @@ def _move_rank_key(r, u):
     return (reliable, -d if d is not None else float("inf"))
 
 def _best(u, rows, rivals):
-    candidates = [r for r in rows if r["d_pts"] > 0]
-    if not candidates:
+    """Pick the headline from rows worth_doing() has ALREADY screened.
+
+    It used to screen again -- `d_pts > 0`, twice -- which is the same rule
+    written in two places and exactly what it is here to stop being. Its
+    caller passes worth_doing()'s output; the rule lives there.
+    """
+    if not rows:
         return None, False
-    reliable = [r for r in candidates
+    reliable = [r for r in rows
                if u.route_view.get(r["action"].buy, "free") != "listed"]
-    pool, uncertain = (reliable, False) if reliable else (candidates, True)
+    pool, uncertain = (reliable, False) if reliable else (rows, True)
     best = max(pool, key=lambda r: r["d_pts"])
-    if best["d_pts"] <= 0 or best["action"].net <= 0:
+    if best["action"].net <= 0:
         return best, uncertain
     floor = VALUE_TOLERANCE * best["d_pts"]
     cheaper = [r for r in pool
@@ -1294,8 +1299,13 @@ def _selftest() -> None:
     assert len(al) == 1 and "Yuri Berchiche" in al[0] and "+36%" in al[0], al
     assert "€14.1M" in al[0], al
     assert alert_lines(u, [], ["riv"]) == []
+    # A MOVE WORTH NOTHING IS NOT NEWS -- and the rule that says so lives in
+    # worth_doing(), once. alert_lines() used to repeat it, which is how the
+    # phone and the JSON came to disagree in the first place: two copies of
+    # "recommendable" that had drifted apart.
     flat = [{**rows[0], "net_pts": 0.0, "d_win": 0.0, "d_pts": 0.0}]
-    assert alert_lines(u, flat, ["riv"]) == [], "a move worth nothing is not news"
+    assert worth_doing(u, flat) == [], "the screen drops it"
+    assert alert_lines(u, worth_doing(u, flat), ["riv"]) == []
 
     assert "idle" not in _price_note(0.05, 0.03)
     assert "idle" not in _price_note(0.05, 0.03, 0.0)
@@ -1321,7 +1331,9 @@ def _selftest() -> None:
         "a self-funding move within reach of the best gain wins outright"
     winonly = {**rows[0], "action": Action("buy", buy="x", cost=1e6),
               "net_pts": 0.0, "d_win": 0.05, "d_pts": 0.0, "pts_lo": 0.0}
-    assert _best(u, [winonly], ["riv"]) == (None, False)
+    assert worth_doing(u, [winonly]) == [], \
+        "a move that gains no points is screened out before _best sees it"
+    assert _best(u, [], ["riv"]) == (None, False), "nothing left, nothing said"
 
     safer = {**rows[0],
              "action": Action("clause", buy="safer", sell="benat",
