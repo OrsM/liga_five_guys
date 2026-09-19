@@ -21,16 +21,16 @@ play 5-4-1 · finish 2.23 · win 34% · season 1,354–2,225
 | Omar El Hilali | DEF | 0% | 0.00 | yours | — | -5 (-78–+40) | +0 | — |
 | Ali Houary | DEL | 31% | 1.24 | yours | — | +0 (-10–+9) | -51 | — |
 | **OFFERS — someone wants him** | | | | | | | | |
-| Pablo Fornals | MED | 75% | 4.13 | yours | offer 48.07M (+6% vs 45.42M going rate) | -59 (-224–+40) | +61 | — |
-| Alvaro Mantilla | DEF | 81% | 2.12 | yours | offer 1.76M (+5% vs 1.67M going rate) | -0 (-14–+11) | -19 | — |
-| Yeray Alvarez | DEF | 65% | 2.62 | yours | offer 7.73M (+5% vs 7.36M going rate) | -5 (-61–+33) | +2 | — |
-| Omar El Hilali | DEF | 0% | 0.00 | yours | offer 15.59M (-4% vs 16.19M going rate) | -5 (-78–+40) | +0 | — |
-| Carl Starfelt | DEF | 35% | 2.21 | yours | offer 9.19M (-5% vs 9.71M going rate) | +0 (-47–+32) | -1 | — |
-| Ali Houary | DEL | 31% | 1.24 | yours | offer 0.92M (-9% vs 1.01M going rate) | +0 (-10–+9) | -51 | — |
+| Pablo Fornals | MED | 75% | 4.13 | yours | offer 48.07M (+4% vs 46.11M going rate) | -59 (-224–+40) | +61 | — |
+| Alvaro Mantilla | DEF | 81% | 2.12 | yours | offer 1.76M (+4% vs 1.69M going rate) | -0 (-14–+11) | -19 | — |
+| Yeray Alvarez | DEF | 65% | 2.62 | yours | offer 7.73M (+4% vs 7.47M going rate) | -5 (-61–+33) | +2 | — |
+| Omar El Hilali | DEF | 0% | 0.00 | yours | offer 15.59M (-5% vs 16.43M going rate) | -5 (-78–+40) | +0 | — |
+| Carl Starfelt | DEF | 35% | 2.21 | yours | offer 9.19M (-7% vs 9.86M going rate) | +0 (-47–+32) | -1 | — |
+| Ali Houary | DEL | 31% | 1.24 | yours | offer 0.92M (-10% vs 1.02M going rate) | +0 (-10–+9) | -51 | — |
 | **BUY — free agents** | | | | | | | | |
-| Pape Gueye | MED | 76% | 6.64 | free agent | 32.74M · bid 33.33M (1 bid in) | +4 (-173–+168) sell Alonso | +56 | 1.9 |
+| Pape Gueye | MED | 76% | 6.64 | free agent | 32.74M · bid 33.20M (1 bid in) | +4 (-173–+168) sell Alonso | +56 | 1.9 |
 | **RAID — a clause, cannot be refused** | | | | | | | | |
-| Unai Lopez | MED | 77% | 3.89 | Albert | 15.81M · bid 16.12M | +16 (-77–+171) sell Starfelt | +50 | 2.5 |
+| Unai Lopez | MED | 77% | 3.89 | Albert | 15.81M · bid 16.03M | +16 (-77–+171) sell Starfelt | +50 | 2.5 |
 | **PASS** | | | | | | | | |
 | Hugo Gonzalez | MED | 55% | 3.40 | free agent | -1.62M | +1 (-26–+38) | +5 | — |
 

@@ -145,100 +145,6 @@ def lagged_pair(actuals: list[dict],
     return out
 
 
-TRANSFER_SHRINK = 12.0
-
-
-def _transfer_events() -> list[tuple[float, int]]:
-    """Every transfer we can price: (premium over market value, bids on the
-    listing). A buy and a sell are the same event seen from two sides, so
-    both count -- this league's feed records them separately and neither
-    alone is a big enough sample to condition on."""
-    value: dict[str, list[tuple[str, float]]] = {}
-    for r in read_csv(TIDY / "api_teams.csv"):
-        mv = schema.num(r, schema.API_TEAMS.MARKET_VALUE, default=0.0)
-        if mv > 0:
-            value.setdefault(
-                schema.text(r, schema.API_TEAMS.PLAYER_ID), []).append(
-                    (schema.text(r, schema.API_TEAMS.OBSERVED_AT)[:10], mv))
-    # PER LISTING, AND AT ITS LAST SIGHTING -- not the most bids that player
-    # ever drew across every listing he has appeared in, which is what this
-    # took first and which quietly inflated every contested cell. A listing
-    # is one auction; a player has many.
-    per_listing: dict[str, tuple[str, int, str]] = {}
-    for r in read_csv(TIDY / "api_market.csv"):
-        mid = schema.text(r, schema.API_MARKET.MARKET_ID)
-        pid = schema.text(r, schema.API_MARKET.PLAYER_ID)
-        if not mid or not pid:
-            continue
-        seen = schema.text(r, schema.API_MARKET.OBSERVED_AT)
-        n = int(schema.num(r, schema.API_MARKET.BIDS, default=0.0))
-        cur = per_listing.get(mid)
-        if cur is None or seen > cur[2]:
-            per_listing[mid] = (pid, n, seen)
-    bids: dict[str, int] = {}
-    for pid, n, _seen in per_listing.values():
-        bids[pid] = max(bids.get(pid, 0), n)
-    out = []
-    from ffcore.tidy import load_api_activity
-    for a in load_api_activity():
-        if schema.text(a, schema.API_ACTIVITY.KIND) not in ("buy", "sell"):
-            continue
-        pid = schema.text(a, schema.API_ACTIVITY.PLAYER_ID)
-        day = schema.text(a, schema.API_ACTIVITY.AT)[:10]
-        amount = schema.num(a, schema.API_ACTIVITY.AMOUNT, default=0.0)
-        seen = value.get(pid)
-        if not seen or not day or amount <= 0:
-            continue
-        near = min(seen, key=lambda ov: abs(_day_num(ov[0]) - _day_num(day)))
-        if near[1] > 0:
-            out.append((amount / near[1] - 1.0, bids.get(pid, 0)))
-    return out
-
-
-def transfer_premium(bids: int | None = None,
-                     events=None) -> tuple[float, str]:
-    """What a player actually changes hands for, over his market value.
-
-    ONE NUMBER, TWO QUESTIONS. Judging a bid on your own player and deciding
-    what to bid for someone else's are the same measurement from opposite
-    ends, so they share a fitter rather than drifting apart.
-
-    With `bids`, it conditions on how contested the listing is -- and shrinks
-    that cell toward the unconditional median by TRANSFER_SHRINK, the same
-    pseudo-count trick the rate floor uses. That matters here: the raw split
-    says 2-bid listings clear +4.2% against -0.6% for one bid, but holding
-    player value constant collapses it to +1.7% on eleven observations.
-    Expensive players attract bids AND clear high; the bid count was mostly
-    reading the player. Shrinkage lets the cell speak in proportion to how
-    much of it there is, so this sharpens on its own as the season fills in
-    rather than needing anyone to re-decide.
-    """
-    ev = _transfer_events() if events is None else list(events)
-    if len(ev) < 20:
-        return 0.0, ("only %d priced transfer(s) so far, so a bid is judged "
-                     "against the quoted value itself" % len(ev))
-    base = statistics.median(p for p, _n in ev)
-    if bids is None:
-        return base, ("%+.1f%% is the median of %d priced transfer(s) "
-                      "against market value on the day" % (100 * base, len(ev)))
-    cell = [p for p, n in ev if n == bids]
-    if not cell:
-        return base, ("no transfer logged yet with %d bid(s) on it, so the "
-                      "overall median of %d stands" % (bids, len(ev)))
-    med = statistics.median(cell)
-    k = TRANSFER_SHRINK
-    got = (med * len(cell) + base * k) / (len(cell) + k)
-    return got, ("%+.1f%% with %d bid(s): the %d matching transfer(s) "
-                 "median %+.1f%%, pulled toward the overall %+.1f%% because "
-                 "%d is not many" % (100 * got, bids, len(cell), 100 * med,
-                                     100 * base, len(cell)))
-
-
-def _day_num(d: str) -> int:
-    digits = "".join(c for c in d if c.isdigit())
-    return int(digits[:8]) if len(digits) >= 8 else 0
-
-
 def fit_rate_rel_floor(pool, min_pairs: int = 30) -> tuple[float, str]:
     import statistics as _stats
 
@@ -1356,31 +1262,6 @@ def main() -> None:
 
 
 def _selftest() -> None:
-    # WHAT A SALE FETCHES, not what the app quotes. A bid is the only way a
-    # player leaves for money, so a bid has to be judged against other bids.
-    assert _day_num("2026-09-18") == 20260918
-    assert _day_num("2026-09-18T22:25:51+02:00") == 20260918
-    assert _day_num("") == 0 and _day_num("nope") == 0
-    # ONE FITTER, BOTH SIDES. What a bid on your player is worth and what
-    # to bid for someone else's are the same measurement from opposite ends.
-    thin, why = transfer_premium(events=[(0.5, 1)] * 3)
-    assert thin == 0.0 and "priced transfer" in why, (thin, why)
-    fake = [(0.00, 1)] * 40 + [(0.40, 2)] * 2
-    base, _ = transfer_premium(events=fake)
-    assert abs(base) < 0.01, base
-    # SHRINKAGE IS THE POINT. Two contested observations at +40% must not
-    # become a +40% recommendation; the cell speaks in proportion to its
-    # size, so this sharpens on its own as the season fills in instead of
-    # needing anyone to re-decide it.
-    hot, hot_why = transfer_premium(bids=2, events=fake)
-    assert 0.0 < hot < 0.10, (hot, hot_why)
-    assert "pulled toward" in hot_why, hot_why
-    many = [(0.00, 1)] * 40 + [(0.40, 2)] * 200
-    loud, _ = transfer_premium(bids=2, events=many)
-    assert loud > hot, "a bigger cell must be believed more, not less"
-    assert transfer_premium(bids=9, events=fake)[0] == base, \
-        "a bid count never seen falls back to the overall median"
-
     assert _light("every_run", [0.5], False)[0] == GREEN
     assert _light("twice_daily", [17.6], False)[0] == AMBER
     assert _light("twice_daily", [0.2, 30.0], False)[0] == AMBER

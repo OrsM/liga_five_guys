@@ -47,6 +47,22 @@ check "hand-written field read" 54 \
   "$(grep -rEc '\(\s*[a-z_]+\.get\([^)]*\)\s*or\s*""\s*\)\.strip\(\)' --include='*.py' src/ \
      | awk -F: '{s+=$2} END{print s+0}')"
 
+# WHAT A PLAYER COSTS, derived in more than one place. This is the check
+# that was missing on 2026-09-19, when a second premium-over-market-value
+# fitter went into methodology.py while ffcore/bid.py already had one -- a
+# better one, with a lag guard on the quoted value. Every gate passed,
+# because the others count duplicated IDIOMS and lines, and neither can see
+# a function that recomputes what another module already derives.
+#
+# The contract: a premium over market value is computed in ffcore/bid.py and
+# nowhere else. Everything else renders it. Budget 2, and both are named so
+# a third has to be argued for rather than added: ffcore/bid.py, which owns
+# it, and ffcore/tidy.py's value-delta helper, which answers "how has his
+# price moved" rather than "what did he go for".
+check "premium over market value" 2 \
+  "$(grep -rEc '/ *[a-z_.]*value[a-z_]* *- *1' --include='*.py' src/ \
+     | awk -F: '$2>0 {n++} END{print n+0}')"
+
 # Per-player facts stored outside PlayerProfile. Budget 0 -- this one is
 # finished, and must stay finished.
 check "Universe flat-dict storage" 0 \

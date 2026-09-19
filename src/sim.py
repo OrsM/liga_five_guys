@@ -149,15 +149,18 @@ def ladder_rows(u, rows, bands=None, exp=None, xi=None) -> list[dict]:
     spare = max_spare_proceeds(u)
     rest = [k for k in u.price_view if k not in mine and exp.get(k, 0.0) > bar]
     bands = {k: v for k, v in (bands or {}).items() if k not in won}
-    from methodology import transfer_premium
-    clearing, _clearing_why = transfer_premium()
-    _ask_cache: dict = {}
-
-    def ask_at(n):
-        if n not in _ask_cache:
-            _ask_cache[n] = transfer_premium(bids=n)[0] if n is not None \
-                else clearing
-        return _ask_cache[n]
+    # ONE DOOR FOR WHAT A PLAYER COSTS. ffcore.bid already fits the premium
+    # over market value from every logged deal -- with a lag guard on the
+    # quoted value that a hand-rolled version does not have -- and already
+    # turns it into a cash-capped bid range with its reasoning. It had never
+    # been called from here, so an afternoon went on rebuilding it worse.
+    from ffcore.bid import deals as _deals, premiums as _premiums, suggest
+    from ffcore.model import session as _session
+    _lg = _session().lg
+    _dl = _deals(_lg, _lg.market) if _lg and _lg.market else []
+    buy_prem = _premiums(_dl, "buy")
+    sell_prem = _premiums(_dl, "sell")
+    _rival_max = max(u.rival_cash.values(), default=None)
 
     _pf = u.player_forecasts()
     par = {k: v["par"] for k, v in _pf.items()}
@@ -168,13 +171,16 @@ def ladder_rows(u, rows, bands=None, exp=None, xi=None) -> list[dict]:
         if k in bands:
             pts, lo, hi, _action = bands[k]
         _worth = u.value_view.get(k)
-        _n = u.bids_view.get(k)
-        _mkt = u.value_view.get(k)
+        # CASH FOR THIS MOVE, not cash in hand. suggest() refuses a bid it
+        # cannot fund, and every buy on this board is funded by a sale --
+        # handing it the bare balance made it refuse every row.
+        _ask = suggest(_worth, buy_prem, u.cash + spare, _rival_max)
+        _hold = suggest(_worth, sell_prem)
         return {"offer": u.received_offers.get(k),
-                "rivals": _n,
-                "ask": (_mkt * (1.0 + ask_at(_n))) if _mkt else None,
+                "rivals": u.bids_view.get(k),
+                "ask": _ask.low,
                 "worth": _worth,
-                "going": (_worth * (1.0 + clearing)) if _worth else None,
+                "going": _hold.low,
                 "name": title_name(u.name_view.get(k, k)),
                 "pos": u.pos_view.get(k, ""), "start": u.start_view.get(k, 0.0),
                 "xpts": exp.get(k, 0.0), "group": group, "where": where,
