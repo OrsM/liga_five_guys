@@ -29,7 +29,18 @@ if printf '%s\n' "${TESTS[@]}" \
     | xargs -P 4 -I {} sh -c "\"$UV\" run --frozen python src/{} >/dev/null 2>&1 \
         || { echo \"  FAILED: {}\"; exit 255; }"; then
     echo "selftests: ${#TESTS[@]} suites pass"
-    exit 0
+    # AND THE DUPLICATION GATE, in the same breath, because lfg-run already
+    # refuses to publish when this script fails and nothing else about the
+    # concept ratchet was automatic. It was run by hand, which means it was
+    # run when somebody remembered -- and on 2026-09-19 a second
+    # premium-over-market-value fitter went in while every gate that DID run
+    # passed it. Miguel: "I don't want to be checking after".
+    #
+    # concepts.sh is seconds and reads no data, so it costs a report nothing
+    # and cannot fail because the league moved. regress.sh deliberately
+    # stays out: it compares against a recorded baseline and would fail
+    # every time the market legitimately changed.
+    exec bash "$(dirname "${BASH_SOURCE[0]}")/concepts.sh"
 fi
 
 echo "selftests: failures detected — re-running serially for detail" >&2

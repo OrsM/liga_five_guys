@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+# Refuse a commit that re-derives a concept another module already owns.
+#
+# WHY HERE AND NOT ONLY IN THE RUNNER. tools/selftests.sh now ends by
+# calling concepts.sh, so lfg-run refuses to publish on a regression -- but
+# that is after the code is already in. This stops it entering. Miguel:
+# "I don't want to be checking after".
+#
+# CONCEPTS ONLY, deliberately. The full suite takes ~20s and the unattended
+# report commits twice a day; a hook that can fail for an unrelated reason
+# would turn a flaky test into lost data. concepts.sh reads no data, takes
+# seconds, and cannot fail because the league moved.
+#
+# Versioned via core.hooksPath so it survives a clone, unlike .git/hooks.
+exec bash "$(git rev-parse --show-toplevel)/tools/concepts.sh"
