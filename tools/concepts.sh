@@ -138,7 +138,16 @@ check "Universe flat-dict storage" 0 \
 # the silence was not. An audit of every snapshot ever taken says type 1 was
 # the only gap, and the same audit run over the lineup feed says
 # tacticalFormation is its only non-slot key and is already read.
-check "src/ lines" 20300 \
+# 20300 -> 20450 on 2026-09-19: jornada_bounds() -- the best and worst legal
+# eleven a manager could have fielded from the squad he owned when a round
+# locked, against what those players actually scored. A real award has to sit
+# between them, so anything outside is an illegal side or the app docking a
+# manager who was overdrawn at the lock. An INDEPENDENT reading of solvency,
+# owing nothing to our own ledger. Reuses csv_as_of + latest_only for the
+# historical squad, load_api_stats for the scores and best_xi for the shape
+# rules; the lines are its self-test and the note that api_stats is a
+# per-STAT breakdown, which cost two wrong runs before it was summed.
+check "src/ lines" 20450 \
   "$(find src -name '*.py' | xargs cat | wc -l)"
 
 [ "$fail" -eq 0 ] && echo "concepts: no duplication regained" || echo "concepts: a concept regained a second implementation"
