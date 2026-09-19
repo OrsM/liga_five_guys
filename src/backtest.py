@@ -33,50 +33,52 @@ POS_ID_SLOT = {"1": "POR", "2": "DEF", "3": "MED", "4": "DEL"}
 
 
 def squad_at(manager: str, when: dt.datetime) -> dict[str, str]:
-    """Who a manager owned at a past moment, as {player_id: slot}.
+    """Who a manager owned at a past moment, as {ff_id: slot}.
+
+    Keyed by ff_id, not the app\'s own player id, because that is the key
+    load_perjornada() and every forecast in this repo already speak.
 
     csv_as_of() reads api_teams.csv out of the commit that was current then,
     and latest_only() takes that file's newest snapshot -- the two existing
     pieces, rather than a fourth way to ask what a squad looked like.
     """
+    from ffcore.crosswalk import Crosswalk
     from ffcore.schema import API_TEAMS, text
-    from ffcore.tidy import latest_only
-    return {text(r, API_TEAMS.PLAYER_ID):
-            POS_ID_SLOT[text(r, API_TEAMS.POSITION_ID)]
-            for r in latest_only(csv_as_of(when, "data/tidy/api_teams.csv"))
-            if text(r, API_TEAMS.MANAGER) == manager
-            and text(r, API_TEAMS.POSITION_ID) in POS_ID_SLOT}
+    from ffcore.tidy import TIDY, latest_only
+    xw = Crosswalk.read(TIDY / "players.csv", TIDY / "clubs.csv")
+    ff_of = {getattr(v, "app_id", ""): k for k, v in xw.players.items()
+             if getattr(v, "app_id", "")}
+    out = {}
+    for r in latest_only(csv_as_of(when, "data/tidy/api_teams.csv")):
+        slot = POS_ID_SLOT.get(text(r, API_TEAMS.POSITION_ID))
+        ff = ff_of.get(text(r, API_TEAMS.PLAYER_ID))
+        if slot and ff and text(r, API_TEAMS.MANAGER) == manager:
+            out[ff] = slot
+    return out
 
 
-def jornada_points(jornada: int, rows=None) -> dict[str, float]:
-    """What each player actually scored in one jornada.
+def jornada_points(jornada: int) -> dict[str, float]:
+    """What each player scored in one jornada, by ff_id.
 
-    SUMMED OVER STATS, because that is what a row is. api_stats holds one
-    row per player per week PER STAT -- ball_recovery, poss_lost_all,
-    marca_points and the rest -- so a player\'s jornada score is their total,
-    not any single row. Taking one row gave bounds roughly half the real
-    award and made every manager look like a cheat.
-
-    marca_points counts: summing every stat reproduces the season total
-    api_teams reports for 67 of 75 players, where excluding it reproduces 1.
-
-    load_api_stats() is the right door for the rows themselves: it runs
-    latest_per_key over (player_id, week, stat), so a later correction wins
-    and the original does not linger.
+    load_perjornada() IS this table -- the repo derives it every run and
+    keys it the way everything else here is keyed. The first version of this
+    function summed api_stats instead, which meant discovering for itself
+    that api_stats is a per-stat breakdown and that marca_points counts: a
+    second derivation of a number already sitting in data/season/live, with
+    its own bugs to find.
     """
-    from ffcore.schema import API_STATS, num, text
-    from ffcore.tidy import load_api_stats
-    want, out = str(jornada), collections.defaultdict(float)
-    for r in (load_api_stats() if rows is None else rows):
-        if text(r, API_STATS.WEEK) != want:
-            continue
-        out[text(r, API_STATS.PLAYER_ID)] += num(r, API_STATS.POINTS,
-                                                 default=0.0)
-    return dict(out)
+    from ffcore.schema import PERJORNADA, num, text
+    from ffcore.tidy import load_perjornada
+    want = str(jornada)
+    return {text(r, PERJORNADA.FF_ID): num(r, PERJORNADA.POINTS_DELTA,
+                                           default=0.0)
+            for r in load_perjornada()
+            if text(r, PERJORNADA.JORNADA) == want
+            and text(r, PERJORNADA.FF_ID)}
 
 
-def jornada_bounds(manager: str, jornada: int, owned_at: dt.datetime,
-                   stats_rows=None) -> dict | None:
+def jornada_bounds(manager: str, jornada: int,
+                   owned_at: dt.datetime) -> dict | None:
     """The most and the least a manager could have scored in one jornada.
 
     Owned at the START of the round, scoring IN the round: the best legal
@@ -94,7 +96,7 @@ def jornada_bounds(manager: str, jornada: int, owned_at: dt.datetime,
     squad = squad_at(manager, owned_at)
     if not squad:
         return None
-    pts = jornada_points(jornada, stats_rows)
+    pts = jornada_points(jornada)
     top = best_xi(squad, pts)
     if not top:
         return None
@@ -109,10 +111,10 @@ def jornada_bounds(manager: str, jornada: int, owned_at: dt.datetime,
 
 
 def audit_jornada(manager: str, jornada: int, owned_at: dt.datetime,
-                  actual: float, stats_rows=None) -> dict | None:
+                  actual: float) -> dict | None:
     """jornada_bounds(), with the award the app actually gave held against
     it. verdict is "ok", "below floor" or "above ceiling"."""
-    b = jornada_bounds(manager, jornada, owned_at, stats_rows)
+    b = jornada_bounds(manager, jornada, owned_at)
     if b is None:
         return None
     verdict = ("below floor" if actual < b["worst"] - 1e-9
@@ -487,17 +489,13 @@ def replay_ladder_percentile(topn: int = 3, min_days: float = 3.0) -> dict:
 
 
 def _selftest() -> None:
-    # A JORNADA'S POINTS ARE A SUM. api_stats is one row per player per week
-    # PER STAT, so reading a single row gives roughly half a real score and
-    # makes every manager look like they fielded an impossible eleven.
-    rows = [{"player_id": "a", "week": "5", "stat": "goal", "points": "4"},
-            {"player_id": "a", "week": "5", "stat": "poss_lost", "points": "-1"},
-            {"player_id": "a", "week": "5", "stat": "marca_points", "points": "2"},
-            {"player_id": "b", "week": "5", "stat": "goal", "points": "1"},
-            {"player_id": "a", "week": "4", "stat": "goal", "points": "9"}]
-    got = jornada_points(5, rows)
-    assert got == {"a": 5.0, "b": 1.0}, got
-    assert jornada_points(9, rows) == {}, "a week nobody played is empty"
+    # ONE PER-JORNADA POINTS TABLE, NOT TWO. load_perjornada() is the one
+    # this repo builds and forecasts from; jornada_points() reads it rather
+    # than summing api_stats into a second copy with its own bugs to find.
+    j3 = jornada_points(3)
+    assert j3, "jornada 3 has scores in data/season/live"
+    assert all(isinstance(k, str) and k for k in j3), "keyed by ff_id"
+    assert jornada_points(99) == {}, "a jornada nobody played is empty"
 
     # THE BAND IS WHAT EVERY LEGAL ELEVEN CAN REACH. Eleven starters plus a
     # bench man who outscores one of them: the ceiling must pick him up and
@@ -507,34 +505,28 @@ def _selftest() -> None:
              "bench": "MED"}
     pts = {k: 3.0 for k in squad}
     pts["bench"], pts["m0"] = 20.0, -5.0
-    stat_rows = [{"player_id": k, "week": "5", "stat": "x", "points": str(v)}
-                 for k, v in pts.items()]
     import backtest as _bt
-    real = _bt.squad_at
+    real_squad, real_pts = _bt.squad_at, _bt.jornada_points
     _bt.squad_at = lambda manager, when: squad
+    _bt.jornada_points = lambda jornada: pts
     try:
-        b = jornada_bounds("whoever", 5, dt.datetime.now(dt.timezone.utc),
-                           stat_rows)
+        now = dt.datetime.now(dt.timezone.utc)
+        b = _bt.jornada_bounds("whoever", 5, now)
         assert b["best"] > b["worst"], b
         assert b["best"] >= 20.0, ("the ceiling must be able to field the "
                                    "bench man who outscored a starter", b)
-        assert b["worst"] <= b["best"], b
-        mid = _bt.audit_jornada("whoever", 5,
-                                dt.datetime.now(dt.timezone.utc),
-                                (b["best"] + b["worst"]) / 2, stat_rows)
+        mid = _bt.audit_jornada("whoever", 5, now,
+                                (b["best"] + b["worst"]) / 2)
         assert mid["verdict"] == "ok", mid
-        over = _bt.audit_jornada("whoever", 5,
-                                 dt.datetime.now(dt.timezone.utc),
-                                 b["best"] + 1, stat_rows)
+        over = _bt.audit_jornada("whoever", 5, now, b["best"] + 1)
         assert over["verdict"] == "above ceiling", over
-        under = _bt.audit_jornada("whoever", 5,
-                                  dt.datetime.now(dt.timezone.utc),
-                                  b["worst"] - 1, stat_rows)
-        # Below the floor is the interesting one: no legal eleven from this
-        # squad scores that little, so points were taken away.
+        # Below the floor is the one that matters: no legal eleven from this
+        # squad scores that little, so points were taken away. That is what
+        # caught miguel_autentico on 7 against a floor of 39 in jornada 3.
+        under = _bt.audit_jornada("whoever", 5, now, b["worst"] - 1)
         assert under["verdict"] == "below floor", under
     finally:
-        _bt.squad_at = real
+        _bt.squad_at, _bt.jornada_points = real_squad, real_pts
 
     recent = commit_as_of(dt.datetime.now(dt.timezone.utc), "data/tidy/market.csv")
     assert recent is not None, "no commit found for market.csv at all"
