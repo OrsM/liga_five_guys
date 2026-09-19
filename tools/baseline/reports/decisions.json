@@ -64,6 +64,7 @@
   {
    "offer": 7732022.0,
    "worth": 7216166.0,
+   "going": 7473993.372329793,
    "name": "Yeray Alvarez",
    "pos": "DEF",
    "start": 0.65,
@@ -84,6 +85,7 @@
   {
    "offer": null,
    "worth": 7751774.0,
+   "going": 8028738.183101443,
    "name": "Sergio Carreira",
    "pos": "DEF",
    "start": 0.49920634920634926,
@@ -104,6 +106,7 @@
   {
    "offer": 9187618.0,
    "worth": 9525661.0,
+   "going": 9866004.631969439,
    "name": "Carl Starfelt",
    "pos": "DEF",
    "start": 0.34523809523809523,
@@ -124,6 +127,7 @@
   {
    "offer": 1755126.0,
    "worth": 1633223.0,
+   "going": 1691576.6457612782,
    "name": "Alvaro Mantilla",
    "pos": "DEF",
    "start": 0.8134920634920636,
@@ -144,6 +148,7 @@
   {
    "offer": 15591356.0,
    "worth": 15872587.0,
+   "going": 16439700.810614394,
    "name": "Omar El Hilali",
    "pos": "DEF",
    "start": 0.0,
@@ -164,6 +169,7 @@
   {
    "offer": 918500.0,
    "worth": 989489.0,
+   "going": 1024842.586491668,
    "name": "Ali Houary",
    "pos": "DEL",
    "start": 0.3138227513227513,
@@ -184,6 +190,7 @@
   {
    "offer": 48069902.0,
    "worth": 44544655.0,
+   "going": 46136197.01136547,
    "name": "Pablo Fornals",
    "pos": "MED",
    "start": 0.7547619047619049,
@@ -199,11 +206,12 @@
    "value": null,
    "market": null,
    "premium": null,
-   "bought": 58220110.0
+   "bought": null
   },
   {
    "offer": 1755126.0,
    "worth": 1633223.0,
+   "going": 1691576.6457612782,
    "name": "Alvaro Mantilla",
    "pos": "DEF",
    "start": 0.8134920634920636,
@@ -219,11 +227,12 @@
    "value": null,
    "market": null,
    "premium": null,
-   "bought": 2300305.0
+   "bought": null
   },
   {
    "offer": 7732022.0,
    "worth": 7216166.0,
+   "going": 7473993.372329793,
    "name": "Yeray Alvarez",
    "pos": "DEF",
    "start": 0.65,
@@ -239,11 +248,12 @@
    "value": null,
    "market": null,
    "premium": null,
-   "bought": 6931556.0
+   "bought": null
   },
   {
    "offer": 15591356.0,
    "worth": 15872587.0,
+   "going": 16439700.810614394,
    "name": "Omar El Hilali",
    "pos": "DEF",
    "start": 0.0,
@@ -264,6 +274,7 @@
   {
    "offer": 9187618.0,
    "worth": 9525661.0,
+   "going": 9866004.631969439,
    "name": "Carl Starfelt",
    "pos": "DEF",
    "start": 0.34523809523809523,
@@ -284,6 +295,7 @@
   {
    "offer": 918500.0,
    "worth": 989489.0,
+   "going": 1024842.586491668,
    "name": "Ali Houary",
    "pos": "DEL",
    "start": 0.3138227513227513,
@@ -299,11 +311,12 @@
    "value": null,
    "market": null,
    "premium": null,
-   "bought": 1777400.0
+   "bought": null
   },
   {
    "offer": null,
    "worth": 32741841.0,
+   "going": 33911678.6714546,
    "name": "Pape Gueye",
    "pos": "MED",
    "start": 0.7619047619047619,
@@ -324,6 +337,7 @@
   {
    "offer": null,
    "worth": 15808402.0,
+   "going": 16373222.536056548,
    "name": "Unai Lopez",
    "pos": "MED",
    "start": 0.7690476190476191,

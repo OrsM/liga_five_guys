@@ -21,12 +21,12 @@ play 5-4-1 · finish 2.19 · win 36% · season 1,358–2,229
 | Omar El Hilali | DEF | 0% | 0.00 | yours | — | -6 (-83–+41) | +0 | — |
 | Ali Houary | DEL | 31% | 1.24 | yours | — | +0 (-10–+10) | -51 | — |
 | **OFFERS — someone wants him** | | | | | | | | |
-| Pablo Fornals | MED | 75% | 4.13 | yours | offer 48.07M (+8% vs 44.54M) · paid 58.22M, -10.15M | -57 (-227–+41) | +61 | — |
-| Alvaro Mantilla | DEF | 81% | 2.12 | yours | offer 1.76M (+7% vs 1.63M) · paid 2.30M, -0.55M | -1 (-14–+12) | -19 | — |
-| Yeray Alvarez | DEF | 65% | 2.62 | yours | offer 7.73M (+7% vs 7.22M) · paid 6.93M, +0.80M | -5 (-61–+34) | +2 | — |
-| Omar El Hilali | DEF | 0% | 0.00 | yours | offer 15.59M (-2% vs 15.87M) | -6 (-83–+41) | +0 | — |
-| Carl Starfelt | DEF | 35% | 2.21 | yours | offer 9.19M (-4% vs 9.53M) | +1 (-47–+32) | -1 | — |
-| Ali Houary | DEL | 31% | 1.24 | yours | offer 0.92M (-7% vs 0.99M) · paid 1.78M, -0.86M | +0 (-10–+10) | -51 | — |
+| Pablo Fornals | MED | 75% | 4.13 | yours | offer 48.07M (+4% vs 46.14M going rate) | -57 (-227–+41) | +61 | — |
+| Alvaro Mantilla | DEF | 81% | 2.12 | yours | offer 1.76M (+4% vs 1.69M going rate) | -1 (-14–+12) | -19 | — |
+| Yeray Alvarez | DEF | 65% | 2.62 | yours | offer 7.73M (+3% vs 7.47M going rate) | -5 (-61–+34) | +2 | — |
+| Omar El Hilali | DEF | 0% | 0.00 | yours | offer 15.59M (-5% vs 16.44M going rate) | -6 (-83–+41) | +0 | — |
+| Carl Starfelt | DEF | 35% | 2.21 | yours | offer 9.19M (-7% vs 9.87M going rate) | +1 (-47–+32) | -1 | — |
+| Ali Houary | DEL | 31% | 1.24 | yours | offer 0.92M (-10% vs 1.02M going rate) | +0 (-10–+10) | -51 | — |
 | **BUY — free agents** | | | | | | | | |
 | Pape Gueye | MED | 76% | 6.64 | free agent | 32.74M | +4 (-160–+173) sell Natan | +57 | — |
 | **RAID — a clause, cannot be refused** | | | | | | | | |

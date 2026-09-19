@@ -155,7 +155,15 @@ check "Universe flat-dict storage" 0 \
 # numbers that make it good or bad: what he fetches today, and what was paid
 # for him. One section, so the offer is stated once rather than sprinkled
 # across whichever rows happen to appear.
-check "src/ lines" 20495 \
+# 20495 -> 20575 on 2026-09-19: clearing_premium(). A bid is the ONLY way a
+# player leaves your squad for money -- 68 logged sales against market value
+# make one smooth hump with no spike at 1.00, and no sale ever pairs with
+# another manager's buy -- so judging a bid against the quoted value was
+# judging it against a price nobody trades at. The going rate is now fitted
+# each run (+3.6% at 68 sales) and the offer is measured against that. The
+# purchase-price comparison came OUT: it is a sunk cost and had no business
+# in the decision.
+check "src/ lines" 20575 \
   "$(find src -name '*.py' | xargs cat | wc -l)"
 
 [ "$fail" -eq 0 ] && echo "concepts: no duplication regained" || echo "concepts: a concept regained a second implementation"

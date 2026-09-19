@@ -145,6 +145,56 @@ def lagged_pair(actuals: list[dict],
     return out
 
 
+def clearing_premium(min_sales: int = 20) -> tuple[float, str]:
+    """What a sale actually FETCHES, against the market value at the time.
+
+    A bid is the only way a player leaves your squad for money, so market
+    value is not the thing to judge one against -- what other bids have
+    cleared at is. Measured over every sale in the activity feed against
+    that player's market value on the day: one smooth hump, no spike at
+    exactly 1.00, which is how we know there is no fixed-price channel
+    hiding in there.
+
+    Returns the median premium, so +0.04 means a sale typically clears 4%
+    above the quoted value and a bid at market value is a below-average bid.
+    """
+    from ffcore.tidy import load_api_activity, read_csv, TIDY
+    value: dict[str, list[tuple[str, float]]] = {}
+    for r in read_csv(TIDY / "api_teams.csv"):
+        mv = schema.num(r, schema.API_TEAMS.MARKET_VALUE, default=0.0)
+        if mv > 0:
+            value.setdefault(
+                schema.text(r, schema.API_TEAMS.PLAYER_ID), []).append(
+                    (schema.text(r, schema.API_TEAMS.OBSERVED_AT)[:10], mv))
+    ratios = []
+    for a in load_api_activity():
+        if schema.text(a, schema.API_ACTIVITY.KIND) != "sell":
+            continue
+        pid = schema.text(a, schema.API_ACTIVITY.PLAYER_ID)
+        day = schema.text(a, schema.API_ACTIVITY.AT)[:10]
+        seen = value.get(pid)
+        amount = schema.num(a, schema.API_ACTIVITY.AMOUNT, default=0.0)
+        if not seen or not day or amount <= 0:
+            continue
+        near = min(seen, key=lambda ov: abs(_day_num(ov[0]) - _day_num(day)))
+        if near[1] > 0:
+            ratios.append(amount / near[1])
+    if len(ratios) < min_sales:
+        return 0.0, ("only %d logged sale(s) to measure against market "
+                     "value, so a bid is judged against the quoted value "
+                     "itself" % len(ratios))
+    med = statistics.median(ratios) - 1.0
+    return med, ("%+.1f%% is the median of %d logged sale(s) against the "
+                 "market value on the day (range %+.0f%% to %+.0f%%)"
+                 % (100 * med, len(ratios), 100 * (min(ratios) - 1),
+                    100 * (max(ratios) - 1)))
+
+
+def _day_num(d: str) -> int:
+    digits = "".join(c for c in d if c.isdigit())
+    return int(digits[:8]) if len(digits) >= 8 else 0
+
+
 def fit_rate_rel_floor(pool, min_pairs: int = 30) -> tuple[float, str]:
     import statistics as _stats
 
@@ -1262,6 +1312,18 @@ def main() -> None:
 
 
 def _selftest() -> None:
+    # WHAT A SALE FETCHES, not what the app quotes. A bid is the only way a
+    # player leaves for money, so a bid has to be judged against other bids.
+    assert _day_num("2026-09-18") == 20260918
+    assert _day_num("2026-09-18T22:25:51+02:00") == 20260918
+    assert _day_num("") == 0 and _day_num("nope") == 0
+    thin, why = clearing_premium(min_sales=10 ** 9)
+    assert thin == 0.0, thin
+    assert "judged against the quoted value itself" in why, why
+    fitted, why2 = clearing_premium()
+    assert -0.5 < fitted < 0.5, (fitted, why2)
+    assert "median of" in why2 and "sale" in why2, why2
+
     assert _light("every_run", [0.5], False)[0] == GREEN
     assert _light("twice_daily", [17.6], False)[0] == AMBER
     assert _light("twice_daily", [0.2, 30.0], False)[0] == AMBER

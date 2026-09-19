@@ -149,6 +149,8 @@ def ladder_rows(u, rows, bands=None, exp=None, xi=None) -> list[dict]:
     spare = max_spare_proceeds(u)
     rest = [k for k in u.price_view if k not in mine and exp.get(k, 0.0) > bar]
     bands = {k: v for k, v in (bands or {}).items() if k not in won}
+    from methodology import clearing_premium
+    clearing, _clearing_why = clearing_premium()
     _pf = u.player_forecasts()
     par = {k: v["par"] for k, v in _pf.items()}
     pj = {k: v["pj"] for k, v in _pf.items()}
@@ -157,8 +159,10 @@ def ladder_rows(u, rows, bands=None, exp=None, xi=None) -> list[dict]:
             lo=None, hi=None, market=None, premium=None, bought=None):
         if k in bands:
             pts, lo, hi, _action = bands[k]
+        _worth = u.value_view.get(k)
         return {"offer": u.received_offers.get(k),
-                "worth": u.value_view.get(k),
+                "worth": _worth,
+                "going": (_worth * (1.0 + clearing)) if _worth else None,
                 "name": title_name(u.name_view.get(k, k)),
                 "pos": u.pos_view.get(k, ""), "start": u.start_view.get(k, 0.0),
                 "xpts": exp.get(k, 0.0), "group": group, "where": where,
@@ -190,8 +194,7 @@ def ladder_rows(u, rows, bands=None, exp=None, xi=None) -> list[dict]:
     for k in sorted((k for k in u.received_offers if k in mine_all),
                     key=lambda k: -(u.received_offers[k]
                                     / (u.value_view.get(k) or 1e18))):
-        out.append(cell(k, "offer", "yours", None, None,
-                        bought=u.bought.get(k)))
+        out.append(cell(k, "offer", "yours", None, None))
 
     def buy_cell(k, group):
         r = won[k]
@@ -291,15 +294,22 @@ def ladder(u, rows, base, data=None, exp=None, xi=None) -> list[str]:
                 # exactly like no offer at all.
                 if r["group"] == "offer" and r.get("offer"):
                     money = "offer %.2fM" % (r["offer"] / 1e6)
-                    if r.get("worth"):
-                        over = r["offer"] / r["worth"] - 1.0
-                        money += " (%+.0f%% vs %.2fM" % (100 * over,
-                                                         r["worth"] / 1e6)
-                        money += ")"
-                    if r.get("bought"):
-                        money += (" · paid %.2fM, %+.2fM"
-                                 % (r["bought"] / 1e6,
-                                    (r["offer"] - r["bought"]) / 1e6))
+                    # AGAINST WHAT A SALE ACTUALLY FETCHES, not against the
+                    # quoted value. A bid is the only way a player leaves
+                    # for money -- there is no fixed-price channel, which is
+                    # why the 68 logged sales make one smooth hump with no
+                    # spike at 1.00 -- so the quoted value is not the offer
+                    # a seller is really choosing between. The going rate is
+                    # the median of those sales, fitted each run.
+                    #
+                    # WHAT HE COST IS NOT HERE, deliberately. It was, and it
+                    # is a sunk cost: whether to take 48M for Fornals turns
+                    # on what 48M buys against what Fornals scores, not on
+                    # what he was bought for. Miguel: "agree it is sunk cost".
+                    if r.get("going"):
+                        money += (" (%+.0f%% vs %.2fM going rate)"
+                                 % (100 * (r["offer"] / r["going"] - 1.0),
+                                    r["going"] / 1e6))
                 elif r["group"] == "sell":
                     if r.get("bought") is not None:
                         gain = (r["money"] or 0.0) - r["bought"]
@@ -1350,6 +1360,14 @@ def _selftest() -> None:
     assert got[0]["offer"] == 6.0e6, got[0]
     assert got[0]["worth"] == 5.0e6, ("market value comes along, because a "
                                       "bid means nothing without it", got[0])
+    # Judged against what a sale FETCHES, which is the quoted value lifted
+    # by the fitted clearing premium -- so a bid at the quoted value is a
+    # below-average bid, not a fair one.
+    assert got[0]["going"] is not None and got[0]["going"] >= 5.0e6, got[0]
+    # AND NOT against what he cost: that is sunk, and it was in here until
+    # Miguel pointed out it has no business in the decision.
+    assert got[0].get("bought") is None, ("purchase price is a sunk cost",
+                                          got[0])
     # Ordered by how generous the bid is against market value: steady is
     # 6.0M against 5.0M, dud has no market value to be generous against.
     assert got[1]["worth"] is None, got[1]
