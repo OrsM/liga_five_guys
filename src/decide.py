@@ -86,7 +86,16 @@ class Universe:
         return candidates(self, expected, budget)
 
     def player_forecasts(self) -> dict[str, dict]:
-        return player_forecasts(self)
+        """Every player's season and next-jornada forecast, par and pj.
+
+        CACHED, because it simulates every remaining jornada and the
+        renderers each want it. ladder_rows() and worth_doing() both ask,
+        so an uncached call ran the whole thing twice a report.
+        """
+        got = self.__dict__.get("_pf_cache")
+        if got is None:
+            got = self.__dict__["_pf_cache"] = player_forecasts(self)
+        return got
 
     def rank(self, acts: list["Action"], seed: int = 1,
             price=None, extra=()) -> tuple:

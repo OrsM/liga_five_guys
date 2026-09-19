@@ -162,9 +162,8 @@ def ladder_rows(u, rows, bands=None, exp=None, xi=None) -> list[dict]:
     sell_prem = _premiums(_dl, "sell")
     _rival_max = max(u.rival_cash.values(), default=None)
 
-    _pf = u.player_forecasts()
-    par = {k: v["par"] for k, v in _pf.items()}
-    pj = {k: v["pj"] for k, v in _pf.items()}
+    # par is a COLUMN here, not a screen -- worth_doing() owns the screen.
+    par = {k: v["par"] for k, v in u.player_forecasts().items()}
 
     def cell(k, group, where, money, pts, note="", value=None,
             lo=None, hi=None, market=None, premium=None):
@@ -223,17 +222,22 @@ def ladder_rows(u, rows, bands=None, exp=None, xi=None) -> list[dict]:
                     lo=r.get("pts_lo"), hi=r.get("pts_hi"),
                     market=u.value_view.get(k), premium=r.get("burn") or 0.0)
 
-    buys = [k for k in rest if k in won]
-    mae = current_mae()
-    ranked = sorted(buys, key=lambda k: _move_rank_key(won[k], u))
-    for k in ranked:
-        if (route_kind(u, k) == "free" and _gains(won[k])
-                and _clears_par_floor(par, mae, k,
-                                      len(u.state.jornadas), pj)):
-            out.append(buy_cell(k, "buy"))
-    raid_keys = raid_shortlist(u, won.values(), par, mae, pj)
-    for k in sorted(raid_keys, key=lambda k: _move_rank_key(won[k], u)):
-        out.append(buy_cell(k, "raid"))
+    # THE SAME SCREEN AS THE RECOMMENDATION, not a second copy of it. This
+    # block used to re-derive the whole thing -- its own player_forecasts(),
+    # its own par/pj/mae, its own _clears_par_floor and raid_shortlist --
+    # beside worth_doing() doing exactly that for payload() and the phone.
+    # Three renderers, two implementations, and they had already disagreed
+    # twice this week.
+    offer_keys = {r["action"].buy
+                  for r in worth_doing(u, [won[k] for k in rest if k in won])
+                  if r["action"].buy}
+    for k in sorted((k for k in rest if k in offer_keys),
+                    key=lambda k: _move_rank_key(won[k], u)):
+        # "listed" is neither: a man his owner has put up for sale can be
+        # outbid, so the board never calls him a buy or a raid.
+        kind = route_kind(u, k)
+        if kind in ("free", "raid"):
+            out.append(buy_cell(k, "buy" if kind == "free" else "raid"))
     for k in sorted((k for k in rest if k not in won
                      and u.price_view[k] > u.cash + spare),
                     key=lambda k: -exp.get(k, 0.0)):
