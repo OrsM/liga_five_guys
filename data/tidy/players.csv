@@ -200,7 +200,7 @@ player_id,name,club_id,ff_slug,af_slug,app_id,understat_id,app_names
 14097,pablo garcia,deportivo,pablo-garcia-2,,2997,,Pablo
 14100,raul jimenez,valencia,raul-jimenez-1,,,,
 14105,jorge salinas,racing,jorge-salinas,482469,3011,14687,Jorge Salinas
-14115,matia barzic,elche,matia-barzic,,3192,,Barzic|Umaru
+14115,matia barzic,elche,matia-barzic,,3192,14719,Barzic|Umaru
 14118,ali houary,elche,-ali-houary,448243,3190,13838,Ali Houary
 14125,luiz junior,villarreal,luiz-junior,278619,2467,12917,Júnior R.
 14135,manu gonzalez,betis,manu-gonzalez,,2794,,Manu G.
@@ -224,7 +224,7 @@ player_id,name,club_id,ff_slug,af_slug,app_id,understat_id,app_names
 14894,ismael santana,valencia,,,,,
 14903,hugo de llanos,real madrid,,,,,
 14904,daniel yañez,real madrid,,,2957,13266,Yañez
-14928,jose angel lopez,espanyol,jose-angel-lopez,,3172,,Jose Angel
+14928,jose angel lopez,espanyol,jose-angel-lopez,,3172,13455,Jose Angel
 14935,youssef enriquez,alaves,youssef-enriquez,,2568,,Youssef
 14962,mario solorzano,racing,,,3033,,M. Solorzano
 14967,juanpe gil,rayo,,,2744,,
@@ -424,7 +424,7 @@ player_id,name,club_id,ff_slug,af_slug,app_id,understat_id,app_names
 2715,pepelu,valencia,pepelu,47463,2464,2551,Pepelu
 2727,ezequiel ponce,elche,ezequiel-ponce,,3188,2057,E. Ponce
 2733,rodri hernandez,barcelona,rodri-hernandez,,3208,2496,Rodri
-2751,kike garcia,espanyol,kike-garcia,,2509,5074,Kike García
+2751,kike garcia,espanyol,kike-garcia,,2509,5074,A. García|Kike García
 2759,carles aleña,alaves,carles-alena,143,2564,5058,Aleñá
 2771,alex grimaldo,atletico,alex-grimaldo,563,3155,11866,Grimaldo
 2799,carlos soler,real sociedad,carlos-soler,930,2772,2478,C. Soler
