@@ -658,6 +658,36 @@ def _gains(r) -> bool:
     return d is not None and d > 0
 
 
+def worth_doing(u, rows) -> list:
+    """The moves this report is willing to recommend, screened once.
+
+    THREE RULES, ONE PLACE. Enough evidence under the edge to believe it
+    (the par floor, weighted by how many matches it rests on), one raid per
+    victim, and an edge at all once the move is actually simulated.
+
+    It lived inside payload(), so decisions.json obeyed all three and the
+    "Do this" line on the phone obeyed none: _best() takes whatever rank()
+    returned. On 2026-09-19 that had the alert telling Miguel to buy Jose
+    Angel Lopez for +18 while the JSON from the same run, the same minute,
+    listed neither him nor that move -- it had dropped him on the par
+    floor. The ladder is the browse view and still shows everything with
+    its own delta; this is the recommendation, and there is one of it.
+    """
+    _pf = u.player_forecasts()
+    par_of = {k: v["par"] for k, v in _pf.items()}
+    pj_of = {k: v["pj"] for k, v in _pf.items()}
+    mae = current_mae()
+    rows = [r for r in rows if not r["action"].buy
+            or _clears_par_floor(par_of, mae, r["action"].buy,
+                                 len(u.state.jornadas), pj_of)]
+    keep_raid = raid_shortlist(u, rows, par_of, mae, pj_of)
+    rows = [r for r in rows
+            if route_kind(u, r["action"].buy) != "raid"
+            or r["action"].buy in keep_raid]
+    # A candidate can clear rank()'s screen and still simulate negative.
+    return [r for r in rows if r.get("d_pts", 0.0) > 0]
+
+
 def _move_rank_key(r, u):
     reliable = 0 if u.route_view.get(r["action"].buy, "free") != "listed" else 1
     d = r.get("d_pts")
@@ -816,17 +846,7 @@ def payload(u, rows, base, rivals, locks_h=None, n_actions: int = 0,
     names = {k: title_name(v) for k, v in u.name_view.items()}
     lo, hi = base.band(u.me)
     moves = []
-    _pf = u.player_forecasts()
-    par_of = {k: v["par"] for k, v in _pf.items()}
-    pj_of = {k: v["pj"] for k, v in _pf.items()}
-    mae = current_mae()
-    rows = [r for r in rows if not r["action"].buy
-           or _clears_par_floor(par_of, mae, r["action"].buy,
-                                len(u.state.jornadas), pj_of)]
-    keep_raid = raid_shortlist(u, rows, par_of, mae, pj_of)
-    rows = [r for r in rows
-           if route_kind(u, r["action"].buy) != "raid"
-           or r["action"].buy in keep_raid]
+    rows = worth_doing(u, rows)
     # A MOVE HAS TO GAIN POINTS TO BE A MOVE. `rows` is what survived
     # rank()'s screen, not a verdict: a candidate can clear the screen and
     # then simulate NEGATIVE once it is run properly. _best() has always
@@ -836,7 +856,6 @@ def payload(u, rows, base, rivals, locks_h=None, n_actions: int = 0,
     # -16.63 points. The ladder still lists everything, grouped and with
     # its Δ shown; this is the recommendations list, and a recommendation
     # to lose points is not one.
-    rows = [r for r in rows if r.get("d_pts", 0.0) > 0]
     for r in sorted(rows, key=lambda r: _move_rank_key(r, u)):
         a = r["action"]
         who = max(rivals, key=lambda v: r["d_beat"].get(v, 0.0)) \
@@ -1093,6 +1112,28 @@ def _selftest() -> None:
     assert not _gains({"d_pts": 0.0}), "break-even is not worth a transfer"
     assert not _gains({}), "no simulated figure is not a yes"
     assert not _gains({"d_pts": None})
+
+    # THE PHONE AND THE JSON MUST NAME THE SAME MOVE. worth_doing() is the
+    # one screen; alert_lines() and payload() both run on its output. When
+    # only payload() screened, a run on 2026-09-19 told Miguel to buy Jose
+    # Angel Lopez while its own decisions.json listed neither him nor that
+    # move, having dropped him on the par floor.
+    _wd_rows = [{"action": Action("buy", buy="yuri", cost=1e6),
+                 "d_pts": 5.0, "d_win": 0.01, "net_pts": 5.0, "pts_lo": 0.0,
+                 "pts_hi": 9.0, "helps": 0.7, "value": None, "burn": None,
+                 "charge": 0.0, "answer": None, "mean": 0.0, "d_beat": {}},
+                {"action": Action("buy", buy="benat", cost=1e6),
+                 "d_pts": -3.0, "d_win": -0.01, "net_pts": -3.0,
+                 "pts_lo": -9.0, "pts_hi": 1.0, "helps": 0.2, "value": None,
+                 "burn": None, "charge": 0.0, "answer": None, "mean": 0.0,
+                 "d_beat": {}}]
+    kept = worth_doing(u2, _wd_rows)
+    assert [r["action"].buy for r in kept] == ["yuri"], kept
+    # and the headline is chosen from exactly that, never from the raw rows
+    import inspect as _ins
+    src_main = _ins.getsource(main)
+    assert "alert_lines(u, worth_doing(" in src_main, \
+        "the phone's headline must be screened by the same rule as the JSON"
 
     assert bid_lines(u2, []) == [], "no bids, nothing to say"
     u_bid = _dc_replace(u2, cash=3e6, my_bids={"yuri": 8e6, "benat": 2e6},
@@ -1598,7 +1639,7 @@ def main() -> None:
     }, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
     print("wrote %s" % (REPORTS / "decisions.json"))
 
-    lines = alert_lines(u, rows, rivals)
+    lines = alert_lines(u, worth_doing(u, rows), rivals)
     if lines or ALERTS.exists():
         prev = [ln for ln in
                 (ALERTS.read_text(encoding="utf-8").splitlines()
