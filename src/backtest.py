@@ -39,11 +39,13 @@ def squad_at(manager: str, when: dt.datetime) -> dict[str, str]:
     and latest_only() takes that file's newest snapshot -- the two existing
     pieces, rather than a fourth way to ask what a squad looked like.
     """
+    from ffcore.schema import API_TEAMS, text
     from ffcore.tidy import latest_only
-    return {r["player_id"]: POS_ID_SLOT[r["position_id"]]
+    return {text(r, API_TEAMS.PLAYER_ID):
+            POS_ID_SLOT[text(r, API_TEAMS.POSITION_ID)]
             for r in latest_only(csv_as_of(when, "data/tidy/api_teams.csv"))
-            if r.get("manager") == manager
-            and (r.get("position_id") or "") in POS_ID_SLOT}
+            if text(r, API_TEAMS.MANAGER) == manager
+            and text(r, API_TEAMS.POSITION_ID) in POS_ID_SLOT}
 
 
 def jornada_points(jornada: int, rows=None) -> dict[str, float]:
@@ -62,15 +64,14 @@ def jornada_points(jornada: int, rows=None) -> dict[str, float]:
     latest_per_key over (player_id, week, stat), so a later correction wins
     and the original does not linger.
     """
+    from ffcore.schema import API_STATS, num, text
     from ffcore.tidy import load_api_stats
     want, out = str(jornada), collections.defaultdict(float)
     for r in (load_api_stats() if rows is None else rows):
-        if (r.get("week") or "").strip() != want:
+        if text(r, API_STATS.WEEK) != want:
             continue
-        try:
-            out[r["player_id"]] += float(r.get("points") or 0.0)
-        except ValueError:
-            continue
+        out[text(r, API_STATS.PLAYER_ID)] += num(r, API_STATS.POINTS,
+                                                 default=0.0)
     return dict(out)
 
 
