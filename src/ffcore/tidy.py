@@ -27,7 +27,7 @@ __all__ = ["ROOT", "TIDY", "SEASON", "DECISIONS", "REPORTS", "PARTS", "MADRID",
            "MATCH_LEN", "minutes_played", "fresh_only", "DAILY_FRESH_DAYS",
            "EVERY_RUN_FRESH_DAYS", "stale_feeds",
            "GATED_API", "age_phrase", "last_api_standings",
-           "load_api_lineup", "market_routes", "pending_sent", "bought_price",
+           "load_api_lineup", "market_routes", "pending_sent",
            "pending_received", "LISTED_SELLER", "team_slug_of", "lock_order",
            "JornadaClock", "shown", "newest", "table_stats", "load_matches", "load_matches_history",
            "load_starters", "load_perjornada", "load_api_stats", "clock", "clock_history",
@@ -973,26 +973,6 @@ def pending_sent(mkt: list[dict], key_of) -> dict[str, float]:
     return out
 
 
-def bought_price(txns: list[dict], xw) -> dict[str, float]:
-    out: dict[str, float] = {}
-    for t in txns:
-        to = (t.get("to") or "").strip()
-        if not to or to == "market":
-            continue
-        price = (t.get("price") or "").strip()
-        if not price:
-            continue
-        key = xw.player(app_id=(t.get("player_id") or "").strip()) if xw \
-            else None
-        if not key:
-            continue
-        try:
-            out[key] = float(price)
-        except ValueError:
-            continue
-    return out
-
-
 def pending_received(offers: list[dict], pt_to_key: dict[str, str]
                      ) -> dict[str, float]:
     out: dict[str, float] = {}
@@ -1370,30 +1350,6 @@ def _selftest() -> None:
     assert got == {"me_a": 6795815.0}, got
     assert pending_received([], p2k) == {}
     assert pending_received(offers, {}) == {}
-
-    from ffcore.crosswalk import Crosswalk, Player
-    bp_xw = Crosswalk(players={
-        "steady": Player(player_id="steady", app_id="101"),
-        "flip": Player(player_id="flip", app_id="102"),
-    })
-    bp_txns = [
-        {"date": "2026-08-11", "player": "Steady", "player_id": "101",
-         "from": "market", "to": "me", "price": "5000000"},
-        {"date": "2026-08-12", "player": "Flip", "player_id": "102",
-         "from": "market", "to": "riv", "price": "3000000"},
-        {"date": "2026-08-20", "player": "Flip", "player_id": "102",
-         "from": "riv", "to": "market", "price": "4000000"},
-        {"date": "2026-08-21", "player": "Flip", "player_id": "102",
-         "from": "market", "to": "me", "price": "4500000"},
-        {"date": "2026-08-13", "player": "Nobody", "player_id": "999",
-         "from": "market", "to": "me", "price": "1"},
-        {"date": "2026-08-14", "player": "Steady", "player_id": "101",
-         "from": "market", "to": "me", "price": ""},
-    ]
-    bp = bought_price(bp_txns, bp_xw)
-    assert bp == {"steady": 5000000.0, "flip": 4500000.0}, bp
-    assert bought_price([], bp_xw) == {}
-    assert bought_price(bp_txns, None) == {}
 
     jl_matches = [{"match_id": "1", "jornada": "1", "home": "alaves",
                   "away": "getafe", "score": "3-0"},

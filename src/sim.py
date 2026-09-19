@@ -156,7 +156,7 @@ def ladder_rows(u, rows, bands=None, exp=None, xi=None) -> list[dict]:
     pj = {k: v["pj"] for k, v in _pf.items()}
 
     def cell(k, group, where, money, pts, note="", value=None,
-            lo=None, hi=None, market=None, premium=None, bought=None):
+            lo=None, hi=None, market=None, premium=None):
         if k in bands:
             pts, lo, hi, _action = bands[k]
         _worth = u.value_view.get(k)
@@ -169,7 +169,7 @@ def ladder_rows(u, rows, bands=None, exp=None, xi=None) -> list[dict]:
                 "money": money, "pts": pts, "par": par.get(k),
                 "pts_lo": lo, "pts_hi": hi, "note": note, "value": value,
                 "market": market, "premium": premium,
-                "bought": bought}
+                }
 
     out = []
     chg = xi_change(fielded_keys(u), xi)
@@ -187,8 +187,8 @@ def ladder_rows(u, rows, bands=None, exp=None, xi=None) -> list[dict]:
     for k in by_slot(u, benched, exp):
         out.append(cell(k, "keep", "yours", None, None))
     for k in sorted(dead, key=lambda k: -exp.get(k, 0.0)):
-        out.append(cell(k, "sell", "yours", u.proceeds_view.get(k, 0.0), None,
-                        bought=u.bought.get(k)))
+        out.append(cell(k, "sell", "yours", u.proceeds_view.get(k, 0.0),
+                        None))
 
     mine_all = set(u.state.squads.get(u.me, {}))
     for k in sorted((k for k in u.received_offers if k in mine_all),
@@ -310,13 +310,6 @@ def ladder(u, rows, base, data=None, exp=None, xi=None) -> list[str]:
                         money += (" (%+.0f%% vs %.2fM going rate)"
                                  % (100 * (r["offer"] / r["going"] - 1.0),
                                     r["going"] / 1e6))
-                elif r["group"] == "sell":
-                    if r.get("bought") is not None:
-                        gain = (r["money"] or 0.0) - r["bought"]
-                        money += (" (bought %.2fM, %+.2fM)"
-                                 % (r["bought"] / 1e6, gain / 1e6))
-                    else:
-                        money += " (bought: unknown)"
         return ("| %s | %s | %.0f%% | %.2f | %s | %s | %s | %s | %s |"
                 % (r["name"], r["pos"] or "—", 100 * r["start"], r["xpts"],
                    r["where"], money, season,
@@ -852,7 +845,7 @@ def payload(u, rows, base, rivals, locks_h=None, n_actions: int = 0,
         "band": [lo, hi],
         "moves": moves,
         "sell": [{"name": names.get(k, k), "pos": u.pos_view.get(k, ""),
-                  "raises": got, "bought": u.bought.get(k)}
+                  "raises": got}
                  for k, got in dead_weight(u)],
         "ladder": (ladder_data if ladder_data is not None
                   else ladder_rows(u, rows, exp=exp, xi=xi)),
@@ -1366,8 +1359,8 @@ def _selftest() -> None:
     assert got[0]["going"] is not None and got[0]["going"] >= 5.0e6, got[0]
     # AND NOT against what he cost: that is sunk, and it was in here until
     # Miguel pointed out it has no business in the decision.
-    assert got[0].get("bought") is None, ("purchase price is a sunk cost",
-                                          got[0])
+    assert "bought" not in got[0], ("purchase price is a sunk cost",
+                                    got[0])
     # Ordered by how generous the bid is against market value: steady is
     # 6.0M against 5.0M, dud has no market value to be generous against.
     assert got[1]["worth"] is None, got[1]
@@ -1452,8 +1445,7 @@ def _selftest() -> None:
            players=players_from_flat(
                pos={**{k: v for k, v in sqb.items()}, "cand": "MED"},
                price={"cand": 5e6},
-               proceeds={"dead": 1e6, "star": 20e6}),
-           bought={"dead": 0.8e6})
+               proceeds={"dead": 1e6, "star": 20e6}))
     asked = band_acts(ub)
     keys = {k for k, _a in asked}
     assert keys == {*sqb, "cand"}, keys
@@ -1474,18 +1466,18 @@ def _selftest() -> None:
     assert bands["cand"][0] > 0, bands["cand"]
     assert ub.rank([], extra=[])[3] == {}
 
+    # WHAT A MAN COST IS NOWHERE, in either renderer. It was on the SELL row
+    # and in the JSON beside it, and it is a sunk cost either way: what he
+    # raises is the number that decides anything.
     sell_lad = "\n".join(ladder(ub, [], baseb))
     dead_line = next(l for l in sell_lad.splitlines()
                      if l.lower().startswith("| dead"))
-    assert "1.00M (bought 0.80M, +0.20M)" in dead_line, dead_line
-    ub_unknown = _dc_replace(ub, bought={})
-    unk_lad = "\n".join(ladder(ub_unknown, [], baseb))
-    unk_line = next(l for l in unk_lad.splitlines()
-                    if l.lower().startswith("| dead"))
-    assert "1.00M (bought: unknown)" in unk_line, unk_line
+    assert "1.00M" in dead_line, dead_line
+    assert "bought" not in dead_line.lower(), dead_line
     sell_json = payload(ub, [], baseb, ["riv"])["sell"]
     by_name = {r["name"]: r for r in sell_json}
-    assert by_name["Dead"]["bought"] == 0.8e6, by_name["Dead"]
+    assert by_name["Dead"]["raises"] == 1e6, by_name["Dead"]
+    assert "bought" not in by_name["Dead"], by_name["Dead"]
     assert "star" not in by_name, by_name
 
     buy_cand = decide.Action("buy", buy="cand", cost=5e6)

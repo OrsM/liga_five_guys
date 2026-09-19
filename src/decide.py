@@ -34,7 +34,7 @@ from ffcore.tidy import (run_now,
                          load_api_stats, load_matches, load_perjornada,
                          last_api_standings, load_api_offers, load_api_teams,
                          load_players, market_routes, pending_sent,
-                         bought_price, pending_received)
+                         pending_received)
 from ffcore.schema import text, num, API_TEAMS, API_STANDINGS
 from ffcore.schema import MARKET as MARKET_TBL
 
@@ -57,7 +57,6 @@ class Universe:
     cash: float
     me: str
     players: dict[str, PlayerProfile] = field(default_factory=dict)
-    bought: dict[str, float] = field(default_factory=dict)
     rival_cash: dict[str, float] = field(default_factory=dict)
     part_played: dict[int, set[str]] = field(default_factory=dict)
     first_jornada_of: dict[str, int] = field(default_factory=dict)
@@ -482,8 +481,7 @@ def load(trials_pool=None) -> Universe:
         start_note=_calibrated()[0].note(),
         unjoined=list(unjoined_clubs) + list(lg.api_unjoined),
         locked_cash=locked_cash, my_bids=my_bids,
-        received_offers=received_offers,
-        bought=bought_price(lg.txns, lg.xw))
+        received_offers=received_offers)
     return _LOAD_CACHE
 
 
