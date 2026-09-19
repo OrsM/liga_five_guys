@@ -157,7 +157,9 @@ def ladder_rows(u, rows, bands=None, exp=None, xi=None) -> list[dict]:
             lo=None, hi=None, market=None, premium=None, bought=None):
         if k in bands:
             pts, lo, hi, _action = bands[k]
-        return {"name": title_name(u.name_view.get(k, k)),
+        return {"offer": u.received_offers.get(k),
+                "worth": u.value_view.get(k),
+                "name": title_name(u.name_view.get(k, k)),
                 "pos": u.pos_view.get(k, ""), "start": u.start_view.get(k, 0.0),
                 "xpts": exp.get(k, 0.0), "group": group, "where": where,
                 "money": money, "pts": pts, "par": par.get(k),
@@ -182,6 +184,13 @@ def ladder_rows(u, rows, bands=None, exp=None, xi=None) -> list[dict]:
         out.append(cell(k, "keep", "yours", None, None))
     for k in sorted(dead, key=lambda k: -exp.get(k, 0.0)):
         out.append(cell(k, "sell", "yours", u.proceeds_view.get(k, 0.0), None,
+                        bought=u.bought.get(k)))
+
+    mine_all = set(u.state.squads.get(u.me, {}))
+    for k in sorted((k for k in u.received_offers if k in mine_all),
+                    key=lambda k: -(u.received_offers[k]
+                                    / (u.value_view.get(k) or 1e18))):
+        out.append(cell(k, "offer", "yours", None, None,
                         bought=u.bought.get(k)))
 
     def buy_cell(k, group):
@@ -274,7 +283,24 @@ def ladder(u, rows, base, data=None, exp=None, xi=None) -> list[str]:
                     money += " +%.2fM" % (r["premium"] / 1e6)
             else:
                 money = ("%+.2fM" % (r["money"] / 1e6)) if r["money"] else "—"
-                if r["group"] == "sell":
+                # A BID ON A MAN YOU OWN, judged against the two numbers
+                # that make it good or bad: what he is worth on the market
+                # today, and what you paid for him. The bid already lifts
+                # his proceeds inside the simulation -- it just never said
+                # so, so a generous offer on a man you were keeping looked
+                # exactly like no offer at all.
+                if r["group"] == "offer" and r.get("offer"):
+                    money = "offer %.2fM" % (r["offer"] / 1e6)
+                    if r.get("worth"):
+                        over = r["offer"] / r["worth"] - 1.0
+                        money += " (%+.0f%% vs %.2fM" % (100 * over,
+                                                         r["worth"] / 1e6)
+                        money += ")"
+                    if r.get("bought"):
+                        money += (" · paid %.2fM, %+.2fM"
+                                 % (r["bought"] / 1e6,
+                                    (r["offer"] - r["bought"]) / 1e6))
+                elif r["group"] == "sell":
                     if r.get("bought") is not None:
                         gain = (r["money"] or 0.0) - r["bought"]
                         money += (" (bought %.2fM, %+.2fM)"
@@ -319,6 +345,10 @@ def ladder(u, rows, base, data=None, exp=None, xi=None) -> list[str]:
     if by_group.get("sell"):
         out.append("| **SELL — never start** | | | | | | | | |")
         out += [row_md(r) for r in by_group["sell"]]
+
+    if by_group.get("offer"):
+        out.append("| **OFFERS — someone wants him** | | | | | | | | |")
+        out += [row_md(r) for r in by_group["offer"]]
 
     if by_group.get("buy"):
         out.append("| **BUY — free agents** | | | | | | | | |")
@@ -1304,6 +1334,28 @@ def _selftest() -> None:
     for r in owned_lad:
         by_group.setdefault(r["group"], []).append(r["name"].lower())
     assert by_group["buy"] == ["steady", "dud", "maverick"], by_group
+
+    # A BID ON A MAN YOU OWN gets its own row, wherever he sits. It already
+    # lifted his proceeds inside the simulation and said nothing, so the best
+    # offer on the board -- 48.07M for Fornals, 8% over market -- was
+    # invisible, because a settled starter is collapsed into the eleven's
+    # summary line and never gets a row at all.
+    offered = _dc_replace(
+        uc_owned,
+        state=LeagueState({"me": {"steady": "MED", "dud": "MED"}, "riv": {}},
+                          [1, 2], "me"),
+        received_offers={"steady": 6.0e6, "dud": 1.0e6})
+    got = [r for r in ladder_rows(offered, all_rows) if r["group"] == "offer"]
+    assert [r["name"].lower() for r in got] == ["steady", "dud"], got
+    assert got[0]["offer"] == 6.0e6, got[0]
+    assert got[0]["worth"] == 5.0e6, ("market value comes along, because a "
+                                      "bid means nothing without it", got[0])
+    # Ordered by how generous the bid is against market value: steady is
+    # 6.0M against 5.0M, dud has no market value to be generous against.
+    assert got[1]["worth"] is None, got[1]
+    assert all(r.get("offer") for r in got), got
+    assert not [r for r in ladder_rows(uc_owned, all_rows)
+                if r["group"] == "offer"], "no offers, no section"
     assert by_group["raid"] == ["rivals"], by_group
     assert "wished" not in [n for names in by_group.values() for n in names], \
         by_group

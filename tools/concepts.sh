@@ -147,7 +147,15 @@ check "Universe flat-dict storage" 0 \
 # historical squad, load_api_stats for the scores and best_xi for the shape
 # rules; the lines are its self-test and the note that api_stats is a
 # per-STAT breakdown, which cost two wrong runs before it was summed.
-check "src/ lines" 20450 \
+# 20450 -> 20495 on 2026-09-19: the OFFERS block. Six live bids on players
+# Miguel owns were lifting their proceeds inside the simulation and saying
+# nothing anywhere -- and the biggest, 48.07M for Fornals at 8% over market,
+# could never have shown, because a settled starter is collapsed into the
+# eleven's summary line and gets no row. A bid is now judged against the two
+# numbers that make it good or bad: what he fetches today, and what was paid
+# for him. One section, so the offer is stated once rather than sprinkled
+# across whichever rows happen to appear.
+check "src/ lines" 20495 \
   "$(find src -name '*.py' | xargs cat | wc -l)"
 
 [ "$fail" -eq 0 ] && echo "concepts: no duplication regained" || echo "concepts: a concept regained a second implementation"
