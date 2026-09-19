@@ -689,7 +689,9 @@ def worth_doing(u, rows) -> list:
             if route_kind(u, r["action"].buy) != "raid"
             or r["action"].buy in keep_raid]
     # A candidate can clear rank()'s screen and still simulate negative.
-    return [r for r in rows if r.get("d_pts", 0.0) > 0]
+    # _gains() is that test; raid_shortlist() already uses it, so writing
+    # `d_pts > 0` again here was the same rule in two hands.
+    return [r for r in rows if _gains(r)]
 
 
 def _move_rank_key(r, u):
