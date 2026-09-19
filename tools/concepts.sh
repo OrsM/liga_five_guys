@@ -163,7 +163,16 @@ check "Universe flat-dict storage" 0 \
 # each run (+3.6% at 68 sales) and the offer is measured against that. The
 # purchase-price comparison came OUT: it is a sunk cost and had no business
 # in the decision.
-check "src/ lines" 20575 \
+# 20575 -> 20610 on 2026-09-19: transfer_premium() replaces
+# clearing_premium(), and it is ONE fitter for what had been drifting into
+# two questions -- what a bid on your player is worth, and what to bid for
+# someone else's. Both are the premium over market value at which a player
+# changes hands, so both read the same fit, conditioned on how contested
+# the listing is and SHRUNK toward the unconditional median by a
+# pseudo-count. The shrinkage is the point: two contested sales at +40% must
+# not become a +40% recommendation, and the cell earns its voice as the
+# season fills in without anyone re-deciding the number.
+check "src/ lines" 20610 \
   "$(find src -name '*.py' | xargs cat | wc -l)"
 
 [ "$fail" -eq 0 ] && echo "concepts: no duplication regained" || echo "concepts: a concept regained a second implementation"

@@ -149,8 +149,16 @@ def ladder_rows(u, rows, bands=None, exp=None, xi=None) -> list[dict]:
     spare = max_spare_proceeds(u)
     rest = [k for k in u.price_view if k not in mine and exp.get(k, 0.0) > bar]
     bands = {k: v for k, v in (bands or {}).items() if k not in won}
-    from methodology import clearing_premium
-    clearing, _clearing_why = clearing_premium()
+    from methodology import transfer_premium
+    clearing, _clearing_why = transfer_premium()
+    _ask_cache: dict = {}
+
+    def ask_at(n):
+        if n not in _ask_cache:
+            _ask_cache[n] = transfer_premium(bids=n)[0] if n is not None \
+                else clearing
+        return _ask_cache[n]
+
     _pf = u.player_forecasts()
     par = {k: v["par"] for k, v in _pf.items()}
     pj = {k: v["pj"] for k, v in _pf.items()}
@@ -160,7 +168,11 @@ def ladder_rows(u, rows, bands=None, exp=None, xi=None) -> list[dict]:
         if k in bands:
             pts, lo, hi, _action = bands[k]
         _worth = u.value_view.get(k)
+        _n = u.bids_view.get(k)
+        _mkt = u.value_view.get(k)
         return {"offer": u.received_offers.get(k),
+                "rivals": _n,
+                "ask": (_mkt * (1.0 + ask_at(_n))) if _mkt else None,
                 "worth": _worth,
                 "going": (_worth * (1.0 + clearing)) if _worth else None,
                 "name": title_name(u.name_view.get(k, k)),
@@ -284,6 +296,16 @@ def ladder(u, rows, base, data=None, exp=None, xi=None) -> list[str]:
                 money = "%.2fM" % (r["market"] / 1e6)
                 if r["premium"]:
                     money += " +%.2fM" % (r["premium"] / 1e6)
+                # WHAT TO ACTUALLY BID. Market value is what he is worth,
+                # not what he goes for: fitted over every priced transfer
+                # this season and conditioned on how many bids are already
+                # in, because that is the one thing you know before you bid.
+                if r.get("ask"):
+                    money += " · bid %.2fM" % (r["ask"] / 1e6)
+                    if r.get("rivals"):
+                        money += " (%d bid%s in)" % (r["rivals"],
+                                                     "" if r["rivals"] == 1
+                                                     else "s")
             else:
                 money = ("%+.2fM" % (r["money"] / 1e6)) if r["money"] else "—"
                 # A BID ON A MAN YOU OWN, judged against the two numbers

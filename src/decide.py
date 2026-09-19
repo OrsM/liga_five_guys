@@ -100,6 +100,15 @@ class Universe:
                                  if p.current.pos})
 
     @cached_property
+    def bids_view(self) -> Mapping[str, int]:
+        """How many bids are already on a listing -- how contested it is
+        before you add yours. Scraped since the first day and read by
+        nothing until now."""
+        return MappingProxyType({k: p.current.bids
+                                 for k, p in self.players.items()
+                                 if p.current.bids is not None})
+
+    @cached_property
     def price_view(self) -> Mapping[str, float]:
         return MappingProxyType({k: p.current.price
                                  for k, p in self.players.items()
