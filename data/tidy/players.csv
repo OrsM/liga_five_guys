@@ -93,7 +93,7 @@ player_id,name,club_id,ff_slug,af_slug,app_id,understat_id,app_names
 11886,manuel angel,real madrid,manuel-ngel,,2907,14502,
 11905,saba sazonov,getafe,saba-sazonov,,3134,9381,Saba Sazonov
 11916,andres garcia,getafe,andres-garcia,388013,3135,13392,Andrés Garcia
-11983,alvaro djalo,athletic,lvaro-djalo,,3122,13001,Alvaro J.|Djalo
+11983,alvaro djalo,athletic,lvaro-djalo,,3122,13001,Djalo
 11998,petar ratkov,levante,petar-ratkov,,3256,14342,Ratkov
 12025,filip ugrinic,valencia,filip-ugrinic,48465,2612,13761,Ugrinic
 12042,chidera ejuke,sevilla,chidera-ejuke,39121,2454,8694,Ejuke
@@ -262,13 +262,14 @@ player_id,name,club_id,ff_slug,af_slug,app_id,understat_id,app_names
 16004,davinchi,getafe,davinchi,471478,2736,13788,Davinchi
 16014,antonio martinez bastida,elche,,,2816,,A. Martinez
 16017,alejandro panach,valencia,alejandro-panach,,2863,,Panach
-16018,aimar blazquez,valencia,aimar-blazquez,,2748,,Aimar Blázquez
+16018,aimar blazquez,valencia,aimar-blazquez,,2748,13763,Aimar Blázquez
 16020,nacho perez,levante,nacho-perez-1,504605,2742,13772,Nacho Perez
 16022,kareem tunde,levante,kareem-tunde,579287,,14258,
 16099,lucas noubi,deportivo,lucas-noubi,319512,2985,14706,Noubi
 16146,samu becerra,rayo,,,2679,13695,Becerra
 16147,ivan alonso,rayo,ivan-alonso,,3180,,Alonso
 16149,moha hamdoune,getafe,moha-hamdoune,,3245,,Moha
+16154,jose antonio morante,betis,,,3276,,Morante
 16155,theo folgado,real sociedad,,,2792,,Folgado
 16156,oscar marcos,celta,,,2849,,Óscar Marcos
 16158,mauro echegoyen,osasuna,mauro-echegoyen,,2723,,Mauro
@@ -356,7 +357,7 @@ player_id,name,club_id,ff_slug,af_slug,app_id,understat_id,app_names
 18014,arouna sangante,sevilla,arouna-sangante,,3138,11788,Sangante
 18017,teun gijselhart,deportivo,teun-gijselhart,,3187,14713,Gijselhart
 18018,justin de haas,valencia,justin-de-haas,36884,3120,14800,De Haas
-18021,alvaro padilla,elche,alvaro-padilla,,3191,14718,Á. Padilla
+18021,alvaro padilla,elche,alvaro-padilla,,3191,14718,Alvaro J.|Á. Padilla
 18026,manuel angel castillo,sevilla,manuel-angel-castillo,,3214,,Manuel Ángel
 18027,igor galdin,levante,,,3167,,Galdin
 18028,marc santos,levante,marc-santos,,3165,14702,Marc Santos
