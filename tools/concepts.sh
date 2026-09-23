@@ -188,7 +188,27 @@ check "Universe flat-dict storage" 0 \
 # pseudo-count. The shrinkage is the point: two contested sales at +40% must
 # not become a +40% recommendation, and the cell earns its voice as the
 # season fills in without anyone re-deciding the number.
-check "src/ lines" 20610 \
+# 20610 -> 20638 on 2026-09-23: three real perf fixes, not a duplicated
+# concept -- Market.at()/series() re-parsed a player's whole price history
+# from scratch on every call (4.6M redundant money() calls, 76s of a 196s
+# run, from sec_drift() alone calling drift() once per deal per horizon);
+# load_understat_players()'s cache key included `season`, so the same
+# season's several callers each re-read and re-sorted the ~160k-row CSV;
+# load_lineups() had no cache at all and re-read the ~174k-row CSV on
+# each of 3 calls in one build(). All three now parse once and are reused.
+# 20638 -> 20754 on 2026-09-23: STORE_DAILY. market.csv/lineups.csv/
+# understat_players.csv write a full row per key every scrape round
+# regardless of whether anything changed -- measured 83.7%/86.5%/98.9%
+# duplicate consecutive rows, a 5-8x amplification on every reader that
+# re-parses these files (Market, load_market_frozen, load_lineups,
+# load_understat_players). A NEW CAPABILITY, not a tidy: a key's row for
+# today is now overwritten in place rather than appended, so N rounds in
+# one day net one row. _compact_daily() is the one function both the full
+# rebuild and the tail-append path call, so retroactive compaction of the
+# existing history is just running a full rebuild, not a second script.
+# Most of the added lines are _append_csv_daily (refuses on a shape change,
+# same as _append_csv) and its self-test.
+check "src/ lines" 20754 \
   "$(find src -name '*.py' | xargs cat | wc -l)"
 
 [ "$fail" -eq 0 ] && echo "concepts: no duplication regained" || echo "concepts: a concept regained a second implementation"

@@ -8,7 +8,8 @@ from ffcore.second import LEGEND, af_cell, second_cells
 from ffcore.text import norm
 from ffcore.tidy import (run_now, shown,
                          DECISIONS, PARTS, append_csv,
-                         load_players, widen_csv, write_lines)
+                         load_players, stale_owned_players,
+                         widen_csv, write_lines)
 from slate import read_slate
 
 HEAD = ("| Player | Team | Pos | Value | 24h | FF | AF |\n"
@@ -275,6 +276,7 @@ def main():
 
     lg = session().lg
     print("replayed %d transaction(s)" % len(lg.txns))
+    players = stale_owned_players(players, lg.owner, lg.market)
 
     on_offer, unresolved = read_slate(lg.market, xw=lg.xw)
     if on_offer or unresolved:

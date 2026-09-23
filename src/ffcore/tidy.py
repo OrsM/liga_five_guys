@@ -8,7 +8,7 @@ import sys
 from datetime import datetime, timedelta, timezone
 from functools import lru_cache
 from pathlib import Path
-from types import MappingProxyType
+from types import MappingProxyType, SimpleNamespace
 from typing import NamedTuple
 
 from ffcore.parse import money, pct100
@@ -380,8 +380,25 @@ def load_market_latest() -> list[dict]:
 LINEUP_SOURCE = "futbolfantasy"
 
 
+_LINEUPS_CACHE: dict[tuple, tuple] = {}
+
+
 def load_lineups(source: str = LINEUP_SOURCE) -> list[dict]:
-    return pick_source(read_csv(TIDY / "lineups.csv"), source)
+    """All lineup rows for `source` (default) or every source (""). One
+    build() call hits this 3x across sources -- each used to re-read the
+    whole ~174k-row CSV; the raw parse is now cached per file version and
+    `source` filters the cached, unfiltered read."""
+    path = TIDY / "lineups.csv"
+    try:
+        st = path.stat()
+    except OSError:
+        return []
+    key = (st.st_mtime_ns, st.st_size)
+    hit = _LINEUPS_CACHE.get(key)
+    if hit is None:
+        hit = tuple(read_csv(path))
+        _LINEUPS_CACHE[key] = hit
+    return pick_source([dict(r) for r in hit], source)
 
 
 def load_lineups_latest(source: str = LINEUP_SOURCE) -> list[dict]:
@@ -549,24 +566,28 @@ _UNDERSTAT_CACHE: dict[tuple, tuple] = {}
 
 
 def load_understat_players(season: str = "") -> list[dict]:
+    """Latest row per (season, understat_id). The cache key used to include
+    `season`, so each of a run's several same-season calls (score.py alone:
+    5x across two seasons per build()) re-read and re-sorted the whole
+    ~160k-row CSV. Cached once per file version instead; `season` only
+    filters the already-deduped, far smaller result."""
     path = TIDY / "understat_players.csv"
     try:
         st = path.stat()
     except OSError:
         return []
-    key = (season, st.st_mtime_ns, st.st_size)
+    key = (st.st_mtime_ns, st.st_size)
     hit = _UNDERSTAT_CACHE.get(key)
     if hit is None:
-        rows = read_csv(path)
-        if season:
-            rows = [r for r in rows if r.get("season") == season]
         latest: dict[tuple, dict] = {}
-        for r in sorted(rows, key=lambda r: r.get("observed_at", "")):
+        for r in sorted(read_csv(path), key=lambda r: r.get("observed_at", "")):
             k = (r.get("season"), r.get("understat_id"))
             if k[1]:
                 latest[k] = r
         hit = tuple(latest.values())
         _UNDERSTAT_CACHE[key] = hit
+    if season:
+        return [dict(r) for r in hit if r.get("season") == season]
     return [dict(r) for r in hit]
 
 
@@ -719,6 +740,30 @@ def _merge(players: dict, rows: list[dict], name_col: str, fields,
     return players
 
 
+def stale_owned_players(players: dict, owned_keys, market) -> dict:
+    """players, plus a last-known record for each owned key the live
+    market snapshot dropped, via market.latest() (never expiring) and
+    load_players()'s own field parsing. Tags the backfilled `status` as
+    stale so squads.flag() renders a warning instead of reading as fresh.
+    Does not touch load_players()'s own forecasting player universe.
+    """
+    missing = [k for k in owned_keys if k not in players]
+    if not missing or market is None:
+        return players
+    latest = market.latest()
+    stale = [latest[k] for k in missing if k in latest]
+    if not stale:
+        return players
+    out = dict(players)
+    _merge(out, stale, "name", MARKET_FIELDS)
+    for r in stale:
+        key = row_key(r, ())
+        rec = out.get(key)
+        if rec is not None:
+            rec["status"] = "stale since %s" % r.get("observed_at", "?")
+    return out
+
+
 def load_players() -> dict[str, dict]:
     market, xi = load_market_latest(), _cached_latest_snapshot(TIDY / "lineups.csv")
     if not market and not xi:
@@ -808,6 +853,7 @@ class Market:
         self._latest: list | None = None
         self._name_idx: dict | None = None
         self._resolved: dict[str, str | None] = {}
+        self._parsed_cache: dict[str, list] = {}
         self._by_key: dict[str, list[tuple[datetime, dict]]] = {}
         latest = latest_only(rows)
         self._by_name: dict[str, list] = {}
@@ -897,16 +943,25 @@ class Market:
     def latest(self) -> dict[str, dict]:
         return {k: hist[-1][1] for k, hist in self._by_key.items() if hist}
 
+    def _parsed(self, key: str) -> list[tuple[datetime, dict, float | None]]:
+        """(t, row, money(row['value'])) per key, parsed once and cached --
+        at()/series() used to re-parse a player's whole history every call."""
+        cached = self._parsed_cache.get(key)
+        if cached is None:
+            cached = [(t, r, money(r.get("value")))
+                     for t, r in self._by_key.get(key, ())]
+            self._parsed_cache[key] = cached
+        return cached
+
     def at(self, name, when: datetime | None) -> Valuation | None:
         key = self.key_for(name)
         if not key or when is None:
             return None
-        hist = self._by_key.get(key) or []
+        hist = self._parsed(key)
         if not hist:
             return None
-        prior = [(t, r) for t, r in hist if t <= when]
-        t, r = prior[-1] if prior else hist[0]
-        val = money(r.get("value"))
+        prior = [(t, r, v) for t, r, v in hist if t <= when]
+        t, r, val = prior[-1] if prior else hist[0]
         if val is None:
             return None
         return Valuation(val, r.get("observed_at", ""),
@@ -915,12 +970,9 @@ class Market:
 
     def series(self, name) -> list[tuple[datetime, float]]:
         key = self.key_for(name)
-        out = []
-        for t, r in self._by_key.get(key, []) if key else []:
-            v = money(r.get("value"))
-            if v is not None:
-                out.append((t, v))
-        return out
+        if not key:
+            return []
+        return [(t, v) for t, _r, v in self._parsed(key) if v is not None]
 
     def drift(self, name, since: datetime | None, days: float):
         if since is None:
@@ -1089,6 +1141,29 @@ def _selftest_new_loaders() -> None:
             except (TypeError, ValueError):
                 continue
     assert j1 == expect, "jornada_of_match() must be first-write-wins"
+
+    _selftest_stale_owned()
+
+
+def _selftest_stale_owned() -> None:
+    live = {"live_id": {"name": "Still Listed", "value": 5_000_000}}
+    fell_off = {"live_id": {"name": "Still Listed", "value": 5_000_000},
+               "gone_id": {"ff_id": "gone_id", "name": "Gustavo",
+                            "value": "13594034",
+                            "observed_at": "2026-09-01T1056Z", "team": "Racing",
+                            "position": "mediocampista"}}
+    market = SimpleNamespace(latest=lambda: fell_off)
+
+    out = stale_owned_players(live, ["live_id", "gone_id"], market)
+    assert out["live_id"] == live["live_id"], "must not touch a live record"
+    assert (out["gone_id"]["value"], out["gone_id"]["name"],
+           out["gone_id"]["status"]) == \
+        (13_594_034.0, "Gustavo", "stale since 2026-09-01T1056Z"), out
+    assert "gone_id" not in live, "must not mutate the input dict"
+
+    assert stale_owned_players(live, ["live_id"], market) is live
+    assert stale_owned_players(live, ["never_seen"], market) is live
+    assert stale_owned_players(live, ["gone_id"], None) is live
 
 
 def _selftest() -> None:

@@ -57,10 +57,10 @@ from ffcore.auth import API_BASE
 from ffcore.league import load_config
 from ffcore.tidy import ROOT, SEASON, TIDY, append_csv
 from sources import (API_LEAGUES_KEY, CAL_KEY, MATCH_KEY_RE,
-                     ROW_TABLE, STORE_ONCE, league_sources, offer_sources,
-                     parse_api_leagues, parse_points, parser_sig,
-                     played_sources, player_sources, season_label,
-                     source_for, sources)
+                     ROW_TABLE, STORE_DAILY, STORE_ONCE, league_sources,
+                     offer_sources, parse_api_leagues, parse_points,
+                     parser_sig, played_sources, player_sources,
+                     season_label, source_for, sources)
 
 RAW = ROOT / "raw"
 
@@ -507,8 +507,13 @@ def _parse_tail(walk, tail, sigs_now, stamps, state) -> bool:
         return False              # a table the tables file has never seen
 
     for table in sorted(pending):
-        if not _append_csv(TIDY / f"{table}.csv", pending[table],
-                           STORE_ONCE.get(table)):
+        daily = STORE_DAILY.get(table)
+        if daily:
+            if not _append_csv_daily(TIDY / f"{table}.csv", pending[table],
+                                     daily):
+                return False
+        elif not _append_csv(TIDY / f"{table}.csv", pending[table],
+                             STORE_ONCE.get(table)):
             return False
 
     _append_cache_lines(fresh)
@@ -611,12 +616,16 @@ def _parse_everything(walk, sigs_now, stamps) -> None:
     written: list[str] = []
     for table in sorted(spilled | set(pending)):
         once = STORE_ONCE.get(table)
+        daily = STORE_DAILY.get(table)
         seen: set[int] = set()
         w = fh = None
         fieldnames: list = []
         fieldset: set = set()
         n = 0
-        for r in _spilled_rows(spill, table, pending.pop(table, [])):
+        rows_iter = _spilled_rows(spill, table, pending.pop(table, []))
+        if daily:
+            rows_iter = _compact_daily(list(rows_iter), daily)
+        for r in rows_iter:
             if once:
                 k = tuple((r.get(c) or "") for c in once)
                 if all(k):
@@ -875,6 +884,60 @@ def _spilled_rows(root: Path, table: str, tail: list):
                     yield json.loads(line)
     for r in tail:
         yield r
+
+
+def _compact_daily(rows: list[dict], key_cols) -> list[dict]:
+    """One row per (key, day): later rows for the same key on the same day
+    overwrite the earlier one in place rather than adding a new row. `day`
+    is observed_at's first 10 characters (observed_at is UTC, see
+    ffcore.tidy.shown), and the group keeps its FIRST position so output
+    order stays the original interleaving, just with reruns collapsed.
+    A row missing any key column passes through uncompacted -- same
+    all-or-nothing rule STORE_ONCE uses, so a blank id never merges rows.
+    """
+    out: list[dict] = []
+    pos: dict[tuple, int] = {}
+    for r in rows:
+        k = tuple((r.get(c) or "") for c in key_cols)
+        if not all(k):
+            out.append(r)
+            continue
+        gk = (k, (r.get("observed_at") or "")[:10])
+        i = pos.get(gk)
+        if i is None:
+            pos[gk] = len(out)
+            out.append(r)
+        else:
+            out[i] = r
+    return out
+
+
+def _append_csv_daily(path: Path, rows: list[dict], key_cols) -> bool:
+    """_append_csv's STORE_DAILY counterpart: a key's row for today is
+    overwritten rather than appended, so N rounds in one day net one row
+    per key. Needs the whole file (already ~6x smaller for a compacted
+    table) since overwriting a mid-file row means rewriting the file.
+    """
+    if not rows:
+        return True
+    if not path.exists():
+        _write_csv(path, _compact_daily(rows, key_cols))
+        return True
+    try:
+        with path.open(newline="", encoding="utf-8") as fh:
+            reader = csv.DictReader(fh)
+            header = reader.fieldnames
+            if header is None:
+                return False
+            existing = list(reader)
+    except OSError:
+        return False
+    fieldset = set(header)
+    for r in rows:
+        if not set(r) <= fieldset:
+            return False          # shape moved -- a rebuild, not a guess
+    _write_csv(path, _compact_daily(existing + rows, key_cols))
+    return True
 
 
 def _append_csv(path: Path, rows: list[dict], once_key=None) -> bool:
@@ -1162,6 +1225,10 @@ def _selftest() -> None:
     assert set(STORE_ONCE) == {"api_activity", "api_players",
                               "api_stats", "results_history"}, STORE_ONCE
     assert "api_teams" not in STORE_ONCE and "market" not in STORE_ONCE
+    assert set(STORE_DAILY) == {"market", "lineups",
+                                "understat_players"}, STORE_DAILY
+    assert not set(STORE_ONCE) & set(STORE_DAILY), \
+        "a table cannot be both keep-first-forever and one-per-day"
     line = {"player_id": "1337", "week": "1", "stat": "goals",
             "value": "1", "points": "4", "observed_at": "t1"}
     again = dict(line, observed_at="t2")
@@ -1202,6 +1269,45 @@ def _selftest() -> None:
         assert body[-1].endswith("t3"), body
         assert _append_csv(once, [dict(again)], STORE_ONCE["api_stats"])
         assert len(once.read_text(encoding="utf-8").strip().splitlines()) == 3
+
+        # STORE_DAILY: same key, same day, three rounds -- one row, the
+        # last round's data, in the FIRST round's position.
+        m1 = {"observed_at": "2026-09-20T0900Z", "ff_id": "1", "value": "10"}
+        m2 = {"observed_at": "2026-09-20T1300Z", "ff_id": "1", "value": "10"}
+        m3 = {"observed_at": "2026-09-20T1800Z", "ff_id": "1", "value": "11"}
+        other = {"observed_at": "2026-09-20T0900Z", "ff_id": "2", "value": "5"}
+        got = _compact_daily([m1, other, m2, m3], ("ff_id",))
+        assert got == [m3, other], got
+        # A new day for the same key is a new row, not an overwrite.
+        m4 = {"observed_at": "2026-09-21T0900Z", "ff_id": "1", "value": "11"}
+        assert _compact_daily([m1, m4], ("ff_id",)) == [m1, m4]
+        # A blank key column passes through uncompacted rather than merging
+        # with every other blank-keyed row.
+        blank = {"observed_at": "2026-09-20T0900Z", "ff_id": "", "value": "x"}
+        assert _compact_daily([blank, dict(blank)], ("ff_id",)) == \
+            [blank, dict(blank)]
+
+        daily = Path(tmp) / "market.csv"
+        assert _append_csv_daily(daily, [m1], ("ff_id",)) and daily.exists()
+        assert daily.read_text(encoding="utf-8") == \
+            "observed_at,ff_id,value\n2026-09-20T0900Z,1,10\n"
+        # Same day, no change -- overwrites the existing line in place.
+        assert _append_csv_daily(daily, [m2], ("ff_id",))
+        assert daily.read_text(encoding="utf-8") == \
+            "observed_at,ff_id,value\n2026-09-20T1300Z,1,10\n"
+        # Same day, value moved -- still one line, now the new value.
+        assert _append_csv_daily(daily, [m3], ("ff_id",))
+        assert daily.read_text(encoding="utf-8") == \
+            "observed_at,ff_id,value\n2026-09-20T1800Z,1,11\n"
+        # A new day appends a second line rather than overwriting the first.
+        assert _append_csv_daily(daily, [m4], ("ff_id",))
+        assert daily.read_text(encoding="utf-8") == (
+            "observed_at,ff_id,value\n"
+            "2026-09-20T1800Z,1,11\n2026-09-21T0900Z,1,11\n"), \
+            daily.read_text(encoding="utf-8")
+        # Shape moved -- refuse, same as _append_csv, so the caller rebuilds.
+        assert not _append_csv_daily(
+            daily, [dict(m4, extra="z")], ("ff_id",))
 
     # TWO CACHES, TWO FILES. points.py passes its own name to these same
     # helpers; a line file that ignored the argument sent both to one path,

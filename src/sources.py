@@ -1131,6 +1131,16 @@ STORE_ONCE = {"api_activity": ("activity_id",),
               "results_history": ("season", "date", "home_name", "away_name",
                                   "home_goals", "away_goals")}
 
+# Values here keep changing (price drifts, a status flips, a season total
+# ticks up) so STORE_ONCE's keep-the-first-forever rule is wrong for them --
+# but most scrape rounds still see no change, so writing a fresh row every
+# round is 5-8x duplication. One row per (key, day) instead: a round that
+# matches what is already on disk for today overwrites that day's row
+# rather than appending a new one.
+STORE_DAILY = {"market": ("ff_id",),
+              "lineups": ("source", "team_slug", "player_slug"),
+              "understat_players": ("source", "season", "understat_id")}
+
 ROW_TABLE = "table"
 
 ACT_JOINED, ACT_BUY, ACT_SELL = 9, 31, 33
