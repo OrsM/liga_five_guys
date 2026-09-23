@@ -387,7 +387,8 @@ def _market_key(slug) -> str:
 
 
 def start_intervals(matches: list[dict], starters: list[dict],
-                    fixtures: list[dict], market: list[dict] = ()):
+                    fixtures: list[dict], market: list[dict] = (),
+                    roles=("starter",)):
     jornada_of = {}
     for m in matches:
         try:
@@ -400,7 +401,7 @@ def start_intervals(matches: list[dict], starters: list[dict],
     seen, by_round, teams, ungraded = set(), {}, {}, set()
     graded = 0
     for r in starters:
-        if (r.get("role") or "") != "starter":
+        if (r.get("role") or "") not in roles:
             continue
         jor = jornada_of.get(r.get("match_id"))
         if jor is None:
@@ -462,11 +463,12 @@ def load_universe() -> set:
             if r.get("name")}
 
 
-def load_starts():
+def load_starts(roles=("starter",)):
     return start_intervals(load_matches(),
                            load_starters(),
                            read_csv(TIDY / "fixtures.csv"),
-                           read_csv(TIDY / "market.csv"))
+                           read_csv(TIDY / "market.csv"),
+                           roles)
 
 
 def load_predictions() -> dict[str, list[tuple[dt.datetime, dict]]]:
@@ -972,6 +974,8 @@ def golden_rows() -> list[dict]:
                        in clock_history().team_locks.items()}
 
     intervals, _graded, _ungraded = load_starts()
+    squad_of = {lock: keys for lock, keys, _t
+                in load_starts(("starter", "sub"))[0]}
     per = _group_by_key(forecast_claims())
 
     out = []
@@ -986,6 +990,7 @@ def golden_rows() -> list[dict]:
             golden = {"player": row["player_name"], "jornada": jor,
                       "predicted_start_pct": row["start_pct"],
                       "actual_started": key in played,
+                      "in_squad": key in squad_of.get(lock, ()),
                       "predicted_rate": None, "actual_points": None,
                       "rate_err": None}
             rp = rate_by_key.get((key, jor))
@@ -1513,10 +1518,10 @@ def _selftest() -> None:
     checked = [r for r in golden if r["predicted_rate"] is not None]
     assert checked, "golden_rows() must find at least one fully-joined row"
     bad = [r for r in checked
-          if not r["actual_started"] and r["actual_points"] != 0.0]
+          if not r["in_squad"] and r["actual_points"] != 0.0]
     assert len(bad) <= max(2, len(checked) // 8), (len(bad), len(checked), bad)
     print(f"  golden_rows(): {len(golden)} rows, {len(checked)} fully "
-         f"joined, {len(bad)} known points.py-mislabel exception(s)")
+         f"joined, {len(bad)} scored without a lineup row")
 
     gd = golden_dataset()
     total_rows = sum(len(v) for v in gd.values())
