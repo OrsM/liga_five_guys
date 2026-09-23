@@ -208,7 +208,14 @@ check "Universe flat-dict storage" 0 \
 # existing history is just running a full rebuild, not a second script.
 # Most of the added lines are _append_csv_daily (refuses on a shape change,
 # same as _append_csv) and its self-test.
-check "src/ lines" 20754 \
+# 20754 -> 20763 on 2026-09-24: run.py timed gc.collect() outside the
+# per-stage timer it fed, so ten forced collections on a memory-pressured
+# box (swap in use) turned into a 332.7s gap between the printed per-stage
+# sum (365.7s) and the printed total (698.4s) with no stage to blame it on.
+# A bug fix, not a tidy -- the lines are the comment recording why the
+# collect stays (this repo runs under a 750M MemoryMax) while its cost
+# moves inside the timer it always should have been in.
+check "src/ lines" 20763 \
   "$(find src -name '*.py' | xargs cat | wc -l)"
 
 [ "$fail" -eq 0 ] && echo "concepts: no duplication regained" || echo "concepts: a concept regained a second implementation"

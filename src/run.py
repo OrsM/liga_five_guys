@@ -54,8 +54,17 @@ def main(argv: list[str]) -> int:
             traceback.print_exc()
             print("  FAILED: %s" % name)
             return 1
-        times.append((time.time() - t0, name))
+        # gc.collect() BEFORE the stage's time is recorded, not after: it
+        # used to run outside the timer, so a stage's own printed cost was
+        # a lie and the difference showed up as an unexplained gap between
+        # the per-stage sum and the total -- 365.7s vs 698.4s on
+        # 2026-09-23, all of it later traced to GC passes over a
+        # memory-pressured box (swap in use), invisible because nothing
+        # timed them. Kept, not removed: this repo runs under a 750M
+        # MemoryMax and the collect is what keeps one stage's numpy/CSV
+        # working set from still being live when the next stage allocates.
         gc.collect()
+        times.append((time.time() - t0, name))
 
     print("  %s" % "  ".join("%s %.1fs" % (n, t) for t, n in times))
     print("  %d stages in %.1fs" % (len(times), time.time() - started))
