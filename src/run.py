@@ -26,6 +26,7 @@ STAGES: list[tuple[str, str]] = [
     ("xi", "xi:main"),
     ("methodology", "methodology:main"),
     ("sim", "sim:main"),
+    ("flip", "flip:main"),
     ("digest", "digest:main"),
 ]
 

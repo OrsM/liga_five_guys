@@ -266,7 +266,13 @@ check "Universe flat-dict storage" 0 \
 # already priced purchases -- supplies the value then; the cash line prints the
 # date and the value. Not the app's own value table: it only begins 2026-09-12,
 # so an as-of lookup there silently returns a value from AFTER the event.
-check "src/ lines" 20973 \
+# 20973 -> 21254 on 2026-09-24: src/flip.py, a new stage. Buys free-market players
+# whose value is drifting up, holds them, and sells non-starters when holding is
+# expected to lose value or an offer beats it. Every constant in it was measured
+# (44 days of values, 70 winning bids, 75 app offers) and is documented where it
+# is set; the expectation table is recomputed from market.csv each run, so it
+# needs no stored model. Recommendations are logged when made (flip_log.csv).
+check "src/ lines" 21254 \
   "$(find src -name '*.py' | xargs cat | wc -l)"
 
 [ "$fail" -eq 0 ] && echo "concepts: no duplication regained" || echo "concepts: a concept regained a second implementation"

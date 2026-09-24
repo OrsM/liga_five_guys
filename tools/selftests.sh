@@ -31,7 +31,7 @@ TESTS=(ffcore/parse.py ffcore/text.py ffcore/schema.py ffcore/tidy.py
        "slate.py --selftest" "points.py --selftest"
        "methodology.py --selftest"
        "ledger.py --selftest"
-       "crosswalk.py --selftest" "run.py --selftest")
+       "crosswalk.py --selftest" "run.py --selftest" "flip.py --selftest")
 SESSION_TESTS=(xi.py report.py decide.py sim.py)
 
 session_ok=0
