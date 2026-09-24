@@ -37,3 +37,35 @@ data/tidy/startcal.json
 # Claude Code worktrees and session state -- never part of the repo.
 .claude/
 data/tidy/.parse_spill/
+
+# data/tidy is DERIVED from data/raw (2026-09-24): a full rebuild from the
+# raw snapshots alone reproduced each file below byte-for-byte, so
+# committing them only stores the same information twice (and re-hashes
+# a 22MB starters.csv on every report). Regenerate with
+#   PYTHONPATH=src FF_ROOT=./data uv run python src/run.py
+# NOT listed, on purpose -- players.csv/clubs.csv (the crosswalk
+# accumulates aliases and IDs run to run; a rebuild loses them) and
+# feeds.csv (the fetch log) exist nowhere else. An explicit list, not
+# data/tidy/*: a new stateful table must fail toward being committed.
+data/tidy/api_activity.csv
+data/tidy/api_leagues.csv
+data/tidy/api_lineup.csv
+data/tidy/api_market.csv
+data/tidy/api_offers.csv
+data/tidy/api_players.csv
+data/tidy/api_players_all.csv
+data/tidy/api_standings.csv
+data/tidy/api_stats.csv
+data/tidy/api_teams.csv
+data/tidy/elo.csv
+data/tidy/fixtures.csv
+data/tidy/lineups.csv
+data/tidy/market.csv
+data/tidy/matches.csv
+data/tidy/odds.csv
+data/tidy/results_history.csv
+data/tidy/starters.csv
+data/tidy/transactions.csv
+data/tidy/understat_players.csv
+data/tidy/snapindex.json
+data/tidy/parse_state.json
