@@ -245,7 +245,12 @@ check "Universe flat-dict storage" 0 \
 # behave as it does in a real run and not as it does standalone.
 # 20882 -> 20884 on 2026-09-24: two comment lines recording why snapshots are
 # compressed at xz preset 3 (1.6s vs 8.4s, +13% size) -- see ingest._write().
-check "src/ lines" 20884 \
+# 20884 -> 20887 on 2026-09-24: the "app says nobody holds him" warning now says
+# WHY it matters (the feed has no sale, so that manager's cash counts his cost
+# as spent) instead of leaving it to be worked out. Words only -- an attempt
+# to infer the missing sales into the ledger was reverted as more error
+# surface than the estimate is worth.
+check "src/ lines" 20887 \
   "$(find src -name '*.py' | xargs cat | wc -l)"
 
 [ "$fail" -eq 0 ] && echo "concepts: no duplication regained" || echo "concepts: a concept regained a second implementation"

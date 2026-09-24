@@ -266,7 +266,10 @@ def owner_drift(ledger: dict, api: dict, names=None) -> list[str]:
         now = api.get(key)
         if now is None:
             out.append("**%s** — the ledger has him at %s; the app says "
-                       "nobody in the league holds him." % (_who(key), held))
+                       "nobody in the league holds him. The feed has no sale "
+                       "of him (the app drops players without one), so that "
+                       "manager's cash estimate counts what he cost as spent "
+                       "for good." % (_who(key), held))
         elif now != held:
             out.append("**%s** — the ledger has him at %s; the app says %s."
                        % (_who(key), held, now))
