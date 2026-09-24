@@ -226,7 +226,12 @@ check "Universe flat-dict storage" 0 \
 # scheduled run -- 36s of the 38s `squads` stage, found by run.py's new
 # sampler. Now keyed on a hash of the observations (0.11s to build), so it
 # refits only when a match result actually changes them. Same values.
-check "src/ lines" 20795 \
+# 20795 -> 20822 on 2026-09-24: ingest.fetch() slept 1.5-3s after every
+# public request, serially across hosts, so 52 requests to six sites cost
+# ~115s of a 122s fetch. Now paced per host (_by_host + a per-host clock):
+# each site still waits 1.5-3s between its OWN requests, and the waits
+# overlap. Simulated 123s -> 52s on the real source list.
+check "src/ lines" 20822 \
   "$(find src -name '*.py' | xargs cat | wc -l)"
 
 [ "$fail" -eq 0 ] && echo "concepts: no duplication regained" || echo "concepts: a concept regained a second implementation"

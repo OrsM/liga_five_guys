@@ -39,6 +39,7 @@ from __future__ import annotations
 import csv
 import hashlib
 import io
+import itertools
 import json
 import gzip
 import lzma
@@ -51,6 +52,7 @@ import tarfile
 import time
 from datetime import datetime, timezone
 from pathlib import Path
+from urllib.parse import urlparse
 
 
 from ffcore.auth import API_BASE
@@ -70,7 +72,19 @@ HEADERS = {
     "Accept-Language": "es-ES,es;q=0.9,en;q=0.5",
 }
 
+# Per HOST, not per request: each site still sees 1.5-3s between its own
+# requests, but 23 futbolfantasy + 21 analiticafantasy pages no longer queue
+# behind one another's sleeps (2026-09-24: ~115s of a 122s fetch was sleeping).
 DELAY = (1.5, 3.0)
+
+
+def _by_host(srcs) -> list:
+    """`srcs` interleaved across hosts, each host's own order kept."""
+    lanes: dict[str, list] = {}
+    for s in srcs:
+        lanes.setdefault(urlparse(s.url).netloc, []).append(s)
+    return [s for row in itertools.zip_longest(*lanes.values())
+            for s in row if s is not None]
 TIMEOUT = 30.0
 
 MANIFEST = "MANIFEST.csv"
@@ -296,7 +310,8 @@ def fetch() -> Path:
 
     with httpx.Client(headers=HEADERS, timeout=TIMEOUT,
                       follow_redirects=True) as c:
-        queue = list(sources())
+        queue = _by_host(sources())
+        last: dict[str, float] = {}
         league_id = None
         me = load_config().me
         while queue:
@@ -319,6 +334,11 @@ def fetch() -> Path:
                           f"Run `python -m ffcore.auth --login`.")
                     continue
                 extra["Authorization"] = f"Bearer {bearer}"
+            if not src.auth:
+                host = urlparse(url).netloc
+                time.sleep(max(0.0, last.get(host, -1e9) - time.monotonic()
+                               + random.uniform(*DELAY)))
+                last[host] = time.monotonic()
             t0 = time.monotonic()
             kw = {"headers": extra} if extra else {}
             if src.timeout is not None:
@@ -368,8 +388,6 @@ def fetch() -> Path:
                 rows.append({"page": src.key, "sig": sig, "stored": stamp,
                              "seen": stamp})
                 print(f"  {src.key}: {len(r.text) // 1024}KB")
-            if not src.auth:
-                time.sleep(random.uniform(*DELAY))
 
     rows = carry_matches(rows, prev)
 
@@ -1352,6 +1370,15 @@ def _selftest() -> None:
     assert due(twice, {"m": {"seen": "2026-08-15T0940Z"}},
                "2026-08-15T1600Z")
     assert due(twice, {}, "2026-08-15T0000Z")
+
+    # -- _by_host: hosts interleaved so their per-host delays overlap, and
+    # each host's own order kept (a source can depend on an earlier one).
+    mk = lambda k, h: Source(k, "t", "https://%s/%s" % (h, k), None, None,
+                             "every_run")
+    got = [x.key for x in _by_host([mk("a1", "a"), mk("a2", "a"),
+                                    mk("a3", "a"), mk("b1", "b"),
+                                    mk("b2", "b")])]
+    assert got == ["a1", "b1", "a2", "b2", "a3"], got
     assert not due(twice, {"m": {"seen": "2026-08-15T2340Z"}},
                    "2026-08-16T0005Z")
 
