@@ -1,12 +1,12 @@
 {
- "generated_at": "2026-09-24T08:01Z",
- "locks_in_h": 370.9799539241667,
- "cash": 18872203.525315974,
+ "generated_at": "2026-09-24T09:04Z",
+ "locks_in_h": 369.92779485694444,
+ "cash": 18972143.076984953,
  "cash_locked": 13334822.0,
  "squad_value": 306696454.0,
  "jornadas_left": 32,
- "acquirable": 56,
- "considered": 357,
+ "acquirable": 80,
+ "considered": 238,
  "expected_finish": 1.88,
  "p_win": 0.449,
  "band": [
@@ -30,33 +30,11 @@
    "pts_lo": -45.20217672458332,
    "pts_hi": 99.51216117158637,
    "value": 1.018064073546847,
-   "left": 466689.5253159739,
+   "left": 566629.0769849531,
    "answer": null,
    "p_win_after": 0.473,
    "vs": "Albert Laporta",
    "vs_gain": 0.025666666666666726
-  },
-  {
-   "label": "clause Luka Sucic from BurtonGM89 · sell Ali Houary",
-   "kind": "clause",
-   "buy": "Luka Sucic",
-   "sell": "Ali Houary",
-   "sell_n": 1,
-   "victim": "BurtonGM89",
-   "owner": "BurtonGM89",
-   "net_pts": 8.804195625624516,
-   "d_win": 0.035999999999999976,
-   "net": -12413202.0,
-   "d_pts": 8.804195625624516,
-   "helps": 0.586,
-   "pts_lo": -37.26379847497269,
-   "pts_hi": 68.22399129645241,
-   "value": 0.7092606424695671,
-   "left": 6459001.525315974,
-   "answer": null,
-   "p_win_after": 0.485,
-   "vs": "BurtonGM89",
-   "vs_gain": 0.05566666666666675
   },
   {
    "label": "buy German Valera · sell Ali Houary",
@@ -74,7 +52,7 @@
    "pts_lo": -34.76157686828499,
    "pts_hi": 60.08565301918793,
    "value": 0.6041960882544132,
-   "left": 6556400.525315974,
+   "left": 6656340.076984953,
    "answer": null,
    "p_win_after": 0.46,
    "vs": "Albert Laporta",
@@ -85,7 +63,7 @@
  "ladder": [
   {
    "offer": null,
-   "rivals": null,
+   "rivals": 0,
    "ask": 15500202.40550731,
    "worth": 15253897.0,
    "going": 15700659.307459975,
@@ -95,11 +73,13 @@
    "xpts": 1.9533562105525255,
    "group": "in",
    "where": "bench",
+   "label": "PUT ON",
    "money": null,
    "pts": -11.043991957853905,
    "par": 6.3553204649322765,
    "pts_lo": -63.908472111741105,
    "pts_hi": 34.52273595104625,
+   "pts_mean": -13.58757558867186,
    "note": "",
    "value": null,
    "market": null,
@@ -107,7 +87,7 @@
   },
   {
    "offer": 7851399.0,
-   "rivals": null,
+   "rivals": 1,
    "ask": 7807875.767382531,
    "worth": 7683805.0,
    "going": 7908851.389907608,
@@ -117,11 +97,13 @@
    "xpts": 1.6112217846017025,
    "group": "in",
    "where": "bench",
+   "label": "PUT ON",
    "money": null,
    "pts": -1.9992107673245982,
    "par": 0.03301529172843232,
    "pts_lo": -36.79131153214016,
    "pts_hi": 24.348552474962183,
+   "pts_mean": -4.310534256796031,
    "note": "",
    "value": null,
    "market": null,
@@ -129,7 +111,7 @@
   },
   {
    "offer": 29424630.0,
-   "rivals": null,
+   "rivals": 1,
    "ask": 28164958.25002738,
    "worth": 27717404.0,
    "going": 28529202.543535486,
@@ -139,11 +121,13 @@
    "xpts": 1.433343818322446,
    "group": "out",
    "where": "yours",
+   "label": "TAKE OFF",
    "money": null,
    "pts": -54.63343339895108,
    "par": 66.51686350229697,
    "pts_lo": -189.58347366582723,
    "pts_hi": 51.513084433903586,
+   "pts_mean": -62.359461887686976,
    "note": "",
    "value": null,
    "market": null,
@@ -151,7 +135,7 @@
   },
   {
    "offer": 20084869.0,
-   "rivals": null,
+   "rivals": 1,
    "ask": 19869799.327295303,
    "worth": 19554059.0,
    "going": 20126766.192073505,
@@ -161,11 +145,13 @@
    "xpts": 1.0955638267214776,
    "group": "out",
    "where": "yours",
+   "label": "TAKE OFF",
    "money": null,
    "pts": -18.382526380630907,
    "par": 23.33950956643254,
    "pts_lo": -97.44630843454453,
    "pts_hi": 45.79142575557337,
+   "pts_mean": -22.202085897691262,
    "note": "",
    "value": null,
    "market": null,
@@ -173,7 +159,7 @@
   },
   {
    "offer": 6247379.0,
-   "rivals": null,
+   "rivals": 1,
    "ask": 6581369.006068474,
    "worth": 6476788.0,
    "going": 6666482.787621096,
@@ -183,11 +169,13 @@
    "xpts": 1.4964895339054378,
    "group": "keep",
    "where": "yours",
+   "label": "KEEP — bench",
    "money": null,
    "pts": -6.2527243753424955,
    "par": 1.5403640458834502,
    "pts_lo": -50.74006471712412,
    "pts_hi": 27.229121051621064,
+   "pts_mean": -9.255572020460217,
    "note": "",
    "value": null,
    "market": null,
@@ -195,7 +183,7 @@
   },
   {
    "offer": null,
-   "rivals": null,
+   "rivals": 0,
    "ask": 8497343.733146662,
    "worth": 8362317.0,
    "going": 8607235.923907233,
@@ -205,11 +193,13 @@
    "xpts": 1.3701842352149816,
    "group": "keep",
    "where": "yours",
+   "label": "KEEP — bench",
    "money": null,
    "pts": -0.46489779454350355,
    "par": 0.0,
    "pts_lo": -50.89649154587905,
    "pts_hi": 34.011454543517836,
+   "pts_mean": -4.681371790480802,
    "note": "",
    "value": null,
    "market": null,
@@ -217,7 +207,7 @@
   },
   {
    "offer": null,
-   "rivals": null,
+   "rivals": 0,
    "ask": 1415995.8305121902,
    "worth": 1393495.0,
    "going": 1434308.245404367,
@@ -227,11 +217,13 @@
    "xpts": 1.2292767497922759,
    "group": "keep",
    "where": "yours",
+   "label": "KEEP — bench",
    "money": null,
    "pts": -3.127064602038331,
    "par": -25.548690071648124,
    "pts_lo": -32.768346367986375,
    "pts_hi": 17.990011338656178,
+   "pts_mean": -5.656860552639912,
    "note": "",
    "value": null,
    "market": null,
@@ -239,7 +231,7 @@
   },
   {
    "offer": 959027.0,
-   "rivals": null,
+   "rivals": 1,
    "ask": 906900.0626324416,
    "worth": 892489.0,
    "going": 918628.578956292,
@@ -249,11 +241,13 @@
    "xpts": 1.2010636981575105,
    "group": "keep",
    "where": "yours",
+   "label": "KEEP — bench",
    "money": null,
    "pts": 0.0,
    "par": -40.95235950049677,
    "pts_lo": -5.775743943413704,
    "pts_hi": 5.729583040942202,
+   "pts_mean": 0.014683755216499245,
    "note": "",
    "value": null,
    "market": null,
@@ -261,7 +255,7 @@
   },
   {
    "offer": 31397001.0,
-   "rivals": null,
+   "rivals": 1,
    "ask": 28524959.84230413,
    "worth": 28071685.0,
    "going": 28893859.868814807,
@@ -271,11 +265,13 @@
    "xpts": 2.4854753573369037,
    "group": "offer",
    "where": "yours",
+   "label": "OFFERS — someone wants him",
    "money": null,
    "pts": -36.67756391030423,
    "par": 46.22500998722792,
    "pts_lo": -147.61314658911004,
    "pts_hi": 52.855649731305036,
+   "pts_mean": -42.8067151225498,
    "note": "",
    "value": null,
    "market": null,
@@ -283,7 +279,7 @@
   },
   {
    "offer": 959027.0,
-   "rivals": null,
+   "rivals": 1,
    "ask": 906900.0626324416,
    "worth": 892489.0,
    "going": 918628.578956292,
@@ -293,11 +289,13 @@
    "xpts": 1.2010636981575105,
    "group": "offer",
    "where": "yours",
+   "label": "OFFERS — someone wants him",
    "money": null,
    "pts": 0.0,
    "par": -40.95235950049677,
    "pts_lo": -5.775743943413704,
    "pts_hi": 5.729583040942202,
+   "pts_mean": 0.014683755216499245,
    "note": "",
    "value": null,
    "market": null,
@@ -305,7 +303,7 @@
   },
   {
    "offer": 29424630.0,
-   "rivals": null,
+   "rivals": 1,
    "ask": 28164958.25002738,
    "worth": 27717404.0,
    "going": 28529202.543535486,
@@ -315,11 +313,13 @@
    "xpts": 1.433343818322446,
    "group": "offer",
    "where": "yours",
+   "label": "OFFERS — someone wants him",
    "money": null,
    "pts": -54.63343339895108,
    "par": 66.51686350229697,
    "pts_lo": -189.58347366582723,
    "pts_hi": 51.513084433903586,
+   "pts_mean": -62.359461887686976,
    "note": "",
    "value": null,
    "market": null,
@@ -327,7 +327,7 @@
   },
   {
    "offer": 20084869.0,
-   "rivals": null,
+   "rivals": 1,
    "ask": 19869799.327295303,
    "worth": 19554059.0,
    "going": 20126766.192073505,
@@ -337,11 +337,13 @@
    "xpts": 1.0955638267214776,
    "group": "offer",
    "where": "yours",
+   "label": "OFFERS — someone wants him",
    "money": null,
    "pts": -18.382526380630907,
    "par": 23.33950956643254,
    "pts_lo": -97.44630843454453,
    "pts_hi": 45.79142575557337,
+   "pts_mean": -22.202085897691262,
    "note": "",
    "value": null,
    "market": null,
@@ -349,7 +351,7 @@
   },
   {
    "offer": 7851399.0,
-   "rivals": null,
+   "rivals": 1,
    "ask": 7807875.767382531,
    "worth": 7683805.0,
    "going": 7908851.389907608,
@@ -359,11 +361,13 @@
    "xpts": 1.6112217846017025,
    "group": "offer",
    "where": "yours",
+   "label": "OFFERS — someone wants him",
    "money": null,
    "pts": -1.9992107673245982,
    "par": 0.03301529172843232,
    "pts_lo": -36.79131153214016,
    "pts_hi": 24.348552474962183,
+   "pts_mean": -4.310534256796031,
    "note": "",
    "value": null,
    "market": null,
@@ -371,7 +375,7 @@
   },
   {
    "offer": 28861110.0,
-   "rivals": null,
+   "rivals": 1,
    "ask": 29478883.125725154,
    "worth": 29010450.0,
    "going": 29860119.797983572,
@@ -381,11 +385,13 @@
    "xpts": 3.8570192403209274,
    "group": "offer",
    "where": "yours",
+   "label": "OFFERS — someone wants him",
    "money": null,
    "pts": -22.47685205948551,
    "par": 32.46526348270905,
    "pts_lo": -173.70395031698382,
    "pts_hi": 95.08039935651402,
+   "pts_mean": -32.27071941658529,
    "note": "",
    "value": null,
    "market": null,
@@ -393,7 +399,7 @@
   },
   {
    "offer": 30658657.0,
-   "rivals": null,
+   "rivals": 1,
    "ask": 32093302.46158861,
    "worth": 31583325.0,
    "going": 32508350.202035803,
@@ -403,11 +409,13 @@
    "xpts": 2.7683284012583442,
    "group": "offer",
    "where": "yours",
+   "label": "OFFERS — someone wants him",
    "money": null,
    "pts": -27.943636694343695,
    "par": 6.7279145489460035,
    "pts_lo": -121.9846764806218,
    "pts_hi": 47.89063980215409,
+   "pts_mean": -33.56204005489282,
    "note": "",
    "value": null,
    "market": null,
@@ -415,7 +423,7 @@
   },
   {
    "offer": 6247379.0,
-   "rivals": null,
+   "rivals": 1,
    "ask": 6581369.006068474,
    "worth": 6476788.0,
    "going": 6666482.787621096,
@@ -425,11 +433,13 @@
    "xpts": 1.4964895339054378,
    "group": "offer",
    "where": "yours",
+   "label": "OFFERS — someone wants him",
    "money": null,
    "pts": -6.2527243753424955,
    "par": 1.5403640458834502,
    "pts_lo": -50.74006471712412,
    "pts_hi": 27.229121051621064,
+   "pts_mean": -9.255572020460217,
    "note": "",
    "value": null,
    "market": null,
@@ -437,7 +447,7 @@
   },
   {
    "offer": 38054189.0,
-   "rivals": null,
+   "rivals": 1,
    "ask": 41226161.8329912,
    "worth": 40571059.0,
    "going": 41759320.59209904,
@@ -447,11 +457,13 @@
    "xpts": 3.441421334981253,
    "group": "offer",
    "where": "yours",
+   "label": "OFFERS — someone wants him",
    "money": null,
    "pts": -36.327031518733406,
    "par": 48.541462834086005,
    "pts_lo": -152.601424016026,
    "pts_hi": 51.045551564676934,
+   "pts_mean": -45.78680828921923,
    "note": "",
    "value": null,
    "market": null,
@@ -459,7 +471,7 @@
   },
   {
    "offer": 15350760.0,
-   "rivals": null,
+   "rivals": 1,
    "ask": 16738064.61008164,
    "worth": 16472089.0,
    "going": 16954530.20766818,
@@ -469,11 +481,13 @@
    "xpts": 3.2626759166440475,
    "group": "offer",
    "where": "yours",
+   "label": "OFFERS — someone wants him",
    "money": null,
    "pts": -55.742995249641915,
    "par": 68.89526894694022,
    "pts_lo": -169.55187546931182,
    "pts_hi": 32.30948949827816,
+   "pts_mean": -62.887671304849086,
    "note": "",
    "value": null,
    "market": null,
@@ -481,7 +495,7 @@
   },
   {
    "offer": 11087502.0,
-   "rivals": null,
+   "rivals": 1,
    "ask": 12392277.029772969,
    "worth": 12195358.0,
    "going": 12552540.579663444,
@@ -491,11 +505,13 @@
    "xpts": 2.184552135159915,
    "group": "offer",
    "where": "yours",
+   "label": "OFFERS — someone wants him",
    "money": null,
    "pts": -28.10672616309455,
    "par": 39.29415664427758,
    "pts_lo": -112.87465580172002,
    "pts_hi": 40.1542726765854,
+   "pts_mean": -33.09523848388136,
    "note": "",
    "value": null,
    "market": null,
@@ -503,7 +519,7 @@
   },
   {
    "offer": 11785081.0,
-   "rivals": null,
+   "rivals": 1,
    "ask": 13341570.747243762,
    "worth": 13129567.0,
    "going": 13514111.070860734,
@@ -513,11 +529,13 @@
    "xpts": 2.699917883497251,
    "group": "offer",
    "where": "yours",
+   "label": "OFFERS — someone wants him",
    "money": null,
    "pts": -33.96496482138741,
    "par": 43.6187365393278,
    "pts_lo": -121.96406109806803,
    "pts_hi": 43.053759984257724,
+   "pts_mean": -37.55275584907794,
    "note": "",
    "value": null,
    "market": null,
@@ -535,11 +553,13 @@
    "xpts": 2.2610833666376124,
    "group": "raid",
    "where": "Magic",
+   "label": "RAID — a clause, cannot be refused",
    "money": -18405514.0,
    "pts": 18.73799255856352,
    "par": 29.92312124314418,
    "pts_lo": -45.20217672458332,
    "pts_hi": 99.51216117158637,
+   "pts_mean": null,
    "note": "sell Houary",
    "value": 1.018064073546847,
    "market": 11894083.0,
@@ -547,29 +567,7 @@
   },
   {
    "offer": null,
-   "rivals": null,
-   "ask": 14271339.199189173,
-   "worth": 14044561.0,
-   "going": 14455903.785363136,
-   "name": "Luka Sucic",
-   "pos": "MED",
-   "start": 0.45476190476190476,
-   "xpts": 2.2619358758792267,
-   "group": "raid",
-   "where": "BurtonGM89",
-   "money": -12413202.0,
-   "pts": 8.804195625624516,
-   "par": 29.148893048132066,
-   "pts_lo": -37.26379847497269,
-   "pts_hi": 68.22399129645241,
-   "note": "sell Houary",
-   "value": 0.7092606424695671,
-   "market": 14044561.0,
-   "premium": 0.0
-  },
-  {
-   "offer": null,
-   "rivals": 1,
+   "rivals": 2,
    "ask": 13550140.009560296,
    "worth": 13334822.0,
    "going": 13725377.662352253,
@@ -579,15 +577,41 @@
    "xpts": 2.343738562381594,
    "group": "buy",
    "where": "free agent",
+   "label": "BUY — free agents",
    "money": -12315803.0,
    "pts": 7.441159996311967,
    "par": 23.96187215978256,
    "pts_lo": -34.76157686828499,
    "pts_hi": 60.08565301918793,
+   "pts_mean": null,
    "note": "sell Houary",
    "value": 0.6041960882544132,
    "market": 13334822.0,
    "premium": 0.0
+  },
+  {
+   "offer": null,
+   "rivals": 1,
+   "ask": null,
+   "worth": 158927883.0,
+   "going": 163582627.14366433,
+   "name": "Lamine Yamal",
+   "pos": "DEL",
+   "start": 0.474021164021164,
+   "xpts": 4.478331277349257,
+   "group": "save",
+   "where": "BurtonGM89",
+   "label": "SAVE — better than yours, out of reach",
+   "money": -98857237.92301506,
+   "pts": 105.41313243783554,
+   "par": 105.50641521481002,
+   "pts_lo": -23.36940270114219,
+   "pts_hi": 274.45139493617813,
+   "pts_mean": 118.92103173201865,
+   "note": "short",
+   "value": 1.066316788255058,
+   "market": null,
+   "premium": null
   },
   {
    "offer": null,
@@ -601,19 +625,21 @@
    "xpts": 3.6832713625050304,
    "group": "save",
    "where": "free agent",
-   "money": -1647043.4746840298,
+   "label": "SAVE — better than yours, out of reach",
+   "money": -1547103.9230150431,
    "pts": 13.950052076876432,
    "par": 27.09008471741093,
    "pts_lo": -50.23186841530323,
    "pts_hi": 102.47562198271588,
+   "pts_mean": 21.009877960962786,
    "note": "short",
-   "value": 8.469753404385772,
+   "value": 9.016881070077146,
    "market": null,
    "premium": null
   },
   {
    "offer": null,
-   "rivals": null,
+   "rivals": 1,
    "ask": null,
    "worth": 61115223.0,
    "going": 62905190.38003481,
@@ -623,13 +649,15 @@
    "xpts": 2.154803691328616,
    "group": "save",
    "where": "BurtonGM89",
-   "money": -762672.4746840298,
+   "label": "SAVE — better than yours, out of reach",
+   "money": -1044577.9230150431,
    "pts": 30.26105494905778,
    "par": 23.032555579023253,
    "pts_lo": -45.84116366198914,
    "pts_hi": 130.62766062287304,
+   "pts_mean": 37.49293763770794,
    "note": "short",
-   "value": 39.67765450247138,
+   "value": 28.9696482017474,
    "market": null,
    "premium": null
   }
@@ -657,7 +685,7 @@
    "mean": 1779.670804745719,
    "lo": 1482.0644058824794,
    "hi": 2097.226009510179,
-   "cash": 18872203.525315974,
+   "cash": 18972143.076984953,
    "cash_known": true,
    "p_above": null
   },
@@ -668,7 +696,7 @@
    "mean": 1689.3800677147772,
    "lo": 1363.3785632168333,
    "hi": 2033.5405650758219,
-   "cash": -32677542.0,
+   "cash": -32577542.0,
    "cash_known": false,
    "p_above": 0.608
   },
@@ -679,7 +707,7 @@
    "mean": 1663.8653180020303,
    "lo": 1363.7244455406578,
    "hi": 1973.2869497138693,
-   "cash": -41308592.0,
+   "cash": -41208592.0,
    "cash_known": false,
    "p_above": 0.6313333333333333
   },
@@ -690,7 +718,7 @@
    "mean": 1404.560451452459,
    "lo": 1164.8108608869206,
    "hi": 1651.7537693056213,
-   "cash": 8122343.0,
+   "cash": 8222343.0,
    "cash_known": false,
    "p_above": 0.897
   },
@@ -701,7 +729,7 @@
    "mean": 1140.5602035900142,
    "lo": 922.6127841978238,
    "hi": 1361.15100190194,
-   "cash": 173002436.0,
+   "cash": 173102436.0,
    "cash_known": false,
    "p_above": 0.9853333333333333
   }
@@ -711,26 +739,13 @@
    "key": "5227",
    "name": "Gonzalo Villar",
    "pos": "MED",
-   "price": 9901903.0,
+   "price": 9788968.0,
    "season_pts": 90.83360831125972,
    "next_pts": null,
    "par": 26.382607666228168,
    "par_lo": null,
    "par_hi": null,
-   "value": 2.6643977088270976,
-   "simulated": false
-  },
-  {
-   "key": "8392",
-   "name": "Luka Sucic",
-   "pos": "MED",
-   "price": 13372229.0,
-   "season_pts": 93.59989369316362,
-   "next_pts": null,
-   "par": 29.148893048132066,
-   "par_lo": null,
-   "par_hi": null,
-   "value": 2.1798080969247584,
+   "value": 2.695136777056393,
    "simulated": false
   },
   {
@@ -747,6 +762,19 @@
    "simulated": false
   },
   {
+   "key": "8944",
+   "name": "Ramon Terrats",
+   "pos": "MED",
+   "price": 10458558.0,
+   "season_pts": 108.84688555962023,
+   "next_pts": null,
+   "par": 18.858050825091368,
+   "par_lo": -47.03039576720539,
+   "par_hi": 106.66522892468569,
+   "value": 1.8031215034703032,
+   "simulated": true
+  },
+  {
    "key": "1881",
    "name": "Unai Lopez",
    "pos": "MED",
@@ -758,19 +786,6 @@
    "par_hi": 122.47622128360119,
    "value": 1.6616854515280133,
    "simulated": true
-  },
-  {
-   "key": "7916",
-   "name": "Aitor Paredes",
-   "pos": "DEF",
-   "price": 13958356.0,
-   "season_pts": 107.593217645514,
-   "next_pts": 1.67837367102016,
-   "par": 22.926721470736,
-   "par_lo": null,
-   "par_hi": null,
-   "value": 1.642508721710207,
-   "simulated": false
   },
   {
    "key": "9931",
@@ -812,6 +827,19 @@
    "simulated": true
   },
   {
+   "key": "13864",
+   "name": "Marc Bernal",
+   "pos": "MED",
+   "price": 27628474.0,
+   "season_pts": 95.8476422778326,
+   "next_pts": null,
+   "par": 31.39664163280105,
+   "par_lo": null,
+   "par_hi": null,
+   "value": 1.1363871067508486,
+   "simulated": false
+  },
+  {
    "key": "8686",
    "name": "Juan Iglesias",
    "pos": "DEF",
@@ -825,6 +853,19 @@
    "simulated": true
   },
   {
+   "key": "10258",
+   "name": "Pablo Ibañez",
+   "pos": "MED",
+   "price": 13369970.0,
+   "season_pts": 101.98325866144005,
+   "next_pts": null,
+   "par": 14.067487859882135,
+   "par_lo": -45.19021257681672,
+   "par_hi": 87.4462113788975,
+   "value": 1.0521704880326683,
+   "simulated": true
+  },
+  {
    "key": "3738",
    "name": "Edu Exposito",
    "pos": "MED",
@@ -835,6 +876,19 @@
    "par_lo": -52.381006776328974,
    "par_hi": 135.45579787200174,
    "value": 0.9680078900822453,
+   "simulated": true
+  },
+  {
+   "key": "7916",
+   "name": "Aitor Paredes",
+   "pos": "DEF",
+   "price": 14405303.0,
+   "season_pts": 107.593217645514,
+   "next_pts": 1.67837367102016,
+   "par": 12.252029234044699,
+   "par_lo": -45.86527639302422,
+   "par_hi": 96.49395599180998,
+   "value": 0.8505221468819294,
    "simulated": true
   },
   {
@@ -864,16 +918,42 @@
    "simulated": true
   },
   {
+   "key": "5995",
+   "name": "David Hancko",
+   "pos": "DEF",
+   "price": 40408854.0,
+   "season_pts": 131.3451898126278,
+   "next_pts": null,
+   "par": 28.68356074414737,
+   "par_lo": -57.19808700122177,
+   "par_hi": 138.49041105101776,
+   "value": 0.7098335613315679,
+   "simulated": true
+  },
+  {
    "key": "9987",
    "name": "Roberto Fernandez",
    "pos": "DEL",
-   "price": 41739824.0,
+   "price": 42682352.0,
    "season_pts": 118.32296117845888,
    "next_pts": null,
    "par": 29.927007758091463,
    "par_lo": -51.968557788643736,
    "par_hi": 132.25509035171092,
-   "value": 0.7169893135651809,
+   "value": 0.7011564816786915,
+   "simulated": true
+  },
+  {
+   "key": "11520",
+   "name": "Lamine Yamal",
+   "pos": "DEL",
+   "price": 158927883.0,
+   "season_pts": 203.72927230013414,
+   "next_pts": null,
+   "par": 105.41313243783554,
+   "par_lo": -23.36940270114219,
+   "par_hi": 274.45139493617813,
+   "value": 0.6632765154106756,
    "simulated": true
   },
   {
@@ -900,6 +980,19 @@
    "par_lo": -37.11627968575842,
    "par_hi": 67.97495562653629,
    "value": 0.6297539149217941,
+   "simulated": true
+  },
+  {
+   "key": "8392",
+   "name": "Luka Sucic",
+   "pos": "MED",
+   "price": 14044561.0,
+   "season_pts": 93.59989369316362,
+   "next_pts": null,
+   "par": 8.804195625624516,
+   "par_lo": -37.26379847497269,
+   "par_hi": 68.22399129645241,
+   "value": 0.6268758151731846,
    "simulated": true
   },
   {
@@ -932,52 +1025,52 @@
    "key": "1919",
    "name": "David Soria",
    "pos": "POR",
-   "price": 37357161.0,
+   "price": 37920742.0,
    "season_pts": 161.57177792684388,
    "next_pts": null,
    "par": 19.351504820446507,
    "par_lo": -51.67607243905159,
    "par_hi": 109.05848371357108,
-   "value": 0.5180132617798903,
+   "value": 0.5103145086255567,
    "simulated": true
   },
   {
    "key": "6635",
    "name": "Ante Budimir",
    "pos": "DEL",
-   "price": 60733378.0,
+   "price": 61115223.0,
    "season_pts": 121.25541266434738,
    "next_pts": null,
    "par": 30.26105494905778,
    "par_lo": -45.84116366198914,
    "par_hi": 130.62766062287304,
-   "value": 0.49826069198814826,
+   "value": 0.4951475829362151,
    "simulated": true
   },
   {
-   "key": "5032",
-   "name": "Toni Martinez",
-   "pos": "DEL",
-   "price": 28027217.0,
-   "season_pts": 99.11618254155849,
-   "next_pts": null,
-   "par": 13.827415311734626,
-   "par_lo": -45.07211888227077,
-   "par_hi": 89.08137344638389,
-   "value": 0.4933567008003194,
-   "simulated": true
-  },
-  {
-   "key": "189",
-   "name": "Jonny Castro",
+   "key": "775",
+   "name": "Jose Maria Gimenez",
    "pos": "DEF",
-   "price": 16004814.0,
-   "season_pts": 91.4924199300932,
+   "price": 12718003.0,
+   "season_pts": 95.97489139100318,
    "next_pts": null,
-   "par": 6.825923755315202,
+   "par": 6.226777563736391,
+   "par_lo": -39.88102239608527,
+   "par_hi": 69.15127450320078,
+   "value": 0.4896034042244204,
+   "simulated": true
+  },
+  {
+   "key": "6392",
+   "name": "Fran Garcia",
+   "pos": "DEF",
+   "price": 28531916.0,
+   "season_pts": 98.40837387869259,
+   "next_pts": null,
+   "par": 13.741877703914582,
    "par_lo": null,
    "par_hi": null,
-   "value": 0.4264919139525896,
+   "value": 0.4816317875012173,
    "simulated": false
   },
   {
@@ -994,29 +1087,29 @@
    "simulated": true
   },
   {
-   "key": "13864",
-   "name": "Marc Bernal",
-   "pos": "MED",
-   "price": 27658307.0,
-   "season_pts": 95.8476422778326,
+   "key": "16236",
+   "name": "Miguel Sierra",
+   "pos": "DEL",
+   "price": 8910445.0,
+   "season_pts": 84.94379594857747,
    "next_pts": null,
-   "par": 9.643869151777835,
-   "par_lo": -38.731691540579234,
-   "par_hi": 74.66209042748672,
-   "value": 0.34867893945127715,
+   "par": 3.5536106276287,
+   "par_lo": -31.32428346587601,
+   "par_hi": 50.807994864082865,
+   "value": 0.3988140466192991,
    "simulated": true
   },
   {
-   "key": "6235",
-   "name": "Odysseas Vlachodimos",
-   "pos": "POR",
-   "price": 32178189.0,
-   "season_pts": 140.117972481021,
+   "key": "13036",
+   "name": "Yoel Lago",
+   "pos": "DEF",
+   "price": 9241162.0,
+   "season_pts": 95.72031625929526,
    "next_pts": null,
-   "par": 10.705380494656197,
-   "par_lo": -42.92021417855438,
-   "par_hi": 76.2267453899308,
-   "value": 0.33269058413002034,
+   "par": 3.0769539850418823,
+   "par_lo": -41.30177666841708,
+   "par_hi": 58.28198669455637,
+   "value": 0.332961805565348,
    "simulated": true
   },
   {
@@ -1056,19 +1149,6 @@
    "par_lo": -27.10962776890217,
    "par_hi": 45.54313336660964,
    "value": 0.17461745303992146,
-   "simulated": true
-  },
-  {
-   "key": "6392",
-   "name": "Fran Garcia",
-   "pos": "DEF",
-   "price": 28893855.0,
-   "season_pts": 98.40837387869259,
-   "next_pts": null,
-   "par": 4.932018873375455,
-   "par_lo": -39.37330819557842,
-   "par_hi": 63.752685389867565,
-   "value": 0.17069438721054891,
    "simulated": true
   },
   {
@@ -1150,6 +1230,19 @@
    "simulated": true
   },
   {
+   "key": "5032",
+   "name": "Toni Martinez",
+   "pos": "DEL",
+   "price": 28027217.0,
+   "season_pts": 99.11618254155849,
+   "next_pts": null,
+   "par": 0.8933254562343649,
+   "par_lo": null,
+   "par_hi": null,
+   "value": 0.03187349840101373,
+   "simulated": false
+  },
+  {
    "key": "5859",
    "name": "Gorka Guruzeta",
    "pos": "DEL",
@@ -1205,7 +1298,7 @@
    "key": "6973",
    "name": "Alfonso Herrero",
    "pos": "POR",
-   "price": 18856589.0,
+   "price": 19142340.0,
    "season_pts": 140.43672072602845,
    "next_pts": null,
    "par": 0.0,
@@ -1263,6 +1356,19 @@
    "par": 0.0,
    "par_lo": 0.0,
    "par_hi": 0.0,
+   "value": 0.0,
+   "simulated": true
+  },
+  {
+   "key": "3589",
+   "name": "Dominik Livakovic",
+   "pos": "POR",
+   "price": 2654638.0,
+   "season_pts": 79.36229183088072,
+   "next_pts": null,
+   "par": 0.0,
+   "par_lo": -5.983912801395377,
+   "par_hi": 9.332000603903817,
    "value": 0.0,
    "simulated": true
   },
@@ -1384,6 +1490,19 @@
    "simulated": true
   },
   {
+   "key": "6235",
+   "name": "Odysseas Vlachodimos",
+   "pos": "POR",
+   "price": 32477683.0,
+   "season_pts": 140.117972481021,
+   "next_pts": null,
+   "par": -0.31874824500744126,
+   "par_lo": null,
+   "par_hi": null,
+   "value": -0.00981437761454354,
+   "simulated": false
+  },
+  {
    "key": "5035",
    "name": "Brahim Diaz",
    "pos": "MED",
@@ -1397,29 +1516,29 @@
    "simulated": true
   },
   {
+   "key": "17376",
+   "name": "Aaron Ndive Mayol",
+   "pos": "MED",
+   "price": 807677.0,
+   "season_pts": 63.3033643687081,
+   "next_pts": null,
+   "par": -0.2696747439954379,
+   "par_lo": -10.849462567906585,
+   "par_hi": 13.18062001842568,
+   "value": -0.33388934437335455,
+   "simulated": true
+  },
+  {
    "key": "12538",
    "name": "Jon Aramburu",
    "pos": "DEF",
-   "price": 19002909.0,
+   "price": 18706532.0,
    "season_pts": 70.07091819289342,
    "next_pts": null,
    "par": -14.595577981884588,
    "par_lo": null,
    "par_hi": null,
-   "value": -0.7680707191664492,
-   "simulated": false
-  },
-  {
-   "key": "16236",
-   "name": "Miguel Sierra",
-   "pos": "DEL",
-   "price": 8384717.0,
-   "season_pts": 84.94379594857747,
-   "next_pts": null,
-   "par": -13.279061136746648,
-   "par_lo": null,
-   "par_hi": null,
-   "value": -1.5837220429439238,
+   "value": -0.7802396500796935,
    "simulated": false
   },
   {
@@ -1437,12 +1556,61 @@
   }
  ],
  "flip": {
-  "horizon": 5,
-  "hurdle": 0.01,
-  "cash": 18872203.525315974,
-  "reserve": 13334822.0,
-  "spendable": 5537381.525315974,
-  "picks": [],
+  "cash": 18972143.076984953,
+  "reserve": 11894083.0,
+  "spendable": 7078060.076984953,
+  "picks": [
+   {
+    "key": "7842",
+    "name": "ferran jutgla",
+    "ask": 9635696.0,
+    "value": 9830251.0,
+    "last": 2.0191068709515,
+    "h": 9,
+    "n": 147,
+    "days": 30,
+    "drift": 6.796527357171758,
+    "gain": 117404.55151397921,
+    "pay": 10329840.77424769,
+    "max_bid": 10447245.325761668,
+    "fits": false,
+    "reason": {
+     "code": "rising",
+     "last": 2.0191068709515,
+     "drift": 6.796527357171758,
+     "h": 9,
+     "n": 147,
+     "days": 30,
+     "ask": 9635696.0,
+     "pay": 10329840.77424769
+    }
+   },
+   {
+    "key": "9213",
+    "name": "julen agirrezabala",
+    "ask": 24098012.0,
+    "value": 24569567.0,
+    "last": 1.9568211684848,
+    "h": 10,
+    "n": 145,
+    "days": 30,
+    "drift": 5.921739889719616,
+    "gain": 63781.67457574606,
+    "pay": 25834005.860698603,
+    "max_bid": 25897787.53527435,
+    "fits": false,
+    "reason": {
+     "code": "rising",
+     "last": 1.9568211684848,
+     "drift": 5.921739889719616,
+     "h": 10,
+     "n": 145,
+     "days": 30,
+     "ask": 24098012.0,
+     "pay": 25834005.860698603
+    }
+   }
+  ],
   "sells": [
    {
     "key": "14118",
@@ -1450,8 +1618,18 @@
     "value": 892489.0,
     "offer": 959027.0,
     "last": -1.9642541337543,
-    "why": "the app's offer beats what holding is expected to fetch",
-    "season_pts": 0.0
+    "gain": 168777.56973105017,
+    "cost_pts": 0.0,
+    "benefit_pts": 0.13690056379015847,
+    "reason": {
+     "code": "sale",
+     "now": 959027.0,
+     "hold": 790249.4302689498,
+     "h": 10,
+     "offered": true,
+     "cost": 0.0,
+     "benefit": 0.13690056379015847
+    }
    }
   ],
   "held": [
@@ -1461,8 +1639,18 @@
     "value": 6476788.0,
     "offer": 6247379.0,
     "last": -2.4488298973925,
-    "why": "the app's offer beats what holding is expected to fetch -- but the report keeps him: selling costs 6 season points (up to 51 in a bad case)",
-    "season_pts": -6.2527243753424955
+    "gain": 494277.0302153826,
+    "cost_pts": 9.255572020460217,
+    "benefit_pts": 0.40092296750592643,
+    "reason": {
+     "code": "keep",
+     "now": 6247379.0,
+     "hold": 5753101.969784617,
+     "h": 10,
+     "offered": true,
+     "cost": 9.255572020460217,
+     "benefit": 0.40092296750592643
+    }
    },
    {
     "key": "7027",
@@ -1470,8 +1658,18 @@
     "value": 1393495.0,
     "offer": null,
     "last": -1.5163775989416,
-    "why": "expected to lose 8.2% over the next 5 updates -- but the report keeps him: selling costs 3 season points (up to 33 in a bad case)",
-    "season_pts": -3.127064602038331
+    "gain": 115203.90582719119,
+    "cost_pts": 5.656860552639912,
+    "benefit_pts": 0.09344535345367816,
+    "reason": {
+     "code": "keep",
+     "now": 1386709.4323644768,
+     "hold": 1271505.5265372857,
+     "h": 10,
+     "offered": false,
+     "cost": 5.656860552639912,
+     "benefit": 0.09344535345367816
+    }
    },
    {
     "key": "9612",
@@ -1479,35 +1677,102 @@
     "value": 8362317.0,
     "offer": null,
     "last": -2.6056145117491,
-    "why": "expected to lose 8.2% over the next 5 updates -- but the report keeps him: selling costs 0 season points (up to 51 in a bad case)",
-    "season_pts": -0.46489779454350355
+    "gain": 1415049.9939321047,
+    "cost_pts": 4.681371790480802,
+    "benefit_pts": 1.1477896160565844,
+    "reason": {
+     "code": "keep",
+     "now": 8321597.03502475,
+     "hold": 6906547.041092645,
+     "h": 10,
+     "offered": false,
+     "cost": 4.681371790480802,
+     "benefit": 1.1477896160565844
+    }
    }
   ],
-  "table": {
-   "-1e+09..-3": [
-    -11.174001695392283,
-    1347
+  "measured": {
+   "offer": 0.9951305403783126,
+   "premium": 1.072038882738485,
+   "offers": 75,
+   "auctions": 70,
+   "risk": 1.0,
+   "hurdle": 0.0,
+   "points_per_million": 0.8111300809006301
+  },
+  "view": {
+   "heading": "MARKET",
+   "summary": "7.08M to spend; 11.89M held back for the report's own buys",
+   "sections": [
+    {
+     "label": "BUY — free market",
+     "tone": "buy",
+     "rows": [
+      {
+       "name": "ferran jutgla",
+       "detail": "last update +2.0%; the history says at least +6.8% over the next 9 updates (147 similar cases on 30 different days); ask 9.64M, expect to pay ~10.33M",
+       "right": [
+        "≤ 10.45M",
+        "bid, over budget"
+       ]
+      },
+      {
+       "name": "julen agirrezabala",
+       "detail": "last update +2.0%; the history says at least +5.9% over the next 10 updates (145 similar cases on 30 different days); ask 24.10M, expect to pay ~25.83M",
+       "right": [
+        "≤ 25.90M",
+        "bid, over budget"
+       ]
+      }
+     ],
+     "empty": "Nothing on the free market is expected to beat the cost of tying the cash up."
+    },
+    {
+     "label": "SELL — not starting",
+     "tone": "sell",
+     "rows": [
+      {
+       "name": "ali houary",
+       "detail": "the app offers 959K against at most ~790K from holding 10 updates: 169K more, worth 0.1 season points at what the report's buys return, for the 0.0 he is expected to cost the season",
+       "right": [
+        "892K",
+        "offer 959K"
+       ]
+      }
+     ]
+    },
+    {
+     "label": "HELD BACK — the report keeps them",
+     "tone": "held",
+     "rows": [
+      {
+       "name": "yeray alvarez",
+       "detail": "the app offers 6.25M against at most ~5.75M from holding 10 updates, but the 494K gained is worth 0.4 season points and he is expected to add 9.3 -- the report keeps him",
+       "right": [
+        "6.48M",
+        ""
+       ]
+      },
+      {
+       "name": "raul garcia",
+       "detail": "an offer would bring ~1.39M against at most ~1.27M from holding 10 updates, but the 115K gained is worth 0.1 season points and he is expected to add 5.7 -- the report keeps him",
+       "right": [
+        "1.39M",
+        ""
+       ]
+      },
+      {
+       "name": "carl starfelt",
+       "detail": "an offer would bring ~8.32M against at most ~6.91M from holding 10 updates, but the 1.42M gained is worth 1.1 season points and he is expected to add 4.7 -- the report keeps him",
+       "right": [
+        "8.36M",
+        ""
+       ]
+      }
+     ]
+    }
    ],
-   "-3..-1": [
-    -8.23096359120576,
-    8454
-   ],
-   "-1..1": [
-    2.5591404107038476,
-    11445
-   ],
-   "1..3": [
-    7.180994432258115,
-    1836
-   ],
-   "3..6": [
-    17.15758116976403,
-    987
-   ],
-   "6..1e+09": [
-    36.592036890672084,
-    508
-   ]
+   "ping": "\nBuy: ferran jutgla (bid up to 10.45M), julen agirrezabala (bid up to 25.90M)\nSell: ali houary"
   }
  }
 }
