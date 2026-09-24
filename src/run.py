@@ -36,53 +36,6 @@ def call(spec: str):
     return getattr(__import__(mod), fn)
 
 
-SLOW_STAGE_S = 8.0
-
-
-class _Sampler:
-    """Where a stage spends its time, sampled -- not profiled.
-
-    A stage that took 38s in a scheduled run took 2s by hand on the same
-    data (2026-09-24), so the number alone says nothing and cProfile's ~2x
-    overhead would itself distort the run being explained. Samples the main
-    thread's innermost repo frame every 0.25s; a stage under SLOW_STAGE_S
-    prints nothing, so a healthy run's log is unchanged.
-    """
-
-    def __init__(self):
-        self.hits = collections.Counter()
-        self._stop = threading.Event()
-        self._main = threading.get_ident()
-        self._t = threading.Thread(target=self._run, daemon=True)
-
-    def _run(self):
-        while not self._stop.wait(0.25):
-            f = sys._current_frames().get(self._main)
-            inner = None
-            while f is not None:
-                fn = f.f_code.co_filename
-                if "/src/" in fn and inner is None:
-                    inner = "%s:%s" % (fn.rsplit("/src/", 1)[1], f.f_code.co_name)
-                f = f.f_back
-            self.hits[inner or "(outside src/)"] += 1
-
-    def __enter__(self):
-        self._t.start()
-        return self
-
-    def __exit__(self, *exc):
-        self._stop.set()
-        self._t.join()
-
-    def report(self, name: str, secs: float) -> None:
-        if secs < SLOW_STAGE_S or not self.hits:
-            return
-        n = sum(self.hits.values())
-        print("  slow %s (%.1fs), where:" % (name, secs))
-        for k, v in self.hits.most_common(6):
-            print("    %3d%%  %s" % (100 * v // n, k))
-
-
 def _sample(hits, stop, tid) -> None:
     # Innermost src/ frame of the main thread every 0.25s, not cProfile: a
     # stage took 38s scheduled and 2.2s by hand (2026-09-24) and cProfile's
@@ -108,10 +61,11 @@ def main(argv: list[str]) -> int:
     for name, spec in stages:
         t0 = time.time()
         print("%s" % name, flush=True)
-        sampler = _Sampler()
+        hits, stop = collections.Counter(), threading.Event()
+        threading.Thread(target=_sample, daemon=True, args=(
+            hits, stop, threading.get_ident())).start()
         try:
-            with sampler:
-                call(spec)()
+            call(spec)()
         except SystemExit as e:
             if e.code:
                 print("  FAILED: %s exited %s" % (name, e.code))
@@ -120,7 +74,6 @@ def main(argv: list[str]) -> int:
             traceback.print_exc()
             print("  FAILED: %s" % name)
             return 1
-        sampler.report(name, time.time() - t0)
         # gc.collect() BEFORE the stage's time is recorded, not after: it
         # used to run outside the timer, so a stage's own printed cost was
         # a lie and the difference showed up as an unexplained gap between

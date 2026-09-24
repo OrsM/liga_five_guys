@@ -215,13 +215,13 @@ check "Universe flat-dict storage" 0 \
 # A bug fix, not a tidy -- the lines are the comment recording why the
 # collect stays (this repo runs under a 750M MemoryMax) while its cost
 # moves inside the timer it always should have been in.
-# 20763 -> 20835 on 2026-09-24: run.py names where a stage that takes over
+# 20763 -> 20788 on 2026-09-24: run.py names where a stage that takes over
 # 8s spent it (a 0.25s sampler of the main thread's innermost src/ frame).
 # `squads` took 38s in scheduled runs and 2.2s by hand on the same data in
 # a fresh process under the same MemoryHigh/MemoryMax, so the number alone
 # cannot say what differs and cProfile's overhead would distort the run.
 # Printed only for a slow stage, so a healthy run's log is unchanged.
-check "src/ lines" 20835 \
+check "src/ lines" 20788 \
   "$(find src -name '*.py' | xargs cat | wc -l)"
 
 [ "$fail" -eq 0 ] && echo "concepts: no duplication regained" || echo "concepts: a concept regained a second implementation"
