@@ -25,7 +25,7 @@ TESTS=(ffcore/parse.py ffcore/text.py ffcore/schema.py ffcore/tidy.py
        ffcore/fixtures.py ffcore/auth.py
        ffcore/model.py ffcore/attributes.py
        ffcore/forecast.py ffcore/season.py ffcore/render.py
-       ffcore/startprob.py ffcore/crosswalk.py ffcore/market.py sources.py
+       ffcore/startprob.py ffcore/crosswalk.py sources.py
        "ingest.py --selftest" "ffcore/league.py --selftest" ffcore/fixture.py
        ffcore/second.py ffcore/score.py ffcore/bid.py "digest.py --selftest"
        "slate.py --selftest" "points.py --selftest"

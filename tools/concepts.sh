@@ -296,7 +296,11 @@ check "Universe flat-dict storage" 0 \
 # (its net cash out, clause premium included: 18.41M for a raid whose player is
 # valued 11.89M) instead of a price I inferred from candidate rows; picks say how
 # much more cash they need, and the ping lists only what can be afforded.
-check "src/ lines" 21605 \
+# 21605 -> 21179 on 2026-09-24: deleted code nothing called -- score.py's
+# experiment scaffolding (backtest_predictor, walk_forward_compare,
+# log_experiment, experiment_history, _precision_blend), the whole unused
+# ffcore/market.py offer sampler, and sim._net. The ratchet only ever goes down.
+check "src/ lines" 21179 \
   "$(find src -name '*.py' | xargs cat | wc -l)"
 
 [ "$fail" -eq 0 ] && echo "concepts: no duplication regained" || echo "concepts: a concept regained a second implementation"

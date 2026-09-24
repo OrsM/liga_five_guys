@@ -23,10 +23,6 @@ OUT = "sim.md"
 SHOW = 8
 
 
-def _net(v) -> str:
-    return ("+" if v > 0 else "") + fmt_money(v)
-
-
 def _pts(v) -> str:
     return "{:,.0f}".format(v)
 

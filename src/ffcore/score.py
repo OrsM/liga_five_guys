@@ -54,19 +54,6 @@ DECAY_GRID = (1.0, 0.85, 0.7, 0.55, 0.4)
 
 
 
-def _precision_blend(estimates) -> tuple[float, float] | None:
-    w_sum = m_sum = 0.0
-    for mean, var in estimates:
-        if var is None or var <= 0:
-            continue
-        w = 1.0 / var
-        w_sum += w
-        m_sum += mean * w
-    if w_sum <= 0:
-        return None
-    return m_sum / w_sum, 1.0 / w_sum
-
-
 def load_understat_current(xw=None) -> dict[str, dict]:
     from ffcore.tidy import load_understat_players, load_crosswalk
 
@@ -199,99 +186,6 @@ def _shots_by_jornada(xw) -> dict[str, dict[int, float]]:
             continue
         out.setdefault(key, {})[wk] = val
     return out
-
-
-def backtest_predictor(feature_by_key_jornada: dict[str, dict[int, float]],
-                       actual_by_key_jornada: dict[str, dict[int, float]],
-                       min_pairs: int = 10) -> dict | None:
-    import statistics as _statistics
-
-    from stats import bootstrap_gap
-
-    pairs = []
-    for key, jd_feat in feature_by_key_jornada.items():
-        jd_actual = actual_by_key_jornada.get(key, {})
-        common = sorted(set(jd_feat) & set(jd_actual))
-        if len(common) < 2:
-            continue
-        prior, last = common[:-1], common[-1]
-        x = sum(jd_feat[j] for j in prior) / len(prior)
-        pairs.append((x, jd_actual[last]))
-    n = len(pairs)
-    if n < min_pairs:
-        return None
-
-    feature_err, baseline_err = [], []
-    for i in range(n):
-        train = pairs[:i] + pairs[i + 1:]
-        train_ys = [t[1] for t in train]
-        slope, intercept = _linreg([t[0] for t in train], train_ys)
-        x_i, y_i = pairs[i]
-        feature_err.append(abs((slope * x_i + intercept) - y_i))
-        baseline_err.append(abs(_statistics.mean(train_ys) - y_i))
-    return {"n": n, "mae_feature": sum(feature_err) / n,
-           "mae_baseline": sum(baseline_err) / n,
-           "gap": bootstrap_gap(feature_err, baseline_err)}
-
-
-def walk_forward_compare(jornadas: list[int], fit_new, predict_new,
-                         predict_old, actual, min_history: int = 1
-                         ) -> dict | None:
-    from stats import bootstrap_gap
-
-    per_jornada = []
-    all_old_err, all_new_err = [], []
-    for i, j in enumerate(jornadas):
-        if i < min_history:
-            continue
-        params = fit_new(j)
-        preds_new = predict_new(params, j)
-        preds_old = predict_old(j)
-        acts = actual(j)
-        common = set(preds_new) & set(preds_old) & set(acts)
-        if not common:
-            continue
-        old_err = [abs(preds_old[k] - acts[k]) for k in common]
-        new_err = [abs(preds_new[k] - acts[k]) for k in common]
-        all_old_err += old_err
-        all_new_err += new_err
-        per_jornada.append({"jornada": j, "n": len(common),
-                            "mae_old": sum(old_err) / len(old_err),
-                            "mae_new": sum(new_err) / len(new_err)})
-    if not all_old_err:
-        return None
-    return {"per_jornada": per_jornada, "n": len(all_old_err),
-           "mae_old": sum(all_old_err) / len(all_old_err),
-           "mae_new": sum(all_new_err) / len(all_new_err),
-           "gap": bootstrap_gap(all_new_err, all_old_err)}
-
-
-EXPERIMENT_LOG = "experiment_log.csv"
-
-
-def log_experiment(feature: str, position: str, result: dict | None,
-                   verdict: str, notes: str = "") -> None:
-    from ffcore.tidy import DECISIONS, append_csv, run_now
-
-    DECISIONS.mkdir(parents=True, exist_ok=True)
-    row = {"observed_at": run_now().strftime("%Y-%m-%dT%H%MZ"),
-          "feature": feature, "position": position,
-          "n": result["n"] if result else "",
-          "mae_feature": "%.4f" % result["mae_feature"] if result else "",
-          "mae_baseline": "%.4f" % result["mae_baseline"] if result else "",
-          "beats": (result["gap"]["beats"]
-                   if result and result.get("gap") else ""),
-          "verdict": verdict, "notes": notes}
-    append_csv(DECISIONS / EXPERIMENT_LOG, [row],
-              ["observed_at", "feature", "position", "n", "mae_feature",
-               "mae_baseline", "beats", "verdict", "notes"])
-
-
-def experiment_history() -> list[dict]:
-    from ffcore.tidy import DECISIONS, read_csv
-
-    path = DECISIONS / EXPERIMENT_LOG
-    return read_csv(path) if path.exists() else []
 
 
 def _shots_points_fit(xw, players=None) -> tuple[float, float, int]:
@@ -1148,15 +1042,6 @@ def _selftest() -> None:
     decay2, why2 = _fit_decay(trending)
     assert decay2 < 1.0 and "beat flat" in why2, (decay2, why2)
 
-    mean, var = _precision_blend([(0.100, 0.055 ** 2), (0.000, 0.006 ** 2)])
-    assert abs(mean - 0.001) < 0.0005, mean
-    assert var < 0.006 ** 2
-    assert _precision_blend([(5.0, 0.0), (3.0, 1.0)]) == (3.0, 1.0)
-    assert _precision_blend([]) is None
-    assert _precision_blend([(5.0, 0.0)]) is None
-    eq_mean, eq_var = _precision_blend([(2.0, 1.0), (4.0, 1.0)])
-    assert abs(eq_mean - 3.0) < 1e-9 and abs(eq_var - 0.5) < 1e-9
-
     from ffcore.crosswalk import Crosswalk as _CW, Player as _P
     import ffcore.tidy as _tidy
     import tempfile as _tempfile
@@ -1241,101 +1126,6 @@ def _selftest() -> None:
     assert abs(with_shots.ppm - expect_shots) < 1e-9, \
         (with_shots.ppm, expect_shots)
     assert "shots" in with_shots.why
-
-    assert backtest_predictor({}, {}, min_pairs=1) is None
-    exact_feat = {str(i): {1: float(i), 2: float(i)} for i in range(1, 13)}
-    exact_act = {str(i): {1: float(i) - 1, 2: float(i) + 1, 3: float(i) * 2}
-                for i in range(1, 13)}
-    exact = backtest_predictor(exact_feat, exact_act, min_pairs=10)
-    assert exact is not None and exact["n"] == 12, exact
-    assert exact["mae_feature"] < exact["mae_baseline"], exact
-    assert exact["gap"]["beats"], exact
-    import random as _random_bp
-    _rng_bp = _random_bp.Random(7)
-    noise_feat = {str(i): {1: _rng_bp.random(), 2: _rng_bp.random()}
-                 for i in range(1, 13)}
-    noise_act = {str(i): {1: 5.0, 2: 5.0, 3: 5.0 + _rng_bp.uniform(-0.5, 0.5)}
-                for i in range(1, 13)}
-    noisy = backtest_predictor(noise_feat, noise_act, min_pairs=10)
-    assert noisy is not None and not noisy["gap"]["beats"], noisy
-
-    _rng_reg = _random_bp.Random(11)
-    varied_levels = {str(i): 2.0 + i * 3.0 for i in range(1, 21)}
-    noise_feat2 = {k: {1: _rng_reg.random(), 2: _rng_reg.random()}
-                  for k in varied_levels}
-    noise_act2 = {k: {1: lvl + _rng_reg.uniform(-1, 1),
-                      2: lvl + _rng_reg.uniform(-1, 1),
-                      3: lvl + _rng_reg.uniform(-1, 1)}
-                 for k, lvl in varied_levels.items()}
-    noisy2 = backtest_predictor(noise_feat2, noise_act2, min_pairs=10)
-    assert noisy2 is not None and not noisy2["gap"]["beats"], noisy2
-
-    jornadas_wf = [1, 2, 3, 4, 5]
-    actual_map = {1: {"p1": 10.0, "p2": 4.0}, 2: {"p1": 10.0, "p2": 4.0},
-                 3: {"p1": 10.0, "p2": 4.0}, 4: {"p1": 10.0, "p2": 4.0},
-                 5: {"p1": 10.0, "p2": 4.0}}
-
-    def actual_wf(j):
-        return actual_map[j]
-
-    def predict_old_flat(j):
-        return {"p1": 7.0, "p2": 7.0}
-
-    def fit_mean(cutoff):
-        prior = [actual_map[j] for j in jornadas_wf if j < cutoff]
-        if not prior:
-            return {"p1": 7.0, "p2": 7.0}
-        return {k: sum(p[k] for p in prior) / len(prior) for k in ("p1", "p2")}
-
-    def predict_mean(params, j):
-        return dict(params)
-
-    exact_wf = walk_forward_compare(jornadas_wf, fit_mean, predict_mean,
-                                    predict_old_flat, actual_wf,
-                                    min_history=1)
-    assert exact_wf is not None and exact_wf["n"] == 8, exact_wf
-    assert exact_wf["mae_new"] < 1e-9 < exact_wf["mae_old"], exact_wf
-    assert exact_wf["gap"]["beats"], exact_wf
-    assert len(exact_wf["per_jornada"]) == 4, exact_wf
-
-    exact_wf0 = walk_forward_compare(jornadas_wf, fit_mean, predict_mean,
-                                     predict_old_flat, actual_wf,
-                                     min_history=0)
-    assert len(exact_wf0["per_jornada"]) == 5, exact_wf0
-
-    def fit_bad(cutoff):
-        return {"p1": 0.0, "p2": 0.0}
-
-    def predict_bad(params, j):
-        return dict(params)
-
-    worse_wf = walk_forward_compare(jornadas_wf, fit_bad, predict_bad,
-                                    predict_old_flat, actual_wf,
-                                    min_history=1)
-    assert worse_wf["mae_new"] > worse_wf["mae_old"], worse_wf
-
-    assert walk_forward_compare(
-        jornadas_wf, lambda c: {}, lambda p, j: {},
-        lambda j: {"nobody": 1.0}, actual_wf, min_history=1) is None
-
-    import tempfile as _tempfile5
-    from ffcore import tidy as _tidy5
-
-    with _tempfile5.TemporaryDirectory() as _d5:
-        _real_decisions5 = _tidy5.DECISIONS
-        _tidy5.DECISIONS = __import__("pathlib").Path(_d5)
-        try:
-            assert experiment_history() == []
-            log_experiment("shots", "delantero", exact, "kept",
-                          "synthetic exact-fit case")
-            log_experiment("team_defense", "defensa", None, "no effect",
-                          "not enough data")
-            hist = experiment_history()
-            assert len(hist) == 2, hist
-            assert hist[0]["feature"] == "shots" and hist[0]["verdict"] == "kept"
-            assert hist[1]["n"] == "", hist[1]
-        finally:
-            _tidy5.DECISIONS = _real_decisions5
 
     import csv as _csv3
     import os as _os3

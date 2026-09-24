@@ -155,7 +155,7 @@ This is the mechanical half of a fair complaint from Miguel: that the report
 kept proposing to overspend and give up two players for one, for marginal
 returns. It did, and this is why.
 
-**SPEND NOW OR SPEND LATER, MEASURED.** `ffcore/market.py` simulates what the
+**SPEND NOW OR SPEND LATER, MEASURED.** an offer sampler (`ffcore/market.py`, removed 2026-09-24 once the engine read real offers; see git history) simulated what the
 app is likely to deal you next, fitted to every cycle on record, and the
 answer was not the one anybody expected:
 
@@ -570,7 +570,6 @@ PYTHONPATH=src python src/ffcore/season.py                # shapes, best XI, sta
 PYTHONPATH=src python src/ffcore/render.py                # folded names, made readable
 PYTHONPATH=src python src/ffcore/startprob.py             # calibration + the fit's guard
 PYTHONPATH=src python src/ffcore/crosswalk.py             # the crosswalk table + merging
-PYTHONPATH=src python src/ffcore/market.py                # the offer sampler + its fit
 PYTHONPATH=src python src/sources.py                      # parsers + signatures
 PYTHONPATH=src python src/ingest.py --selftest            # archives + carry-forward
 PYTHONPATH=src python src/ffcore/league.py --selftest     # config + cash
