@@ -48276,3 +48276,854 @@ observed_at,source,team_id,player_id,player_name,player_name_full,position_id,ma
 2026-09-23T2155Z,laliga,7,3096,Martín Anselmi,,5,681857,ok
 2026-09-23T2155Z,laliga,14,3097,Beñat,,5,681857,ok
 2026-09-23T2155Z,laliga,18,3277,Oscar Sánchez,,5,1389050,ok
+2026-09-24T0307Z,laliga,3,68,Unai Simón,,1,46577902,ok
+2026-09-24T0307Z,laliga,6,140,Iván Villar,,1,544379,ok
+2026-09-24T0307Z,laliga,9,184,David Soria,,1,37920742,ok
+2026-09-24T0307Z,laliga,13,204,Aitor Fdez,,1,567165,ok
+2026-09-24T0307Z,laliga,15,230,Courtois,,1,58388567,ok
+2026-09-24T0307Z,laliga,16,274,Remiro,,1,35527169,ok
+2026-09-24T0307Z,laliga,13,644,Sergio Herrera,,1,28520371,ok
+2026-09-24T0307Z,laliga,21,988,Sivera,,1,44242580,ok
+2026-09-24T0307Z,laliga,49,1219,Agirrezabala,,1,24569567,ok
+2026-09-24T0307Z,laliga,2,2321,J. Musso,,1,1719855,ok
+2026-09-24T0307Z,laliga,2,2322,Oblak,,1,48256503,ok
+2026-09-24T0307Z,laliga,7,2351,Iñaki Peña,,1,4015501,out_of_league
+2026-09-24T0307Z,laliga,9,2363,Letacek,,1,487187,ok
+2026-09-24T0307Z,laliga,14,2378,D. Cárdenas,,1,1128458,ok
+2026-09-24T0307Z,laliga,5,2413,Adrián,,1,1907121,out_of_league
+2026-09-24T0307Z,laliga,15,2423,Lunin,,1,1057165,ok
+2026-09-24T0307Z,laliga,16,2435,Marrero,,1,730258,ok
+2026-09-24T0307Z,laliga,18,2457,Dimitrievski,,1,21447015,ok
+2026-09-24T0307Z,laliga,20,2467,Júnior R.,,1,21107292,ok
+2026-09-24T0307Z,laliga,5,2468,Diego Conde,,1,1085800,ok
+2026-09-24T0307Z,laliga,8,2507,Dmitrovic,,1,38779309,ok
+2026-09-24T0307Z,laliga,14,2519,A. Batalla,,1,13867498,injured
+2026-09-24T0307Z,laliga,18,2540,C. Rivero,,1,445253,ok
+2026-09-24T0307Z,laliga,5,2541,Á. Valles,,1,60121001,ok
+2026-09-24T0307Z,laliga,8,2565,A. Fortuño,,1,455179,ok
+2026-09-24T0307Z,laliga,21,2567,Raúl Fernández,,1,903475,out_of_league
+2026-09-24T0307Z,laliga,17,2579,Fran González,,1,486786,ok
+2026-09-24T0307Z,laliga,6,2597,Marc Vidal,,1,1003764,out_of_league
+2026-09-24T0307Z,laliga,5,2610,Pau López,,1,2634421,out_of_league
+2026-09-24T0307Z,laliga,7,2613,M. Dituro,,1,9748854,ok
+2026-09-24T0307Z,laliga,4,2634,Joan García,,1,62184660,injured
+2026-09-24T0307Z,laliga,2,2643,Esquivel,,1,509215,ok
+2026-09-24T0307Z,laliga,3,2644,Padilla,,1,682159,ok
+2026-09-24T0307Z,laliga,4,2647,Kochen,,1,677941,out_of_league
+2026-09-24T0307Z,laliga,8,2658,Tristán,,1,501872,out_of_league
+2026-09-24T0307Z,laliga,11,2666,P. Campos,,1,566801,ok
+2026-09-24T0307Z,laliga,11,2667,A. Primo,,1,1104126,out_of_league
+2026-09-24T0307Z,laliga,11,2668,Cayetano,,1,602249,out_of_league
+2026-09-24T0307Z,laliga,17,2677,Rafa Romero,,1,602257,out_of_league
+2026-09-24T0307Z,laliga,20,2696,Ruben,,1,461069,ok
+2026-09-24T0307Z,laliga,6,2713,Ionut Radu,,1,43881023,ok
+2026-09-24T0307Z,laliga,7,2715,A. Iturbe,,1,515422,ok
+2026-09-24T0307Z,laliga,13,2719,Stamatakis,,1,602319,out_of_league
+2026-09-24T0307Z,laliga,15,2722,Mestre,,1,677860,out_of_league
+2026-09-24T0307Z,laliga,14,2724,Adrián Molina,,1,502201,ok
+2026-09-24T0307Z,laliga,14,2744,Juanpe Gil,,1,602234,out_of_league
+2026-09-24T0307Z,laliga,17,2747,Alberto F.,,1,702633,out_of_league
+2026-09-24T0307Z,laliga,21,2749,Swiderski,,1,468296,ok
+2026-09-24T0307Z,laliga,11,2755,Ryan,,1,29010450,ok
+2026-09-24T0307Z,laliga,20,2758,Arnau Tenas,,1,6597370,out_of_league
+2026-09-24T0307Z,laliga,17,2759,Vlachodimos,,1,32477824,ok
+2026-09-24T0307Z,laliga,4,2783,Szczesny,,1,1234351,ok
+2026-09-24T0307Z,laliga,21,2791,Montero,,1,602316,out_of_league
+2026-09-24T0307Z,laliga,16,2792,Folgado,,1,702606,out_of_league
+2026-09-24T0307Z,laliga,5,2793,Germán,,1,702622,out_of_league
+2026-09-24T0307Z,laliga,5,2794,Manu G.,,1,581691,out_of_league
+2026-09-24T0307Z,laliga,3,2809,M. Santos,,1,702606,out_of_league
+2026-09-24T0307Z,laliga,9,2819,Ferrer,,1,489447,ok
+2026-09-24T0307Z,laliga,9,2820,J. Benito,,1,602319,out_of_league
+2026-09-24T0307Z,laliga,4,2823,Eder Aller,,1,702705,out_of_league
+2026-09-24T0307Z,laliga,16,2835,Fraga,,1,602234,out_of_league
+2026-09-24T0307Z,laliga,15,2837,Javi Navarro,,1,702622,out_of_league
+2026-09-24T0307Z,laliga,26,2966,Bachmann,,1,501880,out_of_league
+2026-09-24T0307Z,laliga,26,2971,Rios,,1,903386,out_of_league
+2026-09-24T0307Z,laliga,26,2975,A. Ferllo,,1,1632662,ok
+2026-09-24T0307Z,laliga,26,2983,Eric Puerto,,1,367523,out_of_league
+2026-09-24T0307Z,laliga,26,2988,Germán,,1,466325,ok
+2026-09-24T0307Z,laliga,49,3001,Jokin Ezkieta,,1,5949251,out_of_league
+2026-09-24T0307Z,laliga,49,3016,Alvaro J.,,1,602234,out_of_league
+2026-09-24T0307Z,laliga,49,3018,Eriksson,,1,1063664,doubtful
+2026-09-24T0307Z,laliga,49,3021,Andreev,,1,601574,out_of_league
+2026-09-24T0307Z,laliga,49,3029,Laro,,1,602234,out_of_league
+2026-09-24T0307Z,laliga,12,3040,A. Herrero,,1,19142432,ok
+2026-09-24T0307Z,laliga,12,3057,Carlos Lopez,,1,424173,ok
+2026-09-24T0307Z,laliga,12,3061,Andrés,,1,401498,out_of_league
+2026-09-24T0307Z,laliga,26,3109,Leo Román,,1,36193740,ok
+2026-09-24T0307Z,laliga,2,3118,Moldovan,,1,500000,out_of_league
+2026-09-24T0307Z,laliga,20,3130,Gulácsi,,1,4348958,ok
+2026-09-24T0307Z,laliga,21,3141,Owono,,1,743690,out_of_league
+2026-09-24T0307Z,laliga,21,3160,A. Rodriguez,,1,556118,ok
+2026-09-24T0307Z,laliga,11,3167,Galdin,,1,483833,ok
+2026-09-24T0307Z,laliga,8,3171,Llorenç,,1,460205,ok
+2026-09-24T0307Z,laliga,6,3196,Bayindir,,1,937900,ok
+2026-09-24T0307Z,laliga,18,3232,Van Oevelen,,1,924844,ok
+2026-09-24T0307Z,laliga,5,3233,A. De Pablo,,1,700000,out_of_league
+2026-09-24T0307Z,laliga,4,3251,Livakovic,,1,2654638,ok
+2026-09-24T0307Z,laliga,14,3267,Emil Audero,,1,5080158,ok
+2026-09-24T0307Z,laliga,20,3280,Kinareikin,,1,1000000,out_of_league
+2026-09-24T0307Z,laliga,2,67,Marcos Llorente,,2,47363733,ok
+2026-09-24T0307Z,laliga,3,74,Yuri,,2,16631426,ok
+2026-09-24T0307Z,laliga,3,77,Yeray,,2,6476788,ok
+2026-09-24T0307Z,laliga,5,121,Bartra,,2,35581877,injured
+2026-09-24T0307Z,laliga,2,255,Le Normand,,2,10405768,ok
+2026-09-24T0307Z,laliga,16,265,Zubeldia,,2,9727831,injured
+2026-09-24T0307Z,laliga,18,302,Gayá,,2,7424199,ok
+2026-09-24T0307Z,laliga,9,673,Domingos Duarte,,2,8021003,out_of_league
+2026-09-24T0307Z,laliga,13,1033,Catena,,2,28332302,ok
+2026-09-24T0307Z,laliga,14,1056,Pedrosa,,2,2632042,ok
+2026-09-24T0307Z,laliga,14,1121,Balliu,,2,580774,ok
+2026-09-24T0307Z,laliga,17,1147,Juan Iglesias,,2,18270711,ok
+2026-09-24T0307Z,laliga,4,1218,Álex Balde,,2,9642521,ok
+2026-09-24T0307Z,laliga,17,1251,Carmona,,2,1641149,ok
+2026-09-24T0307Z,laliga,21,1337,Tenaglia,,2,32681103,ok
+2026-09-24T0307Z,laliga,14,1535,Chavarría,,2,17526407,out_of_league
+2026-09-24T0307Z,laliga,20,1614,Cardona,,2,1941787,ok
+2026-09-24T0307Z,laliga,4,1775,Pau Cubarsí,,2,60870653,ok
+2026-09-24T0307Z,laliga,13,1890,Boyomo,,2,11986264,ok
+2026-09-24T0307Z,laliga,8,1930,El Hilali,,2,15253897,ok
+2026-09-24T0307Z,laliga,20,1959,Mouriño,,2,14768977,ok
+2026-09-24T0307Z,laliga,16,1989,Sergio Gómez,,2,16175059,ok
+2026-09-24T0307Z,laliga,18,1991,Tárrega,,2,6949454,injured
+2026-09-24T0307Z,laliga,13,2005,Abel Bretones,,2,8906048,ok
+2026-09-24T0307Z,laliga,6,2074,Javi Rodríguez,,2,6864120,ok
+2026-09-24T0307Z,laliga,15,2146,Asencio,,2,1639579,ok
+2026-09-24T0307Z,laliga,21,2178,F. Garcés,,2,469288,injured
+2026-09-24T0307Z,laliga,6,2206,Yoel Lago,,2,9241162,ok
+2026-09-24T0307Z,laliga,7,2293,John C.,,2,555213,out_of_league
+2026-09-24T0307Z,laliga,7,2294,R.P. Bigas,,2,1826666,ok
+2026-09-24T0307Z,laliga,11,2300,Dela,,2,18105214,ok
+2026-09-24T0307Z,laliga,3,2314,Vivian,,2,3524350,doubtful
+2026-09-24T0307Z,laliga,3,2315,Paredes,,2,14405303,ok
+2026-09-24T0307Z,laliga,8,2316,Gorosabel,,2,922792,ok
+2026-09-24T0307Z,laliga,2,2323,Lenglet,,2,2906079,out_of_league
+2026-09-24T0307Z,laliga,26,2324,Giménez,,2,12718003,ok
+2026-09-24T0307Z,laliga,2,2325,Molina,,2,3996790,out_of_league
+2026-09-24T0307Z,laliga,6,2329,Javi Galán,,2,6798139,ok
+2026-09-24T0307Z,laliga,13,2334,Juan Cruz,,2,3011603,out_of_league
+2026-09-24T0307Z,laliga,3,2335,Areso,,2,3931033,ok
+2026-09-24T0307Z,laliga,13,2336,Herrando,,2,1203420,injured
+2026-09-24T0307Z,laliga,6,2346,Álvaro Núñez,,2,2922229,ok
+2026-09-24T0307Z,laliga,4,2353,Christensen,,2,7758626,injured
+2026-09-24T0307Z,laliga,4,2354,Eric,,2,42957351,ok
+2026-09-24T0307Z,laliga,4,2355,Kounde,,2,23640990,ok
+2026-09-24T0307Z,laliga,4,2356,R. Araujo,,2,4635257,out_of_league
+2026-09-24T0307Z,laliga,13,2366,Diego Rico,,2,1832586,ok
+2026-09-24T0307Z,laliga,14,2379,A. Mumin,,2,6022356,out_of_league
+2026-09-24T0307Z,laliga,14,2380,Pacha,,2,3513040,out_of_league
+2026-09-24T0307Z,laliga,6,2389,O. Mingueza,,2,15056479,out_of_league
+2026-09-24T0307Z,laliga,6,2390,Starfelt,,2,8362317,ok
+2026-09-24T0307Z,laliga,6,2391,Ristic,,2,903386,out_of_league
+2026-09-24T0307Z,laliga,6,2392,C. Dominguez,,2,683567,out_of_league
+2026-09-24T0307Z,laliga,12,2398,F. Calero,,2,959504,ok
+2026-09-24T0307Z,laliga,18,2403,Copete,,2,728009,injured
+2026-09-24T0307Z,laliga,5,2414,Bellerín,,2,17958525,ok
+2026-09-24T0307Z,laliga,5,2415,Llorente ,,2,7098448,injured
+2026-09-24T0307Z,laliga,15,2425,F. Mendy,,2,494408,injured
+2026-09-24T0307Z,laliga,15,2426,E. Militão,,2,4399725,injured
+2026-09-24T0307Z,laliga,15,2428,Rüdiger,,2,19507518,ok
+2026-09-24T0307Z,laliga,5,2429,Fran García,,2,28531986,ok
+2026-09-24T0307Z,laliga,16,2437,Aritz,,2,3713786,out_of_league
+2026-09-24T0307Z,laliga,16,2438,Aihen,,2,648719,ok
+2026-09-24T0307Z,laliga,16,2439,Pacheco,,2,1429191,ok
+2026-09-24T0307Z,laliga,16,2442,Odriozola,,2,465631,injured
+2026-09-24T0307Z,laliga,16,2443,Aramburu,,2,18706654,ok
+2026-09-24T0307Z,laliga,17,2449,Marcao,,2,473531,ok
+2026-09-24T0307Z,laliga,17,2450,Nianzou,,2,1673795,out_of_league
+2026-09-24T0307Z,laliga,18,2458,Diakhaby,,2,2536131,injured
+2026-09-24T0307Z,laliga,18,2461,J. Vázquez,,2,1457476,ok
+2026-09-24T0307Z,laliga,18,2462,Cömert,,2,3714144,out_of_league
+2026-09-24T0307Z,laliga,20,2469,Costa,,2,610752,ok
+2026-09-24T0307Z,laliga,20,2470,Foyth,,2,11022841,doubtful
+2026-09-24T0307Z,laliga,20,2471,Kambwala,,2,898601,out_of_league
+2026-09-24T0307Z,laliga,17,2479,Kike Salas,,2,11894083,ok
+2026-09-24T0307Z,laliga,18,2496,Thierry Correia,,2,8030584,out_of_league
+2026-09-24T0307Z,laliga,12,2525,Salinas,,2,920607,ok
+2026-09-24T0307Z,laliga,8,2526,Miguel Rubio,,2,511776,out_of_league
+2026-09-24T0307Z,laliga,6,2528,Aidoo Jr,,2,2810540,out_of_league
+2026-09-24T0307Z,laliga,7,2529,Rubén S.,,2,438707,ok
+2026-09-24T0307Z,laliga,15,2530,Huijsen,,2,49209239,suspended
+2026-09-24T0307Z,laliga,15,2531,Trent,,2,19755345,ok
+2026-09-24T0307Z,laliga,2,2532,Ruggeri,,2,5846056,out_of_league
+2026-09-24T0307Z,laliga,15,2533,Á. Carreras,,2,8834431,ok
+2026-09-24T0307Z,laliga,3,2538,I. Lekue,,2,3183051,out_of_league
+2026-09-24T0307Z,laliga,20,2542,Rafa Marín,,2,9647743,out_of_league
+2026-09-24T0307Z,laliga,5,2543,Natan,,2,40571059,ok
+2026-09-24T0307Z,laliga,3,2545,Adama,,2,447202,out_of_league
+2026-09-24T0307Z,laliga,18,2546,Foulquier,,2,827595,injured
+2026-09-24T0307Z,laliga,14,2550,Luiz Felipe,,2,1187535,injured
+2026-09-24T0307Z,laliga,21,2552,Jonny Otto,,2,16477706,ok
+2026-09-24T0307Z,laliga,13,2559,V. Rosier,,2,1730074,injured
+2026-09-24T0307Z,laliga,2,2561,Hancko,,2,40408854,ok
+2026-09-24T0307Z,laliga,2,2562,Marc Pubill,,2,38405390,ok
+2026-09-24T0307Z,laliga,21,2568,Youssef,,2,931885,ok
+2026-09-24T0307Z,laliga,15,2572,Fortea,,2,802099,out_of_league
+2026-09-24T0307Z,laliga,15,2573,Diego Aguado,,2,774109,out_of_league
+2026-09-24T0307Z,laliga,2,2585,Kostis,,2,702674,out_of_league
+2026-09-24T0307Z,laliga,7,2596,V. Chust,,2,4062409,ok
+2026-09-24T0307Z,laliga,6,2604,Carreira,,2,7683805,ok
+2026-09-24T0307Z,laliga,21,2606,V. Parada,,2,3775868,out_of_league
+2026-09-24T0307Z,laliga,5,2609,Valentín Gómez,,2,2136643,ok
+2026-09-24T0307Z,laliga,20,2614,C. Romero,,2,18601758,ok
+2026-09-24T0307Z,laliga,11,2624,Manu Sánchez,,2,4793106,ok
+2026-09-24T0307Z,laliga,5,2627,Junior,,2,1305092,ok
+2026-09-24T0307Z,laliga,11,2629,Elgezabal,,2,1420696,out_of_league
+2026-09-24T0307Z,laliga,5,2630,Rodríguez,,2,9033741,out_of_league
+2026-09-24T0307Z,laliga,7,2631,Léo Pétrot,,2,3011625,out_of_league
+2026-09-24T0307Z,laliga,3,2645,Rego,,2,1622779,ok
+2026-09-24T0307Z,laliga,4,2648,Jofre,,2,602319,out_of_league
+2026-09-24T0307Z,laliga,6,2653,Manuel Fernández,,2,396748,out_of_league
+2026-09-24T0307Z,laliga,16,2656,Jon Martin,,2,21916149,ok
+2026-09-24T0307Z,laliga,9,2661,Djene,,2,19554059,ok
+2026-09-24T0307Z,laliga,9,2663,Ismael,,2,1104254,out_of_league
+2026-09-24T0307Z,laliga,11,2669,Matías Moreno,,2,9033768,out_of_league
+2026-09-24T0307Z,laliga,11,2670,Víctor G.,,2,830863,ok
+2026-09-24T0307Z,laliga,11,2671,Jeremy Toljan,,2,1703957,ok
+2026-09-24T0307Z,laliga,14,2678,J. Vertrouwd,,2,606710,injured
+2026-09-24T0307Z,laliga,17,2680,A. Castrín,,2,7278698,ok
+2026-09-24T0307Z,laliga,18,2692,Rubo,,2,602292,out_of_league
+2026-09-24T0307Z,laliga,20,2698,Pau Navarro,,2,3618526,ok
+2026-09-24T0307Z,laliga,9,2699,J. Ives Valou,,2,467940,ok
+2026-09-24T0307Z,laliga,5,2711,Á. Ortiz,,2,865253,ok
+2026-09-24T0307Z,laliga,6,2714,Javi Rueda,,2,5428695,ok
+2026-09-24T0307Z,laliga,7,2716,Albert,,2,803099,out_of_league
+2026-09-24T0307Z,laliga,13,2720,R. Chasco,,2,501932,out_of_league
+2026-09-24T0307Z,laliga,14,2725,De Las Sias,,2,467940,ok
+2026-09-24T0307Z,laliga,20,2728,Renato Veiga,,2,24260162,ok
+2026-09-24T0307Z,laliga,9,2736,Davinchi,,2,1199226,ok
+2026-09-24T0307Z,laliga,3,2737,Jon De Luis,,2,602257,out_of_league
+2026-09-24T0307Z,laliga,9,2740,Vilaplana,,2,582013,out_of_league
+2026-09-24T0307Z,laliga,11,2741,Martin Krug,,2,602249,out_of_league
+2026-09-24T0307Z,laliga,11,2742,Nacho Perez,,2,2056800,ok
+2026-09-24T0307Z,laliga,17,2753,Suazo,,2,6841276,ok
+2026-09-24T0307Z,laliga,4,2757,Gerard Martín,,2,45780551,ok
+2026-09-24T0307Z,laliga,11,2767,Alan Matturro,,2,2411763,out_of_league
+2026-09-24T0307Z,laliga,9,2774,Kiko F.,,2,1611308,injured
+2026-09-24T0307Z,laliga,9,2776,A. Abqar,,2,3100577,injured
+2026-09-24T0307Z,laliga,8,2785,Riedel,,2,5530352,ok
+2026-09-24T0307Z,laliga,17,2789,Oso,,2,13827919,out_of_league
+2026-09-24T0307Z,laliga,17,2790,Cardoso,,2,520680,ok
+2026-09-24T0307Z,laliga,18,2795,Navarro,,2,501909,out_of_league
+2026-09-24T0307Z,laliga,15,2807,D. Jiménez,,2,602248,out_of_league
+2026-09-24T0307Z,laliga,5,2811,Bladi,,2,602248,out_of_league
+2026-09-24T0307Z,laliga,9,2817,Nyom,,2,1505801,out_of_league
+2026-09-24T0307Z,laliga,16,2818,Hector Fort,,2,2827301,ok
+2026-09-24T0307Z,laliga,3,2827,Monreal,,2,548623,ok
+2026-09-24T0307Z,laliga,21,2831,Ballestero,,2,602316,out_of_league
+2026-09-24T0307Z,laliga,14,2833,N. Mendy,,2,6022356,out_of_league
+2026-09-24T0307Z,laliga,16,2834,Beitia,,2,455163,ok
+2026-09-24T0307Z,laliga,20,2839,Sierra,,2,602292,out_of_league
+2026-09-24T0307Z,laliga,4,2843,Xavi Espart,,2,41540087,ok
+2026-09-24T0307Z,laliga,7,2844,David Delgado,,2,602324,out_of_league
+2026-09-24T0307Z,laliga,13,2846,Arguibide,,2,3178460,ok
+2026-09-24T0307Z,laliga,6,2848,P. Meixus,,2,485372,out_of_league
+2026-09-24T0307Z,laliga,21,2851,Álvaro García,,2,501929,out_of_league
+2026-09-24T0307Z,laliga,21,2852,Egoitz M.l.,,2,602316,out_of_league
+2026-09-24T0307Z,laliga,9,2854,Lucas Laso,,2,501932,out_of_league
+2026-09-24T0307Z,laliga,9,2855,Yassin T.,,2,501932,out_of_league
+2026-09-24T0307Z,laliga,11,2858,Huseini,,2,501874,out_of_league
+2026-09-24T0307Z,laliga,18,2863,Panach,,2,484630,ok
+2026-09-24T0307Z,laliga,18,2864,Marc Jurado,,2,602292,out_of_league
+2026-09-24T0307Z,laliga,15,2867,Valdepeñas,,2,802997,out_of_league
+2026-09-24T0307Z,laliga,13,2872,Mikel,,2,602319,out_of_league
+2026-09-24T0307Z,laliga,13,2873,Santos,,2,484516,ok
+2026-09-24T0307Z,laliga,15,2874,Joan Martínez,,2,702622,out_of_league
+2026-09-24T0307Z,laliga,17,2876,Iker Muñoz,,2,467940,ok
+2026-09-24T0307Z,laliga,2,2881,D. Martínez,,2,499122,ok
+2026-09-24T0307Z,laliga,2,2882,J. Boñar,,2,445140,out_of_league
+2026-09-24T0307Z,laliga,2,2883,Purić,,2,434872,out_of_league
+2026-09-24T0307Z,laliga,21,2885,Xanet Olaiz,,2,469097,ok
+2026-09-24T0307Z,laliga,4,2889,Tommy Marqués,,2,602319,out_of_league
+2026-09-24T0307Z,laliga,9,2890,Montes,,2,602319,out_of_league
+2026-09-24T0307Z,laliga,16,2898,Kita,,2,602234,out_of_league
+2026-09-24T0307Z,laliga,18,2901,Fontanet,,2,581987,out_of_league
+2026-09-24T0307Z,laliga,4,2906,Cancelo,,2,33048511,ok
+2026-09-24T0307Z,laliga,17,2912,Julio Díaz,,2,439451,ok
+2026-09-24T0307Z,laliga,7,2914,Bema Sina,,2,602324,out_of_league
+2026-09-24T0307Z,laliga,9,2924,Zaid Romero,,2,27717404,ok
+2026-09-24T0307Z,laliga,9,2926,Boselli,,2,1009850,ok
+2026-09-24T0307Z,laliga,8,2930,Nuñez,,2,9200739,ok
+2026-09-24T0307Z,laliga,20,2934,Freeman,,2,1615711,ok
+2026-09-24T0307Z,laliga,3,2936,Egiluz,,2,429758,injured
+2026-09-24T0307Z,laliga,21,2938,Koski,,2,18769528,ok
+2026-09-24T0307Z,laliga,7,2949,B. Sangare,,2,3216532,injured
+2026-09-24T0307Z,laliga,18,2950,Saravia,,2,1505733,out_of_league
+2026-09-24T0307Z,laliga,15,2952,Lamini,,2,677955,out_of_league
+2026-09-24T0307Z,laliga,17,2953,Gattoni,,2,435131,out_of_league
+2026-09-24T0307Z,laliga,2,2960,Spina,,2,702702,out_of_league
+2026-09-24T0307Z,laliga,26,2963,Quagliata,,2,4339033,ok
+2026-09-24T0307Z,laliga,26,2965,M. Loureiro,,2,1914039,ok
+2026-09-24T0307Z,laliga,26,2968,Quique T.,,2,602257,out_of_league
+2026-09-24T0307Z,laliga,26,2972,Damián,,2,602257,out_of_league
+2026-09-24T0307Z,laliga,26,2976,A. Alti,,2,3755419,ok
+2026-09-24T0307Z,laliga,26,2979,Samu,,2,702633,out_of_league
+2026-09-24T0307Z,laliga,26,2982,I.vidal,,2,501880,out_of_league
+2026-09-24T0307Z,laliga,26,2985,Noubi,,2,14433336,ok
+2026-09-24T0307Z,laliga,26,2987,Comas,,2,489540,ok
+2026-09-24T0307Z,laliga,26,2989,Dani Barcia,,2,617218,ok
+2026-09-24T0307Z,laliga,26,2990,Ximo Navarro,,2,4475298,ok
+2026-09-24T0307Z,laliga,26,2996,Escudero,,2,1003764,out_of_league
+2026-09-24T0307Z,laliga,26,2997,Pablo,,2,468964,out_of_league
+2026-09-24T0307Z,laliga,49,2999,Mantilla,,2,1432681,ok
+2026-09-24T0307Z,laliga,49,3000,Iñigo,,2,498145,ok
+2026-09-24T0307Z,laliga,49,3006,Mario García,,2,733895,out_of_league
+2026-09-24T0307Z,laliga,49,3008,Manu Hernando,,2,1997700,ok
+2026-09-24T0307Z,laliga,49,3009,Castro,,2,5018630,out_of_league
+2026-09-24T0307Z,laliga,49,3010,Suleiman,,2,954892,out_of_league
+2026-09-24T0307Z,laliga,49,3011,Jorge Salinas,,2,6289322,ok
+2026-09-24T0307Z,laliga,49,3013,Calera,,2,802979,out_of_league
+2026-09-24T0307Z,laliga,49,3020,Carlos Sánchez,,2,507130,out_of_league
+2026-09-24T0307Z,laliga,49,3026,Pablo Ramón,,2,1903868,ok
+2026-09-24T0307Z,laliga,49,3027,Facu,,2,1187314,ok
+2026-09-24T0307Z,laliga,49,3030,Aitor Crespo,,2,802979,out_of_league
+2026-09-24T0307Z,laliga,12,3037,C. Puga,,2,3087507,ok
+2026-09-24T0307Z,laliga,12,3039,Murillo,,2,766312,injured
+2026-09-24T0307Z,laliga,12,3041,Rafita,,2,7323047,ok
+2026-09-24T0307Z,laliga,12,3042,Einar,,2,5363654,ok
+2026-09-24T0307Z,laliga,12,3043,Montero,,2,4115370,out_of_league
+2026-09-24T0307Z,laliga,12,3047,Dani Sánchez,,2,598317,out_of_league
+2026-09-24T0307Z,laliga,12,3051,Victor,,2,1254684,out_of_league
+2026-09-24T0307Z,laliga,12,3054,Recio,,2,2483857,ok
+2026-09-24T0307Z,laliga,12,3058,Gabilondo,,2,401498,out_of_league
+2026-09-24T0307Z,laliga,12,3059,Pastor,,2,422254,ok
+2026-09-24T0307Z,laliga,12,3062,Arriaza,,2,401498,out_of_league
+2026-09-24T0307Z,laliga,12,3063,M. Santaella,,2,401498,out_of_league
+2026-09-24T0307Z,laliga,12,3064,Moussa,,2,401498,out_of_league
+2026-09-24T0307Z,laliga,3,3065,Laporte,,2,44081242,ok
+2026-09-24T0307Z,laliga,7,3067,Affengruber,,2,23124950,out_of_league
+2026-09-24T0307Z,laliga,8,3068,Cabrera,,2,10705413,ok
+2026-09-24T0307Z,laliga,15,3080,Dumfries,,2,28212679,ok
+2026-09-24T0307Z,laliga,14,3081,Ratiu,,2,21012025,ok
+2026-09-24T0307Z,laliga,14,3082,Lejeune,,2,17985935,ok
+2026-09-24T0307Z,laliga,8,3098,Q. Hartman,,2,2879203,ok
+2026-09-24T0307Z,laliga,15,3106,Cucurella,,2,49718008,ok
+2026-09-24T0307Z,laliga,15,3107,Konaté,,2,35414459,ok
+2026-09-24T0307Z,laliga,11,3111,Cabello,,2,512203,ok
+2026-09-24T0307Z,laliga,7,3115,Diaby,,2,564164,ok
+2026-09-24T0307Z,laliga,18,3120,De Haas,,2,3823544,ok
+2026-09-24T0307Z,laliga,6,3123,Marcos Alonso,,2,28071685,ok
+2026-09-24T0307Z,laliga,12,3132,J. Berrocal,,2,689138,ok
+2026-09-24T0307Z,laliga,9,3134,Saba Sazonov,,2,670186,ok
+2026-09-24T0307Z,laliga,17,3138,Sangante,,2,6656416,ok
+2026-09-24T0307Z,laliga,49,3139,Pedro Felipe,,2,931157,ok
+2026-09-24T0307Z,laliga,26,3142,Angeliño,,2,6458617,suspended
+2026-09-24T0307Z,laliga,14,3146,Kumbulla,,2,1705691,ok
+2026-09-24T0307Z,laliga,26,3149,Bright Ede,,2,3476447,ok
+2026-09-24T0307Z,laliga,9,3150,Mojica,,2,14814324,ok
+2026-09-24T0307Z,laliga,2,3155,Grimaldo,,2,45518209,ok
+2026-09-24T0307Z,laliga,21,3156,Valentini,,2,672151,ok
+2026-09-24T0307Z,laliga,14,3157,Pelayo,,2,589240,ok
+2026-09-24T0307Z,laliga,21,3158,Diarra,,2,1006795,out_of_league
+2026-09-24T0307Z,laliga,21,3159,Novoa,,2,533076,ok
+2026-09-24T0307Z,laliga,8,3162,Hinojo,,2,4299915,ok
+2026-09-24T0307Z,laliga,11,3165,Marc Santos,,2,530927,ok
+2026-09-24T0307Z,laliga,8,3170,Timera,,2,483766,ok
+2026-09-24T0307Z,laliga,8,3172,Jose Angel,,2,483766,ok
+2026-09-24T0307Z,laliga,11,3174,Mandi,,2,11500413,ok
+2026-09-24T0307Z,laliga,8,3177,Vanja Drkusic,,2,1502584,ok
+2026-09-24T0307Z,laliga,14,3178,Lozano,,2,483766,ok
+2026-09-24T0307Z,laliga,3,3184,H. Rincón,,2,1241445,ok
+2026-09-24T0307Z,laliga,7,3189,Barzic,,2,509697,ok
+2026-09-24T0307Z,laliga,6,3195,Faye,,2,1553319,ok
+2026-09-24T0307Z,laliga,2,3197,Cuti Romero,,2,40653596,ok
+2026-09-24T0307Z,laliga,18,3206,Maffeo,,2,5415523,ok
+2026-09-24T0307Z,laliga,3,3213,Johaneko,,2,1132084,ok
+2026-09-24T0307Z,laliga,18,3215,Córdoba,,2,876059,ok
+2026-09-24T0307Z,laliga,9,3218,Curro ,,2,600000,out_of_league
+2026-09-24T0307Z,laliga,15,3221,Mario Rivas,,2,700000,out_of_league
+2026-09-24T0307Z,laliga,4,3223,Cortés,,2,700000,out_of_league
+2026-09-24T0307Z,laliga,4,3226,Jordi Pesquer,,2,600000,out_of_league
+2026-09-24T0307Z,laliga,11,3227,Ifeanyi Ndukwe,,2,1201249,ok
+2026-09-24T0307Z,laliga,18,3236,Arnau,,2,8040053,ok
+2026-09-24T0307Z,laliga,16,3238,M. Sarr,,2,8558689,ok
+2026-09-24T0307Z,laliga,6,3241,Ribes,,2,600000,out_of_league
+2026-09-24T0307Z,laliga,13,3243,Rockson,,2,763486,ok
+2026-09-24T0307Z,laliga,11,3246,Axel Tape,,2,1523105,ok
+2026-09-24T0307Z,laliga,11,3248,Xavi Grande,,2,716988,out_of_league
+2026-09-24T0307Z,laliga,49,3253,Aaron,,2,2047838,ok
+2026-09-24T0307Z,laliga,6,3259,Cáceres,,2,4605045,ok
+2026-09-24T0307Z,laliga,14,3260,Mujaid Sadick,,2,3011902,ok
+2026-09-24T0307Z,laliga,49,3261,Belocian,,2,2762406,ok
+2026-09-24T0307Z,laliga,7,3263,Revivo,,2,3610589,ok
+2026-09-24T0307Z,laliga,7,3268,Lomonaco,,2,4531715,ok
+2026-09-24T0307Z,laliga,18,3269,Rodrigo Gamón,,2,800000,out_of_league
+2026-09-24T0307Z,laliga,12,3270,Aznou,,2,921236,injured
+2026-09-24T0307Z,laliga,2,3272,Javier Gil,,2,920629,ok
+2026-09-24T0307Z,laliga,2,3273,J. Dominguez,,2,1716990,ok
+2026-09-24T0307Z,laliga,3,92,Vesga,,3,1566041,out_of_league
+2026-09-24T0307Z,laliga,21,270,Guevara,,3,574199,ok
+2026-09-24T0307Z,laliga,18,581,Rioja,,3,4858252,doubtful
+2026-09-24T0307Z,laliga,13,637,Moncayola,,3,6633138,ok
+2026-09-24T0307Z,laliga,13,652,Rubén García,,3,12807553,ok
+2026-09-24T0307Z,laliga,13,680,Moi Gómez,,3,2909286,injured
+2026-09-24T0307Z,laliga,16,701,Barrenetxea,,3,20784016,ok
+2026-09-24T0307Z,laliga,17,856,Guridi,,3,6424284,ok
+2026-09-24T0307Z,laliga,13,873,Torró,,3,1245561,ok
+2026-09-24T0307Z,laliga,14,1029,Álvaro García,,3,16808405,ok
+2026-09-24T0307Z,laliga,20,1031,Comesaña,,3,13374448,injured
+2026-09-24T0307Z,laliga,3,1070,De Galarreta,,3,17306326,ok
+2026-09-24T0307Z,laliga,14,1103,Óscar Valentín,,3,3044224,ok
+2026-09-24T0307Z,laliga,16,1197,Kubo,,3,17373862,ok
+2026-09-24T0307Z,laliga,16,1215,Turrientes,,3,6277767,ok
+2026-09-24T0307Z,laliga,4,1221,Gavi,,3,12980023,ok
+2026-09-24T0307Z,laliga,15,1300,Camavinga,,3,7624263,ok
+2026-09-24T0307Z,laliga,15,1480,Tchouaméni,,3,21101429,ok
+2026-09-24T0307Z,laliga,49,1529,Almeida,,3,1068560,ok
+2026-09-24T0307Z,laliga,2,1565,Barrios,,3,39489907,injured
+2026-09-24T0307Z,laliga,15,1674,Arda Güler,,3,104947450,ok
+2026-09-24T0307Z,laliga,5,1682,Altimira,,3,1907121,out_of_league
+2026-09-24T0307Z,laliga,17,1694,Sow,,3,8403008,out_of_league
+2026-09-24T0307Z,laliga,4,1715,Fermín,,3,99892046,ok
+2026-09-24T0307Z,laliga,13,1730,Iker Muñoz,,3,1850101,ok
+2026-09-24T0307Z,laliga,17,1754,Juanlu,,3,2730959,out_of_league
+2026-09-24T0307Z,laliga,3,1787,Prados,,3,651085,ok
+2026-09-24T0307Z,laliga,8,1938,Pol Lozano,,3,905893,ok
+2026-09-24T0307Z,laliga,3,2040,Jauregizar,,3,11948579,ok
+2026-09-24T0307Z,laliga,6,2078,Hugo Alvarez,,3,2182531,ok
+2026-09-24T0307Z,laliga,6,2295,Febas,,3,12219961,ok
+2026-09-24T0307Z,laliga,3,2317,Unai G.,,3,2277228,out_of_league
+2026-09-24T0307Z,laliga,3,2318,O. Sancet,,3,40646929,ok
+2026-09-24T0307Z,laliga,2,2326,Koke,,3,16095112,ok
+2026-09-24T0307Z,laliga,2,2331,Carlos Martín,,3,1444464,out_of_league
+2026-09-24T0307Z,laliga,13,2338,Aimar,,3,7143931,injured
+2026-09-24T0307Z,laliga,21,2342,Protesoni,,3,956738,ok
+2026-09-24T0307Z,laliga,7,2347,Y. Santiago,,3,455172,injured
+2026-09-24T0307Z,laliga,7,2348,M. Aguado,,3,3332372,ok
+2026-09-24T0307Z,laliga,4,2358,F. De Jong,,3,8133770,injured
+2026-09-24T0307Z,laliga,26,2362,M. Casadó,,3,6360325,injured
+2026-09-24T0307Z,laliga,16,2372,Herrera,,3,5245101,ok
+2026-09-24T0307Z,laliga,14,2383,Pathé I. Ciss,,3,24028724,ok
+2026-09-24T0307Z,laliga,14,2384,Unai Lopez,,3,17309607,ok
+2026-09-24T0307Z,laliga,14,2385,Pedro Díaz,,3,1062414,ok
+2026-09-24T0307Z,laliga,6,2394,Williot,,3,3939819,ok
+2026-09-24T0307Z,laliga,11,2395,Hugo Sotelo,,3,744758,injured
+2026-09-24T0307Z,laliga,5,2417,Lo Celso,,3,11885058,ok
+2026-09-24T0307Z,laliga,5,2418,Marc Roca,,3,16701380,ok
+2026-09-24T0307Z,laliga,15,2430,Valverde,,3,58630129,injured
+2026-09-24T0307Z,laliga,15,2431,Brahim,,3,6701596,ok
+2026-09-24T0307Z,laliga,16,2444,Sucic,,3,14044561,ok
+2026-09-24T0307Z,laliga,11,2445,Olasagasti,,3,8815796,ok
+2026-09-24T0307Z,laliga,16,2446,Zakharyan,,3,559945,ok
+2026-09-24T0307Z,laliga,9,2452,Gudelj,,3,5665157,ok
+2026-09-24T0307Z,laliga,17,2453,Agoumé,,3,13129567,ok
+2026-09-24T0307Z,laliga,18,2464,Pepelu,,3,12195358,ok
+2026-09-24T0307Z,laliga,14,2465,Fran Pérez,,3,505603,ok
+2026-09-24T0307Z,laliga,20,2473,Gueye,,3,34463380,ok
+2026-09-24T0307Z,laliga,21,2474,Denis Suárez,,3,2922554,ok
+2026-09-24T0307Z,laliga,2,2480,Johnny,,3,3547325,ok
+2026-09-24T0307Z,laliga,16,2490,Brais Méndez,,3,15055894,out_of_league
+2026-09-24T0307Z,laliga,11,2499,Vencedor,,3,2208253,out_of_league
+2026-09-24T0307Z,laliga,9,2511,R. Terrats,,3,10458558,ok
+2026-09-24T0307Z,laliga,8,2516,Puado,,3,2087689,injured
+2026-09-24T0307Z,laliga,2,2534,Álex Baena,,3,68638571,ok
+2026-09-24T0307Z,laliga,14,2536,Gumbau,,3,2308659,out_of_league
+2026-09-24T0307Z,laliga,5,2548,Riquelme,,3,18995124,ok
+2026-09-24T0307Z,laliga,3,2549,Navarro,,3,12516282,ok
+2026-09-24T0307Z,laliga,2,2553,Almada,,3,5800439,out_of_league
+2026-09-24T0307Z,laliga,20,2556,Buchanan,,3,9817800,ok
+2026-09-24T0307Z,laliga,8,2563,A. Roca,,3,492679,out_of_league
+2026-09-24T0307Z,laliga,21,2564,Aleñá,,3,2644862,ok
+2026-09-24T0307Z,laliga,21,2569,Ibañez,,3,13369970,ok
+2026-09-24T0307Z,laliga,20,2575,Thomas Partey,,3,8030584,out_of_league
+2026-09-24T0307Z,laliga,18,2586,Santamaría,,3,2927468,out_of_league
+2026-09-24T0307Z,laliga,7,2587,Josan,,3,570079,ok
+2026-09-24T0307Z,laliga,7,2601,Martim Neto,,3,869666,ok
+2026-09-24T0307Z,laliga,6,2607,Ilaix Moriba,,3,10490905,ok
+2026-09-24T0307Z,laliga,18,2612,Ugrinic,,3,3189215,ok
+2026-09-24T0307Z,laliga,11,2616,C. Alvarez,,3,13010918,out_of_league
+2026-09-24T0307Z,laliga,21,2620,Calebe,,3,1305021,out_of_league
+2026-09-24T0307Z,laliga,16,2621,Gorrotxa,,3,2274687,ok
+2026-09-24T0307Z,laliga,8,2622,Urko,,3,4007550,ok
+2026-09-24T0307Z,laliga,5,2626,Deossa,,3,5050517,ok
+2026-09-24T0307Z,laliga,11,2628,O. Rey,,3,2288928,ok
+2026-09-24T0307Z,laliga,6,2639,M. Román,,3,16472089,ok
+2026-09-24T0307Z,laliga,9,2640,Mario Martín,,3,2189718,ok
+2026-09-24T0307Z,laliga,4,2649,Guille Fernández,,3,702705,out_of_league
+2026-09-24T0307Z,laliga,9,2662,Risco,,3,488343,ok
+2026-09-24T0307Z,laliga,16,2665,Marín,,3,666646,ok
+2026-09-24T0307Z,laliga,11,2672,Pampin,,3,702624,out_of_league
+2026-09-24T0307Z,laliga,14,2679,Becerra,,3,535517,ok
+2026-09-24T0307Z,laliga,17,2682,Januzaj,,3,2810664,out_of_league
+2026-09-24T0307Z,laliga,17,2687,Manu Bueno,,3,511192,ok
+2026-09-24T0307Z,laliga,7,2703,Redondo,,3,1192473,suspended
+2026-09-24T0307Z,laliga,21,2704,L. Pinillos,,3,501929,out_of_league
+2026-09-24T0307Z,laliga,5,2710,D. Pérez,,3,702622,out_of_league
+2026-09-24T0307Z,laliga,2,2717,R. Mendoza,,3,837761,ok
+2026-09-24T0307Z,laliga,13,2721,A. Osambela,,3,456234,ok
+2026-09-24T0307Z,laliga,13,2723,Mauro,,3,473238,ok
+2026-09-24T0307Z,laliga,2,2733,Jano,,3,501929,out_of_league
+2026-09-24T0307Z,laliga,15,2735,Thiago Pitarch,,3,4437461,ok
+2026-09-24T0307Z,laliga,5,2739,Iván,,3,602248,out_of_league
+2026-09-24T0307Z,laliga,11,2743,Joan Ruiz,,3,602249,out_of_league
+2026-09-24T0307Z,laliga,17,2745,Edu Altozano,,3,467940,ok
+2026-09-24T0307Z,laliga,8,2760,Pickel,,3,1505622,out_of_league
+2026-09-24T0307Z,laliga,11,2766,Arriaga,,3,2543981,out_of_league
+2026-09-24T0307Z,laliga,16,2772,C. Soler,,3,32209609,ok
+2026-09-24T0307Z,laliga,17,2773,Mendy,,3,2409140,out_of_league
+2026-09-24T0307Z,laliga,9,2775,Javi Muñoz,,3,521115,out_of_league
+2026-09-24T0307Z,laliga,2,2782,Nico Gonzalez,,3,15057942,out_of_league
+2026-09-24T0307Z,laliga,4,2784,Marc Bernal,,3,27628686,ok
+2026-09-24T0307Z,laliga,17,2786,Jordán,,3,562079,out_of_league
+2026-09-24T0307Z,laliga,18,2796,Lucas Núñez,,3,501909,out_of_league
+2026-09-24T0307Z,laliga,20,2797,Hugo Lopez,,3,485400,out_of_league
+2026-09-24T0307Z,laliga,5,2799,Amrabat,,3,20074982,out_of_league
+2026-09-24T0307Z,laliga,18,2802,Lucas Beltrán,,3,9034408,out_of_league
+2026-09-24T0307Z,laliga,2,2810,Taufik Seidu,,3,602316,out_of_league
+2026-09-24T0307Z,laliga,2,2812,Javi Serrano,,3,429199,out_of_league
+2026-09-24T0307Z,laliga,7,2815,Adam B.,,3,702711,out_of_league
+2026-09-24T0307Z,laliga,7,2816,A. Martinez,,3,602324,out_of_league
+2026-09-24T0307Z,laliga,13,2830,Pedroarena,,3,602319,out_of_league
+2026-09-24T0307Z,laliga,21,2832,Morcillo,,3,581757,out_of_league
+2026-09-24T0307Z,laliga,16,2836,Lebarbier,,3,602234,out_of_league
+2026-09-24T0307Z,laliga,20,2840,Barry,,3,602292,out_of_league
+2026-09-24T0307Z,laliga,4,2842,Juan Hernández,,3,581760,out_of_league
+2026-09-24T0307Z,laliga,3,2845,Selton,,3,602257,out_of_league
+2026-09-24T0307Z,laliga,6,2850,H. González,,3,2445367,ok
+2026-09-24T0307Z,laliga,11,2859,Roson,,3,602249,out_of_league
+2026-09-24T0307Z,laliga,16,2862,Marchal,,3,547201,ok
+2026-09-24T0307Z,laliga,20,2868,Carlos Macià,,3,584676,ok
+2026-09-24T0307Z,laliga,13,2871,Jon Garcia,,3,702705,out_of_league
+2026-09-24T0307Z,laliga,3,2878,Eder García,,3,602257,out_of_league
+2026-09-24T0307Z,laliga,6,2884,A. Arcos,,3,602257,out_of_league
+2026-09-24T0307Z,laliga,21,2886,Izei,,3,582010,out_of_league
+2026-09-24T0307Z,laliga,15,2888,Cestero,,3,482316,ok
+2026-09-24T0307Z,laliga,9,2891,Solozabal,,3,602319,out_of_league
+2026-09-24T0307Z,laliga,8,2893,Ferri,,3,602248,out_of_league
+2026-09-24T0307Z,laliga,16,2899,Astiazaran,,3,602257,out_of_league
+2026-09-24T0307Z,laliga,16,2900,Aguirre,,3,602257,out_of_league
+2026-09-24T0307Z,laliga,20,2902,Diatta,,3,457903,ok
+2026-09-24T0307Z,laliga,20,2903,J. Gaitán,,3,602292,out_of_league
+2026-09-24T0307Z,laliga,11,2905,K. Tunde,,3,6665784,out_of_league
+2026-09-24T0307Z,laliga,15,2907,Manuel Ángel,,3,702606,out_of_league
+2026-09-24T0307Z,laliga,15,2908,Palacios,,3,802979,out_of_league
+2026-09-24T0307Z,laliga,11,2911,Raghouber,,3,2406299,out_of_league
+2026-09-24T0307Z,laliga,6,2913,Burcio,,3,548623,ok
+2026-09-24T0307Z,laliga,7,2915,Álex Sánchez,,3,602324,out_of_league
+2026-09-24T0307Z,laliga,15,2917,Meso,,3,702606,out_of_league
+2026-09-24T0307Z,laliga,15,2918,Pol Fortuny,,3,602234,out_of_league
+2026-09-24T0307Z,laliga,9,2919,Mestanza,,3,601574,out_of_league
+2026-09-24T0307Z,laliga,9,2920,A. Riquelme,,3,602324,out_of_league
+2026-09-24T0307Z,laliga,6,2929,Fer López,,3,15056479,out_of_league
+2026-09-24T0307Z,laliga,7,2939,G. Villar,,3,9783891,ok
+2026-09-24T0307Z,laliga,5,2940,Fidalgo,,3,1045787,ok
+2026-09-24T0307Z,laliga,2,2944,Obed Vargas,,3,515553,ok
+2026-09-24T0307Z,laliga,6,2945,Vecino,,3,1640026,out_of_league
+2026-09-24T0307Z,laliga,6,2954,Antañón,,3,535517,ok
+2026-09-24T0307Z,laliga,7,2958,Morcillo,,3,768319,ok
+2026-09-24T0307Z,laliga,8,2964,Gragera,,3,1195313,out_of_league
+2026-09-24T0307Z,laliga,26,2967,Mané,,3,677966,out_of_league
+2026-09-24T0307Z,laliga,26,2969,Fabi,,3,702633,out_of_league
+2026-09-24T0307Z,laliga,26,2970,Nájera,,3,581622,out_of_league
+2026-09-24T0307Z,laliga,26,2974,Noé,,3,702633,out_of_league
+2026-09-24T0307Z,laliga,26,2977,Riki,,3,550657,ok
+2026-09-24T0307Z,laliga,26,2981,Enrique,,3,581700,out_of_league
+2026-09-24T0307Z,laliga,26,2984,Rubén López,,3,501880,out_of_league
+2026-09-24T0307Z,laliga,26,2991,D. Villares,,3,1032246,ok
+2026-09-24T0307Z,laliga,26,2992,Jose Angel,,3,638301,out_of_league
+2026-09-24T0307Z,laliga,26,2993,Diego Gómez,,3,702633,out_of_league
+2026-09-24T0307Z,laliga,26,2994,Mella,,3,1518253,ok
+2026-09-24T0307Z,laliga,26,2995,Mario Soriano,,3,30247225,ok
+2026-09-24T0307Z,laliga,26,2998,Patiño,,3,459319,out_of_league
+2026-09-24T0307Z,laliga,49,3003,Aldasoro,,3,607842,out_of_league
+2026-09-24T0307Z,laliga,49,3012,Maguette,,3,1611254,ok
+2026-09-24T0307Z,laliga,49,3014,Diego Fuentes,,3,903351,out_of_league
+2026-09-24T0307Z,laliga,49,3015,A. Vallecillo,,3,483331,ok
+2026-09-24T0307Z,laliga,3,3023,Peio Canales,,3,5709880,ok
+2026-09-24T0307Z,laliga,15,3024,Sergio,,3,1191866,ok
+2026-09-24T0307Z,laliga,49,3028,G. Puerta,,3,12816999,out_of_league
+2026-09-24T0307Z,laliga,49,3032,Izan,,3,702606,out_of_league
+2026-09-24T0307Z,laliga,49,3033,M. Solorzano,,3,602234,out_of_league
+2026-09-24T0307Z,laliga,12,3035,Izan M.,,3,3235846,ok
+2026-09-24T0307Z,laliga,12,3036,Dani Lorenzo,,3,10371098,ok
+2026-09-24T0307Z,laliga,12,3038,Rafa Rodríguez,,3,2093554,ok
+2026-09-24T0307Z,laliga,12,3044,Dotor,,3,5016220,ok
+2026-09-24T0307Z,laliga,12,3046,Aaron Ochoa,,3,3513040,out_of_league
+2026-09-24T0307Z,laliga,12,3048,Ramon,,3,512630,ok
+2026-09-24T0307Z,laliga,12,3052,Darko,,3,1003725,out_of_league
+2026-09-24T0307Z,laliga,12,3056,Juanpe,,3,581931,out_of_league
+2026-09-24T0307Z,laliga,12,3060,Luismi,,3,401489,out_of_league
+2026-09-24T0307Z,laliga,12,3066,Dorrio O.,,3,400000,out_of_league
+2026-09-24T0307Z,laliga,21,3069,Blanco,,3,17787019,ok
+2026-09-24T0307Z,laliga,12,3072,Larrubia,,3,21962733,ok
+2026-09-24T0307Z,laliga,7,3074,Germán V.,,3,13334822,ok
+2026-09-24T0307Z,laliga,18,3075,Javi Guerra,,3,19481168,ok
+2026-09-24T0307Z,laliga,8,3077,Edu Expósito,,3,31100933,ok
+2026-09-24T0307Z,laliga,20,3086,Moleiro,,3,44887720,ok
+2026-09-24T0307Z,laliga,5,3090,Isco,,3,36400770,ok
+2026-09-24T0307Z,laliga,4,3092,Olmo,,3,48320774,ok
+2026-09-24T0307Z,laliga,5,3099,Fornals,,3,41098502,ok
+2026-09-24T0307Z,laliga,4,3100,Pedri,,3,91529749,ok
+2026-09-24T0307Z,laliga,15,3101,Bellingham,,3,119919963,ok
+2026-09-24T0307Z,laliga,2,3114,Hjulmand,,3,19262275,ok
+2026-09-24T0307Z,laliga,15,3116,Bernardo Silva,,3,35121755,ok
+2026-09-24T0307Z,laliga,26,3119,Amatucci,,3,16179320,ok
+2026-09-24T0307Z,laliga,18,3121,Dieng,,3,1769835,ok
+2026-09-24T0307Z,laliga,6,3124,Damián ,,3,1300000,out_of_league
+2026-09-24T0307Z,laliga,49,3125,Canales,,3,25988846,ok
+2026-09-24T0307Z,laliga,8,3127,Moscardo,,3,3024135,ok
+2026-09-24T0307Z,laliga,18,3128,Guido Rodríguez,,3,13440885,ok
+2026-09-24T0307Z,laliga,9,3133,Mangala,,3,10410942,ok
+2026-09-24T0307Z,laliga,9,3135,Andrés Garcia,,3,7647830,ok
+2026-09-24T0307Z,laliga,9,3136,Neyou,,3,1760294,out_of_league
+2026-09-24T0307Z,laliga,12,3140,Juan Cruz,,3,5913713,ok
+2026-09-24T0307Z,laliga,21,3144,Mikel Rodriguez,,3,1672138,injured
+2026-09-24T0307Z,laliga,26,3148,Asp Jensen,,3,3350857,ok
+2026-09-24T0307Z,laliga,7,3151,Buonanotte,,3,3220265,ok
+2026-09-24T0307Z,laliga,8,3161,Javi Hernández,,3,16857434,ok
+2026-09-24T0307Z,laliga,49,3163,Caste,,3,483766,ok
+2026-09-24T0307Z,laliga,11,3164,Bardeli,,3,8398706,ok
+2026-09-24T0307Z,laliga,11,3166,Manel Usedo,,3,507346,ok
+2026-09-24T0307Z,laliga,11,3168,Alberto Calatrava,,3,554506,ok
+2026-09-24T0307Z,laliga,8,3169,Bauza,,3,530927,ok
+2026-09-24T0307Z,laliga,20,3173,Cheikh Thiam,,3,555511,ok
+2026-09-24T0307Z,laliga,17,3175,Guillén,,3,1651127,ok
+2026-09-24T0307Z,laliga,14,3179,Marco Román,,3,507346,ok
+2026-09-24T0307Z,laliga,7,3182,Lemar,,3,4085740,ok
+2026-09-24T0307Z,laliga,3,3185,Gerenabarrena,,3,3648671,ok
+2026-09-24T0307Z,laliga,26,3187,Gijselhart,,3,1256424,out_of_league
+2026-09-24T0307Z,laliga,2,3193,Kang-In Lee,,3,69756991,ok
+2026-09-24T0307Z,laliga,5,3199,F. Bernal,,3,13002989,ok
+2026-09-24T0307Z,laliga,9,3200,Francho,,3,1959803,ok
+2026-09-24T0307Z,laliga,2,3201,Castillo,,3,1000000,out_of_league
+2026-09-24T0307Z,laliga,16,3202,Goti,,3,1118373,out_of_league
+2026-09-24T0307Z,laliga,12,3203,Otu Jr,,3,600345,ok
+2026-09-24T0307Z,laliga,49,3205,Iván Martín,,3,6883247,ok
+2026-09-24T0307Z,laliga,12,3207,P. Martínez,,3,4214612,ok
+2026-09-24T0307Z,laliga,4,3208,Rodri,,3,74031345,ok
+2026-09-24T0307Z,laliga,17,3211,Kochorashvili,,3,5873547,ok
+2026-09-24T0307Z,laliga,49,3212,Hugo Pérez,,3,663175,ok
+2026-09-24T0307Z,laliga,17,3214,Manuel Ángel,,3,900000,out_of_league
+2026-09-24T0307Z,laliga,18,3216,Jaume Durà,,3,689918,ok
+2026-09-24T0307Z,laliga,9,3219,Óscar López,,3,689918,ok
+2026-09-24T0307Z,laliga,4,3224,Brian Fariñas,,3,580432,ok
+2026-09-24T0307Z,laliga,11,3228,Requena,,3,810222,ok
+2026-09-24T0307Z,laliga,11,3230,Thiago,,3,1910345,ok
+2026-09-24T0307Z,laliga,49,3234,Matteo Prati,,3,2416813,ok
+2026-09-24T0307Z,laliga,18,3239,Mayol,,3,807677,ok
+2026-09-24T0307Z,laliga,20,3242,Saliba,,3,6461909,ok
+2026-09-24T0307Z,laliga,14,3244,G. Bouaré,,3,780842,ok
+2026-09-24T0307Z,laliga,9,3245,Moha,,3,800000,out_of_league
+2026-09-24T0307Z,laliga,18,3250,Harvey Elliott,,3,10686050,ok
+2026-09-24T0307Z,laliga,21,3257,Diallo,,3,549308,ok
+2026-09-24T0307Z,laliga,5,3264,Ceballos,,3,17063723,ok
+2026-09-24T0307Z,laliga,17,3265,Fofana,,3,17705856,ok
+2026-09-24T0307Z,laliga,12,3274,Cajuste,,3,4677783,injured
+2026-09-24T0307Z,laliga,20,3279,Bonafé,,3,1057681,out_of_league
+2026-09-24T0307Z,laliga,3,91,Iñaki Williams,,4,35821480,ok
+2026-09-24T0307Z,laliga,20,356,Gerard,,4,37164238,ok
+2026-09-24T0307Z,laliga,14,886,De Frutos,,4,21547168,ok
+2026-09-24T0307Z,laliga,3,927,Berenguer,,4,10742969,ok
+2026-09-24T0307Z,laliga,18,1191,Hugo Duro,,4,4481914,ok
+2026-09-24T0307Z,laliga,2,1210,Giuliano,,4,41635667,ok
+2026-09-24T0307Z,laliga,18,1260,Diego López,,4,773664,injured
+2026-09-24T0307Z,laliga,3,1484,Guruzeta,,4,6667203,injured
+2026-09-24T0307Z,laliga,8,1950,Jofre,,4,585661,injured
+2026-09-24T0307Z,laliga,5,2217,Cucho,,4,34683111,ok
+2026-09-24T0307Z,laliga,11,2302,R. Brugué,,4,5583607,ok
+2026-09-24T0307Z,laliga,11,2303,I. Romero,,4,6363363,ok
+2026-09-24T0307Z,laliga,3,2319,Maroan,,4,436076,ok
+2026-09-24T0307Z,laliga,2,2332,Sorloth,,4,7633621,injured
+2026-09-24T0307Z,laliga,13,2337,Kike Barja,,4,1385083,ok
+2026-09-24T0307Z,laliga,13,2339,Raúl,,4,1393495,ok
+2026-09-24T0307Z,laliga,4,2359,Ferran,,4,53492240,out_of_league
+2026-09-24T0307Z,laliga,14,2382,Isi,,4,8141330,doubtful
+2026-09-24T0307Z,laliga,14,2386,Nteka,,4,832902,injured
+2026-09-24T0307Z,laliga,14,2387,Camello,,4,30233375,ok
+2026-09-24T0307Z,laliga,6,2396,Franco Cervi,,4,2810540,out_of_league
+2026-09-24T0307Z,laliga,6,2397,Pablo Durán,,4,816611,ok
+2026-09-24T0307Z,laliga,8,2400,Pere Milla,,4,3523906,ok
+2026-09-24T0307Z,laliga,5,2419,Aitor Ruibal,,4,824341,injured
+2026-09-24T0307Z,laliga,5,2420,Bakambu,,4,4215745,out_of_league
+2026-09-24T0307Z,laliga,5,2421,Chimy Ávila,,4,5614701,out_of_league
+2026-09-24T0307Z,laliga,15,2434,Rodrygo,,4,1435840,injured
+2026-09-24T0307Z,laliga,16,2448,Oskarsson,,4,5936222,suspended
+2026-09-24T0307Z,laliga,17,2454,Ejuke,,4,5568452,ok
+2026-09-24T0307Z,laliga,17,2455,Peque,,4,1980083,ok
+2026-09-24T0307Z,laliga,17,2456,Isaac,,4,4887411,ok
+2026-09-24T0307Z,laliga,20,2477,I. Akhomach,,4,3058082,ok
+2026-09-24T0307Z,laliga,9,2488,B. Mayoral,,4,1162873,injured
+2026-09-24T0307Z,laliga,6,2492,Iago Aspas,,4,5054185,injured
+2026-09-24T0307Z,laliga,3,2501,Nico Serrano,,4,524772,ok
+2026-09-24T0307Z,laliga,20,2504,Ayoze,,4,17352302,ok
+2026-09-24T0307Z,laliga,8,2509,Kike García,,4,1103939,injured
+2026-09-24T0307Z,laliga,8,2520,Roberto,,4,42682352,ok
+2026-09-24T0307Z,laliga,4,2522,Raphinha,,4,157845682,ok
+2026-09-24T0307Z,laliga,13,2557,I. Benito,,4,537305,out_of_league
+2026-09-24T0307Z,laliga,18,2560,Raba,,4,681589,ok
+2026-09-24T0307Z,laliga,15,2574,Gonzalo,,4,3832043,out_of_league
+2026-09-24T0307Z,laliga,21,2577,A. Rebbach,,4,5145171,ok
+2026-09-24T0307Z,laliga,18,2588,Danjuma,,4,4663241,ok
+2026-09-24T0307Z,laliga,21,2600,Mariano,,4,21606047,ok
+2026-09-24T0307Z,laliga,7,2602,Álvaro,,4,10283491,out_of_league
+2026-09-24T0307Z,laliga,6,2603,Ferran Jutglà,,4,9830251,ok
+2026-09-24T0307Z,laliga,18,2617,Sadiq,,4,2596740,injured
+2026-09-24T0307Z,laliga,16,2619,Karrikaburu,,4,490040,out_of_league
+2026-09-24T0307Z,laliga,8,2623,Dolan,,4,14211295,ok
+2026-09-24T0307Z,laliga,4,2635,Rashford,,4,53706955,out_of_league
+2026-09-24T0307Z,laliga,9,2641,A. Liso,,4,2208509,out_of_league
+2026-09-24T0307Z,laliga,3,2646,Izeta,,4,1060915,out_of_league
+2026-09-24T0307Z,laliga,4,2650,Toni Fernández,,4,602319,out_of_league
+2026-09-24T0307Z,laliga,5,2651,Iker Losada,,4,933551,ok
+2026-09-24T0307Z,laliga,6,2654,El Abdellaoui,,4,740450,injured
+2026-09-24T0307Z,laliga,9,2664,Joselu,,4,502201,ok
+2026-09-24T0307Z,laliga,11,2673,Paco Cortes,,4,511739,ok
+2026-09-24T0307Z,laliga,11,2674,A. J. Morales,,4,3212005,out_of_league
+2026-09-24T0307Z,laliga,18,2693,Otorbi,,4,611335,ok
+2026-09-24T0307Z,laliga,11,2700,Etta Eyong,,4,10263350,injured
+2026-09-24T0307Z,laliga,20,2701,Cabanes,,4,602292,out_of_league
+2026-09-24T0307Z,laliga,7,2702,Rafa Mir,,4,7027127,out_of_league
+2026-09-24T0307Z,laliga,7,2708,André Silva,,4,12046505,out_of_league
+2026-09-24T0307Z,laliga,49,2712,Pablo García,,4,8119322,ok
+2026-09-24T0307Z,laliga,15,2718,F. Mastantuono,,4,10037262,out_of_league
+2026-09-24T0307Z,laliga,17,2746,Miguel Sierra,,4,8910445,ok
+2026-09-24T0307Z,laliga,18,2748,Aimar Blázquez,,4,581656,out_of_league
+2026-09-24T0307Z,laliga,17,2754,Alfon,,4,1842698,ok
+2026-09-24T0307Z,laliga,18,2756,Ramazani,,4,16061171,out_of_league
+2026-09-24T0307Z,laliga,20,2761,Oluwaseyi,,4,1048344,ok
+2026-09-24T0307Z,laliga,21,2768,Lucas Boyé,,4,32443916,ok
+2026-09-24T0307Z,laliga,5,2770,Antony,,4,59989790,ok
+2026-09-24T0307Z,laliga,20,2771,Mikautadze,,4,48175262,ok
+2026-09-24T0307Z,laliga,9,2778,Álex Sancris,,4,482539,out_of_league
+2026-09-24T0307Z,laliga,9,2779,Juanmi,,4,462197,injured
+2026-09-24T0307Z,laliga,7,2780,Grady Diangana,,4,584883,ok
+2026-09-24T0307Z,laliga,17,2788,Alex Costa,,4,602284,out_of_league
+2026-09-24T0307Z,laliga,14,2798,Alemâo,,4,1314505,ok
+2026-09-24T0307Z,laliga,17,2801,Alexis Sánchez,,4,3860920,out_of_league
+2026-09-24T0307Z,laliga,9,2803,Kamara,,4,2409281,out_of_league
+2026-09-24T0307Z,laliga,4,2808,Bardghji,,4,965752,injured
+2026-09-24T0307Z,laliga,14,2813,Rayane,,4,560122,ok
+2026-09-24T0307Z,laliga,9,2821,Mykyta,,4,602319,out_of_league
+2026-09-24T0307Z,laliga,3,2828,Adrián,,4,602257,out_of_league
+2026-09-24T0307Z,laliga,3,2829,Ibon Sánchez,,4,501880,out_of_league
+2026-09-24T0307Z,laliga,13,2847,R. Arroyo,,4,602319,out_of_league
+2026-09-24T0307Z,laliga,6,2849,Óscar Marcos,,4,602257,out_of_league
+2026-09-24T0307Z,laliga,7,2853,Nordin Al-Lal,,4,448557,ok
+2026-09-24T0307Z,laliga,16,2865,Gorka Carrera,,4,509468,ok
+2026-09-24T0307Z,laliga,16,2875,Mariezkurrena,,4,677966,out_of_league
+2026-09-24T0307Z,laliga,3,2879,Asier Hierro,,4,602257,out_of_league
+2026-09-24T0307Z,laliga,3,2880,Bujan,,4,602316,out_of_league
+2026-09-24T0307Z,laliga,21,2887,Mañas,,4,454827,doubtful
+2026-09-24T0307Z,laliga,7,2922,Osorio,,4,699164,ok
+2026-09-24T0307Z,laliga,13,2923,Raúl Moro,,4,6705934,injured
+2026-09-24T0307Z,laliga,9,2925,Luis Vázquez,,4,9034879,out_of_league
+2026-09-24T0307Z,laliga,21,2932,Ángel Pérez,,4,27488985,ok
+2026-09-24T0307Z,laliga,7,2933,Cepeda,,4,1620583,ok
+2026-09-24T0307Z,laliga,8,2937,Ngonge,,4,2007497,out_of_league
+2026-09-24T0307Z,laliga,7,2941,T. Morente,,4,3296405,ok
+2026-09-24T0307Z,laliga,21,2943,Diabate,,4,4015452,out_of_league
+2026-09-24T0307Z,laliga,9,2947,Birma,,4,1505812,out_of_league
+2026-09-24T0307Z,laliga,16,2955,Ochieng,,4,1294795,ok
+2026-09-24T0307Z,laliga,15,2957,Yañez,,4,702606,out_of_league
+2026-09-24T0307Z,laliga,2,2961,Miguel Cubo,,4,474464,ok
+2026-09-24T0307Z,laliga,26,2962,Luismi Cruz,,4,11039922,ok
+2026-09-24T0307Z,laliga,26,2973,Bil Nsongo,,4,7635943,ok
+2026-09-24T0307Z,laliga,26,2978,Cristian H.,,4,803010,out_of_league
+2026-09-24T0307Z,laliga,26,2980,Eddahchouri,,4,847394,ok
+2026-09-24T0307Z,laliga,49,3002,Iñigo Vicente,,4,31583325,ok
+2026-09-24T0307Z,laliga,49,3005,Sangalli,,4,2509314,out_of_league
+2026-09-24T0307Z,laliga,49,3007,Arana,,4,505396,ok
+2026-09-24T0307Z,laliga,49,3017,Guliashvili,,4,761809,ok
+2026-09-24T0307Z,laliga,49,3019,Mata,,4,1505588,out_of_league
+2026-09-24T0307Z,laliga,49,3022,Villalibre,,4,3166012,ok
+2026-09-24T0307Z,laliga,49,3025,S. Franco,,4,702606,out_of_league
+2026-09-24T0307Z,laliga,49,3031,Diego Diaz,,4,476033,out_of_league
+2026-09-24T0307Z,laliga,12,3034,Joaquín,,4,3819053,ok
+2026-09-24T0307Z,laliga,12,3045,Niño,,4,958798,ok
+2026-09-24T0307Z,laliga,12,3049,Lobete,,4,503145,injured
+2026-09-24T0307Z,laliga,12,3050,Jauregi,,4,614813,ok
+2026-09-24T0307Z,laliga,12,3055,Haitam,,4,430739,doubtful
+2026-09-24T0307Z,laliga,12,3070,Chupe,,4,21317555,ok
+2026-09-24T0307Z,laliga,6,3071,B. Iglesias,,4,11024664,ok
+2026-09-24T0307Z,laliga,49,3073,Andrés Martín,,4,10130151,injured
+2026-09-24T0307Z,laliga,26,3076,Yeremay,,4,23848897,ok
+2026-09-24T0307Z,laliga,21,3078,T. Martínez,,4,16086050,ok
+2026-09-24T0307Z,laliga,2,3079,Lookman,,4,41996205,ok
+2026-09-24T0307Z,laliga,3,3083,Nico Williams,,4,58250723,ok
+2026-09-24T0307Z,laliga,13,3084,Budimir,,4,61115223,ok
+2026-09-24T0307Z,laliga,16,3085,Guedes,,4,16254080,ok
+2026-09-24T0307Z,laliga,20,3087,Pepe,,4,53068070,ok
+2026-09-24T0307Z,laliga,2,3088,Julián Alvarez,,4,38451037,doubtful
+2026-09-24T0307Z,laliga,5,3089,Ez Abde,,4,34464517,ok
+2026-09-24T0307Z,laliga,16,3091,Oyarzabal,,4,48418422,ok
+2026-09-24T0307Z,laliga,15,3102,Vini Jr.,,4,97973894,ok
+2026-09-24T0307Z,laliga,15,3103,Mbappé,,4,153364198,ok
+2026-09-24T0307Z,laliga,4,3104,Lamine Yamal,,4,158927883,ok
+2026-09-24T0307Z,laliga,8,3105,Cala,,4,5347369,ok
+2026-09-24T0307Z,laliga,26,3108,Aubameyang,,4,103437062,injured
+2026-09-24T0307Z,laliga,6,3110,C. Pérez,,4,705094,out_of_league
+2026-09-24T0307Z,laliga,15,3112,Endrick,,4,2915349,ok
+2026-09-24T0307Z,laliga,18,3113,Tenés,,4,447417,injured
+2026-09-24T0307Z,laliga,17,3117,Vargas,,4,8152902,injured
+2026-09-24T0307Z,laliga,3,3122,Djalo,,4,557582,ok
+2026-09-24T0307Z,laliga,9,3126,Uche,,4,5931904,injured
+2026-09-24T0307Z,laliga,15,3129,Carlos Espí,,4,13535026,ok
+2026-09-24T0307Z,laliga,8,3131,Marcos,,4,1384419,ok
+2026-09-24T0307Z,laliga,9,3137,Satriano,,4,18607297,ok
+2026-09-24T0307Z,laliga,15,3143,Diomande,,4,54622468,ok
+2026-09-24T0307Z,laliga,17,3145,Robbie Ure,,4,9435426,ok
+2026-09-24T0307Z,laliga,7,3147,Fer Niño,,4,17767740,ok
+2026-09-24T0307Z,laliga,49,3152,Y. Zabiri,,4,19283081,ok
+2026-09-24T0307Z,laliga,21,3153,Miguel Rodríguez,,4,1043371,ok
+2026-09-24T0307Z,laliga,9,3154,Enes Ünal,,4,14896201,ok
+2026-09-24T0307Z,laliga,17,3176,Ibra,,4,507346,ok
+2026-09-24T0307Z,laliga,14,3180,Alonso,,4,460187,ok
+2026-09-24T0307Z,laliga,9,3181,Ibra Drj,,4,483766,ok
+2026-09-24T0307Z,laliga,13,3183,Dubasin,,4,5666556,ok
+2026-09-24T0307Z,laliga,26,3186,Kevin,,4,534063,ok
+2026-09-24T0307Z,laliga,7,3188,E. Ponce,,4,795819,ok
+2026-09-24T0307Z,laliga,7,3190,Ali Houary,,4,892489,ok
+2026-09-24T0307Z,laliga,7,3191,Á. Padilla,,4,595508,ok
+2026-09-24T0307Z,laliga,7,3192,Umaru,,4,592826,out_of_league
+2026-09-24T0307Z,laliga,2,3194,Arnau Ortiz,,4,807832,ok
+2026-09-24T0307Z,laliga,14,3198,Tsitaishvili,,4,1119300,ok
+2026-09-24T0307Z,laliga,12,3204,Juani,,4,920629,ok
+2026-09-24T0307Z,laliga,4,3209,Adeyemi,,4,68358776,ok
+2026-09-24T0307Z,laliga,4,3210,Gordon,,4,73735689,ok
+2026-09-24T0307Z,laliga,18,3217,Sato,,4,5806512,ok
+2026-09-24T0307Z,laliga,20,3220,Nizar El Jmili,,4,689918,ok
+2026-09-24T0307Z,laliga,15,3222,Alexis Ciria,,4,568166,ok
+2026-09-24T0307Z,laliga,4,3225,Abdelkarim,,4,2447055,ok
+2026-09-24T0307Z,laliga,11,3229,Yanis Musuayi,,4,984797,ok
+2026-09-24T0307Z,laliga,5,3231,Parrott,,4,19634405,ok
+2026-09-24T0307Z,laliga,13,3235,A. Bonel,,4,613015,ok
+2026-09-24T0307Z,laliga,8,3237,Bryan,,4,13516191,ok
+2026-09-24T0307Z,laliga,6,3240,Driouech,,4,2266415,ok
+2026-09-24T0307Z,laliga,49,3247,Iker Luque,,4,1127607,ok
+2026-09-24T0307Z,laliga,26,3249,Adama Traoré,,4,12596581,ok
+2026-09-24T0307Z,laliga,13,3252,Del Castillo,,4,7815130,ok
+2026-09-24T0307Z,laliga,9,3254,Iván Azón,,4,4178870,ok
+2026-09-24T0307Z,laliga,2,3255,J. David,,4,41328388,ok
+2026-09-24T0307Z,laliga,11,3256,Ratkov,,4,2390611,ok
+2026-09-24T0307Z,laliga,4,3258,Gabriel Jesus,,4,23504580,ok
+2026-09-24T0307Z,laliga,17,3262,Félix Correia,,4,5350613,ok
+2026-09-24T0307Z,laliga,17,3266,Stassin,,4,14965981,injured
+2026-09-24T0307Z,laliga,9,3271,Moha Achraf,,4,1074435,ok
+2026-09-24T0307Z,laliga,14,3275,RDT,,4,920629,doubtful
+2026-09-24T0307Z,laliga,5,3276,Morante,,4,997531,ok
+2026-09-24T0307Z,laliga,20,3278,A. García,,4,1158184,out_of_league
+2026-09-24T0307Z,laliga,20,1356,Marcelino,,5,8030121,out_of_league
+2026-09-24T0307Z,laliga,3,1481,Ernesto Valverde,,5,4918256,out_of_league
+2026-09-24T0307Z,laliga,9,1611,Bordalás,,5,8979219,ok
+2026-09-24T0307Z,laliga,20,1849,Iñigo Perez,,5,824344,ok
+2026-09-24T0307Z,laliga,6,1851,Claudio Giraldez,,5,826536,ok
+2026-09-24T0307Z,laliga,4,1976,Hansi Flick,,5,3618876,ok
+2026-09-24T0307Z,laliga,2,2527,Simeone,,5,1649532,ok
+2026-09-24T0307Z,laliga,18,2566,Carlos Corberán,,5,501424,out_of_league
+2026-09-24T0307Z,laliga,5,2580,Manuel Pellegrini,,5,1253817,ok
+2026-09-24T0307Z,laliga,13,2637,Alessio Lisci,,5,1806855,out_of_league
+2026-09-24T0307Z,laliga,8,2638,Manolo González,,5,573079,ok
+2026-09-24T0307Z,laliga,16,2869,Matarazzo,,5,1130842,ok
+2026-09-24T0307Z,laliga,11,2877,Luís Castro,,5,602731,ok
+2026-09-24T0307Z,laliga,21,2951,Sánchez Flores,,5,519309,ok
+2026-09-24T0307Z,laliga,17,2959,Luis García,,5,519309,ok
+2026-09-24T0307Z,laliga,26,2986,Antonio Hidalgo,,5,677106,ok
+2026-09-24T0307Z,laliga,49,3004,José Alberto,,5,540075,ok
+2026-09-24T0307Z,laliga,12,3053,Funes,,5,605815,ok
+2026-09-24T0307Z,laliga,15,3093,Mourinho,,5,4103814,ok
+2026-09-24T0307Z,laliga,3,3094,Edin Terzic,,5,1924315,ok
+2026-09-24T0307Z,laliga,13,3095,Ramis,,5,637266,ok
+2026-09-24T0307Z,laliga,7,3096,Martín Anselmi,,5,673115,ok
+2026-09-24T0307Z,laliga,14,3097,Beñat,,5,673115,ok
+2026-09-24T0307Z,laliga,18,3277,Oscar Sánchez,,5,1352021,ok
