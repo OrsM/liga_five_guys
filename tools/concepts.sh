@@ -309,7 +309,11 @@ check "Universe flat-dict storage" 0 \
 # "injured"/"doubt" flag means for a regular's minutes (0.54 / 0.60, where
 # "injured" was hard-coded 0) instead of assuming it; the two-line table in
 # score.status_multiplier applies it.
-check "src/ lines" 21400 \
+# 21400 -> 21405 on 2026-09-24: the daily 100k reward is counted in whole
+# payments (floor of days, unmeasured income rounded to whole payments), not
+# 100k x fractional days: the residual in the user's own balance is exactly
+# 46 x 100k over 37.6 days.
+check "src/ lines" 21405 \
   "$(find src -name '*.py' | xargs cat | wc -l)"
 
 [ "$fail" -eq 0 ] && echo "concepts: no duplication regained" || echo "concepts: a concept regained a second implementation"

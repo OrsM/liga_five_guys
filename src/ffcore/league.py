@@ -1,6 +1,7 @@
 
 from __future__ import annotations
 
+import math
 import configparser
 import pathlib
 import re
@@ -167,7 +168,7 @@ def allowance(since, now, daily_bonus: float) -> tuple[float, float]:
     if since is None or now is None:
         return 0.0, 0.0
     days = max(0.0, (now - since).total_seconds() / 86400.0)
-    return days * (daily_bonus or 0.0), days
+    return math.floor(days) * (daily_bonus or 0.0), days
 
 
 def _app_ids_of(xw) -> dict:
@@ -625,6 +626,9 @@ class League:
             daily, days = allowance(start, run_now(), self.cfg.daily_bonus)
             if since is None and handle in own_bonus:
                 unmeasured = unmeasured_rate * days if days else 0.0
+                if self.cfg.daily_bonus:
+                    unmeasured = self.cfg.daily_bonus * round(
+                        unmeasured / self.cfg.daily_bonus)
                 bonus = daily + own_bonus[handle] + unmeasured
                 if daily:
                     notes.append("%.2fM of daily allowance over %.0f days"
@@ -1126,6 +1130,7 @@ def _selftest_cash() -> None:
     assert allowance(four_days, now, 100000) == (400000.0, 4.0)
     assert allowance(now, now, 100000) == (0.0, 0.0)
     assert allowance(four_days, now, 0) == (0.0, 4.0)
+    assert allowance(four_days - timedelta(hours=12), now, 100000) == (400000.0, 4.5)
     assert allowance(now, four_days, 100000) == (0.0, 0.0)
     assert allowance(None, now, 100000) == (0.0, 0.0)
 
