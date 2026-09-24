@@ -1,7 +1,7 @@
 {
- "generated_at": "2026-09-24T09:04Z",
- "locks_in_h": 369.92779485694444,
- "cash": 18972143.076984953,
+ "generated_at": "2026-09-24T14:07Z",
+ "locks_in_h": 364.87489991361116,
+ "cash": 18972224.58369329,
  "cash_locked": 13334822.0,
  "squad_value": 306696454.0,
  "jornadas_left": 32,
@@ -30,7 +30,7 @@
    "pts_lo": -45.20217672458332,
    "pts_hi": 99.51216117158637,
    "value": 1.018064073546847,
-   "left": 566629.0769849531,
+   "left": 566710.5836932883,
    "answer": null,
    "p_win_after": 0.473,
    "vs": "Albert Laporta",
@@ -52,7 +52,7 @@
    "pts_lo": -34.76157686828499,
    "pts_hi": 60.08565301918793,
    "value": 0.6041960882544132,
-   "left": 6656340.076984953,
+   "left": 6656421.583693288,
    "answer": null,
    "p_win_after": 0.46,
    "vs": "Albert Laporta",
@@ -602,14 +602,14 @@
    "group": "save",
    "where": "BurtonGM89",
    "label": "SAVE — better than yours, out of reach",
-   "money": -98857237.92301506,
+   "money": -98857156.4163067,
    "pts": 105.41313243783554,
    "par": 105.50641521481002,
    "pts_lo": -23.36940270114219,
    "pts_hi": 274.45139493617813,
    "pts_mean": 118.92103173201865,
    "note": "short",
-   "value": 1.066316788255058,
+   "value": 1.066317667422279,
    "market": null,
    "premium": null
   },
@@ -626,14 +626,14 @@
    "group": "save",
    "where": "free agent",
    "label": "SAVE — better than yours, out of reach",
-   "money": -1547103.9230150431,
+   "money": -1547022.4163067117,
    "pts": 13.950052076876432,
    "par": 27.09008471741093,
    "pts_lo": -50.23186841530323,
    "pts_hi": 102.47562198271588,
    "pts_mean": 21.009877960962786,
    "note": "short",
-   "value": 9.016881070077146,
+   "value": 9.01735613513612,
    "market": null,
    "premium": null
   },
@@ -650,14 +650,14 @@
    "group": "save",
    "where": "BurtonGM89",
    "label": "SAVE — better than yours, out of reach",
-   "money": -1044577.9230150431,
+   "money": -1044496.4163067117,
    "pts": 30.26105494905778,
    "par": 23.032555579023253,
    "pts_lo": -45.84116366198914,
    "pts_hi": 130.62766062287304,
    "pts_mean": 37.49293763770794,
    "note": "short",
-   "value": 28.9696482017474,
+   "value": 28.97190883244903,
    "market": null,
    "premium": null
   }
@@ -685,7 +685,7 @@
    "mean": 1779.670804745719,
    "lo": 1482.0644058824794,
    "hi": 2097.226009510179,
-   "cash": 18972143.076984953,
+   "cash": 18972224.58369329,
    "cash_known": true,
    "p_above": null
   },
@@ -1556,9 +1556,9 @@
   }
  ],
  "flip": {
-  "cash": 18972143.076984953,
-  "reserve": 11894083.0,
-  "spendable": 7078060.076984953,
+  "cash": 18972224.58369329,
+  "reserve": 18405514.0,
+  "spendable": 566710.5836932883,
   "picks": [
    {
     "key": "7842",
@@ -1574,6 +1574,7 @@
     "pay": 10329840.77424769,
     "max_bid": 10447245.325761668,
     "fits": false,
+    "short": 9763130.1905544,
     "reason": {
      "code": "rising",
      "last": 2.0191068709515,
@@ -1599,6 +1600,7 @@
     "pay": 25834005.860698603,
     "max_bid": 25897787.53527435,
     "fits": false,
+    "short": 25267295.277005315,
     "reason": {
      "code": "rising",
      "last": 1.9568211684848,
@@ -1702,7 +1704,7 @@
   },
   "view": {
    "heading": "MARKET",
-   "summary": "7.08M to spend; 11.89M held back for the report's own buys",
+   "summary": "567K to spend; 18.41M held back for the report's top move",
    "sections": [
     {
      "label": "BUY — free market",
@@ -1713,7 +1715,7 @@
        "detail": "last update +2.0%; the history says at least +6.8% over the next 9 updates (147 similar cases on 30 different days); ask 9.64M, expect to pay ~10.33M",
        "right": [
         "≤ 10.45M",
-        "bid, over budget"
+        "bid; needs 9.76M more"
        ]
       },
       {
@@ -1721,7 +1723,7 @@
        "detail": "last update +2.0%; the history says at least +5.9% over the next 10 updates (145 similar cases on 30 different days); ask 24.10M, expect to pay ~25.83M",
        "right": [
         "≤ 25.90M",
-        "bid, over budget"
+        "bid; needs 25.27M more"
        ]
       }
      ],
@@ -1772,7 +1774,7 @@
      ]
     }
    ],
-   "ping": "\nBuy: ferran jutgla (bid up to 10.45M), julen agirrezabala (bid up to 25.90M)\nSell: ali houary"
+   "ping": "\nSell: ali houary"
   }
  }
 }
