@@ -300,7 +300,12 @@ check "Universe flat-dict storage" 0 \
 # experiment scaffolding (backtest_predictor, walk_forward_compare,
 # log_experiment, experiment_history, _precision_blend), the whole unused
 # ffcore/market.py offer sampler, and sim._net. The ratchet only ever goes down.
-check "src/ lines" 21179 \
+# 21179 -> 21319 on 2026-09-24: ffcore/lineupweight.py (~140 lines with its
+# selftest) replaces the reused constant SHRINK_K as the weight on a line-up
+# percentage with one fitted walk-forward on points every run (k=2 vs 8, held-out
+# MSE -0.9%, bootstrap over players excludes zero); tools/forecast_walkforward.py
+# is its scorecard and imports the same code.
+check "src/ lines" 21319 \
   "$(find src -name '*.py' | xargs cat | wc -l)"
 
 [ "$fail" -eq 0 ] && echo "concepts: no duplication regained" || echo "concepts: a concept regained a second implementation"

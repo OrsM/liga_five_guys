@@ -501,7 +501,8 @@ def load(trials_pool=None) -> Universe:
         cash=cash, me=me, players=profiles,
         rival_cash=rival_cash,
         part_played=played, first_jornada_of=first_jornada_of,
-        start_note=_calibrated()[0].note(),
+        start_note=(_calibrated()[0].note() + " "
+                    + _calibrated()[0].lineup_why).strip(),
         unjoined=list(unjoined_clubs) + list(lg.api_unjoined),
         locked_cash=locked_cash, my_bids=my_bids,
         received_offers=received_offers)

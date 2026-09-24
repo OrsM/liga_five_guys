@@ -523,6 +523,8 @@ def _calibrated():
                 "groups": cal.groups}) + "\n", encoding="utf-8")
         except OSError:
             pass
+    from ffcore.lineupweight import fit_lineup_weight
+    cal.lineup_k, cal.lineup_why = fit_lineup_weight()
     _CAL_CACHE.append((cal, second))
     return _CAL_CACHE[0]
 
@@ -728,11 +730,11 @@ class Scorer:
         cur = self.current.get(norm(rec.get("name", "")))
         start_n = cur.get("start_n", 0.0) if cur else 0.0
         if start_n > 0.0:
-            k_s = self.shrink_k
+            k_s, k_l = self.shrink_k, self.cal.lineup_k or self.shrink_k
             pct_rest = (k_s * NEUTRAL_START + start_n * 100.0
                        * cur["start_rate"]) / (k_s + start_n)
-            pct_used = (k_s * pct_used + start_n * 100.0 * cur["start_rate"]
-                       ) / (k_s + start_n)
+            pct_used = (k_l * pct_used + start_n * 100.0 * cur["start_rate"]
+                       ) / (k_l + start_n)
         else:
             pct_rest = pct_used
         m = self.board.get(schema.text(rec, schema.MARKET.TEAM))

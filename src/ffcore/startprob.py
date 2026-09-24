@@ -57,6 +57,7 @@ class Calibration:
         self.alpha, self.beta = alpha, beta
         self.weight, self.titular = weight, titular
         self.n, self.fitted, self.gain, self.why = n, fitted, gain, why
+        self.lineup_k, self.lineup_why = None, ""
         self.groups = groups
 
     def p(self, ff_pct, af=None) -> float:
