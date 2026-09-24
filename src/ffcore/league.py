@@ -564,19 +564,17 @@ class League:
                  if r.get("user_id") and r.get("manager")}
         own_bonus = bonus_income(load_api_activity(), users)
 
-        unmeasured_rate = 0.0
+        click_rate, my_clicks, my_days = 0.0, 0, 0.0
         me_txns = [t for t in self.txns
                   if schema.text(t, schema.TRANSACTIONS.TO_) == self.cfg.me
                   or schema.text(t, schema.TRANSACTIONS.FROM_) == self.cfg.me]
         me_start = min((ledger_stamp(t.get("date", "")) for t in me_txns
                        if ledger_stamp(t.get("date", ""))), default=None)
-        if paid is not None:
-            me_daily, me_days = allowance(me_start, run_now(),
-                                          self.cfg.daily_bonus)
-            me_unmeasured = max(0.0, paid - me_daily
-                                - own_bonus.get(self.cfg.me, 0.0))
-            if me_days:
-                unmeasured_rate = me_unmeasured / me_days
+        if paid is not None and self.cfg.daily_bonus:
+            _, my_days = allowance(me_start, run_now(), self.cfg.daily_bonus)
+            my_clicks = round((paid - own_bonus.get(self.cfg.me, 0.0))
+                              / self.cfg.daily_bonus)
+            click_rate = my_clicks / my_days if my_days else 0.0
 
         for handle, mgr in self.managers.items():
             budget = self.cfg.budget
@@ -625,22 +623,16 @@ class League:
                  if ledger_stamp(t.get("date", ""))), default=None)
             daily, days = allowance(start, run_now(), self.cfg.daily_bonus)
             if since is None and handle in own_bonus:
-                unmeasured = unmeasured_rate * days if days else 0.0
-                if self.cfg.daily_bonus:
-                    unmeasured = self.cfg.daily_bonus * round(
-                        unmeasured / self.cfg.daily_bonus)
-                bonus = daily + own_bonus[handle] + unmeasured
-                if daily:
-                    notes.append("%.2fM of daily allowance over %.0f days"
-                                 % (daily / 1e6, days))
+                clicks = round(click_rate * days) if days else 0
+                bonus = clicks * self.cfg.daily_bonus + own_bonus[handle]
+                if clicks:
+                    notes.append("%d payments of %.0fk assuming they claim "
+                                 "as often as you do (you: %d in %.0f days)"
+                                 % (clicks, self.cfg.daily_bonus / 1e3,
+                                    my_clicks, my_days))
                 notes.append("%.2fM of their own weekly performance bonus, "
                              "recorded in the app's activity feed"
                              % (own_bonus[handle] / 1e6))
-                if unmeasured:
-                    notes.append("%.2fM assuming they earn unmeasured "
-                                 "income (video bonus, ideal XI, or "
-                                 "unknown) at your own measured rate"
-                                 % (unmeasured / 1e6))
             elif since is None and paid is not None:
                 bonus = paid
                 notes.append("%.2fM the app has paid you since the season "
