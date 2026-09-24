@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import gc
 import collections
+import os
 import sys
 import threading
 import time
@@ -86,7 +87,7 @@ def main(argv: list[str]) -> int:
         gc.collect()
         stop.set()
         times.append((time.time() - t0, name))
-        if times[-1][0] > 8:            # a healthy run's log is unchanged
+        if times[-1][0] > float(os.environ.get("LFG_SLOW_S", 8)):  # quiet when healthy
             print("  slow %s, where: %s" % (name, "  ".join(
                 "%d%% %s" % (100 * v // sum(hits.values()), k)
                 for k, v in hits.most_common(5))))

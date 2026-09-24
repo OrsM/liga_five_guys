@@ -237,7 +237,13 @@ check "Universe flat-dict storage" 0 \
 # (_parse_origin/_parse_workers), each opening its own snapshot so only rows
 # cross the pipe, and never more than the service's memory cap allows. Output
 # byte-identical to serial on the full history.
-check "src/ lines" 20866 \
+# 20866 -> 20882 on 2026-09-24: crosswalk._by_exact_value() rescanned the whole
+# market history (~28k rows of float()) on each of 161 calls -- 2.9s of a 3.9s
+# stage, found by profiling; now a value index built once per market. Output
+# byte-identical (players.csv/clubs.csv). run.py's slow-stage threshold reads
+# LFG_SLOW_S so a stage can be profiled in place, where shared caches make it
+# behave as it does in a real run and not as it does standalone.
+check "src/ lines" 20882 \
   "$(find src -name '*.py' | xargs cat | wc -l)"
 
 [ "$fail" -eq 0 ] && echo "concepts: no duplication regained" || echo "concepts: a concept regained a second implementation"

@@ -313,15 +313,30 @@ def _by_exact_value(raw_value, market) -> str | None:
         return None
     if not want:
         return None
-    hits = set()
-    for row in market.rows:
-        try:
-            if float(row.get("value")) == want:
-                hits.add(market.key_of(row))
-        except (TypeError, ValueError):
-            continue
+    hits = set(_value_index(market).get(want, ()))
     hits.discard("")
     return hits.pop() if len(hits) == 1 else None
+
+
+_VALUE_INDEX: dict[int, tuple[int, dict]] = {}
+
+
+def _value_index(market) -> dict:
+    """{value: {player key}} over the whole market history, built once per
+    market. This used to rescan every row on every call -- 161 calls x ~28k
+    rows of float() was 2.9s of a 3.9s crosswalk stage (2026-09-24, profiled).
+    Keyed on the row count as well as the object, so appended rows rebuild."""
+    hit = _VALUE_INDEX.get(id(market))
+    if hit is None or hit[0] != len(market.rows):
+        idx: dict[float, set] = {}
+        for row in market.rows:
+            try:
+                idx.setdefault(float(row.get("value")), set()).add(
+                    market.key_of(row))
+            except (TypeError, ValueError):
+                continue
+        hit = _VALUE_INDEX[id(market)] = (len(market.rows), idx)
+    return hit[1]
 
 
 def _rows(path) -> list[dict]:
