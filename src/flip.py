@@ -161,31 +161,30 @@ def auction_ratios(listings: list[dict], buys: list[dict]) -> list[float]:
     return out
 
 
-def report_view(ladder: list[dict], name_key) -> tuple[dict, list[dict]]:
-    """What the season report says: ({key: (group, expected season points change
-    if he is sold)} for my players, [{price, points per million}] for what it
-    wants to buy). `name_key` maps a ladder name back to a player key."""
+def report_view(ladder: list[dict], name_key) -> dict:
+    """{key: (group, expected season points change if he is sold)} for my players,
+    as the season report's ladder says. `name_key` maps a ladder name to a key."""
     verdict = {}
     for r in ladder:
         k = name_key(r["name"])
         if r["where"] == "yours" and k and r["group"] in ("sell", "keep", "out", "in") \
                 and r.get("pts_mean") is not None:
             verdict[k] = (r["group"], r["pts_mean"])
-    targets = [{"price": r["market"], "rate": r["value"]} for r in ladder
-               if r["group"] in ("buy", "raid") and r.get("market")
-               and r.get("value") is not None]
-    return verdict, targets
+    return verdict
 
 
-def money_rate(targets: list[dict]) -> float:
-    """Season points a million buys, as the report itself measures it: the
-    median points-per-million of what it wants to buy. 0 when it wants nothing."""
-    return median(t["rate"] for t in targets) if targets else 0.0
+def money_rate(moves: list[dict]) -> float:
+    """Season points a million buys, as the report's OWN ranked moves measure it
+    (their points-per-million). 0 when the report wants to do nothing."""
+    rates = [m["value"] for m in moves if m.get("value") is not None]
+    return median(rates) if rates else 0.0
 
 
-def reserve(targets: list[dict]) -> float:
-    """Cash the report's best target (most points per million) needs."""
-    return max(targets, key=lambda t: t["rate"])["price"] if targets else 0.0
+def reserve(moves: list[dict]) -> float:
+    """Cash the report's top-ranked move needs after its own funding -- its net
+    cash out, premium included. The report decides what the cash is for first;
+    the market only gets what that leaves."""
+    return max(0.0, -moves[0]["net"]) if moves else 0.0
 
 
 # ---------------------------------------------------------------- the decisions
@@ -208,7 +207,7 @@ def picks(listings: list[dict], last: dict[str, float], model: dict,
         out.append({**l, "last": last[l["key"]], "h": bel["h"], "n": bel["n"],
                     "days": bel["days"], "drift": bel["lo"], "gain": leave - pay, "pay": pay,
                     "max_bid": leave / (1 + hurdle * bel["h"]),
-                    "fits": pay <= cash,
+                    "fits": pay <= cash, "short": max(0.0, pay - cash),
                     "reason": {"code": "rising", "last": last[l["key"]],
                                "drift": bel["lo"], "h": bel["h"], "n": bel["n"],
                                "days": bel["days"], "ask": l["ask"], "pay": pay}})
@@ -301,17 +300,18 @@ def present(out: dict) -> dict:
         return {"name": p["name"], "detail": say(p["reason"]), "right": right}
 
     buys = [row(p, ["≤ " + _m(p["max_bid"]),
-                    "bid" if p["fits"] else "bid, over budget"])
+                    "bid" if p["fits"] else "bid; needs %s more" % _m(p["short"])])
             for p in out["picks"]]
     sold = [row(p, [_m(p["value"]),
                     "offer " + _m(p["offer"]) if p["offer"] else ""])
             for p in out["sells"]]
     held = [row(p, [_m(p["value"]), ""]) for p in out["held"]]
+    doable = [p for p in out["picks"] if p["fits"]]      # the ping is for what you can act on
     ping = ("\nBuy: " + ", ".join("%s (bid up to %s)" % (p["name"], _m(p["max_bid"]))
-                                  for p in out["picks"][:2]) if buys else "")
+                                  for p in doable[:2]) if doable else "")
     ping += ("\nSell: " + ", ".join(p["name"] for p in out["sells"][:3])
              if sold else "")
-    hold = ("; %s held back for the report's own buys" % _m(out["reserve"])
+    hold = ("; %s held back for the report's top move" % _m(out["reserve"])
             if out["reserve"] > 0 else "")
     return {
         "heading": "MARKET",
@@ -414,17 +414,18 @@ def main() -> None:
              for k in mine if k not in xi]
     by_name = {norm(name.get(k, k)): k for k in mine}
 
-    verdict, targets = {}, []
+    verdict, moves = {}, []
     try:
-        ladder = json.loads((REPORTS / "decisions.json").read_text())["ladder"]
-        verdict, targets = report_view(ladder, lambda n: by_name.get(norm(n)))
+        doc = json.loads((REPORTS / "decisions.json").read_text())
+        verdict = report_view(doc["ladder"], lambda n: by_name.get(norm(n)))
+        moves = doc["moves"]
     except (OSError, ValueError, KeyError):
         pass
-    held_back = reserve(targets)
+    held_back = reserve(moves)
     now = run_now().astimezone(MADRID)
     recent = recently(DECISIONS / "flip_log.csv", now)
     sales, kept = sells(bench, last, dict(u.received_offers), model, verdict,
-                        money_rate(targets))
+                        money_rate(moves))
     spend = max(0.0, u.cash - held_back)
     out = {"cash": u.cash, "reserve": held_back, "spendable": spend,
            "picks": [p for p in picks(free, last, model, spend, cfg.flip_hurdle)
@@ -434,7 +435,7 @@ def main() -> None:
            "measured": {"offer": offer, "premium": premium,
                         "offers": len(offer_r), "auctions": len(paid_r),
                         "risk": cfg.flip_risk, "hurdle": cfg.flip_hurdle,
-                        "points_per_million": money_rate(targets)}}
+                        "points_per_million": money_rate(moves)}}
     out["view"] = present(out)
     path = REPORTS / "decisions.json"
     try:
@@ -503,15 +504,18 @@ def _selftest() -> None:
             {"player_id": "7", "at": "2026-09-05T10:00:00+02:00", "amount": "1"}]    # not at the close
     assert auction_ratios(lst, buys) == [1.04], auction_ratios(lst, buys)
 
-    # the report, read
-    ladder = [{"name": "Kept", "where": "yours", "group": "keep", "pts_mean": -0.5, "market": None, "value": None},
-              {"name": "Free", "where": "yours", "group": "sell", "pts_mean": -3.0, "market": None, "value": None},
-              {"name": "Cheap", "where": "x", "group": "buy", "pts_mean": None, "market": 10e6, "value": 0.6},
-              {"name": "Dear", "where": "x", "group": "raid", "pts_mean": None, "market": 20e6, "value": 1.0}]
-    ver, tg = report_view(ladder, {"Kept": "k", "Free": "f"}.get)
+    # the report, read: verdicts from its ladder; cash and points-per-million from
+    # its own ranked MOVES (net is cash in, so a cash need is -net; a raid whose
+    # clause premium is paid out is a bigger need than the player's value)
+    ladder = [{"name": "Kept", "where": "yours", "group": "keep", "pts_mean": -0.5},
+              {"name": "Free", "where": "yours", "group": "sell", "pts_mean": -3.0},
+              {"name": "Rival", "where": "x", "group": "raid", "pts_mean": None}]
+    ver = report_view(ladder, {"Kept": "k", "Free": "f"}.get)
     assert ver == {"k": ("keep", -0.5), "f": ("sell", -3.0)}, ver
-    assert money_rate(tg) == 0.8 and reserve(tg) == 20e6
-    assert money_rate([]) == 0.0 and reserve([]) == 0.0
+    moves = [{"net": -18.4e6, "value": 1.0}, {"net": -12.3e6, "value": 0.6}, {"net": 5e6, "value": None}]
+    assert reserve(moves) == 18.4e6 and money_rate(moves) == 0.8
+    assert reserve([{"net": 3e6, "value": 1.0}]) == 0.0      # a move that RAISES cash reserves none
+    assert reserve([]) == 0.0 and money_rate([]) == 0.0
 
     # buys: only what beats the friction on the CONFIDENT end
     lst = [{"key": "a", "name": "Riser", "ask": 10e6, "value": 10e6},
@@ -521,7 +525,8 @@ def _selftest() -> None:
     assert [g["name"] for g in got] == ["Riser"], got
     g = got[0]
     assert g["fits"] and g["gain"] > 0 and g["max_bid"] >= g["pay"], g
-    assert picks(lst, {"a": 5.0}, model, 1e6, 0.0)[0]["fits"] is False
+    poor = picks(lst, {"a": 5.0}, model, 1e6, 0.0)[0]
+    assert poor["fits"] is False and abs(poor["short"] - (poor["pay"] - 1e6)) < 1e-6, poor
     assert picks(lst, {"a": 5.0}, model, 50e6, 10.0) == []    # a hurdle it cannot clear
 
     # sells: money must buy more season points than the player is worth
@@ -543,13 +548,18 @@ def _selftest() -> None:
     out = {"cash": 20e6, "reserve": 10e6, "spendable": 10e6, "picks": got,
            "sells": sold, "held": held}
     v = present(out)
-    assert v["summary"] == "10.00M to spend; 10.00M held back for the report's own buys", v["summary"]
+    assert v["summary"] == "10.00M to spend; 10.00M held back for the report's top move", v["summary"]
+    tight = present({**out, "picks": [poor]})["sections"][0]["rows"][0]["right"]
+    assert tight[1].startswith("bid; needs ") and tight[1].endswith(" more"), tight
     lab = {s["tone"]: s for s in v["sections"]}
     assert lab["buy"]["rows"][0]["name"] == "Riser" and "bid" in lab["buy"]["rows"][0]["right"]
     assert "+5.0%" in lab["buy"]["rows"][0]["detail"], lab["buy"]["rows"][0]
     assert "the report keeps him" in lab["held"]["rows"][0]["detail"]
     assert v["ping"].startswith("\nBuy: Riser (bid up to") and "Sell: Free" in v["ping"], v["ping"]
     assert present({**out, "picks": [], "sells": [], "held": []})["ping"] == ""
+    # ...and only what you can afford: an unaffordable pick stays on the page
+    # (with what is missing) but does not go in the notification
+    assert "Buy:" not in present({**out, "picks": [poor]})["ping"]
     try:
         say({"code": "nope"})
         raise AssertionError("an unknown reason must not be papered over")

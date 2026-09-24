@@ -292,7 +292,11 @@ check "Universe flat-dict storage" 0 \
 # Sentences come from ONE function (say) fed structured reasons, and the page and
 # ping draw the box's view. Same rule applied to the ladder: sim.GROUP_LABEL is
 # the one copy of the group headings; the page had its own list and it had drifted.
-check "src/ lines" 21595 \
+# 21595 -> 21605 on 2026-09-24: flip reserves what the report's own TOP MOVE needs
+# (its net cash out, clause premium included: 18.41M for a raid whose player is
+# valued 11.89M) instead of a price I inferred from candidate rows; picks say how
+# much more cash they need, and the ping lists only what can be afforded.
+check "src/ lines" 21605 \
   "$(find src -name '*.py' | xargs cat | wc -l)"
 
 [ "$fail" -eq 0 ] && echo "concepts: no duplication regained" || echo "concepts: a concept regained a second implementation"
