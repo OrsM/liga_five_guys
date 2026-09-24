@@ -305,7 +305,11 @@ check "Universe flat-dict storage" 0 \
 # percentage with one fitted walk-forward on points every run (k=2 vs 8, held-out
 # MSE -0.9%, bootstrap over players excludes zero); tools/forecast_walkforward.py
 # is its scorecard and imports the same code.
-check "src/ lines" 21319 \
+# 21319 -> 21400 on 2026-09-24: lineupweight.fit_status_factors measures what a
+# "injured"/"doubt" flag means for a regular's minutes (0.54 / 0.60, where
+# "injured" was hard-coded 0) instead of assuming it; the two-line table in
+# score.status_multiplier applies it.
+check "src/ lines" 21400 \
   "$(find src -name '*.py' | xargs cat | wc -l)"
 
 [ "$fail" -eq 0 ] && echo "concepts: no duplication regained" || echo "concepts: a concept regained a second implementation"

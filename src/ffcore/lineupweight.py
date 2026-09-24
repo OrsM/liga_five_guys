@@ -24,6 +24,8 @@ GRID = (0.5, 1.0, 2.0, 3.0, 4.0, 6.0, 8.0, 12.0)
 PRIOR_90 = 4.0        # 90-minute units of position prior on a player's rate
 WARMUP = 3            # jornadas of history before rows are judged
 MIN_ROWS = 300
+REGULAR = 0.7          # share of earlier minutes that makes a player a regular
+MIN_STATUS_ROWS = 20   # flagged regulars needed before a status is measured
 
 
 def stamp(s):
@@ -105,6 +107,47 @@ def fit_lineup_weight(data=None) -> tuple[float | None, str]:
                       len(p)))
 
 
+def fit_status_factors(lineups=None, starters=None) -> dict[str, tuple[float, int]]:
+    """{status: (share of his normal minutes a flagged regular played, n)}.
+
+    A regular is a player with >= REGULAR of his earlier minutes. The flag is
+    the last one seen >= LEAD_H before the scrape; a player missing from the
+    match sheet played 0, so a flag that means "out" shows as ~0 and one that
+    is only a knock shows what it is. Measured 2026-09-24: "injured" 0.54
+    (95% 0.30-0.79, 42 rows) where the model had assumed 0.0."""
+    from ffcore.tidy import (MATCH_LEN, load_lineups, load_starters,
+                             minutes_played)
+
+    play, scraped, teams = {}, {}, collections.defaultdict(set)
+    for r in (starters if starters is not None else load_starters()):
+        if r.get("role") in ("starter", "sub"):
+            m = r["match_id"]
+            scraped[m] = min(scraped.get(m, "9"), r["observed_at"])
+            teams[m].add(r["team_slug"])
+            play[(m, r["team_slug"], r["player_slug"])] = min(
+                1.0, minutes_played(r["role"], r.get("minute")) / MATCH_LEN)
+    flags = collections.defaultdict(list)
+    for r in sorted(lineups if lineups is not None else load_lineups(),
+                    key=lambda r: r["observed_at"]):
+        flags[(r["team_slug"], r["player_slug"])].append(
+            (stamp(r["observed_at"]), r.get("status") or "ok"))
+    earlier, seen = collections.defaultdict(list), collections.defaultdict(list)
+    for m in sorted(scraped, key=scraped.get):
+        cut = stamp(scraped[m]) - timedelta(hours=LEAD_H)
+        for who, marks in flags.items():
+            hist = earlier[who]
+            before = [f for t, f in marks if t <= cut]
+            if who[0] in teams[m] and before and len(hist) >= 2 \
+                    and st.mean(hist) >= REGULAR:
+                seen[before[-1]].append(play.get((m, *who), 0.0))
+        for (mm, team, slug), share in play.items():
+            if mm == m:
+                earlier[(team, slug)].append(share)
+    base = st.mean(seen["ok"]) if seen["ok"] else 0.0
+    return {f: (st.mean(v) / base, len(v)) for f, v in seen.items()
+            if base > 0 and f != "ok" and len(v) >= MIN_STATUS_ROWS}
+
+
 def _selftest() -> None:
     def game(who, j, share, line):
         return {"key": who, "pos": "MED", "j": j, "at": "2026-09-%02dT1200Z" % j,
@@ -129,6 +172,26 @@ def _selftest() -> None:
     k, why = fit_lineup_weight(data[:20])
     assert k is None and "need" in why, (k, why)
     assert not pairs([game("a", 1, 1.0, 1.0)]), "no history, nothing to judge"
+    # regulars flagged "injured" miss every match, "doubt" every other one
+    starters, lineups = [], []
+    for m in range(1, 9):
+        for i in range(50):
+            who = "p%d" % i
+            flag = "injured" if i < 25 and m > 3 else "doubt" if i < 40 and \
+                m > 3 and i % 2 else "ok"
+            lineups.append({"team_slug": "t", "player_slug": who,
+                            "observed_at": "2026-09-%02dT0800Z" % m,
+                            "status": flag})
+            plays = flag == "ok" or (flag == "doubt" and m % 2)
+            if plays:
+                starters.append({"match_id": str(m), "team_slug": "t",
+                                 "player_slug": who, "role": "starter",
+                                 "minute": "", "observed_at":
+                                 "2026-09-%02dT2000Z" % (m + 1)})
+    got = fit_status_factors(lineups, starters)
+    assert got["injured"][0] < 0.05 and got["injured"][1] >= MIN_STATUS_ROWS, got
+    assert 0.3 < got["doubt"][0] < 0.7, got
+    assert fit_status_factors(lineups[:10], starters[:10]) == {}
     print("ffcore.lineupweight self-test OK")
 
 

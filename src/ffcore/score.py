@@ -41,7 +41,12 @@ OUT_STATUSES = frozenset({"injured", "suspended", "unavailable"})
 PROMOTED_DISCOUNT = 0.70
 
 
+STATUS_FACTOR: dict[str, float] = {}
+
+
 def status_multiplier(status: str) -> float:
+    if status in STATUS_FACTOR:
+        return STATUS_FACTOR[status]
     if status in OUT_STATUSES:
         return 0.0
     if status == "doubt":
@@ -523,8 +528,15 @@ def _calibrated():
                 "groups": cal.groups}) + "\n", encoding="utf-8")
         except OSError:
             pass
-    from ffcore.lineupweight import fit_lineup_weight
+    from ffcore.lineupweight import fit_lineup_weight, fit_status_factors
     cal.lineup_k, cal.lineup_why = fit_lineup_weight()
+    flagged = fit_status_factors()
+    STATUS_FACTOR.clear()
+    STATUS_FACTOR.update({f: v for f, (v, _n) in flagged.items()})
+    if flagged:
+        cal.lineup_why += "; regulars flagged " + ", ".join(
+            "%s played %.0f%% of normal (%d)" % (f, 100 * v, n)
+            for f, (v, n) in sorted(flagged.items()))
     _CAL_CACHE.append((cal, second))
     return _CAL_CACHE[0]
 
@@ -879,6 +891,12 @@ def pick_xi(pool: dict, force: dict | None = None):
 
 
 def _selftest() -> None:
+    assert status_multiplier("injured") == 0.0 and status_multiplier("doubt") == DOUBT_FACTOR
+    STATUS_FACTOR["injured"] = 0.5
+    try:
+        assert status_multiplier("injured") == 0.5 and status_multiplier("ok") == 1.0
+    finally:
+        STATUS_FACTOR.clear()
     from ffcore.fixture import Match
 
     def mk(name, pos="defensa", team="Mid", value="10.00M"):
