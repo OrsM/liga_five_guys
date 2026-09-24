@@ -120,7 +120,9 @@ def _read(path: Path, only: set | None = None) -> dict[str, str]:
 def _write(path: Path, members: dict[str, str]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(".tmp")
-    with lzma.open(tmp, "wb", preset=6) as xz:
+    # preset 3, not 6 (2026-09-24): 1.6s vs 8.4s on a 57MB snapshot for +13%
+    # size (1278KB vs 1129KB) -- a fixed ~7s off every full fetch.
+    with lzma.open(tmp, "wb", preset=3) as xz:
         with tarfile.open(fileobj=xz, mode="w", format=tarfile.USTAR_FORMAT) as tf:
             for name in sorted(members):
                 blob = members[name].encode("utf-8")

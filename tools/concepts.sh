@@ -243,7 +243,9 @@ check "Universe flat-dict storage" 0 \
 # byte-identical (players.csv/clubs.csv). run.py's slow-stage threshold reads
 # LFG_SLOW_S so a stage can be profiled in place, where shared caches make it
 # behave as it does in a real run and not as it does standalone.
-check "src/ lines" 20882 \
+# 20882 -> 20884 on 2026-09-24: two comment lines recording why snapshots are
+# compressed at xz preset 3 (1.6s vs 8.4s, +13% size) -- see ingest._write().
+check "src/ lines" 20884 \
   "$(find src -name '*.py' | xargs cat | wc -l)"
 
 [ "$fail" -eq 0 ] && echo "concepts: no duplication regained" || echo "concepts: a concept regained a second implementation"
