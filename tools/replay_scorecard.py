@@ -9,8 +9,8 @@ everyone cancels out.
     PYTHONPATH=src FF_ROOT=./data uv run python tools/replay_scorecard.py
 
 First read (2026-09-24, 20 days, 432 move-days): the #1 move netted +2.7 pts
-over 10 days and beat the same day's other moves by +5.1 (95% +1.7..+8.6);
-ranks 2-5 were flat to negative; raids ("clause") averaged -1.5. The report's
+over 10 days and beat the same day's other moves by +2.7 (95% +0.1..+5.4, so
+only just clear of zero); ranks 2-5 were flat to negative; raids ("clause") averaged -1.5. The report's
 own predicted gain (d_pts, pts_lo, d_win) correlated +0.03..+0.09 with what
 happened, so its size says little -- only which move it ranks first.
 """
