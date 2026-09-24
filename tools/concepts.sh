@@ -231,13 +231,13 @@ check "Universe flat-dict storage" 0 \
 # ~115s of a 122s fetch. Now paced per host (_by_host + a per-host clock):
 # each site still waits 1.5-3s between its OWN requests, and the waits
 # overlap. Simulated 123s -> 52s on the real source list.
-# 20822 -> 20864 on 2026-09-24: ingest._parse_everything() parsed every
+# 20822 -> 20866 on 2026-09-24: ingest._parse_everything() parsed every
 # document serially -- 376s for a cold-cache rebuild, of 458s total -- though
 # each is a pure function of one snapshot. Now one worker per physical core
 # (_parse_origin/_parse_workers), each opening its own snapshot so only rows
 # cross the pipe, and never more than the service's memory cap allows. Output
 # byte-identical to serial on the full history.
-check "src/ lines" 20864 \
+check "src/ lines" 20866 \
   "$(find src -name '*.py' | xargs cat | wc -l)"
 
 [ "$fail" -eq 0 ] && echo "concepts: no duplication regained" || echo "concepts: a concept regained a second implementation"

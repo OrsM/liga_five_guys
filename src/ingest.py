@@ -75,7 +75,9 @@ HEADERS = {
 # Per HOST, not per request: each site still sees 1.5-3s between its own
 # requests, but 23 futbolfantasy + 21 analiticafantasy pages no longer queue
 # behind one another's sleeps (2026-09-24: ~115s of a 122s fetch was sleeping).
-DELAY = (1.5, 3.0)
+# 1.5-3.0 -> 1.0-2.0 the same day: a full 72-request fetch, 73s -> 56s, no
+# 403/429 from any of the six sites. Revert here if one starts to answer 429.
+DELAY = (1.0, 2.0)
 
 
 def _by_host(srcs) -> list:
