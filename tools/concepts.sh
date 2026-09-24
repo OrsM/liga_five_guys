@@ -272,7 +272,15 @@ check "Universe flat-dict storage" 0 \
 # (44 days of values, 70 winning bids, 75 app offers) and is documented where it
 # is set; the expectation table is recomputed from market.csv each run, so it
 # needs no stored model. Recommendations are logged when made (flip_log.csv).
-check "src/ lines" 21254 \
+# 21254 -> 21336 on 2026-09-24: flip may only advise selling a player the REPORT would
+# let go for free (its SELL group, or ~0 season points with no downside band);
+# anyone else the market says to sell is shown as HELD BACK with what selling
+# costs. The first version used this week's XI to decide who was dispensable and
+# told me to sell four players the report said to keep (Yeray -6, Raul -3, Carl
+# -0 with a -51 downside): selling a bench player gives up optionality the
+# season simulation already prices. Plus a cooldown so a player sold this week
+# is not bought back next.
+check "src/ lines" 21336 \
   "$(find src -name '*.py' | xargs cat | wc -l)"
 
 [ "$fail" -eq 0 ] && echo "concepts: no duplication regained" || echo "concepts: a concept regained a second implementation"

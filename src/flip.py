@@ -32,6 +32,15 @@ MIN_N = 30             # observations behind an expectation before it is believe
 BUCKETS = ((-1e9, -3.0), (-3.0, -1.0), (-1.0, 1.0),
            (1.0, 3.0), (3.0, 6.0), (6.0, 1e9))   # size of the last update, in %
 GOOD_OFFER = 1.03      # with no expectation to weigh it against, an offer this many times value is taken
+# THE REPORT OWNS "WHO IS DISPENSABLE". A bench player is optionality -- he covers
+# injuries and rotation -- and the season simulation already prices it: each
+# row carries the season points selling him alone gains or costs, with a 10th-
+# percentile band. This module may sell only a player the report itself would
+# let go for nothing: never starts (its SELL group), or a median cost above
+# SELL_PTS_FLOOR AND no real downside (10th percentile above SELL_LO_FLOOR).
+SELL_PTS_FLOOR = -1.0
+SELL_LO_FLOOR = -10.0
+COOLDOWN_DAYS = 3      # a player just sold is not bought back (or the reverse): no whipsaw
 
 
 def steps(rows: list[dict]) -> dict[str, list[float]]:
@@ -94,14 +103,18 @@ def picks(listings: list[dict], last: dict[str, float], table: dict,
 
 
 def sells(bench: list[dict], last: dict[str, float],
-          offers: dict[str, float], table: dict) -> list[dict]:
-    """Non-starters to sell now, and why. `bench` [{key, name, value}].
+          offers: dict[str, float], table: dict,
+          cost: dict[str, tuple]) -> tuple[list[dict], list[dict]]:
+    """(sales, held back) among non-starters. `bench` [{key, name, value}];
+    `cost` {key: (group, season pts, 10th-percentile pts)} from the report.
 
-    A holding is sold when holding is expected to LOSE value, or when an offer
-    already beats what holding is expected to fetch -- the same table that
-    picks the buys, so a player on the way up is not sold at +6%.
+    Sold when holding is expected to LOSE value, or an offer already beats what
+    holding is expected to fetch (the same table that picks the buys, so a
+    player on the way up is not sold at +6%) -- AND the report says letting
+    him go costs nothing. A player the market says to sell but the report says
+    to keep is `held back`, with what selling him would cost in season points.
     """
-    out = []
+    out, held = [], []
     for p in bench:
         offer, step = offers.get(p["key"]), last.get(p["key"])
         exp, n = table.get(bucket(step), (0.0, 0))
@@ -117,8 +130,21 @@ def sells(bench: list[dict], last: dict[str, float],
                   "update %+.1f%%)" % (-exp, HORIZON, step)
         else:
             continue
-        out.append({**p, "offer": offer, "last": step, "why": why})
-    return out
+        group, pts, lo = cost.get(p["key"], (None, None, None))
+        free = group == "sell" or (pts is not None and pts >= SELL_PTS_FLOOR
+                                   and lo is not None and lo >= SELL_LO_FLOOR)
+        row = {**p, "offer": offer, "last": step, "why": why, "season_pts": pts}
+        if free:
+            out.append(row)
+        else:
+            held.append({**row, "why": "%s -- but the report keeps him: selling "
+                         "costs %s season points%s" % (
+                             why.split(" (")[0],
+                             "an unknown number of" if pts is None
+                             else "%.0f" % -pts,
+                             "" if lo is None or lo >= SELL_LO_FLOOR else
+                             " (up to %.0f in a bad case)" % -lo)})
+    return out, held
 
 
 LOG = ["day", "run_at", "action", "key", "name", "ask", "value", "offer",
@@ -154,8 +180,21 @@ def record(path, out: dict, now) -> int:
     return len(new)
 
 
+def recently(path, now) -> set[tuple[str, str]]:
+    """{(key, action)} advised in the last COOLDOWN_DAYS days, before today's
+    close -- so a player sold on Monday is not recommended back on Tuesday."""
+    if not path.exists():
+        return set()
+    today = now.strftime("%Y-%m-%d")
+    since = (now - timedelta(days=COOLDOWN_DAYS)).strftime("%Y-%m-%d")
+    with open(path, newline="", encoding="utf-8") as fh:
+        return {(r["key"], r["action"]) for r in csv.DictReader(fh)
+                if since <= r["day"] < today}
+
+
 def main() -> None:
     import decide
+    from ffcore.text import norm
     from ffcore.tidy import DECISIONS, MADRID, REPORTS, TIDY, read_csv, run_now
 
     u = decide.load()
@@ -176,18 +215,28 @@ def main() -> None:
     bench = [{"key": k, "name": name.get(k, k), "value": value.get(k, 0.0)}
              for k in mine if k not in xi]
 
-    reserve = 0.0
+    reserve, cost = 0.0, {}
     try:
         ladder = json.loads((REPORTS / "decisions.json").read_text())["ladder"]
         reserve = max((r["market"] or 0.0 for r in ladder
                        if r["group"] == "buy"), default=0.0)
+        said = {norm(r["name"]): (r["group"], r["pts"], r["pts_lo"])
+                for r in ladder if r["where"] == "yours"
+                and r["group"] in ("sell", "keep", "out", "in")}
+        cost = {b["key"]: said[norm(b["name"])] for b in bench
+                if norm(b["name"]) in said}
     except (OSError, ValueError, KeyError):
         pass
+    sales, held = sells(bench, last, dict(u.received_offers), table, cost)
+    recent = recently(DECISIONS / "flip_log.csv", run_now().astimezone(MADRID))
 
     out = {"horizon": HORIZON, "hurdle": HURDLE, "cash": u.cash,
            "reserve": reserve, "spendable": max(0.0, u.cash - reserve),
-           "picks": picks(free, last, table, max(0.0, u.cash - reserve)),
-           "sells": sells(bench, last, dict(u.received_offers), table),
+           "picks": [p for p in picks(free, last, table,
+                                      max(0.0, u.cash - reserve))
+                     if (p["key"], "SELL") not in recent],
+           "sells": [p for p in sales if (p["key"], "BUY") not in recent],
+           "held": held,
            "table": {"%g..%g" % b: v for b, v in table.items()}}
     path = REPORTS / "decisions.json"
     try:
@@ -238,19 +287,52 @@ def _selftest() -> None:
     # a hurdle it cannot clear: same player, but he only rises a little
     weak = {b: (1.0, 100) for b in BUCKETS}
     assert picks(lst, {"a": 4.0}, weak, cash=50e6) == []
-    # sells: expected to fall; an offer that beats holding; a rising player
-    # who is offered only a little over value (HOLD -- he is expected to go
-    # up further); a steady one nobody wants.
+    # sells: expected to fall; an offer that beats holding; a rising player who
+    # is offered only a little over value (HOLD -- he is expected to go up
+    # further); a steady one nobody wants.
     bench = [{"key": "f", "name": "Faller", "value": 5e6},
              {"key": "o", "name": "Offered", "value": 5e6},
              {"key": "r", "name": "Riser", "value": 5e6},
              {"key": "s", "name": "Steady", "value": 5e6}]
     last = {"f": -2.0, "o": 0.0, "r": 4.0, "s": 0.0}
-    got = sells(bench, last, {"o": 5.5e6, "r": 5.3e6}, table)
-    assert [x["name"] for x in got] == ["Faller", "Offered"], got
+    free_to_go = {"f": ("keep", -0.3, -2.0), "o": ("sell", -50.0, -200.0),
+                  "r": ("keep", 0.0, 0.0), "s": ("keep", 0.0, 0.0)}
+    got, held = sells(bench, last, {"o": 5.5e6, "r": 5.3e6}, table, free_to_go)
+    assert [x["name"] for x in got] == ["Faller", "Offered"] and held == [], (got, held)
     assert "lose" in got[0]["why"] and "beats" in got[1]["why"], got
     # no history behind a bucket: fall back to a plain 'offer well above value'
-    assert [x["name"] for x in sells(bench, last, {"s": 5.2e6}, {})] == ["Steady"]
+    assert [x["name"] for x in sells(bench, last, {"s": 5.2e6}, {}, free_to_go)[0]] == ["Steady"]
+
+    # THE REPORT OWNS WHO IS DISPENSABLE. The market says sell a falling player,
+    # but if the season simulation says letting him go costs points -- or has a
+    # real downside band, or says nothing at all -- he is HELD BACK, and the
+    # reason says what it would cost. Only a player the report lets go for free
+    # (its own SELL group, or ~0 median cost with no downside) is ever advised.
+    kept = {"f": ("keep", -6.0, -51.0)}
+    got, held = sells(bench[:1], last, {}, table, kept)
+    assert got == [] and len(held) == 1, (got, held)
+    assert "the report keeps him" in held[0]["why"] and "6 season points" in held[0]["why"], held
+    assert "up to 51 in a bad case" in held[0]["why"], held
+    assert sells(bench[:1], last, {}, table, {"f": ("keep", -0.3, -51.0)})[0] == []   # median ~0, wide downside
+    assert sells(bench[:1], last, {}, table, {})[0] == []                              # report silent: do nothing
+    assert "unknown number" in sells(bench[:1], last, {}, table, {})[1][0]["why"]
+
+    # no whipsaw: what was advised in the last few days (before today) is remembered
+    import tempfile
+    from datetime import datetime
+    from pathlib import Path
+    with tempfile.TemporaryDirectory() as d:
+        lp = Path(d) / "log.csv"
+        assert recently(lp, datetime(2026, 9, 24, 12, 0)) == set()
+        for day, act, key in (("2026-09-20", "SELL", "old"), ("2026-09-22", "SELL", "a"),
+                              ("2026-09-23", "BUY", "b"), ("2026-09-24", "SELL", "today")):
+            with open(lp, "a", newline="") as fh:
+                w = csv.DictWriter(fh, fieldnames=LOG, restval="")
+                if lp.stat().st_size == 0:
+                    w.writeheader()
+                w.writerow({"day": day, "action": act, "key": key})
+        assert recently(lp, datetime(2026, 9, 24, 12, 0)) == {("a", "SELL"), ("b", "BUY")}, \
+            recently(lp, datetime(2026, 9, 24, 12, 0))
     # the decision log: last word before the close wins; after the close it is tomorrow's
     import tempfile
     from datetime import datetime
