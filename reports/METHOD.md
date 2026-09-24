@@ -1,4 +1,4 @@
-# Liga Five Guys — how the numbers are made — 2026-09-24 22:36 CEST
+# Liga Five Guys — how the numbers are made — 2026-09-24 22:41 CEST
 
 
 
@@ -30,22 +30,22 @@
 | | Table | What it is used for | Fetched from | Rows | Newest row | Fetching |
 |---|---|---|---|--:|---|---|
 | 🟢 | api_activity | every transfer, which is what the ledger replays — one row per deal, so the newest is the last deal and not the last sweep | LaLiga Fantasy API | 249 | 24 Sep 22:35 CEST | fetched 1 minute ago |
-| 🟢 | api_leagues | your cash and the league's id | LaLiga Fantasy API | 247 | 24 Sep 22:35 CEST | fetched 1 minute ago |
-| 🟢 | api_lineup | the eleven you have actually fielded, and the formation the app says you are playing | LaLiga Fantasy API | 2,464 | 24 Sep 22:35 CEST | fetched 1 minute ago |
-| 🟢 | api_market | what is on offer, and the bids on it | LaLiga Fantasy API | 7,716 | 24 Sep 22:35 CEST | fetched 1 minute ago |
-| 🟢 | api_players | names for players nobody owns any more — one row per player, first sighting kept | LaLiga Fantasy API | 150 | 24 Sep 22:35 CEST | fetched 1 minute ago |
-| 🟢 | api_standings | the league table — position, points, squad value, and your balance | LaLiga Fantasy API | 1,235 | 24 Sep 22:35 CEST | fetched 1 minute ago |
+| 🟢 | api_leagues | your cash and the league's id | LaLiga Fantasy API | 248 | 24 Sep 22:40 CEST | fetched 1 minute ago |
+| 🟢 | api_lineup | the eleven you have actually fielded, and the formation the app says you are playing | LaLiga Fantasy API | 2,475 | 24 Sep 22:40 CEST | fetched 1 minute ago |
+| 🟢 | api_market | what is on offer, and the bids on it | LaLiga Fantasy API | 7,769 | 24 Sep 22:40 CEST | fetched 1 minute ago |
+| 🟢 | api_players | names for players nobody owns any more — one row per player, first sighting kept | LaLiga Fantasy API | 150 | 24 Sep 22:35 CEST | fetched 6 minutes ago |
+| 🟢 | api_standings | the league table — position, points, squad value, and your balance | LaLiga Fantasy API | 1,240 | 24 Sep 22:40 CEST | fetched 1 minute ago |
 | 🟢 | api_stats | what the app scored each player, broken into what he did — one row per player per week per stat, a correction being a later row rather than an overwrite | LaLiga Fantasy API | 15,709 | 24 Sep 22:35 CEST | fetched 1 minute ago |
-| 🟢 | api_teams | all five squads | LaLiga Fantasy API | 17,919 | 24 Sep 22:35 CEST | fetched 1 minute ago |
+| 🟢 | api_teams | all five squads | LaLiga Fantasy API | 17,999 | 24 Sep 22:40 CEST | fetched 1 minute ago |
 | ⚪ | clubs | the same, for clubs | src/crosswalk.py | 20 | — | rebuilt every run from the tables above |
-| 🟢 | elo | team strength, which ranks the fixture term | clubelo.com | 4,545 | 24 Sep 22:35 CEST | fetched 17 hours ago |
-| 🟢 | fixtures | who plays whom next, for the fixture term | analiticafantasy.com | 3,070 | 24 Sep 22:35 CEST | fetched 17 hours ago |
-| 🟢 | lineups | probable XI percentages, both sources | analiticafantasy.com, futbolfantasy.com ×40 | 25,560 | 24 Sep 22:35 CEST | fetched 1 minute ago |
-| 🟢 | market | price, value, position, fitness — every player in the game | futbolfantasy.com | 28,967 | 24 Sep 22:35 CEST | fetched 1 minute ago |
-| 🟢 | matches | fixtures, kickoffs, results | futbolfantasy.com | 95,380 | 24 Sep 22:35 CEST | fetched 17 hours ago |
+| 🟢 | elo | team strength, which ranks the fixture term | clubelo.com | 4,564 | 24 Sep 22:40 CEST | fetched 18 hours ago |
+| 🟢 | fixtures | who plays whom next, for the fixture term | analiticafantasy.com | 3,081 | 24 Sep 22:40 CEST | fetched 18 hours ago |
+| 🟢 | lineups | probable XI percentages, both sources | analiticafantasy.com, futbolfantasy.com ×40 | 25,560 | 24 Sep 22:40 CEST | fetched 6 minutes ago |
+| 🟢 | market | price, value, position, fitness — every player in the game | futbolfantasy.com | 28,967 | 24 Sep 22:40 CEST | fetched 1 minute ago |
+| 🟢 | matches | fixtures, kickoffs, results | futbolfantasy.com | 95,760 | 24 Sep 22:40 CEST | fetched 18 hours ago |
 | ⚪ | players | the crosswalk: one key per player across all four spellings | src/crosswalk.py | 725 | — | rebuilt every run from the tables above |
 | 🟢 | points | realised points per jornada, the actuals in every table below | futbolfantasy.com | 2,206 | 21 Sep 07:44 CEST | fetched 1 minute ago |
-| 🟢 | starters | confirmed elevens, which is what P(start) is graded on | futbolfantasy.com | 335,142 | 24 Sep 22:35 CEST | fetched 29 hours ago |
+| 🟢 | starters | confirmed elevens, which is what P(start) is graded on | futbolfantasy.com | 338,350 | 24 Sep 22:40 CEST | fetched 29 hours ago |
 
 ### The model, as configured right now
 

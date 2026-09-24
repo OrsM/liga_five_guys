@@ -1,11 +1,11 @@
 {
- "generated_at": "2026-09-24T20:36Z",
- "locks_in_h": 358.3947830727778,
+ "generated_at": "2026-09-24T20:41Z",
+ "locks_in_h": 358.31251728,
  "cash": 18972120.0,
  "cash_locked": 0,
  "squad_value": 307796154.0,
  "jornadas_left": 32,
- "acquirable": 79,
+ "acquirable": 80,
  "considered": 323,
  "expected_finish": 1.9,
  "p_win": 0.439,
@@ -1185,6 +1185,19 @@
    "par_lo": -36.210849492175115,
    "par_hi": 67.51777193225905,
    "value": 0.6167986495861116,
+   "simulated": true
+  },
+  {
+   "key": "7658",
+   "name": "German Valera",
+   "pos": "MED",
+   "price": 13334769.0,
+   "season_pts": 89.27231015669254,
+   "next_pts": null,
+   "par": 7.679718967499639,
+   "par_lo": -34.369935994549834,
+   "par_hi": 57.475357463024665,
+   "value": 0.5759169107091123,
    "simulated": true
   },
   {
