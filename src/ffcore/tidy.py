@@ -489,6 +489,11 @@ def load_api_teams(now=None) -> list[dict]:
                       EVERY_RUN_FRESH_DAYS, now)
 
 
+def load_api_team_history() -> list[dict]:
+    """EVERY roster snapshot, where load_api_teams() is the newest only."""
+    return read_csv(TIDY / "api_teams.csv")
+
+
 def _activity_order(r: dict):
     raw = (r.get("activity_id") or "").strip()
     return (r.get("at") or "", int(raw) if raw.isdigit() else 0)

@@ -255,10 +255,18 @@ check "Universe flat-dict storage" 0 \
 # money gone (Albert Laporta -67.35M included a 49.99M signing with no refund).
 # League.dropped records those players once, where the ledger's and the app's
 # ownership both exist, and the estimate prices them at market value as one
-# more STATED ASSUMPTION in its math line -- beside the unmeasured-income one.
+# more STATED ASSUMPTION in its math line -- beside the unmeasured-income one,
+# valued AS OF the first roster snapshot without him (gone_at + Market.at),
+# not today: the value at the time is what the app paid.
 # The ledger itself stays exactly what the feed said (an inference layer that
 # wrote guessed rows into it was prototyped and reverted).
-check "src/ lines" 20924 \
+# 20924 -> 20973 on 2026-09-24: the same refund is now priced AS OF the day he
+# left, not today. gone_at() finds the first roster snapshot without him (a
+# first-absence search over the roster history, ~10 lines); Market.at() -- which
+# already priced purchases -- supplies the value then; the cash line prints the
+# date and the value. Not the app's own value table: it only begins 2026-09-12,
+# so an as-of lookup there silently returns a value from AFTER the event.
+check "src/ lines" 20973 \
   "$(find src -name '*.py' | xargs cat | wc -l)"
 
 [ "$fail" -eq 0 ] && echo "concepts: no duplication regained" || echo "concepts: a concept regained a second implementation"

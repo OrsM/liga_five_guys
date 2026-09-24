@@ -19,8 +19,8 @@ from ffcore.tidy import (load_crosswalk,
                          run_now,
                          Market, input_path, ledger_stamp,
                          load_api_activity, load_api_standings, load_api_teams,
-                         load_market_frozen, read_ledger,
-                         snapshot_stamp)
+                         load_api_team_history, load_market_frozen,
+                         read_ledger, snapshot_stamp)
 
 __all__ = ["MARKET", "Config", "load_config", "read_rosters", "identify",
            "read_api_balances", "owner_from_api", "owner_drift",
@@ -255,6 +255,25 @@ def ledger_from_api(activity: list[dict], users: dict,
     return out
 
 
+def gone_at(history: list[dict], pid: str, manager: str, bought):
+    """When the app first showed `pid` no longer with `manager`, or None.
+
+    The first roster snapshot after the purchase AND after the last snapshot
+    that did list him. It is the earliest moment we KNOW he was gone, so the
+    removal happened at or before it -- and, for a player never in any
+    snapshot (bought before the league API was first read), the first
+    snapshot after the purchase. `history` is every roster snapshot.
+    """
+    last = max((r["observed_at"] for r in history
+                if r["player_id"] == pid and r["manager"] == manager),
+               default="")
+    for s in sorted({r["observed_at"] for r in history}):
+        t = snapshot_stamp(s)
+        if s > last and t and bought and t > bought:
+            return t
+    return None
+
+
 def owner_drift(ledger: dict, api: dict, names=None) -> list[str]:
     if not api:
         return []
@@ -427,7 +446,8 @@ class Manager:
 class League:
 
     def __init__(self, cfg: Config, rosters, txns, market: Market | None,
-                 api_teams=None, standings=None, xw=None):
+                 api_teams=None, standings=None, xw=None,
+                 roster_history=None):
         self.cfg = cfg
         self.rosters = rosters
         self.txns = txns
@@ -437,7 +457,7 @@ class League:
                                                           market, xw)
 
         self.api_unjoined: list[str] = []
-        self.dropped: dict[str, str] = {}
+        self.dropped: dict[str, tuple] = {}
         self._api_teams = api_teams
         self._standings = standings
         if api_teams and market is None:
@@ -457,10 +477,17 @@ class League:
                         "matches the name, so he is missing from the board."
                         % raw)
                 # The app drops a player from a squad WITHOUT publishing a sale;
-                # the ledger, built from the feed, keeps him. {key: who} of
-                # exactly those -- the cash estimate prices them below.
-                self.dropped = {k: m for k, m in self.owner.items()
-                                if k not in api_owner}
+                # the ledger, built from the feed, keeps him. {key: (who, when
+                # the rosters first showed him gone)} of exactly those -- the
+                # cash estimate prices them, AT THAT MOMENT, below.
+                bought = {self.txn_key(t): (schema.text(
+                    t, schema.TRANSACTIONS.PLAYER_ID),
+                    ledger_stamp(t.get("date", ""))) for t in txns}
+                for k, m in self.owner.items():
+                    if k not in api_owner and k in bought:
+                        pid, when = bought[k]
+                        self.dropped[k] = (
+                            m, gone_at(roster_history or [], pid, m, when))
                 self.owner = api_owner
 
         self.managers: dict[str, Manager] = {
@@ -485,6 +512,7 @@ class League:
         market = Market(load_market_frozen()) if with_market else None
         return cls(cfg, read_rosters(), read_ledger(), market,
                    api_teams=load_api_teams(),
+                   roster_history=load_api_team_history(),
                    standings=load_api_standings(), xw=load_crosswalk())
 
     def txn_key(self, t: dict) -> str | None:
@@ -615,18 +643,16 @@ class League:
                 if days is not None and daily:
                     notes.append("%.2fM of daily allowance over %.0f days"
                                  % (daily / 1e6, days))
-            gone = [k for k, m in self.dropped.items() if m == handle]
             refund = 0.0
-            if gone and since is None and self.market is not None:
-                vals = self.market.latest()
-                refund = sum(money((vals.get(k) or {}).get("value")) or 0.0
-                             for k in gone)
-                if refund:
-                    notes.append("%.2fM assuming the app paid market value "
-                                 "for %s, removed from their squad with no "
-                                 "sale in the feed" % (refund / 1e6, ", ".join(
-                                     (vals.get(k) or {}).get("name") or k
-                                     for k in gone)))
+            for k, (m, when) in self.dropped.items():
+                v = (self.market.at(k, when)
+                     if m == handle and since is None and self.market else None)
+                if v is not None and v.value:
+                    refund += v.value
+                    notes.append("%.2fM assuming the app paid %s's market value "
+                                 "when he left their squad (gone by %s, no sale "
+                                 "in the feed)" % (v.value / 1e6, v.name,
+                                                   shown(when)))
             bonus_note = " and ".join(notes) if notes else None
 
             value = base + sold - bought + bonus + refund
@@ -1021,22 +1047,40 @@ def _selftest_anchor_is_current() -> None:
     lg3 = League(Config(me="miguel_autentico"), rosters, [], mkt, api_teams=[])
     assert lg3.owner[norm("Simeone")] == "miguel_autentico", lg3.owner
 
-    # -- the app drops a player WITHOUT a feed sale: the ledger keeps him, the
-    # cash estimate prices him at market value and says it assumed so ---------
-    mkt2 = Market([{"name": n, "value": v, "observed_at": "2026-08-17T2246Z",
-                    "position": "DEL"}
-                   for n, v in (("Ghost", "8000000"), ("Kept", "1000000"))])
-    tx = [{"date": "2026-08-12T22:24", "player": n, "from": MARKET,
-           "to": "rival", "price": pr}
-          for n, pr in (("Ghost", "20000000"), ("Kept", "1000000"))]
+    # -- the app drops a player WITHOUT a feed sale: the ledger keeps him, and
+    # the cash estimate prices him at the value he had WHEN HE LEFT, not now --
+    hist = lambda n, *pts: [{"name": n, "value": v, "observed_at": at,
+                             "position": "DEL"} for at, v in pts]
+    mkt2 = Market(hist("Ghost", ("2026-08-17T2246Z", "8000000"),
+                       ("2026-08-25T0600Z", "3000000"))
+                  + hist("Seen", ("2026-08-17T2246Z", "9000000"),
+                         ("2026-08-19T0600Z", "6000000"),
+                         ("2026-08-25T0600Z", "2000000"))
+                  + hist("Kept", ("2026-08-17T2246Z", "1000000")))
+    tx = [{"date": "2026-08-12T22:24", "player": n, "player_id": i,
+           "from": MARKET, "to": "rival", "price": pr}
+          for n, i, pr in (("Ghost", "66", "20000000"),
+                           ("Seen", "77", "10000000"),
+                           ("Kept", "5", "1000000"))]
+    rows = lambda snap, *pids: [{"observed_at": snap, "manager": "rival",
+                                 "player_id": p} for p in pids]
     lg4 = League(Config(me="miguel_autentico", budget=100e6),
                  {"miguel_autentico": [], "rival": []}, tx, mkt2,
-                 api_teams=[{"manager": "rival", "player_name": "Kept"}])
-    assert lg4.dropped == {norm("Ghost"): "rival"}, lg4.dropped
+                 api_teams=[{"manager": "rival", "player_name": "Kept"}],
+                 roster_history=rows("2026-08-17T2246Z", "5", "77")
+                 + rows("2026-08-18T0600Z", "5", "77")
+                 + rows("2026-08-19T0600Z", "5"))
+    # Ghost was never in a roster: gone by the FIRST snapshot after his
+    # purchase. Seen was listed twice: gone by the first snapshot without him.
+    assert {k: v[1].strftime("%m-%dT%H%M") for k, v in lg4.dropped.items()} \
+        == {"ghost": "08-17T2246", "seen": "08-19T0600"}, lg4.dropped
     c4 = lg4["rival"].cash
-    assert c4.value == 100e6 - 21e6 + 8e6, c4.value
-    assert "8.00M assuming the app paid market value for Ghost" in c4.basis, \
-        c4.basis
+    # 100 - (20+10+1) + 8 (Ghost when gone, NOT the 3 he is worth now)
+    #                 + 6 (Seen when gone, NOT the 2 he is worth now)
+    assert c4.value == 83e6, (c4.value, c4.basis)
+    assert "8.00M assuming the app paid Ghost's market value when he left" \
+        in c4.basis and "gone by" in c4.basis, c4.basis
+    assert gone_at([], "1", "m", None) is None      # no history: cannot say
     # Nothing dropped, nothing assumed -- the ordinary case adds no term.
     assert not lg2.dropped and "assuming the app paid" not in \
         lg2["BurtonGM89"].cash.basis, lg2.dropped
