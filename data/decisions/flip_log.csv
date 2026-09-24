@@ -1,5 +1,5 @@
 day,run_at,action,key,name,ask,value,offer,last,expected_pct,max_bid,cash,why
-2026-09-24,2026-09-24T09:18,SELL,14118,ali houary,,892489,959027,-1.9642541337543,,,18874660,the app's offer beats what holding is expected to fetch
-2026-09-24,2026-09-24T09:18,SELL,1972,yeray alvarez,,6476788,6247379,-2.4488298973925,,,18874660,the app's offer beats what holding is expected to fetch
-2026-09-24,2026-09-24T09:18,SELL,7027,raul garcia,,1393495,0,-1.5163775989416,,,18874660,expected to lose 8.2% over the next 5 updates (last update -1.5%)
-2026-09-24,2026-09-24T09:18,SELL,9612,carl starfelt,,8362317,0,-2.6056145117491,,,18874660,expected to lose 8.2% over the next 5 updates (last update -2.6%)
+2026-09-24,2026-09-24T09:22,SELL,14118,ali houary,,892489,959027,-1.9642541337543,,,18872200,the app's offer beats what holding is expected to fetch
+2026-09-24,2026-09-24T09:22,SELL,1972,yeray alvarez,,6476788,6247379,-2.4488298973925,,,18872200,the app's offer beats what holding is expected to fetch
+2026-09-24,2026-09-24T09:22,SELL,7027,raul garcia,,1393495,0,-1.5163775989416,,,18872200,expected to lose 8.2% over the next 5 updates (last update -1.5%)
+2026-09-24,2026-09-24T09:22,SELL,9612,carl starfelt,,8362317,0,-2.6056145117491,,,18872200,expected to lose 8.2% over the next 5 updates (last update -2.6%)
