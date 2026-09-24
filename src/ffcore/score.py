@@ -582,6 +582,7 @@ _CAL_CACHE: list = []
 def _calibrated():
     if _CAL_CACHE:
         return _CAL_CACHE[0]
+    import hashlib
     import json
     from ffcore.crosswalk import Crosswalk
     from ffcore.startprob import (Calibration, METHOD_VERSION, observations,
@@ -599,7 +600,15 @@ def _calibrated():
             load_lineups() + second, truth, cut,
             neutral_default=NEUTRAL_START, absent_default=ABSENT_START,
             xw=xw)
-    stamp = "%d:%d:%s" % (METHOD_VERSION, len(truth), cut)
+    # KEYED ON THE OBSERVATIONS THEMSELVES, not len(truth): starters.csv
+    # grows on every scrape, so that key missed every run and the
+    # leave-one-group-out grid search (36s of a 38s `squads` stage, 2026-09-24,
+    # sampled) re-ran to arrive at the same answer. Building them is 0.11s.
+    obs = observations(load_lineups() + second, truth, cut,
+                       neutral=NEUTRAL_START, absent=ABSENT_START,
+                       xw=xw) if cut else []
+    stamp = "%d:%s" % (METHOD_VERSION,
+                       hashlib.sha1(repr(obs).encode()).hexdigest())
     path = TIDY / "startcal.json"
     cal = Calibration()
     try:
@@ -611,9 +620,7 @@ def _calibrated():
                           was["titular"], was["n"], was["fitted"],
                           was["gain"], was["why"], was["groups"])
     elif cut:
-        cal = Calibration.fit(observations(
-            load_lineups() + second, truth, cut, neutral=NEUTRAL_START,
-            absent=ABSENT_START, xw=xw))
+        cal = Calibration.fit(obs)
         try:
             path.write_text(json.dumps({
                 "fingerprint": stamp, "alpha": cal.alpha, "beta": cal.beta,

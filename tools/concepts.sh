@@ -221,7 +221,12 @@ check "Universe flat-dict storage" 0 \
 # a fresh process under the same MemoryHigh/MemoryMax, so the number alone
 # cannot say what differs and cProfile's overhead would distort the run.
 # Printed only for a slow stage, so a healthy run's log is unchanged.
-check "src/ lines" 20788 \
+# 20788 -> 20795 on 2026-09-24: score._calibrated() keyed its cached startprob
+# fit on len(starters.csv), which grows every scrape, so it refit on every
+# scheduled run -- 36s of the 38s `squads` stage, found by run.py's new
+# sampler. Now keyed on a hash of the observations (0.11s to build), so it
+# refits only when a match result actually changes them. Same values.
+check "src/ lines" 20795 \
   "$(find src -name '*.py' | xargs cat | wc -l)"
 
 [ "$fail" -eq 0 ] && echo "concepts: no duplication regained" || echo "concepts: a concept regained a second implementation"
