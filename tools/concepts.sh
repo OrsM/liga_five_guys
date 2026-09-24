@@ -280,7 +280,19 @@ check "Universe flat-dict storage" 0 \
 # -0 with a -51 downside): selling a bench player gives up optionality the
 # season simulation already prices. Plus a cooldown so a player sold this week
 # is not bought back next.
-check "src/ lines" 21336 \
+# 21336 -> 21595 on 2026-09-24: flip.py rebuilt so no decision rests on a number or a
+# sentence written into the code. The trade's cost (auction premium, offer
+# discount) is measured each run; what an update of a given size leads to is a
+# K=sqrt(n) nearest-neighbour lookup with uncertainty across CALENDAR DAYS (the
+# market moves together; deciles put +2% and +20% in one bucket and said +32%);
+# money's worth in season points is the report's own points-per-million; what a
+# bench player costs the season is the simulation's expected (MEAN) change --
+# now exported in the ladder, because a median hides optionality (Carl Starfelt:
+# median -0.4, mean -4.7). Preferences (hurdle, risk) are in inputs/league.ini.
+# Sentences come from ONE function (say) fed structured reasons, and the page and
+# ping draw the box's view. Same rule applied to the ladder: sim.GROUP_LABEL is
+# the one copy of the group headings; the page had its own list and it had drifted.
+check "src/ lines" 21595 \
   "$(find src -name '*.py' | xargs cat | wc -l)"
 
 [ "$fail" -eq 0 ] && echo "concepts: no duplication regained" || echo "concepts: a concept regained a second implementation"

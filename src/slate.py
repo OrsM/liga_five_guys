@@ -60,7 +60,7 @@ def comparison_rows(u, bands=None) -> list[dict]:
         par, par_lo, par_hi = f.get("par"), None, None
         b = (bands or {}).get(k)
         if b is not None:
-            par, par_lo, par_hi, _act = b
+            par, par_lo, par_hi, _act, _mean = b
         out.append({
             "key": k, "name": title_name(u.name_view.get(k, k)),
             "pos": u.pos_view.get(k, ""), "price": price,
@@ -198,7 +198,7 @@ def _selftest() -> None:
     md = comparison_table(rows)
     assert any(l.startswith("| Cheap") for l in md), md
 
-    b = {"cheap": (2.5, 1.0, 4.0, Action("buy", buy="cheap", cost=2e6))}
+    b = {"cheap": (2.5, 1.0, 4.0, Action("buy", buy="cheap", cost=2e6), 2.4)}
     rows2 = comparison_rows(cu, bands=b)
     by_key2 = {r["key"]: r for r in rows2}
     assert (by_key2["cheap"]["par"], by_key2["cheap"]["par_lo"],

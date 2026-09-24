@@ -1,154 +1,334 @@
-"""Buy players whose market value is drifting up, hold while it does, sell when it turns.
+"""Buy players whose market value is drifting up, hold while it does, sell what holding will not pay for.
 
 WHY THIS SHAPE (measured 2026-09-24 on 44 days of values and the league's own
-ledger). A player's market value has momentum: after an update of +3% or more
-he rises again 90% of the time, +10.7% over the next three updates. But an
-OVERNIGHT flip loses money -- the auction winner pays a median 4% over the ask
-and the app buys back at a median 0.985x value -- so a buy has to be HELD for
-the drift to pay for that friction, and SOLD on an actual fall (a flat update
-is a pause, not a reversal: a quarter of all updates are flat). The managers
-who made money here (Albert +72M, Burton +47M) held a median 8-9 days.
+ledger). A player's market value has momentum: after a large update he tends to
+rise again. But an OVERNIGHT flip loses money -- the auction winner pays over the
+ask and the app buys back under value -- so a buy has to be HELD for the drift to
+pay for that friction. The managers who made money here held a median 8-9 days.
+
+NOTHING BELOW IS A CHOSEN NUMBER. Every figure a decision rests on is computed
+from the data on each run: what an update of a given size has been followed by
+(its nearest past neighbours, K = sqrt(n), uncertainty measured across calendar
+days because the market moves together), how much the auction premium and the
+app's offer discount cost (measured from the feed and the offers), how long to
+hold (the length whose CONFIDENT return per update is best), what money is worth
+in season points (the report's own points-per-million), and what selling a
+player costs in season points (the simulation's expected change). The only inputs that are preferences, not facts,
+are in inputs/league.ini: the hurdle and how cautious to be.
 
 WHAT COUNTS IS AN UPDATE, NOT A CALENDAR DAY. The daily rows are not aligned
-with the nightly value update (before ~Sep 6 the last snapshot of a day fell
-after it, after that before it), so every figure here is "the next h updates".
+with the nightly value update, so every figure is "the next h updates".
 
-Only the FREE MARKET (the app's own listings) is considered -- not clause
-raids, not other managers' listings. The capital is cash plus players who will
-not start; those are sold on a fall or an offer above value.
+THE REPORT OWNS WHO IS DISPENSABLE. A bench player is optionality, and the season
+simulation prices it. This module sells one only when what the market pays beats
+holding by more than the report says he is worth to the season.
+
+WORDS COME FROM ONE PLACE. A decision carries a REASON -- a code and the numbers
+behind it -- and say() is the only function that turns one into a sentence.
+present() builds the whole view (headings, rows, the ping) from the decisions;
+the page draws it and contains no wording of its own.
 """
 from __future__ import annotations
 
+import bisect
 import csv
 import json
+import math
 import sys
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
+from itertools import accumulate
+from statistics import mean, median, pstdev
 
-HORIZON = 5            # updates a buy is expected to be held
-HURDLE = 0.01          # net return per update the cash must earn to be worth locking up
-OFFER = 0.985          # median app offer / value (75 offers, 2026-09-24)
-PREMIUM = 1.04         # median winning price / ask (70 feed buys, 2026-09-24)
-MIN_N = 30             # observations behind an expectation before it is believed
-BUCKETS = ((-1e9, -3.0), (-3.0, -1.0), (-1.0, 1.0),
-           (1.0, 3.0), (3.0, 6.0), (6.0, 1e9))   # size of the last update, in %
-GOOD_OFFER = 1.03      # with no expectation to weigh it against, an offer this many times value is taken
-# THE REPORT OWNS "WHO IS DISPENSABLE". A bench player is optionality -- he covers
-# injuries and rotation -- and the season simulation already prices it: each
-# row carries the season points selling him alone gains or costs, with a 10th-
-# percentile band. This module may sell only a player the report itself would
-# let go for nothing: never starts (its SELL group), or a median cost above
-# SELL_PTS_FLOOR AND no real downside (10th percentile above SELL_LO_FLOOR).
-SELL_PTS_FLOOR = -1.0
-SELL_LO_FLOOR = -10.0
-COOLDOWN_DAYS = 3      # a player just sold is not bought back (or the reverse): no whipsaw
-
-
-def steps(rows: list[dict]) -> dict[str, list[float]]:
-    """{player: [% change from each daily row to the next]}, oldest first."""
-    vals: dict[str, list[float]] = {}
+# ------------------------------------------------------------ numbers from data
+def steps(rows: list[dict]) -> dict[str, list[tuple[str, float]]]:
+    """{player: [(day, % change from the previous daily row)]}, oldest first."""
+    vals: dict[str, list[tuple[str, float]]] = {}
     for r in sorted(rows, key=lambda r: r["observed_at"]):
         try:
-            vals.setdefault(r["ff_id"], []).append(float(r["value"]))
+            vals.setdefault(r["ff_id"], []).append(
+                (r["observed_at"][:10], float(r["value"])))
         except (KeyError, ValueError):
             pass
-    return {k: [100 * (b / a - 1) for a, b in zip(v, v[1:]) if a > 0]
-            for k, v in vals.items()}
+    return {k: [(b[0], 100 * (b[1] / a[1] - 1)) for a, b in zip(v, v[1:])
+                if a[1] > 0] for k, v in vals.items()}
 
 
-def outlook(by_player: dict[str, list[float]], lo: float, hi: float,
-            h: int = HORIZON) -> tuple[float, int]:
-    """(mean compounded % over the next h updates, observations) after an
-    update in [lo, hi) -- over EVERY player's history, not only the ones for
-    sale, because that is where the sample is."""
-    got = []
-    for s in by_player.values():
-        for i in range(len(s) - h):
-            if lo <= s[i] < hi:
-                g = 1.0
-                for c in s[i + 1:i + 1 + h]:
-                    g *= 1 + c / 100
-                got.append(100 * (g - 1))
-    return (sum(got) / len(got), len(got)) if got else (0.0, 0)
+def belief(window: list[tuple], h: int, z: float) -> dict | None:
+    """mean outcome, and the values z standard errors either side of it.
+
+    The market moves TOGETHER (one repricing lifts every player on the same
+    night), so player-days are not independent: uncertainty is measured across
+    CALENDAR DAYS, and windows that start on consecutive days share h-1 updates,
+    so only about days/h of them are independent. None when the window spans a
+    single day: there is nothing to measure the spread against."""
+    by_day: dict[str, list[float]] = {}
+    for _, out, day in window:
+        by_day.setdefault(day, []).append(out)
+    if len(by_day) < 2:
+        return None
+    se = pstdev([mean(v) for v in by_day.values()]) / math.sqrt(
+        max(1.0, len(by_day) / h))
+    m = mean(out for _, out, _ in window)
+    return {"mean": m, "lo": m - z * se, "hi": m + z * se, "n": len(window),
+            "days": len(by_day)}
 
 
-def bucket(step: float | None):
-    return next((b for b in BUCKETS if step is not None
-                 and b[0] <= step < b[1]), None)
+class Outlook:
+    """What an update of a given size has been followed by, for every hold length.
+
+    No buckets: a query takes the K most similar updates ever seen, K = sqrt(n)
+    (the standard nearest-neighbour rule), so the resolution follows the data --
+    fine where updates are common, wide where they are rare."""
+
+    def __init__(self, by_player: dict[str, list[tuple[str, float]]]):
+        self.hmax = max(1, int(median(len(s) for s in by_player.values())) // 4) \
+            if by_player else 1
+        self.obs: dict[int, list[tuple]] = {h: [] for h in range(1, self.hmax + 1)}
+        for s in by_player.values():
+            pref = [1.0, *accumulate((1 + c / 100 for _, c in s),
+                                     lambda a, b: a * b)]
+            for i, (day, step) in enumerate(s):
+                for h in range(1, min(self.hmax, len(s) - 1 - i) + 1):
+                    self.obs[h].append((step, 100 * (pref[i + 1 + h] / pref[i + 1]
+                                                     - 1), day))
+        for v in self.obs.values():
+            v.sort()
+        self.keys = {h: [o[0] for o in v] for h, v in self.obs.items()}
+
+    def near(self, step: float, h: int) -> list[tuple]:
+        """The K past updates closest in size to `step`, and what followed."""
+        v, ks = self.obs[h], self.keys[h]
+        k = max(3, round(math.sqrt(len(v))))
+        lo = hi = bisect.bisect_left(ks, step)
+        while hi - lo < k and (lo > 0 or hi < len(v)):
+            if lo > 0 and (hi >= len(v) or step - ks[lo - 1] <= ks[hi] - step):
+                lo -= 1
+            else:
+                hi += 1
+        return v[lo:hi]
+
+    def best(self, step: float | None, offer: float, premium: float,
+             z: float) -> dict | None:
+        """The hold length whose CONFIDENT return per update, after the premium
+        and the offer discount, is best -- with the belief behind it."""
+        if step is None or not self.obs:
+            return None
+        best = None
+        for h in self.obs:
+            bel = belief(self.near(step, h), h, z)
+            if bel is None:
+                continue
+            net = ((1 + bel["lo"] / 100) * offer / premium - 1) / h
+            if best is None or net > best["net"]:
+                best = {**bel, "h": h, "net": net}
+        return best
 
 
-def picks(listings: list[dict], last: dict[str, float], table: dict,
-          cash: float, h: int = HORIZON) -> list[dict]:
-    """Free-market listings worth buying, best expected millions first.
+def offer_ratios(offers: list[dict], teams: list[dict], value_at) -> list[float]:
+    """offer / market value, for every offer the app has made on a player."""
+    who = {t["player_team_id"]: t["player_name"] for t in teams
+           if t.get("player_team_id")}
+    seen, out = set(), []
+    for o in offers:
+        if not o.get("offer_id") or o["offer_id"] in seen:
+            continue
+        seen.add(o["offer_id"])
+        v = value_at(who.get(o["player_team_id"], ""), o["created_at"])
+        if v and float(o["money"] or 0) > 0:
+            out.append(float(o["money"]) / v)
+    return out
 
-    `listings` [{key, name, ask, value}]; `last` {key: % of the last update};
-    `table` {bucket: (mean %, n)}; `cash` what may be spent. `max_bid` is the
-    dearest price at which the cash still earns HURDLE per update; `fits` says
-    whether the price you would probably pay (ask x PREMIUM) is affordable.
-    """
+
+def auction_ratios(listings: list[dict], buys: list[dict]) -> list[float]:
+    """price paid / ask, for every purchase that ends a free-market listing:
+    the buy lands within minutes of the listing's own close."""
+    ends = {}
+    for r in listings:
+        if r.get("seller") != "marketPlayerLeague" or not r.get("expires_at"):
+            continue
+        k = (r["player_id"], datetime.fromisoformat(r["expires_at"])
+             .astimezone(timezone.utc))
+        if k not in ends or r["observed_at"] > ends[k]["observed_at"]:
+            ends[k] = r
+    out = []
+    for b in buys:
+        at = datetime.fromisoformat(b["at"]).astimezone(timezone.utc)
+        for (pid, close), r in ends.items():
+            if pid == b["player_id"] and abs((at - close).total_seconds()) < 600 \
+                    and float(r["sale_price"] or 0) > 0:
+                out.append(float(b["amount"]) / float(r["sale_price"]))
+                break
+    return out
+
+
+def report_view(ladder: list[dict], name_key) -> tuple[dict, list[dict]]:
+    """What the season report says: ({key: (group, expected season points change
+    if he is sold)} for my players, [{price, points per million}] for what it
+    wants to buy). `name_key` maps a ladder name back to a player key."""
+    verdict = {}
+    for r in ladder:
+        k = name_key(r["name"])
+        if r["where"] == "yours" and k and r["group"] in ("sell", "keep", "out", "in") \
+                and r.get("pts_mean") is not None:
+            verdict[k] = (r["group"], r["pts_mean"])
+    targets = [{"price": r["market"], "rate": r["value"]} for r in ladder
+               if r["group"] in ("buy", "raid") and r.get("market")
+               and r.get("value") is not None]
+    return verdict, targets
+
+
+def money_rate(targets: list[dict]) -> float:
+    """Season points a million buys, as the report itself measures it: the
+    median points-per-million of what it wants to buy. 0 when it wants nothing."""
+    return median(t["rate"] for t in targets) if targets else 0.0
+
+
+def reserve(targets: list[dict]) -> float:
+    """Cash the report's best target (most points per million) needs."""
+    return max(targets, key=lambda t: t["rate"])["price"] if targets else 0.0
+
+
+# ---------------------------------------------------------------- the decisions
+def picks(listings: list[dict], last: dict[str, float], model: dict,
+          cash: float, hurdle: float) -> list[dict]:
+    """Free-market listings worth buying, biggest confident gain first.
+
+    `model` = {outlook, offer, premium, risk}. Decided on the CONFIDENT end of
+    the expected drift (mean - z se), so a thin sample cannot recommend a buy."""
     out = []
     for l in listings:
-        b = bucket(last.get(l["key"]))
-        exp, n = table.get(b, (0.0, 0))
-        if b is None or n < MIN_N:
+        bel = model["outlook"].best(last.get(l["key"]), model["offer"],
+                                    model["premium"], model["risk"])
+        if bel is None:
             continue
-        leave = l["value"] * (1 + exp / 100) * OFFER
-        pay = l["ask"] * PREMIUM
-        if (leave / pay - 1) / h < HURDLE:
+        leave = l["value"] * (1 + bel["lo"] / 100) * model["offer"]
+        pay = l["ask"] * model["premium"]
+        if (leave / pay - 1) / bel["h"] <= hurdle:
             continue
-        out.append({**l, "last": last[l["key"]], "expected_pct": exp, "n": n,
-                    "expected_gain": leave - pay, "pay": pay,
-                    "max_bid": leave / (1 + HURDLE * h),
-                    "fits": pay <= cash})
-    return sorted(out, key=lambda x: -x["expected_gain"])
+        out.append({**l, "last": last[l["key"]], "h": bel["h"], "n": bel["n"],
+                    "days": bel["days"], "drift": bel["lo"], "gain": leave - pay, "pay": pay,
+                    "max_bid": leave / (1 + hurdle * bel["h"]),
+                    "fits": pay <= cash,
+                    "reason": {"code": "rising", "last": last[l["key"]],
+                               "drift": bel["lo"], "h": bel["h"], "n": bel["n"],
+                               "days": bel["days"], "ask": l["ask"], "pay": pay}})
+    return sorted(out, key=lambda x: -x["gain"])
 
 
-def sells(bench: list[dict], last: dict[str, float],
-          offers: dict[str, float], table: dict,
-          cost: dict[str, tuple]) -> tuple[list[dict], list[dict]]:
-    """(sales, held back) among non-starters. `bench` [{key, name, value}];
-    `cost` {key: (group, season pts, 10th-percentile pts)} from the report.
+def sells(bench: list[dict], last: dict[str, float], offers: dict[str, float],
+          model: dict, verdict: dict, rate: float) -> tuple[list[dict], list[dict]]:
+    """(sales, held back) among non-starters. `bench` [{key, name, value}].
 
-    Sold when holding is expected to LOSE value, or an offer already beats what
-    holding is expected to fetch (the same table that picks the buys, so a
-    player on the way up is not sold at +6%) -- AND the report says letting
-    him go costs nothing. A player the market says to sell but the report says
-    to keep is `held back`, with what selling him would cost in season points.
-    """
+    Selling now brings the app's offer if there is one, else what an offer is
+    expected to be; holding is expected to bring the CONFIDENT top of the drift
+    (holding might be better than average, so that is what selling must beat).
+    The difference is money; the report says what that money buys in season
+    points (`rate`) and what the player is worth to the season (his expected
+    points change if sold, `verdict`). Sold only when the money buys more than
+    he is worth -- a player the report has no verdict on is left alone."""
     out, held = [], []
     for p in bench:
-        offer, step = offers.get(p["key"]), last.get(p["key"])
-        exp, n = table.get(bucket(step), (0.0, 0))
-        known = n >= MIN_N
-        hold = p["value"] * (1 + exp / 100) * OFFER
-        if offer and known and offer >= hold:
-            why = "the app's offer beats what holding is expected to fetch"
-        elif offer and not known and offer >= GOOD_OFFER * p["value"]:
-            why = "the app offers %.0f%% over his value" % (
-                100 * (offer / p["value"] - 1))
-        elif known and exp < 0:
-            why = "expected to lose %.1f%% over the next %d updates (last " \
-                  "update %+.1f%%)" % (-exp, HORIZON, step)
-        else:
+        v = verdict.get(p["key"])
+        bel = model["outlook"].best(last.get(p["key"]), model["offer"],
+                                    model["premium"], model["risk"])
+        if v is None or bel is None:
             continue
-        group, pts, lo = cost.get(p["key"], (None, None, None))
-        free = group == "sell" or (pts is not None and pts >= SELL_PTS_FLOOR
-                                   and lo is not None and lo >= SELL_LO_FLOOR)
-        row = {**p, "offer": offer, "last": step, "why": why, "season_pts": pts}
-        if free:
-            out.append(row)
-        else:
-            held.append({**row, "why": "%s -- but the report keeps him: selling "
-                         "costs %s season points%s" % (
-                             why.split(" (")[0],
-                             "an unknown number of" if pts is None
-                             else "%.0f" % -pts,
-                             "" if lo is None or lo >= SELL_LO_FLOOR else
-                             " (up to %.0f in a bad case)" % -lo)})
+        group, exp_pts = v
+        now = offers.get(p["key"]) or p["value"] * model["offer"]
+        hold = p["value"] * (1 + bel["hi"] / 100) * model["offer"]
+        gain = now - hold
+        if gain <= 0:
+            continue
+        cost = 0.0 if group == "sell" else max(0.0, -exp_pts)
+        benefit = rate * gain / 1e6
+        sale = benefit >= cost
+        row = {**p, "offer": offers.get(p["key"]), "last": last.get(p["key"]),
+               "gain": gain, "cost_pts": cost, "benefit_pts": benefit,
+               "reason": {"code": "sale" if sale else "keep",
+                          "now": now, "hold": hold, "h": bel["h"],
+                          "offered": offers.get(p["key"]) is not None,
+                          "cost": cost, "benefit": benefit}}
+        (out if sale else held).append(row)
     return out, held
 
 
+# ------------------------------------------------------------------- the words
+def _m(v: float) -> str:
+    from ffcore.parse import fmt_money
+    return fmt_money(v)
+
+
+def _p(v: float) -> str:
+    return "%+.1f%%" % v
+
+
+def _pts(v: float) -> str:
+    return "%.1f" % v if v < 10 else "%.0f" % v
+
+
+def say(r: dict) -> str:
+    """The ONE place a reason becomes a sentence."""
+    c = r["code"]
+    if c == "rising":
+        return ("last update %s; the history says at least %s over the next %d "
+                "updates (%d similar cases on %d different days); ask %s, "
+                "expect to pay ~%s"
+                % (_p(r["last"]), _p(r["drift"]), r["h"], r["n"], r["days"],
+                   _m(r["ask"]), _m(r["pay"])))
+    if c in ("sale", "keep"):
+        how = ("the app offers %s" % _m(r["now"]) if r["offered"]
+               else "an offer would bring ~%s" % _m(r["now"]))
+        more = _m(r["now"] - r["hold"])
+        if c == "sale":
+            return ("%s against at most ~%s from holding %d updates: %s more, "
+                    "worth %s season points at what the report's buys return, "
+                    "for the %s he is expected to cost the season"
+                    % (how, _m(r["hold"]), r["h"], more,
+                       _pts(r["benefit"]), _pts(r["cost"])))
+        return ("%s against at most ~%s from holding %d updates, but the %s "
+                "gained is worth %s season points and he is expected to add "
+                "%s -- the report keeps him"
+                % (how, _m(r["hold"]), r["h"], more,
+                   _pts(r["benefit"]), _pts(r["cost"])))
+    raise ValueError("no wording for reason code %r" % c)
+
+
+def present(out: dict) -> dict:
+    """The whole display, from the decisions: what the page draws and the ping
+    says. Rows are {name, detail, right: [main, caption]}; a section's `tone`
+    is all the page needs to colour it."""
+    def row(p, right):
+        return {"name": p["name"], "detail": say(p["reason"]), "right": right}
+
+    buys = [row(p, ["≤ " + _m(p["max_bid"]),
+                    "bid" if p["fits"] else "bid, over budget"])
+            for p in out["picks"]]
+    sold = [row(p, [_m(p["value"]),
+                    "offer " + _m(p["offer"]) if p["offer"] else ""])
+            for p in out["sells"]]
+    held = [row(p, [_m(p["value"]), ""]) for p in out["held"]]
+    ping = ("\nBuy: " + ", ".join("%s (bid up to %s)" % (p["name"], _m(p["max_bid"]))
+                                  for p in out["picks"][:2]) if buys else "")
+    ping += ("\nSell: " + ", ".join(p["name"] for p in out["sells"][:3])
+             if sold else "")
+    hold = ("; %s held back for the report's own buys" % _m(out["reserve"])
+            if out["reserve"] > 0 else "")
+    return {
+        "heading": "MARKET",
+        "summary": "%s to spend%s" % (_m(out["spendable"]), hold),
+        "sections": [
+            {"label": "BUY — free market", "tone": "buy", "rows": buys,
+             "empty": "Nothing on the free market is expected to beat the cost "
+                      "of tying the cash up."},
+            {"label": "SELL — not starting", "tone": "sell", "rows": sold},
+            {"label": "HELD BACK — the report keeps them", "tone": "held",
+             "rows": held}],
+        "ping": ping}
+
+
+# ------------------------------------------------------------------- the log
 LOG = ["day", "run_at", "action", "key", "name", "ask", "value", "offer",
-       "last", "expected_pct", "max_bid", "cash", "why"]
+       "last", "horizon", "max_bid", "cash", "why"]
 
 
 def record(path, out: dict, now) -> int:
@@ -166,46 +346,64 @@ def record(path, out: dict, now) -> int:
     base = {"day": day, "run_at": now.strftime("%Y-%m-%dT%H:%M"),
             "cash": round(out["cash"])}
     new = [{**base, "action": "BUY", "key": p["key"], "name": p["name"],
-            "ask": round(p["ask"]), "value": round(p["value"]),
-            "last": p["last"], "expected_pct": round(p["expected_pct"], 2),
-            "max_bid": round(p["max_bid"])} for p in out["picks"]]
+            "ask": round(p["ask"]), "value": round(p["value"]), "last": p["last"],
+            "horizon": p["h"], "max_bid": round(p["max_bid"]),
+            "why": say(p["reason"])} for p in out["picks"]]
     new += [{**base, "action": "SELL", "key": p["key"], "name": p["name"],
              "value": round(p["value"]), "offer": round(p["offer"] or 0),
-             "last": p["last"], "why": p["why"]} for p in out["sells"]]
+             "last": p["last"], "horizon": p["reason"]["h"],
+             "why": say(p["reason"])} for p in out["sells"]]
     path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, "w", newline="", encoding="utf-8") as fh:
-        w = csv.DictWriter(fh, fieldnames=LOG, restval="")
+        w = csv.DictWriter(fh, fieldnames=LOG, restval="", extrasaction="ignore")
         w.writeheader()
-        w.writerows(keep + new)
+        w.writerows(keep + new)      # rows from an older layout keep what still fits
     return len(new)
 
 
 def recently(path, now) -> set[tuple[str, str]]:
-    """{(key, action)} advised in the last COOLDOWN_DAYS days, before today's
-    close -- so a player sold on Monday is not recommended back on Tuesday."""
+    """{(key, action)} still inside the hold the advice assumed: what was advised
+    within its own horizon (in updates, about days) is not reversed the next day."""
     if not path.exists():
         return set()
-    today = now.strftime("%Y-%m-%d")
-    since = (now - timedelta(days=COOLDOWN_DAYS)).strftime("%Y-%m-%d")
+    today = datetime.strptime(now.strftime("%Y-%m-%d"), "%Y-%m-%d")
     with open(path, newline="", encoding="utf-8") as fh:
         return {(r["key"], r["action"]) for r in csv.DictReader(fh)
-                if since <= r["day"] < today}
+                if r.get("horizon") and datetime.strptime(r["day"], "%Y-%m-%d")
+                < today <= datetime.strptime(r["day"], "%Y-%m-%d")
+                + timedelta(days=int(float(r["horizon"])))}
 
 
+# ------------------------------------------------------------------------ main
 def main() -> None:
     import decide
+    from ffcore.league import load_config
     from ffcore.text import norm
-    from ffcore.tidy import DECISIONS, MADRID, REPORTS, TIDY, read_csv, run_now
+    from ffcore.tidy import (DECISIONS, MADRID, REPORTS, TIDY, Market,
+                             load_market_frozen, read_csv, run_now)
 
-    u = decide.load()
+    cfg, u = load_config(), decide.load()
     rows = read_csv(TIDY / "market.csv")
-    table = {b: outlook(steps(rows), *b) for b in BUCKETS}
-    newest = max(r["observed_at"] for r in rows)
-    last = {}
-    for r in rows:
-        if r["observed_at"] == newest and r.get("delta_pct_1d") not in (None, "", "None"):
-            last[r["ff_id"]] = float(r["delta_pct_1d"])
+    by_player = steps(rows)
+    mk = Market(load_market_frozen())
+    value_at = lambda name, when: (lambda v: v.value if v else None)(
+        mk.at(name, datetime.fromisoformat(when).astimezone(timezone.utc)))
+    offer_r = offer_ratios(read_csv(TIDY / "api_offers.csv"),
+                           read_csv(TIDY / "api_teams.csv"), value_at)
+    paid_r = auction_ratios(read_csv(TIDY / "api_market.csv"),
+                            [a for a in read_csv(TIDY / "api_activity.csv")
+                             if a["kind"] == "buy"])
+    if not offer_r or not paid_r or not by_player:
+        print("flip: not enough history to measure the cost of trading yet")
+        return
+    offer, premium = mean(offer_r), mean(paid_r)
+    model = {"outlook": Outlook(by_player), "offer": offer, "premium": premium,
+             "risk": cfg.flip_risk}
 
+    newest = max(r["observed_at"] for r in rows)
+    last = {r["ff_id"]: float(r["delta_pct_1d"]) for r in rows
+            if r["observed_at"] == newest
+            and r.get("delta_pct_1d") not in (None, "", "None")}
     name, price, value = u.name_view, u.price_view, u.value_view
     _, xi = u.current_xi
     mine = u.state.squads.get(u.me, {})
@@ -214,30 +412,30 @@ def main() -> None:
             for k, r in u.route_view.items() if r == "free" and k in price]
     bench = [{"key": k, "name": name.get(k, k), "value": value.get(k, 0.0)}
              for k in mine if k not in xi]
+    by_name = {norm(name.get(k, k)): k for k in mine}
 
-    reserve, cost = 0.0, {}
+    verdict, targets = {}, []
     try:
         ladder = json.loads((REPORTS / "decisions.json").read_text())["ladder"]
-        reserve = max((r["market"] or 0.0 for r in ladder
-                       if r["group"] == "buy"), default=0.0)
-        said = {norm(r["name"]): (r["group"], r["pts"], r["pts_lo"])
-                for r in ladder if r["where"] == "yours"
-                and r["group"] in ("sell", "keep", "out", "in")}
-        cost = {b["key"]: said[norm(b["name"])] for b in bench
-                if norm(b["name"]) in said}
+        verdict, targets = report_view(ladder, lambda n: by_name.get(norm(n)))
     except (OSError, ValueError, KeyError):
         pass
-    sales, held = sells(bench, last, dict(u.received_offers), table, cost)
-    recent = recently(DECISIONS / "flip_log.csv", run_now().astimezone(MADRID))
-
-    out = {"horizon": HORIZON, "hurdle": HURDLE, "cash": u.cash,
-           "reserve": reserve, "spendable": max(0.0, u.cash - reserve),
-           "picks": [p for p in picks(free, last, table,
-                                      max(0.0, u.cash - reserve))
+    held_back = reserve(targets)
+    now = run_now().astimezone(MADRID)
+    recent = recently(DECISIONS / "flip_log.csv", now)
+    sales, kept = sells(bench, last, dict(u.received_offers), model, verdict,
+                        money_rate(targets))
+    spend = max(0.0, u.cash - held_back)
+    out = {"cash": u.cash, "reserve": held_back, "spendable": spend,
+           "picks": [p for p in picks(free, last, model, spend, cfg.flip_hurdle)
                      if (p["key"], "SELL") not in recent],
            "sells": [p for p in sales if (p["key"], "BUY") not in recent],
-           "held": held,
-           "table": {"%g..%g" % b: v for b, v in table.items()}}
+           "held": kept,
+           "measured": {"offer": offer, "premium": premium,
+                        "offers": len(offer_r), "auctions": len(paid_r),
+                        "risk": cfg.flip_risk, "hurdle": cfg.flip_hurdle,
+                        "points_per_million": money_rate(targets)}}
+    out["view"] = present(out)
     path = REPORTS / "decisions.json"
     try:
         doc = json.loads(path.read_text(encoding="utf-8"))
@@ -246,112 +444,145 @@ def main() -> None:
                         encoding="utf-8")
     except (OSError, ValueError):
         print("flip: no decisions.json to attach to")
-    logged = record(DECISIONS / "flip_log.csv", out, run_now().astimezone(MADRID))
-    print("flip: %d buy(s), %d sale(s) logged; %.1fM to spend (%.1fM held back for "
-          "the report's own targets)" % (logged - len(out["sells"]),
-                                         len(out["sells"]),
-                                         out["spendable"] / 1e6, reserve / 1e6))
+    logged = record(DECISIONS / "flip_log.csv", out, now)
+    print("flip: %d buy(s), %d sale(s) logged; %s to spend (%s held back for the "
+          "report's own targets); offers pay %.3fx value (%d), auctions cost "
+          "%.3fx ask (%d)"
+          % (logged - len(out["sells"]), len(out["sells"]), _m(spend),
+             _m(held_back), offer, len(offer_r), premium, len(paid_r)))
 
 
+# -------------------------------------------------------------------- self-test
 def _selftest() -> None:
-    # A player who rose a lot last update keeps rising for a while in this
-    # history; one who fell keeps falling. Two rows per day per player.
-    days = ["2026-08-%02d" % d for d in range(10, 26)]
+    # A history where a big rise is followed by more rise, a fall by more fall.
+    days = ["2026-08-%02d" % d for d in range(10, 30)]
     rows = []
-    for k, path in (("up", [100 * 1.05 ** i for i in range(16)]),
-                    ("down", [100 * 0.98 ** i for i in range(16)]),
-                    ("flat", [100.0] * 16)):
-        for _ in range(12):        # enough players for MIN_N
-            for d, v in zip(days, path):
-                rows.append({"observed_at": d + "T2359Z", "ff_id": k + str(_),
-                             "value": str(v)})
+    for k, g in (("up", 1.05), ("down", 0.98), ("flat", 1.0)):
+        for i in range(12):
+            for n, d in enumerate(days):
+                rows.append({"observed_at": d + "T2359Z", "ff_id": k + str(i),
+                             "value": str(100 * g ** n)})
     by = steps(rows)
-    assert abs(by["up0"][0] - 5.0) < 1e-9 and by["flat0"][0] == 0.0, by["up0"][:2]
-    exp, n = outlook(by, 3.0, 6.0)
-    assert n >= MIN_N and abs(exp - (1.05 ** 5 - 1) * 100) < 1e-6, (exp, n)
-    assert outlook(by, 50.0, 60.0) == (0.0, 0)          # nothing there: no belief
-    assert bucket(4.0) == (3.0, 6.0) and bucket(0.5) == (-1.0, 1.0)
-    assert bucket(None) is None and bucket(-9.0) == BUCKETS[0]
-    table = {b: outlook(by, *b) for b in BUCKETS}
+    assert by["up0"][0] == ("2026-08-11", by["up0"][0][1]) and abs(by["up0"][0][1] - 5.0) < 1e-9
+    assert by["flat0"][0][1] == 0.0
+    ol = Outlook(by)
+    assert ol.hmax == 4 and set(ol.obs) == {1, 2, 3, 4}       # median 19 updates // 4
+    # NO BUCKETS: the K nearest past updates to +5% are the 'up' players, to -2% the 'down' ones
+    assert {round(o[0]) for o in ol.near(5.0, 3)} == {5}
+    assert {round(o[0]) for o in ol.near(-2.0, 3)} == {-2}
+    assert all(abs(o[1] - (1.05 ** 3 - 1) * 100) < 1e-6 for o in ol.near(5.0, 3))
+    # uncertainty is across DAYS: many players on one day are one observation
+    one_day = [(5.0, 10.0, "d1")] * 50
+    assert belief(one_day, 1, 1.0) is None
+    two_days = [(5.0, 10.0, "d1"), (5.0, 20.0, "d2")] * 10
+    bel = belief(two_days, 1, 1.0)
+    assert bel["mean"] == 15.0 and bel["days"] == 2 and bel["lo"] < 15.0 < bel["hi"], bel
+    # more caution = a lower confident value; a longer hold widens it
+    assert belief(two_days, 1, 2.0)["lo"] < bel["lo"]
+    assert belief(two_days, 4, 1.0)["lo"] < bel["lo"]
+    top = ol.best(5.0, 0.98, 1.05, 1.0)
+    assert top["h"] >= 1 and top["net"] > 0 and top["days"] >= 2, top
+    assert ol.best(-2.0, 0.98, 1.05, 1.0)["net"] < 0 and ol.best(None, 0.98, 1.05, 1.0) is None
+    model = {"outlook": ol, "offer": 0.98, "premium": 1.05, "risk": 1.0}
+
+    # what the trade costs is MEASURED
+    teams = [{"player_team_id": "9", "player_name": "Zed"}]
+    offs = [{"offer_id": "1", "player_team_id": "9", "money": "5500000",
+             "created_at": "2026-09-01T22:24:00+02:00"},
+            {"offer_id": "1", "player_team_id": "9", "money": "5500000",
+             "created_at": "2026-09-01T22:24:00+02:00"},
+            {"offer_id": "", "player_team_id": "9", "money": "", "created_at": ""}]
+    assert offer_ratios(offs, teams, lambda n, w: 5e6 if n == "Zed" else None) == [1.1]
+    close = "2026-09-02T22:24:00+02:00"
+    lst = [{"seller": "marketPlayerLeague", "player_id": "7", "expires_at": close,
+            "sale_price": "10000000", "observed_at": "a"},
+           {"seller": "marketPlayerTeam", "player_id": "8", "expires_at": close,
+            "sale_price": "10000000", "observed_at": "a"}]
+    buys = [{"player_id": "7", "at": "2026-09-02T22:24:10+02:00", "amount": "10400000"},
+            {"player_id": "8", "at": "2026-09-02T22:24:10+02:00", "amount": "99"},   # not a free-market listing
+            {"player_id": "7", "at": "2026-09-05T10:00:00+02:00", "amount": "1"}]    # not at the close
+    assert auction_ratios(lst, buys) == [1.04], auction_ratios(lst, buys)
+
+    # the report, read
+    ladder = [{"name": "Kept", "where": "yours", "group": "keep", "pts_mean": -0.5, "market": None, "value": None},
+              {"name": "Free", "where": "yours", "group": "sell", "pts_mean": -3.0, "market": None, "value": None},
+              {"name": "Cheap", "where": "x", "group": "buy", "pts_mean": None, "market": 10e6, "value": 0.6},
+              {"name": "Dear", "where": "x", "group": "raid", "pts_mean": None, "market": 20e6, "value": 1.0}]
+    ver, tg = report_view(ladder, {"Kept": "k", "Free": "f"}.get)
+    assert ver == {"k": ("keep", -0.5), "f": ("sell", -3.0)}, ver
+    assert money_rate(tg) == 0.8 and reserve(tg) == 20e6
+    assert money_rate([]) == 0.0 and reserve([]) == 0.0
+
+    # buys: only what beats the friction on the CONFIDENT end
     lst = [{"key": "a", "name": "Riser", "ask": 10e6, "value": 10e6},
-           {"key": "b", "name": "Flat", "ask": 10e6, "value": 10e6},
+           {"key": "b", "name": "Faller", "ask": 10e6, "value": 10e6},
            {"key": "c", "name": "NoData", "ask": 10e6, "value": 10e6}]
-    got = picks(lst, {"a": 4.0, "b": 0.0}, table, cash=50e6)
+    got = picks(lst, {"a": 5.0, "b": -2.0}, model, 50e6, 0.0)
     assert [g["name"] for g in got] == ["Riser"], got
     g = got[0]
-    assert g["fits"] and g["expected_gain"] > 0 and g["max_bid"] > g["pay"], g
-    # ...the cheapest price at which it still clears the hurdle is exactly max_bid
-    leave = 10e6 * 1.05 ** 5 * OFFER
-    assert abs(g["max_bid"] - leave / (1 + HURDLE * HORIZON)) < 1e-3, g
-    assert picks(lst, {"a": 4.0}, table, cash=1e6)[0]["fits"] is False
-    # a hurdle it cannot clear: same player, but he only rises a little
-    weak = {b: (1.0, 100) for b in BUCKETS}
-    assert picks(lst, {"a": 4.0}, weak, cash=50e6) == []
-    # sells: expected to fall; an offer that beats holding; a rising player who
-    # is offered only a little over value (HOLD -- he is expected to go up
-    # further); a steady one nobody wants.
-    bench = [{"key": "f", "name": "Faller", "value": 5e6},
-             {"key": "o", "name": "Offered", "value": 5e6},
-             {"key": "r", "name": "Riser", "value": 5e6},
-             {"key": "s", "name": "Steady", "value": 5e6}]
-    last = {"f": -2.0, "o": 0.0, "r": 4.0, "s": 0.0}
-    free_to_go = {"f": ("keep", -0.3, -2.0), "o": ("sell", -50.0, -200.0),
-                  "r": ("keep", 0.0, 0.0), "s": ("keep", 0.0, 0.0)}
-    got, held = sells(bench, last, {"o": 5.5e6, "r": 5.3e6}, table, free_to_go)
-    assert [x["name"] for x in got] == ["Faller", "Offered"] and held == [], (got, held)
-    assert "lose" in got[0]["why"] and "beats" in got[1]["why"], got
-    # no history behind a bucket: fall back to a plain 'offer well above value'
-    assert [x["name"] for x in sells(bench, last, {"s": 5.2e6}, {}, free_to_go)[0]] == ["Steady"]
+    assert g["fits"] and g["gain"] > 0 and g["max_bid"] >= g["pay"], g
+    assert picks(lst, {"a": 5.0}, model, 1e6, 0.0)[0]["fits"] is False
+    assert picks(lst, {"a": 5.0}, model, 50e6, 10.0) == []    # a hurdle it cannot clear
 
-    # THE REPORT OWNS WHO IS DISPENSABLE. The market says sell a falling player,
-    # but if the season simulation says letting him go costs points -- or has a
-    # real downside band, or says nothing at all -- he is HELD BACK, and the
-    # reason says what it would cost. Only a player the report lets go for free
-    # (its own SELL group, or ~0 median cost with no downside) is ever advised.
-    kept = {"f": ("keep", -6.0, -51.0)}
-    got, held = sells(bench[:1], last, {}, table, kept)
-    assert got == [] and len(held) == 1, (got, held)
-    assert "the report keeps him" in held[0]["why"] and "6 season points" in held[0]["why"], held
-    assert "up to 51 in a bad case" in held[0]["why"], held
-    assert sells(bench[:1], last, {}, table, {"f": ("keep", -0.3, -51.0)})[0] == []   # median ~0, wide downside
-    assert sells(bench[:1], last, {}, table, {})[0] == []                              # report silent: do nothing
-    assert "unknown number" in sells(bench[:1], last, {}, table, {})[1][0]["why"]
+    # sells: money must buy more season points than the player is worth
+    bench = [{"key": "k", "name": "Kept", "value": 5e6},
+             {"key": "f", "name": "Free", "value": 5e6},
+             {"key": "u", "name": "Unjudged", "value": 5e6}]
+    fall = {"k": -2.0, "f": -2.0, "u": -2.0}
+    sold, held = sells(bench, fall, {}, model, ver, rate=0.1)
+    assert [x["name"] for x in sold] == ["Free"], (sold, held)   # group sell: costs the season 0
+    assert [x["name"] for x in held] == ["Kept"], held           # 0.1 pts/M is worth less than the 0.5 he adds
+    # the same player, but money buys more: now the sale beats what he adds
+    sold2, _ = sells(bench, fall, {}, model, ver, rate=8.0)
+    assert "Kept" in [x["name"] for x in sold2], sold2
+    # a player nobody has a verdict on is never advised; no gain from selling: no sale
+    assert "Unjudged" not in [x["name"] for x in sold2 + held]
+    assert sells(bench[:1], {"k": 5.0}, {}, model, ver, 8.0) == ([], [])   # rising: hold
 
-    # no whipsaw: what was advised in the last few days (before today) is remembered
+    # the words: one function, every number from the reason
+    out = {"cash": 20e6, "reserve": 10e6, "spendable": 10e6, "picks": got,
+           "sells": sold, "held": held}
+    v = present(out)
+    assert v["summary"] == "10.00M to spend; 10.00M held back for the report's own buys", v["summary"]
+    lab = {s["tone"]: s for s in v["sections"]}
+    assert lab["buy"]["rows"][0]["name"] == "Riser" and "bid" in lab["buy"]["rows"][0]["right"]
+    assert "+5.0%" in lab["buy"]["rows"][0]["detail"], lab["buy"]["rows"][0]
+    assert "the report keeps him" in lab["held"]["rows"][0]["detail"]
+    assert v["ping"].startswith("\nBuy: Riser (bid up to") and "Sell: Free" in v["ping"], v["ping"]
+    assert present({**out, "picks": [], "sells": [], "held": []})["ping"] == ""
+    try:
+        say({"code": "nope"})
+        raise AssertionError("an unknown reason must not be papered over")
+    except ValueError:
+        pass
+
+    # the decision log: last word before the close wins; after it, tomorrow's
     import tempfile
-    from datetime import datetime
     from pathlib import Path
     with tempfile.TemporaryDirectory() as d:
-        lp = Path(d) / "log.csv"
-        assert recently(lp, datetime(2026, 9, 24, 12, 0)) == set()
-        for day, act, key in (("2026-09-20", "SELL", "old"), ("2026-09-22", "SELL", "a"),
-                              ("2026-09-23", "BUY", "b"), ("2026-09-24", "SELL", "today")):
-            with open(lp, "a", newline="") as fh:
-                w = csv.DictWriter(fh, fieldnames=LOG, restval="")
-                if lp.stat().st_size == 0:
-                    w.writeheader()
-                w.writerow({"day": day, "action": act, "key": key})
-        assert recently(lp, datetime(2026, 9, 24, 12, 0)) == {("a", "SELL"), ("b", "BUY")}, \
-            recently(lp, datetime(2026, 9, 24, 12, 0))
-    # the decision log: last word before the close wins; after the close it is tomorrow's
-    import tempfile
-    from datetime import datetime
-    out = {"cash": 20e6, "picks": [{"key": "a", "name": "Riser", "ask": 10e6,
-                                    "value": 10e6, "last": 4.0,
-                                    "expected_pct": 27.6, "max_bid": 12e6}],
-           "sells": [{"key": "f", "name": "Faller", "value": 5e6, "offer": None,
-                      "last": -2.0, "why": "x"}]}
-    with tempfile.TemporaryDirectory() as d:
-        from pathlib import Path
         p = Path(d) / "log.csv"
         assert record(p, out, datetime(2026, 9, 24, 21, 45)) == 2
-        out2 = {**out, "picks": [], "sells": out["sells"]}
-        assert record(p, out2, datetime(2026, 9, 24, 22, 10)) == 1   # replaces
-        rows = list(csv.DictReader(open(p)))
-        assert [(r["day"], r["action"]) for r in rows] == [("2026-09-24", "SELL")], rows
-        record(p, out, datetime(2026, 9, 24, 23, 0))                 # after the close: tomorrow's
-        days = sorted({r["day"] for r in csv.DictReader(open(p))})
-        assert days == ["2026-09-24", "2026-09-25"], days
+        assert record(p, {**out, "picks": []}, datetime(2026, 9, 24, 22, 10)) == 1
+        assert [r["action"] for r in csv.DictReader(open(p))] == ["SELL"]
+        record(p, out, datetime(2026, 9, 24, 23, 0))
+        assert sorted({r["day"] for r in csv.DictReader(open(p))}) == ["2026-09-24", "2026-09-25"]
+        # no whipsaw: advised on the 24th with a 2-update hold -> not reversed until the 27th
+        q = Path(d) / "l2.csv"
+        with open(q, "w", newline="") as fh:
+            w = csv.DictWriter(fh, fieldnames=LOG, restval="")
+            w.writeheader()
+            w.writerow({"day": "2026-09-24", "action": "SELL", "key": "a", "horizon": "2"})
+            w.writerow({"day": "2026-09-24", "action": "BUY", "key": "b", "horizon": ""})
+        assert recently(q, datetime(2026, 9, 25, 12, 0)) == {("a", "SELL")}
+        assert recently(q, datetime(2026, 9, 27, 12, 0)) == set()
+        assert recently(q, datetime(2026, 9, 24, 12, 0)) == set()      # not before it was advised
+    # a log written by an older layout must never break a run
+    with tempfile.TemporaryDirectory() as d:
+        old = Path(d) / "old.csv"
+        old.write_text("day,run_at,action,key,name,expected_pct\n2026-09-20,x,BUY,k,K,12.5\n")
+        assert recently(old, datetime(2026, 9, 24, 12, 0)) == set()
+        record(old, out, datetime(2026, 9, 24, 21, 45))
+        assert [r["day"] for r in csv.DictReader(open(old))][0] == "2026-09-20"
     print("flip self-test OK")
 
 

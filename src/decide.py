@@ -296,8 +296,13 @@ def rank(u: Universe, acts: list[Action], seed: int = 1,
     for a, r, bonus in zip(keep, scored, bonuses):
         if bonus and a.victim in r.totals:
             r.totals[a.victim] = [x + bonus for x in r.totals[a.victim]]
-    bands = {k: (*band(paired(r, base, u.me)), a)
-            for (k, a), r in zip(rest, final[len(afters) + 1:])}
+    # (median, 10th, 90th, action, MEAN). The mean is the expected season points
+    # change, which includes the tails a median hides -- a bench player who is
+    # useless in most seasons and decisive in a few has a median near 0 and a
+    # mean that says what his cover is worth.
+    bands = {k: (*band(pairs), a, sum(pairs) / len(pairs) if pairs else 0.0)
+            for (k, a), pairs in ((ka, paired(r, base, u.me)) for ka, r in
+                                  zip(rest, final[len(afters) + 1:]))}
     rivals = [m for m in u.state.squads if m != u.me]
     out = []
     for a, r in zip(keep, scored):

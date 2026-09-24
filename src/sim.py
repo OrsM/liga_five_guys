@@ -136,6 +136,22 @@ def short_manager(m: str) -> str:
 
 
 
+# THE ONE COPY of the ladder's group headings. The markdown table below and every
+# JSON row use it, and the page draws the row's own `label` -- it used to carry
+# its own list, which had already drifted ("BUY -- with the proceeds" on the
+# phone, "BUY -- free agents" here) for a table that says the opposite of what
+# the row underneath it means.
+GROUP_LABEL = {
+    "in": "PUT ON", "out": "TAKE OFF",
+    "field": "FIELD — your eleven — the app has not said what you are playing",
+    "keep": "KEEP — bench", "sell": "SELL — never start",
+    "offer": "OFFERS — someone wants him",
+    "buy": "BUY — free agents",
+    "raid": "RAID — a clause, cannot be refused",
+    "save": "SAVE — better than yours, out of reach", "pass": "PASS",
+}
+
+
 def ladder_rows(u, rows, bands=None, exp=None, xi=None) -> list[dict]:
 
     if exp is None or xi is None:
@@ -168,7 +184,9 @@ def ladder_rows(u, rows, bands=None, exp=None, xi=None) -> list[dict]:
     def cell(k, group, where, money, pts, note="", value=None,
             lo=None, hi=None, market=None, premium=None):
         if k in bands:
-            pts, lo, hi, _action = bands[k]
+            pts, lo, hi, _action, mean = bands[k]
+        else:
+            mean = None
         _worth = u.value_view.get(k)
         # CASH FOR THIS MOVE, not cash in hand. suggest() refuses a bid it
         # cannot fund, and every buy on this board is funded by a sale --
@@ -183,8 +201,10 @@ def ladder_rows(u, rows, bands=None, exp=None, xi=None) -> list[dict]:
                 "name": title_name(u.name_view.get(k, k)),
                 "pos": u.pos_view.get(k, ""), "start": u.start_view.get(k, 0.0),
                 "xpts": exp.get(k, 0.0), "group": group, "where": where,
+                "label": GROUP_LABEL[group],
                 "money": money, "pts": pts, "par": par.get(k),
-                "pts_lo": lo, "pts_hi": hi, "note": note, "value": value,
+                "pts_lo": lo, "pts_hi": hi, "pts_mean": mean,
+                "note": note, "value": value,
                 "market": market, "premium": premium,
                 }
 
@@ -353,18 +373,17 @@ def ladder(u, rows, base, data=None, exp=None, xi=None) -> list[str]:
            "|---|---|--:|--:|---|--:|--:|--:|--:|"]
 
     if by_group.get("field"):
-        out.append("| **FIELD — your eleven — the app has not said what you "
-                   "are playing** | | | | | | | | |")
+        out.append("| **" + GROUP_LABEL["field"] + "** | | | | | | | | |")
         out += [row_md(r) for r in by_group["field"]]
     elif not by_group.get("in") and not by_group.get("out"):
         out.append("| **XI — no change, you are fielding the best eleven** "
                    "| | | | | | | | |")
     else:
         if by_group.get("in"):
-            out.append("| **PUT ON** | | | | | | | | |")
+            out.append("| **" + GROUP_LABEL["in"] + "** | | | | | | | | |")
             out += [row_md(r) for r in by_group["in"]]
         if by_group.get("out"):
-            out.append("| **TAKE OFF** | | | | | | | | |")
+            out.append("| **" + GROUP_LABEL["out"] + "** | | | | | | | | |")
             out += [row_md(r) for r in by_group["out"]]
     tot = sum(exp.get(k, 0.0) for k in xi)
     riv = _rival_best(u)
@@ -374,26 +393,26 @@ def ladder(u, rows, base, data=None, exp=None, xi=None) -> list[str]:
                % (shape(u, xi), tot, riv_who, riv_total, tot - riv_total))
 
     if by_group.get("keep"):
-        out.append("| **KEEP — bench** | | | | | | | | |")
+        out.append("| **" + GROUP_LABEL["keep"] + "** | | | | | | | | |")
         out += [row_md(r) for r in by_group["keep"]]
 
     if by_group.get("sell"):
-        out.append("| **SELL — never start** | | | | | | | | |")
+        out.append("| **" + GROUP_LABEL["sell"] + "** | | | | | | | | |")
         out += [row_md(r) for r in by_group["sell"]]
 
     if by_group.get("offer"):
-        out.append("| **OFFERS — someone wants him** | | | | | | | | |")
+        out.append("| **" + GROUP_LABEL["offer"] + "** | | | | | | | | |")
         out += [row_md(r) for r in by_group["offer"]]
 
     if by_group.get("buy"):
-        out.append("| **BUY — free agents** | | | | | | | | |")
+        out.append("| **" + GROUP_LABEL["buy"] + "** | | | | | | | | |")
         out += [row_md(r) for r in by_group["buy"]]
     elif by_group.get("raid"):
         out.append("| **BUY — free agents — none clear the bar today** | | "
                    "| | | | | |")
 
     if by_group.get("raid"):
-        out.append("| **RAID — a clause, cannot be refused** "
+        out.append("| **" + GROUP_LABEL["raid"] + "** "
                    "| | | | | | | | |")
         out += [row_md(r) for r in by_group["raid"]]
     elif not by_group.get("buy"):
@@ -401,11 +420,11 @@ def ladder(u, rows, base, data=None, exp=None, xi=None) -> list[str]:
                    "| | | | | |")
 
     if by_group.get("save"):
-        out.append("| **SAVE — better than yours, out of reach** | | | | | | | | |")
+        out.append("| **" + GROUP_LABEL["save"] + "** | | | | | | | | |")
         out += [row_md(r) for r in by_group["save"]]
 
     if by_group.get("pass"):
-        out.append("| **PASS** | | | | | | | | |")
+        out.append("| **" + GROUP_LABEL["pass"] + "** | | | | | | | | |")
         out += [row_md(r) for r in by_group["pass"]]
 
     out += ["",
@@ -1545,7 +1564,7 @@ def _selftest() -> None:
     _rows, baseb, _lam, bands = ub.rank([], extra=asked)
     assert set(bands) == {*sqb, "cand"}, sorted(bands)
     for key in bands:
-        med, lo, hi, _act = bands[key]
+        med, lo, hi, _act, _mean = bands[key]
         assert lo <= med <= hi, (key, bands[key])
     assert bands["star"][0] < -20, bands["star"]
     assert -5 < bands["dead"][0] < 5, bands["dead"]
