@@ -267,9 +267,8 @@ def owner_drift(ledger: dict, api: dict, names=None) -> list[str]:
         if now is None:
             out.append("**%s** — the ledger has him at %s; the app says "
                        "nobody in the league holds him. The feed has no sale "
-                       "of him (the app drops players without one), so that "
-                       "manager's cash estimate counts what he cost as spent "
-                       "for good." % (_who(key), held))
+                       "of him: the app drops players without publishing "
+                       "one." % (_who(key), held))
         elif now != held:
             out.append("**%s** — the ledger has him at %s; the app says %s."
                        % (_who(key), held, now))
@@ -438,6 +437,7 @@ class League:
                                                           market, xw)
 
         self.api_unjoined: list[str] = []
+        self.dropped: dict[str, str] = {}
         self._api_teams = api_teams
         self._standings = standings
         if api_teams and market is None:
@@ -456,6 +456,11 @@ class League:
                         "**%s** — the app says he is owned, but no market row "
                         "matches the name, so he is missing from the board."
                         % raw)
+                # The app drops a player from a squad WITHOUT publishing a sale;
+                # the ledger, built from the feed, keeps him. {key: who} of
+                # exactly those -- the cash estimate prices them below.
+                self.dropped = {k: m for k, m in self.owner.items()
+                                if k not in api_owner}
                 self.owner = api_owner
 
         self.managers: dict[str, Manager] = {
@@ -610,9 +615,21 @@ class League:
                 if days is not None and daily:
                     notes.append("%.2fM of daily allowance over %.0f days"
                                  % (daily / 1e6, days))
+            gone = [k for k, m in self.dropped.items() if m == handle]
+            refund = 0.0
+            if gone and since is None and self.market is not None:
+                vals = self.market.latest()
+                refund = sum(money((vals.get(k) or {}).get("value")) or 0.0
+                             for k in gone)
+                if refund:
+                    notes.append("%.2fM assuming the app paid market value "
+                                 "for %s, removed from their squad with no "
+                                 "sale in the feed" % (refund / 1e6, ", ".join(
+                                     (vals.get(k) or {}).get("name") or k
+                                     for k in gone)))
             bonus_note = " and ".join(notes) if notes else None
 
-            value = base + sold - bought + bonus
+            value = base + sold - bought + bonus + refund
             math = ("%s − %.2fM bought + %.2fM sold across %d ledger row(s)"
                     "%s = %.2fM"
                     % (basis, bought / 1e6, sold / 1e6, counted,
@@ -1003,6 +1020,26 @@ def _selftest_anchor_is_current() -> None:
 
     lg3 = League(Config(me="miguel_autentico"), rosters, [], mkt, api_teams=[])
     assert lg3.owner[norm("Simeone")] == "miguel_autentico", lg3.owner
+
+    # -- the app drops a player WITHOUT a feed sale: the ledger keeps him, the
+    # cash estimate prices him at market value and says it assumed so ---------
+    mkt2 = Market([{"name": n, "value": v, "observed_at": "2026-08-17T2246Z",
+                    "position": "DEL"}
+                   for n, v in (("Ghost", "8000000"), ("Kept", "1000000"))])
+    tx = [{"date": "2026-08-12T22:24", "player": n, "from": MARKET,
+           "to": "rival", "price": pr}
+          for n, pr in (("Ghost", "20000000"), ("Kept", "1000000"))]
+    lg4 = League(Config(me="miguel_autentico", budget=100e6),
+                 {"miguel_autentico": [], "rival": []}, tx, mkt2,
+                 api_teams=[{"manager": "rival", "player_name": "Kept"}])
+    assert lg4.dropped == {norm("Ghost"): "rival"}, lg4.dropped
+    c4 = lg4["rival"].cash
+    assert c4.value == 100e6 - 21e6 + 8e6, c4.value
+    assert "8.00M assuming the app paid market value for Ghost" in c4.basis, \
+        c4.basis
+    # Nothing dropped, nothing assumed -- the ordinary case adds no term.
+    assert not lg2.dropped and "assuming the app paid" not in \
+        lg2["BurtonGM89"].cash.basis, lg2.dropped
 
 
 def _selftest_cash() -> None:

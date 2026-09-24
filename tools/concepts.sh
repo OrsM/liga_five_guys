@@ -250,7 +250,15 @@ check "Universe flat-dict storage" 0 \
 # as spent) instead of leaving it to be worked out. Words only -- an attempt
 # to infer the missing sales into the ledger was reverted as more error
 # surface than the estimate is worth.
-check "src/ lines" 20887 \
+# 20887 -> 20924 on 2026-09-24: the app removes a player from a squad WITHOUT a
+# feed sale, so the ledger kept the purchase and the cash estimate read it as
+# money gone (Albert Laporta -67.35M included a 49.99M signing with no refund).
+# League.dropped records those players once, where the ledger's and the app's
+# ownership both exist, and the estimate prices them at market value as one
+# more STATED ASSUMPTION in its math line -- beside the unmeasured-income one.
+# The ledger itself stays exactly what the feed said (an inference layer that
+# wrote guessed rows into it was prototyped and reverted).
+check "src/ lines" 20924 \
   "$(find src -name '*.py' | xargs cat | wc -l)"
 
 [ "$fail" -eq 0 ] && echo "concepts: no duplication regained" || echo "concepts: a concept regained a second implementation"
