@@ -563,10 +563,51 @@ def _tidy_has(tables) -> bool:
     return bool(tables) and all((TIDY / f"{t}.csv").exists() for t in tables)
 
 
+def _parse_origin(task) -> dict:
+    """One snapshot's needed documents -> {parse_key: rows}. A pure function
+    of the snapshot, so a worker opens it ITSELF: only rows cross the pipe,
+    never the ~2MB of HTML per page."""
+    origin, want = task
+    out, sigs = {}, _Sigs()
+    for o, key, html in documents({origin: want}):
+        src = source_for(key)
+        try:
+            rows = src.parse(html, o, key)
+        except Exception as e:
+            print(f"  warn: {o}/{key}: {type(e).__name__}: {e}")
+            rows = []
+        out[parse_key(sigs.of(key, html), src)] = rows
+    return out
+
+
+def _parse_workers(misses: int) -> int:
+    """1 for the handful of documents a normal run parses (a pool would cost
+    more than it saves); otherwise one per physical core, never more than the service's
+    own memory cap leaves room for -- a parsing worker holds one ~2MB page and
+    its lxml tree, ~200MB, and lfg.service is capped at 750MB with the parent
+    already at ~360MB. A cold-cache rebuild (376s serial, 2026-09-24) is the
+    only time this matters, and it must not become an OOM kill."""
+    if misses < 24:
+        return 1
+    # PHYSICAL cores, not logical CPUs: lxml is cache/memory bound, and on this
+    # box (i5-5200U, 2 cores x 2 threads) measured 2026-09-24 on 674 documents:
+    # 1 worker 51.6s, 2 workers 32.1s, 4 workers 41.8s and 80% MORE total CPU.
+    n = max(1, (os.cpu_count() or 2) // 2)
+    try:
+        cg = Path("/sys/fs/cgroup") / (Path("/proc/self/cgroup").read_text()
+                                        .strip().split("::")[-1].lstrip("/"))
+        cap = (cg / "memory.max").read_text().strip()
+        if cap != "max":
+            rss = int((cg / "memory.current").read_text())
+            n = min(n, max(1, (int(cap) - rss - 100 * 2**20) // (200 * 2**20)))
+    except (OSError, ValueError):
+        pass
+    return n
+
+
 def _parse_everything(walk, sigs_now, stamps) -> None:
     pending: dict[str, list[dict]] = {}
     cache, fresh = _parse_cache(), {}
-    keys = _Sigs()
 
     need: dict[str, set] = {}
     for stamp, docs in walk:
@@ -576,15 +617,16 @@ def _parse_everything(walk, sigs_now, stamps) -> None:
                     and parse_key(ck, src) not in cache):
                 need.setdefault(origin, set()).add(key)
     misses = sum(len(v) for v in need.values())
-
-    for origin, key, html in documents(need):
-        src = source_for(key)
-        try:
-            rows = src.parse(html, origin, key)
-        except Exception as e:
-            print(f"  warn: {origin}/{key}: {type(e).__name__}: {e}")
-            rows = []
-        cache[parse_key(keys.of(key, html), src)] = rows
+    tasks, n = sorted(need.items()), _parse_workers(misses)
+    if n > 1:
+        import concurrent.futures as cf
+        import multiprocessing as mp
+        with cf.ProcessPoolExecutor(n, mp_context=mp.get_context("fork")) as ex:
+            for part in ex.map(_parse_origin, tasks):
+                cache.update(part)
+    else:
+        for t in tasks:
+            cache.update(_parse_origin(t))
 
     # ROWS GO TO DISK BEFORE THEY CAN GROW INTO THE PROCESS. Holding every
     # table until the last snapshot was routed cost 476MB on top of the
