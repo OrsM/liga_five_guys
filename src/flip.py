@@ -6,15 +6,15 @@ rise again. But an OVERNIGHT flip loses money -- the auction winner pays over th
 ask and the app buys back under value -- so a buy has to be HELD for the drift to
 pay for that friction. The managers who made money here held a median 8-9 days.
 
-NOTHING BELOW IS A CHOSEN NUMBER. Every figure a decision rests on is computed
-from the data on each run: what an update of a given size has been followed by
-(its nearest past neighbours, K = sqrt(n), uncertainty measured across calendar
-days because the market moves together), how much the auction premium and the
-app's offer discount cost (measured from the feed and the offers), how long to
-hold (the length whose CONFIDENT return per update is best), what money is worth
-in season points (the report's own points-per-million), and what selling a
-player costs in season points (the simulation's expected change). The only inputs that are preferences, not facts,
-are in inputs/league.ini: the hurdle and how cautious to be.
+NOTHING BELOW IS A CHOSEN NUMBER, AND NOTHING IS A KNOB. Every figure a decision
+rests on is computed from the data on each run: what an update of a given size
+has been followed by (its K = sqrt(n) nearest past neighbours), how much the
+auction premium and the app's offer discount cost (measured from the feed and the
+offers), how long to hold (the length whose expected return per update is best),
+what money is worth in season points (the report's own points-per-million), and
+what selling a player costs in season points (the simulation's expected change).
+Decisions use the EXPECTED drift: walked forward it matched what happened
+(+20.8% predicted, +20.8% realised); a "confident low" bound understated it.
 
 WHAT COUNTS IS AN UPDATE, NOT A CALENDAR DAY. The daily rows are not aligned
 with the nightly value update, so every figure is "the next h updates".
@@ -37,7 +37,7 @@ import math
 import sys
 from datetime import datetime, timedelta, timezone
 from itertools import accumulate
-from statistics import mean, median, pstdev
+from statistics import mean, median
 
 # ------------------------------------------------------------ numbers from data
 def steps(rows: list[dict]) -> dict[str, list[tuple[str, float]]]:
@@ -53,24 +53,18 @@ def steps(rows: list[dict]) -> dict[str, list[tuple[str, float]]]:
                 if a[1] > 0] for k, v in vals.items()}
 
 
-def belief(window: list[tuple], h: int, z: float) -> dict | None:
-    """mean outcome, and the values z standard errors either side of it.
+def belief(window: list[tuple], h: int) -> dict | None:
+    """The expected outcome of the h updates that followed, and how much it rests on.
 
     The market moves TOGETHER (one repricing lifts every player on the same
-    night), so player-days are not independent: uncertainty is measured across
-    CALENDAR DAYS, and windows that start on consecutive days share h-1 updates,
-    so only about days/h of them are independent. None when the window spans a
-    single day: there is nothing to measure the spread against."""
-    by_day: dict[str, list[float]] = {}
-    for _, out, day in window:
-        by_day.setdefault(day, []).append(out)
-    if len(by_day) < 2:
+    night), so `days` -- the calendar days the cases fall on -- is what counts as
+    evidence, not the number of player-days. None when the window spans a single
+    day: one repricing is not a pattern."""
+    days = {day for _, _, day in window}
+    if len(days) < 2:
         return None
-    se = pstdev([mean(v) for v in by_day.values()]) / math.sqrt(
-        max(1.0, len(by_day) / h))
-    m = mean(out for _, out, _ in window)
-    return {"mean": m, "lo": m - z * se, "hi": m + z * se, "n": len(window),
-            "days": len(by_day)}
+    return {"mean": mean(out for _, out, _ in window), "n": len(window),
+            "days": len(days)}
 
 
 class Outlook:
@@ -107,18 +101,17 @@ class Outlook:
                 hi += 1
         return v[lo:hi]
 
-    def best(self, step: float | None, offer: float, premium: float,
-             z: float) -> dict | None:
-        """The hold length whose CONFIDENT return per update, after the premium
+    def best(self, step: float | None, offer: float, premium: float) -> dict | None:
+        """The hold length whose expected return per update, after the premium
         and the offer discount, is best -- with the belief behind it."""
         if step is None or not self.obs:
             return None
         best = None
         for h in self.obs:
-            bel = belief(self.near(step, h), h, z)
+            bel = belief(self.near(step, h), h)
             if bel is None:
                 continue
-            net = ((1 + bel["lo"] / 100) * offer / premium - 1) / h
+            net = ((1 + bel["mean"] / 100) * offer / premium - 1) / h
             if best is None or net > best["net"]:
                 best = {**bel, "h": h, "net": net}
         return best
@@ -189,29 +182,30 @@ def reserve(moves: list[dict]) -> float:
 
 # ---------------------------------------------------------------- the decisions
 def picks(listings: list[dict], last: dict[str, float], model: dict,
-          cash: float, hurdle: float) -> list[dict]:
-    """Free-market listings worth buying, biggest confident gain first.
+          cash: float) -> list[dict]:
+    """Free-market listings expected to pay, best gain per million paid first.
 
-    `model` = {outlook, offer, premium, risk}. Decided on the CONFIDENT end of
-    the expected drift (mean - z se), so a thin sample cannot recommend a buy."""
+    `model` = {outlook, offer, premium}. A listing is worth buying when what he
+    is expected to fetch after holding beats what winning him costs; `max_bid`
+    is where the two are equal."""
     out = []
     for l in listings:
         bel = model["outlook"].best(last.get(l["key"]), model["offer"],
-                                    model["premium"], model["risk"])
+                                    model["premium"])
         if bel is None:
             continue
-        leave = l["value"] * (1 + bel["lo"] / 100) * model["offer"]
+        leave = l["value"] * (1 + bel["mean"] / 100) * model["offer"]
         pay = l["ask"] * model["premium"]
-        if (leave / pay - 1) / bel["h"] <= hurdle:
+        if leave <= pay:
             continue
         out.append({**l, "last": last[l["key"]], "h": bel["h"], "n": bel["n"],
-                    "days": bel["days"], "drift": bel["lo"], "gain": leave - pay, "pay": pay,
-                    "max_bid": leave / (1 + hurdle * bel["h"]),
+                    "days": bel["days"], "drift": bel["mean"], "gain": leave - pay,
+                    "pay": pay, "max_bid": leave,
                     "fits": pay <= cash, "short": max(0.0, pay - cash),
                     "reason": {"code": "rising", "last": last[l["key"]],
-                               "drift": bel["lo"], "h": bel["h"], "n": bel["n"],
+                               "drift": bel["mean"], "h": bel["h"], "n": bel["n"],
                                "days": bel["days"], "ask": l["ask"], "pay": pay}})
-    return sorted(out, key=lambda x: -x["gain"])
+    return sorted(out, key=lambda x: -x["gain"] / x["pay"])
 
 
 def sells(bench: list[dict], last: dict[str, float], offers: dict[str, float],
@@ -219,28 +213,30 @@ def sells(bench: list[dict], last: dict[str, float], offers: dict[str, float],
     """(sales, held back) among non-starters. `bench` [{key, name, value}].
 
     Selling now brings the app's offer if there is one, else what an offer is
-    expected to be; holding is expected to bring the CONFIDENT top of the drift
-    (holding might be better than average, so that is what selling must beat).
-    The difference is money; the report says what that money buys in season
+    expected to be; holding is expected to bring the drift the history predicts.
+    The difference is money, and the report says what money buys in season
     points (`rate`) and what the player is worth to the season (his expected
-    points change if sold, `verdict`). Sold only when the money buys more than
-    he is worth -- a player the report has no verdict on is left alone."""
+    points change if sold, `verdict`). Sold when the money buys more than he is
+    worth PLUS what winning him back would cost (the auction premium), so a
+    sale is only advised when it will still be right after the next update. A
+    player the report has no verdict on is left alone."""
     out, held = [], []
     for p in bench:
         v = verdict.get(p["key"])
         bel = model["outlook"].best(last.get(p["key"]), model["offer"],
-                                    model["premium"], model["risk"])
+                                    model["premium"])
         if v is None or bel is None:
             continue
         group, exp_pts = v
         now = offers.get(p["key"]) or p["value"] * model["offer"]
-        hold = p["value"] * (1 + bel["hi"] / 100) * model["offer"]
+        hold = p["value"] * (1 + bel["mean"] / 100) * model["offer"]
         gain = now - hold
         if gain <= 0:
             continue
         cost = 0.0 if group == "sell" else max(0.0, -exp_pts)
         benefit = rate * gain / 1e6
-        sale = benefit >= cost
+        back = rate * p["value"] * (model["premium"] - 1) / 1e6
+        sale = benefit >= cost + back
         row = {**p, "offer": offers.get(p["key"]), "last": last.get(p["key"]),
                "gain": gain, "cost_pts": cost, "benefit_pts": benefit,
                "reason": {"code": "sale" if sale else "keep",
@@ -269,7 +265,7 @@ def say(r: dict) -> str:
     """The ONE place a reason becomes a sentence."""
     c = r["code"]
     if c == "rising":
-        return ("last update %s; the history says at least %s over the next %d "
+        return ("last update %s; the history says %s over the next %d "
                 "updates (%d similar cases on %d different days); ask %s, "
                 "expect to pay ~%s"
                 % (_p(r["last"]), _p(r["drift"]), r["h"], r["n"], r["days"],
@@ -279,12 +275,12 @@ def say(r: dict) -> str:
                else "an offer would bring ~%s" % _m(r["now"]))
         more = _m(r["now"] - r["hold"])
         if c == "sale":
-            return ("%s against at most ~%s from holding %d updates: %s more, "
+            return ("%s against ~%s expected from holding %d updates: %s more, "
                     "worth %s season points at what the report's buys return, "
                     "for the %s he is expected to cost the season"
                     % (how, _m(r["hold"]), r["h"], more,
                        _pts(r["benefit"]), _pts(r["cost"])))
-        return ("%s against at most ~%s from holding %d updates, but the %s "
+        return ("%s against ~%s expected from holding %d updates, but the %s "
                 "gained is worth %s season points and he is expected to add "
                 "%s -- the report keeps him"
                 % (how, _m(r["hold"]), r["h"], more,
@@ -377,12 +373,11 @@ def recently(path, now) -> set[tuple[str, str]]:
 # ------------------------------------------------------------------------ main
 def main() -> None:
     import decide
-    from ffcore.league import load_config
     from ffcore.text import norm
     from ffcore.tidy import (DECISIONS, MADRID, REPORTS, TIDY, Market,
                              load_market_frozen, read_csv, run_now)
 
-    cfg, u = load_config(), decide.load()
+    u = decide.load()
     rows = read_csv(TIDY / "market.csv")
     by_player = steps(rows)
     mk = Market(load_market_frozen())
@@ -397,8 +392,7 @@ def main() -> None:
         print("flip: not enough history to measure the cost of trading yet")
         return
     offer, premium = mean(offer_r), mean(paid_r)
-    model = {"outlook": Outlook(by_player), "offer": offer, "premium": premium,
-             "risk": cfg.flip_risk}
+    model = {"outlook": Outlook(by_player), "offer": offer, "premium": premium}
 
     newest = max(r["observed_at"] for r in rows)
     last = {r["ff_id"]: float(r["delta_pct_1d"]) for r in rows
@@ -428,13 +422,12 @@ def main() -> None:
                         money_rate(moves))
     spend = max(0.0, u.cash - held_back)
     out = {"cash": u.cash, "reserve": held_back, "spendable": spend,
-           "picks": [p for p in picks(free, last, model, spend, cfg.flip_hurdle)
+           "picks": [p for p in picks(free, last, model, spend)
                      if (p["key"], "SELL") not in recent],
            "sells": [p for p in sales if (p["key"], "BUY") not in recent],
            "held": kept,
            "measured": {"offer": offer, "premium": premium,
                         "offers": len(offer_r), "auctions": len(paid_r),
-                        "risk": cfg.flip_risk, "hurdle": cfg.flip_hurdle,
                         "points_per_million": money_rate(moves)}}
     out["view"] = present(out)
     path = REPORTS / "decisions.json"
@@ -474,17 +467,14 @@ def _selftest() -> None:
     assert all(abs(o[1] - (1.05 ** 3 - 1) * 100) < 1e-6 for o in ol.near(5.0, 3))
     # uncertainty is across DAYS: many players on one day are one observation
     one_day = [(5.0, 10.0, "d1")] * 50
-    assert belief(one_day, 1, 1.0) is None
+    assert belief(one_day, 1) is None
     two_days = [(5.0, 10.0, "d1"), (5.0, 20.0, "d2")] * 10
-    bel = belief(two_days, 1, 1.0)
-    assert bel["mean"] == 15.0 and bel["days"] == 2 and bel["lo"] < 15.0 < bel["hi"], bel
-    # more caution = a lower confident value; a longer hold widens it
-    assert belief(two_days, 1, 2.0)["lo"] < bel["lo"]
-    assert belief(two_days, 4, 1.0)["lo"] < bel["lo"]
-    top = ol.best(5.0, 0.98, 1.05, 1.0)
+    bel = belief(two_days, 1)
+    assert bel == {"mean": 15.0, "n": 20, "days": 2}, bel
+    top = ol.best(5.0, 0.98, 1.05)
     assert top["h"] >= 1 and top["net"] > 0 and top["days"] >= 2, top
-    assert ol.best(-2.0, 0.98, 1.05, 1.0)["net"] < 0 and ol.best(None, 0.98, 1.05, 1.0) is None
-    model = {"outlook": ol, "offer": 0.98, "premium": 1.05, "risk": 1.0}
+    assert ol.best(-2.0, 0.98, 1.05)["net"] < 0 and ol.best(None, 0.98, 1.05) is None
+    model = {"outlook": ol, "offer": 0.98, "premium": 1.05}
 
     # what the trade costs is MEASURED
     teams = [{"player_team_id": "9", "player_name": "Zed"}]
@@ -517,17 +507,23 @@ def _selftest() -> None:
     assert reserve([{"net": 3e6, "value": 1.0}]) == 0.0      # a move that RAISES cash reserves none
     assert reserve([]) == 0.0 and money_rate([]) == 0.0
 
-    # buys: only what beats the friction on the CONFIDENT end
+    # buys: only what is expected to beat the friction
     lst = [{"key": "a", "name": "Riser", "ask": 10e6, "value": 10e6},
            {"key": "b", "name": "Faller", "ask": 10e6, "value": 10e6},
            {"key": "c", "name": "NoData", "ask": 10e6, "value": 10e6}]
-    got = picks(lst, {"a": 5.0, "b": -2.0}, model, 50e6, 0.0)
+    got = picks(lst, {"a": 5.0, "b": -2.0}, model, 50e6)
     assert [g["name"] for g in got] == ["Riser"], got
     g = got[0]
     assert g["fits"] and g["gain"] > 0 and g["max_bid"] >= g["pay"], g
-    poor = picks(lst, {"a": 5.0}, model, 1e6, 0.0)[0]
+    poor = picks(lst, {"a": 5.0}, model, 1e6)[0]
     assert poor["fits"] is False and abs(poor["short"] - (poor["pay"] - 1e6)) < 1e-6, poor
-    assert picks(lst, {"a": 5.0}, model, 50e6, 10.0) == []    # a hurdle it cannot clear
+    # ranked by gain per million paid, not by gain: the dear one gains more in
+    # money (3.9M against 1.5M) but the cheap one earns more per million
+    two = [{"key": "a", "name": "Dear", "ask": 30e6, "value": 30e6},
+           {"key": "d", "name": "Cheap", "ask": 4e6, "value": 5e6}]
+    ranked = picks(two, {"a": 5.0, "d": 5.0}, model, 99e6)
+    assert max(ranked, key=lambda r: r["gain"])["name"] == "Dear", ranked
+    assert [r["name"] for r in ranked] == ["Cheap", "Dear"], ranked
 
     # sells: money must buy more season points than the player is worth
     bench = [{"key": "k", "name": "Kept", "value": 5e6},
@@ -543,6 +539,14 @@ def _selftest() -> None:
     # a player nobody has a verdict on is never advised; no gain from selling: no sale
     assert "Unjudged" not in [x["name"] for x in sold2 + held]
     assert sells(bench[:1], {"k": 5.0}, {}, model, ver, 8.0) == ([], [])   # rising: hold
+    # a sale must also clear what buying him back would cost (the auction premium):
+    # a gain smaller than that is not worth advising, because it can be undone only at a loss
+    thin = [{"key": "f", "name": "Free", "value": 5e6}]
+    top_fall = model["outlook"].best(-2.0, 0.98, 1.05)
+    back_pts = 8.0 * 5e6 * 0.05 / 1e6
+    edge = 5e6 * (1 + top_fall["mean"] / 100) * 0.98 + (back_pts * 1e6 / 8.0)
+    assert sells(thin, {"f": -2.0}, {"f": edge - 1e4}, model, ver, 8.0)[0] == []
+    assert len(sells(thin, {"f": -2.0}, {"f": edge + 1e4}, model, ver, 8.0)[0]) == 1
 
     # the words: one function, every number from the reason
     out = {"cash": 20e6, "reserve": 10e6, "spendable": 10e6, "picks": got,

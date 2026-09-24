@@ -288,7 +288,7 @@ check "Universe flat-dict storage" 0 \
 # money's worth in season points is the report's own points-per-million; what a
 # bench player costs the season is the simulation's expected (MEAN) change --
 # now exported in the ladder, because a median hides optionality (Carl Starfelt:
-# median -0.4, mean -4.7). Preferences (hurdle, risk) are in inputs/league.ini.
+# median -0.4, mean -4.7). No preferences: decisions use the expected drift (flip.py header).
 # Sentences come from ONE function (say) fed structured reasons, and the page and
 # ping draw the box's view. Same rule applied to the ladder: sim.GROUP_LABEL is
 # the one copy of the group headings; the page had its own list and it had drifted.

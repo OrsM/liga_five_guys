@@ -10,10 +10,8 @@ the feed shows one, else the ask, plus 1% to beat them. Run it as history grows:
 WHY IT EXISTS. The first version of the strategy was tuned and checked on the
 same 44 days it learned from (+20% per trade). Walked forward it is about +6-7%
 per trade over ~6 updates on 9-11 trades (2026-09-24): the honest figure, and
-what the risk setting in inputs/league.ini should be chosen against as the sample
-grows. "predicted" is the model's confident lower bound; "realised" is the raw
-drift that followed -- if realised is far BELOW predicted, the model is
-overconfident.
+what a change to the buy rule should be judged against as the sample grows. "predicted" is the model's expected drift; "realised" is the raw drift that
+followed -- if realised is far BELOW predicted, the model is overconfident.
 
 Friction (offer discount, auction premium) is measured on the FULL history: a
 small leak, because the early days have too few samples to measure it at all.
@@ -80,30 +78,32 @@ def main() -> None:
         cands = [(ff_of.get(pid), pid, float(r["sale_price"]),
                   float(r["market_value"])) for (pid, d), r in close.items()
                  if d == day]
-        for z in (0.0, 0.5, 1.0, 2.0):
+        for pick, score in (("gain", lambda g, ask, b: g),
+                            ("gain per million", lambda g, ask, b: g / ask),
+                            ("return per update", lambda g, ask, b: b["net"])):
             best = None
             for ff, pid, ask, val in cands:
                 s = known.get(ff)
-                b = outlook.best(s[-1][1], offer, premium, z) if s else None
+                b = outlook.best(s[-1][1], offer, premium) if s else None
                 if b is None or b["net"] <= 0:
                     continue
-                gain = val * (1 + b["lo"] / 100) * offer - ask * premium
-                if best is None or gain > best[0]:
-                    best = (gain, ff, pid, ask, val, b)
+                gain = val * (1 + b["mean"] / 100) * offer - ask * premium
+                if best is None or score(gain, ask, b) > best[0]:
+                    best = (score(gain, ask, b), ff, pid, ask, val, b)
             if best:
                 _, ff, pid, ask, val, b = best
                 r = realised(ff, day, b["h"])
                 if r is not None:
                     cost = paid.get((pid, day), ask * premium) * 1.01
-                    out[z].append((val * (1 + r) * offer / cost - 1, b["h"],
-                                   b["lo"], 100 * r))
+                    out[pick].append((val * (1 + r) * offer / cost - 1, b["h"],
+                                      b["mean"], 100 * r))
     print("walk-forward: %d closing days judged (%s .. %s); offers pay %.3fx value, "
           "auctions cost %.3fx ask\n" % (len(judged), judged[0], judged[-1],
                                          offer, premium))
-    print("%-5s %6s %9s %8s %8s %6s   predicted (confident low) -> realised drift"
-          % ("risk", "trades", "mean net", "median", "%profit", "hold"))
-    for z, r in sorted(out.items()):
-        print("%-5.1f %6d %8.1f%% %7.1f%% %7.0f%% %6.1f   %+.1f%% -> %+.1f%%"
+    print("%-18s %6s %9s %8s %8s %6s   predicted -> realised drift"
+          % ("ranked by", "trades", "mean net", "median", "%profit", "hold"))
+    for z, r in out.items():
+        print("%-18s %6d %8.1f%% %7.1f%% %7.0f%% %6.1f   %+.1f%% -> %+.1f%%"
               % (z, len(r), 100 * st.mean(x[0] for x in r),
                  100 * st.median(x[0] for x in r),
                  100 * sum(1 for x in r if x[0] > 0) / len(r),

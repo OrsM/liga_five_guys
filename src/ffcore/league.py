@@ -51,8 +51,6 @@ class Config:
     start_cross: float = 70.0
     shrink_k: float = 8.0
     daily_bonus: float = 0.0
-    flip_hurdle: float = 0.0
-    flip_risk: float = 1.0
 
 
 def load_config(name: str = "league.ini") -> Config:
@@ -77,8 +75,6 @@ def load_config(name: str = "league.ini") -> Config:
         shrink_k=float(get("thresholds", "shrink_k", DEFAULTS["shrink_k"])),
         daily_bonus=money(get("league", "daily_bonus",
                               DEFAULTS["daily_bonus"])) or 0.0,
-        flip_hurdle=float(get("flip", "hurdle", 0.0)),
-        flip_risk=float(get("flip", "risk", 1.0)),
     )
     return cfg
 
