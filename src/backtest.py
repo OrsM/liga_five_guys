@@ -20,7 +20,7 @@ __all__ = ["commit_as_of", "csv_as_of", "commits_touching",
           "replay_ladder_percentile", "compare_arms",
           "screen_audit_episode", "replay_screen_misses",
           "POS_ID_SLOT", "squad_at", "jornada_points", "jornada_bounds",
-          "awards_by_round", "audit_jornada"]
+          "awards_by_round", "audit_jornada", "track_record"]
 
 _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -421,6 +421,22 @@ def _grade_episodes(episodes, points_between, now, min_days=None,
            "nets": nets, "horizon_days": horizon_days}
 
 
+def _format_track_record(r: dict | None) -> str | None:
+    if r is None or r["n"] < 5:
+        return None
+    return ("the report's #1 move has netted **%+.1f pts** on average over "
+           "the %g days that followed (%d of its last %d calls, %.0f%% "
+           "won)" % (r["mean_net"], HORIZON_DAYS, r["n"], r["total_episodes"],
+                     100 * r["wins"] / r["n"]))
+
+
+def track_record(min_days: float = 3.0) -> str | None:
+    """One sentence, generated from replay_recommendations(): has the
+    report's own #1 move actually paid off? None if too few calls have had
+    time to resolve yet -- the report says nothing rather than guess."""
+    return _format_track_record(replay_recommendations(min_days))
+
+
 def compare_arms(a: dict, b: dict, a_name: str, b_name: str) -> str:
     gap = stats.bootstrap_gap(a["nets"], b["nets"])
     lines = [f"{a_name}: {a['n']} eps, mean {a['mean_net']:+.1f} pts/ep "
@@ -619,6 +635,14 @@ def _selftest() -> None:
         print(f"  replay_ladder_percentile(top3), horizon="
              f"{cur['horizon_days']:.0f}d:")
         print("  " + compare_arms(pct, cur, "percentile", "current"))
+
+    assert _format_track_record(None) is None
+    assert _format_track_record({"n": 4, "total_episodes": 4, "mean_net": 9.0,
+                                 "wins": 4}) is None
+    got = _format_track_record({"n": 10, "total_episodes": 12,
+                                "mean_net": 2.5, "wins": 6})
+    assert got is not None and "+2.5 pts" in got and "10 of its last 12" in \
+        got and "60%" in got, got
 
     print("backtest.py selftest OK")
 

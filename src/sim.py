@@ -907,6 +907,7 @@ def payload(u, rows, base, rivals, locks_h=None, n_actions: int = 0,
         })
     return {
         "locks_in_h": locks_h,
+        "track_record": _track_record(),
         "cash": u.cash,
         "cash_locked": u.locked_cash,
         "squad_value": squad_value(u),
@@ -939,6 +940,16 @@ def payload(u, rows, base, rivals, locks_h=None, n_actions: int = 0,
             for m in sorted(u.state.squads, key=lambda m: -base.mean(m))],
     }
 
+
+
+def _track_record():
+    # Its own git-history replay, best-effort: a shallow clone or a slow
+    # disk should not break the report over a line that is a bonus.
+    try:
+        import backtest
+        return backtest.track_record()
+    except Exception:
+        return None
 
 
 PRICE_LOG = "cash_price_log.csv"
@@ -999,7 +1010,11 @@ def render(u, rows, base, stamp: str, rivals, n_actions: int = 0,
 
     if exp is None or xi is None:
         exp, xi = u.current_xi
-    out = ["# The simulation — %s" % stamp, "", "## Now", ""]
+    out = ["# The simulation — %s" % stamp, ""]
+    tr = _track_record()
+    if tr:
+        out += ["_Track record: %s._" % tr, ""]
+    out += ["## Now", ""]
     out += header(u, base, n_actions or len(rows), locks_h, xi=xi)
     out += ["## Every player you could hold", ""]
     out += ladder(u, rows, base, ladder_data, exp=exp, xi=xi)
@@ -1610,7 +1625,16 @@ def _selftest() -> None:
     assert _clears_par_floor(par_of, 2.9, "missing") is False
 
     current_mae = _real_current_mae
-    print("sim self-test OK (220 cases)")
+    # a broken or slow replay never breaks the report over a bonus line
+    import backtest
+    real_tr = backtest.track_record
+    backtest.track_record = lambda *a, **k: (_ for _ in ()).throw(RuntimeError)
+    try:
+        assert _track_record() is None
+    finally:
+        backtest.track_record = real_tr
+
+    print("sim self-test OK (221 cases)")
 
 
 def main() -> None:

@@ -313,7 +313,10 @@ check "Universe flat-dict storage" 0 \
 # payments (floor of days, unmeasured income rounded to whole payments), not
 # 100k x fractional days: the residual in the user's own balance is exactly
 # 46 x 100k over 37.6 days.
-check "src/ lines" 21397 \
+# 21397 -> 21445 on 2026-09-24: backtest.track_record() (reused replay_recommendations)
+# and its sim.py wiring -- the report now prints its own measured track record
+# instead of nothing, guarded so a broken replay drops the line, not the run.
+check "src/ lines" 21445 \
   "$(find src -name '*.py' | xargs cat | wc -l)"
 
 [ "$fail" -eq 0 ] && echo "concepts: no duplication regained" || echo "concepts: a concept regained a second implementation"
