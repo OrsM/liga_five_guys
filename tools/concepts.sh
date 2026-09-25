@@ -354,7 +354,14 @@ check "Universe flat-dict storage" 0 \
 # (report vs. workings disagreeing). The score TOTAL logged stays local on
 # purpose: it is the Scorer's per-round rating, not sim.py's season xi_total
 # -- methodology.py's own fits grade against that specific quantity.
-check "src/ lines" 21893 \
+# 21893 -> 21908 on 2026-09-24: rounds_left() orders remaining jornadas by real
+# kickoff, not jornada number -- a rescheduled fixture (jornada 6, one match
+# moved a month out for a European date) was anchoring the whole season
+# forecast to a jornada that was, in practice, over. Reuses JornadaClock
+# (tidy.py) rather than a fresh kickoff join: a first attempt at the join
+# mismatched jornada 38 to an October kickoff (two legs, no jornada tag to
+# disambiguate) and was reverted before shipping.
+check "src/ lines" 21908 \
   "$(find src -name '*.py' | xargs cat | wc -l)"
 
 [ "$fail" -eq 0 ] && echo "concepts: no duplication regained" || echo "concepts: a concept regained a second implementation"

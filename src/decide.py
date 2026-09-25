@@ -30,7 +30,7 @@ from ffcore.text import norm
 from ffcore.season import (LeagueState, best_xi,
                            simulate_many)
 from ffcore.tidy import (run_now,
-                         latest_only, load_api_market,
+                         latest_only, load_api_market, load_fixtures,
                          load_api_stats, load_matches, load_perjornada,
                          last_api_standings, load_api_offers, load_api_teams,
                          load_players, market_routes, pending_sent,
@@ -347,7 +347,7 @@ def load(trials_pool=None) -> Universe:
                         for r in (lg.market.latest().values()
                                   if lg.market is not None else [])
                         if text(r, MARKET_TBL.TEAM)})
-    rem, played, unjoined_clubs = rounds_left(m, mkt_teams)
+    rem, played, unjoined_clubs = rounds_left(m, mkt_teams, load_fixtures())
 
     teams = load_api_teams()
     mkt = load_api_market()

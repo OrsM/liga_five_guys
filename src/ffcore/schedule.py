@@ -4,11 +4,26 @@ from __future__ import annotations
 from ffcore.crosswalk import club_key
 
 
-def rounds_left(matches, teams) -> tuple[list[int], dict[int, set[str]], list]:
+def rounds_left(matches, teams, fixtures=()
+                ) -> tuple[list[int], dict[int, set[str]], list]:
+    """`rem`, ORDERED BY REAL CALENDAR TIME where it is known, not jornada
+    number. Found 2026-09-24: jornada 6 had one match rescheduled a month
+    out (a European date), while jornada 8, fully unplayed, kicks off two
+    weeks sooner -- jornada-number order put the stale one first. Reuses
+    JornadaClock (tidy.py), already built to disambiguate a home/away pair
+    that meets twice a season by the exact (home, away) leg matches.csv
+    itself recorded -- not a fresh team-pair join, which cannot tell the
+    two legs apart and mismatched jornada 38 to an October kickoff when
+    tried (a live-run check, never shipped)."""
+    from ffcore.tidy import JornadaClock
+
     js = {r["jornada"] for r in matches if (r.get("jornada") or "").isdigit()}
     finished = {j for j in js
                 if all(r.get("score") for r in matches if r["jornada"] == j)}
-    rem = sorted(int(j) for j in js - finished)
+    open_j = {int(j) for j in js - finished}
+    clock_order = [j for j in JornadaClock(matches, fixtures).order
+                  if j in open_j] if fixtures else []
+    rem = clock_order + sorted(open_j - set(clock_order))
 
     played: dict[int, set[str]] = {}
     unjoined: list[str] = []
