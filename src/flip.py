@@ -155,12 +155,21 @@ def auction_ratios(listings: list[dict], buys: list[dict]) -> list[float]:
 
 
 def report_view(ladder: list[dict], name_key) -> dict:
-    """{key: (group, expected season points change if he is sold)} for my players,
-    as the season report's ladder says. `name_key` maps a ladder name to a key."""
+    """{key: (group, expected season points change if he is sold)} for my
+    players, as the season report's ladder says. `name_key` maps a ladder
+    name to a key.
+
+    "offer" ROWS ARE INCLUDED. A currently-fielded starter carries no verdict
+    under his own group ("field" is not one of the groups below -- the report
+    is silent on starters by default), but the ladder still prices what
+    losing him costs wherever he has a live received offer, and that is
+    what a funding menu needs: not just "is he dispensable" but "what would
+    selling him cost", for anyone with money on the table."""
     verdict = {}
     for r in ladder:
         k = name_key(r["name"])
-        if r["where"] == "yours" and k and r["group"] in ("sell", "keep", "out", "in") \
+        if r["where"] == "yours" and k \
+                and r["group"] in ("sell", "keep", "out", "in", "offer") \
                 and r.get("pts_mean") is not None:
             verdict[k] = (r["group"], r["pts_mean"])
     return verdict
@@ -247,6 +256,54 @@ def sells(bench: list[dict], last: dict[str, float], offers: dict[str, float],
     return out, held
 
 
+def fund(offers: dict[str, float], mine: dict, names: dict, xi: set,
+        verdict: dict, rate: float) -> list[dict]:
+    """Every squad player with a real received offer on the table, cheapest
+    in season points first -- what selling him costs, whether he starts or
+    not. This answers "where do I get the cash", nothing more: the report
+    OWNS who is dispensable, so nobody here is picked FOR you, a starter
+    least of all -- sells()/picks() already act where the arithmetic is a
+    clear yes; this is a menu for when it is not.
+
+    cost_pts IS ALREADY SEASON- AND XI-AWARE, not a guess bolted on here:
+    it is `pts_mean` off the same ladder every other section reads, and that
+    number comes from sim.band_acts() running a stand-alone sell of THIS
+    player, alone, through the full season Monte Carlo -- best XI
+    re-optimised inside every simulated week, an average-player phantom
+    filling his slot. A key starter prices in the tens of points (Pablo
+    Fornals: -60.0, 2026-09-25); a fringe bench player in tenths.
+
+    ONE CAVEAT WORTH KEEPING: each cost is marginal -- HIM ALONE, everyone
+    else held as they are. Selling several players from this menu at once is
+    not guaranteed to cost exactly the sum of their costs (two players in
+    the same position interact), the same caveat every other one-at-a-time
+    row on the ladder already carries. Only cash is summed below (`running`)
+    -- points never are, and nothing here claims to have costed a COMBINED
+    sale.
+
+    A player with no report verdict is left off, same rule as sells(): an
+    unpriced sale is not a sale this module can grade."""
+    out = []
+    for k, offer in offers.items():
+        if k not in mine:
+            continue
+        v = verdict.get(k)
+        if v is None:
+            continue
+        group, exp_pts = v
+        cost = 0.0 if group == "sell" else max(0.0, -exp_pts)
+        out.append({"key": k, "name": names.get(k, k), "offer": offer,
+                    "cost_pts": cost, "starter": k in xi,
+                    "reason": {"code": "fund", "offer": offer, "cost": cost,
+                               "starter": k in xi}})
+    out.sort(key=lambda p: (p["cost_pts"], -p["offer"]))
+    running = 0.0
+    for p in out:
+        running += p["offer"]
+        p["running"] = running
+    return out
+
+
 # ------------------------------------------------------------------- the words
 def _m(v: float) -> str:
     from ffcore.parse import fmt_money
@@ -285,6 +342,13 @@ def say(r: dict) -> str:
                 "%s -- the report keeps him"
                 % (how, _m(r["hold"]), r["h"], more,
                    _pts(r["benefit"]), _pts(r["cost"])))
+    if c == "fund":
+        where = "currently in your eleven" if r["starter"] else "on the bench"
+        if r["cost"] <= 0:
+            return "%s, %s; free to take, the report already has him leaving" \
+                % (_m(r["offer"]), where)
+        return "%s, %s; selling him costs the season %s points" \
+            % (_m(r["offer"]), where, _pts(r["cost"]))
     raise ValueError("no wording for reason code %r" % c)
 
 
@@ -302,6 +366,9 @@ def present(out: dict) -> dict:
                     "offer " + _m(p["offer"]) if p["offer"] else ""])
             for p in out["sells"]]
     held = [row(p, [_m(p["value"]), ""]) for p in out["held"]]
+    funded = [row(p, [_m(p["offer"]), "%s pts" % _pts(p["cost_pts"])
+                      if p["cost_pts"] > 0 else "free"])
+             for p in out["fund"]]
     doable = [p for p in out["picks"] if p["fits"]]      # the ping is for what you can act on
     ping = ("\nBuy: " + ", ".join("%s (bid up to %s)" % (p["name"], _m(p["max_bid"]))
                                   for p in doable[:2]) if doable else "")
@@ -309,16 +376,26 @@ def present(out: dict) -> dict:
              if sold else "")
     hold = ("; %s held back for the report's top move" % _m(out["reserve"])
             if out["reserve"] > 0 else "")
+    sections = [
+        {"label": "BUY — free market", "tone": "buy", "rows": buys,
+         "empty": "Nothing on the free market is expected to beat the cost "
+                  "of tying the cash up."},
+        {"label": "SELL — not starting", "tone": "sell", "rows": sold},
+        {"label": "HELD BACK — the report keeps them", "tone": "held",
+         "rows": held}]
+    # ONLY WHEN SOMETHING IS SHORT (out["fund"] is empty otherwise, set by
+    # main()) -- a menu of real offers already on the table, cheapest in
+    # season points first, for whichever pick needs the cash. Never a
+    # recommendation on its own: sells() already acts where selling is a
+    # clear yes, and a starter sale is too big a call for this to make FOR
+    # you, so every candidate is shown, priced, and left to you.
+    if funded:
+        sections.append({"label": "FUND — offers already on the table",
+                         "tone": "fund", "rows": funded})
     return {
         "heading": "MARKET",
         "summary": "%s to spend%s" % (_m(out["spendable"]), hold),
-        "sections": [
-            {"label": "BUY — free market", "tone": "buy", "rows": buys,
-             "empty": "Nothing on the free market is expected to beat the cost "
-                      "of tying the cash up."},
-            {"label": "SELL — not starting", "tone": "sell", "rows": sold},
-            {"label": "HELD BACK — the report keeps them", "tone": "held",
-             "rows": held}],
+        "sections": sections,
         "ping": ping}
 
 
@@ -421,11 +498,16 @@ def main() -> None:
     sales, kept = sells(bench, last, dict(u.received_offers), model, verdict,
                         money_rate(moves))
     spend = max(0.0, u.cash - held_back)
+    pick_list = [p for p in picks(free, last, model, spend)
+                if (p["key"], "SELL") not in recent]
+    short = max([held_back - u.cash] + [p["short"] for p in pick_list],
+               default=0.0)
+    funding = (fund(dict(u.received_offers), mine, name, xi, verdict,
+                    money_rate(moves)) if short > 0 else [])
     out = {"cash": u.cash, "reserve": held_back, "spendable": spend,
-           "picks": [p for p in picks(free, last, model, spend)
-                     if (p["key"], "SELL") not in recent],
+           "picks": pick_list,
            "sells": [p for p in sales if (p["key"], "BUY") not in recent],
-           "held": kept,
+           "held": kept, "fund": funding,
            "measured": {"offer": offer, "premium": premium,
                         "offers": len(offer_r), "auctions": len(paid_r),
                         "points_per_million": money_rate(moves)}}
@@ -499,9 +581,15 @@ def _selftest() -> None:
     # clause premium is paid out is a bigger need than the player's value)
     ladder = [{"name": "Kept", "where": "yours", "group": "keep", "pts_mean": -0.5},
               {"name": "Free", "where": "yours", "group": "sell", "pts_mean": -3.0},
+              # a fielded starter carries no "field" verdict, but the ladder
+              # still prices him wherever he has a real offer -- report_view
+              # must pick that up, or a starter can never be priced at all
+              {"name": "Star", "where": "yours", "group": "offer",
+               "pts_mean": -9.0},
               {"name": "Rival", "where": "x", "group": "raid", "pts_mean": None}]
-    ver = report_view(ladder, {"Kept": "k", "Free": "f"}.get)
-    assert ver == {"k": ("keep", -0.5), "f": ("sell", -3.0)}, ver
+    ver = report_view(ladder, {"Kept": "k", "Free": "f", "Star": "s"}.get)
+    assert ver == {"k": ("keep", -0.5), "f": ("sell", -3.0),
+                   "s": ("offer", -9.0)}, ver
     moves = [{"net": -18.4e6, "value": 1.0}, {"net": -12.3e6, "value": 0.6}, {"net": 5e6, "value": None}]
     assert reserve(moves) == 18.4e6 and money_rate(moves) == 0.8
     assert reserve([{"net": 3e6, "value": 1.0}]) == 0.0      # a move that RAISES cash reserves none
@@ -548,9 +636,21 @@ def _selftest() -> None:
     assert sells(thin, {"f": -2.0}, {"f": edge - 1e4}, model, ver, 8.0)[0] == []
     assert len(sells(thin, {"f": -2.0}, {"f": edge + 1e4}, model, ver, 8.0)[0]) == 1
 
+    # fund(): every squad player with a real offer, cheapest in points
+    # first -- INCLUDING a starter, which sells()/picks() never touch
+    my_squad = {"k": 1, "f": 1, "s": 1, "u": 1}
+    offers = {"k": 5e6, "f": 2e6, "s": 30e6, "u": 1e6, "outside": 9e6}
+    names = {"k": "Kept", "f": "Free", "s": "Star", "u": "Unjudged"}
+    menu = fund(offers, my_squad, names, {"s"}, ver, rate=1.0)
+    # "outside" is not on the squad, "u" has no verdict: both excluded
+    assert [p["name"] for p in menu] == ["Free", "Kept", "Star"], menu
+    assert menu[0]["cost_pts"] == 0.0 and menu[1]["cost_pts"] == 0.5, menu
+    assert menu[2]["starter"] and not menu[0]["starter"], menu
+    assert menu[-1]["running"] == 5e6 + 2e6 + 30e6, menu
+
     # the words: one function, every number from the reason
     out = {"cash": 20e6, "reserve": 10e6, "spendable": 10e6, "picks": got,
-           "sells": sold, "held": held}
+           "sells": sold, "held": held, "fund": []}
     v = present(out)
     assert v["summary"] == "10.00M to spend; 10.00M held back for the report's top move", v["summary"]
     tight = present({**out, "picks": [poor]})["sections"][0]["rows"][0]["right"]

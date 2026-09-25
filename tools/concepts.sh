@@ -329,7 +329,13 @@ check "Universe flat-dict storage" 0 \
 # per docs/notes/score.md) is now fitted each run against real promoted-team
 # matches, shrunk toward the stated default so a thin/lopsided sample cannot
 # swing it far -- measured 0.75 on 336 real matches, close to the guess.
-check "src/ lines" 21660 \
+# 21660 -> 21760 on 2026-09-24: flip.fund() -- every squad player (starter or
+# bench) with a live received offer, priced in season points via the SAME
+# ladder every other section reads (sim.band_acts() runs a stand-alone sale
+# through the full season Monte Carlo, best XI re-optimised each trial), so a
+# key starter (Fornals: -60.0 pts) and a fringe bench player (0.1 pts) are on
+# one honestly-priced menu. Shown only when a pick or the reserve is short.
+check "src/ lines" 21760 \
   "$(find src -name '*.py' | xargs cat | wc -l)"
 
 [ "$fail" -eq 0 ] && echo "concepts: no duplication regained" || echo "concepts: a concept regained a second implementation"
