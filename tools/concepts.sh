@@ -8,8 +8,12 @@
 #
 # This counts the OLD spelling of each unified concept and fails if the
 # number goes UP. Budgets are the current count plus the documented
-# exceptions below -- lower one whenever you retire a site, never raise one
-# without saying why in the same commit.
+# exceptions below -- lower one whenever you retire a site.
+#
+# Claude: never raise a budget yourself to make this pass, on this check or
+# any added later. Setting your own bar to whatever you just produced is
+# not verification. If a change genuinely needs a budget higher, stop and
+# ask the user -- don't edit the number.
 set -uo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
@@ -363,6 +367,22 @@ check "Universe flat-dict storage" 0 \
 # disambiguate) and was reverted before shipping.
 check "src/ lines" 21850 \
   "$(find src -name '*.py' | xargs cat | wc -l)"
+
+# Real duplication, not a line-count proxy: normalized 3-statement windows
+# that recur verbatim across two different top-level functions/methods
+# (tools/microclones.py). "src/ lines" above tracks size, which moves for
+# reasons that have nothing to do with duplication (a deleted comment, an
+# added test) -- it got bumped up as often as down and stopped meaning
+# anything.
+#
+# NON-NEGOTIABLE: this budget is set by whoever is reviewing the change,
+# not by the agent that just wrote the merge being measured -- an agent
+# lowering its own bar to exactly what it just produced proves nothing.
+# Claude: NEVER raise this number yourself, "with justification" or
+# otherwise. If a change needs it higher, stop and ask; do not edit this
+# line to make a check pass.
+check "micro-clone windows" 82 \
+  "$(python3 tools/microclones.py --count)"
 
 [ "$fail" -eq 0 ] && echo "concepts: no duplication regained" || echo "concepts: a concept regained a second implementation"
 exit "$fail"
