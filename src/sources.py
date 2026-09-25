@@ -1300,15 +1300,11 @@ sign_api_activity = partial(_sign_rows, parse=lambda t: parse_api_activity(t, ""
 
 def parse_api_teams(text: str, observed_at: str,
                     key: str = "api_teams") -> list[dict]:
-    d = _j(text)
-    if not isinstance(d, list):
-        return []
-    rows = []
-    for t in d:
+    def row(t):
+        out = []
         m = t.get("manager") or {}
         if t.get("id"):
-            rows.append({
-                "observed_at": observed_at, "source": LFG_SOURCE,
+            out.append({
                 ROW_TABLE: "api_standings",
                 "team_id": str(t["id"]),
                 "user_id": str(m.get("id") or ""),
@@ -1327,8 +1323,7 @@ def parse_api_teams(text: str, observed_at: str,
             pm = _pm(p)
             if not pm.get("id"):
                 continue
-            rows.append({
-                "observed_at": observed_at, "source": LFG_SOURCE,
+            out.append({
                 ROW_TABLE: "api_teams",
                 "team_id": str(t.get("id") or ""),
                 "manager": m.get("managerName") or "",
@@ -1339,8 +1334,9 @@ def parse_api_teams(text: str, observed_at: str,
                 "player_status": pm.get("playerStatus") or "",
                 "player_team_id": str(p.get("playerTeamId") or ""),
             })
-            rows += _stat_rows(pm, observed_at)
-    return rows
+            out += _stat_rows(pm, observed_at)
+        return out
+    return _parse_json_list(text, observed_at, row)
 
 
 def _stat_rows(pm: dict, observed_at: str) -> list[dict]:
