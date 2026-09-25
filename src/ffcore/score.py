@@ -270,20 +270,31 @@ def _shots_by_jornada(xw) -> dict[str, dict[int, float]]:
     return out
 
 
-def _shots_points_fit(xw, players=None) -> tuple[float, float, int]:
+def _forward_shots_minutes(xw, players=None):
+    """Forward players' shots-per-jornada, minutes-per-jornada (both keyed
+    by crosswalk key), and the players table -- the shared setup
+    _shots_points_fit() and load_shots_current() each rebuilt separately
+    (same _shots_by_jornada() call, same _per_jornada_current() call, same
+    "pos == delantero" filter applied downstream) before diverging into a
+    fit and a rate. () for by_key when no perjornada file exists yet."""
     from ffcore.tidy import (SEASON, load, load_players,
                              load_perjornada, jornada_of_match)
 
-    if xw is None:
-        return 0.0, 0.0, 0
+    players = players if players is not None else load_players()
+    shots_by_key = _shots_by_jornada(xw)
     live = SEASON / "live"
     files = sorted(live.glob("perjornada_*.csv")) if live.exists() else []
-    if not files:
-        return 0.0, 0.0, 0
     by_key = _per_jornada_current(load("starters"), load_perjornada(),
-                                  jornada_of_match(), xw)
-    shots_by_key = _shots_by_jornada(xw)
-    players = players if players is not None else load_players()
+                                  jornada_of_match(), xw) if files else {}
+    return shots_by_key, by_key, players
+
+
+def _shots_points_fit(xw, players=None) -> tuple[float, float, int]:
+    if xw is None:
+        return 0.0, 0.0, 0
+    shots_by_key, by_key, players = _forward_shots_minutes(xw, players)
+    if not by_key:
+        return 0.0, 0.0, 0
 
     xs, ys = [], []
     for key, jd_shots in shots_by_key.items():
@@ -310,22 +321,14 @@ def _shots_points_fit(xw, players=None) -> tuple[float, float, int]:
 
 
 def load_shots_current(xw=None, players=None) -> dict[str, dict]:
-    from ffcore.tidy import (SEASON, load, load_crosswalk, load_players,
-                             load_perjornada, jornada_of_match)
+    from ffcore.tidy import load_crosswalk
 
     xw = xw if xw is not None else load_crosswalk()
     if xw is None:
         return {}
-    players = players if players is not None else load_players()
-    shots_by_key = _shots_by_jornada(xw)
-    live = SEASON / "live"
-    files = sorted(live.glob("perjornada_*.csv")) if live.exists() else []
-    minutes_by_key: dict[str, dict[int, float]] = {}
-    if files:
-        by_key = _per_jornada_current(load("starters"), load_perjornada(),
-                                      jornada_of_match(), xw)
-        minutes_by_key = {k: {j: mins for j, (_pts, mins) in jd.items()}
-                          for k, jd in by_key.items()}
+    shots_by_key, by_key, players = _forward_shots_minutes(xw, players)
+    minutes_by_key = {k: {j: mins for j, (_pts, mins) in jd.items()}
+                      for k, jd in by_key.items()}
     out = {}
     for key, jd_shots in shots_by_key.items():
         if (players.get(key) or {}).get("pos", "").lower() != "delantero":
