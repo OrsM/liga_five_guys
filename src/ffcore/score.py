@@ -79,10 +79,9 @@ def fit_promoted_discount(market: list[dict], history: dict,
     from ffcore.tidy import SEASON, read_csv
 
     promoted = {norm(t) for t in detect_promoted(market, history)}
-    team_of = {r.get("ff_id"): norm(r.get("team", "")) for r in market
-              if r.get("ff_id")}
-    pos_of = {r.get("ff_id"): SLOT.get((r.get("position") or "").lower())
-             for r in market if r.get("ff_id")}
+    facts = {r["ff_id"]: (norm(r.get("team", "")),
+                          SLOT.get((r.get("position") or "").lower()))
+            for r in market if r.get("ff_id")}
     live = SEASON / "live"
     files = sorted(live.glob("perjornada_*.csv")) if live.exists() else []
     if not files:
@@ -95,10 +94,9 @@ def fit_promoted_discount(market: list[dict], history: dict,
             continue
         if games <= 0:
             continue
-        ff = r.get("ff_id")
-        if team_of.get(ff) not in promoted:
+        team, slot = facts.get(r.get("ff_id"), ("", None))
+        if team not in promoted:
             continue
-        slot = pos_of.get(ff)
         prior = prior_of.get(slot)
         if not prior:
             continue

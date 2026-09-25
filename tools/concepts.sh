@@ -325,11 +325,11 @@ check "Universe flat-dict storage" 0 \
 # mtime/size discipline as read_csv()) replaces four independent readers of
 # players.csv+clubs.csv (methodology.py's own _XW_CACHE, backtest.py,
 # score.py's _calibrated(), methodology.py's forecast_claims()).
-# 21527 -> 21662 on 2026-09-24: PROMOTED_DISCOUNT (0.70, stated but never checked
+# 21527 -> 21660 on 2026-09-24: PROMOTED_DISCOUNT (0.70, stated but never checked
 # per docs/notes/score.md) is now fitted each run against real promoted-team
 # matches, shrunk toward the stated default so a thin/lopsided sample cannot
 # swing it far -- measured 0.75 on 336 real matches, close to the guess.
-check "src/ lines" 21662 \
+check "src/ lines" 21660 \
   "$(find src -name '*.py' | xargs cat | wc -l)"
 
 [ "$fail" -eq 0 ] && echo "concepts: no duplication regained" || echo "concepts: a concept regained a second implementation"
