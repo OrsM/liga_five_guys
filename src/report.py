@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import json
-import os
 import re
 import sys
 from pathlib import Path
@@ -12,12 +11,10 @@ from ffcore.bid import deals, low_priced_buys
 from ffcore.render import title_name
 from ffcore.score import SLOT_LABEL, SLOT_MIN, squad_pool
 from ffcore.tidy import (run_now, shown,
-                         ALERTS, DECISIONS,
+                         ALERTS, DECISIONS, WARNINGS,
                          age_phrase, append_csv, load_crosswalk,
                          load_deadline, read_csv,
                          snapshot_stamp, stale_feeds, widen_csv, write_lines)
-
-WARNINGS = Path(os.environ.get("LFG_WARNINGS", ".runtime/warnings.json"))
 
 STALE_HOURS = 14.0
 

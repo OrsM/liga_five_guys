@@ -15,6 +15,7 @@ from ffcore.parse import money, pct100
 from ffcore.text import index_by, norm, resolve
 
 __all__ = ["ROOT", "TIDY", "SEASON", "DECISIONS", "REPORTS", "PARTS", "MADRID",
+           "WARNINGS",
            "input_path", "read_csv", "write_csv", "append_csv", "widen_csv", "log_row",
            "write_lines", "snapshot_stamp", "ledger_stamp", "latest_only",
            "latest_per_key", "snapshots",
@@ -42,6 +43,8 @@ REPORTS = Path(os.environ.get("LFG_REPORTS", "reports"))
 PARTS = Path(os.environ.get("LFG_PARTS", ".runtime/parts"))
 
 ALERTS = Path(os.environ.get("LFG_ALERTS", ".runtime/alerts.md"))
+
+WARNINGS = Path(os.environ.get("LFG_WARNINGS", ".runtime/warnings.json"))
 
 
 def _madrid():

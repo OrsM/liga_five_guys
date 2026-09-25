@@ -175,32 +175,32 @@ def pages(only: set | None = None):
 _INDEX = "snapindex.json"
 
 
-def _index_load() -> dict:
+def _read_json(path: Path, default):
+    """A whole small JSON file, or `default` if it is missing or corrupt --
+    the read half of the cache/index/state contract every JSON-blob store
+    in this module shares (doc_keys' snapindex, _load_parse_state,
+    parse_cache's legacy-blob fallback)."""
     try:
-        blob = json.loads((TIDY / _INDEX).read_text(encoding="utf-8"))
+        return json.loads(path.read_text(encoding="utf-8"))
     except (OSError, ValueError):
-        return {}
-    return blob.get("snaps", {})
+        return default
 
 
-def _index_save(snaps: dict) -> None:
+def _write_json(path: Path, obj) -> None:
     TIDY.mkdir(parents=True, exist_ok=True)
     try:
-        (TIDY / _INDEX).write_text(json.dumps({"snaps": snaps}),
-                                   encoding="utf-8")
+        path.write_text(json.dumps(obj), encoding="utf-8")
     except OSError:
         pass
 
 
-def _size_of(path: Path) -> int:
-    return path.stat().st_size if path.is_file() else -1
-
-
 def doc_keys():
-    idx, out, carried, keys = _index_load(), [], {}, Sigs()
+    idx = _read_json(TIDY / _INDEX, {}).get("snaps", {})
+    out, carried, keys = [], {}, Sigs()
     fresh, opened = {}, 0
     for snap in snapshots():
-        stamp, size = _stamp_of(snap), _size_of(snap)
+        stamp = _stamp_of(snap)
+        size = snap.stat().st_size if snap.is_file() else -1
         have = idx.get(stamp)
         if have is not None and have.get("size") == size:
             resolved = {p: (v[0], v[1]) for p, v in have["pages"].items()}
@@ -218,7 +218,7 @@ def doc_keys():
                         "pages": {p: list(v) for p, v in resolved.items()}}
         out.append((stamp, resolved))
     if fresh != idx:
-        _index_save(fresh)
+        _write_json(TIDY / _INDEX, {"snaps": fresh})
     if opened:
         print("  read %d of %d snapshots from disk" % (opened, len(out)))
     return out
@@ -240,43 +240,24 @@ TWICE_DAILY_HOURS = 6.0
 
 
 def due(src, prev: dict, now: str) -> bool:
+    from ffcore.tidy import snapshot_stamp
+
     if src.cadence == "once":
         return src.key not in prev
     seen = prev.get(src.key, {}).get("seen", "")
     if src.cadence == "twice_daily":
-        gap = _hours_between(seen, now)
+        a, b = snapshot_stamp(seen), snapshot_stamp(now)
+        gap = None if a is None or b is None else (b - a).total_seconds() / 3600.0
         return gap is None or gap >= TWICE_DAILY_HOURS
     if src.cadence != "daily":
         return True
     return not (seen[:10] == now[:10])
 
 
-def _hours_between(then: str, now: str) -> float | None:
-    from ffcore.tidy import snapshot_stamp
-
-    a, b = snapshot_stamp(then), snapshot_stamp(now)
-    if a is None or b is None:
-        return None
-    return (b - a).total_seconds() / 3600.0
-
-
 def carry_matches(rows: list[dict], prev: dict) -> list[dict]:
     have = {r["page"] for r in rows}
     return rows + [dict(r) for page, r in prev.items()
                    if MATCH_KEY_RE.match(page) and page not in have]
-
-
-def _odds_api_key() -> str | None:
-    env = os.environ.get("ODDS_API_KEY")
-    if env:
-        return env.strip()
-    repo_root = Path(__file__).resolve().parent.parent
-    path = repo_root / ".odds_api_key"
-    try:
-        key = path.read_text().strip()
-    except FileNotFoundError:
-        return None
-    return key or None
 
 
 def fetch() -> Path:
@@ -310,7 +291,13 @@ def fetch() -> Path:
     except Exception as e:                              # noqa: BLE001
         print(f"  warn: league token unusable ({e}); API sources skipped.")
 
-    odds_key = _odds_api_key()
+    odds_key = os.environ.get("ODDS_API_KEY", "").strip() or None
+    if not odds_key:
+        odds_path = Path(__file__).resolve().parent.parent / ".odds_api_key"
+        try:
+            odds_key = odds_path.read_text().strip() or None
+        except FileNotFoundError:
+            odds_key = None
     if odds_key is None:
         print("  note: no Odds API key (.odds_api_key or ODDS_API_KEY); "
               "the odds source will be skipped.")
@@ -407,7 +394,11 @@ def fetch() -> Path:
     print(f"snapshot: {dest} ({dest.stat().st_size // 1024}KB) — "
           f"{len(store)} stored, {unchanged} unchanged, {skipped} not due"
           + (f", {rotted} ROTTED" if rotted else ""))
-    _log_feeds(stamp, timing, fails)
+    if timing:
+        append_csv(TIDY / FEEDS,
+                  [{"observed_at": stamp, "page": k, "status": st,
+                    "seconds": "%.2f" % t} for t, k, st in timing],
+                  FEED_FIELDS)
     if timing:
         slow = sorted(timing, reverse=True)[:5]
         print("  slowest: " + ", ".join(
@@ -423,16 +414,6 @@ def fetch() -> Path:
 
 FEEDS = "feeds.csv"
 FEED_FIELDS = ["observed_at", "page", "status", "seconds"]
-
-
-def _log_feeds(stamp: str, timing: list, fails: dict) -> None:
-    if not timing:
-        return
-    TIDY.mkdir(parents=True, exist_ok=True)
-    append_csv(TIDY / FEEDS,
-               [{"observed_at": stamp, "page": k, "status": st,
-                 "seconds": "%.2f" % t} for t, k, st in timing],
-               FEED_FIELDS)
 
 
 
@@ -510,7 +491,7 @@ def _parse_tail(walk, tail, sigs_now, stamps, state) -> bool:
             keyed.append((stamp, pk, src))
             want[(origin, key)] = pk
 
-    cache = _cache_lines(set(want.values()))
+    cache = _read_cache_lines(_CACHE, set(want.values()))
     need: dict[str, set] = {}
     for (origin, key), pk in want.items():
         if pk not in cache:
@@ -812,33 +793,33 @@ def _lines_name(name: str) -> str:
 
 
 def _load_parse_state(name: str = _STATE) -> dict:
-    try:
-        blob = json.loads((TIDY / name).read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        return {}
+    blob = _read_json(TIDY / name, {})
     return blob if isinstance(blob, dict) else {}
 
 
 def _save_parse_state(state: dict, name: str = _STATE) -> None:
-    TIDY.mkdir(parents=True, exist_ok=True)
-    try:
-        (TIDY / name).write_text(json.dumps(state), encoding="utf-8")
-    except OSError:
-        pass
+    _write_json(TIDY / name, state)
 
 
-def _cache_lines(keys: set, name: str = _CACHE) -> dict:
-    """The cached rows for JUST these keys, read a line at a time.
+def _read_cache_lines(name: str, keys: set | None = None) -> dict:
+    """Cached rows from the line-format cache, filtered to `keys` when
+    given -- the one streaming reader behind both parse_cache() (keys=None,
+    every document, falling back to the legacy single-blob format when the
+    line file has never been written) and a tail append's `keys` subset
+    (always on the line format already, since a tail only runs after a
+    full parse has already produced it). These were the identical
+    line-by-line loop written out twice.
 
     The point of the line format is that a tail append needs a few hundred
     documents out of several thousand, and json.load() of the single-blob
     cache costs 368MB to get them. Streaming keeps only what was asked for.
     """
-    out: dict = {}
+    lines = TIDY / _lines_name(name)
     try:
-        fh = (TIDY / _lines_name(name)).open(encoding="utf-8")
+        fh = lines.open(encoding="utf-8")
     except OSError:
-        return out
+        return {} if keys is not None else _read_json(TIDY / name, {}).get("docs", {})
+    out: dict = {}
     with fh:
         for line in fh:
             if not line.strip():
@@ -848,7 +829,7 @@ def _cache_lines(keys: set, name: str = _CACHE) -> dict:
             except ValueError:
                 continue
             k = rec.get("k")
-            if k in keys:
+            if k and (keys is None or k in keys):
                 out[k] = rec.get("r") or []
     return out
 
@@ -869,28 +850,7 @@ def parse_cache(name: str = _CACHE) -> dict:
     """Every cached document. The line file is the live format; the single
     blob is read once, on the first run after the change, and then replaced
     by save_parse_cache below."""
-    lines = TIDY / _lines_name(name)
-    if lines.exists():
-        out: dict = {}
-        try:
-            with lines.open(encoding="utf-8") as fh:
-                for line in fh:
-                    if not line.strip():
-                        continue
-                    try:
-                        rec = json.loads(line)
-                    except ValueError:
-                        continue
-                    if rec.get("k"):
-                        out[rec["k"]] = rec.get("r") or []
-        except OSError:
-            return {}
-        return out
-    try:
-        blob = json.loads((TIDY / name).read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        return {}
-    return blob.get("docs", {})
+    return _read_cache_lines(name)
 
 
 def save_parse_cache(docs: dict, name: str = _CACHE) -> None:

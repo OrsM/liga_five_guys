@@ -6,8 +6,6 @@ import sys
 
 import json
 import math
-import os as _os
-from pathlib import Path
 
 from decide import dead_weight, overdraft_fix, route_kind, value_rate  # noqa: E402,F401
 from methodology import current_mae
@@ -15,7 +13,7 @@ from ffcore.parse import fmt_money
 from ffcore.league import app_fielded
 from ffcore.render import title_name
 from ffcore.tidy import (run_now, shown,
-                         ALERTS, PARTS, REPORTS, write_lines)
+                         ALERTS, PARTS, REPORTS, WARNINGS, write_lines)
 
 __all__ = ["shape"]
 
@@ -38,7 +36,7 @@ def fielded_keys(u=None) -> list[str]:
 
 
 def _warnings() -> list:
-    p = Path(_os.environ.get("LFG_WARNINGS", ".runtime/warnings.json"))
+    p = WARNINGS
     try:
         got = json.loads(p.read_text(encoding="utf-8"))
         return got if isinstance(got, list) else []
