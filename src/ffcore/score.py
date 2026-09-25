@@ -403,29 +403,35 @@ def _per_jornada_current(starters_rows, perjornada_rows, jornada_of_match,
     return out
 
 
-def _weighted_totals(per_jornada: dict[int, tuple[float, float]],
-                     decay: float) -> tuple[float, float]:
+def _decay_walk(per_jornada: dict[int, tuple[float, float]], decay: float,
+                terms) -> tuple[float, float]:
+    """Decay-weighted sum of terms(pts, mins, w) over `per_jornada`, newest
+    jornada weighted 1.0 -- the accumulation loop _weighted_totals() and
+    _weighted_start() each walked separately, only the per-step terms
+    differ."""
     if not per_jornada:
         return 0.0, 0.0
     latest = max(per_jornada)
-    wpts = wmatch = 0.0
+    a = b = 0.0
     for j, (pts, mins) in per_jornada.items():
         w = decay ** (latest - j)
-        wpts += pts * w
-        wmatch += (mins / 90.0) * w
-    return wpts, wmatch
+        da, db = terms(pts, mins, w)
+        a += da
+        b += db
+    return a, b
+
+
+def _weighted_totals(per_jornada: dict[int, tuple[float, float]],
+                     decay: float) -> tuple[float, float]:
+    return _decay_walk(per_jornada, decay,
+                       lambda pts, mins, w: (pts * w, (mins / 90.0) * w))
 
 
 def _weighted_start(per_jornada: dict[int, tuple[float, float]],
                     decay: float) -> tuple[float, float]:
-    if not per_jornada:
-        return 0.0, 0.0
-    latest = max(per_jornada)
-    wsum = wn = 0.0
-    for j, (_pts, mins) in per_jornada.items():
-        w = decay ** (latest - j)
-        wsum += w * min(1.0, mins / 90.0)
-        wn += w
+    wsum, wn = _decay_walk(
+        per_jornada, decay,
+        lambda pts, mins, w: (w * min(1.0, mins / 90.0), w))
     return (wsum / wn if wn else 0.0), wn
 
 
