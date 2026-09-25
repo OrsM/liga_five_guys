@@ -335,7 +335,12 @@ check "Universe flat-dict storage" 0 \
 # through the full season Monte Carlo, best XI re-optimised each trial), so a
 # key starter (Fornals: -60.0 pts) and a fringe bench player (0.1 pts) are on
 # one honestly-priced menu. Shown only when a pick or the reserve is short.
-check "src/ lines" 21760 \
+# 21760 -> 21838 on 2026-09-25: fund() ranks on net points (cost minus what
+# the cash is worth at the report's own points-per-million, not cost alone)
+# and prices the sell-now-vs-wait timing with the same Outlook model the buy
+# side already uses -- a costly starter with a big offer can rank ABOVE a
+# nearly-free bench player with a small one.
+check "src/ lines" 21838 \
   "$(find src -name '*.py' | xargs cat | wc -l)"
 
 [ "$fail" -eq 0 ] && echo "concepts: no duplication regained" || echo "concepts: a concept regained a second implementation"
