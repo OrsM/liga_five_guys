@@ -69,6 +69,18 @@ def detect_promoted(market: list[dict], history: dict) -> set[str]:
     return {t for t, (n, k) in per_team.items() if n >= 10 and k / n < 0.15}
 
 
+def _latest_perjornada_file():
+    """The newest live/perjornada_*.csv, or None -- the "does a live
+    per-jornada file exist yet" check fit_promoted_discount(),
+    _current_from_perjornada() and _forward_shots_minutes() each spelled
+    out separately."""
+    from ffcore.tidy import SEASON
+
+    live = SEASON / "live"
+    files = sorted(live.glob("perjornada_*.csv")) if live.exists() else []
+    return files[-1] if files else None
+
+
 def fit_promoted_discount(market: list[dict], history: dict,
                           prior_of: dict) -> tuple[float, str]:
     """How much a promoted player's positional prior overstates him,
@@ -76,18 +88,17 @@ def fit_promoted_discount(market: list[dict], history: dict,
     so a thin or lopsided sample cannot swing it far from the stated
     default: measured 2026-09-24 at 0.75 pooled (0.64-0.91 by position,
     n=21-110 each -- too uneven to split), vs the shipped 0.70."""
-    from ffcore.tidy import SEASON, read_csv
+    from ffcore.tidy import read_csv
 
     promoted = {norm(t) for t in detect_promoted(market, history)}
     facts = {r["ff_id"]: (norm(r.get("team", "")),
                           SLOT.get((r.get("position") or "").lower()))
             for r in market if r.get("ff_id")}
-    live = SEASON / "live"
-    files = sorted(live.glob("perjornada_*.csv")) if live.exists() else []
-    if not files:
+    latest = _latest_perjornada_file()
+    if latest is None:
         return PROMOTED_DISCOUNT, "no live per-jornada file yet"
     num = den = n = 0.0
-    for r in read_csv(files[-1]):
+    for r in read_csv(latest):
         try:
             games = float(r.get("games_delta") or 0)
         except (TypeError, ValueError):
@@ -282,15 +293,13 @@ def _forward_shots_minutes(xw, players=None):
     (same _shots_by_jornada() call, same _per_jornada_current() call, same
     "pos == delantero" filter applied downstream) before diverging into a
     fit and a rate. () for by_key when no perjornada file exists yet."""
-    from ffcore.tidy import (SEASON, load, load_players,
-                             load_perjornada, jornada_of_match)
+    from ffcore.tidy import load, load_players, load_perjornada, jornada_of_match
 
     players = players if players is not None else load_players()
     shots_by_key = _shots_by_jornada(xw)
-    live = SEASON / "live"
-    files = sorted(live.glob("perjornada_*.csv")) if live.exists() else []
-    by_key = _per_jornada_current(load("starters"), load_perjornada(),
-                                  jornada_of_match(), xw) if files else {}
+    by_key = _per_jornada_current(
+        load("starters"), load_perjornada(), jornada_of_match(), xw) \
+        if _latest_perjornada_file() is not None else {}
     return shots_by_key, by_key, players
 
 
@@ -475,14 +484,13 @@ def _fit_decay(by_key: dict[str, dict[int, tuple[float, float]]]) -> tuple[float
 
 
 def _current_from_perjornada() -> tuple[dict, str]:
-    from ffcore.tidy import (SEASON, load, load_crosswalk,
+    from ffcore.tidy import (load, load_crosswalk,
                              load_perjornada, jornada_of_match)
 
-    live = SEASON / "live"
-    files = sorted(live.glob("perjornada_*.csv")) if live.exists() else []
-    if not files:
+    latest = _latest_perjornada_file()
+    if latest is None:
         return {}, ""
-    label = files[-1].stem.replace("perjornada_", "")
+    label = latest.stem.replace("perjornada_", "")
     xw = load_crosswalk()
     if xw is None:
         return {}, ""
