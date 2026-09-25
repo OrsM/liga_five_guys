@@ -79,16 +79,28 @@ def _group_by_key(rows, key_fn=None, when_fn=None, value_fn=None,
     return per
 
 
-def pair(actuals: list[dict],
-         preds: dict[str, list[tuple[dt.datetime, dict]]]) -> list[dict]:
-    out = []
+def _matched_actuals(actuals: list[dict],
+                     preds: dict[str, list[tuple[dt.datetime, dict]]],
+                     require_jornada: bool = False):
+    """Actuals matched against `preds` via match_claim, as (a, key, fac) --
+    the join loop pair() and golden_dataset() each walked separately
+    (games_delta filter, match_claim, skip on no match)."""
     for a in actuals:
         if a["games_delta"] < 1:
+            continue
+        if require_jornada and a.get("jornada") is None:
             continue
         got = match_claim(a["keys"], preds, a["from_dt"])
         if got is None:
             continue
-        _key, fac = got
+        key, fac = got
+        yield a, key, fac
+
+
+def pair(actuals: list[dict],
+         preds: dict[str, list[tuple[dt.datetime, dict]]]) -> list[dict]:
+    out = []
+    for a, _key, fac in _matched_actuals(actuals, preds):
         predicted = fac["score"] * a["games_delta"]
         out.append({
             "name": a["name"],
@@ -498,17 +510,11 @@ def golden_dataset() -> dict[int, dict[str, dict]]:
     preds = load_predictions()
     actuals, _label = load_actuals()
     out: dict[int, dict[str, dict]] = {}
-    for a in actuals:
-        if a["games_delta"] < 1 or a.get("jornada") is None:
-            continue
-        got = match_claim(a["keys"], preds, a["from_dt"])
-        if got is None:
-            continue
-        matched_key, fac = got
+    for a, key, fac in _matched_actuals(actuals, preds, require_jornada=True):
         row = dict(fac)
         row["actual"] = a["points_delta"]
         row["games"] = a["games_delta"]
-        out.setdefault(a["jornada"], {})[matched_key] = row
+        out.setdefault(a["jornada"], {})[key] = row
     return out
 
 
