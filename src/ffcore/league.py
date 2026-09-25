@@ -19,7 +19,7 @@ from ffcore.text import norm
 from ffcore.tidy import (load_crosswalk,
                          run_now,
                          Market, input_path, ledger_stamp,
-                         load_api_activity, load_api_standings, load_api_teams,
+                         load_api, load_api_activity,
                          load_api_team_history, load_market_frozen,
                          read_ledger, snapshot_stamp)
 
@@ -129,7 +129,7 @@ def read_balances(name: str = "cash.txt") -> dict[str, tuple[float, str]]:
 
 def read_api_balances(rows=None) -> dict[str, tuple[float, str]]:
     out: dict[str, tuple[float, str]] = {}
-    for r in (load_api_standings() if rows is None else rows):
+    for r in (load_api("standings") if rows is None else rows):
         handle = schema.text(r, schema.API_STANDINGS.MANAGER)
         raw = schema.text(r, schema.API_STANDINGS.TEAM_MONEY)
         if not handle or not raw:
@@ -200,9 +200,9 @@ def owner_from_api(rows: list[dict], market, ledger_owner: dict | None = None,
 
 
 def app_fielded(squad, names: dict, rows=None, ids=None) -> list[str]:
-    from ffcore.tidy import load_api_lineup
+    from ffcore.tidy import load_api
 
-    rows = load_api_lineup() if rows is None else rows
+    rows = load_api("lineup") if rows is None else rows
     ids = app_ids_known() if ids is None else ids
     squad = set(squad)
     by_name = {norm(names.get(k, k)): k for k in squad}
@@ -512,9 +512,9 @@ class League:
         cfg = load_config()
         market = Market(load_market_frozen()) if with_market else None
         return cls(cfg, read_rosters(), read_ledger(), market,
-                   api_teams=load_api_teams(),
+                   api_teams=load_api("teams"),
                    roster_history=load_api_team_history(),
-                   standings=load_api_standings(), xw=load_crosswalk())
+                   standings=load_api("standings"), xw=load_crosswalk())
 
     def txn_key(self, t: dict) -> str | None:
         pid = schema.text(t, schema.TRANSACTIONS.PLAYER_ID)
@@ -556,7 +556,7 @@ class League:
 
         users = {r.get("user_id"): r.get("manager")
                  for r in (self._standings if self._standings is not None
-                          else load_api_standings())
+                          else load_api("standings"))
                  if r.get("user_id") and r.get("manager")}
         own_bonus = bonus_income(load_api_activity(), users)
 

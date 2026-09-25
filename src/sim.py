@@ -28,11 +28,11 @@ def _pts(v) -> str:
 
 
 def squad_value(u) -> float:
-    return sum(u.proceeds_view.values())
+    return sum(u.view("proceeds").values())
 
 
 def fielded_keys(u=None) -> list[str]:
-    return app_fielded(u.state.squads.get(u.me, {}), u.name_view) if u else []
+    return app_fielded(u.state.squads.get(u.me, {}), u.view("name")) if u else []
 
 
 def _warnings() -> list:
@@ -103,10 +103,10 @@ def header(u, base, n_actions: int, locks_h=None, xi=None) -> list[str]:
 
 
 def short(key, u) -> str:
-    full = title_name(u.name_view.get(key, key))
+    full = title_name(u.view("name").get(key, key))
     last = full.split()[-1] if full.split() else full
     clash = sum(1 for k in u.state.squads.get(u.me, {})
-                if title_name(u.name_view.get(k, k)).split()[-1:] == [last])
+                if title_name(u.view("name").get(k, k)).split()[-1:] == [last])
     return full if clash > 1 else last
 
 
@@ -117,7 +117,7 @@ def by_slot(u, keys, exp=None):
 
     if exp is None:
         exp, _ = u.current_xi
-    return sorted(keys, key=lambda k: (SLOT_ORDER.get(u.pos_view.get(k, ""), 9),
+    return sorted(keys, key=lambda k: (SLOT_ORDER.get(u.view("pos").get(k, ""), 9),
                                        -exp.get(k, 0.0)))
 
 
@@ -159,7 +159,7 @@ def ladder_rows(u, rows, bands=None, exp=None, xi=None) -> list[dict]:
     bar = u.xi_bar
     from ffcore.candidates import max_spare_proceeds
     spare = max_spare_proceeds(u)
-    rest = [k for k in u.price_view if k not in mine and exp.get(k, 0.0) > bar]
+    rest = [k for k in u.view("price") if k not in mine and exp.get(k, 0.0) > bar]
     bands = {k: v for k, v in (bands or {}).items() if k not in won}
     # ONE DOOR FOR WHAT A PLAYER COSTS. ffcore.bid already fits the premium
     # over market value from every logged deal -- with a lag guard on the
@@ -183,19 +183,19 @@ def ladder_rows(u, rows, bands=None, exp=None, xi=None) -> list[dict]:
             pts, lo, hi, _action, mean = bands[k]
         else:
             mean = None
-        _worth = u.value_view.get(k)
+        _worth = u.view("value").get(k)
         # CASH FOR THIS MOVE, not cash in hand. suggest() refuses a bid it
         # cannot fund, and every buy on this board is funded by a sale --
         # handing it the bare balance made it refuse every row.
         _ask = suggest(_worth, buy_prem, u.cash + spare, _rival_max)
         _hold = suggest(_worth, sell_prem)
         return {"offer": u.received_offers.get(k),
-                "rivals": u.bids_view.get(k),
+                "rivals": u.view("bids").get(k),
                 "ask": _ask.low,
                 "worth": _worth,
                 "going": _hold.low,
-                "name": title_name(u.name_view.get(k, k)),
-                "pos": u.pos_view.get(k, ""), "start": u.start_view.get(k, 0.0),
+                "name": title_name(u.view("name").get(k, k)),
+                "pos": u.view("pos").get(k, ""), "start": u.view("start").get(k, 0.0),
                 "xpts": exp.get(k, 0.0), "group": group, "where": where,
                 "label": GROUP_LABEL[group],
                 "money": money, "pts": pts, "par": par.get(k),
@@ -220,23 +220,23 @@ def ladder_rows(u, rows, bands=None, exp=None, xi=None) -> list[dict]:
     for k in by_slot(u, benched, exp):
         out.append(cell(k, "keep", "yours", None, None))
     for k in sorted(dead, key=lambda k: -exp.get(k, 0.0)):
-        out.append(cell(k, "sell", "yours", u.proceeds_view.get(k, 0.0),
+        out.append(cell(k, "sell", "yours", u.view("proceeds").get(k, 0.0),
                         None))
 
     mine_all = set(u.state.squads.get(u.me, {}))
     for k in sorted((k for k in u.received_offers if k in mine_all),
                     key=lambda k: -(u.received_offers[k]
-                                    / (u.value_view.get(k) or 1e18))):
+                                    / (u.view("value").get(k) or 1e18))):
         out.append(cell(k, "offer", "yours", None, None))
 
     def buy_cell(k, group):
         r = won[k]
         sold = r["action"].sell
         note = ("sell " + " + ".join(short(s, u) for s in sold)) if sold else ""
-        return cell(k, group, short_manager(u.owner_view.get(k)) or "free agent",
+        return cell(k, group, short_manager(u.view("owner").get(k)) or "free agent",
                     -r["action"].net, r["d_pts"], note, value=r.get("value"),
                     lo=r.get("pts_lo"), hi=r.get("pts_hi"),
-                    market=u.value_view.get(k), premium=r.get("burn") or 0.0)
+                    market=u.view("value").get(k), premium=r.get("burn") or 0.0)
 
     # THE SAME SCREEN AS THE RECOMMENDATION, not a second copy of it. This
     # block used to re-derive the whole thing -- its own player_forecasts(),
@@ -255,19 +255,19 @@ def ladder_rows(u, rows, bands=None, exp=None, xi=None) -> list[dict]:
         if kind in ("free", "raid"):
             out.append(buy_cell(k, "buy" if kind == "free" else "raid"))
     for k in sorted((k for k in rest if k not in won
-                     and u.price_view[k] > u.cash + spare),
+                     and u.view("price")[k] > u.cash + spare),
                     key=lambda k: -exp.get(k, 0.0)):
-        short_by = u.price_view[k] - u.cash - spare
+        short_by = u.view("price")[k] - u.cash - spare
         save_pts = bands[k][0] if k in bands else None
-        out.append(cell(k, "save", short_manager(u.owner_view.get(k)) or "free agent",
+        out.append(cell(k, "save", short_manager(u.view("owner").get(k)) or "free agent",
                         -short_by, save_pts, "short",
                         value=value_rate(save_pts, short_by)))
     for k in sorted((k for k in rest if k not in won
-                     and u.price_view[k] <= u.cash + spare
+                     and u.view("price")[k] <= u.cash + spare
                      and route_kind(u, k) == "free"),
                     key=lambda k: -exp.get(k, 0.0)):
-        out.append(cell(k, "pass", short_manager(u.owner_view.get(k)) or "free agent",
-                        -u.price_view[k], None))
+        out.append(cell(k, "pass", short_manager(u.view("owner").get(k)) or "free agent",
+                        -u.view("price")[k], None))
     return out
 
 
@@ -281,10 +281,10 @@ def band_acts(u, exp=None, xi=None) -> list:
     mine = u.state.squads.get(u.me, {})
     bar = u.xi_bar
     acts = [(k, decide.Action("sell", sell=(k,),
-                              proceeds=u.proceeds_view.get(k, 0.0)))
+                              proceeds=u.view("proceeds").get(k, 0.0)))
            for k in mine]
-    acts += [(k, decide.Action("buy", buy=k, cost=u.price_view.get(k, 0.0)))
-            for k in u.price_view
+    acts += [(k, decide.Action("buy", buy=k, cost=u.view("price").get(k, 0.0)))
+            for k in u.view("price")
             if k not in mine and exp.get(k, 0.0) > bar]
     return acts
 
@@ -293,8 +293,8 @@ def market_candidates(u) -> list:
     import decide
 
     mine = u.state.squads.get(u.me, {})
-    return [(k, decide.Action("buy", buy=k, cost=u.price_view.get(k, 0.0)))
-           for k in u.price_view if k not in mine]
+    return [(k, decide.Action("buy", buy=k, cost=u.view("price").get(k, 0.0)))
+           for k in u.view("price") if k not in mine]
 
 
 def ladder(u, rows, base, data=None, exp=None, xi=None) -> list[str]:
@@ -714,7 +714,7 @@ def worth_doing(u, rows) -> list:
 
 
 def _move_rank_key(r, u):
-    reliable = 0 if u.route_view.get(r["action"].buy, "free") != "listed" else 1
+    reliable = 0 if u.view("route").get(r["action"].buy, "free") != "listed" else 1
     d = r.get("d_pts")
     return (reliable, -d if d is not None else float("inf"))
 
@@ -728,7 +728,7 @@ def _best(u, rows, rivals):
     if not rows:
         return None, False
     reliable = [r for r in rows
-               if u.route_view.get(r["action"].buy, "free") != "listed"]
+               if u.view("route").get(r["action"].buy, "free") != "listed"]
     pool, uncertain = (reliable, False) if reliable else (rows, True)
     best = max(pool, key=lambda r: r["d_pts"])
     if best["action"].net <= 0:
@@ -753,7 +753,7 @@ def bid_lines(u, rows) -> list[str]:
     when cash had the bids wrongly netted out of it."""
     if not u.my_bids:
         return []
-    name = lambda k: title_name(u.name_view.get(k, k))          # noqa: E731
+    name = lambda k: title_name(u.view("name").get(k, k))          # noqa: E731
 
     # A bid is worth keeping only if the board still wants the man AND the
     # money is there once the sale that funds him is counted. Endorsement
@@ -805,7 +805,7 @@ def alert_lines(u, rows, rivals) -> list[str]:
             return out + ["**Overdrawn %s** — no safe dead-weight sale covers "
                           "it; needs a manual look before the jornada locks."
                           % fmt_money(-u.cash)]
-        names = ", ".join("%s (+€%.1fM)" % (title_name(u.name_view.get(k, k)),
+        names = ", ".join("%s (+€%.1fM)" % (title_name(u.view("name").get(k, k)),
                                             p / 1e6) for k, p in sells)
         if short > 0:
             return out + ["**Overdrawn %s** — sell %s clears most of it, "
@@ -832,14 +832,14 @@ def alert_lines(u, rows, rivals) -> list[str]:
         cost += " · needs the seller to accept, not guaranteed"
     return out + ["**Do this** — %s (%+.0f season pts, %+.0f%% to win, %s)"
                   % (a.label({k: title_name(v)
-                              for k, v in u.name_view.items()}),
+                              for k, v in u.view("name").items()}),
                      best["d_pts"], 100 * best["d_win"], cost)]
 
 
 def shape(u, keys) -> str:
     n = {}
     for k in keys:
-        n[u.pos_view.get(k, "")] = n.get(u.pos_view.get(k, ""), 0) + 1
+        n[u.view("pos").get(k, "")] = n.get(u.view("pos").get(k, ""), 0) + 1
     return "%d-%d-%d" % (n.get("DEF", 0), n.get("MED", 0), n.get("DEL", 0))
 
 
@@ -873,7 +873,7 @@ def payload(u, rows, base, rivals, locks_h=None, n_actions: int = 0,
 
     if exp is None or xi is None:
         exp, xi = u.current_xi
-    names = {k: title_name(v) for k, v in u.name_view.items()}
+    names = {k: title_name(v) for k, v in u.view("name").items()}
     lo, hi = base.band(u.me)
     moves = []
     rows = worth_doing(u, rows)
@@ -898,7 +898,7 @@ def payload(u, rows, base, rivals, locks_h=None, n_actions: int = 0,
             "sell": " + ".join(names.get(k, k) for k in a.sell),
             "sell_n": len(a.sell),
             "victim": a.victim,
-            "owner": u.owner_view.get(a.buy, "") if a.buy else "",
+            "owner": u.view("owner").get(a.buy, "") if a.buy else "",
             "net_pts": r["net_pts"], "d_win": r["d_win"], "net": -a.net,
             "d_pts": r.get("d_pts", 0.0), "helps": r.get("helps", 0.0),
             "pts_lo": r.get("pts_lo", 0.0), "pts_hi": r.get("pts_hi", 0.0),
@@ -916,13 +916,13 @@ def payload(u, rows, base, rivals, locks_h=None, n_actions: int = 0,
         "cash_locked": u.locked_cash,
         "squad_value": squad_value(u),
         "jornadas_left": len(u.state.jornadas),
-        "acquirable": len(u.price_view),
+        "acquirable": len(u.view("price")),
         "considered": n_actions,
         "expected_finish": round(base.expected_position(), 2),
         "p_win": round(base.position().get(1, 0.0), 3),
         "band": [lo, hi],
         "moves": moves,
-        "sell": [{"name": names.get(k, k), "pos": u.pos_view.get(k, ""),
+        "sell": [{"name": names.get(k, k), "pos": u.view("pos").get(k, ""),
                   "raises": got}
                  for k, got in dead_weight(u)],
         "ladder": (ladder_data if ladder_data is not None

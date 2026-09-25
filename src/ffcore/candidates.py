@@ -16,7 +16,7 @@ def fieldable_spares(u) -> list[str]:
 
 
 def max_spare_proceeds(u) -> float:
-    return max((u.proceeds_view.get(k, 0.0) for k in fieldable_spares(u)),
+    return max((u.view("proceeds").get(k, 0.0) for k in fieldable_spares(u)),
               default=0.0)
 
 
@@ -36,26 +36,26 @@ def candidates(u, expected: dict[str, float],
     par_of = {k: v["par"] for k, v in player_forecasts(u).items()}
 
     def _spare_rank(k):
-        vr = value_rate(par_of.get(k, 0.0), u.proceeds_view.get(k, 0.0))
+        vr = value_rate(par_of.get(k, 0.0), u.view("proceeds").get(k, 0.0))
         return (vr is None, vr if vr is not None else 0.0)
 
     spare = sorted(fieldable_spare, key=_spare_rank)
 
     out: list[Action] = []
-    for c, price in sorted(u.price_view.items(), key=lambda kv: kv[1]):
+    for c, price in sorted(u.view("price").items(), key=lambda kv: kv[1]):
         if c in mine or bar_exp.get(c, 0.0) <= bar:
             continue
         kind_ = route_kind(u, c)
         if kind_ == "listed":
             continue
         raid = kind_ == "raid"
-        victim = u.owner_view.get(c, "") if raid else ""
+        victim = u.view("owner").get(c, "") if raid else ""
         kind = "clause" if raid else "buy"
         swap = kind + "-swap" if raid else "swap"
         if price <= cash:
             out.append(Action(kind, buy=c, cost=price, victim=victim))
         for s in spare:
-            got = u.proceeds_view.get(s, 0.0)
+            got = u.view("proceeds").get(s, 0.0)
             if price <= cash + got:
                 out.append(Action(swap, buy=c, sell=s, cost=price,
                                   proceeds=got, victim=victim))
@@ -69,7 +69,7 @@ def dead_weight(u) -> list[tuple[str, float]]:
     starts: set[str] = set()
     for j in choosable:
         starts.update(best_xi(mine, u.forecaster.expected(j)))
-    return sorted(((k, u.proceeds_view.get(k, 0.0)) for k in mine
+    return sorted(((k, u.view("proceeds").get(k, 0.0)) for k in mine
                    if k not in starts),
                   key=lambda kv: -kv[1])
 
@@ -102,7 +102,7 @@ def apply(u, a: Action) -> dict[str, dict[str, str]]:
     if a.buy:
         for m in sq:
             sq[m].pop(a.buy, None)
-        sq[u.me][a.buy] = u.pos_view.get(a.buy, "MED")
+        sq[u.me][a.buy] = u.view("pos").get(a.buy, "MED")
     return {m: phantom_topup(s) for m, s in sq.items()}
 
 
@@ -159,7 +159,7 @@ def _selftest() -> None:
     assert "k" not in spares, spares
     assert "f1" in spares and "dead_f" in spares, spares
     assert max_spare_proceeds(u) == max(
-        (u.proceeds_view.get(s, 0.0) for s in spares), default=0.0), \
+        (u.view("proceeds").get(s, 0.0) for s in spares), default=0.0), \
         (max_spare_proceeds(u), spares)
     assert max_spare_proceeds(u) == 6e6, max_spare_proceeds(u)
     bare = Universe(

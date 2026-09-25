@@ -194,7 +194,7 @@ def _selftest() -> None:
     for manager, squad in u.state.squads.items():
         assert _fieldable(squad), (manager, squad)
     assert set(u.players) == set(DEFAULT_SQUAD), u.players
-    assert u.pos_view == DEFAULT_SQUAD, u.pos_view
+    assert u.view("pos") == DEFAULT_SQUAD, u.view("pos")
 
     boot = tiny_bootstrap()
     for j in DEFAULT_JORNADAS:

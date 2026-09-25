@@ -27,7 +27,7 @@ __all__ = ["ROOT", "TIDY", "SEASON", "DECISIONS", "REPORTS", "PARTS", "MADRID",
            "MATCH_LEN", "minutes_played", "fresh_only", "DAILY_FRESH_DAYS",
            "EVERY_RUN_FRESH_DAYS", "stale_feeds",
            "GATED_API", "age_phrase", "last_api_standings",
-           "load_api_lineup", "market_routes", "pending_sent",
+           "load_api", "market_routes", "pending_sent",
            "pending_received", "LISTED_SELLER", "team_slug_of", "lock_order",
            "JornadaClock", "shown", "newest", "table_stats", "load_matches", "load_matches_history",
            "load_starters", "load_perjornada", "load_api_stats", "clock", "clock_history",
@@ -484,13 +484,11 @@ def stale_feeds(now=None, names=GATED_API) -> dict[str, float]:
     return out
 
 
-def load_api_teams(now=None) -> list[dict]:
-    return fresh_only(newest("api_teams.csv"),
-                      EVERY_RUN_FRESH_DAYS, now)
+def load_api(name: str, now=None) -> list[dict]:
+    return fresh_only(newest("api_%s.csv" % name), EVERY_RUN_FRESH_DAYS, now)
 
 
 def load_api_team_history() -> list[dict]:
-    """EVERY roster snapshot, where load_api_teams() is the newest only."""
     return read_csv(TIDY / "api_teams.csv")
 
 
@@ -503,28 +501,8 @@ def load_api_activity() -> list[dict]:
     return sorted(read_csv(TIDY / "api_activity.csv"), key=_activity_order)
 
 
-def load_api_market(now=None) -> list[dict]:
-    return fresh_only(newest("api_market.csv"),
-                      EVERY_RUN_FRESH_DAYS, now)
-
-
-def load_api_standings(now=None) -> list[dict]:
-    return fresh_only(newest("api_standings.csv"),
-                      EVERY_RUN_FRESH_DAYS, now)
-
-
 def last_api_standings() -> list[dict]:
     return newest("api_standings.csv")
-
-
-def load_api_lineup(now=None) -> list[dict]:
-    return fresh_only(newest("api_lineup.csv"),
-                      EVERY_RUN_FRESH_DAYS, now)
-
-
-def load_api_offers(now=None) -> list[dict]:
-    return fresh_only(newest("api_offers.csv"),
-                      EVERY_RUN_FRESH_DAYS, now)
 
 
 
@@ -1270,10 +1248,10 @@ def _selftest() -> None:
     assert fresh_only(missed, EVERY_RUN_FRESH_DAYS, now) == []
 
     stale = datetime(2099, 1, 1, tzinfo=timezone.utc)
-    assert load_api_teams(now=stale) == []
-    assert load_api_market(now=stale) == []
-    assert load_api_standings(now=stale) == []
-    assert load_api_offers(now=stale) == []
+    assert load_api("teams", now=stale) == []
+    assert load_api("market", now=stale) == []
+    assert load_api("standings", now=stale) == []
+    assert load_api("offers", now=stale) == []
 
     assert last_api_standings() != [] or read_csv(TIDY / "api_standings.csv") == []
 

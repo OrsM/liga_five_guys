@@ -7,8 +7,8 @@ import sys
 
 
 from ffcore.league import ledger_from_api
-from ffcore.tidy import (LEDGER, load_api_activity,
-                         load_api_players, load_api_standings)
+from ffcore.tidy import (LEDGER, load_api, load_api_activity,
+                         load_api_players)
 
 FIELDS = ["date", "player", "player_id", "from", "to", "price", "note"]
 
@@ -23,7 +23,7 @@ HEADER = """\
 
 
 def user_map() -> dict:
-    return {r["user_id"]: r["manager"] for r in load_api_standings()
+    return {r["user_id"]: r["manager"] for r in load_api("standings")
             if r.get("user_id") and r.get("manager")}
 
 

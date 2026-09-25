@@ -41,8 +41,8 @@ def slate_from_api(rows: list[dict], market, xw=None) -> tuple[set, list]:
 
 def read_slate(market, rows=None, xw=None) -> tuple[set, list]:
     if rows is None:
-        from ffcore.tidy import load_api_market
-        rows = load_api_market()
+        from ffcore.tidy import load_api
+        rows = load_api("market")
     return slate_from_api(rows, market, xw)
 
 
@@ -53,7 +53,7 @@ def comparison_rows(u, bands=None) -> list[dict]:
     mine = set(u.state.squads.get(u.me, {}))
     fc = u.player_forecasts()
     out = []
-    for k, price in u.price_view.items():
+    for k, price in u.view("price").items():
         if k in mine:
             continue
         f = fc.get(k, {})
@@ -62,8 +62,8 @@ def comparison_rows(u, bands=None) -> list[dict]:
         if b is not None:
             par, par_lo, par_hi, _act, _mean = b
         out.append({
-            "key": k, "name": title_name(u.name_view.get(k, k)),
-            "pos": u.pos_view.get(k, ""), "price": price,
+            "key": k, "name": title_name(u.view("name").get(k, k)),
+            "pos": u.view("pos").get(k, ""), "price": price,
             "season_pts": f.get("season_pts"), "next_pts": f.get("next_pts"),
             "par": par, "par_lo": par_lo, "par_hi": par_hi,
             "value": decide.value_rate(par, price),

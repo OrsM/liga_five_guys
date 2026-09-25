@@ -535,12 +535,12 @@ def main() -> None:
     last = {r["ff_id"]: float(r["delta_pct_1d"]) for r in rows
             if r["observed_at"] == newest
             and r.get("delta_pct_1d") not in (None, "", "None")}
-    name, price, value = u.name_view, u.price_view, u.value_view
+    name, price, value = u.view("name"), u.view("price"), u.view("value")
     _, xi = u.current_xi
     mine = u.state.squads.get(u.me, {})
     free = [{"key": k, "name": name.get(k, k), "ask": price[k],
              "value": value.get(k) or price[k]}
-            for k, r in u.route_view.items() if r == "free" and k in price]
+            for k, r in u.view("route").items() if r == "free" and k in price]
     bench = [{"key": k, "name": name.get(k, k), "value": value.get(k, 0.0)}
              for k in mine if k not in xi]
     by_name = {norm(name.get(k, k)): k for k in mine}

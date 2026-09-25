@@ -174,7 +174,7 @@ if not bar_exp:
 bar = u.xi_bar
 mine = set(u.state.squads.get(u.me, {{}}))
 near = []
-for c, price in u.price_view.items():
+for c, price in u.view("price").items():
     if c in mine or price > u.cash:
         continue
     exp = bar_exp.get(c, 0.0)

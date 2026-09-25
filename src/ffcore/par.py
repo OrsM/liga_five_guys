@@ -23,8 +23,8 @@ def player_forecasts(u) -> dict[str, dict]:
             sim_next = exp
 
     wide_pool = squad_pool(
-        {"key": k, "slot": u.pos_view.get(k, ""), "score": pts}
-        for k, pts in sim_season.items() if u.pos_view.get(k))
+        {"key": k, "slot": u.view("pos").get(k, ""), "score": pts}
+        for k, pts in sim_season.items() if u.view("pos").get(k))
     repl = _replacement(wide_pool, len(u.state.squads)) if u.state.squads \
         else {}
 
@@ -32,9 +32,9 @@ def player_forecasts(u) -> dict[str, dict]:
     for k, p in u.players.items():
         in_sim = k in sim_season
         season_pts = sim_season.get(k) if in_sim \
-            else u.market_exp_view.get(k, 0.0) * n_rem
-        next_pts = sim_next.get(k) if in_sim else u.market_exp_view.get(k, 0.0)
-        slot = u.pos_view.get(k)
+            else u.view("market_exp").get(k, 0.0) * n_rem
+        next_pts = sim_next.get(k) if in_sim else u.view("market_exp").get(k, 0.0)
+        slot = u.view("pos").get(k)
         out[k] = {
             "season_pts": season_pts,
             "next_pts": next_pts,

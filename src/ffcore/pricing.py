@@ -10,7 +10,7 @@ def locked(until: dict, key: str, now) -> bool:
 def burn(u, a) -> float | None:
     if not a.buy:
         return 0.0
-    val = u.value_view.get(a.buy)
+    val = u.view("value").get(a.buy)
     if val is None:
         return None
     return max(0.0, a.cost - val)
@@ -48,9 +48,12 @@ def _selftest() -> None:
 
     @dataclass
     class _FakeUniverse:
-        value_view: dict = field(default_factory=dict)
+        values: dict = field(default_factory=dict)
         rival_cash: dict = field(default_factory=dict)
         me: str = "me"
+
+        def view(self, field_name):
+            return self.values if field_name == "value" else {}
 
     import datetime as dt
     now = dt.datetime(2026, 8, 18, tzinfo=dt.timezone.utc)
@@ -61,7 +64,7 @@ def _selftest() -> None:
     assert locked({}, "x", now) is True
     assert locked({"x": None}, "x", now) is True
 
-    u = _FakeUniverse(value_view={"star": 5e6, "free": 4e6})
+    u = _FakeUniverse(values={"star": 5e6, "free": 4e6})
     assert burn(u, _FakeAction(buy="star", cost=8e6)) == 3e6
     assert burn(u, _FakeAction(buy="free", cost=4e6)) == 0.0
     assert burn(u, _FakeAction(buy="free", cost=3e6)) == 0.0

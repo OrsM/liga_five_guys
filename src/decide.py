@@ -30,9 +30,9 @@ from ffcore.text import norm
 from ffcore.season import (LeagueState, best_xi,
                            simulate_many)
 from ffcore.tidy import (run_now,
-                         latest_only, load_api_market, load_fixtures,
+                         latest_only, load_api, load_fixtures,
                          load_api_stats, load_matches, load_perjornada,
-                         last_api_standings, load_api_offers, load_api_teams,
+                         last_api_standings,
                          load_players, market_routes, pending_sent,
                          pending_received)
 from ffcore.schema import text, num, API_TEAMS, API_STANDINGS
@@ -102,70 +102,29 @@ class Universe:
         return rank(self, acts, seed=seed, price=price, extra=extra)
 
 
-    @cached_property
-    def pos_view(self) -> Mapping[str, str]:
-        return MappingProxyType({k: _pos_of(p.current.pos)
-                                 for k, p in self.players.items()
-                                 if p.current.pos})
+    _FIELDS = {
+        "pos": (lambda p: p.current.pos, bool, lambda v: _pos_of(v)),
+        "bids": (lambda p: p.current.bids, None, None),
+        "price": (lambda p: p.current.price, None, None),
+        "proceeds": (lambda p: p.current.proceeds, None, None),
+        "owner": (lambda p: p.current.owner, bool, None),
+        "value": (lambda p: p.current.value, None, None),
+        "market_exp": (lambda p: p.derived.market_exp, None, None),
+        "start": (lambda p: p.derived.start_p, None, None),
+        "route": (lambda p: p.current.route, bool, None),
+        "name": (lambda p: p.identity.name, lambda v: True, None),
+    }
 
-    @cached_property
-    def bids_view(self) -> Mapping[str, int]:
-        """How many bids are already on a listing -- how contested it is
-        before you add yours. Scraped since the first day and read by
-        nothing until now."""
-        return MappingProxyType({k: p.current.bids
-                                 for k, p in self.players.items()
-                                 if p.current.bids is not None})
-
-    @cached_property
-    def price_view(self) -> Mapping[str, float]:
-        return MappingProxyType({k: p.current.price
-                                 for k, p in self.players.items()
-                                 if p.current.price is not None})
-
-    @cached_property
-    def proceeds_view(self) -> Mapping[str, float]:
-        return MappingProxyType({k: p.current.proceeds
-                                 for k, p in self.players.items()
-                                 if p.current.proceeds is not None})
-
-    @cached_property
-    def owner_view(self) -> Mapping[str, str]:
-        return MappingProxyType({k: p.current.owner
-                                 for k, p in self.players.items()
-                                 if p.current.owner})
-
-    @cached_property
-    def value_view(self) -> Mapping[str, float]:
-        return MappingProxyType({k: p.current.value
-                                 for k, p in self.players.items()
-                                 if p.current.value is not None})
-
-    @cached_property
-    def market_exp_view(self) -> Mapping[str, float]:
-        return MappingProxyType({k: p.derived.market_exp
-                                 for k, p in self.players.items()
-                                 if p.derived.market_exp is not None})
-
-    @cached_property
-    def start_view(self) -> Mapping[str, float]:
-        return MappingProxyType({k: p.derived.start_p
-                                 for k, p in self.players.items()
-                                 if p.derived.start_p is not None})
-
-
-
-    @cached_property
-    def route_view(self) -> Mapping[str, str]:
-        return MappingProxyType({k: p.current.route
-                                 for k, p in self.players.items()
-                                 if p.current.route})
-
-
-    @cached_property
-    def name_view(self) -> Mapping[str, str]:
-        return MappingProxyType({k: p.identity.name
-                                 for k, p in self.players.items()})
+    def view(self, field: str) -> Mapping:
+        cache = self.__dict__.setdefault("_view_cache", {})
+        if field not in cache:
+            get, keep, transform = self._FIELDS[field]
+            keep = keep or (lambda v: v is not None)
+            transform = transform or (lambda v: v)
+            cache[field] = MappingProxyType(
+                {k: transform(v) for k, p in self.players.items()
+                 for v in (get(p),) if keep(v)})
+        return cache[field]
 
 
 def _pos_of(raw: str) -> str:
@@ -199,10 +158,10 @@ def xi_bar(exp: dict[str, float], xi) -> float:
 def route_kind(u: Universe, k: str) -> str:
     if k in u.state.squads.get(u.me, {}):
         return "mine"
-    owner = u.owner_view.get(k)
+    owner = u.view("owner").get(k)
     if not owner or owner == u.me:
         return "free"
-    return "raid" if u.route_view.get(k, "market") == "clause" else "listed"
+    return "raid" if u.view("route").get(k, "market") == "clause" else "listed"
 
 
 def _fieldable(squad: dict[str, str]) -> bool:
@@ -276,7 +235,7 @@ def rank(u: Universe, acts: list[Action], seed: int = 1,
 
     top = screened[:KEEP]
     top = _top_up(top, screened,
-                 ok=lambda d, a: u.route_view.get(a.buy, "free") != "listed",
+                 ok=lambda d, a: u.view("route").get(a.buy, "free") != "listed",
                  rank_key=lambda t: -t[0], minimum=KEEP_RELIABLE_MIN)
     ratio = lambda t: t[0] / (t[1].net / 1e6)                    # noqa: E731
     best_value = {a.buy or a.sell for _, a in
@@ -349,8 +308,8 @@ def load(trials_pool=None) -> Universe:
                         if text(r, MARKET_TBL.TEAM)})
     rem, played, unjoined_clubs = rounds_left(m, mkt_teams, load_fixtures())
 
-    teams = load_api_teams()
-    mkt = load_api_market()
+    teams = load_api("teams")
+    mkt = load_api("market")
     owner = dict(lg.owner)
     me = lg.cfg.me
 
@@ -398,7 +357,7 @@ def load(trials_pool=None) -> Universe:
 
     proceeds = {k: float((players[k] or {}).get("value") or 0)
                 for k in squads.get(me, {})}
-    received_offers = pending_received(load_api_offers(), pt_to_key)
+    received_offers = pending_received(load_api("offers"), pt_to_key)
     for k, money in received_offers.items():
         if k in proceeds:
             proceeds[k] = max(proceeds[k], money)
@@ -647,7 +606,7 @@ def _selftest() -> None:
         state=LeagueState({"me": dict(mine), "riv": dict(theirs)}, [1], "me"),
         forecaster=B(per), cash=4e6, me="me",
         players=players_from_flat(
-            pos={**u.pos_view, "dear": "MED"},
+            pos={**u.view("pos"), "dear": "MED"},
             price={"dear": 20e6},
             proceeds={"me_bench": 8e6, "me_spare2": 5e6, "me_spare3": 4e6}))
     u3.state.squads["me"]["me_spare2"] = "MED"
@@ -703,8 +662,8 @@ def _selftest() -> None:
             route={"thin_del": "free", "deep_med": "free"}))
     vexp, vxi = current_xi(uvor)
     assert xi_bar(vexp, vxi) == 1.0, xi_bar(vexp, vxi)
-    assert min(vexp[k] for k in vxi if uvor.pos_view[k] == "DEL") == 1.0, vxi
-    assert min(vexp[k] for k in vxi if uvor.pos_view[k] == "MED") == 5.0, vxi
+    assert min(vexp[k] for k in vxi if uvor.view("pos")[k] == "DEL") == 1.0, vxi
+    assert min(vexp[k] for k in vxi if uvor.view("pos")[k] == "MED") == 5.0, vxi
     vrows, _vb, _vl, _vbd = rank(
         uvor, [Action("buy", buy="thin_del", cost=5e6),
                Action("buy", buy="deep_med", cost=5e6)])
@@ -736,7 +695,7 @@ def _selftest() -> None:
         state=LeagueState({"me": dict(mine), "riv": dict(theirs)}, [1], "me"),
         forecaster=B(per2), cash=6e6, me="me",
         players=players_from_flat(
-            pos={**u.pos_view, "free_x": "MED", "th_m1": "MED"},
+            pos={**u.view("pos"), "free_x": "MED", "th_m1": "MED"},
             price={"free_x": 5e6, "th_m1": 5e6}, route={"th_m1": "clause"},
             owner={"th_m1": "riv"}))
     got, _, _, _ = rank(u2, [Action("buy", buy="free_x", cost=5e6),
@@ -788,7 +747,7 @@ def _selftest() -> None:
         state=LeagueState({"me": dict(mine), "riv": dict(theirs)}, [1], "me"),
         forecaster=B(per5), cash=100e6, me="me",
         players=players_from_flat(
-            pos={**u.pos_view, **{a.buy: "MED" for a in acts5}},
+            pos={**u.view("pos"), **{a.buy: "MED" for a in acts5}},
             price={a.buy: 1e6 for a in acts5}, route=route5))
     rows5, *_ = rank(u5, acts5)
     kept5 = {r["action"].buy for r in rows5}
@@ -812,7 +771,7 @@ def _selftest() -> None:
         state=LeagueState({"me": dict(mine), "riv": dict(theirs)}, [1], "me"),
         forecaster=B(per6), cash=1000e6, me="me",
         players=players_from_flat(
-            pos={**u.pos_view, **{a.buy: "MED" for a in acts6}},
+            pos={**u.view("pos"), **{a.buy: "MED" for a in acts6}},
             price={a.buy: a.cost for a in acts6}))
     rows6, *_ = rank(u6, acts6)
     kept6 = {r["action"].buy for r in rows6}
@@ -826,7 +785,7 @@ def _selftest() -> None:
         forecaster=B({1: {"me_k": (0.1, 1.0), "dud": (1.0, 1.0)},
                       2: {**{k: (5.0, 1.0) for k in mine}, "dud": (1.0, 1.0)}}),
         cash=50e6, me="me",
-        players=players_from_flat(pos={**u.pos_view, "dud": "MED"},
+        players=players_from_flat(pos={**u.view("pos"), "dud": "MED"},
                                   price={"dud": 1e6}))
     half.part_played = {1: {"somewhere"}}
     assert not any(a.buy == "dud"
@@ -886,21 +845,21 @@ def _selftest() -> None:
                 "none_edge": none_edge})
 
     for field_name in _FALSY_DROP:
-        view = getattr(u_views, field_name + "_view")
+        view = u_views.view(field_name)
         assert "falsy_edge" not in view, (field_name, dict(view))
     for field_name in ("owner", "route"):
-        view = getattr(u_views, field_name + "_view")
+        view = u_views.view(field_name)
         assert "none_edge" not in view, (field_name, dict(view))
 
     for field_name in _NONE_ONLY_DROP:
-        view = getattr(u_views, field_name + "_view")
+        view = u_views.view(field_name)
         assert "zero_edge" in view and not view["zero_edge"], \
             (field_name, dict(view))
         assert "none_edge" not in view, (field_name, dict(view))
 
-    assert u_views.name_view["falsy_edge"] == "falsy_edge"
-    assert u_views.name_view["zero_edge"] == "zero_edge"
-    assert u_views.name_view["none_edge"] == "none_edge"
+    assert u_views.view("name")["falsy_edge"] == "falsy_edge"
+    assert u_views.view("name")["zero_edge"] == "zero_edge"
+    assert u_views.view("name")["none_edge"] == "none_edge"
 
     print("decide self-test OK (150 cases)")
 
@@ -913,7 +872,7 @@ if __name__ == "__main__":
     exp = u.forecaster.expected(u.state.jornadas[0])
     acts = candidates(u, exp, budget=float("inf"))
     print("%d jornadas left · cash %s · %d players acquirable · %d actions"
-          % (len(u.state.jornadas), fmt_money(u.cash), len(u.price_view), len(acts)))
+          % (len(u.state.jornadas), fmt_money(u.cash), len(u.view("price")), len(acts)))
     print(u.forecaster.pool_note())
     rows, base, _lam, _b = rank(u, acts)
     print("\nnow: expected position %.2f · P(win) %.0f%%"
