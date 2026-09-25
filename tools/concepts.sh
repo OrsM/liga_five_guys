@@ -321,7 +321,11 @@ check "Universe flat-dict storage" 0 \
 # rows on ff_id since 2026-08-20, so name-only matching missed 98% of the
 # real log; fit_rate_rel_floor and drift_frac_from_history went from ~50
 # stale August pairs to 370 real ones.
-check "src/ lines" 21480 \
+# 21480 -> 21527 on 2026-09-24: one cached load_crosswalk() (tidy.py, same
+# mtime/size discipline as read_csv()) replaces four independent readers of
+# players.csv+clubs.csv (methodology.py's own _XW_CACHE, backtest.py,
+# score.py's _calibrated(), methodology.py's forecast_claims()).
+check "src/ lines" 21527 \
   "$(find src -name '*.py' | xargs cat | wc -l)"
 
 [ "$fail" -eq 0 ] && echo "concepts: no duplication regained" || echo "concepts: a concept regained a second implementation"

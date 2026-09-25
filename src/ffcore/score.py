@@ -483,16 +483,15 @@ def _calibrated():
         return _CAL_CACHE[0]
     import hashlib
     import json
-    from ffcore.crosswalk import Crosswalk
     from ffcore.startprob import (Calibration, METHOD_VERSION, observations,
                                   fit_start_fallbacks)
-    from ffcore.tidy import load_lineups, read_csv, TIDY
+    from ffcore.tidy import load_crosswalk, load_lineups, read_csv, TIDY
     from ffcore.second import SECOND_SOURCE
 
     second = load_lineups(SECOND_SOURCE)
     truth = read_csv(TIDY / "starters.csv")
     cut = min((r.get("observed_at", "") for r in truth), default="")
-    xw = Crosswalk.read(TIDY / "players.csv", TIDY / "clubs.csv")
+    xw = load_crosswalk()
     global NEUTRAL_START, ABSENT_START
     if cut:
         NEUTRAL_START, ABSENT_START, _fallback_why = fit_start_fallbacks(

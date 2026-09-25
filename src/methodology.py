@@ -17,7 +17,7 @@ from ffcore.tidy import (clock_history, load_starters, run_now, shown,
                          DAILY_FRESH_DAYS, EVERY_RUN_FRESH_DAYS,
                          SEASON, TIDY, age_phrase, load_elo,
                          stale_feeds,
-                         load_lineups, load_matches,
+                         load_crosswalk, load_lineups, load_matches,
                          read_csv, snapshot_stamp, write_csv, write_lines,
                          team_slug_of, lock_order, JornadaClock)
 
@@ -372,17 +372,11 @@ def market_names(market: list[dict], slugs) -> dict[str, list[dict]]:
     return out
 
 
-_XW_CACHE: list = []
-
-
 def _market_key(slug) -> str:
     slug = (slug or "").strip()
     if not slug:
         return ""
-    if not _XW_CACHE:
-        from ffcore.tidy import load_crosswalk
-        _XW_CACHE.append(load_crosswalk())
-    xw = _XW_CACHE[0]
+    xw = load_crosswalk()
     return (xw.player(ff_slug=slug) or "") if xw else ""
 
 
@@ -946,9 +940,7 @@ def _instance_briers(intervals, claims, src, instances) -> list[float]:
 
 
 def forecast_claims() -> list[dict]:
-    from ffcore.crosswalk import Crosswalk
-
-    xw = Crosswalk.read(TIDY / "players.csv", TIDY / "clubs.csv")
+    xw = load_crosswalk()
     out = []
     for r in read_csv(DECISIONS / "squad_log.csv"):
         try:
@@ -1502,12 +1494,18 @@ def _selftest() -> None:
         assert heading not in guide, heading
 
     import tempfile
+    import ffcore.tidy as _tidy_fc
     global DECISIONS, TIDY
     real_decisions, real_tidy = DECISIONS, TIDY
+    real_tidy_mod = _tidy_fc.TIDY
     tmp = tempfile.mkdtemp()
     try:
         DECISIONS = __import__("pathlib").Path(tmp)
-        TIDY = DECISIONS
+        # forecast_claims() reads its crosswalk through load_crosswalk(),
+        # which resolves paths off ffcore.tidy's OWN TIDY -- patching only
+        # this module's imported name (as below, for DECISIONS/squad_log.csv)
+        # would leave load_crosswalk() reading the real players.csv.
+        TIDY = _tidy_fc.TIDY = DECISIONS
         write_csv(DECISIONS / "squad_log.csv", [
             {"observed_at": "2026-08-10T1200Z", "player": "Nailed",
              "start_pct": "90", "ff_id": "nailed"},
@@ -1530,6 +1528,8 @@ def _selftest() -> None:
         claims = forecast_claims()
     finally:
         DECISIONS, TIDY = real_decisions, real_tidy
+        _tidy_fc.TIDY = real_tidy_mod
+        _tidy_fc._XW_CACHE.clear()
     assert {c["player_name"] for c in claims} == {"Nailed", "Benched"}, claims
     got = {c["player_name"]: c["start_pct"] for c in claims}
     assert got == {"Nailed": 90.0, "Benched": 85.0}, got

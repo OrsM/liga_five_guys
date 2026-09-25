@@ -536,12 +536,27 @@ def load_api_players() -> dict[str, str]:
     return out
 
 
+_XW_CACHE: dict = {}
+
+
 def load_crosswalk():
+    """Cached like read_csv(): keyed on both files' (mtime, size), so every
+    caller shares one parse per real change instead of each re-reading
+    players.csv/clubs.csv by hand -- the pattern that had four independent
+    copies (methodology.py's own _XW_CACHE among them) before this."""
     from ffcore.crosswalk import Crosswalk
     path = TIDY / "players.csv"
-    if not path.exists():
+    clubs = TIDY / "clubs.csv"
+    try:
+        key = (path.stat().st_mtime_ns, path.stat().st_size,
+              clubs.stat().st_mtime_ns, clubs.stat().st_size)
+    except OSError:
         return None
-    return Crosswalk.read(path, TIDY / "clubs.csv")
+    hit = _XW_CACHE.get("xw")
+    if hit is None or hit[0] != key:
+        hit = (key, Crosswalk.read(path, clubs))
+        _XW_CACHE["xw"] = hit
+    return hit[1]
 
 
 def load_fixtures() -> list[dict]:
@@ -1074,6 +1089,39 @@ def _selftest_cache() -> None:
         assert read_csv(Path(tmp) / "nope.csv") == []
 
 
+def _selftest_crosswalk_cache() -> None:
+    import tempfile
+
+    global TIDY
+    real_tidy = TIDY
+    with tempfile.TemporaryDirectory() as tmp:
+        TIDY = Path(tmp)
+        try:
+            assert load_crosswalk() is None    # no players.csv yet
+            write_csv(TIDY / "players.csv",
+                     [{"player_id": "a", "name": "A", "club_id": "c"}],
+                     ["player_id", "name", "club_id", "ff_slug", "af_slug",
+                      "app_id", "understat_id", "app_names"])
+            write_csv(TIDY / "clubs.csv",
+                     [{"club_id": "c", "market": "C", "ff_slug": "c-slug"}],
+                     ["club_id", "market", "ff_slug", "elo", "market_id",
+                      "af_id", "aliases"])
+            xw1 = load_crosswalk()
+            assert xw1.players["a"].name == "A", xw1.players
+            assert load_crosswalk() is xw1     # same object: cache hit
+
+            write_csv(TIDY / "players.csv",
+                     [{"player_id": "a", "name": "Renamed", "club_id": "c"}],
+                     ["player_id", "name", "club_id", "ff_slug", "af_slug",
+                      "app_id", "understat_id", "app_names"])
+            xw2 = load_crosswalk()
+            assert xw2 is not xw1 and xw2.players["a"].name == "Renamed", \
+                xw2.players
+        finally:
+            TIDY = real_tidy
+            _XW_CACHE.clear()
+
+
 def _selftest_new_loaders() -> None:
     rows = [{"k": "a", "observed_at": "t1", "v": "old-a"},
             {"k": "a", "observed_at": "t3", "v": "new-a"},
@@ -1174,6 +1222,7 @@ def _selftest_stale_owned() -> None:
 def _selftest() -> None:
     _selftest_cache()
     _selftest_new_loaders()
+    _selftest_crosswalk_cache()
     rows = [{"observed_at": "t1", "name": "A"}, {"observed_at": "t2",
             "name": "B"}, {"observed_at": "t2", "name": "C"}]
     assert [r["name"] for r in latest_only(rows)] == ["B", "C"]
@@ -1462,7 +1511,7 @@ def _selftest() -> None:
         == [1, 2, 3]
     assert clock.order == [1]
 
-    print("ffcore.tidy self-test OK (76 cases)")
+    print("ffcore.tidy self-test OK (80 cases)")
 
 
 if __name__ == "__main__":

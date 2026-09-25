@@ -42,10 +42,9 @@ def squad_at(manager: str, when: dt.datetime) -> dict[str, str]:
     and latest_only() takes that file's newest snapshot -- the two existing
     pieces, rather than a fourth way to ask what a squad looked like.
     """
-    from ffcore.crosswalk import Crosswalk
     from ffcore.schema import API_TEAMS, text
-    from ffcore.tidy import TIDY, latest_only
-    xw = Crosswalk.read(TIDY / "players.csv", TIDY / "clubs.csv")
+    from ffcore.tidy import latest_only, load_crosswalk
+    xw = load_crosswalk()
     ff_of = {getattr(v, "app_id", ""): k for k, v in xw.players.items()
              if getattr(v, "app_id", "")}
     out = {}
