@@ -136,14 +136,14 @@ DECAY_GRID = (1.0, 0.85, 0.7, 0.55, 0.4)
 
 
 
-def load_understat_current(xw=None) -> dict[str, dict]:
-    from ffcore.tidy import load_understat_players, load_crosswalk
+def _forward_understat_rows(season: str, xw):
+    """Understat rows for outfield forwards this crosswalk can key, as
+    (key, row, minutes) -- the position filter, understat_id lookup and
+    minutes parse load_understat_current() and _xg_points_fit() each
+    walked separately."""
+    from ffcore.tidy import load_understat_players
 
-    xw = xw if xw is not None else load_crosswalk()
-    if xw is None:
-        return {}
-    out: dict[str, dict] = {}
-    for r in load_understat_players("2026"):
+    for r in load_understat_players(season):
         if "F" not in (r.get("position") or ""):
             continue
         uid = schema.text(r, schema.UNDERSTAT_PLAYERS.UNDERSTAT_ID)
@@ -152,11 +152,21 @@ def load_understat_current(xw=None) -> dict[str, dict]:
         key = xw.player(understat_id=uid)
         if not key:
             continue
-        player = xw.players.get(key)
-        market_name = norm(player.name) if player and player.name else key
-        mins = float(r.get("minutes") or 0)
+        yield key, r, float(r.get("minutes") or 0)
+
+
+def load_understat_current(xw=None) -> dict[str, dict]:
+    from ffcore.tidy import load_crosswalk
+
+    xw = xw if xw is not None else load_crosswalk()
+    if xw is None:
+        return {}
+    out: dict[str, dict] = {}
+    for key, r, mins in _forward_understat_rows("2026", xw):
         if mins <= 0:
             continue
+        player = xw.players.get(key)
+        market_name = norm(player.name) if player and player.name else key
         out[market_name] = {
             "xg90": (float(r.get("xg") or 0) + float(r.get("xa") or 0))
                     / mins * 90, "minutes": mins}
@@ -172,7 +182,7 @@ def _linreg(xs, ys) -> tuple[float, float]:
 
 
 def _xg_points_fit(xw) -> tuple[float, float, int]:
-    from ffcore.tidy import load_understat_players, SEASON, read_csv
+    from ffcore.tidy import SEASON, read_csv
 
     pts_files = sorted(SEASON.glob("points_*.csv")) if SEASON.exists() else []
     if not pts_files or xw is None:
@@ -185,14 +195,9 @@ def _xg_points_fit(xw) -> tuple[float, float, int]:
         if key:
             pts_by_key[key] = r
     xs, ys = [], []
-    for r in load_understat_players("2025"):
-        if "F" not in (r.get("position") or ""):
+    for key, r, mins in _forward_understat_rows("2025", xw):
+        if key not in pts_by_key:
             continue
-        uid = schema.text(r, schema.UNDERSTAT_PLAYERS.UNDERSTAT_ID)
-        key = xw.player(understat_id=uid) if uid else None
-        if not key or key not in pts_by_key:
-            continue
-        mins = float(r.get("minutes") or 0)
         pr = pts_by_key[key]
         games = float(pr.get("games") or 0)
         if mins < 450 or games < 10:
