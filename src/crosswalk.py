@@ -7,9 +7,9 @@ import sys
 from ffcore import schema
 from ffcore.crosswalk import Club, Crosswalk, Player
 from ffcore.text import norm
-from ffcore.tidy import (TIDY, latest_only, load_fixtures, newest,
-                         load_lineups_latest, load_market, load_market_latest,
-                         load_starters, narrow_by_club, read_csv, row_key,
+from ffcore.tidy import (TIDY, latest_only, load, load_fixtures, newest,
+                         load_lineups_latest, load_market_latest,
+                         narrow_by_club, read_csv, row_key,
                          shared_names)
 
 PLAYERS = "players.csv"
@@ -212,13 +212,13 @@ def main() -> None:
 
     market = load_market_latest()
     lineups = load_lineups_latest(source="")
-    starters = load_starters()
+    starters = load("starters")
     api_rows = (newest("api_teams.csv") + newest("api_market.csv")
                 + newest("api_players.csv") + newest("api_players_all.csv"))
     elo_rows = read_csv(TIDY / "elo.csv")
     lg = League.load()
 
-    market_ids = {schema.text(r, schema.MARKET.FF_ID) for r in load_market()
+    market_ids = {schema.text(r, schema.MARKET.FF_ID) for r in load("market")
                   if schema.text(r, schema.MARKET.FF_ID)}
 
     clubs = build_clubs(market, lineups, elo_rows, load_fixtures())

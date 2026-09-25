@@ -20,7 +20,7 @@ from ffcore.tidy import (load_crosswalk,
                          run_now,
                          Market, input_path, ledger_stamp,
                          load_api, load_api_activity,
-                         load_api_team_history, load_market_frozen,
+                         load, load_market_frozen,
                          read_ledger, snapshot_stamp)
 
 __all__ = ["MARKET", "Config", "load_config", "read_rosters", "identify",
@@ -517,7 +517,7 @@ class League:
         market = Market(load_market_frozen()) if with_market else None
         return cls(cfg, read_rosters(), read_ledger(), market,
                    api_teams=load_api("teams"),
-                   roster_history=load_api_team_history(),
+                   roster_history=load("api_team_history"),
                    standings=load_api("standings"), xw=load_crosswalk())
 
     def txn_key(self, t: dict) -> str | None:

@@ -271,7 +271,7 @@ def _shots_by_jornada(xw) -> dict[str, dict[int, float]]:
 
 
 def _shots_points_fit(xw, players=None) -> tuple[float, float, int]:
-    from ffcore.tidy import (SEASON, load_players, load_starters,
+    from ffcore.tidy import (SEASON, load, load_players,
                              load_perjornada, jornada_of_match)
 
     if xw is None:
@@ -280,7 +280,7 @@ def _shots_points_fit(xw, players=None) -> tuple[float, float, int]:
     files = sorted(live.glob("perjornada_*.csv")) if live.exists() else []
     if not files:
         return 0.0, 0.0, 0
-    by_key = _per_jornada_current(load_starters(), load_perjornada(),
+    by_key = _per_jornada_current(load("starters"), load_perjornada(),
                                   jornada_of_match(), xw)
     shots_by_key = _shots_by_jornada(xw)
     players = players if players is not None else load_players()
@@ -310,8 +310,8 @@ def _shots_points_fit(xw, players=None) -> tuple[float, float, int]:
 
 
 def load_shots_current(xw=None, players=None) -> dict[str, dict]:
-    from ffcore.tidy import (SEASON, load_crosswalk, load_players,
-                             load_starters, load_perjornada, jornada_of_match)
+    from ffcore.tidy import (SEASON, load, load_crosswalk, load_players,
+                             load_perjornada, jornada_of_match)
 
     xw = xw if xw is not None else load_crosswalk()
     if xw is None:
@@ -322,7 +322,7 @@ def load_shots_current(xw=None, players=None) -> dict[str, dict]:
     files = sorted(live.glob("perjornada_*.csv")) if live.exists() else []
     minutes_by_key: dict[str, dict[int, float]] = {}
     if files:
-        by_key = _per_jornada_current(load_starters(), load_perjornada(),
+        by_key = _per_jornada_current(load("starters"), load_perjornada(),
                                       jornada_of_match(), xw)
         minutes_by_key = {k: {j: mins for j, (_pts, mins) in jd.items()}
                           for k, jd in by_key.items()}
@@ -461,7 +461,7 @@ def _fit_decay(by_key: dict[str, dict[int, tuple[float, float]]]) -> tuple[float
 
 
 def _current_from_perjornada() -> tuple[dict, str]:
-    from ffcore.tidy import (SEASON, load_crosswalk, load_starters,
+    from ffcore.tidy import (SEASON, load, load_crosswalk,
                              load_perjornada, jornada_of_match)
 
     live = SEASON / "live"
@@ -473,7 +473,7 @@ def _current_from_perjornada() -> tuple[dict, str]:
     if xw is None:
         return {}, ""
 
-    by_key = _per_jornada_current(load_starters(), load_perjornada(),
+    by_key = _per_jornada_current(load("starters"), load_perjornada(),
                                   jornada_of_match(), xw)
     decay, _why = _fit_decay(by_key)
 
@@ -526,17 +526,17 @@ def load_points() -> tuple[dict, str, dict, str]:
 def build(market: list[dict], xi_rows: list[dict], now,
           shrink_k: float = SHRINK_K, calibrate: bool = True) -> tuple:
     from ffcore.fixture import fixture_board
-    from ffcore.tidy import load_elo, load_fixtures
+    from ffcore.tidy import load, load_fixtures
 
     prior, prior_label, cur, cur_label = load_points()
     cal, second = None, None
     if calibrate:
         cal, second = _calibrated()
-    from ffcore.tidy import (load_crosswalk, load_results_history,
+    from ffcore.tidy import (load, load_crosswalk,
                              load_understat_players)
     xw = load_crosswalk()
-    board = fixture_board(market, load_fixtures(), now, load_elo(),
-                          xw=xw, results=load_results_history(),
+    board = fixture_board(market, load_fixtures(), now, load("elo"),
+                          xw=xw, results=load("results_history"),
                           understat_rows=load_understat_players("2025"))
     xg_cur = load_understat_current(xw)
     xg_slope, xg_intercept, xg_n = _xg_points_fit(xw)

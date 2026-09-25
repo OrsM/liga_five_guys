@@ -30,8 +30,8 @@ from ffcore.text import norm
 from ffcore.season import (LeagueState, best_xi,
                            simulate_many)
 from ffcore.tidy import (run_now,
-                         latest_only, load_api, load_fixtures,
-                         load_api_stats, load_matches, load_perjornada,
+                         latest_only, load, load_api, load_fixtures,
+                         load_api_stats, load_perjornada,
                          last_api_standings,
                          load_players, market_routes, pending_sent,
                          pending_received)
@@ -301,7 +301,7 @@ def load(trials_pool=None) -> Universe:
     lg, sc = _m.lg, _m.sc
     players = load_players()
 
-    m = load_matches()
+    m = load("matches")
     mkt_teams = sorted({text(r, MARKET_TBL.TEAM)
                         for r in (lg.market.latest().values()
                                   if lg.market is not None else [])
@@ -404,17 +404,16 @@ def load(trials_pool=None) -> Universe:
             matches[k] = s_.pj
     from ffcore import fixture as _fixture
     from ffcore.fixture import club_volatility, fit_home_edge, season_board
-    from ffcore.tidy import load_elo, load_results_history, \
-        load_understat_players
+    from ffcore.tidy import load, load_understat_players
     slug_of = {norm(c.market): c.ff_slug for c in lg.xw.clubs.values()
               if c.market and c.ff_slug} if lg.xw is not None else {}
     club_of_slug = {k: slug_of[v] for k, v in club.items() if v in slug_of}
-    results_hist = load_results_history()
+    results_hist = load("results_history")
     club_rel = club_volatility(results_hist, list(slug_of.values()))
     _fixture.HOME_EDGE, _home_edge_why = fit_home_edge(results_hist, m)
     sboard = {j: {norm(team): m for team, m in layer.items()}
              for j, layer in season_board(
-                 _m.market, m, rem, now, load_elo(), xw=lg.xw,
+                 _m.market, m, rem, now, load("elo"), xw=lg.xw,
                  results=results_hist,
                  understat_rows=load_understat_players("2025")).items()}
     ppm_of = {k: s.ppm for k, s in scored.items() if s}

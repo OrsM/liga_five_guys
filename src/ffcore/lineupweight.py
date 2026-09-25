@@ -33,8 +33,8 @@ def stamp(s):
 
 
 def rows():
-    from ffcore.tidy import (MATCH_LEN, TIDY, jornada_of_match, load_crosswalk,
-                             load_lineups, load_perjornada, load_starters,
+    from ffcore.tidy import (MATCH_LEN, TIDY, jornada_of_match, load,
+                             load_crosswalk, load_lineups, load_perjornada,
                              minutes_played, read_csv)
 
     xw = load_crosswalk()
@@ -45,7 +45,7 @@ def rows():
         if r["games_delta"] == "1":
             points[(r["ff_id"], int(r["jornada"]))] = float(r["points_delta"])
     seen, scraped = {}, {}
-    for r in load_starters():
+    for r in load("starters"):
         if r.get("role") not in ("starter", "sub"):
             continue
         m = r["match_id"]
@@ -115,11 +115,10 @@ def fit_status_factors(lineups=None, starters=None) -> dict[str, tuple[float, in
     match sheet played 0, so a flag that means "out" shows as ~0 and one that
     is only a knock shows what it is. Measured 2026-09-24: "injured" 0.54
     (95% 0.30-0.79, 42 rows) where the model had assumed 0.0."""
-    from ffcore.tidy import (MATCH_LEN, load_lineups, load_starters,
-                             minutes_played)
+    from ffcore.tidy import MATCH_LEN, load, load_lineups, minutes_played
 
     play, scraped, teams = {}, {}, collections.defaultdict(set)
-    for r in (starters if starters is not None else load_starters()):
+    for r in (starters if starters is not None else load("starters")):
         if r.get("role") in ("starter", "sub"):
             m = r["match_id"]
             scraped[m] = min(scraped.get(m, "9"), r["observed_at"])

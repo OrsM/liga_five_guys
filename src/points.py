@@ -5,7 +5,7 @@ import sys
 
 
 from ffcore.text import norm
-from ffcore.tidy import SEASON, load_matches_history, write_csv
+from ffcore.tidy import SEASON, load, write_csv
 
 LIVE = SEASON / "live"
 
@@ -154,7 +154,7 @@ def main() -> None:
         sys.exit("no points page found in any snapshot under data/raw/ — "
                  "run ingest.py fetch first")
 
-    timeline = match_jornadas(load_matches_history())
+    timeline = match_jornadas(load("matches_history"))
 
     for label, seq in sorted(by_label.items()):
         kept = keep_changed(seq)

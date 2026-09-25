@@ -6,7 +6,7 @@ import sys
 
 
 from ffcore.tidy import (read_csv, TIDY, SEASON, load_crosswalk,
-                         load_matches, load_starters, load_perjornada)
+                         load, load_perjornada)
 from ffcore.score import _per_jornada_current
 from stats import percentile
 
@@ -115,8 +115,8 @@ def leave_one_out(cases: list[tuple[str, float, float]]) -> dict:
 
 def run() -> None:
     xw = load_crosswalk()
-    starters = load_starters()
-    matches = load_matches()
+    starters = load("starters")
+    matches = load("matches")
     lineups = read_csv(TIDY / "lineups.csv")
     files = sorted((SEASON / "live").glob("perjornada_*.csv"))
     if not files or xw is None:

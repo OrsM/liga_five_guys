@@ -11,13 +11,13 @@ from ffcore import schema
 from ffcore.fixture import FIX_BAND
 from ffcore.score import SHRINK_K
 from ffcore.text import norm, resolve
-from ffcore.tidy import (clock_history, load_starters, run_now, shown,
+from ffcore.tidy import (clock_history, load, run_now, shown,
                          table_stats,
                          DECISIONS, PARTS, LINEUP_SOURCE,
                          DAILY_FRESH_DAYS, EVERY_RUN_FRESH_DAYS,
-                         SEASON, TIDY, age_phrase, load_elo,
+                         SEASON, TIDY, age_phrase,
                          stale_feeds,
-                         load_crosswalk, load_lineups, load_matches,
+                         load_crosswalk, load_lineups,
                          read_csv, snapshot_stamp, write_csv, write_lines,
                          team_slug_of, lock_order, JornadaClock)
 
@@ -463,8 +463,8 @@ def load_universe() -> set:
 
 
 def load_starts(roles=("starter",)):
-    return start_intervals(load_matches(),
-                           load_starters(),
+    return start_intervals(load("matches"),
+                           load("starters"),
                            read_csv(TIDY / "fixtures.csv"),
                            read_csv(TIDY / "market.csv"),
                            roles)
@@ -709,7 +709,7 @@ def feed_lines() -> list[str]:
 def elo_basis() -> str:
     from ffcore.fixture import elo_strength, team_strength
 
-    rows = load_elo()
+    rows = load("elo")
     if not rows:
         return ("summed squad value — %s, so the wallet is standing in for "
                 "the pitch (see the feed table for how long)"
@@ -733,10 +733,10 @@ def latest_market() -> list[dict]:
 
 def formula_lines() -> list[str]:
     from ffcore.fixture import attack_defense, fit_home_edge
-    from ffcore.tidy import load_crosswalk, load_results_history
+    from ffcore.tidy import load_crosswalk, load
 
-    results_hist = load_results_history()
-    matches = load_matches()
+    results_hist = load("results_history")
+    matches = load("matches")
     home_edge, home_edge_why = fit_home_edge(results_hist, matches)
     teams = sorted({r.get("team") for r in latest_market() if r.get("team")})
     xw = load_crosswalk()

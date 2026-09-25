@@ -19,18 +19,18 @@ __all__ = ["ROOT", "TIDY", "SEASON", "DECISIONS", "REPORTS", "PARTS", "MADRID",
            "write_lines", "snapshot_stamp", "ledger_stamp", "latest_only",
            "latest_per_key", "snapshots",
            "Market", "Valuation", "VALUE_TOLERANCE", "price_agrees",
-           "load_market", "load_market_frozen", "load_lineups",
+           "load", "load_market_frozen", "load_lineups",
            "shared_names", "row_key", "run_now", "load_crosswalk",
            "load_players", "read_ledger", "LEDGER", "load_deadline", "LINEUP_SOURCE",
            "pick_source", "load_fixtures", "next_kickoff", "kickoff_stamp",
-           "load_elo", "load_odds", "load_results_history", "load_understat_players",
+           "load_odds", "load_understat_players",
            "MATCH_LEN", "minutes_played", "fresh_only", "DAILY_FRESH_DAYS",
            "EVERY_RUN_FRESH_DAYS", "stale_feeds",
            "GATED_API", "age_phrase", "last_api_standings",
            "load_api", "market_routes", "pending_sent",
            "pending_received", "LISTED_SELLER", "team_slug_of", "lock_order",
-           "JornadaClock", "shown", "newest", "table_stats", "load_matches", "load_matches_history",
-           "load_starters", "load_perjornada", "load_api_stats", "clock", "clock_history",
+           "JornadaClock", "shown", "newest", "table_stats",
+           "load_perjornada", "load_api_stats", "clock", "clock_history",
            "jornada_of_match"]
 
 ROOT = Path(os.environ.get("FF_ROOT", "./data"))
@@ -371,8 +371,24 @@ def snapshots(rows: list[dict]) -> list[str]:
     return sorted({r.get("observed_at", "") for r in rows if r.get("observed_at")})
 
 
-def load_market() -> list[dict]:
-    return read_csv(TIDY / "market.csv")
+_TABLE_MODE = {
+    "market": ("history", "market"),
+    "matches_history": ("history", "matches"),
+    "api_team_history": ("history", "api_teams"),
+    "results_history": ("history", "results_history"),
+    "matches": ("newest", "matches"),
+    "starters": ("newest", "starters"),
+    "elo": ("fresh", "elo"),
+}
+
+
+def load(name: str, now=None) -> list[dict]:
+    mode, file = _TABLE_MODE[name]
+    if mode == "history":
+        return read_csv(TIDY / f"{file}.csv")
+    if mode == "newest":
+        return newest(f"{file}.csv")
+    return fresh_only(newest(f"{file}.csv"), DAILY_FRESH_DAYS, now)
 
 
 def load_market_frozen() -> list:
@@ -419,18 +435,6 @@ def pick_source(rows: list[dict], source: str) -> list[dict]:
 
 
 
-def load_matches() -> list[dict]:
-    return newest("matches.csv")
-
-
-def load_matches_history() -> list[dict]:
-    return read_csv(TIDY / "matches.csv")
-
-
-def load_starters() -> list[dict]:
-    return newest("starters.csv")
-
-
 def _api_stats_key(r: dict):
     return ((r.get("player_id") or "").strip(), (r.get("week") or "").strip(),
             (r.get("stat") or "").strip())
@@ -455,9 +459,6 @@ def kickoff_stamp(s: str):
             else when.astimezone(timezone.utc))
 
 
-def load_elo(now=None) -> list[dict]:
-    return fresh_only(newest("elo.csv"),
-                      DAILY_FRESH_DAYS, now)
 
 
 GATED_API = ("api_teams", "api_market", "api_standings",
@@ -488,10 +489,6 @@ def stale_feeds(now=None, names=GATED_API) -> dict[str, float]:
 
 def load_api(name: str, now=None) -> list[dict]:
     return fresh_only(newest("api_%s.csv" % name), EVERY_RUN_FRESH_DAYS, now)
-
-
-def load_api_team_history() -> list[dict]:
-    return read_csv(TIDY / "api_teams.csv")
 
 
 def _activity_order(r: dict):
@@ -556,10 +553,6 @@ def load_odds() -> list[dict]:
     return latest_per_key(read_csv(TIDY / "odds.csv"),
                           lambda r: (schema.text(r, "home"),
                                      schema.text(r, "away")))
-
-
-def load_results_history() -> list[dict]:
-    return read_csv(TIDY / "results_history.csv")
 
 
 _UNDERSTAT_CACHE: dict[tuple, tuple] = {}
@@ -674,14 +667,14 @@ _CLOCK_HISTORY: list = []
 
 def clock() -> JornadaClock:
     if not _CLOCK:
-        _CLOCK.append(JornadaClock(load_matches(), load_fixtures()))
+        _CLOCK.append(JornadaClock(load("matches"), load_fixtures()))
     return _CLOCK[0]
 
 
 def clock_history() -> JornadaClock:
     if not _CLOCK_HISTORY:
         _CLOCK_HISTORY.append(
-            JornadaClock(load_matches(), read_csv(TIDY / "fixtures.csv")))
+            JornadaClock(load("matches"), read_csv(TIDY / "fixtures.csv")))
     return _CLOCK_HISTORY[0]
 
 
@@ -691,7 +684,7 @@ _JORNADA_OF_MATCH: list = []
 def jornada_of_match() -> dict[str, int]:
     if not _JORNADA_OF_MATCH:
         out: dict[str, int] = {}
-        for m in load_matches_history():
+        for m in load("matches_history"):
             mid = (m.get("match_id") or "").strip()
             if not mid or mid in out:
                 continue
@@ -1119,19 +1112,19 @@ def _selftest_new_loaders() -> None:
     if matches_full:
         real_matches = {r.get("match_id") for r in matches_full
                         if r.get("match_id")}
-        got_matches = {r.get("match_id") for r in load_matches()}
+        got_matches = {r.get("match_id") for r in load("matches")}
         assert got_matches == real_matches, \
-            "load_matches() lost a match latest_only should have kept"
-        assert load_matches_history() == matches_full
+            'load("matches") lost a match latest_only should have kept'
+        assert load("matches_history") == matches_full
 
     starters_full = read_csv(TIDY / "starters.csv")
     if starters_full:
         real_keys = {(r.get("match_id"), r.get("player_name"))
                     for r in starters_full}
         got_keys = {(r.get("match_id"), r.get("player_name"))
-                   for r in load_starters()}
+                   for r in load("starters")}
         assert got_keys == real_keys, \
-            "load_starters() lost a (match, player) key latest_only should keep"
+            'load("starters") lost a (match, player) key latest_only should keep'
 
     stats_all = read_csv(TIDY / "api_stats.csv")
     if stats_all:
@@ -1166,7 +1159,7 @@ def _selftest_new_loaders() -> None:
     j2 = jornada_of_match()
     assert j1 is j2, "jornada_of_match() must be memoized"
     expect: dict[str, int] = {}
-    for m in load_matches_history():
+    for m in load("matches_history"):
         mid = (m.get("match_id") or "").strip()
         if mid and mid not in expect:
             try:
