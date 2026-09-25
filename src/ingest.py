@@ -479,6 +479,14 @@ def parse() -> None:
     _parse_everything(walk, sigs_now, stamps)
 
 
+def _walkable_src(key: str):
+    """The parser for `key`, or None if it has none or feeds the points
+    table -- points.py walks that feed itself, on its own cache. Three
+    walkers here each re-derived this guard separately."""
+    src = source_for(key)
+    return src if src is not None and src.table != "points" else None
+
+
 def _parse_tail(walk, tail, sigs_now, stamps, state) -> bool:
     """Fold ONLY the new snapshots into the tables that already exist.
 
@@ -495,8 +503,8 @@ def _parse_tail(walk, tail, sigs_now, stamps, state) -> bool:
         if stamp not in tail_set:
             continue
         for key, (ck, origin) in sorted(docs.items()):
-            src = source_for(key)
-            if src is None or src.table == "points":
+            src = _walkable_src(key)
+            if src is None:
                 continue
             pk = parse_key(ck, src)
             keyed.append((stamp, pk, src))
@@ -551,8 +559,8 @@ def _parser_sigs(walk) -> dict[str, str]:
     out: dict[str, str] = {}
     for _stamp, docs in walk:
         for key in docs:
-            src = source_for(key)
-            if src is None or src.table == "points":
+            src = _walkable_src(key)
+            if src is None:
                 continue
             name = getattr(src.parse, "__name__", "")
             if name and name not in out:
@@ -619,9 +627,8 @@ def _parse_everything(walk, sigs_now, stamps) -> None:
     need: dict[str, set] = {}
     for stamp, docs in walk:
         for key, (ck, origin) in docs.items():
-            src = source_for(key)
-            if (src is not None and src.table != "points"
-                    and parse_key(ck, src) not in cache):
+            src = _walkable_src(key)
+            if src is not None and parse_key(ck, src) not in cache:
                 need.setdefault(origin, set()).add(key)
     misses = sum(len(v) for v in need.values())
     tasks, n = sorted(need.items()), _parse_workers(misses)
@@ -651,8 +658,8 @@ def _parse_everything(walk, sigs_now, stamps) -> None:
     hits = 0
     for stamp, docs in walk:
         for key, (ck, origin) in sorted(docs.items()):
-            src = source_for(key)
-            if src is None or src.table == "points":
+            src = _walkable_src(key)
+            if src is None:
                 continue
             pk = parse_key(ck, src)
             rows = cache.get(pk, [])
