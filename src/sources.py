@@ -862,9 +862,18 @@ def fd_season_code(now: datetime) -> str:
     return "%02d%02d" % (y % 100, (y + 1) % 100)
 
 
-def fd_sources(now: datetime | None = None) -> list["Source"]:
+def _season_start_year(now: datetime | None = None) -> int:
     now = now or datetime.now(timezone.utc)
-    cur_y = now.year if now.month >= 7 else now.year - 1
+    return now.year if now.month >= 7 else now.year - 1
+
+
+def _season_suffix(key: str, prefix: str) -> str:
+    m = re.match(r"^%s_(\d{4})$" % re.escape(prefix), key)
+    return m.group(1) if m else ""
+
+
+def fd_sources(now: datetime | None = None) -> list["Source"]:
+    cur_y = _season_start_year(now)
     out = []
     for back in range(FD_SEASONS_BACK + 1):
         y = cur_y - back
@@ -905,8 +914,7 @@ def _fd_slug(name: str) -> str:
 
 def parse_fd_results(text: str, observed_at: str,
                      key: str = "fd_2526") -> list[dict]:
-    m = re.match(r"^fd_(\d{4})$", key)
-    season = m.group(1) if m else ""
+    season = _season_suffix(key, "fd")
     rows = []
     for r in _fd_rows(text):
         home, away = (r.get("HomeTeam") or "").strip(), \
@@ -1064,8 +1072,7 @@ UNDERSTAT_SEASONS_BACK = 1
 
 
 def understat_sources(now: datetime | None = None) -> list["Source"]:
-    now = now or datetime.now(timezone.utc)
-    cur_y = now.year if now.month >= 7 else now.year - 1
+    cur_y = _season_start_year(now)
     out = []
     for back in range(UNDERSTAT_SEASONS_BACK + 1):
         y = cur_y - back
@@ -1090,8 +1097,7 @@ def _understat_rows(text: str) -> list[dict]:
 
 def parse_understat_players(text: str, observed_at: str,
                             key: str = "understat_2026") -> list[dict]:
-    m = re.match(r"^understat_(\d{4})$", key)
-    season = m.group(1) if m else ""
+    season = _season_suffix(key, "understat")
     out = []
     for p in _understat_rows(text):
         pid = str(p.get("id") or "").strip()
@@ -1181,6 +1187,11 @@ def _j(text: str):
         return json.loads(text or "")
     except (ValueError, TypeError):
         return None
+
+
+def _j_dict(text: str) -> dict | None:
+    d = _j(text)
+    return d if isinstance(d, dict) else None
 
 
 def _pm(item: dict) -> dict:
@@ -1381,8 +1392,8 @@ LINEUP_WEEK_RE = re.compile(r"api_lineup_(\d+)$")
 
 def parse_api_lineup(text: str, observed_at: str,
                      key: str = "api_lineup_1") -> list[dict]:
-    d = _j(text)
-    if not isinstance(d, dict):
+    d = _j_dict(text)
+    if d is None:
         return []
     form = d.get("formation") or {}
     tactical = form.get("tacticalFormation") or []
@@ -1428,8 +1439,8 @@ API_PLAYER_KEY_RE = re.compile(r"^api_player_(\d+)$")
 
 def parse_api_player(text: str, observed_at: str,
                      key: str = "api_player_0") -> list[dict]:
-    d = _j(text)
-    if not isinstance(d, dict):
+    d = _j_dict(text)
+    if d is None:
         return []
     m = API_PLAYER_KEY_RE.match(key or "")
     pid = m.group(1) if m else str(d.get("id") or "")
