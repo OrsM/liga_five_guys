@@ -347,7 +347,14 @@ check "Universe flat-dict storage" 0 \
 # "offer" group as a second listing of a player already shown elsewhere --
 # FUND (flip.py) now owns that view. The DATA stays (flip.report_view()
 # still reads it); only the duplicate markdown section is cut.
-check "src/ lines" 21883 \
+# 21883 -> 21893 on 2026-09-25: report.py stops re-deriving DEF/MED/DEL counts
+# from the scorer's own rows -- a second implementation of exactly what
+# sim.shape() already does from the Universe. The SAME class of "two
+# computations of one fact" this codebase has already been burned by
+# (report vs. workings disagreeing). The score TOTAL logged stays local on
+# purpose: it is the Scorer's per-round rating, not sim.py's season xi_total
+# -- methodology.py's own fits grade against that specific quantity.
+check "src/ lines" 21893 \
   "$(find src -name '*.py' | xargs cat | wc -l)"
 
 [ "$fail" -eq 0 ] && echo "concepts: no duplication regained" || echo "concepts: a concept regained a second implementation"

@@ -40,7 +40,7 @@ def squad_names(lg) -> tuple[list[str], str]:
     return [], "nothing"
 
 
-def log_squad(observed, players, chosen, formation, total, deadline,
+def log_squad(observed, players, chosen, formation: str, total, deadline,
               obs_dt) -> None:
     path = DECISIONS / "squad_log.csv"
     widen_csv(path, LOG_COLS)
@@ -55,7 +55,7 @@ def log_squad(observed, players, chosen, formation, total, deadline,
                else "listed_blank" if p["on_page"] else "absent")
         rows.append({
             "observed_at": observed, "hours_to_lock": htl,
-            "formation": "-".join(str(x) for x in formation),
+            "formation": formation,
             "index_total": f"{total:.2f}",
             "ff_id": p.get("key", ""),
             "player": p["name"], "pos": p["pos"], "slot": p["slot"],
@@ -135,12 +135,22 @@ def main() -> None:
     pool = squad_pool(players)
 
     import decide
-    xi = decide.load().current_xi[1] if players else set()
+    import sim
+    u = decide.load() if players else None
+    xi = u.current_xi[1] if u else set()
     if players and xi:
         chosen = [p for p in players if p.get("key") in xi]
-        formation = tuple(sum(1 for p in chosen if p["slot"] == s)
-                          for s in ("DEF", "MED", "DEL"))
-        best = (sum(p["score"] for p in chosen), formation, chosen)
+        # FORMATION IS sim.shape()'S JOB, NOT A SECOND COUNT OF THE SAME XI.
+        # This used to re-derive DEF/MED/DEL counts from the scorer's rows,
+        # a second implementation of exactly what shape() already does from
+        # the Universe -- the same class of duplication that let a report
+        # and its own workings disagree before (see lfg-publish's own note
+        # on why decisions.json IS the report now, not a second rendering
+        # of it). The SCORE total stays local: it is the Scorer's per-round
+        # rating, deliberately NOT sim.py's season-forecast xi_total --
+        # squad_log.csv's own grading pipeline (methodology.fit_rate_rel_floor,
+        # golden_dataset) reads it as that specific quantity.
+        best = (sum(p["score"] for p in chosen), sim.shape(u, xi), chosen)
     else:
         best = None
 
