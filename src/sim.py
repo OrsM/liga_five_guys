@@ -396,9 +396,13 @@ def ladder(u, rows, base, data=None, exp=None, xi=None) -> list[str]:
         out.append("| **" + GROUP_LABEL["sell"] + "** | | | | | | | | |")
         out += [row_md(r) for r in by_group["sell"]]
 
-    if by_group.get("offer"):
-        out.append("| **" + GROUP_LABEL["offer"] + "** | | | | | | | | |")
-        out += [row_md(r) for r in by_group["offer"]]
+    # "offer" rows are NOT rendered as their own section: every one of them
+    # duplicates a player already listed above (keep/out/sell/field) with
+    # the same pts_mean, just re-tagged because he has a live bid -- flip.py
+    # now owns that view (FUND, net points + sell-now-vs-wait timing) and
+    # does it better. The rows stay in ladder_rows()'s DATA (decisions.json)
+    # because flip.report_view() prices a fielded starter through them --
+    # only the markdown listing, which nobody reads twice, is cut.
 
     if by_group.get("buy"):
         out.append("| **" + GROUP_LABEL["buy"] + "** | | | | | | | | |")

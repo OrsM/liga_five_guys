@@ -340,7 +340,14 @@ check "Universe flat-dict storage" 0 \
 # and prices the sell-now-vs-wait timing with the same Outlook model the buy
 # side already uses -- a costly starter with a big offer can rank ABOVE a
 # nearly-free bench player with a small one.
-check "src/ lines" 21838 \
+# 21838 -> 21883 on 2026-09-25: fund() trims to what covers the shortfall plus
+# one further option, not the whole squad (listing all 17 read as "sell
+# everyone"), and the section label states the real shortfall and says
+# plainly it is not a recommendation; sim.ladder() stops rendering the
+# "offer" group as a second listing of a player already shown elsewhere --
+# FUND (flip.py) now owns that view. The DATA stays (flip.report_view()
+# still reads it); only the duplicate markdown section is cut.
+check "src/ lines" 21883 \
   "$(find src -name '*.py' | xargs cat | wc -l)"
 
 [ "$fail" -eq 0 ] && echo "concepts: no duplication regained" || echo "concepts: a concept regained a second implementation"

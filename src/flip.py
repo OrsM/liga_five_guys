@@ -257,8 +257,8 @@ def sells(bench: list[dict], last: dict[str, float], offers: dict[str, float],
 
 
 def fund(offers: dict[str, float], mine: dict, names: dict, xi: set,
-        verdict: dict, rate: float, value: dict, last: dict, model: dict
-        ) -> list[dict]:
+        verdict: dict, rate: float, value: dict, last: dict, model: dict,
+        need: float = 0.0) -> list[dict]:
     """Every squad player with a real received offer on the table, cheapest
     in season points first -- what selling him costs, whether he starts or
     not. This answers "where do I get the cash", nothing more: the report
@@ -273,6 +273,13 @@ def fund(offers: dict[str, float], mine: dict, names: dict, xi: set,
     re-optimised inside every simulated week, an average-player phantom
     filling his slot. A key starter prices in the tens of points (Pablo
     Fornals: -60.0, 2026-09-25); a fringe bench player in tenths.
+
+    TRIMMED TO `need`, NOT THE WHOLE SQUAD. Found 2026-09-25: listing every
+    offered player -- 17 of them, most of the squad -- read as "sell all of
+    these" when it meant "pick from these", so it is cut to the cheapest
+    ones whose offers cover `need` plus ONE further option, never the rest.
+    need=0.0 (the default) keeps everything, for a caller (a test, a script)
+    that wants the full menu rather than a specific shortfall.
 
     money_now IS THE SAME "sell now vs. wait" READING sells() ALREADY MAKES
     for its own bench-only, obvious-yes cases -- the offer against what the
@@ -334,6 +341,10 @@ def fund(offers: dict[str, float], mine: dict, names: dict, xi: set,
     for p in out:
         running += p["offer"]
         p["running"] = running
+    if need > 0:
+        covered = next((i for i, p in enumerate(out) if p["running"] >= need),
+                       len(out) - 1)
+        out = out[:covered + 2]      # the cover point, plus one further option
     return out
 
 
@@ -429,13 +440,18 @@ def present(out: dict) -> dict:
          "rows": held}]
     # ONLY WHEN SOMETHING IS SHORT (out["fund"] is empty otherwise, set by
     # main()) -- a menu of real offers already on the table, cheapest in
-    # season points first, for whichever pick needs the cash. Never a
-    # recommendation on its own: sells() already acts where selling is a
-    # clear yes, and a starter sale is too big a call for this to make FOR
-    # you, so every candidate is shown, priced, and left to you.
+    # season points first, trimmed to what covers the actual shortfall (plus
+    # one further option) rather than the whole squad: listing all 17 read as
+    # "sell everyone" when it meant "pick from these" (found 2026-09-25).
+    # Never a recommendation on its own: sells() already acts where selling
+    # is a clear yes, and a starter sale is too big a call for this to make
+    # FOR you, so every candidate shown is priced and left to you.
     if funded:
-        sections.append({"label": "FUND — offers already on the table",
-                         "tone": "fund", "rows": funded})
+        sections.append({
+            "label": "FUND — %s short, not a recommendation: %d option(s) "
+                     "that would cover it, cheapest first"
+                     % (_m(out["fund_need"]), len(funded)),
+            "tone": "fund", "rows": funded})
     return {
         "heading": "MARKET",
         "summary": "%s to spend%s" % (_m(out["spendable"]), hold),
@@ -547,9 +563,10 @@ def main() -> None:
     short = max([held_back - u.cash] + [p["short"] for p in pick_list],
                default=0.0)
     funding = (fund(dict(u.received_offers), mine, name, xi, verdict,
-                    money_rate(moves), value, last, model)
+                    money_rate(moves), value, last, model, need=short)
               if short > 0 else [])
     out = {"cash": u.cash, "reserve": held_back, "spendable": spend,
+           "fund_need": short,
            "picks": pick_list,
            "sells": [p for p in sales if (p["key"], "BUY") not in recent],
            "held": kept, "fund": funding,
@@ -716,9 +733,29 @@ def _selftest() -> None:
     assert by_name["Riser"]["money_now"] < 0, by_name["Riser"]
     assert by_name["Faller"]["money_now"] > 0, by_name["Faller"]
 
+    # need TRIMS the menu: 5 candidates on the table, but listing all of
+    # them read as "sell everyone" when it meant "pick from these" -- cut to
+    # what covers the shortfall plus ONE further option, never the rest
+    five = {"a": 1, "b": 1, "c": 1, "d": 1, "e": 1}
+    five_offers = {"a": 1e6, "b": 2e6, "c": 3e6, "d": 4e6, "e": 5e6}
+    five_names = {k: k.upper() for k in five}
+    five_ver = {k: ("keep", -1.0) for k in five}
+    whole = fund(five_offers, five, five_names, set(), five_ver, rate=0.1,
+                value={}, last={}, model=model)
+    assert len(whole) == 5, whole                          # need=0: everything
+    trimmed = fund(five_offers, five, five_names, set(), five_ver, rate=0.1,
+                   value={}, last={}, model=model, need=2.5e6)
+    # cheapest-net first is A (1M, smallest offer, ties broken by net_pts);
+    # covering 2.5M needs A+B+C (1+2+3=6M >= 2.5M at the ties this fixture
+    # produces) plus one further -- never all five
+    assert 2 <= len(trimmed) < 5, trimmed
+    assert sum(p["offer"] for p in trimmed[:-1]) < 2.5e6 \
+        or len(trimmed) <= 2, trimmed
+    assert trimmed[-2]["running"] >= 2.5e6, trimmed
+
     # the words: one function, every number from the reason
     out = {"cash": 20e6, "reserve": 10e6, "spendable": 10e6, "picks": got,
-           "sells": sold, "held": held, "fund": []}
+           "sells": sold, "held": held, "fund": [], "fund_need": 0.0}
     v = present(out)
     assert v["summary"] == "10.00M to spend; 10.00M held back for the report's top move", v["summary"]
     tight = present({**out, "picks": [poor]})["sections"][0]["rows"][0]["right"]
@@ -732,7 +769,7 @@ def _selftest() -> None:
     # ...and only what you can afford: an unaffordable pick stays on the page
     # (with what is missing) but does not go in the notification
     assert "Buy:" not in present({**out, "picks": [poor]})["ping"]
-    fund_view = present({**out, "fund": menu})
+    fund_view = present({**out, "fund": menu, "fund_need": 12e6})
     fund_sec = {s["tone"]: s for s in fund_view["sections"]}["fund"]
     assert [r["name"] for r in fund_sec["rows"]] == ["Star", "Free", "Kept"]
     assert fund_sec["rows"][0]["right"] == ["30.00M", "a net gain"], \
@@ -740,6 +777,10 @@ def _selftest() -> None:
     assert fund_sec["rows"][2]["right"][1].startswith("net "), fund_sec["rows"][2]
     assert "a net" in fund_sec["rows"][0]["detail"] \
         or "outearns" in fund_sec["rows"][0]["detail"], fund_sec["rows"][0]
+    # the label states the real shortfall and says, plainly, it is not an
+    # instruction to sell everything shown
+    assert "12.00M short" in fund_sec["label"] and "not a recommendation" \
+        in fund_sec["label"] and "3 option" in fund_sec["label"], fund_sec
     assert not any(s["tone"] == "fund" for s in v["sections"]), \
         "an empty fund list must not draw a section"
     try:
