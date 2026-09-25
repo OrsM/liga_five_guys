@@ -1191,27 +1191,38 @@ def _player_identity(pm: dict) -> dict:
     }
 
 
-def parse_api_leagues(text: str, observed_at: str,
-                      key: str = "api_leagues") -> list[dict]:
+def _parse_json_list(text: str, observed_at: str, row_fn,
+                     if_empty=None) -> list[dict]:
+    """The shared skeleton behind every api_* JSON-list endpoint: parse,
+    require a list, call row_fn(item) -> a list of field dicts (own fields
+    only -- observed_at/source are stamped here), flatten, stamp. row_fn
+    returning [] for an item drops it; `if_empty` (api_offer's one real use)
+    supplies a placeholder row set when nothing survived at all."""
     d = _j(text)
     if not isinstance(d, list):
         return []
-    rows = []
-    for lg in d:
-        t = lg.get("team") or {}
-        if not lg.get("id"):
-            continue
-        rows.append({
-            "observed_at": observed_at, "source": LFG_SOURCE,
-            "league_id": str(lg["id"]), "league_name": lg.get("name") or "",
-            "access": lg.get("access") or "",
-            "managers": str(lg.get("managersNumber") or ""),
-            "team_id": str(t.get("id") or ""),
-            "money": str(t.get("money") or ""),
-            "team_value": str(t.get("teamValue") or ""),
-            "team_points": str(t.get("teamPoints") or ""),
-        })
+    rows = [{"observed_at": observed_at, "source": LFG_SOURCE, **row}
+            for it in d for row in (row_fn(it) or ())]
+    if not rows and if_empty is not None:
+        rows = [{"observed_at": observed_at, "source": LFG_SOURCE, **row}
+               for row in if_empty()]
     return rows
+
+
+def parse_api_leagues(text: str, observed_at: str,
+                      key: str = "api_leagues") -> list[dict]:
+    def row(lg):
+        if not lg.get("id"):
+            return []
+        t = lg.get("team") or {}
+        return [{"league_id": str(lg["id"]), "league_name": lg.get("name") or "",
+                "access": lg.get("access") or "",
+                "managers": str(lg.get("managersNumber") or ""),
+                "team_id": str(t.get("id") or ""),
+                "money": str(t.get("money") or ""),
+                "team_value": str(t.get("teamValue") or ""),
+                "team_points": str(t.get("teamPoints") or "")}]
+    return _parse_json_list(text, observed_at, row)
 
 
 sign_api_leagues = partial(
@@ -1221,16 +1232,11 @@ sign_api_leagues = partial(
 
 def parse_api_market(text: str, observed_at: str,
                      key: str = "api_market") -> list[dict]:
-    d = _j(text)
-    if not isinstance(d, list):
-        return []
-    rows = []
-    for it in d:
+    def row(it):
         pm = _pm(it)
         if not pm.get("id"):
-            continue
-        rows.append({
-            "observed_at": observed_at, "source": LFG_SOURCE,
+            return []
+        return [{
             ROW_TABLE: "api_market",
             "market_id": str(it.get("id") or ""),
             **_player_identity(pm),
@@ -1247,8 +1253,8 @@ def parse_api_market(text: str, observed_at: str,
             "bid_id": str((it.get("bid") or {}).get("id") or ""),
             "bid_money": str((it.get("bid") or {}).get("money") or ""),
             "bid_status": (it.get("bid") or {}).get("status") or "",
-        })
-    return rows
+        }]
+    return _parse_json_list(text, observed_at, row)
 
 
 sign_api_market = partial(
@@ -1259,39 +1265,33 @@ sign_api_market = partial(
 
 def parse_api_activity(text: str, observed_at: str,
                        key: str = "api_activity") -> list[dict]:
-    d = _j(text)
-    if not isinstance(d, list):
-        return []
-    rows = []
-    for a in d:
-        tid = a.get("activityTypeId")
+    # NOTHING IS DROPPED SILENTLY ANY MORE. An allowlist is still right -- an
+    # event whose meaning is unknown must not be guessed at, and the ledger
+    # below ignores any kind it does not recognise. What was wrong was that
+    # the dropped ones left no trace, so a clause buyout was discarded from
+    # the first day of the season and only surfaced when Miguel noticed a
+    # raid missing from the report six weeks later. An unknown type is now
+    # KEPT, named for what it is, and warned about, so the next one costs a
+    # warning rather than a season of bad rival cash.
+    def row(a):
         if not a.get("id"):
-            continue
-        # NOTHING IS DROPPED SILENTLY ANY MORE. An allowlist is still right --
-        # an event whose meaning is unknown must not be guessed at, and the
-        # ledger below ignores any kind it does not recognise. What was wrong
-        # was that the dropped ones left no trace, so a clause buyout was
-        # discarded from the first day of the season and only surfaced when
-        # Miguel noticed a raid missing from the report six weeks later.
-        # An unknown type is now KEPT, named for what it is, and warned about,
-        # so the next one costs a warning rather than a season of bad rival
-        # cash.
-        kind = ACT_KIND.get(tid) or ("unknown:%s" % tid)
-        rows.append({
-            "observed_at": observed_at, "source": LFG_SOURCE,
+            return []
+        kind = ACT_KIND.get(a.get("activityTypeId")) \
+            or ("unknown:%s" % a.get("activityTypeId"))
+        return [{
             "activity_id": str(a["id"]),
             "at": a.get("createdAt") or "",
             "kind": kind,
             "user_id": str(a.get("user1Id") or ""),
             # THE OTHER SIDE. Only a clause has one -- a buy is from the
-            # market and a sell is to it -- and without it the money has
-            # a payer but no payee.
+            # market and a sell is to it -- and without it the money has a
+            # payer but no payee.
             "counterparty": str(a.get("user2Id") or ""),
             "player_id": str(a.get("playerMasterId") or ""),
             "amount": str(a.get("amount") or ""),
             "week": str(a.get("weekNumber") or ""),
-        })
-    return rows
+        }]
+    return _parse_json_list(text, observed_at, row)
 
 
 sign_api_activity = partial(_sign_rows, parse=lambda t: parse_api_activity(t, ""),
@@ -1450,15 +1450,12 @@ API_PLAYERS_ALL_URL = "{base}/v1/competition/1/players?x-lang=es"
 
 def parse_api_players_all(text: str, observed_at: str,
                           key: str = "api_players_all") -> list[dict]:
-    d = _j(text)
-    if not isinstance(d, list):
-        return []
-    return [{
-        "observed_at": observed_at, "source": LFG_SOURCE,
-        "team_id": str(p.get("teamId") or ""),
-        **_player_identity(p),
-        "player_status": p.get("playerStatus") or "",
-    } for p in d if p.get("id")]
+    def row(p):
+        if not p.get("id"):
+            return []
+        return [{"team_id": str(p.get("teamId") or ""), **_player_identity(p),
+                "player_status": p.get("playerStatus") or ""}]
+    return _parse_json_list(text, observed_at, row)
 
 
 sign_api_players_all = partial(
@@ -1504,34 +1501,28 @@ API_OFFER_KEY_RE = re.compile(r"^api_offer_(\d+)$")
 
 def parse_api_offer(text: str, observed_at: str,
                     key: str = "api_offer_0") -> list[dict]:
-    d = _j(text)
-    if not isinstance(d, list):
-        return []
     m = API_OFFER_KEY_RE.match(key or "")
     ptid = m.group(1) if m else ""
     if not ptid:
         return []
-    out = []
-    for it in d:
+
+    def row(it):
         if not it.get("id"):
-            continue
-        out.append({
-            "observed_at": observed_at, "source": LFG_SOURCE,
-            "player_team_id": ptid,
-            "offer_id": str(it["id"]),
-            "money": str(it.get("money") or ""),
-            "status": it.get("status") or "",
+            return []
+        return [{
+            "player_team_id": ptid, "offer_id": str(it["id"]),
+            "money": str(it.get("money") or ""), "status": it.get("status") or "",
             "created_at": it.get("createdAt") or "",
             "expires_at": it.get("expirationDate") or "",
             "from_market": "" if it.get("isFromMarket") is None else
                            str(it["isFromMarket"]).lower(),
-        })
-    if out:
-        return out
-    return [{"observed_at": observed_at, "source": LFG_SOURCE,
-             "player_team_id": ptid, "offer_id": "", "money": "",
-             "status": "", "created_at": "", "expires_at": "",
-             "from_market": ""}]
+        }]
+
+    def empty():
+        return [{"player_team_id": ptid, "offer_id": "", "money": "",
+                "status": "", "created_at": "", "expires_at": "",
+                "from_market": ""}]
+    return _parse_json_list(text, observed_at, row, if_empty=empty)
 
 
 sign_api_offer = partial(

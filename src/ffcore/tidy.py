@@ -1000,6 +1000,21 @@ def market_routes(mkt: list[dict], key_of) -> tuple[dict[str, float],
     return price, route, bids
 
 
+def _pending_amounts(rows, status_field: str, money_field: str,
+                     key_of) -> dict[str, float]:
+    out: dict[str, float] = {}
+    for r in rows:
+        if (r.get(status_field) or "") != "pending":
+            continue
+        amt = float(r.get(money_field) or 0)
+        if not amt:
+            continue
+        k = key_of(r)
+        if k:
+            out[k] = max(out.get(k, 0.0), amt)
+    return out
+
+
 def pending_sent(mkt: list[dict], key_of) -> dict[str, float]:
     """Your own live bids, by player key -- money you have COMMITTED, not
     money you have SPENT. The app does not debit a bid when it is placed
@@ -1007,29 +1022,13 @@ def pending_sent(mkt: list[dict], key_of) -> dict[str, float]:
     34.7M stood against a 13.2M balance), so this must never be subtracted
     from cash. It is a list of actions already taken, to be re-endorsed or
     withdrawn -- mirror of pending_received()."""
-    out: dict[str, float] = {}
-    for r in mkt:
-        if (r.get("bid_status") or "") != "pending" or not r.get("bid_money"):
-            continue
-        k = key_of(r)
-        if not k:
-            continue
-        out[k] = max(out.get(k, 0.0), float(r["bid_money"]))
-    return out
+    return _pending_amounts(mkt, "bid_status", "bid_money", key_of)
 
 
 def pending_received(offers: list[dict], pt_to_key: dict[str, str]
                      ) -> dict[str, float]:
-    out: dict[str, float] = {}
-    for r in offers:
-        if (r.get("status") or "") != "pending":
-            continue
-        k = pt_to_key.get(r.get("player_team_id") or "")
-        money = float(r.get("money") or 0)
-        if not k or not money:
-            continue
-        out[k] = max(out.get(k, 0.0), money)
-    return out
+    return _pending_amounts(offers, "status", "money",
+                            lambda r: pt_to_key.get(r.get("player_team_id") or ""))
 
 
 
