@@ -56,15 +56,7 @@ def _selftest() -> None:
     from decide import Universe
     from ffcore.season import LeagueState
     from ffcore.forecast import Bootstrap
-    from ffcore.crosswalk import Player
-    from ffcore.profile import (PlayerProfile,
-                                PlayerCurrent, PlayerHistory, PlayerDerived)
-
-    def mk_profile(pj, pos="MED", market_exp=None):
-        return PlayerProfile(
-            identity=Player(player_id="x"), current=PlayerCurrent(pos=pos),
-            history=PlayerHistory(),
-            derived=PlayerDerived(pj=pj, market_exp=market_exp))
+    from ffcore.profile import mk_profile
 
     pf_sq = {"me": {"me_a": "MED", "me_b": "MED"}}
     pf_per = {1: {"me_a": (2.0, 1.0), "me_b": (5.0, 1.0), "cand": (4.0, 1.0)},

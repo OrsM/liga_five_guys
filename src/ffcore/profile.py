@@ -7,7 +7,7 @@ from ffcore.crosswalk import Player
 from ffcore.text import norm
 
 __all__ = ["PlayerCurrent", "PlayerHistory",
-          "PlayerDerived", "PlayerProfile", "build_profiles",
+          "PlayerDerived", "PlayerProfile", "build_profiles", "mk_profile",
           "status_adjusted"]
 
 
@@ -190,6 +190,17 @@ def build_profiles(players: dict, sc, perjornada_rows,
         out[k] = PlayerProfile(identity=ident, current=cur,
                               history=hist, derived=der)
     return out
+
+
+def mk_profile(pj: float, pos: str = "MED", price=None, name: str = "",
+               market_exp=None) -> PlayerProfile:
+    """A minimal fake PlayerProfile for tests -- par.py's and slate.py's
+    selftests each used to invent their own local copy of this."""
+    return PlayerProfile(
+        identity=Player(player_id="x", name=name),
+        current=PlayerCurrent(pos=pos, price=price, listed=price is not None),
+        history=PlayerHistory(),
+        derived=PlayerDerived(pj=pj, market_exp=market_exp))
 
 
 def _selftest() -> None:

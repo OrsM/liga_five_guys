@@ -165,15 +165,7 @@ def _selftest() -> None:
     from decide import Universe, Action
     from ffcore.forecast import Bootstrap
     from ffcore.season import LeagueState
-    from ffcore.crosswalk import Player
-    from ffcore.profile import (PlayerProfile, PlayerCurrent,
-                                PlayerHistory, PlayerDerived)
-
-    def cp(pj, pos="MED", price=5e6, name=""):
-        return PlayerProfile(
-            identity=Player(player_id="x", name=name),
-            current=PlayerCurrent(pos=pos, price=price, listed=price is not None),
-            history=PlayerHistory(), derived=PlayerDerived(pj=pj))
+    from ffcore.profile import mk_profile as cp
 
     cu_sq = {"me": {"me_a": "MED"}}
     cu_per = {1: {"me_a": (2.0, 1.0), "cheap": (3.0, 1.0), "rich": (8.0, 1.0)},
