@@ -316,7 +316,12 @@ check "Universe flat-dict storage" 0 \
 # 21397 -> 21445 on 2026-09-24: backtest.track_record() (reused replay_recommendations)
 # and its sim.py wiring -- the report now prints its own measured track record
 # instead of nothing, guarded so a broken replay drops the line, not the run.
-check "src/ lines" 21445 \
+# 21445 -> 21480 on 2026-09-24: load_actuals() now keys on ff_id too --
+# squad_log.csv (what its predictions are matched against) has keyed its own
+# rows on ff_id since 2026-08-20, so name-only matching missed 98% of the
+# real log; fit_rate_rel_floor and drift_frac_from_history went from ~50
+# stale August pairs to 370 real ones.
+check "src/ lines" 21480 \
   "$(find src -name '*.py' | xargs cat | wc -l)"
 
 [ "$fail" -eq 0 ] && echo "concepts: no duplication regained" || echo "concepts: a concept regained a second implementation"

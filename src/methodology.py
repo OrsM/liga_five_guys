@@ -449,7 +449,12 @@ def load_actuals(window_days: int | None = WINDOW_DAYS) -> tuple[list[dict], str
             continue
         full = r.get("player_name_full", "")
         short = r.get("player_name", "")
-        keys = [k for k in {norm(full), norm(short)} if k]
+        # ff_id FIRST: squad_log.csv has keyed its own rows on ff_id, not
+        # name, since 2026-08-20 (98% of it) -- match on name ALONE missed
+        # nearly the whole log, so fit_rate_rel_floor() and
+        # drift_frac_from_history() were grading against a stale August
+        # sliver and calling it "too few pairs" rather than a key mismatch.
+        keys = [k for k in {r.get("ff_id", ""), norm(full), norm(short)} if k]
         jor = r.get("jornada", "")
         rows.append({"name": full or short, "keys": keys,
                      "from_dt": from_dt, "points_delta": pd_,
@@ -1334,6 +1339,36 @@ def _selftest() -> None:
     lag2 = lagged_pair(actuals3, preds3, locks3, 2)
     assert len(lag2) == 1 and lag2[0]["predicted"] == 1.0, lag2
     assert lagged_pair(actuals3, preds3, locks3, 3) == []
+
+    # load_actuals()'s keys must include ff_id: squad_log.csv (what
+    # load_predictions() reads) has keyed its own rows on ff_id, not name,
+    # since 2026-08-20 -- name-only matching here missed 98% of the real
+    # log and every fit reading it (fit_rate_rel_floor,
+    # drift_frac_from_history) silently graded a stale August sliver
+    # while its own "n=" message read as an honest small sample.
+    import csv as _csv_la
+    import tempfile as _tempfile_la
+    _real_live = LIVE
+    with _tempfile_la.TemporaryDirectory() as _d_la:
+        import pathlib as _pl_la
+        live_dir = _pl_la.Path(_d_la)
+        with open(live_dir / "perjornada_2099-00.csv", "w", newline="",
+                 encoding="utf-8") as fh:
+            w = _csv_la.DictWriter(fh, fieldnames=[
+                "from_stamp", "to_stamp", "ff_id", "player_name",
+                "player_name_full", "points_delta", "games_delta", "jornada"])
+            w.writeheader()
+            w.writerow({"from_stamp": "2026-01-01T0000Z",
+                       "to_stamp": "2026-01-02T0000Z", "ff_id": "999",
+                       "player_name": "renamed on the market",
+                       "player_name_full": "", "points_delta": "7",
+                       "games_delta": "1", "jornada": "1"})
+        globals()["LIVE"] = live_dir
+        try:
+            id_row, _ = load_actuals(window_days=None)
+        finally:
+            globals()["LIVE"] = _real_live
+    assert id_row and "999" in id_row[0]["keys"], id_row
 
     # Pins the CONTRACT, not a constant. This asserted `fitted == 1.0`,
     # which was only ever true because the fitter returned the module
