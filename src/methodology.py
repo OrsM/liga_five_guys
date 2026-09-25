@@ -1433,10 +1433,8 @@ def _selftest() -> None:
                  "away": "Levante"},
                 {"kickoff": "2026-08-15T19:30:00+00:00", "home": "Alaves",
                  "away": "Getafe"}]
-    assert team_slug_of("Racing Santander", {"racing", "real-madrid"}) \
-        == "racing"
-    assert team_slug_of("Real Betis", {"betis", "real-sociedad"}) == "betis"
-    assert team_slug_of("Nowhere FC", {"racing"}) is None
+    # team_slug_of() is tidy.py's own function, fully tested there --
+    # JornadaClock uses it internally, not re-verified here a second time.
     locks = JornadaClock(matches, fixtures).round_locks
     assert list(locks) == [1] and locks[1].day == 15, locks
     assert 2 not in locks
