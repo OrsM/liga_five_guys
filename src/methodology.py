@@ -1224,26 +1224,27 @@ def comparison_lines() -> list[str]:
     return out
 
 
-def drift_lines() -> list[str]:
-    fitted, why = drift_frac_from_history()
-    from ffcore.forecast import DRIFT_FRAC as _DEFAULT
-    out = ["### Season-long drift", ""]
-    if fitted == _DEFAULT and "not enough" in why:
-        out += [f"Still the unfitted default ({_DEFAULT:.2f}) — {why}.", ""]
+def _fit_lines(heading: str, fitted, default, unfitted_markers, why) -> list[str]:
+    out = [f"### {heading}", ""]
+    if fitted == default and any(m in why for m in unfitted_markers):
+        out += [f"Still the unfitted default ({default:.2f}) — {why}.", ""]
     else:
         out += [f"**Fit from real data this run: {fitted:.2f}** ({why}).", ""]
     return out
+
+
+def drift_lines() -> list[str]:
+    from ffcore.forecast import DRIFT_FRAC as _DEFAULT
+    fitted, why = drift_frac_from_history()
+    return _fit_lines("Season-long drift", fitted, _DEFAULT,
+                      ("not enough",), why)
 
 
 def rate_rel_floor_lines(pool) -> list[str]:
-    fitted, why = fit_rate_rel_floor(pool)
     from ffcore.forecast import RATE_REL_FLOOR as _DEFAULT
-    out = ["### Rate uncertainty floor", ""]
-    if fitted == _DEFAULT and ("too few" in why or "0 " in why):
-        out += [f"Still the stated default ({_DEFAULT:.2f}) — {why}.", ""]
-    else:
-        out += [f"**Fit from real data this run: {fitted:.2f}** ({why}).", ""]
-    return out
+    fitted, why = fit_rate_rel_floor(pool)
+    return _fit_lines("Rate uncertainty floor", fitted, _DEFAULT,
+                      ("too few", "0 "), why)
 
 
 def main() -> None:

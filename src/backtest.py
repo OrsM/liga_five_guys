@@ -455,33 +455,29 @@ def compare_arms(a: dict, b: dict, a_name: str, b_name: str) -> str:
     return "\n  ".join(lines)
 
 
-def replay_recommendations(min_days: float = 3.0) -> dict | None:
-    commits = commits_touching("reports/decisions.json")
-    if not commits:
-        return None
-    points_between, now = _actuals_index()
-    if now is None:
-        return None
-    episodes = _pick_episodes(commits, lambda moves: moves[:1])
-    return _grade_episodes(episodes, points_between, now, min_days)
-
-
 def _by_pts_lo(moves: list[dict], n: int) -> list[dict]:
     candidates = [m for m in moves if m.get("pts_lo") is not None
                  and m.get("buy") and m.get("sell")]
     return sorted(candidates, key=lambda m: -m["pts_lo"])[:n]
 
 
-def replay_percentile_rank(min_days: float = 3.0) -> dict | None:
+def _replay(pick, min_days: float) -> dict | None:
     commits = commits_touching("reports/decisions.json")
     if not commits:
         return None
     points_between, now = _actuals_index()
     if now is None:
         return None
+    return _grade_episodes(_pick_episodes(commits, pick), points_between,
+                           now, min_days)
 
-    episodes = _pick_episodes(commits, lambda moves: _by_pts_lo(moves, 1))
-    return _grade_episodes(episodes, points_between, now, min_days)
+
+def replay_recommendations(min_days: float = 3.0) -> dict | None:
+    return _replay(lambda moves: moves[:1], min_days)
+
+
+def replay_percentile_rank(min_days: float = 3.0) -> dict | None:
+    return _replay(lambda moves: _by_pts_lo(moves, 1), min_days)
 
 
 def replay_ladder_percentile(topn: int = 3, min_days: float = 3.0) -> dict:
