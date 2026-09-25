@@ -481,13 +481,17 @@ def sign_market(html: str) -> str | None:
     return _digest(MARKET_SURFACE_RE.findall(html))
 
 
-def sign_team(html: str) -> str | None:
+def _sign_elements(html: str, selectors) -> str | None:
     doc = lh.fromstring(html)
     els = []
-    for sel in XI_SELECTORS + FITNESS_SELECTORS:
-        els += _css(doc, sel)
-    els += _suspension_sections(doc)
+    for sel in selectors:
+        els += sel(doc) if callable(sel) else _css(doc, sel)
     return _digest(_surface(els))
+
+
+def sign_team(html: str) -> str | None:
+    return _sign_elements(html, [*XI_SELECTORS, *FITNESS_SELECTORS,
+                                 _suspension_sections])
 
 
 
@@ -594,9 +598,8 @@ def parse_af_team(html: str, observed_at: str,
 
 
 def sign_af_team(html: str) -> str | None:
-    doc = lh.fromstring(html)
-    return _digest(_surface(_css(doc, 'ul[aria-label^="Titulares"]')
-                            + _css(doc, AF_CONSENSO_SELECTOR)))
+    return _sign_elements(html, ['ul[aria-label^="Titulares"]',
+                                 AF_CONSENSO_SELECTOR])
 
 
 
@@ -757,11 +760,7 @@ def parse_starters(html: str, observed_at: str,
 
 
 def sign_starters(html: str) -> str | None:
-    els = []
-    doc = lh.fromstring(html)
-    for sel in MATCH_SIDES:
-        els += _xi_rows(doc, sel)
-    return _digest(_surface(els))
+    return _sign_elements(html, [partial(_xi_rows, side=s) for s in MATCH_SIDES])
 
 
 def _rebuild(key: str, pattern, table: str, parse, sign, url_for, **kw):
