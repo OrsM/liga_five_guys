@@ -194,7 +194,7 @@ def _size_of(path: Path) -> int:
 
 
 def doc_keys():
-    idx, out, carried, keys = _index_load(), [], {}, _Sigs()
+    idx, out, carried, keys = _index_load(), [], {}, Sigs()
     fresh, opened = {}, 0
     for snap in snapshots():
         stamp, size = _stamp_of(snap), _size_of(snap)
@@ -506,7 +506,7 @@ def _parse_tail(walk, tail, sigs_now, stamps, state) -> bool:
             need.setdefault(origin, set()).add(key)
 
     fresh: dict = {}
-    keys = _Sigs()
+    keys = Sigs()
     for origin, key, html in documents(need):
         pk, rows = _parse_one(origin, key, html, keys)
         cache[pk] = rows
@@ -566,14 +566,14 @@ def _parse_origin(task) -> dict:
     of the snapshot, so a worker opens it ITSELF: only rows cross the pipe,
     never the ~2MB of HTML per page."""
     origin, want = task
-    out, sigs = {}, _Sigs()
+    out, sigs = {}, Sigs()
     for o, key, html in documents({origin: want}):
         pk, rows = _parse_one(o, key, html, sigs)
         out[pk] = rows
     return out
 
 
-def _parse_one(origin: str, key: str, html: str, sigs: "_Sigs"
+def _parse_one(origin: str, key: str, html: str, sigs: "Sigs"
                ) -> tuple[str, list[dict]]:
     src = source_for(key)
     try:
@@ -611,7 +611,7 @@ def _parse_workers(misses: int) -> int:
 
 def _parse_everything(walk, sigs_now, stamps) -> None:
     pending: dict[str, list[dict]] = {}
-    cache, fresh = _parse_cache(), {}
+    cache, fresh = parse_cache(), {}
 
     need: dict[str, set] = {}
     for stamp, docs in walk:
@@ -661,7 +661,7 @@ def _parse_everything(walk, sigs_now, stamps) -> None:
             _spill_out(pending, spill, spilled)
             buffered = 0
     hits -= misses
-    _save_parse_cache(fresh)
+    save_parse_cache(fresh)
     del cache, fresh
     print("  parsed %d documents, reused %d" % (misses, hits))
 
@@ -758,7 +758,7 @@ def _parse_everything(walk, sigs_now, stamps) -> None:
 _CACHE = "parsed.json"
 
 
-class _Sigs:
+class Sigs:
 
     def __init__(self) -> None:
         self._at: dict[tuple, str] = {}
@@ -855,10 +855,10 @@ def _append_cache_lines(docs: dict, name: str = _CACHE) -> None:
         pass
 
 
-def _parse_cache(name: str = _CACHE) -> dict:
+def parse_cache(name: str = _CACHE) -> dict:
     """Every cached document. The line file is the live format; the single
     blob is read once, on the first run after the change, and then replaced
-    by _save_parse_cache below."""
+    by save_parse_cache below."""
     lines = TIDY / _lines_name(name)
     if lines.exists():
         out: dict = {}
@@ -883,7 +883,7 @@ def _parse_cache(name: str = _CACHE) -> dict:
     return blob.get("docs", {})
 
 
-def _save_parse_cache(docs: dict, name: str = _CACHE) -> None:
+def save_parse_cache(docs: dict, name: str = _CACHE) -> None:
     """Rewrite the whole cache, pruned to what the walk actually used. Only
     the full path calls this -- a tail append has read a handful of entries
     and must never write its own view back as though it were the lot."""

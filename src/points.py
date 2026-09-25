@@ -105,13 +105,13 @@ _CACHE = "parsed_points.json"
 
 
 def load_snapshots() -> dict[str, list[tuple[str, list[dict]]]]:
-    from ingest import (_parse_cache, _save_parse_cache, _Sigs, parser_sig,
+    from ingest import (parse_cache, save_parse_cache, Sigs, parser_sig,
                         doc_keys, documents)
     from sources import parse_points, season_label
 
     by_label: dict[str, list[tuple[str, list[dict]]]] = {}
     _psig = parser_sig("parse_points")
-    cache, fresh, walk = _parse_cache(_CACHE), {}, doc_keys()
+    cache, fresh, walk = parse_cache(_CACHE), {}, doc_keys()
 
     need: dict[str, set] = {}
     for _stamp, docs in walk:
@@ -126,7 +126,7 @@ def load_snapshots() -> dict[str, list[tuple[str, list[dict]]]]:
         except Exception as e:
             print(f"  warn: {origin}/points: {type(e).__name__}: {e}")
             got = {"rows": [], "label": "", "empty": True}
-        cache["%s@%s" % (_Sigs().of("points", html), _psig)] = got
+        cache["%s@%s" % (Sigs().of("points", html), _psig)] = got
 
     for stamp, docs in walk:
         if "points" not in docs:
@@ -144,7 +144,7 @@ def load_snapshots() -> dict[str, list[tuple[str, list[dict]]]]:
                   "changed? Raw is kept; fix parse and re-run.")
             continue
         by_label.setdefault(got["label"], []).append((stamp, got["rows"]))
-    _save_parse_cache(fresh, _CACHE)
+    save_parse_cache(fresh, _CACHE)
     return by_label
 
 
