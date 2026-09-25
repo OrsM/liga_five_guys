@@ -973,16 +973,13 @@ def cash_price_history():
 
 
 def log_cash_price(measured) -> None:
-    from ffcore.tidy import DECISIONS, append_csv
+    from ffcore.tidy import DECISIONS, log_row
 
     if measured is None:
         return
-    DECISIONS.mkdir(parents=True, exist_ok=True)
-    append_csv(DECISIONS / PRICE_LOG,
-               [{"measured_at": run_now()
-                                 .strftime("%Y-%m-%dT%H%MZ"),
-                 "places_per_million": "%.6f" % measured}],
-               ["measured_at", "places_per_million"])
+    log_row(DECISIONS / PRICE_LOG,
+           {"measured_at": run_now().strftime("%Y-%m-%dT%H%MZ"),
+            "places_per_million": "%.6f" % measured})
 
 
 def _price_note(smoothed, measured, idle_cash: float = 0.0) -> str:

@@ -508,13 +508,7 @@ def _parse_tail(walk, tail, sigs_now, stamps, state) -> bool:
     fresh: dict = {}
     keys = _Sigs()
     for origin, key, html in documents(need):
-        src = source_for(key)
-        try:
-            rows = src.parse(html, origin, key)
-        except Exception as e:
-            print(f"  warn: {origin}/{key}: {type(e).__name__}: {e}")
-            rows = []
-        pk = parse_key(keys.of(key, html), src)
+        pk, rows = _parse_one(origin, key, html, keys)
         cache[pk] = rows
         fresh[pk] = rows
 
@@ -574,14 +568,20 @@ def _parse_origin(task) -> dict:
     origin, want = task
     out, sigs = {}, _Sigs()
     for o, key, html in documents({origin: want}):
-        src = source_for(key)
-        try:
-            rows = src.parse(html, o, key)
-        except Exception as e:
-            print(f"  warn: {o}/{key}: {type(e).__name__}: {e}")
-            rows = []
-        out[parse_key(sigs.of(key, html), src)] = rows
+        pk, rows = _parse_one(o, key, html, sigs)
+        out[pk] = rows
     return out
+
+
+def _parse_one(origin: str, key: str, html: str, sigs: "_Sigs"
+               ) -> tuple[str, list[dict]]:
+    src = source_for(key)
+    try:
+        rows = src.parse(html, origin, key)
+    except Exception as e:
+        print(f"  warn: {origin}/{key}: {type(e).__name__}: {e}")
+        rows = []
+    return parse_key(sigs.of(key, html), src), rows
 
 
 def _parse_workers(misses: int) -> int:

@@ -1101,13 +1101,11 @@ ACCURACY_LOG = "forecast_accuracy_log.csv"
 
 
 def log_forecast_accuracy(n: int, mae: float, naive_mae: float) -> None:
-    from ffcore.tidy import DECISIONS, append_csv
+    from ffcore.tidy import DECISIONS, log_row
 
-    DECISIONS.mkdir(parents=True, exist_ok=True)
-    append_csv(DECISIONS / ACCURACY_LOG,
-              [{"observed_at": run_now().strftime("%Y-%m-%dT%H%MZ"),
-                "n": n, "mae": "%.4f" % mae, "naive_mae": "%.4f" % naive_mae}],
-              ["observed_at", "n", "mae", "naive_mae"])
+    log_row(DECISIONS / ACCURACY_LOG,
+           {"observed_at": run_now().strftime("%Y-%m-%dT%H%MZ"),
+            "n": n, "mae": "%.4f" % mae, "naive_mae": "%.4f" % naive_mae})
 
 
 def forecast_accuracy_history() -> list[dict]:

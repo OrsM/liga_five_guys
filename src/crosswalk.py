@@ -71,6 +71,13 @@ def namesakes(market) -> list[tuple[str, list]]:
     return sorted((k, sorted(v)) for k, v in seen.items() if len(v) > 1)
 
 
+def group_by_name(players) -> dict[str, list]:
+    out: dict[str, list] = {}
+    for p in players:
+        out.setdefault(norm(p.name), []).append(p)
+    return out
+
+
 def build_players(market, lineups, starters, api_rows, lg, clubs) -> dict:
 
     by_club = {c.ff_slug: c.club_id for c in clubs.values() if c.ff_slug}
@@ -87,9 +94,7 @@ def build_players(market, lineups, starters, api_rows, lg, clubs) -> dict:
                           norm(r.get("team")))
         club_of[pid] = norm(r.get("team"))
 
-    shared: dict[str, list] = {}
-    for p in out.values():
-        shared.setdefault(norm(p.name), []).append(p)
+    shared = group_by_name(out.values())
 
     def by_name(name: str, team_slug: str = ""):
         hits = shared.get(norm(name)) or []
@@ -153,9 +158,7 @@ def build_players(market, lineups, starters, api_rows, lg, clubs) -> dict:
 
 
 def attach_bulk_app_ids(rows, players: dict) -> int:
-    by_name: dict[str, list] = {}
-    for p in players.values():
-        by_name.setdefault(norm(p.name), []).append(p)
+    by_name = group_by_name(players.values())
     matched = 0
     for r in rows:
         name = schema.text(r, schema.API_PLAYERS_ALL.PLAYER_NAME)

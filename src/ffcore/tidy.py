@@ -15,7 +15,7 @@ from ffcore.parse import money, pct100
 from ffcore.text import index_by, norm, resolve
 
 __all__ = ["ROOT", "TIDY", "SEASON", "DECISIONS", "REPORTS", "PARTS", "MADRID",
-           "input_path", "read_csv", "write_csv", "append_csv", "widen_csv",
+           "input_path", "read_csv", "write_csv", "append_csv", "widen_csv", "log_row",
            "write_lines", "snapshot_stamp", "ledger_stamp", "latest_only",
            "latest_per_key", "snapshots",
            "Market", "Valuation", "VALUE_TOLERANCE", "price_agrees",
@@ -139,6 +139,10 @@ def widen_csv(path, fieldnames) -> bool:
     cols = have + [c for c in fieldnames if c not in have]
     write_csv(path, [{c: row.get(c, "") for c in cols} for row in rows], cols)
     return True
+
+
+def log_row(path, row: dict) -> None:
+    append_csv(Path(path), [row], list(row))
 
 
 def append_csv(path, rows, fieldnames=None) -> None:
@@ -351,14 +355,16 @@ def shown(t=None, fmt: str = "%Y-%m-%d %H:%M") -> str:
     return when.astimezone(MADRID).strftime(fmt + " %Z")
 
 
+def _age_days(stamp: str, now) -> float | None:
+    when = snapshot_stamp(stamp)
+    return None if when is None else (now - when).total_seconds() / 86400.0
+
+
 def fresh_only(rows: list[dict], max_age_days: float, now=None) -> list[dict]:
     if not rows:
         return []
-    when = snapshot_stamp(max(r.get("observed_at", "") for r in rows))
-    if when is None:
-        return []
-    now = now or run_now()
-    return rows if (now - when).total_seconds() <= max_age_days * 86400 else []
+    age = _age_days(max(r.get("observed_at", "") for r in rows), now or run_now())
+    return rows if age is not None and age <= max_age_days else []
 
 
 def snapshots(rows: list[dict]) -> list[str]:
@@ -473,13 +479,9 @@ def stale_feeds(now=None, names=GATED_API) -> dict[str, float]:
     now = now or run_now()
     out = {}
     for name in names:
-        rows = read_csv(TIDY / f"{name}.csv")
-        when = snapshot_stamp(max((r.get("observed_at", "") for r in rows),
-                                  default=""))
-        if when is None:
-            continue
-        age = (now - when).total_seconds() / 86400.0
-        if age > EVERY_RUN_FRESH_DAYS:
+        _n, newest_stamp = table_stats(TIDY / f"{name}.csv")
+        age = _age_days(newest_stamp, now)
+        if age is not None and age > EVERY_RUN_FRESH_DAYS:
             out[name] = age
     return out
 
