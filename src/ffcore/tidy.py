@@ -68,25 +68,39 @@ def _forget(path) -> None:
     _READ_CACHE.pop(str(Path(path)), None)
 
 
-def read_csv(path) -> list[dict]:
+def _mtime_cached(path, cache: dict, key, build):
+    """cache[key] if `path`'s (mtime, size) stamp still matches, else
+    build() and store it. None if `path` does not exist. The one shape
+    behind every "reread this file only if it changed" cache in this
+    module -- five of them used to hand-roll the stat/OSError/stamp-compare
+    dance separately, one of them (read_csv_frozen) redundantly re-doing
+    the stat check read_csv() already does internally."""
     path = Path(path)
     try:
         st = path.stat()
     except OSError:
-        return []
-    hit = _READ_CACHE.get(str(path))
-    if hit is None or hit[0] != (st.st_mtime_ns, st.st_size):
-        with path.open(encoding="utf-8") as fh:
+        return None
+    stamp = (st.st_mtime_ns, st.st_size)
+    hit = cache.get(key)
+    if hit is None or hit[0] != stamp:
+        hit = (stamp, build())
+        cache[key] = hit
+    return hit[1]
+
+
+def read_csv(path) -> list[dict]:
+    def build():
+        with Path(path).open(encoding="utf-8") as fh:
             r = csv.reader(fh)
             try:
                 fieldnames = next(r)
             except StopIteration:
                 fieldnames = []
             intern = sys.intern
-            rows = [dict(zip(fieldnames, map(intern, row)))
+            return [dict(zip(fieldnames, map(intern, row)))
                     for row in r if row]
-        hit = ((st.st_mtime_ns, st.st_size), rows)
-        _READ_CACHE[str(path)] = hit
+
+    rows = _mtime_cached(path, _READ_CACHE, str(Path(path)), build)
     # READ-ONLY VIEWS, NOT COPIES. This used to rebuild every row with
     # `[dict(r) for r in hit[1]]` so a caller could mutate its result without
     # corrupting the cache. Nothing in the repo ever did: flipping this to a
@@ -96,20 +110,13 @@ def read_csv(path) -> list[dict]:
     # A caller that does need to mutate should build its own dict from a row;
     # it now fails loudly at the assignment rather than silently paying for
     # everyone else's safety.
-    return [MappingProxyType(r) for r in hit[1]]
+    return [MappingProxyType(r) for r in (rows or [])]
 
 
 def read_csv_frozen(path) -> list:
-    path = Path(path)
-    try:
-        st = path.stat()
-    except OSError:
-        return []
-    hit = _READ_CACHE.get(str(path))
-    if hit is None or hit[0] != (st.st_mtime_ns, st.st_size):
-        read_csv(path)
-        hit = _READ_CACHE[str(path)]
-    return [MappingProxyType(r) for r in hit[1]]
+    read_csv(path)
+    hit = _READ_CACHE.get(str(Path(path)))
+    return [MappingProxyType(r) for r in hit[1]] if hit else []
 
 
 def write_csv(path, rows, fieldnames=None) -> None:
@@ -254,18 +261,10 @@ _LATEST_SNAPSHOT_CACHE: dict[tuple, tuple] = {}
 
 
 def _cached_latest_snapshot(path, keep=None, cache_key=None) -> list[dict]:
-    path = Path(path)
-    try:
-        st = path.stat()
-    except OSError:
-        return []
-    stamp = (st.st_mtime_ns, st.st_size)
-    key = (str(path), cache_key)
-    hit = _LATEST_SNAPSHOT_CACHE.get(key)
-    if hit is None or hit[0] != stamp:
-        hit = (stamp, latest_snapshot(path, keep=keep))
-        _LATEST_SNAPSHOT_CACHE[key] = hit
-    return [dict(r) for r in hit[1]]
+    rows = _mtime_cached(path, _LATEST_SNAPSHOT_CACHE,
+                         (str(Path(path)), cache_key),
+                         lambda: latest_snapshot(path, keep=keep))
+    return [dict(r) for r in (rows or [])]
 
 
 def table_stats(path, col: str = "observed_at") -> tuple[int, str]:
@@ -402,7 +401,7 @@ def load_market_latest() -> list[dict]:
 LINEUP_SOURCE = "futbolfantasy"
 
 
-_LINEUPS_CACHE: dict[tuple, tuple] = {}
+_LINEUPS_CACHE: dict = {}
 
 
 def load_lineups(source: str = LINEUP_SOURCE) -> list[dict]:
@@ -411,16 +410,9 @@ def load_lineups(source: str = LINEUP_SOURCE) -> list[dict]:
     whole ~174k-row CSV; the raw parse is now cached per file version and
     `source` filters the cached, unfiltered read."""
     path = TIDY / "lineups.csv"
-    try:
-        st = path.stat()
-    except OSError:
-        return []
-    key = (st.st_mtime_ns, st.st_size)
-    hit = _LINEUPS_CACHE.get(key)
-    if hit is None:
-        hit = tuple(read_csv(path))
-        _LINEUPS_CACHE[key] = hit
-    return pick_source([dict(r) for r in hit], source)
+    rows = _mtime_cached(path, _LINEUPS_CACHE, None,
+                         lambda: tuple(read_csv(path)))
+    return pick_source([dict(r) for r in (rows or [])], source)
 
 
 def load_lineups_latest(source: str = LINEUP_SOURCE) -> list[dict]:
@@ -555,7 +547,7 @@ def load_odds() -> list[dict]:
                                      schema.text(r, "away")))
 
 
-_UNDERSTAT_CACHE: dict[tuple, tuple] = {}
+_UNDERSTAT_CACHE: dict = {}
 
 
 def load_understat_players(season: str = "") -> list[dict]:
@@ -565,20 +557,16 @@ def load_understat_players(season: str = "") -> list[dict]:
     ~160k-row CSV. Cached once per file version instead; `season` only
     filters the already-deduped, far smaller result."""
     path = TIDY / "understat_players.csv"
-    try:
-        st = path.stat()
-    except OSError:
-        return []
-    key = (st.st_mtime_ns, st.st_size)
-    hit = _UNDERSTAT_CACHE.get(key)
-    if hit is None:
+
+    def build():
         latest: dict[tuple, dict] = {}
         for r in sorted(read_csv(path), key=lambda r: r.get("observed_at", "")):
             k = (r.get("season"), r.get("understat_id"))
             if k[1]:
                 latest[k] = r
-        hit = tuple(latest.values())
-        _UNDERSTAT_CACHE[key] = hit
+        return tuple(latest.values())
+
+    hit = _mtime_cached(path, _UNDERSTAT_CACHE, None, build) or ()
     if season:
         return [dict(r) for r in hit if r.get("season") == season]
     return [dict(r) for r in hit]
