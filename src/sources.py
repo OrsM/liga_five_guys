@@ -67,6 +67,16 @@ def _team_map(html: str) -> dict[str, str]:
     return {tid: name.strip() for tid, name in OPTION_RE.findall(m.group(1)) if tid != "0"}
 
 
+def _once(seen: set, key) -> bool:
+    """True the first time `key` is seen (and marks it); False on a repeat
+    or a falsy key. The "skip if already seen, else mark it" filter this
+    file wrote out by hand at six call sites."""
+    if not key or key in seen:
+        return False
+    seen.add(key)
+    return True
+
+
 def _attr(chunk: str, name: str) -> str | None:
     m = re.search(rf'data-{name}="([^"]*)"', chunk)
     return m.group(1) if m else None
@@ -220,9 +230,8 @@ def parse_team(html: str, observed_at: str, key: str = "team_test") -> list[dict
     def add(el, role):
         text = " ".join(el.text_content().split())
         name, pct = _name_from_blob(text)
-        if not name or name.lower() in seen:
+        if not _once(seen, name.lower()):
             return
-        seen.add(name.lower())
         fit = fitness.get(norm(name))
         href = el.get("href") or ""
         if not href:
@@ -556,9 +565,8 @@ def parse_af_team(html: str, observed_at: str,
     rows, seen = [], set()
 
     def add(name, img_src, role, start_pct, note):
-        if not name or name.lower() in seen:
+        if not _once(seen, name.lower()):
             return
-        seen.add(name.lower())
         rows.append(_af_row(observed_at, slug, name, img_src,
                             role, start_pct, note))
 
@@ -617,9 +625,8 @@ def parse_af_fixtures(html: str, observed_at: str,
         teams = [i.get("alt") for i in _css(a, "img[alt]") if i.get("alt")]
         ids = [i.get("data-af-team")
                for i in _css(a, "img[data-af-team]") if i.get("data-af-team")]
-        if not (m and times and len(teams) >= 2) or m.group(1) in seen:
+        if not (m and times and len(teams) >= 2) or not _once(seen, m.group(1)):
             continue
-        seen.add(m.group(1))
         rows.append({
             "observed_at": observed_at,
             "source": AF_SOURCE,
@@ -1538,9 +1545,8 @@ def offer_sources(teams_json: str, me: str, league: str,
         if r.get(ROW_TABLE) != "api_teams" or r.get("manager") != me:
             continue
         ptid = r.get("player_team_id")
-        if not ptid or ptid in seen:
+        if not _once(seen, ptid):
             continue
-        seen.add(ptid)
         out.append(Source(
             "api_offer_%s" % ptid, "api_offers",
             API_OFFER_URL.format(base="{base}", league=league, ptid=ptid),
@@ -2520,6 +2526,16 @@ def _selftest() -> None:
     assert parse_api_player('{"nickname":"X"}', "t",
                             "api_player_777")[0]["player_id"] == "777"
 
+    # A player's FIRST activity row having an unknown kind must not block a
+    # LATER, real one for the same player -- "seen" may only be marked once
+    # the unknown-kind skip has already been decided, not before. Caught by
+    # hand, not by this suite, when a refactor moved the mark earlier.
+    unk_then_known = json.dumps([
+        {"id": "1", "activityTypeId": 9999, "playerMasterId": "42"},
+        {"id": "2", "activityTypeId": list(ACT_KIND)[0], "playerMasterId": "42"},
+    ])
+    assert [s.key for s in player_sources(unk_then_known)] == ["api_player_42"]
+
     ps = player_sources(_API_ACTIVITY_FIXTURE)
     # 2522 is there because a CLAUSE moved him: a player who changed hands
     # is exactly one whose detail page is worth having. The unknown type 77
@@ -2583,6 +2599,16 @@ def _selftest() -> None:
     assert source_for("api_offer_24338726").parse is parse_api_offer
     assert source_for("api_offer_24338726").table == "api_offers"
     assert offer_source("not-an-offer-key") is None
+
+    # A path anchor whose text has no parseable jornada/score (skipped for
+    # THAT reason) must not block a later, valid anchor for the SAME path --
+    # "seen" may only be marked once the jornada/sides check has passed, not
+    # on first sight of the path. Same class of bug as player_sources above.
+    dup_path_html = (
+        '<a href="/partidos/22421-alaves-getafe">no jornada here</a>'
+        '<a href="/partidos/22421-alaves-getafe">Jornada 1 3-0</a>')
+    dup_cal = parse_calendar(dup_path_html, "2026-01-01T0000Z")
+    assert len(dup_cal) == 1 and dup_cal[0]["jornada"] == 1, dup_cal
 
     cal = parse_calendar(_CAL_FIXTURE, "2026-01-01T0000Z")
     byp = {r["path"]: r for r in cal}
@@ -2686,7 +2712,7 @@ def _selftest() -> None:
         assert s.sign(html) is not None, s.key
         assert isinstance(s.parse(html, "2026-01-01T0000Z", s.key), list), s.key
 
-    print("sources.py selftest OK (264 cases)")
+    print("sources.py selftest OK (266 cases)")
 
 
 if __name__ == "__main__":
