@@ -999,6 +999,18 @@ def golden_rows() -> list[dict]:
     return out
 
 
+def _baseline_check(n: int, ours_terms: list[float],
+                    baselines: dict[str, tuple[str, list[float]]],
+                    mean_field: str, mean_value: float) -> dict:
+    """baselines: {vs_suffix: (mean_field_name, terms)} -- the two names do
+    not always match (e.g. mean field "coin_flip", gap field "vs_coin")."""
+    out = {"n": n, mean_field: mean_value, "ours": sum(ours_terms) / n}
+    for suffix, (field_name, terms) in baselines.items():
+        out[field_name] = sum(terms) / n
+        out[f"vs_{suffix}"] = stats.bootstrap_gap(ours_terms, terms)
+    return out
+
+
 def baseline_check(golden: list[dict]) -> dict | None:
     if not golden:
         return None
@@ -1009,11 +1021,9 @@ def baseline_check(golden: list[dict]) -> dict | None:
     coin_terms = [(0.5 - r["actual_started"]) ** 2 for r in golden]
     const_terms = [(mean_claim / 100 - r["actual_started"]) ** 2
                   for r in golden]
-    return {"n": n, "mean_claim": mean_claim,
-           "ours": sum(ours_terms) / n, "coin_flip": sum(coin_terms) / n,
-           "constant": sum(const_terms) / n,
-           "vs_coin": stats.bootstrap_gap(ours_terms, coin_terms),
-           "vs_constant": stats.bootstrap_gap(ours_terms, const_terms)}
+    return _baseline_check(n, ours_terms, {"coin": ("coin_flip", coin_terms),
+                                           "constant": ("constant", const_terms)},
+                           "mean_claim", mean_claim)
 
 
 def source_lines(actuals: list[dict]) -> list[str]:
@@ -1087,9 +1097,7 @@ def rate_baseline_check(pairs: list[dict]) -> dict | None:
     ours = [abs(p["predicted"] / p["matches"] - a)
            for p, a in zip(pairs, actual_rates)]
     naive = [abs(mean_rate - a) for a in actual_rates]
-    gap = stats.bootstrap_gap(ours, naive)
-    return {"n": n, "mean_rate": mean_rate,
-           "ours": sum(ours) / n, "naive": sum(naive) / n, "gap": gap}
+    return _baseline_check(n, ours, {"naive": ("naive", naive)}, "mean_rate", mean_rate)
 
 
 def weighted_mae(pairs: list[dict]) -> float:
@@ -1171,7 +1179,7 @@ def comparison_lines() -> list[str]:
     ]
     rbc = rate_baseline_check(pairs)
     if rbc is not None:
-        gap = rbc["gap"]
+        gap = rbc["vs_naive"]
         if gap is not None and gap["beats"]:
             verdict = "beats it, adding real information."
         elif gap is not None:
