@@ -466,6 +466,12 @@ def replay_recommendations(min_days: float = 3.0) -> dict | None:
     return _grade_episodes(episodes, points_between, now, min_days)
 
 
+def _by_pts_lo(moves: list[dict], n: int) -> list[dict]:
+    candidates = [m for m in moves if m.get("pts_lo") is not None
+                 and m.get("buy") and m.get("sell")]
+    return sorted(candidates, key=lambda m: -m["pts_lo"])[:n]
+
+
 def replay_percentile_rank(min_days: float = 3.0) -> dict | None:
     commits = commits_touching("reports/decisions.json")
     if not commits:
@@ -474,12 +480,7 @@ def replay_percentile_rank(min_days: float = 3.0) -> dict | None:
     if now is None:
         return None
 
-    def pick_by_ptslo(moves):
-        candidates = [m for m in moves if m.get("pts_lo") is not None
-                     and m.get("buy") and m.get("sell")]
-        return [max(candidates, key=lambda m: m["pts_lo"])] if candidates else []
-
-    episodes = _pick_episodes(commits, pick_by_ptslo)
+    episodes = _pick_episodes(commits, lambda moves: _by_pts_lo(moves, 1))
     return _grade_episodes(episodes, points_between, now, min_days)
 
 
@@ -492,13 +493,8 @@ def replay_ladder_percentile(topn: int = 3, min_days: float = 3.0) -> dict:
     def pick_current(moves):
         return [m for m in moves[:topn] if m.get("buy") and m.get("sell")]
 
-    def pick_pctile(moves):
-        candidates = [m for m in moves if m.get("pts_lo") is not None
-                     and m.get("buy") and m.get("sell")]
-        return sorted(candidates, key=lambda m: -m["pts_lo"])[:topn]
-
     cur_eps = _pick_episodes(commits, pick_current)
-    pct_eps = _pick_episodes(commits, pick_pctile)
+    pct_eps = _pick_episodes(commits, lambda moves: _by_pts_lo(moves, topn))
     return {"current": _grade_episodes(cur_eps, points_between, now, min_days),
            "percentile": _grade_episodes(pct_eps, points_between, now, min_days)}
 

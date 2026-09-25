@@ -425,13 +425,17 @@ class Manager:
     sales: list = field(default_factory=list)
     cash: Cash = Cash(None, "unknown", "", "")
 
+    @staticmethod
+    def _total(txns) -> float:
+        return sum(money(t.get("price")) or 0 for t in txns)
+
     @property
     def spend(self) -> float:
-        return sum(money(t.get("price")) or 0 for t in self.buys)
+        return self._total(self.buys)
 
     @property
     def proceeds(self) -> float:
-        return sum(money(t.get("price")) or 0 for t in self.sales)
+        return self._total(self.sales)
 
     @property
     def net(self) -> float:
