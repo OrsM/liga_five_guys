@@ -17,6 +17,8 @@ from ffcore.render import title_name
 from ffcore.tidy import (run_now, shown,
                          ALERTS, PARTS, REPORTS, write_lines)
 
+__all__ = ["shape"]
+
 OUT = "sim.md"
 
 

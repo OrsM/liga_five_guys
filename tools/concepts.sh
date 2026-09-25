@@ -361,7 +361,7 @@ check "Universe flat-dict storage" 0 \
 # (tidy.py) rather than a fresh kickoff join: a first attempt at the join
 # mismatched jornada 38 to an October kickoff (two legs, no jornada tag to
 # disambiguate) and was reverted before shipping.
-check "src/ lines" 21853 \
+check "src/ lines" 21862 \
   "$(find src -name '*.py' | xargs cat | wc -l)"
 
 [ "$fail" -eq 0 ] && echo "concepts: no duplication regained" || echo "concepts: a concept regained a second implementation"

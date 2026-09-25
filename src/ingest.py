@@ -64,6 +64,9 @@ from sources import (API_LEAGUES_KEY, CAL_KEY, MATCH_KEY_RE,
                      parser_sig, played_sources, player_sources,
                      season_label, source_for, sources)
 
+__all__ = ["snapshots", "state", "pages", "doc_keys", "documents", "due",
+          "fetch", "parse", "parse_cache", "save_parse_cache", "baseline"]
+
 RAW = ROOT / "raw"
 
 HEADERS = {
