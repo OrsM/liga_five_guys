@@ -1426,13 +1426,6 @@ def sign_api_lineup(text: str) -> str | None:
                    + ["=%s" % (rows[0]["formation"] if rows else "")])
 
 
-def lineup_source(team_id: str, week: int) -> Source:
-    return Source("api_lineup_%d" % week, "api_lineup",
-                  API_LINEUP_URL.format(base="{base}", team=team_id,
-                                        week=week),
-                  parse_api_lineup, sign_api_lineup, auth=True)
-
-
 API_PLAYER_URL = "{base}/v1/competition/1/player/{pid}?x-lang=es"
 API_PLAYER_KEY_RE = re.compile(r"^api_player_(\d+)$")
 
@@ -1593,7 +1586,11 @@ def league_sources(leagues_json: str, observed_at: str = "") -> list[Source]:
                           API_TEAMS_URL.format(base="{base}", league=lg),
                           parse_api_teams, sign_api_teams, auth=True))
         if r.get("team_id"):
-            out.append(lineup_source(r["team_id"], LINEUP_WEEK))
+            out.append(Source(
+                "api_lineup_%d" % LINEUP_WEEK, "api_lineup",
+                API_LINEUP_URL.format(base="{base}", team=r["team_id"],
+                                      week=LINEUP_WEEK),
+                parse_api_lineup, sign_api_lineup, auth=True))
         for page in (0, 1):
             out.append(Source(
                 "api_activity_%d" % page, "api_activity",

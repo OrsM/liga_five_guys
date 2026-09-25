@@ -755,16 +755,9 @@ class Scorer:
             if r.get("status") and r["status"] != "ok":
                 self.status[key] = r["status"]
 
-        self.promoted = self._detect_promoted()
-        self.priors, self.global_prior = self._priors()
-
-
-    def _detect_promoted(self) -> set[str]:
-        return detect_promoted(self.market, self.history)
-
-    def _priors(self):
-        return position_priors(self.market, self.history)
-
+        self.promoted = detect_promoted(self.market, self.history)
+        self.priors, self.global_prior = position_priors(self.market,
+                                                          self.history)
 
     def rate(self, rec: dict) -> Rating:
         key = norm(rec.get("name", ""))
