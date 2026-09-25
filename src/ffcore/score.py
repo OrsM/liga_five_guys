@@ -40,6 +40,85 @@ DOUBT_FACTOR = 0.5
 OUT_STATUSES = frozenset({"injured", "suspended", "unavailable"})
 PROMOTED_DISCOUNT = 0.70
 
+PROMOTED_DISCOUNT_K = 50.0     # shrinkage weight, in matches, toward the default
+
+
+def position_priors(market: list[dict], history: dict
+                    ) -> tuple[dict[str, float], float]:
+    samples: dict[str, list[float]] = {}
+    for r in market:
+        h = history.get(norm(r.get("name", "")))
+        slot = SLOT.get((r.get("position") or "").lower())
+        if h and slot and h["pj"] >= 10:
+            samples.setdefault(slot, []).append(h["pts"] / h["pj"])
+    priors = {k: statistics.median(v) for k, v in samples.items() if v}
+    flat = [p for v in samples.values() for p in v]
+    return priors, (statistics.median(flat) if flat else 0.0)
+
+
+def detect_promoted(market: list[dict], history: dict) -> set[str]:
+    """Teams whose squad mostly has no top-flight history -- found from the
+    data (no hand-kept promotion list to go stale)."""
+    per_team: dict[str, list[int]] = {}
+    for r in market:
+        team = r.get("team") or "?"
+        h = history.get(norm(r.get("name", "")))
+        tally = per_team.setdefault(team, [0, 0])
+        tally[0] += 1
+        tally[1] += 1 if h and h["pj"] > 0 else 0
+    return {t for t, (n, k) in per_team.items() if n >= 10 and k / n < 0.15}
+
+
+def fit_promoted_discount(market: list[dict], history: dict,
+                          prior_of: dict) -> tuple[float, str]:
+    """How much a promoted player's positional prior overstates him,
+    shrunk toward PROMOTED_DISCOUNT (weight PROMOTED_DISCOUNT_K matches)
+    so a thin or lopsided sample cannot swing it far from the stated
+    default: measured 2026-09-24 at 0.75 pooled (0.64-0.91 by position,
+    n=21-110 each -- too uneven to split), vs the shipped 0.70."""
+    from ffcore.tidy import SEASON, read_csv
+
+    promoted = {norm(t) for t in detect_promoted(market, history)}
+    team_of = {r.get("ff_id"): norm(r.get("team", "")) for r in market
+              if r.get("ff_id")}
+    pos_of = {r.get("ff_id"): SLOT.get((r.get("position") or "").lower())
+             for r in market if r.get("ff_id")}
+    live = SEASON / "live"
+    files = sorted(live.glob("perjornada_*.csv")) if live.exists() else []
+    if not files:
+        return PROMOTED_DISCOUNT, "no live per-jornada file yet"
+    num = den = n = 0.0
+    for r in read_csv(files[-1]):
+        try:
+            games = float(r.get("games_delta") or 0)
+        except (TypeError, ValueError):
+            continue
+        if games <= 0:
+            continue
+        ff = r.get("ff_id")
+        if team_of.get(ff) not in promoted:
+            continue
+        slot = pos_of.get(ff)
+        prior = prior_of.get(slot)
+        if not prior:
+            continue
+        try:
+            pts = float(r.get("points_delta") or 0)
+        except (TypeError, ValueError):
+            continue
+        num += pts
+        den += prior * games
+        n += games
+    if den <= 0 or n < 1:
+        return PROMOTED_DISCOUNT, "no graded promoted-player matches yet"
+    measured = num / den
+    k = PROMOTED_DISCOUNT_K
+    fitted = (k * PROMOTED_DISCOUNT + n * measured) / (k + n)
+    return fitted, ("%.2f measured pooled over %.0f promoted-player matches, "
+                    "shrunk %.0f%% toward the stated %.2f -> %.2f"
+                    % (measured, n, 100 * k / (k + n), PROMOTED_DISCOUNT,
+                       fitted))
+
 
 STATUS_FACTOR: dict[str, float] = {}
 
@@ -466,12 +545,17 @@ def build(market: list[dict], xi_rows: list[dict], now,
     xg_boost, xg_why = _xg_stickiness_boost()
     shots_cur = load_shots_current(xw)
     shots_slope, shots_intercept, shots_n = _shots_points_fit(xw)
+    priors, _global_prior = position_priors(market, prior)
+    promoted_discount, promoted_why = fit_promoted_discount(
+        market, prior, priors)
     sc = Scorer(market, xi_rows, prior, shrink_k=shrink_k,
                 current=cur, board=board, cal=cal, second=second,
                 xg=xg_cur, xg_slope=xg_slope, xg_intercept=xg_intercept,
                 xg_n=xg_n, xg_boost=xg_boost, xg_why=xg_why,
                 shots=shots_cur, shots_slope=shots_slope,
-                shots_intercept=shots_intercept, shots_n=shots_n)
+                shots_intercept=shots_intercept, shots_n=shots_n,
+                promoted_discount=promoted_discount)
+    sc.promoted_why = promoted_why
     return sc, (prior_label, cur_label)
 
 
@@ -588,10 +672,12 @@ class Scorer:
                  xg_intercept: float = 0.0, xg_n: int = 0,
                  xg_boost: float = 1.0, xg_why: str = "",
                  shots: dict | None = None, shots_slope: float = 0.0,
-                 shots_intercept: float = 0.0, shots_n: int = 0):
+                 shots_intercept: float = 0.0, shots_n: int = 0,
+                 promoted_discount: float = PROMOTED_DISCOUNT):
         self.market = market
         self.history = history or {}
         self.shrink_k = shrink_k
+        self.promoted_discount = promoted_discount
         self.current = current or {}
         self.board = board or {}
         self.xg = xg or {}
@@ -654,26 +740,10 @@ class Scorer:
 
 
     def _detect_promoted(self) -> set[str]:
-        per_team: dict[str, list[int]] = {}
-        for r in self.market:
-            team = r.get("team") or "?"
-            h = self.history.get(norm(r.get("name", "")))
-            tally = per_team.setdefault(team, [0, 0])
-            tally[0] += 1
-            tally[1] += 1 if h and h["pj"] > 0 else 0
-        return {t for t, (n, k) in per_team.items()
-                if n >= 10 and k / n < 0.15}
+        return detect_promoted(self.market, self.history)
 
     def _priors(self):
-        samples: dict[str, list[float]] = {}
-        for r in self.market:
-            h = self.history.get(norm(r.get("name", "")))
-            slot = SLOT.get((r.get("position") or "").lower())
-            if h and slot and h["pj"] >= 10:
-                samples.setdefault(slot, []).append(h["pts"] / h["pj"])
-        priors = {k: statistics.median(v) for k, v in samples.items() if v}
-        flat = [p for v in samples.values() for p in v]
-        return priors, (statistics.median(flat) if flat else 0.0)
+        return position_priors(self.market, self.history)
 
 
     def rate(self, rec: dict) -> Rating:
@@ -688,7 +758,7 @@ class Scorer:
             base, why, assumed = ((h["pts"] + k * prior) / (h["pj"] + k),
                                   "%.0fp/%.0fj" % (h["pts"], h["pj"]), False)
         elif (rec.get("team") or "") in self.promoted:
-            base, why, assumed = prior * PROMOTED_DISCOUNT, "assumed", True
+            base, why, assumed = prior * self.promoted_discount, "assumed", True
         else:
             base, why, assumed = prior, "assumed", True
 
@@ -923,6 +993,71 @@ def _selftest() -> None:
     assert abs(blended.ppm - (30.0 + 8 * full.ppm) / (3.0 + 8)) < 1e-9
     assert blended.cur_pj == 3.0
     assert full.ppm < blended.ppm < 10.0
+
+    # A promoted side: 10 players, <15% with a top-flight record.
+    promo_market = [{**mk("q%d" % i, team="Rise"), "ff_id": "q%d" % i}
+                    for i in range(10)]
+    promo_hist = {"q0": {"pts": 34.0, "pj": 34.0}}   # the one veteran on it
+    assert detect_promoted(promo_market, promo_hist) == {"Rise"}
+    # detect_promoted's own team strings are UNNORMALISED (as read from the
+    # market) -- fit_promoted_discount must normalise before comparing
+    # against team_of, or every promoted match reads as ungraded, silently
+    # keeping the stated default with no error (found 2026-09-24).
+    accented = [mk("r%d" % i, team="Málaga") for i in range(10)]
+    assert detect_promoted(accented, {}) == {"Málaga"}
+    sc3 = Scorer(promo_market, [], promo_hist)
+    assert sc3.promoted == {"Rise"}
+    newbie = sc3.rate(mk("q5", team="Rise"))
+    assert newbie.assumed and abs(newbie.ppm - sc3.priors["DEF"]
+                                  * PROMOTED_DISCOUNT) < 1e-9, newbie
+    lower = Scorer(promo_market, [], promo_hist, promoted_discount=0.5)
+    assert lower.rate(mk("q5", team="Rise")).ppm < newbie.ppm
+
+    priors3 = position_priors(promo_market, promo_hist)[0]
+
+    import tempfile
+    import ffcore.tidy as _tidy_sc
+    real_season = _tidy_sc.SEASON
+    with tempfile.TemporaryDirectory() as _d_sc:
+        _tidy_sc.SEASON = __import__("pathlib").Path(_d_sc)
+        try:
+            assert fit_promoted_discount(promo_market, promo_hist, priors3) \
+                == (PROMOTED_DISCOUNT, "no live per-jornada file yet")
+
+            (_tidy_sc.SEASON / "live").mkdir()
+            import csv as _csv_sc
+            cols = ["ff_id", "games_delta", "points_delta"]
+            rows = [{"ff_id": "q%d" % (i % 10), "games_delta": "1",
+                     "points_delta": "%.1f" % (priors3["DEF"]
+                                               * PROMOTED_DISCOUNT)}
+                    for i in range(80)]
+            with open(_tidy_sc.SEASON / "live" / "perjornada_x.csv", "w",
+                     newline="", encoding="utf-8") as fh:
+                w = _csv_sc.DictWriter(fh, fieldnames=cols)
+                w.writeheader()
+                w.writerows(rows)
+            # exactly the shipped ratio, on real rows: shrinkage should
+            # barely move it, and the confirming direction is unambiguous
+            fitted, why = fit_promoted_discount(promo_market, promo_hist,
+                                                priors3)
+            assert abs(fitted - PROMOTED_DISCOUNT) < 0.01, (fitted, why)
+            assert "80 promoted-player matches" in why, why
+
+            # a side that scores at the full prior (no discount at all,
+            # discount=1.0): the fit must move UP off the stated default
+            full_rows = [{"ff_id": "q%d" % (i % 10), "games_delta": "1",
+                         "points_delta": "%.1f" % priors3["DEF"]}
+                        for i in range(400)]
+            with open(_tidy_sc.SEASON / "live" / "perjornada_x.csv", "w",
+                     newline="", encoding="utf-8") as fh:
+                w = _csv_sc.DictWriter(fh, fieldnames=cols)
+                w.writeheader()
+                w.writerows(full_rows)
+            fitted2, _why2 = fit_promoted_discount(promo_market, promo_hist,
+                                                   priors3)
+            assert fitted2 > PROMOTED_DISCOUNT + 0.15, fitted2
+        finally:
+            _tidy_sc.SEASON = real_season
     assert "now" in blended.why and "3j" in blended.why
 
     assert Scorer(market, xi, hist, current={}).rate(mk("p0")) == full
