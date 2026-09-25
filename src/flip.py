@@ -190,6 +190,27 @@ def reserve(moves: list[dict]) -> float:
 
 
 # ---------------------------------------------------------------- the decisions
+def _belief(model: dict, last: dict[str, float], key: str) -> dict | None:
+    """What the price history says an update from `key`'s last known price
+    is followed by -- the identical nearest-neighbour lookup picks(), sells()
+    and fund() each queried separately."""
+    return model["outlook"].best(last.get(key), model["offer"], model["premium"])
+
+
+def _hold_value(value: float, bel: dict, model: dict) -> float:
+    """What holding is expected to bring: `value` grown by the belief's
+    drift, then discounted by the app's own buy-side offer fraction -- the
+    same three-term product picks() (as `leave`), sells() and fund() (both
+    as `hold`) each wrote out separately."""
+    return value * (1 + bel["mean"] / 100) * model["offer"]
+
+
+def _cost_pts(group: str, exp_pts: float) -> float:
+    """Season points a sale costs: 0 for a player the report would already
+    let go for free (its SELL group), else what leaving his slot loses."""
+    return 0.0 if group == "sell" else max(0.0, -exp_pts)
+
+
 def picks(listings: list[dict], last: dict[str, float], model: dict,
           cash: float) -> list[dict]:
     """Free-market listings expected to pay, best gain per million paid first.
@@ -199,11 +220,10 @@ def picks(listings: list[dict], last: dict[str, float], model: dict,
     is where the two are equal."""
     out = []
     for l in listings:
-        bel = model["outlook"].best(last.get(l["key"]), model["offer"],
-                                    model["premium"])
+        bel = _belief(model, last, l["key"])
         if bel is None:
             continue
-        leave = l["value"] * (1 + bel["mean"] / 100) * model["offer"]
+        leave = _hold_value(l["value"], bel, model)
         pay = l["ask"] * model["premium"]
         if leave <= pay:
             continue
@@ -232,17 +252,16 @@ def sells(bench: list[dict], last: dict[str, float], offers: dict[str, float],
     out, held = [], []
     for p in bench:
         v = verdict.get(p["key"])
-        bel = model["outlook"].best(last.get(p["key"]), model["offer"],
-                                    model["premium"])
+        bel = _belief(model, last, p["key"])
         if v is None or bel is None:
             continue
         group, exp_pts = v
         now = offers.get(p["key"]) or p["value"] * model["offer"]
-        hold = p["value"] * (1 + bel["mean"] / 100) * model["offer"]
+        hold = _hold_value(p["value"], bel, model)
         gain = now - hold
         if gain <= 0:
             continue
-        cost = 0.0 if group == "sell" else max(0.0, -exp_pts)
+        cost = _cost_pts(group, exp_pts)
         benefit = rate * gain / 1e6
         back = rate * p["value"] * (model["premium"] - 1) / 1e6
         sale = benefit >= cost + back
@@ -320,14 +339,13 @@ def fund(offers: dict[str, float], mine: dict, names: dict, xi: set,
         if v is None:
             continue
         group, exp_pts = v
-        cost = 0.0 if group == "sell" else max(0.0, -exp_pts)
+        cost = _cost_pts(group, exp_pts)
         benefit = rate * offer / 1e6
         net = cost - benefit
-        bel = model["outlook"].best(last.get(k), model["offer"],
-                                    model["premium"])
+        bel = _belief(model, last, k)
         money_now, hold, h = None, None, None
         if bel is not None and value.get(k):
-            hold = value[k] * (1 + bel["mean"] / 100) * model["offer"]
+            hold = _hold_value(value[k], bel, model)
             money_now, h = offer - hold, bel["h"]
         out.append({"key": k, "name": names.get(k, k), "offer": offer,
                     "cost_pts": cost, "benefit_pts": benefit, "net_pts": net,
