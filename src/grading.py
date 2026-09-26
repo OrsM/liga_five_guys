@@ -38,8 +38,8 @@ def load_actuals(window_days: int | None = WINDOW_DAYS) -> list[dict]:
         full, short = r.get("player_name_full", ""), r.get("player_name", "")
         jor = r.get("jornada", "")
         rows.append({"name": full or short,
-                     "keys": [k for k in {r.get("ff_id", ""), norm(full),
-                                          norm(short)} if k],
+                     "keys": [k for k in dict.fromkeys(
+                         (r.get("ff_id", ""), norm(full), norm(short))) if k],
                      "from_dt": from_dt, "points_delta": points,
                      "games_delta": games,
                      "jornada": int(jor) if jor else None})
