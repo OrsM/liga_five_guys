@@ -98,8 +98,6 @@ Order: 1 → 2 (they share the deletions), then 3, 4, 5/6, 7, 8.
 
 Running count (all of src, functions incl. methods/nested/lambdas and
 selftests): 655 functions / 13,937 lines at 0e49bff → 639 / 13,409 at
-86efa39 → 619 / 12,940 at 43a53a4 → 553 / 11,506 at ee0e191 → 523 / 11,253 at fe60ce5.
+86efa39 → 619 / 12,940 at 43a53a4 → 553 / 11,506 at ee0e191 → 523 / 11,253 at fe60ce5 → 522 / 11,174 at 5a0e254.
 
-Next: the remaining "why" strings that only tests read (fit_home_edge,
-fit_drift_frac, fit_rate_rel_floor, fit_start_fallbacks' callers), and
-the hard-coded "(N cases)" counts in self-test output.
+Done since: fits return values (5a0e254); no hand-kept case counts.
