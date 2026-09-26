@@ -79,24 +79,36 @@ def load_config(name: str = "league.ini") -> Config:
     return cfg
 
 
+def _comment_stripped_lines(path) -> list[str] | None:
+    """Non-blank lines from a plain-text config file, '#'-comments and
+    surrounding whitespace stripped -- the read+strip skeleton
+    read_rosters() and read_balances() each hand-rolled separately. None
+    if the file is missing; callers decide whether that's fatal."""
+    if not path.exists():
+        return None
+    out = []
+    for raw in path.read_text(encoding="utf-8").splitlines():
+        line = raw.split("#", 1)[0].strip()
+        if line:
+            out.append(line)
+    return out
+
+
 def read_rosters(name: str = "rosters_initial.txt") -> dict[str, list[str]]:
     path = input_path(name)
-    if not path.exists():
+    lines = _comment_stripped_lines(path)
+    if lines is None:
         raise SystemExit("missing %s" % path)
     rosters, current = {}, None
-    with path.open(encoding="utf-8") as fh:
-        for raw in fh:
-            line = raw.split("#", 1)[0].strip()
-            if not line:
-                continue
-            if line.startswith("[") and line.endswith("]"):
-                current = line[1:-1].strip()
-                rosters.setdefault(current, [])
-            elif current:
-                m = _ROSTER_CLUB.match(line)
-                if m:
-                    line = "%s@%s" % (norm(m.group(1)), norm(m.group(2)))
-                rosters[current].append(line)
+    for line in lines:
+        if line.startswith("[") and line.endswith("]"):
+            current = line[1:-1].strip()
+            rosters.setdefault(current, [])
+        elif current:
+            m = _ROSTER_CLUB.match(line)
+            if m:
+                line = "%s@%s" % (norm(m.group(1)), norm(m.group(2)))
+            rosters[current].append(line)
     return rosters
 
 
@@ -104,14 +116,11 @@ _ROSTER_CLUB = re.compile(r"^(.*?)\s*\(([^)]+)\)\s*$")
 
 
 def read_balances(name: str = "cash.txt") -> dict[str, tuple[float, str]]:
-    path = input_path(name)
-    if not path.exists():
+    lines = _comment_stripped_lines(input_path(name))
+    if lines is None:
         return {}
     out = {}
-    for raw in path.read_text(encoding="utf-8").splitlines():
-        line = raw.split("#", 1)[0].strip()
-        if not line:
-            continue
+    for line in lines:
         parts = line.split()
         if money(parts[0]) is not None:
             out["__me__"] = (money(parts[0]),
