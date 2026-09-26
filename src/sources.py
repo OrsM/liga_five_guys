@@ -70,6 +70,27 @@ def _once(seen: set, key) -> bool:
     return True
 
 
+def _extract_rows(html: str, selector: str, row_of) -> list[dict]:
+    """One row per element `selector` matches, in document order, deduped
+    -- row_of(el) returns a row dict (its "key" entry is popped and used
+    for _once(); any other falsy/duplicate signal from row_of is a plain
+    None) or None to skip the element outright. parse_calendar() and
+    parse_af_fixtures() each hand-wrote this exact
+    fromstring/loop/guard/dedup/append skeleton separately; only what
+    counts as a row and what a row contains differs between them."""
+    doc = lh.fromstring(html)
+    rows, seen = [], set()
+    for el in _css(doc, selector):
+        row = row_of(el)
+        if row is None:
+            continue
+        key = row.pop("key")
+        if not _once(seen, key):
+            continue
+        rows.append(row)
+    return rows
+
+
 def _attr(chunk: str, name: str) -> str | None:
     m = re.search(rf'data-{name}="([^"]*)"', chunk)
     return m.group(1) if m else None
@@ -587,17 +608,16 @@ AF_MATCH_RE = re.compile(r"/partido/(\d+)")
 
 def parse_af_fixtures(html: str, observed_at: str,
                       key: str = "af_fixtures") -> list[dict]:
-    doc = lh.fromstring(html)
-    rows, seen = [], set()
-    for a in _css(doc, 'a[href*="/partido/"]'):
+    def row_of(a):
         m = AF_MATCH_RE.search(a.get("href") or "")
         times = _css(a, "time[datetime]")
         teams = [i.get("alt") for i in _css(a, "img[alt]") if i.get("alt")]
         ids = [i.get("data-af-team")
                for i in _css(a, "img[data-af-team]") if i.get("data-af-team")]
-        if not (m and times and len(teams) >= 2) or not _once(seen, m.group(1)):
-            continue
-        rows.append({
+        if not (m and times and len(teams) >= 2):
+            return None
+        return {
+            "key": m.group(1),
             "observed_at": observed_at,
             "source": AF_SOURCE,
             "match_id": m.group(1),
@@ -606,8 +626,9 @@ def parse_af_fixtures(html: str, observed_at: str,
             "away": teams[1],
             "home_id": ids[0] if len(ids) > 1 else "",
             "away_id": ids[1] if len(ids) > 1 else "",
-        })
-    return rows
+        }
+
+    return _extract_rows(html, 'a[href*="/partido/"]', row_of)
 
 
 def _sign_links(html: str, href_substr: str) -> str | None:
@@ -655,21 +676,19 @@ def _match_sides(slug: str) -> tuple[str, str] | None:
 
 def parse_calendar(html: str, observed_at: str,
                    key: str = "calendario") -> list[dict]:
-    doc = lh.fromstring(html)
-    rows, seen = [], set()
-    for a in _css(doc, 'a[href*="/partidos/"]'):
+    def row_of(a):
         m = MATCH_PATH_RE.search(a.get("href") or "")
-        if not m or m.group(1) in seen:
-            continue
+        if not m:
+            return None
         path = m.group(1)
         text = _WS.sub(" ", a.text_content()).strip()
         jor = CAL_JORNADA_RE.search(text)
         sides = _match_sides(path.split("-", 1)[1])
         if not (jor and sides):
-            continue
-        seen.add(path)
+            return None
         score = CAL_SCORE_RE.search(text)
-        rows.append({
+        return {
+            "key": path,
             "observed_at": observed_at,
             "source": SOURCE,
             "match_id": path.split("-", 1)[0],
@@ -678,8 +697,9 @@ def parse_calendar(html: str, observed_at: str,
             "home": sides[0],
             "away": sides[1],
             "score": score.group(1).replace(" ", "") if score else "",
-        })
-    return rows
+        }
+
+    return _extract_rows(html, 'a[href*="/partidos/"]', row_of)
 
 
 def sign_calendar(html: str) -> str | None:
