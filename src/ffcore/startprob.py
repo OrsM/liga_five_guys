@@ -158,7 +158,6 @@ def _titular_rate(obs) -> float:
 def observations(lineups, starters, cut: str, roster=None,
                  neutral: float = 60.0, absent: float = 15.0,
                  xw=None) -> list[Obs]:
-    from ffcore.second import resolve_second_source
     from ffcore.text import norm
 
     from ffcore.tidy import MATCH_LEN, minutes_played
@@ -181,7 +180,12 @@ def observations(lineups, starters, cut: str, roster=None,
             wide[r.get("player_slug") or norm(r.get("player_name"))] = r
         else:
             narrow_rows.append(r)
-    narrow = resolve_second_source(narrow_rows, xw)
+    narrow = {}
+    for r in narrow_rows:
+        key = (xw.key_of(r) if xw else None) or norm(
+            r.get("player_name") or r.get("player_slug") or "")
+        if key:
+            narrow[key] = r
 
     out = []
     for slug in sorted(set(wide) | set(truth_of)):

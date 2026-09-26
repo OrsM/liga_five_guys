@@ -15,21 +15,7 @@ from __future__ import annotations
 import sys
 
 
-__all__ = ["read_slate", "comparison_rows", "comparison_table"]
-
-
-def read_slate(xw, rows=None) -> tuple[set, list]:
-    if rows is None:
-        from ffcore.tidy import load_api
-        rows = load_api("market")
-    keys, unresolved = set(), []
-    for r in rows:
-        key = xw.player(app_id=(r.get("player_id") or "").strip())
-        if key:
-            keys.add(key)
-        elif (r.get("player_name") or "").strip():
-            unresolved.append(r["player_name"].strip())
-    return keys, unresolved
+__all__ = ["comparison_rows", "comparison_table"]
 
 
 def comparison_rows(u, bands=None) -> list[dict]:
@@ -71,10 +57,10 @@ def comparison_table(rows: list[dict]) -> list[str]:
     worth_a_look = [r for r in rows if (r["par"] or 0.0) > 0.0]
     skipped = len(rows) - len(worth_a_look)
 
-    from methodology import PAR_DEFINITION
-
     out = ["## Every listed player, compared", "",
-          "PAR = " + PAR_DEFINITION + ". Comparable across "
+          "PAR = season points above the LEAGUE's own replacement level at "
+          "his slot (the score of the last man the league can start there, "
+          "pooled across every squad, not just yours). Comparable across "
           "positions on that basis; a good player can still show a modest "
           "PAR if his position is deep league-wide. Parenthesised range is "
           "a real simulated band where one was run; a plain figure is the "
@@ -103,15 +89,6 @@ def comparison_table(rows: list[dict]) -> list[str]:
 
 
 def _selftest() -> None:
-    from ffcore.crosswalk import Crosswalk, Player
-    xw = Crosswalk({"1337": Player("1337", "Pablo Fornals", app_id="2621")})
-    keys, unres = read_slate(xw, [
-        {"player_name": "Fornals", "player_id": "2621"},
-        {"player_name": "Nobody At All", "player_id": "9"},
-        {"player_name": "", "player_id": ""}])
-    assert keys == {"1337"} and unres == ["Nobody At All"], (keys, unres)
-    assert read_slate(xw, rows=[]) == (set(), [])
-
     from decide import Universe, Action
     from ffcore.forecast import Bootstrap
     from ffcore.season import LeagueState

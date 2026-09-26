@@ -566,7 +566,7 @@ def _calibrated():
                                   NEUTRAL_START, observations,
                                   fit_start_fallbacks)
     from ffcore.tidy import load_crosswalk, TIDY, LINEUP_SOURCE, table
-    from ffcore.second import SECOND_SOURCE
+    from ffcore.tidy import SECOND_SOURCE
 
     second = table("lineups", SECOND_SOURCE)
     truth = table("starters")

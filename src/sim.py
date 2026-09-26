@@ -330,9 +330,7 @@ def ladder(u, rows, base, data=None, exp=None, xi=None) -> list[str]:
         out.append("| **" + GROUP_LABEL["pass"] + "** | | | | | | | | |")
         out += [row_md(r) for r in by_group["pass"]]
 
-    out += ["",
-            "_How to read this table: **How to read the tables** in "
-            "METHOD.md._", ""]
+    out.append("")
     return out
 
 
@@ -351,110 +349,6 @@ def standings(u, base) -> list[str]:
                       "—" if m == u.me
                       else "%.0f%%" % (100 * base.beat(m))))
     out.append("")
-    return out
-
-
-def phantom_filled(u) -> list[tuple[str, list[str]]]:
-    from ffcore.score import SLOT_LABEL
-
-    out = []
-    for m, sq in sorted(u.state.squads.items()):
-        counts: dict[str, int] = {}
-        for k, slot in sq.items():
-            if k.startswith("__phantom_"):
-                counts[slot] = counts.get(slot, 0) + 1
-        if counts:
-            out.append((m, ["%d %s%s" % (n, SLOT_LABEL[s],
-                                        "" if n == 1 else "s")
-                           for s, n in sorted(counts.items())]))
-    return out
-
-
-def caveats(u) -> list[str]:
-    import decide
-    drift_status = ("still the unfitted default"
-                    if "not enough" in u.forecaster.drift_why
-                    else "fit from real data this run")
-
-    out = ["| Not modelled | Which way it bends the answer |", "|---|---|"]
-    for m, filled in phantom_filled(u):
-        out.append("| **%s's squad is short a position** (%s) | his real "
-                   "squad cannot field a legal eleven, so the SIMULATION "
-                   "stands in a league-average player at that spot — the "
-                   "same real per-jornada data every other player's "
-                   "number comes from, not an invented figure or a "
-                   "presumption he never fixes it (assuming he never "
-                   "would is the much stronger, much less plausible "
-                   "claim). His true squad may be stronger or weaker than "
-                   "an average man there once he actually buys one |"
-                   % (m, ", ".join(filled)))
-    for j, clubs in sorted(u.part_played.items()):
-        out.append("| Jornada %d is half played — %d clubs are done | their "
-                   "points are already in `now`, so only the rest of the "
-                   "round is simulated, and it still re-picks an eleven that "
-                   "is in fact already locked |" % (j, len(clubs)))
-    if u.cash_note:
-        from ffcore.bid import deals as _deals, premiums as _premiums
-        from ffcore.model import session
-        _lg = session().lg
-        _clause_prem = None
-        if _lg and _lg.market:
-            _dl = [d for d in _deals(_lg, _lg.market) if d.get("is_clause")]
-            _clause_prem = _premiums(_dl, "buy")
-        prem_phrase = ("a clause runs a median %.2fx market value here (n=%d "
-                       "real raids)" % (1 + _clause_prem.median / 100.0,
-                                        _clause_prem.n)
-                       if _clause_prem else
-                       "a clause runs above market value here — too few "
-                       "real raids logged yet to median")
-        out.append("| %s | %s and the app pays back only the value, so the "
-                   "premium is gone for good. It is charged against the "
-                   "move, but priced off what more money would buy you "
-                   "today — most days, very little |"
-                   % (u.cash_note, prem_phrase))
-    if u.unjoined:
-        out.append("| Named by the app in a way nothing else matches: %s | "
-                   "missing from the simulation entirely |"
-                   % ", ".join("`%s`" % n for n in u.unjoined))
-    out += [
-        "| \"Your eleven\" (top of the ladder) compares only the NEXT "
-        "jornada, off real confirmed lineups/injuries | the standings "
-        "table below simulates the other %d jornadas too, where nobody has "
-        "lineup news yet and squad value dominates — the two can point "
-        "opposite ways (this week's confirmed news vs. the season's "
-        "average squad quality) without either being wrong |"
-        % max(0, len(u.state.jornadas) - 1),
-        "| Beyond the next jornada, P(start) reverts to his own season-"
-        "standing rate | a suspension or a knock is dated to the match it "
-        "was announced for — nothing here predicts a FUTURE one not yet "
-        "known, e.g. who gets injured in March |",
-        "| Rivals never transfer | a steal that guts a squad assumes its "
-        "manager does not simply buy someone back — flatters the steal |",
-        "| Teammates score independently, MATCH TO MATCH | two defenders of "
-        "one club still land on opposite ends of the per-match pool in the "
-        "same round — only their SEASON-LONG rating (club_rel) is shared, "
-        "not one week's luck |",
-        "| Cash scores zero | nothing models the market next cycle, so "
-        "holding money looks worthless and a standalone sale can never look "
-        "good |",
-        "| p_win's season-long spread uses DRIFT_FRAC=%s (%s) | see "
-        "\"Season-long drift\" below for the fit itself — every published "
-        "win-probability model checked (538's NBA/NHL/MLB) is far more "
-        "humble than 70%%+ about a full season this early regardless of "
-        "the exact value, which is what 1.0 as an unfitted default "
-        "already reflects |"
-        % (u.forecaster.drift_frac, drift_status),
-        "| Shape prior | %s |" % u.forecaster.pool_note(),
-        "| P(start) fit | %s |" % u.start_note.rstrip("."),
-        "| win %% and finish are single simulated draws | at FINAL_TRIALS="
-        "%d, the same real inputs have been measured (2026-08-31%s) to "
-        "swing roughly ±7 points (e.g. 19%% to 26%% on one real board) run "
-        "to run — read the headline number as a band that wide, not a "
-        "precise reading |"
-        % (decide.FINAL_TRIALS,
-           "" if decide.FINAL_TRIALS == 3000 else
-           ", at FINAL_TRIALS=3000 — since changed, re-check this figure"),
-        ""]
     return out
 
 
@@ -729,8 +623,6 @@ def render(u, rows, base, stamp: str, rivals, n_actions: int = 0,
     out += ladder(u, rows, base, ladder_data, exp=exp, xi=xi)
     out += ["## Where the league stands", ""]
     out += standings(u, base)
-    out += ["## What the simulation cannot see", ""]
-    out += caveats(u)
     return out
 
 
@@ -742,9 +634,9 @@ def _selftest() -> None:
     from ffcore.crosswalk import Crosswalk, Player
     from ffcore.fixtures import tiny_profile, players_from_flat
 
-    import methodology
-    _real_current_mae = methodology.current_mae
-    methodology.current_mae = lambda: None  # noqa: E731
+    import grading
+    _real_current_mae = grading.current_mae
+    grading.current_mae = lambda: None  # noqa: E731
 
     st = Standings(totals={"me": [1000.0, 1200.0, 1400.0, 1600.0],
                            "riv": [1500.0, 1300.0, 1100.0, 900.0]}, me="me")
@@ -929,37 +821,6 @@ def _selftest() -> None:
     assert "17" in ws and "23" in ws, ws
     assert "1,300" in ws, ws
     assert "50%" in ws, ws
-
-    u.part_played = {1: {"alaves", "getafe"}}
-    u.unjoined = ["A. Ferllo"]
-    u.start_note = "P(start) fitted on 240 confirmed starts"
-    cav = "\n".join(caveats(u))
-    assert "seed prior" in cav, cav
-    assert "240 confirmed starts" in cav, cav
-    assert "jornada 1" in cav.lower(), cav
-    assert "A. Ferllo" in cav, cav
-    u.cash_note = "A buyout premium is charged at **0.002 places per million**"
-    cav2 = "\n".join(caveats(u))
-    assert "0.002 places per million" in cav2, cav2
-    u.part_played, u.unjoined, u.cash_note = {}, [], ""
-    clean = "\n".join(caveats(u))
-    assert "A. Ferllo" not in clean and "jornada 1" not in clean.lower(), clean
-
-    legal_sq = {"k": "POR", **{f"d{i}": "DEF" for i in range(1, 5)},
-               **{f"m{i}": "MED" for i in range(1, 5)},
-               "f1": "DEL", "f2": "DEL"}
-    ph_sq = {"__phantom_DEF_0": "DEF", "d1": "DEF", "d2": "DEF",
-            "m1": "MED", "m2": "MED", "m3": "MED", "m4": "MED", "m5": "MED",
-            "p1": "POR", "f1": "DEL", "f2": "DEL"}
-    u_phantom = Universe(
-        state=LeagueState({"me": legal_sq, "riv": ph_sq}, [1], "me"),
-        forecaster=Bootstrap({}), cash=0.0, me="me")
-    assert phantom_filled(u_phantom) == [("riv", ["1 defensa"])], \
-        phantom_filled(u_phantom)
-    assert "me" not in dict(phantom_filled(u_phantom))
-    ph_cav = "\n".join(caveats(u_phantom))
-    assert "riv's squad is short a position" in ph_cav, ph_cav
-    assert "1 defensa" in ph_cav, ph_cav
 
     d = payload(u, rows, st, ["riv"], locks_h=41.1, n_actions=132)
     assert d["expected_finish"] == 1.5 and d["p_win"] == 0.5, d
@@ -1206,7 +1067,7 @@ def _selftest() -> None:
     assert "132 moves" not in page, page[:400]
     assert page.startswith("# The simulation — 2026-08-18T0152Z"), page[:80]
     heads = [ln for ln in page.splitlines() if ln.startswith("## ")]
-    assert len(heads) == len(set(heads)) == 4, heads
+    assert len(heads) == len(set(heads)) == 3, heads
 
     for banned in ("## Do this", "## The board", "## Warnings"):
         assert banned not in heads, heads
@@ -1270,7 +1131,7 @@ def _selftest() -> None:
     assert [r for r in rows2 if r["action"].buy == "cand"], rows2
     assert "cand" not in bands2, sorted(bands2)
 
-    methodology.current_mae = _real_current_mae
+    grading.current_mae = _real_current_mae
     import backtest
     real_tr = backtest.track_record
     backtest.track_record = lambda *a, **k: (_ for _ in ()).throw(RuntimeError)

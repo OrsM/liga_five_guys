@@ -20,10 +20,10 @@ __all__ = ["ROOT", "TIDY", "SEASON", "DECISIONS", "REPORTS", "PARTS", "MADRID",
            "WARNINGS",
            "input_path", "read_csv", "write_csv", "append_csv", "widen_csv", "log_row",
            "csv_string",
-           "write_lines", "snapshot_stamp", "ledger_stamp", "latest_only",
+           "write_lines", "snapshot_stamp", "ledger_stamp",
            "latest_per_key", "snapshots",
            "Market", "Valuation", "table", "row_key", "run_now", "load_crosswalk",
-           "load_players", "read_ledger", "LEDGER", "load_deadline", "LINEUP_SOURCE",
+           "load_players", "read_ledger", "LEDGER", "load_deadline", "LINEUP_SOURCE", "SECOND_SOURCE",
            "load_fixtures", "kickoff_stamp",
            "load_understat_players",
            "MATCH_LEN", "minutes_played", "fresh_only", "DAILY_FRESH_DAYS",
@@ -197,13 +197,6 @@ def ledger_stamp(s: str):
     return local.astimezone(timezone.utc) if local else None
 
 
-def latest_only(rows: list[dict]) -> list[dict]:
-    if not rows:
-        return []
-    newest = max(r.get("observed_at", "") for r in rows)
-    return [r for r in rows if r.get("observed_at") == newest]
-
-
 def latest_per_key(rows: list[dict], key_fn) -> list[dict]:
     best: dict = {}
     for r in rows:
@@ -322,6 +315,7 @@ def snapshots(rows: list[dict]) -> list[str]:
 
 
 LINEUP_SOURCE = "futbolfantasy"
+SECOND_SOURCE = "analitica"
 
 
 def _api_stats_key(r: dict):
@@ -547,17 +541,6 @@ def _merge(players: dict, rows: list[dict], key_of, name_col: str,
     return players
 
 
-def stale_owned_players(players: dict, owned_keys, market) -> dict:
-    latest = market.latest() if market is not None else {}
-    stale = [latest[k] for k in owned_keys if k not in players and k in latest]
-    if not stale:
-        return players
-    out = _merge(dict(players), stale, row_key, "name", MARKET_FIELDS)
-    for r in stale:
-        out[row_key(r)]["status"] = "stale since %s" % r.get("observed_at", "?")
-    return out
-
-
 def load_players() -> dict[str, dict]:
     market, xi = newest("market"), newest("lineups")
     if not market and not xi:
@@ -737,7 +720,6 @@ def _selftest_new_loaders() -> None:
     got = latest_per_key(rows, lambda r: r["k"])
     by_k = {r["k"]: r["v"] for r in got}
     assert by_k == {"a": "new-a", "b": "only-b"}, by_k
-    assert {r["k"] for r in latest_only(rows)} == {"a"}
     assert {r["k"] for r in got} == {"a", "b"}
     assert latest_per_key([], lambda r: r["k"]) == []
     assert latest_per_key([{"observed_at": "t1"}], lambda r: None) == []
@@ -748,7 +730,7 @@ def _selftest_new_loaders() -> None:
                         if r.get("match_id")}
         got_matches = {r.get("match_id") for r in newest("matches")}
         assert got_matches == real_matches, \
-            'newest("matches") lost a match latest_only should have kept'
+            'newest("matches") lost a match'
         assert table("matches") == matches_full
 
     starters_full = table("starters")
@@ -758,19 +740,19 @@ def _selftest_new_loaders() -> None:
         got_keys = {(r.get("match_id"), r.get("player_name"))
                    for r in newest("starters")}
         assert got_keys == real_keys, \
-            'newest("starters") lost a (match, player) key latest_only should keep'
+            'newest("starters") lost a (match, player) key'
 
     stats_all = table("api_stats")
     if stats_all:
         all_keys = {_api_stats_key(r) for r in stats_all}
-        naive_keys = {_api_stats_key(r) for r in latest_only(stats_all)}
+        last = max(r["observed_at"] for r in stats_all)
+        naive_keys = {_api_stats_key(r) for r in stats_all
+                      if r["observed_at"] == last}
         real_keys = {_api_stats_key(r) for r in load_api_stats()}
         assert real_keys == all_keys, "load_api_stats() must cover every key"
         assert len(real_keys) > len(naive_keys), (
-            "load_api_stats() returned no more keys than latest_only() "
-            "would — this loader exists ONLY because latest_only() loses "
-            "98% of this table's keys; if this assertion ever fails, "
-            "someone put latest_only() back")
+            "load_api_stats() must keep every (player, week, stat), not "
+            "only the newest snapshot's")
 
     files = sorted((SEASON / "live").glob("perjornada_*.csv"))
     if files:
@@ -802,28 +784,6 @@ def _selftest_new_loaders() -> None:
                 continue
     assert j1 == expect, "jornada_of_match() must be first-write-wins"
 
-    _selftest_stale_owned()
-
-
-def _selftest_stale_owned() -> None:
-    live = {"live_id": {"name": "Still Listed", "value": 5_000_000}}
-    fell_off = {"live_id": {"name": "Still Listed", "value": 5_000_000},
-               "gone_id": {"ff_id": "gone_id", "name": "Gustavo",
-                            "value": "13594034",
-                            "observed_at": "2026-09-01T1056Z", "team": "Racing",
-                            "position": "mediocampista"}}
-    market = SimpleNamespace(latest=lambda: fell_off)
-
-    out = stale_owned_players(live, ["live_id", "gone_id"], market)
-    assert out["live_id"] == live["live_id"], "must not touch a live record"
-    assert (out["gone_id"]["value"], out["gone_id"]["name"],
-           out["gone_id"]["status"]) == \
-        (13_594_034.0, "Gustavo", "stale since 2026-09-01T1056Z"), out
-    assert "gone_id" not in live, "must not mutate the input dict"
-
-    assert stale_owned_players(live, ["live_id"], market) is live
-    assert stale_owned_players(live, ["never_seen"], market) is live
-    assert stale_owned_players(live, ["gone_id"], None) is live
 
 
 def _selftest() -> None:
@@ -832,8 +792,6 @@ def _selftest() -> None:
     _selftest_crosswalk_cache()
     rows = [{"observed_at": "t1", "name": "A"}, {"observed_at": "t2",
             "name": "B"}, {"observed_at": "t2", "name": "C"}]
-    assert [r["name"] for r in latest_only(rows)] == ["B", "C"]
-    assert latest_only([]) == []
     assert snapshots(rows) == ["t1", "t2"]
 
     now = datetime(2026, 8, 19, 12, 0, tzinfo=timezone.utc)

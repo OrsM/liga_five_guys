@@ -35,10 +35,10 @@ def commits_touching(path: str) -> list[tuple[str, dt.datetime]]:
 
 
 def _actuals_index():
-    import methodology as M
+    import grading
     from ffcore.text import norm
 
-    actuals, _label = M.load_actuals(window_days=None)
+    actuals = grading.load_actuals(window_days=None)
     if not actuals:
         return None, None
     now = max(a["from_dt"] for a in actuals)

@@ -12,7 +12,7 @@ from typing import Mapping
 
 
 from ffcore.forecast import Bootstrap, pool_from_perjornada
-import methodology as _methodology
+import grading
 from stats import percentile
 from ffcore.parse import fmt_money
 from ffcore.schedule import (rounds_left, next_then_rest,
@@ -411,7 +411,7 @@ def _gains(r) -> bool:
 def worth_doing(u, rows) -> list:
     par_of = {k: v["par"] for k, v in u.player_forecasts.items()}
     pj_of = {k: v["pj"] for k, v in u.player_forecasts.items()}
-    mae = _methodology.current_mae()
+    mae = grading.current_mae()
     rows = [r for r in rows if not r["action"].buy
             or _clears_par_floor(par_of, mae, r["action"].buy,
                                  len(u.state.jornadas), pj_of)]
@@ -566,13 +566,13 @@ def load(trials_pool=None) -> Universe:
                         if k.startswith("__phantom_")}
         for k in phantom_keys:
             first_jornada_of.setdefault(k, rem[0])
-    _history = _methodology._graded_history()
-    drift_frac, drift_why = _methodology.drift_frac_from_history(
+    _history = grading.graded_history()
+    drift_frac, drift_why = grading.drift_frac_from_history(
         history=_history)
     fc = Bootstrap(per_j, pool=pool, matches=matches, club_of=club,
                    club_rel=club_rel, drift_frac=drift_frac,
                    drift_why=drift_why,
-                   rate_floor=_methodology.fit_rate_rel_floor(
+                   rate_floor=grading.fit_rate_rel_floor(
                        pool, history=_history)[0])
 
     carried = {}

@@ -10,12 +10,11 @@ from ffcore.parse import money
 from ffcore.score import SLOT_MIN, pick_xi, squad_pool
 from ffcore.tidy import ledger_stamp
 
-__all__ = ["MAX_LAG_H", "ROUND_TO", "FLOOR_EPS", "HORIZONS", "Premiums", "Advice",
+__all__ = ["MAX_LAG_H", "ROUND_TO", "FLOOR_EPS", "Premiums", "Advice",
            "is_round", "deals", "usable", "premiums", "low_priced_buys",
            "suggest", "gain",
            ]
 
-HORIZONS = (3, 7, 14)
 
 MAX_LAG_H = 36.0
 

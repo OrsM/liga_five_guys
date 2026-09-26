@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import re
 
-__all__ = ["money", "ratio", "pct100", "fmt_money", "fmt_pct", "grouped_sums",
+__all__ = ["money", "ratio", "pct100", "fmt_money", "grouped_sums",
            "text", "num", "whole", "flag"]
 
 _DOT_GROUPED = re.compile(r"\d{1,3}(?:\.\d{3})+$")
@@ -83,10 +83,6 @@ def fmt_money(v) -> str:
     if abs(v) >= 1e6:
         return "%.2fM" % (v / 1e6)
     return "%.0fK" % (v / 1e3)
-
-
-def fmt_pct(v) -> str:
-    return "—" if v is None else "%.0f%%" % v
 
 
 def text(row, col: str, default: str = "") -> str:
@@ -172,12 +168,8 @@ def _selftest() -> None:
         got = fmt_money(raw)
         assert got == want, f"fmt_money({raw!r}) -> {got!r}, wanted {want!r}"
 
-    for raw, want in {72.0: "72%", 0.0: "0%", 95.5: "96%", None: "—"}.items():
-        got = fmt_pct(raw)
-        assert got == want, f"fmt_pct({raw!r}) -> {got!r}, wanted {want!r}"
-
     print("ffcore.parse self-test OK "
-          f"({len(cases_money) + len(cases_ratio) + 5 + len(fmt_cases) + 4} "
+          f"({len(cases_money) + len(cases_ratio) + 5 + len(fmt_cases)} "
           "cases)")
 
 

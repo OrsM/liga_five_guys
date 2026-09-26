@@ -27,15 +27,14 @@ TESTS=(ffcore/parse.py ffcore/text.py ffcore/tidy.py
        ffcore/forecast.py ffcore/season.py ffcore/render.py
        ffcore/startprob.py ffcore/lineupweight.py ffcore/crosswalk.py sources.py
        "ingest.py --selftest" "ffcore/league.py --selftest" ffcore/fixture.py
-       ffcore/second.py ffcore/score.py ffcore/bid.py "digest.py --selftest"
-       "slate.py --selftest" "points.py --selftest"
-       "methodology.py --selftest"
+       ffcore/score.py ffcore/bid.py
+       "slate.py --selftest" "points.py --selftest" "grading.py --selftest"
        "ledger.py --selftest"
        "crosswalk.py --selftest" "run.py --selftest" "flip.py --selftest"
        ffcore/action.py ffcore/pricing.py ffcore/profile.py ffcore/schedule.py
        "stats.py --selftest"
        "backtest.py --selftest")
-SESSION_TESTS=(xi.py report.py decide.py sim.py)
+SESSION_TESTS=(report.py decide.py sim.py)
 
 session_ok=0
 "$UV" run --frozen python tools/session_selftests.py >/dev/null 2>&1 &
