@@ -109,6 +109,8 @@ def build_players(registry: dict, market, lineups, api_rows, clubs) -> dict:
         related = {w[:4] for w in words[pid]} & {
             w[:4] for w in tokens(r.get("player_name"))}
         if not (0.8 < ratio < 1.25 or (related and 0.5 < ratio < 2.0)):
+            print("  app id %s (%s) dropped from %s: the app's name and value "
+                  "disagree" % (p.app_id, r.get("player_name"), p.name))
             p.app_id = ""
         elif not related:
             weak.add(pid)
@@ -127,6 +129,8 @@ def build_players(registry: dict, market, lineups, api_rows, clubs) -> dict:
                 and any(w and (w <= words[pid] or words[pid] <= w)
                         for w in theirs_words)]
         if len(hits) == 1:
+            print("  app id %s (%s) attached to %s"
+                  % (app_id, r.get("player_name"), out[hits[0]].name))
             weak.discard(hits[0])
             held.discard(out[hits[0]].app_id)
             out[hits[0]].app_id = app_id
