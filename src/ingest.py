@@ -436,8 +436,19 @@ def parse() -> None:
     case that needs the full walk is exactly the case that is detectable.
     """
     walk = doc_keys()
-    sigs_now = _parser_sigs(walk)
-    state = _load_parse_state()
+    # Signature of every parser the archives currently depend on: the guard
+    # that says a parser moving means the rows it produced are stale.
+    sigs_now: dict[str, str] = {}
+    for _stamp, docs in walk:
+        for key in docs:
+            src = _walkable_src(key)
+            if src is None:
+                continue
+            name = getattr(src.parse, "__name__", "")
+            if name and name not in sigs_now:
+                sigs_now[name] = parser_sig(name)
+    state = _read_json(TIDY / _STATE, {})
+    state = state if isinstance(state, dict) else {}
     stamps = [stamp for stamp, _ in walk]
     routed = set(state.get("stamps") or ())
     tail = [stamp for stamp in stamps if stamp not in routed]
@@ -524,29 +535,20 @@ def _parse_tail(walk, tail, sigs_now, stamps, state) -> bool:
                              STORE_ONCE.get(table)):
             return False
 
-    _append_cache_lines(fresh)
+    if fresh:
+        TIDY.mkdir(parents=True, exist_ok=True)
+        try:
+            with (TIDY / _lines_name(_CACHE)).open("a", encoding="utf-8") as fh:
+                for k, rows in fresh.items():
+                    fh.write(json.dumps({"k": k, "r": rows}) + "\n")
+        except OSError:
+            pass
     _save_parse_state({"sigs": sigs_now, "stamps": stamps,
                        "tables": sorted(known)})
     print("  tail: %d new snapshot(s), %d document(s) parsed, "
           "%d row(s) appended"
           % (len(tail), len(fresh), sum(len(v) for v in pending.values())))
     return True
-
-
-def _parser_sigs(walk) -> dict[str, str]:
-    """Signature of every parser the archives currently depend on. This is
-    the guard: if one of these moves, the rows it produced are stale and the
-    only honest answer is to derive the lot again."""
-    out: dict[str, str] = {}
-    for _stamp, docs in walk:
-        for key in docs:
-            src = _walkable_src(key)
-            if src is None:
-                continue
-            name = getattr(src.parse, "__name__", "")
-            if name and name not in out:
-                out[name] = parser_sig(name)
-    return out
 
 
 def _tidy_has(tables) -> bool:
@@ -576,31 +578,6 @@ def _parse_one(origin: str, key: str, html: str, sigs: "Sigs"
     return parse_key(sigs.of(key, html), src), rows
 
 
-def _parse_workers(misses: int) -> int:
-    """1 for the handful of documents a normal run parses (a pool would cost
-    more than it saves); otherwise one per physical core, never more than the service's
-    own memory cap leaves room for -- a parsing worker holds one ~2MB page and
-    its lxml tree, ~200MB, and lfg.service is capped at 750MB with the parent
-    already at ~360MB. A cold-cache rebuild (376s serial, 2026-09-24) is the
-    only time this matters, and it must not become an OOM kill."""
-    if misses < 24:
-        return 1
-    # PHYSICAL cores, not logical CPUs: lxml is cache/memory bound, and on this
-    # box (i5-5200U, 2 cores x 2 threads) measured 2026-09-24 on 674 documents:
-    # 1 worker 51.6s, 2 workers 32.1s, 4 workers 41.8s and 80% MORE total CPU.
-    n = max(1, (os.cpu_count() or 2) // 2)
-    try:
-        cg = Path("/sys/fs/cgroup") / (Path("/proc/self/cgroup").read_text()
-                                        .strip().split("::")[-1].lstrip("/"))
-        cap = (cg / "memory.max").read_text().strip()
-        if cap != "max":
-            rss = int((cg / "memory.current").read_text())
-            n = min(n, max(1, (int(cap) - rss - 100 * 2**20) // (200 * 2**20)))
-    except (OSError, ValueError):
-        pass
-    return n
-
-
 def _parse_everything(walk, sigs_now, stamps) -> None:
     pending: dict[str, list[dict]] = {}
     cache, fresh = parse_cache(), {}
@@ -612,7 +589,28 @@ def _parse_everything(walk, sigs_now, stamps) -> None:
             if src is not None and parse_key(ck, src) not in cache:
                 need.setdefault(origin, set()).add(key)
     misses = sum(len(v) for v in need.values())
-    tasks, n = sorted(need.items()), _parse_workers(misses)
+    tasks = sorted(need.items())
+    # Worker count: 1 for the handful of documents a normal run parses (a
+    # pool would cost more than it saves); otherwise one per physical core
+    # (PHYSICAL, not logical -- lxml is cache/memory bound: on this box,
+    # i5-5200U 2 cores x 2 threads, measured 2026-09-24 on 674 documents, 1
+    # worker 51.6s, 2 workers 32.1s, 4 workers 41.8s and 80% MORE total CPU),
+    # never more than the service's own memory cap leaves room for -- a
+    # worker holds one ~2MB page and its lxml tree, ~200MB, and lfg.service
+    # is capped at 750MB with the parent already at ~360MB.
+    if misses < 24:
+        n = 1
+    else:
+        n = max(1, (os.cpu_count() or 2) // 2)
+        try:
+            cg = Path("/sys/fs/cgroup") / (Path("/proc/self/cgroup").read_text()
+                                            .strip().split("::")[-1].lstrip("/"))
+            cap = (cg / "memory.max").read_text().strip()
+            if cap != "max":
+                rss = int((cg / "memory.current").read_text())
+                n = min(n, max(1, (int(cap) - rss - 100 * 2**20) // (200 * 2**20)))
+        except (OSError, ValueError):
+            pass
     if n > 1:
         import concurrent.futures as cf
         import multiprocessing as mp
@@ -792,11 +790,6 @@ def _lines_name(name: str) -> str:
     return (name[:-5] if name.endswith(".json") else name) + ".jsonl"
 
 
-def _load_parse_state(name: str = _STATE) -> dict:
-    blob = _read_json(TIDY / name, {})
-    return blob if isinstance(blob, dict) else {}
-
-
 def _save_parse_state(state: dict, name: str = _STATE) -> None:
     _write_json(TIDY / name, state)
 
@@ -832,18 +825,6 @@ def _read_cache_lines(name: str, keys: set | None = None) -> dict:
             if k and (keys is None or k in keys):
                 out[k] = rec.get("r") or []
     return out
-
-
-def _append_cache_lines(docs: dict, name: str = _CACHE) -> None:
-    if not docs:
-        return
-    TIDY.mkdir(parents=True, exist_ok=True)
-    try:
-        with (TIDY / _lines_name(name)).open("a", encoding="utf-8") as fh:
-            for k, rows in docs.items():
-                fh.write(json.dumps({"k": k, "r": rows}) + "\n")
-    except OSError:
-        pass
 
 
 def parse_cache(name: str = _CACHE) -> dict:
@@ -1083,15 +1064,6 @@ def baseline(url: str = "", label: str = "") -> None:
                  "the last good file is untouched. The markup has probably "
                  "changed: fix sources.parse_points.")
 
-    _write_points_csv(rows, label, url)
-
-
-POINTS_FIELDS = ["player_name", "player_name_full", "team", "points",
-                 "games", "avg", "ff_id", "season", "observed_at",
-                 "source_url"]
-
-
-def _write_points_csv(rows: list[dict], label: str, url: str) -> None:
     stamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%MZ")
     out = SEASON / f"points_{label}.csv"
     out.parent.mkdir(parents=True, exist_ok=True)
@@ -1103,9 +1075,15 @@ def _write_points_csv(rows: list[dict], label: str, url: str) -> None:
             w.writerow(row)
 
     played = sum(1 for r in rows if (r["games"] or "0") != "0")
-    print(f"wrote {SEASON / f'points_{label}.csv'} — {len(rows)} players, "
+    print(f"wrote {out} — {len(rows)} players, "
           f"{played} with minutes, season label '{label}'")
     print("Spot-check a few names against the app before trusting the report.")
+
+
+POINTS_FIELDS = ["player_name", "player_name_full", "team", "points",
+                 "games", "avg", "ff_id", "season", "observed_at",
+                 "source_url"]
+
 
 
 
