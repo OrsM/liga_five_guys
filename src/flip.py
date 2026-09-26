@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import bisect
 import csv
-import json
 import math
 import sys
 from datetime import datetime, timedelta, timezone
@@ -71,17 +70,18 @@ class Outlook:
         return best
 
 
-def offer_ratios(offers: list[dict], teams: list[dict], value_at) -> list[float]:
-    who = {t["player_team_id"]: t["player_name"] for t in teams
-           if t.get("player_team_id")}
+def offer_ratios(offers: list[dict], teams: list[dict], xw, market) -> list[float]:
+    who = {t["player_team_id"]: xw.player(app_id=t.get("player_id") or "")
+           for t in teams if t.get("player_team_id")}
     seen, out = set(), []
     for o in offers:
         if not o.get("offer_id") or o["offer_id"] in seen:
             continue
         seen.add(o["offer_id"])
-        v = value_at(who.get(o["player_team_id"], ""), o["created_at"])
-        if v and float(o["money"] or 0) > 0:
-            out.append(float(o["money"]) / v)
+        v = market.at(who.get(o["player_team_id"]),
+                      datetime.fromisoformat(o["created_at"]).astimezone(timezone.utc))
+        if v and v.value and float(o["money"] or 0) > 0:
+            out.append(float(o["money"]) / v.value)
     return out
 
 
@@ -105,24 +105,13 @@ def auction_ratios(listings: list[dict], buys: list[dict]) -> list[float]:
     return out
 
 
-def report_view(ladder: list[dict], name_key) -> dict:
-    verdict = {}
-    for r in ladder:
-        k = name_key(r["name"])
-        if r["where"] == "yours" and k \
-                and r["group"] in ("sell", "keep", "out", "in", "offer") \
-                and r.get("pts_mean") is not None:
-            verdict[k] = (r["group"], r["pts_mean"])
-    return verdict
-
-
 def money_rate(moves: list[dict]) -> float:
     rates = [m["value"] for m in moves if m.get("value") is not None]
     return median(rates) if rates else 0.0
 
 
 def reserve(moves: list[dict]) -> float:
-    return max(0.0, -moves[0]["net"]) if moves else 0.0
+    return max(0.0, moves[0]["action"].net) if moves else 0.0
 
 
 def _belief(model: dict, last: dict[str, float], key: str) -> dict | None:
@@ -131,10 +120,6 @@ def _belief(model: dict, last: dict[str, float], key: str) -> dict | None:
 
 def _hold_value(value: float, bel: dict, model: dict) -> float:
     return value * (1 + bel["mean"] / 100) * model["offer"]
-
-
-def _cost_pts(group: str, exp_pts: float) -> float:
-    return 0.0 if group == "sell" else max(0.0, -exp_pts)
 
 
 def picks(listings: list[dict], last: dict[str, float], model: dict,
@@ -159,20 +144,18 @@ def picks(listings: list[dict], last: dict[str, float], model: dict,
 
 
 def sells(bench: list[dict], last: dict[str, float], offers: dict[str, float],
-          model: dict, verdict: dict, rate: float) -> tuple[list[dict], list[dict]]:
+          model: dict, sell_cost: dict, rate: float) -> tuple[list[dict], list[dict]]:
     out, held = [], []
     for p in bench:
-        v = verdict.get(p["key"])
+        cost = sell_cost.get(p["key"])
         bel = _belief(model, last, p["key"])
-        if v is None or bel is None:
+        if cost is None or bel is None:
             continue
-        group, exp_pts = v
         now = offers.get(p["key"]) or p["value"] * model["offer"]
         hold = _hold_value(p["value"], bel, model)
         gain = now - hold
         if gain <= 0:
             continue
-        cost = _cost_pts(group, exp_pts)
         benefit = rate * gain / 1e6
         back = rate * p["value"] * (model["premium"] - 1) / 1e6
         sale = benefit >= cost + back
@@ -187,17 +170,13 @@ def sells(bench: list[dict], last: dict[str, float], offers: dict[str, float],
 
 
 def fund(offers: dict[str, float], mine: dict, names: dict, xi: set,
-        verdict: dict, rate: float, value: dict, last: dict, model: dict,
+        sell_cost: dict, rate: float, value: dict, last: dict, model: dict,
         need: float = 0.0) -> list[dict]:
     out = []
     for k, offer in offers.items():
-        if k not in mine:
+        cost = sell_cost.get(k)
+        if k not in mine or cost is None:
             continue
-        v = verdict.get(k)
-        if v is None:
-            continue
-        group, exp_pts = v
-        cost = _cost_pts(group, exp_pts)
         benefit = rate * offer / 1e6
         net = cost - benefit
         bel = _belief(model, last, k)
@@ -362,25 +341,19 @@ def recently(path, now) -> set[tuple[str, str]]:
                 + timedelta(days=int(float(r["horizon"])))}
 
 
-def main() -> None:
-    import decide
-    from ffcore.text import norm
-    from ffcore.tidy import DECISIONS, MADRID, REPORTS, Market, run_now, table
+def run(u, moves: list[dict], sell_cost: dict[str, float]) -> dict | None:
+    from ffcore.tidy import DECISIONS, MADRID, Market, run_now, table
 
-    u = decide.load()
     rows = table("market")
     by_player = steps(rows)
-    mk = Market(table("market"))
-    value_at = lambda name, when: (lambda v: v.value if v else None)(
-        mk.at(name, datetime.fromisoformat(when).astimezone(timezone.utc)))
-    offer_r = offer_ratios(table("api_offers"),
-                           table("api_teams"), value_at)
+    offer_r = offer_ratios(table("api_offers"), table("api_teams"), u.lg.xw,
+                           Market(rows))
     paid_r = auction_ratios(table("api_market"),
                             [a for a in table("api_activity")
                              if a["kind"] == "buy"])
     if not offer_r or not paid_r or not by_player:
         print("flip: not enough history to measure the cost of trading yet")
-        return
+        return None
     offer, premium = mean(offer_r), mean(paid_r)
     model = {"outlook": Outlook(by_player), "offer": offer, "premium": premium}
 
@@ -396,28 +369,20 @@ def main() -> None:
             for k, r in u.view("route").items() if r == "free" and k in price]
     bench = [{"key": k, "name": name.get(k, k), "value": value.get(k, 0.0)}
              for k in mine if k not in xi]
-    by_name = {norm(name.get(k, k)): k for k in mine}
-
-    verdict, moves = {}, []
-    try:
-        doc = json.loads((REPORTS / "decisions.json").read_text())
-        verdict = report_view(doc["ladder"], lambda n: by_name.get(norm(n)))
-        moves = doc["moves"]
-    except (OSError, ValueError, KeyError):
-        pass
+    rate = money_rate(moves)
     held_back = reserve(moves)
     now = run_now().astimezone(MADRID)
     recent = recently(DECISIONS / "flip_log.csv", now)
-    sales, kept = sells(bench, last, dict(u.received_offers), model, verdict,
-                        money_rate(moves))
+    sales, kept = sells(bench, last, dict(u.received_offers), model, sell_cost,
+                        rate)
     spend = max(0.0, u.cash - held_back)
     pick_list = [p for p in picks(free, last, model, spend)
-                if (p["key"], "SELL") not in recent]
+                 if (p["key"], "SELL") not in recent]
     short = max([held_back - u.cash] + [p["short"] for p in pick_list],
-               default=0.0)
-    funding = (fund(dict(u.received_offers), mine, name, xi, verdict,
-                    money_rate(moves), value, last, model, need=short)
-              if short > 0 else [])
+                default=0.0)
+    funding = (fund(dict(u.received_offers), mine, name, xi, sell_cost, rate,
+                    value, last, model, need=short)
+               if short > 0 else [])
     out = {"cash": u.cash, "reserve": held_back, "spendable": spend,
            "fund_need": short,
            "picks": pick_list,
@@ -425,22 +390,15 @@ def main() -> None:
            "held": kept, "fund": funding,
            "measured": {"offer": offer, "premium": premium,
                         "offers": len(offer_r), "auctions": len(paid_r),
-                        "points_per_million": money_rate(moves)}}
+                        "points_per_million": rate}}
     out["view"] = present(out)
-    path = REPORTS / "decisions.json"
-    try:
-        doc = json.loads(path.read_text(encoding="utf-8"))
-        doc["flip"] = out
-        path.write_text(json.dumps(doc, ensure_ascii=False, indent=1) + "\n",
-                        encoding="utf-8")
-    except (OSError, ValueError):
-        print("flip: no decisions.json to attach to")
     logged = record(DECISIONS / "flip_log.csv", out, now)
     print("flip: %d buy(s), %d sale(s) logged; %s to spend (%s held back for the "
           "report's own targets); offers pay %.3fx value (%d), auctions cost "
           "%.3fx ask (%d)"
           % (logged - len(out["sells"]), len(out["sells"]), _m(spend),
              _m(held_back), offer, len(offer_r), premium, len(paid_r)))
+    return out
 
 
 def _selftest() -> None:
@@ -475,7 +433,14 @@ def _selftest() -> None:
             {"offer_id": "1", "player_team_id": "9", "money": "5500000",
              "created_at": "2026-09-01T22:24:00+02:00"},
             {"offer_id": "", "player_team_id": "9", "money": "", "created_at": ""}]
-    assert offer_ratios(offs, teams, lambda n, w: 5e6 if n == "Zed" else None) == [1.1]
+    from ffcore.crosswalk import Crosswalk, Player
+    from ffcore.tidy import Market
+    teams = [dict(teams[0], player_id="77")]
+    zed_xw = Crosswalk({"501": Player("501", "Zed", app_id="77")})
+    zed_mk = Market([{"ff_id": "501", "name": "zed", "value": "5000000",
+                      "observed_at": "2026-09-01T0800Z"}])
+    assert offer_ratios(offs, teams, zed_xw, zed_mk) == [1.1]
+    assert offer_ratios(offs, teams, Crosswalk({}), zed_mk) == []
     close = "2026-09-02T22:24:00+02:00"
     lst = [{"seller": "marketPlayerLeague", "player_id": "7", "expires_at": close,
             "sale_price": "10000000", "observed_at": "a"},
@@ -486,17 +451,13 @@ def _selftest() -> None:
             {"player_id": "7", "at": "2026-09-05T10:00:00+02:00", "amount": "1"}]
     assert auction_ratios(lst, buys) == [1.04], auction_ratios(lst, buys)
 
-    ladder = [{"name": "Kept", "where": "yours", "group": "keep", "pts_mean": -0.5},
-              {"name": "Free", "where": "yours", "group": "sell", "pts_mean": -3.0},
-              {"name": "Star", "where": "yours", "group": "offer",
-               "pts_mean": -9.0},
-              {"name": "Rival", "where": "x", "group": "raid", "pts_mean": None}]
-    ver = report_view(ladder, {"Kept": "k", "Free": "f", "Star": "s"}.get)
-    assert ver == {"k": ("keep", -0.5), "f": ("sell", -3.0),
-                   "s": ("offer", -9.0)}, ver
-    moves = [{"net": -18.4e6, "value": 1.0}, {"net": -12.3e6, "value": 0.6}, {"net": 5e6, "value": None}]
+    from decide import Action
+    ver = {"k": 0.5, "f": 0.0, "s": 9.0}
+    moves = [{"action": Action("buy", buy="x", cost=18.4e6), "value": 1.0},
+             {"action": Action("buy", buy="y", cost=12.3e6), "value": 0.6},
+             {"action": Action("sell", sell=("z",), proceeds=5e6), "value": None}]
     assert reserve(moves) == 18.4e6 and money_rate(moves) == 0.8
-    assert reserve([{"net": 3e6, "value": 1.0}]) == 0.0
+    assert reserve(moves[2:]) == 0.0
     assert reserve([]) == 0.0 and money_rate([]) == 0.0
 
     lst = [{"key": "a", "name": "Riser", "ask": 10e6, "value": 10e6},
@@ -547,7 +508,7 @@ def _selftest() -> None:
 
     priced = fund({"a": 5e6, "b": 5e6}, {"a": 1, "b": 1},
                  {"a": "Riser", "b": "Faller"}, set(),
-                 {"a": ("keep", -1.0), "b": ("keep", -1.0)}, rate=1.0,
+                 {"a": 1.0, "b": 1.0}, rate=1.0,
                  value={"a": 5e6, "b": 5e6}, last={"a": 5.0, "b": -2.0},
                  model=model)
     by_name = {p["name"]: p for p in priced}
@@ -557,7 +518,7 @@ def _selftest() -> None:
     five = {"a": 1, "b": 1, "c": 1, "d": 1, "e": 1}
     five_offers = {"a": 1e6, "b": 2e6, "c": 3e6, "d": 4e6, "e": 5e6}
     five_names = {k: k.upper() for k in five}
-    five_ver = {k: ("keep", -1.0) for k in five}
+    five_ver = dict.fromkeys(five, 1.0)
     whole = fund(five_offers, five, five_names, set(), five_ver, rate=0.1,
                 value={}, last={}, model=model)
     assert len(whole) == 5, whole
@@ -629,5 +590,3 @@ def _selftest() -> None:
 if __name__ == "__main__":
     if "--selftest" in sys.argv:
         _selftest()
-    else:
-        main()

@@ -7,16 +7,18 @@ import sys
 from pathlib import Path
 
 
-from ffcore.bid import deals, low_priced_buys
+from ffcore.league import MARKET
+from ffcore.parse import money
 from ffcore.render import title_name
 from ffcore.score import SLOT_LABEL, SLOT_MIN, squad_pool
-from ffcore.tidy import (run_now, shown,
+from ffcore.tidy import (ledger_stamp, run_now, shown,
                          ALERTS, DECISIONS, WARNINGS,
                          age_phrase, append_csv, load_crosswalk,
                          load_deadline, newest, read_csv,
                          snapshot_stamp, stale_feeds, widen_csv, write_lines)
 
 STALE_HOURS = 14.0
+FLOOR_EPS = 0.5
 
 LOG_COLS = ["observed_at", "hours_to_lock", "formation", "index_total",
             "ff_id", "player", "pos", "slot", "start_pct", "start_source", "status",
@@ -63,6 +65,20 @@ def log_squad(observed, players, chosen, formation: str, total, deadline,
             "pj": f"{p['pj']:.1f}",
         })
     append_csv(path, rows, LOG_COLS)
+
+
+def low_priced_buys(lg) -> list[tuple[str, float]]:
+    out = []
+    for t in lg.txns:
+        price = money(t.get("price"))
+        when = ledger_stamp(t.get("date", ""))
+        if price is None or when is None or (t.get("to") or MARKET) == MARKET:
+            continue
+        v = lg.market.at(t.get("key"), when)
+        premium = (price / v.value - 1) * 100.0 if v and v.value else None
+        if premium is not None and premium < -FLOOR_EPS:
+            out.append((t["player"], premium))
+    return out
 
 
 def stale_feed_warnings(quiet=None) -> list[str]:
@@ -129,7 +145,6 @@ def main() -> None:
         best = None
 
     cash = lg[lg.cfg.me].cash if lg and lg.cfg.me in lg.managers else None
-    dl = deals(lg, lg.market) if lg and lg.market else []
 
     deadline, _dl_src = load_deadline(with_source=True)
     if players and best:
@@ -158,15 +173,14 @@ def main() -> None:
         warnings.append("**Not found in the market:** "
                         + ", ".join(f"`{m}`" for m in missing)
                         + ".")
-    below_floor = low_priced_buys(dl)
+    below_floor = low_priced_buys(lg) if lg.market else []
     if below_floor:
         warnings.append(
             "**%d purchase%s priced below the floor** (%s) — check by hand: "
             "either a mis-join, or a discounted relist after an instant "
             "sale (unverified either way)." % (
                 len(below_floor), "" if len(below_floor) == 1 else "s",
-                ", ".join("%s %+.1f%%" % (d["player"], d["premium"])
-                          for d in below_floor)))
+                ", ".join("%s %+.1f%%" % d for d in below_floor)))
     clashes = xw.clashes() if xw else {}
     if clashes:
         warnings.append(

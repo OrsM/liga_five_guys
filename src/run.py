@@ -23,7 +23,6 @@ STAGES: list[tuple[str, str]] = [
     ("points", "points:main"),
     ("report", "report:main"),
     ("sim", "sim:main"),
-    ("flip", "flip:main"),
 ]
 
 

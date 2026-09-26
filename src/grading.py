@@ -120,8 +120,8 @@ def graded_history() -> tuple[dict, list[dict], dict]:
     return (clock_history().round_locks, load_actuals(), load_predictions())
 
 
-def current_mae() -> float | None:
-    pairs = pair(load_actuals(), load_predictions())
+def current_mae(actuals: list[dict], preds) -> float | None:
+    pairs = pair(actuals, preds)
     return (sum(abs(p["err"]) / p["matches"] for p in pairs) / len(pairs)
             if pairs else None)
 

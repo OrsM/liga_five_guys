@@ -347,14 +347,9 @@ def _calibrated():
         except OSError:
             pass
     from ffcore.lineupweight import fit_lineup_weight, fit_status_factors
-    cal.lineup_k, cal.lineup_why = fit_lineup_weight()
-    flagged = fit_status_factors()
+    cal.lineup_k = fit_lineup_weight()[0]
     cal.neutral_start, cal.absent_start = neutral, absent
-    cal.status_factor = {f: v for f, (v, _n) in flagged.items()}
-    if flagged:
-        cal.lineup_why += "; regulars flagged " + ", ".join(
-            "%s played %.0f%% of normal (%d)" % (f, 100 * v, n)
-            for f, (v, n) in sorted(flagged.items()))
+    cal.status_factor = {f: v for f, (v, _n) in fit_status_factors().items()}
     return cal, second
 
 

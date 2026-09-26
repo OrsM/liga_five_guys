@@ -56,6 +56,7 @@ class Universe:
     locked_cash: float = 0.0
     my_bids: dict[str, float] = field(default_factory=dict)
     received_offers: dict[str, float] = field(default_factory=dict)
+    mae: float | None = None
     lg: League | None = None
     sc: Scorer | None = None
 
@@ -412,7 +413,7 @@ def _gains(r) -> bool:
 def worth_doing(u, rows) -> list:
     par_of = {k: v["par"] for k, v in u.player_forecasts.items()}
     pj_of = {k: v["pj"] for k, v in u.player_forecasts.items()}
-    mae = grading.current_mae()
+    mae = u.mae
     rows = [r for r in rows if not r["action"].buy
             or _clears_par_floor(par_of, mae, r["action"].buy,
                                  len(u.state.jornadas), pj_of)]
@@ -530,7 +531,8 @@ def load() -> Universe:
                     if h != me},
         part_played=played, first_jornada_of=first_jornada_of,
         locked_cash=sum(my_bids.values()), my_bids=my_bids,
-        received_offers=received_offers)
+        received_offers=received_offers,
+        mae=grading.current_mae(history[1], history[2]))
 
 
 def _selftest() -> None:

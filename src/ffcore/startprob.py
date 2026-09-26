@@ -57,7 +57,7 @@ class Calibration:
         self.alpha, self.beta = alpha, beta
         self.weight, self.titular = weight, titular
         self.n, self.fitted, self.gain, self.why = n, fitted, gain, why
-        self.lineup_k, self.lineup_why = None, ""
+        self.lineup_k = None
         self.neutral_start, self.absent_start = NEUTRAL_START, ABSENT_START
         self.status_factor: dict[str, float] = {}
         self.groups = groups

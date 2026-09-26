@@ -427,10 +427,6 @@ class League:
         return sorted(k for k, m in self.owner.items() if m == handle)
 
 
-    def unmatched(self, known_keys) -> list[str]:
-        return sorted(k for k in self.owner if k not in known_keys)
-
-
 def _selftest() -> None:
     import tempfile
 
@@ -566,6 +562,22 @@ start_cross   = 70    # rows per position
     assert flat_income(None, 100e6, 0.0, 0.0) is None
 
     _selftest_derived_ledger()
+    lineup = [{"player_id": "1070", "player_name": "Ionut Radu",
+               "player_name_full": "Ionut Andrei Radu"},
+              {"player_id": "2464", "player_name": "Pepelu",
+               "player_name_full": "José Luis García Vayá"}]
+    squad = {"ionut radu": 1, "pepelu": 1}
+    for sq, names, rows, app_ids, want in [
+            (squad, {"pepelu": "Pepelu"}, lineup, {"1070": "ionut radu"},
+             ["ionut radu", "pepelu"]),
+            (squad, {}, lineup + [{"player_id": "999", "player_name": "Nobody"}],
+             {}, []),
+            (squad, {}, lineup, {"1070": "ionut radu", "2464": "someone else"},
+             []),
+            ({}, {}, [], {}, [])]:
+        xw_f = Crosswalk({k: Player(k, app_id=a) for a, k in app_ids.items()})
+        assert app_fielded(sq, names, rows, xw_f) == want, (app_ids, want)
+
     print("ffcore.league self-test OK")
 
 

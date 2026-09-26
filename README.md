@@ -69,8 +69,7 @@ In the order `run.py` runs it:
    `grading.py`) — one point estimate per player per jornada; fitted
    parameters live on the objects that use them (`Calibration`,
    `Bootstrap`, the boards' `home_edge`), never in module globals.
-5. **Decide and report** (`decide.py`, `sim.py`, `flip.py`, `report.py`,
-   `backtest.py`) — every affordable move, simulated and ranked;
+5. **Decide and report** (`decide.py`, `sim.py`, `flip.py`, `report.py`) — every affordable move, simulated and ranked;
    written to `reports/decisions.json` (what the phone draws) and
    `.runtime/alerts.md` (what it pushes).
 
@@ -361,8 +360,8 @@ bid for a man on today's slate, and the two ways any of it can be wrong about
 a player. **What to bid is the one question the simulation cannot answer** —
 it prices every acquisition at a clause, because a clause is instant and
 cannot be refused, while a market row is a bid that can lose. What it costs to
-win one is a fact about this league's behaviour, and `ffcore/bid.py` survives
-for exactly that.
+win one is a fact about this league's behaviour, and `flip.py` measures it
+from the ledger: what the app pays and what winning bids paid.
 
 Everything else is reference and is **linked**, not reprinted.
 
@@ -458,7 +457,7 @@ src/                 sources.py (the registry and every parser)
                      grading.py (predictions vs what happened; the fits)
                      decide.py (every move, screened and ranked)
                      sim.py (plays out the season; writes decisions.json)
-                     flip.py  report.py  backtest.py  stats.py
+                     flip.py  report.py  stats.py
 src/ffcore/          parse (values)  text (names)  tidy (tables and time)
                      crosswalk (the registry, looked up by id)
                      model (ONE League + Scorer per run)
@@ -850,7 +849,7 @@ a bid and then come back and type its outcome. Nobody comes back: both rows in
 it said `pending` while the ledger already showed one won and one lost. A field
 you have to revisit is a field that drifts. Winning bids are captured
 automatically — a win *is* a transaction — so the only thing lost is losing
-bids, and `ffcore/bid.py` infers premiums from the ledger instead. What losing
+bids, and `flip.py` infers premiums from the ledger instead. What losing
 bids would buy is a P(win | bid) curve, and a fortnight of deals cannot fit one.
 The ceiling half of the question has two free sources instead: `slate_log.csv`
 records what was on offer and therefore what went unsold, and the sell-side
