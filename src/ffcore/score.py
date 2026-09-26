@@ -11,7 +11,7 @@ from ffcore.text import norm
 from ffcore.tidy import minutes_played
 
 __all__ = ["SLOT", "SLOT_LABEL", "SLOT_MIN", "MAX_SLOT", "THIN",
-           "FREE_FORMATIONS", "formations", "starters_per_slot",
+           "FREE_FORMATIONS", "formations", "SHAPES", "starters_per_slot",
            "Rating", "Scorer", "pick_xi", "squad_pool",
            "replacement", "vor",
            "load_points", "build", "load_understat_current"]
@@ -652,6 +652,9 @@ def formations() -> list[tuple]:
     return list(FREE_FORMATIONS)
 
 
+SHAPES = [{"POR": 1, "DEF": d, "MED": m, "DEL": f} for d, m, f in formations()]
+
+
 class Rating(NamedTuple):
     ppm: float
     why: str
@@ -970,10 +973,8 @@ def _xi_search(by_slot: dict[str, list], shapes, force=None):
 def pick_xi(pool: dict, force: dict | None = None):
     by_slot = {slot: [(p, p["score"]) for p in rows]
               for slot, rows in pool.items()}
-    shapes = [{"POR": 1, "DEF": d, "MED": m, "DEL": f}
-             for d, m, f in formations()]
     f = (force, force["slot"], force["score"]) if force is not None else None
-    got = _xi_search(by_slot, shapes, f)
+    got = _xi_search(by_slot, SHAPES, f)
     if got is None:
         return None
     total, shape, picked = got

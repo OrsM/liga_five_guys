@@ -3,16 +3,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from ffcore.score import MAX_SLOT, formations, _xi_search
+from ffcore.score import MAX_SLOT, SHAPES, _xi_search
 
 __all__ = ["LeagueState", "Standings", "simulate",
            "simulate_many", "best_xi"]
 
 XI_SIZE = 11
-
-
-SHAPES = [{"POR": 1, "DEF": d, "MED": m, "DEL": f}
-         for d, m, f in formations()]
 
 
 def best_xi(squad: dict[str, str], value: dict[str, float]) -> list[str]:
