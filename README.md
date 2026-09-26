@@ -70,7 +70,7 @@ In the order `run.py` runs it:
    parameters live on the objects that use them (`Calibration`,
    `Bootstrap`, the boards' `home_edge`), never in module globals.
 5. **Decide and report** (`decide.py`, `sim.py`, `flip.py`, `report.py`,
-   `slate.py`, `backtest.py`) — every affordable move, simulated and ranked;
+   `backtest.py`) — every affordable move, simulated and ranked;
    written to `reports/decisions.json` (what the phone draws) and
    `.runtime/alerts.md` (what it pushes).
 
@@ -457,8 +457,8 @@ src/                 sources.py (the registry and every parser)
                      points.py (per-jornada points)
                      grading.py (predictions vs what happened; the fits)
                      decide.py (every move, screened and ranked)
-                     sim.py (plays out the season — the one table)
-                     flip.py  report.py  slate.py  backtest.py  stats.py
+                     sim.py (plays out the season; writes decisions.json)
+                     flip.py  report.py  backtest.py  stats.py
 src/ffcore/          parse (values)  text (names)  tidy (tables and time)
                      crosswalk (the registry, looked up by id)
                      model (ONE League + Scorer per run)
@@ -515,10 +515,8 @@ from 49% to 11% and expected finish from 1.61 to 2.14 — because the
 calibration sharpens everybody, and my squad turns out to hold more players
 the narrow source is quiet or negative about than my rivals' do. It is a
 validated fit (it beats the raw source on line-ups it has not seen) and it is
-also four matches of evidence. `sim.md` prints what was fitted, on how much,
-every run, so the day it changes the report says so rather than moving
-silently. Treat the level as provisional and the ORDERING as the thing to act
-on until more jornadas land.
+also four matches of evidence. Treat the level as provisional and the
+ORDERING as the thing to act on until more jornadas land.
 
 **Four feeds, four identity spaces, and names as the only bridge.** Measured
 across the store on 2026-08-18, not one pair of slug namespaces overlapped at

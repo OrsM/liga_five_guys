@@ -12,15 +12,9 @@ from ffcore.parse import fmt_money
 from ffcore.league import app_fielded
 from ffcore.render import title_name
 from ffcore.tidy import (run_now, shown,
-                         ALERTS, PARTS, REPORTS, WARNINGS, write_lines)
+                         ALERTS, REPORTS, WARNINGS, write_lines)
 
 __all__ = ["shape"]
-
-OUT = "sim.md"
-
-
-def _pts(v) -> str:
-    return "{:,.0f}".format(v)
 
 
 def squad_value(u) -> float:
@@ -47,31 +41,6 @@ def fielded_shape(u, xi=None) -> str:
         _, xi = u.current_xi
     keys = fielded_keys(u)
     return shape(u, keys) if xi_change(keys, xi)["legal"] else ""
-
-
-def header(u, base, n_actions: int, locks_h=None, xi=None) -> list[str]:
-    lo, hi = base.band(u.me)
-    val = squad_value(u)
-    ctx = []
-    if locks_h is not None:
-        ctx.append("**Locks in %s**"
-                   % ("%.0fh" % locks_h if locks_h < 48
-                      else "%.0f days" % (locks_h / 24)))
-    cash_txt = ("**cash %s**" if u.cash < 0 else "cash %s") % fmt_money(u.cash)
-    if u.locked_cash:
-        cash_txt += " (%s already bid)" % fmt_money(u.locked_cash)
-    ctx += ["squad %s" % fmt_money(val), cash_txt,
-            "total %s" % fmt_money(val + u.cash)]
-
-    want = _shape_now(u, xi=xi)
-    now = fielded_shape(u, xi=xi)
-    form = ("**play %s** (now %s)" % (want, now)) if now and now != want \
-        else "play %s" % want
-    return [" · ".join(ctx), "",
-            "%s · finish %.2f · win %.0f%% · season %s–%s"
-            % (form, base.expected_position(),
-               100 * base.position().get(1, 0.0), _pts(lo), _pts(hi)),
-            ""]
 
 
 def short(key, u) -> str:
@@ -227,129 +196,6 @@ def band_acts(u, exp=None, xi=None) -> list:
             for k in u.view("price")
             if k not in mine and exp.get(k, 0.0) > bar]
     return acts
-
-
-def ladder(u, rows, base, data=None, exp=None, xi=None) -> list[str]:
-
-    if exp is None or xi is None:
-        exp, xi = u.current_xi
-    data = data if data is not None else ladder_rows(u, rows, exp=exp, xi=xi)
-    by_group: dict[str, list[dict]] = {}
-    for r in data:
-        by_group.setdefault(r["group"], []).append(r)
-
-    def row_md(r):
-        if r["group"] == "save":
-            season = ("—" if r["pts"] is None else
-                      "%+.0f (%+.0f–%+.0f) if you could"
-                      % (r["pts"], r["pts_lo"], r["pts_hi"]))
-            money = "%.2fM short" % (-r["money"] / 1e6)
-        else:
-            season = ("—" if r["pts"] is None else
-                      "%+.0f (%+.0f–%+.0f)" % (r["pts"], r["pts_lo"], r["pts_hi"])
-                      if r["pts_lo"] is not None else "%+.0f" % r["pts"])
-            if r["note"]:
-                season += " " + r["note"]
-            if r["group"] in ("buy", "raid") and r["market"] is not None:
-                money = "%.2fM" % (r["market"] / 1e6)
-                if r["premium"]:
-                    money += " +%.2fM" % (r["premium"] / 1e6)
-                if r.get("ask"):
-                    money += " · bid %.2fM" % (r["ask"] / 1e6)
-                    if r.get("rivals"):
-                        money += " (%d bid%s in)" % (r["rivals"],
-                                                     "" if r["rivals"] == 1
-                                                     else "s")
-            else:
-                money = ("%+.2fM" % (r["money"] / 1e6)) if r["money"] else "—"
-                if r["group"] == "offer" and r.get("offer"):
-                    money = "offer %.2fM" % (r["offer"] / 1e6)
-                    if r.get("going"):
-                        money += (" (%+.0f%% vs %.2fM going rate)"
-                                 % (100 * (r["offer"] / r["going"] - 1.0),
-                                    r["going"] / 1e6))
-        return ("| %s | %s | %.0f%% | %.2f | %s | %s | %s | %s | %s |"
-                % (r["name"], r["pos"] or "—", 100 * r["start"], r["xpts"],
-                   r["where"], money, season,
-                   ("%+.0f" % r["par"]) if r.get("par") is not None else "—",
-                   ("%.1f" % r["value"]) if r["value"] is not None else "—"))
-
-    out = ["| Player | Pos | Start | xPts/j | Where | € | Season | PAR | "
-          "pts/M€ |",
-           "|---|---|--:|--:|---|--:|--:|--:|--:|"]
-
-    if by_group.get("field"):
-        out.append("| **" + GROUP_LABEL["field"] + "** | | | | | | | | |")
-        out += [row_md(r) for r in by_group["field"]]
-    elif not by_group.get("in") and not by_group.get("out"):
-        out.append("| **XI — no change, you are fielding the best eleven** "
-                   "| | | | | | | | |")
-    else:
-        if by_group.get("in"):
-            out.append("| **" + GROUP_LABEL["in"] + "** | | | | | | | | |")
-            out += [row_md(r) for r in by_group["in"]]
-        if by_group.get("out"):
-            out.append("| **" + GROUP_LABEL["out"] + "** | | | | | | | | |")
-            out += [row_md(r) for r in by_group["out"]]
-    tot = sum(exp.get(k, 0.0) for k in xi)
-    riv = _rival_best(u)
-    riv_total, riv_who = riv.get("xi", 0.0), riv.get("manager", "")
-    out.append("| **Your eleven — play %s** | | | **%.2f** | "
-               "vs %s **%.2f** | | **%+.2f** | |"
-               % (shape(u, xi), tot, riv_who, riv_total, tot - riv_total))
-
-    if by_group.get("keep"):
-        out.append("| **" + GROUP_LABEL["keep"] + "** | | | | | | | | |")
-        out += [row_md(r) for r in by_group["keep"]]
-
-    if by_group.get("sell"):
-        out.append("| **" + GROUP_LABEL["sell"] + "** | | | | | | | | |")
-        out += [row_md(r) for r in by_group["sell"]]
-
-
-    if by_group.get("buy"):
-        out.append("| **" + GROUP_LABEL["buy"] + "** | | | | | | | | |")
-        out += [row_md(r) for r in by_group["buy"]]
-    elif by_group.get("raid"):
-        out.append("| **BUY — free agents — none clear the bar today** | | "
-                   "| | | | | |")
-
-    if by_group.get("raid"):
-        out.append("| **" + GROUP_LABEL["raid"] + "** "
-                   "| | | | | | | | |")
-        out += [row_md(r) for r in by_group["raid"]]
-    elif not by_group.get("buy"):
-        out.append("| **BUY/RAID — nothing clears the bar this week** | | "
-                   "| | | | | |")
-
-    if by_group.get("save"):
-        out.append("| **" + GROUP_LABEL["save"] + "** | | | | | | | | |")
-        out += [row_md(r) for r in by_group["save"]]
-
-    if by_group.get("pass"):
-        out.append("| **" + GROUP_LABEL["pass"] + "** | | | | | | | | |")
-        out += [row_md(r) for r in by_group["pass"]]
-
-    out.append("")
-    return out
-
-
-def standings(u, base) -> list[str]:
-    out = ["| Manager | now | cash | simulated | 10–90 | P(I finish above) |",
-           "|---|--:|--:|--:|--:|--:|"]
-    order = sorted(u.state.squads, key=lambda m: -base.mean(m))
-    for m in order:
-        lo, hi = base.band(m)
-        out.append("| %s | %.0f | %s | %s | %s–%s | %s |"
-                   % (m + (" **(you)**" if m == u.me else ""),
-                      u.state.carried.get(m, 0.0),
-                      fmt_money(u.cash) if m == u.me
-                      else "~" + fmt_money(u.rival_cash.get(m, 0.0)),
-                      _pts(base.mean(m)), _pts(lo), _pts(hi),
-                      "—" if m == u.me
-                      else "%.0f%%" % (100 * base.beat(m))))
-    out.append("")
-    return out
 
 
 def _move_rank_key(r, u):
@@ -584,45 +430,27 @@ def log_cash_price(measured) -> None:
             "places_per_million": "%.6f" % measured})
 
 
-def _price_note(smoothed, measured, idle_cash: float = 0.0) -> str:
-    if smoothed is None and measured is None:
-        return ("Nothing is charged for a buyout premium yet: no run has been "
-                "able to measure what a million euros is worth")
-    bits = []
-    if smoothed is not None:
-        bits.append("A buyout premium is charged at **%.3f places per "
-                    "million**, the median of every run that has measured it"
-                    % smoothed)
-    if measured is not None:
-        bits.append("today's own reading is %.3f" % measured)
-    note = " — ".join(bits)
-    if idle_cash > 0 and measured is not None and measured > 0:
-        note += (". Nothing clears the bar today: %s sitting idle would be "
-                "worth **~%.2f places** at today's reading, if something "
-                "does" % (fmt_money(idle_cash), measured * idle_cash / 1e6))
-    return note
-
-
-def placeholder(why: str) -> list[str]:
-    return ["# The simulation", "",
-            "_Not built this run: %s._" % why, ""]
-
-
-def render(u, rows, base, stamp: str, rivals, n_actions: int = 0,
-           locks_h=None, ladder_data=None, exp=None, xi=None) -> list[str]:
-
-    if exp is None or xi is None:
-        exp, xi = u.current_xi
-    out = ["# The simulation — %s" % stamp, ""]
-    tr = _track_record()
-    if tr:
-        out += ["_Track record: %s._" % tr, ""]
-    out += ["## Now", ""]
-    out += header(u, base, n_actions or len(rows), locks_h, xi=xi)
-    out += ["## Every player you could hold", ""]
-    out += ladder(u, rows, base, ladder_data, exp=exp, xi=xi)
-    out += ["## Where the league stands", ""]
-    out += standings(u, base)
+def market_rows(u, bands=None) -> list[dict]:
+    mine = set(u.state.squads.get(u.me, {}))
+    fc = u.player_forecasts
+    out = []
+    for k, price in u.view("price").items():
+        if k in mine:
+            continue
+        f = fc.get(k, {})
+        par, par_lo, par_hi = f.get("par"), None, None
+        b = (bands or {}).get(k)
+        if b is not None:
+            par, par_lo, par_hi, _act, _mean = b
+        out.append({
+            "key": k, "name": title_name(u.view("name").get(k, k)),
+            "pos": u.view("pos").get(k, ""), "price": price,
+            "season_pts": f.get("season_pts"), "next_pts": f.get("next_pts"),
+            "par": par, "par_lo": par_lo, "par_hi": par_hi,
+            "value": value_rate(par, price),
+            "simulated": b is not None,
+        })
+    out.sort(key=lambda r: (r["value"] is None, -(r["value"] or 0.0)))
     return out
 
 
@@ -673,29 +501,10 @@ def _selftest() -> None:
     assert short_marks["in"] == [] and short_marks["out"] == []
     assert not xi_change([], best)["legal"]
 
-    h = " ".join(header(u, st, n_actions=132, locks_h=41.1))
-    assert h.index("41h") < h.index("1.50"), h
-    assert "cash 23.60M" in h, h
-    assert "Locks" not in " ".join(header(u, st, 1, locks_h=None))
-    assert "." not in h.replace("1.50", "").replace("41.1", "") \
-        .replace("0.00", "").replace("23.60M", "").replace("1,060", "") \
-        .replace("1,540", "") or True
     u.cash = -133023.0
-    assert "**cash -133K**" in " ".join(header(u, st, 1, locks_h=2.0))
     u.cash = 23.6e6
-    assert "**cash" not in " ".join(header(u, st, 1, locks_h=2.0))
     u.cash, u.locked_cash = -2637643.0, 5938860.0
-    hh = " ".join(header(u, st, 1, locks_h=2.0))
-    assert "**cash -2.64M** (5.94M already bid)" in hh, hh
     u.cash, u.locked_cash = 23.6e6, 0.0
-    assert "locked" not in " ".join(header(u, st, 1, locks_h=2.0))
-    assert "1.50" in h, h
-    assert "50%" in h, h
-    assert "1,060" in h and "1,540" in h, h
-    assert "jornadas left" not in h, h
-    assert "moves simulated" not in h, h
-    assert "23.60M" in h, h
-    assert "play " in h, h
 
     rows = [{"action": Action("clause", buy="yuri", sell="benat",
                               cost=20e6, proceeds=5.87e6, victim="riv"),
@@ -816,11 +625,26 @@ def _selftest() -> None:
     assert "spare_m" not in dict(u2.dead_weight())
     u2.state.jornadas, u2.part_played = [1, 2], {}
 
-    ws = "\n".join(standings(u, st))
-    assert "| me " in ws and "| riv " in ws, ws
-    assert "17" in ws and "23" in ws, ws
-    assert "1,300" in ws, ws
-    assert "50%" in ws, ws
+
+    from ffcore.profile import mk_profile
+    cu_sq = {"me": {"me_a": "MED"}}
+    cu_per = {1: {"me_a": (2.0, 1.0), "cheap": (3.0, 1.0), "rich": (8.0, 1.0)},
+              2: {"me_a": (2.0, 1.0), "cheap": (3.0, 1.0), "rich": (8.0, 1.0)}}
+    cu = Universe(
+        state=LeagueState(cu_sq, [1, 2], "me"),
+        forecaster=Bootstrap(cu_per), cash=0.0, me="me",
+        players={"me_a": mk_profile(5.0, price=3e6),
+                 "cheap": mk_profile(5.0, price=2e6, name="cheap"),
+                 "rich": mk_profile(5.0, price=20e6, name="rich")})
+    mr = market_rows(cu)
+    assert [r["key"] for r in mr] == ["cheap", "rich"], mr
+    assert [(r["season_pts"], r["par"], r["par_lo"]) for r in mr] == [
+        (6.0, 2.0, None), (16.0, 12.0, None)], mr
+    mr2 = {r["key"]: r for r in market_rows(cu, bands={
+        "cheap": (2.5, 1.0, 4.0, Action("buy", buy="cheap", cost=2e6), 2.4)})}
+    assert (mr2["cheap"]["par"], mr2["cheap"]["par_lo"], mr2["cheap"]["par_hi"],
+            mr2["cheap"]["simulated"], mr2["rich"]["simulated"]) == (
+        2.5, 1.0, 4.0, True, False), mr2
 
     d = payload(u, rows, st, ["riv"], locks_h=41.1, n_actions=132)
     assert d["expected_finish"] == 1.5 and d["p_win"] == 0.5, d
@@ -887,13 +711,6 @@ def _selftest() -> None:
     flat = [{**rows[0], "net_pts": 0.0, "d_win": 0.0, "d_pts": 0.0}]
     assert worth_doing(u, flat) == [], "the screen drops it"
     assert alert_lines(u, worth_doing(u, flat), ["riv"]) == []
-
-    assert "idle" not in _price_note(0.05, 0.03)
-    assert "idle" not in _price_note(0.05, 0.03, 0.0)
-    note = _price_note(0.05, 0.02, 10e6)
-    assert "idle" in note and fmt_money(10e6) in note, note
-    assert "~0.20 places" in note, note
-    assert "idle" not in _price_note(0.05, 0.0, 10e6)
 
     cheap_ok = {**rows[0],
                 "action": Action("buy", buy="cheap", cost=2e6, proceeds=0.0),
@@ -1019,18 +836,6 @@ def _selftest() -> None:
     assert by_group["raid"] == ["rivals"], by_group
     assert "wished" not in [n for names in by_group.values() for n in names], \
         by_group
-    md_owned = "\n".join(ladder(uc_owned, all_rows, st))
-    assert "| PAR |" in md_owned, md_owned
-    steady_line = next(l for l in md_owned.splitlines()
-                       if l.lower().startswith("| steady"))
-    assert "+10" in steady_line, steady_line
-    assert "BUY — free agents" in md_owned, md_owned
-    assert "RAID — a clause, cannot be refused" in md_owned, md_owned
-    assert "LISTED" not in md_owned, md_owned
-    assert "wished" not in md_owned.lower(), md_owned
-    no_free_lad = "\n".join(ladder(uc_owned, [riv_row], st))
-    assert "none clear the bar today" in no_free_lad, no_free_lad
-    assert "RAID" in no_free_lad, no_free_lad
 
     steady_cell = next(r for r in owned_lad if r["name"].lower() == "steady")
     assert steady_cell["market"] == 5e6 and not steady_cell["premium"], \
@@ -1038,8 +843,6 @@ def _selftest() -> None:
     rivals_cell = next(r for r in owned_lad if r["name"].lower() == "rivals")
     assert rivals_cell["market"] == 3.8e6, rivals_cell
     assert rivals_cell["premium"] == 1.2e6, rivals_cell
-    assert "5.00M" in md_owned, md_owned
-    assert "3.80M +1.20M" in md_owned, md_owned
 
     slot_players = {"k": "POR", "d": "DEF", "m": "MED", "f": "DEL"}
     u_slot = Universe(
@@ -1062,18 +865,8 @@ def _selftest() -> None:
     assert shape(u_shape, ["a", "b", "c", "d", "f", "g"]) == "3-2-0"
     assert shape(u_shape, []) == "0-0-0"
 
-    page = "\n".join(render(u, rows, st, "2026-08-18T0152Z", ["riv"], 132,
-                             locks_h=41.1))
-    assert "132 moves" not in page, page[:400]
-    assert page.startswith("# The simulation — 2026-08-18T0152Z"), page[:80]
-    heads = [ln for ln in page.splitlines() if ln.startswith("## ")]
-    assert len(heads) == len(set(heads)) == 3, heads
 
-    for banned in ("## Do this", "## The board", "## Warnings"):
-        assert banned not in heads, heads
 
-    ph = "\n".join(placeholder("no api_teams.csv"))
-    assert "no api_teams.csv" in ph and ph.startswith("# The simulation")
 
     from decide import Universe as U2
     from ffcore.season import LeagueState as LS2
@@ -1115,11 +908,6 @@ def _selftest() -> None:
     assert bands["cand"][0] > 0, bands["cand"]
     assert ub.rank([], extra=[])[3] == {}
 
-    sell_lad = "\n".join(ladder(ub, [], baseb))
-    dead_line = next(l for l in sell_lad.splitlines()
-                     if l.lower().startswith("| dead"))
-    assert "1.00M" in dead_line, dead_line
-    assert "bought" not in dead_line.lower(), dead_line
     sell_json = payload(ub, [], baseb, ["riv"])["sell"]
     by_name = {r["name"]: r for r in sell_json}
     assert by_name["Dead"]["raises"] == 1e6, by_name["Dead"]
@@ -1145,31 +933,19 @@ def _selftest() -> None:
 
 def main() -> None:
     import decide
-    from ffcore.model import session
     from ffcore.tidy import load_deadline
 
     REPORTS.mkdir(exist_ok=True)
-    PARTS.mkdir(parents=True, exist_ok=True)
-    rows_m = session().market
-    stamp = rows_m[0]["observed_at"] if rows_m else ""
     deadline = load_deadline()
     locks_h = None if deadline is None else (
         deadline - run_now()).total_seconds() / 3600
 
     u = decide.load()
-    if len(u.state.squads) < 2:
-        write_lines(PARTS / OUT,
-                    placeholder("the league API has not been swept, so there "
-                                "are no rival squads to simulate against"))
-        print("wrote %s (placeholder)" % (PARTS / OUT))
-        return
-    if not u.state.jornadas:
-        write_lines(PARTS / OUT,
-                    placeholder("there are no jornadas left to play"))
-        print("wrote %s (placeholder)" % (PARTS / OUT))
+    if len(u.state.squads) < 2 or not u.state.jornadas:
+        print("sim: nothing to simulate (%d squads, %d jornadas left)"
+              % (len(u.state.squads), len(u.state.jornadas)))
         return
 
-    exp = u.forecaster.expected(u.state.jornadas[0])
     acts = u.candidates(budget=float("inf"))
     smoothed = cash_price_history()
     xi_exp, xi = u.current_xi
@@ -1184,25 +960,15 @@ def main() -> None:
     rows, base, measured, bands = u.rank(
         acts, price=smoothed, extra=extra_acts)
     log_cash_price(measured)
-    idle = u.cash if (not rows and u.cash > 0) else 0.0
-    u.cash_note = _price_note(smoothed, measured, idle)
     rivals = [m for m in u.state.squads if m != u.me]
     ladder_data = ladder_rows(u, rows, bands, exp=xi_exp, xi=xi)
-    from slate import comparison_rows, comparison_table
-    cmp_rows = comparison_rows(u, bands)
-    write_lines(PARTS / OUT,
-                render(u, rows, base, stamp, rivals, len(acts), locks_h,
-                       ladder_data, exp=xi_exp, xi=xi)
-                + comparison_table(cmp_rows))
-    print("wrote %s (%d moves, %d simulated in full)"
-          % (PARTS / OUT, len(acts), len(rows)))
 
     (REPORTS / "decisions.json").write_text(json.dumps({
         "generated_at": run_now()
                           .strftime("%Y-%m-%dT%H:%MZ"),
         **payload(u, rows, base, rivals, locks_h, len(acts),
                   ladder_data=ladder_data, exp=xi_exp, xi=xi),
-        "market": cmp_rows,
+        "market": market_rows(u, bands),
     }, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
     print("wrote %s" % (REPORTS / "decisions.json"))
 
