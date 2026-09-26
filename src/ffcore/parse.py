@@ -21,19 +21,6 @@ def _strip(v) -> tuple[str, bool]:
     return t, neg
 
 
-def _degroup(t: str) -> str:
-    dot, com = "." in t, "," in t
-    if dot and com:
-        if t.rfind(",") > t.rfind("."):
-            return t.replace(".", "").replace(",", ".")
-        return t.replace(",", "")
-    if com:
-        return t.replace(",", "") if t.count(",") > 1 else t.replace(",", ".")
-    if dot and _DOT_GROUPED.fullmatch(t):
-        return t.replace(".", "")
-    return t
-
-
 def money(v):
     t, neg = _strip(v)
     if not t:
@@ -42,8 +29,18 @@ def money(v):
     if t[-1:].upper() in ("M", "K"):
         mult = 1e6 if t[-1].upper() == "M" else 1e3
         t = t[:-1]
+    dot, com = "." in t, "," in t
+    if dot and com:
+        degrouped = (t.replace(".", "").replace(",", ".")
+                    if t.rfind(",") > t.rfind(".") else t.replace(",", ""))
+    elif com:
+        degrouped = t.replace(",", "") if t.count(",") > 1 else t.replace(",", ".")
+    elif dot and _DOT_GROUPED.fullmatch(t):
+        degrouped = t.replace(".", "")
+    else:
+        degrouped = t
     try:
-        x = float(_degroup(t)) * mult
+        x = float(degrouped) * mult
     except ValueError:
         return None
     return -x if neg else x

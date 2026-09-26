@@ -76,8 +76,7 @@ def _mtime_cached(path, cache: dict, key, build):
     build() and store it. None if `path` does not exist. The one shape
     behind every "reread this file only if it changed" cache in this
     module -- five of them used to hand-roll the stat/OSError/stamp-compare
-    dance separately, one of them (read_csv_frozen) redundantly re-doing
-    the stat check read_csv() already does internally."""
+    dance separately."""
     path = Path(path)
     try:
         st = path.stat()
@@ -114,12 +113,6 @@ def read_csv(path) -> list[dict]:
     # it now fails loudly at the assignment rather than silently paying for
     # everyone else's safety.
     return [MappingProxyType(r) for r in (rows or [])]
-
-
-def read_csv_frozen(path) -> list:
-    read_csv(path)
-    hit = _READ_CACHE.get(str(Path(path)))
-    return [MappingProxyType(r) for r in hit[1]] if hit else []
 
 
 def write_csv(path, rows, fieldnames=None) -> None:
@@ -232,41 +225,38 @@ def latest_per_key(rows: list[dict], key_fn) -> list[dict]:
     return list(best.values())
 
 
-def latest_snapshot(path, keep=None) -> list[dict]:
-    path = Path(path)
-    try:
-        fh = path.open(encoding="utf-8")
-    except OSError:
-        return []
-    with fh:
-        r = csv.reader(fh)
-        try:
-            fieldnames = next(r)
-        except StopIteration:
-            fieldnames = []
-        newest = ""
-        kept: list[dict] = []
-        for raw in r:
-            if not raw:
-                continue
-            row = dict(zip(fieldnames, raw))
-            if keep is not None and not keep(row):
-                continue
-            stamp = row.get("observed_at", "")
-            if stamp > newest:
-                newest, kept = stamp, [row]
-            elif stamp == newest:
-                kept.append(row)
-        return kept
-
-
 _LATEST_SNAPSHOT_CACHE: dict[tuple, tuple] = {}
 
 
 def _cached_latest_snapshot(path, keep=None, cache_key=None) -> list[dict]:
+    def build():
+        try:
+            fh = Path(path).open(encoding="utf-8")
+        except OSError:
+            return []
+        with fh:
+            r = csv.reader(fh)
+            try:
+                fieldnames = next(r)
+            except StopIteration:
+                fieldnames = []
+            newest = ""
+            kept: list[dict] = []
+            for raw in r:
+                if not raw:
+                    continue
+                row = dict(zip(fieldnames, raw))
+                if keep is not None and not keep(row):
+                    continue
+                stamp = row.get("observed_at", "")
+                if stamp > newest:
+                    newest, kept = stamp, [row]
+                elif stamp == newest:
+                    kept.append(row)
+            return kept
+
     rows = _mtime_cached(path, _LATEST_SNAPSHOT_CACHE,
-                         (str(Path(path)), cache_key),
-                         lambda: latest_snapshot(path, keep=keep))
+                         (str(Path(path)), cache_key), build)
     return [dict(r) for r in (rows or [])]
 
 
@@ -394,7 +384,7 @@ def load(name: str, now=None) -> list[dict]:
 
 
 def load_market_frozen() -> list:
-    return read_csv_frozen(TIDY / "market.csv")
+    return read_csv(TIDY / "market.csv")
 
 
 def load_market_latest() -> list[dict]:
@@ -877,7 +867,15 @@ class Market:
     def key_for(self, name, team: str = "", value=None):
         k = norm(name)
         if k in self._shared:
-            return self._pick(k, team, value)
+            keys = [key for key in self._by_name.get(k, [])
+                    if key in self._by_key]
+            if team:
+                return narrow_by_club(
+                    keys, _club({"team": team}),
+                    lambda key: _club(self._by_key[key][-1][1]))
+            return self._by_price(
+                {key: (self._by_key[key][-1][1]).get("value")
+                 for key in keys}, value)
         if k in self._by_key:
             return k
         if value is None and k in self._resolved:
@@ -905,15 +903,6 @@ class Market:
         if row is not None:
             return self.key_of(row), []
         return None, [self.key_of(r) for r in cands]
-
-    def _pick(self, shared: str, team: str, value):
-        keys = [k for k in self._by_name.get(shared, []) if k in self._by_key]
-        if team:
-            return narrow_by_club(
-                keys, _club({"team": team}),
-                lambda k: _club(self._by_key[k][-1][1]))
-        return self._by_price(
-            {k: (self._by_key[k][-1][1]).get("value") for k in keys}, value)
 
     def _by_price(self, values: dict, value) -> str | None:
         if value is None:
