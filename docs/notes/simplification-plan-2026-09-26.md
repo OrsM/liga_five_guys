@@ -18,13 +18,16 @@ left ambiguous.
 
 ## Area 1 — identity resolution happens late and separately, at least ten times over
 
-**Status: the contract merge is done** (commit e34ec2d) — `resolve_api`
-deleted, folded into `resolve`; `attach_market()` added; every call site
-below updated. **Still open:** the upstream-timing mechanism (option (a)
-widen_csv stage vs (b) lazy cache, discussed below) for moving items 1,
-3-7 to resolve once at read time instead of per-consumer — this is the
-part of Area 1 that actually removes the seven duplicated loops, and it
-has not been started.
+**Status: done** (e34ec2d, 3939dbd). Chose neither (a) nor (b): the real
+defect was one table resolved by three different ladders, not repeated
+work, so lineup/starters/perjornada rows go through one
+`Crosswalk.key_of(row)` at every consumer (Scorer's private ladder
+deleted). `player(name=)` gained a unique-name rung (the old one never
+matched on real data). `attach_market()` now actually has callers; the
+threaded `market=`/`index=` params are gone. `ledger_owner` stays per
+call: the owner map is the replay's inside League and the app's in
+`decide.load()`, so it is not a run-constant. Also fixed `decide.load()`,
+broken since b46c78e by a `load` name clash.
 
 **Revised a second time, 2026-09-26, after being told the first revision
 was still under-ambitious: it accepted "needs decision-time context" as a
@@ -433,8 +436,9 @@ as if it were the first.
 
 ## Area 2 — six operations have two live entry points
 
-**Status: not started.** This is the biggest remaining piece of unexecuted,
-fully-specified work in this plan.
+**Status: done** (63e5cc9). Both modules deleted; the six operations
+exist only as `Universe` members (`player_forecasts` is a cached
+property); `candidates()` lost its fallback-only `expected` argument.
 
 **Re-investigated in full this session (every line of `decide.py`,
 `ffcore/candidates.py`, `ffcore/par.py`, `ffcore/schedule.py`,
@@ -881,9 +885,9 @@ assertion that they are.**
 
 ## Area 4 — checked whether Area 2's consolidation reveals new duplication between `candidates()`/`rank()` and `sim.py`'s second screen; mostly it doesn't, but it found one real small one
 
-**Status: not started** (the fold-in of `worth_doing()`/`raid_shortlist()`/
-`_gains()`/`_clears_par_floor()`/`_best()` into `decide.py`, the
-`_could_spare()` helper, and the `_top_up` comment are all still open).
+**Status: done** (63e5cc9), minus two items dropped: `_could_spare()`
+(overdraft_fix needs the trial dict itself, not a bool) and the `_top_up`
+comment (comments stripped in c53fb77). `_best` is now `best_move`.
 
 **This area exists because Area 1 and the old Area 2 note were each once wrong
 in the same specific way — cross-file distance hiding (Area 1) or inventing
