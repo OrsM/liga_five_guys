@@ -157,12 +157,19 @@ def flat_income(observed, budget: float, bought: float, sold: float):
     return max(0.0, observed - (budget + sold - bought))
 
 
+def _user_of(r: dict, users: dict, field: str = "user_id") -> str | None:
+    """The manager handle a row's `field` (a user id) resolves to, via
+    `users` -- bonus_income() and ledger_from_api() (twice: the actor and,
+    for a clause, the counterparty) each wrote this lookup out by hand."""
+    return users.get(str(r.get(field) or ""))
+
+
 def bonus_income(activity: list[dict], users: dict) -> dict[str, float]:
     out: dict[str, float] = {}
     for r in activity:
         if r.get("kind") != "bonus":
             continue
-        who = users.get(str(r.get("user_id") or ""))
+        who = _user_of(r, users)
         if not who:
             continue
         out[who] = out.get(who, 0.0) + (money(r.get("amount")) or 0.0)
@@ -229,7 +236,7 @@ def ledger_from_api(activity: list[dict], users: dict,
         kind = r.get("kind")
         if kind not in ("buy", "sell", "clause"):
             continue
-        who = users.get(str(r.get("user_id") or ""))
+        who = _user_of(r, users)
         player = names.get(str(r.get("player_id") or ""))
         if not who or not player:
             continue
@@ -239,7 +246,7 @@ def ledger_from_api(activity: list[dict], users: dict,
             # the money leaves one squad's balance and lands in another's.
             # Dropped entirely until 2026-09-18, which left the buyer looking
             # richer than he was by exactly what he had paid.
-            victim = users.get(str(r.get("counterparty") or ""))
+            victim = _user_of(r, users, "counterparty")
             if not victim:
                 continue
             frm, to = victim, who
