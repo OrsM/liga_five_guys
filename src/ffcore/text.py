@@ -35,12 +35,6 @@ def index_by(rows, key="name") -> dict:
     return {norm(r.get(key)): r for r in rows if norm(r.get(key))}
 
 
-def _contains_words(haystack: str, needle: str) -> bool:
-    if not needle:
-        return False
-    return (" %s " % needle) in (" %s " % haystack)
-
-
 def resolve(query, rows, key="name", index=None):
     q = norm(query)
     if not q:
@@ -50,7 +44,7 @@ def resolve(query, rows, key="name", index=None):
     if q in idx:
         return idx[q], []
 
-    subs = [r for r in rows if _contains_words(norm(r.get(key)), q)]
+    subs = [r for r in rows if (" %s " % q) in (" %s " % norm(r.get(key)))]
     if len(subs) == 1:
         return subs[0], []
     if subs:

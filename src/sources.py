@@ -60,13 +60,6 @@ TEAM_SELECT_RE = re.compile(r'<select[^>]*name="equipo"[^>]*>(.*?)</select>', re
 OPTION_RE = re.compile(r'<option[^>]*value="(\d+)"[^>]*>([^<]+)</option>')
 
 
-def _team_map(html: str) -> dict[str, str]:
-    m = TEAM_SELECT_RE.search(html)
-    if not m:
-        return {}
-    return {tid: name.strip() for tid, name in OPTION_RE.findall(m.group(1)) if tid != "0"}
-
-
 def _once(seen: set, key) -> bool:
     """True the first time `key` is seen (and marks it); False on a repeat
     or a falsy key. The "skip if already seen, else mark it" filter this
@@ -94,16 +87,13 @@ PHOTO_RE = re.compile(r'/jugadores/ficha/(\d+)\.(?:png|jpg|jpeg|webp)')
 ASSET_RE = re.compile(r'\.(png|jpg|jpeg|webp|svg)$', re.I)
 
 
-def _player_path(chunk: str) -> str | None:
+def _slug(chunk: str) -> str | None:
+    path = None
     for cand in HREF_RE.findall(chunk):
         cand = cand.rstrip("/")
         if cand and not ASSET_RE.search(cand):
-            return cand
-    return None
-
-
-def _slug(chunk: str) -> str | None:
-    path = _player_path(chunk)
+            path = cand
+            break
     if path:
         parts = [p for p in path.split("/") if p and p != "ficha"]
         for p in parts:
@@ -118,7 +108,9 @@ def _slug(chunk: str) -> str | None:
 
 
 def parse_market(html: str, observed_at: str, key: str = "market") -> list[dict]:
-    teams = _team_map(html)
+    m = TEAM_SELECT_RE.search(html)
+    teams = ({tid: name.strip() for tid, name in OPTION_RE.findall(m.group(1))
+             if tid != "0"} if m else {})
     rows = []
     for chunk in html.split('class="elemento_jugador')[1:]:
         name, value = _attr(chunk, "nombre"), _attr(chunk, "valor")
@@ -143,12 +135,6 @@ def parse_market(html: str, observed_at: str, key: str = "market") -> list[dict]
 NAME_RE = re.compile(r"^(.*?)\s*(\d{1,3})\s*%")
 
 
-def _name_from_blob(text: str) -> tuple[str | None, int | None]:
-    m = NAME_RE.match(text)
-    if m:
-        return m.group(1).strip() or None, int(m.group(2))
-    head = re.split(r"\d", text, 1)[0].strip()
-    return (head or None), None
 
 
 
@@ -178,11 +164,6 @@ def _note(el) -> str:
     parts = [" ".join(c.text_content().split())
              for c in _css(el, ".comentario")]
     return " · ".join(p for p in parts if p)[:200]
-
-
-def _suspension_sections(doc):
-    return [s for s in _css(doc, "section.mod.sancionados")
-            if "mercado-box" not in " ".join(s.classes)]
 
 
 def parse_fitness(doc) -> dict[str, dict]:
@@ -229,7 +210,11 @@ def parse_team(html: str, observed_at: str, key: str = "team_test") -> list[dict
 
     def add(el, role):
         text = " ".join(el.text_content().split())
-        name, pct = _name_from_blob(text)
+        m = NAME_RE.match(text)
+        if m:
+            name, pct = m.group(1).strip() or None, int(m.group(2))
+        else:
+            name, pct = (re.split(r"\d", text, 1)[0].strip() or None), None
         if not _once(seen, name.lower()):
             return
         fit = fitness.get(norm(name))
@@ -301,24 +286,7 @@ def _cell_texts(el) -> list[str]:
     return out
 
 
-def _map_headers(cells: list[str]) -> dict:
-    got = {}
-    for i, raw in enumerate(cells):
-        low = raw.lower()
-        for field, needles in WANT.items():
-            if field in got:
-                continue
-            if any(n in low for n in needles):
-                got[field] = i
-    return got
-
-
 _POINTS_ID_RE = re.compile(r"openPlayerPointsStats\(\s*(\d+)")
-
-
-def _points_id(tr) -> str:
-    m = _POINTS_ID_RE.search(tr.get("onclick") or "")
-    return m.group(1) if m else ""
 
 
 def parse_points(html: str, observed_at: str = "", key: str = "points") -> list[dict]:
@@ -333,7 +301,14 @@ def parse_points(html: str, observed_at: str = "", key: str = "points") -> list[
             continue
         headers = [" ".join(_cell_texts(c))
                    for c in head[-1].xpath("./th|./td")]
-        cols = _map_headers(headers)
+        cols = {}
+        for i, raw in enumerate(headers):
+            low = raw.lower()
+            for field, needles in WANT.items():
+                if field in cols:
+                    continue
+                if any(n in low for n in needles):
+                    cols[field] = i
         if not {"name", "points", "games"} <= set(cols):
             continue
 
@@ -357,8 +332,9 @@ def parse_points(html: str, observed_at: str = "", key: str = "points") -> list[
                 avg = pts / pj
             if pts is None or pj is None:
                 continue
+            _pid = _POINTS_ID_RE.search(tr.get("onclick") or "")
             rows.append({
-                "ff_id": _points_id(tr),
+                "ff_id": _pid.group(1) if _pid else "",
                 "player_name": short,
                 "player_name_full": full,
                 "team": team,
@@ -498,6 +474,11 @@ def _sign_elements(html: str, selectors) -> str | None:
     return _digest(_surface(els))
 
 
+def _suspension_sections(doc):
+    return [s for s in _css(doc, "section.mod.sancionados")
+           if "mercado-box" not in " ".join(s.classes)]
+
+
 def sign_team(html: str) -> str | None:
     return _sign_elements(html, [*XI_SELECTORS, *FITNESS_SELECTORS,
                                  _suspension_sections])
@@ -532,32 +513,6 @@ AF_SPLIT_RE = re.compile(r"^(.+?)(\d+)\s*/\s*(\d+)\s+titular", re.S)
 AF_FRACTION_RE = re.compile(r"\d+\s*/\s*\d+")
 
 
-def _af_section(ul) -> str | None:
-    parent = ul.getparent()
-    if parent is None:
-        return None
-    text = _WS.sub(" ", parent.text_content()).strip()
-    for head in (AF_UNANIMOUS, AF_DIVIDED):
-        if text.startswith(head):
-            return head
-    return None
-
-
-def _af_row(observed_at, slug, name, img_src, role, start_pct, note) -> dict:
-    m = AF_PHOTO_RE.search(img_src or "")
-    return {
-        "observed_at": observed_at,
-        "source": AF_SOURCE,
-        "team_slug": slug,
-        "player_name": name,
-        "player_slug": m.group(1) if m else None,
-        "role": role,
-        "start_pct": start_pct,
-        "status": "",
-        "note": note,
-    }
-
-
 def parse_af_team(html: str, observed_at: str,
                   key: str = "af_test") -> list[dict]:
     slug = key[3:] if key.startswith("af_") else key
@@ -567,8 +522,18 @@ def parse_af_team(html: str, observed_at: str,
     def add(name, img_src, role, start_pct, note):
         if not _once(seen, name.lower()):
             return
-        rows.append(_af_row(observed_at, slug, name, img_src,
-                            role, start_pct, note))
+        m = AF_PHOTO_RE.search(img_src or "")
+        rows.append({
+            "observed_at": observed_at,
+            "source": AF_SOURCE,
+            "team_slug": slug,
+            "player_name": name,
+            "player_slug": m.group(1) if m else None,
+            "role": role,
+            "start_pct": start_pct,
+            "status": "",
+            "note": note,
+        })
 
     def photo(li):
         img = _css(li, "img[src]")
@@ -584,7 +549,12 @@ def parse_af_team(html: str, observed_at: str,
 
     for block in _css(doc, AF_CONSENSO_SELECTOR):
         for ul in _css(block, "ul"):
-            section = _af_section(ul)
+            section = None
+            parent = ul.getparent()
+            if parent is not None:
+                ptext = _WS.sub(" ", parent.text_content()).strip()
+                section = next((h for h in (AF_UNANIMOUS, AF_DIVIDED)
+                               if ptext.startswith(h)), None)
             if section is None:
                 continue
             for li in _css(ul, "li"):
@@ -716,11 +686,6 @@ def sign_calendar(html: str) -> str | None:
     return _sign_links(html, "/partidos/")
 
 
-def _xi_rows(doc, side: str) -> list:
-    tables = _css(doc, "%s table.tablestats" % side)
-    return _css(tables[0], "tbody tr") if tables else []
-
-
 def parse_starters(html: str, observed_at: str,
                    key: str = "match_1-alaves-getafe") -> list[dict]:
     m = MATCH_KEY_RE.match(key)
@@ -766,6 +731,11 @@ def parse_starters(html: str, observed_at: str,
     return rows
 
 
+def _xi_rows(doc, side: str) -> list:
+    tables = _css(doc, "%s table.tablestats" % side)
+    return _css(tables[0], "tbody tr") if tables else []
+
+
 def sign_starters(html: str) -> str | None:
     return _sign_elements(html, [partial(_xi_rows, side=s) for s in MATCH_SIDES])
 
@@ -796,32 +766,31 @@ ELO_COLS = ("Name", "Elo", "FedURL", "Level")
 ELO_MARK = "var vegaJson ="
 
 
-def _elo_records(html: str) -> list[dict]:
-    text, out, at = html or "", [], 0
-    dec = json.JSONDecoder()
-    while True:
-        at = text.find(ELO_MARK, at)
-        if at < 0:
-            return out
-        at += len(ELO_MARK)
-        start = text.find("{", at)
-        if start < 0:
-            return out
-        try:
-            spec, at = dec.raw_decode(text, start)
-        except ValueError:
-            continue
-        if not isinstance(spec, dict):
-            continue
-        for data in (spec.get("datasets") or {}).values():
-            if isinstance(data, list):
-                out += [r for r in data if isinstance(r, dict)
-                        and all(c in r for c in ELO_COLS)]
-
-
 def parse_elo(text: str, observed_at: str, key: str = "elo") -> list[dict]:
+    def elo_records(html: str) -> list[dict]:
+        text, out, at = html or "", [], 0
+        dec = json.JSONDecoder()
+        while True:
+            at = text.find(ELO_MARK, at)
+            if at < 0:
+                return out
+            at += len(ELO_MARK)
+            start = text.find("{", at)
+            if start < 0:
+                return out
+            try:
+                spec, at = dec.raw_decode(text, start)
+            except ValueError:
+                continue
+            if not isinstance(spec, dict):
+                continue
+            for data in (spec.get("datasets") or {}).values():
+                if isinstance(data, list):
+                    out += [r for r in data if isinstance(r, dict)
+                            and all(c in r for c in ELO_COLS)]
+
     rows = []
-    for rec in _elo_records(text):
+    for rec in elo_records(text):
         if (str(rec["FedURL"]).strip() != ELO_COUNTRY
                 or str(rec["Level"]).strip() != ELO_LEVEL):
             continue
@@ -891,15 +860,6 @@ def _fd_rows(text: str) -> list[dict]:
     return list(csv.DictReader(io.StringIO(text.lstrip("﻿"))))
 
 
-def _fd_date(raw: str) -> str:
-    for fmt in ("%d/%m/%Y", "%d/%m/%y"):
-        try:
-            return datetime.strptime(raw, fmt).strftime("%Y-%m-%d")
-        except ValueError:
-            continue
-    return ""
-
-
 def _fd_match_team(side: str, teams) -> str | None:
     return match_one(side, teams)
 
@@ -921,9 +881,17 @@ def parse_fd_results(text: str, observed_at: str,
                      (r.get("AwayTeam") or "").strip()
         if not home or not away:
             continue
+        date = ""
+        for fmt in ("%d/%m/%Y", "%d/%m/%y"):
+            try:
+                date = datetime.strptime(r.get("Date") or "", fmt
+                                         ).strftime("%Y-%m-%d")
+                break
+            except ValueError:
+                continue
         row = {
             "observed_at": observed_at, "source": FD_SOURCE,
-            "season": season, "date": _fd_date(r.get("Date") or ""),
+            "season": season, "date": date,
             "home_name": home, "away_name": away,
             "home": _fd_slug(home), "away": _fd_slug(away),
         }
@@ -1084,17 +1052,6 @@ def understat_sources(now: datetime | None = None) -> list["Source"]:
     return out
 
 
-def _understat_rows(text: str) -> list[dict]:
-    try:
-        data = json.loads(text or "")
-    except (TypeError, ValueError):
-        return []
-    if not isinstance(data, dict) or not data.get("success"):
-        return []
-    players = data.get("players")
-    return players if isinstance(players, list) else []
-
-
 def parse_understat_players(text: str, observed_at: str,
                             key: str = "understat_2026") -> list[dict]:
     season = _season_suffix(key, "understat")
@@ -1122,6 +1079,17 @@ def parse_understat_players(text: str, observed_at: str,
             "key_passes": (p.get("key_passes") or "").strip(),
         })
     return out
+
+
+def _understat_rows(text: str) -> list[dict]:
+    try:
+        data = json.loads(text or "")
+    except (TypeError, ValueError):
+        return []
+    if not isinstance(data, dict) or not data.get("success"):
+        return []
+    players = data.get("players")
+    return players if isinstance(players, list) else []
 
 
 sign_understat_players = partial(
@@ -1352,27 +1320,21 @@ def parse_api_teams(text: str, observed_at: str,
                 "player_status": pm.get("playerStatus") or "",
                 "player_team_id": str(p.get("playerTeamId") or ""),
             })
-            out += _stat_rows(pm, observed_at)
+            for line in (pm.get("lastStats") or []):
+                week = line.get("weekNumber")
+                for stat, pair in (line.get("stats") or {}).items():
+                    if not isinstance(pair, list) or len(pair) != 2:
+                        continue
+                    out.append({
+                        "observed_at": observed_at, "source": LFG_SOURCE,
+                        ROW_TABLE: "api_stats",
+                        "player_id": str(pm.get("id") or ""),
+                        "week": str(week if week is not None else ""),
+                        "stat": str(stat),
+                        "value": str(pair[0]), "points": str(pair[1]),
+                    })
         return out
     return _parse_json_list(text, observed_at, row)
-
-
-def _stat_rows(pm: dict, observed_at: str) -> list[dict]:
-    out = []
-    for line in (pm.get("lastStats") or []):
-        week = line.get("weekNumber")
-        for stat, pair in (line.get("stats") or {}).items():
-            if not isinstance(pair, list) or len(pair) != 2:
-                continue
-            out.append({
-                "observed_at": observed_at, "source": LFG_SOURCE,
-                ROW_TABLE: "api_stats",
-                "player_id": str(pm.get("id") or ""),
-                "week": str(week if week is not None else ""),
-                "stat": str(stat),
-                "value": str(pair[0]), "points": str(pair[1]),
-            })
-    return out
 
 
 def sign_api_teams(text: str) -> str | None:

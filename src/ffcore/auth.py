@@ -75,10 +75,7 @@ class TokenStore:
         return res
 
     def bearer(self, post=None) -> str:
-        try:
-            cur = self.load()
-        except FileNotFoundError:
-            raise
+        cur = self.load()
         tok = cur.get("access_token")
         got = int(cur.get("obtained_at") or 0)
         ttl = int(cur.get("expires_in") or 0)
