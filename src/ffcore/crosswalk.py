@@ -51,7 +51,6 @@ class Crosswalk:
     def _reindex(self) -> None:
         self._by_ff, self._by_af, self._by_app = {}, {}, {}
         self._by_understat = {}
-        self._by_app_name = {}
         self._clash: dict[str, set] = {}
         names: dict[str, set] = {}
         for p in self.players.values():
@@ -67,18 +66,9 @@ class Crosswalk:
                 if key in idx and idx[key] != p.player_id:
                     self._clash.setdefault(label, set()).add(key)
                 idx[key] = p.player_id
-            for n in p.app_names:
-                k = norm(n)
-                if not k:
-                    continue
-                if k in self._by_app_name \
-                        and self._by_app_name[k] != p.player_id:
-                    self._clash.setdefault("app_name", set()).add(k)
-                self._by_app_name[k] = p.player_id
         for label, keys in self._clash.items():
             idx = {"ff_slug": self._by_ff, "af_slug": self._by_af,
-                   "app_id": self._by_app, "understat_id": self._by_understat,
-                   "app_name": self._by_app_name}[label]
+                   "app_id": self._by_app, "understat_id": self._by_understat}[label]
             for k in keys:
                 idx.pop(k, None)
         self._by_name = {n: next(iter(ids)) for n, ids in names.items()
@@ -88,7 +78,7 @@ class Crosswalk:
         return {k: sorted(v) for k, v in sorted(self._clash.items()) if v}
 
     def player(self, *, name=None, ff_slug=None, af_slug=None, app_id=None,
-               understat_id=None, app_name=None) -> str | None:
+               understat_id=None) -> str | None:
         for key, idx in ((ff_slug, self._by_ff), (af_slug, self._by_af),
                          (app_id, self._by_app),
                          (understat_id, self._by_understat)):
@@ -100,12 +90,6 @@ class Crosswalk:
                 return k
             if k in self._by_name:
                 return self._by_name[k]
-        if app_name:
-            k = norm(app_name)
-            if k in self._by_app_name:
-                return self._by_app_name[k]
-            if k in self.players:
-                return k
         return None
 
     def key_of(self, r) -> str | None:
@@ -166,10 +150,8 @@ def _selftest() -> None:
     })
 
     for kw in ({"name": "Alvaro Fernandez"}, {"ff_slug": "alvaro-fernandez"},
-               {"af_slug": "af-alvaro"}, {"app_id": "2101"},
-               {"app_name": "A. Ferllo"}):
+               {"af_slug": "af-alvaro"}, {"app_id": "2101"}):
         assert xw.player(**kw) == "alvaro fernandez", kw
-    assert xw.player(app_name="Jonny Otto") == "jonny castro"
     assert xw.player(name="Álvaro Fernández") == "alvaro fernandez"
     assert xw.player(ff_slug="who-is-this") is None
     assert xw.player() is None
@@ -190,7 +172,7 @@ def _selftest() -> None:
         pp = os.path.join(d, "p.csv")
         xw.write(pp)
         again = Crosswalk.read(pp)
-        assert again.player(app_name="A. Ferllo") == "alvaro fernandez"
+        assert again.players["alvaro fernandez"].app_names == {"A. Ferllo"}
         assert again.player(ff_slug="jonny-castro") == "jonny castro"
         assert set(again.players) == set(xw.players)
         assert Crosswalk.read(os.path.join(d, "nope.csv")).players == {}
