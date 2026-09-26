@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import re
 
-__all__ = ["money", "ratio", "pct100", "fmt_money", "fmt_pct"]
+__all__ = ["money", "ratio", "pct100", "fmt_money", "fmt_pct", "grouped_sums"]
 
 _DOT_GROUPED = re.compile(r"\d{1,3}(?:\.\d{3})+$")
 _CLEAN = str.maketrans({"\u00a0": "", " ": "", "\u202f": ""})
@@ -65,6 +65,22 @@ def pct100(v):
     if x is None:
         return None
     return x * 100.0 if 0.0 <= x <= 1.0 else x
+
+
+def grouped_sums(items, key_of, *value_fns) -> dict:
+    """{group_key: (sum1, sum2, ...)} accumulating value_fns(item) over
+    already-FILTERED `items`, one running sum per value_fn. key_of(item)
+    returning a constant (e.g. None) makes this one ungrouped tuple of
+    sums. The filtering stays with the caller -- what counts as a row
+    differs everywhere -- but the "bucket by key, sum N parallel values"
+    tail was independently hand-rolled in ffcore.fixture.xg_club_attack()
+    and ffcore.score.fit_promoted_discount()."""
+    sums: dict = {}
+    for item in items:
+        acc = sums.setdefault(key_of(item), [0.0] * len(value_fns))
+        for i, fn in enumerate(value_fns):
+            acc[i] += fn(item)
+    return {k: tuple(v) for k, v in sums.items()}
 
 
 def fmt_money(v) -> str:

@@ -174,22 +174,23 @@ XG_CLUB_PSEUDO_MATCHES = 10.0
 
 
 def xg_club_attack(understat_rows, xw) -> dict[str, float]:
-    from collections import defaultdict
+    from ffcore.parse import grouped_sums
 
-    xg: dict[str, float] = defaultdict(float)
-    mins: dict[str, float] = defaultdict(float)
-    for r in understat_rows:
-        if "F" not in (r.get("position") or ""):
-            continue
-        team = r.get("team_title") or ""
-        if not team or "," in team:
-            continue
-        m = float(r.get("minutes") or 0)
-        if m <= 0:
-            continue
-        xg[team] += float(r.get("xg") or 0) + float(r.get("xa") or 0)
-        mins[team] += m
-    rate = {t: xg[t] / mins[t] * 90 for t in xg if mins[t] > 0}
+    def forwards():
+        for r in understat_rows:
+            if "F" not in (r.get("position") or ""):
+                continue
+            team = r.get("team_title") or ""
+            if not team or "," in team:
+                continue
+            m = float(r.get("minutes") or 0)
+            if m <= 0:
+                continue
+            yield team, float(r.get("xg") or 0) + float(r.get("xa") or 0), m
+
+    sums = grouped_sums(forwards(), lambda item: item[0],
+                       lambda item: item[1], lambda item: item[2])
+    rate = {t: xg / mins * 90 for t, (xg, mins) in sums.items() if mins > 0}
     if not rate:
         return {}
     league_avg = sum(rate.values()) / len(rate)

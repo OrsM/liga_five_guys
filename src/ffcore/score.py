@@ -88,6 +88,7 @@ def fit_promoted_discount(market: list[dict], history: dict,
     so a thin or lopsided sample cannot swing it far from the stated
     default: measured 2026-09-24 at 0.75 pooled (0.64-0.91 by position,
     n=21-110 each -- too uneven to split), vs the shipped 0.70."""
+    from ffcore.parse import grouped_sums
     from ffcore.tidy import read_csv
 
     promoted = {norm(t) for t in detect_promoted(market, history)}
@@ -97,27 +98,30 @@ def fit_promoted_discount(market: list[dict], history: dict,
     latest = _latest_perjornada_file()
     if latest is None:
         return PROMOTED_DISCOUNT, "no live per-jornada file yet"
-    num = den = n = 0.0
-    for r in read_csv(latest):
-        try:
-            games = float(r.get("games_delta") or 0)
-        except (TypeError, ValueError):
-            continue
-        if games <= 0:
-            continue
-        team, slot = facts.get(r.get("ff_id"), ("", None))
-        if team not in promoted:
-            continue
-        prior = prior_of.get(slot)
-        if not prior:
-            continue
-        try:
-            pts = float(r.get("points_delta") or 0)
-        except (TypeError, ValueError):
-            continue
-        num += pts
-        den += prior * games
-        n += games
+
+    def graded():
+        for r in read_csv(latest):
+            try:
+                games = float(r.get("games_delta") or 0)
+            except (TypeError, ValueError):
+                continue
+            if games <= 0:
+                continue
+            team, slot = facts.get(r.get("ff_id"), ("", None))
+            if team not in promoted:
+                continue
+            prior = prior_of.get(slot)
+            if not prior:
+                continue
+            try:
+                pts = float(r.get("points_delta") or 0)
+            except (TypeError, ValueError):
+                continue
+            yield pts, prior * games, games
+
+    num, den, n = grouped_sums(graded(), lambda item: None,
+                               lambda item: item[0], lambda item: item[1],
+                               lambda item: item[2]).get(None, (0.0, 0.0, 0.0))
     if den <= 0 or n < 1:
         return PROMOTED_DISCOUNT, "no graded promoted-player matches yet"
     measured = num / den
