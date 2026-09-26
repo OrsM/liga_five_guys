@@ -500,7 +500,6 @@ PYTHONPATH=src python src/ffcore/parse.py                # number parsing + form
 PYTHONPATH=src python src/ffcore/text.py                 # name normalising
 PYTHONPATH=src python src/ffcore/tidy.py                 # the player view over tidy CSV
 PYTHONPATH=src python src/ffcore/auth.py                 # token rotation, atomicity
-PYTHONPATH=src python src/ffcore/model.py                # the one League+Scorer per run
 PYTHONPATH=src python src/ffcore/attributes.py            # Fitness — FF's panel vs the app
 bash tools/selftests.sh     # every suite: the gate lfg-run uses
 PYTHONPATH=src python src/crosswalk.py --selftest          # resolving every feed's keys

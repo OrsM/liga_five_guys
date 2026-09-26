@@ -119,7 +119,6 @@ def allowance(since, now, daily_bonus: float) -> tuple[float, float]:
 
 def app_fielded(squad, names: dict, rows=None, xw=None) -> list[str]:
     from ffcore.crosswalk import Crosswalk
-    from ffcore.tidy import load_api
 
     rows = load_api("lineup") if rows is None else rows
     xw = xw or load_crosswalk() or Crosswalk()
@@ -240,7 +239,7 @@ class League:
         self.cfg = cfg
         self.market = market
         self.xw = xw
-        self._standings = standings
+        self.standings = standings
         self.txns = [dict(t, key=xw.player(app_id=text(
             t, "player_id"))) for t in txns]
         self.owner: dict[str, str] = {}
@@ -306,7 +305,7 @@ class League:
 
 
     def _estimate_cash(self) -> None:
-        balances = read_api_balances(self._standings)
+        balances = read_api_balances(self.standings)
 
         paid = None
         me_anchor = balances.get(self.cfg.me)
@@ -321,7 +320,7 @@ class League:
             paid = flat_income(me_anchor[0], self.cfg.budget, b, sd)
 
         users = {r.get("user_id"): r.get("manager")
-                 for r in self._standings
+                 for r in self.standings
                  if r.get("user_id") and r.get("manager")}
         own_bonus = bonus_income(load_api_activity(), users)
 

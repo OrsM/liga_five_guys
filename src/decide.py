@@ -2,11 +2,11 @@
 from __future__ import annotations
 
 import datetime as dt
-import itertools
 import math
 import sys
 from dataclasses import dataclass, field, replace
-from functools import cached_property
+from contextlib import suppress
+from functools import cache, cached_property
 from types import MappingProxyType
 from typing import Mapping
 
@@ -18,16 +18,19 @@ from ffcore.parse import fmt_money
 from ffcore.schedule import (rounds_left, next_then_rest,
                              first_jornada_per_player, apply_fixtures,
                              phantom_fill, phantom_topup)
-from ffcore.pricing import locked, burn, cash_price, respond
+from ffcore.pricing import burn, cash_price, respond
 from ffcore.action import Action
 from ffcore.profile import (PlayerProfile, UNSCORED_DEFAULT,
                             build_profiles)
-from ffcore.score import SLOT, _calibrated, replacement, squad_pool, vor
+from ffcore.fixture import club_volatility, season_board
+from ffcore.league import League
+from ffcore.score import SLOT, Scorer, build, replacement, squad_pool, vor
 from ffcore.season import (LeagueState, best_xi,
                            simulate_many)
 from ffcore.tidy import (run_now, load_api, load_fixtures, load_api_stats,
                          load_perjornada, load_players, market_routes, pending,
-                         DAILY_FRESH_DAYS, fresh_only, newest, table)
+                         load_understat_players, DAILY_FRESH_DAYS, LINEUP_SOURCE,
+                         fresh_only, newest, table)
 from ffcore.parse import num, text
 
 __all__ = ["Action", "Universe"]
@@ -51,12 +54,11 @@ class Universe:
     rival_cash: dict[str, float] = field(default_factory=dict)
     part_played: dict[int, set[str]] = field(default_factory=dict)
     first_jornada_of: dict[str, int] = field(default_factory=dict)
-    unjoined: list[str] = field(default_factory=list)
-    start_note: str = ""
-    cash_note: str = ""
     locked_cash: float = 0.0
     my_bids: dict[str, float] = field(default_factory=dict)
     received_offers: dict[str, float] = field(default_factory=dict)
+    lg: League | None = None
+    sc: Scorer | None = None
 
     @cached_property
     def current_xi(self) -> tuple[dict[str, float], set[str]]:
@@ -439,163 +441,101 @@ def best_move(u, rows, rivals):
     return best, uncertain
 
 
-_LOAD_CACHE: Universe | None = None
-
-
-def load(trials_pool=None) -> Universe:
-    global _LOAD_CACHE
-    if _LOAD_CACHE is not None:
-        return _LOAD_CACHE
-    from ffcore.model import session
-    _m = session()
-    lg, sc = _m.lg, _m.sc
+@cache
+def load() -> Universe:
+    lg = League.load()
+    sc, _labels = build(newest("market"), newest("lineups", LINEUP_SOURCE),
+                        run_now(), shrink_k=lg.cfg.shrink_k)
+    me, now = lg.cfg.me, run_now()
     players = load_players()
-
     m = newest("matches")
     rem, played = rounds_left(m, load_fixtures())
 
     teams, mkt = ([dict(r, key=lg.xw.player(app_id=text(r, "player_id")))
                    for r in load_api(name)] for name in ("teams", "market"))
-    owner = dict(lg.owner)
-    me = lg.cfg.me
-
-    squads = {mgr: {k: SLOT[(players[k].get("pos") or "").lower()]
-                    for k in lg.squad(mgr)
-                    if k in players
-                    and (players[k].get("pos") or "").lower() in SLOT}
-              for mgr in lg.managers}
-
     price, route, bids = market_routes(mkt)
-    now = run_now()
-    clause_until: dict = {}
-    pt_to_key: dict[str, str] = {}
-    clause: dict[str, float] = {}
+    clause, clause_until, pt_to_key = {}, {}, {}
     for r in teams:
         k = r["key"]
-        buyout = text(r, "buyout")
         if not k:
             continue
         if r.get("player_team_id"):
             pt_to_key[r["player_team_id"]] = k
-        raw = text(r, "buyout_until")
-        if raw:
-            try:
-                clause_until[k] = dt.datetime.fromisoformat(raw)
-            except ValueError:
-                pass
-        if buyout:
-            clause.setdefault(k, float(r["buyout"]))
-        if r["manager"] == me or not buyout:
+        with suppress(ValueError):
+            clause_until[k] = dt.datetime.fromisoformat(text(r, "buyout_until"))
+        if not text(r, "buyout"):
             continue
-        if locked(clause_until, k, now):
-            continue
-        if k not in price:
-            route[k] = "clause"
-        price.setdefault(k, float(r["buyout"]))
+        clause.setdefault(k, float(r["buyout"]))
+        if r["manager"] != me and k in clause_until and clause_until[k] <= now:
+            route.setdefault(k, "clause")
+            price.setdefault(k, clause[k])
 
-    proceeds = {k: float((players[k] or {}).get("value") or 0)
-                for k in squads.get(me, {})}
+    value = {k: rec["value"] for k, rec in players.items() if rec.get("value")}
     received_offers = pending(
         [dict(r, key=pt_to_key.get(r.get("player_team_id") or ""))
          for r in load_api("offers")], "status", "money")
-    for k, money in received_offers.items():
-        if k in proceeds:
-            proceeds[k] = max(proceeds[k], money)
-    rival_cash = {h: (lg[h].cash.value or 0.0) for h in lg.managers
-                  if h != me}
-    value = {k: float((v or {}).get("value") or 0) for k, v in players.items()
-             if (v or {}).get("value")}
-
-    universe = set(price) | {k for s in squads.values() for k in s}
-
-    perjornada_rows = load_perjornada()
-    match_stats_rows = load_api_stats()
-    mk_keys = (set(price) | set(owner) | set(value) | set(clause)
-              | set(clause_until) | set(route) | set(bids) | set(proceeds))
-    market_keyed = {k: {"listed": k in price, "price": price.get(k),
-                        "owner": owner.get(k), "value": value.get(k),
-                        "clause": clause.get(k),
-                        "clause_until": clause_until.get(k),
-                        "route": route.get(k), "bids": bids.get(k),
-                        "proceeds": proceeds.get(k)}
-                    for k in mk_keys}
-    profiles = build_profiles(players, sc, perjornada_rows, xw=lg.xw,
-                              match_stats_rows=match_stats_rows,
-                              match_rows=m,
-                              market_keyed=market_keyed)
+    proceeds = {k: max(value.get(k, 0.0), received_offers.get(k, 0.0))
+                for k in lg.squad(me)}
+    profiles = build_profiles(
+        players, sc, load_perjornada(), xw=lg.xw,
+        match_stats_rows=load_api_stats(), match_rows=m,
+        market_keyed={k: {"listed": k in price, "price": price.get(k),
+                          "owner": lg.owner.get(k), "value": value.get(k),
+                          "clause": clause.get(k),
+                          "clause_until": clause_until.get(k),
+                          "route": route.get(k), "bids": bids.get(k),
+                          "proceeds": proceeds.get(k)} for k in players})
 
     pos = {k: _pos_of(p.current.pos) for k, p in profiles.items()}
-
-    base, base_rest = {}, {}
-    scored: dict[str, object] = {}
-    for k in universe:
+    club = {k: p.current.club for k, p in profiles.items() if p.current.club}
+    squads = {mgr: {k: pos[k] for k in lg.squad(mgr) if k in pos}
+              for mgr in lg.managers}
+    base, base_rest, matches, ppm_of, status_of = {}, {}, {}, {}, {}
+    for k in set(price).union(*squads.values()):
         p = profiles.get(k)
-        scored[k] = p.derived.scored if p else None
         base[k], base_rest[k] = (p.to_bootstrap_input() if p
                                  else (UNSCORED_DEFAULT, UNSCORED_DEFAULT))
+        s = p.derived.scored if p else None
+        if s:
+            matches[k], ppm_of[k], status_of[k] = s.pj, s.ppm, s.status
 
-    pool = pool_from_perjornada(perjornada_rows)
-    club = {k: players[k]["club"] for k in base
-            if players.get(k, {}).get("club")}
-    matches = {}
-    for k in base:
-        s_ = scored.get(k)
-        if s_ is not None:
-            matches[k] = s_.pj
-    from ffcore.fixture import club_volatility, season_board
-    from ffcore.tidy import load_understat_players
     results_hist = table("results_history")
-    club_rel = club_volatility(results_hist, set(club.values()))
-    sboard = season_board(_m.market, m, rem, now,
+    sboard = season_board(newest("market"), m, rem, now,
                           fresh_only(newest("elo"), DAILY_FRESH_DAYS),
                           results=results_hist,
                           understat_rows=load_understat_players("2025"),
                           home_edge=sc.home_edge)
-    ppm_of = {k: s.ppm for k, s in scored.items() if s}
-    status_of = {k: s.status for k, s in scored.items() if s}
     first_jornada_of = first_jornada_per_player(base, rem, played, club)
     per_j = apply_fixtures(
         next_then_rest(base, base_rest, rem, played, club),
         sboard, club, pos, ppm_of, status_of=status_of,
         first_jornada_of=first_jornada_of, status_factor=sc.cal.status_factor)
     squads, per_j = phantom_fill(squads, per_j, pos)
-    for _m, _sq in squads.items():
-        assert _fieldable(_sq), (_m, _sq)
+    assert all(_fieldable(sq) for sq in squads.values()), squads
     if rem:
-        phantom_keys = {k for layer in per_j.values() for k in layer
-                        if k.startswith("__phantom_")}
-        for k in phantom_keys:
-            first_jornada_of.setdefault(k, rem[0])
-    _history = grading.graded_history()
-    drift_frac, drift_why = grading.drift_frac_from_history(
-        history=_history)
+        first_jornada_of.update({k: rem[0] for layer in per_j.values()
+                                 for k in layer if k.startswith("__phantom_")})
+
+    pool = pool_from_perjornada(load_perjornada())
+    history = grading.graded_history()
+    drift_frac, drift_why = grading.drift_frac_from_history(history=history)
     fc = Bootstrap(per_j, pool=pool, matches=matches, club_of=club,
-                   club_rel=club_rel, drift_frac=drift_frac,
-                   drift_why=drift_why,
+                   club_rel=club_volatility(results_hist, set(club.values())),
+                   drift_frac=drift_frac, drift_why=drift_why,
                    rate_floor=grading.fit_rate_rel_floor(
-                       pool, history=_history)[0])
+                       pool, history=history)[0])
 
-    carried = {}
-    for r in newest("api_standings"):
-        if r.get("manager"):
-            carried.setdefault(r["manager"],
-                              num(r, "team_points", default=0.0))
-    raw_cash = lg[me].cash.value or 0.0
+    carried = {r["manager"]: num(r, "team_points", default=0.0)
+               for r in lg.standings if r.get("manager")}
     my_bids = pending(mkt, "bid_status", "bid_money")
-    locked_cash = sum(my_bids.values())
-    cash = raw_cash
-
-    _LOAD_CACHE = Universe(
+    return Universe(
         state=LeagueState(squads, rem, me, carried), forecaster=fc,
-        cash=cash, me=me, players=profiles,
-        rival_cash=rival_cash,
+        cash=lg[me].cash.value or 0.0, me=me, players=profiles, lg=lg, sc=sc,
+        rival_cash={h: lg[h].cash.value or 0.0 for h in lg.managers
+                    if h != me},
         part_played=played, first_jornada_of=first_jornada_of,
-        start_note=(_calibrated()[0].note() + " "
-                    + _calibrated()[0].lineup_why).strip(),
-        unjoined=list(lg.api_unjoined),
-        locked_cash=locked_cash, my_bids=my_bids,
+        locked_cash=sum(my_bids.values()), my_bids=my_bids,
         received_offers=received_offers)
-    return _LOAD_CACHE
 
 
 def _selftest() -> None:
@@ -640,7 +580,6 @@ def _selftest() -> None:
             price={"star": 10e6, "dud": 1e6, "th_m1": 5e6},
             route={"th_m1": "clause"},
             proceeds={"me_bench": 8e6}, owner={"th_m1": "riv"}))
-    exp = u.forecaster.expected(1)
 
     first = u.current_xi
     assert u.current_xi is first, "cached_property must not recompute"
@@ -902,7 +841,6 @@ def _selftest() -> None:
         players=players_from_flat(pos={**sq_cd, "target": "DEL"},
                                   price={"target": 5e6},
                                   proceeds={"me_f3": 5e6}))
-    exp_cd = u_cd.forecaster.expected(1)
     acts_cd = u_cd.candidates()
     assert any(a.buy == "target" and a.sell == ("me_f3",) for a in acts_cd), \
         acts_cd

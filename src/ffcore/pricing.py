@@ -2,11 +2,6 @@
 from __future__ import annotations
 
 
-def locked(until: dict, key: str, now) -> bool:
-    when = until.get(key)
-    return True if when is None else when > now
-
-
 def burn(u, a) -> float | None:
     if not a.buy:
         return 0.0
@@ -55,15 +50,6 @@ def _selftest() -> None:
         def view(self, field_name):
             return self.values if field_name == "value" else {}
 
-    import datetime as dt
-    now = dt.datetime(2026, 8, 18, tzinfo=dt.timezone.utc)
-    soon = dt.datetime(2026, 8, 24, tzinfo=dt.timezone.utc)
-    past = dt.datetime(2026, 8, 1, tzinfo=dt.timezone.utc)
-    assert locked({"x": soon}, "x", now) is True
-    assert locked({"x": past}, "x", now) is False
-    assert locked({}, "x", now) is True
-    assert locked({"x": None}, "x", now) is True
-
     u = _FakeUniverse(values={"star": 5e6, "free": 4e6})
     assert burn(u, _FakeAction(buy="star", cost=8e6)) == 3e6
     assert burn(u, _FakeAction(buy="free", cost=4e6)) == 0.0
@@ -86,7 +72,7 @@ def _selftest() -> None:
     assert respond(broke, _FakeAction(kind="steal", buy="x", cost=0.0,
                                       victim="riv"), 3.0) == 0.0
 
-    print("ffcore.pricing self-test OK (17 cases)")
+    print("ffcore.pricing self-test OK (13 cases)")
 
 
 if __name__ == "__main__":

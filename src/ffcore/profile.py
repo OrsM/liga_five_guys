@@ -150,7 +150,7 @@ def build_profiles(players: dict, sc, perjornada_rows,
         ident.name = rec.get("name") or ident.name or k
         mk = (market_keyed or {}).get(k, {})
         cur = PlayerCurrent(
-            club=(xp.club_id if xp else "") or rec.get("team") or "",
+            club=rec.get("club") or (xp.club_id if xp else ""),
             pos=(rec.get("pos") or "").upper(),
             market_value=None,
             listed=bool(mk.get("listed")),
@@ -222,9 +222,9 @@ def _selftest() -> None:
 
     from ffcore.crosswalk import Player
 
-    players = {"999": {"name": "Known Player", "pos": "DEL", "team": "betis"},
+    players = {"999": {"name": "Known Player", "pos": "DEL", "club": "betis"},
               "unknown": {"name": "Unknown Player", "pos": "MED",
-                          "team": "celta"}}
+                          "club": "celta"}}
 
     class _FakeXW:
         players = {"999": Player("999", "Known Player", club_id="betis",

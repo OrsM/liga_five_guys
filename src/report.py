@@ -13,7 +13,7 @@ from ffcore.score import SLOT_LABEL, SLOT_MIN, squad_pool
 from ffcore.tidy import (run_now, shown,
                          ALERTS, DECISIONS, WARNINGS,
                          age_phrase, append_csv, load_crosswalk,
-                         load_deadline, read_csv,
+                         load_deadline, newest, read_csv,
                          snapshot_stamp, stale_feeds, widen_csv, write_lines)
 
 STALE_HOURS = 14.0
@@ -84,16 +84,15 @@ def alerts(warnings, token_days) -> list[str]:
 
 
 def main() -> None:
-    from ffcore.model import session
-    m = session()
-    market = m.market
-
+    import decide
+    import sim
+    market = newest("market")
     if not market:
         print("no market data; nothing to warn about")
         return
 
-    lg = m.lg
-    sc = m.sc
+    u = decide.load()
+    lg, sc = u.lg, u.sc
 
     observed = market[0]["observed_at"]
     obs_dt = snapshot_stamp(observed)
@@ -122,10 +121,7 @@ def main() -> None:
     xw = load_crosswalk()
     pool = squad_pool(players)
 
-    import decide
-    import sim
-    u = decide.load() if players else None
-    xi = u.current_xi[1] if u else set()
+    xi = u.current_xi[1] if players else set()
     if players and xi:
         chosen = [p for p in players if p.get("key") in xi]
         best = (sum(p["score"] for p in chosen), sim.shape(u, xi), chosen)

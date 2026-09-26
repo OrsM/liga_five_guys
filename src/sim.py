@@ -89,10 +89,8 @@ def ladder_rows(u, rows, bands=None, exp=None, xi=None) -> list[dict]:
     spare = max_spare_proceeds(u)
     rest = [k for k in u.view("price") if k not in mine and exp.get(k, 0.0) > bar]
     bands = {k: v for k, v in (bands or {}).items() if k not in won}
-    from ffcore.bid import deals as _deals, premiums as _premiums, suggest
-    from ffcore.model import session as _session
-    _lg = _session().lg
-    _dl = _deals(_lg, _lg.market) if _lg and _lg.market else []
+    from ffcore.bid import deals, premiums as _premiums, suggest
+    _dl = deals(u.lg, u.lg.market) if u.lg and u.lg.market else []
     buy_prem = _premiums(_dl, "buy")
     sell_prem = _premiums(_dl, "sell")
     _rival_max = max(u.rival_cash.values(), default=None)
