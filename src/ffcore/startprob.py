@@ -46,10 +46,6 @@ def _platt(p: float, alpha: float, beta: float) -> float:
     return min(CEIL, max(FLOOR, q))
 
 
-def _brier(model, obs) -> float:
-    return sum((model(o) - o.started) ** 2 for o in obs) / len(obs)
-
-
 class Calibration:
 
     def __init__(self, alpha=0.0, beta=1.0, weight=0.0, titular=0.9, n=0,
@@ -104,10 +100,11 @@ class Calibration:
                 for be in SLOPE:
                     for w in WEIGHTS:
                         c = cls(al, be, w, titular)
-                        sc = _brier(
-                            lambda o: c.p(_pct(o.ff), None) if o.af is None
-                            else c.p(_pct(o.ff), {"start_pct": o.af * 100}),
-                            train)
+                        model = (lambda o: c.p(_pct(o.ff), None)
+                                if o.af is None else
+                                c.p(_pct(o.ff), {"start_pct": o.af * 100}))
+                        sc = sum((model(o) - o.started) ** 2
+                                for o in train) / len(train)
                         if best is None or sc < best:
                             best, arg = sc, (al, be, w)
             return arg

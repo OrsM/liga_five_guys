@@ -11,12 +11,8 @@ __all__ = ["LeagueState", "Standings", "simulate",
 XI_SIZE = 11
 
 
-def legal_shapes() -> list[dict[str, int]]:
-    return [{"POR": 1, "DEF": d, "MED": m, "DEL": f}
-           for d, m, f in formations()]
-
-
-SHAPES = legal_shapes()
+SHAPES = [{"POR": 1, "DEF": d, "MED": m, "DEL": f}
+         for d, m, f in formations()]
 
 
 def best_xi(squad: dict[str, str], value: dict[str, float]) -> list[str]:

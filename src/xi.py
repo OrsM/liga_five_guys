@@ -7,7 +7,7 @@ import sys
 from ffcore.league import app_fielded
 from ffcore.text import norm
 from ffcore.tidy import (run_now,
-                         DECISIONS, append_csv, load_deadline, read_csv, write_csv)
+                         DECISIONS, append_csv, load_deadline, widen_csv)
 
 FIELDS = ["logged_at", "hours_to_lock", "n_xi", "xi", "bench",
           "xi_names", "bench_names", "warnings"]
@@ -23,17 +23,6 @@ def fielded(squad: list[str]):
         return [], [], ["%d players for an XI of %d — not logged"
                         % (len(xi), XI_SIZE)]
     return xi, sorted(norm(s) for s in squad if norm(s) not in set(xi)), []
-
-
-def migrate(path, fields) -> None:
-    rows = read_csv(path)
-    if not rows or set(fields) <= set(rows[0]):
-        return
-    for r in rows:
-        for f in fields:
-            r.setdefault(f, "")
-    write_csv(path, rows, fields)
-    print("migrated %s to %d columns" % (path, len(fields)))
 
 
 def main() -> None:
@@ -57,7 +46,7 @@ def main() -> None:
            else "%.1f" % ((deadline - now).total_seconds() / 3600))
 
     path = DECISIONS / "xi_fielded.csv"
-    migrate(path, FIELDS)
+    widen_csv(path, FIELDS)
     append_csv(path, [{
         "logged_at": now.strftime("%Y-%m-%dT%H%MZ"),
         "hours_to_lock": htl,

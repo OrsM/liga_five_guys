@@ -22,13 +22,10 @@ HEADER = """\
 """
 
 
-def user_map() -> dict:
-    return {r["user_id"]: r["manager"] for r in load_api("standings")
-            if r.get("user_id") and r.get("manager")}
-
-
 def build() -> list[dict]:
-    return ledger_from_api(load_api_activity(), user_map(), load_api_players())
+    users = {r["user_id"]: r["manager"] for r in load_api("standings")
+            if r.get("user_id") and r.get("manager")}
+    return ledger_from_api(load_api_activity(), users, load_api_players())
 
 
 def render(rows: list[dict]) -> str:

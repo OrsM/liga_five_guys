@@ -196,7 +196,14 @@ class Crosswalk:
             if len(agreed) == 1:
                 key = agreed[0]
         if not key:
-            key = _by_exact_value(market_value, market)
+            try:
+                want = float(market_value)
+            except (TypeError, ValueError):
+                want = None
+            if want:
+                hits = set(_value_index(market).get(want, ()))
+                hits.discard("")
+                key = hits.pop() if len(hits) == 1 else None
         return key or None
 
     def club(self, *, ff_slug=None, name=None) -> str | None:
@@ -304,18 +311,6 @@ def _priced_like(key: str, raw: str, market_value, index) -> bool:
     if not ours:
         return True
     return price_agrees(theirs, ours)
-
-
-def _by_exact_value(raw_value, market) -> str | None:
-    try:
-        want = float(raw_value)
-    except (TypeError, ValueError):
-        return None
-    if not want:
-        return None
-    hits = set(_value_index(market).get(want, ()))
-    hits.discard("")
-    return hits.pop() if len(hits) == 1 else None
 
 
 _VALUE_INDEX: dict[int, tuple[int, dict]] = {}
