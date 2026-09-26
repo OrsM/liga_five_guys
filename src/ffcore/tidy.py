@@ -5,6 +5,7 @@ import csv
 import os
 import re
 import sys
+from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
 from functools import lru_cache
 from pathlib import Path
@@ -115,16 +116,25 @@ def read_csv(path) -> list[dict]:
     return [MappingProxyType(r) for r in (rows or [])]
 
 
+@contextmanager
+def _csv_dictwriter(path, fieldnames, mode, **writer_kw):
+    """An open csv.DictWriter for `path` -- write_csv() and append_csv()
+    each built this (mkdir, the DictWriter args) separately. Both pass
+    extrasaction="ignore"; only append_csv also needs restval="" (a
+    widened file can have older rows missing a newer column)."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open(mode, newline="", encoding="utf-8") as fh:
+        yield csv.DictWriter(fh, fieldnames=fieldnames, extrasaction="ignore",
+                             lineterminator="\n", **writer_kw)
+
+
 def write_csv(path, rows, fieldnames=None) -> None:
     path = Path(path)
     _forget(path)
     if not rows:
         return
     fieldnames = fieldnames or list(rows[0])
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("w", newline="", encoding="utf-8") as fh:
-        w = csv.DictWriter(fh, fieldnames=fieldnames, extrasaction="ignore",
-                           lineterminator="\n")
+    with _csv_dictwriter(path, fieldnames, "w") as w:
         w.writeheader()
         w.writerows(rows)
 
@@ -158,10 +168,7 @@ def append_csv(path, rows, fieldnames=None) -> None:
     if not fresh:
         with path.open(encoding="utf-8") as fh:
             fieldnames = list(csv.DictReader(fh).fieldnames or fieldnames)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("a", newline="", encoding="utf-8") as fh:
-        w = csv.DictWriter(fh, fieldnames=fieldnames, extrasaction="ignore",
-                           restval="", lineterminator="\n")
+    with _csv_dictwriter(path, fieldnames, "a", restval="") as w:
         if fresh:
             w.writeheader()
         w.writerows(rows)
