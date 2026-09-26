@@ -316,10 +316,6 @@ _VALUE_INDEX: dict[int, tuple[int, dict]] = {}
 
 
 def _value_index(market) -> dict:
-    """{value: {player key}} over the whole market history, built once per
-    market. This used to rescan every row on every call -- 161 calls x ~28k
-    rows of float() was 2.9s of a 3.9s crosswalk stage (2026-09-24, profiled).
-    Keyed on the row count as well as the object, so appended rows rebuild."""
     hit = _VALUE_INDEX.get(id(market))
     if hit is None or hit[0] != len(market.rows):
         idx: dict[float, set] = {}

@@ -220,10 +220,6 @@ class Universe:
         for a, r, bonus in zip(keep, scored, bonuses):
             if bonus and a.victim in r.totals:
                 r.totals[a.victim] = [x + bonus for x in r.totals[a.victim]]
-        # (median, 10th, 90th, action, MEAN). The mean is the expected season points
-        # change, which includes the tails a median hides -- a bench player who is
-        # useless in most seasons and decisive in a few has a median near 0 and a
-        # mean that says what his cover is worth.
         bands = {k: (*band(pairs), a, sum(pairs) / len(pairs) if pairs else 0.0)
                 for (k, a), pairs in ((ka, paired(r, base, self.me)) for ka, r in
                                       zip(rest, final[len(afters) + 1:]))}
@@ -629,13 +625,6 @@ def load(trials_pool=None) -> Universe:
         if r.get("manager"):
             carried.setdefault(r["manager"],
                               num(r, API_STANDINGS.TEAM_POINTS, default=0.0))
-    # A live bid is a COMMITMENT, not a payment. The app does not debit it
-    # when it is placed, so cash is the app's own balance, untouched. Netting
-    # the bids out of it here was a double-count: the same euros were held
-    # back AND charged again by whatever move the engine went on to price,
-    # which on 2026-09-18 forced a 45M sale to fund a 21M bid already placed.
-    # my_bids stays a LIST so each bid can be re-endorsed or withdrawn on its
-    # own; the total survives only as a display and warning figure.
     raw_cash = lg[me].cash.value or 0.0
     my_bids = pending_sent(mkt, market_key)
     locked_cash = sum(my_bids.values())
@@ -672,13 +661,6 @@ def _selftest() -> None:
                                   victim="riv"))
     riv_after = raided["riv"]
     assert "star" not in riv_after, riv_after
-    # PINS THE CONTRACT, NOT THE COUNT. This asserted def_count == 3 --
-    # SLOT_MIN's defender minimum -- which only held while phantom_topup
-    # filled to positional minimums. That was the bug: SLOT_MIN sums to 8
-    # and an eleven is eleven, so a raided squad could satisfy every
-    # minimum and still field nobody, which is what crashed the report on
-    # 2026-09-17. What must be true is that the victim can still be
-    # simulated, and _fieldable() is exactly that question.
     assert _fieldable(riv_after), riv_after
     assert any(k.startswith("__phantom_DEF_") for k in riv_after), riv_after
 

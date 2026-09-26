@@ -70,7 +70,6 @@ def second_cells(who, source: str = SECOND_SOURCE, rows=None, xw=None):
     return cells, unclear
 
 
-
 def _selftest() -> None:
     assert af_cell(None) == "—"
     assert af_cell({}) == "—"

@@ -40,7 +40,7 @@ DOUBT_FACTOR = 0.5
 OUT_STATUSES = frozenset({"injured", "suspended", "unavailable"})
 PROMOTED_DISCOUNT = 0.70
 
-PROMOTED_DISCOUNT_K = 50.0     # shrinkage weight, in matches, toward the default
+PROMOTED_DISCOUNT_K = 50.0
 
 
 def position_priors(market: list[dict], history: dict
@@ -57,8 +57,6 @@ def position_priors(market: list[dict], history: dict
 
 
 def detect_promoted(market: list[dict], history: dict) -> set[str]:
-    """Teams whose squad mostly has no top-flight history -- found from the
-    data (no hand-kept promotion list to go stale)."""
     per_team: dict[str, list[int]] = {}
     for r in market:
         team = r.get("team") or "?"
@@ -70,10 +68,6 @@ def detect_promoted(market: list[dict], history: dict) -> set[str]:
 
 
 def _latest_perjornada_file():
-    """The newest live/perjornada_*.csv, or None -- the "does a live
-    per-jornada file exist yet" check fit_promoted_discount(),
-    _current_from_perjornada() and _forward_shots_minutes() each spelled
-    out separately."""
     from ffcore.tidy import SEASON
 
     live = SEASON / "live"
@@ -83,11 +77,6 @@ def _latest_perjornada_file():
 
 def fit_promoted_discount(market: list[dict], history: dict,
                           prior_of: dict) -> tuple[float, str]:
-    """How much a promoted player's positional prior overstates him,
-    shrunk toward PROMOTED_DISCOUNT (weight PROMOTED_DISCOUNT_K matches)
-    so a thin or lopsided sample cannot swing it far from the stated
-    default: measured 2026-09-24 at 0.75 pooled (0.64-0.91 by position,
-    n=21-110 each -- too uneven to split), vs the shipped 0.70."""
     from ffcore.parse import grouped_sums
     from ffcore.tidy import read_csv
 
@@ -149,13 +138,7 @@ def status_multiplier(status: str) -> float:
 DECAY_GRID = (1.0, 0.85, 0.7, 0.55, 0.4)
 
 
-
-
 def _forward_understat_rows(season: str, xw):
-    """Understat rows for outfield forwards this crosswalk can key, as
-    (key, row, minutes) -- the position filter, understat_id lookup and
-    minutes parse load_understat_current() and _xg_points_fit() each
-    walked separately."""
     from ffcore.tidy import load_understat_players
 
     for r in load_understat_players(season):
@@ -289,12 +272,6 @@ def _shots_by_jornada(xw) -> dict[str, dict[int, float]]:
 
 
 def _forward_shots_minutes(xw, players=None):
-    """Forward players' shots-per-jornada, minutes-per-jornada (both keyed
-    by crosswalk key), and the players table -- the shared setup
-    _shots_points_fit() and load_shots_current() each rebuilt separately
-    (same _shots_by_jornada() call, same _per_jornada_current() call, same
-    "pos == delantero" filter applied downstream) before diverging into a
-    fit and a rate. () for by_key when no perjornada file exists yet."""
     from ffcore.tidy import load, load_players, load_perjornada, jornada_of_match
 
     players = players if players is not None else load_players()
@@ -419,10 +396,6 @@ def _per_jornada_current(starters_rows, perjornada_rows, jornada_of_match,
 
 def _decay_walk(per_jornada: dict[int, tuple[float, float]], decay: float,
                 terms) -> tuple[float, float]:
-    """Decay-weighted sum of terms(pts, mins, w) over `per_jornada`, newest
-    jornada weighted 1.0 -- the accumulation loop _weighted_totals() and
-    _weighted_start() each walked separately, only the per-step terms
-    differ."""
     if not per_jornada:
         return 0.0, 0.0
     latest = max(per_jornada)
@@ -602,10 +575,6 @@ def _calibrated():
             load_lineups() + second, truth, cut,
             neutral_default=NEUTRAL_START, absent_default=ABSENT_START,
             xw=xw)
-    # KEYED ON THE OBSERVATIONS THEMSELVES, not len(truth): starters.csv
-    # grows on every scrape, so that key missed every run and the
-    # leave-one-group-out grid search (36s of a 38s `squads` stage, 2026-09-24,
-    # sampled) re-ran to arrive at the same answer. Building them is 0.11s.
     obs = observations(load_lineups() + second, truth, cut,
                        neutral=NEUTRAL_START, absent=ABSENT_START,
                        xw=xw) if cut else []
@@ -865,8 +834,6 @@ def squad_pool(scored) -> dict[str, list[dict]]:
     return pool
 
 
-
-
 def starters_per_slot() -> dict[str, float]:
     shapes = formations()
     n = len(shapes)
@@ -894,7 +861,6 @@ def vor(row: dict, repl: dict) -> float:
     if not slot:
         return 0.0
     return row.get("score", 0.0) - repl.get(slot, 0.0)
-
 
 
 def _xi_search(by_slot: dict[str, list], shapes, force=None):
@@ -996,15 +962,10 @@ def _selftest() -> None:
     assert blended.cur_pj == 3.0
     assert full.ppm < blended.ppm < 10.0
 
-    # A promoted side: 10 players, <15% with a top-flight record.
     promo_market = [{**mk("q%d" % i, team="Rise"), "ff_id": "q%d" % i}
                     for i in range(10)]
-    promo_hist = {"q0": {"pts": 34.0, "pj": 34.0}}   # the one veteran on it
+    promo_hist = {"q0": {"pts": 34.0, "pj": 34.0}}
     assert detect_promoted(promo_market, promo_hist) == {"Rise"}
-    # detect_promoted's own team strings are UNNORMALISED (as read from the
-    # market) -- fit_promoted_discount must normalise before comparing
-    # against team_of, or every promoted match reads as ungraded, silently
-    # keeping the stated default with no error (found 2026-09-24).
     accented = [mk("r%d" % i, team="Málaga") for i in range(10)]
     assert detect_promoted(accented, {}) == {"Málaga"}
     sc3 = Scorer(promo_market, [], promo_hist, xw=xw)
@@ -1038,15 +999,11 @@ def _selftest() -> None:
                 w = _csv_sc.DictWriter(fh, fieldnames=cols)
                 w.writeheader()
                 w.writerows(rows)
-            # exactly the shipped ratio, on real rows: shrinkage should
-            # barely move it, and the confirming direction is unambiguous
             fitted, why = fit_promoted_discount(promo_market, promo_hist,
                                                 priors3)
             assert abs(fitted - PROMOTED_DISCOUNT) < 0.01, (fitted, why)
             assert "80 promoted-player matches" in why, why
 
-            # a side that scores at the full prior (no discount at all,
-            # discount=1.0): the fit must move UP off the stated default
             full_rows = [{"ff_id": "q%d" % (i % 10), "games_delta": "1",
                          "points_delta": "%.1f" % priors3["DEF"]}
                         for i in range(400)]

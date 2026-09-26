@@ -80,10 +80,6 @@ def load_config(name: str = "league.ini") -> Config:
 
 
 def _comment_stripped_lines(path) -> list[str] | None:
-    """Non-blank lines from a plain-text config file, '#'-comments and
-    surrounding whitespace stripped -- the read+strip skeleton
-    read_rosters() and read_balances() each hand-rolled separately. None
-    if the file is missing; callers decide whether that's fatal."""
     if not path.exists():
         return None
     out = []
@@ -158,9 +154,6 @@ def flat_income(observed, budget: float, bought: float, sold: float):
 
 
 def _user_of(r: dict, users: dict, field: str = "user_id") -> str | None:
-    """The manager handle a row's `field` (a user id) resolves to, via
-    `users` -- bonus_income() and ledger_from_api() (twice: the actor and,
-    for a clause, the counterparty) each wrote this lookup out by hand."""
     return users.get(str(r.get(field) or ""))
 
 
@@ -241,11 +234,6 @@ def ledger_from_api(activity: list[dict], users: dict,
         if not who or not player:
             continue
         if kind == "clause":
-            # A CLAUSE IS THE ONLY MANAGER-TO-MANAGER MOVE. A buy comes from
-            # the market and a sell goes to it; this one has a real payee, so
-            # the money leaves one squad's balance and lands in another's.
-            # Dropped entirely until 2026-09-18, which left the buyer looking
-            # richer than he was by exactly what he had paid.
             victim = _user_of(r, users, "counterparty")
             if not victim:
                 continue
@@ -266,14 +254,6 @@ def ledger_from_api(activity: list[dict], users: dict,
 
 
 def gone_at(history: list[dict], pid: str, manager: str, bought):
-    """When the app first showed `pid` no longer with `manager`, or None.
-
-    The first roster snapshot after the purchase AND after the last snapshot
-    that did list him. It is the earliest moment we KNOW he was gone, so the
-    removal happened at or before it -- and, for a player never in any
-    snapshot (bought before the league API was first read), the first
-    snapshot after the purchase. `history` is every roster snapshot.
-    """
     last = max((r["observed_at"] for r in history
                 if r["player_id"] == pid and r["manager"] == manager),
                default="")
@@ -492,10 +472,6 @@ class League:
                         "**%s** — the app says he is owned, but no market row "
                         "matches the name, so he is missing from the board."
                         % raw)
-                # The app drops a player from a squad WITHOUT publishing a sale;
-                # the ledger, built from the feed, keeps him. {key: (who, when
-                # the rosters first showed him gone)} of exactly those -- the
-                # cash estimate prices them, AT THAT MOMENT, below.
                 bought = {self.txn_key(t): (schema.text(
                     t, schema.TRANSACTIONS.PLAYER_ID),
                     ledger_stamp(t.get("date", ""))) for t in txns}
@@ -782,9 +758,6 @@ def _selftest_api_owner() -> None:
     lone = Market([{"name": "Jonny Castro", "value": "5602302",
                     "observed_at": at, "position": "DEF"}])
 
-    # (xw, raw, handle, market, kwargs, expected) -- one contract, resolve(),
-    # exercised through every rung of its disambiguation ladder rather than
-    # one assertion per rung reimplemented as its own call shape.
     cases = [
         (xw0, "Cardoso", "Magic Mike 333", two,
          {"ledger_owner": led}, norm("Fabio Cardoso")),
@@ -964,11 +937,6 @@ def _selftest_derived_ledger() -> None:
 
     assert ledger_from_api([], users, names) == []
 
-    # A CLAUSE MOVES A PLAYER BETWEEN TWO MANAGERS, and the money with him.
-    # This is the shape the app publishes as a "Market operation" and the one
-    # that was dropped for want of a name: Albert Laporta took Raphinha from
-    # Magic Mike 333 for 141,425,721 on 2026-09-18, and because no row
-    # reached the ledger he still looked like he had the money.
     clause = ledger_from_api(
         [{"at": "2026-09-18T22:25:51+02:00", "kind": "clause",
           "user_id": "11883172", "counterparty": "11881989",
@@ -980,8 +948,6 @@ def _selftest_derived_ledger() -> None:
         "a clause is manager to manager, never via the market"
     assert clause[0]["price"] == "141425721", clause[0]
 
-    # An unknown counterparty is dropped rather than booked against the
-    # market -- crediting the wrong side is worse than crediting nobody.
     assert ledger_from_api(
         [{"at": "2026-09-18T22:25:51+02:00", "kind": "clause",
           "user_id": "11883172", "counterparty": "404",
@@ -1060,8 +1026,6 @@ def _selftest_anchor_is_current() -> None:
     lg3 = League(Config(me="miguel_autentico"), rosters, [], mkt, api_teams=[])
     assert lg3.owner[norm("Simeone")] == "miguel_autentico", lg3.owner
 
-    # -- the app drops a player WITHOUT a feed sale: the ledger keeps him, and
-    # the cash estimate prices him at the value he had WHEN HE LEFT, not now --
     hist = lambda n, *pts: [{"name": n, "value": v, "observed_at": at,
                              "position": "DEL"} for at, v in pts]
     mkt2 = Market(hist("Ghost", ("2026-08-17T2246Z", "8000000"),
@@ -1083,18 +1047,13 @@ def _selftest_anchor_is_current() -> None:
                  roster_history=rows("2026-08-17T2246Z", "5", "77")
                  + rows("2026-08-18T0600Z", "5", "77")
                  + rows("2026-08-19T0600Z", "5"))
-    # Ghost was never in a roster: gone by the FIRST snapshot after his
-    # purchase. Seen was listed twice: gone by the first snapshot without him.
     assert {k: v[1].strftime("%m-%dT%H%M") for k, v in lg4.dropped.items()} \
         == {"ghost": "08-17T2246", "seen": "08-19T0600"}, lg4.dropped
     c4 = lg4["rival"].cash
-    # 100 - (20+10+1) + 8 (Ghost when gone, NOT the 3 he is worth now)
-    #                 + 6 (Seen when gone, NOT the 2 he is worth now)
     assert c4.value == 83e6, (c4.value, c4.basis)
     assert "8.00M assuming the app paid Ghost's market value when he left" \
         in c4.basis and "gone by" in c4.basis, c4.basis
-    assert gone_at([], "1", "m", None) is None      # no history: cannot say
-    # Nothing dropped, nothing assumed -- the ordinary case adds no term.
+    assert gone_at([], "1", "m", None) is None
     assert not lg2.dropped and "assuming the app paid" not in \
         lg2["BurtonGM89"].cash.basis, lg2.dropped
 

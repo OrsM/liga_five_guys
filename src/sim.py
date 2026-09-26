@@ -34,8 +34,6 @@ def fielded_keys(u=None) -> list[str]:
     return app_fielded(u.state.squads.get(u.me, {}), u.view("name")) if u else []
 
 
-
-
 def xi_change(marked: list[str], best) -> dict:
     best = list(best)
     if len(marked) != len(best) or not marked:
@@ -64,8 +62,6 @@ def header(u, base, n_actions: int, locks_h=None, xi=None) -> list[str]:
                       else "%.0f days" % (locks_h / 24)))
     cash_txt = ("**cash %s**" if u.cash < 0 else "cash %s") % fmt_money(u.cash)
     if u.locked_cash:
-        # The bids are NOT held back from this balance -- the app does not
-        # debit them -- so they are shown beside it, not subtracted from it.
         cash_txt += " (%s already bid)" % fmt_money(u.locked_cash)
     ctx += ["squad %s" % fmt_money(val), cash_txt,
             "total %s" % fmt_money(val + u.cash)]
@@ -104,12 +100,6 @@ def short_manager(m: str) -> str:
     return m.split()[0] if m else m
 
 
-
-# THE ONE COPY of the ladder's group headings. The markdown table below and every
-# JSON row use it, and the page draws the row's own `label` -- it used to carry
-# its own list, which had already drifted ("BUY -- with the proceeds" on the
-# phone, "BUY -- free agents" here) for a table that says the opposite of what
-# the row underneath it means.
 GROUP_LABEL = {
     "in": "PUT ON", "out": "TAKE OFF",
     "field": "FIELD — your eleven — the app has not said what you are playing",
@@ -133,11 +123,6 @@ def ladder_rows(u, rows, bands=None, exp=None, xi=None) -> list[dict]:
     spare = max_spare_proceeds(u)
     rest = [k for k in u.view("price") if k not in mine and exp.get(k, 0.0) > bar]
     bands = {k: v for k, v in (bands or {}).items() if k not in won}
-    # ONE DOOR FOR WHAT A PLAYER COSTS. ffcore.bid already fits the premium
-    # over market value from every logged deal -- with a lag guard on the
-    # quoted value that a hand-rolled version does not have -- and already
-    # turns it into a cash-capped bid range with its reasoning. It had never
-    # been called from here, so an afternoon went on rebuilding it worse.
     from ffcore.bid import deals as _deals, premiums as _premiums, suggest
     from ffcore.model import session as _session
     _lg = _session().lg
@@ -146,7 +131,6 @@ def ladder_rows(u, rows, bands=None, exp=None, xi=None) -> list[dict]:
     sell_prem = _premiums(_dl, "sell")
     _rival_max = max(u.rival_cash.values(), default=None)
 
-    # par is a COLUMN here, not a screen -- worth_doing() owns the screen.
     par = {k: v["par"] for k, v in u.player_forecasts.items()}
 
     def cell(k, group, where, money, pts, note="", value=None,
@@ -156,9 +140,6 @@ def ladder_rows(u, rows, bands=None, exp=None, xi=None) -> list[dict]:
         else:
             mean = None
         _worth = u.view("value").get(k)
-        # CASH FOR THIS MOVE, not cash in hand. suggest() refuses a bid it
-        # cannot fund, and every buy on this board is funded by a sale --
-        # handing it the bare balance made it refuse every row.
         _ask = suggest(_worth, buy_prem, u.cash + spare, _rival_max)
         _hold = suggest(_worth, sell_prem)
         return {"offer": u.received_offers.get(k),
@@ -210,19 +191,11 @@ def ladder_rows(u, rows, bands=None, exp=None, xi=None) -> list[dict]:
                     lo=r.get("pts_lo"), hi=r.get("pts_hi"),
                     market=u.view("value").get(k), premium=r.get("burn") or 0.0)
 
-    # THE SAME SCREEN AS THE RECOMMENDATION, not a second copy of it. This
-    # block used to re-derive the whole thing -- its own player_forecasts(),
-    # its own par/pj/mae, its own _clears_par_floor and raid_shortlist --
-    # beside worth_doing() doing exactly that for payload() and the phone.
-    # Three renderers, two implementations, and they had already disagreed
-    # twice this week.
     offer_keys = {r["action"].buy
                   for r in worth_doing(u, [won[k] for k in rest if k in won])
                   if r["action"].buy}
     for k in sorted((k for k in rest if k in offer_keys),
                     key=lambda k: _move_rank_key(won[k], u)):
-        # "listed" is neither: a man his owner has put up for sale can be
-        # outbid, so the board never calls him a buy or a raid.
         kind = u.route_kind(k)
         if kind in ("free", "raid"):
             out.append(buy_cell(k, "buy" if kind == "free" else "raid"))
@@ -241,8 +214,6 @@ def ladder_rows(u, rows, bands=None, exp=None, xi=None) -> list[dict]:
         out.append(cell(k, "pass", short_manager(u.view("owner").get(k)) or "free agent",
                         -u.view("price")[k], None))
     return out
-
-
 
 
 def band_acts(u, exp=None, xi=None) -> list:
@@ -286,10 +257,6 @@ def ladder(u, rows, base, data=None, exp=None, xi=None) -> list[str]:
                 money = "%.2fM" % (r["market"] / 1e6)
                 if r["premium"]:
                     money += " +%.2fM" % (r["premium"] / 1e6)
-                # WHAT TO ACTUALLY BID. Market value is what he is worth,
-                # not what he goes for: fitted over every priced transfer
-                # this season and conditioned on how many bids are already
-                # in, because that is the one thing you know before you bid.
                 if r.get("ask"):
                     money += " · bid %.2fM" % (r["ask"] / 1e6)
                     if r.get("rivals"):
@@ -298,26 +265,8 @@ def ladder(u, rows, base, data=None, exp=None, xi=None) -> list[str]:
                                                      else "s")
             else:
                 money = ("%+.2fM" % (r["money"] / 1e6)) if r["money"] else "—"
-                # A BID ON A MAN YOU OWN, judged against the two numbers
-                # that make it good or bad: what he is worth on the market
-                # today, and what you paid for him. The bid already lifts
-                # his proceeds inside the simulation -- it just never said
-                # so, so a generous offer on a man you were keeping looked
-                # exactly like no offer at all.
                 if r["group"] == "offer" and r.get("offer"):
                     money = "offer %.2fM" % (r["offer"] / 1e6)
-                    # AGAINST WHAT A SALE ACTUALLY FETCHES, not against the
-                    # quoted value. A bid is the only way a player leaves
-                    # for money -- there is no fixed-price channel, which is
-                    # why the 68 logged sales make one smooth hump with no
-                    # spike at 1.00 -- so the quoted value is not the offer
-                    # a seller is really choosing between. The going rate is
-                    # the median of those sales, fitted each run.
-                    #
-                    # WHAT HE COST IS NOT HERE, deliberately. It was, and it
-                    # is a sunk cost: whether to take 48M for Fornals turns
-                    # on what 48M buys against what Fornals scores, not on
-                    # what he was bought for. Miguel: "agree it is sunk cost".
                     if r.get("going"):
                         money += (" (%+.0f%% vs %.2fM going rate)"
                                  % (100 * (r["offer"] / r["going"] - 1.0),
@@ -360,13 +309,6 @@ def ladder(u, rows, base, data=None, exp=None, xi=None) -> list[str]:
         out.append("| **" + GROUP_LABEL["sell"] + "** | | | | | | | | |")
         out += [row_md(r) for r in by_group["sell"]]
 
-    # "offer" rows are NOT rendered as their own section: every one of them
-    # duplicates a player already listed above (keep/out/sell/field) with
-    # the same pts_mean, just re-tagged because he has a live bid -- flip.py
-    # now owns that view (FUND, net points + sell-now-vs-wait timing) and
-    # does it better. The rows stay in ladder_rows()'s DATA (decisions.json)
-    # because flip.report_view() prices a fielded starter through them --
-    # only the markdown listing, which nobody reads twice, is cut.
 
     if by_group.get("buy"):
         out.append("| **" + GROUP_LABEL["buy"] + "** | | | | | | | | |")
@@ -395,8 +337,6 @@ def ladder(u, rows, base, data=None, exp=None, xi=None) -> list[str]:
             "_How to read this table: **How to read the tables** in "
             "METHOD.md._", ""]
     return out
-
-
 
 
 def standings(u, base) -> list[str]:
@@ -531,34 +471,17 @@ def _move_rank_key(r, u):
     return (reliable, -d if d is not None else float("inf"))
 
 def bid_lines(u, rows) -> list[str]:
-    """Your live bids, re-read as what they are: actions already taken.
-
-    The app neither debits them nor stops you bidding past your balance, so
-    nothing else in the system will tell you that the bids standing tonight
-    cost more than you hold. Each run either endorses a bid -- the board
-    still wants that player at that price -- or it does not, and the one
-    free, instant way to raise money is to withdraw the ones it does not.
-    This carries the overdraft warning that cash alone used to carry, back
-    when cash had the bids wrongly netted out of it."""
     if not u.my_bids:
         return []
     name = lambda k: title_name(u.view("name").get(k, k))          # noqa: E731
 
-    # A bid is worth keeping only if the board still wants the man AND the
-    # money is there once the sale that funds him is counted. Endorsement
-    # alone is not enough: the ranking scores one move at a time against
-    # today's squad, so it will happily want two men you can only pay for
-    # one of -- which is the whole reason this warning exists. rows arrive
-    # best-first, so the first move that buys a player is his best price,
-    # and taking them in that order spends the budget the way the board
-    # would spend it.
     cost_of: dict[str, float] = {}
     for r in rows:
         k = r["action"].buy
         if k in u.my_bids and k not in cost_of:
             cost_of[k] = r["action"].net
     keep, drop, spent = [], [], 0.0
-    for k in cost_of:                       # board order, best first
+    for k in cost_of:
         if spent + cost_of[k] <= u.cash:
             keep.append(k)
             spent += cost_of[k]
@@ -681,15 +604,6 @@ def payload(u, rows, base, rivals, locks_h=None, n_actions: int = 0,
 
     moves = []
     rows = worth_doing(u, rows)
-    # A MOVE HAS TO GAIN POINTS TO BE A MOVE. `rows` is what survived
-    # rank()'s screen, not a verdict: a candidate can clear the screen and
-    # then simulate NEGATIVE once it is run properly. best_move() has always
-    # applied this rule (`d_pts > 0`) when it picks the single headline
-    # move; this list did not, so the phone's table showed losing moves
-    # beside winning ones -- one of two on the day this was found, at
-    # -16.63 points. The ladder still lists everything, grouped and with
-    # its Δ shown; this is the recommendations list, and a recommendation
-    # to lose points is not one.
     for r in sorted(rows, key=lambda r: _move_rank_key(r, u)):
         a = r["action"]
         who = max(rivals, key=lambda v: r["d_beat"].get(v, 0.0)) \
@@ -749,10 +663,7 @@ def payload(u, rows, base, rivals, locks_h=None, n_actions: int = 0,
     }
 
 
-
 def _track_record():
-    # Its own git-history replay, best-effort: a shallow clone or a slow
-    # disk should not break the report over a line that is a bonus.
     try:
         import backtest
         return backtest.track_record()
@@ -945,20 +856,7 @@ def _selftest() -> None:
     assert "still" in al_big[0] and "short" in al_big[0], al_big
     assert "d1" not in al_big[0]
 
-    # LIVE BIDS. The board either still wants the man at that price or the
-    # bid should come off the table; and the app neither debits a bid nor
-    # refuses one you cannot cover, so the shortfall has to be said out loud.
-    # A MAN CAN BE EXCELLENT AND STILL BE A LOSING TRADE. par is per-player
-    # and season-long; d_pts is what happens to YOUR squad once the sale
-    # that funds him goes too. The ladder offered Pape Gueye at par +56 with
-    # d_pts -2.0 on 2026-09-18 while the recommendation, which screens on
-    # d_pts, left him out -- two renderers disagreeing off one set of rows.
 
-    # THE PHONE AND THE JSON MUST NAME THE SAME MOVE. worth_doing() is the
-    # one screen; alert_lines() and payload() both run on its output. When
-    # only payload() screened, a run on 2026-09-19 told Miguel to buy Jose
-    # Angel Lopez while its own decisions.json listed neither him nor that
-    # move, having dropped him on the par floor.
     _wd_rows = [{"action": Action("buy", buy="yuri", cost=1e6),
                  "d_pts": 5.0, "d_win": 0.01, "net_pts": 5.0, "pts_lo": 0.0,
                  "pts_hi": 9.0, "helps": 0.7, "value": None, "burn": None,
@@ -970,7 +868,6 @@ def _selftest() -> None:
                  "d_beat": {}}]
     kept = worth_doing(u2, _wd_rows)
     assert [r["action"].buy for r in kept] == ["yuri"], kept
-    # and the headline is chosen from exactly that, never from the raw rows
     import inspect as _ins
     src_main = _ins.getsource(main)
     assert "alert_lines(u, worth_doing(" in src_main, \
@@ -987,8 +884,6 @@ def _selftest() -> None:
     assert "**10.00M bid, 3.00M in hand**" in bl[1], bl
     assert "7.00M short" in bl[1], bl
 
-    # WANTED AND PAID FOR: the board buys Yuri for a net 1M because it sells
-    # someone to do it, and 1M is inside the 3M held -- so that bid stands.
     funded = [{"action": Action("swap", buy="yuri", sell=("d1",),
                                 cost=8e6, proceeds=7e6)}]
     kept = bid_lines(u_bid, funded)
@@ -996,8 +891,6 @@ def _selftest() -> None:
     assert "Yuri" not in kept[0], "an endorsed, funded bid is not withdrawn"
     assert kept[0].startswith("**Withdraw 2.00M**") and "him" in kept[0], kept
 
-    # WANTED AND NOT PAID FOR: same man, no sale behind him, 8M against 3M.
-    # Wanting him is not the test -- affording him is.
     broke = bid_lines(u_bid, [{"action": Action("buy", buy="yuri", cost=8e6)}])
     assert broke[0].startswith("**Withdraw 10.00M**"), broke
     assert "Yuri 8.00M" in broke[0], broke
@@ -1007,7 +900,6 @@ def _selftest() -> None:
     cl = bid_lines(covered, [{"action": Action("buy", buy="yuri", cost=8e6)}])
     assert cl == [], "endorsed and affordable is not news"
 
-    # TWO bids the board wants and one wallet that covers only the first.
     pair = _dc_replace(u2, cash=10e6, my_bids={"yuri": 8e6, "benat": 7e6},
                        locked_cash=15e6)
     pl = bid_lines(pair, [{"action": Action("buy", buy="yuri", cost=8e6)},
@@ -1015,7 +907,6 @@ def _selftest() -> None:
     assert pl[0].startswith("**Withdraw 7.00M**"), pl
     assert "Benat 7.00M" in pl[0] and "Yuri" not in pl[0], pl
 
-    # bid_lines rides ALONGSIDE the other alerts, never instead of them.
     both = alert_lines(_dc_replace(u_over, my_bids={"yuri": 8e6},
                                    locked_cash=8e6), [], ["riv"])
     assert len(both) == 3, both
@@ -1135,10 +1026,6 @@ def _selftest() -> None:
     assert len(al) == 1 and "Yuri Berchiche" in al[0] and "+36%" in al[0], al
     assert "€14.1M" in al[0], al
     assert alert_lines(u, [], ["riv"]) == []
-    # A MOVE WORTH NOTHING IS NOT NEWS -- and the rule that says so lives in
-    # worth_doing(), once. alert_lines() used to repeat it, which is how the
-    # phone and the JSON came to disagree in the first place: two copies of
-    # "recommendable" that had drifted apart.
     flat = [{**rows[0], "net_pts": 0.0, "d_win": 0.0, "d_pts": 0.0}]
     assert worth_doing(u, flat) == [], "the screen drops it"
     assert alert_lines(u, worth_doing(u, flat), ["riv"]) == []
@@ -1255,11 +1142,6 @@ def _selftest() -> None:
         by_group.setdefault(r["group"], []).append(r["name"].lower())
     assert by_group["buy"] == ["steady", "dud", "maverick"], by_group
 
-    # A BID ON A MAN YOU OWN gets its own row, wherever he sits. It already
-    # lifted his proceeds inside the simulation and said nothing, so the best
-    # offer on the board -- 48.07M for Fornals, 8% over market -- was
-    # invisible, because a settled starter is collapsed into the eleven's
-    # summary line and never gets a row at all.
     offered = _dc_replace(
         uc_owned,
         state=LeagueState({"me": {"steady": "MED", "dud": "MED"}, "riv": {}},
@@ -1270,16 +1152,9 @@ def _selftest() -> None:
     assert got[0]["offer"] == 6.0e6, got[0]
     assert got[0]["worth"] == 5.0e6, ("market value comes along, because a "
                                       "bid means nothing without it", got[0])
-    # Judged against what a sale FETCHES, which is the quoted value lifted
-    # by the fitted clearing premium -- so a bid at the quoted value is a
-    # below-average bid, not a fair one.
     assert got[0]["going"] is not None and got[0]["going"] >= 5.0e6, got[0]
-    # AND NOT against what he cost: that is sunk, and it was in here until
-    # Miguel pointed out it has no business in the decision.
     assert "bought" not in got[0], ("purchase price is a sunk cost",
                                     got[0])
-    # Ordered by how generous the bid is against market value: steady is
-    # 6.0M against 5.0M, dud has no market value to be generous against.
     assert got[1]["worth"] is None, got[1]
     assert all(r.get("offer") for r in got), got
     assert not [r for r in ladder_rows(uc_owned, all_rows)
@@ -1383,9 +1258,6 @@ def _selftest() -> None:
     assert bands["cand"][0] > 0, bands["cand"]
     assert ub.rank([], extra=[])[3] == {}
 
-    # WHAT A MAN COST IS NOWHERE, in either renderer. It was on the SELL row
-    # and in the JSON beside it, and it is a sunk cost either way: what he
-    # raises is the number that decides anything.
     sell_lad = "\n".join(ladder(ub, [], baseb))
     dead_line = next(l for l in sell_lad.splitlines()
                      if l.lower().startswith("| dead"))
@@ -1403,7 +1275,6 @@ def _selftest() -> None:
     assert "cand" not in bands2, sorted(bands2)
 
     methodology.current_mae = _real_current_mae
-    # a broken or slow replay never breaks the report over a bonus line
     import backtest
     real_tr = backtest.track_record
     backtest.track_record = lambda *a, **k: (_ for _ in ()).throw(RuntimeError)
@@ -1484,10 +1355,6 @@ def main() -> None:
                 (ALERTS.read_text(encoding="utf-8").splitlines()
                  if ALERTS.exists() else [])
                 if ln.startswith("- ")]
-        # Previous alerts are carried so a warning raised between reports is
-        # not lost -- but carried ONCE. Without this the file grew a fresh
-        # copy of every standing alert on every run, and the noise buried
-        # exactly the time-critical lines the file exists to surface.
         body, seen = [], set()
         for ln in ["- " + ln for ln in lines] + prev:
             if ln not in seen:

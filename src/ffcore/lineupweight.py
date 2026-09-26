@@ -1,18 +1,3 @@
-"""How many played matches is a line-up percentage worth? Measured, not assumed.
-
-Every listed player-match so far (0 points if he did not play), predicted from
-what was known BEFORE it: his own record and the last line-up snapshot taken
-at least LEAD_H before the match page was scraped. The scrape follows the
-final whistle, so a later snapshot can show the real XI -- the leak that made
-an early version of this look 12% better than it was.
-
-The forecast being judged is rate * (k*lineup + sum(past minute shares)) /
-(k + n): `k` is the weight the line-up gets against the player's own minutes.
-It used to be SHRINK_K (8), reused from an unrelated fit. The shares are
-minutes/90 per listed match; the rate is points per 90 shrunk to his position.
-Judged on points, because points are what the forecast is for: fitted to
-minute share alone the best k came out at 12, on points at 2.
-"""
 from __future__ import annotations
 
 import collections
@@ -21,11 +6,11 @@ from datetime import datetime, timedelta
 
 LEAD_H = 24.0
 GRID = (0.5, 1.0, 2.0, 3.0, 4.0, 6.0, 8.0, 12.0)
-PRIOR_90 = 4.0        # 90-minute units of position prior on a player's rate
-WARMUP = 3            # jornadas of history before rows are judged
+PRIOR_90 = 4.0
+WARMUP = 3
 MIN_ROWS = 300
-REGULAR = 0.7          # share of earlier minutes that makes a player a regular
-MIN_STATUS_ROWS = 20   # flagged regulars needed before a status is measured
+REGULAR = 0.7
+MIN_STATUS_ROWS = 20
 
 
 def stamp(s):
@@ -94,7 +79,6 @@ def mse(sample, k):
 
 
 def fit_lineup_weight(data=None) -> tuple[float | None, str]:
-    """Best k on the first 60% of judged rows, with the evidence as a line."""
     p = pairs(data if data is not None else rows())
     if len(p) < MIN_ROWS:
         return None, "only %d comparable player-matches (need %d)" % (
@@ -108,13 +92,6 @@ def fit_lineup_weight(data=None) -> tuple[float | None, str]:
 
 
 def fit_status_factors(lineups=None, starters=None) -> dict[str, tuple[float, int]]:
-    """{status: (share of his normal minutes a flagged regular played, n)}.
-
-    A regular is a player with >= REGULAR of his earlier minutes. The flag is
-    the last one seen >= LEAD_H before the scrape; a player missing from the
-    match sheet played 0, so a flag that means "out" shows as ~0 and one that
-    is only a knock shows what it is. Measured 2026-09-24: "injured" 0.54
-    (95% 0.30-0.79, 42 rows) where the model had assumed 0.0."""
     from ffcore.tidy import MATCH_LEN, load, load_lineups, minutes_played
 
     play, scraped, teams = {}, {}, collections.defaultdict(set)
@@ -152,8 +129,6 @@ def _selftest() -> None:
         return {"key": who, "pos": "MED", "j": j, "at": "2026-09-%02dT1200Z" % j,
                 "line": line, "share": share, "mins": 90.0 * share,
                 "pts": 5.0 * share}
-    # an exact line-up and a record that alternates (so history says nothing):
-    # the fit has to lean on the line-up
     data = []
     for i in range(60):
         for j in range(1, 9):
@@ -162,7 +137,6 @@ def _selftest() -> None:
     data.sort(key=lambda r: r["at"])
     k, why = fit_lineup_weight(data)
     assert k == max(GRID), (k, why)
-    # a line-up that is noise and a steady record: the fit has to lean on history
     steady = [game("p%d" % i, j, 1.0, float((i * j) % 2)) for i in range(60)
               for j in range(1, 9)]
     steady.sort(key=lambda r: r["at"])
@@ -171,7 +145,6 @@ def _selftest() -> None:
     k, why = fit_lineup_weight(data[:20])
     assert k is None and "need" in why, (k, why)
     assert not pairs([game("a", 1, 1.0, 1.0)]), "no history, nothing to judge"
-    # regulars flagged "injured" miss every match, "doubt" every other one
     starters, lineups = [], []
     for m in range(1, 9):
         for i in range(50):

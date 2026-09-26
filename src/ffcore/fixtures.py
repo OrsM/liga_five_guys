@@ -10,7 +10,6 @@ if TYPE_CHECKING:
     from ffcore.season import LeagueState
 
 
-
 __all__ = ["tiny_profile", "tiny_state", "tiny_bootstrap", "tiny_universe",
           "tiny_market_universe", "players_from_flat"]
 
@@ -95,9 +94,6 @@ def players_from_flat(pos=None, price=None, proceeds=None, owner=None,
 
 
 def _with_overrides(name: str, defaults: dict, overrides: dict) -> dict:
-    """`defaults` merged with `overrides`, raising if an override name
-    isn't a known default -- the keyword-validation skeleton tiny_state()
-    and tiny_bootstrap() each wrote out separately."""
     for k in overrides:
         if k not in defaults:
             raise TypeError(f"{name}: unknown override {k!r}")
