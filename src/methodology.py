@@ -7,7 +7,7 @@ import sys
 
 
 import stats
-from ffcore import schema
+from ffcore.parse import flag, text
 from ffcore.fixture import FIX_BAND
 from ffcore.score import SHRINK_K
 from ffcore.text import norm, resolve
@@ -57,7 +57,7 @@ def _group_by_key(rows, key_fn=None, when_fn=None, value_fn=None,
     value_fn = value_fn or (lambda r: r)
     per: dict[str, list] = {}
     for r in rows:
-        if src is not None and schema.text(r, "source") != src:
+        if src is not None and text(r, "source") != src:
             continue
         try:
             key = key_fn(r)
@@ -269,7 +269,7 @@ def _matched_start_rows(intervals, per: dict[str, list], check_teams: bool = Tru
             row = latest_before(hist, start)
             if row is None:
                 continue
-            if teams is not None and schema.text(row, "team_slug") not in teams:
+            if teams is not None and text(row, "team_slug") not in teams:
                 continue
             yield interval, key, row
 
@@ -287,7 +287,7 @@ def _start_classify(row):
 
 
 def start_grade(intervals, claims, universe=None, instances=None):
-    sources = {schema.text(r, "source") for r in claims} - {""}
+    sources = {text(r, "source") for r in claims} - {""}
     per = {src: g for src in sources
           if (g := _group_by_key(claims, src=src, universe=universe))}
 
@@ -299,7 +299,7 @@ def start_grade(intervals, claims, universe=None, instances=None):
             start, played = interval[0], interval[1]
             if instances is not None and (key, start) not in instances:
                 continue
-            slug = schema.text(row, "player_slug")
+            slug = text(row, "player_slug")
             hit = 1.0 if key in played or (slug and slug in played) else 0.0
             kind, pct = _start_classify(row) or (None, None)
             if kind is None:
@@ -373,7 +373,7 @@ def start_intervals(matches: list[dict], starters: list[dict],
         if mark in seen:
             continue
         seen.add(mark)
-        team = schema.text(r, "team_slug")
+        team = text(r, "team_slug")
         lock = locks.get((jor, team))
         if lock is None:
             ungraded.add(jor)
@@ -383,7 +383,7 @@ def start_intervals(matches: list[dict], starters: list[dict],
         by_round.setdefault(lock, set()).update(
             k for k in (_market_key(r.get("player_slug")),
                         norm(r.get("player_name", "")),
-                        schema.text(r, "player_slug"),
+                        text(r, "player_slug"),
                         norm(priced["name"]) if priced else "") if k)
         teams.setdefault(lock, set()).add(team)
     out = [(lock, keys, teams[lock]) for lock, keys in sorted(by_round.items())]
@@ -441,14 +441,14 @@ def load_predictions() -> dict[str, list[tuple[dt.datetime, dict]]]:
                 fac[col] = float(r[col])
             except (KeyError, ValueError, TypeError):
                 fac[col] = None
-        fac["home"] = schema.flag(r, "home")
+        fac["home"] = flag(r, "home")
         fac["pos"] = (r.get("pos") or "").lower()
         fac["status"] = r.get("status") or ""
         return fac
 
     return _group_by_key(
         read_csv(DECISIONS / "squad_log.csv"),
-        key_fn=lambda r: schema.text(r, "ff_id") or norm(r.get("player", "")),
+        key_fn=lambda r: text(r, "ff_id") or norm(r.get("player", "")),
         when_fn=lambda r: snapshot_stamp(r["observed_at"]),
         value_fn=_factors)
 
@@ -877,7 +877,7 @@ def _instance_briers(intervals, claims, src, instances) -> list[float]:
             pct = float(row.get("start_pct"))
         except (TypeError, ValueError):
             continue
-        slug = schema.text(row, "player_slug")
+        slug = text(row, "player_slug")
         hit = 1.0 if key in played or (slug and slug in played) else 0.0
         out.append((pct / 100.0 - hit) ** 2)
     return out
@@ -893,7 +893,7 @@ def forecast_claims() -> list[dict]:
             continue
         if not r.get("player") or not r.get("observed_at"):
             continue
-        p = xw.players.get(schema.text(r, "ff_id"))
+        p = xw.players.get(text(r, "ff_id"))
         team_slug = p.club_id if p else ""
         out.append({"source": "our forecast", "player_name": r["player"],
                     "observed_at": r["observed_at"], "start_pct": pct,

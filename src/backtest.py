@@ -29,29 +29,29 @@ POS_ID_SLOT = {"1": "POR", "2": "DEF", "3": "MED", "4": "DEL"}
 
 
 def squad_at(manager: str, when: dt.datetime) -> dict[str, str]:
-    from ffcore.schema import API_TEAMS, text
+    from ffcore.parse import text
     from ffcore.tidy import latest_only, load_crosswalk
     xw = load_crosswalk()
     ff_of = {getattr(v, "app_id", ""): k for k, v in xw.players.items()
              if getattr(v, "app_id", "")}
     out = {}
     for r in latest_only(csv_as_of(when, "data/tidy/api_teams.csv")):
-        slot = POS_ID_SLOT.get(text(r, API_TEAMS.POSITION_ID))
-        ff = ff_of.get(text(r, API_TEAMS.PLAYER_ID))
-        if slot and ff and text(r, API_TEAMS.MANAGER) == manager:
+        slot = POS_ID_SLOT.get(text(r, "position_id"))
+        ff = ff_of.get(text(r, "player_id"))
+        if slot and ff and text(r, "manager") == manager:
             out[ff] = slot
     return out
 
 
 def jornada_points(jornada: int) -> dict[str, float]:
-    from ffcore.schema import PERJORNADA, num, text
+    from ffcore.parse import num, text
     from ffcore.tidy import load_perjornada
     want = str(jornada)
-    return {text(r, PERJORNADA.FF_ID): num(r, PERJORNADA.POINTS_DELTA,
+    return {text(r, "ff_id"): num(r, "points_delta",
                                            default=0.0)
             for r in load_perjornada()
-            if text(r, PERJORNADA.JORNADA) == want
-            and text(r, PERJORNADA.FF_ID)}
+            if text(r, "jornada") == want
+            and text(r, "ff_id")}
 
 
 def jornada_bounds(manager: str, jornada: int,

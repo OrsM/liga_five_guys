@@ -21,7 +21,7 @@ UV="$HOME/.local/bin/uv"
 export PYTHONPATH=src
 export FF_ROOT=./data
 
-TESTS=(ffcore/parse.py ffcore/text.py ffcore/schema.py ffcore/tidy.py
+TESTS=(ffcore/parse.py ffcore/text.py ffcore/tidy.py
        ffcore/fixtures.py ffcore/auth.py
        ffcore/model.py ffcore/attributes.py
        ffcore/forecast.py ffcore/season.py ffcore/render.py

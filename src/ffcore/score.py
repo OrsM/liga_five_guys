@@ -4,7 +4,7 @@ from __future__ import annotations
 import statistics
 from typing import NamedTuple
 
-from ffcore import schema
+from ffcore.parse import text
 from ffcore.parse import money, pct100, ratio
 from ffcore.startprob import Calibration
 from ffcore.text import norm
@@ -144,7 +144,7 @@ def _forward_understat_rows(season: str, xw):
     for r in load_understat_players(season):
         if "F" not in (r.get("position") or ""):
             continue
-        uid = schema.text(r, schema.UNDERSTAT_PLAYERS.UNDERSTAT_ID)
+        uid = text(r, "understat_id")
         if not uid:
             continue
         key = xw.player(understat_id=uid)
@@ -259,7 +259,7 @@ def _shots_by_jornada(xw) -> dict[str, dict[int, float]]:
     for r in load_api_stats():
         if r.get("stat") != "total_scoring_att":
             continue
-        key = xw.player(app_id=schema.text(r, schema.API_STATS.PLAYER_ID))
+        key = xw.player(app_id=text(r, "player_id"))
         if not key:
             continue
         try:
@@ -345,8 +345,8 @@ def _per_jornada_current(starters_rows, perjornada_rows, jornada_of_match,
     minutes_by_jor: dict[str, dict[int, float]] = {}
     seen: set[tuple[str, str]] = set()
     for r in starters_rows:
-        slug = schema.text(r, schema.STARTERS.PLAYER_SLUG)
-        mid = schema.text(r, schema.STARTERS.MATCH_ID)
+        slug = text(r, "player_slug")
+        mid = text(r, "match_id")
         jor = jornada_of_match.get(mid)
         if not slug or jor is None or r.get("role") not in ("starter", "sub"):
             continue
@@ -364,7 +364,7 @@ def _per_jornada_current(starters_rows, perjornada_rows, jornada_of_match,
     end_total: dict[str, dict[int, float]] = {}
     seen_at: dict[str, dict[int, str]] = {}
     for r in perjornada_rows:
-        raw_jor = schema.text(r, schema.PERJORNADA.JORNADA)
+        raw_jor = text(r, "jornada")
         if not raw_jor:
             continue
         jor = int(raw_jor)
@@ -495,7 +495,7 @@ def load_points() -> tuple[dict, str, dict, str]:
         for r in read_csv(path):
             rec = {"pts": ratio(r.get("points")) or 0.0,
                    "pj": ratio(r.get("games")) or 0.0}
-            pid = schema.text(r, "ff_id")
+            pid = text(r, "ff_id")
             player = xw.players.get(pid) if pid and xw is not None else None
             if player and player.name:
                 out.setdefault(norm(player.name), rec)

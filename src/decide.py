@@ -29,7 +29,7 @@ from ffcore.season import (LeagueState, best_xi,
 from ffcore.tidy import (run_now, load_api, load_fixtures, load_api_stats,
                          load_perjornada, load_players, market_routes, pending,
                          DAILY_FRESH_DAYS, fresh_only, newest, table)
-from ffcore.schema import text, num, API_TEAMS, API_STANDINGS
+from ffcore.parse import num, text
 
 __all__ = ["Action", "Universe"]
 
@@ -477,7 +477,7 @@ def load(trials_pool=None) -> Universe:
     m = newest("matches")
     rem, played = rounds_left(m, load_fixtures())
 
-    teams, mkt = ([dict(r, key=lg.xw.player(app_id=text(r, API_TEAMS.PLAYER_ID)))
+    teams, mkt = ([dict(r, key=lg.xw.player(app_id=text(r, "player_id")))
                    for r in load_api(name)] for name in ("teams", "market"))
     owner = dict(lg.owner)
     me = lg.cfg.me
@@ -495,12 +495,12 @@ def load(trials_pool=None) -> Universe:
     clause: dict[str, float] = {}
     for r in teams:
         k = r["key"]
-        buyout = text(r, API_TEAMS.BUYOUT)
+        buyout = text(r, "buyout")
         if not k:
             continue
         if r.get("player_team_id"):
             pt_to_key[r["player_team_id"]] = k
-        raw = text(r, API_TEAMS.BUYOUT_UNTIL)
+        raw = text(r, "buyout_until")
         if raw:
             try:
                 clause_until[k] = dt.datetime.fromisoformat(raw)
@@ -602,7 +602,7 @@ def load(trials_pool=None) -> Universe:
     for r in newest("api_standings"):
         if r.get("manager"):
             carried.setdefault(r["manager"],
-                              num(r, API_STANDINGS.TEAM_POINTS, default=0.0))
+                              num(r, "team_points", default=0.0))
     raw_cash = lg[me].cash.value or 0.0
     my_bids = pending(mkt, "bid_status", "bid_money")
     locked_cash = sum(my_bids.values())

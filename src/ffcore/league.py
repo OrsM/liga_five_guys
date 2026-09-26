@@ -10,7 +10,7 @@ from datetime import datetime, timedelta, timezone as dt_timezone
 from pathlib import Path
 from typing import NamedTuple
 
-from ffcore import schema
+from ffcore.parse import text
 from ffcore.parse import money
 from ffcore.tidy import shown
 from ffcore.text import norm
@@ -74,8 +74,8 @@ def load_config(name: str = "league.ini") -> Config:
 def read_api_balances(rows) -> dict[str, tuple[float, str]]:
     out: dict[str, tuple[float, str]] = {}
     for r in rows:
-        handle = schema.text(r, schema.API_STANDINGS.MANAGER)
-        raw = schema.text(r, schema.API_STANDINGS.TEAM_MONEY)
+        handle = text(r, "manager")
+        raw = text(r, "team_money")
         if not handle or not raw:
             continue
         try:
@@ -127,7 +127,7 @@ def app_fielded(squad, names: dict, rows=None, xw=None) -> list[str]:
     by_name = {norm(names.get(k, k)): k for k in squad}
     out = []
     for r in rows or []:
-        key = xw.player(app_id=schema.text(r, schema.API_LINEUP.PLAYER_ID))
+        key = xw.player(app_id=text(r, "player_id"))
         if key is None:
             for field in ("player_name", "player_name_full"):
                 key = by_name.get(norm(r.get(field) or ""))
@@ -241,18 +241,18 @@ class League:
         self.market = market
         self.xw = xw
         self._standings = standings
-        self.txns = [dict(t, key=xw.player(app_id=schema.text(
-            t, schema.TRANSACTIONS.PLAYER_ID))) for t in txns]
+        self.txns = [dict(t, key=xw.player(app_id=text(
+            t, "player_id"))) for t in txns]
         self.owner: dict[str, str] = {}
         self.api_unjoined: list[str] = []
         for r in api_teams:
-            handle = schema.text(r, schema.API_TEAMS.MANAGER)
-            key = xw.player(app_id=schema.text(r, schema.API_TEAMS.PLAYER_ID))
+            handle = text(r, "manager")
+            key = xw.player(app_id=text(r, "player_id"))
             if key and handle:
                 self.owner[key] = handle
             elif handle:
                 self.api_unjoined.append(
-                    schema.text(r, schema.API_TEAMS.PLAYER_NAME))
+                    text(r, "player_name"))
         self.warnings = [
             "**%s** — the app says he is owned, but no player in the "
             "crosswalk has his app id, so he is missing from the board." % raw
@@ -262,26 +262,26 @@ class League:
         for t in self.txns:
             if t["key"]:
                 last[t["key"]] = (
-                    schema.text(t, schema.TRANSACTIONS.TO_) or MARKET,
-                    schema.text(t, schema.TRANSACTIONS.PLAYER_ID),
+                    text(t, "to") or MARKET,
+                    text(t, "player_id"),
                     ledger_stamp(t.get("date", "")))
         self.dropped = {k: (m, gone_at(roster_history, pid, m, when))
                         for k, (m, pid, when) in last.items()
                         if self.owner and m != MARKET and k not in self.owner}
 
         handles = ({cfg.me} | set(self.owner.values())
-                   | {schema.text(r, schema.API_STANDINGS.MANAGER)
+                   | {text(r, "manager")
                       for r in standings}
-                   | {schema.text(t, f) for t in self.txns
-                      for f in (schema.TRANSACTIONS.FROM_,
-                                schema.TRANSACTIONS.TO_)}) - {MARKET, ""}
+                   | {text(t, f) for t in self.txns
+                      for f in ("from",
+                                "to")}) - {MARKET, ""}
         self.managers: dict[str, Manager] = {h: Manager(h)
                                              for h in sorted(handles)}
         for key, mgr in self.owner.items():
             self.managers[mgr].players.append(key)
         for t in self.txns:
-            src = schema.text(t, schema.TRANSACTIONS.FROM_) or MARKET
-            dst = schema.text(t, schema.TRANSACTIONS.TO_) or MARKET
+            src = text(t, "from") or MARKET
+            dst = text(t, "to") or MARKET
             if dst != MARKET:
                 self.managers[dst].buys.append(t)
             if src != MARKET:
@@ -314,9 +314,9 @@ class League:
             b, sd = 0.0, 0.0
             for t in self.txns:
                 price = money(t.get("price")) or 0.0
-                if schema.text(t, schema.TRANSACTIONS.TO_) == self.cfg.me:
+                if text(t, "to") == self.cfg.me:
                     b += price
-                if schema.text(t, schema.TRANSACTIONS.FROM_) == self.cfg.me:
+                if text(t, "from") == self.cfg.me:
                     sd += price
             paid = flat_income(me_anchor[0], self.cfg.budget, b, sd)
 
@@ -327,8 +327,8 @@ class League:
 
         click_rate, my_clicks, my_days = 0.0, 0, 0.0
         me_txns = [t for t in self.txns
-                  if schema.text(t, schema.TRANSACTIONS.TO_) == self.cfg.me
-                  or schema.text(t, schema.TRANSACTIONS.FROM_) == self.cfg.me]
+                  if text(t, "to") == self.cfg.me
+                  or text(t, "from") == self.cfg.me]
         me_start = min((ledger_stamp(t.get("date", "")) for t in me_txns
                        if ledger_stamp(t.get("date", ""))), default=None)
         if paid is not None and self.cfg.daily_bonus:
@@ -360,8 +360,8 @@ class League:
                 if since and when and when <= since:
                     continue
                 price = money(t.get("price")) or 0.0
-                src = schema.text(t, schema.TRANSACTIONS.FROM_) or MARKET
-                dst = schema.text(t, schema.TRANSACTIONS.TO_) or MARKET
+                src = text(t, "from") or MARKET
+                dst = text(t, "to") or MARKET
                 if dst == handle:
                     bought += price
                     counted += 1

@@ -3,7 +3,8 @@ from __future__ import annotations
 
 import re
 
-__all__ = ["money", "ratio", "pct100", "fmt_money", "fmt_pct", "grouped_sums"]
+__all__ = ["money", "ratio", "pct100", "fmt_money", "fmt_pct", "grouped_sums",
+           "text", "num", "whole", "flag"]
 
 _DOT_GROUPED = re.compile(r"\d{1,3}(?:\.\d{3})+$")
 _CLEAN = str.maketrans({"\u00a0": "", " ": "", "\u202f": ""})
@@ -88,7 +89,59 @@ def fmt_pct(v) -> str:
     return "—" if v is None else "%.0f%%" % v
 
 
+def text(row, col: str, default: str = "") -> str:
+    v = row.get(col) or ""
+    v = v.strip() if isinstance(v, str) else str(v).strip()
+    return v if v else default
+
+
+def num(row, col: str, default=None):
+    v = row.get(col)
+    if v is None:
+        return default
+    s = v.strip() if isinstance(v, str) else v
+    if s == "":
+        return default
+    try:
+        return float(s)
+    except (TypeError, ValueError):
+        return default
+
+
+def whole(row, col: str, default=None):
+    v = num(row, col, default=None)
+    if v is None:
+        return default
+    try:
+        return int(v)
+    except (TypeError, ValueError, OverflowError):
+        return default
+
+
+def flag(row, col: str, default: bool = False) -> bool:
+    v = row.get(col)
+    if not isinstance(v, str):
+        return default
+    s = v.strip().lower()
+    if s in ("true", "1"):
+        return True
+    if s in ("false", "0"):
+        return False
+    return default
+
+
 def _selftest() -> None:
+    row = {"s": "  x ", "blank": " ", "n": "3.5", "i": "4.0", "bad": "x",
+           "t": "True", "f": "0", "num": 7}
+    for fn, col, default, want in [
+            (text, "s", "", "x"), (text, "blank", "d", "d"),
+            (text, "missing", "", ""), (text, "num", "", "7"),
+            (num, "n", None, 3.5), (num, "blank", 0.0, 0.0),
+            (num, "bad", None, None), (num, "num", None, 7.0),
+            (whole, "i", None, 4), (whole, "bad", -1, -1),
+            (flag, "t", False, True), (flag, "f", True, False),
+            (flag, "bad", True, True)]:
+        assert fn(row, col, default) == want, (fn.__name__, col, want)
     cases_money = {
         "2.050.000": 2050000, "35.276.000": 35276000, "700.000": 700000,
         "49.991.863\u20ac": 49991863, "6892898": 6892898, "80.000.000": 80000000,

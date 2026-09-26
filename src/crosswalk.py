@@ -4,7 +4,7 @@ from __future__ import annotations
 import sys
 
 
-from ffcore import schema
+from ffcore.parse import text
 from ffcore.crosswalk import Crosswalk, Player
 from ffcore.parse import money
 from ffcore.text import norm, tokens
@@ -34,20 +34,20 @@ def build_players(registry: dict, market, lineups, api_rows) -> dict:
         if not pid:
             continue
         p = out.setdefault(pid, Player(pid))
-        p.name = schema.text(r, schema.MARKET.NAME) or p.name
+        p.name = text(r, "name") or p.name
         p.club_id = r.get("club") or p.club_id
     named = group_by_name(out.values())
 
     for r in lineups:
-        slug = schema.text(r, schema.LINEUPS.PLAYER_SLUG)
+        slug = text(r, "player_slug")
         p = _named(named, r.get("player_name"), r.get("team_slug") or "")
-        field = ("af_slug" if schema.text(r, schema.LINEUPS.SOURCE)
+        field = ("af_slug" if text(r, "source")
                  == "analitica" else "ff_slug")
         if p is not None and slug and not getattr(p, field):
             setattr(p, field, slug)
 
     value = {row_key(r): money(r.get("value")) for r in market}
-    app = {schema.text(r, schema.API_TEAMS.PLAYER_ID): r for r in api_rows}
+    app = {text(r, "player_id"): r for r in api_rows}
     words = {pid: set(tokens(p.name)) for pid, p in out.items()}
     weak = set()
     for pid, p in out.items():
@@ -84,7 +84,7 @@ def build_players(registry: dict, market, lineups, api_rows) -> dict:
             weak.discard(hits[0])
             held.discard(out[hits[0]].app_id)
             out[hits[0]].app_id = app_id
-            out[hits[0]].app_names.add(schema.text(r, schema.API_TEAMS.PLAYER_NAME))
+            out[hits[0]].app_names.add(text(r, "player_name"))
             held.add(app_id)
     return out
 
@@ -98,7 +98,7 @@ def build_understat_ids(rows, players: dict) -> int:
 
     best: dict[str, dict] = {}
     for r in rows:
-        uid = schema.text(r, schema.UNDERSTAT_PLAYERS.UNDERSTAT_ID)
+        uid = text(r, "understat_id")
         if not uid:
             continue
         prev = best.get(uid)
