@@ -189,12 +189,8 @@ def difficulty(strength: dict[str, float]) -> dict[str, tuple[float, int]]:
     return out
 
 
-def fixture_board(market: list[dict], fixtures: list[dict],
-                  now: datetime, elo_rows=None, results=None,
-                  understat_rows=None, home_edge: float = HOME_EDGE
-                  ) -> dict[str, Match]:
-    ratings = _difficulty_ratings(market, elo_rows, results, understat_rows,
-                                  home_edge)
+def fixture_board(ratings: "_Ratings", fixtures: list[dict],
+                  now: datetime) -> dict[str, Match]:
     board: dict[str, Match] = {}
     for r in fixtures:
         when = kickoff_stamp(r.get("kickoff"))
@@ -220,7 +216,7 @@ class _Ratings(NamedTuple):
     home_edge: float
 
 
-def _difficulty_ratings(market: list[dict], elo_rows=None, results=None,
+def difficulty_ratings(market: list[dict], elo_rows=None, results=None,
                         understat_rows=None, home_edge: float = HOME_EDGE
                         ) -> _Ratings:
     value = team_strength(market)
@@ -252,12 +248,8 @@ def _match_for(ratings: "_Ratings", team: str, opp: str, opp_name: str,
                 rank=rank, of=len(ratings.teams), basis=row_basis, gap=gap)
 
 
-def season_board(market: list[dict], matches: list[dict], jornadas,
-                 now: datetime, elo_rows=None, results=None,
-                 understat_rows=None, home_edge: float = HOME_EDGE
-                 ) -> dict[int, dict[str, Match]]:
-    ratings = _difficulty_ratings(market, elo_rows, results, understat_rows,
-                                  home_edge)
+def season_board(ratings: "_Ratings", matches: list[dict], jornadas,
+                 now: datetime) -> dict[int, dict[str, Match]]:
     board: dict[int, dict[str, Match]] = {j: {} for j in set(jornadas)}
     for r in matches:
         j = r.get("jornada") or ""
@@ -372,7 +364,7 @@ def _selftest() -> None:
           for k, h, a in [("2026-08-14T19:00:00+00:00", "Rich", "Poor"),
                           ("2026-08-20T19:00:00+00:00", "Mid", "Rich"),
                           ("2026-08-16T19:00:00+00:00", "Poor", "Mid")]]
-    board = fixture_board(mk, fx, now)
+    board = fixture_board(difficulty_ratings(mk), fx, now)
 
     assert board["Rich"].opponent == "Mid" and not board["Rich"].home
     assert board["Mid"].opponent == "Poor", board["Mid"]
@@ -383,9 +375,9 @@ def _selftest() -> None:
     assert abs(board["Poor"].atk_factor - (1.0 * (1.0 + HOME_EDGE))) < 1e-9
     assert board["Mid"].rank == 3 and board["Mid"].of == 3
 
-    assert fixture_board(mk, [], now) == {}
-    solo = fixture_board(mk, [{"kickoff": "2026-08-20T19:00:00+00:00",
-                               "home": "Mid", "away": ""}], now)
+    assert fixture_board(difficulty_ratings(mk), [], now) == {}
+    solo = fixture_board(difficulty_ratings(mk), [{
+        "kickoff": "2026-08-20T19:00:00+00:00", "home": "Mid", "away": ""}], now)
     assert solo["Mid"].rank == 0
     assert abs(solo["Mid"].atk_factor - (1.0 + HOME_EDGE)) < 1e-9
 
@@ -393,7 +385,8 @@ def _selftest() -> None:
                   "away_goals": "5"}] * MIN_AD_MATCHES
     fx2 = [{"kickoff": "2026-08-20T19:00:00+00:00",
            "home": "Mid", "away": "Rich"}]
-    real = fixture_board(mk, fx2, now, results=ad_results)
+    real = fixture_board(difficulty_ratings(mk, results=ad_results), fx2,
+                         now)
     assert real["Mid"].basis == "attack_defense", real["Mid"]
     assert real["Mid"].def_factor != real["Mid"].atk_factor, real["Mid"]
     assert abs(real["Mid"].def_factor - (1.0 / 0.75) * (1.0 + HOME_EDGE)) \
@@ -408,7 +401,7 @@ def _selftest() -> None:
     assert st_elo == {"Rich": 1500.0, "Mid": 1700.0, "Poor": 1900.0}, st_elo
     assert difficulty(st_elo)["Poor"][1] == 1
 
-    eb = fixture_board(mk, fx, now, elo)
+    eb = fixture_board(difficulty_ratings(mk, elo), fx, now)
     assert eb["Rich"].basis == "elo", eb["Rich"]
     assert eb["Mid"].rank == 1 and board["Mid"].rank == 3, (eb["Mid"], board)
     assert eb["Mid"].gap == 1700.0 - 1900.0, eb["Mid"]
@@ -416,25 +409,23 @@ def _selftest() -> None:
 
     assert elo_strength(["Rich", "Mid", "Poor"],
                         [{"club": "Poor", "elo": "1900"}]) is None
-    assert fixture_board(mk, fx, now,
-                         [{"club": "Poor", "elo": "1900"}])["Rich"].basis \
-        == "value"
+    assert fixture_board(difficulty_ratings(mk, [{"club": "Poor", "elo": "1900"}]),
+                         fx, now)["Rich"].basis == "value"
     assert elo_strength(["Rich"], [{"club": "Rich", "elo": ""}]) is None
 
-    assert fixture_board(mk, fx, now, None) == board
-    assert fixture_board(mk, fx, now, []) == board
+    assert fixture_board(difficulty_ratings(mk, []), fx, now) == board
 
     ms = [{"jornada": "1", "home": "Rich", "away": "Poor", "score": "2-0"},
          {"jornada": "2", "home": "Mid", "away": "Rich", "score": ""},
          {"jornada": "2", "home": "Poor", "away": "?", "score": ""},
          {"jornada": "3", "home": "Rich", "away": "Mid", "score": ""}]
-    sb = season_board(mk, ms, [1, 2, 3], now)
+    sb = season_board(difficulty_ratings(mk), ms, [1, 2, 3], now)
     assert set(sb) == {1, 2, 3}, sb
     assert sb[1]["Rich"].opponent == "Poor" and sb[1]["Rich"].home
     assert sb[1]["Poor"].opponent == "Rich" and not sb[1]["Poor"].home
     assert sb[2]["Mid"].opponent == "Rich" and sb[2]["Mid"].home
     same_fixture = fixture_board(
-        mk, [{"kickoff": "2026-08-20T19:00:00+00:00",
+        difficulty_ratings(mk), [{"kickoff": "2026-08-20T19:00:00+00:00",
              "home": "Mid", "away": "Rich"}], now)
     assert sb[2]["Mid"].atk_factor == same_fixture["Mid"].atk_factor
     assert sb[2]["Mid"].def_factor == same_fixture["Mid"].def_factor
@@ -443,18 +434,19 @@ def _selftest() -> None:
     assert sb[3]["Rich"].opponent == "Mid" and sb[3]["Rich"].home
     assert sb[1]["Rich"] != sb[3]["Rich"]
 
-    assert 4 not in season_board(mk, ms, [1, 2, 3], now)
-    assert season_board(mk, [], [1, 2], now) == {1: {}, 2: {}}
+    assert 4 not in season_board(difficulty_ratings(mk), ms, [1, 2, 3], now)
+    assert season_board(difficulty_ratings(mk), [], [1, 2], now) == {
+        1: {}, 2: {}}
 
-    sb_elo = season_board(mk, ms, [2], now, elo)
+    sb_elo = season_board(difficulty_ratings(mk, elo), ms, [2], now)
     assert sb_elo[2]["Mid"].basis == "elo", sb_elo[2]["Mid"]
     same_elo = fixture_board(
-        mk, [{"kickoff": "2026-08-20T19:00:00+00:00",
-             "home": "Mid", "away": "Rich"}], now, elo)
+        difficulty_ratings(mk, elo), [{"kickoff": "2026-08-20T19:00:00+00:00",
+                                       "home": "Mid", "away": "Rich"}], now)
     assert sb_elo[2]["Mid"].rank == same_elo["Mid"].rank
     assert sb_elo[2]["Mid"].gap == same_elo["Mid"].gap
 
-    print("ffcore.fixture self-test OK (81 cases)")
+    print("ffcore.fixture self-test OK (80 cases)")
 
 
 if __name__ == "__main__":

@@ -29,8 +29,7 @@ from ffcore.season import (LeagueState, best_xi,
                            simulate_many)
 from ffcore.tidy import (run_now, load_api, load_fixtures, load_api_stats,
                          load_perjornada, load_players, market_routes, pending,
-                         load_understat_players, DAILY_FRESH_DAYS, LINEUP_SOURCE,
-                         fresh_only, newest, table)
+                         LINEUP_SOURCE, newest, table)
 from ffcore.parse import num, text
 
 __all__ = ["Action", "Universe"]
@@ -275,14 +274,14 @@ def _pos_of(raw: str) -> str:
 
 
 def _fieldable(squad: dict[str, str]) -> bool:
-    from ffcore.score import formations
+    from ffcore.score import FREE_FORMATIONS
     depth: dict[str, int] = {}
     for slot in squad.values():
         depth[slot] = depth.get(slot, 0) + 1
     if depth.get("POR", 0) < 1:
         return False
     return any(depth.get("DEF", 0) >= d and depth.get("MED", 0) >= m
-              and depth.get("DEL", 0) >= n for d, m, n in formations())
+              and depth.get("DEL", 0) >= n for d, m, n in FREE_FORMATIONS)
 
 
 def _score_many(u: Universe, many: list, trials: int, seed: int):
@@ -444,8 +443,8 @@ def best_move(u, rows, rivals):
 @cache
 def load() -> Universe:
     lg = League.load()
-    sc, _labels = build(newest("market"), newest("lineups", LINEUP_SOURCE),
-                        run_now(), shrink_k=lg.cfg.shrink_k)
+    sc = build(newest("market"), newest("lineups", LINEUP_SOURCE), run_now(),
+               shrink_k=lg.cfg.shrink_k)
     me, now = lg.cfg.me, run_now()
     players = load_players()
     m = newest("matches")
@@ -499,12 +498,7 @@ def load() -> Universe:
         if s:
             matches[k], ppm_of[k], status_of[k] = s.pj, s.ppm, s.status
 
-    results_hist = table("results_history")
-    sboard = season_board(newest("market"), m, rem, now,
-                          fresh_only(newest("elo"), DAILY_FRESH_DAYS),
-                          results=results_hist,
-                          understat_rows=load_understat_players("2025"),
-                          home_edge=sc.home_edge)
+    sboard = season_board(sc.ratings, m, rem, now)
     first_jornada_of = first_jornada_per_player(base, rem, played, club)
     per_j = apply_fixtures(
         next_then_rest(base, base_rest, rem, played, club),
@@ -520,7 +514,8 @@ def load() -> Universe:
     history = grading.graded_history()
     drift_frac, drift_why = grading.drift_frac_from_history(history=history)
     fc = Bootstrap(per_j, pool=pool, matches=matches, club_of=club,
-                   club_rel=club_volatility(results_hist, set(club.values())),
+                   club_rel=club_volatility(table("results_history"),
+                                            set(club.values())),
                    drift_frac=drift_frac, drift_why=drift_why,
                    rate_floor=grading.fit_rate_rel_floor(
                        pool, history=history)[0])

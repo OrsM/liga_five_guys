@@ -334,7 +334,6 @@ def _selftest() -> None:
     assert [x.totals for x in again1] == [x.totals for x in again2], \
         "same seed, same seasons"
 
-    import ffcore.forecast as forecast
 
     many_j = list(range(1, 11))
     per10 = {j: {k: (3.0, 1.0) for k in list(a) + list(b)} for j in many_j}

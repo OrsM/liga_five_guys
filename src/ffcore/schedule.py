@@ -89,14 +89,14 @@ def apply_fixtures(per_jornada: dict[int, dict], sboard: dict[int, dict],
 
 
 def phantom_topup(sq: dict[str, str]) -> dict[str, str]:
-    from ffcore.score import formations
+    from ffcore.score import FREE_FORMATIONS
 
     counts: dict[str, int] = {}
     for slot in sq.values():
         counts[slot] = counts.get(slot, 0) + 1
 
     best = None
-    for d, m, f in formations():
+    for d, m, f in FREE_FORMATIONS:
         want = {"POR": 1, "DEF": d, "MED": m, "DEL": f}
         short = {s: n - counts.get(s, 0) for s, n in want.items()
                 if n - counts.get(s, 0) > 0}

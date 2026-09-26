@@ -163,7 +163,7 @@ def build_profiles(players: dict, sc, perjornada_rows,
             bids=mk.get("bids"),
             proceeds=mk.get("proceeds"),
         )
-        row = sc.row_for(k)
+        row = sc.lookup.get(k)
         s = sc.score(row) if row else None
         if s is not None:
             pts_adj, p_start_adj = status_adjusted(
@@ -212,9 +212,7 @@ def _selftest() -> None:
 
     class _FakeScorer:
         cal = Calibration()
-
-        def row_for(self, k):
-            return {"key": k} if k == "999" else None
+        lookup = {"999": {"key": "999"}}
 
         def score(self, row):
             return _FakeScored(ppm=6.0, pj=12.0, pct_used=80.0, fix=1.1,

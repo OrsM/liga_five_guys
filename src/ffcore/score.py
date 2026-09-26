@@ -2,19 +2,18 @@
 from __future__ import annotations
 
 import statistics
+from contextlib import suppress
+from functools import cache
 from typing import NamedTuple
 
-from ffcore.parse import text
-from ffcore.parse import money, pct100, ratio
+from ffcore.parse import money, pct100, ratio, text
 from ffcore.startprob import Calibration
 from ffcore.text import norm
-from ffcore.tidy import minutes_played
+from ffcore.tidy import minutes_played, row_key
 
-__all__ = ["SLOT", "SLOT_LABEL", "SLOT_MIN", "MAX_SLOT",
-           "FREE_FORMATIONS", "formations", "SHAPES", "starters_per_slot",
-           "Rating", "Scorer", "pick_xi", "squad_pool",
-           "replacement", "vor",
-           "load_points", "build", "load_understat_current"]
+__all__ = ["SLOT", "SLOT_LABEL", "SLOT_MIN", "MAX_SLOT", "FREE_FORMATIONS",
+           "SHAPES", "starters_per_slot", "Rating", "Scorer", "pick_xi",
+           "squad_pool", "replacement", "vor", "build"]
 
 SLOT = {
     "portero": "POR",
@@ -44,7 +43,7 @@ def position_priors(market: list[dict], history: dict
                     ) -> tuple[dict[str, float], float]:
     samples: dict[str, list[float]] = {}
     for r in market:
-        h = history.get(norm(r.get("name", "")))
+        h = history.get(row_key(r))
         slot = SLOT.get((r.get("position") or "").lower())
         if h and slot and h["pj"] >= 10:
             samples.setdefault(slot, []).append(h["pts"] / h["pj"])
@@ -54,69 +53,33 @@ def position_priors(market: list[dict], history: dict
 
 
 def detect_promoted(market: list[dict], history: dict) -> set[str]:
-    per_team: dict[str, list[int]] = {}
+    per_club: dict[str, list[int]] = {}
     for r in market:
-        team = r.get("team") or "?"
-        h = history.get(norm(r.get("name", "")))
-        tally = per_team.setdefault(team, [0, 0])
+        h = history.get(row_key(r))
+        tally = per_club.setdefault(r.get("club") or "?", [0, 0])
         tally[0] += 1
         tally[1] += 1 if h and h["pj"] > 0 else 0
-    return {t for t, (n, k) in per_team.items() if n >= 10 and k / n < 0.15}
-
-
-def _latest_perjornada_file():
-    from ffcore.tidy import SEASON
-
-    live = SEASON / "live"
-    files = sorted(live.glob("perjornada_*.csv")) if live.exists() else []
-    return files[-1] if files else None
+    return {c for c, (n, k) in per_club.items() if n >= 10 and k / n < 0.15}
 
 
 def fit_promoted_discount(market: list[dict], history: dict,
-                          prior_of: dict) -> tuple[float, str]:
-    from ffcore.parse import grouped_sums
-    from ffcore.tidy import read_csv
-
-    promoted = {norm(t) for t in detect_promoted(market, history)}
-    facts = {r["ff_id"]: (norm(r.get("team", "")),
-                          SLOT.get((r.get("position") or "").lower()))
-            for r in market if r.get("ff_id")}
-    latest = _latest_perjornada_file()
-    if latest is None:
-        return PROMOTED_DISCOUNT, "no live per-jornada file yet"
-
-    def graded():
-        for r in read_csv(latest):
-            try:
-                games = float(r.get("games_delta") or 0)
-            except (TypeError, ValueError):
-                continue
-            if games <= 0:
-                continue
-            team, slot = facts.get(r.get("ff_id"), ("", None))
-            if team not in promoted:
-                continue
-            prior = prior_of.get(slot)
-            if not prior:
-                continue
-            try:
-                pts = float(r.get("points_delta") or 0)
-            except (TypeError, ValueError):
-                continue
-            yield pts, prior * games, games
-
-    num, den, n = grouped_sums(graded(), lambda item: None,
-                               lambda item: item[0], lambda item: item[1],
-                               lambda item: item[2]).get(None, (0.0, 0.0, 0.0))
-    if den <= 0 or n < 1:
-        return PROMOTED_DISCOUNT, "no graded promoted-player matches yet"
-    measured = num / den
+                          perjornada: list[dict]) -> float:
+    promoted = detect_promoted(market, history)
+    priors = position_priors(market, history)[0]
+    prior_of = {row_key(r): priors.get(SLOT.get((r.get("position") or "").lower()))
+                for r in market if r.get("club") in promoted}
+    pts = expected = n = 0.0
+    for r in perjornada:
+        prior = prior_of.get(r.get("ff_id"))
+        games = ratio(r.get("games_delta")) or 0.0
+        if prior and games > 0:
+            pts += ratio(r.get("points_delta")) or 0.0
+            expected += prior * games
+            n += games
+    if expected <= 0:
+        return PROMOTED_DISCOUNT
     k = PROMOTED_DISCOUNT_K
-    fitted = (k * PROMOTED_DISCOUNT + n * measured) / (k + n)
-    return fitted, ("%.2f measured pooled over %.0f promoted-player matches, "
-                    "shrunk %.0f%% toward the stated %.2f -> %.2f"
-                    % (measured, n, 100 * k / (k + n), PROMOTED_DISCOUNT,
-                       fitted))
+    return (k * PROMOTED_DISCOUNT + n * pts / expected) / (k + n)
 
 
 def status_multiplier(status: str, factors: dict | None = None) -> float:
@@ -132,37 +95,16 @@ def status_multiplier(status: str, factors: dict | None = None) -> float:
 DECAY_GRID = (1.0, 0.85, 0.7, 0.55, 0.4)
 
 
-def _forward_understat_rows(season: str, xw):
-    from ffcore.tidy import load_understat_players
+def _per90(r: dict, a: str, b: str, minutes: float) -> float:
+    return (float(r.get(a) or 0) + float(r.get(b) or 0)) / minutes * 90
 
-    for r in load_understat_players(season):
-        if "F" not in (r.get("position") or ""):
-            continue
+
+def _forwards(understat_rows, xw):
+    for r in understat_rows:
         uid = text(r, "understat_id")
-        if not uid:
-            continue
-        key = xw.player(understat_id=uid)
-        if not key:
-            continue
-        yield key, r, float(r.get("minutes") or 0)
-
-
-def load_understat_current(xw=None) -> dict[str, dict]:
-    from ffcore.tidy import load_crosswalk
-
-    xw = xw if xw is not None else load_crosswalk()
-    if xw is None:
-        return {}
-    out: dict[str, dict] = {}
-    for key, r, mins in _forward_understat_rows("2026", xw):
-        if mins <= 0:
-            continue
-        player = xw.players.get(key)
-        market_name = norm(player.name) if player and player.name else key
-        out[market_name] = {
-            "xg90": (float(r.get("xg") or 0) + float(r.get("xa") or 0))
-                    / mins * 90, "minutes": mins}
-    return out
+        key = xw.player(understat_id=uid) if uid else ""
+        if key and "F" in (r.get("position") or ""):
+            yield key, r, float(r.get("minutes") or 0)
 
 
 def _linreg(xs, ys) -> tuple[float, float]:
@@ -173,164 +115,70 @@ def _linreg(xs, ys) -> tuple[float, float]:
         return 0.0, statistics.fmean(ys)
 
 
-def _xg_points_fit(xw) -> tuple[float, float, int]:
-    from ffcore.tidy import SEASON, read_csv
-
-    pts_files = sorted(SEASON.glob("points_*.csv")) if SEASON.exists() else []
-    if not pts_files or xw is None:
-        return 0.0, 0.0, 0
-    pts_by_key = {}
-    for r in read_csv(pts_files[-1]):
-        key = xw.key_of(r)
-        if key:
-            pts_by_key[key] = r
-    xs, ys = [], []
-    for key, r, mins in _forward_understat_rows("2025", xw):
-        if key not in pts_by_key:
-            continue
-        pr = pts_by_key[key]
-        games = float(pr.get("games") or 0)
-        if mins < 450 or games < 10:
-            continue
-        xs.append((float(r.get("xg") or 0) + float(r.get("xa") or 0))
-                  / mins * 90)
-        ys.append(float(pr.get("points") or 0) / games)
-    if len(xs) < 10:
-        return 0.0, 0.0, len(xs)
-    slope, intercept = _linreg(xs, ys)
-    return slope, intercept, len(xs)
-
-
-def _xg_stickiness_boost() -> tuple[float, str]:
-    from ffcore.tidy import load_understat_players
-
-    r25 = {r["understat_id"]: r for r in load_understat_players("2025")}
-    r26 = {r["understat_id"]: r for r in load_understat_players("2026")}
-    common = set(r25) & set(r26)
+def _xg_stickiness_boost(us25, us26) -> float:
+    later = {r["understat_id"]: r for r in us26}
     pairs = []
-    for uid in common:
-        a, b = r25[uid], r26[uid]
-        m25 = float(a.get("minutes") or 0)
-        m26 = float(b.get("minutes") or 0)
-        if m25 < 450 or m26 < 30:
-            continue
-        pairs.append((
-            (float(a.get("goals") or 0) + float(a.get("assists") or 0))
-            / m25 * 90,
-            (float(b.get("goals") or 0) + float(b.get("assists") or 0))
-            / m26 * 90,
-            (float(a.get("xg") or 0) + float(a.get("xa") or 0)) / m25 * 90,
-            (float(b.get("xg") or 0) + float(b.get("xa") or 0)) / m26 * 90))
+    for r in us25:
+        s = later.get(r["understat_id"])
+        m25 = float(r.get("minutes") or 0)
+        m26 = float((s or {}).get("minutes") or 0)
+        if s and m25 >= 450 and m26 >= 30:
+            pairs.append((_per90(r, "goals", "assists", m25),
+                          _per90(s, "goals", "assists", m26),
+                          _per90(r, "xg", "xa", m25), _per90(s, "xg", "xa", m26)))
     if len(pairs) < 30:
-        return 1.0, ("only %d paired players (need 30) — trusting an "
-                     "xG match the same as a raw one until more "
-                     "accumulate" % len(pairs))
-
-    def corr(xs, ys):
-        try:
-            return statistics.correlation(xs, ys)
-        except statistics.StatisticsError:
-            return 0.0
-
-    r_raw = max(0.02, min(0.9, corr([p[0] for p in pairs],
-                                    [p[1] for p in pairs])))
-    r_xg = max(0.02, min(0.9, corr([p[2] for p in pairs],
-                                   [p[3] for p in pairs])))
-    k_raw_odds = (1 - r_raw) / r_raw
-    k_xg_odds = (1 - r_xg) / r_xg
-    boost = max(0.5, min(3.0, k_raw_odds / k_xg_odds))
-    return boost, ("%d paired players: G+A/90 year-over-year r=%.3f, "
-                   "xG+xA/90 r=%.3f -> boost %.2f"
-                   % (len(pairs), r_raw, r_xg, boost))
+        return 1.0
+    try:
+        r_raw, r_xg = (max(0.02, min(0.9, statistics.correlation(
+            [p[i] for p in pairs], [p[i + 1] for p in pairs]))) for i in (0, 2))
+    except statistics.StatisticsError:
+        return 1.0
+    return max(0.5, min(3.0, ((1 - r_raw) / r_raw) / ((1 - r_xg) / r_xg)))
 
 
-def _shots_by_jornada(xw) -> dict[str, dict[int, float]]:
-    from ffcore.tidy import load_api_stats
-
-    if xw is None:
-        return {}
-    out: dict[str, dict[int, float]] = {}
-    for r in load_api_stats():
-        if r.get("stat") != "total_scoring_att":
-            continue
-        key = xw.player(app_id=text(r, "player_id"))
-        if not key:
-            continue
-        try:
-            wk = int(r.get("week"))
-            val = float(r.get("value") or 0)
-        except (TypeError, ValueError):
-            continue
-        out.setdefault(key, {})[wk] = val
-    return out
-
-
-def _forward_shots_minutes(xw, players=None):
-    from ffcore.tidy import (load_players, load_perjornada, jornada_of_match,
-                             newest)
-
-    players = players if players is not None else load_players()
-    shots_by_key = _shots_by_jornada(xw)
-    by_key = _per_jornada_current(
-        newest("starters"), load_perjornada(), jornada_of_match(), xw) \
-        if _latest_perjornada_file() is not None else {}
-    return shots_by_key, by_key, players
-
-
-def _shots_points_fit(xw, players=None) -> tuple[float, float, int]:
-    if xw is None:
-        return 0.0, 0.0, 0
-    shots_by_key, by_key, players = _forward_shots_minutes(xw, players)
-    if not by_key:
-        return 0.0, 0.0, 0
-
+def xg_evidence(us25, us26, history: dict, xw) -> dict[str, tuple[float, float]]:
     xs, ys = [], []
-    for key, jd_shots in shots_by_key.items():
-        if (players.get(key) or {}).get("pos", "").lower() != "delantero":
+    for key, r, mins in _forwards(us25, xw):
+        h = history.get(key)
+        if h and mins >= 450 and h["pj"] >= 10:
+            xs.append(_per90(r, "xg", "xa", mins))
+            ys.append(h["pts"] / h["pj"])
+    if len(xs) < 10:
+        return {}
+    slope, intercept = _linreg(xs, ys)
+    boost = _xg_stickiness_boost(us25, us26)
+    return {key: (mins / 90 * boost, slope * _per90(r, "xg", "xa", mins) + intercept)
+            for key, r, mins in _forwards(us26, xw) if mins > 0}
+
+
+def shots_evidence(stats_rows, by_key: dict, pos: dict, xw
+                   ) -> dict[str, tuple[float, float]]:
+    shots: dict[str, dict[int, float]] = {}
+    for r in stats_rows:
+        key = xw.player(app_id=text(r, "player_id"))
+        if r.get("stat") != "total_scoring_att" or pos.get(key) != "delantero":
             continue
-        jd_points = by_key.get(key, {})
-        common = sorted(set(jd_shots) & set(jd_points))
+        with suppress(TypeError, ValueError):
+            shots.setdefault(key, {})[int(r.get("week"))] = float(r.get("value") or 0)
+    xs, ys = [], []
+    for key, jd in shots.items():
+        played = by_key.get(key, {})
+        common = sorted(set(jd) & set(played))
         if len(common) < 2:
             continue
-        prior, last = common[:-1], common[-1]
-        total_min = sum(jd_points[j][1] for j in prior)
-        if total_min <= 0:
-            continue
-        shots90 = sum(jd_shots[j] for j in prior) / total_min * 90
-        last_pts, last_min = jd_points[last]
-        if last_min <= 0:
-            continue
-        xs.append(shots90)
-        ys.append(last_pts)
+        mins = sum(played[j][1] for j in common[:-1])
+        last_pts, last_min = played[common[-1]]
+        if mins > 0 and last_min > 0:
+            xs.append(sum(jd[j] for j in common[:-1]) / mins * 90)
+            ys.append(last_pts)
     if len(xs) < 10:
-        return 0.0, 0.0, len(xs)
-    slope, intercept = _linreg(xs, ys)
-    return slope, intercept, len(xs)
-
-
-def load_shots_current(xw=None, players=None) -> dict[str, dict]:
-    from ffcore.tidy import load_crosswalk
-
-    xw = xw if xw is not None else load_crosswalk()
-    if xw is None:
         return {}
-    shots_by_key, by_key, players = _forward_shots_minutes(xw, players)
-    minutes_by_key = {k: {j: mins for j, (_pts, mins) in jd.items()}
-                      for k, jd in by_key.items()}
+    slope, intercept = _linreg(xs, ys)
     out = {}
-    for key, jd_shots in shots_by_key.items():
-        if (players.get(key) or {}).get("pos", "").lower() != "delantero":
-            continue
-        player = xw.players.get(key)
-        if not player or not player.name:
-            continue
-        mins_jd = minutes_by_key.get(key, {})
-        total_min = sum(mins_jd.get(j, 0.0) for j in jd_shots)
-        if total_min <= 0:
-            continue
-        total_shots = sum(jd_shots.values())
-        out[norm(player.name)] = {"shots90": total_shots / total_min * 90,
-                                  "minutes": total_min}
+    for key, jd in shots.items():
+        mins = sum(by_key.get(key, {}).get(j, (0.0, 0.0))[1] for j in jd)
+        if mins > 0:
+            out[key] = (mins / 90, slope * sum(jd.values()) / mins * 90 + intercept)
     return out
 
 
@@ -389,177 +237,74 @@ def _per_jornada_current(starters_rows, perjornada_rows, jornada_of_match,
     return out
 
 
-def _decay_walk(per_jornada: dict[int, tuple[float, float]], decay: float,
-                terms) -> tuple[float, float]:
-    if not per_jornada:
-        return 0.0, 0.0
-    latest = max(per_jornada)
-    a = b = 0.0
-    for j, (pts, mins) in per_jornada.items():
-        w = decay ** (latest - j)
-        da, db = terms(pts, mins, w)
-        a += da
-        b += db
-    return a, b
+def _weighted(per_jornada: dict[int, tuple[float, float]], decay: float
+              ) -> tuple[float, float, float, float]:
+    latest = max(per_jornada, default=0)
+    w = {j: decay ** (latest - j) for j in per_jornada}
+    pts = sum(w[j] * p for j, (p, _m) in per_jornada.items())
+    matches = sum(w[j] * m / 90.0 for j, (_p, m) in per_jornada.items())
+    started = sum(w[j] * min(1.0, m / 90.0) for j, (_p, m) in per_jornada.items())
+    n = sum(w.values())
+    return pts, matches, (started / n if n else 0.0), n
 
 
-def _weighted_totals(per_jornada: dict[int, tuple[float, float]],
-                     decay: float) -> tuple[float, float]:
-    return _decay_walk(per_jornada, decay,
-                       lambda pts, mins, w: (pts * w, (mins / 90.0) * w))
+def _walk_error(by_key: dict, decay: float) -> tuple[float, int]:
+    se, n = 0.0, 0
+    for jd in by_key.values():
+        jors = sorted(jd)
+        for i in range(1, len(jors)):
+            actual_pts, actual_min = jd[jors[i]]
+            wpts, wmatch, _s, _n = _weighted({j: jd[j] for j in jors[:i]}, decay)
+            if actual_min <= 0 or wmatch <= 0:
+                continue
+            se += (wpts / wmatch - actual_pts / (actual_min / 90.0)) ** 2
+            n += 1
+    return (se / n, n) if n else (float("inf"), 0)
 
 
-def _weighted_start(per_jornada: dict[int, tuple[float, float]],
-                    decay: float) -> tuple[float, float]:
-    wsum, wn = _decay_walk(
-        per_jornada, decay,
-        lambda pts, mins, w: (w * min(1.0, mins / 90.0), w))
-    return (wsum / wn if wn else 0.0), wn
-
-
-def _fit_decay(by_key: dict[str, dict[int, tuple[float, float]]]) -> tuple[float, str]:
-    def walk_error(decay: float) -> tuple[float, int]:
-        se, n = 0.0, 0
-        for jd in by_key.values():
-            jors = sorted(jd)
-            for i in range(1, len(jors)):
-                target = jors[i]
-                actual_pts, actual_min = jd[target]
-                if actual_min <= 0:
-                    continue
-                train = {j: jd[j] for j in jors[:i]}
-                wpts, wmatch = _weighted_totals(train, decay)
-                if wmatch <= 0:
-                    continue
-                pred = wpts / wmatch
-                actual = actual_pts / (actual_min / 90.0)
-                se += (pred - actual) ** 2
-                n += 1
-        return (se / n, n) if n else (float("inf"), 0)
-
-    baseline, base_n = walk_error(1.0)
-    if base_n == 0:
-        return 1.0, "no player has a second jornada to predict yet"
-    best_decay, best_err = 1.0, baseline
-    for d in DECAY_GRID:
-        err, n = walk_error(d)
-        if n and err < best_err:
-            best_decay, best_err = d, err
-    if best_decay == 1.0:
-        return 1.0, "flat average %.3f, no decay beat it out of sample" % baseline
-    return best_decay, "decay %.2f beat flat %.3f with %.3f out of sample" % (
-        best_decay, baseline, best_err)
-
-
-def _current_from_perjornada() -> tuple[dict, str]:
-    from ffcore.tidy import (load_crosswalk, load_perjornada, jornada_of_match,
-                             newest)
-
-    latest = _latest_perjornada_file()
-    if latest is None:
-        return {}, ""
-    label = latest.stem.replace("perjornada_", "")
-    xw = load_crosswalk()
-    if xw is None:
-        return {}, ""
-
-    by_key = _per_jornada_current(newest("starters"), load_perjornada(),
-                                  jornada_of_match(), xw)
-    decay, _why = _fit_decay(by_key)
-
-    out = {}
-    for key, per_jornada in by_key.items():
-        player = xw.players.get(key)
-        market_name = norm(player.name) if player else key
-        wpts, wmatch = _weighted_totals(per_jornada, decay)
-        start_rate, start_n = _weighted_start(per_jornada, decay)
-        out[market_name] = {"pts": wpts, "pj": wmatch,
-                            "start_rate": start_rate, "start_n": start_n}
-    return out, label
-
-
-def load_points() -> tuple[dict, str, dict, str]:
-    from ffcore.tidy import SEASON, load_crosswalk, read_csv
-
-    files = sorted(SEASON.glob("points_*.csv")) if SEASON.exists() else []
-    xw = load_crosswalk()
-
-    def read(path) -> dict:
-        out: dict[str, dict] = {}
-        for r in read_csv(path):
-            rec = {"pts": ratio(r.get("points")) or 0.0,
-                   "pj": ratio(r.get("games")) or 0.0}
-            pid = text(r, "ff_id")
-            player = xw.players.get(pid) if pid and xw is not None else None
-            if player and player.name:
-                out.setdefault(norm(player.name), rec)
-            for key in (r.get("player_name"), r.get("player_name_full")):
-                if key:
-                    out.setdefault(norm(key), rec)
-        return out
-
-    def label(path) -> str:
-        return path.stem.replace("points_", "")
-
-    cur, cur_label = _current_from_perjornada()
-    if not files:
-        return {}, "", cur, cur_label
-    prior, prior_label = read(files[-1]), label(files[-1])
-    if cur:
-        return prior, prior_label, cur, cur_label
-    if len(files) > 1:
-        return (read(files[-2]), label(files[-2]),
-                read(files[-1]), label(files[-1]))
-    return prior, prior_label, {}, ""
+def _fit_decay(by_key: dict) -> float:
+    errors = {d: _walk_error(by_key, d) for d in DECAY_GRID}
+    return min(DECAY_GRID, key=lambda d: (errors[d][0], -d))
 
 
 def build(market: list[dict], xi_rows: list[dict], now,
-          shrink_k: float = SHRINK_K, calibrate: bool = True) -> tuple:
-    from ffcore.fixture import fixture_board
-    from ffcore.tidy import (load_fixtures, DAILY_FRESH_DAYS, fresh_only,
-                             newest, table)
+          shrink_k: float = SHRINK_K) -> "Scorer":
+    from ffcore.fixture import difficulty_ratings, fit_home_edge, fixture_board
+    from ffcore.tidy import (DAILY_FRESH_DAYS, SEASON, fresh_only,
+                             jornada_of_match, load_api_stats, load_crosswalk,
+                             load_fixtures, load_perjornada,
+                             load_understat_players, newest, read_csv, table)
 
-    prior, prior_label, cur, cur_label = load_points()
-    cal, second = None, None
-    if calibrate:
-        cal, second = _calibrated()
-    from ffcore.tidy import (load_crosswalk, load_understat_players,
-                             DAILY_FRESH_DAYS, fresh_only, newest, table)
     xw = load_crosswalk()
-    from ffcore.fixture import fit_home_edge
-    home_edge, home_edge_why = fit_home_edge(table("results_history"),
-                                             newest("matches"))
-    board = fixture_board(market, load_fixtures(), now,
-                          fresh_only(newest("elo"), DAILY_FRESH_DAYS),
-                          results=table("results_history"),
-                          understat_rows=load_understat_players("2025"),
-                          home_edge=home_edge)
-    xg_cur = load_understat_current(xw)
-    xg_slope, xg_intercept, xg_n = _xg_points_fit(xw)
-    xg_boost, xg_why = _xg_stickiness_boost()
-    shots_cur = load_shots_current(xw)
-    shots_slope, shots_intercept, shots_n = _shots_points_fit(xw)
-    priors, _global_prior = position_priors(market, prior)
-    promoted_discount, promoted_why = fit_promoted_discount(
-        market, prior, priors)
-    sc = Scorer(market, xi_rows, prior, shrink_k=shrink_k, xw=xw,
-                current=cur, board=board, cal=cal, second=second,
-                xg=xg_cur, xg_slope=xg_slope, xg_intercept=xg_intercept,
-                xg_n=xg_n, xg_boost=xg_boost, xg_why=xg_why,
-                shots=shots_cur, shots_slope=shots_slope,
-                shots_intercept=shots_intercept, shots_n=shots_n,
-                promoted_discount=promoted_discount)
-    sc.promoted_why = promoted_why
-    sc.home_edge, sc.home_edge_why = home_edge, home_edge_why
-    return sc, (prior_label, cur_label)
+    files = sorted(SEASON.glob("points_*.csv"))
+    history = {r["ff_id"]: {"pts": ratio(r.get("points")) or 0.0,
+                            "pj": ratio(r.get("games")) or 0.0}
+               for r in (read_csv(files[-1]) if files else ()) if r.get("ff_id")}
+    perjornada = load_perjornada()
+    by_key = _per_jornada_current(newest("starters"), perjornada,
+                                  jornada_of_match(), xw)
+    decay = _fit_decay(by_key)
+    us25, us26 = load_understat_players("2025"), load_understat_players("2026")
+    pos = {row_key(r): (r.get("position") or "").lower() for r in market}
+    results = table("results_history")
+    ratings = difficulty_ratings(
+        market, fresh_only(newest("elo"), DAILY_FRESH_DAYS), results, us25,
+        fit_home_edge(results, newest("matches"))[0])
+    cal, second = _calibrated()
+    return Scorer(
+        market, xi_rows, history, shrink_k=shrink_k, xw=xw, cal=cal,
+        second=second, ratings=ratings,
+        board=fixture_board(ratings, load_fixtures(), now),
+        current={k: dict(zip(("pts", "pj", "start_rate", "start_n"),
+                             _weighted(jd, decay)))
+                 for k, jd in by_key.items()},
+        evidence={"xg": xg_evidence(us25, us26, history, xw),
+                  "shots": shots_evidence(load_api_stats(), by_key, pos, xw)},
+        promoted_discount=fit_promoted_discount(market, history, perjornada))
 
 
-_CAL_CACHE: list = []
-
-
+@cache
 def _calibrated():
-    if _CAL_CACHE:
-        return _CAL_CACHE[0]
     import hashlib
     import json
     from ffcore.startprob import (ABSENT_START, Calibration, METHOD_VERSION,
@@ -610,15 +355,10 @@ def _calibrated():
         cal.lineup_why += "; regulars flagged " + ", ".join(
             "%s played %.0f%% of normal (%d)" % (f, 100 * v, n)
             for f, (v, n) in sorted(flagged.items()))
-    _CAL_CACHE.append((cal, second))
-    return _CAL_CACHE[0]
+    return cal, second
 
 
-def formations() -> list[tuple]:
-    return list(FREE_FORMATIONS)
-
-
-SHAPES = [{"POR": 1, "DEF": d, "MED": m, "DEL": f} for d, m, f in formations()]
+SHAPES = [{"POR": 1, "DEF": d, "MED": m, "DEL": f} for d, m, f in FREE_FORMATIONS]
 
 
 class Rating(NamedTuple):
@@ -660,32 +400,20 @@ class Scorer:
 
     def __init__(self, market: list[dict], xi: list[dict],
                  history: dict | None = None, shrink_k: float = SHRINK_K,
-                 current: dict | None = None, board: dict | None = None, cal=None, second=None,
-                 xg: dict | None = None, xg_slope: float = 0.0,
-                 xg_intercept: float = 0.0, xg_n: int = 0,
-                 xg_boost: float = 1.0, xg_why: str = "",
-                 shots: dict | None = None, shots_slope: float = 0.0,
-                 shots_intercept: float = 0.0, shots_n: int = 0,
-                 promoted_discount: float = PROMOTED_DISCOUNT, xw=None):
+                 current: dict | None = None, board: dict | None = None,
+                 cal=None, second=None, evidence: dict | None = None,
+                 promoted_discount: float = PROMOTED_DISCOUNT, xw=None,
+                 ratings=None):
+        from ffcore.tidy import load_crosswalk
+
         self.market = market
         self.history = history or {}
         self.shrink_k = shrink_k
         self.promoted_discount = promoted_discount
         self.current = current or {}
         self.board = board or {}
-        self.xg = xg or {}
-        self.xg_slope = xg_slope
-        self.xg_intercept = xg_intercept
-        self.xg_n = xg_n
-        self.xg_boost = xg_boost
-        self.xg_why = xg_why
-        self.shots = shots or {}
-        self.shots_slope = shots_slope
-        self.shots_intercept = shots_intercept
-        self.shots_n = shots_n
-
-        from ffcore.tidy import row_key, load_crosswalk
-
+        self.evidence = evidence or {}
+        self.ratings = ratings
         self.lookup: dict[str, dict] = {row_key(r): r for r in market
                                         if r.get("name")}
         xw = xw if xw is not None else load_crosswalk()
@@ -716,7 +444,7 @@ class Scorer:
                                                           self.history)
 
     def rate(self, rec: dict) -> Rating:
-        key = norm(rec.get("name", ""))
+        key = row_key(rec)
         slot = SLOT.get((rec.get("position") or "").lower(), "")
         prior = self.priors.get(slot, self.global_prior)
         k = self.shrink_k
@@ -726,7 +454,7 @@ class Scorer:
         if h and h["pj"] > 0:
             base, why, assumed = ((h["pts"] + k * prior) / (h["pj"] + k),
                                   "%.0fp/%.0fj" % (h["pts"], h["pj"]), False)
-        elif (rec.get("team") or "") in self.promoted:
+        elif (rec.get("club") or "") in self.promoted:
             base, why, assumed = prior * self.promoted_discount, "assumed", True
         else:
             base, why, assumed = prior, "assumed", True
@@ -734,40 +462,23 @@ class Scorer:
         c = self.current.get(key)
         cur_pj = float(c["pj"]) if c and c["pj"] > 0 else 0.0
         terms = [(k, base)]
+        why_now = why
         if cur_pj > 0:
             terms.append((cur_pj, c["pts"] / cur_pj))
-        xg = self.xg.get(key)
-        xg_note = ""
-        if xg and xg["minutes"] > 0:
-            xg_matches = xg["minutes"] / 90.0 * self.xg_boost
-            xg_rate = self.xg_slope * xg["xg90"] + self.xg_intercept
-            terms.append((xg_matches, xg_rate))
-            xg_note = " + xg %.2f/%.1fj" % (xg_rate, xg["minutes"] / 90.0)
-        shots = self.shots.get(key)
-        shots_note = ""
-        if shots and shots["minutes"] > 0 and self.shots_n >= 10:
-            shots_matches = shots["minutes"] / 90.0
-            shots_rate = (self.shots_slope * shots["shots90"]
-                          + self.shots_intercept)
-            terms.append((shots_matches, shots_rate))
-            shots_note = (" + shots %.2f/%.1fj"
-                         % (shots_rate, shots["minutes"] / 90.0))
+            why_now += " + %.0fp/%.0fj now" % (c["pts"], cur_pj)
+        for label, table in self.evidence.items():
+            weight, rate = table.get(key, (0.0, 0.0))
+            if weight > 0:
+                terms.append((weight, rate))
+                why_now += " + %s %.2f/%.1fj" % (label, rate, weight)
         if len(terms) == 1:
             return Rating(base, why, assumed, 0.0, prior_pj)
         w_sum = sum(w for w, _ in terms)
         blended = sum(w * m for w, m in terms) / w_sum
-        why_now = why
-        if cur_pj > 0:
-            why_now += " + %.0fp/%.0fj now" % (c["pts"], cur_pj)
-        why_now += xg_note + shots_note
         return Rating(blended, why_now, assumed and cur_pj < k, cur_pj,
                      prior_pj + cur_pj)
 
-    def row_for(self, name):
-        return self.lookup.get(name) or self.lookup.get(norm(name))
-
     def score(self, rec: dict) -> Scored:
-        from ffcore.tidy import row_key
         key = row_key(rec)
         st = self.status.get(key, "")
         pct = self.start_pct.get(key)
@@ -777,7 +488,7 @@ class Scorer:
         raw = pct if pct is not None else (
             self.cal.neutral_start if on_page else self.cal.absent_start)
         pct_used = 100.0 * self.cal.p(raw, self.second.get(key))
-        cur = self.current.get(norm(rec.get("name", "")))
+        cur = self.current.get(key)
         start_n = cur.get("start_n", 0.0) if cur else 0.0
         if start_n > 0.0:
             k_s, k_l = self.shrink_k, self.cal.lineup_k or self.shrink_k
@@ -815,7 +526,7 @@ class Scorer:
     def score_squad(self, names) -> tuple[list[Scored], list[str]]:
         out, missing = [], []
         for n in names:
-            r = self.row_for(n)
+            r = self.lookup.get(n)
             if r is None:
                 missing.append(n)
             else:
@@ -835,7 +546,7 @@ def squad_pool(scored) -> dict[str, list[dict]]:
 
 
 def starters_per_slot() -> dict[str, float]:
-    shapes = formations()
+    shapes = FREE_FORMATIONS
     n = len(shapes)
     tot = {"POR": float(n), "DEF": 0.0, "MED": 0.0, "DEL": 0.0}
     for d, m, f in shapes:
@@ -975,47 +686,18 @@ def _selftest() -> None:
     lower = Scorer(promo_market, [], promo_hist, promoted_discount=0.5, xw=xw)
     assert lower.rate(mk("q5", team="Rise")).ppm < newbie.ppm
 
-    priors3 = position_priors(promo_market, promo_hist)[0]
-
-    import tempfile
-    import ffcore.tidy as _tidy_sc
-    real_season = _tidy_sc.SEASON
-    with tempfile.TemporaryDirectory() as _d_sc:
-        _tidy_sc.SEASON = __import__("pathlib").Path(_d_sc)
-        try:
-            assert fit_promoted_discount(promo_market, promo_hist, priors3) \
-                == (PROMOTED_DISCOUNT, "no live per-jornada file yet")
-
-            (_tidy_sc.SEASON / "live").mkdir()
-            import csv as _csv_sc
-            cols = ["ff_id", "games_delta", "points_delta"]
-            rows = [{"ff_id": "q%d" % (i % 10), "games_delta": "1",
-                     "points_delta": "%.1f" % (priors3["DEF"]
-                                               * PROMOTED_DISCOUNT)}
-                    for i in range(80)]
-            with open(_tidy_sc.SEASON / "live" / "perjornada_x.csv", "w",
-                     newline="", encoding="utf-8") as fh:
-                w = _csv_sc.DictWriter(fh, fieldnames=cols)
-                w.writeheader()
-                w.writerows(rows)
-            fitted, why = fit_promoted_discount(promo_market, promo_hist,
-                                                priors3)
-            assert abs(fitted - PROMOTED_DISCOUNT) < 0.01, (fitted, why)
-            assert "80 promoted-player matches" in why, why
-
-            full_rows = [{"ff_id": "q%d" % (i % 10), "games_delta": "1",
-                         "points_delta": "%.1f" % priors3["DEF"]}
-                        for i in range(400)]
-            with open(_tidy_sc.SEASON / "live" / "perjornada_x.csv", "w",
-                     newline="", encoding="utf-8") as fh:
-                w = _csv_sc.DictWriter(fh, fieldnames=cols)
-                w.writeheader()
-                w.writerows(full_rows)
-            fitted2, _why2 = fit_promoted_discount(promo_market, promo_hist,
-                                                   priors3)
-            assert fitted2 > PROMOTED_DISCOUNT + 0.15, fitted2
-        finally:
-            _tidy_sc.SEASON = real_season
+    assert fit_promoted_discount(promo_market, promo_hist, []) \
+        == PROMOTED_DISCOUNT
+    at_discount = [{"ff_id": "q%d" % (i % 10), "games_delta": "1",
+                    "points_delta": "%.1f" % (sc3.priors["DEF"]
+                                              * PROMOTED_DISCOUNT)}
+                   for i in range(80)]
+    assert abs(fit_promoted_discount(promo_market, promo_hist, at_discount)
+               - PROMOTED_DISCOUNT) < 0.01
+    at_prior = [dict(r, points_delta="%.1f" % sc3.priors["DEF"])
+                for r in at_discount * 5]
+    assert fit_promoted_discount(promo_market, promo_hist, at_prior) \
+        > PROMOTED_DISCOUNT + 0.15
     assert "now" in blended.why and "3j" in blended.why
 
     assert Scorer(market, xi, hist, current={}, xw=xw).rate(mk("p0")) == full
@@ -1134,204 +816,71 @@ def _selftest() -> None:
     assert corrected["antonio blanco"] == {1: (9.0, 90.0), 2: (0.0, 45.0)}, \
         corrected
 
-    wpts, wmatch = _weighted_totals(by_key["antonio blanco"], 1.0)
-    assert (wpts, wmatch) == (13.0, 1.5), (wpts, wmatch)
-    wpts, wmatch = _weighted_totals(by_key["antonio blanco"], 0.5)
-    assert abs(wpts - 9.0) < 1e-9, wpts
-    assert _weighted_totals({}, 0.5) == (0.0, 0.0)
+    assert _weighted(by_key["antonio blanco"], 1.0) == (13.0, 1.5, 0.75, 2.0)
+    assert abs(_weighted(by_key["antonio blanco"], 0.5)[0] - 9.0) < 1e-9
+    assert _weighted({}, 0.5) == (0.0, 0.0, 0.0, 0.0)
 
-    one_jornada = {"a": {1: (4.0, 90.0)}, "b": {1: (2.0, 45.0)}}
-    decay, why = _fit_decay(one_jornada)
-    assert decay == 1.0 and "second jornada" in why, (decay, why)
-    assert _fit_decay({}) == (1.0, "no player has a second jornada to "
-                              "predict yet")
-    decay0, _ = _fit_decay(
-        {p: {1: (1.0, 90.0), 2: (9.0, 90.0)} for p in "ab"})
-    assert decay0 == 1.0, decay0
-
-    trending = {p: {1: (1.0, 90.0), 2: (5.0, 90.0), 3: (9.0, 90.0)}
-               for p in ("p%d" % i for i in range(8))}
-    decay2, why2 = _fit_decay(trending)
-    assert decay2 < 1.0 and "beat flat" in why2, (decay2, why2)
-
-    from ffcore.crosswalk import Crosswalk as _CW, Player as _P
-    import ffcore.tidy as _tidy
-    import tempfile as _tempfile
-    import os as _os
-    import csv as _csv
-
-    xw_us = _CW({
-        "striker": _P("striker", "Striker Sam", understat_id="10"),
-        "defender": _P("defender", "Defender Dan", understat_id="20"),
-    })
-    with _tempfile.TemporaryDirectory() as _d:
-        _os.makedirs(_d, exist_ok=True)
-        path = _os.path.join(_d, "understat_players.csv")
-        with open(path, "w", newline="", encoding="utf-8") as fh:
-            w = _csv.DictWriter(fh, fieldnames=[
-                "observed_at", "source", "season", "understat_id",
-                "player_name", "team_title", "team", "position", "games",
-                "minutes", "goals", "assists", "xg", "xa", "npg", "npxg",
-                "shots", "key_passes"])
-            w.writeheader()
-            w.writerow({"observed_at": "2026-08-21T0000Z", "source": "understat",
-                       "season": "2026", "understat_id": "10",
-                       "player_name": "Striker Sam", "team_title": "X",
-                       "team": "x", "position": "F S", "games": "1",
-                       "minutes": "90", "goals": "1", "assists": "0",
-                       "xg": "0.6", "xa": "0.2", "npg": "1", "npxg": "0.6",
-                       "shots": "3", "key_passes": "1"})
-            w.writerow({"observed_at": "2026-08-21T0000Z", "source": "understat",
-                       "season": "2026", "understat_id": "20",
-                       "player_name": "Defender Dan", "team_title": "X",
-                       "team": "x", "position": "D S", "games": "1",
-                       "minutes": "90", "goals": "0", "assists": "0",
-                       "xg": "0.1", "xa": "0.0", "npg": "0", "npxg": "0.1",
-                       "shots": "1", "key_passes": "0"})
-        _real_tidy = _tidy.TIDY
-        _tidy.TIDY = __import__("pathlib").Path(_d)
-        try:
-            us_cur = load_understat_current(xw_us)
-            boost_thin, why_thin = _xg_stickiness_boost()
-        finally:
-            _tidy.TIDY = _real_tidy
-    assert set(us_cur) == {"striker sam"}, us_cur
-    assert abs(us_cur["striker sam"]["xg90"] - 0.8) < 1e-9
-    assert boost_thin == 1.0 and "30" in why_thin, (boost_thin, why_thin)
+    assert _fit_decay({"a": {1: (4.0, 90.0)}, "b": {1: (2.0, 45.0)}}) == 1.0
+    assert _fit_decay({}) == 1.0
+    assert _fit_decay({p: {1: (1.0, 90.0), 2: (9.0, 90.0)} for p in "ab"}) == 1.0
+    assert _fit_decay({p: {1: (1.0, 90.0), 2: (5.0, 90.0), 3: (9.0, 90.0)}
+                       for p in ("p%d" % i for i in range(8))}) < 1.0
 
     slope, intercept = _linreg([1.0, 2.0, 3.0], [2.0, 4.0, 6.0])
     assert abs(slope - 2.0) < 1e-9 and abs(intercept) < 1e-9
     slope0, intercept0 = _linreg([1.0, 1.0, 1.0], [5.0, 5.0, 5.0])
     assert slope0 == 0.0 and abs(intercept0 - 5.0) < 1e-9
 
+    xw_us = Crosswalk({**{"f%d" % i: Player("f%d" % i, "F%d" % i,
+                                            understat_id=str(i))
+                          for i in range(12)},
+                       "d": Player("d", "D", understat_id="99")})
+    us25 = [{"understat_id": str(i), "position": "F S", "minutes": "900",
+             "xg": str(i / 10), "xa": "0"} for i in range(12)]
+    us26 = [{"understat_id": "3", "position": "F S", "minutes": "180",
+             "xg": "0.4", "xa": "0.2"},
+            {"understat_id": "99", "position": "D", "minutes": "90",
+             "xg": "1", "xa": "0"}]
+    hist_us = {"f%d" % i: {"pts": 10.0 * (1 + i), "pj": 10.0}
+               for i in range(12)}
+    ev = xg_evidence(us25, us26, hist_us, xw_us)
+    assert set(ev) == {"f3"}, ev
+    assert abs(ev["f3"][0] - 2.0) < 1e-9 and abs(ev["f3"][1] - 31.0) < 1e-6, ev
+    assert xg_evidence(us25[:9], us26, hist_us, xw_us) == {}
+    assert _xg_stickiness_boost(us25, us26) == 1.0
+
+    xw_sh = Crosswalk({**{"s%d" % i: Player("s%d" % i, "S%d" % i, app_id=str(i))
+                          for i in range(11)},
+                       "d": Player("d", "D", app_id="99")})
+    pos_sh = {**{"s%d" % i: "delantero" for i in range(11)}, "d": "defensa"}
+    stats = ([{"player_id": str(i), "stat": "total_scoring_att",
+               "week": str(w), "value": str(i)}
+              for i in range(11) for w in (1, 2)]
+             + [{"player_id": "99", "stat": "total_scoring_att", "week": "1",
+                 "value": "7"},
+                {"player_id": "4", "stat": "other", "week": "1", "value": "50"}])
+    played_sh = {"s%d" % i: {1: (0.0, 90.0), 2: (2.0 * i + 1, 90.0)}
+                 for i in range(11)}
+    sh = shots_evidence(stats, played_sh, pos_sh, xw_sh)
+    assert set(sh) == set(played_sh), sh
+    assert abs(sh["s4"][0] - 2.0) < 1e-9 and abs(sh["s4"][1] - 9.0) < 1e-6, sh
+    assert shots_evidence(stats, {"s1": played_sh["s1"]}, pos_sh, xw_sh) == {}
+
     market_xg = [mk("Attacker", pos="delantero")]
     hist_xg = {"attacker": {"pts": 100.0, "pj": 34.0}}
     xi_xg = [{"player_name": "Attacker", "start_pct": "100"}]
-    sc_plain = Scorer(market_xg, xi_xg, hist_xg, xw=xw)
-    plain = sc_plain.rate(mk("Attacker", pos="delantero"))
-
-    sc_xg = Scorer(market_xg, xi_xg, hist_xg,
-                  xg={"attacker": {"xg90": 1.0, "minutes": 180.0}},
-                  xg_slope=10.0, xg_intercept=0.0, xg_boost=1.0, xw=xw)
-    with_xg = sc_xg.rate(mk("Attacker", pos="delantero"))
+    fwd = mk("Attacker", pos="delantero")
+    plain = Scorer(market_xg, xi_xg, hist_xg, xw=xw).rate(fwd)
     expect = (SHRINK_K * plain.ppm + 2.0 * 10.0) / (SHRINK_K + 2.0)
-    assert abs(with_xg.ppm - expect) < 1e-9, (with_xg.ppm, expect)
-    assert min(plain.ppm, 10.0) < with_xg.ppm < max(plain.ppm, 10.0)
-    assert "xg" in with_xg.why
-    assert with_xg.cur_pj == 0.0 and with_xg.pj == 34.0
+    for label in ("xg", "shots"):
+        got = Scorer(market_xg, xi_xg, hist_xg, xw=xw,
+                     evidence={label: {"attacker": (2.0, 10.0)}}).rate(fwd)
+        assert abs(got.ppm - expect) < 1e-9, (label, got, expect)
+        assert label in got.why and got.cur_pj == 0.0 and got.pj == 34.0, got
+    assert Scorer(market_xg, xi_xg, hist_xg, xw=xw,
+                  evidence={"xg": {}}).rate(fwd) == plain
 
-    sc_noxg = Scorer(market_xg, xi_xg, hist_xg, xg={}, xw=xw)
-    assert sc_noxg.rate(mk("Attacker", pos="delantero")) == plain
-
-    sc_shots_untrained = Scorer(
-        market_xg, xi_xg, hist_xg,
-        shots={"attacker": {"shots90": 3.0, "minutes": 180.0}},
-        shots_slope=0.0, shots_intercept=0.0, shots_n=3, xw=xw)
-    assert sc_shots_untrained.rate(mk("Attacker", pos="delantero")) == plain
-
-    sc_shots = Scorer(
-        market_xg, xi_xg, hist_xg,
-        shots={"attacker": {"shots90": 2.0, "minutes": 180.0}},
-        shots_slope=5.0, shots_intercept=0.0, shots_n=10, xw=xw)
-    with_shots = sc_shots.rate(mk("Attacker", pos="delantero"))
-    expect_shots = (SHRINK_K * plain.ppm + 2.0 * 10.0) / (SHRINK_K + 2.0)
-    assert abs(with_shots.ppm - expect_shots) < 1e-9, \
-        (with_shots.ppm, expect_shots)
-    assert "shots" in with_shots.why
-
-    import csv as _csv3
-    import os as _os3
-    import tempfile as _tempfile3
-    from ffcore import tidy as _tidy3
-
-    xw3 = Crosswalk({
-        "fwd guy": Player("fwd guy", "Fwd Guy", ff_slug="fwd-guy",
-                          app_id="900"),
-        "def guy": Player("def guy", "Def Guy", ff_slug="def-guy",
-                          app_id="901"),
-    })
-    matches3 = [{"match_id": "m1", "jornada": "1"},
-               {"match_id": "m2", "jornada": "2"},
-               {"match_id": "m3", "jornada": "3"}]
-    starters3 = [
-        {"observed_at": "2026-09-01T0000Z", "player_name": "Fwd Guy",
-         "player_slug": "fwd-guy", "role": "starter", "minute": "",
-         "match_id": "m1"},
-        {"observed_at": "2026-09-01T0000Z", "player_name": "Fwd Guy",
-         "player_slug": "fwd-guy", "role": "starter", "minute": "",
-         "match_id": "m2"},
-        {"observed_at": "2026-09-01T0000Z", "player_name": "Fwd Guy",
-         "player_slug": "fwd-guy", "role": "starter", "minute": "",
-         "match_id": "m3"},
-    ]
-    perjornada3 = [
-        {"ff_id": "900", "player_name_full": "Fwd Guy",
-         "points_total": "2", "jornada": "1"},
-        {"ff_id": "900", "player_name_full": "Fwd Guy",
-         "points_total": "6", "jornada": "2"},
-        {"ff_id": "900", "player_name_full": "Fwd Guy",
-         "points_total": "16", "jornada": "3"},
-    ]
-    with _tempfile3.TemporaryDirectory() as _d3:
-        _os3.makedirs(_os3.path.join(_d3, "season", "live"))
-        with open(_os3.path.join(_d3, "api_stats.csv"), "w", newline="",
-                 encoding="utf-8") as fh:
-            w = _csv3.DictWriter(fh, fieldnames=[
-                "observed_at", "source", "player_id", "week", "stat",
-                "value", "points"])
-            w.writeheader()
-            for wk, val in ((1, "1"), (2, "3")):
-                w.writerow({"observed_at": "2026-08-%02dT0000Z" % (15+wk*7),
-                           "source": "laliga", "player_id": "900",
-                           "week": str(wk), "stat": "total_scoring_att",
-                           "value": val, "points": "0"})
-            w.writerow({"observed_at": "2026-08-22T0000Z", "source": "laliga",
-                       "player_id": "901", "week": "1",
-                       "stat": "total_scoring_att", "value": "5",
-                       "points": "0"})
-        fake_players3 = {"fwd guy": {"pos": "delantero"},
-                        "def guy": {"pos": "defensa"}}
-        with open(_os3.path.join(_d3, "starters.csv"), "w", newline="",
-                 encoding="utf-8") as fh:
-            w = _csv3.DictWriter(fh, fieldnames=[
-                "observed_at", "player_name", "player_slug", "role",
-                "minute", "match_id"])
-            w.writeheader()
-            for r in starters3:
-                w.writerow(r)
-        with open(_os3.path.join(_d3, "matches.csv"), "w", newline="",
-                 encoding="utf-8") as fh:
-            w = _csv3.DictWriter(fh, fieldnames=["match_id", "jornada"])
-            w.writeheader()
-            for r in matches3:
-                w.writerow(r)
-        with open(_os3.path.join(_d3, "season", "live",
-                                "perjornada_2026-27.csv"),
-                 "w", newline="", encoding="utf-8") as fh:
-            w = _csv3.DictWriter(fh, fieldnames=[
-                "ff_id", "player_name_full", "points_total", "jornada"])
-            w.writeheader()
-            for r in perjornada3:
-                w.writerow(r)
-        _real_tidy3, _real_season3 = _tidy3.TIDY, _tidy3.SEASON
-        _tidy3.TIDY = __import__("pathlib").Path(_d3)
-        _tidy3.SEASON = __import__("pathlib").Path(_d3) / "season"
-        try:
-            sbj = _shots_by_jornada(xw3)
-            assert sbj == {"fwd guy": {1: 1.0, 2: 3.0},
-                          "def guy": {1: 5.0}}, sbj
-            fit_slope, fit_intercept, fit_n = _shots_points_fit(
-                xw3, players=fake_players3)
-            assert (fit_slope, fit_intercept, fit_n) == (0.0, 0.0, 1), \
-                (fit_slope, fit_intercept, fit_n)
-            lsc = load_shots_current(xw3, players=fake_players3)
-            assert set(lsc) == {"fwd guy"}, lsc
-            assert abs(lsc["fwd guy"]["shots90"] - 2.0) < 1e-9, lsc
-            assert lsc["fwd guy"]["minutes"] == 180.0, lsc
-        finally:
-            _tidy3.TIDY, _tidy3.SEASON = _real_tidy3, _real_season3
-
-    print("ffcore.score self-test OK (82 cases)")
+    print("ffcore.score self-test OK (69 cases)")
 
 
 if __name__ == "__main__":

@@ -4,7 +4,6 @@ from __future__ import annotations
 import random
 import math
 import statistics
-from typing import Protocol, runtime_checkable
 
 __all__ = ["Bootstrap", "SEED_POOL", "MIN_POOL"]
 
