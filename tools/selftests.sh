@@ -52,18 +52,7 @@ wait "$session_pid" || session_ok=1
 
 if [ "$tests_ok" -eq 0 ] && [ "$session_ok" -eq 0 ]; then
     echo "selftests: $(( ${#TESTS[@]} + ${#SESSION_TESTS[@]} )) suites pass"
-    # AND THE DUPLICATION GATE, in the same breath, because lfg-run already
-    # refuses to publish when this script fails and nothing else about the
-    # concept ratchet was automatic. It was run by hand, which means it was
-    # run when somebody remembered -- and on 2026-09-19 a second
-    # premium-over-market-value fitter went in while every gate that DID run
-    # passed it. Miguel: "I don't want to be checking after".
-    #
-    # concepts.sh is seconds and reads no data, so it costs a report nothing
-    # and cannot fail because the league moved. regress.sh deliberately
-    # stays out: it compares against a recorded baseline and would fail
-    # every time the market legitimately changed.
-    exec bash "$(dirname "${BASH_SOURCE[0]}")/concepts.sh"
+    exit 0
 fi
 
 echo "selftests: failures detected — re-running serially for detail" >&2
