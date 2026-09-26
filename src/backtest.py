@@ -261,16 +261,35 @@ def replay_screen_misses(sample_every: int = 10,
            "results": results}
 
 
+def _checked_golden(golden: list[dict]) -> list[dict]:
+    """golden rows with a real predicted_rate -- the header
+    naive_value_baseline() and recency_only_baseline() each built
+    separately before diverging into two different naive predictors."""
+    return [r for r in golden if r.get("predicted_rate") is not None]
+
+
+def _mae_result(resolved: list[tuple], **extra) -> dict | None:
+    """{n, naive_mae, ours_mae, **extra} from (naive_pred, actual, ours_pred)
+    triples -- the tail naive_value_baseline() and recency_only_baseline()
+    each computed separately."""
+    if not resolved:
+        return None
+    n = len(resolved)
+    naive_mae = sum(abs(p - a) for p, a, _ in resolved) / n
+    ours_mae = sum(abs(o - a) for _, a, o in resolved) / n
+    return {"n": n, "naive_mae": naive_mae, "ours_mae": ours_mae, **extra}
+
+
 def naive_value_baseline(golden: list[dict]) -> dict | None:
     import methodology as M
     from ffcore.text import norm
 
-    checked = [r for r in golden if r.get("predicted_rate") is not None]
+    checked = _checked_golden(golden)
     if not checked:
         return None
     locks = M.clock_history().round_locks
 
-    resolved = []
+    priced = []
     for r in checked:
         lock = locks.get(r["jornada"])
         if lock is None:
@@ -284,24 +303,21 @@ def naive_value_baseline(golden: list[dict]) -> dict | None:
             val = float(row["value"])
         except (KeyError, ValueError):
             continue
-        resolved.append((val, r["actual_points"], r["predicted_rate"]))
+        priced.append((val, r["actual_points"], r["predicted_rate"]))
 
-    if not resolved:
+    if not priced:
         return None
-    n = len(resolved)
-    mean_val = sum(v for v, _, _ in resolved) / n
-    mean_act = sum(a for _, a, _ in resolved) / n
+    mean_val = sum(v for v, _, _ in priced) / len(priced)
+    mean_act = sum(a for _, a, _ in priced) / len(priced)
     k = mean_act / mean_val if mean_val else 0.0
-    naive_mae = sum(abs(k * v - a) for v, a, _ in resolved) / n
-    ours_mae = sum(abs(p - a) for _, a, p in resolved) / n
-    return {"n": n, "k": k, "naive_mae": naive_mae, "ours_mae": ours_mae}
+    return _mae_result([(k * v, a, p) for v, a, p in priced], k=k)
 
 
 def recency_only_baseline(golden: list[dict], window: int = 3) -> dict | None:
     import methodology as M
     from ffcore.text import norm
 
-    checked = [r for r in golden if r.get("predicted_rate") is not None]
+    checked = _checked_golden(golden)
     if not checked:
         return None
     clock = M.clock_history()
@@ -332,13 +348,7 @@ def recency_only_baseline(golden: list[dict], window: int = 3) -> dict | None:
         pred = sum(recent) / len(recent)
         resolved.append((pred, r["actual_points"], r["predicted_rate"]))
 
-    if not resolved:
-        return None
-    n = len(resolved)
-    naive_mae = sum(abs(p - a) for p, a, _ in resolved) / n
-    ours_mae = sum(abs(o - a) for _, a, o in resolved) / n
-    return {"n": n, "window": window, "naive_mae": naive_mae,
-           "ours_mae": ours_mae}
+    return _mae_result(resolved, window=window)
 
 
 def _actuals_index():
