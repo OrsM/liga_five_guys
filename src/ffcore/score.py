@@ -289,7 +289,7 @@ def build(market: list[dict], xi_rows: list[dict], now,
     results = table("results_history")
     ratings = difficulty_ratings(
         market, fresh_only(newest("elo"), DAILY_FRESH_DAYS), results, us25,
-        fit_home_edge(results, newest("matches"))[0])
+        fit_home_edge(results, newest("matches")))
     second = table("lineups", SECOND_SOURCE)
     cal = calibrate(table("lineups", LINEUP_SOURCE), second, table("starters"),
                     xw)
@@ -310,7 +310,6 @@ SHAPES = [{"POR": 1, "DEF": d, "MED": m, "DEL": f} for d, m, f in FREE_FORMATION
 
 class Rating(NamedTuple):
     ppm: float
-    why: str
     assumed: bool
     cur_pj: float = 0.0
     pj: float = 0.0
@@ -392,38 +391,24 @@ class Scorer:
 
     def rate(self, rec: dict) -> Rating:
         key = row_key(rec)
-        slot = SLOT.get((rec.get("position") or "").lower(), "")
-        prior = self.priors.get(slot, self.global_prior)
+        prior = self.priors.get(SLOT.get((rec.get("position") or "").lower(), ""),
+                                self.global_prior)
         k = self.shrink_k
-
         h = self.history.get(key)
         prior_pj = float(h["pj"]) if h and h["pj"] > 0 else 0.0
-        if h and h["pj"] > 0:
-            base, why, assumed = ((h["pts"] + k * prior) / (h["pj"] + k),
-                                  "%.0fp/%.0fj" % (h["pts"], h["pj"]), False)
+        if prior_pj:
+            base = (h["pts"] + k * prior) / (prior_pj + k)
         elif (rec.get("club") or "") in self.promoted:
-            base, why, assumed = prior * self.promoted_discount, "assumed", True
+            base = prior * self.promoted_discount
         else:
-            base, why, assumed = prior, "assumed", True
-
+            base = prior
         c = self.current.get(key)
         cur_pj = float(c["pj"]) if c and c["pj"] > 0 else 0.0
-        terms = [(k, base)]
-        why_now = why
-        if cur_pj > 0:
-            terms.append((cur_pj, c["pts"] / cur_pj))
-            why_now += " + %.0fp/%.0fj now" % (c["pts"], cur_pj)
-        for label, table in self.evidence.items():
-            weight, rate = table.get(key, (0.0, 0.0))
-            if weight > 0:
-                terms.append((weight, rate))
-                why_now += " + %s %.2f/%.1fj" % (label, rate, weight)
-        if len(terms) == 1:
-            return Rating(base, why, assumed, 0.0, prior_pj)
-        w_sum = sum(w for w, _ in terms)
-        blended = sum(w * m for w, m in terms) / w_sum
-        return Rating(blended, why_now, assumed and cur_pj < k, cur_pj,
-                     prior_pj + cur_pj)
+        terms = ([(k, base)] + ([(cur_pj, c["pts"] / cur_pj)] if cur_pj else [])
+                 + [e for t in self.evidence.values()
+                    if (e := t.get(key)) and e[0] > 0])
+        return Rating(sum(w * m for w, m in terms) / sum(w for w, _ in terms),
+                      not prior_pj and cur_pj < k, cur_pj, prior_pj + cur_pj)
 
     def score(self, rec: dict) -> Scored:
         key = row_key(rec)
@@ -647,7 +632,6 @@ def _selftest() -> None:
                 for r in at_discount * 5]
     assert fit_promoted_discount(promo_market, promo_hist, at_prior) \
         > PROMOTED_DISCOUNT + 0.15
-    assert "now" in blended.why and "3j" in blended.why
 
     assert Scorer(market, xi, hist, current={}, xw=xw).rate(dict(row, name="p0")) == full
     assert Scorer(market, xi, hist,
@@ -825,11 +809,11 @@ def _selftest() -> None:
         got = Scorer(market_xg, xi_xg, hist_xg, xw=xw,
                      evidence={label: {"attacker": (2.0, 10.0)}}).rate(fwd)
         assert abs(got.ppm - expect) < 1e-9, (label, got, expect)
-        assert label in got.why and got.cur_pj == 0.0 and got.pj == 34.0, got
+        assert got.cur_pj == 0.0 and got.pj == 34.0, got
     assert Scorer(market_xg, xi_xg, hist_xg, xw=xw,
                   evidence={"xg": {}}).rate(fwd) == plain
 
-    print("ffcore.score self-test OK (69 cases)")
+    print("ffcore.score self-test OK")
 
 
 if __name__ == "__main__":

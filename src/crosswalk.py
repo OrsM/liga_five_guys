@@ -204,7 +204,7 @@ def _selftest() -> None:
     assert matched2 == 0
     assert players["alvaro fernandez"].understat_id == "701"
 
-    print("crosswalk self-test OK (15 cases)")
+    print("crosswalk self-test OK")
 
 
 if __name__ == "__main__":

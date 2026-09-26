@@ -168,9 +168,7 @@ def _selftest() -> None:
         got = fmt_money(raw)
         assert got == want, f"fmt_money({raw!r}) -> {got!r}, wanted {want!r}"
 
-    print("ffcore.parse self-test OK "
-          f"({len(cases_money) + len(cases_ratio) + 5 + len(fmt_cases)} "
-          "cases)")
+    print("ffcore.parse self-test OK")
 
 
 if __name__ == "__main__":

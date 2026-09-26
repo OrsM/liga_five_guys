@@ -331,7 +331,7 @@ def _selftest() -> None:
                             {"home": "a", "away": "b", "jornada": "x"}])
     assert op == {}
 
-    print("ffcore.profile self-test OK (23 cases)")
+    print("ffcore.profile self-test OK")
 
 
 if __name__ == "__main__":

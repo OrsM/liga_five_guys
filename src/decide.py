@@ -474,13 +474,11 @@ def load() -> Universe:
 
     pool = pool_from_perjornada(load_perjornada())
     history = grading.graded_history()
-    drift_frac, drift_why = grading.drift_frac_from_history(history=history)
     fc = Bootstrap(per_j, pool=pool, matches=matches, club_of=club,
                    club_rel=club_volatility(table("results_history"),
                                             set(club.values())),
-                   drift_frac=drift_frac, drift_why=drift_why,
-                   rate_floor=grading.fit_rate_rel_floor(
-                       pool, history=history)[0])
+                   drift_frac=grading.drift_frac_from_history(history),
+                   rate_floor=grading.fit_rate_rel_floor(pool, history))
 
     carried = {r["manager"]: num(r, "team_points", default=0.0)
                for r in lg.standings if r.get("manager")}
@@ -905,7 +903,7 @@ def _selftest() -> None:
                          (2.9, "missing", False)]:
         assert _clears_par_floor(par_of, mae, k) is want, (mae, k)
 
-    print("decide self-test OK (150 cases)")
+    print("decide self-test OK")
 
 
 if __name__ == "__main__":
@@ -916,7 +914,6 @@ if __name__ == "__main__":
     acts = u.candidates(budget=float("inf"))
     print("%d jornadas left · cash %s · %d players acquirable · %d actions"
           % (len(u.state.jornadas), fmt_money(u.cash), len(u.view("price")), len(acts)))
-    print(u.forecaster.pool_note())
     rows, base, _lam, _b = u.rank(acts)
     print("\nnow: expected position %.2f · P(win) %.0f%%"
           % (base.expected_position(), 100 * base.position().get(1, 0)))

@@ -17,7 +17,7 @@ def _selftest() -> None:
     assert percentile(data, 10) < percentile(data, 50) < percentile(data, 90)
     assert percentile([], 50) == 0.0
     assert percentile([7.0], 10) == percentile([7.0], 90) == 7.0
-    print("stats self-test OK (4 cases)")
+    print("stats self-test OK")
 
 
 if __name__ == "__main__":

@@ -30,7 +30,7 @@ def _selftest() -> None:
     assert title_name("") == "" and title_name(None) == ""
     once = title_name("omar el hilali")
     assert once == "Omar El Hilali" and title_name(once) == once
-    print("ffcore.render self-test OK (9 cases)")
+    print("ffcore.render self-test OK")
 
 
 if __name__ == "__main__":

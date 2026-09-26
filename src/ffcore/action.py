@@ -43,7 +43,7 @@ def _selftest() -> None:
     assert Action("sell", sell="y").label({"y": "Yuri"}) == "sell Yuri"
     assert Action("swap", buy="x", sell="y").label({"x": "Xavi"}) \
         == "buy Xavi · sell y"
-    print("ffcore.action self-test OK (6 cases)")
+    print("ffcore.action self-test OK")
 
 
 if __name__ == "__main__":

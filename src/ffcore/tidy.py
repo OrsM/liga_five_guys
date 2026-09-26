@@ -966,7 +966,7 @@ def _selftest() -> None:
         == [1, 2, 3]
     assert clock.order == [1]
 
-    print("ffcore.tidy self-test OK (80 cases)")
+    print("ffcore.tidy self-test OK")
 
 
 if __name__ == "__main__":

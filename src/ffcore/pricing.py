@@ -56,7 +56,7 @@ def _selftest() -> None:
     assert respond(broke, Action("steal", buy="x", cost=0.0,
                                       victim="riv"), 3.0) == 0.0
 
-    print("ffcore.pricing self-test OK (13 cases)")
+    print("ffcore.pricing self-test OK")
 
 
 if __name__ == "__main__":

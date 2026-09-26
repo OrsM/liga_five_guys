@@ -26,12 +26,10 @@ def _z(pairs) -> list[float]:
             if predicted > 0 and actual > 0 and rel > 0]
 
 
-def fit_drift_frac(h1_pairs, h3_pairs) -> tuple[float, str]:
+def fit_drift_frac(h1_pairs, h3_pairs) -> float:
     z1, z3 = _z(h1_pairs), _z(h3_pairs)
     if len(z1) < 20 or len(z3) < 20:
-        return DRIFT_FRAC, ("not enough graded pairs yet (h1=%d, h3=%d, "
-                            "need >=20 each) — keeping %.2f"
-                            % (len(z1), len(z3), DRIFT_FRAC))
+        return DRIFT_FRAC
     var1 = statistics.pvariance(z1)
     var3 = statistics.pvariance(z3)
     growth = (var3 - var1) / 2.0
@@ -44,30 +42,20 @@ def fit_drift_frac(h1_pairs, h3_pairs) -> tuple[float, str]:
             diffs.append((statistics.pvariance(b3)
                           - statistics.pvariance(b1)) / 2.0)
         diffs.sort()
-        upper = diffs[int(0.90 * len(diffs))]
-        fitted = math.sqrt(max(0.0, upper))
-        return fitted, ("h3 no more variable than h1 (%.3f vs %.3f, "
-                        "rate_rel-normalised, n=%d/%d) — no compounding "
-                        "measurable, so using the most the data cannot "
-                        "rule out (90th pct of bootstrapped growth) "
-                        "-> %.2f" % (var3, var1, len(z1), len(z3), fitted))
-    fitted = math.sqrt(growth)
-    return fitted, ("h1 var %.3f, h3 var %.3f (rate_rel-normalised, "
-                   "n=%d/%d) -> drift_frac %.2f" % (var1, var3,
-                                                    len(z1), len(z3), fitted))
+        return math.sqrt(max(0.0, diffs[int(0.90 * len(diffs))]))
+    return math.sqrt(growth)
 
 
 class Bootstrap:
 
     def __init__(self, per_jornada: dict[int, dict[str, tuple[float, float]]],
                  pool=(), matches=None, club_of=None, club_rel=None,
-                 drift_frac: float = DRIFT_FRAC, drift_why: str = "",
+                 drift_frac: float = DRIFT_FRAC,
                  rate_floor: float = RATE_REL_FLOOR):
         self.per_jornada = per_jornada
-        self.drift_frac, self.drift_why = drift_frac, drift_why
+        self.drift_frac = drift_frac
         self._order = {j: sorted(d) for j, d in per_jornada.items()}
         real = [p for p in pool if p is not None]
-        self._real_n = len(real)
         self.pool = tuple(real) if len(real) >= MIN_POOL else SEED_POOL
         mean = statistics.mean(self.pool) if self.pool else 1.0
         self._pool_mean = mean if abs(mean) > 1e-9 else 1.0
@@ -92,12 +80,6 @@ class Bootstrap:
                 continue
             self.start_rel[k] = math.sqrt((1.0 - p) / p) / math.sqrt(
                 max(1.0, float(n) + SHRINK_MATCHES))
-
-    def pool_note(self) -> str:
-        if self._real_n >= MIN_POOL:
-            return "shape from %d observed matches" % self._real_n
-        return ("shape from the seed prior (%d observed, %d needed)"
-                % (self._real_n, MIN_POOL))
 
     def expected(self, jornada: int) -> dict[str, float]:
         return {k: pts * p
@@ -148,7 +130,6 @@ def _selftest() -> None:
     assert same_club.club_of == {"a": "Rich", "b": "Rich", "c": "Poor"}
     assert same_club.club_rel == {"Rich": 0.20, "Poor": 0.0}
 
-    global DRIFT_FRAC
     truth = 0.6
     gen = Bootstrap({1: {"kid": (5.0, 1.0)}}, pool=[0, 2, 4, 6, 8] * 40,
                     matches={"kid": 10})
@@ -166,24 +147,13 @@ def _selftest() -> None:
                 cum_var += step_var
             out.append((1.0, eps0 * math.exp(walk - cum_var / 2.0), rel))
     h1_pairs, h3_pairs = walked[1], walked[3]
-    fitted, why = fit_drift_frac(h1_pairs, h3_pairs)
-    assert abs(fitted - truth) < 0.08, (fitted, truth, why)
-    n1, n3 = (int(x) for x in why.split("n=")[1].split(")")[0].split("/"))
-    assert n1 > 3900 and n3 > 3900, why
-
-    fitted_thin, why_thin = fit_drift_frac(h1_pairs[:5], h3_pairs[:5])
-    assert fitted_thin == DRIFT_FRAC, (fitted_thin, why_thin)
-    assert "not enough" in why_thin, why_thin
-
+    assert abs(fit_drift_frac(h1_pairs, h3_pairs) - truth) < 0.08
+    assert fit_drift_frac(h1_pairs[:5], h3_pairs[:5]) == DRIFT_FRAC
     flat_h1 = [(1.0, 1.0 + rng2.gauss(0.0, rel), rel) for _ in range(200)]
     flat_h3 = [(1.0, 1.0 + rng2.gauss(0.0, rel), rel) for _ in range(200)]
-    fitted_flat, why_flat = fit_drift_frac(flat_h1, flat_h3)
-    if fitted_flat == DRIFT_FRAC:
-        assert "wasn't more variable" in why_flat, why_flat
-
-    fitted_bad, why_bad = fit_drift_frac(
-        [(0.0, 1.0, 0.1)] * 30, [(1.0, -1.0, 0.1)] * 30)
-    assert fitted_bad == DRIFT_FRAC and "not enough" in why_bad, why_bad
+    assert 0.0 <= fit_drift_frac(flat_h1, flat_h3) < truth
+    assert fit_drift_frac([(0.0, 1.0, 0.1)] * 30,
+                          [(1.0, -1.0, 0.1)] * 30) == DRIFT_FRAC
 
     fc = Bootstrap({1: {"nailed": (5.0, 1.0),
                         "rota": (5.0, 0.5),
@@ -198,9 +168,9 @@ def _selftest() -> None:
                                                           "late": 3.0}
     assert fc2.expected_own({"early": 2}) == {}
 
-    assert "seed prior" in Bootstrap({}, pool=[1, 2, 3]).pool_note()
+    assert Bootstrap({}, pool=[1, 2, 3]).pool == SEED_POOL
     big = list(range(MIN_POOL))
-    assert "observed matches" in Bootstrap({}, pool=big).pool_note()
+    assert Bootstrap({}, pool=big).pool == tuple(big)
     z = Bootstrap({1: {"x": (4.0, 1.0)}}, pool=[0] * MIN_POOL)
     assert z._pool_mean != 0.0, z._pool_mean
 
@@ -218,7 +188,7 @@ def _selftest() -> None:
     assert certain.start_rel == {"never": 0.0, "always": 0.0}
     assert Bootstrap({1: {"vet": (5.0, 0.9)}}).start_rel == {}
 
-    print("ffcore.forecast self-test OK (24 cases)")
+    print("ffcore.forecast self-test OK")
 
 
 if __name__ == "__main__":

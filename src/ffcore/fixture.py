@@ -16,7 +16,7 @@ MIN_HOME_EDGE_MATCHES = 50
 
 
 def fit_home_edge(results_history: list[dict],
-                  matches: list[dict] = ()) -> tuple[float, str]:
+                  matches: list[dict] = ()) -> float:
     home_g = away_g = n = 0
     for r in results_history:
         try:
@@ -41,14 +41,9 @@ def fit_home_edge(results_history: list[dict],
         away_g += aws
         n += 1
     if n < MIN_HOME_EDGE_MATCHES or away_g <= 0:
-        return HOME_EDGE, ("only %d real scored matches (need %d) — "
-                          "keeping the %.2f default"
-                          % (n, MIN_HOME_EDGE_MATCHES, HOME_EDGE))
+        return HOME_EDGE
     ratio = home_g / away_g
-    edge = (ratio - 1) / (ratio + 1)
-    return edge, ("fit from %d real matches (home %.2f, away %.2f "
-                 "goals/match, ratio %.3f)" % (n, home_g / n, away_g / n,
-                                               ratio))
+    return (ratio - 1) / (ratio + 1)
 
 
 class Match(NamedTuple):
@@ -282,18 +277,11 @@ def _selftest() -> None:
     assert difficulty({"Only": 1.0})["Only"] == (1.0, 1)
 
     hist_rows = [{"home_goals": "2", "away_goals": "1"}] * 60
-    edge, why = fit_home_edge(hist_rows)
-    assert abs(edge - (1 / 3)) < 1e-9, (edge, why)
-    assert "fit from 60 real matches" in why, why
-
-    dup_matches = [{"match_id": "m1", "jornada": "1", "score": "2-1"}] * 5
-    edge2, why2 = fit_home_edge(hist_rows[:49], dup_matches)
-    assert abs(edge2 - (1 / 3)) < 1e-9, (edge2, why2)
-    assert "50 real matches" in why2, why2
-
-    small_edge, small_why = fit_home_edge(hist_rows[:10])
-    assert small_edge == HOME_EDGE, (small_edge, small_why)
-    assert "keeping the" in small_why, small_why
+    assert abs(fit_home_edge(hist_rows) - 1 / 3) < 1e-9
+    once = (98 / 52 - 1) / (98 / 52 + 1)
+    dup_matches = [{"match_id": "m1", "jornada": "1", "score": "0-3"}] * 5
+    assert abs(fit_home_edge(hist_rows[:49], dup_matches) - once) < 1e-9
+    assert fit_home_edge(hist_rows[:10]) == HOME_EDGE
 
     results = (
         [{"home": "Strong", "away": "Weak", "home_goals": "3", "away_goals": "0"},
@@ -446,7 +434,7 @@ def _selftest() -> None:
     assert sb_elo[2]["Mid"].rank == same_elo["Mid"].rank
     assert sb_elo[2]["Mid"].gap == same_elo["Mid"].gap
 
-    print("ffcore.fixture self-test OK (80 cases)")
+    print("ffcore.fixture self-test OK")
 
 
 if __name__ == "__main__":

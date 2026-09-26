@@ -58,7 +58,7 @@ def _selftest() -> None:
         assert write(rows, path=fresh).startswith("wrote 1 rows")
         assert len(existing(fresh)) == 1
 
-    print("ledger.py self-test OK (11 cases)")
+    print("ledger.py self-test OK")
 
 
 if __name__ == "__main__":

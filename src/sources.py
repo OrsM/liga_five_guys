@@ -2034,7 +2034,7 @@ def _selftest() -> None:
         html = samples.get(s.key, _FIXTURE)
         assert s.parse(html, "2026-01-01T0000Z", s.key), s.key
 
-    print("sources.py selftest OK (266 cases)")
+    print("sources.py selftest OK")
 
 
 if __name__ == "__main__":

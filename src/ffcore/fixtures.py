@@ -264,7 +264,7 @@ def _selftest() -> None:
     assert flat_players["b"].identity.name == "b"
     assert players_from_flat() == {}
 
-    print("ffcore.fixtures self-test OK (24 cases)")
+    print("ffcore.fixtures self-test OK")
 
 
 if __name__ == "__main__":

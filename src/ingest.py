@@ -684,7 +684,7 @@ def _selftest() -> None:
                           ("/jugadores/pedri", "/jugadores/pedri-gonzalez")]:
         assert page_sig(team, _FIXTURE.replace(before, after)) != base, after
 
-    print("ingest.py selftest OK (24 cases)")
+    print("ingest.py selftest OK")
 
 
 if __name__ == "__main__":

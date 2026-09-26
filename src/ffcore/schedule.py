@@ -235,7 +235,7 @@ def _selftest() -> None:
         assert got == added, (squad, got)
         assert all(topped[k] == v for k, v in squad.items())
 
-    print("ffcore.schedule self-test OK (28 cases)")
+    print("ffcore.schedule self-test OK")
 
 
 if __name__ == "__main__":

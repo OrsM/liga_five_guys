@@ -107,7 +107,7 @@ def _selftest() -> None:
     assert match_one("Sevilla", teams) is None
     assert match_one("", teams) is None
 
-    print("ffcore.text self-test OK (19 cases)")
+    print("ffcore.text self-test OK")
 
 
 if __name__ == "__main__":

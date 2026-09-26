@@ -144,52 +144,37 @@ def _z_variance(rels, floor: float) -> float:
                                  for rel, p, a in rels])
 
 
-def fit_rate_rel_floor(pool, min_pairs: int = 30,
-                       history: tuple | None = None) -> tuple[float, str]:
+def fit_rate_rel_floor(pool, history: tuple, min_pairs: int = 30) -> float:
     from ffcore.forecast import RATE_REL_FLOOR, SHRINK_MATCHES
 
     real = [p for p in pool if p is not None]
-    if len(real) < 50:
-        return RATE_REL_FLOOR, ("too few real matches in the pool (n=%d) to "
-                                "measure cv — keeping %.2f"
-                                % (len(real), RATE_REL_FLOOR))
-    mean = statistics.mean(real)
+    mean = statistics.mean(real) if len(real) >= 50 else 0.0
     if abs(mean) < 1e-9:
-        return RATE_REL_FLOOR, "pool mean measured as 0 — can't normalise"
+        return RATE_REL_FLOOR
     cv = statistics.pstdev(real) / mean
-    locks, actuals, preds = history or graded_history()
+    locks, actuals, preds = history
     rels = [(cv / max(1.0, g["pj"] + SHRINK_MATCHES) ** 0.5, g["predicted"],
              g["actual"])
             for g in lagged_pair(actuals, preds, locks, 0)
             if g.get("pj") is not None and g["predicted"] > 0
             and g["actual"] > 0]
     if len(rels) < min_pairs:
-        return RATE_REL_FLOOR, ("too few graded pairs with a logged pj "
-                                "(n=%d, need >=%d) — keeping %.2f"
-                                % (len(rels), min_pairs, RATE_REL_FLOOR))
-
-    best = min((0.10 + 0.05 * i for i in range(19)),
+        return RATE_REL_FLOOR
+    return min((0.10 + 0.05 * i for i in range(19)),
                key=lambda f: abs(_z_variance(rels, f) - 2.0))
-    return best, ("Var(z)=%.2f at the shipped floor %.2f -> best-fit %.2f "
-                  "(n=%d real graded pairs, cv=%.3f)"
-                  % (_z_variance(rels, RATE_REL_FLOOR), RATE_REL_FLOOR, best, len(rels),
-                     cv))
 
 
-def drift_frac_from_history(lag1: int = 1, lag3: int = 3,
-                            history: tuple | None = None) -> tuple[float, str]:
+def drift_frac_from_history(history: tuple, lag1: int = 1,
+                            lag3: int = 3) -> float:
     from ffcore.forecast import fit_drift_frac
 
-    locks, actuals, preds = history or graded_history()
+    locks, actuals, preds = history
     h1 = lagged_pair(actuals, preds, locks, lag1)
     h3 = lagged_pair(actuals, preds, locks, lag3)
     ratios = [p["actual"] / p["predicted"] for p in h1 if p["predicted"] > 0]
-    if len(ratios) < 5:
-        return 1.0, ("too few lag-%d pairs to measure a pooled rate_rel "
-                     "(n=%d)" % (lag1, len(ratios)))
-    pooled = statistics.pstdev(ratios)
+    pooled = statistics.pstdev(ratios) if len(ratios) >= 5 else 0.0
     if pooled <= 0:
-        return 1.0, "pooled rate_rel measured as 0 — can't normalise"
+        return 1.0
     return fit_drift_frac([(p["predicted"], p["actual"], pooled) for p in h1],
                           [(p["predicted"], p["actual"], pooled) for p in h3])
 
@@ -224,10 +209,9 @@ def _selftest() -> None:
         lag1
     assert lagged_pair(actuals, preds, locks, 3) == []
 
-    fitted, why = drift_frac_from_history(history=(locks, actuals, preds))
-    assert fitted == 1.0 and "too few" in why, (fitted, why)
-    floor, why = fit_rate_rel_floor([3] * 10, history=(locks, actuals, preds))
-    assert "too few real matches" in why, why
+    from ffcore.forecast import RATE_REL_FLOOR
+    assert drift_frac_from_history((locks, actuals, preds)) == 1.0
+    assert fit_rate_rel_floor([3] * 10, (locks, actuals, preds)) == RATE_REL_FLOOR
 
     print("grading self-test OK")
 

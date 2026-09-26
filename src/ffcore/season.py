@@ -366,7 +366,7 @@ def _selftest() -> None:
     assert abs(sdrift_mean - sflat_mean) / sflat_mean < 0.05, \
         (sflat_mean, sdrift_mean)
 
-    print("ffcore.season self-test OK (34 cases)")
+    print("ffcore.season self-test OK")
 
 
 if __name__ == "__main__":

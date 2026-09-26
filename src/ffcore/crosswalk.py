@@ -215,7 +215,7 @@ def _selftest() -> None:
         again2 = Crosswalk.read(pp)
         assert again2.player(understat_id="555") == "alvaro fernandez"
 
-    print("ffcore.crosswalk self-test OK (51 cases)")
+    print("ffcore.crosswalk self-test OK")
 
 
 if __name__ == "__main__":
