@@ -260,8 +260,12 @@ def _bucket_means(rows: list[dict], buckets, bucket_field: str,
                   mean_fields: tuple) -> list[tuple]:
     """(label, n, *means) per non-empty bucket -- `rows` grouped by
     bucket_field into `buckets` ranges, each of mean_fields averaged as
-    p[f]/p["matches"] over the group. fixture_rows() and bucket_rows()
-    each built this bucketing loop separately."""
+    p[f]/p["matches"] over the group. comparison_lines() calls this
+    directly for both its fixture-difficulty and per_match buckets rather
+    than through a differently-named wrapper fixed to one bucket
+    scheme -- fixture_rows()/bucket_rows() used to be that wrapper, each
+    with exactly one real caller, so they added a name without adding a
+    choice."""
     out = []
     for lo, hi, label in buckets:
         grp = [p for p in rows if lo <= p[bucket_field] < hi]
@@ -272,17 +276,6 @@ def _bucket_means(rows: list[dict], buckets, bucket_field: str,
                      for f in mean_fields)
         out.append((label, n, *means))
     return out
-
-
-def fixture_rows(pairs: list[dict]) -> tuple[list[tuple], int]:
-    known = [p for p in pairs if p.get("fix") is not None]
-    out = _bucket_means(known, FIX_BUCKETS, "fix",
-                        ("predicted", "actual", "err"))
-    return out, len(pairs) - len(known)
-
-
-def bucket_rows(pairs: list[dict]) -> list[tuple[str, int, float, float]]:
-    return _bucket_means(pairs, BUCKETS, "per_match", ("predicted", "actual"))
 
 
 
@@ -1154,7 +1147,9 @@ def comparison_lines() -> list[str]:
     tp = sum(p["predicted"] for p in pairs)
     ta = sum(p["actual"] for p in pairs)
     mae = sum(abs(p["err"]) for p in pairs) / sum(p["matches"] for p in pairs)
-    fx, no_fix = fixture_rows(pairs)
+    known = [p for p in pairs if p.get("fix") is not None]
+    fx = _bucket_means(known, FIX_BUCKETS, "fix", ("predicted", "actual", "err"))
+    no_fix = len(pairs) - len(known)
     over = sum(1 for p in pairs if p["err"] > 0)
     under = sum(1 for p in pairs if p["err"] < 0)
     mean_signed = sum(p["err"] for p in pairs) / n
@@ -1189,7 +1184,7 @@ def comparison_lines() -> list[str]:
                 f"at all): ours {rbc['ours']:.2f} MAE, that guess "
                 f"{rbc['naive']:.2f} MAE — " + verdict + "_", ""]
         log_forecast_accuracy(n, rbc["ours"], rbc["naive"])
-    buckets = bucket_rows(pairs)
+    buckets = _bucket_means(pairs, BUCKETS, "per_match", ("predicted", "actual"))
     if buckets and min(cnt for _, cnt, _, _ in buckets) >= MIN_BUCKET_N:
         out += [
             "| Forecast bucket | n | Mean forecast | Mean actual |",
@@ -1305,10 +1300,13 @@ def _selftest() -> None:
     assert latest_before(preds["bo"], t(14)) is None
     assert latest_before(preds["bo"], t(14, 1))["score"] == 1.5
 
-    rows = bucket_rows(got)
+    rows = _bucket_means(got, BUCKETS, "per_match", ("predicted", "actual"))
     assert [r[0] for r in rows] == ["under 2", "3–4"], rows
 
-    fx, no_fix = fixture_rows(got)
+    known = [p for p in got if p.get("fix") is not None]
+    fx = _bucket_means(known, FIX_BUCKETS, "fix",
+                       ("predicted", "actual", "err"))
+    no_fix = len(got) - len(known)
     assert [r[0] for r in fx] == ["harder", "easier"], fx
     assert no_fix == 0
     hard, easy = fx
@@ -1317,7 +1315,10 @@ def _selftest() -> None:
 
     old = pair([{"name": "Ane", "keys": ["ane"], "from_dt": t(11),
                  "points_delta": 4.0, "games_delta": 1.0}], preds)
-    fx2, no_fix2 = fixture_rows(old)
+    known2 = [p for p in old if p.get("fix") is not None]
+    fx2 = _bucket_means(known2, FIX_BUCKETS, "fix",
+                        ("predicted", "actual", "err"))
+    no_fix2 = len(old) - len(known2)
     assert fx2 == [] and no_fix2 == 1, (fx2, no_fix2)
 
     locks3 = {1: t(20), 2: t(14), 3: t(10)}
