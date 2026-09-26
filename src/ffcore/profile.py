@@ -202,32 +202,22 @@ def mk_profile(pj: float, pos: str = "MED", price=None, name: str = "",
 
 
 def _selftest() -> None:
-    class _FakeScored:
-        def __init__(self, ppm, pj, pct_used, fix, status, pct_rest=None):
-            self.ppm, self.pj, self.pct_used = ppm, pj, pct_used
-            self.fix, self.status = fix, status
-            self.pct_rest = pct_used if pct_rest is None else pct_rest
-
+    from types import SimpleNamespace
+    from ffcore.crosswalk import Crosswalk, Player
+    from ffcore.score import Scored
     from ffcore.startprob import Calibration
 
-    class _FakeScorer:
-        cal = Calibration()
-        lookup = {"999": {"key": "999"}}
-
-        def score(self, row):
-            return _FakeScored(ppm=6.0, pj=12.0, pct_used=80.0, fix=1.1,
-                               status="ok", pct_rest=60.0) if row else None
-
-    from ffcore.crosswalk import Player
-
+    scored = Scored(name="Known Player", key="999", slot="DEL", pos="delantero",
+                    score=0.0, flat=0.0, ppm=6.0, pct=None, pct_used=80.0,
+                    pct_rest=60.0, on_page=True, status="ok", assumed=False,
+                    value=0.0, fix=1.1, pj=12.0)
+    fake_sc = SimpleNamespace(cal=Calibration(), lookup={"999": "999"},
+                              score={"999": scored}.get)
     players = {"999": {"name": "Known Player", "pos": "DEL", "club": "betis"},
-              "unknown": {"name": "Unknown Player", "pos": "MED",
-                          "club": "celta"}}
-
-    class _FakeXW:
-        players = {"999": Player("999", "Known Player", club_id="betis",
-                                 app_id="app-999", understat_id="us-999")}
-
+               "unknown": {"name": "Unknown Player", "pos": "MED",
+                           "club": "celta"}}
+    xw = Crosswalk({"999": Player("999", "Known Player", club_id="betis",
+                                  app_id="app-999", understat_id="us-999")})
     perjornada = [
         {"ff_id": "999", "player_name": "Known Player", "jornada": "1",
          "points_delta": "5", "games_delta": "1"},
@@ -242,8 +232,8 @@ def _selftest() -> None:
     ]
     matches = [{"home": "betis", "away": "sevilla", "jornada": "1"},
               {"home": "celta", "away": "betis", "jornada": "2"}]
-    profiles = build_profiles(players, _FakeScorer(), perjornada,
-                              xw=_FakeXW(), match_stats_rows=match_stats,
+    profiles = build_profiles(players, fake_sc, perjornada,
+                              xw=xw, match_stats_rows=match_stats,
                               match_rows=matches,
                               market_keyed={"999": {"listed": True,
                                                      "price": 5e6,
@@ -275,17 +265,10 @@ def _selftest() -> None:
 
     from ffcore.score import DOUBT_FACTOR
 
-    class _StatusScorer(_FakeScorer):
-        def __init__(self, status):
-            self.status = status
-
-        def score(self, row):
-            return _FakeScored(ppm=6.0, pj=12.0, pct_used=80.0, fix=1.1,
-                               status=self.status, pct_rest=60.0) \
-                if row else None
-
-    susp_profiles = build_profiles(players, _StatusScorer("suspended"),
-                                   perjornada, xw=_FakeXW(),
+    susp_sc = SimpleNamespace(
+        cal=Calibration(), lookup={"999": "999"},
+        score={"999": scored._replace(status="suspended")}.get)
+    susp_profiles = build_profiles(players, susp_sc, perjornada, xw=xw,
                                    match_stats_rows=match_stats,
                                    match_rows=matches,
                                    market_keyed={"999": {"listed": True,
@@ -300,13 +283,15 @@ def _selftest() -> None:
     assert abs(susp_rest[0] - 6.6) < 1e-9 \
         and abs(susp_rest[1] - 0.6) < 1e-9, susp_rest
 
-    doubt_profiles = build_profiles(players, _StatusScorer("doubt"),
-                                    perjornada, xw=_FakeXW(),
+    doubt_sc = SimpleNamespace(
+        cal=Calibration(), lookup={"999": "999"},
+        score={"999": scored._replace(status="doubt")}.get)
+    doubt_profiles = build_profiles(players, doubt_sc, perjornada, xw=xw,
                                     match_stats_rows=match_stats,
                                     match_rows=matches,
                                     market_keyed={"999": {"listed": True,
-                                                           "price": 5e6,
-                                                           "owner": "alice"}})
+                                                          "price": 5e6,
+                                                          "owner": "alice"}})
     kd = doubt_profiles["999"]
     assert abs(kd.derived.pts_now - 6.6 * DOUBT_FACTOR) < 1e-9, \
         kd.derived.pts_now

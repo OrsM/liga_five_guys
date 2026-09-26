@@ -128,16 +128,14 @@ def main() -> None:
 
 
 def _selftest() -> None:
-    def row(full, pts, pj, short=None, team="X"):
-        return {"player_name": short or full, "player_name_full": full,
-                "team": team, "points": str(pts), "games": str(pj),
-                "avg": ""}
-
-    a = [row("Ane Aldea", 0, 0), row("Bo Bidal", 0, 0)]
-    b = [row("Ane Aldea", 0, 0), row("Bo Bidal", 0, 0)]
-    c = [row("Ane Aldea", 8, 1), row("Bo Bidal", 0, 0)]
-    d = [row("Ane Aldea", 8, 1), row("Bo Bidal", 3, 1),
-         row("Cai Coro", 5, 1)]
+    a, b, c, d = ([{"player_name": name, "player_name_full": name, "team": "X",
+                    "points": pts, "games": pj, "avg": ""}
+                   for name, pts, pj in snap]
+                  for snap in ([("Ane Aldea", "0", "0"), ("Bo Bidal", "0", "0")],
+                               [("Ane Aldea", "0", "0"), ("Bo Bidal", "0", "0")],
+                               [("Ane Aldea", "8", "1"), ("Bo Bidal", "0", "0")],
+                               [("Ane Aldea", "8", "1"), ("Bo Bidal", "3", "1"),
+                                ("Cai Coro", "5", "1")]))
 
     kept = keep_changed([("t0", a), ("t1", b), ("t2", c), ("t3", d)])
     assert [s for s, _ in kept] == ["t0", "t2", "t3"], kept

@@ -73,17 +73,12 @@ def _once(seen: set, key) -> bool:
     return True
 
 
-def _extract_rows(html: str, selector: str, row_of) -> list[dict]:
-    doc = lh.fromstring(html)
+def _extract_rows(html: str, selector: str, row_of, observed_at: str) -> list[dict]:
     rows, seen = [], set()
-    for el in _css(doc, selector):
-        row = row_of(el)
-        if row is None:
-            continue
-        key = row.pop("key")
-        if not _once(seen, key):
-            continue
-        rows.append(row)
+    for el in _css(lh.fromstring(html), selector):
+        row = row_of(el, observed_at)
+        if row is not None and _once(seen, row.pop("key")):
+            rows.append(row)
     return rows
 
 
@@ -218,44 +213,41 @@ def _lineup_row(observed_at, source, team_slug, player_name, player_slug,
     }
 
 
+def _team_player(el) -> tuple:
+    text = " ".join(el.text_content().split())
+    m = NAME_RE.match(text)
+    if m:
+        name, pct = m.group(1).strip() or None, int(m.group(2))
+    else:
+        name, pct = (re.split(r"\d", text, 1)[0].strip() or None), None
+    href = el.get("href") or ""
+    if not href:
+        a = el.find(".//a[@href]")
+        href = a.get("href") if a is not None else ""
+    return name, pct, href
+
+
 def parse_team(html: str, observed_at: str, key: str = "team_test") -> list[dict]:
     slug = key[5:] if key.startswith("team_") else key
     doc = lh.fromstring(html)
     fitness = parse_fitness(doc)
-    rows = []
-    seen = set()
-
-    def add(el, role):
-        text = " ".join(el.text_content().split())
-        m = NAME_RE.match(text)
-        if m:
-            name, pct = m.group(1).strip() or None, int(m.group(2))
-        else:
-            name, pct = (re.split(r"\d", text, 1)[0].strip() or None), None
-        if not _once(seen, name.lower()):
-            return
-        fit = fitness.get(norm(name))
-        href = el.get("href") or ""
-        if not href:
-            a = el.find(".//a[@href]")
-            href = a.get("href") if a is not None else ""
-        rows.append(_lineup_row(
-            observed_at, SOURCE, slug, name,
-            _slug('href="%s"' % href) if href else None, role, pct,
-            fit["status"] if fit else "ok", fit["note"] if fit else ""))
-
-    for el in _css(doc, XI_SELECTORS[0]):
-        add(el, "starter")
-    for el in _css(doc, XI_SELECTORS[1]):
-        add(el, "sub")
-
+    rows, seen = [], set()
+    for role, selector in zip(("starter", "sub"), XI_SELECTORS):
+        for el in _css(doc, selector):
+            name, pct, href = _team_player(el)
+            if not _once(seen, name.lower()):
+                continue
+            fit = fitness.get(norm(name))
+            rows.append(_lineup_row(
+                observed_at, SOURCE, slug, name,
+                _slug('href="%s"' % href) if href else None, role, pct,
+                fit["status"] if fit else "ok", fit["note"] if fit else ""))
+    named = {norm(r["player_name"]) for r in rows}
     for fkey, fit in fitness.items():
-        if fkey in {norm(r["player_name"]) for r in rows}:
-            continue
-        rows.append(_lineup_row(
-            observed_at, SOURCE, slug, fit["name"], fit["slug"] or None,
-            "absent", None, fit["status"], fit["note"]))
-
+        if fkey not in named:
+            rows.append(_lineup_row(
+                observed_at, SOURCE, slug, fit["name"], fit["slug"] or None,
+                "absent", None, fit["status"], fit["note"]))
     return rows
 
 
@@ -394,57 +386,47 @@ AF_SPLIT_RE = re.compile(r"^(.+?)(\d+)\s*/\s*(\d+)\s+titular", re.S)
 AF_FRACTION_RE = re.compile(r"\d+\s*/\s*\d+")
 
 
+def _af_photo(li) -> str:
+    img = _css(li, "img[src]")
+    return img[0].get("src") if img else ""
+
+
+def _af_consensus(doc):
+    for block in _css(doc, AF_CONSENSO_SELECTOR):
+        for ul in _css(block, "ul"):
+            parent = ul.getparent()
+            ptext = (_WS.sub(" ", parent.text_content()).strip()
+                     if parent is not None else "")
+            section = next((h for h in (AF_UNANIMOUS, AF_DIVIDED)
+                            if ptext.startswith(h)), None)
+            for li in (_css(ul, "li") if section else ()):
+                text = _WS.sub(" ", li.text_content()).strip()
+                if section == AF_UNANIMOUS:
+                    if not AF_FRACTION_RE.search(text):
+                        yield text, li, "starter", 100.0, "consenso unánime"
+                    continue
+                m = AF_SPLIT_RE.match(text)
+                if m and int(m.group(3)):
+                    n, d = int(m.group(2)), int(m.group(3))
+                    yield (m.group(1).strip(), li, "doubt",
+                           round(100.0 * n / d, 1), "consenso %d/%d" % (n, d))
+
+
 def parse_af_team(html: str, observed_at: str,
                   key: str = "af_test") -> list[dict]:
     slug = key[3:] if key.startswith("af_") else key
     doc = lh.fromstring(html)
+    named = [((li.get("aria-label") or "")[len(AF_NAME_PREFIX):].strip()
+              if (li.get("aria-label") or "").startswith(AF_NAME_PREFIX)
+              else "", li, "starter", None, "titular")
+             for li in _css(doc, AF_XI_SELECTOR)]
     rows, seen = [], set()
-
-    def add(name, img_src, role, start_pct, note):
+    for name, li, role, pct, note in named or _af_consensus(doc):
         if not _once(seen, name.lower()):
-            return
-        m = AF_PHOTO_RE.search(img_src or "")
-        rows.append(_lineup_row(
-            observed_at, AF_SOURCE, slug, name, m.group(1) if m else None,
-            role, start_pct, "", note))
-
-    def photo(li):
-        img = _css(li, "img[src]")
-        return img[0].get("src") if img else ""
-
-    for li in _css(doc, AF_XI_SELECTOR):
-        label = li.get("aria-label") or ""
-        name = (label[len(AF_NAME_PREFIX):].strip()
-                if label.startswith(AF_NAME_PREFIX) else "")
-        add(name, photo(li), "starter", None, "titular")
-    if rows:
-        return rows
-
-    for block in _css(doc, AF_CONSENSO_SELECTOR):
-        for ul in _css(block, "ul"):
-            section = None
-            parent = ul.getparent()
-            if parent is not None:
-                ptext = _WS.sub(" ", parent.text_content()).strip()
-                section = next((h for h in (AF_UNANIMOUS, AF_DIVIDED)
-                               if ptext.startswith(h)), None)
-            if section is None:
-                continue
-            for li in _css(ul, "li"):
-                text = _WS.sub(" ", li.text_content()).strip()
-                if section == AF_UNANIMOUS:
-                    if AF_FRACTION_RE.search(text):
-                        continue
-                    add(text, photo(li), "starter", 100.0, "consenso unánime")
-                    continue
-                m = AF_SPLIT_RE.match(text)
-                if not m:
-                    continue
-                name, n, d = m.group(1).strip(), int(m.group(2)), int(m.group(3))
-                if not d:
-                    continue
-                add(name, photo(li), "doubt", round(100.0 * n / d, 1),
-                    "consenso %d/%d" % (n, d))
+            continue
+        m = AF_PHOTO_RE.search(_af_photo(li))
+        rows.append(_lineup_row(observed_at, AF_SOURCE, slug, name,
+                                m.group(1) if m else None, role, pct, "", note))
     return rows
 
 
@@ -452,31 +434,33 @@ AF_HUB_URL = f"{AF_BASE}/la-liga/alineaciones-probables"
 AF_MATCH_RE = re.compile(r"/partido/(\d+)")
 
 
+def _af_fixture_row(a, observed_at: str) -> dict | None:
+    m = AF_MATCH_RE.search(a.get("href") or "")
+    times = _css(a, "time[datetime]")
+    teams = [i.get("alt") for i in _css(a, "img[alt]") if i.get("alt")]
+    ids = [i.get("data-af-team")
+           for i in _css(a, "img[data-af-team]") if i.get("data-af-team")]
+    if not (m and times and len(teams) >= 2):
+        return None
+    return {
+        "key": m.group(1),
+        "observed_at": observed_at,
+        "source": AF_SOURCE,
+        "match_id": m.group(1),
+        "kickoff": times[0].get("datetime"),
+        "home": club_slug(teams[0]),
+        "away": club_slug(teams[1]),
+        "home_name": teams[0],
+        "away_name": teams[1],
+        "home_id": ids[0] if len(ids) > 1 else "",
+        "away_id": ids[1] if len(ids) > 1 else "",
+    }
+
+
 def parse_af_fixtures(html: str, observed_at: str,
                       key: str = "af_fixtures") -> list[dict]:
-    def row_of(a):
-        m = AF_MATCH_RE.search(a.get("href") or "")
-        times = _css(a, "time[datetime]")
-        teams = [i.get("alt") for i in _css(a, "img[alt]") if i.get("alt")]
-        ids = [i.get("data-af-team")
-               for i in _css(a, "img[data-af-team]") if i.get("data-af-team")]
-        if not (m and times and len(teams) >= 2):
-            return None
-        return {
-            "key": m.group(1),
-            "observed_at": observed_at,
-            "source": AF_SOURCE,
-            "match_id": m.group(1),
-            "kickoff": times[0].get("datetime"),
-            "home": club_slug(teams[0]),
-            "away": club_slug(teams[1]),
-            "home_name": teams[0],
-            "away_name": teams[1],
-            "home_id": ids[0] if len(ids) > 1 else "",
-            "away_id": ids[1] if len(ids) > 1 else "",
-        }
-
-    return _extract_rows(html, 'a[href*="/partido/"]', row_of)
+    return _extract_rows(html, 'a[href*="/partido/"]', _af_fixture_row,
+                         observed_at)
 
 
 CAL_KEY = "calendario"
@@ -505,32 +489,34 @@ def _match_sides(slug: str) -> tuple[str, str] | None:
     return None
 
 
+def _calendar_row(a, observed_at: str) -> dict | None:
+    m = MATCH_PATH_RE.search(a.get("href") or "")
+    if not m:
+        return None
+    path = m.group(1)
+    text = _WS.sub(" ", a.text_content()).strip()
+    jor = CAL_JORNADA_RE.search(text)
+    sides = _match_sides(path.split("-", 1)[1])
+    if not (jor and sides):
+        return None
+    score = CAL_SCORE_RE.search(text)
+    return {
+        "key": path,
+        "observed_at": observed_at,
+        "source": SOURCE,
+        "match_id": path.split("-", 1)[0],
+        "path": path,
+        "jornada": int(jor.group(1)),
+        "home": sides[0],
+        "away": sides[1],
+        "score": score.group(1).replace(" ", "") if score else "",
+    }
+
+
 def parse_calendar(html: str, observed_at: str,
                    key: str = "calendario") -> list[dict]:
-    def row_of(a):
-        m = MATCH_PATH_RE.search(a.get("href") or "")
-        if not m:
-            return None
-        path = m.group(1)
-        text = _WS.sub(" ", a.text_content()).strip()
-        jor = CAL_JORNADA_RE.search(text)
-        sides = _match_sides(path.split("-", 1)[1])
-        if not (jor and sides):
-            return None
-        score = CAL_SCORE_RE.search(text)
-        return {
-            "key": path,
-            "observed_at": observed_at,
-            "source": SOURCE,
-            "match_id": path.split("-", 1)[0],
-            "path": path,
-            "jornada": int(jor.group(1)),
-            "home": sides[0],
-            "away": sides[1],
-            "score": score.group(1).replace(" ", "") if score else "",
-        }
-
-    return _extract_rows(html, 'a[href*="/partidos/"]', row_of)
+    return _extract_rows(html, 'a[href*="/partidos/"]', _calendar_row,
+                         observed_at)
 
 
 def parse_starters(html: str, observed_at: str,
@@ -608,31 +594,32 @@ ELO_COLS = ("Name", "Elo", "FedURL", "Level")
 ELO_MARK = "var vegaJson ="
 
 
-def parse_elo(text: str, observed_at: str, key: str = "elo") -> list[dict]:
-    def elo_records(html: str) -> list[dict]:
-        text, out, at = html or "", [], 0
-        dec = json.JSONDecoder()
-        while True:
-            at = text.find(ELO_MARK, at)
-            if at < 0:
-                return out
-            at += len(ELO_MARK)
-            start = text.find("{", at)
-            if start < 0:
-                return out
-            try:
-                spec, at = dec.raw_decode(text, start)
-            except ValueError:
-                continue
-            if not isinstance(spec, dict):
-                continue
-            for data in (spec.get("datasets") or {}).values():
-                if isinstance(data, list):
-                    out += [r for r in data if isinstance(r, dict)
-                            and all(c in r for c in ELO_COLS)]
+def _elo_records(html: str) -> list[dict]:
+    text, out, at = html or "", [], 0
+    dec = json.JSONDecoder()
+    while True:
+        at = text.find(ELO_MARK, at)
+        if at < 0:
+            return out
+        at += len(ELO_MARK)
+        start = text.find("{", at)
+        if start < 0:
+            return out
+        try:
+            spec, at = dec.raw_decode(text, start)
+        except ValueError:
+            continue
+        if not isinstance(spec, dict):
+            continue
+        for data in (spec.get("datasets") or {}).values():
+            if isinstance(data, list):
+                out += [r for r in data if isinstance(r, dict)
+                        and all(c in r for c in ELO_COLS)]
 
+
+def parse_elo(text: str, observed_at: str, key: str = "elo") -> list[dict]:
     rows = []
-    for rec in elo_records(text):
+    for rec in _elo_records(text):
         if (str(rec["FedURL"]).strip() != ELO_COUNTRY
                 or str(rec["Level"]).strip() != ELO_LEVEL):
             continue
@@ -840,133 +827,138 @@ def _player_identity(pm: dict) -> dict:
     }
 
 
-def _parse_json_list(text: str, observed_at: str, row_fn,
-                     if_empty=None) -> list[dict]:
+def _parse_json_list(text: str, observed_at: str, row_fn, *args,
+                     if_empty=()) -> list[dict]:
     d = _j(text)
     if not isinstance(d, list):
         return []
-    rows = [{"observed_at": observed_at, "source": LFG_SOURCE, **row}
-            for it in d for row in (row_fn(it) or ())]
-    if not rows and if_empty is not None:
-        rows = [{"observed_at": observed_at, "source": LFG_SOURCE, **row}
-               for row in if_empty()]
-    return rows
+    rows = [row for it in d for row in (row_fn(it, *args) or ())] or list(if_empty)
+    return [{"observed_at": observed_at, "source": LFG_SOURCE, **row}
+            for row in rows]
+
+
+def _league_row(lg) -> list[dict]:
+    if not lg.get("id"):
+        return []
+    t = lg.get("team") or {}
+    return [{"league_id": str(lg["id"]), "league_name": lg.get("name") or "",
+            "access": lg.get("access") or "",
+            "managers": str(lg.get("managersNumber") or ""),
+            "team_id": str(t.get("id") or ""),
+            "money": str(t.get("money") or ""),
+            "team_value": str(t.get("teamValue") or ""),
+            "team_points": str(t.get("teamPoints") or "")}]
 
 
 def parse_api_leagues(text: str, observed_at: str,
                       key: str = "api_leagues") -> list[dict]:
-    def row(lg):
-        if not lg.get("id"):
-            return []
-        t = lg.get("team") or {}
-        return [{"league_id": str(lg["id"]), "league_name": lg.get("name") or "",
-                "access": lg.get("access") or "",
-                "managers": str(lg.get("managersNumber") or ""),
-                "team_id": str(t.get("id") or ""),
-                "money": str(t.get("money") or ""),
-                "team_value": str(t.get("teamValue") or ""),
-                "team_points": str(t.get("teamPoints") or "")}]
-    return _parse_json_list(text, observed_at, row)
+    return _parse_json_list(text, observed_at, _league_row)
+
+
+def _market_row(it) -> list[dict]:
+    pm = _pm(it)
+    if not pm.get("id"):
+        return []
+    return [{
+        ROW_TABLE: "api_market",
+        "market_id": str(it.get("id") or ""),
+        **_player_identity(pm),
+        "sale_price": str(it.get("salePrice") or ""),
+        "bids": next((str(it[k]) for k in ("numberOfBids", "numberOfOffers")
+                      if it.get(k) is not None), ""),
+        "seller": it.get("discr") or "",
+        "status": it.get("status") or "",
+        "player_status": pm.get("playerStatus") or "",
+        "shielded": "" if (it.get("playerTeam") or {}).get("isShielded")
+                          is None else
+                    str((it["playerTeam"]["isShielded"])).lower(),
+        "expires_at": it.get("expirationDate") or "",
+        "bid_id": str((it.get("bid") or {}).get("id") or ""),
+        "bid_money": str((it.get("bid") or {}).get("money") or ""),
+        "bid_status": (it.get("bid") or {}).get("status") or "",
+    }]
 
 
 def parse_api_market(text: str, observed_at: str,
                      key: str = "api_market") -> list[dict]:
-    def row(it):
-        pm = _pm(it)
-        if not pm.get("id"):
-            return []
-        return [{
-            ROW_TABLE: "api_market",
-            "market_id": str(it.get("id") or ""),
-            **_player_identity(pm),
-            "sale_price": str(it.get("salePrice") or ""),
-            "bids": next((str(it[k]) for k in ("numberOfBids", "numberOfOffers")
-                          if it.get(k) is not None), ""),
-            "seller": it.get("discr") or "",
-            "status": it.get("status") or "",
-            "player_status": pm.get("playerStatus") or "",
-            "shielded": "" if (it.get("playerTeam") or {}).get("isShielded")
-                              is None else
-                        str((it["playerTeam"]["isShielded"])).lower(),
-            "expires_at": it.get("expirationDate") or "",
-            "bid_id": str((it.get("bid") or {}).get("id") or ""),
-            "bid_money": str((it.get("bid") or {}).get("money") or ""),
-            "bid_status": (it.get("bid") or {}).get("status") or "",
-        }]
-    return _parse_json_list(text, observed_at, row)
+    return _parse_json_list(text, observed_at, _market_row)
+
+
+def _activity_row(a) -> list[dict]:
+    if not a.get("id"):
+        return []
+    kind = ACT_KIND.get(a.get("activityTypeId")) \
+        or ("unknown:%s" % a.get("activityTypeId"))
+    return [{
+        "activity_id": str(a["id"]),
+        "at": a.get("createdAt") or "",
+        "kind": kind,
+        "user_id": str(a.get("user1Id") or ""),
+        "counterparty": str(a.get("user2Id") or ""),
+        "player_id": str(a.get("playerMasterId") or ""),
+        "amount": str(a.get("amount") or ""),
+        "week": str(a.get("weekNumber") or ""),
+    }]
 
 
 def parse_api_activity(text: str, observed_at: str,
                        key: str = "api_activity") -> list[dict]:
-    def row(a):
-        if not a.get("id"):
-            return []
-        kind = ACT_KIND.get(a.get("activityTypeId")) \
-            or ("unknown:%s" % a.get("activityTypeId"))
-        return [{
-            "activity_id": str(a["id"]),
-            "at": a.get("createdAt") or "",
-            "kind": kind,
-            "user_id": str(a.get("user1Id") or ""),
-            "counterparty": str(a.get("user2Id") or ""),
-            "player_id": str(a.get("playerMasterId") or ""),
-            "amount": str(a.get("amount") or ""),
-            "week": str(a.get("weekNumber") or ""),
-        }]
-    return _parse_json_list(text, observed_at, row)
+    return _parse_json_list(text, observed_at, _activity_row)
+
+
+def _team_rows(t, observed_at: str) -> list[dict]:
+    out = []
+    m = t.get("manager") or {}
+    if t.get("id"):
+        out.append({
+            ROW_TABLE: "api_standings",
+            "team_id": str(t["id"]),
+            "user_id": str(m.get("id") or ""),
+            "manager": m.get("managerName") or "",
+            "position": str(t.get("position") or ""),
+            "previous_position": str(t.get("previousPosition") or ""),
+            "team_points": str(t.get("teamPoints") or ""),
+            "fixture_points": str(t.get("fixturePoints") or ""),
+            "team_value": str(t.get("teamValue") or ""),
+            "team_money": str(t.get("teamMoney") or ""),
+            "banned": "" if t.get("banned") is None
+                      else str(t["banned"]).lower(),
+            "starting_week": str(t.get("startingWeek") or ""),
+        })
+    for p in (t.get("players") or []):
+        pm = _pm(p)
+        if not pm.get("id"):
+            continue
+        out.append({
+            ROW_TABLE: "api_teams",
+            "team_id": str(t.get("id") or ""),
+            "manager": m.get("managerName") or "",
+            **_player_identity(pm),
+            "points": str(pm.get("points") or ""),
+            "buyout": str(p.get("buyoutClause") or ""),
+            "buyout_until": str(p.get("buyoutClauseLockedEndTime") or ""),
+            "player_status": pm.get("playerStatus") or "",
+            "player_team_id": str(p.get("playerTeamId") or ""),
+        })
+        for line in (pm.get("lastStats") or []):
+            week = line.get("weekNumber")
+            for stat, pair in (line.get("stats") or {}).items():
+                if not isinstance(pair, list) or len(pair) != 2:
+                    continue
+                out.append({
+                    "observed_at": observed_at, "source": LFG_SOURCE,
+                    ROW_TABLE: "api_stats",
+                    "player_id": str(pm.get("id") or ""),
+                    "week": str(week if week is not None else ""),
+                    "stat": str(stat),
+                    "value": str(pair[0]), "points": str(pair[1]),
+                })
+    return out
 
 
 def parse_api_teams(text: str, observed_at: str,
                     key: str = "api_teams") -> list[dict]:
-    def row(t):
-        out = []
-        m = t.get("manager") or {}
-        if t.get("id"):
-            out.append({
-                ROW_TABLE: "api_standings",
-                "team_id": str(t["id"]),
-                "user_id": str(m.get("id") or ""),
-                "manager": m.get("managerName") or "",
-                "position": str(t.get("position") or ""),
-                "previous_position": str(t.get("previousPosition") or ""),
-                "team_points": str(t.get("teamPoints") or ""),
-                "fixture_points": str(t.get("fixturePoints") or ""),
-                "team_value": str(t.get("teamValue") or ""),
-                "team_money": str(t.get("teamMoney") or ""),
-                "banned": "" if t.get("banned") is None
-                          else str(t["banned"]).lower(),
-                "starting_week": str(t.get("startingWeek") or ""),
-            })
-        for p in (t.get("players") or []):
-            pm = _pm(p)
-            if not pm.get("id"):
-                continue
-            out.append({
-                ROW_TABLE: "api_teams",
-                "team_id": str(t.get("id") or ""),
-                "manager": m.get("managerName") or "",
-                **_player_identity(pm),
-                "points": str(pm.get("points") or ""),
-                "buyout": str(p.get("buyoutClause") or ""),
-                "buyout_until": str(p.get("buyoutClauseLockedEndTime") or ""),
-                "player_status": pm.get("playerStatus") or "",
-                "player_team_id": str(p.get("playerTeamId") or ""),
-            })
-            for line in (pm.get("lastStats") or []):
-                week = line.get("weekNumber")
-                for stat, pair in (line.get("stats") or {}).items():
-                    if not isinstance(pair, list) or len(pair) != 2:
-                        continue
-                    out.append({
-                        "observed_at": observed_at, "source": LFG_SOURCE,
-                        ROW_TABLE: "api_stats",
-                        "player_id": str(pm.get("id") or ""),
-                        "week": str(week if week is not None else ""),
-                        "stat": str(stat),
-                        "value": str(pair[0]), "points": str(pair[1]),
-                    })
-        return out
-    return _parse_json_list(text, observed_at, row)
+    return _parse_json_list(text, observed_at, _team_rows, observed_at)
 
 
 LINEUP_SLOTS = {"goalkeeper": "POR", "defender": "DEF",
@@ -1029,14 +1021,16 @@ def parse_api_player(text: str, observed_at: str,
 API_PLAYERS_ALL_URL = "{base}/v1/competition/1/players?x-lang=es"
 
 
+def _player_all_row(p) -> list[dict]:
+    if not p.get("id"):
+        return []
+    return [{"team_id": str(p.get("teamId") or ""), **_player_identity(p),
+            "player_status": p.get("playerStatus") or ""}]
+
+
 def parse_api_players_all(text: str, observed_at: str,
                           key: str = "api_players_all") -> list[dict]:
-    def row(p):
-        if not p.get("id"):
-            return []
-        return [{"team_id": str(p.get("teamId") or ""), **_player_identity(p),
-                "player_status": p.get("playerStatus") or ""}]
-    return _parse_json_list(text, observed_at, row)
+    return _parse_json_list(text, observed_at, _player_all_row)
 
 
 def player_source(key: str) -> Source | None:
@@ -1063,30 +1057,28 @@ API_OFFER_URL = ("{base}/v1/competition/1/league/{league}/playerTeam/{ptid}"
 API_OFFER_KEY_RE = re.compile(r"^api_offer_(\d+)$")
 
 
+def _offer_row(it, ptid: str) -> list[dict]:
+    if not it.get("id"):
+        return []
+    return [{
+        "player_team_id": ptid, "offer_id": str(it["id"]),
+        "money": str(it.get("money") or ""), "status": it.get("status") or "",
+        "created_at": it.get("createdAt") or "",
+        "expires_at": it.get("expirationDate") or "",
+        "from_market": "" if it.get("isFromMarket") is None else
+                       str(it["isFromMarket"]).lower(),
+    }]
+
+
 def parse_api_offer(text: str, observed_at: str,
                     key: str = "api_offer_0") -> list[dict]:
     m = API_OFFER_KEY_RE.match(key or "")
     ptid = m.group(1) if m else ""
     if not ptid:
         return []
-
-    def row(it):
-        if not it.get("id"):
-            return []
-        return [{
-            "player_team_id": ptid, "offer_id": str(it["id"]),
-            "money": str(it.get("money") or ""), "status": it.get("status") or "",
-            "created_at": it.get("createdAt") or "",
-            "expires_at": it.get("expirationDate") or "",
-            "from_market": "" if it.get("isFromMarket") is None else
-                           str(it["isFromMarket"]).lower(),
-        }]
-
-    def empty():
-        return [{"player_team_id": ptid, "offer_id": "", "money": "",
-                "status": "", "created_at": "", "expires_at": "",
-                "from_market": ""}]
-    return _parse_json_list(text, observed_at, row, if_empty=empty)
+    return _parse_json_list(text, observed_at, _offer_row, ptid, if_empty=[{
+        "player_team_id": ptid, "offer_id": "", "money": "", "status": "",
+        "created_at": "", "expires_at": "", "from_market": ""}])
 
 
 def offer_source(key: str) -> Source | None:
@@ -1493,34 +1485,36 @@ _CAL_FIXTURE = """<html><body>
 </body></html>"""
 
 
+def _fixture_rows(prefix: str, xi: int, subs: int) -> str:
+    out = []
+    for i in range(xi + subs):
+        if i == xi:
+            out.append('<tr class="header"><td>Suplentes</td></tr>')
+        out.append('<tr class="plegado plegable">'
+                   '<td class="name">%s%d%s</td>'
+                   '<td class="picas">SC</td>'
+                   '</tr>' % (prefix, i, " 64'" if i == 1 else ""))
+        out.append('<tr class="desglose"><td><a href='
+                   '"https://www.futbolfantasy.com/jugadores/%s%d">'
+                   'Ver la ficha del jugador</a></td></tr>' % (prefix, i))
+    return "\n".join(out)
+
+
+def _fixture_side(cls: str, prefix: str, xi: int, subs: int) -> str:
+    return ('<div class="col-12 %s"><h2 class="title">Puntos</h2>'
+            '<table class="tablestats"><tbody>%s</tbody></table></div>'
+            '<div class="col-12 %s"><h2 class="title">En directo</h2>'
+            '<table class="tablestats"><tbody>'
+            '<tr class="plegado plegable"><td class="name">'
+            'Nombre Completo Que No Vale</td></tr>'
+            '</tbody></table></div>'
+            % (cls, _fixture_rows(prefix, xi, subs), cls))
+
+
 def _match_html(home_xi: int = 11, away_xi: int = 11) -> str:
-    def rows(prefix, xi, subs):
-        out = []
-        for i in range(xi + subs):
-            if i == xi:
-                out.append('<tr class="header"><td>Suplentes</td></tr>')
-            out.append('<tr class="plegado plegable">'
-                       '<td class="name">%s%d%s</td>'
-                       '<td class="picas">SC</td>'
-                       '</tr>' % (prefix, i, " 64'" if i == 1 else ""))
-            out.append('<tr class="desglose"><td><a href='
-                       '"https://www.futbolfantasy.com/jugadores/%s%d">'
-                       'Ver la ficha del jugador</a></td></tr>' % (prefix, i))
-        return "\n".join(out)
-
-    def side(cls, prefix, xi, subs):
-        return ('<div class="col-12 %s"><h2 class="title">Puntos</h2>'
-                '<table class="tablestats"><tbody>%s</tbody></table></div>'
-                '<div class="col-12 %s"><h2 class="title">En directo</h2>'
-                '<table class="tablestats"><tbody>'
-                '<tr class="plegado plegable"><td class="name">'
-                'Nombre Completo Que No Vale</td></tr>'
-                '</tbody></table></div>'
-                % (cls, rows(prefix, xi, subs), cls))
-
     return ("<html><body><div class='row stats-table'>%s%s</div></body></html>"
-            % (side("stats-local", "loc", home_xi, 3),
-               side("stats-visitante", "vis", away_xi, 2)))
+            % (_fixture_side("stats-local", "loc", home_xi, 3),
+               _fixture_side("stats-visitante", "vis", away_xi, 2)))
 
 
 _MATCH_FIXTURE = _match_html()

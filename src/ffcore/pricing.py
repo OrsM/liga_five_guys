@@ -31,31 +31,15 @@ def respond(u, a, rate: float | None) -> float:
 
 
 def _selftest() -> None:
-    from dataclasses import dataclass, field
+    from ffcore.action import Action
+    from ffcore.fixtures import players_from_flat, tiny_universe
 
-    @dataclass
-    class _FakeAction:
-        kind: str = "buy"
-        buy: str = ""
-        sell: tuple = ()
-        cost: float = 0.0
-        victim: str = ""
-
-    @dataclass
-    class _FakeUniverse:
-        values: dict = field(default_factory=dict)
-        rival_cash: dict = field(default_factory=dict)
-        me: str = "me"
-
-        def view(self, field_name):
-            return self.values if field_name == "value" else {}
-
-    u = _FakeUniverse(values={"star": 5e6, "free": 4e6})
-    assert burn(u, _FakeAction(buy="star", cost=8e6)) == 3e6
-    assert burn(u, _FakeAction(buy="free", cost=4e6)) == 0.0
-    assert burn(u, _FakeAction(buy="free", cost=3e6)) == 0.0
-    assert burn(u, _FakeAction(sell=("bench",))) == 0.0
-    assert burn(u, _FakeAction(buy="mystery", cost=9e6)) is None
+    u = tiny_universe(players=players_from_flat(value={"star": 5e6, "free": 4e6}))
+    assert burn(u, Action("buy", buy="star", cost=8e6)) == 3e6
+    assert burn(u, Action("buy", buy="free", cost=4e6)) == 0.0
+    assert burn(u, Action("buy", buy="free", cost=3e6)) == 0.0
+    assert burn(u, Action("sell", sell=("bench",))) == 0.0
+    assert burn(u, Action("buy", buy="mystery", cost=9e6)) is None
 
     flat = [(0.0, 0.40), (5e6, 0.30), (12e6, 0.20)]
     assert cash_price(flat) == 0.0
@@ -63,13 +47,13 @@ def _selftest() -> None:
     assert abs(cash_price(step) - 0.10 / 10.0) < 1e-12
     assert cash_price([]) is None and cash_price([(0.0, 0.4)]) is None
 
-    u2 = _FakeUniverse(rival_cash={"riv": 4e6})
-    steal = _FakeAction(kind="steal", buy="x", cost=10e6, victim="riv")
+    u2 = tiny_universe(rival_cash={"riv": 4e6})
+    steal = Action("steal", buy="x", cost=10e6, victim="riv")
     assert respond(u2, steal, 3.0) == 3.0 * (4e6 + 10e6) / 1e6
-    assert respond(u2, _FakeAction(buy="star", cost=1e6), 3.0) == 0.0
+    assert respond(u2, Action("buy", buy="star", cost=1e6), 3.0) == 0.0
     assert respond(u2, steal, None) == 0.0
-    broke = _FakeUniverse(rival_cash={"riv": 0.0})
-    assert respond(broke, _FakeAction(kind="steal", buy="x", cost=0.0,
+    broke = tiny_universe(rival_cash={"riv": 0.0})
+    assert respond(broke, Action("steal", buy="x", cost=0.0,
                                       victim="riv"), 3.0) == 0.0
 
     print("ffcore.pricing self-test OK (13 cases)")

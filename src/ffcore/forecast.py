@@ -21,15 +21,12 @@ RATE_REL_FLOOR = 0.5
 DRIFT_FRAC = 1.0
 
 
-def fit_drift_frac(h1_pairs, h3_pairs) -> tuple[float, str]:
-    def _z(pairs):
-        out = []
-        for predicted, actual, rel in pairs:
-            if predicted <= 0 or actual <= 0 or rel <= 0:
-                continue
-            out.append(math.log(actual / predicted) / rel)
-        return out
+def _z(pairs) -> list[float]:
+    return [math.log(actual / predicted) / rel for predicted, actual, rel in pairs
+            if predicted > 0 and actual > 0 and rel > 0]
 
+
+def fit_drift_frac(h1_pairs, h3_pairs) -> tuple[float, str]:
     z1, z3 = _z(h1_pairs), _z(h3_pairs)
     if len(z1) < 20 or len(z3) < 20:
         return DRIFT_FRAC, ("not enough graded pairs yet (h1=%d, h3=%d, "
@@ -158,17 +155,17 @@ def _selftest() -> None:
     rel = gen.rate_rel["kid"]
     rng2 = random.Random(11)
 
-    def _walked(n_steps: int, drift: float) -> float:
-        walk = cum_var = 0.0
-        step_var = (drift * rel) ** 2
-        eps0 = max(0.0, 1.0 + rng2.gauss(0.0, rel))
-        for _ in range(n_steps):
-            walk += rng2.gauss(0.0, step_var ** 0.5)
-            cum_var += step_var
-        return eps0 * math.exp(walk - cum_var / 2.0)
-
-    h1_pairs = [(1.0, _walked(1, truth), rel) for _ in range(4000)]
-    h3_pairs = [(1.0, _walked(3, truth), rel) for _ in range(4000)]
+    walked = {1: [], 3: []}
+    step_var = (truth * rel) ** 2
+    for n_steps, out in walked.items():
+        for _ in range(4000):
+            walk = cum_var = 0.0
+            eps0 = max(0.0, 1.0 + rng2.gauss(0.0, rel))
+            for _ in range(n_steps):
+                walk += rng2.gauss(0.0, step_var ** 0.5)
+                cum_var += step_var
+            out.append((1.0, eps0 * math.exp(walk - cum_var / 2.0), rel))
+    h1_pairs, h3_pairs = walked[1], walked[3]
     fitted, why = fit_drift_frac(h1_pairs, h3_pairs)
     assert abs(fitted - truth) < 0.08, (fitted, truth, why)
     n1, n3 = (int(x) for x in why.split("n=")[1].split(")")[0].split("/"))

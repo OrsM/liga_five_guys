@@ -23,13 +23,13 @@ class Action:
         return self.cost - self.proceeds
 
     def label(self, names: dict[str, str] | None = None) -> str:
-        def show(k):
-            return (names or {}).get(k, k)
-        sold = " + ".join(show(k) for k in self.sell)
+        names = names or {}
+        sold = " + ".join(names.get(k, k) for k in self.sell)
         if self.kind == "sell":
             return "sell %s" % sold
-        who = "clause %s from %s" % (show(self.buy), self.victim) \
-            if self.victim else "buy %s" % show(self.buy)
+        buy = names.get(self.buy, self.buy)
+        who = ("clause %s from %s" % (buy, self.victim) if self.victim
+               else "buy %s" % buy)
         return who + (" · sell %s" % sold if sold else "")
 
 

@@ -101,12 +101,8 @@ class Universe:
         exp, _xi = self.current_xi
         par_of = {k: v["par"] for k, v in self.player_forecasts.items()}
 
-        def _spare_rank(k):
-            vr = value_rate(par_of.get(k, 0.0),
-                            self.view("proceeds").get(k, 0.0))
-            return (vr is None, vr if vr is not None else 0.0)
-
-        spare = sorted(fieldable_spares(self), key=_spare_rank)
+        spare = sorted(fieldable_spares(self), key=lambda k: _nulls_last(
+            value_rate(par_of.get(k, 0.0), self.view("proceeds").get(k, 0.0))))
 
         out: list[Action] = []
         for c, price in sorted(self.view("price").items(), key=lambda kv: kv[1]):
@@ -178,15 +174,13 @@ class Universe:
         lam = price if price is not None else measured
 
         _, cur_xi = self.current_xi
-        def _touches_xi(a) -> bool:
-            return any(s in cur_xi for s in a.sell)
-
         pick: dict[str, tuple] = {}
         for d, a in screened:
             k = a.buy or a.sell
             cur = pick.get(k)
-            key = (not _touches_xi(a), d, -a.net)
-            if cur is None or key > (not _touches_xi(cur[1]), cur[0], -cur[1].net):
+            key = (not cur_xi.intersection(a.sell), d, -a.net)
+            if cur is None or key > (not cur_xi.intersection(cur[1].sell),
+                                     cur[0], -cur[1].net):
                 pick[k] = (d, a)
         screened = sorted(pick.values(), key=lambda t: (-t[0], t[1].net))
 
@@ -194,13 +188,12 @@ class Universe:
         top = _top_up(top, screened,
                      ok=lambda d, a: self.view("route").get(a.buy, "free") != "listed",
                      rank_key=lambda t: -t[0], minimum=KEEP_RELIABLE_MIN)
-        ratio = lambda t: t[0] / (t[1].net / 1e6)                    # noqa: E731
         best_value = {a.buy or a.sell for _, a in
                      sorted((t for t in screened if t[0] > 0 and t[1].net > 0),
-                            key=lambda t: -ratio(t))[:KEEP_VALUE_MIN]}
+                            key=_per_million)[:KEEP_VALUE_MIN]}
         top = _top_up(top, screened,
                      ok=lambda d, a: (a.buy or a.sell) in best_value,
-                     rank_key=lambda t: -ratio(t), minimum=KEEP_VALUE_MIN)
+                     rank_key=_per_million, minimum=KEEP_VALUE_MIN)
         keep = [a for _, a in top]
         bonuses = [respond(self, a, lam) for a in keep]
         afters = [apply(self, a) for a in keep]
@@ -264,6 +257,14 @@ class Universe:
                 {k: transform(v) for k, p in self.players.items()
                  for v in (get(p),) if keep(v)})
         return cache[field]
+
+
+def _nulls_last(v: float | None) -> tuple[bool, float]:
+    return v is None, v or 0.0
+
+
+def _per_million(t: tuple) -> float:
+    return -t[0] / (t[1].net / 1e6)
 
 
 def _pos_of(raw: str) -> str:
@@ -684,8 +685,7 @@ def _selftest() -> None:
                           (1.0, Action("buy", buy="ok1", cost=1e6)),
                           (0.5, Action("buy", buy="ok2", cost=1e6)),
                           (0.1, Action("buy", buy="bad", cost=1e6))]
-    ok = lambda d, a: a.buy in ("ok1", "ok2", "bad")             # noqa: E731
-    topped = _top_up(top_a, screened_a, ok,
+    topped = _top_up(top_a, screened_a, lambda d, a: a.buy in ("ok1", "ok2", "bad"),
                      rank_key=lambda t: -t[0], minimum=2)
     keys = [a.buy for _, a in topped]
     assert keys == ["a", "b", "ok1", "ok2"], keys

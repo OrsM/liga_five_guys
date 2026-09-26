@@ -1,37 +1,3 @@
-"""
-ingest.py — the only thing that touches the network or the raw store.
-
-    python src/ingest.py fetch      # sweep the registry, store what changed
-    python src/ingest.py parse      # rebuild tidy CSV from every snapshot ever
-    python src/ingest.py baseline   # once a season: last season's points table
-    python src/ingest.py --selftest
-
-Fetch and parse stay separate: when markup changes, fix sources.py and
-re-run parse over the whole history — only possible because parsed
-output isn't the only thing kept.
-
-WHAT IS IN A SNAPSHOT. One xz-compressed tar per sweep:
-
-    data/raw/dt=2026-08-15T0940Z.tar.xz
-        market.html            only if its content changed
-        team_celta.html        only if its content changed
-        MANIFEST.csv           page, sig, stored, seen — ALWAYS, for every page
-
-The manifest, not the file listing, defines what a snapshot observed —
-a page absent from it was not fetched. `stored` names the archive whose
-bytes actually hold a page's content, carried forward by later
-snapshots; the store is append-only, so deleting one archive corrupts
-every later snapshot that carries a page forward from it.
-
-xz + one tar per sweep (not gzip-per-page): halves storage over
-per-page gzip and lets pages across a sweep share dictionary — 60MB/29
-snapshots to 8MB, keeping a season's projection under GitHub's push
-limit.
-
-httpx is imported inside fetch(), never at module level, so --selftest
-runs on a box with no network client installed.
-"""
-
 from __future__ import annotations
 
 import csv
@@ -121,10 +87,6 @@ def _write(path: Path, members: dict[str, str]) -> None:
 
 def _manifest(members: dict[str, str]) -> list[dict]:
     return list(csv.DictReader(io.StringIO(members.get(MANIFEST, ""))))
-
-
-def _manifest_csv(rows: list[dict]) -> str:
-    return csv_string(rows, MANIFEST_FIELDS)
 
 
 def state() -> dict[str, dict]:
@@ -344,16 +306,11 @@ def fetch() -> Path:
         sys.exit("ERROR: no page fetched — nothing written.")
 
     members = {f"{k}.html": v for k, v in store.items()}
-    members[MANIFEST] = _manifest_csv(rows)
+    members[MANIFEST] = csv_string(rows, MANIFEST_FIELDS)
     _write(dest, members)
     print(f"snapshot: {dest} ({dest.stat().st_size // 1024}KB) — "
           f"{len(store)} stored, {unchanged} unchanged, {skipped} not due"
           + (f", {rotted} ROTTED" if rotted else ""))
-    if timing:
-        append_csv(TIDY / FEEDS,
-                  [{"observed_at": stamp, "page": k, "status": st,
-                    "seconds": "%.2f" % t} for t, k, st in timing],
-                  FEED_FIELDS)
     if timing:
         slow = sorted(timing, reverse=True)[:5]
         print("  slowest: " + ", ".join(
@@ -365,10 +322,6 @@ def fetch() -> Path:
                                             for kv in fails.items()))
                  if fails else ""))
     return dest
-
-
-FEEDS = "feeds.csv"
-FEED_FIELDS = ["observed_at", "page", "status", "seconds"]
 
 
 def parse() -> None:
@@ -542,8 +495,8 @@ def baseline(url: str = "", label: str = "") -> None:
 
     _write(RAW / f"season={label}.tar.xz",
            {"points.html": html,
-            MANIFEST: _manifest_csv([{"page": "points", "sig": "",
-                                      "stored": label, "seen": label}])})
+            MANIFEST: csv_string([{"page": "points", "sig": "", "stored": label,
+                                   "seen": label}], MANIFEST_FIELDS)})
 
     rows = parse_points(html)
     if not rows:
@@ -554,12 +507,8 @@ def baseline(url: str = "", label: str = "") -> None:
     stamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%MZ")
     out = SEASON / f"points_{label}.csv"
     out.parent.mkdir(parents=True, exist_ok=True)
-    with out.open("w", newline="", encoding="utf-8") as fh:
-        w = csv.DictWriter(fh, fieldnames=POINTS_FIELDS)
-        w.writeheader()
-        for row in rows:
-            row.update(season=label, observed_at=stamp, source_url=url)
-            w.writerow(row)
+    write_csv(out, [dict(r, season=label, observed_at=stamp, source_url=url)
+                    for r in rows], POINTS_FIELDS)
 
     played = sum(1 for r in rows if (r["games"] or "0") != "0")
     print(f"wrote {out} — {len(rows)} players, "
@@ -579,11 +528,12 @@ def _selftest() -> None:
         p = Path(tmp) / "dt=2026-01-01T0000Z.tar.xz"
         members = {"market.html": "<html>a</html>",
                    "team_celta.html": "<html>b</html>",
-                   MANIFEST: _manifest_csv(
+                   MANIFEST: csv_string(
                        [{"page": "market", "sig": "s1",
                          "stored": "2026-01-01T0000Z", "seen": "2026-01-01T0000Z"},
                         {"page": "team_celta", "sig": "s2",
-                         "stored": "2026-01-01T0000Z", "seen": "2026-01-01T0000Z"}])}
+                         "stored": "2026-01-01T0000Z", "seen": "2026-01-01T0000Z"}],
+                       MANIFEST_FIELDS)}
         _write(p, members)
         assert _read(p) == members, _read(p)
 
@@ -599,11 +549,11 @@ def _selftest() -> None:
     with tempfile.TemporaryDirectory() as tmp:
         RAW, TIDY = Path(tmp) / "raw", Path(tmp) / "tidy"
         RAW.mkdir(parents=True)
-        man = lambda *ps: _manifest_csv(                        # noqa: E731
-            [{"page": p, "sig": "s", "stored": "t", "seen": "t"} for p in ps])
+        man = csv_string([{"page": "market", "sig": "s", "stored": "t",
+                           "seen": "t"}], MANIFEST_FIELDS)
         _write(RAW / "dt=2026-01-01T0000Z.tar.xz",
-               {"market.html": "<html>a</html>", MANIFEST: man("market")})
-        _write(RAW / "dt=2026-01-02T0000Z.tar.xz", {MANIFEST: man("market")})
+               {"market.html": "<html>a</html>", MANIFEST: man})
+        _write(RAW / "dt=2026-01-02T0000Z.tar.xz", {MANIFEST: man})
 
         cold = doc_keys()
         assert [st for st, _ in cold] == ["2026-01-01T0000Z",
@@ -618,7 +568,7 @@ def _selftest() -> None:
         assert "read" not in buf.getvalue(), "archives re-read on a warm index"
 
         _write(RAW / "dt=2026-01-02T0000Z.tar.xz",
-               {"market.html": "<html>bb</html>", MANIFEST: man("market")})
+               {"market.html": "<html>bb</html>", MANIFEST: man})
         buf = _io.StringIO()
         with contextlib.redirect_stdout(buf):
             again = doc_keys()
@@ -630,7 +580,7 @@ def _selftest() -> None:
     RAW, TIDY = _raw, _tidy
 
     rows = [{"page": "market", "sig": "s1", "stored": "t0", "seen": "t1"}]
-    assert _manifest({MANIFEST: _manifest_csv(rows)}) == rows
+    assert _manifest({MANIFEST: csv_string(rows, MANIFEST_FIELDS)}) == rows
 
 
     assert set(STORE_ONCE) == {"api_activity", "api_players",
@@ -696,11 +646,9 @@ def _selftest() -> None:
                "2026-08-15T1600Z")
     assert due(twice, {}, "2026-08-15T0000Z")
 
-    mk = lambda k, h: Source(k, "t", "https://%s/%s" % (h, k), None, None,
-                             "every_run")
-    got = [x.key for x in _by_host([mk("a1", "a"), mk("a2", "a"),
-                                    mk("a3", "a"), mk("b1", "b"),
-                                    mk("b2", "b")])]
+    got = [x.key for x in _by_host([
+        Source(k, "t", "https://%s/%s" % (k[0], k), None, None, "every_run")
+        for k in ("a1", "a2", "a3", "b1", "b2")])]
     assert got == ["a1", "b1", "a2", "b2", "a3"], got
     assert not due(twice, {"m": {"seen": "2026-08-15T2340Z"}},
                    "2026-08-16T0005Z")
@@ -751,4 +699,5 @@ if __name__ == "__main__":
     elif cmd in ("fetch", "parse"):
         {"fetch": fetch, "parse": parse}[cmd]()
     else:
-        sys.exit(__doc__)
+        sys.exit("usage: ingest.py fetch | parse | baseline [--url U] "
+                 "[--label L] | --selftest")

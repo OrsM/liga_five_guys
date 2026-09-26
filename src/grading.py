@@ -139,6 +139,11 @@ def current_mae(actuals: list[dict], preds) -> float | None:
             if pairs else None)
 
 
+def _z_variance(rels, floor: float) -> float:
+    return statistics.pvariance([math.log(a / p) / max(floor, rel)
+                                 for rel, p, a in rels])
+
+
 def fit_rate_rel_floor(pool, min_pairs: int = 30,
                        history: tuple | None = None) -> tuple[float, str]:
     from ffcore.forecast import RATE_REL_FLOOR, SHRINK_MATCHES
@@ -163,15 +168,11 @@ def fit_rate_rel_floor(pool, min_pairs: int = 30,
                                 "(n=%d, need >=%d) — keeping %.2f"
                                 % (len(rels), min_pairs, RATE_REL_FLOOR))
 
-    def var_at(floor):
-        return statistics.pvariance([math.log(a / p) / max(floor, rel)
-                                     for rel, p, a in rels])
-
     best = min((0.10 + 0.05 * i for i in range(19)),
-               key=lambda f: abs(var_at(f) - 2.0))
+               key=lambda f: abs(_z_variance(rels, f) - 2.0))
     return best, ("Var(z)=%.2f at the shipped floor %.2f -> best-fit %.2f "
                   "(n=%d real graded pairs, cv=%.3f)"
-                  % (var_at(RATE_REL_FLOOR), RATE_REL_FLOOR, best, len(rels),
+                  % (_z_variance(rels, RATE_REL_FLOOR), RATE_REL_FLOOR, best, len(rels),
                      cv))
 
 

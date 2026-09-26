@@ -52,22 +52,20 @@ def load_config(name: str = "league.ini") -> Config:
     if path.exists():
         cp.read(path, encoding="utf-8")
 
-    def get(section, key, default):
-        try:
-            return cp.get(section, key)
-        except (configparser.NoSectionError, configparser.NoOptionError):
-            return default
-
     cfg = Config(
-        me=get("league", "me", DEFAULTS["me"]),
-        budget=money(get("league", "budget", DEFAULTS["budget"])) or 0.0,
-        min_start=float(get("thresholds", "min_start", DEFAULTS["min_start"])),
-        start_cross=float(get("thresholds", "start_cross",
-                              DEFAULTS["start_cross"])),
-        shrink_k=float(get("thresholds", "shrink_k", DEFAULTS["shrink_k"])),
-        daily_bonus=money(get("league", "daily_bonus",
-                              DEFAULTS["daily_bonus"])) or 0.0,
+        me=cp.get("league", "me", fallback=DEFAULTS["me"]),
+        budget=money(cp.get("league", "budget",
+                            fallback=DEFAULTS["budget"])) or 0.0,
+        min_start=float(cp.get("thresholds", "min_start",
+                               fallback=DEFAULTS["min_start"])),
+        start_cross=float(cp.get("thresholds", "start_cross",
+                                 fallback=DEFAULTS["start_cross"])),
+        shrink_k=float(cp.get("thresholds", "shrink_k",
+                              fallback=DEFAULTS["shrink_k"])),
+        daily_bonus=money(cp.get("league", "daily_bonus",
+                                 fallback=DEFAULTS["daily_bonus"])) or 0.0,
     )
+
     return cfg
 
 

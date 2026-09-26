@@ -64,7 +64,7 @@ def _forget(path) -> None:
     _READ_CACHE.pop(str(Path(path)), None)
 
 
-def _mtime_cached(path, cache: dict, key, build):
+def _mtime_cached(path, cache: dict, key, build, *args):
     path = Path(path)
     try:
         st = path.stat()
@@ -73,24 +73,20 @@ def _mtime_cached(path, cache: dict, key, build):
     stamp = (st.st_mtime_ns, st.st_size)
     hit = cache.get(key)
     if hit is None or hit[0] != stamp:
-        hit = (stamp, build())
+        hit = (stamp, build(*args))
         cache[key] = hit
     return hit[1]
 
 
-def read_csv(path) -> list[dict]:
-    def build():
-        with Path(path).open(encoding="utf-8") as fh:
-            r = csv.reader(fh)
-            try:
-                fieldnames = next(r)
-            except StopIteration:
-                fieldnames = []
-            intern = sys.intern
-            return [dict(zip(fieldnames, map(intern, row)))
-                    for row in r if row]
+def _parse_csv(path) -> list[dict]:
+    with Path(path).open(encoding="utf-8") as fh:
+        r = csv.reader(fh)
+        fieldnames = next(r, [])
+        return [dict(zip(fieldnames, map(sys.intern, row))) for row in r if row]
 
-    rows = _mtime_cached(path, _READ_CACHE, str(Path(path)), build)
+
+def read_csv(path) -> list[dict]:
+    rows = _mtime_cached(path, _READ_CACHE, str(Path(path)), _parse_csv, path)
     return [MappingProxyType(r) for r in (rows or [])]
 
 
@@ -209,26 +205,27 @@ def table(name: str, source: str = "") -> list:
 _NEWEST_CACHE: dict[tuple, tuple] = {}
 
 
+def _latest_rows(path: Path, source: str) -> list[dict]:
+    with path.open(encoding="utf-8") as fh:
+        r = csv.reader(fh)
+        fieldnames = next(r, [])
+        latest, kept = "", []
+        for raw in r:
+            row = dict(zip(fieldnames, raw))
+            if not raw or (source and row.get("source") != source):
+                continue
+            stamp = row.get("observed_at", "")
+            if stamp > latest:
+                latest, kept = stamp, [row]
+            elif stamp == latest:
+                kept.append(row)
+        return kept
+
+
 def newest(name: str, source: str = "") -> list[dict]:
     path = TIDY / f"{name}.csv"
-
-    def build():
-        with path.open(encoding="utf-8") as fh:
-            r = csv.reader(fh)
-            fieldnames = next(r, [])
-            latest, kept = "", []
-            for raw in r:
-                row = dict(zip(fieldnames, raw))
-                if not raw or (source and row.get("source") != source):
-                    continue
-                stamp = row.get("observed_at", "")
-                if stamp > latest:
-                    latest, kept = stamp, [row]
-                elif stamp == latest:
-                    kept.append(row)
-            return kept
-
-    rows = _mtime_cached(path, _NEWEST_CACHE, (name, source), build)
+    rows = _mtime_cached(path, _NEWEST_CACHE, (name, source), _latest_rows,
+                         path, source)
     return [dict(r) for r in (rows or [])]
 
 
@@ -356,7 +353,7 @@ _XW_CACHE: dict = {}
 def load_crosswalk():
     from ffcore.crosswalk import Crosswalk
     path = TIDY / "players.csv"
-    return _mtime_cached(path, _XW_CACHE, "xw", lambda: Crosswalk.read(path))
+    return _mtime_cached(path, _XW_CACHE, "xw", Crosswalk.read, path)
 
 
 def load_fixtures() -> list[dict]:
@@ -367,18 +364,19 @@ def load_fixtures() -> list[dict]:
 _UNDERSTAT_CACHE: dict = {}
 
 
+def _latest_understat(path: Path) -> tuple[dict, ...]:
+    latest: dict[tuple, dict] = {}
+    for r in sorted(read_csv(path), key=lambda r: r.get("observed_at", "")):
+        k = (r.get("season"), r.get("understat_id"))
+        if k[1]:
+            latest[k] = r
+    return tuple(latest.values())
+
+
 def load_understat_players(season: str = "") -> list[dict]:
     path = TIDY / "understat_players.csv"
-
-    def build():
-        latest: dict[tuple, dict] = {}
-        for r in sorted(read_csv(path), key=lambda r: r.get("observed_at", "")):
-            k = (r.get("season"), r.get("understat_id"))
-            if k[1]:
-                latest[k] = r
-        return tuple(latest.values())
-
-    hit = _mtime_cached(path, _UNDERSTAT_CACHE, None, build) or ()
+    hit = _mtime_cached(path, _UNDERSTAT_CACHE, None, _latest_understat,
+                        path) or ()
     if season:
         return [dict(r) for r in hit if r.get("season") == season]
     return [dict(r) for r in hit]
@@ -517,16 +515,9 @@ LEDGER = TIDY / "transactions.csv"
 
 
 def read_ledger(path=LEDGER) -> list[dict]:
-    path = Path(path)
-    if not path.exists():
-        return []
-    with path.open(newline="", encoding="utf-8") as fh:
-        lines = [ln for ln in fh if not ln.lstrip().startswith("#")]
-    rows = [r for r in csv.DictReader(lines)
-            if (r.get("player") or "").strip()
-            and not r["player"].lstrip().startswith("#")]
-    rows.sort(key=lambda r: (r.get("date") or ""))
-    return rows
+    return sorted((dict(r) for r in read_csv(path)
+                   if (r.get("player") or "").strip()),
+                  key=lambda r: r.get("date") or "")
 
 
 class Valuation(NamedTuple):

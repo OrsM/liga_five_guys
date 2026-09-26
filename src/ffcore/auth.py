@@ -107,17 +107,18 @@ def _post(url: str, form: dict) -> dict:
     return r.json()
 
 
-def authorize_url(verifier: str | None = None) -> tuple[str, str, str]:
+def _b64(b: bytes) -> str:
     import base64
+    return base64.urlsafe_b64encode(b).rstrip(b"=").decode()
+
+
+def authorize_url(verifier: str | None = None) -> tuple[str, str, str]:
     import hashlib
     import secrets
     import urllib.parse
 
-    def b64(b):
-        return base64.urlsafe_b64encode(b).rstrip(b"=").decode()
-
-    verifier = verifier or b64(os.urandom(32))
-    challenge = b64(hashlib.sha256(verifier.encode()).digest())
+    verifier = verifier or _b64(os.urandom(32))
+    challenge = _b64(hashlib.sha256(verifier.encode()).digest())
     state = secrets.token_hex(8)
     q = urllib.parse.urlencode({
         "p": SIGNIN_POLICY, "client_id": CLIENT_ID, "response_type": "code",

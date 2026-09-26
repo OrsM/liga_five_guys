@@ -588,13 +588,13 @@ def _selftest() -> None:
     assert status_multiplier("ok", {"injured": 0.5}) == 1.0
     from ffcore.fixture import Match
 
-    def mk(name, pos="defensa", team="Mid", value="10.00M"):
-        return {"name": name, "position": pos, "team": team, "club": team,
-                "value": value}
+    row = {"position": "defensa", "team": "Mid", "club": "Mid",
+           "value": "10.00M"}
 
     from ffcore.crosswalk import Crosswalk, Player
 
-    market = [mk("p%d" % i) for i in range(10)] + [mk("Sub"), mk("Newbie")]
+    market = [dict(row, name=n) for n in
+              ["p%d" % i for i in range(10)] + ["Sub", "Newbie"]]
     xw = Crosswalk({norm(n): Player(norm(n), n)
                     for n in [r["name"] for r in market] + ["Attacker"]})
     hist = {"p%d" % i: {"pts": 100.0 + i, "pj": 34.0} for i in range(10)}
@@ -606,32 +606,34 @@ def _selftest() -> None:
     prior = sc.priors["DEF"]
     assert 3.0 < prior < 3.1, prior
 
-    thin = sc.rate(mk("Sub"))
+    thin = sc.rate(dict(row, name="Sub"))
     assert abs(thin.ppm - (20.0 + 8 * prior) / (4.0 + 8)) < 1e-9
     assert not thin.assumed and thin.cur_pj == 0.0
-    assert sc.rate(mk("Newbie")).assumed
+    assert sc.rate(dict(row, name="Newbie")).assumed
 
-    full = sc.rate(mk("p0"))
+    full = sc.rate(dict(row, name="p0"))
     cur = {"p0": {"pts": 30.0, "pj": 3.0}}
     sc2 = Scorer(market, xi, hist, current=cur, xw=xw)
-    blended = sc2.rate(mk("p0"))
+    blended = sc2.rate(dict(row, name="p0"))
     assert abs(blended.ppm - (30.0 + 8 * full.ppm) / (3.0 + 8)) < 1e-9
     assert blended.cur_pj == 3.0
     assert full.ppm < blended.ppm < 10.0
 
-    promo_market = [{**mk("q%d" % i, team="Rise"), "ff_id": "q%d" % i}
+    promo_market = [dict(row, name="q%d" % i, team="Rise", club="Rise",
+                         ff_id="q%d" % i)
                     for i in range(10)]
     promo_hist = {"q0": {"pts": 34.0, "pj": 34.0}}
     assert detect_promoted(promo_market, promo_hist) == {"Rise"}
-    accented = [mk("r%d" % i, team="Málaga") for i in range(10)]
+    accented = [dict(row, name="r%d" % i, team="Málaga", club="Málaga")
+                for i in range(10)]
     assert detect_promoted(accented, {}) == {"Málaga"}
     sc3 = Scorer(promo_market, [], promo_hist, xw=xw)
     assert sc3.promoted == {"Rise"}
-    newbie = sc3.rate(mk("q5", team="Rise"))
+    newbie = sc3.rate(dict(row, name="q5", team="Rise", club="Rise"))
     assert newbie.assumed and abs(newbie.ppm - sc3.priors["DEF"]
                                   * PROMOTED_DISCOUNT) < 1e-9, newbie
     lower = Scorer(promo_market, [], promo_hist, promoted_discount=0.5, xw=xw)
-    assert lower.rate(mk("q5", team="Rise")).ppm < newbie.ppm
+    assert lower.rate(dict(row, name="q5", team="Rise", club="Rise")).ppm < newbie.ppm
 
     assert fit_promoted_discount(promo_market, promo_hist, []) \
         == PROMOTED_DISCOUNT
@@ -647,9 +649,9 @@ def _selftest() -> None:
         > PROMOTED_DISCOUNT + 0.15
     assert "now" in blended.why and "3j" in blended.why
 
-    assert Scorer(market, xi, hist, current={}, xw=xw).rate(mk("p0")) == full
+    assert Scorer(market, xi, hist, current={}, xw=xw).rate(dict(row, name="p0")) == full
     assert Scorer(market, xi, hist,
-                  current={"p0": {"pts": 0.0, "pj": 0.0}}, xw=xw).rate(mk("p0")) \
+                  current={"p0": {"pts": 0.0, "pj": 0.0}}, xw=xw).rate(dict(row, name="p0")) \
         == full
 
     when = __import__("datetime").datetime.fromisoformat(
@@ -657,21 +659,21 @@ def _selftest() -> None:
     easy = Match("Elche", True, when, atk_factor=1.30, def_factor=1.10,
                 rank=20, of=20)
     sc3 = Scorer(market, xi, hist, board={"Mid": easy}, xw=xw)
-    s = sc3.score(mk("p0"))
+    s = sc3.score(dict(row, name="p0"))
     assert abs(s.flat - full.ppm) < 1e-9
     assert abs(s.score - full.ppm * 1.10) < 1e-9
     assert s.opp == "Elche" and s.home and s.fix == 1.10
-    fwd = sc3.score(mk("p0", pos="delantero"))
+    fwd = sc3.score(dict(row, name="p0", position="delantero"))
     assert abs(fwd.score - full.ppm * 1.30) < 1e-9, fwd
     assert fwd.fix == 1.30
-    solo = Scorer(market, xi, hist, board={}, xw=xw).score(mk("p0"))
+    solo = Scorer(market, xi, hist, board={}, xw=xw).score(dict(row, name="p0"))
     assert solo.fix == 1.0 and solo.opp == "" and solo.score == solo.flat
 
     out = [{"player_name": "p0", "start_pct": "100", "status": "suspended"}]
-    zero = Scorer(market, out, hist, board={"Mid": easy}, xw=xw).score(mk("p0"))
+    zero = Scorer(market, out, hist, board={"Mid": easy}, xw=xw).score(dict(row, name="p0"))
     assert zero.score == 0.0 and zero.flat == 0.0
     dbt = [{"player_name": "p0", "start_pct": "100", "status": "doubt"}]
-    half = Scorer(market, dbt, hist, board={"Mid": easy}, xw=xw).score(mk("p0"))
+    half = Scorer(market, dbt, hist, board={"Mid": easy}, xw=xw).score(dict(row, name="p0"))
     assert abs(half.flat - full.ppm * DOUBT_FACTOR) < 1e-9
     assert abs(half.score - full.ppm * 1.10 * DOUBT_FACTOR) < 1e-9
 
@@ -692,12 +694,12 @@ def _selftest() -> None:
     benched_cur = {"p0": {"pts": 30.0, "pj": 3.0,
                           "start_rate": 0.0, "start_n": 6.0}}
     sc4 = Scorer(market, xi, hist, current=benched_cur, board={"Mid": easy}, xw=xw)
-    benched_s = sc4.score(mk("p0"))
+    benched_s = sc4.score(dict(row, name="p0"))
     assert benched_s.pct_used < 100.0, benched_s.pct_used
     assert abs(benched_s.pct_used - 800.0 / 14.0) < 1e-9, benched_s.pct_used
 
     untouched = Scorer(market, xi, hist, current={}, board={"Mid": easy}
-                       , xw=xw).score(mk("p0"))
+                       , xw=xw).score(dict(row, name="p0"))
     assert untouched.pct_used == 100.0, untouched.pct_used
     assert untouched.pct_rest == 100.0, untouched.pct_rest
 
@@ -705,7 +707,7 @@ def _selftest() -> None:
                           "start_rate": 0.9, "start_n": 2.0}}
     susp = [{"player_name": "p0", "start_pct": "0", "status": "suspended"}]
     sc5 = Scorer(market, susp, hist, current=starter_cur, board={"Mid": easy}, xw=xw)
-    susp_s = sc5.score(mk("p0"))
+    susp_s = sc5.score(dict(row, name="p0"))
     assert abs(susp_s.pct_used - (8 * 0.0 + 2 * 90.0) / 10) < 1e-9, susp_s
     assert abs(susp_s.pct_rest - (8 * NEUTRAL_START + 2 * 90.0) / 10) < 1e-9, \
         susp_s
@@ -813,10 +815,10 @@ def _selftest() -> None:
     assert abs(sh["s4"][0] - 2.0) < 1e-9 and abs(sh["s4"][1] - 9.0) < 1e-6, sh
     assert shots_evidence(stats, {"s1": played_sh["s1"]}, pos_sh, xw_sh) == {}
 
-    market_xg = [mk("Attacker", pos="delantero")]
+    market_xg = [dict(row, name="Attacker", position="delantero")]
     hist_xg = {"attacker": {"pts": 100.0, "pj": 34.0}}
     xi_xg = [{"player_name": "Attacker", "start_pct": "100"}]
-    fwd = mk("Attacker", pos="delantero")
+    fwd = dict(row, name="Attacker", position="delantero")
     plain = Scorer(market_xg, xi_xg, hist_xg, xw=xw).rate(fwd)
     expect = (SHRINK_K * plain.ppm + 2.0 * 10.0) / (SHRINK_K + 2.0)
     for label in ("xg", "shots"):
