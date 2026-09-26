@@ -84,10 +84,18 @@ Order: 1 → 2 (they share the deletions), then 3, 4, 5/6, 7, 8.
   results changed with the hash seed.
 - **8 Markdown renderer — superseded.** The reports that needed it were
   deleted (4cfdcd3, 1257f4a); decisions.json is the report.
+- **9 The report is what the phone draws** (ae33a10, ee0e191). sim builds
+  only the fields website/src/pages/Fantasy.jsx reads; flip runs inside
+  sim with the moves and sale costs by key (it had been reading them back
+  from JSON by name, and its offer lookup matched 0 of 115 offers once the
+  Market was keyed by id). Alerts and warnings reached no one and were
+  deleted, with report.py, backtest.py and ffcore/bid.py; predictions are
+  logged by grading.
 
 Running count (all of src, functions incl. methods/nested/lambdas and
 selftests): 655 functions / 13,937 lines at 0e49bff → 639 / 13,409 at
-86efa39 → 619 / 12,940 at 43a53a4.
+86efa39 → 619 / 12,940 at 43a53a4 → 548 / 11,601 at ee0e191.
 
-Next: `sim.py`'s ladder/payload and its nested `cell` helper, then
-`report.main`.
+Next: startprob's Calibration (its note()/why strings are read only by
+its own tests; nested grid/lambda in fit), flip.py's remaining nested
+helpers, ingest.py.
