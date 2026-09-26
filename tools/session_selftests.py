@@ -3,7 +3,7 @@ from __future__ import annotations
 import runpy
 import sys
 
-MODULES = ["report.py", "decide.py", "sim.py"]
+MODULES = ["decide.py", "sim.py"]
 
 
 def main() -> int:

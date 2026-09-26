@@ -54,7 +54,6 @@ class Universe:
     part_played: dict[int, set[str]] = field(default_factory=dict)
     first_jornada_of: dict[str, int] = field(default_factory=dict)
     locked_cash: float = 0.0
-    my_bids: dict[str, float] = field(default_factory=dict)
     received_offers: dict[str, float] = field(default_factory=dict)
     mae: float | None = None
     lg: League | None = None
@@ -333,25 +332,6 @@ def max_spare_proceeds(u) -> float:
               default=0.0)
 
 
-def overdraft_fix(u) -> tuple[list[tuple[str, float]], float]:
-    if u.cash >= 0:
-        return [], 0.0
-    need = -u.cash
-    mine = dict(u.state.squads.get(u.me, {}))
-    picked: list[tuple[str, float]] = []
-    raised = 0.0
-    for k, proceeds in u.dead_weight():
-        if raised >= need:
-            break
-        trial = {p: s for p, s in mine.items() if p != k}
-        if not _fieldable(trial):
-            continue
-        mine = trial
-        picked.append((k, proceeds))
-        raised += proceeds
-    return picked, max(0.0, need - raised)
-
-
 def apply(u, a: Action) -> dict[str, dict[str, str]]:
     sq = {m: dict(s) for m, s in u.state.squads.items()}
     for gone in a.sell:
@@ -361,9 +341,6 @@ def apply(u, a: Action) -> dict[str, dict[str, str]]:
             sq[m].pop(a.buy, None)
         sq[u.me][a.buy] = u.view("pos").get(a.buy, "MED")
     return {m: phantom_topup(s) for m, s in sq.items()}
-
-
-VALUE_TOLERANCE = 0.90
 
 
 def _clears_par_floor(par_of: dict, mae, k: str, horizon: int = 1,
@@ -422,23 +399,6 @@ def worth_doing(u, rows) -> list:
             if u.route_kind(r["action"].buy) != "raid"
             or r["action"].buy in keep_raid]
     return [r for r in rows if _gains(r)]
-
-
-def best_move(u, rows, rivals):
-    if not rows:
-        return None, False
-    reliable = [r for r in rows
-               if u.view("route").get(r["action"].buy, "free") != "listed"]
-    pool, uncertain = (reliable, False) if reliable else (rows, True)
-    best = max(pool, key=lambda r: r["d_pts"])
-    if best["action"].net <= 0:
-        return best, uncertain
-    floor = VALUE_TOLERANCE * best["d_pts"]
-    cheaper = [r for r in pool
-              if r["d_pts"] >= floor and r["action"].net < best["action"].net]
-    if cheaper:
-        best = min(cheaper, key=lambda r: r["action"].net)
-    return best, uncertain
 
 
 @cache
@@ -523,14 +483,13 @@ def load() -> Universe:
 
     carried = {r["manager"]: num(r, "team_points", default=0.0)
                for r in lg.standings if r.get("manager")}
-    my_bids = pending(mkt, "bid_status", "bid_money")
     return Universe(
         state=LeagueState(squads, rem, me, carried), forecaster=fc,
         cash=lg[me].cash.value or 0.0, me=me, players=profiles, lg=lg, sc=sc,
         rival_cash={h: lg[h].cash.value or 0.0 for h in lg.managers
                     if h != me},
         part_played=played, first_jornada_of=first_jornada_of,
-        locked_cash=sum(my_bids.values()), my_bids=my_bids,
+        locked_cash=sum(pending(mkt, "bid_status", "bid_money").values()),
         received_offers=received_offers,
         mae=grading.current_mae(history[1], history[2]))
 
@@ -597,14 +556,6 @@ def _selftest() -> None:
     assert "dud" not in names, names
     assert "star" in names, names
 
-    assert overdraft_fix(u) == ([], 0.0), "not overdrawn: nothing to fix"
-    u_small = replace(u, cash=-3e6)
-    sells, short = overdraft_fix(u_small)
-    assert sells == [("me_bench", 8e6)] and short == 0.0, (sells, short)
-    u_big = replace(u, cash=-50e6)
-    sells2, short2 = overdraft_fix(u_big)
-    assert sells2 == [("me_bench", 8e6)], sells2
-    assert short2 == 50e6 - 8e6, short2
     acts = u.candidates()
     assert any(a.kind.startswith("clause") and a.buy == "th_m1"
                for a in acts), [a.kind for a in acts]

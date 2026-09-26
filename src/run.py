@@ -21,7 +21,6 @@ STAGES: list[tuple[str, str]] = [
     ("crosswalk", "crosswalk:main"),
     ("ledger", ""),
     ("points", "points:main"),
-    ("report", "report:main"),
     ("sim", "sim:main"),
 ]
 

@@ -16,19 +16,18 @@ from typing import NamedTuple
 from ffcore.parse import money, pct100
 from ffcore.text import norm
 
-__all__ = ["ROOT", "TIDY", "SEASON", "DECISIONS", "REPORTS", "PARTS", "MADRID",
-           "WARNINGS",
+__all__ = ["ROOT", "TIDY", "SEASON", "DECISIONS", "REPORTS", "MADRID",
            "input_path", "read_csv", "write_csv", "append_csv", "widen_csv", "log_row",
            "csv_string",
-           "write_lines", "snapshot_stamp", "ledger_stamp",
+           "snapshot_stamp", "ledger_stamp",
            "latest_per_key", "snapshots",
            "Market", "Valuation", "table", "row_key", "run_now", "load_crosswalk",
            "load_players", "read_ledger", "LEDGER", "load_deadline", "LINEUP_SOURCE", "SECOND_SOURCE",
            "load_fixtures", "kickoff_stamp",
            "load_understat_players",
            "MATCH_LEN", "minutes_played", "fresh_only", "DAILY_FRESH_DAYS",
-           "EVERY_RUN_FRESH_DAYS", "stale_feeds",
-           "GATED_API", "age_phrase", "load_api", "market_routes", "pending", "LISTED_SELLER", "lock_order",
+           "EVERY_RUN_FRESH_DAYS",
+           "load_api", "market_routes", "pending", "LISTED_SELLER", "lock_order",
            "JornadaClock", "shown", "newest", "table_stats",
            "load_perjornada", "load_api_stats", "clock", "clock_history",
            "jornada_of_match"]
@@ -39,11 +38,7 @@ SEASON = ROOT / "season"
 DECISIONS = ROOT / "decisions"
 REPORTS = Path(os.environ.get("LFG_REPORTS", "reports"))
 
-PARTS = Path(os.environ.get("LFG_PARTS", ".runtime/parts"))
 
-ALERTS = Path(os.environ.get("LFG_ALERTS", ".runtime/alerts.md"))
-
-WARNINGS = Path(os.environ.get("LFG_WARNINGS", ".runtime/warnings.json"))
 
 
 def _madrid():
@@ -164,13 +159,6 @@ def append_csv(path, rows, fieldnames=None) -> None:
 def load_deadline(with_source: bool = False):
     when = clock().next_deadline(run_now())
     return (when, "fixtures" if when else "none") if with_source else when
-
-
-def write_lines(path, lines) -> None:
-    path = Path(path)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text("\n".join(lines).rstrip() + "\n", encoding="utf-8")
-    print("wrote %s" % path)
 
 
 @lru_cache(maxsize=4096)
@@ -339,32 +327,6 @@ def kickoff_stamp(s: str):
         return None
     return (when.replace(tzinfo=timezone.utc) if when.tzinfo is None
             else when.astimezone(timezone.utc))
-
-
-GATED_API = ("api_teams", "api_market", "api_standings",
-             "api_lineup", "api_offers")
-
-
-def age_phrase(days: float) -> str:
-    def unit(n: float, word: str) -> str:
-        return "%.0f %s%s" % (n, word, "" if round(n) == 1 else "s")
-
-    if days >= 2:
-        return unit(days, "day")
-    if days * 24 >= 1:
-        return unit(days * 24, "hour")
-    return unit(max(1, round(days * 1440)), "minute")
-
-
-def stale_feeds(now=None, names=GATED_API) -> dict[str, float]:
-    now = now or run_now()
-    out = {}
-    for name in names:
-        _n, newest_stamp = table_stats(TIDY / f"{name}.csv")
-        age = _age_days(newest_stamp, now)
-        if age is not None and age > EVERY_RUN_FRESH_DAYS:
-            out[name] = age
-    return out
 
 
 def load_api(name: str, now=None) -> list[dict]:
@@ -798,9 +760,7 @@ def _selftest() -> None:
     day_old = [{"observed_at": "2026-08-18T2246Z", "club": "Barcelona"}]
     two_days = [{"observed_at": "2026-08-17T2246Z", "club": "Barcelona"}]
     import inspect as _inspect
-    for _fn in (fresh_only, stale_feeds):
-        _src = _inspect.getsource(_fn)
-        assert "now or run_now()" in _src, _fn.__name__
+    assert "now or run_now()" in _inspect.getsource(fresh_only)
 
     assert run_now() is run_now()
     assert run_now().tzinfo is timezone.utc
@@ -823,10 +783,6 @@ def _selftest() -> None:
     assert fresh_only([{"observed_at": "2026-08-19T2300Z"}],
                       DAILY_FRESH_DAYS, now) != []
 
-    assert age_phrase(3.2) == "3 days" and age_phrase(0.5) == "12 hours"
-    assert age_phrase(0.01) == "14 minutes" and age_phrase(0.0) == "1 minute"
-    assert age_phrase(1 / 24) == "1 hour", age_phrase(1 / 24)
-
     assert EVERY_RUN_FRESH_DAYS * 24 > 13 + 10 / 60
     assert EVERY_RUN_FRESH_DAYS < 1.0
     healthy = [{"observed_at": "2026-08-18T2300Z"}]
@@ -842,10 +798,6 @@ def _selftest() -> None:
 
     assert newest("api_standings") != [] or table("api_standings") == []
 
-    quiet = stale_feeds(now=stale)
-    assert set(quiet) == set(GATED_API), quiet
-    assert min(quiet.values()) > 365 * 70
-    assert "api_nothing" not in stale_feeds(now=stale, names=("api_nothing",))
 
     tw = [{"ff_id": "867", "name": "Álvaro García", "team": "Rayo",
            "value": "20233300", "observed_at": "2026-08-19T1639Z"},

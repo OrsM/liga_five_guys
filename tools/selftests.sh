@@ -1,17 +1,4 @@
 #!/usr/bin/env bash
-# tools/selftests.sh — run the repo's self-test suites: 26 independent ones,
-# 4 at a time, plus xi/report/decide/sim, which all call session() (the
-# whole real-data forecasting build, ~100-165s the first time, ~free after)
-# and used to each pay that first-call cost separately as 4 different `uv
-# run` processes -- tools/session_selftests.py runs those four in ONE
-# process instead, so only the first one actually builds it (measured
-# 2026-09-23: 4 separate ~9min sim.py-sized runs down to one 9min run
-# covering all four). It runs alongside the other 26, not after, since nether
-# waits on the other's files.
-#
-# The TESTS array is copied verbatim from ~/.local/bin/lfg-run (read-only
-# reference; never edited by this script). On failure, the failing suites
-# are re-run serially so the output says WHY, not just which.
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -33,7 +20,7 @@ TESTS=(ffcore/parse.py ffcore/text.py ffcore/tidy.py
        ffcore/action.py ffcore/pricing.py ffcore/profile.py ffcore/schedule.py
        "stats.py --selftest"
       )
-SESSION_TESTS=(report.py decide.py sim.py)
+SESSION_TESTS=(decide.py sim.py)
 
 session_ok=0
 "$UV" run --frozen python tools/session_selftests.py >/dev/null 2>&1 &

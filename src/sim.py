@@ -5,14 +5,13 @@ import statistics
 import sys
 
 import flip
-from decide import (Action, best_move, max_spare_proceeds, overdraft_fix,
-                    value_rate, worth_doing)
+import grading
+from decide import Action, max_spare_proceeds, value_rate, worth_doing
 from ffcore.league import app_fielded
-from ffcore.parse import fmt_money
 from ffcore.render import title_name
 from ffcore.season import best_xi
-from ffcore.tidy import (ALERTS, DECISIONS, REPORTS, WARNINGS, load_deadline,
-                         log_row, read_csv, run_now, shown, write_lines)
+from ffcore.tidy import (DECISIONS, REPORTS, load_deadline, log_row, read_csv,
+                         run_now)
 
 __all__ = ["shape"]
 
@@ -144,74 +143,6 @@ def ladder_rows(u, rows, bands, chg) -> list[dict]:
     return out
 
 
-def bid_lines(u, rows) -> list[str]:
-    if not u.my_bids:
-        return []
-    cost_of: dict[str, float] = {}
-    for r in rows:
-        k = r["action"].buy
-        if k in u.my_bids and k not in cost_of:
-            cost_of[k] = r["action"].net
-    drop, spent = [], 0.0
-    for k, cost in cost_of.items():
-        if spent + cost <= u.cash:
-            spent += cost
-        else:
-            drop.append((k, u.my_bids[k]))
-    drop += [(k, m) for k, m in u.my_bids.items() if k not in cost_of]
-    drop.sort(key=lambda kv: -kv[1])
-    out = []
-    if drop:
-        pron = "him" if len(drop) == 1 else "them"
-        out.append("**Withdraw %s** — %s. Today's board does not buy %s at "
-                   "that price, or cannot pay for %s alongside what it does "
-                   "buy. Withdrawing frees the money at no points cost."
-                   % (fmt_money(sum(m for _k, m in drop)),
-                      ", ".join("%s %s" % (title_name(u.view("name").get(k, k)),
-                                           fmt_money(m)) for k, m in drop),
-                      pron, pron))
-    free = u.cash - u.locked_cash
-    if free < 0:
-        out.append("**%s bid, %s in hand** — if every live bid lands you are "
-                   "%s short, and the app will let that happen. Withdraw or "
-                   "sell before they resolve."
-                   % (fmt_money(u.locked_cash), fmt_money(u.cash),
-                      fmt_money(-free)))
-    return out
-
-
-def alert_lines(u, rows, rivals) -> list[str]:
-    out = bid_lines(u, rows)
-    if u.cash < 0:
-        sells, short_by = overdraft_fix(u)
-        names = ", ".join("%s (+€%.1fM)" % (title_name(u.view("name").get(k, k)),
-                                            p / 1e6) for k, p in sells)
-        if not sells:
-            tail = ("no safe dead-weight sale covers it; needs a manual look "
-                    "before the jornada locks.")
-        elif short_by > 0:
-            tail = ("sell %s clears most of it, still €%.1fM short (no further "
-                    "safe dead-weight sale)." % (names, short_by / 1e6))
-        else:
-            tail = ("sell %s to clear it before the jornada locks (zero points "
-                    "cost: %s never start your eleven)."
-                    % (names, "he doesn't" if len(sells) == 1 else "they don't"))
-        return out + ["**Overdrawn %s** — %s" % (fmt_money(-u.cash), tail)]
-
-    best, uncertain = best_move(u, rows, rivals)
-    if best is None:
-        return out
-    net = best["action"].net
-    cost = ("-€%.1fM" % (net / 1e6) if net > 0
-            else "+€%.1fM raised" % (-net / 1e6) if net < 0 else "free")
-    if uncertain:
-        cost += " · needs the seller to accept, not guaranteed"
-    names = {k: title_name(v) for k, v in u.view("name").items()}
-    return out + ["**Do this** — %s (%+.0f season pts, %+.0f%% to win, %s)"
-                  % (best["action"].label(names), best["d_pts"],
-                     100 * best["d_win"], cost)]
-
-
 def payload(u, base, ladder, chg, locks_h=None) -> dict:
     _exp, xi = u.current_xi
     lo, hi = base.band(u.me)
@@ -222,10 +153,6 @@ def payload(u, base, ladder, chg, locks_h=None) -> dict:
         xi_note = "no change — you are already fielding the best eleven"
     else:
         xi_note = ""
-    try:
-        warnings = json.loads(WARNINGS.read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        warnings = []
     mine = xi_total(u, u.me)
     rival = max(((xi_total(u, m), m) for m in u.state.squads if m != u.me),
                 default=None)
@@ -244,7 +171,6 @@ def payload(u, base, ladder, chg, locks_h=None) -> dict:
         "rival_best": ({"manager": rival[1], "xi": rival[0],
                         "gap": mine - rival[0]} if rival else {}),
         "xi_note": xi_note,
-        "warnings": warnings if isinstance(warnings, list) else [],
         "standings": [
             {"manager": m, "me": m == u.me,
              "now": u.state.carried.get(m, 0.0), "mean": base.mean(m),
@@ -274,7 +200,6 @@ def log_cash_price(measured) -> None:
 
 
 def _selftest() -> None:
-    from dataclasses import replace
     from decide import Universe
     from ffcore.crosswalk import Player
     from ffcore.fixtures import players_from_flat, tiny_profile
@@ -327,39 +252,6 @@ def _selftest() -> None:
     assert len(best_xi({k: v for k, v in sq.items() if k not in dict(dead)},
                        val)) == 11
 
-    u_over = replace(u2, cash=-5e6)
-    al_over = alert_lines(u_over, [], ["riv"])
-    assert len(al_over) == 1 and "Overdrawn" in al_over[0], al_over
-    assert "Benat Turrientes" in al_over[0], al_over
-    assert "Alvaro Fernandez" not in al_over[0], al_over
-    al_big = alert_lines(replace(u2, cash=-15e6), [], ["riv"])
-    assert len(al_big) == 1, al_big
-    assert "Benat Turrientes" in al_big[0] and "Alvaro Fernandez" in al_big[0]
-    assert "still" in al_big[0] and "short" in al_big[0] and "d1" not in al_big[0]
-
-    assert bid_lines(u2, []) == []
-    u_bid = replace(u2, cash=3e6, my_bids={"yuri": 8e6, "benat": 2e6},
-                    locked_cash=10e6)
-    for bids_rows, first in [
-            ([], "**Withdraw 10.00M** — Yuri 8.00M, Benat 2.00M"),
-            ([{"action": Action("swap", buy="yuri", sell=("d1",), cost=8e6,
-                                proceeds=7e6)}], "**Withdraw 2.00M** — Benat"),
-            ([{"action": Action("buy", buy="yuri", cost=8e6)}],
-             "**Withdraw 10.00M** — Yuri 8.00M")]:
-        got = bid_lines(u_bid, bids_rows)
-        assert len(got) == 2 and got[0].startswith(first), (first, got)
-        assert "**10.00M bid, 3.00M in hand**" in got[1] and "7.00M short" in got[1]
-    assert bid_lines(replace(u2, cash=12e6, my_bids={"yuri": 8e6}, locked_cash=8e6),
-                     [{"action": Action("buy", buy="yuri", cost=8e6)}]) == []
-    pl = bid_lines(replace(u2, cash=10e6, my_bids={"yuri": 8e6, "benat": 7e6},
-                           locked_cash=15e6),
-                   [{"action": Action("buy", buy="yuri", cost=8e6)},
-                    {"action": Action("buy", buy="benat", cost=7e6)}])
-    assert pl[0].startswith("**Withdraw 7.00M**") and "Yuri" not in pl[0], pl
-    both = alert_lines(replace(u_over, my_bids={"yuri": 8e6}, locked_cash=8e6),
-                       [], ["riv"])
-    assert len(both) == 3 and "Withdraw" in both[0] and "Overdrawn" in both[-1]
-
     u2.part_played = {1: {"alaves"}}
     u2.forecaster = Bootstrap({1: {k: (v, 1.0) for k, v in val.items()},
                                2: {k: ((9.0 if k == "spare_m" else v), 1.0)
@@ -382,44 +274,8 @@ def _selftest() -> None:
                             "riv": [1500.0, 900.0, 1500.0]}, me="me")
     assert payload(u, st3, [], chg)["p_win"] == 0.333
 
-    al = alert_lines(u, rows, ["riv"])
-    assert len(al) == 1 and "Yuri Berchiche" in al[0] and "+36%" in al[0], al
-    assert "€14.1M" in al[0], al
-    assert alert_lines(u, [], ["riv"]) == []
     flat = [{**rows[0], "net_pts": 0.0, "d_win": 0.0, "d_pts": 0.0}]
     assert worth_doing(u, flat) == []
-
-    cheap_ok = {**rows[0], "action": Action("buy", buy="cheap", cost=2e6),
-                "net_pts": 0.40, "d_win": 0.30, "d_pts": 110.4, "pts_lo": 40.0}
-    cheap_bad = {**rows[0], "action": Action("buy", buy="cheap", cost=2e6),
-                 "net_pts": 0.30, "d_win": 0.20, "d_pts": 82.8, "pts_lo": 30.0}
-    free = {**rows[0], "action": Action("sell", sell=("dead",), proceeds=1e6),
-            "net_pts": 0.40, "d_win": 0.30, "d_pts": 110.4, "pts_lo": 40.0}
-    listed_big = {**rows[0], "action": Action("buy", buy="listed_target",
-                                              cost=30e6),
-                  "net_pts": 0.50, "d_win": 0.40, "pts_lo": 50.0}
-    u_route = Universe(
-        state=LeagueState({"me": {}, "riv": {}}, [1, 2], "me"),
-        forecaster=Bootstrap({}), cash=0.0, me="me",
-        players={"listed_target": tiny_profile("listed_target", route="listed")})
-    for uu, cands, want in [
-            (u, [rows[0], cheap_ok], (cheap_ok, False)),
-            (u, [rows[0], cheap_bad], (rows[0], False)),
-            (u, [rows[0], free], (free, False)),
-            (u, [], (None, False)),
-            (u_route, [listed_big], (listed_big, True)),
-            (u_route, [listed_big, rows[0]], (rows[0], False)),
-            (u_route, [cheap_ok, rows[0]], (cheap_ok, False)),
-            (u_route, [cheap_bad, rows[0]], (rows[0], False)),
-            (u_route, [free, rows[0]], (free, False)),
-            (u_route, [rows[0], listed_big], (rows[0], False))]:
-        assert best_move(uu, cands, ["riv"]) == want, (cands, want)
-    safer = {**rows[0], "action": Action("clause", buy="safer", cost=20e6,
-                                         victim="riv"), "pts_lo": 80.0}
-    riskier = {**rows[0], "action": Action("clause", buy="riskier", cost=20e6,
-                                           victim="riv"), "pts_lo": -10.0}
-    assert best_move(u, [safer, riskier], ["riv"])[0]["action"].buy == "safer"
-    assert best_move(u, [riskier, safer], ["riv"])[0]["action"].buy == "riskier"
 
     all_rows = [{"action": Action(kind, buy=buy, cost=5e6),
                  "net_pts": d_pts / 100, "d_win": 0.0, "d_beat": {},
@@ -512,6 +368,7 @@ def main() -> None:
     import decide
 
     u = decide.load()
+    grading.log_predictions(u.sc)
     if len(u.state.squads) < 2 or not u.state.jornadas:
         print("sim: nothing to simulate (%d squads, %d jornadas left)"
               % (len(u.state.squads), len(u.state.jornadas)))
@@ -540,16 +397,6 @@ def main() -> None:
         json.dumps(doc, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
     print("wrote %s" % (REPORTS / "decisions.json"))
 
-    rivals = [m for m in u.state.squads if m != u.me]
-    lines = alert_lines(u, moves, rivals)
-    prev = [ln for ln in (ALERTS.read_text(encoding="utf-8").splitlines()
-                          if ALERTS.exists() else []) if ln.startswith("- ")]
-    body = list(dict.fromkeys(["- " + ln for ln in lines] + prev))
-    if body:
-        write_lines(ALERTS, ["# Alerts — %s" % shown(), ""] + body)
-    else:
-        ALERTS.unlink(missing_ok=True)
-    print("%d alert(s) from the simulation" % len(lines))
 
 
 if __name__ == "__main__":

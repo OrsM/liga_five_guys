@@ -69,9 +69,10 @@ In the order `run.py` runs it:
    `grading.py`) — one point estimate per player per jornada; fitted
    parameters live on the objects that use them (`Calibration`,
    `Bootstrap`, the boards' `home_edge`), never in module globals.
-5. **Decide and report** (`decide.py`, `sim.py`, `flip.py`, `report.py`) — every affordable move, simulated and ranked;
-   written to `reports/decisions.json` (what the phone draws) and
-   `.runtime/alerts.md` (what it pushes).
+5. **Decide** (`decide.py`, `sim.py`, `flip.py`) — every affordable move,
+   simulated and ranked, and the market's buy/sell/hold picks; written to
+   `reports/decisions.json`, which is what the phone draws. `grading.py`
+   logs the day's per-player predictions so later runs can grade them.
 
 ## The one table
 
@@ -457,27 +458,25 @@ src/                 sources.py (the registry and every parser)
                      grading.py (predictions vs what happened; the fits)
                      decide.py (every move, screened and ranked)
                      sim.py (plays out the season; writes decisions.json)
-                     flip.py  report.py  stats.py
+                     flip.py (the market: what to bid, sell, hold)  stats.py
 src/ffcore/          parse (values)  text (names)  tidy (tables and time)
                      crosswalk (the registry, looked up by id)
-                     model (ONE League + Scorer per run)
                      auth (the league token)  league (owners and cash)
                      score (ratings and the XI)  fixture (opponents)
                      startprob (P(start))  lineupweight  forecast  season
-                     schedule  pricing  bid  profile  action  render
+                     schedule  pricing  profile  action  render
 inputs/league.ini     the one file you edit
 data/raw/dt=….tar.xz  raw pages, deduplicated — append-only, never delete
 data/tidy/players.csv the player registry (tracked)
 data/tidy/*.csv       everything else, rebuilt from raw
 data/decisions/       append-only logs the model reads back
 reports/decisions.json  the report as data, for the phone to draw
-.runtime/alerts.md    exists only when something wants a decision
 ```
 
 ## Tests
 
 No test directory and no pytest. Each module self-tests under
-`if __name__ == "__main__"`, and `lfg-run` runs all thirty before it
+`if __name__ == "__main__"`, and `lfg-run` runs all of them before it
 fetches anything. Twenty seconds, and a failure aborts the run.
 
 **Work TDD.** Add the failing assertion to the module's own `_selftest()`,

@@ -5,16 +5,32 @@ import math
 import statistics
 import sys
 
-from ffcore.parse import flag, text
+from ffcore.parse import text
 from ffcore.text import norm
-from ffcore.tidy import (DECISIONS, SEASON, clock_history, lock_order,
-                         read_csv, run_now, snapshot_stamp)
+from ffcore.tidy import (DECISIONS, SEASON, append_csv, clock_history,
+                         lock_order, read_csv, run_now, snapshot_stamp)
 
-__all__ = ["load_actuals", "load_predictions", "pair", "lagged_pair",
+__all__ = ["log_predictions", "load_actuals", "load_predictions", "pair",
+           "lagged_pair",
            "current_mae", "drift_frac_from_history", "fit_rate_rel_floor",
            "graded_history"]
 
 WINDOW_DAYS = 21
+PREDICTIONS = DECISIONS / "squad_log.csv"
+PREDICTION_COLS = ["observed_at", "ff_id", "player", "score", "ppm", "fix",
+                   "pj"]
+
+
+def log_predictions(sc) -> None:
+    observed = sc.market[0]["observed_at"] if sc.market else ""
+    if not observed or observed in {r.get("observed_at")
+                                    for r in read_csv(PREDICTIONS)}:
+        return
+    append_csv(PREDICTIONS, [
+        {"observed_at": observed, "ff_id": s.key, "player": s.name,
+         "score": "%.3f" % s.score, "ppm": "%.3f" % s.ppm,
+         "fix": "%.3f" % s.fix, "pj": "%.1f" % s.pj}
+        for s in (sc.score(r) for r in sc.lookup.values())], PREDICTION_COLS)
 
 
 def load_actuals(window_days: int | None = WINDOW_DAYS) -> list[dict]:
@@ -48,7 +64,7 @@ def load_actuals(window_days: int | None = WINDOW_DAYS) -> list[dict]:
 
 def load_predictions() -> dict[str, list[tuple[dt.datetime, dict]]]:
     per: dict[str, list] = {}
-    for r in read_csv(DECISIONS / "squad_log.csv"):
+    for r in read_csv(PREDICTIONS):
         key = text(r, "ff_id") or norm(r.get("player", ""))
         when = snapshot_stamp(r.get("observed_at", ""))
         try:
@@ -57,14 +73,11 @@ def load_predictions() -> dict[str, list[tuple[dt.datetime, dict]]]:
             continue
         if not key or when is None:
             continue
-        for col in ("fix", "ppm", "flat", "start_pct", "cur_pj", "pj"):
+        for col in ("fix", "ppm", "pj"):
             try:
                 fac[col] = float(r[col])
             except (KeyError, ValueError, TypeError):
                 fac[col] = None
-        fac["home"] = flag(r, "home")
-        fac["pos"] = (r.get("pos") or "").lower()
-        fac["status"] = r.get("status") or ""
         per.setdefault(key, []).append((when, fac))
     for v in per.values():
         v.sort(key=lambda t: t[0])
