@@ -55,3 +55,20 @@ tell me which transfers to make.
 8. **One markdown table renderer.**
 
 Order: 1 → 2 (they share the deletions), then 3, 4, 5/6, 7, 8.
+
+## Status
+
+- **1 Identity — done** (8068c3d, 1082eba). players.csv is an append-only
+  registry; app ids are validated against the app's own name and value
+  every build, and every change is printed. Corrected 9 wrong ids.
+- **2 League from the app — done** (8068c3d). rosters_initial.txt and
+  cash.txt deleted.
+- **3 Parse — done** (fbf12b4). One chunked append path; parser version is
+  a hash of sources.py; one page_sig replaces 20 sign_* digests; points is
+  a table. Measured: cold parse 5m30s / 412s CPU, peak 558MB under the
+  service's MemoryMax=750M; +30 snapshots incremental in 34s; all 19 tables
+  identical to the old code, row for row.
+- 4-8: not started.
+
+Running count (product code, functions incl. methods/nested/lambdas):
+803 → 715; lines 20,371 → 18,275.
