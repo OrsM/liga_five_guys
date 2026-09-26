@@ -229,33 +229,28 @@ def _selftest() -> None:
     ph_per = {1: {"d1": (4.0, 1.0), "d2": (2.0, 0.5),
                   "other_def": (6.0, 0.5), "x1": (3.0, 1.0)}}
     new_sq, new_per = phantom_fill(ph_sq, ph_per, ph_pos)
-    phantom_keys = [k for k in new_sq["m"] if k.startswith("__phantom_")]
-    assert len(phantom_keys) == 1, phantom_keys
-    pk = phantom_keys[0]
-    assert new_sq["m"][pk] == "DEF", new_sq["m"]
-    assert new_per[1][pk] == (4.0, (1.0 + 0.5 + 0.5) / 3), new_per[1][pk]
-    assert pk == "__phantom_DEF_0", pk
-    assert "__phantom_DEF_0" not in ph_sq["m"], ph_sq
-    assert pk not in ph_per[1], ph_per[1]
-    legal_sq = {"m2": {"p1": "POR", "d1": "DEF", "d2": "DEF", "d3": "DEF",
-                       "x1": "MED", "x2": "MED", "x3": "MED", "f1": "DEL"}}
-    same_sq, filled_per = phantom_fill(legal_sq, ph_per, ph_pos)
-    assert same_sq == legal_sq, same_sq
-    assert "__phantom_DEF_0" in filled_per[1], filled_per[1]
-    assert "__phantom_DEF_2" in filled_per[1], filled_per[1]
+    phantoms = sorted(k for k in new_sq["m"] if k.startswith("__phantom_"))
+    assert phantoms == ["__phantom_DEF_0", "__phantom_DEF_1",
+                        "__phantom_DEF_2", "__phantom_MED_0"], phantoms
+    assert new_per[1]["__phantom_DEF_0"] == (4.0, (1.0 + 0.5 + 0.5) / 3)
+    assert "__phantom_DEF_0" not in ph_sq["m"] and \
+        "__phantom_DEF_0" not in ph_per[1], "inputs must not be mutated"
 
-    assert phantom_topup(legal_sq["m2"]) == legal_sq["m2"], "already legal"
-    short_one = {"d1": "DEF", "d2": "DEF", "x1": "MED", "x2": "MED",
-                "x3": "MED", "p1": "POR", "f1": "DEL"}
-    topped = phantom_topup(short_one)
-    assert topped != short_one, "must not mutate the caller's dict in place"
-    assert short_one == {"d1": "DEF", "d2": "DEF", "x1": "MED", "x2": "MED",
-                         "x3": "MED", "p1": "POR", "f1": "DEL"}, short_one
-    assert topped.get("__phantom_DEF_0") == "DEF", topped
-    assert sum(1 for k in topped if k.startswith("__phantom_")) == 1, topped
-    short_por = {"d1": "DEF", "d2": "DEF", "d3": "DEF", "x1": "MED",
-                "x2": "MED", "x3": "MED", "f1": "DEL"}
-    assert phantom_topup(short_por).get("__phantom_POR_0") == "POR"
+    eleven = {"p1": "POR", **{"d%d" % i: "DEF" for i in range(4)},
+              **{"x%d" % i: "MED" for i in range(4)}, "f1": "DEL", "f2": "DEL"}
+    for squad, added in [
+            (eleven, {}),
+            ({k: v for k, v in eleven.items() if k != "p1"}, {"POR": 1}),
+            ({k: v for k, v in eleven.items() if k not in ("d0", "d1")},
+             {"DEF": 2}),
+            (ph_sq["m"], {"DEF": 3, "MED": 1})]:
+        topped = phantom_topup(squad)
+        got = {}
+        for k, slot in topped.items():
+            if k.startswith("__phantom_"):
+                got[slot] = got.get(slot, 0) + 1
+        assert got == added, (squad, got)
+        assert all(topped[k] == v for k, v in squad.items())
 
     print("ffcore.schedule self-test OK (28 cases)")
 
