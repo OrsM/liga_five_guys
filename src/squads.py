@@ -27,11 +27,6 @@ def flag(rec):
     return "" if st in OK_STATUS else " ⚠︎%s" % st
 
 
-def pos_key(p):
-    p = (p or "").lower()
-    return POS_ORDER.index(p) if p in POS_ORDER else len(POS_ORDER)
-
-
 def row(rec, cells=None):
     return "| %s |" % " | ".join([
         rec.get("name", "?") + flag(rec),
@@ -216,8 +211,10 @@ def write_league(lg, players, stamp, second=None,
                     fmt_money(sum(r.get("value") or 0 for r in recs)),
                     starters, int(lg.cfg.start_cross), m.cash.label()),
                 "", HEAD]
-        recs.sort(key=lambda r: (pos_key(r.get("pos")),
-                                 -(r.get("value") or 0)))
+        recs.sort(key=lambda r: (
+            POS_ORDER.index((r.get("pos") or "").lower())
+            if (r.get("pos") or "").lower() in POS_ORDER else len(POS_ORDER),
+            -(r.get("value") or 0)))
         out += [row(r, second) for r in recs]
         out.append("")
 

@@ -167,12 +167,6 @@ def allowance(since, now, daily_bonus: float) -> tuple[float, float]:
     return math.floor(days) * (daily_bonus or 0.0), days
 
 
-def _app_ids_of(xw) -> dict:
-    if xw is None:
-        return {}
-    return {p.app_id: p.player_id for p in xw.players.values() if p.app_id}
-
-
 def owner_from_api(rows: list[dict], market, ledger_owner: dict | None = None,
                    xw=None) -> tuple[dict, list]:
     from ffcore.crosswalk import Crosswalk
@@ -199,7 +193,10 @@ def app_fielded(squad, names: dict, rows=None, ids=None) -> list[str]:
     from ffcore.tidy import load_api
 
     rows = load_api("lineup") if rows is None else rows
-    ids = _app_ids_of(load_crosswalk()) if ids is None else ids
+    if ids is None:
+        xw = load_crosswalk()
+        ids = ({p.app_id: p.player_id for p in xw.players.values() if p.app_id}
+              if xw is not None else {})
     squad = set(squad)
     by_name = {norm(names.get(k, k)): k for k in squad}
     out = []

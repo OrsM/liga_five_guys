@@ -15,32 +15,6 @@ SLOT = {"portero": "por", "defensa": "def", "mediocampista": "med",
         "delantero": "del"}
 
 
-def _last_season() -> dict[str, tuple[float, float]]:
-    files = sorted(SEASON.glob("points_*.csv"))
-    if not files:
-        return {}
-    out = {}
-    for r in csv.DictReader(open(files[-1], encoding="utf-8")):
-        pid = (r.get("ff_id") or "").strip()
-        if pid:
-            out[pid] = (float(r.get("points") or 0), float(r.get("games") or 0))
-    return out
-
-
-def _this_season() -> dict[str, dict[int, float]]:
-    files = sorted((SEASON / "live").glob("perjornada_*.csv"))
-    if not files:
-        return {}
-    out: dict[str, dict[int, float]] = {}
-    for r in load_perjornada():
-        pid = (r.get("ff_id") or "").strip()
-        j = r.get("jornada")
-        if not pid or not j:
-            continue
-        out.setdefault(pid, {})[int(j)] = float(r.get("points_delta") or 0)
-    return out
-
-
 def _play(status: str, xi_pct: float | None, min_start: float) -> str:
     if status in OUT_STATUSES:
         return "OUT (%s)" % status
@@ -56,8 +30,22 @@ def table(me: str | None = None) -> list[dict]:
     u = decide.load()
     me = me or u.me
     players = load_players()
-    last = _last_season()
-    cur = _this_season()
+    last = {}
+    files = sorted(SEASON.glob("points_*.csv"))
+    if files:
+        for r in csv.DictReader(open(files[-1], encoding="utf-8")):
+            pid = (r.get("ff_id") or "").strip()
+            if pid:
+                last[pid] = (float(r.get("points") or 0), float(r.get("games") or 0))
+
+    cur: dict[str, dict[int, float]] = {}
+    if any((SEASON / "live").glob("perjornada_*.csv")):
+        for r in load_perjornada():
+            pid = (r.get("ff_id") or "").strip()
+            j = r.get("jornada")
+            if not pid or not j:
+                continue
+            cur.setdefault(pid, {})[int(j)] = float(r.get("points_delta") or 0)
     min_start = session().lg.cfg.min_start
 
     rows = []
