@@ -3,10 +3,14 @@ from __future__ import annotations
 import bisect
 import csv
 import math
+import operator
 import sys
 from datetime import datetime, timedelta, timezone
 from itertools import accumulate
 from statistics import mean, median
+
+from ffcore.parse import fmt_money
+
 
 def steps(rows: list[dict]) -> dict[str, list[tuple[str, float]]]:
     vals: dict[str, list[tuple[str, float]]] = {}
@@ -20,7 +24,7 @@ def steps(rows: list[dict]) -> dict[str, list[tuple[str, float]]]:
                 if a[1] > 0] for k, v in vals.items()}
 
 
-def belief(window: list[tuple], h: int) -> dict | None:
+def belief(window: list[tuple]) -> dict | None:
     days = {day for _, _, day in window}
     if len(days) < 2:
         return None
@@ -35,8 +39,7 @@ class Outlook:
             if by_player else 1
         self.obs: dict[int, list[tuple]] = {h: [] for h in range(1, self.hmax + 1)}
         for s in by_player.values():
-            pref = [1.0, *accumulate((1 + c / 100 for _, c in s),
-                                     lambda a, b: a * b)]
+            pref = [1.0, *accumulate((1 + c / 100 for _, c in s), operator.mul)]
             for i, (day, step) in enumerate(s):
                 for h in range(1, min(self.hmax, len(s) - 1 - i) + 1):
                     self.obs[h].append((step, 100 * (pref[i + 1 + h] / pref[i + 1]
@@ -61,7 +64,7 @@ class Outlook:
             return None
         best = None
         for h in self.obs:
-            bel = belief(self.near(step, h), h)
+            bel = belief(self.near(step, h))
             if bel is None:
                 continue
             net = ((1 + bel["mean"] / 100) * offer / premium - 1) / h
@@ -203,11 +206,6 @@ def fund(offers: dict[str, float], mine: dict, names: dict, xi: set,
     return out
 
 
-def _m(v: float) -> str:
-    from ffcore.parse import fmt_money
-    return fmt_money(v)
-
-
 def _p(v: float) -> str:
     return "%+.1f%%" % v
 
@@ -223,21 +221,21 @@ def say(r: dict) -> str:
                 "updates (%d similar cases on %d different days); ask %s, "
                 "expect to pay ~%s"
                 % (_p(r["last"]), _p(r["drift"]), r["h"], r["n"], r["days"],
-                   _m(r["ask"]), _m(r["pay"])))
+                   fmt_money(r["ask"]), fmt_money(r["pay"])))
     if c in ("sale", "keep"):
-        how = ("the app offers %s" % _m(r["now"]) if r["offered"]
-               else "an offer would bring ~%s" % _m(r["now"]))
-        more = _m(r["now"] - r["hold"])
+        how = ("the app offers %s" % fmt_money(r["now"]) if r["offered"]
+               else "an offer would bring ~%s" % fmt_money(r["now"]))
+        more = fmt_money(r["now"] - r["hold"])
         if c == "sale":
             return ("%s against ~%s expected from holding %d updates: %s more, "
                     "worth %s season points at what the report's buys return, "
                     "for the %s he is expected to cost the season"
-                    % (how, _m(r["hold"]), r["h"], more,
+                    % (how, fmt_money(r["hold"]), r["h"], more,
                        _pts(r["benefit"]), _pts(r["cost"])))
         return ("%s against ~%s expected from holding %d updates, but the %s "
                 "gained is worth %s season points and he is expected to add "
                 "%s -- the report keeps him"
-                % (how, _m(r["hold"]), r["h"], more,
+                % (how, fmt_money(r["hold"]), r["h"], more,
                    _pts(r["benefit"]), _pts(r["cost"])))
     if c == "fund":
         where = "currently in your eleven" if r["starter"] else "on the bench"
@@ -251,35 +249,36 @@ def say(r: dict) -> str:
             timing = ""
         elif r["money_now"] >= 0:
             timing = "; the offer beats waiting %d updates by %s" \
-                % (r["h"], _m(r["money_now"]))
+                % (r["h"], fmt_money(r["money_now"]))
         else:
             timing = ("; the price is trending up -- waiting %d updates is "
-                     "expected to bring ~%s more" % (r["h"], _m(-r["money_now"])))
-        return "%s, %s%s; %s" % (_m(r["offer"]), where, timing, verdict)
+                     "expected to bring ~%s more" % (r["h"], fmt_money(-r["money_now"])))
+        return "%s, %s%s; %s" % (fmt_money(r["offer"]), where, timing, verdict)
     raise ValueError("no wording for reason code %r" % c)
 
 
-def present(out: dict) -> dict:
-    def row(p, right):
-        return {"name": p["name"], "detail": say(p["reason"]), "right": right}
+def _row(p: dict, right: list[str]) -> dict:
+    return {"name": p["name"], "detail": say(p["reason"]), "right": right}
 
-    buys = [row(p, ["≤ " + _m(p["max_bid"]),
-                    "bid" if p["fits"] else "bid; needs %s more" % _m(p["short"])])
+
+def present(out: dict) -> dict:
+    buys = [_row(p, ["≤ " + fmt_money(p["max_bid"]),
+                    "bid" if p["fits"] else "bid; needs %s more" % fmt_money(p["short"])])
             for p in out["picks"]]
-    sold = [row(p, [_m(p["value"]),
-                    "offer " + _m(p["offer"]) if p["offer"] else ""])
+    sold = [_row(p, [fmt_money(p["value"]),
+                    "offer " + fmt_money(p["offer"]) if p["offer"] else ""])
             for p in out["sells"]]
-    held = [row(p, [_m(p["value"]), ""]) for p in out["held"]]
-    funded = [row(p, [_m(p["offer"]),
+    held = [_row(p, [fmt_money(p["value"]), ""]) for p in out["held"]]
+    funded = [_row(p, [fmt_money(p["offer"]),
                       "net %s pts" % _pts(p["net_pts"])
                       if p["net_pts"] > 0 else "a net gain"])
              for p in out["fund"]]
     doable = [p for p in out["picks"] if p["fits"]]
-    ping = ("\nBuy: " + ", ".join("%s (bid up to %s)" % (p["name"], _m(p["max_bid"]))
+    ping = ("\nBuy: " + ", ".join("%s (bid up to %s)" % (p["name"], fmt_money(p["max_bid"]))
                                   for p in doable[:2]) if doable else "")
     ping += ("\nSell: " + ", ".join(p["name"] for p in out["sells"][:3])
              if sold else "")
-    hold = ("; %s held back for the report's top move" % _m(out["reserve"])
+    hold = ("; %s held back for the report's top move" % fmt_money(out["reserve"])
             if out["reserve"] > 0 else "")
     sections = [
         {"label": "BUY — free market", "tone": "buy", "rows": buys,
@@ -292,11 +291,11 @@ def present(out: dict) -> dict:
         sections.append({
             "label": "FUND — %s short, not a recommendation: %d option(s) "
                      "that would cover it, cheapest first"
-                     % (_m(out["fund_need"]), len(funded)),
+                     % (fmt_money(out["fund_need"]), len(funded)),
             "tone": "fund", "rows": funded})
     return {
         "heading": "MARKET",
-        "summary": "%s to spend%s" % (_m(out["spendable"]), hold),
+        "summary": "%s to spend%s" % (fmt_money(out["spendable"]), hold),
         "sections": sections,
         "ping": ping}
 
@@ -396,8 +395,8 @@ def run(u, moves: list[dict], sell_cost: dict[str, float]) -> dict | None:
     print("flip: %d buy(s), %d sale(s) logged; %s to spend (%s held back for the "
           "report's own targets); offers pay %.3fx value (%d), auctions cost "
           "%.3fx ask (%d)"
-          % (logged - len(out["sells"]), len(out["sells"]), _m(spend),
-             _m(held_back), offer, len(offer_r), premium, len(paid_r)))
+          % (logged - len(out["sells"]), len(out["sells"]), fmt_money(spend),
+             fmt_money(held_back), offer, len(offer_r), premium, len(paid_r)))
     return out
 
 
@@ -418,9 +417,9 @@ def _selftest() -> None:
     assert {round(o[0]) for o in ol.near(-2.0, 3)} == {-2}
     assert all(abs(o[1] - (1.05 ** 3 - 1) * 100) < 1e-6 for o in ol.near(5.0, 3))
     one_day = [(5.0, 10.0, "d1")] * 50
-    assert belief(one_day, 1) is None
+    assert belief(one_day) is None
     two_days = [(5.0, 10.0, "d1"), (5.0, 20.0, "d2")] * 10
-    bel = belief(two_days, 1)
+    bel = belief(two_days)
     assert bel == {"mean": 15.0, "n": 20, "days": 2}, bel
     top = ol.best(5.0, 0.98, 1.05)
     assert top["h"] >= 1 and top["net"] > 0 and top["days"] >= 2, top
