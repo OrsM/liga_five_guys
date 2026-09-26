@@ -735,10 +735,7 @@ class Scorer:
         self.cal = cal or Calibration()
         self.second: dict[str, dict] = {}
         for r in second or []:
-            k = self._by_ff_slug.get(norm(r.get("player_slug") or ""))
-            if not k:
-                hits = self._name_keys.get(norm(r.get("player_name") or ""), [])
-                k = hits[0] if len(hits) == 1 else None
+            k = self._key_of(r)
             if k:
                 self.second[k] = r
 
@@ -746,10 +743,7 @@ class Scorer:
         self.listed: set[str] = set()
         self.status: dict[str, str] = {}
         for r in xi or []:
-            key = self._by_ff_slug.get(norm(r.get("player_slug") or ""))
-            if not key:
-                hits = self._name_keys.get(norm(r.get("player_name") or ""), [])
-                key = hits[0] if len(hits) == 1 else None
+            key = self._key_of(r)
             if not key:
                 continue
             self.listed.add(key)
@@ -762,6 +756,16 @@ class Scorer:
         self.promoted = detect_promoted(self.market, self.history)
         self.priors, self.global_prior = position_priors(self.market,
                                                           self.history)
+
+    def _key_of(self, r: dict) -> str | None:
+        """A row's canonical key -- ff_slug lookup, else a unique-name
+        fallback via `_name_keys`. The `self.second`/`self.listed` loops
+        each hand-wrote this identical ladder separately."""
+        key = self._by_ff_slug.get(norm(r.get("player_slug") or ""))
+        if key:
+            return key
+        hits = self._name_keys.get(norm(r.get("player_name") or ""), [])
+        return hits[0] if len(hits) == 1 else None
 
     def rate(self, rec: dict) -> Rating:
         key = norm(rec.get("name", ""))
