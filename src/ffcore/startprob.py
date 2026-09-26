@@ -1,30 +1,29 @@
-
 from __future__ import annotations
 
 import math
+from dataclasses import dataclass, field, replace
+from typing import NamedTuple
 
-__all__ = ["Obs", "Calibration", "observations", "af_prob", "METHOD_VERSION",
-          "fit_start_fallbacks"]
+import numpy as np
 
-METHOD_VERSION = 2
+__all__ = ["Obs", "Calibration", "calibrate", "fit", "observations",
+           "af_prob", "fit_start_fallbacks", "NEUTRAL_START", "ABSENT_START"]
 
 INTERCEPT = [round(-3.0 + 0.5 * i, 1) for i in range(13)]
 SLOPE = [round(0.2 + 0.4 * i, 1) for i in range(15)]
 WEIGHTS = [round(0.1 * i, 1) for i in range(11)]
 
 FLOOR, CEIL = 0.01, 0.97
+NEUTRAL_START = 60.0
+ABSENT_START = 15.0
+FALLBACK_K = 8.0
 
 
-class Obs(tuple):
-    __slots__ = ()
-
-    def __new__(cls, ff, af, started, group=""):
-        return super().__new__(cls, (ff, af, float(started), group))
-
-    ff = property(lambda s: s[0])
-    af = property(lambda s: s[1])
-    started = property(lambda s: s[2])
-    group = property(lambda s: s[3])
+class Obs(NamedTuple):
+    ff: float | None
+    af: float | None
+    started: float
+    group: str = ""
 
 
 def af_prob(row, titular: float) -> float | None:
@@ -46,21 +45,16 @@ def _platt(p: float, alpha: float, beta: float) -> float:
     return min(CEIL, max(FLOOR, q))
 
 
-NEUTRAL_START = 60.0
-ABSENT_START = 15.0
-
-
+@dataclass
 class Calibration:
-
-    def __init__(self, alpha=0.0, beta=1.0, weight=0.0, titular=0.9, n=0,
-                 fitted=False, gain=0.0, why="", groups=0):
-        self.alpha, self.beta = alpha, beta
-        self.weight, self.titular = weight, titular
-        self.n, self.fitted, self.gain, self.why = n, fitted, gain, why
-        self.lineup_k = None
-        self.neutral_start, self.absent_start = NEUTRAL_START, ABSENT_START
-        self.status_factor: dict[str, float] = {}
-        self.groups = groups
+    alpha: float = 0.0
+    beta: float = 1.0
+    weight: float = 0.0
+    titular: float = 0.9
+    neutral_start: float = NEUTRAL_START
+    absent_start: float = ABSENT_START
+    lineup_k: float | None = None
+    status_factor: dict[str, float] = field(default_factory=dict)
 
     def p(self, ff_pct, af=None) -> float:
         if ff_pct is None:
@@ -76,77 +70,6 @@ class Calibration:
             return base
         return self.weight * q + (1.0 - self.weight) * base
 
-    def note(self) -> str:
-        if not self.n:
-            return ("P(start) is futbolfantasy's own figure — no confirmed "
-                    "line-up has been recorded yet to fit anything against.")
-        if not self.fitted:
-            return ("P(start) is futbolfantasy's own figure: on %d confirmed "
-                    "starts the fitted version did not beat it out of sample "
-                    "(%s)." % (self.n, self.why))
-        return ("P(start) fitted on %d confirmed starts across %d team "
-                "sheets: futbolfantasy recalibrated (logit %+.1f %+.1fx), "
-                "blended %.0f%% with analiticafantasy where it has an opinion "
-                "(a named starter counts %.0f%%). Brier improves %.3f on "
-                "line-ups the fit had not seen."
-                % (self.n, self.groups, self.alpha, self.beta,
-                   100 * self.weight, 100 * self.titular, self.gain))
-
-    @classmethod
-    def fit(cls, obs) -> "Calibration":
-        obs = [o for o in obs if o.ff is not None or o.af is not None]
-        if len(obs) < 3:
-            return cls(n=len(obs), why="not enough to hold one out")
-
-        titular = _titular_rate(obs)
-
-        def grid(train):
-            best, arg = None, (0.0, 1.0, 0.0)
-            for al in INTERCEPT:
-                for be in SLOPE:
-                    for w in WEIGHTS:
-                        c = cls(al, be, w, titular)
-                        model = (lambda o: c.p(_pct(o.ff), None)
-                                if o.af is None else
-                                c.p(_pct(o.ff), {"start_pct": o.af * 100}))
-                        sc = sum((model(o) - o.started) ** 2
-                                for o in train) / len(train)
-                        if best is None or sc < best:
-                            best, arg = sc, (al, be, w)
-            return arg
-
-        raw = cls(0.0, 1.0, 0.0, titular)
-        groups = sorted({o.group for o in obs})
-        if len(groups) < 2:
-            return cls(n=len(obs), titular=titular,
-                       why="only %d team sheet%s — nothing to hold out"
-                           % (len(groups), "" if len(groups) == 1 else "s"))
-        loo_fit = loo_raw = 0.0
-        for g in groups:
-            train = [o for o in obs if o.group != g]
-            held = [o for o in obs if o.group == g]
-            if not train:
-                continue
-            al, be, w = grid(train)
-            c = cls(al, be, w, titular)
-            for h in held:
-                af_row = None if h.af is None else {"start_pct": h.af * 100}
-                loo_fit += (c.p(_pct(h.ff), af_row) - h.started) ** 2
-                loo_raw += (raw.p(_pct(h.ff), None) - h.started) ** 2
-        loo_fit /= len(obs)
-        loo_raw /= len(obs)
-
-        if loo_fit >= loo_raw:
-            return cls(n=len(obs), titular=titular,
-                       why="Brier %.3f fitted vs %.3f raw" % (loo_fit, loo_raw))
-        al, be, w = grid(obs)
-        return cls(al, be, w, titular, n=len(obs), fitted=True,
-                   gain=loo_raw - loo_fit, groups=len(groups))
-
-
-def _pct(ff):
-    return None if ff is None else ff * 100.0
-
 
 def _titular_rate(obs) -> float:
     hits = [o for o in obs if o.af is not None and o.af >= 0.999]
@@ -155,11 +78,49 @@ def _titular_rate(obs) -> float:
     return min(0.99, max(0.5, sum(o.started for o in hits) / len(hits)))
 
 
-def observations(lineups, starters, cut: str, roster=None,
-                 neutral: float = 60.0, absent: float = 15.0,
-                 xw=None) -> list[Obs]:
-    from ffcore.text import norm
+def _grid_brier(obs) -> np.ndarray:
+    ff = np.array([np.nan if o.ff is None else o.ff for o in obs])
+    af = np.array([np.nan if o.af is None else o.af for o in obs])
+    y = np.array([o.started for o in obs])
+    al = np.array(INTERCEPT)[:, None, None, None]
+    be = np.array(SLOPE)[None, :, None, None]
+    w = np.array(WEIGHTS)[None, None, :, None]
+    p = np.clip(ff, 1e-6, 1.0 - 1e-6)
+    z = np.clip(al + be * np.log(p / (1.0 - p)), -40.0, 40.0)
+    base = np.clip(1.0 / (1.0 + np.exp(-z)), FLOOR, CEIL)
+    base = np.where((al == 0.0) & (be == 1.0), ff, base)
+    blend = np.where(np.isnan(af) | (w == 0.0), base, w * af + (1.0 - w) * base)
+    pred = np.where(np.isnan(ff), np.nan_to_num(af), blend)
+    return ((pred - y) ** 2).mean(axis=-1)
 
+
+def _best(obs, titular: float) -> Calibration:
+    i, j, k = np.unravel_index(np.argmin(_grid_brier(obs)),
+                               (len(INTERCEPT), len(SLOPE), len(WEIGHTS)))
+    return Calibration(INTERCEPT[i], SLOPE[j], WEIGHTS[k], titular)
+
+
+def _brier(c: Calibration, obs) -> float:
+    return sum((c.p(None if o.ff is None else o.ff * 100.0,
+                    None if o.af is None else {"start_pct": o.af * 100})
+                - o.started) ** 2 for o in obs)
+
+
+def fit(obs) -> Calibration:
+    obs = [o for o in obs if o.ff is not None or o.af is not None]
+    titular = _titular_rate(obs)
+    raw = Calibration(titular=titular)
+    groups = sorted({o.group for o in obs})
+    if len(obs) < 3 or len(groups) < 2:
+        return raw
+    held_out = sum(_brier(_best([o for o in obs if o.group != g], titular),
+                          [o for o in obs if o.group == g]) for g in groups)
+    return _best(obs, titular) if held_out < _brier(raw, obs) else raw
+
+
+def observations(lineups, starters, cut: str, neutral: float = NEUTRAL_START,
+                 absent: float = ABSENT_START, xw=None) -> list[Obs]:
+    from ffcore.text import norm
     from ffcore.tidy import MATCH_LEN, minutes_played
 
     truth = [r for r in starters if r.get("role")]
@@ -171,17 +132,14 @@ def observations(lineups, starters, cut: str, roster=None,
     truth_of = {r["player_slug"]: r for r in truth}
 
     wide: dict[str, dict] = {}
-    narrow_rows = []
+    narrow: dict[str, dict] = {}
     for r in sorted((r for r in lineups
                      if r.get("observed_at", "") <= cut
                      and r.get("team_slug") in teams),
                     key=lambda r: r.get("observed_at", "")):
         if (r.get("source") or "").startswith("futbol"):
             wide[r.get("player_slug") or norm(r.get("player_name"))] = r
-        else:
-            narrow_rows.append(r)
-    narrow = {}
-    for r in narrow_rows:
+            continue
         key = (xw.key_of(r) if xw else None) or norm(
             r.get("player_name") or r.get("player_slug") or "")
         if key:
@@ -194,58 +152,60 @@ def observations(lineups, starters, cut: str, roster=None,
         fp = absent / 100.0
         if row is not None:
             fp = neutral / 100.0
-            if (row.get("start_pct") or "") != "":
-                try:
-                    fp = float(row["start_pct"]) / 100.0
-                except (TypeError, ValueError):
-                    pass
-        nm = (row or {}).get("player_name") or seen.get("player_name", "")
-        af = narrow.get(norm(nm))
+            try:
+                fp = float(row.get("start_pct")) / 100.0
+            except (TypeError, ValueError):
+                pass
+        af = narrow.get(norm((row or {}).get("player_name")
+                             or seen.get("player_name", "")))
         if af is None and xw is not None:
             af = narrow.get(xw.key_of(row or seen))
         graded = min(1.0, minutes_played(seen.get("role"), seen.get("minute"))
                      / MATCH_LEN)
         out.append(Obs(fp, af_prob(af, 1.0), graded,
-                       (row or {}).get("team_slug")
-                       or seen.get("team_slug", "")))
+                       (row or {}).get("team_slug") or seen.get("team_slug", "")))
     return out
 
 
-def fit_start_fallbacks(lineups, starters, cut: str,
-                        neutral_default: float = NEUTRAL_START,
-                        absent_default: float = ABSENT_START, k: float = 8.0,
-                        xw=None) -> tuple[float, float, str]:
-    obs = observations(lineups, starters, cut, neutral=neutral_default,
-                       absent=absent_default, xw=xw)
+def _shrunk(default_pct: float, bucket) -> float:
+    if not bucket:
+        return default_pct
+    rate = sum(o.started for o in bucket) / len(bucket)
+    return ((FALLBACK_K * default_pct / 100.0 + len(bucket) * rate)
+            / (FALLBACK_K + len(bucket)) * 100.0)
 
-    def shrink(default_pct, bucket):
-        n = len(bucket)
-        if n == 0:
-            return default_pct, "no real observations yet, keeping %.0f%%" \
-                % default_pct
-        rate = sum(o.started for o in bucket) / n
-        fitted = (k * default_pct / 100.0 + n * rate) / (k + n) * 100.0
-        return fitted, ("%d real observations, %.0f%% actually started -> "
-                       "%.1f%%" % (n, 100 * rate, fitted))
 
-    neutral_bucket = [o for o in obs if abs(o.ff - neutral_default / 100) < 1e-9]
-    absent_bucket = [o for o in obs if abs(o.ff - absent_default / 100) < 1e-9]
-    neutral_pct, neutral_why = shrink(neutral_default, neutral_bucket)
-    absent_pct, absent_why = shrink(absent_default, absent_bucket)
-    return neutral_pct, absent_pct, ("neutral: %s; absent: %s"
-                                    % (neutral_why, absent_why))
+def fit_start_fallbacks(lineups, starters, cut: str, xw=None
+                        ) -> tuple[float, float]:
+    obs = observations(lineups, starters, cut, xw=xw)
+    return (_shrunk(NEUTRAL_START, [o for o in obs
+                                    if abs(o.ff - NEUTRAL_START / 100) < 1e-9]),
+            _shrunk(ABSENT_START, [o for o in obs
+                                   if abs(o.ff - ABSENT_START / 100) < 1e-9]))
+
+
+def calibrate(lineups, second, starters, xw) -> Calibration:
+    from ffcore.lineupweight import fit_lineup_weight, fit_status_factors
+
+    both = lineups + second
+    cut = min((r.get("observed_at", "") for r in starters), default="")
+    cal = Calibration()
+    if cut:
+        neutral, absent = fit_start_fallbacks(both, starters, cut, xw=xw)
+        cal = replace(fit(observations(both, starters, cut, neutral, absent, xw)),
+                      neutral_start=neutral, absent_start=absent)
+    return replace(cal, lineup_k=fit_lineup_weight(),
+                   status_factor=fit_status_factors())
 
 
 def _selftest() -> None:
     assert abs(_platt(0.5, 0.0, 1.0) - 0.5) < 1e-6
     assert abs(_platt(0.8, 0.0, 1.0) - 0.8) < 1e-6
-    assert _platt(0.8, 0.0, 3.0) > 0.8
-    assert _platt(0.2, 0.0, 3.0) < 0.2
+    assert _platt(0.8, 0.0, 3.0) > 0.8 and _platt(0.2, 0.0, 3.0) < 0.2
     assert _platt(0.3, 1.5, 3.0) > _platt(0.3, 0.0, 3.0)
-    assert _platt(0.999, 0.0, 5.8) <= CEIL
-    assert _platt(0.001, 0.0, 5.8) >= FLOOR
-    assert FLOOR <= _platt(1.0, 3.0, 5.8) <= CEIL
-    assert FLOOR <= _platt(0.0, -3.0, 0.2) <= CEIL
+    for p, al, be in [(0.999, 0.0, 5.8), (0.001, 0.0, 5.8), (1.0, 3.0, 5.8),
+                      (0.0, -3.0, 0.2)]:
+        assert FLOOR <= _platt(p, al, be) <= CEIL
 
     assert af_prob({"start_pct": "75"}, 0.9) == 0.75
     assert af_prob({"role": "starter"}, 0.93) == 0.93
@@ -257,33 +217,27 @@ def _selftest() -> None:
     assert raw.p(100.0) == 1.0 and raw.p(0.0) == 0.0
     assert raw.p(80.0, {"start_pct": "20"}) == 0.8
     assert raw.p(None) == 0.0
-    assert "no confirmed line-up" in raw.note()
-
     assert Calibration(weight=0.5).p(None, {"start_pct": "40"}) == 0.4
 
-    obs = [Obs(p, None, st, "sheet%d" % (i % 6))
-           for i, (p, st) in enumerate(
-               [(0.8, 1), (0.7, 1), (0.3, 0), (0.2, 0)] * 12)]
-    cal = Calibration.fit(obs)
-    assert cal.fitted, cal.note()
-    assert cal.beta > 1.0, cal.beta
-    assert cal.p(80.0) > 0.8, cal.p(80.0)
-    assert "recalibrated" in cal.note() and "48 confirmed" in cal.note()
-    assert "6 team sheets" in cal.note(), cal.note()
-
+    sharp = [Obs(p, None, st, "sheet%d" % (i % 6))
+             for i, (p, st) in enumerate([(0.8, 1), (0.7, 1), (0.3, 0),
+                                          (0.2, 0)] * 12)]
+    cal = fit(sharp)
+    assert cal.beta > 1.0 and cal.p(80.0) > 0.8, cal
     noise = [Obs(0.5, None, i % 2, "sheet%d" % (i % 5)) for i in range(20)]
-    assert not Calibration.fit(noise).fitted
-    assert "did not beat it out of sample" in Calibration.fit(noise).note()
+    for obs in (noise, [Obs(0.5, None, 1)],
+                [Obs(0.9, None, i < 11, "same") for i in range(22)]):
+        got = fit(obs)
+        assert (got.alpha, got.beta, got.weight) == (0.0, 1.0, 0.0), got
+    blended = fit([Obs(0.5, float(st), st, "sheet%d" % (i % 5))
+                   for i, st in enumerate([1, 0] * 15)])
+    assert blended.weight > 0.5, blended
 
-    assert not Calibration.fit([Obs(0.5, None, 1)]).fitted
-    assert "hold one out" in Calibration.fit([Obs(0.5, None, 1)]).note()
-    one = Calibration.fit([Obs(0.9, None, i < 11, "same") for i in range(22)])
-    assert not one.fitted and "1 team sheet" in one.note(), one.note()
-
-    good = [Obs(0.5, float(st), st, "sheet%d" % (i % 5))
-            for i, st in enumerate([1, 0] * 15)]
-    cg = Calibration.fit(good)
-    assert cg.fitted and cg.weight > 0.5, (cg.weight, cg.note())
+    grid_obs = sharp + [Obs(None, 1.0, 1, "sheet1"), Obs(0.4, 0.0, 0, "sheet2")]
+    brier = _grid_brier(grid_obs)
+    for i, j, k in [(0, 0, 0), (6, 2, 0), (6, 2, 5), (3, 9, 10)]:
+        c = Calibration(INTERCEPT[i], SLOPE[j], WEIGHTS[k])
+        assert abs(brier[i, j, k] - _brier(c, grid_obs) / len(grid_obs)) < 1e-12
 
     assert abs(_titular_rate([Obs(0.5, 1.0, 1)] * 9 + [Obs(0.5, 1.0, 0)])
                - 0.9) < 1e-9
@@ -318,58 +272,43 @@ def _selftest() -> None:
          "player_name": "Surprise Man", "role": "starter"},
     ]
     got = observations(lineups, starters, cut="M")
-    assert all(o.group == "t" for o in got), got
     by = {o.ff: o for o in got}
-    assert len(got) == 4, got
+    assert len(got) == 4 and all(o.group == "t" for o in got), got
     assert by[0.8].started == 1.0 and by[0.2].started == 0.0
-    assert by[0.8].af == 1.0
-    assert by[0.2].af is None
-    assert abs(by[0.6].ff - 0.6) < 1e-9
-    assert by[0.15].started == 1.0
-    assert all(abs(o.ff - 0.99) > 1e-9 and abs(o.ff - 0.9) > 1e-9
-               for o in got), got
+    assert by[0.8].af == 1.0 and by[0.2].af is None
+    assert abs(by[0.6].ff - 0.6) < 1e-9 and by[0.15].started == 1.0
     assert observations(lineups, [], cut="M") == []
 
-    npct, apct, why = fit_start_fallbacks(lineups, starters, cut="M")
-    assert abs(npct - (8 * 60 + 1 * 0) / 9) < 1e-9, (npct, why)
-    assert abs(apct - (8 * 15 + 1 * 100) / 9) < 1e-9, (apct, why)
-    assert "1 real observations" in why, why
-    npct0, apct0, why0 = fit_start_fallbacks([], [], cut="M")
-    assert npct0 == 60.0 and apct0 == 15.0, (npct0, apct0)
-    assert "no real observations" in why0, why0
+    npct, apct = fit_start_fallbacks(lineups, starters, cut="M")
+    assert abs(npct - (8 * 60 + 1 * 0) / 9) < 1e-9, npct
+    assert abs(apct - (8 * 15 + 1 * 100) / 9) < 1e-9, apct
+    assert fit_start_fallbacks([], [], cut="M") == (60.0, 15.0)
 
     from ffcore.crosswalk import Crosswalk, Player
     xw = Crosswalk({"starter man": Player("starter man", ff_slug="starter-man",
                                           af_slug="af-only-slug")})
-
     odd = [r for r in lineups if r["source"] == "futbolfantasy"] + [
         {"observed_at": "A", "source": "analitica", "team_slug": "t",
          "player_slug": "af-only-slug", "player_name": "S. Man",
          "start_pct": "75", "role": "starter"}]
     assert all(o.af is None for o in observations(odd, starters, cut="M"))
-    got2 = observations(odd, starters, cut="M", xw=xw)
-    assert any(o.af == 0.75 for o in got2), got2
+    assert any(o.af == 0.75 for o in observations(odd, starters, cut="M", xw=xw))
 
-    graded_lineups = [
-        {"observed_at": "A", "source": "futbolfantasy", "team_slug": "t",
-         "player_slug": "hooked-early", "player_name": "Hooked Early",
-         "start_pct": "90", "role": "starter"},
-        {"observed_at": "A", "source": "futbolfantasy", "team_slug": "t",
-         "player_slug": "heavy-sub", "player_name": "Heavy Sub",
-         "start_pct": "10", "role": "sub"},
-    ]
-    graded_starters = [
-        {"observed_at": "K", "team_slug": "t", "player_slug": "hooked-early",
-         "player_name": "Hooked Early", "role": "starter", "minute": "45"},
-        {"observed_at": "K", "team_slug": "t", "player_slug": "heavy-sub",
-         "player_name": "Heavy Sub", "role": "sub", "minute": "45"},
-    ]
-    graded = {o.ff: o.started
-             for o in observations(graded_lineups, graded_starters, cut="M")}
-    assert abs(graded[0.9] - 0.5) < 1e-9, graded
-    assert abs(graded[0.1] - 0.5) < 1e-9, graded
+    graded = {o.ff: o.started for o in observations(
+        [{"observed_at": "A", "source": "futbolfantasy", "team_slug": "t",
+          "player_slug": "hooked-early", "player_name": "Hooked Early",
+          "start_pct": "90", "role": "starter"},
+         {"observed_at": "A", "source": "futbolfantasy", "team_slug": "t",
+          "player_slug": "heavy-sub", "player_name": "Heavy Sub",
+          "start_pct": "10", "role": "sub"}],
+        [{"observed_at": "K", "team_slug": "t", "player_slug": "hooked-early",
+          "player_name": "Hooked Early", "role": "starter", "minute": "45"},
+         {"observed_at": "K", "team_slug": "t", "player_slug": "heavy-sub",
+          "player_name": "Heavy Sub", "role": "sub", "minute": "45"}],
+        cut="M")}
+    assert abs(graded[0.9] - 0.5) < 1e-9 and abs(graded[0.1] - 0.5) < 1e-9
 
-    print("ffcore.startprob self-test OK (54 cases)")
+    print("ffcore.startprob self-test OK")
 
 
 if __name__ == "__main__":

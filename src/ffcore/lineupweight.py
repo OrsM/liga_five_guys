@@ -58,12 +58,11 @@ def rows():
 
 def pairs(data):
     from ffcore.tidy import MATCH_LEN
-    """(row, predicted-rate-per-90, line-up, past shares) for judged rows."""
-    mine, league = collections.defaultdict(lambda: [0.0, 0.0, []]), \
-        collections.defaultdict(lambda: [0.0, 0.0])
-    out = []
+
+    mine, league, out = {}, {}, []
     for r in data:
-        a, g = mine[r["key"]], league[r["pos"]]
+        a = mine.setdefault(r["key"], [0.0, 0.0, []])
+        g = league.setdefault(r["pos"], [0.0, 0.0])
         if r["j"] >= WARMUP and r["line"] is not None and a[2] and g[1]:
             prior = g[0] / (g[1] / MATCH_LEN)
             rate = (PRIOR_90 * prior + a[0]) / (PRIOR_90 + a[1] / MATCH_LEN)
@@ -78,20 +77,15 @@ def mse(sample, k):
                    for r, rate, line, tot, n in sample)
 
 
-def fit_lineup_weight(data=None) -> tuple[float | None, str]:
+def fit_lineup_weight(data=None) -> float | None:
     p = pairs(data if data is not None else rows())
     if len(p) < MIN_ROWS:
-        return None, "only %d comparable player-matches (need %d)" % (
-            len(p), MIN_ROWS)
-    train, test = p[:int(0.6 * len(p))], p[int(0.6 * len(p)):]
-    best = min(GRID, key=lambda k: mse(train, k))
-    return best, ("line-up worth %g played matches: %.3f vs %.3f at 8 on the "
-                  "%d most recent of %d player-matches" % (
-                      best, mse(test, best), mse(test, 8.0), len(test),
-                      len(p)))
+        return None
+    train = p[:int(0.6 * len(p))]
+    return min(GRID, key=lambda k: mse(train, k))
 
 
-def fit_status_factors(lineups=None, starters=None) -> dict[str, tuple[float, int]]:
+def fit_status_factors(lineups=None, starters=None) -> dict[str, float]:
     from ffcore.tidy import (MATCH_LEN, minutes_played, LINEUP_SOURCE, newest,
                              table)
 
@@ -121,31 +115,26 @@ def fit_status_factors(lineups=None, starters=None) -> dict[str, tuple[float, in
             if mm == m:
                 earlier[(team, slug)].append(share)
     base = st.mean(seen["ok"]) if seen["ok"] else 0.0
-    return {f: (st.mean(v) / base, len(v)) for f, v in seen.items()
+    return {f: st.mean(v) / base for f, v in seen.items()
             if base > 0 and f != "ok" and len(v) >= MIN_STATUS_ROWS}
 
 
 def _selftest() -> None:
-    def game(who, j, share, line):
-        return {"key": who, "pos": "MED", "j": j, "at": "2026-09-%02dT1200Z" % j,
-                "line": line, "share": share, "mins": 90.0 * share,
-                "pts": 5.0 * share}
-    data = []
+    data, steady = [], []
     for i in range(60):
         for j in range(1, 9):
-            on = (i + j) % 2
-            data.append(game("p%d" % i, j, float(on), float(on)))
+            for out, share, line in ((data, (i + j) % 2, (i + j) % 2),
+                                     (steady, 1.0, (i * j) % 2)):
+                out.append({"key": "p%d" % i, "pos": "MED", "j": j,
+                            "at": "2026-09-%02dT1200Z" % j, "line": float(line),
+                            "share": float(share), "mins": 90.0 * share,
+                            "pts": 5.0 * share})
     data.sort(key=lambda r: r["at"])
-    k, why = fit_lineup_weight(data)
-    assert k == max(GRID), (k, why)
-    steady = [game("p%d" % i, j, 1.0, float((i * j) % 2)) for i in range(60)
-              for j in range(1, 9)]
     steady.sort(key=lambda r: r["at"])
-    k, _ = fit_lineup_weight(steady)
-    assert k == min(GRID), k
-    k, why = fit_lineup_weight(data[:20])
-    assert k is None and "need" in why, (k, why)
-    assert not pairs([game("a", 1, 1.0, 1.0)]), "no history, nothing to judge"
+    assert fit_lineup_weight(data) == max(GRID)
+    assert fit_lineup_weight(steady) == min(GRID)
+    assert fit_lineup_weight(data[:20]) is None
+    assert not pairs(data[:1])
     starters, lineups = [], []
     for m in range(1, 9):
         for i in range(50):
@@ -162,8 +151,7 @@ def _selftest() -> None:
                                  "minute": "", "observed_at":
                                  "2026-09-%02dT2000Z" % (m + 1)})
     got = fit_status_factors(lineups, starters)
-    assert got["injured"][0] < 0.05 and got["injured"][1] >= MIN_STATUS_ROWS, got
-    assert 0.3 < got["doubt"][0] < 0.7, got
+    assert got["injured"] < 0.05 and 0.3 < got["doubt"] < 0.7, got
     assert fit_status_factors(lineups[:10], starters[:10]) == {}
     print("ffcore.lineupweight self-test OK")
 

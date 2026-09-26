@@ -3,11 +3,10 @@ from __future__ import annotations
 
 import statistics
 from contextlib import suppress
-from functools import cache
 from typing import NamedTuple
 
 from ffcore.parse import money, pct100, ratio, text
-from ffcore.startprob import Calibration
+from ffcore.startprob import Calibration, calibrate
 from ffcore.text import norm
 from ffcore.tidy import minutes_played, row_key
 
@@ -270,7 +269,8 @@ def _fit_decay(by_key: dict) -> float:
 def build(market: list[dict], xi_rows: list[dict], now,
           shrink_k: float = SHRINK_K) -> "Scorer":
     from ffcore.fixture import difficulty_ratings, fit_home_edge, fixture_board
-    from ffcore.tidy import (DAILY_FRESH_DAYS, SEASON, fresh_only,
+    from ffcore.tidy import (DAILY_FRESH_DAYS, LINEUP_SOURCE, SEASON,
+                             SECOND_SOURCE, fresh_only,
                              jornada_of_match, load_api_stats, load_crosswalk,
                              load_fixtures, load_perjornada,
                              load_understat_players, newest, read_csv, table)
@@ -290,7 +290,9 @@ def build(market: list[dict], xi_rows: list[dict], now,
     ratings = difficulty_ratings(
         market, fresh_only(newest("elo"), DAILY_FRESH_DAYS), results, us25,
         fit_home_edge(results, newest("matches"))[0])
-    cal, second = _calibrated()
+    second = table("lineups", SECOND_SOURCE)
+    cal = calibrate(table("lineups", LINEUP_SOURCE), second, table("starters"),
+                    xw)
     return Scorer(
         market, xi_rows, history, shrink_k=shrink_k, xw=xw, cal=cal,
         second=second, ratings=ratings,
@@ -301,56 +303,6 @@ def build(market: list[dict], xi_rows: list[dict], now,
         evidence={"xg": xg_evidence(us25, us26, history, xw),
                   "shots": shots_evidence(load_api_stats(), by_key, pos, xw)},
         promoted_discount=fit_promoted_discount(market, history, perjornada))
-
-
-@cache
-def _calibrated():
-    import hashlib
-    import json
-    from ffcore.startprob import (ABSENT_START, Calibration, METHOD_VERSION,
-                                  NEUTRAL_START, observations,
-                                  fit_start_fallbacks)
-    from ffcore.tidy import load_crosswalk, TIDY, LINEUP_SOURCE, table
-    from ffcore.tidy import SECOND_SOURCE
-
-    second = table("lineups", SECOND_SOURCE)
-    truth = table("starters")
-    cut = min((r.get("observed_at", "") for r in truth), default="")
-    xw = load_crosswalk()
-    neutral, absent = NEUTRAL_START, ABSENT_START
-    if cut:
-        neutral, absent, _fallback_why = fit_start_fallbacks(
-            table("lineups", LINEUP_SOURCE) + second, truth, cut, xw=xw)
-    obs = observations(table("lineups", LINEUP_SOURCE) + second, truth, cut,
-                       neutral=neutral, absent=absent,
-                       xw=xw) if cut else []
-    stamp = "%d:%s" % (METHOD_VERSION,
-                       hashlib.sha1(repr(obs).encode()).hexdigest())
-    path = TIDY / "startcal.json"
-    cal = Calibration()
-    try:
-        was = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        was = {}
-    if cut and was.get("fingerprint") == stamp:
-        cal = Calibration(was["alpha"], was["beta"], was["weight"],
-                          was["titular"], was["n"], was["fitted"],
-                          was["gain"], was["why"], was["groups"])
-    elif cut:
-        cal = Calibration.fit(obs)
-        try:
-            path.write_text(json.dumps({
-                "fingerprint": stamp, "alpha": cal.alpha, "beta": cal.beta,
-                "weight": cal.weight, "titular": cal.titular, "n": cal.n,
-                "fitted": cal.fitted, "gain": cal.gain, "why": cal.why,
-                "groups": cal.groups}) + "\n", encoding="utf-8")
-        except OSError:
-            pass
-    from ffcore.lineupweight import fit_lineup_weight, fit_status_factors
-    cal.lineup_k = fit_lineup_weight()[0]
-    cal.neutral_start, cal.absent_start = neutral, absent
-    cal.status_factor = {f: v for f, (v, _n) in fit_status_factors().items()}
-    return cal, second
 
 
 SHAPES = [{"POR": 1, "DEF": d, "MED": m, "DEL": f} for d, m, f in FREE_FORMATIONS]
