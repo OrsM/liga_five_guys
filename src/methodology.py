@@ -304,6 +304,20 @@ def _matched_start_row(hist, start, teams):
     return row
 
 
+def _matched_start_rows(intervals, per: dict[str, list]):
+    """(interval, key, row) for every interval x per-key claim history pair
+    that resolves via _matched_start_row -- the join loop start_grade()
+    (once per source), _start_instances() and golden_rows() each walked
+    separately."""
+    for interval in intervals:
+        start = interval[0]
+        teams = interval[2] if len(interval) > 2 else None
+        for key, hist in per.items():
+            row = _matched_start_row(hist, start, teams)
+            if row is not None:
+                yield interval, key, row
+
+
 def _start_classify(row):
     try:
         pct = float(row.get("start_pct"))
@@ -324,25 +338,20 @@ def start_grade(intervals, claims, universe=None, instances=None):
     num: dict[str, list] = {}
     nam: dict[str, list] = {}
     skipped = 0
-    for interval in intervals:
-        start, played = interval[0], interval[1]
-        teams = interval[2] if len(interval) > 2 else None
-        for src, byname in per.items():
-            for key, hist in byname.items():
-                if instances is not None and (key, start) not in instances:
-                    continue
-                row = _matched_start_row(hist, start, teams)
-                if row is None:
-                    continue
-                slug = schema.text(row, "player_slug")
-                hit = 1.0 if key in played or (slug and slug in played) else 0.0
-                kind, pct = _start_classify(row) or (None, None)
-                if kind is None:
-                    skipped += 1
-                elif kind == "named":
-                    nam.setdefault(src, []).append(hit)
-                else:
-                    num.setdefault(src, []).append((pct, hit))
+    for src, byname in per.items():
+        for interval, key, row in _matched_start_rows(intervals, byname):
+            start, played = interval[0], interval[1]
+            if instances is not None and (key, start) not in instances:
+                continue
+            slug = schema.text(row, "player_slug")
+            hit = 1.0 if key in played or (slug and slug in played) else 0.0
+            kind, pct = _start_classify(row) or (None, None)
+            if kind is None:
+                skipped += 1
+            elif kind == "named":
+                nam.setdefault(src, []).append(hit)
+            else:
+                num.setdefault(src, []).append((pct, hit))
 
     numbered = []
     for src in sorted(num):
@@ -359,19 +368,9 @@ def start_grade(intervals, claims, universe=None, instances=None):
 
 def _start_instances(intervals, claims, src, universe=None) -> set:
     per = _group_by_key(claims, src=src, universe=universe)
-
-    out = set()
-    for interval in intervals:
-        start = interval[0]
-        teams = interval[2] if len(interval) > 2 else None
-        for key, hist in per.items():
-            row = _matched_start_row(hist, start, teams)
-            if row is None:
-                continue
-            kind, _pct = _start_classify(row) or (None, None)
-            if kind == "numeric":
-                out.add((key, start))
-    return out
+    return {(key, interval[0])
+           for interval, key, row in _matched_start_rows(intervals, per)
+           if (_start_classify(row) or (None, None))[0] == "numeric"}
 
 
 
@@ -986,26 +985,23 @@ def golden_rows() -> list[dict]:
     per = _group_by_key(forecast_claims())
 
     out = []
-    for lock, played, teams in intervals:
+    for interval, key, row in _matched_start_rows(intervals, per):
+        lock, played = interval[0], interval[1]
         jor = jornada_of_lock.get(lock)
         if jor is None:
             continue
-        for key, hist in per.items():
-            row = _matched_start_row(hist, lock, teams)
-            if row is None:
-                continue
-            golden = {"player": row["player_name"], "jornada": jor,
-                      "predicted_start_pct": row["start_pct"],
-                      "actual_started": key in played,
-                      "in_squad": key in squad_of.get(lock, ()),
-                      "predicted_rate": None, "actual_points": None,
-                      "rate_err": None}
-            rp = rate_by_key.get((key, jor))
-            if rp is not None:
-                golden["predicted_rate"] = rp["per_match"]
-                golden["actual_points"] = rp["actual"]
-                golden["rate_err"] = rp["err"]
-            out.append(golden)
+        golden = {"player": row["player_name"], "jornada": jor,
+                  "predicted_start_pct": row["start_pct"],
+                  "actual_started": key in played,
+                  "in_squad": key in squad_of.get(lock, ()),
+                  "predicted_rate": None, "actual_points": None,
+                  "rate_err": None}
+        rp = rate_by_key.get((key, jor))
+        if rp is not None:
+            golden["predicted_rate"] = rp["per_match"]
+            golden["actual_points"] = rp["actual"]
+            golden["rate_err"] = rp["err"]
+        out.append(golden)
     return out
 
 
