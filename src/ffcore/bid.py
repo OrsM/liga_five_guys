@@ -58,8 +58,8 @@ def deals(lg, market) -> list[dict]:
         when = ledger_stamp(t.get("date", ""))
         if price is None or when is None:
             continue
-        who = lg.txn_key(t) if hasattr(lg, "txn_key") else None
-        v = market.at(who or t["player"], when)
+        who = t.get("key")
+        v = market.at(who, when)
         src = (t.get("from") or "").strip() or MARKET
         dst = (t.get("to") or "").strip() or MARKET
         rows.append({
@@ -319,6 +319,7 @@ def _selftest() -> None:
             {"date": "nonsense", "player": "Undated",
              "from": "", "to": "me", "price": "1.000.000"},
         ]
+        txns = [dict(t, key=t["player"]) for t in txns]
 
     dl = deals(_Lg(), _Market())
     assert [d["player"] for d in dl] == ["Bought", "Sold", "Traded",

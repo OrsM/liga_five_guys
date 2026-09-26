@@ -14,7 +14,7 @@ from types import MappingProxyType, SimpleNamespace
 from typing import NamedTuple
 
 from ffcore.parse import money, pct100
-from ffcore.text import index_by, norm, resolve
+from ffcore.text import norm
 
 __all__ = ["ROOT", "TIDY", "SEASON", "DECISIONS", "REPORTS", "PARTS", "MADRID",
            "WARNINGS",
@@ -22,17 +22,16 @@ __all__ = ["ROOT", "TIDY", "SEASON", "DECISIONS", "REPORTS", "PARTS", "MADRID",
            "csv_string",
            "write_lines", "snapshot_stamp", "ledger_stamp", "latest_only",
            "latest_per_key", "snapshots",
-           "Market", "Valuation", "VALUE_TOLERANCE", "price_agrees",
+           "Market", "Valuation",
            "load", "load_market_frozen", "load_lineups",
-           "shared_names", "row_key", "run_now", "load_crosswalk",
+           "row_key", "run_now", "load_crosswalk",
            "load_players", "read_ledger", "LEDGER", "load_deadline", "LINEUP_SOURCE",
            "pick_source", "load_fixtures", "next_kickoff", "kickoff_stamp",
            "load_odds", "load_understat_players",
            "MATCH_LEN", "minutes_played", "fresh_only", "DAILY_FRESH_DAYS",
            "EVERY_RUN_FRESH_DAYS", "stale_feeds",
            "GATED_API", "age_phrase", "last_api_standings",
-           "load_api", "market_routes", "pending_sent",
-           "pending_received", "LISTED_SELLER", "team_slug_of", "lock_order",
+           "load_api", "market_routes", "pending", "LISTED_SELLER", "team_slug_of", "lock_order",
            "JornadaClock", "shown", "newest", "table_stats",
            "load_perjornada", "load_api_stats", "clock", "clock_history",
            "jornada_of_match"]
@@ -625,30 +624,17 @@ XI_FIELDS = [("team", "team_slug", None), ("start", "start_pct", pct100),
              ("status", "status", None)]
 
 
-def _merge(players: dict, rows: list[dict], name_col: str, fields,
-           shared=(), club_of=None, by_ff_slug=None) -> dict:
+def _merge(players: dict, rows: list[dict], key_of, name_col: str,
+           fields) -> dict:
     for r in rows:
-        key = row_key(r, shared) if r.get("ff_id") else ""
-        if not key:
-            key = (by_ff_slug or {}).get(
-                norm(r.get("player_slug") or "")) or ""
-        if not key:
-            key = norm(r.get(name_col))
-            if key in shared:
-                club = _club(r) or (club_of or {}).get(
-                    norm(r.get("team_slug") or ""), "")
-                if not club:
-                    continue
-                key = "%s@%s" % (key, club)
+        key = key_of(r)
         if not key:
             continue
         rec = players.setdefault(key, {})
         rec.setdefault("name", (r.get(name_col) or "").strip())
         for field, col, parse in fields:
-            if field in rec:
-                continue
             raw = r.get(col)
-            if raw in (None, ""):
+            if field in rec or raw in (None, ""):
                 continue
             val = parse(raw) if parse else str(raw).strip()
             if val is not None:
@@ -657,20 +643,13 @@ def _merge(players: dict, rows: list[dict], name_col: str, fields,
 
 
 def stale_owned_players(players: dict, owned_keys, market) -> dict:
-    missing = [k for k in owned_keys if k not in players]
-    if not missing or market is None:
-        return players
-    latest = market.latest()
-    stale = [latest[k] for k in missing if k in latest]
+    latest = market.latest() if market is not None else {}
+    stale = [latest[k] for k in owned_keys if k not in players and k in latest]
     if not stale:
         return players
-    out = dict(players)
-    _merge(out, stale, "name", MARKET_FIELDS)
+    out = _merge(dict(players), stale, row_key, "name", MARKET_FIELDS)
     for r in stale:
-        key = row_key(r, ())
-        rec = out.get(key)
-        if rec is not None:
-            rec["status"] = "stale since %s" % r.get("observed_at", "?")
+        out[row_key(r)]["status"] = "stale since %s" % r.get("observed_at", "?")
     return out
 
 
@@ -678,22 +657,10 @@ def load_players() -> dict[str, dict]:
     market, xi = load_market_latest(), _cached_latest_snapshot(TIDY / "lineups.csv")
     if not market and not xi:
         raise SystemExit("no rows in %s — run `ingest.py parse` first" % TIDY)
-    shared = shared_names(market)
-    club_of = {}
-    for c in read_csv(TIDY / "clubs.csv"):
-        if c.get("ff_slug") and c.get("market"):
-            club_of[norm(c["ff_slug"])] = norm(c["market"])
     xw = load_crosswalk()
-    by_ff_slug = {}
-    if xw is not None:
-        for pl in xw.players.values():
-            if pl.ff_slug:
-                by_ff_slug[norm(pl.ff_slug)] = pl.player_id
-    players: dict[str, dict] = {}
-    _merge(players, market, "name", MARKET_FIELDS, shared, club_of)
-    _merge(players, xi, "player_name", XI_FIELDS, shared, club_of,
-           by_ff_slug=by_ff_slug)
-    return players
+    players = _merge({}, market, row_key, "name", MARKET_FIELDS)
+    return _merge(players, xi, xw.key_of if xw else (lambda r: None),
+                  "player_name", XI_FIELDS)
 
 
 LEDGER = TIDY / "transactions.csv"
@@ -719,176 +686,51 @@ class Valuation(NamedTuple):
     name: str
 
 
-VALUE_TOLERANCE = 0.05
-
-
-def price_agrees(a, b, tolerance: float = VALUE_TOLERANCE) -> bool:
-    if not a or not b:
-        return False
-    return abs(a - b) <= tolerance * max(a, b)
-
-
-def _club(row: dict) -> str:
-    return norm(row.get("team") or "")
-
-
-def narrow_by_club(candidates, want: str, club_of) -> object | None:
-    if not want:
-        return None
-    hits = [c for c in candidates if club_of(c) == want]
-    return hits[0] if len(hits) == 1 else None
-
-
-def shared_names(rows) -> set:
-    clubs: dict[str, set] = {}
-    for r in latest_only(rows):
-        n = norm(r.get("name"))
-        if n:
-            clubs.setdefault(n, set()).add(_club(r))
-    return {n for n, c in clubs.items() if len(c) > 1}
-
-
-def row_key(row: dict, shared: set) -> str:
-    fid = (row.get("ff_id") or "").strip()
-    if fid:
-        return fid
-    n = norm(row.get("name"))
-    return "%s@%s" % (n, _club(row)) if n in shared else n
+def row_key(row: dict) -> str:
+    return (row.get("ff_id") or "").strip() or norm(row.get("name"))
 
 
 class Market:
 
     def __init__(self, rows: list[dict]):
         self.rows = rows
-        self._latest: list | None = None
-        self._name_idx: dict | None = None
-        self._resolved: dict[str, str | None] = {}
-        self._parsed_cache: dict[str, list] = {}
-        self._by_key: dict[str, list[tuple[datetime, dict]]] = {}
-        latest = latest_only(rows)
-        self._by_name: dict[str, list] = {}
-        for r in latest:
-            n = norm(r.get("name"))
-            k = row_key(r, ())
-            if n and k:
-                self._by_name.setdefault(n, [])
-                if k not in self._by_name[n]:
-                    self._by_name[n].append(k)
-        self._shared = {n for n, ks in self._by_name.items() if len(ks) > 1}
+        self._by_key: dict[str, list[tuple[datetime, dict, float | None]]] = {}
         for r in rows:
-            key = self.key_of(r)
+            key = row_key(r)
             when = snapshot_stamp(r.get("observed_at", ""))
-            if not key or when is None:
-                continue
-            self._by_key.setdefault(key, []).append((when, r))
+            if key and when is not None:
+                self._by_key.setdefault(key, []).append(
+                    (when, r, money(r.get("value"))))
         for hist in self._by_key.values():
             hist.sort(key=lambda t: t[0])
-
-    def key_of(self, row: dict) -> str:
-        return row_key(row, self._shared)
 
     def __len__(self) -> int:
         return len(self._by_key)
 
-    def latest_rows(self) -> list:
-        if self._latest is None:
-            self._latest = latest_only(self.rows)
-        return self._latest
-
-    def _name_index(self) -> dict:
-        if self._name_idx is None:
-            self._name_idx = index_by(self.latest_rows(), "name")
-        return self._name_idx
-
-    def key_for(self, name, team: str = "", value=None):
-        k = norm(name)
-        if k in self._shared:
-            keys = [key for key in self._by_name.get(k, [])
-                    if key in self._by_key]
-            if team:
-                return narrow_by_club(
-                    keys, _club({"team": team}),
-                    lambda key: _club(self._by_key[key][-1][1]))
-            return self._by_price(
-                {key: (self._by_key[key][-1][1]).get("value")
-                 for key in keys}, value)
-        if k in self._by_key:
-            return k
-        if value is None and k in self._resolved:
-            return self._resolved[k]
-        row, cands = resolve(name, self.latest_rows(), index=self._name_index())
-        if row is not None:
-            got = self.key_of(row)
-            self._resolved[k] = got
-            return got
-        if cands and value is not None:
-            return self._by_price(
-                {self.key_of(r): r.get("value") for r in cands}, value)
-        if value is None:
-            self._resolved[k] = None
-        return None
-
-    def candidates(self, name) -> tuple:
-        k = norm(name)
-        if k in self._shared:
-            return None, [key for key in self._by_name.get(k, [])
-                          if key in self._by_key]
-        if k in self._by_key:
-            return k, []
-        row, cands = resolve(name, self.latest_rows(), index=self._name_index())
-        if row is not None:
-            return self.key_of(row), []
-        return None, [self.key_of(r) for r in cands]
-
-    def _by_price(self, values: dict, value) -> str | None:
-        if value is None:
-            return None
-        val = money(value) if isinstance(value, str) else float(value)
-        if not val:
-            return None
-        hits = [k for k, raw in values.items() if price_agrees(money(raw), val)]
-        return hits[0] if len(hits) == 1 else None
-
     def latest(self) -> dict[str, dict]:
-        return {k: hist[-1][1] for k, hist in self._by_key.items() if hist}
+        return {k: hist[-1][1] for k, hist in self._by_key.items()}
 
-    def _parsed(self, key: str) -> list[tuple[datetime, dict, float | None]]:
-        cached = self._parsed_cache.get(key)
-        if cached is None:
-            cached = [(t, r, money(r.get("value")))
-                     for t, r in self._by_key.get(key, ())]
-            self._parsed_cache[key] = cached
-        return cached
-
-    def at(self, name, when: datetime | None) -> Valuation | None:
-        key = self.key_for(name)
-        if not key or when is None:
+    def at(self, key, when: datetime | None) -> Valuation | None:
+        hist = self._by_key.get(key)
+        if not hist or when is None:
             return None
-        hist = self._parsed(key)
-        if not hist:
-            return None
-        prior = [(t, r, v) for t, r, v in hist if t <= when]
+        prior = [h for h in hist if h[0] <= when]
         t, r, val = prior[-1] if prior else hist[0]
         if val is None:
             return None
         return Valuation(val, r.get("observed_at", ""),
                          (when - t).total_seconds() / 3600.0,
-                         r.get("name", name))
+                         r.get("name", key))
 
-    def series(self, name) -> list[tuple[datetime, float]]:
-        key = self.key_for(name)
-        if not key:
-            return []
-        return [(t, v) for t, _r, v in self._parsed(key) if v is not None]
+    def series(self, key) -> list[tuple[datetime, float]]:
+        return [(t, v) for t, _r, v in self._by_key.get(key, ()) if v is not None]
 
-    def drift(self, name, since: datetime | None, days: float):
-        if since is None:
-            return None
-        base = self.at(name, since)
+    def drift(self, key, since: datetime | None, days: float):
+        base = self.at(key, since)
         if not base:
             return None
         target = since + timedelta(days=days)
-        later = [(t, v) for t, v in self.series(name) if t >= target]
+        later = [(t, v) for t, v in self.series(key) if t >= target]
         if not later:
             return None
         _, v = later[0]
@@ -898,14 +740,13 @@ class Market:
 LISTED_SELLER = "marketPlayerTeam"
 
 
-def market_routes(mkt: list[dict], key_of) -> tuple[dict[str, float],
-                                                    dict[str, str],
-                                                    dict[str, int]]:
+def market_routes(mkt: list[dict]) -> tuple[dict[str, float], dict[str, str],
+                                            dict[str, int]]:
     price: dict[str, float] = {}
     route: dict[str, str] = {}
     bids: dict[str, int] = {}
     for r in mkt:
-        k = key_of(r)
+        k = r["key"]
         if not k or not r.get("sale_price"):
             continue
         price[k] = float(r["sale_price"])
@@ -914,8 +755,7 @@ def market_routes(mkt: list[dict], key_of) -> tuple[dict[str, float],
     return price, route, bids
 
 
-def _pending_amounts(rows, status_field: str, money_field: str,
-                     key_of) -> dict[str, float]:
+def pending(rows, status_field: str, money_field: str) -> dict[str, float]:
     out: dict[str, float] = {}
     for r in rows:
         if (r.get(status_field) or "") != "pending":
@@ -923,20 +763,12 @@ def _pending_amounts(rows, status_field: str, money_field: str,
         amt = float(r.get(money_field) or 0)
         if not amt:
             continue
-        k = key_of(r)
+        k = r["key"]
         if k:
             out[k] = max(out.get(k, 0.0), amt)
     return out
 
 
-def pending_sent(mkt: list[dict], key_of) -> dict[str, float]:
-    return _pending_amounts(mkt, "bid_status", "bid_money", key_of)
-
-
-def pending_received(offers: list[dict], pt_to_key: dict[str, str]
-                     ) -> dict[str, float]:
-    return _pending_amounts(offers, "status", "money",
-                            lambda r: pt_to_key.get(r.get("player_team_id") or ""))
 
 
 def _selftest_cache() -> None:
@@ -1164,61 +996,19 @@ def _selftest() -> None:
            "value": "501929", "observed_at": "2026-08-19T1639Z"},
           {"ff_id": "5001", "name": "Pepelu", "team": "Valencia",
            "value": "7669774", "observed_at": "2026-08-19T1639Z"}]
-    tm = Market(tw)
+    tm = Market(tw + [dict(tw[0], value="21000000",
+                           observed_at="2026-08-20T1639Z")])
     assert len(tm) == 3, len(tm)
     assert sorted(tm.latest()) == ["12993", "5001", "867"], sorted(tm.latest())
-    rayo, villa = tm.key_for("Álvaro García", team="Rayo"), \
-        tm.key_for("Álvaro García", team="Villarreal")
-    assert (rayo, villa) == ("867", "12993"), (rayo, villa)
-    assert tm.at(rayo, snapshot_stamp("2026-08-19T1700Z")).value == 20233300.0
-    assert tm.at(villa, snapshot_stamp("2026-08-19T1700Z")).value == 501929.0
-
-    assert tm.key_for("Álvaro García") is None
-    assert tm.key_for("alvaro garcia") is None
-
-    assert tm.key_for("Álvaro García", value=20233300) == rayo
-    assert tm.key_for("Álvaro García", value=501929) == villa
-    assert tm.key_for("Álvaro García", value=9e6) is None
-    assert tm.key_for("Álvaro García", team="Elche") is None
-
-    assert tm.key_for("Pepelu") == "5001"
-    assert "5001" in tm.latest()
-    assert not [k for k in tm.latest() if "@" in k]
-
-    gone = [{"name": "Iker Munoz", "team": "Osasuna", "value": "1000000",
-             "observed_at": "2026-07-01T1000Z"},
-            {"name": "Iker Munoz", "team": "Getafe", "value": "2000000",
-             "observed_at": "2026-07-01T1000Z"},
-            {"name": "Iker Munoz", "team": "Getafe", "value": "2100000",
-             "observed_at": "2026-08-19T1639Z"}]
-    assert shared_names(gone) == set(), shared_names(gone)
-    assert shared_names(latest_only(gone)) == shared_names(gone)
-    assert row_key(gone[-1], shared_names(gone)) == norm("Iker Munoz")
-
-    rom = [{"name": "Isaac Romero", "team": "Sevilla", "value": "6023939",
-            "observed_at": "2026-08-19T1639Z"},
-           {"name": "Cristian Romero", "team": "Atletico", "value": "47546565",
-            "observed_at": "2026-08-19T1639Z"},
-           {"name": "Carlos Romero", "team": "Espanyol", "value": "42510131",
-            "observed_at": "2026-08-19T1639Z"}]
-    rm = Market(rom)
-    assert rm.key_for("C. Romero") is None
-    assert rm.key_for("C. Romero", value=45739000) == norm("Cristian Romero")
-    assert rm.key_for("C. Romero", value=45000000) is None
-    assert rm.key_for("C. Romero", value=1000) is None
-    assert rm.key_for("Isaac Romero", value=47546565) == norm("Isaac Romero")
-    assert rm.key_for("C. Romero") is None
-
-    assert tm.candidates("Pepelu") == ("5001", [])
-    got, cands = tm.candidates("Álvaro García")
-    assert got is None and sorted(cands) == ["12993", "867"], cands
-    assert rm.candidates("C. Romero")[0] is None
-    assert sorted(rm.candidates("C. Romero")[1]) == [
-        norm("Carlos Romero"), norm("Cristian Romero"),
-        norm("Isaac Romero")]
-    assert tm.candidates("Nobody At All") == (None, [])
-
-    assert rm.at("C. Romero", snapshot_stamp("2026-08-19T1700Z")) is None
+    for key, when, want in [("867", "2026-08-19T1700Z", 20233300.0),
+                            ("867", "2026-08-20T1700Z", 21000000.0),
+                            ("867", "2026-08-01T0000Z", 20233300.0),
+                            ("12993", "2026-08-19T1700Z", 501929.0)]:
+        assert tm.at(key, snapshot_stamp(when)).value == want, (key, when)
+    assert tm.at("Álvaro García", snapshot_stamp("2026-08-19T1700Z")) is None
+    assert [v for _t, v in tm.series("867")] == [20233300.0, 21000000.0]
+    assert tm.drift("867", snapshot_stamp("2026-08-19T1639Z"), 1)[0] == 766700.0
+    assert row_key({"name": "Iker Muñoz"}) == norm("Iker Munoz")
 
     mkt = [{"name": "Ane Aldea", "team": "Alavés", "position": "defensa",
             "value": "2.050.000", "delta_1d": "-12.000"},
@@ -1228,8 +1018,8 @@ def _selftest() -> None:
            "start_pct": "0.72", "status": "doubt"},
           {"player_name": "Cai Coro", "team_slug": "celta",
            "start_pct": "85", "status": "ok"}]
-    p = _merge(_merge({}, mkt, "name", MARKET_FIELDS), xi,
-               "player_name", XI_FIELDS)
+    p = _merge(_merge({}, mkt, row_key, "name", MARKET_FIELDS), xi,
+               lambda r: norm(r["player_name"]), "player_name", XI_FIELDS)
 
     a = p["ane aldea"]
     assert a["value"] == 2050000.0 and a["delta_1d"] == -12000.0
@@ -1298,17 +1088,17 @@ def _selftest() -> None:
         {"player_name": "Unjoinable", "sale_price": "1000000",
          "seller": "marketPlayerTeam"},
     ]
-    key_of = {"Free Agent": "free_agent", "Listed Rival": "listed_rival",
-             "Not Priced": "not_priced"}.get
-    price, route, bids = market_routes(
-        mkt_rows, lambda r: key_of((r.get("player_name") or "")))
+    for r, k in zip(mkt_rows, ["free_agent", "listed_rival", "not_priced",
+                               None]):
+        r["key"] = k
+    price, route, bids = market_routes(mkt_rows)
     assert price == {"free_agent": 5000000.0, "listed_rival": 8000000.0}, price
     assert route == {"free_agent": "free", "listed_rival": "listed"}, route
     assert bids == {"free_agent": 0, "listed_rival": 2}, bids
     assert "not_priced" not in route and "not_priced" not in price
     unknown_seller = [{"player_name": "Free Agent", "sale_price": "1",
-                       "seller": "something_new"}]
-    _, r2, _ = market_routes(unknown_seller, lambda r: "free_agent")
+                       "seller": "something_new", "key": "free_agent"}]
+    _, r2, _ = market_routes(unknown_seller)
     assert r2 == {"free_agent": "free"}, r2
 
     summer = datetime(2026, 9, 18, 16, 40, tzinfo=timezone.utc)
@@ -1328,23 +1118,15 @@ def _selftest() -> None:
         {"player_name": "A", "bid_status": "pending", "bid_money": "5100000"},
         {"player_name": "", "bid_status": "pending", "bid_money": "9000000"},
     ]
-    sent = pending_sent(mkt_bids, lambda r: r["player_name"])
+    sent = pending([dict(r, key=r["player_name"]) for r in mkt_bids],
+                   "bid_status", "bid_money")
     assert sent == {"A": 5600000.0, "B": 6795815.0}, sent
-    assert sum(sent.values()) == 5600000.0 + 6795815.0
-    assert pending_sent([], lambda r: "x") == {}
-
-    p2k = {"pt1": "me_a", "pt2": "me_b"}
-    offers = [
-        {"player_team_id": "pt1", "status": "pending", "money": "6795815"},
-        {"player_team_id": "pt1", "status": "pending", "money": "1000000"},
-        {"player_team_id": "pt2", "status": "accepted", "money": "9000000"},
-        {"player_team_id": "pt2", "status": "", "money": ""},
-        {"player_team_id": "unknown", "status": "pending", "money": "1"},
-    ]
-    got = pending_received(offers, p2k)
-    assert got == {"me_a": 6795815.0}, got
-    assert pending_received([], p2k) == {}
-    assert pending_received(offers, {}) == {}
+    assert pending([], "bid_status", "bid_money") == {}
+    offers = [{"key": k, "status": st, "money": m} for k, st, m in [
+        ("me_a", "pending", "6795815"), ("me_a", "pending", "1000000"),
+        ("me_b", "accepted", "9000000"), ("me_b", "", ""),
+        (None, "pending", "1")]]
+    assert pending(offers, "status", "money") == {"me_a": 6795815.0}
 
     jl_matches = [{"match_id": "1", "jornada": "1", "home": "alaves",
                   "away": "getafe", "score": "3-0"},

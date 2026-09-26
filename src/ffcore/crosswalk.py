@@ -5,9 +5,8 @@ import csv
 import os
 from dataclasses import dataclass, field
 
-from ffcore.parse import money
 from ffcore.text import norm
-from ffcore.tidy import price_agrees, write_csv
+from ffcore.tidy import write_csv
 
 __all__ = ["Player", "Club", "Crosswalk", "PLAYER_COLS", "CLUB_COLS",
           "club_key"]
@@ -75,16 +74,8 @@ class Crosswalk:
     def __init__(self, players=None, clubs=None):
         self.players: dict[str, Player] = dict(players or {})
         self.clubs: dict[str, Club] = dict(clubs or {})
-        self._market = None
-        self._index: list = []
         self._reindex()
 
-    def attach_market(self, market) -> None:
-        if market is self._market:
-            return
-        from ffcore.tidy import latest_only
-        self._market = market
-        self._index = latest_only(market.rows) if market is not None else []
 
     def _reindex(self) -> None:
         self._by_ff, self._by_af, self._by_app = {}, {}, {}
@@ -163,49 +154,6 @@ class Crosswalk:
                            name=r.get("player_name_full")
                            or r.get("player_name"))
 
-    def resolve(self, raw="", *, hint_app_id="", hint_ff_slug="",
-                hint_af_slug="", hint_club="", hint_price=None,
-                hint_full="", handle="", ledger_owner=None) -> str | None:
-        market, index = self._market, self._index
-        ledger_owner = ledger_owner or {}
-        raw = (raw or "").strip()
-        if raw.isdigit():
-            return raw
-        hint_app_id = (hint_app_id or "").strip()
-        hint_ff_slug = (hint_ff_slug or "").strip()
-        hint_af_slug = (hint_af_slug or "").strip()
-        if hint_app_id or hint_ff_slug or hint_af_slug:
-            got = self.player(app_id=hint_app_id or None,
-                              ff_slug=hint_ff_slug or None,
-                              af_slug=hint_af_slug or None)
-            if got and _priced_like(got, "", hint_price, index):
-                return got
-        if market is not None:
-            for candidate in (raw, (hint_full or "").strip()):
-                if not candidate:
-                    continue
-                key = market.key_for(candidate, team=hint_club,
-                                     value=hint_price)
-                if key and _priced_like(key, candidate, hint_price, index):
-                    return key
-            if ledger_owner and raw:
-                _got, cands = market.candidates(raw)
-                agreed = [c for c in cands if ledger_owner.get(c) == handle]
-                if len(agreed) == 1:
-                    return agreed[0]
-            if hint_price not in (None, ""):
-                try:
-                    want = float(hint_price)
-                except (TypeError, ValueError):
-                    want = None
-                if want:
-                    hits = set(_value_index(market).get(want, ()))
-                    hits.discard("")
-                    if len(hits) == 1:
-                        return next(iter(hits))
-        if raw:
-            return self.player(app_name=raw) or self.player(name=raw)
-        return None
 
     def club(self, *, ff_slug=None, name=None) -> str | None:
         if ff_slug and ff_slug in self._club_ff:
@@ -252,39 +200,6 @@ class Crosswalk:
         write_csv(clubs_path, [c.row() for c in sorted(
             self.clubs.values(), key=lambda c: c.club_id)], CLUB_COLS)
 
-    def merge(self, other: "Crosswalk") -> "Crosswalk":
-        for pid, p in other.players.items():
-            for f in ("app_id", "ff_slug", "af_slug", "understat_id"):
-                val = getattr(p, f)
-                if not val:
-                    continue
-                for cur in self.players.values():
-                    if cur.player_id != pid and getattr(cur, f) == val:
-                        setattr(cur, f, "")
-            if p.app_names:
-                fresh = {norm(n) for n in p.app_names}
-                for cur in self.players.values():
-                    if cur.player_id != pid and cur.app_names:
-                        cur.app_names = {n for n in cur.app_names
-                                         if norm(n) not in fresh}
-            if pid in self.players:
-                self.players[pid].absorb(p)
-            else:
-                self.players[pid] = p
-        for cid, c in other.clubs.items():
-            cur = self.clubs.get(cid)
-            if cur is None:
-                self.clubs[cid] = c
-            else:
-                cur.market = cur.market or c.market
-                cur.ff_slug = cur.ff_slug or c.ff_slug
-                cur.elo = cur.elo or c.elo
-                cur.market_id = cur.market_id or c.market_id
-                cur.af_id = cur.af_id or c.af_id
-                cur.aliases |= c.aliases
-        self._reindex()
-        return self
-
 
 def club_key(raw, teams, xw=None) -> str:
     if xw is not None:
@@ -294,39 +209,6 @@ def club_key(raw, teams, xw=None) -> str:
     from ffcore.fixture import match_team
     hit = match_team(raw or "", teams)
     return norm(hit) if hit else ""
-
-
-def _priced_like(key: str, raw: str, market_value, index) -> bool:
-    if not key or key == norm(raw):
-        return True
-    if market_value in (None, ""):
-        return True
-    try:
-        theirs = float(str(market_value).strip())
-    except (TypeError, ValueError):
-        return True
-    ours = next((money(r.get("value")) for r in (index or [])
-                 if norm(r.get("name")) == key), None)
-    if not ours:
-        return True
-    return price_agrees(theirs, ours)
-
-
-_VALUE_INDEX: dict[int, tuple[int, dict]] = {}
-
-
-def _value_index(market) -> dict:
-    hit = _VALUE_INDEX.get(id(market))
-    if hit is None or hit[0] != len(market.rows):
-        idx: dict[float, set] = {}
-        for row in market.rows:
-            try:
-                idx.setdefault(float(row.get("value")), set()).add(
-                    market.key_of(row))
-            except (TypeError, ValueError):
-                continue
-        hit = _VALUE_INDEX[id(market)] = (len(market.rows), idx)
-    return hit[1]
 
 
 def _rows(path) -> list[dict]:
@@ -368,47 +250,12 @@ def _selftest() -> None:
     assert solo.player(app_id="2614") == "carlos romero"
     assert solo.clashes() == {}
 
-    stale = Crosswalk({"isaac romero": Player("isaac romero", app_id="2614"),
-                       "carlos romero": Player("carlos romero")})
-    fixed = Crosswalk({"carlos romero": Player("carlos romero",
-                                               app_id="2614")})
-    stale.merge(fixed)
-    assert stale.players["isaac romero"].app_id == ""
-    ghost = Crosswalk({
-        "moussa diarra@malaga": Player("moussa diarra@malaga",
-                                       ff_slug="moussa-diarra"),
-        "moussa diarra": Player("moussa diarra")})
-    ghost.merge(Crosswalk({"moussa diarra": Player("moussa diarra",
-                                                   ff_slug="moussa-diarra")}))
-    assert ghost.players["moussa diarra@malaga"].ff_slug == ""
-    assert ghost.player(ff_slug="moussa-diarra") == "moussa diarra"
-    assert ghost.clashes() == {}
-    assert stale.player(app_id="2614") == "carlos romero"
-    assert stale.clashes() == {}
-    st2 = Crosswalk({"isaac romero": Player("isaac romero",
-                                            app_names={"C. Romero"}),
-                     "carlos romero": Player("carlos romero")})
-    st2.merge(Crosswalk({"carlos romero": Player("carlos romero",
-                                                 app_names={"C. Romero"})}))
-    assert st2.players["isaac romero"].app_names == set()
-    assert st2.player(app_name="C. Romero") == "carlos romero"
-
     assert xw.club(ff_slug="rayo-vallecano") == "rayo"
     assert xw.club(name="Rayo") == "rayo"
     assert xw.club(name="Rayo Vallecano") == "rayo"
     assert xw.club(name="Bilbao") == "athletic"
     assert xw.club(name="Athletic Club") == "athletic"
     assert xw.club(name="Nowhere FC") is None
-
-    thin = Crosswalk({"alvaro fernandez": Player("alvaro fernandez")})
-    thin.merge(xw)
-    assert thin.player(app_id="2101") == "alvaro fernandez"
-    back = Crosswalk({"alvaro fernandez": Player("alvaro fernandez")})
-    xw.merge(back)
-    assert xw.players["alvaro fernandez"].ff_slug == "alvaro-fernandez"
-    assert xw.players["alvaro fernandez"].app_names == {"A. Ferllo"}
-    xw.merge(Crosswalk({"new man": Player("new man", "New Man")}))
-    assert xw.player(name="New Man") == "new man"
 
     import tempfile
     with tempfile.TemporaryDirectory() as d:
@@ -422,58 +269,8 @@ def _selftest() -> None:
         assert Crosswalk.read(os.path.join(d, "nope.csv"), cc).players == {}
 
     cov = xw.coverage()
-    assert cov["players"] == 3 and cov["clubs"] == 2
-    assert 0.0 < cov["ff"] < 1.0
-
-    from ffcore.tidy import Market
-
-    ag = Market([
-        {"ff_id": "867", "name": "Álvaro García", "team": "Rayo",
-         "value": "20233300", "observed_at": "2026-08-19T1639Z"},
-        {"ff_id": "12993", "name": "Álvaro García", "team": "Villarreal",
-         "value": "501929", "observed_at": "2026-08-19T1639Z"}])
-    rm = Market([
-        {"ff_id": "1", "name": "Isaac Romero", "team": "Sevilla",
-         "value": "6023939", "observed_at": "2026-08-19T1639Z"},
-        {"ff_id": "2", "name": "Cristian Romero", "team": "Atletico",
-         "value": "47546565", "observed_at": "2026-08-19T1639Z"},
-        {"ff_id": "3", "name": "Carlos Romero", "team": "Espanyol",
-         "value": "42510131", "observed_at": "2026-08-19T1639Z"}])
-    nick = Market([{"ff_id": "9", "name": "Pepelu", "team": "Valencia",
-                    "value": "7669774", "observed_at": "2026-08-19T1639Z"}])
-    jc = Market([{"ff_id": "77", "name": "Jonny Castro", "team": "Alaves",
-                 "value": "5602302", "observed_at": "2026-08-19T1639Z"}])
-    moved = Crosswalk({"manu fernandez": Player(
-        "manu fernandez", "Manu Fernandez", app_names={"Manuel Fernández"})})
-    elsewhere = Crosswalk({"someone else": Player("someone else", app_id="9")})
-    slugged = Crosswalk({"alvaro fernandez": Player(
-        "alvaro fernandez", ff_slug="alvaro-slug", af_slug="af-alvaro")})
-    cases = [
-        (xw, None, "2101", {}, "2101"),
-        (xw, ag, "Álvaro García", {}, None),
-        (xw, ag, "Álvaro García", {"hint_club": "Rayo"}, "867"),
-        (xw, ag, "Álvaro García", {"hint_price": 501929}, "12993"),
-        (xw, rm, "C. Romero", {}, None),
-        (xw, rm, "C. Romero", {"hint_price": 45739000}, "2"),
-        (xw, nick, "nobody knows this nickname", {}, None),
-        (xw, nick, "nobody knows this nickname", {"hint_full": "Pepelu"}, "9"),
-        (moved, None, "Manuel Fernández", {}, "manu fernandez"),
-        (moved, Market([]), "Manuel Fernández", {}, "manu fernandez"),
-        (xw, None, "Absolutely Nobody", {}, None),
-        (xw, None, "", {}, None),
-        (elsewhere, jc, "Jonny Castro", {"hint_app_id": "9"}, "someone else"),
-        (elsewhere, jc, "Jonny Castro", {}, "77"),
-        (slugged, None, "whatever a page called him",
-         {"hint_ff_slug": "alvaro-slug"}, "alvaro fernandez"),
-        (slugged, None, "whatever a page called him",
-         {"hint_af_slug": "af-alvaro"}, "alvaro fernandez"),
-        (slugged, None, "Alvaro Fernandez", {"hint_ff_slug": "no-such-slug"},
-         "alvaro fernandez"),
-    ]
-    for cw, market, raw, hints, expected in cases:
-        cw.attach_market(market)
-        got = cw.resolve(raw, **hints)
-        assert got == expected, (raw, hints, expected, got)
+    assert cov["players"] == 2 and cov["clubs"] == 2
+    assert cov["ff"] == 1.0, cov
 
     named = Crosswalk({
         "867": Player("867", "Álvaro García", ff_slug="alvaro-garcia"),
@@ -503,13 +300,6 @@ def _selftest() -> None:
         "isaac romero": Player("isaac romero", understat_id="9")})
     assert us_clash.player(understat_id="9") is None
     assert us_clash.clashes() == {"understat_id": ["9"]}
-    us_stale = Crosswalk({"isaac romero": Player("isaac romero",
-                                                  understat_id="9"),
-                          "carlos romero": Player("carlos romero")})
-    us_stale.merge(Crosswalk({"carlos romero": Player(
-        "carlos romero", understat_id="9")}))
-    assert us_stale.players["isaac romero"].understat_id == ""
-    assert us_stale.player(understat_id="9") == "carlos romero"
     with tempfile.TemporaryDirectory() as d:
         pp, cc = os.path.join(d, "p2.csv"), os.path.join(d, "c2.csv")
         us.write(pp, cc)

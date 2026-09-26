@@ -146,7 +146,7 @@ def sec_drift(dl, market) -> list[str]:
     out = ["## What a deal did to the price", ""]
     rows = []
     for d in dl:
-        drifts = [market.drift(d["player"], d["when"], h) for h in HORIZONS]
+        drifts = [market.drift(d["key"], d["when"], h) for h in HORIZONS]
         if any(x is not None for x in drifts):
             rows.append((d, drifts))
     if not rows:
@@ -234,13 +234,6 @@ def write_league(lg, players, stamp, second=None,
         out += ["## Ledger warnings", ""] + ["- " + w for w in lg.warnings]
         out.append("")
 
-    if lg.resolved:
-        out += ["## Names the ledger did not spell exactly", "",
-                "Placed by who the counterparty was, or by what the price "
-                "implies. The ledger is generated — a wrong player here is "
-                "fixed in `inputs/rosters_initial.txt`.", ""]
-        out += ["- " + r for r in lg.resolved] + [""]
-
     unmatched = lg.unmatched(players)
     if unmatched:
         out += ["## Unmatched names", "",
@@ -269,7 +262,7 @@ def main():
     print("replayed %d transaction(s)" % len(lg.txns))
     players = stale_owned_players(players, lg.owner, lg.market)
 
-    on_offer, unresolved = read_slate(lg.market, xw=lg.xw)
+    on_offer, unresolved = read_slate(lg.xw)
     if on_offer or unresolved:
         print("slate: %d on offer, %d unjoined"
               % (len(on_offer), len(unresolved)))

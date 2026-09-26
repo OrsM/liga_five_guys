@@ -6,11 +6,10 @@ import sys
 
 from ffcore import schema
 from ffcore.crosswalk import Club, Crosswalk, Player
-from ffcore.text import norm
-from ffcore.tidy import (TIDY, load, load_fixtures, newest,
-                         load_lineups_latest, load_market_latest,
-                         narrow_by_club, read_csv, row_key,
-                         shared_names)
+from ffcore.parse import money
+from ffcore.text import norm, tokens
+from ffcore.tidy import (TIDY, load_fixtures, load_lineups, newest,
+                         load_market_latest, read_csv, row_key)
 
 PLAYERS = "players.csv"
 CLUBS = "clubs.csv"
@@ -62,15 +61,6 @@ def build_clubs(market, lineups, elo_rows, fixtures=()) -> dict:
     return clubs
 
 
-def namesakes(market) -> list[tuple[str, list]]:
-    seen: dict[str, set] = {}
-    for r in market:
-        key = norm(r.get("name"))
-        if key:
-            seen.setdefault(key, set()).add(schema.text(r, schema.MARKET.TEAM))
-    return sorted((k, sorted(v)) for k, v in seen.items() if len(v) > 1)
-
-
 def group_by_name(players) -> dict[str, list]:
     out: dict[str, list] = {}
     for p in players:
@@ -78,98 +68,71 @@ def group_by_name(players) -> dict[str, list]:
     return out
 
 
-def build_players(market, lineups, starters, api_rows, lg, clubs) -> dict:
+def _named(named: dict, name: str, club: str = ""):
+    hits = named.get(norm(name)) or []
+    if len(hits) != 1 and club:
+        hits = [p for p in hits if p.club_id == club]
+    return hits[0] if len(hits) == 1 else None
 
-    by_club = {c.ff_slug: c.club_id for c in clubs.values() if c.ff_slug}
-    ff_to_market = {c.ff_slug: norm(c.market) for c in clubs.values()
-                    if c.ff_slug and c.market}
-    market_shared = shared_names(market)
-    out: dict[str, Player] = {}
-    club_of: dict[str, str] = {}
+
+def build_players(registry: dict, market, lineups, api_rows, clubs) -> dict:
+    club_of_slug = {c.ff_slug: c.club_id for c in clubs.values() if c.ff_slug}
+    out = dict(registry)
     for r in market:
-        pid = row_key(r, market_shared)
+        pid = row_key(r)
         if not pid:
             continue
-        out[pid] = Player(pid, schema.text(r, schema.MARKET.NAME),
-                          norm(r.get("team")))
-        club_of[pid] = norm(r.get("team"))
-
-    shared = group_by_name(out.values())
-
-    def by_name(name: str, team_slug: str = ""):
-        hits = shared.get(norm(name)) or []
-        if len(hits) == 1:
-            return hits[0]
-        want = ff_to_market.get((team_slug or "").strip())
-        return narrow_by_club(hits, want, lambda p: club_of.get(p.player_id))
+        p = out.setdefault(pid, Player(pid))
+        p.name = schema.text(r, schema.MARKET.NAME) or p.name
+        p.club_id = norm(r.get("team")) or p.club_id
+    named = group_by_name(out.values())
 
     for r in lineups:
-        pid = by_name(r.get("player_name"), r.get("team_slug"))
         slug = schema.text(r, schema.LINEUPS.PLAYER_SLUG)
-        if pid is None or not slug:
-            continue
-        wide = schema.text(r, schema.LINEUPS.SOURCE).startswith("futbol")
-        if wide and not pid.ff_slug:
-            pid.ff_slug = slug
-        elif not wide and not pid.af_slug:
-            pid.af_slug = slug
-        if not pid.club_id and r.get("team_slug") in by_club:
-            pid.club_id = by_club[r["team_slug"]]
+        p = _named(named, r.get("player_name"),
+                   club_of_slug.get(r.get("team_slug") or "", ""))
+        field = ("af_slug" if schema.text(r, schema.LINEUPS.SOURCE)
+                 == "analitica" else "ff_slug")
+        if p is not None and slug and not getattr(p, field):
+            setattr(p, field, slug)
 
-    ff_index = {p.ff_slug: p for p in out.values() if p.ff_slug}
-    for r in starters:
-        slug = schema.text(r, schema.STARTERS.PLAYER_SLUG)
-        if slug in ff_index:
+    value = {row_key(r): money(r.get("value")) for r in market}
+    app = {schema.text(r, schema.API_TEAMS.PLAYER_ID): r for r in api_rows}
+    words = {pid: set(tokens(p.name)) for pid, p in out.items()}
+    weak = set()
+    for pid, p in out.items():
+        r = app.get(p.app_id)
+        if r is None:
             continue
-        p = by_name(r.get("player_name"), r.get("team_slug"))
-        if p is not None and slug and not p.ff_slug:
-            p.ff_slug = slug
+        ratio = ((money(r.get("market_value")) or 0) / value[pid]
+                 if value.get(pid) else 1.0)
+        related = {w[:4] for w in words[pid]} & {
+            w[:4] for w in tokens(r.get("player_name"))}
+        if not (0.8 < ratio < 1.25 or (related and 0.5 < ratio < 2.0)):
+            p.app_id = ""
+        elif not related:
+            weak.add(pid)
 
-    known = Crosswalk.read(TIDY / "players.csv", TIDY / "clubs.csv")
-    known.attach_market(lg.market if lg else None)
-    for r in api_rows:
-        raw = schema.text(r, schema.API_TEAMS.PLAYER_NAME)
-        if not raw:
+    held = {p.app_id for p in out.values() if p.app_id}
+    for app_id, r in app.items():
+        theirs = money(r.get("market_value"))
+        if not app_id or app_id in held or not theirs:
             continue
-        key = known.resolve(raw, handle=schema.text(r, schema.API_TEAMS.MANAGER),
-                           ledger_owner=lg.owner if lg else None,
-                           hint_price=r.get("market_value"),
-                           hint_full=r.get("player_name_full") or "",
-                           hint_app_id=r.get("player_id") or "")
-        p = out.get(key) if key else None
-        if p is None:
-            p = by_name(raw)
-        if p is None:
-            continue
-        for other in out.values():
-            if other is not p:
-                other.app_names = {n for n in other.app_names
-                                   if norm(n) != norm(raw)}
-        p.app_names.add(raw)
-        pid = schema.text(r, schema.API_TEAMS.PLAYER_ID)
-        if not pid:
-            continue
-        for other in out.values():
-            if other is not p and other.app_id == pid:
-                other.app_id = ""
-        p.app_id = pid
+        theirs_words = [set(tokens(n)) for n in (r.get("player_name"),
+                                                 r.get("player_name_full"))
+                        if n]
+        hits = [pid for pid in value
+                if (not out[pid].app_id or pid in weak) and value[pid]
+                and 0.8 < theirs / value[pid] < 1.25
+                and any(w and (w <= words[pid] or words[pid] <= w)
+                        for w in theirs_words)]
+        if len(hits) == 1:
+            weak.discard(hits[0])
+            held.discard(out[hits[0]].app_id)
+            out[hits[0]].app_id = app_id
+            out[hits[0]].app_names.add(schema.text(r, schema.API_TEAMS.PLAYER_NAME))
+            held.add(app_id)
     return out
-
-
-def attach_bulk_app_ids(rows, players: dict) -> int:
-    by_name = group_by_name(players.values())
-    matched = 0
-    for r in rows:
-        name = schema.text(r, schema.API_PLAYERS_ALL.PLAYER_NAME)
-        pid = schema.text(r, schema.API_PLAYERS_ALL.PLAYER_ID)
-        if not name or not pid:
-            continue
-        hits = by_name.get(norm(name)) or []
-        if len(hits) != 1 or hits[0].app_id:
-            continue
-        hits[0].app_id = pid
-        matched += 1
-    return matched
 
 
 def build_understat_ids(rows, players: dict, clubs: dict) -> int:
@@ -207,96 +170,34 @@ def build_understat_ids(rows, players: dict, clubs: dict) -> int:
 
 
 def main() -> None:
-    from ffcore.league import League
-
     market = load_market_latest()
-    lineups = load_lineups_latest(source="")
-    starters = load("starters")
-    api_rows = (newest("api_teams.csv") + newest("api_market.csv")
-                + newest("api_players.csv") + newest("api_players_all.csv"))
-    elo_rows = read_csv(TIDY / "elo.csv")
-    lg = League.load()
-
-    market_ids = {schema.text(r, schema.MARKET.FF_ID) for r in load("market")
-                  if schema.text(r, schema.MARKET.FF_ID)}
-
-    clubs = build_clubs(market, lineups, elo_rows, load_fixtures())
-    players = build_players(market, lineups, starters, api_rows, lg, clubs)
+    lineups = load_lineups("") + list(read_csv(TIDY / "starters.csv"))
+    registry = Crosswalk.read(TIDY / PLAYERS, TIDY / CLUBS)
+    clubs = build_clubs(market, lineups, read_csv(TIDY / "elo.csv"),
+                        load_fixtures())
+    players = build_players(
+        registry.players, market, lineups,
+        newest("api_teams.csv") + newest("api_market.csv")
+        + newest("api_players.csv") + newest("api_players_all.csv"), clubs)
     understat_matched = build_understat_ids(
         read_csv(TIDY / "understat_players.csv"), players, clubs)
+    xw = Crosswalk(players, clubs)
+    xw.write(TIDY / PLAYERS, TIDY / CLUBS)
 
-    fresh = Crosswalk(players, clubs)
-    kept = Crosswalk.read(TIDY / PLAYERS, TIDY / CLUBS)
-    doubled = {norm(p.name) for p in players.values()
-               if "@" in p.player_id}
-    dropped = [k for k in list(kept.players) if k in doubled]
-    for k in dropped:
-        del kept.players[k]
-    kept.merge(fresh)
-
-    live = {k: pl for k, pl in kept.players.items() if k in market_ids}
-    by_name = {}
-    for k, pl in live.items():
-        by_name.setdefault(norm(pl.name), k)
-    moved, dropped_ghosts = 0, []
-    for k, pl in list(kept.players.items()):
-        if k in market_ids:
-            continue
-        target = live.get(by_name.get(k, ""))
-        if target is not None:
-            for f in ("ff_slug", "af_slug", "app_id"):
-                if getattr(pl, f) and not getattr(target, f):
-                    setattr(target, f, getattr(pl, f))
-                    moved += 1
-            target.app_names |= pl.app_names
-        dropped_ghosts.append(k)
-        del kept.players[k]
-
-    bulk_matched = attach_bulk_app_ids(
-        read_csv(TIDY / "api_players_all.csv"), kept.players)
-
-    kept._reindex()
-    kept.write(TIDY / PLAYERS, TIDY / CLUBS)
-    if dropped_ghosts:
-        print("  dropped %d row(s) keyed the old way, after moving %d "
-              "identifier(s) onto the live row"
-              % (len(dropped_ghosts), moved))
-
-    c = kept.coverage()
-    print("wrote %s and %s" % (TIDY / PLAYERS, TIDY / CLUBS))
-    if dropped:
-        print("  dropped %d key(s) that two players answered to: %s"
-              % (len(dropped), ", ".join(sorted(dropped))))
-    print("%d players, %d clubs — %.0f%% carry a probable-XI slug, "
-          "%.0f%% the second source's, %.0f%% an app id (%d off-market "
-          "this run), %.0f%% an understat id (%d newly matched this run)"
-          % (c["players"], c["clubs"], 100 * c["ff"], 100 * c["af"],
-             100 * c["app"], bulk_matched, 100 * c["understat"],
-             understat_matched))
-    twins = namesakes(market)
-    if twins:
-        print("  %d name(s) belong to two players; the ids tell them apart: %s"
-              % (len(twins), ", ".join(k for k, _ in twins)))
-
-    clashes = kept.clashes()
-    if clashes:
-        print("  warn: an identifier two players claim identifies neither, "
-              "and these are refused until it is resolved:")
-        for idx, ids in clashes.items():
-            print("    %-12s %s" % (idx, ", ".join(ids)))
+    c = xw.coverage()
+    print("wrote %s and %s: %d players (%d new), %d clubs — %.0f%% carry a "
+          "probable-XI slug, %.0f%% the second source's, %.0f%% an app id, "
+          "%.0f%% an understat id (%d newly matched this run)"
+          % (TIDY / PLAYERS, TIDY / CLUBS, c["players"],
+             len(players) - len(registry.players), c["clubs"],
+             100 * c["ff"], 100 * c["af"], 100 * c["app"],
+             100 * c["understat"], understat_matched))
+    for idx, ids in xw.clashes().items():
+        print("  warn: %s claimed by two players, refused until resolved: %s"
+              % (idx, ", ".join(ids)))
 
 
 def _selftest() -> None:
-    twins = namesakes([{"name": "Álvaro García", "team": "Villarreal"},
-                       {"name": "Alvaro Garcia", "team": "Rayo"},
-                       {"name": "Pablo Fornals", "team": "Betis"},
-                       {"name": "Pablo Fornals", "team": "Betis"}])
-    assert twins == [("alvaro garcia", ["Rayo", "Villarreal"])], twins
-    assert namesakes([{"name": "A", "team": "X"}, {"name": "A", "team": "X"}]) == []
-    assert namesakes([]) == []
-    assert namesakes([{"name": "", "team": "X"}, {"name": "", "team": "Y"}]) == []
-
-
     market = [{"name": "Álvaro Fernández", "slug": "alvaro-fernandez-m",
                "team": "Espanyol"},
               {"name": "Jonny Castro", "slug": "jonny-castro-m",
@@ -315,65 +216,37 @@ def _selftest() -> None:
     assert set(clubs) == {"espanyol", "alaves"}, clubs
     assert clubs["espanyol"].ff_slug == "espanyol"
 
-    players = build_players(market, lineups, starters, [], None, clubs)
+    players = build_players({}, market, lineups + starters, [], clubs)
     xw = Crosswalk(players, clubs)
-    assert xw.player(name="Alvaro Fernandez") == "alvaro fernandez"
-    assert xw.player(ff_slug="alvaro-fdez") == "alvaro fernandez"
-    assert xw.player(af_slug="af-alvaro") == "alvaro fernandez"
-    assert xw.player(ff_slug="jonny-castro-ff") == "jonny castro"
+    for ids, want in [({"name": "Alvaro Fernandez"}, "alvaro fernandez"),
+                      ({"ff_slug": "alvaro-fdez"}, "alvaro fernandez"),
+                      ({"af_slug": "af-alvaro"}, "alvaro fernandez"),
+                      ({"ff_slug": "jonny-castro-ff"}, "jonny castro"),
+                      ({"app_id": "9999"}, None)]:
+        assert xw.player(**ids) == want, (ids, xw.player(**ids))
     assert players["alvaro fernandez"].club_id == "espanyol"
 
-    assert xw.player(app_id="9999") is None
-
-    from ffcore.league import Config, League
-    from ffcore.tidy import Market as _RealMarket
-
-    bulk_mkt = _RealMarket([{"name": "Hugo Duro", "team": "Espanyol",
-                             "value": "8534068",
-                             "observed_at": "2026-08-01T0000Z"}])
-    bulk_lg = League(Config(me="nobody", budget=100e6), {}, [], bulk_mkt)
-    bulk_market_rows = [{"name": "Hugo Duro", "slug": "hugo-duro",
-                        "team": "Espanyol"}]
-    bulk_clubs = build_clubs(bulk_market_rows, [], [])
-    bulk_players = build_players(
-        bulk_market_rows, [], [],
-        [{"player_name": "Hugo Duro", "market_value": "8534068",
-          "player_id": "99999999"}],
-        bulk_lg, bulk_clubs)
-    assert bulk_players["hugo duro"].app_id == "99999999", bulk_players
-
-    stale_market_rows = [{"name": "Alex Sancris", "slug": "alex-sancris",
-                          "team": "Getafe"}]
-    stale_clubs = build_clubs(stale_market_rows, [], [])
-    stale_lg = League(Config(me="nobody", budget=100e6), {}, [],
-                      _RealMarket([{"name": "Someone Else", "team": "Getafe",
-                                   "value": "500000",
-                                   "observed_at": "2026-08-01T0000Z"}]))
-    stale_players = build_players(
-        stale_market_rows, [], [],
-        [{"player_name": "Alex Sancris", "market_value": "551012",
-          "player_id": "11766"}],
-        stale_lg, stale_clubs)
-    assert stale_players["alex sancris"].app_id == "11766", stale_players
-
-    ghost = Player("11766", "Alex Sancris", "getafe")
-    ghost_players = {"11766": ghost}
-    n = attach_bulk_app_ids(
-        [{"player_name": "Álex Sancris", "player_id": "2778"}],
-        ghost_players)
-    assert n == 1, n
-    assert ghost.app_id == "2778", ghost
-    ghost.app_id = "already-known"
-    assert attach_bulk_app_ids(
-        [{"player_name": "Álex Sancris", "player_id": "2778"}],
-        ghost_players) == 0
-    assert ghost.app_id == "already-known", ghost
-    twin_a, twin_b = Player("a", "Pablo Fornals", "betis"), \
-                     Player("b", "Pablo Fornals", "villarreal")
-    twins = {"a": twin_a, "b": twin_b}
-    assert attach_bulk_app_ids(
-        [{"player_name": "Pablo Fornals", "player_id": "999"}], twins) == 0
-    assert twin_a.app_id == "" and twin_b.app_id == "", (twin_a, twin_b)
+    twins = [{"name": "Pablo Fornals", "team": "Betis", "ff_id": "a",
+              "value": "5000000"},
+             {"name": "Pablo Fornals", "team": "Villarreal", "ff_id": "b",
+              "value": "9000000"},
+             {"name": "Fermin Lopez", "team": "Barcelona", "ff_id": "c",
+              "value": "100000000"}]
+    api = [{"player_name": "Fermín", "player_id": "1715",
+            "market_value": "108000000"},
+           {"player_name": "Fer López", "player_id": "2929",
+            "market_value": "15000000"},
+           {"player_name": "Pablo Fornals", "player_id": "12",
+            "market_value": "5100000"},
+           {"player_name": "Fornals", "player_id": "99",
+            "market_value": "40000000"}]
+    got = build_players({"c": Player("c", app_id="2929"),
+                         "gone": Player("gone", "Left The League")},
+                        twins, [], api, build_clubs(twins, [], []))
+    assert {k: p.app_id for k, p in got.items()} == \
+        {"a": "12", "b": "", "c": "1715", "gone": ""}, got
+    assert got["c"].app_names == {"Fermín"}, got["c"]
+    assert got["b"].name == "Pablo Fornals" and got["b"].club_id == "villarreal"
 
     understat = [
         {"understat_id": "701", "player_name": "Alvaro Fernandez",

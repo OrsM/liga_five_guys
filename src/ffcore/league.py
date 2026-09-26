@@ -3,8 +3,6 @@ from __future__ import annotations
 
 import math
 import configparser
-import pathlib
-import re
 import os
 import sys
 from dataclasses import dataclass, field
@@ -16,22 +14,17 @@ from ffcore import schema
 from ffcore.parse import money
 from ffcore.tidy import shown
 from ffcore.text import norm
-from ffcore.tidy import (load_crosswalk,
-                         run_now,
-                         Market, input_path, ledger_stamp,
-                         load_api, load_api_activity,
-                         load, load_market_frozen,
-                         read_ledger, snapshot_stamp)
+from ffcore.tidy import (load_crosswalk, run_now, Market, input_path,
+                         ledger_stamp, load_api, load_api_activity, load,
+                         load_market_frozen, newest, read_ledger,
+                         snapshot_stamp)
 
-__all__ = ["MARKET", "Config", "load_config", "read_rosters", "identify",
-           "read_api_balances", "owner_from_api", "owner_drift",
-           "app_ids_known", "app_fielded", "flat_income", "bonus_income",
-           "allowance",
-           "replay", "Cash", "Manager", "League"]
+__all__ = ["MARKET", "Config", "load_config", "read_api_balances",
+           "app_fielded", "flat_income", "bonus_income", "allowance",
+           "Cash", "Manager", "League"]
 
 MARKET = "market"
 
-PLAUSIBLE = 2.0
 
 DEFAULTS = {
     "me": "miguel_autentico",
@@ -79,62 +72,9 @@ def load_config(name: str = "league.ini") -> Config:
     return cfg
 
 
-def _comment_stripped_lines(path) -> list[str] | None:
-    if not path.exists():
-        return None
-    out = []
-    for raw in path.read_text(encoding="utf-8").splitlines():
-        line = raw.split("#", 1)[0].strip()
-        if line:
-            out.append(line)
-    return out
-
-
-def read_rosters(name: str = "rosters_initial.txt") -> dict[str, list[str]]:
-    path = input_path(name)
-    lines = _comment_stripped_lines(path)
-    if lines is None:
-        raise SystemExit("missing %s" % path)
-    rosters, current = {}, None
-    for line in lines:
-        if line.startswith("[") and line.endswith("]"):
-            current = line[1:-1].strip()
-            rosters.setdefault(current, [])
-        elif current:
-            m = _ROSTER_CLUB.match(line)
-            if m:
-                line = "%s@%s" % (norm(m.group(1)), norm(m.group(2)))
-            rosters[current].append(line)
-    return rosters
-
-
-_ROSTER_CLUB = re.compile(r"^(.*?)\s*\(([^)]+)\)\s*$")
-
-
-def read_balances(name: str = "cash.txt") -> dict[str, tuple[float, str]]:
-    lines = _comment_stripped_lines(input_path(name))
-    if lines is None:
-        return {}
-    out = {}
-    for line in lines:
-        parts = line.split()
-        if money(parts[0]) is not None:
-            out["__me__"] = (money(parts[0]),
-                             parts[1] if len(parts) > 1 else "")
-            continue
-        nums = [i for i, p in enumerate(parts) if money(p) is not None]
-        if not nums:
-            continue
-        i = nums[0]
-        handle = " ".join(parts[:i]).strip()
-        out[handle] = (money(parts[i]),
-                       parts[i + 1] if len(parts) > i + 1 else "")
-    return out
-
-
-def read_api_balances(rows=None) -> dict[str, tuple[float, str]]:
+def read_api_balances(rows) -> dict[str, tuple[float, str]]:
     out: dict[str, tuple[float, str]] = {}
-    for r in (load_api("standings") if rows is None else rows):
+    for r in rows:
         handle = schema.text(r, schema.API_STANDINGS.MANAGER)
         raw = schema.text(r, schema.API_STANDINGS.TEAM_MONEY)
         if not handle or not raw:
@@ -143,7 +83,9 @@ def read_api_balances(rows=None) -> dict[str, tuple[float, str]]:
             value = float(raw)
         except ValueError:
             continue
-        out[handle] = (value, snapshot_stamp(r.get("observed_at") or ""))
+        when = snapshot_stamp(r.get("observed_at") or "")
+        out[handle] = (value, when,
+                       "balance the app reported at %s" % shown(when))
     return out
 
 
@@ -174,28 +116,6 @@ def allowance(since, now, daily_bonus: float) -> tuple[float, float]:
         return 0.0, 0.0
     days = max(0.0, (now - since).total_seconds() / 86400.0)
     return math.floor(days) * (daily_bonus or 0.0), days
-
-
-def owner_from_api(rows: list[dict], market, ledger_owner: dict | None = None,
-                   xw=None) -> tuple[dict, list]:
-    from ffcore.crosswalk import Crosswalk
-    out, unjoined = {}, []
-    xw = xw or Crosswalk()
-    xw.attach_market(market)
-    for r in rows:
-        handle = schema.text(r, schema.API_TEAMS.MANAGER)
-        raw = schema.text(r, schema.API_TEAMS.PLAYER_NAME)
-        if not handle or not raw:
-            continue
-        key = xw.resolve(raw, handle=handle, ledger_owner=ledger_owner,
-                         hint_price=r.get("market_value"),
-                         hint_full=r.get("player_name_full") or "",
-                         hint_app_id=r.get("player_id") or "")
-        if key:
-            out[key] = handle
-        else:
-            unjoined.append(raw)
-    return out, unjoined
 
 
 def app_fielded(squad, names: dict, rows=None, xw=None) -> list[str]:
@@ -262,127 +182,6 @@ def gone_at(history: list[dict], pid: str, manager: str, bought):
     return None
 
 
-def owner_drift(ledger: dict, api: dict, names=None) -> list[str]:
-    if not api:
-        return []
-    def _who(k):
-        return (names or {}).get(k) or k
-
-    out = []
-    for key, held in sorted(ledger.items()):
-        now = api.get(key)
-        if now is None:
-            out.append("**%s** — the ledger has him at %s; the app says "
-                       "nobody in the league holds him. The feed has no sale "
-                       "of him: the app drops players without publishing "
-                       "one." % (_who(key), held))
-        elif now != held:
-            out.append("**%s** — the ledger has him at %s; the app says %s."
-                       % (_who(key), held, now))
-    for key, now in sorted(api.items()):
-        if key not in ledger:
-            out.append("**%s** — the app has him at %s; the ledger has no "
-                       "record of him." % (_who(key), now))
-    return out
-
-
-def identify(t: dict, owner: dict, market=None, xw=None) -> tuple[str, str]:
-    key = norm(t["player"])
-    pid = schema.text(t, schema.TRANSACTIONS.PLAYER_ID)
-    if pid and xw is not None:
-        got = xw.player(app_id=pid)
-        if got:
-            return got, ""
-    if market is None:
-        return key, ""
-
-    got, cands = market.candidates(t["player"])
-    if got is not None:
-        return (got, "" if got == key else "matched %s" % got)
-    if not cands:
-        return key, ""
-
-    src = schema.text(t, schema.TRANSACTIONS.FROM_) or MARKET
-    dst = schema.text(t, schema.TRANSACTIONS.TO_) or MARKET
-    why = ""
-
-    if src != MARKET:
-        kept = [c for c in cands if owner.get(c) == src]
-        if kept:
-            cands, why = kept, "held by %s at the time" % src
-    elif dst != MARKET:
-        kept = [c for c in cands if c not in owner]
-        if kept:
-            cands, why = kept, "the only one nobody owned"
-
-    price = money(t.get("price"))
-    when = ledger_stamp(t.get("date", ""))
-    if len(cands) > 1 and price and when:
-        kept = []
-        for c in cands:
-            v = market.at(c, when)
-            if v and v.value and 1 / PLAUSIBLE <= price / v.value <= PLAUSIBLE:
-                kept.append(c)
-        if kept:
-            cands = kept
-            why = ("price fits only his value" if len(kept) == 1
-                   else why)
-
-    if len(cands) != 1:
-        return key, ""
-    return cands[0], why
-
-
-def _roster_key(raw: str, market, xw=None) -> str:
-    stripped = raw.strip()
-    if stripped.isdigit():
-        return stripped
-    name, _, club = raw.partition("@")
-    if xw is not None:
-        got = xw.resolve(name, hint_club=club)
-        if got:
-            return got
-    elif market is not None:
-        got = market.key_for(name, team=club)
-        if got:
-            return got
-    return norm(raw)
-
-
-def replay(rosters: dict[str, list[str]], txns: list[dict], market=None,
-           xw=None):
-    owner: dict[str, str] = {}
-    for mgr, names in rosters.items():
-        for n in names:
-            owner[_roster_key(n, market, xw)] = mgr
-    warnings: list[str] = []
-    resolved: list[str] = []
-    for t in txns:
-        key, why = identify(t, owner, market, xw)
-        if why:
-            resolved.append("%s: %s → %s (%s)" % (
-                t.get("date", "?"), t["player"], key, why))
-        src = schema.text(t, schema.TRANSACTIONS.FROM_) or MARKET
-        dst = schema.text(t, schema.TRANSACTIONS.TO_) or MARKET
-        if src != MARKET and owner.get(key) not in (src, None):
-            warnings.append("%s: %s was not owned by %s" % (
-                t.get("date", "?"), t["player"], src))
-        elif src != MARKET and owner.get(key) is None:
-            warnings.append("%s: %s sold %s, but nobody was holding him — "
-                            "missing a purchase, or a different spelling?"
-                            % (t.get("date", "?"), src, t["player"]))
-        if dst == MARKET:
-            owner.pop(key, None)
-        else:
-            if src == MARKET and owner.get(key) is not None:
-                warnings.append("%s: %s bought from market but already "
-                                "owned by %s — missing a sale?"
-                                % (t.get("date", "?"), t["player"],
-                                   owner[key]))
-            owner[key] = dst
-    return owner, warnings, resolved
-
-
 class Cash(NamedTuple):
     value: float | None
     confidence: str
@@ -437,82 +236,66 @@ class Manager:
 
 class League:
 
-    def __init__(self, cfg: Config, rosters, txns, market: Market | None,
-                 api_teams=None, standings=None, xw=None,
-                 roster_history=None):
+    def __init__(self, cfg: Config, txns, market: Market | None, xw,
+                 api_teams=(), standings=(), roster_history=()):
         self.cfg = cfg
-        self.rosters = rosters
-        self.txns = txns
         self.market = market
         self.xw = xw
-        if xw is not None:
-            xw.attach_market(market)
-        self.owner, self.warnings, self.resolved = replay(rosters, txns,
-                                                          market, xw)
-
-        self.api_unjoined: list[str] = []
-        self.dropped: dict[str, tuple] = {}
-        self._api_teams = api_teams
         self._standings = standings
-        if api_teams and market is None:
-            api_teams = None
-        if api_teams:
-            api_owner, self.api_unjoined = owner_from_api(
-                api_teams, market, ledger_owner=self.owner, xw=self.xw)
-            if api_owner:
-                self.warnings += owner_drift(
-                    self.owner, api_owner,
-                    {k: (v.get("name") or k)
-                     for k, v in (market.latest().items()
-                                  if market is not None else ())})
-                for raw in self.api_unjoined:
-                    self.warnings.append(
-                        "**%s** — the app says he is owned, but no market row "
-                        "matches the name, so he is missing from the board."
-                        % raw)
-                bought = {self.txn_key(t): (schema.text(
-                    t, schema.TRANSACTIONS.PLAYER_ID),
-                    ledger_stamp(t.get("date", ""))) for t in txns}
-                for k, m in self.owner.items():
-                    if k not in api_owner and k in bought:
-                        pid, when = bought[k]
-                        self.dropped[k] = (
-                            m, gone_at(roster_history or [], pid, m, when))
-                self.owner = api_owner
+        self.txns = [dict(t, key=xw.player(app_id=schema.text(
+            t, schema.TRANSACTIONS.PLAYER_ID))) for t in txns]
+        self.owner: dict[str, str] = {}
+        self.api_unjoined: list[str] = []
+        for r in api_teams:
+            handle = schema.text(r, schema.API_TEAMS.MANAGER)
+            key = xw.player(app_id=schema.text(r, schema.API_TEAMS.PLAYER_ID))
+            if key and handle:
+                self.owner[key] = handle
+            elif handle:
+                self.api_unjoined.append(
+                    schema.text(r, schema.API_TEAMS.PLAYER_NAME))
+        self.warnings = [
+            "**%s** — the app says he is owned, but no player in the "
+            "crosswalk has his app id, so he is missing from the board." % raw
+            for raw in self.api_unjoined]
 
-        self.managers: dict[str, Manager] = {
-            h: Manager(h) for h in rosters
-        }
+        last: dict[str, tuple] = {}
+        for t in self.txns:
+            if t["key"]:
+                last[t["key"]] = (
+                    schema.text(t, schema.TRANSACTIONS.TO_) or MARKET,
+                    schema.text(t, schema.TRANSACTIONS.PLAYER_ID),
+                    ledger_stamp(t.get("date", "")))
+        self.dropped = {k: (m, gone_at(roster_history, pid, m, when))
+                        for k, (m, pid, when) in last.items()
+                        if self.owner and m != MARKET and k not in self.owner}
+
+        handles = ({cfg.me} | set(self.owner.values())
+                   | {schema.text(r, schema.API_STANDINGS.MANAGER)
+                      for r in standings}
+                   | {schema.text(t, f) for t in self.txns
+                      for f in (schema.TRANSACTIONS.FROM_,
+                                schema.TRANSACTIONS.TO_)}) - {MARKET, ""}
+        self.managers: dict[str, Manager] = {h: Manager(h) for h in handles}
         for key, mgr in self.owner.items():
-            self.managers.setdefault(mgr, Manager(mgr)).players.append(key)
-        for t in txns:
+            self.managers[mgr].players.append(key)
+        for t in self.txns:
             src = schema.text(t, schema.TRANSACTIONS.FROM_) or MARKET
             dst = schema.text(t, schema.TRANSACTIONS.TO_) or MARKET
             if dst != MARKET:
-                self.managers.setdefault(dst, Manager(dst)).buys.append(t)
+                self.managers[dst].buys.append(t)
             if src != MARKET:
-                self.managers.setdefault(src, Manager(src)).sales.append(t)
+                self.managers[src].sales.append(t)
 
         self._estimate_cash()
 
-
     @classmethod
     def load(cls, with_market: bool = True) -> "League":
-        cfg = load_config()
-        market = Market(load_market_frozen()) if with_market else None
-        return cls(cfg, read_rosters(), read_ledger(), market,
-                   api_teams=load_api("teams"),
-                   roster_history=load("api_team_history"),
-                   standings=load_api("standings"), xw=load_crosswalk())
-
-    def txn_key(self, t: dict) -> str | None:
-        pid = schema.text(t, schema.TRANSACTIONS.PLAYER_ID)
-        if pid and self.xw is not None:
-            got = self.xw.player(app_id=pid)
-            if got:
-                return got
-        key, _why = identify(t, self.owner, self.market, self.xw)
-        return key or None
+        return cls(load_config(), read_ledger(),
+                   Market(load_market_frozen()) if with_market else None,
+                   load_crosswalk(), api_teams=newest("api_teams.csv"),
+                   standings=newest("api_standings.csv"),
+                   roster_history=load("api_team_history"))
 
     def __getitem__(self, handle: str) -> Manager:
         return self.managers[handle]
@@ -523,17 +306,11 @@ class League:
 
 
     def _estimate_cash(self) -> None:
-        balances = read_balances()
-        me_balance = balances.pop("__me__", None)
-        if me_balance:
-            balances.setdefault(self.cfg.me, me_balance)
-        for handle, (value, when) in read_api_balances(
-                self._standings).items():
-            balances[handle] = (value, when)
+        balances = read_api_balances(self._standings)
 
         paid = None
         me_anchor = balances.get(self.cfg.me)
-        if me_anchor and isinstance(me_anchor[1], datetime) and self.cfg.budget:
+        if me_anchor and me_anchor[1] and self.cfg.budget:
             b, sd = 0.0, 0.0
             for t in self.txns:
                 price = money(t.get("price")) or 0.0
@@ -544,8 +321,7 @@ class League:
             paid = flat_income(me_anchor[0], self.cfg.budget, b, sd)
 
         users = {r.get("user_id"): r.get("manager")
-                 for r in (self._standings if self._standings is not None
-                          else load_api("standings"))
+                 for r in self._standings
                  if r.get("user_id") and r.get("manager")}
         own_bonus = bonus_income(load_api_activity(), users)
 
@@ -566,17 +342,8 @@ class League:
             anchor = balances.get(handle)
 
             if anchor:
-                base, since_s = anchor
-                if isinstance(since_s, datetime):
-                    since, from_app = since_s, True
-                else:
-                    since = ledger_stamp(since_s) if since_s else None
-                    from_app = False
+                base, since, basis = anchor
                 conf = "known"
-                basis = ("balance the app reported at %s"
-                         % shown(since)) if from_app \
-                    else ("balance you recorded%s"
-                          % (" on " + since_s if since_s else ""))
             else:
                 if not budget:
                     mgr.cash = Cash(None, "unknown",
@@ -695,205 +462,112 @@ start_cross   = 70    # rows per position
     real = load_config()
     assert real.min_start is not None
 
-    _selftest_cash()
-    _selftest_identify()
-    _selftest_api_owner()
-    print("ffcore.league self-test OK (8 cases + cash + identify + api)")
-
-
-def _selftest_api_owner() -> None:
-    at = "2026-08-17T2246Z"
-    players = Market([
-        {"name": "Pablo Fornals", "value": "10000000", "observed_at": at,
-         "position": "MED"},
-        {"name": "Simeone", "value": "5000000", "observed_at": at,
-         "position": "DEL"},
-        {"name": "Carl Starfelt", "value": "9000000", "observed_at": at,
-         "position": "DEF"}])
-    rows = [{"manager": "miguel_autentico", "player_name": "Pablo Fornals"},
-            {"manager": "BurtonGM89", "player_name": "Simeone"}]
-
-    owner, unjoined = owner_from_api(rows, players)
-    assert owner == {norm("Pablo Fornals"): "miguel_autentico",
-                     norm("Simeone"): "BurtonGM89"}, owner
-    assert unjoined == [], unjoined
-
-    owner, unjoined = owner_from_api(
-        rows + [{"manager": "SusoGattuso", "player_name": "Nobody At All"}],
-        players)
-    assert unjoined == ["Nobody At All"], unjoined
-    assert len(owner) == 2, owner
-
-    owner, _ = owner_from_api([{"manager": "", "player_name": "Simeone"},
-                               {"manager": "x", "player_name": ""}], players)
-    assert owner == {}, owner
-
-    owner, unjoined = owner_from_api(
-        [{"manager": "miguel_autentico", "player_name": "Fornals"}], players)
-    assert owner == {norm("Pablo Fornals"): "miguel_autentico"}, owner
-    assert unjoined == [], unjoined
-
-    two = Market([
-        {"name": "Fabio Cardoso", "value": "925408", "observed_at": at,
-         "position": "DEF"},
-        {"name": "Johnny Cardoso", "value": "6310000", "observed_at": at,
-         "position": "MED"}])
-    ambiguous_row = [{"manager": "Magic Mike 333", "player_name": "Cardoso"}]
-
     from ffcore.crosswalk import Crosswalk, Player
 
-    xw0 = Crosswalk()
-    led = {norm("Fabio Cardoso"): "Magic Mike 333"}
+    xw = Crosswalk({k: Player(k, k.title(), app_id=a) for k, a in
+                    [("p", "1"), ("ghost", "66"), ("seen", "77"),
+                     ("kept", "5")]})
+    at = "2026-08-17T2318Z"
+    mkt = Market([{"name": "P", "value": "1000000", "observed_at": at}])
+    table = [{"manager": "me", "user_id": "1", "team_id": "1",
+              "team_money": "23596582", "observed_at": at}]
+    buy = {"date": "2026-08-17T22:24", "player": "P", "player_id": "1",
+           "from": MARKET, "to": "me", "price": "10000000"}
 
-    def _xw_of(app_id, key):
-        return Crosswalk({key: Player(player_id=key, app_id=app_id)})
+    lg = League(Config(me="me"), [buy], mkt, xw, standings=table,
+                api_teams=[{"manager": "me", "player_id": "1"},
+                           {"manager": "me", "player_id": "404",
+                            "player_name": "Stranger"}])
+    assert lg.owner == {"p": "me"} and lg["me"].players == ["p"], lg.owner
+    assert lg.api_unjoined == ["Stranger"], lg.api_unjoined
+    assert lg.txns[0]["key"] == "p", lg.txns
+    assert lg["me"].cash.value == 23596582.0, lg["me"].cash
+    assert lg["me"].cash.confidence == "known", lg["me"].cash
+    later = League(Config(me="me"), [buy, dict(buy, date="2026-08-18T09:00",
+                                               price="1000000")],
+                   mkt, xw, standings=table)
+    assert later["me"].cash.value == 23596582.0 - 1000000.0, later["me"].cash
 
-    twins = Market([
-        {"name": "Carlos Romero", "value": "43240000", "observed_at": at,
-         "position": "DEF"},
-        {"name": "Isaac Romero", "value": "6150000", "observed_at": at,
-         "position": "DEL"}])
-    lone = Market([{"name": "Jonny Castro", "value": "5602302",
-                    "observed_at": at, "position": "DEF"}])
+    cash = League(Config(me="me", budget=100e6), [
+        {"date": "2026-08-11T21:24", "player": "x", "from": MARKET,
+         "to": "rich", "price": "10000000"},
+        {"date": "2026-08-11T21:42", "player": "b", "from": "rich",
+         "to": MARKET, "price": "4000000"},
+        {"date": "2026-08-12T21:24", "player": "y", "from": MARKET,
+         "to": "spent", "price": "124560000"}], None, xw)
+    rich, over = cash["rich"].cash, cash["spent"].cash
+    assert rich.value == 94e6 and cash["me"].cash.value == 100e6, rich
+    assert cash["me"].cash.confidence == "estimated"
+    for part in ("10.00M bought", "4.00M sold", "= 94.00M"):
+        assert part in rich.basis, (part, rich.basis)
+    assert over.value == 100e6 - 124.56e6 and over.overdrawn, over
+    assert "= -24.56M" in over.basis and cash["spent"].max_bid == 0.0
+    assert not rich.overdrawn
+    assert any("overdrawn" in w for w in cash.warnings), cash.warnings
 
-    cases = [
-        (xw0, "Cardoso", "Magic Mike 333", two,
-         {"ledger_owner": led}, norm("Fabio Cardoso")),
-        (xw0, "Cardoso", "Magic Mike 333", two, {}, None),
-        (xw0, "Fabio Cardoso", "Magic Mike 333", two, {},
-         norm("Fabio Cardoso")),
-        (xw0, "", "Magic Mike 333", two, {}, None),
-        (xw0, "Cardoso", "Magic Mike 333", two,
-         {"hint_full": "Fabio Cardoso"}, norm("Fabio Cardoso")),
-        (xw0, "Fabio Cardoso", "Magic Mike 333", two,
-         {"hint_full": "Somebody Entirely Different"},
-         norm("Fabio Cardoso")),
-        (xw0, "Cardoso", "Magic Mike 333", two, {"hint_full": ""}, None),
-        (xw0, "Cardoso", "Magic Mike 333", two,
-         {"hint_full": "Cardoso"}, None),
-        (xw0, "C. Romero", "BurtonGM89", twins,
-         {"hint_price": "43244323", "hint_full": "Carlos Romero"},
-         norm("Carlos Romero")),
-        (xw0, "Isaac Romero", "BurtonGM89", twins, {},
-         norm("Isaac Romero")),
-        (xw0, "Isaac Romero", "BurtonGM89", twins,
-         {"hint_price": "6150000"}, norm("Isaac Romero")),
-        (xw0, "Isaac Romero", "BurtonGM89", twins,
-         {"hint_price": "43244323"}, norm("Isaac Romero")),
-        (xw0, "Isaac Romero", "BurtonGM89", twins,
-         {"hint_price": "6160000"}, norm("Isaac Romero")),
-        (xw0, "C. Romero", "BurtonGM89", twins,
-         {"hint_price": "43244323"}, norm("Carlos Romero")),
-        (xw0, "Jonny Otto", "SusoGattuso", lone, {}, None),
-        (_xw_of("2552", norm("Jonny Castro")), "Jonny Otto", "SusoGattuso",
-         lone, {"hint_app_id": "2552"}, norm("Jonny Castro")),
-        (_xw_of("9999", "somebody"), "Jonny Otto", "SusoGattuso", lone,
-         {"hint_app_id": "2552"}, None),
-        (xw0, "Fornals", "miguel_autentico", players, {},
-         norm("Pablo Fornals")),
-        (_xw_of("2552", "someone else"), "Jonny Castro", "SusoGattuso",
-         lone, {"hint_app_id": "2552"}, "someone else"),
-    ]
-    for xw, raw, handle, market, kwargs, expected in cases:
-        xw.attach_market(market)
-        got = xw.resolve(raw, handle=handle, **kwargs)
-        assert got == expected, (raw, handle, kwargs, expected, got)
+    blind = League(Config(me="nobody", budget=0.0), [], None, xw)
+    assert blind["nobody"].cash.value is None
+    assert blind["nobody"].max_bid is None and not blind["nobody"].cash.overdrawn
 
-    owner, unjoined = owner_from_api(
-        [{"manager": "Magic Mike 333", "player_name": "Cardoso",
-          "player_name_full": "Fabio Cardoso"}], two)
-    assert owner == {norm("Fabio Cardoso"): "Magic Mike 333"}, owner
-    assert unjoined == [], unjoined
+    old = [{"date": "2026-01-01T12:00", "player": "P", "from": MARKET,
+            "to": "rival", "price": "10000000"}]
+    plain = League(Config(me="me", budget=100e6), old, None, xw)
+    bonused = League(Config(me="me", budget=100e6, daily_bonus=100000.0),
+                     old, None, xw)
+    assert bonused["rival"].cash.value > plain["rival"].cash.value
+    assert "daily allowance" in bonused["rival"].cash.basis
 
-    owner, unjoined = owner_from_api(ambiguous_row, two)
-    assert owner == {} and unjoined == ["Cardoso"], (owner, unjoined)
+    for days, extra in [(0, 0.0), (4, 400000.0)]:
+        seen = (datetime.now(dt_timezone.utc) - timedelta(days=days)
+                ).strftime("%Y-%m-%dT%H%MZ")
+        got = League(Config(me="me", daily_bonus=100000.0), [], mkt, xw,
+                     api_teams=[{"manager": "me", "player_id": "1"}],
+                     standings=[dict(table[0], observed_at=seen)])["me"].cash
+        assert abs(got.value - (23596582.0 + extra)) < 5000, (days, got)
+    assert "4 days" in got.basis, got.basis
 
-    led = {norm("Fabio Cardoso"): "Magic Mike 333"}
-    owner, unjoined = owner_from_api(ambiguous_row, two, ledger_owner=led)
-    assert owner == {norm("Fabio Cardoso"): "Magic Mike 333"}, owner
-    assert unjoined == [], unjoined
+    history = Market([{"name": n, "value": v, "observed_at": t}
+                      for n, t, v in [
+                          ("Ghost", "2026-08-17T2246Z", "8000000"),
+                          ("Ghost", "2026-08-25T0600Z", "3000000"),
+                          ("Seen", "2026-08-17T2246Z", "9000000"),
+                          ("Seen", "2026-08-19T0600Z", "6000000"),
+                          ("Seen", "2026-08-25T0600Z", "2000000"),
+                          ("Kept", "2026-08-17T2246Z", "1000000")]])
+    snaps = [{"observed_at": t, "manager": "rival", "player_id": p}
+             for t, ps in [("2026-08-17T2246Z", "5 77"),
+                           ("2026-08-18T0600Z", "5 77"),
+                           ("2026-08-19T0600Z", "5")] for p in ps.split()]
+    gone = League(Config(me="me", budget=100e6), [
+        {"date": "2026-08-12T22:24", "player": n, "player_id": i,
+         "from": MARKET, "to": "rival", "price": pr}
+        for n, i, pr in [("Ghost", "66", "20000000"),
+                         ("Seen", "77", "10000000"),
+                         ("Kept", "5", "1000000")]],
+        history, xw, api_teams=[{"manager": "rival", "player_id": "5"}],
+        roster_history=snaps)
+    assert {k: v[1].strftime("%m-%dT%H%M") for k, v in gone.dropped.items()} \
+        == {"ghost": "08-17T2246", "seen": "08-19T0600"}, gone.dropped
+    assert gone["rival"].cash.value == 83e6, gone["rival"].cash
+    assert "8.00M assuming the app paid Ghost's market value when he left" \
+        in gone["rival"].cash.basis
+    assert gone_at([], "1", "m", None) is None
+    assert not lg.dropped
 
-    owner, unjoined = owner_from_api(
-        ambiguous_row, two, ledger_owner={norm("Fabio Cardoso"): "BurtonGM89"})
-    assert owner == {} and unjoined == ["Cardoso"], (owner, unjoined)
-
-    owner, unjoined = owner_from_api(
-        ambiguous_row, two,
-        ledger_owner={norm("Fabio Cardoso"): "Magic Mike 333",
-                      norm("Johnny Cardoso"): "Magic Mike 333"})
-    assert owner == {} and unjoined == ["Cardoso"], (owner, unjoined)
-
-    owner, unjoined = owner_from_api(
-        [{"manager": "SusoGattuso", "player_name": "Jonny Otto",
-          "player_id": "2552"}], lone, xw=_xw_of("2552", norm("Jonny Castro")))
-    assert owner == {norm("Jonny Castro"): "SusoGattuso"}, owner
-    assert unjoined == [], unjoined
-
-    priced = Market([
-        {"name": "Jonny Castro", "value": "5602302", "observed_at": at,
-         "position": "DEF"},
-        {"name": "Someone Else", "value": "9999999", "observed_at": at,
-         "position": "DEF"}])
-    owner, unjoined = owner_from_api(
-        [{"manager": "SusoGattuso", "player_name": "Jonny Otto",
-          "market_value": "5602302"}], priced)
-    assert owner == {norm("Jonny Castro"): "SusoGattuso"}, owner
-    assert unjoined == [], unjoined
-
-    owner, unjoined = owner_from_api(
-        [{"manager": "SusoGattuso", "player_name": "Jonny Otto",
-          "market_value": "5602303"}], priced)
-    assert owner == {} and unjoined == ["Jonny Otto"], (owner, unjoined)
-
-    aged = Market([
-        {"name": "Alvaro Fernandez", "value": "4486912",
-         "observed_at": "2026-08-17T2246Z", "position": "POR"},
-        {"name": "Alvaro Fernandez", "value": "4499000",
-         "observed_at": "2026-08-17T2318Z", "position": "POR"},
-        {"name": "Other Keeper", "value": "3000000",
-         "observed_at": "2026-08-17T2318Z", "position": "POR"}])
-    owner, unjoined = owner_from_api(
-        [{"manager": "me", "player_name": "A. Ferllo",
-          "market_value": "4486912"}], aged)
-    assert owner == {norm("Alvaro Fernandez"): "me"}, owner
-    assert unjoined == [], unjoined
-
-    shared = Market([
-        {"name": "One", "value": "500", "observed_at": "2026-08-16T0000Z",
-         "position": "DEF"},
-        {"name": "Two", "value": "500", "observed_at": "2026-08-17T0000Z",
-         "position": "DEF"}])
-    owner, unjoined = owner_from_api(
-        [{"manager": "me", "player_name": "Nobody", "market_value": "500"}],
-        shared)
-    assert owner == {} and unjoined == ["Nobody"], (owner, unjoined)
-
-    repeated = Market([
-        {"name": "One", "value": "500", "observed_at": "2026-08-16T0000Z",
-         "position": "DEF"},
-        {"name": "One", "value": "500", "observed_at": "2026-08-17T0000Z",
-         "position": "DEF"}])
-    owner, _ = owner_from_api(
-        [{"manager": "me", "player_name": "Nobody", "market_value": "500"}],
-        repeated)
-    assert owner == {norm("One"): "me"}, owner
-
-    twinned = Market([
-        {"name": "A One", "value": "500", "observed_at": at,
-         "position": "DEF"},
-        {"name": "B Two", "value": "500", "observed_at": at,
-         "position": "DEF"}])
-    owner, unjoined = owner_from_api(
-        [{"manager": "x", "player_name": "Unknown", "market_value": "500"}],
-        twinned)
-    assert owner == {} and unjoined == ["Unknown"], (owner, unjoined)
-
-    owner, _ = owner_from_api(
-        [{"manager": "x", "player_name": "Jonny Castro",
-          "market_value": "9999999"}], priced)
-    assert owner == {norm("Jonny Castro"): "x"}, owner
+    now = datetime(2026, 8, 19, 12, 0, tzinfo=dt_timezone.utc)
+    four = datetime(2026, 8, 15, 12, 0, tzinfo=dt_timezone.utc)
+    for since, until, rate, want in [
+            (four, now, 100000, (400000.0, 4.0)), (now, now, 100000, (0.0, 0.0)),
+            (four, now, 0, (0.0, 4.0)),
+            (four - timedelta(hours=12), now, 100000, (400000.0, 4.5)),
+            (now, four, 100000, (0.0, 0.0)), (None, now, 100000, (0.0, 0.0))]:
+        assert allowance(since, until, rate) == want, (since, until, rate)
+    assert round(flat_income(8906184.0, 100e6, 142.18e6, 49.82e6)) == 1266184
+    assert flat_income(1.0, 100e6, 0.0, 0.0) == 0.0
+    assert flat_income(None, 100e6, 0.0, 0.0) is None
 
     _selftest_derived_ledger()
+    print("ffcore.league self-test OK")
 
 
 def _selftest_derived_ledger() -> None:
@@ -954,302 +628,6 @@ def _selftest_derived_ledger() -> None:
         [{"at": "2026-09-18T22:25:51+02:00", "kind": "clause",
           "user_id": "11883172", "player_id": "1337",
           "amount": "1"}], users, names) == [], "no counterparty, no row"
-
-    _selftest_anchor_is_current()
-
-
-def _selftest_anchor_is_current() -> None:
-    at = "2026-08-17T2318Z"
-    mkt = Market([{"name": "P", "value": "1000000", "observed_at": at,
-                   "position": "MED"}])
-    txns = [{"date": "2026-08-17T22:24", "player": "P", "from": "market",
-             "to": "me", "price": "10000000", "note": ""}]
-    api_teams = [{"manager": "me", "player_name": "P", "observed_at": at}]
-    table = [{"manager": "me", "user_id": "1", "team_id": "1",
-              "team_money": "23596582", "observed_at": at}]
-
-    lg = League(Config(me="me"), {"me": []}, txns, mkt, api_teams=api_teams,
-                standings=table)
-    got = lg["me"].cash.value
-    assert got == 23596582.0, (
-        "the app's balance is current; a deal it already includes was "
-        "subtracted again — got %r" % got)
-    assert lg["me"].cash.confidence == "known", lg["me"].cash
-
-    later = txns + [{"date": "2026-08-18T09:00", "player": "P",
-                     "from": "market", "to": "me", "price": "1000000",
-                     "note": ""}]
-    lg2 = League(Config(me="me"), {"me": []}, later, mkt,
-                 api_teams=api_teams, standings=table)
-    assert lg2["me"].cash.value == 23596582.0 - 1000000.0, lg2["me"].cash
-
-    api_odd = [{"manager": "me", "player_name": "A. Ferllo", "observed_at": at}]
-    lg3 = League(Config(me="me"), {"me": ["P"]}, [], None,
-                 api_teams=api_odd, standings=table)
-    assert norm("a ferllo") not in lg3.owner, lg3.owner
-    assert lg3.owner.get(norm("P")) == "me", lg3.owner
-    assert lg3["me"].cash.value == 23596582.0, lg3["me"].cash
-
-    ledger = {norm("Pablo Fornals"): "miguel_autentico",
-              norm("Simeone"): "SusoGattuso",
-              norm("Carl Starfelt"): "miguel_autentico"}
-    api = {norm("Pablo Fornals"): "miguel_autentico",
-           norm("Simeone"): "BurtonGM89"}
-    drift = owner_drift(ledger, api)
-    assert any("simeone" in d.lower() and "SusoGattuso" in d
-               and "BurtonGM89" in d for d in drift), drift
-    assert any("starfelt" in d.lower() and "nobody" in d for d in drift), drift
-    assert len(drift) == 2, drift
-    assert owner_drift(api, api) == []
-    assert owner_drift(ledger, {}) == []
-
-    mkt = Market([{"name": "Pablo Fornals", "value": "10000000",
-                   "observed_at": "2026-08-17T2246Z", "position": "MED"},
-                  {"name": "Simeone", "value": "5000000",
-                   "observed_at": "2026-08-17T2246Z", "position": "DEL"}])
-    rosters = {"miguel_autentico": ["Pablo Fornals", "Simeone"],
-               "BurtonGM89": []}
-    api_rows = [{"manager": "miguel_autentico", "player_name": "Pablo Fornals"},
-                {"manager": "BurtonGM89", "player_name": "Simeone"}]
-
-    plain = League(Config(me="miguel_autentico"), rosters, [], mkt)
-    assert plain.owner[norm("Simeone")] == "miguel_autentico"
-
-    lg2 = League(Config(me="miguel_autentico"), rosters, [], mkt,
-                 api_teams=api_rows)
-    assert lg2.owner[norm("Simeone")] == "BurtonGM89", lg2.owner
-    assert lg2["BurtonGM89"].players == [norm("Simeone")], lg2["BurtonGM89"]
-    assert any("simeone" in w.lower() for w in lg2.warnings), lg2.warnings
-
-    lg3 = League(Config(me="miguel_autentico"), rosters, [], mkt, api_teams=[])
-    assert lg3.owner[norm("Simeone")] == "miguel_autentico", lg3.owner
-
-    hist = lambda n, *pts: [{"name": n, "value": v, "observed_at": at,
-                             "position": "DEL"} for at, v in pts]
-    mkt2 = Market(hist("Ghost", ("2026-08-17T2246Z", "8000000"),
-                       ("2026-08-25T0600Z", "3000000"))
-                  + hist("Seen", ("2026-08-17T2246Z", "9000000"),
-                         ("2026-08-19T0600Z", "6000000"),
-                         ("2026-08-25T0600Z", "2000000"))
-                  + hist("Kept", ("2026-08-17T2246Z", "1000000")))
-    tx = [{"date": "2026-08-12T22:24", "player": n, "player_id": i,
-           "from": MARKET, "to": "rival", "price": pr}
-          for n, i, pr in (("Ghost", "66", "20000000"),
-                           ("Seen", "77", "10000000"),
-                           ("Kept", "5", "1000000"))]
-    rows = lambda snap, *pids: [{"observed_at": snap, "manager": "rival",
-                                 "player_id": p} for p in pids]
-    lg4 = League(Config(me="miguel_autentico", budget=100e6),
-                 {"miguel_autentico": [], "rival": []}, tx, mkt2,
-                 api_teams=[{"manager": "rival", "player_name": "Kept"}],
-                 roster_history=rows("2026-08-17T2246Z", "5", "77")
-                 + rows("2026-08-18T0600Z", "5", "77")
-                 + rows("2026-08-19T0600Z", "5"))
-    assert {k: v[1].strftime("%m-%dT%H%M") for k, v in lg4.dropped.items()} \
-        == {"ghost": "08-17T2246", "seen": "08-19T0600"}, lg4.dropped
-    c4 = lg4["rival"].cash
-    assert c4.value == 83e6, (c4.value, c4.basis)
-    assert "8.00M assuming the app paid Ghost's market value when he left" \
-        in c4.basis and "gone by" in c4.basis, c4.basis
-    assert gone_at([], "1", "m", None) is None
-    assert not lg2.dropped and "assuming the app paid" not in \
-        lg2["BurtonGM89"].cash.basis, lg2.dropped
-
-
-def _selftest_cash() -> None:
-    cfg = Config(me="nobody", budget=100e6)
-    rosters = {"me": ["a"], "rich": ["b"], "spent": ["c"]}
-    txns = [
-        {"date": "2026-08-11T21:24", "player": "x", "from": MARKET,
-         "to": "rich", "price": "10000000"},
-        {"date": "2026-08-11T21:42", "player": "b", "from": "rich",
-         "to": MARKET, "price": "4000000"},
-        {"date": "2026-08-12T21:24", "player": "y", "from": MARKET,
-         "to": "spent", "price": "124560000"},
-    ]
-    lg = League(cfg, rosters, txns, None)
-
-    assert lg["rich"].cash.value == 94e6, lg["rich"].cash.value
-    assert lg["me"].cash.value == 100e6, lg["me"].cash.value
-
-    assert lg["me"].cash.confidence == "estimated", lg["me"].cash.confidence
-
-    assert "10.00M bought" in lg["rich"].cash.basis, lg["rich"].cash.basis
-    assert "4.00M sold" in lg["rich"].cash.basis
-    assert "= 94.00M" in lg["rich"].cash.basis
-
-    over = lg["spent"]
-    assert over.cash.value == 100e6 - 124.56e6, over.cash.value
-    assert over.cash.confidence == "estimated", over.cash.confidence
-    assert over.cash.overdrawn and not lg["rich"].cash.overdrawn
-    assert "= -24.56M" in over.cash.basis, over.cash.basis
-    assert over.max_bid == 0.0, over.max_bid
-    assert any("overdrawn" in w for w in lg.warnings), lg.warnings
-    assert not any("exceeds" in w for w in lg.warnings), lg.warnings
-
-    now = datetime(2026, 8, 19, 12, 0, tzinfo=dt_timezone.utc)
-    four_days = datetime(2026, 8, 15, 12, 0, tzinfo=dt_timezone.utc)
-    assert allowance(four_days, now, 100000) == (400000.0, 4.0)
-    assert allowance(now, now, 100000) == (0.0, 0.0)
-    assert allowance(four_days, now, 0) == (0.0, 4.0)
-    assert allowance(four_days - timedelta(hours=12), now, 100000) == (400000.0, 4.5)
-    assert allowance(now, four_days, 100000) == (0.0, 0.0)
-    assert allowance(None, now, 100000) == (0.0, 0.0)
-
-    import tempfile as _tf
-    with _tf.TemporaryDirectory() as d:
-        f = pathlib.Path(d) / "r.txt"
-        f.write_text("[me]\nalvaro garcia (Rayo)\npepelu\n", encoding="utf-8")
-        got = read_rosters(f)["me"]
-    assert got == ["alvaro garcia@rayo", "pepelu"], got
-
-    assert flat_income(8906184.0, 100e6, 142.18e6, 49.82e6) == 8906184.0 - (
-        100e6 - 142.18e6 + 49.82e6)
-    assert round(flat_income(8906184.0, 100e6, 142.18e6, 49.82e6)) == 1266184
-    assert flat_income(1.0, 100e6, 0.0, 0.0) == 0.0
-    assert flat_income(None, 100e6, 0.0, 0.0) is None
-
-    blind = League(Config(me="nobody", budget=0.0), {"z": ["q"]}, [], None)
-    assert blind["z"].cash.value is None and blind["z"].max_bid is None
-    assert not blind["z"].cash.overdrawn
-
-
-def _selftest_identify() -> None:
-    from ffcore.tidy import Market as _RealMarket
-    _seen = "2026-08-01T0000Z"
-    mkt = _RealMarket([
-        {"name": "Fabio Cardoso", "team": "Alaves", "value": "925408",
-         "observed_at": _seen},
-        {"name": "Johnny Cardoso", "team": "Betis", "value": "6306919",
-         "observed_at": _seen},
-        {"name": "Dani Lorenzo", "team": "Betis", "value": "4000000",
-         "observed_at": _seen},
-        {"name": "Dani Martinez", "team": "Levante", "value": "500000",
-         "observed_at": _seen}])
-    owner = {"dani lorenzo": "alice", "johnny cardoso": "bob"}
-
-    key, why = identify({"player": "Dani", "from": "alice", "to": MARKET},
-                        owner, mkt)
-    assert key == "dani lorenzo", (key, why)
-    assert "alice" in why, why
-
-    key, why = identify({"player": "Dani", "from": "bob", "to": MARKET},
-                        owner, mkt)
-    assert key == "dani" and why == "", (key, why)
-
-    key, why = identify({"player": "Cardoso", "from": MARKET, "to": "alice",
-                         "price": "949269", "date": "2026-08-11T21:24"},
-                        owner, mkt)
-    assert key == "fabio cardoso", (key, why)
-
-    from ffcore.tidy import Market as _RealMarket
-    _at = "2026-08-19T1639Z"
-    twins2 = _RealMarket([
-        {"ff_id": "867", "name": "Álvaro García", "team": "Rayo",
-         "value": "20233300", "observed_at": _at},
-        {"ff_id": "12993", "name": "Álvaro García", "team": "Villarreal",
-         "value": "501929", "observed_at": _at}])
-    owner2 = {"867": "alice"}
-    key, why = identify({"player": "Álvaro García", "from": "alice",
-                         "to": MARKET}, owner2, twins2)
-    assert key == "867", (key, why)
-    assert "alice" in why, why
-    key, why = identify({"player": "Álvaro García", "from": "bob",
-                         "to": MARKET}, owner2, twins2)
-    assert key == norm("Álvaro García") and why == "", (key, why)
-    assert sorted(twins2.latest()) == ["12993", "867"]
-
-    key, why = identify({"player": "Cardoso", "from": MARKET, "to": "alice",
-                         "price": "949269", "date": "2026-08-11T21:24"},
-                        {}, mkt)
-    assert key == "fabio cardoso", (key, why)
-    assert "price" in why, why
-
-    key, why = identify({"player": "Cardoso", "from": MARKET, "to": "alice",
-                         "price": "3000000", "date": "2026-08-11T21:24"},
-                        {}, mkt)
-    assert key == "cardoso" and why == "", (key, why)
-
-    key, why = identify({"player": "Johnny Cardoso", "from": "bob",
-                         "to": MARKET}, owner, mkt)
-    assert key == "johnny cardoso" and why == "", (key, why)
-
-    key, why = identify({"player": "Nobody", "from": MARKET, "to": "alice"},
-                        {}, None)
-    assert key == "nobody" and why == "", (key, why)
-
-    own2, warns, notes = replay({"alice": ["Dani Lorenzo"]},
-                                [{"date": "2026-08-13T21:25", "player": "Dani",
-                                  "from": "alice", "to": MARKET,
-                                  "price": "3800000"}], mkt)
-    assert own2 == {}, own2
-    assert notes and "dani lorenzo" in notes[0], notes
-    assert not warns, warns
-
-    id_mkt = _RealMarket([
-        {"name": "Raul Moro", "ff_id": "7870", "team": "Racing",
-         "value": "2000000", "observed_at": _seen},
-        {"name": "Alvaro Garcia", "ff_id": "12993", "team": "Villarreal",
-         "value": "500000", "observed_at": _seen},
-        {"name": "Alvaro Garcia", "ff_id": "867", "team": "Rayo",
-         "value": "19000000", "observed_at": _seen}])
-    id_owner = {}
-    for mgr, names in {"laporta": ["Raul Moro"]}.items():
-        for n in names:
-            id_owner[_roster_key(n, id_mkt)] = mgr
-    assert id_owner == {"7870": "laporta"}, id_owner
-    assert _roster_key("alvaro garcia@rayo", id_mkt) == "867"
-    assert _roster_key("alvaro garcia@villarreal", id_mkt) == "12993"
-    assert _roster_key("Raul Moro", None) == "raul moro"
-    assert _roster_key("7870", id_mkt) == "7870"
-    assert _roster_key("7870", None) == "7870"
-    assert _roster_key(" 7870 ", id_mkt) == "7870"
-    assert _roster_key("Nobody At All", id_mkt) == "nobody at all"
-
-    from ffcore.crosswalk import Crosswalk, Player
-
-    xw_fern = Crosswalk({"16003": Player("16003", "Manu Fernandez",
-                                         app_names={"Manuel Fernández"})}, {})
-    empty_mkt = _RealMarket([{"name": "Manu Fernandez", "ff_id": "16003",
-                              "team": "Celta", "value": "500000",
-                              "observed_at": _seen}])
-    assert _roster_key("Manuel Fernández", empty_mkt, xw_fern) == "16003"
-    assert _roster_key("Manu Fernandez", empty_mkt, xw_fern) == "16003"
-    assert _roster_key("Total Stranger", empty_mkt, xw_fern) == "total stranger"
-
-    _, warns2, _ = replay({"alice": ["Dani Lorenzo"]},
-                          [{"date": "2026-08-13T21:25", "player": "Xabi",
-                            "from": "alice", "to": MARKET}], mkt)
-    assert any("nobody was holding" in w for w in warns2), warns2
-
-    old = [{"date": "2026-01-01T12:00", "player": "P", "from": MARKET,
-            "to": "rival", "price": "10000000"}]
-    plain = League(Config(me="me", budget=100e6), {"rival": []}, old, None)
-    rich = League(Config(me="me", budget=100e6, daily_bonus=100000.0),
-                  {"rival": []}, old, None)
-    assert rich["rival"].cash.value > plain["rival"].cash.value, (
-        rich["rival"].cash.value, plain["rival"].cash.value)
-    assert "daily allowance" in rich["rival"].cash.basis, rich["rival"].cash
-    def _mine(at, money="23596582"):
-        return [{"manager": "me", "user_id": "1", "team_id": "1",
-                 "team_money": money, "observed_at": at}]
-
-    def _seen(at):
-        return League(Config(me="me", daily_bonus=100000.0), {"me": []}, [],
-                      Market([{"name": "P", "value": "1000000",
-                               "observed_at": at, "position": "MED"}]),
-                      api_teams=[{"manager": "me", "player_name": "P",
-                                  "observed_at": at}],
-                      standings=_mine(at))
-
-    fresh_at = datetime.now(dt_timezone.utc).strftime("%Y-%m-%dT%H%MZ")
-    assert abs(_seen(fresh_at)["me"].cash.value - 23596582.0) < 5000, \
-        _seen(fresh_at)["me"].cash
-    stale_at = (datetime.now(dt_timezone.utc)
-                - timedelta(days=4)).strftime("%Y-%m-%dT%H%MZ")
-    aged = _seen(stale_at)["me"].cash
-    assert abs(aged.value - (23596582.0 + 400000.0)) < 5000, aged
-    assert "4 days" in aged.basis, aged.basis
 
 
 if __name__ == "__main__":                      # pragma: no cover

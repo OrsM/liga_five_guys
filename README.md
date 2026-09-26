@@ -393,8 +393,8 @@ the league's own API:
 | File | Was | Now |
 |---|---|---|
 | `transactions.csv` | append a row after every deal | **generated** from the app's activity feed by `src/ledger.py`, and moved to `data/tidy/` on 2026-08-19 — a file the run overwrites does not belong in the one directory you are asked to maintain |
-| `cash.txt` | a balance you read off a screen | your balance comes from the app, to the euro, every run — so the typed line is now purely the degradation path, and it was measured rather than trusted: with the API's balance withheld it reconstructs **0.04M against the app's own -0.03M**, where having no line at all gives -0.53M. It only earns that after 2026-08-19, when the allowance an anchor accrues *after* it was written stopped being suppressed. Rival balances have no other source at all: `teamMoney` is null for everyone but you. |
-| `rosters_initial.txt` | the starting rosters, written once | still yours, and still needed — but for one narrow job, measured: the app lists some players by surname alone (`Aimar`, `Brahim`, `Llorente`) and the market has two of each. The replay off this file is what breaks those ties. Delete it and **three owned players read as free agents**. It anchors no cash and prices no purchase; both of those come from the feed. |
+| `cash.txt` | a balance you read off a screen | **deleted** 2026-09-26 — your balance comes from the app every run; rivals' are estimated from the activity feed |
+| `rosters_initial.txt` | the starting rosters, written once | **deleted** 2026-09-26 — owners come from the app by player id; the name tie-breaking it existed for is gone with name matching |
 | `lineup.txt` | tick the eleven you are fielding | **deleted** 2026-08-19 — the app publishes the fielded XI at `/v1/competition/1/teams/{team}/lineup/week/{n}`, which this repo had spent a season believing did not exist because every guess was made under the LEAGUE path. The checklist lost a mark whenever a fielded player was sold, so the only runs that ever read it were runs where it was wrong: measured, with the app answering it changed both reports by nothing, and with the app quiet it produced "not a legal eleven — 10 players, 4-4-1" about a team playing a legal 4-5-1 |
 | `seen.txt` | OCR the market screenshot | **deleted** — the market feed, all 41 rows, with bid counts |
 | `squad.txt` | generated fallback roster | **deleted** — see below |
@@ -406,11 +406,6 @@ Ownership and cash are both replayed from it, so the report offered a **63.29M
 budget against a real 23.60M** and recommended selling a player who had already
 gone. The file was never wrong; it was late, which for a decision system is the
 same thing. A feed cannot forget.
-
-`cash.txt` and `rosters_initial.txt` are **kept, not deleted**: the API states
-`teamMoney` for the account that asks and `null` for every other team, so
-rivals' cash is still an estimate and one overheard balance still turns it into
-arithmetic. The `~` in the reports is still honest.
 
 `league.ini` (thresholds and the starting budget) is the one you touch
 occasionally.
@@ -464,8 +459,6 @@ slate from whatever `seen.txt` still held while the report looked normal.
   keep and when to spend.
 - **After any deal:** ~~add the row to the ledger~~ — nothing.
   The feed has it before you could have typed it.
-- **Whenever a rival mentions a balance:** put it in `inputs/cash.txt`. Still
-  worth doing: theirs is the one balance the API will not tell you.
 - **Every ~90 days**, or when the report says the login is close to expiring:
   `python -m ffcore.auth --login`. It needs a browser once.
 
@@ -623,11 +616,11 @@ on the wreckage.
 
 `data/tidy/players.csv` and `clubs.csv` are the fix — one row per player and
 per club, carrying every feed's key for it, built by `src/crosswalk.py` right
-after `parse`. **It is a crosswalk, not a renumbering:** the id stays
-`norm(market name)`, which is what every dict in the repo is already keyed by,
-so adopting it is additive. And it MERGES rather than rebuilds, so a player
-the API named once is nameable forever after the run that saw him, and a feed
-that skips a sweep erases nothing. Coverage is printed every run.
+after `parse`. It is an **append-only registry**: a player gets his id once
+(FF's `ff_id`, which never changes), every other feed's id for him is attached
+the first time a run can match it by name and club, and nothing is ever
+rebuilt or dropped. Downstream code only looks ids up; an id two players
+claim is refused and reported. Coverage is printed every run.
 
 It did not change a single number the day it landed — for the eight clubs that
 had played, the name join happened to work — and that is the point. It removes

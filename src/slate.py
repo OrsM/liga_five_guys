@@ -15,36 +15,21 @@ from __future__ import annotations
 import sys
 
 
-from ffcore.text import norm
-
-__all__ = ["read_slate", "slate_from_api", "comparison_rows",
-          "comparison_table"]
+__all__ = ["read_slate", "comparison_rows", "comparison_table"]
 
 
-def slate_from_api(rows: list[dict], market, xw=None) -> tuple[set, list]:
-    keys, unresolved = set(), []
-    if xw is not None:
-        xw.attach_market(market)
-    for r in rows:
-        raw = (r.get("player_name") or "").strip()
-        if not raw:
-            continue
-        if xw is not None:
-            key = xw.resolve(raw, hint_app_id=r.get("player_id") or "")
-        else:
-            key = market.key_for(raw) if market is not None else norm(raw)
-        if key:
-            keys.add(key)
-        else:
-            unresolved.append(raw)
-    return keys, unresolved
-
-
-def read_slate(market, rows=None, xw=None) -> tuple[set, list]:
+def read_slate(xw, rows=None) -> tuple[set, list]:
     if rows is None:
         from ffcore.tidy import load_api
         rows = load_api("market")
-    return slate_from_api(rows, market, xw)
+    keys, unresolved = set(), []
+    for r in rows:
+        key = xw.player(app_id=(r.get("player_id") or "").strip())
+        if key:
+            keys.add(key)
+        elif (r.get("player_name") or "").strip():
+            unresolved.append(r["player_name"].strip())
+    return keys, unresolved
 
 
 def comparison_rows(u, bands=None) -> list[dict]:
@@ -118,50 +103,14 @@ def comparison_table(rows: list[dict]) -> list[str]:
 
 
 def _selftest() -> None:
-    from ffcore.tidy import Market
-
-    at = "2026-08-17T2246Z"
-    market = Market([
-        {"name": "Álvaro Valles", "value": "31900000", "observed_at": at,
-         "position": "POR"},
-        {"name": "Stole Dimitrievski", "value": "5000000", "observed_at": at,
-         "position": "POR"},
-        {"name": "Pablo Fornals", "value": "58300000", "observed_at": at,
-         "position": "MED"}])
-
-    rows = [{"player_name": "Álvaro Valles", "sale_price": "31900000",
-             "bids": "0", "seller": "marketPlayerLeague"},
-            {"player_name": "Stole Dimitrievski", "sale_price": "5000000",
-             "bids": "2", "seller": "marketPlayerTeam"}]
-
-    keys, unres = slate_from_api(rows, market)
-    assert keys == {norm("Álvaro Valles"), norm("Stole Dimitrievski")}, keys
-    assert unres == [], unres
-
-    keys, unres = slate_from_api(
-        rows + [{"player_name": "Nobody At All"}], market)
-    assert unres == ["Nobody At All"] and len(keys) == 2, (keys, unres)
-
-    keys, unres = slate_from_api([{"player_name": "Fornals"}], market)
-    assert keys == {norm("Pablo Fornals")} and unres == [], (keys, unres)
-
-    assert slate_from_api([{"player_name": ""}], market) == (set(), [])
-
-    assert norm("Stole Dimitrievski") in slate_from_api(rows, market)[0]
-
-
-    assert read_slate(market, rows=[]) == (set(), [])
-
     from ffcore.crosswalk import Crosswalk, Player
-    xw = Crosswalk({"pablo fornals": Player("pablo fornals", "Pablo Fornals",
-                                            app_id="1337")})
-    keys, unres = slate_from_api(
-        [{"player_name": "Nickname Nothing Joins On", "player_id": "1337"}],
-        market, xw=xw)
-    assert keys == {"pablo fornals"} and unres == [], (keys, unres)
-    keys, unres = slate_from_api(
-        [{"player_name": "Fornals", "player_id": "9999"}], market, xw=xw)
-    assert keys == {norm("Pablo Fornals")} and unres == [], (keys, unres)
+    xw = Crosswalk({"1337": Player("1337", "Pablo Fornals", app_id="2621")})
+    keys, unres = read_slate(xw, [
+        {"player_name": "Fornals", "player_id": "2621"},
+        {"player_name": "Nobody At All", "player_id": "9"},
+        {"player_name": "", "player_id": ""}])
+    assert keys == {"1337"} and unres == ["Nobody At All"], (keys, unres)
+    assert read_slate(xw, rows=[]) == (set(), [])
 
     from decide import Universe, Action
     from ffcore.forecast import Bootstrap

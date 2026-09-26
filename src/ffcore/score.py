@@ -683,10 +683,9 @@ class Scorer:
         self.shots_intercept = shots_intercept
         self.shots_n = shots_n
 
-        from ffcore.tidy import row_key, shared_names, load_crosswalk
+        from ffcore.tidy import row_key, load_crosswalk
 
-        shared = shared_names(market)
-        self.lookup: dict[str, dict] = {row_key(r, shared): r for r in market
+        self.lookup: dict[str, dict] = {row_key(r): r for r in market
                                         if r.get("name")}
         xw = xw if xw is not None else load_crosswalk()
 
@@ -768,7 +767,7 @@ class Scorer:
 
     def score(self, rec: dict) -> Scored:
         from ffcore.tidy import row_key
-        key = row_key(rec, ()) or norm(rec.get("name", ""))
+        key = row_key(rec)
         st = self.status.get(key, "")
         pct = self.start_pct.get(key)
         on_page = key in self.listed

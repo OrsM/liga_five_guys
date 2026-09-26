@@ -110,7 +110,7 @@ def _slug(chunk: str) -> str | None:
             if p.isdigit() and p != "00":
                 return p
         if parts:
-            return parts[-1]
+            return parts[0]
     m = PHOTO_RE.search(chunk)
     if m and m.group(1) != "00":
         return m.group(1)
@@ -1879,6 +1879,10 @@ LINEUP_FIXTURE = """
 
 
 def _selftest() -> None:
+    for href, want in [("/jugadores/kazunari-kita/laliga-26-27", "kazunari-kita"),
+                       ("/jugadores/pedri", "pedri"),
+                       ("/jugadores/ficha/1234", "1234")]:
+        assert _slug('href="%s"' % href) == want, (href, _slug('href="%s"' % href))
     rows = parse_team(_FIXTURE, "2026-01-01T0000Z", "team_test")
     by = {r["player_name"]: r for r in rows}
 

@@ -15,7 +15,7 @@ from ffcore import forecast as _forecast
 from ffcore.forecast import Bootstrap, pool_from_perjornada
 import methodology as _methodology
 from stats import percentile
-from ffcore.crosswalk import club_key, Crosswalk
+from ffcore.crosswalk import club_key
 from ffcore.parse import fmt_money
 from ffcore.schedule import (rounds_left, next_then_rest,
                              first_jornada_per_player, apply_fixtures,
@@ -33,13 +33,11 @@ from ffcore.tidy import (run_now,
                          load_fixtures,
                          load_api_stats, load_perjornada,
                          last_api_standings,
-                         load_players, market_routes, pending_sent,
-                         pending_received)
+                         load_players, market_routes, pending)
 from ffcore.schema import text, num, API_TEAMS, API_STANDINGS
 from ffcore.schema import MARKET as MARKET_TBL
 
-__all__ = ["Action", "Universe",
-          "pending_sent", "pending_received"]
+__all__ = ["Action", "Universe"]
 
 SCREEN_TRIALS = 250
 FINAL_TRIALS = 3000
@@ -489,8 +487,8 @@ def load(trials_pool=None) -> Universe:
                         if text(r, MARKET_TBL.TEAM)})
     rem, played, unjoined_clubs = rounds_left(m, mkt_teams, load_fixtures())
 
-    teams = load_api("teams")
-    mkt = load_api("market")
+    teams, mkt = ([dict(r, key=lg.xw.player(app_id=text(r, API_TEAMS.PLAYER_ID)))
+                   for r in load_api(name)] for name in ("teams", "market"))
     owner = dict(lg.owner)
     me = lg.cfg.me
 
@@ -500,21 +498,13 @@ def load(trials_pool=None) -> Universe:
                     and (players[k].get("pos") or "").lower() in SLOT}
               for mgr in lg.managers}
 
-    xw = lg.xw or Crosswalk()
-    xw.attach_market(lg.market)
-
-    def market_key(r):
-        return xw.resolve(r["player_name"], ledger_owner=owner,
-                          hint_price=r.get("market_value"))
-
-    price, route, bids = market_routes(mkt, market_key)
+    price, route, bids = market_routes(mkt)
     now = run_now()
     clause_until: dict = {}
     pt_to_key: dict[str, str] = {}
     clause: dict[str, float] = {}
     for r in teams:
-        k = xw.resolve(r["player_name"], handle=r["manager"],
-                       ledger_owner=owner, hint_price=r.get("market_value"))
+        k = r["key"]
         buyout = text(r, API_TEAMS.BUYOUT)
         if not k:
             continue
@@ -538,7 +528,9 @@ def load(trials_pool=None) -> Universe:
 
     proceeds = {k: float((players[k] or {}).get("value") or 0)
                 for k in squads.get(me, {})}
-    received_offers = pending_received(load_api("offers"), pt_to_key)
+    received_offers = pending(
+        [dict(r, key=pt_to_key.get(r.get("player_team_id") or ""))
+         for r in load_api("offers")], "status", "money")
     for k, money in received_offers.items():
         if k in proceeds:
             proceeds[k] = max(proceeds[k], money)
@@ -626,7 +618,7 @@ def load(trials_pool=None) -> Universe:
             carried.setdefault(r["manager"],
                               num(r, API_STANDINGS.TEAM_POINTS, default=0.0))
     raw_cash = lg[me].cash.value or 0.0
-    my_bids = pending_sent(mkt, market_key)
+    my_bids = pending(mkt, "bid_status", "bid_money")
     locked_cash = sum(my_bids.values())
     cash = raw_cash
 

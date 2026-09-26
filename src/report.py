@@ -180,8 +180,8 @@ def main() -> None:
                 "; ".join("%s: %s" % (k, ", ".join(v))
                           for k, v in clashes.items())))
     if cash and cash.value is not None and cash.confidence != "known":
-        warnings.append("Cash is an estimate — record an observed balance in "
-                        "`inputs/cash.txt`.")
+        warnings.append("Cash is an estimate — the app's standings feed "
+                        "carries no balance for you this run.")
     elif cash and cash.value is not None:
         last_tx = max((t.get("date") or "" for t in lg.txns), default="")
         anchor = re.search(r"\d{4}-\d{2}-\d{2}", cash.basis or "")
@@ -189,7 +189,8 @@ def main() -> None:
             warnings.append(f"Balance last checked {anchor.group(0)}, but the "
                             f"ledger moved on {last_tx[:10]}. Re-check it.")
     elif not cash or cash.value is None:
-        warnings.append("No cash figure — add `inputs/cash.txt`.")
+        warnings.append("No cash figure — the app's standings feed carries "
+                        "no balance and no budget is configured.")
 
     try:
         from ffcore.auth import TokenStore
