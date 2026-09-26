@@ -17,7 +17,7 @@ from ffcore.parse import money, pct100
 from ffcore.text import norm
 
 __all__ = ["ROOT", "TIDY", "SEASON", "DECISIONS", "REPORTS", "MADRID",
-           "TABLES", "Table", "current", "history", "age_hours",
+           "TABLES", "Table", "current", "history", "age_hours", "set_now",
            "input_path", "read_csv", "write_csv", "append_csv", "widen_csv",
            "log_row", "csv_string", "snapshot_stamp", "ledger_stamp",
            "Market", "Valuation", "row_key", "run_now", "load_crosswalk",
@@ -206,19 +206,39 @@ TABLES: dict[str, Table] = {
 }
 
 
+def _cut() -> str:
+    return run_now().strftime("%Y-%m-%dT%H%MZ")
+
+
 def history(name: str, source: str = "") -> list:
-    rows = read_csv(TIDY / f"{name}.csv")
-    return [r for r in rows if r.get("source") == source] if source else rows
+    cut = _cut()
+    return [r for r in read_csv(TIDY / f"{name}.csv")
+            if r.get("observed_at", "") <= cut
+            and (not source or r.get("source") == source)]
 
 
-def _current_rows(name: str) -> tuple:
+def _closed_days(name: str) -> dict[str, str]:
+    out: dict[str, str] = {}
+    for r in read_csv(TIDY / f"{name}.csv"):
+        stamp = r.get("observed_at", "")
+        out[stamp[:10]] = max(out.get(stamp[:10], ""), stamp)
+    return out
+
+
+def _current_rows(name: str, cut: str) -> tuple:
     spec = TABLES[name]
-    rows = sorted(read_csv(TIDY / f"{name}.csv"),
+    rows = sorted((r for r in read_csv(TIDY / f"{name}.csv")
+                   if r.get("observed_at", "") <= cut),
                   key=lambda r: r.get("observed_at", ""))
     if spec.snapshot:
-        last = {r.get("source", ""): r.get("observed_at", "") for r in rows}
+        closed = _closed_days(name) if spec.store == "daily" else {}
+        last: dict[str, str] = {}
+        for r in rows:
+            stamp = r.get("observed_at", "")
+            if closed.get(stamp[:10], stamp) <= cut:
+                last[r.get("source", "")] = stamp
         return tuple(r for r in rows
-                     if r.get("observed_at", "") == last[r.get("source", "")])
+                     if r.get("observed_at", "") == last.get(r.get("source", "")))
     latest = {tuple(r.get(c, "") for c in spec.key): r for r in rows}
     return tuple(r for k, r in latest.items() if all(k))
 
@@ -227,8 +247,9 @@ _CURRENT_CACHE: dict = {}
 
 
 def current(name: str, source: str = "") -> list[dict]:
-    rows = _mtime_cached(TIDY / f"{name}.csv", _CURRENT_CACHE, name,
-                         _current_rows, name) or ()
+    cut = _cut()
+    rows = _mtime_cached(TIDY / f"{name}.csv", _CURRENT_CACHE, (name, cut),
+                         _current_rows, name, cut) or ()
     return [dict(r) for r in rows if not source or r.get("source") == source]
 
 
@@ -282,6 +303,12 @@ def run_now() -> datetime:
     return _NOW[0]
 
 
+def set_now(when: datetime | None) -> None:
+    _NOW[:] = [when] if when is not None else []
+    for cache in (_CURRENT_CACHE, _CLOCK, _CLOCK_HISTORY, _JORNADA_OF_MATCH):
+        cache.clear()
+
+
 def shown(t=None, fmt: str = "%Y-%m-%d %H:%M") -> str:
     when = run_now() if t is None else t
     return when.astimezone(MADRID).strftime(fmt + " %Z")
@@ -293,7 +320,9 @@ SECOND_SOURCE = "analitica"
 
 def load_perjornada() -> list[dict]:
     files = sorted((SEASON / "live").glob("perjornada_*.csv"))
-    return read_csv(files[-1]) if files else []
+    cut = _cut()
+    return [r for r in read_csv(files[-1]) if r.get("to_stamp", "") <= cut
+            ] if files else []
 
 
 def kickoff_stamp(s: str):
@@ -602,19 +631,23 @@ def _selftest_new_loaders() -> None:
     global TIDY
     real = TIDY
     TIDY = Path(tempfile.mkdtemp())
+    a, b, later = "2026-08-01T0900Z", "2026-08-02T0900Z", "2026-08-03T0900Z"
     try:
         write_csv(TIDY / "lineups.csv", [
-            {"observed_at": "a", "source": "futbolfantasy", "player_name": "Ane"},
-            {"observed_at": "b", "source": "analitica", "player_name": "Ane"},
-            {"observed_at": "b", "source": "futbolfantasy", "player_name": "Bo"},
-            {"observed_at": "a", "source": "analitica", "player_name": "Cai"}])
+            {"observed_at": a, "source": "futbolfantasy", "player_name": "Ane"},
+            {"observed_at": b, "source": "analitica", "player_name": "Ane"},
+            {"observed_at": b, "source": "futbolfantasy", "player_name": "Bo"},
+            {"observed_at": a, "source": "analitica", "player_name": "Cai"},
+            {"observed_at": later, "source": "futbolfantasy",
+             "player_name": "Dan"}])
         write_csv(TIDY / "api_stats.csv", [
-            {"observed_at": "t1", "player_id": "1", "week": "1", "stat": "g",
+            {"observed_at": a, "player_id": "1", "week": "1", "stat": "g",
              "value": "0"},
-            {"observed_at": "t2", "player_id": "1", "week": "1", "stat": "g",
+            {"observed_at": b, "player_id": "1", "week": "1", "stat": "g",
              "value": "1"},
-            {"observed_at": "t1", "player_id": "2", "week": "1", "stat": "g",
+            {"observed_at": a, "player_id": "2", "week": "1", "stat": "g",
              "value": "5"}])
+        set_now(snapshot_stamp("2026-08-02T1200Z"))
         for name, source, every, now in [
                 ("lineups", "", 4, ["Ane", "Bo"]),
                 ("lineups", "analitica", 2, ["Ane"]),
@@ -627,8 +660,16 @@ def _selftest_new_loaders() -> None:
         assert stats == {("1", "1"), ("2", "5")}, stats
         assert current("market") == [] and history("market") == []
         assert age_hours("market") is None
+        assert abs(age_hours("lineups") - 3.0) < 1e-9
+        set_now(snapshot_stamp("2026-08-01T1000Z"))
+        assert stats != {(r["player_id"], r["value"])
+                         for r in current("api_stats")}
+        set_now(snapshot_stamp("2026-08-04T0000Z"))
+        assert [r["player_name"] for r in current("lineups", "futbolfantasy")] \
+            == ["Dan"]
     finally:
         TIDY = real
+        set_now(None)
 
     c1 = clock()
     c2 = clock()

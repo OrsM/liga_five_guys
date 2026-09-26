@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import datetime as dt
+import json
 import math
 import statistics
 import sys
+from pathlib import Path
 
 from ffcore.parse import text
 from ffcore.text import norm
@@ -179,6 +181,69 @@ def drift_frac_from_history(history: tuple, lag1: int = 1,
                           [(p["predicted"], p["actual"], pooled) for p in h3])
 
 
+TOP_N = 50
+
+
+def _jornada_points() -> dict[tuple, float]:
+    from ffcore.tidy import load_perjornada
+
+    out: dict[tuple, float] = {}
+    for r in load_perjornada():
+        if r.get("jornada") and r.get("ff_id"):
+            k = (r["ff_id"], int(r["jornada"]))
+            out[k] = out.get(k, 0.0) + float(r.get("points_delta") or 0)
+    return out
+
+
+def score_forecast(pred: dict[str, float], actual: dict[tuple, float],
+                   j: int) -> dict:
+    errs = [p - actual.get((k, j), 0.0) for k, p in pred.items()]
+    top = sorted(pred, key=pred.get, reverse=True)[:TOP_N]
+    return {"n": len(errs),
+            "mae": sum(abs(e) for e in errs) / len(errs) if errs else None,
+            "bias": sum(errs) / len(errs) if errs else None,
+            "top": (sum(actual.get((k, j), 0.0) for k in top) / len(top)
+                    if top else None)}
+
+
+def backtest() -> list[dict]:
+    from ffcore.score import build
+    from ffcore.tidy import (LINEUP_SOURCE, current, row_key, run_now,
+                             set_now)
+
+    locks = clock_history().round_locks
+    actual = _jornada_points()
+    logged = load_predictions()
+    out = []
+    try:
+        for j in sorted({j for _k, j in actual} & set(locks), key=locks.get):
+            set_now(locks[j] - dt.timedelta(minutes=1))
+            market = current("market")
+            sc = build(market, current("lineups", LINEUP_SOURCE), run_now())
+            pred = {row_key(r): sc.score(r).score for r in market}
+            then = {k: fac["score"] for k in pred
+                    if (fac := _claim([k], logged, locks[j])) is not None}
+            out.append({"jornada": j, "pred": pred,
+                        **score_forecast(pred, actual, j),
+                        "logged": score_forecast(then, actual, j)})
+    finally:
+        set_now(None)
+    return out
+
+
+def compare(a: dict[str, dict], b: dict[str, dict]) -> list[dict]:
+    actual = _jornada_points()
+    out = []
+    for j in sorted(set(a) & set(b), key=int):
+        keys = set(a[j]) & set(b[j])
+        pa = {k: a[j][k] for k in keys}
+        pb = {k: b[j][k] for k in keys}
+        sa, sb = score_forecast(pa, actual, int(j)), score_forecast(pb, actual, int(j))
+        out.append({"jornada": int(j), "n": len(keys), "mae": (sa["mae"], sb["mae"]),
+                    "top": (sa["top"], sb["top"])})
+    return out
+
+
 def _selftest() -> None:
     t0 = dt.datetime(2026, 8, 1, tzinfo=dt.timezone.utc)
     day = dt.timedelta(days=1)
@@ -213,9 +278,40 @@ def _selftest() -> None:
     assert drift_frac_from_history((locks, actuals, preds)) == 1.0
     assert fit_rate_rel_floor([3] * 10, (locks, actuals, preds)) == RATE_REL_FLOOR
 
+    got = score_forecast({"a": 3.0, "b": 1.0}, {("a", 1): 5.0}, 1)
+    assert (got["n"], got["mae"], got["bias"]) == (2, 1.5, -0.5), got
+    assert got["top"] == 2.5, got
+    assert score_forecast({}, {}, 1)["mae"] is None
+
     print("grading self-test OK")
 
 
 if __name__ == "__main__":
     if "--selftest" in sys.argv:
         _selftest()
+    elif "--backtest" in sys.argv:
+        runs = backtest()
+        for r in runs:
+            g = r["logged"]
+            print("j%-2d n=%3d mae %.3f bias %+.3f top%d %.2f | logged n=%3d mae %s"
+                  % (r["jornada"], r["n"], r["mae"], r["bias"], TOP_N, r["top"],
+                     g["n"], "%.3f" % g["mae"] if g["mae"] is not None else "-"))
+        rest = sys.argv[sys.argv.index("--backtest") + 1:]
+        if rest:
+            Path(rest[0]).write_text(json.dumps(
+                {str(r["jornada"]): r["pred"] for r in runs}), encoding="utf-8")
+    elif "--compare" in sys.argv:
+        i = sys.argv.index("--compare")
+        a, b = (json.loads(Path(p).read_text(encoding="utf-8"))
+                for p in sys.argv[i + 1:i + 3])
+        rows = compare(a, b)
+        for r in rows:
+            print("j%-2d n=%3d mae %.3f -> %.3f (%+.3f)  top%d %.2f -> %.2f (%+.2f)"
+                  % (r["jornada"], r["n"], *r["mae"], r["mae"][1] - r["mae"][0],
+                     TOP_N, *r["top"], r["top"][1] - r["top"][0]))
+        late = [r for r in rows if r["jornada"] > 1]
+        print("jornadas 2+: mae better in %d/%d, mean %+.3f; top better in %d/%d, mean %+.2f"
+              % (sum(r["mae"][1] < r["mae"][0] for r in late), len(late),
+                 sum(r["mae"][1] - r["mae"][0] for r in late) / max(1, len(late)),
+                 sum(r["top"][1] > r["top"][0] for r in late), len(late),
+                 sum(r["top"][1] - r["top"][0] for r in late) / max(1, len(late))))
