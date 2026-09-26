@@ -61,7 +61,8 @@ def first_jornada_per_player(base: dict, rem: list[int],
 def apply_fixtures(per_jornada: dict[int, dict], sboard: dict[int, dict],
                    club: dict[str, str], pos: dict[str, str],
                    ppm_of: dict[str, float], status_of: dict = None,
-                   first_jornada_of: dict = None) -> dict[int, dict]:
+                   first_jornada_of: dict = None,
+                   status_factor: dict | None = None) -> dict[int, dict]:
     from ffcore.profile import status_adjusted
 
     status_of = status_of or {}
@@ -80,7 +81,8 @@ def apply_fixtures(per_jornada: dict[int, dict], sboard: dict[int, dict],
             new_pts, new_p = max(0.0, ppm_of[k] * fix), p
             if first_jornada_of.get(k) == j:
                 new_pts, new_p = status_adjusted(new_pts, new_p,
-                                                 status_of.get(k, ""))
+                                                 status_of.get(k, ""),
+                                                 status_factor)
             new_layer[k] = (new_pts, new_p)
         out[j] = new_layer
     return out

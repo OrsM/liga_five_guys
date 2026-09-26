@@ -33,8 +33,6 @@ FREE_FORMATIONS = [(5, 4, 1), (5, 3, 2), (4, 5, 1), (4, 4, 2), (4, 3, 3),
                    (3, 5, 2), (3, 4, 3)]
 
 SHRINK_K = 8.0
-NEUTRAL_START = 60.0
-ABSENT_START = 15.0
 DOUBT_FACTOR = 0.5
 
 OUT_STATUSES = frozenset({"injured", "suspended", "unavailable"})
@@ -122,12 +120,9 @@ def fit_promoted_discount(market: list[dict], history: dict,
                        fitted))
 
 
-STATUS_FACTOR: dict[str, float] = {}
-
-
-def status_multiplier(status: str) -> float:
-    if status in STATUS_FACTOR:
-        return STATUS_FACTOR[status]
+def status_multiplier(status: str, factors: dict | None = None) -> float:
+    if status in (factors or {}):
+        return factors[status]
     if status in OUT_STATUSES:
         return 0.0
     if status == "doubt":
@@ -532,10 +527,14 @@ def build(market: list[dict], xi_rows: list[dict], now,
     from ffcore.tidy import (load_crosswalk, load_understat_players,
                              DAILY_FRESH_DAYS, fresh_only, newest, table)
     xw = load_crosswalk()
+    from ffcore.fixture import fit_home_edge
+    home_edge, home_edge_why = fit_home_edge(table("results_history"),
+                                             newest("matches"))
     board = fixture_board(market, load_fixtures(), now,
                           fresh_only(newest("elo"), DAILY_FRESH_DAYS),
                           results=table("results_history"),
-                          understat_rows=load_understat_players("2025"))
+                          understat_rows=load_understat_players("2025"),
+                          home_edge=home_edge)
     xg_cur = load_understat_current(xw)
     xg_slope, xg_intercept, xg_n = _xg_points_fit(xw)
     xg_boost, xg_why = _xg_stickiness_boost()
@@ -552,6 +551,7 @@ def build(market: list[dict], xi_rows: list[dict], now,
                 shots_intercept=shots_intercept, shots_n=shots_n,
                 promoted_discount=promoted_discount)
     sc.promoted_why = promoted_why
+    sc.home_edge, sc.home_edge_why = home_edge, home_edge_why
     return sc, (prior_label, cur_label)
 
 
@@ -563,7 +563,8 @@ def _calibrated():
         return _CAL_CACHE[0]
     import hashlib
     import json
-    from ffcore.startprob import (Calibration, METHOD_VERSION, observations,
+    from ffcore.startprob import (ABSENT_START, Calibration, METHOD_VERSION,
+                                  NEUTRAL_START, observations,
                                   fit_start_fallbacks)
     from ffcore.tidy import load_crosswalk, TIDY, LINEUP_SOURCE, table
     from ffcore.second import SECOND_SOURCE
@@ -572,14 +573,12 @@ def _calibrated():
     truth = table("starters")
     cut = min((r.get("observed_at", "") for r in truth), default="")
     xw = load_crosswalk()
-    global NEUTRAL_START, ABSENT_START
+    neutral, absent = NEUTRAL_START, ABSENT_START
     if cut:
-        NEUTRAL_START, ABSENT_START, _fallback_why = fit_start_fallbacks(
-            table("lineups", LINEUP_SOURCE) + second, truth, cut,
-            neutral_default=NEUTRAL_START, absent_default=ABSENT_START,
-            xw=xw)
+        neutral, absent, _fallback_why = fit_start_fallbacks(
+            table("lineups", LINEUP_SOURCE) + second, truth, cut, xw=xw)
     obs = observations(table("lineups", LINEUP_SOURCE) + second, truth, cut,
-                       neutral=NEUTRAL_START, absent=ABSENT_START,
+                       neutral=neutral, absent=absent,
                        xw=xw) if cut else []
     stamp = "%d:%s" % (METHOD_VERSION,
                        hashlib.sha1(repr(obs).encode()).hexdigest())
@@ -606,8 +605,8 @@ def _calibrated():
     from ffcore.lineupweight import fit_lineup_weight, fit_status_factors
     cal.lineup_k, cal.lineup_why = fit_lineup_weight()
     flagged = fit_status_factors()
-    STATUS_FACTOR.clear()
-    STATUS_FACTOR.update({f: v for f, (v, _n) in flagged.items()})
+    cal.neutral_start, cal.absent_start = neutral, absent
+    cal.status_factor = {f: v for f, (v, _n) in flagged.items()}
     if flagged:
         cal.lineup_why += "; regulars flagged " + ", ".join(
             "%s played %.0f%% of normal (%d)" % (f, 100 * v, n)
@@ -777,13 +776,13 @@ class Scorer:
         rating = self.rate(rec)
 
         raw = pct if pct is not None else (
-            NEUTRAL_START if on_page else ABSENT_START)
+            self.cal.neutral_start if on_page else self.cal.absent_start)
         pct_used = 100.0 * self.cal.p(raw, self.second.get(key))
         cur = self.current.get(norm(rec.get("name", "")))
         start_n = cur.get("start_n", 0.0) if cur else 0.0
         if start_n > 0.0:
             k_s, k_l = self.shrink_k, self.cal.lineup_k or self.shrink_k
-            pct_rest = (k_s * NEUTRAL_START + start_n * 100.0
+            pct_rest = (k_s * self.cal.neutral_start + start_n * 100.0
                        * cur["start_rate"]) / (k_s + start_n)
             pct_used = (k_l * pct_used + start_n * 100.0 * cur["start_rate"]
                        ) / (k_l + start_n)
@@ -926,12 +925,10 @@ def pick_xi(pool: dict, force: dict | None = None):
 
 
 def _selftest() -> None:
+    from ffcore.startprob import NEUTRAL_START
     assert status_multiplier("injured") == 0.0 and status_multiplier("doubt") == DOUBT_FACTOR
-    STATUS_FACTOR["injured"] = 0.5
-    try:
-        assert status_multiplier("injured") == 0.5 and status_multiplier("ok") == 1.0
-    finally:
-        STATUS_FACTOR.clear()
+    assert status_multiplier("injured", {"injured": 0.5}) == 0.5
+    assert status_multiplier("ok", {"injured": 0.5}) == 1.0
     from ffcore.fixture import Match
 
     def mk(name, pos="defensa", team="Mid", value="10.00M"):

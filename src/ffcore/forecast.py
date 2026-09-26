@@ -74,8 +74,11 @@ class Forecaster(Protocol):
 class Bootstrap:
 
     def __init__(self, per_jornada: dict[int, dict[str, tuple[float, float]]],
-                 pool=(), matches=None, club_of=None, club_rel=None):
+                 pool=(), matches=None, club_of=None, club_rel=None,
+                 drift_frac: float = DRIFT_FRAC, drift_why: str = "",
+                 rate_floor: float = RATE_REL_FLOOR):
         self.per_jornada = per_jornada
+        self.drift_frac, self.drift_why = drift_frac, drift_why
         self._order = {j: sorted(d) for j, d in per_jornada.items()}
         real = [p for p in pool if p is not None]
         self._real_n = len(real)
@@ -86,7 +89,7 @@ class Bootstrap:
         self._cv = (sd / self._pool_mean) if self._pool_mean else 0.0
         self.rate_rel = {}
         for k, n in (matches or {}).items():
-            self.rate_rel[k] = max(RATE_REL_FLOOR, self._cv / math.sqrt(
+            self.rate_rel[k] = max(rate_floor, self._cv / math.sqrt(
                 max(1.0, float(n) + SHRINK_MATCHES)))
         self.club_of = dict(club_of or {})
         self.club_rel = dict(club_rel or {})

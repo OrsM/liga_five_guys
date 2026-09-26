@@ -46,6 +46,10 @@ def _platt(p: float, alpha: float, beta: float) -> float:
     return min(CEIL, max(FLOOR, q))
 
 
+NEUTRAL_START = 60.0
+ABSENT_START = 15.0
+
+
 class Calibration:
 
     def __init__(self, alpha=0.0, beta=1.0, weight=0.0, titular=0.9, n=0,
@@ -54,6 +58,8 @@ class Calibration:
         self.weight, self.titular = weight, titular
         self.n, self.fitted, self.gain, self.why = n, fitted, gain, why
         self.lineup_k, self.lineup_why = None, ""
+        self.neutral_start, self.absent_start = NEUTRAL_START, ABSENT_START
+        self.status_factor: dict[str, float] = {}
         self.groups = groups
 
     def p(self, ff_pct, af=None) -> float:
@@ -202,8 +208,8 @@ def observations(lineups, starters, cut: str, roster=None,
 
 
 def fit_start_fallbacks(lineups, starters, cut: str,
-                        neutral_default: float = 60.0,
-                        absent_default: float = 15.0, k: float = 8.0,
+                        neutral_default: float = NEUTRAL_START,
+                        absent_default: float = ABSENT_START, k: float = 8.0,
                         xw=None) -> tuple[float, float, str]:
     obs = observations(lineups, starters, cut, neutral=neutral_default,
                        absent=absent_default, xw=xw)

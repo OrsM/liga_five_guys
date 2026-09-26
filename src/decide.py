@@ -11,7 +11,6 @@ from types import MappingProxyType
 from typing import Mapping
 
 
-from ffcore import forecast as _forecast
 from ffcore.forecast import Bootstrap, pool_from_perjornada
 import methodology as _methodology
 from stats import percentile
@@ -565,23 +564,22 @@ def load(trials_pool=None) -> Universe:
         s_ = scored.get(k)
         if s_ is not None:
             matches[k] = s_.pj
-    from ffcore import fixture as _fixture
-    from ffcore.fixture import club_volatility, fit_home_edge, season_board
+    from ffcore.fixture import club_volatility, season_board
     from ffcore.tidy import load_understat_players
     results_hist = table("results_history")
     club_rel = club_volatility(results_hist, set(club.values()))
-    _fixture.HOME_EDGE, _home_edge_why = fit_home_edge(results_hist, m)
     sboard = season_board(_m.market, m, rem, now,
                           fresh_only(newest("elo"), DAILY_FRESH_DAYS),
                           results=results_hist,
-                          understat_rows=load_understat_players("2025"))
+                          understat_rows=load_understat_players("2025"),
+                          home_edge=sc.home_edge)
     ppm_of = {k: s.ppm for k, s in scored.items() if s}
     status_of = {k: s.status for k, s in scored.items() if s}
     first_jornada_of = first_jornada_per_player(base, rem, played, club)
     per_j = apply_fixtures(
         next_then_rest(base, base_rest, rem, played, club),
         sboard, club, pos, ppm_of, status_of=status_of,
-        first_jornada_of=first_jornada_of)
+        first_jornada_of=first_jornada_of, status_factor=sc.cal.status_factor)
     squads, per_j = phantom_fill(squads, per_j, pos)
     for _m, _sq in squads.items():
         assert _fieldable(_sq), (_m, _sq)
@@ -591,12 +589,13 @@ def load(trials_pool=None) -> Universe:
         for k in phantom_keys:
             first_jornada_of.setdefault(k, rem[0])
     _history = _methodology._graded_history()
-    _forecast.DRIFT_FRAC, _drift_why = \
-        _methodology.drift_frac_from_history(history=_history)
-    _forecast.RATE_REL_FLOOR, _rate_floor_why = \
-        _methodology.fit_rate_rel_floor(pool, history=_history)
-    fc = Bootstrap(per_j, pool=pool, matches=matches,
-                  club_of=club, club_rel=club_rel)
+    drift_frac, drift_why = _methodology.drift_frac_from_history(
+        history=_history)
+    fc = Bootstrap(per_j, pool=pool, matches=matches, club_of=club,
+                   club_rel=club_rel, drift_frac=drift_frac,
+                   drift_why=drift_why,
+                   rate_floor=_methodology.fit_rate_rel_floor(
+                       pool, history=_history)[0])
 
     carried = {}
     for r in newest("api_standings"):

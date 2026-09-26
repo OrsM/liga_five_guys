@@ -375,12 +375,8 @@ def phantom_filled(u) -> list[tuple[str, list[str]]]:
 
 def caveats(u) -> list[str]:
     import decide
-    import methodology as M
-    import ffcore.forecast as forecast
-
-    fitted, why = M.drift_frac_from_history()
     drift_status = ("still the unfitted default"
-                    if fitted == forecast.DRIFT_FRAC and "not enough" in why
+                    if "not enough" in u.forecaster.drift_why
                     else "fit from real data this run")
 
     out = ["| Not modelled | Which way it bends the answer |", "|---|---|"]
@@ -450,7 +446,7 @@ def caveats(u) -> list[str]:
         "humble than 70%%+ about a full season this early regardless of "
         "the exact value, which is what 1.0 as an unfitted default "
         "already reflects |"
-        % (forecast.DRIFT_FRAC, drift_status),
+        % (u.forecaster.drift_frac, drift_status),
         "| Shape prior | %s |" % u.forecaster.pool_note(),
         "| P(start) fit | %s |" % u.start_note.rstrip("."),
         "| win %% and finish are single simulated draws | at FINAL_TRIALS="

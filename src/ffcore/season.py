@@ -118,9 +118,8 @@ def _run_np(states: list, forecaster, trials: int, seed: int,
     draw_normal = _antithetic_normal if antithetic else \
         (lambda rng, shape: rng.standard_normal(shape))
     eps0 = shared = drng = cum_var = walk = None
+    drift_frac = getattr(forecaster, "drift_frac", 1.0)
     if all_keys:
-        from ffcore.forecast import DRIFT_FRAC
-
         rrng = np.random.default_rng([seed, 7919])
         sd = np.array([rel[k] for k in all_keys], dtype=float)
         eps0 = np.clip(
@@ -139,7 +138,7 @@ def _run_np(states: list, forecaster, trials: int, seed: int,
                 [shock_of.get(club_of.get(k, ""), ones) for k in all_keys],
                 axis=1)
         drng = np.random.default_rng([seed, 7921])
-        step_sd = DRIFT_FRAC * sd
+        step_sd = drift_frac * sd
         cum_var = np.zeros(len(all_keys))
         walk = np.zeros((trials, len(all_keys)))
 
@@ -148,13 +147,11 @@ def _run_np(states: list, forecaster, trials: int, seed: int,
         {k for ks in order.values() for k in ks} & set(srel)) if srel else []
     seps0 = sdrng = None
     if all_start_keys:
-        from ffcore.forecast import DRIFT_FRAC as _DF
-
         srrng = np.random.default_rng([seed, 7927])
         ssd = np.array([srel[k] for k in all_start_keys], dtype=float)
         seps0 = draw_normal(srrng, (trials, len(all_start_keys))) * ssd
         sdrng = np.random.default_rng([seed, 7928])
-        step_sd_s = _DF * ssd
+        step_sd_s = drift_frac * ssd
         walk_s = np.zeros((trials, len(all_start_keys)))
 
     managers = [list(st.squads) for st in states]
@@ -343,16 +340,9 @@ def _selftest() -> None:
     per10 = {j: {k: (3.0, 1.0) for k in list(a) + list(b)} for j in many_j}
     st10 = LeagueState(squads={"A": a, "B": b}, jornadas=many_j, me="A")
     matches10 = {k: 20 for k in list(a) + list(b)}
-    was_drift = forecast.DRIFT_FRAC
-    try:
-        forecast.DRIFT_FRAC = 0.0
-        flat_res = simulate(st10, Bootstrap(per10, matches=matches10),
-                            trials=1500, seed=13)
-        forecast.DRIFT_FRAC = 1.0
-        drift_res = simulate(st10, Bootstrap(per10, matches=matches10),
-                             trials=1500, seed=13)
-    finally:
-        forecast.DRIFT_FRAC = was_drift
+    flat_res, drift_res = (
+        simulate(st10, Bootstrap(per10, matches=matches10, drift_frac=d),
+                 trials=1500, seed=13) for d in (0.0, 1.0))
     flat_sd = statistics.pstdev(flat_res.totals["A"])
     drift_sd = statistics.pstdev(drift_res.totals["A"])
     assert drift_sd > flat_sd, (flat_sd, drift_sd)
@@ -365,18 +355,10 @@ def _selftest() -> None:
 
     per10_s = {j: {k: (3.0, 0.7) for k in list(a) + list(b)} for j in many_j}
     const_pool = [3] * (MIN_POOL + 50)
-    was_drift = forecast.DRIFT_FRAC
-    try:
-        forecast.DRIFT_FRAC = 0.0
-        sflat_res = simulate(
-            st10, Bootstrap(per10_s, pool=const_pool, matches=matches10),
-            trials=1500, seed=17)
-        forecast.DRIFT_FRAC = 1.0
-        sdrift_res = simulate(
-            st10, Bootstrap(per10_s, pool=const_pool, matches=matches10),
-            trials=1500, seed=17)
-    finally:
-        forecast.DRIFT_FRAC = was_drift
+    sflat_res, sdrift_res = (
+        simulate(st10, Bootstrap(per10_s, pool=const_pool, matches=matches10,
+                                 drift_frac=d), trials=1500, seed=17)
+        for d in (0.0, 1.0))
     sflat_sd = statistics.pstdev(sflat_res.totals["A"])
     sdrift_sd = statistics.pstdev(sdrift_res.totals["A"])
     assert sdrift_sd > sflat_sd, (sflat_sd, sdrift_sd)

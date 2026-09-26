@@ -235,8 +235,10 @@ def difficulty(strength: dict[str, float]) -> dict[str, tuple[float, int]]:
 
 def fixture_board(market: list[dict], fixtures: list[dict],
                   now: datetime, elo_rows=None, results=None,
-                  understat_rows=None) -> dict[str, Match]:
-    ratings = _difficulty_ratings(market, elo_rows, results, understat_rows)
+                  understat_rows=None, home_edge: float = HOME_EDGE
+                  ) -> dict[str, Match]:
+    ratings = _difficulty_ratings(market, elo_rows, results, understat_rows,
+                                  home_edge)
     board: dict[str, Match] = {}
     for r in fixtures:
         when = kickoff_stamp(r.get("kickoff"))
@@ -259,10 +261,12 @@ class _Ratings(NamedTuple):
     diff: dict
     basis: str
     ad: dict
+    home_edge: float
 
 
 def _difficulty_ratings(market: list[dict], elo_rows=None, results=None,
-                        understat_rows=None) -> _Ratings:
+                        understat_rows=None, home_edge: float = HOME_EDGE
+                        ) -> _Ratings:
     value = team_strength(market)
     teams = list(value)
     ad = (attack_defense(results, teams, xg_club_attack(understat_rows or []))
@@ -270,13 +274,14 @@ def _difficulty_ratings(market: list[dict], elo_rows=None, results=None,
     elo = elo_strength(teams, elo_rows) if elo_rows else None
     strength = elo if elo is not None else value
     return _Ratings(teams=teams, elo=elo, diff=difficulty(strength),
-                    basis="elo" if elo is not None else "value", ad=ad)
+                    basis="elo" if elo is not None else "value", ad=ad,
+                    home_edge=home_edge)
 
 
 def _match_for(ratings: "_Ratings", team: str, opp: str, opp_name: str,
               home: bool, when: datetime) -> Match:
     base, rank = ratings.diff.get(opp, (1.0, 0)) if opp else (1.0, 0)
-    edge = (1.0 + HOME_EDGE) if home else (1.0 - HOME_EDGE)
+    edge = 1.0 + (ratings.home_edge if home else -ratings.home_edge)
     gap = (ratings.elo[team] - ratings.elo[opp]
           if ratings.elo is not None and opp in ratings.elo else None)
     opp_ad = ratings.ad.get(opp) if opp else None
@@ -293,8 +298,10 @@ def _match_for(ratings: "_Ratings", team: str, opp: str, opp_name: str,
 
 def season_board(market: list[dict], matches: list[dict], jornadas,
                  now: datetime, elo_rows=None, results=None,
-                 understat_rows=None) -> dict[int, dict[str, Match]]:
-    ratings = _difficulty_ratings(market, elo_rows, results, understat_rows)
+                 understat_rows=None, home_edge: float = HOME_EDGE
+                 ) -> dict[int, dict[str, Match]]:
+    ratings = _difficulty_ratings(market, elo_rows, results, understat_rows,
+                                  home_edge)
     board: dict[int, dict[str, Match]] = {j: {} for j in set(jornadas)}
     for r in matches:
         j = r.get("jornada") or ""

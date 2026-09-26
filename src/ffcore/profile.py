@@ -38,11 +38,11 @@ class PlayerHistory:
     understat_season: dict | None = None
 
 
-def status_adjusted(pts: float, p_start: float, status: str
-                     ) -> tuple[float, float]:
+def status_adjusted(pts: float, p_start: float, status: str,
+                    factors: dict | None = None) -> tuple[float, float]:
     from ffcore.score import OUT_STATUSES, status_multiplier
 
-    mult = status_multiplier(status)
+    mult = status_multiplier(status, factors)
     if status in OUT_STATUSES:
         return pts, p_start * mult
     return pts * mult, p_start
@@ -168,7 +168,7 @@ def build_profiles(players: dict, sc, perjornada_rows,
         if s is not None:
             pts_adj, p_start_adj = status_adjusted(
                 max(0.0, s.ppm * s.fix), min(1.0, (s.pct_used or 0) / 100),
-                s.status)
+                s.status, sc.cal.status_factor)
         else:
             pts_adj = p_start_adj = None
         der = PlayerDerived(
@@ -208,7 +208,11 @@ def _selftest() -> None:
             self.fix, self.status = fix, status
             self.pct_rest = pct_used if pct_rest is None else pct_rest
 
+    from ffcore.startprob import Calibration
+
     class _FakeScorer:
+        cal = Calibration()
+
         def row_for(self, k):
             return {"key": k} if k == "999" else None
 
