@@ -323,8 +323,9 @@ def load(trials_pool=None) -> Universe:
     index = latest_only(lg.market.rows) if lg.market is not None else []
 
     def market_key(r):
-        return xw.resolve_api(r["player_name"], "", lg.market, owner,
-                              index, r.get("market_value"))
+        return xw.resolve(r["player_name"], market=lg.market,
+                          ledger_owner=owner, index=index,
+                          hint_price=r.get("market_value"))
 
     price, route, bids = market_routes(mkt, market_key)
     now = run_now()
@@ -332,8 +333,9 @@ def load(trials_pool=None) -> Universe:
     pt_to_key: dict[str, str] = {}
     clause: dict[str, float] = {}
     for r in teams:
-        k = xw.resolve_api(r["player_name"], r["manager"], lg.market, owner,
-                           index, r.get("market_value"))
+        k = xw.resolve(r["player_name"], handle=r["manager"],
+                       market=lg.market, ledger_owner=owner, index=index,
+                       hint_price=r.get("market_value"))
         buyout = text(r, API_TEAMS.BUYOUT)
         if not k:
             continue

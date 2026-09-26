@@ -189,15 +189,17 @@ def owner_from_api(rows: list[dict], market, ledger_owner: dict | None = None,
     from ffcore.tidy import latest_only
     out, unjoined = {}, []
     index = latest_only(market.rows) if market is not None else []
-    resolve = (xw or Crosswalk()).resolve_api
+    xw = xw or Crosswalk()
     for r in rows:
         handle = schema.text(r, schema.API_TEAMS.MANAGER)
         raw = schema.text(r, schema.API_TEAMS.PLAYER_NAME)
         if not handle or not raw:
             continue
-        key = resolve(raw, handle, market, ledger_owner, index,
-                      r.get("market_value"), r.get("player_name_full") or "",
-                      r.get("player_id") or "")
+        key = xw.resolve(raw, handle=handle, market=market,
+                         ledger_owner=ledger_owner, index=index,
+                         hint_price=r.get("market_value"),
+                         hint_full=r.get("player_name_full") or "",
+                         hint_app_id=r.get("player_id") or "")
         if key:
             out[key] = handle
         else:
@@ -764,30 +766,72 @@ def _selftest_api_owner() -> None:
          "position": "MED"}])
     ambiguous_row = [{"manager": "Magic Mike 333", "player_name": "Cardoso"}]
 
-    from ffcore.crosswalk import Crosswalk
+    from ffcore.crosswalk import Crosswalk, Player
 
     xw0 = Crosswalk()
     led = {norm("Fabio Cardoso"): "Magic Mike 333"}
-    assert xw0.resolve_api("Cardoso", "Magic Mike 333", two, led) \
-        == norm("Fabio Cardoso")
-    assert xw0.resolve_api("Cardoso", "Magic Mike 333", two) is None
-    assert xw0.resolve_api("Fabio Cardoso", "Magic Mike 333", two) \
-        == norm("Fabio Cardoso")
-    assert xw0.resolve_api("", "Magic Mike 333", two) is None
 
-    assert xw0.resolve_api("Cardoso", "Magic Mike 333", two,
-                          full="Fabio Cardoso") == norm("Fabio Cardoso")
-    assert xw0.resolve_api("Fabio Cardoso", "Magic Mike 333", two,
-                          full="Somebody Entirely Different") \
-        == norm("Fabio Cardoso")
-    assert xw0.resolve_api("Cardoso", "Magic Mike 333", two, full="") is None
+    def _xw_of(app_id, key):
+        return Crosswalk({key: Player(player_id=key, app_id=app_id)})
+
+    twins = Market([
+        {"name": "Carlos Romero", "value": "43240000", "observed_at": at,
+         "position": "DEF"},
+        {"name": "Isaac Romero", "value": "6150000", "observed_at": at,
+         "position": "DEL"}])
+    lone = Market([{"name": "Jonny Castro", "value": "5602302",
+                    "observed_at": at, "position": "DEF"}])
+
+    # (xw, raw, handle, market, kwargs, expected) -- one contract, resolve(),
+    # exercised through every rung of its disambiguation ladder rather than
+    # one assertion per rung reimplemented as its own call shape.
+    cases = [
+        (xw0, "Cardoso", "Magic Mike 333", two,
+         {"ledger_owner": led}, norm("Fabio Cardoso")),
+        (xw0, "Cardoso", "Magic Mike 333", two, {}, None),
+        (xw0, "Fabio Cardoso", "Magic Mike 333", two, {},
+         norm("Fabio Cardoso")),
+        (xw0, "", "Magic Mike 333", two, {}, None),
+        (xw0, "Cardoso", "Magic Mike 333", two,
+         {"hint_full": "Fabio Cardoso"}, norm("Fabio Cardoso")),
+        (xw0, "Fabio Cardoso", "Magic Mike 333", two,
+         {"hint_full": "Somebody Entirely Different"},
+         norm("Fabio Cardoso")),
+        (xw0, "Cardoso", "Magic Mike 333", two, {"hint_full": ""}, None),
+        (xw0, "Cardoso", "Magic Mike 333", two,
+         {"hint_full": "Cardoso"}, None),
+        (xw0, "C. Romero", "BurtonGM89", twins,
+         {"hint_price": "43244323", "hint_full": "Carlos Romero"},
+         norm("Carlos Romero")),
+        (xw0, "Isaac Romero", "BurtonGM89", twins, {},
+         norm("Isaac Romero")),
+        (xw0, "Isaac Romero", "BurtonGM89", twins,
+         {"hint_price": "6150000"}, norm("Isaac Romero")),
+        (xw0, "Isaac Romero", "BurtonGM89", twins,
+         {"hint_price": "43244323"}, norm("Isaac Romero")),
+        (xw0, "Isaac Romero", "BurtonGM89", twins,
+         {"hint_price": "6160000"}, norm("Isaac Romero")),
+        (xw0, "C. Romero", "BurtonGM89", twins,
+         {"hint_price": "43244323"}, norm("Carlos Romero")),
+        (xw0, "Jonny Otto", "SusoGattuso", lone, {}, None),
+        (_xw_of("2552", norm("Jonny Castro")), "Jonny Otto", "SusoGattuso",
+         lone, {"hint_app_id": "2552"}, norm("Jonny Castro")),
+        (_xw_of("9999", "somebody"), "Jonny Otto", "SusoGattuso", lone,
+         {"hint_app_id": "2552"}, None),
+        (xw0, "Fornals", "miguel_autentico", players, {},
+         norm("Pablo Fornals")),
+        (_xw_of("2552", "someone else"), "Jonny Castro", "SusoGattuso",
+         lone, {"hint_app_id": "2552"}, "someone else"),
+    ]
+    for xw, raw, handle, market, kwargs, expected in cases:
+        got = xw.resolve(raw, handle=handle, market=market, **kwargs)
+        assert got == expected, (raw, handle, kwargs, expected, got)
+
     owner, unjoined = owner_from_api(
         [{"manager": "Magic Mike 333", "player_name": "Cardoso",
           "player_name_full": "Fabio Cardoso"}], two)
     assert owner == {norm("Fabio Cardoso"): "Magic Mike 333"}, owner
     assert unjoined == [], unjoined
-    assert xw0.resolve_api("Cardoso", "Magic Mike 333", two,
-                          full="Cardoso") is None
 
     owner, unjoined = owner_from_api(ambiguous_row, two)
     assert owner == {} and unjoined == ["Cardoso"], (owner, unjoined)
@@ -807,43 +851,6 @@ def _selftest_api_owner() -> None:
                       norm("Johnny Cardoso"): "Magic Mike 333"})
     assert owner == {} and unjoined == ["Cardoso"], (owner, unjoined)
 
-    twins = Market([
-        {"name": "Carlos Romero", "value": "43240000", "observed_at": at,
-         "position": "DEF"},
-        {"name": "Isaac Romero", "value": "6150000", "observed_at": at,
-         "position": "DEL"}])
-    assert xw0.resolve_api("C. Romero", "BurtonGM89", twins,
-                          market_value="43244323",
-                          full="Carlos Romero") == norm("Carlos Romero")
-    assert xw0.resolve_api("Isaac Romero", "BurtonGM89", twins) \
-        == norm("Isaac Romero")
-    assert xw0.resolve_api("Isaac Romero", "BurtonGM89", twins,
-                          market_value="6150000") == norm("Isaac Romero")
-    assert xw0.resolve_api("Isaac Romero", "BurtonGM89", twins,
-                          market_value="43244323") == norm("Isaac Romero")
-    assert xw0.resolve_api("Isaac Romero", "BurtonGM89", twins,
-                          market_value="6160000") == norm("Isaac Romero")
-    assert xw0.resolve_api("C. Romero", "BurtonGM89", twins,
-                          market_value="43244323") == norm("Carlos Romero")
-
-    lone = Market([{"name": "Jonny Castro", "value": "5602302",
-                    "observed_at": at, "position": "DEF"}])
-    from ffcore.crosswalk import Player
-
-    def _xw_of(app_id, key):
-        return Crosswalk({key: Player(player_id=key, app_id=app_id)})
-
-    assert xw0.resolve_api("Jonny Otto", "SusoGattuso", lone) is None
-    assert _xw_of("2552", norm("Jonny Castro")).resolve_api(
-        "Jonny Otto", "SusoGattuso", lone,
-        app_id="2552") == norm("Jonny Castro")
-    assert _xw_of("9999", "somebody").resolve_api(
-        "Jonny Otto", "SusoGattuso", lone, app_id="2552") is None
-    assert xw0.resolve_api("Fornals", "miguel_autentico", players) \
-        == norm("Pablo Fornals")
-    assert _xw_of("2552", "someone else").resolve_api(
-        "Jonny Castro", "SusoGattuso", lone,
-        app_id="2552") == "someone else"
     owner, unjoined = owner_from_api(
         [{"manager": "SusoGattuso", "player_name": "Jonny Otto",
           "player_id": "2552"}], lone, xw=_xw_of("2552", norm("Jonny Castro")))

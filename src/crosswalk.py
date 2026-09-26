@@ -131,12 +131,12 @@ def build_players(market, lineups, starters, api_rows, lg, clubs) -> dict:
         raw = schema.text(r, schema.API_TEAMS.PLAYER_NAME)
         if not raw:
             continue
-        key = known.resolve_api(raw, schema.text(r, schema.API_TEAMS.MANAGER),
-                                lg.market if lg else None,
-                                lg.owner if lg else None,
-                                index, r.get("market_value"),
-                                r.get("player_name_full") or "",
-                                r.get("player_id") or "")
+        key = known.resolve(raw, handle=schema.text(r, schema.API_TEAMS.MANAGER),
+                           market=lg.market if lg else None,
+                           ledger_owner=lg.owner if lg else None,
+                           index=index, hint_price=r.get("market_value"),
+                           hint_full=r.get("player_name_full") or "",
+                           hint_app_id=r.get("player_id") or "")
         p = out.get(key) if key else None
         if p is None:
             p = by_name(raw)

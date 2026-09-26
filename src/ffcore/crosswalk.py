@@ -75,7 +75,17 @@ class Crosswalk:
     def __init__(self, players=None, clubs=None):
         self.players: dict[str, Player] = dict(players or {})
         self.clubs: dict[str, Club] = dict(clubs or {})
+        self._market = None
+        self._owner: dict = {}
         self._reindex()
+
+    def attach_market(self, market, owner: dict | None = None) -> None:
+        """Ambient market/owner context for resolve() -- set once when both
+        are known (at League construction, or slate_from_api's entry) so
+        every later resolve() call stops re-threading them through every
+        call site the way resolve_api() used to require."""
+        self._market = market
+        self._owner = owner or {}
 
     def _reindex(self) -> None:
         self._by_ff, self._by_af, self._by_app = {}, {}, {}
@@ -139,18 +149,36 @@ class Crosswalk:
 
     def resolve(self, raw="", *, hint_app_id="", hint_ff_slug="",
                 hint_af_slug="", hint_club="", hint_price=None,
-                hint_full="", market=None) -> str | None:
+                hint_full="", handle="", market=None,
+                ledger_owner=None, index=None) -> str | None:
+        """One disambiguation ladder (id lookup -> market name/club/price
+        match -> owner narrowing -> price-only value-index fallback ->
+        name fallback), replacing what used to be resolve()/resolve_api()'s
+        three-and-a-half separately-grown copies of it. market/ledger_owner
+        default to whatever attach_market() set, so a caller with an
+        ambient Crosswalk no longer threads them through every call the
+        way resolve_api() required; `index` stays an explicit optional
+        param (not also defaulted from an attached value) because real
+        callers precompute latest_only(market.rows) ONCE outside a
+        per-row loop and pass it in -- recomputing it per call here would
+        reintroduce exactly the cost that precompute exists to avoid."""
+        from ffcore.tidy import latest_only
+
+        market = self._market if market is None else market
+        ledger_owner = self._owner if ledger_owner is None else ledger_owner
         raw = (raw or "").strip()
         if raw.isdigit():
             return raw
         hint_app_id = (hint_app_id or "").strip()
         hint_ff_slug = (hint_ff_slug or "").strip()
         hint_af_slug = (hint_af_slug or "").strip()
+        if market is not None and index is None:
+            index = latest_only(market.rows)
         if hint_app_id or hint_ff_slug or hint_af_slug:
             got = self.player(app_id=hint_app_id or None,
                               ff_slug=hint_ff_slug or None,
                               af_slug=hint_af_slug or None)
-            if got:
+            if got and _priced_like(got, "", hint_price, index):
                 return got
         if market is not None:
             for candidate in (raw, (hint_full or "").strip()):
@@ -158,53 +186,26 @@ class Crosswalk:
                     continue
                 key = market.key_for(candidate, team=hint_club,
                                      value=hint_price)
-                if key:
+                if key and _priced_like(key, candidate, hint_price, index):
                     return key
+            if ledger_owner and raw:
+                _got, cands = market.candidates(raw)
+                agreed = [c for c in cands if ledger_owner.get(c) == handle]
+                if len(agreed) == 1:
+                    return agreed[0]
+            if hint_price not in (None, ""):
+                try:
+                    want = float(hint_price)
+                except (TypeError, ValueError):
+                    want = None
+                if want:
+                    hits = set(_value_index(market).get(want, ()))
+                    hits.discard("")
+                    if len(hits) == 1:
+                        return next(iter(hits))
         if raw:
             return self.player(app_name=raw) or self.player(name=raw)
         return None
-
-    def resolve_api(self, raw: str, handle: str, market,
-                    ledger_owner: dict | None = None, index: list | None = None,
-                    market_value=None, full: str = "", app_id: str = ""
-                    ) -> str | None:
-        from ffcore.tidy import latest_only
-
-        raw = (raw or "").strip()
-        if not raw:
-            return None
-        if market is None:
-            return norm(raw) or None
-        if index is None:
-            index = latest_only(market.rows)
-        key = None
-        if (app_id or "").strip():
-            key = self.player(app_id=app_id.strip())
-            if not _priced_like(key, "", market_value, index):
-                key = None
-        if not key:
-            key = market.key_for(raw, value=market_value)
-            if not _priced_like(key, raw, market_value, index):
-                key = None
-        if not key and (full or "").strip():
-            key = market.key_for(full.strip(), value=market_value)
-            if not _priced_like(key, full, market_value, index):
-                key = None
-        if not key and ledger_owner:
-            _got, cands = market.candidates(raw)
-            agreed = [c for c in cands if ledger_owner.get(c) == handle]
-            if len(agreed) == 1:
-                key = agreed[0]
-        if not key:
-            try:
-                want = float(market_value)
-            except (TypeError, ValueError):
-                want = None
-            if want:
-                hits = set(_value_index(market).get(want, ()))
-                hits.discard("")
-                key = hits.pop() if len(hits) == 1 else None
-        return key or None
 
     def club(self, *, ff_slug=None, name=None) -> str | None:
         if ff_slug and ff_slug in self._club_ff:
