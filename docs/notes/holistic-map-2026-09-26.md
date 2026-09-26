@@ -94,7 +94,7 @@ Order: 1 → 2 (they share the deletions), then 3, 4, 5/6, 7, 8.
 
 Running count (all of src, functions incl. methods/nested/lambdas and
 selftests): 655 functions / 13,937 lines at 0e49bff → 639 / 13,409 at
-86efa39 → 619 / 12,940 at 43a53a4 → 548 / 11,601 at ee0e191.
+86efa39 → 619 / 12,940 at 43a53a4 → 553 / 11,506 at ee0e191.
 
 Next: startprob's Calibration (its note()/why strings are read only by
 its own tests; nested grid/lambda in fit), flip.py's remaining nested
