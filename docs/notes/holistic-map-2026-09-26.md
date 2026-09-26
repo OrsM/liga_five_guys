@@ -91,11 +91,15 @@ Order: 1 → 2 (they share the deletions), then 3, 4, 5/6, 7, 8.
   Market was keyed by id). Alerts and warnings reached no one and were
   deleted, with report.py, backtest.py and ffcore/bid.py; predictions are
   logged by grading.
+- **10 Calibration and helpers** (706e938, d91f4e5, 8b27055). The start
+  calibration's grid fit is one numpy expression (38s -> 0.5s, same
+  parameters), so its disk cache went. No nested functions or assigned
+  lambdas remain in src; tests use real objects and data tables.
 
 Running count (all of src, functions incl. methods/nested/lambdas and
 selftests): 655 functions / 13,937 lines at 0e49bff → 639 / 13,409 at
-86efa39 → 619 / 12,940 at 43a53a4 → 553 / 11,506 at ee0e191.
+86efa39 → 619 / 12,940 at 43a53a4 → 553 / 11,506 at ee0e191 → 523 / 11,253 at fe60ce5.
 
-Next: startprob's Calibration (its note()/why strings are read only by
-its own tests; nested grid/lambda in fit), flip.py's remaining nested
-helpers, ingest.py.
+Next: the remaining "why" strings that only tests read (fit_home_edge,
+fit_drift_frac, fit_rate_rel_floor, fit_start_fallbacks' callers), and
+the hard-coded "(N cases)" counts in self-test output.
