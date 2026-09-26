@@ -471,13 +471,27 @@ def _by_pts_lo(moves: list[dict], n: int) -> list[dict]:
     return sorted(candidates, key=lambda m: -m["pts_lo"])[:n]
 
 
-def _replay(pick, min_days: float) -> dict | None:
-    commits = commits_touching("reports/decisions.json")
+def _replay_setup(path: str = "reports/decisions.json"):
+    """(commits, points_between, now) for replaying a decision log, or
+    None if there's nothing to replay -- _replay() and
+    replay_ladder_percentile() each built this bail-if-empty setup
+    separately; the latter paid for _actuals_index() (a full actuals
+    load) even with zero commits, which this restores the short-circuit
+    against."""
+    commits = commits_touching(path)
     if not commits:
         return None
     points_between, now = _actuals_index()
     if now is None:
         return None
+    return commits, points_between, now
+
+
+def _replay(pick, min_days: float) -> dict | None:
+    setup = _replay_setup()
+    if setup is None:
+        return None
+    commits, points_between, now = setup
     return _grade_episodes(_pick_episodes(commits, pick), points_between,
                            now, min_days)
 
@@ -491,10 +505,10 @@ def replay_percentile_rank(min_days: float = 3.0) -> dict | None:
 
 
 def replay_ladder_percentile(topn: int = 3, min_days: float = 3.0) -> dict:
-    commits = commits_touching("reports/decisions.json")
-    points_between, now = _actuals_index()
-    if not commits or now is None:
+    setup = _replay_setup()
+    if setup is None:
         return {"current": None, "percentile": None}
+    commits, points_between, now = setup
 
     def pick_current(moves):
         return [m for m in moves[:topn] if m.get("buy") and m.get("sell")]
