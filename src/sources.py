@@ -7,7 +7,7 @@ import io
 import json
 import re
 from datetime import datetime, timezone
-from functools import lru_cache, partial
+from functools import lru_cache
 from typing import Callable, NamedTuple
 
 from ffcore.text import match_one, norm
@@ -19,27 +19,21 @@ __all__ = ["BASE", "SOURCE", "MARKET_URL", "POINTS_URL", "TEAM_URL", "TEAMS",
            "Source", "sources", "source_for", "SEVERITY",
            "parse_market", "parse_team", "parse_points", "parse_fitness",
            "parse_af_team", "parse_af_fixtures", "season_label",
-           "sign_market", "sign_team", "sign_points", "sign_af_team",
-           "sign_af_fixtures",
            "FD_BASE", "FD_URL", "FD_SOURCE", "FD_ALIASES", "FD_SEASONS_BACK",
            "fd_season_code", "fd_sources", "parse_fd_results",
-           "sign_fd_results",
            "CAL_KEY", "FF_CAL_URL", "MATCH_URL", "MATCH_KEY_RE",
-           "parse_calendar", "parse_starters", "sign_calendar",
-           "sign_starters", "match_source", "played_sources",
+           "parse_calendar", "parse_starters", "match_source", "played_sources",
            "LFG_SOURCE", "API_LEAGUES_KEY", "API_LEAGUES_URL",
            "API_MARKET_URL", "API_ACTIVITY_URL", "API_TEAMS_URL",
            "ACT_KIND", "ACT_JOINED", "ACT_BUY", "ACT_SELL", "ACT_BONUS",
            "ACT_CLAUSE",
            "ACT_BONUS_ZERO", "STORE_ONCE",
-           "ROW_TABLE", "parser_sig", "parser_deps", "top_level",
+           "ROW_TABLE",
            "parse_api_leagues", "parse_api_market", "parse_api_activity",
-           "parse_api_teams", "sign_api_leagues", "sign_api_market",
-           "sign_api_activity", "sign_api_teams", "league_sources",
-           "API_PLAYER_URL", "parse_api_player", "sign_api_player",
-           "player_source", "player_sources",
+           "parse_api_teams", "league_sources",
+           "API_PLAYER_URL", "parse_api_player", "player_source", "player_sources",
            "API_OFFER_URL", "API_OFFER_KEY_RE", "parse_api_offer",
-           "sign_api_offer", "offer_source", "offer_sources"]
+           "offer_source", "offer_sources"]
 
 BASE = "https://www.futbolfantasy.com"
 SOURCE = "futbolfantasy"
@@ -154,8 +148,6 @@ SEVERITY = ["unavailable", "suspended", "injured", "doubt"]
 
 XI_SELECTORS = ['[class*="jugadores-titulares"] .jugador.tipo_lista',
                 '[class*="jugadores-suplentes"] .jugador.tipo_lista']
-FITNESS_SELECTORS = [".lesionados_wrapper section.mod.lesionados > .elemento",
-                     "section.mod.nodisponibles .elemento"]
 
 
 def _flagged_name(el) -> tuple[str, str]:
@@ -336,6 +328,7 @@ def parse_points(html: str, observed_at: str = "", key: str = "points") -> list[
                 "points": f"{pts:g}",
                 "games": f"{pj:g}",
                 "avg": f"{avg:.3f}" if avg is not None else "",
+                "season": season_label(html),
             })
 
         if len(rows) > len(best):
@@ -353,127 +346,10 @@ def season_label(html: str) -> str:
 
 _WS = re.compile(r"\s+")
 
-MARKET_SURFACE_RE = re.compile(
-    r'data-(?:nombre|posicion|valor|diferencia1|diferencia-pct1|equipo)="[^"]*"')
-
-
-_DEFS: dict[int, dict] = {}
-
-
-def _defs(source: str) -> dict[str, tuple[str, set]]:
-    import ast
-
-    hit = _DEFS.get(hash(source))
-    if hit is not None:
-        return hit
-    tree = ast.parse(source)
-    lines = source.splitlines()
-    bodies: dict[str, list] = {}
-    text: dict[str, str] = {}
-    for node in tree.body:
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef,
-                             ast.ClassDef)):
-            names = [node.name]
-        elif isinstance(node, ast.Assign):
-            names = [t.id for t in node.targets if isinstance(t, ast.Name)]
-        elif isinstance(node, ast.AnnAssign) and isinstance(node.target,
-                                                            ast.Name):
-            names = [node.target.id]
-        else:
-            continue
-        seg = "\n".join(lines[node.lineno - 1:(node.end_lineno or node.lineno)])
-        for n in names:
-            text[n] = text.get(n, "") + seg
-            bodies.setdefault(n, []).append(node)
-    out = {n: (text[n],
-               {d.id for node in bodies[n] for d in ast.walk(node)
-                if isinstance(d, ast.Name)})
-           for n in bodies}
-    out = {n: (t, refs & set(out)) for n, (t, refs) in out.items()}
-    _DEFS[hash(source)] = out
-    return out
-
-
-def top_level(source: str) -> dict[str, str]:
-    return {n: t for n, (t, _refs) in _defs(source).items()}
-
-
-def parser_deps(source: str, name: str) -> set[str]:
-    defs = _defs(source)
-    if name not in defs:
-        return set()
-    seen, stack = set(), [name]
-    while stack:
-        cur = stack.pop()
-        if cur in seen:
-            continue
-        seen.add(cur)
-        stack.extend(defs[cur][1] - seen)
-    return seen
-
-
-def parser_sig(name: str, source: str | None = None) -> str:
-    if source is None:
-        source = _MY_SOURCE
-    defs, deps = top_level(source), parser_deps(source, name)
-    if not deps:
-        return hashlib.blake2b(source.encode("utf-8", "replace"),
-                               digest_size=8).hexdigest()
-    body = "\n".join("%s=%s" % (n, defs[n]) for n in sorted(deps))
-    return hashlib.blake2b(body.encode("utf-8", "replace"),
-                           digest_size=8).hexdigest()
-
-
-try:
-    _MY_SOURCE = __import__("pathlib").Path(__file__).read_text(
-        encoding="utf-8")
-except OSError:                                          # pragma: no cover
-    _MY_SOURCE = ""
-
-
-def _digest(parts) -> str | None:
-    if not any(parts):
-        return None
-    return hashlib.sha1("\x1f".join(parts).encode("utf-8")).hexdigest()[:16]
-
-
-def _sign_rows(text: str, parse, fmt, sort: bool = False) -> str | None:
-    rows = parse(text)
-    if not rows:
-        return None
-    parts = [fmt(r) for r in rows]
-    return _digest(sorted(parts) if sort else parts)
-
-
-def _surface(elements) -> list[str]:
-    out: list[str] = []
-    for el in elements:
-        out.append(_WS.sub(" ", el.text_content()).strip())
-        out += [a.get("href") or "" for a in _css(el, "a[href]")]
-        out += [i.get("alt") or "" for i in _css(el, "img[alt]")]
-    return out
-
-
-def sign_market(html: str) -> str | None:
-    return _digest(MARKET_SURFACE_RE.findall(html))
-
-
-def _sign_elements(html: str, selectors) -> str | None:
-    doc = lh.fromstring(html)
-    els = []
-    for sel in selectors:
-        els += sel(doc) if callable(sel) else _css(doc, sel)
-    return _digest(_surface(els))
-
 
 def _suspension_sections(doc):
     return [s for s in _css(doc, "section.mod.sancionados")
            if "mercado-box" not in " ".join(s.classes)]
-
-
-def sign_team(html: str) -> str | None:
-    return _sign_elements(html, [*XI_SELECTORS, *FITNESS_SELECTORS,
-                                 _suspension_sections])
 
 
 AF_BASE = "https://www.analiticafantasy.com"
@@ -558,11 +434,6 @@ def parse_af_team(html: str, observed_at: str,
     return rows
 
 
-def sign_af_team(html: str) -> str | None:
-    return _sign_elements(html, ['ul[aria-label^="Titulares"]',
-                                 AF_CONSENSO_SELECTOR])
-
-
 AF_HUB_URL = f"{AF_BASE}/la-liga/alineaciones-probables"
 AF_MATCH_RE = re.compile(r"/partido/(\d+)")
 
@@ -590,21 +461,6 @@ def parse_af_fixtures(html: str, observed_at: str,
         }
 
     return _extract_rows(html, 'a[href*="/partido/"]', row_of)
-
-
-def _sign_links(html: str, href_substr: str) -> str | None:
-    return _digest(_surface(_css(lh.fromstring(html),
-                                 'a[href*="%s"]' % href_substr)))
-
-
-def sign_af_fixtures(html: str) -> str | None:
-    return _sign_links(html, "/partido/")
-
-
-sign_points = partial(
-    _sign_rows, parse=lambda t: parse_points(t, ""),
-    fmt=lambda r: "%s|%s|%s" % (r["ff_id"], r["points"], r["games"]),
-    sort=True)
 
 
 CAL_KEY = "calendario"
@@ -662,10 +518,6 @@ def parse_calendar(html: str, observed_at: str,
     return _extract_rows(html, 'a[href*="/partidos/"]', row_of)
 
 
-def sign_calendar(html: str) -> str | None:
-    return _sign_links(html, "/partidos/")
-
-
 def parse_starters(html: str, observed_at: str,
                    key: str = "match_1-alaves-getafe") -> list[dict]:
     m = MATCH_KEY_RE.match(key)
@@ -716,20 +568,15 @@ def _xi_rows(doc, side: str) -> list:
     return _css(tables[0], "tbody tr") if tables else []
 
 
-def sign_starters(html: str) -> str | None:
-    return _sign_elements(html, [partial(_xi_rows, side=s) for s in MATCH_SIDES])
-
-
-def _rebuild(key: str, pattern, table: str, parse, sign, url_for, **kw):
+def _rebuild(key: str, pattern, table: str, parse, url_for, **kw):
     m = pattern.match(key or "")
     if not m:
         return None
-    return Source(key, table, url_for(m), parse, sign, **kw)
+    return Source(key, table, url_for(m), parse, **kw)
 
 
 def match_source(key: str) -> Source | None:
-    return _rebuild(key, MATCH_KEY_RE, "starters", parse_starters,
-                    sign_starters, lambda m: MATCH_URL.format(path=m.group(1)),
+    return _rebuild(key, MATCH_KEY_RE, "starters", parse_starters, lambda m: MATCH_URL.format(path=m.group(1)),
                     cadence="once")
 
 
@@ -785,10 +632,6 @@ def parse_elo(text: str, observed_at: str, key: str = "elo") -> list[dict]:
     return rows
 
 
-sign_elo = partial(_sign_rows, parse=lambda t: parse_elo(t, ""),
-                   fmt=lambda r: "%s=%s" % (r["club"], r["elo"]))
-
-
 FD_BASE = "https://www.football-data.co.uk"
 FD_URL = FD_BASE + "/mmz4281/{season}/SP1.csv"
 FD_SOURCE = "football-data"
@@ -829,7 +672,7 @@ def fd_sources(now: datetime | None = None) -> list["Source"]:
         season = "%02d%02d" % (y % 100, (y + 1) % 100)
         out.append(Source(
             "fd_%s" % season, "results_history",
-            FD_URL.format(season=season), parse_fd_results, sign_fd_results,
+            FD_URL.format(season=season), parse_fd_results,
             cadence="every_run" if back == 0 else "once"))
     return out
 
@@ -883,13 +726,6 @@ def parse_fd_results(text: str, observed_at: str,
             row[out_key] = (r.get(col) or "").strip()
         rows.append(row)
     return rows
-
-
-sign_fd_results = partial(
-    _sign_rows, parse=_fd_rows,
-    fmt=lambda r: "%s|%s|%s|%s|%s" % (r.get("Date"), r.get("HomeTeam"),
-                                      r.get("AwayTeam"), r.get("FTHG"),
-                                      r.get("FTAG")))
 
 
 ODDS_URL = ("https://api.the-odds-api.com/v4/sports/soccer_spain_la_liga"
@@ -989,13 +825,6 @@ def parse_odds(text: str, observed_at: str,
     return rows
 
 
-sign_odds = partial(
-    _sign_rows, parse=lambda t: parse_odds(t, ""),
-    fmt=lambda r: "%s|%s|%.3f|%.3f|%.3f" % (
-        r["home"] or r["home_name"], r["away"] or r["away_name"],
-        r["p_home"], r["p_draw"], r["p_away"]))
-
-
 UNDERSTAT_URL = "https://understat.com/main/getPlayersStats/"
 UNDERSTAT_SOURCE = "understat"
 UNDERSTAT_LEAGUE = "La_liga"
@@ -1009,7 +838,7 @@ def understat_sources(now: datetime | None = None) -> list["Source"]:
         y = cur_y - back
         out.append(Source(
             "understat_%d" % y, "understat_players", UNDERSTAT_URL,
-            parse_understat_players, sign_understat_players,
+            parse_understat_players,
             cadence="every_run" if back == 0 else "once",
             body={"league": UNDERSTAT_LEAGUE, "season": str(y)}))
     return out
@@ -1053,13 +882,6 @@ def _understat_rows(text: str) -> list[dict]:
         return []
     players = data.get("players")
     return players if isinstance(players, list) else []
-
-
-sign_understat_players = partial(
-    _sign_rows, parse=_understat_rows,
-    fmt=lambda p: "%s|%s|%s|%s|%s|%s" % (
-        p.get("id"), p.get("games"), p.get("time"), p.get("goals"),
-        p.get("assists"), p.get("xG")))
 
 
 LFG_SOURCE = "laliga"
@@ -1151,11 +973,6 @@ def parse_api_leagues(text: str, observed_at: str,
     return _parse_json_list(text, observed_at, row)
 
 
-sign_api_leagues = partial(
-    _sign_rows, parse=lambda t: parse_api_leagues(t, ""),
-    fmt=lambda r: "%s=%s/%s" % (r["league_id"], r["money"], r["team_value"]))
-
-
 def parse_api_market(text: str, observed_at: str,
                      key: str = "api_market") -> list[dict]:
     def row(it):
@@ -1183,12 +1000,6 @@ def parse_api_market(text: str, observed_at: str,
     return _parse_json_list(text, observed_at, row)
 
 
-sign_api_market = partial(
-    _sign_rows, parse=lambda t: parse_api_market(t, ""),
-    fmt=lambda r: "%s@%s/%s/%s" % (r["player_id"], r["sale_price"],
-                                   r["bids"], r["bid_status"]))
-
-
 def parse_api_activity(text: str, observed_at: str,
                        key: str = "api_activity") -> list[dict]:
     def row(a):
@@ -1207,10 +1018,6 @@ def parse_api_activity(text: str, observed_at: str,
             "week": str(a.get("weekNumber") or ""),
         }]
     return _parse_json_list(text, observed_at, row)
-
-
-sign_api_activity = partial(_sign_rows, parse=lambda t: parse_api_activity(t, ""),
-                            fmt=lambda r: r["activity_id"], sort=True)
 
 
 def parse_api_teams(text: str, observed_at: str,
@@ -1266,15 +1073,6 @@ def parse_api_teams(text: str, observed_at: str,
     return _parse_json_list(text, observed_at, row)
 
 
-def sign_api_teams(text: str) -> str | None:
-    rows = parse_api_teams(text, "")
-    squads = [r for r in rows if r[ROW_TABLE] == "api_teams"]
-    table = [r for r in rows if r[ROW_TABLE] == "api_standings"]
-    return _digest(["%s:%s" % (r["team_id"], r["player_id"]) for r in squads]
-                   + ["$%s=%s/%s" % (r["team_id"], r["team_money"],
-                                     r["position"]) for r in table])
-
-
 LINEUP_SLOTS = {"goalkeeper": "POR", "defender": "DEF",
                 "midfield": "MED", "striker": "DEL"}
 
@@ -1311,12 +1109,6 @@ def parse_api_lineup(text: str, observed_at: str,
     return rows
 
 
-def sign_api_lineup(text: str) -> str | None:
-    rows = parse_api_lineup(text, "")
-    return _digest(["%s:%s" % (r["slot"], r["player_id"]) for r in rows]
-                   + ["=%s" % (rows[0]["formation"] if rows else "")])
-
-
 API_PLAYER_URL = "{base}/v1/competition/1/player/{pid}?x-lang=es"
 API_PLAYER_KEY_RE = re.compile(r"^api_player_(\d+)$")
 
@@ -1338,11 +1130,6 @@ def parse_api_player(text: str, observed_at: str,
     }]
 
 
-def sign_api_player(text: str) -> str | None:
-    rows = parse_api_player(text, "")
-    return _digest([rows[0]["player_name"]]) if rows else None
-
-
 API_PLAYERS_ALL_URL = "{base}/v1/competition/1/players?x-lang=es"
 
 
@@ -1356,16 +1143,8 @@ def parse_api_players_all(text: str, observed_at: str,
     return _parse_json_list(text, observed_at, row)
 
 
-sign_api_players_all = partial(
-    _sign_rows, parse=lambda t: parse_api_players_all(t, ""),
-    fmt=lambda r: "%s@%s/%s" % (r["player_id"], r["player_status"],
-                                r["market_value"]),
-    sort=True)
-
-
 def player_source(key: str) -> Source | None:
     return _rebuild(key, API_PLAYER_KEY_RE, "api_players", parse_api_player,
-                    sign_api_player,
                     lambda m: API_PLAYER_URL.format(base="{base}",
                                                     pid=m.group(1)),
                     cadence="once", auth=True)
@@ -1414,14 +1193,8 @@ def parse_api_offer(text: str, observed_at: str,
     return _parse_json_list(text, observed_at, row, if_empty=empty)
 
 
-sign_api_offer = partial(
-    _sign_rows, parse=lambda t: parse_api_offer(t, "", key="api_offer_0"),
-    fmt=lambda r: "%s@%s/%s" % (r["offer_id"], r["money"], r["status"]))
-
-
 def offer_source(key: str) -> Source | None:
-    return _rebuild(key, API_OFFER_KEY_RE, "api_offers", parse_api_offer,
-                    sign_api_offer, lambda m: API_OFFER_URL, auth=True)
+    return _rebuild(key, API_OFFER_KEY_RE, "api_offers", parse_api_offer, lambda m: API_OFFER_URL, auth=True)
 
 
 def offer_sources(teams_json: str, me: str, league: str,
@@ -1436,22 +1209,22 @@ def offer_sources(teams_json: str, me: str, league: str,
         out.append(Source(
             "api_offer_%s" % ptid, "api_offers",
             API_OFFER_URL.format(base="{base}", league=league, ptid=ptid),
-            parse_api_offer, sign_api_offer, auth=True))
+            parse_api_offer, auth=True))
     return out
 
 
 def api_source(key: str) -> Source | None:
-    table = {"api_market": (API_MARKET_URL, parse_api_market, sign_api_market),
-             "api_teams": (API_TEAMS_URL, parse_api_teams, sign_api_teams)}
+    table = {"api_market": (API_MARKET_URL, parse_api_market),
+             "api_teams": (API_TEAMS_URL, parse_api_teams)}
     if key.startswith("api_activity_"):
         return Source(key, "api_activity", API_ACTIVITY_URL,
-                      parse_api_activity, sign_api_activity, auth=True)
+                      parse_api_activity, auth=True)
     if key.startswith("api_lineup_"):
         return Source(key, "api_lineup", API_LINEUP_URL,
-                      parse_api_lineup, sign_api_lineup, auth=True)
+                      parse_api_lineup, auth=True)
     if key in table:
-        url, p, s = table[key]
-        return Source(key, key, url, p, s,
+        url, p = table[key]
+        return Source(key, key, url, p,
                       cadence="daily" if key == "api_teams" else "every_run",
                       auth=True)
     return None
@@ -1463,21 +1236,21 @@ def league_sources(leagues_json: str, observed_at: str = "") -> list[Source]:
         lg = r["league_id"]
         out.append(Source("api_market", "api_market",
                           API_MARKET_URL.format(base="{base}", league=lg),
-                          parse_api_market, sign_api_market, auth=True))
+                          parse_api_market, auth=True))
         out.append(Source("api_teams", "api_teams",
                           API_TEAMS_URL.format(base="{base}", league=lg),
-                          parse_api_teams, sign_api_teams, auth=True))
+                          parse_api_teams, auth=True))
         if r.get("team_id"):
             out.append(Source(
                 "api_lineup_%d" % LINEUP_WEEK, "api_lineup",
                 API_LINEUP_URL.format(base="{base}", team=r["team_id"],
                                       week=LINEUP_WEEK),
-                parse_api_lineup, sign_api_lineup, auth=True))
+                parse_api_lineup, auth=True))
         for page in (0, 1):
             out.append(Source(
                 "api_activity_%d" % page, "api_activity",
                 API_ACTIVITY_URL.format(base="{base}", league=lg, page=page),
-                parse_api_activity, sign_api_activity, auth=True))
+                parse_api_activity, auth=True))
     return out
 
 
@@ -1486,7 +1259,6 @@ class Source(NamedTuple):
     table: str
     url: str
     parse: Callable
-    sign: Callable
     cadence: str = "every_run"
     body: dict | None = None
     timeout: float | None = None
@@ -1497,29 +1269,28 @@ class Source(NamedTuple):
 @lru_cache(maxsize=None)
 def sources(enabled_only: bool = True) -> list[Source]:
     out = [
-        Source("market", "market", MARKET_URL, parse_market, sign_market),
-        Source("points", "points", POINTS_URL, parse_points, sign_points),
+        Source("market", "market", MARKET_URL, parse_market),
+        Source("points", "points", POINTS_URL, parse_points),
     ]
     out += [Source(f"team_{s}", "lineups", TEAM_URL.format(slug=s),
-                   parse_team, sign_team, cadence="twice_daily")
+                   parse_team, cadence="twice_daily")
             for s in TEAMS]
     out += [Source(f"af_{s}", "lineups", AF_TEAM_URL.format(slug=af),
-                   parse_af_team, sign_af_team, cadence="twice_daily")
+                   parse_af_team, cadence="twice_daily")
             for s, af in sorted(AF_TEAMS.items())]
     out += [Source("af_fixtures", "fixtures", AF_HUB_URL,
-                   parse_af_fixtures, sign_af_fixtures, cadence="daily")]
-    out += [Source("elo", "elo", ELO_URL, parse_elo, sign_elo,
+                   parse_af_fixtures, cadence="daily")]
+    out += [Source("elo", "elo", ELO_URL, parse_elo,
                    cadence="daily", timeout=8.0)]
     out += fd_sources()
     out += understat_sources()
-    out += [Source("odds", "odds", ODDS_URL, parse_odds, sign_odds,
+    out += [Source("odds", "odds", ODDS_URL, parse_odds,
                    cadence="daily", timeout=15.0)]
-    out += [Source(CAL_KEY, "matches", FF_CAL_URL, parse_calendar,
-                   sign_calendar, cadence="daily")]
+    out += [Source(CAL_KEY, "matches", FF_CAL_URL, parse_calendar, cadence="daily")]
     out += [Source(API_LEAGUES_KEY, "api_leagues", API_LEAGUES_URL,
-                   parse_api_leagues, sign_api_leagues, auth=True)]
+                   parse_api_leagues, auth=True)]
     out += [Source("api_players_all", "api_players_all", API_PLAYERS_ALL_URL,
-                   parse_api_players_all, sign_api_players_all,
+                   parse_api_players_all,
                    cadence="daily", auth=True)]
     return [s for s in out if s.enabled or not enabled_only]
 
@@ -1940,24 +1711,6 @@ def _selftest() -> None:
     assert season_label(_POINTS_FIXTURE) == "2025-26"
     assert season_label("<html>nothing</html>") == "unknown"
 
-    assert sign_team(_FIXTURE) == sign_team(_FIXTURE)
-    assert sign_market(_MARKET_FIXTURE) and sign_points(_POINTS_FIXTURE)
-
-    moved = _FIXTURE.replace('class="jugadores-titulares"',
-                             'class="jugadores-titulares" '
-                             'data-posicionalternativa1-x="52%"')
-    assert sign_team(moved) == sign_team(_FIXTURE)
-
-    for before, after in [("Pedri 70%", "Pedri 60%"),
-                          ("Owen Bosch", "Owen Bosche"),
-                          ('alt="Duda"', 'alt="Lesionado"'),
-                          ("/jugadores/pedri", "/jugadores/pedri-gonzalez")]:
-        assert sign_team(_FIXTURE.replace(before, after)) != sign_team(_FIXTURE), \
-            before
-
-    assert sign_team("<html><body><p>nothing here</p></body></html>") is None
-    assert sign_market("<html><body>no players</body></html>") is None
-    assert sign_points("<html><body>no table</body></html>") is None
 
     af = parse_af_team(_AF_FIXTURE, "2026-01-01T0000Z", "af_test")
     assert [r["player_name"] for r in af] == ["Sivera", "Aitor Mañas",
@@ -1971,8 +1724,6 @@ def _selftest() -> None:
     assert "No Deberia" not in {r["player_name"] for r in af}
     assert list(af[0]) == list(rows[0]), (list(af[0]), list(rows[0]))
     assert af[0]["note"] == "titular"
-    assert sign_af_team(_AF_FIXTURE) is not None
-    assert sign_af_team("<html><body>no lineup</body></html>") is None
 
     con = parse_af_team(_AF_CONSENSO_FIXTURE, "2026-01-01T0000Z", "af_test")
     byc = {r["player_name"]: r for r in con}
@@ -1990,7 +1741,6 @@ def _selftest() -> None:
     assert all(r["status"] == "" for r in con)
     assert list(con[0]) == list(rows[0])
     assert parse_af_team("<html><body>new design</body></html>", "t") == []
-    assert sign_af_team(_AF_CONSENSO_FIXTURE) is not None
 
     fx = parse_af_fixtures(_AF_HUB_FIXTURE, "2026-01-01T0000Z")
     assert len(fx) == 1, fx
@@ -1999,33 +1749,6 @@ def _selftest() -> None:
     assert fx[0]["home_id"] == "536" and fx[0]["away_id"] == "728", fx[0]
     assert fx[0]["kickoff"] == "2026-08-15T19:30:00+00:00", fx[0]
     assert fx[0]["source"] == AF_SOURCE
-    assert sign_af_fixtures(_AF_HUB_FIXTURE) is not None
-    assert sign_af_fixtures("<html><body>no matches</body></html>") is None
-
-    sample = "\n".join([
-        "A = 1", "B = 2",
-        "def helper(x):", "    return x + A",
-        "def one(t):", "    return helper(t)",
-        "def two(t):", "    return B",
-    ])
-    assert parser_deps(sample, "one") == {"one", "helper", "A"}, \
-        parser_deps(sample, "one")
-    assert parser_deps(sample, "two") == {"two", "B"}
-    assert parser_deps(sample, "helper") == {"helper", "A"}
-    assert parser_deps(sample, "missing") == set()
-    edited = sample.replace("return x + A", "return x - A")
-    assert parser_sig("one", edited) != parser_sig("one", sample)
-    assert parser_sig("two", edited) == parser_sig("two", sample)
-    assert parser_sig("one", sample.replace("B = 2", "B = 3")) \
-        == parser_sig("one", sample)
-    assert parser_sig("one", sample) != parser_sig("two", sample)
-    rec = "def loops(x):\n    return loops(x)"
-    assert parser_deps(rec, "loops") == {"loops"}
-    assert parser_sig("missing", sample) != parser_sig("missing", edited)
-
-    whole = parser_sig("no such function at all")
-    for src_ in sources():
-        assert parser_sig(src_.parse.__name__) != whole, src_.key
 
     el = parse_elo(_ELO_FIXTURE, "2026-01-01T0000Z", "elo")
     assert [r["club"] for r in el] == ["Barcelona", "Real Madrid",
@@ -2042,12 +1765,6 @@ def _selftest() -> None:
     assert parse_elo("", "t") == []
     assert parse_elo("<html><body>no chart here</body></html>", "t") == []
     assert parse_elo("<script>var vegaJson = {not json;</script>", "t") == []
-    assert sign_elo(_ELO_FIXTURE) is not None
-    assert sign_elo(_ELO_FIXTURE) == sign_elo(
-        _ELO_FIXTURE.replace("#A4234B", "#123456"))
-    assert sign_elo(_ELO_FIXTURE.replace("2043.1", "2050.0")) \
-        != sign_elo(_ELO_FIXTURE)
-    assert sign_elo("nothing like the page") is None
     assert ELO_URL.format(date="2026-08-16") == ELO_URL
     assert MARKET_URL.format(date="2026-08-16") == MARKET_URL
 
@@ -2079,12 +1796,6 @@ def _selftest() -> None:
     assert parse_fd_results("﻿Div,Date,HomeTeam,AwayTeam,FTHG,FTAG\n"
                             "SP1,17/08/22,,,,\n", "t", "fd_2223") == []
 
-    assert sign_fd_results(_FD_CUR) is not None
-    assert sign_fd_results("") is None
-    assert sign_fd_results(_FD_CUR) == sign_fd_results(
-        _FD_CUR.replace("18,6,8,2", "99,6,8,2"))
-    assert sign_fd_results(_FD_CUR) != sign_fd_results(
-        _FD_CUR.replace("Alaves,Getafe,3,0", "Alaves,Getafe,4,0"))
 
     assert fd_season_code(datetime(2026, 8, 20, tzinfo=timezone.utc)) == "2627"
     assert fd_season_code(datetime(2027, 5, 1, tzinfo=timezone.utc)) == "2627"
@@ -2188,12 +1899,6 @@ def _selftest() -> None:
     assert len(notot) == 1 and notot[0]["p_over"] == "", notot
     assert notot[0]["p_home"] > 0, notot
 
-    assert sign_odds(_ODDS_LIVE) is not None
-    assert sign_odds("") is None
-    assert sign_odds(_ODDS_LIVE) == sign_odds(
-        _ODDS_LIVE.replace("2026-09-06T19:21:00Z", "2026-09-06T19:45:00Z"))
-    assert sign_odds(_ODDS_LIVE) != sign_odds(
-        _ODDS_LIVE.replace('"price": 2.3', '"price": 4.5'))
 
     assert source_for("odds").parse is parse_odds
     assert source_for("odds").table == "odds"
@@ -2238,13 +1943,6 @@ def _selftest() -> None:
         '{"success": true, "players": [{"id": "", "player_name": "X"}, '
         '{"id": "1", "player_name": ""}]}', "t") == []
 
-    assert sign_understat_players(_UNDERSTAT_PAST) is not None
-    assert sign_understat_players("") is None
-    assert sign_understat_players('{"success": true, "players": []}') is None
-    assert sign_understat_players(_UNDERSTAT_PAST) == sign_understat_players(
-        _UNDERSTAT_PAST.replace('"shots": "146"', '"shots": "147"'))
-    assert sign_understat_players(_UNDERSTAT_PAST) != sign_understat_players(
-        _UNDERSTAT_PAST.replace('"goals": "25"', '"goals": "26"'))
 
     us = understat_sources(datetime(2026, 8, 20, tzinfo=timezone.utc))
     assert [s.key for s in us] == ["understat_2026", "understat_2025"]
@@ -2261,7 +1959,6 @@ def _selftest() -> None:
     assert lg[0]["team_id"] == "38091967" and lg[0]["money"] == "23596582", lg
     assert lg[0]["source"] == LFG_SOURCE
     assert parse_api_leagues("<html>maintenance</html>", "t") == []
-    assert sign_api_leagues("<html>") is None
 
     mk = parse_api_market(_API_MARKET_FIXTURE, "t")
     assert len(mk) == 2, mk
@@ -2274,17 +1971,9 @@ def _selftest() -> None:
     assert mk[0]["player_name"] == "Simeone", mk[0]
     assert mk[0]["player_name_full"] == "Giuliano Simeone", mk[0]
     assert mk[1]["player_name_full"] == "", mk[1]
-    assert sign_api_market(_API_MARKET_FIXTURE) == sign_api_market(
-        _API_MARKET_FIXTURE.replace("2026-08-18T22", "2026-08-20T22"))
-    assert sign_api_market(_API_MARKET_FIXTURE) != sign_api_market(
-        _API_MARKET_FIXTURE.replace("5552694,\"numberOfBids\":1",
-                                    "5552694,\"numberOfBids\":3"))
     assert mk[0]["bid_id"] == "b1" and mk[0]["bid_money"] == "5600000"
     assert mk[0]["bid_status"] == "pending"
     assert mk[1]["bid_id"] == "" and mk[1]["bid_money"] == ""
-    assert sign_api_market(_API_MARKET_FIXTURE) != sign_api_market(
-        _API_MARKET_FIXTURE.replace('"status":"pending"',
-                                    '"status":"accepted"'))
 
     ac = parse_api_activity(_API_ACTIVITY_FIXTURE, "t")
     assert ([r["kind"] for r in ac] ==
@@ -2308,12 +1997,8 @@ def _selftest() -> None:
          "user1Id": 1, "user2Id": 2,
          "createdAt": "2026-09-19T10:00:00+02:00"}])
     assert len(parse_api_activity(_one_more, "t")) == len(ac) + 1
-    assert sign_api_activity(_one_more) != sign_api_activity(
-        _API_ACTIVITY_FIXTURE)
-    assert sign_api_activity(_API_ACTIVITY_FIXTURE) is not None
     import json as _json
     _rev = _json.dumps(list(reversed(_json.loads(_API_ACTIVITY_FIXTURE))))
-    assert sign_api_activity(_rev) == sign_api_activity(_API_ACTIVITY_FIXTURE)
 
     all_rows = parse_api_teams(_API_TEAMS_FIXTURE, "t")
     assert {r[ROW_TABLE] for r in all_rows} == {"api_teams", "api_stats",
@@ -2362,8 +2047,6 @@ def _selftest() -> None:
     assert sum(int(r["points"]) for r in st) == 5
     assert len(tm) == 2 and "stat" not in tm[0], tm[0]
     assert not any(r["player_id"] == "2621" for r in st), st
-    assert sign_api_teams(_API_TEAMS_FIXTURE) == sign_api_teams(
-        _API_TEAMS_FIXTURE.replace('"goals":[1,4]', '"goals":[1,9]'))
 
     disc = league_sources(_API_LEAGUES_FIXTURE)
     assert [s.key for s in disc] == ["api_market", "api_teams",
@@ -2422,10 +2105,7 @@ def _selftest() -> None:
     assert pa[0]["player_status"] == "ok", pa
     assert pa[1]["player_id"] == "68" and pa[1]["player_name"] == "Unai Simón", pa
     assert parse_api_players_all("<html>", "t") == []
-    assert sign_api_players_all(_API_PLAYERS_ALL_FIXTURE) is not None
     _rev = _json.dumps(list(reversed(_json.loads(_API_PLAYERS_ALL_FIXTURE))))
-    assert (sign_api_players_all(_rev) ==
-            sign_api_players_all(_API_PLAYERS_ALL_FIXTURE))
     assert source_for("api_players_all").parse is parse_api_players_all
     assert source_for("api_players_all").table == "api_players_all"
     assert source_for("api_players_all").cadence == "daily"
@@ -2443,12 +2123,6 @@ def _selftest() -> None:
     assert empty[0]["player_team_id"] == "24338726", empty
     assert empty[0]["offer_id"] == "", empty
     assert parse_api_offer(_API_OFFER_FIXTURE, "t", "not-a-key") == []
-    assert sign_api_offer(_API_OFFER_FIXTURE) is not None
-    assert sign_api_offer("[]") is not None
-    assert sign_api_offer("[]") != sign_api_offer(_API_OFFER_FIXTURE)
-    assert sign_api_offer("not json") is None
-    assert sign_api_offer(_API_OFFER_FIXTURE) != sign_api_offer(
-        _API_OFFER_FIXTURE.replace('"pending"', '"accepted"'))
 
     osrc = offer_sources(_API_TEAMS_FIXTURE, "miguel_autentico", "017998544")
     assert [s.key for s in osrc] == ["api_offer_24338726"], osrc
@@ -2482,8 +2156,6 @@ def _selftest() -> None:
                                    "match_22429-sevilla-rayo"], ps
     assert ps[0].url.endswith("/partidos/22421-alaves-getafe")
     assert ps[0].cadence == "once" and ps[0].table == "starters"
-    assert sign_calendar(_CAL_FIXTURE) is not None
-    assert sign_calendar("<html><body>no matches</body></html>") is None
 
     xi = parse_starters(_MATCH_FIXTURE, "2026-01-01T0000Z",
                         "match_22421-alaves-getafe")
@@ -2511,8 +2183,6 @@ def _selftest() -> None:
     assert {r["team_slug"] for r in short} == {"getafe"}, short
     assert parse_starters("<html><body>sin datos</body></html>", "t",
                           "match_22421-alaves-getafe") == []
-    assert sign_starters("<html><body>sin datos</body></html>") is None
-    assert sign_starters(_MATCH_FIXTURE) is not None
     assert parse_starters(_MATCH_FIXTURE, "t", "market") == []
     assert match_source("market") is None
     assert match_source("match_22421-alaves-getafe").key \
@@ -2527,10 +2197,6 @@ def _selftest() -> None:
     assert ln[2]["player_name"] == "Pepelu"
     assert ln[2]["player_name_full"].startswith("Jos")
     assert ln[0]["snapshot_at"].startswith("2026-08-19T20:26")
-    assert sign_api_lineup(LINEUP_FIXTURE) == sign_api_lineup(
-        LINEUP_FIXTURE.replace("4350000", "4360000"))
-    assert sign_api_lineup(LINEUP_FIXTURE) != sign_api_lineup(
-        LINEUP_FIXTURE.replace('"1070"', '"1071"'))
     assert parse_api_lineup("not json", "t1") == []
     assert source_for("api_lineup_38").table == "api_lineup"
 
@@ -2563,10 +2229,11 @@ def _selftest() -> None:
                "api_players_all": _API_PLAYERS_ALL_FIXTURE}
     for i, k in enumerate(sorted(AF_TEAMS)):
         samples[f"af_{k}"] = _AF_FIXTURE if i % 2 else _AF_CONSENSO_FIXTURE
+    for s in fd_sources():
+        samples[s.key] = _FD_CUR
     for s in reg:
         html = samples.get(s.key, _FIXTURE)
-        assert s.sign(html) is not None, s.key
-        assert isinstance(s.parse(html, "2026-01-01T0000Z", s.key), list), s.key
+        assert s.parse(html, "2026-01-01T0000Z", s.key), s.key
 
     print("sources.py selftest OK (266 cases)")
 

@@ -4,8 +4,6 @@ ingest.py — the only thing that touches the network or the raw store.
     python src/ingest.py fetch      # sweep the registry, store what changed
     python src/ingest.py parse      # rebuild tidy CSV from every snapshot ever
     python src/ingest.py baseline   # once a season: last season's points table
-    python src/ingest.py prune      # migrate/compact data/raw (dry run)
-    python src/ingest.py prune --apply
     python src/ingest.py --selftest
 
 Fetch and parse stay separate: when markup changes, fix sources.py and
@@ -41,12 +39,10 @@ import hashlib
 import io
 import itertools
 import json
-import gzip
 import lzma
 import os
 import random
 import re
-import shutil
 import sys
 import tarfile
 import time
@@ -57,15 +53,16 @@ from urllib.parse import urlparse
 
 from ffcore.auth import API_BASE
 from ffcore.league import load_config
-from ffcore.tidy import ROOT, SEASON, TIDY, append_csv, csv_string
+from ffcore.tidy import (ROOT, SEASON, TIDY, append_csv, csv_string, read_csv,
+                         table_stats, widen_csv, write_csv)
 from sources import (API_LEAGUES_KEY, CAL_KEY, MATCH_KEY_RE,
                      ROW_TABLE, STORE_DAILY, STORE_ONCE, league_sources,
                      offer_sources, parse_api_leagues, parse_points,
-                     parser_sig, played_sources, player_sources,
+                     played_sources, player_sources,
                      season_label, source_for, sources)
 
-__all__ = ["snapshots", "state", "pages", "doc_keys", "documents", "due",
-          "fetch", "parse", "parse_cache", "save_parse_cache", "baseline"]
+__all__ = ["snapshots", "state", "doc_keys", "documents", "due",
+          "fetch", "parse", "baseline"]
 
 RAW = ROOT / "raw"
 
@@ -95,18 +92,11 @@ def _stamp_of(path: Path) -> str:
 
 
 def snapshots() -> list[Path]:
-    found = list(RAW.glob("dt=*.tar.xz")) + [p for p in RAW.glob("dt=*")
-                                             if p.is_dir()]
-    return sorted(found, key=_stamp_of)
+    return sorted(RAW.glob("dt=*.tar.xz"), key=_stamp_of)
 
 
 def _read(path: Path, only: set | None = None) -> dict[str, str]:
     want = None if only is None else set(only) | {MANIFEST}
-    if path.is_dir():
-        return {f.name.removesuffix(".gz"):
-                gzip.open(f, "rt", encoding="utf-8", errors="replace").read()
-                for f in sorted(path.glob("*.html.gz"))
-                if want is None or f.name.removesuffix(".gz") in want}
     with tarfile.open(path, "r:xz") as tf:
         return {m.name: tf.extractfile(m).read().decode("utf-8", "replace")
                 for m in tf.getmembers()
@@ -130,11 +120,7 @@ def _write(path: Path, members: dict[str, str]) -> None:
 
 
 def _manifest(members: dict[str, str]) -> list[dict]:
-    body = members.get(MANIFEST)
-    if body is None:
-        return [{"page": k.removesuffix(".html"), "sig": "", "stored": "",
-                 "seen": ""} for k in sorted(members) if k.endswith(".html")]
-    return list(csv.DictReader(io.StringIO(body)))
+    return list(csv.DictReader(io.StringIO(members.get(MANIFEST, ""))))
 
 
 def _manifest_csv(rows: list[dict]) -> str:
@@ -146,17 +132,6 @@ def state() -> dict[str, dict]:
     if not snaps:
         return {}
     return {r["page"]: r for r in _manifest(_read(snaps[-1]))}
-
-
-def pages(only: set | None = None):
-    keep = None if only is None else {"%s.html" % p for p in only}
-    carried: dict[str, str] = {}
-    for snap in snapshots():
-        members = _read(snap, keep)
-        carried.update({k.removesuffix(".html"): v for k, v in members.items()
-                        if k.endswith(".html")})
-        present = [r["page"] for r in _manifest(members)]
-        yield _stamp_of(snap), {p: carried[p] for p in present if p in carried}
 
 
 _INDEX = "snapindex.json"
@@ -183,7 +158,7 @@ def doc_keys():
     fresh, opened = {}, 0
     for snap in snapshots():
         stamp = _stamp_of(snap)
-        size = snap.stat().st_size if snap.is_file() else -1
+        size = snap.stat().st_size
         have = idx.get(stamp)
         if have is not None and have.get("size") == size:
             resolved = {p: (v[0], v[1]) for p, v in have["pages"].items()}
@@ -219,6 +194,19 @@ def documents(need: dict[str, set]):
 
 
 TWICE_DAILY_HOURS = 6.0
+
+
+def page_sig(src, text: str) -> str | None:
+    try:
+        rows = src.parse(text, "", src.key)
+    except Exception:
+        rows = []
+    if not rows:
+        return None
+    return hashlib.sha1("\n".join(sorted(json.dumps(r, sort_keys=True,
+                                                     default=str)
+                                          for r in rows)).encode("utf-8")
+                        ).hexdigest()[:16]
 
 
 def due(src, prev: dict, now: str) -> bool:
@@ -346,7 +334,7 @@ def fetch() -> Path:
             if src.key == "api_teams" and league_id:
                 queue += offer_sources(r.text, me, league_id)
 
-            sig = src.sign(r.text)
+            sig = page_sig(src, r.text)
             was = prev.get(src.key, {})
             if sig is None:
                 print(f"  warn: {src.key} matched no known markup — stored "
@@ -399,278 +387,110 @@ FEED_FIELDS = ["observed_at", "page", "status", "seconds"]
 
 
 def parse() -> None:
+    import sources
+
+    version = hashlib.blake2b(Path(sources.__file__).read_bytes(),
+                              digest_size=8).hexdigest()
     walk = doc_keys()
-    sigs_now: dict[str, str] = {}
-    for _stamp, docs in walk:
-        for key in docs:
-            src = _walkable_src(key)
-            if src is None:
-                continue
-            name = getattr(src.parse, "__name__", "")
-            if name and name not in sigs_now:
-                sigs_now[name] = parser_sig(name)
     state = _read_json(TIDY / _STATE, {})
-    state = state if isinstance(state, dict) else {}
-    stamps = [stamp for stamp, _ in walk]
-    routed = set(state.get("stamps") or ())
-    tail = [stamp for stamp in stamps if stamp not in routed]
-    settled = (routed and routed <= set(stamps)
-               and state.get("sigs") == sigs_now
-               and _tidy_has(state.get("tables") or ()))
-    if settled and not tail:
+    done = set(state.get("stamps") or ())
+    tables = set(state.get("tables") or ())
+    if (state.get("version") != version
+            or not done <= {stamp for stamp, _docs in walk}
+            or not all((TIDY / f"{t}.csv").exists() for t in tables)):
+        for t in tables:
+            (TIDY / f"{t}.csv").unlink(missing_ok=True)
+        if state.get("version") != version:
+            (TIDY / _CACHE).unlink(missing_ok=True)
+        done, tables = set(), set()
+    todo = [(stamp, docs) for stamp, docs in walk if stamp not in done]
+    if not todo:
         print("  nothing new to parse (%d snapshots already folded in)"
-              % len(routed))
+              % len(done))
         return
-    if settled and tail:
-        if _parse_tail(walk, tail, sigs_now, stamps, state):
-            return
-        print("  tail append declined — rebuilding in full")
-    _parse_everything(walk, sigs_now, stamps)
 
-
-def _walkable_src(key: str):
-    src = source_for(key)
-    return src if src is not None and src.table != "points" else None
-
-
-def _parse_tail(walk, tail, sigs_now, stamps, state) -> bool:
-    tail_set = set(tail)
-    want: dict[tuple[str, str], str] = {}
-    keyed: list[tuple[str, str, object]] = []
-    for stamp, docs in walk:
-        if stamp not in tail_set:
-            continue
-        for key, (ck, origin) in sorted(docs.items()):
-            src = _walkable_src(key)
-            if src is None:
-                continue
-            pk = parse_key(ck, src)
-            keyed.append((stamp, pk, src))
-            want[(origin, key)] = pk
-
-    cache = _read_cache_lines(_CACHE, set(want.values()))
-    need: dict[str, set] = {}
-    for (origin, key), pk in want.items():
-        if pk not in cache:
-            need.setdefault(origin, set()).add(key)
-
-    fresh: dict = {}
-    keys = Sigs()
-    for origin, key, html in documents(need):
-        pk, rows = _parse_one(origin, key, html, keys)
-        cache[pk] = rows
-        fresh[pk] = rows
-
-    pending: dict[str, list[dict]] = {}
-    for stamp, pk, src in keyed:
-        if pk not in cache:
-            return False
-        route(pending, cache[pk], src.table, stamp)
-
-    known = set(state.get("tables") or ())
-    if not set(pending) <= known:
-        return False
-
-    for table in sorted(pending):
-        daily = STORE_DAILY.get(table)
-        if daily:
-            if not _append_csv_daily(TIDY / f"{table}.csv", pending[table],
-                                     daily):
-                return False
-        elif not _append_csv(TIDY / f"{table}.csv", pending[table],
-                             STORE_ONCE.get(table)):
-            return False
-
-    if fresh:
+    parsed = rows_out = 0
+    for i in range(0, len(todo), CHUNK):
+        chunk = todo[i:i + CHUNK]
+        cache = _read_cache({ck for _stamp, docs in chunk
+                             for page, (ck, _o) in docs.items()
+                             if source_for(page)})
+        need: dict[str, set] = {}
+        for _stamp, docs in chunk:
+            for page, (ck, origin) in docs.items():
+                if source_for(page) and ck not in cache:
+                    need.setdefault(origin, set()).add(page)
+        fresh = _parse_all(need)
+        cache.update(fresh)
+        parsed += len(fresh)
         TIDY.mkdir(parents=True, exist_ok=True)
-        try:
-            with (TIDY / _lines_name(_CACHE)).open("a", encoding="utf-8") as fh:
-                for k, rows in fresh.items():
-                    fh.write(json.dumps({"k": k, "r": rows}) + "\n")
-        except OSError:
-            pass
-    _save_parse_state({"sigs": sigs_now, "stamps": stamps,
-                       "tables": sorted(known)})
-    print("  tail: %d new snapshot(s), %d document(s) parsed, "
-          "%d row(s) appended"
-          % (len(tail), len(fresh), sum(len(v) for v in pending.values())))
-    return True
+        with (TIDY / _CACHE).open("a", encoding="utf-8") as fh:
+            for ck, rows in fresh.items():
+                fh.write(json.dumps({"k": ck, "r": rows}) + "\n")
+        pending: dict[str, list[dict]] = {}
+        for stamp, docs in chunk:
+            for page, (ck, _origin) in sorted(docs.items()):
+                src = source_for(page)
+                if src is not None:
+                    route(pending, cache.get(ck, []), src.table, stamp)
+        for table, rows in pending.items():
+            _store(TIDY / f"{table}.csv", rows, STORE_ONCE.get(table),
+                   STORE_DAILY.get(table))
+            rows_out += len(rows)
+        tables |= set(pending)
+        done |= {stamp for stamp, _docs in chunk}
+        _write_json(TIDY / _STATE, {"version": version, "stamps": sorted(done),
+                                    "tables": sorted(tables)})
+    print("  %d snapshot(s): %d document(s) parsed, %d row(s) routed"
+          % (len(todo), parsed, rows_out))
+    if not table_stats(TIDY / "market.csv")[0]:
+        sys.exit("ERROR: market parse produced 0 rows — the markup changed.")
 
 
-def _tidy_has(tables) -> bool:
-    return bool(tables) and all((TIDY / f"{t}.csv").exists() for t in tables)
+CHUNK = 25
+_STATE = "parse_state.json"
+_CACHE = "parsed.jsonl"
+
+
+def _read_cache(keys: set) -> dict:
+    out: dict = {}
+    try:
+        fh = (TIDY / _CACHE).open(encoding="utf-8")
+    except OSError:
+        return out
+    with fh:
+        for line in fh:
+            if line[7:line.find('"', 7)] in keys:
+                rec = json.loads(line)
+                out[rec["k"]] = rec["r"]
+    return out
 
 
 def _parse_origin(task) -> dict:
     origin, want = task
-    out, sigs = {}, Sigs()
-    for o, key, html in documents({origin: want}):
-        pk, rows = _parse_one(o, key, html, sigs)
-        out[pk] = rows
+    out = {}
+    for stamp, page, html in documents({origin: want}):
+        try:
+            rows = source_for(page).parse(html, stamp, page)
+        except Exception as e:
+            print(f"  warn: {stamp}/{page}: {type(e).__name__}: {e}")
+            rows = []
+        out[Sigs().of(page, html)] = rows
     return out
 
 
-def _parse_one(origin: str, key: str, html: str, sigs: "Sigs"
-               ) -> tuple[str, list[dict]]:
-    src = source_for(key)
-    try:
-        rows = src.parse(html, origin, key)
-    except Exception as e:
-        print(f"  warn: {origin}/{key}: {type(e).__name__}: {e}")
-        rows = []
-    return parse_key(sigs.of(key, html), src), rows
-
-
-def _parse_everything(walk, sigs_now, stamps) -> None:
-    pending: dict[str, list[dict]] = {}
-    cache, fresh = parse_cache(), {}
-
-    need: dict[str, set] = {}
-    for stamp, docs in walk:
-        for key, (ck, origin) in docs.items():
-            src = _walkable_src(key)
-            if src is not None and parse_key(ck, src) not in cache:
-                need.setdefault(origin, set()).add(key)
-    misses = sum(len(v) for v in need.values())
+def _parse_all(need: dict[str, set]) -> dict:
     tasks = sorted(need.items())
-    if misses < 24:
-        n = 1
-    else:
-        n = max(1, (os.cpu_count() or 2) // 2)
-        try:
-            cg = Path("/sys/fs/cgroup") / (Path("/proc/self/cgroup").read_text()
-                                            .strip().split("::")[-1].lstrip("/"))
-            cap = (cg / "memory.max").read_text().strip()
-            if cap != "max":
-                rss = int((cg / "memory.current").read_text())
-                n = min(n, max(1, (int(cap) - rss - 100 * 2**20) // (200 * 2**20)))
-        except (OSError, ValueError):
-            pass
-    if n > 1:
-        import concurrent.futures as cf
-        import multiprocessing as mp
-        with cf.ProcessPoolExecutor(n, mp_context=mp.get_context("fork")) as ex:
-            for part in ex.map(_parse_origin, tasks):
-                cache.update(part)
-    else:
-        for t in tasks:
-            cache.update(_parse_origin(t))
-
-    spill = TIDY / ".parse_spill"
-    if spill.exists():
-        for f in spill.glob("*.jsonl"):
-            f.unlink()
-    spilled: set[str] = set()
-    buffered = 0
-
-    hits = 0
-    for stamp, docs in walk:
-        for key, (ck, origin) in sorted(docs.items()):
-            src = _walkable_src(key)
-            if src is None:
-                continue
-            pk = parse_key(ck, src)
-            rows = cache.get(pk, [])
-            hits += 1
-            fresh[pk] = rows
-            route(pending, rows, src.table, stamp)
-            buffered += len(rows)
-        if buffered >= SPILL_ROWS:
-            _spill_out(pending, spill, spilled)
-            buffered = 0
-    hits -= misses
-    save_parse_cache(fresh)
-    del cache, fresh
-    print("  parsed %d documents, reused %d" % (misses, hits))
-
-    TIDY.mkdir(parents=True, exist_ok=True)
-    (TIDY / "probable_xi.csv").unlink(missing_ok=True)
-
-    market_count = 0
-    xi_count = 0
-    tally: dict[str, int] = {}
-    per_source: dict[str, int] = {}
-    fixture_count = 0
-    played: set = set()
-    starters_count = 0
-    starters_matches: set = set()
-
-    written: list[str] = []
-    for table in sorted(spilled | set(pending)):
-        once = STORE_ONCE.get(table)
-        daily = STORE_DAILY.get(table)
-        seen: set[int] = set()
-        w = fh = None
-        fieldnames: list = []
-        fieldset: set = set()
-        n = 0
-        rows_iter = _spilled_rows(spill, table, pending.pop(table, []))
-        if daily:
-            rows_iter = _compact_daily(list(rows_iter), daily)
-        for r in rows_iter:
-            if once:
-                k = tuple((r.get(c) or "") for c in once)
-                if all(k):
-                    h = _key_hash(k)
-                    if h in seen:
-                        continue
-                    seen.add(h)
-            if w is None:
-                fieldnames = list(r)
-                fieldset = set(fieldnames)
-                fh = (TIDY / f"{table}.csv").open(
-                    "w", newline="", encoding="utf-8")
-                w = csv.writer(fh, lineterminator="\n")
-                w.writerow(fieldnames)
-            if not r.keys() <= fieldset:
-                fh.close()
-                raise ValueError("dict contains fields not in fieldnames: "
-                                 + ", ".join(repr(x)
-                                             for x in r.keys() - fieldset))
-            w.writerow([r.get(f, "") for f in fieldnames])
-            n += 1
-            if table == "lineups":
-                tally[r["status"]] = tally.get(r["status"], 0) + 1
-                per_source[r["source"]] = per_source.get(r["source"], 0) + 1
-            elif table == "matches":
-                if r["score"]:
-                    played.add(r["match_id"])
-            elif table == "starters":
-                starters_matches.add(r["match_id"])
-        if fh is not None:
-            fh.close()
-        written.append(table)
-        if table == "market":
-            market_count = n
-        elif table == "lineups":
-            xi_count = n
-        elif table == "fixtures":
-            fixture_count = n
-        elif table == "starters":
-            starters_count = n
-    for f in spill.glob("*.jsonl"):
-        f.unlink()
-
-    if not market_count:
-        sys.exit("ERROR: market parse produced 0 rows — the markup changed.")
-
-    flags = ", ".join("%s %d" % (k or "not stated", v)
-                      for k, v in sorted(tally.items()) if k != "ok")
-    by_src = ", ".join("%s %d" % (k, v) for k, v in sorted(per_source.items()))
-    print(f"market {market_count} rows, lineups {xi_count} rows "
-          f"({by_src}), fixtures {fixture_count} rows")
-    print("  played %d matches, starters %d rows for %d of them"
-          % (len(played), starters_count, len(starters_matches)))
-    print("  status: ok %d%s" % (tally.get("ok", 0),
-                                 (", " + flags) if flags else ""))
-    if not flags:
-        print("  warn: no player flagged in any snapshot — if the site still "
-              "shows injuries, the fitness selectors have rotted.")
-
-    _save_parse_state({"sigs": sigs_now, "stamps": stamps, "tables": written})
-
-
-_CACHE = "parsed.json"
+    if sum(len(v) for v in need.values()) < 24:
+        return {k: v for t in tasks for k, v in _parse_origin(t).items()}
+    import concurrent.futures as cf
+    import multiprocessing as mp
+    out: dict = {}
+    with cf.ProcessPoolExecutor(max(1, (os.cpu_count() or 2) // 2),
+                                mp_context=mp.get_context("fork")) as ex:
+        for part in ex.map(_parse_origin, tasks):
+            out.update(part)
+    return out
 
 
 class Sigs:
@@ -687,66 +507,6 @@ class Sigs:
         return ck
 
 
-_SIG_CACHE: dict[str, str] = {}
-
-
-def parse_key(content_key: str, src) -> str:
-    name = getattr(src.parse, "__name__", "")
-    sig = _SIG_CACHE.get(name)
-    if sig is None:
-        sig = _SIG_CACHE[name] = parser_sig(name)
-    return "%s@%s" % (content_key, sig)
-
-
-_STATE = "parse_state.json"
-
-
-def _lines_name(name: str) -> str:
-    return (name[:-5] if name.endswith(".json") else name) + ".jsonl"
-
-
-def _save_parse_state(state: dict, name: str = _STATE) -> None:
-    _write_json(TIDY / name, state)
-
-
-def _read_cache_lines(name: str, keys: set | None = None) -> dict:
-    lines = TIDY / _lines_name(name)
-    try:
-        fh = lines.open(encoding="utf-8")
-    except OSError:
-        return {} if keys is not None else _read_json(TIDY / name, {}).get("docs", {})
-    out: dict = {}
-    with fh:
-        for line in fh:
-            if not line.strip():
-                continue
-            try:
-                rec = json.loads(line)
-            except ValueError:
-                continue
-            k = rec.get("k")
-            if k and (keys is None or k in keys):
-                out[k] = rec.get("r") or []
-    return out
-
-
-def parse_cache(name: str = _CACHE) -> dict:
-    return _read_cache_lines(name)
-
-
-def save_parse_cache(docs: dict, name: str = _CACHE) -> None:
-    TIDY.mkdir(parents=True, exist_ok=True)
-    tmp = TIDY / (_lines_name(name) + ".new")
-    try:
-        with tmp.open("w", encoding="utf-8") as fh:
-            for k, rows in docs.items():
-                fh.write(json.dumps({"k": k, "r": rows}) + "\n")
-        tmp.replace(TIDY / _lines_name(name))
-        (TIDY / name).unlink(missing_ok=True)
-    except OSError:
-        tmp.unlink(missing_ok=True)
-
-
 def route(tables: dict, rows: list[dict], default: str, stamp: str) -> None:
     for r in rows:
         table = r.get(ROW_TABLE) or default
@@ -756,154 +516,29 @@ def route(tables: dict, rows: list[dict], default: str, stamp: str) -> None:
         tables.setdefault(table, []).append(d)
 
 
-def first_seen(rows: list[dict], key: tuple) -> list[dict]:
-    out, seen = [], set()
-    for r in rows:
-        k = tuple((r.get(c) or "") for c in key)
-        if all(k):
-            if k in seen:
+def _store(path: Path, rows: list[dict], once=None, daily=None) -> None:
+    fields = list(dict.fromkeys(f for r in rows for f in r))
+    widen_csv(path, fields)
+    if daily:
+        by_day: dict = {}
+        for r in list(read_csv(path)) + rows:
+            k = tuple((r.get(c) or "") for c in daily)
+            by_day[(k, (r.get("observed_at") or "")[:10]) if all(k)
+                   else len(by_day)] = r
+        write_csv(path, list(by_day.values()),
+                  list(dict.fromkeys(f for r in by_day.values() for f in r)))
+        return
+    if once:
+        seen = {tuple((r.get(c) or "") for c in once) for r in read_csv(path)}
+        fresh = []
+        for r in rows:
+            k = tuple((r.get(c) or "") for c in once)
+            if all(k) and k in seen:
                 continue
             seen.add(k)
-        out.append(r)
-    return out
-
-
-SPILL_ROWS = 120_000
-
-
-def _spill_out(pending: dict, root: Path, spilled: set) -> None:
-    root.mkdir(parents=True, exist_ok=True)
-    for table, rows in pending.items():
-        if not rows:
-            continue
-        with (root / f"{table}.jsonl").open("a", encoding="utf-8") as fh:
-            for r in rows:
-                fh.write(json.dumps(r) + "\n")
-        spilled.add(table)
-    pending.clear()
-
-
-def _spilled_rows(root: Path, table: str, tail: list):
-    path = root / f"{table}.jsonl"
-    if path.exists():
-        with path.open(encoding="utf-8") as fh:
-            for line in fh:
-                if line.strip():
-                    yield json.loads(line)
-    for r in tail:
-        yield r
-
-
-def _compact_daily(rows: list[dict], key_cols) -> list[dict]:
-    out: list[dict] = []
-    pos: dict[tuple, int] = {}
-    for r in rows:
-        k = tuple((r.get(c) or "") for c in key_cols)
-        if not all(k):
-            out.append(r)
-            continue
-        gk = (k, (r.get("observed_at") or "")[:10])
-        i = pos.get(gk)
-        if i is None:
-            pos[gk] = len(out)
-            out.append(r)
-        else:
-            out[i] = r
-    return out
-
-
-def _append_csv_daily(path: Path, rows: list[dict], key_cols) -> bool:
-    if not rows:
-        return True
-    if not path.exists():
-        _write_csv(path, _compact_daily(rows, key_cols))
-        return True
-    try:
-        with path.open(newline="", encoding="utf-8") as fh:
-            reader = csv.DictReader(fh)
-            header = reader.fieldnames
-            if header is None:
-                return False
-            existing = list(reader)
-    except OSError:
-        return False
-    fieldset = set(header)
-    for r in rows:
-        if not set(r) <= fieldset:
-            return False
-    _write_csv(path, _compact_daily(existing + rows, key_cols))
-    return True
-
-
-def _append_csv(path: Path, rows: list[dict], once_key=None) -> bool:
-    if not rows:
-        return True
-    if not path.exists():
-        _write_csv(path, rows)
-        return True
-    try:
-        with path.open(newline="", encoding="utf-8") as fh:
-            reader = csv.reader(fh)
-            header = next(reader, None)
-            if header is None:
-                return False
-            seen: set[int] = set()
-            if once_key:
-                try:
-                    idx = [header.index(c) for c in once_key]
-                except ValueError:
-                    return False
-                for row in reader:
-                    k = tuple(row[i] if i < len(row) else "" for i in idx)
-                    if all(k):
-                        seen.add(_key_hash(k))
-    except OSError:
-        return False
-
-    fieldset = set(header)
-    add = []
-    for r in rows:
-        if not set(r) <= fieldset:
-            return False
-        if once_key:
-            k = tuple((r.get(c) or "") for c in once_key)
-            if all(k):
-                h = _key_hash(k)
-                if h in seen:
-                    continue
-                seen.add(h)
-        add.append([r.get(f, "") for f in header])
-    if not add:
-        return True
-    try:
-        with path.open("a", newline="", encoding="utf-8") as fh:
-            csv.writer(fh, lineterminator="\n").writerows(add)
-    except OSError:
-        return False
-    return True
-
-
-def _key_hash(k: tuple) -> int:
-    return int.from_bytes(hashlib.blake2b(
-        "\x00".join(k).encode("utf-8", "replace"), digest_size=8).digest(),
-        "big")
-
-
-def _write_csv(path: Path, rows: list[dict]) -> None:
-    if not rows:
-        return
-    fieldnames = list(rows[0])
-    fieldset = set(fieldnames)
-    out = []
-    for r in rows:
-        if not r.keys() <= fieldset:
-            raise ValueError("dict contains fields not in fieldnames: " +
-                             ", ".join(repr(x) for x in r.keys() - fieldset))
-        out.append([r.get(f, "") for f in fieldnames])
-    with path.open("w", newline="", encoding="utf-8") as fh:
-        w = csv.writer(fh, lineterminator="\n")
-        w.writerow(fieldnames)
-        w.writerows(out)
+            fresh.append(r)
+        rows = fresh
+    append_csv(path, rows, fields)
 
 
 def baseline(url: str = "", label: str = "") -> None:
@@ -950,73 +585,6 @@ def baseline(url: str = "", label: str = "") -> None:
 POINTS_FIELDS = ["player_name", "player_name_full", "team", "points",
                  "games", "avg", "ff_id", "season", "observed_at",
                  "source_url"]
-
-
-def prune(apply: bool = False) -> None:
-    snaps = snapshots()
-    if not snaps:
-        sys.exit("nothing under data/raw")
-
-    prev: dict[str, str] = {}
-    stored_at: dict[str, str] = {}
-    plan: list[tuple[Path, dict[str, str], list[dict], int]] = []
-    seen_pages = kept_pages = rotted = 0
-
-    for snap in snaps:
-        stamp = _stamp_of(snap)
-        members = _read(snap)
-        html = {k.removesuffix(".html"): v for k, v in members.items()
-                if k.endswith(".html")}
-        rows, store = [], {}
-        for page in [r["page"] for r in _manifest(members)]:
-            body = html.get(page)
-            if body is None:
-                continue
-            seen_pages += 1
-            src = source_for(page)
-            sig = src.sign(body) if src else None
-            if sig is None:
-                rotted += 1
-                store[page] = body
-                rows.append({"page": page, "sig": "", "stored": stamp,
-                             "seen": stamp})
-            elif prev.get(page) == sig:
-                rows.append({"page": page, "sig": sig,
-                             "stored": stored_at[page], "seen": stamp})
-            else:
-                store[page] = body
-                rows.append({"page": page, "sig": sig, "stored": stamp,
-                             "seen": stamp})
-                stored_at[page] = stamp
-            prev[page] = sig if sig is not None else prev.get(page)
-        kept_pages += len(store)
-        plan.append((snap, store, rows, len(html)))
-
-    before = sum(f.stat().st_size for f in RAW.rglob("*") if f.is_file())
-    print(f"{len(snaps)} snapshots, {seen_pages} stored pages -> "
-          f"{kept_pages} kept ({100 * (1 - kept_pages / seen_pages):.0f}% "
-          f"dropped as unchanged)"
-          + (f", {rotted} kept because selectors matched nothing" if rotted
-             else ""))
-
-    if not apply:
-        print(f"currently {before / 1e6:.1f} MB. Dry run — nothing written. "
-              f"Re-run with --apply.")
-        return
-
-    for snap, store, rows, had in plan:
-        stamp = _stamp_of(snap)
-        members = {f"{k}.html": v for k, v in store.items()}
-        members[MANIFEST] = _manifest_csv(rows)
-        _write(RAW / f"dt={stamp}.tar.xz", members)
-        if snap.is_dir():
-            shutil.rmtree(snap)
-        print(f"  {stamp}: {had} pages -> {len(store)} stored")
-
-    after = sum(f.stat().st_size for f in RAW.rglob("*") if f.is_file())
-    print(f"data/raw {before / 1e6:.1f} MB -> {after / 1e6:.1f} MB. "
-          f"The pages dropped are still in git history; nothing is "
-          f"unrecoverable.")
 
 
 def _selftest() -> None:
@@ -1079,101 +647,43 @@ def _selftest() -> None:
     rows = [{"page": "market", "sig": "s1", "stored": "t0", "seen": "t1"}]
     assert _manifest({MANIFEST: _manifest_csv(rows)}) == rows
 
-    legacy = _manifest({"market.html": "x", "team_celta.html": "y"})
-    assert [r["page"] for r in legacy] == ["market", "team_celta"], legacy
 
-    ev = [{"activity_id": "a1", "at": "2026-08-15T22:24", "observed_at": "t1"},
-          {"activity_id": "a2", "at": "2026-08-16T09:00", "observed_at": "t1"},
-          {"activity_id": "a1", "at": "2026-08-15T22:24", "observed_at": "t2"},
-          {"activity_id": "a3", "at": "2026-08-17T11:00", "observed_at": "t2"}]
-    once_only = first_seen(ev, ("activity_id",))
-    assert [r["activity_id"] for r in once_only] == ["a1", "a2", "a3"], once_only
-    assert once_only[0]["observed_at"] == "t1", once_only[0]
-    assert [r["observed_at"] for r in once_only] == ["t1", "t1", "t2"]
-    odd = first_seen([{"activity_id": "", "at": "x", "observed_at": "t1"},
-                      {"activity_id": "", "at": "y", "observed_at": "t2"}],
-                     ("activity_id",))
-    assert len(odd) == 2, odd
-    pairs = first_seen([{"a": "1", "b": "1"}, {"a": "1", "b": "2"},
-                        {"a": "1", "b": "1"}], ("a", "b"))
-    assert len(pairs) == 2, pairs
-    assert first_seen([], ("activity_id",)) == []
     assert set(STORE_ONCE) == {"api_activity", "api_players",
                               "api_stats", "results_history"}, STORE_ONCE
-    assert "api_teams" not in STORE_ONCE and "market" not in STORE_ONCE
     assert set(STORE_DAILY) == {"market", "lineups",
                                 "understat_players"}, STORE_DAILY
-    assert not set(STORE_ONCE) & set(STORE_DAILY), \
-        "a table cannot be both keep-first-forever and one-per-day"
+    assert not set(STORE_ONCE) & set(STORE_DAILY)
+
     line = {"player_id": "1337", "week": "1", "stat": "goals",
             "value": "1", "points": "4", "observed_at": "t1"}
-    again = dict(line, observed_at="t2")
-    fixed = dict(line, points="6", observed_at="t3")
-    kept = first_seen([line, again, fixed], STORE_ONCE["api_stats"])
-    assert [r["observed_at"] for r in kept] == ["t1", "t3"], kept
-
-    with tempfile.TemporaryDirectory() as tmp:
-        f = Path(tmp) / "t.csv"
-        _write_csv(f, [{"a": "1", "b": "x"}])
-        assert _append_csv(f, [{"a": "2", "b": "y"}])
-        assert f.read_text(encoding="utf-8") == "a,b\n1,x\n2,y\n", \
-            f.read_text(encoding="utf-8")
-        assert _append_csv(f, [{"a": "3"}])
-        assert f.read_text(encoding="utf-8").endswith("3,\n")
-        assert not _append_csv(f, [{"a": "4", "b": "z", "c": "new"}])
-        assert _append_csv(f, []), "nothing to add is not a failure"
-        missing = Path(tmp) / "fresh.csv"
-        assert _append_csv(missing, [{"a": "1"}]) and missing.exists(), \
-            "no file yet is a write, not a refusal"
-
-        once = Path(tmp) / "api_stats.csv"
-        _write_csv(once, [line])
-        assert _append_csv(once, [again, fixed], STORE_ONCE["api_stats"])
-        body = once.read_text(encoding="utf-8").strip().splitlines()
-        assert len(body) == 3, body
-        assert body[-1].endswith("t3"), body
-        assert _append_csv(once, [dict(again)], STORE_ONCE["api_stats"])
-        assert len(once.read_text(encoding="utf-8").strip().splitlines()) == 3
-
-        m1 = {"observed_at": "2026-09-20T0900Z", "ff_id": "1", "value": "10"}
-        m2 = {"observed_at": "2026-09-20T1300Z", "ff_id": "1", "value": "10"}
-        m3 = {"observed_at": "2026-09-20T1800Z", "ff_id": "1", "value": "11"}
-        other = {"observed_at": "2026-09-20T0900Z", "ff_id": "2", "value": "5"}
-        got = _compact_daily([m1, other, m2, m3], ("ff_id",))
-        assert got == [m3, other], got
-        m4 = {"observed_at": "2026-09-21T0900Z", "ff_id": "1", "value": "11"}
-        assert _compact_daily([m1, m4], ("ff_id",)) == [m1, m4]
-        blank = {"observed_at": "2026-09-20T0900Z", "ff_id": "", "value": "x"}
-        assert _compact_daily([blank, dict(blank)], ("ff_id",)) == \
-            [blank, dict(blank)]
-
-        daily = Path(tmp) / "market.csv"
-        assert _append_csv_daily(daily, [m1], ("ff_id",)) and daily.exists()
-        assert daily.read_text(encoding="utf-8") == \
-            "observed_at,ff_id,value\n2026-09-20T0900Z,1,10\n"
-        assert _append_csv_daily(daily, [m2], ("ff_id",))
-        assert daily.read_text(encoding="utf-8") == \
-            "observed_at,ff_id,value\n2026-09-20T1300Z,1,10\n"
-        assert _append_csv_daily(daily, [m3], ("ff_id",))
-        assert daily.read_text(encoding="utf-8") == \
-            "observed_at,ff_id,value\n2026-09-20T1800Z,1,11\n"
-        assert _append_csv_daily(daily, [m4], ("ff_id",))
-        assert daily.read_text(encoding="utf-8") == (
-            "observed_at,ff_id,value\n"
-            "2026-09-20T1800Z,1,11\n2026-09-21T0900Z,1,11\n"), \
-            daily.read_text(encoding="utf-8")
-        assert not _append_csv_daily(
-            daily, [dict(m4, extra="z")], ("ff_id",))
-
-    assert _lines_name("parsed.json") == "parsed.jsonl"
-    assert _lines_name("parsed_points.json") == "parsed_points.jsonl"
-    assert _lines_name("parsed.json") != _lines_name("parsed_points.json")
-
-    assert _key_hash(("a", "b")) == _key_hash(("a", "b"))
-    assert _key_hash(("ab", "c")) != _key_hash(("a", "bc"))
-
-    assert not _tidy_has(()), "no tables recorded is not a licence to append"
-    assert not _tidy_has(("no_such_table_here",))
+    m1 = {"observed_at": "2026-09-20T0900Z", "ff_id": "1", "value": "10"}
+    m3 = dict(m1, observed_at="2026-09-20T1800Z", value="11")
+    m4 = dict(m1, observed_at="2026-09-21T0900Z", value="11")
+    blank = dict(m1, ff_id="")
+    cases = [  # (batches stored in turn, once, daily, resulting file)
+        ([[{"a": "1", "b": "x"}], [{"a": "2", "b": "y"}], [{"a": "3"}]],
+         None, None, "a,b\n1,x\n2,y\n3,\n"),
+        ([[{"a": "1"}], [{"a": "2", "c": "new"}]], None, None,
+         "a,c\n1,\n2,new\n"),
+        ([[line], [dict(line, observed_at="t2"),
+                   dict(line, points="6", observed_at="t3")],
+          [dict(line, observed_at="t4")]], STORE_ONCE["api_stats"], None,
+         "player_id,week,stat,value,points,observed_at\n"
+         "1337,1,goals,1,4,t1\n1337,1,goals,1,6,t3\n"),
+        ([[m1], [m3], [m4]], None, ("ff_id",),
+         "observed_at,ff_id,value\n"
+         "2026-09-20T1800Z,1,11\n2026-09-21T0900Z,1,11\n"),
+        ([[blank, dict(blank)]], None, ("ff_id",),
+         "observed_at,ff_id,value\n2026-09-20T0900Z,,10\n"
+         "2026-09-20T0900Z,,10\n"),
+    ]
+    for batches, once, daily, want in cases:
+        with tempfile.TemporaryDirectory() as tmp:
+            f = Path(tmp) / "t.csv"
+            for rows in batches:
+                _store(f, rows, once, daily)
+            got = f.read_text(encoding="utf-8")
+            assert got == want, (batches, got)
 
     out: dict[str, list] = {}
     route(out, [{"a": "1"}, {ROW_TABLE: "api_stats", "stat": "goals"}],
@@ -1185,16 +695,16 @@ def _selftest() -> None:
     assert len(out["api_teams"]) == 2, out["api_teams"]
     assert all(ROW_TABLE not in r for rs in out.values() for r in rs), out
 
-    from sources import Source, parse_market, sign_market
-    every = Source("m", "market", "u", parse_market, sign_market, "every_run")
-    daily = Source("m", "market", "u", parse_market, sign_market, "daily")
+    from sources import Source, parse_market
+    every = Source("m", "market", "u", parse_market, cadence="every_run")
+    daily = Source("m", "market", "u", parse_market, cadence="daily")
     seen_today = {"m": {"seen": "2026-08-15T0940Z"}}
     assert due(every, seen_today, "2026-08-15")
     assert not due(daily, seen_today, "2026-08-15")
     assert due(daily, seen_today, "2026-08-16")
     assert due(daily, {}, "2026-08-15")
 
-    twice = Source("m", "market", "u", parse_market, sign_market, "twice_daily")
+    twice = Source("m", "market", "u", parse_market, cadence="twice_daily")
     assert not due(twice, {"m": {"seen": "2026-08-15T0940Z"}},
                    "2026-08-15T1200Z")
     assert due(twice, {"m": {"seen": "2026-08-15T0940Z"}},
@@ -1228,6 +738,19 @@ def _selftest() -> None:
     assert _stamp_of(Path("data/raw/dt=2026-08-15T0940Z.tar.xz")) \
         == _stamp_of(Path("data/raw/dt=2026-08-15T0940Z")) == "2026-08-15T0940Z"
 
+    from sources import _FIXTURE
+    team = source_for("team_celta")
+    base = page_sig(team, _FIXTURE)
+    assert base and page_sig(team, "<html></html>") is None
+    assert page_sig(team, _FIXTURE.replace(
+        'class="jugadores-titulares"',
+        'class="jugadores-titulares" data-posicionalternativa1-x="52%"')) == base
+    for before, after in [("Pedri 70%", "Pedri 60%"),
+                          ("Owen Bosch", "Owen Bosche"),
+                          ('alt="Duda"', 'alt="Lesionado"'),
+                          ("/jugadores/pedri", "/jugadores/pedri-gonzalez")]:
+        assert page_sig(team, _FIXTURE.replace(before, after)) != base, after
+
     print("ingest.py selftest OK (24 cases)")
 
 
@@ -1236,8 +759,6 @@ if __name__ == "__main__":
     cmd = argv[0] if argv else "fetch"
     if cmd in ("--selftest", "selftest"):
         _selftest()
-    elif cmd == "prune":
-        prune(apply="--apply" in argv)
     elif cmd == "baseline":
         url = argv[argv.index("--url") + 1] if "--url" in argv else ""
         label = argv[argv.index("--label") + 1] if "--label" in argv else ""

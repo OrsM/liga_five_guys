@@ -5,20 +5,13 @@ import sys
 
 
 from ffcore.text import norm
-from ffcore.tidy import SEASON, load, write_csv
+from ffcore.tidy import SEASON, TIDY, load, read_csv, write_csv
 
 LIVE = SEASON / "live"
 
 DIFF_FIELDS = ["from_stamp", "to_stamp", "season", "ff_id", "player_name",
                "player_name_full", "team", "points_delta", "games_delta",
                "points_total", "games_total", "jornada"]
-
-EMPTY_MARKS = ("no se encontraron resultados", "sin resultados")
-
-
-def empty_season(html: str) -> bool:
-    low = (html or "").lower()
-    return any(m in low for m in EMPTY_MARKS)
 
 
 def match_jornadas(matches_history: list[dict]) -> list[tuple[str, int]]:
@@ -99,51 +92,12 @@ def diff(prev_rows: list[dict], cur_rows: list[dict],
     return out
 
 
-_CACHE = "parsed_points.json"
-
-
 def load_snapshots() -> dict[str, list[tuple[str, list[dict]]]]:
-    from ingest import (parse_cache, save_parse_cache, Sigs, parser_sig,
-                        doc_keys, documents)
-    from sources import parse_points, season_label
-
-    by_label: dict[str, list[tuple[str, list[dict]]]] = {}
-    _psig = parser_sig("parse_points")
-    cache, fresh, walk = parse_cache(_CACHE), {}, doc_keys()
-
-    need: dict[str, set] = {}
-    for _stamp, docs in walk:
-        if "points" in docs and not isinstance(
-                cache.get("%s@%s" % (docs["points"][0], _psig)), dict):
-            need.setdefault(docs["points"][1], set()).add("points")
-    for origin, _key, html in documents(need):
-        try:
-            rows = parse_points(html)
-            got = {"rows": rows, "label": season_label(html),
-                   "empty": bool(empty_season(html))}
-        except Exception as e:
-            print(f"  warn: {origin}/points: {type(e).__name__}: {e}")
-            got = {"rows": [], "label": "", "empty": True}
-        cache["%s@%s" % (Sigs().of("points", html), _psig)] = got
-
-    for stamp, docs in walk:
-        if "points" not in docs:
-            continue
-        ck, origin = docs["points"]
-        ck = "%s@%s" % (ck, _psig)
-        got = cache.get(ck)
-        if not isinstance(got, dict):
-            continue
-        fresh[ck] = got
-        if not got["rows"]:
-            print(f"  note: {stamp}/points has no rows yet — the season has "
-                  "not started." if got["empty"] else
-                  f"  warn: {stamp}/points parsed to 0 rows — markup "
-                  "changed? Raw is kept; fix parse and re-run.")
-            continue
-        by_label.setdefault(got["label"], []).append((stamp, got["rows"]))
-    save_parse_cache(fresh, _CACHE)
-    return by_label
+    by_label: dict[str, dict[str, list[dict]]] = {}
+    for r in read_csv(TIDY / "points.csv"):
+        by_label.setdefault(r["season"], {}).setdefault(
+            r["observed_at"], []).append(r)
+    return {label: sorted(stamps.items()) for label, stamps in by_label.items()}
 
 
 def main() -> None:
@@ -199,10 +153,6 @@ def _selftest() -> None:
     assert next(r for r in d2 if r["player_name_full"] == "Cai Coro"
                 )["games_delta"] == "1"
 
-    assert empty_season("<tbody><tr><td>No se encontraron resultados</td>")
-    assert empty_season("<TD>NO SE ENCONTRARON RESULTADOS</TD>")
-    assert not empty_season("<tbody><tr><td>Ane Aldea</td>")
-    assert not empty_season("")
 
     history = [
         {"observed_at": "t0", "match_id": "1", "jornada": "1", "score": ""},
