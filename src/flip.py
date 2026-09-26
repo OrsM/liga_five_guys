@@ -365,19 +365,18 @@ def recently(path, now) -> set[tuple[str, str]]:
 def main() -> None:
     import decide
     from ffcore.text import norm
-    from ffcore.tidy import (DECISIONS, MADRID, REPORTS, TIDY, Market,
-                             load_market_frozen, read_csv, run_now)
+    from ffcore.tidy import DECISIONS, MADRID, REPORTS, Market, run_now, table
 
     u = decide.load()
-    rows = read_csv(TIDY / "market.csv")
+    rows = table("market")
     by_player = steps(rows)
-    mk = Market(load_market_frozen())
+    mk = Market(table("market"))
     value_at = lambda name, when: (lambda v: v.value if v else None)(
         mk.at(name, datetime.fromisoformat(when).astimezone(timezone.utc)))
-    offer_r = offer_ratios(read_csv(TIDY / "api_offers.csv"),
-                           read_csv(TIDY / "api_teams.csv"), value_at)
-    paid_r = auction_ratios(read_csv(TIDY / "api_market.csv"),
-                            [a for a in read_csv(TIDY / "api_activity.csv")
+    offer_r = offer_ratios(table("api_offers"),
+                           table("api_teams"), value_at)
+    paid_r = auction_ratios(table("api_market"),
+                            [a for a in table("api_activity")
                              if a["kind"] == "buy"])
     if not offer_r or not paid_r or not by_player:
         print("flip: not enough history to measure the cost of trading yet")

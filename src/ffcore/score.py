@@ -272,12 +272,13 @@ def _shots_by_jornada(xw) -> dict[str, dict[int, float]]:
 
 
 def _forward_shots_minutes(xw, players=None):
-    from ffcore.tidy import load, load_players, load_perjornada, jornada_of_match
+    from ffcore.tidy import (load_players, load_perjornada, jornada_of_match,
+                             newest)
 
     players = players if players is not None else load_players()
     shots_by_key = _shots_by_jornada(xw)
     by_key = _per_jornada_current(
-        load("starters"), load_perjornada(), jornada_of_match(), xw) \
+        newest("starters"), load_perjornada(), jornada_of_match(), xw) \
         if _latest_perjornada_file() is not None else {}
     return shots_by_key, by_key, players
 
@@ -457,8 +458,8 @@ def _fit_decay(by_key: dict[str, dict[int, tuple[float, float]]]) -> tuple[float
 
 
 def _current_from_perjornada() -> tuple[dict, str]:
-    from ffcore.tidy import (load, load_crosswalk,
-                             load_perjornada, jornada_of_match)
+    from ffcore.tidy import (load_crosswalk, load_perjornada, jornada_of_match,
+                             newest)
 
     latest = _latest_perjornada_file()
     if latest is None:
@@ -468,7 +469,7 @@ def _current_from_perjornada() -> tuple[dict, str]:
     if xw is None:
         return {}, ""
 
-    by_key = _per_jornada_current(load("starters"), load_perjornada(),
+    by_key = _per_jornada_current(newest("starters"), load_perjornada(),
                                   jornada_of_match(), xw)
     decay, _why = _fit_decay(by_key)
 
@@ -521,17 +522,18 @@ def load_points() -> tuple[dict, str, dict, str]:
 def build(market: list[dict], xi_rows: list[dict], now,
           shrink_k: float = SHRINK_K, calibrate: bool = True) -> tuple:
     from ffcore.fixture import fixture_board
-    from ffcore.tidy import load, load_fixtures
+    from ffcore.tidy import (load_fixtures, DAILY_FRESH_DAYS, fresh_only,
+                             newest, table)
 
     prior, prior_label, cur, cur_label = load_points()
     cal, second = None, None
     if calibrate:
         cal, second = _calibrated()
-    from ffcore.tidy import (load, load_crosswalk,
-                             load_understat_players)
+    from ffcore.tidy import (load_crosswalk, load_understat_players,
+                             DAILY_FRESH_DAYS, fresh_only, newest, table)
     xw = load_crosswalk()
-    board = fixture_board(market, load_fixtures(), now, load("elo"),
-                          xw=xw, results=load("results_history"),
+    board = fixture_board(market, load_fixtures(), now, fresh_only(newest("elo"), DAILY_FRESH_DAYS),
+                          xw=xw, results=table("results_history"),
                           understat_rows=load_understat_players("2025"))
     xg_cur = load_understat_current(xw)
     xg_slope, xg_intercept, xg_n = _xg_points_fit(xw)
@@ -562,20 +564,20 @@ def _calibrated():
     import json
     from ffcore.startprob import (Calibration, METHOD_VERSION, observations,
                                   fit_start_fallbacks)
-    from ffcore.tidy import load_crosswalk, load_lineups, read_csv, TIDY
+    from ffcore.tidy import load_crosswalk, TIDY, LINEUP_SOURCE, table
     from ffcore.second import SECOND_SOURCE
 
-    second = load_lineups(SECOND_SOURCE)
-    truth = read_csv(TIDY / "starters.csv")
+    second = table("lineups", SECOND_SOURCE)
+    truth = table("starters")
     cut = min((r.get("observed_at", "") for r in truth), default="")
     xw = load_crosswalk()
     global NEUTRAL_START, ABSENT_START
     if cut:
         NEUTRAL_START, ABSENT_START, _fallback_why = fit_start_fallbacks(
-            load_lineups() + second, truth, cut,
+            table("lineups", LINEUP_SOURCE) + second, truth, cut,
             neutral_default=NEUTRAL_START, absent_default=ABSENT_START,
             xw=xw)
-    obs = observations(load_lineups() + second, truth, cut,
+    obs = observations(table("lineups", LINEUP_SOURCE) + second, truth, cut,
                        neutral=NEUTRAL_START, absent=ABSENT_START,
                        xw=xw) if cut else []
     stamp = "%d:%s" % (METHOD_VERSION,

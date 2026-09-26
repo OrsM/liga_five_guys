@@ -15,9 +15,8 @@ from ffcore.parse import money
 from ffcore.tidy import shown
 from ffcore.text import norm
 from ffcore.tidy import (load_crosswalk, run_now, Market, input_path,
-                         ledger_stamp, load_api, load_api_activity, load,
-                         load_market_frozen, newest, read_ledger,
-                         snapshot_stamp)
+                         ledger_stamp, load_api, load_api_activity, newest,
+                         read_ledger, snapshot_stamp, table)
 
 __all__ = ["MARKET", "Config", "load_config", "read_api_balances",
            "app_fielded", "flat_income", "bonus_income", "allowance",
@@ -276,7 +275,8 @@ class League:
                    | {schema.text(t, f) for t in self.txns
                       for f in (schema.TRANSACTIONS.FROM_,
                                 schema.TRANSACTIONS.TO_)}) - {MARKET, ""}
-        self.managers: dict[str, Manager] = {h: Manager(h) for h in handles}
+        self.managers: dict[str, Manager] = {h: Manager(h)
+                                             for h in sorted(handles)}
         for key, mgr in self.owner.items():
             self.managers[mgr].players.append(key)
         for t in self.txns:
@@ -292,10 +292,10 @@ class League:
     @classmethod
     def load(cls, with_market: bool = True) -> "League":
         return cls(load_config(), read_ledger(),
-                   Market(load_market_frozen()) if with_market else None,
-                   load_crosswalk(), api_teams=newest("api_teams.csv"),
-                   standings=newest("api_standings.csv"),
-                   roster_history=load("api_team_history"))
+                   Market(table("market")) if with_market else None,
+                   load_crosswalk(), api_teams=newest("api_teams"),
+                   standings=newest("api_standings"),
+                   roster_history=table("api_teams"))
 
     def __getitem__(self, handle: str) -> Manager:
         return self.managers[handle]

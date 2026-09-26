@@ -18,26 +18,26 @@ def stamp(s):
 
 
 def rows():
-    from ffcore.tidy import (MATCH_LEN, TIDY, jornada_of_match, load,
-                             load_crosswalk, load_lineups, load_perjornada,
-                             minutes_played, read_csv)
+    from ffcore.tidy import (MATCH_LEN, jornada_of_match, load_crosswalk,
+                             load_perjornada, minutes_played, LINEUP_SOURCE,
+                             newest, table)
 
     xw = load_crosswalk()
-    pos = {r["ff_id"]: r["position"] for r in read_csv(TIDY / "market.csv")}
+    pos = {r["ff_id"]: r["position"] for r in table("market")}
     jor = jornada_of_match()
     points = {}
     for r in load_perjornada():
         if r["games_delta"] == "1":
             points[(r["ff_id"], int(r["jornada"]))] = float(r["points_delta"])
     seen, scraped = {}, {}
-    for r in load("starters"):
+    for r in newest("starters"):
         if r.get("role") not in ("starter", "sub"):
             continue
         m = r["match_id"]
         scraped[m] = min(scraped.get(m, "9"), r["observed_at"])
         seen.setdefault((m, r["team_slug"], r["player_slug"]), r)
     snaps = collections.defaultdict(list)
-    for r in sorted(load_lineups(), key=lambda r: r["observed_at"]):
+    for r in sorted(table("lineups", LINEUP_SOURCE), key=lambda r: r["observed_at"]):
         if r.get("start_pct") not in (None, ""):
             snaps[(r["team_slug"], r["player_slug"])].append(
                 (stamp(r["observed_at"]), float(r["start_pct"]) / 100.0))
@@ -92,10 +92,11 @@ def fit_lineup_weight(data=None) -> tuple[float | None, str]:
 
 
 def fit_status_factors(lineups=None, starters=None) -> dict[str, tuple[float, int]]:
-    from ffcore.tidy import MATCH_LEN, load, load_lineups, minutes_played
+    from ffcore.tidy import (MATCH_LEN, minutes_played, LINEUP_SOURCE, newest,
+                             table)
 
     play, scraped, teams = {}, {}, collections.defaultdict(set)
-    for r in (starters if starters is not None else load("starters")):
+    for r in (starters if starters is not None else newest("starters")):
         if r.get("role") in ("starter", "sub"):
             m = r["match_id"]
             scraped[m] = min(scraped.get(m, "9"), r["observed_at"])
@@ -103,7 +104,7 @@ def fit_status_factors(lineups=None, starters=None) -> dict[str, tuple[float, in
             play[(m, r["team_slug"], r["player_slug"])] = min(
                 1.0, minutes_played(r["role"], r.get("minute")) / MATCH_LEN)
     flags = collections.defaultdict(list)
-    for r in sorted(lineups if lineups is not None else load_lineups(),
+    for r in sorted(lineups if lineups is not None else table("lineups", LINEUP_SOURCE),
                     key=lambda r: r["observed_at"]):
         flags[(r["team_slug"], r["player_slug"])].append(
             (stamp(r["observed_at"]), r.get("status") or "ok"))

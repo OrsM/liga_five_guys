@@ -28,12 +28,9 @@ from ffcore.score import SLOT, _calibrated, replacement, squad_pool, vor
 from ffcore.text import norm
 from ffcore.season import (LeagueState, best_xi,
                            simulate_many)
-from ffcore.tidy import (run_now,
-                         load as load_table, load_api,
-                         load_fixtures,
-                         load_api_stats, load_perjornada,
-                         last_api_standings,
-                         load_players, market_routes, pending)
+from ffcore.tidy import (run_now, load_api, load_fixtures, load_api_stats,
+                         load_perjornada, load_players, market_routes, pending,
+                         DAILY_FRESH_DAYS, fresh_only, newest, table)
 from ffcore.schema import text, num, API_TEAMS, API_STANDINGS
 from ffcore.schema import MARKET as MARKET_TBL
 
@@ -480,7 +477,7 @@ def load(trials_pool=None) -> Universe:
     lg, sc = _m.lg, _m.sc
     players = load_players()
 
-    m = load_table("matches")
+    m = newest("matches")
     mkt_teams = sorted({text(r, MARKET_TBL.TEAM)
                         for r in (lg.market.latest().values()
                                   if lg.market is not None else [])
@@ -581,12 +578,12 @@ def load(trials_pool=None) -> Universe:
     slug_of = {norm(c.market): c.ff_slug for c in lg.xw.clubs.values()
               if c.market and c.ff_slug} if lg.xw is not None else {}
     club_of_slug = {k: slug_of[v] for k, v in club.items() if v in slug_of}
-    results_hist = load_table("results_history")
+    results_hist = table("results_history")
     club_rel = club_volatility(results_hist, list(slug_of.values()))
     _fixture.HOME_EDGE, _home_edge_why = fit_home_edge(results_hist, m)
     sboard = {j: {norm(team): m for team, m in layer.items()}
              for j, layer in season_board(
-                 _m.market, m, rem, now, load_table("elo"), xw=lg.xw,
+                 _m.market, m, rem, now, fresh_only(newest("elo"), DAILY_FRESH_DAYS), xw=lg.xw,
                  results=results_hist,
                  understat_rows=load_understat_players("2025")).items()}
     ppm_of = {k: s.ppm for k, s in scored.items() if s}
@@ -613,7 +610,7 @@ def load(trials_pool=None) -> Universe:
                   club_of=club_of_slug, club_rel=club_rel)
 
     carried = {}
-    for r in last_api_standings():
+    for r in newest("api_standings"):
         if r.get("manager"):
             carried.setdefault(r["manager"],
                               num(r, API_STANDINGS.TEAM_POINTS, default=0.0))

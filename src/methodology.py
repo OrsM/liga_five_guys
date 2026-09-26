@@ -11,15 +11,12 @@ from ffcore import schema
 from ffcore.fixture import FIX_BAND
 from ffcore.score import SHRINK_K
 from ffcore.text import norm, resolve
-from ffcore.tidy import (clock_history, load, run_now, shown,
-                         table_stats,
-                         DECISIONS, PARTS, LINEUP_SOURCE,
-                         DAILY_FRESH_DAYS, EVERY_RUN_FRESH_DAYS,
-                         SEASON, TIDY, age_phrase,
-                         stale_feeds,
-                         load_crosswalk, load_lineups,
-                         read_csv, snapshot_stamp, write_csv, write_lines,
-                         team_slug_of, lock_order, JornadaClock)
+from ffcore.tidy import (clock_history, run_now, shown, table_stats, DECISIONS,
+                         PARTS, LINEUP_SOURCE, DAILY_FRESH_DAYS,
+                         EVERY_RUN_FRESH_DAYS, SEASON, TIDY, age_phrase,
+                         stale_feeds, load_crosswalk, read_csv, snapshot_stamp,
+                         write_csv, write_lines, team_slug_of, lock_order,
+                         JornadaClock, fresh_only, newest, table)
 
 __all__ = ["PAR_DEFINITION", "clock_history", "current_mae",
           "drift_frac_from_history", "fit_rate_rel_floor", "golden_rows",
@@ -425,15 +422,15 @@ def load_actuals(window_days: int | None = WINDOW_DAYS) -> tuple[list[dict], str
 
 
 def load_universe() -> set:
-    return {norm(r.get("name", "")) for r in read_csv(TIDY / "market.csv")
+    return {norm(r.get("name", "")) for r in table("market")
             if r.get("name")}
 
 
 def load_starts(roles=("starter",)):
-    return start_intervals(load("matches"),
-                           load("starters"),
-                           read_csv(TIDY / "fixtures.csv"),
-                           read_csv(TIDY / "market.csv"),
+    return start_intervals(newest("matches"),
+                           newest("starters"),
+                           table("fixtures"),
+                           table("market"),
                            roles)
 
 
@@ -536,7 +533,7 @@ def _hosts() -> dict[str, tuple[str, str, int]]:
 
 def _feed_state() -> dict[str, str]:
     runs: dict[str, list[dict]] = {}
-    for r in read_csv(TIDY / "feeds.csv"):
+    for r in table("feeds"):
         if r.get("page"):
             runs.setdefault(r["page"], []).append(r)
     out = {}
@@ -667,17 +664,18 @@ def feed_lines() -> list[str]:
 
 
 def latest_market() -> list[dict]:
-    from ffcore.tidy import load_market_latest
+    from ffcore.tidy import newest
 
-    return load_market_latest()
+    return newest("market")
 
 
 def formula_lines() -> list[str]:
     from ffcore.fixture import attack_defense, fit_home_edge
-    from ffcore.tidy import load_crosswalk, load
+    from ffcore.tidy import (load_crosswalk, DAILY_FRESH_DAYS, LINEUP_SOURCE,
+                             fresh_only, newest, table)
 
-    results_hist = load("results_history")
-    matches = load("matches")
+    results_hist = table("results_history")
+    matches = newest("matches")
     home_edge, home_edge_why = fit_home_edge(results_hist, matches)
     teams = sorted({r.get("team") for r in latest_market() if r.get("team")})
     xw = load_crosswalk()
@@ -692,13 +690,13 @@ def formula_lines() -> list[str]:
         f"yet met) | yes, for {len(ad)} of {len(teams)} |")
 
     from ffcore.fixture import elo_strength, team_strength
-    elo_rows = load("elo")
+    elo_rows = fresh_only(newest("elo"), DAILY_FRESH_DAYS)
     if not elo_rows:
         elo = ("summed squad value — %s, so the wallet is standing in for "
               "the pitch (see the feed table for how long)"
               % ("Club Elo has stopped answering and its last reading is "
                  "too old to rank a jornada it predates"
-                 if read_csv(TIDY / "elo.csv") else
+                 if table("elo") else
                  "Club Elo has not been scraped yet"))
     elif elo_strength(list(team_strength(latest_market())), elo_rows) is None:
         elo = ("summed squad value — Club Elo was scraped but did not cover "
@@ -807,7 +805,7 @@ def start_lines() -> list[str]:
         return out
 
     numbered, named, skipped = start_grade(
-        intervals, load_lineups(source="") + forecast_claims(),
+        intervals, table("lineups") + forecast_claims(),
         load_universe())
     if not numbered and not named:
         return out
@@ -834,7 +832,7 @@ def start_lines() -> list[str]:
     our_instances = _start_instances(intervals, ours, "our forecast", universe)
     our_names = {norm(c["player_name"]) for c in ours}
     if our_names and our_instances:
-        restricted = [c for c in load_lineups(source="")
+        restricted = [c for c in table("lineups")
                      if norm(c.get("player_name", "")) in our_names]
         fair_num, _fair_named, _fair_skip = start_grade(
             intervals, restricted + ours, universe, instances=our_instances)
@@ -982,7 +980,7 @@ def source_lines(actuals: list[dict]) -> list[str]:
 
     intervals = appearances(actuals)
     numbered, named, skipped = ([], [], 0) if not intervals else start_grade(
-        intervals, load_lineups(source="") + forecast_claims(),
+        intervals, table("lineups") + forecast_claims(),
         load_universe())
     if numbered or named:
         rows.append("| **appearances** — the wider, blunter sample; a "

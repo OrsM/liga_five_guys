@@ -22,16 +22,13 @@ __all__ = ["ROOT", "TIDY", "SEASON", "DECISIONS", "REPORTS", "PARTS", "MADRID",
            "csv_string",
            "write_lines", "snapshot_stamp", "ledger_stamp", "latest_only",
            "latest_per_key", "snapshots",
-           "Market", "Valuation",
-           "load", "load_market_frozen", "load_lineups",
-           "row_key", "run_now", "load_crosswalk",
+           "Market", "Valuation", "table", "row_key", "run_now", "load_crosswalk",
            "load_players", "read_ledger", "LEDGER", "load_deadline", "LINEUP_SOURCE",
-           "pick_source", "load_fixtures", "next_kickoff", "kickoff_stamp",
-           "load_odds", "load_understat_players",
+           "load_fixtures", "next_kickoff", "kickoff_stamp",
+           "load_understat_players",
            "MATCH_LEN", "minutes_played", "fresh_only", "DAILY_FRESH_DAYS",
            "EVERY_RUN_FRESH_DAYS", "stale_feeds",
-           "GATED_API", "age_phrase", "last_api_standings",
-           "load_api", "market_routes", "pending", "LISTED_SELLER", "team_slug_of", "lock_order",
+           "GATED_API", "age_phrase", "load_api", "market_routes", "pending", "LISTED_SELLER", "team_slug_of", "lock_order",
            "JornadaClock", "shown", "newest", "table_stats",
            "load_perjornada", "load_api_stats", "clock", "clock_history",
            "jornada_of_match"]
@@ -223,35 +220,34 @@ def latest_per_key(rows: list[dict], key_fn) -> list[dict]:
 _LATEST_SNAPSHOT_CACHE: dict[tuple, tuple] = {}
 
 
-def _cached_latest_snapshot(path, keep=None, cache_key=None) -> list[dict]:
+def table(name: str, source: str = "") -> list:
+    rows = read_csv(TIDY / f"{name}.csv")
+    return [r for r in rows if r.get("source") == source] if source else rows
+
+
+_NEWEST_CACHE: dict[tuple, tuple] = {}
+
+
+def newest(name: str, source: str = "") -> list[dict]:
+    path = TIDY / f"{name}.csv"
+
     def build():
-        try:
-            fh = Path(path).open(encoding="utf-8")
-        except OSError:
-            return []
-        with fh:
+        with path.open(encoding="utf-8") as fh:
             r = csv.reader(fh)
-            try:
-                fieldnames = next(r)
-            except StopIteration:
-                fieldnames = []
-            newest = ""
-            kept: list[dict] = []
+            fieldnames = next(r, [])
+            latest, kept = "", []
             for raw in r:
-                if not raw:
-                    continue
                 row = dict(zip(fieldnames, raw))
-                if keep is not None and not keep(row):
+                if not raw or (source and row.get("source") != source):
                     continue
                 stamp = row.get("observed_at", "")
-                if stamp > newest:
-                    newest, kept = stamp, [row]
-                elif stamp == newest:
+                if stamp > latest:
+                    latest, kept = stamp, [row]
+                elif stamp == latest:
                     kept.append(row)
             return kept
 
-    rows = _mtime_cached(path, _LATEST_SNAPSHOT_CACHE,
-                         (str(Path(path)), cache_key), build)
+    rows = _mtime_cached(path, _NEWEST_CACHE, (name, source), build)
     return [dict(r) for r in (rows or [])]
 
 
@@ -286,10 +282,6 @@ def table_stats(path, col: str = "observed_at") -> tuple[int, str]:
     except OSError:
         return 0, ""
     return n, best
-
-
-def newest(name: str, keep=None, cache_key=None) -> list[dict]:
-    return _cached_latest_snapshot(TIDY / name, keep=keep, cache_key=cache_key)
 
 
 DAILY_FRESH_DAYS = 1.05
@@ -329,56 +321,9 @@ def snapshots(rows: list[dict]) -> list[str]:
     return sorted({r.get("observed_at", "") for r in rows if r.get("observed_at")})
 
 
-_TABLE_MODE = {
-    "market": ("history", "market"),
-    "matches_history": ("history", "matches"),
-    "api_team_history": ("history", "api_teams"),
-    "results_history": ("history", "results_history"),
-    "matches": ("newest", "matches"),
-    "starters": ("newest", "starters"),
-    "elo": ("fresh", "elo"),
-}
-
-
-def load(name: str, now=None) -> list[dict]:
-    mode, file = _TABLE_MODE[name]
-    if mode == "history":
-        return read_csv(TIDY / f"{file}.csv")
-    if mode == "newest":
-        return newest(f"{file}.csv")
-    return fresh_only(newest(f"{file}.csv"), DAILY_FRESH_DAYS, now)
-
-
-def load_market_frozen() -> list:
-    return read_csv(TIDY / "market.csv")
-
-
-def load_market_latest() -> list[dict]:
-    return _cached_latest_snapshot(TIDY / "market.csv")
-
 
 LINEUP_SOURCE = "futbolfantasy"
 
-
-_LINEUPS_CACHE: dict = {}
-
-
-def load_lineups(source: str = LINEUP_SOURCE) -> list[dict]:
-    path = TIDY / "lineups.csv"
-    rows = _mtime_cached(path, _LINEUPS_CACHE, None,
-                         lambda: tuple(read_csv(path)))
-    return pick_source([dict(r) for r in (rows or [])], source)
-
-
-def load_lineups_latest(source: str = LINEUP_SOURCE) -> list[dict]:
-    keep = (lambda r: r.get("source") == source) if source else None
-    return _cached_latest_snapshot(TIDY / "lineups.csv", keep=keep,
-                                   cache_key=source)
-
-
-def pick_source(rows: list[dict], source: str) -> list[dict]:
-    return rows if not source else [r for r in rows
-                                    if r.get("source") == source]
 
 
 def _api_stats_key(r: dict):
@@ -387,7 +332,7 @@ def _api_stats_key(r: dict):
 
 
 def load_api_stats() -> list[dict]:
-    return latest_per_key(read_csv(TIDY / "api_stats.csv"), _api_stats_key)
+    return latest_per_key(table("api_stats"), _api_stats_key)
 
 
 def load_perjornada() -> list[dict]:
@@ -431,7 +376,7 @@ def stale_feeds(now=None, names=GATED_API) -> dict[str, float]:
 
 
 def load_api(name: str, now=None) -> list[dict]:
-    return fresh_only(newest("api_%s.csv" % name), EVERY_RUN_FRESH_DAYS, now)
+    return fresh_only(newest("api_" + name), EVERY_RUN_FRESH_DAYS, now)
 
 
 def _activity_order(r: dict):
@@ -440,16 +385,12 @@ def _activity_order(r: dict):
 
 
 def load_api_activity() -> list[dict]:
-    return sorted(read_csv(TIDY / "api_activity.csv"), key=_activity_order)
-
-
-def last_api_standings() -> list[dict]:
-    return newest("api_standings.csv")
+    return sorted(table("api_activity"), key=_activity_order)
 
 
 def load_api_players() -> dict[str, str]:
     out = {}
-    for r in read_csv(TIDY / "api_players.csv"):
+    for r in table("api_players"):
         if r.get("player_id") and r.get("player_name"):
             out[r["player_id"]] = r["player_name"]
     return out
@@ -475,15 +416,8 @@ def load_crosswalk():
 
 
 def load_fixtures() -> list[dict]:
-    rows = newest("fixtures.csv")
+    rows = newest("fixtures")
     return sorted(rows, key=lambda r: r.get("kickoff") or "")
-
-
-def load_odds() -> list[dict]:
-    from ffcore import schema
-    return latest_per_key(read_csv(TIDY / "odds.csv"),
-                          lambda r: (schema.text(r, "home"),
-                                     schema.text(r, "away")))
 
 
 _UNDERSTAT_CACHE: dict = {}
@@ -589,14 +523,14 @@ _CLOCK_HISTORY: list = []
 
 def clock() -> JornadaClock:
     if not _CLOCK:
-        _CLOCK.append(JornadaClock(load("matches"), load_fixtures()))
+        _CLOCK.append(JornadaClock(newest("matches"), load_fixtures()))
     return _CLOCK[0]
 
 
 def clock_history() -> JornadaClock:
     if not _CLOCK_HISTORY:
         _CLOCK_HISTORY.append(
-            JornadaClock(load("matches"), read_csv(TIDY / "fixtures.csv")))
+            JornadaClock(newest("matches"), table("fixtures")))
     return _CLOCK_HISTORY[0]
 
 
@@ -606,7 +540,7 @@ _JORNADA_OF_MATCH: list = []
 def jornada_of_match() -> dict[str, int]:
     if not _JORNADA_OF_MATCH:
         out: dict[str, int] = {}
-        for m in load("matches_history"):
+        for m in table("matches"):
             mid = (m.get("match_id") or "").strip()
             if not mid or mid in out:
                 continue
@@ -654,7 +588,7 @@ def stale_owned_players(players: dict, owned_keys, market) -> dict:
 
 
 def load_players() -> dict[str, dict]:
-    market, xi = load_market_latest(), _cached_latest_snapshot(TIDY / "lineups.csv")
+    market, xi = newest("market"), newest("lineups")
     if not market and not xi:
         raise SystemExit("no rows in %s — run `ingest.py parse` first" % TIDY)
     xw = load_crosswalk()
@@ -843,25 +777,25 @@ def _selftest_new_loaders() -> None:
     assert latest_per_key([], lambda r: r["k"]) == []
     assert latest_per_key([{"observed_at": "t1"}], lambda r: None) == []
 
-    matches_full = read_csv(TIDY / "matches.csv")
+    matches_full = table("matches")
     if matches_full:
         real_matches = {r.get("match_id") for r in matches_full
                         if r.get("match_id")}
-        got_matches = {r.get("match_id") for r in load("matches")}
+        got_matches = {r.get("match_id") for r in newest("matches")}
         assert got_matches == real_matches, \
-            'load("matches") lost a match latest_only should have kept'
-        assert load("matches_history") == matches_full
+            'newest("matches") lost a match latest_only should have kept'
+        assert table("matches") == matches_full
 
-    starters_full = read_csv(TIDY / "starters.csv")
+    starters_full = table("starters")
     if starters_full:
         real_keys = {(r.get("match_id"), r.get("player_name"))
                     for r in starters_full}
         got_keys = {(r.get("match_id"), r.get("player_name"))
-                   for r in load("starters")}
+                   for r in newest("starters")}
         assert got_keys == real_keys, \
-            'load("starters") lost a (match, player) key latest_only should keep'
+            'newest("starters") lost a (match, player) key latest_only should keep'
 
-    stats_all = read_csv(TIDY / "api_stats.csv")
+    stats_all = table("api_stats")
     if stats_all:
         all_keys = {_api_stats_key(r) for r in stats_all}
         naive_keys = {_api_stats_key(r) for r in latest_only(stats_all)}
@@ -894,7 +828,7 @@ def _selftest_new_loaders() -> None:
     j2 = jornada_of_match()
     assert j1 is j2, "jornada_of_match() must be memoized"
     expect: dict[str, int] = {}
-    for m in load("matches_history"):
+    for m in table("matches"):
         mid = (m.get("match_id") or "").strip()
         if mid and mid not in expect:
             try:
@@ -983,7 +917,7 @@ def _selftest() -> None:
     assert load_api("standings", now=stale) == []
     assert load_api("offers", now=stale) == []
 
-    assert last_api_standings() != [] or read_csv(TIDY / "api_standings.csv") == []
+    assert newest("api_standings") != [] or table("api_standings") == []
 
     quiet = stale_feeds(now=stale)
     assert set(quiet) == set(GATED_API), quiet
@@ -1033,13 +967,24 @@ def _selftest() -> None:
     assert c["name"] == "Cai Coro" and c["team"] == "celta" and c["start"] == 85.0
     assert "value" not in c
 
-    both = [{"source": "futbolfantasy", "player_name": "Ane"},
-            {"source": "analitica", "player_name": "Ane"},
-            {"player_name": "Bo"}]
-    assert [r["source"] for r in pick_source(both, "analitica")] == ["analitica"]
-    assert len(pick_source(both, "futbolfantasy")) == 1
-    assert pick_source(both, "") == both
-    assert pick_source(both, "nobody") == []
+    import tempfile
+    real = globals()["TIDY"]
+    globals()["TIDY"] = Path(tempfile.mkdtemp())
+    try:
+        write_csv(globals()["TIDY"] / "lineups.csv", [
+            {"observed_at": "a", "source": "futbolfantasy", "player_name": "Ane"},
+            {"observed_at": "b", "source": "analitica", "player_name": "Ane"},
+            {"observed_at": "b", "source": "futbolfantasy", "player_name": "Bo"}])
+        for source, every, latest in [("", 3, ["Ane", "Bo"]),
+                                      ("analitica", 1, ["Ane"]),
+                                      ("futbolfantasy", 2, ["Bo"]),
+                                      ("nobody", 0, [])]:
+            assert len(table("lineups", source)) == every, source
+            assert [r["player_name"] for r in newest("lineups", source)] \
+                == latest, source
+        assert table("absent") == [] and newest("absent") == []
+    finally:
+        globals()["TIDY"] = real
 
     assert kickoff_stamp("2026-08-15T19:30:00+00:00") == datetime(
         2026, 8, 15, 19, 30, tzinfo=timezone.utc)

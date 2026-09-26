@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 
 sys.path.insert(0, "src")
 import flip                                                   # noqa: E402
-from ffcore.tidy import TIDY, read_csv                        # noqa: E402
+from ffcore.tidy import TIDY, read_csv
 
 WARMUP = 20
 
@@ -15,7 +15,7 @@ WARMUP = 20
 def main() -> None:
     rows, listings, players = (read_csv(TIDY / f) for f in
                                ("market.csv", "api_market.csv", "players.csv"))
-    feed = [a for a in read_csv(TIDY / "api_activity.csv") if a["kind"] == "buy"]
+    feed = [a for a in table("api_activity") if a["kind"] == "buy"]
     ff_of = {r["app_id"]: r["player_id"] for r in players if r["app_id"]}
     paid = {}
     for a in feed:
@@ -35,12 +35,12 @@ def main() -> None:
             if k not in close or r["observed_at"] > close[k]["observed_at"]:
                 close[k] = r
 
-    from ffcore.tidy import Market, load_market_frozen
-    mk = Market(load_market_frozen())
+    from ffcore.tidy import Market, TIDY, read_csv, table
+    mk = Market(table("market"))
     value_at = lambda n, w: (lambda v: v.value if v else None)(
         mk.at(n, datetime.fromisoformat(w).astimezone(timezone.utc)))
-    offer = st.mean(flip.offer_ratios(read_csv(TIDY / "api_offers.csv"),
-                                      read_csv(TIDY / "api_teams.csv"), value_at))
+    offer = st.mean(flip.offer_ratios(table("api_offers"),
+                                      table("api_teams"), value_at))
     premium = st.mean(flip.auction_ratios(listings, feed))
 
     def realised(ff, day, h):

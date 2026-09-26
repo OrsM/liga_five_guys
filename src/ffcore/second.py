@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from ffcore.text import norm, resolve
-from ffcore.tidy import latest_only, load_lineups
+from ffcore.tidy import latest_only, table
 
 __all__ = ["SECOND_SOURCE", "FF_AF_HEAD", "LEGEND", "af_cell",
           "second_cells", "resolve_second_source"]
@@ -44,7 +44,7 @@ def resolve_second_source(rows, xw=None) -> dict[str, dict]:
 
 def second_cells(who, source: str = SECOND_SOURCE, rows=None, xw=None):
     if rows is None:
-        rows = latest_only(load_lineups(source))
+        rows = latest_only(table("lineups", source))
     if xw is None:
         from ffcore.tidy import load_crosswalk
         xw = load_crosswalk()

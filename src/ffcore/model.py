@@ -6,7 +6,7 @@ from dataclasses import dataclass
 
 from ffcore.league import League
 from ffcore.score import build
-from ffcore.tidy import load_market_latest, load_lineups_latest, run_now
+from ffcore.tidy import run_now, LINEUP_SOURCE, newest
 
 __all__ = ["Session", "session", "reset"]
 
@@ -26,8 +26,8 @@ _CACHE: list = []
 
 def session() -> Session:
     if not _CACHE:
-        market = load_market_latest()
-        xi_rows = load_lineups_latest()
+        market = newest("market")
+        xi_rows = newest("lineups", LINEUP_SOURCE)
         lg = League.load()
         sc, (hist, cur) = build(market, xi_rows, run_now(),
                                 shrink_k=lg.cfg.shrink_k if lg else 8.0)
