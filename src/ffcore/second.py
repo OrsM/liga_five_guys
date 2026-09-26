@@ -35,8 +35,7 @@ def af_cell(row) -> str:
 def resolve_second_source(rows, xw=None) -> dict[str, dict]:
     out: dict[str, dict] = {}
     for r in rows:
-        pid = xw.player(af_slug=r.get("player_slug"),
-                        name=r.get("player_name")) if xw else None
+        pid = xw.key_of(r) if xw else None
         key = pid or norm(r.get("player_name") or r.get("player_slug") or "")
         if key:
             out[key] = r

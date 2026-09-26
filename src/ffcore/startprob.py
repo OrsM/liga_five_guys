@@ -163,10 +163,7 @@ def observations(lineups, starters, cut: str, roster=None,
     last = max(r["observed_at"] for r in truth)
     truth = [r for r in truth if r["observed_at"] == last]
     teams = {r.get("team_slug") for r in truth}
-    minutes_of = {r["player_slug"]: minutes_played(r["role"], r.get("minute"))
-                 for r in truth}
-    name_of = {r["player_slug"]: r.get("player_name", "") for r in truth}
-    team_of = {r["player_slug"]: r.get("team_slug", "") for r in truth}
+    truth_of = {r["player_slug"]: r for r in truth}
 
     wide: dict[str, dict] = {}
     narrow_rows = []
@@ -181,8 +178,9 @@ def observations(lineups, starters, cut: str, roster=None,
     narrow = resolve_second_source(narrow_rows, xw)
 
     out = []
-    for slug in sorted(set(wide) | set(truth and name_of)):
+    for slug in sorted(set(wide) | set(truth_of)):
         row = wide.get(slug)
+        seen = truth_of.get(slug) or {}
         fp = absent / 100.0
         if row is not None:
             fp = neutral / 100.0
@@ -191,15 +189,15 @@ def observations(lineups, starters, cut: str, roster=None,
                     fp = float(row["start_pct"]) / 100.0
                 except (TypeError, ValueError):
                     pass
-        nm = (row or {}).get("player_name") or name_of.get(slug, "")
+        nm = (row or {}).get("player_name") or seen.get("player_name", "")
         af = narrow.get(norm(nm))
         if af is None and xw is not None:
-            pid = xw.player(ff_slug=slug, name=nm)
-            if pid:
-                af = narrow.get(pid)
-        graded = min(1.0, minutes_of.get(slug, 0.0) / MATCH_LEN)
+            af = narrow.get(xw.key_of(row or seen))
+        graded = min(1.0, minutes_played(seen.get("role"), seen.get("minute"))
+                     / MATCH_LEN)
         out.append(Obs(fp, af_prob(af, 1.0), graded,
-                       (row or {}).get("team_slug") or team_of.get(slug, "")))
+                       (row or {}).get("team_slug")
+                       or seen.get("team_slug", "")))
     return out
 
 
@@ -330,20 +328,16 @@ def _selftest() -> None:
     assert npct0 == 60.0 and apct0 == 15.0, (npct0, apct0)
     assert "no real observations" in why0, why0
 
-    class _XW:
-        def player(self, **kw):
-            if kw.get("af_slug") == "af-only-slug":
-                return "starter man"
-            if kw.get("ff_slug") == "starter-man":
-                return "starter man"
-            return None
+    from ffcore.crosswalk import Crosswalk, Player
+    xw = Crosswalk({"starter man": Player("starter man", ff_slug="starter-man",
+                                          af_slug="af-only-slug")})
 
     odd = [r for r in lineups if r["source"] == "futbolfantasy"] + [
         {"observed_at": "A", "source": "analitica", "team_slug": "t",
          "player_slug": "af-only-slug", "player_name": "S. Man",
          "start_pct": "75", "role": "starter"}]
     assert all(o.af is None for o in observations(odd, starters, cut="M"))
-    got2 = observations(odd, starters, cut="M", xw=_XW())
+    got2 = observations(odd, starters, cut="M", xw=xw)
     assert any(o.af == 0.75 for o in got2), got2
 
     graded_lineups = [

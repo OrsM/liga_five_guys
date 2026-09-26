@@ -186,17 +186,15 @@ def allowance(since, now, daily_bonus: float) -> tuple[float, float]:
 def owner_from_api(rows: list[dict], market, ledger_owner: dict | None = None,
                    xw=None) -> tuple[dict, list]:
     from ffcore.crosswalk import Crosswalk
-    from ffcore.tidy import latest_only
     out, unjoined = {}, []
-    index = latest_only(market.rows) if market is not None else []
     xw = xw or Crosswalk()
+    xw.attach_market(market)
     for r in rows:
         handle = schema.text(r, schema.API_TEAMS.MANAGER)
         raw = schema.text(r, schema.API_TEAMS.PLAYER_NAME)
         if not handle or not raw:
             continue
-        key = xw.resolve(raw, handle=handle, market=market,
-                         ledger_owner=ledger_owner, index=index,
+        key = xw.resolve(raw, handle=handle, ledger_owner=ledger_owner,
                          hint_price=r.get("market_value"),
                          hint_full=r.get("player_name_full") or "",
                          hint_app_id=r.get("player_id") or "")
@@ -363,7 +361,7 @@ def _roster_key(raw: str, market, xw=None) -> str:
         return stripped
     name, _, club = raw.partition("@")
     if xw is not None:
-        got = xw.resolve(name, hint_club=club, market=market)
+        got = xw.resolve(name, hint_club=club)
         if got:
             return got
     elif market is not None:
@@ -469,6 +467,8 @@ class League:
         self.txns = txns
         self.market = market
         self.xw = xw
+        if xw is not None:
+            xw.attach_market(market)
         self.owner, self.warnings, self.resolved = replay(rosters, txns,
                                                           market, xw)
 
@@ -824,7 +824,8 @@ def _selftest_api_owner() -> None:
          lone, {"hint_app_id": "2552"}, "someone else"),
     ]
     for xw, raw, handle, market, kwargs, expected in cases:
-        got = xw.resolve(raw, handle=handle, market=market, **kwargs)
+        xw.attach_market(market)
+        got = xw.resolve(raw, handle=handle, **kwargs)
         assert got == expected, (raw, handle, kwargs, expected, got)
 
     owner, unjoined = owner_from_api(

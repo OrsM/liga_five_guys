@@ -76,23 +76,26 @@ class Crosswalk:
         self.players: dict[str, Player] = dict(players or {})
         self.clubs: dict[str, Club] = dict(clubs or {})
         self._market = None
-        self._owner: dict = {}
+        self._index: list = []
         self._reindex()
 
-    def attach_market(self, market, owner: dict | None = None) -> None:
-        """Ambient market/owner context for resolve() -- set once when both
-        are known (at League construction, or slate_from_api's entry) so
-        every later resolve() call stops re-threading them through every
-        call site the way resolve_api() used to require."""
+    def attach_market(self, market) -> None:
+        """The market resolve() matches names and prices against."""
+        if market is self._market:
+            return
+        from ffcore.tidy import latest_only
         self._market = market
-        self._owner = owner or {}
+        self._index = latest_only(market.rows) if market is not None else []
 
     def _reindex(self) -> None:
         self._by_ff, self._by_af, self._by_app = {}, {}, {}
         self._by_understat = {}
         self._by_app_name = {}
         self._clash: dict[str, set] = {}
+        names: dict[str, set] = {}
         for p in self.players.values():
+            if p.name:
+                names.setdefault(norm(p.name), set()).add(p.player_id)
             for idx, key, label in (
                     (self._by_ff, p.ff_slug, "ff_slug"),
                     (self._by_af, p.af_slug, "af_slug"),
@@ -117,6 +120,8 @@ class Crosswalk:
                    "app_name": self._by_app_name}[label]
             for k in keys:
                 idx.pop(k, None)
+        self._by_name = {n: next(iter(ids)) for n, ids in names.items()
+                         if len(ids) == 1}
         self._club_ff = {c.ff_slug: c.club_id for c in self.clubs.values()
                          if c.ff_slug}
         self._club_alias = {}
@@ -139,6 +144,8 @@ class Crosswalk:
             k = norm(name)
             if k in self.players:
                 return k
+            if k in self._by_name:
+                return self._by_name[k]
         if app_name:
             k = norm(app_name)
             if k in self._by_app_name:
@@ -147,33 +154,33 @@ class Crosswalk:
                 return k
         return None
 
+    def key_of(self, r) -> str | None:
+        """The canonical key for one tidy row: its ff_id, else its
+        player_slug (an AF slug when the source is analitica, else FF),
+        else its name."""
+        fid = (r.get("ff_id") or "").strip()
+        if fid in self.players:
+            return fid
+        slug = (r.get("player_slug") or "").strip() or None
+        by = "af_slug" if r.get("source") == "analitica" else "ff_slug"
+        return self.player(**{by: slug},
+                           name=r.get("player_name_full")
+                           or r.get("player_name"))
+
     def resolve(self, raw="", *, hint_app_id="", hint_ff_slug="",
                 hint_af_slug="", hint_club="", hint_price=None,
-                hint_full="", handle="", market=None,
-                ledger_owner=None, index=None) -> str | None:
+                hint_full="", handle="", ledger_owner=None) -> str | None:
         """One disambiguation ladder (id lookup -> market name/club/price
         match -> owner narrowing -> price-only value-index fallback ->
-        name fallback), replacing what used to be resolve()/resolve_api()'s
-        three-and-a-half separately-grown copies of it. market/ledger_owner
-        default to whatever attach_market() set, so a caller with an
-        ambient Crosswalk no longer threads them through every call the
-        way resolve_api() required; `index` stays an explicit optional
-        param (not also defaulted from an attached value) because real
-        callers precompute latest_only(market.rows) ONCE outside a
-        per-row loop and pass it in -- recomputing it per call here would
-        reintroduce exactly the cost that precompute exists to avoid."""
-        from ffcore.tidy import latest_only
-
-        market = self._market if market is None else market
-        ledger_owner = self._owner if ledger_owner is None else ledger_owner
+        name fallback), against the market attach_market() set."""
+        market, index = self._market, self._index
+        ledger_owner = ledger_owner or {}
         raw = (raw or "").strip()
         if raw.isdigit():
             return raw
         hint_app_id = (hint_app_id or "").strip()
         hint_ff_slug = (hint_ff_slug or "").strip()
         hint_af_slug = (hint_af_slug or "").strip()
-        if market is not None and index is None:
-            index = latest_only(market.rows)
         if hint_app_id or hint_ff_slug or hint_af_slug:
             got = self.player(app_id=hint_app_id or None,
                               ff_slug=hint_ff_slug or None,
@@ -431,18 +438,11 @@ def _selftest() -> None:
 
     from ffcore.tidy import Market
 
-    assert xw.resolve("2101") == "2101"
-
     ag = Market([
         {"ff_id": "867", "name": "Álvaro García", "team": "Rayo",
          "value": "20233300", "observed_at": "2026-08-19T1639Z"},
         {"ff_id": "12993", "name": "Álvaro García", "team": "Villarreal",
          "value": "501929", "observed_at": "2026-08-19T1639Z"}])
-    assert xw.resolve("Álvaro García", market=ag) is None
-    assert xw.resolve("Álvaro García", hint_club="Rayo", market=ag) == "867"
-    assert xw.resolve("Álvaro García", hint_price=501929, market=ag) \
-        == "12993"
-
     rm = Market([
         {"ff_id": "1", "name": "Isaac Romero", "team": "Sevilla",
          "value": "6023939", "observed_at": "2026-08-19T1639Z"},
@@ -450,40 +450,60 @@ def _selftest() -> None:
          "value": "47546565", "observed_at": "2026-08-19T1639Z"},
         {"ff_id": "3", "name": "Carlos Romero", "team": "Espanyol",
          "value": "42510131", "observed_at": "2026-08-19T1639Z"}])
-    assert xw.resolve("C. Romero", market=rm) is None
-    assert xw.resolve("C. Romero", hint_price=45739000, market=rm) == "2"
-
     nick = Market([{"ff_id": "9", "name": "Pepelu", "team": "Valencia",
                     "value": "7669774", "observed_at": "2026-08-19T1639Z"}])
-    assert xw.resolve("nobody knows this nickname", market=nick) is None
-    assert xw.resolve("nobody knows this nickname",
-                      hint_full="Pepelu", market=nick) == "9"
-
-    moved = Crosswalk({"manu fernandez": Player(
-        "manu fernandez", "Manu Fernandez", app_names={"Manuel Fernández"})})
-    empty_market = Market([])
-    assert moved.resolve("Manuel Fernández") == "manu fernandez"
-    assert moved.resolve("Manuel Fernández", market=empty_market) \
-        == "manu fernandez"
-
-    assert xw.resolve("Absolutely Nobody") is None
-    assert xw.resolve("") is None
-
     jc = Market([{"ff_id": "77", "name": "Jonny Castro", "team": "Alaves",
                  "value": "5602302", "observed_at": "2026-08-19T1639Z"}])
+    moved = Crosswalk({"manu fernandez": Player(
+        "manu fernandez", "Manu Fernandez", app_names={"Manuel Fernández"})})
     elsewhere = Crosswalk({"someone else": Player("someone else", app_id="9")})
-    assert elsewhere.resolve("Jonny Castro", hint_app_id="9", market=jc) \
-        == "someone else"
-    assert elsewhere.resolve("Jonny Castro", market=jc) == "77"
-
     slugged = Crosswalk({"alvaro fernandez": Player(
         "alvaro fernandez", ff_slug="alvaro-slug", af_slug="af-alvaro")})
-    assert slugged.resolve("whatever a page called him",
-                           hint_ff_slug="alvaro-slug") == "alvaro fernandez"
-    assert slugged.resolve("whatever a page called him",
-                           hint_af_slug="af-alvaro") == "alvaro fernandez"
-    assert slugged.resolve("Alvaro Fernandez",
-                           hint_ff_slug="no-such-slug") == "alvaro fernandez"
+    cases = [  # (crosswalk, attached market, raw, hints, expected)
+        (xw, None, "2101", {}, "2101"),
+        (xw, ag, "Álvaro García", {}, None),
+        (xw, ag, "Álvaro García", {"hint_club": "Rayo"}, "867"),
+        (xw, ag, "Álvaro García", {"hint_price": 501929}, "12993"),
+        (xw, rm, "C. Romero", {}, None),
+        (xw, rm, "C. Romero", {"hint_price": 45739000}, "2"),
+        (xw, nick, "nobody knows this nickname", {}, None),
+        (xw, nick, "nobody knows this nickname", {"hint_full": "Pepelu"}, "9"),
+        (moved, None, "Manuel Fernández", {}, "manu fernandez"),
+        (moved, Market([]), "Manuel Fernández", {}, "manu fernandez"),
+        (xw, None, "Absolutely Nobody", {}, None),
+        (xw, None, "", {}, None),
+        (elsewhere, jc, "Jonny Castro", {"hint_app_id": "9"}, "someone else"),
+        (elsewhere, jc, "Jonny Castro", {}, "77"),
+        (slugged, None, "whatever a page called him",
+         {"hint_ff_slug": "alvaro-slug"}, "alvaro fernandez"),
+        (slugged, None, "whatever a page called him",
+         {"hint_af_slug": "af-alvaro"}, "alvaro fernandez"),
+        (slugged, None, "Alvaro Fernandez", {"hint_ff_slug": "no-such-slug"},
+         "alvaro fernandez"),
+    ]
+    for cw, market, raw, hints, expected in cases:
+        cw.attach_market(market)
+        got = cw.resolve(raw, **hints)
+        assert got == expected, (raw, hints, expected, got)
+
+    named = Crosswalk({
+        "867": Player("867", "Álvaro García", ff_slug="alvaro-garcia"),
+        "12993": Player("12993", "Álvaro García"),
+        "5": Player("5", "Pepelu", af_slug="af-5"),
+        "132": Player("132", "Sergio Canales")})
+    rows = [
+        ({"player_slug": "alvaro-garcia", "player_name": "x"}, "867"),
+        ({"player_slug": "gone", "player_name": "Álvaro García"}, None),
+        ({"source": "analitica", "player_slug": "af-5"}, "5"),
+        ({"source": "futbolfantasy", "player_slug": "af-5"}, None),
+        ({"source": "analitica", "player_slug": "?", "player_name": "Pepelu"},
+         "5"),
+        ({"ff_id": "132", "player_name": "whoever"}, "132"),
+        ({"ff_id": "999", "player_name": "Canales",
+          "player_name_full": "Sergio Canales"}, "132"),
+    ]
+    for r, expected in rows:
+        assert named.key_of(r) == expected, (r, named.key_of(r))
 
     us = Crosswalk({"alvaro fernandez": Player(
         "alvaro fernandez", "Alvaro Fernandez", understat_id="555")})

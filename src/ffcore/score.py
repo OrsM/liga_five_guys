@@ -204,9 +204,7 @@ def _xg_points_fit(xw) -> tuple[float, float, int]:
         return 0.0, 0.0, 0
     pts_by_key = {}
     for r in read_csv(pts_files[-1]):
-        pid = schema.text(r, "ff_id")
-        key = pid if pid in xw.players else xw.player(
-            name=r.get("player_name_full") or r.get("player_name"))
+        key = xw.key_of(r)
         if key:
             pts_by_key[key] = r
     xs, ys = [], []
@@ -374,7 +372,7 @@ def _per_jornada_current(starters_rows, perjornada_rows, jornada_of_match,
         jor = jornada_of_match.get(mid)
         if not slug or jor is None or r.get("role") not in ("starter", "sub"):
             continue
-        key = xw.player(ff_slug=slug, name=r.get("player_name"))
+        key = xw.key_of(r)
         if not key:
             continue
         dedup = (mid, key)
@@ -392,9 +390,7 @@ def _per_jornada_current(starters_rows, perjornada_rows, jornada_of_match,
         if not raw_jor:
             continue
         jor = int(raw_jor)
-        pid = schema.text(r, schema.PERJORNADA.FF_ID)
-        key = pid if pid in xw.players else xw.player(
-            name=r.get("player_name_full") or r.get("player_name"))
+        key = xw.key_of(r)
         if not key:
             continue
         total = ratio(r.get("points_total"))
@@ -572,7 +568,7 @@ def build(market: list[dict], xi_rows: list[dict], now,
     priors, _global_prior = position_priors(market, prior)
     promoted_discount, promoted_why = fit_promoted_discount(
         market, prior, priors)
-    sc = Scorer(market, xi_rows, prior, shrink_k=shrink_k,
+    sc = Scorer(market, xi_rows, prior, shrink_k=shrink_k, xw=xw,
                 current=cur, board=board, cal=cal, second=second,
                 xg=xg_cur, xg_slope=xg_slope, xg_intercept=xg_intercept,
                 xg_n=xg_n, xg_boost=xg_boost, xg_why=xg_why,
@@ -700,7 +696,7 @@ class Scorer:
                  xg_boost: float = 1.0, xg_why: str = "",
                  shots: dict | None = None, shots_slope: float = 0.0,
                  shots_intercept: float = 0.0, shots_n: int = 0,
-                 promoted_discount: float = PROMOTED_DISCOUNT):
+                 promoted_discount: float = PROMOTED_DISCOUNT, xw=None):
         self.market = market
         self.history = history or {}
         self.shrink_k = shrink_k
@@ -721,24 +717,14 @@ class Scorer:
         from ffcore.tidy import row_key, shared_names, load_crosswalk
 
         shared = shared_names(market)
-        self.lookup: dict[str, dict] = {}
-        self._name_keys: dict[str, list] = {}
-        for r in market:
-            if r.get("name"):
-                k = row_key(r, shared)
-                self.lookup[k] = r
-                seen_for = self._name_keys.setdefault(norm(r.get("name")), [])
-                if k not in seen_for:
-                    seen_for.append(k)
-        xw = load_crosswalk()
-        self._by_ff_slug = {norm(p.ff_slug): p.player_id
-                            for p in (xw.players.values() if xw else ())
-                            if p.ff_slug}
+        self.lookup: dict[str, dict] = {row_key(r, shared): r for r in market
+                                        if r.get("name")}
+        xw = xw if xw is not None else load_crosswalk()
 
         self.cal = cal or Calibration()
         self.second: dict[str, dict] = {}
         for r in second or []:
-            k = self._key_of(r)
+            k = xw.key_of(r) if xw else None
             if k:
                 self.second[k] = r
 
@@ -746,7 +732,7 @@ class Scorer:
         self.listed: set[str] = set()
         self.status: dict[str, str] = {}
         for r in xi or []:
-            key = self._key_of(r)
+            key = xw.key_of(r) if xw else None
             if not key:
                 continue
             self.listed.add(key)
@@ -759,16 +745,6 @@ class Scorer:
         self.promoted = detect_promoted(self.market, self.history)
         self.priors, self.global_prior = position_priors(self.market,
                                                           self.history)
-
-    def _key_of(self, r: dict) -> str | None:
-        """A row's canonical key -- ff_slug lookup, else a unique-name
-        fallback via `_name_keys`. The `self.second`/`self.listed` loops
-        each hand-wrote this identical ladder separately."""
-        key = self._by_ff_slug.get(norm(r.get("player_slug") or ""))
-        if key:
-            return key
-        hits = self._name_keys.get(norm(r.get("player_name") or ""), [])
-        return hits[0] if len(hits) == 1 else None
 
     def rate(self, rec: dict) -> Rating:
         key = norm(rec.get("name", ""))
@@ -993,13 +969,17 @@ def _selftest() -> None:
     def mk(name, pos="defensa", team="Mid", value="10.00M"):
         return {"name": name, "position": pos, "team": team, "value": value}
 
+    from ffcore.crosswalk import Crosswalk, Player
+
     market = [mk("p%d" % i) for i in range(10)] + [mk("Sub"), mk("Newbie")]
+    xw = Crosswalk({norm(n): Player(norm(n), n)
+                    for n in [r["name"] for r in market] + ["Attacker"]})
     hist = {"p%d" % i: {"pts": 100.0 + i, "pj": 34.0} for i in range(10)}
     hist["sub"] = {"pts": 20.0, "pj": 4.0}
     xi = [{"player_name": n, "start_pct": "100"}
           for n in [r["name"] for r in market]]
 
-    sc = Scorer(market, xi, hist)
+    sc = Scorer(market, xi, hist, xw=xw)
     prior = sc.priors["DEF"]
     assert 3.0 < prior < 3.1, prior
 
@@ -1010,7 +990,7 @@ def _selftest() -> None:
 
     full = sc.rate(mk("p0"))
     cur = {"p0": {"pts": 30.0, "pj": 3.0}}
-    sc2 = Scorer(market, xi, hist, current=cur)
+    sc2 = Scorer(market, xi, hist, current=cur, xw=xw)
     blended = sc2.rate(mk("p0"))
     assert abs(blended.ppm - (30.0 + 8 * full.ppm) / (3.0 + 8)) < 1e-9
     assert blended.cur_pj == 3.0
@@ -1027,12 +1007,12 @@ def _selftest() -> None:
     # keeping the stated default with no error (found 2026-09-24).
     accented = [mk("r%d" % i, team="Málaga") for i in range(10)]
     assert detect_promoted(accented, {}) == {"Málaga"}
-    sc3 = Scorer(promo_market, [], promo_hist)
+    sc3 = Scorer(promo_market, [], promo_hist, xw=xw)
     assert sc3.promoted == {"Rise"}
     newbie = sc3.rate(mk("q5", team="Rise"))
     assert newbie.assumed and abs(newbie.ppm - sc3.priors["DEF"]
                                   * PROMOTED_DISCOUNT) < 1e-9, newbie
-    lower = Scorer(promo_market, [], promo_hist, promoted_discount=0.5)
+    lower = Scorer(promo_market, [], promo_hist, promoted_discount=0.5, xw=xw)
     assert lower.rate(mk("q5", team="Rise")).ppm < newbie.ppm
 
     priors3 = position_priors(promo_market, promo_hist)[0]
@@ -1082,16 +1062,16 @@ def _selftest() -> None:
             _tidy_sc.SEASON = real_season
     assert "now" in blended.why and "3j" in blended.why
 
-    assert Scorer(market, xi, hist, current={}).rate(mk("p0")) == full
+    assert Scorer(market, xi, hist, current={}, xw=xw).rate(mk("p0")) == full
     assert Scorer(market, xi, hist,
-                  current={"p0": {"pts": 0.0, "pj": 0.0}}).rate(mk("p0")) \
+                  current={"p0": {"pts": 0.0, "pj": 0.0}}, xw=xw).rate(mk("p0")) \
         == full
 
     when = __import__("datetime").datetime.fromisoformat(
         "2026-08-20T19:00:00+00:00")
     easy = Match("Elche", True, when, atk_factor=1.30, def_factor=1.10,
                 rank=20, of=20)
-    sc3 = Scorer(market, xi, hist, board={"Mid": easy})
+    sc3 = Scorer(market, xi, hist, board={"Mid": easy}, xw=xw)
     s = sc3.score(mk("p0"))
     assert abs(s.flat - full.ppm) < 1e-9
     assert abs(s.score - full.ppm * 1.10) < 1e-9
@@ -1099,14 +1079,14 @@ def _selftest() -> None:
     fwd = sc3.score(mk("p0", pos="delantero"))
     assert abs(fwd.score - full.ppm * 1.30) < 1e-9, fwd
     assert fwd.fix == 1.30
-    solo = Scorer(market, xi, hist, board={}).score(mk("p0"))
+    solo = Scorer(market, xi, hist, board={}, xw=xw).score(mk("p0"))
     assert solo.fix == 1.0 and solo.opp == "" and solo.score == solo.flat
 
     out = [{"player_name": "p0", "start_pct": "100", "status": "suspended"}]
-    zero = Scorer(market, out, hist, board={"Mid": easy}).score(mk("p0"))
+    zero = Scorer(market, out, hist, board={"Mid": easy}, xw=xw).score(mk("p0"))
     assert zero.score == 0.0 and zero.flat == 0.0
     dbt = [{"player_name": "p0", "start_pct": "100", "status": "doubt"}]
-    half = Scorer(market, dbt, hist, board={"Mid": easy}).score(mk("p0"))
+    half = Scorer(market, dbt, hist, board={"Mid": easy}, xw=xw).score(mk("p0"))
     assert abs(half.flat - full.ppm * DOUBT_FACTOR) < 1e-9
     assert abs(half.score - full.ppm * 1.10 * DOUBT_FACTOR) < 1e-9
 
@@ -1126,20 +1106,20 @@ def _selftest() -> None:
 
     benched_cur = {"p0": {"pts": 30.0, "pj": 3.0,
                           "start_rate": 0.0, "start_n": 6.0}}
-    sc4 = Scorer(market, xi, hist, current=benched_cur, board={"Mid": easy})
+    sc4 = Scorer(market, xi, hist, current=benched_cur, board={"Mid": easy}, xw=xw)
     benched_s = sc4.score(mk("p0"))
     assert benched_s.pct_used < 100.0, benched_s.pct_used
     assert abs(benched_s.pct_used - 800.0 / 14.0) < 1e-9, benched_s.pct_used
 
     untouched = Scorer(market, xi, hist, current={}, board={"Mid": easy}
-                       ).score(mk("p0"))
+                       , xw=xw).score(mk("p0"))
     assert untouched.pct_used == 100.0, untouched.pct_used
     assert untouched.pct_rest == 100.0, untouched.pct_rest
 
     starter_cur = {"p0": {"pts": 30.0, "pj": 2.0,
                           "start_rate": 0.9, "start_n": 2.0}}
     susp = [{"player_name": "p0", "start_pct": "0", "status": "suspended"}]
-    sc5 = Scorer(market, susp, hist, current=starter_cur, board={"Mid": easy})
+    sc5 = Scorer(market, susp, hist, current=starter_cur, board={"Mid": easy}, xw=xw)
     susp_s = sc5.score(mk("p0"))
     assert abs(susp_s.pct_used - (8 * 0.0 + 2 * 90.0) / 10) < 1e-9, susp_s
     assert abs(susp_s.pct_rest - (8 * NEUTRAL_START + 2 * 90.0) / 10) < 1e-9, \
@@ -1271,12 +1251,12 @@ def _selftest() -> None:
     market_xg = [mk("Attacker", pos="delantero")]
     hist_xg = {"attacker": {"pts": 100.0, "pj": 34.0}}
     xi_xg = [{"player_name": "Attacker", "start_pct": "100"}]
-    sc_plain = Scorer(market_xg, xi_xg, hist_xg)
+    sc_plain = Scorer(market_xg, xi_xg, hist_xg, xw=xw)
     plain = sc_plain.rate(mk("Attacker", pos="delantero"))
 
     sc_xg = Scorer(market_xg, xi_xg, hist_xg,
                   xg={"attacker": {"xg90": 1.0, "minutes": 180.0}},
-                  xg_slope=10.0, xg_intercept=0.0, xg_boost=1.0)
+                  xg_slope=10.0, xg_intercept=0.0, xg_boost=1.0, xw=xw)
     with_xg = sc_xg.rate(mk("Attacker", pos="delantero"))
     expect = (SHRINK_K * plain.ppm + 2.0 * 10.0) / (SHRINK_K + 2.0)
     assert abs(with_xg.ppm - expect) < 1e-9, (with_xg.ppm, expect)
@@ -1284,19 +1264,19 @@ def _selftest() -> None:
     assert "xg" in with_xg.why
     assert with_xg.cur_pj == 0.0 and with_xg.pj == 34.0
 
-    sc_noxg = Scorer(market_xg, xi_xg, hist_xg, xg={})
+    sc_noxg = Scorer(market_xg, xi_xg, hist_xg, xg={}, xw=xw)
     assert sc_noxg.rate(mk("Attacker", pos="delantero")) == plain
 
     sc_shots_untrained = Scorer(
         market_xg, xi_xg, hist_xg,
         shots={"attacker": {"shots90": 3.0, "minutes": 180.0}},
-        shots_slope=0.0, shots_intercept=0.0, shots_n=3)
+        shots_slope=0.0, shots_intercept=0.0, shots_n=3, xw=xw)
     assert sc_shots_untrained.rate(mk("Attacker", pos="delantero")) == plain
 
     sc_shots = Scorer(
         market_xg, xi_xg, hist_xg,
         shots={"attacker": {"shots90": 2.0, "minutes": 180.0}},
-        shots_slope=5.0, shots_intercept=0.0, shots_n=10)
+        shots_slope=5.0, shots_intercept=0.0, shots_n=10, xw=xw)
     with_shots = sc_shots.rate(mk("Attacker", pos="delantero"))
     expect_shots = (SHRINK_K * plain.ppm + 2.0 * 10.0) / (SHRINK_K + 2.0)
     assert abs(with_shots.ppm - expect_shots) < 1e-9, \

@@ -23,13 +23,14 @@ __all__ = ["read_slate", "slate_from_api", "comparison_rows",
 
 def slate_from_api(rows: list[dict], market, xw=None) -> tuple[set, list]:
     keys, unresolved = set(), []
+    if xw is not None:
+        xw.attach_market(market)
     for r in rows:
         raw = (r.get("player_name") or "").strip()
         if not raw:
             continue
         if xw is not None:
-            key = xw.resolve(raw, hint_app_id=r.get("player_id") or "",
-                             market=market)
+            key = xw.resolve(raw, hint_app_id=r.get("player_id") or "")
         else:
             key = market.key_for(raw) if market is not None else norm(raw)
         if key:

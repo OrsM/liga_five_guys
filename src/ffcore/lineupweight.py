@@ -58,7 +58,7 @@ def rows():
                 (stamp(r["observed_at"]), float(r["start_pct"]) / 100.0))
     out = []
     for (m, team, slug), r in seen.items():
-        j, key = jor.get(m), xw.player(ff_slug=slug, name=r.get("player_name"))
+        j, key = jor.get(m), xw.key_of(r)
         if j is None or not key or pos.get(key) is None:
             continue
         cut = stamp(scraped[m]) - timedelta(hours=LEAD_H)

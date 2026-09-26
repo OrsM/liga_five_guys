@@ -7,7 +7,7 @@ import sys
 from ffcore import schema
 from ffcore.crosswalk import Club, Crosswalk, Player
 from ffcore.text import norm
-from ffcore.tidy import (TIDY, latest_only, load, load_fixtures, newest,
+from ffcore.tidy import (TIDY, load, load_fixtures, newest,
                          load_lineups_latest, load_market_latest,
                          narrow_by_club, read_csv, row_key,
                          shared_names)
@@ -125,16 +125,15 @@ def build_players(market, lineups, starters, api_rows, lg, clubs) -> dict:
         if p is not None and slug and not p.ff_slug:
             p.ff_slug = slug
 
-    index = latest_only(lg.market.rows) if lg and lg.market is not None else []
     known = Crosswalk.read(TIDY / "players.csv", TIDY / "clubs.csv")
+    known.attach_market(lg.market if lg else None)
     for r in api_rows:
         raw = schema.text(r, schema.API_TEAMS.PLAYER_NAME)
         if not raw:
             continue
         key = known.resolve(raw, handle=schema.text(r, schema.API_TEAMS.MANAGER),
-                           market=lg.market if lg else None,
                            ledger_owner=lg.owner if lg else None,
-                           index=index, hint_price=r.get("market_value"),
+                           hint_price=r.get("market_value"),
                            hint_full=r.get("player_name_full") or "",
                            hint_app_id=r.get("player_id") or "")
         p = out.get(key) if key else None
