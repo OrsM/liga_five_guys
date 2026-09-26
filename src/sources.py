@@ -222,6 +222,25 @@ def parse_fitness(doc) -> dict[str, dict]:
     return found
 
 
+def _lineup_row(observed_at, source, team_slug, player_name, player_slug,
+                role, start_pct, status, note) -> dict:
+    """The 9-key lineup-row envelope -- parse_team()'s add() closure, its
+    post-loop "absent" row, and parse_af_team()'s add() closure each built
+    this dict literal separately, proven identical by the file's own
+    self-test (`list(af[0]) == list(rows[0])`)."""
+    return {
+        "observed_at": observed_at,
+        "source": source,
+        "team_slug": team_slug,
+        "player_name": player_name,
+        "player_slug": player_slug,
+        "role": role,
+        "start_pct": start_pct,
+        "status": status,
+        "note": note,
+    }
+
+
 def parse_team(html: str, observed_at: str, key: str = "team_test") -> list[dict]:
     slug = key[5:] if key.startswith("team_") else key
     doc = lh.fromstring(html)
@@ -243,17 +262,10 @@ def parse_team(html: str, observed_at: str, key: str = "team_test") -> list[dict
         if not href:
             a = el.find(".//a[@href]")
             href = a.get("href") if a is not None else ""
-        rows.append({
-            "observed_at": observed_at,
-            "source": SOURCE,
-            "team_slug": slug,
-            "player_name": name,
-            "player_slug": _slug('href="%s"' % href) if href else None,
-            "role": role,
-            "start_pct": pct,
-            "status": fit["status"] if fit else "ok",
-            "note": fit["note"] if fit else "",
-        })
+        rows.append(_lineup_row(
+            observed_at, SOURCE, slug, name,
+            _slug('href="%s"' % href) if href else None, role, pct,
+            fit["status"] if fit else "ok", fit["note"] if fit else ""))
 
     for el in _css(doc, XI_SELECTORS[0]):
         add(el, "starter")
@@ -263,17 +275,9 @@ def parse_team(html: str, observed_at: str, key: str = "team_test") -> list[dict
     for fkey, fit in fitness.items():
         if fkey in {norm(r["player_name"]) for r in rows}:
             continue
-        rows.append({
-            "observed_at": observed_at,
-            "source": SOURCE,
-            "team_slug": slug,
-            "player_name": fit["name"],
-            "player_slug": fit["slug"] or None,
-            "role": "absent",
-            "start_pct": None,
-            "status": fit["status"],
-            "note": fit["note"],
-        })
+        rows.append(_lineup_row(
+            observed_at, SOURCE, slug, fit["name"], fit["slug"] or None,
+            "absent", None, fit["status"], fit["note"]))
 
     return rows
 
@@ -544,17 +548,9 @@ def parse_af_team(html: str, observed_at: str,
         if not _once(seen, name.lower()):
             return
         m = AF_PHOTO_RE.search(img_src or "")
-        rows.append({
-            "observed_at": observed_at,
-            "source": AF_SOURCE,
-            "team_slug": slug,
-            "player_name": name,
-            "player_slug": m.group(1) if m else None,
-            "role": role,
-            "start_pct": start_pct,
-            "status": "",
-            "note": note,
-        })
+        rows.append(_lineup_row(
+            observed_at, AF_SOURCE, slug, name, m.group(1) if m else None,
+            role, start_pct, "", note))
 
     def photo(li):
         img = _css(li, "img[src]")
