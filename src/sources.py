@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import csv
-import hashlib
 import io
 import json
 import re
@@ -19,7 +18,7 @@ __all__ = ["BASE", "SOURCE", "MARKET_URL", "POINTS_URL", "TEAM_URL", "TEAMS",
            "Source", "sources", "source_for", "SEVERITY",
            "parse_market", "parse_team", "parse_points", "parse_fitness",
            "parse_af_team", "parse_af_fixtures", "season_label",
-           "FD_BASE", "FD_URL", "FD_SOURCE", "FD_ALIASES", "FD_SEASONS_BACK",
+           "FD_BASE", "FD_URL", "FD_SOURCE", "CLUB_ALIASES", "club_slug", "FD_SEASONS_BACK",
            "fd_season_code", "fd_sources", "parse_fd_results",
            "CAL_KEY", "FF_CAL_URL", "MATCH_URL", "MATCH_KEY_RE",
            "parse_calendar", "parse_starters", "match_source", "played_sources",
@@ -47,6 +46,20 @@ TEAMS = [
     "osasuna", "racing", "rayo-vallecano", "real-madrid", "real-sociedad",
     "sevilla", "valencia", "villarreal",
 ]
+
+CLUB_ALIASES = {
+    "ath bilbao": "athletic", "bilbao": "athletic", "ath madrid": "atletico",
+    "atl madrid": "atletico", "espanol": "espanyol", "sociedad": "real-sociedad",
+    "vallecano": "rayo-vallecano", "rayo": "rayo-vallecano",
+    "dep a coruna": "deportivo", "la coruna": "deportivo",
+    "santander": "racing",
+}
+
+
+def club_slug(name) -> str:
+    if not name or "," in name:
+        return ""
+    return match_one(name, TEAMS) or CLUB_ALIASES.get(norm(name), "")
 
 
 TEAM_SELECT_RE = re.compile(r'<select[^>]*name="equipo"[^>]*>(.*?)</select>', re.S)
@@ -128,6 +141,7 @@ def parse_market(html: str, observed_at: str, key: str = "market") -> list[dict]
             "position": (_attr(chunk, "posicion") or "").lower(),
             "team_id": team_id,
             "team": teams.get(team_id or "", ""),
+            "club": club_slug(teams.get(team_id or "", "")),
             "value": int(value),
             "delta_1d": _num(_attr(chunk, "diferencia1")),
             "delta_pct_1d": _num(_attr(chunk, "diferencia-pct1")),
@@ -454,8 +468,10 @@ def parse_af_fixtures(html: str, observed_at: str,
             "source": AF_SOURCE,
             "match_id": m.group(1),
             "kickoff": times[0].get("datetime"),
-            "home": teams[0],
-            "away": teams[1],
+            "home": club_slug(teams[0]),
+            "away": club_slug(teams[1]),
+            "home_name": teams[0],
+            "away_name": teams[1],
             "home_id": ids[0] if len(ids) > 1 else "",
             "away_id": ids[1] if len(ids) > 1 else "",
         }
@@ -476,13 +492,12 @@ MATCH_SIDES = (".stats-local", ".stats-visitante")
 MATCH_SUBS_HEADER = "Suplentes"
 MATCH_MINUTE_RE = re.compile(r"\s*\d+\s*'\s*$")
 MATCH_MINUTE_CAPTURE_RE = re.compile(r"(\d+)\s*'\s*$")
-MATCH_ALIASES = {"rayo": "rayo-vallecano"}
 XI_SIZE = 11
 
 
 def _match_sides(slug: str) -> tuple[str, str] | None:
     known = {t: t for t in TEAMS}
-    known.update(MATCH_ALIASES)
+    known.update(CLUB_ALIASES)
     for head in known:
         tail = slug[len(head) + 1:]
         if slug.startswith(head + "-") and tail in known:
@@ -628,7 +643,8 @@ def parse_elo(text: str, observed_at: str, key: str = "elo") -> list[dict]:
             continue
         if club:
             rows.append({"observed_at": observed_at, "source": ELO_SOURCE,
-                         "club": club, "elo": str(rating)})
+                         "club": club_slug(club), "club_name": club,
+                         "elo": str(rating)})
     return rows
 
 
@@ -636,12 +652,6 @@ FD_BASE = "https://www.football-data.co.uk"
 FD_URL = FD_BASE + "/mmz4281/{season}/SP1.csv"
 FD_SOURCE = "football-data"
 
-FD_ALIASES = {
-    "ath bilbao": "athletic", "ath madrid": "atletico",
-    "espanol": "espanyol", "sociedad": "real-sociedad",
-    "vallecano": "rayo-vallecano", "dep a coruna": "deportivo",
-    "santander": "racing",
-}
 
 FD_SEASONS_BACK = 3
 
@@ -683,18 +693,6 @@ def _fd_rows(text: str) -> list[dict]:
     return list(csv.DictReader(io.StringIO(text.lstrip("﻿"))))
 
 
-def _fd_match_team(side: str, teams) -> str | None:
-    return match_one(side, teams)
-
-
-def _fd_slug(name: str) -> str:
-    hit = _fd_match_team(name, TEAMS)
-    if hit:
-        return hit
-    slug = FD_ALIASES.get(norm(name) or "")
-    return slug if slug in TEAMS else ""
-
-
 def parse_fd_results(text: str, observed_at: str,
                      key: str = "fd_2526") -> list[dict]:
     season = _season_suffix(key, "fd")
@@ -716,7 +714,7 @@ def parse_fd_results(text: str, observed_at: str,
             "observed_at": observed_at, "source": FD_SOURCE,
             "season": season, "date": date,
             "home_name": home, "away_name": away,
-            "home": _fd_slug(home), "away": _fd_slug(away),
+            "home": club_slug(home), "away": club_slug(away),
         }
         for col, out_key in zip(FD_FIELDS,
                                 ("home_goals", "away_goals", "home_xg",
@@ -813,7 +811,7 @@ def parse_odds(text: str, observed_at: str,
             "observed_at": observed_at, "source": ODDS_SOURCE,
             "kickoff": (ev.get("commence_time") or "").strip(),
             "home_name": home_name, "away_name": away_name,
-            "home": _fd_slug(home_name), "away": _fd_slug(away_name),
+            "home": club_slug(home_name), "away": club_slug(away_name),
             "n_bookmakers": n_books,
             "p_home": implied["home"] / total,
             "p_draw": implied["draw"] / total,
@@ -857,7 +855,7 @@ def parse_understat_players(text: str, observed_at: str,
             "observed_at": observed_at, "source": UNDERSTAT_SOURCE,
             "season": season, "understat_id": pid, "player_name": name,
             "team_title": (p.get("team_title") or "").strip(),
-            "team": _fd_match_team(p.get("team_title") or "", TEAMS) or "",
+            "team": club_slug(p.get("team_title")),
             "position": (p.get("position") or "").strip(),
             "games": (p.get("games") or "").strip(),
             "minutes": (p.get("time") or "").strip(),
@@ -1745,23 +1743,32 @@ def _selftest() -> None:
     fx = parse_af_fixtures(_AF_HUB_FIXTURE, "2026-01-01T0000Z")
     assert len(fx) == 1, fx
     assert fx[0]["match_id"] == "100011934"
-    assert fx[0]["home"] == "Sevilla" and fx[0]["away"] == "Rayo Vallecano"
+    assert (fx[0]["home"], fx[0]["away"]) == ("sevilla", "rayo-vallecano")
+    assert (fx[0]["home_name"], fx[0]["away_name"]) == ("Sevilla",
+                                                        "Rayo Vallecano")
     assert fx[0]["home_id"] == "536" and fx[0]["away_id"] == "728", fx[0]
     assert fx[0]["kickoff"] == "2026-08-15T19:30:00+00:00", fx[0]
     assert fx[0]["source"] == AF_SOURCE
 
+    for name, want in [("Real Sociedad", "real-sociedad"), ("Bilbao", "athletic"),
+                       ("Atl. Madrid", "atletico"), ("La Coruna", "deportivo"),
+                       ("Rayo", "rayo-vallecano"), ("Celta Vigo", "celta"),
+                       ("Girona,Real Sociedad", ""), ("Girona", ""), ("", "")]:
+        assert club_slug(name) == want, (name, club_slug(name))
+
     el = parse_elo(_ELO_FIXTURE, "2026-01-01T0000Z", "elo")
-    assert [r["club"] for r in el] == ["Barcelona", "Real Madrid",
-                                       "Elche"], el
+    assert [(r["club"], r["club_name"]) for r in el] == [
+        ("barcelona", "Barcelona"), ("real-madrid", "Real Madrid"),
+        ("elche", "Elche")], el
     assert el[0]["elo"] == "2043.1" and el[0]["source"] == ELO_SOURCE, el[0]
-    assert not any(r["club"] in ("Bayern", "Zaragoza") for r in el), el
+    assert not any(r["club_name"] in ("Bayern", "Zaragoza") for r in el), el
     assert parse_elo(_ELO_FIXTURE.replace("2043.1", "1980.0455939177232"),
                      "t")[0]["elo"] == "1980.0455939177232"
     assert parse_elo(_ELO_FIXTURE.replace('"Elo":', '"Rating":'), "t") == []
     assert parse_elo(_ELO_FIXTURE.replace('"FedURL":', '"Fed":'), "t") == []
     assert [r["club"] for r in
             parse_elo(_ELO_FIXTURE.replace("2043.1", '"n/a"'), "t")] \
-        == ["Real Madrid", "Elche"]
+        == ["real-madrid", "elche"]
     assert parse_elo("", "t") == []
     assert parse_elo("<html><body>no chart here</body></html>", "t") == []
     assert parse_elo("<script>var vegaJson = {not json;</script>", "t") == []

@@ -1,11 +1,9 @@
 
 from __future__ import annotations
 
-from ffcore.crosswalk import club_key
 
 
-def rounds_left(matches, teams, fixtures=()
-                ) -> tuple[list[int], dict[int, set[str]], list]:
+def rounds_left(matches, fixtures=()) -> tuple[list[int], dict[int, set[str]]]:
     from ffcore.tidy import JornadaClock
 
     js = {r["jornada"] for r in matches if (r.get("jornada") or "").isdigit()}
@@ -17,19 +15,12 @@ def rounds_left(matches, teams, fixtures=()
     rem = clock_order + sorted(open_j - set(clock_order))
 
     played: dict[int, set[str]] = {}
-    unjoined: list[str] = []
     for r in matches:
         j = r.get("jornada") or ""
-        if not j.isdigit() or int(j) not in rem or not r.get("score"):
-            continue
-        for side in (r.get("home"), r.get("away")):
-            club = club_key(side, teams)
-            if not club:
-                if side and side not in unjoined:
-                    unjoined.append(side)
-                continue
-            played.setdefault(int(j), set()).add(club)
-    return rem, played, unjoined
+        if j.isdigit() and int(j) in rem and r.get("score"):
+            played.setdefault(int(j), set()).update(
+                c for c in (r.get("home"), r.get("away")) if c)
+    return rem, played
 
 
 def next_then_rest(base: dict, base_rest: dict, rem: list[int],
@@ -149,24 +140,14 @@ def phantom_fill(squads: dict[str, dict[str, str]], per_jornada: dict[int, dict]
 
 
 def _selftest() -> None:
-    teams = ["Alavés", "Getafe", "Celta Vigo", "Osasuna", "Rayo"]
     ms = [{"jornada": "1", "home": "alaves", "away": "getafe", "score": "3-0"},
           {"jornada": "1", "home": "celta", "away": "osasuna", "score": ""},
           {"jornada": "2", "home": "alaves", "away": "celta", "score": ""},
           {"jornada": "3", "home": "alaves", "away": "getafe", "score": "1-1"},
           {"jornada": "", "home": "alaves", "away": "celta", "score": ""}]
-    rem, done, unjoined = rounds_left(ms, teams)
+    rem, done = rounds_left(ms)
     assert rem == [1, 2], rem
     assert done == {1: {"alaves", "getafe"}}, done
-    assert unjoined == [], unjoined
-
-    _r, _d, un = rounds_left(
-        [{"jornada": "1", "home": "zzz-united", "away": "getafe",
-          "score": "1-0"},
-         {"jornada": "1", "home": "celta", "away": "osasuna", "score": ""}],
-        teams)
-    assert un == ["zzz-united"], un
-    assert _d == {1: {"getafe"}}, _d
 
     rem2, played2 = [1, 2, 3], {1: {"alaves"}}
     base2 = {"susp": (5.0, 0.05), "normal": (4.0, 0.9)}

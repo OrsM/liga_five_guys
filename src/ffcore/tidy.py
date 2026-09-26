@@ -28,7 +28,7 @@ __all__ = ["ROOT", "TIDY", "SEASON", "DECISIONS", "REPORTS", "PARTS", "MADRID",
            "load_understat_players",
            "MATCH_LEN", "minutes_played", "fresh_only", "DAILY_FRESH_DAYS",
            "EVERY_RUN_FRESH_DAYS", "stale_feeds",
-           "GATED_API", "age_phrase", "load_api", "market_routes", "pending", "LISTED_SELLER", "team_slug_of", "lock_order",
+           "GATED_API", "age_phrase", "load_api", "market_routes", "pending", "LISTED_SELLER", "lock_order",
            "JornadaClock", "shown", "newest", "table_stats",
            "load_perjornada", "load_api_stats", "clock", "clock_history",
            "jornada_of_match"]
@@ -402,17 +402,7 @@ _XW_CACHE: dict = {}
 def load_crosswalk():
     from ffcore.crosswalk import Crosswalk
     path = TIDY / "players.csv"
-    clubs = TIDY / "clubs.csv"
-    try:
-        key = (path.stat().st_mtime_ns, path.stat().st_size,
-              clubs.stat().st_mtime_ns, clubs.stat().st_size)
-    except OSError:
-        return None
-    hit = _XW_CACHE.get("xw")
-    if hit is None or hit[0] != key:
-        hit = (key, Crosswalk.read(path, clubs))
-        _XW_CACHE["xw"] = hit
-    return hit[1]
+    return _mtime_cached(path, _XW_CACHE, "xw", lambda: Crosswalk.read(path))
 
 
 def load_fixtures() -> list[dict]:
@@ -461,14 +451,6 @@ def next_kickoff(now=None):
     return min(ahead) if ahead else None
 
 
-def team_slug_of(side: str, slugs) -> str | None:
-    from ffcore.fixture import match_team
-
-    spelled = {s.replace("-", " "): s for s in slugs}
-    hit = match_team(side, list(spelled))
-    return spelled.get(hit) if hit else None
-
-
 def lock_order(locks: dict[int, datetime]) -> list[int]:
     return [j for j, _ in sorted(locks.items(), key=lambda kv: kv[1])]
 
@@ -482,13 +464,10 @@ class JornadaClock:
                 jornada_of[(m["home"], m["away"])] = int(m["jornada"])
             except (KeyError, ValueError, TypeError):
                 continue
-        slugs = {s for pair_ in jornada_of for s in pair_}
-
         self.team_locks: dict[tuple[int, str], datetime] = {}
         for f in fixtures:
             when = kickoff_stamp(f.get("kickoff"))
-            home = team_slug_of(f.get("home") or "", slugs)
-            away = team_slug_of(f.get("away") or "", slugs)
+            home, away = f.get("home"), f.get("away")
             jor = jornada_of.get((home, away))
             if when is None or jor is None:
                 continue
@@ -552,9 +531,10 @@ def jornada_of_match() -> dict[str, int]:
     return _JORNADA_OF_MATCH[0]
 
 
-MARKET_FIELDS = [("team", "team", None), ("pos", "position", None),
+MARKET_FIELDS = [("team", "team", None), ("club", "club", None),
+                 ("pos", "position", None),
                  ("value", "value", money), ("delta_1d", "delta_1d", money)]
-XI_FIELDS = [("team", "team_slug", None), ("start", "start_pct", pct100),
+XI_FIELDS = [("club", "team_slug", None), ("start", "start_pct", pct100),
              ("status", "status", None)]
 
 
@@ -744,10 +724,6 @@ def _selftest_crosswalk_cache() -> None:
                      [{"player_id": "a", "name": "A", "club_id": "c"}],
                      ["player_id", "name", "club_id", "ff_slug", "af_slug",
                       "app_id", "understat_id", "app_names"])
-            write_csv(TIDY / "clubs.csv",
-                     [{"club_id": "c", "market": "C", "ff_slug": "c-slug"}],
-                     ["club_id", "market", "ff_slug", "elo", "market_id",
-                      "af_id", "aliases"])
             xw1 = load_crosswalk()
             assert xw1.players["a"].name == "A", xw1.players
             assert load_crosswalk() is xw1
@@ -964,7 +940,7 @@ def _selftest() -> None:
     assert "start" not in p["bo bidal"]
 
     c = p["cai coro"]
-    assert c["name"] == "Cai Coro" and c["team"] == "celta" and c["start"] == 85.0
+    assert c["name"] == "Cai Coro" and c["club"] == "celta" and c["start"] == 85.0
     assert "value" not in c
 
     import tempfile
@@ -1079,14 +1055,10 @@ def _selftest() -> None:
                   "away": "levante", "score": "1-0"},
                  {"match_id": "9", "jornada": "2", "home": "rayo-vallecano",
                   "away": "alaves", "score": "2-2"}]
-    jl_fixtures = [{"kickoff": "2026-08-16T17:00:00+00:00", "home": "Espanyol",
-                   "away": "Levante"},
-                  {"kickoff": "2026-08-15T19:30:00+00:00", "home": "Alaves",
-                   "away": "Getafe"}]
-    assert team_slug_of("Racing Santander", {"racing", "real-madrid"}) \
-        == "racing"
-    assert team_slug_of("Real Betis", {"betis", "real-sociedad"}) == "betis"
-    assert team_slug_of("Nowhere FC", {"racing"}) is None
+    jl_fixtures = [{"kickoff": "2026-08-16T17:00:00+00:00", "home": "espanyol",
+                   "away": "levante"},
+                  {"kickoff": "2026-08-15T19:30:00+00:00", "home": "alaves",
+                   "away": "getafe"}]
     clock = JornadaClock(jl_matches, jl_fixtures)
     jl = clock.round_locks
     assert list(jl) == [1] and jl[1].day == 15, jl

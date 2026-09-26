@@ -8,7 +8,7 @@ from pathlib import Path
 __all__ = [
     "text", "num", "whole", "flag",
     "MATCHES", "STARTERS", "MARKET", "LINEUPS", "API_STATS", "PERJORNADA",
-    "PLAYERS", "CLUBS", "FIXTURES", "ELO", "UNDERSTAT_PLAYERS",
+    "PLAYERS", "FIXTURES", "ELO", "UNDERSTAT_PLAYERS",
     "API_MARKET", "API_PLAYERS", "API_TEAMS", "FEEDS", "TRANSACTIONS",
     "API_ACTIVITY", "API_LINEUP", "API_OFFERS", "API_PLAYERS_ALL",
     "API_STANDINGS", "RESULTS_HISTORY",
@@ -136,16 +136,6 @@ class PLAYERS:
     APP_ID = "app_id"
     UNDERSTAT_ID = "understat_id"
     APP_NAMES = "app_names"
-
-
-class CLUBS:
-    CLUB_ID = "club_id"
-    MARKET = "market"
-    FF_SLUG = "ff_slug"
-    ELO = "elo"
-    MARKET_ID = "market_id"
-    AF_ID = "af_id"
-    ALIASES = "aliases"
 
 
 class FIXTURES:
@@ -428,7 +418,7 @@ def _selftest() -> None:
         (MATCHES, "matches.csv"), (STARTERS, "starters.csv"),
         (MARKET, "market.csv"), (LINEUPS, "lineups.csv"),
         (API_STATS, "api_stats.csv"), (PLAYERS, "players.csv"),
-        (CLUBS, "clubs.csv"), (FIXTURES, "fixtures.csv"),
+        (FIXTURES, "fixtures.csv"),
         (ELO, "elo.csv"), (UNDERSTAT_PLAYERS, "understat_players.csv"),
         (API_MARKET, "api_market.csv"), (API_PLAYERS, "api_players.csv"),
         (API_TEAMS, "api_teams.csv"), (FEEDS, "feeds.csv"),

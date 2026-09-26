@@ -8,7 +8,6 @@ from typing import NamedTuple
 
 
 from ffcore.parse import money
-from ffcore.text import match_one, norm
 from ffcore.tidy import kickoff_stamp
 
 FIX_BAND = 0.12
@@ -110,39 +109,24 @@ def clean_sheet_from_odds(p_home, p_draw, p_away, p_over, line=2.5):
     return math.exp(-la), math.exp(-lh)
 
 
-ELO_ALIASES = {"athletic": "Bilbao", "racing": "Santander"}
-
-
-def elo_strength(market_teams, elo_rows) -> dict[str, float] | None:
+def elo_strength(clubs, elo_rows) -> dict[str, float] | None:
     have = {}
     for r in elo_rows:
-        club = (r.get("club") or "").strip()
         try:
-            rating = float(r.get("elo"))
-        except (TypeError, ValueError):
+            have[r["club"]] = float(r.get("elo"))
+        except (KeyError, TypeError, ValueError):
             continue
-        if club:
-            have[club] = rating
-    if not have:
+    if not have or any(c not in have for c in clubs):
         return None
-    out = {}
-    for team in market_teams:
-        club = match_team(team, list(have))
-        if club is None:
-            alias = ELO_ALIASES.get(norm(team))
-            club = alias if alias in have else None
-        if club is None:
-            return None
-        out[team] = have[club]
-    return out
+    return {c: have[c] for c in clubs}
 
 
 def team_strength(market: list[dict]) -> dict[str, float]:
     tot: dict[str, float] = {}
     for r in market:
-        team = (r.get("team") or "").strip()
-        if team:
-            tot[team] = tot.get(team, 0.0) + (money(r.get("value")) or 0.0)
+        if r.get("club"):
+            tot[r["club"]] = tot.get(r["club"], 0.0) + (money(r.get("value"))
+                                                         or 0.0)
     return tot
 
 
@@ -151,36 +135,24 @@ MIN_AD_MATCHES = 10
 XG_CLUB_PSEUDO_MATCHES = 10.0
 
 
-def xg_club_attack(understat_rows, xw) -> dict[str, float]:
+def xg_club_attack(understat_rows) -> dict[str, float]:
     from ffcore.parse import grouped_sums
 
-    def forwards():
-        for r in understat_rows:
-            if "F" not in (r.get("position") or ""):
-                continue
-            team = r.get("team_title") or ""
-            if not team or "," in team:
-                continue
-            m = float(r.get("minutes") or 0)
-            if m <= 0:
-                continue
-            yield team, float(r.get("xg") or 0) + float(r.get("xa") or 0), m
-
-    sums = grouped_sums(forwards(), lambda item: item[0],
-                       lambda item: item[1], lambda item: item[2])
+    slug = {r.get("team_title"): r["team"] for r in understat_rows
+            if r.get("team")}
+    forwards = ((r["team_title"],
+                 float(r.get("xg") or 0) + float(r.get("xa") or 0),
+                 float(r.get("minutes") or 0))
+                for r in understat_rows
+                if "F" in (r.get("position") or "")
+                and "," not in (r.get("team_title") or ",")
+                and float(r.get("minutes") or 0) > 0)
+    sums = grouped_sums(forwards, lambda item: item[0],
+                        lambda item: item[1], lambda item: item[2])
     rate = {t: xg / mins * 90 for t, (xg, mins) in sums.items() if mins > 0}
-    if not rate:
-        return {}
-    league_avg = sum(rate.values()) / len(rate)
-    if not league_avg:
-        return {}
-    out = {}
-    for name, v in rate.items():
-        cid = xw.club(name=name) if xw is not None else None
-        slug = xw.clubs[cid].ff_slug if cid and cid in xw.clubs else None
-        if slug:
-            out[slug] = v / league_avg
-    return out
+    league_avg = sum(rate.values()) / len(rate) if rate else 0
+    return {slug[t]: v / league_avg for t, v in rate.items()
+            if t in slug} if league_avg else {}
 
 
 def _match_goals(results: list[dict]):
@@ -261,37 +233,22 @@ def difficulty(strength: dict[str, float]) -> dict[str, tuple[float, int]]:
     return out
 
 
-def match_team(side: str, teams) -> str | None:
-    return match_one(side, teams)
-
-
 def fixture_board(market: list[dict], fixtures: list[dict],
-                  now: datetime, elo_rows=None, xw=None,
-                  results=None, understat_rows=None) -> dict[str, Match]:
-    ratings = _difficulty_ratings(market, elo_rows, xw, results,
-                                  understat_rows)
-    teams = ratings.teams
+                  now: datetime, elo_rows=None, results=None,
+                  understat_rows=None) -> dict[str, Match]:
+    ratings = _difficulty_ratings(market, elo_rows, results, understat_rows)
     board: dict[str, Match] = {}
-
     for r in fixtures:
         when = kickoff_stamp(r.get("kickoff"))
         if not when or when <= now:
             continue
-        for side, other, sid, oid, home in (
-                (r.get("home"), r.get("away"), r.get("home_id"),
-                 r.get("away_id"), True),
-                (r.get("away"), r.get("home"), r.get("away_id"),
-                 r.get("home_id"), False)):
-            team = ratings.by_af.get((sid or "").strip()) or match_team(
-                side or "", teams)
-            if not team:
-                continue
+        for team, opp, opp_name, home in (
+                (r.get("home"), r.get("away"), r.get("away_name"), True),
+                (r.get("away"), r.get("home"), r.get("home_name"), False)):
             prev = board.get(team)
-            if prev and prev.kickoff <= when:
+            if team not in ratings.diff or (prev and prev.kickoff <= when):
                 continue
-            opp = ratings.by_af.get((oid or "").strip()) or match_team(
-                other or "", teams)
-            board[team] = _match_for(ratings, team, opp, other or "?",
+            board[team] = _match_for(ratings, team, opp, opp_name or "?",
                                      home, when)
     return board
 
@@ -301,34 +258,19 @@ class _Ratings(NamedTuple):
     elo: dict | None
     diff: dict
     basis: str
-    ad_by_slug: dict
-    slug_of: dict
-    by_af: dict
+    ad: dict
 
 
-def _difficulty_ratings(market: list[dict], elo_rows=None, xw=None,
-                        results=None, understat_rows=None) -> _Ratings:
+def _difficulty_ratings(market: list[dict], elo_rows=None, results=None,
+                        understat_rows=None) -> _Ratings:
     value = team_strength(market)
     teams = list(value)
-    slug_of = {c.market: c.ff_slug for c in xw.clubs.values()
-              if c.market and c.ff_slug} if xw is not None else {}
-    xg_attack = (xg_club_attack(understat_rows, xw)
-                if understat_rows and xw is not None else {})
-    ad_by_slug = (attack_defense(results, list(slug_of.values()), xg_attack)
-                 if results and slug_of else {})
-    by_af = {}
-    if xw is not None:
-        for c in xw.clubs.values():
-            if c.af_id and c.market:
-                hit = match_team(c.market, teams)
-                if hit:
-                    by_af[c.af_id] = hit
+    ad = (attack_defense(results, teams, xg_club_attack(understat_rows or []))
+          if results else {})
     elo = elo_strength(teams, elo_rows) if elo_rows else None
     strength = elo if elo is not None else value
-    basis = "elo" if elo is not None else "value"
-    diff = difficulty(strength)
-    return _Ratings(teams=teams, elo=elo, diff=diff, basis=basis,
-                    ad_by_slug=ad_by_slug, slug_of=slug_of, by_af=by_af)
+    return _Ratings(teams=teams, elo=elo, diff=difficulty(strength),
+                    basis="elo" if elo is not None else "value", ad=ad)
 
 
 def _match_for(ratings: "_Ratings", team: str, opp: str, opp_name: str,
@@ -337,7 +279,7 @@ def _match_for(ratings: "_Ratings", team: str, opp: str, opp_name: str,
     edge = (1.0 + HOME_EDGE) if home else (1.0 - HOME_EDGE)
     gap = (ratings.elo[team] - ratings.elo[opp]
           if ratings.elo is not None and opp in ratings.elo else None)
-    opp_ad = ratings.ad_by_slug.get(ratings.slug_of.get(opp)) if opp else None
+    opp_ad = ratings.ad.get(opp) if opp else None
     if opp_ad is not None:
         atk_base, def_base = opp_ad[1], 1.0 / opp_ad[0]
         row_basis = "attack_defense"
@@ -350,27 +292,19 @@ def _match_for(ratings: "_Ratings", team: str, opp: str, opp_name: str,
 
 
 def season_board(market: list[dict], matches: list[dict], jornadas,
-                 now: datetime, elo_rows=None, xw=None,
-                 results=None, understat_rows=None
-                 ) -> dict[int, dict[str, Match]]:
-    ratings = _difficulty_ratings(market, elo_rows, xw, results,
-                                  understat_rows)
-    teams = ratings.teams
-    want = set(jornadas)
-    board: dict[int, dict[str, Match]] = {j: {} for j in want}
+                 now: datetime, elo_rows=None, results=None,
+                 understat_rows=None) -> dict[int, dict[str, Match]]:
+    ratings = _difficulty_ratings(market, elo_rows, results, understat_rows)
+    board: dict[int, dict[str, Match]] = {j: {} for j in set(jornadas)}
     for r in matches:
         j = r.get("jornada") or ""
-        if not j.isdigit() or int(j) not in want:
+        if not j.isdigit() or int(j) not in board:
             continue
-        j = int(j)
-        for side, other, home in ((r.get("home"), r.get("away"), True),
-                                  (r.get("away"), r.get("home"), False)):
-            team = match_team(side or "", teams)
-            if not team or team in board[j]:
-                continue
-            opp = match_team(other or "", teams)
-            board[j][team] = _match_for(ratings, team, opp, other or "?",
-                                        home, now)
+        for team, opp, home in ((r.get("home"), r.get("away"), True),
+                                (r.get("away"), r.get("home"), False)):
+            if team in ratings.diff and team not in board[int(j)]:
+                board[int(j)][team] = _match_for(ratings, team, opp, opp or "?",
+                                                 home, now)
     return board
 
 
@@ -388,11 +322,11 @@ def _selftest() -> None:
     assert clean_sheet_from_odds(0.4, 0.3, 0.3, "") == (None, None)
     assert clean_sheet_from_odds("", "", "", "") == (None, None)
 
-    mk = [{"team": "Rich", "value": "100.00M"},
-          {"team": "Rich", "value": "100.00M"},
-          {"team": "Mid", "value": "50.00M"},
-          {"team": "Poor", "value": "10.00M"},
-          {"team": "", "value": "999.00M"}]
+    mk = [{"club": "Rich", "value": "100.00M"},
+          {"club": "Rich", "value": "100.00M"},
+          {"club": "Mid", "value": "50.00M"},
+          {"club": "Poor", "value": "10.00M"},
+          {"club": "", "value": "999.00M"}]
 
     st = team_strength(mk)
     assert st == {"Rich": 200e6, "Mid": 50e6, "Poor": 10e6}, st
@@ -439,26 +373,20 @@ def _selftest() -> None:
     assert attack_defense([{"home": "A", "away": "B", "home_goals": "",
                             "away_goals": ""}], ["A", "B"]) == {}
 
-    from ffcore.crosswalk import Crosswalk, Club
-
-    xw3 = Crosswalk({}, {
-        "strong club": Club("strong club", market="Strong", ff_slug="Strong"),
-        "weak club": Club("weak club", market="Weak", ff_slug="Weak"),
-    })
-    und_rows = (
-        [{"position": "F", "team_title": "Strong", "minutes": "900",
-          "xg": "9", "xa": "0"}] * 3
-        + [{"position": "F", "team_title": "Weak", "minutes": "900",
-           "xg": "1", "xa": "0"}] * 3
-        + [{"position": "D", "team_title": "Strong", "minutes": "900",
-           "xg": "20", "xa": "0"}]
-        + [{"position": "F", "team_title": "Strong,Weak",
-           "minutes": "900", "xg": "5", "xa": "0"}]
-    )
-    xga = xg_club_attack(und_rows, xw3)
-    assert xga["Strong"] > 1.0 > xga["Weak"], xga
-    assert xg_club_attack([], xw3) == {}
-    assert xg_club_attack(und_rows, None) == {}
+    und_rows = [{"position": pos, "team_title": title, "team": slug,
+                 "minutes": "900", "xg": xg, "xa": "0"}
+                for pos, title, slug, xg, n in [
+                    ("F", "Strong FC", "Strong", "9", 3),
+                    ("F", "Weak FC", "Weak", "1", 3),
+                    ("D", "Strong FC", "Strong", "20", 1),
+                    ("F", "Relegated FC", "", "5", 3),
+                    ("F", "Strong FC,Weak FC", "", "5", 1)]
+                for _ in range(n)]
+    xga = xg_club_attack(und_rows)
+    assert set(xga) == {"Strong", "Weak"}, xga
+    assert abs(xga["Strong"] - 9 / 5) < 1e-9 and abs(xga["Weak"] - 1 / 5) < 1e-9, \
+        "the league average includes clubs without a slug"
+    assert xg_club_attack([]) == {}
 
     real_only = attack_defense(results, ["Strong", "Weak"])
     blended = attack_defense(results, ["Strong", "Weak"], xga)
@@ -489,23 +417,11 @@ def _selftest() -> None:
         [{"home": "Empty", "away": "X", "home_goals": "0",
           "away_goals": "0"}] * MIN_AD_MATCHES, ["Empty"]) == {}
 
-    teams = ["Celta", "Betis", "Atlético", "Real Madrid", "Real Sociedad"]
-    assert match_team("Celta Vigo", teams) == "Celta"
-    assert match_team("Real Betis", teams) == "Betis"
-    assert match_team("Atletico Madrid", teams) == "Atlético"
-    assert match_team("Real Madrid", teams) == "Real Madrid"
-    assert match_team("Real Sociedad", teams) == "Real Sociedad"
-    assert match_team("Nowhere FC", teams) is None
-    assert match_team("", teams) is None
-    assert match_team("Real", ["Real Madrid", "Real Sociedad"]) is None
-
     now = datetime.fromisoformat("2026-08-15T12:00:00+00:00")
-    fx = [{"kickoff": "2026-08-14T19:00:00+00:00",
-           "home": "Rich", "away": "Poor"},
-          {"kickoff": "2026-08-20T19:00:00+00:00",
-           "home": "Mid", "away": "Rich"},
-          {"kickoff": "2026-08-16T19:00:00+00:00",
-           "home": "Poor", "away": "Mid"}]
+    fx = [{"kickoff": k, "home": h, "away": a, "home_name": h, "away_name": a}
+          for k, h, a in [("2026-08-14T19:00:00+00:00", "Rich", "Poor"),
+                          ("2026-08-20T19:00:00+00:00", "Mid", "Rich"),
+                          ("2026-08-16T19:00:00+00:00", "Poor", "Mid")]]
     board = fixture_board(mk, fx, now)
 
     assert board["Rich"].opponent == "Mid" and not board["Rich"].home
@@ -518,26 +434,16 @@ def _selftest() -> None:
     assert board["Mid"].rank == 3 and board["Mid"].of == 3
 
     assert fixture_board(mk, [], now) == {}
-    assert fixture_board(mk, [{"kickoff": "2026-08-20T19:00:00+00:00",
-                               "home": "Nowhere FC",
-                               "away": "Elsewhere FC"}], now) == {}
     solo = fixture_board(mk, [{"kickoff": "2026-08-20T19:00:00+00:00",
-                               "home": "Mid", "away": "Nowhere FC"}], now)
+                               "home": "Mid", "away": ""}], now)
     assert solo["Mid"].rank == 0
     assert abs(solo["Mid"].atk_factor - (1.0 + HOME_EDGE)) < 1e-9
 
-    from ffcore.crosswalk import Club, Crosswalk
-
-    xw2 = Crosswalk({}, {
-        "rich": Club("rich", market="Rich", ff_slug="rich-slug"),
-        "mid": Club("mid", market="Mid", ff_slug="mid-slug"),
-        "poor": Club("poor", market="Poor", ff_slug="poor-slug"),
-    })
-    ad_results = [{"home": "rich-slug", "away": "x-slug", "home_goals": "3",
+    ad_results = [{"home": "Rich", "away": "x", "home_goals": "3",
                   "away_goals": "5"}] * MIN_AD_MATCHES
     fx2 = [{"kickoff": "2026-08-20T19:00:00+00:00",
            "home": "Mid", "away": "Rich"}]
-    real = fixture_board(mk, fx2, now, results=ad_results, xw=xw2)
+    real = fixture_board(mk, fx2, now, results=ad_results)
     assert real["Mid"].basis == "attack_defense", real["Mid"]
     assert real["Mid"].def_factor != real["Mid"].atk_factor, real["Mid"]
     assert abs(real["Mid"].def_factor - (1.0 / 0.75) * (1.0 + HOME_EDGE)) \
@@ -545,8 +451,6 @@ def _selftest() -> None:
     assert abs(real["Mid"].atk_factor - 1.25 * (1.0 + HOME_EDGE)) < 1e-9, \
         real["Mid"]
     assert real["Rich"].basis in ("value", "none")
-    no_xw = fixture_board(mk, fx2, now, results=ad_results)
-    assert no_xw["Mid"].basis != "attack_defense", no_xw["Mid"]
 
     elo = [{"club": "Poor", "elo": "1900"}, {"club": "Mid", "elo": "1700"},
            {"club": "Rich", "elo": "1500"}]
@@ -567,37 +471,6 @@ def _selftest() -> None:
         == "value"
     assert elo_strength(["Rich"], [{"club": "Rich", "elo": ""}]) is None
 
-    city = [{"club": "Bilbao", "elo": "1800"},
-            {"club": "Santander", "elo": "1600"}]
-    assert elo_strength(["Athletic", "Racing"], city) \
-        == {"Athletic": 1800.0, "Racing": 1600.0}
-    assert elo_strength(["Athletic", "Racing"],
-                        [{"club": "Bilbao", "elo": "1800"}]) is None
-    assert elo_strength(["Athletic"], [{"club": "Athletic", "elo": "1750"}]) \
-        == {"Athletic": 1750.0}
-    assert elo_strength(["Rich"], []) is None
-
-    market_20 = ["Alavés", "Athletic", "Atlético", "Barcelona", "Betis",
-                 "Celta", "Deportivo", "Elche", "Espanyol", "Getafe",
-                 "Levante", "Málaga", "Osasuna", "Racing", "Rayo",
-                 "Real Madrid", "Real Sociedad", "Sevilla", "Valencia",
-                 "Villarreal"]
-    elo_20 = ["Alaves", "Athletic Club", "Atlético", "Barcelona", "Betis",
-              "Celta", "Depor", "Elche", "Espanyol", "Getafe", "Levante",
-              "Malaga", "Osasuna", "Santander", "Rayo Vallecano",
-              "Real Madrid", "Real Sociedad", "Sevilla", "Valencia",
-              "Villarreal"]
-    full = elo_strength(market_20, [{"club": c, "elo": str(1500 + i)}
-                                    for i, c in enumerate(elo_20)])
-    assert full is not None and len(full) == 20, full
-    assert full["Racing"] == 1513.0 and full["Athletic"] == 1501.0, full
-    assert elo_strength(market_20,
-                        [{"club": "Bilbao" if c == "Athletic Club" else c,
-                          "elo": str(1500 + i)}
-                         for i, c in enumerate(elo_20)]) == full
-    assert elo_strength(["Real"], [{"club": "Real Madrid", "elo": "2000"},
-                                   {"club": "Real Sociedad", "elo": "1800"}]) \
-        is None
     assert fixture_board(mk, fx, now, None) == board
     assert fixture_board(mk, fx, now, []) == board
 

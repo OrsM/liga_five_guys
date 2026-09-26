@@ -8,14 +8,10 @@ from dataclasses import dataclass, field
 from ffcore.text import norm
 from ffcore.tidy import write_csv
 
-__all__ = ["Player", "Club", "Crosswalk", "PLAYER_COLS", "CLUB_COLS",
-          "club_key"]
+__all__ = ["Player", "Crosswalk", "PLAYER_COLS"]
 
 PLAYER_COLS = ["player_id", "name", "club_id", "ff_slug",
                "af_slug", "app_id", "understat_id", "app_names"]
-CLUB_FIELDS = ["club_id", "market", "ff_slug", "elo", "market_id", "af_id",
-               "aliases"]
-CLUB_COLS = CLUB_FIELDS
 
 
 def _join(vals) -> str:
@@ -44,36 +40,11 @@ class Player:
                 "app_id": self.app_id, "understat_id": self.understat_id,
                 "app_names": _join(self.app_names)}
 
-    def absorb(self, other: "Player") -> None:
-        for f in ("name", "club_id", "ff_slug", "af_slug",
-                  "app_id", "understat_id"):
-            if not getattr(self, f) and getattr(other, f):
-                setattr(self, f, getattr(other, f))
-        self.app_names |= other.app_names
-
-
-@dataclass
-class Club:
-    club_id: str
-    market: str = ""
-    ff_slug: str = ""
-    elo: str = ""
-    aliases: set = field(default_factory=set)
-    market_id: str = ""
-    af_id: str = ""
-
-    def row(self) -> dict:
-        return {"club_id": self.club_id, "market": self.market,
-                "ff_slug": self.ff_slug, "elo": self.elo,
-                "market_id": self.market_id, "af_id": self.af_id,
-                "aliases": _join(self.aliases)}
-
 
 class Crosswalk:
 
-    def __init__(self, players=None, clubs=None):
+    def __init__(self, players=None):
         self.players: dict[str, Player] = dict(players or {})
-        self.clubs: dict[str, Club] = dict(clubs or {})
         self._reindex()
 
 
@@ -112,13 +83,6 @@ class Crosswalk:
                 idx.pop(k, None)
         self._by_name = {n: next(iter(ids)) for n, ids in names.items()
                          if len(ids) == 1}
-        self._club_ff = {c.ff_slug: c.club_id for c in self.clubs.values()
-                         if c.ff_slug}
-        self._club_alias = {}
-        for c in self.clubs.values():
-            for a in {c.market, c.elo, c.club_id} | c.aliases:
-                if a:
-                    self._club_alias[norm(a)] = c.club_id
 
     def clashes(self) -> dict:
         return {k: sorted(v) for k, v in sorted(self._clash.items()) if v}
@@ -155,14 +119,6 @@ class Crosswalk:
                            or r.get("player_name"))
 
 
-    def club(self, *, ff_slug=None, name=None) -> str | None:
-        if ff_slug and ff_slug in self._club_ff:
-            return self._club_ff[ff_slug]
-        for cand in (ff_slug, name):
-            if cand and norm(cand) in self._club_alias:
-                return self._club_alias[norm(cand)]
-        return None
-
     def coverage(self) -> dict:
         n = len(self.players) or 1
         return {"players": len(self.players),
@@ -170,12 +126,11 @@ class Crosswalk:
                 "af": sum(1 for p in self.players.values() if p.af_slug) / n,
                 "app": sum(1 for p in self.players.values() if p.app_id) / n,
                 "understat": sum(1 for p in self.players.values()
-                                 if p.understat_id) / n,
-                "clubs": len(self.clubs)}
+                                 if p.understat_id) / n}
 
     @classmethod
-    def read(cls, players_path, clubs_path) -> "Crosswalk":
-        players, clubs = {}, {}
+    def read(cls, players_path) -> "Crosswalk":
+        players = {}
         for r in _rows(players_path):
             pid = r.get("player_id")
             if pid:
@@ -185,30 +140,11 @@ class Crosswalk:
                     r.get("af_slug", ""), r.get("app_id", ""),
                     r.get("understat_id", ""),
                     _split(r.get("app_names")))
-        for r in _rows(clubs_path):
-            cid = r.get("club_id")
-            if cid:
-                clubs[cid] = Club(cid, r.get("market", ""),
-                                  r.get("ff_slug", ""), r.get("elo", ""),
-                                  _split(r.get("aliases")),
-                                  r.get("market_id", ""), r.get("af_id", ""))
-        return cls(players, clubs)
+        return cls(players)
 
-    def write(self, players_path, clubs_path) -> None:
+    def write(self, players_path) -> None:
         write_csv(players_path, [p.row() for p in sorted(
             self.players.values(), key=lambda p: p.player_id)], PLAYER_COLS)
-        write_csv(clubs_path, [c.row() for c in sorted(
-            self.clubs.values(), key=lambda c: c.club_id)], CLUB_COLS)
-
-
-def club_key(raw, teams, xw=None) -> str:
-    if xw is not None:
-        hit = xw.club(ff_slug=raw, name=raw)
-        if hit:
-            return hit
-    from ffcore.fixture import match_team
-    hit = match_team(raw or "", teams)
-    return norm(hit) if hit else ""
 
 
 def _rows(path) -> list[dict]:
@@ -227,9 +163,7 @@ def _selftest() -> None:
         "jonny castro": Player("jonny castro", "Jonny Castro", "alaves",
                                ff_slug="jonny-castro",
                                app_names={"Jonny Otto"}),
-    }, {"rayo": Club("rayo", "Rayo", "rayo-vallecano", "Rayo Vallecano"),
-        "athletic": Club("athletic", "Athletic", "athletic", "Bilbao",
-                         {"Athletic Club"})})
+    })
 
     for kw in ({"name": "Alvaro Fernandez"}, {"ff_slug": "alvaro-fernandez"},
                {"af_slug": "af-alvaro"}, {"app_id": "2101"},
@@ -250,26 +184,19 @@ def _selftest() -> None:
     assert solo.player(app_id="2614") == "carlos romero"
     assert solo.clashes() == {}
 
-    assert xw.club(ff_slug="rayo-vallecano") == "rayo"
-    assert xw.club(name="Rayo") == "rayo"
-    assert xw.club(name="Rayo Vallecano") == "rayo"
-    assert xw.club(name="Bilbao") == "athletic"
-    assert xw.club(name="Athletic Club") == "athletic"
-    assert xw.club(name="Nowhere FC") is None
 
     import tempfile
     with tempfile.TemporaryDirectory() as d:
-        pp, cc = os.path.join(d, "p.csv"), os.path.join(d, "c.csv")
-        xw.write(pp, cc)
-        again = Crosswalk.read(pp, cc)
+        pp = os.path.join(d, "p.csv")
+        xw.write(pp)
+        again = Crosswalk.read(pp)
         assert again.player(app_name="A. Ferllo") == "alvaro fernandez"
         assert again.player(ff_slug="jonny-castro") == "jonny castro"
-        assert again.club(name="Bilbao") == "athletic"
         assert set(again.players) == set(xw.players)
-        assert Crosswalk.read(os.path.join(d, "nope.csv"), cc).players == {}
+        assert Crosswalk.read(os.path.join(d, "nope.csv")).players == {}
 
     cov = xw.coverage()
-    assert cov["players"] == 2 and cov["clubs"] == 2
+    assert cov["players"] == 2
     assert cov["ff"] == 1.0, cov
 
     named = Crosswalk({
@@ -301,24 +228,10 @@ def _selftest() -> None:
     assert us_clash.player(understat_id="9") is None
     assert us_clash.clashes() == {"understat_id": ["9"]}
     with tempfile.TemporaryDirectory() as d:
-        pp, cc = os.path.join(d, "p2.csv"), os.path.join(d, "c2.csv")
-        us.write(pp, cc)
-        again2 = Crosswalk.read(pp, cc)
+        pp = os.path.join(d, "p2.csv")
+        us.write(pp)
+        again2 = Crosswalk.read(pp)
         assert again2.player(understat_id="555") == "alvaro fernandez"
-
-    teams = ["Alavés", "Getafe", "Celta Vigo", "Osasuna", "Rayo"]
-    assert club_key("rayo-vallecano", teams) == "rayo"
-
-    class _XW:
-        def club(self, **kw):
-            return "rayo" if "vallecano" in str(kw.values()).lower() else None
-
-    assert club_key("Rayo Vallecano", [], xw=_XW()) == "rayo"
-    assert club_key("celta", teams, xw=_XW()) == "celta vigo"
-    assert club_key("Rayo", teams) == "rayo"
-    assert club_key("celta", teams) == "celta vigo"
-    assert club_key("zzz-united", teams) == ""
-    assert club_key("", teams) == ""
 
     print("ffcore.crosswalk self-test OK (51 cases)")
 

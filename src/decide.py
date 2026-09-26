@@ -15,7 +15,6 @@ from ffcore import forecast as _forecast
 from ffcore.forecast import Bootstrap, pool_from_perjornada
 import methodology as _methodology
 from stats import percentile
-from ffcore.crosswalk import club_key
 from ffcore.parse import fmt_money
 from ffcore.schedule import (rounds_left, next_then_rest,
                              first_jornada_per_player, apply_fixtures,
@@ -25,14 +24,12 @@ from ffcore.action import Action
 from ffcore.profile import (PlayerProfile, UNSCORED_DEFAULT,
                             build_profiles)
 from ffcore.score import SLOT, _calibrated, replacement, squad_pool, vor
-from ffcore.text import norm
 from ffcore.season import (LeagueState, best_xi,
                            simulate_many)
 from ffcore.tidy import (run_now, load_api, load_fixtures, load_api_stats,
                          load_perjornada, load_players, market_routes, pending,
                          DAILY_FRESH_DAYS, fresh_only, newest, table)
 from ffcore.schema import text, num, API_TEAMS, API_STANDINGS
-from ffcore.schema import MARKET as MARKET_TBL
 
 __all__ = ["Action", "Universe"]
 
@@ -478,11 +475,7 @@ def load(trials_pool=None) -> Universe:
     players = load_players()
 
     m = newest("matches")
-    mkt_teams = sorted({text(r, MARKET_TBL.TEAM)
-                        for r in (lg.market.latest().values()
-                                  if lg.market is not None else [])
-                        if text(r, MARKET_TBL.TEAM)})
-    rem, played, unjoined_clubs = rounds_left(m, mkt_teams, load_fixtures())
+    rem, played = rounds_left(m, load_fixtures())
 
     teams, mkt = ([dict(r, key=lg.xw.player(app_id=text(r, API_TEAMS.PLAYER_ID)))
                    for r in load_api(name)] for name in ("teams", "market"))
@@ -565,8 +558,8 @@ def load(trials_pool=None) -> Universe:
                                  else (UNSCORED_DEFAULT, UNSCORED_DEFAULT))
 
     pool = pool_from_perjornada(perjornada_rows)
-    club = {k: club_key(players[k].get("team"), mkt_teams)
-            for k in base if k in players}
+    club = {k: players[k]["club"] for k in base
+            if players.get(k, {}).get("club")}
     matches = {}
     for k in base:
         s_ = scored.get(k)
@@ -575,17 +568,13 @@ def load(trials_pool=None) -> Universe:
     from ffcore import fixture as _fixture
     from ffcore.fixture import club_volatility, fit_home_edge, season_board
     from ffcore.tidy import load_understat_players
-    slug_of = {norm(c.market): c.ff_slug for c in lg.xw.clubs.values()
-              if c.market and c.ff_slug} if lg.xw is not None else {}
-    club_of_slug = {k: slug_of[v] for k, v in club.items() if v in slug_of}
     results_hist = table("results_history")
-    club_rel = club_volatility(results_hist, list(slug_of.values()))
+    club_rel = club_volatility(results_hist, set(club.values()))
     _fixture.HOME_EDGE, _home_edge_why = fit_home_edge(results_hist, m)
-    sboard = {j: {norm(team): m for team, m in layer.items()}
-             for j, layer in season_board(
-                 _m.market, m, rem, now, fresh_only(newest("elo"), DAILY_FRESH_DAYS), xw=lg.xw,
-                 results=results_hist,
-                 understat_rows=load_understat_players("2025")).items()}
+    sboard = season_board(_m.market, m, rem, now,
+                          fresh_only(newest("elo"), DAILY_FRESH_DAYS),
+                          results=results_hist,
+                          understat_rows=load_understat_players("2025"))
     ppm_of = {k: s.ppm for k, s in scored.items() if s}
     status_of = {k: s.status for k, s in scored.items() if s}
     first_jornada_of = first_jornada_per_player(base, rem, played, club)
@@ -607,7 +596,7 @@ def load(trials_pool=None) -> Universe:
     _forecast.RATE_REL_FLOOR, _rate_floor_why = \
         _methodology.fit_rate_rel_floor(pool, history=_history)
     fc = Bootstrap(per_j, pool=pool, matches=matches,
-                  club_of=club_of_slug, club_rel=club_rel)
+                  club_of=club, club_rel=club_rel)
 
     carried = {}
     for r in newest("api_standings"):
@@ -626,7 +615,7 @@ def load(trials_pool=None) -> Universe:
         part_played=played, first_jornada_of=first_jornada_of,
         start_note=(_calibrated()[0].note() + " "
                     + _calibrated()[0].lineup_why).strip(),
-        unjoined=list(unjoined_clubs) + list(lg.api_unjoined),
+        unjoined=list(lg.api_unjoined),
         locked_cash=locked_cash, my_bids=my_bids,
         received_offers=received_offers)
     return _LOAD_CACHE

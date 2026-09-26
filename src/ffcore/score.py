@@ -532,8 +532,9 @@ def build(market: list[dict], xi_rows: list[dict], now,
     from ffcore.tidy import (load_crosswalk, load_understat_players,
                              DAILY_FRESH_DAYS, fresh_only, newest, table)
     xw = load_crosswalk()
-    board = fixture_board(market, load_fixtures(), now, fresh_only(newest("elo"), DAILY_FRESH_DAYS),
-                          xw=xw, results=table("results_history"),
+    board = fixture_board(market, load_fixtures(), now,
+                          fresh_only(newest("elo"), DAILY_FRESH_DAYS),
+                          results=table("results_history"),
                           understat_rows=load_understat_players("2025"))
     xg_cur = load_understat_current(xw)
     xg_slope, xg_intercept, xg_n = _xg_points_fit(xw)
@@ -788,7 +789,7 @@ class Scorer:
                        ) / (k_l + start_n)
         else:
             pct_rest = pct_used
-        m = self.board.get(schema.text(rec, schema.MARKET.TEAM))
+        m = self.board.get(rec.get("club"))
         slot = SLOT.get((rec.get("position") or "").lower(), "")
         fix_factor = (m.def_factor if slot in ("POR", "DEF")
                      else m.atk_factor) if m else 1.0
@@ -934,7 +935,8 @@ def _selftest() -> None:
     from ffcore.fixture import Match
 
     def mk(name, pos="defensa", team="Mid", value="10.00M"):
-        return {"name": name, "position": pos, "team": team, "value": value}
+        return {"name": name, "position": pos, "team": team, "club": team,
+                "value": value}
 
     from ffcore.crosswalk import Crosswalk, Player
 
@@ -1091,7 +1093,7 @@ def _selftest() -> None:
                                  ff_slug="blanco", app_id="1"),
         "came on": Player("came on", "Came On", ff_slug="came-on"),
         "unused sub": Player("unused sub", "Unused Sub", ff_slug="unused"),
-    }, {})
+    })
     jornada_map = {"m1": 1, "m2": 2}
     starters_rows = [
         {"player_name": "Blanco", "player_slug": "blanco",
@@ -1165,7 +1167,7 @@ def _selftest() -> None:
     xw_us = _CW({
         "striker": _P("striker", "Striker Sam", understat_id="10"),
         "defender": _P("defender", "Defender Dan", understat_id="20"),
-    }, {})
+    })
     with _tempfile.TemporaryDirectory() as _d:
         _os.makedirs(_d, exist_ok=True)
         path = _os.path.join(_d, "understat_players.csv")
@@ -1251,7 +1253,7 @@ def _selftest() -> None:
                           app_id="900"),
         "def guy": Player("def guy", "Def Guy", ff_slug="def-guy",
                           app_id="901"),
-    }, {})
+    })
     matches3 = [{"match_id": "m1", "jornada": "1"},
                {"match_id": "m2", "jornada": "2"},
                {"match_id": "m3", "jornada": "3"}]

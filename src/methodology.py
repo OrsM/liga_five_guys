@@ -15,7 +15,7 @@ from ffcore.tidy import (clock_history, run_now, shown, table_stats, DECISIONS,
                          PARTS, LINEUP_SOURCE, DAILY_FRESH_DAYS,
                          EVERY_RUN_FRESH_DAYS, SEASON, TIDY, age_phrase,
                          stale_feeds, load_crosswalk, read_csv, snapshot_stamp,
-                         write_csv, write_lines, team_slug_of, lock_order,
+                         write_csv, write_lines, lock_order,
                          JornadaClock, fresh_only, newest, table)
 
 __all__ = ["PAR_DEFINITION", "clock_history", "current_mae",
@@ -329,16 +329,15 @@ def _start_instances(intervals, claims, src, universe=None) -> set:
            if (_start_classify(row) or (None, None))[0] == "numeric"}
 
 
-def market_names(market: list[dict], slugs) -> dict[str, list[dict]]:
+def market_names(market: list[dict]) -> dict[str, list[dict]]:
     latest = {}
     for r in market:
         if r.get("name"):
             latest[r["name"]] = r
     out: dict[str, list[dict]] = {}
     for r in latest.values():
-        slug = team_slug_of(r.get("team") or "", slugs)
-        if slug:
-            out.setdefault(slug, []).append(r)
+        if r.get("club"):
+            out.setdefault(r["club"], []).append(r)
     return out
 
 
@@ -360,7 +359,7 @@ def start_intervals(matches: list[dict], starters: list[dict],
         except (KeyError, ValueError, TypeError):
             continue
     locks = JornadaClock(matches, fixtures).team_locks
-    squads = market_names(market, {r.get("team_slug") for r in starters})
+    squads = market_names(market)
 
     seen, by_round, teams, ungraded = set(), {}, {}, set()
     graded = 0
@@ -677,12 +676,8 @@ def formula_lines() -> list[str]:
     results_hist = table("results_history")
     matches = newest("matches")
     home_edge, home_edge_why = fit_home_edge(results_hist, matches)
-    teams = sorted({r.get("team") for r in latest_market() if r.get("team")})
-    xw = load_crosswalk()
-    slug_of = {c.market: c.ff_slug for c in xw.clubs.values()
-              if c.market and c.ff_slug} if xw is not None else {}
-    ad = attack_defense(results_hist, list(slug_of.values())) if slug_of \
-        else {}
+    teams = sorted({r["club"] for r in latest_market() if r.get("club")})
+    ad = attack_defense(results_hist, teams)
     fixture_line = (
         f"| Fixture factor | per-club attack/defense fitted from real "
         f"goals ({len(ad)} of {len(teams)} clubs; the rest fall back to "
@@ -898,11 +893,8 @@ def forecast_claims() -> list[dict]:
             continue
         if not r.get("player") or not r.get("observed_at"):
             continue
-        team_slug = ""
         p = xw.players.get(schema.text(r, "ff_id"))
-        if p:
-            club = xw.clubs.get(p.club_id)
-            team_slug = club.ff_slug if club else ""
+        team_slug = p.club_id if p else ""
         out.append({"source": "our forecast", "player_name": r["player"],
                     "observed_at": r["observed_at"], "start_pct": pct,
                     "team_slug": team_slug})
@@ -1355,10 +1347,10 @@ def _selftest() -> None:
                 "away": "levante", "score": "1-0"},
                {"match_id": "9", "jornada": "2", "home": "rayo-vallecano",
                 "away": "alaves", "score": "2-2"}]
-    fixtures = [{"kickoff": "2026-08-16T17:00:00+00:00", "home": "Espanyol",
-                 "away": "Levante"},
-                {"kickoff": "2026-08-15T19:30:00+00:00", "home": "Alaves",
-                 "away": "Getafe"}]
+    fixtures = [{"kickoff": "2026-08-16T17:00:00+00:00", "home": "espanyol",
+                 "away": "levante"},
+                {"kickoff": "2026-08-15T19:30:00+00:00", "home": "alaves",
+                 "away": "getafe"}]
     locks = JornadaClock(matches, fixtures).round_locks
     assert list(locks) == [1] and locks[1].day == 15, locks
     assert 2 not in locks
@@ -1388,18 +1380,17 @@ def _selftest() -> None:
     assert levante_keys == {"cai", "cai-slug"}, levante_keys
     assert levante_teams == {"levante"}, levante_teams
 
-    market = [{"name": "abdel abqar", "team": "Alaves"},
-              {"name": "abdel abqar", "team": "Alaves"},
-              {"name": "ivan romero", "team": "Alaves"},
-              {"name": "rafael romero", "team": "Alaves"},
-              {"name": "someone else", "team": "Barcelona"}]
+    market = [{"name": n, "team": t.title(), "club": t} for n, t in [
+        ("abdel abqar", "alaves"), ("abdel abqar", "alaves"),
+        ("ivan romero", "alaves"), ("rafael romero", "alaves"),
+        ("someone else", "barcelona")]]
     iv3, _, _ = start_intervals(
         matches, [start("1", "Abqar", "abqar-slug"),
                   start("1", "Romero", "romero-slug")], fixtures, market)
     assert "abdel abqar" in iv3[0][1], iv3[0][1]
     assert "ivan romero" not in iv3[0][1] \
         and "rafael romero" not in iv3[0][1], iv3[0][1]
-    assert set(market_names(market, {"alaves"})) == {"alaves"}
+    assert set(market_names(market)) == {"alaves", "barcelona"}
 
     slugged = [{"source": "ff", "player_name": "Whoever They Call Him",
                 "player_slug": "ane-slug", "start_pct": "90", "role": "starter",
@@ -1446,10 +1437,6 @@ def _selftest() -> None:
                   {"player_id": "benched", "name": "Benched", "club_id": "fc"}],
                  ["player_id", "name", "club_id", "ff_slug", "af_slug",
                   "app_id", "understat_id", "app_names"])
-        write_csv(TIDY / "clubs.csv",
-                 [{"club_id": "fc", "market": "FC", "ff_slug": "fc-slug"}],
-                 ["club_id", "market", "ff_slug", "elo", "market_id",
-                  "af_id", "aliases"])
         claims = forecast_claims()
     finally:
         DECISIONS, TIDY = real_decisions, real_tidy
@@ -1460,9 +1447,9 @@ def _selftest() -> None:
     assert got == {"Nailed": 90.0, "Benched": 85.0}, got
     assert all(c["source"] == "our forecast" for c in claims), claims
     assert {c["player_name"]: c["team_slug"] for c in claims} == \
-        {"Nailed": "fc-slug", "Benched": "fc-slug"}, claims
+        {"Nailed": "fc", "Benched": "fc"}, claims
 
-    iv_f = [(snapshot_stamp("2026-08-10T1800Z"), {"nailed"}, {"fc-slug"})]
+    iv_f = [(snapshot_stamp("2026-08-10T1800Z"), {"nailed"}, {"fc"})]
     numf, _namf, _skipf = start_grade(iv_f, claims)
     row = next(r for r in numf if r[0] == "our forecast")
     _src, n_f, claim_pct, hit_pct, brier = row
