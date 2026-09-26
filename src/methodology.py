@@ -1242,30 +1242,23 @@ def _fit_lines(heading: str, fitted, default, unfitted_markers, why) -> list[str
     return out
 
 
-def drift_lines() -> list[str]:
-    from ffcore.forecast import DRIFT_FRAC as _DEFAULT
-    fitted, why = drift_frac_from_history()
-    return _fit_lines("Season-long drift", fitted, _DEFAULT,
-                      ("not enough",), why)
-
-
-def rate_rel_floor_lines(pool) -> list[str]:
-    from ffcore.forecast import RATE_REL_FLOOR as _DEFAULT
-    fitted, why = fit_rate_rel_floor(pool)
-    return _fit_lines("Rate uncertainty floor", fitted, _DEFAULT,
-                      ("too few", "0 "), why)
-
-
 def main() -> None:
+    from ffcore.forecast import DRIFT_FRAC as _DRIFT_DEFAULT
+    from ffcore.forecast import RATE_REL_FLOOR as _RATE_DEFAULT
+
     out = ["# How the forecast works — and how it's doing", ""]
     out += feed_lines()
     out += formula_lines()
     out += column_guide_lines()
     out += comparison_lines()
-    out += drift_lines()
+    fitted, why = drift_frac_from_history()
+    out += _fit_lines("Season-long drift", fitted, _DRIFT_DEFAULT,
+                      ("not enough",), why)
     fc = _fc()
     if fc is not None:
-        out += rate_rel_floor_lines(fc.pool)
+        fitted, why = fit_rate_rel_floor(fc.pool)
+        out += _fit_lines("Rate uncertainty floor", fitted, _RATE_DEFAULT,
+                          ("too few", "0 "), why)
     out += source_lines(load_actuals()[0])
     PARTS.mkdir(parents=True, exist_ok=True)
     write_lines(PARTS / "methodology.md", out)
