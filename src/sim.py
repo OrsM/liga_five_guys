@@ -35,26 +35,6 @@ def fielded_keys(u=None) -> list[str]:
     return app_fielded(u.state.squads.get(u.me, {}), u.view("name")) if u else []
 
 
-def _warnings() -> list:
-    p = WARNINGS
-    try:
-        got = json.loads(p.read_text(encoding="utf-8"))
-        return got if isinstance(got, list) else []
-    except (OSError, ValueError):
-        return []
-
-
-def xi_note(u, xi=None) -> str:
-
-    if xi is None:
-        _, xi = u.current_xi
-    chg = xi_change(fielded_keys(u), xi)
-    if not chg["legal"]:
-        return ("the app has not said which eleven you are fielding, so this "
-                "is the whole sheet rather than a change list")
-    if not chg["in"] and not chg["out"]:
-        return "no change — you are already fielding the best eleven"
-    return ""
 
 
 def xi_change(marked: list[str], best) -> dict:
@@ -119,12 +99,6 @@ def by_slot(u, keys, exp=None):
         exp, _ = u.current_xi
     return sorted(keys, key=lambda k: (SLOT_ORDER.get(u.view("pos").get(k, ""), 9),
                                        -exp.get(k, 0.0)))
-
-
-def _bar(u, exp=None, xi=None) -> float:
-    if exp is None or xi is None:
-        exp, xi = u.current_xi
-    return u.xi_bar
 
 
 def short_manager(m: str) -> str:
@@ -289,14 +263,6 @@ def band_acts(u, exp=None, xi=None) -> list:
     return acts
 
 
-def market_candidates(u) -> list:
-    import decide
-
-    mine = u.state.squads.get(u.me, {})
-    return [(k, decide.Action("buy", buy=k, cost=u.view("price").get(k, 0.0)))
-           for k in u.view("price") if k not in mine]
-
-
 def ladder(u, rows, base, data=None, exp=None, xi=None) -> list[str]:
 
     if exp is None or xi is None:
@@ -433,10 +399,6 @@ def ladder(u, rows, base, data=None, exp=None, xi=None) -> list[str]:
     return out
 
 
-def _cash_cell(u, manager: str) -> str:
-    if manager == u.me:
-        return fmt_money(u.cash)
-    return "~" + fmt_money(u.rival_cash.get(manager, 0.0))
 
 
 def standings(u, base) -> list[str]:
@@ -447,27 +409,14 @@ def standings(u, base) -> list[str]:
         lo, hi = base.band(m)
         out.append("| %s | %.0f | %s | %s | %s–%s | %s |"
                    % (m + (" **(you)**" if m == u.me else ""),
-                      u.state.carried.get(m, 0.0), _cash_cell(u, m),
+                      u.state.carried.get(m, 0.0),
+                      fmt_money(u.cash) if m == u.me
+                      else "~" + fmt_money(u.rival_cash.get(m, 0.0)),
                       _pts(base.mean(m)), _pts(lo), _pts(hi),
                       "—" if m == u.me
                       else "%.0f%%" % (100 * base.beat(m))))
     out.append("")
     return out
-
-
-def _drift_frac_now() -> float:
-    import ffcore.forecast as forecast
-    return forecast.DRIFT_FRAC
-
-
-def _drift_status_now() -> str:
-    import methodology as M
-    from ffcore.forecast import DRIFT_FRAC as _DEFAULT
-
-    fitted, why = M.drift_frac_from_history()
-    if fitted == _DEFAULT and "not enough" in why:
-        return "still the unfitted default"
-    return "fit from real data this run"
 
 
 def phantom_filled(u) -> list[tuple[str, list[str]]]:
@@ -488,6 +437,13 @@ def phantom_filled(u) -> list[tuple[str, list[str]]]:
 
 def caveats(u) -> list[str]:
     import decide
+    import methodology as M
+    import ffcore.forecast as forecast
+
+    fitted, why = M.drift_frac_from_history()
+    drift_status = ("still the unfitted default"
+                    if fitted == forecast.DRIFT_FRAC and "not enough" in why
+                    else "fit from real data this run")
 
     out = ["| Not modelled | Which way it bends the answer |", "|---|---|"]
     for m, filled in phantom_filled(u):
@@ -556,7 +512,7 @@ def caveats(u) -> list[str]:
         "humble than 70%%+ about a full season this early regardless of "
         "the exact value, which is what 1.0 as an unfitted default "
         "already reflects |"
-        % (_drift_frac_now(), _drift_status_now()),
+        % (forecast.DRIFT_FRAC, drift_status),
         "| Shape prior | %s |" % u.forecaster.pool_note(),
         "| P(start) fit | %s |" % u.start_note.rstrip("."),
         "| win %% and finish are single simulated draws | at FINAL_TRIALS="
@@ -875,6 +831,21 @@ def payload(u, rows, base, rivals, locks_h=None, n_actions: int = 0,
         exp, xi = u.current_xi
     names = {k: title_name(v) for k, v in u.view("name").items()}
     lo, hi = base.band(u.me)
+
+    chg = xi_change(fielded_keys(u), xi)
+    if not chg["legal"]:
+        xi_note = ("the app has not said which eleven you are fielding, so "
+                   "this is the whole sheet rather than a change list")
+    elif not chg["in"] and not chg["out"]:
+        xi_note = "no change — you are already fielding the best eleven"
+    else:
+        xi_note = ""
+    try:
+        warnings = json.loads(WARNINGS.read_text(encoding="utf-8"))
+        warnings = warnings if isinstance(warnings, list) else []
+    except (OSError, ValueError):
+        warnings = []
+
     moves = []
     rows = worth_doing(u, rows)
     # A MOVE HAS TO GAIN POINTS TO BE A MOVE. `rows` is what survived
@@ -927,13 +898,13 @@ def payload(u, rows, base, rivals, locks_h=None, n_actions: int = 0,
                  for k, got in dead_weight(u)],
         "ladder": (ladder_data if ladder_data is not None
                   else ladder_rows(u, rows, exp=exp, xi=xi)),
-        "bar": _bar(u, exp=exp, xi=xi),
+        "bar": u.xi_bar,
         "xi_total": _xi_total(u, u.me, exp=exp),
         "shape": _shape_now(u, xi=xi),
         "rival_best": _rival_best(u, exp=exp),
         "shape_now": fielded_shape(u, xi=xi),
-        "xi_note": xi_note(u, xi=xi),
-        "warnings": _warnings(),
+        "xi_note": xi_note,
+        "warnings": warnings,
         "standings": [
             {"manager": m, "me": m == u.me,
              "now": u.state.carried.get(m, 0.0), "mean": base.mean(m),
@@ -1670,7 +1641,11 @@ def main() -> None:
     xi_exp, xi = u.current_xi
     bar_acts = band_acts(u, exp=xi_exp, xi=xi)
     bar_keys = {k for k, _ in bar_acts}
-    extra_acts = bar_acts + [t for t in market_candidates(u)
+    mine = u.state.squads.get(u.me, {})
+    market_acts = [(k, decide.Action("buy", buy=k,
+                                     cost=u.view("price").get(k, 0.0)))
+                  for k in u.view("price") if k not in mine]
+    extra_acts = bar_acts + [t for t in market_acts
                              if t[0] not in bar_keys]
     rows, base, measured, bands = u.rank(
         acts, price=smoothed, extra=extra_acts)

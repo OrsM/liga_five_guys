@@ -29,14 +29,6 @@ def _score_h3(p: dict) -> float:
     return p["score"] + 2 * rest_rate
 
 
-def squad_names(lg) -> tuple[list[str], str]:
-    if lg is not None:
-        mine = lg.managers.get(lg.cfg.me)
-        if mine and mine.players:
-            return (list(mine.players), "ledger")
-    return [], "nothing"
-
-
 def log_squad(observed, players, chosen, formation: str, total, deadline,
               obs_dt) -> None:
     path = DECISIONS / "squad_log.csv"
@@ -110,7 +102,8 @@ def main() -> None:
     now = run_now()
     age_h = (now - obs_dt).total_seconds() / 3600 if obs_dt else None
 
-    squad, _squad_src = squad_names(lg)
+    mine = lg.managers.get(lg.cfg.me) if lg is not None else None
+    squad = list(mine.players) if mine and mine.players else []
     scored, missing = sc.score_squad(squad)
     players = []
     for s in scored:
