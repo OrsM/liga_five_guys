@@ -746,6 +746,7 @@ def _selftest() -> None:
     from ffcore.forecast import Bootstrap
     from ffcore.season import LeagueState, Standings
     from decide import Action, Universe
+    from ffcore.crosswalk import Crosswalk, Player
     from ffcore.fixtures import tiny_profile, players_from_flat
 
     import methodology
@@ -766,13 +767,16 @@ def _selftest() -> None:
             {"player_id": "2464", "player_name": "Pepelu",
              "player_name_full": "José Luis García Vayá"}]
     squad = {"ionut radu": 1, "pepelu": 1}
-    assert app_fielded(squad, {"pepelu": "Pepelu"}, rows,
-                       {"1070": "ionut radu"}) == ["ionut radu", "pepelu"]
-    assert app_fielded(squad, {}, rows + [{"player_id": "999",
-                                           "player_name": "Nobody"}], {}) == []
-    assert app_fielded(squad, {}, rows,
-                       {"1070": "ionut radu", "2464": "someone else"}) == []
-    assert app_fielded({}, {}, [], {}) == []
+    for sq, names, lineup, app_ids, want in [
+            (squad, {"pepelu": "Pepelu"}, rows, {"1070": "ionut radu"},
+             ["ionut radu", "pepelu"]),
+            (squad, {}, rows + [{"player_id": "999", "player_name": "Nobody"}],
+             {}, []),
+            (squad, {}, rows, {"1070": "ionut radu", "2464": "someone else"},
+             []),
+            ({}, {}, [], {}, [])]:
+        xw = Crosswalk({k: Player(k, app_id=a) for a, k in app_ids.items()})
+        assert app_fielded(sq, names, lineup, xw) == want, (app_ids, want)
 
     best = ["gk", "d1", "d2", "d3", "d4", "m1", "m2", "m3", "m4", "m5", "f1"]
     same = xi_change(list(best), best)
@@ -1092,7 +1096,6 @@ def _selftest() -> None:
     assert best_move(u_route, [rows[0], listed_big], ["riv"]) == (rows[0], False), \
         "order must not change reliable-beats-listed"
 
-    from ffcore.crosswalk import Player
     from ffcore.profile import (PlayerProfile,
                                 PlayerCurrent, PlayerHistory, PlayerDerived)
 

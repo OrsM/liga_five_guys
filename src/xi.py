@@ -77,9 +77,10 @@ def _selftest() -> None:
         return [{"player_id": "", "player_name": n} for n in names]
 
     def app(names):
+        from ffcore.crosswalk import Crosswalk
         from ffcore.league import app_fielded
         keys = {norm(n) for n in squad}
-        return app_fielded(keys, {}, rows(names), {})
+        return app_fielded(keys, {}, rows(names), Crosswalk())
 
     got = app(eleven)
     assert len(got) == 10, got

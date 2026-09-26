@@ -188,37 +188,27 @@ def _note(el) -> str:
 
 
 def parse_fitness(doc) -> dict[str, dict]:
+    flagged = [(el, FITNESS_ALT.get((icon[0].get("alt") or "").strip().lower()
+                                    if icon else ""))
+               for el in _css(doc, ".lesionados_wrapper section.mod.lesionados"
+                                   " > .elemento")
+               for icon in (_css(el, ".icono img"),)]
+    flagged += [(el, "suspended") for sec in _suspension_sections(doc)
+                for el in _css(sec, ".elemento")]
+    flagged += [(el, "unavailable")
+                for el in _css(doc, "section.mod.nodisponibles .elemento")]
     found: dict[str, dict] = {}
-
-    def put(name, slug, status, note=""):
-        key = norm(name)
-        if not key:
-            return
-        prev = found.get(key)
-        if prev and SEVERITY.index(prev["status"]) <= SEVERITY.index(status):
-            return
-        found[key] = {"name": name, "slug": slug, "status": status,
-                      "note": note}
-
-    for el in _css(doc, 
-            ".lesionados_wrapper section.mod.lesionados > .elemento"):
-        icon = _css(el, ".icono img")
-        alt = (icon[0].get("alt") or "").strip().lower() if icon else ""
-        status = FITNESS_ALT.get(alt)
+    for el, status in flagged:
         if not status:
             continue
         name, slug = _flagged_name(el)
-        put(name, slug, status, _note(el))
-
-    for sec in _suspension_sections(doc):
-        for el in _css(sec, ".elemento"):
-            name, slug = _flagged_name(el)
-            put(name, slug, "suspended", _note(el))
-
-    for el in _css(doc, "section.mod.nodisponibles .elemento"):
-        name, slug = _flagged_name(el)
-        put(name, slug, "unavailable", _note(el))
-
+        key = norm(name)
+        prev = found.get(key)
+        if not key or (prev and SEVERITY.index(prev["status"])
+                       <= SEVERITY.index(status)):
+            continue
+        found[key] = {"name": name, "slug": slug, "status": status,
+                      "note": _note(el)}
     return found
 
 

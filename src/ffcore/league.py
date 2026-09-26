@@ -198,19 +198,17 @@ def owner_from_api(rows: list[dict], market, ledger_owner: dict | None = None,
     return out, unjoined
 
 
-def app_fielded(squad, names: dict, rows=None, ids=None) -> list[str]:
+def app_fielded(squad, names: dict, rows=None, xw=None) -> list[str]:
+    from ffcore.crosswalk import Crosswalk
     from ffcore.tidy import load_api
 
     rows = load_api("lineup") if rows is None else rows
-    if ids is None:
-        xw = load_crosswalk()
-        ids = ({p.app_id: p.player_id for p in xw.players.values() if p.app_id}
-              if xw is not None else {})
+    xw = xw or load_crosswalk() or Crosswalk()
     squad = set(squad)
     by_name = {norm(names.get(k, k)): k for k in squad}
     out = []
     for r in rows or []:
-        key = ids.get(schema.text(r, schema.API_LINEUP.PLAYER_ID))
+        key = xw.player(app_id=schema.text(r, schema.API_LINEUP.PLAYER_ID))
         if key is None:
             for field in ("player_name", "player_name_full"):
                 key = by_name.get(norm(r.get(field) or ""))
