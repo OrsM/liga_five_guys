@@ -341,7 +341,7 @@ def load_api_activity() -> list[dict]:
 
 def load_api_players() -> dict[str, str]:
     out = {}
-    for r in table("api_players"):
+    for r in table("api_players_all"):
         if r.get("player_id") and r.get("player_name"):
             out[r["player_id"]] = r["player_name"]
     return out
@@ -685,15 +685,6 @@ def _selftest_new_loaders() -> None:
         assert got_matches == real_matches, \
             'newest("matches") lost a match'
         assert table("matches") == matches_full
-
-    starters_full = table("starters")
-    if starters_full:
-        real_keys = {(r.get("match_id"), r.get("player_name"))
-                    for r in starters_full}
-        got_keys = {(r.get("match_id"), r.get("player_name"))
-                   for r in newest("starters")}
-        assert got_keys == real_keys, \
-            'newest("starters") lost a (match, player) key'
 
     stats_all = table("api_stats")
     if stats_all:

@@ -30,7 +30,7 @@ __all__ = ["BASE", "SOURCE", "MARKET_URL", "POINTS_URL", "TEAM_URL", "TEAMS",
            "ROW_TABLE",
            "parse_api_leagues", "parse_api_market", "parse_api_activity",
            "parse_api_teams", "league_sources",
-           "API_PLAYER_URL", "parse_api_player", "player_source", "player_sources",
+           
            "API_OFFER_URL", "API_OFFER_KEY_RE", "parse_api_offer",
            "offer_source", "offer_sources"]
 
@@ -779,7 +779,7 @@ API_LINEUP_URL = ("{base}/v1/competition/1/teams/{team}"
 LINEUP_WEEK = 38
 
 STORE_ONCE = {"api_activity": ("activity_id",),
-              "api_players": ("player_id",),
+              "starters": ("match_id", "team_slug", "player_slug"),
               "api_stats": ("player_id", "week", "stat", "value", "points"),
               "results_history": ("season", "date", "home_name", "away_name",
                                   "home_goals", "away_goals")}
@@ -997,27 +997,6 @@ def parse_api_lineup(text: str, observed_at: str,
     return rows
 
 
-API_PLAYER_URL = "{base}/v1/competition/1/player/{pid}?x-lang=es"
-API_PLAYER_KEY_RE = re.compile(r"^api_player_(\d+)$")
-
-
-def parse_api_player(text: str, observed_at: str,
-                     key: str = "api_player_0") -> list[dict]:
-    d = _j_dict(text)
-    if d is None:
-        return []
-    m = API_PLAYER_KEY_RE.match(key or "")
-    pid = m.group(1) if m else str(d.get("id") or "")
-    if not pid:
-        return []
-    return [{
-        "observed_at": observed_at, "source": LFG_SOURCE,
-        "team_id": str(d.get("teamId") or ""),
-        **_player_identity(d),
-        "player_id": pid,
-    }]
-
-
 API_PLAYERS_ALL_URL = "{base}/v1/competition/1/players?x-lang=es"
 
 
@@ -1031,25 +1010,6 @@ def _player_all_row(p) -> list[dict]:
 def parse_api_players_all(text: str, observed_at: str,
                           key: str = "api_players_all") -> list[dict]:
     return _parse_json_list(text, observed_at, _player_all_row)
-
-
-def player_source(key: str) -> Source | None:
-    return _rebuild(key, API_PLAYER_KEY_RE, "api_players", parse_api_player,
-                    lambda m: API_PLAYER_URL.format(base="{base}",
-                                                    pid=m.group(1)),
-                    cadence="once", auth=True)
-
-
-def player_sources(activity_json: str, observed_at: str = "") -> list[Source]:
-    out, seen = [], set()
-    for r in parse_api_activity(activity_json, observed_at):
-        pid = r.get("player_id")
-        if not pid or pid in seen or (r.get("kind") or "").startswith(
-                "unknown:"):
-            continue
-        seen.add(pid)
-        out.append(player_source("api_player_%s" % pid))
-    return out
 
 
 API_OFFER_URL = ("{base}/v1/competition/1/league/{league}/playerTeam/{ptid}"
@@ -1185,7 +1145,7 @@ def source_for(key: str) -> Source | None:
     for s in sources(enabled_only=False):
         if s.key == key:
             return s
-    return (match_source(key) or api_source(key) or player_source(key)
+    return (match_source(key) or api_source(key)
             or offer_source(key))
 
 
@@ -1411,10 +1371,6 @@ _API_MARKET_FIXTURE = """[
   "playerMaster":{"id":"2963","nickname":"Marc Roca","positionId":3,
                   "marketValue":5100000}},
  {"id":"m3","salePrice":1,"playerMaster":{}}]"""
-
-_API_PLAYER_FIXTURE = """{"id":"1191","name":"Hugo Duro Perales",
- "nickname":"Hugo Duro","positionId":4,"marketValue":8534068,
- "teamId":"12","points":0}"""
 
 _API_PLAYERS_ALL_FIXTURE = """[
  {"id":"1191","positionId":"3","nickname":"Hugo Duro","playerStatus":"ok",
@@ -1866,32 +1822,6 @@ def _selftest() -> None:
     assert source_for("api_market").parse is parse_api_market
     assert api_source("market") is None
 
-    pl = parse_api_player(_API_PLAYER_FIXTURE, "t", "api_player_1191")
-    assert len(pl) == 1, pl
-    assert pl[0]["player_id"] == "1191", pl
-    assert pl[0]["player_name"] == "Hugo Duro", pl
-    assert pl[0]["player_name_full"] == "Hugo Duro Perales", pl
-    assert pl[0]["market_value"] == "8534068", pl
-    assert parse_api_player("<html>", "t", "api_player_1") == []
-
-    assert parse_api_player('{"nickname":"X"}', "t",
-                            "api_player_777")[0]["player_id"] == "777"
-
-    unk_then_known = json.dumps([
-        {"id": "1", "activityTypeId": 9999, "playerMasterId": "42"},
-        {"id": "2", "activityTypeId": list(ACT_KIND)[0], "playerMasterId": "42"},
-    ])
-    assert [s.key for s in player_sources(unk_then_known)] == ["api_player_42"]
-
-    ps = player_sources(_API_ACTIVITY_FIXTURE)
-    assert [s.key for s in ps] == ["api_player_1337", "api_player_652",
-                                   "api_player_2522"], ps
-    assert not any(s.key == "api_player_1" for s in ps), ps
-    assert all(s.cadence == "once" and s.auth for s in ps), ps
-    assert all(s.table == "api_players" for s in ps), ps
-    assert not any("None" in s.key or s.key == "api_player_" for s in ps)
-    assert source_for("api_player_1191").parse is parse_api_player
-    assert source_for("api_player_1191").table == "api_players"
     assert not any(s.auth for s in sources() if not s.key.startswith("api_"))
 
     pa = parse_api_players_all(_API_PLAYERS_ALL_FIXTURE, "t")

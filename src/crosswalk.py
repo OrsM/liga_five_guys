@@ -125,7 +125,7 @@ def main() -> None:
     players = build_players(
         registry.players, market, lineups,
         newest("api_teams") + newest("api_market")
-        + newest("api_players") + newest("api_players_all"))
+        + newest("api_players_all"))
     understat_matched = build_understat_ids(table("understat_players"),
                                             players)
     xw = Crosswalk(players)

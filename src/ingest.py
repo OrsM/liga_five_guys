@@ -24,7 +24,7 @@ from ffcore.tidy import (ROOT, SEASON, TIDY, append_csv, csv_string, read_csv,
 from sources import (API_LEAGUES_KEY, CAL_KEY, MATCH_KEY_RE,
                      ROW_TABLE, STORE_DAILY, STORE_ONCE, league_sources,
                      offer_sources, parse_api_leagues, parse_points,
-                     played_sources, player_sources,
+                     played_sources,
                      season_label, source_for, sources)
 
 __all__ = ["snapshots", "state", "doc_keys", "documents", "due",
@@ -271,8 +271,6 @@ def fetch() -> Path:
                 continue
             if src.key == CAL_KEY:
                 queue += played_sources(r.text)
-            if src.table == "api_activity":
-                queue += player_sources(r.text)
             if src.key == API_LEAGUES_KEY:
                 queue += league_sources(r.text)
                 leagues = parse_api_leagues(r.text, stamp)
@@ -583,7 +581,7 @@ def _selftest() -> None:
     assert _manifest({MANIFEST: csv_string(rows, MANIFEST_FIELDS)}) == rows
 
 
-    assert set(STORE_ONCE) == {"api_activity", "api_players",
+    assert set(STORE_ONCE) == {"api_activity", "starters",
                               "api_stats", "results_history"}, STORE_ONCE
     assert set(STORE_DAILY) == {"market", "lineups",
                                 "understat_players"}, STORE_DAILY

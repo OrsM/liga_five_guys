@@ -6,7 +6,8 @@ from contextlib import suppress
 from typing import NamedTuple
 
 from ffcore.parse import money, pct100, ratio, text
-from ffcore.startprob import Calibration, calibrate
+from ffcore.lineupweight import line_rows
+from ffcore.startprob import NEUTRAL_START, Calibration, calibrate, outcomes
 from ffcore.text import norm
 from ffcore.tidy import minutes_played, row_key
 
@@ -270,7 +271,7 @@ def build(market: list[dict], xi_rows: list[dict], now,
           shrink_k: float = SHRINK_K) -> "Scorer":
     from ffcore.fixture import difficulty_ratings, fit_home_edge, fixture_board
     from ffcore.tidy import (DAILY_FRESH_DAYS, LINEUP_SOURCE, SEASON,
-                             SECOND_SOURCE, fresh_only,
+                             SECOND_SOURCE, clock_history, fresh_only,
                              jornada_of_match, load_api_stats, load_crosswalk,
                              load_fixtures, load_perjornada,
                              load_understat_players, newest, read_csv, table)
@@ -281,7 +282,7 @@ def build(market: list[dict], xi_rows: list[dict], now,
                             "pj": ratio(r.get("games")) or 0.0}
                for r in (read_csv(files[-1]) if files else ()) if r.get("ff_id")}
     perjornada = load_perjornada()
-    by_key = _per_jornada_current(newest("starters"), perjornada,
+    by_key = _per_jornada_current(table("starters"), perjornada,
                                   jornada_of_match(), xw)
     decay = _fit_decay(by_key)
     us25, us26 = load_understat_players("2025"), load_understat_players("2026")
@@ -291,8 +292,13 @@ def build(market: list[dict], xi_rows: list[dict], now,
         market, fresh_only(newest("elo"), DAILY_FRESH_DAYS), results, us25,
         fit_home_edge(results, newest("matches")))
     second = table("lineups", SECOND_SOURCE)
-    cal = calibrate(table("lineups", LINEUP_SOURCE), second, table("starters"),
-                    xw)
+    outs = outcomes(table("lineups", LINEUP_SOURCE) + second, table("starters"),
+                    clock_history().round_locks, jornada_of_match(), xw)
+    pos = {r["ff_id"]: r["position"] for r in table("market") if r.get("ff_id")}
+    pts = {(r["ff_id"], int(r["jornada"])): float(r["points_delta"])
+           for r in perjornada
+           if r.get("games_delta") == "1" and r.get("jornada")}
+    cal = calibrate(outs, line_rows(outs, pos, pts))
     return Scorer(
         market, xi_rows, history, shrink_k=shrink_k, xw=xw, cal=cal,
         second=second, ratings=ratings,
@@ -424,7 +430,7 @@ class Scorer:
         start_n = cur.get("start_n", 0.0) if cur else 0.0
         if start_n > 0.0:
             k_s, k_l = self.shrink_k, self.cal.lineup_k or self.shrink_k
-            pct_rest = (k_s * self.cal.neutral_start + start_n * 100.0
+            pct_rest = (k_s * NEUTRAL_START + start_n * 100.0
                        * cur["start_rate"]) / (k_s + start_n)
             pct_used = (k_l * pct_used + start_n * 100.0 * cur["start_rate"]
                        ) / (k_l + start_n)
@@ -567,7 +573,6 @@ def pick_xi(pool: dict, force: dict | None = None):
 
 
 def _selftest() -> None:
-    from ffcore.startprob import NEUTRAL_START
     assert status_multiplier("injured") == 0.0 and status_multiplier("doubt") == DOUBT_FACTOR
     assert status_multiplier("injured", {"injured": 0.5}) == 0.5
     assert status_multiplier("ok", {"injured": 0.5}) == 1.0

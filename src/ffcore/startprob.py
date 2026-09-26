@@ -1,13 +1,18 @@
 from __future__ import annotations
 
+import bisect
 import math
 from dataclasses import dataclass, field, replace
 from typing import NamedTuple
 
 import numpy as np
 
-__all__ = ["Obs", "Calibration", "calibrate", "fit", "observations",
-           "af_prob", "fit_start_fallbacks", "NEUTRAL_START", "ABSENT_START"]
+from ffcore.text import norm
+from ffcore.tidy import MATCH_LEN, minutes_played
+
+__all__ = ["Obs", "Outcome", "Calibration", "calibrate", "fit", "outcomes",
+           "observations", "af_prob", "fit_start_fallbacks", "NEUTRAL_START",
+           "ABSENT_START"]
 
 INTERCEPT = [round(-3.0 + 0.5 * i, 1) for i in range(13)]
 SLOPE = [round(0.2 + 0.4 * i, 1) for i in range(15)]
@@ -118,84 +123,112 @@ def fit(obs) -> Calibration:
     return _best(obs, titular) if held_out < _brier(raw, obs) else raw
 
 
-def observations(lineups, starters, cut: str, neutral: float = NEUTRAL_START,
-                 absent: float = ABSENT_START, xw=None) -> list[Obs]:
-    from ffcore.text import norm
-    from ffcore.tidy import MATCH_LEN, minutes_played
+class Outcome(NamedTuple):
+    at: str
+    jornada: int
+    group: str
+    who: str
+    key: str | None
+    listed: bool
+    ff: float | None
+    status: str
+    af: float | None
+    in_squad: bool
+    mins: float
 
-    truth = [r for r in starters if r.get("role")]
-    if not truth:
-        return []
-    last = max(r["observed_at"] for r in truth)
-    truth = [r for r in truth if r["observed_at"] == last]
-    teams = {r.get("team_slug") for r in truth}
-    truth_of = {r["player_slug"]: r for r in truth}
 
-    wide: dict[str, dict] = {}
-    narrow: dict[str, dict] = {}
-    for r in sorted((r for r in lineups
-                     if r.get("observed_at", "") <= cut
-                     and r.get("team_slug") in teams),
-                    key=lambda r: r.get("observed_at", "")):
+def _last_before(hist: list, cut: str):
+    i = bisect.bisect_right(hist, cut, key=lambda t: t[0])
+    return hist[i - 1][1] if i else None
+
+
+def _pct(row) -> float | None:
+    try:
+        return float(row.get("start_pct")) / 100.0
+    except (TypeError, ValueError):
+        return None
+
+
+def outcomes(lineups, starters, locks: dict, jornada_of: dict, xw
+             ) -> list[Outcome]:
+    squads: dict[tuple, dict[str, dict]] = {}
+    for r in starters:
+        if r.get("role") in ("starter", "sub") and r.get("player_slug"):
+            squads.setdefault((r["match_id"], r["team_slug"]),
+                              {})[r["player_slug"]] = r
+    wide: dict[str, dict[str, list]] = {}
+    narrow: dict[str, list] = {}
+    for r in sorted(lineups, key=lambda r: r.get("observed_at", "")):
+        stamp = r.get("observed_at", "")
         if (r.get("source") or "").startswith("futbol"):
-            wide[r.get("player_slug") or norm(r.get("player_name"))] = r
+            slug = r.get("player_slug") or norm(r.get("player_name"))
+            wide.setdefault(r.get("team_slug"), {}).setdefault(
+                slug, []).append((stamp, r))
             continue
-        key = (xw.key_of(r) if xw else None) or norm(
-            r.get("player_name") or r.get("player_slug") or "")
-        if key:
-            narrow[key] = r
+        for k in {xw.key_of(r) if xw else None,
+                  norm(r.get("player_name") or r.get("player_slug") or "")}:
+            if k:
+                narrow.setdefault(k, []).append((stamp, r))
 
     out = []
-    for slug in sorted(set(wide) | set(truth_of)):
-        row = wide.get(slug)
-        seen = truth_of.get(slug) or {}
-        fp = absent / 100.0
-        if row is not None:
-            fp = neutral / 100.0
-            try:
-                fp = float(row.get("start_pct")) / 100.0
-            except (TypeError, ValueError):
-                pass
-        af = narrow.get(norm((row or {}).get("player_name")
-                             or seen.get("player_name", "")))
-        if af is None and xw is not None:
-            af = narrow.get(xw.key_of(row or seen))
-        graded = min(1.0, minutes_played(seen.get("role"), seen.get("minute"))
-                     / MATCH_LEN)
-        out.append(Obs(fp, af_prob(af, 1.0), graded,
-                       (row or {}).get("team_slug") or seen.get("team_slug", "")))
-    return out
+    for (match, team), squad in sorted(squads.items()):
+        j = jornada_of.get(match)
+        if j not in locks:
+            continue
+        cut = locks[j].strftime("%Y-%m-%dT%H%MZ")
+        before = {slug: row for slug, hist in wide.get(team, {}).items()
+                  if (row := _last_before(hist, cut)) is not None}
+        for slug in sorted(set(before) | set(squad)):
+            row, played = before.get(slug), squad.get(slug)
+            seen = row or played
+            key = xw.key_of(seen) if xw else None
+            af = next((a for k in (key, norm(seen.get("player_name") or ""))
+                       if k and (a := _last_before(narrow.get(k, []), cut))),
+                      None)
+            out.append(Outcome(
+                cut, j, "%s:%s" % (match, team), "%s:%s" % (team, slug), key,
+                row is not None,
+                _pct(row) if row else None,
+                (row.get("status") or "ok") if row else "",
+                af_prob(af, 1.0), played is not None,
+                minutes_played(played["role"], played.get("minute"))
+                if played else 0.0))
+    return sorted(out, key=lambda o: (o.at, o.group))
 
 
-def _shrunk(default_pct: float, bucket) -> float:
-    if not bucket:
+def _share(o: Outcome) -> float:
+    return min(1.0, o.mins / MATCH_LEN)
+
+
+def observations(outs: list[Outcome], neutral: float = NEUTRAL_START,
+                 absent: float = ABSENT_START) -> list[Obs]:
+    return [Obs(o.ff if o.ff is not None
+                else (neutral if o.listed else absent) / 100.0,
+                o.af, _share(o), o.group) for o in outs]
+
+
+def _shrunk(default_pct: float, shares: list[float]) -> float:
+    if not shares:
         return default_pct
-    rate = sum(o.started for o in bucket) / len(bucket)
-    return ((FALLBACK_K * default_pct / 100.0 + len(bucket) * rate)
-            / (FALLBACK_K + len(bucket)) * 100.0)
+    rate = sum(shares) / len(shares)
+    return ((FALLBACK_K * default_pct / 100.0 + len(shares) * rate)
+            / (FALLBACK_K + len(shares)) * 100.0)
 
 
-def fit_start_fallbacks(lineups, starters, cut: str, xw=None
-                        ) -> tuple[float, float]:
-    obs = observations(lineups, starters, cut, xw=xw)
-    return (_shrunk(NEUTRAL_START, [o for o in obs
-                                    if abs(o.ff - NEUTRAL_START / 100) < 1e-9]),
-            _shrunk(ABSENT_START, [o for o in obs
-                                   if abs(o.ff - ABSENT_START / 100) < 1e-9]))
+def fit_start_fallbacks(outs: list[Outcome]) -> tuple[float, float]:
+    return (_shrunk(NEUTRAL_START, [_share(o) for o in outs
+                                    if o.listed and o.ff is None]),
+            _shrunk(ABSENT_START, [_share(o) for o in outs if not o.listed]))
 
 
-def calibrate(lineups, second, starters, xw) -> Calibration:
+def calibrate(outs: list[Outcome], line_rows: list[dict]) -> Calibration:
     from ffcore.lineupweight import fit_lineup_weight, fit_status_factors
 
-    both = lineups + second
-    cut = min((r.get("observed_at", "") for r in starters), default="")
-    cal = Calibration()
-    if cut:
-        neutral, absent = fit_start_fallbacks(both, starters, cut, xw=xw)
-        cal = replace(fit(observations(both, starters, cut, neutral, absent, xw)),
-                      neutral_start=neutral, absent_start=absent)
-    return replace(cal, lineup_k=fit_lineup_weight(),
-                   status_factor=fit_status_factors())
+    neutral, absent = fit_start_fallbacks(outs)
+    return replace(fit(observations(outs, neutral, absent)),
+                   neutral_start=neutral, absent_start=absent,
+                   lineup_k=fit_lineup_weight(line_rows),
+                   status_factor=fit_status_factors(outs))
 
 
 def _selftest() -> None:
@@ -243,70 +276,70 @@ def _selftest() -> None:
                - 0.9) < 1e-9
     assert _titular_rate([Obs(0.5, None, 1)]) == 0.9
 
+    import datetime as dt
+    from ffcore.crosswalk import Crosswalk, Player
+
+    locks = {1: dt.datetime(2026, 8, 15, 19, 30, tzinfo=dt.timezone.utc)}
+    before, after = "2026-08-14T1000Z", "2026-08-16T1000Z"
     lineups = [
-        {"observed_at": "A", "source": "futbolfantasy", "team_slug": "t",
+        {"observed_at": before, "source": "futbolfantasy", "team_slug": "t",
          "player_slug": "starter-man", "player_name": "Starter Man",
          "start_pct": "80", "role": "starter"},
-        {"observed_at": "A", "source": "analitica", "team_slug": "t",
+        {"observed_at": before, "source": "analitica", "team_slug": "t",
          "player_slug": "af-starter-man", "player_name": "Starter Man",
          "start_pct": "", "role": "starter"},
-        {"observed_at": "A", "source": "futbolfantasy", "team_slug": "t",
+        {"observed_at": before, "source": "futbolfantasy", "team_slug": "t",
          "player_slug": "bench-man", "player_name": "Bench Man",
          "start_pct": "20", "role": "sub"},
-        {"observed_at": "A", "source": "futbolfantasy", "team_slug": "t",
+        {"observed_at": before, "source": "futbolfantasy", "team_slug": "t",
          "player_slug": "vague-man", "player_name": "Vague Man",
          "start_pct": "", "role": "sub"},
-        {"observed_at": "Z", "source": "futbolfantasy", "team_slug": "t",
+        {"observed_at": after, "source": "futbolfantasy", "team_slug": "t",
          "player_slug": "starter-man", "player_name": "Starter Man",
          "start_pct": "99", "role": "starter"},
-        {"observed_at": "A", "source": "futbolfantasy", "team_slug": "other",
+        {"observed_at": before, "source": "futbolfantasy", "team_slug": "other",
          "player_slug": "elsewhere", "player_name": "Elsewhere",
          "start_pct": "90", "role": "starter"},
     ]
     starters = [
-        {"observed_at": "K", "team_slug": "t", "player_slug": "starter-man",
-         "player_name": "Starter Man", "role": "starter"},
-        {"observed_at": "K", "team_slug": "t", "player_slug": "bench-man",
-         "player_name": "Bench Man", "role": "sub"},
-        {"observed_at": "K", "team_slug": "t", "player_slug": "surprise-man",
-         "player_name": "Surprise Man", "role": "starter"},
+        {"match_id": "m1", "team_slug": "t", "player_slug": "starter-man",
+         "player_name": "Starter Man", "role": "starter", "minute": ""},
+        {"match_id": "m1", "team_slug": "t", "player_slug": "bench-man",
+         "player_name": "Bench Man", "role": "sub", "minute": ""},
+        {"match_id": "m1", "team_slug": "t", "player_slug": "surprise-man",
+         "player_name": "Surprise Man", "role": "starter", "minute": "45"},
+        {"match_id": "m9", "team_slug": "t", "player_slug": "starter-man",
+         "player_name": "Starter Man", "role": "starter", "minute": ""},
     ]
-    got = observations(lineups, starters, cut="M")
-    by = {o.ff: o for o in got}
-    assert len(got) == 4 and all(o.group == "t" for o in got), got
-    assert by[0.8].started == 1.0 and by[0.2].started == 0.0
-    assert by[0.8].af == 1.0 and by[0.2].af is None
-    assert abs(by[0.6].ff - 0.6) < 1e-9 and by[0.15].started == 1.0
-    assert observations(lineups, [], cut="M") == []
+    outs = outcomes(lineups, starters, locks, {"m1": 1, "m9": 9}, None)
+    by = {o.who: o for o in outs}
+    assert set(by) == {"t:starter-man", "t:bench-man", "t:vague-man",
+                       "t:surprise-man"}, by
+    assert (by["t:starter-man"].ff, by["t:starter-man"].af,
+            by["t:starter-man"].mins) == (0.8, 1.0, 90.0), by["t:starter-man"]
+    assert by["t:bench-man"].mins == 0.0 and by["t:bench-man"].af is None
+    assert by["t:vague-man"].listed and by["t:vague-man"].ff is None
+    assert not by["t:vague-man"].in_squad
+    assert not by["t:surprise-man"].listed and by["t:surprise-man"].mins == 45.0
+    assert outcomes(lineups, [], locks, {}, None) == []
 
-    npct, apct = fit_start_fallbacks(lineups, starters, cut="M")
+    obs = {o.ff: o.started for o in observations(outs)}
+    assert obs == {0.8: 1.0, 0.2: 0.0, 0.6: 0.0, 0.15: 0.5}, obs
+    npct, apct = fit_start_fallbacks(outs)
     assert abs(npct - (8 * 60 + 1 * 0) / 9) < 1e-9, npct
-    assert abs(apct - (8 * 15 + 1 * 100) / 9) < 1e-9, apct
-    assert fit_start_fallbacks([], [], cut="M") == (60.0, 15.0)
+    assert abs(apct - (8 * 15 + 1 * 50) / 9) < 1e-9, apct
+    assert fit_start_fallbacks([]) == (60.0, 15.0)
 
-    from ffcore.crosswalk import Crosswalk, Player
     xw = Crosswalk({"starter man": Player("starter man", ff_slug="starter-man",
                                           af_slug="af-only-slug")})
     odd = [r for r in lineups if r["source"] == "futbolfantasy"] + [
-        {"observed_at": "A", "source": "analitica", "team_slug": "t",
+        {"observed_at": before, "source": "analitica", "team_slug": "t",
          "player_slug": "af-only-slug", "player_name": "S. Man",
          "start_pct": "75", "role": "starter"}]
-    assert all(o.af is None for o in observations(odd, starters, cut="M"))
-    assert any(o.af == 0.75 for o in observations(odd, starters, cut="M", xw=xw))
-
-    graded = {o.ff: o.started for o in observations(
-        [{"observed_at": "A", "source": "futbolfantasy", "team_slug": "t",
-          "player_slug": "hooked-early", "player_name": "Hooked Early",
-          "start_pct": "90", "role": "starter"},
-         {"observed_at": "A", "source": "futbolfantasy", "team_slug": "t",
-          "player_slug": "heavy-sub", "player_name": "Heavy Sub",
-          "start_pct": "10", "role": "sub"}],
-        [{"observed_at": "K", "team_slug": "t", "player_slug": "hooked-early",
-          "player_name": "Hooked Early", "role": "starter", "minute": "45"},
-         {"observed_at": "K", "team_slug": "t", "player_slug": "heavy-sub",
-          "player_name": "Heavy Sub", "role": "sub", "minute": "45"}],
-        cut="M")}
-    assert abs(graded[0.9] - 0.5) < 1e-9 and abs(graded[0.1] - 0.5) < 1e-9
+    plain = outcomes(odd, starters, locks, {"m1": 1}, None)
+    assert all(o.af is None for o in plain)
+    keyed = outcomes(odd, starters, locks, {"m1": 1}, xw)
+    assert [o.af for o in keyed if o.key == "starter man"] == [0.75], keyed
 
     print("ffcore.startprob self-test OK")
 
