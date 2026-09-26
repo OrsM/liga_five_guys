@@ -295,27 +295,25 @@ def appearances(actuals: list[dict]) -> list[tuple[dt.datetime, set]]:
     return sorted(by_start.items())
 
 
-def _matched_start_row(hist, start, teams):
-    row = latest_before(hist, start)
-    if row is None:
-        return None
-    if teams is not None and schema.text(row, "team_slug") not in teams:
-        return None
-    return row
-
-
-def _matched_start_rows(intervals, per: dict[str, list]):
+def _matched_start_rows(intervals, per: dict[str, list], check_teams: bool = True):
     """(interval, key, row) for every interval x per-key claim history pair
-    that resolves via _matched_start_row -- the join loop start_grade()
-    (once per source), _start_instances() and golden_rows() each walked
-    separately."""
+    whose latest claim before the interval's start matches its teams --
+    the join loop start_grade() (once per source), _start_instances() and
+    golden_rows() each walked separately. _instance_briers() wants the same
+    walk but skips the teams check (check_teams=False): its (key, start)
+    pairs are already team-validated, from a prior _start_instances() call
+    against a DIFFERENT source's rows, so re-checking THIS source's row
+    against `teams` would filter on the wrong source's claim."""
     for interval in intervals:
         start = interval[0]
-        teams = interval[2] if len(interval) > 2 else None
+        teams = interval[2] if check_teams and len(interval) > 2 else None
         for key, hist in per.items():
-            row = _matched_start_row(hist, start, teams)
-            if row is not None:
-                yield interval, key, row
+            row = latest_before(hist, start)
+            if row is None:
+                continue
+            if teams is not None and schema.text(row, "team_slug") not in teams:
+                continue
+            yield interval, key, row
 
 
 def _start_classify(row):
@@ -715,25 +713,6 @@ def feed_lines() -> list[str]:
             "|---|---|---|---|--:|---|---|"] + rows + [""]
 
 
-def elo_basis() -> str:
-    from ffcore.fixture import elo_strength, team_strength
-
-    rows = load("elo")
-    if not rows:
-        return ("summed squad value — %s, so the wallet is standing in for "
-                "the pitch (see the feed table for how long)"
-                % ("Club Elo has stopped answering and its last reading is "
-                   "too old to rank a jornada it predates"
-                   if read_csv(TIDY / "elo.csv") else
-                   "Club Elo has not been scraped yet"))
-    teams = list(team_strength(latest_market()))
-    if elo_strength(teams, rows) is None:
-        return ("summed squad value — Club Elo was scraped but did not cover "
-                "every club in the market, and half a league ranked by Elo is "
-                "not a ranking")
-    return "**Club Elo rating**, a result-based rating with no transfer fees in it"
-
-
 def latest_market() -> list[dict]:
     from ffcore.tidy import load_market_latest
 
@@ -758,6 +737,32 @@ def formula_lines() -> list[str]:
         f"goals ({len(ad)} of {len(teams)} clubs; the rest fall back to "
         f"±{FIX_BAND * 100:.0f}% by squad-value rank, MIN_AD_MATCHES not "
         f"yet met) | yes, for {len(ad)} of {len(teams)} |")
+
+    from ffcore.fixture import elo_strength, team_strength
+    elo_rows = load("elo")
+    if not elo_rows:
+        elo = ("summed squad value — %s, so the wallet is standing in for "
+              "the pitch (see the feed table for how long)"
+              % ("Club Elo has stopped answering and its last reading is "
+                 "too old to rank a jornada it predates"
+                 if read_csv(TIDY / "elo.csv") else
+                 "Club Elo has not been scraped yet"))
+    elif elo_strength(list(team_strength(latest_market())), elo_rows) is None:
+        elo = ("summed squad value — Club Elo was scraped but did not cover "
+              "every club in the market, and half a league ranked by Elo is "
+              "not a ranking")
+    else:
+        elo = "**Club Elo rating**, a result-based rating with no transfer fees in it"
+
+    if _RATE_NOTE:
+        rate_note = _RATE_NOTE[0]
+    else:
+        import statistics
+        rel = sorted(getattr(_fc(), "rate_rel", {}).values())
+        rate_note = ("±%.0f%% of a rate" % (100 * statistics.median(rel))
+                    if rel else "not applied — no match counts")
+        _RATE_NOTE.append(rate_note)
+
     return [
         "### The model, as configured right now", "",
         "| Term | Setting | Fitted? |",
@@ -768,7 +773,7 @@ def formula_lines() -> list[str]:
         "toward the positional prior, then this season toward that | yes |",
         fixture_line,
         f"| Home advantage | +{home_edge * 100:.1f}% | yes — {home_edge_why} |",
-        f"| Team strength | {elo_basis()} | — |",
+        f"| Team strength | {elo} | — |",
         f"| P(start) read from | `{LINEUP_SOURCE}` | see the Brier table |",
         "| Fixture applies to | fielding only — never a buy, a sale or the "
         "line | — |",
@@ -778,7 +783,7 @@ def formula_lines() -> list[str]:
         "| Season spread, RATE ERROR | the rate is a mean of a few matches, "
         "so each simulated season multiplies it by one draw of "
         "cv/√(matches+K) held all year — median %s across the squads | "
-        "derived, not fitted |" % _rate_note(), "",
+        "derived, not fitted |" % rate_note, "",
     ]
 
 
@@ -836,17 +841,6 @@ def _fc():
 
 
 _RATE_NOTE: list = []
-
-
-def _rate_note() -> str:
-    if _RATE_NOTE:
-        return _RATE_NOTE[0]
-    import statistics
-    fc = _fc()
-    rel = sorted(getattr(fc, "rate_rel", {}).values())
-    _RATE_NOTE.append("±%.0f%% of a rate" % (100 * statistics.median(rel))
-                      if rel else "not applied — no match counts")
-    return _RATE_NOTE[0]
 
 
 def start_lines() -> list[str]:
@@ -930,21 +924,17 @@ def _instance_briers(intervals, claims, src, instances) -> list[float]:
     per = _group_by_key(claims, src=src)
 
     out = []
-    for interval in intervals:
+    for interval, key, row in _matched_start_rows(intervals, per, check_teams=False):
         start, played = interval[0], interval[1]
-        for key, hist in per.items():
-            if (key, start) not in instances:
-                continue
-            row = latest_before(hist, start)
-            if row is None:
-                continue
-            try:
-                pct = float(row.get("start_pct"))
-            except (TypeError, ValueError):
-                continue
-            slug = schema.text(row, "player_slug")
-            hit = 1.0 if key in played or (slug and slug in played) else 0.0
-            out.append((pct / 100.0 - hit) ** 2)
+        if (key, start) not in instances:
+            continue
+        try:
+            pct = float(row.get("start_pct"))
+        except (TypeError, ValueError):
+            continue
+        slug = schema.text(row, "player_slug")
+        hit = 1.0 if key in played or (slug and slug in played) else 0.0
+        out.append((pct / 100.0 - hit) ** 2)
     return out
 
 
@@ -1106,9 +1096,6 @@ def rate_baseline_check(pairs: list[dict]) -> dict | None:
     return _baseline_check(n, ours, {"naive": ("naive", naive)}, "mean_rate", mean_rate)
 
 
-def weighted_mae(pairs: list[dict]) -> float:
-    total_matches = sum(p["matches"] for p in pairs)
-    return sum(abs(p["err"]) for p in pairs) / total_matches
 
 
 ACCURACY_LOG = "forecast_accuracy_log.csv"
@@ -1163,7 +1150,7 @@ def comparison_lines() -> list[str]:
     n = len(pairs)
     tp = sum(p["predicted"] for p in pairs)
     ta = sum(p["actual"] for p in pairs)
-    mae = weighted_mae(pairs)
+    mae = sum(abs(p["err"]) for p in pairs) / sum(p["matches"] for p in pairs)
     fx, no_fix = fixture_rows(pairs)
     over = sum(1 for p in pairs if p["err"] > 0)
     under = sum(1 for p in pairs if p["err"] < 0)
