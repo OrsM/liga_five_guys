@@ -9,7 +9,7 @@ from ffcore.parse import money, pct100, ratio, text
 from ffcore.lineupweight import line_rows
 from ffcore.startprob import NEUTRAL_START, Calibration, calibrate, outcomes
 from ffcore.text import norm
-from ffcore.tidy import minutes_played, row_key
+from ffcore.tidy import (current, minutes_played, row_key)
 
 __all__ = ["SLOT", "SLOT_LABEL", "SLOT_MIN", "MAX_SLOT", "FREE_FORMATIONS",
            "SHAPES", "starters_per_slot", "Rating", "Scorer", "pick_xi",
@@ -270,45 +270,45 @@ def _fit_decay(by_key: dict) -> float:
 def build(market: list[dict], xi_rows: list[dict], now,
           shrink_k: float = SHRINK_K) -> "Scorer":
     from ffcore.fixture import difficulty_ratings, fit_home_edge, fixture_board
-    from ffcore.tidy import (DAILY_FRESH_DAYS, LINEUP_SOURCE, SEASON,
-                             SECOND_SOURCE, clock_history, fresh_only,
-                             jornada_of_match, load_api_stats, load_crosswalk,
-                             load_fixtures, load_perjornada,
-                             load_understat_players, newest, read_csv, table)
+    from ffcore.tidy import (LINEUP_SOURCE, SEASON, history,
+                             SECOND_SOURCE, clock_history, jornada_of_match, load_crosswalk,
+                             load_perjornada,
+                             read_csv)
 
     xw = load_crosswalk()
     files = sorted(SEASON.glob("points_*.csv"))
-    history = {r["ff_id"]: {"pts": ratio(r.get("points")) or 0.0,
+    last_season = {r["ff_id"]: {"pts": ratio(r.get("points")) or 0.0,
                             "pj": ratio(r.get("games")) or 0.0}
                for r in (read_csv(files[-1]) if files else ()) if r.get("ff_id")}
     perjornada = load_perjornada()
-    by_key = _per_jornada_current(table("starters"), perjornada,
+    by_key = _per_jornada_current(current("starters"), perjornada,
                                   jornada_of_match(), xw)
     decay = _fit_decay(by_key)
-    us25, us26 = load_understat_players("2025"), load_understat_players("2026")
+    us25, us26 = ([r for r in current("understat_players") if r["season"] == y]
+                  for y in ("2025", "2026"))
     pos = {row_key(r): (r.get("position") or "").lower() for r in market}
-    results = table("results_history")
+    results = current("results_history")
     ratings = difficulty_ratings(
-        market, fresh_only(newest("elo"), DAILY_FRESH_DAYS), results, us25,
-        fit_home_edge(results, newest("matches")))
-    second = table("lineups", SECOND_SOURCE)
-    outs = outcomes(table("lineups", LINEUP_SOURCE) + second, table("starters"),
+        market, current("elo"), results, us25,
+        fit_home_edge(results, current("matches")))
+    second = history("lineups", SECOND_SOURCE)
+    outs = outcomes(history("lineups", LINEUP_SOURCE) + second, current("starters"),
                     clock_history().round_locks, jornada_of_match(), xw)
-    pos = {r["ff_id"]: r["position"] for r in table("market") if r.get("ff_id")}
+    pos = {r["ff_id"]: r["position"] for r in history("market") if r.get("ff_id")}
     pts = {(r["ff_id"], int(r["jornada"])): float(r["points_delta"])
            for r in perjornada
            if r.get("games_delta") == "1" and r.get("jornada")}
     cal = calibrate(outs, line_rows(outs, pos, pts))
     return Scorer(
-        market, xi_rows, history, shrink_k=shrink_k, xw=xw, cal=cal,
+        market, xi_rows, last_season, shrink_k=shrink_k, xw=xw, cal=cal,
         second=second, ratings=ratings,
-        board=fixture_board(ratings, load_fixtures(), now),
+        board=fixture_board(ratings, current("fixtures"), now),
         current={k: dict(zip(("pts", "pj", "start_rate", "start_n"),
                              _weighted(jd, decay)))
                  for k, jd in by_key.items()},
-        evidence={"xg": xg_evidence(us25, us26, history, xw),
-                  "shots": shots_evidence(load_api_stats(), by_key, pos, xw)},
-        promoted_discount=fit_promoted_discount(market, history, perjornada))
+        evidence={"xg": xg_evidence(us25, us26, last_season, xw),
+                  "shots": shots_evidence(current("api_stats"), by_key, pos, xw)},
+        promoted_discount=fit_promoted_discount(market, last_season, perjornada))
 
 
 SHAPES = [{"POR": 1, "DEF": d, "MED": m, "DEL": f} for d, m, f in FREE_FORMATIONS]
@@ -351,7 +351,7 @@ class Scored(NamedTuple):
 class Scorer:
 
     def __init__(self, market: list[dict], xi: list[dict],
-                 history: dict | None = None, shrink_k: float = SHRINK_K,
+                 last_season: dict | None = None, shrink_k: float = SHRINK_K,
                  current: dict | None = None, board: dict | None = None,
                  cal=None, second=None, evidence: dict | None = None,
                  promoted_discount: float = PROMOTED_DISCOUNT, xw=None,
@@ -359,7 +359,7 @@ class Scorer:
         from ffcore.tidy import load_crosswalk
 
         self.market = market
-        self.history = history or {}
+        self.last_season = last_season or {}
         self.shrink_k = shrink_k
         self.promoted_discount = promoted_discount
         self.current = current or {}
@@ -391,16 +391,16 @@ class Scorer:
             if r.get("status") and r["status"] != "ok":
                 self.status[key] = r["status"]
 
-        self.promoted = detect_promoted(self.market, self.history)
+        self.promoted = detect_promoted(self.market, self.last_season)
         self.priors, self.global_prior = position_priors(self.market,
-                                                          self.history)
+                                                          self.last_season)
 
     def rate(self, rec: dict) -> Rating:
         key = row_key(rec)
         prior = self.priors.get(SLOT.get((rec.get("position") or "").lower(), ""),
                                 self.global_prior)
         k = self.shrink_k
-        h = self.history.get(key)
+        h = self.last_season.get(key)
         prior_pj = float(h["pj"]) if h and h["pj"] > 0 else 0.0
         if prior_pj:
             base = (h["pts"] + k * prior) / (prior_pj + k)

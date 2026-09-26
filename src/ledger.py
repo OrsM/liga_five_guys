@@ -5,15 +5,17 @@ import sys
 
 
 from ffcore.league import ledger_from_api
-from ffcore.tidy import (LEDGER, csv_string, load_api, load_api_activity,
-                         load_api_players, read_csv)
+from ffcore.tidy import (current, LEDGER, csv_string, read_csv)
 
 FIELDS = ["date", "player", "player_id", "from", "to", "price", "note"]
 
 def build() -> list[dict]:
-    users = {r["user_id"]: r["manager"] for r in load_api("standings")
+    users = {r["user_id"]: r["manager"] for r in current("api_standings")
             if r.get("user_id") and r.get("manager")}
-    return ledger_from_api(load_api_activity(), users, load_api_players())
+    return ledger_from_api(current("api_activity"), users,
+                           {r["player_id"]: r["player_name"]
+                            for r in current("api_players_all")
+                            if r.get("player_id") and r.get("player_name")})
 
 
 def existing(path=LEDGER) -> list[dict]:

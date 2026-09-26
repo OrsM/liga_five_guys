@@ -26,7 +26,7 @@ __all__ = ["BASE", "SOURCE", "MARKET_URL", "POINTS_URL", "TEAM_URL", "TEAMS",
            "API_MARKET_URL", "API_ACTIVITY_URL", "API_TEAMS_URL",
            "ACT_KIND", "ACT_JOINED", "ACT_BUY", "ACT_SELL", "ACT_BONUS",
            "ACT_CLAUSE",
-           "ACT_BONUS_ZERO", "STORE_ONCE",
+           "ACT_BONUS_ZERO",
            "ROW_TABLE",
            "parse_api_leagues", "parse_api_market", "parse_api_activity",
            "parse_api_teams", "league_sources",
@@ -777,16 +777,6 @@ API_TEAMS_URL = "{base}/v1/competition/1/leagues/{league}/teams?x-lang=es"
 API_LINEUP_URL = ("{base}/v1/competition/1/teams/{team}"
                   "/lineup/week/{week}?x-lang=es")
 LINEUP_WEEK = 38
-
-STORE_ONCE = {"api_activity": ("activity_id",),
-              "starters": ("match_id", "team_slug", "player_slug"),
-              "api_stats": ("player_id", "week", "stat", "value", "points"),
-              "results_history": ("season", "date", "home_name", "away_name",
-                                  "home_goals", "away_goals")}
-
-STORE_DAILY = {"market": ("ff_id",),
-              "lineups": ("source", "team_slug", "player_slug"),
-              "understat_players": ("source", "season", "understat_id")}
 
 ROW_TABLE = "table"
 

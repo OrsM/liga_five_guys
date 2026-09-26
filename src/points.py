@@ -5,7 +5,7 @@ import sys
 
 
 from ffcore.text import norm
-from ffcore.tidy import SEASON, write_csv, table
+from ffcore.tidy import (history, SEASON, write_csv)
 
 LIVE = SEASON / "live"
 
@@ -94,7 +94,7 @@ def diff(prev_rows: list[dict], cur_rows: list[dict],
 
 def load_snapshots() -> dict[str, list[tuple[str, list[dict]]]]:
     by_label: dict[str, dict[str, list[dict]]] = {}
-    for r in table("points"):
+    for r in history("points"):
         by_label.setdefault(r["season"], {}).setdefault(
             r["observed_at"], []).append(r)
     return {label: sorted(stamps.items()) for label, stamps in by_label.items()}
@@ -106,7 +106,7 @@ def main() -> None:
         sys.exit("no points page found in any snapshot under data/raw/ — "
                  "run ingest.py fetch first")
 
-    timeline = match_jornadas(table("matches"))
+    timeline = match_jornadas(history("matches"))
 
     for label, seq in sorted(by_label.items()):
         kept = keep_changed(seq)

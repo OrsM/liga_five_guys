@@ -27,13 +27,13 @@ from ffcore.league import League
 from ffcore.score import SLOT, Scorer, build, replacement, squad_pool, vor
 from ffcore.season import (LeagueState, best_xi,
                            simulate_many)
-from ffcore.tidy import (run_now, load_api, load_fixtures, load_api_stats,
-                         load_perjornada, load_players, market_routes, pending,
-                         LINEUP_SOURCE, newest, table)
+from ffcore.tidy import (LINEUP_SOURCE, age_hours, current, load_perjornada,
+                         load_players, market_routes, pending, run_now)
 from ffcore.parse import num, text
 
 __all__ = ["Action", "Universe"]
 
+APP_FRESH_HOURS = 14.4
 SCREEN_TRIALS = 250
 FINAL_TRIALS = 3000
 KEEP = 12
@@ -404,16 +404,20 @@ def worth_doing(u, rows) -> list:
 
 @cache
 def load() -> Universe:
+    age = age_hours("api_teams")
+    if age is None or age > APP_FRESH_HOURS:
+        raise SystemExit("the app's squads are %s old; no board is built from "
+                         "them" % ("unknown" if age is None else "%.0fh" % age))
     lg = League.load()
-    sc = build(newest("market"), newest("lineups", LINEUP_SOURCE), run_now(),
+    sc = build(current("market"), current("lineups", LINEUP_SOURCE), run_now(),
                shrink_k=lg.cfg.shrink_k)
     me, now = lg.cfg.me, run_now()
     players = load_players()
-    m = newest("matches")
-    rem, played = rounds_left(m, load_fixtures())
+    m = current("matches")
+    rem, played = rounds_left(m, current("fixtures"))
 
     teams, mkt = ([dict(r, key=lg.xw.player(app_id=text(r, "player_id")))
-                   for r in load_api(name)] for name in ("teams", "market"))
+                   for r in current(name)] for name in ("api_teams", "api_market"))
     price, route, bids = market_routes(mkt)
     clause, clause_until, pt_to_key = {}, {}, {}
     for r in teams:
@@ -434,12 +438,12 @@ def load() -> Universe:
     value = {k: rec["value"] for k, rec in players.items() if rec.get("value")}
     received_offers = pending(
         [dict(r, key=pt_to_key.get(r.get("player_team_id") or ""))
-         for r in load_api("offers")], "status", "money")
+         for r in current("api_offers")], "status", "money")
     proceeds = {k: max(value.get(k, 0.0), received_offers.get(k, 0.0))
                 for k in lg.squad(me)}
     profiles = build_profiles(
         players, sc, load_perjornada(), xw=lg.xw,
-        match_stats_rows=load_api_stats(), match_rows=m,
+        match_stats_rows=current("api_stats"), match_rows=m,
         market_keyed={k: {"listed": k in price, "price": price.get(k),
                           "owner": lg.owner.get(k), "value": value.get(k),
                           "clause": clause.get(k),
@@ -475,7 +479,7 @@ def load() -> Universe:
     pool = pool_from_perjornada(load_perjornada())
     history = grading.graded_history()
     fc = Bootstrap(per_j, pool=pool, matches=matches, club_of=club,
-                   club_rel=club_volatility(table("results_history"),
+                   club_rel=club_volatility(current("results_history"),
                                             set(club.values())),
                    drift_frac=grading.drift_frac_from_history(history),
                    rate_floor=grading.fit_rate_rel_floor(pool, history))

@@ -12,11 +12,10 @@ from typing import NamedTuple
 
 from ffcore.parse import text
 from ffcore.parse import money
-from ffcore.tidy import shown
+from ffcore.tidy import (current, history, shown)
 from ffcore.text import norm
 from ffcore.tidy import (load_crosswalk, run_now, Market, input_path,
-                         ledger_stamp, load_api, load_api_activity, newest,
-                         read_ledger, snapshot_stamp, table)
+                         ledger_stamp, read_ledger, snapshot_stamp)
 
 __all__ = ["MARKET", "Config", "load_config", "read_api_balances",
            "app_fielded", "flat_income", "bonus_income", "allowance",
@@ -118,7 +117,7 @@ def allowance(since, now, daily_bonus: float) -> tuple[float, float]:
 def app_fielded(squad, names: dict, rows=None, xw=None) -> list[str]:
     from ffcore.crosswalk import Crosswalk
 
-    rows = load_api("lineup") if rows is None else rows
+    rows = current("api_lineup") if rows is None else rows
     xw = xw or load_crosswalk() or Crosswalk()
     squad = set(squad)
     by_name = {norm(names.get(k, k)): k for k in squad}
@@ -289,10 +288,10 @@ class League:
     @classmethod
     def load(cls, with_market: bool = True) -> "League":
         return cls(load_config(), read_ledger(),
-                   Market(table("market")) if with_market else None,
-                   load_crosswalk(), api_teams=newest("api_teams"),
-                   standings=newest("api_standings"),
-                   roster_history=table("api_teams"))
+                   Market(history("market")) if with_market else None,
+                   load_crosswalk(), api_teams=current("api_teams"),
+                   standings=current("api_standings"),
+                   roster_history=history("api_teams"))
 
     def __getitem__(self, handle: str) -> Manager:
         return self.managers[handle]
@@ -320,7 +319,7 @@ class League:
         users = {r.get("user_id"): r.get("manager")
                  for r in self.standings
                  if r.get("user_id") and r.get("manager")}
-        own_bonus = bonus_income(load_api_activity(), users)
+        own_bonus = bonus_income(current("api_activity"), users)
 
         click_rate, my_clicks, my_days = 0.0, 0, 0.0
         me_txns = [t for t in self.txns

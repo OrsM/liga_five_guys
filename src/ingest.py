@@ -19,10 +19,10 @@ from urllib.parse import urlparse
 
 from ffcore.auth import API_BASE
 from ffcore.league import load_config
-from ffcore.tidy import (ROOT, SEASON, TIDY, append_csv, csv_string, read_csv,
+from ffcore.tidy import (TABLES, Table, ROOT, SEASON, TIDY, append_csv, csv_string, read_csv,
                          table_stats, widen_csv, write_csv)
 from sources import (API_LEAGUES_KEY, CAL_KEY, MATCH_KEY_RE,
-                     ROW_TABLE, STORE_DAILY, STORE_ONCE, league_sources,
+                     ROW_TABLE, league_sources,
                      offer_sources, parse_api_leagues, parse_points,
                      played_sources,
                      season_label, source_for, sources)
@@ -325,8 +325,8 @@ def fetch() -> Path:
 def parse() -> None:
     import sources
 
-    version = hashlib.blake2b(Path(sources.__file__).read_bytes(),
-                              digest_size=8).hexdigest()
+    version = hashlib.blake2b(Path(sources.__file__).read_bytes()
+                              + repr(TABLES).encode(), digest_size=8).hexdigest()
     walk = doc_keys()
     state = _read_json(TIDY / _STATE, {})
     done = set(state.get("stamps") or ())
@@ -370,8 +370,8 @@ def parse() -> None:
                 if src is not None:
                     route(pending, cache.get(ck, []), src.table, stamp)
         for table, rows in pending.items():
-            _store(TIDY / f"{table}.csv", rows, STORE_ONCE.get(table),
-                   STORE_DAILY.get(table))
+            _store(TIDY / f"{table}.csv", rows,
+                   TABLES.get(table, Table(True)))
             rows_out += len(rows)
         tables |= set(pending)
         done |= {stamp for stamp, _docs in chunk}
@@ -452,27 +452,30 @@ def route(tables: dict, rows: list[dict], default: str, stamp: str) -> None:
         tables.setdefault(table, []).append(d)
 
 
-def _store(path: Path, rows: list[dict], once=None, daily=None) -> None:
+def _content(r: dict) -> tuple:
+    return tuple(sorted((k, str(v)) for k, v in r.items()
+                        if k != "observed_at" and v not in ("", None)))
+
+
+def _store(path: Path, rows: list[dict], spec: Table) -> None:
     fields = list(dict.fromkeys(f for r in rows for f in r))
     widen_csv(path, fields)
-    if daily:
+    if spec.store == "daily":
         by_day: dict = {}
         for r in list(read_csv(path)) + rows:
-            k = tuple((r.get(c) or "") for c in daily)
+            k = tuple((r.get(c) or "") for c in spec.key)
             by_day[(k, (r.get("observed_at") or "")[:10]) if all(k)
                    else len(by_day)] = r
         write_csv(path, list(by_day.values()),
                   list(dict.fromkeys(f for r in by_day.values() for f in r)))
         return
-    if once:
-        seen = {tuple((r.get(c) or "") for c in once) for r in read_csv(path)}
+    if spec.store == "once":
+        seen = {_content(r) for r in read_csv(path)}
         fresh = []
         for r in rows:
-            k = tuple((r.get(c) or "") for c in once)
-            if all(k) and k in seen:
-                continue
-            seen.add(k)
-            fresh.append(r)
+            if _content(r) not in seen:
+                seen.add(_content(r))
+                fresh.append(r)
         rows = fresh
     append_csv(path, rows, fields)
 
@@ -581,40 +584,34 @@ def _selftest() -> None:
     assert _manifest({MANIFEST: csv_string(rows, MANIFEST_FIELDS)}) == rows
 
 
-    assert set(STORE_ONCE) == {"api_activity", "starters",
-                              "api_stats", "results_history"}, STORE_ONCE
-    assert set(STORE_DAILY) == {"market", "lineups",
-                                "understat_players"}, STORE_DAILY
-    assert not set(STORE_ONCE) & set(STORE_DAILY)
-
     line = {"player_id": "1337", "week": "1", "stat": "goals",
             "value": "1", "points": "4", "observed_at": "t1"}
     m1 = {"observed_at": "2026-09-20T0900Z", "ff_id": "1", "value": "10"}
     m3 = dict(m1, observed_at="2026-09-20T1800Z", value="11")
     m4 = dict(m1, observed_at="2026-09-21T0900Z", value="11")
     blank = dict(m1, ff_id="")
-    cases = [  # (batches stored in turn, once, daily, resulting file)
+    cases = [
         ([[{"a": "1", "b": "x"}], [{"a": "2", "b": "y"}], [{"a": "3"}]],
-         None, None, "a,b\n1,x\n2,y\n3,\n"),
-        ([[{"a": "1"}], [{"a": "2", "c": "new"}]], None, None,
+         Table(True), "a,b\n1,x\n2,y\n3,\n"),
+        ([[{"a": "1"}], [{"a": "2", "c": "new"}]], Table(True),
          "a,c\n1,\n2,new\n"),
         ([[line], [dict(line, observed_at="t2"),
                    dict(line, points="6", observed_at="t3")],
-          [dict(line, observed_at="t4")]], STORE_ONCE["api_stats"], None,
+          [dict(line, observed_at="t4")]], TABLES["api_stats"],
          "player_id,week,stat,value,points,observed_at\n"
          "1337,1,goals,1,4,t1\n1337,1,goals,1,6,t3\n"),
-        ([[m1], [m3], [m4]], None, ("ff_id",),
+        ([[m1], [m3], [m4]], TABLES["market"],
          "observed_at,ff_id,value\n"
          "2026-09-20T1800Z,1,11\n2026-09-21T0900Z,1,11\n"),
-        ([[blank, dict(blank)]], None, ("ff_id",),
+        ([[blank, dict(blank)]], TABLES["market"],
          "observed_at,ff_id,value\n2026-09-20T0900Z,,10\n"
          "2026-09-20T0900Z,,10\n"),
     ]
-    for batches, once, daily, want in cases:
+    for batches, spec, want in cases:
         with tempfile.TemporaryDirectory() as tmp:
             f = Path(tmp) / "t.csv"
             for rows in batches:
-                _store(f, rows, once, daily)
+                _store(f, rows, spec)
             got = f.read_text(encoding="utf-8")
             assert got == want, (batches, got)
 

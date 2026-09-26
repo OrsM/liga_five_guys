@@ -341,14 +341,14 @@ def recently(path, now) -> set[tuple[str, str]]:
 
 
 def run(u, moves: list[dict], sell_cost: dict[str, float]) -> dict | None:
-    from ffcore.tidy import DECISIONS, MADRID, Market, run_now, table
+    from ffcore.tidy import (current, history, DECISIONS, MADRID, Market, run_now)
 
-    rows = table("market")
+    rows = history("market")
     by_player = steps(rows)
-    offer_r = offer_ratios(table("api_offers"), table("api_teams"), u.lg.xw,
+    offer_r = offer_ratios(history("api_offers"), history("api_teams"), u.lg.xw,
                            Market(rows))
-    paid_r = auction_ratios(table("api_market"),
-                            [a for a in table("api_activity")
+    paid_r = auction_ratios(history("api_market"),
+                            [a for a in current("api_activity")
                              if a["kind"] == "buy"])
     if not offer_r or not paid_r or not by_player:
         print("flip: not enough history to measure the cost of trading yet")

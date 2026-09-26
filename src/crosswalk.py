@@ -8,7 +8,7 @@ from ffcore.parse import text
 from ffcore.crosswalk import Crosswalk, Player
 from ffcore.parse import money
 from ffcore.text import norm, tokens
-from ffcore.tidy import TIDY, newest, row_key, table
+from ffcore.tidy import (current, history, TIDY, row_key)
 
 PLAYERS = "players.csv"
 
@@ -119,14 +119,14 @@ def build_understat_ids(rows, players: dict) -> int:
 
 
 def main() -> None:
-    market = newest("market")
-    lineups = table("lineups") + table("starters")
+    market = current("market")
+    lineups = history("lineups") + current("starters")
     registry = Crosswalk.read(TIDY / PLAYERS)
     players = build_players(
         registry.players, market, lineups,
-        newest("api_teams") + newest("api_market")
-        + newest("api_players_all"))
-    understat_matched = build_understat_ids(table("understat_players"),
+        current("api_teams") + current("api_market")
+        + current("api_players_all"))
+    understat_matched = build_understat_ids(current("understat_players"),
                                             players)
     xw = Crosswalk(players)
     xw.write(TIDY / PLAYERS)
