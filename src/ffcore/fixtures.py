@@ -94,6 +94,18 @@ def players_from_flat(pos=None, price=None, proceeds=None, owner=None,
     return out
 
 
+def _with_overrides(name: str, defaults: dict, overrides: dict) -> dict:
+    """`defaults` merged with `overrides`, raising if an override name
+    isn't a known default -- the keyword-validation skeleton tiny_state()
+    and tiny_bootstrap() each wrote out separately."""
+    for k in overrides:
+        if k not in defaults:
+            raise TypeError(f"{name}: unknown override {k!r}")
+    defaults = dict(defaults)
+    defaults.update(overrides)
+    return defaults
+
+
 def tiny_state(**overrides) -> "LeagueState":
     from ffcore.season import LeagueState
 
@@ -103,11 +115,7 @@ def tiny_state(**overrides) -> "LeagueState":
         me="me",
         carried={},
     )
-    for k in overrides:
-        if k not in defaults:
-            raise TypeError(f"tiny_state: unknown override {k!r}")
-    defaults.update(overrides)
-    return LeagueState(**defaults)
+    return LeagueState(**_with_overrides("tiny_state", defaults, overrides))
 
 
 def tiny_bootstrap(**overrides) -> "Bootstrap":
@@ -123,11 +131,7 @@ def tiny_bootstrap(**overrides) -> "Bootstrap":
         club_of=None,
         club_rel=None,
     )
-    for k in overrides:
-        if k not in defaults:
-            raise TypeError(f"tiny_bootstrap: unknown override {k!r}")
-    defaults.update(overrides)
-    return Bootstrap(**defaults)
+    return Bootstrap(**_with_overrides("tiny_bootstrap", defaults, overrides))
 
 
 def tiny_universe(**overrides) -> "Universe":
