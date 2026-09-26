@@ -204,6 +204,20 @@ def xg_club_attack(understat_rows, xw) -> dict[str, float]:
     return out
 
 
+def _match_goals(results: list[dict]):
+    """(home, away, home_goals, away_goals) for every parseable results row
+    -- attack_defense() and club_volatility() each walked `results` and
+    extracted this separately before diverging into different per-team
+    accumulations."""
+    for r in results:
+        home, away = (r.get("home") or "").strip(), (r.get("away") or "").strip()
+        try:
+            hg, ag = float(r["home_goals"]), float(r["away_goals"])
+        except (TypeError, ValueError, KeyError):
+            continue
+        yield home, away, hg, ag
+
+
 def attack_defense(results: list[dict], teams,
                    xg_attack: dict[str, float] | None = None,
                    xg_pseudo: float = XG_CLUB_PSEUDO_MATCHES
@@ -212,12 +226,7 @@ def attack_defense(results: list[dict], teams,
     conceded: dict[str, float] = {}
     played: dict[str, int] = {}
     total_goals, total_matches = 0.0, 0
-    for r in results:
-        home, away = (r.get("home") or "").strip(), (r.get("away") or "").strip()
-        try:
-            hg, ag = float(r["home_goals"]), float(r["away_goals"])
-        except (TypeError, ValueError, KeyError):
-            continue
+    for home, away, hg, ag in _match_goals(results):
         if home:
             scored[home] = scored.get(home, 0.0) + hg
             conceded[home] = conceded.get(home, 0.0) + ag
@@ -248,12 +257,7 @@ def attack_defense(results: list[dict], teams,
 
 def club_volatility(results: list[dict], teams) -> dict[str, float]:
     involvement: dict[str, list[float]] = {}
-    for r in results:
-        home, away = (r.get("home") or "").strip(), (r.get("away") or "").strip()
-        try:
-            hg, ag = float(r["home_goals"]), float(r["away_goals"])
-        except (TypeError, ValueError, KeyError):
-            continue
+    for home, away, hg, ag in _match_goals(results):
         if home:
             involvement.setdefault(home, []).append(hg + ag)
         if away:
