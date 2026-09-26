@@ -431,9 +431,11 @@ def load(trials_pool=None) -> Universe:
                         if k.startswith("__phantom_")}
         for k in phantom_keys:
             first_jornada_of.setdefault(k, rem[0])
-    _forecast.DRIFT_FRAC, _drift_why = _methodology.drift_frac_from_history()
+    _history = _methodology._graded_history()
+    _forecast.DRIFT_FRAC, _drift_why = \
+        _methodology.drift_frac_from_history(history=_history)
     _forecast.RATE_REL_FLOOR, _rate_floor_why = \
-        _methodology.fit_rate_rel_floor(pool)
+        _methodology.fit_rate_rel_floor(pool, history=_history)
     fc = Bootstrap(per_j, pool=pool, matches=matches,
                   club_of=club_of_slug, club_rel=club_rel)
 

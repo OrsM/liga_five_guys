@@ -161,7 +161,22 @@ def lagged_pair(actuals: list[dict],
     return out
 
 
-def fit_rate_rel_floor(pool, min_pairs: int = 30) -> tuple[float, str]:
+def _graded_history() -> tuple[dict, list[dict], dict]:
+    """(round_locks, actuals, predictions) -- the real-data load
+    fit_rate_rel_floor() and drift_frac_from_history() each open with,
+    before diverging into different lagged_pair() calls. Shared because
+    it is the same three loads, not because the fits are the same job;
+    decide.py's load() calls both fitters back to back on the same run,
+    so factoring this out also removes a real redundant pair of reads
+    (load_actuals()/load_predictions() no longer run twice)."""
+    locks = clock_history().round_locks
+    actuals, _label = load_actuals()
+    preds = load_predictions()
+    return locks, actuals, preds
+
+
+def fit_rate_rel_floor(pool, min_pairs: int = 30,
+                       history: tuple | None = None) -> tuple[float, str]:
     import statistics as _stats
 
     from ffcore.forecast import RATE_REL_FLOOR as _default
@@ -176,9 +191,7 @@ def fit_rate_rel_floor(pool, min_pairs: int = 30) -> tuple[float, str]:
         return _default, "pool mean measured as 0 — can't normalise"
     cv = _stats.pstdev(real) / mean
 
-    locks = clock_history().round_locks
-    actuals, _label = load_actuals()
-    preds = load_predictions()
+    locks, actuals, preds = history if history is not None else _graded_history()
 
     graded = lagged_pair(actuals, preds, locks, 0, predicted_fn=_conditional)
     rels = []
@@ -206,12 +219,11 @@ def fit_rate_rel_floor(pool, min_pairs: int = 30) -> tuple[float, str]:
                            len(rels), cv))
 
 
-def drift_frac_from_history(lag1: int = 1, lag3: int = 3) -> tuple[float, str]:
+def drift_frac_from_history(lag1: int = 1, lag3: int = 3,
+                            history: tuple | None = None) -> tuple[float, str]:
     from ffcore.forecast import fit_drift_frac
 
-    locks = clock_history().round_locks
-    actuals, _label = load_actuals()
-    preds = load_predictions()
+    locks, actuals, preds = history if history is not None else _graded_history()
 
     # CONDITIONAL, matching fit_rate_rel_floor() above. Bootstrap's own
     # prediction is UNCONDITIONAL -- pts * p_start -- while load_actuals()
