@@ -256,30 +256,33 @@ FIX_BUCKETS = [(-1e9, 1.0 - FIX_EDGE, "harder"),
                (1.0 + FIX_EDGE, 1e9, "easier")]
 
 
-def fixture_rows(pairs: list[dict]) -> tuple[list[tuple], int]:
-    known = [p for p in pairs if p.get("fix") is not None]
+def _bucket_means(rows: list[dict], buckets, bucket_field: str,
+                  mean_fields: tuple) -> list[tuple]:
+    """(label, n, *means) per non-empty bucket -- `rows` grouped by
+    bucket_field into `buckets` ranges, each of mean_fields averaged as
+    p[f]/p["matches"] over the group. fixture_rows() and bucket_rows()
+    each built this bucketing loop separately."""
     out = []
-    for lo, hi, label in FIX_BUCKETS:
-        grp = [p for p in known if lo <= p["fix"] < hi]
+    for lo, hi, label in buckets:
+        grp = [p for p in rows if lo <= p[bucket_field] < hi]
         if not grp:
             continue
         n = len(grp)
-        per = lambda f: sum(p[f] / p["matches"] for p in grp) / n  # noqa: E731
-        out.append((label, n, per("predicted"), per("actual"), per("err")))
+        means = tuple(sum(p[f] / p["matches"] for p in grp) / n
+                     for f in mean_fields)
+        out.append((label, n, *means))
+    return out
+
+
+def fixture_rows(pairs: list[dict]) -> tuple[list[tuple], int]:
+    known = [p for p in pairs if p.get("fix") is not None]
+    out = _bucket_means(known, FIX_BUCKETS, "fix",
+                        ("predicted", "actual", "err"))
     return out, len(pairs) - len(known)
 
 
 def bucket_rows(pairs: list[dict]) -> list[tuple[str, int, float, float]]:
-    out = []
-    for lo, hi, label in BUCKETS:
-        grp = [p for p in pairs if lo <= p["per_match"] < hi]
-        if not grp:
-            continue
-        n = len(grp)
-        mp = sum(p["predicted"] / p["matches"] for p in grp) / n
-        ma = sum(p["actual"] / p["matches"] for p in grp) / n
-        out.append((label, n, mp, ma))
-    return out
+    return _bucket_means(pairs, BUCKETS, "per_match", ("predicted", "actual"))
 
 
 
