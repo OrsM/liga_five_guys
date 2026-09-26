@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 
 from ffcore.parse import money
 from ffcore.text import norm
-from ffcore.tidy import price_agrees
+from ffcore.tidy import price_agrees, write_csv
 
 __all__ = ["Player", "Club", "Crosswalk", "PLAYER_COLS", "CLUB_COLS",
           "club_key"]
@@ -246,12 +246,10 @@ class Crosswalk:
         return cls(players, clubs)
 
     def write(self, players_path, clubs_path) -> None:
-        _write(players_path, PLAYER_COLS,
-               [p.row() for p in sorted(self.players.values(),
-                                        key=lambda p: p.player_id)])
-        _write(clubs_path, CLUB_COLS,
-               [c.row() for c in sorted(self.clubs.values(),
-                                        key=lambda c: c.club_id)])
+        write_csv(players_path, [p.row() for p in sorted(
+            self.players.values(), key=lambda p: p.player_id)], PLAYER_COLS)
+        write_csv(clubs_path, [c.row() for c in sorted(
+            self.clubs.values(), key=lambda c: c.club_id)], CLUB_COLS)
 
     def merge(self, other: "Crosswalk") -> "Crosswalk":
         for pid, p in other.players.items():
@@ -339,13 +337,6 @@ def _rows(path) -> list[dict]:
         return []
     with open(path, newline="", encoding="utf-8") as fh:
         return list(csv.DictReader(fh))
-
-
-def _write(path, cols, rows) -> None:
-    with open(path, "w", newline="", encoding="utf-8") as fh:
-        w = csv.DictWriter(fh, fieldnames=cols)
-        w.writeheader()
-        w.writerows(rows)
 
 
 def _selftest() -> None:

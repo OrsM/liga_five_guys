@@ -57,7 +57,7 @@ from urllib.parse import urlparse
 
 from ffcore.auth import API_BASE
 from ffcore.league import load_config
-from ffcore.tidy import ROOT, SEASON, TIDY, append_csv
+from ffcore.tidy import ROOT, SEASON, TIDY, append_csv, csv_string
 from sources import (API_LEAGUES_KEY, CAL_KEY, MATCH_KEY_RE,
                      ROW_TABLE, STORE_DAILY, STORE_ONCE, league_sources,
                      offer_sources, parse_api_leagues, parse_points,
@@ -147,11 +147,7 @@ def _manifest(members: dict[str, str]) -> list[dict]:
 
 
 def _manifest_csv(rows: list[dict]) -> str:
-    buf = io.StringIO()
-    w = csv.DictWriter(buf, fieldnames=MANIFEST_FIELDS, lineterminator="\n")
-    w.writeheader()
-    w.writerows(rows)
-    return buf.getvalue()
+    return csv_string(rows, MANIFEST_FIELDS)
 
 
 def state() -> dict[str, dict]:

@@ -2,12 +2,11 @@
 from __future__ import annotations
 
 import csv
-import io
 import sys
 
 
 from ffcore.league import ledger_from_api
-from ffcore.tidy import (LEDGER, load_api, load_api_activity,
+from ffcore.tidy import (LEDGER, csv_string, load_api, load_api_activity,
                          load_api_players)
 
 FIELDS = ["date", "player", "player_id", "from", "to", "price", "note"]
@@ -29,12 +28,7 @@ def build() -> list[dict]:
 
 
 def render(rows: list[dict]) -> str:
-    buf = io.StringIO()
-    buf.write(HEADER)
-    w = csv.DictWriter(buf, fieldnames=FIELDS, lineterminator="\n")
-    w.writeheader()
-    w.writerows(rows)
-    return buf.getvalue()
+    return HEADER + csv_string(rows, FIELDS)
 
 
 def existing(path=LEDGER) -> list[dict]:

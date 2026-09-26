@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import csv
+import io
 import os
 import re
 import sys
@@ -18,6 +19,7 @@ from ffcore.text import index_by, norm, resolve
 __all__ = ["ROOT", "TIDY", "SEASON", "DECISIONS", "REPORTS", "PARTS", "MADRID",
            "WARNINGS",
            "input_path", "read_csv", "write_csv", "append_csv", "widen_csv", "log_row",
+           "csv_string",
            "write_lines", "snapshot_stamp", "ledger_stamp", "latest_only",
            "latest_per_key", "snapshots",
            "Market", "Valuation", "VALUE_TOLERANCE", "price_agrees",
@@ -126,6 +128,18 @@ def _csv_dictwriter(path, fieldnames, mode, **writer_kw):
     with path.open(mode, newline="", encoding="utf-8") as fh:
         yield csv.DictWriter(fh, fieldnames=fieldnames, extrasaction="ignore",
                              lineterminator="\n", **writer_kw)
+
+
+def csv_string(rows, fieldnames) -> str:
+    """rows as CSV text, header included -- ledger.render() and
+    ingest._manifest_csv() each built this (StringIO, DictWriter,
+    writeheader, writerows, getvalue) separately, for embedding the
+    result rather than persisting it to a path."""
+    buf = io.StringIO()
+    w = csv.DictWriter(buf, fieldnames=fieldnames, lineterminator="\n")
+    w.writeheader()
+    w.writerows(rows)
+    return buf.getvalue()
 
 
 def write_csv(path, rows, fieldnames=None) -> None:
