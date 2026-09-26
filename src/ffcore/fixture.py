@@ -65,50 +65,6 @@ class Match(NamedTuple):
     cs_against: float | None = None
 
 
-def _poisson(k: int, lam: float) -> float:
-    return math.exp(-lam) * lam ** k / math.factorial(k)
-
-
-def clean_sheet_from_odds(p_home, p_draw, p_away, p_over, line=2.5):
-    try:
-        ph, pd_, pa = float(p_home), float(p_draw), float(p_away)
-        po, ln = float(p_over), float(line)
-    except (TypeError, ValueError):
-        return None, None
-    if not (0 < ph < 1 and 0 < po < 1):
-        return None, None
-
-    def err(lh, la):
-        eh = ed = eo = 0.0
-        for h in range(9):
-            for a in range(9):
-                pr = _poisson(h, lh) * _poisson(a, la)
-                if h > a:
-                    eh += pr
-                elif h == a:
-                    ed += pr
-                if h + a > ln:
-                    eo += pr
-        return (eh - ph) ** 2 + (ed - pd_) ** 2 + (eo - po) ** 2
-
-    best = (None, 1.0, 1.0)
-    for i in range(1, 41):
-        for j in range(1, 41):
-            lh, la = i * 0.1, j * 0.1
-            e = err(lh, la)
-            if best[0] is None or e < best[0]:
-                best = (e, lh, la)
-    _e, bh, ba = best
-    for i in range(-9, 10):
-        for j in range(-9, 10):
-            lh, la = max(0.01, bh + i * 0.01), max(0.01, ba + j * 0.01)
-            e = err(lh, la)
-            if e < best[0]:
-                best = (e, lh, la)
-    _e, lh, la = best
-    return math.exp(-la), math.exp(-lh)
-
-
 def elo_strength(clubs, elo_rows) -> dict[str, float] | None:
     have = {}
     for r in elo_rows:
@@ -316,19 +272,6 @@ def season_board(market: list[dict], matches: list[dict], jornadas,
 
 
 def _selftest() -> None:
-    even = clean_sheet_from_odds(0.36, 0.28, 0.36, 0.40)
-    assert even[0] is not None and abs(even[0] - even[1]) < 0.02, even
-    assert 0.25 < even[0] < 0.65, even
-
-    lop = clean_sheet_from_odds(0.81, 0.15, 0.04, 0.44)
-    assert lop[0] > lop[1] + 0.3, lop
-
-    high = clean_sheet_from_odds(0.36, 0.28, 0.36, 0.75)
-    assert high[0] < even[0], (high, even)
-
-    assert clean_sheet_from_odds(0.4, 0.3, 0.3, "") == (None, None)
-    assert clean_sheet_from_odds("", "", "", "") == (None, None)
-
     mk = [{"club": "Rich", "value": "100.00M"},
           {"club": "Rich", "value": "100.00M"},
           {"club": "Mid", "value": "50.00M"},

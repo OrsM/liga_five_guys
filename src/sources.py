@@ -19,7 +19,7 @@ __all__ = ["BASE", "SOURCE", "MARKET_URL", "POINTS_URL", "TEAM_URL", "TEAMS",
            "parse_market", "parse_team", "parse_points", "parse_fitness",
            "parse_af_team", "parse_af_fixtures", "season_label",
            "FD_BASE", "FD_URL", "FD_SOURCE", "CLUB_ALIASES", "club_slug", "FD_SEASONS_BACK",
-           "fd_season_code", "fd_sources", "parse_fd_results",
+           "fd_sources", "parse_fd_results",
            "CAL_KEY", "FF_CAL_URL", "MATCH_URL", "MATCH_KEY_RE",
            "parse_calendar", "parse_starters", "match_source", "played_sources",
            "LFG_SOURCE", "API_LEAGUES_KEY", "API_LEAGUES_URL",
@@ -659,11 +659,6 @@ FD_FIELDS = ("FTHG", "FTAG", "HxG", "AxG", "HS", "AS", "HST", "AST",
             "HC", "AC")
 
 
-def fd_season_code(now: datetime) -> str:
-    y = now.year if now.month >= 7 else now.year - 1
-    return "%02d%02d" % (y % 100, (y + 1) % 100)
-
-
 def _season_start_year(now: datetime | None = None) -> int:
     now = now or datetime.now(timezone.utc)
     return now.year if now.month >= 7 else now.year - 1
@@ -723,103 +718,6 @@ def parse_fd_results(text: str, observed_at: str,
                                  "home_corners", "away_corners")):
             row[out_key] = (r.get(col) or "").strip()
         rows.append(row)
-    return rows
-
-
-ODDS_URL = ("https://api.the-odds-api.com/v4/sports/soccer_spain_la_liga"
-           "/odds/?apiKey={odds_key}&regions=eu&markets=h2h,totals"
-           "&oddsFormat=decimal")
-ODDS_SOURCE = "odds_api"
-
-
-def _median(xs: list[float]) -> float | None:
-    xs = sorted(xs)
-    n = len(xs)
-    if n == 0:
-        return None
-    mid = n // 2
-    return xs[mid] if n % 2 else (xs[mid - 1] + xs[mid]) / 2.0
-
-
-def parse_odds(text: str, observed_at: str,
-              key: str = "odds_api") -> list[dict]:
-    try:
-        events = json.loads(text) if text else []
-    except (ValueError, TypeError):
-        return []
-    rows = []
-    for ev in events:
-        home_name = (ev.get("home_team") or "").strip()
-        away_name = (ev.get("away_team") or "").strip()
-        if not home_name or not away_name:
-            continue
-        prices: dict[str, list[float]] = {"home": [], "away": [], "draw": []}
-        n_books = 0
-        for bk in ev.get("bookmakers") or []:
-            h2h = next((m for m in bk.get("markets") or []
-                       if m.get("key") == "h2h"), None)
-            if h2h is None:
-                continue
-            outcomes = {o.get("name"): o.get("price")
-                       for o in h2h.get("outcomes") or []}
-            try:
-                prices["home"].append(float(outcomes[home_name]))
-                prices["away"].append(float(outcomes[away_name]))
-                prices["draw"].append(float(outcomes["Draw"]))
-            except (KeyError, TypeError, ValueError):
-                continue
-            n_books += 1
-        if n_books == 0:
-            continue
-        med = {k: _median(v) for k, v in prices.items()}
-        implied = {k: (1.0 / p if p else 0.0) for k, p in med.items()}
-        total = sum(implied.values())
-        if total <= 0:
-            continue
-        line_prices: dict[float, dict[str, list[float]]] = {}
-        for bk in ev.get("bookmakers") or []:
-            tot = next((m for m in bk.get("markets") or []
-                       if m.get("key") == "totals"), None)
-            if tot is None:
-                continue
-            for o in tot.get("outcomes") or []:
-                try:
-                    pt = float(o.get("point"))
-                    pr = float(o.get("price"))
-                except (TypeError, ValueError):
-                    continue
-                side = (o.get("name") or "").strip().lower()
-                if side not in ("over", "under"):
-                    continue
-                line_prices.setdefault(pt, {"over": [], "under": []})[side].append(pr)
-        total_line = p_over = p_under = ""
-        if line_prices:
-            modal = max(line_prices,
-                       key=lambda pt: len(line_prices[pt]["over"])
-                       + len(line_prices[pt]["under"]))
-            mo = _median(line_prices[modal]["over"])
-            mu = _median(line_prices[modal]["under"])
-            if mo and mu:
-                io, iu = 1.0 / mo, 1.0 / mu
-                tot_imp = io + iu
-                if tot_imp > 0:
-                    total_line = modal
-                    p_over = io / tot_imp
-                    p_under = iu / tot_imp
-
-        rows.append({
-            "observed_at": observed_at, "source": ODDS_SOURCE,
-            "kickoff": (ev.get("commence_time") or "").strip(),
-            "home_name": home_name, "away_name": away_name,
-            "home": club_slug(home_name), "away": club_slug(away_name),
-            "n_bookmakers": n_books,
-            "p_home": implied["home"] / total,
-            "p_draw": implied["draw"] / total,
-            "p_away": implied["away"] / total,
-            "total_line": total_line,
-            "p_over": p_over,
-            "p_under": p_under,
-        })
     return rows
 
 
@@ -1282,8 +1180,6 @@ def sources(enabled_only: bool = True) -> list[Source]:
                    cadence="daily", timeout=8.0)]
     out += fd_sources()
     out += understat_sources()
-    out += [Source("odds", "odds", ODDS_URL, parse_odds,
-                   cadence="daily", timeout=15.0)]
     out += [Source(CAL_KEY, "matches", FF_CAL_URL, parse_calendar, cadence="daily")]
     out += [Source(API_LEAGUES_KEY, "api_leagues", API_LEAGUES_URL,
                    parse_api_leagues, auth=True)]
@@ -1804,10 +1700,6 @@ def _selftest() -> None:
                             "SP1,17/08/22,,,,\n", "t", "fd_2223") == []
 
 
-    assert fd_season_code(datetime(2026, 8, 20, tzinfo=timezone.utc)) == "2627"
-    assert fd_season_code(datetime(2027, 5, 1, tzinfo=timezone.utc)) == "2627"
-    assert fd_season_code(datetime(2026, 6, 30, tzinfo=timezone.utc)) == "2526"
-    assert fd_season_code(datetime(2026, 7, 1, tzinfo=timezone.utc)) == "2627"
 
     fs = fd_sources(datetime(2026, 8, 20, tzinfo=timezone.utc))
     assert [s.key for s in fs] == ["fd_2627", "fd_2526", "fd_2425", "fd_2324"]
@@ -1816,100 +1708,6 @@ def _selftest() -> None:
     assert all(s.table == "results_history" for s in fs)
     assert source_for("fd_2627").parse is parse_fd_results
 
-    _ODDS_LIVE = json.dumps([{
-        "id": "823ef5c97dc93ff1e8fd7dbafb90c9d5",
-        "sport_key": "soccer_spain_la_liga", "sport_title": "La Liga - Spain",
-        "commence_time": "2026-09-06T19:00:00Z",
-        "home_team": "Espanyol", "away_team": "Sevilla",
-        "bookmakers": [
-            {"key": "betsson", "title": "Betsson",
-             "last_update": "2026-09-06T19:21:00Z",
-             "markets": [{"key": "h2h", "last_update": "2026-09-06T19:21:00Z",
-                         "outcomes": [{"name": "Espanyol", "price": 2.3},
-                                     {"name": "Sevilla", "price": 3.2},
-                                     {"name": "Draw", "price": 2.78}]}]},
-            {"key": "betfair_ex_eu", "title": "Betfair",
-             "last_update": "2026-09-06T19:20:59Z",
-             "markets": [{"key": "h2h",
-                         "last_update": "2026-09-06T19:20:59Z",
-                         "outcomes": [{"name": "Espanyol", "price": 2.5},
-                                     {"name": "Sevilla", "price": 3.55},
-                                     {"name": "Draw", "price": 3.05}]}]},
-            {"key": "betclic_fr", "title": "Betclic (FR)",
-             "last_update": "2026-09-06T19:17:33Z",
-             "markets": [{"key": "h2h",
-                         "last_update": "2026-09-06T19:17:33Z",
-                         "outcomes": [{"name": "Espanyol", "price": 2.35},
-                                     {"name": "Sevilla", "price": 3.0},
-                                     {"name": "Draw", "price": 2.9}]}]},
-        ],
-    }])
-    odds = parse_odds(_ODDS_LIVE, "2026-09-06T1930Z")
-    assert len(odds) == 1, odds
-    o = odds[0]
-    assert o["home"] == "espanyol" and o["away"] == "sevilla", o
-    assert o["kickoff"] == "2026-09-06T19:00:00Z"
-    assert o["n_bookmakers"] == 3, o
-    assert abs(o["p_home"] - 0.393) < 0.005, o
-    assert abs(o["p_away"] - 0.289) < 0.005, o
-    assert abs(o["p_draw"] - 0.318) < 0.005, o
-    assert abs(o["p_home"] + o["p_away"] + o["p_draw"] - 1.0) < 1e-9, o
-
-    assert parse_odds("", "t") == []
-    assert parse_odds("not json", "t") == []
-    assert parse_odds(json.dumps([{"home_team": "Espanyol",
-                                   "away_team": "Sevilla",
-                                   "bookmakers": [{"key": "x",
-                                                   "markets": []}]}]),
-                      "t") == []
-    unresolved = parse_odds(json.dumps([{
-        "home_team": "Espanyol", "away_team": "Not A Real Club FC",
-        "bookmakers": [{"key": "x", "markets": [{"key": "h2h",
-                        "outcomes": [{"name": "Espanyol", "price": 2.0},
-                                    {"name": "Not A Real Club FC",
-                                     "price": 2.0},
-                                    {"name": "Draw", "price": 3.0}]}]}]}]),
-        "t")
-    assert len(unresolved) == 1 and unresolved[0]["away"] == "", unresolved
-
-    tot = parse_odds(json.dumps([{
-        "home_team": "Espanyol", "away_team": "Elche",
-        "bookmakers": [
-            {"key": "a", "markets": [
-                {"key": "h2h", "outcomes": [
-                    {"name": "Espanyol", "price": 2.0},
-                    {"name": "Elche", "price": 4.0},
-                    {"name": "Draw", "price": 3.5}]},
-                {"key": "totals", "outcomes": [
-                    {"name": "Over", "price": 2.0, "point": 2.5},
-                    {"name": "Under", "price": 2.0, "point": 2.5}]}]},
-            {"key": "b", "markets": [
-                {"key": "h2h", "outcomes": [
-                    {"name": "Espanyol", "price": 2.0},
-                    {"name": "Elche", "price": 4.0},
-                    {"name": "Draw", "price": 3.5}]},
-                {"key": "totals", "outcomes": [
-                    {"name": "Over", "price": 9.0, "point": 3.5},
-                    {"name": "Under", "price": 1.05, "point": 3.5}]}]},
-        ]}]), "t")
-    assert len(tot) == 1, tot
-    assert tot[0]["total_line"] == 2.5, tot[0]
-    assert abs(tot[0]["p_over"] - 0.5) < 1e-9, tot[0]
-    assert abs(tot[0]["p_under"] - 0.5) < 1e-9, tot[0]
-
-    notot = parse_odds(json.dumps([{
-        "home_team": "Espanyol", "away_team": "Elche",
-        "bookmakers": [{"key": "a", "markets": [{"key": "h2h", "outcomes": [
-            {"name": "Espanyol", "price": 2.0},
-            {"name": "Elche", "price": 4.0},
-            {"name": "Draw", "price": 3.5}]}]}]}]), "t")
-    assert len(notot) == 1 and notot[0]["p_over"] == "", notot
-    assert notot[0]["p_home"] > 0, notot
-
-
-    assert source_for("odds").parse is parse_odds
-    assert source_for("odds").table == "odds"
-    assert source_for("odds").cadence == "daily"
 
     _UNDERSTAT_PAST = ('{"success": true, "players": [{"id": "3423", '
                        '"player_name": "Kylian Mbappe-Lottin", "games": '
@@ -2208,8 +2006,8 @@ def _selftest() -> None:
     assert source_for("api_lineup_38").table == "api_lineup"
 
     reg = sources()
-    assert len(reg) == (8 + len(TEAMS) + len(AF_TEAMS) + FD_SEASONS_BACK + 1
-                        + UNDERSTAT_SEASONS_BACK + 1) == 54, len(reg)
+    assert len(reg) == (7 + len(TEAMS) + len(AF_TEAMS) + FD_SEASONS_BACK + 1
+                        + UNDERSTAT_SEASONS_BACK + 1) == 53, len(reg)
     assert set(AF_TEAMS) == set(TEAMS), set(AF_TEAMS) ^ set(TEAMS)
     assert {s.cadence for s in reg if s.key.startswith(("team_", "af_"))
             and s.key != "af_fixtures"} == {"twice_daily"}
@@ -2222,7 +2020,7 @@ def _selftest() -> None:
     assert {s.table for s in reg} == {"market", "points", "lineups",
                                       "fixtures", "elo", "matches",
                                       "api_leagues", "results_history",
-                                      "understat_players", "odds",
+                                      "understat_players",
                                       "api_players_all"}
     assert source_for("team_celta").parse is parse_team
     assert source_for("gone") is None
@@ -2232,7 +2030,7 @@ def _selftest() -> None:
                "af_fixtures": _AF_HUB_FIXTURE, "elo": _ELO_FIXTURE,
                CAL_KEY: _CAL_FIXTURE, API_LEAGUES_KEY: _API_LEAGUES_FIXTURE,
                "understat_2026": _UNDERSTAT_LIVE,
-               "understat_2025": _UNDERSTAT_PAST, "odds": _ODDS_LIVE,
+               "understat_2025": _UNDERSTAT_PAST,
                "api_players_all": _API_PLAYERS_ALL_FIXTURE}
     for i, k in enumerate(sorted(AF_TEAMS)):
         samples[f"af_{k}"] = _AF_FIXTURE if i % 2 else _AF_CONSENSO_FIXTURE

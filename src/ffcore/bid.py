@@ -13,7 +13,6 @@ from ffcore.tidy import ledger_stamp
 __all__ = ["MAX_LAG_H", "ROUND_TO", "FLOOR_EPS", "HORIZONS", "Premiums", "Advice",
            "is_round", "deals", "usable", "premiums", "low_priced_buys",
            "suggest", "gain",
-           "xi_snapshots", "demand_summary",
            ]
 
 HORIZONS = (3, 7, 14)
@@ -130,55 +129,6 @@ def gain(pool: dict, candidate: dict, base_total: float):
     trial[slot].sort(key=lambda p: p["score"], reverse=True)
     best = pick_xi(trial, force=candidate)
     return None if best is None else best[0] - base_total
-
-
-def xi_snapshots(lg, sc, by_key) -> dict[str, dict]:
-    out = {}
-    for m in lg:
-        scored, missing = sc.score_squad(m.players)
-        pool = squad_pool(scored)
-        counts = Counter(p.slot for p in scored if p.slot)
-        out[m.handle] = {
-            "pool": pool,
-            "best": pick_xi(pool) if scored else None,
-            "missing": missing,
-            "short": [sl for sl, need in SLOT_MIN.items()
-                      if counts.get(sl, 0) < need],
-        }
-    return out
-
-
-def demand_summary(cand: dict, lg, snaps: dict) -> str:
-    threats, broke = [], 0
-    for m in lg:
-        if m.handle == lg.cfg.me:
-            continue
-        snap = snaps[m.handle]
-        if snap["best"] is None:
-            if cand.get("slot") in snap["short"]:
-                threats.append((float("inf"), m.handle, "needs"))
-            continue
-        g = gain(snap["pool"], cand, snap["best"][0])
-        if g is None or g <= 0:
-            continue
-        if m.max_bid is not None and m.max_bid < (cand.get("value") or 0):
-            broke += 1
-        else:
-            threats.append((g, m.handle,
-                            "?" if m.max_bid is None else ""))
-    threats.sort(key=lambda t: -t[0])
-
-    bits = []
-    if threats:
-        g, h, mark = threats[0]
-        head = h.split()[0][:8]
-        bits.append("%s needs" % head if mark == "needs"
-                    else "%s %+.1f%s" % (head, g, mark))
-        if len(threats) > 1:
-            bits.append("+%d more" % (len(threats) - 1))
-    if broke:
-        bits.append("(%d broke)" % broke)
-    return ", ".join(bits) if bits else "none"
 
 
 def _selftest() -> None:
@@ -351,33 +301,6 @@ def _selftest() -> None:
         def __iter__(self):
             return iter(self._m)
 
-    def snap(pool=None, short=()):
-        best = pick_xi(pool) if pool else None
-        return {"best": best, "pool": pool or {},
-                "short": list(short), "missing": []}
-
-    weak_pool = {"POR": [{"slot": "POR", "score": 5.0}],
-                 "DEF": [{"slot": "DEF", "score": 3.0}] * 5,
-                 "MED": [{"slot": "MED", "score": 1.0}] * 5,
-                 "DEL": [{"slot": "DEL", "score": 2.0}] * 3}
-    strong_pool = {k: [dict(p, score=9.0) for p in v]
-                   for k, v in weak_pool.items()}
-    cand = {"slot": "MED", "score": 5.0, "value": 10e6, "name": "x"}
-
-    lg = _Lg([_M("me", None), _M("Rich Guy", 50e6), _M("Poor", 1e6),
-              _M("Mystery", None), _M("Full", 50e6)])
-    snaps = {"me": snap(weak_pool), "Rich Guy": snap(weak_pool),
-             "Poor": snap(weak_pool), "Mystery": snap(weak_pool),
-             "Full": snap(strong_pool)}
-    cell = demand_summary(cand, lg, snaps)
-    assert "Rich" in cell and "+1 more" in cell and "(1 broke)" in cell, cell
-    assert demand_summary(cand, _Lg([_M("me", None), _M("Full", 50e6)]),
-                          {"me": snap(weak_pool), "Full": snap(strong_pool)}
-                          ) == "none"
-    got = demand_summary(
-        cand, _Lg([_M("me", None), _M("Stuck", 1e6)]),
-        {"me": snap(weak_pool), "Stuck": snap(short=["MED"])})
-    assert got == "Stuck needs", got
 
     print("ffcore.bid self-test OK (127 cases)")
 

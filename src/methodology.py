@@ -453,18 +453,6 @@ def load_predictions() -> dict[str, list[tuple[dt.datetime, dict]]]:
         value_fn=_factors)
 
 
-def golden_dataset() -> dict[int, dict[str, dict]]:
-    preds = load_predictions()
-    actuals, _label = load_actuals()
-    out: dict[int, dict[str, dict]] = {}
-    for a, key, fac in _matched_actuals(actuals, preds, require_jornada=True):
-        row = dict(fac)
-        row["actual"] = a["points_delta"]
-        row["games"] = a["games_delta"]
-        out.setdefault(a["jornada"], {})[key] = row
-    return out
-
-
 FILLS = {
     "market": "price, value, position, fitness — every player in the game",
     "lineups": "probable XI percentages, both sources",
@@ -1470,19 +1458,6 @@ def _selftest() -> None:
     print(f"  golden_rows(): {len(golden)} rows, {len(checked)} fully "
          f"joined, {len(bad)} scored without a lineup row")
 
-    gd = golden_dataset()
-    total_rows = sum(len(v) for v in gd.values())
-    assert total_rows >= 30, (
-        "golden_dataset() should reach the same order of magnitude as "
-        "pair()'s own real-data join (40-60 rows this season as of "
-        "2026-09) — a much smaller number means the shared join itself "
-        "broke, not that a hypothesis's own data is thin: %d" % total_rows)
-    assert len(gd) >= 3, gd
-    sample_row = next(iter(next(iter(gd.values())).values()))
-    for field in ("score", "fix", "ppm", "flat", "home", "pos", "status",
-                 "actual", "games"):
-        assert field in sample_row, (field, sample_row)
-    print(f"  golden_dataset(): {total_rows} rows across {len(gd)} jornadas")
 
     assert baseline_check([]) is None
     perfect = [{"predicted_start_pct": 100.0, "actual_started": True}] * 5

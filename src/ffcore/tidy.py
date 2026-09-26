@@ -24,7 +24,7 @@ __all__ = ["ROOT", "TIDY", "SEASON", "DECISIONS", "REPORTS", "PARTS", "MADRID",
            "latest_per_key", "snapshots",
            "Market", "Valuation", "table", "row_key", "run_now", "load_crosswalk",
            "load_players", "read_ledger", "LEDGER", "load_deadline", "LINEUP_SOURCE",
-           "load_fixtures", "next_kickoff", "kickoff_stamp",
+           "load_fixtures", "kickoff_stamp",
            "load_understat_players",
            "MATCH_LEN", "minutes_played", "fresh_only", "DAILY_FRESH_DAYS",
            "EVERY_RUN_FRESH_DAYS", "stale_feeds",
@@ -321,9 +321,7 @@ def snapshots(rows: list[dict]) -> list[str]:
     return sorted({r.get("observed_at", "") for r in rows if r.get("observed_at")})
 
 
-
 LINEUP_SOURCE = "futbolfantasy"
-
 
 
 def _api_stats_key(r: dict):
@@ -442,13 +440,6 @@ def minutes_played(role: str, raw_minute, match_len: float = MATCH_LEN) -> float
     else:
         return 0.0
     return max(0.0, mins)
-
-
-def next_kickoff(now=None):
-    now = now or run_now()
-    ahead = [k for k in (kickoff_stamp(r.get("kickoff"))
-                         for r in load_fixtures()) if k and k > now]
-    return min(ahead) if ahead else None
 
 
 def lock_order(locks: dict[int, datetime]) -> list[int]:
@@ -681,8 +672,6 @@ def pending(rows, status_field: str, money_field: str) -> dict[str, float]:
         if k:
             out[k] = max(out.get(k, 0.0), amt)
     return out
-
-
 
 
 def _selftest_cache() -> None:

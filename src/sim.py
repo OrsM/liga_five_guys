@@ -19,9 +19,6 @@ __all__ = ["shape"]
 OUT = "sim.md"
 
 
-SHOW = 8
-
-
 def _pts(v) -> str:
     return "{:,.0f}".format(v)
 

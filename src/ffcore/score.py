@@ -10,7 +10,7 @@ from ffcore.startprob import Calibration
 from ffcore.text import norm
 from ffcore.tidy import minutes_played
 
-__all__ = ["SLOT", "SLOT_LABEL", "SLOT_MIN", "MAX_SLOT", "THIN",
+__all__ = ["SLOT", "SLOT_LABEL", "SLOT_MIN", "MAX_SLOT",
            "FREE_FORMATIONS", "formations", "SHAPES", "starters_per_slot",
            "Rating", "Scorer", "pick_xi", "squad_pool",
            "replacement", "vor",
@@ -27,7 +27,6 @@ SLOT_LABEL = {"POR": "portero", "DEF": "defensa", "MED": "mediocampista",
               "DEL": "delantero"}
 SLOT_MIN = {"POR": 1, "DEF": 3, "MED": 3, "DEL": 1}
 MAX_SLOT = {"POR": 1, "DEF": 5, "MED": 5, "DEL": 3}
-THIN = {"POR": 2, "DEF": 4, "MED": 4, "DEL": 2}
 
 FREE_FORMATIONS = [(5, 4, 1), (5, 3, 2), (4, 5, 1), (4, 4, 2), (4, 3, 3),
                    (3, 5, 2), (3, 4, 3)]

@@ -261,17 +261,6 @@ def fetch() -> Path:
     except Exception as e:                              # noqa: BLE001
         print(f"  warn: league token unusable ({e}); API sources skipped.")
 
-    odds_key = os.environ.get("ODDS_API_KEY", "").strip() or None
-    if not odds_key:
-        odds_path = Path(__file__).resolve().parent.parent / ".odds_api_key"
-        try:
-            odds_key = odds_path.read_text().strip() or None
-        except FileNotFoundError:
-            odds_key = None
-    if odds_key is None:
-        print("  note: no Odds API key (.odds_api_key or ODDS_API_KEY); "
-              "the odds source will be skipped.")
-
     with httpx.Client(headers=HEADERS, timeout=TIMEOUT,
                       follow_redirects=True) as c:
         queue = _by_host(sources())
@@ -285,11 +274,7 @@ def fetch() -> Path:
                     rows.append(dict(prev[src.key]))
                 skipped += 1
                 continue
-            if src.key == "odds" and odds_key is None:
-                skipped += 1
-                continue
-            url = src.url.format(date=stamp[:10], base=API_BASE,
-                                 odds_key=odds_key or "")
+            url = src.url.format(date=stamp[:10], base=API_BASE)
             extra = {}
             if src.auth:
                 if bearer is None:

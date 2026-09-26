@@ -4,12 +4,11 @@ from __future__ import annotations
 from ffcore.text import norm, resolve
 from ffcore.tidy import latest_only, table
 
-__all__ = ["SECOND_SOURCE", "FF_AF_HEAD", "LEGEND", "af_cell",
+__all__ = ["SECOND_SOURCE", "LEGEND", "af_cell",
           "second_cells", "resolve_second_source"]
 
 SECOND_SOURCE = "analitica"
 
-FF_AF_HEAD = "FF | AF"
 
 LEGEND = ("**FF** is futbolfantasy's own probable-XI percentage. **AF** is "
           "analiticafantasy's read of the same eleven, printed beside it as "

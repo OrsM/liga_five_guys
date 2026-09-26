@@ -361,28 +361,6 @@ def apply(u, a: Action) -> dict[str, dict[str, str]]:
     return {m: phantom_topup(s) for m, s in sq.items()}
 
 
-def offer_combos(u) -> list[tuple[str, Action]]:
-    mine = u.state.squads.get(u.me, {})
-    offers = {k: v for k, v in u.received_offers.items()
-             if k in mine and v > 0}
-    deficit = -u.cash
-    if deficit <= 0 or not offers:
-        return []
-    names = sorted(offers)
-    covers: list[tuple[str, ...]] = []
-    for r in range(1, len(names) + 1):
-        for combo in itertools.combinations(names, r):
-            cs = set(combo)
-            if any(set(c) <= cs for c in covers):
-                continue
-            if sum(offers[k] for k in combo) >= deficit:
-                covers.append(combo)
-    return [("OFFERS:" + "|".join(combo),
-            Action("sell", sell=combo,
-                  proceeds=sum(offers[k] for k in combo)))
-           for combo in covers]
-
-
 VALUE_TOLERANCE = 0.90
 
 
@@ -709,28 +687,6 @@ def _selftest() -> None:
     assert "th_m1" in after["me"]
     assert "th_m1" in u.state.squads["riv"], "apply must not mutate"
 
-    uoc = Universe(state=LeagueState({"me": {"a": "MED", "b": "MED",
-                                             "c": "MED", "d": "MED"}},
-                                     jornadas=[1], me="me", carried={}),
-                  forecaster=None,
-                  cash=-10_000_000.0, me="me",
-                  received_offers={"a": 4_000_000.0, "b": 4_000_000.0,
-                                   "c": 9_000_000.0, "d": 3_000_000.0})
-    got = {k: a.sell for k, a in offer_combos(uoc)}
-    assert set(got.values()) == {("a", "c"), ("b", "c"), ("c", "d"),
-                                 ("a", "b", "d")}, got
-    for a in dict(offer_combos(uoc)).values():
-        assert a.buy == "" and a.kind == "sell"
-    assert sum(a.proceeds for a in dict(offer_combos(uoc)).values()
-              if a.sell == ("c", "d")) == 12_000_000.0
-    upos = replace(uoc, cash=0.0)
-    assert offer_combos(upos) == []
-    uno = replace(uoc, received_offers={})
-    assert offer_combos(uno) == []
-    ugone = replace(uoc, received_offers={**uoc.received_offers,
-                                          "gone": 50_000_000.0})
-    assert "gone" not in {p for a in dict(offer_combos(ugone)).values()
-                          for p in a.sell}
 
     u3 = Universe(
         state=LeagueState({"me": dict(mine), "riv": dict(theirs)}, [1], "me"),
@@ -1018,14 +974,6 @@ def _selftest() -> None:
     after = apply(u, Action("buy", buy="new_por", sell=("spare_d",)))
     assert "spare_d" not in after["me"], after["me"]
     assert after["me"]["new_por"] == "MED", after["me"]
-
-    u2 = replace(u, cash=-9e6, received_offers={
-        "spare_d": 4e6, "dead_f": 6e6, "f1": 20e6})
-    labels = {c[0] for c in offer_combos(u2)}
-    assert not any("|" in lab and "f1" in lab for lab in labels), labels
-    assert "OFFERS:f1" in labels, labels
-    assert "OFFERS:dead_f|spare_d" in labels, labels
-    assert offer_combos(replace(u2, cash=5e6)) == []
 
     for pts, cost, want in [(120.0, 14.13e6, 120.0 / 14.13), (120.0, 0.0, None),
                             (120.0, -5e6, None), (None, 5e6, None),

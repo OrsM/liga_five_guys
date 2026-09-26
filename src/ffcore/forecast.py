@@ -6,7 +6,7 @@ import math
 import statistics
 from typing import Protocol, runtime_checkable
 
-__all__ = ["Forecaster", "Bootstrap", "SEED_POOL", "MIN_POOL"]
+__all__ = ["Bootstrap", "SEED_POOL", "MIN_POOL"]
 
 SEED_POOL = (-1, -1, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1,
              1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 3,
@@ -59,16 +59,6 @@ def fit_drift_frac(h1_pairs, h3_pairs) -> tuple[float, str]:
     return fitted, ("h1 var %.3f, h3 var %.3f (rate_rel-normalised, "
                    "n=%d/%d) -> drift_frac %.2f" % (var1, var3,
                                                     len(z1), len(z3), fitted))
-
-
-@runtime_checkable
-class Forecaster(Protocol):
-
-    def expected(self, jornada: int) -> dict[str, float]:
-        pass
-
-    def expected_own(self, first_jornada_of: dict[str, int]) -> dict[str, float]:
-        pass
 
 
 class Bootstrap:
@@ -202,7 +192,6 @@ def _selftest() -> None:
     fc = Bootstrap({1: {"nailed": (5.0, 1.0),
                         "rota": (5.0, 0.5),
                         "out": (5.0, 0.0)}})
-    assert isinstance(fc, Forecaster)
 
     e = fc.expected(1)
     assert e == {"nailed": 5.0, "rota": 2.5, "out": 0.0}, e

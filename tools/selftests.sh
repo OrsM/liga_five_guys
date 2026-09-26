@@ -23,7 +23,7 @@ export FF_ROOT=./data
 
 TESTS=(ffcore/parse.py ffcore/text.py ffcore/tidy.py
        ffcore/fixtures.py ffcore/auth.py
-       ffcore/model.py ffcore/attributes.py
+       ffcore/model.py
        ffcore/forecast.py ffcore/season.py ffcore/render.py
        ffcore/startprob.py ffcore/lineupweight.py ffcore/crosswalk.py sources.py
        "ingest.py --selftest" "ffcore/league.py --selftest" ffcore/fixture.py
@@ -33,7 +33,7 @@ TESTS=(ffcore/parse.py ffcore/text.py ffcore/tidy.py
        "ledger.py --selftest"
        "crosswalk.py --selftest" "run.py --selftest" "flip.py --selftest"
        ffcore/action.py ffcore/pricing.py ffcore/profile.py ffcore/schedule.py
-       "gap_signal.py --selftest" "scout.py --selftest" "stats.py --selftest"
+       "stats.py --selftest"
        "backtest.py --selftest")
 SESSION_TESTS=(xi.py report.py decide.py sim.py)
 

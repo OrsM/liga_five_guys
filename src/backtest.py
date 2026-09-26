@@ -1,94 +1,16 @@
 
 from __future__ import annotations
 
-import collections
-import csv
 import datetime as dt
-import io
 import json
 import os
-import shutil
 import subprocess
 import sys
-import tempfile
 
 
-import stats
-
-__all__ = ["commit_as_of", "csv_as_of", "commits_touching",
-          "replay_recommendations", "replay_percentile_rank",
-          "replay_ladder_percentile", "compare_arms",
-          "screen_audit_episode", "replay_screen_misses",
-          "POS_ID_SLOT", "squad_at", "jornada_points", "jornada_bounds",
-          "awards_by_round", "audit_jornada", "track_record"]
+__all__ = ["commits_touching", "track_record", "replay_recommendations"]
 
 _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-
-
-POS_ID_SLOT = {"1": "POR", "2": "DEF", "3": "MED", "4": "DEL"}
-
-
-def squad_at(manager: str, when: dt.datetime) -> dict[str, str]:
-    from ffcore.parse import text
-    from ffcore.tidy import latest_only, load_crosswalk
-    xw = load_crosswalk()
-    ff_of = {getattr(v, "app_id", ""): k for k, v in xw.players.items()
-             if getattr(v, "app_id", "")}
-    out = {}
-    for r in latest_only(csv_as_of(when, "data/tidy/api_teams.csv")):
-        slot = POS_ID_SLOT.get(text(r, "position_id"))
-        ff = ff_of.get(text(r, "player_id"))
-        if slot and ff and text(r, "manager") == manager:
-            out[ff] = slot
-    return out
-
-
-def jornada_points(jornada: int) -> dict[str, float]:
-    from ffcore.parse import num, text
-    from ffcore.tidy import load_perjornada
-    want = str(jornada)
-    return {text(r, "ff_id"): num(r, "points_delta",
-                                           default=0.0)
-            for r in load_perjornada()
-            if text(r, "jornada") == want
-            and text(r, "ff_id")}
-
-
-def jornada_bounds(manager: str, jornada: int,
-                   owned_at: dt.datetime) -> dict | None:
-    from ffcore.season import best_xi
-    squad = squad_at(manager, owned_at)
-    if not squad:
-        return None
-    pts = jornada_points(jornada)
-    top = best_xi(squad, pts)
-    if not top:
-        return None
-    bottom = best_xi(squad, {k: -v for k, v in pts.items()})
-    return {"manager": manager, "jornada": jornada,
-            "owned_at": owned_at.isoformat(timespec="minutes"),
-            "squad": len(squad), "scored": sum(1 for k in squad if k in pts),
-            "best": sum(pts.get(k, 0.0) for k in top),
-            "worst": sum(pts.get(k, 0.0) for k in bottom)}
-
-
-def audit_jornada(manager: str, jornada: int, owned_at: dt.datetime,
-                  actual: float) -> dict | None:
-    b = jornada_bounds(manager, jornada, owned_at)
-    if b is None:
-        return None
-    verdict = ("below floor" if actual < b["worst"] - 1e-9
-               else "above ceiling" if actual > b["best"] + 1e-9 else "ok")
-    return {**b, "actual": actual, "verdict": verdict}
-
-
-def commit_as_of(when: dt.datetime, path: str) -> str | None:
-    out = subprocess.run(
-        ["git", "log", "--format=%H", "--before", when.isoformat(), "-1",
-         "--", path],
-        cwd=_ROOT, capture_output=True, text=True, check=False)
-    sha = out.stdout.strip()
-    return sha or None
 
 
 def _show(sha: str, path: str) -> str | None:
@@ -96,14 +18,6 @@ def _show(sha: str, path: str) -> str | None:
                          cwd=_ROOT, capture_output=True, text=True,
                          check=False)
     return out.stdout if out.returncode == 0 else None
-
-
-def csv_as_of(when: dt.datetime, path: str) -> list[dict]:
-    sha = commit_as_of(when, path)
-    if sha is None:
-        return []
-    text = _show(sha, path)
-    return list(csv.DictReader(io.StringIO(text))) if text is not None else []
 
 
 def commits_touching(path: str) -> list[tuple[str, dt.datetime]]:
@@ -118,191 +32,6 @@ def commits_touching(path: str) -> list[tuple[str, dt.datetime]]:
         except ValueError:
             continue
     return commits
-
-
-NEAR_MISS_FRAC = 0.85
-
-_SCREEN_AUDIT_SCRIPT = """
-import json, sys
-import decide
-
-u = decide.load()
-bar_exp, xi = u.current_xi
-if not bar_exp:
-    print(json.dumps({{"error": "no xi"}}))
-    sys.exit(0)
-bar = u.xi_bar
-mine = set(u.state.squads.get(u.me, {{}}))
-near = []
-for c, price in u.view("price").items():
-    if c in mine or price > u.cash:
-        continue
-    exp = bar_exp.get(c, 0.0)
-    if exp <= bar and exp >= bar * {frac} and u.route_kind(c) != "listed":
-        near.append((c, price, exp))
-
-if not near:
-    print(json.dumps({{"near_miss_count": 0}}))
-    sys.exit(0)
-
-acts = [decide.Action("buy", buy=c, cost=price) for c, price, _exp in near]
-rows, base, measured, bands = u.rank(acts)
-best = None
-for r in rows:
-    if best is None or r["pts_lo"] > best["pts_lo"]:
-        best = {{"buy": r["action"].buy, "pts_lo": r["pts_lo"],
-                "d_pos": r["d_pos"]}}
-print(json.dumps({{"near_miss_count": len(near), "best": best}}))
-"""
-
-
-def screen_audit_episode(sha: str, when: str, near_miss_frac: float = NEAR_MISS_FRAC,
-                         timeout: float = 90.0) -> dict:
-    tmp = tempfile.mkdtemp(prefix="lfg_screen_audit_")
-    try:
-        wt = subprocess.run(
-            ["git", "worktree", "add", "--detach", "--force", tmp, sha],
-            cwd=_ROOT, capture_output=True, text=True, check=False)
-        if wt.returncode != 0:
-            return {"sha": sha, "error": "worktree add failed",
-                   "detail": wt.stderr.strip()[-500:]}
-        script = _SCREEN_AUDIT_SCRIPT.format(frac=near_miss_frac)
-        try:
-            proc = subprocess.run([sys.executable, "-c", script], cwd=tmp,
-                                  capture_output=True, text=True,
-                                  timeout=timeout, check=False)
-        except subprocess.TimeoutExpired:
-            return {"sha": sha, "error": "audit script timed out"}
-        if proc.returncode != 0:
-            return {"sha": sha, "error": "audit script failed",
-                   "detail": proc.stderr.strip()[-500:]}
-        try:
-            result = json.loads(proc.stdout.strip().splitlines()[-1])
-        except (ValueError, IndexError):
-            return {"sha": sha, "error": "bad script output",
-                   "detail": proc.stdout.strip()[-500:]}
-        if result.get("error"):
-            return {"sha": sha, "error": result["error"]}
-        n = result.get("near_miss_count", 0)
-        if not n or not result.get("best"):
-            return {"sha": sha, "when": when, "near_miss_count": n,
-                   "near_miss_best": None, "actual_best_pts_lo": None,
-                   "beat_actual": None}
-        actual_pts_lo = None
-        text = _show(sha, "reports/decisions.json")
-        if text:
-            try:
-                moves = json.loads(text).get("moves") or []
-                if moves and moves[0].get("pts_lo") is not None:
-                    actual_pts_lo = moves[0]["pts_lo"]
-            except (ValueError, TypeError):
-                pass
-        beat = (actual_pts_lo is not None
-               and result["best"]["pts_lo"] > actual_pts_lo)
-        return {"sha": sha, "when": when, "near_miss_count": n,
-               "near_miss_best": result["best"],
-               "actual_best_pts_lo": actual_pts_lo, "beat_actual": beat}
-    finally:
-        subprocess.run(["git", "worktree", "remove", "--force", tmp],
-                       cwd=_ROOT, capture_output=True, text=True, check=False)
-        shutil.rmtree(tmp, ignore_errors=True)
-
-
-def replay_screen_misses(sample_every: int = 10,
-                         near_miss_frac: float = NEAR_MISS_FRAC) -> dict:
-    commits = commits_touching("reports/decisions.json")
-    sampled = commits[::max(1, sample_every)]
-    results = [screen_audit_episode(sha, when.isoformat(), near_miss_frac)
-              for sha, when in sampled]
-    valid = [r for r in results if "error" not in r]
-    beats = [r for r in valid if r.get("beat_actual")]
-    return {"sampled": len(sampled), "valid": len(valid),
-           "errors": len(results) - len(valid), "beats": len(beats),
-           "results": results}
-
-
-def _checked_golden(golden: list[dict]) -> list[dict]:
-    return [r for r in golden if r.get("predicted_rate") is not None]
-
-
-def _mae_result(resolved: list[tuple], **extra) -> dict | None:
-    if not resolved:
-        return None
-    n = len(resolved)
-    naive_mae = sum(abs(p - a) for p, a, _ in resolved) / n
-    ours_mae = sum(abs(o - a) for _, a, o in resolved) / n
-    return {"n": n, "naive_mae": naive_mae, "ours_mae": ours_mae, **extra}
-
-
-def naive_value_baseline(golden: list[dict]) -> dict | None:
-    import methodology as M
-    from ffcore.text import norm
-
-    checked = _checked_golden(golden)
-    if not checked:
-        return None
-    locks = M.clock_history().round_locks
-
-    priced = []
-    for r in checked:
-        lock = locks.get(r["jornada"])
-        if lock is None:
-            continue
-        hist_market = csv_as_of(lock, "data/tidy/market.csv")
-        row = next((m for m in hist_market
-                   if norm(m.get("name", "")) == norm(r["player"])), None)
-        if row is None:
-            continue
-        try:
-            val = float(row["value"])
-        except (KeyError, ValueError):
-            continue
-        priced.append((val, r["actual_points"], r["predicted_rate"]))
-
-    if not priced:
-        return None
-    mean_val = sum(v for v, _, _ in priced) / len(priced)
-    mean_act = sum(a for _, a, _ in priced) / len(priced)
-    k = mean_act / mean_val if mean_val else 0.0
-    return _mae_result([(k * v, a, p) for v, a, p in priced], k=k)
-
-
-def recency_only_baseline(golden: list[dict], window: int = 3) -> dict | None:
-    import methodology as M
-    from ffcore.text import norm
-
-    checked = _checked_golden(golden)
-    if not checked:
-        return None
-    clock = M.clock_history()
-    order = clock.order
-    pos = {j: i for i, j in enumerate(order)}
-
-    actuals, _label = M.load_actuals()
-    by_player: dict[str, dict[int, float]] = {}
-    for a in actuals:
-        if a["games_delta"] < 1:
-            continue
-        i = pos.get(a.get("jornada"))
-        if i is None:
-            continue
-        by_player.setdefault(norm(a["name"]), {})[i] = \
-            a["points_delta"] / a["games_delta"]
-
-    resolved = []
-    for r in checked:
-        i = pos.get(r["jornada"])
-        if i is None:
-            continue
-        hist = by_player.get(norm(r["player"]), {})
-        prior = sorted((idx, rate) for idx, rate in hist.items() if idx < i)
-        if not prior:
-            continue
-        recent = [rate for _, rate in prior[-window:]]
-        pred = sum(recent) / len(recent)
-        resolved.append((pred, r["actual_points"], r["predicted_rate"]))
-
-    return _mae_result(resolved, window=window)
 
 
 def _actuals_index():
@@ -397,31 +126,6 @@ def track_record(min_days: float = 3.0) -> str | None:
     return _format_track_record(replay_recommendations(min_days))
 
 
-def compare_arms(a: dict, b: dict, a_name: str, b_name: str) -> str:
-    gap = stats.bootstrap_gap(a["nets"], b["nets"])
-    lines = [f"{a_name}: {a['n']} eps, mean {a['mean_net']:+.1f} pts/ep "
-             f"(total {a['total_net']:+.1f})",
-             f"{b_name}: {b['n']} eps, mean {b['mean_net']:+.1f} pts/ep "
-             f"(total {b['total_net']:+.1f})"]
-    if gap is None:
-        lines.append("-> not enough data on one side to compare")
-    elif gap["beats"]:
-        lines.append(f"-> {a_name} BEATS {b_name} (90% CI on the per-episode "
-                     f"gap: {gap['lo']:+.1f} to {gap['hi']:+.1f} pts, "
-                     "excludes zero)")
-    else:
-        lines.append(f"-> no significant difference (90% CI on the "
-                     f"per-episode gap: {gap['lo']:+.1f} to {gap['hi']:+.1f} "
-                     "pts, straddles zero)")
-    return "\n  ".join(lines)
-
-
-def _by_pts_lo(moves: list[dict], n: int) -> list[dict]:
-    candidates = [m for m in moves if m.get("pts_lo") is not None
-                 and m.get("buy") and m.get("sell")]
-    return sorted(candidates, key=lambda m: -m["pts_lo"])[:n]
-
-
 def _replay_setup(path: str = "reports/decisions.json"):
     commits = commits_touching(path)
     if not commits:
@@ -445,102 +149,7 @@ def replay_recommendations(min_days: float = 3.0) -> dict | None:
     return _replay(lambda moves: moves[:1], min_days)
 
 
-def replay_percentile_rank(min_days: float = 3.0) -> dict | None:
-    return _replay(lambda moves: _by_pts_lo(moves, 1), min_days)
-
-
-def replay_ladder_percentile(topn: int = 3, min_days: float = 3.0) -> dict:
-    setup = _replay_setup()
-    if setup is None:
-        return {"current": None, "percentile": None}
-    commits, points_between, now = setup
-
-    def pick_current(moves):
-        return [m for m in moves[:topn] if m.get("buy") and m.get("sell")]
-
-    cur_eps = _pick_episodes(commits, pick_current)
-    pct_eps = _pick_episodes(commits, lambda moves: _by_pts_lo(moves, topn))
-    return {"current": _grade_episodes(cur_eps, points_between, now, min_days),
-           "percentile": _grade_episodes(pct_eps, points_between, now, min_days)}
-
-
 def _selftest() -> None:
-    j3 = jornada_points(3)
-    assert j3, "jornada 3 has scores in data/season/live"
-    assert all(isinstance(k, str) and k for k in j3), "keyed by ff_id"
-    assert jornada_points(99) == {}, "a jornada nobody played is empty"
-
-    squad = {"p": "POR", **{f"d{i}": "DEF" for i in range(4)},
-             **{f"m{i}": "MED" for i in range(4)}, "f0": "DEL", "f1": "DEL",
-             "bench": "MED"}
-    pts = {k: 3.0 for k in squad}
-    pts["bench"], pts["m0"] = 20.0, -5.0
-    import backtest as _bt
-    real_squad, real_pts = _bt.squad_at, _bt.jornada_points
-    _bt.squad_at = lambda manager, when: squad
-    _bt.jornada_points = lambda jornada: pts
-    try:
-        now = dt.datetime.now(dt.timezone.utc)
-        b = _bt.jornada_bounds("whoever", 5, now)
-        assert b["best"] > b["worst"], b
-        assert b["best"] >= 20.0, ("the ceiling must be able to field the "
-                                   "bench man who outscored a starter", b)
-        mid = _bt.audit_jornada("whoever", 5, now,
-                                (b["best"] + b["worst"]) / 2)
-        assert mid["verdict"] == "ok", mid
-        over = _bt.audit_jornada("whoever", 5, now, b["best"] + 1)
-        assert over["verdict"] == "above ceiling", over
-        under = _bt.audit_jornada("whoever", 5, now, b["worst"] - 1)
-        assert under["verdict"] == "below floor", under
-    finally:
-        _bt.squad_at, _bt.jornada_points = real_squad, real_pts
-
-    recent = commit_as_of(dt.datetime.now(dt.timezone.utc), "data/tidy/market.csv")
-    assert recent is not None, "no commit found for market.csv at all"
-
-    ancient = commit_as_of(dt.datetime(2020, 1, 1, tzinfo=dt.timezone.utc),
-                           "data/tidy/market.csv")
-    assert ancient is None, ancient
-
-    never = commit_as_of(dt.datetime.now(dt.timezone.utc),
-                         "data/tidy/this_file_does_not_exist.csv")
-    assert never is None, never
-
-    early = dt.datetime(2026, 8, 12, tzinfo=dt.timezone.utc)
-    later = dt.datetime(2026, 8, 20, tzinfo=dt.timezone.utc)
-    rows_early = csv_as_of(early, "data/tidy/market.csv")
-    rows_later = csv_as_of(later, "data/tidy/market.csv")
-    assert rows_early, "expected real market rows by 2026-08-12"
-    assert rows_later, "expected real market rows by 2026-08-20"
-    assert "observed_at" in rows_early[0], rows_early[0]
-
-    assert csv_as_of(later, "data/tidy/nope_never_existed.csv") == []
-
-    import methodology as M
-    assert naive_value_baseline([]) is None
-    golden = M.golden_rows()
-    result = naive_value_baseline(golden)
-    checked = [r for r in golden if r.get("predicted_rate") is not None]
-    if checked:
-        assert result is not None, "expected real historical values to resolve"
-        assert result["n"] > 0, result
-        assert result["k"] > 0, result
-        print(f"  naive_value_baseline(): n={result['n']}, ours "
-             f"{result['ours_mae']:.2f} MAE vs market-value-scaled "
-             f"{result['naive_mae']:.2f} MAE")
-
-    assert recency_only_baseline([]) is None
-    rresult = recency_only_baseline(golden)
-    if checked:
-        if rresult is not None:
-            assert rresult["n"] > 0, rresult
-            print(f"  recency_only_baseline(): n={rresult['n']}, ours "
-                 f"{rresult['ours_mae']:.2f} MAE vs last-{rresult['window']} "
-                 f"recency {rresult['naive_mae']:.2f} MAE")
-        else:
-            print("  recency_only_baseline(): no player yet has a prior "
-                 "played jornada to build a recency estimate from")
-
     ct = commits_touching("reports/decisions.json")
     assert ct, "expected real decisions.json history"
     times = [w for _, w in ct]
@@ -557,35 +166,6 @@ def _selftest() -> None:
              f"({rec['too_fresh']} too fresh to grade yet), {rec['wins']}/"
              f"{rec['n']} net positive, total net {rec['total_net']:+.1f} "
              f"real pts, mean {rec['mean_net']:+.1f} pts/episode")
-
-    assert replay_percentile_rank(min_days=1e9) is None
-    prec = replay_percentile_rank()
-    if prec is not None:
-        assert prec["n"] > 0, prec
-        assert prec["n"] + prec["too_fresh"] == prec["total_episodes"], prec
-        assert 0 <= prec["wins"] <= prec["n"], prec
-        print(f"  replay_percentile_rank(): {prec['n']} graded episodes "
-             f"({prec['too_fresh']} too fresh), {prec['wins']}/{prec['n']} "
-             f"net positive, total net {prec['total_net']:+.1f} real pts, "
-             f"mean {prec['mean_net']:+.1f} pts/episode")
-        if rec is not None:
-            print("  " + compare_arms(prec, rec, "percentile-rank",
-                                      "mean-rank"))
-
-    empty = replay_ladder_percentile(topn=3, min_days=1e9)
-    assert empty == {"current": None, "percentile": None}, empty
-    ladder = replay_ladder_percentile(topn=3)
-    assert set(ladder) == {"current", "percentile"}, ladder
-    cur, pct = ladder["current"], ladder["percentile"]
-    if cur is not None and pct is not None:
-        assert cur["n"] > 0 and pct["n"] > 0, ladder
-        if cur["total_net"] < 0:
-            print(f"  ** the SHIPPED top-{3} ladder's own real historical "
-                 f"net is NEGATIVE: {cur['total_net']:+.1f} pts over "
-                 f"{cur['n']} episodes (mean {cur['mean_net']:+.1f}/ep) **")
-        print(f"  replay_ladder_percentile(top3), horizon="
-             f"{cur['horizon_days']:.0f}d:")
-        print("  " + compare_arms(pct, cur, "percentile", "current"))
 
     assert _format_track_record(None) is None
     assert _format_track_record({"n": 4, "total_episodes": 4, "mean_net": 9.0,
