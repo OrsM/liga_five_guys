@@ -68,7 +68,26 @@ Order: 1 → 2 (they share the deletions), then 3, 4, 5/6, 7, 8.
   a table. Measured: cold parse 5m30s / 412s CPU, peak 558MB under the
   service's MemoryMax=750M; +30 snapshots incremental in 34s; all 19 tables
   identical to the old code, row for row.
-- 4-8: not started.
+- **4 One table loader — done.** `table(name)` for every row and
+  `newest(name)` for the latest snapshot, one mtime cache.
+- **5 Fitted parameters — done** (eda1944). They live on their owners
+  (`Calibration`, `Bootstrap`, the boards' `home_edge`); no module globals.
+- **6 One player record — done as far as load** (86efa39). `decide.load()`
+  is the one assembly point: it builds the League and Scorer, derives
+  squads, clubs and positions from the profiles, and the Universe carries
+  `lg`/`sc`. ffcore/model.py deleted. Still parallel: `score.build` fits and
+  builds its own fixture board from the same inputs `load` builds the
+  season board from.
+- **7 One grading module — done.** grading.py replaced methodology.py.
+  Graded matching tries the id before names (f9b10f0); it was a set, so
+  results changed with the hash seed.
+- **8 Markdown renderer — superseded.** The reports that needed it were
+  deleted (4cfdcd3, 1257f4a); decisions.json is the report.
 
-Running count (product code, functions incl. methods/nested/lambdas):
-803 → 715; lines 20,371 → 18,275.
+Running count (all of src, functions incl. methods/nested/lambdas and
+selftests): 655 functions / 13,937 lines at 0e49bff → 639 / 13,409 at
+86efa39.
+
+Next: `score.build` (duplicate imports, a second fixture board, fits
+recomputed per call), then `sim.py`'s ladder/payload and its nested
+`cell` helper, then `report.main`.
