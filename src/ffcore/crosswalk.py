@@ -80,7 +80,6 @@ class Crosswalk:
         self._reindex()
 
     def attach_market(self, market) -> None:
-        """The market resolve() matches names and prices against."""
         if market is self._market:
             return
         from ffcore.tidy import latest_only
@@ -155,9 +154,6 @@ class Crosswalk:
         return None
 
     def key_of(self, r) -> str | None:
-        """The canonical key for one tidy row: its ff_id, else its
-        player_slug (an AF slug when the source is analitica, else FF),
-        else its name."""
         fid = (r.get("ff_id") or "").strip()
         if fid in self.players:
             return fid
@@ -170,9 +166,6 @@ class Crosswalk:
     def resolve(self, raw="", *, hint_app_id="", hint_ff_slug="",
                 hint_af_slug="", hint_club="", hint_price=None,
                 hint_full="", handle="", ledger_owner=None) -> str | None:
-        """One disambiguation ladder (id lookup -> market name/club/price
-        match -> owner narrowing -> price-only value-index fallback ->
-        name fallback), against the market attach_market() set."""
         market, index = self._market, self._index
         ledger_owner = ledger_owner or {}
         raw = (raw or "").strip()
@@ -459,7 +452,7 @@ def _selftest() -> None:
     elsewhere = Crosswalk({"someone else": Player("someone else", app_id="9")})
     slugged = Crosswalk({"alvaro fernandez": Player(
         "alvaro fernandez", ff_slug="alvaro-slug", af_slug="af-alvaro")})
-    cases = [  # (crosswalk, attached market, raw, hints, expected)
+    cases = [
         (xw, None, "2101", {}, "2101"),
         (xw, ag, "Álvaro García", {}, None),
         (xw, ag, "Álvaro García", {"hint_club": "Rayo"}, "867"),

@@ -245,7 +245,7 @@ def _selftest() -> None:
     assert dw["bench_m"] == 3e6 and dw["bench_k"] == 2e6, dw
 
     exp, _xi = mu.current_xi
-    acts = mu.candidates(exp)
+    acts = mu.candidates()
     assert acts, "tiny_market_universe() must produce real candidate actions"
     targets = {a.buy for a in acts if a.buy}
     assert "cand_free" in targets, targets

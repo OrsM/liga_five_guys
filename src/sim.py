@@ -5,10 +5,9 @@ import sys
 
 
 import json
-import math
 
-from decide import dead_weight, overdraft_fix, route_kind, value_rate  # noqa: E402,F401
-from methodology import current_mae
+from decide import (best_move, max_spare_proceeds, overdraft_fix,  # noqa: E402
+                    value_rate, worth_doing)
 from ffcore.parse import fmt_money
 from ffcore.league import app_fielded
 from ffcore.render import title_name
@@ -131,7 +130,6 @@ def ladder_rows(u, rows, bands=None, exp=None, xi=None) -> list[dict]:
     dead = {k for k, _ in dead_weight}
     won = {r["action"].buy: r for r in rows if r["action"].buy}
     bar = u.xi_bar
-    from ffcore.candidates import max_spare_proceeds
     spare = max_spare_proceeds(u)
     rest = [k for k in u.view("price") if k not in mine and exp.get(k, 0.0) > bar]
     bands = {k: v for k, v in (bands or {}).items() if k not in won}
@@ -149,7 +147,7 @@ def ladder_rows(u, rows, bands=None, exp=None, xi=None) -> list[dict]:
     _rival_max = max(u.rival_cash.values(), default=None)
 
     # par is a COLUMN here, not a screen -- worth_doing() owns the screen.
-    par = {k: v["par"] for k, v in u.player_forecasts().items()}
+    par = {k: v["par"] for k, v in u.player_forecasts.items()}
 
     def cell(k, group, where, money, pts, note="", value=None,
             lo=None, hi=None, market=None, premium=None):
@@ -225,7 +223,7 @@ def ladder_rows(u, rows, bands=None, exp=None, xi=None) -> list[dict]:
                     key=lambda k: _move_rank_key(won[k], u)):
         # "listed" is neither: a man his owner has put up for sale can be
         # outbid, so the board never calls him a buy or a raid.
-        kind = route_kind(u, k)
+        kind = u.route_kind(k)
         if kind in ("free", "raid"):
             out.append(buy_cell(k, "buy" if kind == "free" else "raid"))
     for k in sorted((k for k in rest if k not in won
@@ -238,7 +236,7 @@ def ladder_rows(u, rows, bands=None, exp=None, xi=None) -> list[dict]:
                         value=value_rate(save_pts, short_by)))
     for k in sorted((k for k in rest if k not in won
                      and u.view("price")[k] <= u.cash + spare
-                     and route_kind(u, k) == "free"),
+                     and u.route_kind(k) == "free"),
                     key=lambda k: -exp.get(k, 0.0)):
         out.append(cell(k, "pass", short_manager(u.view("owner").get(k)) or "free agent",
                         -u.view("price")[k], None))
@@ -527,175 +525,10 @@ def caveats(u) -> list[str]:
     return out
 
 
-VALUE_TOLERANCE = 0.90
-
-def _clears_par_floor(par_of: dict, mae, k: str, horizon: int = 1,
-                      pj_of: dict | None = None) -> bool:
-    """Is his edge bigger than our error in measuring it?
-
-    COMPARE LIKE WITH LIKE. `par` is points above replacement across the
-    WHOLE remaining season; `mae` is the model's error on ONE player in
-    ONE jornada. This compared them directly, which is a units mismatch --
-    a season-scale number against a per-round one -- so the floor sat
-    about six times too low and almost everything cleared it. That is how
-    a midfielder whose entire edge rested on 3.3 matches (par 11.2, under
-    0.35 a jornada) came to be headlined as a recommendation.
-
-    Over `horizon` rounds the errors partly cancel rather than accumulate,
-    so the season-scale error is mae*sqrt(horizon), not mae*horizon. On
-    today's data that moves the bar from 3.29 to 18.9 season points, which
-    keeps the thick-evidence moves (par 43 off 33 matches, par 19 off 40)
-    and drops the thin ones (par 14 off 5 matches, par 11 off 3.3).
-    """
-    if mae is None:
-        return True
-    par = par_of.get(k)
-    if par is None:
-        return False
-    # WEIGHT THE EDGE BY THE EVIDENCE UNDER IT. Comparing par against a
-    # season-scale error got the UNITS right (see above) but still had no
-    # view on how much is known: a striker whose rate rests on three
-    # matches cleared the same bar as one with twenty-one, because par is
-    # a point estimate and point estimates say nothing about their own
-    # reliability. Taking a maximum over sixty-five candidates then picks
-    # the thin records preferentially -- they are the ones whose noise had
-    # room to run upward.
-    #
-    # Same shrinkage the rate itself already gets (ffcore.score.SHRINK_K,
-    # Marcel-style regression to the mean, graded at the minimum of a
-    # 2/4/8/16/32 grid on 1,778 outcomes): pull par toward zero by the
-    # evidence behind it. No new constant -- the pseudo-count that decides
-    # how much a thin rate is trusted should decide how much a thin EDGE
-    # is trusted too.
-    #
-    # Screening on the simulated lower band instead was tried first and is
-    # wrong here: every move's pts_lo is negative at current dispersion
-    # (-85 to -66 on 2026-09-18), so it would refuse every recommendation.
-    from ffcore.score import SHRINK_K
-
-    pj = pj_of.get(k) if pj_of else None
-    if pj is not None:
-        par = par * pj / (pj + SHRINK_K)
-    return par >= mae * math.sqrt(max(1, horizon))
-
-
-def _best_raid_per_victim(raid_keys, won) -> list[str]:
-    best: dict[str, tuple[float, str]] = {}
-    for k in raid_keys:
-        r = won[k]
-        victim = r["action"].victim
-        score = r["d_beat"].get(victim)
-        if score is None:
-            score = r.get("d_pts") or 0.0
-        cur = best.get(victim)
-        if cur is None or score > cur[0]:
-            best[victim] = (score, k)
-    return [k for _score, k in best.values()]
-
-
-def raid_shortlist(u, rows, par_of, mae, pj_of=None) -> set:
-    """The raid keys worth showing: one per victim, chosen among those that
-    clear the par floor.
-
-    ORDER IS THE POINT. Floor FIRST, then one-per-victim. The reverse --
-    pick each victim's best raid, then drop it if it misses the floor --
-    makes a victim vanish entirely even when a second, weaker raid on him
-    would have cleared. ladder_rows() floored first, payload() deduped
-    first, so the markdown could show a victim's second-best raid while
-    the JSON showed him no raid at all, off the same rows in the same run.
-
-    "Raid" is route_kind(u, k) == "raid" everywhere. payload() used to ask
-    action.victim instead, a second definition of the same thing.
-    """
-    raids = {r["action"].buy: r for r in rows
-             if r["action"].buy
-             and route_kind(u, r["action"].buy) == "raid"
-             and _gains(r)
-             and _clears_par_floor(par_of, mae, r["action"].buy,
-                                   len(u.state.jornadas), pj_of)}
-    return set(_best_raid_per_victim(list(raids), raids))
-
-
-def _gains(r) -> bool:
-    """Does the SIMULATION say this move wins points?
-
-    par and the simulation answer different questions and can disagree. par
-    is a season-long, per-player figure: how far above a replacement at his
-    slot he sits. d_pts is what actually happens to YOUR squad when the sale
-    that funds him goes with him. A man can be excellent and still be a
-    losing trade, because the eleven he joins loses whoever paid for him.
-
-    On 2026-09-18 the ladder offered "BUY Pape Gueye, sell Alonso" at par
-    +56 -- comfortably over the floor -- while the same row carried d_pts
-    -2.0 and the recommendation itself, which has always screened on d_pts,
-    did not include him. Two renderers off one set of rows, disagreeing
-    about the same move. The floor asks whether there is enough evidence to
-    believe the edge; this asks whether there is an edge at all, and a row
-    has to pass both to be offered.
-    """
-    d = r.get("d_pts")
-    return d is not None and d > 0
-
-
-def worth_doing(u, rows) -> list:
-    """The moves this report is willing to recommend, screened once.
-
-    THREE RULES, ONE PLACE. Enough evidence under the edge to believe it
-    (the par floor, weighted by how many matches it rests on), one raid per
-    victim, and an edge at all once the move is actually simulated.
-
-    It lived inside payload(), so decisions.json obeyed all three and the
-    "Do this" line on the phone obeyed none: _best() takes whatever rank()
-    returned. On 2026-09-19 that had the alert telling Miguel to buy Jose
-    Angel Lopez for +18 while the JSON from the same run, the same minute,
-    listed neither him nor that move -- it had dropped him on the par
-    floor. The ladder is the browse view and still shows everything with
-    its own delta; this is the recommendation, and there is one of it.
-    """
-    _pf = u.player_forecasts()
-    par_of = {k: v["par"] for k, v in _pf.items()}
-    pj_of = {k: v["pj"] for k, v in _pf.items()}
-    mae = current_mae()
-    rows = [r for r in rows if not r["action"].buy
-            or _clears_par_floor(par_of, mae, r["action"].buy,
-                                 len(u.state.jornadas), pj_of)]
-    keep_raid = raid_shortlist(u, rows, par_of, mae, pj_of)
-    rows = [r for r in rows
-            if route_kind(u, r["action"].buy) != "raid"
-            or r["action"].buy in keep_raid]
-    # A candidate can clear rank()'s screen and still simulate negative.
-    # _gains() is that test; raid_shortlist() already uses it, so writing
-    # `d_pts > 0` again here was the same rule in two hands.
-    return [r for r in rows if _gains(r)]
-
-
 def _move_rank_key(r, u):
     reliable = 0 if u.view("route").get(r["action"].buy, "free") != "listed" else 1
     d = r.get("d_pts")
     return (reliable, -d if d is not None else float("inf"))
-
-def _best(u, rows, rivals):
-    """Pick the headline from rows worth_doing() has ALREADY screened.
-
-    It used to screen again -- `d_pts > 0`, twice -- which is the same rule
-    written in two places and exactly what it is here to stop being. Its
-    caller passes worth_doing()'s output; the rule lives there.
-    """
-    if not rows:
-        return None, False
-    reliable = [r for r in rows
-               if u.view("route").get(r["action"].buy, "free") != "listed"]
-    pool, uncertain = (reliable, False) if reliable else (rows, True)
-    best = max(pool, key=lambda r: r["d_pts"])
-    if best["action"].net <= 0:
-        return best, uncertain
-    floor = VALUE_TOLERANCE * best["d_pts"]
-    cheaper = [r for r in pool
-              if r["d_pts"] >= floor and r["action"].net < best["action"].net]
-    if cheaper:
-        best = min(cheaper, key=lambda r: r["action"].net)
-    return best, uncertain
-
 
 def bid_lines(u, rows) -> list[str]:
     """Your live bids, re-read as what they are: actions already taken.
@@ -773,7 +606,7 @@ def alert_lines(u, rows, rivals) -> list[str]:
                       % (fmt_money(-u.cash), names,
                          "he doesn't" if len(sells) == 1 else "they don't")]
 
-    best, uncertain = _best(u, rows, rivals)
+    best, uncertain = best_move(u, rows, rivals)
     if best is None:
         return out
     a = best["action"]
@@ -850,7 +683,7 @@ def payload(u, rows, base, rivals, locks_h=None, n_actions: int = 0,
     rows = worth_doing(u, rows)
     # A MOVE HAS TO GAIN POINTS TO BE A MOVE. `rows` is what survived
     # rank()'s screen, not a verdict: a candidate can clear the screen and
-    # then simulate NEGATIVE once it is run properly. _best() has always
+    # then simulate NEGATIVE once it is run properly. best_move() has always
     # applied this rule (`d_pts > 0`) when it picks the single headline
     # move; this list did not, so the phone's table showed losing moves
     # beside winning ones -- one of two on the day this was found, at
@@ -895,7 +728,7 @@ def payload(u, rows, base, rivals, locks_h=None, n_actions: int = 0,
         "moves": moves,
         "sell": [{"name": names.get(k, k), "pos": u.view("pos").get(k, ""),
                   "raises": got}
-                 for k, got in dead_weight(u)],
+                 for k, got in u.dead_weight()],
         "ladder": (ladder_data if ladder_data is not None
                   else ladder_rows(u, rows, exp=exp, xi=xi)),
         "bar": u.xi_bar,
@@ -1001,12 +834,12 @@ def _selftest() -> None:
     import decide
     from ffcore.forecast import Bootstrap
     from ffcore.season import LeagueState, Standings
-    from decide import Action, Universe, dead_weight
+    from decide import Action, Universe
     from ffcore.fixtures import tiny_profile, players_from_flat
 
-    global current_mae
-    _real_current_mae = current_mae
-    current_mae = lambda: None  # noqa: E731
+    import methodology
+    _real_current_mae = methodology.current_mae
+    methodology.current_mae = lambda: None  # noqa: E731
 
     st = Standings(totals={"me": [1000.0, 1200.0, 1400.0, 1600.0],
                            "riv": [1500.0, 1300.0, 1100.0, 900.0]}, me="me")
@@ -1089,7 +922,7 @@ def _selftest() -> None:
                                "d1": 9e6},
                       name={"spare_m": "benat turrientes",
                            "spare_k": "alvaro fernandez"}))
-    dead = dead_weight(u2)
+    dead = u2.dead_weight()
     assert [k for k, _ in dead] == ["spare_m", "spare_k"], dead
     assert [v for _, v in dead] == [7.45e6, 4.73e6], dead
     assert "d1" not in dict(dead)
@@ -1120,11 +953,6 @@ def _selftest() -> None:
     # that funds him goes too. The ladder offered Pape Gueye at par +56 with
     # d_pts -2.0 on 2026-09-18 while the recommendation, which screens on
     # d_pts, left him out -- two renderers disagreeing off one set of rows.
-    assert _gains({"d_pts": 0.1})
-    assert not _gains({"d_pts": -2.0}), "a losing move is not a buy"
-    assert not _gains({"d_pts": 0.0}), "break-even is not worth a transfer"
-    assert not _gains({}), "no simulated figure is not a yes"
-    assert not _gains({"d_pts": None})
 
     # THE PHONE AND THE JSON MUST NAME THE SAME MOVE. worth_doing() is the
     # one screen; alert_lines() and payload() both run on its output. When
@@ -1197,15 +1025,15 @@ def _selftest() -> None:
     u2.forecaster = Bootstrap({1: {k: (v, 1.0) for k, v in val.items()},
                                2: {k: ((9.0 if k == "spare_m" else v), 1.0)
                                    for k, v in val.items()}})
-    assert "spare_m" not in dict(dead_weight(u2)), \
+    assert "spare_m" not in dict(u2.dead_weight()), \
         "a man who starts in a round still ahead is not spare"
     u2.forecaster = Bootstrap(
         {1: {k: ((9.0 if k == "spare_m" else v), 1.0) for k, v in val.items()},
          2: {k: (v, 1.0) for k, v in val.items()}})
-    assert "spare_m" in dict(dead_weight(u2)), \
+    assert "spare_m" in dict(u2.dead_weight()), \
         "a man who starts only in a locked round is still spare"
     u2.state.jornadas = [1]
-    assert "spare_m" not in dict(dead_weight(u2))
+    assert "spare_m" not in dict(u2.dead_weight())
     u2.state.jornadas, u2.part_played = [1, 2], {}
 
     ws = "\n".join(standings(u, st))
@@ -1325,23 +1153,23 @@ def _selftest() -> None:
     cheap_ok = {**rows[0],
                 "action": Action("buy", buy="cheap", cost=2e6, proceeds=0.0),
                 "net_pts": 0.40, "d_win": 0.30, "d_pts": 110.4, "pts_lo": 40.0}
-    assert _best(u, [rows[0], cheap_ok], ["riv"]) == (cheap_ok, False), \
+    assert best_move(u, [rows[0], cheap_ok], ["riv"]) == (cheap_ok, False), \
         "a move keeping 90%+ of the best gain for a fraction of the cost wins"
     cheap_bad = {**rows[0],
                  "action": Action("buy", buy="cheap", cost=2e6, proceeds=0.0),
                  "net_pts": 0.30, "d_win": 0.20, "d_pts": 82.8, "pts_lo": 30.0}
-    assert _best(u, [rows[0], cheap_bad], ["riv"]) == (rows[0], False), \
+    assert best_move(u, [rows[0], cheap_bad], ["riv"]) == (rows[0], False), \
         "a cheaper move that gives up too much of the gain does not win"
     free = {**rows[0],
             "action": Action("sell", sell=("dead",), cost=0.0, proceeds=1e6),
             "net_pts": 0.40, "d_win": 0.30, "d_pts": 110.4, "pts_lo": 40.0}
-    assert _best(u, [rows[0], free], ["riv"]) == (free, False), \
+    assert best_move(u, [rows[0], free], ["riv"]) == (free, False), \
         "a self-funding move within reach of the best gain wins outright"
     winonly = {**rows[0], "action": Action("buy", buy="x", cost=1e6),
               "net_pts": 0.0, "d_win": 0.05, "d_pts": 0.0, "pts_lo": 0.0}
     assert worth_doing(u, [winonly]) == [], \
-        "a move that gains no points is screened out before _best sees it"
-    assert _best(u, [], ["riv"]) == (None, False), "nothing left, nothing said"
+        "a move that gains no points is screened out before best_move sees it"
+    assert best_move(u, [], ["riv"]) == (None, False), "nothing left, nothing said"
 
     safer = {**rows[0],
              "action": Action("clause", buy="safer", sell="benat",
@@ -1351,9 +1179,9 @@ def _selftest() -> None:
                "action": Action("clause", buy="riskier", sell="benat",
                                 cost=20e6, proceeds=5.87e6, victim="riv"),
                "pts_lo": -10.0}
-    best1, _ = _best(u, [safer, riskier], ["riv"])
+    best1, _ = best_move(u, [safer, riskier], ["riv"])
     assert best1["action"].buy == "safer", best1
-    best2, _ = _best(u, [riskier, safer], ["riv"])
+    best2, _ = best_move(u, [riskier, safer], ["riv"])
     assert best2["action"].buy == "riskier", best2
 
     listed_big = {**rows[0],
@@ -1364,17 +1192,17 @@ def _selftest() -> None:
         forecaster=Bootstrap({}), cash=0.0, me="me",
         players={"listed_target": tiny_profile("listed_target",
                                                route="listed")})
-    assert _best(u_route, [listed_big], ["riv"]) == (listed_big, True)
-    assert _best(u_route, [listed_big, rows[0]], ["riv"]) == (rows[0], False), \
+    assert best_move(u_route, [listed_big], ["riv"]) == (listed_big, True)
+    assert best_move(u_route, [listed_big, rows[0]], ["riv"]) == (rows[0], False), \
         "a reliable move beats a bigger listed one outright"
 
-    assert _best(u_route, [cheap_ok, rows[0]], ["riv"]) == (cheap_ok, False), \
+    assert best_move(u_route, [cheap_ok, rows[0]], ["riv"]) == (cheap_ok, False), \
         "order must not change the value-for-money winner"
-    assert _best(u_route, [cheap_bad, rows[0]], ["riv"]) == (rows[0], False), \
+    assert best_move(u_route, [cheap_bad, rows[0]], ["riv"]) == (rows[0], False), \
         "order must not change which move keeps too little of the gain"
-    assert _best(u_route, [free, rows[0]], ["riv"]) == (free, False), \
+    assert best_move(u_route, [free, rows[0]], ["riv"]) == (free, False), \
         "order must not change a self-funding winner"
-    assert _best(u_route, [rows[0], listed_big], ["riv"]) == (rows[0], False), \
+    assert best_move(u_route, [rows[0], listed_big], ["riv"]) == (rows[0], False), \
         "order must not change reliable-beats-listed"
 
     from ffcore.crosswalk import Player
@@ -1574,29 +1402,7 @@ def _selftest() -> None:
     assert [r for r in rows2 if r["action"].buy == "cand"], rows2
     assert "cand" not in bands2, sorted(bands2)
 
-    def _raid_row(buy, victim, d_pts, d_beat_victim):
-        return {"action": decide.Action("steal", buy=buy, victim=victim),
-               "d_pts": d_pts, "d_beat": {victim: d_beat_victim}}
-
-    won_raids = {
-        "r1": _raid_row("r1", "riv", d_pts=5.0, d_beat_victim=0.20),
-        "r2": _raid_row("r2", "riv", d_pts=8.0, d_beat_victim=0.05),
-        "r3": _raid_row("r3", "riv2", d_pts=3.0, d_beat_victim=0.10),
-    }
-    kept = _best_raid_per_victim(list(won_raids), won_raids)
-    assert sorted(kept) == ["r1", "r3"], kept
-    fallback = {"x": _raid_row("x", "solo", d_pts=1.0, d_beat_victim=0.0)}
-    fallback["x"]["d_beat"] = {}
-    assert _best_raid_per_victim(["x"], fallback) == ["x"]
-
-    par_of = {"good": 5.0, "weak": 1.99, "unknown": None}
-    assert _clears_par_floor(par_of, None, "weak") is True
-    assert _clears_par_floor(par_of, 2.9, "good") is True
-    assert _clears_par_floor(par_of, 2.9, "weak") is False
-    assert _clears_par_floor(par_of, 2.9, "unknown") is False
-    assert _clears_par_floor(par_of, 2.9, "missing") is False
-
-    current_mae = _real_current_mae
+    methodology.current_mae = _real_current_mae
     # a broken or slow replay never breaks the report over a bonus line
     import backtest
     real_tr = backtest.track_record
@@ -1636,7 +1442,7 @@ def main() -> None:
         return
 
     exp = u.forecaster.expected(u.state.jornadas[0])
-    acts = u.candidates(exp, budget=float("inf"))
+    acts = u.candidates(budget=float("inf"))
     smoothed = cash_price_history()
     xi_exp, xi = u.current_xi
     bar_acts = band_acts(u, exp=xi_exp, xi=xi)
