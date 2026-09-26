@@ -62,11 +62,6 @@ class Match(NamedTuple):
     of: int
     basis: str = "value"
     gap: float | None = None
-    # P(this player's team keeps a clean sheet) and P(the opponent does),
-    # solved from bookmaker odds where they exist. NOT used in scoring --
-    # a defender's points come from ppm * def_factor, which has no
-    # clean-sheet slot to put these in. Carried so they can be graded
-    # against what actually happens before anyone restructures that.
     cs_for: float | None = None
     cs_against: float | None = None
 
@@ -76,21 +71,6 @@ def _poisson(k: int, lam: float) -> float:
 
 
 def clean_sheet_from_odds(p_home, p_draw, p_away, p_over, line=2.5):
-    """(P(home clean sheet), P(away clean sheet)) from one fixture's odds.
-
-    THE 1X2 SAYS WHO WINS, THE TOTAL SAYS HOW MANY. Neither alone gives a
-    clean sheet; together they pin down both sides' scoring rates. Fits
-    independent Poisson rates whose implied P(home win), P(draw) and
-    P(over line) best match the quoted market, then reads the clean sheet
-    straight off: P(home keeps one) = P(away scores 0) = exp(-lam_away).
-
-    Independent Poisson understates draws slightly (the Dixon-Coles
-    correction exists for exactly that) and is not corrected for here --
-    this is a market read, not a match model, and the draw share is an
-    input rather than something being predicted.
-
-    Returns (None, None) if any input is missing.
-    """
     try:
         ph, pd_, pa = float(p_home), float(p_draw), float(p_away)
         po, ln = float(p_over), float(line)
@@ -112,8 +92,6 @@ def clean_sheet_from_odds(p_home, p_draw, p_away, p_over, line=2.5):
                     eo += pr
         return (eh - ph) ** 2 + (ed - pd_) ** 2 + (eo - po) ** 2
 
-    # coarse then fine: the surface is smooth and one fixture is cheap,
-    # but this runs per fixture per report, so not a 3600-point grid.
     best = (None, 1.0, 1.0)
     for i in range(1, 41):
         for j in range(1, 41):
@@ -206,10 +184,6 @@ def xg_club_attack(understat_rows, xw) -> dict[str, float]:
 
 
 def _match_goals(results: list[dict]):
-    """(home, away, home_goals, away_goals) for every parseable results row
-    -- attack_defense() and club_volatility() each walked `results` and
-    extracted this separately before diverging into different per-team
-    accumulations."""
     for r in results:
         home, away = (r.get("home") or "").strip(), (r.get("away") or "").strip()
         try:
@@ -401,24 +375,16 @@ def season_board(market: list[dict], matches: list[dict], jornadas,
 
 
 def _selftest() -> None:
-    # -- clean_sheet_from_odds: the market read, not a match model ------
-    # A dead-even market: both sides equally likely to score, so equal
-    # clean sheets. 40% over 2.5 is a low-scoring game, so both should be
-    # comfortably above a coin flip.
     even = clean_sheet_from_odds(0.36, 0.28, 0.36, 0.40)
     assert even[0] is not None and abs(even[0] - even[1]) < 0.02, even
     assert 0.25 < even[0] < 0.65, even
 
-    # A heavy favourite keeps MORE clean sheets than the underdog, because
-    # the underdog is the one unlikely to score.
     lop = clean_sheet_from_odds(0.81, 0.15, 0.04, 0.44)
     assert lop[0] > lop[1] + 0.3, lop
 
-    # More goals expected -> fewer clean sheets, both ends.
     high = clean_sheet_from_odds(0.36, 0.28, 0.36, 0.75)
     assert high[0] < even[0], (high, even)
 
-    # Missing or malformed input is (None, None), never a guess.
     assert clean_sheet_from_odds(0.4, 0.3, 0.3, "") == (None, None)
     assert clean_sheet_from_odds("", "", "", "") == (None, None)
 

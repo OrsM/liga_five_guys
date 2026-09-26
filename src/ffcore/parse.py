@@ -68,13 +68,6 @@ def pct100(v):
 
 
 def grouped_sums(items, key_of, *value_fns) -> dict:
-    """{group_key: (sum1, sum2, ...)} accumulating value_fns(item) over
-    already-FILTERED `items`, one running sum per value_fn. key_of(item)
-    returning a constant (e.g. None) makes this one ungrouped tuple of
-    sums. The filtering stays with the caller -- what counts as a row
-    differs everywhere -- but the "bucket by key, sum N parallel values"
-    tail was independently hand-rolled in ffcore.fixture.xg_club_attack()
-    and ffcore.score.fit_promoted_discount()."""
     sums: dict = {}
     for item in items:
         acc = sums.setdefault(key_of(item), [0.0] * len(value_fns))

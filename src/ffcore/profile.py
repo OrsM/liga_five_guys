@@ -194,8 +194,6 @@ def build_profiles(players: dict, sc, perjornada_rows,
 
 def mk_profile(pj: float, pos: str = "MED", price=None, name: str = "",
                market_exp=None) -> PlayerProfile:
-    """A minimal fake PlayerProfile for tests -- par.py's and slate.py's
-    selftests each used to invent their own local copy of this."""
     return PlayerProfile(
         identity=Player(player_id="x", name=name),
         current=PlayerCurrent(pos=pos, price=price, listed=price is not None),

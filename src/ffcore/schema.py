@@ -56,7 +56,6 @@ def flag(row, col: str, default: bool = False) -> bool:
     return default
 
 
-
 class MATCHES:
     OBSERVED_AT = "observed_at"
     SOURCE = "source"
@@ -126,7 +125,6 @@ class PERJORNADA:
     POINTS_TOTAL = "points_total"
     GAMES_TOTAL = "games_total"
     JORNADA = "jornada"
-
 
 
 class PLAYERS:
@@ -342,7 +340,6 @@ class RESULTS_HISTORY:
     AWAY_SHOTS_ON_TARGET = "away_shots_on_target"
     HOME_CORNERS = "home_corners"
     AWAY_CORNERS = "away_corners"
-
 
 
 def _selftest() -> None:

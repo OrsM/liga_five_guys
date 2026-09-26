@@ -65,8 +65,6 @@ def log_squad(observed, players, chosen, formation: str, total, deadline,
     append_csv(path, rows, LOG_COLS)
 
 
-
-
 def stale_feed_warnings(quiet=None) -> list[str]:
     quiet = stale_feeds() if quiet is None else quiet
     if not quiet:
@@ -130,16 +128,6 @@ def main() -> None:
     xi = u.current_xi[1] if u else set()
     if players and xi:
         chosen = [p for p in players if p.get("key") in xi]
-        # FORMATION IS sim.shape()'S JOB, NOT A SECOND COUNT OF THE SAME XI.
-        # This used to re-derive DEF/MED/DEL counts from the scorer's rows,
-        # a second implementation of exactly what shape() already does from
-        # the Universe -- the same class of duplication that let a report
-        # and its own workings disagree before (see lfg-publish's own note
-        # on why decisions.json IS the report now, not a second rendering
-        # of it). The SCORE total stays local: it is the Scorer's per-round
-        # rating, deliberately NOT sim.py's season-forecast xi_total --
-        # squad_log.csv's own grading pipeline (methodology.fit_rate_rel_floor,
-        # golden_dataset) reads it as that specific quantity.
         best = (sum(p["score"] for p in chosen), sim.shape(u, xi), chosen)
     else:
         best = None

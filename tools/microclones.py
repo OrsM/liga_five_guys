@@ -1,20 +1,4 @@
 #!/usr/bin/env python3
-"""tools/microclones.py -- count near-identical 3-statement windows repeated
-across DIFFERENT top-level functions/methods in src/.
-
-Unlike tools/concepts.sh's other checks (which track named, already-found
-concepts), this is a blunt, general duplication detector: normalize each
-function's body (strip string/number literals) and slide a 3-line window
-over it, then count windows that recur, verbatim, inside some OTHER
-function. A function's own nested closures are excluded from its own
-count -- a closure's lines are a physical subset of its enclosing
-function's lines, so comparing a function against itself that way is not
-duplication, it is the same bytes counted twice (see cell()/ladder_rows()
-in sim.py, which this script used to -- wrongly -- flag).
-
-Run directly to see the actual matches; run with --count for the bare
-number tools/concepts.sh ratchets on.
-"""
 from __future__ import annotations
 
 import ast
@@ -32,8 +16,6 @@ def _norm_line(l: str) -> str:
 
 
 def _top_level_funcs(tree: ast.AST):
-    """FunctionDefs whose lines exclude any NESTED FunctionDef's lines --
-    the fix for the cell()/ladder_rows() false positive."""
     for node in ast.walk(tree):
         if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
             continue

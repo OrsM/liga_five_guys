@@ -61,7 +61,6 @@ def _madrid():
 MADRID = _madrid()
 
 
-
 def input_path(name: str) -> Path:
     p = Path("inputs") / name
     return p if p.exists() else Path(name)
@@ -75,11 +74,6 @@ def _forget(path) -> None:
 
 
 def _mtime_cached(path, cache: dict, key, build):
-    """cache[key] if `path`'s (mtime, size) stamp still matches, else
-    build() and store it. None if `path` does not exist. The one shape
-    behind every "reread this file only if it changed" cache in this
-    module -- five of them used to hand-roll the stat/OSError/stamp-compare
-    dance separately."""
     path = Path(path)
     try:
         st = path.stat()
@@ -106,24 +100,11 @@ def read_csv(path) -> list[dict]:
                     for row in r if row]
 
     rows = _mtime_cached(path, _READ_CACHE, str(Path(path)), build)
-    # READ-ONLY VIEWS, NOT COPIES. This used to rebuild every row with
-    # `[dict(r) for r in hit[1]]` so a caller could mutate its result without
-    # corrupting the cache. Nothing in the repo ever did: flipping this to a
-    # view and running all 32 suites turned up exactly one mutator -- the
-    # selftest written to prove the copy worked. The copy cost 188,184 fresh
-    # dicts per read of starters.csv, seven times a run.
-    # A caller that does need to mutate should build its own dict from a row;
-    # it now fails loudly at the assignment rather than silently paying for
-    # everyone else's safety.
     return [MappingProxyType(r) for r in (rows or [])]
 
 
 @contextmanager
 def _csv_dictwriter(path, fieldnames, mode, **writer_kw):
-    """An open csv.DictWriter for `path` -- write_csv() and append_csv()
-    each built this (mkdir, the DictWriter args) separately. Both pass
-    extrasaction="ignore"; only append_csv also needs restval="" (a
-    widened file can have older rows missing a newer column)."""
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open(mode, newline="", encoding="utf-8") as fh:
         yield csv.DictWriter(fh, fieldnames=fieldnames, extrasaction="ignore",
@@ -131,10 +112,6 @@ def _csv_dictwriter(path, fieldnames, mode, **writer_kw):
 
 
 def csv_string(rows, fieldnames) -> str:
-    """rows as CSV text, header included -- ledger.render() and
-    ingest._manifest_csv() each built this (StringIO, DictWriter,
-    writeheader, writerows, getvalue) separately, for embedding the
-    result rather than persisting it to a path."""
     buf = io.StringIO()
     w = csv.DictWriter(buf, fieldnames=fieldnames, lineterminator="\n")
     w.writeheader()
@@ -200,7 +177,6 @@ def write_lines(path, lines) -> None:
     print("wrote %s" % path)
 
 
-
 @lru_cache(maxsize=4096)
 def _digits_to_dt(s: str, tz):
     digits = re.sub(r"\D", "", s or "")
@@ -223,7 +199,6 @@ def snapshot_stamp(s: str):
 def ledger_stamp(s: str):
     local = _digits_to_dt(s, MADRID)
     return local.astimezone(timezone.utc) if local else None
-
 
 
 def latest_only(rows: list[dict]) -> list[dict]:
@@ -282,15 +257,6 @@ def _cached_latest_snapshot(path, keep=None, cache_key=None) -> list[dict]:
 
 
 def table_stats(path, col: str = "observed_at") -> tuple[int, str]:
-    """How many rows, and the newest value in one column -- WITHOUT keeping
-    the table.
-
-    The freshness table wants exactly this for every tidy file, and it was
-    getting it with read_csv(): five history tables materialised and held
-    for the life of the process, 276MB of cache, to print a row count and a
-    timestamp. If a table is already cached because something genuinely
-    needed its rows, that copy is used and nothing is read twice.
-    """
     path = Path(path)
     try:
         st = path.stat()
@@ -324,15 +290,6 @@ def table_stats(path, col: str = "observed_at") -> tuple[int, str]:
 
 
 def newest(name: str, keep=None, cache_key=None) -> list[dict]:
-    """The newest snapshot of a tidy table, read in ONE PASS.
-
-    latest_only(read_csv(x)) gets the same answer by materialising the whole
-    history first, which for starters.csv is 226,012 rows and 61MB held for
-    the life of the process to keep the ~900 that are current. The streaming
-    reader underneath this was already here and already used by
-    load_market_latest(); thirteen other call sites had each re-derived the
-    expensive version by hand.
-    """
     return _cached_latest_snapshot(TIDY / name, keep=keep, cache_key=cache_key)
 
 
@@ -353,17 +310,6 @@ def run_now() -> datetime:
 
 
 def shown(t=None, fmt: str = "%Y-%m-%d %H:%M") -> str:
-    """A clock for a PERSON to read: Madrid, where the league plays and where
-    the reader is, labelled with whichever offset is in force (CEST or CET)
-    rather than assumed.
-
-    DATA MUST NOT USE THIS, and the split is the whole point. observed_at,
-    the dt= snapshot names, logged_at and decisions.json's generated_at are
-    KEYS -- they join tables, order snapshots and name files. They stay UTC,
-    where an hour never repeats itself and the October clock change cannot
-    reorder a season or make two snapshots collide on one name. What changes
-    here is only what gets printed for someone to read.
-    """
     when = run_now() if t is None else t
     return when.astimezone(MADRID).strftime(fmt + " %Z")
 
@@ -419,10 +365,6 @@ _LINEUPS_CACHE: dict = {}
 
 
 def load_lineups(source: str = LINEUP_SOURCE) -> list[dict]:
-    """All lineup rows for `source` (default) or every source (""). One
-    build() call hits this 3x across sources -- each used to re-read the
-    whole ~174k-row CSV; the raw parse is now cached per file version and
-    `source` filters the cached, unfiltered read."""
     path = TIDY / "lineups.csv"
     rows = _mtime_cached(path, _LINEUPS_CACHE, None,
                          lambda: tuple(read_csv(path)))
@@ -440,7 +382,6 @@ def pick_source(rows: list[dict], source: str) -> list[dict]:
                                     if r.get("source") == source]
 
 
-
 def _api_stats_key(r: dict):
     return ((r.get("player_id") or "").strip(), (r.get("week") or "").strip(),
             (r.get("stat") or "").strip())
@@ -455,7 +396,6 @@ def load_perjornada() -> list[dict]:
     return read_csv(files[-1]) if files else []
 
 
-
 def kickoff_stamp(s: str):
     try:
         when = datetime.fromisoformat((s or "").strip())
@@ -463,8 +403,6 @@ def kickoff_stamp(s: str):
         return None
     return (when.replace(tzinfo=timezone.utc) if when.tzinfo is None
             else when.astimezone(timezone.utc))
-
-
 
 
 GATED_API = ("api_teams", "api_market", "api_standings",
@@ -510,7 +448,6 @@ def last_api_standings() -> list[dict]:
     return newest("api_standings.csv")
 
 
-
 def load_api_players() -> dict[str, str]:
     out = {}
     for r in read_csv(TIDY / "api_players.csv"):
@@ -523,10 +460,6 @@ _XW_CACHE: dict = {}
 
 
 def load_crosswalk():
-    """Cached like read_csv(): keyed on both files' (mtime, size), so every
-    caller shares one parse per real change instead of each re-reading
-    players.csv/clubs.csv by hand -- the pattern that had four independent
-    copies (methodology.py's own _XW_CACHE among them) before this."""
     from ffcore.crosswalk import Crosswalk
     path = TIDY / "players.csv"
     clubs = TIDY / "clubs.csv"
@@ -548,13 +481,6 @@ def load_fixtures() -> list[dict]:
 
 
 def load_odds() -> list[dict]:
-    """Newest bookmaker quote per fixture, from odds.csv.
-
-    latest_per_key on (home, away) rather than latest_only: a fixture is
-    quoted from the moment it is listed until it kicks off, so the newest
-    SNAPSHOT only carries whatever was still unplayed when it was taken,
-    while every fixture's own newest quote is what a consumer wants.
-    """
     from ffcore import schema
     return latest_per_key(read_csv(TIDY / "odds.csv"),
                           lambda r: (schema.text(r, "home"),
@@ -565,11 +491,6 @@ _UNDERSTAT_CACHE: dict = {}
 
 
 def load_understat_players(season: str = "") -> list[dict]:
-    """Latest row per (season, understat_id). The cache key used to include
-    `season`, so each of a run's several same-season calls (score.py alone:
-    5x across two seasons per build()) re-read and re-sorted the whole
-    ~160k-row CSV. Cached once per file version instead; `season` only
-    filters the already-deduped, far smaller result."""
     path = TIDY / "understat_players.csv"
 
     def build():
@@ -736,12 +657,6 @@ def _merge(players: dict, rows: list[dict], name_col: str, fields,
 
 
 def stale_owned_players(players: dict, owned_keys, market) -> dict:
-    """players, plus a last-known record for each owned key the live
-    market snapshot dropped, via market.latest() (never expiring) and
-    load_players()'s own field parsing. Tags the backfilled `status` as
-    stale so squads.flag() renders a warning instead of reading as fresh.
-    Does not touch load_players()'s own forecasting player universe.
-    """
     missing = [k for k in owned_keys if k not in players]
     if not missing or market is None:
         return players
@@ -938,8 +853,6 @@ class Market:
         return {k: hist[-1][1] for k, hist in self._by_key.items() if hist}
 
     def _parsed(self, key: str) -> list[tuple[datetime, dict, float | None]]:
-        """(t, row, money(row['value'])) per key, parsed once and cached --
-        at()/series() used to re-parse a player's whole history every call."""
         cached = self._parsed_cache.get(key)
         if cached is None:
             cached = [(t, r, money(r.get("value")))
@@ -1017,12 +930,6 @@ def _pending_amounts(rows, status_field: str, money_field: str,
 
 
 def pending_sent(mkt: list[dict], key_of) -> dict[str, float]:
-    """Your own live bids, by player key -- money you have COMMITTED, not
-    money you have SPENT. The app does not debit a bid when it is placed
-    (verified against its own balance feed on 2026-09-18: two bids totalling
-    34.7M stood against a 13.2M balance), so this must never be subtracted
-    from cash. It is a list of actions already taken, to be re-endorsed or
-    withdrawn -- mirror of pending_received()."""
     return _pending_amounts(mkt, "bid_status", "bid_money", key_of)
 
 
@@ -1030,7 +937,6 @@ def pending_received(offers: list[dict], pt_to_key: dict[str, str]
                      ) -> dict[str, float]:
     return _pending_amounts(offers, "status", "money",
                             lambda r: pt_to_key.get(r.get("player_team_id") or ""))
-
 
 
 def _selftest_cache() -> None:
@@ -1042,15 +948,12 @@ def _selftest_cache() -> None:
         first = read_csv(p)
         assert [r["a"] for r in first] == ["1", "2"], first
 
-        # The rows are read-only views: a caller cannot corrupt the cache
-        # because it cannot write at all. Stronger than the copy this
-        # replaced, and free.
         try:
             first[0]["a"] = "999"
             raise AssertionError("read_csv rows must be read-only")
         except TypeError:
             pass
-        first.append({"a": "3", "b": "z"})     # the LIST is still the caller's
+        first.append({"a": "3", "b": "z"})
         assert [r["a"] for r in read_csv(p)] == ["1", "2"], read_csv(p)
 
         write_csv(p, [{"a": "7", "b": "q"}])
@@ -1070,7 +973,7 @@ def _selftest_crosswalk_cache() -> None:
     with tempfile.TemporaryDirectory() as tmp:
         TIDY = Path(tmp)
         try:
-            assert load_crosswalk() is None    # no players.csv yet
+            assert load_crosswalk() is None
             write_csv(TIDY / "players.csv",
                      [{"player_id": "a", "name": "A", "club_id": "c"}],
                      ["player_id", "name", "club_id", "ff_slug", "af_slug",
@@ -1081,7 +984,7 @@ def _selftest_crosswalk_cache() -> None:
                       "af_id", "aliases"])
             xw1 = load_crosswalk()
             assert xw1.players["a"].name == "A", xw1.players
-            assert load_crosswalk() is xw1     # same object: cache hit
+            assert load_crosswalk() is xw1
 
             write_csv(TIDY / "players.csv",
                      [{"player_id": "a", "name": "Renamed", "club_id": "c"}],
@@ -1408,18 +1311,11 @@ def _selftest() -> None:
     _, r2, _ = market_routes(unknown_seller, lambda r: "free_agent")
     assert r2 == {"free_agent": "free"}, r2
 
-    # THE CLOCK A PERSON READS vs THE CLOCK THAT KEYS THE DATA.
     summer = datetime(2026, 9, 18, 16, 40, tzinfo=timezone.utc)
     winter = datetime(2026, 12, 18, 16, 40, tzinfo=timezone.utc)
     assert shown(summer) == "2026-09-18 18:40 CEST", shown(summer)
-    # The October change is the reason the offset is read rather than
-    # assumed -- the same UTC hour is 18:40 in September and 17:40 in
-    # December, and a hardcoded "+2" would silently be an hour out all winter.
     assert shown(winter) == "2026-12-18 17:40 CET", shown(winter)
     assert shown(summer, "%d %b %H:%M") == "18 Sep 18:40 CEST"
-    # A key must NOT move with the clocks: snapshot_stamp round-trips the
-    # UTC spelling that names files and orders snapshots, untouched by any
-    # of this.
     assert snapshot_stamp("2026-09-18T1640Z") == summer, \
         snapshot_stamp("2026-09-18T1640Z")
 
@@ -1433,9 +1329,6 @@ def _selftest() -> None:
         {"player_name": "", "bid_status": "pending", "bid_money": "9000000"},
     ]
     sent = pending_sent(mkt_bids, lambda r: r["player_name"])
-    # The SAME player twice keeps the standing bid, not the sum -- two rows
-    # are two snapshots of one commitment, and an unresolvable row is dropped
-    # rather than folded into a total nobody can act on.
     assert sent == {"A": 5600000.0, "B": 6795815.0}, sent
     assert sum(sent.values()) == 5600000.0 + 6795815.0
     assert pending_sent([], lambda r: "x") == {}

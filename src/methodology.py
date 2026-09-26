@@ -31,7 +31,6 @@ WINDOW_DAYS = 21
 NOT_GRADED: list[str] = []
 
 
-
 def latest_before(preds: list[tuple[dt.datetime, dict]],
                   cutoff: dt.datetime) -> dict | None:
     best = None
@@ -82,9 +81,6 @@ def _group_by_key(rows, key_fn=None, when_fn=None, value_fn=None,
 def _matched_actuals(actuals: list[dict],
                      preds: dict[str, list[tuple[dt.datetime, dict]]],
                      require_jornada: bool = False):
-    """Actuals matched against `preds` via match_claim, as (a, key, fac) --
-    the join loop pair() and golden_dataset() each walked separately
-    (games_delta filter, match_claim, skip on no match)."""
     for a in actuals:
         if a["games_delta"] < 1:
             continue
@@ -116,15 +112,6 @@ def pair(actuals: list[dict],
 
 
 def _conditional(fac: dict) -> float:
-    """The prediction CONDITIONAL on the player having played: his rate
-    times the fixture, with no P(start) in it.
-
-    `_default_predicted` below is the unconditional one -- it carries
-    P(start) -- and load_actuals() only ever yields rows for players who
-    DID play. Grade one against the other and P(start) miscalibration
-    reads as rate error. Both fitters here want this one; shared rather
-    than nested inside one of them, which is why the other never got it.
-    """
     return (fac.get("ppm") or 0.0) * (fac.get("fix") or 1.0)
 
 
@@ -162,13 +149,6 @@ def lagged_pair(actuals: list[dict],
 
 
 def _graded_history() -> tuple[dict, list[dict], dict]:
-    """(round_locks, actuals, predictions) -- the real-data load
-    fit_rate_rel_floor() and drift_frac_from_history() each open with,
-    before diverging into different lagged_pair() calls. Shared because
-    it is the same three loads, not because the fits are the same job;
-    decide.py's load() calls both fitters back to back on the same run,
-    so factoring this out also removes a real redundant pair of reads
-    (load_actuals()/load_predictions() no longer run twice)."""
     locks = clock_history().round_locks
     actuals, _label = load_actuals()
     preds = load_predictions()
@@ -225,16 +205,6 @@ def drift_frac_from_history(lag1: int = 1, lag3: int = 3,
 
     locks, actuals, preds = history if history is not None else _graded_history()
 
-    # CONDITIONAL, matching fit_rate_rel_floor() above. Bootstrap's own
-    # prediction is UNCONDITIONAL -- pts * p_start -- while load_actuals()
-    # only yields rows for players who actually played (games_delta >= 1).
-    # Comparing the two mixes P(start) miscalibration into what reads as
-    # RATE drift, and it gets worse at longer lags because P(start)
-    # further out is less accurate. That is experiment_log.csv's
-    # drift_frac_conditional_fix (2026-09-16, n=279), which SUPERSEDED
-    # three earlier entries chasing a drift signal that turned out to be
-    # this artifact. The correction was applied to rate_rel's fit and
-    # never to this one. Measured: rate_rel 1.725 -> 1.196.
     h1 = lagged_pair(actuals, preds, locks, lag1, predicted_fn=_conditional)
     h3 = lagged_pair(actuals, preds, locks, lag3, predicted_fn=_conditional)
     if not h1:
@@ -270,14 +240,6 @@ FIX_BUCKETS = [(-1e9, 1.0 - FIX_EDGE, "harder"),
 
 def _bucket_means(rows: list[dict], buckets, bucket_field: str,
                   mean_fields: tuple) -> list[tuple]:
-    """(label, n, *means) per non-empty bucket -- `rows` grouped by
-    bucket_field into `buckets` ranges, each of mean_fields averaged as
-    p[f]/p["matches"] over the group. comparison_lines() calls this
-    directly for both its fixture-difficulty and per_match buckets rather
-    than through a differently-named wrapper fixed to one bucket
-    scheme -- fixture_rows()/bucket_rows() used to be that wrapper, each
-    with exactly one real caller, so they added a name without adding a
-    choice."""
     out = []
     for lo, hi, label in buckets:
         grp = [p for p in rows if lo <= p[bucket_field] < hi]
@@ -288,7 +250,6 @@ def _bucket_means(rows: list[dict], buckets, bucket_field: str,
                      for f in mean_fields)
         out.append((label, n, *means))
     return out
-
 
 
 START_EDGE = 10.0
@@ -304,14 +265,6 @@ def appearances(actuals: list[dict]) -> list[tuple[dt.datetime, set]]:
 
 
 def _matched_start_rows(intervals, per: dict[str, list], check_teams: bool = True):
-    """(interval, key, row) for every interval x per-key claim history pair
-    whose latest claim before the interval's start matches its teams --
-    the join loop start_grade() (once per source), _start_instances() and
-    golden_rows() each walked separately. _instance_briers() wants the same
-    walk but skips the teams check (check_teams=False): its (key, start)
-    pairs are already team-validated, from a prior _start_instances() call
-    against a DIFFERENT source's rows, so re-checking THIS source's row
-    against `teams` would filter on the wrong source's claim."""
     for interval in intervals:
         start = interval[0]
         teams = interval[2] if check_teams and len(interval) > 2 else None
@@ -379,7 +332,6 @@ def _start_instances(intervals, claims, src, universe=None) -> set:
            if (_start_classify(row) or (None, None))[0] == "numeric"}
 
 
-
 def market_names(market: list[dict], slugs) -> dict[str, list[dict]]:
     latest = {}
     for r in market:
@@ -442,7 +394,6 @@ def start_intervals(matches: list[dict], starters: list[dict],
     return out, graded, sorted(ungraded)
 
 
-
 def load_actuals(window_days: int | None = WINDOW_DAYS) -> tuple[list[dict], str]:
     files = sorted(LIVE.glob("perjornada_*.csv")) if LIVE.exists() else []
     if not files:
@@ -464,11 +415,6 @@ def load_actuals(window_days: int | None = WINDOW_DAYS) -> tuple[list[dict], str
             continue
         full = r.get("player_name_full", "")
         short = r.get("player_name", "")
-        # ff_id FIRST: squad_log.csv has keyed its own rows on ff_id, not
-        # name, since 2026-08-20 (98% of it) -- match on name ALONE missed
-        # nearly the whole log, so fit_rate_rel_floor() and
-        # drift_frac_from_history() were grading against a stale August
-        # sliver and calling it "too few pairs" rather than a key mismatch.
         keys = [k for k in {r.get("ff_id", ""), norm(full), norm(short)} if k]
         jor = r.get("jornada", "")
         rows.append({"name": full or short, "keys": keys,
@@ -521,7 +467,6 @@ def golden_dataset() -> dict[int, dict[str, dict]]:
         row["games"] = a["games_delta"]
         out.setdefault(a["jornada"], {})[key] = row
     return out
-
 
 
 FILLS = {
@@ -795,7 +740,6 @@ def formula_lines() -> list[str]:
     ]
 
 
-
 def column_guide_lines() -> list[str]:
     return [
         "### How to read the tables", "",
@@ -1006,8 +950,6 @@ def golden_rows() -> list[dict]:
 def _baseline_check(n: int, ours_terms: list[float],
                     baselines: dict[str, tuple[str, list[float]]],
                     mean_field: str, mean_value: float) -> dict:
-    """baselines: {vs_suffix: (mean_field_name, terms)} -- the two names do
-    not always match (e.g. mean field "coin_flip", gap field "vs_coin")."""
     out = {"n": n, mean_field: mean_value, "ours": sum(ours_terms) / n}
     for suffix, (field_name, terms) in baselines.items():
         out[field_name] = sum(terms) / n
@@ -1102,8 +1044,6 @@ def rate_baseline_check(pairs: list[dict]) -> dict | None:
            for p, a in zip(pairs, actual_rates)]
     naive = [abs(mean_rate - a) for a in actual_rates]
     return _baseline_check(n, ours, {"naive": ("naive", naive)}, "mean_rate", mean_rate)
-
-
 
 
 ACCURACY_LOG = "forecast_accuracy_log.csv"
@@ -1265,7 +1205,6 @@ def main() -> None:
     print(f"wrote {PARTS / 'methodology.md'} ({len(out)} lines)")
 
 
-
 def _selftest() -> None:
     assert _light("every_run", [0.5], False)[0] == GREEN
     assert _light("twice_daily", [17.6], False)[0] == AMBER
@@ -1341,12 +1280,6 @@ def _selftest() -> None:
     assert len(lag2) == 1 and lag2[0]["predicted"] == 1.0, lag2
     assert lagged_pair(actuals3, preds3, locks3, 3) == []
 
-    # load_actuals()'s keys must include ff_id: squad_log.csv (what
-    # load_predictions() reads) has keyed its own rows on ff_id, not name,
-    # since 2026-08-20 -- name-only matching here missed 98% of the real
-    # log and every fit reading it (fit_rate_rel_floor,
-    # drift_frac_from_history) silently graded a stale August sliver
-    # while its own "n=" message read as an honest small sample.
     import csv as _csv_la
     import tempfile as _tempfile_la
     _real_live = LIVE
@@ -1371,13 +1304,6 @@ def _selftest() -> None:
             globals()["LIVE"] = _real_live
     assert id_row and "999" in id_row[0]["keys"], id_row
 
-    # Pins the CONTRACT, not a constant. This asserted `fitted == 1.0`,
-    # which was only ever true because the fitter returned the module
-    # default whenever it could not measure compounding -- the behaviour
-    # that put an unfitted 1.00 into every band. What must hold is that a
-    # real number comes back with a reason attached, and that it lands
-    # inside the range this estimator can actually produce: sqrt() of a
-    # bootstrapped variance growth, which cannot sensibly exceed 1.
     fitted, why = drift_frac_from_history()
     assert isinstance(fitted, float) and 0.0 <= fitted <= 1.0, (fitted, why)
     assert isinstance(why, str) and why, (fitted, why)
@@ -1435,8 +1361,6 @@ def _selftest() -> None:
                  "away": "Levante"},
                 {"kickoff": "2026-08-15T19:30:00+00:00", "home": "Alaves",
                  "away": "Getafe"}]
-    # team_slug_of() is tidy.py's own function, fully tested there --
-    # JornadaClock uses it internally, not re-verified here a second time.
     locks = JornadaClock(matches, fixtures).round_locks
     assert list(locks) == [1] and locks[1].day == 15, locks
     assert 2 not in locks
@@ -1508,10 +1432,6 @@ def _selftest() -> None:
     tmp = tempfile.mkdtemp()
     try:
         DECISIONS = __import__("pathlib").Path(tmp)
-        # forecast_claims() reads its crosswalk through load_crosswalk(),
-        # which resolves paths off ffcore.tidy's OWN TIDY -- patching only
-        # this module's imported name (as below, for DECISIONS/squad_log.csv)
-        # would leave load_crosswalk() reading the real players.csv.
         TIDY = _tidy_fc.TIDY = DECISIONS
         write_csv(DECISIONS / "squad_log.csv", [
             {"observed_at": "2026-08-10T1200Z", "player": "Nailed",

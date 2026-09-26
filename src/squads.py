@@ -57,12 +57,8 @@ def log_slate(on_offer, players, stamp):
     append_csv(path, rows, SLATE_LOG)
 
 
-
-
 def pct(v) -> str:
     return "—" if v is None else "%+.1f%%" % v
-
-
 
 
 def sec_premium(lg, dl) -> list[str]:
@@ -144,8 +140,6 @@ def sec_premium(lg, dl) -> list[str]:
     out += ["", "`~` priced against a snapshot more than %dh away and left "
             "out of the medians." % MAX_LAG_H, ""]
     return out
-
-
 
 
 def sec_drift(dl, market) -> list[str]:

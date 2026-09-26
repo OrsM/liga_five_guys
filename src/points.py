@@ -16,7 +16,6 @@ DIFF_FIELDS = ["from_stamp", "to_stamp", "season", "ff_id", "player_name",
 EMPTY_MARKS = ("no se encontraron resultados", "sin resultados")
 
 
-
 def empty_season(html: str) -> bool:
     low = (html or "").lower()
     return any(m in low for m in EMPTY_MARKS)
@@ -100,7 +99,6 @@ def diff(prev_rows: list[dict], cur_rows: list[dict],
     return out
 
 
-
 _CACHE = "parsed_points.json"
 
 
@@ -173,7 +171,6 @@ def main() -> None:
               f"{len(flat)} per-jornada rows")
 
     print(f"wrote {LIVE}/ — report.py does not read this folder, on purpose.")
-
 
 
 def _selftest() -> None:

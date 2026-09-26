@@ -181,8 +181,6 @@ def demand_summary(cand: dict, lg, snaps: dict) -> str:
     return ", ".join(bits) if bits else "none"
 
 
-
-
 def _selftest() -> None:
     fixed = [
         {"side": "buy", "premium": 2.0, "lag_h": 0.1},

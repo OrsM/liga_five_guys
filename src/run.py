@@ -39,9 +39,6 @@ def call(spec: str):
 
 
 def _sample(hits, stop, tid) -> None:
-    # Innermost src/ frame of the main thread every 0.25s, not cProfile: a
-    # stage took 38s scheduled and 2.2s by hand (2026-09-24) and cProfile's
-    # ~2x would distort the run being explained.
     while not stop.wait(0.25):
         f, at = sys._current_frames().get(tid), "(outside src/)"
         while f is not None:
@@ -76,19 +73,10 @@ def main(argv: list[str]) -> int:
             traceback.print_exc()
             print("  FAILED: %s" % name)
             return 1
-        # gc.collect() BEFORE the stage's time is recorded, not after: it
-        # used to run outside the timer, so a stage's own printed cost was
-        # a lie and the difference showed up as an unexplained gap between
-        # the per-stage sum and the total -- 365.7s vs 698.4s on
-        # 2026-09-23, all of it later traced to GC passes over a
-        # memory-pressured box (swap in use), invisible because nothing
-        # timed them. Kept, not removed: this repo runs under a 750M
-        # MemoryMax and the collect is what keeps one stage's numpy/CSV
-        # working set from still being live when the next stage allocates.
         gc.collect()
         stop.set()
         times.append((time.time() - t0, name))
-        if times[-1][0] > float(os.environ.get("LFG_SLOW_S", 8)):  # quiet when healthy
+        if times[-1][0] > float(os.environ.get("LFG_SLOW_S", 8)):
             print("  slow %s, where: %s" % (name, "  ".join(
                 "%d%% %s" % (100 * v // sum(hits.values()), k)
                 for k, v in hits.most_common(5))))

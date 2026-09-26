@@ -1,19 +1,3 @@
-"""Did the report's recommended moves beat what it did not recommend?
-
-Every reports/decisions.json in git history is a call made at that time. Each
-listed move (buy X, sell Y) is graded on what the two players really scored in
-the HORIZON days that followed -- buy points minus sell points, as backtest.py
-does -- and moves are compared WITHIN their own day, so a good or bad week for
-everyone cancels out.
-
-    PYTHONPATH=src FF_ROOT=./data uv run python tools/replay_scorecard.py
-
-First read (2026-09-24, 20 days, 432 move-days): the #1 move netted +2.7 pts
-over 10 days and beat the same day's other moves by +2.7 (95% +0.1..+5.4, so
-only just clear of zero); ranks 2-5 were flat to negative; raids ("clause") averaged -1.5. The report's
-own predicted gain (d_pts, pts_lo, d_win) correlated +0.03..+0.09 with what
-happened, so its size says little -- only which move it ranks first.
-"""
 from __future__ import annotations
 
 import collections

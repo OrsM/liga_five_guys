@@ -107,8 +107,6 @@ def _post(url: str, form: dict) -> dict:
     return r.json()
 
 
-
-
 def authorize_url(verifier: str | None = None) -> tuple[str, str, str]:
     import base64
     import hashlib

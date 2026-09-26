@@ -25,23 +25,10 @@ __all__ = ["commit_as_of", "csv_as_of", "commits_touching",
 _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
-# Derived from the data, not assumed: cross-referencing api_teams'
-# position_id against the market's textual position over 10,780 pairings
-# gives 1->POR 768, 2->DEF 4352, 3->MED 3242, 4->DEL 2418, with nothing
-# landing in two slots.
 POS_ID_SLOT = {"1": "POR", "2": "DEF", "3": "MED", "4": "DEL"}
 
 
 def squad_at(manager: str, when: dt.datetime) -> dict[str, str]:
-    """Who a manager owned at a past moment, as {ff_id: slot}.
-
-    Keyed by ff_id, not the app\'s own player id, because that is the key
-    load_perjornada() and every forecast in this repo already speak.
-
-    csv_as_of() reads api_teams.csv out of the commit that was current then,
-    and latest_only() takes that file's newest snapshot -- the two existing
-    pieces, rather than a fourth way to ask what a squad looked like.
-    """
     from ffcore.schema import API_TEAMS, text
     from ffcore.tidy import latest_only, load_crosswalk
     xw = load_crosswalk()
@@ -57,15 +44,6 @@ def squad_at(manager: str, when: dt.datetime) -> dict[str, str]:
 
 
 def jornada_points(jornada: int) -> dict[str, float]:
-    """What each player scored in one jornada, by ff_id.
-
-    load_perjornada() IS this table -- the repo derives it every run and
-    keys it the way everything else here is keyed. The first version of this
-    function summed api_stats instead, which meant discovering for itself
-    that api_stats is a per-stat breakdown and that marca_points counts: a
-    second derivation of a number already sitting in data/season/live, with
-    its own bugs to find.
-    """
     from ffcore.schema import PERJORNADA, num, text
     from ffcore.tidy import load_perjornada
     want = str(jornada)
@@ -78,19 +56,6 @@ def jornada_points(jornada: int) -> dict[str, float]:
 
 def jornada_bounds(manager: str, jornada: int,
                    owned_at: dt.datetime) -> dict | None:
-    """The most and the least a manager could have scored in one jornada.
-
-    Owned at the START of the round, scoring IN the round: the best legal
-    eleven that squad could field, and the worst. A real award has to sit
-    between them, because every legal eleven does.
-
-    Outside the band means the eleven that scored was not one this squad
-    could legally field. Above the ceiling is impossible from these players;
-    below the floor means points were taken away -- an illegal side, or the
-    app's own penalty on a manager who is overdrawn when the round locks.
-    That is the point of the test: it is an INDEPENDENT reading of whether a
-    rival was in the red, owing nothing to our own ledger arithmetic.
-    """
     from ffcore.season import best_xi
     squad = squad_at(manager, owned_at)
     if not squad:
@@ -99,8 +64,6 @@ def jornada_bounds(manager: str, jornada: int,
     top = best_xi(squad, pts)
     if not top:
         return None
-    # The worst legal eleven is the best one under negated points -- same
-    # shape rules, so the floor is a side he could actually have put out.
     bottom = best_xi(squad, {k: -v for k, v in pts.items()})
     return {"manager": manager, "jornada": jornada,
             "owned_at": owned_at.isoformat(timespec="minutes"),
@@ -111,8 +74,6 @@ def jornada_bounds(manager: str, jornada: int,
 
 def audit_jornada(manager: str, jornada: int, owned_at: dt.datetime,
                   actual: float) -> dict | None:
-    """jornada_bounds(), with the award the app actually gave held against
-    it. verdict is "ok", "below floor" or "above ceiling"."""
     b = jornada_bounds(manager, jornada, owned_at)
     if b is None:
         return None
@@ -157,7 +118,6 @@ def commits_touching(path: str) -> list[tuple[str, dt.datetime]]:
         except ValueError:
             continue
     return commits
-
 
 
 NEAR_MISS_FRAC = 0.85
@@ -262,16 +222,10 @@ def replay_screen_misses(sample_every: int = 10,
 
 
 def _checked_golden(golden: list[dict]) -> list[dict]:
-    """golden rows with a real predicted_rate -- the header
-    naive_value_baseline() and recency_only_baseline() each built
-    separately before diverging into two different naive predictors."""
     return [r for r in golden if r.get("predicted_rate") is not None]
 
 
 def _mae_result(resolved: list[tuple], **extra) -> dict | None:
-    """{n, naive_mae, ours_mae, **extra} from (naive_pred, actual, ours_pred)
-    triples -- the tail naive_value_baseline() and recency_only_baseline()
-    each computed separately."""
     if not resolved:
         return None
     n = len(resolved)
@@ -440,9 +394,6 @@ def _format_track_record(r: dict | None) -> str | None:
 
 
 def track_record(min_days: float = 3.0) -> str | None:
-    """One sentence, generated from replay_recommendations(): has the
-    report's own #1 move actually paid off? None if too few calls have had
-    time to resolve yet -- the report says nothing rather than guess."""
     return _format_track_record(replay_recommendations(min_days))
 
 
@@ -472,12 +423,6 @@ def _by_pts_lo(moves: list[dict], n: int) -> list[dict]:
 
 
 def _replay_setup(path: str = "reports/decisions.json"):
-    """(commits, points_between, now) for replaying a decision log, or
-    None if there's nothing to replay -- _replay() and
-    replay_ladder_percentile() each built this bail-if-empty setup
-    separately; the latter paid for _actuals_index() (a full actuals
-    load) even with zero commits, which this restores the short-circuit
-    against."""
     commits = commits_touching(path)
     if not commits:
         return None
@@ -520,17 +465,11 @@ def replay_ladder_percentile(topn: int = 3, min_days: float = 3.0) -> dict:
 
 
 def _selftest() -> None:
-    # ONE PER-JORNADA POINTS TABLE, NOT TWO. load_perjornada() is the one
-    # this repo builds and forecasts from; jornada_points() reads it rather
-    # than summing api_stats into a second copy with its own bugs to find.
     j3 = jornada_points(3)
     assert j3, "jornada 3 has scores in data/season/live"
     assert all(isinstance(k, str) and k for k in j3), "keyed by ff_id"
     assert jornada_points(99) == {}, "a jornada nobody played is empty"
 
-    # THE BAND IS WHAT EVERY LEGAL ELEVEN CAN REACH. Eleven starters plus a
-    # bench man who outscores one of them: the ceiling must pick him up and
-    # the floor must leave him out, and both must field a legal shape.
     squad = {"p": "POR", **{f"d{i}": "DEF" for i in range(4)},
              **{f"m{i}": "MED" for i in range(4)}, "f0": "DEL", "f1": "DEL",
              "bench": "MED"}
@@ -551,9 +490,6 @@ def _selftest() -> None:
         assert mid["verdict"] == "ok", mid
         over = _bt.audit_jornada("whoever", 5, now, b["best"] + 1)
         assert over["verdict"] == "above ceiling", over
-        # Below the floor is the one that matters: no legal eleven from this
-        # squad scores that little, so points were taken away. That is what
-        # caught miguel_autentico on 7 against a floor of 39 in jornada 3.
         under = _bt.audit_jornada("whoever", 5, now, b["worst"] - 1)
         assert under["verdict"] == "below floor", under
     finally:

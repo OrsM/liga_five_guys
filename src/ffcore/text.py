@@ -73,7 +73,6 @@ def match_one(side, candidates) -> str | None:
     return hits[0] if len(hits) == 1 else None
 
 
-
 def _selftest() -> None:
     rows = [{"name": "Isaac Romero"}, {"name": "Cristian Romero"},
             {"name": "Carlos Romero"}, {"name": "Lamine Yamal"},

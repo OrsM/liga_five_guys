@@ -40,22 +40,6 @@ def fit_drift_frac(h1_pairs, h3_pairs) -> tuple[float, str]:
     var3 = statistics.pvariance(z3)
     growth = (var3 - var1) / 2.0
     if growth <= 0:
-        # NO DETECTABLE COMPOUNDING. This used to return DRIFT_FRAC
-        # unchanged, and that was the single biggest number in the report
-        # nobody had chosen: the module default is 1.00, while sqrt() of
-        # any growth this fit could plausibly measure lands under 0.25. So
-        # "no evidence" resolved to roughly five times the largest value
-        # the evidence could support, and it drove about two thirds of the
-        # season band and halved the reported p_win.
-        #
-        # An absence of measured growth is not an absence of information.
-        # Bootstrap the growth statistic and take the high end of its own
-        # interval: the most drift the data CANNOT rule out. Still the
-        # conservative choice -- the widest band the evidence allows --
-        # without being a number the evidence never supported.
-        #
-        # Seeded, because this feeds every simulated band and the report
-        # has to be reproducible run to run.
         rng = random.Random(20260917)
         diffs = []
         for _ in range(1000):
@@ -81,15 +65,10 @@ def fit_drift_frac(h1_pairs, h3_pairs) -> tuple[float, str]:
 class Forecaster(Protocol):
 
     def expected(self, jornada: int) -> dict[str, float]:
-        """Mean points per player for that jornada. Cheap; used for ranking
-        and for the XI a manager would pick, which must be chosen on what is
-        knowable rather than on the sampled outcome."""
+        pass
 
     def expected_own(self, first_jornada_of: dict[str, int]) -> dict[str, float]:
-        """Mean points per player, each read at HIS OWN next jornada rather
-        than one shared jornada for everyone — the right question for "who
-        should I field right now" when the round in progress means players
-        aren't all waiting on the same next match."""
+        pass
 
 
 class Bootstrap:
@@ -142,7 +121,6 @@ class Bootstrap:
             if rec:
                 out[k] = rec[0] * rec[1]
         return out
-
 
 
 def pool_from_perjornada(rows) -> list[int]:

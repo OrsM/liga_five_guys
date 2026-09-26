@@ -1,7 +1,3 @@
-"""Scorecard for the points forecast: see src/ffcore/lineupweight.py.
-
-    PYTHONPATH=src FF_ROOT=./data uv run python tools/forecast_walkforward.py
-"""
 import random
 import statistics as st
 import sys

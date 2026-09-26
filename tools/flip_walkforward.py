@@ -1,21 +1,3 @@
-"""Would the market advice in src/flip.py have made money, judged only on what was known each day?
-
-For every past market close it rebuilds the model from rows dated BEFORE that
-day, takes the pick flip.picks() logic would have made, and measures what really
-happened over the hold it chose -- at the price the winner actually paid where
-the feed shows one, else the ask, plus 1% to beat them. Run it as history grows:
-
-    PYTHONPATH=src FF_ROOT=./data uv run python tools/flip_walkforward.py
-
-WHY IT EXISTS. The first version of the strategy was tuned and checked on the
-same 44 days it learned from (+20% per trade). Walked forward it is about +6-7%
-per trade over ~6 updates on 9-11 trades (2026-09-24): the honest figure, and
-what a change to the buy rule should be judged against as the sample grows. "predicted" is the model's expected drift; "realised" is the raw drift that
-followed -- if realised is far BELOW predicted, the model is overconfident.
-
-Friction (offer discount, auction premium) is measured on the FULL history: a
-small leak, because the early days have too few samples to measure it at all.
-"""
 from __future__ import annotations
 
 import collections
@@ -27,7 +9,7 @@ sys.path.insert(0, "src")
 import flip                                                   # noqa: E402
 from ffcore.tidy import TIDY, read_csv                        # noqa: E402
 
-WARMUP = 20            # days of history before the first decision is judged
+WARMUP = 20
 
 
 def main() -> None:

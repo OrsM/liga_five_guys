@@ -75,16 +75,10 @@ HEADERS = {
     "Accept-Language": "es-ES,es;q=0.9,en;q=0.5",
 }
 
-# Per HOST, not per request: each site still sees 1.5-3s between its own
-# requests, but 23 futbolfantasy + 21 analiticafantasy pages no longer queue
-# behind one another's sleeps (2026-09-24: ~115s of a 122s fetch was sleeping).
-# 1.5-3.0 -> 1.0-2.0 the same day: a full 72-request fetch, 73s -> 56s, no
-# 403/429 from any of the six sites. Revert here if one starts to answer 429.
 DELAY = (1.0, 2.0)
 
 
 def _by_host(srcs) -> list:
-    """`srcs` interleaved across hosts, each host's own order kept."""
     lanes: dict[str, list] = {}
     for s in srcs:
         lanes.setdefault(urlparse(s.url).netloc, []).append(s)
@@ -94,7 +88,6 @@ TIMEOUT = 30.0
 
 MANIFEST = "MANIFEST.csv"
 MANIFEST_FIELDS = ["page", "sig", "stored", "seen"]
-
 
 
 def _stamp_of(path: Path) -> str:
@@ -123,8 +116,6 @@ def _read(path: Path, only: set | None = None) -> dict[str, str]:
 def _write(path: Path, members: dict[str, str]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(".tmp")
-    # preset 3, not 6 (2026-09-24): 1.6s vs 8.4s on a 57MB snapshot for +13%
-    # size (1278KB vs 1129KB) -- a fixed ~7s off every full fetch.
     with lzma.open(tmp, "wb", preset=3) as xz:
         with tarfile.open(fileobj=xz, mode="w", format=tarfile.USTAR_FORMAT) as tf:
             for name in sorted(members):
@@ -172,10 +163,6 @@ _INDEX = "snapindex.json"
 
 
 def _read_json(path: Path, default):
-    """A whole small JSON file, or `default` if it is missing or corrupt --
-    the read half of the cache/index/state contract every JSON-blob store
-    in this module shares (doc_keys' snapindex, _load_parse_state,
-    parse_cache's legacy-blob fallback)."""
     try:
         return json.loads(path.read_text(encoding="utf-8"))
     except (OSError, ValueError):
@@ -229,7 +216,6 @@ def documents(need: dict[str, set]):
         for name, html in _read(snap, {"%s.html" % p for p in want}).items():
             if name.endswith(".html"):
                 yield stamp, name.removesuffix(".html"), html
-
 
 
 TWICE_DAILY_HOURS = 6.0
@@ -412,28 +398,8 @@ FEEDS = "feeds.csv"
 FEED_FIELDS = ["observed_at", "page", "status", "seconds"]
 
 
-
 def parse() -> None:
-    """Rebuild the tidy tables from the snapshot archives.
-
-    THE WHOLE HISTORY, EVERY RUN, is the default and it is deliberate: a
-    parser's signature is part of its cache key, so fixing a parser
-    invalidates everything it ever produced and the next run re-derives the
-    season without anyone remembering to backfill. That property is worth
-    real money and it is why this is not simply incremental.
-
-    It is also why it cannot stay unconditional. Measured 2026-09-18 at
-    jornada 6 of 38: the cache alone is 368MB resident and holding every
-    table before writing any of them adds 476MB, for a peak of 872MB against
-    a 900MB MemoryMax -- already throttled on every run, and growing with
-    the archive. So the full walk now runs when it CAN change the answer,
-    and the tail alone when it provably cannot: same parser signatures, same
-    snapshots already folded in, and only new archives at the end. The one
-    case that needs the full walk is exactly the case that is detectable.
-    """
     walk = doc_keys()
-    # Signature of every parser the archives currently depend on: the guard
-    # that says a parser moving means the rows it produced are stale.
     sigs_now: dict[str, str] = {}
     for _stamp, docs in walk:
         for key in docs:
@@ -452,11 +418,6 @@ def parse() -> None:
                and state.get("sigs") == sigs_now
                and _tidy_has(state.get("tables") or ()))
     if settled and not tail:
-        # Same parsers, same archives, and the tables were built from exactly
-        # these -- so a rebuild would reproduce what is already on disk, at
-        # 874MB and ten seconds, to change nothing. A run with no new
-        # snapshot is normally a re-run by hand; the daily path always has
-        # one, because fetch writes an archive every time.
         print("  nothing new to parse (%d snapshots already folded in)"
               % len(routed))
         return
@@ -468,22 +429,11 @@ def parse() -> None:
 
 
 def _walkable_src(key: str):
-    """The parser for `key`, or None if it has none or feeds the points
-    table -- points.py walks that feed itself, on its own cache. Three
-    walkers here each re-derived this guard separately."""
     src = source_for(key)
     return src if src is not None and src.table != "points" else None
 
 
 def _parse_tail(walk, tail, sigs_now, stamps, state) -> bool:
-    """Fold ONLY the new snapshots into the tables that already exist.
-
-    Returns False rather than guessing whenever the append would not be
-    identical to a full rebuild -- an unparsed document, a table that has
-    grown a column, a table the state does not know about. The caller then
-    does the whole thing. A wrong "yes" here corrupts the season quietly,
-    so every doubt resolves to a rebuild.
-    """
     tail_set = set(tail)
     want: dict[tuple[str, str], str] = {}
     keyed: list[tuple[str, str, object]] = []
@@ -514,12 +464,12 @@ def _parse_tail(walk, tail, sigs_now, stamps, state) -> bool:
     pending: dict[str, list[dict]] = {}
     for stamp, pk, src in keyed:
         if pk not in cache:
-            return False          # never seen, never parsed -- rebuild
+            return False
         route(pending, cache[pk], src.table, stamp)
 
     known = set(state.get("tables") or ())
     if not set(pending) <= known:
-        return False              # a table the tables file has never seen
+        return False
 
     for table in sorted(pending):
         daily = STORE_DAILY.get(table)
@@ -552,9 +502,6 @@ def _tidy_has(tables) -> bool:
 
 
 def _parse_origin(task) -> dict:
-    """One snapshot's needed documents -> {parse_key: rows}. A pure function
-    of the snapshot, so a worker opens it ITSELF: only rows cross the pipe,
-    never the ~2MB of HTML per page."""
     origin, want = task
     out, sigs = {}, Sigs()
     for o, key, html in documents({origin: want}):
@@ -586,14 +533,6 @@ def _parse_everything(walk, sigs_now, stamps) -> None:
                 need.setdefault(origin, set()).add(key)
     misses = sum(len(v) for v in need.values())
     tasks = sorted(need.items())
-    # Worker count: 1 for the handful of documents a normal run parses (a
-    # pool would cost more than it saves); otherwise one per physical core
-    # (PHYSICAL, not logical -- lxml is cache/memory bound: on this box,
-    # i5-5200U 2 cores x 2 threads, measured 2026-09-24 on 674 documents, 1
-    # worker 51.6s, 2 workers 32.1s, 4 workers 41.8s and 80% MORE total CPU),
-    # never more than the service's own memory cap leaves room for -- a
-    # worker holds one ~2MB page and its lxml tree, ~200MB, and lfg.service
-    # is capped at 750MB with the parent already at ~360MB.
     if misses < 24:
         n = 1
     else:
@@ -617,12 +556,6 @@ def _parse_everything(walk, sigs_now, stamps) -> None:
         for t in tasks:
             cache.update(_parse_origin(t))
 
-    # ROWS GO TO DISK BEFORE THEY CAN GROW INTO THE PROCESS. Holding every
-    # table until the last snapshot was routed cost 476MB on top of the
-    # cache, for a peak of 874MB against a 900MB MemoryMax -- and the limit
-    # is not going up, so the pipeline has to come down. Buffered in memory
-    # up to SPILL_ROWS, appended to a per-table file past it, streamed back
-    # one table at a time below. Same rows, same order, a bounded buffer.
     spill = TIDY / ".parse_spill"
     if spill.exists():
         for f in spill.glob("*.jsonl"):
@@ -734,9 +667,6 @@ def _parse_everything(walk, sigs_now, stamps) -> None:
         print("  warn: no player flagged in any snapshot — if the site still "
               "shows injuries, the fitness selectors have rotted.")
 
-    # LAST, and only on the path that actually derived everything. A state
-    # written before the canary above would let a run that bailed on empty
-    # market rows still licence tomorrow's tail append.
     _save_parse_state({"sigs": sigs_now, "stamps": stamps, "tables": written})
 
 
@@ -772,17 +702,6 @@ _STATE = "parse_state.json"
 
 
 def _lines_name(name: str) -> str:
-    """The line-file that stands in for a given blob cache.
-
-    THIS TAKES THE NAME, and that is the whole point of it. There are two
-    caches -- parsed.json for the pages and parsed_points.json for the
-    points, points.py passing its own name to the same helpers -- and the
-    first version of the line format ignored the argument and wrote both to
-    one file. points then read the pages' cache, missed everything, and
-    overwrote it with its own 88 entries, so every full walk re-parsed all
-    3,383 documents: 395s instead of 11s. It looked like a slow rebuild
-    rather than a broken cache, which is how it survived a commit.
-    """
     return (name[:-5] if name.endswith(".json") else name) + ".jsonl"
 
 
@@ -791,18 +710,6 @@ def _save_parse_state(state: dict, name: str = _STATE) -> None:
 
 
 def _read_cache_lines(name: str, keys: set | None = None) -> dict:
-    """Cached rows from the line-format cache, filtered to `keys` when
-    given -- the one streaming reader behind both parse_cache() (keys=None,
-    every document, falling back to the legacy single-blob format when the
-    line file has never been written) and a tail append's `keys` subset
-    (always on the line format already, since a tail only runs after a
-    full parse has already produced it). These were the identical
-    line-by-line loop written out twice.
-
-    The point of the line format is that a tail append needs a few hundred
-    documents out of several thousand, and json.load() of the single-blob
-    cache costs 368MB to get them. Streaming keeps only what was asked for.
-    """
     lines = TIDY / _lines_name(name)
     try:
         fh = lines.open(encoding="utf-8")
@@ -824,16 +731,10 @@ def _read_cache_lines(name: str, keys: set | None = None) -> dict:
 
 
 def parse_cache(name: str = _CACHE) -> dict:
-    """Every cached document. The line file is the live format; the single
-    blob is read once, on the first run after the change, and then replaced
-    by save_parse_cache below."""
     return _read_cache_lines(name)
 
 
 def save_parse_cache(docs: dict, name: str = _CACHE) -> None:
-    """Rewrite the whole cache, pruned to what the walk actually used. Only
-    the full path calls this -- a tail append has read a handful of entries
-    and must never write its own view back as though it were the lot."""
     TIDY.mkdir(parents=True, exist_ok=True)
     tmp = TIDY / (_lines_name(name) + ".new")
     try:
@@ -871,7 +772,6 @@ SPILL_ROWS = 120_000
 
 
 def _spill_out(pending: dict, root: Path, spilled: set) -> None:
-    """Append what is buffered to per-table files and let go of it."""
     root.mkdir(parents=True, exist_ok=True)
     for table, rows in pending.items():
         if not rows:
@@ -884,9 +784,6 @@ def _spill_out(pending: dict, root: Path, spilled: set) -> None:
 
 
 def _spilled_rows(root: Path, table: str, tail: list):
-    """Everything routed to this table, spilled part first, in walk order --
-    which is the order first_seen() depends on, so "as dealt" still means
-    the first snapshot that carried the row."""
     path = root / f"{table}.jsonl"
     if path.exists():
         with path.open(encoding="utf-8") as fh:
@@ -898,14 +795,6 @@ def _spilled_rows(root: Path, table: str, tail: list):
 
 
 def _compact_daily(rows: list[dict], key_cols) -> list[dict]:
-    """One row per (key, day): later rows for the same key on the same day
-    overwrite the earlier one in place rather than adding a new row. `day`
-    is observed_at's first 10 characters (observed_at is UTC, see
-    ffcore.tidy.shown), and the group keeps its FIRST position so output
-    order stays the original interleaving, just with reruns collapsed.
-    A row missing any key column passes through uncompacted -- same
-    all-or-nothing rule STORE_ONCE uses, so a blank id never merges rows.
-    """
     out: list[dict] = []
     pos: dict[tuple, int] = {}
     for r in rows:
@@ -924,11 +813,6 @@ def _compact_daily(rows: list[dict], key_cols) -> list[dict]:
 
 
 def _append_csv_daily(path: Path, rows: list[dict], key_cols) -> bool:
-    """_append_csv's STORE_DAILY counterpart: a key's row for today is
-    overwritten rather than appended, so N rounds in one day net one row
-    per key. Needs the whole file (already ~6x smaller for a compacted
-    table) since overwriting a mid-file row means rewriting the file.
-    """
     if not rows:
         return True
     if not path.exists():
@@ -946,24 +830,12 @@ def _append_csv_daily(path: Path, rows: list[dict], key_cols) -> bool:
     fieldset = set(header)
     for r in rows:
         if not set(r) <= fieldset:
-            return False          # shape moved -- a rebuild, not a guess
+            return False
     _write_csv(path, _compact_daily(existing + rows, key_cols))
     return True
 
 
 def _append_csv(path: Path, rows: list[dict], once_key=None) -> bool:
-    """Append rows to a table that already exists, or say no.
-
-    Refuses on a header that does not match exactly -- a new or missing
-    column means the shape changed, and appending under the old header would
-    silently drop or misalign a field. The caller rebuilds instead.
-
-    STORE_ONCE tables are deduped against what is already on disk, which is
-    the whole point of "as dealt": the same api_stats row is re-reported in
-    every later snapshot. The existing keys are held as 64-bit hashes rather
-    than tuples -- 710,850 rows of api_stats is ~23MB that way against
-    ~230MB of Python tuples, and this exists to save memory.
-    """
     if not rows:
         return True
     if not path.exists():
@@ -992,7 +864,7 @@ def _append_csv(path: Path, rows: list[dict], once_key=None) -> bool:
     add = []
     for r in rows:
         if not set(r) <= fieldset:
-            return False          # shape moved -- a rebuild, not a guess
+            return False
         if once_key:
             k = tuple((r.get(c) or "") for c in once_key)
             if all(k):
@@ -1032,7 +904,6 @@ def _write_csv(path: Path, rows: list[dict]) -> None:
         w = csv.writer(fh, lineterminator="\n")
         w.writerow(fieldnames)
         w.writerows(out)
-
 
 
 def baseline(url: str = "", label: str = "") -> None:
@@ -1079,8 +950,6 @@ def baseline(url: str = "", label: str = "") -> None:
 POINTS_FIELDS = ["player_name", "player_name_full", "team", "points",
                  "games", "avg", "ff_id", "season", "observed_at",
                  "source_url"]
-
-
 
 
 def prune(apply: bool = False) -> None:
@@ -1148,7 +1017,6 @@ def prune(apply: bool = False) -> None:
     print(f"data/raw {before / 1e6:.1f} MB -> {after / 1e6:.1f} MB. "
           f"The pages dropped are still in git history; nothing is "
           f"unrecoverable.")
-
 
 
 def _selftest() -> None:
@@ -1244,53 +1112,37 @@ def _selftest() -> None:
     kept = first_seen([line, again, fixed], STORE_ONCE["api_stats"])
     assert [r["observed_at"] for r in kept] == ["t1", "t3"], kept
 
-    # APPENDING THE TAIL MUST EQUAL REBUILDING THE LOT, or it is not an
-    # optimisation, it is data loss on a schedule. _append_csv says no rather
-    # than guessing, and every no sends the caller back to the full walk.
     with tempfile.TemporaryDirectory() as tmp:
         f = Path(tmp) / "t.csv"
         _write_csv(f, [{"a": "1", "b": "x"}])
         assert _append_csv(f, [{"a": "2", "b": "y"}])
         assert f.read_text(encoding="utf-8") == "a,b\n1,x\n2,y\n", \
             f.read_text(encoding="utf-8")
-        # A ROW WITH FEWER FIELDS is what _write_csv already tolerates, so
-        # the appender must too -- refusing here would rebuild for ever and
-        # the tail path would never once run.
         assert _append_csv(f, [{"a": "3"}])
         assert f.read_text(encoding="utf-8").endswith("3,\n")
-        # A NEW COLUMN is a shape change: appending under the old header
-        # would drop it silently, so this is a refusal, not a best effort.
         assert not _append_csv(f, [{"a": "4", "b": "z", "c": "new"}])
         assert _append_csv(f, []), "nothing to add is not a failure"
         missing = Path(tmp) / "fresh.csv"
         assert _append_csv(missing, [{"a": "1"}]) and missing.exists(), \
             "no file yet is a write, not a refusal"
 
-        # STORE_ONCE across the append boundary: the same api_stats line is
-        # re-reported by every later snapshot, so what is already on disk has
-        # to be deduped against, not just what is in this batch.
         once = Path(tmp) / "api_stats.csv"
         _write_csv(once, [line])
         assert _append_csv(once, [again, fixed], STORE_ONCE["api_stats"])
         body = once.read_text(encoding="utf-8").strip().splitlines()
-        assert len(body) == 3, body            # header + t1 + t3, never t2
+        assert len(body) == 3, body
         assert body[-1].endswith("t3"), body
         assert _append_csv(once, [dict(again)], STORE_ONCE["api_stats"])
         assert len(once.read_text(encoding="utf-8").strip().splitlines()) == 3
 
-        # STORE_DAILY: same key, same day, three rounds -- one row, the
-        # last round's data, in the FIRST round's position.
         m1 = {"observed_at": "2026-09-20T0900Z", "ff_id": "1", "value": "10"}
         m2 = {"observed_at": "2026-09-20T1300Z", "ff_id": "1", "value": "10"}
         m3 = {"observed_at": "2026-09-20T1800Z", "ff_id": "1", "value": "11"}
         other = {"observed_at": "2026-09-20T0900Z", "ff_id": "2", "value": "5"}
         got = _compact_daily([m1, other, m2, m3], ("ff_id",))
         assert got == [m3, other], got
-        # A new day for the same key is a new row, not an overwrite.
         m4 = {"observed_at": "2026-09-21T0900Z", "ff_id": "1", "value": "11"}
         assert _compact_daily([m1, m4], ("ff_id",)) == [m1, m4]
-        # A blank key column passes through uncompacted rather than merging
-        # with every other blank-keyed row.
         blank = {"observed_at": "2026-09-20T0900Z", "ff_id": "", "value": "x"}
         assert _compact_daily([blank, dict(blank)], ("ff_id",)) == \
             [blank, dict(blank)]
@@ -1299,37 +1151,25 @@ def _selftest() -> None:
         assert _append_csv_daily(daily, [m1], ("ff_id",)) and daily.exists()
         assert daily.read_text(encoding="utf-8") == \
             "observed_at,ff_id,value\n2026-09-20T0900Z,1,10\n"
-        # Same day, no change -- overwrites the existing line in place.
         assert _append_csv_daily(daily, [m2], ("ff_id",))
         assert daily.read_text(encoding="utf-8") == \
             "observed_at,ff_id,value\n2026-09-20T1300Z,1,10\n"
-        # Same day, value moved -- still one line, now the new value.
         assert _append_csv_daily(daily, [m3], ("ff_id",))
         assert daily.read_text(encoding="utf-8") == \
             "observed_at,ff_id,value\n2026-09-20T1800Z,1,11\n"
-        # A new day appends a second line rather than overwriting the first.
         assert _append_csv_daily(daily, [m4], ("ff_id",))
         assert daily.read_text(encoding="utf-8") == (
             "observed_at,ff_id,value\n"
             "2026-09-20T1800Z,1,11\n2026-09-21T0900Z,1,11\n"), \
             daily.read_text(encoding="utf-8")
-        # Shape moved -- refuse, same as _append_csv, so the caller rebuilds.
         assert not _append_csv_daily(
             daily, [dict(m4, extra="z")], ("ff_id",))
 
-    # TWO CACHES, TWO FILES. points.py passes its own name to these same
-    # helpers; a line file that ignored the argument sent both to one path,
-    # so points read the pages' cache, missed every entry and then wrote its
-    # own 88 over the top -- and every full walk re-parsed all 3,383
-    # documents at 395s instead of 11s, looking like slowness rather than a
-    # broken cache.
     assert _lines_name("parsed.json") == "parsed.jsonl"
     assert _lines_name("parsed_points.json") == "parsed_points.jsonl"
     assert _lines_name("parsed.json") != _lines_name("parsed_points.json")
 
     assert _key_hash(("a", "b")) == _key_hash(("a", "b"))
-    # The separator matters: without it ("ab","c") and ("a","bc") collide,
-    # and a collision here drops a row that should have been kept.
     assert _key_hash(("ab", "c")) != _key_hash(("a", "bc"))
 
     assert not _tidy_has(()), "no tables recorded is not a licence to append"
@@ -1361,8 +1201,6 @@ def _selftest() -> None:
                "2026-08-15T1600Z")
     assert due(twice, {}, "2026-08-15T0000Z")
 
-    # -- _by_host: hosts interleaved so their per-host delays overlap, and
-    # each host's own order kept (a source can depend on an earlier one).
     mk = lambda k, h: Source(k, "t", "https://%s/%s" % (h, k), None, None,
                              "every_run")
     got = [x.key for x in _by_host([mk("a1", "a"), mk("a2", "a"),

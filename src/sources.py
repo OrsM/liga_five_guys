@@ -55,15 +55,11 @@ TEAMS = [
 ]
 
 
-
 TEAM_SELECT_RE = re.compile(r'<select[^>]*name="equipo"[^>]*>(.*?)</select>', re.S)
 OPTION_RE = re.compile(r'<option[^>]*value="(\d+)"[^>]*>([^<]+)</option>')
 
 
 def _once(seen: set, key) -> bool:
-    """True the first time `key` is seen (and marks it); False on a repeat
-    or a falsy key. The "skip if already seen, else mark it" filter this
-    file wrote out by hand at six call sites."""
     if not key or key in seen:
         return False
     seen.add(key)
@@ -71,13 +67,6 @@ def _once(seen: set, key) -> bool:
 
 
 def _extract_rows(html: str, selector: str, row_of) -> list[dict]:
-    """One row per element `selector` matches, in document order, deduped
-    -- row_of(el) returns a row dict (its "key" entry is popped and used
-    for _once(); any other falsy/duplicate signal from row_of is a plain
-    None) or None to skip the element outright. parse_calendar() and
-    parse_af_fixtures() each hand-wrote this exact
-    fromstring/loop/guard/dedup/append skeleton separately; only what
-    counts as a row and what a row contains differs between them."""
     doc = lh.fromstring(html)
     rows, seen = [], set()
     for el in _css(doc, selector):
@@ -152,11 +141,7 @@ def parse_market(html: str, observed_at: str, key: str = "market") -> list[dict]
     return rows
 
 
-
 NAME_RE = re.compile(r"^(.*?)\s*(\d{1,3})\s*%")
-
-
-
 
 
 FITNESS_ALT = {
@@ -214,10 +199,6 @@ def parse_fitness(doc) -> dict[str, dict]:
 
 def _lineup_row(observed_at, source, team_slug, player_name, player_slug,
                 role, start_pct, status, note) -> dict:
-    """The 9-key lineup-row envelope -- parse_team()'s add() closure, its
-    post-loop "absent" row, and parse_af_team()'s add() closure each built
-    this dict literal separately, proven identical by the file's own
-    self-test (`list(af[0]) == list(rows[0])`)."""
     return {
         "observed_at": observed_at,
         "source": source,
@@ -270,7 +251,6 @@ def parse_team(html: str, observed_at: str, key: str = "team_test") -> list[dict
             "absent", None, fit["status"], fit["note"]))
 
     return rows
-
 
 
 WANT = {
@@ -371,13 +351,10 @@ def season_label(html: str) -> str:
     return "unknown"
 
 
-
 _WS = re.compile(r"\s+")
 
 MARKET_SURFACE_RE = re.compile(
     r'data-(?:nombre|posicion|valor|diferencia1|diferencia-pct1|equipo)="[^"]*"')
-
-
 
 
 _DEFS: dict[int, dict] = {}
@@ -499,7 +476,6 @@ def sign_team(html: str) -> str | None:
                                  _suspension_sections])
 
 
-
 AF_BASE = "https://www.analiticafantasy.com"
 AF_SOURCE = "analitica"
 AF_TEAM_URL = f"{AF_BASE}/equipo/{{slug}}"
@@ -587,7 +563,6 @@ def sign_af_team(html: str) -> str | None:
                                  AF_CONSENSO_SELECTOR])
 
 
-
 AF_HUB_URL = f"{AF_BASE}/la-liga/alineaciones-probables"
 AF_MATCH_RE = re.compile(r"/partido/(\d+)")
 
@@ -630,7 +605,6 @@ sign_points = partial(
     _sign_rows, parse=lambda t: parse_points(t, ""),
     fmt=lambda r: "%s|%s|%s" % (r["ff_id"], r["points"], r["games"]),
     sort=True)
-
 
 
 CAL_KEY = "calendario"
@@ -968,23 +942,6 @@ def parse_odds(text: str, observed_at: str,
         total = sum(implied.values())
         if total <= 0:
             continue
-        # OVER/UNDER, the half this feed was not asking for until
-        # 2026-09-17. h2h alone says who wins; it cannot say how many
-        # goals, and a clean sheet is the single biggest driver of a
-        # defender's or keeper's points. With p_home/p_draw/p_away and
-        # P(over N) a consumer can solve for each side's expected goals
-        # and read P(clean sheet) off them directly, instead of inferring
-        # it from a goals-conceded rate the way the Elo path does.
-        #
-        # ONE LINE ONLY, the modal one across books (almost always 2.5):
-        # medianing prices quoted at different lines would average
-        # unrelated questions. Books that quote another line are skipped
-        # rather than bent onto this one.
-        #
-        # OPTIONAL. Ten of fourteen books offered totals when this was
-        # written; an event with h2h and no totals still emits its row
-        # with these three fields blank, because losing the h2h data to
-        # gain nothing would be the worse trade.
         line_prices: dict[float, dict[str, list[float]]] = {}
         for bk in ev.get("bookmakers") or []:
             tot = next((m for m in bk.get("markets") or []
@@ -1122,12 +1079,6 @@ STORE_ONCE = {"api_activity": ("activity_id",),
               "results_history": ("season", "date", "home_name", "away_name",
                                   "home_goals", "away_goals")}
 
-# Values here keep changing (price drifts, a status flips, a season total
-# ticks up) so STORE_ONCE's keep-the-first-forever rule is wrong for them --
-# but most scrape rounds still see no change, so writing a fresh row every
-# round is 5-8x duplication. One row per (key, day) instead: a round that
-# matches what is already on disk for today overwrites that day's row
-# rather than appending a new one.
 STORE_DAILY = {"market": ("ff_id",),
               "lineups": ("source", "team_slug", "player_slug"),
               "understat_players": ("source", "season", "understat_id")}
@@ -1137,18 +1088,6 @@ ROW_TABLE = "table"
 ACT_JOINED, ACT_BUY, ACT_SELL = 9, 31, 33
 ACT_BONUS, ACT_BONUS_ZERO = 6, 7
 
-# A CLAUSE BUYOUT -- one manager taking another's player at his release
-# clause, which the app announces as a "Market operation". It was scraped
-# from the first day and thrown away for want of this line: parse_api_activity
-# skips any activityTypeId it has no name for, and 1 was not on the list. Two
-# of them had happened (Luismi Cruz, and Raphinha for 141,425,721 on
-# 2026-09-18) and neither reached the ledger, so the buyer was never debited
-# and the victim never credited -- which is why Albert Laporta appeared to be
-# sitting on 141M he had in fact spent.
-#
-# An allowlist is still right: an unknown event should be dropped rather than
-# guessed at. What was missing is anyone checking what it had dropped. An
-# audit of every snapshot ever taken says type 1 is the only one, 2 events.
 ACT_CLAUSE = 1
 
 ACT_KIND = {ACT_JOINED: "joined", ACT_BUY: "buy", ACT_SELL: "sell",
@@ -1185,11 +1124,6 @@ def _player_identity(pm: dict) -> dict:
 
 def _parse_json_list(text: str, observed_at: str, row_fn,
                      if_empty=None) -> list[dict]:
-    """The shared skeleton behind every api_* JSON-list endpoint: parse,
-    require a list, call row_fn(item) -> a list of field dicts (own fields
-    only -- observed_at/source are stamped here), flatten, stamp. row_fn
-    returning [] for an item drops it; `if_empty` (api_offer's one real use)
-    supplies a placeholder row set when nothing survived at all."""
     d = _j(text)
     if not isinstance(d, list):
         return []
@@ -1257,14 +1191,6 @@ sign_api_market = partial(
 
 def parse_api_activity(text: str, observed_at: str,
                        key: str = "api_activity") -> list[dict]:
-    # NOTHING IS DROPPED SILENTLY ANY MORE. An allowlist is still right -- an
-    # event whose meaning is unknown must not be guessed at, and the ledger
-    # below ignores any kind it does not recognise. What was wrong was that
-    # the dropped ones left no trace, so a clause buyout was discarded from
-    # the first day of the season and only surfaced when Miguel noticed a
-    # raid missing from the report six weeks later. An unknown type is now
-    # KEPT, named for what it is, and warned about, so the next one costs a
-    # warning rather than a season of bad rival cash.
     def row(a):
         if not a.get("id"):
             return []
@@ -1275,9 +1201,6 @@ def parse_api_activity(text: str, observed_at: str,
             "at": a.get("createdAt") or "",
             "kind": kind,
             "user_id": str(a.get("user1Id") or ""),
-            # THE OTHER SIDE. Only a clause has one -- a buy is from the
-            # market and a sell is to it -- and without it the money has a
-            # payer but no payee.
             "counterparty": str(a.get("user2Id") or ""),
             "player_id": str(a.get("playerMasterId") or ""),
             "amount": str(a.get("amount") or ""),
@@ -1449,15 +1372,6 @@ def player_source(key: str) -> Source | None:
 
 
 def player_sources(activity_json: str, observed_at: str = "") -> list[Source]:
-    """Which players a detail page is worth fetching for, read off the feed.
-
-    KNOWN KINDS ONLY. The parser keeps an event it has no name for rather
-    than dropping it silently, which is right -- but "keep the record" and
-    "go and fetch against it" are different decisions. A player id read out
-    of an event whose meaning is unknown is a request against a guess, so
-    this stays on the kinds whose shape is understood. A clause counts: its
-    player really did change hands.
-    """
     out, seen = [], set()
     for r in parse_api_activity(activity_json, observed_at):
         pid = r.get("player_id")
@@ -1567,7 +1481,6 @@ def league_sources(leagues_json: str, observed_at: str = "") -> list[Source]:
     return out
 
 
-
 class Source(NamedTuple):
     key: str
     table: str
@@ -1617,7 +1530,6 @@ def source_for(key: str) -> Source | None:
             return s
     return (match_source(key) or api_source(key) or player_source(key)
             or offer_source(key))
-
 
 
 _FIXTURE = """
@@ -2238,7 +2150,6 @@ def _selftest() -> None:
         "t")
     assert len(unresolved) == 1 and unresolved[0]["away"] == "", unresolved
 
-    # -- totals: the over/under half, added 2026-09-17 ------------------
     tot = parse_odds(json.dumps([{
         "home_team": "Espanyol", "away_team": "Elche",
         "bookmakers": [
@@ -2250,7 +2161,6 @@ def _selftest() -> None:
                 {"key": "totals", "outcomes": [
                     {"name": "Over", "price": 2.0, "point": 2.5},
                     {"name": "Under", "price": 2.0, "point": 2.5}]}]},
-            # a book quoting a DIFFERENT line is skipped, not averaged in
             {"key": "b", "markets": [
                 {"key": "h2h", "outcomes": [
                     {"name": "Espanyol", "price": 2.0},
@@ -2262,13 +2172,9 @@ def _selftest() -> None:
         ]}]), "t")
     assert len(tot) == 1, tot
     assert tot[0]["total_line"] == 2.5, tot[0]
-    # 2.0/2.0 is an even market: both sides 0.5 once the overround is out,
-    # and the 3.5 book's lopsided prices must not drag it.
     assert abs(tot[0]["p_over"] - 0.5) < 1e-9, tot[0]
     assert abs(tot[0]["p_under"] - 0.5) < 1e-9, tot[0]
 
-    # h2h with NO totals still yields its row, with the fields blank --
-    # losing the h2h data to gain nothing would be the worse trade.
     notot = parse_odds(json.dumps([{
         "home_team": "Espanyol", "away_team": "Elche",
         "bookmakers": [{"key": "a", "markets": [{"key": "h2h", "outcomes": [
@@ -2377,13 +2283,6 @@ def _selftest() -> None:
                                     '"status":"accepted"'))
 
     ac = parse_api_activity(_API_ACTIVITY_FIXTURE, "t")
-    # EVERY EVENT SURVIVES THE PARSE, including one this code has no name
-    # for. a4 is activityTypeId 77, which means nothing here; it used to be
-    # dropped without trace, and that silence is what hid the clause buyout
-    # (type 1) for a whole season -- scraped from day one, discarded every
-    # run, and only noticed when a raid went missing from the report. The
-    # ledger still refuses to act on a kind it does not understand; it just
-    # cannot pretend the event never happened.
     assert ([r["kind"] for r in ac] ==
             ["buy", "sell", "joined", "unknown:77", "bonus", "bonus",
              "clause"]), ac
@@ -2391,24 +2290,14 @@ def _selftest() -> None:
     assert ac[4]["week"] == "2" and ac[4]["amount"] == "2200000", ac[4]
     assert ac[5]["week"] == "3" and ac[5]["amount"] == "", ac[5]
 
-    # A CLAUSE CARRIES BOTH SIDES. user2Id is the only place the payee
-    # appears, and without it the money has a payer and no recipient.
     clause = ac[6]
     assert clause["kind"] == "clause", clause
     assert clause["user_id"] == "3480702", clause
     assert clause["counterparty"] == "11877808", clause
     assert clause["amount"] == "141425721", clause
     assert clause["player_id"] == "2522", clause
-    # Nothing else has a counterparty: a buy is from the market, a sell to it.
     assert all(r["counterparty"] == "" for r in ac if r["kind"] != "clause")
 
-    # A NEW EVENT MUST CHANGE THE SIGNATURE, or its page would be served
-    # from the parse cache and the event never reach the table. It does,
-    # because the signature is the set of activity ids and a new event
-    # carries a new one. NOT COVERED, and worth knowing: an event whose
-    # TYPE the app later corrected in place, keeping its id, would be
-    # served stale -- accepted, because ids here are per-event and the app
-    # has never rewritten one.
     import json as _aj
     _one_more = _aj.dumps(_aj.loads(_API_ACTIVITY_FIXTURE) + [
         {"id": "a8", "activityTypeId": 1, "amount": 5, "playerMasterId": 9,
@@ -2502,10 +2391,6 @@ def _selftest() -> None:
     assert parse_api_player('{"nickname":"X"}', "t",
                             "api_player_777")[0]["player_id"] == "777"
 
-    # A player's FIRST activity row having an unknown kind must not block a
-    # LATER, real one for the same player -- "seen" may only be marked once
-    # the unknown-kind skip has already been decided, not before. Caught by
-    # hand, not by this suite, when a refactor moved the mark earlier.
     unk_then_known = json.dumps([
         {"id": "1", "activityTypeId": 9999, "playerMasterId": "42"},
         {"id": "2", "activityTypeId": list(ACT_KIND)[0], "playerMasterId": "42"},
@@ -2513,11 +2398,6 @@ def _selftest() -> None:
     assert [s.key for s in player_sources(unk_then_known)] == ["api_player_42"]
 
     ps = player_sources(_API_ACTIVITY_FIXTURE)
-    # 2522 is there because a CLAUSE moved him: a player who changed hands
-    # is exactly one whose detail page is worth having. The unknown type 77
-    # in the fixture names player 1 and is NOT here -- the event is kept in
-    # the table, but a request built on a meaning we do not know would be a
-    # request built on a guess.
     assert [s.key for s in ps] == ["api_player_1337", "api_player_652",
                                    "api_player_2522"], ps
     assert not any(s.key == "api_player_1" for s in ps), ps
@@ -2576,10 +2456,6 @@ def _selftest() -> None:
     assert source_for("api_offer_24338726").table == "api_offers"
     assert offer_source("not-an-offer-key") is None
 
-    # A path anchor whose text has no parseable jornada/score (skipped for
-    # THAT reason) must not block a later, valid anchor for the SAME path --
-    # "seen" may only be marked once the jornada/sides check has passed, not
-    # on first sight of the path. Same class of bug as player_sources above.
     dup_path_html = (
         '<a href="/partidos/22421-alaves-getafe">no jornada here</a>'
         '<a href="/partidos/22421-alaves-getafe">Jornada 1 3-0</a>')
