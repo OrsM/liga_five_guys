@@ -1070,9 +1070,8 @@ functions become siblings.
 
 ## Area 5 — `src/sources.py`'s parser/sign layer, re-audited against the sharper standard (earlier this session's pass on this file was weaker: it spot-checked and stopped at "needs different inputs")
 
-**Status: `_lineup_row()` extraction done (commit `fb1a912`). The secondary,
-lower-priority `parse_fitness` three-scan-loop → `_scan()` helper is
-still open (optional).**
+**Status: done** (fb1a912, 4ac3d81 -- `parse_fitness` became one
+(element, status) table and one loop, no `_scan()` helper).
 
 **Read every parser and sign function in the file end to end (~2,700 lines,
 29 parser/sign functions), plus the shared engines already in place
@@ -1345,11 +1344,8 @@ over from the earlier, weaker one.
 
 ## Area 6 — the report/decide-adjacent leaf modules (`squads.py`, `scout.py`, `gap_signal.py`, `report.py`, `flip.py`, `backtest.py`, `ffcore/score.py`'s non-fit_* content, `ffcore/season.py`, `ffcore/profile.py`, both `crosswalk.py` files, `xi.py`, `points.py`, `digest.py`) — one still-open item from Area 1, one real small duplicate found fresh, one cosmetic-looking duplicate correctly left alone, and everything else confirmed clean by reading, not by inheriting an earlier "reviewed" label
 
-**Status: the `Scorer.__init__` duplicate (item 1 below) is done (commit
-`3cb954e`). The `backtest.py` `_replay_setup()` duplicate is done (commit
-`b9796cf`). The `score.py`/`season.py` `SHAPES` duplicate is done (commit
-`93a16b0`). The `ffcore/league.py: app_fielded` hand-rolled resolve ladder
-(a lead, not a specced fix) is still open/optional.**
+**Status: done** (3cb954e, b9796cf, 93a16b0; `app_fielded` takes the
+crosswalk in 4ac3d81).
 
 **Method used throughout this area, same as Areas 1-4: for each module,
 what job is it doing (the contract), which functions implement it, and —
