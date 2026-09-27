@@ -8,7 +8,7 @@ from typing import NamedTuple
 import numpy as np
 
 from ffcore.text import norm
-from ffcore.tidy import MATCH_LEN, minutes_played
+from ffcore.tidy import minutes_played
 
 __all__ = ["Obs", "Outcome", "Calibration", "calibrate", "fit", "outcomes",
            "observations", "fit_start_fallbacks", "NEUTRAL_START",
@@ -144,15 +144,15 @@ def outcomes(lineups, starters, locks: dict, jornada_of: dict, xw
     return sorted(out, key=lambda o: (o.at, o.group))
 
 
-def _share(o: Outcome) -> float:
-    return min(1.0, o.mins / MATCH_LEN)
+def _played(o: Outcome) -> float:
+    return 1.0 if o.mins > 0 else 0.0
 
 
 def observations(outs: list[Outcome], neutral: float = NEUTRAL_START,
                  absent: float = ABSENT_START) -> list[Obs]:
     return [Obs(o.ff if o.ff is not None
                 else (neutral if o.listed else absent) / 100.0,
-                _share(o), o.group) for o in outs]
+                _played(o), o.group) for o in outs]
 
 
 def _shrunk(default_pct: float, shares: list[float]) -> float:
@@ -164,9 +164,9 @@ def _shrunk(default_pct: float, shares: list[float]) -> float:
 
 
 def fit_start_fallbacks(outs: list[Outcome]) -> tuple[float, float]:
-    return (_shrunk(NEUTRAL_START, [_share(o) for o in outs
+    return (_shrunk(NEUTRAL_START, [_played(o) for o in outs
                                     if o.listed and o.ff is None]),
-            _shrunk(ABSENT_START, [_share(o) for o in outs if not o.listed]))
+            _shrunk(ABSENT_START, [_played(o) for o in outs if not o.listed]))
 
 
 def calibrate(outs: list[Outcome]) -> Calibration:
@@ -249,10 +249,10 @@ def _selftest() -> None:
     assert outcomes(lineups, [], locks, {}, None) == []
 
     obs = {o.ff: o.started for o in observations(outs)}
-    assert obs == {0.8: 1.0, 0.2: 0.0, 0.6: 0.0, 0.15: 0.5}, obs
+    assert obs == {0.8: 1.0, 0.2: 0.0, 0.6: 0.0, 0.15: 1.0}, obs
     npct, apct = fit_start_fallbacks(outs)
     assert abs(npct - (8 * 60 + 1 * 0) / 9) < 1e-9, npct
-    assert abs(apct - (8 * 15 + 1 * 50) / 9) < 1e-9, apct
+    assert abs(apct - (8 * 15 + 1 * 100) / 9) < 1e-9, apct
     assert fit_start_fallbacks([]) == (60.0, 15.0)
 
     print("ffcore.startprob self-test OK")

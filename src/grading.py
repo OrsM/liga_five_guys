@@ -29,7 +29,7 @@ def score_forecast(pred: dict[str, float], actual: dict[tuple, float],
     errs = [p - actual.get((k, j), 0.0) for k, p in pred.items()]
     top = sorted(pred, key=pred.get, reverse=True)[:TOP_N]
     return {"n": len(errs),
-            "mae": sum(abs(e) for e in errs) / len(errs) if errs else None,
+            "rmse": math.sqrt(sum(e * e for e in errs) / len(errs)) if errs else None,
             "bias": sum(errs) / len(errs) if errs else None,
             "top": (sum(actual.get((k, j), 0.0) for k in top) / len(top)
                     if top else None)}
@@ -79,7 +79,7 @@ def compare(a: dict[str, dict], b: dict[str, dict]) -> list[dict]:
         pa = {k: a[j][k] for k in keys}
         pb = {k: b[j][k] for k in keys}
         sa, sb = score_forecast(pa, actual, int(j)), score_forecast(pb, actual, int(j))
-        out.append({"jornada": int(j), "n": len(keys), "mae": (sa["mae"], sb["mae"]),
+        out.append({"jornada": int(j), "n": len(keys), "rmse": (sa["rmse"], sb["rmse"]),
                     "top": (sa["top"], sb["top"])})
     return out
 
@@ -92,9 +92,10 @@ def _selftest() -> None:
                               ("b", 2): 2.0}) == 0.0
 
     got = score_forecast({"a": 3.0, "b": 1.0}, {("a", 1): 5.0}, 1)
-    assert (got["n"], got["mae"], got["bias"]) == (2, 1.5, -0.5), got
+    assert got["n"] == 2 and got["bias"] == -0.5, got
+    assert abs(got["rmse"] - math.sqrt(2.5)) < 1e-12, got
     assert got["top"] == 2.5, got
-    assert score_forecast({}, {}, 1)["mae"] is None
+    assert score_forecast({}, {}, 1)["rmse"] is None
 
     print("grading self-test OK")
 
@@ -105,8 +106,8 @@ if __name__ == "__main__":
     elif "--backtest" in sys.argv:
         runs = backtest()
         for r in runs:
-            print("j%-2d n=%3d mae %.3f bias %+.3f top%d %.2f"
-                  % (r["jornada"], r["n"], r["mae"], r["bias"], TOP_N, r["top"]))
+            print("j%-2d n=%3d rmse %.3f bias %+.3f top%d %.2f"
+                  % (r["jornada"], r["n"], r["rmse"], r["bias"], TOP_N, r["top"]))
         print("persistent share of a player's expectation: %.2f" % persistence(
             {r["jornada"]: r["pred"] for r in runs}, _jornada_points()))
         rest = sys.argv[sys.argv.index("--backtest") + 1:]
@@ -119,12 +120,12 @@ if __name__ == "__main__":
                 for p in sys.argv[i + 1:i + 3])
         rows = compare(a, b)
         for r in rows:
-            print("j%-2d n=%3d mae %.3f -> %.3f (%+.3f)  top%d %.2f -> %.2f (%+.2f)"
-                  % (r["jornada"], r["n"], *r["mae"], r["mae"][1] - r["mae"][0],
+            print("j%-2d n=%3d rmse %.3f -> %.3f (%+.3f)  top%d %.2f -> %.2f (%+.2f)"
+                  % (r["jornada"], r["n"], *r["rmse"], r["rmse"][1] - r["rmse"][0],
                      TOP_N, *r["top"], r["top"][1] - r["top"][0]))
         late = [r for r in rows if r["jornada"] > 1]
-        print("jornadas 2+: mae better in %d/%d, mean %+.3f; top better in %d/%d, mean %+.2f"
-              % (sum(r["mae"][1] < r["mae"][0] for r in late), len(late),
-                 sum(r["mae"][1] - r["mae"][0] for r in late) / max(1, len(late)),
+        print("jornadas 2+: rmse better in %d/%d, mean %+.3f; top better in %d/%d, mean %+.2f"
+              % (sum(r["rmse"][1] < r["rmse"][0] for r in late), len(late),
+                 sum(r["rmse"][1] - r["rmse"][0] for r in late) / max(1, len(late)),
                  sum(r["top"][1] > r["top"][0] for r in late), len(late),
                  sum(r["top"][1] - r["top"][0] for r in late) / max(1, len(late))))

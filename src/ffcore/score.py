@@ -119,10 +119,9 @@ def _per_jornada_current(starters_rows, played, jornada_of_match, xw
 def _totals(per_jornada: dict[int, tuple[float, float]]
             ) -> tuple[float, float, float, float]:
     pts = sum(p for p, _m in per_jornada.values())
-    matches = sum(m / 90.0 for _p, m in per_jornada.values())
-    started = sum(min(1.0, m / 90.0) for _p, m in per_jornada.values())
+    apps = sum(1 for _p, m in per_jornada.values() if m > 0)
     n = len(per_jornada)
-    return pts, matches, (started / n if n else 0.0), n
+    return pts, float(apps), (apps / n if n else 0.0), n
 
 
 def build(market: list[dict], xi_rows: list[dict], now,
@@ -420,7 +419,7 @@ def _selftest() -> None:
     assert "unused sub" not in by_key, by_key
     assert _per_jornada_current([], [], {}, xw2) == {}
 
-    assert _totals(by_key["antonio blanco"]) == (13.0, 1.5, 0.75, 2)
+    assert _totals(by_key["antonio blanco"]) == (13.0, 2.0, 1.0, 2)
     assert _totals({}) == (0.0, 0.0, 0.0, 0)
 
     print("ffcore.score self-test OK")

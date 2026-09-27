@@ -11,7 +11,7 @@ SEED_POOL = (-1, -1, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1,
 
 MIN_POOL = 200
 
-PERSISTENT_SHARE = 0.28
+PERSISTENT_SHARE = 0.21
 
 
 class Bootstrap:
