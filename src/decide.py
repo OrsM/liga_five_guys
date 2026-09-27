@@ -15,7 +15,7 @@ from ffcore.schedule import expectations, phantom_fill, phantom_topup
 from ffcore.pricing import auction_ratios, burn, cash_price, steps, trend
 from ffcore.action import Action
 from ffcore.league import League
-from ffcore.score import SLOT, Scorer, build, replacement, squad_pool, vor
+from ffcore.score import SLOT, build, replacement, squad_pool, vor
 from ffcore.season import (LeagueState, best_xi,
                            simulate_many)
 from ffcore.tidy import (DECISIONS, LINEUP_SOURCE, age_hours, current, history,
@@ -42,11 +42,8 @@ class Universe:
     part_played: dict[int, set[str]] = field(default_factory=dict)
     first_jornada_of: dict[str, int] = field(default_factory=dict)
     locked_cash: float = 0.0
-    received_offers: dict[str, float] = field(default_factory=dict)
     lam: float | None = None
     premium: float = 1.0
-    lg: League | None = None
-    sc: Scorer | None = None
 
     @cached_property
     def next_up(self) -> dict[str, tuple[float, float]]:
@@ -343,11 +340,11 @@ def load() -> Universe:
                for r in lg.standings if r.get("manager")}
     return Universe(
         state=LeagueState(squads, rem, me, carried), forecaster=fc,
-        cash=lg.cash[me], me=me, facts=facts, lg=lg, sc=sc,
+        cash=lg.cash[me], me=me, facts=facts,
         rival_cash={h: v for h, v in lg.cash.items() if h != me},
         part_played=played, first_jornada_of=first_jornada_of,
         locked_cash=sum(facts["my_bid"].values()),
-        received_offers=received_offers, lam=cash_price_history(),
+        lam=cash_price_history(),
         premium=_premium(me),
         )
 
@@ -550,8 +547,7 @@ def _selftest() -> None:
         state=LeagueState({"me": dict(sq)}, [1], "me"),
         forecaster=Bootstrap(per), cash=0.0, me="me",
         facts=dict(pos=dict(sq),
-                                  proceeds={"spare_d": 4e6, "dead_f": 6e6}),
-        received_offers={})
+                                  proceeds={"spare_d": 4e6, "dead_f": 6e6}))
     mine = u.state.squads["me"]
     spares = fieldable_spares(u)
     for s in spares:
