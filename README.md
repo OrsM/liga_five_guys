@@ -75,6 +75,8 @@ Everything else comes from the app's API and public pages.
     python src/grading.py --prices                # price model walk-forward vs "no change"
     bash tools/selftests.sh                       # every module's self-test
     python tools/golden.py freeze|check           # a refactor must rebuild the same board
+    python tools/structure.py [--check]           # coupling numbers; --check gates selftests
+    python tools/uml.py docs                      # regenerate docs/*.mmd from the code
 
 Run them with `PYTHONPATH=src FF_ROOT=<a copy of data>`; rehearse boards on a
 copy of `data/`, never the live one. A change goes in when the backtest

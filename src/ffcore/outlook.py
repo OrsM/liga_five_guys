@@ -3,6 +3,7 @@ from __future__ import annotations
 from functools import cached_property
 from typing import Mapping, NamedTuple
 
+from ffcore.forecast import Bootstrap
 from ffcore.score import replacement, squad_pool, vor
 from ffcore.season import LeagueState, best_xi
 
@@ -21,7 +22,7 @@ class Outlook:
     """What each player is expected to score, and the eleven that makes the
     most of it. Points only: what anything costs is the market's business."""
 
-    def __init__(self, state: LeagueState, forecaster,
+    def __init__(self, state: LeagueState, forecaster: Bootstrap,
                  pos: Mapping[str, str] | None = None,
                  part_played: Mapping[int, set[str]] | None = None,
                  first_jornada_of: Mapping[str, int] | None = None):

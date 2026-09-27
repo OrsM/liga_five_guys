@@ -72,7 +72,7 @@ def estimate_cash(activity, users: dict, me: str, my_cash: float | None,
 
 class League:
 
-    def __init__(self, cfg: Config, xw, api_teams=(), standings=(),
+    def __init__(self, cfg: Config, xw: Crosswalk, api_teams=(), standings=(),
                  activity=()):
         self.cfg, self.xw, self.standings = cfg, xw, standings
         self.owner = {k: text(r, "manager") for r in api_teams

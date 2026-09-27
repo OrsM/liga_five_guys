@@ -1,0 +1,149 @@
+flowchart LR
+    classDef hub fill:#fee2e2,stroke:#b91c1c,color:#111
+    classDef leaf fill:#f3f4f6,stroke:#6b7280,color:#111
+    subgraph stages["Stages (src/)"]
+        assemble["assemble 144<br/>in 2 · out 17"]:::hub
+        crosswalk["crosswalk 157"]
+        decide["decide 504"]
+        grading["grading 138"]
+        ingest["ingest 764"]
+        run["run 82"]
+        sim["sim 227"]
+    end
+    subgraph fetch["Fetch and parse"]
+        auth["auth 247"]
+        footballdata["footballdata 131"]
+        futbolfantasy["futbolfantasy 754"]
+        laliga_api["laliga_api 572"]
+        source["source 46"]
+        sources["sources 100"]
+    end
+    subgraph data["Tables and time"]
+        clock["clock 84"]
+        ff_crosswalk["ff_crosswalk 185"]
+        jornadas["jornadas 94"]
+        league["league 166"]
+        players["players 111"]
+        points["points 109"]
+        tidy["tidy 358<br/>in 10 · out 2"]:::hub
+    end
+    subgraph model["Model"]
+        action["action 44"]
+        fixture["fixture 238"]
+        forecast["forecast 50"]
+        market["market 153"]
+        outlook["outlook 113"]
+        pricing["pricing 144"]
+        rules["rules 55"]
+        schedule["schedule 200"]
+        score["score 365"]
+        season["season 234"]
+        startprob["startprob 306"]
+    end
+    subgraph util["Pure utilities"]
+        parse["parse 206<br/>in 12 · out 0"]:::hub
+        render["render 37"]:::leaf
+        text["text 120"]:::leaf
+        stats["stats 26"]:::leaf
+    end
+    run -. "by name" .-> ingest
+    run -. "by name" .-> crosswalk
+    run -. "by name" .-> sim
+    assemble --> decide
+    assemble --> clock
+    assemble --> fixture
+    assemble --> forecast
+    assemble --> jornadas
+    assemble --> league
+    assemble --> market
+    assemble --> parse
+    assemble --> players
+    assemble --> points
+    assemble --> pricing
+    assemble --> rules
+    assemble --> schedule
+    assemble --> score
+    assemble --> season
+    assemble --> startprob
+    assemble --> tidy
+    crosswalk --> ff_crosswalk
+    crosswalk --> parse
+    crosswalk --> text
+    crosswalk --> tidy
+    decide --> action
+    decide --> forecast
+    decide --> market
+    decide --> outlook
+    decide --> pricing
+    decide --> rules
+    decide --> schedule
+    decide --> season
+    decide --> stats
+    clock --> parse
+    ff_crosswalk --> text
+    ff_crosswalk --> tidy
+    fixture --> parse
+    footballdata --> futbolfantasy
+    footballdata --> source
+    futbolfantasy --> parse
+    futbolfantasy --> source
+    futbolfantasy --> text
+    jornadas --> clock
+    jornadas --> fixture
+    jornadas --> tidy
+    laliga_api --> source
+    league --> ff_crosswalk
+    league --> parse
+    league --> players
+    league --> text
+    league --> tidy
+    market --> action
+    outlook --> forecast
+    outlook --> score
+    outlook --> season
+    players --> ff_crosswalk
+    players --> parse
+    players --> text
+    players --> tidy
+    points --> parse
+    points --> text
+    points --> tidy
+    schedule --> fixture
+    schedule --> rules
+    schedule --> score
+    score --> parse
+    score --> rules
+    score --> startprob
+    score --> text
+    season --> rules
+    season --> stats
+    startprob --> parse
+    startprob --> rules
+    startprob --> text
+    tidy --> clock
+    tidy --> parse
+    grading --> assemble
+    grading --> clock
+    grading --> jornadas
+    grading --> points
+    grading --> pricing
+    grading --> schedule
+    grading --> tidy
+    ingest --> auth
+    ingest --> futbolfantasy
+    ingest --> laliga_api
+    ingest --> league
+    ingest --> parse
+    ingest --> tidy
+    ingest --> sources
+    sim --> assemble
+    sim --> decide
+    sim --> clock
+    sim --> jornadas
+    sim --> league
+    sim --> render
+    sim --> tidy
+    sources --> footballdata
+    sources --> futbolfantasy
+    sources --> laliga_api
+    sources --> source

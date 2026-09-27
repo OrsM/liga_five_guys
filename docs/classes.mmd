@@ -1,0 +1,294 @@
+classDiagram
+    direction LR
+    class Band {
+        <<NamedTuple>>
+        decide
+        +median: float
+        +lo: float
+        +hi: float
+        +action: Action
+        +mean: float
+    }
+    class Ranking {
+        <<NamedTuple>>
+        decide
+        +rows: list~dict~
+        +base: Standings
+        +measured: float | None
+        +bands: dict~str Band~
+    }
+    class Universe {
+        <<frozen dataclass>>
+        decide
+        +state: LeagueState
+        +forecaster: Bootstrap
+        +market: Market
+        +rival_cash: dict~str float~
+        +part_played: dict~int set~str~~
+        +first_jornada_of: dict~str int~
+        +me()
+        +mine()
+        +outlook()
+        +route_kind()
+        +candidates()
+        +rank()
+    }
+    class Action {
+        <<frozen dataclass>>
+        ffcore.action
+        +kind: str
+        +buy: str
+        +sell: tuple~str ...~
+        +cost: float
+        +proceeds: float
+        +net()
+        +label()
+    }
+    class TokenStore {
+        ffcore.auth
+        +path
+        +load()
+        +save()
+        +refresh()
+        +bearer()
+        +expiry_days()
+    }
+    class Player {
+        <<dataclass>>
+        ffcore.crosswalk
+        +player_id: str
+        +name: str
+        +club_id: str
+        +ff_slug: str
+        +app_id: str
+        +app_names: set
+        +row()
+    }
+    class Crosswalk {
+        ffcore.crosswalk
+        +players
+        +clashes()
+        +player()
+        +key_of()
+        +coverage()
+        +read()
+        +write()
+    }
+    class Match {
+        <<NamedTuple>>
+        ffcore.fixture
+        +atk_factor: float
+        +def_factor: float
+    }
+    class JornadaClock {
+        ffcore.fixture
+        +team_locks
+        +round_locks
+        +team_lock()
+        +round_lock()
+        +order()
+        +next_deadline()
+    }
+    class Bootstrap {
+        ffcore.forecast
+        +per_jornada
+        +share: float
+        +pool
+        +pool_mean
+        +order()
+        +expected()
+    }
+    class Config {
+        <<dataclass>>
+        ffcore.league
+        +me: str
+        +budget: float
+    }
+    class League {
+        ffcore.league
+        +cfg: Config
+        +xw: Crosswalk
+        +owner
+        +cash
+        +managers
+        +standings
+        +load()
+        +me()
+        +key_of_app()
+        +squad()
+    }
+    class Market {
+        <<frozen dataclass>>
+        ffcore.market
+        +cash: float
+        +lam: float | None
+        +premium: float
+        +name: dict~str str~
+        +pos: dict~str str~
+        +price: dict~str float~
+        +route: dict~str str~
+        +owner: dict~str str~
+        ...4 more fields
+        +locked_cash()
+        +burn()
+        +cash_pts()
+    }
+    class XI {
+        <<NamedTuple>>
+        ffcore.outlook
+        +expected: dict~str float~
+        +players: set~str~
+        +ranked()
+    }
+    class Outlook {
+        ffcore.outlook
+        +state: LeagueState
+        +forecaster: Bootstrap
+        +pos: Mapping~str str~ | None
+        +part_played: Mapping~int set~str~~ | None
+        +first_jornada_of: Mapping~str int~ | None
+        +next_up()
+        +xi()
+        +season()
+        +xi_bar()
+        +par()
+    }
+    class Scored {
+        <<NamedTuple>>
+        ffcore.points
+        +key: str
+        +jornada: int
+        +pts: float
+        +games: float
+        +at: str
+    }
+    class Momentum {
+        ffcore.pricing
+        +hmax
+        +slope
+    }
+    class Rating {
+        <<NamedTuple>>
+        ffcore.score
+        +ppm: float
+        +assumed: bool
+        +cur_pj: float
+        +pj: float
+    }
+    class Rates {
+        <<NamedTuple>>
+        ffcore.score
+        +key: str
+        +slot: str
+        +ppm: float
+        +p_now: float
+        +p_rest: float
+        +status: str
+        +pj: float
+    }
+    class Scorer {
+        ffcore.score
+        +market: list~dict~
+        +starts: StartOdds
+        +last_season: dict | None
+        +shrink_k: float
+        +promoted_discount: float
+        +current: dict | None
+        +lookup
+        +promoted
+        ...2 more fields
+        +rate()
+        +rates()
+    }
+    class LeagueState {
+        <<dataclass>>
+        ffcore.season
+        +squads: dict~str dict~str str~~
+        +jornadas: list~int~
+        +me: str
+        +carried: dict~str float~
+    }
+    class Standings {
+        <<dataclass>>
+        ffcore.season
+        +totals: dict~str list~float~~
+        +me: str
+        +trials()
+        +mean()
+        +band()
+        +beat()
+        +position()
+        +expected_position()
+    }
+    class Source {
+        <<NamedTuple>>
+        ffcore.source
+        +key: str
+        +table: str
+        +url: str
+        +parse: Callable
+        +cadence: str
+        +enabled: bool
+        +auth: bool
+    }
+    class Obs {
+        <<NamedTuple>>
+        ffcore.startprob
+        +ff: float | None
+        +started: float
+        +group: str
+    }
+    class Calibration {
+        <<dataclass>>
+        ffcore.startprob
+        +alpha: float
+        +beta: float
+        +neutral_start: float
+        +absent_start: float
+        +p()
+    }
+    class StartOdds {
+        ffcore.startprob
+        +cal: Calibration | None
+        +start_pct
+        +listed
+        +status
+        +p_now()
+        +status_of()
+    }
+    class Outcome {
+        <<NamedTuple>>
+        ffcore.startprob
+        +at: str
+        +jornada: int
+        +group: str
+        +who: str
+        +key: str | None
+        +listed: bool
+        +ff: float | None
+        +status: str
+        ...2 more fields
+    }
+    class Table {
+        <<NamedTuple>>
+        ffcore.tidy
+        +snapshot: bool
+        +key: tuple
+        +store: str
+    }
+    class Sigs {
+        ingest
+        +of()
+    }
+    Band *-- Action : action
+    League *-- Config : cfg
+    League *-- Crosswalk : xw
+    Outlook *-- Bootstrap : forecaster
+    Outlook *-- LeagueState : state
+    Ranking *-- Band : bands
+    Ranking *-- Standings : base
+    Scorer *-- StartOdds : starts
+    StartOdds *-- Calibration : cal
+    Universe *-- Bootstrap : forecaster
+    Universe *-- LeagueState : state
+    Universe *-- Market : market
