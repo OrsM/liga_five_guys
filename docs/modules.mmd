@@ -6,7 +6,7 @@ flowchart LR
         crosswalk["crosswalk 157"]
         decide["decide 504"]
         grading["grading 138"]
-        ingest["ingest 764"]
+        ingest["ingest 755"]
         run["run 82"]
         sim["sim 227"]
     end
@@ -14,9 +14,9 @@ flowchart LR
         auth["auth 247"]
         footballdata["footballdata 131"]
         futbolfantasy["futbolfantasy 754"]
-        laliga_api["laliga_api 572"]
-        source["source 46"]
-        sources["sources 100"]
+        laliga_api["laliga_api 584"]
+        source["source 50"]
+        sources["sources 119"]
     end
     subgraph data["Tables and time"]
         clock["clock 84"]
@@ -29,19 +29,20 @@ flowchart LR
     end
     subgraph model["Model"]
         action["action 44"]
-        fixture["fixture 238"]
+        fixture["fixture 169"]
         forecast["forecast 50"]
         market["market 153"]
         outlook["outlook 113"]
         pricing["pricing 144"]
         rules["rules 55"]
-        schedule["schedule 200"]
+        schedule["schedule 201"]
         score["score 365"]
         season["season 234"]
         startprob["startprob 306"]
     end
     subgraph util["Pure utilities"]
-        parse["parse 206<br/>in 12 · out 0"]:::hub
+        locks["locks 86"]:::leaf
+        parse["parse 206<br/>in 13 · out 0"]:::hub
         render["render 37"]:::leaf
         text["text 120"]:::leaf
         stats["stats 26"]:::leaf
@@ -89,7 +90,7 @@ flowchart LR
     futbolfantasy --> source
     futbolfantasy --> text
     jornadas --> clock
-    jornadas --> fixture
+    jornadas --> locks
     jornadas --> tidy
     laliga_api --> source
     league --> ff_crosswalk
@@ -97,6 +98,7 @@ flowchart LR
     league --> players
     league --> text
     league --> tidy
+    locks --> parse
     market --> action
     outlook --> forecast
     outlook --> score
@@ -109,6 +111,7 @@ flowchart LR
     points --> text
     points --> tidy
     schedule --> fixture
+    schedule --> locks
     schedule --> rules
     schedule --> score
     score --> parse

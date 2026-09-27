@@ -80,15 +80,6 @@ classDiagram
         +atk_factor: float
         +def_factor: float
     }
-    class JornadaClock {
-        ffcore.fixture
-        +team_locks
-        +round_locks
-        +team_lock()
-        +round_lock()
-        +order()
-        +next_deadline()
-    }
     class Bootstrap {
         ffcore.forecast
         +per_jornada
@@ -116,6 +107,15 @@ classDiagram
         +me()
         +key_of_app()
         +squad()
+    }
+    class JornadaClock {
+        ffcore.locks
+        +team_locks
+        +round_locks
+        +team_lock()
+        +round_lock()
+        +order()
+        +next_deadline()
     }
     class Market {
         <<frozen dataclass>>
@@ -230,6 +230,7 @@ classDiagram
         +cadence: str
         +enabled: bool
         +auth: bool
+        +follow
     }
     class Obs {
         <<NamedTuple>>
