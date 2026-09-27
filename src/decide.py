@@ -414,7 +414,7 @@ def load() -> Universe:
     me, now = lg.cfg.me, run_now()
     players = load_players()
     m = current("matches")
-    rem, played = rounds_left(m, current("fixtures"))
+    rem, played = rounds_left(m)
 
     teams, mkt = ([dict(r, key=lg.xw.player(app_id=text(r, "player_id")))
                    for r in current(name)] for name in ("api_teams", "api_market"))

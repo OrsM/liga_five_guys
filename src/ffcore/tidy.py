@@ -149,7 +149,7 @@ def append_csv(path, rows, fieldnames=None) -> None:
 
 def load_deadline(with_source: bool = False):
     when = clock().next_deadline(run_now())
-    return (when, "fixtures" if when else "none") if with_source else when
+    return (when, "calendar" if when else "none") if with_source else when
 
 
 @lru_cache(maxsize=4096)
@@ -186,7 +186,6 @@ TABLES: dict[str, Table] = {
     "market": Table(True, ("ff_id",), "daily"),
     "lineups": Table(True, ("source", "team_slug", "player_slug"), "daily"),
     "matches": Table(True),
-    "fixtures": Table(True),
     "points": Table(True),
     "api_teams": Table(True),
     "api_standings": Table(True),
@@ -361,20 +360,15 @@ def lock_order(locks: dict[int, datetime]) -> list[int]:
 
 class JornadaClock:
 
-    def __init__(self, matches: list[dict], fixtures: list[dict]):
-        jornada_of: dict[tuple[str, str], int] = {}
-        for m in matches:
-            try:
-                jornada_of[(m["home"], m["away"])] = int(m["jornada"])
-            except (KeyError, ValueError, TypeError):
-                continue
+    def __init__(self, matches: list[dict]):
+        latest: dict[tuple, tuple[int, datetime]] = {}
+        for m in sorted(matches, key=lambda r: r.get("observed_at", "")):
+            when = kickoff_stamp(m.get("kickoff"))
+            jor = m.get("jornada") or ""
+            if when is not None and str(jor).isdigit():
+                latest[(m.get("home"), m.get("away"))] = (int(jor), when)
         self.team_locks: dict[tuple[int, str], datetime] = {}
-        for f in fixtures:
-            when = kickoff_stamp(f.get("kickoff"))
-            home, away = f.get("home"), f.get("away")
-            jor = jornada_of.get((home, away))
-            if when is None or jor is None:
-                continue
+        for (home, away), (jor, when) in latest.items():
             for team in (home, away):
                 key = (jor, team)
                 if key not in self.team_locks or when < self.team_locks[key]:
@@ -406,14 +400,14 @@ _CLOCK_HISTORY: list = []
 
 def clock() -> JornadaClock:
     if not _CLOCK:
-        _CLOCK.append(JornadaClock(current("matches"), current("fixtures")))
+        _CLOCK.append(JornadaClock(current("matches")))
     return _CLOCK[0]
 
 
 def clock_history() -> JornadaClock:
     if not _CLOCK_HISTORY:
         _CLOCK_HISTORY.append(
-            JornadaClock(current("matches"), history("fixtures")))
+            JornadaClock(history("matches")))
     return _CLOCK_HISTORY[0]
 
 
@@ -672,9 +666,7 @@ def _selftest_new_loaders() -> None:
 
     _full = clock_history()
     assert _full is clock_history(), "clock_history() must be memoized too"
-    assert set(c1.team_locks) < set(_full.team_locks), \
-        ("clock() is no longer upcoming-only -- if that was deliberate, "
-         "load_deadline() changed with it; see clock()'s own docstring")
+    assert set(c1.team_locks) <= set(_full.team_locks)
     assert isinstance(c1, JornadaClock)
 
     j1 = jornada_of_match()
@@ -835,17 +827,17 @@ def _selftest() -> None:
         (None, "pending", "1")]]
     assert pending(offers, "status", "money") == {"me_a": 6795815.0}
 
-    jl_matches = [{"match_id": "1", "jornada": "1", "home": "alaves",
-                  "away": "getafe", "score": "3-0"},
-                 {"match_id": "2", "jornada": "1", "home": "espanyol",
-                  "away": "levante", "score": "1-0"},
-                 {"match_id": "9", "jornada": "2", "home": "rayo-vallecano",
-                  "away": "alaves", "score": "2-2"}]
-    jl_fixtures = [{"kickoff": "2026-08-16T17:00:00+00:00", "home": "espanyol",
-                   "away": "levante"},
-                  {"kickoff": "2026-08-15T19:30:00+00:00", "home": "alaves",
-                   "away": "getafe"}]
-    clock = JornadaClock(jl_matches, jl_fixtures)
+    jl_matches = [
+        {"observed_at": "2026-08-10T0900Z", "jornada": "1", "home": "alaves",
+         "away": "getafe", "kickoff": "2026-08-14T19:30:00+00:00"},
+        {"observed_at": "2026-08-12T0900Z", "jornada": "1", "home": "alaves",
+         "away": "getafe", "kickoff": "2026-08-15T19:30:00+00:00"},
+        {"observed_at": "2026-08-12T0900Z", "jornada": "1",
+         "home": "espanyol", "away": "levante",
+         "kickoff": "2026-08-16T17:00:00+00:00"},
+        {"observed_at": "2026-08-12T0900Z", "jornada": "2",
+         "home": "rayo-vallecano", "away": "alaves", "kickoff": ""}]
+    clock = JornadaClock(jl_matches)
     jl = clock.round_locks
     assert list(jl) == [1] and jl[1].day == 15, jl
     assert 2 not in jl

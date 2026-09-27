@@ -134,21 +134,18 @@ def difficulty(strength: dict[str, float]) -> dict[str, float]:
             for i, team in enumerate(order)}
 
 
-def fixture_board(ratings: "_Ratings", fixtures: list[dict],
+def fixture_board(ratings: "_Ratings", matches: list[dict],
                   now: datetime) -> dict[str, Match]:
     board: dict[str, Match] = {}
-    for r in fixtures:
+    for r in matches:
         when = kickoff_stamp(r.get("kickoff"))
         if not when or when <= now:
             continue
-        for team, opp, opp_name, home in (
-                (r.get("home"), r.get("away"), r.get("away_name"), True),
-                (r.get("away"), r.get("home"), r.get("home_name"), False)):
+        for team, opp, home in ((r.get("home"), r.get("away"), True),
+                                (r.get("away"), r.get("home"), False)):
             prev = board.get(team)
-            if team not in ratings.diff or (prev and prev.kickoff <= when):
-                continue
-            board[team] = _match_for(ratings, team, opp, opp_name or "?",
-                                     home, when)
+            if team in ratings.diff and not (prev and prev.kickoff <= when):
+                board[team] = _match_for(ratings, opp, home, when)
     return board
 
 
@@ -166,14 +163,14 @@ def difficulty_ratings(market: list[dict], results=None,
                     home_edge=home_edge)
 
 
-def _match_for(ratings: "_Ratings", team: str, opp: str, opp_name: str,
-              home: bool, when: datetime) -> Match:
+def _match_for(ratings: "_Ratings", opp: str, home: bool,
+               when: datetime) -> Match:
     base = ratings.diff.get(opp, 1.0) if opp else 1.0
     edge = 1.0 + (ratings.home_edge if home else -ratings.home_edge)
     opp_ad = ratings.ad.get(opp) if opp else None
     atk_base, def_base = ((opp_ad[1], 1.0 / opp_ad[0]) if opp_ad is not None
                           else (base, base))
-    return Match(opponent=opp_name, home=home, kickoff=when,
+    return Match(opponent=opp or "?", home=home, kickoff=when,
                  atk_factor=atk_base * edge, def_factor=def_base * edge)
 
 
@@ -187,8 +184,7 @@ def season_board(ratings: "_Ratings", matches: list[dict], jornadas,
         for team, opp, home in ((r.get("home"), r.get("away"), True),
                                 (r.get("away"), r.get("home"), False)):
             if team in ratings.diff and team not in board[int(j)]:
-                board[int(j)][team] = _match_for(ratings, team, opp, opp or "?",
-                                                 home, now)
+                board[int(j)][team] = _match_for(ratings, opp, home, now)
     return board
 
 

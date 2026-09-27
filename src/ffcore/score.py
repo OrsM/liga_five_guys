@@ -270,7 +270,7 @@ def build(market: list[dict], xi_rows: list[dict], now,
     return Scorer(
         market, xi_rows, last_season, shrink_k=shrink_k, xw=xw, cal=cal,
         second=second, ratings=ratings,
-        board=fixture_board(ratings, current("fixtures"), now),
+        board=fixture_board(ratings, current("matches"), now),
         current={k: dict(zip(("pts", "pj", "start_rate", "start_n"),
                              _weighted(jd, decay)))
                  for k, jd in by_key.items()},

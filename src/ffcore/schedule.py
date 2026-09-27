@@ -3,15 +3,14 @@ from __future__ import annotations
 
 
 
-def rounds_left(matches, fixtures=()) -> tuple[list[int], dict[int, set[str]]]:
+def rounds_left(matches) -> tuple[list[int], dict[int, set[str]]]:
     from ffcore.tidy import JornadaClock
 
     js = {r["jornada"] for r in matches if (r.get("jornada") or "").isdigit()}
     finished = {j for j in js
                 if all(r.get("score") for r in matches if r["jornada"] == j)}
     open_j = {int(j) for j in js - finished}
-    clock_order = [j for j in JornadaClock(matches, fixtures).order
-                  if j in open_j] if fixtures else []
+    clock_order = [j for j in JornadaClock(matches).order if j in open_j]
     rem = clock_order + sorted(open_j - set(clock_order))
 
     played: dict[int, set[str]] = {}

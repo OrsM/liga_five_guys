@@ -7,6 +7,7 @@ import json
 import re
 from datetime import datetime, timezone
 from functools import lru_cache
+from zoneinfo import ZoneInfo
 from typing import Callable, NamedTuple
 
 from ffcore.text import match_one, norm
@@ -14,10 +15,10 @@ from ffcore.text import match_one, norm
 from lxml import html as lh
 
 __all__ = ["BASE", "SOURCE", "MARKET_URL", "POINTS_URL", "TEAM_URL", "TEAMS",
-           "AF_BASE", "AF_SOURCE", "AF_TEAM_URL", "AF_TEAMS", "AF_HUB_URL",
+           "AF_BASE", "AF_SOURCE", "AF_TEAM_URL", "AF_TEAMS",
            "Source", "sources", "source_for", "SEVERITY",
            "parse_market", "parse_team", "parse_points", "parse_fitness",
-           "parse_af_team", "parse_af_fixtures", "season_label",
+           "parse_af_team", "season_label",
            "FD_BASE", "FD_URL", "FD_SOURCE", "CLUB_ALIASES", "club_slug", "FD_SEASONS_BACK",
            "fd_sources", "parse_fd_results",
            "CAL_KEY", "FF_CAL_URL", "MATCH_URL", "MATCH_KEY_RE",
@@ -71,15 +72,6 @@ def _once(seen: set, key) -> bool:
         return False
     seen.add(key)
     return True
-
-
-def _extract_rows(html: str, selector: str, row_of, observed_at: str) -> list[dict]:
-    rows, seen = [], set()
-    for el in _css(lh.fromstring(html), selector):
-        row = row_of(el, observed_at)
-        if row is not None and _once(seen, row.pop("key")):
-            rows.append(row)
-    return rows
 
 
 def _attr(chunk: str, name: str) -> str | None:
@@ -430,39 +422,6 @@ def parse_af_team(html: str, observed_at: str,
     return rows
 
 
-AF_HUB_URL = f"{AF_BASE}/la-liga/alineaciones-probables"
-AF_MATCH_RE = re.compile(r"/partido/(\d+)")
-
-
-def _af_fixture_row(a, observed_at: str) -> dict | None:
-    m = AF_MATCH_RE.search(a.get("href") or "")
-    times = _css(a, "time[datetime]")
-    teams = [i.get("alt") for i in _css(a, "img[alt]") if i.get("alt")]
-    ids = [i.get("data-af-team")
-           for i in _css(a, "img[data-af-team]") if i.get("data-af-team")]
-    if not (m and times and len(teams) >= 2):
-        return None
-    return {
-        "key": m.group(1),
-        "observed_at": observed_at,
-        "source": AF_SOURCE,
-        "match_id": m.group(1),
-        "kickoff": times[0].get("datetime"),
-        "home": club_slug(teams[0]),
-        "away": club_slug(teams[1]),
-        "home_name": teams[0],
-        "away_name": teams[1],
-        "home_id": ids[0] if len(ids) > 1 else "",
-        "away_id": ids[1] if len(ids) > 1 else "",
-    }
-
-
-def parse_af_fixtures(html: str, observed_at: str,
-                      key: str = "af_fixtures") -> list[dict]:
-    return _extract_rows(html, 'a[href*="/partido/"]', _af_fixture_row,
-                         observed_at)
-
-
 CAL_KEY = "calendario"
 FF_CAL_URL = f"{BASE}/laliga/calendario"
 MATCH_URL = f"{BASE}/partidos/{{path}}"
@@ -471,6 +430,21 @@ MATCH_PATH_RE = re.compile(r"/partidos/(\d+-[a-z0-9-]+)")
 MATCH_KEY_RE = re.compile(r"^match_(\d+-[a-z0-9-]+)$")
 CAL_JORNADA_RE = re.compile(r"Jornada\s*(\d+)")
 CAL_SCORE_RE = re.compile(r"\b(\d+\s*-\s*\d+)\b")
+CAL_KICKOFF_RE = re.compile(r"(\d\d)/(\d\d) (\d\d):(\d\d)h")
+MADRID = ZoneInfo("Europe/Madrid")
+
+
+def _kickoff(text: str, observed_at: str) -> str:
+    m = CAL_KICKOFF_RE.search(text)
+    if not m or not observed_at[:4].isdigit() or not observed_at[5:7].isdigit():
+        return ""
+    day, month, hour, minute = map(int, m.groups())
+    start = int(observed_at[:4]) - (int(observed_at[5:7]) < 7)
+    try:
+        return datetime(start + (month < 7), month, day, hour, minute,
+                        tzinfo=MADRID).isoformat()
+    except ValueError:
+        return ""
 
 MATCH_SIDES = (".stats-local", ".stats-visitante")
 MATCH_SUBS_HEADER = "Suplentes"
@@ -510,13 +484,18 @@ def _calendar_row(a, observed_at: str) -> dict | None:
         "home": sides[0],
         "away": sides[1],
         "score": score.group(1).replace(" ", "") if score else "",
+        "kickoff": "" if score else _kickoff(text, observed_at),
     }
 
 
 def parse_calendar(html: str, observed_at: str,
                    key: str = "calendario") -> list[dict]:
-    return _extract_rows(html, 'a[href*="/partidos/"]', _calendar_row,
-                         observed_at)
+    rows, seen = [], set()
+    for el in _css(lh.fromstring(html), 'a[href*="/partidos/"]'):
+        row = _calendar_row(el, observed_at)
+        if row is not None and _once(seen, row.pop("key")):
+            rows.append(row)
+    return rows
 
 
 def parse_starters(html: str, observed_at: str,
@@ -1053,8 +1032,6 @@ def sources(enabled_only: bool = True) -> list[Source]:
     out += [Source(f"af_{s}", "lineups", AF_TEAM_URL.format(slug=af),
                    parse_af_team, cadence="twice_daily")
             for s, af in sorted(AF_TEAMS.items())]
-    out += [Source("af_fixtures", "fixtures", AF_HUB_URL,
-                   parse_af_fixtures, cadence="daily")]
     out += fd_sources()
     out += understat_sources()
     out += [Source(CAL_KEY, "matches", FF_CAL_URL, parse_calendar, cadence="daily")]
@@ -1226,18 +1203,6 @@ _AF_CONSENSO_FIXTURE = """<html><body>
       </ul></div>
   </div>
 </section>
-</body></html>"""
-
-_AF_HUB_FIXTURE = """<html><body>
-<a href="/partido/100011934">
-  <time datetime="2026-08-15T19:30:00+00:00">15 ago, 21:30</time>
-  <span>Once posibles →</span>
-  <img alt="Sevilla" src="/escudos/536.png" data-af-team="536"/><span>Sevilla</span>
-  <img alt="Rayo Vallecano" src="/escudos/728.png" data-af-team="728"/>
-  <span>Rayo Vallecano</span>
-</a>
-<a href="/partido/100011934">duplicate, same id</a>
-<a href="/partido/999">no time, no crests</a>
 </body></html>"""
 
 _API_LEAGUES_FIXTURE = """[{"id":"017998544","access":"private",
@@ -1477,16 +1442,6 @@ def _selftest() -> None:
     assert all(r["status"] == "" for r in con)
     assert list(con[0]) == list(rows[0])
     assert parse_af_team("<html><body>new design</body></html>", "t") == []
-
-    fx = parse_af_fixtures(_AF_HUB_FIXTURE, "2026-01-01T0000Z")
-    assert len(fx) == 1, fx
-    assert fx[0]["match_id"] == "100011934"
-    assert (fx[0]["home"], fx[0]["away"]) == ("sevilla", "rayo-vallecano")
-    assert (fx[0]["home_name"], fx[0]["away_name"]) == ("Sevilla",
-                                                        "Rayo Vallecano")
-    assert fx[0]["home_id"] == "536" and fx[0]["away_id"] == "728", fx[0]
-    assert fx[0]["kickoff"] == "2026-08-15T19:30:00+00:00", fx[0]
-    assert fx[0]["source"] == AF_SOURCE
 
     for name, want in [("Real Sociedad", "real-sociedad"), ("Bilbao", "athletic"),
                        ("Atl. Madrid", "atletico"), ("La Coruna", "deportivo"),
@@ -1738,6 +1693,14 @@ def _selftest() -> None:
     assert byp["22421-alaves-getafe"]["jornada"] == 1
     assert byp["22421-alaves-getafe"]["match_id"] == "22421"
     assert byp["22424-elche-betis"]["score"] == ""
+    assert byp["22421-alaves-getafe"]["kickoff"] == ""
+    live = {r["path"]: r for r in parse_calendar(_CAL_FIXTURE, "2026-08-15T0900Z")}
+    assert live["22424-elche-betis"]["kickoff"] == "2026-08-17T21:00:00+02:00"
+    assert _kickoff("Jornada 20 Dom 10/01 20:00h", "2026-12-20T0900Z") \
+        == "2027-01-10T20:00:00+01:00"
+    assert _kickoff("Jornada 20 Dom 10/01 20:00h", "2027-01-02T0900Z") \
+        == "2027-01-10T20:00:00+01:00"
+    assert _kickoff("Jornada 1 Lun 17/08 21:00h", "t") == ""
     assert byp["22429-sevilla-rayo"]["away"] == "rayo-vallecano", byp
     assert _match_sides("real-madrid-real-sociedad") \
         == ("real-madrid", "real-sociedad")
@@ -1792,19 +1755,17 @@ def _selftest() -> None:
     assert source_for("api_lineup_38").table == "api_lineup"
 
     reg = sources()
-    assert len(reg) == (6 + len(TEAMS) + len(AF_TEAMS) + FD_SEASONS_BACK + 1
-                        + UNDERSTAT_SEASONS_BACK + 1) == 52, len(reg)
+    assert len(reg) == (5 + len(TEAMS) + len(AF_TEAMS) + FD_SEASONS_BACK + 1
+                        + UNDERSTAT_SEASONS_BACK + 1) == 51, len(reg)
     assert set(AF_TEAMS) == set(TEAMS), set(AF_TEAMS) ^ set(TEAMS)
-    assert {s.cadence for s in reg if s.key.startswith(("team_", "af_"))
-            and s.key != "af_fixtures"} == {"twice_daily"}
-    assert next(s.cadence for s in reg if s.key == "af_fixtures") == "daily"
+    assert {s.cadence for s in reg if s.key.startswith(("team_", "af_"))} \
+        == {"twice_daily"}
     assert {s.cadence for s in reg if s.key in ("market", "points")} \
         == {"every_run"}
-    assert {s.key for s in reg} >= {"market", "points", "team_barcelona",
-                                    "af_fixtures"}
+    assert {s.key for s in reg} >= {"market", "points", "team_barcelona"}
     assert len({s.key for s in reg}) == len(reg)
     assert {s.table for s in reg} == {"market", "points", "lineups",
-                                      "fixtures", "matches",
+                                      "matches",
                                       "api_leagues", "results_history",
                                       "understat_players",
                                       "api_players_all"}
@@ -1813,7 +1774,6 @@ def _selftest() -> None:
 
     assert source_for("af_celta").parse is parse_af_team
     samples = {"market": _MARKET_FIXTURE, "points": _POINTS_FIXTURE,
-               "af_fixtures": _AF_HUB_FIXTURE,
                CAL_KEY: _CAL_FIXTURE, API_LEAGUES_KEY: _API_LEAGUES_FIXTURE,
                "understat_2026": _UNDERSTAT_LIVE,
                "understat_2025": _UNDERSTAT_PAST,
