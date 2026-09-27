@@ -21,7 +21,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-HOME = Path(os.environ.get("LFG_GOLDEN", "/tmp/lfg-golden"))
+HOME = Path(os.environ.get("LFG_GOLDEN", Path.home() / ".cache" / "lfg-golden"))
 LOG = Path("decisions") / "cash_price_log.csv"
 
 
