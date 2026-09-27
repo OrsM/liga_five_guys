@@ -142,7 +142,7 @@ def _selftest() -> None:
 
     rows, _base, _measured, _bands = mu.rank(acts, seed=1)
     assert rows, "rank() must return at least one row for a real market"
-    assert any(r["action"].buy == "cand_free" for r in rows), rows
+    assert any(r.action.buy == "cand_free" for r in rows), rows
 
     print("ffcore.fixtures self-test OK")
 

@@ -28,7 +28,7 @@ def xi_change(marked: list[str], best) -> dict:
 
 
 def why(r) -> str:
-    return " + ".join(w for w, v in (("points", r["d_pts"]), ("cash", r["cash_pts"]))
+    return " + ".join(w for w, v in (("points", r.d_pts), ("cash", r.cash_pts))
                       if v > 0)
 
 
@@ -37,11 +37,11 @@ def player(m, k) -> dict:
 
 
 def buy_row(m, r) -> dict:
-    a = r["action"]
+    a = r.action
     return {**player(m, a.buy), "ask": a.cost,
             "bid": min(a.cost * m.premium, max(a.cost, m.cash + a.proceeds)),
             "sell": [player(m, k)["name"] for k in a.sell],
-            "proceeds": a.proceeds, "gain": r["d_pts"], "why": why(r),
+            "proceeds": a.proceeds, "gain": r.d_pts, "why": why(r),
             "trend": m.trend.get(a.buy),
             "placed": m.my_bid.get(a.buy),
             "done": a.buy in m.my_bid}
@@ -61,7 +61,7 @@ def report(u, ranked, chg, lock_at=None) -> dict:
     o, m, mine = u.outlook, u.market, u.mine
     exp, xi = o.xi
     picked, gain = plan(u, rows, base)
-    gone = {k for p in picked for k in p["action"].sell}
+    gone = {k for p in picked for k in p.action.sell}
     todo = []
     if chg["in"] or chg["out"]:
         todo.append({"what": "field", "legal": chg["legal"],
@@ -76,10 +76,10 @@ def report(u, ranked, chg, lock_at=None) -> dict:
               "done": m.route.get(k) == "listed"}
              for k, v in sorted(sale_pts(u, bands).items(), key=lambda kv: -kv[1])
              if v > 0 and k not in gone]
-    chosen = {p["action"].buy for p in picked}
+    chosen = {p.action.buy for p in picked}
     backup = [buy_row(m, r) for r in sorted(worth_doing(u, rows),
-                                            key=lambda r: -r["net_pts"])
-              if r["action"].buy and r["action"].buy not in chosen][:BACKUPS]
+                                            key=lambda r: -r.net_pts)
+              if r.action.buy and r.action.buy not in chosen][:BACKUPS]
     lo, hi = base.band(u.me)
     return {
         "generated_at": run_now().strftime("%Y-%m-%dT%H:%MZ"),
@@ -117,7 +117,7 @@ def log_cash_price(measured) -> None:
 def _selftest() -> None:
     from dataclasses import replace
 
-    from decide import Action, Band, Universe
+    from decide import Action, Band, Move, Universe
     from ffcore.fixtures import tiny_market_universe
     from ffcore.market import Market
     from ffcore.forecast import Bootstrap
@@ -133,7 +133,8 @@ def _selftest() -> None:
 
     for d_pts, cash, want in [(1.0, 0.2, "points + cash"), (-1.0, 0.2, "cash"),
                               (2.0, -0.1, "points"), (0.0, 0.0, "")]:
-        assert why({"d_pts": d_pts, "cash_pts": cash}) == want, (d_pts, cash)
+        assert why(Move(Action("buy", buy="x"), d_pts, cash_pts=cash)) == want, (
+            d_pts, cash)
 
     mu = tiny_market_universe(lam=0.3)
     mu = replace(mu, market=replace(mu.market, value={"bench_m": 3e6},
@@ -166,12 +167,12 @@ def _selftest() -> None:
     assert bands["star"].median < -20 and -5 < bands["dead"].median < 5
     assert bands["dead"].action == asked["dead"], bands["dead"]
     picked, gain = plan(ub, rows, base)
-    bought = [p["action"].buy for p in picked]
+    bought = [p.action.buy for p in picked]
     assert bought and set(bought) <= {"cand", "twin"}, bought
-    assert sum(p["action"].net for p in picked) <= ub.market.cash, picked
-    sold = [k for p in picked for k in p["action"].sell]
+    assert sum(p.action.net for p in picked) <= ub.market.cash, picked
+    sold = [k for p in picked for k in p.action.sell]
     assert len(sold) == len(set(sold)), sold
-    assert gain >= max(r["net_pts"] for r in rows) - 5.0, (gain, rows[0])
+    assert gain >= max(r.net_pts for r in rows) - 5.0, (gain, rows[0])
 
     doc = report(ub, ranked, xi_change([], ub.outlook.xi.ranked()))
     assert [d["what"] for d in doc["do"]][:1] == ["field"], doc["do"]

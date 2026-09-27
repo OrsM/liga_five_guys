@@ -17,12 +17,28 @@ from ffcore.outlook import Outlook
 from ffcore.season import LeagueState, Standings, best_xi, simulate_many
 
 from ffcore.rules import FREE_FORMATIONS
-__all__ = ["Action", "Band", "Ranking", "Universe", "band_acts", "plan",
+__all__ = ["Action", "Band", "Move", "Ranking", "Universe", "band_acts", "plan",
            "sale_pts"]
 
 SCREEN_TRIALS = 250
 FINAL_TRIALS = 3000
 KEEP = 12
+
+
+@dataclass(frozen=True)
+class Move:
+    """One candidate, scored against doing nothing: its median change in
+    season points with the 10th-90th percentile band, and the cash it frees
+    or spends, priced in points."""
+    action: Action
+    d_pts: float
+    pts_lo: float = 0.0
+    pts_hi: float = 0.0
+    cash_pts: float = 0.0
+
+    @property
+    def net_pts(self) -> float:
+        return self.d_pts + self.cash_pts
 
 
 class Band(NamedTuple):
@@ -34,7 +50,7 @@ class Band(NamedTuple):
 
 
 class Ranking(NamedTuple):
-    rows: list[dict]
+    rows: list[Move]
     base: Standings
     measured: float | None
     bands: dict[str, Band]
@@ -139,18 +155,8 @@ class Universe:
             cash = self.market.cash_pts(a, lam)
             pairs = paired(r, base, self.me)
             d_pts, lo, hi = band(pairs)
-            out.append({
-                "action": a,
-                "d_pts": d_pts,
-                "pts_lo": lo,
-                "pts_hi": hi,
-                "net_pts": d_pts + cash,
-                "burn": self.market.burn(a),
-                "cash_pts": cash,
-                "d_win": r.position().get(1, 0.0) - base.position().get(1, 0.0),
-                "mean": r.mean(self.me),
-            })
-        rows = sorted(out, key=lambda d: (-d["net_pts"], d["action"].net))
+            out.append(Move(a, d_pts, lo, hi, cash))
+        rows = sorted(out, key=lambda d: (-d.net_pts, d.action.net))
         return Ranking(rows, base, measured, bands)
 
 
@@ -210,7 +216,7 @@ def apply(u, *acts: Action) -> dict[str, dict[str, str]]:
 
 
 def worth_doing(u, rows) -> list:
-    return [r for r in rows if r["net_pts"] > 0]
+    return [r for r in rows if r.net_pts > 0]
 
 
 def band_acts(u) -> list:
@@ -231,12 +237,12 @@ def sale_pts(u, bands) -> dict[str, float]:
 def plan(u, rows, base) -> tuple[list[dict], float]:
     picked: list[dict] = []
     cash, gain = u.market.cash, 0.0
-    for r in sorted(worth_doing(u, rows), key=lambda r: -r["net_pts"]):
-        a = r["action"]
-        used = {k for p in picked for k in (p["action"].buy, *p["action"].sell)}
+    for r in sorted(worth_doing(u, rows), key=lambda r: -r.net_pts):
+        a = r.action
+        used = {k for p in picked for k in (p.action.buy, *p.action.sell)}
         if used & {a.buy, *a.sell} or a.net > cash:
             continue
-        acts = [p["action"] for p in picked] + [a]
+        acts = [p.action for p in picked] + [a]
         after = score_many(u, [apply(u, *acts)], FINAL_TRIALS, 1)[0]
         total = band(paired(after, base, u.me))[0] + sum(
             u.market.cash_pts(x) for x in acts)
@@ -327,11 +333,11 @@ def _selftest() -> None:
     rows, base, _lam, _b = u.rank(acts)
     assert rows, "something should be worth doing"
     top = rows[0]
-    assert top["d_pts"] > 0, top["d_pts"]
-    assert top["pts_lo"] <= top["d_pts"] <= top["pts_hi"]
-    assert top["net_pts"] > 0, top
-    assert [r["net_pts"] for r in rows] == sorted(
-        (r["net_pts"] for r in rows), reverse=True)
+    assert top.d_pts > 0, top.d_pts
+    assert top.pts_lo <= top.d_pts <= top.pts_hi
+    assert top.net_pts > 0, top
+    assert [r.net_pts for r in rows] == sorted(
+        (r.net_pts for r in rows), reverse=True)
 
     vsq = {"me_k": "POR",
            **{"me_d%d" % i: "DEF" for i in range(1, 6)},
@@ -358,9 +364,9 @@ def _selftest() -> None:
     assert min(vexp[k] for k in vxi if uvor.market.pos[k] == "MED") == 5.0, vxi
     vrows, _vb, _vl, _vbd = uvor.rank([Action("buy", buy="thin_del", cost=5e6),
                Action("buy", buy="deep_med", cost=5e6)])
-    vby = {r["action"].buy: r for r in vrows}
-    assert vby["thin_del"]["action"].net == vby["deep_med"]["action"].net
-    assert vby["thin_del"]["d_pts"] > 2 * vby["deep_med"]["d_pts"] > 0, vby
+    vby = {r.action.buy: r for r in vrows}
+    assert vby["thin_del"].action.net == vby["deep_med"].action.net
+    assert vby["thin_del"].d_pts > 2 * vby["deep_med"].d_pts > 0, vby
 
     bsq = {"me_k": "POR", "me_d1": "DEF", "me_d2": "DEF", "me_d3": "DEF",
            "me_d4": "DEF", "me_d5": "DEF", "me_m1": "MED", "me_m2": "MED",
@@ -392,7 +398,7 @@ def _selftest() -> None:
         market=Market(cash=1000e6, pos={**u.market.pos, **{a.buy: "MED" for a in acts6}},
                    price={a.buy: a.cost for a in acts6}))
     rows6, *_ = u6.rank(acts6)
-    kept6 = [r["action"].buy for r in rows6]
+    kept6 = [r.action.buy for r in rows6]
     assert len(kept6) == KEEP and "sham" not in kept6, kept6
     assert set(kept6) <= {"big%d" % i for i in range(KEEP + 1)}, kept6
 
