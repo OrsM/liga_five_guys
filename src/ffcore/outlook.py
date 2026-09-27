@@ -94,6 +94,14 @@ def _selftest() -> None:
                      first_jornada_of={"star": 2})
     assert firsts.next_up == {"star": (9.0, 0.5)}, firsts.next_up
 
+    pf_per = {j: {"me_a": (2.0, 1.0), "me_b": (5.0, 1.0), "cand": (4.0, 1.0)}
+              for j in (1, 2)}
+    two = Outlook(LeagueState({"me": {"me_a": "MED", "me_b": "MED"}}, [1, 2], "me"),
+                  Bootstrap(pf_per), dict.fromkeys(("me_a", "me_b", "cand"), "MED"))
+    assert two.par == {"me_a": 0.0, "me_b": 6.0, "cand": 4.0}, two.par
+    assert set(Outlook(two.state, two.forecaster).par.values()) == {0.0}, \
+        "a player with no position is worth nothing over replacement"
+
     empty = Outlook(LeagueState({}, [], "me"), Bootstrap({}))
     assert empty.xi == XI({}, set()) and empty.xi_bar == 0.0
     assert empty.par == {}

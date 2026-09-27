@@ -536,14 +536,6 @@ def _selftest() -> None:
         got = value_rate(pts, cost)
         assert got == want or abs(got - want) < 1e-9, (pts, cost, got)
 
-    pf_per = {j: {"me_a": (2.0, 1.0), "me_b": (5.0, 1.0), "cand": (4.0, 1.0)}
-              for j in (1, 2)}
-    par = Universe(
-        state=LeagueState({"me": {"me_a": "MED", "me_b": "MED"}}, [1, 2], "me"),
-        forecaster=Bootstrap(pf_per),
-        market=Market(pos=dict.fromkeys(("me_a", "me_b", "cand"), "MED"))).outlook.par
-    assert par == {"me_a": 0.0, "me_b": 6.0, "cand": 4.0}, par
-
     assert premium_to_beat([1.0] * 5 + [1.3] * 5) == 1.3
     assert premium_to_beat([1.0] * 9 + [1.3]) == 1.0
     assert premium_to_beat([]) == 1.0
