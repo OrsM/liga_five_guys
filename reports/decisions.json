@@ -1,56 +1,41 @@
 {
- "generated_at": "2026-09-27T08:24Z",
- "locks_in_h": 298.5968732177778,
- "cash": 28846827.0,
+ "generated_at": "2026-09-27T09:34Z",
+ "locks_in_h": 297.42905332805555,
+ "cash": 28946827.0,
  "cash_locked": 0,
  "squad_value": 305429735.0,
- "expected_finish": 2.2,
- "p_win": 0.298,
+ "expected_finish": 2.16,
+ "p_win": 0.249,
  "band": [
-  1439.625863986641,
-  2180.2552479251026
+  1636.8437845518047,
+  1975.2319925244303
  ],
  "ladder": [
   {
-   "name": "Omar El Hilali",
+   "name": "Yeray Alvarez",
    "pos": "DEF",
-   "start": 0.9319987560886116,
-   "xpts": 3.4002302154780395,
+   "start": 0.7528997006820821,
+   "xpts": 4.215704487849747,
    "group": "in",
    "where": "bench",
    "label": "PUT ON",
    "money": null,
-   "pts": -9.257614830031912,
+   "pts": -8.592093973868487,
    "note": "",
    "value": null,
    "market": null,
    "premium": null
   },
   {
-   "name": "Dakonam Djene",
+   "name": "Alvaro Mantilla",
    "pos": "DEF",
-   "start": 0.917978667151263,
-   "xpts": 1.9357634690883427,
+   "start": 0.916776508552574,
+   "xpts": 3.104346241448651,
    "group": "out",
    "where": "yours",
    "label": "TAKE OFF",
    "money": null,
-   "pts": -17.148922258308858,
-   "note": "",
-   "value": null,
-   "market": null,
-   "premium": null
-  },
-  {
-   "name": "Yeray Alvarez",
-   "pos": "DEF",
-   "start": 0.55,
-   "xpts": 2.786901536136108,
-   "group": "keep",
-   "where": "yours",
-   "label": "KEEP — bench",
-   "money": null,
-   "pts": -3.900757850095374,
+   "pts": 0.0,
    "note": "",
    "value": null,
    "market": null,
@@ -59,13 +44,28 @@
   {
    "name": "Sergio Carreira",
    "pos": "DEF",
-   "start": 0.6444444444444444,
-   "xpts": 2.3714865009497834,
+   "start": 0.9027063873032766,
+   "xpts": 3.342340689194383,
    "group": "keep",
    "where": "yours",
    "label": "KEEP — bench",
    "money": null,
-   "pts": -4.733303476882043,
+   "pts": -8.277711152289271,
+   "note": "",
+   "value": null,
+   "market": null,
+   "premium": null
+  },
+  {
+   "name": "Dakonam Djene",
+   "pos": "DEF",
+   "start": 0.9834431752192406,
+   "xpts": 2.3274913435635853,
+   "group": "keep",
+   "where": "yours",
+   "label": "KEEP — bench",
+   "money": null,
+   "pts": -22.201970941802188,
    "note": "",
    "value": null,
    "market": null,
@@ -74,14 +74,29 @@
   {
    "name": "Raul Garcia",
    "pos": "DEL",
-   "start": 0.4062637570911613,
-   "xpts": 1.3049215143035968,
+   "start": 0.6754919881467499,
+   "xpts": 1.9958870205344938,
    "group": "keep",
    "where": "yours",
    "label": "KEEP — bench",
    "money": null,
-   "pts": -0.6510280648136586,
+   "pts": -2.329178940533666,
    "note": "",
+   "value": null,
+   "market": null,
+   "premium": null
+  },
+  {
+   "name": "Alvaro Mantilla",
+   "pos": "DEF",
+   "start": 0.916776508552574,
+   "xpts": 3.104346241448651,
+   "group": "sell",
+   "where": "yours",
+   "label": "SELL — worth more as cash",
+   "money": 1326340.0,
+   "pts": 0.0,
+   "note": "cash",
    "value": null,
    "market": null,
    "premium": null
@@ -89,41 +104,71 @@
   {
    "name": "Dani Olmo",
    "pos": "MED",
-   "start": 0.4474747474747475,
-   "xpts": 3.4186941581327055,
+   "start": 0.9027063873032766,
+   "xpts": 4.433253065137134,
    "group": "buy",
    "where": "free agent",
    "label": "BUY — free agents",
    "money": -26880196.0,
-   "pts": 10.535403008534217,
-   "note": "sell Djene",
-   "value": 0.3919392183202167,
+   "pts": 25.753584040856595,
+   "note": "sell Djene · for points",
+   "value": 0.9580876583212635,
    "market": 47635295.0,
-   "premium": 427454.0
+   "premium": 2642811.477995068
+  },
+  {
+   "name": "German Valera",
+   "pos": "MED",
+   "start": 0.9834431752192406,
+   "xpts": 2.439906926701374,
+   "group": "buy",
+   "where": "free agent",
+   "label": "BUY — free agents",
+   "money": -12113725.0,
+   "pts": 23.446007099867984,
+   "note": "sell Mantilla · for points",
+   "value": 1.9354911144068387,
+   "market": 13456262.0,
+   "premium": 603296.2483468596
+  },
+  {
+   "name": "Antonio Blanco",
+   "pos": "MED",
+   "start": 0.984,
+   "xpts": 2.83962549850216,
+   "group": "buy",
+   "where": "free agent",
+   "label": "BUY — free agents",
+   "money": -15712332.0,
+   "pts": 6.885095809497784,
+   "note": "sell Mantilla · for points",
+   "value": 0.43819694043492613,
+   "market": 16673426.0,
+   "premium": 1150609.9297724143
   },
   {
    "name": "Lamine Yamal",
    "pos": "DEL",
-   "start": 0.9375757575757575,
-   "xpts": 11.243145773437563,
+   "start": 0.984,
+   "xpts": 10.023433031417516,
    "group": "save",
    "where": "BurtonGM89",
    "label": "SAVE — better than yours, out of reach",
-   "money": -91358061.0,
-   "pts": 170.83926463354123,
+   "money": -91258061.0,
+   "pts": 189.70722620004722,
    "note": "short",
-   "value": 1.8699966129265946,
+   "value": 2.0787996602299845,
    "market": null,
    "premium": null
   }
  ],
- "xi_total": 53.85943840762817,
+ "xi_total": 58.08837703635794,
  "shape": "5-4-1",
  "shape_now": "5-4-1",
  "rival_best": {
-  "manager": "Albert Laporta",
-  "xi": 54.22189779814933,
-  "gap": -0.3624593905211597
+  "manager": "BurtonGM89",
+  "xi": 60.26317731611817,
+  "gap": -2.174800279760227
  },
  "xi_note": "",
  "standings": [
@@ -131,179 +176,56 @@
    "manager": "BurtonGM89",
    "me": false,
    "now": 311.0,
-   "mean": 1853.6006137496872,
-   "lo": 1444.7453475055775,
-   "hi": 2294.416900631417,
-   "cash": -54327242.0,
+   "mean": 1871.4959976407454,
+   "lo": 1679.0103365160187,
+   "hi": 2074.044365044425,
+   "cash": -54227242.0,
    "cash_known": false,
-   "p_above": 0.4623333333333333
-  },
-  {
-   "manager": "miguel_autentico",
-   "me": true,
-   "now": 371.0,
-   "mean": 1802.7740875539137,
-   "lo": 1439.625863986641,
-   "hi": 2180.2552479251026,
-   "cash": 28846827.0,
-   "cash_known": true,
-   "p_above": null
+   "p_above": 0.36566666666666664
   },
   {
    "manager": "Albert Laporta",
    "me": false,
    "now": 272.0,
-   "mean": 1769.5953317286267,
-   "lo": 1363.526286233872,
-   "hi": 2214.6455562097,
-   "cash": -52206606.0,
+   "mean": 1803.6786197673398,
+   "lo": 1608.5741390022658,
+   "hi": 2001.5903141319227,
+   "cash": -52106606.0,
    "cash_known": false,
-   "p_above": 0.539
+   "p_above": 0.49866666666666665
+  },
+  {
+   "manager": "miguel_autentico",
+   "me": true,
+   "now": 371.0,
+   "mean": 1803.2833210367976,
+   "lo": 1636.8437845518047,
+   "hi": 1975.2319925244303,
+   "cash": 28946827.0,
+   "cash_known": true,
+   "p_above": null
   },
   {
    "manager": "SusoGattuso",
    "me": false,
    "now": 211.0,
-   "mean": 1454.6194134509246,
-   "lo": 1175.4465573072223,
-   "hi": 1754.7223449853773,
-   "cash": -25918901.0,
+   "mean": 1451.3350038535293,
+   "lo": 1314.4222355592397,
+   "hi": 1591.8053463925448,
+   "cash": -25818901.0,
    "cash_known": false,
-   "p_above": 0.824
+   "p_above": 0.979
   },
   {
    "manager": "Magic Mike 333",
    "me": false,
    "now": 271.0,
-   "mean": 1124.5366223895537,
-   "lo": 876.5658347950392,
-   "hi": 1390.147634471562,
-   "cash": 170008709.0,
+   "mean": 1167.1877090621947,
+   "lo": 1050.6177698662386,
+   "hi": 1284.8952483279259,
+   "cash": 170108709.0,
    "cash_known": false,
-   "p_above": 0.978
+   "p_above": 1.0
   }
- ],
- "flip": {
-  "cash": 28846827.0,
-  "reserve": 26880196.0,
-  "spendable": 1966631.0,
-  "fund_need": -1966631.0,
-  "picks": [],
-  "sells": [],
-  "held": [
-   {
-    "key": "1972",
-    "name": "yeray alvarez",
-    "value": 6025465.0,
-    "offer": 5708419.0,
-    "last": -2.4038387560487,
-    "gain": 815043.0398421865,
-    "cost_pts": 9.272407175564043,
-    "benefit_pts": 0.31944733193307984,
-    "reason": {
-     "code": "keep",
-     "now": 5708419.0,
-     "hold": 4893375.9601578135,
-     "h": 11,
-     "offered": true,
-     "cost": 9.272407175564043,
-     "benefit": 0.31944733193307984
-    }
-   },
-   {
-    "key": "7027",
-    "name": "raul garcia",
-    "value": 1326176.0,
-    "offer": 1346447.0,
-    "last": -1.6227130872645,
-    "gain": 147646.6165560491,
-    "cost_pts": 4.3959472731829745,
-    "benefit_pts": 0.05786849948060265,
-    "reason": {
-     "code": "keep",
-     "now": 1346447.0,
-     "hold": 1198800.383443951,
-     "h": 11,
-     "offered": true,
-     "cost": 4.3959472731829745,
-     "benefit": 0.05786849948060265
-    }
-   },
-   {
-    "key": "7199",
-    "name": "sergio carreira",
-    "value": 7420802.0,
-    "offer": 7440474.0,
-    "last": -1.2210527100443,
-    "gain": 581672.8362737307,
-    "cost_pts": 8.43891561102773,
-    "benefit_pts": 0.22798039676722942,
-    "reason": {
-     "code": "keep",
-     "now": 7440474.0,
-     "hold": 6858801.163726269,
-     "h": 11,
-     "offered": true,
-     "cost": 8.43891561102773,
-     "benefit": 0.22798039676722942
-    }
-   }
-  ],
-  "fund": [],
-  "measured": {
-   "offer": 1.0008447285934015,
-   "premium": 1.0746639947159153,
-   "offers": 132,
-   "auctions": 77,
-   "points_per_million": 0.3919392183202167
-  },
-  "view": {
-   "heading": "MARKET",
-   "summary": "1.97M to spend; 26.88M held back for the report's top move",
-   "sections": [
-    {
-     "label": "BUY — free market",
-     "tone": "buy",
-     "rows": [],
-     "empty": "Nothing on the free market is expected to beat the cost of tying the cash up."
-    },
-    {
-     "label": "SELL — not starting",
-     "tone": "sell",
-     "rows": []
-    },
-    {
-     "label": "HELD BACK — the report keeps them",
-     "tone": "held",
-     "rows": [
-      {
-       "name": "yeray alvarez",
-       "detail": "the app offers 5.71M against ~4.89M expected from holding 11 updates, but the 815K gained is worth 0.3 season points and he is expected to add 9.3 -- the report keeps him",
-       "right": [
-        "6.03M",
-        ""
-       ]
-      },
-      {
-       "name": "raul garcia",
-       "detail": "the app offers 1.35M against ~1.20M expected from holding 11 updates, but the 148K gained is worth 0.1 season points and he is expected to add 4.4 -- the report keeps him",
-       "right": [
-        "1.33M",
-        ""
-       ]
-      },
-      {
-       "name": "sergio carreira",
-       "detail": "the app offers 7.44M against ~6.86M expected from holding 11 updates, but the 582K gained is worth 0.2 season points and he is expected to add 8.4 -- the report keeps him",
-       "right": [
-        "7.42M",
-        ""
-       ]
-      }
-     ]
-    }
-   ],
-   "ping": ""
-  }
- }
+ ]
 }
