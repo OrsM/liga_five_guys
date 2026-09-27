@@ -6,29 +6,13 @@ from typing import NamedTuple
 
 from ffcore.parse import text
 from ffcore.startprob import NEUTRAL_START, StartOdds
-from ffcore.text import norm
-from ffcore.players import row_key
-from ffcore.points import Scored, minutes_played
+from ffcore.text import norm, row_key
+from ffcore.rules import FREE_FORMATIONS, SLOT, minutes_played
 
-__all__ = ["SLOT", "SLOT_LABEL", "SLOT_MIN", "MAX_SLOT", "FREE_FORMATIONS",
-           "starters_per_slot", "Rating", "Rates", "Scorer", "squad_pool",
+__all__ = ["starters_per_slot", "Rating", "Rates", "Scorer", "squad_pool",
            "replacement", "vor", "per_jornada_current", "totals",
            "fit_promoted_discount"]
 
-SLOT = {
-    "portero": "POR",
-    "defensa": "DEF",
-    "mediocampista": "MED",
-    "centrocampista": "MED",
-    "delantero": "DEL",
-}
-SLOT_LABEL = {"POR": "portero", "DEF": "defensa", "MED": "mediocampista",
-              "DEL": "delantero"}
-SLOT_MIN = {"POR": 1, "DEF": 3, "MED": 3, "DEL": 1}
-MAX_SLOT = {"POR": 1, "DEF": 5, "MED": 5, "DEL": 3}
-
-FREE_FORMATIONS = [(5, 4, 1), (5, 3, 2), (4, 5, 1), (4, 4, 2), (4, 3, 3),
-                   (3, 5, 2), (3, 4, 3)]
 
 SHRINK_K = 4.0
 DOUBT_FACTOR = 0.5
@@ -79,8 +63,6 @@ def fit_promoted_discount(market: list[dict], history: dict,
         return PROMOTED_DISCOUNT
     k = PROMOTED_DISCOUNT_K
     return (k * PROMOTED_DISCOUNT + n * pts / expected) / (k + n)
-
-
 
 
 def per_jornada_current(starters_rows, played, jornada_of_match, xw
@@ -240,6 +222,8 @@ def vor(row: dict, repl: dict) -> float:
 
 
 def _selftest() -> None:
+    from ffcore.points import Scored
+
     K = SHRINK_K
 
     row = {"position": "defensa", "team": "Mid", "club": "Mid",

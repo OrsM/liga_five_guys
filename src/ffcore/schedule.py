@@ -1,10 +1,12 @@
 
 from __future__ import annotations
 
+from ffcore.fixture import JornadaClock, season_board
+from ffcore.rules import FREE_FORMATIONS, MAX_SLOT
+from ffcore.score import DOUBT_FACTOR, OUT_STATUSES
 
 
 def rounds_left(matches) -> tuple[list[int], dict[int, set[str]]]:
-    from ffcore.jornadas import JornadaClock
 
     js = {r["jornada"] for r in matches if (r.get("jornada") or "").isdigit()}
     finished = {j for j in js
@@ -27,7 +29,6 @@ UNSCORED_DEFAULT = (2.0, 0.5)
 
 def status_adjusted(pts: float, p_start: float, status: str
                     ) -> tuple[float, float]:
-    from ffcore.score import DOUBT_FACTOR, OUT_STATUSES
 
     if status in OUT_STATUSES:
         return pts, 0.0
@@ -63,7 +64,6 @@ def season(rates: dict, club: dict[str, str], rem: list[int],
 def expectations(sc, ratings, keys, matches: list[dict]
                  ) -> tuple[dict[int, dict], dict[str, int], dict, list[int],
                             dict[int, set[str]]]:
-    from ffcore.fixture import season_board
 
     rem, played = rounds_left(matches)
     rates = {k: sc.rates(sc.lookup[k]) if k in sc.lookup else None
@@ -75,7 +75,6 @@ def expectations(sc, ratings, keys, matches: list[dict]
 
 
 def phantom_topup(sq: dict[str, str]) -> dict[str, str]:
-    from ffcore.score import FREE_FORMATIONS
 
     counts: dict[str, int] = {}
     for slot in sq.values():
@@ -101,7 +100,6 @@ def phantom_topup(sq: dict[str, str]) -> dict[str, str]:
 def phantom_fill(squads: dict[str, dict[str, str]], per_jornada: dict[int, dict],
                  pos: dict[str, str]
                  ) -> tuple[dict[str, dict[str, str]], dict[int, dict]]:
-    from ffcore.score import MAX_SLOT
 
     squads = {m: dict(sq) for m, sq in squads.items()}
     per_jornada = {j: dict(layer) for j, layer in per_jornada.items()}

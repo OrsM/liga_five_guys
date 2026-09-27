@@ -72,7 +72,7 @@ Everything else comes from the app's API and public pages.
 
     python src/grading.py --backtest [out.json]   # rebuild each past lock's forecast; rmse, bias, top-50, persistence
     python src/grading.py --compare a.json b.json # two backtests, jornada by jornada
-    python src/ffcore/pricing.py --grade          # price model walk-forward vs "no change"
+    python src/grading.py --prices                # price model walk-forward vs "no change"
     bash tools/selftests.sh                       # every module's self-test
     python tools/golden.py freeze|check           # a refactor must rebuild the same board
 
@@ -90,6 +90,7 @@ rather than reaching through them; ruff flags reads of private members.
                     grading, stats
     src/ffcore/     tidy (paths, CSVs, current/history), clock (now, stamps),
                     jornadas (locks), points (points history), players,
+                    rules (slots, formations, minutes),
                     source, futbolfantasy, footballdata, laliga_api, parse,
                     text, auth, crosswalk, league, score, startprob, fixture,
                     schedule, forecast, season, outlook, market, pricing,

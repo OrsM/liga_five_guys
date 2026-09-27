@@ -3,7 +3,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from ffcore.score import FREE_FORMATIONS, MAX_SLOT
+import numpy as np
+
+from ffcore.rules import FREE_FORMATIONS, MAX_SLOT
+from stats import percentile
 
 __all__ = ["LeagueState", "Standings", "simulate",
            "simulate_many", "best_xi"]
@@ -50,7 +53,6 @@ class Standings:
         return sum(v) / len(v)
 
     def band(self, manager: str, lo=0.1, hi=0.9) -> tuple[float, float]:
-        from stats import percentile
         v = self.totals.get(manager) or [0.0]
         return percentile(v, lo * 100), percentile(v, hi * 100)
 
@@ -88,7 +90,6 @@ def simulate_many(states: list, forecaster, trials: int = 2000,
 
 
 def draws(forecaster, jornadas, trials: int, seed: int):
-    import numpy as np
 
     pool = np.asarray(forecaster.pool, dtype=float)
     everyone = sorted({k for j in jornadas for k in forecaster.order(j)})
@@ -110,7 +111,6 @@ def draws(forecaster, jornadas, trials: int, seed: int):
 
 
 def _run_np(states: list, forecaster, trials: int, seed: int):
-    import numpy as np
 
     managers = [list(st.squads) for st in states]
     totals = [{m: np.full(trials, float(st.carried.get(m, 0.0)))

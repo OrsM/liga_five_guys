@@ -4,11 +4,9 @@ from __future__ import annotations
 import sys
 
 
-from ffcore.parse import text
+from ffcore.parse import money, text
 from ffcore.crosswalk import Crosswalk, Player
-from ffcore.parse import money
-from ffcore.text import norm, tokens
-from ffcore.players import row_key
+from ffcore.text import norm, row_key, tokens
 from ffcore.tidy import current, history, TIDY
 
 PLAYERS = "players.csv"

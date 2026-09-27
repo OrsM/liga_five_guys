@@ -16,6 +16,7 @@ from ffcore.market import Market
 from ffcore.outlook import Outlook
 from ffcore.season import LeagueState, Standings, best_xi, simulate_many
 
+from ffcore.rules import FREE_FORMATIONS
 __all__ = ["Action", "Band", "Ranking", "Universe", "band_acts", "plan",
            "sale_pts"]
 
@@ -158,7 +159,6 @@ def _nulls_last(v: float | None) -> tuple[bool, float]:
 
 
 def _fieldable(squad: dict[str, str]) -> bool:
-    from ffcore.score import FREE_FORMATIONS
     depth: dict[str, int] = {}
     for slot in squad.values():
         depth[slot] = depth.get(slot, 0) + 1

@@ -2,9 +2,11 @@
 from __future__ import annotations
 
 import re
+from datetime import datetime, timezone
+from functools import lru_cache
 
-__all__ = ["money", "ratio", "pct100", "fmt_money",
-           "text", "num", "whole", "flag"]
+__all__ = ["money", "ratio", "pct100", "fmt_money", "text", "num", "whole",
+           "flag", "snapshot_stamp", "kickoff_stamp"]
 
 _DOT_GROUPED = re.compile(r"\d{1,3}(?:\.\d{3})+$")
 _CLEAN = str.maketrans({"\u00a0": "", " ": "", "\u202f": ""})
@@ -117,7 +119,45 @@ def flag(row, col: str, default: bool = False) -> bool:
     return default
 
 
+@lru_cache(maxsize=4096)
+def _digits_to_dt(s: str, tz):
+    digits = re.sub(r"\D", "", s or "")
+    if len(digits) < 8:
+        return None
+    try:
+        return datetime(
+            int(digits[:4]), int(digits[4:6]), int(digits[6:8]),
+            int(digits[8:10]) if len(digits) >= 10 else 0,
+            int(digits[10:12]) if len(digits) >= 12 else 0,
+            tzinfo=tz)
+    except ValueError:
+        return None
+
+
+def snapshot_stamp(s: str):
+    return _digits_to_dt(s, timezone.utc)
+
+
+def kickoff_stamp(s: str):
+    try:
+        when = datetime.fromisoformat((s or "").strip())
+    except ValueError:
+        return None
+    return (when.replace(tzinfo=timezone.utc) if when.tzinfo is None
+            else when.astimezone(timezone.utc))
+
+
 def _selftest() -> None:
+    from datetime import datetime, timezone
+
+    assert kickoff_stamp("2026-08-15T19:30:00+00:00") == datetime(
+        2026, 8, 15, 19, 30, tzinfo=timezone.utc)
+    assert kickoff_stamp("2026-08-15T21:30:00+02:00") == datetime(
+        2026, 8, 15, 19, 30, tzinfo=timezone.utc)
+    assert kickoff_stamp("2026-08-15T19:30:00") == datetime(
+        2026, 8, 15, 19, 30, tzinfo=timezone.utc)
+    assert kickoff_stamp("") is None and kickoff_stamp("soon") is None
+
     row = {"s": "  x ", "blank": " ", "n": "3.5", "i": "4.0", "bad": "x",
            "t": "True", "f": "0", "num": 7}
     for fn, col, default, want in [

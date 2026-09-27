@@ -9,7 +9,7 @@ import numpy as np
 
 from ffcore.parse import pct100
 from ffcore.text import norm
-from ffcore.points import minutes_played
+from ffcore.rules import minutes_played
 
 __all__ = ["Obs", "Outcome", "Calibration", "StartOdds", "calibrate", "fit", "outcomes",
            "observations", "fit_start_fallbacks", "NEUTRAL_START",

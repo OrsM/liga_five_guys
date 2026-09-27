@@ -24,12 +24,14 @@ from ffcore.league import load_config
 from ffcore.tidy import (TABLES, Table, ROOT, SEASON, TIDY, append_csv,
                          csv_string, read_csv, table_stats, widen_csv,
                          write_csv)
-from ffcore.futbolfantasy import (CAL_KEY, MATCH_KEY_RE, parse_points,
-                                  played_sources, season_label)
+from ffcore.futbolfantasy import (CAL_KEY, MATCH_KEY_RE, POINTS_URL,
+                                  parse_points, played_sources, season_label)
 from ffcore.laliga_api import (API_LEAGUES_KEY, ROW_TABLE, league_sources,
                                offer_sources, parse_api_leagues)
 from sources import source_for, sources
 
+from ffcore.auth import TokenStore
+from ffcore.parse import snapshot_stamp
 __all__ = ["snapshots", "state", "doc_keys", "documents", "due",
           "fetch", "parse", "baseline"]
 
@@ -175,7 +177,6 @@ def page_sig(src, text: str) -> str | None:
 
 
 def due(src, prev: dict, now: str) -> bool:
-    from ffcore.clock import snapshot_stamp
 
     if src.cadence == "once":
         return src.key not in prev
@@ -214,7 +215,6 @@ def fetch() -> Path:
 
     bearer = None
     try:
-        from ffcore.auth import TokenStore
         store_ = TokenStore()
         bearer = store_.bearer()
         left = store_.expiry_days()
@@ -226,8 +226,10 @@ def fetch() -> Path:
     except Exception as e:                              # noqa: BLE001
         print(f"  warn: league token unusable ({e}); API sources skipped.")
 
-    with httpx.Client(headers=HEADERS, timeout=TIMEOUT,
-                      follow_redirects=True) as c:
+    # retries: a connection that never opens is tried again; nothing is sent
+    # twice, since httpx only retries connect errors and timeouts.
+    with httpx.Client(headers=HEADERS, timeout=TIMEOUT, follow_redirects=True,
+                      transport=httpx.HTTPTransport(retries=2)) as c:
         queue = _by_host(sources())
         last: dict[str, float] = {}
         league_id = None
@@ -323,9 +325,7 @@ def fetch() -> Path:
 
 
 def parse() -> None:
-    import sources
-
-    version = fingerprint(sources.source_for) + repr(TABLES)
+    version = fingerprint(source_for) + repr(TABLES)
     walk = doc_keys()
     state = _read_json(TIDY / _STATE, {})
     done = set(state.get("stamps") or ())
@@ -535,7 +535,6 @@ def _store(path: Path, rows: list[dict], spec: Table) -> None:
 def baseline(url: str = "", label: str = "") -> None:
     import httpx
 
-    from ffcore.futbolfantasy import POINTS_URL
     url = url or POINTS_URL
 
     with httpx.Client(headers=HEADERS, timeout=45,

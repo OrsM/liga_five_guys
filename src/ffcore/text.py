@@ -5,7 +5,7 @@ import re
 import unicodedata
 from functools import lru_cache
 
-__all__ = ["norm", "tokens", "resolve", "index_by", "match_one"]
+__all__ = ["norm", "tokens", "resolve", "index_by", "match_one", "row_key"]
 
 _TO_SPACE = str.maketrans({".": " ", "-": " ", "_": " ", "/": " ", ",": " "})
 _DELETE = str.maketrans({"'": "", "\u2019": "", "`": "", "\u00b4": ""})
@@ -73,7 +73,13 @@ def match_one(side, candidates) -> str | None:
     return hits[0] if len(hits) == 1 else None
 
 
+def row_key(row: dict) -> str:
+    return (row.get("ff_id") or "").strip() or norm(row.get("name"))
+
+
 def _selftest() -> None:
+    assert row_key({"name": "Iker Muñoz"}) == norm("Iker Munoz")
+
     rows = [{"name": "Isaac Romero"}, {"name": "Cristian Romero"},
             {"name": "Carlos Romero"}, {"name": "Lamine Yamal"},
             {"name": "Álvaro Fernández"}]

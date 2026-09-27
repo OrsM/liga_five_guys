@@ -11,8 +11,11 @@ from pathlib import Path
 from ffcore.schedule import expectations
 from ffcore.jornadas import clock_history
 from ffcore.points import scored
-from ffcore.tidy import current
 
+from assemble import fixture_ratings, scorer
+from ffcore.clock import set_now
+from ffcore.pricing import grade, steps
+from ffcore.tidy import LINEUP_SOURCE, current, history
 __all__ = ["backtest", "compare", "persistence", "score_forecast"]
 
 TOP_N = 50
@@ -37,9 +40,6 @@ def score_forecast(pred: dict[str, float], actual: dict[tuple, float],
 
 
 def backtest() -> list[dict]:
-    from assemble import fixture_ratings, scorer
-    from ffcore.clock import set_now
-    from ffcore.tidy import LINEUP_SOURCE
 
     locks = clock_history().round_locks
     actual = _jornada_points()
@@ -117,6 +117,10 @@ if __name__ == "__main__":
         if rest:
             Path(rest[0]).write_text(json.dumps(
                 {str(r["jornada"]): r["pred"] for r in runs}), encoding="utf-8")
+    elif "--prices" in sys.argv:
+        for h, g in grade(steps(history("market"))).items():
+            print("%d update(s) ahead: n=%d  error %.2f%%  vs %.2f%% for "
+                  "'no change'" % (h, g["n"], g["mae"], g["zero"]))
     elif "--compare" in sys.argv:
         i = sys.argv.index("--compare")
         a, b = (json.loads(Path(p).read_text(encoding="utf-8"))

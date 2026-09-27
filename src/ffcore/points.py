@@ -4,11 +4,11 @@ from __future__ import annotations
 
 from typing import NamedTuple
 
-from ffcore.clock import kickoff_stamp
+from ffcore.parse import kickoff_stamp
 from ffcore.text import norm
 from ffcore.tidy import current, history
 
-__all__ = ["Scored", "scored", "MATCH_LEN", "minutes_played"]
+__all__ = ["Scored", "scored"]
 
 
 class Scored(NamedTuple):
@@ -65,25 +65,12 @@ def scored() -> list[Scored]:
     return out
 
 
-MATCH_LEN = 90.0
-
-
-def minutes_played(role: str, raw_minute, match_len: float = MATCH_LEN) -> float:
-    raw = (raw_minute or "").strip()
-    if role == "starter":
-        mins = float(raw) if raw else match_len
-    elif role == "sub":
-        mins = (match_len - float(raw)) if raw else 0.0
-    else:
-        return 0.0
-    return max(0.0, mins)
-
-
 def _selftest() -> None:
     import tempfile
     from pathlib import Path
 
-    from ffcore.clock import set_now, snapshot_stamp
+    from ffcore.clock import set_now
+    from ffcore.parse import snapshot_stamp
     from ffcore.tidy import tables_in, write_csv
 
     a, b, later = "2026-08-01T0900Z", "2026-08-02T0900Z", "2026-08-03T0900Z"
@@ -115,12 +102,6 @@ def _selftest() -> None:
         finally:
             set_now(None)
 
-    assert minutes_played("starter", "") == 90.0
-    assert minutes_played("starter", "64") == 64.0
-    assert minutes_played("sub", "") == 0.0
-    assert minutes_played("sub", "64") == 26.0
-    assert minutes_played("coach", "") == 0.0
-    assert minutes_played("starter", "0") == 0.0
     print("ffcore.points self-test OK")
 
 

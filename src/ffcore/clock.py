@@ -4,13 +4,12 @@ depends on now register a reset with on_reset; set_now calls them."""
 from __future__ import annotations
 
 import os
-import re
 from datetime import datetime, timedelta, timezone
-from functools import lru_cache
 from typing import Callable
 
-__all__ = ["MADRID", "run_now", "set_now", "on_reset", "shown",
-           "snapshot_stamp", "kickoff_stamp"]
+from ffcore.parse import snapshot_stamp
+
+__all__ = ["MADRID", "run_now", "set_now", "on_reset", "shown"]
 
 
 def _madrid():
@@ -22,34 +21,6 @@ def _madrid():
 
 
 MADRID = _madrid()
-
-
-@lru_cache(maxsize=4096)
-def _digits_to_dt(s: str, tz):
-    digits = re.sub(r"\D", "", s or "")
-    if len(digits) < 8:
-        return None
-    try:
-        return datetime(
-            int(digits[:4]), int(digits[4:6]), int(digits[6:8]),
-            int(digits[8:10]) if len(digits) >= 10 else 0,
-            int(digits[10:12]) if len(digits) >= 12 else 0,
-            tzinfo=tz)
-    except ValueError:
-        return None
-
-
-def snapshot_stamp(s: str):
-    return _digits_to_dt(s, timezone.utc)
-
-
-def kickoff_stamp(s: str):
-    try:
-        when = datetime.fromisoformat((s or "").strip())
-    except ValueError:
-        return None
-    return (when.replace(tzinfo=timezone.utc) if when.tzinfo is None
-            else when.astimezone(timezone.utc))
 
 
 _NOW: list = []
@@ -98,13 +69,6 @@ def _selftest() -> None:
     assert run_now() != snapshot_stamp("2026-08-01T1000Z")
     _RESETS.pop()
 
-    assert kickoff_stamp("2026-08-15T19:30:00+00:00") == datetime(
-        2026, 8, 15, 19, 30, tzinfo=timezone.utc)
-    assert kickoff_stamp("2026-08-15T21:30:00+02:00") == datetime(
-        2026, 8, 15, 19, 30, tzinfo=timezone.utc)
-    assert kickoff_stamp("2026-08-15T19:30:00") == datetime(
-        2026, 8, 15, 19, 30, tzinfo=timezone.utc)
-    assert kickoff_stamp("") is None and kickoff_stamp("soon") is None
 
     summer = datetime(2026, 9, 18, 16, 40, tzinfo=timezone.utc)
     winter = datetime(2026, 12, 18, 16, 40, tzinfo=timezone.utc)

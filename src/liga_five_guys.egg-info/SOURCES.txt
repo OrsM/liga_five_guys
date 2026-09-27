@@ -29,6 +29,7 @@ src/ffcore/players.py
 src/ffcore/points.py
 src/ffcore/pricing.py
 src/ffcore/render.py
+src/ffcore/rules.py
 src/ffcore/schedule.py
 src/ffcore/score.py
 src/ffcore/season.py

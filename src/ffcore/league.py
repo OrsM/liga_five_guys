@@ -9,6 +9,7 @@ from ffcore.text import norm
 from ffcore.players import load_crosswalk
 from ffcore.tidy import current, input_path
 
+from ffcore.crosswalk import Crosswalk
 __all__ = ["Config", "load_config", "app_fielded", "estimate_cash", "League"]
 
 
@@ -31,7 +32,6 @@ def load_config(name: str = "league.ini") -> Config:
 
 
 def app_fielded(squad, names: dict, rows=None, xw=None) -> list[str]:
-    from ffcore.crosswalk import Crosswalk
 
     rows = current("api_lineup") if rows is None else rows
     xw = xw or load_crosswalk() or Crosswalk()

@@ -9,7 +9,8 @@ from pathlib import Path
 from types import MappingProxyType
 from typing import NamedTuple
 
-from ffcore.clock import on_reset, run_now, snapshot_stamp
+from ffcore.clock import on_reset, run_now
+from ffcore.parse import snapshot_stamp
 
 __all__ = ["ROOT", "TIDY", "SEASON", "DECISIONS", "REPORTS", "TABLES", "Table",
            "current", "history", "age_hours", "table_path", "tables_in",

@@ -141,11 +141,4 @@ def _selftest() -> None:
 
 
 if __name__ == "__main__":
-    import sys
-    if "--grade" in sys.argv:
-        from ffcore.tidy import history
-        for h, g in grade(steps(history("market"))).items():
-            print("%d update(s) ahead: n=%d  error %.2f%%  vs %.2f%% for "
-                  "'no change'" % (h, g["n"], g["mae"], g["zero"]))
-    else:
-        _selftest()
+    _selftest()

@@ -12,6 +12,7 @@ TESTS=(ffcore/parse.py ffcore/text.py ffcore/tidy.py
        ffcore/fixtures.py ffcore/auth.py
        ffcore/forecast.py ffcore/season.py ffcore/outlook.py ffcore/render.py
        ffcore/clock.py ffcore/jornadas.py ffcore/points.py ffcore/players.py
+       ffcore/rules.py
        ffcore/startprob.py ffcore/crosswalk.py sources.py ffcore/source.py
        ffcore/futbolfantasy.py ffcore/footballdata.py ffcore/laliga_api.py
        "ingest.py --selftest" "ffcore/league.py --selftest" ffcore/fixture.py
@@ -36,8 +37,10 @@ else
     tests_ok=1
 fi
 wait "$session_pid" || session_ok=1
+structure_ok=0
+"$UV" run --frozen python tools/structure.py --check >&2 || structure_ok=1
 
-if [ "$tests_ok" -eq 0 ] && [ "$session_ok" -eq 0 ]; then
+if [ "$tests_ok" -eq 0 ] && [ "$session_ok" -eq 0 ] && [ "$structure_ok" -eq 0 ]; then
     echo "selftests: $(( ${#TESTS[@]} + ${#SESSION_TESTS[@]} )) suites pass"
     exit 0
 fi
@@ -53,4 +56,5 @@ for t in "${TESTS[@]}" "${SESSION_TESTS[@]/%/ --selftest}"; do
         status=1
     fi
 done
+[ "$structure_ok" -eq 0 ] || status=1
 exit "$status"

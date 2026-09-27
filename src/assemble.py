@@ -19,8 +19,8 @@ from ffcore.players import load_crosswalk, load_players
 from ffcore.points import scored
 from ffcore.pricing import auction_ratios, steps, trend
 from ffcore.schedule import expectations, phantom_fill
-from ffcore.score import (SLOT, Scorer, fit_promoted_discount,
-                          per_jornada_current, totals)
+from ffcore.score import fit_promoted_discount, per_jornada_current, Scorer, totals
+from ffcore.rules import SLOT
 from ffcore.season import LeagueState
 from ffcore.startprob import StartOdds, calibrate, outcomes
 from ffcore.tidy import (DECISIONS, LINEUP_SOURCE, SEASON, age_hours, current,

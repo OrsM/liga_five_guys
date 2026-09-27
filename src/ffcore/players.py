@@ -3,18 +3,17 @@ per player, and the crosswalk of ids between the sources."""
 from __future__ import annotations
 
 from ffcore.parse import money, pct100
-from ffcore.text import norm
+from ffcore.text import norm, row_key
 from ffcore.tidy import LINEUP_SOURCE, current, mtime_cached, table_path
 
-__all__ = ["load_crosswalk", "load_players", "row_key", "MARKET_FIELDS",
-           "XI_FIELDS"]
+from ffcore.crosswalk import Crosswalk
+__all__ = ["load_crosswalk", "load_players", "MARKET_FIELDS", "XI_FIELDS"]
 
 
 _XW_CACHE: dict = {}
 
 
 def load_crosswalk():
-    from ffcore.crosswalk import Crosswalk
     path = table_path("players")
     return mtime_cached(path, _XW_CACHE, "xw", Crosswalk.read, path)
 
@@ -56,10 +55,6 @@ def load_players() -> dict[str, dict]:
                   "player_name", XI_FIELDS)
 
 
-def row_key(row: dict) -> str:
-    return (row.get("ff_id") or "").strip() or norm(row.get("name"))
-
-
 def _selftest() -> None:
     import tempfile
     from pathlib import Path
@@ -67,7 +62,6 @@ def _selftest() -> None:
     from ffcore.crosswalk import PLAYER_COLS
     from ffcore.tidy import tables_in, write_csv
 
-    assert row_key({"name": "Iker Muñoz"}) == norm("Iker Munoz")
 
     mkt = [{"name": "Ane Aldea", "team": "Alavés", "position": "defensa",
             "value": "2.050.000", "delta_1d": "-12.000"},
