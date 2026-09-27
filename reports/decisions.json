@@ -1,8 +1,8 @@
 {
- "generated_at": "2026-09-27T10:00Z",
+ "generated_at": "2026-09-27T10:07Z",
  "lock_at": "2026-10-09T19:00:00+00:00",
  "cash": 29046827.0,
- "cash_locked": 0,
+ "cash_locked": 13966262.0,
  "finish": 2.51,
  "p_win": 0.102,
  "band": [
@@ -10,17 +10,6 @@
   2103.393994851778
  ],
  "do": [
-  {
-   "what": "field",
-   "legal": true,
-   "on": [
-    "Yeray Alvarez"
-   ],
-   "off": [
-    "Alvaro Mantilla"
-   ],
-   "gain": 1.6712857952940285
-  },
   {
    "what": "buy",
    "name": "German Valera",
@@ -65,7 +54,7 @@
    "trend": -7.365797506809283
   }
  ],
- "ping": "Field Yeray Alvarez; Buy German Valera (bid up to 16.0M), selling Alvaro Mantilla",
+ "ping": "Buy German Valera (bid up to 16.0M), selling Alvaro Mantilla",
  "bid_beats": 0.8,
  "squad": [
   {
