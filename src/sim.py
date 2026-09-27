@@ -25,16 +25,16 @@ def xi_change(marked: list[str], best) -> dict:
 
 
 def band_acts(u) -> list:
-    mine = u.state.squads.get(u.me, {})
+    mine, o = u.state.squads.get(u.me, {}), u.outlook
     return ([(k, Action("sell", sell=(k,),
                         proceeds=u.view("proceeds").get(k, 0.0))) for k in mine]
             + [(k, Action("buy", buy=k, cost=price))
                for k, price in u.view("price").items()
-               if k not in mine and u.season.get(k, 0.0) > u.xi_bar])
+               if k not in mine and o.season.get(k, 0.0) > o.xi_bar])
 
 
 def sale_pts(u, bands) -> dict[str, float]:
-    _exp, xi = u.current_xi
+    xi = u.outlook.xi.players
     return {k: u.cash_pts(bands[k][3]) + bands[k][4]
             for k in u.state.squads.get(u.me, {}) if k in bands and k not in xi}
 
@@ -88,7 +88,8 @@ def ping(todo: list[dict]) -> str:
 
 
 def report(u, base, rows, bands, chg, lock_at=None) -> dict:
-    exp, xi = u.current_xi
+    o = u.outlook
+    exp, xi = o.xi
     picked, gain = plan(u, rows, base)
     gone = {k for p in picked for k in p["action"].sell}
     todo = []
@@ -122,8 +123,8 @@ def report(u, base, rows, bands, chg, lock_at=None) -> dict:
         "bid_beats": BID_BEATS,
         "squad": [
             {**player(u, k), "xi": k in xi,
-             "start": u.next_up.get(k, (0.0, 0.0))[1], "next": exp.get(k, 0.0),
-             "season": u.season.get(k, 0.0), "value": u.view("value").get(k),
+             "start": o.next_up.get(k, (0.0, 0.0))[1], "next": exp.get(k, 0.0),
+             "season": o.season.get(k, 0.0), "value": u.view("value").get(k),
              "trend": u.view("trend").get(k)}
             for k in sorted(mine, key=lambda k: (SLOT_ORDER.get(mine[k], 9),
                                                  -exp.get(k, 0.0)))],
@@ -197,7 +198,7 @@ def _selftest() -> None:
     assert len(sold) == len(set(sold)), sold
     assert gain >= max(r["net_pts"] for r in rows) - 5.0, (gain, rows[0])
 
-    doc = report(ub, base, rows, bands, xi_change([], ub.current_xi[1]))
+    doc = report(ub, base, rows, bands, xi_change([], ub.outlook.xi.players))
     assert [d["what"] for d in doc["do"]][:1] == ["field"], doc["do"]
     assert {d["name"].lower() for d in doc["do"] if d["what"] == "buy"} == set(bought)
     assert all(b["name"].lower() not in bought for b in doc["backup"])
@@ -216,7 +217,7 @@ def _selftest() -> None:
                  {"what": "sell", "name": "E", "done": False}]) == "Sell E"
 
     ub.facts.update(my_bid={bought[0]: 4e6}, route={"dead": "listed"})
-    doc = report(ub, base, rows, bands, xi_change([], ub.current_xi[1]))
+    doc = report(ub, base, rows, bands, xi_change([], ub.outlook.xi.players))
     buys = {d["name"].lower(): d for d in doc["do"] if d["what"] == "buy"}
     assert buys[bought[0]]["done"] and buys[bought[0]]["placed"] == 4e6, buys
     assert all(not d["done"] and d["placed"] is None
@@ -239,7 +240,7 @@ def main() -> None:
         u.candidates(budget=float("inf")), extra=band_acts(u))
     log_cash_price(measured)
     chg = xi_change(app_fielded(u.state.squads.get(u.me, {}), u.view("name")),
-                    u.current_xi[1])
+                    u.outlook.xi.players)
     REPORTS.mkdir(exist_ok=True)
     (REPORTS / "decisions.json").write_text(json.dumps(
         report(u, base, rows, bands, chg, load_deadline()),

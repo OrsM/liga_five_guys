@@ -137,7 +137,7 @@ def _selftest() -> None:
     mu = tiny_market_universe()
     assert _fieldable(mu.state.squads["me"]), mu.state.squads["me"]
 
-    exp, _xi = mu.current_xi
+    exp = mu.outlook.xi.expected
     acts = mu.candidates()
     assert acts, "tiny_market_universe() must produce real candidate actions"
     targets = {a.buy for a in acts if a.buy}

@@ -15,9 +15,9 @@ from ffcore.schedule import expectations, phantom_fill, phantom_topup
 from ffcore.pricing import auction_ratios, burn, cash_price, steps, trend
 from ffcore.action import Action
 from ffcore.league import League
-from ffcore.score import SLOT, build, replacement, squad_pool, vor
-from ffcore.season import (LeagueState, best_xi,
-                           simulate_many)
+from ffcore.outlook import Outlook
+from ffcore.score import SLOT, build
+from ffcore.season import LeagueState, best_xi, simulate_many
 from ffcore.tidy import (DECISIONS, LINEUP_SOURCE, age_hours, current, history,
                          load_deadline, load_players, market_routes, pending,
                          read_csv, run_now, scored)
@@ -46,33 +46,9 @@ class Universe:
     premium: float = 1.0
 
     @cached_property
-    def next_up(self) -> dict[str, tuple[float, float]]:
-        per_j = self.forecaster.per_jornada
-        if not self.first_jornada_of:
-            j = next((j for j in self.state.jornadas
-                      if j not in self.part_played),
-                     self.state.jornadas[0] if self.state.jornadas else 0)
-            return dict(per_j.get(j, {}))
-        return {k: per_j[j][k] for k, j in self.first_jornada_of.items()
-                if k in per_j.get(j, {})}
-
-    @cached_property
-    def current_xi(self) -> tuple[dict[str, float], set[str]]:
-        exp = {k: pts * p for k, (pts, p) in self.next_up.items()}
-        return exp, set(best_xi(self.state.squads.get(self.me, {}), exp))
-
-    @cached_property
-    def season(self) -> dict[str, float]:
-        out: dict[str, float] = {}
-        for j in self.state.jornadas:
-            for k, pts in self.forecaster.expected(j).items():
-                out[k] = out.get(k, 0.0) + pts
-        return out
-
-    @cached_property
-    def xi_bar(self) -> float:
-        _exp, xi = self.current_xi
-        return min((self.season.get(k, 0.0) for k in xi), default=0.0)
+    def outlook(self) -> Outlook:
+        return Outlook(self.state, self.forecaster, self.me, self.view("pos"),
+                       self.part_played, self.first_jornada_of)
 
     def route_kind(self, k: str) -> str:
         if k in self.state.squads.get(self.me, {}):
@@ -97,7 +73,8 @@ class Universe:
     def candidates(self, budget: float | None = None) -> list["Action"]:
         cash = self.cash if budget is None else budget
         mine = set(self.state.squads.get(self.me, {}))
-        par_of = self.par
+        o = self.outlook
+        par_of = o.par
 
         spare = sorted(fieldable_spares(self), key=lambda k: _nulls_last(
             value_rate(par_of.get(k, 0.0), self.view("proceeds").get(k, 0.0))))
@@ -106,7 +83,7 @@ class Universe:
         for c, price in sorted(self.view("price").items(), key=lambda kv: kv[1]):
             if c in mine or self.route_kind(c) == "listed":
                 continue
-            if self.season.get(c, 0.0) <= self.xi_bar and self.cash_pts(
+            if o.season.get(c, 0.0) <= o.xi_bar and self.cash_pts(
                     Action("buy", buy=c, cost=price)) <= 0:
                 continue
             if price <= cash:
@@ -117,17 +94,6 @@ class Universe:
                     out.append(Action("swap", buy=c, sell=s, cost=price,
                                       proceeds=got))
         return out
-
-    @cached_property
-    def par(self) -> dict[str, float]:
-        season = self.season
-        pos = self.view("pos")
-        repl = replacement(squad_pool(
-            {"key": k, "slot": pos.get(k, ""), "score": v}
-            for k, v in season.items() if pos.get(k)),
-            len(self.state.squads)) if self.state.squads else {}
-        return {k: vor({"slot": pos.get(k), "score": v}, repl)
-                for k, v in season.items()}
 
     def rank(self, acts: list["Action"], seed: int = 1,
              extra: list[tuple[str, "Action"]] = ()) -> tuple:
@@ -146,7 +112,7 @@ class Universe:
                 d, _lo, _hi = band(paired(r, base_s, self.me))
                 screened.append((d + self.cash_pts(a, lam), a))
 
-        _, cur_xi = self.current_xi
+        cur_xi = self.outlook.xi.players
         pick: dict[str, tuple] = {}
         for d, a in screened:
             k = a.buy or a.sell
@@ -373,17 +339,17 @@ def _selftest() -> None:
             price={"star": 10e6, "dud": 1e6, "th_m1": 5e6},
             proceeds={"me_bench": 8e6}, owner={"th_m1": "riv"}))
 
-    first = u.current_xi
-    assert u.current_xi is first, "cached_property must not recompute"
-    assert u.xi_bar is u.xi_bar, "cached_property must not recompute"
+    first = u.outlook.xi
+    assert u.outlook.xi is first, "cached_property must not recompute"
+    assert u.outlook.xi_bar is u.outlook.xi_bar, "cached_property must not recompute"
 
-    cxi_exp, cxi = u.current_xi
+    cxi_exp, cxi = u.outlook.xi
     fallback_j = next((j for j in u.state.jornadas if j not in u.part_played),
                       u.state.jornadas[0] if u.state.jornadas else 0)
     assert cxi_exp == u.forecaster.expected(fallback_j), cxi_exp
     assert "me_bench" not in cxi, cxi
     assert len(cxi) == 11, cxi
-    bar = u.xi_bar
+    bar = u.outlook.xi_bar
     assert bar == min(cxi_exp.get(k, 0.0) for k in cxi), bar
     assert bar > 0.5, bar
 
@@ -446,8 +412,8 @@ def _selftest() -> None:
             pos={**vsq, **vth, "thin_del": "DEL", "deep_med": "MED"},
             price={"thin_del": 5e6, "deep_med": 5e6},
             route={"thin_del": "free", "deep_med": "free"}))
-    vexp, vxi = uvor.current_xi
-    assert uvor.xi_bar == 1.0, uvor.xi_bar
+    vexp, vxi = uvor.outlook.xi
+    assert uvor.outlook.xi_bar == 1.0, uvor.outlook.xi_bar
     assert min(vexp[k] for k in vxi if uvor.view("pos")[k] == "DEL") == 1.0, vxi
     assert min(vexp[k] for k in vxi if uvor.view("pos")[k] == "MED") == 5.0, vxi
     vrows, _vb, _vl, _vbd = uvor.rank([Action("buy", buy="thin_del", cost=5e6),
@@ -576,7 +542,7 @@ def _selftest() -> None:
     par = Universe(
         state=LeagueState({"me": {"me_a": "MED", "me_b": "MED"}}, [1, 2], "me"),
         forecaster=Bootstrap(pf_per), cash=0.0, me="me",
-        facts={"pos": dict.fromkeys(("me_a", "me_b", "cand"), "MED")}).par
+        facts={"pos": dict.fromkeys(("me_a", "me_b", "cand"), "MED")}).outlook.par
     assert par == {"me_a": 0.0, "me_b": 6.0, "cand": 4.0}, par
 
     assert premium_to_beat([1.0] * 5 + [1.3] * 5) == 1.3
