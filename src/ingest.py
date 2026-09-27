@@ -422,26 +422,26 @@ def _leaf(x) -> str:
 @functools.cache
 def fingerprint(fn) -> str:
     seen, h = set(), hashlib.blake2b(digest_size=8)
-
-    def walk(obj):
+    todo: list[tuple[bool, object]] = [(True, fn)]
+    while todo:
+        is_obj, obj = todo.pop()
+        if not is_obj:
+            h.update(_leaf(obj).encode())
+            continue
         obj = getattr(obj, "__wrapped__", obj)
         if id(obj) in seen:
-            return
+            continue
         seen.add(id(obj))
         code = obj if isinstance(obj, types.CodeType) else getattr(
             obj, "__code__", None)
         if code is None:
             h.update(_leaf(obj).encode())
-            return
+            continue
         h.update(code.co_code)
         glb = getattr(obj, "__globals__", {})
-        for c in code.co_consts:
-            walk(c) if isinstance(c, types.CodeType) else h.update(
-                _leaf(c).encode())
-        for name in code.co_names:
-            if name in glb:
-                walk(glb[name])
-    walk(fn)
+        todo.extend(reversed(
+            [(isinstance(c, types.CodeType), c) for c in code.co_consts]
+            + [(True, glb[name]) for name in code.co_names if name in glb]))
     return h.hexdigest()
 
 
