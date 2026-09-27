@@ -468,11 +468,13 @@ def _store(path: Path, rows: list[dict], spec: Table) -> None:
                   list(dict.fromkeys(f for r in by_day.values() for f in r)))
         return
     if spec.store == "once":
-        seen = {_content(r) for r in read_csv(path)}
+        latest = {tuple(r.get(c, "") for c in spec.key): _content(r)
+                  for r in read_csv(path)}
         fresh = []
         for r in rows:
-            if _content(r) not in seen:
-                seen.add(_content(r))
+            k = tuple((r.get(c) or "") for c in spec.key)
+            if latest.get(k) != _content(r):
+                latest[k] = _content(r)
                 fresh.append(r)
         rows = fresh
     append_csv(path, rows, fields)
@@ -597,7 +599,7 @@ def _selftest() -> None:
                    dict(line, points="6", observed_at="t3")],
           [dict(line, observed_at="t4")]], TABLES["api_activity"],
          "player_id,week,stat,value,points,observed_at\n"
-         "1337,1,goals,1,4,t1\n1337,1,goals,1,6,t3\n"),
+         "1337,1,goals,1,4,t1\n1337,1,goals,1,6,t3\n1337,1,goals,1,4,t4\n"),
         ([[m1], [m3], [m4]], TABLES["market"],
          "observed_at,ff_id,value\n"
          "2026-09-20T1800Z,1,11\n2026-09-21T0900Z,1,11\n"),
@@ -605,6 +607,12 @@ def _selftest() -> None:
          "observed_at,ff_id,value\n2026-09-20T0900Z,,10\n"
          "2026-09-20T0900Z,,10\n"),
     ]
+    k1 = {"observed_at": "t1", "match_id": "7", "kickoff": "a"}
+    cases.append(([[k1], [dict(k1, observed_at="t2", kickoff="b")],
+                   [dict(k1, observed_at="t3", kickoff="a")],
+                   [dict(k1, observed_at="t4", kickoff="a")]],
+                  TABLES["matches"],
+                  "observed_at,match_id,kickoff\nt1,7,a\nt2,7,b\nt3,7,a\n"))
     for batches, spec, want in cases:
         with tempfile.TemporaryDirectory() as tmp:
             f = Path(tmp) / "t.csv"

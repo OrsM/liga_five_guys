@@ -44,113 +44,75 @@ def player_key(r: dict) -> str:
             or norm(r.get("player_name_full") or r.get("player_name") or ""))
 
 
-def totals(rows: list[dict]) -> dict[str, tuple[float, float]]:
-    out = {}
-    for r in rows:
-        key = player_key(r)
-        if key:
-            out[key] = (float(r["points"]), float(r["games"]))
-    return out
-
-
-def keep_changed(seq: list[tuple[str, list[dict]]]) -> list[tuple[str, list[dict]]]:
-    kept, prev = [], None
-    for stamp, rows in seq:
-        cur = totals(rows)
-        if cur != prev:
-            kept.append((stamp, rows))
-            prev = cur
-    return kept
-
-
-def diff(prev_rows: list[dict], cur_rows: list[dict],
-         from_stamp: str, to_stamp: str, season: str,
-         jornada_timeline: list[tuple[str, int]] = ()) -> list[dict]:
-    prev = totals(prev_rows)
-    jor = jornada_asof(jornada_timeline, to_stamp)
-    out = []
-    for r in cur_rows:
+def deltas(rows: list[dict], season: str,
+           jornada_timeline: list[tuple[str, int]] = ()) -> list[dict]:
+    last: dict[str, tuple[float, float]] = {}
+    moved: dict[str, list[tuple[dict, tuple[float, float]]]] = {}
+    for r in sorted(rows, key=lambda r: r.get("observed_at", "")):
         key = player_key(r)
         if not key:
             continue
-        pts, pj = float(r["points"]), float(r["games"])
-        p0, j0 = prev.get(key, (0.0, 0.0))
-        if pts == p0 and pj == j0:
-            continue
-        out.append({
-            "from_stamp": from_stamp, "to_stamp": to_stamp, "season": season,
-            "ff_id": (r.get("ff_id") or "").strip(),
-            "player_name": r.get("player_name", ""),
-            "player_name_full": r.get("player_name_full", ""),
-            "team": r.get("team", ""),
-            "points_delta": f"{pts - p0:g}",
-            "games_delta": f"{pj - j0:g}",
-            "points_total": f"{pts:g}",
-            "games_total": f"{pj:g}",
-            "jornada": "" if jor is None else str(jor),
-        })
+        now = (float(r["points"]), float(r["games"]))
+        if last.get(key) != now:
+            moved.setdefault(r["observed_at"], []).append(
+                (r, last.get(key, (0.0, 0.0))))
+            last[key] = now
+    stamps = sorted(moved)
+    out = []
+    for s0, s1 in zip(stamps, stamps[1:]):
+        jor = jornada_asof(jornada_timeline, s1)
+        for r, (p0, j0) in moved[s1]:
+            pts, pj = float(r["points"]), float(r["games"])
+            out.append({
+                "from_stamp": s0, "to_stamp": s1, "season": season,
+                "ff_id": (r.get("ff_id") or "").strip(),
+                "player_name": r.get("player_name", ""),
+                "player_name_full": r.get("player_name_full", ""),
+                "team": r.get("team", ""),
+                "points_delta": f"{pts - p0:g}",
+                "games_delta": f"{pj - j0:g}",
+                "points_total": f"{pts:g}",
+                "games_total": f"{pj:g}",
+                "jornada": "" if jor is None else str(jor),
+            })
     return out
 
 
-def load_snapshots() -> dict[str, list[tuple[str, list[dict]]]]:
-    by_label: dict[str, dict[str, list[dict]]] = {}
-    for r in history("points"):
-        by_label.setdefault(r["season"], {}).setdefault(
-            r["observed_at"], []).append(r)
-    return {label: sorted(stamps.items()) for label, stamps in by_label.items()}
-
-
 def main() -> None:
-    by_label = load_snapshots()
-    if not by_label:
+    by_season: dict[str, list[dict]] = {}
+    for r in history("points"):
+        by_season.setdefault(r["season"], []).append(r)
+    if not by_season:
         sys.exit("no points page found in any snapshot under data/raw/ — "
                  "run ingest.py fetch first")
-
     timeline = match_jornadas(history("matches"))
-
-    for label, seq in sorted(by_label.items()):
-        kept = keep_changed(seq)
-
-        deltas = []
-        for (s0, r0), (s1, r1) in zip(kept, kept[1:]):
-            deltas.append(diff(r0, r1, s0, s1, label, timeline))
-
-        LIVE.mkdir(parents=True, exist_ok=True)
-        flat = [row for d in deltas for row in d]
-        write_csv(LIVE / f"perjornada_{label}.csv", flat, DIFF_FIELDS)
-
-        moved = sum(1 for d in deltas if d)
-        print(f"{label}: {len(seq)} snapshots -> {len(kept)} kept, "
-              f"{moved} interval(s) with movement, "
-              f"{len(flat)} per-jornada rows")
-
-    print(f"wrote {LIVE}/ — report.py does not read this folder, on purpose.")
+    LIVE.mkdir(parents=True, exist_ok=True)
+    for season, rows in sorted(by_season.items()):
+        flat = deltas(rows, season, timeline)
+        write_csv(LIVE / f"perjornada_{season}.csv", flat, DIFF_FIELDS)
+        print(f"{season}: {len(rows)} rows -> {len(flat)} per-jornada rows")
 
 
 def _selftest() -> None:
-    a, b, c, d = ([{"player_name": name, "player_name_full": name, "team": "X",
-                    "points": pts, "games": pj, "avg": ""}
-                   for name, pts, pj in snap]
-                  for snap in ([("Ane Aldea", "0", "0"), ("Bo Bidal", "0", "0")],
-                               [("Ane Aldea", "0", "0"), ("Bo Bidal", "0", "0")],
-                               [("Ane Aldea", "8", "1"), ("Bo Bidal", "0", "0")],
-                               [("Ane Aldea", "8", "1"), ("Bo Bidal", "3", "1"),
-                                ("Cai Coro", "5", "1")]))
-
-    kept = keep_changed([("t0", a), ("t1", b), ("t2", c), ("t3", d)])
-    assert [s for s, _ in kept] == ["t0", "t2", "t3"], kept
-
-    d1 = diff(a, c, "t0", "t2", "s")
-    assert len(d1) == 1 and d1[0]["player_name_full"] == "Ane Aldea"
-    assert d1[0]["points_delta"] == "8" and d1[0]["games_delta"] == "1"
-
-    d2 = diff(c, d, "t2", "t3", "s")
-    got = {r["player_name_full"]: r["points_delta"] for r in d2}
-    assert got == {"Bo Bidal": "3", "Cai Coro": "5"}, got
-
-    assert next(r for r in d2 if r["player_name_full"] == "Cai Coro"
-                )["games_delta"] == "1"
-
+    snaps = [("t0", [("Ane Aldea", "0", "0"), ("Bo Bidal", "0", "0")]),
+             ("t1", [("Ane Aldea", "0", "0"), ("Bo Bidal", "0", "0")]),
+             ("t2", [("Ane Aldea", "8", "1"), ("Bo Bidal", "0", "0")]),
+             ("t3", [("Ane Aldea", "8", "1"), ("Bo Bidal", "3", "1"),
+                     ("Cai Coro", "5", "1")])]
+    full = [{"observed_at": t, "player_name": name, "player_name_full": name,
+             "team": "X", "points": pts, "games": pj, "avg": ""}
+            for t, snap in snaps for name, pts, pj in snap]
+    changed_only = [r for i, r in enumerate(full)
+                    if not any(q["player_name"] == r["player_name"]
+                               and (q["points"], q["games"])
+                               == (r["points"], r["games"])
+                               for q in full[:i])]
+    for rows in (full, changed_only):
+        got = [(r["from_stamp"], r["to_stamp"], r["player_name_full"],
+                r["points_delta"], r["games_delta"]) for r in deltas(rows, "s")]
+        assert got == [("t0", "t2", "Ane Aldea", "8", "1"),
+                       ("t2", "t3", "Bo Bidal", "3", "1"),
+                       ("t2", "t3", "Cai Coro", "5", "1")], got
 
     history = [
         {"observed_at": "t0", "match_id": "1", "jornada": "1", "score": ""},
@@ -167,9 +129,8 @@ def _selftest() -> None:
     assert jornada_asof(tl, "t3") == 2
     assert jornada_asof(tl, "t9") == 2
 
-    d3 = diff(a, c, "t0", "t2", "s", jornada_timeline=tl)
-    assert d3[0]["jornada"] == "1", d3
-    assert diff(a, c, "t0", "t2", "s")[0]["jornada"] == ""
+    assert [r["jornada"] for r in deltas(full, "s", tl)] == ["1", "2", "2"]
+    assert deltas(full, "s")[0]["jornada"] == ""
 
     print("points.py selftest OK")
 

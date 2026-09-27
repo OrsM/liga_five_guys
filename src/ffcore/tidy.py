@@ -185,8 +185,8 @@ class Table(NamedTuple):
 TABLES: dict[str, Table] = {
     "market": Table(True, ("ff_id",), "daily"),
     "lineups": Table(True, ("source", "team_slug", "player_slug"), "daily"),
-    "matches": Table(True),
-    "points": Table(True),
+    "matches": Table(False, ("match_id",), "once"),
+    "points": Table(False, ("season", "ff_id"), "once"),
     "api_teams": Table(True),
     "api_standings": Table(True),
     "api_market": Table(True),
