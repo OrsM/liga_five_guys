@@ -25,9 +25,9 @@ def cash_price(reach) -> float | None:
 
 def _selftest() -> None:
     from ffcore.action import Action
-    from ffcore.fixtures import players_from_flat, tiny_universe
+    from ffcore.fixtures import tiny_universe
 
-    u = tiny_universe(players=players_from_flat(value={"star": 5e6, "free": 4e6}))
+    u = tiny_universe(facts={"value": {"star": 5e6, "free": 4e6}})
     assert burn(u, Action("buy", buy="star", cost=8e6)) == 3e6
     assert burn(u, Action("buy", buy="free", cost=4e6)) == 0.0
     assert burn(u, Action("buy", buy="free", cost=3e6)) == 0.0

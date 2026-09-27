@@ -3,12 +3,10 @@ from __future__ import annotations
 
 import math
 import statistics
-from datetime import datetime
 from typing import NamedTuple
 
 
 from ffcore.parse import money
-from ffcore.tidy import kickoff_stamp
 
 FIX_BAND = 0.12
 HOME_EDGE = 0.04
@@ -47,9 +45,6 @@ def fit_home_edge(results_history: list[dict],
 
 
 class Match(NamedTuple):
-    opponent: str
-    home: bool
-    kickoff: datetime
     atk_factor: float
     def_factor: float
 
@@ -134,21 +129,6 @@ def difficulty(strength: dict[str, float]) -> dict[str, float]:
             for i, team in enumerate(order)}
 
 
-def fixture_board(ratings: "_Ratings", matches: list[dict],
-                  now: datetime) -> dict[str, Match]:
-    board: dict[str, Match] = {}
-    for r in matches:
-        when = kickoff_stamp(r.get("kickoff"))
-        if not when or when <= now:
-            continue
-        for team, opp, home in ((r.get("home"), r.get("away"), True),
-                                (r.get("away"), r.get("home"), False)):
-            prev = board.get(team)
-            if team in ratings.diff and not (prev and prev.kickoff <= when):
-                board[team] = _match_for(ratings, opp, home, when)
-    return board
-
-
 class _Ratings(NamedTuple):
     diff: dict
     ad: dict
@@ -163,19 +143,17 @@ def difficulty_ratings(market: list[dict], results=None,
                     home_edge=home_edge)
 
 
-def _match_for(ratings: "_Ratings", opp: str, home: bool,
-               when: datetime) -> Match:
+def _match_for(ratings: "_Ratings", opp: str, home: bool) -> Match:
     base = ratings.diff.get(opp, 1.0) if opp else 1.0
     edge = 1.0 + (ratings.home_edge if home else -ratings.home_edge)
     opp_ad = ratings.ad.get(opp) if opp else None
     atk_base, def_base = ((opp_ad[1], 1.0 / opp_ad[0]) if opp_ad is not None
                           else (base, base))
-    return Match(opponent=opp or "?", home=home, kickoff=when,
-                 atk_factor=atk_base * edge, def_factor=def_base * edge)
+    return Match(atk_base * edge, def_base * edge)
 
 
-def season_board(ratings: "_Ratings", matches: list[dict], jornadas,
-                 now: datetime) -> dict[int, dict[str, Match]]:
+def season_board(ratings: "_Ratings", matches: list[dict], jornadas
+                 ) -> dict[int, dict[str, Match]]:
     board: dict[int, dict[str, Match]] = {j: {} for j in set(jornadas)}
     for r in matches:
         j = r.get("jornada") or ""
@@ -184,7 +162,7 @@ def season_board(ratings: "_Ratings", matches: list[dict], jornadas,
         for team, opp, home in ((r.get("home"), r.get("away"), True),
                                 (r.get("away"), r.get("home"), False)):
             if team in ratings.diff and team not in board[int(j)]:
-                board[int(j)][team] = _match_for(ratings, opp, home, now)
+                board[int(j)][team] = _match_for(ratings, opp, home)
     return board
 
 
@@ -245,61 +223,26 @@ def _selftest() -> None:
         [{"home": "Empty", "away": "X", "home_goals": "0",
           "away_goals": "0"}] * MIN_AD_MATCHES, ["Empty"]) == {}
 
-    now = datetime.fromisoformat("2026-08-15T12:00:00+00:00")
-    fx = [{"kickoff": k, "home": h, "away": a, "home_name": h, "away_name": a}
-          for k, h, a in [("2026-08-14T19:00:00+00:00", "Rich", "Poor"),
-                          ("2026-08-20T19:00:00+00:00", "Mid", "Rich"),
-                          ("2026-08-16T19:00:00+00:00", "Poor", "Mid")]]
-    board = fixture_board(difficulty_ratings(mk), fx, now)
-
-    assert board["Rich"].opponent == "Mid" and not board["Rich"].home
-    assert board["Mid"].opponent == "Poor", board["Mid"]
-    assert board["Mid"].kickoff.day == 16
-    assert abs(board["Mid"].atk_factor
-               - (1.0 + FIX_BAND) * (1.0 - HOME_EDGE)) < 1e-9
-    assert board["Mid"].atk_factor == board["Mid"].def_factor
-    assert abs(board["Poor"].atk_factor - (1.0 * (1.0 + HOME_EDGE))) < 1e-9
-
-    assert fixture_board(difficulty_ratings(mk), [], now) == {}
-    solo = fixture_board(difficulty_ratings(mk), [{
-        "kickoff": "2026-08-20T19:00:00+00:00", "home": "Mid", "away": ""}], now)
-    assert abs(solo["Mid"].atk_factor - (1.0 + HOME_EDGE)) < 1e-9
+    ms = [{"jornada": "1", "home": "Rich", "away": "Poor", "score": "2-0"},
+          {"jornada": "2", "home": "Mid", "away": "Rich", "score": ""},
+          {"jornada": "2", "home": "Poor", "away": "", "score": ""},
+          {"jornada": "3", "home": "Poor", "away": "Mid", "score": ""}]
+    sb = season_board(difficulty_ratings(mk), ms, [1, 2, 3])
+    assert set(sb) == {1, 2, 3} and 4 not in sb, sb
+    assert sb[2]["Mid"] == Match((1.0 - FIX_BAND) * (1.0 + HOME_EDGE),
+                                 (1.0 - FIX_BAND) * (1.0 + HOME_EDGE)), sb[2]
+    assert sb[3]["Mid"].atk_factor == (1.0 + FIX_BAND) * (1.0 - HOME_EDGE)
+    assert sb[2]["Poor"] == Match(1.0 + HOME_EDGE, 1.0 + HOME_EDGE), sb[2]
+    assert sb[1]["Rich"] != sb[3]["Mid"]
+    assert season_board(difficulty_ratings(mk), [], [1, 2]) == {1: {}, 2: {}}
 
     ad_results = [{"home": "Rich", "away": "x", "home_goals": "3",
-                  "away_goals": "5"}] * MIN_AD_MATCHES
-    fx2 = [{"kickoff": "2026-08-20T19:00:00+00:00",
-           "home": "Mid", "away": "Rich"}]
-    real = fixture_board(difficulty_ratings(mk, results=ad_results), fx2,
-                         now)
-    assert real["Mid"].def_factor != real["Mid"].atk_factor, real["Mid"]
-    assert abs(real["Mid"].def_factor - (1.0 / 0.75) * (1.0 + HOME_EDGE)) \
-        < 1e-9, real["Mid"]
-    assert abs(real["Mid"].atk_factor - 1.25 * (1.0 + HOME_EDGE)) < 1e-9, \
-        real["Mid"]
-
-    assert fixture_board(difficulty_ratings(mk, []), fx, now) == board
-
-    ms = [{"jornada": "1", "home": "Rich", "away": "Poor", "score": "2-0"},
-         {"jornada": "2", "home": "Mid", "away": "Rich", "score": ""},
-         {"jornada": "2", "home": "Poor", "away": "?", "score": ""},
-         {"jornada": "3", "home": "Rich", "away": "Mid", "score": ""}]
-    sb = season_board(difficulty_ratings(mk), ms, [1, 2, 3], now)
-    assert set(sb) == {1, 2, 3}, sb
-    assert sb[1]["Rich"].opponent == "Poor" and sb[1]["Rich"].home
-    assert sb[1]["Poor"].opponent == "Rich" and not sb[1]["Poor"].home
-    assert sb[2]["Mid"].opponent == "Rich" and sb[2]["Mid"].home
-    same_fixture = fixture_board(
-        difficulty_ratings(mk), [{"kickoff": "2026-08-20T19:00:00+00:00",
-             "home": "Mid", "away": "Rich"}], now)
-    assert sb[2]["Mid"].atk_factor == same_fixture["Mid"].atk_factor
-    assert sb[2]["Mid"].def_factor == same_fixture["Mid"].def_factor
-    assert sb[2]["Poor"].opponent == "?"
-    assert sb[3]["Rich"].opponent == "Mid" and sb[3]["Rich"].home
-    assert sb[1]["Rich"] != sb[3]["Rich"]
-
-    assert 4 not in season_board(difficulty_ratings(mk), ms, [1, 2, 3], now)
-    assert season_board(difficulty_ratings(mk), [], [1, 2], now) == {
-        1: {}, 2: {}}
+                   "away_goals": "5"}] * MIN_AD_MATCHES
+    real = season_board(difficulty_ratings(mk, results=ad_results), ms, [2])[2]
+    assert abs(real["Mid"].def_factor - (1.0 / 0.75) * (1.0 + HOME_EDGE)) < 1e-9
+    assert abs(real["Mid"].atk_factor - 1.25 * (1.0 + HOME_EDGE)) < 1e-9
+    assert season_board(difficulty_ratings(mk, []), ms, [2]) == \
+        season_board(difficulty_ratings(mk), ms, [2])
 
     print("ffcore.fixture self-test OK")
 

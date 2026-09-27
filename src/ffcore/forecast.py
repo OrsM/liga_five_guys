@@ -85,14 +85,6 @@ class Bootstrap:
         return {k: pts * p
                 for k, (pts, p) in self.per_jornada.get(jornada, {}).items()}
 
-    def expected_own(self, first_jornada_of: dict[str, int]) -> dict[str, float]:
-        out = {}
-        for k, j in first_jornada_of.items():
-            rec = self.per_jornada.get(j, {}).get(k)
-            if rec:
-                out[k] = rec[0] * rec[1]
-        return out
-
 
 def pool_from_perjornada(rows) -> list[int]:
     out = []
@@ -162,11 +154,6 @@ def _selftest() -> None:
     e = fc.expected(1)
     assert e == {"nailed": 5.0, "rota": 2.5, "out": 0.0}, e
     assert fc.expected(99) == {}, "a jornada nobody plays is empty, not an error"
-
-    fc2 = Bootstrap({1: {"early": (4.0, 1.0)}, 2: {"late": (6.0, 0.5)}})
-    assert fc2.expected_own({"early": 1, "late": 2}) == {"early": 4.0,
-                                                          "late": 3.0}
-    assert fc2.expected_own({"early": 2}) == {}
 
     assert Bootstrap({}, pool=[1, 2, 3]).pool == SEED_POOL
     big = list(range(MIN_POOL))

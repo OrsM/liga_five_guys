@@ -12,14 +12,10 @@ from typing import Mapping
 from ffcore.forecast import Bootstrap, pool_from_perjornada
 import grading
 from stats import percentile
-from ffcore.schedule import (rounds_left, next_then_rest,
-                             first_jornada_per_player, apply_fixtures,
-                             phantom_fill, phantom_topup)
+from ffcore.schedule import expectations, phantom_fill, phantom_topup
 from ffcore.pricing import burn, cash_price
 from ffcore.action import Action
-from ffcore.profile import (PlayerProfile, UNSCORED_DEFAULT,
-                            build_profiles)
-from ffcore.fixture import club_volatility, season_board
+from ffcore.fixture import club_volatility
 from ffcore.league import League
 from ffcore.score import SLOT, Scorer, build, replacement, squad_pool, vor
 from ffcore.season import (LeagueState, best_xi,
@@ -46,7 +42,7 @@ class Universe:
     forecaster: Bootstrap
     cash: float
     me: str
-    players: dict[str, PlayerProfile] = field(default_factory=dict)
+    facts: dict[str, dict] = field(default_factory=dict)
     rival_cash: dict[str, float] = field(default_factory=dict)
     part_played: dict[int, set[str]] = field(default_factory=dict)
     first_jornada_of: dict[str, int] = field(default_factory=dict)
@@ -57,14 +53,19 @@ class Universe:
     sc: Scorer | None = None
 
     @cached_property
-    def current_xi(self) -> tuple[dict[str, float], set[str]]:
-        if self.first_jornada_of:
-            exp = self.forecaster.expected_own(self.first_jornada_of)
-        else:
+    def next_up(self) -> dict[str, tuple[float, float]]:
+        per_j = self.forecaster.per_jornada
+        if not self.first_jornada_of:
             j = next((j for j in self.state.jornadas
                       if j not in self.part_played),
                      self.state.jornadas[0] if self.state.jornadas else 0)
-            exp = self.forecaster.expected(j)
+            return dict(per_j.get(j, {}))
+        return {k: per_j[j][k] for k, j in self.first_jornada_of.items()
+                if k in per_j.get(j, {})}
+
+    @cached_property
+    def current_xi(self) -> tuple[dict[str, float], set[str]]:
+        exp = {k: pts * p for k, (pts, p) in self.next_up.items()}
         return exp, set(best_xi(self.state.squads.get(self.me, {}), exp))
 
     @cached_property
@@ -93,7 +94,7 @@ class Universe:
         cash = self.cash if budget is None else budget
         mine = set(self.state.squads.get(self.me, {}))
         exp, _xi = self.current_xi
-        par_of = {k: v["par"] for k, v in self.player_forecasts.items()}
+        par_of = self.par
 
         spare = sorted(fieldable_spares(self), key=lambda k: _nulls_last(
             value_rate(par_of.get(k, 0.0), self.view("proceeds").get(k, 0.0))))
@@ -114,38 +115,18 @@ class Universe:
         return out
 
     @cached_property
-    def player_forecasts(self) -> dict[str, dict]:
-        jornadas = self.state.jornadas
-        n_rem = len(jornadas)
-        sim_season: dict[str, float] = {}
-        sim_next: dict[str, float] = {}
-        for i, j in enumerate(jornadas):
-            exp = self.forecaster.expected(j)
-            for k, pts in exp.items():
-                sim_season[k] = sim_season.get(k, 0.0) + pts
-            if i == 0:
-                sim_next = exp
-
+    def par(self) -> dict[str, float]:
+        season: dict[str, float] = {}
+        for j in self.state.jornadas:
+            for k, pts in self.forecaster.expected(j).items():
+                season[k] = season.get(k, 0.0) + pts
         pos = self.view("pos")
-        wide_pool = squad_pool(
-            {"key": k, "slot": pos.get(k, ""), "score": pts}
-            for k, pts in sim_season.items() if pos.get(k))
-        repl = replacement(wide_pool, len(self.state.squads)) \
-            if self.state.squads else {}
-
-        out = {}
-        for k, p in self.players.items():
-            in_sim = k in sim_season
-            market_exp = self.view("market_exp").get(k, 0.0)
-            season_pts = sim_season.get(k) if in_sim else market_exp * n_rem
-            out[k] = {
-                "season_pts": season_pts,
-                "next_pts": sim_next.get(k) if in_sim else market_exp,
-                "par": vor({"slot": pos.get(k), "score": season_pts}, repl),
-                "pj": p.derived.pj,
-                "simulated": in_sim,
-            }
-        return out
+        repl = replacement(squad_pool(
+            {"key": k, "slot": pos.get(k, ""), "score": v}
+            for k, v in season.items() if pos.get(k)),
+            len(self.state.squads)) if self.state.squads else {}
+        return {k: vor({"slot": pos.get(k), "score": v}, repl)
+                for k, v in season.items()}
 
     def rank(self, acts: list["Action"], seed: int = 1, price=None,
              extra: list[tuple[str, "Action"]] = ()) -> tuple:
@@ -214,28 +195,8 @@ class Universe:
         rows = sorted(out, key=lambda d: (-d["net_pts"], d["action"].net))
         return rows, base, measured, bands
 
-    _FIELDS = {
-        "pos": (lambda p: p.current.pos, bool, lambda v: _pos_of(v)),
-        "price": (lambda p: p.current.price, None, None),
-        "proceeds": (lambda p: p.current.proceeds, None, None),
-        "owner": (lambda p: p.current.owner, bool, None),
-        "value": (lambda p: p.current.value, None, None),
-        "market_exp": (lambda p: p.derived.market_exp, None, None),
-        "start": (lambda p: p.derived.start_p, None, None),
-        "route": (lambda p: p.current.route, bool, None),
-        "name": (lambda p: p.identity.name, lambda v: True, None),
-    }
-
     def view(self, field: str) -> Mapping:
-        cache = self.__dict__.setdefault("_view_cache", {})
-        if field not in cache:
-            get, keep, transform = self._FIELDS[field]
-            keep = keep or (lambda v: v is not None)
-            transform = transform or (lambda v: v)
-            cache[field] = MappingProxyType(
-                {k: transform(v) for k, p in self.players.items()
-                 for v in (get(p),) if keep(v)})
-        return cache[field]
+        return MappingProxyType(self.facts.get(field, {}))
 
 
 def _nulls_last(v: float | None) -> tuple[bool, float]:
@@ -342,8 +303,7 @@ def _gains(r) -> bool:
 
 
 def worth_doing(u, rows) -> list:
-    par_of = {k: v["par"] for k, v in u.player_forecasts.items()}
-    pj_of = {k: v["pj"] for k, v in u.player_forecasts.items()}
+    par_of, pj_of = u.par, u.view("pj")
     mae = u.mae
     rows = [r for r in rows if not r["action"].buy
             or _clears_par_floor(par_of, mae, r["action"].buy,
@@ -360,10 +320,9 @@ def load() -> Universe:
     lg = League.load()
     sc = build(current("market"), current("lineups", LINEUP_SOURCE), run_now(),
                shrink_k=lg.cfg.shrink_k)
-    me, now = lg.cfg.me, run_now()
+    me = lg.cfg.me
     players = load_players()
     m = current("matches")
-    rem, played = rounds_left(m)
 
     teams, mkt = ([dict(r, key=lg.xw.player(app_id=text(r, "player_id")))
                    for r in current(name)] for name in ("api_teams", "api_market"))
@@ -377,32 +336,25 @@ def load() -> Universe:
          for r in current("api_offers")], "status", "money")
     proceeds = {k: max(value.get(k, 0.0), received_offers.get(k, 0.0))
                 for k in lg.squad(me)}
-    profiles = build_profiles(
-        players, sc, xw=lg.xw,
-        market_keyed={k: {"listed": k in price, "price": price.get(k),
-                          "owner": lg.owner.get(k), "value": value.get(k),
-                          "route": route.get(k),
-                          "proceeds": proceeds.get(k)} for k in players})
-
-    pos = {k: _pos_of(p.current.pos) for k, p in profiles.items()}
-    club = {k: p.current.club for k, p in profiles.items() if p.current.club}
+    pos = {k: _pos_of((rec.get("pos") or "").upper())
+           for k, rec in players.items()}
     squads = {mgr: {k: pos[k] for k in lg.squad(mgr) if k in pos}
               for mgr in lg.managers}
-    base, base_rest, matches, ppm_of, status_of = {}, {}, {}, {}, {}
-    for k in set(price).union(*squads.values()):
-        p = profiles.get(k)
-        base[k], base_rest[k] = (p.to_bootstrap_input() if p
-                                 else (UNSCORED_DEFAULT, UNSCORED_DEFAULT))
-        s = p.derived.scored if p else None
-        if s:
-            matches[k], ppm_of[k], status_of[k] = s.pj, s.ppm, s.status
-
-    sboard = season_board(sc.ratings, m, rem, now)
-    first_jornada_of = first_jornada_per_player(base, rem, played, club)
-    per_j = apply_fixtures(
-        next_then_rest(base, base_rest, rem, played, club),
-        sboard, club, pos, ppm_of, status_of=status_of,
-        first_jornada_of=first_jornada_of, status_factor=sc.cal.status_factor)
+    per_j, first_jornada_of, rates, rem, played = expectations(
+        sc, set(price).union(*squads.values()), m)
+    club = {k: rec.get("club") or (lg.xw.players[k].club_id
+                                   if k in lg.xw.players else "")
+            for k, rec in players.items()}
+    club = {k: c for k, c in club.items() if c}
+    facts = {"name": {k: rec.get("name") or k for k, rec in players.items()},
+             "pos": pos,
+             "price": {k: v for k, v in price.items() if k in players},
+             "route": {k: v for k, v in route.items() if k in players},
+             "owner": {k: v for k, v in lg.owner.items() if k in players},
+             "value": {k: v for k, v in value.items() if k in players},
+             "proceeds": {k: v for k, v in proceeds.items() if k in players},
+             "pj": {k: r.pj for k, r in rates.items() if r}}
+    matches = {k: r.pj for k, r in rates.items() if r}
     squads, per_j = phantom_fill(squads, per_j, pos)
     assert all(_fieldable(sq) for sq in squads.values()), squads
     if rem:
@@ -421,7 +373,7 @@ def load() -> Universe:
                for r in lg.standings if r.get("manager")}
     return Universe(
         state=LeagueState(squads, rem, me, carried), forecaster=fc,
-        cash=lg[me].cash.value or 0.0, me=me, players=profiles, lg=lg, sc=sc,
+        cash=lg[me].cash.value or 0.0, me=me, facts=facts, lg=lg, sc=sc,
         rival_cash={h: lg[h].cash.value or 0.0 for h in lg.managers
                     if h != me},
         part_played=played, first_jornada_of=first_jornada_of,
@@ -432,7 +384,6 @@ def load() -> Universe:
 
 def _selftest() -> None:
     from ffcore.forecast import Bootstrap as B
-    from ffcore.fixtures import players_from_flat
 
     sq = {"k": "POR", **{f"d{i}": "DEF" for i in range(1, 5)},
           **{f"m{i}": "MED" for i in range(1, 6)}, "f1": "DEL", "bench": "MED"}
@@ -448,7 +399,7 @@ def _selftest() -> None:
     u = Universe(
         state=LeagueState({"me": dict(mine), "riv": dict(theirs)}, [1], "me"),
         forecaster=B(per), cash=12e6, me="me",
-        players=players_from_flat(
+        facts=dict(
             pos={**{k: v for k, v in mine.items()},
                 **{k: v for k, v in theirs.items()},
                 "star": "MED", "dud": "MED"},
@@ -482,7 +433,7 @@ def _selftest() -> None:
     u3 = Universe(
         state=LeagueState({"me": dict(mine), "riv": dict(theirs)}, [1], "me"),
         forecaster=B(per), cash=4e6, me="me",
-        players=players_from_flat(
+        facts=dict(
             pos={**u.view("pos"), "dear": "MED"},
             price={"dear": 20e6},
             proceeds={"me_bench": 8e6, "me_spare2": 5e6, "me_spare3": 4e6}))
@@ -531,7 +482,7 @@ def _selftest() -> None:
     uvor = Universe(
         state=LeagueState({"me": dict(vsq), "riv": dict(vth)}, [1], "me"),
         forecaster=B(vper), cash=6e6, me="me",
-        players=players_from_flat(
+        facts=dict(
             pos={**vsq, **vth, "thin_del": "DEL", "deep_med": "MED"},
             price={"thin_del": 5e6, "deep_med": 5e6},
             route={"thin_del": "free", "deep_med": "free"}))
@@ -601,7 +552,7 @@ def _selftest() -> None:
     u5 = Universe(
         state=LeagueState({"me": dict(mine), "riv": dict(theirs)}, [1], "me"),
         forecaster=B(per5), cash=100e6, me="me",
-        players=players_from_flat(
+        facts=dict(
             pos={**u.view("pos"), **{a.buy: "MED" for a in acts5}},
             price={a.buy: 1e6 for a in acts5}, route=route5))
     rows5, *_ = u5.rank(acts5)
@@ -625,7 +576,7 @@ def _selftest() -> None:
     u6 = Universe(
         state=LeagueState({"me": dict(mine), "riv": dict(theirs)}, [1], "me"),
         forecaster=B(per6), cash=1000e6, me="me",
-        players=players_from_flat(
+        facts=dict(
             pos={**u.view("pos"), **{a.buy: "MED" for a in acts6}},
             price={a.buy: a.cost for a in acts6}))
     rows6, *_ = u6.rank(acts6)
@@ -640,7 +591,7 @@ def _selftest() -> None:
         forecaster=B({1: {"me_k": (0.1, 1.0), "dud": (1.0, 1.0)},
                       2: {**{k: (5.0, 1.0) for k in mine}, "dud": (1.0, 1.0)}}),
         cash=50e6, me="me",
-        players=players_from_flat(pos={**u.view("pos"), "dud": "MED"},
+        facts=dict(pos={**u.view("pos"), "dud": "MED"},
                                   price={"dud": 1e6}))
     half.part_played = {1: {"somewhere"}}
     assert not any(a.buy == "dud"
@@ -669,7 +620,7 @@ def _selftest() -> None:
     u_cd = Universe(
         state=LeagueState({"me": dict(sq_cd)}, [1], "me"),
         forecaster=BCD(per_cd), cash=0.0, me="me",
-        players=players_from_flat(pos={**sq_cd, "target": "DEL"},
+        facts=dict(pos={**sq_cd, "target": "DEL"},
                                   price={"target": 5e6},
                                   proceeds={"me_f3": 5e6}))
     acts_cd = u_cd.candidates()
@@ -681,40 +632,6 @@ def _selftest() -> None:
         [a for a in acts_cd if a.sell]
 
 
-    from ffcore.fixtures import tiny_profile as _tiny_p
-
-    _FALSY_DROP = ("pos", "owner", "route")
-    _NONE_ONLY_DROP = ("price", "proceeds", "value", "market_exp", "start")
-
-    falsy_edge = _tiny_p("falsy_edge", pos="", owner="", route="")
-    zero_edge = _tiny_p("zero_edge", price=0.0, proceeds=0.0, value=0.0,
-                       market_exp=0.0, start_p=0.0)
-    none_edge = _tiny_p("none_edge", owner=None, route=None, price=None,
-                       proceeds=None, value=None, market_exp=None,
-                       start_p=None)
-    u_views = Universe(
-        state=LeagueState({"me": {}}, [1], "me"), forecaster=B({}),
-        cash=0.0, me="me",
-        players={"falsy_edge": falsy_edge, "zero_edge": zero_edge,
-                "none_edge": none_edge})
-
-    for field_name in _FALSY_DROP:
-        view = u_views.view(field_name)
-        assert "falsy_edge" not in view, (field_name, dict(view))
-    for field_name in ("owner", "route"):
-        view = u_views.view(field_name)
-        assert "none_edge" not in view, (field_name, dict(view))
-
-    for field_name in _NONE_ONLY_DROP:
-        view = u_views.view(field_name)
-        assert "zero_edge" in view and not view["zero_edge"], \
-            (field_name, dict(view))
-        assert "none_edge" not in view, (field_name, dict(view))
-
-    assert u_views.view("name")["falsy_edge"] == "falsy_edge"
-    assert u_views.view("name")["zero_edge"] == "zero_edge"
-    assert u_views.view("name")["none_edge"] == "none_edge"
-
     sq = {"k": "POR", "d1": "DEF", "d2": "DEF", "d3": "DEF", "d4": "DEF",
          "spare_d": "DEF", "m1": "MED", "m2": "MED", "m3": "MED", "m4": "MED",
          "f1": "DEL", "dead_f": "DEL"}
@@ -724,7 +641,7 @@ def _selftest() -> None:
     u = Universe(
         state=LeagueState({"me": dict(sq)}, [1], "me"),
         forecaster=Bootstrap(per), cash=0.0, me="me",
-        players=players_from_flat(pos=dict(sq),
+        facts=dict(pos=dict(sq),
                                   proceeds={"spare_d": 4e6, "dead_f": 6e6}),
         received_offers={})
     mine = u.state.squads["me"]
@@ -750,22 +667,13 @@ def _selftest() -> None:
         got = value_rate(pts, cost)
         assert got == want or abs(got - want) < 1e-9, (pts, cost, got)
 
-    from ffcore.profile import mk_profile
     pf_per = {j: {"me_a": (2.0, 1.0), "me_b": (5.0, 1.0), "cand": (4.0, 1.0)}
               for j in (1, 2)}
-    fc = Universe(
+    par = Universe(
         state=LeagueState({"me": {"me_a": "MED", "me_b": "MED"}}, [1, 2], "me"),
         forecaster=Bootstrap(pf_per), cash=0.0, me="me",
-        players={"me_a": mk_profile(20.0), "me_b": mk_profile(15.0),
-                 "cand": mk_profile(8.0),
-                 "unsimmed": mk_profile(1.0, "DEL", market_exp=3.0)}
-    ).player_forecasts
-    for k, season, nxt, par, simulated in [
-            ("me_a", 4.0, 2.0, 0.0, True), ("me_b", 10.0, 5.0, 6.0, True),
-            ("cand", 8.0, 4.0, 4.0, True), ("unsimmed", 6.0, 3.0, 6.0, False)]:
-        assert (fc[k]["season_pts"], fc[k]["next_pts"], fc[k]["par"],
-                fc[k]["simulated"]) == (season, nxt, par, simulated), (k, fc[k])
-    assert fc["cand"]["pj"] == 8.0, fc["cand"]
+        facts={"pos": dict.fromkeys(("me_a", "me_b", "cand"), "MED")}).par
+    assert par == {"me_a": 0.0, "me_b": 6.0, "cand": 4.0}, par
 
     for d_pts, want in [(0.1, True), (-2.0, False), (0.0, False), (None, False)]:
         assert _gains({"d_pts": d_pts}) is want, d_pts

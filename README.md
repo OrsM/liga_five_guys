@@ -463,8 +463,8 @@ src/ffcore/          parse (values)  text (names)  tidy (tables and time)
                      crosswalk (the registry, looked up by id)
                      auth (the league token)  league (owners and cash)
                      score (ratings and the XI)  fixture (opponents)
-                     startprob (P(start))  lineupweight  forecast  season
-                     schedule  pricing  profile  action  render
+                     startprob (P(start))  forecast  season
+                     schedule  pricing  action  render
 inputs/league.ini     the one file you edit
 data/raw/dt=….tar.xz  raw pages, deduplicated — append-only, never delete
 data/tidy/players.csv the player registry (tracked)
@@ -1076,7 +1076,7 @@ differently-keyed ownership map is worse than none.
   a real drop in playing time moves the number ahead of the editorial page
   catching up; `ffcore.forecast.Bootstrap.start_rel`/`start_draw` widen the
   simulated band the further a jornada is projected, scaled by how much real
-  evidence (`Scored.pj`) backs the reading — a rotation player and a nailed
+  evidence (`Rates.pj`) backs the reading — a rotation player and a nailed
   starter published at the same percentage are no longer simulated
   identically. Still not modelled: an injury's own return timeline (still a
   flat categorical zero/halve, not a hazard curve), and there is no

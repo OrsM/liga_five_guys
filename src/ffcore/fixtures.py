@@ -6,12 +6,11 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from decide import Universe
     from ffcore.forecast import Bootstrap
-    from ffcore.profile import PlayerProfile
     from ffcore.season import LeagueState
 
 
-__all__ = ["tiny_profile", "tiny_state", "tiny_bootstrap", "tiny_universe",
-          "tiny_market_universe", "players_from_flat"]
+__all__ = ["tiny_state", "tiny_bootstrap", "tiny_universe",
+          "tiny_market_universe"]
 
 
 DEFAULT_SQUAD: dict[str, str] = {
@@ -22,69 +21,6 @@ DEFAULT_SQUAD: dict[str, str] = {
 }
 
 DEFAULT_JORNADAS: list[int] = [1, 2]
-
-_CURRENT_DEFAULTS: dict[str, object] = dict(
-    club="", pos="MED", status="ok", listed=True,
-    price=5e6, owner=None, value=5e6, route="listed", proceeds=None,
-)
-_DERIVED_DEFAULTS: dict[str, object] = dict(
-    ppm=5.0, pj=10.0, start_p=0.8, market_exp=4.0, pts_now=5.0, scored=None,
-)
-
-
-def tiny_profile(key: str, **overrides) -> "PlayerProfile":
-    from ffcore.crosswalk import Player
-    from ffcore.profile import PlayerCurrent, PlayerDerived
-    from ffcore.profile import PlayerProfile
-
-    name = overrides.pop("name", key)
-    current_kwargs = dict(_CURRENT_DEFAULTS)
-    derived_kwargs = dict(_DERIVED_DEFAULTS)
-    for k, v in overrides.items():
-        if k in current_kwargs:
-            current_kwargs[k] = v
-        elif k in derived_kwargs:
-            derived_kwargs[k] = v
-        else:
-            raise TypeError(f"tiny_profile: unknown override {k!r}")
-
-    return PlayerProfile(
-        identity=Player(player_id=key, name=name),
-        current=PlayerCurrent(**current_kwargs),
-        derived=PlayerDerived(**derived_kwargs),
-    )
-
-
-def players_from_flat(pos=None, price=None, proceeds=None, owner=None,
-                      value=None, market_exp=None, start=None, route=None,
-                      name=None
-                      ) -> dict[str, "PlayerProfile"]:
-    from ffcore.crosswalk import Player
-    from ffcore.profile import (PlayerCurrent,
-                                PlayerDerived, PlayerProfile as _PP)
-    keys = (set(pos or {}) | set(price or {}) | set(proceeds or {})
-           | set(owner or {}) | set(value or {}) | set(market_exp or {})
-           | set(start or {}) | set(route or {}) | set(name or {}))
-    out = {}
-    for k in keys:
-        out[k] = _PP(
-            identity=Player(player_id=k, name=(name or {}).get(k, k)),
-            current=PlayerCurrent(
-                pos=(pos or {}).get(k, ""),
-                listed=k in (price or {}),
-                price=(price or {}).get(k),
-                proceeds=(proceeds or {}).get(k),
-                owner=(owner or {}).get(k),
-                value=(value or {}).get(k),
-                route=(route or {}).get(k),
-            ),
-            derived=PlayerDerived(
-                market_exp=(market_exp or {}).get(k),
-                start_p=(start or {}).get(k),
-            ),
-        )
-    return out
-
 
 def _with_overrides(name: str, defaults: dict, overrides: dict) -> dict:
     for k in overrides:
@@ -129,8 +65,7 @@ def tiny_universe(**overrides) -> "Universe":
     defaults = dict(
         state=tiny_state(),
         forecaster=tiny_bootstrap(),
-        players={k: tiny_profile(k, pos=pos)
-                for k, pos in DEFAULT_SQUAD.items()},
+        facts={"pos": dict(DEFAULT_SQUAD)},
         cash=20e6,
         me="me",
     )
@@ -153,25 +88,16 @@ def tiny_market_universe(**overrides) -> "Universe":
         per_jornada[j]["cand_free"] = (9.0, 0.8)
         per_jornada[j]["cand_rival"] = (10.0, 0.9)
 
-    players = {k: tiny_profile(k, pos=pos) for k, pos in DEFAULT_SQUAD.items()}
-    players["bench_m"] = tiny_profile(
-        "bench_m", pos="MED", listed=False, price=None,
-        proceeds=3e6, pts_now=1.0, start_p=0.5, market_exp=0.5)
-    players["bench_k"] = tiny_profile(
-        "bench_k", pos="POR", listed=False, price=None,
-        proceeds=2e6, pts_now=1.0, start_p=0.5, market_exp=0.5)
-    players["cand_free"] = tiny_profile(
-        "cand_free", pos="MED", price=5e6, listed=True,
-        pts_now=9.0, start_p=0.8, market_exp=7.2)
-    players["cand_rival"] = tiny_profile(
-        "cand_rival", pos="MED", price=100e6, listed=True,
-        owner="riv", route="listed", pts_now=10.0, start_p=0.9,
-        market_exp=9.0)
+    facts = {"pos": {**squad, "cand_free": "MED", "cand_rival": "MED"},
+             "price": {"cand_free": 5e6, "cand_rival": 100e6},
+             "proceeds": {"bench_m": 3e6, "bench_k": 2e6},
+             "owner": {"cand_rival": "riv"},
+             "route": {"cand_rival": "listed"}}
 
     defaults = dict(
         state=tiny_state(squads={"me": squad}),
         forecaster=tiny_bootstrap(per_jornada=per_jornada),
-        players=players,
+        facts=facts,
         cash=5.5e6,
         me="me",
     )
@@ -186,7 +112,6 @@ def _selftest() -> None:
     assert u.state.squads["me"] == DEFAULT_SQUAD, u.state.squads
     for manager, squad in u.state.squads.items():
         assert _fieldable(squad), (manager, squad)
-    assert set(u.players) == set(DEFAULT_SQUAD), u.players
     assert u.view("pos") == DEFAULT_SQUAD, u.view("pos")
 
     boot = tiny_bootstrap()
@@ -201,30 +126,16 @@ def _selftest() -> None:
     for j in u.state.jornadas:
         assert u.forecaster.expected(j), j
 
-    base = tiny_profile("x")
-    changed = tiny_profile("x", pos="DEL", price=9e6)
-    assert changed.current.pos == "DEL" and changed.current.price == 9e6
-    assert changed.current.status == base.current.status == "ok"
-    assert changed.derived.ppm == base.derived.ppm == 5.0
-    assert changed.identity.name == "x" == base.identity.name
-
     base_u = tiny_universe()
     changed_u = tiny_universe(cash=1.0)
     assert changed_u.cash == 1.0
     assert changed_u.state.squads == base_u.state.squads
-    assert set(changed_u.players) == set(base_u.players)
 
     base_st = tiny_state()
     changed_st = tiny_state(me="riv")
     assert changed_st.me == "riv"
     assert changed_st.squads == base_st.squads
     assert changed_st.jornadas == base_st.jornadas
-
-    try:
-        tiny_profile("x", nonsense=1)
-        raise AssertionError("expected TypeError for unknown override")
-    except TypeError:
-        pass
 
     mu = tiny_market_universe()
     assert _fieldable(mu.state.squads["me"]), mu.state.squads["me"]
@@ -243,19 +154,6 @@ def _selftest() -> None:
     rows, _base, _measured, _bands = mu.rank(acts, seed=1)
     assert rows, "rank() must return at least one row for a real market"
     assert any(r["action"].buy == "cand_free" for r in rows), rows
-
-    flat_players = players_from_flat(
-        pos={"a": "DEF", "b": "MED"}, price={"a": 5e6},
-        owner={"b": "riv"}, name={"a": "Alpha"})
-    assert set(flat_players) == {"a", "b"}, flat_players
-    assert flat_players["a"].current.pos == "DEF"
-    assert flat_players["a"].current.price == 5e6
-    assert flat_players["a"].current.listed is True
-    assert flat_players["b"].current.listed is False
-    assert flat_players["b"].current.owner == "riv"
-    assert flat_players["a"].identity.name == "Alpha"
-    assert flat_players["b"].identity.name == "b"
-    assert players_from_flat() == {}
 
     print("ffcore.fixtures self-test OK")
 

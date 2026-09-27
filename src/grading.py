@@ -9,7 +9,8 @@ from pathlib import Path
 
 from ffcore.parse import text
 from ffcore.text import norm
-from ffcore.tidy import (DECISIONS, append_csv, clock_history,
+from ffcore.schedule import expectations
+from ffcore.tidy import (DECISIONS, append_csv, clock_history, current,
                          lock_order, read_csv, run_now, snapshot_stamp)
 
 __all__ = ["log_predictions", "load_actuals", "load_predictions", "pair",
@@ -19,8 +20,7 @@ __all__ = ["log_predictions", "load_actuals", "load_predictions", "pair",
 
 WINDOW_DAYS = 21
 PREDICTIONS = DECISIONS / "squad_log.csv"
-PREDICTION_COLS = ["observed_at", "ff_id", "player", "score", "ppm", "fix",
-                   "pj"]
+PREDICTION_COLS = ["observed_at", "ff_id", "player", "score", "pts", "pj"]
 
 
 def log_predictions(sc) -> None:
@@ -28,11 +28,14 @@ def log_predictions(sc) -> None:
     if not observed or observed in {r.get("observed_at")
                                     for r in read_csv(PREDICTIONS)}:
         return
+    per_j, first_of, rates, _rem, _played = expectations(
+        sc, set(sc.lookup), current("matches"))
     append_csv(PREDICTIONS, [
-        {"observed_at": observed, "ff_id": s.key, "player": s.name,
-         "score": "%.3f" % s.score, "ppm": "%.3f" % s.ppm,
-         "fix": "%.3f" % s.fix, "pj": "%.1f" % s.pj}
-        for s in (sc.score(r) for r in sc.lookup.values())], PREDICTION_COLS)
+        {"observed_at": observed, "ff_id": k,
+         "player": sc.lookup[k].get("name", ""),
+         "score": "%.3f" % (per_j[j][k][0] * per_j[j][k][1]),
+         "pts": "%.3f" % per_j[j][k][0], "pj": "%.1f" % rates[k].pj}
+        for k, j in first_of.items()], PREDICTION_COLS)
 
 
 def load_actuals(window_days: int | None = WINDOW_DAYS) -> list[dict]:
@@ -73,11 +76,15 @@ def load_predictions() -> dict[str, list[tuple[dt.datetime, dict]]]:
             continue
         if not key or when is None:
             continue
-        for col in ("fix", "ppm", "pj"):
-            try:
-                fac[col] = float(r[col])
-            except (KeyError, ValueError, TypeError):
-                fac[col] = None
+        try:
+            fac["pts"] = float(r["pts"]) if r.get("pts") else (
+                float(r["ppm"]) * float(r.get("fix") or 1.0))
+        except (KeyError, ValueError, TypeError):
+            fac["pts"] = None
+        try:
+            fac["pj"] = float(r["pj"])
+        except (KeyError, ValueError, TypeError):
+            fac["pj"] = None
         per.setdefault(key, []).append((when, fac))
     for v in per.values():
         v.sort(key=lambda t: t[0])
@@ -108,12 +115,12 @@ def pair(actuals: list[dict], preds, locks: dict[int, dt.datetime]
         fac = (_claim(a["keys"], preds, lock)
                if a["games_delta"] >= 1 and lock is not None else None)
         if fac is not None:
-            out.append(_graded_row(a, fac["score"], fix=fac.get("fix")))
+            out.append(_graded_row(a, fac["score"]))
     return out
 
 
 def _conditional(fac: dict) -> float:
-    return (fac.get("ppm") or 0.0) * (fac.get("fix") or 1.0)
+    return fac.get("pts") or 0.0
 
 
 def lagged_pair(actuals: list[dict], preds, locks: dict[int, dt.datetime],
@@ -209,8 +216,7 @@ def score_forecast(pred: dict[str, float], actual: dict[tuple, float],
 
 def backtest() -> list[dict]:
     from ffcore.score import build
-    from ffcore.tidy import (LINEUP_SOURCE, current, row_key, run_now,
-                             set_now)
+    from ffcore.tidy import LINEUP_SOURCE, set_now
 
     locks = clock_history().round_locks
     actual = _jornada_points()
@@ -221,7 +227,8 @@ def backtest() -> list[dict]:
             set_now(locks[j] - dt.timedelta(minutes=1))
             market = current("market")
             sc = build(market, current("lineups", LINEUP_SOURCE), run_now())
-            pred = {row_key(r): sc.score(r).score for r in market}
+            per_j = expectations(sc, set(sc.lookup), current("matches"))[0]
+            pred = {k: pts * p for k, (pts, p) in per_j.get(j, {}).items()}
             then = {k: fac["score"] for k in pred
                     if (fac := _claim([k], logged, locks[j])) is not None}
             out.append({"jornada": j, "pred": pred,
@@ -248,8 +255,8 @@ def compare(a: dict[str, dict], b: dict[str, dict]) -> list[dict]:
 def _selftest() -> None:
     t0 = dt.datetime(2026, 8, 1, tzinfo=dt.timezone.utc)
     day = dt.timedelta(days=1)
-    preds = {"7": [(t0, {"score": 4.0, "ppm": 5.0, "fix": 1.2, "pj": 10.0}),
-                   (t0 + 5 * day, {"score": 6.0, "ppm": 6.0, "fix": 1.0,
+    preds = {"7": [(t0, {"score": 4.0, "pts": 6.0, "pj": 10.0}),
+                   (t0 + 5 * day, {"score": 6.0, "pts": 6.0,
                                    "pj": 12.0})]}
     actuals = [
         {"name": "A", "keys": ["7"], "points_delta": 10.0, "games_delta": 2.0, "jornada": 2},
@@ -259,8 +266,8 @@ def _selftest() -> None:
         {"name": "A", "keys": ["7"], "points_delta": 5.0, "games_delta": 1.0, "jornada": 1}]
     locks = {1: t0 + 2 * day, 2: t0 + 4 * day, 3: t0 + 8 * day}
     got = pair(actuals, preds, locks)
-    assert [(g["predicted"], g["err"], g["fix"]) for g in got] == [
-        (8.0, -2.0, 1.2), (6.0, 3.0, 1.0), (4.0, -1.0, 1.2)], got
+    assert [(g["predicted"], g["err"]) for g in got] == [
+        (8.0, -2.0), (6.0, 3.0), (4.0, -1.0)], got
     assert pair(actuals, preds, {}) == []
     lag0 = lagged_pair(actuals, preds, locks, 0)
     assert [(g["jornada"], g["per_match"], g["pj"]) for g in lag0] == [

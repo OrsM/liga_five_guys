@@ -3,23 +3,29 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from ffcore.score import MAX_SLOT, SHAPES, _xi_search
+from ffcore.score import FREE_FORMATIONS, MAX_SLOT
 
 __all__ = ["LeagueState", "Standings", "simulate",
            "simulate_many", "best_xi"]
 
 XI_SIZE = 11
+SHAPES = [{"POR": 1, "DEF": d, "MED": m, "DEL": f} for d, m, f in FREE_FORMATIONS]
 
 
 def best_xi(squad: dict[str, str], value: dict[str, float]) -> list[str]:
-    by_slot: dict[str, list[tuple]] = {}
+    by_slot: dict[str, list[float]] = {}
     for k, slot in squad.items():
-        by_slot.setdefault(slot, []).append((k, value.get(k, 0.0)))
-    for slot in by_slot:
-        by_slot[slot].sort(key=lambda kv: -kv[1])
-
-    got = _xi_search(by_slot, SHAPES)
-    return got[2] if got else []
+        by_slot.setdefault(slot, []).append((value.get(k, 0.0), k))
+    for rows in by_slot.values():
+        rows.sort(key=lambda vk: -vk[0])
+    best = None
+    for shape in SHAPES:
+        if all(len(by_slot.get(slot, ())) >= n for slot, n in shape.items()):
+            picked = [vk for slot, n in shape.items() for vk in by_slot[slot][:n]]
+            total = sum(v for v, _k in picked)
+            if best is None or total > best[0]:
+                best = (total, [k for _v, k in picked])
+    return best[1] if best else []
 
 
 @dataclass

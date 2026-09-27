@@ -73,7 +73,7 @@ def cell(u, k, group, place, money=None, pts=None, note="", value=None,
          market=None, premium=None) -> dict:
     exp, _xi = u.current_xi
     return {"name": title_name(u.view("name").get(k, k)),
-            "pos": u.view("pos").get(k, ""), "start": u.view("start").get(k, 0.0),
+            "pos": u.view("pos").get(k, ""), "start": u.next_up.get(k, (0.0, 0.0))[1],
             "xpts": exp.get(k, 0.0), "group": group, "where": place,
             "label": GROUP_LABEL[group], "money": money, "pts": pts,
             "note": note, "value": value, "market": market, "premium": premium}
@@ -199,11 +199,7 @@ def log_cash_price(measured) -> None:
 
 def _selftest() -> None:
     from decide import Universe
-    from ffcore.crosswalk import Player
-    from ffcore.fixtures import players_from_flat, tiny_profile
     from ffcore.forecast import Bootstrap
-    from ffcore.profile import (PlayerCurrent, PlayerDerived,
-                                PlayerProfile)
     from ffcore.season import LeagueState, Standings
 
     best = ["gk", "d1", "d2", "d3", "d4", "m1", "m2", "m3", "m4", "m5", "f1"]
@@ -220,7 +216,7 @@ def _selftest() -> None:
     u = Universe(state=LeagueState({"me": {}, "riv": {}}, [1, 2], "me",
                                    carried={"me": 17.0, "riv": 23.0}),
                  forecaster=Bootstrap({}, pool=[1, 2, 3]), cash=23.6e6, me="me",
-                 players=players_from_flat(
+                 facts=dict(
                      name={"yuri": "yuri berchiche",
                            "benat": "benat turrientes"}))
     rows = [{"action": Action("swap", buy="yuri", sell="benat",
@@ -239,7 +235,7 @@ def _selftest() -> None:
                   forecaster=Bootstrap({1: {k: (v, 1.0) for k, v in val.items()},
                                         2: {k: (v, 1.0) for k, v in val.items()}}),
                   cash=0.0, me="me",
-                  players=players_from_flat(
+                  facts=dict(
                       pos=dict(sq),
                       proceeds={"spare_m": 7.45e6, "spare_k": 4.73e6, "d1": 9e6},
                       name={"spare_m": "benat turrientes",
@@ -293,14 +289,9 @@ def _selftest() -> None:
                  "dud": (3.0, 1.0),
                  "wished": (6.5, 1.0)} for j in (1, 2)}),
         cash=10e6, me="me",
-        players={k: PlayerProfile(
-            identity=Player(player_id=k, name=k),
-            current=PlayerCurrent(
-                pos="MED", price=uc_price.get(k), owner=uc_owner.get(k),
-                route=uc_route.get(k), value=uc_value.get(k),
-                listed=k in uc_price),
-            derived=PlayerDerived(pj=5.0))
-            for k in uc_price})
+        facts={"pos": dict.fromkeys(uc_price, "MED"), "price": uc_price,
+               "owner": uc_owner, "route": uc_route, "value": uc_value,
+               "pj": dict.fromkeys(uc_price, 5.0)})
     lad = ladder_rows(uc, all_rows, {}, xi_change([], []))
     by_group = {}
     for r in lad:
@@ -315,10 +306,10 @@ def _selftest() -> None:
     u_pos = Universe(
         state=LeagueState({"me": {}}, [1], "me"), forecaster=Bootstrap({}),
         cash=0.0, me="me",
-        players={key: tiny_profile(key, pos=pos) for key, pos in {
+        facts={"pos": {
             "a": "POR", "b": "DEF", "c": "DEF", "d": "DEF", "e": "DEF",
             "f": "MED", "g": "MED", "h": "MED", "i": "MED", "j": "DEL",
-            "k": "DEL"}.items()})
+            "k": "DEL"}})
     assert by_slot(u_pos, ["j", "f", "a", "b"]) == ["a", "b", "f", "j"]
     assert shape(u_pos, list("abcdefghijk")) == "4-4-2"
     assert shape(u_pos, ["a", "b", "c", "d", "f", "g"]) == "3-2-0"
@@ -338,7 +329,7 @@ def _selftest() -> None:
                   forecaster=Bootstrap(perb, matches={k: 30 for k in
                                                       (*sqb, *riv, "cand")}),
                   cash=10e6, me="me",
-                  players=players_from_flat(
+                  facts=dict(
                       pos={**sqb, "cand": "MED"}, price={"cand": 5e6},
                       proceeds={"dead": 1e6, "star": 20e6}))
     asked = dict(band_acts(ub))

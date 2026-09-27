@@ -4,15 +4,15 @@ from __future__ import annotations
 import statistics
 from typing import NamedTuple
 
-from ffcore.parse import money, pct100, ratio, text
-from ffcore.lineupweight import line_rows
-from ffcore.startprob import NEUTRAL_START, Calibration, calibrate, outcomes
+from ffcore.parse import pct100, ratio, text
+from ffcore.startprob import (NEUTRAL_START, Calibration, calibrate, line_rows,
+                              outcomes)
 from ffcore.text import norm
 from ffcore.tidy import (current, minutes_played, row_key)
 
 __all__ = ["SLOT", "SLOT_LABEL", "SLOT_MIN", "MAX_SLOT", "FREE_FORMATIONS",
-           "SHAPES", "starters_per_slot", "Rating", "Scorer", "pick_xi",
-           "squad_pool", "replacement", "vor", "build"]
+           "starters_per_slot", "Rating", "Rates", "Scorer", "squad_pool",
+           "replacement", "vor", "build"]
 
 SLOT = {
     "portero": "POR",
@@ -237,7 +237,7 @@ def _fit_decay(by_key: dict) -> float:
 
 def build(market: list[dict], xi_rows: list[dict], now,
           shrink_k: float = SHRINK_K) -> "Scorer":
-    from ffcore.fixture import difficulty_ratings, fit_home_edge, fixture_board
+    from ffcore.fixture import difficulty_ratings, fit_home_edge
     from ffcore.tidy import (LINEUP_SOURCE, SEASON, history,
                              SECOND_SOURCE, clock_history, jornada_of_match, load_crosswalk,
                              load_perjornada,
@@ -254,7 +254,6 @@ def build(market: list[dict], xi_rows: list[dict], now,
     decay = _fit_decay(by_key)
     us25, us26 = ([r for r in current("understat_players") if r["season"] == y]
                   for y in ("2025", "2026"))
-    pos = {row_key(r): (r.get("position") or "").lower() for r in market}
     results = current("results_history")
     ratings = difficulty_ratings(
         market, results,
@@ -270,15 +269,11 @@ def build(market: list[dict], xi_rows: list[dict], now,
     return Scorer(
         market, xi_rows, last_season, shrink_k=shrink_k, xw=xw, cal=cal,
         second=second, ratings=ratings,
-        board=fixture_board(ratings, current("matches"), now),
         current={k: dict(zip(("pts", "pj", "start_rate", "start_n"),
                              _weighted(jd, decay)))
                  for k, jd in by_key.items()},
-        evidence={"xg": xg_evidence(us25, us26, last_season, xw)},
+        xg=xg_evidence(us25, us26, last_season, xw),
         promoted_discount=fit_promoted_discount(market, last_season, perjornada))
-
-
-SHAPES = [{"POR": 1, "DEF": d, "MED": m, "DEL": f} for d, m, f in FREE_FORMATIONS]
 
 
 class Rating(NamedTuple):
@@ -288,37 +283,22 @@ class Rating(NamedTuple):
     pj: float = 0.0
 
 
-class Scored(NamedTuple):
-    name: str
+class Rates(NamedTuple):
     key: str
     slot: str
-    pos: str
-    score: float
-    flat: float
     ppm: float
-    pct: float | None
-    pct_used: float
-    pct_rest: float
-    on_page: bool
+    p_now: float
+    p_rest: float
     status: str
-    assumed: bool
-    value: float
-    fix: float = 1.0
-    opp: str = ""
-    home: bool = True
-    cur_pj: float = 0.0
-    pj: float = 0.0
-
-    def as_row(self) -> dict:
-        return dict(self._asdict())
+    pj: float
 
 
 class Scorer:
 
     def __init__(self, market: list[dict], xi: list[dict],
                  last_season: dict | None = None, shrink_k: float = SHRINK_K,
-                 current: dict | None = None, board: dict | None = None,
-                 cal=None, second=None, evidence: dict | None = None,
+                 current: dict | None = None,
+                 cal=None, second=None, xg: dict | None = None,
                  promoted_discount: float = PROMOTED_DISCOUNT, xw=None,
                  ratings=None):
         from ffcore.tidy import load_crosswalk
@@ -328,8 +308,7 @@ class Scorer:
         self.shrink_k = shrink_k
         self.promoted_discount = promoted_discount
         self.current = current or {}
-        self.board = board or {}
-        self.evidence = evidence or {}
+        self.xg = xg or {}
         self.ratings = ratings
         self.lookup: dict[str, dict] = {row_key(r): r for r in market
                                         if r.get("name")}
@@ -376,71 +355,35 @@ class Scorer:
         c = self.current.get(key)
         cur_pj = float(c["pj"]) if c and c["pj"] > 0 else 0.0
         terms = ([(k, base)] + ([(cur_pj, c["pts"] / cur_pj)] if cur_pj else [])
-                 + [e for t in self.evidence.values()
-                    if (e := t.get(key)) and e[0] > 0])
+                 + [e for e in [self.xg.get(key)] if e and e[0] > 0])
         return Rating(sum(w * m for w, m in terms) / sum(w for w, _ in terms),
                       not prior_pj and cur_pj < k, cur_pj, prior_pj + cur_pj)
 
-    def score(self, rec: dict) -> Scored:
+    def rates(self, rec: dict) -> Rates:
         key = row_key(rec)
-        st = self.status.get(key, "")
-        pct = self.start_pct.get(key)
-        on_page = key in self.listed
         rating = self.rate(rec)
-
+        pct = self.start_pct.get(key)
         raw = pct if pct is not None else (
-            self.cal.neutral_start if on_page else self.cal.absent_start)
-        pct_used = 100.0 * self.cal.p(raw, self.second.get(key))
+            self.cal.neutral_start if key in self.listed else self.cal.absent_start)
+        p_now = self.cal.p(raw, self.second.get(key))
+        p_rest = p_now
         cur = self.current.get(key)
         start_n = cur.get("start_n", 0.0) if cur else 0.0
         if start_n > 0.0:
-            k_s, k_l = self.shrink_k, self.cal.lineup_k or self.shrink_k
-            pct_rest = (k_s * NEUTRAL_START + start_n * 100.0
-                       * cur["start_rate"]) / (k_s + start_n)
-            pct_used = (k_l * pct_used + start_n * 100.0 * cur["start_rate"]
-                       ) / (k_l + start_n)
-        else:
-            pct_rest = pct_used
-        m = self.board.get(rec.get("club"))
-        slot = SLOT.get((rec.get("position") or "").lower(), "")
-        fix_factor = (m.def_factor if slot in ("POR", "DEF")
-                     else m.atk_factor) if m else 1.0
-        flat = rating.ppm * pct_used / 100.0
-        score = flat * fix_factor
-        mult = status_multiplier(st)
-        score *= mult
-        flat *= mult
-
-        return Scored(
-            name=rec.get("name", key), key=key,
-            slot=slot,
-            pos=(rec.get("position") or "").lower(),
-            score=score, flat=flat, fix=fix_factor,
-            opp=m.opponent if m else "", home=m.home if m else True,
-            cur_pj=rating.cur_pj, pj=rating.pj,
-            ppm=rating.ppm, pct=pct, pct_used=pct_used, pct_rest=pct_rest,
-            on_page=on_page, status=st,
-            assumed=rating.assumed,
-            value=money(rec.get("value")) or 0.0,
-        )
-
-    def score_squad(self, names) -> tuple[list[Scored], list[str]]:
-        out, missing = [], []
-        for n in names:
-            r = self.lookup.get(n)
-            if r is None:
-                missing.append(n)
-            else:
-                out.append(self.score(r))
-        return out, missing
+            k_l = self.cal.lineup_k or self.shrink_k
+            p_rest = ((self.shrink_k * NEUTRAL_START / 100.0
+                       + start_n * cur["start_rate"]) / (self.shrink_k + start_n))
+            p_now = (k_l * p_now + start_n * cur["start_rate"]) / (k_l + start_n)
+        return Rates(key, SLOT.get((rec.get("position") or "").lower(), ""),
+                     rating.ppm, p_now, p_rest, self.status.get(key, ""),
+                     rating.pj)
 
 
 def squad_pool(scored) -> dict[str, list[dict]]:
     pool: dict[str, list[dict]] = {}
     for p in scored:
-        row = p.as_row() if isinstance(p, Scored) else p
-        if row.get("slot"):
-            pool.setdefault(row["slot"], []).append(row)
+        if p.get("slot"):
+            pool.setdefault(p["slot"], []).append(p)
     for v in pool.values():
         v.sort(key=lambda p: p["score"], reverse=True)
     return pool
@@ -475,71 +418,10 @@ def vor(row: dict, repl: dict) -> float:
     return row.get("score", 0.0) - repl.get(slot, 0.0)
 
 
-def _xi_search(by_slot: dict[str, list], shapes, force=None):
-    if force is None:
-        prefix: dict[str, list[float]] = {}
-        for slot, items in by_slot.items():
-            acc, ps = 0.0, [0.0]
-            for _, v in items:
-                acc += v
-                ps.append(acc)
-            prefix[slot] = ps
-
-        best = None
-        for shape in shapes:
-            picked, total, ok = [], 0.0, True
-            for slot, n in shape.items():
-                items = by_slot.get(slot, [])
-                if len(items) < n:
-                    ok = False
-                    break
-                picked += [it for it, _ in items[:n]]
-                total += prefix[slot][n]
-            if ok and (best is None or total > best[0]):
-                best = (total, shape, picked)
-        return best
-
-    f_item, f_slot, f_val = force
-    best = None
-    for shape in shapes:
-        if not f_slot or shape.get(f_slot, 0) < 1:
-            continue
-        picked, ok = [], True
-        for slot, n in shape.items():
-            items = by_slot.get(slot, [])
-            if slot == f_slot:
-                rest = [it for it in items if it[0] is not f_item][:n - 1]
-                take = [(f_item, f_val)] + rest
-            else:
-                take = items[:n]
-            if len(take) < n:
-                ok = False
-                break
-            picked += take
-        if not ok:
-            continue
-        total = sum(v for _, v in picked)
-        if best is None or total > best[0]:
-            best = (total, shape, [it for it, _ in picked])
-    return best
-
-
-def pick_xi(pool: dict, force: dict | None = None):
-    by_slot = {slot: [(p, p["score"]) for p in rows]
-              for slot, rows in pool.items()}
-    f = (force, force["slot"], force["score"]) if force is not None else None
-    got = _xi_search(by_slot, SHAPES, f)
-    if got is None:
-        return None
-    total, shape, picked = got
-    return total, (shape["DEF"], shape["MED"], shape["DEL"]), picked
-
-
 def _selftest() -> None:
     assert status_multiplier("injured") == 0.0 and status_multiplier("doubt") == DOUBT_FACTOR
     assert status_multiplier("injured", {"injured": 0.5}) == 0.5
     assert status_multiplier("ok", {"injured": 0.5}) == 1.0
-    from ffcore.fixture import Match
 
     row = {"position": "defensa", "team": "Mid", "club": "Mid",
            "value": "10.00M"}
@@ -606,29 +488,11 @@ def _selftest() -> None:
                   current={"p0": {"pts": 0.0, "pj": 0.0}}, xw=xw).rate(dict(row, name="p0")) \
         == full
 
-    when = __import__("datetime").datetime.fromisoformat(
-        "2026-08-20T19:00:00+00:00")
-    easy = Match("Elche", True, when, atk_factor=1.30, def_factor=1.10)
-    sc3 = Scorer(market, xi, hist, board={"Mid": easy}, xw=xw)
-    s = sc3.score(dict(row, name="p0"))
-    assert abs(s.flat - full.ppm) < 1e-9
-    assert abs(s.score - full.ppm * 1.10) < 1e-9
-    assert s.opp == "Elche" and s.home and s.fix == 1.10
-    fwd = sc3.score(dict(row, name="p0", position="delantero"))
-    assert abs(fwd.score - full.ppm * 1.30) < 1e-9, fwd
-    assert fwd.fix == 1.30
-    solo = Scorer(market, xi, hist, board={}, xw=xw).score(dict(row, name="p0"))
-    assert solo.fix == 1.0 and solo.opp == "" and solo.score == solo.flat
-
-    out = [{"player_name": "p0", "start_pct": "100", "status": "suspended"}]
-    zero = Scorer(market, out, hist, board={"Mid": easy}, xw=xw).score(dict(row, name="p0"))
-    assert zero.score == 0.0 and zero.flat == 0.0
     dbt = [{"player_name": "p0", "start_pct": "100", "status": "doubt"}]
-    half = Scorer(market, dbt, hist, board={"Mid": easy}, xw=xw).score(dict(row, name="p0"))
-    assert abs(half.flat - full.ppm * DOUBT_FACTOR) < 1e-9
-    assert abs(half.score - full.ppm * 1.10 * DOUBT_FACTOR) < 1e-9
-
-    assert "fix" in s.as_row() and "flat" in s.as_row()
+    r0 = Scorer(market, dbt, hist, xw=xw).rates(dict(row, name="p0"))
+    assert (r0.key, r0.slot, r0.status, r0.p_now, r0.p_rest) == (
+        "p0", "DEF", "doubt", 1.0, 1.0), r0
+    assert abs(r0.ppm - full.ppm) < 1e-9 and r0.pj == full.pj
 
     per = starters_per_slot()
     assert per == {"POR": 1.0, "DEF": 4.0, "MED": 4.0, "DEL": 2.0}, per
@@ -642,27 +506,17 @@ def _selftest() -> None:
     assert vor({"slot": "DEL", "score": 6.0}, repl) == -2.0
     assert vor({"slot": ""}, repl) == 0.0
 
-    benched_cur = {"p0": {"pts": 30.0, "pj": 3.0,
-                          "start_rate": 0.0, "start_n": 6.0}}
-    sc4 = Scorer(market, xi, hist, current=benched_cur, board={"Mid": easy}, xw=xw)
-    benched_s = sc4.score(dict(row, name="p0"))
-    assert benched_s.pct_used < 100.0, benched_s.pct_used
-    assert abs(benched_s.pct_used - 800.0 / 14.0) < 1e-9, benched_s.pct_used
-
-    untouched = Scorer(market, xi, hist, current={}, board={"Mid": easy}
-                       , xw=xw).score(dict(row, name="p0"))
-    assert untouched.pct_used == 100.0, untouched.pct_used
-    assert untouched.pct_rest == 100.0, untouched.pct_rest
-
-    starter_cur = {"p0": {"pts": 30.0, "pj": 2.0,
-                          "start_rate": 0.9, "start_n": 2.0}}
+    benched = Scorer(market, xi, hist, xw=xw, current={"p0": {
+        "pts": 30.0, "pj": 3.0, "start_rate": 0.0, "start_n": 6.0}}).rates(
+        dict(row, name="p0"))
+    assert abs(benched.p_now - 8.0 / 14.0) < 1e-9, benched
     susp = [{"player_name": "p0", "start_pct": "0", "status": "suspended"}]
-    sc5 = Scorer(market, susp, hist, current=starter_cur, board={"Mid": easy}, xw=xw)
-    susp_s = sc5.score(dict(row, name="p0"))
-    assert abs(susp_s.pct_used - (8 * 0.0 + 2 * 90.0) / 10) < 1e-9, susp_s
-    assert abs(susp_s.pct_rest - (8 * NEUTRAL_START + 2 * 90.0) / 10) < 1e-9, \
-        susp_s
-    assert susp_s.pct_rest > susp_s.pct_used + 25.0, susp_s
+    back = Scorer(market, susp, hist, xw=xw, current={"p0": {
+        "pts": 30.0, "pj": 2.0, "start_rate": 0.9, "start_n": 2.0}}).rates(
+        dict(row, name="p0"))
+    assert abs(back.p_now - 2 * 0.9 / 10) < 1e-9, back
+    assert abs(back.p_rest - (8 * NEUTRAL_START / 100 + 2 * 0.9) / 10) < 1e-9
+    assert back.status == "suspended"
 
     from ffcore.crosswalk import Crosswalk, Player
 
@@ -755,13 +609,11 @@ def _selftest() -> None:
     fwd = dict(row, name="Attacker", position="delantero")
     plain = Scorer(market_xg, xi_xg, hist_xg, xw=xw).rate(fwd)
     expect = (SHRINK_K * plain.ppm + 2.0 * 10.0) / (SHRINK_K + 2.0)
-    for label in ("xg", "other"):
-        got = Scorer(market_xg, xi_xg, hist_xg, xw=xw,
-                     evidence={label: {"attacker": (2.0, 10.0)}}).rate(fwd)
-        assert abs(got.ppm - expect) < 1e-9, (label, got, expect)
-        assert got.cur_pj == 0.0 and got.pj == 34.0, got
-    assert Scorer(market_xg, xi_xg, hist_xg, xw=xw,
-                  evidence={"xg": {}}).rate(fwd) == plain
+    got = Scorer(market_xg, xi_xg, hist_xg, xw=xw,
+                 xg={"attacker": (2.0, 10.0)}).rate(fwd)
+    assert abs(got.ppm - expect) < 1e-9, (got, expect)
+    assert got.cur_pj == 0.0 and got.pj == 34.0, got
+    assert Scorer(market_xg, xi_xg, hist_xg, xw=xw, xg={}).rate(fwd) == plain
 
     print("ffcore.score self-test OK")
 
