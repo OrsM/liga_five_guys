@@ -8,7 +8,8 @@ from ffcore.parse import text
 from ffcore.crosswalk import Crosswalk, Player
 from ffcore.parse import money
 from ffcore.text import norm, tokens
-from ffcore.tidy import (current, history, TIDY, row_key)
+from ffcore.players import row_key
+from ffcore.tidy import current, history, TIDY
 
 PLAYERS = "players.csv"
 

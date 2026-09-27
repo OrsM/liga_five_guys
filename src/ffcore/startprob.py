@@ -8,7 +8,7 @@ from typing import NamedTuple
 import numpy as np
 
 from ffcore.text import norm
-from ffcore.tidy import minutes_played
+from ffcore.points import minutes_played
 
 __all__ = ["Obs", "Outcome", "Calibration", "calibrate", "fit", "outcomes",
            "observations", "fit_start_fallbacks", "NEUTRAL_START",

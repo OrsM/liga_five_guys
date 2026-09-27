@@ -7,7 +7,9 @@ from typing import NamedTuple
 from ffcore.parse import pct100, ratio, text
 from ffcore.startprob import NEUTRAL_START, Calibration, calibrate, outcomes
 from ffcore.text import norm
-from ffcore.tidy import Scored, current, minutes_played, row_key
+from ffcore.players import row_key
+from ffcore.points import Scored, minutes_played
+from ffcore.tidy import current
 
 __all__ = ["SLOT", "SLOT_LABEL", "SLOT_MIN", "MAX_SLOT", "FREE_FORMATIONS",
            "starters_per_slot", "Rating", "Rates", "Scorer", "squad_pool",
@@ -126,10 +128,10 @@ def _totals(per_jornada: dict[int, tuple[float, float]]
 
 def build(market: list[dict], xi_rows: list[dict], now) -> "Scorer":
     from ffcore.fixture import difficulty_ratings
-    from ffcore.tidy import (LINEUP_SOURCE, SEASON, history,
-                             clock_history, jornada_of_match, load_crosswalk,
-                             scored,
-                             read_csv)
+    from ffcore.jornadas import clock_history, jornada_of_match
+    from ffcore.players import load_crosswalk
+    from ffcore.points import scored
+    from ffcore.tidy import LINEUP_SOURCE, SEASON, history, read_csv
 
     xw = load_crosswalk()
     files = sorted(SEASON.glob("points_*.csv"))
@@ -177,7 +179,7 @@ class Scorer:
                  cal=None,
                  promoted_discount: float = PROMOTED_DISCOUNT, xw=None,
                  ratings=None):
-        from ffcore.tidy import load_crosswalk
+        from ffcore.players import load_crosswalk
 
         self.market = market
         self.last_season = last_season or {}

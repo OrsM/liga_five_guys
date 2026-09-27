@@ -9,8 +9,10 @@ import sys
 from pathlib import Path
 
 from ffcore.schedule import expectations
-from ffcore.tidy import (clock_history, current,
-                         run_now, scored)
+from ffcore.clock import run_now
+from ffcore.jornadas import clock_history
+from ffcore.points import scored
+from ffcore.tidy import current
 
 __all__ = ["backtest", "compare", "persistence", "score_forecast"]
 
@@ -37,7 +39,8 @@ def score_forecast(pred: dict[str, float], actual: dict[tuple, float],
 
 def backtest() -> list[dict]:
     from ffcore.score import build
-    from ffcore.tidy import LINEUP_SOURCE, set_now
+    from ffcore.clock import set_now
+    from ffcore.tidy import LINEUP_SOURCE
 
     locks = clock_history().round_locks
     actual = _jornada_points()

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 
 def rounds_left(matches) -> tuple[list[int], dict[int, set[str]]]:
-    from ffcore.tidy import JornadaClock
+    from ffcore.jornadas import JornadaClock
 
     js = {r["jornada"] for r in matches if (r.get("jornada") or "").isdigit()}
     finished = {j for j in js

@@ -21,8 +21,9 @@ from urllib.parse import urlparse
 
 from ffcore.auth import API_BASE
 from ffcore.league import load_config
-from ffcore.tidy import (TABLES, Table, ROOT, SEASON, TIDY, append_csv, csv_string, read_csv,
-                         table_stats, widen_csv, write_csv)
+from ffcore.tidy import (TABLES, Table, ROOT, SEASON, TIDY, append_csv,
+                         csv_string, read_csv, table_stats, widen_csv,
+                         write_csv)
 from ffcore.futbolfantasy import (CAL_KEY, MATCH_KEY_RE, parse_points,
                                   played_sources, season_label)
 from ffcore.laliga_api import (API_LEAGUES_KEY, ROW_TABLE, league_sources,
@@ -174,7 +175,7 @@ def page_sig(src, text: str) -> str | None:
 
 
 def due(src, prev: dict, now: str) -> bool:
-    from ffcore.tidy import snapshot_stamp
+    from ffcore.clock import snapshot_stamp
 
     if src.cadence == "once":
         return src.key not in prev

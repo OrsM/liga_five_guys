@@ -6,8 +6,9 @@ from functools import lru_cache
 
 from ffcore.footballdata import fd_sources
 from ffcore.futbolfantasy import (CAL_KEY, FF_CAL_URL, MARKET_URL, POINTS_URL,
-                                  TEAM_URL, TEAMS, match_source, parse_calendar,
-                                  parse_market, parse_points, parse_team)
+                                  TEAM_URL, TEAMS, match_source,
+                                  parse_calendar, parse_market, parse_points,
+                                  parse_team)
 from ffcore.laliga_api import (API_LEAGUES_KEY, API_LEAGUES_URL,
                                API_PLAYERS_ALL_URL, api_source, offer_source,
                                parse_api_leagues, parse_api_players_all)

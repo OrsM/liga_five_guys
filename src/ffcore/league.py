@@ -6,7 +6,8 @@ from dataclasses import dataclass
 
 from ffcore.parse import money, text
 from ffcore.text import norm
-from ffcore.tidy import current, input_path, load_crosswalk
+from ffcore.players import load_crosswalk
+from ffcore.tidy import current, input_path
 
 __all__ = ["Config", "load_config", "app_fielded", "estimate_cash", "League"]
 

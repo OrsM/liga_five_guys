@@ -1,31 +1,21 @@
-
 from __future__ import annotations
 
 import csv
 import io
 import os
-import re
 import sys
 from contextlib import contextmanager
-from datetime import datetime, timedelta, timezone
-from functools import lru_cache
 from pathlib import Path
 from types import MappingProxyType
 from typing import NamedTuple
 
-from ffcore.parse import money, pct100
-from ffcore.text import norm
+from ffcore.clock import on_reset, run_now, snapshot_stamp
 
-__all__ = ["ROOT", "TIDY", "SEASON", "DECISIONS", "REPORTS", "MADRID",
-           "TABLES", "Table", "current", "history", "age_hours", "set_now",
+__all__ = ["ROOT", "TIDY", "SEASON", "DECISIONS", "REPORTS", "TABLES", "Table",
+           "current", "history", "age_hours", "table_path", "tables_in",
            "input_path", "read_csv", "write_csv", "append_csv", "widen_csv",
-           "log_row", "csv_string", "snapshot_stamp",
-           "row_key", "run_now", "load_crosswalk",
-           "load_players", "load_deadline",
-           "LINEUP_SOURCE", "kickoff_stamp", "MATCH_LEN",
-           "minutes_played",
-           "lock_order", "JornadaClock", "shown", "table_stats",
-           "scored", "Scored", "clock", "clock_history", "jornada_of_match"]
+           "log_row", "csv_string", "mtime_cached", "table_stats",
+           "LINEUP_SOURCE"]
 
 ROOT = Path(os.environ.get("FF_ROOT", "./data"))
 TIDY = ROOT / "tidy"
@@ -34,15 +24,19 @@ DECISIONS = ROOT / "decisions"
 REPORTS = Path(os.environ.get("LFG_REPORTS", "reports"))
 
 
-def _madrid():
+def table_path(name: str) -> Path:
+    return TIDY / f"{name}.csv"
+
+
+@contextmanager
+def tables_in(path: Path):
+    global TIDY
+    real = TIDY
+    TIDY = Path(path)
     try:
-        from zoneinfo import ZoneInfo
-        return ZoneInfo("Europe/Madrid")
-    except Exception:                                    # pragma: no cover
-        return timezone(timedelta(hours=2))
-
-
-MADRID = _madrid()
+        yield TIDY
+    finally:
+        TIDY = real
 
 
 def input_path(name: str) -> Path:
@@ -57,7 +51,7 @@ def _forget(path) -> None:
     _READ_CACHE.pop(str(Path(path)), None)
 
 
-def _mtime_cached(path, cache: dict, key, build, *args):
+def mtime_cached(path, cache: dict, key, build, *args):
     path = Path(path)
     try:
         st = path.stat()
@@ -79,7 +73,7 @@ def _parse_csv(path) -> list[dict]:
 
 
 def read_csv(path) -> list[dict]:
-    rows = _mtime_cached(path, _READ_CACHE, str(Path(path)), _parse_csv, path)
+    rows = mtime_cached(path, _READ_CACHE, str(Path(path)), _parse_csv, path)
     return [MappingProxyType(r) for r in (rows or [])]
 
 
@@ -145,30 +139,6 @@ def append_csv(path, rows, fieldnames=None) -> None:
         w.writerows(rows)
 
 
-def load_deadline(with_source: bool = False):
-    when = clock().next_deadline(run_now())
-    return (when, "calendar" if when else "none") if with_source else when
-
-
-@lru_cache(maxsize=4096)
-def _digits_to_dt(s: str, tz):
-    digits = re.sub(r"\D", "", s or "")
-    if len(digits) < 8:
-        return None
-    try:
-        return datetime(
-            int(digits[:4]), int(digits[4:6]), int(digits[6:8]),
-            int(digits[8:10]) if len(digits) >= 10 else 0,
-            int(digits[10:12]) if len(digits) >= 12 else 0,
-            tzinfo=tz)
-    except ValueError:
-        return None
-
-
-def snapshot_stamp(s: str):
-    return _digits_to_dt(s, timezone.utc)
-
-
 class Table(NamedTuple):
     snapshot: bool
     key: tuple = ()
@@ -200,14 +170,14 @@ def _cut() -> str:
 
 def history(name: str, source: str = "") -> list:
     cut = _cut()
-    return [r for r in read_csv(TIDY / f"{name}.csv")
+    return [r for r in read_csv(table_path(name))
             if r.get("observed_at", "") <= cut
             and (not source or r.get("source") == source)]
 
 
 def _closed_days(name: str) -> dict[str, str]:
     out: dict[str, str] = {}
-    for r in read_csv(TIDY / f"{name}.csv"):
+    for r in read_csv(table_path(name)):
         stamp = r.get("observed_at", "")
         out[stamp[:10]] = max(out.get(stamp[:10], ""), stamp)
     return out
@@ -215,7 +185,7 @@ def _closed_days(name: str) -> dict[str, str]:
 
 def _current_rows(name: str, cut: str) -> tuple:
     spec = TABLES[name]
-    rows = sorted((r for r in read_csv(TIDY / f"{name}.csv")
+    rows = sorted((r for r in read_csv(table_path(name))
                    if r.get("observed_at", "") <= cut),
                   key=lambda r: r.get("observed_at", ""))
     if spec.snapshot:
@@ -236,7 +206,7 @@ _CURRENT_CACHE: dict = {}
 
 def current(name: str, source: str = "") -> list[dict]:
     cut = _cut()
-    rows = _mtime_cached(TIDY / f"{name}.csv", _CURRENT_CACHE, (name, cut),
+    rows = mtime_cached(table_path(name), _CURRENT_CACHE, (name, cut),
                          _current_rows, name, cut) or ()
     return [dict(r) for r in rows if not source or r.get("source") == source]
 
@@ -280,236 +250,10 @@ def table_stats(path, col: str = "observed_at") -> tuple[int, str]:
     return n, best
 
 
-_NOW: list = []
-
-
-def run_now() -> datetime:
-    if not _NOW:
-        pinned = os.environ.get("LFG_NOW", "").strip()
-        _NOW.append(snapshot_stamp(pinned) if pinned
-                    else datetime.now(timezone.utc))
-    return _NOW[0]
-
-
-def set_now(when: datetime | None) -> None:
-    _NOW[:] = [when] if when is not None else []
-    for cache in (_CURRENT_CACHE, _CLOCK, _CLOCK_HISTORY, _JORNADA_OF_MATCH):
-        cache.clear()
-
-
-def shown(t=None, fmt: str = "%Y-%m-%d %H:%M") -> str:
-    when = run_now() if t is None else t
-    return when.astimezone(MADRID).strftime(fmt + " %Z")
-
-
 LINEUP_SOURCE = "futbolfantasy"
 
 
-class Scored(NamedTuple):
-    key: str
-    jornada: int
-    pts: float
-    games: float
-    at: str
-
-
-def _club_matches() -> dict[str, list[tuple[str, int]]]:
-    when: dict[tuple, tuple[str, int]] = {}
-    for m in sorted(history("matches"), key=lambda r: r.get("observed_at", "")):
-        pair, jor = (m.get("home"), m.get("away")), m.get("jornada") or ""
-        if not str(jor).isdigit():
-            continue
-        kick = kickoff_stamp(m.get("kickoff"))
-        if kick is not None:
-            when[pair] = (kick.strftime("%Y-%m-%dT%H%MZ"), int(jor))
-        elif m.get("score") and pair not in when:
-            when[pair] = (m.get("observed_at", ""), int(jor))
-    out: dict[str, list[tuple[str, int]]] = {}
-    for pair, at in when.items():
-        for club in pair:
-            out.setdefault(club, []).append(at)
-    return {c: sorted(v) for c, v in out.items()}
-
-
-def scored() -> list[Scored]:
-    rows = history("points")
-    season = max((r.get("season") or "" for r in rows), default="")
-    rows = sorted((r for r in rows if r.get("season") == season),
-                  key=lambda r: r.get("observed_at", ""))
-    club = {r["ff_id"]: r.get("club") for r in current("market")
-            if r.get("ff_id")}
-    games = _club_matches()
-    every = sorted(at for v in games.values() for at in v)
-    first = rows[0]["observed_at"] if rows else ""
-    last: dict[str, tuple[float, float]] = {}
-    out = []
-    for r in rows:
-        key = (r.get("ff_id") or "").strip() or norm(
-            r.get("player_name_full") or r.get("player_name") or "")
-        now = (float(r["points"]), float(r["games"]))
-        before = last.get(key, (0.0, 0.0))
-        if not key or now == before:
-            continue
-        last[key] = now
-        at = r["observed_at"]
-        played = [j for t, j in games.get(club.get(key), every) if t <= at]
-        if at != first and played:
-            out.append(Scored(key, played[-1], now[0] - before[0],
-                              now[1] - before[1], at))
-    return out
-
-
-def kickoff_stamp(s: str):
-    try:
-        when = datetime.fromisoformat((s or "").strip())
-    except ValueError:
-        return None
-    return (when.replace(tzinfo=timezone.utc) if when.tzinfo is None
-            else when.astimezone(timezone.utc))
-
-
-_XW_CACHE: dict = {}
-
-
-def load_crosswalk():
-    from ffcore.crosswalk import Crosswalk
-    path = TIDY / "players.csv"
-    return _mtime_cached(path, _XW_CACHE, "xw", Crosswalk.read, path)
-
-
-MATCH_LEN = 90.0
-
-
-def minutes_played(role: str, raw_minute, match_len: float = MATCH_LEN) -> float:
-    raw = (raw_minute or "").strip()
-    if role == "starter":
-        mins = float(raw) if raw else match_len
-    elif role == "sub":
-        mins = (match_len - float(raw)) if raw else 0.0
-    else:
-        return 0.0
-    return max(0.0, mins)
-
-
-def lock_order(locks: dict[int, datetime]) -> list[int]:
-    return [j for j, _ in sorted(locks.items(), key=lambda kv: kv[1])]
-
-
-class JornadaClock:
-
-    def __init__(self, matches: list[dict]):
-        latest: dict[tuple, tuple[int, datetime]] = {}
-        for m in sorted(matches, key=lambda r: r.get("observed_at", "")):
-            when = kickoff_stamp(m.get("kickoff"))
-            jor = m.get("jornada") or ""
-            if when is not None and str(jor).isdigit():
-                latest[(m.get("home"), m.get("away"))] = (int(jor), when)
-        self.team_locks: dict[tuple[int, str], datetime] = {}
-        for (home, away), (jor, when) in latest.items():
-            for team in (home, away):
-                key = (jor, team)
-                if key not in self.team_locks or when < self.team_locks[key]:
-                    self.team_locks[key] = when
-
-        self.round_locks: dict[int, datetime] = {}
-        for (jor, _team), when in self.team_locks.items():
-            if jor not in self.round_locks or when < self.round_locks[jor]:
-                self.round_locks[jor] = when
-
-    def team_lock(self, jornada: int, team: str) -> datetime | None:
-        return self.team_locks.get((jornada, team))
-
-    def round_lock(self, jornada: int) -> datetime | None:
-        return self.round_locks.get(jornada)
-
-    @property
-    def order(self) -> list[int]:
-        return lock_order(self.round_locks)
-
-    def next_deadline(self, now: datetime) -> datetime | None:
-        ahead = [t for t in self.round_locks.values() if t > now]
-        return min(ahead) if ahead else None
-
-
-_CLOCK: list = []
-_CLOCK_HISTORY: list = []
-
-
-def clock() -> JornadaClock:
-    if not _CLOCK:
-        _CLOCK.append(JornadaClock(current("matches")))
-    return _CLOCK[0]
-
-
-def clock_history() -> JornadaClock:
-    if not _CLOCK_HISTORY:
-        rows = history("matches")
-        dated = {(r.get("home"), r.get("away")) for r in rows if r.get("kickoff")}
-        blind = {int(r["jornada"]) for r in rows
-                 if r.get("score") and str(r.get("jornada")).isdigit()
-                 and (r.get("home"), r.get("away")) not in dated}
-        full = JornadaClock(rows)
-        full.round_locks = {j: t for j, t in full.round_locks.items()
-                            if j not in blind}
-        _CLOCK_HISTORY.append(full)
-    return _CLOCK_HISTORY[0]
-
-
-_JORNADA_OF_MATCH: list = []
-
-
-def jornada_of_match() -> dict[str, int]:
-    if not _JORNADA_OF_MATCH:
-        out: dict[str, int] = {}
-        for m in current("matches"):
-            mid = (m.get("match_id") or "").strip()
-            if not mid or mid in out:
-                continue
-            try:
-                out[mid] = int(m.get("jornada"))
-            except (TypeError, ValueError):
-                continue
-        _JORNADA_OF_MATCH.append(out)
-    return _JORNADA_OF_MATCH[0]
-
-
-MARKET_FIELDS = [("team", "team", None), ("club", "club", None),
-                 ("pos", "position", None),
-                 ("value", "value", money), ("delta_1d", "delta_1d", money)]
-XI_FIELDS = [("club", "team_slug", None), ("start", "start_pct", pct100),
-             ("status", "status", None)]
-
-
-def _merge(players: dict, rows: list[dict], key_of, name_col: str,
-           fields) -> dict:
-    for r in rows:
-        key = key_of(r)
-        if not key:
-            continue
-        rec = players.setdefault(key, {})
-        rec.setdefault("name", (r.get(name_col) or "").strip())
-        for field, col, parse in fields:
-            raw = r.get(col)
-            if field in rec or raw in (None, ""):
-                continue
-            val = parse(raw) if parse else str(raw).strip()
-            if val is not None:
-                rec[field] = val
-    return players
-
-
-def load_players() -> dict[str, dict]:
-    market, xi = current("market"), current("lineups", LINEUP_SOURCE)
-    if not market and not xi:
-        raise SystemExit("no rows in %s — run `ingest.py parse` first" % TIDY)
-    xw = load_crosswalk()
-    players = _merge({}, market, row_key, "name", MARKET_FIELDS)
-    return _merge(players, xi, xw.key_of if xw else (lambda r: None),
-                  "player_name", XI_FIELDS)
-
-
-def row_key(row: dict) -> str:
-    return (row.get("ff_id") or "").strip() or norm(row.get("name"))
+on_reset(_CURRENT_CACHE.clear)
 
 
 def _selftest_cache() -> None:
@@ -538,167 +282,52 @@ def _selftest_cache() -> None:
         assert read_csv(Path(tmp) / "nope.csv") == []
 
 
-def _selftest_crosswalk_cache() -> None:
+def _selftest_tables() -> None:
     import tempfile
-    from ffcore.crosswalk import PLAYER_COLS
 
-    global TIDY
-    real_tidy = TIDY
-    with tempfile.TemporaryDirectory() as tmp:
-        TIDY = Path(tmp)
-        try:
-            assert load_crosswalk() is None
-            write_csv(TIDY / "players.csv",
-                     [{"player_id": "a", "name": "A", "club_id": "c"}],
-                     PLAYER_COLS)
-            xw1 = load_crosswalk()
-            assert xw1.players["a"].name == "A", xw1.players
-            assert load_crosswalk() is xw1
+    from ffcore.clock import set_now
 
-            write_csv(TIDY / "players.csv",
-                     [{"player_id": "a", "name": "Renamed", "club_id": "c"}],
-                     PLAYER_COLS)
-            xw2 = load_crosswalk()
-            assert xw2 is not xw1 and xw2.players["a"].name == "Renamed", \
-                xw2.players
-        finally:
-            TIDY = real_tidy
-            _XW_CACHE.clear()
-
-
-def _selftest_new_loaders() -> None:
-    import tempfile
-    global TIDY
-    real = TIDY
-    TIDY = Path(tempfile.mkdtemp())
     a, b, later = "2026-08-01T0900Z", "2026-08-02T0900Z", "2026-08-03T0900Z"
-    try:
-        write_csv(TIDY / "lineups.csv", [
-            {"observed_at": a, "source": "futbolfantasy", "player_name": "Ane"},
-            {"observed_at": b, "source": "analitica", "player_name": "Ane"},
-            {"observed_at": b, "source": "futbolfantasy", "player_name": "Bo"},
-            {"observed_at": a, "source": "analitica", "player_name": "Cai"},
-            {"observed_at": later, "source": "futbolfantasy",
-             "player_name": "Dan"}])
-        write_csv(TIDY / "api_activity.csv", [
-            {"observed_at": a, "activity_id": "1", "value": "0"},
-            {"observed_at": b, "activity_id": "1", "value": "1"},
-            {"observed_at": a, "activity_id": "2", "value": "5"}])
-        set_now(snapshot_stamp("2026-08-02T1200Z"))
-        for name, source, every, now in [
-                ("lineups", "", 4, ["Ane", "Bo"]),
-                ("lineups", "analitica", 2, ["Ane"]),
-                ("lineups", "futbolfantasy", 2, ["Bo"]),
-                ("lineups", "nobody", 0, [])]:
-            assert len(history(name, source)) == every, source
-            assert sorted(r["player_name"] for r in current(name, source)) \
-                == now, source
-        stats = {(r["activity_id"], r["value"]) for r in current("api_activity")}
-        assert stats == {("1", "1"), ("2", "5")}, stats
-        assert current("market") == [] and history("market") == []
-        assert age_hours("market") is None
-        assert abs(age_hours("lineups") - 3.0) < 1e-9
-        set_now(snapshot_stamp("2026-08-01T1000Z"))
-        assert stats != {(r["activity_id"], r["value"])
-                         for r in current("api_activity")}
-        set_now(snapshot_stamp("2026-08-04T0000Z"))
-        assert [r["player_name"] for r in current("lineups", "futbolfantasy")] \
-            == ["Dan"]
-
-        write_csv(TIDY / "market.csv", [
-            {"observed_at": a, "ff_id": "1", "club": "x"},
-            {"observed_at": a, "ff_id": "2", "club": "y"}])
-        write_csv(TIDY / "matches.csv", [
-            {"observed_at": a, "match_id": "m1", "jornada": "1", "home": "x",
-             "away": "y", "score": "", "kickoff": "2026-08-01T10:00:00+00:00"},
-            {"observed_at": later, "match_id": "m2", "jornada": "2",
-             "home": "x", "away": "z", "score": "1-0", "kickoff": ""}])
-        write_csv(TIDY / "points.csv", [
-            {"observed_at": a, "season": "2025-26", "ff_id": "1",
-             "points": "90", "games": "30"},
-            *({"observed_at": a, "season": "2026-27", "ff_id": k,
-               "points": "0", "games": "0"} for k in "12"),
-            {"observed_at": b, "season": "2026-27", "ff_id": "1",
-             "points": "5", "games": "1"},
-            {"observed_at": later, "season": "2026-27", "ff_id": "1",
-             "points": "12", "games": "2"},
-            {"observed_at": later, "season": "2026-27", "ff_id": "2",
-             "points": "3", "games": "1"}])
-        assert set(scored()) == {Scored("1", 1, 5.0, 1.0, b),
-                                 Scored("1", 2, 7.0, 1.0, later),
-                                 Scored("2", 1, 3.0, 1.0, later)}, scored()
-    finally:
-        TIDY = real
-        set_now(None)
-
-    c1 = clock()
-    c2 = clock()
-    assert c1 is c2, "clock() must return the SAME object on a second call"
-
-    _full = clock_history()
-    assert _full is clock_history(), "clock_history() must be memoized too"
-    assert set(c1.team_locks) <= set(_full.team_locks)
-    assert isinstance(c1, JornadaClock)
-
-    j1 = jornada_of_match()
-    j2 = jornada_of_match()
-    assert j1 is j2, "jornada_of_match() must be memoized"
-    expect: dict[str, int] = {}
-    for m in current("matches"):
-        mid = (m.get("match_id") or "").strip()
-        if mid and mid not in expect:
-            try:
-                expect[mid] = int(m.get("jornada"))
-            except (TypeError, ValueError):
-                continue
-    assert j1 == expect, "jornada_of_match() must be first-write-wins"
+    with tempfile.TemporaryDirectory() as tmp, tables_in(Path(tmp)) as tidy:
+        try:
+            write_csv(tidy / "lineups.csv", [
+                {"observed_at": a, "source": "futbolfantasy", "player_name": "Ane"},
+                {"observed_at": b, "source": "analitica", "player_name": "Ane"},
+                {"observed_at": b, "source": "futbolfantasy", "player_name": "Bo"},
+                {"observed_at": a, "source": "analitica", "player_name": "Cai"},
+                {"observed_at": later, "source": "futbolfantasy",
+                 "player_name": "Dan"}])
+            write_csv(tidy / "api_activity.csv", [
+                {"observed_at": a, "activity_id": "1", "value": "0"},
+                {"observed_at": b, "activity_id": "1", "value": "1"},
+                {"observed_at": a, "activity_id": "2", "value": "5"}])
+            set_now(snapshot_stamp("2026-08-02T1200Z"))
+            for name, source, every, now in [
+                    ("lineups", "", 4, ["Ane", "Bo"]),
+                    ("lineups", "analitica", 2, ["Ane"]),
+                    ("lineups", "futbolfantasy", 2, ["Bo"]),
+                    ("lineups", "nobody", 0, [])]:
+                assert len(history(name, source)) == every, source
+                assert sorted(r["player_name"] for r in current(name, source)) \
+                    == now, source
+            stats = {(r["activity_id"], r["value"]) for r in current("api_activity")}
+            assert stats == {("1", "1"), ("2", "5")}, stats
+            assert current("market") == [] and history("market") == []
+            assert age_hours("market") is None
+            assert abs(age_hours("lineups") - 3.0) < 1e-9
+            set_now(snapshot_stamp("2026-08-01T1000Z"))
+            assert stats != {(r["activity_id"], r["value"])
+                             for r in current("api_activity")}
+            set_now(snapshot_stamp("2026-08-04T0000Z"))
+            assert [r["player_name"] for r in current("lineups", "futbolfantasy")] \
+                == ["Dan"]
+        finally:
+            set_now(None)
 
 
 def _selftest() -> None:
     _selftest_cache()
-    _selftest_new_loaders()
-    _selftest_crosswalk_cache()
-    assert run_now() is run_now()
-    assert run_now().tzinfo is timezone.utc
-    _NOW.clear()
-    os.environ["LFG_NOW"] = "2026-08-20T0900Z"
-    assert run_now() == snapshot_stamp("2026-08-20T0900Z")
-    del os.environ["LFG_NOW"]
-    _NOW.clear()
-    assert run_now().year >= 2026
-
-    assert row_key({"name": "Iker Muñoz"}) == norm("Iker Munoz")
-
-    mkt = [{"name": "Ane Aldea", "team": "Alavés", "position": "defensa",
-            "value": "2.050.000", "delta_1d": "-12.000"},
-           {"name": "Bo Bidal", "team": "Betis", "position": "delantero",
-            "value": "", "delta_1d": "0"}]
-    xi = [{"player_name": "Ane Aldea", "team_slug": "alaves",
-           "start_pct": "0.72", "status": "doubt"},
-          {"player_name": "Cai Coro", "team_slug": "celta",
-           "start_pct": "85", "status": "ok"}]
-    p = _merge(_merge({}, mkt, row_key, "name", MARKET_FIELDS), xi,
-               lambda r: norm(r["player_name"]), "player_name", XI_FIELDS)
-
-    a = p["ane aldea"]
-    assert a["value"] == 2050000.0 and a["delta_1d"] == -12000.0
-    assert a["pos"] == "defensa" and a["start"] == 72.0 and a["status"] == "doubt"
-    assert a["team"] == "Alavés" and a["name"] == "Ane Aldea"
-
-    assert "value" not in p["bo bidal"] and p["bo bidal"]["delta_1d"] == 0.0
-    assert "start" not in p["bo bidal"]
-
-    c = p["cai coro"]
-    assert c["name"] == "Cai Coro" and c["club"] == "celta" and c["start"] == 85.0
-    assert "value" not in c
-
-    assert kickoff_stamp("2026-08-15T19:30:00+00:00") == datetime(
-        2026, 8, 15, 19, 30, tzinfo=timezone.utc)
-    assert kickoff_stamp("2026-08-15T21:30:00+02:00") == datetime(
-        2026, 8, 15, 19, 30, tzinfo=timezone.utc)
-    assert kickoff_stamp("2026-08-15T19:30:00") == datetime(
-        2026, 8, 15, 19, 30, tzinfo=timezone.utc)
-    assert kickoff_stamp("") is None and kickoff_stamp("soon") is None
+    _selftest_tables()
 
     import tempfile
     with tempfile.TemporaryDirectory() as tmp:
@@ -721,49 +350,6 @@ def _selftest() -> None:
         append_csv(log, [{"a": "8", "b": "9", "c": "10"}], ["a", "b", "c"])
         assert read_csv(log)[3]["c"] == "10"
         assert widen_csv(Path(tmp) / "nope.csv", ["a"]) is False
-
-    assert minutes_played("starter", "") == 90.0
-    assert minutes_played("starter", "64") == 64.0
-    assert minutes_played("sub", "") == 0.0
-    assert minutes_played("sub", "64") == 26.0
-    assert minutes_played("coach", "") == 0.0
-    assert minutes_played("starter", "0") == 0.0
-
-    summer = datetime(2026, 9, 18, 16, 40, tzinfo=timezone.utc)
-    winter = datetime(2026, 12, 18, 16, 40, tzinfo=timezone.utc)
-    assert shown(summer) == "2026-09-18 18:40 CEST", shown(summer)
-    assert shown(winter) == "2026-12-18 17:40 CET", shown(winter)
-    assert shown(summer, "%d %b %H:%M") == "18 Sep 18:40 CEST"
-    assert snapshot_stamp("2026-09-18T1640Z") == summer, \
-        snapshot_stamp("2026-09-18T1640Z")
-
-    jl_matches = [
-        {"observed_at": "2026-08-10T0900Z", "jornada": "1", "home": "alaves",
-         "away": "getafe", "kickoff": "2026-08-14T19:30:00+00:00"},
-        {"observed_at": "2026-08-12T0900Z", "jornada": "1", "home": "alaves",
-         "away": "getafe", "kickoff": "2026-08-15T19:30:00+00:00"},
-        {"observed_at": "2026-08-12T0900Z", "jornada": "1",
-         "home": "espanyol", "away": "levante",
-         "kickoff": "2026-08-16T17:00:00+00:00"},
-        {"observed_at": "2026-08-12T0900Z", "jornada": "2",
-         "home": "rayo-vallecano", "away": "alaves", "kickoff": ""}]
-    clock = JornadaClock(jl_matches)
-    jl = clock.round_locks
-    assert list(jl) == [1] and jl[1].day == 15, jl
-    assert 2 not in jl
-    assert clock.round_lock(1) == jl[1] and clock.round_lock(2) is None
-    assert clock.team_lock(1, "alaves") == jl[1]
-    assert clock.team_lock(1, "espanyol") > jl[1]
-    assert clock.next_deadline(
-        datetime(2026, 8, 15, 20, tzinfo=timezone.utc)) is None
-    assert clock.next_deadline(
-        datetime(2026, 8, 15, 18, tzinfo=timezone.utc)) == jl[1]
-    assert lock_order({3: datetime(2026, 9, 3, tzinfo=timezone.utc),
-                       1: datetime(2026, 8, 15, tzinfo=timezone.utc),
-                       2: datetime(2026, 8, 20, tzinfo=timezone.utc)}) \
-        == [1, 2, 3]
-    assert clock.order == [1]
-
     print("ffcore.tidy self-test OK")
 
 

@@ -28,9 +28,11 @@ Everything else comes from the app's API and public pages.
 ## The pipeline (`src/run.py`)
 
 1. **parse** (`sources.py`, `ingest.py`): every fetched page is archived in
-   `data/raw/`; parsers turn it into `data/tidy/*.csv`. Each cached page is
-   keyed by a fingerprint of its parser's code, so editing one parser
-   re-parses only its pages.
+   `data/raw/`; parsers turn it into `data/tidy/*.csv`. `sources.py` says
+   what to fetch; the parsers live with their provider (`ffcore/futbolfantasy`,
+   `ffcore/footballdata`, `ffcore/laliga_api`). Each cached page is keyed by a
+   fingerprint of its parser's code, so editing one parser re-parses only its
+   pages.
 2. **crosswalk** (`crosswalk.py`): `data/tidy/players.csv`, one id per
    player (FF's `ff_id`) with the app's and FF's slugs attached.
 3. **sim** (`sim.py`, `decide.py`): builds the board the phone draws.
@@ -42,7 +44,7 @@ Everything else comes from the app's API and public pages.
   chance of appearing (FF's line-up percentages, calibrated against who
   actually played), times the opponent's attack/defence factor. One table,
   `per_j[jornada][player] = (points, p)`, feeds the board and the backtest.
-- **Points history** (`tidy.scored()`): each change in a player's points
+- **Points history** (`ffcore/points.py`, `scored()`): each change in a player's points
   total, given to the latest match his club had played.
 - **Uncertainty** (`ffcore/forecast.py`, `ffcore/season.py`): match-level
   points drawn from the pool of real single-match scores, and one
@@ -82,10 +84,12 @@ rather than reaching through them; ruff flags reads of private members.
 ## Layout
 
     src/            run, ingest, sources, crosswalk, decide, sim, grading, stats
-    src/ffcore/     tidy (tables, time, points history), parse, text, auth,
-                    crosswalk, league, score, startprob, fixture, schedule,
-                    forecast, season, outlook, market, pricing, action, render,
-                    fixtures (test data)
+    src/ffcore/     tidy (paths, CSVs, current/history), clock (now, stamps),
+                    jornadas (locks), points (points history), players,
+                    source, futbolfantasy, footballdata, laliga_api, parse,
+                    text, auth, crosswalk, league, score, startprob, fixture,
+                    schedule, forecast, season, outlook, market, pricing,
+                    action, render, fixtures (test data)
     inputs/         league.ini
     data/raw/       archived pages, append-only
     data/tidy/      tables rebuilt from raw; players.csv is tracked

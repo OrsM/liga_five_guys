@@ -7,7 +7,9 @@ from decide import (BID_BEATS, PRICE_LOG, band_acts, plan, sale_pts,
                     worth_doing)
 from ffcore.league import app_fielded
 from ffcore.render import title_name
-from ffcore.tidy import DECISIONS, REPORTS, load_deadline, log_row, run_now
+from ffcore.clock import run_now
+from ffcore.jornadas import load_deadline
+from ffcore.tidy import DECISIONS, REPORTS, log_row
 
 __all__ = ["report"]
 
