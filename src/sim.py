@@ -73,7 +73,9 @@ def buy_row(u, r) -> dict:
             "bid": min(a.cost * u.premium, max(a.cost, u.cash + a.proceeds)),
             "sell": [player(u, k)["name"] for k in a.sell],
             "proceeds": a.proceeds, "gain": r["d_pts"], "why": why(r),
-            "trend": u.view("trend").get(a.buy)}
+            "trend": u.view("trend").get(a.buy),
+            "placed": u.view("my_bid").get(a.buy),
+            "done": a.buy in u.view("my_bid")}
 
 
 def ping(todo: list[dict]) -> str:
@@ -82,7 +84,7 @@ def ping(todo: list[dict]) -> str:
                 d["name"], d["bid"] / 1e6,
                 ", selling " + " + ".join(d["sell"]) if d["sell"] else ""),
             "sell": lambda d: "Sell " + d["name"]}
-    return "; ".join(said[d["what"]](d) for d in todo)
+    return "; ".join(said[d["what"]](d) for d in todo if not d.get("done"))
 
 
 def report(u, base, rows, bands, chg, lock_at=None) -> dict:
@@ -99,7 +101,8 @@ def report(u, base, rows, bands, chg, lock_at=None) -> dict:
                      if chg["legal"] else None})
     todo += [{"what": "buy", **buy_row(u, r)} for r in picked]
     todo += [{"what": "sell", **player(u, k),
-              "proceeds": u.view("proceeds").get(k, 0.0)}
+              "proceeds": u.view("proceeds").get(k, 0.0),
+              "done": u.view("route").get(k) == "listed"}
              for k, v in sorted(sale_pts(u, bands).items(), key=lambda kv: -kv[1])
              if v > 0 and k not in gone]
     chosen = {p["action"].buy for p in picked}
@@ -209,6 +212,17 @@ def _selftest() -> None:
                  {"what": "sell", "name": "E"}]) == (
         "Field A, B; Buy C (bid up to 12.3M), selling D; Sell E")
     assert ping([]) == ""
+    assert ping([{"what": "buy", "name": "C", "bid": 1e6, "sell": [], "done": True},
+                 {"what": "sell", "name": "E", "done": False}]) == "Sell E"
+
+    ub.facts.update(my_bid={bought[0]: 4e6}, route={"dead": "listed"})
+    doc = report(ub, base, rows, bands, xi_change([], ub.current_xi[1]))
+    buys = {d["name"].lower(): d for d in doc["do"] if d["what"] == "buy"}
+    assert buys[bought[0]]["done"] and buys[bought[0]]["placed"] == 4e6, buys
+    assert all(not d["done"] and d["placed"] is None
+               for n, d in buys.items() if n != bought[0]), buys
+    assert all(d["done"] == (d["name"].lower() == "dead")
+               for d in doc["do"] if d["what"] == "sell"), doc["do"]
 
     print("sim self-test OK")
 

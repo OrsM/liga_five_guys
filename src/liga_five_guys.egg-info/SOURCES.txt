@@ -3,8 +3,6 @@ pyproject.toml
 src/crosswalk.py
 src/decide.py
 src/ingest.py
-src/ledger.py
-src/points.py
 src/run.py
 src/sim.py
 src/sources.py
@@ -17,10 +15,8 @@ src/ffcore/fixture.py
 src/ffcore/fixtures.py
 src/ffcore/forecast.py
 src/ffcore/league.py
-src/ffcore/lineupweight.py
 src/ffcore/parse.py
 src/ffcore/pricing.py
-src/ffcore/profile.py
 src/ffcore/render.py
 src/ffcore/schedule.py
 src/ffcore/score.py

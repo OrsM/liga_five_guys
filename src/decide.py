@@ -329,6 +329,7 @@ def load() -> Universe:
              "value": {k: v for k, v in value.items() if k in players},
              "proceeds": {k: v for k, v in proceeds.items() if k in players},
              "pj": {k: r.pj for k, r in rates.items() if r},
+             "my_bid": pending(mkt, "bid_status", "bid_money"),
              "trend": trend(steps(history("market")), _updates_to_lock())}
     squads, per_j = phantom_fill(squads, per_j, pos)
     assert all(_fieldable(sq) for sq in squads.values()), squads
@@ -345,7 +346,7 @@ def load() -> Universe:
         cash=lg.cash[me], me=me, facts=facts, lg=lg, sc=sc,
         rival_cash={h: v for h, v in lg.cash.items() if h != me},
         part_played=played, first_jornada_of=first_jornada_of,
-        locked_cash=sum(pending(mkt, "bid_status", "bid_money").values()),
+        locked_cash=sum(facts["my_bid"].values()),
         received_offers=received_offers, lam=cash_price_history(),
         premium=_premium(me),
         )
