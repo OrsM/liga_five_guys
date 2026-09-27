@@ -4,7 +4,7 @@ from __future__ import annotations
 
 
 from ffcore.clock import on_reset, run_now
-from ffcore.fixture import JornadaClock
+from ffcore.locks import JornadaClock
 from ffcore.tidy import current, history
 
 __all__ = ["clock", "clock_history", "jornada_of_match", "load_deadline"]

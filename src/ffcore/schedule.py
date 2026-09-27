@@ -1,7 +1,8 @@
 
 from __future__ import annotations
 
-from ffcore.fixture import JornadaClock, season_board
+from ffcore.fixture import season_board
+from ffcore.locks import JornadaClock
 from ffcore.rules import FREE_FORMATIONS, MAX_SLOT
 from ffcore.score import DOUBT_FACTOR, OUT_STATUSES
 

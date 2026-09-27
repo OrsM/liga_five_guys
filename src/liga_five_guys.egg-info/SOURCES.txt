@@ -22,6 +22,7 @@ src/ffcore/futbolfantasy.py
 src/ffcore/jornadas.py
 src/ffcore/laliga_api.py
 src/ffcore/league.py
+src/ffcore/locks.py
 src/ffcore/market.py
 src/ffcore/outlook.py
 src/ffcore/parse.py
