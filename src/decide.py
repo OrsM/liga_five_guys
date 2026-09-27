@@ -14,7 +14,7 @@ from ffcore.pricing import cash_price
 from ffcore.action import Action
 from ffcore.market import Market
 from ffcore.outlook import Outlook
-from ffcore.season import LeagueState, best_xi, simulate_many
+from ffcore.season import LeagueState, Standings, best_xi, simulate_many
 
 __all__ = ["Action", "Band", "Ranking", "Universe", "band_acts", "plan",
            "sale_pts"]
@@ -34,7 +34,7 @@ class Band(NamedTuple):
 
 class Ranking(NamedTuple):
     rows: list[dict]
-    base: object
+    base: Standings
     measured: float | None
     bands: dict[str, Band]
 
