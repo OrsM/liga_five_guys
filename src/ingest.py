@@ -415,6 +415,8 @@ def _keep_cache(keys: set) -> None:
 def _leaf(x) -> str:
     if isinstance(x, (set, frozenset)):
         return repr(sorted(map(repr, x)))
+    if isinstance(x, types.ModuleType):
+        return "module " + x.__name__
     r = repr(x)
     return type(x).__qualname__ if " at 0x" in r else r
 
@@ -572,6 +574,14 @@ POINTS_FIELDS = ["player_name", "player_name_full", "team", "points",
 
 
 def _selftest() -> None:
+    uses = compile("mod.thing", "<fp>", "eval")
+    at = {}
+    for where in ("/repo/.venv", "/elsewhere/.venv"):
+        mod = types.ModuleType("somelib")
+        mod.__file__ = where + "/somelib/__init__.py"
+        at[where] = fingerprint(types.FunctionType(uses, {"mod": mod}))
+    assert len(set(at.values())) == 1, \
+        "a module is fingerprinted by name, not by where it is installed"
     import tempfile
 
     with tempfile.TemporaryDirectory() as tmp:
