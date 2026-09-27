@@ -5,6 +5,7 @@ import sys
 from statistics import median
 from dataclasses import dataclass, field
 from functools import cache, cached_property
+from typing import NamedTuple
 
 
 from ffcore.forecast import Bootstrap
@@ -22,12 +23,27 @@ from ffcore.tidy import (DECISIONS, LINEUP_SOURCE, age_hours, current, history,
                          read_csv, run_now, scored)
 from ffcore.parse import num, text
 
-__all__ = ["Action", "Universe"]
+__all__ = ["Action", "Band", "Ranking", "Universe"]
 
 APP_FRESH_HOURS = 14.4
 SCREEN_TRIALS = 250
 FINAL_TRIALS = 3000
 KEEP = 12
+
+
+class Band(NamedTuple):
+    median: float
+    lo: float
+    hi: float
+    action: Action
+    mean: float
+
+
+class Ranking(NamedTuple):
+    rows: list[dict]
+    base: object
+    measured: float | None
+    bands: dict[str, Band]
 
 
 @dataclass
@@ -40,20 +56,24 @@ class Universe:
     part_played: dict[int, set[str]] = field(default_factory=dict)
     first_jornada_of: dict[str, int] = field(default_factory=dict)
 
+    @property
+    def mine(self) -> dict[str, str]:
+        return self.state.squads.get(self.me, {})
+
     @cached_property
     def outlook(self) -> Outlook:
         return Outlook(self.state, self.forecaster, self.me, self.market.pos,
                        self.part_played, self.first_jornada_of)
 
     def route_kind(self, k: str) -> str:
-        if k in self.state.squads.get(self.me, {}):
+        if k in self.mine:
             return "mine"
         owner = self.market.owner.get(k)
         return "free" if not owner or owner == self.me else "listed"
 
     def candidates(self, budget: float | None = None) -> list["Action"]:
         cash = self.market.cash if budget is None else budget
-        mine = set(self.state.squads.get(self.me, {}))
+        mine = set(self.mine)
         o = self.outlook
         par_of = o.par
 
@@ -77,7 +97,7 @@ class Universe:
         return out
 
     def rank(self, acts: list["Action"], seed: int = 1,
-             extra: list[tuple[str, "Action"]] = ()) -> tuple:
+             extra: list[tuple[str, "Action"]] = ()) -> Ranking:
         screen = score_many(self, [self.state.squads]
                              + [apply(self, a) for a in acts],
                              SCREEN_TRIALS, seed)
@@ -111,7 +131,7 @@ class Universe:
         final = score_many(self, [self.state.squads] + afters
                             + [apply(self, a) for _k, a in rest], FINAL_TRIALS, seed)
         base, scored = final[0], final[1:len(afters) + 1]
-        bands = {k: (*band(pairs), a, sum(pairs) / len(pairs) if pairs else 0.0)
+        bands = {k: Band(*band(pairs), a, sum(pairs) / len(pairs) if pairs else 0.0)
                 for (k, a), pairs in ((ka, paired(r, base, self.me)) for ka, r in
                                       zip(rest, final[len(afters) + 1:]))}
         out = []
@@ -131,7 +151,7 @@ class Universe:
                 "mean": r.mean(self.me),
             })
         rows = sorted(out, key=lambda d: (-d["net_pts"], d["action"].net))
-        return rows, base, measured, bands
+        return Ranking(rows, base, measured, bands)
 
 
 def _nulls_last(v: float | None) -> tuple[bool, float]:
@@ -182,7 +202,7 @@ def value_rate(pts, cost) -> float | None:
 
 
 def fieldable_spares(u) -> list[str]:
-    mine_squad = u.state.squads.get(u.me, {})
+    mine_squad = u.mine
     return [k for k in mine_squad if _fieldable(
         {p: s for p, s in mine_squad.items() if p != k})]
 

@@ -24,7 +24,7 @@ def call(spec: str):
 
 def _sample(hits, stop, tid) -> None:
     while not stop.wait(0.25):
-        f, at = sys._current_frames().get(tid), "(outside src/)"
+        f, at = sys._current_frames().get(tid), "(outside src/)"  # noqa: SLF001 -- the sampler needs another thread's frame
         while f is not None:
             if "/src/" in f.f_code.co_filename:
                 at = "%s:%s" % (f.f_code.co_filename.rsplit("/src/", 1)[1],

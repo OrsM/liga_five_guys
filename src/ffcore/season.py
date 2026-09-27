@@ -91,12 +91,12 @@ def draws(forecaster, jornadas, trials: int, seed: int):
     import numpy as np
 
     pool = np.asarray(forecaster.pool, dtype=float)
-    everyone = sorted({k for j in jornadas for k in forecaster._order.get(j, [])})
+    everyone = sorted({k for j in jornadas for k in forecaster.order(j)})
     col = {k: i for i, k in enumerate(everyone)}
     rate = np.clip(1.0 + forecaster.share * np.random.default_rng(
         [seed, 7919]).standard_normal((trials, len(everyone))), 0.0, None)
     for j in jornadas:
-        keys = forecaster._order.get(j, [])
+        keys = forecaster.order(j)
         if not keys:
             continue
         per = forecaster.per_jornada[j]
@@ -106,7 +106,7 @@ def draws(forecaster, jornadas, trials: int, seed: int):
         yield j, keys, np.where(
             rng.random((trials, len(keys))) < p[None, :],
             pool[rng.integers(0, len(pool), (trials, len(keys)))]
-            * (pts / forecaster._pool_mean) * rate[:, [col[k] for k in keys]], 0.0)
+            * (pts / forecaster.pool_mean) * rate[:, [col[k] for k in keys]], 0.0)
 
 
 def _run_np(states: list, forecaster, trials: int, seed: int):

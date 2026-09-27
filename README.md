@@ -51,7 +51,10 @@ Everything else comes from the app's API and public pages.
 - **Prices** (`ffcore/pricing.py`): values keep their trend; the next h
   updates move by a fitted multiple of the last one. The auction premium
   is the median winning bid over asking in the last 50 auctions.
-- **Moves** (`decide.py`): every affordable buy, sale and swap is simulated
+- **Moves** (`decide.py`): the `Universe` joins an `Outlook`
+  (`ffcore/outlook.py`: expected points and the best eleven, no money) to
+  a `Market` (`ffcore/market.py`: names, prices, values, your cash and
+  bids, no points). Every affordable buy, sale and swap is simulated
   and scored in season points: the points it adds plus, at the measured
   points-per-million, the value its players are expected to gain by the
   lock less the premium paid. Rows say whether they are for points, cash
@@ -66,18 +69,23 @@ Everything else comes from the app's API and public pages.
     python src/grading.py --compare a.json b.json # two backtests, jornada by jornada
     python src/ffcore/pricing.py --grade          # price model walk-forward vs "no change"
     bash tools/selftests.sh                       # every module's self-test
+    python tools/golden.py freeze|check           # a refactor must rebuild the same board
 
 Run them with `PYTHONPATH=src FF_ROOT=<a copy of data>`; rehearse boards on a
 copy of `data/`, never the live one. A change goes in when the backtest
 says so, judged by squared error (the simulation needs means, and absolute
-error rewards forecasts biased low on skewed points).
+error rewards forecasts biased low on skewed points). A change that should
+not move the board (a refactor) is frozen first and checked against it.
+New code asks the `Universe`, `Outlook` or `Market` for what it needs
+rather than reaching through them; ruff flags reads of private members.
 
 ## Layout
 
     src/            run, ingest, sources, crosswalk, decide, sim, grading, stats
     src/ffcore/     tidy (tables, time, points history), parse, text, auth,
                     crosswalk, league, score, startprob, fixture, schedule,
-                    forecast, season, pricing, action, render, fixtures (test data)
+                    forecast, season, outlook, market, pricing, action, render,
+                    fixtures (test data)
     inputs/         league.ini
     data/raw/       archived pages, append-only
     data/tidy/      tables rebuilt from raw; players.csv is tracked

@@ -26,7 +26,7 @@ dependencies = [
 ]
 
 [tool.ruff.lint]
-select = ["E4", "E7", "E9", "F"]
+select = ["E4", "E7", "E9", "F", "SLF001"]
 
 # src/ holds one package (ffcore) plus the top-level stage modules.
 # Declaring it here is what lets `import ffcore` work from anywhere --

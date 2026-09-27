@@ -24,7 +24,10 @@ class Bootstrap:
         real = [p for p in pool if p is not None]
         self.pool = tuple(real) if len(real) >= MIN_POOL else SEED_POOL
         mean = statistics.mean(self.pool)
-        self._pool_mean = mean if abs(mean) > 1e-9 else 1.0
+        self.pool_mean = mean if abs(mean) > 1e-9 else 1.0
+
+    def order(self, jornada: int) -> list[str]:
+        return self._order.get(jornada, [])
 
     def expected(self, jornada: int) -> dict[str, float]:
         return {k: pts * p
@@ -39,7 +42,7 @@ def _selftest() -> None:
     assert Bootstrap({}, pool=[1, 2, 3]).pool == SEED_POOL
     big = list(range(MIN_POOL))
     assert Bootstrap({}, pool=big).pool == tuple(big)
-    assert Bootstrap({1: {"x": (4.0, 1.0)}}, pool=[0] * MIN_POOL)._pool_mean == 1.0
+    assert Bootstrap({1: {"x": (4.0, 1.0)}}, pool=[0] * MIN_POOL).pool_mean == 1.0
     print("ffcore.forecast self-test OK")
 
 
