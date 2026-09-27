@@ -13,7 +13,10 @@ src/ffcore/auth.py
 src/ffcore/crosswalk.py
 src/ffcore/fixture.py
 src/ffcore/fixtures.py
+src/ffcore/footballdata.py
 src/ffcore/forecast.py
+src/ffcore/futbolfantasy.py
+src/ffcore/laliga_api.py
 src/ffcore/league.py
 src/ffcore/market.py
 src/ffcore/outlook.py
@@ -23,6 +26,7 @@ src/ffcore/render.py
 src/ffcore/schedule.py
 src/ffcore/score.py
 src/ffcore/season.py
+src/ffcore/source.py
 src/ffcore/startprob.py
 src/ffcore/text.py
 src/ffcore/tidy.py

@@ -23,11 +23,11 @@ from ffcore.auth import API_BASE
 from ffcore.league import load_config
 from ffcore.tidy import (TABLES, Table, ROOT, SEASON, TIDY, append_csv, csv_string, read_csv,
                          table_stats, widen_csv, write_csv)
-from sources import (API_LEAGUES_KEY, CAL_KEY, MATCH_KEY_RE,
-                     ROW_TABLE, league_sources,
-                     offer_sources, parse_api_leagues, parse_points,
-                     played_sources,
-                     season_label, source_for, sources)
+from ffcore.futbolfantasy import (CAL_KEY, MATCH_KEY_RE, parse_points,
+                                  played_sources, season_label)
+from ffcore.laliga_api import (API_LEAGUES_KEY, ROW_TABLE, league_sources,
+                               offer_sources, parse_api_leagues)
+from sources import source_for, sources
 
 __all__ = ["snapshots", "state", "doc_keys", "documents", "due",
           "fetch", "parse", "baseline"]
@@ -534,7 +534,7 @@ def _store(path: Path, rows: list[dict], spec: Table) -> None:
 def baseline(url: str = "", label: str = "") -> None:
     import httpx
 
-    from sources import POINTS_URL
+    from ffcore.futbolfantasy import POINTS_URL
     url = url or POINTS_URL
 
     with httpx.Client(headers=HEADERS, timeout=45,
@@ -554,7 +554,7 @@ def baseline(url: str = "", label: str = "") -> None:
     if not rows:
         sys.exit("PARSE FAILED — no table matched, so nothing was written and "
                  "the last good file is untouched. The markup has probably "
-                 "changed: fix sources.parse_points.")
+                 "changed: fix ffcore.futbolfantasy.parse_points.")
 
     stamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%MZ")
     out = SEASON / f"points_{label}.csv"
@@ -690,7 +690,8 @@ def _selftest() -> None:
     assert len(out["api_teams"]) == 2, out["api_teams"]
     assert all(ROW_TABLE not in r for rs in out.values() for r in rs), out
 
-    from sources import Source, parse_market
+    from ffcore.futbolfantasy import parse_market
+    from ffcore.source import Source
     every = Source("m", "market", "u", parse_market, cadence="every_run")
     daily = Source("m", "market", "u", parse_market, cadence="daily")
     seen_today = {"m": {"seen": "2026-08-15T0940Z"}}
@@ -713,7 +714,7 @@ def _selftest() -> None:
     assert not due(twice, {"m": {"seen": "2026-08-15T2340Z"}},
                    "2026-08-16T0005Z")
 
-    from sources import match_source
+    from ffcore.futbolfantasy import match_source
     once = match_source("match_22421-alaves-getafe")
     assert due(once, {}, "2026-08-15")
     assert not due(once, {once.key: {"seen": "2026-08-15T0940Z"}}, "2026-08-16")
@@ -731,7 +732,7 @@ def _selftest() -> None:
     assert _stamp_of(Path("data/raw/dt=2026-08-15T0940Z.tar.xz")) \
         == _stamp_of(Path("data/raw/dt=2026-08-15T0940Z")) == "2026-08-15T0940Z"
 
-    from sources import _FIXTURE
+    from ffcore.futbolfantasy import _FIXTURE
     team = source_for("team_celta")
     base = page_sig(team, _FIXTURE)
     assert base and page_sig(team, "<html></html>") is None
