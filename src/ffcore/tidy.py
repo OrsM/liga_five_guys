@@ -22,7 +22,7 @@ __all__ = ["ROOT", "TIDY", "SEASON", "DECISIONS", "REPORTS", "MADRID",
            "log_row", "csv_string", "snapshot_stamp", "ledger_stamp",
            "Market", "Valuation", "row_key", "run_now", "load_crosswalk",
            "load_players", "read_ledger", "LEDGER", "load_deadline",
-           "LINEUP_SOURCE", "SECOND_SOURCE", "kickoff_stamp", "MATCH_LEN",
+           "LINEUP_SOURCE", "kickoff_stamp", "MATCH_LEN",
            "minutes_played", "market_routes", "pending", "LISTED_SELLER",
            "lock_order", "JornadaClock", "shown", "table_stats",
            "load_perjornada", "clock", "clock_history", "jornada_of_match"]
@@ -193,8 +193,6 @@ TABLES: dict[str, Table] = {
     "api_offers": Table(True),
     "api_lineup": Table(True),
     "api_leagues": Table(True),
-    "understat_players": Table(False, ("source", "season", "understat_id"),
-                               "daily"),
     "api_players_all": Table(False, ("player_id",), "daily"),
     "results_history": Table(False, ("season", "date", "home_name",
                                      "away_name"), "once"),
@@ -312,7 +310,6 @@ def shown(t=None, fmt: str = "%Y-%m-%d %H:%M") -> str:
 
 
 LINEUP_SOURCE = "futbolfantasy"
-SECOND_SOURCE = "analitica"
 
 
 def load_perjornada() -> list[dict]:
@@ -595,6 +592,7 @@ def _selftest_cache() -> None:
 
 def _selftest_crosswalk_cache() -> None:
     import tempfile
+    from ffcore.crosswalk import PLAYER_COLS
 
     global TIDY
     real_tidy = TIDY
@@ -604,16 +602,14 @@ def _selftest_crosswalk_cache() -> None:
             assert load_crosswalk() is None
             write_csv(TIDY / "players.csv",
                      [{"player_id": "a", "name": "A", "club_id": "c"}],
-                     ["player_id", "name", "club_id", "ff_slug", "af_slug",
-                      "app_id", "understat_id", "app_names"])
+                     PLAYER_COLS)
             xw1 = load_crosswalk()
             assert xw1.players["a"].name == "A", xw1.players
             assert load_crosswalk() is xw1
 
             write_csv(TIDY / "players.csv",
                      [{"player_id": "a", "name": "Renamed", "club_id": "c"}],
-                     ["player_id", "name", "club_id", "ff_slug", "af_slug",
-                      "app_id", "understat_id", "app_names"])
+                     PLAYER_COLS)
             xw2 = load_crosswalk()
             assert xw2 is not xw1 and xw2.players["a"].name == "Renamed", \
                 xw2.players

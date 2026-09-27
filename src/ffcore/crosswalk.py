@@ -10,8 +10,8 @@ from ffcore.tidy import write_csv
 
 __all__ = ["Player", "Crosswalk", "PLAYER_COLS"]
 
-PLAYER_COLS = ["player_id", "name", "club_id", "ff_slug",
-               "af_slug", "app_id", "understat_id", "app_names"]
+PLAYER_COLS = ["player_id", "name", "club_id", "ff_slug", "app_id",
+               "app_names"]
 
 
 def _join(vals) -> str:
@@ -28,16 +28,13 @@ class Player:
     name: str = ""
     club_id: str = ""
     ff_slug: str = ""
-    af_slug: str = ""
     app_id: str = ""
-    understat_id: str = ""
     app_names: set = field(default_factory=set)
 
     def row(self) -> dict:
         return {"player_id": self.player_id, "name": self.name,
                 "club_id": self.club_id,
-                "ff_slug": self.ff_slug, "af_slug": self.af_slug,
-                "app_id": self.app_id, "understat_id": self.understat_id,
+                "ff_slug": self.ff_slug, "app_id": self.app_id,
                 "app_names": _join(self.app_names)}
 
 
@@ -49,8 +46,7 @@ class Crosswalk:
 
 
     def _reindex(self) -> None:
-        self._by_ff, self._by_af, self._by_app = {}, {}, {}
-        self._by_understat = {}
+        self._by_ff, self._by_app = {}, {}
         self._clash: dict[str, set] = {}
         names: dict[str, set] = {}
         for p in self.players.values():
@@ -58,17 +54,14 @@ class Crosswalk:
                 names.setdefault(norm(p.name), set()).add(p.player_id)
             for idx, key, label in (
                     (self._by_ff, p.ff_slug, "ff_slug"),
-                    (self._by_af, p.af_slug, "af_slug"),
-                    (self._by_app, p.app_id, "app_id"),
-                    (self._by_understat, p.understat_id, "understat_id")):
+                    (self._by_app, p.app_id, "app_id")):
                 if not key:
                     continue
                 if key in idx and idx[key] != p.player_id:
                     self._clash.setdefault(label, set()).add(key)
                 idx[key] = p.player_id
         for label, keys in self._clash.items():
-            idx = {"ff_slug": self._by_ff, "af_slug": self._by_af,
-                   "app_id": self._by_app, "understat_id": self._by_understat}[label]
+            idx = {"ff_slug": self._by_ff, "app_id": self._by_app}[label]
             for k in keys:
                 idx.pop(k, None)
         self._by_name = {n: next(iter(ids)) for n, ids in names.items()
@@ -77,11 +70,8 @@ class Crosswalk:
     def clashes(self) -> dict:
         return {k: sorted(v) for k, v in sorted(self._clash.items()) if v}
 
-    def player(self, *, name=None, ff_slug=None, af_slug=None, app_id=None,
-               understat_id=None) -> str | None:
-        for key, idx in ((ff_slug, self._by_ff), (af_slug, self._by_af),
-                         (app_id, self._by_app),
-                         (understat_id, self._by_understat)):
+    def player(self, *, name=None, ff_slug=None, app_id=None) -> str | None:
+        for key, idx in ((ff_slug, self._by_ff), (app_id, self._by_app)):
             if key and key in idx:
                 return idx[key]
         if name:
@@ -96,9 +86,7 @@ class Crosswalk:
         fid = (r.get("ff_id") or "").strip()
         if fid in self.players:
             return fid
-        slug = (r.get("player_slug") or "").strip() or None
-        by = "af_slug" if r.get("source") == "analitica" else "ff_slug"
-        return self.player(**{by: slug},
+        return self.player(ff_slug=(r.get("player_slug") or "").strip() or None,
                            name=r.get("player_name_full")
                            or r.get("player_name"))
 
@@ -107,10 +95,7 @@ class Crosswalk:
         n = len(self.players) or 1
         return {"players": len(self.players),
                 "ff": sum(1 for p in self.players.values() if p.ff_slug) / n,
-                "af": sum(1 for p in self.players.values() if p.af_slug) / n,
-                "app": sum(1 for p in self.players.values() if p.app_id) / n,
-                "understat": sum(1 for p in self.players.values()
-                                 if p.understat_id) / n}
+                "app": sum(1 for p in self.players.values() if p.app_id) / n}
 
     @classmethod
     def read(cls, players_path) -> "Crosswalk":
@@ -120,9 +105,7 @@ class Crosswalk:
             if pid:
                 players[pid] = Player(
                     pid, r.get("name", ""), r.get("club_id", ""),
-                    r.get("ff_slug", ""),
-                    r.get("af_slug", ""), r.get("app_id", ""),
-                    r.get("understat_id", ""),
+                    r.get("ff_slug", ""), r.get("app_id", ""),
                     _split(r.get("app_names")))
         return cls(players)
 
@@ -142,7 +125,7 @@ def _selftest() -> None:
     xw = Crosswalk({
         "alvaro fernandez": Player(
             "alvaro fernandez", "Alvaro Fernandez", "espanyol",
-            "alvaro-fernandez", "af-alvaro", "2101",
+            "alvaro-fernandez", "2101",
             app_names={"A. Ferllo"}),
         "jonny castro": Player("jonny castro", "Jonny Castro", "alaves",
                                ff_slug="jonny-castro",
@@ -150,7 +133,7 @@ def _selftest() -> None:
     })
 
     for kw in ({"name": "Alvaro Fernandez"}, {"ff_slug": "alvaro-fernandez"},
-               {"af_slug": "af-alvaro"}, {"app_id": "2101"}):
+               {"app_id": "2101"}):
         assert xw.player(**kw) == "alvaro fernandez", kw
     assert xw.player(name="Álvaro Fernández") == "alvaro fernandez"
     assert xw.player(ff_slug="who-is-this") is None
@@ -184,36 +167,16 @@ def _selftest() -> None:
     named = Crosswalk({
         "867": Player("867", "Álvaro García", ff_slug="alvaro-garcia"),
         "12993": Player("12993", "Álvaro García"),
-        "5": Player("5", "Pepelu", af_slug="af-5"),
         "132": Player("132", "Sergio Canales")})
     rows = [
         ({"player_slug": "alvaro-garcia", "player_name": "x"}, "867"),
         ({"player_slug": "gone", "player_name": "Álvaro García"}, None),
-        ({"source": "analitica", "player_slug": "af-5"}, "5"),
-        ({"source": "futbolfantasy", "player_slug": "af-5"}, None),
-        ({"source": "analitica", "player_slug": "?", "player_name": "Pepelu"},
-         "5"),
         ({"ff_id": "132", "player_name": "whoever"}, "132"),
         ({"ff_id": "999", "player_name": "Canales",
           "player_name_full": "Sergio Canales"}, "132"),
     ]
     for r, expected in rows:
         assert named.key_of(r) == expected, (r, named.key_of(r))
-
-    us = Crosswalk({"alvaro fernandez": Player(
-        "alvaro fernandez", "Alvaro Fernandez", understat_id="555")})
-    assert us.player(understat_id="555") == "alvaro fernandez"
-    assert "understat" in us.coverage()
-    us_clash = Crosswalk({
-        "carlos romero": Player("carlos romero", understat_id="9"),
-        "isaac romero": Player("isaac romero", understat_id="9")})
-    assert us_clash.player(understat_id="9") is None
-    assert us_clash.clashes() == {"understat_id": ["9"]}
-    with tempfile.TemporaryDirectory() as d:
-        pp = os.path.join(d, "p2.csv")
-        us.write(pp)
-        again2 = Crosswalk.read(pp)
-        assert again2.player(understat_id="555") == "alvaro fernandez"
 
     print("ffcore.crosswalk self-test OK")
 

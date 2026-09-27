@@ -41,10 +41,8 @@ def build_players(registry: dict, market, lineups, api_rows) -> dict:
     for r in lineups:
         slug = text(r, "player_slug")
         p = _named(named, r.get("player_name"), r.get("team_slug") or "")
-        field = ("af_slug" if text(r, "source")
-                 == "analitica" else "ff_slug")
-        if p is not None and slug and not getattr(p, field):
-            setattr(p, field, slug)
+        if p is not None and slug and not p.ff_slug:
+            p.ff_slug = slug
 
     value = {row_key(r): money(r.get("value")) for r in market}
     app = {text(r, "player_id"): r for r in api_rows}
@@ -89,35 +87,6 @@ def build_players(registry: dict, market, lineups, api_rows) -> dict:
     return out
 
 
-def build_understat_ids(rows, players: dict) -> int:
-    from ffcore.text import resolve as text_resolve
-
-    by_club: dict[str, list] = {}
-    for p in players.values():
-        by_club.setdefault(p.club_id, []).append(p)
-
-    best: dict[str, dict] = {}
-    for r in rows:
-        uid = text(r, "understat_id")
-        if not uid:
-            continue
-        prev = best.get(uid)
-        if prev is None or (r.get("season") or "") >= (prev.get("season") or ""):
-            best[uid] = r
-
-    matched = 0
-    for uid, r in best.items():
-        candidates = by_club.get(r.get("team") or "", [])
-        if not candidates:
-            continue
-        wrapped = [{"name": p.name, "_p": p} for p in candidates]
-        hit, _cands = text_resolve(r.get("player_name") or "", wrapped)
-        if hit is not None and not hit["_p"].understat_id:
-            hit["_p"].understat_id = uid
-            matched += 1
-    return matched
-
-
 def main() -> None:
     market = current("market")
     lineups = history("lineups") + current("starters")
@@ -126,19 +95,15 @@ def main() -> None:
         registry.players, market, lineups,
         current("api_teams") + current("api_market")
         + current("api_players_all"))
-    understat_matched = build_understat_ids(current("understat_players"),
-                                            players)
     xw = Crosswalk(players)
     xw.write(TIDY / PLAYERS)
 
     c = xw.coverage()
     print("wrote %s: %d players (%d new) — %.0f%% carry a "
-          "probable-XI slug, %.0f%% the second source's, %.0f%% an app id, "
-          "%.0f%% an understat id (%d newly matched this run)"
+          "probable-XI slug, %.0f%% an app id"
           % (TIDY / PLAYERS, c["players"],
              len(players) - len(registry.players),
-             100 * c["ff"], 100 * c["af"], 100 * c["app"],
-             100 * c["understat"], understat_matched))
+             100 * c["ff"], 100 * c["app"]))
     for idx, ids in xw.clashes().items():
         print("  warn: %s claimed by two players, refused until resolved: %s"
               % (idx, ", ".join(ids)))
@@ -151,8 +116,6 @@ def _selftest() -> None:
     lineups = [
         {"source": "futbolfantasy", "team_slug": "espanyol",
          "player_name": "Álvaro Fernández", "player_slug": "alvaro-fdez"},
-        {"source": "analitica", "team_slug": "espanyol",
-         "player_name": "Alvaro Fernandez", "player_slug": "af-alvaro"},
     ]
     starters = [{"team_slug": "alaves", "player_name": "Jonny Castro",
                  "player_slug": "jonny-castro-ff", "role": "starter"}]
@@ -160,7 +123,6 @@ def _selftest() -> None:
     xw = Crosswalk(players)
     for ids, want in [({"name": "Alvaro Fernandez"}, "alvaro fernandez"),
                       ({"ff_slug": "alvaro-fdez"}, "alvaro fernandez"),
-                      ({"af_slug": "af-alvaro"}, "alvaro fernandez"),
                       ({"ff_slug": "jonny-castro-ff"}, "jonny castro"),
                       ({"app_id": "9999"}, None)]:
         assert xw.player(**ids) == want, (ids, xw.player(**ids))
@@ -185,24 +147,6 @@ def _selftest() -> None:
         {"a": "12", "b": "", "c": "1715", "gone": ""}, got
     assert got["c"].app_names == {"Fermín"}, got["c"]
     assert got["b"].name == "Pablo Fornals" and got["b"].club_id == "villarreal"
-
-    understat = [
-        {"understat_id": "701", "player_name": "Alvaro Fernandez",
-         "team": "espanyol", "season": "2025"},
-        {"understat_id": "999", "player_name": "Nobody Real",
-         "team": "", "season": "2025"},
-    ]
-    matched = build_understat_ids(understat, players)
-    assert matched == 1, matched
-    assert players["alvaro fernandez"].understat_id == "701"
-    assert xw.player(understat_id="701") is None
-    assert Crosswalk(players).player(understat_id="701") \
-        == "alvaro fernandez"
-    matched2 = build_understat_ids(
-        [{"understat_id": "999999", "player_name": "Alvaro Fernandez",
-          "team": "espanyol", "season": "2025"}], players)
-    assert matched2 == 0
-    assert players["alvaro fernandez"].understat_id == "701"
 
     print("crosswalk self-test OK")
 

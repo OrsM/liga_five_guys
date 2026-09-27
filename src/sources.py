@@ -15,10 +15,9 @@ from ffcore.text import match_one, norm
 from lxml import html as lh
 
 __all__ = ["BASE", "SOURCE", "MARKET_URL", "POINTS_URL", "TEAM_URL", "TEAMS",
-           "AF_BASE", "AF_SOURCE", "AF_TEAM_URL", "AF_TEAMS",
            "Source", "sources", "source_for", "SEVERITY",
            "parse_market", "parse_team", "parse_points", "parse_fitness",
-           "parse_af_team", "season_label",
+           "season_label",
            "FD_BASE", "FD_URL", "FD_SOURCE", "CLUB_ALIASES", "club_slug", "FD_SEASONS_BACK",
            "fd_sources", "parse_fd_results",
            "CAL_KEY", "FF_CAL_URL", "MATCH_URL", "MATCH_KEY_RE",
@@ -350,78 +349,6 @@ def _suspension_sections(doc):
            if "mercado-box" not in " ".join(s.classes)]
 
 
-AF_BASE = "https://www.analiticafantasy.com"
-AF_SOURCE = "analitica"
-AF_TEAM_URL = f"{AF_BASE}/equipo/{{slug}}"
-
-AF_TEAMS = {
-    "alaves": "alaves-542", "athletic": "athletic-club-531",
-    "atletico": "atletico-madrid-530", "barcelona": "barcelona-529",
-    "betis": "real-betis-543", "celta": "celta-vigo-538",
-    "deportivo": "deportivo-la-coruna-544", "elche": "elche-797",
-    "espanyol": "espanyol-540", "getafe": "getafe-546",
-    "levante": "levante-539", "malaga": "malaga-535",
-    "osasuna": "osasuna-727", "racing": "racing-santander-4665",
-    "rayo-vallecano": "rayo-vallecano-728", "real-madrid": "real-madrid-541",
-    "real-sociedad": "real-sociedad-548", "sevilla": "sevilla-536",
-    "valencia": "valencia-532", "villarreal": "villarreal-533",
-}
-
-AF_XI_SELECTOR = 'ul[aria-label^="Titulares"] li[aria-label^="Ver resumen de"]'
-AF_NAME_PREFIX = "Ver resumen de "
-AF_PHOTO_RE = re.compile(r"/jugadores/(\d+)\.(?:png|jpg|jpeg|webp)")
-
-AF_CONSENSO_SELECTOR = '[aria-label="Consenso de alineaciones"]'
-AF_UNANIMOUS = "Unánimes"
-AF_DIVIDED = "Más divididos"
-AF_SPLIT_RE = re.compile(r"^(.+?)(\d+)\s*/\s*(\d+)\s+titular", re.S)
-AF_FRACTION_RE = re.compile(r"\d+\s*/\s*\d+")
-
-
-def _af_photo(li) -> str:
-    img = _css(li, "img[src]")
-    return img[0].get("src") if img else ""
-
-
-def _af_consensus(doc):
-    for block in _css(doc, AF_CONSENSO_SELECTOR):
-        for ul in _css(block, "ul"):
-            parent = ul.getparent()
-            ptext = (_WS.sub(" ", parent.text_content()).strip()
-                     if parent is not None else "")
-            section = next((h for h in (AF_UNANIMOUS, AF_DIVIDED)
-                            if ptext.startswith(h)), None)
-            for li in (_css(ul, "li") if section else ()):
-                text = _WS.sub(" ", li.text_content()).strip()
-                if section == AF_UNANIMOUS:
-                    if not AF_FRACTION_RE.search(text):
-                        yield text, li, "starter", 100.0, "consenso unánime"
-                    continue
-                m = AF_SPLIT_RE.match(text)
-                if m and int(m.group(3)):
-                    n, d = int(m.group(2)), int(m.group(3))
-                    yield (m.group(1).strip(), li, "doubt",
-                           round(100.0 * n / d, 1), "consenso %d/%d" % (n, d))
-
-
-def parse_af_team(html: str, observed_at: str,
-                  key: str = "af_test") -> list[dict]:
-    slug = key[3:] if key.startswith("af_") else key
-    doc = lh.fromstring(html)
-    named = [((li.get("aria-label") or "")[len(AF_NAME_PREFIX):].strip()
-              if (li.get("aria-label") or "").startswith(AF_NAME_PREFIX)
-              else "", li, "starter", None, "titular")
-             for li in _css(doc, AF_XI_SELECTOR)]
-    rows, seen = [], set()
-    for name, li, role, pct, note in named or _af_consensus(doc):
-        if not _once(seen, name.lower()):
-            continue
-        m = AF_PHOTO_RE.search(_af_photo(li))
-        rows.append(_lineup_row(observed_at, AF_SOURCE, slug, name,
-                                m.group(1) if m else None, role, pct, "", note))
-    return rows
-
-
 CAL_KEY = "calendario"
 FF_CAL_URL = f"{BASE}/laliga/calendario"
 MATCH_URL = f"{BASE}/partidos/{{path}}"
@@ -636,65 +563,6 @@ def parse_fd_results(text: str, observed_at: str,
             row[out_key] = (r.get(col) or "").strip()
         rows.append(row)
     return rows
-
-
-UNDERSTAT_URL = "https://understat.com/main/getPlayersStats/"
-UNDERSTAT_SOURCE = "understat"
-UNDERSTAT_LEAGUE = "La_liga"
-UNDERSTAT_SEASONS_BACK = 1
-
-
-def understat_sources(now: datetime | None = None) -> list["Source"]:
-    cur_y = _season_start_year(now)
-    out = []
-    for back in range(UNDERSTAT_SEASONS_BACK + 1):
-        y = cur_y - back
-        out.append(Source(
-            "understat_%d" % y, "understat_players", UNDERSTAT_URL,
-            parse_understat_players,
-            cadence="every_run" if back == 0 else "once",
-            body={"league": UNDERSTAT_LEAGUE, "season": str(y)}))
-    return out
-
-
-def parse_understat_players(text: str, observed_at: str,
-                            key: str = "understat_2026") -> list[dict]:
-    season = _season_suffix(key, "understat")
-    out = []
-    for p in _understat_rows(text):
-        pid = str(p.get("id") or "").strip()
-        name = (p.get("player_name") or "").strip()
-        if not pid or not name:
-            continue
-        out.append({
-            "observed_at": observed_at, "source": UNDERSTAT_SOURCE,
-            "season": season, "understat_id": pid, "player_name": name,
-            "team_title": (p.get("team_title") or "").strip(),
-            "team": club_slug(p.get("team_title")),
-            "position": (p.get("position") or "").strip(),
-            "games": (p.get("games") or "").strip(),
-            "minutes": (p.get("time") or "").strip(),
-            "goals": (p.get("goals") or "").strip(),
-            "assists": (p.get("assists") or "").strip(),
-            "xg": (p.get("xG") or "").strip(),
-            "xa": (p.get("xA") or "").strip(),
-            "npg": (p.get("npg") or "").strip(),
-            "npxg": (p.get("npxG") or "").strip(),
-            "shots": (p.get("shots") or "").strip(),
-            "key_passes": (p.get("key_passes") or "").strip(),
-        })
-    return out
-
-
-def _understat_rows(text: str) -> list[dict]:
-    try:
-        data = json.loads(text or "")
-    except (TypeError, ValueError):
-        return []
-    if not isinstance(data, dict) or not data.get("success"):
-        return []
-    players = data.get("players")
-    return players if isinstance(players, list) else []
 
 
 LFG_SOURCE = "laliga"
@@ -1015,7 +883,6 @@ class Source(NamedTuple):
     url: str
     parse: Callable
     cadence: str = "every_run"
-    body: dict | None = None
     enabled: bool = True
     auth: bool = False
 
@@ -1029,11 +896,7 @@ def sources(enabled_only: bool = True) -> list[Source]:
     out += [Source(f"team_{s}", "lineups", TEAM_URL.format(slug=s),
                    parse_team, cadence="twice_daily")
             for s in TEAMS]
-    out += [Source(f"af_{s}", "lineups", AF_TEAM_URL.format(slug=af),
-                   parse_af_team, cadence="twice_daily")
-            for s, af in sorted(AF_TEAMS.items())]
     out += fd_sources()
-    out += understat_sources()
     out += [Source(CAL_KEY, "matches", FF_CAL_URL, parse_calendar, cadence="daily")]
     out += [Source(API_LEAGUES_KEY, "api_leagues", API_LEAGUES_URL,
                    parse_api_leagues, auth=True)]
@@ -1153,57 +1016,6 @@ _POINTS_FIXTURE = """
 </body></html>
 """
 
-
-_AF_FIXTURE = """<html><body>
-<div><img alt="Foto de Aitor Ma\u00f1as"
-     src="https://assets.analiticafantasy.com/jugadores/1.png?v=13&width=90"/>
-     <button>Aitor Ma\u00f1as</button></div>
-<ul role="tabpanel" aria-label="Titulares Test">
-  <li role="button" aria-label="Ver resumen de Sivera">
-    <img alt="Foto de Sivera"
-         src="https://assets.analiticafantasy.com/jugadores/47353.png?v=13&width=66"/>
-    <span title="Portero">PT</span>
-    <p><span>1</span><span> - </span>Sivera</p></li>
-  <li role="button" aria-label="Ver resumen de Aitor Ma\u00f1as">
-    <img alt="Foto de Aitor Ma\u00f1as"
-         src="https://assets.analiticafantasy.com/jugadores/1.png?v=13&width=66"/>
-    <span title="Delantero">DL</span>
-    <p><span>9</span><span> - </span>Aitor Ma\u00f1as</p></li>
-  <li role="button" aria-label="Ver resumen de Sin Foto">
-    <span title="Defensa">DF</span>
-    <p><span>4</span><span> - </span>Sin Foto</p></li>
-</ul>
-<ul aria-label="Suplentes Test">
-  <li role="button" aria-label="Ver resumen de No Deberia">x</li>
-</ul>
-</body></html>"""
-
-
-_AF_CONSENSO_FIXTURE = """<html><body>
-<section aria-label="Consenso de alineaciones">
-  <div>
-    <div><h3>Unánimes</h3><p>2 jugadores en el once de todos</p>
-      <ul>
-        <li><img src="https://assets.analiticafantasy.com/jugadores/47270.png?v=13&width=36"/>
-            <span>Unai Simón</span></li>
-        <li><img src="https://assets.analiticafantasy.com/jugadores/47273.png?v=13&width=36"/>
-            <span>Yuri</span></li>
-      </ul></div>
-    <div><h3>Más divididos</h3><p>Titulares en algunos editores</p>
-      <ul>
-        <li><img src="https://assets.analiticafantasy.com/jugadores/183849.png?v=13&width=33"/>
-            <span>Aitor Paredes</span><span>2/3 titular</span></li>
-        <li><img src="https://assets.analiticafantasy.com/jugadores/84086.png?v=13&width=33"/>
-            <span>Robert Navarro</span><span>1/3 titular</span></li>
-      </ul></div>
-    <div><h3>Candidato a capitán</h3><p>Editores que marcan</p>
-      <ul>
-        <li><img src="https://assets.analiticafantasy.com/jugadores/183799.png?v=13&width=33"/>
-            <span>Nico Williams</span><span>1/3</span></li>
-      </ul></div>
-  </div>
-</section>
-</body></html>"""
 
 _API_LEAGUES_FIXTURE = """[{"id":"017998544","access":"private",
  "name":"Some Guys","managersNumber":5,
@@ -1413,36 +1225,6 @@ def _selftest() -> None:
     assert season_label("<html>nothing</html>") == "unknown"
 
 
-    af = parse_af_team(_AF_FIXTURE, "2026-01-01T0000Z", "af_test")
-    assert [r["player_name"] for r in af] == ["Sivera", "Aitor Mañas",
-                                              "Sin Foto"], af
-    assert all(r["source"] == AF_SOURCE for r in af)
-    assert all(r["team_slug"] == "test" for r in af)
-    assert all(r["role"] == "starter" for r in af)
-    assert af[0]["player_name"] == "Sivera" and af[0]["player_slug"] == "47353"
-    assert all(r["start_pct"] is None and r["status"] == "" for r in af)
-    assert af[2]["player_slug"] is None
-    assert "No Deberia" not in {r["player_name"] for r in af}
-    assert list(af[0]) == list(rows[0]), (list(af[0]), list(rows[0]))
-    assert af[0]["note"] == "titular"
-
-    con = parse_af_team(_AF_CONSENSO_FIXTURE, "2026-01-01T0000Z", "af_test")
-    byc = {r["player_name"]: r for r in con}
-    assert set(byc) == {"Unai Simón", "Yuri", "Aitor Paredes",
-                        "Robert Navarro"}, sorted(byc)
-    assert byc["Unai Simón"]["start_pct"] == 100.0
-    assert byc["Unai Simón"]["note"] == "consenso unánime"
-    assert byc["Unai Simón"]["role"] == "starter"
-    assert byc["Aitor Paredes"]["start_pct"] == 66.7, byc["Aitor Paredes"]
-    assert byc["Aitor Paredes"]["note"] == "consenso 2/3"
-    assert byc["Robert Navarro"]["start_pct"] == 33.3
-    assert byc["Robert Navarro"]["role"] == "doubt"
-    assert "Nico Williams" not in byc, con
-    assert not any(c.isdigit() for r in con for c in r["player_name"]), con
-    assert all(r["status"] == "" for r in con)
-    assert list(con[0]) == list(rows[0])
-    assert parse_af_team("<html><body>new design</body></html>", "t") == []
-
     for name, want in [("Real Sociedad", "real-sociedad"), ("Bilbao", "athletic"),
                        ("Atl. Madrid", "atletico"), ("La Coruna", "deportivo"),
                        ("Rayo", "rayo-vallecano"), ("Celta Vigo", "celta"),
@@ -1488,56 +1270,6 @@ def _selftest() -> None:
     assert all(s.table == "results_history" for s in fs)
     assert source_for("fd_2627").parse is parse_fd_results
 
-
-    _UNDERSTAT_PAST = ('{"success": true, "players": [{"id": "3423", '
-                       '"player_name": "Kylian Mbappe-Lottin", "games": '
-                       '"31", "time": "2623", "goals": "25", "xG": '
-                       '"25.796528611332178", "assists": "5", "xA": '
-                       '"7.240631651133299", "shots": "146", '
-                       '"key_passes": "65", "position": "F S", '
-                       '"team_title": "Real Madrid", "npg": "17", '
-                       '"npxG": "19.107029650360346"}]}')
-    _UNDERSTAT_LIVE = ('{"success": true, "players": [{"id": "13350", '
-                       '"player_name": "Roberto Fern\\u00e1ndez", "games": '
-                       '"1", "time": "90", "goals": "2", "xG": '
-                       '"1.1255605220794678", "assists": "0", "xA": '
-                       '"0.1955643743276596", "shots": "2", '
-                       '"key_passes": "2", "position": "F", "team_title": '
-                       '"Espanyol", "npg": "2", "npxG": '
-                       '"1.1255605220794678"}]}')
-
-    past = parse_understat_players(_UNDERSTAT_PAST, "2026-08-21T0000Z",
-                                   "understat_2025")
-    assert len(past) == 1, past
-    assert past[0]["season"] == "2025" and past[0]["understat_id"] == "3423"
-    assert past[0]["player_name"] == "Kylian Mbappe-Lottin"
-    assert past[0]["team"] == "real-madrid", past[0]
-    assert past[0]["games"] == "31" and past[0]["minutes"] == "2623"
-    assert past[0]["xg"] == "25.796528611332178"
-    assert past[0]["xa"] == "7.240631651133299"
-
-    live = parse_understat_players(_UNDERSTAT_LIVE, "2026-08-21T0522Z",
-                                   "understat_2026")
-    assert live[0]["player_name"] == "Roberto Fernández"
-    assert live[0]["team"] == "espanyol" and live[0]["season"] == "2026"
-
-    assert parse_understat_players('{"error": {"error_code": 4}}', "t") == []
-    assert parse_understat_players("", "t") == []
-    assert parse_understat_players("not json at all", "t") == []
-    assert parse_understat_players(
-        '{"success": true, "players": [{"id": "", "player_name": "X"}, '
-        '{"id": "1", "player_name": ""}]}', "t") == []
-
-
-    us = understat_sources(datetime(2026, 8, 20, tzinfo=timezone.utc))
-    assert [s.key for s in us] == ["understat_2026", "understat_2025"]
-    assert us[0].cadence == "every_run" and us[1].cadence == "once"
-    assert all(s.table == "understat_players" for s in us)
-    assert all(s.url == UNDERSTAT_URL for s in us)
-    assert us[0].body == {"league": "La_liga", "season": "2026"}
-    assert us[1].body == {"league": "La_liga", "season": "2025"}
-    assert all(s.body is None for s in sources() if s.key not in
-              ("understat_2026", "understat_2025"))
 
     lg = parse_api_leagues(_API_LEAGUES_FIXTURE, "2026-01-01T0000Z")
     assert len(lg) == 1 and lg[0]["league_id"] == "017998544", lg
@@ -1755,10 +1487,8 @@ def _selftest() -> None:
     assert source_for("api_lineup_38").table == "api_lineup"
 
     reg = sources()
-    assert len(reg) == (5 + len(TEAMS) + len(AF_TEAMS) + FD_SEASONS_BACK + 1
-                        + UNDERSTAT_SEASONS_BACK + 1) == 51, len(reg)
-    assert set(AF_TEAMS) == set(TEAMS), set(AF_TEAMS) ^ set(TEAMS)
-    assert {s.cadence for s in reg if s.key.startswith(("team_", "af_"))} \
+    assert len(reg) == 5 + len(TEAMS) + FD_SEASONS_BACK + 1 == 29, len(reg)
+    assert {s.cadence for s in reg if s.key.startswith("team_")} \
         == {"twice_daily"}
     assert {s.cadence for s in reg if s.key in ("market", "points")} \
         == {"every_run"}
@@ -1767,19 +1497,13 @@ def _selftest() -> None:
     assert {s.table for s in reg} == {"market", "points", "lineups",
                                       "matches",
                                       "api_leagues", "results_history",
-                                      "understat_players",
                                       "api_players_all"}
     assert source_for("team_celta").parse is parse_team
     assert source_for("gone") is None
 
-    assert source_for("af_celta").parse is parse_af_team
     samples = {"market": _MARKET_FIXTURE, "points": _POINTS_FIXTURE,
                CAL_KEY: _CAL_FIXTURE, API_LEAGUES_KEY: _API_LEAGUES_FIXTURE,
-               "understat_2026": _UNDERSTAT_LIVE,
-               "understat_2025": _UNDERSTAT_PAST,
                "api_players_all": _API_PLAYERS_ALL_FIXTURE}
-    for i, k in enumerate(sorted(AF_TEAMS)):
-        samples[f"af_{k}"] = _AF_FIXTURE if i % 2 else _AF_CONSENSO_FIXTURE
     for s in fd_sources():
         samples[s.key] = _FD_CUR
     for s in reg:

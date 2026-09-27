@@ -253,8 +253,7 @@ def fetch() -> Path:
             t0 = time.monotonic()
             kw = {"headers": extra} if extra else {}
             try:
-                r = (c.post(url, data=src.body, **kw) if src.body is not None
-                    else c.get(url, **kw))
+                r = c.get(url, **kw)
             except httpx.RequestError as e:
                 timing.append((time.monotonic() - t0, src.key, "FAILED"))
                 fails[src.key] = type(e).__name__
