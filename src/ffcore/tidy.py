@@ -406,8 +406,15 @@ def clock() -> JornadaClock:
 
 def clock_history() -> JornadaClock:
     if not _CLOCK_HISTORY:
-        _CLOCK_HISTORY.append(
-            JornadaClock(history("matches")))
+        rows = history("matches")
+        dated = {(r.get("home"), r.get("away")) for r in rows if r.get("kickoff")}
+        blind = {int(r["jornada"]) for r in rows
+                 if r.get("score") and str(r.get("jornada")).isdigit()
+                 and (r.get("home"), r.get("away")) not in dated}
+        full = JornadaClock(rows)
+        full.round_locks = {j: t for j, t in full.round_locks.items()
+                            if j not in blind}
+        _CLOCK_HISTORY.append(full)
     return _CLOCK_HISTORY[0]
 
 
