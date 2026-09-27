@@ -83,17 +83,6 @@ class Universe:
         owner = self.view("owner").get(k)
         return "free" if not owner or owner == self.me else "listed"
 
-    def dead_weight(self) -> list[tuple[str, float]]:
-        mine = self.state.squads.get(self.me, {})
-        choosable = [j for j in self.state.jornadas
-                     if j not in self.part_played] or list(self.state.jornadas)
-        starts: set[str] = set()
-        for j in choosable:
-            starts.update(best_xi(mine, self.forecaster.expected(j)))
-        return sorted(((k, self.view("proceeds").get(k, 0.0)) for k in mine
-                       if k not in starts),
-                      key=lambda kv: -kv[1])
-
     def cash_pts(self, a: "Action", lam: float | None = None) -> float:
         lam = self.lam if lam is None else lam
         if not lam:
@@ -145,7 +134,7 @@ class Universe:
 
     def rank(self, acts: list["Action"], seed: int = 1,
              extra: list[tuple[str, "Action"]] = ()) -> tuple:
-        screen = _score_many(self, [self.state.squads]
+        screen = score_many(self, [self.state.squads]
                              + [apply(self, a) for a in acts],
                              SCREEN_TRIALS, seed)
         base_s, rest = screen[0], screen[1:]
@@ -175,7 +164,7 @@ class Universe:
         afters = [apply(self, a) for a in keep]
         answered = {a.buy for a in keep if a.buy}
         rest = [(k, a) for k, a in extra if k not in answered]
-        final = _score_many(self, [self.state.squads] + afters
+        final = score_many(self, [self.state.squads] + afters
                             + [apply(self, a) for _k, a in rest], FINAL_TRIALS, seed)
         base, scored = final[0], final[1:len(afters) + 1]
         bands = {k: (*band(pairs), a, sum(pairs) / len(pairs) if pairs else 0.0)
@@ -196,7 +185,6 @@ class Universe:
                 "cash_pts": cash,
                 "d_win": r.position().get(1, 0.0) - base.position().get(1, 0.0),
                 "mean": r.mean(self.me),
-                "value": value_rate(d_pts, a.net),
             })
         rows = sorted(out, key=lambda d: (-d["net_pts"], d["action"].net))
         return rows, base, measured, bands
@@ -227,7 +215,7 @@ def _fieldable(squad: dict[str, str]) -> bool:
               and depth.get("DEL", 0) >= n for d, m, n in FREE_FORMATIONS)
 
 
-def _score_many(u: Universe, many: list, trials: int, seed: int):
+def score_many(u: Universe, many: list, trials: int, seed: int):
     return simulate_many(
         [LeagueState(squads=sq, jornadas=u.state.jornadas, me=u.me,
                      carried=u.state.carried) for sq in many],
@@ -258,17 +246,13 @@ def fieldable_spares(u) -> list[str]:
         {p: s for p, s in mine_squad.items() if p != k})]
 
 
-def max_spare_proceeds(u) -> float:
-    return max((u.view("proceeds").get(k, 0.0) for k in fieldable_spares(u)),
-              default=0.0)
-
-
-def apply(u, a: Action) -> dict[str, dict[str, str]]:
+def apply(u, *acts: Action) -> dict[str, dict[str, str]]:
     sq = {m: dict(s) for m, s in u.state.squads.items()}
-    for gone in a.sell:
-        sq[u.me].pop(gone, None)
-    if a.buy:
-        sq[u.me][a.buy] = u.view("pos").get(a.buy, "MED")
+    for a in acts:
+        for gone in a.sell:
+            sq[u.me].pop(gone, None)
+        if a.buy:
+            sq[u.me][a.buy] = u.view("pos").get(a.buy, "MED")
     return {m: phantom_topup(s) for m, s in sq.items()}
 
 
@@ -439,13 +423,6 @@ def _selftest() -> None:
     assert [r["net_pts"] for r in rows] == sorted(
         (r["net_pts"] for r in rows), reverse=True)
 
-    spend = next(r for r in rows if r["action"].net > 0)
-    assert abs(spend["value"] - spend["d_pts"] / (spend["action"].net / 1e6)
-              ) < 1e-9, spend
-    sale = next((r for r in rows if r["action"].net <= 0), None)
-    if sale is not None:
-        assert sale["value"] is None, sale
-
     vsq = {"me_k": "POR",
            **{"me_d%d" % i: "DEF" for i in range(1, 6)},
            **{"me_m%d" % i: "MED" for i in range(1, 7)},
@@ -473,7 +450,6 @@ def _selftest() -> None:
     vby = {r["action"].buy: r for r in vrows}
     assert vby["thin_del"]["action"].net == vby["deep_med"]["action"].net
     assert vby["thin_del"]["d_pts"] > 2 * vby["deep_med"]["d_pts"] > 0, vby
-    assert vby["thin_del"]["value"] > 2 * vby["deep_med"]["value"] > 0, vby
 
     bsq = {"me_k": "POR", "me_d1": "DEF", "me_d2": "DEF", "me_d3": "DEF",
            "me_d4": "DEF", "me_d5": "DEF", "me_m1": "MED", "me_m2": "MED",
@@ -573,15 +549,15 @@ def _selftest() -> None:
     for s in spares:
         assert _fieldable({p: pos for p, pos in mine.items() if p != s}), s
     assert "k" not in spares and "f1" in spares and "dead_f" in spares, spares
-    assert max_spare_proceeds(u) == 6e6, max_spare_proceeds(u)
     bare = Universe(
         state=LeagueState({"me": {"k": "POR", "d1": "DEF", "d2": "DEF",
                                   "d3": "DEF", "m1": "MED", "m2": "MED",
                                   "m3": "MED", "f1": "DEL"}}, [1], "me"),
         forecaster=Bootstrap({1: {}}), cash=0.0, me="me")
-    assert fieldable_spares(bare) == [] and max_spare_proceeds(bare) == 0.0
-    assert dict(u.dead_weight()) == {"dead_f": 6e6}, u.dead_weight()
-    after = apply(u, Action("buy", buy="new_por", sell=("spare_d",)))
+    assert fieldable_spares(bare) == []
+    after = apply(u, Action("buy", buy="new_por", sell=("spare_d",)),
+                  Action("sell", sell=("dead_f",)))
+    assert "dead_f" not in after["me"], after["me"]
     assert "spare_d" not in after["me"], after["me"]
     assert after["me"]["new_por"] == "MED", after["me"]
 

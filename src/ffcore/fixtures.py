@@ -137,10 +137,6 @@ def _selftest() -> None:
     mu = tiny_market_universe()
     assert _fieldable(mu.state.squads["me"]), mu.state.squads["me"]
 
-    dw = dict(mu.dead_weight())
-    assert set(dw) == {"bench_m", "bench_k"}, dw
-    assert dw["bench_m"] == 3e6 and dw["bench_k"] == 2e6, dw
-
     exp, _xi = mu.current_xi
     acts = mu.candidates()
     assert acts, "tiny_market_universe() must produce real candidate actions"
