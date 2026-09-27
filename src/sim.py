@@ -1,28 +1,25 @@
 from __future__ import annotations
 
 import json
-import statistics
 import sys
 
-import flip
 import grading
-from decide import Action, max_spare_proceeds, value_rate, worth_doing
+from decide import (PRICE_LOG, Action, max_spare_proceeds, value_rate,
+                    worth_doing)
 from ffcore.league import app_fielded
 from ffcore.render import title_name
 from ffcore.season import best_xi
-from ffcore.tidy import (DECISIONS, REPORTS, load_deadline, log_row, read_csv,
+from ffcore.tidy import (DECISIONS, REPORTS, load_deadline, log_row,
                          run_now)
 
 __all__ = ["shape"]
-
-PRICE_LOG = "cash_price_log.csv"
 
 SLOT_ORDER = {"POR": 0, "DEF": 1, "MED": 2, "DEL": 3}
 
 GROUP_LABEL = {
     "in": "PUT ON", "out": "TAKE OFF",
     "field": "FIELD — your eleven — the app has not said what you are playing",
-    "keep": "KEEP — bench", "sell": "SELL — never start",
+    "keep": "KEEP — bench", "sell": "SELL — worth more as cash",
     "buy": "BUY — free agents",
     "save": "SAVE — better than yours, out of reach", "pass": "PASS",
 }
@@ -80,9 +77,7 @@ def cell(u, k, group, place, money=None, pts=None, note="", value=None,
 
 
 def move_rank(r, u):
-    listed = u.view("route").get(r["action"].buy, "free") == "listed"
-    d = r.get("d_pts")
-    return (listed, -d if d is not None else float("inf"))
+    return (u.view("route").get(r["action"].buy, "free") == "listed", -r["net_pts"])
 
 
 def band_acts(u) -> list:
@@ -95,10 +90,23 @@ def band_acts(u) -> list:
                if k not in mine and exp.get(k, 0.0) > u.xi_bar])
 
 
+def sale_pts(u, bands, dead) -> dict[str, float]:
+    _exp, xi = u.current_xi
+    return {k: u.cash_pts(bands[k][3])
+            - (0.0 if k in dead else max(0.0, -bands[k][4]))
+            for k in u.state.squads.get(u.me, {}) if k in bands and k not in xi}
+
+
+def why(r) -> str:
+    return " + ".join(w for w, v in (("points", r["d_pts"]), ("cash", r["cash_pts"]))
+                      if v > 0)
+
+
 def ladder_rows(u, rows, bands, chg) -> list[dict]:
     exp, xi = u.current_xi
     mine = u.state.squads.get(u.me, {})
-    dead = {k for k, _ in u.dead_weight()}
+    sale = sale_pts(u, bands, {k for k, _ in u.dead_weight()})
+    dead = {k for k, v in sale.items() if v >= 0}
     won = {r["action"].buy: r for r in rows if r["action"].buy}
     pts = {k: v[0] for k, v in bands.items() if k not in won}
     reach = u.cash + max_spare_proceeds(u)
@@ -113,7 +121,8 @@ def ladder_rows(u, rows, bands, chg) -> list[dict]:
         u, [k for k in mine if k not in xi and k not in dead and k not in moving])]
     out = [cell(u, k, g, place, pts=pts.get(k)) for k, g, place in plan]
     out += [cell(u, k, "sell", "yours", money=u.view("proceeds").get(k, 0.0),
-                 pts=pts.get(k)) for k in sorted(dead, key=lambda k: -exp.get(k, 0.0))]
+                 pts=pts.get(k), note="cash" if u.cash_pts(bands[k][3]) > 0 else "")
+            for k in sorted(dead, key=lambda k: -sale[k])]
 
     screened = {r["action"].buy
                 for r in worth_doing(u, [won[k] for k in rest if k in won])}
@@ -125,7 +134,9 @@ def ladder_rows(u, rows, bands, chg) -> list[dict]:
         out.append(cell(
             u, k, "buy", where(u, k),
             money=-r["action"].net, pts=r["d_pts"],
-            note=("sell " + " + ".join(short(s, u) for s in sold)) if sold else "",
+            note=" · ".join(n for n in (
+                ("sell " + " + ".join(short(s, u) for s in sold)) if sold else "",
+                "for " + why(r) if why(r) else "") if n),
             value=r.get("value"), market=u.view("value").get(k),
             premium=r.get("burn") or 0.0))
     for k in sorted((k for k in rest if k not in won and price[k] > reach),
@@ -180,16 +191,6 @@ def payload(u, base, ladder, chg, locks_h=None) -> dict:
     }
 
 
-def cash_price_history():
-    seen = []
-    for r in read_csv(DECISIONS / PRICE_LOG):
-        try:
-            seen.append(float(r["places_per_million"]))
-        except (TypeError, ValueError, KeyError):
-            continue
-    return statistics.median(seen) if seen else None
-
-
 def log_cash_price(measured) -> None:
     if measured is not None:
         log_row(DECISIONS / PRICE_LOG,
@@ -221,7 +222,7 @@ def _selftest() -> None:
                            "benat": "benat turrientes"}))
     rows = [{"action": Action("swap", buy="yuri", sell="benat",
                               cost=20e6, proceeds=5.87e6),
-             "net_pts": 0.433, "d_win": 0.364,
+             "net_pts": 0.433, "cash_pts": 0.0, "d_win": 0.364,
              "d_pts": 120.0, "pts_lo": 43.3, "pts_hi": 210.0, "mean": 1510.0,
              "value": 120.0 / (14.13e6 / 1e6)}]
 
@@ -271,7 +272,7 @@ def _selftest() -> None:
     assert worth_doing(u, flat) == []
 
     all_rows = [{"action": Action("buy", buy=buy, cost=5e6),
-                 "net_pts": d_pts / 100, "d_win": 0.0, "value": value,
+                 "net_pts": d_pts, "cash_pts": 0.0, "d_win": 0.0, "value": value,
                  "d_pts": d_pts, "pts_lo": lo, "pts_hi": hi, "burn": burn}
                 for buy, d_pts, lo, hi, value, burn in [
                     ("steady", 40.0, 10.0, 70.0, 8.0, None),
@@ -346,6 +347,17 @@ def _selftest() -> None:
                                       extra=list(asked.items()))
     assert [r for r in rows2 if r["action"].buy == "cand"] and "cand" not in bands2
 
+    for d_pts, cash, want in [(1.0, 0.2, "points + cash"), (-1.0, 0.2, "cash"),
+                              (2.0, -0.1, "points"), (0.0, 0.0, "")]:
+        assert why({"d_pts": d_pts, "cash_pts": cash}) == want, (d_pts, cash)
+    from ffcore.fixtures import tiny_market_universe
+    mu = tiny_market_universe(lam=0.3)
+    mu.facts.update(value={"bench_m": 3e6}, trend={"bench_m": -10.0})
+    bm = {"bench_m": (0.0, 0.0, 0.0,
+                      Action("sell", sell=("bench_m",), proceeds=3e6), -2.0)}
+    assert abs(sale_pts(mu, bm, set())["bench_m"] - (0.09 - 2.0)) < 1e-9
+    assert abs(sale_pts(mu, bm, {"bench_m"})["bench_m"] - 0.09) < 1e-9
+
     print("sim self-test OK")
 
 
@@ -362,21 +374,13 @@ def main() -> None:
     locks_h = (None if deadline is None
                else (deadline - run_now()).total_seconds() / 3600)
     rows, base, measured, bands = u.rank(
-        u.candidates(budget=float("inf")), price=cash_price_history(),
-        extra=band_acts(u))
+        u.candidates(budget=float("inf")), extra=band_acts(u))
     log_cash_price(measured)
     chg = xi_change(app_fielded(u.state.squads.get(u.me, {}), u.view("name")),
                     u.current_xi[1])
 
-    moves = sorted(worth_doing(u, rows), key=lambda r: move_rank(r, u))
-    dead = {k for k, _ in u.dead_weight()}
-    sell_cost = {k: 0.0 if k in dead else max(0.0, -bands[k][4])
-                 for k in u.state.squads.get(u.me, {}) if k in bands}
     doc = {"generated_at": run_now().strftime("%Y-%m-%dT%H:%MZ"),
            **payload(u, base, ladder_rows(u, rows, bands, chg), chg, locks_h)}
-    market = flip.run(u, moves, sell_cost)
-    if market is not None:
-        doc["flip"] = market
     REPORTS.mkdir(exist_ok=True)
     (REPORTS / "decisions.json").write_text(
         json.dumps(doc, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")

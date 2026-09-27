@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import math
 import sys
+from statistics import mean, median
 from dataclasses import dataclass, field
 from functools import cache, cached_property
 from types import MappingProxyType
@@ -13,15 +14,16 @@ from ffcore.forecast import Bootstrap
 import grading
 from stats import percentile
 from ffcore.schedule import expectations, phantom_fill, phantom_topup
-from ffcore.pricing import burn, cash_price
+from ffcore.pricing import auction_ratios, burn, cash_price, steps, trend
 from ffcore.action import Action
 from ffcore.fixture import club_volatility
 from ffcore.league import League
 from ffcore.score import SLOT, Scorer, build, replacement, squad_pool, vor
 from ffcore.season import (LeagueState, best_xi,
                            simulate_many)
-from ffcore.tidy import (LINEUP_SOURCE, age_hours, current, scored,
-                         load_players, market_routes, pending, run_now)
+from ffcore.tidy import (DECISIONS, LINEUP_SOURCE, age_hours, current, history,
+                         load_deadline, load_players, market_routes, pending,
+                         read_csv, run_now, scored)
 from ffcore.parse import num, text
 
 __all__ = ["Action", "Universe"]
@@ -49,6 +51,8 @@ class Universe:
     locked_cash: float = 0.0
     received_offers: dict[str, float] = field(default_factory=dict)
     mae: float | None = None
+    lam: float | None = None
+    premium: float = 1.0
     lg: League | None = None
     sc: Scorer | None = None
 
@@ -90,6 +94,20 @@ class Universe:
                        if k not in starts),
                       key=lambda kv: -kv[1])
 
+    def cash_pts(self, a: "Action", lam: float | None = None) -> float:
+        lam = self.lam if lam is None else lam
+        if not lam:
+            return 0.0
+        value, trend = self.view("value"), self.view("trend")
+        proceeds = self.view("proceeds")
+        money = -(burn(self, a) or 0.0)
+        if a.buy:
+            money += value.get(a.buy, 0.0) * trend.get(a.buy, 0.0) / 100
+        for k in a.sell:
+            v = value.get(k, proceeds.get(k, 0.0))
+            money += proceeds.get(k, 0.0) - v * (1 + trend.get(k, 0.0) / 100)
+        return lam * money / 1e6
+
     def candidates(self, budget: float | None = None) -> list["Action"]:
         cash = self.cash if budget is None else budget
         mine = set(self.state.squads.get(self.me, {}))
@@ -101,9 +119,10 @@ class Universe:
 
         out: list[Action] = []
         for c, price in sorted(self.view("price").items(), key=lambda kv: kv[1]):
-            if c in mine or exp.get(c, 0.0) <= self.xi_bar:
+            if c in mine or self.route_kind(c) == "listed":
                 continue
-            if self.route_kind(c) == "listed":
+            if exp.get(c, 0.0) <= self.xi_bar and self.cash_pts(
+                    Action("buy", buy=c, cost=price)) <= 0:
                 continue
             if price <= cash:
                 out.append(Action("buy", buy=c, cost=price))
@@ -128,7 +147,7 @@ class Universe:
         return {k: vor({"slot": pos.get(k), "score": v}, repl)
                 for k, v in season.items()}
 
-    def rank(self, acts: list["Action"], seed: int = 1, price=None,
+    def rank(self, acts: list["Action"], seed: int = 1,
              extra: list[tuple[str, "Action"]] = ()) -> tuple:
         screen = _score_many(self, [self.state.squads]
                              + [apply(self, a) for a in acts],
@@ -138,10 +157,12 @@ class Universe:
         for a, r in zip(acts, rest):
             d, _lo, _hi = band(paired(r, base_s, self.me))
             reach.append((a.cost - a.proceeds - self.cash, d))
-            if a.cost <= self.cash + a.proceeds:
-                screened.append((d, a))
         measured = cash_price(reach)
-        lam = price if price is not None else measured
+        lam = self.lam if self.lam is not None else (measured or 0.0)
+        for a, r in zip(acts, rest):
+            if a.cost <= self.cash + a.proceeds:
+                d, _lo, _hi = band(paired(r, base_s, self.me))
+                screened.append((d + self.cash_pts(a, lam), a))
 
         _, cur_xi = self.current_xi
         pick: dict[str, tuple] = {}
@@ -176,8 +197,7 @@ class Universe:
                                       zip(rest, final[len(afters) + 1:]))}
         out = []
         for a, r in zip(keep, scored):
-            b_ = burn(self, a)
-            charge = 0.0 if (lam is None or b_ is None) else lam * b_ / 1e6
+            cash = self.cash_pts(a, lam)
             pairs = paired(r, base, self.me)
             d_pts, lo, hi = band(pairs)
             out.append({
@@ -185,9 +205,9 @@ class Universe:
                 "d_pts": d_pts,
                 "pts_lo": lo,
                 "pts_hi": hi,
-                "net_pts": d_pts - charge,
-                "burn": b_,
-                "charge": charge,
+                "net_pts": d_pts + cash,
+                "burn": burn(self, a),
+                "cash_pts": cash,
                 "d_win": r.position().get(1, 0.0) - base.position().get(1, 0.0),
                 "mean": r.mean(self.me),
                 "value": value_rate(d_pts, a.net),
@@ -297,18 +317,35 @@ def _clears_par_floor(par_of: dict, mae, k: str, horizon: int = 1,
     return par >= mae * math.sqrt(max(1, horizon))
 
 
-def _gains(r) -> bool:
-    d = r.get("d_pts")
-    return d is not None and d > 0
-
-
 def worth_doing(u, rows) -> list:
     par_of, pj_of = u.par, u.view("pj")
     mae = u.mae
-    rows = [r for r in rows if not r["action"].buy
-            or _clears_par_floor(par_of, mae, r["action"].buy,
-                                 len(u.state.jornadas), pj_of)]
-    return [r for r in rows if _gains(r)]
+    return [r for r in rows if r["net_pts"] > 0 and (
+        not r["action"].buy or r["cash_pts"] > 0
+        or _clears_par_floor(par_of, mae, r["action"].buy,
+                             len(u.state.jornadas), pj_of))]
+
+
+PRICE_LOG = "cash_price_log.csv"
+PRICE_WINDOW = 50
+
+
+def cash_price_history() -> float | None:
+    seen = [x for r in read_csv(DECISIONS / PRICE_LOG)
+            if (x := num(r, "places_per_million")) is not None]
+    return median(seen[-PRICE_WINDOW:]) if seen else None
+
+
+def _updates_to_lock() -> int:
+    deadline = load_deadline()
+    hours = (deadline - run_now()).total_seconds() / 3600 if deadline else 24.0
+    return max(1, round(hours / 24))
+
+
+def _premium() -> float:
+    paid = auction_ratios(history("api_market"),
+                          [a for a in current("api_activity") if a["kind"] == "buy"])
+    return mean(paid) if paid else 1.0
 
 
 @cache
@@ -353,7 +390,8 @@ def load() -> Universe:
              "owner": {k: v for k, v in lg.owner.items() if k in players},
              "value": {k: v for k, v in value.items() if k in players},
              "proceeds": {k: v for k, v in proceeds.items() if k in players},
-             "pj": {k: r.pj for k, r in rates.items() if r}}
+             "pj": {k: r.pj for k, r in rates.items() if r},
+             "trend": trend(steps(history("market")), _updates_to_lock())}
     matches = {k: r.pj for k, r in rates.items() if r}
     squads, per_j = phantom_fill(squads, per_j, pos)
     assert all(_fieldable(sq) for sq in squads.values()), squads
@@ -362,12 +400,12 @@ def load() -> Universe:
                                  for k in layer if k.startswith("__phantom_")})
 
     pool = [s.pts for s in scored() if s.games == 1]
-    history = grading.graded_history()
+    graded = grading.graded_history()
     fc = Bootstrap(per_j, pool=pool, matches=matches, club_of=club,
                    club_rel=club_volatility(current("results_history"),
                                             set(club.values())),
-                   drift_frac=grading.drift_frac_from_history(history),
-                   rate_floor=grading.fit_rate_rel_floor(pool, history))
+                   drift_frac=grading.drift_frac_from_history(graded),
+                   rate_floor=grading.fit_rate_rel_floor(pool, graded))
 
     carried = {r["manager"]: num(r, "team_points", default=0.0)
                for r in lg.standings if r.get("manager")}
@@ -377,8 +415,9 @@ def load() -> Universe:
         rival_cash={h: v for h, v in lg.cash.items() if h != me},
         part_played=played, first_jornada_of=first_jornada_of,
         locked_cash=sum(pending(mkt, "bid_status", "bid_money").values()),
-        received_offers=received_offers,
-        mae=grading.current_mae(history[1], history[2], history[0]))
+        received_offers=received_offers, lam=cash_price_history(),
+        premium=_premium(),
+        mae=grading.current_mae(graded[1], graded[2], graded[0]))
 
 
 def _selftest() -> None:
@@ -674,15 +713,27 @@ def _selftest() -> None:
         facts={"pos": dict.fromkeys(("me_a", "me_b", "cand"), "MED")}).par
     assert par == {"me_a": 0.0, "me_b": 6.0, "cand": 4.0}, par
 
-    for d_pts, want in [(0.1, True), (-2.0, False), (0.0, False), (None, False)]:
-        assert _gains({"d_pts": d_pts}) is want, d_pts
-    assert not _gains({})
-
     par_of = {"good": 5.0, "weak": 1.99, "unknown": None}
     for mae, k, want in [(None, "weak", True), (2.9, "good", True),
                          (2.9, "weak", False), (2.9, "unknown", False),
                          (2.9, "missing", False)]:
         assert _clears_par_floor(par_of, mae, k) is want, (mae, k)
+
+    from ffcore.fixtures import tiny_market_universe
+    mu = tiny_market_universe(lam=0.3, premium=1.05)
+    mu.facts.update(value={"bench_m": 3e6, "riser": 2e6},
+                    trend={"riser": 20.0, "bench_m": -10.0},
+                    price={**mu.facts["price"], "riser": 2e6},
+                    pos={**mu.facts["pos"], "riser": "MED"})
+    buy_riser = Action("buy", buy="riser", cost=2e6)
+    assert abs(mu.cash_pts(buy_riser) - 0.3 * (0.4 - 0.1)) < 1e-9
+    assert "riser" in {a.buy for a in mu.candidates()}
+    sell_m = Action("sell", sell=("bench_m",), proceeds=3e6)
+    assert abs(mu.cash_pts(sell_m) - 0.3 * 0.3) < 1e-9
+    assert mu.cash_pts(buy_riser, lam=0.0) == 0.0
+    mu.facts["trend"] = {"riser": 0.0}
+    assert mu.cash_pts(buy_riser) < 0
+    assert "riser" not in {a.buy for a in mu.candidates()}
 
     print("decide self-test OK")
 

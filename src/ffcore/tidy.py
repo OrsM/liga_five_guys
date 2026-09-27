@@ -20,7 +20,7 @@ __all__ = ["ROOT", "TIDY", "SEASON", "DECISIONS", "REPORTS", "MADRID",
            "TABLES", "Table", "current", "history", "age_hours", "set_now",
            "input_path", "read_csv", "write_csv", "append_csv", "widen_csv",
            "log_row", "csv_string", "snapshot_stamp",
-           "Market", "Valuation", "row_key", "run_now", "load_crosswalk",
+           "row_key", "run_now", "load_crosswalk",
            "load_players", "load_deadline",
            "LINEUP_SOURCE", "kickoff_stamp", "MATCH_LEN",
            "minutes_played", "market_routes", "pending", "LISTED_SELLER",
@@ -510,62 +510,8 @@ def load_players() -> dict[str, dict]:
                   "player_name", XI_FIELDS)
 
 
-class Valuation(NamedTuple):
-    value: float
-    observed_at: str
-    lag_h: float
-    name: str
-
-
 def row_key(row: dict) -> str:
     return (row.get("ff_id") or "").strip() or norm(row.get("name"))
-
-
-class Market:
-
-    def __init__(self, rows: list[dict]):
-        self.rows = rows
-        self._by_key: dict[str, list[tuple[datetime, dict, float | None]]] = {}
-        for r in rows:
-            key = row_key(r)
-            when = snapshot_stamp(r.get("observed_at", ""))
-            if key and when is not None:
-                self._by_key.setdefault(key, []).append(
-                    (when, r, money(r.get("value"))))
-        for hist in self._by_key.values():
-            hist.sort(key=lambda t: t[0])
-
-    def __len__(self) -> int:
-        return len(self._by_key)
-
-    def latest(self) -> dict[str, dict]:
-        return {k: hist[-1][1] for k, hist in self._by_key.items()}
-
-    def at(self, key, when: datetime | None) -> Valuation | None:
-        hist = self._by_key.get(key)
-        if not hist or when is None:
-            return None
-        prior = [h for h in hist if h[0] <= when]
-        t, r, val = prior[-1] if prior else hist[0]
-        if val is None:
-            return None
-        return Valuation(val, r.get("observed_at", ""),
-                         (when - t).total_seconds() / 3600.0,
-                         r.get("name", key))
-
-    def series(self, key) -> list[tuple[datetime, float]]:
-        return [(t, v) for t, _r, v in self._by_key.get(key, ()) if v is not None]
-
-    def drift(self, key, since: datetime | None, days: float):
-        base = self.at(key, since)
-        if not base:
-            return None
-        target = since + timedelta(days=days)
-        later = [(t, v) for t, v in self.series(key) if t >= target]
-        if not later:
-            return None
-        _, v = later[0]
-        return v - base.value, (v / base.value - 1) * 100.0 if base.value else None
 
 
 LISTED_SELLER = "marketPlayerTeam"
@@ -753,24 +699,6 @@ def _selftest() -> None:
     _NOW.clear()
     assert run_now().year >= 2026
 
-    tw = [{"ff_id": "867", "name": "Álvaro García", "team": "Rayo",
-           "value": "20233300", "observed_at": "2026-08-19T1639Z"},
-          {"ff_id": "12993", "name": "Álvaro García", "team": "Villarreal",
-           "value": "501929", "observed_at": "2026-08-19T1639Z"},
-          {"ff_id": "5001", "name": "Pepelu", "team": "Valencia",
-           "value": "7669774", "observed_at": "2026-08-19T1639Z"}]
-    tm = Market(tw + [dict(tw[0], value="21000000",
-                           observed_at="2026-08-20T1639Z")])
-    assert len(tm) == 3, len(tm)
-    assert sorted(tm.latest()) == ["12993", "5001", "867"], sorted(tm.latest())
-    for key, when, want in [("867", "2026-08-19T1700Z", 20233300.0),
-                            ("867", "2026-08-20T1700Z", 21000000.0),
-                            ("867", "2026-08-01T0000Z", 20233300.0),
-                            ("12993", "2026-08-19T1700Z", 501929.0)]:
-        assert tm.at(key, snapshot_stamp(when)).value == want, (key, when)
-    assert tm.at("Álvaro García", snapshot_stamp("2026-08-19T1700Z")) is None
-    assert [v for _t, v in tm.series("867")] == [20233300.0, 21000000.0]
-    assert tm.drift("867", snapshot_stamp("2026-08-19T1639Z"), 1)[0] == 766700.0
     assert row_key({"name": "Iker Muñoz"}) == norm("Iker Munoz")
 
     mkt = [{"name": "Ane Aldea", "team": "Alavés", "position": "defensa",
