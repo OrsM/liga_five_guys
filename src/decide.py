@@ -14,13 +14,12 @@ from ffcore.schedule import expectations, phantom_fill, phantom_topup
 from ffcore.pricing import auction_ratios, cash_price, steps, trend
 from ffcore.action import Action
 from ffcore.league import League
-from ffcore.market import Market
+from ffcore.market import Market, market_routes, pending
 from ffcore.outlook import Outlook
 from ffcore.score import SLOT, build
 from ffcore.season import LeagueState, best_xi, simulate_many
 from ffcore.tidy import (DECISIONS, LINEUP_SOURCE, age_hours, current, history,
-                         load_deadline, load_players, market_routes, pending,
-                         read_csv, run_now, scored)
+                         load_deadline, load_players, read_csv, run_now, scored)
 from ffcore.parse import num, text
 
 __all__ = ["Action", "Band", "Ranking", "Universe", "band_acts", "plan",

@@ -4,7 +4,7 @@ from dataclasses import dataclass, field, replace
 
 from ffcore.action import Action
 
-__all__ = ["Market"]
+__all__ = ["Market", "LISTED_SELLER", "market_routes", "pending"]
 
 
 @dataclass(frozen=True)
@@ -52,6 +52,35 @@ class Market:
         return lam * money / 1e6
 
 
+LISTED_SELLER = "marketPlayerTeam"
+
+
+def market_routes(mkt: list[dict]) -> tuple[dict[str, float], dict[str, str]]:
+    price: dict[str, float] = {}
+    route: dict[str, str] = {}
+    for r in mkt:
+        k = r["key"]
+        if not k or not r.get("sale_price"):
+            continue
+        price[k] = float(r["sale_price"])
+        route[k] = "listed" if r.get("seller") == LISTED_SELLER else "free"
+    return price, route
+
+
+def pending(rows, status_field: str, money_field: str) -> dict[str, float]:
+    out: dict[str, float] = {}
+    for r in rows:
+        if (r.get(status_field) or "") != "pending":
+            continue
+        amt = float(r.get(money_field) or 0)
+        if not amt:
+            continue
+        k = r["key"]
+        if k:
+            out[k] = max(out.get(k, 0.0), amt)
+    return out
+
+
 def _selftest() -> None:
     m = Market(value={"star": 5e6, "free": 4e6})
     assert m.burn(Action("buy", buy="star", cost=8e6)) == 3e6
@@ -77,6 +106,46 @@ def _selftest() -> None:
         pass
     else:
         raise AssertionError("a misspelt table must fail, not read as empty")
+    mkt_rows = [
+        {"player_name": "Free Agent", "sale_price": "5000000",
+         "seller": "marketPlayerLeague", "bids": "0"},
+        {"player_name": "Listed Rival", "sale_price": "8000000",
+         "seller": "marketPlayerTeam", "bids": "2"},
+        {"player_name": "Not Priced", "sale_price": "",
+         "seller": "marketPlayerLeague"},
+        {"player_name": "Unjoinable", "sale_price": "1000000",
+         "seller": "marketPlayerTeam"},
+    ]
+    for r, k in zip(mkt_rows, ["free_agent", "listed_rival", "not_priced",
+                               None]):
+        r["key"] = k
+    price, route = market_routes(mkt_rows)
+    assert price == {"free_agent": 5000000.0, "listed_rival": 8000000.0}, price
+    assert route == {"free_agent": "free", "listed_rival": "listed"}, route
+    assert "not_priced" not in route and "not_priced" not in price
+    unknown_seller = [{"player_name": "Free Agent", "sale_price": "1",
+                       "seller": "something_new", "key": "free_agent"}]
+    _, r2 = market_routes(unknown_seller)
+    assert r2 == {"free_agent": "free"}, r2
+
+    mkt_bids = [
+        {"player_name": "A", "bid_status": "pending", "bid_money": "5600000"},
+        {"player_name": "B", "bid_status": "pending", "bid_money": "6795815"},
+        {"player_name": "C", "bid_status": "", "bid_money": ""},
+        {"player_name": "D", "bid_status": "accepted", "bid_money": "2000000"},
+        {"player_name": "E", "bid_status": "pending", "bid_money": ""},
+        {"player_name": "A", "bid_status": "pending", "bid_money": "5100000"},
+        {"player_name": "", "bid_status": "pending", "bid_money": "9000000"},
+    ]
+    sent = pending([dict(r, key=r["player_name"]) for r in mkt_bids],
+                   "bid_status", "bid_money")
+    assert sent == {"A": 5600000.0, "B": 6795815.0}, sent
+    assert pending([], "bid_status", "bid_money") == {}
+    offers = [{"key": k, "status": st, "money": m} for k, st, m in [
+        ("me_a", "pending", "6795815"), ("me_a", "pending", "1000000"),
+        ("me_b", "accepted", "9000000"), ("me_b", "", ""),
+        (None, "pending", "1")]]
+    assert pending(offers, "status", "money") == {"me_a": 6795815.0}
     print("ffcore.market self-test OK")
 
 
