@@ -1,7 +1,6 @@
 
 from __future__ import annotations
 
-import math
 import sys
 from statistics import median
 from dataclasses import dataclass, field
@@ -11,7 +10,6 @@ from typing import Mapping
 
 
 from ffcore.forecast import Bootstrap
-import grading
 from stats import percentile
 from ffcore.schedule import expectations, phantom_fill, phantom_topup
 from ffcore.pricing import auction_ratios, burn, cash_price, steps, trend
@@ -32,10 +30,6 @@ SCREEN_TRIALS = 250
 FINAL_TRIALS = 3000
 KEEP = 12
 
-KEEP_RELIABLE_MIN = 6
-
-KEEP_VALUE_MIN = 4
-
 
 @dataclass
 class Universe:
@@ -49,7 +43,6 @@ class Universe:
     first_jornada_of: dict[str, int] = field(default_factory=dict)
     locked_cash: float = 0.0
     received_offers: dict[str, float] = field(default_factory=dict)
-    mae: float | None = None
     lam: float | None = None
     premium: float = 1.0
     lg: League | None = None
@@ -174,17 +167,7 @@ class Universe:
                 pick[k] = (d, a)
         screened = sorted(pick.values(), key=lambda t: (-t[0], t[1].net))
 
-        top = screened[:KEEP]
-        top = _top_up(top, screened,
-                     ok=lambda d, a: self.view("route").get(a.buy, "free") != "listed",
-                     rank_key=lambda t: -t[0], minimum=KEEP_RELIABLE_MIN)
-        best_value = {a.buy or a.sell for _, a in
-                     sorted((t for t in screened if t[0] > 0 and t[1].net > 0),
-                            key=_per_million)[:KEEP_VALUE_MIN]}
-        top = _top_up(top, screened,
-                     ok=lambda d, a: (a.buy or a.sell) in best_value,
-                     rank_key=_per_million, minimum=KEEP_VALUE_MIN)
-        keep = [a for _, a in top]
+        keep = [a for _, a in screened[:KEEP]]
         afters = [apply(self, a) for a in keep]
         answered = {a.buy for a in keep if a.buy}
         rest = [(k, a) for k, a in extra if k not in answered]
@@ -220,10 +203,6 @@ class Universe:
 
 def _nulls_last(v: float | None) -> tuple[bool, float]:
     return v is None, v or 0.0
-
-
-def _per_million(t: tuple) -> float:
-    return -t[0] / (t[1].net / 1e6)
 
 
 def _pos_of(raw: str) -> str:
@@ -263,18 +242,6 @@ def band(pairs) -> tuple[float, float, float]:
             percentile(pairs, 90))
 
 
-def _top_up(top: list[tuple], screened: list[tuple], ok, rank_key,
-           minimum: int) -> list[tuple]:
-    kept = {a.buy or a.sell for _, a in top}
-    have = sum(1 for d, a in top if ok(d, a))
-    if have >= minimum:
-        return top
-    more = sorted((t for t in screened
-                   if (t[1].buy or t[1].sell) not in kept and ok(*t)),
-                  key=rank_key)
-    return top + more[:minimum - have]
-
-
 def value_rate(pts, cost) -> float | None:
     if pts is None or cost is None or cost <= 0:
         return None
@@ -301,28 +268,8 @@ def apply(u, a: Action) -> dict[str, dict[str, str]]:
     return {m: phantom_topup(s) for m, s in sq.items()}
 
 
-def _clears_par_floor(par_of: dict, mae, k: str, horizon: int = 1,
-                      pj_of: dict | None = None) -> bool:
-    if mae is None:
-        return True
-    par = par_of.get(k)
-    if par is None:
-        return False
-    from ffcore.score import SHRINK_K
-
-    pj = pj_of.get(k) if pj_of else None
-    if pj is not None:
-        par = par * pj / (pj + SHRINK_K)
-    return par >= mae * math.sqrt(max(1, horizon))
-
-
 def worth_doing(u, rows) -> list:
-    par_of, pj_of = u.par, u.view("pj")
-    mae = u.mae
-    return [r for r in rows if r["net_pts"] > 0 and (
-        not r["action"].buy or r["cash_pts"] > 0
-        or _clears_par_floor(par_of, mae, r["action"].buy,
-                             len(u.state.jornadas), pj_of))]
+    return [r for r in rows if r["net_pts"] > 0]
 
 
 PRICE_LOG = "cash_price_log.csv"
@@ -395,7 +342,6 @@ def load() -> Universe:
                                  for k in layer if k.startswith("__phantom_")})
 
     fc = Bootstrap(per_j, pool=[s.pts for s in scored() if s.games == 1])
-    graded = grading.graded_history()
 
     carried = {r["manager"]: num(r, "team_points", default=0.0)
                for r in lg.standings if r.get("manager")}
@@ -407,7 +353,7 @@ def load() -> Universe:
         locked_cash=sum(pending(mkt, "bid_status", "bid_money").values()),
         received_offers=received_offers, lam=cash_price_history(),
         premium=_premium(),
-        mae=grading.current_mae(graded[1], graded[2], graded[0]))
+        )
 
 
 def _selftest() -> None:
@@ -541,77 +487,23 @@ def _selftest() -> None:
     assert sum(1 for k in bxi2 if bsq2[k] == "DEF") == 4, bxi2
     assert sum(bexp[k] for k in bxi2) - sum(bexp[k] for k in bxi) == 1.0
 
-    top_a = [(9.0, Action("buy", buy="a", cost=1e6)),
-             (8.0, Action("buy", buy="b", cost=1e6))]
-    screened_a = top_a + [(7.0, Action("buy", buy="c", cost=1e6)),
-                          (1.0, Action("buy", buy="ok1", cost=1e6)),
-                          (0.5, Action("buy", buy="ok2", cost=1e6)),
-                          (0.1, Action("buy", buy="bad", cost=1e6))]
-    topped = _top_up(top_a, screened_a, lambda d, a: a.buy in ("ok1", "ok2", "bad"),
-                     rank_key=lambda t: -t[0], minimum=2)
-    keys = [a.buy for _, a in topped]
-    assert keys == ["a", "b", "ok1", "ok2"], keys
-    already_enough = _top_up(top_a, screened_a, lambda d, a: True,
-                             rank_key=lambda t: -t[0], minimum=2)
-    assert already_enough == top_a, already_enough
-    dup_check = _top_up([(9.0, Action("buy", buy="a", cost=1e6))],
-                        [(9.0, Action("buy", buy="a", cost=1e6)),
-                         (5.0, Action("buy", buy="b", cost=1e6))],
-                        lambda d, a: True, rank_key=lambda t: -t[0],
-                        minimum=2)
-    assert [a.buy for _, a in dup_check] == ["a", "b"], dup_check
-    gain_aware = _top_up([], screened_a, lambda d, a: d > 0.5,
-                         rank_key=lambda t: -t[0], minimum=10)
-    assert [a.buy for _, a in gain_aware] == ["a", "b", "c", "ok1"], \
-        gain_aware
-
-    per5 = {1: dict(per[1])}
-    acts5 = []
-    for i in range(15):
-        key = "listed%d" % i
-        per5[1][key] = (10.0 - i * 0.1, 1.0)
-        acts5.append(Action("buy", buy=key, cost=1e6))
-    for i in range(3):
-        key = "reliable%d" % i
-        per5[1][key] = (2.0, 1.0)
-        acts5.append(Action("buy", buy=key, cost=1e6))
-    route5 = {"listed%d" % i: "listed" for i in range(15)}
-    route5.update({"reliable%d" % i: "free" for i in range(3)})
-    u5 = Universe(
-        state=LeagueState({"me": dict(mine), "riv": dict(theirs)}, [1], "me"),
-        forecaster=B(per5), cash=100e6, me="me",
-        facts=dict(
-            pos={**u.view("pos"), **{a.buy: "MED" for a in acts5}},
-            price={a.buy: 1e6 for a in acts5}, route=route5))
-    rows5, *_ = u5.rank(acts5)
-    kept5 = {r["action"].buy for r in rows5}
-    assert all(("reliable%d" % i) in kept5 for i in range(3)), kept5
-    assert len(kept5) == 15, kept5
-    assert sum(1 for k in kept5 if k.startswith("listed")) == 12, kept5
-
     per6 = {1: dict(per[1])}
     acts6 = []
     for i in range(15):
         key = "big%d" % i
-        per6[1][key] = (10.0 - i * 0.1, 1.0)
+        per6[1][key] = (40.0 - 2 * i, 1.0)
         acts6.append(Action("buy", buy=key, cost=20e6))
-    for i in range(3):
-        key = "eff%d" % i
-        per6[1][key] = (6.0, 1.0)
-        acts6.append(Action("buy", buy=key, cost=1e4))
     per6[1]["sham"] = (0.1, 1.0)
     acts6.append(Action("buy", buy="sham", cost=1e3))
     u6 = Universe(
         state=LeagueState({"me": dict(mine), "riv": dict(theirs)}, [1], "me"),
         forecaster=B(per6), cash=1000e6, me="me",
-        facts=dict(
-            pos={**u.view("pos"), **{a.buy: "MED" for a in acts6}},
-            price={a.buy: a.cost for a in acts6}))
+        facts=dict(pos={**u.view("pos"), **{a.buy: "MED" for a in acts6}},
+                   price={a.buy: a.cost for a in acts6}))
     rows6, *_ = u6.rank(acts6)
-    kept6 = {r["action"].buy for r in rows6}
-    assert all(("eff%d" % i) in kept6 for i in range(3)), kept6
-    assert sum(1 for k in kept6 if k.startswith("big")) == 12, kept6
-    assert "sham" not in kept6, kept6
+    kept6 = [r["action"].buy for r in rows6]
+    assert len(kept6) == KEEP and "sham" not in kept6, kept6
+    assert set(kept6) <= {"big%d" % i for i in range(KEEP + 1)}, kept6
 
     half = Universe(
         state=LeagueState({"me": dict(mine), "riv": dict(theirs)}, [1, 2],
@@ -702,12 +594,6 @@ def _selftest() -> None:
         forecaster=Bootstrap(pf_per), cash=0.0, me="me",
         facts={"pos": dict.fromkeys(("me_a", "me_b", "cand"), "MED")}).par
     assert par == {"me_a": 0.0, "me_b": 6.0, "cand": 4.0}, par
-
-    par_of = {"good": 5.0, "weak": 1.99, "unknown": None}
-    for mae, k, want in [(None, "weak", True), (2.9, "good", True),
-                         (2.9, "weak", False), (2.9, "unknown", False),
-                         (2.9, "missing", False)]:
-        assert _clears_par_floor(par_of, mae, k) is want, (mae, k)
 
     from ffcore.fixtures import tiny_market_universe
     mu = tiny_market_universe(lam=0.3, premium=1.05)

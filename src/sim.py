@@ -3,7 +3,6 @@ from __future__ import annotations
 import json
 import sys
 
-import grading
 from decide import (PRICE_LOG, Action, max_spare_proceeds, value_rate,
                     worth_doing)
 from ffcore.league import app_fielded
@@ -364,7 +363,6 @@ def main() -> None:
     import decide
 
     u = decide.load()
-    grading.log_predictions(u.sc)
     if len(u.state.squads) < 2 or not u.state.jornadas:
         print("sim: nothing to simulate (%d squads, %d jornadas left)"
               % (len(u.state.squads), len(u.state.jornadas)))
