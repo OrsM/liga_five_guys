@@ -21,6 +21,8 @@ def _rebuild(key: str, pattern, table: str, parse, url_for, **kw):
 
 
 class Source(NamedTuple):
+    """follow(text, context) returns the pages a fetched page points to,
+    queued in the same run: the context carries who you are ("me")."""
     key: str
     table: str
     url: str
@@ -28,6 +30,7 @@ class Source(NamedTuple):
     cadence: str = "every_run"
     enabled: bool = True
     auth: bool = False
+    follow: Callable[[str, dict], list] | None = None
 
 
 def _selftest() -> None:
@@ -39,6 +42,7 @@ def _selftest() -> None:
                    lambda m: "u/" + m.group(1), cadence="once")
     assert got == Source("page_7", "t", "u/7", str, cadence="once"), got
     assert _rebuild("other", re.compile(r"^page_(\d+)$"), "t", str, str) is None
+    assert got.follow is None, "a page follows nothing unless it says so"
     print("ffcore.source self-test OK")
 
 

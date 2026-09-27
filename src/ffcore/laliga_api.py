@@ -305,6 +305,12 @@ def api_source(key: str) -> Source | None:
     return None
 
 
+def _offers_for(league: str):
+    def follow(teams_json: str, context: dict) -> list[Source]:
+        return offer_sources(teams_json, context["me"], league)
+    return follow
+
+
 def league_sources(leagues_json: str, observed_at: str = "") -> list[Source]:
     out = []
     for r in parse_api_leagues(leagues_json, observed_at):
@@ -314,7 +320,7 @@ def league_sources(leagues_json: str, observed_at: str = "") -> list[Source]:
                           parse_api_market, auth=True))
         out.append(Source("api_teams", "api_teams",
                           API_TEAMS_URL.format(base="{base}", league=lg),
-                          parse_api_teams, auth=True))
+                          parse_api_teams, auth=True, follow=_offers_for(lg)))
         if r.get("team_id"):
             out.append(Source(
                 "api_lineup_%d" % LINEUP_WEEK, "api_lineup",
@@ -520,6 +526,12 @@ def _selftest() -> None:
     assert all(s.cadence == "every_run" for s in disc if s.key == "api_teams")
     assert "017998544" in disc[0].url and "{base}" in disc[0].url
     assert league_sources("<html>") == []
+    teams = next(s for s in disc if s.key == "api_teams")
+    assert [s.key for s in teams.follow(_API_TEAMS_FIXTURE,
+                                        {"me": "miguel_autentico"})] \
+        == ["api_offer_24338726"], "api_teams follows to your offers"
+    assert teams.follow(_API_TEAMS_FIXTURE, {"me": "nobody"}) == []
+    assert all(s.follow is None for s in disc if s.key != "api_teams")
     assert api_source("market") is None
 
     pa = parse_api_players_all(_API_PLAYERS_ALL_FIXTURE, "t")

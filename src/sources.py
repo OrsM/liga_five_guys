@@ -8,13 +8,22 @@ from ffcore.footballdata import fd_sources
 from ffcore.futbolfantasy import (CAL_KEY, FF_CAL_URL, MARKET_URL, POINTS_URL,
                                   TEAM_URL, TEAMS, match_source,
                                   parse_calendar, parse_market, parse_points,
-                                  parse_team)
+                                  parse_team, played_sources)
 from ffcore.laliga_api import (API_LEAGUES_KEY, API_LEAGUES_URL,
-                               API_PLAYERS_ALL_URL, api_source, offer_source,
-                               parse_api_leagues, parse_api_players_all)
+                               league_sources, API_PLAYERS_ALL_URL, api_source,
+                               offer_source, parse_api_leagues,
+                               parse_api_players_all)
 from ffcore.source import Source
 
 __all__ = ["Source", "sources", "source_for"]
+
+
+def _played_matches(calendar_html: str, _context: dict) -> list[Source]:
+    return played_sources(calendar_html)
+
+
+def _league_pages(leagues_json: str, _context: dict) -> list[Source]:
+    return league_sources(leagues_json)
 
 
 @lru_cache(maxsize=None)
@@ -27,9 +36,10 @@ def sources(enabled_only: bool = True) -> list[Source]:
                    parse_team, cadence="twice_daily")
             for s in TEAMS]
     out += fd_sources()
-    out += [Source(CAL_KEY, "matches", FF_CAL_URL, parse_calendar, cadence="daily")]
+    out += [Source(CAL_KEY, "matches", FF_CAL_URL, parse_calendar,
+                   cadence="daily", follow=_played_matches)]
     out += [Source(API_LEAGUES_KEY, "api_leagues", API_LEAGUES_URL,
-                   parse_api_leagues, auth=True)]
+                   parse_api_leagues, auth=True, follow=_league_pages)]
     out += [Source("api_players_all", "api_players_all", API_PLAYERS_ALL_URL,
                    parse_api_players_all,
                    cadence="daily", auth=True)]
@@ -68,6 +78,15 @@ def _selftest() -> None:
     assert source_for("api_offer_24338726").table == "api_offers"
     assert source_for("match_22421-alaves-getafe").parse is parse_starters
     assert source_for("api_lineup_38").table == "api_lineup"
+
+    cal = source_for(CAL_KEY).follow(_CAL_FIXTURE, {})
+    assert [s.key for s in cal] == [s.key for s in played_sources(_CAL_FIXTURE)] \
+        and cal, "the calendar follows to the matches it says were played"
+    lgs = source_for(API_LEAGUES_KEY).follow(_API_LEAGUES_FIXTURE, {})
+    assert [s.key for s in lgs] == [s.key for s in league_sources(
+        _API_LEAGUES_FIXTURE)] and lgs, "the leagues list follows to its pages"
+    assert all(s.follow is None for s in sources()
+               if s.key not in (CAL_KEY, API_LEAGUES_KEY))
 
     reg = sources()
     assert len(reg) == 5 + len(TEAMS) + FD_SEASONS_BACK + 1 == 29, len(reg)

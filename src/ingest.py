@@ -24,10 +24,9 @@ from ffcore.league import load_config
 from ffcore.tidy import (TABLES, Table, ROOT, SEASON, TIDY, append_csv,
                          csv_string, read_csv, table_stats, widen_csv,
                          write_csv)
-from ffcore.futbolfantasy import (CAL_KEY, MATCH_KEY_RE, POINTS_URL,
-                                  parse_points, played_sources, season_label)
-from ffcore.laliga_api import (API_LEAGUES_KEY, ROW_TABLE, league_sources,
-                               offer_sources, parse_api_leagues)
+from ffcore.futbolfantasy import (MATCH_KEY_RE, POINTS_URL, parse_points,
+                                  season_label)
+from ffcore.laliga_api import ROW_TABLE
 from sources import source_for, sources
 
 from ffcore.auth import TokenStore
@@ -232,8 +231,7 @@ def fetch() -> Path:
                       transport=httpx.HTTPTransport(retries=2)) as c:
         queue = _by_host(sources())
         last: dict[str, float] = {}
-        league_id = None
-        me = load_config().me
+        context = {"me": load_config().me}
         while queue:
             src = queue.pop(0)
             if not due(src, prev, stamp):
@@ -271,15 +269,8 @@ def fetch() -> Path:
             if r.status_code != 200:
                 print(f"  warn: {r.status_code} on {src.key}, skipping")
                 continue
-            if src.key == CAL_KEY:
-                queue += played_sources(r.text)
-            if src.key == API_LEAGUES_KEY:
-                queue += league_sources(r.text)
-                leagues = parse_api_leagues(r.text, stamp)
-                if leagues:
-                    league_id = leagues[0]["league_id"]
-            if src.key == "api_teams" and league_id:
-                queue += offer_sources(r.text, me, league_id)
+            if src.follow:
+                queue += src.follow(r.text, context)
 
             sig = page_sig(src, r.text)
             was = prev.get(src.key, {})
