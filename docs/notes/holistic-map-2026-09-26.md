@@ -101,3 +101,8 @@ selftests): 655 functions / 13,937 lines at 0e49bff → 639 / 13,409 at
 86efa39 → 619 / 12,940 at 43a53a4 → 553 / 11,506 at ee0e191 → 523 / 11,253 at fe60ce5 → 522 / 11,174 at 5a0e254.
 
 Done since: fits return values (5a0e254); no hand-kept case counts.
+Fits use only pre-lock information (abf9607); one declaration per table,
+readers ask current()/history() (82fbf12); backtest harness in grading.py
+(fb7efe6). On its evidence: Elo, the club xG blend and the player shots
+term are gone, with the app per-match stats and the never-read
+PlayerHistory (89fa3f3).
