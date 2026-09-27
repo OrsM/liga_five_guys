@@ -7,39 +7,6 @@ from typing import NamedTuple
 from ffcore.parse import money
 
 FIX_BAND = 0.12
-HOME_EDGE = 0.04
-MIN_HOME_EDGE_MATCHES = 50
-
-
-def fit_home_edge(results_history: list[dict],
-                  matches: list[dict] = ()) -> float:
-    home_g = away_g = n = 0
-    for r in results_history:
-        try:
-            hg, ag = int(r["home_goals"]), int(r["away_goals"])
-        except (KeyError, ValueError, TypeError):
-            continue
-        home_g += hg
-        away_g += ag
-        n += 1
-    seen = set()
-    for r in matches:
-        score = (r.get("score") or "").strip()
-        mid, jor = r.get("match_id"), r.get("jornada")
-        if not score or (mid, jor) in seen:
-            continue
-        seen.add((mid, jor))
-        try:
-            hs, aws = (int(x) for x in score.split("-"))
-        except ValueError:
-            continue
-        home_g += hs
-        away_g += aws
-        n += 1
-    if n < MIN_HOME_EDGE_MATCHES or away_g <= 0:
-        return HOME_EDGE
-    ratio = home_g / away_g
-    return (ratio - 1) / (ratio + 1)
 
 
 class Match(NamedTuple):
@@ -109,24 +76,19 @@ def difficulty(strength: dict[str, float]) -> dict[str, float]:
 class _Ratings(NamedTuple):
     diff: dict
     ad: dict
-    home_edge: float
 
 
-def difficulty_ratings(market: list[dict], results=None,
-                       home_edge: float = HOME_EDGE) -> _Ratings:
+def difficulty_ratings(market: list[dict], results=None) -> _Ratings:
     value = team_strength(market)
     return _Ratings(diff=difficulty(value),
-                    ad=attack_defense(results, list(value)) if results else {},
-                    home_edge=home_edge)
+                    ad=attack_defense(results, list(value)) if results else {})
 
 
-def _match_for(ratings: "_Ratings", opp: str, home: bool) -> Match:
+def _match_for(ratings: "_Ratings", opp: str) -> Match:
     base = ratings.diff.get(opp, 1.0) if opp else 1.0
-    edge = 1.0 + (ratings.home_edge if home else -ratings.home_edge)
     opp_ad = ratings.ad.get(opp) if opp else None
-    atk_base, def_base = ((opp_ad[1], 1.0 / opp_ad[0]) if opp_ad is not None
-                          else (base, base))
-    return Match(atk_base * edge, def_base * edge)
+    return Match(*((opp_ad[1], 1.0 / opp_ad[0]) if opp_ad is not None
+                   else (base, base)))
 
 
 def season_board(ratings: "_Ratings", matches: list[dict], jornadas
@@ -136,10 +98,10 @@ def season_board(ratings: "_Ratings", matches: list[dict], jornadas
         j = r.get("jornada") or ""
         if not j.isdigit() or int(j) not in board:
             continue
-        for team, opp, home in ((r.get("home"), r.get("away"), True),
-                                (r.get("away"), r.get("home"), False)):
+        for team, opp in ((r.get("home"), r.get("away")),
+                          (r.get("away"), r.get("home"))):
             if team in ratings.diff and team not in board[int(j)]:
-                board[int(j)][team] = _match_for(ratings, opp, home)
+                board[int(j)][team] = _match_for(ratings, opp)
     return board
 
 
@@ -158,12 +120,6 @@ def _selftest() -> None:
                               "Poor": 1.0 + FIX_BAND}
     assert difficulty({"Only": 1.0}) == {"Only": 1.0}
 
-    hist_rows = [{"home_goals": "2", "away_goals": "1"}] * 60
-    assert abs(fit_home_edge(hist_rows) - 1 / 3) < 1e-9
-    once = (98 / 52 - 1) / (98 / 52 + 1)
-    dup_matches = [{"match_id": "m1", "jornada": "1", "score": "0-3"}] * 5
-    assert abs(fit_home_edge(hist_rows[:49], dup_matches) - once) < 1e-9
-    assert fit_home_edge(hist_rows[:10]) == HOME_EDGE
 
     results = (
         [{"home": "Strong", "away": "Weak", "home_goals": "3", "away_goals": "0"},
@@ -191,18 +147,17 @@ def _selftest() -> None:
           {"jornada": "3", "home": "Poor", "away": "Mid", "score": ""}]
     sb = season_board(difficulty_ratings(mk), ms, [1, 2, 3])
     assert set(sb) == {1, 2, 3} and 4 not in sb, sb
-    assert sb[2]["Mid"] == Match((1.0 - FIX_BAND) * (1.0 + HOME_EDGE),
-                                 (1.0 - FIX_BAND) * (1.0 + HOME_EDGE)), sb[2]
-    assert sb[3]["Mid"].atk_factor == (1.0 + FIX_BAND) * (1.0 - HOME_EDGE)
-    assert sb[2]["Poor"] == Match(1.0 + HOME_EDGE, 1.0 + HOME_EDGE), sb[2]
-    assert sb[1]["Rich"] != sb[3]["Mid"]
+    assert sb[2]["Mid"] == Match((1.0 - FIX_BAND),
+                                 (1.0 - FIX_BAND)), sb[2]
+    assert sb[3]["Mid"].atk_factor == (1.0 + FIX_BAND)
+    assert sb[2]["Poor"] == Match(1.0, 1.0), sb[2]
     assert season_board(difficulty_ratings(mk), [], [1, 2]) == {1: {}, 2: {}}
 
     ad_results = [{"home": "Rich", "away": "x", "home_goals": "3",
                    "away_goals": "5"}] * MIN_AD_MATCHES
     real = season_board(difficulty_ratings(mk, results=ad_results), ms, [2])[2]
-    assert abs(real["Mid"].def_factor - (1.0 / 0.75) * (1.0 + HOME_EDGE)) < 1e-9
-    assert abs(real["Mid"].atk_factor - 1.25 * (1.0 + HOME_EDGE)) < 1e-9
+    assert abs(real["Mid"].def_factor - (1.0 / 0.75)) < 1e-9
+    assert abs(real["Mid"].atk_factor - 1.25) < 1e-9
     assert season_board(difficulty_ratings(mk, []), ms, [2]) == \
         season_board(difficulty_ratings(mk), ms, [2])
 

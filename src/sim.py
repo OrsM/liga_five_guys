@@ -80,13 +80,12 @@ def move_rank(r, u):
 
 
 def band_acts(u) -> list:
-    exp, _xi = u.current_xi
     mine = u.state.squads.get(u.me, {})
     return ([(k, Action("sell", sell=(k,),
                         proceeds=u.view("proceeds").get(k, 0.0))) for k in mine]
             + [(k, Action("buy", buy=k, cost=price))
                for k, price in u.view("price").items()
-               if k not in mine and exp.get(k, 0.0) > u.xi_bar])
+               if k not in mine and u.season.get(k, 0.0) > u.xi_bar])
 
 
 def sale_pts(u, bands, dead) -> dict[str, float]:
@@ -110,7 +109,7 @@ def ladder_rows(u, rows, bands, chg) -> list[dict]:
     pts = {k: v[0] for k, v in bands.items() if k not in won}
     reach = u.cash + max_spare_proceeds(u)
     price = u.view("price")
-    rest = [k for k in price if k not in mine and exp.get(k, 0.0) > u.xi_bar]
+    rest = [k for k in price if k not in mine and u.season.get(k, 0.0) > u.xi_bar]
 
     plan = ([(k, "in", "bench") for k in by_slot(u, chg["in"])]
             + [(k, "out", "yours") for k in by_slot(u, chg["out"])]
@@ -139,13 +138,13 @@ def ladder_rows(u, rows, bands, chg) -> list[dict]:
             value=r.get("value"), market=u.view("value").get(k),
             premium=r.get("burn") or 0.0))
     for k in sorted((k for k in rest if k not in won and price[k] > reach),
-                    key=lambda k: -exp.get(k, 0.0)):
+                    key=lambda k: -u.season.get(k, 0.0)):
         out.append(cell(u, k, "save", where(u, k), money=reach - price[k],
                         pts=pts.get(k), note="short",
                         value=value_rate(pts.get(k), price[k] - reach)))
     for k in sorted((k for k in rest if k not in won and price[k] <= reach
                      and u.route_kind(k) == "free"),
-                    key=lambda k: -exp.get(k, 0.0)):
+                    key=lambda k: -u.season.get(k, 0.0)):
         out.append(cell(u, k, "pass", where(u, k), money=-price[k],
                         pts=pts.get(k)))
     return out

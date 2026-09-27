@@ -5,8 +5,7 @@ import statistics
 from typing import NamedTuple
 
 from ffcore.parse import pct100, ratio, text
-from ffcore.startprob import (NEUTRAL_START, Calibration, calibrate, line_rows,
-                              outcomes)
+from ffcore.startprob import NEUTRAL_START, Calibration, calibrate, outcomes
 from ffcore.text import norm
 from ffcore.tidy import Scored, current, minutes_played, row_key
 
@@ -80,17 +79,6 @@ def fit_promoted_discount(market: list[dict], history: dict,
     return (k * PROMOTED_DISCOUNT + n * pts / expected) / (k + n)
 
 
-def status_multiplier(status: str, factors: dict | None = None) -> float:
-    if status in (factors or {}):
-        return factors[status]
-    if status in OUT_STATUSES:
-        return 0.0
-    if status == "doubt":
-        return DOUBT_FACTOR
-    return 1.0
-
-
-DECAY_GRID = (1.0, 0.85, 0.7, 0.55, 0.4)
 
 
 def _per_jornada_current(starters_rows, played, jornada_of_match, xw
@@ -128,39 +116,18 @@ def _per_jornada_current(starters_rows, played, jornada_of_match, xw
     return out
 
 
-def _weighted(per_jornada: dict[int, tuple[float, float]], decay: float
-              ) -> tuple[float, float, float, float]:
-    latest = max(per_jornada, default=0)
-    w = {j: decay ** (latest - j) for j in per_jornada}
-    pts = sum(w[j] * p for j, (p, _m) in per_jornada.items())
-    matches = sum(w[j] * m / 90.0 for j, (_p, m) in per_jornada.items())
-    started = sum(w[j] * min(1.0, m / 90.0) for j, (_p, m) in per_jornada.items())
-    n = sum(w.values())
+def _totals(per_jornada: dict[int, tuple[float, float]]
+            ) -> tuple[float, float, float, float]:
+    pts = sum(p for p, _m in per_jornada.values())
+    matches = sum(m / 90.0 for _p, m in per_jornada.values())
+    started = sum(min(1.0, m / 90.0) for _p, m in per_jornada.values())
+    n = len(per_jornada)
     return pts, matches, (started / n if n else 0.0), n
-
-
-def _walk_error(by_key: dict, decay: float) -> tuple[float, int]:
-    se, n = 0.0, 0
-    for jd in by_key.values():
-        jors = sorted(jd)
-        for i in range(1, len(jors)):
-            actual_pts, actual_min = jd[jors[i]]
-            wpts, wmatch, _s, _n = _weighted({j: jd[j] for j in jors[:i]}, decay)
-            if actual_min <= 0 or wmatch <= 0:
-                continue
-            se += (wpts / wmatch - actual_pts / (actual_min / 90.0)) ** 2
-            n += 1
-    return (se / n, n) if n else (float("inf"), 0)
-
-
-def _fit_decay(by_key: dict) -> float:
-    errors = {d: _walk_error(by_key, d) for d in DECAY_GRID}
-    return min(DECAY_GRID, key=lambda d: (errors[d][0], -d))
 
 
 def build(market: list[dict], xi_rows: list[dict], now,
           shrink_k: float = SHRINK_K) -> "Scorer":
-    from ffcore.fixture import difficulty_ratings, fit_home_edge
+    from ffcore.fixture import difficulty_ratings
     from ffcore.tidy import (LINEUP_SOURCE, SEASON, history,
                              clock_history, jornada_of_match, load_crosswalk,
                              scored,
@@ -174,21 +141,15 @@ def build(market: list[dict], xi_rows: list[dict], now,
     played = scored()
     by_key = _per_jornada_current(current("starters"), played,
                                   jornada_of_match(), xw)
-    decay = _fit_decay(by_key)
-    results = current("results_history")
-    ratings = difficulty_ratings(
-        market, results,
-        fit_home_edge(results, current("matches")))
+    ratings = difficulty_ratings(market, current("results_history"))
     outs = outcomes(history("lineups", LINEUP_SOURCE), current("starters"),
                     clock_history().round_locks, jornada_of_match(), xw)
-    pos = {r["ff_id"]: r["position"] for r in history("market") if r.get("ff_id")}
-    pts = {(s.key, s.jornada): s.pts for s in played if s.games == 1}
-    cal = calibrate(outs, line_rows(outs, pos, pts))
+    cal = calibrate(outs)
     return Scorer(
         market, xi_rows, last_season, shrink_k=shrink_k, xw=xw, cal=cal,
         ratings=ratings,
         current={k: dict(zip(("pts", "pj", "start_rate", "start_n"),
-                             _weighted(jd, decay)))
+                             _totals(jd)))
                  for k, jd in by_key.items()},
         promoted_discount=fit_promoted_discount(market, last_season, played))
 
@@ -280,10 +241,10 @@ class Scorer:
         cur = self.current.get(key)
         start_n = cur.get("start_n", 0.0) if cur else 0.0
         if start_n > 0.0:
-            k_l = self.cal.lineup_k or self.shrink_k
-            p_rest = ((self.shrink_k * NEUTRAL_START / 100.0
-                       + start_n * cur["start_rate"]) / (self.shrink_k + start_n))
-            p_now = (k_l * p_now + start_n * cur["start_rate"]) / (k_l + start_n)
+            k = self.shrink_k
+            p_rest = ((k * NEUTRAL_START / 100.0 + start_n * cur["start_rate"])
+                      / (k + start_n))
+            p_now = (k * p_now + start_n * cur["start_rate"]) / (k + start_n)
         return Rates(key, SLOT.get((rec.get("position") or "").lower(), ""),
                      rating.ppm, p_now, p_rest, self.status.get(key, ""),
                      rating.pj)
@@ -329,9 +290,6 @@ def vor(row: dict, repl: dict) -> float:
 
 
 def _selftest() -> None:
-    assert status_multiplier("injured") == 0.0 and status_multiplier("doubt") == DOUBT_FACTOR
-    assert status_multiplier("injured", {"injured": 0.5}) == 0.5
-    assert status_multiplier("ok", {"injured": 0.5}) == 1.0
 
     row = {"position": "defensa", "team": "Mid", "club": "Mid",
            "value": "10.00M"}
@@ -462,15 +420,8 @@ def _selftest() -> None:
     assert "unused sub" not in by_key, by_key
     assert _per_jornada_current([], [], {}, xw2) == {}
 
-    assert _weighted(by_key["antonio blanco"], 1.0) == (13.0, 1.5, 0.75, 2.0)
-    assert abs(_weighted(by_key["antonio blanco"], 0.5)[0] - 9.0) < 1e-9
-    assert _weighted({}, 0.5) == (0.0, 0.0, 0.0, 0.0)
-
-    assert _fit_decay({"a": {1: (4.0, 90.0)}, "b": {1: (2.0, 45.0)}}) == 1.0
-    assert _fit_decay({}) == 1.0
-    assert _fit_decay({p: {1: (1.0, 90.0), 2: (9.0, 90.0)} for p in "ab"}) == 1.0
-    assert _fit_decay({p: {1: (1.0, 90.0), 2: (5.0, 90.0), 3: (9.0, 90.0)}
-                       for p in ("p%d" % i for i in range(8))}) < 1.0
+    assert _totals(by_key["antonio blanco"]) == (13.0, 1.5, 0.75, 2)
+    assert _totals({}) == (0.0, 0.0, 0.0, 0)
 
     print("ffcore.score self-test OK")
 

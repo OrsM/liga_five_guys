@@ -25,27 +25,25 @@ def rounds_left(matches) -> tuple[list[int], dict[int, set[str]]]:
 UNSCORED_DEFAULT = (2.0, 0.5)
 
 
-def status_adjusted(pts: float, p_start: float, status: str,
-                    factors: dict | None = None) -> tuple[float, float]:
-    from ffcore.score import OUT_STATUSES, status_multiplier
+def status_adjusted(pts: float, p_start: float, status: str
+                    ) -> tuple[float, float]:
+    from ffcore.score import DOUBT_FACTOR, OUT_STATUSES
 
-    mult = status_multiplier(status, factors)
     if status in OUT_STATUSES:
-        return pts, p_start * mult
-    return pts * mult, p_start
+        return pts, 0.0
+    return (pts * DOUBT_FACTOR if status == "doubt" else pts), p_start
 
 
-def jornada_expectation(r, match, first: bool,
-                        factors: dict | None = None) -> tuple[float, float]:
+def jornada_expectation(r, match, first: bool) -> tuple[float, float]:
     fix = 1.0 if match is None else (
         match.def_factor if r.slot in ("POR", "DEF") else match.atk_factor)
     pts, p = max(0.0, r.ppm * fix), (r.p_now if first else r.p_rest)
-    return status_adjusted(pts, p, r.status, factors) if first else (pts, p)
+    return status_adjusted(pts, p, r.status) if first else (pts, p)
 
 
 def season(rates: dict, club: dict[str, str], rem: list[int],
-           played: dict[int, set[str]], board: dict[int, dict],
-           factors: dict | None = None) -> tuple[dict[int, dict], dict[str, int]]:
+           played: dict[int, set[str]], board: dict[int, dict]
+           ) -> tuple[dict[int, dict], dict[str, int]]:
     per_j: dict[int, dict] = {}
     first_of: dict[str, int] = {}
     for j in rem:
@@ -57,7 +55,7 @@ def season(rates: dict, club: dict[str, str], rem: list[int],
             if first:
                 first_of[k] = j
             layer[k] = UNSCORED_DEFAULT if r is None else jornada_expectation(
-                r, board.get(j, {}).get(club.get(k)), first, factors)
+                r, board.get(j, {}).get(club.get(k)), first)
         per_j[j] = layer
     return per_j, first_of
 
@@ -72,8 +70,7 @@ def expectations(sc, keys, matches: list[dict]
              for k in keys}
     club = {k: sc.lookup[k].get("club") for k in keys if k in sc.lookup}
     per_j, first_of = season(rates, club, rem, played,
-                             season_board(sc.ratings, matches, rem),
-                             sc.cal.status_factor)
+                             season_board(sc.ratings, matches, rem))
     return per_j, first_of, rates, rem, played
 
 

@@ -65,9 +65,17 @@ class Universe:
         return exp, set(best_xi(self.state.squads.get(self.me, {}), exp))
 
     @cached_property
+    def season(self) -> dict[str, float]:
+        out: dict[str, float] = {}
+        for j in self.state.jornadas:
+            for k, pts in self.forecaster.expected(j).items():
+                out[k] = out.get(k, 0.0) + pts
+        return out
+
+    @cached_property
     def xi_bar(self) -> float:
-        exp, xi = self.current_xi
-        return min((exp.get(k, 0.0) for k in xi), default=0.0)
+        _exp, xi = self.current_xi
+        return min((self.season.get(k, 0.0) for k in xi), default=0.0)
 
     def route_kind(self, k: str) -> str:
         if k in self.state.squads.get(self.me, {}):
@@ -103,7 +111,6 @@ class Universe:
     def candidates(self, budget: float | None = None) -> list["Action"]:
         cash = self.cash if budget is None else budget
         mine = set(self.state.squads.get(self.me, {}))
-        exp, _xi = self.current_xi
         par_of = self.par
 
         spare = sorted(fieldable_spares(self), key=lambda k: _nulls_last(
@@ -113,7 +120,7 @@ class Universe:
         for c, price in sorted(self.view("price").items(), key=lambda kv: kv[1]):
             if c in mine or self.route_kind(c) == "listed":
                 continue
-            if exp.get(c, 0.0) <= self.xi_bar and self.cash_pts(
+            if self.season.get(c, 0.0) <= self.xi_bar and self.cash_pts(
                     Action("buy", buy=c, cost=price)) <= 0:
                 continue
             if price <= cash:
@@ -127,10 +134,7 @@ class Universe:
 
     @cached_property
     def par(self) -> dict[str, float]:
-        season: dict[str, float] = {}
-        for j in self.state.jornadas:
-            for k, pts in self.forecaster.expected(j).items():
-                season[k] = season.get(k, 0.0) + pts
+        season = self.season
         pos = self.view("pos")
         repl = replacement(squad_pool(
             {"key": k, "slot": pos.get(k, ""), "score": v}
