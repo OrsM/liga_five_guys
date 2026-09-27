@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import datetime as dt
-import json
+import itertools
 import math
 import statistics
+import json
 import sys
 from pathlib import Path
 
@@ -11,12 +12,10 @@ from ffcore.parse import text
 from ffcore.text import norm
 from ffcore.schedule import expectations
 from ffcore.tidy import (DECISIONS, Scored, append_csv, clock_history, current,
-                         lock_order, read_csv, run_now, scored, snapshot_stamp)
+                         read_csv, run_now, scored, snapshot_stamp)
 
 __all__ = ["log_predictions", "load_actuals", "load_predictions", "pair",
-           "lagged_pair",
-           "current_mae", "drift_frac_from_history", "fit_rate_rel_floor",
-           "graded_history"]
+           "current_mae", "graded_history"]
 
 WINDOW_DAYS = 21
 PREDICTIONS = DECISIONS / "squad_log.csv"
@@ -97,25 +96,6 @@ def pair(actuals: list[dict], preds, locks: dict[int, dt.datetime]
     return out
 
 
-def _conditional(fac: dict) -> float:
-    return fac.get("pts") or 0.0
-
-
-def lagged_pair(actuals: list[dict], preds, locks: dict[int, dt.datetime],
-                lag: int) -> list[dict]:
-    order = lock_order(locks)
-    pos = {j: i for i, j in enumerate(order)}
-    out = []
-    for a in actuals:
-        i = pos.get(a.jornada)
-        if a.games < 1 or i is None or i - lag < 0:
-            continue
-        fac = _claim([a.key], preds, locks[order[i - lag]])
-        if fac is not None:
-            out.append(_graded_row(a, _conditional(fac), pj=fac.get("pj")))
-    return out
-
-
 def graded_history() -> tuple[dict, list[dict], dict]:
     return (clock_history().round_locks, load_actuals(), load_predictions())
 
@@ -125,46 +105,6 @@ def current_mae(actuals: list[dict], preds,
     pairs = pair(actuals, preds, locks)
     return (sum(abs(p["err"]) / p["matches"] for p in pairs) / len(pairs)
             if pairs else None)
-
-
-def _z_variance(rels, floor: float) -> float:
-    return statistics.pvariance([math.log(a / p) / max(floor, rel)
-                                 for rel, p, a in rels])
-
-
-def fit_rate_rel_floor(pool, history: tuple, min_pairs: int = 30) -> float:
-    from ffcore.forecast import RATE_REL_FLOOR, SHRINK_MATCHES
-
-    real = [p for p in pool if p is not None]
-    mean = statistics.mean(real) if len(real) >= 50 else 0.0
-    if abs(mean) < 1e-9:
-        return RATE_REL_FLOOR
-    cv = statistics.pstdev(real) / mean
-    locks, actuals, preds = history
-    rels = [(cv / max(1.0, g["pj"] + SHRINK_MATCHES) ** 0.5, g["predicted"],
-             g["actual"])
-            for g in lagged_pair(actuals, preds, locks, 0)
-            if g.get("pj") is not None and g["predicted"] > 0
-            and g["actual"] > 0]
-    if len(rels) < min_pairs:
-        return RATE_REL_FLOOR
-    return min((0.10 + 0.05 * i for i in range(19)),
-               key=lambda f: abs(_z_variance(rels, f) - 2.0))
-
-
-def drift_frac_from_history(history: tuple, lag1: int = 1,
-                            lag3: int = 3) -> float:
-    from ffcore.forecast import fit_drift_frac
-
-    locks, actuals, preds = history
-    h1 = lagged_pair(actuals, preds, locks, lag1)
-    h3 = lagged_pair(actuals, preds, locks, lag3)
-    ratios = [p["actual"] / p["predicted"] for p in h1 if p["predicted"] > 0]
-    pooled = statistics.pstdev(ratios) if len(ratios) >= 5 else 0.0
-    if pooled <= 0:
-        return 1.0
-    return fit_drift_frac([(p["predicted"], p["actual"], pooled) for p in h1],
-                          [(p["predicted"], p["actual"], pooled) for p in h3])
 
 
 TOP_N = 50
@@ -213,6 +153,21 @@ def backtest() -> list[dict]:
     return out
 
 
+def persistence(preds: dict[int, dict[str, float]],
+                actual: dict[tuple, float]) -> float:
+    by: dict[str, list[tuple[float, float]]] = {}
+    for j, pred in preds.items():
+        for k, e in pred.items():
+            by.setdefault(k, []).append((actual.get((k, j), 0.0) - e, e))
+    bias = statistics.fmean(r for v in by.values() for r, _ in v) if by else 0.0
+    num = den = 0.0
+    for v in by.values():
+        for (ra, ea), (rb, eb) in itertools.combinations(v, 2):
+            num += (ra - bias) * (rb - bias)
+            den += ea * eb
+    return math.sqrt(max(0.0, num) / den) if den else 0.0
+
+
 def compare(a: dict[str, dict], b: dict[str, dict]) -> list[dict]:
     actual = _jornada_points()
     out = []
@@ -241,17 +196,11 @@ def _selftest() -> None:
     assert [(g["predicted"], g["err"]) for g in got] == [
         (8.0, -2.0), (6.0, 3.0), (4.0, -1.0)], got
     assert pair(actuals, preds, {}) == []
-    lag0 = lagged_pair(actuals, preds, locks, 0)
-    assert [(g["jornada"], g["per_match"], g["pj"]) for g in lag0] == [
-        (2, 6.0, 10.0), (3, 6.0, 12.0), (1, 6.0, 10.0)], lag0
-    lag1 = lagged_pair(actuals, preds, locks, 1)
-    assert [(g["jornada"], g["pj"]) for g in lag1] == [(2, 10.0), (3, 10.0)], \
-        lag1
-    assert lagged_pair(actuals, preds, locks, 3) == []
-
-    from ffcore.forecast import RATE_REL_FLOOR
-    assert drift_frac_from_history((locks, actuals, preds)) == 1.0
-    assert fit_rate_rel_floor([3] * 10, (locks, actuals, preds)) == RATE_REL_FLOOR
+    same = {1: {"a": 2.0, "b": 2.0}, 2: {"a": 2.0, "b": 2.0}}
+    assert persistence(same, {("a", 1): 3.0, ("a", 2): 3.0, ("b", 1): 1.0,
+                              ("b", 2): 1.0}) == 0.5
+    assert persistence(same, {("a", 1): 3.0, ("a", 2): 1.0, ("b", 1): 2.0,
+                              ("b", 2): 2.0}) == 0.0
 
     got = score_forecast({"a": 3.0, "b": 1.0}, {("a", 1): 5.0}, 1)
     assert (got["n"], got["mae"], got["bias"]) == (2, 1.5, -0.5), got
@@ -271,6 +220,8 @@ if __name__ == "__main__":
             print("j%-2d n=%3d mae %.3f bias %+.3f top%d %.2f | logged n=%3d mae %s"
                   % (r["jornada"], r["n"], r["mae"], r["bias"], TOP_N, r["top"],
                      g["n"], "%.3f" % g["mae"] if g["mae"] is not None else "-"))
+        print("persistent share of a player's expectation: %.2f" % persistence(
+            {r["jornada"]: r["pred"] for r in runs}, _jornada_points()))
         rest = sys.argv[sys.argv.index("--backtest") + 1:]
         if rest:
             Path(rest[0]).write_text(json.dumps(

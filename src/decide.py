@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import math
 import sys
-from statistics import mean, median
+from statistics import median
 from dataclasses import dataclass, field
 from functools import cache, cached_property
 from types import MappingProxyType
@@ -16,7 +16,6 @@ from stats import percentile
 from ffcore.schedule import expectations, phantom_fill, phantom_topup
 from ffcore.pricing import auction_ratios, burn, cash_price, steps, trend
 from ffcore.action import Action
-from ffcore.fixture import club_volatility
 from ffcore.league import League
 from ffcore.score import SLOT, Scorer, build, replacement, squad_pool, vor
 from ffcore.season import (LeagueState, best_xi,
@@ -249,7 +248,7 @@ def _score_many(u: Universe, many: list, trials: int, seed: int):
     return simulate_many(
         [LeagueState(squads=sq, jornadas=u.state.jornadas, me=u.me,
                      carried=u.state.carried) for sq in many],
-        u.forecaster, trials=trials, seed=seed, antithetic=True)
+        u.forecaster, trials=trials, seed=seed)
 
 
 def paired(after, base, me) -> list[float]:
@@ -343,9 +342,10 @@ def _updates_to_lock() -> int:
 
 
 def _premium() -> float:
-    paid = auction_ratios(history("api_market"),
-                          [a for a in current("api_activity") if a["kind"] == "buy"])
-    return mean(paid) if paid else 1.0
+    paid = auction_ratios(history("api_market"), sorted(
+        (a for a in current("api_activity") if a["kind"] == "buy"),
+        key=lambda a: a["at"]))
+    return median(paid[-PRICE_WINDOW:]) if paid else 1.0
 
 
 @cache
@@ -379,10 +379,6 @@ def load() -> Universe:
               for mgr in lg.managers}
     per_j, first_jornada_of, rates, rem, played = expectations(
         sc, set(price).union(*squads.values()), m)
-    club = {k: rec.get("club") or (lg.xw.players[k].club_id
-                                   if k in lg.xw.players else "")
-            for k, rec in players.items()}
-    club = {k: c for k, c in club.items() if c}
     facts = {"name": {k: rec.get("name") or k for k, rec in players.items()},
              "pos": pos,
              "price": {k: v for k, v in price.items() if k in players},
@@ -392,20 +388,14 @@ def load() -> Universe:
              "proceeds": {k: v for k, v in proceeds.items() if k in players},
              "pj": {k: r.pj for k, r in rates.items() if r},
              "trend": trend(steps(history("market")), _updates_to_lock())}
-    matches = {k: r.pj for k, r in rates.items() if r}
     squads, per_j = phantom_fill(squads, per_j, pos)
     assert all(_fieldable(sq) for sq in squads.values()), squads
     if rem:
         first_jornada_of.update({k: rem[0] for layer in per_j.values()
                                  for k in layer if k.startswith("__phantom_")})
 
-    pool = [s.pts for s in scored() if s.games == 1]
+    fc = Bootstrap(per_j, pool=[s.pts for s in scored() if s.games == 1])
     graded = grading.graded_history()
-    fc = Bootstrap(per_j, pool=pool, matches=matches, club_of=club,
-                   club_rel=club_volatility(current("results_history"),
-                                            set(club.values())),
-                   drift_frac=grading.drift_frac_from_history(graded),
-                   rate_floor=grading.fit_rate_rel_floor(pool, graded))
 
     carried = {r["manager"]: num(r, "team_points", default=0.0)
                for r in lg.standings if r.get("manager")}

@@ -78,92 +78,43 @@ class Standings:
         return sum(k * p for k, p in self.position(manager).items())
 
 
-def _antithetic_normal(rng, shape: tuple):
-    import numpy as np
-
-    trials = shape[0]
-    half = trials // 2
-    if half == 0:
-        return rng.standard_normal(shape)
-    z = rng.standard_normal((half,) + shape[1:])
-    parts = [z, -z]
-    if trials % 2:
-        parts.append(rng.standard_normal((1,) + shape[1:]))
-    return np.concatenate(parts, axis=0)
-
-
 def simulate_many(states: list, forecaster, trials: int = 2000,
-                  seed: int = 0, antithetic: bool = False) -> list:
+                  seed: int = 0) -> list:
     if not states:
         return []
-    fast = _run_np(states, forecaster, trials, seed, antithetic)
+    fast = _run_np(states, forecaster, trials, seed)
     return [Standings(totals=tot, me=st.me)
             for tot, st in zip(fast, states)]
 
 
-def _run_np(states: list, forecaster, trials: int, seed: int,
-           antithetic: bool = False):
-    try:
-        import numpy as np
-    except ImportError:
-        return None
+def draws(forecaster, jornadas, trials: int, seed: int):
+    import numpy as np
 
-    order = getattr(forecaster, "_order", None)
-    per_j = getattr(forecaster, "per_jornada", None)
-    pool = getattr(forecaster, "pool", None)
-    mean = getattr(forecaster, "_pool_mean", None)
-    if order is None or per_j is None or not pool:
-        return None
+    pool = np.asarray(forecaster.pool, dtype=float)
+    everyone = sorted({k for j in jornadas for k in forecaster._order.get(j, [])})
+    col = {k: i for i, k in enumerate(everyone)}
+    rate = np.clip(1.0 + forecaster.share * np.random.default_rng(
+        [seed, 7919]).standard_normal((trials, len(everyone))), 0.0, None)
+    for j in jornadas:
+        keys = forecaster._order.get(j, [])
+        if not keys:
+            continue
+        per = forecaster.per_jornada[j]
+        pts = np.array([per[k][0] for k in keys], dtype=float)
+        p = np.array([per[k][1] for k in keys], dtype=float)
+        rng = np.random.default_rng([seed, j])
+        yield j, keys, np.where(
+            rng.random((trials, len(keys))) < p[None, :],
+            pool[rng.integers(0, len(pool), (trials, len(keys)))]
+            * (pts / forecaster._pool_mean) * rate[:, [col[k] for k in keys]], 0.0)
 
-    pool_a = np.asarray(pool, dtype=float)
-    rel = getattr(forecaster, "rate_rel", None) or {}
-    club_of = getattr(forecaster, "club_of", None) or {}
-    club_rel = getattr(forecaster, "club_rel", None) or {}
-    all_keys = sorted({k for ks in order.values() for k in ks} & set(rel)) \
-        if rel else []
-    draw_normal = _antithetic_normal if antithetic else \
-        (lambda rng, shape: rng.standard_normal(shape))
-    eps0 = shared = drng = cum_var = walk = None
-    drift_frac = getattr(forecaster, "drift_frac", 1.0)
-    if all_keys:
-        rrng = np.random.default_rng([seed, 7919])
-        sd = np.array([rel[k] for k in all_keys], dtype=float)
-        eps0 = np.clip(
-            1.0 + draw_normal(rrng, (trials, len(all_keys))) * sd,
-            0.0, None)
-        clubs = sorted(club_rel)
-        if clubs:
-            crng = np.random.default_rng([seed, 7920])
-            csd = np.array([club_rel[c] for c in clubs], dtype=float)
-            shock = np.clip(
-                1.0 + draw_normal(crng, (trials, len(clubs))) * csd,
-                0.0, None)
-            shock_of = {c: shock[:, i] for i, c in enumerate(clubs)}
-            ones = np.ones(trials)
-            shared = np.stack(
-                [shock_of.get(club_of.get(k, ""), ones) for k in all_keys],
-                axis=1)
-        drng = np.random.default_rng([seed, 7921])
-        step_sd = drift_frac * sd
-        cum_var = np.zeros(len(all_keys))
-        walk = np.zeros((trials, len(all_keys)))
 
-    srel = getattr(forecaster, "start_rel", None) or {}
-    all_start_keys = sorted(
-        {k for ks in order.values() for k in ks} & set(srel)) if srel else []
-    seps0 = sdrng = None
-    if all_start_keys:
-        srrng = np.random.default_rng([seed, 7927])
-        ssd = np.array([srel[k] for k in all_start_keys], dtype=float)
-        seps0 = draw_normal(srrng, (trials, len(all_start_keys))) * ssd
-        sdrng = np.random.default_rng([seed, 7928])
-        step_sd_s = drift_frac * ssd
-        walk_s = np.zeros((trials, len(all_start_keys)))
+def _run_np(states: list, forecaster, trials: int, seed: int):
+    import numpy as np
 
     managers = [list(st.squads) for st in states]
     totals = [{m: np.full(trials, float(st.carried.get(m, 0.0)))
                for m in ms} for st, ms in zip(states, managers)]
-
     exp_by_j = {}
     xi_memo: dict = {}
     xis = []
@@ -182,51 +133,8 @@ def _run_np(states: list, forecaster, trials: int, seed: int,
             per_state[j] = row
         xis.append(per_state)
 
-    rate_mult = {}
-    for j in states[0].jornadas:
-        if all_keys:
-            step_var = step_sd ** 2
-            walk += draw_normal(drng, (trials, len(all_keys))) \
-                * step_sd
-            cum_var += step_var
-            walked = np.exp(walk - cum_var / 2.0)
-            individual = eps0 * walked
-            m = individual * shared if shared is not None else individual
-            rate_mult = {k: m[:, i] for i, k in enumerate(all_keys)}
-        start_shift = {}
-        if all_start_keys:
-            walk_s += draw_normal(sdrng, (trials, len(all_start_keys))) \
-                * step_sd_s
-            shifted = seps0 + walk_s
-            start_shift = {k: shifted[:, i]
-                           for i, k in enumerate(all_start_keys)}
-        keys = order.get(j, [])
-        if not keys:
-            continue
+    for j, keys, drawn in draws(forecaster, states[0].jornadas, trials, seed):
         at = {k: i for i, k in enumerate(keys)}
-        per = per_j[j]
-        pts = np.array([per[k][0] for k in keys], dtype=float)
-        p = np.array([per[k][1] for k in keys], dtype=float)
-        rng = np.random.default_rng([seed, j])
-        scale = np.ones((trials, len(keys))) if not rate_mult else np.stack(
-            [rate_mult[k] if k in rate_mult else np.ones(trials)
-             for k in keys], axis=1)
-        if start_shift:
-            from ffcore.startprob import FLOOR, CEIL
-
-            shift = np.stack(
-                [start_shift[k] if k in start_shift else np.zeros(trials)
-                 for k in keys], axis=1)
-            p_clip = np.clip(p, 1e-6, 1.0 - 1e-6)
-            logit_p = np.log(p_clip / (1.0 - p_clip))
-            p_trial = 1.0 / (1.0 + np.exp(-(logit_p[None, :] + shift)))
-            p_trial = np.clip(p_trial, FLOOR, CEIL)
-        else:
-            p_trial = p[None, :]
-        drawn = np.where(rng.random((trials, len(keys))) < p_trial,
-                         pool_a[rng.integers(0, len(pool_a),
-                                             (trials, len(keys)))]
-                         * (pts / mean) * scale, 0.0)
         for i in range(len(states)):
             for m in managers[i]:
                 idx = [at[k] for k in xis[i][j][m] if k in at]
@@ -236,13 +144,11 @@ def _run_np(states: list, forecaster, trials: int, seed: int,
 
 
 def simulate(state: LeagueState, forecaster, trials: int = 2000,
-             seed: int = 0, antithetic: bool = False) -> Standings:
-    return simulate_many([state], forecaster, trials=trials, seed=seed,
-                         antithetic=antithetic)[0]
+             seed: int = 0) -> Standings:
+    return simulate_many([state], forecaster, trials=trials, seed=seed)[0]
 
 
 def _selftest() -> None:
-    import statistics
 
     from ffcore.forecast import Bootstrap
 
@@ -299,26 +205,6 @@ def _selftest() -> None:
     r2 = simulate(st, Bootstrap(per), trials=200, seed=4)
     assert r1.totals == r2.totals
 
-    matches = {k: 20 for k in list(a) + list(b)}
-    club_of_a = {f"a_{k}": "OneClub" for k in sq}
-    baseline_fc = Bootstrap(per, matches=matches)
-    correlated_fc = Bootstrap(per, matches=matches, club_of=club_of_a,
-                              club_rel={"OneClub": 0.6})
-    base_res = simulate(st, baseline_fc, trials=1500, seed=11)
-    corr_res = simulate(st, correlated_fc, trials=1500, seed=11)
-    base_sd = statistics.pstdev(base_res.totals["A"])
-    corr_sd = statistics.pstdev(corr_res.totals["A"])
-    assert corr_sd > base_sd, (base_sd, corr_sd)
-    assert abs(statistics.mean(corr_res.totals["A"])
-              - statistics.mean(base_res.totals["A"])) < 5.0
-    assert abs(statistics.pstdev(base_res.totals["B"])
-              - statistics.pstdev(corr_res.totals["B"])) < 1e-6
-    corr_res2 = simulate(st, Bootstrap(per, matches=matches,
-                                       club_of=club_of_a,
-                                       club_rel={"OneClub": 0.6}),
-                         trials=1500, seed=11)
-    assert corr_res.totals == corr_res2.totals
-
     b2 = {f"b_{k}": v for k, v in sq.items()}
     alt = LeagueState(squads={"A": dict(a), "B": dict(b2)}, jornadas=[1],
                       me="A")
@@ -340,37 +226,6 @@ def _selftest() -> None:
     assert [x.totals for x in again1] == [x.totals for x in again2], \
         "same seed, same seasons"
 
-
-    many_j = list(range(1, 11))
-    per10 = {j: {k: (3.0, 1.0) for k in list(a) + list(b)} for j in many_j}
-    st10 = LeagueState(squads={"A": a, "B": b}, jornadas=many_j, me="A")
-    matches10 = {k: 20 for k in list(a) + list(b)}
-    flat_res, drift_res = (
-        simulate(st10, Bootstrap(per10, matches=matches10, drift_frac=d),
-                 trials=1500, seed=13) for d in (0.0, 1.0))
-    flat_sd = statistics.pstdev(flat_res.totals["A"])
-    drift_sd = statistics.pstdev(drift_res.totals["A"])
-    assert drift_sd > flat_sd, (flat_sd, drift_sd)
-    flat_mean = statistics.mean(flat_res.totals["A"])
-    drift_mean = statistics.mean(drift_res.totals["A"])
-    assert abs(drift_mean - flat_mean) / flat_mean < 0.03, \
-        (flat_mean, drift_mean)
-
-    from ffcore.forecast import MIN_POOL
-
-    per10_s = {j: {k: (3.0, 0.7) for k in list(a) + list(b)} for j in many_j}
-    const_pool = [3] * (MIN_POOL + 50)
-    sflat_res, sdrift_res = (
-        simulate(st10, Bootstrap(per10_s, pool=const_pool, matches=matches10,
-                                 drift_frac=d), trials=1500, seed=17)
-        for d in (0.0, 1.0))
-    sflat_sd = statistics.pstdev(sflat_res.totals["A"])
-    sdrift_sd = statistics.pstdev(sdrift_res.totals["A"])
-    assert sdrift_sd > sflat_sd, (sflat_sd, sdrift_sd)
-    sflat_mean = statistics.mean(sflat_res.totals["A"])
-    sdrift_mean = statistics.mean(sdrift_res.totals["A"])
-    assert abs(sdrift_mean - sflat_mean) / sflat_mean < 0.05, \
-        (sflat_mean, sdrift_mean)
 
     print("ffcore.season self-test OK")
 

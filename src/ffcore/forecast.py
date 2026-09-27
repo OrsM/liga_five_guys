@@ -1,11 +1,8 @@
-
 from __future__ import annotations
 
-import random
-import math
 import statistics
 
-__all__ = ["Bootstrap", "SEED_POOL", "MIN_POOL"]
+__all__ = ["Bootstrap", "SEED_POOL", "MIN_POOL", "PERSISTENT_SHARE"]
 
 SEED_POOL = (-1, -1, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1,
              1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 3,
@@ -14,72 +11,20 @@ SEED_POOL = (-1, -1, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1,
 
 MIN_POOL = 200
 
-SHRINK_MATCHES = 8.0
-
-RATE_REL_FLOOR = 0.5
-
-DRIFT_FRAC = 1.0
-
-
-def _z(pairs) -> list[float]:
-    return [math.log(actual / predicted) / rel for predicted, actual, rel in pairs
-            if predicted > 0 and actual > 0 and rel > 0]
-
-
-def fit_drift_frac(h1_pairs, h3_pairs) -> float:
-    z1, z3 = _z(h1_pairs), _z(h3_pairs)
-    if len(z1) < 20 or len(z3) < 20:
-        return DRIFT_FRAC
-    var1 = statistics.pvariance(z1)
-    var3 = statistics.pvariance(z3)
-    growth = (var3 - var1) / 2.0
-    if growth <= 0:
-        rng = random.Random(20260917)
-        diffs = []
-        for _ in range(1000):
-            b1 = [rng.choice(z1) for _ in z1]
-            b3 = [rng.choice(z3) for _ in z3]
-            diffs.append((statistics.pvariance(b3)
-                          - statistics.pvariance(b1)) / 2.0)
-        diffs.sort()
-        return math.sqrt(max(0.0, diffs[int(0.90 * len(diffs))]))
-    return math.sqrt(growth)
+PERSISTENT_SHARE = 0.28
 
 
 class Bootstrap:
 
     def __init__(self, per_jornada: dict[int, dict[str, tuple[float, float]]],
-                 pool=(), matches=None, club_of=None, club_rel=None,
-                 drift_frac: float = DRIFT_FRAC,
-                 rate_floor: float = RATE_REL_FLOOR):
+                 pool=(), share: float = PERSISTENT_SHARE):
         self.per_jornada = per_jornada
-        self.drift_frac = drift_frac
+        self.share = share
         self._order = {j: sorted(d) for j, d in per_jornada.items()}
         real = [p for p in pool if p is not None]
         self.pool = tuple(real) if len(real) >= MIN_POOL else SEED_POOL
-        mean = statistics.mean(self.pool) if self.pool else 1.0
+        mean = statistics.mean(self.pool)
         self._pool_mean = mean if abs(mean) > 1e-9 else 1.0
-        sd = statistics.pstdev(self.pool) if len(self.pool) > 1 else 0.0
-        self._cv = (sd / self._pool_mean) if self._pool_mean else 0.0
-        self.rate_rel = {}
-        for k, n in (matches or {}).items():
-            self.rate_rel[k] = max(rate_floor, self._cv / math.sqrt(
-                max(1.0, float(n) + SHRINK_MATCHES)))
-        self.club_of = dict(club_of or {})
-        self.club_rel = dict(club_rel or {})
-
-        p0 = {}
-        for j in sorted(per_jornada):
-            for k, (_pts, p) in per_jornada[j].items():
-                p0.setdefault(k, p)
-        self.start_rel = {}
-        for k, n in (matches or {}).items():
-            p = p0.get(k)
-            if p is None or p <= 0.0 or p >= 1.0:
-                self.start_rel[k] = 0.0
-                continue
-            self.start_rel[k] = math.sqrt((1.0 - p) / p) / math.sqrt(
-                max(1.0, float(n) + SHRINK_MATCHES))
 
     def expected(self, jornada: int) -> dict[str, float]:
         return {k: pts * p
@@ -87,78 +32,14 @@ class Bootstrap:
 
 
 def _selftest() -> None:
-    from ffcore.score import SHRINK_K
-    assert SHRINK_MATCHES == SHRINK_K, "one shrinkage, two modules"
-
-    thin = Bootstrap({1: {"vet": (5.0, 1.0), "kid": (5.0, 1.0)}},
-                     pool=[0, 2, 4, 6, 8] * 40, matches={"vet": 34, "kid": 0})
-    assert thin.rate_rel["vet"] == thin.rate_rel["kid"] == RATE_REL_FLOOR, \
-        thin.rate_rel
-
-    wide = Bootstrap({1: {"vet": (5.0, 1.0), "kid": (5.0, 1.0)}},
-                     pool=[0, 0, 0, 0, 10] * 40, matches={"vet": 34, "kid": 0})
-    assert abs(wide.rate_rel["vet"] - RATE_REL_FLOOR) < 1e-9, wide.rate_rel
-    assert abs(wide.rate_rel["kid"] - 0.707) < 0.01, wide.rate_rel
-    assert wide.rate_rel["vet"] < wide.rate_rel["kid"], wide.rate_rel
-    assert Bootstrap({1: {"vet": (5.0, 1.0)}}, pool=[1, 2, 3]).rate_rel == {}
-
-    assert thin.club_of == {} and thin.club_rel == {}
-    same_club = Bootstrap(
-        {1: {"a": (5.0, 1.0), "b": (5.0, 1.0), "c": (5.0, 1.0)}},
-        pool=[0, 2, 4, 6, 8] * 40, matches={"a": 20, "b": 20, "c": 20},
-        club_of={"a": "Rich", "b": "Rich", "c": "Poor"},
-        club_rel={"Rich": 0.20, "Poor": 0.0})
-    assert same_club.club_of == {"a": "Rich", "b": "Rich", "c": "Poor"}
-    assert same_club.club_rel == {"Rich": 0.20, "Poor": 0.0}
-
-    truth = 0.6
-    gen = Bootstrap({1: {"kid": (5.0, 1.0)}}, pool=[0, 2, 4, 6, 8] * 40,
-                    matches={"kid": 10})
-    rel = gen.rate_rel["kid"]
-    rng2 = random.Random(11)
-
-    walked = {1: [], 3: []}
-    step_var = (truth * rel) ** 2
-    for n_steps, out in walked.items():
-        for _ in range(4000):
-            walk = cum_var = 0.0
-            eps0 = max(0.0, 1.0 + rng2.gauss(0.0, rel))
-            for _ in range(n_steps):
-                walk += rng2.gauss(0.0, step_var ** 0.5)
-                cum_var += step_var
-            out.append((1.0, eps0 * math.exp(walk - cum_var / 2.0), rel))
-    h1_pairs, h3_pairs = walked[1], walked[3]
-    assert abs(fit_drift_frac(h1_pairs, h3_pairs) - truth) < 0.08
-    assert fit_drift_frac(h1_pairs[:5], h3_pairs[:5]) == DRIFT_FRAC
-    flat_h1 = [(1.0, 1.0 + rng2.gauss(0.0, rel), rel) for _ in range(200)]
-    flat_h3 = [(1.0, 1.0 + rng2.gauss(0.0, rel), rel) for _ in range(200)]
-    assert 0.0 <= fit_drift_frac(flat_h1, flat_h3) < truth
-    assert fit_drift_frac([(0.0, 1.0, 0.1)] * 30,
-                          [(1.0, -1.0, 0.1)] * 30) == DRIFT_FRAC
-
-    fc = Bootstrap({1: {"nailed": (5.0, 1.0),
-                        "rota": (5.0, 0.5),
+    fc = Bootstrap({1: {"nailed": (5.0, 1.0), "rota": (5.0, 0.5),
                         "out": (5.0, 0.0)}})
-
-    e = fc.expected(1)
-    assert e == {"nailed": 5.0, "rota": 2.5, "out": 0.0}, e
+    assert fc.expected(1) == {"nailed": 5.0, "rota": 2.5, "out": 0.0}
     assert fc.expected(99) == {}, "a jornada nobody plays is empty, not an error"
-
     assert Bootstrap({}, pool=[1, 2, 3]).pool == SEED_POOL
     big = list(range(MIN_POOL))
     assert Bootstrap({}, pool=big).pool == tuple(big)
-    z = Bootstrap({1: {"x": (4.0, 1.0)}}, pool=[0] * MIN_POOL)
-    assert z._pool_mean != 0.0, z._pool_mean
-
-
-    sthin = Bootstrap({1: {"vet": (5.0, 0.9), "kid": (5.0, 0.9)}},
-                      matches={"vet": 34, "kid": 0})
-    assert sthin.start_rel["vet"] < sthin.start_rel["kid"], sthin.start_rel
-    certain = Bootstrap({1: {"never": (5.0, 0.0), "always": (5.0, 1.0)}},
-                        matches={"never": 10, "always": 10})
-    assert certain.start_rel == {"never": 0.0, "always": 0.0}
-    assert Bootstrap({1: {"vet": (5.0, 0.9)}}).start_rel == {}
-
+    assert Bootstrap({1: {"x": (4.0, 1.0)}}, pool=[0] * MIN_POOL)._pool_mean == 1.0
     print("ffcore.forecast self-test OK")
 
 

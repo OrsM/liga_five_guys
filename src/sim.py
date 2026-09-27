@@ -327,8 +327,7 @@ def _selftest() -> None:
                 **{k: (3.0, 0.9) for k in riv}} for j in many_j}
     ub = Universe(state=LeagueState({"me": dict(sqb), "riv": dict(riv)}, many_j,
                                     "me"),
-                  forecaster=Bootstrap(perb, matches={k: 30 for k in
-                                                      (*sqb, *riv, "cand")}),
+                  forecaster=Bootstrap(perb),
                   cash=10e6, me="me",
                   facts=dict(
                       pos={**sqb, "cand": "MED"}, price={"cand": 5e6},

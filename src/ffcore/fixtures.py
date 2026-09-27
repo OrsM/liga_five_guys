@@ -52,9 +52,6 @@ def tiny_bootstrap(**overrides) -> "Bootstrap":
     defaults = dict(
         per_jornada=default_per_jornada,
         pool=(),
-        matches=None,
-        club_of=None,
-        club_rel=None,
     )
     return Bootstrap(**_with_overrides("tiny_bootstrap", defaults, overrides))
 

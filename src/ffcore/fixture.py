@@ -1,8 +1,6 @@
 
 from __future__ import annotations
 
-import math
-import statistics
 from typing import NamedTuple
 
 
@@ -101,27 +99,6 @@ def attack_defense(results: list[dict], teams
     return out
 
 
-def club_volatility(results: list[dict], teams) -> dict[str, float]:
-    involvement: dict[str, list[float]] = {}
-    for home, away, hg, ag in _match_goals(results):
-        if home:
-            involvement.setdefault(home, []).append(hg + ag)
-        if away:
-            involvement.setdefault(away, []).append(hg + ag)
-    out = {}
-    for t in teams:
-        vals = involvement.get(t, [])
-        n = len(vals)
-        if n < MIN_AD_MATCHES:
-            continue
-        mean = statistics.mean(vals)
-        if mean <= 0:
-            continue
-        cv = statistics.pstdev(vals) / mean
-        out[t] = cv / math.sqrt(n)
-    return out
-
-
 def difficulty(strength: dict[str, float]) -> dict[str, float]:
     order = sorted(strength, key=lambda t: -strength[t])
     n = len(order)
@@ -207,21 +184,6 @@ def _selftest() -> None:
     assert attack_defense([], ["Strong"]) == {}
     assert attack_defense([{"home": "A", "away": "B", "home_goals": "",
                             "away_goals": ""}], ["A", "B"]) == {}
-
-    steady = [{"home": "Steady", "away": "Weak", "home_goals": "1",
-              "away_goals": "1"}] * MIN_AD_MATCHES
-    wild = ([{"home": "Wild", "away": "Weak", "home_goals": "0",
-             "away_goals": "0"}] * (MIN_AD_MATCHES // 2)
-           + [{"home": "Wild", "away": "Weak", "home_goals": "8",
-              "away_goals": "0"}] * (MIN_AD_MATCHES // 2))
-    vol = club_volatility(steady + wild, ["Steady", "Wild", "Thin"])
-    assert vol["Steady"] == 0.0, vol
-    assert vol["Wild"] > 0.0, vol
-    assert "Thin" not in vol, vol
-    assert club_volatility([], ["Steady"]) == {}
-    assert club_volatility(
-        [{"home": "Empty", "away": "X", "home_goals": "0",
-          "away_goals": "0"}] * MIN_AD_MATCHES, ["Empty"]) == {}
 
     ms = [{"jornada": "1", "home": "Rich", "away": "Poor", "score": "2-0"},
           {"jornada": "2", "home": "Mid", "away": "Rich", "score": ""},
