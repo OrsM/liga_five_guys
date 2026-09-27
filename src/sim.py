@@ -3,8 +3,8 @@ from __future__ import annotations
 import json
 import sys
 
-from decide import (BID_BEATS, FINAL_TRIALS, PRICE_LOG, Action, apply, band, paired,
-                    score_many, worth_doing)
+from decide import (BID_BEATS, PRICE_LOG, band_acts, plan, sale_pts,
+                    worth_doing)
 from ffcore.league import app_fielded
 from ffcore.render import title_name
 from ffcore.tidy import DECISIONS, REPORTS, load_deadline, log_row, run_now
@@ -24,42 +24,9 @@ def xi_change(marked: list[str], best) -> dict:
             "out": [k for k in marked if k not in want]}
 
 
-def band_acts(u) -> list:
-    mine, o, m = u.mine, u.outlook, u.market
-    return ([(k, Action("sell", sell=(k,),
-                        proceeds=m.proceeds.get(k, 0.0))) for k in mine]
-            + [(k, Action("buy", buy=k, cost=price))
-               for k, price in m.price.items()
-               if k not in mine and o.season.get(k, 0.0) > o.xi_bar])
-
-
-def sale_pts(u, bands) -> dict[str, float]:
-    xi = u.outlook.xi.players
-    return {k: u.market.cash_pts(bands[k].action) + bands[k].mean
-            for k in u.mine if k in bands and k not in xi}
-
-
 def why(r) -> str:
     return " + ".join(w for w, v in (("points", r["d_pts"]), ("cash", r["cash_pts"]))
                       if v > 0)
-
-
-def plan(u, rows, base) -> tuple[list[dict], float]:
-    picked: list[dict] = []
-    cash, gain = u.market.cash, 0.0
-    for r in sorted(worth_doing(u, rows), key=lambda r: -r["net_pts"]):
-        a = r["action"]
-        used = {k for p in picked for k in (p["action"].buy, *p["action"].sell)}
-        if used & {a.buy, *a.sell} or a.net > cash:
-            continue
-        acts = [p["action"] for p in picked] + [a]
-        after = score_many(u, [apply(u, *acts)], FINAL_TRIALS, 1)[0]
-        total = band(paired(after, base, u.me))[0] + sum(
-            u.market.cash_pts(x) for x in acts)
-        if total > gain:
-            picked.append(r)
-            cash, gain = cash - a.net, total
-    return picked, gain
 
 
 def player(m, k) -> dict:
@@ -147,7 +114,7 @@ def log_cash_price(measured) -> None:
 def _selftest() -> None:
     from dataclasses import replace
 
-    from decide import Band, Universe
+    from decide import Action, Band, Universe
     from ffcore.fixtures import tiny_market_universe
     from ffcore.market import Market
     from ffcore.forecast import Bootstrap

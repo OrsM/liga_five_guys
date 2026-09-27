@@ -23,7 +23,8 @@ from ffcore.tidy import (DECISIONS, LINEUP_SOURCE, age_hours, current, history,
                          read_csv, run_now, scored)
 from ffcore.parse import num, text
 
-__all__ = ["Action", "Band", "Ranking", "Universe"]
+__all__ = ["Action", "Band", "Ranking", "Universe", "band_acts", "plan",
+           "sale_pts"]
 
 APP_FRESH_HOURS = 14.4
 SCREEN_TRIALS = 250
@@ -225,6 +226,39 @@ def apply(u, *acts: Action) -> dict[str, dict[str, str]]:
 
 def worth_doing(u, rows) -> list:
     return [r for r in rows if r["net_pts"] > 0]
+
+
+def band_acts(u) -> list:
+    mine, o, m = u.mine, u.outlook, u.market
+    return ([(k, Action("sell", sell=(k,),
+                        proceeds=m.proceeds.get(k, 0.0))) for k in mine]
+            + [(k, Action("buy", buy=k, cost=price))
+               for k, price in m.price.items()
+               if k not in mine and o.season.get(k, 0.0) > o.xi_bar])
+
+
+def sale_pts(u, bands) -> dict[str, float]:
+    xi = u.outlook.xi.players
+    return {k: u.market.cash_pts(bands[k].action) + bands[k].mean
+            for k in u.mine if k in bands and k not in xi}
+
+
+def plan(u, rows, base) -> tuple[list[dict], float]:
+    picked: list[dict] = []
+    cash, gain = u.market.cash, 0.0
+    for r in sorted(worth_doing(u, rows), key=lambda r: -r["net_pts"]):
+        a = r["action"]
+        used = {k for p in picked for k in (p["action"].buy, *p["action"].sell)}
+        if used & {a.buy, *a.sell} or a.net > cash:
+            continue
+        acts = [p["action"] for p in picked] + [a]
+        after = score_many(u, [apply(u, *acts)], FINAL_TRIALS, 1)[0]
+        total = band(paired(after, base, u.me))[0] + sum(
+            u.market.cash_pts(x) for x in acts)
+        if total > gain:
+            picked.append(r)
+            cash, gain = cash - a.net, total
+    return picked, gain
 
 
 PRICE_LOG = "cash_price_log.csv"
