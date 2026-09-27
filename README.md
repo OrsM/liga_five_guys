@@ -53,6 +53,9 @@ Everything else comes from the app's API and public pages.
 - **Prices** (`ffcore/pricing.py`): values keep their trend; the next h
   updates move by a fitted multiple of the last one. The auction premium
   is the median winning bid over asking in the last 50 auctions.
+- **Assembly** (`assemble.py`): the one place that reads the tables and
+  builds the scorer, market, league state and forecast; model modules never
+  read a table themselves.
 - **Moves** (`decide.py`): the `Universe` joins an `Outlook`
   (`ffcore/outlook.py`: expected points and the best eleven, no money) to
   a `Market` (`ffcore/market.py`: names, prices, values, your cash and
@@ -83,7 +86,8 @@ rather than reaching through them; ruff flags reads of private members.
 
 ## Layout
 
-    src/            run, ingest, sources, crosswalk, decide, sim, grading, stats
+    src/            run, ingest, sources, crosswalk, assemble, decide, sim,
+                    grading, stats
     src/ffcore/     tidy (paths, CSVs, current/history), clock (now, stamps),
                     jornadas (locks), points (points history), players,
                     source, futbolfantasy, footballdata, laliga_api, parse,

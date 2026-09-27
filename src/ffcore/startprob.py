@@ -7,10 +7,11 @@ from typing import NamedTuple
 
 import numpy as np
 
+from ffcore.parse import pct100
 from ffcore.text import norm
 from ffcore.points import minutes_played
 
-__all__ = ["Obs", "Outcome", "Calibration", "calibrate", "fit", "outcomes",
+__all__ = ["Obs", "Outcome", "Calibration", "StartOdds", "calibrate", "fit", "outcomes",
            "observations", "fit_start_fallbacks", "NEUTRAL_START",
            "ABSENT_START"]
 
@@ -49,6 +50,37 @@ class Calibration:
         if (self.alpha, self.beta) == (0.0, 1.0):
             return ff_pct / 100.0
         return _platt(ff_pct / 100.0, self.alpha, self.beta)
+
+
+class StartOdds:
+    """What the probable-XI pages say about each player's next start: the
+    listed start percentage, whether he is listed at all, and any injury or
+    suspension, read through the calibration fitted to who really started."""
+
+    def __init__(self, xi: list[dict], xw, cal: Calibration | None = None):
+        self.cal = cal or Calibration()
+        self.start_pct: dict[str, float] = {}
+        self.listed: set[str] = set()
+        self.status: dict[str, str] = {}
+        for r in xi or []:
+            key = xw.key_of(r) if xw else None
+            if not key:
+                continue
+            self.listed.add(key)
+            p = pct100(r.get("start_pct"))
+            if p is not None and p >= 0:
+                self.start_pct[key] = max(self.start_pct.get(key, 0.0), p)
+            if r.get("status") and r["status"] != "ok":
+                self.status[key] = r["status"]
+
+    def p_now(self, key: str) -> float:
+        pct = self.start_pct.get(key)
+        return self.cal.p(pct if pct is not None else (
+            self.cal.neutral_start if key in self.listed
+            else self.cal.absent_start))
+
+    def status_of(self, key: str) -> str:
+        return self.status.get(key, "")
 
 
 def _grid_brier(obs) -> np.ndarray:
@@ -176,6 +208,18 @@ def calibrate(outs: list[Outcome]) -> Calibration:
 
 
 def _selftest() -> None:
+    from ffcore.crosswalk import Crosswalk, Player
+
+    xw = Crosswalk({"ana": Player("ana", "Ana"), "bo": Player("bo", "Bo")})
+    odds = StartOdds([{"player_name": "Ana", "start_pct": "80", "status": "ok"},
+                      {"player_name": "Ana", "start_pct": "90"},
+                      {"player_name": "Bo", "start_pct": "", "status": "doubt"},
+                      {"player_name": "Nobody", "start_pct": "99"}], xw)
+    assert odds.p_now("ana") == 0.9, "the higher of two listings"
+    assert odds.p_now("bo") == NEUTRAL_START / 100 and odds.status_of("bo") == "doubt"
+    assert odds.p_now("cai") == ABSENT_START / 100 and odds.status_of("cai") == ""
+    assert StartOdds([{"player_name": "Ana", "start_pct": "80"}], None).listed == set()
+
     assert abs(_platt(0.5, 0.0, 1.0) - 0.5) < 1e-6
     assert abs(_platt(0.8, 0.0, 1.0) - 0.8) < 1e-6
     assert _platt(0.8, 0.0, 3.0) > 0.8 and _platt(0.2, 0.0, 3.0) < 0.2

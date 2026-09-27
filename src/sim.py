@@ -3,7 +3,8 @@ from __future__ import annotations
 import json
 import sys
 
-from decide import (BID_BEATS, PRICE_LOG, band_acts, plan, sale_pts,
+from assemble import PRICE_LOG
+from decide import (BID_BEATS, band_acts, plan, sale_pts,
                     worth_doing)
 from ffcore.league import app_fielded
 from ffcore.render import title_name
@@ -204,9 +205,9 @@ def _selftest() -> None:
 
 
 def main() -> None:
-    import decide
+    import assemble
 
-    u = decide.load()
+    u = assemble.universe()
     if len(u.state.squads) < 2 or not u.state.jornadas:
         print("sim: nothing to simulate (%d squads, %d jornadas left)"
               % (len(u.state.squads), len(u.state.jornadas)))

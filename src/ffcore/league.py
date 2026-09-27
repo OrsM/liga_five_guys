@@ -92,6 +92,13 @@ class League:
         return cls(load_config(), load_crosswalk(), current("api_teams"),
                    current("api_standings"), current("api_activity"))
 
+    @property
+    def me(self) -> str:
+        return self.cfg.me
+
+    def key_of_app(self, app_id: str) -> str | None:
+        return self.xw.player(app_id=app_id)
+
     def squad(self, handle: str) -> list[str]:
         return sorted(k for k, m in self.owner.items() if m == handle)
 

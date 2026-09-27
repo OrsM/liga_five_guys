@@ -40,6 +40,5 @@ build-backend = "setuptools.build_meta"
 [tool.setuptools]
 package-dir = {"" = "src"}
 packages = ["ffcore"]
-py-modules = ["decide", "sim", "report", "methodology", "slate", "squads",
-              "points", "ledger", "crosswalk", "ingest", "sources", "digest",
-              "scout", "backtest", "gap_signal", "stats", "xi", "run"]
+py-modules = ["run", "ingest", "sources", "crosswalk", "assemble", "decide",
+              "sim", "grading", "stats"]

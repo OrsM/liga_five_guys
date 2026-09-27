@@ -1,7 +1,9 @@
 README.md
 pyproject.toml
+src/assemble.py
 src/crosswalk.py
 src/decide.py
+src/grading.py
 src/ingest.py
 src/run.py
 src/sim.py

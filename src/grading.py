@@ -9,7 +9,6 @@ import sys
 from pathlib import Path
 
 from ffcore.schedule import expectations
-from ffcore.clock import run_now
 from ffcore.jornadas import clock_history
 from ffcore.points import scored
 from ffcore.tidy import current
@@ -38,7 +37,7 @@ def score_forecast(pred: dict[str, float], actual: dict[tuple, float],
 
 
 def backtest() -> list[dict]:
-    from ffcore.score import build
+    from assemble import fixture_ratings, scorer
     from ffcore.clock import set_now
     from ffcore.tidy import LINEUP_SOURCE
 
@@ -49,8 +48,9 @@ def backtest() -> list[dict]:
         for j in sorted({j for _k, j in actual} & set(locks), key=locks.get):
             set_now(locks[j] - dt.timedelta(minutes=1))
             market = current("market")
-            sc = build(market, current("lineups", LINEUP_SOURCE), run_now())
-            per_j = expectations(sc, set(sc.lookup), current("matches"))[0]
+            sc = scorer(market, current("lineups", LINEUP_SOURCE))
+            per_j = expectations(sc, fixture_ratings(market), set(sc.lookup),
+                                 current("matches"))[0]
             pred = {k: pts * p for k, (pts, p) in per_j.get(j, {}).items()}
             out.append({"jornada": j, "pred": pred,
                         **score_forecast(pred, actual, j)})

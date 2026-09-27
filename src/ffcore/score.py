@@ -4,16 +4,16 @@ from __future__ import annotations
 import statistics
 from typing import NamedTuple
 
-from ffcore.parse import pct100, ratio, text
-from ffcore.startprob import NEUTRAL_START, Calibration, calibrate, outcomes
+from ffcore.parse import text
+from ffcore.startprob import NEUTRAL_START, StartOdds
 from ffcore.text import norm
 from ffcore.players import row_key
 from ffcore.points import Scored, minutes_played
-from ffcore.tidy import current
 
 __all__ = ["SLOT", "SLOT_LABEL", "SLOT_MIN", "MAX_SLOT", "FREE_FORMATIONS",
            "starters_per_slot", "Rating", "Rates", "Scorer", "squad_pool",
-           "replacement", "vor", "build"]
+           "replacement", "vor", "per_jornada_current", "totals",
+           "fit_promoted_discount"]
 
 SLOT = {
     "portero": "POR",
@@ -83,7 +83,7 @@ def fit_promoted_discount(market: list[dict], history: dict,
 
 
 
-def _per_jornada_current(starters_rows, played, jornada_of_match, xw
+def per_jornada_current(starters_rows, played, jornada_of_match, xw
                          ) -> dict[str, dict[int, tuple[float, float]]]:
     minutes_by_jor: dict[str, dict[int, float]] = {}
     seen: set[tuple[str, str]] = set()
@@ -118,40 +118,12 @@ def _per_jornada_current(starters_rows, played, jornada_of_match, xw
     return out
 
 
-def _totals(per_jornada: dict[int, tuple[float, float]]
+def totals(per_jornada: dict[int, tuple[float, float]]
             ) -> tuple[float, float, float, float]:
     pts = sum(p for p, _m in per_jornada.values())
     apps = sum(1 for _p, m in per_jornada.values() if m > 0)
     n = len(per_jornada)
     return pts, float(apps), (apps / n if n else 0.0), n
-
-
-def build(market: list[dict], xi_rows: list[dict], now) -> "Scorer":
-    from ffcore.fixture import difficulty_ratings
-    from ffcore.jornadas import clock_history, jornada_of_match
-    from ffcore.players import load_crosswalk
-    from ffcore.points import scored
-    from ffcore.tidy import LINEUP_SOURCE, SEASON, history, read_csv
-
-    xw = load_crosswalk()
-    files = sorted(SEASON.glob("points_*.csv"))
-    last_season = {r["ff_id"]: {"pts": ratio(r.get("points")) or 0.0,
-                            "pj": ratio(r.get("games")) or 0.0}
-               for r in (read_csv(files[-1]) if files else ()) if r.get("ff_id")}
-    played = scored()
-    by_key = _per_jornada_current(current("starters"), played,
-                                  jornada_of_match(), xw)
-    ratings = difficulty_ratings(market, current("results_history"))
-    outs = outcomes(history("lineups", LINEUP_SOURCE), current("starters"),
-                    clock_history().round_locks, jornada_of_match(), xw)
-    cal = calibrate(outs)
-    return Scorer(
-        market, xi_rows, last_season, xw=xw, cal=cal,
-        ratings=ratings,
-        current={k: dict(zip(("pts", "pj", "start_rate", "start_n"),
-                             _totals(jd)))
-                 for k, jd in by_key.items()},
-        promoted_discount=fit_promoted_discount(market, last_season, played))
 
 
 class Rating(NamedTuple):
@@ -172,41 +144,22 @@ class Rates(NamedTuple):
 
 
 class Scorer:
+    """Points per match for any player: last season shrunk toward his
+    position's prior (discounted for promoted clubs), then this season's
+    matches; and, from StartOdds, his chance of starting."""
 
-    def __init__(self, market: list[dict], xi: list[dict],
+    def __init__(self, market: list[dict], starts: StartOdds,
                  last_season: dict | None = None, shrink_k: float = SHRINK_K,
                  current: dict | None = None,
-                 cal=None,
-                 promoted_discount: float = PROMOTED_DISCOUNT, xw=None,
-                 ratings=None):
-        from ffcore.players import load_crosswalk
-
+                 promoted_discount: float = PROMOTED_DISCOUNT):
         self.market = market
+        self.starts = starts
         self.last_season = last_season or {}
         self.shrink_k = shrink_k
         self.promoted_discount = promoted_discount
         self.current = current or {}
-        self.ratings = ratings
         self.lookup: dict[str, dict] = {row_key(r): r for r in market
                                         if r.get("name")}
-        xw = xw if xw is not None else load_crosswalk()
-
-        self.cal = cal or Calibration()
-
-        self.start_pct: dict[str, float] = {}
-        self.listed: set[str] = set()
-        self.status: dict[str, str] = {}
-        for r in xi or []:
-            key = xw.key_of(r) if xw else None
-            if not key:
-                continue
-            self.listed.add(key)
-            p = pct100(r.get("start_pct"))
-            if p is not None and p >= 0:
-                self.start_pct[key] = max(self.start_pct.get(key, 0.0), p)
-            if r.get("status") and r["status"] != "ok":
-                self.status[key] = r["status"]
-
         self.promoted = detect_promoted(self.market, self.last_season)
         self.priors, self.global_prior = position_priors(self.market,
                                                           self.last_season)
@@ -233,10 +186,7 @@ class Scorer:
     def rates(self, rec: dict) -> Rates:
         key = row_key(rec)
         rating = self.rate(rec)
-        pct = self.start_pct.get(key)
-        raw = pct if pct is not None else (
-            self.cal.neutral_start if key in self.listed else self.cal.absent_start)
-        p_now = self.cal.p(raw)
+        p_now = self.starts.p_now(key)
         p_rest = p_now
         cur = self.current.get(key)
         start_n = cur.get("start_n", 0.0) if cur else 0.0
@@ -246,7 +196,7 @@ class Scorer:
                       / (k + start_n))
             p_now = (k * p_now + start_n * cur["start_rate"]) / (k + start_n)
         return Rates(key, SLOT.get((rec.get("position") or "").lower(), ""),
-                     rating.ppm, p_now, p_rest, self.status.get(key, ""),
+                     rating.ppm, p_now, p_rest, self.starts.status_of(key),
                      rating.pj)
 
 
@@ -306,7 +256,7 @@ def _selftest() -> None:
     xi = [{"player_name": n, "start_pct": "100"}
           for n in [r["name"] for r in market]]
 
-    sc = Scorer(market, xi, hist, xw=xw)
+    sc = Scorer(market, StartOdds(xi, xw), hist)
     prior = sc.priors["DEF"]
     assert 3.0 < prior < 3.1, prior
 
@@ -317,7 +267,7 @@ def _selftest() -> None:
 
     full = sc.rate(dict(row, name="p0"))
     cur = {"p0": {"pts": 30.0, "pj": 3.0}}
-    sc2 = Scorer(market, xi, hist, current=cur, xw=xw)
+    sc2 = Scorer(market, StartOdds(xi, xw), hist, current=cur)
     blended = sc2.rate(dict(row, name="p0"))
     assert abs(blended.ppm - (30.0 + K * full.ppm) / (3.0 + K)) < 1e-9
     assert blended.cur_pj == 3.0
@@ -331,12 +281,12 @@ def _selftest() -> None:
     accented = [dict(row, name="r%d" % i, team="Málaga", club="Málaga")
                 for i in range(10)]
     assert detect_promoted(accented, {}) == {"Málaga"}
-    sc3 = Scorer(promo_market, [], promo_hist, xw=xw)
+    sc3 = Scorer(promo_market, StartOdds([], xw), promo_hist)
     assert sc3.promoted == {"Rise"}
     newbie = sc3.rate(dict(row, name="q5", team="Rise", club="Rise"))
     assert newbie.assumed and abs(newbie.ppm - sc3.priors["DEF"]
                                   * PROMOTED_DISCOUNT) < 1e-9, newbie
-    lower = Scorer(promo_market, [], promo_hist, promoted_discount=0.5, xw=xw)
+    lower = Scorer(promo_market, StartOdds([], xw), promo_hist, promoted_discount=0.5)
     assert lower.rate(dict(row, name="q5", team="Rise", club="Rise")).ppm < newbie.ppm
 
     assert fit_promoted_discount(promo_market, promo_hist, []) \
@@ -350,13 +300,13 @@ def _selftest() -> None:
     assert fit_promoted_discount(promo_market, promo_hist, at_prior) \
         > PROMOTED_DISCOUNT + 0.15
 
-    assert Scorer(market, xi, hist, current={}, xw=xw).rate(dict(row, name="p0")) == full
-    assert Scorer(market, xi, hist,
-                  current={"p0": {"pts": 0.0, "pj": 0.0}}, xw=xw).rate(dict(row, name="p0")) \
+    assert Scorer(market, StartOdds(xi, xw), hist, current={}).rate(dict(row, name="p0")) == full
+    assert Scorer(market, StartOdds(xi, xw), hist,
+                  current={"p0": {"pts": 0.0, "pj": 0.0}}).rate(dict(row, name="p0")) \
         == full
 
     dbt = [{"player_name": "p0", "start_pct": "100", "status": "doubt"}]
-    r0 = Scorer(market, dbt, hist, xw=xw).rates(dict(row, name="p0"))
+    r0 = Scorer(market, StartOdds(dbt, xw), hist).rates(dict(row, name="p0"))
     assert (r0.key, r0.slot, r0.status, r0.p_now, r0.p_rest) == (
         "p0", "DEF", "doubt", 1.0, 1.0), r0
     assert abs(r0.ppm - full.ppm) < 1e-9 and r0.pj == full.pj
@@ -373,12 +323,12 @@ def _selftest() -> None:
     assert vor({"slot": "DEL", "score": 6.0}, repl) == -2.0
     assert vor({"slot": ""}, repl) == 0.0
 
-    benched = Scorer(market, xi, hist, xw=xw, current={"p0": {
+    benched = Scorer(market, StartOdds(xi, xw), hist, current={"p0": {
         "pts": 30.0, "pj": 3.0, "start_rate": 0.0, "start_n": 6.0}}).rates(
         dict(row, name="p0"))
     assert abs(benched.p_now - K / (K + 6)) < 1e-9, benched
     susp = [{"player_name": "p0", "start_pct": "0", "status": "suspended"}]
-    back = Scorer(market, susp, hist, xw=xw, current={"p0": {
+    back = Scorer(market, StartOdds(susp, xw), hist, current={"p0": {
         "pts": 30.0, "pj": 2.0, "start_rate": 0.9, "start_n": 2.0}}).rates(
         dict(row, name="p0"))
     assert abs(back.p_now - 2 * 0.9 / (K + 2)) < 1e-9, back
@@ -413,16 +363,16 @@ def _selftest() -> None:
     ]
     played = [Scored("antonio blanco", 1, 8.0, 1.0, "t1"),
               Scored("antonio blanco", 2, 5.0, 1.0, "t2")]
-    by_key = _per_jornada_current(starters_rows, played,
+    by_key = per_jornada_current(starters_rows, played,
                                   jornada_map, xw2)
     assert by_key["antonio blanco"] == {1: (8.0, 90.0), 2: (5.0, 45.0)}, \
         by_key["antonio blanco"]
     assert "came on" not in by_key, by_key
     assert "unused sub" not in by_key, by_key
-    assert _per_jornada_current([], [], {}, xw2) == {}
+    assert per_jornada_current([], [], {}, xw2) == {}
 
-    assert _totals(by_key["antonio blanco"]) == (13.0, 2.0, 1.0, 2)
-    assert _totals({}) == (0.0, 0.0, 0.0, 0)
+    assert totals(by_key["antonio blanco"]) == (13.0, 2.0, 1.0, 2)
+    assert totals({}) == (0.0, 0.0, 0.0, 0)
 
     print("ffcore.score self-test OK")
 

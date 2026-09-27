@@ -60,7 +60,7 @@ def season(rates: dict, club: dict[str, str], rem: list[int],
     return per_j, first_of
 
 
-def expectations(sc, keys, matches: list[dict]
+def expectations(sc, ratings, keys, matches: list[dict]
                  ) -> tuple[dict[int, dict], dict[str, int], dict, list[int],
                             dict[int, set[str]]]:
     from ffcore.fixture import season_board
@@ -70,7 +70,7 @@ def expectations(sc, keys, matches: list[dict]
              for k in keys}
     club = {k: sc.lookup[k].get("club") for k in keys if k in sc.lookup}
     per_j, first_of = season(rates, club, rem, played,
-                             season_board(sc.ratings, matches, rem))
+                             season_board(ratings, matches, rem))
     return per_j, first_of, rates, rem, played
 
 
