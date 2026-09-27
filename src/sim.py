@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import sys
 
-from decide import (FINAL_TRIALS, PRICE_LOG, Action, apply, band, paired,
+from decide import (BID_BEATS, FINAL_TRIALS, PRICE_LOG, Action, apply, band, paired,
                     score_many, worth_doing)
 from ffcore.league import app_fielded
 from ffcore.render import title_name
@@ -116,6 +116,7 @@ def report(u, base, rows, bands, chg, lock_at=None) -> dict:
         "p_win": round(base.position().get(1, 0.0), 3),
         "band": [lo, hi],
         "do": todo, "plan_gain": gain, "backup": backup, "ping": ping(todo),
+        "bid_beats": BID_BEATS,
         "squad": [
             {**player(u, k), "xi": k in xi,
              "start": u.next_up.get(k, (0.0, 0.0))[1], "next": exp.get(k, 0.0),

@@ -262,6 +262,7 @@ def worth_doing(u, rows) -> list:
 
 PRICE_LOG = "cash_price_log.csv"
 PRICE_WINDOW = 50
+BID_BEATS = 0.8
 
 
 def cash_price_history() -> float | None:
@@ -276,11 +277,18 @@ def _updates_to_lock() -> int:
     return max(1, round(hours / 24))
 
 
-def _premium() -> float:
-    paid = auction_ratios(history("api_market"), sorted(
-        (a for a in current("api_activity") if a["kind"] == "buy"),
-        key=lambda a: a["at"]))
-    return median(paid[-PRICE_WINDOW:]) if paid else 1.0
+def premium_to_beat(ratios: list[float]) -> float:
+    recent = sorted(ratios[-PRICE_WINDOW:])
+    return recent[min(len(recent) - 1, int(BID_BEATS * len(recent)))] if recent else 1.0
+
+
+def _premium(me: str) -> float:
+    mine = {text(r, "user_id") for r in current("api_standings")
+            if text(r, "manager") == me}
+    return premium_to_beat(auction_ratios(history("api_market"), sorted(
+        (a for a in current("api_activity")
+         if a["kind"] == "buy" and a["user_id"] not in mine),
+        key=lambda a: a["at"])))
 
 
 @cache
@@ -339,7 +347,7 @@ def load() -> Universe:
         part_played=played, first_jornada_of=first_jornada_of,
         locked_cash=sum(pending(mkt, "bid_status", "bid_money").values()),
         received_offers=received_offers, lam=cash_price_history(),
-        premium=_premium(),
+        premium=_premium(me),
         )
 
 
@@ -573,6 +581,10 @@ def _selftest() -> None:
         forecaster=Bootstrap(pf_per), cash=0.0, me="me",
         facts={"pos": dict.fromkeys(("me_a", "me_b", "cand"), "MED")}).par
     assert par == {"me_a": 0.0, "me_b": 6.0, "cand": 4.0}, par
+
+    assert premium_to_beat([1.0] * 5 + [1.3] * 5) == 1.3
+    assert premium_to_beat([1.0] * 9 + [1.3]) == 1.0
+    assert premium_to_beat([]) == 1.0
 
     from ffcore.fixtures import tiny_market_universe
     mu = tiny_market_universe(lam=0.3, premium=1.05)
