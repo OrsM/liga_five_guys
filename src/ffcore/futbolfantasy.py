@@ -89,26 +89,29 @@ def _slug(chunk: str) -> str | None:
 
 
 def parse_market(html: str, observed_at: str, key: str = "market") -> list[dict]:
-    m = TEAM_SELECT_RE.search(html)
-    teams = ({tid: name.strip() for tid, name in OPTION_RE.findall(m.group(1))
-             if tid != "0"} if m else {})
+    doc = lh.fromstring(html)
+    select = doc.xpath('(//select[@name="equipo"])[1]')
+    teams = {o.get("value"): (o.text or "").strip()
+             for o in (select[0].iter("option") if select else ())
+             if (o.get("value") or "").isdigit() and o.get("value") != "0"
+             and (o.text or "").strip() and not len(o)}
     rows = []
-    for chunk in html.split('class="elemento_jugador')[1:]:
-        name, value = _attr(chunk, "nombre"), _attr(chunk, "valor")
+    for el in doc.xpath('//*[starts-with(@class, "elemento_jugador")]'):
+        name, value = el.get("data-nombre"), el.get("data-valor")
         if not name or not value:
             continue
-        team_id = _attr(chunk, "equipo")
+        team_id = el.get("data-equipo")
         rows.append({
             "observed_at": observed_at,
-            "ff_id": _attr(chunk, "id") or "",
+            "ff_id": el.get("data-id") or "",
             "name": name,
-            "position": (_attr(chunk, "posicion") or "").lower(),
+            "position": (el.get("data-posicion") or "").lower(),
             "team_id": team_id,
             "team": teams.get(team_id or "", ""),
             "club": club_slug(teams.get(team_id or "", "")),
             "value": int(value),
-            "delta_1d": _num(_attr(chunk, "diferencia1")),
-            "delta_pct_1d": _num(_attr(chunk, "diferencia-pct1")),
+            "delta_1d": _num(el.get("data-diferencia1")),
+            "delta_pct_1d": _num(el.get("data-diferencia-pct1")),
         })
     return rows
 
