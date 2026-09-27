@@ -46,22 +46,23 @@ def player_key(r: dict) -> str:
 
 def deltas(rows: list[dict], season: str,
            jornada_timeline: list[tuple[str, int]] = ()) -> list[dict]:
+    rows = sorted(rows, key=lambda r: r.get("observed_at", ""))
     last: dict[str, tuple[float, float]] = {}
     moved: dict[str, list[tuple[dict, tuple[float, float]]]] = {}
-    for r in sorted(rows, key=lambda r: r.get("observed_at", "")):
+    for r in rows:
         key = player_key(r)
         if not key:
             continue
         now = (float(r["points"]), float(r["games"]))
-        if last.get(key) != now:
-            moved.setdefault(r["observed_at"], []).append(
-                (r, last.get(key, (0.0, 0.0))))
+        before = last.get(key, (0.0, 0.0))
+        if before != now:
+            moved.setdefault(r["observed_at"], []).append((r, before))
             last[key] = now
-    stamps = sorted(moved)
+    stamps = sorted(set(moved) | ({rows[0]["observed_at"]} if rows else set()))
     out = []
     for s0, s1 in zip(stamps, stamps[1:]):
         jor = jornada_asof(jornada_timeline, s1)
-        for r, (p0, j0) in moved[s1]:
+        for r, (p0, j0) in moved.get(s1, []):
             pts, pj = float(r["points"]), float(r["games"])
             out.append({
                 "from_stamp": s0, "to_stamp": s1, "season": season,
@@ -107,6 +108,11 @@ def _selftest() -> None:
                                and (q["points"], q["games"])
                                == (r["points"], r["games"])
                                for q in full[:i])]
+    late = [dict(r, observed_at="t4", player_name=n, player_name_full=n,
+                 points="0", games="0") for r, n in zip(full[:1], ["Dee Dow"])]
+    assert deltas(full + late, "s") == deltas(full, "s")
+    zeros = [dict(r, points="0", games="0") for r in full if r["observed_at"] == "t0"]
+    assert [r["from_stamp"] for r in deltas(zeros + full[2:], "s")][0] == "t0"
     for rows in (full, changed_only):
         got = [(r["from_stamp"], r["to_stamp"], r["player_name_full"],
                 r["points_delta"], r["games_delta"]) for r in deltas(rows, "s")]

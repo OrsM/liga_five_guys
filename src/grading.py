@@ -9,7 +9,7 @@ from pathlib import Path
 
 from ffcore.parse import text
 from ffcore.text import norm
-from ffcore.tidy import (DECISIONS, SEASON, append_csv, clock_history,
+from ffcore.tidy import (DECISIONS, append_csv, clock_history,
                          lock_order, read_csv, run_now, snapshot_stamp)
 
 __all__ = ["log_predictions", "load_actuals", "load_predictions", "pair",
@@ -36,29 +36,27 @@ def log_predictions(sc) -> None:
 
 
 def load_actuals(window_days: int | None = WINDOW_DAYS) -> list[dict]:
-    files = sorted((SEASON / "live").glob("perjornada_*.csv"))
-    if not files:
-        return []
+    from ffcore.tidy import load_perjornada
+
     cutoff = (run_now() - dt.timedelta(days=window_days)
               if window_days is not None
               else dt.datetime.min.replace(tzinfo=dt.timezone.utc))
     rows = []
-    for r in read_csv(files[-1]):
+    for r in load_perjornada():
         try:
-            from_dt = snapshot_stamp(r["from_stamp"])
             to_dt = snapshot_stamp(r["to_stamp"])
             games = float(r["games_delta"] or 0)
             points = float(r["points_delta"] or 0)
         except (KeyError, ValueError, TypeError):
             continue
-        if to_dt is None or from_dt is None or to_dt < cutoff:
+        if to_dt is None or to_dt < cutoff:
             continue
         full, short = r.get("player_name_full", ""), r.get("player_name", "")
         jor = r.get("jornada", "")
         rows.append({"name": full or short,
                      "keys": [k for k in dict.fromkeys(
                          (r.get("ff_id", ""), norm(full), norm(short))) if k],
-                     "from_dt": from_dt, "points_delta": points,
+                     "points_delta": points,
                      "games_delta": games,
                      "jornada": int(jor) if jor else None})
     return rows
@@ -102,11 +100,13 @@ def _graded_row(a: dict, per_match: float, **extra) -> dict:
             "jornada": a.get("jornada"), **extra}
 
 
-def pair(actuals: list[dict], preds) -> list[dict]:
+def pair(actuals: list[dict], preds, locks: dict[int, dt.datetime]
+         ) -> list[dict]:
     out = []
     for a in actuals:
-        fac = _claim(a["keys"], preds, a["from_dt"]) \
-            if a["games_delta"] >= 1 else None
+        lock = locks.get(a.get("jornada"))
+        fac = (_claim(a["keys"], preds, lock)
+               if a["games_delta"] >= 1 and lock is not None else None)
         if fac is not None:
             out.append(_graded_row(a, fac["score"], fix=fac.get("fix")))
     return out
@@ -135,8 +135,9 @@ def graded_history() -> tuple[dict, list[dict], dict]:
     return (clock_history().round_locks, load_actuals(), load_predictions())
 
 
-def current_mae(actuals: list[dict], preds) -> float | None:
-    pairs = pair(actuals, preds)
+def current_mae(actuals: list[dict], preds,
+                locks: dict[int, dt.datetime]) -> float | None:
+    pairs = pair(actuals, preds, locks)
     return (sum(abs(p["err"]) / p["matches"] for p in pairs) / len(pairs)
             if pairs else None)
 
@@ -251,21 +252,16 @@ def _selftest() -> None:
                    (t0 + 5 * day, {"score": 6.0, "ppm": 6.0, "fix": 1.0,
                                    "pj": 12.0})]}
     actuals = [
-        {"name": "A", "keys": ["7"], "from_dt": t0 + 3 * day,
-         "points_delta": 10.0, "games_delta": 2.0, "jornada": 2},
-        {"name": "A", "keys": ["7"], "from_dt": t0 + 9 * day,
-         "points_delta": 3.0, "games_delta": 1.0, "jornada": 3},
-        {"name": "B", "keys": ["x"], "from_dt": t0 + 9 * day,
-         "points_delta": 3.0, "games_delta": 1.0, "jornada": 3},
-        {"name": "A", "keys": ["7"], "from_dt": t0 + 9 * day,
-         "points_delta": 0.0, "games_delta": 0.0, "jornada": 3},
-        {"name": "A", "keys": ["7"], "from_dt": t0,
-         "points_delta": 5.0, "games_delta": 1.0, "jornada": 1}]
-    got = pair(actuals, preds)
-    assert [(g["predicted"], g["err"], g["fix"]) for g in got] == [
-        (8.0, -2.0, 1.2), (6.0, 3.0, 1.0)], got
-
+        {"name": "A", "keys": ["7"], "points_delta": 10.0, "games_delta": 2.0, "jornada": 2},
+        {"name": "A", "keys": ["7"], "points_delta": 3.0, "games_delta": 1.0, "jornada": 3},
+        {"name": "B", "keys": ["x"], "points_delta": 3.0, "games_delta": 1.0, "jornada": 3},
+        {"name": "A", "keys": ["7"], "points_delta": 0.0, "games_delta": 0.0, "jornada": 3},
+        {"name": "A", "keys": ["7"], "points_delta": 5.0, "games_delta": 1.0, "jornada": 1}]
     locks = {1: t0 + 2 * day, 2: t0 + 4 * day, 3: t0 + 8 * day}
+    got = pair(actuals, preds, locks)
+    assert [(g["predicted"], g["err"], g["fix"]) for g in got] == [
+        (8.0, -2.0, 1.2), (6.0, 3.0, 1.0), (4.0, -1.0, 1.2)], got
+    assert pair(actuals, preds, {}) == []
     lag0 = lagged_pair(actuals, preds, locks, 0)
     assert [(g["jornada"], g["per_match"], g["pj"]) for g in lag0] == [
         (2, 6.0, 10.0), (3, 6.0, 12.0), (1, 6.0, 10.0)], lag0

@@ -493,7 +493,7 @@ def load() -> Universe:
         part_played=played, first_jornada_of=first_jornada_of,
         locked_cash=sum(pending(mkt, "bid_status", "bid_money").values()),
         received_offers=received_offers,
-        mae=grading.current_mae(history[1], history[2]))
+        mae=grading.current_mae(history[1], history[2], history[0]))
 
 
 def _selftest() -> None:
