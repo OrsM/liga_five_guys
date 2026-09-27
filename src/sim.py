@@ -202,7 +202,7 @@ def _selftest() -> None:
     assert len(sold) == len(set(sold)), sold
     assert gain >= max(r["net_pts"] for r in rows) - 5.0, (gain, rows[0])
 
-    doc = report(ub, ranked, xi_change([], ub.outlook.xi.players))
+    doc = report(ub, ranked, xi_change([], ub.outlook.xi.ranked()))
     assert [d["what"] for d in doc["do"]][:1] == ["field"], doc["do"]
     assert {d["name"].lower() for d in doc["do"] if d["what"] == "buy"} == set(bought)
     assert all(b["name"].lower() not in bought for b in doc["backup"])
@@ -221,7 +221,7 @@ def _selftest() -> None:
                  {"what": "sell", "name": "E", "done": False}]) == "Sell E"
 
     ub.market = replace(ub.market, my_bid={bought[0]: 4e6}, route={"dead": "listed"})
-    doc = report(ub, ranked, xi_change([], ub.outlook.xi.players))
+    doc = report(ub, ranked, xi_change([], ub.outlook.xi.ranked()))
     buys = {d["name"].lower(): d for d in doc["do"] if d["what"] == "buy"}
     assert buys[bought[0]]["done"] and buys[bought[0]]["placed"] == 4e6, buys
     assert all(not d["done"] and d["placed"] is None
@@ -242,8 +242,7 @@ def main() -> None:
         return
     ranked = u.rank(u.candidates(budget=float("inf")), extra=band_acts(u))
     log_cash_price(ranked.measured)
-    chg = xi_change(app_fielded(u.mine, u.market.name),
-                    u.outlook.xi.players)
+    chg = xi_change(app_fielded(u.mine, u.market.name), u.outlook.xi.ranked())
     REPORTS.mkdir(exist_ok=True)
     (REPORTS / "decisions.json").write_text(json.dumps(
         report(u, ranked, chg, load_deadline()),

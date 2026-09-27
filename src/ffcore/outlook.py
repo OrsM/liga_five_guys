@@ -13,6 +13,9 @@ class XI(NamedTuple):
     expected: dict[str, float]
     players: set[str]
 
+    def ranked(self) -> list[str]:
+        return sorted(self.players, key=lambda k: (-self.expected.get(k, 0.0), k))
+
 
 class Outlook:
     """What each player is expected to score, and the eleven that makes the
@@ -79,6 +82,8 @@ def _selftest() -> None:
     assert len(o.xi.players) == 11 and "bench" not in o.xi.players, o.xi
     exp, players = o.xi
     assert exp["star"] == 4.5 and players == o.xi.players
+    ranked = XI({"a": 1.0, "b": 3.0, "c": 3.0}, {"c", "a", "b"}).ranked()
+    assert ranked == ["b", "c", "a"], ranked
     assert o.season["m0"] == 6.0 and o.season["star"] == 9.0, o.season
     assert o.xi_bar == 6.0, o.xi_bar
 
