@@ -442,8 +442,7 @@ def load() -> Universe:
     proceeds = {k: max(value.get(k, 0.0), received_offers.get(k, 0.0))
                 for k in lg.squad(me)}
     profiles = build_profiles(
-        players, sc, load_perjornada(), xw=lg.xw,
-        match_stats_rows=current("api_stats"), match_rows=m,
+        players, sc, xw=lg.xw,
         market_keyed={k: {"listed": k in price, "price": price.get(k),
                           "owner": lg.owner.get(k), "value": value.get(k),
                           "clause": clause.get(k),

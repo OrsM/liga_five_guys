@@ -252,8 +252,6 @@ def fetch() -> Path:
                 last[host] = time.monotonic()
             t0 = time.monotonic()
             kw = {"headers": extra} if extra else {}
-            if src.timeout is not None:
-                kw["timeout"] = src.timeout
             try:
                 r = (c.post(url, data=src.body, **kw) if src.body is not None
                     else c.get(url, **kw))
@@ -597,7 +595,7 @@ def _selftest() -> None:
          "a,c\n1,\n2,new\n"),
         ([[line], [dict(line, observed_at="t2"),
                    dict(line, points="6", observed_at="t3")],
-          [dict(line, observed_at="t4")]], TABLES["api_stats"],
+          [dict(line, observed_at="t4")]], TABLES["api_activity"],
          "player_id,week,stat,value,points,observed_at\n"
          "1337,1,goals,1,4,t1\n1337,1,goals,1,6,t3\n"),
         ([[m1], [m3], [m4]], TABLES["market"],
@@ -616,11 +614,11 @@ def _selftest() -> None:
             assert got == want, (batches, got)
 
     out: dict[str, list] = {}
-    route(out, [{"a": "1"}, {ROW_TABLE: "api_stats", "stat": "goals"}],
+    route(out, [{"a": "1"}, {ROW_TABLE: "api_standings", "stat": "goals"}],
           "api_teams", "t1")
-    assert set(out) == {"api_teams", "api_stats"}, list(out)
+    assert set(out) == {"api_teams", "api_standings"}, list(out)
     assert out["api_teams"][0] == {"a": "1", "observed_at": "t1"}
-    assert out["api_stats"][0]["observed_at"] == "t1"
+    assert out["api_standings"][0]["observed_at"] == "t1"
     route(out, [{ROW_TABLE: "api_teams", "b": "2"}], "api_teams", "t2")
     assert len(out["api_teams"]) == 2, out["api_teams"]
     assert all(ROW_TABLE not in r for rs in out.values() for r in rs), out

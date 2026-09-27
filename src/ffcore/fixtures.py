@@ -24,7 +24,7 @@ DEFAULT_SQUAD: dict[str, str] = {
 DEFAULT_JORNADAS: list[int] = [1, 2]
 
 _CURRENT_DEFAULTS: dict[str, object] = dict(
-    club="", pos="MED", status="ok", market_value=5e6, listed=True,
+    club="", pos="MED", status="ok", listed=True,
     price=5e6, owner=None, value=5e6, clause=None, clause_until=None,
     route="listed", bids=0, proceeds=None,
 )
@@ -35,7 +35,7 @@ _DERIVED_DEFAULTS: dict[str, object] = dict(
 
 def tiny_profile(key: str, **overrides) -> "PlayerProfile":
     from ffcore.crosswalk import Player
-    from ffcore.profile import PlayerCurrent, PlayerDerived, PlayerHistory
+    from ffcore.profile import PlayerCurrent, PlayerDerived
     from ffcore.profile import PlayerProfile
 
     name = overrides.pop("name", key)
@@ -52,7 +52,6 @@ def tiny_profile(key: str, **overrides) -> "PlayerProfile":
     return PlayerProfile(
         identity=Player(player_id=key, name=name),
         current=PlayerCurrent(**current_kwargs),
-        history=PlayerHistory(),
         derived=PlayerDerived(**derived_kwargs),
     )
 
@@ -62,7 +61,7 @@ def players_from_flat(pos=None, price=None, proceeds=None, owner=None,
                       clause_until=None, route=None, bids=None, name=None
                       ) -> dict[str, "PlayerProfile"]:
     from ffcore.crosswalk import Player
-    from ffcore.profile import (PlayerCurrent, PlayerHistory,
+    from ffcore.profile import (PlayerCurrent,
                                 PlayerDerived, PlayerProfile as _PP)
     keys = (set(pos or {}) | set(price or {}) | set(proceeds or {})
            | set(owner or {}) | set(value or {}) | set(market_exp or {})
@@ -84,7 +83,6 @@ def players_from_flat(pos=None, price=None, proceeds=None, owner=None,
                 route=(route or {}).get(k),
                 bids=(bids or {}).get(k),
             ),
-            history=PlayerHistory(),
             derived=PlayerDerived(
                 market_exp=(market_exp or {}).get(k),
                 start_p=(start or {}).get(k),

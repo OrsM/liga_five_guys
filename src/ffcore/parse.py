@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import re
 
-__all__ = ["money", "ratio", "pct100", "fmt_money", "grouped_sums",
+__all__ = ["money", "ratio", "pct100", "fmt_money",
            "text", "num", "whole", "flag"]
 
 _DOT_GROUPED = re.compile(r"\d{1,3}(?:\.\d{3})+$")
@@ -66,15 +66,6 @@ def pct100(v):
     if x is None:
         return None
     return x * 100.0 if 0.0 <= x <= 1.0 else x
-
-
-def grouped_sums(items, key_of, *value_fns) -> dict:
-    sums: dict = {}
-    for item in items:
-        acc = sums.setdefault(key_of(item), [0.0] * len(value_fns))
-        for i, fn in enumerate(value_fns):
-            acc[i] += fn(item)
-    return {k: tuple(v) for k, v in sums.items()}
 
 
 def fmt_money(v) -> str:

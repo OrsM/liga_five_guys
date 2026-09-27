@@ -1,12 +1,11 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 from ffcore.crosswalk import Player
-from ffcore.text import norm
 
-__all__ = ["PlayerCurrent", "PlayerHistory",
+__all__ = ["PlayerCurrent",
           "PlayerDerived", "PlayerProfile", "build_profiles", "mk_profile",
           "status_adjusted"]
 
@@ -16,7 +15,6 @@ class PlayerCurrent:
     club: str = ""
     pos: str = ""
     status: str = ""
-    market_value: float | None = None
     listed: bool = False
     price: float | None = None
     owner: str | None = None
@@ -26,16 +24,6 @@ class PlayerCurrent:
     route: str | None = None
     bids: int | None = None
     proceeds: float | None = None
-
-
-@dataclass
-class PlayerHistory:
-    points_by_jornada: dict[int, float] = field(default_factory=dict)
-    started_by_jornada: dict[int, bool] = field(default_factory=dict)
-    match_stats_by_jornada: dict[int, dict] = field(default_factory=dict)
-    opponent_by_jornada: dict[int, tuple] = field(default_factory=dict)
-    market_value_series: list = field(default_factory=list)
-    understat_season: dict | None = None
 
 
 def status_adjusted(pts: float, p_start: float, status: str,
@@ -65,7 +53,6 @@ UNSCORED_DEFAULT = (2.0, 0.5)
 class PlayerProfile:
     identity: Player
     current: PlayerCurrent
-    history: PlayerHistory
     derived: PlayerDerived
 
     def to_bootstrap_input(self) -> tuple[tuple[float, float],
@@ -79,70 +66,8 @@ class PlayerProfile:
                (pts_rest, p_rest))
 
 
-def _match_stats_history(rows) -> dict[str, dict[int, dict]]:
-    out: dict[str, dict[int, dict]] = {}
-    for r in rows:
-        pid = (r.get("player_id") or "").strip()
-        if not pid:
-            continue
-        try:
-            week = int(r["week"])
-        except (KeyError, TypeError, ValueError):
-            continue
-        stat = (r.get("stat") or "").strip()
-        if not stat:
-            continue
-        try:
-            value = float(r.get("value") or 0)
-            points = float(r.get("points") or 0)
-        except (TypeError, ValueError):
-            continue
-        out.setdefault(pid, {}).setdefault(week, {})[stat] = (value, points)
-    return out
-
-
-def _opponent_history(match_rows) -> dict[str, dict[int, tuple]]:
-    out: dict[str, dict[int, tuple]] = {}
-    for r in match_rows:
-        home, away = (r.get("home") or "").strip(), (r.get("away") or "").strip()
-        if not home or not away:
-            continue
-        try:
-            j = int(r["jornada"])
-        except (KeyError, TypeError, ValueError):
-            continue
-        out.setdefault(home, {})[j] = (away, True)
-        out.setdefault(away, {})[j] = (home, False)
-    return out
-
-
-def _perjornada_history(rows) -> dict[str, PlayerHistory]:
-    out: dict[str, PlayerHistory] = {}
-    for r in rows:
-        fid = (r.get("ff_id") or "").strip()
-        key = fid or norm(r.get("player_name") or "")
-        if not key:
-            continue
-        try:
-            j = int(r["jornada"])
-            pts = float(r.get("points_delta") or 0)
-            games = int(r.get("games_delta") or 0)
-        except (KeyError, TypeError, ValueError):
-            continue
-        h = out.setdefault(key, PlayerHistory())
-        h.points_by_jornada[j] = h.points_by_jornada.get(j, 0.0) + pts
-        if games > 0:
-            h.started_by_jornada[j] = True
-
-    return out
-
-
-def build_profiles(players: dict, sc, perjornada_rows,
-                   xw=None, match_stats_rows=None, match_rows=None,
+def build_profiles(players: dict, sc, xw=None,
                    market_keyed: dict | None = None) -> dict[str, "PlayerProfile"]:
-    histories = _perjornada_history(perjornada_rows)
-    match_stats = _match_stats_history(match_stats_rows or [])
-    opponents = _opponent_history(match_rows or [])
     out: dict[str, PlayerProfile] = {}
     for k, rec in players.items():
         xp = xw.players.get(k) if xw is not None else None
@@ -152,7 +77,6 @@ def build_profiles(players: dict, sc, perjornada_rows,
         cur = PlayerCurrent(
             club=rec.get("club") or (xp.club_id if xp else ""),
             pos=(rec.get("pos") or "").upper(),
-            market_value=None,
             listed=bool(mk.get("listed")),
             price=mk.get("price"),
             owner=mk.get("owner"),
@@ -181,14 +105,7 @@ def build_profiles(players: dict, sc, perjornada_rows,
         )
         if s is not None:
             cur.status = s.status
-        hist = histories.get(k) or histories.get(norm(ident.name)) \
-            or PlayerHistory()
-        if ident.app_id in match_stats:
-            hist.match_stats_by_jornada = match_stats[ident.app_id]
-        if cur.club in opponents:
-            hist.opponent_by_jornada = opponents[cur.club]
-        out[k] = PlayerProfile(identity=ident, current=cur,
-                              history=hist, derived=der)
+        out[k] = PlayerProfile(identity=ident, current=cur, derived=der)
     return out
 
 
@@ -197,7 +114,6 @@ def mk_profile(pj: float, pos: str = "MED", price=None, name: str = "",
     return PlayerProfile(
         identity=Player(player_id="x", name=name),
         current=PlayerCurrent(pos=pos, price=price, listed=price is not None),
-        history=PlayerHistory(),
         derived=PlayerDerived(pj=pj, market_exp=market_exp))
 
 
@@ -218,23 +134,7 @@ def _selftest() -> None:
                            "club": "celta"}}
     xw = Crosswalk({"999": Player("999", "Known Player", club_id="betis",
                                   app_id="app-999", understat_id="us-999")})
-    perjornada = [
-        {"ff_id": "999", "player_name": "Known Player", "jornada": "1",
-         "points_delta": "5", "games_delta": "1"},
-        {"ff_id": "999", "player_name": "Known Player", "jornada": "2",
-         "points_delta": "3", "games_delta": "1"},
-    ]
-    match_stats = [
-        {"player_id": "app-999", "week": "1", "stat": "goals",
-         "value": "1", "points": "4"},
-        {"player_id": "app-999", "week": "1", "stat": "mins_played",
-         "value": "90", "points": "2"},
-    ]
-    matches = [{"home": "betis", "away": "sevilla", "jornada": "1"},
-              {"home": "celta", "away": "betis", "jornada": "2"}]
-    profiles = build_profiles(players, fake_sc, perjornada,
-                              xw=xw, match_stats_rows=match_stats,
-                              match_rows=matches,
+    profiles = build_profiles(players, fake_sc, xw=xw,
                               market_keyed={"999": {"listed": True,
                                                      "price": 5e6,
                                                      "owner": "alice"}})
@@ -250,15 +150,6 @@ def _selftest() -> None:
     assert k.derived.ppm == 6.0 and k.derived.pj == 12.0
     assert abs(k.derived.start_p - 0.8) < 1e-9
     assert abs(k.derived.market_exp - 5.28) < 1e-9
-    assert k.history.points_by_jornada == {1: 5.0, 2: 3.0}
-    assert k.history.started_by_jornada == {1: True, 2: True}
-    assert k.history.match_stats_by_jornada == {
-        1: {"goals": (1.0, 4.0), "mins_played": (90.0, 2.0)}}, \
-        k.history.match_stats_by_jornada
-    assert k.history.opponent_by_jornada == {
-        1: ("sevilla", True), 2: ("celta", False)}, \
-        k.history.opponent_by_jornada
-
     this_j, rest = k.to_bootstrap_input()
     assert abs(this_j[0] - 6.6) < 1e-9 and abs(this_j[1] - 0.8) < 1e-9, this_j
     assert abs(rest[0] - 6.6) < 1e-9 and abs(rest[1] - 0.6) < 1e-9, rest
@@ -268,9 +159,7 @@ def _selftest() -> None:
     susp_sc = SimpleNamespace(
         cal=Calibration(), lookup={"999": "999"},
         score={"999": scored._replace(status="suspended")}.get)
-    susp_profiles = build_profiles(players, susp_sc, perjornada, xw=xw,
-                                   match_stats_rows=match_stats,
-                                   match_rows=matches,
+    susp_profiles = build_profiles(players, susp_sc, xw=xw,
                                    market_keyed={"999": {"listed": True,
                                                           "price": 5e6,
                                                           "owner": "alice"}})
@@ -286,9 +175,7 @@ def _selftest() -> None:
     doubt_sc = SimpleNamespace(
         cal=Calibration(), lookup={"999": "999"},
         score={"999": scored._replace(status="doubt")}.get)
-    doubt_profiles = build_profiles(players, doubt_sc, perjornada, xw=xw,
-                                    match_stats_rows=match_stats,
-                                    match_rows=matches,
+    doubt_profiles = build_profiles(players, doubt_sc, xw=xw,
                                     market_keyed={"999": {"listed": True,
                                                           "price": 5e6,
                                                           "owner": "alice"}})
@@ -305,31 +192,7 @@ def _selftest() -> None:
     assert u.identity.player_id == "unknown" and u.current.club == "celta"
     assert u.derived.ppm is None and u.derived.market_exp is None
     assert u.current.listed is False and u.current.price is None
-    assert u.history.points_by_jornada == {}
     assert u.to_bootstrap_input() == (UNSCORED_DEFAULT, UNSCORED_DEFAULT)
-
-    rows2 = [{"ff_id": "", "player_name": "No Id Here", "jornada": "3",
-             "points_delta": "7", "games_delta": "1"}]
-    h2 = _perjornada_history(rows2)
-    assert set(h2) == {"no id here"}, h2
-    assert h2["no id here"].points_by_jornada == {3: 7.0}
-
-    bad = [{"ff_id": "1", "player_name": "X", "jornada": "n/a",
-           "points_delta": "1", "games_delta": "1"}]
-    assert _perjornada_history(bad) == {}
-
-    ms_bad = [{"player_id": "", "week": "1", "stat": "goals",
-              "value": "1", "points": "4"},
-             {"player_id": "5", "week": "x", "stat": "goals",
-              "value": "1", "points": "4"},
-             {"player_id": "5", "week": "1", "stat": "",
-              "value": "1", "points": "4"}]
-    assert _match_stats_history(ms_bad) == {}
-    assert _match_stats_history([]) == {}
-
-    op = _opponent_history([{"home": "betis", "away": "", "jornada": "1"},
-                            {"home": "a", "away": "b", "jornada": "x"}])
-    assert op == {}
 
     print("ffcore.profile self-test OK")
 

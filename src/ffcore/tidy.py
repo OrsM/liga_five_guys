@@ -188,7 +188,6 @@ TABLES: dict[str, Table] = {
     "matches": Table(True),
     "fixtures": Table(True),
     "points": Table(True),
-    "elo": Table(True),
     "api_teams": Table(True),
     "api_standings": Table(True),
     "api_market": Table(True),
@@ -202,7 +201,6 @@ TABLES: dict[str, Table] = {
                                      "away_name"), "once"),
     "starters": Table(False, ("match_id", "team_slug", "player_slug"), "once"),
     "api_activity": Table(False, ("activity_id",), "once"),
-    "api_stats": Table(False, ("player_id", "week", "stat"), "once"),
 }
 
 
@@ -640,13 +638,10 @@ def _selftest_new_loaders() -> None:
             {"observed_at": a, "source": "analitica", "player_name": "Cai"},
             {"observed_at": later, "source": "futbolfantasy",
              "player_name": "Dan"}])
-        write_csv(TIDY / "api_stats.csv", [
-            {"observed_at": a, "player_id": "1", "week": "1", "stat": "g",
-             "value": "0"},
-            {"observed_at": b, "player_id": "1", "week": "1", "stat": "g",
-             "value": "1"},
-            {"observed_at": a, "player_id": "2", "week": "1", "stat": "g",
-             "value": "5"}])
+        write_csv(TIDY / "api_activity.csv", [
+            {"observed_at": a, "activity_id": "1", "value": "0"},
+            {"observed_at": b, "activity_id": "1", "value": "1"},
+            {"observed_at": a, "activity_id": "2", "value": "5"}])
         set_now(snapshot_stamp("2026-08-02T1200Z"))
         for name, source, every, now in [
                 ("lineups", "", 4, ["Ane", "Bo"]),
@@ -656,14 +651,14 @@ def _selftest_new_loaders() -> None:
             assert len(history(name, source)) == every, source
             assert sorted(r["player_name"] for r in current(name, source)) \
                 == now, source
-        stats = {(r["player_id"], r["value"]) for r in current("api_stats")}
+        stats = {(r["activity_id"], r["value"]) for r in current("api_activity")}
         assert stats == {("1", "1"), ("2", "5")}, stats
         assert current("market") == [] and history("market") == []
         assert age_hours("market") is None
         assert abs(age_hours("lineups") - 3.0) < 1e-9
         set_now(snapshot_stamp("2026-08-01T1000Z"))
-        assert stats != {(r["player_id"], r["value"])
-                         for r in current("api_stats")}
+        assert stats != {(r["activity_id"], r["value"])
+                         for r in current("api_activity")}
         set_now(snapshot_stamp("2026-08-04T0000Z"))
         assert [r["player_name"] for r in current("lineups", "futbolfantasy")] \
             == ["Dan"]

@@ -167,9 +167,9 @@ def _selftest() -> None:
     from ffcore.fixture import Match as _M
 
     easy_m = _M(opponent="Easy", home=True, kickoff=None,
-               atk_factor=1.2, def_factor=1.1, rank=3, of=3)
+               atk_factor=1.2, def_factor=1.1)
     hard_m = _M(opponent="Hard", home=False, kickoff=None,
-               atk_factor=0.8, def_factor=0.7, rank=1, of=3)
+               atk_factor=0.8, def_factor=0.7)
     pj3 = {1: {"del": (10.0, 0.9), "por": (5.0, 0.9), "ghost": (3.0, 0.5)},
           2: {"del": (10.0, 0.9), "por": (5.0, 0.9)}}
     board = {1: {"myclub": easy_m}, 2: {"myclub": hard_m}}

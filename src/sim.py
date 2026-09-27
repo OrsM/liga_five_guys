@@ -204,7 +204,7 @@ def _selftest() -> None:
     from ffcore.crosswalk import Player
     from ffcore.fixtures import players_from_flat, tiny_profile
     from ffcore.forecast import Bootstrap
-    from ffcore.profile import (PlayerCurrent, PlayerDerived, PlayerHistory,
+    from ffcore.profile import (PlayerCurrent, PlayerDerived,
                                 PlayerProfile)
     from ffcore.season import LeagueState, Standings
 
@@ -304,7 +304,7 @@ def _selftest() -> None:
                 pos="MED", price=uc_price.get(k), owner=uc_owner.get(k),
                 route=uc_route.get(k), value=uc_value.get(k),
                 listed=k in uc_price),
-            history=PlayerHistory(), derived=PlayerDerived(pj=5.0))
+            derived=PlayerDerived(pj=5.0))
             for k in uc_price})
     lad = ladder_rows(uc, all_rows, {}, xi_change([], []))
     by_group = {}

@@ -586,55 +586,6 @@ def played_sources(cal_html: str, observed_at: str = "") -> list[Source]:
             for r in parse_calendar(cal_html, observed_at) if r["score"]]
 
 
-ELO_SOURCE = "clubelo"
-ELO_URL = "https://clubelo.com/ESP"
-ELO_COUNTRY = "ESP"
-ELO_LEVEL = "1"
-ELO_COLS = ("Name", "Elo", "FedURL", "Level")
-ELO_MARK = "var vegaJson ="
-
-
-def _elo_records(html: str) -> list[dict]:
-    text, out, at = html or "", [], 0
-    dec = json.JSONDecoder()
-    while True:
-        at = text.find(ELO_MARK, at)
-        if at < 0:
-            return out
-        at += len(ELO_MARK)
-        start = text.find("{", at)
-        if start < 0:
-            return out
-        try:
-            spec, at = dec.raw_decode(text, start)
-        except ValueError:
-            continue
-        if not isinstance(spec, dict):
-            continue
-        for data in (spec.get("datasets") or {}).values():
-            if isinstance(data, list):
-                out += [r for r in data if isinstance(r, dict)
-                        and all(c in r for c in ELO_COLS)]
-
-
-def parse_elo(text: str, observed_at: str, key: str = "elo") -> list[dict]:
-    rows = []
-    for rec in _elo_records(text):
-        if (str(rec["FedURL"]).strip() != ELO_COUNTRY
-                or str(rec["Level"]).strip() != ELO_LEVEL):
-            continue
-        club = str(rec["Name"]).strip()
-        try:
-            rating = float(rec["Elo"])
-        except (TypeError, ValueError):
-            continue
-        if club:
-            rows.append({"observed_at": observed_at, "source": ELO_SOURCE,
-                         "club": club_slug(club), "club_name": club,
-                         "elo": str(rating)})
-    return rows
-
-
 FD_BASE = "https://www.football-data.co.uk"
 FD_URL = FD_BASE + "/mmz4281/{season}/SP1.csv"
 FD_SOURCE = "football-data"
@@ -930,19 +881,6 @@ def _team_rows(t, observed_at: str) -> list[dict]:
             "player_status": pm.get("playerStatus") or "",
             "player_team_id": str(p.get("playerTeamId") or ""),
         })
-        for line in (pm.get("lastStats") or []):
-            week = line.get("weekNumber")
-            for stat, pair in (line.get("stats") or {}).items():
-                if not isinstance(pair, list) or len(pair) != 2:
-                    continue
-                out.append({
-                    "observed_at": observed_at, "source": LFG_SOURCE,
-                    ROW_TABLE: "api_stats",
-                    "player_id": str(pm.get("id") or ""),
-                    "week": str(week if week is not None else ""),
-                    "stat": str(stat),
-                    "value": str(pair[0]), "points": str(pair[1]),
-                })
     return out
 
 
@@ -1099,7 +1037,6 @@ class Source(NamedTuple):
     parse: Callable
     cadence: str = "every_run"
     body: dict | None = None
-    timeout: float | None = None
     enabled: bool = True
     auth: bool = False
 
@@ -1118,8 +1055,6 @@ def sources(enabled_only: bool = True) -> list[Source]:
             for s, af in sorted(AF_TEAMS.items())]
     out += [Source("af_fixtures", "fixtures", AF_HUB_URL,
                    parse_af_fixtures, cadence="daily")]
-    out += [Source("elo", "elo", ELO_URL, parse_elo,
-                   cadence="daily", timeout=8.0)]
     out += fd_sources()
     out += understat_sources()
     out += [Source(CAL_KEY, "matches", FF_CAL_URL, parse_calendar, cadence="daily")]
@@ -1304,39 +1239,6 @@ _AF_HUB_FIXTURE = """<html><body>
 <a href="/partido/100011934">duplicate, same id</a>
 <a href="/partido/999">no time, no crests</a>
 </body></html>"""
-
-_ELO_FIXTURE = """<!DOCTYPE html><html><body>
-<h2><a href="ESP/Ranking">Ranking</a></h2>
-<div id="chartEloGolo" style="width: 100%;"></div>
-<script type="text/javascript">
-            var vegaJson = {
-  "$schema": "https://vega.github.io/schema/vega-lite/v5.20.1.json",
-  "config": {"background": "#A2AAA5", "view": {"continuousWidth": 300}},
-  "datasets": {
-    "data-4f53cda18c2baa0c0354bb5f9a3ecbe5": [],
-    "data-7c739729bfdfdd6abc8ff5e88cc19d07": [
-      {"Colour": "#A4234B", "Elo": 2043.1, "FedURL": "ESP",
-       "Federation": "Spain", "Golo": 2.029053, "Level": 1,
-       "Name": "Barcelona", "TLC": "BAR"},
-      {"Colour": "#DC052D", "Elo": 2010.4, "FedURL": "GER",
-       "Federation": "Germany", "Golo": 1.94, "Level": 1,
-       "Name": "Bayern", "TLC": "BAY"},
-      {"Colour": "#FFFFFF", "Elo": 1988.7, "FedURL": "ESP",
-       "Federation": "Spain", "Golo": 1.585982, "Level": 1,
-       "Name": "Real Madrid", "TLC": "RMA"},
-      {"Colour": "#00913F", "Elo": 1602.5, "FedURL": "ESP",
-       "Federation": "Spain", "Golo": 1.08, "Level": 1,
-       "Name": "Elche", "TLC": "ELC"},
-      {"Colour": "#0B4EA2", "Elo": 1521.0, "FedURL": "ESP",
-       "Federation": "Spain", "Golo": 1.01, "Level": 2,
-       "Name": "Zaragoza", "TLC": "ZAR"}
-    ]
-  },
-  "mark": {"type": "point"}
-};
-        </script>
-</body></html>"""
-
 
 _API_LEAGUES_FIXTURE = """[{"id":"017998544","access":"private",
  "name":"Some Guys","managersNumber":5,
@@ -1592,23 +1494,6 @@ def _selftest() -> None:
                        ("Girona,Real Sociedad", ""), ("Girona", ""), ("", "")]:
         assert club_slug(name) == want, (name, club_slug(name))
 
-    el = parse_elo(_ELO_FIXTURE, "2026-01-01T0000Z", "elo")
-    assert [(r["club"], r["club_name"]) for r in el] == [
-        ("barcelona", "Barcelona"), ("real-madrid", "Real Madrid"),
-        ("elche", "Elche")], el
-    assert el[0]["elo"] == "2043.1" and el[0]["source"] == ELO_SOURCE, el[0]
-    assert not any(r["club_name"] in ("Bayern", "Zaragoza") for r in el), el
-    assert parse_elo(_ELO_FIXTURE.replace("2043.1", "1980.0455939177232"),
-                     "t")[0]["elo"] == "1980.0455939177232"
-    assert parse_elo(_ELO_FIXTURE.replace('"Elo":', '"Rating":'), "t") == []
-    assert parse_elo(_ELO_FIXTURE.replace('"FedURL":', '"Fed":'), "t") == []
-    assert [r["club"] for r in
-            parse_elo(_ELO_FIXTURE.replace("2043.1", '"n/a"'), "t")] \
-        == ["real-madrid", "elche"]
-    assert parse_elo("", "t") == []
-    assert parse_elo("<html><body>no chart here</body></html>", "t") == []
-    assert parse_elo("<script>var vegaJson = {not json;</script>", "t") == []
-    assert ELO_URL.format(date="2026-08-16") == ELO_URL
     assert MARKET_URL.format(date="2026-08-16") == MARKET_URL
 
     _FD_CUR = ("﻿Div,Date,Time,HomeTeam,AwayTeam,FTHG,FTAG,FTR,HTHG,"
@@ -1746,8 +1631,7 @@ def _selftest() -> None:
     _rev = _json.dumps(list(reversed(_json.loads(_API_ACTIVITY_FIXTURE))))
 
     all_rows = parse_api_teams(_API_TEAMS_FIXTURE, "t")
-    assert {r[ROW_TABLE] for r in all_rows} == {"api_teams", "api_stats",
-                                            "api_standings"}
+    assert {r[ROW_TABLE] for r in all_rows} == {"api_teams", "api_standings"}
     tm = [r for r in all_rows if r[ROW_TABLE] == "api_teams"]
     assert len(tm) == 2, tm
     assert tm[0]["manager"] == "miguel_autentico"
@@ -1783,16 +1667,6 @@ def _selftest() -> None:
     assert tm[1]["player_status"] == "", tm[1]
     assert "offers" not in tm[0] and "listed_until" not in tm[0], tm[0]
 
-    st = [r for r in all_rows if r[ROW_TABLE] == "api_stats"]
-    assert len(st) == 4, st
-    goals = next(r for r in st if r["stat"] == "goals")
-    assert goals["player_id"] == "1337" and goals["week"] == "1", goals
-    assert goals["value"] == "1" and goals["points"] == "4", goals
-    assert next(r for r in st if r["stat"] == "yellow_card")["points"] == "-1"
-    assert sum(int(r["points"]) for r in st) == 5
-    assert len(tm) == 2 and "stat" not in tm[0], tm[0]
-    assert not any(r["player_id"] == "2621" for r in st), st
-
     disc = league_sources(_API_LEAGUES_FIXTURE)
     assert [s.key for s in disc] == ["api_market", "api_teams",
                                      "api_lineup_%d" % LINEUP_WEEK,
@@ -1800,8 +1674,6 @@ def _selftest() -> None:
     assert "/teams/38091967/lineup/" in next(
         s.url for s in disc if s.table == "api_lineup")
     assert all(s.auth for s in disc), "every API entry needs the bearer"
-    elo = next(s for s in sources() if s.key == "elo")
-    assert elo.timeout == 8.0, elo.timeout
     assert all(s.cadence == "every_run" for s in disc if s.key == "api_teams")
     assert "017998544" in disc[0].url and "{base}" in disc[0].url
     assert league_sources("<html>") == []
@@ -1920,8 +1792,8 @@ def _selftest() -> None:
     assert source_for("api_lineup_38").table == "api_lineup"
 
     reg = sources()
-    assert len(reg) == (7 + len(TEAMS) + len(AF_TEAMS) + FD_SEASONS_BACK + 1
-                        + UNDERSTAT_SEASONS_BACK + 1) == 53, len(reg)
+    assert len(reg) == (6 + len(TEAMS) + len(AF_TEAMS) + FD_SEASONS_BACK + 1
+                        + UNDERSTAT_SEASONS_BACK + 1) == 52, len(reg)
     assert set(AF_TEAMS) == set(TEAMS), set(AF_TEAMS) ^ set(TEAMS)
     assert {s.cadence for s in reg if s.key.startswith(("team_", "af_"))
             and s.key != "af_fixtures"} == {"twice_daily"}
@@ -1932,7 +1804,7 @@ def _selftest() -> None:
                                     "af_fixtures"}
     assert len({s.key for s in reg}) == len(reg)
     assert {s.table for s in reg} == {"market", "points", "lineups",
-                                      "fixtures", "elo", "matches",
+                                      "fixtures", "matches",
                                       "api_leagues", "results_history",
                                       "understat_players",
                                       "api_players_all"}
@@ -1941,7 +1813,7 @@ def _selftest() -> None:
 
     assert source_for("af_celta").parse is parse_af_team
     samples = {"market": _MARKET_FIXTURE, "points": _POINTS_FIXTURE,
-               "af_fixtures": _AF_HUB_FIXTURE, "elo": _ELO_FIXTURE,
+               "af_fixtures": _AF_HUB_FIXTURE,
                CAL_KEY: _CAL_FIXTURE, API_LEAGUES_KEY: _API_LEAGUES_FIXTURE,
                "understat_2026": _UNDERSTAT_LIVE,
                "understat_2025": _UNDERSTAT_PAST,

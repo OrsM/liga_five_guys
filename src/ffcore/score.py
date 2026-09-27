@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import statistics
-from contextlib import suppress
 from typing import NamedTuple
 
 from ffcore.parse import money, pct100, ratio, text
@@ -151,37 +150,6 @@ def xg_evidence(us25, us26, history: dict, xw) -> dict[str, tuple[float, float]]
             for key, r, mins in _forwards(us26, xw) if mins > 0}
 
 
-def shots_evidence(stats_rows, by_key: dict, pos: dict, xw
-                   ) -> dict[str, tuple[float, float]]:
-    shots: dict[str, dict[int, float]] = {}
-    for r in stats_rows:
-        key = xw.player(app_id=text(r, "player_id"))
-        if r.get("stat") != "total_scoring_att" or pos.get(key) != "delantero":
-            continue
-        with suppress(TypeError, ValueError):
-            shots.setdefault(key, {})[int(r.get("week"))] = float(r.get("value") or 0)
-    xs, ys = [], []
-    for key, jd in shots.items():
-        played = by_key.get(key, {})
-        common = sorted(set(jd) & set(played))
-        if len(common) < 2:
-            continue
-        mins = sum(played[j][1] for j in common[:-1])
-        last_pts, last_min = played[common[-1]]
-        if mins > 0 and last_min > 0:
-            xs.append(sum(jd[j] for j in common[:-1]) / mins * 90)
-            ys.append(last_pts)
-    if len(xs) < 10:
-        return {}
-    slope, intercept = _linreg(xs, ys)
-    out = {}
-    for key, jd in shots.items():
-        mins = sum(by_key.get(key, {}).get(j, (0.0, 0.0))[1] for j in jd)
-        if mins > 0:
-            out[key] = (mins / 90, slope * sum(jd.values()) / mins * 90 + intercept)
-    return out
-
-
 def _per_jornada_current(starters_rows, perjornada_rows, jornada_of_match,
                          xw) -> dict[str, dict[int, tuple[float, float]]]:
     minutes_by_jor: dict[str, dict[int, float]] = {}
@@ -289,7 +257,7 @@ def build(market: list[dict], xi_rows: list[dict], now,
     pos = {row_key(r): (r.get("position") or "").lower() for r in market}
     results = current("results_history")
     ratings = difficulty_ratings(
-        market, current("elo"), results, us25,
+        market, results,
         fit_home_edge(results, current("matches")))
     second = history("lineups", SECOND_SOURCE)
     outs = outcomes(history("lineups", LINEUP_SOURCE) + second, current("starters"),
@@ -306,8 +274,7 @@ def build(market: list[dict], xi_rows: list[dict], now,
         current={k: dict(zip(("pts", "pj", "start_rate", "start_n"),
                              _weighted(jd, decay)))
                  for k, jd in by_key.items()},
-        evidence={"xg": xg_evidence(us25, us26, last_season, xw),
-                  "shots": shots_evidence(current("api_stats"), by_key, pos, xw)},
+        evidence={"xg": xg_evidence(us25, us26, last_season, xw)},
         promoted_discount=fit_promoted_discount(market, last_season, perjornada))
 
 
@@ -341,8 +308,6 @@ class Scored(NamedTuple):
     home: bool = True
     cur_pj: float = 0.0
     pj: float = 0.0
-    fix_basis: str = "none"
-    elo_gap: float | None = None
 
     def as_row(self) -> dict:
         return dict(self._asdict())
@@ -452,8 +417,6 @@ class Scorer:
             pos=(rec.get("position") or "").lower(),
             score=score, flat=flat, fix=fix_factor,
             opp=m.opponent if m else "", home=m.home if m else True,
-            fix_basis=m.basis if m else "none",
-            elo_gap=m.gap if m else None,
             cur_pj=rating.cur_pj, pj=rating.pj,
             ppm=rating.ppm, pct=pct, pct_used=pct_used, pct_rest=pct_rest,
             on_page=on_page, status=st,
@@ -645,8 +608,7 @@ def _selftest() -> None:
 
     when = __import__("datetime").datetime.fromisoformat(
         "2026-08-20T19:00:00+00:00")
-    easy = Match("Elche", True, when, atk_factor=1.30, def_factor=1.10,
-                rank=20, of=20)
+    easy = Match("Elche", True, when, atk_factor=1.30, def_factor=1.10)
     sc3 = Scorer(market, xi, hist, board={"Mid": easy}, xw=xw)
     s = sc3.score(dict(row, name="p0"))
     assert abs(s.flat - full.ppm) < 1e-9
@@ -787,30 +749,13 @@ def _selftest() -> None:
     assert xg_evidence(us25[:9], us26, hist_us, xw_us) == {}
     assert _xg_stickiness_boost(us25, us26) == 1.0
 
-    xw_sh = Crosswalk({**{"s%d" % i: Player("s%d" % i, "S%d" % i, app_id=str(i))
-                          for i in range(11)},
-                       "d": Player("d", "D", app_id="99")})
-    pos_sh = {**{"s%d" % i: "delantero" for i in range(11)}, "d": "defensa"}
-    stats = ([{"player_id": str(i), "stat": "total_scoring_att",
-               "week": str(w), "value": str(i)}
-              for i in range(11) for w in (1, 2)]
-             + [{"player_id": "99", "stat": "total_scoring_att", "week": "1",
-                 "value": "7"},
-                {"player_id": "4", "stat": "other", "week": "1", "value": "50"}])
-    played_sh = {"s%d" % i: {1: (0.0, 90.0), 2: (2.0 * i + 1, 90.0)}
-                 for i in range(11)}
-    sh = shots_evidence(stats, played_sh, pos_sh, xw_sh)
-    assert set(sh) == set(played_sh), sh
-    assert abs(sh["s4"][0] - 2.0) < 1e-9 and abs(sh["s4"][1] - 9.0) < 1e-6, sh
-    assert shots_evidence(stats, {"s1": played_sh["s1"]}, pos_sh, xw_sh) == {}
-
     market_xg = [dict(row, name="Attacker", position="delantero")]
     hist_xg = {"attacker": {"pts": 100.0, "pj": 34.0}}
     xi_xg = [{"player_name": "Attacker", "start_pct": "100"}]
     fwd = dict(row, name="Attacker", position="delantero")
     plain = Scorer(market_xg, xi_xg, hist_xg, xw=xw).rate(fwd)
     expect = (SHRINK_K * plain.ppm + 2.0 * 10.0) / (SHRINK_K + 2.0)
-    for label in ("xg", "shots"):
+    for label in ("xg", "other"):
         got = Scorer(market_xg, xi_xg, hist_xg, xw=xw,
                      evidence={label: {"attacker": (2.0, 10.0)}}).rate(fwd)
         assert abs(got.ppm - expect) < 1e-9, (label, got, expect)
