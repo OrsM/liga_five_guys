@@ -1,5 +1,5 @@
 {
- "generated_at": "2026-09-27T10:07Z",
+ "generated_at": "2026-09-27T16:51Z",
  "lock_at": "2026-10-09T19:00:00+00:00",
  "cash": 29046827.0,
  "cash_locked": 13966262.0,
@@ -22,7 +22,9 @@
    "proceeds": 1326340.0,
    "gain": 20.712818926077034,
    "why": "points",
-   "trend": 0.4140981238248253
+   "trend": 0.4140981238248253,
+   "placed": 13966262.0,
+   "done": true
   }
  ],
  "plan_gain": 20.01120416221626,
@@ -38,7 +40,9 @@
    "proceeds": 21182553.0,
    "gain": 21.988479238377067,
    "why": "points",
-   "trend": -3.0559822546389297
+   "trend": -3.0559822546389297,
+   "placed": null,
+   "done": false
   },
   {
    "name": "Antonio Blanco",
@@ -51,10 +55,12 @@
    "proceeds": 1326340.0,
    "gain": 6.045767698291911,
    "why": "points",
-   "trend": -7.365797506809283
+   "trend": -7.365797506809283,
+   "placed": null,
+   "done": false
   }
  ],
- "ping": "Buy German Valera (bid up to 16.0M), selling Alvaro Mantilla",
+ "ping": "",
  "bid_beats": 0.8,
  "squad": [
   {
