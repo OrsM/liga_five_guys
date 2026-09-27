@@ -270,7 +270,10 @@ def fetch() -> Path:
                 print(f"  warn: {r.status_code} on {src.key}, skipping")
                 continue
             if src.follow:
-                queue += src.follow(r.text, context)
+                more = src.follow(r.text, context)
+                queue += more
+                if more:
+                    print(f"  {src.key}: leads to {len(more)} page(s)")
 
             sig = page_sig(src, r.text)
             was = prev.get(src.key, {})
