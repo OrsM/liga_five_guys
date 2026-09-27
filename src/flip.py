@@ -1,12 +1,9 @@
 from __future__ import annotations
 
-import bisect
 import csv
 import math
-import operator
 import sys
 from datetime import datetime, timedelta, timezone
-from itertools import accumulate
 from statistics import mean, median
 
 from ffcore.parse import fmt_money
@@ -24,53 +21,60 @@ def steps(rows: list[dict]) -> dict[str, list[tuple[str, float]]]:
                 if a[1] > 0] for k, v in vals.items()}
 
 
-def belief(window: list[tuple]) -> dict | None:
-    days = {day for _, _, day in window}
-    if len(days) < 2:
-        return None
-    return {"mean": mean(out for _, out, _ in window), "n": len(window),
-            "days": len(days)}
+CLIP = 20.0
+
+
+def _clip(step: float) -> float:
+    return max(-CLIP, min(CLIP, step))
+
+
+def _ahead(s: list[tuple[str, float]], i: int, h: int) -> float:
+    return 100 * (math.prod(1 + c / 100 for _, c in s[i + 1:i + 1 + h]) - 1)
 
 
 class Outlook:
 
-    def __init__(self, by_player: dict[str, list[tuple[str, float]]]):
+    def __init__(self, by_player: dict[str, list[tuple[str, float]]],
+                 until: str = "9999"):
         self.hmax = max(1, int(median(len(s) for s in by_player.values())) // 4) \
             if by_player else 1
-        self.obs: dict[int, list[tuple]] = {h: [] for h in range(1, self.hmax + 1)}
-        for s in by_player.values():
-            pref = [1.0, *accumulate((1 + c / 100 for _, c in s), operator.mul)]
-            for i, (day, step) in enumerate(s):
-                for h in range(1, min(self.hmax, len(s) - 1 - i) + 1):
-                    self.obs[h].append((step, 100 * (pref[i + 1 + h] / pref[i + 1]
-                                                     - 1), day))
-        for v in self.obs.values():
-            v.sort()
-        self.keys = {h: [o[0] for o in v] for h, v in self.obs.items()}
-
-    def near(self, step: float, h: int) -> list[tuple]:
-        v, ks = self.obs[h], self.keys[h]
-        k = max(3, round(math.sqrt(len(v))))
-        lo = hi = bisect.bisect_left(ks, step)
-        while hi - lo < k and (lo > 0 or hi < len(v)):
-            if lo > 0 and (hi >= len(v) or step - ks[lo - 1] <= ks[hi] - step):
-                lo -= 1
-            else:
-                hi += 1
-        return v[lo:hi]
+        self.slope: dict[int, float] = {}
+        self.n: dict[int, int] = {}
+        for h in range(1, self.hmax + 1):
+            pairs = [(_clip(s[i][1]), _clip(_ahead(s, i, h)))
+                     for s in by_player.values() for i in range(len(s) - h)
+                     if s[i + h][0] <= until]
+            sxx = sum(x * x for x, _ in pairs)
+            if sxx:
+                self.slope[h] = sum(x * y for x, y in pairs) / sxx
+                self.n[h] = len(pairs)
 
     def best(self, step: float | None, offer: float, premium: float) -> dict | None:
-        if step is None or not self.obs:
+        if step is None:
             return None
         best = None
-        for h in self.obs:
-            bel = belief(self.near(step, h))
-            if bel is None:
-                continue
-            net = ((1 + bel["mean"] / 100) * offer / premium - 1) / h
+        for h, c in self.slope.items():
+            drift = c * _clip(step)
+            net = ((1 + drift / 100) * offer / premium - 1) / h
             if best is None or net > best["net"]:
-                best = {**bel, "h": h, "net": net}
+                best = {"mean": drift, "h": h, "n": self.n[h], "net": net}
         return best
+
+
+def grade(by_player: dict[str, list[tuple[str, float]]],
+          horizons=(1, 3, 5)) -> dict[int, dict]:
+    days = sorted({d for s in by_player.values() for d, _ in s})
+    pairs: dict[int, list[tuple[float, float]]] = {h: [] for h in horizons}
+    for d in days[len(days) // 4:]:
+        ol = Outlook(by_player, until=d)
+        for s in by_player.values():
+            i = next((i for i, (day, _) in enumerate(s) if day == d), None)
+            for h in horizons:
+                if i is not None and i + h < len(s) and h in ol.slope:
+                    pairs[h].append((ol.slope[h] * _clip(s[i][1]), _ahead(s, i, h)))
+    return {h: {"n": len(v), "mae": mean(abs(p - a) for p, a in v),
+                "zero": mean(abs(a) for _, a in v)}
+            for h, v in pairs.items() if v}
 
 
 def offer_ratios(offers: list[dict], teams: list[dict], xw, market) -> list[float]:
@@ -137,12 +141,12 @@ def picks(listings: list[dict], last: dict[str, float], model: dict,
         if leave <= pay:
             continue
         out.append({**l, "last": last[l["key"]], "h": bel["h"], "n": bel["n"],
-                    "days": bel["days"], "drift": bel["mean"], "gain": leave - pay,
+                    "drift": bel["mean"], "gain": leave - pay,
                     "pay": pay, "max_bid": leave,
                     "fits": pay <= cash, "short": max(0.0, pay - cash),
                     "reason": {"code": "rising", "last": last[l["key"]],
                                "drift": bel["mean"], "h": bel["h"], "n": bel["n"],
-                               "days": bel["days"], "ask": l["ask"], "pay": pay}})
+                               "ask": l["ask"], "pay": pay}})
     return sorted(out, key=lambda x: -x["gain"] / x["pay"])
 
 
@@ -217,10 +221,9 @@ def _pts(v: float) -> str:
 def say(r: dict) -> str:
     c = r["code"]
     if c == "rising":
-        return ("last update %s; the history says %s over the next %d "
-                "updates (%d similar cases on %d different days); ask %s, "
-                "expect to pay ~%s"
-                % (_p(r["last"]), _p(r["drift"]), r["h"], r["n"], r["days"],
+        return ("last update %s; prices keep their trend, so %s over the next "
+                "%d updates (fitted on %d past moves); ask %s, expect to pay ~%s"
+                % (_p(r["last"]), _p(r["drift"]), r["h"], r["n"],
                    fmt_money(r["ask"]), fmt_money(r["pay"])))
     if c in ("sale", "keep"):
         how = ("the app offers %s" % fmt_money(r["now"]) if r["offered"]
@@ -412,17 +415,14 @@ def _selftest() -> None:
     assert by["up0"][0] == ("2026-08-11", by["up0"][0][1]) and abs(by["up0"][0][1] - 5.0) < 1e-9
     assert by["flat0"][0][1] == 0.0
     ol = Outlook(by)
-    assert ol.hmax == 4 and set(ol.obs) == {1, 2, 3, 4}
-    assert {round(o[0]) for o in ol.near(5.0, 3)} == {5}
-    assert {round(o[0]) for o in ol.near(-2.0, 3)} == {-2}
-    assert all(abs(o[1] - (1.05 ** 3 - 1) * 100) < 1e-6 for o in ol.near(5.0, 3))
-    one_day = [(5.0, 10.0, "d1")] * 50
-    assert belief(one_day) is None
-    two_days = [(5.0, 10.0, "d1"), (5.0, 20.0, "d2")] * 10
-    bel = belief(two_days)
-    assert bel == {"mean": 15.0, "n": 20, "days": 2}, bel
+    assert ol.hmax == 4 and set(ol.slope) == {1, 2, 3, 4}
+    up = Outlook({k: v for k, v in by.items() if k.startswith("up")})
+    assert abs(up.slope[3] * 5.0 - (1.05 ** 3 - 1) * 100) < 1e-6, up.slope
+    assert Outlook(by, until="2026-08-12").n[1] == 36
     top = ol.best(5.0, 0.98, 1.05)
-    assert top["h"] >= 1 and top["net"] > 0 and top["days"] >= 2, top
+    assert top["h"] >= 1 and top["net"] > 0 and top["n"] > 0, top
+    g = grade(by, horizons=(1, 2))
+    assert g[1]["mae"] < g[1]["zero"] and g[2]["n"] > 0, g
     assert ol.best(-2.0, 0.98, 1.05)["net"] < 0 and ol.best(None, 0.98, 1.05) is None
     model = {"outlook": ol, "offer": 0.98, "premium": 1.05}
 
@@ -589,3 +589,8 @@ def _selftest() -> None:
 if __name__ == "__main__":
     if "--selftest" in sys.argv:
         _selftest()
+    elif "--grade" in sys.argv:
+        from ffcore.tidy import history
+        for h, g in grade(steps(history("market"))).items():
+            print("%d update(s) ahead: n=%d  error %.2f%%  vs %.2f%% for "
+                  "'no change'" % (h, g["n"], g["mae"], g["zero"]))
