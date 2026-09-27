@@ -1,11 +1,9 @@
 
 from __future__ import annotations
 
-import datetime as dt
 import math
 import sys
-from dataclasses import dataclass, field, replace
-from contextlib import suppress
+from dataclasses import dataclass, field
 from functools import cache, cached_property
 from types import MappingProxyType
 from typing import Mapping
@@ -14,11 +12,10 @@ from typing import Mapping
 from ffcore.forecast import Bootstrap, pool_from_perjornada
 import grading
 from stats import percentile
-from ffcore.parse import fmt_money
 from ffcore.schedule import (rounds_left, next_then_rest,
                              first_jornada_per_player, apply_fixtures,
                              phantom_fill, phantom_topup)
-from ffcore.pricing import burn, cash_price, respond
+from ffcore.pricing import burn, cash_price
 from ffcore.action import Action
 from ffcore.profile import (PlayerProfile, UNSCORED_DEFAULT,
                             build_profiles)
@@ -79,10 +76,7 @@ class Universe:
         if k in self.state.squads.get(self.me, {}):
             return "mine"
         owner = self.view("owner").get(k)
-        if not owner or owner == self.me:
-            return "free"
-        return ("raid" if self.view("route").get(k, "market") == "clause"
-                else "listed")
+        return "free" if not owner or owner == self.me else "listed"
 
     def dead_weight(self) -> list[tuple[str, float]]:
         mine = self.state.squads.get(self.me, {})
@@ -108,20 +102,15 @@ class Universe:
         for c, price in sorted(self.view("price").items(), key=lambda kv: kv[1]):
             if c in mine or exp.get(c, 0.0) <= self.xi_bar:
                 continue
-            kind_ = self.route_kind(c)
-            if kind_ == "listed":
+            if self.route_kind(c) == "listed":
                 continue
-            raid = kind_ == "raid"
-            victim = self.view("owner").get(c, "") if raid else ""
-            kind = "clause" if raid else "buy"
-            swap = kind + "-swap" if raid else "swap"
             if price <= cash:
-                out.append(Action(kind, buy=c, cost=price, victim=victim))
+                out.append(Action("buy", buy=c, cost=price))
             for s in spare:
                 got = self.view("proceeds").get(s, 0.0)
                 if price <= cash + got:
-                    out.append(Action(swap, buy=c, sell=s, cost=price,
-                                      proceeds=got, victim=victim))
+                    out.append(Action("swap", buy=c, sell=s, cost=price,
+                                      proceeds=got))
         return out
 
     @cached_property
@@ -195,20 +184,15 @@ class Universe:
                      ok=lambda d, a: (a.buy or a.sell) in best_value,
                      rank_key=_per_million, minimum=KEEP_VALUE_MIN)
         keep = [a for _, a in top]
-        bonuses = [respond(self, a, lam) for a in keep]
         afters = [apply(self, a) for a in keep]
         answered = {a.buy for a in keep if a.buy}
         rest = [(k, a) for k, a in extra if k not in answered]
         final = _score_many(self, [self.state.squads] + afters
                             + [apply(self, a) for _k, a in rest], FINAL_TRIALS, seed)
         base, scored = final[0], final[1:len(afters) + 1]
-        for a, r, bonus in zip(keep, scored, bonuses):
-            if bonus and a.victim in r.totals:
-                r.totals[a.victim] = [x + bonus for x in r.totals[a.victim]]
         bands = {k: (*band(pairs), a, sum(pairs) / len(pairs) if pairs else 0.0)
                 for (k, a), pairs in ((ka, paired(r, base, self.me)) for ka, r in
                                       zip(rest, final[len(afters) + 1:]))}
-        rivals = [m for m in self.state.squads if m != self.me]
         out = []
         for a, r in zip(keep, scored):
             b_ = burn(self, a)
@@ -217,17 +201,13 @@ class Universe:
             d_pts, lo, hi = band(pairs)
             out.append({
                 "action": a,
-                "helps": (sum(1 for d in pairs if d > 0) / len(pairs)
-                          if pairs else 0.0),
                 "d_pts": d_pts,
                 "pts_lo": lo,
                 "pts_hi": hi,
                 "net_pts": d_pts - charge,
                 "burn": b_,
                 "charge": charge,
-                "answer": None,
                 "d_win": r.position().get(1, 0.0) - base.position().get(1, 0.0),
-                "d_beat": {v: r.beat(v) - base.beat(v) for v in rivals},
                 "mean": r.mean(self.me),
                 "value": value_rate(d_pts, a.net),
             })
@@ -236,7 +216,6 @@ class Universe:
 
     _FIELDS = {
         "pos": (lambda p: p.current.pos, bool, lambda v: _pos_of(v)),
-        "bids": (lambda p: p.current.bids, None, None),
         "price": (lambda p: p.current.price, None, None),
         "proceeds": (lambda p: p.current.proceeds, None, None),
         "owner": (lambda p: p.current.owner, bool, None),
@@ -338,8 +317,6 @@ def apply(u, a: Action) -> dict[str, dict[str, str]]:
     for gone in a.sell:
         sq[u.me].pop(gone, None)
     if a.buy:
-        for m in sq:
-            sq[m].pop(a.buy, None)
         sq[u.me][a.buy] = u.view("pos").get(a.buy, "MED")
     return {m: phantom_topup(s) for m, s in sq.items()}
 
@@ -359,30 +336,6 @@ def _clears_par_floor(par_of: dict, mae, k: str, horizon: int = 1,
     return par >= mae * math.sqrt(max(1, horizon))
 
 
-def _best_raid_per_victim(raid_keys, won) -> list[str]:
-    best: dict[str, tuple[float, str]] = {}
-    for k in raid_keys:
-        r = won[k]
-        victim = r["action"].victim
-        score = r["d_beat"].get(victim)
-        if score is None:
-            score = r.get("d_pts") or 0.0
-        cur = best.get(victim)
-        if cur is None or score > cur[0]:
-            best[victim] = (score, k)
-    return [k for _score, k in best.values()]
-
-
-def raid_shortlist(u, rows, par_of, mae, pj_of=None) -> set:
-    raids = {r["action"].buy: r for r in rows
-             if r["action"].buy
-             and u.route_kind(r["action"].buy) == "raid"
-             and _gains(r)
-             and _clears_par_floor(par_of, mae, r["action"].buy,
-                                   len(u.state.jornadas), pj_of)}
-    return set(_best_raid_per_victim(list(raids), raids))
-
-
 def _gains(r) -> bool:
     d = r.get("d_pts")
     return d is not None and d > 0
@@ -395,10 +348,6 @@ def worth_doing(u, rows) -> list:
     rows = [r for r in rows if not r["action"].buy
             or _clears_par_floor(par_of, mae, r["action"].buy,
                                  len(u.state.jornadas), pj_of)]
-    keep_raid = raid_shortlist(u, rows, par_of, mae, pj_of)
-    rows = [r for r in rows
-            if u.route_kind(r["action"].buy) != "raid"
-            or r["action"].buy in keep_raid]
     return [r for r in rows if _gains(r)]
 
 
@@ -418,22 +367,9 @@ def load() -> Universe:
 
     teams, mkt = ([dict(r, key=lg.xw.player(app_id=text(r, "player_id")))
                    for r in current(name)] for name in ("api_teams", "api_market"))
-    price, route, bids = market_routes(mkt)
-    clause, clause_until, pt_to_key = {}, {}, {}
-    for r in teams:
-        k = r["key"]
-        if not k:
-            continue
-        if r.get("player_team_id"):
-            pt_to_key[r["player_team_id"]] = k
-        with suppress(ValueError):
-            clause_until[k] = dt.datetime.fromisoformat(text(r, "buyout_until"))
-        if not text(r, "buyout"):
-            continue
-        clause.setdefault(k, float(r["buyout"]))
-        if r["manager"] != me and k in clause_until and clause_until[k] <= now:
-            route.setdefault(k, "clause")
-            price.setdefault(k, clause[k])
+    price, route = market_routes(mkt)
+    pt_to_key = {r["player_team_id"]: r["key"] for r in teams
+                 if r["key"] and r.get("player_team_id")}
 
     value = {k: rec["value"] for k, rec in players.items() if rec.get("value")}
     received_offers = pending(
@@ -445,9 +381,7 @@ def load() -> Universe:
         players, sc, xw=lg.xw,
         market_keyed={k: {"listed": k in price, "price": price.get(k),
                           "owner": lg.owner.get(k), "value": value.get(k),
-                          "clause": clause.get(k),
-                          "clause_until": clause_until.get(k),
-                          "route": route.get(k), "bids": bids.get(k),
+                          "route": route.get(k),
                           "proceeds": proceeds.get(k)} for k in players})
 
     pos = {k: _pos_of(p.current.pos) for k, p in profiles.items()}
@@ -500,23 +434,6 @@ def _selftest() -> None:
     from ffcore.forecast import Bootstrap as B
     from ffcore.fixtures import players_from_flat
 
-    ph_pos = {"d1": "DEF", "d2": "DEF", "other_def": "DEF",
-              "x1": "MED", "x2": "MED", "x3": "MED", "p1": "POR", "f1": "DEL"}
-
-    thin_riv = {"d1": "DEF", "d2": "DEF", "star": "DEF",
-               "x1": "MED", "x2": "MED", "x3": "MED", "p1": "POR", "f1": "DEL"}
-    u_thin = Universe(
-        state=LeagueState({"me": {}, "riv": dict(thin_riv)}, [1], "me"),
-        forecaster=B({1: {}}), cash=0.0, me="me",
-        players=players_from_flat(pos={**ph_pos, "star": "DEF"},
-                                  owner={"star": "riv"}))
-    raided = apply(u_thin, Action("steal", buy="star", cost=1e6,
-                                  victim="riv"))
-    riv_after = raided["riv"]
-    assert "star" not in riv_after, riv_after
-    assert _fieldable(riv_after), riv_after
-    assert any(k.startswith("__phantom_DEF_") for k in riv_after), riv_after
-
     sq = {"k": "POR", **{f"d{i}": "DEF" for i in range(1, 5)},
           **{f"m{i}": "MED" for i in range(1, 6)}, "f1": "DEL", "bench": "MED"}
     mine = {f"me_{k}": v for k, v in sq.items()}
@@ -536,7 +453,6 @@ def _selftest() -> None:
                 **{k: v for k, v in theirs.items()},
                 "star": "MED", "dud": "MED"},
             price={"star": 10e6, "dud": 1e6, "th_m1": 5e6},
-            route={"th_m1": "clause"},
             proceeds={"me_bench": 8e6}, owner={"th_m1": "riv"}))
 
     first = u.current_xi
@@ -559,22 +475,8 @@ def _selftest() -> None:
     assert "star" in names, names
 
     acts = u.candidates()
-    assert any(a.kind.startswith("clause") and a.buy == "th_m1"
-               for a in acts), [a.kind for a in acts]
-    listed_current = replace(u.players["th_m1"].current, route="listed")
-    u_listed = replace(u, players={**u.players,
-                                   "th_m1": replace(u.players["th_m1"],
-                                                    current=listed_current)})
-    listed = u_listed.candidates()
-    assert not any(a.buy == "th_m1" for a in listed), \
-        [a.kind for a in listed if a.buy == "th_m1"]
+    assert not any(a.buy == "th_m1" for a in acts), "a rival's player is not for sale"
     assert all(a.cost <= u.cash + a.proceeds for a in acts), acts
-
-    a = next(x for x in acts if x.buy == "th_m1" and not x.sell)
-    after = apply(u, a)
-    assert "th_m1" not in after["riv"], after["riv"]
-    assert "th_m1" in after["me"]
-    assert "th_m1" in u.state.squads["riv"], "apply must not mutate"
 
 
     u3 = Universe(
@@ -602,13 +504,11 @@ def _selftest() -> None:
     rows, base, _lam, _b = u.rank(acts)
     assert rows, "something should be worth doing"
     top = rows[0]
-    assert 0.5 < top["helps"] <= 1.0, top["helps"]
     assert top["d_pts"] > 0, top["d_pts"]
     assert top["pts_lo"] <= top["d_pts"] <= top["pts_hi"]
     assert top["net_pts"] > 0, top
     assert [r["net_pts"] for r in rows] == sorted(
         (r["net_pts"] for r in rows), reverse=True)
-    assert set(top["d_beat"]) == {"riv"}
 
     spend = next(r for r in rows if r["action"].net > 0)
     assert abs(spend["value"] - spend["d_pts"] / (spend["action"].net / 1e6)
@@ -661,24 +561,6 @@ def _selftest() -> None:
     assert "cand" in bxi2 and "me_d5" not in bxi2, bxi2
     assert sum(1 for k in bxi2 if bsq2[k] == "DEF") == 4, bxi2
     assert sum(bexp[k] for k in bxi2) - sum(bexp[k] for k in bxi) == 1.0
-
-    per2 = {1: dict(per[1])}
-    per2[1]["free_x"] = (9.0, 1.0)
-    per2[1]["th_m1"] = (9.0, 1.0)
-    u2 = Universe(
-        state=LeagueState({"me": dict(mine), "riv": dict(theirs)}, [1], "me"),
-        forecaster=B(per2), cash=6e6, me="me",
-        players=players_from_flat(
-            pos={**u.view("pos"), "free_x": "MED", "th_m1": "MED"},
-            price={"free_x": 5e6, "th_m1": 5e6}, route={"th_m1": "clause"},
-            owner={"th_m1": "riv"}))
-    got, _, _, _ = u2.rank([Action("buy", buy="free_x", cost=5e6),
-                          Action("clause", buy="th_m1", cost=5e6,
-                                 victim="riv")])
-    by = {r["action"].buy: r["net_pts"] for r in got}
-    assert abs(by["th_m1"] - by["free_x"]) < 1e-9, by
-    d_beat = {r["action"].buy: r["d_beat"]["riv"] for r in got}
-    assert d_beat["th_m1"] > d_beat["free_x"] > 0.0, d_beat
 
     top_a = [(9.0, Action("buy", buy="a", cost=1e6)),
              (8.0, Action("buy", buy="b", cost=1e6))]
@@ -889,17 +771,6 @@ def _selftest() -> None:
         assert _gains({"d_pts": d_pts}) is want, d_pts
     assert not _gains({})
 
-    won_raids = {b: {"action": Action("steal", buy=b, victim=v), "d_pts": d,
-                     "d_beat": {v: beat}}
-                 for b, v, d, beat in [("r1", "riv", 5.0, 0.20),
-                                       ("r2", "riv", 8.0, 0.05),
-                                       ("r3", "riv2", 3.0, 0.10),
-                                       ("x", "solo", 1.0, None)]}
-    won_raids["x"]["d_beat"] = {}
-    assert sorted(_best_raid_per_victim(["r1", "r2", "r3"], won_raids)) \
-        == ["r1", "r3"]
-    assert _best_raid_per_victim(["x"], won_raids) == ["x"]
-
     par_of = {"good": 5.0, "weak": 1.99, "unknown": None}
     for mae, k, want in [(None, "weak", True), (2.9, "good", True),
                          (2.9, "weak", False), (2.9, "unknown", False),
@@ -912,20 +783,3 @@ def _selftest() -> None:
 if __name__ == "__main__":
     if "--selftest" in sys.argv:
         _selftest()
-        raise SystemExit(0)
-    u = load()
-    acts = u.candidates(budget=float("inf"))
-    print("%d jornadas left · cash %s · %d players acquirable · %d actions"
-          % (len(u.state.jornadas), fmt_money(u.cash), len(u.view("price")), len(acts)))
-    rows, base, _lam, _b = u.rank(acts)
-    print("\nnow: expected position %.2f · P(win) %.0f%%"
-          % (base.expected_position(), 100 * base.position().get(1, 0)))
-    rivals = [m for m in u.state.squads if m != u.me]
-    print("\n%-52s %7s %7s %10s   %s"
-          % ("do this", "net pts", "Δwin", "net €", "biggest gain vs"))
-    for r in rows[:8]:
-        a = r["action"]
-        who = max(rivals, key=lambda v: r["d_beat"][v])
-        print("%-52s %+7.1f %+6.1f%% %10s   %s %+.0f%%"
-              % (a.label()[:52], r["net_pts"], 100 * r["d_win"],
-                 fmt_money(-a.net), who[:16], 100 * r["d_beat"][who]))

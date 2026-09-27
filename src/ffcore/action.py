@@ -11,7 +11,6 @@ class Action:
     sell: tuple[str, ...] = ()
     cost: float = 0.0
     proceeds: float = 0.0
-    victim: str = ""
 
     def __post_init__(self):
         if isinstance(self.sell, str):
@@ -27,19 +26,14 @@ class Action:
         sold = " + ".join(names.get(k, k) for k in self.sell)
         if self.kind == "sell":
             return "sell %s" % sold
-        buy = names.get(self.buy, self.buy)
-        who = ("clause %s from %s" % (buy, self.victim) if self.victim
-               else "buy %s" % buy)
-        return who + (" · sell %s" % sold if sold else "")
+        return ("buy %s" % names.get(self.buy, self.buy)
+                + (" · sell %s" % sold if sold else ""))
 
 
 def _selftest() -> None:
-    assert Action("clause", buy="X", victim="R").label() == "clause X from R"
     assert Action("swap", buy="X", sell="Y").label() == "buy X · sell Y"
     assert Action("swap", buy="X", sell="Y").sell == ("Y",)
     assert Action("buy", buy="X").sell == ()
-    assert Action("clause", buy="x", victim="R").label({"x": "Xavi"}) \
-        == "clause Xavi from R"
     assert Action("sell", sell="y").label({"y": "Yuri"}) == "sell Yuri"
     assert Action("swap", buy="x", sell="y").label({"x": "Xavi"}) \
         == "buy Xavi · sell y"

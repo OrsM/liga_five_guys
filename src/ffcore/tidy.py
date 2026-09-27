@@ -541,19 +541,16 @@ class Market:
 LISTED_SELLER = "marketPlayerTeam"
 
 
-def market_routes(mkt: list[dict]) -> tuple[dict[str, float], dict[str, str],
-                                            dict[str, int]]:
+def market_routes(mkt: list[dict]) -> tuple[dict[str, float], dict[str, str]]:
     price: dict[str, float] = {}
     route: dict[str, str] = {}
-    bids: dict[str, int] = {}
     for r in mkt:
         k = r["key"]
         if not k or not r.get("sale_price"):
             continue
         price[k] = float(r["sale_price"])
         route[k] = "listed" if r.get("seller") == LISTED_SELLER else "free"
-        bids[k] = int(r.get("bids") or 0)
-    return price, route, bids
+    return price, route
 
 
 def pending(rows, status_field: str, money_field: str) -> dict[str, float]:
@@ -797,14 +794,13 @@ def _selftest() -> None:
     for r, k in zip(mkt_rows, ["free_agent", "listed_rival", "not_priced",
                                None]):
         r["key"] = k
-    price, route, bids = market_routes(mkt_rows)
+    price, route = market_routes(mkt_rows)
     assert price == {"free_agent": 5000000.0, "listed_rival": 8000000.0}, price
     assert route == {"free_agent": "free", "listed_rival": "listed"}, route
-    assert bids == {"free_agent": 0, "listed_rival": 2}, bids
     assert "not_priced" not in route and "not_priced" not in price
     unknown_seller = [{"player_name": "Free Agent", "sale_price": "1",
                        "seller": "something_new", "key": "free_agent"}]
-    _, r2, _ = market_routes(unknown_seller)
+    _, r2 = market_routes(unknown_seller)
     assert r2 == {"free_agent": "free"}, r2
 
     summer = datetime(2026, 9, 18, 16, 40, tzinfo=timezone.utc)

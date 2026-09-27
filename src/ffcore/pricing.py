@@ -23,13 +23,6 @@ def cash_price(reach) -> float | None:
     return max(0.0, (best_any - best_now) / span) if span else None
 
 
-def respond(u, a, rate: float | None) -> float:
-    if not a.victim or a.victim == u.me or not rate:
-        return 0.0
-    budget = max(0.0, u.rival_cash.get(a.victim, 0.0)) + a.cost
-    return rate * budget / 1e6
-
-
 def _selftest() -> None:
     from ffcore.action import Action
     from ffcore.fixtures import players_from_flat, tiny_universe
@@ -46,15 +39,6 @@ def _selftest() -> None:
     step = [(0.0, 0.40), (10e6, 0.50)]
     assert abs(cash_price(step) - 0.10 / 10.0) < 1e-12
     assert cash_price([]) is None and cash_price([(0.0, 0.4)]) is None
-
-    u2 = tiny_universe(rival_cash={"riv": 4e6})
-    steal = Action("steal", buy="x", cost=10e6, victim="riv")
-    assert respond(u2, steal, 3.0) == 3.0 * (4e6 + 10e6) / 1e6
-    assert respond(u2, Action("buy", buy="star", cost=1e6), 3.0) == 0.0
-    assert respond(u2, steal, None) == 0.0
-    broke = tiny_universe(rival_cash={"riv": 0.0})
-    assert respond(broke, Action("steal", buy="x", cost=0.0,
-                                      victim="riv"), 3.0) == 0.0
 
     print("ffcore.pricing self-test OK")
 

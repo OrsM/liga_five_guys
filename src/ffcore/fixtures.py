@@ -25,8 +25,7 @@ DEFAULT_JORNADAS: list[int] = [1, 2]
 
 _CURRENT_DEFAULTS: dict[str, object] = dict(
     club="", pos="MED", status="ok", listed=True,
-    price=5e6, owner=None, value=5e6, clause=None, clause_until=None,
-    route="listed", bids=0, proceeds=None,
+    price=5e6, owner=None, value=5e6, route="listed", proceeds=None,
 )
 _DERIVED_DEFAULTS: dict[str, object] = dict(
     ppm=5.0, pj=10.0, start_p=0.8, market_exp=4.0, pts_now=5.0, scored=None,
@@ -57,16 +56,15 @@ def tiny_profile(key: str, **overrides) -> "PlayerProfile":
 
 
 def players_from_flat(pos=None, price=None, proceeds=None, owner=None,
-                      value=None, market_exp=None, start=None, clause=None,
-                      clause_until=None, route=None, bids=None, name=None
+                      value=None, market_exp=None, start=None, route=None,
+                      name=None
                       ) -> dict[str, "PlayerProfile"]:
     from ffcore.crosswalk import Player
     from ffcore.profile import (PlayerCurrent,
                                 PlayerDerived, PlayerProfile as _PP)
     keys = (set(pos or {}) | set(price or {}) | set(proceeds or {})
            | set(owner or {}) | set(value or {}) | set(market_exp or {})
-           | set(start or {}) | set(clause or {}) | set(clause_until or {})
-           | set(route or {}) | set(bids or {}) | set(name or {}))
+           | set(start or {}) | set(route or {}) | set(name or {}))
     out = {}
     for k in keys:
         out[k] = _PP(
@@ -78,10 +76,7 @@ def players_from_flat(pos=None, price=None, proceeds=None, owner=None,
                 proceeds=(proceeds or {}).get(k),
                 owner=(owner or {}).get(k),
                 value=(value or {}).get(k),
-                clause=(clause or {}).get(k),
-                clause_until=(clause_until or {}).get(k),
                 route=(route or {}).get(k),
-                bids=(bids or {}).get(k),
             ),
             derived=PlayerDerived(
                 market_exp=(market_exp or {}).get(k),
@@ -156,7 +151,7 @@ def tiny_market_universe(**overrides) -> "Universe":
         per_jornada[j]["bench_m"] = (1.0, 0.5)
         per_jornada[j]["bench_k"] = (1.0, 0.5)
         per_jornada[j]["cand_free"] = (9.0, 0.8)
-        per_jornada[j]["cand_raid"] = (10.0, 0.9)
+        per_jornada[j]["cand_rival"] = (10.0, 0.9)
 
     players = {k: tiny_profile(k, pos=pos) for k, pos in DEFAULT_SQUAD.items()}
     players["bench_m"] = tiny_profile(
@@ -168,9 +163,9 @@ def tiny_market_universe(**overrides) -> "Universe":
     players["cand_free"] = tiny_profile(
         "cand_free", pos="MED", price=5e6, listed=True,
         pts_now=9.0, start_p=0.8, market_exp=7.2)
-    players["cand_raid"] = tiny_profile(
-        "cand_raid", pos="MED", price=100e6, listed=True,
-        owner="riv", route="clause", pts_now=10.0, start_p=0.9,
+    players["cand_rival"] = tiny_profile(
+        "cand_rival", pos="MED", price=100e6, listed=True,
+        owner="riv", route="listed", pts_now=10.0, start_p=0.9,
         market_exp=9.0)
 
     defaults = dict(
@@ -243,7 +238,7 @@ def _selftest() -> None:
     assert acts, "tiny_market_universe() must produce real candidate actions"
     targets = {a.buy for a in acts if a.buy}
     assert "cand_free" in targets, targets
-    assert "cand_raid" not in targets, targets
+    assert "cand_rival" not in targets, targets
 
     rows, _base, _measured, _bands = mu.rank(acts, seed=1)
     assert rows, "rank() must return at least one row for a real market"

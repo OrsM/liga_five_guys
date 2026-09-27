@@ -24,7 +24,6 @@ GROUP_LABEL = {
     "field": "FIELD — your eleven — the app has not said what you are playing",
     "keep": "KEEP — bench", "sell": "SELL — never start",
     "buy": "BUY — free agents",
-    "raid": "RAID — a clause, cannot be refused",
     "save": "SAVE — better than yours, out of reach", "pass": "PASS",
 }
 
@@ -119,13 +118,12 @@ def ladder_rows(u, rows, bands, chg) -> list[dict]:
     screened = {r["action"].buy
                 for r in worth_doing(u, [won[k] for k in rest if k in won])}
     for k in sorted(screened, key=lambda k: move_rank(won[k], u)):
-        kind = u.route_kind(k)
-        if kind not in ("free", "raid"):
+        if u.route_kind(k) != "free":
             continue
         r = won[k]
         sold = r["action"].sell
         out.append(cell(
-            u, k, "buy" if kind == "free" else "raid", where(u, k),
+            u, k, "buy", where(u, k),
             money=-r["action"].net, pts=r["d_pts"],
             note=("sell " + " + ".join(short(s, u) for s in sold)) if sold else "",
             value=r.get("value"), market=u.view("value").get(k),
@@ -225,11 +223,10 @@ def _selftest() -> None:
                  players=players_from_flat(
                      name={"yuri": "yuri berchiche",
                            "benat": "benat turrientes"}))
-    rows = [{"action": Action("clause", buy="yuri", sell="benat",
-                              cost=20e6, proceeds=5.87e6, victim="riv"),
-             "net_pts": 0.433, "d_win": 0.364, "d_beat": {"riv": 0.37},
-             "d_pts": 120.0, "pts_lo": 43.3, "pts_hi": 210.0,
-             "helps": 0.90, "mean": 1510.0,
+    rows = [{"action": Action("swap", buy="yuri", sell="benat",
+                              cost=20e6, proceeds=5.87e6),
+             "net_pts": 0.433, "d_win": 0.364,
+             "d_pts": 120.0, "pts_lo": 43.3, "pts_hi": 210.0, "mean": 1510.0,
              "value": 120.0 / (14.13e6 / 1e6)}]
 
     sq = {"k": "POR", "d1": "DEF", "d2": "DEF", "d3": "DEF", "d4": "DEF",
@@ -277,25 +274,23 @@ def _selftest() -> None:
     flat = [{**rows[0], "net_pts": 0.0, "d_win": 0.0, "d_pts": 0.0}]
     assert worth_doing(u, flat) == []
 
-    all_rows = [{"action": Action(kind, buy=buy, cost=5e6),
-                 "net_pts": d_pts / 100, "d_win": 0.0, "d_beat": {},
-                 "value": value, "d_pts": d_pts, "pts_lo": lo, "pts_hi": hi,
-                 "helps": helps, "burn": burn}
-                for buy, kind, d_pts, lo, hi, helps, value, burn in [
-                    ("steady", "buy", 40.0, 10.0, 70.0, 0.80, 8.0, None),
-                    ("dud", "buy", 20.0, 5.0, 35.0, 0.60, 4.0, None),
-                    ("maverick", "buy", 10.0, -50.0, 260.0, 0.55, 2.0, None),
-                    ("rivals", "clause", 60.0, 20.0, 90.0, 0.90, 12.0, 1.2e6),
-                    ("wished", "buy", 50.0, 15.0, 80.0, 0.85, 10.0, None)]]
-    uc_price = dict.fromkeys(("steady", "maverick", "dud", "rivals", "wished"), 5e6)
-    uc_owner = {"rivals": "riv", "wished": "riv"}
-    uc_route = {"rivals": "clause", "wished": "listed"}
-    uc_value = {"steady": 5e6, "rivals": 3.8e6}
+    all_rows = [{"action": Action("buy", buy=buy, cost=5e6),
+                 "net_pts": d_pts / 100, "d_win": 0.0, "value": value,
+                 "d_pts": d_pts, "pts_lo": lo, "pts_hi": hi, "burn": burn}
+                for buy, d_pts, lo, hi, value, burn in [
+                    ("steady", 40.0, 10.0, 70.0, 8.0, None),
+                    ("dud", 20.0, 5.0, 35.0, 4.0, 1.2e6),
+                    ("maverick", 10.0, -50.0, 260.0, 2.0, None),
+                    ("wished", 50.0, 15.0, 80.0, 10.0, None)]]
+    uc_price = dict.fromkeys(("steady", "maverick", "dud", "wished"), 5e6)
+    uc_owner = {"wished": "riv"}
+    uc_route = {"wished": "listed"}
+    uc_value = {"steady": 5e6, "dud": 3.8e6}
     uc = Universe(
         state=LeagueState({"me": {}, "riv": {}}, [1, 2], "me"),
         forecaster=Bootstrap(
             {j: {"steady": (5.0, 1.0), "maverick": (4.0, 1.0),
-                 "dud": (3.0, 1.0), "rivals": (7.0, 1.0),
+                 "dud": (3.0, 1.0),
                  "wished": (6.5, 1.0)} for j in (1, 2)}),
         cash=10e6, me="me",
         players={k: PlayerProfile(
@@ -311,12 +306,11 @@ def _selftest() -> None:
     for r in lad:
         by_group.setdefault(r["group"], []).append(r["name"].lower())
     assert by_group["buy"] == ["steady", "dud", "maverick"], by_group
-    assert by_group["raid"] == ["rivals"], by_group
     assert "wished" not in sum(by_group.values(), []), by_group
     cells = {r["name"].lower(): r for r in lad}
     assert (cells["steady"]["market"], cells["steady"]["premium"]) == (5e6, 0.0)
-    assert (cells["rivals"]["market"], cells["rivals"]["premium"]) == (3.8e6, 1.2e6)
-    assert cells["rivals"]["where"] == "riv" and cells["steady"]["where"] == "free agent"
+    assert (cells["dud"]["market"], cells["dud"]["premium"]) == (3.8e6, 1.2e6)
+    assert cells["steady"]["where"] == "free agent"
 
     u_pos = Universe(
         state=LeagueState({"me": {}}, [1], "me"), forecaster=Bootstrap({}),

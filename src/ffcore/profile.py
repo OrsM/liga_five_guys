@@ -19,10 +19,7 @@ class PlayerCurrent:
     price: float | None = None
     owner: str | None = None
     value: float | None = None
-    clause: float | None = None
-    clause_until: object = None
     route: str | None = None
-    bids: int | None = None
     proceeds: float | None = None
 
 
@@ -81,10 +78,7 @@ def build_profiles(players: dict, sc, xw=None,
             price=mk.get("price"),
             owner=mk.get("owner"),
             value=mk.get("value"),
-            clause=mk.get("clause"),
-            clause_until=mk.get("clause_until"),
             route=mk.get("route"),
-            bids=mk.get("bids"),
             proceeds=mk.get("proceeds"),
         )
         row = sc.lookup.get(k)
