@@ -86,17 +86,6 @@ class Bootstrap:
                 for k, (pts, p) in self.per_jornada.get(jornada, {}).items()}
 
 
-def pool_from_perjornada(rows) -> list[int]:
-    out = []
-    for r in rows:
-        try:
-            if int(r.get("games_delta") or 0) == 1:
-                out.append(int(r["points_delta"]))
-        except (TypeError, ValueError):
-            continue
-    return out
-
-
 def _selftest() -> None:
     from ffcore.score import SHRINK_K
     assert SHRINK_MATCHES == SHRINK_K, "one shrinkage, two modules"
@@ -161,11 +150,6 @@ def _selftest() -> None:
     z = Bootstrap({1: {"x": (4.0, 1.0)}}, pool=[0] * MIN_POOL)
     assert z._pool_mean != 0.0, z._pool_mean
 
-    rows = [{"games_delta": "1", "points_delta": "4"},
-            {"games_delta": "2", "points_delta": "9"},
-            {"games_delta": "1", "points_delta": "-1"},
-            {"games_delta": "x", "points_delta": "3"}]
-    assert pool_from_perjornada(rows) == [4, -1]
 
     sthin = Bootstrap({1: {"vet": (5.0, 0.9), "kid": (5.0, 0.9)}},
                       matches={"vet": 34, "kid": 0})

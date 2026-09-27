@@ -25,7 +25,7 @@ __all__ = ["ROOT", "TIDY", "SEASON", "DECISIONS", "REPORTS", "MADRID",
            "LINEUP_SOURCE", "kickoff_stamp", "MATCH_LEN",
            "minutes_played", "market_routes", "pending", "LISTED_SELLER",
            "lock_order", "JornadaClock", "shown", "table_stats",
-           "load_perjornada", "clock", "clock_history", "jornada_of_match"]
+           "scored", "Scored", "clock", "clock_history", "jornada_of_match"]
 
 ROOT = Path(os.environ.get("FF_ROOT", "./data"))
 TIDY = ROOT / "tidy"
@@ -312,11 +312,58 @@ def shown(t=None, fmt: str = "%Y-%m-%d %H:%M") -> str:
 LINEUP_SOURCE = "futbolfantasy"
 
 
-def load_perjornada() -> list[dict]:
-    files = sorted((SEASON / "live").glob("perjornada_*.csv"))
-    cut = _cut()
-    return [r for r in read_csv(files[-1]) if r.get("to_stamp", "") <= cut
-            ] if files else []
+class Scored(NamedTuple):
+    key: str
+    jornada: int
+    pts: float
+    games: float
+    at: str
+
+
+def _club_matches() -> dict[str, list[tuple[str, int]]]:
+    when: dict[tuple, tuple[str, int]] = {}
+    for m in sorted(history("matches"), key=lambda r: r.get("observed_at", "")):
+        pair, jor = (m.get("home"), m.get("away")), m.get("jornada") or ""
+        if not str(jor).isdigit():
+            continue
+        kick = kickoff_stamp(m.get("kickoff"))
+        if kick is not None:
+            when[pair] = (kick.strftime("%Y-%m-%dT%H%MZ"), int(jor))
+        elif m.get("score") and pair not in when:
+            when[pair] = (m.get("observed_at", ""), int(jor))
+    out: dict[str, list[tuple[str, int]]] = {}
+    for pair, at in when.items():
+        for club in pair:
+            out.setdefault(club, []).append(at)
+    return {c: sorted(v) for c, v in out.items()}
+
+
+def scored() -> list[Scored]:
+    rows = history("points")
+    season = max((r.get("season") or "" for r in rows), default="")
+    rows = sorted((r for r in rows if r.get("season") == season),
+                  key=lambda r: r.get("observed_at", ""))
+    club = {r["ff_id"]: r.get("club") for r in current("market")
+            if r.get("ff_id")}
+    games = _club_matches()
+    every = sorted(at for v in games.values() for at in v)
+    first = rows[0]["observed_at"] if rows else ""
+    last: dict[str, tuple[float, float]] = {}
+    out = []
+    for r in rows:
+        key = (r.get("ff_id") or "").strip() or norm(
+            r.get("player_name_full") or r.get("player_name") or "")
+        now = (float(r["points"]), float(r["games"]))
+        before = last.get(key, (0.0, 0.0))
+        if not key or now == before:
+            continue
+        last[key] = now
+        at = r["observed_at"]
+        played = [j for t, j in games.get(club.get(key), every) if t <= at]
+        if at != first and played:
+            out.append(Scored(key, played[-1], now[0] - before[0],
+                              now[1] - before[1], at))
+    return out
 
 
 def kickoff_stamp(s: str):
@@ -656,6 +703,29 @@ def _selftest_new_loaders() -> None:
         set_now(snapshot_stamp("2026-08-04T0000Z"))
         assert [r["player_name"] for r in current("lineups", "futbolfantasy")] \
             == ["Dan"]
+
+        write_csv(TIDY / "market.csv", [
+            {"observed_at": a, "ff_id": "1", "club": "x"},
+            {"observed_at": a, "ff_id": "2", "club": "y"}])
+        write_csv(TIDY / "matches.csv", [
+            {"observed_at": a, "match_id": "m1", "jornada": "1", "home": "x",
+             "away": "y", "score": "", "kickoff": "2026-08-01T10:00:00+00:00"},
+            {"observed_at": later, "match_id": "m2", "jornada": "2",
+             "home": "x", "away": "z", "score": "1-0", "kickoff": ""}])
+        write_csv(TIDY / "points.csv", [
+            {"observed_at": a, "season": "2025-26", "ff_id": "1",
+             "points": "90", "games": "30"},
+            *({"observed_at": a, "season": "2026-27", "ff_id": k,
+               "points": "0", "games": "0"} for k in "12"),
+            {"observed_at": b, "season": "2026-27", "ff_id": "1",
+             "points": "5", "games": "1"},
+            {"observed_at": later, "season": "2026-27", "ff_id": "1",
+             "points": "12", "games": "2"},
+            {"observed_at": later, "season": "2026-27", "ff_id": "2",
+             "points": "3", "games": "1"}])
+        assert set(scored()) == {Scored("1", 1, 5.0, 1.0, b),
+                                 Scored("1", 2, 7.0, 1.0, later),
+                                 Scored("2", 1, 3.0, 1.0, later)}, scored()
     finally:
         TIDY = real
         set_now(None)

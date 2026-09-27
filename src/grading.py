@@ -10,8 +10,8 @@ from pathlib import Path
 from ffcore.parse import text
 from ffcore.text import norm
 from ffcore.schedule import expectations
-from ffcore.tidy import (DECISIONS, append_csv, clock_history, current,
-                         lock_order, read_csv, run_now, snapshot_stamp)
+from ffcore.tidy import (DECISIONS, Scored, append_csv, clock_history, current,
+                         lock_order, read_csv, run_now, scored, snapshot_stamp)
 
 __all__ = ["log_predictions", "load_actuals", "load_predictions", "pair",
            "lagged_pair",
@@ -38,31 +38,10 @@ def log_predictions(sc) -> None:
         for k, j in first_of.items()], PREDICTION_COLS)
 
 
-def load_actuals(window_days: int | None = WINDOW_DAYS) -> list[dict]:
-    from ffcore.tidy import load_perjornada
-
-    cutoff = (run_now() - dt.timedelta(days=window_days)
-              if window_days is not None
-              else dt.datetime.min.replace(tzinfo=dt.timezone.utc))
-    rows = []
-    for r in load_perjornada():
-        try:
-            to_dt = snapshot_stamp(r["to_stamp"])
-            games = float(r["games_delta"] or 0)
-            points = float(r["points_delta"] or 0)
-        except (KeyError, ValueError, TypeError):
-            continue
-        if to_dt is None or to_dt < cutoff:
-            continue
-        full, short = r.get("player_name_full", ""), r.get("player_name", "")
-        jor = r.get("jornada", "")
-        rows.append({"name": full or short,
-                     "keys": [k for k in dict.fromkeys(
-                         (r.get("ff_id", ""), norm(full), norm(short))) if k],
-                     "points_delta": points,
-                     "games_delta": games,
-                     "jornada": int(jor) if jor else None})
-    return rows
+def load_actuals(window_days: int | None = WINDOW_DAYS) -> list[Scored]:
+    cutoff = ("" if window_days is None else (
+        run_now() - dt.timedelta(days=window_days)).strftime("%Y-%m-%dT%H%MZ"))
+    return [s for s in scored() if s.at >= cutoff]
 
 
 def load_predictions() -> dict[str, list[tuple[dt.datetime, dict]]]:
@@ -99,21 +78,20 @@ def _claim(keys, preds, cutoff: dt.datetime) -> dict | None:
     return None
 
 
-def _graded_row(a: dict, per_match: float, **extra) -> dict:
-    predicted = per_match * a["games_delta"]
-    return {"name": a["name"], "predicted": predicted,
-            "actual": a["points_delta"], "per_match": per_match,
-            "matches": a["games_delta"], "err": predicted - a["points_delta"],
-            "jornada": a.get("jornada"), **extra}
+def _graded_row(a: Scored, per_match: float, **extra) -> dict:
+    predicted = per_match * a.games
+    return {"key": a.key, "predicted": predicted, "actual": a.pts,
+            "per_match": per_match, "matches": a.games,
+            "err": predicted - a.pts, "jornada": a.jornada, **extra}
 
 
 def pair(actuals: list[dict], preds, locks: dict[int, dt.datetime]
          ) -> list[dict]:
     out = []
     for a in actuals:
-        lock = locks.get(a.get("jornada"))
-        fac = (_claim(a["keys"], preds, lock)
-               if a["games_delta"] >= 1 and lock is not None else None)
+        lock = locks.get(a.jornada)
+        fac = (_claim([a.key], preds, lock)
+               if a.games >= 1 and lock is not None else None)
         if fac is not None:
             out.append(_graded_row(a, fac["score"]))
     return out
@@ -129,10 +107,10 @@ def lagged_pair(actuals: list[dict], preds, locks: dict[int, dt.datetime],
     pos = {j: i for i, j in enumerate(order)}
     out = []
     for a in actuals:
-        i = pos.get(a.get("jornada"))
-        if a["games_delta"] < 1 or i is None or i - lag < 0:
+        i = pos.get(a.jornada)
+        if a.games < 1 or i is None or i - lag < 0:
             continue
-        fac = _claim(a["keys"], preds, locks[order[i - lag]])
+        fac = _claim([a.key], preds, locks[order[i - lag]])
         if fac is not None:
             out.append(_graded_row(a, _conditional(fac), pj=fac.get("pj")))
     return out
@@ -193,13 +171,9 @@ TOP_N = 50
 
 
 def _jornada_points() -> dict[tuple, float]:
-    from ffcore.tidy import load_perjornada
-
     out: dict[tuple, float] = {}
-    for r in load_perjornada():
-        if r.get("jornada") and r.get("ff_id"):
-            k = (r["ff_id"], int(r["jornada"]))
-            out[k] = out.get(k, 0.0) + float(r.get("points_delta") or 0)
+    for s in scored():
+        out[s.key, s.jornada] = out.get((s.key, s.jornada), 0.0) + s.pts
     return out
 
 
@@ -259,11 +233,9 @@ def _selftest() -> None:
                    (t0 + 5 * day, {"score": 6.0, "pts": 6.0,
                                    "pj": 12.0})]}
     actuals = [
-        {"name": "A", "keys": ["7"], "points_delta": 10.0, "games_delta": 2.0, "jornada": 2},
-        {"name": "A", "keys": ["7"], "points_delta": 3.0, "games_delta": 1.0, "jornada": 3},
-        {"name": "B", "keys": ["x"], "points_delta": 3.0, "games_delta": 1.0, "jornada": 3},
-        {"name": "A", "keys": ["7"], "points_delta": 0.0, "games_delta": 0.0, "jornada": 3},
-        {"name": "A", "keys": ["7"], "points_delta": 5.0, "games_delta": 1.0, "jornada": 1}]
+        Scored("7", 2, 10.0, 2.0, "t"), Scored("7", 3, 3.0, 1.0, "t"),
+        Scored("x", 3, 3.0, 1.0, "t"), Scored("7", 3, 0.0, 0.0, "t"),
+        Scored("7", 1, 5.0, 1.0, "t")]
     locks = {1: t0 + 2 * day, 2: t0 + 4 * day, 3: t0 + 8 * day}
     got = pair(actuals, preds, locks)
     assert [(g["predicted"], g["err"]) for g in got] == [

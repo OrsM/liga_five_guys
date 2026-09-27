@@ -20,7 +20,6 @@ STAGES: list[tuple[str, str]] = [
     ("parse", "ingest:parse"),
     ("crosswalk", "crosswalk:main"),
     ("ledger", ""),
-    ("points", "points:main"),
     ("sim", "sim:main"),
 ]
 

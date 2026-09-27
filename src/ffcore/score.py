@@ -8,7 +8,7 @@ from ffcore.parse import pct100, ratio, text
 from ffcore.startprob import (NEUTRAL_START, Calibration, calibrate, line_rows,
                               outcomes)
 from ffcore.text import norm
-from ffcore.tidy import (current, minutes_played, row_key)
+from ffcore.tidy import Scored, current, minutes_played, row_key
 
 __all__ = ["SLOT", "SLOT_LABEL", "SLOT_MIN", "MAX_SLOT", "FREE_FORMATIONS",
            "starters_per_slot", "Rating", "Rates", "Scorer", "squad_pool",
@@ -62,19 +62,18 @@ def detect_promoted(market: list[dict], history: dict) -> set[str]:
 
 
 def fit_promoted_discount(market: list[dict], history: dict,
-                          perjornada: list[dict]) -> float:
+                          played: list) -> float:
     promoted = detect_promoted(market, history)
     priors = position_priors(market, history)[0]
     prior_of = {row_key(r): priors.get(SLOT.get((r.get("position") or "").lower()))
                 for r in market if r.get("club") in promoted}
     pts = expected = n = 0.0
-    for r in perjornada:
-        prior = prior_of.get(r.get("ff_id"))
-        games = ratio(r.get("games_delta")) or 0.0
-        if prior and games > 0:
-            pts += ratio(r.get("points_delta")) or 0.0
-            expected += prior * games
-            n += games
+    for s in played:
+        prior = prior_of.get(s.key)
+        if prior and s.games > 0:
+            pts += s.pts
+            expected += prior * s.games
+            n += s.games
     if expected <= 0:
         return PROMOTED_DISCOUNT
     k = PROMOTED_DISCOUNT_K
@@ -94,8 +93,8 @@ def status_multiplier(status: str, factors: dict | None = None) -> float:
 DECAY_GRID = (1.0, 0.85, 0.7, 0.55, 0.4)
 
 
-def _per_jornada_current(starters_rows, perjornada_rows, jornada_of_match,
-                         xw) -> dict[str, dict[int, tuple[float, float]]]:
+def _per_jornada_current(starters_rows, played, jornada_of_match, xw
+                         ) -> dict[str, dict[int, tuple[float, float]]]:
     minutes_by_jor: dict[str, dict[int, float]] = {}
     seen: set[tuple[str, str]] = set()
     for r in starters_rows:
@@ -115,30 +114,10 @@ def _per_jornada_current(starters_rows, perjornada_rows, jornada_of_match,
         by_j[jor] = by_j.get(jor, 0.0) + minutes_played(r.get("role"),
                                                          r.get("minute"))
 
-    end_total: dict[str, dict[int, float]] = {}
-    seen_at: dict[str, dict[int, str]] = {}
-    for r in perjornada_rows:
-        raw_jor = text(r, "jornada")
-        if not raw_jor:
-            continue
-        jor = int(raw_jor)
-        key = xw.key_of(r)
-        if not key:
-            continue
-        total = ratio(r.get("points_total"))
-        if total is None:
-            continue
-        end_total.setdefault(key, {})[jor] = total
-        seen_at.setdefault(key, {})[jor] = (r.get("to_stamp")
-                                            or r.get("from_stamp") or "")
-
     points_by_jor: dict[str, dict[int, float]] = {}
-    for key, totals in end_total.items():
-        order = sorted(totals, key=lambda j: seen_at[key].get(j, ""))
-        prev = 0.0
-        for jor in order:
-            points_by_jor.setdefault(key, {})[jor] = totals[jor] - prev
-            prev = totals[jor]
+    for s in played:
+        by_j = points_by_jor.setdefault(s.key, {})
+        by_j[s.jornada] = by_j.get(s.jornada, 0.0) + s.pts
 
     out: dict[str, dict[int, tuple[float, float]]] = {}
     for key, points_jd in points_by_jor.items():
@@ -184,7 +163,7 @@ def build(market: list[dict], xi_rows: list[dict], now,
     from ffcore.fixture import difficulty_ratings, fit_home_edge
     from ffcore.tidy import (LINEUP_SOURCE, SEASON, history,
                              clock_history, jornada_of_match, load_crosswalk,
-                             load_perjornada,
+                             scored,
                              read_csv)
 
     xw = load_crosswalk()
@@ -192,8 +171,8 @@ def build(market: list[dict], xi_rows: list[dict], now,
     last_season = {r["ff_id"]: {"pts": ratio(r.get("points")) or 0.0,
                             "pj": ratio(r.get("games")) or 0.0}
                for r in (read_csv(files[-1]) if files else ()) if r.get("ff_id")}
-    perjornada = load_perjornada()
-    by_key = _per_jornada_current(current("starters"), perjornada,
+    played = scored()
+    by_key = _per_jornada_current(current("starters"), played,
                                   jornada_of_match(), xw)
     decay = _fit_decay(by_key)
     results = current("results_history")
@@ -203,9 +182,7 @@ def build(market: list[dict], xi_rows: list[dict], now,
     outs = outcomes(history("lineups", LINEUP_SOURCE), current("starters"),
                     clock_history().round_locks, jornada_of_match(), xw)
     pos = {r["ff_id"]: r["position"] for r in history("market") if r.get("ff_id")}
-    pts = {(r["ff_id"], int(r["jornada"])): float(r["points_delta"])
-           for r in perjornada
-           if r.get("games_delta") == "1" and r.get("jornada")}
+    pts = {(s.key, s.jornada): s.pts for s in played if s.games == 1}
     cal = calibrate(outs, line_rows(outs, pos, pts))
     return Scorer(
         market, xi_rows, last_season, shrink_k=shrink_k, xw=xw, cal=cal,
@@ -213,7 +190,7 @@ def build(market: list[dict], xi_rows: list[dict], now,
         current={k: dict(zip(("pts", "pj", "start_rate", "start_n"),
                              _weighted(jd, decay)))
                  for k, jd in by_key.items()},
-        promoted_discount=fit_promoted_discount(market, last_season, perjornada))
+        promoted_discount=fit_promoted_discount(market, last_season, played))
 
 
 class Rating(NamedTuple):
@@ -405,13 +382,11 @@ def _selftest() -> None:
 
     assert fit_promoted_discount(promo_market, promo_hist, []) \
         == PROMOTED_DISCOUNT
-    at_discount = [{"ff_id": "q%d" % (i % 10), "games_delta": "1",
-                    "points_delta": "%.1f" % (sc3.priors["DEF"]
-                                              * PROMOTED_DISCOUNT)}
-                   for i in range(80)]
+    at_discount = [Scored("q%d" % (i % 10), 1, round(
+        sc3.priors["DEF"] * PROMOTED_DISCOUNT, 1), 1.0, "t") for i in range(80)]
     assert abs(fit_promoted_discount(promo_market, promo_hist, at_discount)
                - PROMOTED_DISCOUNT) < 0.01
-    at_prior = [dict(r, points_delta="%.1f" % sc3.priors["DEF"])
+    at_prior = [r._replace(pts=round(sc3.priors["DEF"], 1))
                 for r in at_discount * 5]
     assert fit_promoted_discount(promo_market, promo_hist, at_prior) \
         > PROMOTED_DISCOUNT + 0.15
@@ -477,31 +452,15 @@ def _selftest() -> None:
            "role": "starter", "minute": "", "match_id": "m1"}
           for _ in range(56)),
     ]
-    perjornada_rows = [
-        {"ff_id": "1", "player_name_full": "Antonio Blanco",
-         "points_delta": "3", "points_total": "8", "jornada": "1"},
-        {"ff_id": "1", "player_name_full": "Antonio Blanco",
-         "points_delta": "5", "points_total": "13", "jornada": "2"},
-        {"ff_id": "1", "player_name_full": "Antonio Blanco",
-         "points_delta": "99", "points_total": "112", "jornada": ""},
-    ]
-    by_key = _per_jornada_current(starters_rows, perjornada_rows,
+    played = [Scored("antonio blanco", 1, 8.0, 1.0, "t1"),
+              Scored("antonio blanco", 2, 5.0, 1.0, "t2")]
+    by_key = _per_jornada_current(starters_rows, played,
                                   jornada_map, xw2)
     assert by_key["antonio blanco"] == {1: (8.0, 90.0), 2: (5.0, 45.0)}, \
         by_key["antonio blanco"]
     assert "came on" not in by_key, by_key
     assert "unused sub" not in by_key, by_key
     assert _per_jornada_current([], [], {}, xw2) == {}
-
-    corrected = _per_jornada_current(
-        starters_rows,
-        [{"ff_id": "1", "player_name_full": "Antonio Blanco",
-          "points_total": "8", "jornada": "1"},
-         {"ff_id": "1", "player_name_full": "Antonio Blanco",
-          "points_total": "9", "jornada": "1"}],
-        jornada_map, xw2)
-    assert corrected["antonio blanco"] == {1: (9.0, 90.0), 2: (0.0, 45.0)}, \
-        corrected
 
     assert _weighted(by_key["antonio blanco"], 1.0) == (13.0, 1.5, 0.75, 2.0)
     assert abs(_weighted(by_key["antonio blanco"], 0.5)[0] - 9.0) < 1e-9

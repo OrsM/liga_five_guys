@@ -9,7 +9,7 @@ from types import MappingProxyType
 from typing import Mapping
 
 
-from ffcore.forecast import Bootstrap, pool_from_perjornada
+from ffcore.forecast import Bootstrap
 import grading
 from stats import percentile
 from ffcore.schedule import expectations, phantom_fill, phantom_topup
@@ -20,7 +20,7 @@ from ffcore.league import League
 from ffcore.score import SLOT, Scorer, build, replacement, squad_pool, vor
 from ffcore.season import (LeagueState, best_xi,
                            simulate_many)
-from ffcore.tidy import (LINEUP_SOURCE, age_hours, current, load_perjornada,
+from ffcore.tidy import (LINEUP_SOURCE, age_hours, current, scored,
                          load_players, market_routes, pending, run_now)
 from ffcore.parse import num, text
 
@@ -361,7 +361,7 @@ def load() -> Universe:
         first_jornada_of.update({k: rem[0] for layer in per_j.values()
                                  for k in layer if k.startswith("__phantom_")})
 
-    pool = pool_from_perjornada(load_perjornada())
+    pool = [s.pts for s in scored() if s.games == 1]
     history = grading.graded_history()
     fc = Bootstrap(per_j, pool=pool, matches=matches, club_of=club,
                    club_rel=club_volatility(current("results_history"),

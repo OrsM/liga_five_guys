@@ -14,7 +14,7 @@ TESTS=(ffcore/parse.py ffcore/text.py ffcore/tidy.py
        ffcore/startprob.py ffcore/crosswalk.py sources.py
        "ingest.py --selftest" "ffcore/league.py --selftest" ffcore/fixture.py
        ffcore/score.py
-       "points.py --selftest" "grading.py --selftest"
+       "grading.py --selftest"
        "ledger.py --selftest"
        "crosswalk.py --selftest" "run.py --selftest" "flip.py --selftest"
        ffcore/action.py ffcore/pricing.py ffcore/schedule.py
