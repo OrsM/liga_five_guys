@@ -19,9 +19,9 @@ from ffcore.text import norm
 __all__ = ["ROOT", "TIDY", "SEASON", "DECISIONS", "REPORTS", "MADRID",
            "TABLES", "Table", "current", "history", "age_hours", "set_now",
            "input_path", "read_csv", "write_csv", "append_csv", "widen_csv",
-           "log_row", "csv_string", "snapshot_stamp", "ledger_stamp",
+           "log_row", "csv_string", "snapshot_stamp",
            "Market", "Valuation", "row_key", "run_now", "load_crosswalk",
-           "load_players", "read_ledger", "LEDGER", "load_deadline",
+           "load_players", "load_deadline",
            "LINEUP_SOURCE", "kickoff_stamp", "MATCH_LEN",
            "minutes_played", "market_routes", "pending", "LISTED_SELLER",
            "lock_order", "JornadaClock", "shown", "table_stats",
@@ -169,11 +169,6 @@ def _digits_to_dt(s: str, tz):
 
 def snapshot_stamp(s: str):
     return _digits_to_dt(s, timezone.utc)
-
-
-def ledger_stamp(s: str):
-    local = _digits_to_dt(s, MADRID)
-    return local.astimezone(timezone.utc) if local else None
 
 
 class Table(NamedTuple):
@@ -513,15 +508,6 @@ def load_players() -> dict[str, dict]:
     players = _merge({}, market, row_key, "name", MARKET_FIELDS)
     return _merge(players, xi, xw.key_of if xw else (lambda r: None),
                   "player_name", XI_FIELDS)
-
-
-LEDGER = TIDY / "transactions.csv"
-
-
-def read_ledger(path=LEDGER) -> list[dict]:
-    return sorted((dict(r) for r in read_csv(path)
-                   if (r.get("player") or "").strip()),
-                  key=lambda r: r.get("date") or "")
 
 
 class Valuation(NamedTuple):

@@ -373,9 +373,8 @@ def load() -> Universe:
                for r in lg.standings if r.get("manager")}
     return Universe(
         state=LeagueState(squads, rem, me, carried), forecaster=fc,
-        cash=lg[me].cash.value or 0.0, me=me, facts=facts, lg=lg, sc=sc,
-        rival_cash={h: lg[h].cash.value or 0.0 for h in lg.managers
-                    if h != me},
+        cash=lg.cash[me], me=me, facts=facts, lg=lg, sc=sc,
+        rival_cash={h: v for h, v in lg.cash.items() if h != me},
         part_played=played, first_jornada_of=first_jornada_of,
         locked_cash=sum(pending(mkt, "bid_status", "bid_money").values()),
         received_offers=received_offers,

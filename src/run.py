@@ -10,23 +10,14 @@ import time
 import traceback
 
 
-def _ledger() -> None:
-    import ledger
-
-    print(ledger.write(ledger.build()))
-
-
 STAGES: list[tuple[str, str]] = [
     ("parse", "ingest:parse"),
     ("crosswalk", "crosswalk:main"),
-    ("ledger", ""),
     ("sim", "sim:main"),
 ]
 
 
 def call(spec: str):
-    if not spec:
-        return _ledger
     mod, fn = spec.split(":")
     return getattr(__import__(mod), fn)
 
