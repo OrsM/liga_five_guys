@@ -16,7 +16,7 @@ TESTS=(ffcore/parse.py ffcore/text.py ffcore/tidy.py
        ffcore/score.py
        "grading.py --selftest"
        "crosswalk.py --selftest" "run.py --selftest"
-       ffcore/action.py ffcore/pricing.py ffcore/schedule.py
+       ffcore/action.py ffcore/market.py ffcore/pricing.py ffcore/schedule.py
        "stats.py --selftest"
       )
 SESSION_TESTS=(decide.py sim.py)

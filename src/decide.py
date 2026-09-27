@@ -5,16 +5,15 @@ import sys
 from statistics import median
 from dataclasses import dataclass, field
 from functools import cache, cached_property
-from types import MappingProxyType
-from typing import Mapping
 
 
 from ffcore.forecast import Bootstrap
 from stats import percentile
 from ffcore.schedule import expectations, phantom_fill, phantom_topup
-from ffcore.pricing import auction_ratios, burn, cash_price, steps, trend
+from ffcore.pricing import auction_ratios, cash_price, steps, trend
 from ffcore.action import Action
 from ffcore.league import League
+from ffcore.market import Market
 from ffcore.outlook import Outlook
 from ffcore.score import SLOT, build
 from ffcore.season import LeagueState, best_xi, simulate_many
@@ -35,61 +34,43 @@ KEEP = 12
 class Universe:
     state: LeagueState
     forecaster: Bootstrap
-    cash: float
     me: str
-    facts: dict[str, dict] = field(default_factory=dict)
+    market: Market = field(default_factory=Market)
     rival_cash: dict[str, float] = field(default_factory=dict)
     part_played: dict[int, set[str]] = field(default_factory=dict)
     first_jornada_of: dict[str, int] = field(default_factory=dict)
-    locked_cash: float = 0.0
-    lam: float | None = None
-    premium: float = 1.0
 
     @cached_property
     def outlook(self) -> Outlook:
-        return Outlook(self.state, self.forecaster, self.me, self.view("pos"),
+        return Outlook(self.state, self.forecaster, self.me, self.market.pos,
                        self.part_played, self.first_jornada_of)
 
     def route_kind(self, k: str) -> str:
         if k in self.state.squads.get(self.me, {}):
             return "mine"
-        owner = self.view("owner").get(k)
+        owner = self.market.owner.get(k)
         return "free" if not owner or owner == self.me else "listed"
 
-    def cash_pts(self, a: "Action", lam: float | None = None) -> float:
-        lam = self.lam if lam is None else lam
-        if not lam:
-            return 0.0
-        value, trend = self.view("value"), self.view("trend")
-        proceeds = self.view("proceeds")
-        money = -(burn(self, a) or 0.0)
-        if a.buy:
-            money += value.get(a.buy, 0.0) * trend.get(a.buy, 0.0) / 100
-        for k in a.sell:
-            v = value.get(k, proceeds.get(k, 0.0))
-            money += proceeds.get(k, 0.0) - v * (1 + trend.get(k, 0.0) / 100)
-        return lam * money / 1e6
-
     def candidates(self, budget: float | None = None) -> list["Action"]:
-        cash = self.cash if budget is None else budget
+        cash = self.market.cash if budget is None else budget
         mine = set(self.state.squads.get(self.me, {}))
         o = self.outlook
         par_of = o.par
 
         spare = sorted(fieldable_spares(self), key=lambda k: _nulls_last(
-            value_rate(par_of.get(k, 0.0), self.view("proceeds").get(k, 0.0))))
+            value_rate(par_of.get(k, 0.0), self.market.proceeds.get(k, 0.0))))
 
         out: list[Action] = []
-        for c, price in sorted(self.view("price").items(), key=lambda kv: kv[1]):
+        for c, price in sorted(self.market.price.items(), key=lambda kv: kv[1]):
             if c in mine or self.route_kind(c) == "listed":
                 continue
-            if o.season.get(c, 0.0) <= o.xi_bar and self.cash_pts(
+            if o.season.get(c, 0.0) <= o.xi_bar and self.market.cash_pts(
                     Action("buy", buy=c, cost=price)) <= 0:
                 continue
             if price <= cash:
                 out.append(Action("buy", buy=c, cost=price))
             for s in spare:
-                got = self.view("proceeds").get(s, 0.0)
+                got = self.market.proceeds.get(s, 0.0)
                 if price <= cash + got:
                     out.append(Action("swap", buy=c, sell=s, cost=price,
                                       proceeds=got))
@@ -104,13 +85,13 @@ class Universe:
         screened, reach = [], []
         for a, r in zip(acts, rest):
             d, _lo, _hi = band(paired(r, base_s, self.me))
-            reach.append((a.cost - a.proceeds - self.cash, d))
+            reach.append((a.cost - a.proceeds - self.market.cash, d))
         measured = cash_price(reach)
-        lam = self.lam if self.lam is not None else (measured or 0.0)
+        lam = self.market.lam if self.market.lam is not None else (measured or 0.0)
         for a, r in zip(acts, rest):
-            if a.cost <= self.cash + a.proceeds:
+            if a.cost <= self.market.cash + a.proceeds:
                 d, _lo, _hi = band(paired(r, base_s, self.me))
-                screened.append((d + self.cash_pts(a, lam), a))
+                screened.append((d + self.market.cash_pts(a, lam), a))
 
         cur_xi = self.outlook.xi.players
         pick: dict[str, tuple] = {}
@@ -135,7 +116,7 @@ class Universe:
                                       zip(rest, final[len(afters) + 1:]))}
         out = []
         for a, r in zip(keep, scored):
-            cash = self.cash_pts(a, lam)
+            cash = self.market.cash_pts(a, lam)
             pairs = paired(r, base, self.me)
             d_pts, lo, hi = band(pairs)
             out.append({
@@ -144,16 +125,13 @@ class Universe:
                 "pts_lo": lo,
                 "pts_hi": hi,
                 "net_pts": d_pts + cash,
-                "burn": burn(self, a),
+                "burn": self.market.burn(a),
                 "cash_pts": cash,
                 "d_win": r.position().get(1, 0.0) - base.position().get(1, 0.0),
                 "mean": r.mean(self.me),
             })
         rows = sorted(out, key=lambda d: (-d["net_pts"], d["action"].net))
         return rows, base, measured, bands
-
-    def view(self, field: str) -> Mapping:
-        return MappingProxyType(self.facts.get(field, {}))
 
 
 def _nulls_last(v: float | None) -> tuple[bool, float]:
@@ -215,7 +193,7 @@ def apply(u, *acts: Action) -> dict[str, dict[str, str]]:
         for gone in a.sell:
             sq[u.me].pop(gone, None)
         if a.buy:
-            sq[u.me][a.buy] = u.view("pos").get(a.buy, "MED")
+            sq[u.me][a.buy] = u.market.pos.get(a.buy, "MED")
     return {m: phantom_topup(s) for m, s in sq.items()}
 
 
@@ -282,18 +260,19 @@ def load() -> Universe:
            for k, rec in players.items()}
     squads = {mgr: {k: pos[k] for k in lg.squad(mgr) if k in pos}
               for mgr in lg.managers}
-    per_j, first_jornada_of, rates, rem, played = expectations(
+    per_j, first_jornada_of, _rates, rem, played = expectations(
         sc, set(price).union(*squads.values()), m)
-    facts = {"name": {k: rec.get("name") or k for k, rec in players.items()},
-             "pos": pos,
-             "price": {k: v for k, v in price.items() if k in players},
-             "route": {k: v for k, v in route.items() if k in players},
-             "owner": {k: v for k, v in lg.owner.items() if k in players},
-             "value": {k: v for k, v in value.items() if k in players},
-             "proceeds": {k: v for k, v in proceeds.items() if k in players},
-             "pj": {k: r.pj for k, r in rates.items() if r},
-             "my_bid": pending(mkt, "bid_status", "bid_money"),
-             "trend": trend(steps(history("market")), _updates_to_lock())}
+    market = Market(
+        cash=lg.cash[me], lam=cash_price_history(), premium=_premium(me),
+        name={k: rec.get("name") or k for k, rec in players.items()},
+        pos=pos,
+        price={k: v for k, v in price.items() if k in players},
+        route={k: v for k, v in route.items() if k in players},
+        owner={k: v for k, v in lg.owner.items() if k in players},
+        value={k: v for k, v in value.items() if k in players},
+        proceeds={k: v for k, v in proceeds.items() if k in players},
+        my_bid=pending(mkt, "bid_status", "bid_money"),
+        trend=trend(steps(history("market")), _updates_to_lock()))
     squads, per_j = phantom_fill(squads, per_j, pos)
     assert all(_fieldable(sq) for sq in squads.values()), squads
     if rem:
@@ -305,17 +284,15 @@ def load() -> Universe:
     carried = {r["manager"]: num(r, "team_points", default=0.0)
                for r in lg.standings if r.get("manager")}
     return Universe(
-        state=LeagueState(squads, rem, me, carried), forecaster=fc,
-        cash=lg.cash[me], me=me, facts=facts,
+        state=LeagueState(squads, rem, me, carried), forecaster=fc, me=me,
+        market=market,
         rival_cash={h: v for h, v in lg.cash.items() if h != me},
-        part_played=played, first_jornada_of=first_jornada_of,
-        locked_cash=sum(facts["my_bid"].values()),
-        lam=cash_price_history(),
-        premium=_premium(me),
-        )
+        part_played=played, first_jornada_of=first_jornada_of)
 
 
 def _selftest() -> None:
+    from dataclasses import replace
+
     from ffcore.forecast import Bootstrap as B
 
     sq = {"k": "POR", **{f"d{i}": "DEF" for i in range(1, 5)},
@@ -331,8 +308,8 @@ def _selftest() -> None:
 
     u = Universe(
         state=LeagueState({"me": dict(mine), "riv": dict(theirs)}, [1], "me"),
-        forecaster=B(per), cash=12e6, me="me",
-        facts=dict(
+        forecaster=B(per), me="me",
+        market=Market(cash=12e6, 
             pos={**{k: v for k, v in mine.items()},
                 **{k: v for k, v in theirs.items()},
                 "star": "MED", "dud": "MED"},
@@ -360,14 +337,14 @@ def _selftest() -> None:
 
     acts = u.candidates()
     assert not any(a.buy == "th_m1" for a in acts), "a rival's player is not for sale"
-    assert all(a.cost <= u.cash + a.proceeds for a in acts), acts
+    assert all(a.cost <= u.market.cash + a.proceeds for a in acts), acts
 
 
     u3 = Universe(
         state=LeagueState({"me": dict(mine), "riv": dict(theirs)}, [1], "me"),
-        forecaster=B(per), cash=4e6, me="me",
-        facts=dict(
-            pos={**u.view("pos"), "dear": "MED"},
+        forecaster=B(per), me="me",
+        market=Market(cash=4e6, 
+            pos={**u.market.pos, "dear": "MED"},
             price={"dear": 20e6},
             proceeds={"me_bench": 8e6, "me_spare2": 5e6, "me_spare3": 4e6}))
     u3.state.squads["me"]["me_spare2"] = "MED"
@@ -407,15 +384,15 @@ def _selftest() -> None:
     vper[1]["deep_med"] = (8.0, 1.0)
     uvor = Universe(
         state=LeagueState({"me": dict(vsq), "riv": dict(vth)}, [1], "me"),
-        forecaster=B(vper), cash=6e6, me="me",
-        facts=dict(
+        forecaster=B(vper), me="me",
+        market=Market(cash=6e6, 
             pos={**vsq, **vth, "thin_del": "DEL", "deep_med": "MED"},
             price={"thin_del": 5e6, "deep_med": 5e6},
             route={"thin_del": "free", "deep_med": "free"}))
     vexp, vxi = uvor.outlook.xi
     assert uvor.outlook.xi_bar == 1.0, uvor.outlook.xi_bar
-    assert min(vexp[k] for k in vxi if uvor.view("pos")[k] == "DEL") == 1.0, vxi
-    assert min(vexp[k] for k in vxi if uvor.view("pos")[k] == "MED") == 5.0, vxi
+    assert min(vexp[k] for k in vxi if uvor.market.pos[k] == "DEL") == 1.0, vxi
+    assert min(vexp[k] for k in vxi if uvor.market.pos[k] == "MED") == 5.0, vxi
     vrows, _vb, _vl, _vbd = uvor.rank([Action("buy", buy="thin_del", cost=5e6),
                Action("buy", buy="deep_med", cost=5e6)])
     vby = {r["action"].buy: r for r in vrows}
@@ -448,8 +425,8 @@ def _selftest() -> None:
     acts6.append(Action("buy", buy="sham", cost=1e3))
     u6 = Universe(
         state=LeagueState({"me": dict(mine), "riv": dict(theirs)}, [1], "me"),
-        forecaster=B(per6), cash=1000e6, me="me",
-        facts=dict(pos={**u.view("pos"), **{a.buy: "MED" for a in acts6}},
+        forecaster=B(per6), me="me",
+        market=Market(cash=1000e6, pos={**u.market.pos, **{a.buy: "MED" for a in acts6}},
                    price={a.buy: a.cost for a in acts6}))
     rows6, *_ = u6.rank(acts6)
     kept6 = [r["action"].buy for r in rows6]
@@ -461,8 +438,8 @@ def _selftest() -> None:
                           "me", ),
         forecaster=B({1: {"me_k": (0.1, 1.0), "dud": (1.0, 1.0)},
                       2: {**{k: (5.0, 1.0) for k in mine}, "dud": (1.0, 1.0)}}),
-        cash=50e6, me="me",
-        facts=dict(pos={**u.view("pos"), "dud": "MED"},
+        me="me",
+        market=Market(cash=50e6, pos={**u.market.pos, "dud": "MED"},
                                   price={"dud": 1e6}))
     half.part_played = {1: {"somewhere"}}
     assert not any(a.buy == "dud"
@@ -490,8 +467,8 @@ def _selftest() -> None:
     from ffcore.forecast import Bootstrap as BCD
     u_cd = Universe(
         state=LeagueState({"me": dict(sq_cd)}, [1], "me"),
-        forecaster=BCD(per_cd), cash=0.0, me="me",
-        facts=dict(pos={**sq_cd, "target": "DEL"},
+        forecaster=BCD(per_cd), me="me",
+        market=Market(pos={**sq_cd, "target": "DEL"},
                                   price={"target": 5e6},
                                   proceeds={"me_f3": 5e6}))
     acts_cd = u_cd.candidates()
@@ -511,8 +488,8 @@ def _selftest() -> None:
     per[1]["dead_f"] = (0.1, 1.0)
     u = Universe(
         state=LeagueState({"me": dict(sq)}, [1], "me"),
-        forecaster=Bootstrap(per), cash=0.0, me="me",
-        facts=dict(pos=dict(sq),
+        forecaster=Bootstrap(per), me="me",
+        market=Market(pos=dict(sq),
                                   proceeds={"spare_d": 4e6, "dead_f": 6e6}))
     mine = u.state.squads["me"]
     spares = fieldable_spares(u)
@@ -523,7 +500,7 @@ def _selftest() -> None:
         state=LeagueState({"me": {"k": "POR", "d1": "DEF", "d2": "DEF",
                                   "d3": "DEF", "m1": "MED", "m2": "MED",
                                   "m3": "MED", "f1": "DEL"}}, [1], "me"),
-        forecaster=Bootstrap({1: {}}), cash=0.0, me="me")
+        forecaster=Bootstrap({1: {}}), me="me")
     assert fieldable_spares(bare) == []
     after = apply(u, Action("buy", buy="new_por", sell=("spare_d",)),
                   Action("sell", sell=("dead_f",)))
@@ -541,8 +518,8 @@ def _selftest() -> None:
               for j in (1, 2)}
     par = Universe(
         state=LeagueState({"me": {"me_a": "MED", "me_b": "MED"}}, [1, 2], "me"),
-        forecaster=Bootstrap(pf_per), cash=0.0, me="me",
-        facts={"pos": dict.fromkeys(("me_a", "me_b", "cand"), "MED")}).outlook.par
+        forecaster=Bootstrap(pf_per), me="me",
+        market=Market(pos=dict.fromkeys(("me_a", "me_b", "cand"), "MED"))).outlook.par
     assert par == {"me_a": 0.0, "me_b": 6.0, "cand": 4.0}, par
 
     assert premium_to_beat([1.0] * 5 + [1.3] * 5) == 1.3
@@ -551,18 +528,18 @@ def _selftest() -> None:
 
     from ffcore.fixtures import tiny_market_universe
     mu = tiny_market_universe(lam=0.3, premium=1.05)
-    mu.facts.update(value={"bench_m": 3e6, "riser": 2e6},
-                    trend={"riser": 20.0, "bench_m": -10.0},
-                    price={**mu.facts["price"], "riser": 2e6},
-                    pos={**mu.facts["pos"], "riser": "MED"})
+    mu.market = replace(mu.market, value={"bench_m": 3e6, "riser": 2e6},
+                        trend={"riser": 20.0, "bench_m": -10.0},
+                        price={**mu.market.price, "riser": 2e6},
+                        pos={**mu.market.pos, "riser": "MED"})
     buy_riser = Action("buy", buy="riser", cost=2e6)
-    assert abs(mu.cash_pts(buy_riser) - 0.3 * (0.4 - 0.1)) < 1e-9
+    assert abs(mu.market.cash_pts(buy_riser) - 0.3 * (0.4 - 0.1)) < 1e-9
     assert "riser" in {a.buy for a in mu.candidates()}
     sell_m = Action("sell", sell=("bench_m",), proceeds=3e6)
-    assert abs(mu.cash_pts(sell_m) - 0.3 * 0.3) < 1e-9
-    assert mu.cash_pts(buy_riser, lam=0.0) == 0.0
-    mu.facts["trend"] = {"riser": 0.0}
-    assert mu.cash_pts(buy_riser) < 0
+    assert abs(mu.market.cash_pts(sell_m) - 0.3 * 0.3) < 1e-9
+    assert mu.market.cash_pts(buy_riser, lam=0.0) == 0.0
+    mu.market.trend = {"riser": 0.0}
+    assert mu.market.cash_pts(buy_riser) < 0
     assert "riser" not in {a.buy for a in mu.candidates()}
 
     print("decide self-test OK")

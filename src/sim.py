@@ -27,15 +27,15 @@ def xi_change(marked: list[str], best) -> dict:
 def band_acts(u) -> list:
     mine, o = u.state.squads.get(u.me, {}), u.outlook
     return ([(k, Action("sell", sell=(k,),
-                        proceeds=u.view("proceeds").get(k, 0.0))) for k in mine]
+                        proceeds=u.market.proceeds.get(k, 0.0))) for k in mine]
             + [(k, Action("buy", buy=k, cost=price))
-               for k, price in u.view("price").items()
+               for k, price in u.market.price.items()
                if k not in mine and o.season.get(k, 0.0) > o.xi_bar])
 
 
 def sale_pts(u, bands) -> dict[str, float]:
     xi = u.outlook.xi.players
-    return {k: u.cash_pts(bands[k][3]) + bands[k][4]
+    return {k: u.market.cash_pts(bands[k][3]) + bands[k][4]
             for k in u.state.squads.get(u.me, {}) if k in bands and k not in xi}
 
 
@@ -46,7 +46,7 @@ def why(r) -> str:
 
 def plan(u, rows, base) -> tuple[list[dict], float]:
     picked: list[dict] = []
-    cash, gain = u.cash, 0.0
+    cash, gain = u.market.cash, 0.0
     for r in sorted(worth_doing(u, rows), key=lambda r: -r["net_pts"]):
         a = r["action"]
         used = {k for p in picked for k in (p["action"].buy, *p["action"].sell)}
@@ -55,7 +55,7 @@ def plan(u, rows, base) -> tuple[list[dict], float]:
         acts = [p["action"] for p in picked] + [a]
         after = score_many(u, [apply(u, *acts)], FINAL_TRIALS, 1)[0]
         total = band(paired(after, base, u.me))[0] + sum(
-            u.cash_pts(x) for x in acts)
+            u.market.cash_pts(x) for x in acts)
         if total > gain:
             picked.append(r)
             cash, gain = cash - a.net, total
@@ -63,19 +63,19 @@ def plan(u, rows, base) -> tuple[list[dict], float]:
 
 
 def player(u, k) -> dict:
-    return {"name": title_name(u.view("name").get(k, k)),
-            "pos": u.view("pos").get(k, "")}
+    return {"name": title_name(u.market.name.get(k, k)),
+            "pos": u.market.pos.get(k, "")}
 
 
 def buy_row(u, r) -> dict:
     a = r["action"]
     return {**player(u, a.buy), "ask": a.cost,
-            "bid": min(a.cost * u.premium, max(a.cost, u.cash + a.proceeds)),
+            "bid": min(a.cost * u.market.premium, max(a.cost, u.market.cash + a.proceeds)),
             "sell": [player(u, k)["name"] for k in a.sell],
             "proceeds": a.proceeds, "gain": r["d_pts"], "why": why(r),
-            "trend": u.view("trend").get(a.buy),
-            "placed": u.view("my_bid").get(a.buy),
-            "done": a.buy in u.view("my_bid")}
+            "trend": u.market.trend.get(a.buy),
+            "placed": u.market.my_bid.get(a.buy),
+            "done": a.buy in u.market.my_bid}
 
 
 def ping(todo: list[dict]) -> str:
@@ -102,8 +102,8 @@ def report(u, base, rows, bands, chg, lock_at=None) -> dict:
                      if chg["legal"] else None})
     todo += [{"what": "buy", **buy_row(u, r)} for r in picked]
     todo += [{"what": "sell", **player(u, k),
-              "proceeds": u.view("proceeds").get(k, 0.0),
-              "done": u.view("route").get(k) == "listed"}
+              "proceeds": u.market.proceeds.get(k, 0.0),
+              "done": u.market.route.get(k) == "listed"}
              for k, v in sorted(sale_pts(u, bands).items(), key=lambda kv: -kv[1])
              if v > 0 and k not in gone]
     chosen = {p["action"].buy for p in picked}
@@ -115,7 +115,7 @@ def report(u, base, rows, bands, chg, lock_at=None) -> dict:
     return {
         "generated_at": run_now().strftime("%Y-%m-%dT%H:%MZ"),
         "lock_at": lock_at.isoformat() if lock_at else None,
-        "cash": u.cash, "cash_locked": u.locked_cash,
+        "cash": u.market.cash, "cash_locked": u.market.locked_cash,
         "finish": round(base.expected_position(), 2),
         "p_win": round(base.position().get(1, 0.0), 3),
         "band": [lo, hi],
@@ -124,15 +124,15 @@ def report(u, base, rows, bands, chg, lock_at=None) -> dict:
         "squad": [
             {**player(u, k), "xi": k in xi,
              "start": o.next_up.get(k, (0.0, 0.0))[1], "next": exp.get(k, 0.0),
-             "season": o.season.get(k, 0.0), "value": u.view("value").get(k),
-             "trend": u.view("trend").get(k)}
+             "season": o.season.get(k, 0.0), "value": u.market.value.get(k),
+             "trend": u.market.trend.get(k)}
             for k in sorted(mine, key=lambda k: (SLOT_ORDER.get(mine[k], 9),
                                                  -exp.get(k, 0.0)))],
         "standings": [
             {"manager": m, "me": m == u.me,
              "now": u.state.carried.get(m, 0.0), "mean": base.mean(m),
              "lo": base.band(m)[0], "hi": base.band(m)[1],
-             "cash": u.cash if m == u.me else u.rival_cash.get(m, 0.0),
+             "cash": u.market.cash if m == u.me else u.rival_cash.get(m, 0.0),
              "p_above": None if m == u.me else base.beat(m)}
             for m in sorted(u.state.squads, key=lambda m: -base.mean(m))],
     }
@@ -146,8 +146,11 @@ def log_cash_price(measured) -> None:
 
 
 def _selftest() -> None:
+    from dataclasses import replace
+
     from decide import Universe
     from ffcore.fixtures import tiny_market_universe
+    from ffcore.market import Market
     from ffcore.forecast import Bootstrap
     from ffcore.season import LeagueState
 
@@ -164,7 +167,7 @@ def _selftest() -> None:
         assert why({"d_pts": d_pts, "cash_pts": cash}) == want, (d_pts, cash)
 
     mu = tiny_market_universe(lam=0.3)
-    mu.facts.update(value={"bench_m": 3e6}, trend={"bench_m": -10.0})
+    mu.market = replace(mu.market, value={"bench_m": 3e6}, trend={"bench_m": -10.0})
     bm = {"bench_m": (0.0, 0.0, 0.0,
                       Action("sell", sell=("bench_m",), proceeds=3e6), -2.0)}
     assert abs(sale_pts(mu, bm)["bench_m"] - (0.09 - 2.0)) < 1e-9
@@ -181,8 +184,8 @@ def _selftest() -> None:
             for j in many_j}
     ub = Universe(state=LeagueState({"me": dict(sqb), "riv": dict(riv)}, many_j,
                                     "me"),
-                  forecaster=Bootstrap(perb), cash=10e6, me="me",
-                  facts=dict(pos={**sqb, "cand": "MED", "twin": "MED"},
+                  forecaster=Bootstrap(perb), me="me",
+                  market=Market(cash=10e6, pos={**sqb, "cand": "MED", "twin": "MED"},
                              price={"cand": 5e6, "twin": 5e6},
                              proceeds={"dead": 1e6, "star": 20e6}))
     asked = dict(band_acts(ub))
@@ -193,7 +196,7 @@ def _selftest() -> None:
     picked, gain = plan(ub, rows, base)
     bought = [p["action"].buy for p in picked]
     assert bought and set(bought) <= {"cand", "twin"}, bought
-    assert sum(p["action"].net for p in picked) <= ub.cash, picked
+    assert sum(p["action"].net for p in picked) <= ub.market.cash, picked
     sold = [k for p in picked for k in p["action"].sell]
     assert len(sold) == len(set(sold)), sold
     assert gain >= max(r["net_pts"] for r in rows) - 5.0, (gain, rows[0])
@@ -216,7 +219,7 @@ def _selftest() -> None:
     assert ping([{"what": "buy", "name": "C", "bid": 1e6, "sell": [], "done": True},
                  {"what": "sell", "name": "E", "done": False}]) == "Sell E"
 
-    ub.facts.update(my_bid={bought[0]: 4e6}, route={"dead": "listed"})
+    ub.market = replace(ub.market, my_bid={bought[0]: 4e6}, route={"dead": "listed"})
     doc = report(ub, base, rows, bands, xi_change([], ub.outlook.xi.players))
     buys = {d["name"].lower(): d for d in doc["do"] if d["what"] == "buy"}
     assert buys[bought[0]]["done"] and buys[bought[0]]["placed"] == 4e6, buys
@@ -239,7 +242,7 @@ def main() -> None:
     rows, base, measured, bands = u.rank(
         u.candidates(budget=float("inf")), extra=band_acts(u))
     log_cash_price(measured)
-    chg = xi_change(app_fielded(u.state.squads.get(u.me, {}), u.view("name")),
+    chg = xi_change(app_fielded(u.state.squads.get(u.me, {}), u.market.name),
                     u.outlook.xi.players)
     REPORTS.mkdir(exist_ok=True)
     (REPORTS / "decisions.json").write_text(json.dumps(

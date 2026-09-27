@@ -88,15 +88,6 @@ def auction_ratios(listings: list[dict], buys: list[dict]) -> list[float]:
     return out
 
 
-def burn(u, a) -> float | None:
-    if not a.buy:
-        return 0.0
-    val = u.view("value").get(a.buy)
-    if val is None:
-        return None
-    return max(0.0, a.cost * u.premium - val)
-
-
 def cash_price(reach) -> float | None:
     pts = sorted((max(0.0, c), d) for c, d in reach)
     if len(pts) < 2 or pts[-1][0] <= 0:
@@ -110,18 +101,6 @@ def cash_price(reach) -> float | None:
 
 
 def _selftest() -> None:
-    from ffcore.action import Action
-    from ffcore.fixtures import tiny_universe
-
-    u = tiny_universe(facts={"value": {"star": 5e6, "free": 4e6}})
-    assert burn(u, Action("buy", buy="star", cost=8e6)) == 3e6
-    assert burn(u, Action("buy", buy="free", cost=4e6)) == 0.0
-    assert burn(u, Action("buy", buy="free", cost=3e6)) == 0.0
-    assert burn(u, Action("sell", sell=("bench",))) == 0.0
-    assert burn(u, Action("buy", buy="mystery", cost=9e6)) is None
-    u.premium = 1.1
-    assert abs(burn(u, Action("buy", buy="free", cost=4e6)) - 0.4e6) < 1e-6
-
     flat = [(0.0, 0.40), (5e6, 0.30), (12e6, 0.20)]
     assert cash_price(flat) == 0.0
     step = [(0.0, 0.40), (10e6, 0.50)]

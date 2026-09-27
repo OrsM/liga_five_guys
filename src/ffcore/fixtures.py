@@ -56,23 +56,25 @@ def tiny_bootstrap(**overrides) -> "Bootstrap":
     return Bootstrap(**_with_overrides("tiny_bootstrap", defaults, overrides))
 
 
-def tiny_universe(**overrides) -> "Universe":
-    from decide import Universe
+def _universe(defaults: dict, market: dict, overrides: dict) -> "Universe":
+    from dataclasses import fields
 
-    defaults = dict(
-        state=tiny_state(),
-        forecaster=tiny_bootstrap(),
-        facts={"pos": dict(DEFAULT_SQUAD)},
-        cash=20e6,
-        me="me",
-    )
-    defaults.update(overrides)
-    return Universe(**defaults)
+    from decide import Universe
+    from ffcore.market import Market
+
+    tables = {f.name for f in fields(Market)}
+    market.update({k: v for k, v in overrides.items() if k in tables})
+    defaults.update({k: v for k, v in overrides.items() if k not in tables})
+    return Universe(market=Market(**market), **defaults)
+
+
+def tiny_universe(**overrides) -> "Universe":
+    return _universe(dict(state=tiny_state(), forecaster=tiny_bootstrap(),
+                          me="me"),
+                     {"pos": dict(DEFAULT_SQUAD), "cash": 20e6}, overrides)
 
 
 def tiny_market_universe(**overrides) -> "Universe":
-    from decide import Universe
-
     squad = dict(DEFAULT_SQUAD)
     squad["bench_m"] = "MED"
     squad["bench_k"] = "POR"
@@ -85,21 +87,16 @@ def tiny_market_universe(**overrides) -> "Universe":
         per_jornada[j]["cand_free"] = (9.0, 0.8)
         per_jornada[j]["cand_rival"] = (10.0, 0.9)
 
-    facts = {"pos": {**squad, "cand_free": "MED", "cand_rival": "MED"},
-             "price": {"cand_free": 5e6, "cand_rival": 100e6},
-             "proceeds": {"bench_m": 3e6, "bench_k": 2e6},
-             "owner": {"cand_rival": "riv"},
-             "route": {"cand_rival": "listed"}}
+    market = {"pos": {**squad, "cand_free": "MED", "cand_rival": "MED"},
+              "price": {"cand_free": 5e6, "cand_rival": 100e6},
+              "proceeds": {"bench_m": 3e6, "bench_k": 2e6},
+              "owner": {"cand_rival": "riv"},
+              "route": {"cand_rival": "listed"},
+              "cash": 5.5e6}
 
-    defaults = dict(
-        state=tiny_state(squads={"me": squad}),
-        forecaster=tiny_bootstrap(per_jornada=per_jornada),
-        facts=facts,
-        cash=5.5e6,
-        me="me",
-    )
-    defaults.update(overrides)
-    return Universe(**defaults)
+    return _universe(dict(state=tiny_state(squads={"me": squad}),
+                          forecaster=tiny_bootstrap(per_jornada=per_jornada),
+                          me="me"), market, overrides)
 
 
 def _selftest() -> None:
@@ -109,7 +106,7 @@ def _selftest() -> None:
     assert u.state.squads["me"] == DEFAULT_SQUAD, u.state.squads
     for manager, squad in u.state.squads.items():
         assert _fieldable(squad), (manager, squad)
-    assert u.view("pos") == DEFAULT_SQUAD, u.view("pos")
+    assert u.market.pos == DEFAULT_SQUAD, u.market.pos
 
     boot = tiny_bootstrap()
     for j in DEFAULT_JORNADAS:
@@ -125,7 +122,7 @@ def _selftest() -> None:
 
     base_u = tiny_universe()
     changed_u = tiny_universe(cash=1.0)
-    assert changed_u.cash == 1.0
+    assert changed_u.market.cash == 1.0
     assert changed_u.state.squads == base_u.state.squads
 
     base_st = tiny_state()
