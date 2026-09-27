@@ -1,176 +1,229 @@
 {
- "generated_at": "2026-09-27T09:34Z",
- "locks_in_h": 297.42905332805555,
+ "generated_at": "2026-09-27T09:47Z",
+ "lock_at": "2026-10-09T19:00:00+00:00",
  "cash": 28946827.0,
  "cash_locked": 0,
- "squad_value": 305429735.0,
- "expected_finish": 2.16,
+ "finish": 2.16,
  "p_win": 0.249,
  "band": [
   1636.8437845518047,
   1975.2319925244303
  ],
- "ladder": [
+ "do": [
   {
-   "name": "Yeray Alvarez",
-   "pos": "DEF",
-   "start": 0.7528997006820821,
-   "xpts": 4.215704487849747,
-   "group": "in",
-   "where": "bench",
-   "label": "PUT ON",
-   "money": null,
-   "pts": -8.592093973868487,
-   "note": "",
-   "value": null,
-   "market": null,
-   "premium": null
+   "what": "field",
+   "legal": true,
+   "on": [
+    "Yeray Alvarez"
+   ],
+   "off": [
+    "Alvaro Mantilla"
+   ],
+   "gain": 1.111358246401096
   },
   {
-   "name": "Alvaro Mantilla",
-   "pos": "DEF",
-   "start": 0.916776508552574,
-   "xpts": 3.104346241448651,
-   "group": "out",
-   "where": "yours",
-   "label": "TAKE OFF",
-   "money": null,
-   "pts": 0.0,
-   "note": "",
-   "value": null,
-   "market": null,
-   "premium": null
-  },
-  {
-   "name": "Sergio Carreira",
-   "pos": "DEF",
-   "start": 0.9027063873032766,
-   "xpts": 3.342340689194383,
-   "group": "keep",
-   "where": "yours",
-   "label": "KEEP — bench",
-   "money": null,
-   "pts": -8.277711152289271,
-   "note": "",
-   "value": null,
-   "market": null,
-   "premium": null
-  },
-  {
-   "name": "Dakonam Djene",
-   "pos": "DEF",
-   "start": 0.9834431752192406,
-   "xpts": 2.3274913435635853,
-   "group": "keep",
-   "where": "yours",
-   "label": "KEEP — bench",
-   "money": null,
-   "pts": -22.201970941802188,
-   "note": "",
-   "value": null,
-   "market": null,
-   "premium": null
-  },
-  {
-   "name": "Raul Garcia",
-   "pos": "DEL",
-   "start": 0.6754919881467499,
-   "xpts": 1.9958870205344938,
-   "group": "keep",
-   "where": "yours",
-   "label": "KEEP — bench",
-   "money": null,
-   "pts": -2.329178940533666,
-   "note": "",
-   "value": null,
-   "market": null,
-   "premium": null
-  },
-  {
-   "name": "Alvaro Mantilla",
-   "pos": "DEF",
-   "start": 0.916776508552574,
-   "xpts": 3.104346241448651,
-   "group": "sell",
-   "where": "yours",
-   "label": "SELL — worth more as cash",
-   "money": 1326340.0,
-   "pts": 0.0,
-   "note": "cash",
-   "value": null,
-   "market": null,
-   "premium": null
-  },
-  {
+   "what": "buy",
    "name": "Dani Olmo",
    "pos": "MED",
-   "start": 0.9027063873032766,
-   "xpts": 4.433253065137134,
-   "group": "buy",
-   "where": "free agent",
-   "label": "BUY — free agents",
-   "money": -26880196.0,
-   "pts": 25.753584040856595,
-   "note": "sell Djene · for points",
-   "value": 0.9580876583212635,
-   "market": 47635295.0,
-   "premium": 2642811.477995068
+   "ask": 48062749.0,
+   "bid": 50129380.0,
+   "sell": [
+    "Dakonam Djene"
+   ],
+   "proceeds": 21182553.0,
+   "gain": 25.753584040856595,
+   "why": "points",
+   "trend": -3.0559822546389297
   },
+  {
+   "what": "sell",
+   "name": "Alvaro Mantilla",
+   "pos": "DEF",
+   "proceeds": 1326340.0
+  }
+ ],
+ "plan_gain": 23.9724441897978,
+ "backup": [
   {
    "name": "German Valera",
    "pos": "MED",
-   "start": 0.9834431752192406,
-   "xpts": 2.439906926701374,
-   "group": "buy",
-   "where": "free agent",
-   "label": "BUY — free agents",
-   "money": -12113725.0,
-   "pts": 23.446007099867984,
-   "note": "sell Mantilla · for points",
-   "value": 1.9354911144068387,
-   "market": 13456262.0,
-   "premium": 603296.2483468596
+   "ask": 13440065.0,
+   "bid": 14059558.24834686,
+   "sell": [
+    "Alvaro Mantilla"
+   ],
+   "proceeds": 1326340.0,
+   "gain": 23.446007099867984,
+   "why": "points",
+   "trend": 0.4140981238248253
   },
   {
    "name": "Antonio Blanco",
    "pos": "MED",
-   "start": 0.984,
-   "xpts": 2.83962549850216,
-   "group": "buy",
-   "where": "free agent",
-   "label": "BUY — free agents",
-   "money": -15712332.0,
-   "pts": 6.885095809497784,
-   "note": "sell Mantilla · for points",
-   "value": 0.43819694043492613,
-   "market": 16673426.0,
-   "premium": 1150609.9297724143
-  },
-  {
-   "name": "Lamine Yamal",
-   "pos": "DEL",
-   "start": 0.984,
-   "xpts": 10.023433031417516,
-   "group": "save",
-   "where": "BurtonGM89",
-   "label": "SAVE — better than yours, out of reach",
-   "money": -91258061.0,
-   "pts": 189.70722620004722,
-   "note": "short",
-   "value": 2.0787996602299845,
-   "market": null,
-   "premium": null
+   "ask": 17038672.0,
+   "bid": 17824035.929772414,
+   "sell": [
+    "Alvaro Mantilla"
+   ],
+   "proceeds": 1326340.0,
+   "gain": 6.885095809497784,
+   "why": "points",
+   "trend": -7.365797506809283
   }
  ],
- "xi_total": 58.08837703635794,
- "shape": "5-4-1",
- "shape_now": "5-4-1",
- "rival_best": {
-  "manager": "BurtonGM89",
-  "xi": 60.26317731611817,
-  "gap": -2.174800279760227
- },
- "xi_note": "",
+ "ping": "Field Yeray Alvarez; Buy Dani Olmo (bid up to 50.1M), selling Dakonam Djene; Sell Alvaro Mantilla",
+ "squad": [
+  {
+   "name": "Mathew Ryan",
+   "pos": "POR",
+   "xi": true,
+   "start": 0.9828571428571429,
+   "next": 7.4420563722573,
+   "season": 176.0813894999086,
+   "value": 28025251.0,
+   "trend": -3.506617838537025
+  },
+  {
+   "name": "Natan",
+   "pos": "DEF",
+   "xi": true,
+   "start": 0.9173333333333333,
+   "next": 6.3212035531430635,
+   "season": 141.2560141709029,
+   "value": 45201929.0,
+   "trend": 11.868286626085496
+  },
+  {
+   "name": "Marcos Alonso",
+   "pos": "DEF",
+   "xi": true,
+   "start": 0.9108319734491863,
+   "next": 5.215763932793022,
+   "season": 124.18453264356262,
+   "value": 26349261.0,
+   "trend": -7.09037432175329
+  },
+  {
+   "name": "Yeray Alvarez",
+   "pos": "DEF",
+   "xi": true,
+   "start": 0.7528997006820821,
+   "next": 4.215704487849747,
+   "season": 89.03790232514154,
+   "value": 6025465.0,
+   "trend": -8.259911279911002
+  },
+  {
+   "name": "Omar El Hilali",
+   "pos": "DEF",
+   "xi": true,
+   "start": 0.9822605448777578,
+   "next": 4.10264519427677,
+   "season": 92.53449727489311,
+   "value": 15946390.0,
+   "trend": 6.222521310850425
+  },
+  {
+   "name": "Zaid Romero",
+   "pos": "DEF",
+   "xi": true,
+   "start": 0.9828571428571429,
+   "next": 3.3643483065890534,
+   "season": 153.79226975989013,
+   "value": 30728572.0,
+   "trend": 11.313678028463816
+  },
+  {
+   "name": "Sergio Carreira",
+   "pos": "DEF",
+   "xi": false,
+   "start": 0.9027063873032766,
+   "next": 3.342340689194383,
+   "season": 89.78939838949408,
+   "value": 7420802.0,
+   "trend": -4.195700326272927
+  },
+  {
+   "name": "Alvaro Mantilla",
+   "pos": "DEF",
+   "xi": false,
+   "start": 0.916776508552574,
+   "next": 3.104346241448651,
+   "season": 64.16728529483223,
+   "value": 1326340.0,
+   "trend": -8.434684085468774
+  },
+  {
+   "name": "Dakonam Djene",
+   "pos": "DEF",
+   "xi": false,
+   "start": 0.9834431752192406,
+   "next": 2.3274913435635853,
+   "season": 108.38751839113372,
+   "value": 21182553.0,
+   "trend": 8.575326386372966
+  },
+  {
+   "name": "Miguel Roman",
+   "pos": "MED",
+   "xi": true,
+   "start": 0.9659778268230761,
+   "next": 6.839201785013584,
+   "season": 139.39195463935883,
+   "value": 18898444.0,
+   "trend": 14.387812324303864
+  },
+  {
+   "name": "Pablo Fornals",
+   "pos": "MED",
+   "xi": true,
+   "start": 0.916776508552574,
+   "next": 6.040062011709118,
+   "season": 138.45094296336603,
+   "value": 39306665.0,
+   "trend": -4.810682275651947
+  },
+  {
+   "name": "Lucien Agoume",
+   "pos": "MED",
+   "xi": true,
+   "start": 0.9834431752192406,
+   "next": 5.341464090708739,
+   "season": 106.74284756837592,
+   "value": 14009589.0,
+   "trend": 6.424036911055325
+  },
+  {
+   "name": "Pepelu",
+   "pos": "MED",
+   "xi": true,
+   "start": 0.9027063873032766,
+   "next": 4.343118040541323,
+   "season": 108.19873601725763,
+   "value": 13123626.0,
+   "trend": 7.780309034675318
+  },
+  {
+   "name": "Iñigo Vicente",
+   "pos": "DEL",
+   "xi": true,
+   "start": 0.9834431752192406,
+   "next": 4.862809261476218,
+   "season": 114.79913279810418,
+   "value": 30010601.0,
+   "trend": -5.8114609217047715
+  },
+  {
+   "name": "Raul Garcia",
+   "pos": "DEL",
+   "xi": false,
+   "start": 0.6754919881467499,
+   "next": 1.9958870205344938,
+   "season": 75.52733438605429,
+   "value": 1326176.0,
+   "trend": -5.5758590711747
+  }
+ ],
  "standings": [
   {
    "manager": "BurtonGM89",
@@ -180,7 +233,6 @@
    "lo": 1679.0103365160187,
    "hi": 2074.044365044425,
    "cash": -54227242.0,
-   "cash_known": false,
    "p_above": 0.36566666666666664
   },
   {
@@ -191,7 +243,6 @@
    "lo": 1608.5741390022658,
    "hi": 2001.5903141319227,
    "cash": -52106606.0,
-   "cash_known": false,
    "p_above": 0.49866666666666665
   },
   {
@@ -202,7 +253,6 @@
    "lo": 1636.8437845518047,
    "hi": 1975.2319925244303,
    "cash": 28946827.0,
-   "cash_known": true,
    "p_above": null
   },
   {
@@ -213,7 +263,6 @@
    "lo": 1314.4222355592397,
    "hi": 1591.8053463925448,
    "cash": -25818901.0,
-   "cash_known": false,
    "p_above": 0.979
   },
   {
@@ -224,7 +273,6 @@
    "lo": 1050.6177698662386,
    "hi": 1284.8952483279259,
    "cash": 170108709.0,
-   "cash_known": false,
    "p_above": 1.0
   }
  ]
