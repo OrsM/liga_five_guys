@@ -290,8 +290,7 @@ def load() -> Universe:
         raise SystemExit("the app's squads are %s old; no board is built from "
                          "them" % ("unknown" if age is None else "%.0fh" % age))
     lg = League.load()
-    sc = build(current("market"), current("lineups", LINEUP_SOURCE), run_now(),
-               shrink_k=lg.cfg.shrink_k)
+    sc = build(current("market"), current("lineups", LINEUP_SOURCE), run_now())
     me = lg.cfg.me
     players = load_players()
     m = current("matches")

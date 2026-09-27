@@ -28,7 +28,7 @@ MAX_SLOT = {"POR": 1, "DEF": 5, "MED": 5, "DEL": 3}
 FREE_FORMATIONS = [(5, 4, 1), (5, 3, 2), (4, 5, 1), (4, 4, 2), (4, 3, 3),
                    (3, 5, 2), (3, 4, 3)]
 
-SHRINK_K = 8.0
+SHRINK_K = 4.0
 DOUBT_FACTOR = 0.5
 
 OUT_STATUSES = frozenset({"injured", "suspended", "unavailable"})
@@ -124,8 +124,7 @@ def _totals(per_jornada: dict[int, tuple[float, float]]
     return pts, float(apps), (apps / n if n else 0.0), n
 
 
-def build(market: list[dict], xi_rows: list[dict], now,
-          shrink_k: float = SHRINK_K) -> "Scorer":
+def build(market: list[dict], xi_rows: list[dict], now) -> "Scorer":
     from ffcore.fixture import difficulty_ratings
     from ffcore.tidy import (LINEUP_SOURCE, SEASON, history,
                              clock_history, jornada_of_match, load_crosswalk,
@@ -145,7 +144,7 @@ def build(market: list[dict], xi_rows: list[dict], now,
                     clock_history().round_locks, jornada_of_match(), xw)
     cal = calibrate(outs)
     return Scorer(
-        market, xi_rows, last_season, shrink_k=shrink_k, xw=xw, cal=cal,
+        market, xi_rows, last_season, xw=xw, cal=cal,
         ratings=ratings,
         current={k: dict(zip(("pts", "pj", "start_rate", "start_n"),
                              _totals(jd)))
@@ -289,6 +288,7 @@ def vor(row: dict, repl: dict) -> float:
 
 
 def _selftest() -> None:
+    K = SHRINK_K
 
     row = {"position": "defensa", "team": "Mid", "club": "Mid",
            "value": "10.00M"}
@@ -309,7 +309,7 @@ def _selftest() -> None:
     assert 3.0 < prior < 3.1, prior
 
     thin = sc.rate(dict(row, name="Sub"))
-    assert abs(thin.ppm - (20.0 + 8 * prior) / (4.0 + 8)) < 1e-9
+    assert abs(thin.ppm - (20.0 + K * prior) / (4.0 + K)) < 1e-9
     assert not thin.assumed and thin.cur_pj == 0.0
     assert sc.rate(dict(row, name="Newbie")).assumed
 
@@ -317,7 +317,7 @@ def _selftest() -> None:
     cur = {"p0": {"pts": 30.0, "pj": 3.0}}
     sc2 = Scorer(market, xi, hist, current=cur, xw=xw)
     blended = sc2.rate(dict(row, name="p0"))
-    assert abs(blended.ppm - (30.0 + 8 * full.ppm) / (3.0 + 8)) < 1e-9
+    assert abs(blended.ppm - (30.0 + K * full.ppm) / (3.0 + K)) < 1e-9
     assert blended.cur_pj == 3.0
     assert full.ppm < blended.ppm < 10.0
 
@@ -374,13 +374,13 @@ def _selftest() -> None:
     benched = Scorer(market, xi, hist, xw=xw, current={"p0": {
         "pts": 30.0, "pj": 3.0, "start_rate": 0.0, "start_n": 6.0}}).rates(
         dict(row, name="p0"))
-    assert abs(benched.p_now - 8.0 / 14.0) < 1e-9, benched
+    assert abs(benched.p_now - K / (K + 6)) < 1e-9, benched
     susp = [{"player_name": "p0", "start_pct": "0", "status": "suspended"}]
     back = Scorer(market, susp, hist, xw=xw, current={"p0": {
         "pts": 30.0, "pj": 2.0, "start_rate": 0.9, "start_n": 2.0}}).rates(
         dict(row, name="p0"))
-    assert abs(back.p_now - 2 * 0.9 / 10) < 1e-9, back
-    assert abs(back.p_rest - (8 * NEUTRAL_START / 100 + 2 * 0.9) / 10) < 1e-9
+    assert abs(back.p_now - 2 * 0.9 / (K + 2)) < 1e-9, back
+    assert abs(back.p_rest - (K * NEUTRAL_START / 100 + 2 * 0.9) / (K + 2)) < 1e-9
     assert back.status == "suspended"
 
     from ffcore.crosswalk import Crosswalk, Player

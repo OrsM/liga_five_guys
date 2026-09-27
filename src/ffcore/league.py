@@ -15,7 +15,6 @@ __all__ = ["Config", "load_config", "app_fielded", "estimate_cash", "League"]
 class Config:
     me: str = "miguel_autentico"
     budget: float = 100e6
-    shrink_k: float = 8.0
 
 
 def load_config(name: str = "league.ini") -> Config:
@@ -27,9 +26,7 @@ def load_config(name: str = "league.ini") -> Config:
     base = Config()
     return Config(
         me=cp.get("league", "me", fallback=base.me),
-        budget=money(cp.get("league", "budget", fallback=str(base.budget))) or 0.0,
-        shrink_k=float(cp.get("thresholds", "shrink_k",
-                              fallback=str(base.shrink_k))))
+        budget=money(cp.get("league", "budget", fallback=str(base.budget))) or 0.0)
 
 
 def app_fielded(squad, names: dict, rows=None, xw=None) -> list[str]:
@@ -106,9 +103,9 @@ def _selftest() -> None:
     with tempfile.TemporaryDirectory() as tmp:
         p = Path(tmp) / "league.ini"
         p.write_text("[league]\nme = someone\nbudget = 100.000.000\n"
-                     "[thresholds]\nshrink_k = 6 ; matches\n", encoding="utf-8")
+                     , encoding="utf-8")
         cfg = load_config(str(p))
-    assert (cfg.me, cfg.budget, cfg.shrink_k) == ("someone", 100e6, 6.0), cfg
+    assert (cfg.me, cfg.budget) == ("someone", 100e6), cfg
 
     users = {"1": "me", "2": "riv", "3": "quiet"}
     feed = [{"activity_id": "a", "kind": "buy", "user_id": "1", "amount": "30"},

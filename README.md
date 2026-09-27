@@ -21,7 +21,7 @@ run the working tree, so keep it green: work in a worktree, check
 
 ## What you edit
 
-`inputs/league.ini` (who you are, the budget, the shrinkage). Every ~90
+`inputs/league.ini` (who you are and the budget). Every ~90
 days, or when the report says so: `python -m ffcore.auth --login`.
 Everything else comes from the app's API and public pages.
 
