@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import csv
+import functools
 import hashlib
 import io
 import itertools
@@ -12,6 +13,7 @@ import re
 import sys
 import tarfile
 import time
+import types
 from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import urlparse
@@ -322,8 +324,7 @@ def fetch() -> Path:
 def parse() -> None:
     import sources
 
-    version = hashlib.blake2b(Path(sources.__file__).read_bytes()
-                              + repr(TABLES).encode(), digest_size=8).hexdigest()
+    version = fingerprint(sources.source_for) + repr(TABLES)
     walk = doc_keys()
     state = _read_json(TIDY / _STATE, {})
     done = set(state.get("stamps") or ())
@@ -333,8 +334,6 @@ def parse() -> None:
             or not all((TIDY / f"{t}.csv").exists() for t in tables)):
         for t in tables:
             (TIDY / f"{t}.csv").unlink(missing_ok=True)
-        if state.get("version") != version:
-            (TIDY / _CACHE).unlink(missing_ok=True)
         done, tables = set(), set()
     todo = [(stamp, docs) for stamp, docs in walk if stamp not in done]
     if not todo:
@@ -343,15 +342,18 @@ def parse() -> None:
         return
 
     parsed = rows_out = 0
+    used: set[str] = set()
     for i in range(0, len(todo), CHUNK):
-        chunk = todo[i:i + CHUNK]
+        chunk = [(stamp, {page: (_parsed_key(page, ck), origin)
+                          for page, (ck, origin) in docs.items()
+                          if source_for(page)}) for stamp, docs in todo[i:i + CHUNK]]
         cache = _read_cache({ck for _stamp, docs in chunk
-                             for page, (ck, _o) in docs.items()
-                             if source_for(page)})
+                             for ck, _o in docs.values()})
         need: dict[str, set] = {}
         for _stamp, docs in chunk:
             for page, (ck, origin) in docs.items():
-                if source_for(page) and ck not in cache:
+                used.add(ck)
+                if ck not in cache:
                     need.setdefault(origin, set()).add(page)
         fresh = _parse_all(need)
         cache.update(fresh)
@@ -363,9 +365,7 @@ def parse() -> None:
         pending: dict[str, list[dict]] = {}
         for stamp, docs in chunk:
             for page, (ck, _origin) in sorted(docs.items()):
-                src = source_for(page)
-                if src is not None:
-                    route(pending, cache.get(ck, []), src.table, stamp)
+                route(pending, cache.get(ck, []), source_for(page).table, stamp)
         for table, rows in pending.items():
             _store(TIDY / f"{table}.csv", rows,
                    TABLES.get(table, Table(True)))
@@ -374,6 +374,8 @@ def parse() -> None:
         done |= {stamp for stamp, _docs in chunk}
         _write_json(TIDY / _STATE, {"version": version, "stamps": sorted(done),
                                     "tables": sorted(tables)})
+    if len(todo) == len(walk):
+        _keep_cache(used)
     print("  %d snapshot(s): %d document(s) parsed, %d row(s) routed"
           % (len(todo), parsed, rows_out))
     if not table_stats(TIDY / "market.csv")[0]:
@@ -399,6 +401,54 @@ def _read_cache(keys: set) -> dict:
     return out
 
 
+def _keep_cache(keys: set) -> None:
+    path = TIDY / _CACHE
+    if not path.exists():
+        return
+    tmp = path.with_suffix(".tmp")
+    with path.open(encoding="utf-8") as src, tmp.open("w", encoding="utf-8") as dst:
+        dst.writelines(line for line in src
+                       if line[7:line.find('"', 7)] in keys)
+    tmp.replace(path)
+
+
+def _leaf(x) -> str:
+    if isinstance(x, (set, frozenset)):
+        return repr(sorted(map(repr, x)))
+    r = repr(x)
+    return type(x).__qualname__ if " at 0x" in r else r
+
+
+@functools.cache
+def fingerprint(fn) -> str:
+    seen, h = set(), hashlib.blake2b(digest_size=8)
+
+    def walk(obj):
+        obj = getattr(obj, "__wrapped__", obj)
+        if id(obj) in seen:
+            return
+        seen.add(id(obj))
+        code = obj if isinstance(obj, types.CodeType) else getattr(
+            obj, "__code__", None)
+        if code is None:
+            h.update(_leaf(obj).encode())
+            return
+        h.update(code.co_code)
+        glb = getattr(obj, "__globals__", {})
+        for c in code.co_consts:
+            walk(c) if isinstance(c, types.CodeType) else h.update(
+                _leaf(c).encode())
+        for name in code.co_names:
+            if name in glb:
+                walk(glb[name])
+    walk(fn)
+    return h.hexdigest()
+
+
+def _parsed_key(page: str, ck: str) -> str:
+    return "%s:%s" % (ck, fingerprint(source_for(page).parse))
+
+
 def _parse_origin(task) -> dict:
     origin, want = task
     out = {}
@@ -408,7 +458,7 @@ def _parse_origin(task) -> dict:
         except Exception as e:
             print(f"  warn: {stamp}/{page}: {type(e).__name__}: {e}")
             rows = []
-        out[Sigs().of(page, html)] = rows
+        out[_parsed_key(page, Sigs().of(page, html))] = rows
     return out
 
 
