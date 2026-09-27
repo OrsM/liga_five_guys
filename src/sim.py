@@ -166,7 +166,8 @@ def _selftest() -> None:
         assert why({"d_pts": d_pts, "cash_pts": cash}) == want, (d_pts, cash)
 
     mu = tiny_market_universe(lam=0.3)
-    mu.market = replace(mu.market, value={"bench_m": 3e6}, trend={"bench_m": -10.0})
+    mu = replace(mu, market=replace(mu.market, value={"bench_m": 3e6},
+                                    trend={"bench_m": -10.0}))
     bm = {"bench_m": Band(0.0, 0.0, 0.0,
                           Action("sell", sell=("bench_m",), proceeds=3e6), -2.0)}
     assert abs(sale_pts(mu, bm)["bench_m"] - (0.09 - 2.0)) < 1e-9
@@ -183,10 +184,10 @@ def _selftest() -> None:
             for j in many_j}
     ub = Universe(state=LeagueState({"me": dict(sqb), "riv": dict(riv)}, many_j,
                                     "me"),
-                  forecaster=Bootstrap(perb), me="me",
+                  forecaster=Bootstrap(perb),
                   market=Market(cash=10e6, pos={**sqb, "cand": "MED", "twin": "MED"},
-                             price={"cand": 5e6, "twin": 5e6},
-                             proceeds={"dead": 1e6, "star": 20e6}))
+                                price={"cand": 5e6, "twin": 5e6},
+                                proceeds={"dead": 1e6, "star": 20e6}))
     asked = dict(band_acts(ub))
     assert set(asked) == {*sqb, "cand", "twin"}, asked
     assert all(asked[k].buy == "" and asked[k].sell == (k,) for k in sqb)
@@ -220,7 +221,8 @@ def _selftest() -> None:
     assert ping([{"what": "buy", "name": "C", "bid": 1e6, "sell": [], "done": True},
                  {"what": "sell", "name": "E", "done": False}]) == "Sell E"
 
-    ub.market = replace(ub.market, my_bid={bought[0]: 4e6}, route={"dead": "listed"})
+    ub = replace(ub, market=replace(ub.market, my_bid={bought[0]: 4e6},
+                                    route={"dead": "listed"}))
     doc = report(ub, ranked, xi_change([], ub.outlook.xi.ranked()))
     buys = {d["name"].lower(): d for d in doc["do"] if d["what"] == "buy"}
     assert buys[bought[0]]["done"] and buys[bought[0]]["placed"] == 4e6, buys

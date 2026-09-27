@@ -69,8 +69,7 @@ def _universe(defaults: dict, market: dict, overrides: dict) -> "Universe":
 
 
 def tiny_universe(**overrides) -> "Universe":
-    return _universe(dict(state=tiny_state(), forecaster=tiny_bootstrap(),
-                          me="me"),
+    return _universe(dict(state=tiny_state(), forecaster=tiny_bootstrap()),
                      {"pos": dict(DEFAULT_SQUAD), "cash": 20e6}, overrides)
 
 
@@ -95,8 +94,8 @@ def tiny_market_universe(**overrides) -> "Universe":
               "cash": 5.5e6}
 
     return _universe(dict(state=tiny_state(squads={"me": squad}),
-                          forecaster=tiny_bootstrap(per_jornada=per_jornada),
-                          me="me"), market, overrides)
+                          forecaster=tiny_bootstrap(per_jornada=per_jornada)),
+                     market, overrides)
 
 
 def _selftest() -> None:

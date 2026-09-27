@@ -21,11 +21,11 @@ class Outlook:
     """What each player is expected to score, and the eleven that makes the
     most of it. Points only: what anything costs is the market's business."""
 
-    def __init__(self, state: LeagueState, forecaster, me: str,
+    def __init__(self, state: LeagueState, forecaster,
                  pos: Mapping[str, str] | None = None,
                  part_played: Mapping[int, set[str]] | None = None,
                  first_jornada_of: Mapping[str, int] | None = None):
-        self.state, self.forecaster, self.me = state, forecaster, me
+        self.state, self.forecaster = state, forecaster
         self.pos = pos or {}
         self.part_played = part_played or {}
         self.first_jornada_of = first_jornada_of or {}
@@ -44,7 +44,7 @@ class Outlook:
     @cached_property
     def xi(self) -> XI:
         exp = {k: pts * p for k, (pts, p) in self.next_up.items()}
-        return XI(exp, set(best_xi(self.state.squads.get(self.me, {}), exp)))
+        return XI(exp, set(best_xi(self.state.squads.get(self.state.me, {}), exp)))
 
     @cached_property
     def season(self) -> dict[str, float]:
@@ -77,7 +77,7 @@ def _selftest() -> None:
              **{f"m{i}": "MED" for i in range(5)}, "f": "DEL", "bench": "MED"}
     per = {j: {**{k: (3.0, 1.0) for k in squad}, "bench": (1.0, 1.0),
                "star": (9.0, 0.5)} for j in (1, 2)}
-    o = Outlook(LeagueState({"me": squad}, [1, 2], "me"), Bootstrap(per), "me")
+    o = Outlook(LeagueState({"me": squad}, [1, 2], "me"), Bootstrap(per))
     assert o.xi is o.xi, "cached_property must not recompute"
     assert len(o.xi.players) == 11 and "bench" not in o.xi.players, o.xi
     exp, players = o.xi
@@ -88,13 +88,13 @@ def _selftest() -> None:
     assert o.xi_bar == 6.0, o.xi_bar
 
     played = Outlook(LeagueState({"me": squad}, [1, 2], "me"), Bootstrap(per),
-                     "me", part_played={1: {"x"}})
+                     part_played={1: {"x"}})
     assert played.next_up == per[2]
     firsts = Outlook(LeagueState({"me": squad}, [1, 2], "me"), Bootstrap(per),
-                     "me", first_jornada_of={"star": 2})
+                     first_jornada_of={"star": 2})
     assert firsts.next_up == {"star": (9.0, 0.5)}, firsts.next_up
 
-    empty = Outlook(LeagueState({}, [], "me"), Bootstrap({}), "me")
+    empty = Outlook(LeagueState({}, [], "me"), Bootstrap({}))
     assert empty.xi == XI({}, set()) and empty.xi_bar == 0.0
     assert empty.par == {}
     print("ffcore.outlook self-test OK")

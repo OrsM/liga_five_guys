@@ -1,13 +1,13 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 from ffcore.action import Action
 
 __all__ = ["Market"]
 
 
-@dataclass
+@dataclass(frozen=True)
 class Market:
     """Who the players are, what they cost and are worth, and your money.
     Tables are keyed by player and sparse: price only for players on sale,
@@ -59,7 +59,7 @@ def _selftest() -> None:
     assert m.burn(Action("buy", buy="free", cost=3e6)) == 0.0
     assert m.burn(Action("sell", sell=("bench",))) == 0.0
     assert m.burn(Action("buy", buy="mystery", cost=9e6)) is None
-    m.premium = 1.1
+    m = replace(m, premium=1.1)
     assert abs(m.burn(Action("buy", buy="free", cost=4e6)) - 0.4e6) < 1e-6
 
     assert m.cash_pts(Action("buy", buy="free", cost=4e6)) == 0.0, "no lam, no cash"
