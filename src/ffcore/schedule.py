@@ -29,14 +29,13 @@ def rounds_left(matches) -> tuple[list[int], dict[int, set[str]]]:
 UNSCORED_DEFAULT = (2.0, 0.5)
 
 
-def jornada_expectation(r, match, first: bool, avail: float | None = None
+def jornada_expectation(r, match, first: bool, fit: float = 1.0
                         ) -> tuple[float, float]:
+    """(points if he plays, chance he plays): points per match times the
+    fixture, and the chance he is picked if fit times the chance he is fit."""
     fix = 1.0 if match is None else (
         match.def_factor if r.slot in ("POR", "DEF") else match.atk_factor)
-    pts = max(0.0, r.ppm * fix)
-    if avail is not None:
-        return pts, r.p_rest * avail
-    return pts, (r.p_now if first else r.p_rest)
+    return max(0.0, r.ppm * fix), (r.p_now if first else r.p_rest) * fit
 
 
 def jornada_dates(matches: list[dict], rem: list[int]) -> dict[int, date]:
@@ -49,7 +48,7 @@ def jornada_dates(matches: list[dict], rem: list[int]) -> dict[int, date]:
 
 def season(rates: dict, club: dict[str, str], rem: list[int],
            played: dict[int, set[str]], board: dict[int, dict],
-           avail=None) -> tuple[dict[int, dict], dict[str, int]]:
+           fit=None) -> tuple[dict[int, dict], dict[str, int]]:
     per_j: dict[int, dict] = {}
     first_of: dict[str, int] = {}
     for j in rem:
@@ -62,7 +61,7 @@ def season(rates: dict, club: dict[str, str], rem: list[int],
                 first_of[k] = j
             layer[k] = UNSCORED_DEFAULT if r is None else jornada_expectation(
                 r, board.get(j, {}).get(club.get(k)), first,
-                avail(k, j, first_of[k]) if avail else None)
+                fit(k, j, first_of[k]) if fit else 1.0)
         per_j[j] = layer
     return per_j, first_of
 
@@ -78,7 +77,7 @@ def expectations(sc, ratings, keys, matches: list[dict]
     dates = jornada_dates(matches, rem)
     per_j, first_of = season(
         rates, club, rem, played, season_board(ratings, matches, rem),
-        lambda k, j, first: sc.availability(k, j, dates.get(j), first))
+        lambda k, j, first: sc.fit(k, j, dates.get(j), first))
     return per_j, first_of, rates, rem, played
 
 
@@ -143,10 +142,11 @@ def _selftest() -> None:
     assert got == {8: date(2026, 10, 11), 9: date(2026, 10, 18),
                    10: date(2026, 10, 25)}, got
     assert jornada_dates([], [8]) == {}
-    hurt = R("k", "DEL", 4.0, 0.6, 0.8, "doubt", 10.0)
-    assert jornada_expectation(hurt, None, True) == (4.0, 0.6), "no prognosis, no say"
-    assert jornada_expectation(hurt, None, True, 0.5) == (4.0, 0.4), \
-        "a prognosis replaces the doubt halving and the blended start chance"
+    hurt = R("k", "DEL", 4.0, 0.6, 0.8, 10.0)
+    assert jornada_expectation(hurt, None, True) == (4.0, 0.6), "fit unless told"
+    assert jornada_expectation(hurt, None, True, 0.5) == (4.0, 0.3), \
+        "chance he plays = picked if fit x fit"
+    assert jornada_expectation(hurt, None, False, 0.5) == (4.0, 0.4)
 
     ms = [{"jornada": "1", "home": "alaves", "away": "getafe", "score": "3-0"},
           {"jornada": "1", "home": "celta", "away": "osasuna", "score": ""},
@@ -161,18 +161,18 @@ def _selftest() -> None:
     from ffcore.score import Rates
 
     easy, hard = Match(1.2, 1.1), Match(0.8, 0.7)
-    rates = {"del": Rates("del", "DEL", 8.0, 0.9, 0.7, "", 10.0),
-             "por": Rates("por", "POR", 4.0, 0.9, 0.9, "", 10.0),
-             "susp": Rates("susp", "DEL", 8.0, 0.9, 0.8, "suspended", 5.0),
-             "dbt": Rates("dbt", "MED", 5.0, 0.8, 0.8, "doubt", 5.0),
+    rates = {"del": Rates("del", "DEL", 8.0, 0.9, 0.7, 10.0),
+             "por": Rates("por", "POR", 4.0, 0.9, 0.9, 10.0),
+             "susp": Rates("susp", "DEL", 8.0, 0.9, 0.8, 5.0),
+             "dbt": Rates("dbt", "MED", 5.0, 0.8, 0.8, 5.0),
              "ghost": None}
     club = {"del": "mine", "por": "mine", "susp": "mine", "dbt": "mine",
             "ghost": "other"}
     board = {1: {"mine": easy}, 2: {"mine": hard}, 3: {}}
     hurt_now = {"susp": 0.0, "dbt": 0.5}
     per_j, first_of = season(rates, club, [1, 2, 3], {}, board,
-                             lambda k, j, first: (hurt_now[k] if j == first else 1.0)
-                             if k in hurt_now else None)
+                             lambda k, j, first: hurt_now[k] if k in hurt_now
+                             and j == first else 1.0)
     assert per_j[1]["del"] == (8.0 * 1.2, 0.9), per_j[1]
     assert per_j[1]["por"] == (4.0 * 1.1, 0.9), per_j[1]
     assert per_j[2]["del"] == (8.0 * 0.8, 0.7), per_j[2]

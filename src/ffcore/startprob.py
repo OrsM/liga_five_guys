@@ -15,7 +15,7 @@ from ffcore.rules import minutes_played
 from stats import shrink
 
 __all__ = ["Obs", "Outcome", "Calibration", "StartOdds", "Availability",
-           "prognosis", "prognosis_of", "fit_availability", "calibrate", "fit", "outcomes",
+           "prognosis", "prognosis_of", "fit_availability", "last_fit_listing", "calibrate", "fit", "outcomes",
            "observations", "fit_start_fallbacks", "NEUTRAL_START",
            "ABSENT_START"]
 
@@ -73,6 +73,7 @@ PRIOR = {"doubt_for:before": 0.0, "doubt_for:at": 0.5, "doubt_for:after": 1.0,
          "out_until:weeks_before": 0.0, "out_until:days_before": 0.0,
          "out_until:after": 1.0, "indefinite": 0.0}
 AVAIL_K = 4.0
+PICK_K = 4.0    # how many matches of a player's own history the prior is worth
 # A flagged player with no prognosis in his note: the status, read as being
 # about his next match (argument None until that jornada is known).
 IMPLIED = {"doubt": "doubt_for", "suspended": "out_for",
@@ -133,19 +134,41 @@ class Availability:
         return self.level[_bucket(prog, jornada, when, next_j)]
 
 
+def _fit(o: Outcome) -> bool:
+    return o.status in ("", "ok")
+
+
+def last_fit_listing(outs: list[Outcome]) -> dict[str, float]:
+    """Each player's most recent start % while fit: what selection looked like
+    before a flag, when his current listing is about the injury."""
+    out: dict[str, float] = {}
+    for o in sorted(outs, key=lambda o: o.at):
+        if o.key and o.listed and o.status == "ok" and o.ff is not None:
+            out[o.key] = o.ff * 100.0
+    return out
+
+
+def fit_rate(outs: list[Outcome]) -> dict[str, float]:
+    """How often each player appears when listed fit. Only the reference for
+    the fit factor, which is a ratio of like with like (appearances under a
+    prognosis over appearances when fit); how often he is picked is a
+    different question, answered by his matchday-squad record."""
+    seen: dict[str, list[float]] = {}
+    for o in outs:
+        if o.key and o.listed and o.status == "ok":
+            seen.setdefault(o.key, []).append(_played(o))
+    return {key: sum(v) / len(v) for key, v in seen.items() if len(v) >= 3}
+
+
 def fit_availability(outs: list[Outcome], k: float = AVAIL_K) -> Availability:
     """Pair each prognosis, as seen at one lock, with whether the player
     played in that jornada and every later one: the question the forecast
     asks of today's note."""
-    fit_rate: dict[str, list[float]] = {}
     by_key: dict[str, dict[int, Outcome]] = {}
     for o in outs:
-        if not o.key:
-            continue
-        by_key.setdefault(o.key, {})[o.jornada] = o
-        if o.listed and o.status == "ok":
-            fit_rate.setdefault(o.key, []).append(_played(o))
-    base = {key: sum(v) / len(v) for key, v in fit_rate.items() if len(v) >= 3}
+        if o.key:
+            by_key.setdefault(o.key, {})[o.jornada] = o
+    base = fit_rate(outs)
     tally: dict[str, list[float]] = {}
     for key, seen in by_key.items():
         if key not in base:
@@ -167,14 +190,19 @@ def _day(stamp: str) -> dt.date:
 
 
 class StartOdds:
-    """What the probable-XI pages say about each player's next start: the
-    listed start percentage, whether he is listed at all, and any injury or
-    suspension, read through the calibration fitted to who really started."""
+    """Whether a player plays in a jornada, as two factors: the chance he is
+    fit (1 unless flagged; else his prognosis, through Availability) times the
+    chance he is picked if fit. history is his record this season as
+    (appearances, matchday squads), which is what picking is pulled toward."""
 
     def __init__(self, xi: list[dict], xw, cal: Calibration | None = None,
-                 avail: Availability | None = None):
+                 avail: Availability | None = None,
+                 history: dict[str, tuple[float, float]] | None = None,
+                 last_fit: dict[str, float] | None = None):
         self.cal = cal or Calibration()
         self.avail = avail or Availability()
+        self.history = history or {}
+        self.last_fit = last_fit or {}
         self.start_pct: dict[str, float] = {}
         self.listed: set[str] = set()
         self.status: dict[str, str] = {}
@@ -195,19 +223,39 @@ class StartOdds:
                     self.prognosis[key] = prog
 
     def p_now(self, key: str) -> float:
+        """This week's listing, calibrated: the start %, else in the squad or not."""
         pct = self.start_pct.get(key)
         return self.cal.p(pct if pct is not None else (
             self.cal.neutral_start if key in self.listed
             else self.cal.absent_start))
 
+    def listing(self, key: str) -> float:
+        """What futbolfantasy last said about his selection while he was fit:
+        this week's listing if he is fit, else his last one before the flag,
+        else that he is not in the squad."""
+        if key not in self.status:
+            return self.p_now(key)
+        return self.cal.p(self.last_fit.get(key, self.cal.absent_start))
+
+    def picked(self, key: str, next_match: bool) -> float:
+        """The chance he is picked if fit. His next match, if he is fit: this
+        week's listing, pulled toward his record. Later matches (and the next
+        one, if he is flagged): 60% pulled toward his record; with no record,
+        his listing while fit."""
+        got, n = self.history.get(key, (0.0, 0.0))
+        if next_match and key not in self.status:
+            return shrink(self.p_now(key), PICK_K, got, n)
+        return shrink(NEUTRAL_START / 100.0, PICK_K, got, n) if n else self.listing(key)
+
     def status_of(self, key: str) -> str:
         return self.status.get(key, "")
 
-    def availability(self, key: str, jornada: int, when: dt.date | None,
-                     next_j: int) -> float | None:
+    def fit(self, key: str, jornada: int, when: dt.date | None,
+            next_j: int) -> float:
+        """The chance he is fit: 1 unless flagged, else his prognosis."""
         prog = self.prognosis.get(key)
         if prog is None or (when is None and prog[0] == "out_until"):
-            return None
+            return 1.0
         return self.avail.of(prog, jornada, when, next_j)
 
 
@@ -332,8 +380,12 @@ def fit_start_fallbacks(outs: list[Outcome]) -> tuple[float, float]:
 
 
 def calibrate(outs: list[Outcome]) -> Calibration:
-    neutral, absent = fit_start_fallbacks(outs)
-    return replace(fit(observations(outs, neutral, absent)),
+    """What a listing means for selection, fitted on fit players only: for a
+    flagged player the listing is about the injury, which availability
+    already covers."""
+    fit_outs = [o for o in outs if _fit(o)]
+    neutral, absent = fit_start_fallbacks(fit_outs)
+    return replace(fit(observations(fit_outs, neutral, absent)),
                    neutral_start=neutral, absent_start=absent)
 
 
@@ -390,9 +442,23 @@ def _selftest() -> None:
     odds = StartOdds([{"player_name": "Ana", "status": "doubt",
                        "observed_at": "2026-09-28T0400Z",
                        "note": "Duda para la jornada 8"}], xw, avail=fitted)
-    assert odds.availability("ana", 8, sept, 8) == 0.0
-    assert odds.availability("ana", 9, sept, 8) == 1.0
-    assert odds.availability("bo", 8, sept, 8) is None, "no prognosis, no say"
+    assert odds.fit("ana", 8, sept, 8) == 0.0
+    assert odds.fit("ana", 9, sept, 8) == 1.0
+    assert odds.fit("bo", 8, sept, 8) == 1.0, "not flagged, fit"
+    rec = StartOdds([{"player_name": "Ana", "start_pct": "20", "status": "ok"},
+                     {"player_name": "Bo", "start_pct": "0", "status": "injured",
+                      "note": "Duda para la jornada 8"}], xw,
+                    history={"ana": (9.0, 10.0)}, last_fit={"bo": 70.0})
+    assert rec.picked("ana", True) == shrink(0.2, PICK_K, 9.0, 10.0)
+    assert rec.picked("ana", False) == shrink(NEUTRAL_START / 100, PICK_K, 9.0, 10.0)
+    assert rec.picked("bo", True) == rec.picked("bo", False) == 0.7, \
+        "no record: his listing before the injury, not the 0% it caused"
+    assert StartOdds([{"player_name": "Bo", "status": "injured"}], xw).picked(
+        "bo", False) == ABSENT_START / 100, "never listed fit: not in the squad"
+    assert last_fit_listing([
+        Outcome("2026-08-01T1800Z", 1, "m", "t:a", "a", True, 0.8, "ok", True, 90.0),
+        Outcome("2026-08-08T1800Z", 2, "m", "t:a", "a", True, 0.0, "injured", False, 0.0),
+    ]) == {"a": 80.0}
 
     assert abs(_platt(0.5, 0.0, 1.0) - 0.5) < 1e-6
     assert abs(_platt(0.8, 0.0, 1.0) - 0.8) < 1e-6

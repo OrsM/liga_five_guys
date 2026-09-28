@@ -99,11 +99,11 @@ def per_jornada_current(starters_rows, played, jornada_of_match, xw
 
 
 def totals(per_jornada: dict[int, tuple[float, float]]
-            ) -> tuple[float, float, float, float]:
-    pts = sum(p for p, _m in per_jornada.values())
-    apps = sum(1 for _p, m in per_jornada.values() if m > 0)
-    n = len(per_jornada)
-    return pts, float(apps), (apps / n if n else 0.0), n
+           ) -> tuple[float, float, float]:
+    """This season's points, appearances and matchday squads."""
+    return (sum(p for p, _m in per_jornada.values()),
+            float(sum(1 for _p, m in per_jornada.values() if m > 0)),
+            float(len(per_jornada)))
 
 
 class Rating(NamedTuple):
@@ -114,12 +114,13 @@ class Rating(NamedTuple):
 
 
 class Rates(NamedTuple):
+    """A player's forecast inputs: points per match, and the chance he is
+    picked if fit for his next match (p_now) and later ones (p_rest)."""
     key: str
     slot: str
     ppm: float
     p_now: float
     p_rest: float
-    status: str
     pj: float
 
 
@@ -163,24 +164,14 @@ class Scorer:
         return Rating(sum(w * m for w, m in terms) / sum(w for w, _ in terms),
                       not prior_pj and cur_pj < k, cur_pj, prior_pj + cur_pj)
 
-    def availability(self, key: str, jornada: int, when, next_j: int
-                     ) -> float | None:
-        return self.starts.availability(key, jornada, when, next_j)
+    def fit(self, key: str, jornada: int, when, next_j: int) -> float:
+        return self.starts.fit(key, jornada, when, next_j)
 
     def rates(self, rec: dict) -> Rates:
         key = row_key(rec)
-        rating = self.rate(rec)
-        p_now = self.starts.p_now(key)
-        p_rest = p_now
-        cur = self.current.get(key)
-        start_n = cur.get("start_n", 0.0) if cur else 0.0
-        if start_n > 0.0:
-            seen = start_n * cur["start_rate"]
-            p_rest = shrink(NEUTRAL_START / 100.0, self.shrink_k, seen, start_n)
-            p_now = shrink(p_now, self.shrink_k, seen, start_n)
         return Rates(key, SLOT.get((rec.get("position") or "").lower(), ""),
-                     rating.ppm, p_now, p_rest, self.starts.status_of(key),
-                     rating.pj)
+                     self.rate(rec).ppm, self.starts.picked(key, True),
+                     self.starts.picked(key, False), self.rate(rec).pj)
 
 
 def squad_pool(scored) -> dict[str, list[dict]]:
@@ -292,8 +283,8 @@ def _selftest() -> None:
 
     dbt = [{"player_name": "p0", "start_pct": "100", "status": "doubt"}]
     r0 = Scorer(market, StartOdds(dbt, xw), hist).rates(dict(row, name="p0"))
-    assert (r0.key, r0.slot, r0.status, r0.p_now, r0.p_rest) == (
-        "p0", "DEF", "doubt", 1.0, 1.0), r0
+    assert (r0.key, r0.slot, r0.p_now, r0.p_rest) == ("p0", "DEF", 0.15, 0.15), \
+        "flagged, no record, never listed fit: his 100% is not a selection signal"
     assert abs(r0.ppm - full.ppm) < 1e-9 and r0.pj == full.pj
 
     per = starters_per_slot()
@@ -308,17 +299,14 @@ def _selftest() -> None:
     assert vor({"slot": "DEL", "score": 6.0}, repl) == -2.0
     assert vor({"slot": ""}, repl) == 0.0
 
-    benched = Scorer(market, StartOdds(xi, xw), hist, current={"p0": {
-        "pts": 30.0, "pj": 3.0, "start_rate": 0.0, "start_n": 6.0}}).rates(
-        dict(row, name="p0"))
+    benched = Scorer(market, StartOdds(xi, xw, history={"p0": (0.0, 6.0)}), hist,
+                     current={"p0": {"pts": 30.0, "pj": 3.0}}).rates(dict(row, name="p0"))
     assert abs(benched.p_now - K / (K + 6)) < 1e-9, benched
     susp = [{"player_name": "p0", "start_pct": "0", "status": "suspended"}]
-    back = Scorer(market, StartOdds(susp, xw), hist, current={"p0": {
-        "pts": 30.0, "pj": 2.0, "start_rate": 0.9, "start_n": 2.0}}).rates(
-        dict(row, name="p0"))
-    assert abs(back.p_now - 2 * 0.9 / (K + 2)) < 1e-9, back
-    assert abs(back.p_rest - (K * NEUTRAL_START / 100 + 2 * 0.9) / (K + 2)) < 1e-9
-    assert back.status == "suspended"
+    back = Scorer(market, StartOdds(susp, xw, history={"p0": (1.8, 2.0)}), hist,
+                  current={"p0": {"pts": 30.0, "pj": 2.0}}).rates(dict(row, name="p0"))
+    assert abs(back.p_rest - (K * NEUTRAL_START / 100 + 1.8) / (K + 2)) < 1e-9, back
+    assert back.p_now == back.p_rest, "the suspension is the fit factor's, not selection's"
 
     from ffcore.crosswalk import Crosswalk, Player
 
@@ -356,8 +344,8 @@ def _selftest() -> None:
     assert "unused sub" not in by_key, by_key
     assert per_jornada_current([], [], {}, xw2) == {}
 
-    assert totals(by_key["antonio blanco"]) == (13.0, 2.0, 1.0, 2)
-    assert totals({}) == (0.0, 0.0, 0.0, 0)
+    assert totals(by_key["antonio blanco"]) == (13.0, 2.0, 2.0)
+    assert totals({}) == (0.0, 0.0, 0.0)
 
     print("ffcore.score self-test OK")
 
