@@ -15,7 +15,8 @@ from ffcore.rules import minutes_played
 from stats import shrink
 
 __all__ = ["Obs", "Outcome", "Calibration", "StartOdds", "Availability",
-           "prognosis", "prognosis_of", "fit_availability", "last_fit_listing", "calibrate", "fit", "outcomes",
+           "prognosis", "prognosis_of", "bucket", "fit_availability",
+           "last_fit_listing", "calibrate", "fit", "outcomes",
            "observations", "fit_start_fallbacks", "NEUTRAL_START",
            "ABSENT_START"]
 
@@ -112,8 +113,10 @@ def prognosis_of(status: str, note: str, seen: dt.date
         (IMPLIED[status], None) if status in IMPLIED else None)
 
 
-def _bucket(prog: tuple[str, object], jornada: int, when: dt.date,
-            next_j: int) -> str:
+def bucket(prog: tuple[str, object], jornada: int, when: dt.date,
+           next_j: int) -> str:
+    """Where a jornada falls against a prognosis: 'doubt_for:at',
+    'out_until:days_before', ... - the row of the availability table."""
     kind, arg = prog
     if kind == "indefinite":
         return kind
@@ -137,7 +140,7 @@ class Availability:
 
     def of(self, prog: tuple[str, object], jornada: int, when: dt.date,
            next_j: int) -> float:
-        return self.level[_bucket(prog, jornada, when, next_j)]
+        return self.level[bucket(prog, jornada, when, next_j)]
 
 
 def _fit(o: Outcome) -> bool:
@@ -183,7 +186,7 @@ def fit_availability(outs: list[Outcome], k: float = AVAIL_K) -> Availability:
             prog = prognosis_of(oi.status, oi.note, _day(oi.at))
             for j, oj in seen.items() if prog else ():
                 if j >= i:
-                    t = tally.setdefault(_bucket(prog, j, _day(oj.at), i),
+                    t = tally.setdefault(bucket(prog, j, _day(oj.at), i),
                                          [0.0, 0.0])
                     t[0] += _played(oj)
                     t[1] += base[key]
@@ -431,8 +434,8 @@ def _selftest() -> None:
         == ("out_until", dt.date(2026, 11, 5)), "the site's own typo"
     assert prognosis("x Baja indefinida", sept) == ("indefinite", None)
     assert prognosis("Sancionado", sept) is None and prognosis("", sept) is None
-    assert _bucket(("doubt_for", 8), 8, sept, 8) == "doubt_for:at"
-    assert _bucket(("out_until", dt.date(2026, 10, 15)), 9, dt.date(2026, 10, 5), 8) \
+    assert bucket(("doubt_for", 8), 8, sept, 8) == "doubt_for:at"
+    assert bucket(("out_until", dt.date(2026, 10, 15)), 9, dt.date(2026, 10, 5), 8) \
         == "out_until:days_before"
     assert Availability().of(("out_for", 9), 9, sept, 8) == 0.0
     assert Availability().of(("available_from", 8), 9, sept, 8) == 1.0
@@ -446,8 +449,8 @@ def _selftest() -> None:
     gone = StartOdds([{"player_name": "Ana", "start_pct": "90", "status": "ok"}], xw,
                      app={"ana": "out_of_league"})
     assert gone.fit("ana", 9, sept, 8) == 0.0, "left the league: out for good"
-    assert _bucket(("out_for", None), 8, sept, 8) == "out_for:at"
-    assert _bucket(("out_for", None), 9, sept, 8) == "out_for:after", \
+    assert bucket(("out_for", None), 8, sept, 8) == "out_for:at"
+    assert bucket(("out_for", None), 9, sept, 8) == "out_for:after", \
         "a suspension is the next match, whichever jornada that is"
 
     def out(at, j, status, mins, note=""):

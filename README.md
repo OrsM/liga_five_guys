@@ -39,11 +39,29 @@ Everything else comes from the app's API and public pages.
 
 ## The model
 
-- **Points** (`ffcore/score.py`, `ffcore/schedule.py`): points per
-  appearance, shrunk toward last season and position priors, times the
-  chance of appearing (FF's line-up percentages, calibrated against who
-  actually played), times the opponent's attack/defence factor. One table,
-  `per_j[jornada][player] = (points, p)`, feeds the board and the backtest.
+Every forecast is the same product, for every player and jornada, and
+`python tools/explain.py <player>` prints it factor by factor:
+
+    expected points = points per match x fixture x chance he is picked if fit x chance he is fit
+
+- **Points per match** (`ffcore/score.py`, `Scorer.rate`): last season
+  pulled toward his position's typical rate (for a promoted club, that rate
+  discounted), then this season pulled toward that. Every "pulled toward"
+  in the model is `stats.shrink`.
+- **Fixture** (`ffcore/fixture.py`): the opponent's attack or defence factor.
+- **Picked if fit** (`ffcore/startprob.py`, `StartOdds.picked`): for his next
+  match, futbolfantasy's listing (calibrated on fit players) pulled toward
+  his record of appearances in matchday squads; later, 60% pulled toward
+  that record; with no record, his listing while fit. A flagged player's
+  listing is about the injury, so it never counts as selection.
+- **Fit** (`StartOdds.fit`): 1 unless flagged. Flagged by futbolfantasy, his
+  prognosis ("Duda para la jornada 8", "Baja hasta mediados de octubre";
+  a bare status means his next match) places each jornada in a row of the
+  availability table, fitted from past prognoses: appearances under that
+  prognosis over appearances when listed fit. The LaLiga app adds only who
+  has left the league (out for good); its injury flags lag futbolfantasy's.
+- One table, `per_j[jornada][player] = (points, p)`, feeds the board and
+  the backtest.
 - **Points history** (`ffcore/points.py`, `scored()`): each change in a player's points
   total, given to the latest match his club had played.
 - **Uncertainty** (`ffcore/forecast.py`, `ffcore/season.py`): match-level
@@ -63,14 +81,11 @@ Everything else comes from the app's API and public pages.
   and scored in season points: the points it adds plus, at the measured
   points-per-million, the value its players are expected to gain by the
   lock less the premium paid. Rows say whether they are for points, cash
-  or both. A move is shown only if it leaves you better off in at least 70%
-  of simulated seasons (decide.CONFIDENCE); below that its gain is noise,
-  and the board says to keep the cash. A bench player is sold when his cash
-  beats what he still adds.
-- **Injuries** (`ffcore/startprob.py`): futbolfantasy's prognosis on each
-  injury note ("Duda para la jornada 8", "Baja hasta mediados de octubre")
-  sets the player's availability for every remaining jornada, fitted from
-  past prognoses against who actually played.
+  or both. Every action, buy or sale, is a `Move`: its median gain and the
+  share of simulated seasons in which it leaves you better off. One rule
+  decides them all (`worth_doing`): a gain in the median, cash included,
+  and better off in at least 70% of seasons (decide.CONFIDENCE); below that
+  its gain is noise, and the board says to keep the cash.
 - **Rival cash** (`ffcore/league.py`): budget plus their sales, bonuses and
   clause income, less buys and clause payments, plus the income the feed
   never records (your real balance minus the same sum for you).
