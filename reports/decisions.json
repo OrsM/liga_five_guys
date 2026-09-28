@@ -1,52 +1,39 @@
 {
- "generated_at": "2026-09-28T04:40Z",
+ "generated_at": "2026-09-28T08:04Z",
  "lock_at": "2026-10-09T19:00:00+00:00",
  "cash": 15080565.0,
  "cash_locked": 0,
  "finish": 2.14,
  "p_win": 0.21,
  "band": [
-  1846.441257529857,
-  2138.3170216780977
+  1847.8634370090635,
+  2138.462169892324
  ],
  "do": [
   {
-   "what": "buy",
-   "name": "Iago Aspas",
-   "pos": "DEL",
-   "ask": 4649459.0,
-   "bid": 5519081.230571513,
-   "sell": [
-    "Alvaro Mantilla"
+   "what": "field",
+   "legal": true,
+   "on": [
+    "German Valera"
    ],
-   "proceeds": 1361346.0,
-   "gain": 3.690657609849495,
-   "why": "points",
-   "trend": -9.114261934654266,
-   "placed": null,
-   "done": false
-  }
- ],
- "plan_gain": 3.3199847867547505,
- "backup": [
+   "off": [
+    "Zaid Romero"
+   ],
+   "gain": 0.29535440711101124
+  },
   {
-   "name": "Tyrhys Dolan",
-   "pos": "DEL",
-   "ask": 13274599.0,
-   "bid": 15757444.077743964,
-   "sell": [
-    "Alvaro Mantilla"
-   ],
+   "what": "sell",
+   "name": "Alvaro Mantilla",
+   "pos": "DEF",
    "proceeds": 1361346.0,
-   "gain": 4.221746860077019,
-   "why": "points",
-   "trend": -7.305211446696142,
-   "placed": null,
-   "done": false
+   "done": true
   }
  ],
- "ping": "Buy Iago Aspas (bid up to 5.5M), selling Alvaro Mantilla",
+ "plan_gain": 0.0,
+ "backup": [],
+ "ping": "Field German Valera",
  "bid_beats": 0.8,
+ "confidence": 0.7,
  "squad": [
   {
    "name": "Mathew Ryan",
@@ -101,7 +88,7 @@
   {
    "name": "Zaid Romero",
    "pos": "DEF",
-   "xi": true,
+   "xi": false,
    "start": 0.9879999999999999,
    "next": 3.464179014063779,
    "season": 171.24597912145575,
@@ -181,10 +168,10 @@
   {
    "name": "German Valera",
    "pos": "MED",
-   "xi": false,
-   "start": 0.9887112558313004,
-   "next": 2.350698846470443,
-   "season": 117.5349144736542,
+   "xi": true,
+   "start": 0.7906357328099811,
+   "next": 3.7595334211747904,
+   "season": 118.94374904835854,
    "value": 13466031.0,
    "trend": 0.2510812363174331
   },
@@ -218,15 +205,15 @@
    "lo": 1927.761994894869,
    "hi": 2256.0456859433266,
    "cash": -54127242.0,
-   "p_above": 0.26866666666666666
+   "p_above": 0.26966666666666667
   },
   {
    "manager": "miguel_autentico",
    "me": true,
    "now": 371.0,
-   "mean": 1986.4018695287864,
-   "lo": 1846.441257529857,
-   "hi": 2138.3170216780977,
+   "mean": 1986.754574413432,
+   "lo": 1847.8634370090635,
+   "hi": 2138.462169892324,
    "cash": 15080565.0,
    "p_above": null
   },
@@ -234,19 +221,19 @@
    "manager": "Albert Laporta",
    "me": false,
    "now": 272.0,
-   "mean": 1950.3757310555418,
-   "lo": 1781.8716143914282,
-   "hi": 2118.957753939218,
+   "mean": 1950.512981974382,
+   "lo": 1781.7292115934088,
+   "hi": 2119.5084957957924,
    "cash": -4232947.0,
-   "p_above": 0.5893333333333334
+   "p_above": 0.5906666666666667
   },
   {
    "manager": "Magic Mike 333",
    "me": false,
    "now": 271.0,
-   "mean": 1550.2416985844652,
-   "lo": 1436.1301058266836,
-   "hi": 1665.8234904370088,
+   "mean": 1548.1209689673951,
+   "lo": 1432.9356264900894,
+   "hi": 1664.044337533237,
    "cash": 43438037.0,
    "p_above": 0.9986666666666667
   },
@@ -254,9 +241,9 @@
    "manager": "SusoGattuso",
    "me": false,
    "now": 211.0,
-   "mean": 1536.8130915916347,
-   "lo": 1423.9104639271602,
-   "hi": 1651.764789389981,
+   "mean": 1536.5770930932283,
+   "lo": 1423.8095375138769,
+   "hi": 1650.7243860720703,
    "cash": -10208706.0,
    "p_above": 1.0
   }
