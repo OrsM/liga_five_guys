@@ -63,7 +63,14 @@ Everything else comes from the app's API and public pages.
   and scored in season points: the points it adds plus, at the measured
   points-per-million, the value its players are expected to gain by the
   lock less the premium paid. Rows say whether they are for points, cash
-  or both. A bench player is sold when his cash beats what he still adds.
+  or both. A move is shown only if it leaves you better off in at least 70%
+  of simulated seasons (decide.CONFIDENCE); below that its gain is noise,
+  and the board says to keep the cash. A bench player is sold when his cash
+  beats what he still adds.
+- **Injuries** (`ffcore/startprob.py`): futbolfantasy's prognosis on each
+  injury note ("Duda para la jornada 8", "Baja hasta mediados de octubre")
+  sets the player's availability for every remaining jornada, fitted from
+  past prognoses against who actually played.
 - **Rival cash** (`ffcore/league.py`): budget plus their sales, bonuses and
   clause income, less buys and clause payments, plus the income the feed
   never records (your real balance minus the same sum for you).

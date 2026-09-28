@@ -4,7 +4,7 @@ import json
 import sys
 
 from assemble import PRICE_LOG, universe
-from decide import (BID_BEATS, band_acts, plan, sale_pts,
+from decide import (BID_BEATS, CONFIDENCE, band_acts, plan, sale_pts,
                     worth_doing)
 from ffcore.league import app_fielded
 from ffcore.render import title_name
@@ -42,6 +42,7 @@ def buy_row(m, r) -> dict:
             "bid": min(a.cost * m.premium, max(a.cost, m.cash + a.proceeds)),
             "sell": [player(m, k)["name"] for k in a.sell],
             "proceeds": a.proceeds, "gain": r.d_pts, "why": why(r),
+            "chance": round(r.p_better, 3),
             "trend": m.trend.get(a.buy),
             "placed": m.my_bid.get(a.buy),
             "done": a.buy in m.my_bid}
@@ -89,7 +90,7 @@ def report(u, ranked, chg, lock_at=None) -> dict:
         "p_win": round(base.position().get(1, 0.0), 3),
         "band": [lo, hi],
         "do": todo, "plan_gain": gain, "backup": backup, "ping": ping(todo),
-        "bid_beats": BID_BEATS,
+        "bid_beats": BID_BEATS, "confidence": CONFIDENCE,
         "squad": [
             {**player(m, k), "xi": k in xi,
              "start": o.next_up.get(k, (0.0, 0.0))[1], "next": exp.get(k, 0.0),
@@ -178,6 +179,9 @@ def _selftest() -> None:
     assert [d["what"] for d in doc["do"]][:1] == ["field"], doc["do"]
     assert {d["name"].lower() for d in doc["do"] if d["what"] == "buy"} == set(bought)
     assert all(b["name"].lower() not in bought for b in doc["backup"])
+    assert doc["confidence"] == 0.7
+    assert all(0.7 <= d["chance"] <= 1.0 for d in doc["do"] + doc["backup"]
+               if "chance" in d), "only moves that clear the bar are shown"
     assert [s["pos"] for s in doc["squad"]][0] == "POR", doc["squad"]
     assert sum(s["xi"] for s in doc["squad"]) == 11
     assert [r["manager"] for r in doc["standings"]][0] in ("me", "riv")

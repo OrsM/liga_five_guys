@@ -17,7 +17,7 @@ from ffcore.outlook import Outlook
 from ffcore.season import LeagueState, Standings, best_xi, simulate_many
 
 from ffcore.rules import FREE_FORMATIONS
-__all__ = ["Action", "Band", "Move", "Ranking", "Universe", "band_acts", "plan",
+__all__ = ["Action", "Band", "CONFIDENCE", "Move", "Ranking", "Universe", "band_acts", "plan",
            "sale_pts"]
 
 SCREEN_TRIALS = 250
@@ -28,13 +28,15 @@ KEEP = 12
 @dataclass(frozen=True)
 class Move:
     """One candidate, scored against doing nothing: its median change in
-    season points with the 10th-90th percentile band, and the cash it frees
-    or spends, priced in points."""
+    season points with the 10th-90th percentile band, the cash it frees or
+    spends priced in points, and the share of simulated seasons in which it
+    leaves you better off, cash included."""
     action: Action
     d_pts: float
     pts_lo: float = 0.0
     pts_hi: float = 0.0
     cash_pts: float = 0.0
+    p_better: float = 1.0
 
     @property
     def net_pts(self) -> float:
@@ -155,7 +157,8 @@ class Universe:
             cash = self.market.cash_pts(a, lam)
             pairs = paired(r, base, self.me)
             d_pts, lo, hi = band(pairs)
-            out.append(Move(a, d_pts, lo, hi, cash))
+            better = sum(1 for x in pairs if x + cash > 0) / len(pairs) if pairs else 0.0
+            out.append(Move(a, d_pts, lo, hi, cash, better))
         rows = sorted(out, key=lambda d: (-d.net_pts, d.action.net))
         return Ranking(rows, base, measured, bands)
 
@@ -215,8 +218,14 @@ def apply(u, *acts: Action) -> dict[str, dict[str, str]]:
     return {m: phantom_topup(s) for m, s in sq.items()}
 
 
+CONFIDENCE = 0.7
+
+
 def worth_doing(u, rows) -> list:
-    return [r for r in rows if r.net_pts > 0]
+    """Moves that gain in the median AND leave you better off in at least
+    CONFIDENCE of simulated seasons: below that a gain is noise, and the
+    board says to hold rather than spend on it."""
+    return [r for r in rows if r.net_pts > 0 and r.p_better >= CONFIDENCE]
 
 
 def band_acts(u) -> list:
@@ -480,6 +489,12 @@ def _selftest() -> None:
                             (0.0, 5e6, 0.0)]:
         got = value_rate(pts, cost)
         assert got == want or abs(got - want) < 1e-9, (pts, cost, got)
+
+    sure = Move(Action("buy", buy="s"), 5.0, p_better=0.8)
+    coin = Move(Action("buy", buy="c"), 9.0, p_better=0.55)
+    loss = Move(Action("buy", buy="l"), -1.0, p_better=0.9)
+    assert worth_doing(None, [sure, coin, loss]) == [sure], \
+        "a bigger median that is a coin flip is not worth doing"
 
     assert premium_to_beat([1.0] * 5 + [1.3] * 5) == 1.3
     assert premium_to_beat([1.0] * 9 + [1.3]) == 1.0
