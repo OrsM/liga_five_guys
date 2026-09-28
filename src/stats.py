@@ -9,7 +9,16 @@ def percentile(data: list[float], p: float) -> float:
     return cuts[min(max(round(p), 1), 99) - 1]
 
 
+def shrink(prior: float, k: float, total: float, n: float) -> float:
+    """An observed rate pulled toward a prior: k is how many observations the
+    prior is worth, total the sum observed over n."""
+    return (k * prior + total) / (k + n)
+
+
 def _selftest() -> None:
+    assert shrink(0.5, 4.0, 0.0, 0.0) == 0.5, "no data, the prior"
+    assert shrink(0.5, 0.0, 3.0, 4.0) == 0.75, "no weight, the data"
+    assert shrink(0.6, 4.0, 4.0, 4.0) == 0.8, "halfway at k == n"
     data = list(range(1, 101))
     assert abs(percentile(data, 10) - 10) < 1.5, percentile(data, 10)
     assert abs(percentile(data, 50) - 50) < 1.5, percentile(data, 50)

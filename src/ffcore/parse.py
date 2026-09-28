@@ -134,6 +134,13 @@ def _digits_to_dt(s: str, tz):
         return None
 
 
+def year_for(month: int, seen, start: int) -> int:
+    """The year of a month named on a page seen on `seen`, read inside the
+    twelve months that begin at month `start`: July for a season's fixtures,
+    last month for a date still to come."""
+    return seen.year - (seen.month < start) + (month < start)
+
+
 def snapshot_stamp(s: str):
     return _digits_to_dt(s, timezone.utc)
 

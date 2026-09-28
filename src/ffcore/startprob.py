@@ -9,9 +9,10 @@ from typing import NamedTuple
 
 import numpy as np
 
-from ffcore.parse import pct100, snapshot_stamp
+from ffcore.parse import pct100, snapshot_stamp, year_for
 from ffcore.text import norm
 from ffcore.rules import minutes_played
+from stats import shrink
 
 __all__ = ["Obs", "Outcome", "Calibration", "StartOdds", "Availability",
            "prognosis", "prognosis_of", "fit_availability", "calibrate", "fit", "outcomes",
@@ -86,8 +87,8 @@ def prognosis(note: str, seen: dt.date) -> tuple[str, object] | None:
             return kind, int(m.group(1))
     if m := _UNTIL.search(note or ""):
         month = MONTHS[m.group(2)]
-        year = int(m.group(3)) if m.group(3) else (
-            seen.year + (1 if month < seen.month - 1 else 0))
+        year = int(m.group(3)) if m.group(3) else year_for(
+            month, seen, seen.month - 1)
         return "out_until", dt.date(year, month, PART.get(m.group(1), 15))
     if "Baja indefinida" in (note or ""):
         return "indefinite", None
@@ -157,7 +158,7 @@ def fit_availability(outs: list[Outcome], k: float = AVAIL_K) -> Availability:
                                          [0.0, 0.0])
                     t[0] += _played(oj)
                     t[1] += base[key]
-    return Availability({b: min(1.0, (got + k * PRIOR[b]) / (fit + k))
+    return Availability({b: min(1.0, shrink(PRIOR[b], k, got, fit))
                          for b, (got, fit) in tally.items()})
 
 
@@ -320,8 +321,8 @@ def _shrunk(default_pct: float, shares: list[float]) -> float:
     if not shares:
         return default_pct
     rate = sum(shares) / len(shares)
-    return ((FALLBACK_K * default_pct / 100.0 + len(shares) * rate)
-            / (FALLBACK_K + len(shares)) * 100.0)
+    return shrink(default_pct / 100.0, FALLBACK_K, len(shares) * rate,
+                  len(shares)) * 100.0
 
 
 def fit_start_fallbacks(outs: list[Outcome]) -> tuple[float, float]:

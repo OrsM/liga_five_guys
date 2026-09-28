@@ -3,12 +3,13 @@ calendar and match sheets."""
 from __future__ import annotations
 
 import re
-from datetime import datetime
+from datetime import date, datetime
 from zoneinfo import ZoneInfo
 
 from lxml import html as lh
 
 from ffcore.text import match_one, norm
+from ffcore.parse import year_for
 from ffcore.source import Source, _once, _rebuild
 
 __all__ = ["BASE", "SOURCE", "MARKET_URL", "POINTS_URL", "TEAM_URL", "TEAMS",
@@ -347,9 +348,9 @@ def _kickoff(text: str, observed_at: str) -> str:
     if not m or not observed_at[:4].isdigit() or not observed_at[5:7].isdigit():
         return ""
     day, month, hour, minute = map(int, m.groups())
-    start = int(observed_at[:4]) - (int(observed_at[5:7]) < 7)
+    seen = date(int(observed_at[:4]), int(observed_at[5:7]), 1)
     try:
-        return datetime(start + (month < 7), month, day, hour, minute,
+        return datetime(year_for(month, seen, 7), month, day, hour, minute,
                         tzinfo=MADRID).isoformat()
     except ValueError:
         return ""

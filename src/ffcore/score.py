@@ -8,6 +8,7 @@ from ffcore.parse import text
 from ffcore.startprob import NEUTRAL_START, StartOdds
 from ffcore.text import norm, row_key
 from ffcore.rules import FREE_FORMATIONS, SLOT, minutes_played
+from stats import shrink
 
 __all__ = ["starters_per_slot", "Rating", "Rates", "Scorer", "squad_pool",
            "replacement", "vor", "per_jornada_current", "totals",
@@ -59,8 +60,7 @@ def fit_promoted_discount(market: list[dict], history: dict,
             n += s.games
     if expected <= 0:
         return PROMOTED_DISCOUNT
-    k = PROMOTED_DISCOUNT_K
-    return (k * PROMOTED_DISCOUNT + n * pts / expected) / (k + n)
+    return shrink(PROMOTED_DISCOUNT, PROMOTED_DISCOUNT_K, n * pts / expected, n)
 
 
 def per_jornada_current(starters_rows, played, jornada_of_match, xw
@@ -175,10 +175,9 @@ class Scorer:
         cur = self.current.get(key)
         start_n = cur.get("start_n", 0.0) if cur else 0.0
         if start_n > 0.0:
-            k = self.shrink_k
-            p_rest = ((k * NEUTRAL_START / 100.0 + start_n * cur["start_rate"])
-                      / (k + start_n))
-            p_now = (k * p_now + start_n * cur["start_rate"]) / (k + start_n)
+            seen = start_n * cur["start_rate"]
+            p_rest = shrink(NEUTRAL_START / 100.0, self.shrink_k, seen, start_n)
+            p_now = shrink(p_now, self.shrink_k, seen, start_n)
         return Rates(key, SLOT.get((rec.get("position") or "").lower(), ""),
                      rating.ppm, p_now, p_rest, self.starts.status_of(key),
                      rating.pj)
