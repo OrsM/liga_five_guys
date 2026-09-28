@@ -80,26 +80,29 @@ class Universe:
 
     def candidates(self, budget: float | None = None) -> list["Action"]:
         cash = self.market.cash if budget is None else budget
-        mine = set(self.mine)
         o = self.outlook
         par_of = o.par
 
         spare = sorted(fieldable_spares(self), key=lambda k: _nulls_last(
             value_rate(par_of.get(k, 0.0), self.market.proceeds.get(k, 0.0))))
 
+        # Two ways to get a player: bid for a free one on the market, or pay
+        # a rival's player's release clause, which moves him at once.
+        offers = [(price, c, "buy") for c, price in self.market.price.items()
+                  if self.route_kind(c) == "free"]
+        offers += [(price, c, "clause") for c, price in self.market.clause.items()
+                   if self.route_kind(c) == "listed"]
         out: list[Action] = []
-        for c, price in sorted(self.market.price.items(), key=lambda kv: kv[1]):
-            if c in mine or self.route_kind(c) == "listed":
-                continue
+        for price, c, how in sorted(offers):
             if o.season.get(c, 0.0) <= o.xi_bar and self.market.cash_pts(
-                    Action("buy", buy=c, cost=price)) <= 0:
+                    Action(how, buy=c, cost=price)) <= 0:
                 continue
             if price <= cash:
-                out.append(Action("buy", buy=c, cost=price))
+                out.append(Action(how, buy=c, cost=price))
             for s in spare:
                 got = self.market.proceeds.get(s, 0.0)
                 if price <= cash + got:
-                    out.append(Action("swap", buy=c, sell=s, cost=price,
+                    out.append(Action(how, buy=c, sell=s, cost=price,
                                       proceeds=got))
         return out
 
@@ -198,6 +201,8 @@ def apply(u, *acts: Action) -> dict[str, dict[str, str]]:
     for a in acts:
         for gone in a.sell:
             sq[u.me].pop(gone, None)
+        if a.kind == "clause":
+            sq.get(u.market.owner.get(a.buy), {}).pop(a.buy, None)
         if a.buy:
             sq[u.me][a.buy] = u.market.pos.get(a.buy, "MED")
     return {m: phantom_topup(s) for m, s in sq.items()}
@@ -303,6 +308,13 @@ def _selftest() -> None:
 
     acts = u.candidates()
     assert not any(a.buy == "th_m1" for a in acts), "a rival's player is not for sale"
+    open_th = replace(u, market=replace(u.market, clause={"th_m1": 5e6}))
+    took = [a for a in open_th.candidates() if a.buy == "th_m1"]
+    assert took and all(a.kind == "clause" and a.cost == 5e6 for a in took), \
+        "...unless his clause can be paid: then at the clause, at once"
+    after = apply(open_th, took[0])
+    assert "th_m1" in after["me"] and "th_m1" not in after["riv"], \
+        "a clause moves him out of the rival's squad too"
     assert all(a.cost <= u.market.cash + a.proceeds for a in acts), acts
 
 

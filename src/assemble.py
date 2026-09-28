@@ -4,6 +4,7 @@ state and the forecast — so the model modules never read a table
 themselves."""
 from __future__ import annotations
 
+from datetime import datetime
 from functools import cache
 from statistics import median
 
@@ -61,6 +62,17 @@ def app_status(xw) -> dict[str, str]:
     """The LaLiga app's status for each player it lists."""
     return {k: r["player_status"] for r in current("api_players_all")
             if (k := xw.player(app_id=r["player_id"])) and r.get("player_status")}
+
+
+def open_clauses(teams: list[dict]) -> dict[str, float]:
+    """Owned players whose release clause can be paid now: their protection
+    after a transfer has ended. Checked against the league's own clause
+    buys: each paid exactly the listed clause, to the owner."""
+    now = run_now()
+    return {r["key"]: amount for r in teams
+            if r.get("key") and (amount := num(r, "buyout")) and (
+                not r.get("buyout_until")
+                or datetime.fromisoformat(r["buyout_until"]) <= now)}
 
 
 def fixture_ratings(market: list[dict]):
@@ -136,7 +148,8 @@ def universe() -> Universe:
         value={k: v for k, v in value.items() if k in players},
         proceeds={k: v for k, v in proceeds.items() if k in players},
         my_bid=pending(mkt, "bid_status", "bid_money"),
-        trend=trend(steps(history("market")), _updates_to_lock()))
+        trend=trend(steps(history("market")), _updates_to_lock()),
+        clause={k: v for k, v in open_clauses(teams).items() if k in players})
     squads, per_j = phantom_fill(squads, per_j, pos)
     assert all(_fieldable(sq) for sq in squads.values()), squads
     if rem:

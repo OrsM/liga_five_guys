@@ -38,8 +38,11 @@ def player(m, k) -> dict:
 
 def buy_row(m, r) -> dict:
     a = r.action
+    by_clause = a.kind == "clause"
     return {**player(m, a.buy), "ask": a.cost,
-            "bid": min(a.cost * m.premium, max(a.cost, m.cash + a.proceeds)),
+            "bid": a.cost if by_clause else
+            min(a.cost * m.premium, max(a.cost, m.cash + a.proceeds)),
+            "clause_from": m.owner.get(a.buy) if by_clause else None,
             "sell": [player(m, k)["name"] for k in a.sell],
             "proceeds": a.proceeds, "gain": r.d_pts, "why": why(r),
             "chance": round(r.p_better, 3),
@@ -48,11 +51,28 @@ def buy_row(m, r) -> dict:
             "done": a.buy in m.my_bid}
 
 
+def exposed(u) -> list[dict]:
+    """Your players a rival can take now by paying their clause, and who can
+    afford it on the cash estimates, most valuable to you first."""
+    m, o = u.market, u.outlook
+    out = []
+    for k in sorted(u.mine, key=lambda k: -o.season.get(k, 0.0)):
+        if k in m.clause:
+            by = sorted(mgr for mgr, cash in u.rival_cash.items() if cash >= m.clause[k])
+            if by:
+                out.append({**player(m, k), "clause": m.clause[k], "by": by,
+                            "xi": k in o.xi.players, "season": o.season.get(k, 0.0)})
+    return out
+
+
 def ping(todo: list[dict]) -> str:
     said = {"field": lambda d: "Field " + ", ".join(d["on"]),
-            "buy": lambda d: "Buy %s (bid up to %.1fM)%s" % (
+            "buy": lambda d: ("Take %s from %s (clause %.1fM)%s" % (
+                d["name"], d["clause_from"], d["bid"] / 1e6,
+                ", selling " + " + ".join(d["sell"]) if d["sell"] else "")
+                if d.get("clause_from") else "Buy %s (bid up to %.1fM)%s" % (
                 d["name"], d["bid"] / 1e6,
-                ", selling " + " + ".join(d["sell"]) if d["sell"] else ""),
+                ", selling " + " + ".join(d["sell"]) if d["sell"] else "")),
             "sell": lambda d: "Sell " + d["name"]}
     return "; ".join(said[d["what"]](d) for d in todo if not d.get("done"))
 
@@ -91,6 +111,7 @@ def report(u, ranked, chg, lock_at=None) -> dict:
         "band": [lo, hi],
         "do": todo, "plan_gain": gain, "backup": backup, "ping": ping(todo),
         "bid_beats": BID_BEATS, "confidence": CONFIDENCE,
+        "exposed": exposed(u),
         "squad": [
             {**player(m, k), "xi": k in xi,
              "start": o.next_up.get(k, (0.0, 0.0))[1], "next": exp.get(k, 0.0),
@@ -183,6 +204,10 @@ def _selftest() -> None:
     assert {d["name"].lower() for d in doc["do"] if d["what"] == "buy"} == set(bought)
     assert all(b["name"].lower() not in bought for b in doc["backup"])
     assert doc["confidence"] == CONFIDENCE
+    rich = replace(ub, rival_cash={"riv": 25e6},
+                   market=replace(ub.market, clause={"star": 20e6, "dead": 30e6}))
+    assert [(e["name"].lower(), e["by"]) for e in exposed(rich)] == [("star", ["riv"])], \
+        "exposed: what a rival can take now and can afford"
     assert all(CONFIDENCE <= d["chance"] <= 1.0 for d in doc["do"] + doc["backup"]
                if "chance" in d), "only moves that clear the bar are shown"
     assert [s["pos"] for s in doc["squad"]][0] == "POR", doc["squad"]

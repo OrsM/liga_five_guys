@@ -11,7 +11,9 @@ __all__ = ["Market", "LISTED_SELLER", "market_routes", "pending"]
 class Market:
     """Who the players are, what they cost and are worth, and your money.
     Tables are keyed by player and sparse: price only for players on sale,
-    proceeds only for yours, my_bid only where your bid is pending.
+    proceeds only for yours, my_bid only where your bid is pending, clause
+    only for owned players whose release clause can be paid now (it moves
+    the player at once, the money going to his owner).
     No points: what anyone will score is the outlook's business."""
     cash: float = 0.0
     lam: float | None = None
@@ -25,18 +27,21 @@ class Market:
     proceeds: dict[str, float] = field(default_factory=dict)
     trend: dict[str, float] = field(default_factory=dict)
     my_bid: dict[str, float] = field(default_factory=dict)
+    clause: dict[str, float] = field(default_factory=dict)
 
     @property
     def locked_cash(self) -> float:
         return sum(self.my_bid.values())
 
     def burn(self, a: Action) -> float | None:
+        """What a buy costs above the player's value: an auction bid carries
+        the premium it takes to win; a clause is paid as it stands."""
         if not a.buy:
             return 0.0
         val = self.value.get(a.buy)
         if val is None:
             return None
-        return max(0.0, a.cost * self.premium - val)
+        return max(0.0, a.cost * (1.0 if a.kind == "clause" else self.premium) - val)
 
     def cash_pts(self, a: Action, lam: float | None = None) -> float:
         lam = self.lam if lam is None else lam
@@ -98,6 +103,8 @@ def _selftest() -> None:
                     trend={"s": -25.0})
     assert abs(seller.cash_pts(Action("sell", sell=("s",), proceeds=4e6)) - 1.0) < 1e-9
 
+    assert m.burn(Action("clause", buy="free", cost=4e6)) == 0.0, \
+        "a clause is paid as it stands, no auction premium"
     assert Market(my_bid={"a": 1e6, "b": 2.5e6}).locked_cash == 3.5e6
     assert Market().locked_cash == 0.0
     try:

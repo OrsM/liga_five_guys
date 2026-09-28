@@ -80,8 +80,13 @@ Every forecast is the same product, for every player and jornada, and
   bids, no points). Every affordable buy, sale and swap is simulated
   and scored in season points: the points it adds plus, at the measured
   points-per-million, the value its players are expected to gain by the
-  lock less the premium paid. Rows say whether they are for points, cash
-  or both. Every action, buy or sale, is a `Move`: its median gain and the
+  lock less the premium paid. A player comes from the market (a bid, which
+  carries the premium it takes to win) or from a rival by paying his
+  release clause (at once, at the clause, no premium; the rival loses him,
+  and gets the money). Clauses can be paid once a player's protection
+  after his last transfer has ended; the board also lists your players a
+  rival can take that way now, and who can afford them. Rows say whether
+  they are for points, cash or both. Every action, buy or sale, is a `Move`: its median gain and the
   share of simulated seasons in which it leaves you better off. One rule
   decides them all (`worth_doing`): a gain in the median, cash included,
   and better off in at least 70% of seasons (decide.CONFIDENCE); below that
