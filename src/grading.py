@@ -39,21 +39,30 @@ def score_forecast(pred: dict[str, float], actual: dict[tuple, float],
                     if top else None)}
 
 
-def backtest() -> list[dict]:
-
+def backtest(ahead: int = 0) -> list[dict]:
+    """Rebuild the forecast at each past lock and score it against what was
+    scored: the jornada it locks and, with ahead, the next ones too. Each row
+    also scores the players listed injured, doubtful or suspended then."""
     locks = clock_history().round_locks
     actual = _jornada_points()
+    done = {j for _k, j in actual}
     out = []
     try:
-        for j in sorted({j for _k, j in actual} & set(locks), key=locks.get):
-            set_now(locks[j] - dt.timedelta(minutes=1))
+        for i in sorted(done & set(locks), key=locks.get):
+            set_now(locks[i] - dt.timedelta(minutes=1))
             market = current("market")
             sc = scorer(market, current("lineups", LINEUP_SOURCE))
             per_j = expectations(sc, fixture_ratings(market), set(sc.lookup),
                                  current("matches"))[0]
-            pred = {k: pts * p for k, (pts, p) in per_j.get(j, {}).items()}
-            out.append({"jornada": j, "pred": pred,
-                        **score_forecast(pred, actual, j)})
+            flagged = {k for k in sc.lookup if sc.starts.status_of(k)}
+            for j in range(i, i + ahead + 1):
+                if j not in done or j not in per_j:
+                    continue
+                pred = {k: pts * p for k, (pts, p) in per_j[j].items()}
+                hurt = {k: v for k, v in pred.items() if k in flagged}
+                out.append({"jornada": j, "from": i, "pred": pred,
+                            **score_forecast(pred, actual, j),
+                            "flagged": score_forecast(hurt, actual, j)})
     finally:
         set_now(None)
     return out
@@ -106,6 +115,22 @@ def _selftest() -> None:
 if __name__ == "__main__":
     if "--selftest" in sys.argv:
         _selftest()
+    elif "--ahead" in sys.argv:
+        h = int(sys.argv[sys.argv.index("--ahead") + 1])
+        runs = backtest(ahead=h)
+        for d in range(h + 1):
+            rows = [r for r in runs if r["jornada"] - r["from"] == d]
+            f = [r["flagged"] for r in rows if r["flagged"]["n"]]
+            print("%d ahead: %d forecasts, rmse %.3f; flagged players n=%d rmse %.3f bias %+.3f"
+                  % (d, len(rows), statistics.fmean(r["rmse"] for r in rows),
+                     sum(x["n"] for x in f),
+                     math.sqrt(sum(x["rmse"] ** 2 * x["n"] for x in f) / max(1, sum(x["n"] for x in f))),
+                     sum(x["bias"] * x["n"] for x in f) / max(1, sum(x["n"] for x in f))))
+        rest = sys.argv[sys.argv.index("--ahead") + 2:]
+        if rest:
+            Path(rest[0]).write_text(json.dumps(
+                {"%d>%d" % (r["from"], r["jornada"]): r["pred"] for r in runs}),
+                encoding="utf-8")
     elif "--backtest" in sys.argv:
         runs = backtest()
         for r in runs:
