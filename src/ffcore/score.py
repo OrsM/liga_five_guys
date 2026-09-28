@@ -165,6 +165,9 @@ class Scorer:
         return Rating(sum(w * m for w, m in terms) / sum(w for w, _ in terms),
                       not prior_pj and cur_pj < k, cur_pj, prior_pj + cur_pj)
 
+    def availability(self, key: str, jornada: int, when) -> float | None:
+        return self.starts.availability(key, jornada, when)
+
     def rates(self, rec: dict) -> Rates:
         key = row_key(rec)
         rating = self.rate(rec)

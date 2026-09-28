@@ -22,7 +22,7 @@ from ffcore.schedule import expectations, phantom_fill
 from ffcore.score import fit_promoted_discount, per_jornada_current, Scorer, totals
 from ffcore.rules import SLOT
 from ffcore.season import LeagueState
-from ffcore.startprob import StartOdds, calibrate, outcomes
+from ffcore.startprob import StartOdds, calibrate, fit_availability, outcomes
 from ffcore.tidy import (DECISIONS, LINEUP_SOURCE, SEASON, age_hours, current,
                          history, read_csv)
 
@@ -46,7 +46,8 @@ def scorer(market: list[dict], xi_rows: list[dict]) -> Scorer:
     outs = outcomes(history("lineups", LINEUP_SOURCE), current("starters"),
                     clock_history().round_locks, jornada_of_match(), xw)
     return Scorer(
-        market, StartOdds(xi_rows, xw, calibrate(outs)), last_season,
+        market, StartOdds(xi_rows, xw, calibrate(outs), fit_availability(outs)),
+        last_season,
         current={k: dict(zip(("pts", "pj", "start_rate", "start_n"),
                              totals(jd)))
                  for k, jd in by_key.items()},

@@ -1,6 +1,8 @@
 
 from __future__ import annotations
 
+from datetime import date, timedelta
+
 from ffcore.fixture import season_board
 from ffcore.locks import JornadaClock
 from ffcore.rules import FREE_FORMATIONS, MAX_SLOT
@@ -36,16 +38,28 @@ def status_adjusted(pts: float, p_start: float, status: str
     return (pts * DOUBT_FACTOR if status == "doubt" else pts), p_start
 
 
-def jornada_expectation(r, match, first: bool) -> tuple[float, float]:
+def jornada_expectation(r, match, first: bool, avail: float | None = None
+                        ) -> tuple[float, float]:
     fix = 1.0 if match is None else (
         match.def_factor if r.slot in ("POR", "DEF") else match.atk_factor)
-    pts, p = max(0.0, r.ppm * fix), (r.p_now if first else r.p_rest)
+    pts = max(0.0, r.ppm * fix)
+    if avail is not None:
+        return pts, r.p_rest * avail
+    p = r.p_now if first else r.p_rest
     return status_adjusted(pts, p, r.status) if first else (pts, p)
 
 
+def jornada_dates(matches: list[dict], rem: list[int]) -> dict[int, date]:
+    known = {j: when.date() for j in rem
+             if (when := JornadaClock(matches).round_lock(j))}
+    return {j: known[j] if j in known else known[near] + timedelta(weeks=j - near)
+            for j in rem if known
+            for near in [min(known, key=lambda k: abs(k - j))]}
+
+
 def season(rates: dict, club: dict[str, str], rem: list[int],
-           played: dict[int, set[str]], board: dict[int, dict]
-           ) -> tuple[dict[int, dict], dict[str, int]]:
+           played: dict[int, set[str]], board: dict[int, dict],
+           avail=None) -> tuple[dict[int, dict], dict[str, int]]:
     per_j: dict[int, dict] = {}
     first_of: dict[str, int] = {}
     for j in rem:
@@ -57,7 +71,8 @@ def season(rates: dict, club: dict[str, str], rem: list[int],
             if first:
                 first_of[k] = j
             layer[k] = UNSCORED_DEFAULT if r is None else jornada_expectation(
-                r, board.get(j, {}).get(club.get(k)), first)
+                r, board.get(j, {}).get(club.get(k)), first,
+                avail(k, j) if avail else None)
         per_j[j] = layer
     return per_j, first_of
 
@@ -70,8 +85,10 @@ def expectations(sc, ratings, keys, matches: list[dict]
     rates = {k: sc.rates(sc.lookup[k]) if k in sc.lookup else None
              for k in keys}
     club = {k: sc.lookup[k].get("club") for k in keys if k in sc.lookup}
-    per_j, first_of = season(rates, club, rem, played,
-                             season_board(ratings, matches, rem))
+    dates = jornada_dates(matches, rem)
+    per_j, first_of = season(
+        rates, club, rem, played, season_board(ratings, matches, rem),
+        lambda k, j: sc.availability(k, j, dates[j]) if j in dates else None)
     return per_j, first_of, rates, rem, played
 
 
@@ -127,6 +144,20 @@ def phantom_fill(squads: dict[str, dict[str, str]], per_jornada: dict[int, dict]
 
 
 def _selftest() -> None:
+    from ffcore.score import Rates as R
+
+    fixt = [{"jornada": "8", "home": "a", "away": "b",
+             "kickoff": "2026-10-11T14:00:00+00:00", "score": ""},
+            {"jornada": "9", "home": "a", "away": "c", "kickoff": "", "score": ""}]
+    got = jornada_dates(fixt, [8, 9, 10])
+    assert got == {8: date(2026, 10, 11), 9: date(2026, 10, 18),
+                   10: date(2026, 10, 25)}, got
+    assert jornada_dates([], [8]) == {}
+    hurt = R("k", "DEL", 4.0, 0.6, 0.8, "doubt", 10.0)
+    assert jornada_expectation(hurt, None, True) == (2.0, 0.6), "old path: halved"
+    assert jornada_expectation(hurt, None, True, 0.5) == (4.0, 0.4), \
+        "a prognosis replaces the doubt halving and the blended start chance"
+
     ms = [{"jornada": "1", "home": "alaves", "away": "getafe", "score": "3-0"},
           {"jornada": "1", "home": "celta", "away": "osasuna", "score": ""},
           {"jornada": "2", "home": "alaves", "away": "celta", "score": ""},

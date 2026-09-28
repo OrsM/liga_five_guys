@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import bisect
+import datetime as dt
 import math
+import re
 from dataclasses import dataclass, replace
 from typing import NamedTuple
 
@@ -11,7 +13,8 @@ from ffcore.parse import pct100
 from ffcore.text import norm
 from ffcore.rules import minutes_played
 
-__all__ = ["Obs", "Outcome", "Calibration", "StartOdds", "calibrate", "fit", "outcomes",
+__all__ = ["Obs", "Outcome", "Calibration", "StartOdds", "Availability",
+           "prognosis", "fit_availability", "calibrate", "fit", "outcomes",
            "observations", "fit_start_fallbacks", "NEUTRAL_START",
            "ABSENT_START"]
 
@@ -52,16 +55,111 @@ class Calibration:
         return _platt(ff_pct / 100.0, self.alpha, self.beta)
 
 
+MONTHS = {m: i + 1 for i, m in enumerate(
+    "enero febrero marzo abril mayo junio julio agosto septiembre octubre "
+    "noviembre diciembre".split())}
+PART = {"principios": 5, "princpios": 5, "mediados": 15, "finales": 25}
+_UNTIL = re.compile(r"Baja (?:hasta|hsata) (?:(%s) de )?(%s)(?:-\w+)?(?: (\d{4}))?"
+                    % ("|".join(PART), "|".join(MONTHS)))
+_FOR = [(re.compile(r"Duda para la jornada (\d+)"), "doubt_for"),
+        (re.compile(r"Baja confirmada para la jornada (\d+)"), "out_for"),
+        (re.compile(r"Disponible para la jornada (\d+)"), "available_from")]
+# What each prognosis says, read literally; the data moves these (AVAIL_K).
+PRIOR = {"doubt_for:before": 0.0, "doubt_for:at": 0.5, "doubt_for:after": 1.0,
+         "out_for:before": 0.0, "out_for:at": 0.0, "out_for:after": 1.0,
+         "available_from:before": 0.0, "available_from:at": 1.0,
+         "available_from:after": 1.0,
+         "out_until:weeks_before": 0.0, "out_until:days_before": 0.0,
+         "out_until:after": 1.0, "indefinite": 0.0}
+AVAIL_K = 4.0
+
+
+def prognosis(note: str, seen: dt.date) -> tuple[str, object] | None:
+    """futbolfantasy's injury note, as (kind, jornada) or ("out_until",
+    date): 'Duda para la jornada 8', 'Baja hasta mediados de octubre'."""
+    for pat, kind in _FOR:
+        if m := pat.search(note or ""):
+            return kind, int(m.group(1))
+    if m := _UNTIL.search(note or ""):
+        month = MONTHS[m.group(2)]
+        year = int(m.group(3)) if m.group(3) else (
+            seen.year + (1 if month < seen.month - 1 else 0))
+        return "out_until", dt.date(year, month, PART.get(m.group(1), 15))
+    if "Baja indefinida" in (note or ""):
+        return "indefinite", None
+    return None
+
+
+def _bucket(prog: tuple[str, object], jornada: int, when: dt.date) -> str:
+    kind, arg = prog
+    if kind == "indefinite":
+        return kind
+    if kind == "out_until":
+        days = (when - arg).days
+        return "out_until:" + ("weeks_before" if days < -14 else
+                               "days_before" if days < 0 else "after")
+    return "%s:%s" % (kind, "before" if jornada < arg else
+                      "at" if jornada == arg else "after")
+
+
+class Availability:
+    """The chance an injured player is fit for a jornada, by where it falls
+    against his prognosis: fitted from past prognoses against who played,
+    relative to how often the same players play when fit."""
+
+    def __init__(self, level: dict[str, float] | None = None):
+        self.level = {**PRIOR, **(level or {})}
+
+    def of(self, prog: tuple[str, object], jornada: int, when: dt.date) -> float:
+        return self.level[_bucket(prog, jornada, when)]
+
+
+def fit_availability(outs: list[Outcome], k: float = AVAIL_K) -> Availability:
+    """Pair each prognosis, as seen at one lock, with whether the player
+    played in that jornada and every later one: the question the forecast
+    asks of today's note."""
+    fit_rate: dict[str, list[float]] = {}
+    by_key: dict[str, dict[int, Outcome]] = {}
+    for o in outs:
+        if not o.key:
+            continue
+        by_key.setdefault(o.key, {})[o.jornada] = o
+        if o.listed and o.status == "ok":
+            fit_rate.setdefault(o.key, []).append(_played(o))
+    base = {key: sum(v) / len(v) for key, v in fit_rate.items() if len(v) >= 3}
+    tally: dict[str, list[float]] = {}
+    for key, seen in by_key.items():
+        if key not in base:
+            continue
+        for i, oi in seen.items():
+            prog = prognosis(oi.note, _day(oi.at)) if oi.status not in (
+                "", "ok") else None
+            for j, oj in seen.items() if prog else ():
+                if j >= i:
+                    t = tally.setdefault(_bucket(prog, j, _day(oj.at)), [0.0, 0.0])
+                    t[0] += _played(oj)
+                    t[1] += base[key]
+    return Availability({b: min(1.0, (got + k * PRIOR[b]) / (fit + k))
+                         for b, (got, fit) in tally.items()})
+
+
+def _day(stamp: str) -> dt.date:
+    return dt.datetime.strptime(stamp, "%Y-%m-%dT%H%MZ").date()
+
+
 class StartOdds:
     """What the probable-XI pages say about each player's next start: the
     listed start percentage, whether he is listed at all, and any injury or
     suspension, read through the calibration fitted to who really started."""
 
-    def __init__(self, xi: list[dict], xw, cal: Calibration | None = None):
+    def __init__(self, xi: list[dict], xw, cal: Calibration | None = None,
+                 avail: Availability | None = None):
         self.cal = cal or Calibration()
+        self.avail = avail or Availability()
         self.start_pct: dict[str, float] = {}
         self.listed: set[str] = set()
         self.status: dict[str, str] = {}
+        self.prognosis: dict[str, tuple[str, object]] = {}
         for r in xi or []:
             key = xw.key_of(r) if xw else None
             if not key:
@@ -72,6 +170,11 @@ class StartOdds:
                 self.start_pct[key] = max(self.start_pct.get(key, 0.0), p)
             if r.get("status") and r["status"] != "ok":
                 self.status[key] = r["status"]
+                seen = (r.get("observed_at") or "")[:10]
+                prog = prognosis(r.get("note") or "", dt.date.fromisoformat(
+                    seen) if seen else dt.date.today())
+                if prog:
+                    self.prognosis[key] = prog
 
     def p_now(self, key: str) -> float:
         pct = self.start_pct.get(key)
@@ -81,6 +184,10 @@ class StartOdds:
 
     def status_of(self, key: str) -> str:
         return self.status.get(key, "")
+
+    def availability(self, key: str, jornada: int, when: dt.date) -> float | None:
+        prog = self.prognosis.get(key)
+        return None if prog is None else self.avail.of(prog, jornada, when)
 
 
 def _grid_brier(obs) -> np.ndarray:
@@ -127,6 +234,7 @@ class Outcome(NamedTuple):
     status: str
     in_squad: bool
     mins: float
+    note: str = ""
 
 
 def _last_before(hist: list, cut: str):
@@ -172,7 +280,8 @@ def outcomes(lineups, starters, locks: dict, jornada_of: dict, xw
                 (row.get("status") or "ok") if row else "",
                 played is not None,
                 minutes_played(played["role"], played.get("minute"))
-                if played else 0.0))
+                if played else 0.0,
+                (row.get("note") or "") if row else ""))
     return sorted(out, key=lambda o: (o.at, o.group))
 
 
@@ -220,6 +329,44 @@ def _selftest() -> None:
     assert odds.p_now("cai") == ABSENT_START / 100 and odds.status_of("cai") == ""
     assert StartOdds([{"player_name": "Ana", "start_pct": "80"}], None).listed == set()
 
+    sept = dt.date(2026, 9, 28)
+    assert prognosis("Lesión Desde 13/09 (15 días) Duda para la jornada 8", sept) \
+        == ("doubt_for", 8)
+    assert prognosis("x Baja confirmada para la jornada 9", sept) == ("out_for", 9)
+    assert prognosis("x Disponible para la jornada 10", sept) == ("available_from", 10)
+    assert prognosis("x Baja hasta mediados de octubre", sept) \
+        == ("out_until", dt.date(2026, 10, 15))
+    assert prognosis("x Baja hasta enero", sept) == ("out_until", dt.date(2027, 1, 15)), \
+        "a month already past is next year's"
+    assert prognosis("x Baja hasta finales de enero 2028", sept) \
+        == ("out_until", dt.date(2028, 1, 25))
+    assert prognosis("x Baja hsata principios de noviembre", sept) \
+        == ("out_until", dt.date(2026, 11, 5)), "the site's own typo"
+    assert prognosis("x Baja indefinida", sept) == ("indefinite", None)
+    assert prognosis("Sancionado", sept) is None and prognosis("", sept) is None
+    assert _bucket(("doubt_for", 8), 8, sept) == "doubt_for:at"
+    assert _bucket(("out_until", dt.date(2026, 10, 15)), 9, dt.date(2026, 10, 5)) \
+        == "out_until:days_before"
+    assert Availability().of(("out_for", 9), 9, sept) == 0.0
+    assert Availability().of(("available_from", 8), 9, sept) == 1.0
+
+    def out(at, j, status, mins, note=""):
+        return Outcome(at, j, "m", "t:a", "a", True, 0.8, status, True, mins, note)
+    fit_days = ["2026-08-%02dT1800Z" % d for d in (1, 8, 15)]
+    history = [out(a, j + 1, "ok", 90.0) for j, a in enumerate(fit_days)]
+    history += [out("2026-08-22T1800Z", 4, "doubt", 0.0, "Duda para la jornada 4"),
+                out("2026-08-29T1800Z", 5, "ok", 90.0)]
+    fitted = fit_availability(history, k=0.0)
+    assert fitted.level["doubt_for:at"] == 0.0, "doubtful for 4, missed 4"
+    assert fitted.level["doubt_for:after"] == 1.0, "and was back for 5"
+    assert fit_availability([]).level == PRIOR
+    odds = StartOdds([{"player_name": "Ana", "status": "doubt",
+                       "observed_at": "2026-09-28T0400Z",
+                       "note": "Duda para la jornada 8"}], xw, avail=fitted)
+    assert odds.availability("ana", 8, sept) == 0.0
+    assert odds.availability("ana", 9, sept) == 1.0
+    assert odds.availability("bo", 8, sept) is None, "no prognosis, no say"
+
     assert abs(_platt(0.5, 0.0, 1.0) - 0.5) < 1e-6
     assert abs(_platt(0.8, 0.0, 1.0) - 0.8) < 1e-6
     assert _platt(0.8, 0.0, 3.0) > 0.8 and _platt(0.2, 0.0, 3.0) < 0.2
@@ -250,7 +397,6 @@ def _selftest() -> None:
         c = Calibration(INTERCEPT[i], SLOPE[j])
         assert abs(brier[i, j] - _brier(c, grid_obs) / len(grid_obs)) < 1e-12
 
-    import datetime as dt
 
     locks = {1: dt.datetime(2026, 8, 15, 19, 30, tzinfo=dt.timezone.utc)}
     before, after = "2026-08-14T1000Z", "2026-08-16T1000Z"
