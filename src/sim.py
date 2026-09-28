@@ -179,8 +179,8 @@ def _selftest() -> None:
     assert [d["what"] for d in doc["do"]][:1] == ["field"], doc["do"]
     assert {d["name"].lower() for d in doc["do"] if d["what"] == "buy"} == set(bought)
     assert all(b["name"].lower() not in bought for b in doc["backup"])
-    assert doc["confidence"] == 0.7
-    assert all(0.7 <= d["chance"] <= 1.0 for d in doc["do"] + doc["backup"]
+    assert doc["confidence"] == CONFIDENCE
+    assert all(CONFIDENCE <= d["chance"] <= 1.0 for d in doc["do"] + doc["backup"]
                if "chance" in d), "only moves that clear the bar are shown"
     assert [s["pos"] for s in doc["squad"]][0] == "POR", doc["squad"]
     assert sum(s["xi"] for s in doc["squad"]) == 11

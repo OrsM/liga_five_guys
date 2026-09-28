@@ -15,9 +15,7 @@ __all__ = ["starters_per_slot", "Rating", "Rates", "Scorer", "squad_pool",
 
 
 SHRINK_K = 4.0
-DOUBT_FACTOR = 0.5
 
-OUT_STATUSES = frozenset({"injured", "suspended", "unavailable"})
 PROMOTED_DISCOUNT = 0.70
 
 PROMOTED_DISCOUNT_K = 50.0
@@ -165,8 +163,9 @@ class Scorer:
         return Rating(sum(w * m for w, m in terms) / sum(w for w, _ in terms),
                       not prior_pj and cur_pj < k, cur_pj, prior_pj + cur_pj)
 
-    def availability(self, key: str, jornada: int, when) -> float | None:
-        return self.starts.availability(key, jornada, when)
+    def availability(self, key: str, jornada: int, when, next_j: int
+                     ) -> float | None:
+        return self.starts.availability(key, jornada, when, next_j)
 
     def rates(self, rec: dict) -> Rates:
         key = row_key(rec)

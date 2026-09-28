@@ -9,12 +9,12 @@ from typing import NamedTuple
 
 import numpy as np
 
-from ffcore.parse import pct100
+from ffcore.parse import pct100, snapshot_stamp
 from ffcore.text import norm
 from ffcore.rules import minutes_played
 
 __all__ = ["Obs", "Outcome", "Calibration", "StartOdds", "Availability",
-           "prognosis", "fit_availability", "calibrate", "fit", "outcomes",
+           "prognosis", "prognosis_of", "fit_availability", "calibrate", "fit", "outcomes",
            "observations", "fit_start_fallbacks", "NEUTRAL_START",
            "ABSENT_START"]
 
@@ -72,6 +72,10 @@ PRIOR = {"doubt_for:before": 0.0, "doubt_for:at": 0.5, "doubt_for:after": 1.0,
          "out_until:weeks_before": 0.0, "out_until:days_before": 0.0,
          "out_until:after": 1.0, "indefinite": 0.0}
 AVAIL_K = 4.0
+# A flagged player with no prognosis in his note: the status, read as being
+# about his next match (argument None until that jornada is known).
+IMPLIED = {"doubt": "doubt_for", "suspended": "out_for",
+           "unavailable": "out_for", "injured": "out_for"}
 
 
 def prognosis(note: str, seen: dt.date) -> tuple[str, object] | None:
@@ -90,10 +94,23 @@ def prognosis(note: str, seen: dt.date) -> tuple[str, object] | None:
     return None
 
 
-def _bucket(prog: tuple[str, object], jornada: int, when: dt.date) -> str:
+def prognosis_of(status: str, note: str, seen: dt.date
+                 ) -> tuple[str, object] | None:
+    """What a listing says about the coming jornadas: its note's prognosis,
+    else its status for the player's next match; nothing if he is fit."""
+    if status in ("", "ok"):
+        return None
+    return prognosis(note, seen) or (
+        (IMPLIED[status], None) if status in IMPLIED else None)
+
+
+def _bucket(prog: tuple[str, object], jornada: int, when: dt.date,
+            next_j: int) -> str:
     kind, arg = prog
     if kind == "indefinite":
         return kind
+    if arg is None:
+        arg = next_j
     if kind == "out_until":
         days = (when - arg).days
         return "out_until:" + ("weeks_before" if days < -14 else
@@ -110,8 +127,9 @@ class Availability:
     def __init__(self, level: dict[str, float] | None = None):
         self.level = {**PRIOR, **(level or {})}
 
-    def of(self, prog: tuple[str, object], jornada: int, when: dt.date) -> float:
-        return self.level[_bucket(prog, jornada, when)]
+    def of(self, prog: tuple[str, object], jornada: int, when: dt.date,
+           next_j: int) -> float:
+        return self.level[_bucket(prog, jornada, when, next_j)]
 
 
 def fit_availability(outs: list[Outcome], k: float = AVAIL_K) -> Availability:
@@ -132,11 +150,11 @@ def fit_availability(outs: list[Outcome], k: float = AVAIL_K) -> Availability:
         if key not in base:
             continue
         for i, oi in seen.items():
-            prog = prognosis(oi.note, _day(oi.at)) if oi.status not in (
-                "", "ok") else None
+            prog = prognosis_of(oi.status, oi.note, _day(oi.at))
             for j, oj in seen.items() if prog else ():
                 if j >= i:
-                    t = tally.setdefault(_bucket(prog, j, _day(oj.at)), [0.0, 0.0])
+                    t = tally.setdefault(_bucket(prog, j, _day(oj.at), i),
+                                         [0.0, 0.0])
                     t[0] += _played(oj)
                     t[1] += base[key]
     return Availability({b: min(1.0, (got + k * PRIOR[b]) / (fit + k))
@@ -144,7 +162,7 @@ def fit_availability(outs: list[Outcome], k: float = AVAIL_K) -> Availability:
 
 
 def _day(stamp: str) -> dt.date:
-    return dt.datetime.strptime(stamp, "%Y-%m-%dT%H%MZ").date()
+    return snapshot_stamp(stamp).date()
 
 
 class StartOdds:
@@ -170,9 +188,8 @@ class StartOdds:
                 self.start_pct[key] = max(self.start_pct.get(key, 0.0), p)
             if r.get("status") and r["status"] != "ok":
                 self.status[key] = r["status"]
-                seen = (r.get("observed_at") or "")[:10]
-                prog = prognosis(r.get("note") or "", dt.date.fromisoformat(
-                    seen) if seen else dt.date.today())
+                prog = prognosis_of(r["status"], r.get("note") or "", _day(
+                    r["observed_at"]) if r.get("observed_at") else dt.date.today())
                 if prog:
                     self.prognosis[key] = prog
 
@@ -185,9 +202,12 @@ class StartOdds:
     def status_of(self, key: str) -> str:
         return self.status.get(key, "")
 
-    def availability(self, key: str, jornada: int, when: dt.date) -> float | None:
+    def availability(self, key: str, jornada: int, when: dt.date | None,
+                     next_j: int) -> float | None:
         prog = self.prognosis.get(key)
-        return None if prog is None else self.avail.of(prog, jornada, when)
+        if prog is None or (when is None and prog[0] == "out_until"):
+            return None
+        return self.avail.of(prog, jornada, when, next_j)
 
 
 def _grid_brier(obs) -> np.ndarray:
@@ -344,11 +364,17 @@ def _selftest() -> None:
         == ("out_until", dt.date(2026, 11, 5)), "the site's own typo"
     assert prognosis("x Baja indefinida", sept) == ("indefinite", None)
     assert prognosis("Sancionado", sept) is None and prognosis("", sept) is None
-    assert _bucket(("doubt_for", 8), 8, sept) == "doubt_for:at"
-    assert _bucket(("out_until", dt.date(2026, 10, 15)), 9, dt.date(2026, 10, 5)) \
+    assert _bucket(("doubt_for", 8), 8, sept, 8) == "doubt_for:at"
+    assert _bucket(("out_until", dt.date(2026, 10, 15)), 9, dt.date(2026, 10, 5), 8) \
         == "out_until:days_before"
-    assert Availability().of(("out_for", 9), 9, sept) == 0.0
-    assert Availability().of(("available_from", 8), 9, sept) == 1.0
+    assert Availability().of(("out_for", 9), 9, sept, 8) == 0.0
+    assert Availability().of(("available_from", 8), 9, sept, 8) == 1.0
+    assert prognosis_of("suspended", "", sept) == ("out_for", None)
+    assert prognosis_of("doubt", "Duda para la jornada 9", sept) == ("doubt_for", 9)
+    assert prognosis_of("ok", "Duda para la jornada 9", sept) is None
+    assert _bucket(("out_for", None), 8, sept, 8) == "out_for:at"
+    assert _bucket(("out_for", None), 9, sept, 8) == "out_for:after", \
+        "a suspension is the next match, whichever jornada that is"
 
     def out(at, j, status, mins, note=""):
         return Outcome(at, j, "m", "t:a", "a", True, 0.8, status, True, mins, note)
@@ -363,9 +389,9 @@ def _selftest() -> None:
     odds = StartOdds([{"player_name": "Ana", "status": "doubt",
                        "observed_at": "2026-09-28T0400Z",
                        "note": "Duda para la jornada 8"}], xw, avail=fitted)
-    assert odds.availability("ana", 8, sept) == 0.0
-    assert odds.availability("ana", 9, sept) == 1.0
-    assert odds.availability("bo", 8, sept) is None, "no prognosis, no say"
+    assert odds.availability("ana", 8, sept, 8) == 0.0
+    assert odds.availability("ana", 9, sept, 8) == 1.0
+    assert odds.availability("bo", 8, sept, 8) is None, "no prognosis, no say"
 
     assert abs(_platt(0.5, 0.0, 1.0) - 0.5) < 1e-6
     assert abs(_platt(0.8, 0.0, 1.0) - 0.8) < 1e-6

@@ -6,7 +6,6 @@ from datetime import date, timedelta
 from ffcore.fixture import season_board
 from ffcore.locks import JornadaClock
 from ffcore.rules import FREE_FORMATIONS, MAX_SLOT
-from ffcore.score import DOUBT_FACTOR, OUT_STATUSES
 
 
 def rounds_left(matches) -> tuple[list[int], dict[int, set[str]]]:
@@ -30,14 +29,6 @@ def rounds_left(matches) -> tuple[list[int], dict[int, set[str]]]:
 UNSCORED_DEFAULT = (2.0, 0.5)
 
 
-def status_adjusted(pts: float, p_start: float, status: str
-                    ) -> tuple[float, float]:
-
-    if status in OUT_STATUSES:
-        return pts, 0.0
-    return (pts * DOUBT_FACTOR if status == "doubt" else pts), p_start
-
-
 def jornada_expectation(r, match, first: bool, avail: float | None = None
                         ) -> tuple[float, float]:
     fix = 1.0 if match is None else (
@@ -45,13 +36,12 @@ def jornada_expectation(r, match, first: bool, avail: float | None = None
     pts = max(0.0, r.ppm * fix)
     if avail is not None:
         return pts, r.p_rest * avail
-    p = r.p_now if first else r.p_rest
-    return status_adjusted(pts, p, r.status) if first else (pts, p)
+    return pts, (r.p_now if first else r.p_rest)
 
 
 def jornada_dates(matches: list[dict], rem: list[int]) -> dict[int, date]:
-    known = {j: when.date() for j in rem
-             if (when := JornadaClock(matches).round_lock(j))}
+    clock = JornadaClock(matches)
+    known = {j: when.date() for j in rem if (when := clock.round_lock(j))}
     return {j: known[j] if j in known else known[near] + timedelta(weeks=j - near)
             for j in rem if known
             for near in [min(known, key=lambda k: abs(k - j))]}
@@ -72,7 +62,7 @@ def season(rates: dict, club: dict[str, str], rem: list[int],
                 first_of[k] = j
             layer[k] = UNSCORED_DEFAULT if r is None else jornada_expectation(
                 r, board.get(j, {}).get(club.get(k)), first,
-                avail(k, j) if avail else None)
+                avail(k, j, first_of[k]) if avail else None)
         per_j[j] = layer
     return per_j, first_of
 
@@ -88,7 +78,7 @@ def expectations(sc, ratings, keys, matches: list[dict]
     dates = jornada_dates(matches, rem)
     per_j, first_of = season(
         rates, club, rem, played, season_board(ratings, matches, rem),
-        lambda k, j: sc.availability(k, j, dates[j]) if j in dates else None)
+        lambda k, j, first: sc.availability(k, j, dates.get(j), first))
     return per_j, first_of, rates, rem, played
 
 
@@ -154,7 +144,7 @@ def _selftest() -> None:
                    10: date(2026, 10, 25)}, got
     assert jornada_dates([], [8]) == {}
     hurt = R("k", "DEL", 4.0, 0.6, 0.8, "doubt", 10.0)
-    assert jornada_expectation(hurt, None, True) == (2.0, 0.6), "old path: halved"
+    assert jornada_expectation(hurt, None, True) == (4.0, 0.6), "no prognosis, no say"
     assert jornada_expectation(hurt, None, True, 0.5) == (4.0, 0.4), \
         "a prognosis replaces the doubt halving and the blended start chance"
 
@@ -168,7 +158,7 @@ def _selftest() -> None:
     assert done == {1: {"alaves", "getafe"}}, done
 
     from ffcore.fixture import Match
-    from ffcore.score import DOUBT_FACTOR, Rates
+    from ffcore.score import Rates
 
     easy, hard = Match(1.2, 1.1), Match(0.8, 0.7)
     rates = {"del": Rates("del", "DEL", 8.0, 0.9, 0.7, "", 10.0),
@@ -179,14 +169,17 @@ def _selftest() -> None:
     club = {"del": "mine", "por": "mine", "susp": "mine", "dbt": "mine",
             "ghost": "other"}
     board = {1: {"mine": easy}, 2: {"mine": hard}, 3: {}}
-    per_j, first_of = season(rates, club, [1, 2, 3], {}, board)
+    hurt_now = {"susp": 0.0, "dbt": 0.5}
+    per_j, first_of = season(rates, club, [1, 2, 3], {}, board,
+                             lambda k, j, first: (hurt_now[k] if j == first else 1.0)
+                             if k in hurt_now else None)
     assert per_j[1]["del"] == (8.0 * 1.2, 0.9), per_j[1]
     assert per_j[1]["por"] == (4.0 * 1.1, 0.9), per_j[1]
     assert per_j[2]["del"] == (8.0 * 0.8, 0.7), per_j[2]
     assert per_j[3]["del"] == (8.0, 0.7), per_j[3]
     assert per_j[1]["susp"] == (8.0 * 1.2, 0.0), per_j[1]["susp"]
     assert per_j[2]["susp"] == (8.0 * 0.8, 0.8), "a suspension is one match"
-    assert per_j[1]["dbt"] == (5.0 * 1.2 * DOUBT_FACTOR, 0.8), per_j[1]["dbt"]
+    assert per_j[1]["dbt"] == (5.0 * 1.2, 0.8 * 0.5), per_j[1]["dbt"]
     assert per_j[1]["ghost"] == per_j[2]["ghost"] == UNSCORED_DEFAULT
     assert first_of == dict.fromkeys(rates, 1), first_of
 
