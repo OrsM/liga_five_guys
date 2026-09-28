@@ -17,8 +17,8 @@ from ffcore.outlook import Outlook
 from ffcore.season import LeagueState, Standings, best_xi, simulate_many
 
 from ffcore.rules import FREE_FORMATIONS
-__all__ = ["Action", "Band", "CONFIDENCE", "Move", "Ranking", "Universe", "band_acts", "plan",
-           "sale_pts"]
+__all__ = ["Action", "CONFIDENCE", "Move", "Ranking", "Universe", "band_acts", "plan",
+           "sales"]
 
 SCREEN_TRIALS = 250
 FINAL_TRIALS = 3000
@@ -27,14 +27,11 @@ KEEP = 12
 
 @dataclass(frozen=True)
 class Move:
-    """One candidate, scored against doing nothing: its median change in
-    season points with the 10th-90th percentile band, the cash it frees or
-    spends priced in points, and the share of simulated seasons in which it
-    leaves you better off, cash included."""
+    """One action, scored against doing nothing: its median change in season
+    points, the cash it frees or spends priced in points, and the share of
+    simulated seasons in which it leaves you better off, cash included."""
     action: Action
     d_pts: float
-    pts_lo: float = 0.0
-    pts_hi: float = 0.0
     cash_pts: float = 0.0
     p_better: float = 1.0
 
@@ -43,19 +40,11 @@ class Move:
         return self.d_pts + self.cash_pts
 
 
-class Band(NamedTuple):
-    median: float
-    lo: float
-    hi: float
-    action: Action
-    mean: float
-
-
 class Ranking(NamedTuple):
     rows: list[Move]
     base: Standings
     measured: float | None
-    bands: dict[str, Band]
+    alone: dict[str, Move]
 
 
 @dataclass(frozen=True)
@@ -122,13 +111,13 @@ class Universe:
         base_s, rest = screen[0], screen[1:]
         screened, reach = [], []
         for a, r in zip(acts, rest):
-            d, _lo, _hi = band(paired(r, base_s, self.me))
+            d = median_gain(paired(r, base_s, self.me))
             reach.append((a.cost - a.proceeds - self.market.cash, d))
         measured = cash_price(reach)
         lam = self.market.lam if self.market.lam is not None else (measured or 0.0)
         for a, r in zip(acts, rest):
             if a.cost <= self.market.cash + a.proceeds:
-                d, _lo, _hi = band(paired(r, base_s, self.me))
+                d = median_gain(paired(r, base_s, self.me))
                 screened.append((d + self.market.cash_pts(a, lam), a))
 
         cur_xi = self.outlook.xi.players
@@ -149,18 +138,17 @@ class Universe:
         final = score_many(self, [self.state.squads] + afters
                             + [apply(self, a) for _k, a in rest], FINAL_TRIALS, seed)
         base, scored = final[0], final[1:len(afters) + 1]
-        bands = {k: Band(*band(pairs), a, sum(pairs) / len(pairs) if pairs else 0.0)
-                for (k, a), pairs in ((ka, paired(r, base, self.me)) for ka, r in
-                                      zip(rest, final[len(afters) + 1:]))}
-        out = []
-        for a, r in zip(keep, scored):
-            cash = self.market.cash_pts(a, lam)
-            pairs = paired(r, base, self.me)
-            d_pts, lo, hi = band(pairs)
-            better = sum(1 for x in pairs if x + cash > 0) / len(pairs) if pairs else 0.0
-            out.append(Move(a, d_pts, lo, hi, cash, better))
-        rows = sorted(out, key=lambda d: (-d.net_pts, d.action.net))
-        return Ranking(rows, base, measured, bands)
+        alone = {k: self._move(a, paired(r, base, self.me), lam)
+                 for (k, a), r in zip(rest, final[len(afters) + 1:])}
+        rows = sorted((self._move(a, paired(r, base, self.me), lam)
+                       for a, r in zip(keep, scored)),
+                      key=lambda d: (-d.net_pts, d.action.net))
+        return Ranking(rows, base, measured, alone)
+
+    def _move(self, a: Action, pairs: list[float], lam) -> Move:
+        cash = self.market.cash_pts(a, lam)
+        better = sum(1 for x in pairs if x + cash > 0) / len(pairs) if pairs else 0.0
+        return Move(a, median_gain(pairs), cash, better)
 
 
 def _nulls_last(v: float | None) -> tuple[bool, float]:
@@ -189,11 +177,8 @@ def paired(after, base, me) -> list[float]:
                                         base.totals.get(me, [])))
 
 
-def band(pairs) -> tuple[float, float, float]:
-    if not pairs:
-        return (0.0, 0.0, 0.0)
-    return (percentile(pairs, 50), percentile(pairs, 10),
-            percentile(pairs, 90))
+def median_gain(pairs) -> float:
+    return percentile(pairs, 50) if pairs else 0.0
 
 
 def value_rate(pts, cost) -> float | None:
@@ -237,10 +222,12 @@ def band_acts(u) -> list:
                if k not in mine and o.season.get(k, 0.0) > o.xi_bar])
 
 
-def sale_pts(u, bands) -> dict[str, float]:
+def sales(u, alone: dict[str, Move]) -> list[Move]:
+    """Bench players worth selling, by the same rule as any move: a gain in
+    the median, cash included, and better off in CONFIDENCE of seasons."""
     xi = u.outlook.xi.players
-    return {k: u.market.cash_pts(bands[k].action) + bands[k].mean
-            for k in u.mine if k in bands and k not in xi}
+    bench = [alone[k] for k in u.mine if k in alone and k not in xi]
+    return sorted(worth_doing(u, bench), key=lambda mv: -mv.net_pts)
 
 
 def plan(u, rows, base) -> tuple[list[dict], float]:
@@ -253,7 +240,7 @@ def plan(u, rows, base) -> tuple[list[dict], float]:
             continue
         acts = [p.action for p in picked] + [a]
         after = score_many(u, [apply(u, *acts)], FINAL_TRIALS, 1)[0]
-        total = band(paired(after, base, u.me))[0] + sum(
+        total = median_gain(paired(after, base, u.me)) + sum(
             u.market.cash_pts(x) for x in acts)
         if total > gain:
             picked.append(r)
@@ -343,7 +330,6 @@ def _selftest() -> None:
     assert rows, "something should be worth doing"
     top = rows[0]
     assert top.d_pts > 0, top.d_pts
-    assert top.pts_lo <= top.d_pts <= top.pts_hi
     assert top.net_pts > 0, top
     assert [r.net_pts for r in rows] == sorted(
         (r.net_pts for r in rows), reverse=True)

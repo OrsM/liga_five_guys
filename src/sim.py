@@ -4,7 +4,7 @@ import json
 import sys
 
 from assemble import PRICE_LOG, universe
-from decide import (BID_BEATS, CONFIDENCE, band_acts, plan, sale_pts,
+from decide import (BID_BEATS, CONFIDENCE, band_acts, plan, sales,
                     worth_doing)
 from ffcore.league import app_fielded
 from ffcore.render import title_name
@@ -58,7 +58,7 @@ def ping(todo: list[dict]) -> str:
 
 
 def report(u, ranked, chg, lock_at=None) -> dict:
-    rows, base, bands = ranked.rows, ranked.base, ranked.bands
+    rows, base, alone = ranked.rows, ranked.base, ranked.alone
     o, m, mine = u.outlook, u.market, u.mine
     exp, xi = o.xi
     picked, gain = plan(u, rows, base)
@@ -74,9 +74,9 @@ def report(u, ranked, chg, lock_at=None) -> dict:
     todo += [{"what": "buy", **buy_row(m, r)} for r in picked]
     todo += [{"what": "sell", **player(m, k),
               "proceeds": m.proceeds.get(k, 0.0),
+              "chance": round(mv.p_better, 3),
               "done": m.route.get(k) == "listed"}
-             for k, v in sorted(sale_pts(u, bands).items(), key=lambda kv: -kv[1])
-             if v > 0 and k not in gone]
+             for mv in sales(u, alone) for k in mv.action.sell if k not in gone]
     chosen = {p.action.buy for p in picked}
     backup = [buy_row(m, r) for r in sorted(worth_doing(u, rows),
                                             key=lambda r: -r.net_pts)
@@ -118,7 +118,7 @@ def log_cash_price(measured) -> None:
 def _selftest() -> None:
     from dataclasses import replace
 
-    from decide import Action, Band, Move, Universe
+    from decide import Action, Move, Universe
     from ffcore.fixtures import tiny_market_universe
     from ffcore.market import Market
     from ffcore.forecast import Bootstrap
@@ -140,9 +140,12 @@ def _selftest() -> None:
     mu = tiny_market_universe(lam=0.3)
     mu = replace(mu, market=replace(mu.market, value={"bench_m": 3e6},
                                     trend={"bench_m": -10.0}))
-    bm = {"bench_m": Band(0.0, 0.0, 0.0,
-                          Action("sell", sell=("bench_m",), proceeds=3e6), -2.0)}
-    assert abs(sale_pts(mu, bm)["bench_m"] - (0.09 - 2.0)) < 1e-9
+    keep = Move(Action("sell", sell=("bench_m",), proceeds=3e6), -2.0, p_better=0.9)
+    cash_it = Move(Action("sell", sell=("bench_m",), proceeds=3e6), 1.0, p_better=0.9)
+    coin = Move(Action("sell", sell=("bench_m",), proceeds=3e6), 1.0, p_better=0.5)
+    assert sales(mu, {"bench_m": keep}) == [], "worth more on the bench"
+    assert sales(mu, {"bench_m": cash_it}) == [cash_it]
+    assert sales(mu, {"bench_m": coin}) == [], "a sale is a move like any other"
 
     many_j = list(range(1, 11))
     sqb = {"k": "POR", **{f"d{i}": "DEF" for i in range(1, 5)},
@@ -164,9 +167,9 @@ def _selftest() -> None:
     assert set(asked) == {*sqb, "cand", "twin"}, asked
     assert all(asked[k].buy == "" and asked[k].sell == (k,) for k in sqb)
     ranked = ub.rank(ub.candidates(), extra=list(asked.items()))
-    rows, base, bands = ranked.rows, ranked.base, ranked.bands
-    assert bands["star"].median < -20 and -5 < bands["dead"].median < 5
-    assert bands["dead"].action == asked["dead"], bands["dead"]
+    rows, base, alone = ranked.rows, ranked.base, ranked.alone
+    assert alone["star"].d_pts < -20 and -5 < alone["dead"].d_pts < 5
+    assert alone["dead"].action == asked["dead"], alone["dead"]
     picked, gain = plan(ub, rows, base)
     bought = [p.action.buy for p in picked]
     assert bought and set(bought) <= {"cand", "twin"}, bought
