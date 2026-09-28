@@ -77,7 +77,8 @@ Everything else comes from the app's API and public pages.
 
 ## Checking it
 
-    python src/grading.py --backtest [out.json]   # rebuild each past lock's forecast; rmse, bias, top-50, persistence
+    python src/grading.py --backtest [--ahead H] [out.json]  # rebuild each past lock's forecast: rmse, bias, top-50,
+                                                  # persistence; with --ahead, also H jornadas on, flagged players apart
     python src/grading.py --compare a.json b.json # two backtests, jornada by jornada
     python src/grading.py --prices                # price model walk-forward vs "no change"
     bash tools/selftests.sh                       # every module's self-test

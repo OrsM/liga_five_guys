@@ -84,14 +84,20 @@ def persistence(preds: dict[int, dict[str, float]],
 
 
 def compare(a: dict[str, dict], b: dict[str, dict]) -> list[dict]:
+    """Two backtests' next-jornada forecasts, jornada by jornada. Keys are
+    'from>jornada' (or a bare jornada, from older files)."""
     actual = _jornada_points()
+    def nxt(d):
+        return {int(k.split(">")[-1]): v for k, v in d.items()
+                if ">" not in k or len(set(k.split(">"))) == 1}
+    a, b = nxt(a), nxt(b)
     out = []
-    for j in sorted(set(a) & set(b), key=int):
+    for j in sorted(set(a) & set(b)):
         keys = set(a[j]) & set(b[j])
         pa = {k: a[j][k] for k in keys}
         pb = {k: b[j][k] for k in keys}
-        sa, sb = score_forecast(pa, actual, int(j)), score_forecast(pb, actual, int(j))
-        out.append({"jornada": int(j), "n": len(keys), "rmse": (sa["rmse"], sb["rmse"]),
+        sa, sb = score_forecast(pa, actual, j), score_forecast(pb, actual, j)
+        out.append({"jornada": j, "n": len(keys), "rmse": (sa["rmse"], sb["rmse"]),
                     "top": (sa["top"], sb["top"])})
     return out
 
@@ -115,33 +121,31 @@ def _selftest() -> None:
 if __name__ == "__main__":
     if "--selftest" in sys.argv:
         _selftest()
-    elif "--ahead" in sys.argv:
-        h = int(sys.argv[sys.argv.index("--ahead") + 1])
-        runs = backtest(ahead=h)
-        for d in range(h + 1):
-            rows = [r for r in runs if r["jornada"] - r["from"] == d]
-            f = [r["flagged"] for r in rows if r["flagged"]["n"]]
-            print("%d ahead: %d forecasts, rmse %.3f; flagged players n=%d rmse %.3f bias %+.3f"
-                  % (d, len(rows), statistics.fmean(r["rmse"] for r in rows),
-                     sum(x["n"] for x in f),
-                     math.sqrt(sum(x["rmse"] ** 2 * x["n"] for x in f) / max(1, sum(x["n"] for x in f))),
-                     sum(x["bias"] * x["n"] for x in f) / max(1, sum(x["n"] for x in f))))
-        rest = sys.argv[sys.argv.index("--ahead") + 2:]
-        if rest:
-            Path(rest[0]).write_text(json.dumps(
-                {"%d>%d" % (r["from"], r["jornada"]): r["pred"] for r in runs}),
-                encoding="utf-8")
     elif "--backtest" in sys.argv:
-        runs = backtest()
-        for r in runs:
+        args = sys.argv[sys.argv.index("--backtest") + 1:]
+        h = int(args[args.index("--ahead") + 1]) if "--ahead" in args else 0
+        out = [x for i, x in enumerate(args) if not x.startswith("--")
+               and not (i and args[i - 1] == "--ahead")]
+        runs = backtest(ahead=h)
+        first = [r for r in runs if r["jornada"] == r["from"]]
+        for r in first:
             print("j%-2d n=%3d rmse %.3f bias %+.3f top%d %.2f"
                   % (r["jornada"], r["n"], r["rmse"], r["bias"], TOP_N, r["top"]))
         print("persistent share of a player's expectation: %.2f" % persistence(
-            {r["jornada"]: r["pred"] for r in runs}, _jornada_points()))
-        rest = sys.argv[sys.argv.index("--backtest") + 1:]
-        if rest:
-            Path(rest[0]).write_text(json.dumps(
-                {str(r["jornada"]): r["pred"] for r in runs}), encoding="utf-8")
+            {r["jornada"]: r["pred"] for r in first}, _jornada_points()))
+        for d in range(h + 1):
+            rows = [r for r in runs if r["jornada"] - r["from"] == d]
+            f = [r["flagged"] for r in rows if r["flagged"]["n"]]
+            n = max(1, sum(x["n"] for x in f))
+            print("%d ahead: %d forecasts, rmse %.3f; flagged players n=%d rmse %.3f bias %+.3f"
+                  % (d, len(rows), statistics.fmean(r["rmse"] for r in rows),
+                     sum(x["n"] for x in f),
+                     math.sqrt(sum(x["rmse"] ** 2 * x["n"] for x in f) / n),
+                     sum(x["bias"] * x["n"] for x in f) / n))
+        if out:
+            Path(out[0]).write_text(json.dumps(
+                {"%d>%d" % (r["from"], r["jornada"]): r["pred"] for r in runs}),
+                encoding="utf-8")
     elif "--prices" in sys.argv:
         for h, g in grade(steps(history("market"))).items():
             print("%d update(s) ahead: n=%d  error %.2f%%  vs %.2f%% for "
