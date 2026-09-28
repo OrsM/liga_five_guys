@@ -146,6 +146,9 @@ class Scorer:
                                                           self.last_season)
 
     def rate(self, rec: dict) -> Rating:
+        """Points per match: last season pulled toward his position's typical
+        rate (or that rate, discounted for a promoted club); then this
+        season pulled toward that."""
         key = row_key(rec)
         prior = self.priors.get(SLOT.get((rec.get("position") or "").lower(), ""),
                                 self.global_prior)
@@ -153,15 +156,14 @@ class Scorer:
         h = self.last_season.get(key)
         prior_pj = float(h["pj"]) if h and h["pj"] > 0 else 0.0
         if prior_pj:
-            base = (h["pts"] + k * prior) / (prior_pj + k)
+            base = shrink(prior, k, h["pts"], prior_pj)
         elif (rec.get("club") or "") in self.promoted:
             base = prior * self.promoted_discount
         else:
             base = prior
         c = self.current.get(key)
         cur_pj = float(c["pj"]) if c and c["pj"] > 0 else 0.0
-        terms = [(k, base)] + ([(cur_pj, c["pts"] / cur_pj)] if cur_pj else [])
-        return Rating(sum(w * m for w, m in terms) / sum(w for w, _ in terms),
+        return Rating(shrink(base, k, c["pts"] if cur_pj else 0.0, cur_pj),
                       not prior_pj and cur_pj < k, cur_pj, prior_pj + cur_pj)
 
     def fit(self, key: str, jornada: int, when, next_j: int) -> float:
