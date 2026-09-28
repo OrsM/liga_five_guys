@@ -51,10 +51,16 @@ def scorer(market: list[dict], xi_rows: list[dict]) -> Scorer:
     return Scorer(
         market, StartOdds(xi_rows, xw, calibrate(outs),
                           fit_availability(outs), record,
-                          last_fit_listing(outs)),
+                          last_fit_listing(outs), app_status(xw)),
         last_season,
         current={k: {"pts": pts, "pj": apps} for k, (pts, apps, _n) in season.items()},
         promoted_discount=fit_promoted_discount(market, last_season, played))
+
+
+def app_status(xw) -> dict[str, str]:
+    """The LaLiga app's status for each player it lists."""
+    return {k: r["player_status"] for r in current("api_players_all")
+            if (k := xw.player(app_id=r["player_id"])) and r.get("player_status")}
 
 
 def fixture_ratings(market: list[dict]):

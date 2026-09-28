@@ -78,6 +78,10 @@ PICK_K = 4.0    # how many matches of a player's own history the prior is worth
 # about his next match (argument None until that jornada is known).
 IMPLIED = {"doubt": "doubt_for", "suspended": "out_for",
            "unavailable": "out_for", "injured": "out_for"}
+# From the LaLiga app we take only what futbolfantasy does not report: that
+# a player has left the league and will not play again. Its injury flags lag
+# futbolfantasy's daily prognoses (tried: worse on the backtest).
+APP_STATUS = {"out_of_league": "gone"}
 
 
 def prognosis(note: str, seen: dt.date) -> tuple[str, object] | None:
@@ -102,6 +106,8 @@ def prognosis_of(status: str, note: str, seen: dt.date
     else its status for the player's next match; nothing if he is fit."""
     if status in ("", "ok"):
         return None
+    if status == "gone":
+        return "indefinite", None
     return prognosis(note, seen) or (
         (IMPLIED[status], None) if status in IMPLIED else None)
 
@@ -198,7 +204,8 @@ class StartOdds:
     def __init__(self, xi: list[dict], xw, cal: Calibration | None = None,
                  avail: Availability | None = None,
                  history: dict[str, tuple[float, float]] | None = None,
-                 last_fit: dict[str, float] | None = None):
+                 last_fit: dict[str, float] | None = None,
+                 app: dict[str, str] | None = None):
         self.cal = cal or Calibration()
         self.avail = avail or Availability()
         self.history = history or {}
@@ -221,6 +228,13 @@ class StartOdds:
                     r["observed_at"]) if r.get("observed_at") else dt.date.today())
                 if prog:
                     self.prognosis[key] = prog
+        # Flagged if either source flags him; futbolfantasy's prognosis, when
+        # it has one, says for how long.
+        for key, app_status in (app or {}).items():
+            status = APP_STATUS.get(app_status)
+            if status and (key not in self.status or status == "gone"):
+                self.status[key] = status
+                self.prognosis[key] = prognosis_of(status, "", dt.date.min)
 
     def p_now(self, key: str) -> float:
         """This week's listing, calibrated: the start %, else in the squad or not."""
@@ -425,6 +439,13 @@ def _selftest() -> None:
     assert prognosis_of("suspended", "", sept) == ("out_for", None)
     assert prognosis_of("doubt", "Duda para la jornada 9", sept) == ("doubt_for", 9)
     assert prognosis_of("ok", "Duda para la jornada 9", sept) is None
+    assert prognosis_of("gone", "", sept) == ("indefinite", None)
+    both = StartOdds([{"player_name": "Ana", "start_pct": "90", "status": "ok"}], xw,
+                     app={"ana": "injured"})
+    assert both.status_of("ana") == "", "injuries come from futbolfantasy"
+    gone = StartOdds([{"player_name": "Ana", "start_pct": "90", "status": "ok"}], xw,
+                     app={"ana": "out_of_league"})
+    assert gone.fit("ana", 9, sept, 8) == 0.0, "left the league: out for good"
     assert _bucket(("out_for", None), 8, sept, 8) == "out_for:at"
     assert _bucket(("out_for", None), 9, sept, 8) == "out_for:after", \
         "a suspension is the next match, whichever jornada that is"
