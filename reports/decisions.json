@@ -1,26 +1,15 @@
 {
- "generated_at": "2026-09-29T19:45Z",
+ "generated_at": "2026-09-29T20:25Z",
  "lock_at": "2026-10-09T19:00:00+00:00",
  "cash": 16741911.0,
  "cash_locked": 0,
- "finish": 2.3,
- "p_win": 0.153,
+ "finish": 2.34,
+ "p_win": 0.15,
  "band": [
-  1816.4433065437843,
-  2102.796430123791
+  1816.917629875704,
+  2104.225886944714
  ],
  "do": [
-  {
-   "what": "field",
-   "legal": true,
-   "on": [
-    "German Valera"
-   ],
-   "off": [
-    "Miguel Roman"
-   ],
-   "gain": 3.453103545230152
-  },
   {
    "what": "buy",
    "name": "Aitor Paredes",
@@ -29,18 +18,18 @@
    "bid": 16450559.0,
    "clause_from": "BurtonGM89",
    "sell": [
-    "Sergio Carreira"
+    "Raul Garcia"
    ],
-   "proceeds": 7557317.0,
-   "gain": 34.42645830707909,
+   "proceeds": 1282311.0,
+   "gain": 36.7147335547877,
    "why": "points + cash",
-   "chance": 0.799,
+   "chance": 0.825,
    "trend": 9.085461206662876,
    "placed": null,
    "done": false
   }
  ],
- "plan_gain": 35.03100523640158,
+ "plan_gain": 37.15117686028824,
  "backup": [
   {
    "name": "Luka Sucic",
@@ -51,10 +40,10 @@
    "sell": [
     "Raul Garcia"
    ],
-   "proceeds": 1398400.0,
-   "gain": 26.05418097748327,
+   "proceeds": 1282311.0,
+   "gain": 26.63531691846765,
    "why": "points + cash",
-   "chance": 0.787,
+   "chance": 0.798,
    "trend": 13.995538015508748,
    "placed": null,
    "done": false
@@ -65,13 +54,11 @@
    "ask": 12906305.0,
    "bid": 12906305.0,
    "clause_from": "BurtonGM89",
-   "sell": [
-    "Raul Garcia"
-   ],
-   "proceeds": 1398400.0,
-   "gain": 26.068088118140054,
+   "sell": [],
+   "proceeds": 0.0,
+   "gain": 26.619919133232997,
    "why": "points + cash",
-   "chance": 0.781,
+   "chance": 0.788,
    "trend": 13.720677070701344,
    "placed": null,
    "done": false
@@ -82,19 +69,17 @@
    "ask": 11451824.0,
    "bid": 11451824.0,
    "clause_from": "BurtonGM89",
-   "sell": [
-    "Raul Garcia"
-   ],
-   "proceeds": 1398400.0,
-   "gain": 21.813924444703503,
+   "sell": [],
+   "proceeds": 0.0,
+   "gain": 21.1696007264801,
    "why": "points + cash",
-   "chance": 0.737,
+   "chance": 0.757,
    "trend": 15.72991641160155,
    "placed": null,
    "done": false
   }
  ],
- "ping": "Field German Valera; Take Aitor Paredes from BurtonGM89 (clause 16.5M), selling Sergio Carreira",
+ "ping": "Take Aitor Paredes from BurtonGM89 (clause 16.5M), selling Raul Garcia",
  "bid_beats": 0.8,
  "confidence": 0.7,
  "exposed": [
@@ -356,29 +341,29 @@
    "manager": "BurtonGM89",
    "me": false,
    "now": 311.0,
-   "mean": 2094.0382390138034,
-   "lo": 1925.0704767078432,
-   "hi": 2261.742143401121,
+   "mean": 2095.8705513830073,
+   "lo": 1929.9262501355533,
+   "hi": 2263.6446711490626,
    "cash": -53827242.0,
-   "p_above": 0.212
+   "p_above": 0.20466666666666666
   },
   {
    "manager": "Albert Laporta",
    "me": false,
    "now": 272.0,
-   "mean": 1958.997738051505,
-   "lo": 1793.5677904631034,
-   "hi": 2133.48026085515,
-   "cash": -3932947.0,
-   "p_above": 0.49633333333333335
+   "mean": 1976.9702285975118,
+   "lo": 1807.0471385825792,
+   "hi": 2148.8391862755375,
+   "cash": -6682950.0,
+   "p_above": 0.461
   },
   {
    "manager": "miguel_autentico",
    "me": true,
    "now": 371.0,
-   "mean": 1956.1752193374787,
-   "lo": 1816.4433065437843,
-   "hi": 2102.796430123791,
+   "mean": 1956.6699392180815,
+   "lo": 1816.917629875704,
+   "hi": 2104.225886944714,
    "cash": 16741911.0,
    "p_above": null
   },
@@ -386,21 +371,21 @@
    "manager": "Magic Mike 333",
    "me": false,
    "now": 271.0,
-   "mean": 1547.8366663405907,
-   "lo": 1430.045614041646,
-   "hi": 1667.0789480493038,
+   "mean": 1550.1088358229154,
+   "lo": 1436.8058299356205,
+   "hi": 1665.673681268309,
    "cash": 43738037.0,
-   "p_above": 0.9973333333333333
+   "p_above": 0.9993333333333333
   },
   {
    "manager": "SusoGattuso",
    "me": false,
    "now": 211.0,
-   "mean": 1521.4451587917906,
-   "lo": 1403.168925283638,
-   "hi": 1638.6752996185235,
+   "mean": 1519.4159670457425,
+   "lo": 1405.0513637911004,
+   "hi": 1631.1369094573654,
    "cash": 4920030.0,
-   "p_above": 0.999
+   "p_above": 0.9983333333333333
   }
  ]
 }
