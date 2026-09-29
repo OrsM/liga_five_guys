@@ -141,7 +141,7 @@ player_id,name,club_id,ff_slug,app_id,app_names
 12925,aitor mañas,alaves,aitor-manas,2887,Mañas
 12975,yassin tallal,getafe,,,
 12990,nordin al lal,elche,nordin-al-lal,2853,Nordin Al-Lal
-12993,alvaro garcia,villarreal,alvaro-garcia-1,2851,
+12993,alvaro garcia,villarreal,alvaro-garcia-1,3278,A. García
 13007,vicent abril,valencia,,,
 13035,javi rueda,celta,javi-rueda,2714,Javi Rueda
 13036,yoel lago,celta,yoel-lago,2206,Yoel Lago
@@ -214,6 +214,7 @@ player_id,name,club_id,ff_slug,app_id,app_names
 14766,aitor crespo,racing,,3030,Aitor Crespo
 14812,ruben gomez,villarreal,ruben-gomez-1,2696,Ruben
 14816,jean ives valou,getafe,jean-ives-valou,2699,J. Ives Valou
+14826,javier gil,atletico,,3272,Javier Gil
 14832,albert niculaesei,elche,,2716,Albert
 14866,diego diaz,racing,diego-diaz,3031,Diego Diaz
 14869,samu fernandez,deportivo,samu-fernandez,2979,Samu
@@ -383,6 +384,7 @@ player_id,name,club_id,ff_slug,app_id,app_names
 1826,jan oblak,atletico,jan-oblak,2322,Oblak
 18268,jordi pesquer,barcelona,jordi-pesquer,3226,Jordi Pesquer
 18273,gnangoro bouare,rayo-vallecano,gnangoro-bouare,3244,G. Bouaré
+18275,cesar bonafe,villarreal,cesar-bonafe,3279,Bonafé
 18279,jaume dura,valencia,jaume-dura,3216,Jaume Durà
 18282,yassir zabiri,racing,yassir-zabiri,3152,Y. Zabiri
 18283,kayne van oevelen,valencia,kayne-van-oevelen,3232,Van Oevelen
@@ -398,6 +400,7 @@ player_id,name,club_id,ff_slug,app_id,app_names
 18437,lucas stassin,sevilla,lucas-stassin,3266,Stassin
 18438,kevin lomonaco,elche,kevin-lomonaco,3268,Lomonaco
 1859,josan ferrandez,elche,josan,2587,Josan
+18732,moha achraf,getafe,moha-achraf,3271,Moha Achraf
 1881,unai lopez,rayo-vallecano,unai-lopez,2384,Unai Lopez
 1882,joao cancelo,barcelona,joao-cancelo,2906,Cancelo
 189,jonny castro,alaves,jonny-castro,2552,Jonny Otto
@@ -628,6 +631,7 @@ player_id,name,club_id,ff_slug,app_id,app_names
 8479,eduardo camavinga,real-madrid,eduardo-camavinga,1300,Camavinga
 8485,romain del castillo,osasuna,romain-del-castillo,3252,Del Castillo
 8496,martin satriano,getafe,martin-satriano,3137,Satriano
+8536,jens cajuste,malaga,jens-cajuste,3274,Cajuste
 863,florian lejeune,rayo-vallecano,florian-lejeune,3082,Lejeune
 8634,rafael romero,sevilla,rafael-romero,2677,Rafa Romero
 8646,carlos alvarez,levante,carlos-lvarez,,
