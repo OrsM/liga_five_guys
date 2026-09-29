@@ -1,5 +1,5 @@
 {
- "generated_at": "2026-09-29T20:25Z",
+ "generated_at": "2026-09-29T20:39Z",
  "lock_at": "2026-10-09T19:00:00+00:00",
  "cash": 16741911.0,
  "cash_locked": 0,
@@ -23,13 +23,13 @@
    "proceeds": 1282311.0,
    "gain": 36.7147335547877,
    "why": "points + cash",
-   "chance": 0.825,
+   "chance": 0.827,
    "trend": 9.085461206662876,
    "placed": null,
    "done": false
   }
  ],
- "plan_gain": 37.15117686028824,
+ "plan_gain": 37.300701818198135,
  "backup": [
   {
    "name": "Luka Sucic",
@@ -43,7 +43,7 @@
    "proceeds": 1282311.0,
    "gain": 26.63531691846765,
    "why": "points + cash",
-   "chance": 0.798,
+   "chance": 0.801,
    "trend": 13.995538015508748,
    "placed": null,
    "done": false
@@ -58,7 +58,7 @@
    "proceeds": 0.0,
    "gain": 26.619919133232997,
    "why": "points + cash",
-   "chance": 0.788,
+   "chance": 0.789,
    "trend": 13.720677070701344,
    "placed": null,
    "done": false
@@ -73,7 +73,7 @@
    "proceeds": 0.0,
    "gain": 21.1696007264801,
    "why": "points + cash",
-   "chance": 0.757,
+   "chance": 0.759,
    "trend": 15.72991641160155,
    "placed": null,
    "done": false
