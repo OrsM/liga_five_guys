@@ -88,8 +88,10 @@ def _pos_of(raw: str) -> str:
 
 
 def cash_price_history() -> float | None:
-    seen = [x for r in read_csv(DECISIONS / PRICE_LOG)
-            if (x := num(r, "places_per_million")) is not None]
+    """The median of the last PRICE_WINDOW measures up to now."""
+    now = run_now().strftime("%Y-%m-%dT%H%MZ")
+    seen = [x for r in read_csv(DECISIONS / PRICE_LOG) if r["measured_at"] <= now
+            and (x := num(r, "places_per_million")) is not None]
     return median(seen[-PRICE_WINDOW:]) if seen else None
 
 
