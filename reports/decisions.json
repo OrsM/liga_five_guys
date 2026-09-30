@@ -1,13 +1,13 @@
 {
- "generated_at": "2026-09-30T19:45Z",
+ "generated_at": "2026-09-30T20:38Z",
  "lock_at": "2026-10-09T19:00:00+00:00",
  "cash": 16741911.0,
  "cash_locked": 0,
- "finish": 2.22,
- "p_win": 0.184,
+ "finish": 2.42,
+ "p_win": 0.135,
  "band": [
-  1832.6188727743283,
-  2123.0351299006425
+  1837.036153515432,
+  2117.1379544406063
  ],
  "do": [
   {
@@ -18,18 +18,34 @@
    "bid": 16788922.0,
    "clause_from": "BurtonGM89",
    "sell": [
-    "Raul Garcia"
+    "Sergio Carreira"
    ],
-   "proceeds": 1262044.0,
-   "gain": 33.44924615287937,
+   "proceeds": 7548074.0,
+   "gain": 34.25398390197654,
    "why": "points + cash",
-   "chance": 0.811,
+   "chance": 0.786,
    "trend": 7.216878574448327,
+   "placed": null,
+   "done": false
+  },
+  {
+   "what": "buy",
+   "name": "Roger Brugue",
+   "pos": "DEL",
+   "ask": 5704063.0,
+   "bid": 5704063.0,
+   "clause_from": "SusoGattuso",
+   "sell": [],
+   "proceeds": 0.0,
+   "gain": 19.71661657602351,
+   "why": "points + cash",
+   "chance": 0.733,
+   "trend": 1.0890642507334647,
    "placed": null,
    "done": false
   }
  ],
- "plan_gain": 34.16007986654595,
+ "plan_gain": 52.180279494372876,
  "backup": [
   {
    "name": "Robert Navarro",
@@ -38,12 +54,12 @@
    "bid": 25299734.0,
    "clause_from": "Albert Laporta",
    "sell": [
-    "Omar El Hilali"
+    "German Valera"
    ],
-   "proceeds": 16923344.0,
-   "gain": 35.425430958507604,
+   "proceeds": 13488943.0,
+   "gain": 32.365586358924816,
    "why": "points",
-   "chance": 0.747,
+   "chance": 0.745,
    "trend": 16.951719046541278,
    "placed": null,
    "done": false
@@ -54,11 +70,13 @@
    "ask": 12906305.0,
    "bid": 13385033.0,
    "clause_from": "BurtonGM89",
-   "sell": [],
-   "proceeds": 0.0,
-   "gain": 27.119112126446907,
+   "sell": [
+    "Raul Garcia"
+   ],
+   "proceeds": 1300836.0,
+   "gain": 28.173441560542415,
    "why": "points + cash",
-   "chance": 0.794,
+   "chance": 0.815,
    "trend": 13.014698056215208,
    "placed": null,
    "done": false
@@ -73,15 +91,15 @@
     "Omar El Hilali"
    ],
    "proceeds": 16923344.0,
-   "gain": 25.72354027779636,
+   "gain": 28.09140868350778,
    "why": "points",
-   "chance": 0.72,
+   "chance": 0.735,
    "trend": -4.2650217093468425,
    "placed": null,
    "done": false
   }
  ],
- "ping": "Take Aitor Paredes from BurtonGM89 (clause 16.8M), selling Raul Garcia",
+ "ping": "Take Aitor Paredes from BurtonGM89 (clause 16.8M), selling Sergio Carreira; Take Roger Brugue from SusoGattuso (clause 5.7M)",
  "bid_beats": 0.8,
  "confidence": 0.7,
  "exposed": [
@@ -90,7 +108,8 @@
    "pos": "POR",
    "clause": 27055089.0,
    "by": [
-    "Magic Mike 333"
+    "Magic Mike 333",
+    "SusoGattuso"
    ],
    "xi": true,
    "season": 196.80832265775442
@@ -110,7 +129,8 @@
    "pos": "MED",
    "clause": 21217771.0,
    "by": [
-    "Magic Mike 333"
+    "Magic Mike 333",
+    "SusoGattuso"
    ],
    "xi": false,
    "season": 144.88598015579578
@@ -120,7 +140,8 @@
    "pos": "DEF",
    "clause": 28589508.0,
    "by": [
-    "Magic Mike 333"
+    "Magic Mike 333",
+    "SusoGattuso"
    ],
    "xi": true,
    "season": 133.27495878285086
@@ -130,17 +151,30 @@
    "pos": "DEL",
    "clause": 31271675.0,
    "by": [
-    "Magic Mike 333"
+    "Magic Mike 333",
+    "SusoGattuso"
    ],
    "xi": true,
    "season": 127.70829578131328
+  },
+  {
+   "name": "Dakonam Djene",
+   "pos": "DEF",
+   "clause": 22449231.0,
+   "by": [
+    "Magic Mike 333",
+    "SusoGattuso"
+   ],
+   "xi": false,
+   "season": 120.61868405190891
   },
   {
    "name": "Lucien Agoume",
    "pos": "MED",
    "clause": 14839487.0,
    "by": [
-    "Magic Mike 333"
+    "Magic Mike 333",
+    "SusoGattuso"
    ],
    "xi": true,
    "season": 119.3842606937885
@@ -150,7 +184,8 @@
    "pos": "MED",
    "clause": 13990786.0,
    "by": [
-    "Magic Mike 333"
+    "Magic Mike 333",
+    "SusoGattuso"
    ],
    "xi": true,
    "season": 119.28962769925475
@@ -160,7 +195,8 @@
    "pos": "DEF",
    "clause": 16923344.0,
    "by": [
-    "Magic Mike 333"
+    "Magic Mike 333",
+    "SusoGattuso"
    ],
    "xi": true,
    "season": 107.30702129909658
@@ -170,7 +206,8 @@
    "pos": "DEF",
    "clause": 7122243.0,
    "by": [
-    "Magic Mike 333"
+    "Magic Mike 333",
+    "SusoGattuso"
    ],
    "xi": false,
    "season": 95.03978296143623
@@ -180,7 +217,8 @@
    "pos": "DEF",
    "clause": 6931556.0,
    "by": [
-    "Magic Mike 333"
+    "Magic Mike 333",
+    "SusoGattuso"
    ],
    "xi": true,
    "season": 91.69111695232571
@@ -343,51 +381,51 @@
    "manager": "BurtonGM89",
    "me": false,
    "now": 311.0,
-   "mean": 2092.6698300065163,
-   "lo": 1927.1830773657846,
-   "hi": 2257.4237013361935,
+   "mean": 2094.6349535301492,
+   "lo": 1929.7234594318872,
+   "hi": 2259.782100450311,
    "cash": -50768726.0,
-   "p_above": 0.24233333333333335
-  },
-  {
-   "manager": "miguel_autentico",
-   "me": true,
-   "now": 371.0,
-   "mean": 1973.4673366805512,
-   "lo": 1832.6188727743283,
-   "hi": 2123.0351299006425,
-   "cash": 16741911.0,
-   "p_above": null
+   "p_above": 0.242
   },
   {
    "manager": "Albert Laporta",
    "me": false,
    "now": 272.0,
-   "mean": 1955.7952219847232,
-   "lo": 1790.8387143544962,
-   "hi": 2124.9062422949255,
-   "cash": -6682950.0,
-   "p_above": 0.54
+   "mean": 2043.2399333387793,
+   "lo": 1875.353821241556,
+   "hi": 2217.341545841644,
+   "cash": -95445666.0,
+   "p_above": 0.33666666666666667
+  },
+  {
+   "manager": "miguel_autentico",
+   "me": true,
+   "now": 371.0,
+   "mean": 1973.5481625205434,
+   "lo": 1837.036153515432,
+   "hi": 2117.1379544406063,
+   "cash": 16741911.0,
+   "p_above": null
   },
   {
    "manager": "Magic Mike 333",
    "me": false,
    "now": 271.0,
-   "mean": 1547.103239093874,
-   "lo": 1432.3014230183442,
-   "hi": 1662.644861015984,
+   "mean": 1549.8614917641037,
+   "lo": 1431.9502452725014,
+   "hi": 1665.3624468408316,
    "cash": 43738037.0,
-   "p_above": 0.9983333333333333
+   "p_above": 0.9986666666666667
   },
   {
    "manager": "SusoGattuso",
    "me": false,
    "now": 211.0,
-   "mean": 1521.337347528434,
-   "lo": 1409.0293171491628,
-   "hi": 1636.1404239306476,
-   "cash": 4920030.0,
-   "p_above": 0.9993333333333333
+   "mean": 1492.320355130548,
+   "lo": 1379.3723560926064,
+   "hi": 1608.8469418110615,
+   "cash": 33334289.0,
+   "p_above": 0.9996666666666667
   }
  ]
 }
