@@ -8,7 +8,7 @@ from datetime import datetime
 from functools import cache
 from statistics import median
 
-from decide import PRICE_WINDOW, Universe, _fieldable, premium_to_beat
+from decide import Universe, _fieldable
 from ffcore.clock import run_now
 from ffcore.fixture import difficulty_ratings
 from ffcore.forecast import Bootstrap
@@ -18,7 +18,8 @@ from ffcore.market import Market, market_routes, pending
 from ffcore.parse import num, ratio, text
 from ffcore.players import load_crosswalk, load_players
 from ffcore.points import scored
-from ffcore.pricing import auction_ratios, steps, trend
+from ffcore.pricing import (PRICE_WINDOW, auction_ratios, premium_to_beat, steps,
+                            trend)
 from ffcore.schedule import expectations, phantom_fill
 from ffcore.score import fit_promoted_discount, per_jornada_current, Scorer, totals
 from ffcore.rules import SLOT

@@ -40,7 +40,7 @@ Everything else comes from the app's API and public pages.
 ## The model
 
 Every forecast is the same product, for every player and jornada, and
-`python tools/explain.py <player>` prints it factor by factor:
+`python tools/ask.py forecast <player>` prints it factor by factor:
 
     expected points = points per match x fixture x chance he is picked if fit x chance he is fit
 
@@ -69,28 +69,35 @@ Every forecast is the same product, for every player and jornada, and
   persistent per-player error (`PERSISTENT_SHARE`, measured by the
   backtest), drawn once per simulated season.
 - **Prices** (`ffcore/pricing.py`): values keep their trend; the next h
-  updates move by a fitted multiple of the last one. The auction premium
-  is the median winning bid over asking in the last 50 auctions.
+  updates move by a fitted multiple of the last one. A bid is the
+  premium over asking that beat 80% of the last 50 winning bids.
 - **Assembly** (`assemble.py`): the one place that reads the tables and
   builds the scorer, market, league state and forecast; model modules never
   read a table themselves.
 - **Moves** (`decide.py`): the `Universe` joins an `Outlook`
   (`ffcore/outlook.py`: expected points and the best eleven, no money) to
   a `Market` (`ffcore/market.py`: names, prices, values, your cash and
-  bids, no points). Every affordable buy, sale and swap is simulated
-  and scored in season points: the points it adds plus, at the measured
-  points-per-million, the value its players are expected to gain by the
-  lock less the premium paid. A player comes from the market (a bid, which
-  carries the premium it takes to win) or from a rival by paying his
-  release clause (at once, at the clause, no premium; the rival loses him,
-  and gets the money). Clauses can be paid once a player's protection
-  after his last transfer has ended; the board also lists your players a
-  rival can take that way now, and who can afford them. Rows say whether
-  they are for points, cash or both. Every action, buy or sale, is a `Move`: its median gain and the
-  share of simulated seasons in which it leaves you better off. One rule
-  decides them all (`worth_doing`): a gain in the median, cash included,
-  and better off in at least 70% of seasons (decide.CONFIDENCE); below that
-  its gain is noise, and the board says to keep the cash.
+  bids, no points). A player comes from the market, at the bid it takes
+  to win the auction, or from a rival by paying his release clause, as it
+  stands and at once (he leaves the rival's squad, who gets the money;
+  only once his protection after his last transfer has ended). Every
+  recommendation passes the same four steps, `decide.FUNNEL`, drawn in
+  `docs/funnel.mmd`:
+  1. **candidates**: every sale of a spare, every player you could get,
+     and each of those paid for by a sale.
+  2. **rank**: each move against doing nothing, in simulated seasons: the
+     points it adds plus, at the measured points-per-million, the value
+     its players gain by the lock less what it burns over their value.
+  3. **verdict**: a gain in the median, cash included, and better off in
+     at least 70% of seasons (`CONFIDENCE`); below that its gain is noise.
+  4. **plan**: the best set that shares no player, fits your cash and adds
+     to the joint gain; the rest that clear the bar are the backups.
+
+  `python tools/ask.py why <player>` names the step a player stopped at,
+  `ask.py whatif buy X sell Y` scores a move of your own the same way, and
+  `ask.py forecast <player>` prints his forecast factor by factor. The
+  board also lists your players a rival can take by clause now, and who
+  can afford them.
 - **Rival cash** (`ffcore/league.py`): budget plus their sales, bonuses and
   clause income, less buys and clause payments, plus the income the feed
   never records (your real balance minus the same sum for you).
@@ -137,6 +144,7 @@ Sources: LaLiga Fantasy help ([clauses](https://laligafantasy.zendesk.com/hc/en-
     python tools/golden.py freeze|check           # a refactor must rebuild the same board
     python tools/structure.py [--check]           # coupling numbers; --check gates selftests
     python tools/uml.py docs                      # regenerate docs/*.mmd from the code
+    python tools/ask.py why|whatif|forecast ...   # questions, answered by the code that makes the board
 
 Run them with `PYTHONPATH=src FF_ROOT=<a copy of data>`; rehearse boards on a
 copy of `data/`, never the live one. A change goes in when the backtest

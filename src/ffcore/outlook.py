@@ -4,7 +4,6 @@ from functools import cached_property
 from typing import Mapping, NamedTuple
 
 from ffcore.forecast import Bootstrap
-from ffcore.score import replacement, squad_pool, vor
 from ffcore.season import LeagueState, best_xi
 
 __all__ = ["Outlook", "XI"]
@@ -60,16 +59,6 @@ class Outlook:
         return min((self.season.get(k, 0.0) for k in self.xi.players),
                    default=0.0)
 
-    @cached_property
-    def par(self) -> dict[str, float]:
-        season, pos = self.season, self.pos
-        repl = replacement(squad_pool(
-            {"key": k, "slot": pos.get(k, ""), "score": v}
-            for k, v in season.items() if pos.get(k)),
-            len(self.state.squads)) if self.state.squads else {}
-        return {k: vor({"slot": pos.get(k), "score": v}, repl)
-                for k, v in season.items()}
-
 
 def _selftest() -> None:
     from ffcore.forecast import Bootstrap
@@ -95,17 +84,8 @@ def _selftest() -> None:
                      first_jornada_of={"star": 2})
     assert firsts.next_up == {"star": (9.0, 0.5)}, firsts.next_up
 
-    pf_per = {j: {"me_a": (2.0, 1.0), "me_b": (5.0, 1.0), "cand": (4.0, 1.0)}
-              for j in (1, 2)}
-    two = Outlook(LeagueState({"me": {"me_a": "MED", "me_b": "MED"}}, [1, 2], "me"),
-                  Bootstrap(pf_per), dict.fromkeys(("me_a", "me_b", "cand"), "MED"))
-    assert two.par == {"me_a": 0.0, "me_b": 6.0, "cand": 4.0}, two.par
-    assert set(Outlook(two.state, two.forecaster).par.values()) == {0.0}, \
-        "a player with no position is worth nothing over replacement"
-
     empty = Outlook(LeagueState({}, [], "me"), Bootstrap({}))
     assert empty.xi == XI({}, set()) and empty.xi_bar == 0.0
-    assert empty.par == {}
     print("ffcore.outlook self-test OK")
 
 

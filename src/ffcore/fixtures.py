@@ -140,7 +140,7 @@ def _selftest() -> None:
     assert "cand_free" in targets, targets
     assert "cand_rival" not in targets, targets
 
-    rows, _base, _measured, _bands = mu.rank(acts, seed=1)
+    rows, _base, _measured = mu.rank(acts, seed=1)
     assert rows, "rank() must return at least one row for a real market"
     assert any(r.action.buy == "cand_free" for r in rows), rows
 

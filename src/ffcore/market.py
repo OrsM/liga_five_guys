@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field, replace
+from dataclasses import dataclass, field
 
 from ffcore.action import Action
 
@@ -13,7 +13,8 @@ class Market:
     Tables are keyed by player and sparse: price only for players on sale,
     proceeds only for yours, my_bid only where your bid is pending, clause
     only for owned players whose release clause can be paid now (it moves
-    the player at once, the money going to his owner).
+    the player at once, the money going to his owner). premium is what an
+    auction bid must be, over the asking price, to win.
     No points: what anyone will score is the outlook's business."""
     cash: float = 0.0
     lam: float | None = None
@@ -34,14 +35,12 @@ class Market:
         return sum(self.my_bid.values())
 
     def burn(self, a: Action) -> float | None:
-        """What a buy costs above the player's value: an auction bid carries
-        the premium it takes to win; a clause is paid as it stands."""
+        """What a buy costs above the player's value; its cost is what you
+        pay (for an auction, the bid it takes to win)."""
         if not a.buy:
             return 0.0
         val = self.value.get(a.buy)
-        if val is None:
-            return None
-        return max(0.0, a.cost * (1.0 if a.kind == "clause" else self.premium) - val)
+        return None if val is None else max(0.0, a.cost - val)
 
     def cash_pts(self, a: Action, lam: float | None = None) -> float:
         lam = self.lam if lam is None else lam
@@ -93,8 +92,6 @@ def _selftest() -> None:
     assert m.burn(Action("buy", buy="free", cost=3e6)) == 0.0
     assert m.burn(Action("sell", sell=("bench",))) == 0.0
     assert m.burn(Action("buy", buy="mystery", cost=9e6)) is None
-    m = replace(m, premium=1.1)
-    assert abs(m.burn(Action("buy", buy="free", cost=4e6)) - 0.4e6) < 1e-6
 
     assert m.cash_pts(Action("buy", buy="free", cost=4e6)) == 0.0, "no lam, no cash"
     riser = Market(lam=2.0, value={"r": 10e6}, trend={"r": 5.0})
@@ -103,8 +100,6 @@ def _selftest() -> None:
                     trend={"s": -25.0})
     assert abs(seller.cash_pts(Action("sell", sell=("s",), proceeds=4e6)) - 1.0) < 1e-9
 
-    assert m.burn(Action("clause", buy="free", cost=4e6)) == 0.0, \
-        "a clause is paid as it stands, no auction premium"
     assert Market(my_bid={"a": 1e6, "b": 2.5e6}).locked_cash == 3.5e6
     assert Market().locked_cash == 0.0
     try:

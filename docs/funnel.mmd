@@ -1,0 +1,9 @@
+flowchart LR
+    s0["<b>candidates</b><br/>Every move you could make"]
+    s1["<b>rank</b><br/>Each move scored against doing nothing"]
+    s0 --> s1
+    s2["<b>verdict</b><br/>Worth doing only if it gains and is likely to help"]
+    s1 --> s2
+    s3["<b>plan</b><br/>The best set of moves to make together"]
+    s2 --> s3
+    s3 --> board(["the board"])

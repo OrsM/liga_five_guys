@@ -22,7 +22,7 @@ TESTS=(ffcore/parse.py ffcore/text.py ffcore/tidy.py
        ffcore/action.py ffcore/market.py ffcore/pricing.py ffcore/schedule.py
        "stats.py --selftest"
       )
-SESSION_TESTS=(decide.py sim.py)
+SESSION_TESTS=(src/decide.py src/sim.py tools/ask.py)
 
 session_ok=0
 "$UV" run --frozen python tools/session_selftests.py >/dev/null 2>&1 &
@@ -47,12 +47,12 @@ fi
 
 echo "selftests: failures detected — re-running serially for detail" >&2
 status=0
-for t in "${TESTS[@]}" "${SESSION_TESTS[@]/%/ --selftest}"; do
+for t in "${TESTS[@]/#/src/}" "${SESSION_TESTS[@]/%/ --selftest}"; do
     # shellcheck disable=SC2086
-    if ! "$UV" run --frozen python src/$t >/dev/null 2>&1; then
+    if ! "$UV" run --frozen python $t >/dev/null 2>&1; then
         echo "  FAILED: $t" >&2
         # shellcheck disable=SC2086
-        "$UV" run --frozen python src/$t 2>&1 | tail -20 >&2
+        "$UV" run --frozen python $t 2>&1 | tail -20 >&2
         status=1
     fi
 done

@@ -2,18 +2,18 @@ flowchart LR
     classDef hub fill:#fee2e2,stroke:#b91c1c,color:#111
     classDef leaf fill:#f3f4f6,stroke:#6b7280,color:#111
     subgraph stages["Stages (src/)"]
-        assemble["assemble 144<br/>in 2 · out 17"]:::hub
+        assemble["assemble 168<br/>in 2 · out 17"]:::hub
         crosswalk["crosswalk 157"]
-        decide["decide 504"]
-        grading["grading 138"]
-        ingest["ingest 755"]
+        decide["decide 527<br/>in 2 · out 10"]:::hub
+        grading["grading 167"]
+        ingest["ingest 758"]
         run["run 82"]
-        sim["sim 227"]
+        sim["sim 236"]
     end
     subgraph fetch["Fetch and parse"]
         auth["auth 247"]
         footballdata["footballdata 131"]
-        futbolfantasy["futbolfantasy 754"]
+        futbolfantasy["futbolfantasy 758"]
         laliga_api["laliga_api 584"]
         source["source 50"]
         sources["sources 119"]
@@ -28,24 +28,24 @@ flowchart LR
         tidy["tidy 358<br/>in 10 · out 2"]:::hub
     end
     subgraph model["Model"]
-        action["action 44"]
+        action["action 52"]
         fixture["fixture 169"]
         forecast["forecast 50"]
-        market["market 153"]
-        outlook["outlook 113"]
-        pricing["pricing 144"]
+        market["market 155"]
+        outlook["outlook 93"]
+        pricing["pricing 157"]
         rules["rules 55"]
-        schedule["schedule 201"]
-        score["score 365"]
+        schedule["schedule 225"]
+        score["score 305"]
         season["season 234"]
-        startprob["startprob 306"]
+        startprob["startprob 569"]
     end
     subgraph util["Pure utilities"]
         locks["locks 86"]:::leaf
-        parse["parse 206<br/>in 13 · out 0"]:::hub
+        parse["parse 213<br/>in 13 · out 0"]:::hub
         render["render 37"]:::leaf
         text["text 120"]:::leaf
-        stats["stats 26"]:::leaf
+        stats["stats 35"]:::leaf
     end
     run -. "by name" .-> ingest
     run -. "by name" .-> crosswalk
@@ -76,6 +76,7 @@ flowchart LR
     decide --> market
     decide --> outlook
     decide --> pricing
+    decide --> render
     decide --> rules
     decide --> schedule
     decide --> season
@@ -101,7 +102,6 @@ flowchart LR
     locks --> parse
     market --> action
     outlook --> forecast
-    outlook --> score
     outlook --> season
     players --> ff_crosswalk
     players --> parse
@@ -113,16 +113,17 @@ flowchart LR
     schedule --> fixture
     schedule --> locks
     schedule --> rules
-    schedule --> score
     score --> parse
     score --> rules
     score --> startprob
     score --> text
+    score --> stats
     season --> rules
     season --> stats
     startprob --> parse
     startprob --> rules
     startprob --> text
+    startprob --> stats
     tidy --> clock
     tidy --> parse
     grading --> assemble
@@ -144,6 +145,7 @@ flowchart LR
     sim --> clock
     sim --> jornadas
     sim --> league
+    sim --> pricing
     sim --> render
     sim --> tidy
     sources --> footballdata

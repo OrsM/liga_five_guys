@@ -1,21 +1,30 @@
 classDiagram
     direction LR
-    class Band {
-        <<NamedTuple>>
+    class Move {
+        <<frozen dataclass>>
         decide
-        +median: float
-        +lo: float
-        +hi: float
         +action: Action
-        +mean: float
+        +d_pts: float
+        +cash_pts: float
+        +p_better: float
+        +net_pts()
     }
     class Ranking {
         <<NamedTuple>>
         decide
-        +rows: list~dict~
+        +rows: list~Move~
         +base: Standings
         +measured: float | None
-        +bands: dict~str Band~
+    }
+    class Board {
+        <<NamedTuple>>
+        decide
+        +plan: list~Move~
+        +gain: float
+        +rows: list~Move~
+        +base: Standings
+        +measured: float | None
+        +others()
     }
     class Universe {
         <<frozen dataclass>>
@@ -29,7 +38,8 @@ classDiagram
         +me()
         +mine()
         +outlook()
-        +route_kind()
+        +offer()
+        +worth_a_look()
         +candidates()
         +rank()
     }
@@ -42,6 +52,7 @@ classDiagram
         +cost: float
         +proceeds: float
         +net()
+        +players()
         +label()
     }
     class TokenStore {
@@ -128,7 +139,7 @@ classDiagram
         +price: dict~str float~
         +route: dict~str str~
         +owner: dict~str str~
-        ...4 more fields
+        ...5 more fields
         +locked_cash()
         +burn()
         +cash_pts()
@@ -151,7 +162,6 @@ classDiagram
         +xi()
         +season()
         +xi_bar()
-        +par()
     }
     class Scored {
         <<NamedTuple>>
@@ -183,7 +193,6 @@ classDiagram
         +ppm: float
         +p_now: float
         +p_rest: float
-        +status: str
         +pj: float
     }
     class Scorer {
@@ -198,6 +207,7 @@ classDiagram
         +promoted
         ...2 more fields
         +rate()
+        +fit()
         +rates()
     }
     class LeagueState {
@@ -248,14 +258,26 @@ classDiagram
         +absent_start: float
         +p()
     }
+    class Availability {
+        ffcore.startprob
+        +level
+        +of()
+    }
     class StartOdds {
         ffcore.startprob
         +cal: Calibration | None
+        +avail: Availability | None
+        +history
+        +last_fit: dict~str float~ | None
         +start_pct
         +listed
         +status
+        +prognosis
         +p_now()
+        +listing()
+        +picked()
         +status_of()
+        +fit()
     }
     class Outcome {
         <<NamedTuple>>
@@ -268,7 +290,7 @@ classDiagram
         +listed: bool
         +ff: float | None
         +status: str
-        ...2 more fields
+        ...3 more fields
     }
     class Table {
         <<NamedTuple>>
@@ -281,14 +303,18 @@ classDiagram
         ingest
         +of()
     }
-    Band *-- Action : action
+    Board *-- Move : plan
+    Board *-- Move : rows
+    Board *-- Standings : base
     League *-- Config : cfg
     League *-- Crosswalk : xw
+    Move *-- Action : action
     Outlook *-- Bootstrap : forecaster
     Outlook *-- LeagueState : state
-    Ranking *-- Band : bands
+    Ranking *-- Move : rows
     Ranking *-- Standings : base
     Scorer *-- StartOdds : starts
+    StartOdds *-- Availability : avail
     StartOdds *-- Calibration : cal
     Universe *-- Bootstrap : forecaster
     Universe *-- LeagueState : state

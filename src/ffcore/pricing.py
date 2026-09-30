@@ -5,6 +5,8 @@ from datetime import datetime, timezone
 from statistics import mean, median
 
 CLIP = 20.0
+PRICE_WINDOW = 50
+BID_BEATS = 0.8
 
 
 def steps(rows: list[dict]) -> dict[str, list[tuple[str, float]]]:
@@ -90,6 +92,13 @@ def auction_ratios(listings: list[dict], buys: list[dict]) -> list[float]:
     return out
 
 
+def premium_to_beat(ratios: list[float]) -> float:
+    """The bid, over the asking price, that beats BID_BEATS of the other
+    managers' recent winning bids."""
+    recent = sorted(ratios[-PRICE_WINDOW:])
+    return recent[min(len(recent) - 1, int(BID_BEATS * len(recent)))] if recent else 1.0
+
+
 def cash_price(reach) -> float | None:
     pts = sorted((max(0.0, c), d) for c, d in reach)
     if len(pts) < 2 or pts[-1][0] <= 0:
@@ -136,6 +145,10 @@ def _selftest() -> None:
             {"player_id": "8", "at": "2026-09-02T22:24:10+02:00", "amount": "99"},
             {"player_id": "7", "at": "2026-09-05T10:00:00+02:00", "amount": "1"}]
     assert auction_ratios(lst, buys) == [1.04], auction_ratios(lst, buys)
+
+    assert premium_to_beat([1.0] * 5 + [1.3] * 5) == 1.3
+    assert premium_to_beat([1.0] * 9 + [1.3]) == 1.0
+    assert premium_to_beat([]) == 1.0
 
     print("ffcore.pricing self-test OK")
 

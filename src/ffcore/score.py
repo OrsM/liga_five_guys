@@ -7,11 +7,10 @@ from typing import NamedTuple
 from ffcore.parse import text
 from ffcore.startprob import NEUTRAL_START, StartOdds
 from ffcore.text import norm, row_key
-from ffcore.rules import FREE_FORMATIONS, SLOT, minutes_played
+from ffcore.rules import SLOT, minutes_played
 from stats import shrink
 
-__all__ = ["starters_per_slot", "Rating", "Rates", "Scorer", "squad_pool",
-           "replacement", "vor", "per_jornada_current", "totals",
+__all__ = ["Rating", "Rates", "Scorer", "per_jornada_current", "totals",
            "fit_promoted_discount"]
 
 
@@ -176,45 +175,6 @@ class Scorer:
                      self.starts.picked(key, False), self.rate(rec).pj)
 
 
-def squad_pool(scored) -> dict[str, list[dict]]:
-    pool: dict[str, list[dict]] = {}
-    for p in scored:
-        if p.get("slot"):
-            pool.setdefault(p["slot"], []).append(p)
-    for v in pool.values():
-        v.sort(key=lambda p: p["score"], reverse=True)
-    return pool
-
-
-def starters_per_slot() -> dict[str, float]:
-    shapes = FREE_FORMATIONS
-    n = len(shapes)
-    tot = {"POR": float(n), "DEF": 0.0, "MED": 0.0, "DEL": 0.0}
-    for d, m, f in shapes:
-        tot["DEF"] += d
-        tot["MED"] += m
-        tot["DEL"] += f
-    return {k: v / n for k, v in tot.items()}
-
-
-def replacement(pool: dict, squads: int) -> dict[str, float]:
-    per = starters_per_slot()
-    out = {}
-    for slot, rows in pool.items():
-        if not rows:
-            continue
-        rung = max(1, round(squads * per.get(slot, 0.0)))
-        out[slot] = rows[min(rung, len(rows)) - 1]["score"]
-    return out
-
-
-def vor(row: dict, repl: dict) -> float:
-    slot = row.get("slot")
-    if not slot:
-        return 0.0
-    return row.get("score", 0.0) - repl.get(slot, 0.0)
-
-
 def _selftest() -> None:
     from ffcore.points import Scored
 
@@ -289,17 +249,6 @@ def _selftest() -> None:
         "flagged, no record, never listed fit: his 100% is not a selection signal"
     assert abs(r0.ppm - full.ppm) < 1e-9 and r0.pj == full.pj
 
-    per = starters_per_slot()
-    assert per == {"POR": 1.0, "DEF": 4.0, "MED": 4.0, "DEL": 2.0}, per
-    assert abs(sum(per.values()) - 11.0) < 1e-9
-    pool = {"POR": [{"score": s_} for s_ in (9.0, 8.0, 7.0, 6.0, 5.0, 4.0)],
-           "DEL": [{"score": s_} for s_ in (9.0, 8.0)]}
-    repl = replacement(pool, squads=5)
-    assert repl["POR"] == 5.0, repl
-    assert repl["DEL"] == 8.0, repl
-    assert vor({"slot": "POR", "score": 9.0}, repl) == 4.0
-    assert vor({"slot": "DEL", "score": 6.0}, repl) == -2.0
-    assert vor({"slot": ""}, repl) == 0.0
 
     benched = Scorer(market, StartOdds(xi, xw, history={"p0": (0.0, 6.0)}), hist,
                      current={"p0": {"pts": 30.0, "pj": 3.0}}).rates(dict(row, name="p0"))
