@@ -139,6 +139,7 @@ Sources: LaLiga Fantasy help ([clauses](https://laligafantasy.zendesk.com/hc/en-
     python src/grading.py --backtest [--ahead H] [out.json]  # rebuild each past lock's forecast: rmse, bias, top-50,
                                                   # persistence; with --ahead, also H jornadas on, flagged players apart
     python src/grading.py --compare a.json b.json # two backtests, jornada by jornada
+    python src/grading.py --decisions             # each past lock's board, rebuilt: its moves' forecast vs what happened
     python src/grading.py --prices                # price model walk-forward vs "no change"
     bash tools/selftests.sh                       # every module's self-test
     python tools/golden.py freeze|check           # a refactor must rebuild the same board

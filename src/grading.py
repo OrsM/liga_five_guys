@@ -12,11 +12,12 @@ from ffcore.schedule import expectations
 from ffcore.jornadas import clock_history
 from ffcore.points import scored
 
-from assemble import fixture_ratings, scorer
+from assemble import fixture_ratings, scorer, universe
+from decide import board, verdict
 from ffcore.clock import set_now
 from ffcore.pricing import grade, steps
 from ffcore.tidy import LINEUP_SOURCE, current, history
-__all__ = ["backtest", "compare", "persistence", "score_forecast"]
+__all__ = ["backtest", "compare", "decisions", "persistence", "score_forecast"]
 
 TOP_N = 50
 
@@ -65,6 +66,46 @@ def backtest(ahead: int = 0) -> list[dict]:
                             "flagged": score_forecast(hurt, actual, j)})
     finally:
         set_now(None)
+    return out
+
+
+def decisions() -> list[dict]:
+    """Rebuild each past lock's board with this code and set every ranked
+    move against what its players then scored: the change in points it
+    forecast (players got minus players sold) over the jornadas played
+    since, and the change that happened."""
+    locks = clock_history().round_locks
+    actual = _jornada_points()
+    done = {j for _k, j in actual}
+    out = []
+    try:
+        for i in sorted(done & set(locks), key=locks.get):
+            set_now(locks[i] - dt.timedelta(minutes=1))
+            universe.cache_clear()
+            try:
+                u = universe()
+            except SystemExit as e:
+                print("j%d: no board (%s)" % (i, e), file=sys.stderr)
+                continue
+            b, per_j = board(u), u.forecaster.per_jornada
+            later = sorted(j for j in done if j >= i and j in per_j)
+
+            def change(a, pts) -> float:
+                return sum(pts(a.buy, j) for j in later) - sum(
+                    pts(k, j) for k in a.sell for j in later)
+            for r in b.rows:
+                a = r.action
+                out.append({
+                    "lock": i, "jornadas": len(later), "move": a.label(u.market.name),
+                    "group": "plan" if r in b.plan else
+                             "cleared" if verdict(r) is None else "rejected",
+                    "kind": "sell" if not a.buy else "get",
+                    "chance": r.p_better,
+                    "pred": change(a, lambda k, j: math.prod(per_j[j].get(k, (0.0, 0.0)))),
+                    "real": change(a, lambda k, j: actual.get((k, j), 0.0))})
+    finally:
+        set_now(None)
+        universe.cache_clear()
     return out
 
 
@@ -146,6 +187,25 @@ if __name__ == "__main__":
             Path(out[0]).write_text(json.dumps(
                 {"%d>%d" % (r["from"], r["jornada"]): r["pred"] for r in runs}),
                 encoding="utf-8")
+    elif "--decisions" in sys.argv:
+        runs = decisions()
+        for group in ("plan", "cleared", "rejected"):
+            for kind in ("get", "sell"):
+                rows = [r for r in runs if r["group"] == group and r["kind"] == kind]
+                if not rows:
+                    continue
+                per = [(r["pred"] / r["jornadas"], r["real"] / r["jornadas"])
+                       for r in rows if r["jornadas"]]
+                print("%-8s %-4s n=%3d  per jornada: forecast %+.2f, happened %+.2f;"
+                      " happened > 0 in %.0f%% (forecast chance %.0f%%)" % (
+                          group, kind, len(rows),
+                          statistics.fmean(f for f, _ in per), statistics.fmean(h for _, h in per),
+                          100 * statistics.fmean(h > 0 for _, h in per),
+                          100 * statistics.fmean(r["chance"] for r in rows)))
+        for r in runs:
+            if r["group"] == "plan":
+                print("  j%-2d %-45s forecast %+6.1f happened %+6.1f over %d" % (
+                    r["lock"], r["move"][:45], r["pred"], r["real"], r["jornadas"]))
     elif "--prices" in sys.argv:
         for h, g in grade(steps(history("market"))).items():
             print("%d update(s) ahead: n=%d  error %.2f%%  vs %.2f%% for "
