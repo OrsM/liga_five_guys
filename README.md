@@ -95,6 +95,38 @@ Every forecast is the same product, for every player and jornada, and
   clause income, less buys and clause payments, plus the income the feed
   never records (your real balance minus the same sum for you).
 
+## League rules
+
+The game's rules as of 2026-09-30, and whether the model needs them. A rule
+is in the code only if the feed does not already say it and it changes
+which move wins.
+
+- **Clauses are paid at once, with no approval, and the money goes to the
+  owner.** Modelled (`decide.apply`); confirmed by every clause payment in
+  our feed.
+- **A clause defaults to 166% of market value, or purchase price +50%, and
+  never below market value (1M minimum).** Not needed: the feed gives each
+  clause.
+- **Protection after a transfer** is set per league. Read from the feed
+  (`buyoutClauseLockedEndTime`), not assumed.
+- **Clause buys close before the matchday** (24h by default; 24–72h per
+  league). Not modelled: ours paid one 9h before kickoff, and the app
+  refuses a closed one anyway.
+- **A negative balance at the matchday's start scores 0 points; debt is
+  capped at 20% of team value.** Enforced by the plan (sell before the
+  lock) and by the app (bids).
+- **Raising a clause costs half the raise** (1M pays for +2M). Not modelled:
+  the board lists who is at risk, not what protecting them would cost.
+- **Blindaje:** one player per matchday is shielded from clauses for 24h
+  (48h in premium leagues). Turned on between matchdays, free. Not modelled,
+  and the feed does not show shields: a clause the board suggests may be
+  blocked, which is why it keeps backups.
+
+Sources: LaLiga Fantasy help ([clauses](https://laligafantasy.zendesk.com/hc/en-us/articles/360025683593-How-are-release-clauses-set),
+[rulebook](https://laligafantasy.zendesk.com/hc/en-us/articles/360025679853-Rulebook),
+[negative balance](https://laligafantasy.zendesk.com/hc/en-us/articles/360007533594-Can-I-keep-a-negative-balance)),
+[blindaje](https://www.guiafantasy.com/noticias/1686/como-funciona-el-blindaje-la-nueva-regla-que-revoluciona-laliga-fantasy).
+
 ## Checking it
 
     python src/grading.py --backtest [--ahead H] [out.json]  # rebuild each past lock's forecast: rmse, bias, top-50,
