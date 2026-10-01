@@ -113,9 +113,11 @@ which move wins.
 - **Clauses are paid at once, with no approval, and the money goes to the
   owner.** Modelled (`decide.apply`); confirmed by every clause payment in
   our feed.
-- **A clause defaults to 166% of market value, or purchase price +50%, and
-  never below market value (1M minimum).** Not needed: the feed gives each
-  clause.
+- **A clause defaults to purchase price +50%, market value if higher, 1M
+  minimum** (the help pages). Not so in our league: every bought player's
+  clause is the higher of his market value and what his owner paid, unless
+  raised (2026-10-01, all 60), so 5 of the 6 raids so far cost 1.02-1.05x
+  value. Not needed by the model: the feed gives each clause.
 - **Protection after a transfer** is set per league. Read from the feed
   (`buyoutClauseLockedEndTime`), not assumed.
 - **Clause buys close before the matchday** (24h by default; 24–72h per
