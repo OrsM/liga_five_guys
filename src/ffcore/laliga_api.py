@@ -10,7 +10,7 @@ from ffcore.source import Source, _once, _rebuild
 __all__ = ["LFG_SOURCE", "API_LEAGUES_KEY", "API_LEAGUES_URL",
            "API_MARKET_URL", "API_ACTIVITY_URL", "API_TEAMS_URL", "ROW_TABLE",
            "ACT_JOINED", "ACT_BUY", "ACT_SELL", "ACT_BONUS", "ACT_BONUS_ZERO",
-           "ACT_CLAUSE", "ACT_KIND", "parse_api_leagues", "parse_api_market",
+           "ACT_TRANSFER", "ACT_KIND", "parse_api_leagues", "parse_api_market",
            "parse_api_activity", "parse_api_teams", "API_PLAYERS_ALL_URL",
            "parse_api_players_all", "API_OFFER_URL", "API_OFFER_KEY_RE",
            "parse_api_offer", "offer_source", "offer_sources", "api_source",
@@ -33,11 +33,13 @@ ROW_TABLE = "table"
 ACT_JOINED, ACT_BUY, ACT_SELL = 9, 31, 33
 ACT_BONUS, ACT_BONUS_ZERO = 6, 7
 
-ACT_CLAUSE = 1
+# A player moving between two managers, by clause or by an accepted offer:
+# the feed records both alike (Luismi Cruz moved under a protected clause).
+ACT_TRANSFER = 1
 
 ACT_KIND = {ACT_JOINED: "joined", ACT_BUY: "buy", ACT_SELL: "sell",
            ACT_BONUS: "bonus", ACT_BONUS_ZERO: "bonus",
-           ACT_CLAUSE: "clause"}
+           ACT_TRANSFER: "transfer"}
 
 
 def _j(text: str):
@@ -457,18 +459,18 @@ def _selftest() -> None:
     ac = parse_api_activity(_API_ACTIVITY_FIXTURE, "t")
     assert ([r["kind"] for r in ac] ==
             ["buy", "sell", "joined", "unknown:77", "bonus", "bonus",
-             "clause"]), ac
+             "transfer"]), ac
     assert ac[0]["amount"] == "58220110" and ac[0]["user_id"] == "11881989"
     assert ac[4]["week"] == "2" and ac[4]["amount"] == "2200000", ac[4]
     assert ac[5]["week"] == "3" and ac[5]["amount"] == "", ac[5]
 
-    clause = ac[6]
-    assert clause["kind"] == "clause", clause
-    assert clause["user_id"] == "3480702", clause
-    assert clause["counterparty"] == "11877808", clause
-    assert clause["amount"] == "141425721", clause
-    assert clause["player_id"] == "2522", clause
-    assert all(r["counterparty"] == "" for r in ac if r["kind"] != "clause")
+    moved = ac[6]
+    assert moved["kind"] == "transfer", moved
+    assert moved["user_id"] == "3480702", moved
+    assert moved["counterparty"] == "11877808", moved
+    assert moved["amount"] == "141425721", moved
+    assert moved["player_id"] == "2522", moved
+    assert all(r["counterparty"] == "" for r in ac if r["kind"] != "transfer")
 
     import json as _aj
     _one_more = _aj.dumps(_aj.loads(_API_ACTIVITY_FIXTURE) + [

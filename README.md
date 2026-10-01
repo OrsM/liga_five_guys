@@ -101,7 +101,7 @@ Every forecast is the same product, for every player and jornada, and
   board also lists your players a rival can take by clause now, and who
   can afford them.
 - **Rival cash** (`ffcore/league.py`): budget plus their sales, bonuses and
-  clause income, less buys and clause payments, plus the income the feed
+  transfer income, less buys and transfer payments, plus the income the feed
   never records (your real balance minus the same sum for you).
 
 ## League rules
@@ -111,13 +111,14 @@ is in the code only if the feed does not already say it and it changes
 which move wins.
 
 - **Clauses are paid at once, with no approval, and the money goes to the
-  owner.** Modelled (`decide.apply`); confirmed by every clause payment in
-  our feed.
+  owner.** Modelled (`decide.apply`). The feed records any move between
+  two managers alike, clause or accepted offer ("transfer"); every raid
+  in it paid exactly the clause the feed showed.
 - **A clause defaults to purchase price +50%, market value if higher, 1M
-  minimum** (the help pages). Not so in our league: every bought player's
-  clause is the higher of his market value and what his owner paid, unless
-  raised (2026-10-01, all 60), so 5 of the 6 raids so far cost 1.02-1.05x
-  value. Not needed by the model: the feed gives each clause.
+  minimum** (the help pages). So a raid costs only market value once a
+  player's value has outgrown 1.5x what his owner paid (Raphinha: bought
+  for 80.0M, raided at his 141.4M value). Not needed by the model: the
+  feed gives each clause, and a raid pays exactly that.
 - **Protection after a transfer** is set per league. Read from the feed
   (`buyoutClauseLockedEndTime`), not assumed.
 - **Clause buys close before the matchday** (24h by default; 24–72h per

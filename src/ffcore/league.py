@@ -61,9 +61,9 @@ def estimate_cash(activity, users: dict, me: str, my_cash: float | None,
         kind = r.get("kind")
         if who and kind in ("sell", "bonus"):
             feed[who] += amount
-        elif who and kind in ("buy", "clause"):
+        elif who and kind in ("buy", "transfer"):
             feed[who] -= amount
-        if other and kind == "clause":
+        if other and kind == "transfer":
             feed[other] += amount
     untracked = my_cash - feed[me] if my_cash is not None and me in feed else 0.0
     return {m: (my_cash if m == me and my_cash is not None else v + untracked)
@@ -120,7 +120,7 @@ def _selftest() -> None:
             {"activity_id": "a", "kind": "buy", "user_id": "1", "amount": "30"},
             {"activity_id": "b", "kind": "sell", "user_id": "2", "amount": "20"},
             {"activity_id": "c", "kind": "bonus", "user_id": "2", "amount": "5"},
-            {"activity_id": "d", "kind": "clause", "user_id": "2",
+            {"activity_id": "d", "kind": "transfer", "user_id": "2",
              "counterparty": "1", "amount": "40"},
             {"activity_id": "e", "kind": "joined", "user_id": "3"}]
     got = estimate_cash(feed, users, "me", 116.0, 100.0)
