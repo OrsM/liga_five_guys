@@ -91,7 +91,9 @@ Every forecast is the same product, for every player and jornada, and
   3. **verdict**: a gain in the median, cash included, and better off in
      at least 70% of seasons (`CONFIDENCE`); below that its gain is noise.
   4. **plan**: the best set that shares no player, fits your cash and adds
-     to the joint gain; the rest that clear the bar are the backups.
+     to the joint gain, built best first and best per million first (one
+     dear move can crowd out two cheaper ones that gain more), keeping the
+     set that gains more; the rest that clear the bar are the backups.
 
   `python tools/ask.py why <player>` names the step a player stopped at,
   `ask.py whatif buy X sell Y` scores a move of your own the same way, and

@@ -4,8 +4,8 @@ flowchart LR
     subgraph stages["Stages (src/)"]
         assemble["assemble 170<br/>in 2 · out 17"]:::hub
         crosswalk["crosswalk 157"]
-        decide["decide 527<br/>in 2 · out 10"]:::hub
-        grading["grading 167"]
+        decide["decide 548<br/>in 3 · out 10"]:::hub
+        grading["grading 227"]
         ingest["ingest 758"]
         run["run 82"]
         sim["sim 236"]
@@ -127,6 +127,7 @@ flowchart LR
     tidy --> clock
     tidy --> parse
     grading --> assemble
+    grading --> decide
     grading --> clock
     grading --> jornadas
     grading --> points

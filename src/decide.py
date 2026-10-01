@@ -170,16 +170,24 @@ def verdict(mv: Move) -> str | None:
 
 
 def plan(u, good: list[Move], base: Standings) -> tuple[list[Move], float]:
-    """The best set of moves to make together. Best first, each taken if
-    it shares no player with those already taken, is paid for by the cash
-    left, and adds to their joint gain; again until none is taken, so a
-    sale taken late can still pay for a buy. Every move left out was
-    last tried against the whole plan."""
+    """The best set of moves to make together. Built twice, best first and
+    best per million it ties up first, since one dear move can crowd out
+    two cheaper ones that gain more; the set that gains more is the plan.
+    Every move it leaves out was last tried against the whole of it."""
+    return max((fill(u, good, base, key) for key in (
+        lambda r: -r.net_pts,
+        lambda r: -r.net_pts / max(r.action.net / 1e6, 1.0))), key=lambda pg: pg[1])
+
+
+def fill(u, good: list[Move], base: Standings, order) -> tuple[list[Move], float]:
+    """Moves in this order, each taken if it shares no player with those
+    taken, is paid for by the cash left, and adds to their joint gain;
+    again until none is taken, so a sale taken late still pays for a buy."""
     picked: list[Move] = []
     cash, gain, grew = u.market.cash, 0.0, True
     while grew:
         grew = False
-        for r in sorted(good, key=lambda r: -r.net_pts):
+        for r in sorted(good, key=order):
             if r in picked or blocked(u, picked, r.action, cash):
                 continue
             total = joint_gain(u, [*picked, r], base)
@@ -518,6 +526,19 @@ def _selftest() -> None:
     assert mu.market.cash_pts(buy_riser) < 0
     assert [f.__name__ for f in FUNNEL] == ["candidates", "rank", "verdict", "plan"]
     assert "riser" not in {a.buy for a in mu.candidates()}
+
+    ks = {"k": "POR", **{"d%d" % i: "DEF" for i in range(1, 5)},
+          **{"m%d" % i: "MED" for i in range(1, 5)}, "f1": "DEL", "f2": "DEL"}
+    js = list(range(1, 11))
+    weak = {"m2", "m3", "m4"}
+    perk = {j: {**{k: (0.5 if k in weak else 3.0, 1.0) for k in ks},
+                "dear": (4.0, 1.0), "b": (3.0, 1.0), "c": (3.0, 1.0)} for j in js}
+    uk = Universe(state=LeagueState({"me": dict(ks)}, js, "me"), forecaster=Bootstrap(perk),
+                  market=Market(cash=20e6, lam=0.0,
+                                pos={**ks, "dear": "MED", "b": "MED", "c": "MED"},
+                                price={"dear": 20e6, "b": 10e6, "c": 10e6}))
+    got = sorted(r.action.buy for r in board(uk).plan)
+    assert got == ["b", "c"], ("two cheaper moves gaining more beat one dear one", got)
 
     print("decide self-test OK")
 
