@@ -1,13 +1,13 @@
 {
- "generated_at": "2026-10-01T19:46Z",
+ "generated_at": "2026-10-01T20:36Z",
  "lock_at": "2026-10-09T19:00:00+00:00",
  "cash": 16941911.0,
  "cash_locked": 0,
- "finish": 2.42,
- "p_win": 0.135,
+ "finish": 2.41,
+ "p_win": 0.147,
  "band": [
-  1839.6254978809156,
-  2119.1711168854295
+  1827.3751664396766,
+  2121.4403130865553
  ],
  "do": [
   {
@@ -20,10 +20,10 @@
    "sell": [
     "Raul Garcia"
    ],
-   "proceeds": 1300836.0,
-   "gain": 18.78918242520365,
+   "proceeds": 1241212.0,
+   "gain": 18.670807343845922,
    "why": "points + cash",
-   "chance": 0.727,
+   "chance": 0.72,
    "trend": 0.5029810188960858,
    "placed": null,
    "done": false
@@ -36,18 +36,18 @@
    "bid": 25299734.0,
    "clause_from": "Albert Laporta",
    "sell": [
-    "German Valera"
+    "Omar El Hilali"
    ],
-   "proceeds": 13506322.0,
-   "gain": 32.19800962765294,
+   "proceeds": 17286728.0,
+   "gain": 33.033856642137266,
    "why": "points",
-   "chance": 0.739,
+   "chance": 0.749,
    "trend": 15.2777819328032,
    "placed": null,
    "done": false
   }
  ],
- "plan_gain": 46.15614155827154,
+ "plan_gain": 47.55840323509651,
  "backup": [
   {
    "name": "Aitor Paredes",
@@ -58,10 +58,10 @@
    "sell": [
     "Raul Garcia"
    ],
-   "proceeds": 1300836.0,
-   "gain": 34.412139706385005,
+   "proceeds": 1241212.0,
+   "gain": 33.492986534034,
    "why": "points + cash",
-   "chance": 0.791,
+   "chance": 0.805,
    "trend": 6.915820887412845,
    "placed": null,
    "done": false
@@ -74,32 +74,32 @@
    "clause_from": "BurtonGM89",
    "sell": [],
    "proceeds": 0.0,
-   "gain": 28.17050984264438,
+   "gain": 27.434999970696026,
    "why": "points + cash",
-   "chance": 0.813,
+   "chance": 0.801,
    "trend": 12.312464816618867,
    "placed": null,
    "done": false
   },
   {
-   "name": "Edu Exposito",
+   "name": "Luka Sucic",
    "pos": "MED",
-   "ask": 28305362.0,
-   "bid": 28305362.0,
-   "clause_from": "Albert Laporta",
+   "ask": 17350982.0,
+   "bid": 18892575.0,
+   "clause_from": "BurtonGM89",
    "sell": [
-    "Omar El Hilali"
+    "Yeray Alvarez"
    ],
-   "proceeds": 17286728.0,
-   "gain": 27.33303957804719,
-   "why": "points",
-   "chance": 0.735,
-   "trend": -2.532873510121214,
+   "proceeds": 5505854.0,
+   "gain": 21.327375843199206,
+   "why": "points + cash",
+   "chance": 0.739,
+   "trend": 14.12929054145513,
    "placed": null,
    "done": false
   }
  ],
- "ping": "Take Roger Brugue from SusoGattuso (clause 5.7M), selling Raul Garcia; Take Robert Navarro from Albert Laporta (clause 25.3M), selling German Valera",
+ "ping": "Take Roger Brugue from SusoGattuso (clause 5.7M), selling Raul Garcia; Take Robert Navarro from Albert Laporta (clause 25.3M), selling Omar El Hilali",
  "bid_beats": 0.8,
  "confidence": 0.7,
  "exposed": [
@@ -381,29 +381,29 @@
    "manager": "BurtonGM89",
    "me": false,
    "now": 311.0,
-   "mean": 2095.939729088936,
-   "lo": 1930.9668849010404,
-   "hi": 2261.795645388485,
+   "mean": 2091.0485876095936,
+   "lo": 1924.9684062372644,
+   "hi": 2260.2151100963783,
    "cash": -50568726.0,
-   "p_above": 0.24366666666666667
+   "p_above": 0.24733333333333332
   },
   {
    "manager": "Albert Laporta",
    "me": false,
    "now": 272.0,
-   "mean": 2044.5662388200788,
-   "lo": 1876.5545667890567,
-   "hi": 2218.7168083942724,
+   "mean": 2043.1797740126972,
+   "lo": 1870.048823359474,
+   "hi": 2220.286121712467,
    "cash": -95245666.0,
-   "p_above": 0.34
+   "p_above": 0.3456666666666667
   },
   {
    "manager": "miguel_autentico",
    "me": true,
    "now": 371.0,
-   "mean": 1975.0845052383331,
-   "lo": 1839.6254978809156,
-   "hi": 2119.1711168854295,
+   "mean": 1974.6105981808475,
+   "lo": 1827.3751664396766,
+   "hi": 2121.4403130865553,
    "cash": 16941911.0,
    "p_above": null
   },
@@ -411,19 +411,19 @@
    "manager": "Magic Mike 333",
    "me": false,
    "now": 271.0,
-   "mean": 1556.156951032292,
-   "lo": 1439.8642812078447,
-   "hi": 1670.5572748440038,
+   "mean": 1557.341446619032,
+   "lo": 1440.1783890946651,
+   "hi": 1680.0402477068665,
    "cash": 43938037.0,
-   "p_above": 0.9983333333333333
+   "p_above": 0.9976666666666667
   },
   {
    "manager": "SusoGattuso",
    "me": false,
    "now": 211.0,
-   "mean": 1493.1418383532791,
-   "lo": 1379.938208665794,
-   "hi": 1609.7876188562184,
+   "mean": 1493.5008560544177,
+   "lo": 1379.8377669462739,
+   "hi": 1613.5187876340494,
    "cash": 33534289.0,
    "p_above": 0.9996666666666667
   }
