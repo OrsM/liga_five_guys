@@ -1,5 +1,5 @@
 {
- "generated_at": "2026-10-02T20:36Z",
+ "generated_at": "2026-10-02T21:05Z",
  "lock_at": "2026-10-09T19:00:00+00:00",
  "cash": -64059278.0,
  "cash_locked": 0,
@@ -20,10 +20,64 @@
     "Zaid Romero"
    ],
    "gain": 2.8017001442252596
+  },
+  {
+   "what": "sell",
+   "name": "Sergio Carreira",
+   "pos": "DEF",
+   "proceeds": 6926879.0,
+   "why": "debt",
+   "chance": null,
+   "done": true
+  },
+  {
+   "what": "sell",
+   "name": "Yeray Alvarez",
+   "pos": "DEF",
+   "proceeds": 5392312.0,
+   "why": "debt",
+   "chance": null,
+   "done": true
+  },
+  {
+   "what": "sell",
+   "name": "Omar El Hilali",
+   "pos": "DEF",
+   "proceeds": 17589931.0,
+   "why": "debt",
+   "chance": null,
+   "done": true
+  },
+  {
+   "what": "sell",
+   "name": "Pablo Fornals",
+   "pos": "MED",
+   "proceeds": 37794353.0,
+   "why": "debt",
+   "chance": null,
+   "done": true
   }
  ],
- "plan_gain": 0.0,
- "backup": [],
+ "plan_gain": -70.31845601138588,
+ "backup": [
+  {
+   "name": "Aitor Paredes",
+   "pos": "DEF",
+   "ask": 17494317.0,
+   "bid": 17494317.0,
+   "clause_from": "BurtonGM89",
+   "sell": [
+    "Omar El Hilali"
+   ],
+   "proceeds": 17589931.0,
+   "gain": 26.244512433191176,
+   "why": "points + cash",
+   "chance": 0.737,
+   "trend": 15.688835848727981,
+   "placed": null,
+   "done": false
+  }
+ ],
  "ping": "Field Alex Baena",
  "bid_beats": 0.8,
  "confidence": 0.7,
