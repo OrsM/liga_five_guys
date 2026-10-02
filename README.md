@@ -78,8 +78,8 @@ Every forecast is the same product, for every player and jornada, and
   read a table themselves.
 - **Moves** (`decide.py`): the `Universe` joins an `Outlook`
   (`ffcore/outlook.py`: expected points and the best eleven, no money) to
-  a `Market` (`ffcore/market.py`: names, prices, values, your cash and
-  bids, no points). A player comes from the market, at the bid it takes
+  a `Market` (`ffcore/market.py`: names, prices, values, your cash, bids
+  and debt, no points). A player comes from the market, at the bid it takes
   to win the auction, or from a rival by paying his release clause, as it
   stands and at once (he leaves the rival's squad, who gets the money;
   only once his protection after his last transfer has ended). Every
@@ -130,7 +130,8 @@ which move wins.
   refuses a closed one anyway.
 - **A negative balance at the matchday's start scores 0 points; debt is
   capped at 20% of team value.** Enforced by the plan
-  (`decide.clear_debt` sells before the lock) and by the app (bids).
+  (`Market.owed` is what must be raised, `decide.clear_debt` picks the
+  sales) and by the app (bids).
 - **Raising a clause costs half the raise** (1M pays for +2M). Not modelled:
   the board lists who is at risk, not what protecting them would cost.
 - **Blindaje:** one player per matchday is shielded from clauses for 24h

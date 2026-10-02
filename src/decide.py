@@ -136,12 +136,11 @@ class Universe:
         screen = score_many(self, [self.state.squads]
                             + [apply(self, a) for a in acts], SCREEN_TRIALS, seed)
         gains = [median_gain(paired(r, screen[0], self.me)) for r in screen[1:]]
-        budget = max(m.cash, 0.0)  # in debt, a sale is still affordable
-        measured = cash_price([(a.net - budget, d) for a, d in zip(acts, gains)])
+        measured = cash_price([(m.short(a), d) for a, d in zip(acts, gains)])
         lam = m.lam if m.lam is not None else (measured or 0.0)
         best: dict = {}
         for a, d in zip(acts, gains):
-            if a.net > budget:
+            if m.short(a) > 0:
                 continue
             key, way = (d + m.cash_pts(a, lam), -a.net), (a.buy or a.sell, bool(a.buy and a.sell))
             if way not in best or key > best[way][0]:
@@ -192,15 +191,15 @@ def clear_debt(u, rows: list[Move], base: Standings) -> list[Move]:
     with none to spare and leave a side you can field, the one that loses
     fewest points together. Sales interact (two defenders sold thin your
     defence), so the sets their losses alone rank best are scored jointly."""
-    debt = -u.market.cash
-    if debt <= 0:
+    m = u.market
+    if not m.owed():
         return []
     sales = [r for r in rows if not r.action.buy and r.action.net < 0]
 
     def clears(c) -> bool:
-        raised = sum(r.action.proceeds for r in c)
-        gone = {k for r in c for k in r.action.sell}
-        return (raised >= debt and all(raised - r.action.proceeds < debt for r in c)
+        acts = [r.action for r in c]
+        gone = {k for a in acts for k in a.sell}
+        return (not m.owed(acts) and all(m.owed([b for b in acts if b is not a]) for a in acts)
                 and _fieldable({k: s for k, s in u.mine.items() if k not in gone}))
     sets = [c for n in range(1, DEBT_SALES + 1)
             for c in itertools.combinations(sales, n) if clears(c)]
@@ -215,17 +214,16 @@ def fill(u, good: list[Move], base: Standings, order,
     and adds to their joint gain; again until none is taken, so a sale
     taken late still pays for a buy."""
     picked = list(start)
-    cash = u.market.cash - sum(r.action.net for r in picked)
     gain, grew = joint_gain(u, picked, base) if picked else 0.0, True
     while grew:
         grew = False
         for r in sorted(good, key=order):
-            if r in picked or blocked(u, picked, r.action, cash):
+            if r in picked or blocked(u, picked, r.action):
                 continue
             total = joint_gain(u, [*picked, r], base)
             if total > gain:
                 picked.append(r)
-                cash, gain, grew = cash - r.action.net, total, True
+                gain, grew = total, True
     return picked, gain
 
 
@@ -236,7 +234,7 @@ def joint_gain(u, moves: list[Move], base: Standings) -> float:
         u.market.cash_pts(a) for a in acts)
 
 
-def blocked(u, picked: list[Move], a: Action, cash: float) -> str | None:
+def blocked(u, picked: list[Move], a: Action) -> str | None:
     """Why a move cannot join these: it shares a player with one of them,
     or the cash they leave does not pay for it. None if it can."""
     names = {k: title_name(n) for k, n in u.market.name.items()}
@@ -244,8 +242,9 @@ def blocked(u, picked: list[Move], a: Action, cash: float) -> str | None:
         if shared := set(p.action.players) & set(a.players):
             return "%s is in %s" % (" + ".join(names.get(k, k) for k in shared),
                                     p.action.label(names))
-    if a.net > cash:
-        return "it needs %.1fM and %.1fM is left" % (a.net / 1e6, cash / 1e6)
+    done = [p.action for p in picked]
+    if u.market.short(a, done) > 0:
+        return "it needs %.1fM and %.1fM is left" % (a.net / 1e6, u.market.left(done) / 1e6)
     return None
 
 

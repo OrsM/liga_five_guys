@@ -73,9 +73,8 @@ def fate(u, b, r) -> str:
                     "in the plan to clear your debt before the lock")
     if (no := verdict(r)) is not None:
         return step(verdict, no)
-    cash = u.market.cash - sum(p.action.net for p in b.plan)
     return step(plan, "clears the bar, left out: %s" % (
-        blocked(u, b.plan, r.action, cash) or "it adds nothing alongside the plan"))
+        blocked(u, b.plan, r.action) or "it adds nothing alongside the plan"))
 
 
 def why(u, k: str) -> None:
@@ -137,7 +136,7 @@ def whatif(u, words: list[str]) -> None:
     picked, gain = plan(u, [*b.plan, mv], b.base)
     print(step(plan, "the plan would take it: together %+.1f, against %+.1f" % (gain, b.gain)
                if mv in picked else "clears the bar, but alongside the board's plan: %s" % (
-                   blocked(u, b.plan, mv.action, m.cash - sum(p.action.net for p in b.plan))
+                   blocked(u, b.plan, mv.action)
                    or "it adds nothing to it")))
 
 

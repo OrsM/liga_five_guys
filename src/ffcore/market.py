@@ -34,6 +34,21 @@ class Market:
     def locked_cash(self) -> float:
         return sum(self.my_bid.values())
 
+    def left(self, acts=()) -> float:
+        """Your cash once these moves are made."""
+        return self.cash - sum(a.net for a in acts)
+
+    def owed(self, acts=()) -> float:
+        """What these moves leave to raise before the lock: a balance below
+        zero at the matchday's start scores nothing."""
+        return max(0.0, -self.left(acts))
+
+    def short(self, a: Action, acts=()) -> float:
+        """How much more than the cash these moves leave a move needs; at
+        most 0 if it can be made. In debt there is nothing to spend, but
+        a move that raises money can still be made."""
+        return a.net - max(self.left(acts), 0.0)
+
     def burn(self, a: Action) -> float | None:
         """What a buy costs above the player's value; its cost is what you
         pay (for an auction, the bid it takes to win)."""
@@ -86,6 +101,12 @@ def pending(rows, status_field: str, money_field: str) -> dict[str, float]:
 
 
 def _selftest() -> None:
+    debt = Market(cash=-5e6)
+    sale, buy = Action("sell", sell=("s",), proceeds=3e6), Action("buy", buy="b", cost=1e6)
+    assert debt.owed() == 5e6 and debt.owed([sale]) == 2e6 and debt.left([sale]) == -2e6
+    assert debt.short(sale) <= 0 < debt.short(buy), "in debt, only what raises money"
+    assert Market(cash=2e6).short(buy, [sale]) == 1e6 - 5e6
+
     m = Market(value={"star": 5e6, "free": 4e6})
     assert m.burn(Action("buy", buy="star", cost=8e6)) == 3e6
     assert m.burn(Action("buy", buy="free", cost=4e6)) == 0.0
