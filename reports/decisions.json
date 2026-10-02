@@ -1,107 +1,30 @@
 {
- "generated_at": "2026-10-02T19:46Z",
+ "generated_at": "2026-10-02T20:36Z",
  "lock_at": "2026-10-09T19:00:00+00:00",
- "cash": 17041911.0,
- "cash_locked": 81201189.0,
- "finish": 2.42,
- "p_win": 0.141,
+ "cash": -64059278.0,
+ "cash_locked": 0,
+ "finish": 2.13,
+ "p_win": 0.254,
  "band": [
-  1827.3751664396766,
-  2121.4403130865553
+  1895.8500797930276,
+  2198.8412057201117
  ],
  "do": [
   {
-   "what": "buy",
-   "name": "Roger Brugue",
-   "pos": "DEL",
-   "ask": 5737987.0,
-   "bid": 5737987.0,
-   "clause_from": "SusoGattuso",
-   "sell": [
-    "Raul Garcia"
+   "what": "field",
+   "legal": true,
+   "on": [
+    "Alex Baena"
    ],
-   "proceeds": 1222670.0,
-   "gain": 18.670807343845922,
-   "why": "points + cash",
-   "chance": 0.723,
-   "trend": 3.3180789460993494,
-   "placed": null,
-   "done": false
-  },
-  {
-   "what": "buy",
-   "name": "Robert Navarro",
-   "pos": "MED",
-   "ask": 25299734.0,
-   "bid": 25299734.0,
-   "clause_from": "Albert Laporta",
-   "sell": [
-    "Omar El Hilali"
+   "off": [
+    "Zaid Romero"
    ],
-   "proceeds": 17589931.0,
-   "gain": 33.033856642137266,
-   "why": "points",
-   "chance": 0.764,
-   "trend": 33.87026266327167,
-   "placed": null,
-   "done": false
+   "gain": 2.8017001442252596
   }
  ],
- "plan_gain": 49.7667281583122,
- "backup": [
-  {
-   "name": "Aitor Paredes",
-   "pos": "DEF",
-   "ask": 17494317.0,
-   "bid": 17494317.0,
-   "clause_from": "BurtonGM89",
-   "sell": [
-    "Raul Garcia"
-   ],
-   "proceeds": 1222670.0,
-   "gain": 33.492986534034,
-   "why": "points + cash",
-   "chance": 0.816,
-   "trend": 15.688835848727981,
-   "placed": null,
-   "done": false
-  },
-  {
-   "name": "Ramon Terrats",
-   "pos": "MED",
-   "ask": 14424202.0,
-   "bid": 14424202.0,
-   "clause_from": "BurtonGM89",
-   "sell": [
-    "Raul Garcia"
-   ],
-   "proceeds": 1222670.0,
-   "gain": 27.379900446135025,
-   "why": "points + cash",
-   "chance": 0.814,
-   "trend": 29.54050695839261,
-   "placed": null,
-   "done": false
-  },
-  {
-   "name": "Roberto Fernandez",
-   "pos": "DEL",
-   "ask": 50085732.0,
-   "bid": 50085732.0,
-   "clause_from": "BurtonGM89",
-   "sell": [
-    "Pablo Fornals"
-   ],
-   "proceeds": 37794353.0,
-   "gain": 24.10851736628365,
-   "why": "points + cash",
-   "chance": 0.719,
-   "trend": 10.74797738276217,
-   "placed": null,
-   "done": false
-  }
- ],
- "ping": "Take Roger Brugue from SusoGattuso (clause 5.7M), selling Raul Garcia; Take Robert Navarro from Albert Laporta (clause 25.3M), selling Omar El Hilali",
+ "plan_gain": 0.0,
+ "backup": [],
+ "ping": "Field Alex Baena",
  "bid_beats": 0.8,
  "confidence": 0.7,
  "exposed": [
@@ -123,7 +46,7 @@
    "by": [
     "Magic Mike 333"
    ],
-   "xi": true,
+   "xi": false,
    "season": 171.35302849432347
   },
   {
@@ -280,7 +203,7 @@
   {
    "name": "Zaid Romero",
    "pos": "DEF",
-   "xi": true,
+   "xi": false,
    "start": 0.9879999999999999,
    "next": 3.4649156717932756,
    "season": 171.35302849432347,
@@ -306,6 +229,16 @@
    "season": 120.6684415423779,
    "value": 23232464.0,
    "trend": 12.874465630309999
+  },
+  {
+   "name": "Alex Baena",
+   "pos": "MED",
+   "xi": true,
+   "start": 0.9768030637430065,
+   "next": 6.266615816018535,
+   "season": 177.01617573772643,
+   "value": 81201189.0,
+   "trend": 14.411262473763236
   },
   {
    "name": "Pablo Fornals",
@@ -383,51 +316,51 @@
    "manager": "BurtonGM89",
    "me": false,
    "now": 311.0,
-   "mean": 2091.0485876095936,
-   "lo": 1924.9684062372644,
-   "hi": 2260.2151100963783,
-   "cash": -50468726.0,
-   "p_above": 0.24733333333333332
+   "mean": 2097.1767617118508,
+   "lo": 1927.9980906685657,
+   "hi": 2267.4696670086864,
+   "cash": -50368726.0,
+   "p_above": 0.37833333333333335
   },
   {
    "manager": "Albert Laporta",
    "me": false,
    "now": 272.0,
-   "mean": 2050.799293798807,
-   "lo": 1878.8637428923998,
-   "hi": 2229.785008760468,
-   "cash": -95145666.0,
-   "p_above": 0.33266666666666667
+   "mean": 2049.345239786294,
+   "lo": 1876.9942235104784,
+   "hi": 2226.9117453435256,
+   "cash": -95045666.0,
+   "p_above": 0.48966666666666664
   },
   {
    "manager": "miguel_autentico",
    "me": true,
    "now": 371.0,
-   "mean": 1974.6105981808475,
-   "lo": 1827.3751664396766,
-   "hi": 2121.4403130865553,
-   "cash": 17041911.0,
+   "mean": 2047.3682367208414,
+   "lo": 1895.8500797930276,
+   "hi": 2198.8412057201117,
+   "cash": -64059278.0,
    "p_above": null
   },
   {
    "manager": "Magic Mike 333",
    "me": false,
    "now": 271.0,
-   "mean": 1557.341446619032,
-   "lo": 1440.1783890946651,
-   "hi": 1680.0402477068665,
-   "cash": 44038037.0,
-   "p_above": 0.9976666666666667
+   "mean": 1554.684875850135,
+   "lo": 1441.945839860719,
+   "hi": 1673.282232048139,
+   "cash": 44138037.0,
+   "p_above": 1.0
   },
   {
    "manager": "SusoGattuso",
    "me": false,
    "now": 211.0,
-   "mean": 1493.8857330412668,
-   "lo": 1379.4081114194275,
-   "hi": 1613.3850735732815,
-   "cash": 33634289.0,
-   "p_above": 0.9996666666666667
+   "mean": 1497.4440958367911,
+   "lo": 1381.8532759351615,
+   "hi": 1613.857770311372,
+   "cash": 33734289.0,
+   "p_above": 1.0
   }
  ]
 }
