@@ -21,8 +21,8 @@ def steps(rows: list[dict]) -> dict[str, list[tuple[str, float]]]:
                 if a[1] > 0] for k, v in vals.items()}
 
 
-def _clip(step: float) -> float:
-    return max(-CLIP, min(CLIP, step))
+def _clip(step: float, updates: int = 1) -> float:
+    return max(-CLIP * updates, min(CLIP * updates, step))
 
 
 def _ahead(s: list[tuple[str, float]], i: int, h: int) -> float:
@@ -31,7 +31,8 @@ def _ahead(s: list[tuple[str, float]], i: int, h: int) -> float:
 
 class Momentum:
     """How much of a price change carries into the next h updates: one
-    least-squares slope per horizon, fitted over every player."""
+    least-squares slope per horizon, fitted over every player. Changes are
+    clipped at CLIP per update, so a long rise is not cut short."""
 
     def __init__(self, by_player: dict[str, list[tuple[str, float]]],
                  until: str = "9999"):
@@ -39,18 +40,24 @@ class Momentum:
             if by_player else 1
         self.slope: dict[int, float] = {}
         for h in range(1, self.hmax + 1):
-            pairs = [(_clip(s[i][1]), _clip(_ahead(s, i, h)))
+            pairs = [(_clip(s[i][1]), _clip(_ahead(s, i, h), h))
                      for s in by_player.values() for i in range(len(s) - h)
                      if s[i + h][0] <= until]
             sxx = sum(x * x for x, _ in pairs)
             if sxx:
                 self.slope[h] = sum(x * y for x, y in pairs) / sxx
 
+    @property
+    def horizon(self) -> int:
+        """The longest h the data can fit: a rise is still carrying there."""
+        return max(self.slope, default=1)
 
-def trend(by_player: dict[str, list[tuple[str, float]]],
-          updates: int) -> dict[str, float]:
+
+def trend(by_player: dict[str, list[tuple[str, float]]]) -> dict[str, float]:
+    """Each player's value change, in %, over the momentum horizon: as long
+    as you would hold him, not just until the lock."""
     mo = Momentum(by_player)
-    c = mo.slope.get(max(1, min(updates, mo.hmax)), 0.0)
+    c = mo.slope.get(mo.horizon, 0.0)
     newest = max((s[-1][0] for s in by_player.values() if s), default="")
     return {k: c * _clip(s[-1][1]) for k, s in by_player.items()
             if s and s[-1][0] == newest}
@@ -133,9 +140,13 @@ def _selftest() -> None:
     assert mo.hmax == 4 and set(mo.slope) == {1, 2, 3, 4}
     up = Momentum({k: v for k, v in by.items() if k.startswith("up")})
     assert abs(up.slope[3] * 5.0 - (1.05 ** 3 - 1) * 100) < 1e-6, up.slope
-    t = trend(by, 3)
+    assert mo.horizon == 4
+    t = trend(by)
     assert t["up0"] > 0 > t["down0"] and t["flat0"] == 0.0, t
-    assert trend(by, 99) == trend(by, 4) and trend({}, 3) == {}
+    assert trend({}) == {}
+    long_rise = {"r%d" % i: [("2026-08-%02d" % n, 15.0) for n in range(1, 13)] for i in range(3)}
+    assert abs(Momentum(long_rise).slope[2] * 15.0 - (1.15 ** 2 - 1) * 100) < 1e-6, \
+        "a rise over several updates is not clipped as if it were one"
     g = grade(by, horizons=(1, 2))
     assert g[1]["mae"] < g[1]["zero"] and g[2]["n"] > 0, g
 

@@ -15,7 +15,7 @@ from ffcore.points import scored
 from assemble import fixture_ratings, scorer, universe
 from decide import board, verdict
 from ffcore.clock import set_now
-from ffcore.pricing import grade, steps
+from ffcore.pricing import Momentum, _ahead, grade, steps
 from ffcore.tidy import LINEUP_SOURCE, current, history
 __all__ = ["backtest", "compare", "decisions", "persistence", "score_forecast"]
 
@@ -73,10 +73,13 @@ def decisions() -> list[dict]:
     """Rebuild each past lock's board with this code and set every ranked
     move against what its players then scored: the change in points it
     forecast (players got minus players sold) over the jornadas played
-    since, and the change that happened."""
+    since, and the change that happened; and the value its players were
+    to gain (bought) or lose (sold) over the price horizon, in millions,
+    against what they did."""
     locks = clock_history().round_locks
     actual = _jornada_points()
     done = {j for _k, j in actual}
+    prices = steps(history("market"))
     out = []
     try:
         for i in sorted(done & set(locks), key=locks.get):
@@ -87,8 +90,19 @@ def decisions() -> list[dict]:
             except SystemExit as e:
                 print("j%d: no board (%s)" % (i, e), file=sys.stderr)
                 continue
-            b, per_j = board(u), u.forecaster.per_jornada
+            b, per_j, m = board(u), u.forecaster.per_jornada, u.market
             later = sorted(j for j in done if j >= i and j in per_j)
+            h = Momentum(steps(history("market"))).horizon
+            day = locks[i].strftime("%Y-%m-%d")
+
+            def rose(k) -> float:
+                s = prices.get(k, [])
+                at = max((n for n, (d, _) in enumerate(s) if d <= day), default=None)
+                return 0.0 if at is None or at + h >= len(s) else _ahead(s, at, h)
+
+            def worth(a, pct) -> float:
+                return (m.value.get(a.buy, 0.0) * pct(a.buy) - sum(
+                    m.value.get(k, 0.0) * pct(k) for k in a.sell)) / 100e6
 
             def change(a, pts) -> float:
                 return sum(pts(a.buy, j) for j in later) - sum(
@@ -102,7 +116,9 @@ def decisions() -> list[dict]:
                     "kind": "sell" if not a.buy else "get",
                     "chance": r.p_better,
                     "pred": change(a, lambda k, j: math.prod(per_j[j].get(k, (0.0, 0.0)))),
-                    "real": change(a, lambda k, j: actual.get((k, j), 0.0))})
+                    "real": change(a, lambda k, j: actual.get((k, j), 0.0)),
+                    "value_pred": worth(a, lambda k: m.trend.get(k, 0.0)),
+                    "value_real": worth(a, rose), "lam": m.lam})
     finally:
         set_now(None)
         universe.cache_clear()
@@ -197,15 +213,20 @@ if __name__ == "__main__":
                 per = [(r["pred"] / r["jornadas"], r["real"] / r["jornadas"])
                        for r in rows if r["jornadas"]]
                 print("%-8s %-4s n=%3d  per jornada: forecast %+.2f, happened %+.2f;"
-                      " happened > 0 in %.0f%% (forecast chance %.0f%%)" % (
+                      " happened > 0 in %.0f%% (forecast chance %.0f%%);"
+                      " value forecast %+.2fM, happened %+.2fM" % (
                           group, kind, len(rows),
                           statistics.fmean(f for f, _ in per), statistics.fmean(h for _, h in per),
                           100 * statistics.fmean(h > 0 for _, h in per),
-                          100 * statistics.fmean(r["chance"] for r in rows)))
+                          100 * statistics.fmean(r["chance"] for r in rows),
+                          statistics.fmean(r["value_pred"] for r in rows),
+                          statistics.fmean(r["value_real"] for r in rows)))
         for r in runs:
             if r["group"] == "plan":
-                print("  j%-2d %-45s forecast %+6.1f happened %+6.1f over %d" % (
-                    r["lock"], r["move"][:45], r["pred"], r["real"], r["jornadas"]))
+                print("  j%-2d %-45s forecast %+6.1f happened %+6.1f over %d;"
+                      " value %+5.1fM happened %+5.1fM" % (
+                    r["lock"], r["move"][:45], r["pred"], r["real"], r["jornadas"],
+                    r["value_pred"], r["value_real"]))
     elif "--prices" in sys.argv:
         for h, g in grade(steps(history("market"))).items():
             print("%d update(s) ahead: n=%d  error %.2f%%  vs %.2f%% for "

@@ -69,7 +69,9 @@ Every forecast is the same product, for every player and jornada, and
   persistent per-player error (`PERSISTENT_SHARE`, measured by the
   backtest), drawn once per simulated season.
 - **Prices** (`ffcore/pricing.py`): values keep their trend; the next h
-  updates move by a fitted multiple of the last one. A bid is the
+  updates move by a fitted multiple of the last one, h being the longest
+  horizon the data can fit (a rise was still carrying there), not the
+  lock: a buy pays its premium once and keeps rising after it. A bid is the
   premium over asking that beat 80% of the last 50 winning bids.
 - **Assembly** (`assemble.py`): the one place that reads the tables and
   builds the scorer, market, league state and forecast; model modules never
@@ -87,7 +89,7 @@ Every forecast is the same product, for every player and jornada, and
      and each of those paid for by a sale.
   2. **rank**: each move against doing nothing, in simulated seasons: the
      points it adds plus, at the measured points-per-million, the value
-     its players gain by the lock less what it burns over their value.
+     its players gain over the price horizon less what it burns over their value.
   3. **verdict**: a gain in the median, cash included, and better off in
      at least 70% of seasons (`CONFIDENCE`); below that its gain is noise.
   4. **plan**: the best set that shares no player, fits your cash and adds

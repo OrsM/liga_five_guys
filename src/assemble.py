@@ -12,7 +12,7 @@ from decide import Universe, _fieldable
 from ffcore.clock import run_now
 from ffcore.fixture import difficulty_ratings
 from ffcore.forecast import Bootstrap
-from ffcore.jornadas import clock_history, jornada_of_match, load_deadline
+from ffcore.jornadas import clock_history, jornada_of_match
 from ffcore.league import League
 from ffcore.market import Market, market_routes, pending
 from ffcore.parse import num, ratio, text
@@ -95,12 +95,6 @@ def cash_price_history() -> float | None:
     return median(seen[-PRICE_WINDOW:]) if seen else None
 
 
-def _updates_to_lock() -> int:
-    deadline = load_deadline()
-    hours = (deadline - run_now()).total_seconds() / 3600 if deadline else 24.0
-    return max(1, round(hours / 24))
-
-
 def _premium(me: str) -> float:
     mine = {text(r, "user_id") for r in current("api_standings")
             if text(r, "manager") == me}
@@ -151,7 +145,7 @@ def universe() -> Universe:
         value={k: v for k, v in value.items() if k in players},
         proceeds={k: v for k, v in proceeds.items() if k in players},
         my_bid=pending(mkt, "bid_status", "bid_money"),
-        trend=trend(steps(history("market")), _updates_to_lock()),
+        trend=trend(steps(history("market"))),
         clause={k: v for k, v in open_clauses(teams).items() if k in players})
     squads, per_j = phantom_fill(squads, per_j, pos)
     assert all(_fieldable(sq) for sq in squads.values()), squads
