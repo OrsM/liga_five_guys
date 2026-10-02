@@ -68,10 +68,11 @@ def not_offered(u, k: str) -> str:
 def fate(u, b, r) -> str:
     """Where a ranked move stopped: at verdict, or at plan and why. The plan
     last tried every move it left out against all of itself."""
+    if r in b.plan:
+        return step(plan, "in the plan" if verdict(r) is None else
+                    "in the plan to clear your debt before the lock")
     if (no := verdict(r)) is not None:
         return step(verdict, no)
-    if r in b.plan:
-        return step(plan, "in the plan")
     cash = u.market.cash - sum(p.action.net for p in b.plan)
     return step(plan, "clears the bar, left out: %s" % (
         blocked(u, b.plan, r.action, cash) or "it adds nothing alongside the plan"))

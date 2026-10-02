@@ -92,8 +92,10 @@ Every forecast is the same product, for every player and jornada, and
      its players gain over the price horizon less what it burns over their value.
   3. **verdict**: a gain in the median, cash included, and better off in
      at least 70% of seasons (`CONFIDENCE`); below that its gain is noise.
-  4. **plan**: the best set that shares no player, fits your cash and adds
-     to the joint gain, built best first and best per million first (one
+  4. **plan**: in debt, first the sales that clear it at the fewest points
+     lost together (below zero at the lock scores nothing, so they are made
+     whatever they cost); then the best set that shares no player, fits your
+     cash and adds to the joint gain, built best first and best per million first (one
      dear move can crowd out two cheaper ones that gain more), keeping the
      set that gains more; the rest that clear the bar are the backups.
 
@@ -127,8 +129,8 @@ which move wins.
   league). Not modelled: ours paid one 9h before kickoff, and the app
   refuses a closed one anyway.
 - **A negative balance at the matchday's start scores 0 points; debt is
-  capped at 20% of team value.** Enforced by the plan (sell before the
-  lock) and by the app (bids).
+  capped at 20% of team value.** Enforced by the plan
+  (`decide.clear_debt` sells before the lock) and by the app (bids).
 - **Raising a clause costs half the raise** (1M pays for +2M). Not modelled:
   the board lists who is at risk, not what protecting them would cost.
 - **Blindaje:** one player per matchday is shielded from clauses for 24h

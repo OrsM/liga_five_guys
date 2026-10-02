@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import itertools
 import sys
 from dataclasses import dataclass, field, replace
 from functools import cached_property
@@ -22,6 +23,8 @@ __all__ = ["Action", "Board", "CONFIDENCE", "FUNNEL", "Move", "Universe", "at_ri
 SCREEN_TRIALS = 250
 FINAL_TRIALS = 3000
 CONFIDENCE = 0.7
+DEBT_SALES = 5        # most sales a debt is cleared with
+DEBT_SHORTLIST = 30   # sets of them scored together
 
 @dataclass(frozen=True)
 class Move:
@@ -133,11 +136,12 @@ class Universe:
         screen = score_many(self, [self.state.squads]
                             + [apply(self, a) for a in acts], SCREEN_TRIALS, seed)
         gains = [median_gain(paired(r, screen[0], self.me)) for r in screen[1:]]
-        measured = cash_price([(a.net - m.cash, d) for a, d in zip(acts, gains)])
+        budget = max(m.cash, 0.0)  # in debt, a sale is still affordable
+        measured = cash_price([(a.net - budget, d) for a, d in zip(acts, gains)])
         lam = m.lam if m.lam is not None else (measured or 0.0)
         best: dict = {}
         for a, d in zip(acts, gains):
-            if a.net > m.cash:
+            if a.net > budget:
                 continue
             key, way = (d + m.cash_pts(a, lam), -a.net), (a.buy or a.sell, bool(a.buy and a.sell))
             if way not in best or key > best[way][0]:
@@ -169,22 +173,50 @@ def verdict(mv: Move) -> str | None:
     return None
 
 
-def plan(u, good: list[Move], base: Standings) -> tuple[list[Move], float]:
-    """The best set of moves to make together. Built twice, best first and
+def plan(u, rows: list[Move], base: Standings) -> tuple[list[Move], float]:
+    """The best set of moves to make together, a debt cleared first. After
+    its sales, the moves that clear the bar, built twice: best first and
     best per million it ties up first, since one dear move can crowd out
     two cheaper ones that gain more; the set that gains more is the plan.
     Every move it leaves out was last tried against the whole of it."""
-    return max((fill(u, good, base, key) for key in (
+    owed = clear_debt(u, rows, base)
+    good = [r for r in rows if verdict(r) is None and r not in owed]
+    return max((fill(u, good, base, key, owed) for key in (
         lambda r: -r.net_pts,
         lambda r: -r.net_pts / max(r.action.net / 1e6, 1.0))), key=lambda pg: pg[1])
 
 
-def fill(u, good: list[Move], base: Standings, order) -> tuple[list[Move], float]:
-    """Moves in this order, each taken if it shares no player with those
-    taken, is paid for by the cash left, and adds to their joint gain;
-    again until none is taken, so a sale taken late still pays for a buy."""
-    picked: list[Move] = []
-    cash, gain, grew = u.market.cash, 0.0, True
+def clear_debt(u, rows: list[Move], base: Standings) -> list[Move]:
+    """A balance below zero at the lock scores nothing that jornada, so a
+    debt is cleared whatever it costs: of the sets of sales that clear it
+    with none to spare and leave a side you can field, the one that loses
+    fewest points together. Sales interact (two defenders sold thin your
+    defence), so the sets their losses alone rank best are scored jointly."""
+    debt = -u.market.cash
+    if debt <= 0:
+        return []
+    sales = [r for r in rows if not r.action.buy and r.action.net < 0]
+
+    def clears(c) -> bool:
+        raised = sum(r.action.proceeds for r in c)
+        gone = {k for r in c for k in r.action.sell}
+        return (raised >= debt and all(raised - r.action.proceeds < debt for r in c)
+                and _fieldable({k: s for k, s in u.mine.items() if k not in gone}))
+    sets = [c for n in range(1, DEBT_SALES + 1)
+            for c in itertools.combinations(sales, n) if clears(c)]
+    short = sorted(sets, key=lambda c: -sum(r.net_pts for r in c))[:DEBT_SHORTLIST]
+    return list(max(short, key=lambda c: joint_gain(u, list(c), base), default=()))
+
+
+def fill(u, good: list[Move], base: Standings, order,
+         start: list[Move] = ()) -> tuple[list[Move], float]:
+    """Moves in this order after those it must start with, each taken if
+    it shares no player with those taken, is paid for by the cash left,
+    and adds to their joint gain; again until none is taken, so a sale
+    taken late still pays for a buy."""
+    picked = list(start)
+    cash = u.market.cash - sum(r.action.net for r in picked)
+    gain, grew = joint_gain(u, picked, base) if picked else 0.0, True
     while grew:
         grew = False
         for r in sorted(good, key=order):
@@ -226,8 +258,7 @@ FUNNEL = (Universe.candidates, Universe.rank, verdict, plan)
 def board(u) -> Board:
     """The funnel end to end: what the report shows and ask.py explains."""
     rows, base, measured = u.rank(u.candidates())
-    good = [r for r in rows if verdict(r) is None]
-    picked, gain = plan(u, good, base)
+    picked, gain = plan(u, rows, base)
     return Board(picked, gain, rows, base, measured)
 
 
@@ -539,6 +570,20 @@ def _selftest() -> None:
                                 price={"dear": 20e6, "b": 10e6, "c": 10e6}))
     got = sorted(r.action.buy for r in board(uk).plan)
     assert got == ["b", "c"], ("two cheaper moves gaining more beat one dear one", got)
+
+    perd = {j: {**perk[j], "idle": (0.1, 1.0), "useful": (2.0, 1.0)} for j in js}
+    owing = Universe(state=LeagueState({"me": {**ks, "idle": "MED", "useful": "MED"}}, js, "me"),
+                     forecaster=Bootstrap(perd),
+                     market=Market(cash=-5e6, lam=0.0, pos={**uk.market.pos, "idle": "MED",
+                                                             "useful": "MED"},
+                                   price=uk.market.price,
+                                   proceeds={"idle": 6e6, "useful": 6e6}))
+    got = [r.action.label() for r in board(owing).plan]
+    assert got == [Action("sell", sell=("idle",)).label()], \
+        ("a debt is cleared by the sale that costs fewest points, and buys nothing", got)
+    deep = replace(owing, market=replace(owing.market, cash=-8e6))
+    assert sorted(s for r in board(deep).plan for s in r.action.sell) == ["idle", "useful"], \
+        "whatever it costs"
 
     print("decide self-test OK")
 

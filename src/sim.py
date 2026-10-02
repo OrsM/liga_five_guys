@@ -4,7 +4,7 @@ import json
 import sys
 
 from assemble import PRICE_LOG, universe
-from decide import CONFIDENCE, at_risk, board
+from decide import CONFIDENCE, at_risk, board, verdict
 from ffcore.league import app_fielded
 from ffcore.render import title_name
 from ffcore.clock import run_now
@@ -51,8 +51,11 @@ def buy_row(m, r) -> dict:
 
 def sell_row(m, r) -> dict:
     k = r.action.sell[0]
+    owed = verdict(r) is not None  # only a debt puts a sale below the bar in the plan
     return {**player(m, k), "proceeds": r.action.proceeds,
-            "chance": round(r.p_better, 3), "done": m.route.get(k) == "listed"}
+            "why": "debt" if owed else "cash",
+            "chance": None if owed else round(r.p_better, 3),
+            "done": m.route.get(k) == "listed"}
 
 
 def exposed(u) -> list[dict]:
