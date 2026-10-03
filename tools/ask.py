@@ -47,22 +47,26 @@ def named(u) -> dict[str, str]:
 
 def show(u, mv) -> str:
     names = named(u)
-    return "%s: %+.1f points, %+.1f in cash, better off in %.0f%% of seasons" % (
-        mv.action.label(names), mv.d_pts, mv.cash_pts, 100 * mv.p_better)
+    return ("%s: %+.1f points, %+.1f in cash, better off in %.0f%% of seasons"
+            " (at a glance %+.1f points over whoever plays instead)") % (
+        mv.action.label(names), mv.d_pts, mv.cash_pts, 100 * mv.p_better,
+        u.points(mv.action))
 
 
 def not_offered(u, k: str) -> str:
     """Why candidates() has no move for him, from the steps it takes."""
-    m, o = u.market, u.outlook
+    m = u.market
     a = u.offer(k)
     if a is None:
         owner = m.owner.get(k)
         return step(Universe.candidates, "%s's player, and his clause cannot be paid now"
                     % owner if owner else "nobody's, and not on the market now")
-    return step(Universe.candidates, "%.0f season points, not above your weakest "
-                "starter's %.0f, and his value is not expected to beat the %.1fM paid"
-                % (o.season.get(k, 0.0), o.xi_bar, a.cost / 1e6)) \
-        if not u.worth_a_look(a) else ""
+    ways = [w for w in (a, u.fund(a)) if w]
+    if any(u.worth(w) > 0 for w in ways):
+        return ""
+    return step(Universe.candidates, "worth nothing at a glance: " + "; ".join(
+        "%s %+.1f points over whoever plays instead, %+.1f in cash" % (
+            w.label(named(u)), u.points(w), m.cash_pts(w)) for w in ways))
 
 
 def fate(u, b, r) -> str:
@@ -95,7 +99,7 @@ def why(u, k: str) -> None:
     if r is None:
         a = u.offer(k)
         print(step(Universe.rank, "you cannot pay for him: %.1fM, with %.1fM cash and "
-                   "no spare whose sale covers the rest" % (a.cost / 1e6, u.market.cash / 1e6)))
+                   "no sales that cover the rest" % (a.cost / 1e6, u.market.cash / 1e6)))
         return
     print(show(u, r))
     print(fate(u, b, r))

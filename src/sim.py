@@ -49,10 +49,9 @@ def buy_row(m, r) -> dict:
             "done": a.buy in m.my_bid}
 
 
-def sell_row(m, r) -> dict:
-    k = r.action.sell[0]
+def sell_row(m, r, k) -> dict:
     owed = verdict(r) is not None  # only a debt puts a sale below the bar in the plan
-    return {**player(m, k), "proceeds": r.action.proceeds,
+    return {**player(m, k), "proceeds": m.proceeds.get(k, 0.0),
             "why": "debt" if owed else "cash",
             "chance": None if owed else round(r.p_better, 3),
             "done": m.route.get(k) == "listed"}
@@ -89,8 +88,9 @@ def report(u, b, chg, lock_at=None) -> dict:
                      "gain": (sum(exp.get(k, 0.0) for k in chg["in"])
                               - sum(exp.get(k, 0.0) for k in chg["out"]))
                      if chg["legal"] else None})
-    todo += [{"what": "buy", **buy_row(m, r)} if r.action.buy else
-             {"what": "sell", **sell_row(m, r)} for r in b.plan]
+    todo += [row for r in b.plan for row in (
+        [{"what": "buy", **buy_row(m, r)}] if r.action.buy else
+        [{"what": "sell", **sell_row(m, r, k)} for k in r.action.sell])]
     backup = [buy_row(m, r) for r in b.others if r.action.buy][:BACKUPS]
     lo, hi = base.band(u.me)
     return {

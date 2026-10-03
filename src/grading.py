@@ -107,7 +107,7 @@ def decisions() -> list[dict]:
             def change(a, pts) -> float:
                 return sum(pts(a.buy, j) for j in later) - sum(
                     pts(k, j) for k in a.sell for j in later)
-            for r in b.rows:
+            for r in b.rows + [p for p in b.plan if p not in b.rows]:
                 a = r.action
                 out.append({
                     "lock": i, "jornadas": len(later), "move": a.label(u.market.name),

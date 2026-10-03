@@ -20,11 +20,10 @@ from stats import percentile
 __all__ = ["Action", "Board", "CONFIDENCE", "FUNNEL", "Move", "Universe", "at_risk",
            "board", "plan", "verdict"]
 
-SCREEN_TRIALS = 250
 FINAL_TRIALS = 3000
 CONFIDENCE = 0.7
-DEBT_SALES = 5        # most sales a debt is cleared with
-DEBT_SHORTLIST = 30   # sets of them scored together
+FUNDING_SALES = 5      # most sales a move is paid for with
+FUNDING_SHORTLIST = 20  # sets of them worked out together
 
 @dataclass(frozen=True)
 class Move:
@@ -79,6 +78,7 @@ class Universe:
     rival_cash: dict[str, float] = field(default_factory=dict)
     part_played: dict[int, set[str]] = field(default_factory=dict)
     first_jornada_of: dict[str, int] = field(default_factory=dict)
+    _scored: dict = field(default_factory=dict, repr=False, compare=False)
 
     @property
     def me(self) -> str:
@@ -107,51 +107,91 @@ class Universe:
             return Action("clause", buy=k, cost=m.clause[k])
         return None
 
-    def worth_a_look(self, a: Action) -> bool:
-        """He would beat your weakest starter over the season, or his value
-        is expected to rise by more than the premium."""
-        return (self.outlook.season.get(a.buy, 0.0) > self.outlook.xi_bar
-                or self.market.cash_pts(a) > 0)
+    def squad_after(self, *acts: Action) -> dict[str, str]:
+        sq = dict(self.mine)
+        for a in acts:
+            for k in a.sell:
+                sq.pop(k, None)
+            if a.buy:
+                sq[a.buy] = self.market.pos.get(a.buy, "MED")
+        return sq
+
+    def points(self, a: Action) -> float:
+        """What a move changes your best eleven's expected season by: a
+        player's points above whoever would play instead of him."""
+        return self.outlook.total(self.squad_after(a)) - self.outlook.total(self.mine)
+
+    def worth(self, a: Action) -> float:
+        """A move at a glance: its points, plus its money priced in points.
+        Expected points only; rank scores what it lets through in simulated
+        seasons, where luck and the 70% bar come in."""
+        return self.points(a) + self.market.cash_pts(a)
+
+    def fund(self, a: Action, done: tuple[Action, ...] = ()) -> Action | None:
+        """a paid for by selling, after the moves done: of the sets of your
+        spares left that raise what it would leave you owing at the lock,
+        with none to spare (just one sale if it owes nothing) and a side
+        left to field, the one it is worth most with. Sales interact (two
+        defenders sold thin the defence), so the sets each sale's worth
+        alone ranks best are worked out together."""
+        m = self.market
+        need = m.owed([*done, a])
+        gone = {k for d in done for k in d.players}
+        spares = [k for k in fieldable_spares(self)
+                  if k not in a.sell and k not in gone and m.proceeds.get(k)]
+
+        def selling(ks) -> Action:
+            return replace(a, sell=a.sell + tuple(ks),
+                           proceeds=a.proceeds + sum(m.proceeds[k] for k in ks))
+
+        def enough(ks) -> bool:
+            raised = sum(m.proceeds[k] for k in ks)
+            spare = need > 0 and any(raised - m.proceeds[k] >= need for k in ks)
+            return (raised >= need and not spare
+                    and _fieldable(self.squad_after(*done, selling(ks))))
+        alone = {k: self.worth(selling([k])) for k in spares}
+        sets = [ks for n in range(1, FUNDING_SALES + 1 if need > 0 else 2)
+                for ks in itertools.combinations(spares, n) if enough(ks)]
+        short = sorted(sets, key=lambda ks: -sum(alone[k] for k in ks))[:FUNDING_SHORTLIST]
+        best = max(short, key=lambda ks: self.worth(selling(ks)), default=None)
+        return selling(best) if best else None
 
     def candidates(self) -> list[Action]:
-        """Every move you could make. Sell a spare, get a player, or get
-        one selling a spare to pay for him; affordable or not."""
+        """Every move worth a look: each spare sold; in debt, the sales
+        that clear it; each player you could get, from your cash and paid
+        for by sales, if it is worth anything at a glance (worth). Those
+        you cannot pay for only measure what cash is worth."""
         m = self.market
-        spares = [(s, m.proceeds.get(s, 0.0)) for s in fieldable_spares(self)]
-        out = [Action("sell", sell=(s, ), proceeds=got) for s, got in spares]
-        gets = [a for k in sorted(m.price.keys() | m.clause.keys())
-                if (a := self.offer(k)) and self.worth_a_look(a)]
-        for a in sorted(gets, key=lambda a: a.cost):
-            out.append(a)
-            out += [replace(a, sell=(s, ), proceeds=got) for s, got in spares]
-        return out
+        out = [Action("sell", sell=(s, ), proceeds=m.proceeds.get(s, 0.0))
+               for s in fieldable_spares(self)]
+        if m.owed() and (clear := self.fund(Action("sell"))):
+            out.append(clear)
+        for k in sorted(m.price.keys() | m.clause.keys()):
+            if a := self.offer(k):
+                out += [b for b in (a, self.fund(a)) if b and self.worth(b) > 0]
+        return list(dict.fromkeys(out))
 
     def rank(self, acts: list[Action], seed: int = 1) -> Ranking:
-        """Each move scored against doing nothing. In season points, cash
-        priced in. A quick screen picks, for each player, the spare whose
-        sale best pays for him; then he is scored in full both ways, from
-        your cash and with that sale. The unaffordable ones only measure
-        what cash is worth."""
+        """Each move you can pay for, scored against doing nothing in
+        simulated seasons: season points, cash priced in. Those you cannot
+        pay for only measure, by their points, what cash is worth."""
         m = self.market
-        screen = score_many(self, [self.state.squads]
-                            + [apply(self, a) for a in acts], SCREEN_TRIALS, seed)
-        gains = [median_gain(paired(r, screen[0], self.me)) for r in screen[1:]]
-        measured = cash_price([(m.short(a), d) for a, d in zip(acts, gains)])
+        measured = cash_price([(m.short(a), self.points(a)) for a in acts])
         lam = m.lam if m.lam is not None else (measured or 0.0)
-        best: dict = {}
-        for a, d in zip(acts, gains):
-            if m.short(a) > 0:
-                continue
-            key, way = (d + m.cash_pts(a, lam), -a.net), (a.buy or a.sell, bool(a.buy and a.sell))
-            if way not in best or key > best[way][0]:
-                best[way] = (key, a)
-        keep = [a for _key, a in best.values()]
+        keep = [a for a in acts if m.short(a) <= 0]
         final = score_many(self, [self.state.squads]
                            + [apply(self, a) for a in keep], FINAL_TRIALS, seed)
         rows = sorted((self._move(a, paired(r, final[0], self.me), lam)
                        for a, r in zip(keep, final[1:])),
                       key=lambda mv: (-mv.net_pts, mv.action.net))
         return Ranking(rows, final[0], measured)
+
+    def scored(self, a: Action) -> Move | None:
+        """One move ranked on its own, once: the plan asks again and again."""
+        if a not in self._scored:
+            rows = self.rank([a]).rows
+            self._scored[a] = rows[0] if rows else None
+        return self._scored[a]
 
     def _move(self, a: Action, pairs: list[float], lam) -> Move:
         cash = self.market.cash_pts(a, lam)
@@ -178,33 +218,20 @@ def plan(u, rows: list[Move], base: Standings) -> tuple[list[Move], float]:
     best per million it ties up first, since one dear move can crowd out
     two cheaper ones that gain more; the set that gains more is the plan.
     Every move it leaves out was last tried against the whole of it."""
-    owed = clear_debt(u, rows, base)
+    owed = clear_debt(u, rows)
     good = [r for r in rows if verdict(r) is None and r not in owed]
     return max((fill(u, good, base, key, owed) for key in (
         lambda r: -r.net_pts,
         lambda r: -r.net_pts / max(r.action.net / 1e6, 1.0))), key=lambda pg: pg[1])
 
 
-def clear_debt(u, rows: list[Move], base: Standings) -> list[Move]:
+def clear_debt(u, rows: list[Move]) -> list[Move]:
     """A balance below zero at the lock scores nothing that jornada, so a
-    debt is cleared whatever it costs: of the sets of sales that clear it
-    with none to spare and leave a side you can field, the one that loses
-    fewest points together. Sales interact (two defenders sold thin your
-    defence), so the sets their losses alone rank best are scored jointly."""
+    debt is cleared whatever it costs: the ranked move worth most that
+    leaves you owing nothing (sales, or a buy paid for by more of them)."""
     m = u.market
-    if not m.owed():
-        return []
-    sales = [r for r in rows if not r.action.buy and r.action.net < 0]
-
-    def clears(c) -> bool:
-        acts = [r.action for r in c]
-        gone = {k for a in acts for k in a.sell}
-        return (not m.owed(acts) and all(m.owed([b for b in acts if b is not a]) for a in acts)
-                and _fieldable({k: s for k, s in u.mine.items() if k not in gone}))
-    sets = [c for n in range(1, DEBT_SALES + 1)
-            for c in itertools.combinations(sales, n) if clears(c)]
-    short = sorted(sets, key=lambda c: -sum(r.net_pts for r in c))[:DEBT_SHORTLIST]
-    return list(max(short, key=lambda c: joint_gain(u, list(c), base), default=()))
+    clear = [r for r in rows if m.owed() and not m.owed([r.action])]
+    return [max(clear, key=lambda r: r.net_pts)] if clear else []
 
 
 def fill(u, good: list[Move], base: Standings, order,
@@ -212,19 +239,35 @@ def fill(u, good: list[Move], base: Standings, order,
     """Moves in this order after those it must start with, each taken if
     it shares no player with those taken, is paid for by the cash left,
     and adds to their joint gain; again until none is taken, so a sale
-    taken late still pays for a buy."""
+    taken late still pays for a buy. A buy whose sales are taken already,
+    or that the cash left no longer pays for, is paid for again from what
+    is left, and must still clear the bar."""
     picked = list(start)
     gain, grew = joint_gain(u, picked, base) if picked else 0.0, True
     while grew:
         grew = False
         for r in sorted(good, key=order):
-            if r in picked or blocked(u, picked, r.action):
+            if r in picked or not (r := refunded(u, picked, r)):
                 continue
             total = joint_gain(u, [*picked, r], base)
             if total > gain:
                 picked.append(r)
                 gain, grew = total, True
     return picked, gain
+
+
+def refunded(u, picked: list[Move], r: Move) -> Move | None:
+    """r as it can join these: as it is, or, for a buy, paid for again
+    from the spares and cash they leave, if it still clears the bar."""
+    if not blocked(u, picked, r.action):
+        return r
+    if not r.action.buy or any(r.action.buy in p.action.players for p in picked):
+        return None
+    a = u.fund(replace(r.action, sell=(), proceeds=0.0), tuple(p.action for p in picked))
+    if a is None or blocked(u, picked, a) or u.worth(a) <= 0:
+        return None
+    mv = u.scored(a)
+    return mv if mv and verdict(mv) is None else None
 
 
 def joint_gain(u, moves: list[Move], base: Standings) -> float:
@@ -346,7 +389,6 @@ def _selftest() -> None:
 
     first = u.outlook.xi
     assert u.outlook.xi is first, "cached_property must not recompute"
-    assert u.outlook.xi_bar is u.outlook.xi_bar, "cached_property must not recompute"
 
     cxi_exp, cxi = u.outlook.xi
     fallback_j = next((j for j in u.state.jornadas if j not in u.part_played),
@@ -354,9 +396,6 @@ def _selftest() -> None:
     assert cxi_exp == u.forecaster.expected(fallback_j), cxi_exp
     assert "me_bench" not in cxi, cxi
     assert len(cxi) == 11, cxi
-    bar = u.outlook.xi_bar
-    assert bar == min(cxi_exp.get(k, 0.0) for k in cxi), bar
-    assert bar > 0.5, bar
 
     acts = u.candidates()
     names = {a.buy for a in acts}
@@ -392,10 +431,13 @@ def _selftest() -> None:
             price={"dear": 20e6},
             proceeds={"me_bench": 8e6, "me_spare2": 5e6, "me_spare3": 4e6}))
     acts3 = u3.candidates()
-    assert not any(len(a.sell) > 1 for a in acts3), "one spare funds a buy"
-    assert any(a.buy == "dear" for a in acts3), "unaffordable ones are offered..."
-    assert not any(r.action.buy == "dear" for r in u3.rank(acts3).rows), \
-        "...to measure what cash is worth, and never ranked"
+    funded = [a for a in acts3 if a.buy == "dear" and a.sell]
+    assert [sorted(a.sell) for a in funded] == [["me_bench", "me_spare2", "me_spare3"]], \
+        ("no one spare pays for him; three together do", funded)
+    assert any(a.buy == "dear" and not a.sell for a in acts3), \
+        "from your cash he is offered..."
+    assert [r.action for r in u3.rank(acts3).rows if r.action.buy == "dear"] == funded, \
+        "...to measure what cash is worth; only paid for by sales is he ranked"
 
     sw = next(x for x in acts if x.buy == "star" and x.sell == ("me_bench",))
     af = apply(u, sw)
@@ -434,7 +476,6 @@ def _selftest() -> None:
             price={"thin_del": 5e6, "deep_med": 5e6},
             route={"thin_del": "free", "deep_med": "free"}))
     vexp, vxi = uvor.outlook.xi
-    assert uvor.outlook.xi_bar == 1.0, uvor.outlook.xi_bar
     assert min(vexp[k] for k in vxi if uvor.market.pos[k] == "DEL") == 1.0, vxi
     assert min(vexp[k] for k in vxi if uvor.market.pos[k] == "MED") == 5.0, vxi
     vrows, _vb, _vl = uvor.rank([Action("buy", buy="thin_del", cost=5e6),

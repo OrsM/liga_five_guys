@@ -85,19 +85,24 @@ Every forecast is the same product, for every player and jornada, and
   only once his protection after his last transfer has ended). Every
   recommendation passes the same four steps, `decide.FUNNEL`, drawn in
   `docs/funnel.mmd`:
-  1. **candidates**: every sale of a spare, every player you could get,
-     and each of those paid for by a sale.
+  1. **candidates**: every sale of a spare; in debt, the sales that
+     clear it; every player you could get, from your cash and paid for by
+     the sales he is worth most with (`Universe.fund`: up to five, none
+     to spare), if worth anything at a glance (`Universe.worth`: his
+     points over whoever would play instead, `Outlook.total`, plus money).
   2. **rank**: each move against doing nothing, in simulated seasons: the
      points it adds plus, at the measured points-per-million, the value
      its players gain over the price horizon less what it burns over their value.
   3. **verdict**: a gain in the median, cash included, and better off in
      at least 70% of seasons (`CONFIDENCE`); below that its gain is noise.
-  4. **plan**: in debt, first the sales that clear it at the fewest points
-     lost together (below zero at the lock scores nothing, so they are made
-     whatever they cost); then the best set that shares no player, fits your
-     cash and adds to the joint gain, built best first and best per million first (one
-     dear move can crowd out two cheaper ones that gain more), keeping the
-     set that gains more; the rest that clear the bar are the backups.
+  4. **plan**: in debt, first the ranked move worth most that clears it
+     (below zero at the lock scores nothing, so it is made whatever it
+     costs); then the best set that shares no player, fits your cash and
+     adds to the joint gain, built best first and best per million first
+     (one dear move can crowd out two cheaper ones that gain more), keeping
+     the set that gains more. A buy whose sales are taken is paid for again
+     from what is left and must still clear the bar. The rest that clear
+     the bar are the backups.
 
   `python tools/ask.py why <player>` names the step a player stopped at,
   `ask.py whatif buy X sell Y` scores a move of your own the same way, and

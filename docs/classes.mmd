@@ -35,13 +35,18 @@ classDiagram
         +rival_cash: dict~str float~
         +part_played: dict~int set~str~~
         +first_jornada_of: dict~str int~
+        +_scored: dict
         +me()
         +mine()
         +outlook()
         +offer()
-        +worth_a_look()
+        +squad_after()
+        +points()
+        +worth()
+        +fund()
         +candidates()
         +rank()
+        +scored()
     }
     class Action {
         <<frozen dataclass>>
@@ -164,7 +169,7 @@ classDiagram
         +next_up()
         +xi()
         +season()
-        +xi_bar()
+        +total()
     }
     class Scored {
         <<NamedTuple>>
