@@ -13,7 +13,8 @@ class Market:
     Tables are keyed by player and sparse: price only for players on sale,
     proceeds only for yours, my_bid only where your bid is pending, clause
     only for owned players whose release clause can be paid now (it moves
-    the player at once, the money going to his owner). premium is what an
+    the player at once, the money going to his owner), paid only for
+    players their owner bought. premium is what an
     auction bid must be, over the asking price, to win.
     No points: what anyone will score is the outlook's business."""
     cash: float = 0.0
@@ -29,6 +30,7 @@ class Market:
     trend: dict[str, float] = field(default_factory=dict)
     my_bid: dict[str, float] = field(default_factory=dict)
     clause: dict[str, float] = field(default_factory=dict)
+    paid: dict[str, float] = field(default_factory=dict)
 
     @property
     def locked_cash(self) -> float:

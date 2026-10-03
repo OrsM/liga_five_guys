@@ -2,13 +2,13 @@ flowchart LR
     classDef hub fill:#fee2e2,stroke:#b91c1c,color:#111
     classDef leaf fill:#f3f4f6,stroke:#6b7280,color:#111
     subgraph stages["Stages (src/)"]
-        assemble["assemble 164<br/>in 2 · out 17"]:::hub
+        assemble["assemble 165<br/>in 2 · out 17"]:::hub
         crosswalk["crosswalk 157"]
-        decide["decide 628<br/>in 3 · out 10"]:::hub
+        decide["decide 639<br/>in 3 · out 10"]:::hub
         grading["grading 248"]
         ingest["ingest 758"]
         run["run 82"]
-        sim["sim 239"]
+        sim["sim 240"]
     end
     subgraph fetch["Fetch and parse"]
         auth["auth 247"]
@@ -22,7 +22,7 @@ flowchart LR
         clock["clock 84"]
         ff_crosswalk["ff_crosswalk 185"]
         jornadas["jornadas 94"]
-        league["league 166"]
+        league["league 189"]
         players["players 111"]
         points["points 109"]
         tidy["tidy 358<br/>in 10 · out 2"]:::hub
@@ -31,7 +31,7 @@ flowchart LR
         action["action 52"]
         fixture["fixture 169"]
         forecast["forecast 50"]
-        market["market 176"]
+        market["market 178"]
         outlook["outlook 87"]
         pricing["pricing 171"]
         rules["rules 55"]

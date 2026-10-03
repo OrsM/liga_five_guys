@@ -55,6 +55,11 @@ class Board(NamedTuple):
     base: Standings
     measured: float | None
 
+    def sale(self, k: str) -> Move | None:
+        """Selling him on his own, as ranked."""
+        return next((r for r in self.rows
+                     if not r.action.buy and r.action.sell == (k, )), None)
+
     @property
     def others(self) -> list[Move]:
         """Other players worth getting, best way first, should a bid fail."""
@@ -131,6 +136,12 @@ class Universe:
         """What a move adds to your expected season: a player's points over
         whoever would play instead of him."""
         return self.expected(a) - self.expected()
+
+    def sells_above(self, mv: Move) -> float | None:
+        """The offer above which a sale gains: every million more it
+        fetches adds lam points, so this is where its gain is nil."""
+        lam = self.market.lam
+        return mv.action.proceeds - mv.net_pts * 1e6 / lam if lam else None
 
     def worth(self, a: Action) -> float:
         """A move at a glance: what it adds to the simulated seasons'

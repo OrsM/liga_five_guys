@@ -85,11 +85,15 @@ def why(u, k: str) -> None:
     b = board(u)
     names = named(u)
     if k in u.mine:
-        sale = next((r for r in b.rows if r.action.kind == "sell" and r.action.sell == (k, )), None)
-        print("yours. Selling him alone: " + (show(u, sale) + "\n  " + fate(u, b, sale)
+        m, sale = u.market, b.sale(k)
+        print("yours: paid %s, worth %.1fM, %+.0f%% expected; selling pays above %s" % (
+            "%.1fM" % (m.paid[k] / 1e6) if k in m.paid else "nothing (starting squad)",
+            m.value.get(k, 0.0) / 1e6, m.trend.get(k, 0.0),
+            "%.1fM" % (u.sells_above(sale) / 1e6) if sale and u.sells_above(sale) else "-"))
+        print("Selling him alone: " + (show(u, sale) + "\n  " + fate(u, b, sale)
               if sale else "not ranked (your side cannot be fielded without him)"))
         for p in b.plan:
-            if k in p.action.sell and p.action.buy:
+            if k in p.action.sell and p.action.sell != (k, ):
                 print("the plan sells him in: " + p.action.label(names))
         return
     if gone := not_offered(u, k):

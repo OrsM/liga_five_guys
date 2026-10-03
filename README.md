@@ -110,6 +110,11 @@ Every forecast is the same product, for every player and jornada, and
   `ask.py forecast <player>` prints his forecast factor by factor. The
   board also lists your players a rival can take by clause now, and who
   can afford them.
+- **Price paid** (`ffcore/league.py`, `price_paid`): each owned player's
+  last buy or transfer to his owner, keyed like every other table. The
+  board's squad shows it beside his value and the offer above which
+  selling him gains (`Universe.sells_above`: his ranked sale's gain is
+  nil there, a million more fetching lam points).
 - **Rival cash** (`ffcore/league.py`): budget plus their sales, bonuses and
   transfer income, less buys and transfer payments, plus the income the feed
   never records (your real balance minus the same sum for you).

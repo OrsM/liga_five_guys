@@ -142,6 +142,7 @@ def universe() -> Universe:
         price={k: v for k, v in price.items() if k in players},
         route={k: v for k, v in route.items() if k in players},
         owner={k: v for k, v in lg.owner.items() if k in players},
+        paid={k: v for k, v in lg.paid.items() if k in players},
         value={k: v for k, v in value.items() if k in players},
         proceeds={k: v for k, v in proceeds.items() if k in players},
         my_bid=pending(mkt, "bid_status", "bid_money"),

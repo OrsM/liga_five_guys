@@ -70,6 +70,19 @@ def estimate_cash(activity, users: dict, me: str, my_cash: float | None,
             for m, v in feed.items()}
 
 
+def price_paid(activity, users: dict, owner: dict, key_of) -> dict[str, float]:
+    """What each owned player's owner paid for him: his last buy or
+    transfer to that manager. Players from the starting squad have none."""
+    paid: dict[str, float] = {}
+    for r in sorted({r.get("activity_id") or id(r): r for r in activity}.values(),
+                    key=lambda r: r.get("at") or ""):
+        k = key_of(text(r, "player_id"))
+        if k and r.get("kind") in ("buy", "transfer") \
+                and users.get(text(r, "user_id")) == owner.get(k):
+            paid[k] = money(r.get("amount")) or 0.0
+    return paid
+
+
 class League:
 
     def __init__(self, cfg: Config, xw: Crosswalk, api_teams=(), standings=(),
@@ -84,6 +97,7 @@ class League:
                      if text(r, "manager") == cfg.me and r.get("team_money")),
                     None)
         self.cash = estimate_cash(activity, users, cfg.me, mine, cfg.budget)
+        self.paid = price_paid(activity, users, self.owner, self.key_of_app)
         self.managers = sorted({cfg.me} | set(self.owner.values())
                                | set(users.values()))
 
@@ -135,6 +149,15 @@ def _selftest() -> None:
                            {"user_id": "2", "manager": "riv"}],
                 activity=feed)
     assert lg.owner == {"p": "riv"} and lg.squad("riv") == ["p"], lg.owner
+    assert lg.paid == {}, "nobody bought p"
+    bought = League(Config(me="me", budget=100.0), xw,
+                    api_teams=[{"manager": "riv", "player_id": "7"}],
+                    standings=[{"user_id": "1", "manager": "me"}, {"user_id": "2", "manager": "riv"}],
+                    activity=[{"activity_id": "x", "kind": "buy", "user_id": "1", "player_id": "7",
+                               "amount": "9", "at": "2026-09-01"},
+                              {"activity_id": "y", "kind": "transfer", "user_id": "2", "player_id": "7",
+                               "counterparty": "1", "amount": "12", "at": "2026-09-20"}])
+    assert bought.paid == {"p": 12.0}, ("what his owner paid, not the one before", bought.paid)
     assert lg.managers == ["me", "riv"] and lg.cash["riv"] == 91.0, lg.cash
 
     lineup = [{"player_id": "1070", "player_name": "Ionut Radu",

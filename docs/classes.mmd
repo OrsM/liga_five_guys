@@ -24,6 +24,7 @@ classDiagram
         +rows: list~Move~
         +base: Standings
         +measured: float | None
+        +sale()
         +others()
     }
     class Universe {
@@ -43,6 +44,7 @@ classDiagram
         +squad_after()
         +expected()
         +points()
+        +sells_above()
         +worth()
         +fund()
         +ways()
@@ -118,6 +120,7 @@ classDiagram
         +xw: Crosswalk
         +owner
         +cash
+        +paid
         +managers
         +standings
         +load()
@@ -145,7 +148,7 @@ classDiagram
         +price: dict~str float~
         +route: dict~str str~
         +owner: dict~str str~
-        ...5 more fields
+        ...6 more fields
         +locked_cash()
         +left()
         +owed()

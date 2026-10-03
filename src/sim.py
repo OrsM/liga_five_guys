@@ -107,7 +107,8 @@ def report(u, b, chg, lock_at=None) -> dict:
             {**player(m, k), "xi": k in xi,
              "start": o.next_up.get(k, (0.0, 0.0))[1], "next": exp.get(k, 0.0),
              "season": o.season.get(k, 0.0), "value": m.value.get(k),
-             "trend": m.trend.get(k)}
+             "trend": m.trend.get(k), "paid": m.paid.get(k),
+             "sell_above": (sale := b.sale(k)) and u.sells_above(sale)}
             for k in sorted(mine, key=lambda k: (SLOT_ORDER.get(mine[k], 9),
                                                  -exp.get(k, 0.0)))],
         "standings": [
