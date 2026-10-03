@@ -1,5 +1,5 @@
 {
- "generated_at": "2026-10-02T21:05Z",
+ "generated_at": "2026-10-03T06:44Z",
  "lock_at": "2026-10-09T19:00:00+00:00",
  "cash": -64059278.0,
  "cash_locked": 0,
@@ -23,9 +23,9 @@
   },
   {
    "what": "sell",
-   "name": "Sergio Carreira",
+   "name": "Omar El Hilali",
    "pos": "DEF",
-   "proceeds": 6926879.0,
+   "proceeds": 17906865.0,
    "why": "debt",
    "chance": null,
    "done": true
@@ -34,16 +34,7 @@
    "what": "sell",
    "name": "Yeray Alvarez",
    "pos": "DEF",
-   "proceeds": 5392312.0,
-   "why": "debt",
-   "chance": null,
-   "done": true
-  },
-  {
-   "what": "sell",
-   "name": "Omar El Hilali",
-   "pos": "DEF",
-   "proceeds": 17589931.0,
+   "proceeds": 5276166.0,
    "why": "debt",
    "chance": null,
    "done": true
@@ -52,32 +43,23 @@
    "what": "sell",
    "name": "Pablo Fornals",
    "pos": "MED",
-   "proceeds": 37794353.0,
+   "proceeds": 37630535.0,
+   "why": "debt",
+   "chance": null,
+   "done": true
+  },
+  {
+   "what": "sell",
+   "name": "Sergio Carreira",
+   "pos": "DEF",
+   "proceeds": 6828050.0,
    "why": "debt",
    "chance": null,
    "done": true
   }
  ],
- "plan_gain": -70.31845601138588,
- "backup": [
-  {
-   "name": "Aitor Paredes",
-   "pos": "DEF",
-   "ask": 17494317.0,
-   "bid": 17494317.0,
-   "clause_from": "BurtonGM89",
-   "sell": [
-    "Omar El Hilali"
-   ],
-   "proceeds": 17589931.0,
-   "gain": 26.244512433191176,
-   "why": "points + cash",
-   "chance": 0.737,
-   "trend": 15.688835848727981,
-   "placed": null,
-   "done": false
-  }
- ],
+ "plan_gain": -68.04526796219979,
+ "backup": [],
  "ping": "Field Alex Baena",
  "bid_beats": 0.8,
  "confidence": 0.7,
@@ -85,7 +67,7 @@
   {
    "name": "Mathew Ryan",
    "pos": "POR",
-   "clause": 26445112.0,
+   "clause": 26190941.0,
    "by": [
     "Magic Mike 333",
     "SusoGattuso"
@@ -96,7 +78,7 @@
   {
    "name": "Zaid Romero",
    "pos": "DEF",
-   "clause": 35122505.0,
+   "clause": 35879393.0,
    "by": [
     "Magic Mike 333"
    ],
@@ -106,7 +88,7 @@
   {
    "name": "Miguel Roman",
    "pos": "MED",
-   "clause": 20515921.0,
+   "clause": 20031731.0,
    "by": [
     "Magic Mike 333",
     "SusoGattuso"
@@ -139,7 +121,7 @@
   {
    "name": "Dakonam Djene",
    "pos": "DEF",
-   "clause": 23232464.0,
+   "clause": 23517620.0,
    "by": [
     "Magic Mike 333",
     "SusoGattuso"
@@ -150,7 +132,7 @@
   {
    "name": "Lucien Agoume",
    "pos": "MED",
-   "clause": 15410697.0,
+   "clause": 15664731.0,
    "by": [
     "Magic Mike 333",
     "SusoGattuso"
@@ -161,7 +143,7 @@
   {
    "name": "Pepelu",
    "pos": "MED",
-   "clause": 14613016.0,
+   "clause": 14942197.0,
    "by": [
     "Magic Mike 333",
     "SusoGattuso"
@@ -172,7 +154,7 @@
   {
    "name": "Omar El Hilali",
    "pos": "DEF",
-   "clause": 17589931.0,
+   "clause": 17906865.0,
    "by": [
     "Magic Mike 333",
     "SusoGattuso"
@@ -183,7 +165,7 @@
   {
    "name": "Sergio Carreira",
    "pos": "DEF",
-   "clause": 6926879.0,
+   "clause": 6828050.0,
    "by": [
     "Magic Mike 333",
     "SusoGattuso"
@@ -211,8 +193,8 @@
    "start": 0.9879999999999999,
    "next": 7.704038206971382,
    "season": 196.95769957641468,
-   "value": 26445112.0,
-   "trend": -7.887374159318741
+   "value": 26190941.0,
+   "trend": -7.702826598000703
   },
   {
    "name": "Natan",
@@ -221,8 +203,8 @@
    "start": 0.8981818181818181,
    "next": 6.74799823702561,
    "season": 162.8449841026583,
-   "value": 52681448.0,
-   "trend": 22.17408638006986
+   "value": 53899448.0,
+   "trend": 18.52930454094941
   },
   {
    "name": "Marcos Alonso",
@@ -231,8 +213,8 @@
    "start": 0.8875823814144305,
    "next": 5.176836506281899,
    "season": 133.38313573503524,
-   "value": 23920095.0,
-   "trend": -13.39824756316477
+   "value": 23521409.0,
+   "trend": -13.357882526437075
   },
   {
    "name": "Omar El Hilali",
@@ -241,8 +223,8 @@
    "start": 0.9875823814144304,
    "next": 4.407882863781271,
    "season": 107.39354077897273,
-   "value": 17589931.0,
-   "trend": 13.093143758547804
+   "value": 17906865.0,
+   "trend": 14.440233984736892
   },
   {
    "name": "Yeray Alvarez",
@@ -251,8 +233,8 @@
    "start": 0.7270297904774574,
    "next": 4.12738195834699,
    "season": 91.76035151466739,
-   "value": 5392312.0,
-   "trend": -15.394127875877528
+   "value": 5276166.0,
+   "trend": -17.262304749067763
   },
   {
    "name": "Zaid Romero",
@@ -261,8 +243,8 @@
    "start": 0.9879999999999999,
    "next": 3.4649156717932756,
    "season": 171.35302849432347,
-   "value": 35122505.0,
-   "trend": 17.22859884403335
+   "value": 35879393.0,
+   "trend": 17.270927904030785
   },
   {
    "name": "Sergio Carreira",
@@ -271,8 +253,8 @@
    "start": 0.9336634458885977,
    "next": 3.3744653097076087,
    "season": 95.11719295393532,
-   "value": 6926879.0,
-   "trend": -10.953161851139518
+   "value": 6828050.0,
+   "trend": -11.434477758116703
   },
   {
    "name": "Dakonam Djene",
@@ -281,8 +263,8 @@
    "start": 0.9887112558313004,
    "next": 2.401013086707124,
    "season": 120.6684415423779,
-   "value": 23232464.0,
-   "trend": 12.874465630309999
+   "value": 23517620.0,
+   "trend": 9.836866458972302
   },
   {
    "name": "Alex Baena",
@@ -291,8 +273,8 @@
    "start": 0.9768030637430065,
    "next": 6.266615816018535,
    "season": 177.01617573772643,
-   "value": 81201189.0,
-   "trend": 14.411262473763236
+   "value": 82657651.0,
+   "trend": 14.37494871771002
   },
   {
    "name": "Pablo Fornals",
@@ -301,8 +283,8 @@
    "start": 0.8978021649222095,
    "next": 5.804836141120648,
    "season": 143.68284861828548,
-   "value": 37794353.0,
-   "trend": -4.044157510644855
+   "value": 37630535.0,
+   "trend": -3.4737954247858824
   },
   {
    "name": "Lucien Agoume",
@@ -311,8 +293,8 @@
    "start": 0.9887112558313004,
    "next": 5.549661604201001,
    "season": 119.43307330541167,
-   "value": 15410697.0,
-   "trend": 13.912793702793449
+   "value": 15664731.0,
+   "trend": 13.211103637613178
   },
   {
    "name": "German Valera",
@@ -321,8 +303,8 @@
    "start": 0.9887112558313004,
    "next": 4.701518947362596,
    "season": 119.9381193064708,
-   "value": 13535404.0,
-   "trend": 1.6073498409487736
+   "value": 13573664.0,
+   "trend": 2.2653915547845633
   },
   {
    "name": "Pepelu",
@@ -331,8 +313,8 @@
    "start": 0.9336634458885977,
    "next": 4.567901519049422,
    "season": 119.33900747153616,
-   "value": 14613016.0,
-   "trend": 15.516298820075896
+   "value": 14942197.0,
+   "trend": 18.05362572989054
   },
   {
    "name": "Miguel Roman",
@@ -341,8 +323,8 @@
    "start": 0.0,
    "next": 0.0,
    "season": 145.02116299054902,
-   "value": 20515921.0,
-   "trend": -17.590891636925644
+   "value": 20031731.0,
+   "trend": -18.91447677539639
   },
   {
    "name": "Iñigo Vicente",
@@ -351,8 +333,8 @@
    "start": 0.9887112558313004,
    "next": 5.022457249377415,
    "season": 127.81450222558672,
-   "value": 27737824.0,
-   "trend": -9.987830905327453
+   "value": 27383002.0,
+   "trend": -10.25197847760172
   },
   {
    "name": "Raul Garcia",
@@ -361,8 +343,8 @@
    "start": 0.7906357328099811,
    "next": 2.233940559881427,
    "season": 78.6827533993593,
-   "value": 1222670.0,
-   "trend": -11.151514461602279
+   "value": 1204915.0,
+   "trend": -11.638069725448775
   }
  ],
  "standings": [
