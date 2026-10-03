@@ -1,5 +1,5 @@
 {
- "generated_at": "2026-10-03T06:48Z",
+ "generated_at": "2026-10-03T06:59Z",
  "lock_at": "2026-10-09T19:00:00+00:00",
  "cash": -64059278.0,
  "cash_locked": 0,
@@ -58,7 +58,7 @@
    "done": true
   }
  ],
- "plan_gain": -68.04515811635322,
+ "plan_gain": -68.04526796219979,
  "backup": [],
  "ping": "Field Alex Baena",
  "bid_beats": 0.8,
@@ -196,7 +196,9 @@
    "value": 26190941.0,
    "trend": -7.702826598000703,
    "paid": 21511188.0,
-   "sell_above": null
+   "sell_above": null,
+   "offer": null,
+   "offer_odds": null
   },
   {
    "name": "Natan",
@@ -208,7 +210,9 @@
    "value": 53899448.0,
    "trend": 18.52930454094941,
    "paid": 37492727.0,
-   "sell_above": 132852707.18814962
+   "sell_above": 132874030.99033807,
+   "offer": null,
+   "offer_odds": null
   },
   {
    "name": "Marcos Alonso",
@@ -220,7 +224,9 @@
    "value": 23521409.0,
    "trend": -13.357882526437075,
    "paid": 28589508.0,
-   "sell_above": 55613086.40927163
+   "sell_above": 55623980.39237238,
+   "offer": null,
+   "offer_odds": null
   },
   {
    "name": "Omar El Hilali",
@@ -232,7 +238,9 @@
    "value": 17906865.0,
    "trend": 14.440233984736892,
    "paid": null,
-   "sell_above": 31249471.763050824
+   "sell_above": 31252797.690955874,
+   "offer": null,
+   "offer_odds": null
   },
   {
    "name": "Yeray Alvarez",
@@ -244,7 +252,9 @@
    "value": 5276166.0,
    "trend": -17.262304749067763,
    "paid": 6931556.0,
-   "sell_above": 6590913.6938626375
+   "sell_above": 6591601.813140949,
+   "offer": null,
+   "offer_odds": null
   },
   {
    "name": "Zaid Romero",
@@ -256,7 +266,9 @@
    "value": 35879393.0,
    "trend": 17.270927904030785,
    "paid": 28662117.0,
-   "sell_above": 118140182.78739822
+   "sell_above": 118163701.24514699,
+   "offer": null,
+   "offer_odds": null
   },
   {
    "name": "Sergio Carreira",
@@ -268,7 +280,9 @@
    "value": 6828050.0,
    "trend": -11.434477758116703,
    "paid": 6737554.0,
-   "sell_above": 10349064.291870952
+   "sell_above": 10350394.366432898,
+   "offer": null,
+   "offer_odds": null
   },
   {
    "name": "Dakonam Djene",
@@ -280,7 +294,9 @@
    "value": 23517620.0,
    "trend": 9.836866458972302,
    "paid": 16059124.0,
-   "sell_above": 51247723.50586593
+   "sell_above": 51255582.16525318,
+   "offer": null,
+   "offer_odds": null
   },
   {
    "name": "Alex Baena",
@@ -292,7 +308,9 @@
    "value": 82657651.0,
    "trend": 14.37494871771002,
    "paid": 81201189.0,
-   "sell_above": 173774096.75927967
+   "sell_above": 173798595.47068697,
+   "offer": null,
+   "offer_odds": null
   },
   {
    "name": "Pablo Fornals",
@@ -304,7 +322,9 @@
    "value": 37630535.0,
    "trend": -3.4737954247858824,
    "paid": 58220110.0,
-   "sell_above": 78828966.57389951
+   "sell_above": 78842109.00603032,
+   "offer": null,
+   "offer_odds": null
   },
   {
    "name": "Lucien Agoume",
@@ -316,7 +336,9 @@
    "value": 15664731.0,
    "trend": 13.211103637613178,
    "paid": 5891526.0,
-   "sell_above": 32428076.057667326
+   "sell_above": 32432619.29184828,
+   "offer": null,
+   "offer_odds": null
   },
   {
    "name": "German Valera",
@@ -328,7 +350,9 @@
    "value": 13573664.0,
    "trend": 2.2653915547845633,
    "paid": 13966262.0,
-   "sell_above": 29837997.063885808
+   "sell_above": 29842930.800745763,
+   "offer": null,
+   "offer_odds": null
   },
   {
    "name": "Pepelu",
@@ -340,7 +364,9 @@
    "value": 14942197.0,
    "trend": 18.05362572989054,
    "paid": null,
-   "sell_above": 33924412.49776653
+   "sell_above": 33929447.57893972,
+   "offer": null,
+   "offer_odds": null
   },
   {
    "name": "Miguel Roman",
@@ -352,7 +378,9 @@
    "value": 20031731.0,
    "trend": -18.91447677539639,
    "paid": 5307217.0,
-   "sell_above": 70268163.65512323
+   "sell_above": 70284867.89108247,
+   "offer": null,
+   "offer_odds": null
   },
   {
    "name": "Iñigo Vicente",
@@ -364,7 +392,9 @@
    "value": 27383002.0,
    "trend": -10.25197847760172,
    "paid": null,
-   "sell_above": 81583742.52896819
+   "sell_above": 81601368.99706978,
+   "offer": null,
+   "offer_odds": null
   },
   {
    "name": "Raul Garcia",
@@ -376,7 +406,9 @@
    "value": 1204915.0,
    "trend": -11.638069725448775,
    "paid": 1451398.0,
-   "sell_above": 1090389.0656415832
+   "sell_above": 1090397.012794028,
+   "offer": null,
+   "offer_odds": null
   }
  ],
  "standings": [
