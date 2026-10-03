@@ -50,15 +50,14 @@ class Outlook:
     @cached_property
     def season(self) -> dict[str, float]:
         out: dict[str, float] = {}
-        for j in self.state.jornadas:
-            for k, pts in self.forecaster.expected(j).items():
+        for exp in self._expected.values():
+            for k, pts in exp.items():
                 out[k] = out.get(k, 0.0) + pts
         return out
 
     @cached_property
-    def _expected(self) -> list[dict[str, float]]:
-        return [self.forecaster.expected(j) for j in self.state.jornadas
-                if j not in self.part_played]
+    def _expected(self) -> dict[int, dict[str, float]]:
+        return {j: self.forecaster.expected(j) for j in self.state.jornadas}
 
     def total(self, squad: Mapping[str, str]) -> float:
         """What this squad's best eleven is expected to score in the
@@ -69,7 +68,8 @@ class Outlook:
         if key not in self._totals:
             sq = dict(squad)
             self._totals[key] = sum(sum(e.get(k, 0.0) for k in best_xi(sq, e))
-                                    for e in self._expected)
+                                    for j, e in self._expected.items()
+                                    if j not in self.part_played)
         return self._totals[key]
 
 

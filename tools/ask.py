@@ -61,7 +61,7 @@ def not_offered(u, k: str) -> str:
         owner = m.owner.get(k)
         return step(Universe.candidates, "%s's player, and his clause cannot be paid now"
                     % owner if owner else "nobody's, and not on the market now")
-    ways = [w for w in (a, u.fund(a)) if w]
+    ways = u.ways(a)
     if any(u.worth(w) > 0 for w in ways):
         return ""
     return step(Universe.candidates, "worth nothing at a glance: " + "; ".join(

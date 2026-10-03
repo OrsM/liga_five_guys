@@ -156,6 +156,10 @@ class Universe:
         best = max(short, key=lambda ks: self.worth(selling(ks)), default=None)
         return selling(best) if best else None
 
+    def ways(self, a: Action) -> list[Action]:
+        """How you could pay for a: from your cash, and by selling."""
+        return [b for b in (a, self.fund(a)) if b]
+
     def candidates(self) -> list[Action]:
         """Every move worth a look: each spare sold; in debt, the sales
         that clear it; each player you could get, from your cash and paid
@@ -168,7 +172,7 @@ class Universe:
             out.append(clear)
         for k in sorted(m.price.keys() | m.clause.keys()):
             if a := self.offer(k):
-                out += [b for b in (a, self.fund(a)) if b and self.worth(b) > 0]
+                out += [b for b in self.ways(a) if self.worth(b) > 0]
         return list(dict.fromkeys(out))
 
     def rank(self, acts: list[Action], seed: int = 1) -> Ranking:
@@ -351,13 +355,10 @@ def fieldable_spares(u) -> list[str]:
 
 def apply(u, *acts: Action) -> dict[str, dict[str, str]]:
     sq = {m: dict(s) for m, s in u.state.squads.items()}
+    sq[u.me] = u.squad_after(*acts)
     for a in acts:
-        for gone in a.sell:
-            sq[u.me].pop(gone, None)
         if a.kind == "clause":
             sq.get(u.market.owner.get(a.buy), {}).pop(a.buy, None)
-        if a.buy:
-            sq[u.me][a.buy] = u.market.pos.get(a.buy, "MED")
     return {m: phantom_topup(s) for m, s in sq.items()}
 
 
