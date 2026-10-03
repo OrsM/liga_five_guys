@@ -3,6 +3,7 @@ from __future__ import annotations
 import configparser
 import sys
 from dataclasses import dataclass
+from typing import NamedTuple
 
 from ffcore.parse import money, text
 from ffcore.text import norm
@@ -10,7 +11,8 @@ from ffcore.players import load_crosswalk
 from ffcore.tidy import current, input_path
 
 from ffcore.crosswalk import Crosswalk
-__all__ = ["Config", "load_config", "app_fielded", "estimate_cash", "League"]
+__all__ = ["Config", "Entry", "load_config", "app_fielded", "estimate_cash", "ledger",
+           "League", "price_paid"]
 
 
 @dataclass
@@ -51,36 +53,51 @@ def app_fielded(squad, names: dict, rows=None, xw=None) -> list[str]:
     return out
 
 
-def estimate_cash(activity, users: dict, me: str, my_cash: float | None,
+class Entry(NamedTuple):
+    """One event of the activity feed: who (the manager it is about) and
+    other (the one paid, in a transfer), the player keyed like every other
+    table, and the money."""
+    at: str
+    kind: str
+    who: str | None
+    other: str | None
+    key: str | None
+    amount: float
+
+
+PAYS = ("buy", "transfer")   # who paid amount for the player
+EARNS = ("sell", "bonus")    # who was paid amount
+
+
+def ledger(activity, users: dict, key_of) -> list[Entry]:
+    """The activity feed read once: each event once, oldest first."""
+    rows = {r.get("activity_id") or id(r): r for r in activity}.values()
+    return sorted((Entry(r.get("at") or "", r.get("kind") or "",
+                         users.get(text(r, "user_id")), users.get(text(r, "counterparty")),
+                         key_of(text(r, "player_id")), money(r.get("amount")) or 0.0)
+                   for r in rows), key=lambda e: e.at)
+
+
+def estimate_cash(entries: list[Entry], managers, me: str, my_cash: float | None,
                   budget: float) -> dict[str, float]:
-    feed = {m: budget for m in users.values()}
-    for r in {r.get("activity_id") or id(r): r for r in activity}.values():
-        amount = money(r.get("amount")) or 0.0
-        who, other = users.get(text(r, "user_id")), users.get(
-            text(r, "counterparty"))
-        kind = r.get("kind")
-        if who and kind in ("sell", "bonus"):
-            feed[who] += amount
-        elif who and kind in ("buy", "transfer"):
-            feed[who] -= amount
-        if other and kind == "transfer":
-            feed[other] += amount
+    feed = {m: budget for m in managers}
+    for e in entries:
+        if e.who and e.kind in EARNS:
+            feed[e.who] += e.amount
+        elif e.who and e.kind in PAYS:
+            feed[e.who] -= e.amount
+        if e.other and e.kind == "transfer":
+            feed[e.other] += e.amount
     untracked = my_cash - feed[me] if my_cash is not None and me in feed else 0.0
     return {m: (my_cash if m == me and my_cash is not None else v + untracked)
             for m, v in feed.items()}
 
 
-def price_paid(activity, users: dict, owner: dict, key_of) -> dict[str, float]:
+def price_paid(entries: list[Entry], owner: dict) -> dict[str, float]:
     """What each owned player's owner paid for him: his last buy or
     transfer to that manager. Players from the starting squad have none."""
-    paid: dict[str, float] = {}
-    for r in sorted({r.get("activity_id") or id(r): r for r in activity}.values(),
-                    key=lambda r: r.get("at") or ""):
-        k = key_of(text(r, "player_id"))
-        if k and r.get("kind") in ("buy", "transfer") \
-                and users.get(text(r, "user_id")) == owner.get(k):
-            paid[k] = money(r.get("amount")) or 0.0
-    return paid
+    return {e.key: e.amount for e in entries
+            if e.key and e.kind in PAYS and e.who == owner.get(e.key)}
 
 
 class League:
@@ -96,8 +113,9 @@ class League:
         mine = next((money(r.get("team_money")) for r in standings
                      if text(r, "manager") == cfg.me and r.get("team_money")),
                     None)
-        self.cash = estimate_cash(activity, users, cfg.me, mine, cfg.budget)
-        self.paid = price_paid(activity, users, self.owner, self.key_of_app)
+        entries = ledger(activity, users, self.key_of_app)
+        self.cash = estimate_cash(entries, users.values(), cfg.me, mine, cfg.budget)
+        self.paid = price_paid(entries, self.owner)
         self.managers = sorted({cfg.me} | set(self.owner.values())
                                | set(users.values()))
 
@@ -137,9 +155,11 @@ def _selftest() -> None:
             {"activity_id": "d", "kind": "transfer", "user_id": "2",
              "counterparty": "1", "amount": "40"},
             {"activity_id": "e", "kind": "joined", "user_id": "3"}]
-    got = estimate_cash(feed, users, "me", 116.0, 100.0)
+    entries = ledger(feed, users, lambda _id: None)
+    assert len(entries) == 5, "each event once"
+    got = estimate_cash(entries, users.values(), "me", 116.0, 100.0)
     assert got == {"me": 116.0, "riv": 91.0, "quiet": 106.0}, got
-    assert estimate_cash(feed, users, "me", None, 100.0)["riv"] == 85.0
+    assert estimate_cash(entries, users.values(), "me", None, 100.0)["riv"] == 85.0
 
     xw = Crosswalk({"p": Player("p", app_id="7")})
     lg = League(Config(me="me", budget=100.0), xw,

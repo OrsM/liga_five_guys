@@ -21,6 +21,7 @@ from assemble import scorer, universe  # noqa: E402
 from decide import (FUNNEL, Action, Universe, blocked, board, plan,  # noqa: E402
                     verdict)
 from ffcore.render import title_name  # noqa: E402
+from sim import holding  # noqa: E402
 from ffcore.schedule import jornada_dates, jornada_expectation  # noqa: E402
 from ffcore.startprob import bucket  # noqa: E402
 from ffcore.tidy import LINEUP_SOURCE, current  # noqa: E402
@@ -85,11 +86,11 @@ def why(u, k: str) -> None:
     b = board(u)
     names = named(u)
     if k in u.mine:
-        m, sale = u.market, b.sale(k)
-        print("yours: paid %s, worth %.1fM, %+.0f%% expected; selling pays above %s" % (
-            "%.1fM" % (m.paid[k] / 1e6) if k in m.paid else "nothing (starting squad)",
-            m.value.get(k, 0.0) / 1e6, m.trend.get(k, 0.0),
-            "%.1fM" % (u.sells_above(sale) / 1e6) if sale and u.sells_above(sale) else "-"))
+        h, sale = holding(u, b, k), b.sale(k)
+        shown = {f: "-" if h[f] is None else "%.1fM" % (h[f] / 1e6)
+                 for f in ("paid", "value", "sell_above")}
+        print("yours: paid {paid}, worth {value}, selling pays above {sell_above}".format(**shown)
+              + ", %+.0f%% expected" % (h["trend"] or 0.0))
         print("Selling him alone: " + (show(u, sale) + "\n  " + fate(u, b, sale)
               if sale else "not ranked (your side cannot be fielded without him)"))
         for p in b.plan:

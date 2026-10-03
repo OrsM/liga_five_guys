@@ -57,6 +57,19 @@ def sell_row(m, r, k) -> dict:
             "done": m.route.get(k) == "listed"}
 
 
+def holding(u, b, k) -> dict:
+    """One of your players as the board shows him: how he plays, what he
+    is worth, what he cost and the offer above which selling him gains."""
+    m, o = u.market, u.outlook
+    exp, xi = o.xi
+    sale = b.sale(k)
+    return {**player(m, k), "xi": k in xi,
+            "start": o.next_up.get(k, (0.0, 0.0))[1], "next": exp.get(k, 0.0),
+            "season": o.season.get(k, 0.0), "value": m.value.get(k),
+            "trend": m.trend.get(k), "paid": m.paid.get(k),
+            "sell_above": sale and u.sells_above(sale)}
+
+
 def exposed(u) -> list[dict]:
     m, o = u.market, u.outlook
     return [{**player(m, k), "clause": m.clause[k], "by": by,
@@ -103,14 +116,8 @@ def report(u, b, chg, lock_at=None) -> dict:
         "do": todo, "plan_gain": b.gain, "backup": backup, "ping": ping(todo),
         "bid_beats": BID_BEATS, "confidence": CONFIDENCE,
         "exposed": exposed(u),
-        "squad": [
-            {**player(m, k), "xi": k in xi,
-             "start": o.next_up.get(k, (0.0, 0.0))[1], "next": exp.get(k, 0.0),
-             "season": o.season.get(k, 0.0), "value": m.value.get(k),
-             "trend": m.trend.get(k), "paid": m.paid.get(k),
-             "sell_above": (sale := b.sale(k)) and u.sells_above(sale)}
-            for k in sorted(mine, key=lambda k: (SLOT_ORDER.get(mine[k], 9),
-                                                 -exp.get(k, 0.0)))],
+        "squad": [holding(u, b, k) for k in sorted(
+            mine, key=lambda k: (SLOT_ORDER.get(mine[k], 9), -exp.get(k, 0.0)))],
         "standings": [
             {"manager": mgr, "me": mgr == u.me,
              "now": u.state.carried.get(mgr, 0.0), "mean": base.mean(mgr),
