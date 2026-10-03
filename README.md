@@ -67,7 +67,10 @@ Every forecast is the same product, for every player and jornada, and
 - **Uncertainty** (`ffcore/forecast.py`, `ffcore/season.py`): match-level
   points drawn from the pool of real single-match scores, and one
   persistent per-player error (`PERSISTENT_SHARE`, measured by the
-  backtest), drawn once per simulated season.
+  backtest), drawn once per simulated season. Their average is also
+  worked out exactly (`season.expected_totals`, same elevens), cheap
+  enough to try many moves with; a jornada under way keeps the elevens
+  that fielded it.
 - **Prices** (`ffcore/pricing.py`): values keep their trend; the next h
   updates move by a fitted multiple of the last one, h being the longest
   horizon the data can fit (a rise was still carrying there), not the
@@ -88,8 +91,8 @@ Every forecast is the same product, for every player and jornada, and
   1. **candidates**: every sale of a spare; in debt, the sales that
      clear it; every player you could get, from your cash and paid for by
      the sales he is worth most with (`Universe.fund`: up to five, none
-     to spare), if worth anything at a glance (`Universe.worth`: his
-     points over whoever would play instead, `Outlook.total`, plus money).
+     to spare), if worth anything at a glance (`Universe.worth`: what it
+     adds to the simulated seasons' average, plus money).
   2. **rank**: each move against doing nothing, in simulated seasons: the
      points it adds plus, at the measured points-per-million, the value
      its players gain over the price horizon less what it burns over their value.
@@ -100,9 +103,7 @@ Every forecast is the same product, for every player and jornada, and
      costs); then the best set that shares no player, fits your cash and
      adds to the joint gain, built best first and best per million first
      (one dear move can crowd out two cheaper ones that gain more), keeping
-     the set that gains more. A buy whose sales are taken is paid for again
-     from what is left and must still clear the bar. The rest that clear
-     the bar are the backups.
+     the set that gains more. The rest that clear the bar are the backups.
 
   `python tools/ask.py why <player>` names the step a player stopped at,
   `ask.py whatif buy X sell Y` scores a move of your own the same way, and

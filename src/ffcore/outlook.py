@@ -29,7 +29,6 @@ class Outlook:
         self.pos = pos or {}
         self.part_played = part_played or {}
         self.first_jornada_of = first_jornada_of or {}
-        self._totals: dict[frozenset, float] = {}
 
     @cached_property
     def next_up(self) -> dict[str, tuple[float, float]]:
@@ -50,27 +49,10 @@ class Outlook:
     @cached_property
     def season(self) -> dict[str, float]:
         out: dict[str, float] = {}
-        for exp in self._expected.values():
-            for k, pts in exp.items():
+        for j in self.state.jornadas:
+            for k, pts in self.forecaster.expected(j).items():
                 out[k] = out.get(k, 0.0) + pts
         return out
-
-    @cached_property
-    def _expected(self) -> dict[int, dict[str, float]]:
-        return {j: self.forecaster.expected(j) for j in self.state.jornadas}
-
-    def total(self, squad: Mapping[str, str]) -> float:
-        """What this squad's best eleven is expected to score in the
-        jornadas still to start (a move made now changes nothing in one
-        under way). A player is worth what he changes it by: his points
-        above whoever would play instead."""
-        key = frozenset(squad.items())
-        if key not in self._totals:
-            sq = dict(squad)
-            self._totals[key] = sum(sum(e.get(k, 0.0) for k in best_xi(sq, e))
-                                    for j, e in self._expected.items()
-                                    if j not in self.part_played)
-        return self._totals[key]
 
 
 def _selftest() -> None:
@@ -88,12 +70,6 @@ def _selftest() -> None:
     ranked = XI({"a": 1.0, "b": 3.0, "c": 3.0}, {"c", "a", "b"}).ranked()
     assert ranked == ["b", "c", "a"], ranked
     assert o.season["m0"] == 6.0 and o.season["star"] == 9.0, o.season
-    assert o.total(squad) == 2 * 33.0, o.total(squad)
-    with_star = {**{k: v for k, v in squad.items() if k != "m0"}, "star": "MED"}
-    assert o.total(with_star) - o.total(squad) == 2 * (4.5 - 3.0), \
-        "a player is worth his points over the one he displaces"
-    assert o.total({k: v for k, v in squad.items() if k != "m0"}) - o.total(squad) == -2 * 2.0, \
-        "sold, the bench man plays instead"
 
     played = Outlook(LeagueState({"me": squad}, [1, 2], "me"), Bootstrap(per),
                      part_played={1: {"x"}})
@@ -103,7 +79,7 @@ def _selftest() -> None:
     assert firsts.next_up == {"star": (9.0, 0.5)}, firsts.next_up
 
     empty = Outlook(LeagueState({}, [], "me"), Bootstrap({}))
-    assert empty.xi == XI({}, set()) and empty.total({}) == 0.0
+    assert empty.xi == XI({}, set())
     print("ffcore.outlook self-test OK")
 
 

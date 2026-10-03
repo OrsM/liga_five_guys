@@ -14,7 +14,7 @@ from ffcore.pricing import cash_price
 from ffcore.render import title_name
 from ffcore.rules import FREE_FORMATIONS
 from ffcore.schedule import phantom_topup
-from ffcore.season import LeagueState, Standings, simulate_many
+from ffcore.season import LeagueState, Standings, expected_totals, simulate_many
 from stats import percentile
 
 __all__ = ["Action", "Board", "CONFIDENCE", "FUNNEL", "Move", "Universe", "at_risk",
@@ -78,7 +78,7 @@ class Universe:
     rival_cash: dict[str, float] = field(default_factory=dict)
     part_played: dict[int, set[str]] = field(default_factory=dict)
     first_jornada_of: dict[str, int] = field(default_factory=dict)
-    _scored: dict = field(default_factory=dict, repr=False, compare=False)
+    _means: dict = field(default_factory=dict, repr=False, compare=False)
 
     @property
     def me(self) -> str:
@@ -116,29 +116,38 @@ class Universe:
                 sq[a.buy] = self.market.pos.get(a.buy, "MED")
         return sq
 
+    def expected(self, *acts: Action) -> float:
+        """Your season after these moves, as the simulated seasons average:
+        worked out exactly, so cheap enough to try many moves with."""
+        sq = apply(self, *acts)[self.me]
+        key = frozenset(sq.items())
+        if key not in self._means:
+            st = LeagueState({self.me: sq}, self.state.jornadas, self.me,
+                             fielded=fielded(self))
+            self._means[key] = expected_totals([st], self.forecaster)[0][self.me]
+        return self._means[key]
+
     def points(self, a: Action) -> float:
-        """What a move changes your best eleven's expected season by: a
-        player's points above whoever would play instead of him."""
-        return self.outlook.total(self.squad_after(a)) - self.outlook.total(self.mine)
+        """What a move adds to your expected season: a player's points over
+        whoever would play instead of him."""
+        return self.expected(a) - self.expected()
 
     def worth(self, a: Action) -> float:
-        """A move at a glance: its points, plus its money priced in points.
-        Expected points only; rank scores what it lets through in simulated
-        seasons, where luck and the 70% bar come in."""
+        """A move at a glance: what it adds to the simulated seasons'
+        average, plus its money priced in points. rank then looks at the
+        spread of those seasons: their median and the 70% bar."""
         return self.points(a) + self.market.cash_pts(a)
 
-    def fund(self, a: Action, done: tuple[Action, ...] = ()) -> Action | None:
-        """a paid for by selling, after the moves done: of the sets of your
-        spares left that raise what it would leave you owing at the lock,
-        with none to spare (just one sale if it owes nothing) and a side
-        left to field, the one it is worth most with. Sales interact (two
-        defenders sold thin the defence), so the sets each sale's worth
-        alone ranks best are worked out together."""
+    def fund(self, a: Action) -> Action | None:
+        """a paid for by selling: of the sets of your spares that raise
+        what it would leave you owing at the lock, with none to spare (just
+        one sale if it owes nothing) and a side left to field, the one it
+        is worth most with. Sales interact (two defenders sold thin the
+        defence), so the sets each sale's worth alone ranks best are worked
+        out together."""
         m = self.market
-        need = m.owed([*done, a])
-        gone = {k for d in done for k in d.players}
-        spares = [k for k in fieldable_spares(self)
-                  if k not in a.sell and k not in gone and m.proceeds.get(k)]
+        need = m.owed([a])
+        spares = [k for k in fieldable_spares(self) if k not in a.sell and m.proceeds.get(k)]
 
         def selling(ks) -> Action:
             return replace(a, sell=a.sell + tuple(ks),
@@ -148,7 +157,7 @@ class Universe:
             raised = sum(m.proceeds[k] for k in ks)
             spare = need > 0 and any(raised - m.proceeds[k] >= need for k in ks)
             return (raised >= need and not spare
-                    and _fieldable(self.squad_after(*done, selling(ks))))
+                    and _fieldable(self.squad_after(selling(ks))))
         alone = {k: self.worth(selling([k])) for k in spares}
         sets = [ks for n in range(1, FUNDING_SALES + 1 if need > 0 else 2)
                 for ks in itertools.combinations(spares, n) if enough(ks)]
@@ -189,13 +198,6 @@ class Universe:
                        for a, r in zip(keep, final[1:])),
                       key=lambda mv: (-mv.net_pts, mv.action.net))
         return Ranking(rows, final[0], measured)
-
-    def scored(self, a: Action) -> Move | None:
-        """One move ranked on its own, once: the plan asks again and again."""
-        if a not in self._scored:
-            rows = self.rank([a]).rows
-            self._scored[a] = rows[0] if rows else None
-        return self._scored[a]
 
     def _move(self, a: Action, pairs: list[float], lam) -> Move:
         cash = self.market.cash_pts(a, lam)
@@ -243,35 +245,19 @@ def fill(u, good: list[Move], base: Standings, order,
     """Moves in this order after those it must start with, each taken if
     it shares no player with those taken, is paid for by the cash left,
     and adds to their joint gain; again until none is taken, so a sale
-    taken late still pays for a buy. A buy whose sales are taken already,
-    or that the cash left no longer pays for, is paid for again from what
-    is left, and must still clear the bar."""
+    taken late still pays for a buy."""
     picked = list(start)
     gain, grew = joint_gain(u, picked, base) if picked else 0.0, True
     while grew:
         grew = False
         for r in sorted(good, key=order):
-            if r in picked or not (r := refunded(u, picked, r)):
+            if r in picked or blocked(u, picked, r.action):
                 continue
             total = joint_gain(u, [*picked, r], base)
             if total > gain:
                 picked.append(r)
                 gain, grew = total, True
     return picked, gain
-
-
-def refunded(u, picked: list[Move], r: Move) -> Move | None:
-    """r as it can join these: as it is, or, for a buy, paid for again
-    from the spares and cash they leave, if it still clears the bar."""
-    if not blocked(u, picked, r.action):
-        return r
-    if not r.action.buy or any(r.action.buy in p.action.players for p in picked):
-        return None
-    a = u.fund(replace(r.action, sell=(), proceeds=0.0), tuple(p.action for p in picked))
-    if a is None or blocked(u, picked, a) or u.worth(a) <= 0:
-        return None
-    mv = u.scored(a)
-    return mv if mv and verdict(mv) is None else None
 
 
 def joint_gain(u, moves: list[Move], base: Standings) -> float:
@@ -332,10 +318,18 @@ def _fieldable(squad: dict[str, str]) -> bool:
 
 
 def score_many(u: Universe, many: list, trials: int, seed: int):
+    under_way = fielded(u)
     return simulate_many(
         [LeagueState(squads=sq, jornadas=u.state.jornadas, me=u.me,
-                     carried=u.state.carried) for sq in many],
+                     carried=u.state.carried, fielded=under_way) for sq in many],
         u.forecaster, trials=trials, seed=seed)
+
+
+def fielded(u) -> dict[int, dict[str, dict[str, str]]]:
+    """The squads as they stand, for the jornadas already under way: a
+    move made now cannot change those."""
+    now = apply(u)
+    return {j: now for j in u.part_played}
 
 
 def paired(after, base, me) -> list[float]:
