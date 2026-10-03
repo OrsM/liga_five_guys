@@ -158,15 +158,15 @@ class Universe:
         out together."""
         m = self.market
         need = m.owed([a])
-        spares = [k for k in fieldable_spares(self) if k not in a.sell and m.proceeds.get(k)]
+        spares = [k for k in fieldable_spares(self) if k not in a.sell and m.fetches(k)]
 
         def selling(ks) -> Action:
             return replace(a, sell=a.sell + tuple(ks),
-                           proceeds=a.proceeds + sum(m.proceeds[k] for k in ks))
+                           proceeds=a.proceeds + sum(m.fetches(k) for k in ks))
 
         def enough(ks) -> bool:
-            raised = sum(m.proceeds[k] for k in ks)
-            spare = need > 0 and any(raised - m.proceeds[k] >= need for k in ks)
+            raised = sum(m.fetches(k) for k in ks)
+            spare = need > 0 and any(raised - m.fetches(k) >= need for k in ks)
             return (raised >= need and not spare
                     and _fieldable(self.squad_after(selling(ks))))
         alone = {k: self.worth(selling([k])) for k in spares}
@@ -186,7 +186,7 @@ class Universe:
         for by sales, if it is worth anything at a glance (worth). Those
         you cannot pay for only measure what cash is worth."""
         m = self.market
-        out = [Action("sell", sell=(s, ), proceeds=m.proceeds.get(s, 0.0))
+        out = [Action("sell", sell=(s, ), proceeds=m.fetches(s))
                for s in fieldable_spares(self)]
         if m.owed() and (clear := self.fund(Action("sell"))):
             out.append(clear)
@@ -391,7 +391,7 @@ def _selftest() -> None:
             cash=12e6,
             pos={**mine, **theirs, "star": "MED", "dud": "MED"},
             price={"star": 10e6, "dud": 1e6, "th_m1": 5e6},
-            proceeds={"me_bench": 8e6}, owner={"th_m1": "riv"}))
+            value={"me_bench": 8e6}, owner={"th_m1": "riv"}))
 
     first = u.outlook.xi
     assert u.outlook.xi is first, "cached_property must not recompute"
@@ -435,7 +435,7 @@ def _selftest() -> None:
         market=Market(
             cash=4e6, pos={**u.market.pos, "dear": "MED"},
             price={"dear": 20e6},
-            proceeds={"me_bench": 8e6, "me_spare2": 5e6, "me_spare3": 4e6}))
+            value={"me_bench": 8e6, "me_spare2": 5e6, "me_spare3": 4e6}))
     acts3 = u3.candidates()
     funded = [a for a in acts3 if a.buy == "dear" and a.sell]
     assert [sorted(a.sell) for a in funded] == [["me_bench", "me_spare2", "me_spare3"]], \
@@ -541,7 +541,7 @@ def _selftest() -> None:
         state=LeagueState({"me": dict(sq_cd)}, [1], "me"),
         forecaster=BCD(per_cd),
         market=Market(pos={**sq_cd, "target": "DEL"}, price={"target": 5e6},
-                      proceeds={"me_f3": 5e6}))
+                      value={"me_f3": 5e6}))
     acts_cd = u_cd.candidates()
     assert not any("me_k" in a.sell for a in acts_cd), "never your only keeper"
     rows_cd = u_cd.rank(acts_cd).rows
@@ -559,7 +559,7 @@ def _selftest() -> None:
         state=LeagueState({"me": dict(sq)}, [1], "me"),
         forecaster=Bootstrap(per),
         market=Market(pos=dict(sq),
-                      proceeds={"spare_d": 4e6, "dead_f": 6e6}))
+                      value={"spare_d": 4e6, "dead_f": 6e6}))
     mine = u.state.squads["me"]
     spares = fieldable_spares(u)
     for s in spares:
@@ -623,7 +623,7 @@ def _selftest() -> None:
                      market=Market(cash=-5e6, lam=0.0, pos={**uk.market.pos, "idle": "MED",
                                                              "useful": "MED"},
                                    price=uk.market.price,
-                                   proceeds={"idle": 6e6, "useful": 6e6}))
+                                   value={"idle": 6e6, "useful": 6e6}))
     got = [r.action.label() for r in board(owing).plan]
     assert got == [Action("sell", sell=("idle",)).label()], \
         ("a debt is cleared by the sale that costs fewest points, and buys nothing", got)

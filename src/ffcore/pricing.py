@@ -46,21 +46,27 @@ class Momentum:
             sxx = sum(x * x for x, _ in pairs)
             if sxx:
                 self.slope[h] = sum(x * y for x, y in pairs) / sxx
+        self.by_player = by_player
+
+    @property
+    def carry(self) -> tuple[float, ...]:
+        """The share of a trend (its move over the horizon) already made
+        after each update."""
+        end = self.slope.get(self.horizon)
+        return tuple(self.slope[h] / end for h in sorted(self.slope)) if end else ()
 
     @property
     def horizon(self) -> int:
         """The longest h the data can fit: a rise is still carrying there."""
         return max(self.slope, default=1)
 
-
-def trend(by_player: dict[str, list[tuple[str, float]]]) -> dict[str, float]:
-    """Each player's value change, in %, over the momentum horizon: as long
-    as you would hold him, not just until the lock."""
-    mo = Momentum(by_player)
-    c = mo.slope.get(mo.horizon, 0.0)
-    newest = max((s[-1][0] for s in by_player.values() if s), default="")
-    return {k: c * _clip(s[-1][1]) for k, s in by_player.items()
-            if s and s[-1][0] == newest}
+    def trend(self) -> dict[str, float]:
+        """Each player's value change, in %, over the horizon: as long as
+        you would hold him, not just until the lock."""
+        c = self.slope.get(self.horizon, 0.0)
+        newest = max((s[-1][0] for s in self.by_player.values() if s), default="")
+        return {k: c * _clip(s[-1][1]) for k, s in self.by_player.items()
+                if s and s[-1][0] == newest}
 
 
 def grade(by_player: dict[str, list[tuple[str, float]]],
@@ -97,6 +103,20 @@ def auction_ratios(listings: list[dict], buys: list[dict]) -> list[float]:
                 out.append(float(b["amount"]) / float(r["sale_price"]))
                 break
     return out
+
+
+def offer_ratios(offers: list[dict], teams: list[dict]) -> list[float]:
+    """The game's nightly offers for listed players, each over the player's
+    value when it was made, oldest first: each offer once."""
+    value = {(r["observed_at"], r.get("player_team_id")): float(r.get("market_value") or 0)
+             for r in teams}
+    seen: dict[str, tuple[str, float]] = {}
+    for r in offers:
+        v = value.get((r["observed_at"], r.get("player_team_id")))
+        if r.get("from_market") == "true" and r.get("money") and v \
+                and r.get("offer_id") and r["offer_id"] not in seen:
+            seen[r["offer_id"]] = (r.get("created_at") or "", float(r["money"]) / v)
+    return [x for _at, x in sorted(seen.values())]
 
 
 def premium_to_beat(ratios: list[float]) -> float:
@@ -141,9 +161,10 @@ def _selftest() -> None:
     up = Momentum({k: v for k, v in by.items() if k.startswith("up")})
     assert abs(up.slope[3] * 5.0 - (1.05 ** 3 - 1) * 100) < 1e-6, up.slope
     assert mo.horizon == 4
-    t = trend(by)
+    assert mo.carry[-1] == 1.0 and 0 < mo.carry[0] < mo.carry[1], mo.carry
+    t = mo.trend()
     assert t["up0"] > 0 > t["down0"] and t["flat0"] == 0.0, t
-    assert trend({}) == {}
+    assert Momentum({}).trend() == {}
     long_rise = {"r%d" % i: [("2026-08-%02d" % n, 15.0) for n in range(1, 13)] for i in range(3)}
     assert abs(Momentum(long_rise).slope[2] * 15.0 - (1.15 ** 2 - 1) * 100) < 1e-6, \
         "a rise over several updates is not clipped as if it were one"
@@ -159,6 +180,13 @@ def _selftest() -> None:
             {"player_id": "8", "at": "2026-09-02T22:24:10+02:00", "amount": "99"},
             {"player_id": "7", "at": "2026-09-05T10:00:00+02:00", "amount": "1"}]
     assert auction_ratios(lst, buys) == [1.04], auction_ratios(lst, buys)
+
+    teams = [{"observed_at": "t1", "player_team_id": "9", "market_value": "10"}]
+    offers = [{"observed_at": "t1", "player_team_id": "9", "from_market": "true", "money": "11",
+               "offer_id": "o", "created_at": "c"}] * 2 + [
+              {"observed_at": "t1", "player_team_id": "9", "from_market": "false", "money": "12",
+               "offer_id": "m", "created_at": "c"}]
+    assert offer_ratios(offers, teams) == [1.1], "the game's offers, each once, over value"
 
     assert premium_to_beat([1.0] * 5 + [1.3] * 5) == 1.3
     assert premium_to_beat([1.0] * 9 + [1.3]) == 1.0

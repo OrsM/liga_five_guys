@@ -114,6 +114,16 @@ classDiagram
         +me: str
         +budget: float
     }
+    class Entry {
+        <<NamedTuple>>
+        ffcore.league
+        +at: str
+        +kind: str
+        +who: str | None
+        +other: str | None
+        +key: str | None
+        +amount: float
+    }
     class League {
         ffcore.league
         +cfg: Config
@@ -148,8 +158,10 @@ classDiagram
         +price: dict~str float~
         +route: dict~str str~
         +owner: dict~str str~
-        ...6 more fields
+        ...9 more fields
         +locked_cash()
+        +fetches()
+        +offer_odds()
         +left()
         +owed()
         +short()
@@ -185,9 +197,12 @@ classDiagram
     }
     class Momentum {
         ffcore.pricing
+        +by_player
         +hmax
         +slope
+        +carry()
         +horizon()
+        +trend()
     }
     class Rating {
         <<NamedTuple>>

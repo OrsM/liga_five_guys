@@ -12,14 +12,14 @@ from decide import Universe, _fieldable
 from ffcore.clock import run_now
 from ffcore.fixture import difficulty_ratings
 from ffcore.forecast import Bootstrap
-from ffcore.jornadas import clock_history, jornada_of_match
+from ffcore.jornadas import clock_history, jornada_of_match, load_deadline
 from ffcore.league import League
 from ffcore.market import Market, market_routes, pending
 from ffcore.parse import num, ratio, text
 from ffcore.players import load_crosswalk, load_players
 from ffcore.points import scored
-from ffcore.pricing import (PRICE_WINDOW, auction_ratios, premium_to_beat, steps,
-                            trend)
+from ffcore.pricing import (PRICE_WINDOW, Momentum, auction_ratios, offer_ratios,
+                            premium_to_beat, steps)
 from ffcore.schedule import expectations, phantom_fill
 from ffcore.score import fit_promoted_discount, per_jornada_current, Scorer, totals
 from ffcore.rules import SLOT
@@ -95,6 +95,18 @@ def cash_price_history() -> float | None:
     return median(seen[-PRICE_WINDOW:]) if seen else None
 
 
+def _nights_left(offers: list[dict]) -> int:
+    """The game's nightly offers still to come before the lock: one as each
+    standing offer expires, then one a day."""
+    ends = [datetime.fromisoformat(r["expires_at"]) for r in offers
+            if r.get("status") == "pending" and r.get("expires_at")]
+    lock = load_deadline()
+    if not ends or lock is None:
+        return 0
+    days = (lock - max(ends)).total_seconds() / 86400
+    return max(0, int(days) + 1) if days > 0 else 0
+
+
 def _premium(me: str) -> float:
     mine = {text(r, "user_id") for r in current("api_standings")
             if text(r, "manager") == me}
@@ -124,17 +136,17 @@ def universe() -> Universe:
                  if r["key"] and r.get("player_team_id")}
 
     value = {k: rec["value"] for k, rec in players.items() if rec.get("value")}
+    offers = current("api_offers")
     received_offers = pending(
         [dict(r, key=pt_to_key.get(r.get("player_team_id") or ""))
-         for r in current("api_offers")], "status", "money")
-    proceeds = {k: max(value.get(k, 0.0), received_offers.get(k, 0.0))
-                for k in lg.squad(me)}
+         for r in offers], "status", "money")
     pos = {k: _pos_of((rec.get("pos") or "").upper())
            for k, rec in players.items()}
     squads = {mgr: {k: pos[k] for k in lg.squad(mgr) if k in pos}
               for mgr in lg.managers}
     per_j, first_jornada_of, _rates, rem, played = expectations(
         sc, fixture_ratings(mkt_rows), set(price).union(*squads.values()), m)
+    prices = Momentum(steps(history("market")))
     market = Market(
         cash=lg.cash[me], lam=cash_price_history(), premium=_premium(me),
         name={k: rec.get("name") or k for k, rec in players.items()},
@@ -143,10 +155,12 @@ def universe() -> Universe:
         route={k: v for k, v in route.items() if k in players},
         owner={k: v for k, v in lg.owner.items() if k in players},
         paid={k: v for k, v in lg.paid.items() if k in players},
+        offer={k: v for k, v in received_offers.items() if k in lg.squad(me)},
+        offer_ratios=tuple(offer_ratios(history("api_offers"), history("api_teams"))),
+        nights_left=_nights_left(offers),
         value={k: v for k, v in value.items() if k in players},
-        proceeds={k: v for k, v in proceeds.items() if k in players},
         my_bid=pending(mkt, "bid_status", "bid_money"),
-        trend=trend(steps(history("market"))),
+        trend=prices.trend(), carry=prices.carry,
         clause={k: v for k, v in open_clauses(teams).items() if k in players})
     squads, per_j = phantom_fill(squads, per_j, pos)
     assert all(_fieldable(sq) for sq in squads.values()), squads

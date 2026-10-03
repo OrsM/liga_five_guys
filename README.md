@@ -76,6 +76,12 @@ Every forecast is the same product, for every player and jornada, and
   horizon the data can fit (a rise was still carrying there), not the
   lock: a buy pays its premium once and keeps rising after it. A bid is the
   premium over asking that beat 80% of the last 50 winning bids.
+  A sale gets the game's offer standing on him, else his value: the game
+  offers for each listed player every night, centred on value (median
+  0.99x, 80% within 0.92-1.07x) and fresh each night. The board shows
+  where an offer stands among the recent ones and the chance that a
+  later one, at his value then (`Momentum.carry`), pays more before the
+  lock (`Market.offer_odds`).
 - **Assembly** (`assemble.py`): the one place that reads the tables and
   builds the scorer, market, league state and forecast; model modules never
   read a table themselves.

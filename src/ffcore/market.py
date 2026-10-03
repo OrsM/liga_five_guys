@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 from ffcore.action import Action
+from ffcore.pricing import PRICE_WINDOW
 
 __all__ = ["Market", "LISTED_SELLER", "market_routes", "pending"]
 
@@ -11,10 +12,14 @@ __all__ = ["Market", "LISTED_SELLER", "market_routes", "pending"]
 class Market:
     """Who the players are, what they cost and are worth, and your money.
     Tables are keyed by player and sparse: price only for players on sale,
-    proceeds only for yours, my_bid only where your bid is pending, clause
+    my_bid only where your bid is pending, clause
     only for owned players whose release clause can be paid now (it moves
     the player at once, the money going to his owner), paid only for
-    players their owner bought. premium is what an
+    players their owner bought, offer only for yours with an offer standing
+    (fetches: what a sale gets). offer_ratios are the game's
+    past nightly offers over value, nights_left the offers still to come
+    before the lock, carry the share of a trend made after each update
+    (night). premium is what an
     auction bid must be, over the asking price, to win.
     No points: what anyone will score is the outlook's business."""
     cash: float = 0.0
@@ -26,15 +31,38 @@ class Market:
     route: dict[str, str] = field(default_factory=dict)
     owner: dict[str, str] = field(default_factory=dict)
     value: dict[str, float] = field(default_factory=dict)
-    proceeds: dict[str, float] = field(default_factory=dict)
     trend: dict[str, float] = field(default_factory=dict)
     my_bid: dict[str, float] = field(default_factory=dict)
     clause: dict[str, float] = field(default_factory=dict)
     paid: dict[str, float] = field(default_factory=dict)
+    offer: dict[str, float] = field(default_factory=dict)
+    offer_ratios: tuple[float, ...] = ()
+    nights_left: int = 0
+    carry: tuple[float, ...] = ()
 
     @property
     def locked_cash(self) -> float:
         return sum(self.my_bid.values())
+
+    def fetches(self, k: str) -> float:
+        """What selling him gets now: the offer standing, else his value."""
+        return self.offer.get(k) or self.value.get(k, 0.0)
+
+    def offer_odds(self, k: str) -> tuple[float, float] | None:
+        """How his standing offer compares with the game's recent ones: the
+        share it beats, and the chance that one of the nights' offers still
+        to come before the lock beats it in money (each drawn afresh, over
+        his value that night as his trend has it)."""
+        recent = self.offer_ratios[-PRICE_WINDOW:]
+        offer, value = self.offer.get(k), self.value.get(k)
+        if not offer or not value or not recent:
+            return None
+        none_better = 1.0
+        for night in range(1, self.nights_left + 1):
+            done = self.carry[min(night, len(self.carry)) - 1] if self.carry else 1.0
+            then = value * (1 + self.trend.get(k, 0.0) / 100 * done)
+            none_better *= sum(x * then <= offer for x in recent) / len(recent)
+        return sum(x * value < offer for x in recent) / len(recent), 1 - none_better
 
     def left(self, acts=()) -> float:
         """Your cash once these moves are made."""
@@ -63,13 +91,12 @@ class Market:
         lam = self.lam if lam is None else lam
         if not lam:
             return 0.0
-        value, trend, proceeds = self.value, self.trend, self.proceeds
+        value, trend = self.value, self.trend
         money = -(self.burn(a) or 0.0)
         if a.buy:
             money += value.get(a.buy, 0.0) * trend.get(a.buy, 0.0) / 100
         for k in a.sell:
-            v = value.get(k, proceeds.get(k, 0.0))
-            money += proceeds.get(k, 0.0) - v * (1 + trend.get(k, 0.0) / 100)
+            money += self.fetches(k) - value.get(k, 0.0) * (1 + trend.get(k, 0.0) / 100)
         return lam * money / 1e6
 
 
@@ -103,6 +130,14 @@ def pending(rows, status_field: str, money_field: str) -> dict[str, float]:
 
 
 def _selftest() -> None:
+    odds = Market(value={"s": 10e6}, offer={"s": 10.5e6}, nights_left=2,
+                  offer_ratios=(0.9, 1.0, 1.0, 1.1))
+    assert odds.offer_odds("s") == (0.75, 1 - 0.75 ** 2), odds.offer_odds("s")
+    rising = replace(odds, trend={"s": 20.0}, carry=(0.5, 1.0))
+    assert rising.offer_odds("s")[1] > odds.offer_odds("s")[1], \
+        "a rising value makes the offers to come dearer"
+    assert Market(value={"s": 1.0}).offer_odds("s") is None
+
     debt = Market(cash=-5e6)
     sale, buy = Action("sell", sell=("s",), proceeds=3e6), Action("buy", buy="b", cost=1e6)
     assert debt.owed() == 5e6 and debt.owed([sale]) == 2e6 and debt.left([sale]) == -2e6
@@ -119,7 +154,8 @@ def _selftest() -> None:
     assert m.cash_pts(Action("buy", buy="free", cost=4e6)) == 0.0, "no lam, no cash"
     riser = Market(lam=2.0, value={"r": 10e6}, trend={"r": 5.0})
     assert abs(riser.cash_pts(Action("buy", buy="r", cost=10e6)) - 1.0) < 1e-9
-    seller = Market(lam=1.0, value={"s": 4e6}, proceeds={"s": 4e6},
+    assert Market(value={"s": 4e6}, offer={"s": 5e6}).fetches("s") == 5e6
+    seller = Market(lam=1.0, value={"s": 4e6},
                     trend={"s": -25.0})
     assert abs(seller.cash_pts(Action("sell", sell=("s",), proceeds=4e6)) - 1.0) < 1e-9
 

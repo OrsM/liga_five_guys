@@ -51,7 +51,7 @@ def buy_row(m, r) -> dict:
 
 def sell_row(m, r, k) -> dict:
     owed = verdict(r) is not None  # only a debt puts a sale below the bar in the plan
-    return {**player(m, k), "proceeds": m.proceeds.get(k, 0.0),
+    return {**player(m, k), "proceeds": m.fetches(k),
             "why": "debt" if owed else "cash",
             "chance": None if owed else round(r.p_better, 3),
             "done": m.route.get(k) == "listed"}
@@ -59,7 +59,9 @@ def sell_row(m, r, k) -> dict:
 
 def holding(u, b, k) -> dict:
     """One of your players as the board shows him: how he plays, what he
-    is worth, what he cost and the offer above which selling him gains."""
+    is worth, what he cost, the offer above which selling him gains, and
+    the offer standing, if any: the share of the game's offers it beats
+    and the chance of a better one before the lock."""
     m, o = u.market, u.outlook
     exp, xi = o.xi
     sale = b.sale(k)
@@ -67,7 +69,8 @@ def holding(u, b, k) -> dict:
             "start": o.next_up.get(k, (0.0, 0.0))[1], "next": exp.get(k, 0.0),
             "season": o.season.get(k, 0.0), "value": m.value.get(k),
             "trend": m.trend.get(k), "paid": m.paid.get(k),
-            "sell_above": sale and u.sells_above(sale)}
+            "sell_above": sale and u.sells_above(sale),
+            "offer": m.offer.get(k), "offer_odds": m.offer_odds(k)}
 
 
 def exposed(u) -> list[dict]:
@@ -171,7 +174,7 @@ def _selftest() -> None:
                   forecaster=Bootstrap(perb),
                   market=Market(cash=10e6, pos={**sqb, "cand": "MED", "twin": "MED"},
                                 price={"cand": 5e6, "twin": 5e6},
-                                proceeds={"dead": 1e6, "star": 20e6}))
+                                value={"dead": 1e6, "star": 20e6}))
     b = board(ub)
     rows = {r.action.buy or r.action.sell: r for r in ub.rank(ub.candidates()).rows}
     assert rows[("star",)].d_pts < -20 and -5 < rows[("dead",)].d_pts < 5, \

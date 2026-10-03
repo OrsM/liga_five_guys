@@ -130,7 +130,7 @@ def whatif(u, words: list[str]) -> None:
             return
         a = u.offer(k)
     if sold:
-        a = replace(a, sell=(sold, ), proceeds=m.proceeds.get(sold, 0.0))
+        a = replace(a, sell=(sold, ), proceeds=m.fetches(sold))
     rows = u.rank([a]).rows
     if not rows:
         print(step(Universe.rank, "you cannot pay for it: %.1fM net, %.1fM cash"
