@@ -120,8 +120,8 @@ def offer_ratios(offers: list[dict], teams: list[dict]) -> list[float]:
 
 
 def premium_to_beat(ratios: list[float]) -> float:
-    """The bid, over the asking price, that beats BID_BEATS of the other
-    managers' recent winning bids."""
+    """The bid, over the asking price, at or above BID_BEATS of these
+    recent winning bids."""
     recent = sorted(ratios[-PRICE_WINDOW:])
     return recent[min(len(recent) - 1, int(BID_BEATS * len(recent)))] if recent else 1.0
 

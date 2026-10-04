@@ -97,11 +97,14 @@ def _nights_left(offers: list[dict]) -> int:
 
 
 def _premium(me: str) -> float:
+    """The bid over asking that your own auctions were won at: rivals'
+    winning bids are mostly the boldest bidder's, 1.19x against your 1.00x
+    (2026-10-04)."""
     mine = {text(r, "user_id") for r in current("api_standings")
             if text(r, "manager") == me}
     return premium_to_beat(auction_ratios(history("api_market"), sorted(
         (a for a in current("api_activity")
-         if a["kind"] == "buy" and a["user_id"] not in mine),
+         if a["kind"] == "buy" and a["user_id"] in mine),
         key=lambda a: a["at"])))
 
 

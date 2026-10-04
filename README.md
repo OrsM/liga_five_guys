@@ -75,7 +75,8 @@ Every forecast is the same product, for every player and jornada, and
   updates move by a fitted multiple of the last one, h being the longest
   horizon the data can fit (a rise was still carrying there), not the
   lock: a buy pays its premium once and keeps rising after it. A bid is the
-  premium over asking that beat 80% of the last 50 winning bids.
+  premium over asking at or above 80% of your last 50 winning bids (yours,
+  not the league's: the league's are mostly its boldest bidder's).
   The game offers for each listed player every night, centred on value
   (median 0.99x, 80% within 0.92-1.07x) and fresh each night. A sale gets
   tonight's offer or what waiting is worth, whichever is more
