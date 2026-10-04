@@ -62,12 +62,11 @@ def not_offered(u, k: str) -> str:
         owner = m.owner.get(k)
         return step(Universe.candidates, "%s's player, and his clause cannot be paid now"
                     % owner if owner else "nobody's, and not on the market now")
-    ways = u.ways(a)
-    if any(u.worth(w) > 0 for w in ways):
+    if u.worth(a) > 0:
         return ""
-    return step(Universe.candidates, "worth nothing at a glance: " + "; ".join(
-        "%s %+.1f points over whoever plays instead, %+.1f in cash" % (
-            w.label(named(u)), u.points(w), m.cash_pts(w)) for w in ways))
+    return step(Universe.candidates, "worth nothing at a glance: %s %+.1f points over "
+                "whoever plays instead, %+.1f in cash" % (
+                    a.label(named(u)), u.points(a), m.cash_pts(a)))
 
 
 def fate(u, b, r) -> str:
@@ -79,7 +78,7 @@ def fate(u, b, r) -> str:
     if (no := verdict(r)) is not None:
         return step(verdict, no)
     return step(plan, "clears the bar, left out: %s" % (
-        blocked(u, b.plan, r.action) or "it adds nothing alongside the plan"))
+        blocked(u, b.plan, r.action, b.rows) or "it adds nothing alongside the plan"))
 
 
 def why(u, k: str) -> None:
@@ -131,21 +130,16 @@ def whatif(u, words: list[str]) -> None:
         a = u.offer(k)
     if sold:
         a = replace(a, sell=(sold, ), proceeds=m.fetches(sold))
-    rows = u.rank([a]).rows
-    if not rows:
-        print(step(Universe.rank, "you cannot pay for it: %.1fM net, %.1fM cash"
-                   % (a.net / 1e6, m.cash / 1e6)))
-        return
-    mv = rows[0]
+    mv = u.rank([a]).rows[0]
     print(show(u, mv))
     if (no := verdict(mv)) is not None:
         print(step(verdict, no))
         return
     b = board(u)
-    picked, gain = plan(u, [*b.plan, mv], b.base)
+    picked, gain = plan(u, [*b.rows, mv], b.base)
     print(step(plan, "the plan would take it: together %+.1f, against %+.1f" % (gain, b.gain)
                if mv in picked else "clears the bar, but alongside the board's plan: %s" % (
-                   blocked(u, b.plan, mv.action)
+                   blocked(u, b.plan, mv.action, b.rows)
                    or "it adds nothing to it")))
 
 

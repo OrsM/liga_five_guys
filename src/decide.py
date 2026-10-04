@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import itertools
 import sys
 from dataclasses import dataclass, field, replace
 from functools import cached_property
@@ -22,8 +21,6 @@ __all__ = ["Action", "Board", "CONFIDENCE", "FUNNEL", "Move", "Universe", "at_ri
 
 FINAL_TRIALS = 3000
 CONFIDENCE = 0.7
-FUNDING_SALES = 5      # most sales a move is paid for with
-FUNDING_SHORTLIST = 20  # sets of them worked out together
 
 @dataclass(frozen=True)
 class Move:
@@ -149,64 +146,29 @@ class Universe:
         spread of those seasons: their median and the 70% bar."""
         return self.points(a) + self.market.cash_pts(a)
 
-    def fund(self, a: Action) -> Action | None:
-        """a paid for by selling: of the sets of your spares that raise
-        what it would leave you owing at the lock, with none to spare (just
-        one sale if it owes nothing) and a side left to field, the one it
-        is worth most with. Sales interact (two defenders sold thin the
-        defence), so the sets each sale's worth alone ranks best are worked
-        out together."""
-        m = self.market
-        need = m.owed([a])
-        spares = [k for k in fieldable_spares(self) if k not in a.sell and m.fetches(k)]
-
-        def selling(ks) -> Action:
-            return replace(a, sell=a.sell + tuple(ks),
-                           proceeds=a.proceeds + sum(m.fetches(k) for k in ks))
-
-        def enough(ks) -> bool:
-            raised = sum(m.fetches(k) for k in ks)
-            spare = need > 0 and any(raised - m.fetches(k) >= need for k in ks)
-            return (raised >= need and not spare
-                    and _fieldable(self.squad_after(selling(ks))))
-        alone = {k: self.worth(selling([k])) for k in spares}
-        sets = [ks for n in range(1, FUNDING_SALES + 1 if need > 0 else 2)
-                for ks in itertools.combinations(spares, n) if enough(ks)]
-        short = sorted(sets, key=lambda ks: -sum(alone[k] for k in ks))[:FUNDING_SHORTLIST]
-        best = max(short, key=lambda ks: self.worth(selling(ks)), default=None)
-        return selling(best) if best else None
-
-    def ways(self, a: Action) -> list[Action]:
-        """How you could pay for a: from your cash, and by selling."""
-        return [b for b in (a, self.fund(a)) if b]
-
     def candidates(self) -> list[Action]:
-        """Every move worth a look: each spare sold; in debt, the sales
-        that clear it; each player you could get, from your cash and paid
-        for by sales, if it is worth anything at a glance (worth). Those
-        you cannot pay for only measure what cash is worth."""
+        """Every move worth a look: each spare sold, and each player you
+        could get, from your cash, if worth anything at a glance (worth).
+        What a buy needs beyond your cash, the plan raises by selling."""
         m = self.market
         out = [Action("sell", sell=(s, ), proceeds=m.fetches(s))
                for s in fieldable_spares(self)]
-        if m.owed() and (clear := self.fund(Action("sell"))):
-            out.append(clear)
         for k in sorted(m.price.keys() | m.clause.keys()):
-            if a := self.offer(k):
-                out += [b for b in self.ways(a) if self.worth(b) > 0]
-        return list(dict.fromkeys(out))
+            if (a := self.offer(k)) and self.worth(a) > 0:
+                out.append(a)
+        return out
 
     def rank(self, acts: list[Action], seed: int = 1) -> Ranking:
-        """Each move you can pay for, scored against doing nothing in
-        simulated seasons: season points, cash priced in. Those you cannot
-        pay for only measure, by their points, what cash is worth."""
+        """Each move, scored against doing nothing in simulated seasons:
+        season points, cash priced in. Those you cannot pay for yet also
+        measure, by their points, what cash is worth."""
         m = self.market
         measured = cash_price([(m.short(a), self.points(a)) for a in acts])
         lam = m.lam if m.lam is not None else (measured or 0.0)
-        keep = [a for a in acts if m.short(a) <= 0]
         final = score_many(self, [self.state.squads]
-                           + [apply(self, a) for a in keep], FINAL_TRIALS, seed)
+                           + [apply(self, a) for a in acts], FINAL_TRIALS, seed)
         rows = sorted((self._move(a, paired(r, final[0], self.me), lam)
-                       for a, r in zip(keep, final[1:])),
+                       for a, r in zip(acts, final[1:])),
                       key=lambda mv: (-mv.net_pts, mv.action.net))
         return Ranking(rows, final[0], measured)
 
@@ -230,44 +192,52 @@ def verdict(mv: Move) -> str | None:
 
 
 def plan(u, rows: list[Move], base: Standings) -> tuple[list[Move], float]:
-    """The best set of moves to make together, a debt cleared first. After
-    its sales, the moves that clear the bar, built twice: best first and
-    best per million it ties up first, since one dear move can crowd out
-    two cheaper ones that gain more; the set that gains more is the plan.
-    Every move it leaves out was last tried against the whole of it."""
-    owed = clear_debt(u, rows)
-    good = [r for r in rows if verdict(r) is None and r not in owed]
-    return max((fill(u, good, base, key, owed) for key in (
+    """The best set of moves to make together. The moves that clear the
+    bar, built twice: best first and best per million it ties up first,
+    since one dear move can crowd out two cheaper ones that gain more; the
+    set that gains more is the plan. Every move it leaves out was last
+    tried against the whole of it."""
+    good = [r for r in rows if verdict(r) is None]
+    return max((fill(u, good, rows, base, key) for key in (
         lambda r: -r.net_pts,
         lambda r: -r.net_pts / max(r.action.net / 1e6, 1.0))), key=lambda pg: pg[1])
 
 
-def clear_debt(u, rows: list[Move]) -> list[Move]:
-    """A balance below zero at the lock scores nothing that jornada, so a
-    debt is cleared whatever it costs: the ranked move worth most that
-    leaves you owing nothing (sales, or a buy paid for by more of them)."""
-    m = u.market
-    clear = [r for r in rows if m.owed() and not m.owed([r.action])]
-    return [max(clear, key=lambda r: r.net_pts)] if clear else []
+def raised(u, moves: list[Move], rows: list[Move]) -> list[Move] | None:
+    """These moves and the sales that pay for them: the game's one money
+    rule is a balance of at least zero at the lock (below it you score
+    nothing), so what they leave below zero is raised by the ranked sales
+    that cost fewest points a million, a side left to field. None if it
+    cannot be."""
+    m, out = u.market, list(moves)
+    taken = {k for mv in out for k in mv.action.players}
+    sales = sorted((r for r in rows if not r.action.buy and r.action.proceeds
+                    and not taken & set(r.action.sell)),
+                   key=lambda r: -r.net_pts / (r.action.proceeds / 1e6))
+    for r in sales:
+        if m.left([mv.action for mv in out]) >= 0:
+            break
+        if _fieldable(u.squad_after(*(mv.action for mv in out), r.action)):
+            out.append(r)
+    return out if m.left([mv.action for mv in out]) >= 0 else None
 
 
-def fill(u, good: list[Move], base: Standings, order,
-         start: list[Move] = ()) -> tuple[list[Move], float]:
-    """Moves in this order after those it must start with, each taken if
-    it shares no player with those taken, is paid for by the cash left,
-    and adds to their joint gain; again until none is taken, so a sale
-    taken late still pays for a buy."""
-    picked = list(start)
+def fill(u, good: list[Move], rows: list[Move], base: Standings,
+         order) -> tuple[list[Move], float]:
+    """Moves in this order, each taken, with the sales that pay for it,
+    if it shares no player with those taken and adds to their joint gain;
+    again until none is taken."""
+    picked = raised(u, [], rows) or []
     gain, grew = joint_gain(u, picked, base) if picked else 0.0, True
     while grew:
         grew = False
         for r in sorted(good, key=order):
-            if r in picked or blocked(u, picked, r.action):
+            if r in picked or blocked(u, picked, r.action, rows):
                 continue
-            total = joint_gain(u, [*picked, r], base)
+            trial = raised(u, [*picked, r], rows)
+            total = joint_gain(u, trial, base)
             if total > gain:
-                picked.append(r)
-                gain, grew = total, True
+                picked, gain, grew = trial, total, True
     return picked, gain
 
 
@@ -278,17 +248,18 @@ def joint_gain(u, moves: list[Move], base: Standings) -> float:
         u.market.cash_pts(a) for a in acts)
 
 
-def blocked(u, picked: list[Move], a: Action) -> str | None:
+def blocked(u, picked: list[Move], a: Action, rows: list[Move]) -> str | None:
     """Why a move cannot join these: it shares a player with one of them,
-    or the cash they leave does not pay for it. None if it can."""
+    or no sales left can pay for it. None if it can."""
     names = {k: title_name(n) for k, n in u.market.name.items()}
     for p in picked:
         if shared := set(p.action.players) & set(a.players):
             return "%s is in %s" % (" + ".join(names.get(k, k) for k in shared),
                                     p.action.label(names))
-    done = [p.action for p in picked]
-    if u.market.short(a, done) > 0:
-        return "it needs %.1fM and %.1fM is left" % (a.net / 1e6, u.market.left(done) / 1e6)
+    if raised(u, [*picked, Move(a, 0.0)], rows) is None:
+        done = [p.action for p in picked]
+        return "it needs %.1fM, %.1fM is left and no sales raise the rest" % (
+            a.net / 1e6, u.market.left(done) / 1e6)
     return None
 
 
@@ -368,7 +339,6 @@ def apply(u, *acts: Action) -> dict[str, dict[str, str]]:
 
 
 def _selftest() -> None:
-    from dataclasses import replace
 
     from ffcore.forecast import Bootstrap as B
     from ffcore.season import best_xi
@@ -426,36 +396,33 @@ def _selftest() -> None:
 
 
     per3 = {1: dict(per[1])}
-    per3[1].update({"dear": (11.0, 1.0), "me_spare2": (0.4, 1.0),
+    per3[1].update({"dear": (40.0, 1.0), "me_spare2": (0.4, 1.0),
                     "me_spare3": (0.3, 1.0)})
     u3 = Universe(
         state=LeagueState({"me": {**mine, "me_spare2": "MED", "me_spare3": "POR"},
                            "riv": dict(theirs)}, [1], "me"),
         forecaster=B(per3),
         market=Market(
-            cash=4e6, pos={**u.market.pos, "dear": "MED"},
+            cash=4e6, lam=0.1, pos={**u.market.pos, "dear": "MED"},
             price={"dear": 20e6},
             value={"me_bench": 8e6, "me_spare2": 5e6, "me_spare3": 4e6}))
     acts3 = u3.candidates()
-    funded = [a for a in acts3 if a.buy == "dear" and a.sell]
-    assert [sorted(a.sell) for a in funded] == [["me_bench", "me_spare2", "me_spare3"]], \
-        ("no one spare pays for him; three together do", funded)
-    assert any(a.buy == "dear" and not a.sell for a in acts3), \
-        "from your cash he is offered..."
-    assert [r.action for r in u3.rank(acts3).rows if r.action.buy == "dear"] == funded, \
-        "...to measure what cash is worth; only paid for by sales is he ranked"
+    assert [a.sell for a in acts3 if a.buy == "dear"] == [()], \
+        "a buy is offered from your cash; sales are moves of their own"
+    assert any(r.action.buy == "dear" for r in u3.rank(acts3).rows), \
+        "and ranked though you cannot pay for it yet"
+    got = board(u3).plan
+    assert {r.action.buy for r in got} - {""} == {"dear"}, got
+    assert sorted(k for r in got for k in r.action.sell) == [
+        "me_bench", "me_spare2", "me_spare3"], ("no one spare pays for him; three together do", got)
 
-    sw = next(x for x in acts if x.buy == "star" and x.sell == ("me_bench",))
-    af = apply(u, sw)
+    af = apply(u, Action("buy", buy="star", sell=("me_bench",)))
     assert "me_bench" not in af["me"] and "star" in af["me"]
 
     rows, base, _lam = u.rank(acts)
     assert rows, "something should be worth doing"
-    assert all(r.action.net <= u.market.cash for r in rows), rows
-    ways = [(r.action.buy or r.action.sell, bool(r.action.buy and r.action.sell))
-            for r in rows]
-    assert len(set(ways)) == len(ways) and ("star", False) in ways, \
-        "each player at most twice: from your cash, and with his best sale"
+    ways = [r.action.buy or r.action.sell for r in rows]
+    assert len(set(ways)) == len(ways) and "star" in ways, "each move once"
     top = rows[0]
     assert top.d_pts > 0, top.d_pts
     assert top.net_pts > 0, top
@@ -532,7 +499,7 @@ def _selftest() -> None:
                 "me_m1": (3.0, 1.0), "me_m2": (3.0, 1.0), "me_m3": (3.0, 1.0),
                 "me_m4": (3.0, 1.0), "me_f1": (5.0, 1.0), "me_f2": (4.0, 1.0),
                 "me_f3": (0.1, 1.0),
-                "target": (9.0, 1.0)}}
+                "target": (20.0, 1.0)}}
     sq_cd = {"me_k": "POR", "me_d1": "DEF", "me_d2": "DEF", "me_d3": "DEF",
            "me_d4": "DEF", "me_m1": "MED", "me_m2": "MED", "me_m3": "MED",
            "me_m4": "MED", "me_f1": "DEL", "me_f2": "DEL", "me_f3": "DEL"}
@@ -540,12 +507,11 @@ def _selftest() -> None:
     u_cd = Universe(
         state=LeagueState({"me": dict(sq_cd)}, [1], "me"),
         forecaster=BCD(per_cd),
-        market=Market(pos={**sq_cd, "target": "DEL"}, price={"target": 5e6},
+        market=Market(lam=0.2, pos={**sq_cd, "target": "DEL"}, price={"target": 5e6},
                       value={"me_f3": 5e6}))
     acts_cd = u_cd.candidates()
     assert not any("me_k" in a.sell for a in acts_cd), "never your only keeper"
-    rows_cd = u_cd.rank(acts_cd).rows
-    assert [r.action.sell for r in rows_cd if r.action.buy == "target"] == [("me_f3",)], \
+    assert sorted(r.action.label() for r in board(u_cd).plan) == ["buy target", "sell me_f3"], \
         "with no cash, he is paid for by the one spare that raises it"
 
 
@@ -593,16 +559,15 @@ def _selftest() -> None:
         price={**mu.market.price, "riser": 2e6},
         pos={**mu.market.pos, "riser": "MED"}))
     buy_riser = mu.offer("riser")
-    assert abs(mu.market.cash_pts(buy_riser) - 0.3 * (0.4 - 0.1)) < 1e-9, \
-        "his value gains 0.4M; the bid to win it burns 0.1M"
-    assert "riser" in {a.buy for a in mu.candidates()}
+    assert abs(mu.market.cash_pts(buy_riser) - 0.3 * (0.4 - 2.1)) < 1e-9, \
+        "his value gains 0.4M; the bid to win him ties up 2.1M"
+    assert ("riser" in {a.buy for a in mu.candidates()}) == (mu.worth(buy_riser) > 0)
     sell_m = Action("sell", sell=("bench_m",), proceeds=3e6)
-    assert abs(mu.market.cash_pts(sell_m) - 0.3 * 0.3) < 1e-9
-    assert mu.market.cash_pts(buy_riser, lam=0.0) == 0.0
-    mu = replace(mu, market=replace(mu.market, trend={"riser": 0.0}))
-    assert mu.market.cash_pts(buy_riser) < 0
+    assert abs(mu.market.cash_pts(sell_m) - 0.3 * (3 + 0.3)) < 1e-9, \
+        "all he fetches, and the 0.3M his price would have lost"
+    flat = replace(mu, market=replace(mu.market, trend={"riser": 0.0}))
+    assert flat.worth(flat.offer("riser")) < mu.worth(buy_riser)
     assert [f.__name__ for f in FUNNEL] == ["candidates", "rank", "verdict", "plan"]
-    assert "riser" not in {a.buy for a in mu.candidates()}
 
     ks = {"k": "POR", **{"d%d" % i: "DEF" for i in range(1, 5)},
           **{"m%d" % i: "MED" for i in range(1, 5)}, "f1": "DEL", "f2": "DEL"}
@@ -626,10 +591,17 @@ def _selftest() -> None:
                                    value={"idle": 6e6, "useful": 6e6}))
     got = [r.action.label() for r in board(owing).plan]
     assert got == [Action("sell", sell=("idle",)).label()], \
-        ("a debt is cleared by the sale that costs fewest points, and buys nothing", got)
+        ("a debt is raised by the sale that costs fewest points a million", got)
     deep = replace(owing, market=replace(owing.market, cash=-8e6))
     assert sorted(s for r in board(deep).plan for s in r.action.sell) == ["idle", "useful"], \
         "whatever it costs"
+    pers = {j: {**perk[j], "star": (5.0, 1.0), "ace": (4.0, 1.0)} for j in js}
+    star = Universe(state=LeagueState({"me": {**ks, "star": "MED"}}, js, "me"),
+                    forecaster=Bootstrap(pers),
+                    market=Market(cash=-30e6, lam=1.0, pos={**ks, "star": "MED", "ace": "MED"},
+                                  price={"ace": 1e6}, value={"star": 31e6}))
+    got = sorted(r.action.label() for r in board(star).plan)
+    assert got == ["buy ace", "sell star"], ("the sale that clears a debt pays for a buy too", got)
 
     print("decide self-test OK")
 

@@ -96,22 +96,26 @@ Every forecast is the same product, for every player and jornada, and
   only once his protection after his last transfer has ended). Every
   recommendation passes the same four steps, `decide.FUNNEL`, drawn in
   `docs/funnel.mmd`:
-  1. **candidates**: every sale of a spare; in debt, the sales that
-     clear it; every player you could get, from your cash and paid for by
-     the sales he is worth most with (`Universe.fund`: up to five, none
-     to spare), if worth anything at a glance (`Universe.worth`: what it
-     adds to the simulated seasons' average, plus money).
+  1. **candidates**: every sale of a spare, and every player you could
+     get, from your cash, if worth anything at a glance
+     (`Universe.worth`: what it adds to the simulated seasons' average,
+     plus money).
   2. **rank**: each move against doing nothing, in simulated seasons: the
-     points it adds plus, at the measured points-per-million, the value
-     its players gain over the price horizon less what it burns over their value.
+     points it adds plus its money at one price, the measured points a
+     million buys (`Market.cash_pts`): a sale earns all it fetches, a buy
+     pays all it costs, and each player's price change over the horizon
+     counts as money fetched when he is sold. Money in a player is not
+     money in hand: it buys nothing until he is sold.
   3. **verdict**: a gain in the median, cash included, and better off in
      at least 70% of seasons (`CONFIDENCE`); below that its gain is noise.
-  4. **plan**: in debt, first the ranked move worth most that clears it
-     (below zero at the lock scores nothing, so it is made whatever it
-     costs); then the best set that shares no player, fits your cash and
-     adds to the joint gain, built best first and best per million first
-     (one dear move can crowd out two cheaper ones that gain more), keeping
-     the set that gains more. The rest that clear the bar are the backups.
+  4. **plan**: the best set that shares no player and adds to the joint
+     gain, built best first and best per million first (one dear move can
+     crowd out two cheaper ones that gain more), keeping the set that gains
+     more. The game's one money rule, a balance of at least zero at the
+     lock (below it you score nothing), binds every set the same way,
+     whether a debt or a buy put it below: the ranked sales that cost
+     fewest points a million raise the rest (`decide.raised`). The rest
+     that clear the bar are the backups.
 
   `python tools/ask.py why <player>` names the step a player stopped at,
   `ask.py whatif buy X sell Y` scores a move of your own the same way, and
@@ -150,9 +154,11 @@ which move wins.
   league). Not modelled: ours paid one 9h before kickoff, and the app
   refuses a closed one anyway.
 - **A negative balance at the matchday's start scores 0 points; debt is
-  capped at 20% of team value.** Enforced by the plan
-  (`Market.owed` is what must be raised, `decide.clear_debt` picks the
-  sales) and by the app (bids).
+  capped at 20% of team value.** Enforced by the plan (`decide.raised`:
+  the same rule that keeps a buy within your cash) and by the app (bids).
+  Not modelled for rivals: the simulated seasons ignore every manager's
+  cash, so a rival below zero at the lock still scores, and a clause you
+  pay a rival in debt is not counted as helping him.
 - **Raising a clause costs half the raise** (1M pays for +2M). Not modelled:
   the board lists who is at risk, not what protecting them would cost.
 - **Blindaje:** one player per matchday is shielded from clauses for 24h

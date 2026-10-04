@@ -90,36 +90,24 @@ class Market:
         """Your cash once these moves are made."""
         return self.cash - sum(a.net for a in acts)
 
-    def owed(self, acts=()) -> float:
-        """What these moves leave to raise before the lock: a balance below
-        zero at the matchday's start scores nothing."""
-        return max(0.0, -self.left(acts))
-
     def short(self, a: Action, acts=()) -> float:
         """How much more than the cash these moves leave a move needs; at
         most 0 if it can be made. In debt there is nothing to spend, but
         a move that raises money can still be made."""
         return a.net - max(self.left(acts), 0.0)
 
-    def burn(self, a: Action) -> float | None:
-        """What a buy costs above the player's value; its cost is what you
-        pay (for an auction, the bid it takes to win)."""
-        if not a.buy:
-            return 0.0
-        val = self.value.get(a.buy)
-        return None if val is None else max(0.0, a.cost - val)
-
     def cash_pts(self, a: Action, lam: float | None = None) -> float:
+        """The money a move frees, priced at lam points a million wherever
+        it sits: all a sale fetches, less all a buy costs, plus what the
+        price of each player in less each player out moves by (fetched when
+        he is sold)."""
         lam = self.lam if lam is None else lam
         if not lam:
             return 0.0
-        value, trend = self.value, self.trend
-        money = -(self.burn(a) or 0.0)
-        if a.buy:
-            money += value.get(a.buy, 0.0) * trend.get(a.buy, 0.0) / 100
-        for k in a.sell:
-            money += self.fetches(k) - value.get(k, 0.0) * (1 + trend.get(k, 0.0) / 100)
-        return lam * money / 1e6
+        drift = sum(sign * self.value.get(k, 0.0) * self.trend.get(k, 0.0) / 100
+                    for sign, ks in ((1, (a.buy, ) if a.buy else ()), (-1, a.sell))
+                    for k in ks)
+        return lam * (drift - a.net) / 1e6
 
 
 LISTED_SELLER = "marketPlayerTeam"
@@ -169,24 +157,21 @@ def _selftest() -> None:
 
     debt = Market(cash=-5e6)
     sale, buy = Action("sell", sell=("s",), proceeds=3e6), Action("buy", buy="b", cost=1e6)
-    assert debt.owed() == 5e6 and debt.owed([sale]) == 2e6 and debt.left([sale]) == -2e6
+    assert debt.left([sale]) == -2e6
     assert debt.short(sale) <= 0 < debt.short(buy), "in debt, only what raises money"
     assert Market(cash=2e6).short(buy, [sale]) == 1e6 - 5e6
 
-    m = Market(value={"star": 5e6, "free": 4e6})
-    assert m.burn(Action("buy", buy="star", cost=8e6)) == 3e6
-    assert m.burn(Action("buy", buy="free", cost=4e6)) == 0.0
-    assert m.burn(Action("buy", buy="free", cost=3e6)) == 0.0
-    assert m.burn(Action("sell", sell=("bench",))) == 0.0
-    assert m.burn(Action("buy", buy="mystery", cost=9e6)) is None
-
-    assert m.cash_pts(Action("buy", buy="free", cost=4e6)) == 0.0, "no lam, no cash"
+    assert Market().cash_pts(Action("buy", buy="free", cost=4e6)) == 0.0, "no lam, no cash"
+    flat = Market(lam=0.5, value={"p": 10e6})
+    assert flat.cash_pts(Action("buy", buy="p", cost=10e6)) == -5.0, \
+        "a buy at his value still ties up all it costs"
+    assert flat.cash_pts(Action("sell", sell=("p",), proceeds=10e6)) == 5.0, \
+        "a sale frees all it fetches, not what it fetches over his value"
     riser = Market(lam=2.0, value={"r": 10e6}, trend={"r": 5.0})
-    assert abs(riser.cash_pts(Action("buy", buy="r", cost=10e6)) - 1.0) < 1e-9
+    assert abs(riser.cash_pts(Action("buy", buy="r", cost=10e6)) - 2.0 * (0.5 - 10)) < 1e-9, \
+        "and gains what his price will add, fetched when he is sold"
+    assert abs(riser.cash_pts(Action("sell", sell=("r",), proceeds=10e6)) - 2.0 * (10 - 0.5)) < 1e-9
     assert Market(value={"s": 4e6}, offer={"s": 5e6}).fetches("s") == 5e6
-    seller = Market(lam=1.0, value={"s": 4e6},
-                    trend={"s": -25.0})
-    assert abs(seller.cash_pts(Action("sell", sell=("s",), proceeds=4e6)) - 1.0) < 1e-9
 
     assert Market(my_bid={"a": 1e6, "b": 2.5e6}).locked_cash == 3.5e6
     assert Market().locked_cash == 0.0

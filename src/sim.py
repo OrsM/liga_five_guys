@@ -41,8 +41,7 @@ def buy_row(m, r) -> dict:
     by_clause = a.kind == "clause"
     return {**player(m, a.buy), "ask": m.price.get(a.buy, a.cost), "bid": a.cost,
             "clause_from": m.owner.get(a.buy) if by_clause else None,
-            "sell": [player(m, k)["name"] for k in a.sell],
-            "proceeds": a.proceeds, "gain": r.d_pts, "why": why(r),
+            "gain": r.d_pts, "why": why(r),
             "chance": round(r.p_better, 3),
             "trend": m.trend.get(a.buy),
             "placed": m.my_bid.get(a.buy),
@@ -50,13 +49,14 @@ def buy_row(m, r) -> dict:
 
 
 def sell_row(m, r, k) -> dict:
-    """A sale in the plan: what it fetches, why, and the offer standing on
-    him: take it tonight, or (done for tonight) wait for a better one."""
-    owed = verdict(r) is not None  # only a debt puts a sale below the bar in the plan
+    """A sale in the plan: what it fetches, why (it pays on its own, or the
+    plan needs the cash: below zero at the lock scores nothing), and the
+    offer standing on him: take it tonight, or (done for tonight) wait."""
+    needed = verdict(r) is not None
     take = m.takes(k)
     return {**player(m, k), "proceeds": m.fetches(k),
-            "why": "debt" if owed else "cash",
-            "chance": None if owed else round(r.p_better, 3),
+            "why": "needed" if needed else "pays",
+            "chance": None if needed else round(r.p_better, 3),
             "offer": m.offer.get(k), "offer_odds": m.offer_odds(k),
             "waiting": m.waiting(k), "take": take,
             "done": m.route.get(k) == "listed" and not take}
@@ -87,12 +87,10 @@ def exposed(u) -> list[dict]:
 
 def ping(todo: list[dict]) -> str:
     said = {"field": lambda d: "Field " + ", ".join(d["on"]),
-            "buy": lambda d: ("Take %s from %s (clause %.1fM)%s" % (
-                d["name"], d["clause_from"], d["bid"] / 1e6,
-                ", selling " + " + ".join(d["sell"]) if d["sell"] else "")
-                if d.get("clause_from") else "Buy %s (bid up to %.1fM)%s" % (
-                d["name"], d["bid"] / 1e6,
-                ", selling " + " + ".join(d["sell"]) if d["sell"] else "")),
+            "buy": lambda d: ("Take %s from %s (clause %.1fM)" % (
+                d["name"], d["clause_from"], d["bid"] / 1e6)
+                if d.get("clause_from") else "Buy %s (bid up to %.1fM)" % (
+                d["name"], d["bid"] / 1e6)),
             "sell": lambda d: ("Accept the offer for %s (%.1fM)" % (
                 d["name"], d["offer"] / 1e6) if d.get("take") else "Sell " + d["name"])}
     return "; ".join(said[d["what"]](d) for d in todo if not d.get("done"))
@@ -123,7 +121,7 @@ def report(u, b, chg, lock_at=None) -> dict:
         "p_win": round(base.position().get(1, 0.0), 3),
         "band": [lo, hi],
         "do": todo, "plan_gain": b.gain, "backup": backup, "ping": ping(todo),
-        "bid_beats": BID_BEATS, "confidence": CONFIDENCE,
+        "bid_beats": BID_BEATS, "confidence": CONFIDENCE, "cash_price": m.lam,
         "exposed": exposed(u),
         "squad": [holding(u, b, k) for k in sorted(
             mine, key=lambda k: (SLOT_ORDER.get(mine[k], 9), -exp.get(k, 0.0)))],
@@ -198,6 +196,7 @@ def _selftest() -> None:
     assert {d["name"].lower() for d in doc["do"] if d["what"] == "buy"} == set(bought)
     assert all(b["name"].lower() not in bought for b in doc["backup"])
     assert doc["confidence"] == CONFIDENCE
+    assert doc["cash_price"] == ub.market.lam
     rich = replace(ub, rival_cash={"riv": 25e6},
                    market=replace(ub.market, clause={"star": 20e6, "dead": 30e6}))
     assert [(e["name"].lower(), e["by"]) for e in exposed(rich)] == [("star", ["riv"])], \
@@ -211,11 +210,11 @@ def _selftest() -> None:
         "p_above"] is None
     json.dumps(doc)
     assert ping([{"what": "field", "on": ["A", "B"]},
-                 {"what": "buy", "name": "C", "bid": 12.34e6, "sell": ["D"]},
+                 {"what": "buy", "name": "C", "bid": 12.34e6},
                  {"what": "sell", "name": "E"}]) == (
-        "Field A, B; Buy C (bid up to 12.3M), selling D; Sell E")
+        "Field A, B; Buy C (bid up to 12.3M); Sell E")
     assert ping([]) == ""
-    assert ping([{"what": "buy", "name": "C", "bid": 1e6, "sell": [], "done": True},
+    assert ping([{"what": "buy", "name": "C", "bid": 1e6, "done": True},
                  {"what": "sell", "name": "E", "done": False}]) == "Sell E"
 
     ub = replace(ub, market=replace(ub.market, my_bid={bought[0]: 4e6},
