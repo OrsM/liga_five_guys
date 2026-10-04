@@ -55,25 +55,17 @@ def show(u, mv) -> str:
 
 
 def not_offered(u, k: str) -> str:
-    """Why candidates() has no move for him, from the steps it takes."""
-    m = u.market
-    a = u.acquire(k)
-    if a is None:
-        owner = m.owner.get(k)
-        return step(Universe.candidates, "%s's player, and his clause cannot be paid now"
-                    % owner if owner else "nobody's, and not on the market now")
-    if u.points(a) > 0:
-        return ""
-    return step(Universe.candidates, "worth nothing at a glance: %s %+.1f points over "
-                "whoever plays instead" % (a.label(named(u)), u.points(a)))
+    """Why candidates() has no move for him, or "" if it has."""
+    no = u.why_not(k)
+    return step(Universe.candidates, no) if no else ""
 
 
 def fate(u, b, r) -> str:
     """Where a ranked move stopped: at verdict, or at plan and why. The plan
     last tried every move it left out against all of itself."""
     if r in b.plan:
-        return step(plan, "in the plan" if verdict(r) is None else
-                    "in the plan to clear your debt before the lock")
+        return step(plan, "in the plan" if r.action.buy else
+                    "in the plan, raising cash it needs")
     if (no := verdict(r)) is not None:
         return step(verdict, no)
     return step(plan, "clears the bar, left out: %s" % (
@@ -82,7 +74,6 @@ def fate(u, b, r) -> str:
 
 def why(u, k: str) -> None:
     b = board(u)
-    names = named(u)
     if k in u.mine:
         h, sale = holding(u, b, k), b.sale(k)
         shown = {f: "-" if h[f] is None else "%.1fM" % (h[f] / 1e6)
@@ -93,19 +84,11 @@ def why(u, k: str) -> None:
                  if h["per_million"] is not None else ""))
         print("Selling him alone: " + (show(u, sale) + "\n  " + fate(u, b, sale)
               if sale else "not ranked (your side cannot be fielded without him)"))
-        for p in b.plan:
-            if k in p.action.sell and p.action.sell != (k, ):
-                print("the plan sells him in: " + p.action.label(names))
         return
     if gone := not_offered(u, k):
         print(gone)
         return
-    r = next((r for r in b.rows if r.action.buy == k), None)
-    if r is None:
-        a = u.acquire(k)
-        print(step(Universe.rank, "you cannot pay for him: %.1fM, with %.1fM cash and "
-                   "no sales that cover the rest" % (a.cost / 1e6, u.market.cash / 1e6)))
-        return
+    r = next(r for r in b.rows if r.action.buy == k)
     print(show(u, r))
     print(fate(u, b, r))
 
@@ -213,7 +196,8 @@ def _selftest() -> None:
     for r in b.rows:
         said = fate(u, b, r)
         if r in b.plan:
-            assert said == "4/4 plan: in the plan", said
+            assert said == ("4/4 plan: in the plan" if r.action.buy else
+                            "4/4 plan: in the plan, raising cash it needs"), said
         elif verdict(r) is None:
             assert said.startswith("4/4 plan: clears the bar, left out: "), said
         else:

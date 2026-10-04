@@ -135,10 +135,20 @@ class Universe:
         m = self.market
         out = [Action("sell", sell=(s, ), proceeds=m.fetches(s))
                for s in fieldable_spares(self)]
-        for k in sorted(m.price.keys() | m.clause.keys()):
-            if (a := self.acquire(k)) and self.points(a) > 0:
-                out.append(a)
-        return out
+        return out + [self.acquire(k) for k in sorted(m.price.keys() | m.clause.keys())
+                      if self.why_not(k) is None]
+
+    def why_not(self, k: str) -> str | None:
+        """Why getting him is not a candidate, or None if it is."""
+        a = self.acquire(k)
+        if a is None:
+            owner = self.market.owner.get(k)
+            return ("%s's player, and his clause cannot be paid now" % owner if owner
+                    else "nobody's, and not on the market now")
+        if self.points(a) <= 0:
+            return "worth nothing at a glance: %s %+.1f points over whoever plays instead" % (
+                a.label(), self.points(a))
+        return None
 
     def rank(self, acts: list[Action], seed: int = 1) -> Ranking:
         """Each move, scored against doing nothing in simulated seasons."""
@@ -354,6 +364,10 @@ def _selftest() -> None:
     names = {a.buy for a in acts}
     assert "dud" not in names, names
     assert "star" in names, names
+    assert u.why_not("star") is None
+    assert u.why_not("dud").startswith("worth nothing at a glance: buy dud "), u.why_not("dud")
+    assert u.why_not("nobody") == "nobody's, and not on the market now"
+    assert u.why_not("th_m1") == "riv's player, and his clause cannot be paid now"
 
     acts = u.candidates()
     assert not any(a.buy == "th_m1" for a in acts), "a rival's player is not for sale"
