@@ -59,10 +59,32 @@ class Market:
             return None
         none_better = 1.0
         for night in range(1, self.nights_left + 1):
-            done = self.carry[min(night, len(self.carry)) - 1] if self.carry else 1.0
-            then = value * (1 + self.trend.get(k, 0.0) / 100 * done)
+            then = self._value_on(k, night)
             none_better *= sum(x * then <= offer for x in recent) / len(recent)
         return sum(x * value < offer for x in recent) / len(recent), 1 - none_better
+
+    def _value_on(self, k: str, night: int) -> float:
+        done = self.carry[min(night, len(self.carry)) - 1] if self.carry else 1.0
+        return self.value[k] * (1 + self.trend.get(k, 0.0) / 100 * done)
+
+    def waiting(self, k: str) -> float | None:
+        """What turning down his standing offer is worth on average, if each
+        night's offer to come is then taken only when it beats waiting on,
+        and the last one before the lock always: None without an offer."""
+        recent = self.offer_ratios[-PRICE_WINDOW:]
+        if not self.offer.get(k) or not self.value.get(k) or not recent:
+            return None
+        later = 0.0
+        for night in range(self.nights_left, 0, -1):
+            then = self._value_on(k, night)
+            later = sum(max(x * then, later) for x in recent) / len(recent)
+        return later
+
+    def takes(self, k: str) -> bool:
+        """Whether a sale should take his standing offer tonight: it is at
+        least what waiting for a later one is worth."""
+        wait = self.waiting(k)
+        return wait is not None and self.offer[k] >= wait
 
     def left(self, acts=()) -> float:
         """Your cash once these moves are made."""
@@ -137,6 +159,13 @@ def _selftest() -> None:
     assert rising.offer_odds("s")[1] > odds.offer_odds("s")[1], \
         "a rising value makes the offers to come dearer"
     assert Market(value={"s": 1.0}).offer_odds("s") is None
+    assert abs(odds.waiting("s") - (1.0 + 1.0 + 1.0 + 1.1) / 4 * 10e6) < 1, \
+        "the last night's offer is taken; the night before's only above it"
+    low = replace(odds, offer={"s": 10.1e6})
+    assert odds.takes("s") and not low.takes("s"), (odds.waiting("s"), low.offer)
+    assert replace(low, nights_left=1).takes("s"), "one night left, worth 10M on average"
+    assert replace(low, nights_left=0).takes("s"), "no night left: take it"
+    assert odds.waiting("nobody") is None and not odds.takes("nobody")
 
     debt = Market(cash=-5e6)
     sale, buy = Action("sell", sell=("s",), proceeds=3e6), Action("buy", buy="b", cost=1e6)

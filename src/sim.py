@@ -50,11 +50,16 @@ def buy_row(m, r) -> dict:
 
 
 def sell_row(m, r, k) -> dict:
+    """A sale in the plan: what it fetches, why, and the offer standing on
+    him: take it tonight, or (done for tonight) wait for a better one."""
     owed = verdict(r) is not None  # only a debt puts a sale below the bar in the plan
+    take = m.takes(k)
     return {**player(m, k), "proceeds": m.fetches(k),
             "why": "debt" if owed else "cash",
             "chance": None if owed else round(r.p_better, 3),
-            "done": m.route.get(k) == "listed"}
+            "offer": m.offer.get(k), "offer_odds": m.offer_odds(k),
+            "waiting": m.waiting(k), "take": take,
+            "done": m.route.get(k) == "listed" and not take}
 
 
 def holding(u, b, k) -> dict:
@@ -88,7 +93,8 @@ def ping(todo: list[dict]) -> str:
                 if d.get("clause_from") else "Buy %s (bid up to %.1fM)%s" % (
                 d["name"], d["bid"] / 1e6,
                 ", selling " + " + ".join(d["sell"]) if d["sell"] else "")),
-            "sell": lambda d: "Sell " + d["name"]}
+            "sell": lambda d: ("Accept the offer for %s (%.1fM)" % (
+                d["name"], d["offer"] / 1e6) if d.get("take") else "Sell " + d["name"])}
     return "; ".join(said[d["what"]](d) for d in todo if not d.get("done"))
 
 
@@ -223,6 +229,19 @@ def _selftest() -> None:
                for n, d in buys.items() if n != bought[0]), buys
     assert [(d["name"].lower(), d["done"], d["proceeds"]) for d in doc["do"]
             if d["what"] == "sell"] == [("dead", True, 1e6)], doc["do"]
+
+    def sale(offer):
+        mk = replace(ub.market, offer={"dead": offer}, nights_left=2,
+                     offer_ratios=(0.9, 1.0, 1.0, 1.1))
+        doc = report(replace(ub, market=mk), b._replace(plan=[sell_dead]),
+                     xi_change([], ub.outlook.xi.ranked()))
+        return (next(d for d in doc["do"] if d["what"] == "sell"),
+                doc["ping"].split("; ")[-1])
+    (take, said), (wait, quiet) = sale(1.1e6), sale(0.9e6)
+    assert take["take"] and not take["done"] and take["offer"] == take["proceeds"] == 1.1e6
+    assert said == "Accept the offer for Dead (1.1M)", said
+    assert not wait["take"] and wait["done"] and wait["waiting"] > 0.9e6, wait
+    assert "Dead" not in quiet and wait["offer_odds"][0] == 0.0, (quiet, wait)
 
     print("sim self-test OK")
 
