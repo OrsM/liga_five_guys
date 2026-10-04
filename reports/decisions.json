@@ -1,5 +1,5 @@
 {
- "generated_at": "2026-10-04T09:45Z",
+ "generated_at": "2026-10-04T10:08Z",
  "lock_at": "2026-10-09T19:00:00+00:00",
  "cash": -56530263.0,
  "cash_locked": 0,
@@ -12,15 +12,20 @@
  "do": [
   {
    "what": "field",
-   "label": "field Alex Baena",
+   "label": "field Roberto Fernandez, Aitor Paredes, Miguel Sierra, Robert Navarro, Kike Salas, Ramon Terrats",
    "legal": true,
    "on": [
-    "Alex Baena"
+    "Roberto Fernandez",
+    "Aitor Paredes",
+    "Miguel Sierra",
+    "Robert Navarro",
+    "Kike Salas",
+    "Ramon Terrats"
    ],
    "off": [
     "Zaid Romero"
    ],
-   "gain": 2.8017001442252596
+   "gain": 5.3174101555269715
   },
   {
    "what": "sell",
@@ -30,6 +35,7 @@
    "proceeds": 5170747.0,
    "offer": null,
    "take": false,
+   "gain": -2.3092539451901075,
    "per_million": -0.44659967799432215,
    "done": false
   },
@@ -41,6 +47,7 @@
    "proceeds": 1186454.0,
    "offer": null,
    "take": false,
+   "gain": -0.7629937979723991,
    "per_million": -0.6430875516222282,
    "done": false
   },
@@ -52,6 +59,7 @@
    "proceeds": 18154207.0,
    "offer": null,
    "take": false,
+   "gain": -11.831864836631212,
    "per_million": -0.6517423116653464,
    "done": false
   },
@@ -63,6 +71,7 @@
    "proceeds": 91516019.1534396,
    "offer": 87423063.0,
    "take": false,
+   "gain": -69.60300334763406,
    "per_million": -0.7605554086758816,
    "done": true
   },
@@ -134,6 +143,7 @@
    "proceeds": 37558140.0,
    "offer": null,
    "take": false,
+   "gain": -36.4447726650925,
    "per_million": -0.9703561642054824,
    "done": false
   },
@@ -160,6 +170,7 @@
    "proceeds": 15882070.0,
    "offer": null,
    "take": false,
+   "gain": -15.637788909039728,
    "per_million": -0.9846190647088022,
    "done": false
   },
@@ -171,6 +182,7 @@
    "proceeds": 23755919.0,
    "offer": null,
    "take": false,
+   "gain": -24.320771587488935,
    "per_million": -1.0237773410276798,
    "done": false
   },
@@ -197,6 +209,7 @@
    "proceeds": 15208926.0,
    "offer": null,
    "take": false,
+   "gain": -16.66126132438933,
    "per_million": -1.0954923000078591,
    "done": false
   }
@@ -244,7 +257,7 @@
   }
  ],
  "cash_after": 8556235.153439596,
- "ping": "field Alex Baena; sell Yeray Alvarez; sell Raul Garcia; sell Omar El Hilali; take Aitor Paredes; take Miguel Sierra; take Ramon Terrats; take Robert Navarro; sell Pablo Fornals; take Roberto Fernandez; sell Lucien Agoume; sell Dakonam Djene; take Kike Salas; sell Pepelu",
+ "ping": "field Roberto Fernandez, Aitor Paredes, Miguel Sierra, Robert Navarro, Kike Salas, Ramon Terrats; sell Yeray Alvarez; sell Raul Garcia; sell Omar El Hilali; take Aitor Paredes; take Miguel Sierra; take Ramon Terrats; take Robert Navarro; sell Pablo Fornals; take Roberto Fernandez; sell Lucien Agoume; sell Dakonam Djene; take Kike Salas; sell Pepelu",
  "exposed": [
   {
    "name": "Mathew Ryan",
