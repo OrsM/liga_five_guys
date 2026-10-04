@@ -30,8 +30,7 @@ class Action:
         sold = " + ".join(names.get(k, k) for k in self.sell)
         if self.kind == "sell":
             return "sell %s" % sold
-        return ("%s %s" % ("take" if self.kind == "clause" else "buy",
-                           names.get(self.buy, self.buy))
+        return ("buy %s" % names.get(self.buy, self.buy)
                 + (" · sell %s" % sold if sold else ""))
 
 
@@ -42,7 +41,6 @@ def _selftest() -> None:
     assert Action("buy", buy="X", sell="Y").players == ("X", "Y")
     assert Action("sell", sell="Y").players == ("Y", )
     assert Action("sell", sell="y").label({"y": "Yuri"}) == "sell Yuri"
-    assert Action("clause", buy="x", sell="y").label() == "take x · sell y"
     assert Action("swap", buy="x", sell="y").label({"x": "Xavi"}) \
         == "buy Xavi · sell y"
     print("ffcore.action self-test OK")

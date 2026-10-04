@@ -90,17 +90,13 @@ class Universe:
 
     def acquire(self, k: str) -> Action | None:
         """How you could get him and what it would cost you: a bid for a
-        player on the market, at the premium it takes to win the auction, or
-        a rival's player's release clause, paid as it stands and at once."""
+        player on the market, at the premium it takes to win the auction.
+        Never a rival's player by his clause: you do not shoot first."""
         m = self.market
         owner = m.owner.get(k)
-        if k in self.mine:
+        if k in self.mine or (owner and owner != self.me) or k not in m.price:
             return None
-        if (not owner or owner == self.me) and k in m.price:
-            return Action("buy", buy=k, cost=m.price[k] * m.premium)
-        if owner and owner != self.me and k in m.clause:
-            return Action("clause", buy=k, cost=m.clause[k])
-        return None
+        return Action("buy", buy=k, cost=m.price[k] * m.premium)
 
     def after(self, *acts: Action) -> Universe:
         """The league once these moves are made."""
@@ -140,7 +136,7 @@ class Universe:
         m = self.market
         out = [Action("sell", sell=(s, ), proceeds=m.fetches(s))
                for s in fieldable_spares(self)]
-        return out + [self.acquire(k) for k in sorted(m.price.keys() | m.clause.keys())
+        return out + [self.acquire(k) for k in sorted(m.price)
                       if self.why_not(k) is None]
 
     def why_not(self, k: str) -> str | None:
@@ -148,7 +144,7 @@ class Universe:
         a = self.acquire(k)
         if a is None:
             owner = self.market.owner.get(k)
-            return ("%s's player, and his clause cannot be paid now" % owner if owner
+            return ("%s's player" % owner if owner and owner != self.me
                     else "nobody's, and not on the market now")
         if self.points(a) <= 0:
             return "worth nothing at a glance: %s %+.1f points over whoever plays instead" % (
@@ -324,9 +320,6 @@ def fieldable_spares(u) -> list[str]:
 def apply(u, *acts: Action) -> dict[str, dict[str, str]]:
     sq = {m: dict(s) for m, s in u.state.squads.items()}
     sq[u.me] = u.squad_after(*acts)
-    for a in acts:
-        if a.kind == "clause":
-            sq.get(u.market.owner.get(a.buy), {}).pop(a.buy, None)
     return {m: phantom_topup(s) for m, s in sq.items()}
 
 
@@ -372,20 +365,16 @@ def _selftest() -> None:
     assert u.why_not("star") is None
     assert u.why_not("dud").startswith("worth nothing at a glance: buy dud "), u.why_not("dud")
     assert u.why_not("nobody") == "nobody's, and not on the market now"
-    assert u.why_not("th_m1") == "riv's player, and his clause cannot be paid now"
+    assert u.why_not("th_m1") == "riv's player"
 
     acts = u.candidates()
     assert not any(a.buy == "th_m1" for a in acts), "a rival's player is not for sale"
     open_th = replace(u, market=replace(u.market, clause={"th_m1": 5e6}))
-    took = [a for a in open_th.candidates() if a.buy == "th_m1"]
-    assert took and all(a.kind == "clause" and a.cost == 5e6 for a in took), \
-        "...unless his clause can be paid: then at the clause, at once"
+    assert not any(a.buy == "th_m1" for a in open_th.candidates()), \
+        "not even when his clause can be paid: no clause buys"
     dear = replace(u, market=replace(u.market, premium=1.25))
     assert next(a for a in dear.candidates() if a.buy == "star").cost == 12.5e6, \
         "an auction costs the bid it takes to win"
-    after = apply(open_th, took[0])
-    assert "th_m1" in after["me"] and "th_m1" not in after["riv"], \
-        "a clause moves him out of the rival's squad too"
     sells = {a.sell for a in acts if a.kind == "sell"}
     assert ("me_bench",) in sells and ("me_k",) not in sells, \
         "a spare can be sold; your only keeper cannot"

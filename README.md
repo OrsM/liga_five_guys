@@ -89,9 +89,8 @@ Every forecast is the same product, for every player and jornada, and
   (`ffcore/outlook.py`: expected points and the best eleven, no money) to
   a `Market` (`ffcore/market.py`: names, prices, values, your cash, bids
   and debt, no points). A player comes from the market, at the bid it takes
-  to win the auction, or from a rival by paying his release clause, as it
-  stands and at once (he leaves the rival's squad, who gets the money;
-  only once his protection after his last transfer has ended). Every
+  to win the auction; never from a rival by his release clause (you do
+  not shoot first). Every
   recommendation passes the same four steps, `decide.FUNNEL`, drawn in
   `docs/funnel.mmd`:
   1. **candidates**: every sale of a spare, and every player you could
@@ -134,7 +133,8 @@ is in the code only if the feed does not already say it and it changes
 which move wins.
 
 - **Clauses are paid at once, with no approval, and the money goes to the
-  owner.** Modelled (`decide.apply`). The feed records any move between
+  owner.** The board never pays one; it lists your players a rival can
+  take now (`decide.at_risk`). The feed records any move between
   two managers alike, clause or accepted offer ("transfer"); every raid
   in it paid exactly the clause the feed showed.
 - **A clause defaults to purchase price +50%, market value if higher, 1M
@@ -151,14 +151,13 @@ which move wins.
   capped at 20% of team value.** Enforced by the plan (`decide.raised`:
   the same rule that keeps a buy within your cash) and by the app (bids).
   Not modelled for rivals: the simulated seasons ignore every manager's
-  cash, so a rival below zero at the lock still scores, and a clause you
-  pay a rival in debt is not counted as helping him.
+  cash, so a rival below zero at the lock still scores.
 - **Raising a clause costs half the raise** (1M pays for +2M). Not modelled:
   the board lists who is at risk, not what protecting them would cost.
 - **Blindaje:** one player per matchday is shielded from clauses for 24h
   (48h in premium leagues). Turned on between matchdays, free. Not modelled,
-  and the feed does not show shields: a clause the board suggests may be
-  blocked, which is why it keeps backups.
+  and the feed does not show shields: a player listed at risk may be
+  shielded.
 
 Sources: LaLiga Fantasy help ([clauses](https://laligafantasy.zendesk.com/hc/en-us/articles/360025683593-How-are-release-clauses-set),
 [rulebook](https://laligafantasy.zendesk.com/hc/en-us/articles/360025679853-Rulebook),

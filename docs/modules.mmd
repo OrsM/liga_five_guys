@@ -4,11 +4,11 @@ flowchart LR
     subgraph stages["Stages (src/)"]
         assemble["assemble 168<br/>in 2 · out 17"]:::hub
         crosswalk["crosswalk 157"]
-        decide["decide 577"]
+        decide["decide 587"]
         grading["grading 248"]
         ingest["ingest 758"]
         run["run 82"]
-        sim["sim 247"]
+        sim["sim 245"]
     end
     subgraph fetch["Fetch and parse"]
         auth["auth 247"]
@@ -28,7 +28,7 @@ flowchart LR
         tidy["tidy 353<br/>in 10 · out 2"]:::hub
     end
     subgraph model["Model"]
-        action["action 52"]
+        action["action 50"]
         fixture["fixture 169"]
         forecast["forecast 50"]
         market["market 182"]
@@ -146,7 +146,6 @@ flowchart LR
     sim --> clock
     sim --> jornadas
     sim --> league
-    sim --> pricing
     sim --> render
     sim --> tidy
     sources --> footballdata

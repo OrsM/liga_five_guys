@@ -201,7 +201,7 @@ def _selftest() -> None:
         else:
             assert said == "3/4 verdict: " + verdict(r), said
     assert not_offered(u, "cand_rival") == \
-        "1/4 candidates: riv's player, and his clause cannot be paid now"
+        "1/4 candidates: riv's player"
     assert not_offered(u, "nobody") == "1/4 candidates: nobody's, and not on the market now"
     assert not_offered(u, "cand_free") == ""
     print("ask self-test OK")

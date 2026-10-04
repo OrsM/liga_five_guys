@@ -32,9 +32,7 @@ def player(m, k) -> dict:
 
 def buy_row(m, r) -> dict:
     a = r.action
-    by_clause = a.kind == "clause"
     return {**player(m, a.buy), "ask": m.price.get(a.buy, a.cost), "bid": a.cost,
-            "clause_from": m.owner.get(a.buy) if by_clause else None,
             "gain": r.d_pts, "per_million": r.per_million,
             "chance": round(r.p_better, 3),
             "trend": m.trend.get(a.buy),
