@@ -9,7 +9,6 @@ from ffcore.league import app_fielded
 from ffcore.render import title_name
 from ffcore.clock import run_now
 from ffcore.jornadas import load_deadline
-from ffcore.pricing import BID_BEATS
 from ffcore.tidy import REPORTS
 
 __all__ = ["report"]
@@ -50,7 +49,7 @@ def sell_row(m, r, k) -> dict:
     million."""
     take = m.takes(k)
     return {**player(m, k), "proceeds": m.fetches(k), "offer": m.offer.get(k),
-            "take": take, "per_million": -r.per_million,
+            "take": take, "per_million": r.per_million,
             "done": m.route.get(k) == "listed" and not take}
 
 
@@ -65,7 +64,7 @@ def holding(u, b, k) -> dict:
             "start": o.next_up.get(k, (0.0, 0.0))[1], "next": exp.get(k, 0.0),
             "season": o.season.get(k, 0.0), "value": m.value.get(k),
             "trend": m.trend.get(k), "paid": m.paid.get(k),
-            "per_million": sale and -sale.per_million,
+            "per_million": sale and sale.per_million,
             "offer": m.offer.get(k)}
 
 
@@ -76,32 +75,23 @@ def exposed(u) -> list[dict]:
             for k, by in at_risk(u)]
 
 
-def ping(todo: list[dict]) -> str:
-    said = {"field": lambda d: "Field " + ", ".join(d["on"]),
-            "buy": lambda d: ("Take %s from %s (clause %.1fM)" % (
-                d["name"], d["clause_from"], d["bid"] / 1e6)
-                if d.get("clause_from") else "Buy %s (bid up to %.1fM)" % (
-                d["name"], d["bid"] / 1e6)),
-            "sell": lambda d: ("Accept the offer for %s (%.1fM)" % (
-                d["name"], d["offer"] / 1e6) if d.get("take") else "Sell " + d["name"])}
-    return "; ".join(said[d["what"]](d) for d in todo if not d.get("done"))
-
-
 def report(u, b, chg, lock_at=None) -> dict:
     """The board as the phone shows it; every choice in it is decide.board's."""
     o, m, mine, base = u.outlook, u.market, u.mine, b.base
     exp, xi = o.xi
     todo = []
     if chg["in"] or chg["out"]:
-        todo.append({"what": "field", "legal": chg["legal"],
+        todo.append({"what": "field", "label": "field " + ", ".join(
+                         player(m, k)["name"] for k in chg["in"]), "legal": chg["legal"],
                      "on": [player(m, k)["name"] for k in chg["in"]],
                      "off": [player(m, k)["name"] for k in chg["out"]],
                      "gain": (sum(exp.get(k, 0.0) for k in chg["in"])
                               - sum(exp.get(k, 0.0) for k in chg["out"]))
                      if chg["legal"] else None})
-    todo += [row for r in b.plan for row in (
-        [{"what": "buy", **buy_row(m, r)}] if r.action.buy else
-        [{"what": "sell", **sell_row(m, r, k)} for k in r.action.sell])]
+    names = {k: player(m, k)["name"] for k in m.name}
+    todo += [{"what": "buy" if r.action.buy else "sell", "label": r.action.label(names),
+              **(buy_row(m, r) if r.action.buy else sell_row(m, r, r.action.sell[0]))}
+             for r in b.plan]
     backup = [buy_row(m, r) for r in b.others][:BACKUPS]
     lo, hi = base.band(u.me)
     return {
@@ -111,8 +101,9 @@ def report(u, b, chg, lock_at=None) -> dict:
         "finish": round(base.expected_position(), 2),
         "p_win": round(base.position().get(1, 0.0), 3),
         "band": [lo, hi],
-        "do": todo, "plan_gain": b.gain, "backup": backup, "ping": ping(todo),
-        "bid_beats": BID_BEATS, "confidence": CONFIDENCE,
+        "do": todo, "plan_gain": b.gain, "backup": backup,
+        "cash_after": m.left([r.action for r in b.plan]),
+        "ping": "; ".join(d["label"] for d in todo if not d.get("done")),
         "exposed": exposed(u),
         "squad": [holding(u, b, k) for k in sorted(
             mine, key=lambda k: (SLOT_ORDER.get(mine[k], 9), -exp.get(k, 0.0)))],
@@ -174,7 +165,7 @@ def _selftest() -> None:
     assert [d["what"] for d in doc["do"]][:1] == ["field"], doc["do"]
     assert {d["name"].lower() for d in doc["do"] if d["what"] == "buy"} == set(bought)
     assert all(b["name"].lower() not in bought for b in doc["backup"])
-    assert doc["confidence"] == CONFIDENCE
+    assert doc["cash_after"] == ub.market.left([r.action for r in b.plan])
     rich = replace(ub, rival_cash={"riv": 25e6},
                    market=replace(ub.market, clause={"star": 20e6, "dead": 30e6}))
     assert [(e["name"].lower(), e["by"]) for e in exposed(rich)] == [("star", ["riv"])], \
@@ -187,13 +178,9 @@ def _selftest() -> None:
     assert doc["standings"][[r["me"] for r in doc["standings"]].index(True)][
         "p_above"] is None
     json.dumps(doc)
-    assert ping([{"what": "field", "on": ["A", "B"]},
-                 {"what": "buy", "name": "C", "bid": 12.34e6},
-                 {"what": "sell", "name": "E"}]) == (
-        "Field A, B; Buy C (bid up to 12.3M); Sell E")
-    assert ping([]) == ""
-    assert ping([{"what": "buy", "name": "C", "bid": 1e6, "done": True},
-                 {"what": "sell", "name": "E", "done": False}]) == "Sell E"
+    assert doc["ping"] == "; ".join(d["label"] for d in doc["do"]), \
+        "the ping is each move's Action.label, not words of its own"
+    assert doc["do"][0]["label"].startswith("field ")
 
     ub = replace(ub, market=replace(ub.market, my_bid={bought[0]: 4e6},
                                     route={"dead": "listed"}))
@@ -216,11 +203,12 @@ def _selftest() -> None:
                 doc["ping"].split("; ")[-1])
     (take, said), (wait, quiet) = sale(1.1e6), sale(0.9e6)
     assert take["take"] and not take["done"] and take["offer"] == take["proceeds"] == 1.1e6
-    assert said == "Accept the offer for Dead (1.1M)", said
+    assert said == "sell dead", said
     assert not wait["take"] and wait["done"] and wait["proceeds"] > wait["offer"] == 0.9e6, \
         "waiting: the sale raises what waiting is worth"
     assert "Dead" not in quiet, quiet
-    assert set(take) == {"what", "name", "pos", "proceeds", "offer", "take", "per_million", "done"}
+    assert set(take) == {"what", "label", "name", "pos", "proceeds", "offer", "take",
+                         "per_million", "done"}
 
     print("sim self-test OK")
 

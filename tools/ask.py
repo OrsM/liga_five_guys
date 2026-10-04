@@ -64,8 +64,7 @@ def fate(u, b, r) -> str:
     """Where a ranked move stopped: at verdict, or at plan and why. The plan
     last tried every move it left out against all of itself."""
     if r in b.plan:
-        return step(plan, "in the plan" if r.action.buy else
-                    "in the plan, raising cash it needs")
+        return step(plan, "in the plan")
     if (no := verdict(r)) is not None:
         return step(verdict, no)
     return step(plan, "clears the bar, left out: %s" % (
@@ -80,7 +79,7 @@ def why(u, k: str) -> None:
                  for f in ("paid", "value")}
         print("yours: paid {paid}, worth {value}".format(**shown)
               + ", %+.0f%% expected" % (h["trend"] or 0.0)
-              + (", selling costs %.2f points a million" % h["per_million"]
+              + (", selling him %+.2f pts/M" % h["per_million"]
                  if h["per_million"] is not None else ""))
         print("Selling him alone: " + (show(u, sale) + "\n  " + fate(u, b, sale)
               if sale else "not ranked (your side cannot be fielded without him)"))
@@ -196,8 +195,7 @@ def _selftest() -> None:
     for r in b.rows:
         said = fate(u, b, r)
         if r in b.plan:
-            assert said == ("4/4 plan: in the plan" if r.action.buy else
-                            "4/4 plan: in the plan, raising cash it needs"), said
+            assert said == "4/4 plan: in the plan", said
         elif verdict(r) is None:
             assert said.startswith("4/4 plan: clears the bar, left out: "), said
         else:
