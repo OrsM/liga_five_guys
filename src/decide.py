@@ -102,6 +102,11 @@ class Universe:
             return Action("clause", buy=k, cost=m.clause[k])
         return None
 
+    def after(self, *acts: Action) -> Universe:
+        """The league once these moves are made."""
+        return replace(self, state=replace(self.state, squads=apply(self, *acts)),
+                       _means={})
+
     def squad_after(self, *acts: Action) -> dict[str, str]:
         sq = dict(self.mine)
         for a in acts:
@@ -576,6 +581,8 @@ def _selftest() -> None:
     got = sorted(r.action.label() for r in board(star).plan)
     assert got == ["buy ace", "sell star"], ("the sale that clears a debt pays for a buy too", got)
     rows = star.rank(star.candidates()).rows
+    sold = star.after(Action("sell", sell=("star",)))
+    assert "star" not in sold.mine and "star" in star.mine and "star" not in sold.outlook.xi.players
     sale, ace = (next(r for r in rows if r.action.label() == x) for x in ("sell star", "buy ace"))
     assert raised(star, [sale], rows) == [sale]
     assert raised(star, [sale, sale], rows) is None, "a player is in one move at most"

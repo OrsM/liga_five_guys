@@ -49,7 +49,7 @@ def sell_row(m, r, k) -> dict:
     million."""
     take = m.takes(k)
     return {**player(m, k), "proceeds": m.fetches(k), "offer": m.offer.get(k),
-            "take": take, "per_million": r.per_million,
+            "take": take, "gain": r.d_pts, "per_million": r.per_million,
             "done": m.route.get(k) == "listed" and not take}
 
 
@@ -75,17 +75,23 @@ def exposed(u) -> list[dict]:
             for k, by in at_risk(u)]
 
 
-def report(u, b, chg, lock_at=None) -> dict:
-    """The board as the phone shows it; every choice in it is decide.board's."""
+def report(u, b, fielded: list[str], lock_at=None) -> dict:
+    """The board as the phone shows it; every choice in it is decide.board's.
+    The line-up is the plan's: the best eleven once its moves are made,
+    against the one fielded now."""
     o, m, mine, base = u.outlook, u.market, u.mine, b.base
     exp, xi = o.xi
+    plan_xi = u.after(*(r.action for r in b.plan)).outlook.xi
+    then = plan_xi.expected
+    chg = xi_change(fielded, plan_xi.ranked())
+    sold = {k for r in b.plan for k in r.action.sell}
     todo = []
     if chg["in"] or chg["out"]:
         todo.append({"what": "field", "label": "field " + ", ".join(
                          player(m, k)["name"] for k in chg["in"]), "legal": chg["legal"],
                      "on": [player(m, k)["name"] for k in chg["in"]],
-                     "off": [player(m, k)["name"] for k in chg["out"]],
-                     "gain": (sum(exp.get(k, 0.0) for k in chg["in"])
+                     "off": [player(m, k)["name"] for k in chg["out"] if k not in sold],
+                     "gain": (sum(then.get(k, 0.0) for k in chg["in"])
                               - sum(exp.get(k, 0.0) for k in chg["out"]))
                      if chg["legal"] else None})
     names = {k: player(m, k)["name"] for k in m.name}
@@ -161,7 +167,16 @@ def _selftest() -> None:
     assert b.gain >= max(r.d_pts for r in b.plan) - 5.0, (b.gain, b.plan)
     assert all(r not in b.plan and verdict(r) is None for r in b.others)
 
-    doc = report(ub, b, xi_change([], ub.outlook.xi.ranked()))
+    doc = report(ub, b, [])
+    after = ub.after(*(r.action for r in b.plan))
+    field = doc["do"][0]
+    sold = {k for r in b.plan for k in r.action.sell}
+    assert field["what"] == "field" and set(field["on"]) == {
+        player(ub.market, k)["name"] for k in after.outlook.xi.ranked()}, \
+        "the line-up is the plan's: the squad after its moves"
+    assert not {player(ub.market, k)["name"] for k in sold} & set(field["on"] + field["off"]), \
+        "a sold player is neither fielded nor benched"
+    assert all("gain" in d for d in doc["do"]), "every move says its points"
     assert [d["what"] for d in doc["do"]][:1] == ["field"], doc["do"]
     assert {d["name"].lower() for d in doc["do"] if d["what"] == "buy"} == set(bought)
     assert all(b["name"].lower() not in bought for b in doc["backup"])
@@ -185,8 +200,7 @@ def _selftest() -> None:
     ub = replace(ub, market=replace(ub.market, my_bid={bought[0]: 4e6},
                                     route={"dead": "listed"}))
     sell_dead = Move(Action("sell", sell=("dead",), proceeds=1e6), 0.5, p_better=0.8)
-    doc = report(ub, b._replace(plan=b.plan + [sell_dead]),
-                 xi_change([], ub.outlook.xi.ranked()))
+    doc = report(ub, b._replace(plan=b.plan + [sell_dead]), [])
     buys = {d["name"].lower(): d for d in doc["do"] if d["what"] == "buy"}
     assert buys[bought[0]]["done"] and buys[bought[0]]["placed"] == 4e6, buys
     assert all(not d["done"] and d["placed"] is None
@@ -197,8 +211,7 @@ def _selftest() -> None:
     def sale(offer):
         mk = replace(ub.market, offer={"dead": offer}, nights_left=2,
                      offer_ratios=(0.9, 1.0, 1.0, 1.1))
-        doc = report(replace(ub, market=mk), b._replace(plan=[sell_dead]),
-                     xi_change([], ub.outlook.xi.ranked()))
+        doc = report(replace(ub, market=mk), b._replace(plan=[sell_dead]), [])
         return (next(d for d in doc["do"] if d["what"] == "sell"),
                 doc["ping"].split("; ")[-1])
     (take, said), (wait, quiet) = sale(1.1e6), sale(0.9e6)
@@ -208,7 +221,7 @@ def _selftest() -> None:
         "waiting: the sale raises what waiting is worth"
     assert "Dead" not in quiet, quiet
     assert set(take) == {"what", "label", "name", "pos", "proceeds", "offer", "take",
-                         "per_million", "done"}
+                         "gain", "per_million", "done"}
 
     print("sim self-test OK")
 
@@ -220,10 +233,9 @@ def main() -> None:
               % (len(u.state.squads), len(u.state.jornadas)))
         return
     b = board(u)
-    chg = xi_change(app_fielded(u.mine, u.market.name), u.outlook.xi.ranked())
     REPORTS.mkdir(exist_ok=True)
     (REPORTS / "decisions.json").write_text(json.dumps(
-        report(u, b, chg, load_deadline()),
+        report(u, b, app_fielded(u.mine, u.market.name), load_deadline()),
         ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
     print("wrote %s" % (REPORTS / "decisions.json"))
 
