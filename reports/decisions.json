@@ -1,5 +1,5 @@
 {
- "generated_at": "2026-10-04T09:25Z",
+ "generated_at": "2026-10-04T09:34Z",
  "lock_at": "2026-10-09T19:00:00+00:00",
  "cash": -56530263.0,
  "cash_locked": 0,
@@ -26,11 +26,9 @@
    "name": "Yeray Alvarez",
    "pos": "DEF",
    "proceeds": 5170747.0,
-   "per_million": 0.44659967799432215,
    "offer": null,
-   "offer_odds": null,
-   "waiting": null,
    "take": false,
+   "per_million": 0.44659967799432215,
    "done": false
   },
   {
@@ -38,11 +36,9 @@
    "name": "Raul Garcia",
    "pos": "DEL",
    "proceeds": 1186454.0,
-   "per_million": 0.6430875516222282,
    "offer": null,
-   "offer_odds": null,
-   "waiting": null,
    "take": false,
+   "per_million": 0.6430875516222282,
    "done": false
   },
   {
@@ -50,26 +46,19 @@
    "name": "Omar El Hilali",
    "pos": "DEF",
    "proceeds": 18154207.0,
-   "per_million": 0.6517423116653464,
    "offer": null,
-   "offer_odds": null,
-   "waiting": null,
    "take": false,
+   "per_million": 0.6517423116653464,
    "done": false
   },
   {
    "what": "sell",
    "name": "Alex Baena",
    "pos": "MED",
-   "proceeds": 87423063.0,
-   "per_million": 0.7961629455563008,
+   "proceeds": 91516019.1534396,
    "offer": 87423063.0,
-   "offer_odds": [
-    0.68,
-    0.9716824
-   ],
-   "waiting": 91516019.1534396,
    "take": false,
+   "per_million": 0.7605554086758816,
    "done": true
   },
   {
@@ -133,11 +122,9 @@
    "name": "Pablo Fornals",
    "pos": "MED",
    "proceeds": 37558140.0,
-   "per_million": 0.9703561642054824,
    "offer": null,
-   "offer_odds": null,
-   "waiting": null,
    "take": false,
+   "per_million": 0.9703561642054824,
    "done": false
   },
   {
@@ -159,11 +146,9 @@
    "name": "Lucien Agoume",
    "pos": "MED",
    "proceeds": 15882070.0,
-   "per_million": 0.9846190647088022,
    "offer": null,
-   "offer_odds": null,
-   "waiting": null,
    "take": false,
+   "per_million": 0.9846190647088022,
    "done": false
   },
   {
@@ -171,11 +156,9 @@
    "name": "Dakonam Djene",
    "pos": "DEF",
    "proceeds": 23755919.0,
-   "per_million": 1.0237773410276798,
    "offer": null,
-   "offer_odds": null,
-   "waiting": null,
    "take": false,
+   "per_million": 1.0237773410276798,
    "done": false
   },
   {
@@ -197,11 +180,9 @@
    "name": "Pepelu",
    "pos": "MED",
    "proceeds": 15208926.0,
-   "per_million": 1.0954923000078591,
    "offer": null,
-   "offer_odds": null,
-   "waiting": null,
    "take": false,
+   "per_million": 1.0954923000078591,
    "done": false
   }
  ],
@@ -373,8 +354,7 @@
    "trend": -6.728699153134167,
    "paid": 21511188.0,
    "per_million": null,
-   "offer": null,
-   "offer_odds": null
+   "offer": null
   },
   {
    "name": "Natan",
@@ -387,8 +367,7 @@
    "trend": 18.333296232642894,
    "paid": 37492727.0,
    "per_million": 1.1020217583411602,
-   "offer": null,
-   "offer_odds": null
+   "offer": null
   },
   {
    "name": "Marcos Alonso",
@@ -401,8 +380,7 @@
    "trend": -12.984320891785773,
    "paid": 28589508.0,
    "per_million": 1.5298748715639026,
-   "offer": null,
-   "offer_odds": null
+   "offer": null
   },
   {
    "name": "Omar El Hilali",
@@ -415,8 +393,7 @@
    "trend": 11.150921669773698,
    "paid": null,
    "per_million": 0.6517423116653464,
-   "offer": null,
-   "offer_odds": null
+   "offer": null
   },
   {
    "name": "Yeray Alvarez",
@@ -429,8 +406,7 @@
    "trend": -16.129945413003437,
    "paid": 6931556.0,
    "per_million": 0.44659967799432215,
-   "offer": null,
-   "offer_odds": null
+   "offer": null
   },
   {
    "name": "Zaid Romero",
@@ -443,8 +419,7 @@
    "trend": 13.645074917931248,
    "paid": 28662117.0,
    "per_million": 1.8972936095953759,
-   "offer": null,
-   "offer_odds": null
+   "offer": null
   },
   {
    "name": "Dakonam Djene",
@@ -457,8 +432,7 @@
    "trend": 8.180150756093608,
    "paid": 16059124.0,
    "per_million": 1.0237773410276798,
-   "offer": null,
-   "offer_odds": null
+   "offer": null
   },
   {
    "name": "Alex Baena",
@@ -470,12 +444,8 @@
    "value": 83977860.0,
    "trend": 12.894131241485182,
    "paid": 81201189.0,
-   "per_million": 0.7961629455563008,
-   "offer": 87423063.0,
-   "offer_odds": [
-    0.68,
-    0.9716824
-   ]
+   "per_million": 0.7605554086758816,
+   "offer": 87423063.0
   },
   {
    "name": "Pablo Fornals",
@@ -488,8 +458,7 @@
    "trend": -1.553104349881949,
    "paid": 58220110.0,
    "per_million": 0.9703561642054824,
-   "offer": null,
-   "offer_odds": null
+   "offer": null
   },
   {
    "name": "Lucien Agoume",
@@ -502,8 +471,7 @@
    "trend": 11.20075194882821,
    "paid": 5891526.0,
    "per_million": 0.9846190647088022,
-   "offer": null,
-   "offer_odds": null
+   "offer": null
   },
   {
    "name": "German Valera",
@@ -515,12 +483,8 @@
    "value": 13600875.0,
    "trend": 1.6183776204127283,
    "paid": 13966262.0,
-   "per_million": 1.1854314456420976,
-   "offer": 14239424.0,
-   "offer_odds": [
-    0.76,
-    0.8328668800000001
-   ]
+   "per_million": 1.1736808979724151,
+   "offer": 14239424.0
   },
   {
    "name": "Pepelu",
@@ -533,8 +497,7 @@
    "trend": 14.4108047908302,
    "paid": null,
    "per_million": 1.0954923000078591,
-   "offer": null,
-   "offer_odds": null
+   "offer": null
   },
   {
    "name": "Miguel Roman",
@@ -547,11 +510,7 @@
    "trend": -18.892786702185838,
    "paid": 5307217.0,
    "per_million": 2.3078539323008833,
-   "offer": 19949634.0,
-   "offer_odds": [
-    0.56,
-    0.5576319999999999
-   ]
+   "offer": 19949634.0
   },
   {
    "name": "Iñigo Vicente",
@@ -564,8 +523,7 @@
    "trend": -9.306434664763025,
    "paid": null,
    "per_million": 1.7625141690112658,
-   "offer": null,
-   "offer_odds": null
+   "offer": null
   },
   {
    "name": "Raul Garcia",
@@ -578,8 +536,7 @@
    "trend": -12.368905394513309,
    "paid": 1451398.0,
    "per_million": 0.6430875516222282,
-   "offer": null,
-   "offer_odds": null
+   "offer": null
   }
  ],
  "standings": [
