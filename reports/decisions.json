@@ -1,5 +1,5 @@
 {
- "generated_at": "2026-10-04T13:47Z",
+ "generated_at": "2026-10-04T19:45Z",
  "lock_at": "2026-10-09T19:00:00+00:00",
  "cash": 30892800.0,
  "cash_locked": 35961566.0,
@@ -46,7 +46,7 @@
    "take": false,
    "gain": -0.9947173948469299,
    "per_million": -0.8383952473900631,
-   "done": false
+   "done": true
   },
   {
    "what": "sell",
@@ -58,7 +58,7 @@
    "take": false,
    "gain": -15.81805592092428,
    "per_million": -0.8713162696076056,
-   "done": false
+   "done": true
   },
   {
    "what": "buy",
@@ -96,7 +96,7 @@
    "take": false,
    "gain": -51.42686640862394,
    "per_million": -1.3692602032109134,
-   "done": false
+   "done": true
   }
  ],
  "plan_gain": 43.57001392299412,
@@ -115,7 +115,7 @@
   }
  ],
  "cash_after": 13733686.622084193,
- "ping": "field Carlos Soler, Angel Perez, Dakonam Djene; sell Raul Garcia; sell Omar El Hilali; buy Carlos Soler; sell Pablo Fornals",
+ "ping": "field Carlos Soler, Angel Perez, Dakonam Djene; buy Carlos Soler",
  "exposed": [
   {
    "name": "Mathew Ryan",
@@ -426,9 +426,9 @@
    "manager": "Albert Laporta",
    "me": false,
    "now": 272.0,
-   "mean": 2052.3875316090725,
-   "lo": 1875.6082703849322,
-   "hi": 2231.922838481035,
+   "mean": 2052.516622294574,
+   "lo": 1876.0540488896484,
+   "hi": 2232.2910128430917,
    "cash": -94645666.0,
    "p_above": 0.33066666666666666
   },
