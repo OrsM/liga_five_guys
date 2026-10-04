@@ -6,7 +6,6 @@ from __future__ import annotations
 
 from datetime import datetime
 from functools import cache
-from statistics import median
 
 from decide import Universe, _fieldable
 from ffcore.clock import run_now
@@ -18,7 +17,7 @@ from ffcore.market import Market, market_routes, pending
 from ffcore.parse import num, ratio, text
 from ffcore.players import load_crosswalk, load_players
 from ffcore.points import scored
-from ffcore.pricing import (PRICE_WINDOW, Momentum, auction_ratios, offer_ratios,
+from ffcore.pricing import (Momentum, auction_ratios, offer_ratios,
                             premium_to_beat, steps)
 from ffcore.schedule import expectations, phantom_fill
 from ffcore.score import fit_promoted_discount, per_jornada_current, Scorer, totals
@@ -26,14 +25,12 @@ from ffcore.rules import SLOT
 from ffcore.season import LeagueState
 from ffcore.startprob import (StartOdds, calibrate, fit_availability,
                               last_fit_listing, outcomes)
-from ffcore.tidy import (DECISIONS, LINEUP_SOURCE, SEASON, age_hours, current,
+from ffcore.tidy import (LINEUP_SOURCE, SEASON, age_hours, current,
                          history, read_csv)
 
-__all__ = ["universe", "scorer", "fixture_ratings", "cash_price_history",
-           "PRICE_LOG", "APP_FRESH_HOURS"]
+__all__ = ["universe", "scorer", "fixture_ratings", "APP_FRESH_HOURS"]
 
 APP_FRESH_HOURS = 14.4
-PRICE_LOG = "cash_price_log.csv"
 
 
 def scorer(market: list[dict], xi_rows: list[dict]) -> Scorer:
@@ -85,14 +82,6 @@ def _pos_of(raw: str) -> str:
     if mapped:
         return mapped
     return raw if raw in ("POR", "DEF", "MED", "DEL") else "MED"
-
-
-def cash_price_history() -> float | None:
-    """The median of the last PRICE_WINDOW measures up to now."""
-    now = run_now().strftime("%Y-%m-%dT%H%MZ")
-    seen = [x for r in read_csv(DECISIONS / PRICE_LOG) if r["measured_at"] <= now
-            and (x := num(r, "places_per_million")) is not None]
-    return median(seen[-PRICE_WINDOW:]) if seen else None
 
 
 def _nights_left(offers: list[dict]) -> int:
@@ -148,7 +137,7 @@ def universe() -> Universe:
         sc, fixture_ratings(mkt_rows), set(price).union(*squads.values()), m)
     prices = Momentum(steps(history("market")))
     market = Market(
-        cash=lg.cash[me], lam=cash_price_history(), premium=_premium(me),
+        cash=lg.cash[me], premium=_premium(me),
         name={k: rec.get("name") or k for k, rec in players.items()},
         pos=pos,
         price={k: v for k, v in price.items() if k in players},

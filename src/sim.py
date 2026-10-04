@@ -3,14 +3,14 @@ from __future__ import annotations
 import json
 import sys
 
-from assemble import PRICE_LOG, universe
+from assemble import universe
 from decide import CONFIDENCE, at_risk, board, verdict
 from ffcore.league import app_fielded
 from ffcore.render import title_name
 from ffcore.clock import run_now
 from ffcore.jornadas import load_deadline
 from ffcore.pricing import BID_BEATS
-from ffcore.tidy import DECISIONS, REPORTS, log_row
+from ffcore.tidy import REPORTS
 
 __all__ = ["report"]
 
@@ -27,11 +27,6 @@ def xi_change(marked: list[str], best) -> dict:
             "out": [k for k in marked if k not in want]}
 
 
-def why(r) -> str:
-    return " + ".join(w for w, v in (("points", r.d_pts), ("cash", r.cash_pts))
-                      if v > 0)
-
-
 def player(m, k) -> dict:
     return {"name": title_name(m.name.get(k, k)), "pos": m.pos.get(k, "")}
 
@@ -41,7 +36,7 @@ def buy_row(m, r) -> dict:
     by_clause = a.kind == "clause"
     return {**player(m, a.buy), "ask": m.price.get(a.buy, a.cost), "bid": a.cost,
             "clause_from": m.owner.get(a.buy) if by_clause else None,
-            "gain": r.d_pts, "why": why(r),
+            "gain": r.d_pts, "per_million": r.per_million,
             "chance": round(r.p_better, 3),
             "trend": m.trend.get(a.buy),
             "placed": m.my_bid.get(a.buy),
@@ -49,14 +44,11 @@ def buy_row(m, r) -> dict:
 
 
 def sell_row(m, r, k) -> dict:
-    """A sale in the plan: what it fetches, why (it pays on its own, or the
-    plan needs the cash: below zero at the lock scores nothing), and the
-    offer standing on him: take it tonight, or (done for tonight) wait."""
-    needed = verdict(r) is not None
+    """A sale in the plan, there to pay for its buys or a debt: what it
+    fetches, the points it costs per million, and the offer standing on
+    him: take it tonight, or (done for tonight) wait."""
     take = m.takes(k)
-    return {**player(m, k), "proceeds": m.fetches(k),
-            "why": "needed" if needed else "pays",
-            "chance": None if needed else round(r.p_better, 3),
+    return {**player(m, k), "proceeds": m.fetches(k), "per_million": -r.per_million,
             "offer": m.offer.get(k), "offer_odds": m.offer_odds(k),
             "waiting": m.waiting(k), "take": take,
             "done": m.route.get(k) == "listed" and not take}
@@ -64,9 +56,9 @@ def sell_row(m, r, k) -> dict:
 
 def holding(u, b, k) -> dict:
     """One of your players as the board shows him: how he plays, what he
-    is worth, what he cost, the offer above which selling him gains, and
-    the offer standing, if any: the share of the game's offers it beats
-    and the chance of a better one before the lock."""
+    is worth, what he cost, the points his sale costs per million it
+    raises, and the offer standing, if any: the share of the game's offers
+    it beats and the chance of a better one before the lock."""
     m, o = u.market, u.outlook
     exp, xi = o.xi
     sale = b.sale(k)
@@ -74,7 +66,7 @@ def holding(u, b, k) -> dict:
             "start": o.next_up.get(k, (0.0, 0.0))[1], "next": exp.get(k, 0.0),
             "season": o.season.get(k, 0.0), "value": m.value.get(k),
             "trend": m.trend.get(k), "paid": m.paid.get(k),
-            "sell_above": sale and u.sells_above(sale),
+            "per_million": sale and -sale.per_million,
             "offer": m.offer.get(k), "offer_odds": m.offer_odds(k)}
 
 
@@ -121,7 +113,7 @@ def report(u, b, chg, lock_at=None) -> dict:
         "p_win": round(base.position().get(1, 0.0), 3),
         "band": [lo, hi],
         "do": todo, "plan_gain": b.gain, "backup": backup, "ping": ping(todo),
-        "bid_beats": BID_BEATS, "confidence": CONFIDENCE, "cash_price": m.lam,
+        "bid_beats": BID_BEATS, "confidence": CONFIDENCE,
         "exposed": exposed(u),
         "squad": [holding(u, b, k) for k in sorted(
             mine, key=lambda k: (SLOT_ORDER.get(mine[k], 9), -exp.get(k, 0.0)))],
@@ -135,17 +127,10 @@ def report(u, b, chg, lock_at=None) -> dict:
     }
 
 
-def log_cash_price(measured) -> None:
-    if measured is not None:
-        log_row(DECISIONS / PRICE_LOG,
-                {"measured_at": run_now().strftime("%Y-%m-%dT%H%MZ"),
-                 "places_per_million": "%.6f" % measured})
-
-
 def _selftest() -> None:
     from dataclasses import replace
 
-    from decide import Action, Move, Universe, verdict
+    from decide import Action, Move, Universe
     from ffcore.market import Market
     from ffcore.forecast import Bootstrap
     from ffcore.season import LeagueState
@@ -157,11 +142,6 @@ def _selftest() -> None:
             (best[:10], False, best, [])]:
         got = xi_change(marked, best)
         assert (got["legal"], got["in"], got["out"]) == (legal, ins, outs), got
-
-    for d_pts, cash, want in [(1.0, 0.2, "points + cash"), (-1.0, 0.2, "cash"),
-                              (2.0, -0.1, "points"), (0.0, 0.0, "")]:
-        assert why(Move(Action("buy", buy="x"), d_pts, cash_pts=cash)) == want, (
-            d_pts, cash)
 
     many_j = list(range(1, 11))
     sqb = {"k": "POR", **{f"d{i}": "DEF" for i in range(1, 5)},
@@ -188,7 +168,7 @@ def _selftest() -> None:
     assert sum(p.action.net for p in b.plan) <= ub.market.cash, b.plan
     sold = [k for p in b.plan for k in p.action.sell]
     assert len(sold) == len(set(sold)), sold
-    assert b.gain >= max(r.net_pts for r in b.plan) - 5.0, (b.gain, b.plan)
+    assert b.gain >= max(r.d_pts for r in b.plan) - 5.0, (b.gain, b.plan)
     assert all(r not in b.plan and verdict(r) is None for r in b.others)
 
     doc = report(ub, b, xi_change([], ub.outlook.xi.ranked()))
@@ -196,7 +176,6 @@ def _selftest() -> None:
     assert {d["name"].lower() for d in doc["do"] if d["what"] == "buy"} == set(bought)
     assert all(b["name"].lower() not in bought for b in doc["backup"])
     assert doc["confidence"] == CONFIDENCE
-    assert doc["cash_price"] == ub.market.lam
     rich = replace(ub, rival_cash={"riv": 25e6},
                    market=replace(ub.market, clause={"star": 20e6, "dead": 30e6}))
     assert [(e["name"].lower(), e["by"]) for e in exposed(rich)] == [("star", ["riv"])], \
@@ -252,7 +231,6 @@ def main() -> None:
               % (len(u.state.squads), len(u.state.jornadas)))
         return
     b = board(u)
-    log_cash_price(b.measured)
     chg = xi_change(app_fielded(u.mine, u.market.name), u.outlook.xi.ranked())
     REPORTS.mkdir(exist_ok=True)
     (REPORTS / "decisions.json").write_text(json.dumps(

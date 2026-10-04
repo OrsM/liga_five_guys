@@ -1,7 +1,7 @@
 # liga_five_guys
 
-Advice for a five-manager LaLiga Fantasy league: who to field, who to buy
-for points, for cash or both, and when to sell. Personal use; don't
+Advice for a five-manager LaLiga Fantasy league: who to field, who to buy,
+and who to sell to pay for them. Personal use; don't
 redistribute the scraped data.
 
 ## Where it runs
@@ -97,25 +97,22 @@ Every forecast is the same product, for every player and jornada, and
   recommendation passes the same four steps, `decide.FUNNEL`, drawn in
   `docs/funnel.mmd`:
   1. **candidates**: every sale of a spare, and every player you could
-     get, from your cash, if worth anything at a glance
-     (`Universe.worth`: what it adds to the simulated seasons' average,
-     plus money).
-  2. **rank**: each move against doing nothing, in simulated seasons: the
-     points it adds plus its money at one price, the measured points a
-     million buys (`Market.cash_pts`): a sale earns all it fetches, a buy
-     pays all it costs, and each player's price change over the horizon
-     counts as money fetched when he is sold. Money in a player is not
-     money in hand: it buys nothing until he is sold.
-  3. **verdict**: a gain in the median, cash included, and better off in
-     at least 70% of seasons (`CONFIDENCE`); below that its gain is noise.
+     get, from your cash, if he adds points at a glance (`Universe.points`:
+     what he adds to the simulated seasons' average over whoever would
+     play instead).
+  2. **rank**: each move against doing nothing, in simulated seasons:
+     the points it adds, and per million it spends or raises
+     (`Move.per_million`).
+  3. **verdict**: a gain in the median, and better off in at least 70% of
+     seasons (`CONFIDENCE`); below that its gain is noise.
   4. **plan**: the best set that shares no player and adds to the joint
      gain, built best first and best per million first (one dear move can
      crowd out two cheaper ones that gain more), keeping the set that gains
-     more. The game's one money rule, a balance of at least zero at the
-     lock (below it you score nothing), binds every set the same way,
-     whether a debt or a buy put it below: the ranked sales that cost
-     fewest points a million raise the rest (`decide.raised`). The rest
-     that clear the bar are the backups.
+     more. Money has no price of its own: it only bounds the set, by the
+     game's one money rule, a balance of at least zero at the lock (below
+     it you score nothing). What a debt or a buy leaves below zero is
+     raised by the ranked sales that cost fewest points a million
+     (`decide.raised`). The rest that clear the bar are the backups.
 
   `python tools/ask.py why <player>` names the step a player stopped at,
   `ask.py whatif buy X sell Y` scores a move of your own the same way, and
@@ -126,9 +123,8 @@ Every forecast is the same product, for every player and jornada, and
   once, each event keyed like every other table. Rival cash and the price
   paid (each owned player's last buy or transfer to his owner) are both
   read from it. The
-  board's squad shows it beside his value and the offer above which
-  selling him gains (`Universe.sells_above`: his ranked sale's gain is
-  nil there, a million more fetching lam points).
+  board's squad shows it beside his value and the points his sale costs
+  per million it raises.
 - **Rival cash**: budget plus their sales, bonuses and
   transfer income, less buys and transfer payments, plus the income the feed
   never records (your real balance minus the same sum for you).
@@ -206,5 +202,4 @@ rather than reaching through them; ruff flags reads of private members.
     inputs/         league.ini
     data/raw/       archived pages, append-only
     data/tidy/      tables rebuilt from raw; players.csv is tracked
-    data/decisions/ cash_price_log.csv (points per million, read back)
     reports/        decisions.json, what the phone draws

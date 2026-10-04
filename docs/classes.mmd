@@ -5,16 +5,14 @@ classDiagram
         decide
         +action: Action
         +d_pts: float
-        +cash_pts: float
         +p_better: float
-        +net_pts()
+        +per_million()
     }
     class Ranking {
         <<NamedTuple>>
         decide
         +rows: list~Move~
         +base: Standings
-        +measured: float | None
     }
     class Board {
         <<NamedTuple>>
@@ -23,7 +21,6 @@ classDiagram
         +gain: float
         +rows: list~Move~
         +base: Standings
-        +measured: float | None
         +sale()
         +others()
     }
@@ -44,8 +41,6 @@ classDiagram
         +squad_after()
         +expected()
         +points()
-        +sells_above()
-        +worth()
         +candidates()
         +rank()
     }
@@ -149,14 +144,14 @@ classDiagram
         <<frozen dataclass>>
         ffcore.market
         +cash: float
-        +lam: float | None
         +premium: float
         +name: dict~str str~
         +pos: dict~str str~
         +price: dict~str float~
         +route: dict~str str~
         +owner: dict~str str~
-        ...9 more fields
+        +value: dict~str float~
+        ...8 more fields
         +locked_cash()
         +fetches()
         +offer_odds()
@@ -164,7 +159,6 @@ classDiagram
         +takes()
         +left()
         +short()
-        +cash_pts()
     }
     class XI {
         <<NamedTuple>>

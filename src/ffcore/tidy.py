@@ -12,16 +12,15 @@ from typing import NamedTuple
 from ffcore.clock import on_reset, run_now
 from ffcore.parse import snapshot_stamp
 
-__all__ = ["ROOT", "TIDY", "SEASON", "DECISIONS", "REPORTS", "TABLES", "Table",
+__all__ = ["ROOT", "TIDY", "SEASON", "REPORTS", "TABLES", "Table",
            "current", "history", "age_hours", "table_path", "tables_in",
            "input_path", "read_csv", "write_csv", "append_csv", "widen_csv",
-           "log_row", "csv_string", "mtime_cached", "table_stats",
+           "csv_string", "mtime_cached", "table_stats",
            "LINEUP_SOURCE"]
 
 ROOT = Path(os.environ.get("FF_ROOT", "./data"))
 TIDY = ROOT / "tidy"
 SEASON = ROOT / "season"
-DECISIONS = ROOT / "decisions"
 REPORTS = Path(os.environ.get("LFG_REPORTS", "reports"))
 
 
@@ -118,10 +117,6 @@ def widen_csv(path, fieldnames) -> bool:
     cols = have + [c for c in fieldnames if c not in have]
     write_csv(path, [{c: row.get(c, "") for c in cols} for row in rows], cols)
     return True
-
-
-def log_row(path, row: dict) -> None:
-    append_csv(Path(path), [row], list(row))
 
 
 def append_csv(path, rows, fieldnames=None) -> None:

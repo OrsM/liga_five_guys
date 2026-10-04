@@ -48,9 +48,9 @@ def named(u) -> dict[str, str]:
 
 def show(u, mv) -> str:
     names = named(u)
-    return ("%s: %+.1f points, %+.1f in cash, better off in %.0f%% of seasons"
+    return ("%s: %+.1f points (%+.2f a million), better off in %.0f%% of seasons"
             " (at a glance %+.1f points over whoever plays instead)") % (
-        mv.action.label(names), mv.d_pts, mv.cash_pts, 100 * mv.p_better,
+        mv.action.label(names), mv.d_pts, mv.per_million, 100 * mv.p_better,
         u.points(mv.action))
 
 
@@ -62,11 +62,10 @@ def not_offered(u, k: str) -> str:
         owner = m.owner.get(k)
         return step(Universe.candidates, "%s's player, and his clause cannot be paid now"
                     % owner if owner else "nobody's, and not on the market now")
-    if u.worth(a) > 0:
+    if u.points(a) > 0:
         return ""
     return step(Universe.candidates, "worth nothing at a glance: %s %+.1f points over "
-                "whoever plays instead, %+.1f in cash" % (
-                    a.label(named(u)), u.points(a), m.cash_pts(a)))
+                "whoever plays instead" % (a.label(named(u)), u.points(a)))
 
 
 def fate(u, b, r) -> str:
@@ -87,9 +86,11 @@ def why(u, k: str) -> None:
     if k in u.mine:
         h, sale = holding(u, b, k), b.sale(k)
         shown = {f: "-" if h[f] is None else "%.1fM" % (h[f] / 1e6)
-                 for f in ("paid", "value", "sell_above")}
-        print("yours: paid {paid}, worth {value}, selling pays above {sell_above}".format(**shown)
-              + ", %+.0f%% expected" % (h["trend"] or 0.0))
+                 for f in ("paid", "value")}
+        print("yours: paid {paid}, worth {value}".format(**shown)
+              + ", %+.0f%% expected" % (h["trend"] or 0.0)
+              + (", selling costs %.2f points a million" % h["per_million"]
+                 if h["per_million"] is not None else ""))
         print("Selling him alone: " + (show(u, sale) + "\n  " + fate(u, b, sale)
               if sale else "not ranked (your side cannot be fielded without him)"))
         for p in b.plan:
@@ -203,7 +204,7 @@ def _selftest() -> None:
     from ffcore.fixtures import tiny_market_universe
     from ffcore.forecast import Bootstrap
 
-    u = tiny_market_universe(lam=0.3)
+    u = tiny_market_universe()
     season = list(range(1, 11))
     u = replace(u, state=replace(u.state, jornadas=season), forecaster=Bootstrap(
         {j: dict(u.forecaster.per_jornada[1]) for j in season}))

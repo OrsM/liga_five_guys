@@ -5,9 +5,7 @@
 
 Boards are built at N snapshot times spread over the season, with the
 clock pinned to each, so the check sees sells, line-up changes and swaps
-that any single day may not have. Every build starts from the frozen log,
-because sim appends to decisions/cash_price_log.csv and later runs read it
-back. Freeze and check hash strings differently, so a board that depends
+that any single day may not have. Freeze and check hash strings differently, so a board that depends
 on the order of a set shows up as a difference rather than by luck.
 Everything but generated_at must match exactly.
 """
@@ -22,7 +20,6 @@ import sys
 from pathlib import Path
 
 HOME = Path(os.environ.get("LFG_GOLDEN", Path.home() / ".cache" / "lfg-golden"))
-LOG = Path("decisions") / "cash_price_log.csv"
 
 
 def stamps(n: int) -> list[str]:
@@ -37,7 +34,6 @@ def build(now: str, hash_seed: str) -> dict | None:
     scratch, out = HOME / "scratch", HOME / "out"
     if not scratch.exists():
         shutil.copytree(HOME / "data", scratch, symlinks=True)
-    shutil.copy2(HOME / "data" / LOG, scratch / LOG)
     shutil.rmtree(out, ignore_errors=True)
     out.mkdir(parents=True)
     env = dict(os.environ, PYTHONPATH="src", FF_ROOT=str(scratch),

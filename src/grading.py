@@ -118,7 +118,7 @@ def decisions() -> list[dict]:
                     "pred": change(a, lambda k, j: math.prod(per_j[j].get(k, (0.0, 0.0)))),
                     "real": change(a, lambda k, j: actual.get((k, j), 0.0)),
                     "value_pred": worth(a, lambda k: m.trend.get(k, 0.0)),
-                    "value_real": worth(a, rose), "lam": m.lam})
+                    "value_real": worth(a, rose)})
     finally:
         set_now(None)
         universe.cache_clear()

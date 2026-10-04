@@ -126,28 +126,7 @@ def premium_to_beat(ratios: list[float]) -> float:
     return recent[min(len(recent) - 1, int(BID_BEATS * len(recent)))] if recent else 1.0
 
 
-def cash_price(reach) -> float | None:
-    """Points a million is worth: the best move you cannot afford yet adds
-    so many points over the best you can, and needs so many millions more.
-    reach is (millions over your cash, points) per move."""
-    if len(reach) < 2:
-        return None
-    best_now = max((d for c, d in reach if c <= 0.0), default=None)
-    if best_now is None:
-        return None
-    over, best_any = max(reach, key=lambda cd: (cd[1], -cd[0]))
-    return max(0.0, (best_any - best_now) / (over / 1e6)) if over > 0 else 0.0
-
-
 def _selftest() -> None:
-    flat = [(0.0, 0.40), (5e6, 0.30), (12e6, 0.20)]
-    assert cash_price(flat) == 0.0
-    step = [(0.0, 0.40), (10e6, 0.50)]
-    assert abs(cash_price(step) - 0.10 / 10.0) < 1e-12
-    assert cash_price([]) is None and cash_price([(0.0, 0.4)]) is None
-    assert abs(cash_price([(0.0, 0.40), (4e6, 0.60), (40e6, 0.30)]) - 0.05) < 1e-12, \
-        "the best move money cannot buy yet, not the dearest"
-
     days = ["2026-08-%02d" % d for d in range(10, 30)]
     rows = [{"observed_at": d + "T2359Z", "ff_id": k + str(i),
              "value": str(100 * g ** n)}
