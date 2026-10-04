@@ -44,7 +44,9 @@ class Ranking(NamedTuple):
 
 class Board(NamedTuple):
     """The recommendation: the moves to make and what they gain together,
-    every move ranked, and the season if you do nothing."""
+    every move ranked, and the season if you do nothing. In debt, doing
+    nothing is the sales that clear it (first in plan and rows); the rest
+    is measured from the league after them."""
     plan: list[Move]
     gain: float
     rows: list[Move]
@@ -93,15 +95,14 @@ class Universe:
         player on the market, at the premium it takes to win the auction.
         Never a rival's player by his clause: you do not shoot first."""
         m = self.market
-        owner = m.owner.get(k)
-        if k in self.mine or (owner and owner != self.me) or k not in m.price:
+        if k in m.owner or k not in m.price:
             return None
         return Action("buy", buy=k, cost=m.price[k] * m.premium)
 
     def after(self, *acts: Action) -> Universe:
-        """The league once these moves are made."""
+        """The league once these moves are made, your cash with it."""
         return replace(self, state=replace(self.state, squads=apply(self, *acts)),
-                       _means={})
+                       market=replace(self.market, cash=self.market.left(acts)), _means={})
 
     def squad_after(self, *acts: Action) -> dict[str, str]:
         sq = dict(self.mine)
@@ -144,8 +145,7 @@ class Universe:
         a = self.acquire(k)
         if a is None:
             owner = self.market.owner.get(k)
-            return ("%s's player" % owner if owner and owner != self.me
-                    else "nobody's, and not on the market now")
+            return "%s's player" % owner if owner else "nobody's, and not on the market now"
         if self.points(a) <= 0:
             return "worth nothing at a glance: %s %+.1f points over whoever plays instead" % (
                 a.label(), self.points(a))
@@ -217,8 +217,8 @@ def fill(u, good: list[Move], rows: list[Move], base: Standings,
     """Moves in this order, each taken, with the sales that pay for it,
     if it shares no player with those taken and adds to their joint gain;
     again until none is taken."""
-    picked = raised(u, [], rows) or []
-    gain, grew = joint_gain(u, picked, base) if picked else 0.0, True
+    picked: list[Move] = []
+    gain, grew = 0.0, True
     while grew:
         grew = False
         for r in sorted(good, key=order):
@@ -258,10 +258,16 @@ FUNNEL = (Universe.candidates, Universe.rank, verdict, plan)
 
 
 def board(u) -> Board:
-    """The funnel end to end: what the report shows and ask.py explains."""
+    """The funnel end to end: what the report shows and ask.py explains.
+    Doing nothing must obey the money rule too: in debt, the sales raised
+    clears it with are made first, and every move is measured from there."""
     rows, base = u.rank(u.candidates())
+    forced = raised(u, [], rows) or []
+    if forced:
+        u = u.after(*(r.action for r in forced))
+        rows, base = u.rank(u.candidates())
     picked, gain = plan(u, rows, base)
-    return Board(picked, gain, rows, base)
+    return Board(forced + picked, gain, forced + rows, base)
 
 
 def at_risk(u) -> list[tuple[str, list[str]]]:
@@ -556,9 +562,17 @@ def _selftest() -> None:
                                                              "useful": "MED"},
                                    price=uk.market.price,
                                    value={"idle": 6e6, "useful": 6e6}))
-    got = [r.action.label() for r in board(owing).plan]
+    owed = board(owing)
+    got = [r.action.label() for r in owed.plan]
     assert got == [Action("sell", sell=("idle",)).label()], \
         ("a debt is raised by the sale that costs fewest points a million", got)
+    assert owed.gain == 0.0 and owed.sale("idle") is owed.plan[0], \
+        "measured from the sales the money rule forces, not from a debt you cannot keep"
+    assert owing.after(owed.plan[0].action).market.cash == 1e6, "after a move, its cash too"
+    listed = replace(owing, market=replace(owing.market, owner={"idle": "me"},
+                                           price={**owing.market.price, "idle": 6e6}))
+    assert listed.after(Action("sell", sell=("idle",))).acquire("idle") is None, \
+        "your own listed player is not a buy, sold or not"
     deep = replace(owing, market=replace(owing.market, cash=-8e6))
     assert sorted(s for r in board(deep).plan for s in r.action.sell) == ["idle", "useful"], \
         "whatever it costs"
