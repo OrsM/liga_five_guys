@@ -57,7 +57,7 @@ def show(u, mv) -> str:
 def not_offered(u, k: str) -> str:
     """Why candidates() has no move for him, from the steps it takes."""
     m = u.market
-    a = u.offer(k)
+    a = u.acquire(k)
     if a is None:
         owner = m.owner.get(k)
         return step(Universe.candidates, "%s's player, and his clause cannot be paid now"
@@ -102,7 +102,7 @@ def why(u, k: str) -> None:
         return
     r = next((r for r in b.rows if r.action.buy == k), None)
     if r is None:
-        a = u.offer(k)
+        a = u.acquire(k)
         print(step(Universe.rank, "you cannot pay for him: %.1fM, with %.1fM cash and "
                    "no sales that cover the rest" % (a.cost / 1e6, u.market.cash / 1e6)))
         return
@@ -128,7 +128,7 @@ def whatif(u, words: list[str]) -> None:
         if gone := not_offered(u, k):
             print(gone)
             return
-        a = u.offer(k)
+        a = u.acquire(k)
     if sold:
         a = replace(a, sell=(sold, ), proceeds=m.fetches(sold))
     mv = u.rank([a]).rows[0]

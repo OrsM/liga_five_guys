@@ -44,23 +44,11 @@ class Market:
         return sum(self.my_bid.values())
 
     def fetches(self, k: str) -> float:
-        """What selling him gets now: the offer standing, else his value."""
-        return self.offer.get(k) or self.value.get(k, 0.0)
-
-    def offer_odds(self, k: str) -> tuple[float, float] | None:
-        """How his standing offer compares with the game's recent ones: the
-        share it beats, and the chance that one of the nights' offers still
-        to come before the lock beats it in money (each drawn afresh, over
-        his value that night as his trend has it)."""
-        recent = self.offer_ratios[-PRICE_WINDOW:]
-        offer, value = self.offer.get(k), self.value.get(k)
-        if not offer or not value or not recent:
-            return None
-        none_better = 1.0
-        for night in range(1, self.nights_left + 1):
-            then = self._value_on(k, night)
-            none_better *= sum(x * then <= offer for x in recent) / len(recent)
-        return sum(x * value < offer for x in recent) / len(recent), 1 - none_better
+        """What selling him gets: the offer standing on him or what waiting
+        for a later one is worth, whichever is more; with no offer yet, his
+        value."""
+        return max(self.offer[k], self.waiting(k) or 0.0) if k in self.offer \
+            else self.value.get(k, 0.0)
 
     def _value_on(self, k: str, night: int) -> float:
         done = self.carry[min(night, len(self.carry)) - 1] if self.carry else 1.0
@@ -80,10 +68,8 @@ class Market:
         return later
 
     def takes(self, k: str) -> bool:
-        """Whether a sale should take his standing offer tonight: it is at
-        least what waiting for a later one is worth."""
-        wait = self.waiting(k)
-        return wait is not None and self.offer[k] >= wait
+        """Whether a sale takes his standing offer tonight rather than wait."""
+        return k in self.offer and self.fetches(k) == self.offer[k]
 
     def left(self, acts=()) -> float:
         """Your cash once these moves are made."""
@@ -122,11 +108,8 @@ def pending(rows, status_field: str, money_field: str) -> dict[str, float]:
 def _selftest() -> None:
     odds = Market(value={"s": 10e6}, offer={"s": 10.5e6}, nights_left=2,
                   offer_ratios=(0.9, 1.0, 1.0, 1.1))
-    assert odds.offer_odds("s") == (0.75, 1 - 0.75 ** 2), odds.offer_odds("s")
     rising = replace(odds, trend={"s": 20.0}, carry=(0.5, 1.0))
-    assert rising.offer_odds("s")[1] > odds.offer_odds("s")[1], \
-        "a rising value makes the offers to come dearer"
-    assert Market(value={"s": 1.0}).offer_odds("s") is None
+    assert rising.waiting("s") > odds.waiting("s"), "a rising value makes the offers to come dearer"
     assert abs(odds.waiting("s") - (1.0 + 1.0 + 1.0 + 1.1) / 4 * 10e6) < 1, \
         "the last night's offer is taken; the night before's only above it"
     low = replace(odds, offer={"s": 10.1e6})
@@ -134,13 +117,15 @@ def _selftest() -> None:
     assert replace(low, nights_left=1).takes("s"), "one night left, worth 10M on average"
     assert replace(low, nights_left=0).takes("s"), "no night left: take it"
     assert odds.waiting("nobody") is None and not odds.takes("nobody")
+    assert odds.fetches("s") == 10.5e6 and low.fetches("s") == low.waiting("s"), \
+        "a sale gets tonight's offer or what waiting is worth, whichever is more"
+    assert Market(value={"s": 4e6}).fetches("s") == 4e6, "no offer yet: his value"
 
     debt = Market(cash=-5e6)
     sale, buy = Action("sell", sell=("s",), proceeds=3e6), Action("buy", buy="b", cost=1e6)
     assert debt.left([sale]) == -2e6
     assert Market(cash=2e6).left([buy, sale]) == 2e6 - 1e6 + 3e6
 
-    assert Market(value={"s": 4e6}, offer={"s": 5e6}).fetches("s") == 5e6
 
     assert Market(my_bid={"a": 1e6, "b": 2.5e6}).locked_cash == 3.5e6
     assert Market().locked_cash == 0.0

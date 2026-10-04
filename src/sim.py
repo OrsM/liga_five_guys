@@ -45,20 +45,19 @@ def buy_row(m, r) -> dict:
 
 def sell_row(m, r, k) -> dict:
     """A sale in the plan, there to pay for its buys or a debt: what it
-    fetches, the points it costs per million, and the offer standing on
-    him: take it tonight, or (done for tonight) wait."""
+    raises (Market.fetches), the offer standing on him and whether to take
+    it tonight or (done for tonight) wait, and the points it costs a
+    million."""
     take = m.takes(k)
-    return {**player(m, k), "proceeds": m.fetches(k), "per_million": -r.per_million,
-            "offer": m.offer.get(k), "offer_odds": m.offer_odds(k),
-            "waiting": m.waiting(k), "take": take,
+    return {**player(m, k), "proceeds": m.fetches(k), "offer": m.offer.get(k),
+            "take": take, "per_million": -r.per_million,
             "done": m.route.get(k) == "listed" and not take}
 
 
 def holding(u, b, k) -> dict:
     """One of your players as the board shows him: how he plays, what he
     is worth, what he cost, the points his sale costs per million it
-    raises, and the offer standing, if any: the share of the game's offers
-    it beats and the chance of a better one before the lock."""
+    raises, and the offer standing on him, if any."""
     m, o = u.market, u.outlook
     exp, xi = o.xi
     sale = b.sale(k)
@@ -67,7 +66,7 @@ def holding(u, b, k) -> dict:
             "season": o.season.get(k, 0.0), "value": m.value.get(k),
             "trend": m.trend.get(k), "paid": m.paid.get(k),
             "per_million": sale and -sale.per_million,
-            "offer": m.offer.get(k), "offer_odds": m.offer_odds(k)}
+            "offer": m.offer.get(k)}
 
 
 def exposed(u) -> list[dict]:
@@ -103,7 +102,7 @@ def report(u, b, chg, lock_at=None) -> dict:
     todo += [row for r in b.plan for row in (
         [{"what": "buy", **buy_row(m, r)}] if r.action.buy else
         [{"what": "sell", **sell_row(m, r, k)} for k in r.action.sell])]
-    backup = [buy_row(m, r) for r in b.others if r.action.buy][:BACKUPS]
+    backup = [buy_row(m, r) for r in b.others][:BACKUPS]
     lo, hi = base.band(u.me)
     return {
         "generated_at": run_now().strftime("%Y-%m-%dT%H:%MZ"),
@@ -218,8 +217,10 @@ def _selftest() -> None:
     (take, said), (wait, quiet) = sale(1.1e6), sale(0.9e6)
     assert take["take"] and not take["done"] and take["offer"] == take["proceeds"] == 1.1e6
     assert said == "Accept the offer for Dead (1.1M)", said
-    assert not wait["take"] and wait["done"] and wait["waiting"] > 0.9e6, wait
-    assert "Dead" not in quiet and wait["offer_odds"][0] == 0.0, (quiet, wait)
+    assert not wait["take"] and wait["done"] and wait["proceeds"] > wait["offer"] == 0.9e6, \
+        "waiting: the sale raises what waiting is worth"
+    assert "Dead" not in quiet, quiet
+    assert set(take) == {"what", "name", "pos", "proceeds", "offer", "take", "per_million", "done"}
 
     print("sim self-test OK")
 

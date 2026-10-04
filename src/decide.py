@@ -57,14 +57,9 @@ class Board(NamedTuple):
 
     @property
     def others(self) -> list[Move]:
-        """Other players worth getting, best way first, should a bid fail."""
-        seen = {p.action.buy for p in self.plan}
-        out = []
-        for r in self.rows:
-            if r.action.buy not in seen and verdict(r) is None:
-                seen.add(r.action.buy)
-                out.append(r)
-        return out
+        """Other players worth getting, should a bid fail."""
+        return [r for r in self.rows
+                if r.action.buy and r not in self.plan and verdict(r) is None]
 
 
 @dataclass(frozen=True)
@@ -93,7 +88,7 @@ class Universe:
         return Outlook(self.state, self.forecaster, self.market.pos,
                        self.part_played, self.first_jornada_of)
 
-    def offer(self, k: str) -> Action | None:
+    def acquire(self, k: str) -> Action | None:
         """How you could get him and what it would cost you: a bid for a
         player on the market, at the premium it takes to win the auction, or
         a rival's player's release clause, paid as it stands and at once."""
@@ -141,7 +136,7 @@ class Universe:
         out = [Action("sell", sell=(s, ), proceeds=m.fetches(s))
                for s in fieldable_spares(self)]
         for k in sorted(m.price.keys() | m.clause.keys()):
-            if (a := self.offer(k)) and self.points(a) > 0:
+            if (a := self.acquire(k)) and self.points(a) > 0:
                 out.append(a)
         return out
 
@@ -185,13 +180,16 @@ def plan(u, rows: list[Move], base: Standings) -> tuple[list[Move], float]:
 
 
 def raised(u, moves: list[Move], rows: list[Move]) -> list[Move] | None:
-    """These moves and the sales that pay for them: the game's one money
-    rule is a balance of at least zero at the lock (below it you score
-    nothing), so what they leave below zero is raised by the ranked sales
-    that cost fewest points a million, a side left to field. None if it
-    cannot be."""
+    """These moves and the sales that pay for them, or None if they cannot
+    be made together: a player is in one move at most, and the game's one
+    money rule is a balance of at least zero at the lock (below it you
+    score nothing), so what they leave below zero is raised by the ranked
+    sales that cost fewest points a million, a side left to field."""
     m, out = u.market, list(moves)
-    taken = {k for mv in out for k in mv.action.players}
+    players = [k for mv in out for k in mv.action.players]
+    taken = set(players)
+    if len(taken) < len(players):
+        return None
     sales = sorted((r for r in rows if not r.action.buy and r.action.proceeds
                     and not taken & set(r.action.sell)),
                    key=lambda r: -r.per_million)
@@ -213,9 +211,8 @@ def fill(u, good: list[Move], rows: list[Move], base: Standings,
     while grew:
         grew = False
         for r in sorted(good, key=order):
-            if r in picked or blocked(u, picked, r.action, rows):
+            if r in picked or (trial := raised(u, [*picked, r], rows)) is None:
                 continue
-            trial = raised(u, [*picked, r], rows)
             total = joint_gain(u, trial, base)
             if total > gain:
                 picked, gain, grew = trial, total, True
@@ -229,8 +226,8 @@ def joint_gain(u, moves: list[Move], base: Standings) -> float:
 
 
 def blocked(u, picked: list[Move], a: Action, rows: list[Move]) -> str | None:
-    """Why a move cannot join these: it shares a player with one of them,
-    or no sales left can pay for it. None if it can."""
+    """Why raised refuses a move alongside these, in words. None if it
+    does not."""
     names = {k: title_name(n) for k, n in u.market.name.items()}
     for p in picked:
         if shared := set(p.action.players) & set(a.players):
@@ -564,6 +561,13 @@ def _selftest() -> None:
                                   price={"ace": 1e6}, value={"star": 31e6}))
     got = sorted(r.action.label() for r in board(star).plan)
     assert got == ["buy ace", "sell star"], ("the sale that clears a debt pays for a buy too", got)
+    rows = star.rank(star.candidates()).rows
+    sale, ace = (next(r for r in rows if r.action.label() == x) for x in ("sell star", "buy ace"))
+    assert raised(star, [sale], rows) == [sale]
+    assert raised(star, [sale, sale], rows) is None, "a player is in one move at most"
+    assert raised(star, [ace], rows) == [ace, sale], "what a buy leaves below zero, sales raise"
+    assert blocked(star, [sale], sale.action, rows) == "star is in sell star"
+    assert all(r.action.buy for r in board(star).others), "backups are buys"
 
     print("decide self-test OK")
 
